@@ -1,126 +1,28 @@
-import type { HistogramCell, TierlistData } from "@scripta/shared";
+import { createTierlistsApi } from "@scripta/shared";
 import { File, Paths } from "expo-file-system";
-import { apiClient } from "../../core/api";
+import { apiClient, request } from "../../core/api";
 
-export interface Tierlist {
-  id: string;
-  name: string;
-  data: TierlistData;
-  createdAt: string;
-  updatedAt: string;
-  voteCode: string | null;
-  voteAccess: "anonymous" | "members";
-  votingOpen: boolean;
-  sourceTierlistId: string | null;
-  promotedAt: string | null;
-  originCreatorId: string;
-}
+export type { BallotResponse, Tierlist, VotedTierlist, VotingBoard } from "@scripta/shared";
 
-export interface VotingBoard {
-  name: string;
-  tiers: Array<{ id: string; label: string; color: string }>;
-  pool: string[];
-  access: "anonymous" | "members";
-  votingOpen: boolean;
-  ballotCount: number;
-  eligibleVoteCount: number;
-  promotedAt: string | null;
-  histogram?: HistogramCell[];
-}
-
-export interface PublicBook {
-  key: string;
-  workId: string | null;
-  title: string;
-  author?: string;
-  isbn?: string;
-  imageId?: string;
-  coverUrl?: string | null;
-}
-
-export interface BallotResponse {
-  ballotId: string;
-  placements: Array<{ workId: string; tierId: string }>;
-  results: { histogram: HistogramCell[]; ballotCount: number };
-}
-
-export async function fetchTierlists() {
-  return (await apiClient.request<{ tierlists: Tierlist[] }>("/tierlists", { auth: true })).tierlists;
-}
-
-export function createTierlist(name: string, data?: TierlistData, access?: "anonymous" | "members") {
-  return apiClient.request<Tierlist>("/tierlists", { method: "POST", body: { name, data, access }, auth: true });
-}
-
-export function updateTierlist(id: string, patch: { name?: string; data?: TierlistData }) {
-  return apiClient.request<Tierlist>(`/tierlists/${id}`, { method: "PUT", body: patch, auth: true });
-}
-
-export function deleteTierlist(id: string) {
-  return apiClient.request(`/tierlists/${id}`, { method: "DELETE", auth: true });
-}
-
-/** A published tier list the signed-in account holds a ballot on — the
- *  backend's PublishedTierlistRef shape. */
-export interface VotedTierlist {
-  id: string;
-  ownerUserId: string;
-  createdAt: string;
-  voteCode: string;
-  name: string;
-  poolSize: number;
-  ballotCount: number;
-  eligibleVoteCount: number;
-  promotedAt: string | null;
-  votingOpen: boolean;
-}
-
-/** Polls the account has voted on (own ones excluded server-side), latest
- *  ballot first — the "Voted on" section of the games list. */
-export async function fetchVotedTierlists() {
-  return (await apiClient.request<{ tierlists: VotedTierlist[] }>("/tierlists/voted", { auth: true })).tierlists;
-}
-
-export function fetchVotingBoard(code: string) {
-  return apiClient.request<{ board: VotingBoard; books: PublicBook[] }>(`/tierlists/voting/${encodeURIComponent(code)}`);
-}
-
-export function submitBallot(code: string, placements: Array<{ workId: string; tierId: string }>, ballotId: string | null, authenticated: boolean) {
-  const suffix = ballotId ? `/${encodeURIComponent(ballotId)}` : "";
-  return apiClient.request<BallotResponse>(`/tierlists/voting/${encodeURIComponent(code)}/ballot${suffix}`, {
-    method: ballotId ? "PUT" : "POST",
-    body: { placements },
-    auth: authenticated,
-  });
-}
-
-export function fetchBallot(code: string, ballotId: string, authenticated: boolean) {
-  return apiClient.request<BallotResponse>(`/tierlists/voting/${encodeURIComponent(code)}/ballot/${encodeURIComponent(ballotId)}`, { auth: authenticated });
-}
-
-/** The signed-in account's own ballot, which it holds no id for: openVoting
- *  seeds the owner's ballot server-side, so the owner's editor has never
- *  stored one. Resolved from the account, not from the path. */
-export function fetchMyBallot(code: string) {
-  return apiClient.request<BallotResponse>(`/tierlists/voting/${encodeURIComponent(code)}/ballot`, { auth: true });
-}
-
-export function openVoting(id: string, access: "anonymous" | "members") {
-  return apiClient.request<{ tierlist: Tierlist; voteCode: string }>(`/tierlists/${id}/open-voting`, { method: "POST", body: { access }, auth: true });
-}
-
-export async function setVotingState(id: string, patch: { access?: "anonymous" | "members"; open?: boolean }) {
-  return (await apiClient.request<{ tierlist: Tierlist }>(`/tierlists/${id}/voting`, { method: "PUT", body: patch, auth: true })).tierlist;
-}
-
-export function fetchTierlistResults(id: string) {
-  return apiClient.request<{ histogram: HistogramCell[]; ballotCount: number }>(`/tierlists/${id}/results`, { auth: true });
-}
+export const {
+  fetchTierlists,
+  createTierlist,
+  updateTierlist,
+  deleteTierlist,
+  fetchVotedTierlists,
+  fetchVotingBoard,
+  submitBallot,
+  fetchBallot,
+  fetchMyBallot,
+  openVoting,
+  setVotingState,
+  fetchTierlistResults,
+} = createTierlistsApi(request);
 
 export async function renderTierlistShareVideo(id: string, imageUri: string) {
   const form = new FormData();
   form.append("image", new File(imageUri));
-  const { base64 } = await apiClient.request<{ base64: string }>(`/tierlists/${id}/share-video`, { method: "POST", body: form, auth: true });
+  const { base64 } = await apiClient.request<{ base64: string }>(`/tierlists/${encodeURIComponent(id)}/share-video`, { method: "POST", body: form, auth: true });
   const file = new File(Paths.cache, `tierlist-${id}-${Date.now()}.mp4`);
   file.create();
   file.write(base64, { encoding: "base64" });

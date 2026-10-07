@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { fetchBallotApi, fetchTierlistResultsApi, fetchVotingBoard, submitBallotApi, type BallotResponse, type HistogramCell } from "../api/tierlistVoting";
+import { fetchBallot, fetchMyBallot, fetchTierlistResultsApi, fetchVotingBoard, submitBallotApi, type BallotResponse, type HistogramCell } from "../api/tierlistVoting";
 import { getSession } from "../auth/tokenStore";
 
 // The anonymous voter's ONLY handle on their ballot. A signed-in voter
@@ -35,7 +35,7 @@ export function useTierlistVoting(code: string) {
   // because "you have no ballot here" comes back as a 404, not a blip.
   const existing = useQuery({
     queryKey: ["tierlists", "ballot", code, storedBallotId],
-    queryFn: () => fetchBallotApi(code, storedBallotId),
+    queryFn: () => (storedBallotId === null ? fetchMyBallot(code) : fetchBallot(code, storedBallotId)),
     enabled: code.length > 0 && (storedBallotId !== null || Boolean(getSession())),
     retry: false
   });

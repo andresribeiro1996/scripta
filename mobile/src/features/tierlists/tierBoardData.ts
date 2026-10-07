@@ -1,5 +1,4 @@
-import type { TierlistData } from "@scripta/shared";
-import type { PublicBook } from "./api";
+import type { PublicBookData, TierlistData } from "@scripta/shared";
 
 function sectionIds(data: TierlistData, section: string) {
   return section === "pool" ? data.pool : data.tiers.find((tier) => tier.id === section)?.workIds ?? [];
@@ -38,6 +37,6 @@ export function reorderBook(data: TierlistData, workId: string, direction: -1 | 
   return replaceSection(data, section, ids);
 }
 
-export function votingBooks(books: PublicBook[]): Array<Record<string, unknown>> {
+export function votingBooks(books: PublicBookData[]): Array<Record<string, unknown>> {
   return books.map((book) => ({ Title: book.title, Attribution: book.author, ISBN: book.isbn, ImageId: book.imageId, _coverUrl: book.coverUrl, _key: book.key, _workId: book.workId ?? undefined }));
 }
