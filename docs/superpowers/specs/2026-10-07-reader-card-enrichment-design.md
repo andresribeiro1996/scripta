@@ -409,3 +409,30 @@ node_modules/.bin/tsx docs/superpowers/specs/2026-10-07-reader-card-mockups/twel
 ```
 
 `face.ts` (trait), `counters.ts`, `verso.ts`, `pages.ts` (layouts), `editor.ts`, `extras.ts` and `six.ts`/`twelve.ts` (motto, footer, finish and corner options) match the screens agreed in the brainstorm.
+
+## A0 findings
+
+Probed 2026-10-07 on the Android emulator (Expo Go, react-native-svg 15.15.4, 320×640 at 160 dpi) through `SvgXml`, on the throwaway branch `spike/reader-card-svg`. The host was heavily loaded (load average 12–23), so the timings are pessimistic.
+
+| Probe | Result |
+|---|---|
+| `data:` PNG inside `<pattern>` | Works: the speckle tile repeats over the paper. |
+| Remote `https:` image | Works: the cover photo loads. |
+| `textPath` with `startOffset="50%"` | Partly: the text follows the arc and starts at its midpoint, but `text-anchor="middle"` on `<textPath>` is ignored, so the text runs off the arc's right end and is clipped. |
+| Mask from a `data:` PNG pattern | Works, faintly: the speckle shows in the disc but with low contrast. |
+| GaussianBlur on a group | Works: a soft, feathered blob. |
+| Heavy card: 320-tick dial | Works: every tick draws. |
+| Heavy card: letterpress filter (offset/flood/composite/merge) | Not visible: no white edge at 1 px per dp. Ignored or too thin to show is undecided. |
+| Row of 12 heavy thumbnails | Scrolls and tracks the finger. Smoothness is unprovable under this load; its frame times were about 2× a plain cover row's. |
+
+Timings from React's Profiler (JS render only, without native rasterisation): heavy card mount 200.7 ms, the row of 12 thumbnails mount 1583.2 ms, first update 264.7 ms, later updates under 1 ms.
+
+The new front also renders on the device: dial, "WITH A STREAK OF THE …" and the seal at 135°, in light and dark, with the detail sheet still opening on tap.
+
+**Decisions:**
+- **Textures:** keep the baked `data:` PNG tiles for patterns and masks. A6 tunes the mask tile's contrast up, because the mask reads faintly.
+- **Signature cover:** the renderer may emit the one remote `https:` image. The client-drawn fallback is not needed.
+- **Arc text (`arc` and `wavyRibbon` mottos):** do not rely on `text-anchor` on `<textPath>`. A5 centres arc text with `startOffset` computed from `fit.ts`'s width estimate, or puts the anchor on the parent `<text>` after a re-probe.
+- **Letterpress:** undecided. A6 re-probes it on a denser screen or a real phone before building the finish. If it is still invisible, letterpress draws a second offset copy of the ink group in the paper colour, like `riso`, instead of using a filter.
+- **Thumbnails:** a heavy card takes over 50 ms to mount, so editor thumbnails draw a simplified dial (one mark per segment band, not per book) and render lazily. A4 plans that.
+- **Full-screen viewer:** stays on `SvgXml`. Nothing here needs the expo-dom fallback.
