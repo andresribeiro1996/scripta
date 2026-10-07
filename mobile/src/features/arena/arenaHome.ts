@@ -30,6 +30,18 @@ export type SectionedItem =
 
 export const CREATED_BY_YOU = "Created by you";
 
+export const DELETE_EFFECT: Record<OwnedItem["kind"], string> = {
+  tournament: "Its matches and every vote on them are deleted, and its link stops working.",
+  tierlist: "Its ballots are deleted, and its voting link stops working.",
+  quiz: "Its plays and leaderboard are deleted, and its link stops working.",
+};
+
+export const TOURNAMENT_STATUS_LABEL: Record<Tournament["status"], string> = {
+  seeding: "Seeding",
+  active: "Active",
+  completed: "Completed",
+};
+
 export function tabIndex(tab: ArenaTab): number {
   return Math.max(0, ARENA_TABS.findIndex((option) => option.value === tab));
 }

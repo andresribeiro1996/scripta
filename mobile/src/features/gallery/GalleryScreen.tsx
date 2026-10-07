@@ -116,7 +116,7 @@ export function GalleryScreen() {
             <Text numberOfLines={1} style={[typography.caption, { color: colors.textDim }]}>{item.width}×{item.height} · {formatBytes(item.byteSize)}</Text>
             {(usage.get(item.id) ?? 0) > 0 ? <Text style={[typography.caption, { color: colors.accent }]}>Cover for {usage.get(item.id)} book{usage.get(item.id) === 1 ? "" : "s"}</Text> : null}
             {(muralUsage.get(item.id) ?? 0) > 0 ? <Text style={[typography.caption, { color: colors.accent }]}>Used by {muralUsage.get(item.id)} mural reference{muralUsage.get(item.id) === 1 ? "" : "s"}</Text> : null}
-            <Pressable accessibilityRole="button" accessibilityLabel={`Delete ${item.filename}`} disabled={remove.isPending} onPress={() => confirmDelete(item)} style={styles.deleteButton}>
+            <Pressable accessibilityRole="button" accessibilityLabel={`Delete ${item.width}×${item.height} image`} disabled={remove.isPending} onPress={() => confirmDelete(item)} style={styles.deleteButton}>
               <Text style={[typography.body, { color: colors.danger }]}>Delete</Text>
             </Pressable>
           </View>

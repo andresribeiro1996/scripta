@@ -29,7 +29,7 @@ export function ChampionBanner({ champion }: { champion: DuelSide }) {
 const styles = StyleSheet.create({
   wrap: { alignItems: "center", gap: spacing.sm },
   label: { flexDirection: "row", alignItems: "center", gap: spacing.xs, marginTop: spacing.xs },
-  labelText: { fontWeight: "700", textTransform: "uppercase", letterSpacing: 1 },
+  labelText: { fontWeight: "700" },
   title: { fontWeight: "700", textAlign: "center" },
   center: { textAlign: "center" },
 });

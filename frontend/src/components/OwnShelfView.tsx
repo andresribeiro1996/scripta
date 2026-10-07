@@ -360,7 +360,7 @@ function OwnerControls({
               {busy ? "Working…" : "Switch"}
             </button>
           </div>
-          <p className={sectionLabel}>Shown in your feed</p>
+          <p className={sectionLabel}>What other readers see</p>
           {FEED_SETTING_ROWS.map(({ key, label }) => (
             <button
               key={key}

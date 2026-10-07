@@ -10,6 +10,8 @@ import { deleteTierlist, fetchTierlists, fetchVotedTierlists, type Tierlist, typ
 import { deleteTournament, fetchMyTournaments, fetchVotedTournaments, type Tournament } from "./api";
 import {
   ARENA_TABS,
+  DELETE_EFFECT,
+  TOURNAMENT_STATUS_LABEL,
   coverRemainder,
   emptyCopy,
   filterSections,
@@ -109,7 +111,7 @@ export function ArenaHomeScreen() {
       loading={busy && !deleting}
       onPress={() => tab === "tournaments" ? router.push("/seed/new" as never) : tab === "quizzes" ? router.push("/quiz/new" as never) : router.push("/tierlist/new" as never)}
     />
-    <Dialog visible={deleting !== null} title={`Delete “${deleting?.name ?? ""}”?`} onClose={() => setDeleting(null)}><View style={styles.dialog}><Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>This cannot be undone.</Text><Button label="Delete" variant="destructive" loading={busy} onPress={() => void remove()} /></View></Dialog>
+    <Dialog visible={deleting !== null} title={`Delete “${deleting?.name ?? ""}”?`} onClose={() => setDeleting(null)}><View style={styles.dialog}><Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{deleting ? `${DELETE_EFFECT[deleting.kind]} This can't be undone.` : ""}</Text><Button label="Delete" variant="destructive" loading={busy} onPress={() => void remove()} /></View></Dialog>
   </Screen>;
 }
 
@@ -214,7 +216,7 @@ function TournamentBody({ tournament }: { tournament: Tournament }) {
       </View>
     ) : tournament.covers.length === 0 ? <View style={[styles.tile, { backgroundColor: colors.accentSoft }]}>
       <Text {...dynamicType} display={false} style={[styles.tileCount, { color: colors.accent }]}>{tournament.bracketSize}</Text>
-      <Text {...dynamicType} style={[styles.tileLabel, { color: colors.accent }]}>BOOKS</Text>
+      <Text {...dynamicType} style={[styles.tileLabel, { color: colors.accent }]}>Books</Text>
     </View> : null}
     <View style={styles.grow}>
       <Text numberOfLines={1} {...dynamicType} style={[typography.title, styles.strong, { color: colors.text }]}>{tournament.name}</Text>
@@ -229,7 +231,7 @@ function TournamentBody({ tournament }: { tournament: Tournament }) {
       </View> : null}
       <View style={styles.statusLine}>
         <View style={[styles.pill, { backgroundColor: tone.backgroundColor }]}>
-          <Text {...dynamicType} style={[styles.pillText, { color: tone.color }]}>{tournament.status.toUpperCase()}</Text>
+          <Text {...dynamicType} style={[styles.pillText, { color: tone.color }]}>{TOURNAMENT_STATUS_LABEL[tournament.status]}</Text>
         </View>
         {progress.label ? <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.grow, { color: colors.textDim }]}>{progress.label}</Text> : null}
       </View>
@@ -291,13 +293,13 @@ const styles = StyleSheet.create({
   coverOverlap: { marginLeft: -9 },
   coverMore: { marginLeft: spacing.sm },
   statusLine: { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginTop: spacing.xs },
-  sectionHeader: { marginTop: spacing.lg, marginBottom: spacing.xs, textTransform: "uppercase", letterSpacing: 0.8 },
+  sectionHeader: { marginTop: spacing.lg, marginBottom: spacing.xs },
   pill: { paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: radii.full },
-  pillText: { fontSize: 11, lineHeight: 15, fontWeight: "700", letterSpacing: 0.5 },
+  pillText: { fontSize: 11, lineHeight: 15, fontWeight: "700" },
   tile: { width: 56, height: 56, borderRadius: radii.md, alignItems: "center", justifyContent: "center" },
   winnerTile: { height: 84 },
   tileCount: { fontSize: 20, lineHeight: 24, fontWeight: "700" },
-  tileLabel: { fontSize: 9, lineHeight: 12, letterSpacing: 0.8 },
+  tileLabel: { fontSize: 9, lineHeight: 12 },
   distribution: { flexDirection: "row", gap: 2, height: 6, marginTop: spacing.sm },
   segment: { borderRadius: 3, flexBasis: 0 },
   dialog: { gap: spacing.md },

@@ -38,7 +38,7 @@ export function ColorEditor({ color, onChange, onDone, onCancel }: {
       <View style={styles.top}>
         <View accessibilityLabel={`Sample ${color}`} style={[styles.sample, { backgroundColor: color, borderColor: colors.border }]} />
         <View style={styles.grow}>
-          <Input label="HEX" value={text} onChangeText={edit} autoCapitalize="none" autoCorrect={false} maxLength={7} error={text.trim() !== "" && !typed ? "Use a color like #1a2b3c" : undefined} />
+          <Input label="Hex" value={text} onChangeText={edit} autoCapitalize="none" autoCorrect={false} maxLength={7} error={text.trim() !== "" && !typed ? "Use a color like #1a2b3c" : undefined} />
         </View>
       </View>
       {Platform.OS === "ios" ? (

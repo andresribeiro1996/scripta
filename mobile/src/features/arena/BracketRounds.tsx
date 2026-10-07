@@ -25,7 +25,7 @@
 // bold text alone was doing all the work and losing.
 //
 // A match is a flat block on the page separated by a hairline, not a card:
-// the same shape the home feed's activity rows use — an uppercase label row
+// the same shape the home feed's activity rows use — a label row
 // carrying the state in colour, then the content under it. Boxes around
 // every match made a results table look like a stack of widgets.
 //
@@ -403,7 +403,7 @@ const styles = StyleSheet.create({
   // else, so a round reads as one list of results.
   block: { paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderBottomWidth: 1 },
   labelRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs, paddingBottom: spacing.xs, paddingHorizontal: spacing.xs },
-  meta: { fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6 },
+  meta: { fontSize: 11 },
   roundHead: { paddingTop: spacing.lg, paddingBottom: spacing.sm, paddingHorizontal: spacing.lg, gap: 2 },
   pair: { flexDirection: "row", alignItems: "stretch", gap: spacing.sm },
   brace: { width: 3, borderRadius: 2 },

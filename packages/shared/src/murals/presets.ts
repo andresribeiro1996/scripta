@@ -62,7 +62,7 @@ export function shelfPresetSummary(books: Book[], published: boolean) {
   const library = titledBooks(books);
   const reading = library.filter((book) => book.ReadStatus === 1).length;
   const finished = library.filter((book) => book.ReadStatus === 2).length;
-  const visibility = published ? "Your page is published, so visitors will see it once you keep it." : "Only you can see it.";
+  const visibility = published ? "Keep this shelf to show it on your published page." : "Only you can see it.";
   return `Made from your ${library.length} ${library.length === 1 ? "book" : "books"}: ${reading} you're reading and ${finished} you've finished. ${visibility}`;
 }
 
