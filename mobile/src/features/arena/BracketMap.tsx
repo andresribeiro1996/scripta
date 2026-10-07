@@ -19,7 +19,7 @@
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
-import { bracketShape, countdownLabel, duelWinner, needsVote, type BracketSlot, type Duel, type DuelSide } from "@scripta/shared";
+import { bracketShape, countdownLabel, duelWinner, needsVote, roundLabel, type BracketSlot, type Duel, type DuelSide } from "@scripta/shared";
 import { Icon, Sheet, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { BookCover } from "./BookCover";
 import { DuelSideRow } from "./DuelSideRow";
@@ -221,10 +221,7 @@ export function BracketMap({
   const tileRatio = (cells: number) => cells / maxPerRow;
 
   function labelFor(roundIdx: number): string {
-    const perSide = top[roundIdx]!.length;
-    if (perSide === 1) return "Semis";
-    if (perSide === 2) return "Quarters";
-    return `Round ${roundIdx + 1}`;
+    return roundLabel(byRound[roundIdx]!.length, roundIdx + 1);
   }
 
   const finalDuel = hasCentre ? finalRound[0] : null;
