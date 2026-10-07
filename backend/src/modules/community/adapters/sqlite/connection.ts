@@ -105,6 +105,7 @@ function syncFeedSettingColumns(db: DatabaseSync): void {
 }
 
 function migrateSchema(db: DatabaseSync, schema: string): void {
+  db.exec("DROP INDEX IF EXISTS idx_events_publication_ref");
   if (!tableColumns(db, "events").includes("payload")) {
     db.exec(`
       CREATE TABLE events_new (

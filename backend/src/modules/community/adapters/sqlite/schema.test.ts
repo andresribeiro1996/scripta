@@ -47,7 +47,8 @@ test("fresh database gets events payload column, partial unique indexes, and pro
   const profileCols = (db.prepare("PRAGMA table_info(profiles)").all() as Array<{ name: string }>).map((c) => c.name);
   assert.ok(profileCols.includes("feed_settings"));
   const indexes = eventIndexNames(db);
-  assert.ok(indexes.includes("idx_events_publication_ref"));
+  assert.ok(indexes.includes("idx_events_publication_ref_v2"));
+  assert.ok(!indexes.includes("idx_events_publication_ref"));
   assert.ok(indexes.includes("idx_events_user_type_ref"));
   db.close();
 });
@@ -74,7 +75,7 @@ test("legacy events table is rebuilt preserving rows", () => {
   assert.equal(rows[0].payload, null);
   assert.ok(eventTableColumns(db).includes("payload"));
   assert.ok(eventTableColumns(db).includes("trace_id"));
-  assert.ok(eventIndexNames(db).includes("idx_events_publication_ref"));
+  assert.ok(eventIndexNames(db).includes("idx_events_publication_ref_v2"));
   db.close();
 });
 
@@ -348,5 +349,38 @@ test("a fill that fails leaves no inbox behind, so the next open starts over", (
   existing.close();
   const db = openCommunityDb();
   assert.deepEqual(inboxPairs(db), [["f1", "a-added"], ["f1", "a-published"]]);
+  db.close();
+});
+
+test("an existing database swaps the publication index, keeps its events, and then ignores a duplicate quiz publication", () => {
+  const path = removeDatabase();
+  const existing = new DatabaseSync(path);
+  existing.exec(`
+    CREATE TABLE events (
+      id TEXT PRIMARY KEY, user_id TEXT NOT NULL, type TEXT NOT NULL,
+      ref_type TEXT NOT NULL, ref_id TEXT NOT NULL, payload TEXT, created_at TEXT NOT NULL, trace_id TEXT, source TEXT
+    );
+    CREATE UNIQUE INDEX idx_events_publication_ref ON events(ref_type, ref_id) WHERE type IN ('tierlist_published', 'tournament_published');
+    INSERT INTO events (id, user_id, type, ref_type, ref_id, created_at)
+      VALUES ('e1', 'u1', 'tierlist_published', 'tierlist', 't1', '2026-01-01T00:00:00.000Z'),
+             ('e2', 'u2', 'tournament_published', 'tournament', 'g1', '2026-01-02T00:00:00.000Z');
+  `);
+  existing.close();
+
+  for (let opens = 0; opens < 2; opens++) {
+    const db = openCommunityDb();
+    const indexes = eventIndexNames(db);
+    assert.ok(indexes.includes("idx_events_publication_ref_v2"));
+    assert.ok(!indexes.includes("idx_events_publication_ref"));
+    assert.deepEqual((db.prepare("SELECT id FROM events ORDER BY id").all() as Array<{ id: string }>).map((row) => row.id), ["e1", "e2"]);
+    db.close();
+  }
+
+  const db = openCommunityDb();
+  const insert = db.prepare("INSERT OR IGNORE INTO events (id, user_id, type, ref_type, ref_id, created_at) VALUES (?, 'u1', ?, ?, ?, '2026-01-03T00:00:00.000Z')");
+  assert.equal(insert.run("q1", "quiz_published", "quiz", "quiz-1").changes, 1);
+  assert.equal(insert.run("q2", "quiz_published", "quiz", "quiz-1").changes, 0);
+  assert.equal(insert.run("t1-again", "tierlist_published", "tierlist", "t1").changes, 0);
+  assert.equal(insert.run("g1-again", "tournament_published", "tournament", "g1").changes, 0);
   db.close();
 });

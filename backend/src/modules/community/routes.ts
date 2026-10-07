@@ -21,7 +21,7 @@ const suggestedQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(20)
 });
 const discoverQuerySchema = z.object({
-  type: z.enum(["all", "tierlist", "tournament"]).default("all"),
+  type: z.enum(["all", "tierlist", "tournament", "quiz"]).default("all"),
   q: z.string().trim().max(120).default(""),
   limit: z.coerce.number().int().min(1).max(50).default(20),
   offset: z.coerce.number().int().min(0).default(0)
