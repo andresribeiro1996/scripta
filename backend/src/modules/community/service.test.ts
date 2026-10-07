@@ -770,15 +770,57 @@ test("getProfileByUsername's user carries a reader glyph only when published, sw
   assert.deepEqual(readerGlyphCalls, ["alice"]);
 });
 
-test("getProfileByUsername 404s for an unknown username and for the viewer's own unpublished profile", () => {
-  const { repo, profiles } = createRepoFake();
-  const { deps, usernames, readerProfiles } = createDeps(repo);
+test("getProfileByUsername 404s for an unknown username", () => {
+  const { repo } = createRepoFake();
+  const { deps } = createDeps(repo);
   const service = createCommunityService(deps);
   assert.throws(() => service.getProfileByUsername("ghost"), ProfileNotFoundError);
+});
+
+test("the owner sees their own unpublished profile in full", () => {
+  const { repo, profiles } = createRepoFake();
+  const { deps, usernames, readerProfiles, ownedMurals, muralPayloads, tierlistRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
   usernames.set("alice", "alice");
   readerProfiles.set("alice", reader("alice"));
+  ownedMurals.add("alice:m1");
+  muralPayloads.set("alice:m1", fakePayload);
+  tierlistRefs.set("t1", tierRef("t1", "alice"));
+  profiles.set("alice", profileRow("alice", { published: 0, mural_id: "m1" }));
+  const view = service.getProfileByUsername("alice", "alice");
+  assert.equal(view.private, false);
+  assert.equal(view.profile.publishedAt, null);
+  assert.deepEqual(view.mural, fakePayload);
+  assert.deepEqual(view.published.tierlists.map((t) => t.id), ["t1"]);
+  assert.ok(view.feedSettings);
+});
+
+test("owner without a profiles row sees their own profile", () => {
+  const { repo } = createRepoFake();
+  const { deps, usernames, readerProfiles } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  readerProfiles.set("alice", reader("alice"));
+  const view = service.getProfileByUsername("alice", "alice");
+  assert.equal(view.private, false);
+  assert.equal(view.mural, null);
+});
+
+test("a follower of an unpublished user still gets the private shell and 404s", () => {
+  const { repo, profiles } = createRepoFake();
+  const { deps, usernames, readerProfiles, libraries } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  readerProfiles.set("alice", reader("alice"));
+  libraries.set("alice", { books: [] });
   profiles.set("alice", profileRow("alice", { published: 0 }));
-  assert.throws(() => service.getProfileByUsername("alice", "alice"), ProfileNotFoundError);
+  repo.insertFollow({ follower_id: "bob", followee_id: "alice", created_at: at(1) });
+  const view = service.getProfileByUsername("alice", "bob");
+  assert.equal(view.private, true);
+  assert.equal(view.mural, null);
+  assert.throws(() => service.getActivity("alice", "bob", undefined, 10), ProfileNotFoundError);
+  assert.throws(() => service.getLibrary("alice", "bob"), ProfileNotFoundError);
+  assert.throws(() => service.getLibrary("alice"), ProfileNotFoundError);
 });
 
 test("getProfileByUsername shows an unpublished user as private, with nothing published", () => {
@@ -2270,6 +2312,7 @@ test("getLibrary serves a published owner's library and 404s otherwise", () => {
   assert.deepEqual(service.getLibrary("alice"), { data: { books: [{ Title: "Dune" }] } });
   assert.throws(() => service.getLibrary("bob"), ProfileNotFoundError);
   assert.throws(() => service.getLibrary("ghost"), ProfileNotFoundError);
+  assert.deepEqual(service.getLibrary("bob", "bob"), { data: { books: [{ Title: "Emma" }] } });
 });
 
 test("getLibrary reads a published owner with no library as null", () => {

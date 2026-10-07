@@ -183,7 +183,8 @@ export function buildPublicCommunityRoutes(service: CommunityService) {
     app.get("/community/profiles/:username/library", async (request, reply) => {
       const { username } = request.params as { username: string };
       try {
-        const library = service.getLibrary(username);
+        const viewer = getOptionalAuthenticatedUser(request);
+        const library = service.getLibrary(username, viewer?.id);
         reply.header("Cache-Control", "no-store");
         return reply.send(library);
       } catch (err) {

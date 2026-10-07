@@ -26,7 +26,7 @@ const cases: Array<[string, (api: CommunityApi) => Promise<unknown>, string, Api
   ["fetchProfile", (api) => api.fetchProfile("zoë"), "/community/profiles/zo%C3%AB", { auth: "optional" }],
   ["fetchActivity", (api) => api.fetchActivity("u", "c 1"), "/community/profiles/u/activity?cursor=c%201", { auth: "optional" }],
   ["fetchActivity without cursor", (api) => api.fetchActivity("u"), "/community/profiles/u/activity", { auth: "optional" }],
-  ["fetchProfileLibrary", (api) => api.fetchProfileLibrary("u"), "/community/profiles/u/library", { auth: "none" }],
+  ["fetchProfileLibrary", (api) => api.fetchProfileLibrary("u"), "/community/profiles/u/library", { auth: "optional" }],
   ["updateFeedSettings", (api) => api.updateFeedSettings(settings), "/community/profile/feed-settings", { method: "PUT", body: settings, auth: "required" }],
   ["followUser", (api) => api.followUser("u1"), "/community/follows", { method: "POST", body: { userId: "u1" }, auth: "required" }],
   ["unfollowUser", (api) => api.unfollowUser("u/1"), "/community/follows/u%2F1", { method: "DELETE", auth: "required" }],

@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { mock, test } from "node:test";
+import { DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
 
 const tempRoot = mkdtempSync(join(tmpdir(), "community-schema-"));
 process.env.JWT_ACCESS_SECRET = "a".repeat(64);
@@ -14,6 +15,7 @@ process.env.GALLERY_DB_PATH = join(tempRoot, "gallery.sqlite");
 process.env.COMMUNITY_DB_PATH = join(tempRoot, "community.sqlite");
 
 const { openCommunityDb } = await import("./connection.js");
+const { createSqliteCommunityRepository } = await import("./sqliteCommunityRepository.js");
 
 function eventTableColumns(db: DatabaseSync) {
   return (db.prepare("PRAGMA table_info(events)").all() as Array<{ name: string }>).map((c) => c.name);
@@ -382,5 +384,13 @@ test("an existing database swaps the publication index, keeps its events, and th
   assert.equal(insert.run("q2", "quiz_published", "quiz", "quiz-1").changes, 0);
   assert.equal(insert.run("t1-again", "tierlist_published", "tierlist", "t1").changes, 0);
   assert.equal(insert.run("g1-again", "tournament_published", "tournament", "g1").changes, 0);
+  db.close();
+});
+
+test("a profile row's column defaults are the shared feed defaults", () => {
+  removeDatabase();
+  const db = openCommunityDb();
+  db.prepare(`INSERT INTO profiles (user_id, published, updated_at) VALUES ('fresh', 0, '2026-10-07T00:00:00.000Z')`).run();
+  assert.deepEqual(createSqliteCommunityRepository(db).getFeedSettings("fresh"), DEFAULT_FEED_SETTINGS);
   db.close();
 });

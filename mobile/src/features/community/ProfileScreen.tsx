@@ -2,6 +2,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Stack, router } from "expo-router";
 import { FlatList, Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
+import { useAuth } from "../../core/auth";
 import { Text } from "../../ui/Text";
 import { followFailureMessage } from "@scripta/shared/community";
 import { ensureBookBlockHeights, profileOnlyMural, readerGlyphLabel, type IdentityKey, type Mural } from "@scripta/shared";
@@ -20,6 +21,7 @@ import { ReaderGlyph } from "./ReaderGlyph";
 export function ProfileScreen({ username }: { username: string }) {
   const { colors, id: viewerTheme } = useTheme();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const profile = useQuery({
     queryKey: ["community", "profile", username],
     queryFn: () => fetchProfile(username),
@@ -152,12 +154,14 @@ export function ProfileScreen({ username }: { username: string }) {
                   ) : (
                     <MuralCanvas mural={profileOnlyMural(viewerTheme)} books={[]} images={[]} tierlists={[]} profile={profileUser} />
                   )}
-                  <Button
-                    label={view!.profile.viewerFollows === true ? "Following" : "Follow"}
-                    variant={view!.profile.viewerFollows === true ? "secondary" : "primary"}
-                    loading={busy}
-                    onPress={() => void toggleFollow()}
-                  />
+                  {view!.profile.user.userId !== user?.id ? (
+                    <Button
+                      label={view!.profile.viewerFollows === true ? "Following" : "Follow"}
+                      variant={view!.profile.viewerFollows === true ? "secondary" : "primary"}
+                      loading={busy}
+                      onPress={() => void toggleFollow()}
+                    />
+                  ) : null}
                   <Text {...dynamicType} style={[typography.caption, styles.eyebrow, { color: colors.textDim }]}>
                     Published
                   </Text>

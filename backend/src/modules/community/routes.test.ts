@@ -568,6 +568,31 @@ test("dashboard rejects an empty, malformed or oversized kinds, and an oversized
   await app.close();
 });
 
+test("library passes the bearer viewer to the service", async () => {
+  const app = Fastify();
+  app.decorate("authenticateAccessToken", (token: string) => ({ id: `user-${token}`, email: "u@example.test", username: `user-${token}`, avatarId: null }));
+  await app.register(
+    buildPublicCommunityRoutes(
+      fakeService({ getLibrary: (username, viewerId) => ({ data: { username, viewerId: viewerId ?? null } }) })
+    )
+  );
+  const signedIn = await app.inject({ method: "GET", url: "/community/profiles/alice/library", headers: { authorization: "Bearer abc123" } });
+  assert.equal(signedIn.statusCode, 200);
+  assert.deepEqual(signedIn.json(), { data: { username: "alice", viewerId: "user-abc123" } });
+  const anonymous = await app.inject({ method: "GET", url: "/community/profiles/alice/library" });
+  assert.deepEqual(anonymous.json(), { data: { username: "alice", viewerId: null } });
+  await app.close();
+});
+
+test("library rejects an invalid bearer token", async () => {
+  const app = Fastify();
+  app.decorate("authenticateAccessToken", () => null);
+  await app.register(buildPublicCommunityRoutes(fakeService()));
+  const rejected = await app.inject({ method: "GET", url: "/community/profiles/alice/library", headers: { authorization: "Bearer not-a-token" } });
+  assert.equal(rejected.statusCode, 401);
+  await app.close();
+});
+
 test("library endpoint returns the owner's library and 404s when unpublished", async () => {
   const app = Fastify();
   await app.register(buildPublicCommunityRoutes(fakeService({ getLibrary: (username) => ({ data: username === "alice" ? { books: [] } : null }) })));
