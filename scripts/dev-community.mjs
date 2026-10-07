@@ -53,8 +53,8 @@ async function signIn(identifier, password) {
  *  including the dev account, which dev-account.mjs deliberately seeds with a
  *  library and nothing else. */
 async function ensurePublishedProfile(user) {
-  const existing = await app.inject({ method: "GET", url: `/community/profiles/${user.username}`, headers: { authorization: `Bearer ${user.token}` } });
-  if (existing.statusCode === 200) return;
+  const { published } = await call("GET", "/community/profile", undefined, user.token);
+  if (published) return;
   const murals = await call("GET", "/murals", undefined, user.token);
   const mural = murals.length ? murals[0] : await call("POST", "/murals", { name: `${user.username}'s reading room` }, user.token);
   await call("PUT", "/community/profile/publish", { muralId: mural.id }, user.token);
