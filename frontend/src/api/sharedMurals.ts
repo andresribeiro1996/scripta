@@ -8,7 +8,7 @@
 // PublicBookData/PublicHighlight mirror the backend's redacted shapes
 // exactly (backend/src/modules/library/publicResolver.ts) — same
 // no-shared-package duplication every other cross-boundary type in this
-// app already has (see that file's own top comment, or blockRefs.ts's).
+// app already has (see that file's own top comment).
 
 import type { PublicReaderCard } from "@scripta/shared";
 import type { ThemeId } from "@scripta/shared/themes";

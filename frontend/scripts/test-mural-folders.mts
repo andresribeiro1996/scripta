@@ -1,5 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { createElement } from "react";
+import { renderToString } from "react-dom/server";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useMuralFolders } from "../src/hooks/useMuralFolders.ts";
 import { buildTree, collectSubtreeIds, folderPath } from "../src/lib/muralFolders.ts";
 import type { MuralFolder } from "../src/lib/murals.ts";
 
@@ -33,4 +37,22 @@ test("collectSubtreeIds closes transitively and includes the id itself", () => {
   assert.deepEqual([...collectSubtreeIds(folders, "root1")].sort(), ["child1", "grandchild", "root1"]);
   assert.deepEqual([...collectSubtreeIds(folders, "grandchild")], ["grandchild"]);
   assert.deepEqual([...collectSubtreeIds(folders, "root2")], ["root2", "childOf2"]);
+});
+
+test("deleting a folder invalidates the murals its children were reparented in", async () => {
+  const originalFetch = globalThis.fetch;
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
+  let hook!: ReturnType<typeof useMuralFolders>;
+  function Probe() { hook = useMuralFolders(); return null; }
+  client.setQueryData(["muralFolders"], [root1]);
+  client.setQueryData(["murals"], [{ id: "m", folderId: "root1" }]);
+  renderToString(createElement(QueryClientProvider, { client }, createElement(Probe)));
+  globalThis.fetch = async () => new Response(null, { status: 204 });
+  try {
+    await hook.remove("root1");
+    assert.equal(client.getQueryState(["murals"])?.isInvalidated, true);
+  } finally {
+    globalThis.fetch = originalFetch;
+    client.clear();
+  }
 });

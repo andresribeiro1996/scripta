@@ -1,5 +1,5 @@
-// Exercises lib/murals.ts — mural/block CRUD, the two scrub-on-delete
-// helpers, and the resolve* helpers block renderers use.
+// Exercises lib/murals.ts — mural/block CRUD, the image scrub-on-delete
+// helper, and the resolve* helpers block renderers use.
 // Run with:
 //   npx tsx scripts/test-murals.mts
 
@@ -19,7 +19,6 @@ import {
   resolveQuoteCollection,
   resolveShelfBooks,
   screenPointToGrid,
-  scrubBooksFromMurals,
   scrubImageFromMurals,
   setMuralCover,
   updateBlock,
@@ -214,50 +213,6 @@ console.log("\n8. addBlock — the 'tierlist' block type: a reference, not an in
   check("createTier ids are unique per call", createTier("A", "#000").id !== createTier("A", "#000").id);
 }
 
-console.log("\n9. scrubBooksFromMurals — spotlight/quote pointing straight at a deleted book are removed");
-{
-  const murals = muralWithBlocks([
-    { id: "b1", type: "spotlight", layout: { x: 0, y: 0, w: 1, h: 1 }, bookKey: "ta:deleted|a" },
-    { id: "b2", type: "quote", layout: { x: 0, y: 0, w: 1, h: 1 }, bookKey: "ta:deleted|a", highlightId: "h1" },
-    { id: "b3", type: "spotlight", layout: { x: 0, y: 0, w: 1, h: 1 }, bookKey: "ta:kept|b" }
-  ]);
-  const result = scrubBooksFromMurals(murals, ["ta:deleted|a"]);
-  check("spotlight referencing the deleted book is gone", !result[0].blocks.some((b) => b.id === "b1"));
-  check("quote referencing the deleted book is gone", !result[0].blocks.some((b) => b.id === "b2"));
-  check("spotlight referencing an unrelated book survives", result[0].blocks.some((b) => b.id === "b3"));
-}
-
-console.log("\n10. scrubBooksFromMurals — shelf/quoteCollection filter members, only dropped if left empty");
-{
-  const murals = muralWithBlocks([
-    { id: "shelf1", type: "shelf", layout: { x: 0, y: 0, w: 1, h: 1 }, title: "Top 5", bookKeys: ["ta:deleted|a", "ta:kept|b", "ta:kept2|c"] },
-    { id: "shelf2", type: "shelf", layout: { x: 0, y: 0, w: 1, h: 1 }, title: "Only one", bookKeys: ["ta:deleted|a"] },
-    {
-      id: "qc1",
-      type: "quoteCollection",
-      layout: { x: 0, y: 0, w: 1, h: 1 },
-      title: "Quotes",
-      quotes: [
-        { bookKey: "ta:deleted|a", highlightId: "h1" },
-        { bookKey: "ta:kept|b", highlightId: "h2" }
-      ]
-    }
-  ]);
-  const result = scrubBooksFromMurals(murals, ["ta:deleted|a"]);
-  const shelf1 = result[0].blocks.find((b) => b.id === "shelf1") as Extract<MuralBlock, { type: "shelf" }>;
-  check("shelf1 keeps its two other members", shelf1.bookKeys.length === 2 && !shelf1.bookKeys.includes("ta:deleted|a"));
-  check("shelf2 (would be empty) is removed entirely", !result[0].blocks.some((b) => b.id === "shelf2"));
-  const qc1 = result[0].blocks.find((b) => b.id === "qc1") as Extract<MuralBlock, { type: "quoteCollection" }>;
-  check("quoteCollection keeps its other quote", qc1.quotes.length === 1 && qc1.quotes[0].bookKey === "ta:kept|b");
-}
-
-console.log("\n11. scrubBooksFromMurals — a true no-op (same array reference) when nothing is affected");
-{
-  const murals = muralWithBlocks([{ id: "b1", type: "spotlight", layout: { x: 0, y: 0, w: 1, h: 1 }, bookKey: "ta:unrelated|z" }]);
-  const result = scrubBooksFromMurals(murals, ["ta:not-referenced-anywhere|q"]);
-  check("same murals array reference back", result === murals);
-}
-
 console.log("\n12. removeBlock — whitespace is authored content, survivors keep their exact coordinates");
 {
   // Compaction (compactBlocksVertically) used to close the gap a removed
@@ -273,26 +228,6 @@ console.log("\n12. removeBlock — whitespace is authored content, survivors kee
   check("removing the top block leaves the bottom one at its authored y", murals[0].blocks[0] === bottom && murals[0].blocks[0].layout.y === 2);
 
   check("removing a block that doesn't exist is a true no-op (same array reference)", removeBlock(murals, "m1", "does-not-exist") === murals);
-}
-
-console.log("\n13. scrubBooksFromMurals — a fully-removed block leaves coordinates untouched, and a mere member trim always did");
-{
-  const murals = muralWithBlocks([
-    { id: "spot1", type: "spotlight", layout: { x: 0, y: 0, w: 4, h: 3 }, bookKey: "ta:deleted|a" },
-    { id: "shelf1", type: "shelf", layout: { x: 0, y: 3, w: 8, h: 3 }, title: "Shelf", bookKeys: ["ta:deleted|a", "ta:kept|b"] }
-  ]);
-  const result = scrubBooksFromMurals(murals, ["ta:deleted|a"]);
-  const shelf1 = result[0].blocks.find((b) => b.id === "shelf1") as Extract<MuralBlock, { type: "shelf" }>;
-  check("spotlight (fully removed) is gone", !result[0].blocks.some((b) => b.id === "spot1"));
-  check("the shelf below it keeps its authored position — no compaction", shelf1.layout.y === 3);
-  check("the shelf itself just lost one member, not the whole block", shelf1.bookKeys.length === 1 && shelf1.bookKeys[0] === "ta:kept|b");
-
-  // A shelf that only loses a MEMBER (stays as a block) must not have its
-  // layout touched either — nothing actually disappeared from the canvas.
-  const murals2 = muralWithBlocks([{ id: "shelf1", type: "shelf", layout: { x: 2, y: 5, w: 8, h: 3 }, title: "Shelf", bookKeys: ["ta:deleted|a", "ta:kept|b"] }]);
-  const result2 = scrubBooksFromMurals(murals2, ["ta:deleted|a"]);
-  const shelf2 = result2[0].blocks[0] as Extract<MuralBlock, { type: "shelf" }>;
-  check("a shelf that merely lost a member keeps its exact original layout", shelf2.layout.x === 2 && shelf2.layout.y === 5);
 }
 
 console.log("\n14. scrubImageFromMurals — removes only the image block(s) using the deleted image, leaves others alone");
@@ -400,30 +335,6 @@ console.log("\n17. scrubImageFromMurals — also clears a mural's OWN cover, not
 
   const noop = scrubImageFromMurals(murals, "gallery-does-not-exist");
   check("no-op (neither the cover nor any block referenced it) returns the same array reference", noop === murals);
-}
-
-console.log("\n18. scrubBooksFromMurals — a tierlist block is never touched by a book deletion");
-{
-  // The counterpart to tier lists being their own resource: a block that
-  // only holds an id has no book references to scrub, so it must survive
-  // a deletion untouched — down to the same object reference, which is
-  // what scrubBooksFromMurals promises for anything it doesn't change.
-  const murals = muralWithBlocks([
-    { id: "tl1", type: "tierlist", layout: { x: 0, y: 0, w: 10, h: 8 }, tierlistId: "list-1" },
-    { id: "sp1", type: "spotlight", layout: { x: 0, y: 8, w: 4, h: 5 }, bookKey: "ta:deleted|a" }
-  ]);
-  const originalTierlist = murals[0].blocks.find((b) => b.id === "tl1");
-  const result = scrubBooksFromMurals(murals, ["ta:deleted|a"]);
-  const block = result[0].blocks.find((b) => b.id === "tl1");
-  check("the tierlist block survives a book deletion", block !== undefined);
-  // Deep-equal rather than `===` — identity through a scrub was never
-  // promised at the block level (the reference guarantee in this module
-  // is at the mural level, see useMurals.ts), so asserting it would be
-  // testing an implementation detail. What must hold is that nothing
-  // about the block changed — including its authored position.
-  check("nothing about it changed", JSON.stringify(block) === JSON.stringify(originalTierlist));
-  check("its link is intact", (block as Extract<MuralBlock, { type: "tierlist" }>).tierlistId === "list-1");
-  check("the block that DID reference the deleted book is gone", !result[0].blocks.some((b) => b.id === "sp1"));
 }
 
 {

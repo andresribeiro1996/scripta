@@ -68,7 +68,7 @@ export interface MuralsService {
    *  row (with `user_id` and the raw `blocks` string) — deliberately NOT
    *  the owner-scoped `Mural` DTO the rest of this service returns, since
    *  routes.ts needs `user_id` (to resolve library data) and unparsed
-   *  `blocks` (to feed extractReferences) that every other method here
+   *  `blocks` (to feed blockReferences) that every other method here
    *  intentionally hides from callers. Used only by that one route. */
   getRowByShareToken(token: string): MuralRow | undefined;
 }

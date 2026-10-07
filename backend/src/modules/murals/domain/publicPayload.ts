@@ -1,10 +1,9 @@
-import { muralThemeId, type ReaderProfile } from "@scripta/shared";
+import { blockReferences, muralThemeId, type ReaderProfile } from "@scripta/shared";
 import type { ThemeId } from "@scripta/shared/themes";
 import { env } from "../../../config/env.js";
 import { resolvePublicReaderProfile } from "../../auth/index.js";
 import { resolvePublicBooksByWork, resolvePublicLibraryData } from "../../library/index.js";
 import type { TierlistData } from "../../tierlists/index.js";
-import { extractReferences } from "./blockRefs.js";
 import type { MuralRow } from "./types.js";
 
 type PublicLibraryData = ReturnType<typeof resolvePublicLibraryData>;
@@ -22,7 +21,7 @@ export function resolveMuralPublicPayload(
   blocks: unknown,
   getTierlistData?: (ownerUserId: string, tierlistId: string) => TierlistData | undefined
 ): MuralPublicPayload {
-  const refs = extractReferences(blocks);
+  const refs = blockReferences(blocks);
 
   const tierlistIds: string[] = [];
   if (Array.isArray(blocks)) {

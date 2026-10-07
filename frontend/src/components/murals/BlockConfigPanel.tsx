@@ -15,7 +15,7 @@ import { resolveHomeBlock, type Group } from "@scripta/shared";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import type { GalleryImage } from "../../api/gallery";
-import { ALL_STAT_METRICS, BLOCK_TYPE_LABELS, BOOK_GENRES, STAT_METRIC_LABELS, type MuralBlock } from "../../lib/murals";
+import { ALL_STAT_METRICS, BOOK_GENRES, STAT_METRIC_LABELS, blockLabel, type MuralBlock } from "../../lib/murals";
 import { bookKey } from "../../lib/merge";
 import { BookSearchList, GalleryImageGrid } from "./pickers";
 import { useDismissible } from "../../hooks/useDismissible";
@@ -68,7 +68,7 @@ export function BlockConfigPanel({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-(--color-border) p-4">
-          <h3 className="text-sm font-semibold">{BLOCK_TYPE_LABELS[draft.type]}</h3>
+          <h3 className="text-sm font-semibold">{blockLabel(draft.type)}</h3>
           <button onClick={onClose} className="text-sm text-(--color-text-dim) hover:text-(--color-text)">
             Close
           </button>

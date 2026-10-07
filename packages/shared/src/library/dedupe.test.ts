@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { combineBooks, findDuplicates, markDistinct, mergeDuplicateBooks, rekeyKeys, rekeyTierBoard } from "./dedupe.js";
+import { combineBooks, findDuplicates, markDistinct, mergeDuplicateBooks, rekeyKeys } from "./dedupe.js";
 import { bookKey } from "./merge.js";
 import type { LibraryData } from "./types.js";
 
@@ -92,9 +92,7 @@ test("markDistinct records every pair of the group once", () => {
   assert.deepEqual(marked.distinctBooks, [["a", "b"], ["b", "c"], ["a", "c"]]);
 });
 
-test("rekeyKeys and rekeyTierBoard rewrite and de-duplicate, tiers winning over the pool", () => {
+test("rekeyKeys rewrites and de-duplicates", () => {
   const from = new Set(["old"]);
   assert.deepEqual(rekeyKeys(["old", "x", "new"], from, "new"), ["new", "x"]);
-  const board = { name: "n", tiers: [{ id: "s", bookKeys: ["old"] }, { id: "a", bookKeys: ["new"] }], pool: ["new", "y"] };
-  assert.deepEqual(rekeyTierBoard(board, from, "new"), { name: "n", tiers: [{ id: "s", bookKeys: ["new"] }, { id: "a", bookKeys: [] }], pool: ["y"] });
 });

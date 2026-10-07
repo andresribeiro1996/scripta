@@ -1,4 +1,4 @@
-import { ALL_STAT_METRICS, BOOK_GENRES, STAT_METRIC_LABELS, bookKey, resolveHomeBlock, resolveQuote, type BlockType, type Group, type MuralBlock } from "@scripta/shared";
+import { ALL_STAT_METRICS, BOOK_GENRES, STAT_METRIC_LABELS, bookKey, resolveHomeBlock, resolveQuote, type Group, type MuralBlock } from "@scripta/shared";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Icon, Input, Segmented } from "../../ui";
 import { Text } from "../../ui/Text";
@@ -9,14 +9,8 @@ import type { Tierlist } from "../tierlists/api";
 
 export type PickerKind = "book" | "image" | "tierlist";
 
-const CONTENTLESS: ReadonlySet<BlockType> = new Set<BlockType>(["currentlyReading", "empty", "readerCard"]);
-
 const SHELF_SOURCES = [{ value: "pick", label: "Pick books" }, { value: "follow", label: "Follow a collection" }] as const;
 const QUOTE_SOURCES = [{ value: "pinned", label: "Pinned passage" }, { value: "rediscover", label: "Rediscover" }] as const;
-
-export function hasContentFields(type: BlockType): boolean {
-  return !CONTENTLESS.has(type);
-}
 
 function PickerRow({ label, value, onPress }: { label: string; value: string; onPress: () => void }) {
   const { colors } = useTheme();
