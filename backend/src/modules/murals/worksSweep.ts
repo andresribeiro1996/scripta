@@ -1,7 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
+import { blockReferences } from "@scripta/shared";
 import { resolveEntryWorks, type SweepBatch, type WorkEntry, type WorkRef, type WorksSweepStep } from "../library/index.js";
 import { openMuralsDb } from "./adapters/sqlite/connection.js";
-import { extractReferences } from "./domain/blockRefs.js";
 
 type Resolve = (ownerUserId: string, entries: WorkEntry[]) => Map<string, WorkRef>;
 
@@ -24,7 +24,7 @@ export function createMuralsWorksStep(db: DatabaseSync, resolve: Resolve): Works
     const murals = pendingStmt.all(afterRowid, limit) as Array<{ rowid: number; id: string; user_id: string; blocks: string }>;
     let resolved = 0;
     for (const mural of murals) {
-      const keys = [...extractReferences(JSON.parse(mural.blocks)).bookKeys];
+      const keys = [...blockReferences(JSON.parse(mural.blocks)).bookKeys];
       const works = resolve(mural.user_id, keys.map((key) => ({ key })));
       db.exec("BEGIN IMMEDIATE");
       try {

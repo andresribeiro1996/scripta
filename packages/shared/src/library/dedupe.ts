@@ -97,20 +97,6 @@ export function rekeyKeys(keys: readonly string[], from: ReadonlySet<string>, to
   return [...new Set(keys.map((key) => (from.has(key) ? to : key)))];
 }
 
-export function rekeyTierBoard<T extends Record<string, unknown>>(board: T, from: ReadonlySet<string>, to: string): T {
-  const placed = new Set<string>();
-  const tiers = Array.isArray(board.tiers)
-    ? board.tiers.map((tier: unknown) => {
-        if (!isBook(tier) || !Array.isArray(tier.bookKeys)) return tier;
-        const bookKeys = rekeyKeys(tier.bookKeys as string[], from, to).filter((key) => !placed.has(key));
-        bookKeys.forEach((key) => placed.add(key));
-        return { ...tier, bookKeys };
-      })
-    : board.tiers;
-  const pool = Array.isArray(board.pool) ? rekeyKeys(board.pool as string[], from, to).filter((key) => !placed.has(key)) : board.pool;
-  return { ...board, tiers, pool };
-}
-
 function rekeyPairs(pairs: readonly unknown[], from: ReadonlySet<string>, to: string): string[][] {
   const seen = new Set<string>();
   const result: string[][] = [];

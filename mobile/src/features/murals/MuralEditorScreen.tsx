@@ -1,11 +1,13 @@
 import { useCallback, useMemo, useState } from "react";
 import { THEME_IDS, themes, type ThemeId } from "@scripta/shared/themes";
 import {
-  BLOCK_TYPE_LABELS,
+  BLOCK_TYPES,
+  blockLabel,
   bookKey,
   compactMuralBlocks,
   createBlockCandidate,
   createDuplicateCandidate,
+  isConfigurable,
   muralThemeId,
   moveMuralBlock,
   resolveBlockStyle,
@@ -31,7 +33,7 @@ import { fetchTierlists } from "../tierlists/api";
 import { changeBlockLayout, MURAL_ROW_HEIGHT } from "./layout";
 import { BlockActionBar, type BlockAction } from "./BlockActionBar";
 import { BlockSheet, type SheetTab } from "./BlockSheet";
-import { ContentTab, hasContentFields, type PickerKind } from "./ContentTab";
+import { ContentTab, type PickerKind } from "./ContentTab";
 import { LayoutTab } from "./LayoutTab";
 import { BlockPreview, MuralCanvas } from "./MuralCanvas";
 import { MuralShareSheet } from "./MuralShareSheet";
@@ -40,8 +42,6 @@ import { fetchMural, shareMural, unshareMural, updateMural } from "./api";
 import { MURALS_QUERY_KEY, withGrownBlocks } from "./useMurals";
 import { useAuth } from "../../core/auth";
 import { API_URL } from "../../core/config";
-
-const BLOCK_TYPES = Object.keys(BLOCK_TYPE_LABELS) as BlockType[];
 
 export function MuralEditorScreen({ id }: { id: string }) {
   const { user } = useAuth();
@@ -157,7 +157,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
     const block = createBlockCandidate(type, currentBlocks);
     changeBlocks([...currentBlocks, block]);
     setSelectedId(block.id);
-    setSheetTab(hasContentFields(type) ? "content" : null);
+    setSheetTab(isConfigurable(type) ? "content" : null);
     setAdding(false);
   }
 
@@ -192,7 +192,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
   if (muralQuery.isError || !mural || !draftMural) return <ErrorState title="Mural unavailable" body="It may have been deleted." actionLabel="Back" onAction={() => router.back()} />;
 
   const blockActions: BlockAction[] = selected ? [
-    { key: "edit", label: "Edit", accessibilityLabel: "Edit block content, style and size", icon: "edit", tone: "accent", onPress: () => setSheetTab(hasContentFields(selected.type) ? "content" : "style") },
+    { key: "edit", label: "Edit", accessibilityLabel: "Edit block content, style and size", icon: "edit", tone: "accent", onPress: () => setSheetTab(isConfigurable(selected.type) ? "content" : "style") },
     { key: "more", label: "More", accessibilityLabel: "More block actions", icon: "more", onPress: () => setActionsOpen(true) },
     { key: "done", label: "Done", accessibilityLabel: "Deselect block", icon: "confirm", onPress: () => { setSelectedId(null); setSheetTab(null); } },
   ] : [];
@@ -257,8 +257,8 @@ export function MuralEditorScreen({ id }: { id: string }) {
         setShareFor({ ...updated, name: currentName, theme: currentTheme, blocks: currentBlocks });
       }} />
       <Sheet visible={themeOpen} title="Theme" onClose={() => setThemeOpen(false)}><ScrollView contentContainerStyle={styles.sheet}><ThemeGrid options={THEME_IDS} value={currentTheme} onChange={(next) => { setTheme(next); setThemeOpen(false); }} /></ScrollView></Sheet>
-      <Sheet visible={adding} title="Add block" onClose={() => setAdding(false)}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheet}>{BLOCK_TYPES.map((type) => <Button key={type} label={BLOCK_TYPE_LABELS[type]} variant="secondary" onPress={() => add(type)} />)}</ScrollView></Sheet>
-      <Sheet visible={selected !== null && actionsOpen} title={selected ? `${BLOCK_TYPE_LABELS[selected.type]} actions` : "Block actions"} onClose={() => setActionsOpen(false)}>
+      <Sheet visible={adding} title="Add block" onClose={() => setAdding(false)}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheet}>{BLOCK_TYPES.map((type) => <Button key={type} label={blockLabel(type)} variant="secondary" onPress={() => add(type)} />)}</ScrollView></Sheet>
+      <Sheet visible={selected !== null && actionsOpen} title={selected ? `${blockLabel(selected.type)} actions` : "Block actions"} onClose={() => setActionsOpen(false)}>
         <View>
           {moreActions.map((action) => {
             const disabled = busy || action.disabled;
@@ -280,7 +280,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
         onTabChange={setSheetTab}
         onClose={() => setSheetTab(null)}
         preview={(maxHeight) => selected ? <BlockPreview theme={currentTheme} block={selected} canvasWidth={windowWidth - spacing.sm * 2} maxHeight={maxHeight} books={books} images={gallery.data ?? []} tierlists={tierlists.data ?? []} profile={profile} groups={groups} /> : null}
-        content={selected && hasContentFields(selected.type) ? <ContentTab block={selected} books={books} groups={groups} images={gallery.data ?? []} tierlists={tierlists.data ?? []} update={updateSelected} onPick={setPicking} /> : null}
+        content={selected && isConfigurable(selected.type) ? <ContentTab block={selected} books={books} groups={groups} images={gallery.data ?? []} tierlists={tierlists.data ?? []} update={updateSelected} onPick={setPicking} /> : null}
         style={selected ? <StyleTab
           style={resolveBlockStyle(selected.style)}
           palette={themes[currentTheme].colors}

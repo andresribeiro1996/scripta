@@ -3,7 +3,7 @@
 // MuralsRepository interface this fulfills.
 
 import type { DatabaseSync } from "node:sqlite";
-import { rekeyBlocks } from "../../domain/rekeyBlocks.js";
+import { rekeyBlocks } from "@scripta/shared";
 import type { MuralsRepository } from "../../domain/ports.js";
 import type { MuralFolderRow, MuralRow } from "../../domain/types.js";
 

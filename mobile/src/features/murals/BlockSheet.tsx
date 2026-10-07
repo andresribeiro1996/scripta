@@ -1,4 +1,4 @@
-import { BLOCK_TYPE_LABELS, type MuralBlock } from "@scripta/shared";
+import { blockLabel, type MuralBlock } from "@scripta/shared";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Keyboard, Platform, StyleSheet, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -44,7 +44,7 @@ export function BlockSheet({ block, visible, tab, onTabChange, onClose, preview,
   const wanted = tab ?? lastTab.current;
   const current = tabs.find((item) => item.value === wanted)?.value ?? "layout";
   return (
-    <Sheet visible={visible} title={block ? BLOCK_TYPE_LABELS[block.type] : ""} onClose={onClose}>
+    <Sheet visible={visible} title={block ? blockLabel(block.type) : ""} onClose={onClose}>
       <View style={[styles.frame, { height: frameHeight }]}>
         {keyboardShown || frameHeight < 320 * fontScale ? null : preview(Math.min(144, Math.round(frameHeight / 5)))}
         <Segmented options={tabs} value={current} onChange={onTabChange} accessibilityLabel="Block settings" />

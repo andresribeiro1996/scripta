@@ -62,7 +62,7 @@ export function BlockRenderer({
     case "profile":
       return <ProfileBlockView block={block} books={books} profile={profile} shelfThemeOverride={shelfThemeOverride} />;
     case "currentlyReading":
-      return <CurrentlyReadingBlockView books={books} />;
+      return <CurrentlyReadingBlockView block={block} books={books} />;
     case "stats":
       return <StatsBlockView block={block} books={books} statsOverride={statsOverride} />;
     case "tierlist":
