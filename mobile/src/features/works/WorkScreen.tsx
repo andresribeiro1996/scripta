@@ -4,7 +4,6 @@ import { useQuery } from "@tanstack/react-query";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { editionLabel } from "@scripta/shared";
 import { Text } from "../../ui/Text";
-import { useAuth } from "../../core/auth";
 import { isPermanentError } from "../../core/apiClient";
 import { Button, ErrorState, HeaderActions, IconButton, Screen, Skeleton, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { BookCover } from "../arena/BookCover";
@@ -17,14 +16,13 @@ import { fetchWork } from "./api";
 import { workScreenSections } from "./workScreenModel";
 
 export function WorkScreen({ id }: { id: string }) {
-  const { user } = useAuth();
   const { colors } = useTheme();
   const [adding, setAdding] = useState(false);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [shareError, setShareError] = useState<string | null>(null);
   const [aboutOpen, setAboutOpen] = useState(false);
   const inTabs = useSegments()[0] === "(app)";
-  const query = useQuery({ queryKey: ["works", id], queryFn: () => fetchWork(id, Boolean(user)), retry: false });
+  const query = useQuery({ queryKey: ["works", id], queryFn: () => fetchWork(id), retry: false });
   const canonicalId = query.data?.work.id;
 
   useEffect(() => {

@@ -397,7 +397,7 @@ export function MuralsListPage() {
                 >
                   {hasCover && (
                     <>
-                      <img src={mural.coverImageUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                      <img src={mural.coverImageUrl ?? undefined} alt="" className="absolute inset-0 h-full w-full object-cover" />
                       {/* Same dark-scrim-behind-overlay-text treatment
                           BookCard.tsx uses over its own cover art — strongest
                           right where the name/menu sit, fading out toward the

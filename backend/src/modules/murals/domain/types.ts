@@ -1,7 +1,5 @@
 // Domain types for the murals module.
 
-import type { ThemeId } from "@scripta/shared/themes";
-
 /** Row shape as stored — `blocks` is the mural's block list as raw JSON
  *  text, kept opaque all the way down (same treatment as `data` in
  *  modules/library/domain/types.ts's LibraryDocumentRow): parsed only at
@@ -24,24 +22,6 @@ export interface MuralRow {
   updated_at: string;
 }
 
-/** What the service hands back to routes.ts — `blocks` here is the
- *  parsed JSON array, not the raw text. `shareToken`/`shareUrl` are
- *  always null from this task; Task 4 populates them once sharing
- *  exists. */
-export interface Mural {
-  id: string;
-  name: string;
-  theme: ThemeId;
-  blocks: unknown[];
-  coverImageId: string | null;
-  coverImageUrl: string | null;
-  shareToken: string | null;
-  shareUrl: string | null;
-  folderId: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export interface MuralFolderRow {
   id: string;
   user_id: string;
@@ -51,10 +31,4 @@ export interface MuralFolderRow {
   updated_at: string;
 }
 
-export interface MuralFolder {
-  id: string;
-  name: string;
-  parentId: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
+export type { MuralFolder } from "@scripta/shared";

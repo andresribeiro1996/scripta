@@ -22,21 +22,4 @@ export interface GalleryImageRow {
   created_at: string;
 }
 
-/** What the service hands back to routes.ts. */
-export interface GalleryImage {
-  id: string;
-  filename: string;
-  mimeType: string;
-  width: number;
-  height: number;
-  byteSize: number;
-  createdAt: string;
-  /** Where the raw bytes can be fetched — deliberately a plain,
-   *  unauthenticated object-store URL keyed by this image's random `id`
-   *  (see plugin.ts's galleryUrlFor). It has to be usable directly as
-   *  an `<img src>` with no Authorization header attached, the same trust
-   *  model this app already uses for the books module's own
-   *  GET /covers/cached/:id/:size URLs — an unguessable UUID is the
-   *  access control, not a session check. */
-  url: string;
-}
+export type { GalleryImage } from "@scripta/shared";

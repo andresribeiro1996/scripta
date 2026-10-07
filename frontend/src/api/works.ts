@@ -1,6 +1,4 @@
-import type { WorkPage } from "@scripta/shared";
-import { apiFetch } from "./client";
+import { createWorksApi } from "@scripta/shared";
+import { request } from "./request";
 
-export async function fetchWork(id: string): Promise<WorkPage> {
-  return (await apiFetch(`/works/${encodeURIComponent(id)}`)) as WorkPage;
-}
+export const { fetchWork } = createWorksApi(request);

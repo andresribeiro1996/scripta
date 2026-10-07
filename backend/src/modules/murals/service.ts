@@ -4,17 +4,18 @@
 
 import { randomUUID } from "node:crypto";
 import { muralThemeId } from "@scripta/shared";
+import type { Mural as WireMural, MuralBlock } from "@scripta/shared";
 import { FolderCycleError, InvalidFolderReferenceError, MuralConflictError } from "./domain/errors.js";
 import type { ThemeId } from "@scripta/shared/themes";
 import type { MuralsRepository } from "./domain/ports.js";
-import type { Mural, MuralFolder, MuralFolderRow, MuralRow } from "./domain/types.js";
+import type { MuralFolder, MuralFolderRow, MuralRow } from "./domain/types.js";
 
-function toMural(row: MuralRow, publicUrlFor: (token: string) => string): Mural {
+function toMural(row: MuralRow, publicUrlFor: (token: string) => string): WireMural {
   return {
     id: row.id,
     name: row.name,
     theme: muralThemeId(row.theme),
-    blocks: JSON.parse(row.blocks),
+    blocks: JSON.parse(row.blocks) as MuralBlock[],
     coverImageId: row.cover_image_id,
     coverImageUrl: row.cover_image_url,
     shareToken: row.share_token,
@@ -36,29 +37,29 @@ function toFolder(row: MuralFolderRow): MuralFolder {
 }
 
 export interface MuralsService {
-  listMurals(userId: string): Mural[];
+  listMurals(userId: string): WireMural[];
   /** `theme` omitted (older clients) falls back to the owner's account theme. */
-  createMural(userId: string, name: string, folderId?: string | null, theme?: ThemeId): Mural;
+  createMural(userId: string, name: string, folderId?: string | null, theme?: ThemeId): WireMural;
   /** undefined if no mural with that id is owned by userId — a
    *  caller-facing 404, not a server error. */
-  getMural(userId: string, id: string): Mural | undefined;
+  getMural(userId: string, id: string): WireMural | undefined;
   /** Partial merge onto the existing row — only the keys present in
    *  `patch` change. undefined if not owned. */
-  updateMural(userId: string, id: string, patch: { name?: string; theme?: ThemeId; blocks?: unknown[]; folderId?: string | null; updatedAt?: string }, resolveWorks?: (blocks: unknown[]) => Map<string, string | null>): Mural | undefined;
+  updateMural(userId: string, id: string, patch: { name?: string; theme?: ThemeId; blocks?: unknown[]; folderId?: string | null; updatedAt?: string }, resolveWorks?: (blocks: unknown[]) => Map<string, string | null>): WireMural | undefined;
   /** Returns false if no mural with that id was owned by userId — same
    *  convention as modules/gallery/service.ts's deleteImage. */
   deleteMural(userId: string, id: string): boolean;
   /** undefined if not owned. */
-  setCover(userId: string, id: string, imageId: string, url: string): Mural | undefined;
+  setCover(userId: string, id: string, imageId: string, url: string): WireMural | undefined;
   /** undefined if not owned. */
-  clearCover(userId: string, id: string): Mural | undefined;
+  clearCover(userId: string, id: string): WireMural | undefined;
   /** Idempotent: a mural that's already shared keeps its existing token
    *  rather than minting a new one, so a re-opened share modal (or a
    *  retried request) never invalidates a link someone already has.
    *  undefined if not owned. */
-  share(userId: string, id: string): Mural | undefined;
+  share(userId: string, id: string): WireMural | undefined;
   /** undefined if not owned. */
-  unshare(userId: string, id: string): Mural | undefined;
+  unshare(userId: string, id: string): WireMural | undefined;
   listFolders(userId: string): MuralFolder[];
   createFolder(userId: string, name: string, parentId?: string | null): MuralFolder;
   renameFolder(userId: string, id: string, name: string): MuralFolder | undefined;
