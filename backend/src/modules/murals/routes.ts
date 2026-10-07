@@ -21,12 +21,11 @@
 // limit, same as it always did.
 
 import type { FastifyInstance } from "fastify";
-import { blockReferences } from "@scripta/shared";
+import { blockReferences, type ResolvedTierlist } from "@scripta/shared";
 import { THEME_IDS } from "@scripta/shared/themes";
 import { z } from "zod";
 import { authGuard } from "../auth/index.js";
 import { resolveEntryWorks, workIdsByKey, WorkResolutionError } from "../library/index.js";
-import type { TierlistData } from "../tierlists/index.js";
 import { FolderCycleError, InvalidFolderReferenceError, MuralConflictError } from "./domain/errors.js";
 import { resolveMuralPublicPayload } from "./domain/publicPayload.js";
 import type { MuralsService } from "./service.js";
@@ -273,7 +272,7 @@ export function buildMuralRoutes(service: MuralsService, resolveWorks: typeof re
  *  library's publicResolver. Absent (tests, future compositions without
  *  tierlists), referenced blocks simply resolve to nothing and render
  *  their "unavailable" state client-side. */
-export function buildPublicMuralRoutes(service: MuralsService, getTierlistData?: (ownerUserId: string, tierlistId: string) => TierlistData | undefined) {
+export function buildPublicMuralRoutes(service: MuralsService, getTierlistData?: (ownerUserId: string, tierlistId: string) => ResolvedTierlist | undefined) {
   return async function publicMuralRoutes(app: FastifyInstance) {
     // Deliberately NOT behind authGuard — same trust model as
     // modules/library/routes.ts's own GET /library/shared/:token: the

@@ -10,6 +10,7 @@
 // comment for why a module like this doesn't use one for that case).
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import type { BallotResponse, PublicBookData, Tierlist as WireTierlist, TierlistData, VotingBoard } from "@scripta/shared";
 import { z } from "zod";
 import { sendWorksError } from "../../worksErrors.js";
 import { authGuard, getOptionalAuthenticatedUser } from "../auth/index.js";
@@ -17,7 +18,7 @@ import { duplicateWorkMessage, firstKeyPerWork, knownWorkIds, resolvePublicBooks
 import { boardWorks } from "./domain/boardKeys.js";
 import type { Tierlist } from "./domain/types.js";
 import type { BallotOutcome, TierlistsService, Voter } from "./service.js";
-import { boardBooks, boardCanonical, canonicalBoard, canonicalFirst, histogramToWorks, placementsFromWorks, placementsToWorks, type WorksBoard } from "./wire.js";
+import { boardBooks, boardCanonical, canonicalBoard, canonicalFirst, histogramToWorks, placementsFromWorks, placementsToWorks } from "./wire.js";
 import { InvalidShareImageError, MAX_SHARE_IMAGE_BYTES, renderShareVideo, ShareVideoRenderError } from "./shareVideo.js";
 
 const idParamSchema = z.object({ id: z.string().uuid() });
@@ -57,11 +58,11 @@ const listPublicQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).default(0)
 });
 
-function answer(tierlist: Tierlist): Tierlist {
+function answer(tierlist: Tierlist): WireTierlist {
   return { ...tierlist, data: canonicalBoard(tierlist.data) };
 }
 
-function storedBoard(board: WorksBoard): { data: WorksBoard } | { status: 400 | 409; error: string } {
+function storedBoard(board: TierlistData): { data: TierlistData } | { status: 400 | 409; error: string } {
   const all = [...board.tiers.flatMap((tier) => tier.workIds), ...board.pool];
   if (new Set(all).size !== all.length) return { status: 400, error: "Duplicate tier or book." };
   const ids = knownWorkIds(all);
@@ -71,7 +72,7 @@ function storedBoard(board: WorksBoard): { data: WorksBoard } | { status: 400 | 
   return { data: { tiers: board.tiers.map((tier) => ({ ...tier, workIds: swap(tier.workIds) })), pool: swap(board.pool) } };
 }
 
-function booksInOrder(ownerUserId: string, workIds: string[]): unknown[] {
+function booksInOrder(ownerUserId: string, workIds: string[]): PublicBookData[] {
   const found = resolvePublicBooksByWork(ownerUserId, workIds);
   return workIds.flatMap((id) => found.get(id) ?? []);
 }
@@ -102,7 +103,7 @@ export function buildTierlistRoutes(service: TierlistsService) {
         const publicBooks = access && board ? booksInOrder(request.user.id, board.data.pool) : [];
         if (access && board && publicBooks.length !== board.data.pool.length) return reply.code(400).send({ error: "A selected book is no longer in your library." });
         const tierlist = service.createTierlist(request.user.id, name, board?.data, access, publicBooks);
-        return reply.code(201).send(board ? { ...tierlist, data: board.data } : tierlist);
+        return reply.code(201).send(board ? ({ ...tierlist, data: board.data } satisfies WireTierlist) : tierlist);
       } catch (err) {
         return sendWorksError(reply, err);
       }
@@ -128,7 +129,7 @@ export function buildTierlistRoutes(service: TierlistsService) {
       const body = updateTierlistSchema.safeParse(request.body);
       if (!body.success) return reply.code(400).send({ error: body.error.issues[0]?.message ?? "Invalid request." });
       try {
-        let board: { data: WorksBoard } | undefined;
+        let board: { data: TierlistData } | undefined;
         const owned = service.getTierlist(request.user.id, params.data.id);
         if (body.data.data !== undefined) {
           if (!owned || owned.voteCode !== null) return reply.code(404).send({ error: "No tier list with that id." });
@@ -139,7 +140,7 @@ export function buildTierlistRoutes(service: TierlistsService) {
         const data = board?.data ?? (owned ? canonicalBoard(owned.data) : undefined);
         const tierlist = service.updateTierlist(request.user.id, params.data.id, { ...(body.data.name !== undefined ? { name: body.data.name } : {}), ...(board ? { data: board.data } : {}) });
         if (!tierlist || !data) return reply.code(404).send({ error: "No tier list with that id." });
-        return reply.send({ ...tierlist, data });
+        return reply.send({ ...tierlist, data } satisfies WireTierlist);
       } catch (err) {
         return sendWorksError(reply, err);
       }
@@ -174,7 +175,7 @@ export function buildTierlistRoutes(service: TierlistsService) {
         if (!tierlist) {
           return reply.code(404).send({ error: "No tier list with that id." });
         }
-        return reply.code(201).send({ tierlist: { ...tierlist, data: canonicalBoard(tierlist.data, known) }, voteCode: tierlist.voteCode });
+        return reply.code(201).send({ tierlist: { ...tierlist, data: canonicalBoard(tierlist.data, known) } satisfies WireTierlist, voteCode: tierlist.voteCode });
       } catch (err) {
         return sendWorksError(reply, err);
       }
@@ -197,7 +198,7 @@ export function buildTierlistRoutes(service: TierlistsService) {
         if (!tierlist) {
           return reply.code(404).send({ error: "No tier list with that id." });
         }
-        return reply.send({ tierlist: { ...tierlist, data } });
+        return reply.send({ tierlist: { ...tierlist, data } satisfies WireTierlist });
       } catch (err) {
         return sendWorksError(reply, err);
       }
@@ -305,7 +306,7 @@ export function buildPublicTierlistRoutes(service: TierlistsService) {
           eligibleVoteCount: board.eligibleVoteCount,
           promotedAt: board.promotedAt,
           ...(board.votingOpen ? {} : { histogram: histogramToWorks(board.histogram, canonical, first) })
-        },
+        } satisfies VotingBoard,
         books: boardBooks(pool, board.publicBooks, () => booksInOrder(board.ownerUserId, pool))
       });
     });
@@ -376,5 +377,5 @@ function sendBallotOutcome(reply: FastifyReply, service: TierlistsService, code:
     ballotId: outcome.ballotId,
     placements: placementsToWorks(outcome.placements, canonical, first),
     results: { histogram: histogramToWorks(board?.histogram ?? [], canonical, first), ballotCount: board?.ballotCount ?? 0 }
-  });
+  } satisfies BallotResponse);
 }
