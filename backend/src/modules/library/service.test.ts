@@ -2069,3 +2069,15 @@ test("finishing or unfinishing a book recomputes the stored facts", () => {
   service.applyChange("u1", { kind: "book", bookKey: keyOf(3), readStatus: 0 });
   assert.equal(JSON.parse(rowsInDb(db, "u1").summary.reader_card as string).facts.finished, 9);
 });
+
+test("merging duplicates moves the reader card's chosen book and highlight to the kept copy", () => {
+  const { service } = setup();
+  const kept = owned(1);
+  const copy = { ...owned(1), ISBN: "9780441569595", highlights: [{ Type: "highlight", Text: "line", BookmarkID: "h1" }] };
+  const saved = service.saveLibrary("u1", { books: [kept, copy], groups: [] });
+  service.patchReaderCardStyle("u1", { signature: { bookKey: bookKey(copy), note: null }, highlight: { bookKey: bookKey(copy), highlightId: "h1" } });
+  service.mergeBooks("u1", bookKey(kept), [bookKey(kept), bookKey(copy)], saved.updatedAt);
+  const style = service.getReaderCardStyle("u1");
+  assert.equal(style.signature?.bookKey, bookKey(kept));
+  assert.equal(style.highlight?.bookKey, bookKey(kept));
+});

@@ -3,7 +3,7 @@
 // modules/auth/service.ts.
 
 import { createHash, randomUUID } from "node:crypto";
-import { applyLibraryChange, bookKey, bookMatchKeys, buildManualBook, calculateShelfTheme, eligiblePassages, isCertainMatch, isFinishedBook, isGroup, localDay, mergeDuplicateBooks, normalizeIsbn, normalizeReaderCardStyle, publicReaderCardOf, readerIdentity, seedCoverLookup, setReadStatus, type CoverLookupParams, type IdentityKey, type LibraryChange, type LibraryChangeAnswer, type LibraryData, type ReaderCardStyle, type ReaderCardStylePatch } from "@scripta/shared";
+import { applyLibraryChange, bookKey, bookMatchKeys, buildManualBook, calculateShelfTheme, eligiblePassages, isCertainMatch, isFinishedBook, isGroup, localDay, mergeDuplicateBooks, normalizeIsbn, normalizeReaderCardStyle, publicReaderCardOf, readerIdentity, rekeyReaderCardStyle, seedCoverLookup, setReadStatus, type CoverLookupParams, type IdentityKey, type LibraryChange, type LibraryChangeAnswer, type LibraryData, type ReaderCardStyle, type ReaderCardStylePatch } from "@scripta/shared";
 import type { BookRecommendationInput } from "@scripta/shared/community";
 import { BOOK_EVENTS_PER_SAVE, COVER_URL_MAX_LENGTH, DISPLAY_TEXT_MAX_LENGTH, LIBRARY_MATCH_BOOK_CAP, LIBRARY_PUT_HEADROOM_BYTES, LIBRARY_ROWS_VERSION, MATCH_KEY_MAX_LENGTH } from "./domain/constants.js";
 import { InvalidReaderCardChoiceError, LibraryChangeNotFoundError, LibraryConflictError, LibraryTooLargeError, NoLibraryDocumentError } from "./domain/errors.js";
@@ -373,6 +373,13 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
     return normalizeReaderCardStyle(raw === undefined ? null : JSON.parse(raw));
   };
 
+  const rekeyStyle = (userId: string, fromKeys: string[], toKey: string) => {
+    if (repo.getReaderCardStyle(userId) === undefined) return;
+    const style = storedStyle(userId);
+    const next = rekeyReaderCardStyle(style, fromKeys, toKey);
+    if (next.signature !== style.signature || next.highlight !== style.highlight) repo.setReaderCardStyle(userId, JSON.stringify(next));
+  };
+
   return {
     getLibrary(userId) {
       const row = repo.getDocument(userId);
@@ -477,6 +484,7 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
       const present = new Set(library.books.filter(isRecord).map(bookKey));
       const fromKeys = merge.filter((key) => key !== keep && present.has(key));
       if (fromKeys.length > 0 && rekeyBooks) rekeyBooks(userId, fromKeys, keep);
+      if (fromKeys.length > 0) rekeyStyle(userId, fromKeys, keep);
       const saved = repo.upsertDocument(userId, json, deriveLibraryData(next), rowsWithWorks(userId, next), row.updated_at);
       if (!saved) throw new LibraryConflictError();
       return toLibraryDocumentText(saved, publicUrlFor, worksOf(userId));
