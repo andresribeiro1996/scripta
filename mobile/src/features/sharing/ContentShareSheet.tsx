@@ -101,13 +101,13 @@ export function ContentShareSheet({ visible, onClose, title, description, url, c
               <Text accessibilityLiveRegion="polite" style={[typography.caption, { color: colors.textDim, flex: 1 }]}>{busy ? "Preparing your share…" : imageReady ? "Full image · Ready to share" : "Loading your image…"}</Text>
             </View>
             <View style={styles.actions}>
-              <View style={styles.imageAction}><Button label="Save image" variant="secondary" disabled={busy || !imageReady} onPress={() => void run(() => exportImage("save"))} /></View>
-              <View style={styles.imageAction}><Button label="Send image" disabled={busy || !imageReady} onPress={() => void run(() => exportImage("send"))} /></View>
-              {onExportVideo ? <View style={styles.imageAction}><Button label="Send video" variant="secondary" disabled={busy || !imageReady} onPress={() => void run(() => exportImage("video"))} /></View> : null}
+              <View style={styles.rowItem}><Button label="Save image" variant="secondary" disabled={busy || !imageReady} onPress={() => void run(() => exportImage("save"))} /></View>
+              <View style={styles.rowItem}><Button label="Send image" disabled={busy || !imageReady} onPress={() => void run(() => exportImage("send"))} /></View>
+              {onExportVideo ? <View style={styles.rowItem}><Button label="Send video" variant="secondary" disabled={busy || !imageReady} onPress={() => void run(() => exportImage("video"))} /></View> : null}
             </View>
           </View>
-        </> : <ScrollView contentContainerStyle={{ gap: spacing.lg, paddingBottom: spacing.sm }}>
-          <View style={{ gap: spacing.sm, paddingVertical: spacing.sm }}>
+        </> : <ScrollView key={view} contentContainerStyle={{ gap: spacing.md, paddingBottom: spacing.sm }}>
+          <View style={{ gap: spacing.sm }}>
             <Text numberOfLines={3} {...dynamicType} style={[typography.title, { color: colors.text, fontWeight: "700" }]}>{title}</Text>
             <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{view === "qr" ? "Let someone nearby scan this with their camera." : children ? "A picture to post. A link to explore." : "Invite someone to explore and take part."}</Text>
           </View>
@@ -126,8 +126,8 @@ export function ContentShareSheet({ visible, onClose, title, description, url, c
           </> : <>
             {children ? <ShareChoice icon="image" label="Share as image" detail="Made for stories, posts & group chats" primary disabled={busy} onPress={() => setView("image")} /> : null}
             {shareUrl ? <View style={styles.actions}>
-              <ShareChoice icon="link" label="Send link" detail="Open the live version" disabled={busy} onPress={() => void run(async () => { await Share.share({ message: shareUrl, title }); })} />
-              <ShareChoice icon="qr" label="QR code" detail="Share face to face" disabled={busy} onPress={() => setView("qr")} />
+              <View style={styles.rowItem}><ShareChoice icon="link" label="Send link" detail="Open the live version" disabled={busy} onPress={() => void run(async () => { await Share.share({ message: shareUrl, title }); })} /></View>
+              <View style={styles.rowItem}><ShareChoice icon="qr" label="QR code" detail="Share face to face" disabled={busy} onPress={() => setView("qr")} /></View>
             </View> : onEnableLink ? <ShareChoice icon="link" label={enableLinkLabel} detail="Let others open the live version" disabled={busy} onPress={() => void run(async () => { const next = await onEnableLink(); if (next) setCreatedUrl(next); })} /> : null}
             {children ? <Text style={[typography.caption, { color: colors.textDim, textAlign: "center" }]}>Sharing an image keeps your visibility unchanged.</Text> : null}
             {shareUrl && onDisableLink ? <Pressable accessibilityRole="button" accessibilityState={{ disabled: busy }} disabled={busy} onPress={() => void run(async () => { await onDisableLink(); setCreatedUrl(null); })} style={({ pressed }) => [styles.textAction, { opacity: busy || pressed ? 0.5 : 1 }]}><Text {...dynamicType} style={[typography.caption, { color: colors.danger, alignSelf: "stretch", textAlign: "center" }]}>Stop sharing link</Text></Pressable> : null}
@@ -159,10 +159,10 @@ function ShareChoice({ icon, label, detail, primary = false, disabled, onPress }
 const styles = StyleSheet.create({
   header: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   actions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md },
-  imageAction: { flex: 1, minWidth: 120 },
+  rowItem: { flex: 1, minWidth: 120 },
   iconAction: { width: minimumTouchTarget, height: minimumTouchTarget, borderRadius: radii.full, alignItems: "center", justifyContent: "center" },
   textAction: { minHeight: minimumTouchTarget, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.sm },
-  choice: { flexGrow: 1, minWidth: 130, padding: spacing.lg, gap: spacing.lg, borderRadius: radii.xl, borderCurve: "continuous" },
+  choice: { flexGrow: 1, padding: spacing.md, gap: spacing.sm, borderRadius: radii.xl, borderCurve: "continuous" },
   choiceIcon: { width: minimumTouchTarget, height: minimumTouchTarget, borderRadius: radii.lg, alignItems: "center", justifyContent: "center" },
   note: { padding: spacing.md, borderRadius: radii.lg },
   qr: { alignItems: "center", gap: spacing.lg, paddingVertical: spacing.xxl, borderRadius: radii.xl },
