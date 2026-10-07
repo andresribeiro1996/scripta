@@ -799,6 +799,18 @@ export function ErrorState(props: { title?: string; body?: string; actionLabel?:
   return <StatePanel title="Something went wrong" {...props} error />;
 }
 
+export function EditorHeading({ name, onRename, accessibilityLabel }: { name: string; onRename?: () => void; accessibilityLabel?: string }) {
+  const { colors } = useTheme();
+  const title = <Text display numberOfLines={2} style={[typography.title, styles.headingText, { color: colors.text }]}>{name}</Text>;
+  if (!onRename) return <View accessibilityRole="header" style={styles.heading}>{title}</View>;
+  return (
+    <Pressable accessibilityLabel={accessibilityLabel ?? `Rename ${name}`} accessibilityRole="button" hitSlop={spacing.sm} onPress={onRename} style={styles.heading}>
+      {title}
+      <Icon color={colors.textDim} name="edit" size={18} />
+    </Pressable>
+  );
+}
+
 export function OfflineBanner({ message = "You're offline. Connect to refresh." }: { message?: string }) {
   const { colors } = useTheme();
   return (
@@ -822,6 +834,8 @@ const styles = StyleSheet.create({
   menuTrigger: { minWidth: 48, minHeight: 48, alignItems: "center", justifyContent: "center" },
   labelledIconButton: { minHeight: minimumTouchTarget, flexDirection: "row", alignItems: "center", gap: spacing.xs, paddingHorizontal: spacing.sm, borderRadius: radii.full },
   grow: { flex: 1 },
+  heading: { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingHorizontal: spacing.sm, marginBottom: spacing.sm },
+  headingText: { flex: 1, fontWeight: "700" },
   tabRow: { flexDirection: "row", borderBottomWidth: 1 },
   tab: { flex: 1, minHeight: minimumTouchTarget, flexDirection: "row", gap: spacing.xs, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.sm },
   tabLabel: { fontWeight: "700" },

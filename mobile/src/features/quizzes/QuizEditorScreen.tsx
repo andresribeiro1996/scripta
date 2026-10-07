@@ -6,7 +6,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pressable, ScrollView, Share, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { API_URL } from "../../core/config";
-import { Button, Dialog, ErrorState, FormScroll, HeaderActions, IconButton, Input, Menu, type MenuItem, SaveStateButton, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { Button, Dialog, EditorHeading, ErrorState, FormScroll, HeaderActions, IconButton, Input, Menu, type MenuItem, SaveStateButton, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { coverUrlForApi } from "../library/lib/coverUrl";
 import { publicContentUrl } from "../sharing/links";
 import { fetchQuizResults, publishQuiz, setPlayState, updateQuiz, type Quiz } from "./api";
@@ -106,7 +106,8 @@ export function QuizEditorScreen({ quiz, onUpdated }: { quiz: Quiz; onUpdated: (
   return <Screen top={false}>
     <Stack.Screen options={{
       headerShown: true,
-      title: current.name,
+      title: "",
+      headerLargeTitleEnabled: false,
       headerRight: () => <HeaderActions>
         {!frozen ? <SaveStateButton busy={busy || publishing} unsaved={dirty} onPress={() => void run(() => updateQuiz(current.id, { data: dataRef.current }))} /> : null}
         <Menu title={current.name} items={actionItems}><IconButton framed accessibilityLabel="Quiz actions" name="more" /></Menu>
@@ -114,6 +115,7 @@ export function QuizEditorScreen({ quiz, onUpdated }: { quiz: Quiz; onUpdated: (
     }} />
     {error ? <Toast visible message={error} tone="error" /> : null}
     {!frozen ? <FormScroll contentContainerStyle={styles.screen}>
+      <EditorHeading name={current.name} />
       <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{data.books.length} books · {publishing ? "Publishing…" : busy ? "Saving…" : dirty ? "Unsaved changes" : "Saved"}</Text>
       <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>Questions</Text>
       <View style={styles.lengths}>
@@ -138,7 +140,7 @@ export function QuizEditorScreen({ quiz, onUpdated }: { quiz: Quiz; onUpdated: (
       </View>)}
       <Button label="Publish quiz" loading={publishing} disabled={data.books.length < 4 || busy} onPress={() => setConfirmingPublish(true)} />
       {data.books.length < 4 ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>A quiz needs at least 4 books.</Text> : null}
-    </FormScroll> : frozen ? results.isPending ? <Skeleton height={180} /> : <SwipeableTabs accessibilityLabel="Quiz editor view" options={PUBLISHED_VIEWS} value={view} onChange={setView} renderPage={(page) => page === "results" ? results.isError ? <ErrorState body="Couldn't load results." actionLabel="Retry" onAction={() => void results.refetch()} /> : <ScrollView contentContainerStyle={styles.screen}>
+    </FormScroll> : frozen ? results.isPending ? <Skeleton height={180} /> : <View style={styles.grow}><View style={styles.frozenHeading}><EditorHeading name={current.name} /></View><SwipeableTabs accessibilityLabel="Quiz editor view" options={PUBLISHED_VIEWS} value={view} onChange={setView} renderPage={(page) => page === "results" ? results.isError ? <ErrorState body="Couldn't load results." actionLabel="Retry" onAction={() => void results.refetch()} /> : <ScrollView contentContainerStyle={styles.screen}>
       {(results.data?.plays ?? []).map((play, i) => <View key={`${play.playerName ?? "Guest"}-${i}`} style={[styles.leaderRow, { borderColor: colors.border }]}>
         <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{i + 1}</Text>
         <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, styles.grow, { color: colors.text }]}>{play.playerName ?? "Guest"}</Text>
@@ -159,10 +161,10 @@ export function QuizEditorScreen({ quiz, onUpdated }: { quiz: Quiz; onUpdated: (
           ? <Image source={{ uri: uriFor(String(question.options[question.answerIndex])) }} contentFit="contain" style={styles.answerThumb} alt="Answer cover" />
           : <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, styles.grow, { color: colors.text }]}>{String(question.options[question.answerIndex])}</Text>}
       </View>)}
-    </ScrollView>} /> : null}
+    </ScrollView>} /></View> : null}
     <Dialog visible={confirmingPublish} title="Publish quiz" onClose={() => setConfirmingPublish(false)}>
       <View style={styles.dialog}>
-        <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>Publishing mints the challenge link and locks the books, quotes, and questions. This can't be undone.</Text>
+        <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>Publishing creates the challenge link and locks the books, quotes and questions. This can't be undone.</Text>
         <Button label="Publish" loading={publishing} onPress={() => void publish()} />
       </View>
     </Dialog>
@@ -176,6 +178,7 @@ const styles = StyleSheet.create({
   row: { minHeight: 52, borderWidth: 1, borderRadius: radii.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, flexDirection: "row", alignItems: "center", gap: spacing.sm },
   offered: { opacity: 0.5 },
   grow: { flex: 1 },
+  frozenHeading: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
   book: { borderWidth: 1, borderRadius: radii.md, padding: spacing.md, gap: spacing.sm },
   section: { gap: spacing.sm },
   leaderRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.xs, borderBottomWidth: StyleSheet.hairlineWidth },

@@ -23,7 +23,7 @@ import { AccessibilityInfo, Pressable, ScrollView, StyleSheet, useWindowDimensio
 import Animated, { useAnimatedReaction, useAnimatedRef, useAnimatedScrollHandler, useSharedValue } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 import { Text } from "../../ui/Text";
-import { Button, Dialog, EmptyState, ErrorState, Fab, HeaderActions, Icon, IconButton, Input, SaveStateButton, Sheet, Toast } from "../../ui";
+import { Button, Dialog, EditorHeading, EmptyState, ErrorState, Fab, HeaderActions, Icon, IconButton, Input, SaveStateButton, Sheet, Toast } from "../../ui";
 import { ThemeGrid } from "../../ui/ThemeGrid";
 import { MuralThemeScope, radii, spacing, typography } from "../../ui/theme";
 import { MuralScreen } from "./MuralScreen";
@@ -242,10 +242,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
       />
       {error ? <Toast visible message={error} tone="error" /> : null}
       <Animated.ScrollView ref={scrollRef} onLayout={(event) => setViewportHeight(event.nativeEvent.layout.height)} onScroll={onScroll} scrollEventThrottle={16} onContentSizeChange={(_width, height) => { contentHeight.set(height); flushScroll(height); }} keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.canvasScroll, { paddingBottom: Math.max(120, dockHeight + spacing.md) }]}>
-        <Pressable accessibilityLabel={`Rename mural, ${currentName}`} accessibilityRole="button" hitSlop={spacing.sm} onPress={() => { setDraftName(currentName); setNameError(undefined); setRenaming(true); }} style={styles.heading}>
-          <Text display numberOfLines={2} style={[typography.title, styles.headingText, { color: colors.text }]}>{currentName}</Text>
-          <Icon color={colors.textDim} name="edit" size={18} />
-        </Pressable>
+        <EditorHeading name={currentName} accessibilityLabel={`Rename mural, ${currentName}`} onRename={() => { setDraftName(currentName); setNameError(undefined); setRenaming(true); }} />
         <Text style={[typography.caption, styles.dragHelp, { color: colors.textDim }]}>Hold a block to drag. Move to an edge to scroll.</Text>
         <View onLayout={(event) => setCanvasTop(event.nativeEvent.layout.y)}><MuralCanvas mural={draftMural} books={books} groups={groups} images={gallery.data ?? []} tierlists={tierlists.data ?? []} profile={profile} editable={!busy} onDragChange={onDragChange} dragScroll={{ ref: scrollRef, offset: scrollOffset, contentHeight, bottomInset }} selectedBlockId={selectedId} onSelectBlock={(blockId) => { setSelectedId(blockId); if (blockId === null) setSheetTab(null); }} onLayoutChange={(blockId, layout) => {
           const next = moveMuralBlock(currentBlocks, blockId, layout);
@@ -332,8 +329,6 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   canvasScroll: { paddingHorizontal: spacing.sm, paddingTop: spacing.md, paddingBottom: 120 },
   dock: { position: "absolute", left: spacing.sm, right: spacing.sm, bottom: spacing.sm, borderWidth: 1, borderRadius: radii.xl, padding: spacing.xs, flexDirection: "row" },
-  heading: { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingHorizontal: spacing.sm, marginBottom: spacing.sm },
-  headingText: { flex: 1, fontWeight: "700" },
   dragHelp: { paddingHorizontal: spacing.sm, marginBottom: spacing.md },
   undo: { position: "absolute", left: spacing.md },
   dialog: { gap: spacing.md },
