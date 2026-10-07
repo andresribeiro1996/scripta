@@ -1,9 +1,9 @@
-import { router, useLocalSearchParams } from "expo-router";
+import { router, Stack, useLocalSearchParams } from "expo-router";
 import { readSnapshot } from "@scripta/shared";
 import { BookDetail } from "@/features/library/components/BookDetail";
 import { useBook } from "@/features/library/hooks/useBook";
 import { useLibraryActions } from "@/features/library/hooks/useLibraryActions";
-import { ErrorState, Screen, Skeleton } from "@/ui";
+import { ErrorState, Screen, SheetHeader, Skeleton } from "@/ui";
 
 export default function BookDetailRoute() {
   const { key } = useLocalSearchParams<{ key: string }>();
@@ -13,6 +13,8 @@ export default function BookDetailRoute() {
 
   return (
     <Screen top={false}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <SheetHeader title="Book details" onClose={() => router.back()} />
       {loading ? (
         <Skeleton height={180} />
       ) : !book ? (
