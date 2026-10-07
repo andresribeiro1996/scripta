@@ -1,10 +1,6 @@
-import type { LibraryData } from "./library";
-import { publicFetch } from "./client";
+import { createPublicApi } from "@scripta/shared";
+import { request } from "./request";
 
-export interface SharedLibraryPayload {
-  data: LibraryData;
-}
+export type { SharedLibraryPayload } from "@scripta/shared";
 
-export async function fetchSharedLibrary(token: string): Promise<SharedLibraryPayload> {
-  return (await publicFetch(`/library/shared/${token}`)) as SharedLibraryPayload;
-}
+export const { fetchSharedLibrary } = createPublicApi(request);

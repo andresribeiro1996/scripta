@@ -1,106 +1,25 @@
-import type { LibraryData, MuralBlock, PublicReaderCard, ResolvedTierlist, ShelfTheme } from "@scripta/shared";
-import { dashboardQuery, withKnownDigestItems, type DashboardFeedPage } from "@scripta/shared/dashboard";
-import type { ThemeId } from "@scripta/shared/themes";
-import type {
-  ActivityItem,
-  DiscoverItem,
-  DiscoverType,
-  FeedSettings,
-  OwnProfile,
-  Page,
-  PersonResult,
-  PublishedProfile,
-  PublishProfileInput,
-  QuizSummary,
-  SuggestedReader,
-  TierlistSummary,
-  TournamentSummary,
-} from "@scripta/shared/community";
-import { apiClient } from "../../core/api";
-import { renderableDiscover } from "./communityHome";
-import type { PublicBookData, PublicHighlight } from "../public/api";
+import type { Page } from "@scripta/shared/community";
+import { createCommunityApi } from "@scripta/shared/community";
+import { request } from "../../core/api";
 
-export interface CommunityProfileView {
-  private: boolean;
-  profile: PublishedProfile;
-  mural: {
-    mural: { id: string; name: string; theme: ThemeId; blocks: MuralBlock[]; coverImageUrl: string | null };
-    library: {
-      books: PublicBookData[];
-      highlights: PublicHighlight[];
-      currentlyReading: PublicBookData[];
-      stats: Record<string, number>;
-      shelfTheme?: ShelfTheme;
-      readerCard?: PublicReaderCard;
-    };
-    imageUrls: Record<string, string | null>;
-    tierlists: Record<string, ResolvedTierlist>;
-  } | null;
-  published: { tierlists: TierlistSummary[]; tournaments: TournamentSummary[]; quizzes: QuizSummary[] };
-  feedSettings?: FeedSettings;
-}
+export type { CommunityProfileView } from "@scripta/shared/community";
 
 export type CommunityPage<T> = Page<T>;
 
-export async function fetchDashboard(cursor?: string) {
-  return withKnownDigestItems(await apiClient.request<DashboardFeedPage>(`/community/dashboard${dashboardQuery(cursor)}`, { auth: true }));
-}
-
-export function markDashboardSeen() {
-  return apiClient.request("/community/dashboard/seen", { method: "POST", auth: true });
-}
-
-export async function fetchDiscover(type: DiscoverType, q: string, offset: number, signedIn: boolean) {
-  const params = new URLSearchParams({ type, q, offset: String(offset) });
-  const page = await apiClient.request<{ items: DiscoverItem[]; nextOffset: number | null }>(`/community/discover?${params}`, { auth: signedIn });
-  return { ...page, items: renderableDiscover(page.items) };
-}
-
-export async function searchPeople(q: string) {
-  return apiClient.request<{ people: PersonResult[] }>(`/community/people?q=${encodeURIComponent(q)}`, { auth: true });
-}
-
-export async function fetchSuggestedPeople() {
-  return apiClient.request<{ people: SuggestedReader[] }>("/community/people/suggested", { auth: true });
-}
-
-export async function fetchProfile(username: string) {
-  return apiClient.request<CommunityProfileView>(`/community/profiles/${encodeURIComponent(username)}`, { auth: true });
-}
-
-export async function fetchActivity(username: string, cursor?: string): Promise<Page<ActivityItem>> {
-  const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
-  return apiClient.request<Page<ActivityItem>>(`/community/profiles/${encodeURIComponent(username)}/activity${query}`, { auth: true });
-}
-
-export async function fetchProfileLibrary(username: string) {
-  return apiClient.request<{ data: LibraryData | null }>(`/community/profiles/${encodeURIComponent(username)}/library`);
-}
-
-export function updateFeedSettings(settings: FeedSettings) {
-  return apiClient.request("/community/profile/feed-settings", { method: "PUT", body: settings, auth: true });
-}
-
-export function followUser(userId: string) {
-  return apiClient.request("/community/follows", { method: "POST", body: { userId }, auth: true });
-}
-
-export function unfollowUser(userId: string) {
-  return apiClient.request(`/community/follows/${userId}`, { method: "DELETE", auth: true });
-}
-
-export function publishProfile(input: PublishProfileInput) {
-  return apiClient.request("/community/profile/publish", { method: "PUT", body: input, auth: true });
-}
-
-export function unpublishProfile() {
-  return apiClient.request("/community/profile/publish", { method: "DELETE", auth: true });
-}
-
-export function fetchOwnProfile() {
-  return apiClient.request<OwnProfile>("/community/profile", { auth: true });
-}
-
-export function setShelfMural(muralId: string) {
-  return apiClient.request("/community/profile/mural", { method: "PUT", body: { muralId }, auth: true });
-}
+export const {
+  fetchDashboard,
+  markDashboardSeen,
+  fetchDiscover,
+  searchPeople,
+  fetchSuggestedPeople,
+  fetchProfile,
+  fetchActivity,
+  fetchProfileLibrary,
+  updateFeedSettings,
+  followUser,
+  unfollowUser,
+  publishProfile,
+  unpublishProfile,
+  fetchOwnProfile,
+  setShelfMural,
+} = createCommunityApi(request);

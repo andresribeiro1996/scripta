@@ -1,4 +1,4 @@
-import { activityRow, isKnownContent, contentDetail, contentKindLabel, contentStats, contentStatus, contentTarget, feedHeading, feedTarget, type ActivityItem, type DiscoverItem } from "@scripta/shared/community";
+import { activityRow, contentDetail, contentKindLabel, contentStats, contentStatus, contentTarget, feedHeading, feedTarget, type ActivityItem } from "@scripta/shared/community";
 
 export { contentDetail, contentKindLabel, contentStats, contentStatus, contentTarget, feedHeading, feedTarget };
 
@@ -10,10 +10,6 @@ export const DISCOVER_FILTERS = [
 ] as const;
 
 export type DiscoverFilter = (typeof DISCOVER_FILTERS)[number]["value"];
-
-export function renderableDiscover(items: DiscoverItem[]): DiscoverItem[] {
-  return items.filter((item) => isKnownContent(item.content));
-}
 
 export function renderableActivity(items: ActivityItem[]): ActivityItem[] {
   return items.filter((item) => activityRow(item) !== null);

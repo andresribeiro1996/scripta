@@ -7,7 +7,6 @@ import { Text } from "../../ui/Text";
 import { DEFAULT_TIER_PRESET, readerGlyphLabel } from "@scripta/shared";
 import { EmptyState, ErrorState, Icon, Input, Skeleton, Toast, dynamicType, minimumTouchTarget, radii, spacing, typography, useReducedMotion, useTheme, type IconName } from "../../ui";
 import type { ContentTone, DiscoverItem, PublishedContent } from "@scripta/shared/community";
-import { useAuth } from "../../core/auth";
 import { ArenaBooksSheet } from "../arena/ArenaBooksSheet";
 import { fetchDiscover } from "./api";
 import { DISCOVER_FILTERS, contentKindLabel, contentStats, contentStatus, contentTarget, type DiscoverFilter } from "./communityHome";
@@ -23,10 +22,9 @@ export function DiscoverPane({ linkAuthors = true }: { linkAuthors?: boolean }) 
   const [filter, setFilter] = useState<DiscoverFilter>("all");
   const [search, setSearch] = useState("");
   const needle = useDebouncedValue(search.trim(), 300);
-  const { user } = useAuth();
   const discover = useInfiniteQuery({
     queryKey: ["community", "discover", filter, needle],
-    queryFn: ({ pageParam }) => fetchDiscover(filter, needle, pageParam, Boolean(user)),
+    queryFn: ({ pageParam }) => fetchDiscover(filter, needle, pageParam),
     initialPageParam: 0,
     getNextPageParam: (lastPage) => lastPage.nextOffset ?? undefined,
     retry: false,
