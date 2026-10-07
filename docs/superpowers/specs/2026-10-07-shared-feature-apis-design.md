@@ -65,21 +65,13 @@ export type ApiRequest = <T>(path: string, init: ApiRequestInit) => Promise<T>;
 - `auth` is required, so every endpoint states its mode.
 - `body` is a plain value. The adapter serialises it, and a `FormData` passes through untouched.
 
-`path.ts` exports a template tag that applies `encodeURIComponent` to every interpolated value. Query strings are built with `URLSearchParams` inside the factory that needs one.
+`path.ts` exports `apiPath`, a template tag that applies `encodeURIComponent` to every interpolated value. Query strings are built inside the factory that needs one, the same way the clients build them today.
 
 ```ts
-path`/arenas/${id}/duels/${duelId}/vote`
+apiPath`/arenas/${id}/duels/${duelId}/vote`
 ```
 
-`package.json` gains:
-- an `./api` subpath export
-- an `./arena/*` export
-- a `./works/*` export
-- a `./socials/*` export
-- a `./gallery/*` export
-- a `./public/*` export
-
-That covers every new folder. Existing folders already have subpath exports.
+The new folders (`api`, `public`, `socials`, `gallery`) export from the package root, the same way `arena` and `works` already do, so `package.json` needs no new subpath exports. Community stays subpath-only (`@scripta/shared/community`), as it is today.
 
 ### Factories: `packages/shared/src/<feature>/api.ts`
 
@@ -98,7 +90,7 @@ Each factory takes an `ApiRequest` and returns an object of endpoint functions:
 | `createPublicApi` | `fetchSharedMural(token)`, `fetchSharedLibrary(token)` |
 | `createSocialsApi` | status list, link-session (returns the `linkId`; the client navigates), Bluesky connect, disconnect, post |
 | `createGalleryApi` | list, delete |
-| `createMuralsApi` | the 12 mural and folder routes |
+| `createMuralsApi` | the 13 mural and folder routes |
 | `createWorksApi` | `fetchWork(id)` |
 
 - **Union of endpoints.** A factory covers every endpoint either client uses.
@@ -200,7 +192,7 @@ Domain types that differ from what goes on the wire (`data: unknown` on `Tierlis
 
 Everything not listed here stays exactly as it is today.
 
-1. **Path parameters are encoded on both clients**, through the `path` template tag.
+1. **Path parameters are encoded on both clients**, through the `apiPath` template tag.
 2. **`GET /arenas/:id` sends the viewer's token** when one is held, on both clients. This fixes the "you voted" badges for signed-in viewers.
 3. **Mobile optional routes follow the "token if held" rule.** These are:
    - profile and activity, which were always `auth: true` and failed fast
@@ -217,7 +209,7 @@ Everything not listed here stays exactly as it is today.
 ## Testing
 
 - **Shared:**
-  - `path.test.ts` checks encoding.
+  - `path.test.ts` checks `apiPath` encoding.
   - One `api.test.ts` per factory records calls on a fake `ApiRequest`. For every endpoint it asserts the path, method, auth mode and body, and that the envelope is unwrapped.
   - These are written from today's client code, with only the agreed changes, and become the contract.
 - **Web:** `frontend/scripts/test-request.mts` stubs `fetch` and the session, and checks:
