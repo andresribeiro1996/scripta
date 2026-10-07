@@ -16,8 +16,8 @@ import type {
   TierlistSummary,
   TournamentSummary,
 } from "@scripta/shared/community";
-import { isKnownContent } from "@scripta/shared/community";
 import { apiClient } from "../../core/api";
+import { renderableDiscover } from "./communityHome";
 import type { PublicBookData, PublicHighlight } from "../public/api";
 
 export interface CommunityProfileView {
@@ -53,7 +53,7 @@ export function markDashboardSeen() {
 export async function fetchDiscover(type: DiscoverType, q: string, offset: number, signedIn: boolean) {
   const params = new URLSearchParams({ type, q, offset: String(offset) });
   const page = await apiClient.request<{ items: DiscoverItem[]; nextOffset: number | null }>(`/community/discover?${params}`, { auth: signedIn });
-  return { ...page, items: page.items.filter((item) => isKnownContent(item.content)) };
+  return { ...page, items: renderableDiscover(page.items) };
 }
 
 export async function searchPeople(q: string) {

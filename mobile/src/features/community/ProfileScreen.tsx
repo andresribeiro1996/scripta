@@ -163,7 +163,7 @@ export function ProfileScreen({ username }: { username: string }) {
                   </Text>
                 </View>
               }
-              ListEmptyComponent={<EmptyState title="Nothing published yet" body="Tier lists and tournaments show up here." />}
+              ListEmptyComponent={<EmptyState title="Nothing published yet" body="Tier lists, tournaments and quizzes show up here." />}
               renderItem={({ item }) => (
                 <Pressable
                   accessibilityRole="link"

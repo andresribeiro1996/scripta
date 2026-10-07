@@ -75,7 +75,7 @@ export function DiscoverPane({ linkAuthors = true }: { linkAuthors?: boolean }) 
             </View>
           ) : discover.isError && !discover.data ? (
             <View style={styles.page}>
-              <ErrorState body="Couldn't load tier lists and tournaments." actionLabel="Retry" onAction={() => void discover.refetch()} />
+              <ErrorState body="Couldn't load tier lists, tournaments and quizzes." actionLabel="Retry" onAction={() => void discover.refetch()} />
             </View>
           ) : (
             <FlatList
@@ -92,7 +92,7 @@ export function DiscoverPane({ linkAuthors = true }: { linkAuthors?: boolean }) 
               onRefresh={() => void discover.refetch()}
               ListEmptyComponent={
                 <View style={styles.page}>
-                  <EmptyState title="Nothing published yet" body="Check back later for new tier lists and tournaments." />
+                  <EmptyState title="Nothing published yet" body="Check back later for new tier lists, tournaments and quizzes." />
                 </View>
               }
               onEndReached={() => {
@@ -117,7 +117,7 @@ export function DiscoverPane({ linkAuthors = true }: { linkAuthors?: boolean }) 
           <View style={styles.grow}>
             <Input
               icon="search"
-              accessibilityLabel="Search tier lists and tournaments"
+              accessibilityLabel="Search tier lists, tournaments and quizzes by name"
               value={search}
               onChangeText={setSearch}
               placeholder="Search"

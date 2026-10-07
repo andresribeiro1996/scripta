@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { DiscoverItem, FeedItem } from "@scripta/shared/community";
+import type { ActivityItem, DiscoverItem, FeedItem } from "@scripta/shared/community";
 import {
   DISCOVER_FILTERS,
   contentDetail,
@@ -10,6 +10,8 @@ import {
   contentTarget,
   feedHeading,
   feedTarget,
+  renderableActivity,
+  renderableDiscover,
 } from "./communityHome.js";
 
 const tierlist = {
@@ -104,4 +106,16 @@ test("content targets route by kind", () => {
     feedHeading({ ...feedItem, content: tournament, type: "tournament_published" }),
     "andre published a tournament"
   );
+});
+
+test("discover drops items whose content kind this build cannot draw", () => {
+  const known: DiscoverItem = { author: actor, content: quiz, createdAt: "2026-09-10T00:00:00.000Z" } as DiscoverItem;
+  const hologram = { author: actor, content: { kind: "hologram", id: "h1" }, createdAt: "2026-09-10T00:00:00.000Z" } as unknown as DiscoverItem;
+  assert.deepEqual(renderableDiscover([hologram, known]), [known]);
+});
+
+test("activity drops items whose type this build cannot draw", () => {
+  const known: ActivityItem = { id: "a1", type: "quiz_published", payload: { name: "Dune trivia" }, createdAt: "2026-09-10T00:00:00.000Z" };
+  const future = { id: "a2", type: "hologram_published", payload: {}, createdAt: "2026-09-10T00:00:00.000Z" } as unknown as ActivityItem;
+  assert.deepEqual(renderableActivity([future, known]), [known]);
 });

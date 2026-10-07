@@ -5,6 +5,7 @@ import { Text } from "../../ui/Text";
 import { activityDay, activityRow, relativeTime, type ActivityItem } from "@scripta/shared/community";
 import { EmptyState, ErrorState, Icon, Skeleton, dynamicType, radii, spacing, typography, useTheme, type IconName } from "../../ui";
 import { fetchActivity } from "./api";
+import { renderableActivity } from "./communityHome";
 import { CoverFan, SLOT_HEIGHT, SLOT_WIDTH } from "./CoverFan";
 
 export function ActivityList({ username }: { username: string }) {
@@ -14,7 +15,7 @@ export function ActivityList({ username }: { username: string }) {
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
   });
-  const items = activity.data?.pages.flatMap((page) => page.items).filter((item) => activityRow(item) !== null) ?? [];
+  const items = renderableActivity(activity.data?.pages.flatMap((page) => page.items) ?? []);
 
   if (activity.isPending)
     return (
