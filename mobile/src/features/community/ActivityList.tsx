@@ -138,7 +138,7 @@ const styles = StyleSheet.create({
   strong: { fontWeight: "700" },
   body: { padding: spacing.lg },
   list: { paddingBottom: spacing.huge, flexGrow: 1 },
-  day: { textTransform: "uppercase", letterSpacing: 0.8, paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.xs },
+  day: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.xs },
   row: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth },
   slot: { width: SLOT_WIDTH, height: SLOT_HEIGHT, justifyContent: "center" },
   medallion: { marginLeft: 14, width: 48, height: 48, borderRadius: radii.full, borderWidth: StyleSheet.hairlineWidth, alignItems: "center", justifyContent: "center" },

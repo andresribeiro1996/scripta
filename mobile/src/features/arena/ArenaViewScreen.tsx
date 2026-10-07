@@ -227,6 +227,6 @@ const styles = StyleSheet.create({
   // The same bottom strip the round rail sits in, so the toggle keeps its
   // place between the two views.
   classicBar: { position: "absolute", left: 0, right: 0, bottom: 0, minHeight: 64, flexDirection: "row", alignItems: "center", justifyContent: "flex-end", paddingHorizontal: spacing.lg, borderTopWidth: 1 },
-  note: { textAlign: "center", textTransform: "uppercase", letterSpacing: 1, fontWeight: "700" },
+  note: { textAlign: "center", fontWeight: "700" },
   dialog: { gap: spacing.md },
 });

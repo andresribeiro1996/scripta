@@ -316,7 +316,7 @@ const styles = StyleSheet.create({
   metaName: { flexShrink: 1 },
   page: { flex: 1, padding: spacing.lg },
   list: { padding: spacing.lg, gap: spacing.sm, paddingBottom: spacing.huge },
-  eyebrow: { textTransform: "uppercase", letterSpacing: 0.8, fontWeight: "600" },
+  eyebrow: { fontWeight: "600" },
   muralHeader: { gap: spacing.lg, marginBottom: spacing.xs },
   card: { flexDirection: "row", alignItems: "center", gap: spacing.md, borderWidth: 1, borderRadius: radii.lg, paddingVertical: spacing.md, paddingHorizontal: spacing.lg },
   dialogGap: { gap: spacing.md },

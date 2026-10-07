@@ -143,7 +143,7 @@ export function FinishedScreen({ book, before, onClose }: { book: Record<string,
       : "Added to Finished on your shelf";
 
   return (
-    <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
+    <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
       {shelfError ? <Toast visible message={shelfError} tone="error" /> : null}
 
       <View style={styles.header}>
@@ -210,7 +210,7 @@ export function FinishedScreen({ book, before, onClose }: { book: Record<string,
 const styles = StyleSheet.create({
   content: { gap: spacing.lg, paddingBottom: spacing.xl },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md },
-  eyebrow: { textTransform: "uppercase", letterSpacing: 0.8, fontWeight: "600", flexShrink: 1 },
+  eyebrow: { fontWeight: "600", flex: 1 },
   bookRow: { flexDirection: "row", gap: spacing.lg },
   cover: { width: 96, aspectRatio: 2 / 3, borderRadius: 8, overflow: "hidden" },
   bookText: { flex: 1, justifyContent: "center" },

@@ -115,7 +115,7 @@ test("shelfPresetSummary counts the reader's books", () => {
 });
 
 test("shelfPresetSummary warns a published profile that visitors will see the kept shelf", () => {
-  assert.equal(shelfPresetSummary(library, true), "Made from your 5 books: 1 you're reading and 3 you've finished. Your page is published, so visitors will see it once you keep it.");
+  assert.equal(shelfPresetSummary(library, true), "Made from your 5 books: 1 you're reading and 3 you've finished. Keep this shelf to show it on your published page.");
 });
 
 test("editing a shelf block through updateBlock keeps its role", () => {

@@ -78,7 +78,7 @@ export function OwnLibraryPane() {
           books.length === 0 ? (
             <EmptyState
               title="Start your library"
-              body="Import a library.json, KoboReader.sqlite, Goodreads CSV, or StoryGraph CSV — or add a book by hand."
+              body="Import your existing collection, or add your first book manually."
               actionLabel="Import library…"
               onAction={() => router.push("/import" as never)}
             />
@@ -99,7 +99,7 @@ export function OwnLibraryPane() {
           );
         }}
       />
-      <Fab label="New" accessibilityLabel="Add a book" onPress={() => router.push("/add-book" as never)} />
+      <Fab label="New" accessibilityLabel="New book" onPress={() => router.push("/add-book" as never)} />
     </View>
   );
 }
