@@ -7,6 +7,7 @@ import { categoryFor, DEFAULT_FEED_SETTINGS, encodeCursor, normalizeFeedSettings
 import type { ParticipationItem } from "@scripta/shared/dashboard";
 import type { PublishedTierlistRef } from "../tierlists/service.js";
 import type { PublishedTournamentRef } from "../arena/service.js";
+import type { PublishedQuizRef } from "../quizzes/service.js";
 import type { MuralPublicPayload } from "../murals/index.js";
 import type { CommunityRepository, CursorKeyset } from "./domain/ports.js";
 import type { EventRow, FollowRow, ProfileRow } from "./domain/types.js";
@@ -146,18 +147,20 @@ function createDeps(repo: CommunityRepository) {
   const sharedBooksCalls: Array<{ viewerId: string; candidateId: string; limit: number }> = [];
   const tierlistRefs = new Map<string, PublishedTierlistRef>();
   const tournamentRefs = new Map<string, PublishedTournamentRef>();
+  const quizRefs = new Map<string, PublishedQuizRef>();
   const byNewest = <T extends { createdAt: string }>(a: T, b: T) => b.createdAt.localeCompare(a.createdAt);
   const seenAt = { value: null as string | null };
   const votes = new Set<string>();
   const tournamentVotes = new Set<string>();
+  const quizPlays = new Set<string>();
   const readerGlyphs = new Map<string, IdentityKey | null>();
   const readerGlyphCalls: string[] = [];
   const tierlistParticipation: GameParticipation[] = [];
   const tournamentParticipation: GameParticipation[] = [];
   const quizParticipation: GameParticipation[] = [];
-  const windowCalls: Array<{ kind: "tierlist" | "tournament"; needle: string; limit: number }> = [];
-  const publishedManyCalls: Array<{ kind: "tierlist" | "tournament"; ids: string[] }> = [];
-  const votedAmongCalls: Array<{ kind: "tierlist" | "tournament"; viewerId: string; ids: string[] }> = [];
+  const windowCalls: Array<{ kind: "tierlist" | "tournament" | "quiz"; needle: string; limit: number }> = [];
+  const publishedManyCalls: Array<{ kind: "tierlist" | "tournament" | "quiz"; ids: string[] }> = [];
+  const votedAmongCalls: Array<{ kind: "tierlist" | "tournament" | "quiz"; viewerId: string; ids: string[] }> = [];
   const deps: CommunityDeps = {
     repo,
     now: () => NOW,
@@ -244,13 +247,33 @@ function createDeps(repo: CommunityRepository) {
       get: (id) => tournamentRefs.get(id),
       listByOwner: (owner) => [...tournamentRefs.values()].filter((r) => r.ownerUserId === owner).sort(byNewest)
     },
+    quizzes: {
+      discoverWindow: (needle, limit) => {
+        windowCalls.push({ kind: "quiz", needle, limit });
+        return [...quizRefs.values()]
+          .filter((r) => normalizeWords(r.name).includes(needle))
+          .sort(byNewest)
+          .slice(0, limit)
+          .map((r) => ({ id: r.id, createdAt: r.createdAt, ownerUserId: r.ownerUserId }));
+      },
+      getPublishedMany: (ids) => {
+        publishedManyCalls.push({ kind: "quiz", ids: [...ids] });
+        return ids.flatMap((id) => quizRefs.get(id) ?? []);
+      },
+      votedAmong: (viewerId, ids) => {
+        votedAmongCalls.push({ kind: "quiz", viewerId, ids: [...ids] });
+        return ids.filter((id) => quizPlays.has(`${viewerId}:${id}`));
+      },
+      get: (id) => quizRefs.get(id),
+      listByOwner: (owner) => [...quizRefs.values()].filter((r) => r.ownerUserId === owner).sort(byNewest)
+    },
     participation: {
       tierlists: () => tierlistParticipation,
       tournaments: () => tournamentParticipation,
       quizzes: () => quizParticipation
     }
   };
-  return { deps, readerProfiles, usernames, ownedMurals, muralPayloads, libraries, libraryCalls, sharedCounts, sharedShelves, sharedBookCountsCalls, sharedBooksCalls, tierlistRefs, tournamentRefs, seenAt, votes, tournamentVotes, readerGlyphs, readerGlyphCalls, tierlistParticipation, tournamentParticipation, quizParticipation, windowCalls, publishedManyCalls, votedAmongCalls };
+  return { deps, readerProfiles, usernames, ownedMurals, muralPayloads, libraries, libraryCalls, sharedCounts, sharedShelves, sharedBookCountsCalls, sharedBooksCalls, tierlistRefs, tournamentRefs, quizRefs, seenAt, votes, tournamentVotes, quizPlays, readerGlyphs, readerGlyphCalls, tierlistParticipation, tournamentParticipation, quizParticipation, windowCalls, publishedManyCalls, votedAmongCalls };
 }
 
 function profileRow(userId: string, overrides: Partial<ProfileRow> = {}): ProfileRow {
@@ -312,6 +335,21 @@ export function tournRef(id: string, owner: string, overrides: Partial<Published
     name: `Cup ${id}`,
     bracketSize: 8,
     status: "active",
+    covers: [],
+    ...overrides
+  };
+}
+
+export function quizRef(id: string, owner: string, overrides: Partial<PublishedQuizRef> = {}): PublishedQuizRef {
+  return {
+    id,
+    ownerUserId: owner,
+    createdAt: "2026-09-04T00:00:00.000Z",
+    voteCode: `play-${id}`,
+    name: `Quiz ${id}`,
+    questionCount: 6,
+    playCount: 3,
+    playOpen: true,
     covers: [],
     ...overrides
   };
@@ -770,7 +808,7 @@ test("getProfileByUsername shows an unpublished user as private, with nothing pu
   assert.equal(view.profile.followingCount, 1);
   assert.equal(view.profile.viewerFollows, true);
   assert.equal(view.mural, null);
-  assert.deepEqual(view.published, { tierlists: [], tournaments: [] });
+  assert.deepEqual(view.published, { tierlists: [], tournaments: [], quizzes: [] });
 
   assert.equal(service.getProfileByUsername("bob").private, true);
 });
@@ -1682,8 +1720,8 @@ test("discover builds summaries and voted flags only for the page it returns", (
   const page = service.getDiscover("all", "", 3, 1, "viewer");
 
   assert.deepEqual(page.items.map((item) => [item.content.id, item.content.viewerVoted]), [["g1", false], ["t4", true], ["t3", false]]);
-  assert.deepEqual(publishedManyCalls, [{ kind: "tierlist", ids: ["t4", "t3"] }, { kind: "tournament", ids: ["g1"] }]);
-  assert.deepEqual(votedAmongCalls, [{ kind: "tierlist", viewerId: "viewer", ids: ["t4", "t3"] }, { kind: "tournament", viewerId: "viewer", ids: ["g1"] }]);
+  assert.deepEqual(publishedManyCalls, [{ kind: "tierlist", ids: ["t4", "t3"] }, { kind: "tournament", ids: ["g1"] }, { kind: "quiz", ids: [] }]);
+  assert.deepEqual(votedAmongCalls, [{ kind: "tierlist", viewerId: "viewer", ids: ["t4", "t3"] }, { kind: "tournament", viewerId: "viewer", ids: ["g1"] }, { kind: "quiz", viewerId: "viewer", ids: [] }]);
 
   votedAmongCalls.length = 0;
   service.getDiscover("all", "", 3, 1);
@@ -1703,6 +1741,7 @@ test("discover reads each window only as far as the page needs, up to the cap, a
     { kind: "tierlist", needle: "", limit: 61 },
     { kind: "tierlist", needle: "fantasy", limit: 500 },
     { kind: "tournament", needle: "fantasy", limit: 500 },
+    { kind: "quiz", needle: "fantasy", limit: 500 },
     { kind: "tournament", needle: "", limit: 500 }
   ]);
 });
@@ -1973,8 +2012,8 @@ test("a visitor's read leaves out exactly the types of the categories the owner 
 
   assert.deepEqual(hiddenWith({ publications: true, reading: true, votes: true, follows: true }), []);
   assert.deepEqual(hiddenWith(DEFAULT_FEED_SETTINGS), ["book_added", "book_finished"]);
-  assert.deepEqual(hiddenWith({ publications: false, reading: true, votes: true, follows: false }), ["following", "mural_published", "tierlist_published", "tournament_published"]);
-  assert.deepEqual(hiddenWith({ publications: false, reading: false, votes: false, follows: false }), ["book_added", "book_finished", "following", "mural_published", "tierlist_published", "tournament_published", "voted_on"]);
+  assert.deepEqual(hiddenWith({ publications: false, reading: true, votes: true, follows: false }), ["following", "mural_published", "quiz_published", "tierlist_published", "tournament_published"]);
+  assert.deepEqual(hiddenWith({ publications: false, reading: false, votes: false, follows: false }), ["book_added", "book_finished", "following", "mural_published", "quiz_published", "tierlist_published", "tournament_published", "voted_on"]);
 });
 
 test("a row the repository returns although its category is switched off is still left out of a visitor's page, and the page reads on past it", () => {
@@ -2141,7 +2180,7 @@ test("only the categories that came on are backfilled, each turn-on in its own t
   service.updateFeedSettings("alice", { ...ALL_OFF, publications: true, votes: true });
   service.updateFeedSettings("alice", { ...ALL_OFF, publications: true, votes: true, reading: true });
   await Promise.all(tasks);
-  assert.deepEqual(backfills.map((backfill) => backfill.types), [["tierlist_published", "tournament_published", "voted_on"], READING_TYPES]);
+  assert.deepEqual(backfills.map((backfill) => backfill.types), [["tierlist_published", "tournament_published", "quiz_published", "voted_on"], READING_TYPES]);
 
   service.updateFeedSettings("alice", ALL_OFF);
   service.updateFeedSettings("alice", { publications: true, reading: true, votes: true, follows: true });
@@ -2467,4 +2506,153 @@ test("suggested readers scan at most the 500 most recently active published prof
   };
   suggested();
   assert.deepEqual(requested, [500]);
+});
+
+test("a follower's dashboard shows a quiz publication and a quiz play, each under its own switch", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, quizRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  readerProfiles.set("bob", reader("bob"));
+  repo.upsertProfile(profileRow("alice"));
+  repo.upsertProfile(profileRow("bob"));
+  repo.insertFollow({ follower_id: "viewer", followee_id: "alice", created_at: at(1) });
+  repo.insertFollow({ follower_id: "viewer", followee_id: "bob", created_at: at(1) });
+  quizRefs.set("q1", quizRef("q1", "alice", { covers: ["a", "b", "c", "d"] }));
+  quizRefs.set("q2", quizRef("q2", "alice"));
+  repo.insertEvent({ id: "e-pub", user_id: "alice", type: "quiz_published", ref_type: "quiz", ref_id: "q1", payload: null, created_at: at(3) });
+  repo.insertEvent({ id: "e-play", user_id: "bob", type: "voted_on", ref_type: "quiz", ref_id: "q2", payload: JSON.stringify({ game: "quiz", id: "q2", name: "Quiz q2" }), created_at: at(4) });
+
+  const items = service.getDashboard("viewer", undefined, 20, ALL_KINDS).items;
+  assert.deepEqual(items.map((item) => [item.kind, item.id]), [["vote", "e-play"], ["publication", "e-pub"]]);
+  const [vote, publication] = items;
+  assert.deepEqual(publication && "content" in publication ? publication.content : null, { kind: "quiz", id: "q1", voteCode: "play-q1", name: "Quiz q1", questionCount: 6, playCount: 3, playOpen: true, covers: ["a", "b", "c"] });
+  assert.equal(publication && "type" in publication ? publication.type : null, "quiz_published");
+  assert.equal(vote && "content" in vote ? vote.content.kind : null, "quiz");
+
+  repo.updateFeedSettings("alice", { ...DEFAULT_FEED_SETTINGS, publications: false });
+  assert.deepEqual(service.getDashboard("viewer", undefined, 20, ALL_KINDS).items.map((item) => item.id), ["e-play"]);
+  repo.updateFeedSettings("alice", DEFAULT_FEED_SETTINGS);
+  repo.updateFeedSettings("bob", { ...DEFAULT_FEED_SETTINGS, votes: false });
+  assert.deepEqual(service.getDashboard("viewer", undefined, 20, ALL_KINDS).items.map((item) => item.id), ["e-pub"]);
+});
+
+test("a quiz whose play closed after publishing still shows, closed", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, usernames, quizRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  readerProfiles.set("alice", reader("alice"));
+  repo.upsertProfile(profileRow("alice"));
+  repo.insertFollow({ follower_id: "viewer", followee_id: "alice", created_at: at(1) });
+  quizRefs.set("q1", quizRef("q1", "alice", { playOpen: false }));
+  repo.insertEvent({ id: "e-pub", user_id: "alice", type: "quiz_published", ref_type: "quiz", ref_id: "q1", payload: null, created_at: at(3) });
+
+  const [item] = service.getDashboard("viewer", undefined, 20, ALL_KINDS).items;
+  assert.equal(item && "content" in item && item.content.kind === "quiz" ? item.content.playOpen : null, false);
+  const activity = service.getActivity("alice", undefined, undefined, 20).items;
+  assert.equal(activity[0]?.payload.href, "/play/play-q1");
+});
+
+test("the dashboard drops quiz items whose quiz was deleted or changed owner", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, quizRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  readerProfiles.set("bob", reader("bob"));
+  repo.upsertProfile(profileRow("alice"));
+  repo.upsertProfile(profileRow("bob"));
+  repo.insertFollow({ follower_id: "viewer", followee_id: "alice", created_at: at(1) });
+  repo.insertFollow({ follower_id: "viewer", followee_id: "bob", created_at: at(1) });
+  quizRefs.set("q2", quizRef("q2", "bob"));
+  repo.insertEvent({ id: "e-gone", user_id: "alice", type: "quiz_published", ref_type: "quiz", ref_id: "q1", payload: null, created_at: at(3) });
+  repo.insertEvent({ id: "e-foreign", user_id: "alice", type: "quiz_published", ref_type: "quiz", ref_id: "q2", payload: null, created_at: at(4) });
+  repo.insertEvent({ id: "e-play-gone", user_id: "bob", type: "voted_on", ref_type: "quiz", ref_id: "q3", payload: JSON.stringify({ game: "quiz", id: "q3", name: "Old" }), created_at: at(5) });
+
+  assert.deepEqual(service.getDashboard("viewer", undefined, 20, ALL_KINDS).items, []);
+});
+
+test("getActivity enriches quiz publications and plays with a play link, and drops them once the quiz is deleted", () => {
+  const { repo } = createRepoFake();
+  const { deps, usernames, quizRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  repo.upsertProfile(profileRow("alice"));
+  quizRefs.set("q1", quizRef("q1", "alice", { covers: ["a", "b", "c", "d"] }));
+  quizRefs.set("q2", quizRef("q2", "bob", { covers: ["x"] }));
+  repo.insertEvent({ id: "e-pub", user_id: "alice", type: "quiz_published", ref_type: "quiz", ref_id: "q1", payload: null, created_at: at(3) });
+  repo.insertEvent({ id: "e-play", user_id: "alice", type: "voted_on", ref_type: "quiz", ref_id: "q2", payload: JSON.stringify({ game: "quiz", id: "q2", name: "Quiz q2" }), created_at: at(2) });
+
+  const items = service.getActivity("alice", "alice", undefined, 20).items;
+  assert.deepEqual(items.map((item) => [item.id, item.type, item.payload]), [
+    ["e-pub", "quiz_published", { name: "Quiz q1", href: "/play/play-q1", detail: "6 questions · 3 plays", covers: ["a", "b", "c"] }],
+    ["e-play", "voted_on", { game: "quiz", id: "q2", name: "Quiz q2", covers: ["x"], href: "/play/play-q2" }]
+  ]);
+
+  quizRefs.clear();
+  assert.deepEqual(service.getActivity("alice", "alice", undefined, 20).items, []);
+});
+
+test("getActivity drops a quiz publication whose quiz is owned by someone else", () => {
+  const { repo } = createRepoFake();
+  const { deps, usernames, quizRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  repo.upsertProfile(profileRow("alice"));
+  quizRefs.set("q1", quizRef("q1", "bob"));
+  repo.insertEvent({ id: "e-pub", user_id: "alice", type: "quiz_published", ref_type: "quiz", ref_id: "q1", payload: null, created_at: at(3) });
+
+  assert.deepEqual(service.getActivity("alice", "alice", undefined, 20).items, []);
+});
+
+test("a profile's Published list includes its quizzes, and nothing while unpublished", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, usernames, quizRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  usernames.set("alice", "alice");
+  repo.upsertProfile(profileRow("alice"));
+  quizRefs.set("q1", quizRef("q1", "alice"));
+  quizRefs.set("q2", quizRef("q2", "bob"));
+
+  assert.deepEqual(service.getProfileByUsername("alice").published.quizzes.map((q) => [q.kind, q.id]), [["quiz", "q1"]]);
+  repo.upsertProfile(profileRow("alice", { published: 0 }));
+  assert.deepEqual(service.getProfileByUsername("alice").published.quizzes, []);
+});
+
+test("discover's quiz filter returns only quizzes, all includes them, and the viewer's played flag is set", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs, tournamentRefs, quizRefs, quizPlays, windowCalls, votedAmongCalls } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  tierlistRefs.set("t1", tierRef("t1", "alice", { createdAt: at(1) }));
+  tournamentRefs.set("g1", tournRef("g1", "alice", { createdAt: at(2) }));
+  quizRefs.set("q1", quizRef("q1", "alice", { createdAt: at(3) }));
+  quizRefs.set("q2", quizRef("q2", "alice", { createdAt: at(4), name: "Fantasy quiz" }));
+  quizRefs.set("q3", quizRef("q3", "ghost", { createdAt: at(5) }));
+  quizPlays.add("viewer:q1");
+
+  const onlyQuizzes = service.getDiscover("quiz", "", 10, 0, "viewer");
+  assert.deepEqual(onlyQuizzes.items.map((item) => [item.content.kind, item.content.id, item.content.viewerVoted]), [["quiz", "q2", false], ["quiz", "q1", true]]);
+  assert.deepEqual(windowCalls.map((call) => call.kind), ["quiz"]);
+  assert.deepEqual(votedAmongCalls.filter((call) => call.kind === "quiz"), [{ kind: "quiz", viewerId: "viewer", ids: ["q2", "q1"] }]);
+
+  assert.deepEqual(service.getDiscover("all", "", 10, 0).items.map((item) => item.content.kind), ["quiz", "quiz", "tournament", "tierlist"]);
+  assert.deepEqual(service.getDiscover("tierlist", "", 10, 0).items.map((item) => item.content.kind), ["tierlist"]);
+  assert.deepEqual(service.getDiscover("all", "fantasy", 10, 0).items.map((item) => item.content.id), ["q2"]);
+});
+
+test("discover leaves out a quiz that was deleted between the window and the page read", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, quizRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  quizRefs.set("q1", quizRef("q1", "alice"));
+  const original = deps.quizzes.getPublishedMany;
+  deps.quizzes.getPublishedMany = (ids) => {
+    quizRefs.clear();
+    return original(ids);
+  };
+
+  assert.deepEqual(service.getDiscover("quiz", "", 10, 0).items, []);
 });

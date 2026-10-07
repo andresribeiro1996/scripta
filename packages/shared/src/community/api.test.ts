@@ -3,7 +3,7 @@ import { test } from "node:test";
 import type { ApiRequest, ApiRequestInit } from "../api/port.js";
 import { dashboardQuery } from "../dashboard.js";
 import { createCommunityApi, type CommunityApi } from "./api.js";
-import type { FeedSettings, PublishProfileInput } from "./types.js";
+import type { DiscoverItem, FeedSettings, PublishProfileInput } from "./types.js";
 
 function recorder(answer: unknown = {}) {
   const calls: Array<{ path: string; init: ApiRequestInit }> = [];
@@ -43,6 +43,13 @@ for (const [name, call, path, init] of cases) {
     assert.deepEqual(calls, [{ path, init }]);
   });
 }
+
+test("fetchDiscover drops items whose content kind this build cannot draw", async () => {
+  const known = { author: {}, content: { kind: "quiz", id: "q1" } } as unknown as DiscoverItem;
+  const unknown = { author: {}, content: { kind: "hologram", id: "h1" } } as unknown as DiscoverItem;
+  const { api } = recorder({ items: [unknown, known], nextOffset: 20 });
+  assert.deepEqual(await api.fetchDiscover("all", "", 0), { items: [known], nextOffset: 20 });
+});
 
 test("people lists are unwrapped", async () => {
   assert.deepEqual(await recorder({ people: ["P"] }).api.searchPeople("a"), ["P"]);

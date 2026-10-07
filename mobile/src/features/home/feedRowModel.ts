@@ -38,7 +38,7 @@ export function feedRowModel(item: DigestItem): FeedRowModel {
     case "publication":
       return {
         covers: item.content.covers,
-        icon: item.content.kind === "tierlist" ? "tierlist" : "arena",
+        icon: item.content.kind === "tierlist" ? "tierlist" : item.content.kind === "quiz" ? "champion" : "arena",
         label: contentKindLabel(item.content),
         tone: "accent",
         title: item.content.name,
@@ -48,8 +48,8 @@ export function feedRowModel(item: DigestItem): FeedRowModel {
     case "vote":
       return {
         covers: [],
-        icon: "vote",
-        label: item.content.kind === "tierlist" ? "Ranked" : "Voted",
+        icon: item.content.kind === "quiz" ? "champion" : "vote",
+        label: item.content.kind === "tierlist" ? "Ranked" : item.content.kind === "quiz" ? "Played" : "Voted",
         tone: "accent",
         title: "",
         detail: item.content.name,

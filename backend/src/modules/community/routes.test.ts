@@ -78,6 +78,25 @@ test("discover passes type/q/limit/offset through", async () => {
   await app.close();
 });
 
+test("discover accepts the quiz type", async () => {
+  const seen: unknown[] = [];
+  const app = Fastify();
+  await app.register(
+    buildPublicCommunityRoutes(
+      fakeService({
+        getDiscover: (type) => {
+          seen.push(type);
+          return { items: [], nextOffset: null };
+        }
+      })
+    )
+  );
+  const res = await app.inject({ method: "GET", url: "/community/discover?type=quiz" });
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(seen, ["quiz"]);
+  await app.close();
+});
+
 test("discover passes the viewer through when signed in", async () => {
   const seen: Array<string | undefined> = [];
   const app = Fastify();

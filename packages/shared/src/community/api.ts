@@ -2,6 +2,7 @@ import { apiPath } from "../api/path.js";
 import type { ApiRequest } from "../api/port.js";
 import { dashboardQuery, withKnownDigestItems, type DashboardFeedPage } from "../dashboard.js";
 import type { LibraryData } from "../library/index.js";
+import { isKnownContent } from "./helpers.js";
 import type { ActivityItem, CommunityProfileView, DiscoverItem, DiscoverType, FeedSettings, OwnProfile, Page, PersonResult, PublishProfileInput, SuggestedReader } from "./types.js";
 
 export function createCommunityApi(request: ApiRequest) {
@@ -12,9 +13,10 @@ export function createCommunityApi(request: ApiRequest) {
     async markDashboardSeen(): Promise<void> {
       await request("/community/dashboard/seen", { method: "POST", auth: "required" });
     },
-    fetchDiscover(type: DiscoverType, q: string, offset = 0): Promise<{ items: DiscoverItem[]; nextOffset: number | null }> {
+    async fetchDiscover(type: DiscoverType, q: string, offset = 0): Promise<{ items: DiscoverItem[]; nextOffset: number | null }> {
       const params = new URLSearchParams({ type, q, offset: String(offset) });
-      return request(`/community/discover?${params}`, { auth: "optional" });
+      const page = await request<{ items: DiscoverItem[]; nextOffset: number | null }>(`/community/discover?${params}`, { auth: "optional" });
+      return { ...page, items: page.items.filter((item) => isKnownContent(item.content)) };
     },
     async searchPeople(q: string): Promise<PersonResult[]> {
       return (await request<{ people: PersonResult[] }>(`/community/people?q=${encodeURIComponent(q)}`, { auth: "required" })).people;

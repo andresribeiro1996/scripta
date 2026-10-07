@@ -6,7 +6,8 @@ import { test } from "node:test";
 import type { QuizzesRepository } from "./domain/ports.js";
 import type { QuizBook } from "@scripta/shared";
 import type { AnswerRow, PlayRow, QuizRow } from "./domain/types.js";
-import { createQuizzesService } from "./service.js";
+import { normalizeWords } from "@scripta/shared";
+import { createQuizzesPublicApi, createQuizzesService } from "./service.js";
 
 function createInMemoryRepo(): QuizzesRepository {
   const quizzes = new Map<string, QuizRow>();
@@ -84,6 +85,23 @@ function createInMemoryRepo(): QuizzesRepository {
       }));
     },
     listPublishedByWorks: () => [],
+    getPublicById: (id) => [...quizzes.values()].find((q) => q.id === id && q.vote_code !== null),
+    listPublicByUser: (ownerUserId) =>
+      [...quizzes.values()]
+        .filter((q) => q.owner_user_id === ownerUserId && q.vote_code !== null)
+        .sort((a, b) => b.created_at.localeCompare(a.created_at)),
+    listPublicByIds: (ids) => [...quizzes.values()].filter((q) => q.vote_code !== null && ids.includes(q.id)),
+    discoverWindow: (needle, limit) =>
+      [...quizzes.values()]
+        .filter((q) => q.vote_code !== null && normalizeWords(q.name).includes(needle))
+        .sort((a, b) => b.created_at.localeCompare(a.created_at))
+        .slice(0, limit),
+    playCountsFor: (ids) => {
+      const counts = new Map<string, number>();
+      for (const p of plays.values()) if (ids.includes(p.quiz_id)) counts.set(p.quiz_id, (counts.get(p.quiz_id) ?? 0) + 1);
+      return counts;
+    },
+    votedAmong: (viewerUserId, ids) => ids.filter((id) => [...plays.values()].some((p) => p.quiz_id === id && p.voter_user_id === viewerUserId)),
     listParticipation: () => [],
     listRecentPlayers: () => []
   };
@@ -250,4 +268,146 @@ test("the play board looks each question's book up by its stored work", () => {
     const expected = { cover_title: owner.coverUrl, title_cover: owner.title, quote_title: owner.quote, blurb_title: owner.blurb }[source.type];
     assert.equal(question.prompt, expected);
   }
+});
+
+function makeEmittingService() {
+  const published: Array<[string, string]> = [];
+  const played: Array<[string, string, string]> = [];
+  const repo = createInMemoryRepo();
+  const service = createQuizzesService(
+    repo,
+    (quizId, ownerUserId) => published.push([quizId, ownerUserId]),
+    (playerUserId, quizId, quizName) => played.push([playerUserId, quizId, quizName])
+  );
+  const created = service.createQuiz("u1", "My quiz", {
+    sourceLabel: "Shelf",
+    questionCount: 3,
+    allowedTypes: ["cover_title", "title_cover", "quote_title", "blurb_title"],
+    books: Array.from({ length: 6 }, (_, i) => book(`b${i}`)),
+    questions: null
+  });
+  return { service, published, played, quizId: created.id };
+}
+
+function answerFirst(service: ReturnType<typeof createQuizzesService>, code: string) {
+  return service.getPlayBoard(code)!.questions.map((q) => ({ questionId: q.id, choiceIndex: 0 }));
+}
+
+test("publish emits exactly once with the quiz and its owner, and a second publish emits nothing", () => {
+  const { service, published, quizId } = makeEmittingService();
+  assert.ok(service.publishQuiz("u1", quizId, []).ok);
+  assert.deepEqual(published, [[quizId, "u1"]]);
+  assert.equal(service.publishQuiz("u1", quizId, []).ok, false);
+  assert.deepEqual(published, [[quizId, "u1"]]);
+});
+
+test("a refused publish emits nothing", () => {
+  const { service, published, quizId } = makeEmittingService();
+  assert.equal(service.publishQuiz("u2", quizId, []).ok, false);
+  const few = service.createQuiz("u1", "Few", { sourceLabel: "", questionCount: 10, allowedTypes: ["cover_title"], books: [book("f0")], questions: null });
+  assert.equal(service.publishQuiz("u1", few.id, []).ok, false);
+  assert.deepEqual(published, []);
+});
+
+test("a signed-in play emits once with the player, quiz and name, and the owner's own play emits too", () => {
+  const { service, played, quizId } = makeEmittingService();
+  const outcome = service.publishQuiz("u1", quizId, []);
+  assert.ok(outcome.ok);
+  const code = outcome.ok ? outcome.quiz.voteCode! : "";
+  const answers = answerFirst(service, code);
+  assert.ok(service.submitPlay(code, answers, 1000, "Bob", { kind: "user", userId: "u9" }).ok);
+  assert.deepEqual(played, [["u9", quizId, "My quiz"]]);
+  assert.equal(service.submitPlay(code, answers, 1000, "Bob", { kind: "user", userId: "u9" }).ok, false);
+  assert.equal(played.length, 1);
+  assert.ok(service.submitPlay(code, answers, 1000, "Owner", { kind: "user", userId: "u1" }).ok);
+  assert.deepEqual(played[1], ["u1", quizId, "My quiz"]);
+});
+
+test("an anonymous play and a play on a closed quiz emit nothing", () => {
+  const { service, played, quizId } = makeEmittingService();
+  const outcome = service.publishQuiz("u1", quizId, []);
+  assert.ok(outcome.ok);
+  const code = outcome.ok ? outcome.quiz.voteCode! : "";
+  const answers = answerFirst(service, code);
+  assert.ok(service.submitPlay(code, answers, 1000, null, { kind: "anonymous", playId: null }).ok);
+  service.setPlayState("u1", quizId, false);
+  assert.equal(service.submitPlay(code, answers, 1000, "Bob", { kind: "user", userId: "u9" }).ok, false);
+  assert.deepEqual(played, []);
+});
+
+function publishedFixture() {
+  const repo = createInMemoryRepo();
+  const service = createQuizzesService(repo);
+  const make = (owner: string, name: string, books: QuizBook[], questionCount = 3) => {
+    const created = service.createQuiz(owner, name, { sourceLabel: "", questionCount, allowedTypes: ["title_cover"], books, questions: null });
+    const outcome = service.publishQuiz(owner, created.id, []);
+    assert.ok(outcome.ok);
+    return created.id;
+  };
+  return { repo, service, make };
+}
+
+test("published refs carry counts, play state and the first three non-empty covers", () => {
+  const { service, make } = publishedFixture();
+  const books = [book("c0", { coverUrl: null }), book("c1"), book("c2", { coverUrl: "" }), book("c3"), book("c4"), book("c5")];
+  const id = make("u1", "Covers", books, 2);
+  const code = service.getQuiz("u1", id)!.voteCode!;
+  service.submitPlay(code, answerFirst(service, code), 1000, "A", { kind: "anonymous", playId: null });
+  service.submitPlay(code, answerFirst(service, code), 1000, "B", { kind: "user", userId: "u9" });
+  service.setPlayState("u1", id, false);
+
+  const ref = createQuizzesPublicApi(service).getPublished(id);
+  assert.deepEqual(ref, {
+    id,
+    ownerUserId: "u1",
+    createdAt: service.getQuiz("u1", id)!.createdAt,
+    voteCode: code,
+    name: "Covers",
+    questionCount: 2,
+    playCount: 2,
+    playOpen: false,
+    covers: ["https://covers.test/c1.jpg", "https://covers.test/c3.jpg", "https://covers.test/c4.jpg"]
+  });
+});
+
+test("the public reads return only published quizzes", () => {
+  const { service, make } = publishedFixture();
+  const six = Array.from({ length: 6 }, (_, i) => book(`b${i}`));
+  const first = make("u1", "First", six);
+  const second = make("u1", "Second", six);
+  const other = make("u2", "Other", six);
+  const draft = service.createQuiz("u1", "Draft", { sourceLabel: "", questionCount: 3, allowedTypes: ["title_cover"], books: six, questions: null });
+  const api = createQuizzesPublicApi(service);
+
+  assert.equal(api.getPublished(draft.id), undefined);
+  assert.equal(api.getPublished("ghost"), undefined);
+  assert.deepEqual(api.listPublishedByOwner("u1").map((r) => r.id).sort(), [first, second].sort());
+  assert.deepEqual(api.getPublishedMany([first, draft.id, other, "ghost"]).map((r) => r.id).sort(), [first, other].sort());
+  assert.deepEqual(api.getPublishedMany([]), []);
+});
+
+test("discoverWindow filters by normalized name and returns id, createdAt and owner only", () => {
+  const { service, make } = publishedFixture();
+  const six = Array.from({ length: 6 }, (_, i) => book(`b${i}`));
+  const habits = make("u1", "Hábitos Atómicos", six);
+  make("u2", "Fantasy", six);
+  const api = createQuizzesPublicApi(service);
+
+  assert.deepEqual(api.discoverWindow("habitos", 10), [{ id: habits, createdAt: service.getQuiz("u1", habits)!.createdAt, ownerUserId: "u1" }]);
+  assert.equal(api.discoverWindow("", 10).length, 2);
+  assert.equal(api.discoverWindow("", 1).length, 1);
+  assert.deepEqual(api.discoverWindow("nothing like it", 10), []);
+});
+
+test("votedAmong lists the published quizzes the viewer has played", () => {
+  const { service, make } = publishedFixture();
+  const six = Array.from({ length: 6 }, (_, i) => book(`b${i}`));
+  const played = make("u1", "Played", six);
+  const unplayed = make("u1", "Unplayed", six);
+  const code = service.getQuiz("u1", played)!.voteCode!;
+  service.submitPlay(code, answerFirst(service, code), 1000, null, { kind: "user", userId: "u9" });
+  const api = createQuizzesPublicApi(service);
+
+  assert.deepEqual(api.votedAmong("u9", [played, unplayed]), [played]);
+  assert.deepEqual(api.votedAmong("u8", [played, unplayed]), []);
 });
