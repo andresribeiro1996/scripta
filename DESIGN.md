@@ -143,7 +143,7 @@ Full guidelines, states and prop shapes live in the artifact's per-component REA
 
 ### Other controls
 
-- **ToggleSwitch** (inline in `SocialsSection.tsx`, worth extracting) — 44×24 pill, `accent` fill when on (not `success` — this is a settings toggle, not a status indicator).
+- **ToggleSwitch** (`ui/components.tsx`; Settings → Socials, Feed settings) — 44×24 pill, `accent` fill when on (not `success` — this is a settings toggle, not a status indicator).
 - **TierColorPicker** (`components/tierlist/TierColorPicker.tsx`) — 6 preset swatches (S/A/B/C/D/Grey) + custom `<input type="color">` in a dashed tile. Commits on **blur**, not `change`, so dragging the native color wheel doesn't spam re-renders.
 
 ### Headers (mobile — native stack bar via `useScreenOptions()`)
