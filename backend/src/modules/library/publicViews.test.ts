@@ -1018,6 +1018,19 @@ test("a chosen highlight that left its book drops out while the chosen signature
   assert.equal(chosen?.highlight, undefined);
 });
 
+test("a chosen book and highlight still resolve for visitors after their duplicates merge", () => {
+  const owner = "card-merged";
+  const kept = { ContentID: "m1", Title: "Orlando", Attribution: "Virginia Woolf", ReadStatus: 2 };
+  const copy = { ...kept, ISBN: "9780156031516", highlights: [{ Type: "highlight", Text: "Different persons", BookmarkID: "h1" }] };
+  const saved = service.saveLibrary(owner, { books: [kept, copy], groups: [] });
+  service.patchReaderCardStyle(owner, { signature: { bookKey: bookKey(copy), note: "why" }, highlight: { bookKey: bookKey(copy), highlightId: "h1" } });
+  service.mergeBooks(owner, bookKey(kept), [bookKey(kept), bookKey(copy)], saved.updatedAt);
+  const chosen = resolvePublicLibraryData(owner, cardRequest).readerCard?.chosen;
+  assert.equal(chosen?.signature?.title, "Orlando");
+  assert.equal(chosen?.signature?.note, "why");
+  assert.deepEqual(chosen?.highlight, { text: "Different persons", title: "Orlando", author: "Virginia Woolf" });
+});
+
 test("a reader who never styled their card gets the default public style and no choices", () => {
   const owner = "card-plain";
   service.saveLibrary(owner, { books: [earthsea], groups: [] });
