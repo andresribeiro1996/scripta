@@ -30,12 +30,12 @@ test("nextIndex advances but clamps to the last question", () => {
   assert.equal(nextIndex(questions, 2), 2);
 });
 
-test("playStage walks loading → closed → playing → played", () => {
+test("playStage walks loading → leaderboard → playing → played", () => {
   const base = { boardReady: false, boardMissing: false, playOpen: true, resolved: false, alreadyPlayed: false };
   assert.equal(playStage(base), "loading");
   assert.equal(playStage({ ...base, boardReady: true, resolved: true }), "playing");
   assert.equal(playStage({ ...base, boardReady: true, resolved: true, alreadyPlayed: true }), "played");
-  assert.equal(playStage({ ...base, boardReady: true, playOpen: false, resolved: true }), "closed");
+  assert.equal(playStage({ ...base, boardReady: true, playOpen: false, resolved: true }), "leaderboard");
   assert.equal(playStage({ ...base, boardReady: true, playOpen: false }), "loading");
   assert.equal(playStage({ ...base, boardReady: true, playOpen: false, resolved: true, alreadyPlayed: true }), "played");
   assert.equal(playStage({ ...base, boardMissing: true }), "unavailable");

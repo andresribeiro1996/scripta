@@ -14,7 +14,7 @@ test("a result always shows, open or closed", () => {
   assert.equal(quizPlayStage({ ...base, playOpen: false, hasResult: true }), "result");
 });
 
-test("a closed quiz waits for the own-play lookup, then shows the closed message", () => {
+test("a closed quiz waits for the own-play lookup, then shows the leaderboard", () => {
   assert.equal(quizPlayStage({ ...base, playOpen: false, ownPlayPending: true }), "loading");
-  assert.equal(quizPlayStage({ ...base, playOpen: false }), "closed");
+  assert.equal(quizPlayStage({ ...base, playOpen: false }), "leaderboard");
 });

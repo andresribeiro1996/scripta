@@ -20,7 +20,7 @@ export function nextIndex(questions: PublicQuizQuestion[], index: number): numbe
   return Math.min(index + 1, questions.length - 1);
 }
 
-export type PlayStage = "loading" | "unavailable" | "closed" | "played" | "playing";
+export type PlayStage = "loading" | "unavailable" | "leaderboard" | "played" | "playing";
 
 /** The single decision point the play screen renders from, kept pure. */
 export function playStage(input: {
@@ -34,5 +34,5 @@ export function playStage(input: {
   if (!input.boardReady) return "loading";
   if (!input.resolved) return "loading";
   if (input.alreadyPlayed) return "played";
-  return input.playOpen ? "playing" : "closed";
+  return input.playOpen ? "playing" : "leaderboard";
 }
