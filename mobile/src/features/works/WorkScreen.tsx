@@ -127,8 +127,8 @@ export function WorkScreen({ id }: { id: string }) {
           {heading("Readers")}
           <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{model.countsLabel}</Text>
           {model.readerGroups.map((group) => (
-            <View key={group.title} style={styles.group}>
-              <Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.textDim }]}>{group.title}</Text>
+            <View key={group.key} style={styles.group}>
+              {group.title ? <Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.textDim }]}>{group.title}</Text> : null}
               {group.rows.map((row) => {
                 const body = (
                   <>

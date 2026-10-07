@@ -153,7 +153,7 @@ export function MuralBlockDetail({
             <BookSummary book={book} />
             {workIdOf(book) && (
               <Link to={`/work/${workIdOf(book)}`} className="mt-4 inline-block text-sm font-semibold text-(--color-accent) hover:underline">
-                About this book
+                Book page
               </Link>
             )}
           </div>

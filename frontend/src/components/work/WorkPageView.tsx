@@ -4,16 +4,18 @@ import { FINISH_FEELINGS, editionLabel, gameOwnerLabel, readerCountsLabel, reade
 import { AuthorAvatar } from "../CommunityAuthorAvatar";
 import { CoverImage } from "../BookCard";
 import { ReaderGlyph } from "../ReaderGlyph";
+import { BackLink } from "./BackLink";
 
 const rowClass = "flex items-center gap-3 rounded-xl border border-(--color-border) bg-(--color-surface) p-4";
 const sectionHeading = "mb-3 text-lg font-bold";
 
-export function WorkPageView({ page, signedIn, onAdd, onShare }: { page: WorkPage; signedIn: boolean; onAdd: () => void; onShare: () => void }) {
+export function WorkPageView({ page, signedIn, backTo, onBack, onAdd, onShare }: { page: WorkPage; signedIn: boolean; backTo: string; onBack: (() => void) | null; onAdd: () => void; onShare: () => void }) {
   const { work, mine, readers, games } = page;
   const [aboutOpen, setAboutOpen] = useState(false);
   const aboutPreview = work.summary ? summaryPreview(work.summary) : null;
   const feeling = mine?.rating ? FINISH_FEELINGS.find((f) => f.rating === mine.rating)?.label ?? null : null;
   const gameRows: Array<[string, WorkGameRef[]]> = [["Tier list", games.tierlists], ["Tournament", games.arenas], ["Quiz", games.quizzes]];
+  const bothGroups = readers.followed.length > 0 && readers.others.length > 0;
   const anyGame = gameRows.some(([, list]) => list.length > 0);
   const isbn = work.editions.find((edition) => edition.isbn)?.isbn;
   const coverBook = useMemo(
@@ -22,6 +24,7 @@ export function WorkPageView({ page, signedIn, onAdd, onShare }: { page: WorkPag
   );
   return (
     <main className="mx-auto max-w-5xl px-5 py-8">
+      <BackLink backTo={backTo} onBack={onBack} />
       <header className="mb-8 flex flex-col gap-5 sm:flex-row">
         <div className="relative aspect-[2/3] w-32 shrink-0 overflow-hidden rounded-xl bg-(--color-border)">
           <CoverImage book={coverBook} size="full" />
@@ -82,8 +85,8 @@ export function WorkPageView({ page, signedIn, onAdd, onShare }: { page: WorkPag
       <section className="mb-8">
         <h2 className={sectionHeading}>Readers</h2>
         <p className="mb-3 text-sm text-(--color-text-dim)">{readerCountsLabel(readers.counts)}</p>
-        {readers.followed.length > 0 ? <ReaderList title="People you follow" readers={readers.followed} signedIn={signedIn} /> : null}
-        {readers.others.length > 0 ? <ReaderList title={signedIn ? "Other readers" : "Readers"} readers={readers.others} signedIn={signedIn} /> : null}
+        {readers.followed.length > 0 ? <ReaderList title={bothGroups ? "People you follow" : null} readers={readers.followed} signedIn={signedIn} /> : null}
+        {readers.others.length > 0 ? <ReaderList title={bothGroups ? "Other readers" : null} readers={readers.others} signedIn={signedIn} /> : null}
       </section>
       <section>
         <h2 className={sectionHeading}>Games</h2>
@@ -106,10 +109,10 @@ export function WorkPageView({ page, signedIn, onAdd, onShare }: { page: WorkPag
   );
 }
 
-function ReaderList({ title, readers, signedIn }: { title: string; readers: WorkReader[]; signedIn: boolean }) {
+function ReaderList({ title, readers, signedIn }: { title: string | null; readers: WorkReader[]; signedIn: boolean }) {
   return (
     <div className="mb-4">
-      <h3 className="mb-3 text-sm font-semibold text-(--color-text-dim)">{title}</h3>
+      {title ? <h3 className="mb-3 text-sm font-semibold text-(--color-text-dim)">{title}</h3> : null}
       <ul className="grid grid-cols-1 gap-3">
         {readers.map((reader) => {
           const body = (

@@ -2,6 +2,14 @@ import { FINISH_FEELINGS, gameOwnerLabel, readerCountsLabel, readerStatusLabel, 
 
 const readerRow = (reader: WorkReader) => ({ username: reader.username, avatarUrl: reader.avatarUrl, readerGlyph: reader.readerGlyph, status: readerStatusLabel(reader.readStatus), linksToProfile: reader.published });
 
+function readerGroups({ followed, others }: WorkPage["readers"]) {
+  const groups = [
+    { key: "followed", heading: "People you follow", rows: followed.map(readerRow) },
+    { key: "others", heading: "Other readers", rows: others.map(readerRow) }
+  ].filter((group) => group.rows.length > 0);
+  return groups.map(({ key, heading, rows }) => ({ key, title: groups.length > 1 ? heading : null, rows }));
+}
+
 export function workScreenSections(page: WorkPage) {
   const { mine, readers, games } = page;
   const feeling = mine?.rating ? FINISH_FEELINGS.find((f) => f.rating === mine.rating)?.label ?? null : null;
@@ -12,10 +20,7 @@ export function workScreenSections(page: WorkPage) {
     aboutPreview: page.work.summary ? summaryPreview(page.work.summary) : null,
     mine: mine ? { status: readerStatusLabel(mine.readStatus), detail: [feeling, `${mine.highlightCount} ${mine.highlightCount === 1 ? "highlight" : "highlights"}`].filter(Boolean).join(" · ") } : null,
     countsLabel: readerCountsLabel(readers.counts),
-    readerGroups: [
-      { title: "People you follow", rows: readers.followed.map(readerRow) },
-      { title: "Other readers", rows: readers.others.map(readerRow) }
-    ].filter((group) => group.rows.length > 0),
+    readerGroups: readerGroups(readers),
     games: gameRows,
     gamesEmpty: gameRows.length === 0
   };
