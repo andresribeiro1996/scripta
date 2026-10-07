@@ -33,14 +33,14 @@ export function CommunityProfilePage() {
   const { session } = useAuth();
   const queryClient = useQueryClient();
   const viewerTheme = useResolvedTheme();
-  const { view, isLoading, isNotFound } = useCommunityProfile(username ?? "");
-  const activity = useCommunityActivity(username ?? "");
-  const library = useCommunityLibrary(username ?? "", Boolean(view));
+  const isOwnHandle = Boolean(username) && session?.user.username === username;
+  const otherUsername = isOwnHandle ? "" : username ?? "";
+  const { view, isLoading, isNotFound } = useCommunityProfile(otherUsername);
+  const activity = useCommunityActivity(otherUsername);
+  const library = useCommunityLibrary(otherUsername, Boolean(view));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<ProfileTab>("mural");
-
-  const isOwnHandle = Boolean(username) && session?.user.username === username;
 
   async function run(action: () => Promise<void>) {
     setBusy(true);
