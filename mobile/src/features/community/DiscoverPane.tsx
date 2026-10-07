@@ -180,7 +180,7 @@ function DiscoverRow({ item, onPreviewBooks, linkAuthor }: { item: DiscoverItem;
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={glyphLabel ? `Open ${author.username}'s profile, ${glyphLabel}` : `Open ${author.username}'s profile`}
-                  hitSlop={spacing.sm}
+                  hitSlop={{ top: 14, bottom: 14, left: spacing.sm, right: spacing.sm }}
                   onPress={() => openProfile(author.username)}
                   style={[styles.nameRow, styles.shrink]}
                 >
@@ -203,7 +203,7 @@ function DiscoverRow({ item, onPreviewBooks, linkAuthor }: { item: DiscoverItem;
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={`See all ${content.bookCount} books in ${content.name}`}
-                  hitSlop={spacing.sm}
+                  hitSlop={{ top: 14, bottom: 14, left: spacing.sm, right: spacing.sm }}
                   onPress={() => onPreviewBooks({ id: content.id, name: content.name })}
                   style={styles.rowAction}
                 >
