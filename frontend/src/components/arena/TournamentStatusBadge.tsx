@@ -1,4 +1,4 @@
-import type { TournamentSummary } from "../../api/arena";
+import type { Tournament } from "../../api/arena";
 
 /** A tournament's stage, as a coloured pill.
  *
@@ -24,16 +24,16 @@ export function TournamentStatusBadge({
   round,
   className = ""
 }: {
-  status: TournamentSummary["status"];
+  status: Tournament["status"];
   round?: number;
   className?: string;
 }) {
-  const styles: Record<TournamentSummary["status"], string> = {
+  const styles: Record<Tournament["status"], string> = {
     seeding: "border-(--color-border) bg-(--color-surface) text-(--color-text-dim)",
     active: "border-(--color-accent) bg-(--color-accent-soft) text-(--color-accent)",
     completed: "border-(--color-success) bg-(--color-success-soft) text-(--color-success)"
   };
-  const labels: Record<TournamentSummary["status"], string> = {
+  const labels: Record<Tournament["status"], string> = {
     seeding: "Seeding",
     active: round ? `Round ${round}` : "Active",
     completed: "Completed"

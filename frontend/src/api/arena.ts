@@ -1,96 +1,19 @@
-// Thin wrapper functions over apiFetch/publicFetch for every /arenas
-// route — same shape as api/gallery.ts (a standalone backend resource,
-// not a field on the account's library document).
+import { createArenaApi } from "@scripta/shared";
+import { request } from "./request";
 
-import { apiFetch, publicFetch } from "./client";
-import { getSession } from "../auth/tokenStore";
-import type { Duel, SeedBook } from "@scripta/shared";
+export type { Duel, DuelSide, SeedBook, Tournament, TournamentView } from "@scripta/shared";
 
-export type { Duel, DuelSide, SeedBook } from "@scripta/shared";
-
-export interface TournamentSummary {
-  id: string;
-  name: string;
-  bracketSize: number;
-  roundDurationMinutes: number;
-  status: "seeding" | "active" | "completed";
-  currentRound: number;
-  createdAt: string;
-  ownerUserId: string;
-}
-
-export interface TournamentView extends TournamentSummary {
-  slots: Array<{ slotIndex: number } & SeedBook>;
-  duels: Duel[];
-}
-
-export async function createTournament(input: { name: string; bracketSize: number; roundDurationMinutes: number }): Promise<TournamentSummary> {
-  const body = (await apiFetch("/arenas", { method: "POST", body: JSON.stringify(input) })) as { tournament: TournamentSummary };
-  return body.tournament;
-}
-
-export async function fetchMyTournaments(): Promise<TournamentSummary[]> {
-  const body = (await apiFetch("/arenas/mine")) as { tournaments: TournamentSummary[] };
-  return body.tournaments;
-}
-
-/** Tournaments the account has cast at least one vote in (own ones
- *  excluded server-side), most recent vote first. */
-export async function fetchVotedTournaments(): Promise<TournamentSummary[]> {
-  const body = (await apiFetch("/arenas/voted")) as { tournaments: TournamentSummary[] };
-  return body.tournaments;
-}
-
-/** Public — works with no session at all. `voterToken` lets the backend
- *  fill in each active duel's `hasVoted`. */
-export async function fetchTournament(id: string, voterToken: string): Promise<TournamentView> {
-  const body = (await publicFetch(`/arenas/${id}?voterToken=${encodeURIComponent(voterToken)}`)) as { tournament: TournamentView };
-  return body.tournament;
-}
-
-/** Full-replace — same semantics as PUT /library. Send every slot the
- *  seeding UI currently has assigned, not just the changed ones. */
-export async function setTournamentSlots(id: string, slots: Array<{ slotIndex: number; book: SeedBook }>): Promise<void> {
-  await apiFetch(`/arenas/${id}/slots`, { method: "PUT", body: JSON.stringify({ slots }) });
-}
-
-export async function randomFillTournament(id: string, pool: SeedBook[]): Promise<void> {
-  await apiFetch(`/arenas/${id}/random-fill`, { method: "POST", body: JSON.stringify({ pool }) });
-}
-
-export async function startTournament(id: string): Promise<void> {
-  await apiFetch(`/arenas/${id}/start`, { method: "POST" });
-}
-
-/** Public — no session required, this is the whole point of BookArena.
- *  A caller who HAS a session still sends its token, so the vote (and the
- *  browser token's whole history) is claimed for the account — same
- *  treatment api/tierlistVoting.ts's ballotFetch gives ballots. */
-export async function voteOnDuel(tournamentId: string, duelId: string, voterToken: string, workId: string): Promise<void> {
-  await (getSession() ? apiFetch : publicFetch)(`/arenas/${tournamentId}/duels/${duelId}/vote`, {
-    method: "POST",
-    body: JSON.stringify({ voterToken, workId })
-  });
-}
-
-export async function settleDuelEarly(tournamentId: string, duelId: string): Promise<void> {
-  await apiFetch(`/arenas/${tournamentId}/duels/${duelId}/settle`, { method: "POST" });
-}
-
-export async function resolveTiebreak(tournamentId: string, duelId: string, winnerWorkId: string): Promise<void> {
-  await apiFetch(`/arenas/${tournamentId}/duels/${duelId}/tiebreak`, { method: "POST", body: JSON.stringify({ winnerWorkId }) });
-}
-
-/** Name only — everything else about a tournament is fixed at creation.
- *  `bracketSize` lays out the slots and duels, and `roundDurationMinutes`
- *  drives deadlines already written onto live duels, so neither can be
- *  changed after the fact. Exists so a tournament can be created without
- *  a name up front (see ArenaListPage's "+" tile) and named afterwards,
- *  the way a mural is. */
-export async function renameTournament(id: string, name: string): Promise<void> {
-  await apiFetch(`/arenas/${id}`, { method: "PATCH", body: JSON.stringify({ name }) });
-}
-
-export async function deleteTournament(id: string): Promise<void> {
-  await apiFetch(`/arenas/${id}`, { method: "DELETE" });
-}
+export const {
+  createTournament,
+  fetchMyTournaments,
+  fetchVotedTournaments,
+  fetchTournament,
+  setTournamentSlots,
+  randomFillTournament,
+  startTournament,
+  voteOnDuel,
+  settleDuelEarly,
+  resolveTiebreak,
+  renameTournament,
+  deleteTournament,
+} = createArenaApi(request);

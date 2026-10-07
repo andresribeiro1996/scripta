@@ -107,7 +107,7 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
           <ArenaVoteDeck
             duel={next}
             disabled={busy === next.id}
-            onVote={(workId) => void action(next.id, () => voteOnDuel(id, next.id, token, workId, Boolean(user)))}
+            onVote={(workId) => void action(next.id, () => voteOnDuel(id, next.id, token, workId))}
           />
         </View>
       );

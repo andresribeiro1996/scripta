@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Quiz } from "../quizzes/api.js";
 import type { Tierlist, VotedTierlist } from "../tierlists/api.js";
-import type { TournamentSummary } from "./api.js";
+import type { Tournament } from "./api.js";
 import { ARENA_TABS, coverRemainder, emptyCopy, filterItems, filterSections, homeSections, ownedItems, previewCovers, tabAtIndex, tabIndex, tierDistribution, tournamentProgress, votedTierlistDetail, type OwnedItem, type SectionedItem } from "./arenaHome.js";
 
 const itemDetail = (items: OwnedItem[]): string | undefined => {
@@ -12,7 +12,7 @@ const itemDetail = (items: OwnedItem[]): string | undefined => {
   return first?.kind === "tierlist" || first?.kind === "quiz" ? first.detail : undefined;
 };
 
-const tournament = (over: Partial<TournamentSummary> = {}): TournamentSummary => ({
+const tournament = (over: Partial<Tournament> = {}): Tournament => ({
   id: "t1",
   name: "Best of 2025",
   bracketSize: 8,
