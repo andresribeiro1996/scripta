@@ -9,7 +9,7 @@ export default defineRailway(() => {
   });
 
   const scripta = service("scripta", {
-    source: github("andresribeiro1996/scripta", { checkSuites: true, rootDirectory: "/" }),
+    source: github("andresribeiro1996/scripta", { branch: "production", checkSuites: true, rootDirectory: "/" }),
     build: {
       builder: "RAILPACK",
       buildCommand: "sh backend/scripts/install-litestream.sh && npm run build --workspace @scripta/shared && npm run build --workspace backend",

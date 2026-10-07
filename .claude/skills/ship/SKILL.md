@@ -1,11 +1,11 @@
 ---
 name: ship
-description: Take finished work in a worktree to main — verify, commit, push, open or update the PR, merge once CI is green, and bring the main checkout up to date. Use when the user says commit, push, open a PR, merge it, "push it to main", or asks whether something is on main.
+description: Take finished work in a worktree to main — verify, commit, push, open or update the PR with auto-merge on so it lands once CI is green, bring the main checkout up to date, and deploy to production when asked. Use when the user says commit, push, open a PR, merge it, deploy, "push it to main", or asks whether something is on main or live.
 ---
 
 # Ship
 
-Everything reaches `main` through a PR, including "push it to main" — never push to `main` directly. Only do the steps the user asked for: "commit this" stops at step 2, "push" at 3, "open a PR" at 4, "merge" goes through 6.
+Everything reaches `main` through a PR, including "push it to main" — never push to `main` directly. Only do the steps the user asked for: "commit this" stops at step 2, "push" at 3. "Open a PR", "merge", "ship" and "push it to main" all go through 6: every PR gets auto-merge, so it lands by itself when CI is green and nobody has to ask for the merge. Stop at step 4 only when the user says not to merge or asks for a draft. Merging never deploys; step 7 runs only when the user asks to deploy.
 
 ## 1. Verify
 
@@ -33,9 +33,9 @@ git push -u origin HEAD
 
 If the branch touches auth, tokens, OAuth, share links or visibility rules, run the `security-review` skill now and fix what it finds before merging. For a multi-task branch that hasn't had one, dispatch `branch-reviewer`.
 
-## 5. Merge — only when the user asked
+## 5. Auto-merge
 
-The repo uses merge commits.
+Enable it as soon as the PR exists, without waiting to be asked. The required `checks` run is the gate. The repo uses merge commits.
 
 ```bash
 gh pr merge <n> --merge --auto
@@ -43,7 +43,7 @@ gh pr merge <n> --merge --auto
 
 `--auto` merges the moment required checks pass. If GitHub refuses because auto-merge is disabled on the repo: when `get_status` shows every check passing, run `gh pr merge <n> --merge`; otherwise enable the app's auto-merge with the `ccd_pr` `set_auto_merge` tool and tell the user it will merge when CI is green. Never poll CI yourself (`gh pr checks` loops, sleep, ScheduleWakeup) — the app reports check results.
 
-If CI fails, dispatch `ci-fixer`.
+If CI fails, dispatch `ci-fixer`. Branches must be up to date with `main`: when `get_status` shows the PR behind, run `gh pr update-branch <n>`; when it conflicts, run the `sync_with_base_branch` tool (or merge `origin/main`), resolve, verify and push. A stacked PR whose base is not `main` gets auto-merge only once it is retargeted to `main`.
 
 ## 6. After the merge
 
@@ -61,6 +61,16 @@ git pull --ff-only origin main
 
 Never stash, reset or check out anything there; if the pull refuses because of local changes, tell the user which files.
 
-Backend and web deploy from `main` automatically. If the user wants to know it is live, dispatch `deploy-ops`. If they want it on their phone, `node scripts/dev-phone.mjs` from the worktree.
+If the user wants it on their phone before a deploy, `node scripts/dev-phone.mjs` from the worktree.
 
-Report: the commit SHA, PR URL, merge state, and whether the main checkout was updated.
+## 7. Deploy — only when the user asks
+
+Merging does not deploy. The backend (Railway), the web app (Cloudflare Pages) and the phone OTA update all deploy from the `production` branch, and only the Deploy workflow moves it:
+
+```bash
+gh workflow run deploy.yml
+```
+
+It deploys the newest `main` commit whose CI passed (`-f sha=<sha>` picks one), refuses anything not on `main` or not green, and lists the commits going out in the run summary. Never push to `production` any other way. Migrations run when the backend boots, so one deploy runs every migration merged since the last. If the user wants to know it is live, dispatch `deploy-ops`.
+
+Report: the commit SHA, PR URL, merge state, whether the main checkout was updated, and, after a deploy, the Deploy run URL.
