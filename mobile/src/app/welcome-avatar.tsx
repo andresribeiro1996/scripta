@@ -44,14 +44,15 @@ export default function WelcomeAvatarRoute() {
     {user.avatarId ? <Image source={{ uri: `${API_URL}/auth/avatar/${user.avatarId}/file` }} style={styles.avatar} /> : <View style={[styles.avatar, styles.initial, { backgroundColor: colors.accentSoft }]}><Text style={[styles.initialText, { color: colors.accent }]}>{(user.username ?? user.email)[0]?.toUpperCase()}</Text></View>}
     {error ? <Text accessibilityRole="alert" style={[typography.caption, { color: colors.danger }]}>{error}</Text> : null}
     {user.avatarId
-      ? <><Button label="Continue" disabled={busy} onPress={() => router.replace(finishAuthNavigation() as never)} /><Button label="Choose a different photo" variant="secondary" loading={busy} onPress={() => void choosePhoto()} /></>
-      : <><Button label="Choose a photo" loading={busy} onPress={() => void choosePhoto()} /><Button label="Skip for now" variant="secondary" disabled={busy} onPress={() => router.replace(finishAuthNavigation() as never)} /></>}
+      ? <View style={styles.actions}><Button label="Continue" disabled={busy} onPress={() => router.replace(finishAuthNavigation() as never)} /><Button label="Choose a different photo" variant="secondary" loading={busy} onPress={() => void choosePhoto()} /></View>
+      : <View style={styles.actions}><Button label="Choose a photo" loading={busy} onPress={() => void choosePhoto()} /><Button label="Skip for now" variant="secondary" disabled={busy} onPress={() => router.replace(finishAuthNavigation() as never)} /></View>}
   </View>;
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, alignItems: "center", justifyContent: "center", padding: spacing.xl, gap: spacing.md },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
+  actions: { alignSelf: "stretch", gap: spacing.md },
   title: { ...typography.heading, fontWeight: "700" },
   avatar: { width: 96, height: 96, borderRadius: radii.full },
   initial: { alignItems: "center", justifyContent: "center" },
