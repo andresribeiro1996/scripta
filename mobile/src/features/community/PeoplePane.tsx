@@ -30,7 +30,7 @@ export function PeoplePane() {
     enabled: needle.length === 0,
     retry: false,
   });
-  const results: (PersonResult | SuggestedReader)[] = (needle.length > 0 ? people.data?.people : suggested.data?.people) ?? [];
+  const results: (PersonResult | SuggestedReader)[] = (needle.length > 0 ? people.data : suggested.data) ?? [];
 
   async function toggle(person: PersonResult) {
     setBusyId(person.user.userId);
