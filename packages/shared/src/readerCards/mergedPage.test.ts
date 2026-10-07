@@ -21,9 +21,9 @@ test("the merged back has the chosen book and highlight above compact rows with 
 });
 
 test("only the owner's merged back shows the leaders", () => {
-  const owner = { view: "owner" as const, leaders: [{ label: "Earthsea", count: 4 }] };
-  assert.ok(texts(merged(owner)).includes("◇ Earthsea"));
-  assert.doesNotMatch(merged({ ...owner, view: "visitor" }), /Earthsea/);
+  const owner = { view: "owner" as const, leaders: [{ label: "Discworld", count: 4 }] };
+  assert.ok(texts(merged(owner)).includes("◇ Discworld"));
+  assert.doesNotMatch(merged({ ...owner, view: "visitor" }), /Discworld/);
 });
 
 test("with nothing chosen a visitor's merged back starts with the record header", () => {
