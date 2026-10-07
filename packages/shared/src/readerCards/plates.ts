@@ -1,6 +1,6 @@
-import { SANS, SERIF, composePlate } from "./compose.js";
+import { MONO, SANS, SERIF, composePlate } from "./compose.js";
 
-export const PLATE_FONTS = { serif: SERIF, sans: SANS };
+export const PLATE_FONTS = { serif: SERIF, sans: SANS, mono: MONO };
 
 export const PAPER = "#f1eadb";
 export const REVERSED_LINE = "#efe5d1";
