@@ -1,7 +1,7 @@
 import fastifyMultipart from "@fastify/multipart";
 import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import type { LibraryChange } from "@scripta/shared";
+import { COUNTERS, SIGNATURE_NOTE_MAX, TRAITS, type LibraryChange } from "@scripta/shared";
 import { createWriteStream } from "node:fs";
 import { mkdtemp, readdir, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -11,7 +11,7 @@ import { z } from "zod";
 import { env } from "../../config/env.js";
 import { authGuard, rateLimitKey } from "../auth/index.js";
 import { LIBRARY_SMALL_SAVE_MAX_BYTES } from "./domain/constants.js";
-import { LibraryChangeNotFoundError, LibraryConflictError, LibraryTooLargeError, NoLibraryDocumentError } from "./domain/errors.js";
+import { InvalidReaderCardChoiceError, LibraryChangeNotFoundError, LibraryConflictError, LibraryTooLargeError, NoLibraryDocumentError } from "./domain/errors.js";
 import type { LibraryDocumentText } from "./domain/types.js";
 import { libraryTooLargeMessage } from "./domain/sizeLimit.js";
 import { ImportBusyError, InvalidImportError, parseImport } from "./import/parseImport.js";
@@ -94,6 +94,13 @@ const mergeBooksSchema = z.object({
 });
 
 const bookKeySchema = z.string().min(1).max(2000);
+
+const readerCardStylePatchSchema = z.object({
+  counter: z.enum(COUNTERS).optional(),
+  trait: z.enum(TRAITS).optional(),
+  signature: z.object({ bookKey: bookKeySchema, note: z.string().trim().max(SIGNATURE_NOTE_MAX).nullable().default(null) }).strict().nullable().optional(),
+  highlight: z.object({ bookKey: bookKeySchema, highlightId: z.string().min(1).max(200) }).strict().nullable().optional(),
+}).strict();
 
 const membershipChangeSchema = z.object({ bookKey: bookKeySchema, member: z.boolean() });
 
@@ -245,6 +252,23 @@ export function buildLibraryRoutes(service: LibraryService) {
         const { readStatus, day, bookKey, rating } = parsed.data;
         const change: LibraryChange = readStatus === 2 ? { kind: "book", bookKey, rating, readStatus, day: day! } : { kind: "book", bookKey, rating, readStatus, day };
         return applyChange(service, request.user.id, change, reply);
+      });
+    });
+
+    await app.register(async (cards) => {
+      await cards.register(fastifyRateLimit, { max: 120, timeWindow: "1 minute", keyGenerator: rateLimitKey });
+
+      cards.get("/library/reader-card/style", { preHandler: authGuard }, async (request) => service.getReaderCardStyle(request.user.id));
+
+      cards.patch("/library/reader-card/style", { preHandler: authGuard }, async (request, reply) => {
+        const parsed = readerCardStylePatchSchema.safeParse(request.body);
+        if (!parsed.success) return reply.code(400).send({ error: "Expected a reader card style change with known options." });
+        try {
+          return reply.send(service.patchReaderCardStyle(request.user.id, parsed.data));
+        } catch (error) {
+          if (error instanceof InvalidReaderCardChoiceError) return reply.code(400).send({ error: error.message });
+          throw error;
+        }
       });
     });
 
