@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions, type LayoutChangeEvent } from "react-native";
 import { Text } from "../../ui/Text";
 import { SvgXml } from "react-native-svg";
-import { PLATE_FONTS, READER_PLATES, readerCardLabel, readerCardPlateLine, readerIdentity, renderPlate, type Group, type PublicReaderCard } from "@scripta/shared";
+import { DEFAULT_READER_CARD_STYLE, PLATE_FONTS, READER_PLATES, readerCardFacts, readerCardLabel, readerCardPlateLine, readerIdentity, renderReaderCard, seedOf, type Group, type PublicReaderCard } from "@scripta/shared";
 import { Sheet, cardFontFamily, spacing, typography, useTheme } from "../../ui";
 
 const PLATE_RATIO = 350 / 250;
@@ -14,11 +14,11 @@ export function ReaderCardBlock({ books, groups, readerName, publicCard, editabl
   const [open, setOpen] = useState(false);
   const [box, setBox] = useState({ width: 0, height: 0 });
   const own = useMemo(() => (publicCard ? null : readerIdentity(books, groups)), [books, groups, publicCard]);
-  const card = publicCard ?? own!;
+  const card = useMemo<PublicReaderCard>(() => publicCard ?? { ...own!, ...readerCardFacts(books, groups, own!.identity) }, [publicCard, own, books, groups]);
   const label = readerCardLabel(card);
   const unwrittenLine = own ? readerCardPlateLine(own.missing) : "yet to be written";
   const xml = useMemo(() => {
-    const svg = renderPlate({ identity: card.identity, state: card.state, readerName, print: mode === "dark" ? "reversed" : "paper", label, unwrittenLine });
+    const svg = renderReaderCard({ card, style: DEFAULT_READER_CARD_STYLE, readerName, print: mode === "dark" ? "reversed" : "paper", label, unwrittenLine, seed: seedOf(readerName) });
     return svg.replaceAll(PLATE_FONTS.serif, cardFontFamily("playfairDisplay")).replaceAll(PLATE_FONTS.sans, cardFontFamily("sans"));
   }, [card, readerName, mode, label, unwrittenLine]);
   const plateOf = (key: string | null) => READER_PLATES.find((plate) => plate.key === key);

@@ -1,17 +1,14 @@
 import { useMemo } from "react";
-import { READER_PLATES, readerCardLabel, readerCardPlateLine, renderPlate, type Group, type PublicReaderCard, type ReaderIdentity } from "@scripta/shared";
+import { DEFAULT_READER_CARD_STYLE, READER_PLATES, readerCardLabel, readerCardPlateLine, renderReaderCard, seedOf, type Group, type PublicReaderCard, type ReaderIdentity } from "@scripta/shared";
 import { useReaderCard } from "../../../hooks/useReaderCard";
 
 export function ReaderCardPlate({ card, own, readerName, fill = true }: { card: PublicReaderCard; own: ReaderIdentity | null; readerName: string; fill?: boolean }) {
   const label = readerCardLabel(card);
   const unwrittenLine = own ? readerCardPlateLine(own.missing) : "yet to be written";
-  const { paper, reversed } = useMemo(
-    () => ({
-      paper: renderPlate({ identity: card.identity, state: card.state, readerName, print: "paper", label, unwrittenLine }),
-      reversed: renderPlate({ identity: card.identity, state: card.state, readerName, print: "reversed", label, unwrittenLine })
-    }),
-    [card, readerName, label, unwrittenLine]
-  );
+  const { paper, reversed } = useMemo(() => {
+    const base = { card, style: DEFAULT_READER_CARD_STYLE, readerName, label, unwrittenLine, seed: seedOf(readerName) };
+    return { paper: renderReaderCard({ ...base, print: "paper" }), reversed: renderReaderCard({ ...base, print: "reversed" }) };
+  }, [card, readerName, label, unwrittenLine]);
   const innerClass = fill ? "block h-full w-full [&>svg]:h-full [&>svg]:w-full" : "block w-full [&>svg]:h-full [&>svg]:w-full";
   return (
     <span className={`mx-auto block aspect-[5/7] max-w-full ${fill ? "h-full" : "w-full"}`}>
