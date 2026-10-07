@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { PublicQuizQuestion } from "@scripta/shared";
 import { useQuery } from "@tanstack/react-query";
-import { router, Stack } from "expo-router";
+import { router, Stack, useNavigation } from "expo-router";
+import { usePreventRemove } from "expo-router/react-navigation";
 import { isPermanentError } from "../../core/apiClient";
 import { Image } from "expo-image";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { useAuth } from "../../core/auth";
 import { ApiError } from "../../core/api";
@@ -62,6 +63,13 @@ export function QuizPlayScreen({ code }: { code: string }) {
   }
 
   const result = submitted ?? ownPlay;
+  const navigation = useNavigation();
+  usePreventRemove(Object.keys(answers).length > 0 && !submitted, ({ data }) => {
+    Alert.alert("Leave this quiz?", "Your answers so far won't be saved.", [
+      { text: "Keep playing", style: "cancel" },
+      { text: "Leave", style: "destructive", onPress: () => navigation.dispatch(data.action) },
+    ]);
+  });
   const stage = playStage({
     boardReady: board.isSuccess,
     boardMissing: board.isError,
