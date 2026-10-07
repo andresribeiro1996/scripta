@@ -119,7 +119,7 @@ export function ContentShareSheet({ visible, onClose, title, description, url, c
               <View style={{ padding: spacing.md, backgroundColor: "white", borderRadius: radii.xl }}>
                 <QRCode value={shareUrl} size={Math.min(220, width - 112)} quietZone={8} backgroundColor="white" color="black" />
               </View>
-              <Text style={[typography.caption, { color: colors.textDim }]}>Open in Atmyshelf</Text>
+              <Text style={[typography.caption, { color: colors.textDim, alignSelf: "stretch", textAlign: "center" }]}>Open in Atmyshelf</Text>
             </View>
             <Text numberOfLines={1} ellipsizeMode="middle" style={[typography.caption, { color: colors.textDim, textAlign: "center" }]}>{shareUrl}</Text>
             <Button label="Send link instead" disabled={busy} onPress={() => void run(async () => { await Share.share({ message: shareUrl, title }); })} />
@@ -130,7 +130,7 @@ export function ContentShareSheet({ visible, onClose, title, description, url, c
               <ShareChoice icon="qr" label="QR code" detail="Share face to face" disabled={busy} onPress={() => setView("qr")} />
             </View> : onEnableLink ? <ShareChoice icon="link" label={enableLinkLabel} detail="Let others open the live version" disabled={busy} onPress={() => void run(async () => { const next = await onEnableLink(); if (next) setCreatedUrl(next); })} /> : null}
             {children ? <Text style={[typography.caption, { color: colors.textDim, textAlign: "center" }]}>Sharing an image keeps your visibility unchanged.</Text> : null}
-            {shareUrl && onDisableLink ? <Pressable accessibilityRole="button" accessibilityState={{ disabled: busy }} disabled={busy} onPress={() => void run(async () => { await onDisableLink(); setCreatedUrl(null); })} style={({ pressed }) => [styles.textAction, { opacity: busy || pressed ? 0.5 : 1 }]}><Text {...dynamicType} style={[typography.caption, { color: colors.danger }]}>Stop sharing link</Text></Pressable> : null}
+            {shareUrl && onDisableLink ? <Pressable accessibilityRole="button" accessibilityState={{ disabled: busy }} disabled={busy} onPress={() => void run(async () => { await onDisableLink(); setCreatedUrl(null); })} style={({ pressed }) => [styles.textAction, { opacity: busy || pressed ? 0.5 : 1 }]}><Text {...dynamicType} style={[typography.caption, { color: colors.danger, alignSelf: "stretch", textAlign: "center" }]}>Stop sharing link</Text></Pressable> : null}
           </>}
           {busy ? <ActivityIndicator accessibilityLabel="Working" color={colors.accent} /> : null}
         </ScrollView>}
