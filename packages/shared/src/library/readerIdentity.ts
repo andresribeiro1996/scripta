@@ -1,4 +1,5 @@
 import { READER_PLATES, type CardState, type IdentityKey } from "../readerCards/index.js";
+import type { PublicReaderCardStyle, ReaderCardChosen } from "../readerCards/style.js";
 import { genresForBook, isFinishedBook, type BookGenre } from "./bookGenres.js";
 import type { Group } from "./groups.js";
 import { bookKey } from "./merge.js";
@@ -20,7 +21,7 @@ export interface ReaderIdentity {
   coverage: string[];
   missing: string | null;
 }
-export type PublicReaderCard = Pick<ReaderIdentity, "state" | "identity" | "runnerUp" | "signal" | "coverage"> & Partial<Pick<ReaderIdentity, "streak">> & Partial<ReaderCardFacts>;
+export type PublicReaderCard = Pick<ReaderIdentity, "state" | "identity" | "runnerUp" | "signal" | "coverage"> & Partial<Pick<ReaderIdentity, "streak">> & Partial<ReaderCardFacts> & { style?: PublicReaderCardStyle; chosen?: ReaderCardChosen };
 
 interface Candidate { key: IdentityKey; strength: number; signal: ReaderSignal; leaders: ReaderLeader[]; gap: string }
 

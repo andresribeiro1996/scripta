@@ -61,7 +61,7 @@ export function renderPlate(options: RenderPlateOptions): string {
 
 export interface ReaderCardInput {
   card: PublicReaderCard;
-  style: ReaderCardStyle;
+  style: Pick<ReaderCardStyle, "counter" | "trait">;
   readerName: string;
   print: PlatePrint;
   label: string;

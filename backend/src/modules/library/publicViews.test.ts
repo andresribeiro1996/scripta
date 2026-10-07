@@ -704,7 +704,9 @@ const expectedDataMain = {
     },
     coverage: [
       "genres known for 2 of 5 finished books"
-    ]
+    ],
+    style: { counter: "dial", trait: "both" },
+    chosen: {}
   },
   collectionBooks: {
     col1: [
@@ -749,7 +751,9 @@ const expectedDataEmpty = {
     signal: null,
     coverage: [
       "genres known for 0 of 0 finished books"
-    ]
+    ],
+    style: { counter: "dial", trait: "both" },
+    chosen: {}
   },
   collectionBooks: {
     col1: []
@@ -811,7 +815,9 @@ const expectedDataBare = {
     signal: null,
     coverage: [
       "genres known for 0 of 0 finished books"
-    ]
+    ],
+    style: { counter: "dial", trait: "both" },
+    chosen: {}
   },
   collectionBooks: {
     col1: [],
@@ -961,4 +967,76 @@ test("public books resolve by work through the owner's first copy, and follow a 
   const [target] = resolveWorks([{ isbn: null, title: "A Separate Merge Target", author: "Someone Else" }]);
   openBooksDb().prepare("UPDATE works SET merged_into = ? WHERE id = ?").run(target!, rows[0]!.work_id);
   assert.equal(resolvePublicBooksByWork(userId, [rows[0]!.work_id]).get(rows[0]!.work_id)!.workId, target);
+});
+
+const cardRequest = { bookKeys: [], highlightRefs: [], needsCurrentlyReading: false, statsMetrics: [], needsReaderCard: true };
+const earthsea = { Title: "A Wizard of Earthsea", Attribution: "Ursula K. Le Guin", ReadStatus: 2, highlights: [{ Type: "highlight", Text: "To light a candle", Annotation: "my private note", BookmarkID: "h1" }] };
+
+test("a visitor's reader card carries the public style and the resolved choices, never the annotation", () => {
+  const owner = "card-choices";
+  service.saveLibrary(owner, { books: [earthsea], groups: [] });
+  service.patchReaderCardStyle(owner, { counter: "shelf", signature: { bookKey: bookKey(earthsea), note: "why" }, highlight: { bookKey: bookKey(earthsea), highlightId: "h1" } });
+  const result = resolvePublicLibraryData(owner, cardRequest);
+  const card = result.readerCard!;
+  assert.deepEqual(card.style, { counter: "shelf", trait: "both" });
+  assert.equal(card.chosen?.signature?.title, "A Wizard of Earthsea");
+  assert.equal(card.chosen?.signature?.author, "Ursula K. Le Guin");
+  assert.equal(card.chosen?.signature?.note, "why");
+  assert.deepEqual(Object.keys(card.chosen!.signature!).sort(), ["author", "coverUrl", "note", "title", "workId"]);
+  assert.deepEqual(card.chosen?.highlight, { text: "To light a candle", title: "A Wizard of Earthsea", author: "Ursula K. Le Guin" });
+  assert.deepEqual(Object.keys(card.chosen!.highlight!).sort(), ["author", "text", "title"]);
+  assert.doesNotMatch(JSON.stringify(result), /my private note/);
+  assert.deepEqual(result.books, []);
+});
+
+test("a chosen highlight whose book left the library drops out of the visitor's card", () => {
+  const owner = "card-gone";
+  const first = service.saveLibrary(owner, { books: [earthsea], groups: [] });
+  service.patchReaderCardStyle(owner, { signature: { bookKey: bookKey(earthsea), note: null }, highlight: { bookKey: bookKey(earthsea), highlightId: "h1" } });
+  service.saveLibrary(owner, { books: [{ Title: "Dune", Attribution: "Frank Herbert", ReadStatus: 2 }], groups: [] }, first.updatedAt);
+  assert.deepEqual(resolvePublicLibraryData(owner, cardRequest).readerCard?.chosen, {});
+});
+
+test("a chosen highlight whose text went blank drops out, and its annotation never leaves", () => {
+  const owner = "card-blank";
+  const first = service.saveLibrary(owner, { books: [earthsea], groups: [] });
+  service.patchReaderCardStyle(owner, { highlight: { bookKey: bookKey(earthsea), highlightId: "h1" } });
+  const blanked = { ...earthsea, highlights: [{ Type: "highlight", Text: "   ", Annotation: "annotation of a blanked passage", BookmarkID: "h1" }] };
+  service.saveLibrary(owner, { books: [blanked], groups: [] }, first.updatedAt);
+  const result = resolvePublicLibraryData(owner, cardRequest);
+  assert.doesNotMatch(JSON.stringify(result), /annotation of a blanked passage/);
+  assert.equal(result.readerCard?.chosen?.highlight, undefined);
+});
+
+test("a chosen highlight that left its book drops out while the chosen signature stays", () => {
+  const owner = "card-lost-highlight";
+  const first = service.saveLibrary(owner, { books: [earthsea], groups: [] });
+  service.patchReaderCardStyle(owner, { signature: { bookKey: bookKey(earthsea), note: "why" }, highlight: { bookKey: bookKey(earthsea), highlightId: "h1" } });
+  const trimmed = { ...earthsea, highlights: [{ Type: "highlight", Text: "Another line", BookmarkID: "h2" }] };
+  service.saveLibrary(owner, { books: [trimmed], groups: [] }, first.updatedAt);
+  const chosen = resolvePublicLibraryData(owner, cardRequest).readerCard?.chosen;
+  assert.equal(chosen?.signature?.title, "A Wizard of Earthsea");
+  assert.equal(chosen?.signature?.note, "why");
+  assert.equal(chosen?.highlight, undefined);
+});
+
+test("a chosen book and highlight still resolve for visitors after their duplicates merge", () => {
+  const owner = "card-merged";
+  const kept = { ContentID: "m1", Title: "Orlando", Attribution: "Virginia Woolf", ReadStatus: 2 };
+  const copy = { ...kept, ISBN: "9780156031516", highlights: [{ Type: "highlight", Text: "Different persons", BookmarkID: "h1" }] };
+  const saved = service.saveLibrary(owner, { books: [kept, copy], groups: [] });
+  service.patchReaderCardStyle(owner, { signature: { bookKey: bookKey(copy), note: "why" }, highlight: { bookKey: bookKey(copy), highlightId: "h1" } });
+  service.mergeBooks(owner, bookKey(kept), [bookKey(kept), bookKey(copy)], saved.updatedAt);
+  const chosen = resolvePublicLibraryData(owner, cardRequest).readerCard?.chosen;
+  assert.equal(chosen?.signature?.title, "Orlando");
+  assert.equal(chosen?.signature?.note, "why");
+  assert.deepEqual(chosen?.highlight, { text: "Different persons", title: "Orlando", author: "Virginia Woolf" });
+});
+
+test("a reader who never styled their card gets the default public style and no choices", () => {
+  const owner = "card-plain";
+  service.saveLibrary(owner, { books: [earthsea], groups: [] });
+  const card = resolvePublicLibraryData(owner, cardRequest).readerCard!;
+  assert.deepEqual(card.style, { counter: "dial", trait: "both" });
+  assert.deepEqual(card.chosen, {});
 });

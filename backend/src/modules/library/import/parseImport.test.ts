@@ -76,7 +76,9 @@ async function testApp() {
     addBook: () => { throw new Error("not used"); },
     mergeBooks: () => { throw new Error("not used"); },
     applyChange: () => { throw new Error("not used"); },
-    getPublicByToken: () => null
+    getPublicByToken: () => null,
+    getReaderCardStyle: () => { throw new Error("not used"); },
+    patchReaderCardStyle: () => { throw new Error("not used"); }
   };
   const app = Fastify();
   app.decorate("authenticateAccessToken", (token: string) => getAuthenticatedUserFromAccessToken(token, (id) => id === "user-1" ? {

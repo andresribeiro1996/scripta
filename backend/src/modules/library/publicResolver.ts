@@ -1,5 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
-import { isGroup, normalizeImageId, publicReaderCard, readerIdentity, type Group, type IdentityKey, type PublicBookData, type PublicHighlight, type PublicLibraryData, type PublicReaderCard, type ShelfTheme } from "@scripta/shared";
+import { isGroup, normalizeImageId, normalizeReaderCardStyle, publicReaderCard, publicStyle, readerIdentity, type Group, type IdentityKey, type PublicBookData, type PublicHighlight, type PublicLibraryData, type PublicReaderCard, type ReaderCardChosen, type ReaderCardStyle, type ShelfTheme } from "@scripta/shared";
 import type { SharedBook } from "@scripta/shared/community";
 import { peekCachedCoverUrl, peekCachedCoverUrls } from "../books/index.js";
 import { openLibraryDb } from "./adapters/sqlite/connection.js";
@@ -87,7 +87,7 @@ function toPublicLibraryBooks(rows: BookRowRecord[]): Record<string, unknown>[] 
 const BOOK_COLUMNS = `SELECT position, book_key, title, author, isbn, image_id, read_status, series_number, sort_order, cover_url, work_id FROM library_books`;
 
 type Statement = ReturnType<DatabaseSync["prepare"]>;
-let cached: { summaryStmt: Statement; booksStmt: Statement; booksByKeyStmt: Statement; currentlyReadingStmt: Statement; highlightStmt: Statement; finishedInYearStmt: Statement; getGlyphStmt: Statement; sharedCountsStmt: Statement; sharedBooksStmt: Statement } | null = null;
+let cached: { summaryStmt: Statement; booksStmt: Statement; booksByKeyStmt: Statement; currentlyReadingStmt: Statement; highlightStmt: Statement; styleStmt: Statement; finishedInYearStmt: Statement; getGlyphStmt: Statement; sharedCountsStmt: Statement; sharedBooksStmt: Statement } | null = null;
 function getStatements() {
   if (!cached) {
     const db = openLibraryDb();
@@ -97,6 +97,7 @@ function getStatements() {
       booksByKeyStmt: db.prepare(`${BOOK_COLUMNS} WHERE user_id = ? AND book_key IN (SELECT value FROM json_each(?)) ORDER BY position`),
       currentlyReadingStmt: db.prepare(`${BOOK_COLUMNS} WHERE user_id = ? AND read_status = 1 ORDER BY position`),
       highlightStmt: db.prepare(`SELECT text, annotation FROM library_highlights WHERE user_id = ? AND position = ? AND highlight_id = ?`),
+      styleStmt: db.prepare(`SELECT style FROM reader_card_styles WHERE user_id = ?`),
       finishedInYearStmt: db.prepare(`SELECT COUNT(*) AS n FROM library_books WHERE user_id = ? AND finished_year = ?`),
       getGlyphStmt: db.prepare(`SELECT glyph FROM library_derived WHERE user_id = ?`),
       sharedCountsStmt: db.prepare(`
@@ -163,6 +164,26 @@ function readSummary(userId: string): SummaryRecord | undefined {
   return getStatements().summaryStmt.get(userId) as SummaryRecord | undefined;
 }
 
+function readerCardStyleOf(userId: string): ReaderCardStyle {
+  const row = getStatements().styleStmt.get(userId) as { style: string } | undefined;
+  return normalizeReaderCardStyle(row ? JSON.parse(row.style) : null);
+}
+
+function chosenOf(userId: string, style: ReaderCardStyle, byKey: Map<string, BookRowRecord>): ReaderCardChosen {
+  const chosen: ReaderCardChosen = {};
+  const signatureRow = style.signature ? byKey.get(style.signature.bookKey) : undefined;
+  if (style.signature && signatureRow) {
+    const [book] = toPublicBooks([signatureRow]);
+    chosen.signature = { title: book!.title, author: book!.author, workId: book!.workId ?? null, coverUrl: book!.coverUrl, note: style.signature.note };
+  }
+  const highlightRow = style.highlight ? byKey.get(style.highlight.bookKey) : undefined;
+  if (style.highlight && highlightRow) {
+    const found = getStatements().highlightStmt.get(userId, highlightRow.position, style.highlight.highlightId) as { text: string | null } | undefined;
+    if (found?.text?.trim()) chosen.highlight = { text: found.text, title: highlightRow.title || "Untitled", author: highlightRow.author || "Unknown author" };
+  }
+  return chosen;
+}
+
 export function resolvePublicLibraryData(userId: string, req: PublicDataRequest): PublicLibraryData {
   const summary = readSummary(userId);
   if (!summary || summary.meta === null) return emptyResult(req);
@@ -175,7 +196,9 @@ export function resolvePublicLibraryData(userId: string, req: PublicDataRequest)
     const collection = groupRecords.find((group) => group.id === id && group.type === "collection");
     collectionCandidates[id] = Array.isArray(collection?.bookKeys) ? collection.bookKeys.filter((key): key is string => typeof key === "string") : [];
   }
-  const wantedKeys = [...new Set([...req.bookKeys, ...Object.values(collectionCandidates).flat(), ...req.highlightRefs.map((ref) => ref.bookKey)])];
+  const style = req.needsReaderCard ? readerCardStyleOf(userId) : null;
+  const choiceKeys = [style?.signature?.bookKey, style?.highlight?.bookKey].filter((key): key is string => Boolean(key));
+  const wantedKeys = [...new Set([...req.bookKeys, ...Object.values(collectionCandidates).flat(), ...req.highlightRefs.map((ref) => ref.bookKey), ...choiceKeys])];
   const byKey = new Map<string, BookRowRecord>();
   if (wantedKeys.length > 0) {
     for (const row of statements.booksByKeyStmt.all(userId, JSON.stringify(wantedKeys)) as unknown as BookRowRecord[]) byKey.set(row.book_key, row);
@@ -229,7 +252,7 @@ export function resolvePublicLibraryData(userId: string, req: PublicDataRequest)
     currentlyReading,
     stats,
     ...(req.needsShelfTheme ? { shelfTheme: JSON.parse(summary.shelf_theme as string) as ShelfTheme } : {}),
-    ...(req.needsReaderCard ? { readerCard: JSON.parse(summary.reader_card as string) as PublicReaderCard } : {}),
+    ...(req.needsReaderCard ? { readerCard: { ...(JSON.parse(summary.reader_card as string) as PublicReaderCard), style: publicStyle(style!), chosen: chosenOf(userId, style!, byKey) } } : {}),
     ...(req.collectionIds ? { collectionBooks } : {})
   };
 }

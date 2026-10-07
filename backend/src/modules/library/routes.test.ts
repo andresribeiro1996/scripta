@@ -480,3 +480,123 @@ test("POST /library/books/add keys and stores a book without the client's _key a
   assert.deepEqual(read.json().data.books, [{ ...untagged, _order: 0 }]);
   await app.close();
 });
+
+const styleUrl = "/library/reader-card/style";
+const asUser = (user: string) => ({ authorization: `Bearer ${user}` });
+const wizard = { Title: "A Wizard of Earthsea", Attribution: "Ursula K. Le Guin", ReadStatus: 2, highlights: [
+  { Type: "highlight", Text: "To light a candle", BookmarkID: "h1" },
+  { Type: "note", Text: "mine", Annotation: "private", BookmarkID: "n1" },
+  { Type: "review", Text: "five stars", BookmarkID: "goodreads-review:1" },
+] };
+const unread = { Title: "Dune", Attribution: "Frank Herbert", ReadStatus: 1 };
+const dispossessed = { Title: "The Dispossessed", Attribution: "Ursula K. Le Guin", ReadStatus: 2, highlights: [{ Type: "highlight", Text: "True journey is return", BookmarkID: "h2" }] };
+
+test("GET reader card style returns the default before any change", async () => {
+  const { app } = await setup();
+  const response = await app.inject({ method: "GET", url: styleUrl, headers: asUser("u1") });
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json(), { counter: "dial", trait: "both", signature: null, highlight: null });
+  await app.close();
+});
+
+test("PATCH reader card style merges each change into the stored style", async () => {
+  const { app } = await setup();
+  await app.inject({ method: "PATCH", url: styleUrl, headers: asUser("u1"), payload: { counter: "shelf" } });
+  const response = await app.inject({ method: "PATCH", url: styleUrl, headers: asUser("u1"), payload: { trait: "seal" } });
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json(), { counter: "shelf", trait: "seal", signature: null, highlight: null });
+  await app.close();
+});
+
+test("PATCH reader card style rejects unknown options and unknown fields", async () => {
+  const { app, service } = await setup();
+  service.saveLibrary("u1", { books: [wizard], groups: [] });
+  const key = bookKey(wizard);
+  for (const payload of [{ counter: "spiral" }, { trait: 3 }, { motto: "x" }, { signature: { bookKey: key, note: "a".repeat(61) } }, { signature: { bookKey: key, motto: "x" } }, { highlight: { bookKey: key, highlightId: "h1", motto: "x" } }]) {
+    const response = await app.inject({ method: "PATCH", url: styleUrl, headers: asUser("u1"), payload });
+    assert.equal(response.statusCode, 400, JSON.stringify(payload));
+    assert.equal(typeof response.json().error, "string");
+  }
+  const stored = await app.inject({ method: "GET", url: styleUrl, headers: asUser("u1") });
+  assert.deepEqual(stored.json(), { counter: "dial", trait: "both", signature: null, highlight: null });
+  await app.close();
+});
+
+test("a counter or trait change keeps the stored signature and highlight", async () => {
+  const { app, service } = await setup();
+  service.saveLibrary("u1", { books: [wizard], groups: [] });
+  const patch = (payload: object) => app.inject({ method: "PATCH", url: styleUrl, headers: asUser("u1"), payload });
+  await patch({ signature: { bookKey: bookKey(wizard), note: "why" } });
+  await patch({ highlight: { bookKey: bookKey(wizard), highlightId: "h1" } });
+  const response = await patch({ counter: "ring" });
+  assert.equal(response.statusCode, 200);
+  const expected = { counter: "ring", trait: "both", signature: { bookKey: bookKey(wizard), note: "why" }, highlight: { bookKey: bookKey(wizard), highlightId: "h1" } };
+  assert.deepEqual(response.json(), expected);
+  const stored = await app.inject({ method: "GET", url: styleUrl, headers: asUser("u1") });
+  assert.deepEqual(stored.json(), expected);
+  await app.close();
+});
+
+test("a signature must be a finished book in the caller's own library", async () => {
+  const { app, service } = await setup();
+  service.saveLibrary("u1", { books: [wizard, unread], groups: [] });
+  const patch = (user: string, key: string) => app.inject({ method: "PATCH", url: styleUrl, headers: asUser(user), payload: { signature: { bookKey: key, note: "  why  " } } });
+  assert.equal((await patch("u1", bookKey(unread))).statusCode, 400);
+  assert.equal((await patch("u2", bookKey(wizard))).statusCode, 400);
+  const ok = await patch("u1", bookKey(wizard));
+  assert.equal(ok.statusCode, 200);
+  assert.deepEqual(ok.json().signature, { bookKey: bookKey(wizard), note: "why" });
+  await app.close();
+});
+
+test("a highlight must be one of the caller's Kobo highlights, not a note or a review", async () => {
+  const { app, service } = await setup();
+  service.saveLibrary("u1", { books: [wizard], groups: [] });
+  const patch = (highlightId: string) => app.inject({ method: "PATCH", url: styleUrl, headers: asUser("u1"), payload: { highlight: { bookKey: bookKey(wizard), highlightId } } });
+  assert.equal((await patch("n1")).statusCode, 400);
+  assert.equal((await patch("goodreads-review:1")).statusCode, 400);
+  assert.equal((await patch("h1")).statusCode, 200);
+  const stored = await app.inject({ method: "GET", url: styleUrl, headers: asUser("u1") });
+  assert.deepEqual(stored.json().highlight, { bookKey: bookKey(wizard), highlightId: "h1" });
+  await app.close();
+});
+
+test("a highlight id only counts under the book it belongs to", async () => {
+  const { app, service } = await setup();
+  service.saveLibrary("u1", { books: [wizard, dispossessed], groups: [] });
+  const patch = (key: string, highlightId: string) => app.inject({ method: "PATCH", url: styleUrl, headers: asUser("u1"), payload: { highlight: { bookKey: key, highlightId } } });
+  assert.equal((await patch(bookKey(dispossessed), "h1")).statusCode, 400);
+  assert.equal((await patch(bookKey(wizard), "h2")).statusCode, 400);
+  const stored = await app.inject({ method: "GET", url: styleUrl, headers: asUser("u1") });
+  assert.equal(stored.json().highlight, null);
+  assert.equal((await patch(bookKey(dispossessed), "h2")).statusCode, 200);
+  await app.close();
+});
+
+test("a rejected choice stores nothing, and null clears a choice", async () => {
+  const { app, service } = await setup();
+  service.saveLibrary("u1", { books: [wizard, unread], groups: [] });
+  await app.inject({ method: "PATCH", url: styleUrl, headers: asUser("u1"), payload: { signature: { bookKey: bookKey(wizard) } } });
+  await app.inject({ method: "PATCH", url: styleUrl, headers: asUser("u1"), payload: { counter: "ring", signature: { bookKey: bookKey(unread) } } });
+  const afterReject = (await app.inject({ method: "GET", url: styleUrl, headers: asUser("u1") })).json();
+  assert.equal(afterReject.counter, "dial");
+  assert.equal(afterReject.signature.bookKey, bookKey(wizard));
+  const cleared = await app.inject({ method: "PATCH", url: styleUrl, headers: asUser("u1"), payload: { signature: null } });
+  assert.equal(cleared.json().signature, null);
+  await app.inject({ method: "PATCH", url: styleUrl, headers: asUser("u1"), payload: { highlight: { bookKey: bookKey(wizard), highlightId: "h1" } } });
+  const highlightCleared = await app.inject({ method: "PATCH", url: styleUrl, headers: asUser("u1"), payload: { highlight: null } });
+  assert.equal(highlightCleared.statusCode, 200);
+  assert.equal(highlightCleared.json().highlight, null);
+  const stored = await app.inject({ method: "GET", url: styleUrl, headers: asUser("u1") });
+  assert.equal(stored.json().highlight, null);
+  await app.close();
+});
+
+test("the reader card style needs a signed-in user", async () => {
+  const { app } = await setup();
+  assert.equal((await app.inject({ method: "GET", url: styleUrl })).statusCode, 401);
+  assert.equal((await app.inject({ method: "PATCH", url: styleUrl, payload: { counter: "shelf" } })).statusCode, 401);
+  const stored = await app.inject({ method: "GET", url: styleUrl, headers: asUser("u1") });
+  assert.deepEqual(stored.json(), { counter: "dial", trait: "both", signature: null, highlight: null });
+  await app.close();
+});

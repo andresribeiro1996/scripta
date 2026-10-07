@@ -3,10 +3,10 @@
 // modules/auth/service.ts.
 
 import { createHash, randomUUID } from "node:crypto";
-import { applyLibraryChange, bookKey, bookMatchKeys, buildManualBook, calculateShelfTheme, isCertainMatch, isFinishedBook, isGroup, localDay, mergeDuplicateBooks, normalizeIsbn, publicReaderCardOf, readerIdentity, seedCoverLookup, setReadStatus, type CoverLookupParams, type IdentityKey, type LibraryChange, type LibraryChangeAnswer, type LibraryData } from "@scripta/shared";
+import { applyLibraryChange, bookKey, bookMatchKeys, buildManualBook, calculateShelfTheme, eligiblePassages, isCertainMatch, isFinishedBook, isGroup, localDay, mergeDuplicateBooks, normalizeIsbn, normalizeReaderCardStyle, publicReaderCardOf, readerIdentity, rekeyReaderCardStyle, seedCoverLookup, setReadStatus, type CoverLookupParams, type IdentityKey, type LibraryChange, type LibraryChangeAnswer, type LibraryData, type ReaderCardStyle, type ReaderCardStylePatch } from "@scripta/shared";
 import type { BookRecommendationInput } from "@scripta/shared/community";
 import { BOOK_EVENTS_PER_SAVE, COVER_URL_MAX_LENGTH, DISPLAY_TEXT_MAX_LENGTH, LIBRARY_MATCH_BOOK_CAP, LIBRARY_PUT_HEADROOM_BYTES, LIBRARY_ROWS_VERSION, MATCH_KEY_MAX_LENGTH } from "./domain/constants.js";
-import { LibraryChangeNotFoundError, LibraryConflictError, LibraryTooLargeError, NoLibraryDocumentError } from "./domain/errors.js";
+import { InvalidReaderCardChoiceError, LibraryChangeNotFoundError, LibraryConflictError, LibraryTooLargeError, NoLibraryDocumentError } from "./domain/errors.js";
 import type { LibraryRepository } from "./domain/ports.js";
 import type { LibraryBookRow, LibraryBookRows, LibraryDerived, LibraryDocument, LibraryDocumentRow, LibraryDocumentText, LibraryHighlightRow, LibraryMatchKeyRow, LibraryRows, LibrarySmallSave } from "./domain/types.js";
 import { canonicalWorks as canonicalCatalogWorks, resolveWorks as resolveCatalogWorks } from "../books/index.js";
@@ -291,6 +291,8 @@ export interface LibraryService {
    *  the one place a stranger can reach a user's library data with no
    *  session at all. */
   getPublicByToken(token: string): { data: unknown } | null;
+  getReaderCardStyle(userId: string): ReaderCardStyle;
+  patchReaderCardStyle(userId: string, patch: ReaderCardStylePatch): ReaderCardStyle;
 }
 
 function coverLookupsOf(data: unknown): CoverLookupParams[] {
@@ -365,6 +367,18 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
     if (Buffer.byteLength(json) > maxDocumentBytes - LIBRARY_PUT_HEADROOM_BYTES) throw new LibraryTooLargeError();
     return json;
   }
+
+  const storedStyle = (userId: string): ReaderCardStyle => {
+    const raw = repo.getReaderCardStyle(userId);
+    return normalizeReaderCardStyle(raw === undefined ? null : JSON.parse(raw));
+  };
+
+  const rekeyStyle = (userId: string, fromKeys: string[], toKey: string) => {
+    if (repo.getReaderCardStyle(userId) === undefined) return;
+    const style = storedStyle(userId);
+    const next = rekeyReaderCardStyle(style, fromKeys, toKey);
+    if (next.signature !== style.signature || next.highlight !== style.highlight) repo.setReaderCardStyle(userId, JSON.stringify(next));
+  };
 
   return {
     getLibrary(userId) {
@@ -470,6 +484,7 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
       const present = new Set(library.books.filter(isRecord).map(bookKey));
       const fromKeys = merge.filter((key) => key !== keep && present.has(key));
       if (fromKeys.length > 0 && rekeyBooks) rekeyBooks(userId, fromKeys, keep);
+      if (fromKeys.length > 0) rekeyStyle(userId, fromKeys, keep);
       const saved = repo.upsertDocument(userId, json, deriveLibraryData(next), rowsWithWorks(userId, next), row.updated_at);
       if (!saved) throw new LibraryConflictError();
       return toLibraryDocumentText(saved, publicUrlFor, worksOf(userId));
@@ -527,6 +542,24 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
       if (!owner) return null;
       const data = resolvePublicLibrary(owner);
       return data ? { data } : null;
+    },
+
+    getReaderCardStyle(userId) {
+      return storedStyle(userId);
+    },
+
+    patchReaderCardStyle(userId, patch) {
+      const next = normalizeReaderCardStyle({ ...storedStyle(userId), ...patch });
+      if (patch.signature || patch.highlight) {
+        const row = repo.getDocument(userId);
+        const books = row ? parseStoredLibrary(row).books.filter(isRecord) : [];
+        const signature = next.signature;
+        if (patch.signature && !(signature && books.some((book) => isFinishedBook(book) && bookKey(book) === signature.bookKey))) throw new InvalidReaderCardChoiceError("signature");
+        const highlight = next.highlight;
+        if (patch.highlight && !(highlight && eligiblePassages(books).some((ref) => ref.bookKey === highlight.bookKey && ref.highlightId === highlight.highlightId))) throw new InvalidReaderCardChoiceError("highlight");
+      }
+      repo.setReaderCardStyle(userId, JSON.stringify(next));
+      return next;
     }
   };
 }
