@@ -1,24 +1,8 @@
-import type { LibraryData, MuralBlock, PublicReaderCard, ReaderProfile, ResolvedTierlist, ShelfTheme } from "@scripta/shared";
+import type { LibraryData, MuralBlock, PublicBookData, PublicHighlight, PublicReaderCard, ReaderProfile, ResolvedTierlist, ShelfTheme } from "@scripta/shared";
 import type { ThemeId } from "@scripta/shared/themes";
 import { apiClient } from "../../core/api";
 
-export interface PublicBookData {
-  key: string;
-  workId: string | null;
-  title: string;
-  author: string;
-  isbn: string | null;
-  imageId: string | null;
-  coverUrl: string | null;
-  readStatus: number | null;
-}
-
-export interface PublicHighlight {
-  bookKey: string;
-  highlightId: string;
-  text: string;
-  annotation: string | null;
-}
+export type { PublicBookData, PublicHighlight } from "@scripta/shared";
 
 export interface SharedMuralPayload {
   mural: { id: string; name: string; theme: ThemeId; blocks: MuralBlock[]; coverImageUrl: string | null };

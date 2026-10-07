@@ -11,7 +11,8 @@ import { ApiError } from "../../core/api";
 import { isPermanentError } from "../../core/apiClient";
 import { Button, EmptyState, ErrorState, Fab, IconButton, Screen, Sheet, Skeleton, SwipeableTabs, Toast, dynamicType, spacing, typography, useTheme } from "../../ui";
 import { AddBookSheet } from "../community/AddBookSheet";
-import { fetchBallot, fetchMyBallot, fetchVotingBoard, submitBallot, type BallotResponse, type PublicBook } from "./api";
+import { fetchBallot, fetchMyBallot, fetchVotingBoard, submitBallot, type BallotResponse } from "./api";
+import type { PublicBookData } from "@scripta/shared";
 import { TierBoard, TierHead, workOf, type TierBook } from "./TierBoard";
 import { TierlistResults } from "./TierlistResults";
 import { TierSortDeck } from "./TierSortDeck";
@@ -38,7 +39,7 @@ export function VoteTierlistScreen({ code, startInRank = false }: { code: string
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [booksOpen, setBooksOpen] = useState(false);
-  const [addBook, setAddBook] = useState<PublicBook | null>(null);
+  const [addBook, setAddBook] = useState<PublicBookData | null>(null);
   const [sharing, setSharing] = useState(false);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [linkError, setLinkError] = useState<string | null>(null);
@@ -68,7 +69,7 @@ export function VoteTierlistScreen({ code, startInRank = false }: { code: string
     if (!ready || storedId === undefined) return;
     if (!user && !storedId) { setBallotLoading(false); return; }
     setBallotLoading(true);
-    const request = user ? fetchMyBallot(code) : fetchBallot(code, storedId!, false);
+    const request = user ? fetchMyBallot(code) : fetchBallot(code, storedId!);
     void request.then((found) => { setBallot(found); setBallotError(null); }).catch((reason) => {
       if (reason instanceof ApiError && reason.status === 404) {
         setBallot(null);
@@ -81,7 +82,7 @@ export function VoteTierlistScreen({ code, startInRank = false }: { code: string
 
   if (!ready || storedId === undefined || boardQuery.isPending || ballotLoading) return <Screen bottom style={styles.screen}><Skeleton height={180} /></Screen>;
   if (boardQuery.isError || !boardQuery.data) return <Screen bottom style={styles.screen}><ErrorState title="No tier list at that link" body="Check the voting code and try again." actionLabel={isPermanentError(boardQuery.error) ? "Go to Atmyshelf" : "Retry"} onAction={isPermanentError(boardQuery.error) ? () => router.replace("/") : () => void boardQuery.refetch()} /></Screen>;
-  if (ballotError) return <Screen bottom style={styles.screen}><ErrorState title="Your votes unavailable" body={ballotError} actionLabel="Retry" onAction={() => { setBallotError(null); setBallotLoading(true); if (user) void fetchMyBallot(code).then(setBallot).catch((reason) => setBallotError(String(reason))).finally(() => setBallotLoading(false)); else if (storedId) void fetchBallot(code, storedId, false).then(setBallot).catch((reason) => setBallotError(String(reason))).finally(() => setBallotLoading(false)); }} /></Screen>;
+  if (ballotError) return <Screen bottom style={styles.screen}><ErrorState title="Your votes unavailable" body={ballotError} actionLabel="Retry" onAction={() => { setBallotError(null); setBallotLoading(true); if (user) void fetchMyBallot(code).then(setBallot).catch((reason) => setBallotError(String(reason))).finally(() => setBallotLoading(false)); else if (storedId) void fetchBallot(code, storedId).then(setBallot).catch((reason) => setBallotError(String(reason))).finally(() => setBallotLoading(false)); }} /></Screen>;
   const { board } = boardQuery.data;
   const allWorks = new Set(books.flatMap((book) => { const id = workOf(book); return id ? [id] : []; }));
   const cleanBoard = { ...board, pool: board.pool.filter((id) => allWorks.has(id)) };
@@ -101,7 +102,7 @@ export function VoteTierlistScreen({ code, startInRank = false }: { code: string
     setBusy(true);
     setError(null);
     try {
-      const response = await submitBallot(code, placements, ballot?.ballotId ?? null, Boolean(user));
+      const response = await submitBallot(code, placements, ballot?.ballotId ?? null);
       setStoredId(response.ballotId);
       setBallot(response);
       setWorking(null);
@@ -117,7 +118,7 @@ export function VoteTierlistScreen({ code, startInRank = false }: { code: string
     }
   }
 
-  function openAddBook(book: PublicBook) {
+  function openAddBook(book: PublicBookData) {
     setBooksOpen(false);
     setAddBook(book);
   }

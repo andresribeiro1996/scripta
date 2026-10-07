@@ -1,120 +1,15 @@
-// Thin apiFetch/publicFetch wrappers over the tierlists module's PUBLIC
-// voting routes (backend's modules/tierlists/routes.ts's
-// buildPublicTierlistRoutes) plus the two owner-only voting-state routes
-// from buildTierlistRoutes — same "one function per backend route, no
-// client-side logic" shape as api/tierlists.ts and api/arena.ts.
-//
-// `HistogramCell` is re-exported from lib/tierlistResults.ts, where the
-// aggregation that consumes it lives, same api-reuses-lib-types split
-// api/tierlists.ts already follows for TierDefinition.
+import { createTierlistsApi } from "@scripta/shared";
+import { request } from "./request";
 
-import { getSession } from "../auth/tokenStore";
-import type { HistogramCell } from "../lib/tierlistResults";
-import { apiFetch, publicFetch } from "./client";
-import type { Tierlist } from "./tierlists";
+export type { BallotResponse, HistogramCell, VotedTierlist, VotingBoard } from "@scripta/shared";
 
-export type { HistogramCell };
-
-/** Ballot routes are public — anyone with the link may vote — but a caller
- *  who HAS a session must still send its token: `members` access is refused
- *  outright without one, and account-level dedupe (the backend's partial
- *  unique index on (tierlist_id, voter_user_id)) only engages when the
- *  request identifies a user. publicFetch hard-codes the token to
- *  undefined, so it can only ever produce an anonymous ballot. */
-async function ballotFetch(path: string, init?: RequestInit): Promise<unknown> {
-  return (getSession() ? apiFetch : publicFetch)(path, init);
-}
-
-export interface VotingBoard {
-  name: string;
-  tiers: Array<{ id: string; label: string; color: string }>;
-  pool: string[];
-  access: "anonymous" | "members";
-  votingOpen: boolean;
-  ballotCount: number;
-  eligibleVoteCount: number;
-  promotedAt: string | null;
-  /** Absent while voting is open — the backend withholds the standings
-   *  until you've voted (see routes.ts's board route). A closed poll's
-   *  board carries the final histogram. */
-  histogram?: HistogramCell[];
-}
-
-export interface BallotResponse {
-  ballotId: string;
-  placements: Array<{ workId: string; tierId: string }>;
-  results: { histogram: HistogramCell[]; ballotCount: number };
-}
-
-/** A published tier list the signed-in account holds a ballot on — the
- *  backend's PublishedTierlistRef shape, minus nothing we use. */
-export interface VotedTierlist {
-  id: string;
-  ownerUserId: string;
-  createdAt: string;
-  voteCode: string;
-  name: string;
-  poolSize: number;
-  ballotCount: number;
-  eligibleVoteCount: number;
-  promotedAt: string | null;
-  votingOpen: boolean;
-}
-
-/** Polls the account has voted on (own ones excluded server-side), latest
- *  ballot first — the "Voted on" section of the games list. */
-export async function fetchVotedTierlists(): Promise<VotedTierlist[]> {
-  const body = (await apiFetch("/tierlists/voted")) as { tierlists: VotedTierlist[] };
-  return body.tierlists;
-}
-
-/** Public — a voting board resolved by its vote code, books already
- *  redacted to the public shape by the backend. */
-export async function fetchVotingBoard(code: string): Promise<{ board: VotingBoard; books: Array<Record<string, unknown>> }> {
-  return (await publicFetch(`/tierlists/voting/${encodeURIComponent(code)}`)) as { board: VotingBoard; books: Array<Record<string, unknown>> };
-}
-
-/** Public — casts or edits a ballot. POSTs a new ballot when `ballotId` is
- *  null, PUTs to the existing ballot otherwise. A signed-in caller's
- *  account is what the backend actually keys the ballot to; `ballotId` is
- *  only the anonymous voter's handle, ignored for a signed-in caller. */
-export async function submitBallotApi(
-  code: string,
-  placements: Array<{ workId: string; tierId: string }>,
-  ballotId: string | null
-): Promise<BallotResponse> {
-  const encodedCode = encodeURIComponent(code);
-  const path = ballotId === null ? `/tierlists/voting/${encodedCode}/ballot` : `/tierlists/voting/${encodedCode}/ballot/${encodeURIComponent(ballotId)}`;
-  return (await ballotFetch(path, { method: ballotId === null ? "POST" : "PUT", body: JSON.stringify({ placements }) })) as BallotResponse;
-}
-
-/** Public — re-fetches an existing ballot. A null `ballotId` asks for the
- *  signed-in account's own ballot, which is the only way the owner can read
- *  theirs: openVoting seeds it server-side, so no browser ever stored its
- *  id. 404s when the caller holds no ballot on this poll. */
-export async function fetchBallotApi(code: string, ballotId: string | null): Promise<BallotResponse> {
-  const encodedCode = encodeURIComponent(code);
-  const path = ballotId === null ? `/tierlists/voting/${encodedCode}/ballot` : `/tierlists/voting/${encodedCode}/ballot/${encodeURIComponent(ballotId)}`;
-  return (await ballotFetch(path)) as BallotResponse;
-}
-
-/** Owner-only — the poll's full results, ownership-checked server-side.
- *  The public board withholds the histogram while voting is open, so this
- *  is how the owner sees the standings of an open poll at any time. */
-export async function fetchTierlistResultsApi(id: string): Promise<{ histogram: HistogramCell[]; ballotCount: number }> {
-  return (await apiFetch(`/tierlists/${id}/results`)) as { histogram: HistogramCell[]; ballotCount: number };
-}
-
-/** Owner-only — turns voting on for the first time, minting the vote code. */
-export async function openVotingApi(id: string, access: "anonymous" | "members"): Promise<{ tierlist: Tierlist; voteCode: string }> {
-  return (await apiFetch(`/tierlists/${id}/open-voting`, { method: "POST", body: JSON.stringify({ access }) })) as {
-    tierlist: Tierlist;
-    voteCode: string;
-  };
-}
-
-/** Owner-only — flips access and/or open/closed on an already-opened poll. */
-export async function setVotingStateApi(id: string, patch: { access?: "anonymous" | "members"; open?: boolean }): Promise<Tierlist> {
-  const body = (await apiFetch(`/tierlists/${id}/voting`, { method: "PUT", body: JSON.stringify(patch) })) as { tierlist: Tierlist };
-  return body.tierlist;
-}
+export const {
+  fetchVotedTierlists,
+  fetchVotingBoard,
+  submitBallot: submitBallotApi,
+  fetchBallot,
+  fetchMyBallot,
+  fetchTierlistResults: fetchTierlistResultsApi,
+  openVoting: openVotingApi,
+  setVotingState: setVotingStateApi,
+} = createTierlistsApi(request);

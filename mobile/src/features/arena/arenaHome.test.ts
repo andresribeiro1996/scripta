@@ -171,6 +171,7 @@ const votedTierlist = (over: Partial<VotedTierlist> = {}): VotedTierlist => ({
   eligibleVoteCount: 2,
   promotedAt: null,
   votingOpen: true,
+  covers: [],
   ...over,
 });
 
