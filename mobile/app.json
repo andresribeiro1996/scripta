@@ -60,6 +60,11 @@
               "scheme": "https",
               "host": "atmyshelf.com",
               "pathPrefix": "/play/"
+            },
+            {
+              "scheme": "https",
+              "host": "atmyshelf.com",
+              "pathPrefix": "/work/"
             }
           ]
         }

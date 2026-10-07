@@ -74,14 +74,14 @@ test("the work's own summary beats the first edition's", () => {
   assert.equal(page.work.summary, "Spice.");
 });
 
-test("the viewer's edition summary beats the work's", () => {
+test("the work's summary beats the viewer's edition summary", () => {
   const page = createWorksService(deps({ getWorkPage: pageWith("Spice.", ["Mine.", "Especiaria."]) })).getPage("w", "viewer")!;
-  assert.equal(page.work.summary, "Mine.");
+  assert.equal(page.work.summary, "Spice.");
 });
 
-test("a viewer whose edition has no summary gets the work's", () => {
-  const page = createWorksService(deps({ getWorkPage: pageWith("Spice.", [null, "Especiaria."]) })).getPage("w", "viewer")!;
-  assert.equal(page.work.summary, "Spice.");
+test("with no work summary the viewer's edition summary beats the first edition's", () => {
+  const page = createWorksService(deps({ getWorkPage: pageWith(null, ["Mine.", "Especiaria."]) })).getPage("w", "viewer")!;
+  assert.equal(page.work.summary, "Mine.");
 });
 
 test("with no work summary the first edition with one is used, and with none the summary is null", () => {
