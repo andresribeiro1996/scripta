@@ -56,9 +56,10 @@ Layer order, bottom to top:
 | `ring` | Arcs in proportion to each segment, one dash pattern per segment, no per-book marks. |
 
 **Trait** (`both` default, `seal`, `line`, `none`):
-- **Line:** "WITH A STREAK OF THE ⟨runner-up⟩" under the epithet.
-- **Seal:** the runner-up's glyph in its own ink, sitting on the ring at 135°.
-- **No runner-up:** neither is drawn.
+- **Source:** a new `streak` field on `ReaderIdentity` and `PublicReaderCard`. `runnerUp` is only set on a Leaning tie, so it cannot be used. `streak` is the second-strongest candidate when its strength reaches the Leaning threshold (0.75), else null. On a tie it equals `runnerUp`. Unwritten cards have none.
+- **Line:** "WITH A STREAK OF THE ⟨streak⟩" under the epithet.
+- **Seal:** the streak's glyph in its own ink, sitting on the ring at 135°.
+- **No streak:** neither is drawn.
 
 **Motto.** Free text of up to 28 characters, in one of 12 looks. An empty text means no motto. Every look except `bannerBelow` lifts EX LIBRIS to a smaller line above it.
 
@@ -179,7 +180,7 @@ type ReaderCardStyle = {
   - The zod schema is built from the shared option lists.
   - Responds 400 when `signature.bookKey` is not a finished book in the caller's library, or `highlight` is not an `eligiblePassages` entry (`packages/shared/src/murals/home.ts:5-12`) of that book.
   - Motto text and note are trimmed and length-checked. They are escaped at render.
-- **Client:** both routes go in `@scripta/shared`'s API client, next to the library calls.
+- **Client:** there is no shared library API factory, so a new `createReaderCardApi(request: ApiRequest)` goes in `packages/shared/src/readerCards/api.ts`, following `murals/api.ts`. Each client destructures it in A4.
 
 ### Public numbers
 
@@ -197,15 +198,15 @@ facts: { finished: number; highlights: number; series: number; since: number | n
 - **Facts:**
   - `highlights` counts eligible passages.
   - `series` counts series groups with a finished book.
-  - `since` is the year of the earliest finish date. The plan confirms which date fields the imports carry; it is null when no date exists.
+  - `since` is the year of the earliest `DateLastRead` among finished books. Every import writes that field (Kobo's is the last-read time, which is close enough). It is parsed like `murals/stats.ts` does, and is null when no date parses.
   - `edition` is the year the card was last recomputed.
 - **Reader number:**
   - It is the 1-based rank of the account's creation time.
   - The auth module exposes it through a method on its port; the plan confirms which one. The public resolver asks for it only when `footer.left` is `readerNumber`.
   - It reveals sign-up order, which the owner accepted.
 - **Recompute triggers:**
-  - Today a small save recomputes the card only when a status flips or series membership changes (`backend/src/modules/library/service.ts:488-489`). Highlight changes are added as a trigger, otherwise `marked` and `highlights` go stale.
-  - Bumping the library's derived `user_version` recomputes every user's card once at boot.
+  - A small save recomputes the card when a status flips or series membership changes (`backend/src/modules/library/service.ts:487-489`). Highlights only change through full saves (`PUT /library`, `addBook`), which always recompute, so no new trigger is needed.
+  - Bumping `LIBRARY_DERIVED_VERSION` (1 → 2, `domain/constants.ts`) drops `library_derived`, which makes the boot backfill rewrite every user's `library_summary.reader_card` once.
 
 ### Public payload
 
@@ -213,6 +214,7 @@ facts: { finished: number; highlights: number; series: number; since: number | n
 
 ```ts
 type PublicReaderCard = Pick<ReaderIdentity, "state" | "identity" | "runnerUp" | "signal" | "coverage"> & {
+  streak?: IdentityKey | null;
   dial?: { segments: … };
   facts?: { …; readerNumber?: number };
   style?: Omit<ReaderCardStyle, "signature" | "highlight">;
@@ -263,7 +265,7 @@ readerCardSummary(input): string[]      // text alternative for screen readers
   - Five PNG tiles: cotton fibre, vellum, kraft, stamp speckle (used as a mask) and riso grain.
   - Baked once by a script with sharp and committed as a base64 module, at about 12 KB per tile and 60 KB in total.
   - Regenerated only when the design changes.
-- **Determinism:** all randomness (spots, spine heights, speckles, watercolour edges) comes from a seed derived from the username. The same card looks the same on every screen and on the server.
+- **Determinism:** all randomness (spots, spine heights, speckles, watercolour edges) comes from a seed derived from the username, which is the name the card already prints (`readerName={profile?.username}`). The same card looks the same on every screen and on the server.
 - **Text fitting:** `fit.ts` estimates widths from per-font average character widths. It shrinks a motto to its look's slot, wraps the signature title to 2 lines and the highlight to 4 (ending in "…"), and shortens footer values to their corner.
 - **Fonts:**
   - **Playfair Display:** already used.
@@ -353,7 +355,7 @@ Stacked PRs. Each is retargeted to `main` before `--auto`, so CI runs. Device pa
 | Phase | Content | Verify |
 |---|---|---|
 | **A0 · Spike** (throwaway, not merged) | A test screen in mobile rendering, through `SvgXml`: a `data:` PNG inside `<pattern>`, a remote `https:` image, `textPath` with `startOffset="50%"`, a mask with an image, GaussianBlur on a group. It also times the heaviest card (320-tick dial, letterpress, laurel corners) and a row of 12 thumbnails. | `device-checker`, after `node scripts/dev-status.mjs --json` shows the emulator free. Outcome: a go/no-go per finish. Fallbacks: procedural textures, the client drawing the cover over a slot, or a DOM component (expo-dom, a store build) for the full-screen viewer only. |
-| **A1 · Renderer core** | `compose.ts`, `style.ts`, counters, trait, `readerCardFacts` with `dial`/`facts` saved server-side, the recompute trigger and `user_version` bump, the portable test, the contact sheet | Shared and backend tests. Visible change: every card gains the dial, line and seal. |
+| **A1 · Renderer core** | `compose.ts`, `style.ts`, counters, `streak` and the trait, `readerCardFacts` with `dial`/`facts` saved server-side, the `LIBRARY_DERIVED_VERSION` bump, the portable test, the contact sheet | Shared and backend tests. Visible change: every card gains the dial, line and seal. |
 | **A2 · Backend** | Style table, `GET`/`PATCH`, `chosen` resolution without annotation, rekey on merge, eraser, shared API types and client | Backend tests (env preamble, new test file in `backend/package.json`'s list). **security-review**, because the phase decides what visitors see. |
 | **A3 · Pages and viewer** | `pages.ts`, Courier Prime, `ReaderCardImage`/`ReaderCardViewer` on both clients, three layouts, a11y, replacing the detail sheets | Web in the preview browser; mobile through `device-checker` |
 | **A4 · Editor** | Routes, entry points, pickers, `searchPassages`, the glyph switch move | Same as A3 |
