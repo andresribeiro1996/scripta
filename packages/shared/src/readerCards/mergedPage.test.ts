@@ -16,8 +16,8 @@ const texts = (svg: string) => [...svg.matchAll(/<text[^>]*>([^<]*)<\/text>/g)].
 test("the merged back has the chosen book and highlight above compact rows with only the lead genre", () => {
   const all = texts(merged());
   for (const expected of ["SIGNATURE BOOK", "Finished", "34", "Fantasy &amp; SF", "22 · 65%", "With highlights", "10", "Runner-up", "Lamplighter", "genres known for 34 of 34 finished books", "A Wizard of Earthsea", "URSULA K. LE GUIN · A WIZARD OF EARTHSEA"]) assert.ok(all.includes(expected), expected);
-  assert.ok(all.some((line) => line.startsWith("“To light")));
-  assert.ok(!all.includes("Mystery & crime"));
+  assert.ok(all.some((line) => line.startsWith(“”To light”)));
+  assert.ok(!all.includes(“Mystery &amp; crime”));
 });
 
 test("only the owner's merged back shows the leaders", () => {
