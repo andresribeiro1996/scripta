@@ -194,7 +194,7 @@ function MatchCard({
             accessibilityRole="button"
             accessibilityLabel="Settle this match now"
             disabled={busy}
-            hitSlop={6}
+            hitSlop={10}
             onPress={() => onSettle(duel.id)}
             style={[styles.settle, { borderColor: colors.border, opacity: busy ? 0.5 : 1 }]}
           >
