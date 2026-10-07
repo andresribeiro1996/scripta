@@ -95,7 +95,7 @@ export function coverageLines(coverage: string[]): string {
 function subtitle(card: PublicReaderCard): string {
   if (card.state === "unwritten" || !card.identity) return "UNWRITTEN";
   const plate = PLATES.find((item) => item.key === card.identity)!;
-  return `${card.state === "leaning" ? "LEANING TOWARD" : "THE"} ${plate.name.toUpperCase()} · PLATE ${plate.numeral}`;
+  return `${card.state === "leaning" ? "LEANING ·" : "THE"} ${plate.name.toUpperCase()} · PLATE ${plate.numeral}`;
 }
 
 export function recordBody(input: ReaderCardInput): string {

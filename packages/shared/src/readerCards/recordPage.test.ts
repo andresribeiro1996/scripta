@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { PublicReaderCard } from "../library/readerIdentity.js";
+import { PLATES } from "./plates.js";
 import { renderReaderCard, type ReaderCardInput } from "./render.js";
 import { seedOf } from "./seed.js";
 
@@ -53,4 +54,22 @@ test("row text is escaped and cut to its width", () => {
 
 test("the front is unchanged when no page is named", () => {
   assert.equal(renderReaderCard(input()), renderReaderCard(input(), "front"));
+});
+
+test("the record's second header line is drawn whole for every plate, settled and leaning", () => {
+  for (const plate of PLATES) {
+    for (const state of ["settled", "leaning"] as const) {
+      const expected = state === "leaning" ? `LEANING · ${plate.name.toUpperCase()} · PLATE ${plate.numeral}` : `THE ${plate.name.toUpperCase()} · PLATE ${plate.numeral}`;
+      const all = texts(renderReaderCard(input({ card: { state, identity: plate.key, runnerUp: null, signal: null, coverage: [] } }), "record"));
+      assert.ok(all.includes(expected), expected);
+    }
+  }
+});
+
+test("text that looks like a class attribute is drawn as typed and never restyled", () => {
+  const svg = renderReaderCard(input({ view: "owner", leaders: [{ label: `x class="abc" y`, count: 2 }, { label: `class="pt"`, count: 1 }] }), "record");
+  const all = texts(svg);
+  assert.ok(all.includes(`◇ x class="abc" y`));
+  assert.ok(all.includes(`◇ class="pt"`));
+  assert.ok(all.every((line) => !line.includes("style=")));
 });

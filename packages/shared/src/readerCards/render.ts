@@ -37,11 +37,11 @@ const rules = (g: string, l: string): Record<string, string> => ({
 
 const withStyle = (svg: string, [g, l]: [string, string]) => {
   const r = rules(g, l);
-  return svg.replace(/ class="(\w+)"/g, (_, c: string) => {
+  return svg.replace(/<[^>]*>/g, (tag) => tag.replace(/ class="(\w+)"/g, (_, c: string) => {
     const style = r[c];
     if (!style) throw new Error(`No print rule for class "${c}"`);
     return ` style="${style}"`;
-  });
+  }));
 };
 
 function faceOf({ identity, state, readerName, label, unwrittenLine, width = 250 }: RenderPlateOptions): { face: PlateFace; ink: IdentityKey | "graph" } {
