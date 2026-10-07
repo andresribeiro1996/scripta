@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { activityRow, followFailureMessage, personCaption, suggestionReason } from "./helpers.js";
-import type { PersonResult, SuggestedReader } from "./types.js";
+import { activityRow, contentDetail, contentKindLabel, contentStats, contentStatus, contentTarget, feedAction, followFailureMessage, personCaption, suggestionReason } from "./helpers.js";
+import type { FeedItem, PersonResult, QuizSummary, SuggestedReader } from "./types.js";
 
 test("suggestionReason counts the shared books, singular or plural", () => {
   assert.equal(suggestionReason({ sharedCount: 6 }), "You share 6 books");
@@ -56,7 +56,35 @@ test("followFailureMessage shows the server's message on a 409 and the generic o
 
 test("activity rows for book events carry the work id when the event has one", () => {
   const at = "2026-10-06T00:00:00Z";
-  assert.equal(activityRow({ id: "e", type: "book_finished", payload: { title: "Dune", author: "FH", workId: "w1", status: 2 }, createdAt: at }).workId, "w1");
-  assert.equal(activityRow({ id: "e", type: "book_added", payload: { title: "Dune" }, createdAt: at }).workId, null);
-  assert.equal(activityRow({ id: "e", type: "following", payload: { username: "ana", workId: "w1" }, createdAt: at }).workId, null);
+  assert.equal(activityRow({ id: "e", type: "book_finished", payload: { title: "Dune", author: "FH", workId: "w1", status: 2 }, createdAt: at })?.workId, "w1");
+  assert.equal(activityRow({ id: "e", type: "book_added", payload: { title: "Dune" }, createdAt: at })?.workId, null);
+  assert.equal(activityRow({ id: "e", type: "following", payload: { username: "ana", workId: "w1" }, createdAt: at })?.workId, null);
+});
+
+const quiz = (overrides: Partial<QuizSummary> = {}): QuizSummary => ({ kind: "quiz", id: "q1", voteCode: "qcode", name: "Dune trivia", questionCount: 8, playCount: 3, playOpen: true, covers: [], ...overrides });
+
+test("a quiz reads as a quiz in every content helper", () => {
+  assert.equal(contentKindLabel(quiz()), "Quiz");
+  assert.equal(contentDetail(quiz()), "8 questions · 3 plays");
+  assert.equal(contentDetail(quiz({ playOpen: false })), "8 questions · 3 plays · closed");
+  assert.deepEqual(contentStats(quiz()), [{ value: 8, label: "questions" }, { value: 3, label: "plays" }]);
+  assert.equal(contentTarget(quiz()), "/play/qcode");
+  const item: FeedItem = { id: "e", actor: { userId: "u1", username: "ana", avatarUrl: null }, type: "quiz_published", content: quiz(), createdAt: "2026-10-07T00:00:00Z" };
+  assert.equal(feedAction(item), "published a quiz");
+});
+
+test("a quiz is Played, Open or Closed", () => {
+  assert.deepEqual(contentStatus(quiz({ viewerVoted: true })), { label: "Played", tone: "info" });
+  assert.deepEqual(contentStatus(quiz()), { label: "Open", tone: "accent" });
+  assert.deepEqual(contentStatus(quiz({ playOpen: false })), { label: "Closed", tone: "neutral" });
+  assert.deepEqual(contentStatus(quiz({ playOpen: false, viewerVoted: true })), { label: "Closed", tone: "neutral" });
+});
+
+test("activity rows name quiz events and skip a type this build does not know", () => {
+  const at = "2026-10-07T00:00:00Z";
+  assert.equal(activityRow({ id: "e", type: "quiz_published", payload: { name: "Dune trivia" }, createdAt: at })?.label, "Published a quiz");
+  assert.equal(activityRow({ id: "e", type: "voted_on", payload: { game: "quiz", name: "Dune trivia" }, createdAt: at })?.label, "Played a quiz");
+  assert.equal(activityRow({ id: "e", type: "voted_on", payload: { game: "tierlist", name: "x" }, createdAt: at })?.label, "Ranked a tier list");
+  assert.equal(activityRow({ id: "e", type: "voted_on", payload: { game: "tournament", name: "x" }, createdAt: at })?.label, "Voted in a tournament");
+  assert.equal(activityRow({ id: "e", type: "hologram" as never, payload: {}, createdAt: at }), null);
 });
