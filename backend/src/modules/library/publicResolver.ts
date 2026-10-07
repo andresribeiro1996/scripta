@@ -1,21 +1,11 @@
 import type { DatabaseSync } from "node:sqlite";
-import { isGroup, normalizeImageId, publicReaderCard, readerIdentity, type Group, type IdentityKey, type PublicBookData, type PublicHighlight, type PublicReaderCard, type ShelfTheme } from "@scripta/shared";
+import { isGroup, normalizeImageId, publicReaderCard, readerIdentity, type Group, type IdentityKey, type PublicBookData, type PublicHighlight, type PublicLibraryData, type PublicReaderCard, type ShelfTheme } from "@scripta/shared";
 import type { SharedBook } from "@scripta/shared/community";
 import { peekCachedCoverUrl, peekCachedCoverUrls } from "../books/index.js";
 import { openLibraryDb } from "./adapters/sqlite/connection.js";
 import { canonicalWorkIds, copyKeysForWorks } from "./works.js";
 
 export type { PublicBookData, PublicHighlight };
-
-export interface ResolvedPublicData {
-  collectionBooks?: Record<string, string[]>;
-  books: PublicBookData[];
-  highlights: PublicHighlight[];
-  currentlyReading: PublicBookData[];
-  stats: Record<string, number>;
-  shelfTheme?: ShelfTheme;
-  readerCard?: PublicReaderCard;
-}
 
 export interface PublicDataRequest {
   collectionIds?: string[];
@@ -128,9 +118,9 @@ function getStatements() {
   return cached;
 }
 
-const EMPTY_RESULT: ResolvedPublicData = { books: [], highlights: [], currentlyReading: [], stats: {} };
+const EMPTY_RESULT: PublicLibraryData = { books: [], highlights: [], currentlyReading: [], stats: {} };
 
-function emptyResult(req: PublicDataRequest): ResolvedPublicData {
+function emptyResult(req: PublicDataRequest): PublicLibraryData {
   return req.needsReaderCard ? { ...EMPTY_RESULT, readerCard: publicReaderCard(readerIdentity([], [])) } : EMPTY_RESULT;
 }
 
@@ -173,7 +163,7 @@ function readSummary(userId: string): SummaryRecord | undefined {
   return getStatements().summaryStmt.get(userId) as SummaryRecord | undefined;
 }
 
-export function resolvePublicLibraryData(userId: string, req: PublicDataRequest): ResolvedPublicData {
+export function resolvePublicLibraryData(userId: string, req: PublicDataRequest): PublicLibraryData {
   const summary = readSummary(userId);
   if (!summary || summary.meta === null) return emptyResult(req);
   const statements = getStatements();

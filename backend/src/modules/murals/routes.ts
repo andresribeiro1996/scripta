@@ -21,7 +21,7 @@
 // limit, same as it always did.
 
 import type { FastifyInstance } from "fastify";
-import { blockReferences, type ResolvedTierlist } from "@scripta/shared";
+import { blockReferences, type ResolvedTierlist, type SharedMuralPayload } from "@scripta/shared";
 import { THEME_IDS } from "@scripta/shared/themes";
 import { z } from "zod";
 import { authGuard } from "../auth/index.js";
@@ -315,7 +315,7 @@ export function buildPublicMuralRoutes(service: MuralsService, getTierlistData?:
         profile: payload.profile,
         imageUrls: payload.imageUrls,
         tierlists: payload.tierlists
-      });
+      } satisfies SharedMuralPayload);
     });
   };
 }

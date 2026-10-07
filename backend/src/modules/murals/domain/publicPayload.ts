@@ -1,19 +1,10 @@
-import { blockReferences, muralThemeId, type ReaderProfile, type ResolvedTierlist } from "@scripta/shared";
-import type { ThemeId } from "@scripta/shared/themes";
+import { blockReferences, muralThemeId, type MuralBlock, type MuralPublicPayload, type ResolvedTierlist } from "@scripta/shared";
 import { env } from "../../../config/env.js";
 import { resolvePublicReaderProfile } from "../../auth/index.js";
 import { resolvePublicBooksByWork, resolvePublicLibraryData } from "../../library/index.js";
 import type { MuralRow } from "./types.js";
 
-type PublicLibraryData = ReturnType<typeof resolvePublicLibraryData>;
-
-export interface MuralPublicPayload {
-  mural: { id: string; name: string; theme: ThemeId; blocks: unknown[]; coverImageUrl: string | null };
-  library: PublicLibraryData;
-  profile: ReaderProfile | undefined;
-  imageUrls: Record<string, string | null>;
-  tierlists: Record<string, ResolvedTierlist>;
-}
+export type { MuralPublicPayload };
 
 export function resolveMuralPublicPayload(
   row: MuralRow,
@@ -73,7 +64,7 @@ export function resolveMuralPublicPayload(
           return { ...rest, bookKeys: libraryData.collectionBooks?.[collectionId] ?? [] };
         }
         return block;
-      }),
+      }) as MuralBlock[],
       coverImageUrl: row.cover_image_id ? imageUrls[row.cover_image_id]! : row.cover_image_url
     },
     library: libraryData,

@@ -1,11 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { normalizeWords, type IdentityKey, type ReaderProfile } from "@scripta/shared";
 import { categoryFor, contentDetail, decodeCursor, encodeCursor, DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
-import type { ActivityEventType, ActivityItem, CommunityAuthor, CommunityEventType, DiscoverItem, DiscoverType, FeedSettings, FollowState, GameParticipation, OwnProfile, Page, ParticipationGameKind, PersonResult, PublishProfileInput, PublishedContent, PublishedProfile, SharedBook, SuggestedReader, TierlistSummary, TournamentSummary } from "@scripta/shared/community";
+import type { ActivityEventType, ActivityItem, CommunityAuthor, CommunityProfileView, CommunityEventType, DiscoverItem, DiscoverType, FeedSettings, FollowState, GameParticipation, OwnProfile, Page, ParticipationGameKind, PersonResult, PublishProfileInput, PublishedContent, PublishedProfile, SharedBook, SuggestedReader, TierlistSummary, TournamentSummary } from "@scripta/shared/community";
 import type { DashboardFeedPage, DigestItem, ParticipationItem } from "@scripta/shared/dashboard";
 import type { PublishedTournamentRef, TournamentDiscoverRef } from "../arena/service.js";
 import type { MuralsPublicApi } from "../murals/publicApi.js";
-import type { MuralPublicPayload } from "../murals/index.js";
 import type { PublishedTierlistRef, TierlistDiscoverRef } from "../tierlists/service.js";
 import { currentTrace } from "../../trace.js";
 import { FollowLimitError, InvalidCursorError, MuralNotOwnedError, NotFollowingError, ProfileNotFoundError, SelfFollowError, UsernameRequiredError } from "./domain/errors.js";
@@ -72,14 +71,6 @@ export function createBestEffortRecorder(emit: CommunityPublicApi["emitEvent"], 
   };
 }
 
-export interface PublicProfileView {
-  private: boolean;
-  profile: PublishedProfile;
-  mural: MuralPublicPayload | null;
-  published: { tierlists: TierlistSummary[]; tournaments: TournamentSummary[] };
-  feedSettings?: FeedSettings;
-}
-
 /** What a feed row can show at a glance — the rest of a pool's covers are
  *  a page the reader taps through to, not a thumbnail. */
 const FEED_COVER_LIMIT = 3;
@@ -142,7 +133,7 @@ export interface CommunityService {
   unpublishProfile(userId: string): void;
   getOwnProfile(userId: string): OwnProfile;
   setShelfMural(userId: string, muralId: string): void;
-  getProfileByUsername(username: string, viewerId?: string): PublicProfileView;
+  getProfileByUsername(username: string, viewerId?: string): CommunityProfileView;
   getDashboard(viewerId: string, cursor: string | undefined, limit: number, kinds?: ReadonlySet<string>): DashboardFeedPage & { newCount: number };
   markDashboardSeen(viewerId: string): void;
   getDiscover(type: DiscoverType, q: string, limit: number, offset: number, viewerId?: string): { items: DiscoverItem[]; nextOffset: number | null };
@@ -385,7 +376,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
       if (!author) throw new ProfileNotFoundError();
       const mural = published && row.mural_id ? deps.murals.getMuralPublicPayload(userId, row.mural_id) : null;
       const glyphOf = glyphLookup();
-      const view: PublicProfileView = {
+      const view: CommunityProfileView = {
         private: !published,
         profile: {
           user: withGlyph(author, userId, glyphOf),
