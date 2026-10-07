@@ -43,7 +43,6 @@ export interface BooksRepository {
   replaceLanguage(id: string, tag: string): void;
   mergeWorks(fromId: string, intoId: string): string;
   detachEdition(bookId: string, at: string): string;
-  resolveWorkId(id: string): string | null;
   getWorkView(id: string): WorkView | undefined;
   workPageRows(id: string): WorkPageRows | undefined;
   assignWork(bookId: string): string;
