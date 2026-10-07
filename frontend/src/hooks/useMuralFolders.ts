@@ -51,6 +51,7 @@ export function useMuralFolders() {
         murals.map((m) => ((m.folderId ?? null) === id ? { ...m, folderId: parentId } : m))
       );
     }
+    await queryClient.invalidateQueries({ queryKey: ["murals"] });
   }
 
   return { ...query, create, rename, move, remove };

@@ -17,7 +17,7 @@ import { ChevronLeftIcon, FullscreenIcon, PaletteIcon, PencilIcon, ShareIcon, to
 import { useGalleryImages } from "../hooks/useGalleryImages";
 import { useLibrary } from "../hooks/useLibrary";
 import { useMuralFullscreen } from "../hooks/useMuralFullscreen";
-import { useMurals } from "../hooks/useMurals";
+import { MuralConflictError, useMurals } from "../hooks/useMurals";
 import { useTierlists } from "../hooks/useTierlists";
 import { useWorkBooks } from "../hooks/useWorkBooks";
 import { muralThemeStyle, useResolvedTheme } from "../lib/theme";
@@ -207,11 +207,12 @@ export function MuralEditorPage() {
   async function guard<T>(work: Promise<T>, message: string): Promise<T | undefined> {
     try {
       return await work;
-    } catch {
-      toast({ kind: "error", message });
+    } catch (error) {
+      const conflict = error instanceof MuralConflictError;
+      toast({ kind: "error", message: conflict ? error.message : message });
       // The PUT may have landed with only its response lost, so take the
       // server's word before forcing the canvas to match the cache.
-      await refetch();
+      if (!conflict) await refetch();
       setRevertNonce((n) => n + 1);
       return undefined;
     }
