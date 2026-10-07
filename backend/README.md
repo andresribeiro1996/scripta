@@ -358,7 +358,7 @@ Measured on production on 2026-09-30, after a tester imported a 167-book library
 - **The "new" counts stop at 100, and clients show 99+.** On the first page `followingNewCount` and `personalNewCount` are each counted up to 100. `followingNewCount` is counted in SQL from the inbox (viewer, types, the authors' switches, rows newer than `seenAt`), so it can include items the list later drops as unrenderable: a deleted or re-owned tier list, tournament or quiz, an actor without a reader profile. `personalNewCount` renders its rows first (new followers, participation), so it counts only what the list can show.
 - **Who sees a reader (community).** `community/domain/visibility.ts` decides it.
   - Profile content (mural, published lists, activity, library) is visible when the profile is published, or to its owner.
-  - Strangers get a `private` shell for an unpublished profile.
+  - Everyone but the owner gets a `private` shell for an unpublished profile, followers included.
   - The reader glyph needs a published profile with the glyph switch on.
   - Participants are named only when published, with votes shown.
   - An unpublished reader can be followed only by someone they follow.
