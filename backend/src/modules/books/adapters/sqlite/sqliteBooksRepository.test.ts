@@ -884,6 +884,7 @@ test("mergeWorks moves every edition into the target, leaves merged_into, and ke
   assert.equal(repo.mergeWorks(empty.work_id!, english.work_id!), english.work_id);
   assert.deepEqual([empty.id, portuguese.id, english.id].map((id) => repo.getBook(id)!.work_id), [english.work_id, english.work_id, english.work_id]);
   assert.deepEqual([empty.work_id, portuguese.work_id].map((id) => workById(db, id).merged_into), [english.work_id, english.work_id]);
+  assert.deepEqual(repo.canonicalWorkIds([empty.work_id!, portuguese.work_id!, english.work_id!]), new Map([[empty.work_id!, english.work_id!], [portuguese.work_id!, english.work_id!], [english.work_id!, english.work_id!]]));
   assert.equal(workById(db, english.work_id).title, "Blindness");
   assert.equal(repo.getBook(portuguese.id)!.ol_work_key, null);
 });
@@ -919,6 +920,8 @@ test("a merge chain longer than one hop is refused rather than followed", () => 
   const a = repo.createBook({ title: "A", author: "X", isbn: "9789720000001" }, ["isbn:9789720000001"], NOW);
   const b = repo.createBook({ title: "B", author: "X", isbn: "9789720000002" }, ["isbn:9789720000002"], NOW);
   const c = repo.createBook({ title: "C", author: "X", isbn: "9789720000003" }, ["isbn:9789720000003"], NOW);
+  assert.deepEqual(repo.canonicalWorkIds(["no-such-work", a.work_id!]), new Map([[a.work_id!, a.work_id!]]));
+  assert.equal(repo.workPageRows("no-such-work"), undefined);
   db.prepare("UPDATE works SET merged_into = ? WHERE id = ?").run(b.work_id, a.work_id);
   db.prepare("UPDATE works SET merged_into = ? WHERE id = ?").run(c.work_id, b.work_id);
   assert.throws(() => repo.workPageRows(a.work_id!), /one hop/);
