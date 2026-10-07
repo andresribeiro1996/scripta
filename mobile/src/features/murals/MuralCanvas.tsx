@@ -202,10 +202,14 @@ export function BlockContent({ block, books, images, tierlists, profile, groups,
     </>;
   }
   if (block.type === "spotlight") {
-    const selected = blockBooks(block, books);
-    return <><Text numberOfLines={1} style={text.title}>{title(selected[0])}</Text>
-      {selected.length ? <View style={styles.bookRow}>{selected.slice(0, 3).map((book) => <View key={bookKey(book)} style={styles.bookColumn}><View style={styles.bookCover}><CoverImage book={book} contentFit="contain" onLoadEnd={onAssetReady ? () => onAssetReady(`cover:${block.id}:${bookKey(book)}:${String(book._coverUrl ?? "")}`) : undefined} /></View><Text numberOfLines={2} style={text.caption}>{title(book)}</Text></View>)}</View> : <EmptyBlock message="Choose books or connect a collection in Edit." style={[text.caption, dim]} />}
-    </>;
+    const [book] = blockBooks(block, books);
+    if (!book) return <EmptyBlock message="Pick a book for this spotlight." style={[text.caption, dim]} />;
+    return <View style={styles.bookColumn}>
+      <View style={styles.bookCover}><CoverImage book={book} contentFit="contain" onLoadEnd={onAssetReady ? () => onAssetReady(`cover:${block.id}:${bookKey(book)}:${String(book._coverUrl ?? "")}`) : undefined} /></View>
+      <Text numberOfLines={1} style={text.title}>{title(book)}</Text>
+      <Text numberOfLines={1} style={[text.caption, dim]}>{String(book.Attribution ?? "Unknown author")}</Text>
+      {block.caption ? <Text style={text.caption}>{block.caption}</Text> : null}
+    </View>;
   }
   if (block.type === "quote") { const value = resolveQuote(block, books); return <><Text numberOfLines={6} style={text.body}>“{String(value?.highlight.Text ?? "No eligible passage available")}”</Text>{value ? <Text style={[text.caption, dim]}>{String(value.book.Title)} · {String(value.book.Attribution ?? "")}</Text> : null}</>; }
   if (block.type === "quoteCollection") return <>{eyebrow(block.title || "Quotes")}{resolveQuoteCollection(block, books).map(({ highlight }, index) => <Text key={index} style={text.body}>“{String(highlight.Text ?? highlight.Annotation ?? "")}”</Text>)}</>;
@@ -528,7 +532,6 @@ const styles = StyleSheet.create({
   previewBox: { borderRadius: radii.lg, alignItems: "center", justifyContent: "center", overflow: "hidden" },
   previewBlock: { overflow: "hidden" },
   emptyBlock: { flex: 1, minHeight: 0, alignItems: "center", justifyContent: "center" },
-  bookRow: { flex: 1, flexDirection: "row", gap: spacing.sm },
   bookColumn: { flex: 1, minWidth: 0, gap: spacing.xs },
   bookCover: { flex: 1, minHeight: 48 },
   eyebrowRow: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", gap: spacing.sm },
