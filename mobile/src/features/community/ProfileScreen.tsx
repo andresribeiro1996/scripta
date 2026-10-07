@@ -201,7 +201,7 @@ const PROFILE_TABS = [
 
 type ProfileTab = (typeof PROFILE_TABS)[number]["value"];
 
-type PublishedRow = { kind: "tierlist" | "tournament"; id: string; name: string; detail: string; target: string; label: string };
+type PublishedRow = { kind: "tierlist" | "tournament" | "quiz"; id: string; name: string; detail: string; target: string; label: string };
 
 function publishedRows(view: CommunityProfileView): PublishedRow[] {
   const rows: PublishedRow[] = [];
@@ -210,6 +210,9 @@ function publishedRows(view: CommunityProfileView): PublishedRow[] {
   }
   for (const item of view.published.tournaments) {
     rows.push({ kind: "tournament", id: item.id, name: item.name, detail: contentDetail(item), target: contentTarget(item), label: contentKindLabel(item) });
+  }
+  for (const item of view.published.quizzes) {
+    rows.push({ kind: "quiz", id: item.id, name: item.name, detail: contentDetail(item), target: contentTarget(item), label: contentKindLabel(item) });
   }
   return rows;
 }

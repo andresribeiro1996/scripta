@@ -16,7 +16,7 @@ import { useDebouncedValue } from "../library/lib/debounce";
 import { openProfile } from "./AuthorAvatar";
 import { ReaderGlyph } from "./ReaderGlyph";
 
-const FILTER_ICONS: Record<DiscoverFilter, IconName> = { all: "filter", tierlist: "tierlist", tournament: "bracket" };
+const FILTER_ICONS: Record<DiscoverFilter, IconName> = { all: "filter", tierlist: "tierlist", tournament: "bracket", quiz: "champion" };
 
 export function DiscoverPane({ linkAuthors = true }: { linkAuthors?: boolean }) {
   const { colors } = useTheme();
@@ -162,7 +162,7 @@ function DiscoverRow({ item, onPreviewBooks, linkAuthor }: { item: DiscoverItem;
     <Pressable accessibilityRole="link" accessibilityLabel={`Open ${content.name}`} onPress={() => router.push(contentTarget(content) as never)}>
       {({ pressed }) => (
         <View style={[styles.row, { backgroundColor: pressed ? colors.surfacePressed : "transparent", borderBottomColor: colors.border }]}>
-          {content.kind === "tierlist" ? <TierlistThumb covers={content.covers} /> : <TournamentThumb covers={content.covers} />}
+          {content.kind === "tournament" ? <TournamentThumb covers={content.covers} /> : <FanThumb covers={content.covers} ladder={content.kind === "tierlist"} />}
           <View style={styles.grow}>
             <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>
               {content.name}
@@ -238,17 +238,19 @@ function StatusBadge({ label, tone }: { label: string; tone: ContentTone }) {
   );
 }
 
-function TierlistThumb({ covers }: { covers: PublishedContent["covers"] }) {
+function FanThumb({ covers, ladder }: { covers: PublishedContent["covers"]; ladder: boolean }) {
   const { colors } = useTheme();
   const fan: Array<string | null> = covers.length ? covers.slice(0, 3) : [null];
   const middle = (fan.length - 1) / 2;
   return (
     <View style={styles.thumb} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
-      <View style={styles.ladder}>
-        {DEFAULT_TIER_PRESET.map((tier) => (
-          <View key={tier.label} style={[styles.grow, { backgroundColor: tier.color }]} />
-        ))}
-      </View>
+      {ladder ? (
+        <View style={styles.ladder}>
+          {DEFAULT_TIER_PRESET.map((tier) => (
+            <View key={tier.label} style={[styles.grow, { backgroundColor: tier.color }]} />
+          ))}
+        </View>
+      ) : null}
       {fan.map((cover, index) => (
         <Cover
           key={cover ?? index}

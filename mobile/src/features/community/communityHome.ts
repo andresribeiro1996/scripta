@@ -6,6 +6,7 @@ export const DISCOVER_FILTERS = [
   { value: "all", label: "All" },
   { value: "tierlist", label: "Tier lists" },
   { value: "tournament", label: "Tournaments" },
+  { value: "quiz", label: "Quizzes" },
 ] as const;
 
 export type DiscoverFilter = (typeof DISCOVER_FILTERS)[number]["value"];
