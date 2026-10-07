@@ -116,3 +116,62 @@ export function recordBody(input: ReaderCardInput): string {
   if (card.dial?.segments.length) out += LEGENDS[input.style.counter].map((line, i) => svgText(125, 268 + i * 9, line, { size: 6.2, font: "serif", italic: true })).join("");
   return out + coverageLines(card.coverage);
 }
+
+export const COVER_URL = /^https:\/\/[^\s"'<>&]+$/;
+
+type Signature = NonNullable<ReaderCardChosen["signature"]>;
+type Highlight = NonNullable<ReaderCardChosen["highlight"]>;
+
+export function cover(signature: Signature, x: number, y: number, w: number, h: number): string {
+  const frame = `<rect class="pl" x="${x}" y="${y}" width="${w}" height="${h}" rx="1.2" stroke-width=".4"/>`;
+  if (signature.coverUrl && COVER_URL.test(signature.coverUrl)) {
+    return `<image href="${signature.coverUrl}" x="${x}" y="${y}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid meet"/>${frame}`;
+  }
+  const s = w / 52;
+  const title = wrapLines(signature.title.toUpperCase(), { font: "caps", size: 4.6 * s, width: w - 8, lines: 4 });
+  const author = fitLine((signature.author.trim().split(/\s+/).pop() ?? "").toUpperCase(), { font: "caps", size: 3.6 * s, width: w - 8 });
+  return `<rect class="pf" x="${x}" y="${y}" width="${w}" height="${h}" rx="1.2"/><rect class="pgs" x="${x + 3}" y="${y + 3}" width="${w - 6}" height="${h - 6}" stroke-width=".4" opacity=".6"/>`
+    + title.map((line, i) => svgText(x + w / 2, y + 20 * s + i * 6.5 * s, line, { size: 4.6 * s, weight: 700, cls: "pg" })).join("")
+    + svgText(x + w / 2, y + h - 8 * s, author, { size: 3.6 * s, cls: "pg" });
+}
+
+function signatureBlock(signature: Signature, top: number, big: boolean): { svg: string; bottom: number } {
+  const [w, h] = big ? [76, 112] : [52, 77];
+  let svg = svgText(125, top, "SIGNATURE BOOK", { size: 6.5, spacing: 2.6, weight: 600 }) + cover(signature, 125 - w / 2, top + 10, w, h);
+  let y = top + 10 + h + 16;
+  const title = wrapLines(signature.title, { font: "serif", size: 12, width: 190, lines: 2 });
+  svg += title.map((line, i) => svgText(125, y + i * 14, line, { size: 12, font: "serif" })).join("");
+  y += (title.length - 1) * 14 + 12;
+  svg += svgText(125, y, fitLine(signature.author.toUpperCase(), { font: "caps", size: 5.8, width: 190, spacing: 1.4 }), { size: 5.8, spacing: 1.4, weight: 600 });
+  if (signature.note) {
+    const note = wrapLines(`“${signature.note}”`, { font: "serif", size: 7.5, width: 190, lines: 2 });
+    svg += note.map((line, i) => svgText(125, y + 13 + i * 10, line, { size: 7.5, font: "serif", italic: true })).join("");
+    y += 13 + (note.length - 1) * 10;
+  }
+  return { svg, bottom: y };
+}
+
+function highlightBlock(highlight: Highlight, top: number, size: number): string {
+  const lines = wrapLines(`“${highlight.text}”`, { font: "serif", size, width: 190, lines: 4 });
+  const attribution = top + (lines.length - 1) * (size + 4) + 14;
+  return lines.map((line, i) => svgText(125, top + i * (size + 4), line, { size, font: "serif", italic: true })).join("")
+    + svgText(125, attribution, fitLine(`${highlight.author} · ${highlight.title}`.toUpperCase(), { font: "caps", size: 5.2, width: 190, spacing: 1.2 }), { size: 5.2, spacing: 1.2, weight: 600, opacity: 0.85 });
+}
+
+const divider = (y: number) => `<path class="pl" d="M82 ${y}H117M133 ${y}H168" stroke-width=".8"/><circle class="pf" cx="125" cy="${y}" r="2"/>`;
+
+const INVITATION = ["Pick a signature book and a", "highlight, and they show here", "for everyone who opens", "your card."];
+
+export function chosenBody(input: ReaderCardInput): string {
+  const { signature, highlight } = input.card.chosen ?? {};
+  if (signature && highlight) {
+    const book = signatureBlock(signature, 38, false);
+    const y = book.bottom + 12;
+    return book.svg + divider(y) + highlightBlock(highlight, y + 26, 11);
+  }
+  if (signature) return signatureBlock(signature, 52, true).svg;
+  if (highlight) return svgText(125, 120, "“", { size: 40, font: "serif", opacity: 0.3 }) + highlightBlock(highlight, 150, 13);
+  if (input.view !== "owner") return "";
+  return svgText(125, 40, "CHOSEN BY THE READER", { size: 6.5, spacing: 2.6, weight: 600 })
+    + INVITATION.map((line, i) => svgText(125, 150 + i * 15, line, { size: 11, font: "serif", italic: true })).join("");
+}

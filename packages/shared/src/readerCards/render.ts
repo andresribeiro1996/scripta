@@ -3,7 +3,7 @@ import type { PublicReaderCard, ReaderLeader } from "../library/readerIdentity.j
 import { composePage, composePlate, SANS, type PlateFace, type PlateSlots } from "./compose.js";
 import { drawCounter, SEAL_ANGLE } from "./counters.js";
 import { INKS, PAPER, PLATES, REVERSED_LINE, emblems, glyph, glyphBody, type IdentityKey } from "./plates.js";
-import { recordBody, type ReaderCardView } from "./pages.js";
+import { chosenBody, recordBody, type ReaderCardView } from "./pages.js";
 import type { PublicReaderCardStyle } from "./style.js";
 import { escape } from "./svgText.js";
 
@@ -91,10 +91,11 @@ function traitLine(streak: IdentityKey): string {
   return `<text class="pt" x="125" y="297" text-anchor="middle" font-size="5.6" letter-spacing="1.5" font-family="${SANS}" font-weight="600">WITH A STREAK OF THE ${name}</text>`;
 }
 
-export function renderReaderCard(input: ReaderCardInput, page: "front" | "record" = "front"): string {
+export function renderReaderCard(input: ReaderCardInput, page: "front" | "record" | "chosen" = "front"): string {
   const { card, style, print, seed } = input;
   const { face, ink } = faceOf({ ...input, identity: card.identity, state: card.state });
   if (page === "record") return withStyle(composePage({ ...face, label: `${face.label}, reader’s record` }, recordBody(input)), inks(ink, print));
+  if (page === "chosen") return withStyle(composePage({ ...face, label: `${face.label}, chosen by the reader` }, chosenBody(input)), inks(ink, print));
   const streak = card.state === "unwritten" ? null : card.streak ?? null;
   const seal = streak !== null && (style.trait === "both" || style.trait === "seal");
   const line = streak !== null && (style.trait === "both" || style.trait === "line");
