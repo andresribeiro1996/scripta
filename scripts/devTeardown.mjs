@@ -121,6 +121,27 @@ export function pidsToTeardown(candidates, worktreePath) {
   return { toKill, toSkip };
 }
 
+export function processGroup(pid) {
+  try {
+    const pgid = Number(execFileSync("ps", ["-o", "pgid=", "-p", String(pid)], { encoding: "utf8" }).trim());
+    return Number.isInteger(pgid) && pgid > 1 ? pgid : undefined;
+  } catch (error) {
+    if (error.status === 1) return undefined;
+    throw error;
+  }
+}
+
+// dev-emulator.mjs spawns the backend and Metro detached, so each stack is
+// its own process group led by the `npm run …` it started, and the listener
+// is only the last link of that chain (npm → sh → npm → tsx watch → server).
+// Killing just the listener leaves the supervisors above it alive. The whole
+// group is killed only when its leader is still alive, sits at or inside this
+// worktree (same cwd rule as pidsToTeardown) and is not our own group.
+export function shouldKillGroup({ pgid, leaderCwd, ownPgid }, worktreePath) {
+  if (pgid === undefined || pgid === ownPgid) return false;
+  return pidsToTeardown([{ pid: pgid, cwd: leaderCwd }], worktreePath).toKill.length === 1;
+}
+
 function isAlive(pid) {
   try {
     process.kill(pid, 0);
@@ -153,16 +174,27 @@ function killPid(pid, { graceMs = 2000 } = {}) {
 }
 
 // Finds whatever is listening on `port`, keeps only PIDs verified to
-// belong to `worktreePath`, kills those, and reports both what was killed
-// and what was skipped (with why) so the caller can log it.
+// belong to `worktreePath`, kills those (with their whole process group when
+// shouldKillGroup allows), and reports both what was killed and what was
+// skipped (with why) so the caller can log it.
 export function teardownPort(port, worktreePath) {
   const pids = pidsListeningOn(port);
   const { toKill, toSkip } = pidsToTeardown(
     pids.map((pid) => ({ pid, cwd: processCwd(pid) })),
     worktreePath,
   );
-  for (const pid of toKill) killPid(pid);
-  return { killed: toKill, skipped: toSkip };
+  const ownPgid = processGroup(process.pid);
+  const groups = [];
+  for (const pid of toKill) {
+    const pgid = processGroup(pid);
+    if (shouldKillGroup({ pgid, leaderCwd: pgid === undefined ? undefined : processCwd(pgid), ownPgid }, worktreePath)) {
+      killPid(-pgid);
+      groups.push(pgid);
+    } else {
+      killPid(pid);
+    }
+  }
+  return { killed: toKill, groups, skipped: toSkip };
 }
 
 function log(message) {
@@ -184,9 +216,13 @@ export function releaseWorktree({ path, worktree, branch }) {
   } else {
     log(`Slot ${slot} (${branch}) — tearing down backend :${ports.backend}, web :${ports.vite} and Metro :${ports.metro}...`);
     for (const [label, port] of teardownTargets(ports)) {
-      const { killed, skipped } = teardownPort(port, worktree);
-      if (killed.length > 0) log(`  ${label} :${port} — killed pid(s) ${killed.join(", ")}.`);
-      else log(`  ${label} :${port} — nothing listening.`);
+      const { killed, groups, skipped } = teardownPort(port, worktree);
+      if (killed.length > 0) {
+        const groupNote = groups.length > 0 ? `, process group(s) ${groups.join(", ")}` : "";
+        log(`  ${label} :${port} — killed pid(s) ${killed.join(", ")}${groupNote}.`);
+      } else {
+        log(`  ${label} :${port} — nothing listening.`);
+      }
       for (const { pid, reason } of skipped) {
         console.warn(`[dev-release] WARNING: left pid ${pid} on ${label} :${port} running — ${reason}.`);
       }
