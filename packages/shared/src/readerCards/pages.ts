@@ -175,3 +175,36 @@ export function chosenBody(input: ReaderCardInput): string {
   return svgText(125, 40, "CHOSEN BY THE READER", { size: 6.5, spacing: 2.6, weight: 600 })
     + INVITATION.map((line, i) => svgText(125, 150 + i * 15, line, { size: 11, font: "serif", italic: true })).join("");
 }
+
+export function mergedBody(input: ReaderCardInput): string {
+  const { signature, highlight } = input.card.chosen ?? {};
+  let out = "";
+  let y: number;
+  if (signature || highlight) {
+    let top = 30;
+    if (signature) {
+      out += cover(signature, 30, 30, 40, 59) + svgText(80, 44, "SIGNATURE BOOK", { size: 5.4, spacing: 2, weight: 600, anchor: "start" });
+      if (input.view === "owner") {
+        const title = wrapLines(signature.title, { font: "serif", size: 11, width: 140, lines: 2 });
+        out += title.map((line, i) => svgText(80, 60 + i * 13, line, { size: 11, font: "serif", anchor: "start" })).join("");
+        out += svgText(80, 60 + title.length * 13, fitLine(signature.author.toUpperCase(), { font: "caps", size: 5.4, width: 140, spacing: 1.3 }), { size: 5.4, spacing: 1.3, weight: 600, anchor: "start" });
+      }
+      top = 104;
+    }
+    if (highlight) {
+      const lines = wrapLines(`“${highlight.text}”`, { font: "serif", size: 9, width: 190, lines: 2 });
+      out += lines.map((line, i) => svgText(125, top + 8 + i * 13, line, { size: 9, font: "serif", italic: true })).join("");
+      const at = top + 8 + lines.length * 13 + 2;
+      if (input.view === "owner") out += svgText(125, at, fitLine(`${highlight.author} · ${highlight.title}`.toUpperCase(), { font: "caps", size: 5, width: 190, spacing: 1.2 }), { size: 5, spacing: 1.2, weight: 600, opacity: 0.85 });
+      top = at + 4;
+    }
+    y = top + 10;
+  } else if (input.view === "owner") {
+    out += ["Pick a signature book and a highlight,", "and they show here for everyone."].map((line, i) => svgText(125, 44 + i * 12, line, { size: 9, font: "serif", italic: true })).join("");
+    y = 70;
+  } else {
+    out += svgText(125, 40, "READER'S RECORD", { size: 8.5, spacing: 3.2, weight: 600 });
+    y = 52;
+  }
+  return out + rule(y, 0.9) + rule(y + 2.5, 0.4) + rowsSvg(recordRows(input, true), y + 18, 284, 7) + coverageLines(input.card.coverage);
+}
