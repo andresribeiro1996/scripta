@@ -72,8 +72,7 @@ export interface Standing {
 - `standing` reads `getProfileRow` and `getFeedSettings`, falling back to `DEFAULT_FEED_SETTINGS` (the same fallback as today's `settingsFor`). It reads the viewer's followees once (`listFollowees`).
 - A user with no profile row has `published: false` and default settings.
 - `standings(userIds)` is the batch path for works readers. It keeps today's single query by reading `visibilityRows` plus `listFollowees` once.
-  - `visibilityRows` widens to return `show_votes` too. This makes `Standing.settings` complete without a per-user settings read.
-  - Columns not selected keep their SQL defaults, which match `DEFAULT_FEED_SETTINGS`.
+  - `visibilityRows` widens to return all five `show_*` columns. This makes `Standing.settings` complete without a per-user settings read.
 
 ### Call sites
 
@@ -81,7 +80,7 @@ export interface Standing {
 |---|---|
 | `getProfileByUsername` | `canViewContent` decides whether content (mural, published lists, `publishedAt`) is filled. `private: isPrivate(...)`. The owner-unpublished 404 is removed. `feedSettings` is still sent only to the owner |
 | `getActivity` | `canViewContent` replaces `visibleUserId`. The owner still sees all categories |
-| `getLibrary` | `canViewContent` replaces `publishedUserId`, so the owner can now read their own library |
+| `getLibrary` | Takes the viewer: `getLibrary(username, viewerId?)`. `canViewContent` replaces `publishedUserId`, so the owner can now read their own library. Its route, `GET /community/profiles/:username/library`, reads `getOptionalAuthenticatedUser` like the profile and activity routes, so it moves from auth mode `"none"` to `"optional"`. The shared `createCommunityApi().fetchProfileLibrary` changes to match |
 | `glyphLookup` | `showsGlyph`, cached by the reader |
 | `participationItems` | `canNameAsParticipant` |
 | `follow` | `canFollow`, using the existing reverse-follow lookup |
@@ -96,7 +95,7 @@ After this change, `service.ts` and the works module contain no `published === 1
 The feed's `authorShows` stays in SQL, because it runs on every inbox write and read. Two changes make it the named rule:
 
 - A test asserts that the SQL `COALESCE` defaults in `authorShows` and the `profiles` column defaults equal `DEFAULT_FEED_SETTINGS`. Today they agree by coincidence.
-- A sentence in `backend/src/modules/community/README.md` names the rule:
+- A bullet in `backend/README.md` names the rule:
   - The feed is gated by the author's switches only.
   - Profile publishing does not gate it.
   - Discover and works games are gated by having a username only.
@@ -118,7 +117,7 @@ The owner's own profile address no longer answers 404.
 Everything not listed here stays exactly as it is today.
 
 1. **`GET /community/profiles/:me`.** The owner of an unpublished profile gets the full view, with `private: false`. It used to answer 404.
-2. **`GET /community/profiles/:me/library`.** The owner of an unpublished profile gets their library. It used to answer 404.
+2. **`GET /community/profiles/:me/library`.** The owner of an unpublished profile gets their library. It used to answer 404. The route now reads an optional viewer, so both clients send the token when one is held (shared factory `"none"` → `"optional"`). An expired token on it answers 401, the same as on the profile and activity routes.
 3. **`GET /community/people/suggested`.** `private` is computed, not hard-coded. The value is unchanged (`false`), because suggestions list only published profiles.
 
 ## Testing
