@@ -16,7 +16,7 @@ import type { PublicBookData } from "@scripta/shared";
 import { TierBoard, TierHead, workOf, type TierBook } from "./TierBoard";
 import { TierlistResults } from "./TierlistResults";
 import { TierSortDeck } from "./TierSortDeck";
-import { moveBookTo, votingBooks } from "./tierBoardData";
+import { moveBookTo, samePlacements, votingBooks } from "./tierBoardData";
 import { TierlistShareImage } from "./TierlistShareImage";
 import { shareableCommunityResults } from "./tierlistShareData";
 import { ContentShareSheet } from "../sharing/ContentShareSheet";
@@ -91,7 +91,7 @@ export function VoteTierlistScreen({ code, startInRank = false }: { code: string
   const canEdit = board.votingOpen && !board.promotedAt && !blocked && (!ballot || editing);
   const showRank = view === "rank" && canEdit && (data.pool.length > 0 || selectedWorkId !== null);
   const placements = toPlacements(data);
-  const dirty = JSON.stringify(placements) !== JSON.stringify(ballot?.placements ?? []);
+  const dirty = !samePlacements(placements, ballot?.placements ?? []);
   const changeData = setWorking;
   const histogram = board.histogram ?? ballot?.results.histogram ?? (board.ballotCount === 0 ? [] : null);
   const hasCommunity = shareableCommunityResults(histogram, board.ballotCount);
