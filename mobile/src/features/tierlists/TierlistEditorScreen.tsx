@@ -7,7 +7,7 @@ import { FlatList, Pressable, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { apiClient, ApiError } from "../../core/api";
 import { useLibrary, useWorkBooks } from "../library";
-import { Button, Dialog, EmptyState, ErrorState, Fab, HeaderActions, IconButton, Input, Menu, type MenuItem, SaveStateButton, Screen, Sheet, Skeleton, SwipeableTabs, Toast, dynamicType, spacing, typography, useTheme } from "../../ui";
+import { Button, Dialog, EditorHeading, EmptyState, ErrorState, Fab, HeaderActions, IconButton, Input, Menu, type MenuItem, SaveStateButton, Screen, Sheet, Skeleton, SwipeableTabs, Toast, dynamicType, spacing, typography, useTheme } from "../../ui";
 import { fetchMyBallot, fetchTierlistResults, fetchVotingBoard, openVoting, renderTierlistShareVideo, setVotingState, updateTierlist, type Tierlist } from "./api";
 import { moveBookTo, votingBooks } from "./tierBoardData";
 import { TierBoard, TierHead } from "./TierBoard";
@@ -138,7 +138,8 @@ export function TierlistEditorScreen({ tierlist, onUpdated, startInRank = false 
   return <Screen top={false} style={styles.screen}>
     <Stack.Screen options={{
       headerShown: true,
-      title: current.name,
+      title: "",
+      headerLargeTitleEnabled: false,
       headerRight: () => <HeaderActions>
         {!frozen ? <SaveStateButton busy={busy} unsaved={dirty} onPress={() => void save()} /> : null}
         <IconButton framed accessibilityLabel="Share tier list" name="share" onPress={showShare} />
@@ -146,6 +147,7 @@ export function TierlistEditorScreen({ tierlist, onUpdated, startInRank = false 
       </HeaderActions>,
     }} />
     {error ? <Toast visible message={error} tone="error" /> : null}
+    <EditorHeading name={current.name} accessibilityLabel={`Rename tier list, ${current.name}`} onRename={frozen ? undefined : () => setRenaming(true)} />
     {!frozen ? view === "sort" ? <Pressable accessibilityRole="button" accessibilityLabel="Back to board" onPress={() => { setSelectedWorkId(null); setView("board"); }}><Text {...dynamicType} style={[typography.body, { color: colors.accent }]}>‹ Board</Text></Pressable> : <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{placed} of {placed + data.pool.length} ranked · {busy ? "Saving…" : dirty ? "Unsaved changes" : "Saved"}</Text> : null}
     {frozen ? board.isPending || myBallot.isPending ? <Skeleton height={180} /> : board.isError ? <ErrorState title="Board unavailable" actionLabel="Retry" onAction={() => void board.refetch()} /> : myBallot.isError ? <ErrorState title="Your votes unavailable" actionLabel="Retry" onAction={() => void myBallot.refetch()} /> : <SwipeableTabs accessibilityLabel="Tier list view" options={VOTE_VIEWS} value={view === "results" ? "results" : "board"} onChange={setView} renderPage={(page, active) => page === "results" ? results.isPending ? <View style={styles.tabPage}><Skeleton height={140} /></View> : results.isError ? <ErrorState title="Results unavailable" actionLabel="Retry" onAction={() => void results.refetch()} /> : <TierlistResults histogram={results.data.histogram} tiers={board.data.board.tiers} pool={board.data.board.pool} books={books} ballotCount={results.data.ballotCount} eligibleVoteCount={board.data.board.eligibleVoteCount} votingOpen={current.votingOpen} promoted={Boolean(current.promotedAt)} ownPlacements={myPlacements ?? []} active={active} mode={resultMode} onModeChange={setResultMode} /> : <View style={styles.boardPage}><TierHead><Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{current.promotedAt ? "Permanent reference" : current.votingOpen ? "Voting open" : "Voting closed"}</Text><Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{boardData.tiers.reduce((sum, tier) => sum + tier.workIds.length, 0)} of {boardData.tiers.reduce((sum, tier) => sum + tier.workIds.length, 0) + boardData.pool.length} ranked</Text></TierHead><TierBoard data={boardData} books={books} onChange={() => {}} structureEditable={false} poolLabel="Unranked" bottomClearance={76} /></View>} /> : library.isPending ? <Skeleton height={180} /> : library.isError ? <ErrorState body="Your library couldn't be loaded." actionLabel="Retry" onAction={() => void library.refetch()} /> : view === "sort" ? <TierSortDeck data={data} books={books} selectedWorkId={selectedWorkId} onAssign={(workId, tierId) => { changeData(moveBookTo(data, workId, tierId)); if (selectedWorkId || (data.pool.length === 1 && data.pool.includes(workId))) { setSelectedWorkId(null); setView("board"); } }} /> : <TierBoard data={data} books={books} onChange={changeData} structureEditable poolLabel="Pool" bottomClearance={76} onReassign={(workId) => { setSelectedWorkId(workId); setView("sort"); }} />}
     {!frozen && view === "board" && data.pool.length === 0 ? <View style={styles.complete}><Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>All books ranked</Text><Button label={dirty ? "Save board" : "Saved"} disabled={!dirty} loading={busy} onPress={() => void save()} /></View> : null}

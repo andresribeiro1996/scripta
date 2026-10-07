@@ -33,7 +33,7 @@ import {
   type PerCardStyle,
   type SortKey,
 } from "@scripta/shared";
-import { Button, EmptyState, ErrorState, HeaderActions, IconButton, Input, Menu, Screen, Sheet, Skeleton, SwipeableTabs, type MenuItem } from "../../ui/components";
+import { Button, EditorHeading, EmptyState, ErrorState, HeaderActions, IconButton, Input, Menu, Screen, Sheet, Skeleton, SwipeableTabs, type MenuItem } from "../../ui/components";
 import { Icon, dynamicType, useTheme } from "../../ui";
 import { radii, spacing, typography } from "../../ui/theme";
 import { useMurals } from "../murals/useMurals";
@@ -127,14 +127,13 @@ export function LibraryScreen() {
     ]);
   }
 
+  function startRenamingLibrary() {
+    setNameDraft(library?.data.name ?? "");
+    setEditingName(true);
+  }
+
   const actionItems: MenuItem[] = [
-    {
-      label: "Rename library…",
-      onPress: () => {
-        setNameDraft(library?.data.name ?? "");
-        setEditingName(true);
-      },
-    },
+    { label: "Rename library…", onPress: startRenamingLibrary },
     { label: "Import / sync…", onPress: () => router.push("/import" as never) },
     ...(books.length > 1 ? [{ label: "Reorder…", onPress: () => router.push("/reorder" as never) }] : []),
     ...(!onCollectionsTab && books.length > 0 ? [{ label: "Select…", onPress: () => setSelectionMode(true) }] : []),
@@ -178,7 +177,8 @@ export function LibraryScreen() {
             }
           : {
               headerShown: true,
-              title: library?.data.name || "Library",
+              title: "",
+              headerLargeTitleEnabled: false,
               headerBackVisible: undefined,
               headerLeft: undefined,
               headerRight: () => (
@@ -213,8 +213,8 @@ export function LibraryScreen() {
 
       {!isPending && !isError && books.length === 0 && (
         <EmptyState
-          title="No library saved yet."
-          body="Import a library.json, KoboReader.sqlite, Goodreads CSV, or StoryGraph CSV — or add a book by hand."
+          title="Start your library"
+          body="Import your existing collection, or add your first book manually."
           actionLabel="Import library…"
           onAction={() => router.push("/import" as never)}
           secondaryActionLabel="Add a book manually"
@@ -223,6 +223,8 @@ export function LibraryScreen() {
       )}
 
       {!isPending && !isError && books.length > 0 && (
+        <>
+        <View style={styles.heading}><EditorHeading name={library?.data.name || "Library"} accessibilityLabel={`Rename library, ${library?.data.name || "Library"}`} onRename={startRenamingLibrary} /></View>
         <SwipeableTabs
           accessibilityLabel="Library shelf"
           options={LIBRARY_TABS}
@@ -296,6 +298,7 @@ export function LibraryScreen() {
           );
         }}
         />
+        </>
       )}
 
       <Sheet visible={editingName} title="Rename library" onClose={() => setEditingName(false)}>
@@ -310,6 +313,7 @@ export function LibraryScreen() {
 }
 
 const styles = StyleSheet.create({
+  heading: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
   loading: { padding: spacing.lg, gap: spacing.md },
   loadingRow: { flexDirection: "row", gap: spacing.md },
   shelfHead: { gap: spacing.md },

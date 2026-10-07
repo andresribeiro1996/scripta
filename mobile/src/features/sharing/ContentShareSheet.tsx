@@ -106,9 +106,9 @@ export function ContentShareSheet({ visible, onClose, title, description, url, c
               {onExportVideo ? <View style={styles.imageAction}><Button label="Send video" variant="secondary" disabled={busy || !imageReady} onPress={() => void run(() => exportImage("video"))} /></View> : null}
             </View>
           </View>
-        </> : <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: spacing.lg, paddingBottom: spacing.sm }}>
+        </> : <ScrollView contentContainerStyle={{ gap: spacing.lg, paddingBottom: spacing.sm }}>
           <View style={{ gap: spacing.sm, paddingVertical: spacing.sm }}>
-            <Text numberOfLines={3} {...dynamicType} style={[typography.heading, { color: colors.text, fontWeight: "700" }]}>{title}</Text>
+            <Text numberOfLines={3} {...dynamicType} style={[typography.title, { color: colors.text, fontWeight: "700" }]}>{title}</Text>
             <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{view === "qr" ? "Let someone nearby scan this with their camera." : children ? "A picture to post. A link to explore." : "Invite someone to explore and take part."}</Text>
           </View>
           {description ? <View style={[styles.note, { backgroundColor: colors.background }]}><Text style={[typography.caption, { color: colors.textDim }]}>{description}</Text></View> : null}
@@ -119,9 +119,9 @@ export function ContentShareSheet({ visible, onClose, title, description, url, c
               <View style={{ padding: spacing.md, backgroundColor: "white", borderRadius: radii.xl }}>
                 <QRCode value={shareUrl} size={Math.min(220, width - 112)} quietZone={8} backgroundColor="white" color="black" />
               </View>
-              <Text style={[typography.caption, { color: colors.textDim }]}>OPEN IN ATMYSHELF</Text>
+              <Text style={[typography.caption, { color: colors.textDim, alignSelf: "stretch", textAlign: "center" }]}>Open in Atmyshelf</Text>
             </View>
-            <Text selectable numberOfLines={2} style={[typography.caption, { color: colors.textDim, textAlign: "center" }]}>{shareUrl}</Text>
+            <Text numberOfLines={1} ellipsizeMode="middle" style={[typography.caption, { color: colors.textDim, textAlign: "center" }]}>{shareUrl}</Text>
             <Button label="Send link instead" disabled={busy} onPress={() => void run(async () => { await Share.share({ message: shareUrl, title }); })} />
           </> : <>
             {children ? <ShareChoice icon="image" label="Share as image" detail="Made for stories, posts & group chats" primary disabled={busy} onPress={() => setView("image")} /> : null}
@@ -130,7 +130,7 @@ export function ContentShareSheet({ visible, onClose, title, description, url, c
               <ShareChoice icon="qr" label="QR code" detail="Share face to face" disabled={busy} onPress={() => setView("qr")} />
             </View> : onEnableLink ? <ShareChoice icon="link" label={enableLinkLabel} detail="Let others open the live version" disabled={busy} onPress={() => void run(async () => { const next = await onEnableLink(); if (next) setCreatedUrl(next); })} /> : null}
             {children ? <Text style={[typography.caption, { color: colors.textDim, textAlign: "center" }]}>Sharing an image keeps your visibility unchanged.</Text> : null}
-            {shareUrl && onDisableLink ? <Pressable accessibilityRole="button" accessibilityState={{ disabled: busy }} disabled={busy} onPress={() => void run(async () => { await onDisableLink(); setCreatedUrl(null); })} style={({ pressed }) => [styles.textAction, { opacity: busy || pressed ? 0.5 : 1 }]}><Text {...dynamicType} style={[typography.caption, { color: colors.danger }]}>Stop sharing link</Text></Pressable> : null}
+            {shareUrl && onDisableLink ? <Pressable accessibilityRole="button" accessibilityState={{ disabled: busy }} disabled={busy} onPress={() => void run(async () => { await onDisableLink(); setCreatedUrl(null); })} style={({ pressed }) => [styles.textAction, { opacity: busy || pressed ? 0.5 : 1 }]}><Text {...dynamicType} style={[typography.caption, { color: colors.danger, alignSelf: "stretch", textAlign: "center" }]}>Stop sharing link</Text></Pressable> : null}
           </>}
           {busy ? <ActivityIndicator accessibilityLabel="Working" color={colors.accent} /> : null}
         </ScrollView>}
