@@ -288,7 +288,7 @@ export function Input({
   // it there is no way to reach the underlying TextInput.
   ref,
   ...props
-}: TextInputProps & { label?: string; error?: string; hint?: string; icon?: IconName; ref?: Ref<TextInput> }) {
+}: Omit<TextInputProps, "style"> & { label?: string; error?: string; hint?: string; icon?: IconName; ref?: Ref<TextInput>; style?: ViewStyle }) {
   const { colors, fonts } = useTheme();
   const [visible, setVisible] = useState(false);
   const inputRef = useRef<TextInput>(null);
@@ -299,7 +299,11 @@ export function Input({
   return (
     <View ref={fieldRef} style={styles.field}>
       {label ? <Text {...dynamicType} style={[styles.label, { color: colors.text }]}>{label}</Text> : null}
-      <View style={{ position: "relative" }}>
+      <View style={[
+        styles.inputBox,
+        { backgroundColor: colors.surface, borderColor: error ? colors.danger : focused ? colors.accent : colors.border, opacity: editable ? 1 : 0.55 },
+        style,
+      ]}>
       {icon ? <View style={styles.inputIcon} pointerEvents="none"><Icon name={icon} size={18} color={colors.textDim} /></View> : null}
       <TextInput
         {...props}
@@ -315,10 +319,10 @@ export function Input({
         selectionColor={colors.accent}
         style={[
           styles.input,
-          { backgroundColor: colors.surface, borderColor: error ? colors.danger : focused ? colors.accent : colors.border, color: colors.text, opacity: editable ? 1 : 0.55 },
+          { color: colors.text },
+          props.multiline ? { textAlignVertical: "top" } : null,
           icon ? { paddingLeft: minimumTouchTarget } : null,
           secureTextEntry ? { paddingRight: minimumTouchTarget + spacing.sm } : null,
-          style,
           fontStyleFor(fonts.text, "text", { fontSize: typography.input.fontSize }) ?? { fontFamily: SYSTEM_FAMILY },
         ]}
       />
@@ -798,7 +802,8 @@ const styles = StyleSheet.create({
   iconButton: { minHeight: minimumTouchTarget, minWidth: minimumTouchTarget, alignItems: "center", justifyContent: "center", borderRadius: radii.full },
   field: { gap: spacing.xs },
   label: { ...typography.body, fontWeight: "600" },
-  input: { minHeight: minimumTouchTarget, borderWidth: 1, borderRadius: radii.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, ...typography.input },
+  inputBox: { position: "relative", minHeight: minimumTouchTarget, borderWidth: 1, borderRadius: radii.md },
+  input: { flexGrow: 1, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, ...typography.input },
   inputIcon: { position: "absolute", left: 0, top: 0, bottom: 0, width: minimumTouchTarget, alignItems: "center", justifyContent: "center", zIndex: 1 },
   help: { ...typography.caption },
   overlay: { flex: 1 },

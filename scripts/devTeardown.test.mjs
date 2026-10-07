@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { pidsToTeardown, teardownTargets } from "./devTeardown.mjs";
+import { pidsToTeardown, shouldKillGroup, teardownTargets } from "./devTeardown.mjs";
 
 test("teardownTargets covers all three of the slot's ports, web included", () => {
   assert.deepEqual(teardownTargets({ backend: 3100, vite: 5273, metro: 8181 }), [
@@ -80,4 +80,25 @@ test("multiple candidates are partitioned independently", () => {
   );
   assert.deepEqual(toKill, [1, 4]);
   assert.deepEqual(toSkip.map((s) => s.pid), [2, 3]);
+});
+
+test("a process group led from inside this worktree is killed whole", () => {
+  assert.equal(shouldKillGroup({ pgid: 369, leaderCwd: THIS_WORKTREE, ownPgid: 1000 }, THIS_WORKTREE), true);
+});
+
+test("a process group whose leader is a different worktree's is not killed", () => {
+  const leaderCwd = "/Users/dev/scripta-wt/other-branch";
+  assert.equal(shouldKillGroup({ pgid: 369, leaderCwd, ownPgid: 1000 }, THIS_WORKTREE), false);
+});
+
+test("a process group whose leader is gone or unreadable is not killed", () => {
+  assert.equal(shouldKillGroup({ pgid: 369, leaderCwd: undefined, ownPgid: 1000 }, THIS_WORKTREE), false);
+});
+
+test("a listener with no resolvable process group is not group-killed", () => {
+  assert.equal(shouldKillGroup({ pgid: undefined, leaderCwd: THIS_WORKTREE, ownPgid: 1000 }, THIS_WORKTREE), false);
+});
+
+test("our own process group is never killed", () => {
+  assert.equal(shouldKillGroup({ pgid: 1000, leaderCwd: THIS_WORKTREE, ownPgid: 1000 }, THIS_WORKTREE), false);
 });

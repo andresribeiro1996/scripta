@@ -4,6 +4,7 @@ import type { DigestKind } from "@scripta/shared/dashboard";
 export const DIGEST_EVENT_TYPES: ReadonlyArray<readonly [ActivityEventType, DigestKind]> = [
   ["tierlist_published", "publication"],
   ["tournament_published", "publication"],
+  ["quiz_published", "publication"],
   ["voted_on", "vote"],
   ["book_added", "reading"],
   ["book_finished", "reading"]
@@ -14,6 +15,7 @@ export const FEED_EVENT_TYPES: readonly ActivityEventType[] = DIGEST_EVENT_TYPES
 const EVERY_ACTIVITY_EVENT_TYPE = {
   tierlist_published: true,
   tournament_published: true,
+  quiz_published: true,
   book_added: true,
   book_finished: true,
   following: true,

@@ -15,7 +15,7 @@ export interface ProfileRow {
   feed_settings: string | null;
 }
 
-export type CommunityRefType = "tierlist" | "tournament" | "book" | "user" | "mural";
+export type CommunityRefType = "tierlist" | "tournament" | "quiz" | "book" | "user" | "mural";
 
 export interface EventRow {
   id: string;

@@ -330,7 +330,7 @@ test("an event is written to the inbox of each follower of its author, and of no
   assert.deepEqual(inboxRows(db, "fan-author"), []);
 });
 
-test("only the five feed types reach an inbox, even from an author who shows every category", () => {
+test("only the six feed types reach an inbox, even from an author who shows every category", () => {
   const { db, r } = openRepo();
   r.updateFeedSettings("types-author", ALL_ON);
   r.insertFollow({ follower_id: "types-fan", followee_id: "types-author", created_at: "2026-09-10T00:00:00.000Z" });
@@ -363,7 +363,7 @@ test("an event is written to the inbox of each follower only if its author shows
   }
 
   for (const author of ["write-no-profile", "write-published"]) {
-    assert.deepEqual(inboxEventIds(db, `${author}-fan-1`).sort(), [`${author}-tierlist_published`, `${author}-tournament_published`, `${author}-voted_on`]);
+    assert.deepEqual(inboxEventIds(db, `${author}-fan-1`).sort(), [`${author}-quiz_published`, `${author}-tierlist_published`, `${author}-tournament_published`, `${author}-voted_on`]);
   }
   assert.equal(inboxEventIds(db, "write-all-on-fan-1").length, FEED_EVENT_TYPES.length);
   assert.deepEqual(inboxEventIds(db, "write-all-off-fan-1"), []);
@@ -788,6 +788,7 @@ test("the dashboard service pages through a real inbox newest first, narrowed to
     murals: { ownsMural: unused, getMuralPublicPayload: unused },
     tierlists: { discoverWindow: unused, getPublishedMany: unused, votedAmong: unused, get: (id) => refs.get(id), listByOwner: unused },
     tournaments: { discoverWindow: unused, getPublishedMany: unused, votedAmong: unused, get: () => undefined, listByOwner: unused },
+    quizzes: { discoverWindow: unused, getPublishedMany: unused, votedAmong: unused, get: () => undefined, listByOwner: unused },
     participation: { tierlists: () => [], tournaments: () => [], quizzes: () => [] }
   });
   const at = (day: number) => `2026-09-0${day}T00:00:00.000Z`;

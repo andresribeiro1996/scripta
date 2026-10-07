@@ -176,7 +176,7 @@ export function FinishedScreen({ book, before, onClose }: { book: Record<string,
           onChangeText={(text) => { setNote(text); noteRef.current = text; }}
           placeholder="What stuck with you?"
           accessibilityLabel="A thought to keep"
-          style={{ minHeight: 96, textAlignVertical: "top" }}
+          style={{ minHeight: 96 }}
         />
       </View>
 

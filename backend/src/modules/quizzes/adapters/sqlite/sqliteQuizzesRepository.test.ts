@@ -266,3 +266,60 @@ test("published quizzes about any of the given works, newest first; drafts never
     { id: "old", name: "Old", path: "/play/code-old", ownerUserId: "u1" }
   ]);
 });
+
+function seedPublished() {
+  const repo = makeRepo();
+  repo.insert(quizRow({ id: "habits", name: "Hábitos Atómicos", vote_code: "c1", created_at: "2026-01-01T00:00:00.000Z" }));
+  repo.insert(quizRow({ id: "fantasy", name: "Fantasy ranked", owner_user_id: "u2", vote_code: "c2", created_at: "2026-02-01T00:00:00.000Z" }));
+  repo.insert(quizRow({ id: "habits-2", name: "Atomic Habits: Hábitos", vote_code: "c3", created_at: "2026-03-01T00:00:00.000Z" }));
+  repo.insert(quizRow({ id: "draft", name: "Hábitos privados", created_at: "2026-04-01T00:00:00.000Z" }));
+  return repo;
+}
+
+test("getPublicById and listPublicByUser see published quizzes only, newest first", () => {
+  const repo = seedPublished();
+  assert.equal(repo.getPublicById("habits")?.vote_code, "c1");
+  assert.equal(repo.getPublicById("draft"), undefined);
+  assert.equal(repo.getPublicById("ghost"), undefined);
+  assert.deepEqual(repo.listPublicByUser("u1").map((r) => r.id), ["habits-2", "habits"]);
+  assert.deepEqual(repo.listPublicByUser("u2").map((r) => r.id), ["fantasy"]);
+  assert.deepEqual(repo.listPublicByUser("u3"), []);
+});
+
+test("listPublicByIds returns the published quizzes among the ids and nothing else", () => {
+  const repo = seedPublished();
+  assert.deepEqual(repo.listPublicByIds(["habits", "draft", "ghost", "fantasy"]).map((r) => r.id).sort(), ["fantasy", "habits"]);
+  assert.deepEqual(repo.listPublicByIds([]), []);
+});
+
+test("discoverWindow matches published names accent-insensitively, newest first, up to the limit", () => {
+  const repo = seedPublished();
+  const ids = (needle: string, limit = 10) => repo.discoverWindow(needle, limit).map((r) => r.id);
+  assert.deepEqual(ids("habitos"), ["habits-2", "habits"]);
+  assert.deepEqual(ids("habitos", 1), ["habits-2"]);
+  assert.deepEqual(ids("habitos atom"), ["habits"]);
+  assert.deepEqual(ids("fantasy"), ["fantasy"]);
+  assert.deepEqual(ids("nothing like it"), []);
+  assert.deepEqual(ids(""), ["habits-2", "fantasy", "habits"]);
+  assert.deepEqual(ids("", 2), ["habits-2", "fantasy"]);
+  assert.deepEqual(repo.discoverWindow("fantasy", 10).map((r) => ({ ...r })), [{ id: "fantasy", created_at: "2026-02-01T00:00:00.000Z", owner_user_id: "u2" }]);
+});
+
+test("playCountsFor counts plays per requested quiz and omits quizzes without plays", () => {
+  const repo = seedPublished();
+  repo.savePlay(playRow("p1", "habits", "u9"), []);
+  repo.savePlay(playRow("p2", "habits", null), []);
+  repo.savePlay(playRow("p3", "fantasy", "u9"), []);
+  assert.deepEqual([...repo.playCountsFor(["habits", "fantasy", "habits-2"])].sort(), [["fantasy", 1], ["habits", 2]]);
+  assert.equal(repo.playCountsFor([]).size, 0);
+});
+
+test("votedAmong returns the published quizzes the viewer has played, owner plays included", () => {
+  const repo = seedPublished();
+  repo.savePlay(playRow("p1", "habits", "u9"), []);
+  repo.savePlay(playRow("p2", "fantasy", "u2"), []);
+  repo.savePlay(playRow("p3", "habits-2", null), []);
+  assert.deepEqual(repo.votedAmong("u9", ["habits", "fantasy", "habits-2", "ghost"]), ["habits"]);
+  assert.deepEqual(repo.votedAmong("u2", ["habits", "fantasy"]), ["fantasy"]);
+  assert.deepEqual(repo.votedAmong("u9", []), []);
+});

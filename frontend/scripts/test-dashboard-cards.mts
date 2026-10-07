@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildDashboardCards, digestHeading, digestTarget, type DigestItem } from "@scripta/shared/dashboard";
+import { buildDashboardCards, digestHeading, digestTarget, withKnownDigestItems, type DashboardFeedPage, type DigestItem } from "@scripta/shared/dashboard";
 import { bookKey } from "@scripta/shared/library/merge";
 
 test("cards derive from read status", () => {
@@ -48,4 +48,17 @@ test("digest headings and targets by kind", () => {
   assert.equal(digestTarget(pub), "/vote/code12ab");
   assert.equal(digestHeading(follow), "sam started following you");
   assert.equal(digestTarget(follow), "/community/u/sam");
+});
+
+test("a quiz digest item reads as a quiz and an unknown content kind is dropped", () => {
+  const actor = { userId: "u1", username: "andre", avatarUrl: null };
+  const pub: DigestItem = {
+    kind: "publication", id: "e1", type: "quiz_published", createdAt: "2026-10-07T00:00:00.000Z", actor,
+    content: { kind: "quiz", id: "q1", voteCode: "qcode", name: "Dune trivia", questionCount: 8, playCount: 3, playOpen: true, covers: [] }
+  };
+  const unknown = { ...pub, id: "e2", content: { kind: "hologram", id: "h1", name: "x" } } as unknown as DigestItem;
+  assert.equal(digestHeading(pub), "andre published a quiz");
+  assert.equal(digestTarget(pub), "/play/qcode");
+  const page: DashboardFeedPage = { items: [pub, unknown], nextCursor: null, seenAt: null, personalNewCount: 0, followingNewCount: 0 };
+  assert.deepEqual(withKnownDigestItems(page).items, [pub]);
 });
