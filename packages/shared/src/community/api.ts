@@ -32,7 +32,7 @@ export function createCommunityApi(request: ApiRequest) {
       return request<Page<ActivityItem>>(apiPath`/community/profiles/${username}/activity` + query, { auth: "optional" });
     },
     fetchProfileLibrary(username: string): Promise<{ data: LibraryData | null }> {
-      return request(apiPath`/community/profiles/${username}/library`, { auth: "none" });
+      return request(apiPath`/community/profiles/${username}/library`, { auth: "optional" });
     },
     async updateFeedSettings(settings: FeedSettings): Promise<void> {
       await request("/community/profile/feed-settings", { method: "PUT", body: settings, auth: "required" });

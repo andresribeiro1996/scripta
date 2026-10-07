@@ -153,7 +153,7 @@ export interface CommunityService {
   searchPeople(viewerId: string, q: string, limit: number): PersonResult[];
   suggestPeople(viewerId: string, limit: number): SuggestedReader[];
   getActivity(username: string, viewerId: string | undefined, cursor: string | undefined, limit: number): Page<ActivityItem>;
-  getLibrary(username: string): { data: Record<string, unknown> | null };
+  getLibrary(username: string, viewerId?: string): { data: Record<string, unknown> | null };
   getFeedSettings(userId: string): FeedSettings;
   updateFeedSettings(userId: string, settings: FeedSettings): void;
   archiveOldEvents(): Promise<{ moved: number; purged: number }>;
@@ -197,15 +197,11 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
     const glyph = glyphOf(userId);
     return glyph ? { ...author, userId, readerGlyph: glyph } : { ...author, userId };
   };
-  const visibleUserId = (username: string, viewerId: string | undefined): string => {
+  const contentOwner = (username: string, viewerId: string | undefined): string => {
     const userId = deps.findUserIdByUsername(username);
-    if (!userId) throw new ProfileNotFoundError();
-    if (userId === viewerId) return userId;
-    const row = repo.getProfileRow(userId);
-    if (!row || row.published !== 1) throw new ProfileNotFoundError();
+    if (!userId || !createVisibility(repo, viewerId ?? null).canViewContent(userId)) throw new ProfileNotFoundError();
     return userId;
   };
-  const publishedUserId = (username: string): string => visibleUserId(username, undefined);
 
   type DigestRow = { id: string; createdAt: string; event?: EventRow; follow?: FollowRow; participation?: ParticipationItem };
   type Bound = { keyset?: CursorKeyset; since?: string };
@@ -389,27 +385,28 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
     getProfileByUsername(username, viewerId) {
       const userId = deps.findUserIdByUsername(username);
       if (!userId) throw new ProfileNotFoundError();
-      const row = repo.getProfileRow(userId);
-      const published = row?.published === 1;
-      if (!published && viewerId === userId) throw new ProfileNotFoundError();
       const author = deps.resolveProfiles([userId]).get(userId);
       if (!author) throw new ProfileNotFoundError();
-      const mural = published && row.mural_id ? deps.murals.getMuralPublicPayload(userId, row.mural_id) : null;
+      const visibility = createVisibility(repo, viewerId ?? null);
+      const shown = visibility.canViewContent(userId);
+      const published = visibility.standing(userId).published;
+      const row = repo.getProfileRow(userId);
+      const mural = shown && row?.mural_id ? deps.murals.getMuralPublicPayload(userId, row.mural_id) : null;
       const glyphOf = glyphLookup();
       const view: CommunityProfileView = {
-        private: !published,
+        private: visibility.isPrivate(userId),
         profile: {
           user: withGlyph(author, userId, glyphOf),
-          publishedAt: published ? row.published_at ?? row.updated_at : null,
+          publishedAt: published && row ? row.published_at ?? row.updated_at : null,
           followerCount: repo.countFollowers(userId),
           followingCount: repo.countFollowing(userId),
           viewerFollows: viewerId ? repo.getFollow(viewerId, userId) !== undefined : undefined
         },
         mural,
         published: {
-          tierlists: published ? deps.tierlists.listByOwner(userId).map(toTierlistSummary) : [],
-          tournaments: published ? deps.tournaments.listByOwner(userId).map(toTournamentSummary) : [],
-          quizzes: published ? deps.quizzes.listByOwner(userId).map(toQuizSummary) : []
+          tierlists: shown ? deps.tierlists.listByOwner(userId).map(toTierlistSummary) : [],
+          tournaments: shown ? deps.tournaments.listByOwner(userId).map(toTournamentSummary) : [],
+          quizzes: shown ? deps.quizzes.listByOwner(userId).map(toQuizSummary) : []
         }
       };
       if (viewerId === userId) view.feedSettings = settingsFor(userId);
@@ -526,11 +523,11 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
         sharedBooks: entry.shared > 0 ? deps.sharedBooks(viewerId, entry.id, SHARED_BOOKS_SHOWN) : []
       }));
     },
-    getLibrary(username) {
-      return { data: deps.resolveLibrary(publishedUserId(username)) };
+    getLibrary(username, viewerId) {
+      return { data: deps.resolveLibrary(contentOwner(username, viewerId)) };
     },
     getActivity(username, viewerId, cursor, limit) {
-      const userId = visibleUserId(username, viewerId);
+      const userId = contentOwner(username, viewerId);
       const keyset = cursor ? decodeCursor(cursor) : undefined;
       if (cursor && !keyset) throw new InvalidCursorError();
       const owner = viewerId === userId;
