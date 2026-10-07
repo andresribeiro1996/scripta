@@ -6,7 +6,7 @@ import { COUNTERS } from "./counters.js";
 import { PLATES, type IdentityKey } from "./plates.js";
 import { renderReaderCard } from "./render.js";
 import { seedOf } from "./seed.js";
-import { TRAITS } from "./style.js";
+import { DEFAULT_READER_CARD_STYLE, TRAITS } from "./style.js";
 
 const ELEMENTS = new Set(["svg", "g", "defs", "path", "rect", "circle", "ellipse", "line", "polyline", "polygon", "text", "tspan", "textPath", "linearGradient", "radialGradient", "stop", "pattern", "clipPath", "mask", "image", "filter", "feOffset", "feFlood", "feComposite", "feMerge", "feMergeNode", "feGaussianBlur", "feColorMatrix", "feBlend", "feDropShadow"]);
 
@@ -36,7 +36,7 @@ test("every counter, trait, print, state and identity stays inside react-native-
   for (const [index, identity] of identities.entries()) for (const state of identity ? (["settled", "leaning"] as const) : (["unwritten"] as const)) {
     for (const [size, segments] of Object.entries(dials)) for (const counter of COUNTERS) for (const trait of TRAITS) for (const print of ["paper", "reversed"] as const) {
       const card: PublicReaderCard = { state, identity, runnerUp: null, streak: PLATES[(index + 1) % PLATES.length]!.key, signal: null, coverage: [], dial: { segments }, facts: { finished: 0, highlights: 0, series: 0, since: null, edition: 2026 } };
-      const svg = renderReaderCard({ card, style: { counter, trait }, readerName: "andre", print, label: "x", seed: seedOf("andre") });
+      const svg = renderReaderCard({ card, style: { ...DEFAULT_READER_CARD_STYLE, counter, trait }, readerName: "andre", print, label: "x", seed: seedOf("andre") });
       assert.deepEqual(portabilityProblems(svg), [], `${identity}/${state}/${size}/${counter}/${trait}/${print}`);
     }
   }

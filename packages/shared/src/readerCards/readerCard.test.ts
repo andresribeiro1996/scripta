@@ -5,7 +5,7 @@ import { COUNTERS } from "./counters.js";
 import { INKS } from "./plates.js";
 import { renderPlate, renderReaderCard } from "./render.js";
 import { seedOf } from "./seed.js";
-import { DEFAULT_READER_CARD_STYLE, TRAITS, normalizeReaderCardStyle, type ReaderCardStyle } from "./style.js";
+import { DEFAULT_READER_CARD_STYLE, TRAITS, normalizeReaderCardStyle, type PublicReaderCardStyle } from "./style.js";
 
 const card = (fields: Partial<PublicReaderCard> = {}): PublicReaderCard => ({
   state: "settled", identity: "star", runnerUp: null, streak: "lamp", signal: null, coverage: [],
@@ -13,7 +13,7 @@ const card = (fields: Partial<PublicReaderCard> = {}): PublicReaderCard => ({
   facts: { finished: 30, highlights: 40, series: 2, since: 2014, edition: 2026 },
   ...fields,
 });
-const render = (fields: Partial<PublicReaderCard> = {}, style: Pick<ReaderCardStyle, "counter" | "trait"> = DEFAULT_READER_CARD_STYLE, print: "paper" | "reversed" = "paper") =>
+const render = (fields: Partial<PublicReaderCard> = {}, style: PublicReaderCardStyle = DEFAULT_READER_CARD_STYLE, print: "paper" | "reversed" = "paper") =>
   renderReaderCard({ card: card(fields), style, readerName: "andre", print, label: "Reader card", seed: seedOf("andre") });
 const plain = renderPlate({ identity: "star", state: "settled", readerName: "andre", print: "paper", label: "Reader card" });
 
@@ -68,7 +68,7 @@ test("an unwritten card keeps its counter but never a trait", () => {
 
 test("every counter, trait and print renders fully inlined", () => {
   for (const counter of COUNTERS) for (const trait of TRAITS) for (const print of ["paper", "reversed"] as const) {
-    const svg = render({}, { counter, trait }, print);
+    const svg = render({}, { ...DEFAULT_READER_CARD_STYLE, counter, trait }, print);
     assert.doesNotMatch(svg, / class="\w+"/);
     assert.doesNotMatch(svg, /<style>|NaN/);
   }

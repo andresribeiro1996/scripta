@@ -1,5 +1,9 @@
 import { isEligiblePassage } from "../murals/home.js";
+import { readerCardLabel, readerCardPlateLine } from "../readerCards/card.js";
 import type { IdentityKey } from "../readerCards/plates.js";
+import type { ReaderCardBase } from "../readerCards/render.js";
+import { seedOf } from "../readerCards/seed.js";
+import { DEFAULT_READER_CARD_STYLE, normalizeReaderCardStyle, publicStyle } from "../readerCards/style.js";
 import { genresForBook } from "./bookGenres.js";
 import type { Group } from "./groups.js";
 import { parseBookDate } from "./libraryView.js";
@@ -46,4 +50,14 @@ export function readerCardFacts(books: Book[], groups: Group[], identity: Identi
 export function publicReaderCardOf(books: Book[], groups: Group[], now: Date = new Date()): PublicReaderCard {
   const identity = readerIdentity(books, groups);
   return { ...publicReaderCard(identity), ...readerCardFacts(books, groups, identity.identity, now) };
+}
+
+export function readerCardInputOf(books: Book[], groups: Group[], readerName: string, override?: PublicReaderCard): ReaderCardBase {
+  const seed = seedOf(readerName);
+  if (override) {
+    return { card: override, style: publicStyle(normalizeReaderCardStyle(override.style)), view: "visitor", readerName, label: readerCardLabel(override), unwrittenLine: "yet to be written", seed };
+  }
+  const own = readerIdentity(books, groups);
+  const card: PublicReaderCard = { ...publicReaderCard(own), ...readerCardFacts(books, groups, own.identity) };
+  return { card, style: publicStyle(DEFAULT_READER_CARD_STYLE), view: "owner", leaders: own.leaders, missing: own.missing, readerName, label: readerCardLabel(card), unwrittenLine: readerCardPlateLine(own.missing), seed };
 }

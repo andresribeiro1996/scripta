@@ -1,9 +1,10 @@
 import type { DialGroup } from "../library/readerCardFacts.js";
-import type { PublicReaderCard } from "../library/readerIdentity.js";
+import type { PublicReaderCard, ReaderLeader } from "../library/readerIdentity.js";
 import { composePlate, SANS, type PlateFace, type PlateSlots } from "./compose.js";
 import { drawCounter, SEAL_ANGLE } from "./counters.js";
 import { INKS, PAPER, PLATES, REVERSED_LINE, emblems, glyph, glyphBody, type IdentityKey } from "./plates.js";
-import type { ReaderCardStyle } from "./style.js";
+import type { ReaderCardView } from "./pages.js";
+import type { PublicReaderCardStyle } from "./style.js";
 
 export type PlatePrint = "paper" | "reversed";
 export type CardState = "settled" | "leaning" | "unwritten";
@@ -61,14 +62,19 @@ export function renderPlate(options: RenderPlateOptions): string {
 
 export interface ReaderCardInput {
   card: PublicReaderCard;
-  style: Pick<ReaderCardStyle, "counter" | "trait">;
+  style: PublicReaderCardStyle;
   readerName: string;
   print: PlatePrint;
   label: string;
   unwrittenLine?: string;
   seed: number;
   width?: number;
+  view?: ReaderCardView;
+  leaders?: ReaderLeader[];
+  missing?: string | null;
 }
+
+export type ReaderCardBase = Omit<ReaderCardInput, "print">;
 
 const GENRE_LEADS: ReadonlySet<string> = new Set(["lamp", "star", "arch", "corr"]);
 const SEAL_SIZE = 26;
