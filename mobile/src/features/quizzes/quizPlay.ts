@@ -32,7 +32,7 @@ export function playStage(input: {
 }): PlayStage {
   if (input.boardMissing) return "unavailable";
   if (!input.boardReady) return "loading";
-  if (!input.playOpen) return "closed";
   if (!input.resolved) return "loading";
-  return input.alreadyPlayed ? "played" : "playing";
+  if (input.alreadyPlayed) return "played";
+  return input.playOpen ? "playing" : "closed";
 }

@@ -11,6 +11,7 @@ import { useParams } from "react-router-dom";
 import type { PublicQuizQuestion } from "@scripta/shared";
 import { CoverImage } from "../components/BookCard";
 import { fetchPublicResultsApi, submitPlayApi, type PlayResponse } from "../api/quizzes";
+import { quizPlayStage } from "../lib/quizPlayStage";
 import { storePlayId, useQuizPlay } from "../hooks/useQuizPlay";
 
 function InfoScreen({ message }: { message: string }) {
@@ -99,10 +100,12 @@ export function PlayQuizPage() {
   if (board.isPending) return <InfoScreen message="Loading…" />;
   if (board.isError) return <InfoScreen message={board.error instanceof Error ? board.error.message : "No quiz at that link."} />;
   const playBoard = board.data;
-  if (!playBoard.playOpen) return <InfoScreen message="This quiz isn't open for play." />;
 
   const result = submitted ?? (ownPlay.data ?? null);
   const questions = playBoard.questions;
+  const stage = quizPlayStage({ playOpen: playBoard.playOpen, hasResult: result !== null, ownPlayPending: ownPlay.isPending });
+  if (stage === "loading") return <InfoScreen message="Loading…" />;
+  if (stage === "closed") return <InfoScreen message="This quiz isn't open for play." />;
 
   if (result) {
     return <ResultsView code={code ?? ""} result={result} questions={questions} copied={copied} setCopied={setCopied} alreadyPlayed={submitted === null} />;

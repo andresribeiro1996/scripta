@@ -36,5 +36,7 @@ test("playStage walks loading → closed → playing → played", () => {
   assert.equal(playStage({ ...base, boardReady: true, resolved: true }), "playing");
   assert.equal(playStage({ ...base, boardReady: true, resolved: true, alreadyPlayed: true }), "played");
   assert.equal(playStage({ ...base, boardReady: true, playOpen: false, resolved: true }), "closed");
+  assert.equal(playStage({ ...base, boardReady: true, playOpen: false }), "loading");
+  assert.equal(playStage({ ...base, boardReady: true, playOpen: false, resolved: true, alreadyPlayed: true }), "played");
   assert.equal(playStage({ ...base, boardMissing: true }), "unavailable");
 });

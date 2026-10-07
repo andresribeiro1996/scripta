@@ -20,7 +20,7 @@ const DISCOVER_FILTERS: Array<{ value: DiscoverType; label: string }> = [
 ];
 
 const segmented = (active: boolean, first: boolean) =>
-  `flex min-h-11 flex-1 items-center justify-center px-3 text-sm font-semibold ${first ? "" : "border-l border-(--color-border)"} ${
+  `flex min-h-11 flex-auto shrink-0 items-center whitespace-nowrap justify-center px-3 text-sm font-semibold ${first ? "" : "border-l border-(--color-border)"} ${
     active ? "bg-(--color-accent-soft) text-(--color-accent)" : "text-(--color-text-dim) hover:bg-(--color-surface-hover)"
   }`;
 
@@ -93,7 +93,7 @@ function DiscoverPane() {
   return (
     <div>
       <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search tier lists, tournaments and quizzes" aria-label="Search tier lists, tournaments and quizzes by name" className={searchInput} />
-      <div className="mb-4 flex items-stretch overflow-hidden rounded-lg border border-(--color-border) bg-(--color-surface) sm:w-96">
+      <div className="mb-4 flex items-stretch overflow-x-auto rounded-lg border border-(--color-border) bg-(--color-surface) sm:w-96">
         {DISCOVER_FILTERS.map((f, i) => (
           <button key={f.value} onClick={() => setType(f.value)} aria-pressed={type === f.value} className={segmented(type === f.value, i === 0)}>
             {f.label}

@@ -28,11 +28,8 @@ export interface QuizzesRepository {
   getPublicById(id: string): QuizRow | undefined;
   listPublicByUser(ownerUserId: string): QuizRow[];
   listPublicByIds(ids: string[]): QuizRow[];
-  /** Published quizzes whose normalized name contains `needle` (every
-   *  published quiz when it is empty), newest first. */
   discoverWindow(needle: string, limit: number): QuizDiscoverRow[];
   playCountsFor(ids: string[]): Map<string, number>;
-  /** The ids, among `ids`, of published quizzes the user has a play on. */
   votedAmong(viewerUserId: string, ids: string[]): string[];
   /** Publish: store the generated question set, mint the code, open play —
    *  one UPDATE, so a quiz can never be half-published. */
