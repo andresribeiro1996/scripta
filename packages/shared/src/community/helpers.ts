@@ -10,6 +10,12 @@ import type {
   SuggestedReader
 } from "./types.js";
 
+const CONTENT_KINDS: Record<PublishedContent["kind"], true> = { tierlist: true, tournament: true, quiz: true };
+
+export function isKnownContent(content: PublishedContent): boolean {
+  return CONTENT_KINDS[content?.kind] === true;
+}
+
 export function contentKindLabel(content: PublishedContent): string {
   switch (content.kind) {
     case "tierlist":

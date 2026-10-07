@@ -12,6 +12,7 @@ import type { ActivityItem } from "../../packages/shared/dist/community/index.js
 test("categoryFor maps every activity type", () => {
   assert.equal(categoryFor("tierlist_published"), "publications");
   assert.equal(categoryFor("tournament_published"), "publications");
+  assert.equal(categoryFor("quiz_published"), "publications");
   assert.equal(categoryFor("mural_published"), "publications");
   assert.equal(categoryFor("book_added"), "reading");
   assert.equal(categoryFor("book_finished"), "reading");
@@ -35,7 +36,11 @@ test("defaults keep reading private", () => {
 });
 
 test("activityRow gives each event a label, tone, title and link", () => {
-  const row = (type: ActivityItem["type"], payload: Record<string, unknown>) => activityRow({ id: "1", type, payload, createdAt: "x" });
+  const row = (type: ActivityItem["type"], payload: Record<string, unknown>) => {
+    const result = activityRow({ id: "1", type, payload, createdAt: "x" });
+    assert.ok(result, `no row for ${type}`);
+    return result;
+  };
   assert.deepEqual(row("book_added", { title: "Dune", author: "Frank Herbert", status: 1, coverUrl: "dune.jpg" }), {
     kind: "reading", label: "Added to library", tone: "dim", title: "Dune", meta: "Frank Herbert · Reading", covers: ["dune.jpg"], href: null, username: null, workId: null
   });
@@ -52,6 +57,15 @@ test("activityRow gives each event a label, tone, title and link", () => {
     kind: "follow", label: "Followed", tone: "dim", title: "@mia", meta: "", covers: [], href: null, username: "mia", workId: null
   });
   assert.equal(row("mural_published", { muralId: "m1" }).kind, "mural");
+});
+
+test("activityRow gives quiz events a row and returns null for a type it does not know", () => {
+  const quizRow = activityRow({ id: "1", type: "quiz_published", payload: { name: "Dune trivia", href: "/play/qcode", detail: "8 questions · 3 plays", covers: ["a"] }, createdAt: "x" });
+  assert.deepEqual(quizRow, {
+    kind: "publication", label: "Published a quiz", tone: "accent", title: "Dune trivia", meta: "8 questions · 3 plays", covers: ["a"], href: "/play/qcode", username: null, workId: null
+  });
+  assert.equal(activityRow({ id: "1", type: "voted_on", payload: { game: "quiz", name: "Dune trivia", href: "/play/qcode" }, createdAt: "x" })?.label, "Played a quiz");
+  assert.equal(activityRow({ id: "1", type: "hologram" as ActivityItem["type"], payload: {}, createdAt: "x" }), null);
 });
 
 test("activityDay names recent days and dates older ones", () => {

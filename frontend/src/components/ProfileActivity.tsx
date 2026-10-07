@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { activityDay, activityRow, relativeTime, type ActivityItem } from "@scripta/shared/community";
+import { activityDay, activityRow, relativeTime, type ActivityItem, type ActivityRow } from "@scripta/shared/community";
 import type { useCommunityActivity } from "../hooks/useCommunity";
 import { EmptyState } from "./EmptyState";
 import { ArenaIcon, CommunityIcon, LibraryIcon, MuralsIcon } from "./NavIcons";
@@ -15,6 +15,7 @@ const TONE = {
 function Glyph({ item, size }: { item: ActivityItem; size: number }) {
   switch (item.type) {
     case "tournament_published":
+    case "quiz_published":
       return <ArenaIcon size={size} />;
     case "following":
       return <CommunityIcon size={size} />;
@@ -32,8 +33,7 @@ function Glyph({ item, size }: { item: ActivityItem; size: number }) {
   }
 }
 
-function ActivityEntry({ item }: { item: ActivityItem }) {
-  const row = activityRow(item);
+function ActivityEntry({ item, row }: { item: ActivityItem; row: ActivityRow }) {
   const tone = TONE[row.tone];
   const target = row.workId ? `/work/${row.workId}` : row.href ?? (row.username ? `/community/u/${row.username}` : null);
   const body: ReactNode = (
@@ -95,16 +95,20 @@ export function ProfileActivity({ activity }: { activity: ReturnType<typeof useC
       />
     );
   }
-  if (activity.items.length === 0) return <EmptyState title="No activity yet." body="Publishing and reading will show up here." />;
+  const entries = activity.items.flatMap((item) => {
+    const row = activityRow(item);
+    return row ? [{ item, row }] : [];
+  });
+  if (entries.length === 0) return <EmptyState title="No activity yet." body="Publishing and reading will show up here." />;
   return (
     <div>
-      {activity.items.map((item, i) => {
+      {entries.map(({ item, row }, i) => {
         const day = activityDay(item.createdAt);
-        const showDay = i === 0 || activityDay(activity.items[i - 1]!.createdAt) !== day;
+        const showDay = i === 0 || activityDay(entries[i - 1]!.item.createdAt) !== day;
         return (
           <div key={item.id}>
             {showDay && <h3 className={`pb-1 text-[11px] font-semibold tracking-wider text-(--color-text-dim) uppercase ${i === 0 ? "" : "pt-5"}`}>{day}</h3>}
-            <ActivityEntry item={item} />
+            <ActivityEntry item={item} row={row} />
           </div>
         );
       })}

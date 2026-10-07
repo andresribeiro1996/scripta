@@ -1,5 +1,5 @@
 import type { CommunityAuthor, FeedItem, ParticipationGameKind, PublishedContent } from "./community/types.js";
-import { contentTarget, feedAction, feedTarget } from "./community/helpers.js";
+import { contentTarget, feedAction, feedTarget, isKnownContent } from "./community/helpers.js";
 import { bookKey } from "./library/merge.js";
 import { rediscoverPassage } from "./murals/home.js";
 
@@ -47,11 +47,9 @@ export interface DashboardFeedPage {
 
 const DIGEST_KINDS: Record<DigestKind, true> = { publication: true, vote: true, reading: true, follow: true, participation: true };
 
-const CONTENT_KINDS: Record<PublishedContent["kind"], true> = { tierlist: true, tournament: true, quiz: true };
-
 function isKnownDigestItem(item: DigestItem): boolean {
   if (DIGEST_KINDS[item.kind as DigestKind] !== true) return false;
-  if (item.kind === "publication" || item.kind === "vote") return CONTENT_KINDS[item.content?.kind as PublishedContent["kind"]] === true;
+  if (item.kind === "publication" || item.kind === "vote") return isKnownContent(item.content);
   return true;
 }
 

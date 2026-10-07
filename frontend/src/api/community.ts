@@ -8,10 +8,12 @@ import type {
   PersonResult,
   PublishedProfile,
   PublishProfileInput,
+  QuizSummary,
   SuggestedReader,
   TierlistSummary,
   TournamentSummary
 } from "@scripta/shared/community";
+import { isKnownContent } from "@scripta/shared/community";
 import { dashboardQuery, withKnownDigestItems, type DashboardFeedPage } from "@scripta/shared/dashboard";
 import type { PublicReaderCard } from "@scripta/shared";
 import type { ThemeId } from "@scripta/shared/themes";
@@ -37,7 +39,7 @@ export interface CommunityProfileView {
     imageUrls: Record<string, string | null>;
     tierlists: Record<string, ResolvedTierlist>;
   } | null;
-  published: { tierlists: TierlistSummary[]; tournaments: TournamentSummary[] };
+  published: { tierlists: TierlistSummary[]; tournaments: TournamentSummary[]; quizzes: QuizSummary[] };
   feedSettings?: FeedSettings;
 }
 
@@ -51,7 +53,8 @@ export async function markDashboardSeen(): Promise<void> {
 
 export async function fetchDiscover(type: DiscoverType, q: string, offset = 0): Promise<{ items: DiscoverItem[]; nextOffset: number | null }> {
   const params = new URLSearchParams({ type, q, offset: String(offset) });
-  return (await apiFetch(`/community/discover?${params}`)) as { items: DiscoverItem[]; nextOffset: number | null };
+  const page = (await apiFetch(`/community/discover?${params}`)) as { items: DiscoverItem[]; nextOffset: number | null };
+  return { ...page, items: page.items.filter((item) => isKnownContent(item.content)) };
 }
 
 export async function fetchPeople(q: string): Promise<PersonResult[]> {

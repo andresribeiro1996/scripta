@@ -15,7 +15,8 @@ import { discoverDestination } from "../lib/landing";
 const DISCOVER_FILTERS: Array<{ value: DiscoverType; label: string }> = [
   { value: "all", label: "All" },
   { value: "tierlist", label: "Tier lists" },
-  { value: "tournament", label: "Tournaments" }
+  { value: "tournament", label: "Tournaments" },
+  { value: "quiz", label: "Quizzes" }
 ];
 
 const segmented = (active: boolean, first: boolean) =>
@@ -91,8 +92,8 @@ function DiscoverPane() {
 
   return (
     <div>
-      <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search tier lists and tournaments" aria-label="Search tier lists and tournaments by name" className={searchInput} />
-      <div className="mb-4 flex items-stretch overflow-hidden rounded-lg border border-(--color-border) bg-(--color-surface) sm:w-72">
+      <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search tier lists, tournaments and quizzes" aria-label="Search tier lists, tournaments and quizzes by name" className={searchInput} />
+      <div className="mb-4 flex items-stretch overflow-hidden rounded-lg border border-(--color-border) bg-(--color-surface) sm:w-96">
         {DISCOVER_FILTERS.map((f, i) => (
           <button key={f.value} onClick={() => setType(f.value)} aria-pressed={type === f.value} className={segmented(type === f.value, i === 0)}>
             {f.label}
@@ -100,9 +101,9 @@ function DiscoverPane() {
         ))}
       </div>
       {isLoading && <SkeletonCardGrid count={4} label="Loading published games" tileClassName="min-h-[110px]" />}
-      {!isLoading && error && items.length === 0 && <EmptyState title="Couldn't load tier lists and tournaments." action={retryButton(refetch)} />}
+      {!isLoading && error && items.length === 0 && <EmptyState title="Couldn't load published games." action={retryButton(refetch)} />}
       {!isLoading && !error && items.length === 0 && (
-        <EmptyState icon={CommunityIcon} title="Nothing published yet." body="Published tier lists and tournaments show up here." />
+        <EmptyState icon={CommunityIcon} title="Nothing published yet." body="Published tier lists, tournaments and quizzes show up here." />
       )}
       {!isLoading && items.length > 0 && (
         <>
@@ -141,7 +142,7 @@ function DiscoverRow({ item }: { item: DiscoverItem }) {
   const status = contentStatus(content);
   return (
     <li className="relative flex items-center gap-3 border-b border-(--color-border) px-2 py-3 hover:bg-(--color-surface-hover)">
-      {content.kind === "tierlist" ? <TierlistThumb covers={content.covers} /> : <TournamentThumb covers={content.covers} />}
+      {content.kind === "tierlist" ? <TierlistThumb covers={content.covers} /> : content.kind === "quiz" ? <QuizThumb covers={content.covers} /> : <TournamentThumb covers={content.covers} />}
       <div className="min-w-0 flex-1">
         <h3 className="truncate text-sm font-semibold">
           <Link to={contentTarget(content)} className="after:absolute after:inset-0">
@@ -211,6 +212,15 @@ function TournamentThumb({ covers }: { covers: string[] }) {
       <span className="absolute top-1/2 left-1/2 z-10 -translate-x-1/2 -translate-y-1/2 rounded-full border border-(--color-border) bg-(--color-surface) px-1.5 text-[10px] leading-4 font-bold tracking-widest">
         VS
       </span>
+    </div>
+  );
+}
+
+function QuizThumb({ covers }: { covers: string[] }) {
+  return (
+    <div aria-hidden="true" className="relative shrink-0" style={{ width: THUMB_WIDTH, height: THUMB_HEIGHT }}>
+      <Cover src={covers[0] ?? null} style={{ left: (THUMB_WIDTH - FAN_WIDTH) / 2, top: (THUMB_HEIGHT - FAN_HEIGHT) / 2, width: FAN_WIDTH, height: FAN_HEIGHT }} />
+      <span className="absolute right-1 bottom-1 z-10 flex h-5 w-5 items-center justify-center rounded-full border border-(--color-border) bg-(--color-surface) text-[11px] leading-none font-bold">?</span>
     </div>
   );
 }

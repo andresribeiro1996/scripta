@@ -369,7 +369,7 @@ Verified end-to-end in a real browser against the real backend (not mocked), all
 
 ### Tier list voting and permanent references
 
-`TierListCreatePage.tsx` guides the creator through choosing books, naming tiers, and choosing private or public access. `TierListEditorPage.tsx` can publish an existing private list. `VoteTierlistPage.tsx` (`/vote/:code`) lets readers rank books and submit a ballot. Discover lists published tier lists and tournaments, at `/arena` for signed-out visitors and `/community/discover` for signed-in ones.
+`TierListCreatePage.tsx` guides the creator through choosing books, naming tiers, and choosing private or public access. `TierListEditorPage.tsx` can publish an existing private list. `VoteTierlistPage.tsx` (`/vote/:code`) lets readers rank books and submit a ballot. Discover lists published tier lists, tournaments and quizzes, at `/arena` for signed-out visitors and `/community/discover` for signed-in ones.
 
 **One resource**: publishing adds a vote code to the existing tier list and freezes its name, tiers, pool, and book details. The creator can manage voting and delete it until it reaches 100 distinct signed-in, noncreator ballots containing a placement. It then becomes an app-owned permanent reference, with creator attribution retained.
 
@@ -386,7 +386,7 @@ Each mode also computes a per-book `spread` (the share of voters who didn't put 
 
 **Results are visible after you submit, and that gate is enforced server-side, not just in the UI.** While voting is open, `GET /tierlists/voting/:code` omits the per-book/per-tier histogram entirely — a voter gets the tally back in the response to their *own* ballot, so no amount of curling the board hands out the standings before you've voted. A closed poll's board does carry the final histogram (showing it is the whole point of closing), and the owner reads their own poll's standings at any time through the ownership-checked `GET /tierlists/:id/results`, which is what `TierListEditorPage.tsx` renders. Either way the numbers are live: every response reflects all ballots cast up to that moment, even minutes/hours later.
 
-**The public directory** — `/arena` renders `PublicDiscoverPage` (in `pages/DiscoverPage.tsx`) for signed-out visitors; signed-in visitors are redirected to `/community/discover`. Discover lists published tier lists and tournaments with each one's name, status, book count and (for tier lists) ballot count, and pages in with "Load more". Tier lists link directly to `/vote/:code`, tournaments to `/arena/:id`.
+**The public directory** — `/arena` renders `PublicDiscoverPage` (in `pages/DiscoverPage.tsx`) for signed-out visitors; signed-in visitors are redirected to `/community/discover`. Discover lists published tier lists, tournaments and quizzes with each one's name, status and stats, and pages in with "Load more"; it drops items whose content kind this build does not know. Tier lists link directly to `/vote/:code`, tournaments to `/arena/:id`, quizzes to `/play/:code`.
 
 **A ballot is exactly what the voter placed** — anything still in the pool (unranked books) is recorded as "no opinion" for that book/voter pair, which is why results carry per-book vote counts rather than per-book response rates.
 

@@ -2,7 +2,7 @@
 // same copy the mobile app re-exports. Run with: npx tsx scripts/test-community-helpers.mts
 
 import type { FeedItem, PublishedContent } from "../../packages/shared/dist/community/index.js";
-import { contentDetail, contentKindLabel, contentTarget, feedHeading, feedTarget } from "../../packages/shared/dist/community/index.js";
+import { contentDetail, contentKindLabel, contentStats, contentStatus, contentTarget, feedHeading, feedTarget, isKnownContent } from "../../packages/shared/dist/community/index.js";
 
 let passed = 0;
 let failed = 0;
@@ -42,6 +42,17 @@ const feedItem: FeedItem = {
   createdAt: "2026-09-10T00:00:00.000Z"
 };
 
+const quiz: PublishedContent = {
+  kind: "quiz",
+  id: "q1",
+  voteCode: "qcode",
+  name: "Dune trivia",
+  questionCount: 8,
+  playCount: 3,
+  playOpen: true,
+  covers: []
+};
+
 check("tier list kind label", contentKindLabel(tierlist) === "Tier list");
 check("tournament kind label", contentKindLabel(tournament) === "Tournament");
 check("tier list detail", contentDetail(tierlist) === "12 books · 4 ballots");
@@ -55,6 +66,15 @@ check(
   "tournament feed heading",
   feedHeading({ ...feedItem, content: tournament, type: "tournament_published" }) === "andre published a tournament"
 );
+
+check("quiz kind label", contentKindLabel(quiz) === "Quiz");
+check("quiz detail", contentDetail(quiz) === "8 questions · 3 plays");
+check("quiz target", contentTarget(quiz) === "/play/qcode");
+check("quiz status", contentStatus(quiz).label === "Open");
+check("quiz stats", contentStats(quiz).length === 2);
+check("quiz feed heading", feedHeading({ ...feedItem, content: quiz, type: "quiz_published" }) === "andre published a quiz");
+check("quiz is known content", isKnownContent(quiz));
+check("unknown content kind is not known", !isKnownContent({ kind: "hologram" } as never));
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

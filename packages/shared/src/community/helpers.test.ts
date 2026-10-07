@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { activityRow, contentDetail, contentKindLabel, contentStats, contentStatus, contentTarget, feedAction, followFailureMessage, personCaption, suggestionReason } from "./helpers.js";
-import type { FeedItem, PersonResult, QuizSummary, SuggestedReader } from "./types.js";
+import { activityRow, contentDetail, contentKindLabel, contentStats, contentStatus, contentTarget, feedAction, followFailureMessage, isKnownContent, personCaption, suggestionReason } from "./helpers.js";
+import type { FeedItem, PersonResult, PublishedContent, QuizSummary, SuggestedReader } from "./types.js";
 
 test("suggestionReason counts the shared books, singular or plural", () => {
   assert.equal(suggestionReason({ sharedCount: 6 }), "You share 6 books");
@@ -87,4 +87,12 @@ test("activity rows name quiz events and skip a type this build does not know", 
   assert.equal(activityRow({ id: "e", type: "voted_on", payload: { game: "tierlist", name: "x" }, createdAt: at })?.label, "Ranked a tier list");
   assert.equal(activityRow({ id: "e", type: "voted_on", payload: { game: "tournament", name: "x" }, createdAt: at })?.label, "Voted in a tournament");
   assert.equal(activityRow({ id: "e", type: "hologram" as never, payload: {}, createdAt: at }), null);
+});
+
+test("isKnownContent accepts the kinds this build renders and rejects others", () => {
+  assert.equal(isKnownContent(quiz()), true);
+  assert.equal(isKnownContent({ kind: "tournament" } as PublishedContent), true);
+  assert.equal(isKnownContent({ kind: "tierlist" } as PublishedContent), true);
+  assert.equal(isKnownContent({ kind: "hologram" } as never), false);
+  assert.equal(isKnownContent(undefined as never), false);
 });
