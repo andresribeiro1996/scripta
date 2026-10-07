@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { CoverImage } from "../../BookCard";
 import type { ResolvedTierlist } from "../../../api/tierlists";
 import { bookKey } from "../../../lib/merge";
-import { resolveShelfBooks, type MuralBlock, type TierDefinition } from "../../../lib/murals";
+import { blockBooks, resolveShelfBooks, type MuralBlock, type TierDefinition } from "../../../lib/murals";
 import { OptionsMenu, type OptionsMenuItem } from "../../OptionsMenu";
 import { TierRowEmpty, TierRowShell, TierRowTiles } from "../../tierlist/TierRowShell";
 
@@ -117,9 +117,9 @@ export function ShelfBlockView({ block, books }: { block: Extract<MuralBlock, { 
   );
 }
 
-/** Auto-computed, no picker at all — every book with ReadStatus === 1. */
-export function CurrentlyReadingBlockView({ books }: { books: Array<Record<string, unknown>> }) {
-  const reading = books.filter((b) => b.ReadStatus === 1);
+/** Auto-computed, no picker at all — whatever blockBooks says is being read. */
+export function CurrentlyReadingBlockView({ block, books }: { block: Extract<MuralBlock, { type: "currentlyReading" }>; books: Array<Record<string, unknown>> }) {
+  const reading = blockBooks(block, books);
   const showProgress = reading.some((b) => readingPercent(b) !== null);
   return (
     <div className="flex h-full flex-col overflow-hidden block-p-2.5">

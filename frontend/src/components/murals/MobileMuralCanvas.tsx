@@ -6,7 +6,7 @@ import { useRef, useState, type CSSProperties } from "react";
 import type { GalleryImage } from "../../api/gallery";
 import type { ResolvedTierlist } from "../../api/tierlists";
 import { BLOCK_PAD_SCALE, blockFinishImage, blockFontFamilyCss, resolveBlockStyle, resolveBorderColor } from "../../lib/libraryStyle";
-import { muralBlockTitle, GRID_COLUMNS, screenPointToGrid, type BlockLayout, type Mural, type MuralBlock, type ReaderProfile, type ShelfTheme } from "../../lib/murals";
+import { isConfigurable, muralBlockTitle, GRID_COLUMNS, screenPointToGrid, type BlockLayout, type Mural, type MuralBlock, type ReaderProfile, type ShelfTheme } from "../../lib/murals";
 import { muralThemeStyle } from "../../lib/theme";
 import { ActionSheet } from "../Sheet";
 import { MobileBlockPreview } from "./MobileBlockPreview";
@@ -398,7 +398,7 @@ export function MobileMuralCanvas({
           title="Block actions"
           onClose={() => setMoreOpen(false)}
           items={[
-            ...(selected.type === "currentlyReading" || selected.type === "empty" ? [] : [{ label: "Configure", onClick: () => onConfigureBlock?.(selected) }]),
+            ...(isConfigurable(selected.type) ? [{ label: "Configure", onClick: () => onConfigureBlock?.(selected) }] : []),
             { label: "Style", onClick: () => onStyleBlock?.(selected) },
             { label: "Duplicate", onClick: () => onDuplicateBlock?.(selected.id) },
             { label: "Delete", onClick: () => onDeleteBlock?.(selected.id), danger: true }
