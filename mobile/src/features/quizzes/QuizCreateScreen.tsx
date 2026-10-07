@@ -9,7 +9,7 @@ import { Button, Input, Screen, Segmented, Toast, dynamicType, radii, spacing, t
 import { resolveCover } from "../library/api/covers";
 import { createQuiz, type Quiz } from "./api";
 
-const SOURCES = [{ value: "shelf", label: "Shelf" }, { value: "collection", label: "Collection" }, { value: "pool", label: "Famous books" }] as const;
+const SOURCES = [{ value: "shelf", label: "Shelf" }, { value: "collection", label: "Collection" }, { value: "pool", label: "Famous" }] as const;
 type Source = (typeof SOURCES)[number]["value"];
 
 const TYPE_LABELS: Record<QuizQuestionType, string> = {
