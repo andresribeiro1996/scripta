@@ -273,6 +273,10 @@ export function HeaderActions({ children }: { children: ReactNode }) {
   return <View style={styles.headerActions}>{children}</View>;
 }
 
+export function SaveStateButton({ busy, unsaved, onPress }: { busy: boolean; unsaved: boolean; onPress: () => void }) {
+  return <IconButton framed label={busy ? "Saving…" : unsaved ? "Save" : "Saved"} disabled={busy || !unsaved} tone={unsaved ? "accent" : "default"} accessibilityLabel={busy ? "Saving changes" : unsaved ? "Save changes" : "All changes saved"} name={!busy && !unsaved ? "confirm" : "save"} onPress={onPress} />;
+}
+
 export function Input({
   label,
   error,

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { THEME_IDS, themes, type ThemeId } from "@scripta/shared/themes";
 import {
   BLOCK_TYPES,
@@ -23,7 +23,7 @@ import { AccessibilityInfo, Pressable, ScrollView, StyleSheet, useWindowDimensio
 import Animated, { useAnimatedReaction, useAnimatedRef, useAnimatedScrollHandler, useSharedValue } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 import { Text } from "../../ui/Text";
-import { Button, Dialog, EmptyState, ErrorState, Fab, HeaderActions, Icon, IconButton, Input, Sheet, Toast } from "../../ui";
+import { Button, Dialog, EmptyState, ErrorState, Fab, HeaderActions, Icon, IconButton, Input, SaveStateButton, Sheet, Toast } from "../../ui";
 import { ThemeGrid } from "../../ui/ThemeGrid";
 import { MuralThemeScope, radii, spacing, typography } from "../../ui/theme";
 import { MuralScreen } from "./MuralScreen";
@@ -58,6 +58,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
   const [blocks, setBlocks] = useState<MuralBlock[] | null>(null);
   const [history, setHistory] = useState<MuralBlock[][]>([]);
   const scrollRef = useAnimatedRef<ScrollView>();
+  const pendingScroll = useRef<number | null>(null);
   const scrollOffset = useSharedValue(0);
   const contentHeight = useSharedValue(0);
   const bottomInset = useSharedValue(88);
@@ -159,6 +160,18 @@ export function MuralEditorScreen({ id }: { id: string }) {
     setSelectedId(block.id);
     setSheetTab(isConfigurable(type) ? "content" : null);
     setAdding(false);
+    const bottom = canvasTop + (block.layout.y + block.layout.h) * MURAL_ROW_HEIGHT;
+    if (bottom > scrollOffset.get() + viewportHeight - dockHeight - spacing.md) {
+      pendingScroll.current = bottom + dockHeight + spacing.md - viewportHeight;
+      flushScroll(contentHeight.get());
+    }
+  }
+
+  function flushScroll(height: number) {
+    const y = pendingScroll.current;
+    if (y === null || height < y + viewportHeight) return;
+    pendingScroll.current = null;
+    scrollRef.current?.scrollTo({ y, animated: true });
   }
 
   function cacheMural(updated: Mural) {
@@ -173,6 +186,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
     setName(updated.name);
     setTheme(updated.theme);
     setBlocks(updated.blocks);
+    setHistory([]);
     return updated;
   }
 
@@ -220,14 +234,14 @@ export function MuralEditorScreen({ id }: { id: string }) {
           title: "",
           headerLargeTitleEnabled: false,
           headerRight: () => dragging ? null : <MuralThemeScope theme={currentTheme}><HeaderActions>
-            <IconButton framed label={busy ? "Saving…" : unsaved ? "Save" : "Saved"} disabled={busy || !unsaved} tone={unsaved ? "accent" : "default"} accessibilityLabel={busy ? "Saving changes" : unsaved ? "Save changes" : "All changes saved"} name={!busy && !unsaved ? "confirm" : "save"} onPress={() => void save()} />
+            <SaveStateButton busy={busy} unsaved={unsaved} onPress={() => void save()} />
             <IconButton framed accessibilityLabel="Mural theme" name="theme" onPress={() => setThemeOpen(true)} />
             <IconButton framed accessibilityLabel="Share mural" name="share" onPress={() => setShareFor(draftMural)} />
           </HeaderActions></MuralThemeScope>,
         }}
       />
       {error ? <Toast visible message={error} tone="error" /> : null}
-      <Animated.ScrollView ref={scrollRef} onLayout={(event) => setViewportHeight(event.nativeEvent.layout.height)} onScroll={onScroll} scrollEventThrottle={16} onContentSizeChange={(_width, height) => contentHeight.set(height)} keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.canvasScroll, { paddingBottom: Math.max(120, dockHeight + spacing.md) }]}>
+      <Animated.ScrollView ref={scrollRef} onLayout={(event) => setViewportHeight(event.nativeEvent.layout.height)} onScroll={onScroll} scrollEventThrottle={16} onContentSizeChange={(_width, height) => { contentHeight.set(height); flushScroll(height); }} keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.canvasScroll, { paddingBottom: Math.max(120, dockHeight + spacing.md) }]}>
         <Pressable accessibilityLabel={`Rename mural, ${currentName}`} accessibilityRole="button" hitSlop={spacing.sm} onPress={() => { setDraftName(currentName); setNameError(undefined); setRenaming(true); }} style={styles.heading}>
           <Text display numberOfLines={2} style={[typography.title, styles.headingText, { color: colors.text }]}>{currentName}</Text>
           <Icon color={colors.textDim} name="edit" size={18} />

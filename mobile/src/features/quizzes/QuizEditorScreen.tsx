@@ -6,7 +6,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pressable, ScrollView, Share, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { API_URL } from "../../core/config";
-import { Button, Dialog, ErrorState, FormScroll, IconButton, Input, Menu, type MenuItem, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { Button, Dialog, ErrorState, FormScroll, HeaderActions, IconButton, Input, Menu, type MenuItem, SaveStateButton, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { coverUrlForApi } from "../library/lib/coverUrl";
 import { publicContentUrl } from "../sharing/links";
 import { fetchQuizResults, publishQuiz, setPlayState, updateQuiz, type Quiz } from "./api";
@@ -107,12 +107,14 @@ export function QuizEditorScreen({ quiz, onUpdated }: { quiz: Quiz; onUpdated: (
     <Stack.Screen options={{
       headerShown: true,
       title: current.name,
-      headerRight: () => <Menu title={current.name} items={actionItems}><IconButton framed accessibilityLabel="Quiz actions" name="more" /></Menu>,
+      headerRight: () => <HeaderActions>
+        {!frozen ? <SaveStateButton busy={busy || publishing} unsaved={dirty} onPress={() => void run(() => updateQuiz(current.id, { data: dataRef.current }))} /> : null}
+        <Menu title={current.name} items={actionItems}><IconButton framed accessibilityLabel="Quiz actions" name="more" /></Menu>
+      </HeaderActions>,
     }} />
     {error ? <Toast visible message={error} tone="error" /> : null}
     {!frozen ? <FormScroll contentContainerStyle={styles.screen}>
       <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{data.books.length} books · {publishing ? "Publishing…" : busy ? "Saving…" : dirty ? "Unsaved changes" : "Saved"}</Text>
-      <Button label="Save changes" disabled={!dirty || publishing} loading={busy} onPress={() => void run(() => updateQuiz(current.id, { data: dataRef.current }))} />
       <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>Questions</Text>
       <View style={styles.lengths}>
         {[4, 5, 10, 15, 20].filter((count) => count <= data.books.length).map((count) => (

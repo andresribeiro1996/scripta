@@ -176,7 +176,7 @@ export function BlockContent({ block, books, images, tierlists, profile, groups,
   const text = blockTextStyles(style, colors.text);
   const dim = { color: blockColors.dim };
   const eyebrow = (label: string, count?: number) => <View style={styles.eyebrowRow}><Text numberOfLines={1} style={[text.label, styles.genreLabel, dim, styles.eyebrowLabel]}>{label}</Text>{count === undefined ? null : <Text style={[text.caption, dim, styles.eyebrowCount]}>{count} {count === 1 ? "book" : "books"}</Text>}</View>;
-  if (block.type === "text") return <><Text style={text.title}>{block.heading || "Note"}</Text><Text style={text.body}>{block.body}</Text></>;
+  if (block.type === "text") return <><Text numberOfLines={2} style={text.title}>{block.heading || "Note"}</Text><Text style={text.body}>{block.body}</Text></>;
   if (block.type === "profile") {
     const theme = shelfThemeOverride ?? calculateShelfTheme(books);
     const initial = (profile?.username || "Reader")[0]?.toUpperCase();
