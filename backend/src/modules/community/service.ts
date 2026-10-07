@@ -12,6 +12,7 @@ import { FollowLimitError, InvalidCursorError, MuralNotOwnedError, NotFollowingE
 import { ACTIVITY_EVENT_TYPES, ARCHIVE_BATCH, BACKFILL_BATCH, BOOK_EVENTS_PER_DAY, BOOK_EVENTS_WINDOW_MS, DIGEST_EVENT_TYPES, FEED_EVENT_TYPES, FEED_WINDOW_MS, FOLLOW_LIMIT, READING_EVENT_TYPES } from "./domain/feed.js";
 import type { CommunityRepository, CursorKeyset } from "./domain/ports.js";
 import type { EventRow, FollowRow } from "./domain/types.js";
+import { createVisibility, readerListing, type ReaderListing } from "./domain/visibility.js";
 
 const DISCOVER_SCAN_CAP = 500;
 const SUGGESTION_SCAN_CAP = 500;
@@ -182,10 +183,11 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
     if (types.length > 0) background(() => backfillInboxes(userId, types));
   };
   const glyphLookup = (): ((userId: string) => IdentityKey | null) => {
+    const visibility = createVisibility(repo, null);
     const cache = new Map<string, IdentityKey | null>();
     return (userId) => {
       if (cache.has(userId)) return cache.get(userId) ?? null;
-      const glyph = repo.getProfileRow(userId)?.published === 1 && settingsFor(userId).readerGlyph ? deps.readerGlyphFor(userId) : null;
+      const glyph = visibility.showsGlyph(userId) ? deps.readerGlyphFor(userId) : null;
       cache.set(userId, glyph);
       return glyph;
     };
@@ -214,6 +216,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
 
   const participationItems = (viewerId: string, since: string): ParticipationItem[] => {
     const glyphOf = glyphLookup();
+    const visibility = createVisibility(repo, viewerId);
     const games: Array<[ParticipationGameKind, GameParticipation[]]> = [
       ["tierlist", deps.participation.tierlists(viewerId, since)],
       ["tournament", deps.participation.tournaments(viewerId, since)],
@@ -221,7 +224,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
     ];
     return games.flatMap(([kind, list]) =>
       list.map((game) => {
-        const nameable = game.recent.map((entry) => entry.userId).filter((userId) => repo.getProfileRow(userId)?.published === 1 && settingsFor(userId).votes);
+        const nameable = game.recent.map((entry) => entry.userId).filter((userId) => visibility.canNameAsParticipant(userId));
         const profiles = deps.resolveProfiles(nameable);
         const actors = nameable
           .filter((userId) => profiles.has(userId))
@@ -318,7 +321,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
       if (followerId === followeeId) throw new SelfFollowError();
       if (!deps.resolveProfiles([followeeId]).has(followeeId)) throw new ProfileNotFoundError();
       if (repo.getFollow(followerId, followeeId)) return;
-      if (repo.getProfileRow(followeeId)?.published !== 1 && !repo.getFollow(followeeId, followerId)) throw new ProfileNotFoundError();
+      if (!createVisibility(repo, followerId).canFollow(followeeId)) throw new ProfileNotFoundError();
       if (repo.countFollowing(followerId) >= FOLLOW_LIMIT) throw new FollowLimitError();
       const inserted = repo.insertFollow({ follower_id: followerId, followee_id: followeeId, created_at: new Date().toISOString() });
       if (inserted) {
@@ -491,10 +494,11 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
       const found = deps.searchUsernameOwners(needle, limit).filter((id) => id !== viewerId);
       const authors = deps.resolveProfiles(found);
       const glyphOf = glyphLookup();
+      const visibility = createVisibility(repo, viewerId);
       return found.flatMap((id) => {
         const user = authors.get(id);
         if (!user) return [];
-        return [{ user: withGlyph(user, id, glyphOf), followerCount: repo.countFollowers(id), viewerFollows: repo.getFollow(viewerId, id) !== undefined, private: repo.getProfileRow(id)?.published !== 1 }];
+        return [{ user: withGlyph(user, id, glyphOf), followerCount: repo.countFollowers(id), viewerFollows: repo.getFollow(viewerId, id) !== undefined, private: visibility.isPrivate(id) }];
       });
     },
     suggestPeople(viewerId, limit) {
@@ -512,11 +516,12 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
       const overlapping = scored.filter((entry) => entry.shared > 0).sort((a, b) => b.shared - a.shared || a.recency - b.recency);
       const fill = overlapping.length < SUGGESTION_OVERLAP_FLOOR ? scored.filter((entry) => entry.shared === 0) : [];
       const glyphOf = glyphLookup();
+      const visibility = createVisibility(repo, viewerId);
       return [...overlapping, ...fill].slice(0, limit).map((entry) => ({
         user: withGlyph(entry.user, entry.id, glyphOf),
         followerCount: repo.countFollowers(entry.id),
         viewerFollows: false,
-        private: false,
+        private: visibility.isPrivate(entry.id),
         sharedCount: entry.shared,
         sharedBooks: entry.shared > 0 ? deps.sharedBooks(viewerId, entry.id, SHARED_BOOKS_SHOWN) : []
       }));
@@ -617,21 +622,17 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
 
 export interface CommunityPublicApi {
   emitEvent(userId: string, type: ActivityEventType, refType: CommunityRefType, refId: string, payload?: Record<string, unknown>): void;
-  readerVisibility(viewerId: string | null, userIds: string[]): Map<string, { followed: boolean; published: boolean; showGlyph: boolean }>;
+  readerVisibility(viewerId: string | null, userIds: string[]): Map<string, ReaderListing>;
 }
 
 export function createCommunityPublicApi(repo: CommunityRepository, now: () => number = Date.now): CommunityPublicApi {
   return {
     emitEvent: createActivityRecorder(repo, now),
     readerVisibility(viewerId, userIds) {
-      const visible = new Map<string, { followed: boolean; published: boolean; showGlyph: boolean }>();
-      if (userIds.length === 0) return visible;
-      const followees = new Set(viewerId ? repo.listFollowees(viewerId) : []);
-      for (const row of repo.visibilityRows(userIds)) {
-        const published = row.published === 1;
-        const followed = followees.has(row.user_id) && (published || row.show_reading === 1);
-        if (!published && !followed) continue;
-        visible.set(row.user_id, { followed, published, showGlyph: published && row.show_reader_glyph === 1 });
+      const visible = new Map<string, ReaderListing>();
+      for (const [userId, standing] of createVisibility(repo, viewerId).standings(userIds)) {
+        const listing = readerListing(standing);
+        if (listing) visible.set(userId, listing);
       }
       return visible;
     }
