@@ -3,7 +3,7 @@
 // service.ts is written against this interface only.
 
 import type { QuestionStat } from "@scripta/shared";
-import type { AnswerRow, PlayRow, QuizGameRow, QuizRow } from "./types.js";
+import type { AnswerRow, PlayRow, QuizDiscoverRow, QuizGameRow, QuizRow } from "./types.js";
 
 export interface QuizzesRepository {
   listByUser(userId: string): QuizRow[];
@@ -25,6 +25,15 @@ export interface QuizzesRepository {
    *  play routes, where the caller may have no session at all. */
   getByVoteCode(code: string): QuizRow | undefined;
   listPublishedByWorks(workIds: string[], limit: number): QuizGameRow[];
+  getPublicById(id: string): QuizRow | undefined;
+  listPublicByUser(ownerUserId: string): QuizRow[];
+  listPublicByIds(ids: string[]): QuizRow[];
+  /** Published quizzes whose normalized name contains `needle` (every
+   *  published quiz when it is empty), newest first. */
+  discoverWindow(needle: string, limit: number): QuizDiscoverRow[];
+  playCountsFor(ids: string[]): Map<string, number>;
+  /** The ids, among `ids`, of published quizzes the user has a play on. */
+  votedAmong(viewerUserId: string, ids: string[]): string[];
   /** Publish: store the generated question set, mint the code, open play —
    *  one UPDATE, so a quiz can never be half-published. */
   publish(id: string, userId: string, data: string, code: string): QuizRow | undefined;

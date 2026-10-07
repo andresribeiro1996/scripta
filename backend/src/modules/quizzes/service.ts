@@ -95,6 +95,50 @@ function toPublicQuestion(question: QuizQuestion, bookByWork: Map<string, QuizBo
   return { id: question.id, type: question.type, prompt, options: question.options };
 }
 
+export interface PublishedQuizRef {
+  id: string;
+  ownerUserId: string;
+  createdAt: string;
+  voteCode: string;
+  name: string;
+  questionCount: number;
+  playCount: number;
+  playOpen: boolean;
+  covers: string[];
+}
+
+export interface QuizDiscoverRef {
+  id: string;
+  createdAt: string;
+  ownerUserId: string;
+}
+
+const COVER_PREVIEW_LIMIT = 3;
+
+function toPublishedRef(row: QuizRow, playCount: number): PublishedQuizRef {
+  const doc = readDocument(toQuiz(row));
+  const covers: string[] = [];
+  for (const book of doc.books) {
+    if (covers.length >= COVER_PREVIEW_LIMIT) break;
+    if (typeof book?.coverUrl === "string" && book.coverUrl) covers.push(book.coverUrl);
+  }
+  return {
+    id: row.id,
+    ownerUserId: row.owner_user_id,
+    createdAt: row.created_at,
+    voteCode: row.vote_code!,
+    name: row.name,
+    questionCount: doc.questionCount,
+    playCount,
+    playOpen: row.play_open === 1,
+    covers
+  };
+}
+
+export type EmitPublished = (quizId: string, ownerUserId: string) => void;
+
+export type EmitPlayed = (playerUserId: string, quizId: string, quizName: string) => void;
+
 export interface QuizzesService {
   listQuizzes(userId: string): Quiz[];
   createQuiz(userId: string, name: string, data: unknown): Quiz;
@@ -113,11 +157,16 @@ export interface QuizzesService {
   getPublicResults(code: string): { plays: Array<Omit<ResultPlay, "playId">>; questionCount: number } | undefined;
   listPublishedByWorks(workIds: string[], limit: number): QuizGameRow[];
   participationByOwner(ownerUserId: string, since: string): GameParticipation[];
+  getPublishedRef(id: string): PublishedQuizRef | undefined;
+  listPublishedRefsByOwner(ownerUserId: string): PublishedQuizRef[];
+  getPublishedRefs(ids: string[]): PublishedQuizRef[];
+  discoverWindow(needle: string, limit: number): QuizDiscoverRef[];
+  votedAmong(viewerUserId: string, ids: string[]): string[];
 }
 
 const RECENT_PARTICIPANT_LIMIT = 10;
 
-export function createQuizzesService(repo: QuizzesRepository): QuizzesService {
+export function createQuizzesService(repo: QuizzesRepository, emitPublished?: EmitPublished, emitPlayed?: EmitPlayed): QuizzesService {
   return {
     listQuizzes(userId) {
       return repo.listByUser(userId).map(toQuiz);
@@ -185,6 +234,7 @@ export function createQuizzesService(repo: QuizzesRepository): QuizzesService {
       }
       const published = repo.publish(id, userId, JSON.stringify({ ...doc, books, questions }), code);
       if (!published) return { ok: false, reason: "not-found" };
+      emitPublished?.(id, userId);
       return { ok: true, quiz: toQuiz(published) };
     },
 
@@ -253,6 +303,7 @@ export function createQuizzesService(repo: QuizzesRepository): QuizzesService {
         correct: correct[answer.questionId] ? 1 : 0
       }));
       repo.savePlay(play, answerRows);
+      if (player.kind === "user") emitPlayed?.(player.userId, row.id, row.name);
       return { ok: true, playId: play.id, score, correct };
     },
 
@@ -297,6 +348,28 @@ export function createQuizzesService(repo: QuizzesRepository): QuizzesService {
 
     listPublishedByWorks: (workIds, limit) => repo.listPublishedByWorks(workIds, limit),
 
+    getPublishedRef(id) {
+      const row = repo.getPublicById(id);
+      return row ? toPublishedRef(row, repo.playCount(id)) : undefined;
+    },
+
+    listPublishedRefsByOwner(ownerUserId) {
+      const rows = repo.listPublicByUser(ownerUserId);
+      const counts = repo.playCountsFor(rows.map((row) => row.id));
+      return rows.map((row) => toPublishedRef(row, counts.get(row.id) ?? 0));
+    },
+
+    getPublishedRefs(ids) {
+      const counts = repo.playCountsFor(ids);
+      return repo.listPublicByIds(ids).map((row) => toPublishedRef(row, counts.get(row.id) ?? 0));
+    },
+
+    discoverWindow(needle, limit) {
+      return repo.discoverWindow(needle, limit).map((row) => ({ id: row.id, createdAt: row.created_at, ownerUserId: row.owner_user_id }));
+    },
+
+    votedAmong: (viewerUserId, ids) => repo.votedAmong(viewerUserId, ids),
+
     participationByOwner(ownerUserId, since) {
       return repo.listParticipation(ownerUserId, since).map((row) => ({
         id: row.id,
@@ -320,6 +393,11 @@ export interface GameByWork {
 export interface QuizzesPublicApi {
   participationByOwner(ownerUserId: string, since: string): GameParticipation[];
   publishedByWorks(workIds: string[], limit: number): GameByWork[];
+  getPublished(id: string): PublishedQuizRef | undefined;
+  listPublishedByOwner(ownerUserId: string): PublishedQuizRef[];
+  getPublishedMany(ids: string[]): PublishedQuizRef[];
+  discoverWindow(needle: string, limit: number): QuizDiscoverRef[];
+  votedAmong(viewerUserId: string, ids: string[]): string[];
 }
 
 export function createQuizzesPublicApi(service: QuizzesService): QuizzesPublicApi {
@@ -331,6 +409,11 @@ export function createQuizzesPublicApi(service: QuizzesService): QuizzesPublicAp
         name: row.name,
         path: `/play/${row.vote_code}`,
         ownerUserId: row.owner_user_id
-      }))
+      })),
+    getPublished: (id) => service.getPublishedRef(id),
+    listPublishedByOwner: (ownerUserId) => service.listPublishedRefsByOwner(ownerUserId),
+    getPublishedMany: (ids) => service.getPublishedRefs(ids),
+    discoverWindow: (needle, limit) => service.discoverWindow(needle, limit),
+    votedAmong: (viewerUserId, ids) => service.votedAmong(viewerUserId, ids)
   };
 }
