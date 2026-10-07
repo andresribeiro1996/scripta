@@ -7,7 +7,7 @@ import { Image } from "expo-image";
 import { Button, Dialog, EmptyState, ErrorState, Fab, Icon, IconButton, Input, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { deleteQuiz, fetchQuizzes, type Quiz } from "../quizzes/api";
 import { deleteTierlist, fetchTierlists, fetchVotedTierlists, type Tierlist, type VotedTierlist } from "../tierlists/api";
-import { deleteTournament, fetchMyTournaments, fetchVotedTournaments, type TournamentSummary } from "./api";
+import { deleteTournament, fetchMyTournaments, fetchVotedTournaments, type Tournament } from "./api";
 import {
   ARENA_TABS,
   coverRemainder,
@@ -191,7 +191,7 @@ function ArenaList({
 // Covers when the pool has art, a bracket-size tile when it doesn't: a
 // tournament seeded from books whose covers never resolved would otherwise
 // leave an empty strip where the art should be.
-function TournamentBody({ tournament }: { tournament: TournamentSummary }) {
+function TournamentBody({ tournament }: { tournament: Tournament }) {
   const { colors } = useTheme();
   const progress = tournamentProgress(tournament);
   const remainder = coverRemainder(tournament);

@@ -1,19 +1,19 @@
 import { canonicalWorkIds } from "../library/index.js";
-import type { DuelSideView, DuelView, SeedBookView, TournamentSummary, TournamentView } from "./service.js";
+import type { Duel, DuelSide, SeedBook, Tournament, TournamentView } from "@scripta/shared";
 
 function workOf(id: string | null, canonical: Map<string, string>): string | null {
   return id === null ? null : canonical.get(id) ?? id;
 }
 
-function bookForWire(book: SeedBookView, canonical: Map<string, string>) {
+function bookForWire(book: SeedBook, canonical: Map<string, string>): SeedBook {
   return { workId: workOf(book.workId, canonical), title: book.title, author: book.author, cover: book.cover };
 }
 
-function sideForWire(side: DuelSideView, canonical: Map<string, string>) {
+function sideForWire(side: DuelSide, canonical: Map<string, string>): DuelSide {
   return { ...bookForWire(side, canonical), votes: side.votes };
 }
 
-function duelForWire(duel: DuelView, canonical: Map<string, string>) {
+function duelForWire(duel: Duel, canonical: Map<string, string>): Duel {
   return {
     id: duel.id,
     roundNumber: duel.roundNumber,
@@ -28,7 +28,7 @@ function duelForWire(duel: DuelView, canonical: Map<string, string>) {
   };
 }
 
-function summaryForWire<T extends TournamentSummary>(summary: T, canonical: Map<string, string>) {
+function summaryForWire<T extends Tournament>(summary: T, canonical: Map<string, string>): T {
   return { ...summary, winner: summary.winner && bookForWire(summary.winner, canonical) };
 }
 
@@ -36,12 +36,12 @@ function canonicalFor(ids: Array<string | null>) {
   return canonicalWorkIds(ids.filter((id): id is string => id !== null));
 }
 
-export function summariesForWire(summaries: TournamentSummary[]) {
+export function summariesForWire(summaries: Tournament[]): Tournament[] {
   const canonical = canonicalFor(summaries.map((summary) => summary.winner?.workId ?? null));
   return summaries.map((summary) => summaryForWire(summary, canonical));
 }
 
-export function tournamentForWire(view: TournamentView) {
+export function tournamentForWire(view: TournamentView): TournamentView {
   const canonical = canonicalFor([
     view.winner?.workId ?? null,
     ...view.slots.map((slot) => slot.workId),

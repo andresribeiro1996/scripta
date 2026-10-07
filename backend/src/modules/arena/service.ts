@@ -11,6 +11,7 @@
 // whether closes_at must already have passed.
 
 import { randomUUID } from "node:crypto";
+import type { Duel, DuelSide, SeedBook, Tournament, TournamentView } from "@scripta/shared";
 import type { GameParticipation } from "@scripta/shared/community";
 import {
   AlreadyVotedError,
@@ -31,72 +32,27 @@ import { canonicalWorkIds } from "../library/index.js";
 import type { ArenaRepository } from "./domain/ports.js";
 import type { DuelRow, SeedBookInput, SeedPreview, TournamentGameRow, TournamentRow, TournamentSlotRow } from "./domain/types.js";
 
-export interface SeedBookView {
-  workId: string | null;
-  title: string;
-  author: string;
-  cover: string | null;
-}
-
-export interface TournamentSummary {
-  id: string;
-  name: string;
-  bracketSize: number;
-  roundDurationMinutes: number;
-  status: TournamentRow["status"];
-  currentRound: number;
-  createdAt: string;
-  ownerUserId: string;
-  /** Up to eight cover URLs from the seeded pool, for the list card.
-   *  Empty when nothing is seeded yet, or when no seeded book had art. */
-  covers: string[];
-  filledSlots: number;
-  /** The champion book, once this tournament's final duel has settled —
-   *  null for anything still seeding or in progress. */
-  winner: SeedBookView | null;
-}
-
 export interface TournamentDiscoverRef {
   id: string;
   createdAt: string;
   ownerUserId: string;
 }
 
-export interface DuelSideView extends SeedBookView {
-  votes: number;
-}
-
-export interface DuelView {
-  id: string;
-  roundNumber: number;
-  duelIndex: number;
-  bookA: DuelSideView;
-  bookB: DuelSideView;
-  winnerWorkId: string | null;
-  status: DuelRow["status"];
-  opensAt: string;
-  closesAt: string;
-  hasVoted: boolean;
-}
-
-export interface TournamentView extends TournamentSummary {
-  slots: Array<{ slotIndex: number } & SeedBookView>;
-  duels: DuelView[];
-}
+export type { Duel, DuelSide, SeedBook, Tournament, TournamentView };
 
 export interface ArenaService {
-  createTournament(ownerUserId: string, input: { name: string; bracketSize: number; roundDurationMinutes: number }): TournamentSummary;
-  listMine(ownerUserId: string): TournamentSummary[];
-  listPublic(limit: number, offset: number): TournamentSummary[];
+  createTournament(ownerUserId: string, input: { name: string; bracketSize: number; roundDurationMinutes: number }): Tournament;
+  listMine(ownerUserId: string): Tournament[];
+  listPublic(limit: number, offset: number): Tournament[];
   discoverWindow(needle: string, limit: number): TournamentDiscoverRef[];
-  listPublicByIds(ids: string[]): TournamentSummary[];
+  listPublicByIds(ids: string[]): Tournament[];
   listPublishedByWorks(workIds: string[], limit: number): TournamentGameRow[];
   votedAmong(voterUserId: string, ids: string[]): string[];
   getTournamentView(id: string, voterToken?: string, viewerUserId?: string | null): TournamentView | null;
   setSlotsManual(tournamentId: string, ownerUserId: string, entries: Array<{ slotIndex: number; book: SeedBookInput }>): void;
   seedingSlots(tournamentId: string, ownerUserId: string): TournamentSlotRow[];
   randomFill(tournamentId: string, ownerUserId: string, pool: SeedBookInput[]): void;
-  getPublicSummary(tournamentId: string): TournamentSummary | undefined;
+  getPublicSummary(tournamentId: string): Tournament | undefined;
   start(tournamentId: string, ownerUserId: string): void;
   /** Casts one vote. `voterUserId` is the signed-in caller's account id,
    *  or null for an anonymous vote — when present, the vote is stamped
@@ -106,7 +62,7 @@ export interface ArenaService {
   vote(tournamentId: string, duelId: string, voterToken: string, workId: string, voterUserId?: string | null): void;
   /** Tournaments the account has voted in, most recent vote first —
    *  own tournaments excluded (listMine already shows those). */
-  listVoted(voterUserId: string): TournamentSummary[];
+  listVoted(voterUserId: string): Tournament[];
   participationByOwner(ownerUserId: string, since: string): GameParticipation[];
   settleEarly(tournamentId: string, ownerUserId: string, duelId: string): void;
   tiebreak(tournamentId: string, ownerUserId: string, duelId: string, workId: string): void;
@@ -130,7 +86,7 @@ const EMPTY_PREVIEW: SeedPreview = { covers: [], filledSlots: 0 };
 // The preview and winner are required arguments rather than optional ones:
 // every caller has to say what a card should show, so a new list endpoint
 // can't quietly ship summaries with no covers/winner and no error to notice.
-function toTournamentSummary(row: TournamentRow, preview: SeedPreview, winner: SeedBookView | null): TournamentSummary {
+function toTournamentSummary(row: TournamentRow, preview: SeedPreview, winner: SeedBook | null): Tournament {
   return {
     id: row.id,
     name: row.name,
@@ -148,7 +104,7 @@ function toTournamentSummary(row: TournamentRow, preview: SeedPreview, winner: S
 
 // Only the final round's duel can produce a champion — an early round's
 // settled duel just fed its winner into the next round, not the title.
-function winnerFromDuels(duels: DuelRow[]): SeedBookView | null {
+function winnerFromDuels(duels: DuelRow[]): SeedBook | null {
   if (duels.length === 0) return null;
   const maxRound = Math.max(...duels.map((d) => d.round_number));
   const final = duels.find((d) => d.round_number === maxRound && d.winner_side !== null);
@@ -164,18 +120,18 @@ export function previewFromSlots(slots: TournamentSlotRow[]): SeedPreview {
   return { covers, filledSlots: slots.length };
 }
 
-function summariesWithPreviews(repo: ArenaRepository, rows: TournamentRow[]): TournamentSummary[] {
+function summariesWithPreviews(repo: ArenaRepository, rows: TournamentRow[]): Tournament[] {
   if (rows.length === 0) return [];
   const previews = repo.getSeedPreviews(rows.map((row) => row.id), COVER_PREVIEW_LIMIT);
   const completedIds = rows.filter((row) => row.status === "completed").map((row) => row.id);
-  const winners = new Map<string, SeedBookView>();
+  const winners = new Map<string, SeedBook>();
   for (const duel of repo.getFinalDuels(completedIds)) {
     if (duel.winner_side !== null) winners.set(duel.tournament_id, winnerBookFromDuel(duel));
   }
   return rows.map((row) => toTournamentSummary(row, previews.get(row.id) ?? EMPTY_PREVIEW, winners.get(row.id) ?? null));
 }
 
-function winnerBookFromDuel(d: DuelRow): SeedBookView {
+function winnerBookFromDuel(d: DuelRow): SeedBook {
   return d.winner_side === "a"
     ? { title: d.book_a_title, author: d.book_a_author, cover: d.book_a_cover, workId: d.book_a_work_id }
     : { title: d.book_b_title, author: d.book_b_author, cover: d.book_b_cover, workId: d.book_b_work_id };
@@ -184,7 +140,7 @@ function winnerBookFromDuel(d: DuelRow): SeedBookView {
 function buildDuelsForRound(
   tournamentId: string,
   roundNumber: number,
-  books: SeedBookView[],
+  books: SeedBook[],
   opensAtIso: string,
   roundDurationMinutes: number
 ): DuelRow[] {
@@ -278,7 +234,7 @@ export function createArenaService(
     maybeAdvanceRound(tournament, duel.round_number, nowIso);
   }
 
-  function toDuelView(d: DuelRow, voterToken: string | undefined, viewerUserId: string | null | undefined): DuelView {
+  function toDuelView(d: DuelRow, voterToken: string | undefined, viewerUserId: string | null | undefined): Duel {
     const votes = repo.countVotesBySide(d.id);
     return {
       id: d.id,
@@ -444,7 +400,7 @@ export function createArenaService(
       const slots = repo.getSlots(tournamentId).sort((a, b) => a.slot_index - b.slot_index);
       if (slots.length !== tournament.bracket_size) throw new IncompleteSeedError(tournament.bracket_size, slots.length);
 
-      const books: SeedBookView[] = slots.map((s) => ({ workId: s.work_id, title: s.title, author: s.author, cover: s.cover_url }));
+      const books: SeedBook[] = slots.map((s) => ({ workId: s.work_id, title: s.title, author: s.author, cover: s.cover_url }));
       const nowIso = new Date().toISOString();
       const duels = buildDuelsForRound(tournamentId, 1, books, nowIso, tournament.round_duration_minutes);
       repo.insertDuels(duels);
@@ -544,7 +500,7 @@ export interface ArenaPublicApi {
   participationByOwner(ownerUserId: string, since: string): GameParticipation[];
 }
 
-function toPublishedRef(summary: TournamentSummary): PublishedTournamentRef {
+function toPublishedRef(summary: Tournament): PublishedTournamentRef {
   return {
     id: summary.id,
     ownerUserId: summary.ownerUserId,

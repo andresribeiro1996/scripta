@@ -1,7 +1,7 @@
 import type { TierDefinition } from "@scripta/shared";
 import type { Quiz } from "../quizzes/api";
 import type { Tierlist, VotedTierlist } from "../tierlists/api";
-import type { TournamentSummary } from "./api";
+import type { Tournament } from "./api";
 
 export const ARENA_TABS = [
   { value: "tournaments", label: "Tournaments" },
@@ -15,7 +15,7 @@ export type ArenaTab = (typeof ARENA_TABS)[number]["value"];
 // summary, so it has no caption string; a tier list's caption is a plain
 // count and stays one.
 export type OwnedItem =
-  | { id: string; name: string; kind: "tournament"; source: TournamentSummary }
+  | { id: string; name: string; kind: "tournament"; source: Tournament }
   | { id: string; name: string; detail: string; kind: "tierlist"; source: Tierlist }
   | { id: string; name: string; detail: string; kind: "quiz"; source: Quiz };
 
@@ -25,7 +25,7 @@ export type OwnedItem =
 export type SectionedItem =
   | { kind: "header"; key: string; title: string }
   | { kind: "owned"; key: string; item: OwnedItem }
-  | { kind: "votedTournament"; key: string; target: string; tournament: TournamentSummary }
+  | { kind: "votedTournament"; key: string; target: string; tournament: Tournament }
   | { kind: "votedTierlist"; key: string; target: string; tierlist: VotedTierlist };
 
 export const CREATED_BY_YOU = "Created by you";
@@ -38,7 +38,7 @@ export function tabAtIndex(index: number): ArenaTab {
   return ARENA_TABS[Math.min(ARENA_TABS.length - 1, Math.max(0, index))]!.value;
 }
 
-export function ownedItems(tab: ArenaTab, tournaments: TournamentSummary[], tierlists: Tierlist[], quizzes: Quiz[] = []): OwnedItem[] {
+export function ownedItems(tab: ArenaTab, tournaments: Tournament[], tierlists: Tierlist[], quizzes: Quiz[] = []): OwnedItem[] {
   if (tab === "tournaments") {
     return tournaments.map((source) => ({
       id: source.id,
@@ -83,7 +83,7 @@ export function filterItems(items: OwnedItem[], search: string): OwnedItem[] {
 export function homeSections(
   tab: ArenaTab,
   owned: OwnedItem[],
-  votedTournaments: TournamentSummary[],
+  votedTournaments: Tournament[],
   votedTierlists: VotedTierlist[]
 ): SectionedItem[] {
   const voted = tab === "tournaments" ? votedTournaments : tab === "tierlists" ? votedTierlists : [];
@@ -149,7 +149,7 @@ export function tierDistribution(tiers: TierDefinition[]): TierSegment[] {
   return tiers.map((tier) => ({ color: tier.color, weight: sorted === 0 ? 1 : tier.workIds.length }));
 }
 
-export function tournamentProgress(tournament: TournamentSummary): {
+export function tournamentProgress(tournament: Tournament): {
   label: string;
   totalRounds: number;
   completedRounds: number;
@@ -171,7 +171,7 @@ export function tournamentProgress(tournament: TournamentSummary): {
 /** The thumbnail stack under the name. A finished tournament draws its
  *  champion as the card's own cover, so keeping it in the stack too spends
  *  a slot on a book already shown. */
-export function previewCovers(tournament: TournamentSummary): string[] {
+export function previewCovers(tournament: Tournament): string[] {
   const champion = tournament.winner?.cover;
   return champion ? tournament.covers.filter((cover) => cover !== champion) : tournament.covers;
 }
@@ -179,7 +179,7 @@ export function previewCovers(tournament: TournamentSummary): string[] {
 /** Seeded books beyond what the card shows — the stack plus the winner
  *  cover, which is one of them. Slots seeded without art are counted but
  *  never previewed, so this can't be derived from the bracket size. */
-export function coverRemainder(tournament: TournamentSummary): number {
+export function coverRemainder(tournament: Tournament): number {
   const shown = previewCovers(tournament).length + (tournament.winner ? 1 : 0);
   return Math.max(0, tournament.filledSlots - shown);
 }

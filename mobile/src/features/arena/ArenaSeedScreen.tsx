@@ -6,9 +6,9 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { booksByWork, filterBooks, seedCoverLookup, toSeedBook, workIdOf, type SeedBook } from "@scripta/shared";
 import { Button, EmptyState, ErrorState, Input, Screen, Sheet, Skeleton, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { useLibrary, useWorkBooks } from "../library";
-import { createTournament, fetchTournament, randomFillTournament, resolveCover, setTournamentSlots, startTournament, type TournamentSummary } from "./api";
+import { createTournament, fetchTournament, randomFillTournament, resolveCover, setTournamentSlots, startTournament, type Tournament } from "./api";
 
-export function ArenaSeedScreen({ tournament, onStarted }: { tournament?: TournamentSummary; onStarted: (id: string) => void }) {
+export function ArenaSeedScreen({ tournament, onStarted }: { tournament?: Tournament; onStarted: (id: string) => void }) {
   const { colors } = useTheme();
   const queryClient = useQueryClient();
   const [name, setName] = useState(tournament?.name ?? "Untitled tournament");
@@ -41,7 +41,7 @@ export function ArenaSeedScreen({ tournament, onStarted }: { tournament?: Tourna
   async function materialize() {
     if (current) return current;
     const hours = Number(duration);
-    const created = await createTournament(name.trim() || "Untitled tournament", size, Number.isFinite(hours) && hours > 0 ? hours * 60 : 1440);
+    const created = await createTournament({ name: name.trim() || "Untitled tournament", bracketSize: size, roundDurationMinutes: Number.isFinite(hours) && hours > 0 ? hours * 60 : 1440 });
     setCurrent(created);
     await queryClient.invalidateQueries({ queryKey: ["arena", "mine"] });
     return created;

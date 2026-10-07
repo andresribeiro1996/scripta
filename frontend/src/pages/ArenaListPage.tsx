@@ -24,7 +24,7 @@ import { useQuizzes } from "../hooks/useQuizzes";
 import { useTierlists } from "../hooks/useTierlists";
 import { useVotedTierlists } from "../hooks/useVotedTierlists";
 import { useVotedTournaments } from "../hooks/useVotedTournaments";
-import type { TournamentSummary } from "../api/arena";
+import type { Tournament } from "../api/arena";
 
 export function ArenaListPage() {
   const { tournaments, isLoading } = useMyTournaments();
@@ -340,7 +340,7 @@ export function ArenaListPage() {
 
 // Shared by both tournament sections — a voted tournament is never
 // seeding, but the card markup is identical either way.
-function TournamentCard({ t }: { t: TournamentSummary }) {
+function TournamentCard({ t }: { t: Tournament }) {
   return (
     <a
       href={t.status === "seeding" ? `/dashboard/arena/${t.id}/seed` : `/arena/${t.id}`}
