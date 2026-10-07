@@ -121,6 +121,17 @@ export function slotForWorktree(registry, worktree) {
   return Object.keys(registry.slots).find((slot) => registry.slots[slot].worktree === worktree);
 }
 
+export const STALE_CLAIM_MS = 4 * 60 * 60 * 1000;
+
+export function staleSlots(registry, now, callerWorktree) {
+  return Object.entries(registry.slots).flatMap(([slot, entry]) => {
+    if (entry.worktree === callerWorktree) return [];
+    const claimedAt = Date.parse(entry.claimedAt);
+    const ageMs = Number.isNaN(claimedAt) ? Infinity : now - claimedAt;
+    return ageMs > STALE_CLAIM_MS ? [{ slot, entry, ageMs }] : [];
+  });
+}
+
 export function branchForWorktree(registry, worktree) {
   const slot = slotForWorktree(registry, worktree);
   return slot === undefined ? undefined : registry.slots[slot].branch;

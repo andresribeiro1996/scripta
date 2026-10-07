@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { MAX_SLOT, portsForSlot, readRegistry, withLock, writeRegistry } from "./devRegistry.mjs";
-import { claimSlot, isSlotLive, releaseSlot, slotForWorktree } from "./devRegistry.mjs";
+import { claimSlot, isSlotLive, releaseSlot, slotForWorktree, STALE_CLAIM_MS, staleSlots } from "./devRegistry.mjs";
 import { AVDS, assertHoldsDevice, deviceHolders, recordDeviceSerial, releaseDevice, takeDevice } from "./devRegistry.mjs";
 
 test("isSlotLive: a dead pid with an occupied port is live", () => {
@@ -379,4 +379,31 @@ test("a lease with no recorded serial is handled without throwing", () => {
     const holders = deviceHolders(readRegistry(path));
     assert.equal(holders.find((holder) => holder.avd === avd).serial, undefined);
   });
+});
+
+const NOW = Date.parse("2026-10-07T12:00:00Z");
+const claimedAgo = (ms, worktree = "/wt/other") => ({ worktree, branch: "b", claimedAt: new Date(NOW - ms).toISOString() });
+
+test("staleSlots: a claim under 4h old is fresh", () => {
+  const registry = { slots: { 1: claimedAgo(STALE_CLAIM_MS - 1000) } };
+  assert.deepEqual(staleSlots(registry, NOW, "/wt/self"), []);
+});
+
+test("staleSlots: a claim just over 4h old is stale", () => {
+  const registry = { slots: { 1: claimedAgo(STALE_CLAIM_MS + 1000) } };
+  const [stale] = staleSlots(registry, NOW, "/wt/self");
+  assert.equal(stale.slot, "1");
+  assert.equal(stale.ageMs, STALE_CLAIM_MS + 1000);
+});
+
+test("staleSlots: the caller's own old slot is excluded", () => {
+  const registry = { slots: { 1: claimedAgo(STALE_CLAIM_MS * 10, "/wt/self"), 2: claimedAgo(STALE_CLAIM_MS * 10) } };
+  assert.deepEqual(staleSlots(registry, NOW, "/wt/self").map(({ slot }) => slot), ["2"]);
+});
+
+test("staleSlots: a missing or unparsable claimedAt is stale", () => {
+  const registry = {
+    slots: { 1: { worktree: "/wt/a", branch: "a" }, 2: { worktree: "/wt/b", branch: "b", claimedAt: "t" } },
+  };
+  assert.deepEqual(staleSlots(registry, NOW, "/wt/self").map(({ slot }) => slot), ["1", "2"]);
 });

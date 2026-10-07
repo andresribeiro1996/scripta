@@ -14,6 +14,7 @@ import { assertResourcesAvailable, DEFAULT_LIMITS, probePorts, readHost, worktre
 import { claimSlot, isSlotLive, portsForSlot, readRegistry, registryPath, slotForWorktree } from "./devRegistry.mjs";
 import { writeLaunchConfig } from "./devLaunchConfig.mjs";
 import { applySlotEnv } from "./devSlotEnv.mjs";
+import { reapStaleSlots } from "./devTeardown.mjs";
 import { mobileCertsExist } from "./mobileCertPaths.mjs";
 
 // The 4-stack gate must never block a worktree re-running its OWN
@@ -45,6 +46,8 @@ export function assertResourceGate({ registry, worktree, isPortFree, limits = DE
 export async function claimThisWorktreeSlot({ repoRoot, transport = "loopback", lanAddress, requestedSlot } = {}) {
   const path = registryPath(repoRoot);
   const { worktree, branch, isPrimary } = worktreeIdentity(repoRoot);
+
+  reapStaleSlots({ path, worktree });
 
   // Probed once, up front, so the resource gate and the claim itself
   // (isSlotLive / claimSlot) judge port occupancy from the same

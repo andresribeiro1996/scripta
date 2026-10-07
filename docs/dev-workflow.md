@@ -4,7 +4,7 @@ Port slots, the emulator lease, and how concurrent agent sessions share this rep
 
 ## Port slots and dev servers
 
-Run `node scripts/dev-emulator.mjs` (claims this worktree's port slot) and `npm run dev:release` when done. Never hardcode 3000/8081/5173, and never kill another worktree's process to free a port.
+Run `node scripts/dev-emulator.mjs` (claims this worktree's port slot) and `npm run dev:release` when done. Never hardcode 3000/8081/5173, and never kill another worktree's process to free a port. Stacks claimed more than 4 hours ago are released automatically by the next claim from any worktree; re-running `dev-emulator.mjs` or `dev:claim` refreshes your own clock.
 
 `dev:claim` also writes `.claude/launch.json`, so `preview_start` with `web` / `api` starts this worktree's servers on its slot ports.
 
