@@ -1,14 +1,16 @@
-import { Stack } from "expo-router";
+import { router, Stack } from "expo-router";
 import { ShareSheetBody } from "@/features/library/components/ShareSheet";
 import { useLibrary } from "@/features/library/hooks/useLibrary";
-import { Screen } from "@/ui";
+import { Screen, SheetHeader } from "@/ui";
 
 export default function ShareRoute() {
   const { data: library, share, unshare } = useLibrary();
   const name = library?.data.name || "Library";
+  const title = `Share "${name}"`;
   return (
     <Screen top={false}>
-      <Stack.Screen options={{ title: `Share "${name}"` }} />
+      <Stack.Screen options={{ title, headerShown: false }} />
+      <SheetHeader title={title} onClose={() => router.back()} />
       <ShareSheetBody
         title={name}
         shareToken={library?.shareToken ?? null}

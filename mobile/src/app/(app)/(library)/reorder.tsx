@@ -1,10 +1,10 @@
 import { useMemo } from "react";
-import { router } from "expo-router";
+import { router, Stack } from "expo-router";
 import { orderLibraryBooks } from "@scripta/shared";
 import { ReorderList } from "@/features/library/components/ReorderList";
 import { useLibrary } from "@/features/library/hooks/useLibrary";
 import { useLibraryActions } from "@/features/library/hooks/useLibraryActions";
-import { Screen } from "@/ui";
+import { Screen, SheetHeader } from "@/ui";
 
 export default function ReorderRoute() {
   const { data: library } = useLibrary();
@@ -17,6 +17,8 @@ export default function ReorderRoute() {
   );
   return (
     <Screen top={false}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <SheetHeader title="Reorder books" onClose={() => router.back()} />
       <ReorderList orderedBooks={ordered} onMove={reorder} onClose={() => router.back()} />
     </Screen>
   );
