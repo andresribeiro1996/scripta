@@ -2,7 +2,7 @@ import { useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { bookKey, upNextPair } from "@scripta/shared";
-import { Button, Sheet, spacing, typography, useTheme } from "../../ui";
+import { Button, Sheet, dynamicType, spacing, typography, useTheme } from "../../ui";
 import { CoverImage } from "../library/components/CoverImage";
 import { DuelButton } from "../library/components/DuelButton";
 import { useLibraryActions } from "../library/hooks/useLibraryActions";
@@ -34,6 +34,7 @@ export function PickNextSheet({ visible, keys, books, onClose }: { visible: bool
 
   return (
     <Sheet visible={visible} title="Pick your next read" onClose={close}>
+      <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>Picking one moves it to Reading now.</Text>
       <View style={styles.pair}>
         {pair.map((book) => (
           <View key={bookKey(book)} style={styles.side}>
@@ -41,8 +42,8 @@ export function PickNextSheet({ visible, keys, books, onClose }: { visible: bool
             <Text numberOfLines={2} style={[typography.body, { color: colors.text, textAlign: "center" }]}>{String(book.Title ?? "Untitled")}</Text>
             <View style={styles.duelWrap}>
               <DuelButton
-                label="This one"
-                accessibilityLabel={`This one: ${String(book.Title ?? "Untitled")}`}
+                label="Start this one"
+                accessibilityLabel={`Start reading ${String(book.Title ?? "Untitled")}`}
                 disabled={saving}
                 onPress={() => void choose(book)}
               />
