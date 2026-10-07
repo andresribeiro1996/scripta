@@ -169,23 +169,6 @@ export function ensureBookBlockHeights(blocks: MuralBlock[]): MuralBlock[] {
   });
 }
 
-/** Where the next new footprint of size `w`×`h` lands: below everything
- *  already on the canvas, left-aligned — never overlapping existing
- *  blocks, so dropping something new is always safe without checking the
- *  canvas first. The user is free to drag it wherever they actually want
- *  afterward. Shared by both addBlock (a type's own default size) and
- *  duplicateBlock (the ORIGINAL block's actual current size, which may
- *  have been resized away from that default). */
-function nextLayoutBelow(existing: MuralBlock[], w: number, h: number): BlockLayout {
-  const y = existing.reduce((max, b) => Math.max(max, b.layout.y + b.layout.h), 0);
-  return { x: 0, y, w, h };
-}
-
-function nextBlockLayout(existing: MuralBlock[], type: BlockType): BlockLayout {
-  const { w, h } = blockSize(type);
-  return nextLayoutBelow(existing, w, h);
-}
-
 export function layoutsOverlap(a: BlockLayout, b: BlockLayout): boolean {
   "worklet";
   return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
@@ -336,27 +319,26 @@ export function screenPointToGrid(x: number, y: number, canvasWidth = 1200, marg
 
 /** Adds a new block of `type` (with default config for that type — the
  *  caller/picker fills in the real content right after via updateBlock,
- *  same "add then configure" flow as the rest of the app) at the next
- *  free spot on the canvas. Returns the new block's id alongside the
+ *  same "add then configure" flow as the rest of the app) in the first
+ *  free slot on the canvas. Returns the new block's id alongside the
  *  updated murals list, since the caller (AddBlockMenu.tsx) needs it to
  *  immediately open that block's config panel. */
 export function addBlock(murals: Mural[], muralId: string, type: BlockType): { murals: Mural[]; blockId: string } {
-  const blockId = newId();
   const now = new Date().toISOString();
+  let blockId = "";
   const updated = murals.map((m) => {
     if (m.id !== muralId) return m;
-    const layout = nextBlockLayout(m.blocks, type);
-    const block = newBlock(blockId, type, layout);
+    const block = createBlockCandidate(type, m.blocks);
+    blockId = block.id;
     return { ...m, blocks: [...m.blocks, block], updatedAt: now };
   });
   return { murals: updated, blockId };
 }
 
 /** Copies a block — same type, same content, same style, a fresh id —
- *  landing below everything already on the canvas at the ORIGINAL
- *  block's own current size (`nextLayoutBelow`, not `nextBlockLayout`'s
- *  type-default size: a duplicate should match what you actually
- *  resized it to, not reset to a fresh block's starting footprint). No
+ *  into the first free slot on the canvas at the ORIGINAL block's own
+ *  current size (a duplicate should match what you actually resized it
+ *  to, not reset to a fresh block's starting footprint). No
  *  "configure this" step afterward, unlike addBlock — the whole point of
  *  duplicating is that it's already fully set up; you're free to drag it
  *  somewhere else or tweak it from there. Returns the SAME `murals`
@@ -371,9 +353,7 @@ export function duplicateBlock(murals: Mural[], muralId: string, blockId: string
     const original = m.blocks.find((b) => b.id === blockId);
     if (!original) return m;
     changed = true;
-    const layout = nextLayoutBelow(m.blocks, original.layout.w, original.layout.h);
-    const duplicate: MuralBlock = { ...withMuralBlockLayout(original, layout), id: newId() };
-    return { ...m, blocks: [...m.blocks, duplicate], updatedAt: now };
+    return { ...m, blocks: [...m.blocks, createDuplicateCandidate(original, m.blocks)], updatedAt: now };
   });
   return changed ? result : murals;
 }

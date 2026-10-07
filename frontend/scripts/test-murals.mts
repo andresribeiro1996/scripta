@@ -105,18 +105,36 @@ console.log("\n2b. Multi-book blocks have enough height for full covers");
   check("height upgrade is idempotent", ensureBookBlockHeights(upgraded) === upgraded);
 }
 
-console.log("\n3. addBlock — lands below existing blocks, never overlapping");
+console.log("\n3. addBlock — first free slot, never overlapping");
 {
   let murals = makeMural();
   const muralId = murals[0].id;
   const first = addBlock(murals, muralId, "text");
   murals = first.murals;
-  check("first block at y=0", murals[0].blocks[0].layout.y === 0);
+  check("first block at the origin", JSON.stringify(murals[0].blocks[0].layout) === JSON.stringify({ x: 0, y: 0, w: 4, h: 2 }));
   const second = addBlock(murals, muralId, "stats");
   murals = second.murals;
   const [b1, b2] = murals[0].blocks;
-  check("second block starts at/after the first's bottom edge", b2.layout.y >= b1.layout.y + b1.layout.h);
+  check("second block takes the free slot beside the first, not below it", JSON.stringify(b2.layout) === JSON.stringify({ x: 4, y: 0, w: 6, h: 2 }));
+  check("second block does not overlap the first", isValidBlockLayout(b2.layout, [b1]));
   check("addBlock returns the new block's id", second.blockId === b2.id);
+
+  const withGap = muralWithBlocks([
+    { id: "a", type: "text", layout: { x: 4, y: 0, w: 8, h: 2 }, heading: "A" },
+    { id: "b", type: "text", layout: { x: 0, y: 2, w: 12, h: 2 }, heading: "B" }
+  ]);
+  const inGap = addBlock(withGap, "m1", "text");
+  const gapBlock = inGap.murals[0].blocks.find((b) => b.id === inGap.blockId)!;
+  check("a gap at the top-left takes the new block", JSON.stringify(gapBlock.layout) === JSON.stringify({ x: 0, y: 0, w: 4, h: 2 }));
+
+  const full = muralWithBlocks([
+    { id: "a", type: "text", layout: { x: 0, y: 0, w: 12, h: 2 }, heading: "A" },
+    { id: "b", type: "text", layout: { x: 0, y: 2, w: 6, h: 2 }, heading: "B" },
+    { id: "c", type: "text", layout: { x: 6, y: 2, w: 6, h: 2 }, heading: "C" }
+  ]);
+  const appended = addBlock(full, "m1", "stats");
+  const appendedBlock = appended.murals[0].blocks.find((b) => b.id === appended.blockId)!;
+  check("with no fitting gap the block goes at x=0 below the last row", JSON.stringify(appendedBlock.layout) === JSON.stringify({ x: 0, y: 4, w: 6, h: 2 }));
 }
 
 console.log("\n4. updateBlock / removeBlock");
@@ -156,7 +174,7 @@ console.log("\n6. addBlock — the 'empty' block type: a plain styled rectangle,
   check("gets a real, non-zero default footprint like every other type", block.layout.w > 0 && block.layout.h > 0);
 }
 
-console.log("\n7. duplicateBlock — same type/content/style, a fresh id, lands below everything at the ORIGINAL's own size");
+console.log("\n7. duplicateBlock — same type/content/style, a fresh id, first free slot at the ORIGINAL's own size");
 {
   const murals = muralWithBlocks([
     {
@@ -181,7 +199,15 @@ console.log("\n7. duplicateBlock — same type/content/style, a fresh id, lands 
     "the duplicate's SIZE matches the original's actual (resized) footprint, not the type's default",
     duplicate.layout.w === 6 && duplicate.layout.h === 5
   );
-  check("the duplicate lands below every existing block, not overlapping anything", duplicate.layout.y >= 7);
+  check("the duplicate is placed in the first free slot, not overlapping anything", JSON.stringify(duplicate.layout) === JSON.stringify({ x: 4, y: 5, w: 6, h: 5 }) && isValidBlockLayout(duplicate.layout, [original, result[0].blocks.find((b) => b.id === "other")!]));
+
+  const gapMural = muralWithBlocks([
+    { id: "orig", type: "text", layout: { x: 4, y: 0, w: 4, h: 2 }, heading: "Orig" },
+    { id: "right", type: "text", layout: { x: 8, y: 0, w: 4, h: 2 }, heading: "Right" },
+    { id: "bottom", type: "text", layout: { x: 0, y: 2, w: 12, h: 2 }, heading: "Bottom" }
+  ]);
+  const gapCopy = duplicateBlock(gapMural, "m1", "orig")[0].blocks.find((b) => !["orig", "right", "bottom"].includes(b.id))!;
+  check("a gap at the top-left takes the duplicate", JSON.stringify(gapCopy.layout) === JSON.stringify({ x: 0, y: 0, w: 4, h: 2 }));
 
   check("duplicating a block id that doesn't exist is a true no-op (same array reference)", duplicateBlock(result, "m1", "does-not-exist") === result);
   check("duplicating into a mural id that doesn't exist is also a true no-op", duplicateBlock(result, "does-not-exist", "spot1") === result);

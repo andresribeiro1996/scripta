@@ -236,7 +236,7 @@ test("moving an expanded block keeps its original inset and older saved toggles 
   assert.deepEqual(toggleMuralBlockExpansion([duplicate], duplicate.id, "h", 20)[0].layout, { x: 0, y: 3, w: 2, h: 2 });
   const [mural] = duplicateBlock([{ id: "m", name: "M", theme: "light", blocks: expanded, createdAt: "", updatedAt: "", shareToken: null, shareUrl: null, folderId: null }], "m", "a");
   const last = mural.blocks.at(-1)!;
-  assert.deepEqual(toggleMuralBlockExpansion(mural.blocks, last.id, "h", 20).at(-1)!.layout, { x: 0, y: 13, w: 2, h: 2 });
+  assert.deepEqual(toggleMuralBlockExpansion(mural.blocks, last.id, "h", 20).at(-1)!.layout, { x: 0, y: 3, w: 2, h: 2 });
   const legacy = [{ ...blocks[0], layout: { ...blocks[0].layout, w: 8 }, expandedFrom: { w: 2 } }];
   assert.deepEqual(toggleMuralBlockExpansion(legacy, "a", "w", 10), blocks);
 });
