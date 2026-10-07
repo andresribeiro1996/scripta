@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { router, Stack } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { Alert, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { createVoterToken } from "@scripta/shared";
 import { useAuth } from "../../core/auth";
@@ -79,6 +79,13 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
     }
   }
 
+  function confirmSettle(duelId: string) {
+    Alert.alert("Settle this match now?", "Voting closes and the current votes decide the winner. A tie comes back to you to break.", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Settle", style: "destructive", onPress: () => void action(duelId, () => settleDuelEarly(id, duelId)) },
+    ]);
+  }
+
   if (!token || tournament.isPending) return <Screen bottom top={false} style={styles.centered}><Skeleton height={160} /></Screen>;
   if (tournament.isError || !data) return <Screen bottom top={false} style={styles.centered}><ErrorState title="Tournament unavailable" body={tournament.error instanceof Error ? tournament.error.message : "No such tournament."} actionLabel={isPermanentError(tournament.error) ? "Go to Atmyshelf" : "Retry"} onAction={isPermanentError(tournament.error) ? () => router.replace("/") : () => void tournament.refetch()} /></Screen>;
 
@@ -144,7 +151,7 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
               tournament={data}
               isOwner={isOwner}
               busyDuelId={busy}
-              onSettle={(duelId) => void action(duelId, () => settleDuelEarly(id, duelId))}
+              onSettle={confirmSettle}
               onTiebreak={(duelId, workId) => void action(duelId, () => resolveTiebreak(id, duelId, workId))}
             />
           </ScrollView>
@@ -164,7 +171,7 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
         refreshing={tournament.isRefetching}
         onRefresh={refresh}
         onShowClassic={() => setBracketView("classic")}
-        onSettle={(duelId) => void action(duelId, () => settleDuelEarly(id, duelId))}
+        onSettle={confirmSettle}
         onTiebreak={(duelId, workId) => void action(duelId, () => resolveTiebreak(id, duelId, workId))}
       />
     );

@@ -120,7 +120,7 @@ function MatchTile({
           accessibilityLabel="Settle this match now"
           disabled={busy}
           onPress={() => onSettle(duel.id)}
-          hitSlop={6}
+          hitSlop={12}
           style={[styles.settleButton, { backgroundColor: colors.accent, borderColor: colors.surface, opacity: busy ? 0.5 : 1 }]}
         >
           <Icon name="confirm" size={11} color={colors.onAccent} />
