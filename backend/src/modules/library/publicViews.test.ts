@@ -705,7 +705,7 @@ const expectedDataMain = {
     coverage: [
       "genres known for 2 of 5 finished books"
     ],
-    style: { counter: "dial", trait: "both" },
+    style: { counter: "dial", layout: "faces", trait: "both" },
     chosen: {}
   },
   collectionBooks: {
@@ -752,7 +752,7 @@ const expectedDataEmpty = {
     coverage: [
       "genres known for 0 of 0 finished books"
     ],
-    style: { counter: "dial", trait: "both" },
+    style: { counter: "dial", layout: "faces", trait: "both" },
     chosen: {}
   },
   collectionBooks: {
@@ -816,7 +816,7 @@ const expectedDataBare = {
     coverage: [
       "genres known for 0 of 0 finished books"
     ],
-    style: { counter: "dial", trait: "both" },
+    style: { counter: "dial", layout: "faces", trait: "both" },
     chosen: {}
   },
   collectionBooks: {
@@ -978,7 +978,7 @@ test("a visitor's reader card carries the public style and the resolved choices,
   service.patchReaderCardStyle(owner, { counter: "shelf", signature: { bookKey: bookKey(earthsea), note: "why" }, highlight: { bookKey: bookKey(earthsea), highlightId: "h1" } });
   const result = resolvePublicLibraryData(owner, cardRequest);
   const card = result.readerCard!;
-  assert.deepEqual(card.style, { counter: "shelf", trait: "both" });
+  assert.deepEqual(card.style, { counter: "shelf", layout: "faces", trait: "both" });
   assert.equal(card.chosen?.signature?.title, "A Wizard of Earthsea");
   assert.equal(card.chosen?.signature?.author, "Ursula K. Le Guin");
   assert.equal(card.chosen?.signature?.note, "why");
@@ -1037,6 +1037,6 @@ test("a reader who never styled their card gets the default public style and no 
   const owner = "card-plain";
   service.saveLibrary(owner, { books: [earthsea], groups: [] });
   const card = resolvePublicLibraryData(owner, cardRequest).readerCard!;
-  assert.deepEqual(card.style, { counter: "dial", trait: "both" });
+  assert.deepEqual(card.style, { counter: "dial", layout: "faces", trait: "both" });
   assert.deepEqual(card.chosen, {});
 });

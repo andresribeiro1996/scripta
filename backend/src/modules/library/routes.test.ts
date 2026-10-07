@@ -495,7 +495,7 @@ test("GET reader card style returns the default before any change", async () => 
   const { app } = await setup();
   const response = await app.inject({ method: "GET", url: styleUrl, headers: asUser("u1") });
   assert.equal(response.statusCode, 200);
-  assert.deepEqual(response.json(), { counter: "dial", trait: "both", signature: null, highlight: null });
+  assert.deepEqual(response.json(), { counter: "dial", layout: "faces", trait: "both", signature: null, highlight: null });
   await app.close();
 });
 
@@ -504,7 +504,7 @@ test("PATCH reader card style merges each change into the stored style", async (
   await app.inject({ method: "PATCH", url: styleUrl, headers: asUser("u1"), payload: { counter: "shelf" } });
   const response = await app.inject({ method: "PATCH", url: styleUrl, headers: asUser("u1"), payload: { trait: "seal" } });
   assert.equal(response.statusCode, 200);
-  assert.deepEqual(response.json(), { counter: "shelf", trait: "seal", signature: null, highlight: null });
+  assert.deepEqual(response.json(), { counter: "shelf", layout: "faces", trait: "seal", signature: null, highlight: null });
   await app.close();
 });
 
@@ -512,13 +512,21 @@ test("PATCH reader card style rejects unknown options and unknown fields", async
   const { app, service } = await setup();
   service.saveLibrary("u1", { books: [wizard], groups: [] });
   const key = bookKey(wizard);
-  for (const payload of [{ counter: "spiral" }, { trait: 3 }, { motto: "x" }, { signature: { bookKey: key, note: "a".repeat(61) } }, { signature: { bookKey: key, motto: "x" } }, { highlight: { bookKey: key, highlightId: "h1", motto: "x" } }]) {
+  for (const payload of [{ counter: "spiral" }, { layout: "scroll" }, { trait: 3 }, { motto: "x" }, { signature: { bookKey: key, note: "a".repeat(61) } }, { signature: { bookKey: key, motto: "x" } }, { highlight: { bookKey: key, highlightId: "h1", motto: "x" } }]) {
     const response = await app.inject({ method: "PATCH", url: styleUrl, headers: asUser("u1"), payload });
     assert.equal(response.statusCode, 400, JSON.stringify(payload));
     assert.equal(typeof response.json().error, "string");
   }
   const stored = await app.inject({ method: "GET", url: styleUrl, headers: asUser("u1") });
-  assert.deepEqual(stored.json(), { counter: "dial", trait: "both", signature: null, highlight: null });
+  assert.deepEqual(stored.json(), { counter: "dial", layout: "faces", trait: "both", signature: null, highlight: null });
+  await app.close();
+});
+
+test("PATCH reader card style stores a known layout", async () => {
+  const { app } = await setup();
+  const response = await app.inject({ method: "PATCH", url: styleUrl, headers: asUser("u1"), payload: { layout: "book" } });
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.json().layout, "book");
   await app.close();
 });
 
@@ -530,7 +538,7 @@ test("a counter or trait change keeps the stored signature and highlight", async
   await patch({ highlight: { bookKey: bookKey(wizard), highlightId: "h1" } });
   const response = await patch({ counter: "ring" });
   assert.equal(response.statusCode, 200);
-  const expected = { counter: "ring", trait: "both", signature: { bookKey: bookKey(wizard), note: "why" }, highlight: { bookKey: bookKey(wizard), highlightId: "h1" } };
+  const expected = { counter: "ring", layout: "faces", trait: "both", signature: { bookKey: bookKey(wizard), note: "why" }, highlight: { bookKey: bookKey(wizard), highlightId: "h1" } };
   assert.deepEqual(response.json(), expected);
   const stored = await app.inject({ method: "GET", url: styleUrl, headers: asUser("u1") });
   assert.deepEqual(stored.json(), expected);
@@ -597,6 +605,6 @@ test("the reader card style needs a signed-in user", async () => {
   assert.equal((await app.inject({ method: "GET", url: styleUrl })).statusCode, 401);
   assert.equal((await app.inject({ method: "PATCH", url: styleUrl, payload: { counter: "shelf" } })).statusCode, 401);
   const stored = await app.inject({ method: "GET", url: styleUrl, headers: asUser("u1") });
-  assert.deepEqual(stored.json(), { counter: "dial", trait: "both", signature: null, highlight: null });
+  assert.deepEqual(stored.json(), { counter: "dial", layout: "faces", trait: "both", signature: null, highlight: null });
   await app.close();
 });

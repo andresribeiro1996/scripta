@@ -2,6 +2,8 @@ import { COUNTERS, type Counter } from "./counters.js";
 
 export const TRAITS = ["both", "seal", "line", "none"] as const;
 export type Trait = (typeof TRAITS)[number];
+export const LAYOUTS = ["faces", "book", "merged"] as const;
+export type Layout = (typeof LAYOUTS)[number];
 export const SIGNATURE_NOTE_MAX = 60;
 
 export interface ChosenSignature { bookKey: string; note: string | null }
@@ -9,20 +11,21 @@ export interface ChosenHighlight { bookKey: string; highlightId: string }
 
 export interface ReaderCardStyle {
   counter: Counter;
+  layout: Layout;
   trait: Trait;
   signature: ChosenSignature | null;
   highlight: ChosenHighlight | null;
 }
 
 export type ReaderCardStylePatch = Partial<ReaderCardStyle>;
-export type PublicReaderCardStyle = Omit<ReaderCardStyle, "signature" | "highlight">;
+export type PublicReaderCardStyle = Pick<ReaderCardStyle, "counter" | "layout" | "trait">;
 
 export interface ReaderCardChosen {
   signature?: { title: string; author: string; workId: string | null; coverUrl: string | null; note: string | null };
   highlight?: { text: string; title: string; author: string };
 }
 
-export const DEFAULT_READER_CARD_STYLE: ReaderCardStyle = { counter: "dial", trait: "both", signature: null, highlight: null };
+export const DEFAULT_READER_CARD_STYLE: ReaderCardStyle = { counter: "dial", layout: "faces", trait: "both", signature: null, highlight: null };
 
 function oneOf<T extends string>(options: readonly T[], value: unknown, fallback: T): T {
   return options.includes(value as T) ? (value as T) : fallback;
@@ -49,6 +52,7 @@ export function normalizeReaderCardStyle(value: unknown): ReaderCardStyle {
   const raw = record(value) ?? {};
   return {
     counter: oneOf(COUNTERS, raw.counter, DEFAULT_READER_CARD_STYLE.counter),
+    layout: oneOf(LAYOUTS, raw.layout, DEFAULT_READER_CARD_STYLE.layout),
     trait: oneOf(TRAITS, raw.trait, DEFAULT_READER_CARD_STYLE.trait),
     signature: signatureOf(raw.signature),
     highlight: highlightOf(raw.highlight),
@@ -56,7 +60,7 @@ export function normalizeReaderCardStyle(value: unknown): ReaderCardStyle {
 }
 
 export function publicStyle(style: ReaderCardStyle): PublicReaderCardStyle {
-  return { counter: style.counter, trait: style.trait };
+  return { counter: style.counter, layout: style.layout, trait: style.trait };
 }
 
 export function rekeyReaderCardStyle(style: ReaderCardStyle, fromKeys: readonly string[], toKey: string): ReaderCardStyle {

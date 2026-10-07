@@ -1,7 +1,7 @@
 import fastifyMultipart from "@fastify/multipart";
 import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { COUNTERS, SIGNATURE_NOTE_MAX, TRAITS, type LibraryChange } from "@scripta/shared";
+import { COUNTERS, LAYOUTS, SIGNATURE_NOTE_MAX, TRAITS, type LibraryChange } from "@scripta/shared";
 import { createWriteStream } from "node:fs";
 import { mkdtemp, readdir, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -97,6 +97,7 @@ const bookKeySchema = z.string().min(1).max(2000);
 
 const readerCardStylePatchSchema = z.object({
   counter: z.enum(COUNTERS).optional(),
+  layout: z.enum(LAYOUTS).optional(),
   trait: z.enum(TRAITS).optional(),
   signature: z.object({ bookKey: bookKeySchema, note: z.string().trim().max(SIGNATURE_NOTE_MAX).nullable().default(null) }).strict().nullable().optional(),
   highlight: z.object({ bookKey: bookKeySchema, highlightId: z.string().min(1).max(200) }).strict().nullable().optional(),
