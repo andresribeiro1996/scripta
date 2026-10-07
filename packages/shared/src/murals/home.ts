@@ -2,11 +2,15 @@ import { bookKey } from "../library/merge.js";
 import type { Group } from "../library/groups.js";
 import { resolveQuote, type MuralBlock } from "./murals.js";
 
+export function isEligiblePassage(highlight: unknown): highlight is Record<string, unknown> {
+  if (!highlight || typeof highlight !== "object") return false;
+  const { Type, Text, BookmarkID } = highlight as Record<string, unknown>;
+  return Type === "highlight" && typeof Text === "string" && Text.trim() !== "" && typeof BookmarkID === "string" && BookmarkID.trim() !== "";
+}
+
 export function eligiblePassages(books: Array<Record<string, unknown>>) {
   return books.flatMap((book) => (Array.isArray(book.highlights) ? book.highlights : [])
-    .filter((highlight): highlight is Record<string, unknown> => Boolean(highlight && typeof highlight === "object" &&
-      highlight.Type === "highlight" && typeof highlight.Text === "string" && highlight.Text.trim() &&
-      typeof highlight.BookmarkID === "string" && highlight.BookmarkID.trim()))
+    .filter(isEligiblePassage)
     .map((highlight) => ({ bookKey: bookKey(book), highlightId: String(highlight.BookmarkID) })))
     .sort((a, b) => `${a.bookKey}:${a.highlightId}`.localeCompare(`${b.bookKey}:${b.highlightId}`));
 }

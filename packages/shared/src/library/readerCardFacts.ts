@@ -1,4 +1,4 @@
-import { eligiblePassages } from "../murals/home.js";
+import { isEligiblePassage } from "../murals/home.js";
 import type { IdentityKey } from "../readerCards/plates.js";
 import { genresForBook } from "./bookGenres.js";
 import type { Group } from "./groups.js";
@@ -23,7 +23,7 @@ export function readerCardFacts(books: Book[], groups: Group[], identity: Identi
   let highlights = 0;
   let since: number | null = null;
   for (const book of finished) {
-    const passages = eligiblePassages([book]).length;
+    const passages = Array.isArray(book.highlights) ? book.highlights.filter(isEligiblePassage).length : 0;
     highlights += passages;
     const genres = genresForBook(book);
     const group: DialGroup = order.find((signal) => genres.some((genre) => signal.genres.includes(genre)))?.key ?? (genres.length > 0 ? "other" : "unknown");
