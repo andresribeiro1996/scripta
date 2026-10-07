@@ -21,7 +21,7 @@ import { createBooksService, MAX_UPLOAD_BYTES, type BooksService } from "./books
 import type { FetchCoverImage } from "./coverResolver.js";
 import { encodeCover } from "./domain/images.js";
 import type { BookLookup } from "./domain/normalize.js";
-import { coverUrlFor } from "./publicCoverLookup.js";
+import { coverUrlFor, useBooksRepository } from "./publicCoverLookup.js";
 import { buildAdminRoutes, buildCatalogRoutes, buildCoverFileRoutes, buildResolveRoutes } from "./routes.js";
 import { createCoverWorker } from "./worker.js";
 
@@ -52,6 +52,7 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
     }
   });
   const repo = timedMethods(createSqliteBooksRepository(timeStep(app.log, "startup:books-open", openBooksDb)), app.log, "books");
+  useBooksRepository(repo);
   const isbndbThrottle = createThrottle(ISBNDB_GAP_MS);
   const openLibraryThrottle = createThrottle(OPEN_LIBRARY_GAP_MS);
   const openLibraryCoverThrottle = createThrottle(OPEN_LIBRARY_COVER_GAP_MS);

@@ -234,12 +234,15 @@ export function buildApp() {
   });
 
   const sweepSteps = { library: sweepLibraryWorks, murals: sweepMuralsWorks };
-  const stopWorksSweep = startWorksSweep(
-    Object.entries(sweepSteps).map(([name, step]) => (after: number, limit: number) => timeSync(app.log, `works-sweep:${name}`, () => step(after, limit))),
-    app.log
-  );
+  let stopWorksSweep: (() => void) | null = null;
+  app.addHook("onReady", async () => {
+    stopWorksSweep = startWorksSweep(
+      Object.entries(sweepSteps).map(([name, step]) => (after: number, limit: number) => timeSync(app.log, `works-sweep:${name}`, () => step(after, limit))),
+      app.log
+    );
+  });
   app.addHook("onClose", async () => {
-    stopWorksSweep();
+    stopWorksSweep?.();
   });
 
   app.addHook("onReady", async () => {

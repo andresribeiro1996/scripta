@@ -1,3 +1,4 @@
+import type { DatabaseSync } from "node:sqlite";
 import { createObjectStore } from "../../storage/createObjectStore.js";
 import { openBooksDb } from "./adapters/sqlite/connection.js";
 import { createSqliteBooksRepository } from "./adapters/sqlite/sqliteBooksRepository.js";
@@ -15,9 +16,20 @@ export interface PeekCachedCoverParams {
 }
 
 let repo: BooksRepository | null = null;
+let fallbackDb: DatabaseSync | null = null;
 
 export function booksRepository(): BooksRepository {
-  return (repo ??= createSqliteBooksRepository(openBooksDb()));
+  if (!repo) {
+    fallbackDb = openBooksDb();
+    repo = createSqliteBooksRepository(fallbackDb);
+  }
+  return repo;
+}
+
+export function useBooksRepository(next: BooksRepository): void {
+  fallbackDb?.close();
+  fallbackDb = null;
+  repo = next;
 }
 
 export function peekCachedCoverUrl(params: PeekCachedCoverParams): string | null {
