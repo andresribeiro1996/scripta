@@ -33,9 +33,9 @@ const dials: Record<string, DialSegment[]> = {
 const identities: Array<IdentityKey | null> = [...PLATES.map((plate) => plate.key), null];
 
 test("every counter, trait, print, state and identity stays inside react-native-svg's subset", () => {
-  for (const identity of identities) for (const state of identity ? (["settled", "leaning"] as const) : (["unwritten"] as const)) {
+  for (const [index, identity] of identities.entries()) for (const state of identity ? (["settled", "leaning"] as const) : (["unwritten"] as const)) {
     for (const [size, segments] of Object.entries(dials)) for (const counter of COUNTERS) for (const trait of TRAITS) for (const print of ["paper", "reversed"] as const) {
-      const card: PublicReaderCard = { state, identity, runnerUp: null, streak: identity === "lamp" ? "star" : "lamp", signal: null, coverage: [], dial: { segments }, facts: { finished: 0, highlights: 0, series: 0, since: null, edition: 2026 } };
+      const card: PublicReaderCard = { state, identity, runnerUp: null, streak: PLATES[(index + 1) % PLATES.length]!.key, signal: null, coverage: [], dial: { segments }, facts: { finished: 0, highlights: 0, series: 0, since: null, edition: 2026 } };
       const svg = renderReaderCard({ card, style: { counter, trait }, readerName: "andre", print, label: "x", seed: seedOf("andre") });
       assert.deepEqual(portabilityProblems(svg), [], `${identity}/${state}/${size}/${counter}/${trait}/${print}`);
     }
