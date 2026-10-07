@@ -79,3 +79,36 @@ export interface ResultPlay {
   durationMs: number;
   createdAt: string;
 }
+
+export interface Quiz {
+  id: string;
+  name: string;
+  data: QuizData;
+  voteCode: string | null;
+  playOpen: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PlayBoard {
+  name: string;
+  sourceLabel: string;
+  questionCount: number;
+  playOpen: boolean;
+  playCount: number;
+  questions: PublicQuizQuestion[];
+}
+
+export interface PlayResponse {
+  playId: string;
+  score: number;
+  correct: Record<string, boolean>;
+}
+
+export type PublicResultPlay = Omit<ResultPlay, "playId">;
+
+export interface PlaySubmission {
+  answers: Array<{ questionId: string; choiceIndex: number }>;
+  durationMs: number;
+  playerName?: string;
+}
