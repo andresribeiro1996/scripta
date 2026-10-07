@@ -419,8 +419,6 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       });
     },
 
-    resolveWorkId: (id) => liveWorkId(id),
-
     getWorkView(id) {
       const work = workStmt.get(id) as { id: string; ol_work_key: string | null; title: string; author: string } | undefined;
       if (!work) return undefined;
