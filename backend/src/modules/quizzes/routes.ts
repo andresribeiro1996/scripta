@@ -6,6 +6,7 @@
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
+import type { PlayResponse } from "@scripta/shared";
 import { authGuard, getOptionalAuthenticatedUser } from "../auth/index.js";
 import { canonicalByKey, duplicateWorkMessage, resolvePublicBooksByWork } from "../library/index.js";
 import { sendWorksError } from "../../worksErrors.js";
@@ -241,5 +242,5 @@ function sendPlayOutcome(reply: FastifyReply, outcome: PlayOutcome) {
     if (outcome.reason === "already-played") return reply.code(409).send({ error: "You've already played this quiz." });
     return reply.code(400).send({ error: "Those answers don't match this quiz." });
   }
-  return reply.send({ playId: outcome.playId, score: outcome.score, correct: outcome.correct });
+  return reply.send({ playId: outcome.playId, score: outcome.score, correct: outcome.correct } satisfies PlayResponse);
 }

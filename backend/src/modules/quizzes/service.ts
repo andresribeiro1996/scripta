@@ -3,7 +3,7 @@
 // module's service.ts.
 
 import { randomBytes, randomUUID } from "node:crypto";
-import { QUIZ_QUESTION_TYPES, generateQuizQuestions, gradeAnswers, type PublicQuizQuestion, type QuestionStat, type QuizBook, type QuizQuestion, type QuizQuestionType, type ResultPlay, type SubmittedAnswer } from "@scripta/shared";
+import { QUIZ_QUESTION_TYPES, generateQuizQuestions, gradeAnswers, type PlayBoard, type PublicQuizQuestion, type QuestionStat, type QuizBook, type QuizQuestion, type QuizQuestionType, type ResultPlay, type SubmittedAnswer } from "@scripta/shared";
 import type { GameParticipation } from "@scripta/shared/community";
 import type { QuizzesRepository } from "./domain/ports.js";
 import type { AnswerRow, PlayRow, Quiz, QuizGameRow, QuizRow } from "./domain/types.js";
@@ -63,14 +63,7 @@ export type PublishOutcome =
   | { ok: false; reason: "already-published"; error: string }
   | { ok: false; reason: "invalid"; error: string };
 
-export interface PlayBoard {
-  name: string;
-  sourceLabel: string;
-  questionCount: number;
-  playOpen: boolean;
-  playCount: number;
-  questions: PublicQuizQuestion[];
-}
+export type { PlayBoard };
 
 export interface QuizResults {
   plays: ResultPlay[];
