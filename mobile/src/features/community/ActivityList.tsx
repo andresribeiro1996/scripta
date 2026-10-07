@@ -5,6 +5,7 @@ import { Text } from "../../ui/Text";
 import { activityDay, activityRow, relativeTime, type ActivityItem } from "@scripta/shared/community";
 import { EmptyState, ErrorState, Icon, Skeleton, dynamicType, radii, spacing, typography, useTheme, type IconName } from "../../ui";
 import { fetchActivity } from "./api";
+import { renderableActivity } from "./communityHome";
 import { CoverFan, SLOT_HEIGHT, SLOT_WIDTH } from "./CoverFan";
 
 export function ActivityList({ username }: { username: string }) {
@@ -14,7 +15,7 @@ export function ActivityList({ username }: { username: string }) {
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
   });
-  const items = activity.data?.pages.flatMap((page) => page.items) ?? [];
+  const items = renderableActivity(activity.data?.pages.flatMap((page) => page.items) ?? []);
 
   if (activity.isPending)
     return (
@@ -57,8 +58,10 @@ function iconFor(item: ActivityItem): IconName {
       return "tierlist";
     case "tournament_published":
       return "arena";
+    case "quiz_published":
+      return "champion";
     case "voted_on":
-      return "vote";
+      return item.payload.game === "quiz" ? "champion" : "vote";
     case "following":
       return "follow";
     case "mural_published":
@@ -71,6 +74,7 @@ function iconFor(item: ActivityItem): IconName {
 function ActivityRowView({ item, day }: { item: ActivityItem; day: string | null }) {
   const { colors } = useTheme();
   const row = activityRow(item);
+  if (!row) return null;
   const toneColor = row.tone === "accent" ? colors.accent : row.tone === "success" ? colors.success : colors.textDim;
   const toneFill = row.tone === "accent" ? colors.accentSoft : row.tone === "success" ? colors.successSoft : colors.surface;
   const target = row.workId ? `/work/${row.workId}` : row.href ?? (row.username ? `/u/${row.username}` : null);

@@ -87,6 +87,16 @@ test("a row of a kind this build doesn't know is dropped, and everything else on
   assert.deepEqual(withKnownDigestItems(page), { ...page, items: [follow, participation()] });
 });
 
+test("a quiz vote reads as played, and a publication of an unknown content kind is dropped", () => {
+  const quiz = { kind: "quiz" as const, id: "q1", voteCode: "qc", name: "Dune trivia", questionCount: 8, playCount: 3, playOpen: true, covers: [] };
+  const vote: DigestItem = { kind: "vote", id: "e2", actor, content: quiz, createdAt: "2026-09-17T00:00:00.000Z" };
+  assert.equal(digestAction(vote), "played Dune trivia");
+  assert.equal(digestTarget(vote), "/play/qc");
+  const hologram = { kind: "publication", id: "e5", actor, type: "tierlist_published", content: { kind: "hologram" }, createdAt: "2026-09-18T00:00:00.000Z" } as unknown as DigestItem;
+  const page = { items: [hologram, vote], nextCursor: null, seenAt: null, personalNewCount: 0, followingNewCount: 0 };
+  assert.deepEqual(withKnownDigestItems(page), { ...page, items: [vote] });
+});
+
 test("the dashboard query lists every kind this build can draw, then carries the cursor encoded", () => {
   const kinds = "?kinds=publication,vote,reading,follow,participation";
   assert.equal(dashboardQuery(), kinds);

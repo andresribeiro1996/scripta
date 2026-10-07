@@ -1,5 +1,5 @@
 import type { CommunityAuthor, FeedItem, ParticipationGameKind, PublishedContent } from "./community/types.js";
-import { contentTarget, feedAction, feedTarget } from "./community/helpers.js";
+import { contentTarget, feedAction, feedTarget, isKnownContent } from "./community/helpers.js";
 import { bookKey } from "./library/merge.js";
 import { rediscoverPassage } from "./murals/home.js";
 
@@ -47,8 +47,14 @@ export interface DashboardFeedPage {
 
 const DIGEST_KINDS: Record<DigestKind, true> = { publication: true, vote: true, reading: true, follow: true, participation: true };
 
+function isKnownDigestItem(item: DigestItem): boolean {
+  if (DIGEST_KINDS[item.kind as DigestKind] !== true) return false;
+  if (item.kind === "publication" || item.kind === "vote") return isKnownContent(item.content);
+  return true;
+}
+
 export function withKnownDigestItems(page: DashboardFeedPage): DashboardFeedPage {
-  return { ...page, items: page.items.filter((item) => DIGEST_KINDS[item.kind as DigestKind] === true) };
+  return { ...page, items: page.items.filter(isKnownDigestItem) };
 }
 
 export function dashboardQuery(cursor?: string): string {
@@ -112,7 +118,14 @@ export function digestAction(item: DigestItem): string {
     case "publication":
       return feedAction(item);
     case "vote":
-      return item.content.kind === "tierlist" ? `ranked books on ${item.content.name}` : `voted in ${item.content.name}`;
+      switch (item.content.kind) {
+        case "tierlist":
+          return `ranked books on ${item.content.name}`;
+        case "tournament":
+          return `voted in ${item.content.name}`;
+        case "quiz":
+          return `played ${item.content.name}`;
+      }
     case "reading":
       return `${item.finished ? "finished" : "added"} ${item.book.title}`;
     case "follow":

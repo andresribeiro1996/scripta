@@ -209,6 +209,13 @@ export function buildApp() {
       get: getArenaPublicApi().getPublished,
       listByOwner: getArenaPublicApi().listPublishedByOwner
     },
+    quizzes: {
+      discoverWindow: getQuizzesPublicApi().discoverWindow,
+      getPublishedMany: getQuizzesPublicApi().getPublishedMany,
+      votedAmong: getQuizzesPublicApi().votedAmong,
+      get: getQuizzesPublicApi().getPublished,
+      listByOwner: getQuizzesPublicApi().listPublishedByOwner
+    },
     participation: {
       tierlists: getTierlistsPublicApi().participationByOwner,
       tournaments: getArenaPublicApi().participationByOwner,
@@ -220,7 +227,11 @@ export function buildApp() {
     emitVotedOn: (voterUserId: string, tierlistId: string, tierlistName: string) =>
       recordActivity(voterUserId, "voted_on", "tierlist", tierlistId, { game: "tierlist", id: tierlistId, name: tierlistName })
   });
-  app.register(registerQuizzesModule);
+  app.register(registerQuizzesModule, {
+    emitPublished: (quizId: string, ownerUserId: string) => recordActivity(ownerUserId, "quiz_published", "quiz", quizId),
+    emitPlayed: (playerUserId: string, quizId: string, quizName: string) =>
+      recordActivity(playerUserId, "voted_on", "quiz", quizId, { game: "quiz", id: quizId, name: quizName })
+  });
   app.register(registerWorksModule, {
     getWorkPage,
     holdersOfWorks,

@@ -111,7 +111,8 @@ export function CommunityProfilePage() {
     : null;
   const publishedRows = [
     ...view.published.tierlists.map((item) => ({ kind: contentKindLabel(item), name: item.name, detail: contentDetail(item), target: contentTarget(item) })),
-    ...view.published.tournaments.map((item) => ({ kind: contentKindLabel(item), name: item.name, detail: contentDetail(item), target: contentTarget(item) }))
+    ...view.published.tournaments.map((item) => ({ kind: contentKindLabel(item), name: item.name, detail: contentDetail(item), target: contentTarget(item) })),
+    ...view.published.quizzes.map((item) => ({ kind: contentKindLabel(item), name: item.name, detail: contentDetail(item), target: contentTarget(item) }))
   ];
 
   const user = view.profile.user;
@@ -166,7 +167,7 @@ export function CommunityProfilePage() {
               </div>
               <h2 className="mb-3 text-[11px] font-semibold tracking-wider text-(--color-text-dim) uppercase">Published</h2>
               {publishedRows.length === 0 ? (
-                <EmptyState title="Nothing published yet." body="Tier lists and tournaments show up here." />
+                <EmptyState title="Nothing published yet." body="Tier lists, tournaments and quizzes show up here." />
               ) : (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   {publishedRows.map((row) => (

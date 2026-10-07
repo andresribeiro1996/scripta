@@ -92,7 +92,10 @@ export function QuizPlayScreen({ code }: { code: string }) {
     {stage === "loading" || board.isPending ? <Screen bottom style={styles.screen}><Skeleton height={180} /></Screen>
     : stage === "unavailable" ? <ErrorState title="No quiz at that link" body="Check the code and try again." actionLabel={isPermanentError(board.error) ? "Go to Atmyshelf" : "Retry"} onAction={isPermanentError(board.error) ? () => router.replace("/") : () => void board.refetch()} />
     : recoverError ? <ErrorState title="Couldn't check your previous plays" body={recoverError} actionLabel="Retry" onAction={() => { setRecoverError(null); loadOwnPlay(); }} />
-    : stage === "closed" ? <ErrorState title="This quiz isn't open for play" body="Its owner closed it for now." />
+    : stage === "leaderboard" ? <View style={styles.closed}>
+      <Text {...dynamicType} style={[typography.body, styles.center, { color: colors.textDim }]}>This quiz is closed.</Text>
+      <Leaderboard code={code} />
+    </View>
     : stage === "played" && board.data ? <EndScreen code={code} board={board.data} result={result!} returning={submitted === null} tab={tab} setTab={setTab} />
     : board.data ? (() => {
       const questions = board.data.questions;
@@ -156,18 +159,8 @@ function EndScreen({ code, board, result, returning, tab, setTab }: {
   setTab: (tab: "you" | "board") => void;
 }) {
   const { colors } = useTheme();
-  const leaderboard = useQuery({ queryKey: ["quizzes", "results", code], queryFn: () => fetchPublicResults(code), retry: false });
   return <SwipeableTabs accessibilityLabel="Quiz results" options={[{ value: "you", label: "You" }, { value: "board", label: "Leaderboard" }]} value={tab} onChange={setTab} renderPage={(page) => page === "board" ? (
-    leaderboard.isPending ? <View style={styles.section}><Skeleton height={180} /></View> : leaderboard.isError ? <ErrorState body="Couldn't load the leaderboard." actionLabel="Retry" onAction={() => void leaderboard.refetch()} /> : <ScrollView contentContainerStyle={styles.section}>
-      {leaderboard.data.plays.map((play, i) => (
-        <View key={`${play.playerName ?? "Guest"}-${i}`} style={[styles.leaderRow, { borderColor: colors.border }]}>
-          <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{i + 1}</Text>
-          <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, styles.grow, { color: colors.text }]}>{play.playerName ?? "Guest"}</Text>
-          <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{play.score}/{leaderboard.data!.questionCount}</Text>
-          <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{(play.durationMs / 1000).toFixed(1)}s</Text>
-        </View>
-      ))}
-    </ScrollView>
+    <Leaderboard code={code} />
   ) : (
     <ScrollView contentContainerStyle={styles.section}>
       <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{returning ? "You already played this quiz." : "Your score"}</Text>
@@ -182,7 +175,27 @@ function EndScreen({ code, board, result, returning, tab, setTab }: {
   )} />;
 }
 
+function Leaderboard({ code }: { code: string }) {
+  const { colors } = useTheme();
+  const leaderboard = useQuery({ queryKey: ["quizzes", "results", code], queryFn: () => fetchPublicResults(code), retry: false });
+  if (leaderboard.isPending) return <View style={styles.section}><Skeleton height={180} /></View>;
+  if (leaderboard.isError) return <ErrorState body="Couldn't load the leaderboard." actionLabel="Retry" onAction={() => void leaderboard.refetch()} />;
+  if (leaderboard.data.plays.length === 0) return <View style={styles.section}><Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>No plays yet.</Text></View>;
+  return <ScrollView contentContainerStyle={styles.section}>
+    {leaderboard.data.plays.map((play, i) => (
+      <View key={`${play.playerName ?? "Guest"}-${i}`} style={[styles.leaderRow, { borderColor: colors.border }]}>
+        <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{i + 1}</Text>
+        <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, styles.grow, { color: colors.text }]}>{play.playerName ?? "Guest"}</Text>
+        <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{play.score}/{leaderboard.data.questionCount}</Text>
+        <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{(play.durationMs / 1000).toFixed(1)}s</Text>
+      </View>
+    ))}
+  </ScrollView>;
+}
+
 const styles = StyleSheet.create({
+  closed: { flex: 1, gap: spacing.md },
+  center: { textAlign: "center" },
   screen: { padding: spacing.lg, gap: spacing.md },
   page: { flexGrow: 1, gap: spacing.md },
   track: { height: 4, borderRadius: radii.full },

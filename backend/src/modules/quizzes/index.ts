@@ -3,4 +3,4 @@
 // modules/tierlists/index.ts.
 
 export { quizzesPlugin as registerQuizzesModule, deleteQuizzesUserData, getQuizzesPublicApi } from "./plugin.js";
-export type { GameByWork, QuizzesPublicApi } from "./service.js";
+export type { GameByWork, PublishedQuizRef, QuizDiscoverRef, QuizzesPublicApi } from "./service.js";

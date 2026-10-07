@@ -37,6 +37,22 @@ test("a vote is its own headline, so it carries no title and no covers", () => {
   assert.equal(row.detail, "Fantasy doorstoppers");
 });
 
+const quiz = { kind: "quiz" as const, id: "q1", voteCode: "qc", name: "Dune trivia", questionCount: 5, playCount: 2, playOpen: true, covers: ["q.png"] };
+
+test("a quiz publication and a quiz play read as quizzes, not as tournaments", () => {
+  const published = feedRowModel({ kind: "publication", id: "e5", actor, type: "quiz_published", content: quiz, createdAt: "2026-09-17T00:00:00.000Z" });
+  assert.equal(published.label, "Quiz");
+  assert.equal(published.icon, "champion");
+  assert.equal(published.title, "Dune trivia");
+  assert.equal(published.detail, "5 questions · 2 plays");
+  const played = feedRowModel({ kind: "vote", id: "e6", actor, content: quiz, createdAt: "2026-09-17T00:00:00.000Z" });
+  assert.equal(played.label, "Played");
+  assert.equal(played.icon, "champion");
+  assert.equal(played.detail, "Dune trivia");
+  const tournament = { kind: "tournament" as const, id: "g1", name: "Cup", bracketSize: 8, status: "active" as const, bookCount: 8, covers: [] };
+  assert.equal(feedRowModel({ kind: "vote", id: "e7", actor, content: tournament, createdAt: "2026-09-17T00:00:00.000Z" }).label, "Voted");
+});
+
 test("a finished book shows its one cover and reads as done", () => {
   const item: DigestItem = { kind: "reading", id: "e3", actor, book: { title: "Hyperion", author: "Dan Simmons", coverUrl: "h.png" }, finished: true, createdAt: "2026-09-17T00:00:00.000Z" };
   const row = feedRowModel(item);
@@ -119,6 +135,8 @@ test("a row opens the native route for what it is about: the owner's game, a pro
   assert.equal(digestRoute({ kind: "reading", id: "e3", actor, book: { title: "Hyperion", author: "Dan Simmons", coverUrl: null }, finished: true, createdAt }), "/u/alice");
   const publication: DigestItem = { kind: "publication", id: "e1", actor, type: "tierlist_published", content: tierlist, createdAt };
   assert.equal(digestRoute(publication), digestTarget(publication));
+  assert.equal(digestRoute({ kind: "publication", id: "e5", actor, type: "quiz_published", content: quiz, createdAt }), "/play/qc");
+  assert.equal(digestRoute({ kind: "vote", id: "e6", actor, content: quiz, createdAt }), "/play/qc");
 });
 
 test("a reading item with a work opens the work screen, without one the reader", () => {

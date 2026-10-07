@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { DiscoverItem, FeedItem } from "@scripta/shared/community";
+import type { ActivityItem, DiscoverItem, FeedItem } from "@scripta/shared/community";
 import {
   DISCOVER_FILTERS,
   contentDetail,
@@ -10,6 +10,7 @@ import {
   contentTarget,
   feedHeading,
   feedTarget,
+  renderableActivity,
 } from "./communityHome.js";
 
 const tierlist = {
@@ -34,10 +35,21 @@ const tournament = {
   covers: [] as string[],
 } as const;
 
+const quiz = {
+  kind: "quiz",
+  id: "q1",
+  voteCode: "qc12",
+  name: "Dune trivia",
+  questionCount: 5,
+  playCount: 2,
+  playOpen: true,
+  covers: [] as string[],
+} as const;
+
 const actor = { userId: "u1", username: "andre", avatarUrl: null };
 
 test("filter option table", () => {
-  assert.deepEqual(DISCOVER_FILTERS.map((f) => f.value), ["all", "tierlist", "tournament"]);
+  assert.deepEqual(DISCOVER_FILTERS.map((f) => f.value), ["all", "tierlist", "tournament", "quiz"]);
 });
 
 test("content labels and detail lines", () => {
@@ -46,6 +58,17 @@ test("content labels and detail lines", () => {
   assert.equal(contentDetail(tierlist), "12 books · 4 ballots");
   assert.equal(contentDetail({ ...tierlist, votingOpen: false }), "12 books · 4 ballots · closed");
   assert.equal(contentDetail(tournament), "8-book bracket · active");
+});
+
+test("quiz copy, status and target", () => {
+  assert.equal(contentKindLabel(quiz), "Quiz");
+  assert.equal(contentDetail(quiz), "5 questions · 2 plays");
+  assert.equal(contentDetail({ ...quiz, playOpen: false }), "5 questions · 2 plays · closed");
+  assert.deepEqual(contentStatus(quiz), { label: "Open", tone: "accent" });
+  assert.deepEqual(contentStatus({ ...quiz, viewerVoted: true }), { label: "Played", tone: "info" });
+  assert.deepEqual(contentStatus({ ...quiz, playOpen: false }), { label: "Closed", tone: "neutral" });
+  assert.deepEqual(contentStats(quiz), [{ value: 5, label: "questions" }, { value: 2, label: "plays" }]);
+  assert.equal(contentTarget(quiz), "/play/qc12");
 });
 
 test("content status names the state and its tone", () => {
@@ -82,4 +105,10 @@ test("content targets route by kind", () => {
     feedHeading({ ...feedItem, content: tournament, type: "tournament_published" }),
     "andre published a tournament"
   );
+});
+
+test("activity drops items whose type this build cannot draw", () => {
+  const known: ActivityItem = { id: "a1", type: "quiz_published", payload: { name: "Dune trivia" }, createdAt: "2026-09-10T00:00:00.000Z" };
+  const future = { id: "a2", type: "hologram_published", payload: {}, createdAt: "2026-09-10T00:00:00.000Z" } as unknown as ActivityItem;
+  assert.deepEqual(renderableActivity([future, known]), [known]);
 });
