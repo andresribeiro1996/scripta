@@ -1,7 +1,8 @@
-import { useDeferredValue, useMemo, useRef, useState } from "react";
-import { StyleSheet, View, useWindowDimensions } from "react-native";
+import { useDeferredValue, useMemo, useRef, useState, type ReactNode } from "react";
+import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
 import { CARD_PRINTS, CORNER_LABELS, CORNER_STYLES, COUNTERS, COUNTER_LABELS, FOOTER_LEFTS, FOOTER_LEFT_LABELS, FOOTER_RIGHTS, FOOTER_RIGHT_LABELS, LAYOUTS, LAYOUT_LABELS, MOTTO_LOOKS, MOTTO_LOOK_LABELS, MOTTO_MAX, PRINT_LABELS, TRAITS, TRAIT_LABELS, cardRatio, counterThumbnail, styleThumbnail, type MottoLook, type ReaderCardBase } from "@scripta/shared";
-import { Segmented, spacing } from "../../ui";
+import { Icon, Segmented, Sheet, minimumTouchTarget, radii, spacing, useTheme } from "../../ui";
+import { Text } from "../../ui/Text";
 import { Chip, Section, Tile } from "../library/components/StyleControls";
 import { ReaderCardImage } from "../murals/ReaderCardImage";
 import { DraftField } from "./DraftField";
@@ -15,9 +16,8 @@ const TRAIT_OPTIONS = options(TRAITS, TRAIT_LABELS);
 const LAYOUT_OPTIONS = options(LAYOUTS, LAYOUT_LABELS);
 const PRINT_OPTIONS = options(CARD_PRINTS, PRINT_LABELS);
 
-function TileRow<T extends string>({ items, value, labels, onPick }: { items: Array<{ option: T; input: ReaderCardBase }>; value: T | null; labels: Record<T, string>; onPick: (option: T) => void }) {
-  const { width: windowWidth } = useWindowDimensions();
-  const width = Math.floor((windowWidth - spacing.xl * 2 - (TILE_COLUMNS - 1) * spacing.sm) / TILE_COLUMNS) - TILE_PADDING;
+function TileRow<T extends string>({ items, value, labels, available, onPick }: { items: Array<{ option: T; input: ReaderCardBase }>; value: T | null; labels: Record<T, string>; available: number; onPick: (option: T) => void }) {
+  const width = Math.floor((available - (TILE_COLUMNS - 1) * spacing.sm) / TILE_COLUMNS) - TILE_PADDING;
   return (
     <View style={styles.row}>
       {items.map((item) => (
@@ -37,7 +37,28 @@ function ChipRow<T extends string>({ keys, labels, value, onPick }: { keys: read
   );
 }
 
+function OptionSheet({ title, current, children }: { title: string; current: string; children: (available: number, close: () => void) => ReactNode }) {
+  const { colors } = useTheme();
+  const [open, setOpen] = useState(false);
+  const [available, setAvailable] = useState(0);
+  const close = () => setOpen(false);
+  return (
+    <>
+      <Pressable accessibilityRole="button" accessibilityLabel={`${title}: ${current}`} accessibilityHint="Shows the options" onPress={() => setOpen(true)} style={[styles.trigger, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+        <Text numberOfLines={1} style={[styles.triggerLabel, { color: colors.text }]}>{current}</Text>
+        <Icon name="chevronRight" size={18} color={colors.textDim} />
+      </Pressable>
+      <Sheet visible={open} title={title} onClose={close}>
+        <ScrollView onLayout={(event) => setAvailable(event.nativeEvent.layout.width)} contentContainerStyle={styles.sheet}>
+          {available > 0 ? children(available, close) : null}
+        </ScrollView>
+      </Sheet>
+    </>
+  );
+}
+
 export function ReaderCardOptions({ input, onChange }: { input: ReaderCardBase; onChange: SaveStyle }) {
+  const { width: windowWidth } = useWindowDimensions();
   const { counter, trait, layout, motto, footer, corners, print } = input.style;
   const [look, setLook] = useState<MottoLook>(motto?.look ?? "ribbon");
   const lastText = useRef(motto?.text ?? null);
@@ -64,23 +85,31 @@ export function ReaderCardOptions({ input, onChange }: { input: ReaderCardBase; 
   return (
     <>
       <Section title="Counter">
-        <TileRow items={counterThumbs} value={counter} labels={COUNTER_LABELS} onPick={(next) => void onChange({ counter: next })} />
+        <TileRow items={counterThumbs} value={counter} labels={COUNTER_LABELS} available={windowWidth - spacing.xl * 2} onPick={(next) => void onChange({ counter: next })} />
       </Section>
       <Section title="Second trait">
         <Segmented accessibilityLabel="Second trait" options={TRAIT_OPTIONS} value={trait} onChange={(next) => void onChange({ trait: next })} />
       </Section>
       <Section title="Motto">
         <DraftField label="Your motto" initial={motto?.text ?? null} max={MOTTO_MAX} onSave={saveMotto} />
-        <TileRow items={mottoThumbs} value={motto?.look ?? look} labels={MOTTO_LOOK_LABELS} onPick={pickLook} />
+        <OptionSheet title="Motto look" current={MOTTO_LOOK_LABELS[motto?.look ?? look]}>
+          {(available, close) => <TileRow items={mottoThumbs} value={motto?.look ?? look} labels={MOTTO_LOOK_LABELS} available={available} onPick={(next) => { close(); pickLook(next); }} />}
+        </OptionSheet>
       </Section>
       <Section title="Footer, left">
-        <ChipRow keys={FOOTER_LEFTS} labels={FOOTER_LEFT_LABELS} value={footer.left} onPick={(left) => void onChange({ footer: { ...footer, left } })} />
+        <OptionSheet title="Footer, left" current={FOOTER_LEFT_LABELS[footer.left]}>
+          {(_, close) => <ChipRow keys={FOOTER_LEFTS} labels={FOOTER_LEFT_LABELS} value={footer.left} onPick={(left) => { close(); void onChange({ footer: { ...footer, left } }); }} />}
+        </OptionSheet>
       </Section>
       <Section title="Footer, right">
-        <ChipRow keys={FOOTER_RIGHTS} labels={FOOTER_RIGHT_LABELS} value={footer.right} onPick={(right) => void onChange({ footer: { ...footer, right } })} />
+        <OptionSheet title="Footer, right" current={FOOTER_RIGHT_LABELS[footer.right]}>
+          {(_, close) => <ChipRow keys={FOOTER_RIGHTS} labels={FOOTER_RIGHT_LABELS} value={footer.right} onPick={(right) => { close(); void onChange({ footer: { ...footer, right } }); }} />}
+        </OptionSheet>
       </Section>
       <Section title="Corners">
-        <TileRow items={cornerThumbs} value={corners} labels={CORNER_LABELS} onPick={(next) => void onChange({ corners: next })} />
+        <OptionSheet title="Corners" current={CORNER_LABELS[corners]}>
+          {(available, close) => <TileRow items={cornerThumbs} value={corners} labels={CORNER_LABELS} available={available} onPick={(next) => { close(); void onChange({ corners: next }); }} />}
+        </OptionSheet>
       </Section>
       <Section title="Print">
         <Segmented accessibilityLabel="Print" options={PRINT_OPTIONS} value={print} onChange={(next) => void onChange({ print: next })} />
@@ -92,4 +121,9 @@ export function ReaderCardOptions({ input, onChange }: { input: ReaderCardBase; 
   );
 }
 
-const styles = StyleSheet.create({ row: { flexDirection: "row", flexWrap: "wrap", alignItems: "flex-start", gap: spacing.sm } });
+const styles = StyleSheet.create({
+  row: { flexDirection: "row", flexWrap: "wrap", alignItems: "flex-start", gap: spacing.sm },
+  trigger: { minHeight: minimumTouchTarget, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm, borderWidth: 1, borderRadius: radii.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  triggerLabel: { flex: 1, fontSize: 14, fontWeight: "500" },
+  sheet: { paddingBottom: spacing.xl },
+});

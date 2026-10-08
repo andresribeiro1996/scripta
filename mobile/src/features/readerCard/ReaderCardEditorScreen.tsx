@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 import { ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
-import { hasChosen, readerCardInputOf, saveFailureMessage, visitorView, type ReaderCardStylePatch } from "@scripta/shared";
+import { hasChosen, readerCardInputOf, saveFailureMessage, type ReaderCardStylePatch } from "@scripta/shared";
 import { useAuth } from "../../core/auth";
-import { Button, Segmented, Toast, minimumTouchTarget, spacing, typography, useTheme } from "../../ui";
+import { Button, Toast, minimumTouchTarget, spacing, typography, useTheme } from "../../ui";
 import { Text } from "../../ui/Text";
 import { useLibrary } from "../library/hooks/useLibrary";
 import { NO_GROUPS } from "../murals/MuralCanvas";
@@ -17,7 +17,6 @@ const NO_BOOKS: Array<Record<string, unknown>> = [];
 const PREVIEW_MAX = 280;
 const PIN_SHARE = 0.4;
 const PIN_CHROME = minimumTouchTarget + spacing.md + spacing.sm * 2;
-const AUDIENCES = [{ value: "you", label: "You" }, { value: "visitors", label: "Visitors" }] as const;
 
 export function ReaderCardEditorScreen() {
   const { colors } = useTheme();
@@ -29,11 +28,9 @@ export function ReaderCardEditorScreen() {
   const groups = library?.data.groups ?? NO_GROUPS;
   const { data: style, isPending, refetch } = useReaderCardStyle();
   const save = useSaveReaderCardStyle();
-  const [audience, setAudience] = useState<"you" | "visitors">("you");
   const [error, setError] = useState<string | null>(null);
   const own = useOwnCardStyle();
   const input = useMemo(() => readerCardInputOf(books, groups, readerName, undefined, own), [books, groups, readerName, own]);
-  const preview = useMemo(() => (audience === "you" ? input : visitorView(input)), [audience, input]);
   const width = Math.min(windowWidth - spacing.xl * 2, PREVIEW_MAX, (windowHeight * PIN_SHARE - PIN_CHROME) / PLATE_RATIO);
 
   const change = async (patch: ReaderCardStylePatch) => {
@@ -55,10 +52,9 @@ export function ReaderCardEditorScreen() {
   return (
     <View style={styles.screen}>
       <View style={[styles.pinned, { backgroundColor: colors.background }]}>
-        <ReaderCardTurner key={`${preview.view}-${preview.style.layout}-${hasChosen(preview.card.chosen)}`} input={preview} width={width} />
+        <ReaderCardTurner key={`${input.view}-${input.style.layout}-${hasChosen(input.card.chosen)}`} input={input} width={width} />
       </View>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.page}>
-        <Segmented accessibilityLabel="Preview as" options={AUDIENCES} value={audience} onChange={setAudience} />
         {input.card.state === "unwritten" && input.missing ? <Text style={[typography.body, { color: colors.textDim }]}>{input.missing}</Text> : null}
         {error ? <Toast visible message={error} tone="error" /> : null}
         <ReaderCardOptions input={input} onChange={change} />
