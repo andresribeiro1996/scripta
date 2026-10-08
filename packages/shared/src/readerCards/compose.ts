@@ -3,6 +3,9 @@ import type { IdentityKey } from "./plates.js";
 export const SERIF = "'Playfair Display', Georgia, 'Times New Roman', serif";
 export const SANS = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
 export const MONO = "'Courier Prime', 'Courier New', Courier, monospace";
+export const SCRIPT = "'Pinyon Script', 'Snell Roundhand', cursive";
+
+export const EX_LIBRIS = `<text class="pt" x="125" y="45" text-anchor="middle" font-size="8.5" letter-spacing="3.4" font-family="${SANS}" font-weight="600">EX LIBRIS</text>`;
 
 export interface PlateFace {
   key: IdentityKey | "none";
@@ -14,6 +17,7 @@ export interface PlateFace {
   reader: string;
   width: number;
   label: string;
+  viewBox?: readonly [number, number, number, number];
 }
 
 export interface PlateSlots {
@@ -24,6 +28,7 @@ export interface PlateSlots {
   top?: string;
   rings?: string;
   seal?: string;
+  banner?: string;
   trait?: string;
   footerLeft?: string;
   footerRight?: string;
@@ -32,7 +37,11 @@ export interface PlateSlots {
 
 const DIAMONDS = [[16, 16], [234, 16], [16, 334], [234, 334]].map(([x, y]) => `M${x} ${y! - 4.5}L${x! + 4.5} ${y}L${x} ${y! + 4.5}L${x! - 4.5} ${y}Z`).join("");
 
-const openSvg = (face: PlateFace) => `<svg xmlns="http://www.w3.org/2000/svg" class="plate id-${face.key}" viewBox="0 0 250 350" width="${face.width}" height="${+(face.width * 1.4).toFixed(2)}" role="img" aria-label="${face.label}">`;
+const openSvg = (face: PlateFace) => {
+  const [x, y, w, h] = face.viewBox ?? [0, 0, 250, 350];
+  const height = face.viewBox ? +((face.width * h) / w).toFixed(2) : +(face.width * 1.4).toFixed(2);
+  return `<svg xmlns="http://www.w3.org/2000/svg" class="plate id-${face.key}" viewBox="${x} ${y} ${w} ${h}" width="${face.width}" height="${height}" role="img" aria-label="${face.label}">`;
+};
 const GROUND = `<rect class="pg" width="250" height="350" rx="4"/>`;
 const FRAME = [`<rect class="pl" x="10" y="10" width="230" height="330" stroke-width="1.6"/>`, `<rect class="pl" x="16" y="16" width="218" height="318" stroke-width=".6"/>`];
 const corners = (slots: PlateSlots) => slots.corners ?? `<path class="pf" d="${DIAMONDS}"/>`;
@@ -51,13 +60,14 @@ export function composePlate(face: PlateFace, slots: PlateSlots = {}): string {
     ...FRAME,
     slots.frameBand,
     corners(slots),
-    slots.header ?? `<text class="pt" x="125" y="45" text-anchor="middle" font-size="8.5" letter-spacing="3.4" font-family="${SANS}" font-weight="600">EX LIBRIS</text>`,
+    slots.header ?? EX_LIBRIS,
     slots.top,
     `<circle class="pl" cx="125" cy="134" r="60" stroke-width="1.4"/>`,
     `<circle class="pl" cx="125" cy="134" r="55" stroke-width=".6"/>`,
     slots.rings,
     face.emblemSvg,
     slots.seal,
+    slots.banner,
     `<text class="pt" x="125" y="220" text-anchor="middle" font-size="8" letter-spacing="3" font-family="${SANS}" font-weight="600">${face.eyebrow}</text>`,
     `<text class="pt" x="125" y="247" text-anchor="middle" font-size="25" font-family="${SERIF}">${face.name}</text>`,
     `<path class="pl" d="M82 263H117M133 263H168" stroke-width=".8"/><circle class="pf" cx="125" cy="263" r="2"/>`,

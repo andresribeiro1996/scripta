@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
+import { existsSync, readFileSync } from "node:fs";
 import { test } from "node:test";
 import { createElement } from "react";
 import { renderToString } from "react-dom/server";
-import { readerCardInputOf, type Layout, type PublicReaderCard } from "@scripta/shared";
+import { DEFAULT_READER_CARD_STYLE, publicStyle, readerCardInputOf, type Layout, type PublicReaderCard } from "@scripta/shared";
 import { ReaderCardImage } from "../src/components/readerCard/ReaderCardImage";
 import { ReaderCardTurner } from "../src/components/readerCard/ReaderCardTurner";
 import { ReaderCardViewer } from "../src/components/readerCard/ReaderCardViewer";
@@ -11,10 +12,10 @@ const card: PublicReaderCard = {
   state: "settled", identity: "star", runnerUp: null, streak: "lamp", signal: null, coverage: ["genres known for 3 of 3 finished books"],
   dial: { segments: [{ group: "star", books: 3, marked: 1 }] },
   facts: { finished: 3, highlights: 2, series: 0, since: 2020, edition: 2026 },
-  style: { counter: "dial", layout: "faces", trait: "both" },
+  style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), counter: "dial", layout: "faces", trait: "both" },
   chosen: { highlight: { text: "To light a candle", title: "A Wizard of Earthsea", author: "Ursula K. Le Guin" } },
 };
-const visitor = (layout: Layout, fields: Partial<PublicReaderCard> = {}) => readerCardInputOf([], [], "andre", { ...card, ...fields, style: { counter: "dial", layout, trait: "both" } });
+const visitor = (layout: Layout, fields: Partial<PublicReaderCard> = {}) => readerCardInputOf([], [], "andre", { ...card, style: { ...card.style!, layout }, ...fields });
 const viewer = (input: ReturnType<typeof visitor>) => renderToString(createElement(ReaderCardViewer, { input, onClose: () => undefined }));
 
 test("the image draws both prints, each hidden by the other theme", () => {
@@ -22,6 +23,20 @@ test("the image draws both prints, each hidden by the other theme", () => {
   assert.equal(html.match(/<svg /g)?.length, 2);
   assert.match(html, /dark:hidden/);
   assert.match(html, /hidden h-full w-full dark:block/);
+});
+
+test("a fixed print draws one copy whatever the theme, and auto draws both", () => {
+  const fixed = renderToString(createElement(ReaderCardImage, { input: visitor("faces", { style: { ...card.style!, print: "reversed" } }) }));
+  assert.equal(fixed.match(/<svg /g)?.length, 1);
+  assert.doesNotMatch(fixed, /dark:hidden|dark:block/);
+  assert.match(fixed, /#efe5d1/);
+  assert.equal(renderToString(createElement(ReaderCardImage, { input: visitor("faces") })).match(/<svg /g)?.length, 2);
+});
+
+test("a cropped image keeps the crop's proportions", () => {
+  const html = renderToString(createElement(ReaderCardImage, { input: { ...visitor("faces"), crop: "corner" } }));
+  assert.match(html, /aspect-ratio:1/);
+  assert.match(html, /viewBox="0 0 100 100"/);
 });
 
 test("the viewer is a modal dialog that announces its page and carries the card as text", () => {
@@ -67,4 +82,10 @@ test("only the owner's viewer offers Edit card, and only when it can go somewher
   assert.match(renderToString(createElement(ReaderCardViewer, { input: owner, onClose: noop, onEdit: noop })), />Edit card</);
   assert.doesNotMatch(renderToString(createElement(ReaderCardViewer, { input: owner, onClose: noop })), /Edit card/);
   assert.doesNotMatch(renderToString(createElement(ReaderCardViewer, { input: visitor("faces"), onClose: noop, onEdit: noop })), /Edit card/);
+});
+
+test("the script font is served and declared", () => {
+  assert.match(readFileSync("src/index.css", "utf8"), /font-family: "Pinyon Script";\s*src: url\("\/fonts\/pinyon-script-400\.ttf"\) format\("truetype"\);/);
+  assert.ok(existsSync("public/fonts/pinyon-script-400.ttf"));
+  assert.ok(existsSync("public/fonts/licenses/pinyonScript.txt"));
 });

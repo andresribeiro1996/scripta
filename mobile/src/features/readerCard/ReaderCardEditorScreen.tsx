@@ -10,7 +10,7 @@ import { ReaderCardTurner } from "../murals/ReaderCardTurner";
 import { HighlightChoice, SignatureChoice } from "./ReaderCardChoices";
 import { ReaderCardOptions } from "./ReaderCardOptions";
 import { ReaderGlyphSetting } from "./ReaderGlyphSetting";
-import { coverOf, useReaderCardStyle, useSaveReaderCardStyle } from "./useReaderCardStyle";
+import { useOwnCardStyle, useReaderCardStyle, useSaveReaderCardStyle } from "./useReaderCardStyle";
 
 const NO_BOOKS: Array<Record<string, unknown>> = [];
 const PREVIEW_MAX = 280;
@@ -28,7 +28,8 @@ export function ReaderCardEditorScreen() {
   const save = useSaveReaderCardStyle();
   const [audience, setAudience] = useState<"you" | "visitors">("you");
   const [error, setError] = useState<string | null>(null);
-  const input = useMemo(() => readerCardInputOf(books, groups, readerName, undefined, style ? { style, coverOf } : undefined), [books, groups, readerName, style]);
+  const own = useOwnCardStyle();
+  const input = useMemo(() => readerCardInputOf(books, groups, readerName, undefined, own), [books, groups, readerName, own]);
   const preview = useMemo(() => (audience === "you" ? input : visitorView(input)), [audience, input]);
   const width = Math.min(windowWidth - spacing.xl * 2, PREVIEW_MAX);
 
@@ -54,7 +55,7 @@ export function ReaderCardEditorScreen() {
       <ReaderCardTurner key={`${preview.view}-${preview.style.layout}-${hasChosen(preview.card.chosen)}`} input={preview} width={width} />
       {input.card.state === "unwritten" && input.missing ? <Text style={[typography.body, { color: colors.textDim }]}>{input.missing}</Text> : null}
       {error ? <Toast visible message={error} tone="error" /> : null}
-      <ReaderCardOptions input={input} onChange={(patch) => void change(patch)} />
+      <ReaderCardOptions input={input} onChange={change} />
       <SignatureChoice books={books} signature={style.signature} chosen={input.card.chosen?.signature} onChange={change} />
       <HighlightChoice books={books} highlight={style.highlight} chosen={input.card.chosen?.highlight} onChange={change} />
       <ReaderGlyphSetting username={readerName} books={books} groups={groups} />

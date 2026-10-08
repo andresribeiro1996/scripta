@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { fitLine, textWidth, wrapLines } from "./fit.js";
+import { fitLine, fitSize, textWidth, wrapLines } from "./fit.js";
 
 const body = { font: "serif", size: 11, width: 190 } as const;
 
@@ -43,4 +43,40 @@ test("one overlong word is cut, and blank text gives no lines", () => {
   assert.equal(lines.length, 1);
   assert.ok(lines[0]!.endsWith("…"));
   assert.deepEqual(wrapLines("   ", { ...body, lines: 2 }), []);
+});
+
+test("fitSize keeps a size that fits and shrinks one that does not, never below the minimum", () => {
+  const opts = { font: "serif", size: 8, width: 100, spacing: 0.6, min: 5 } as const;
+  assert.equal(fitSize("Per libros", opts), 8);
+  const wide = "Why Wise Women Weep Now";
+  assert.ok(textWidth(wide, opts) > 100);
+  const shrunk = fitSize(wide, opts);
+  assert.ok(shrunk < 8 && shrunk >= 5, String(shrunk));
+  assert.ok(textWidth(wide, { ...opts, size: shrunk }) <= 100);
+  assert.equal(fitLine(wide, { ...opts, size: shrunk }), wide);
+  assert.equal(fitSize("W".repeat(200), opts), 5);
+});
+
+test("wide letters and wide code points are estimated wider than the average", () => {
+  const opts = { font: "serif", size: 10 } as const;
+  assert.ok(textWidth("W".repeat(8), opts) > textWidth("a".repeat(8), opts));
+  assert.ok(textWidth("🙂🙂", opts) > textWidth("aa", opts));
+  assert.equal(textWidth("WW", { font: "mono", size: 10 }), textWidth("aa", { font: "mono", size: 10 }));
+});
+
+test("a wide-letter line is cut with an ellipsis inside the width", () => {
+  const opts = { font: "serif", size: 8, width: 100, spacing: 0.6 } as const;
+  const line = fitLine("W".repeat(28), opts);
+  assert.ok(line.endsWith("…") && line.length < 28);
+  assert.ok(textWidth(line, opts) <= 100);
+});
+
+test("script text is estimated narrower than the serif", () => {
+  assert.ok(textWidth("Andre Ribeiro", { font: "script", size: 12 }) < textWidth("Andre Ribeiro", { font: "serif", size: 12 }));
+});
+
+test("italic is estimated narrower than serif for ordinary text and as wide for wide glyphs", () => {
+  const options = { size: 10 } as const;
+  assert.ok(textWidth("Per libros ad astra", { ...options, font: "italic" }) < textWidth("Per libros ad astra", { ...options, font: "serif" }));
+  assert.equal(textWidth("WW", { ...options, font: "italic" }), textWidth("WW", { ...options, font: "serif" }));
 });

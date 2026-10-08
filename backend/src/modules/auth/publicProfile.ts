@@ -11,6 +11,8 @@ interface CachedStatements {
   getSeen: ReturnType<DatabaseSync["prepare"]>;
   setSeen: ReturnType<DatabaseSync["prepare"]>;
   getTheme: ReturnType<DatabaseSync["prepare"]>;
+  joined: ReturnType<DatabaseSync["prepare"]>;
+  rank: ReturnType<DatabaseSync["prepare"]>;
 }
 
 let cached: CachedStatements | null = null;
@@ -30,7 +32,9 @@ function statements(): CachedStatements {
       search: db.prepare("SELECT id FROM users WHERE username LIKE ? ESCAPE '\\' ORDER BY username LIMIT ?"),
       getSeen: db.prepare("SELECT dashboard_seen_at FROM users WHERE id = ?"),
       setSeen: db.prepare("UPDATE users SET dashboard_seen_at = ? WHERE id = ?"),
-      getTheme: db.prepare("SELECT theme FROM users WHERE id = ?")
+      getTheme: db.prepare("SELECT theme FROM users WHERE id = ?"),
+      joined: db.prepare("SELECT created_at, rowid FROM users WHERE id = ?"),
+      rank: db.prepare("SELECT COUNT(*) AS n FROM users WHERE created_at < ? OR (created_at = ? AND rowid <= ?)")
     };
   }
   return cached;
@@ -84,4 +88,10 @@ export function getUserTheme(userId: string): ThemeId {
   const row = statements().getTheme.get(userId) as { theme: string | null } | undefined;
   const preference = parseThemePreference(row?.theme);
   return preference === "system" ? "light" : preference;
+}
+
+export function readerNumberOf(userId: string): number | undefined {
+  const row = statements().joined.get(userId) as { created_at: string; rowid: number } | undefined;
+  if (!row) return undefined;
+  return (statements().rank.get(row.created_at, row.created_at, row.rowid) as { n: number }).n;
 }

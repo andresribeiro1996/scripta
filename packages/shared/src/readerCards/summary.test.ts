@@ -4,6 +4,7 @@ import type { PublicReaderCard } from "../library/readerIdentity.js";
 import { readerCardSummary } from "./pages.js";
 import type { ReaderCardBase } from "./render.js";
 import { seedOf } from "./seed.js";
+import { DEFAULT_READER_CARD_STYLE, publicStyle } from "./style.js";
 
 const card: PublicReaderCard = {
   state: "settled", identity: "star", runnerUp: null, streak: "lamp",
@@ -13,7 +14,7 @@ const card: PublicReaderCard = {
   facts: { finished: 34, highlights: 40, series: 2, since: 2014, edition: 2026 },
   chosen: { signature: { title: "A Wizard of Earthsea", author: "Ursula K. Le Guin", workId: null, coverUrl: null, note: "lent twice" }, highlight: { text: "To light a candle", title: "A Wizard of Earthsea", author: "Ursula K. Le Guin" } },
 };
-const base = (fields: Partial<ReaderCardBase> = {}): ReaderCardBase => ({ card, style: { counter: "dial", layout: "faces", trait: "both" }, readerName: "andre", label: "Reader card", seed: seedOf("andre"), view: "visitor", ...fields });
+const base = (fields: Partial<ReaderCardBase> = {}): ReaderCardBase => ({ card, style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), counter: "dial", layout: "faces", trait: "both" }, readerName: "andre", label: "Reader card", seed: seedOf("andre"), view: "visitor", ...fields });
 
 test("the summary reads the card in order: plate, streak, evidence, choices, coverage", () => {
   assert.deepEqual(readerCardSummary(base()), [
@@ -37,4 +38,9 @@ test("only the owner's summary names the leaders and the missing line", () => {
 
 test("an unwritten card says so", () => {
   assert.equal(readerCardSummary(base({ card: { state: "unwritten", identity: null, runnerUp: null, signal: null, coverage: [] } }))[0], "An unwritten reader card.");
+});
+
+test("the motto is read out after the plate", () => {
+  const lines = readerCardSummary(base({ style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), motto: { text: "Per libros ad astra", look: "arc" } } }));
+  assert.equal(lines[1], "Motto: “Per libros ad astra”.");
 });

@@ -19,7 +19,7 @@ const { createSqliteLibraryRepository } = await import("../library/adapters/sqli
 const { createLibraryService } = await import("../library/service.js");
 const { openAuthDb } = await import("../auth/adapters/sqlite/connection.js");
 const { getAuthenticatedUserFromAccessToken } = await import("../auth/tokens.js");
-const { bookKey } = await import("@scripta/shared");
+const { bookKey, DEFAULT_READER_CARD_STYLE, publicStyle } = await import("@scripta/shared");
 const saveLibrary = (db: DatabaseSync, userId: string, document: unknown) => createLibraryService(createSqliteLibraryRepository(db), () => "", 10 * 1024 * 1024).saveLibrary(userId, document);
 const authorization = (sub: string) => ({ authorization: `Bearer ${jwt.sign({ sub, email: `${sub}@example.test`, username: sub }, process.env.JWT_ACCESS_SECRET!, { expiresIn: "5m" })}` });
 
@@ -125,7 +125,7 @@ test("public mural payload carries the reader card without leaking titles or ser
       streak: null,
       signal: { counted: 3, of: 10, label: "3 of 10 finished books are in a series" },
       coverage: ["genres known for 0 of 10 finished books"],
-      style: { counter: "dial", layout: "faces", trait: "both" },
+      style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), counter: "dial", layout: "faces", trait: "both" },
       chosen: {}
     });
     assert.ok(dial && facts);

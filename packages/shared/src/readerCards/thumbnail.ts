@@ -1,6 +1,7 @@
 import type { DialSegment } from "../library/readerCardFacts.js";
 import type { Counter } from "./counters.js";
-import type { ReaderCardBase } from "./render.js";
+import type { CardCrop, ReaderCardBase } from "./render.js";
+import type { PublicReaderCardStyle } from "./style.js";
 
 export const THUMBNAIL_MARKS = 24;
 
@@ -14,7 +15,11 @@ export function thumbnailSegments(segments: DialSegment[]): DialSegment[] {
   });
 }
 
-export function counterThumbnail(input: ReaderCardBase, counter: Counter): ReaderCardBase {
+export function styleThumbnail(input: ReaderCardBase, patch: Partial<PublicReaderCardStyle>, crop?: CardCrop): ReaderCardBase {
   const { dial } = input.card;
-  return { ...input, style: { ...input.style, counter }, card: dial ? { ...input.card, dial: { segments: thumbnailSegments(dial.segments) } } : input.card };
+  return { ...input, ...(crop ? { crop } : {}), style: { ...input.style, ...patch }, card: dial ? { ...input.card, dial: { segments: thumbnailSegments(dial.segments) } } : input.card };
+}
+
+export function counterThumbnail(input: ReaderCardBase, counter: Counter): ReaderCardBase {
+  return styleThumbnail(input, { counter });
 }

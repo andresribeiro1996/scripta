@@ -9,7 +9,7 @@ const card: PublicReaderCard = {
   facts: { finished: 3, highlights: 1, series: 0, since: null, edition: 2026 },
   chosen: { signature: { title: "Fire & Blood", author: "George R. R. Martin", workId: null, coverUrl: null, note: null }, highlight: { text: "a & b", title: "Fire & Blood", author: "George R. R. Martin" } },
 };
-const fonts = { serif: "SERIF-X", sans: "SANS-X", mono: "MONO-X" };
+const fonts = { serif: "SERIF-X", sans: "SANS-X", mono: "MONO-X", script: "SCRIPT-X" };
 
 test("every card font becomes a bundled family and ampersands draw as themselves", () => {
   const input = readerCardInputOf([], [], "andre", card);
@@ -30,4 +30,8 @@ test("angle brackets survive SvgXml as CDATA and typed entities stay literal", (
   const typed = chosen("&lt;");
   assert.ok(typed.includes("&lt;"));
   assert.doesNotMatch(typed, /CDATA/);
+});
+
+test("the script family becomes the bundled script font", () => {
+  assert.equal(readerCardXml(`<text font-family="${PLATE_FONTS.script}">A</text>`, fonts), `<text font-family="SCRIPT-X">A</text>`);
 });

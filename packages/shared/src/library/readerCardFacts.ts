@@ -17,7 +17,7 @@ export type DialGroup = GenreIdentity | "other" | "unknown";
 export interface DialSegment { group: DialGroup; books: number; marked: number }
 export interface ReaderCardFacts {
   dial: { segments: DialSegment[] };
-  facts: { finished: number; highlights: number; series: number; since: number | null; edition: number };
+  facts: { finished: number; highlights: number; series: number; since: number | null; edition: number; readerNumber?: number };
 }
 
 export function readerCardFacts(books: Book[], groups: Group[], identity: IdentityKey | null, now: Date = new Date()): ReaderCardFacts {
@@ -54,7 +54,7 @@ export function publicReaderCardOf(books: Book[], groups: Group[], now: Date = n
 }
 
 export type CoverOf = (book: Book) => string | null;
-export interface OwnCardStyle { style: ReaderCardStyle; coverOf: CoverOf }
+export interface OwnCardStyle { style: ReaderCardStyle; coverOf: CoverOf; readerNumber?: number | null }
 
 export function ownChosen(books: Book[], style: ReaderCardStyle, coverOf: CoverOf): ReaderCardChosen {
   const chosen: ReaderCardChosen = {};
@@ -73,7 +73,8 @@ export function readerCardInputOf(books: Book[], groups: Group[], readerName: st
     return { card: override, style: publicStyle(normalizeReaderCardStyle(override.style)), view: "visitor", readerName, label: readerCardLabel(override), unwrittenLine: "yet to be written", seed };
   }
   const identity = readerIdentity(books, groups);
-  const card: PublicReaderCard = { ...publicReaderCard(identity), ...readerCardFacts(books, groups, identity.identity), ...(own ? { chosen: ownChosen(books, own.style, own.coverOf) } : {}) };
+  const facts = readerCardFacts(books, groups, identity.identity);
+  const card: PublicReaderCard = { ...publicReaderCard(identity), ...facts, ...(own?.readerNumber ? { facts: { ...facts.facts, readerNumber: own.readerNumber } } : {}), ...(own ? { chosen: ownChosen(books, own.style, own.coverOf) } : {}) };
   return { card, style: publicStyle(own?.style ?? DEFAULT_READER_CARD_STYLE), view: "owner", leaders: identity.leaders, missing: identity.missing, readerName, label: readerCardLabel(card), unwrittenLine: readerCardPlateLine(identity.missing), seed };
 }
 

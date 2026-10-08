@@ -1,26 +1,17 @@
-import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { useMemo, useRef, useState, type RefObject } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
-import { SIGNATURE_NOTE_MAX, bookKey, bookPassages, isFinishedBook, noteSaver, searchPassages, type ChosenHighlight, type ChosenSignature, type Passage, type ReaderCardChosen, type ReaderCardStylePatch } from "@scripta/shared";
+import { SIGNATURE_NOTE_MAX, bookKey, bookPassages, isFinishedBook, searchPassages, type ChosenHighlight, type ChosenSignature, type Passage, type ReaderCardChosen, type ReaderCardStylePatch } from "@scripta/shared";
 import { Button, Input, Sheet, minimumTouchTarget, spacing, typography, useTheme } from "../../ui";
 import { Text } from "../../ui/Text";
 import { BookPickerList } from "../library/components/BookPickerList";
 import { Section } from "../library/components/StyleControls";
-import { useDebouncedCallback } from "../library/lib/debounce";
+import { DraftField } from "./DraftField";
 
 export type SaveStyle = (patch: ReaderCardStylePatch) => Promise<boolean>;
 type Book = Record<string, unknown>;
 
-const NOTE_DELAY_MS = 600;
-
 function NoteField({ signature, onChange, flushRef }: { signature: ChosenSignature; onChange: SaveStyle; flushRef: RefObject<() => void> }) {
-  const [draft, setDraft] = useState(signature.note ?? "");
-  const [save] = useState(() => noteSaver(signature, (failed, previous) => setDraft((current) => (current === failed ? (previous ?? "") : current))));
-  const { schedule, flush } = useDebouncedCallback((value: string) => save(value, onChange), NOTE_DELAY_MS);
-  useEffect(() => {
-    flushRef.current = flush;
-    return () => { flushRef.current = () => {}; };
-  });
-  return <Input label="Note" value={draft} maxLength={SIGNATURE_NOTE_MAX} hint={`${draft.length}/${SIGNATURE_NOTE_MAX}`} onChangeText={(value) => { setDraft(value); schedule(value); }} />;
+  return <DraftField label="Note" initial={signature.note} max={SIGNATURE_NOTE_MAX} onSave={(note) => onChange({ signature: { bookKey: signature.bookKey, note } })} flushRef={flushRef} />;
 }
 
 export function SignatureChoice({ books, signature, chosen, onChange }: { books: Book[]; signature: ChosenSignature | null; chosen?: ReaderCardChosen["signature"]; onChange: SaveStyle }) {

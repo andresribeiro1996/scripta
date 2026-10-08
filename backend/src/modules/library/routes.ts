@@ -1,7 +1,7 @@
 import fastifyMultipart from "@fastify/multipart";
 import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { COUNTERS, LAYOUTS, SIGNATURE_NOTE_MAX, TRAITS, type LibraryChange } from "@scripta/shared";
+import { CARD_PRINTS, CORNER_STYLES, COUNTERS, FOOTER_LEFTS, FOOTER_RIGHTS, LAYOUTS, MOTTO_LOOKS, MOTTO_MAX, SIGNATURE_NOTE_MAX, TRAITS, type LibraryChange } from "@scripta/shared";
 import { createWriteStream } from "node:fs";
 import { mkdtemp, readdir, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { z } from "zod";
 import { env } from "../../config/env.js";
-import { authGuard, rateLimitKey } from "../auth/index.js";
+import { authGuard, rateLimitKey, readerNumberOf } from "../auth/index.js";
 import { LIBRARY_SMALL_SAVE_MAX_BYTES } from "./domain/constants.js";
 import { InvalidReaderCardChoiceError, LibraryChangeNotFoundError, LibraryConflictError, LibraryTooLargeError, NoLibraryDocumentError } from "./domain/errors.js";
 import type { LibraryDocumentText } from "./domain/types.js";
@@ -99,6 +99,10 @@ const readerCardStylePatchSchema = z.object({
   counter: z.enum(COUNTERS).optional(),
   layout: z.enum(LAYOUTS).optional(),
   trait: z.enum(TRAITS).optional(),
+  motto: z.object({ text: z.string().trim().min(1).max(MOTTO_MAX), look: z.enum(MOTTO_LOOKS) }).strict().nullable().optional(),
+  footer: z.object({ left: z.enum(FOOTER_LEFTS), right: z.enum(FOOTER_RIGHTS) }).strict().optional(),
+  corners: z.enum(CORNER_STYLES).optional(),
+  print: z.enum(CARD_PRINTS).optional(),
   signature: z.object({ bookKey: bookKeySchema, note: z.string().trim().max(SIGNATURE_NOTE_MAX).nullable().default(null) }).strict().nullable().optional(),
   highlight: z.object({ bookKey: bookKeySchema, highlightId: z.string().min(1).max(200) }).strict().nullable().optional(),
 }).strict();
@@ -260,6 +264,7 @@ export function buildLibraryRoutes(service: LibraryService) {
       await cards.register(fastifyRateLimit, { max: 120, timeWindow: "1 minute", keyGenerator: rateLimitKey });
 
       cards.get("/library/reader-card/style", { preHandler: authGuard }, async (request) => service.getReaderCardStyle(request.user.id));
+      cards.get("/library/reader-card/number", { preHandler: authGuard }, async (request) => ({ readerNumber: readerNumberOf(request.user.id) ?? null }));
 
       cards.patch("/library/reader-card/style", { preHandler: authGuard }, async (request, reply) => {
         const parsed = readerCardStylePatchSchema.safeParse(request.body);

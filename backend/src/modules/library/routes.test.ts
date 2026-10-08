@@ -495,7 +495,7 @@ test("GET reader card style returns the default before any change", async () => 
   const { app } = await setup();
   const response = await app.inject({ method: "GET", url: styleUrl, headers: asUser("u1") });
   assert.equal(response.statusCode, 200);
-  assert.deepEqual(response.json(), { counter: "dial", layout: "faces", trait: "both", signature: null, highlight: null });
+  assert.deepEqual(response.json(), { counter: "dial", layout: "faces", trait: "both", motto: null, footer: { left: "plate", right: "name" }, corners: "diamonds", print: "auto", signature: null, highlight: null });
   await app.close();
 });
 
@@ -504,7 +504,7 @@ test("PATCH reader card style merges each change into the stored style", async (
   await app.inject({ method: "PATCH", url: styleUrl, headers: asUser("u1"), payload: { counter: "shelf" } });
   const response = await app.inject({ method: "PATCH", url: styleUrl, headers: asUser("u1"), payload: { trait: "seal" } });
   assert.equal(response.statusCode, 200);
-  assert.deepEqual(response.json(), { counter: "shelf", layout: "faces", trait: "seal", signature: null, highlight: null });
+  assert.deepEqual(response.json(), { counter: "shelf", layout: "faces", trait: "seal", motto: null, footer: { left: "plate", right: "name" }, corners: "diamonds", print: "auto", signature: null, highlight: null });
   await app.close();
 });
 
@@ -518,7 +518,7 @@ test("PATCH reader card style rejects unknown options and unknown fields", async
     assert.equal(typeof response.json().error, "string");
   }
   const stored = await app.inject({ method: "GET", url: styleUrl, headers: asUser("u1") });
-  assert.deepEqual(stored.json(), { counter: "dial", layout: "faces", trait: "both", signature: null, highlight: null });
+  assert.deepEqual(stored.json(), { counter: "dial", layout: "faces", trait: "both", motto: null, footer: { left: "plate", right: "name" }, corners: "diamonds", print: "auto", signature: null, highlight: null });
   await app.close();
 });
 
@@ -530,6 +530,40 @@ test("PATCH reader card style stores a known layout", async () => {
   await app.close();
 });
 
+test("PATCH reader card style stores a motto, both footer corners, the corners and the print", async () => {
+  const { app } = await setup();
+  const payload = { motto: { text: "  Per libros ad astra ", look: "arc" }, footer: { left: "since", right: "initials" }, corners: "laurel", print: "reversed" };
+  const response = await app.inject({ method: "PATCH", url: styleUrl, headers: asUser("u1"), payload });
+  assert.equal(response.statusCode, 200);
+  const body = response.json();
+  assert.deepEqual(body.motto, { text: "Per libros ad astra", look: "arc" });
+  assert.deepEqual(body.footer, { left: "since", right: "initials" });
+  assert.equal(body.corners, "laurel");
+  assert.equal(body.print, "reversed");
+  const cleared = await app.inject({ method: "PATCH", url: styleUrl, headers: asUser("u1"), payload: { motto: null } });
+  assert.equal(cleared.json().motto, null);
+  assert.equal(cleared.json().corners, "laurel");
+  await app.close();
+});
+
+test("PATCH reader card style rejects a bad motto, half a footer and unknown decorations", async () => {
+  const { app } = await setup();
+  for (const payload of [
+    { motto: { text: "a".repeat(29), look: "arc" } },
+    { motto: { text: "   ", look: "arc" } },
+    { motto: { text: "x", look: "neon" } },
+    { motto: { text: "x", look: "arc", colour: "red" } },
+    { footer: { left: "since" } },
+    { footer: { left: "since", right: "neon" } },
+    { corners: "neon" },
+    { print: "dark" },
+  ]) {
+    const response = await app.inject({ method: "PATCH", url: styleUrl, headers: asUser("u1"), payload });
+    assert.equal(response.statusCode, 400, JSON.stringify(payload));
+  }
+  await app.close();
+});
+
 test("a counter or trait change keeps the stored signature and highlight", async () => {
   const { app, service } = await setup();
   service.saveLibrary("u1", { books: [wizard], groups: [] });
@@ -538,7 +572,7 @@ test("a counter or trait change keeps the stored signature and highlight", async
   await patch({ highlight: { bookKey: bookKey(wizard), highlightId: "h1" } });
   const response = await patch({ counter: "ring" });
   assert.equal(response.statusCode, 200);
-  const expected = { counter: "ring", layout: "faces", trait: "both", signature: { bookKey: bookKey(wizard), note: "why" }, highlight: { bookKey: bookKey(wizard), highlightId: "h1" } };
+  const expected = { counter: "ring", layout: "faces", trait: "both", motto: null, footer: { left: "plate", right: "name" }, corners: "diamonds", print: "auto", signature: { bookKey: bookKey(wizard), note: "why" }, highlight: { bookKey: bookKey(wizard), highlightId: "h1" } };
   assert.deepEqual(response.json(), expected);
   const stored = await app.inject({ method: "GET", url: styleUrl, headers: asUser("u1") });
   assert.deepEqual(stored.json(), expected);
@@ -605,6 +639,20 @@ test("the reader card style needs a signed-in user", async () => {
   assert.equal((await app.inject({ method: "GET", url: styleUrl })).statusCode, 401);
   assert.equal((await app.inject({ method: "PATCH", url: styleUrl, payload: { counter: "shelf" } })).statusCode, 401);
   const stored = await app.inject({ method: "GET", url: styleUrl, headers: asUser("u1") });
-  assert.deepEqual(stored.json(), { counter: "dial", layout: "faces", trait: "both", signature: null, highlight: null });
+  assert.deepEqual(stored.json(), { counter: "dial", layout: "faces", trait: "both", motto: null, footer: { left: "plate", right: "name" }, corners: "diamonds", print: "auto", signature: null, highlight: null });
+  await app.close();
+});
+
+test("GET reader card number answers the owner's rank, or null without an account row", async () => {
+  const { app } = await setup();
+  const { openAuthDb } = await import("../auth/adapters/sqlite/connection.js");
+  const before = await app.inject({ method: "GET", url: "/library/reader-card/number", headers: asUser("ranked") });
+  assert.deepEqual(before.json(), { readerNumber: null });
+  openAuthDb().prepare(`INSERT INTO users (id, email, username, auth_version, created_at) VALUES (?, ?, ?, 0, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`).run("ranked", "ranked@test.dev", "ranked");
+  const after = await app.inject({ method: "GET", url: "/library/reader-card/number", headers: asUser("ranked") });
+  assert.equal(after.statusCode, 200);
+  assert.ok(after.json().readerNumber >= 1);
+  const anonymous = await app.inject({ method: "GET", url: "/library/reader-card/number" });
+  assert.equal(anonymous.statusCode, 401);
   await app.close();
 });

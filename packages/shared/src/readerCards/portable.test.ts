@@ -6,29 +6,32 @@ import { COUNTERS } from "./counters.js";
 import type { ReaderCardPage } from "./pages.js";
 import { PLATES, type IdentityKey } from "./plates.js";
 import { renderReaderCard } from "./render.js";
-import { seedOf } from "./seed.js";
-import { DEFAULT_READER_CARD_STYLE, TRAITS, type ReaderCardChosen } from "./style.js";
+import { random, seedOf } from "./seed.js";
+import { CARD_PRINTS, CORNER_STYLES, DEFAULT_READER_CARD_STYLE, FOOTER_LEFTS, FOOTER_RIGHTS, MOTTO_LOOKS, TRAITS, publicStyle, type PublicReaderCardStyle, type ReaderCardChosen } from "./style.js";
 
 const ELEMENTS = new Set(["svg", "g", "defs", "path", "rect", "circle", "ellipse", "line", "polyline", "polygon", "text", "tspan", "textPath", "linearGradient", "radialGradient", "stop", "pattern", "clipPath", "mask", "image", "filter", "feOffset", "feFlood", "feComposite", "feMerge", "feMergeNode", "feGaussianBlur", "feColorMatrix", "feBlend", "feDropShadow"]);
 
 function portabilityProblems(svg: string): string[] {
   const problems: string[] = [];
   let remoteImages = 0;
+  const ids = [...svg.matchAll(/ id="([^"]*)"/g)].map((match) => match[1]!);
+  if (new Set(ids).size !== ids.length) problems.push("duplicate id");
   for (const [, name, attrs] of svg.matchAll(/<([a-zA-Z][\w:-]*)([^>]*)>/g)) {
     if (!ELEMENTS.has(name!)) problems.push(`<${name}>`);
     for (const [, attr, value] of attrs!.matchAll(/([\w:-]+)="([^"]*)"/g)) {
       if (attr === "class" && !/^(plate|glyph) id-/.test(value!)) problems.push(`class="${value}"`);
       if (attr === "style" && value!.includes("mix-blend-mode")) problems.push("mix-blend-mode");
       const remote = (attr === "href" || attr === "xlink:href") && name === "image" && /^https:\/\/[^\s"'<>&\\]+$/.test(value!);
+      const local = attr === "href" && name === "textPath" && value!.startsWith("#") && ids.includes(value!.slice(1));
       if (remote) remoteImages++;
-      if ((attr === "href" || attr === "xlink:href") && !value!.startsWith("data:") && !remote) problems.push(`${attr}="${value!.slice(0, 40)}"`);
-      if (attr === "id") problems.push(`id="${value}"`);
+      if ((attr === "href" || attr === "xlink:href") && !value!.startsWith("data:") && !remote && !local) problems.push(`${attr}="${value!.slice(0, 40)}"`);
+      if (attr === "id" && !/^rc-[a-zA-Z]+-\d+-(paper|reversed)$/.test(value!)) problems.push(`id="${value}"`);
     }
   }
   if ((svg.match(/<svg\b/g) ?? []).length !== 1) problems.push("nested <svg>");
   if (remoteImages > 1) problems.push("more than one remote image");
   if (/url\(\s*['"]?#/.test(svg)) problems.push("url(#…)");
-  if (/NaN|Infinity/.test(svg)) problems.push("NaN");
+  if (/NaN|Infinity|undefined/.test(svg)) problems.push("NaN");
   return problems;
 }
 
@@ -36,6 +39,14 @@ test("the guard counts every remote image and catches spaced or quoted url(#…)
   const twoImages = `<svg xmlns="http://www.w3.org/2000/svg"><image xlink:href="https://a.example/b" width="1"/><image x="2" href="https://a.example/c"/></svg>`;
   assert.deepEqual(portabilityProblems(twoImages), ["more than one remote image"]);
   assert.deepEqual(portabilityProblems(`<svg xmlns="http://www.w3.org/2000/svg"><rect fill="url( #a)"/></svg>`), ["url(#…)"]);
+});
+
+test("the guard allows only card ids and textPath references to them", () => {
+  const ok = `<svg xmlns="http://www.w3.org/2000/svg"><defs><path id="rc-arc-1-paper" d="M0 0"/></defs><text><textPath href="#rc-arc-1-paper">a</textPath></text></svg>`;
+  assert.deepEqual(portabilityProblems(ok), []);
+  assert.deepEqual(portabilityProblems(ok.replace(`href="#rc-arc-1-paper"`, `href="#elsewhere"`)), [`href="#elsewhere"`]);
+  assert.ok(portabilityProblems(ok.replaceAll("rc-arc-1-paper", "x")).includes(`id="x"`));
+  assert.ok(portabilityProblems(ok.replace("</defs>", `<path id="rc-arc-1-paper" d="M1 1"/></defs>`)).includes("duplicate id"));
 });
 
 const dials: Record<string, DialSegment[]> = {
@@ -75,6 +86,40 @@ test("every back page, view, choice and print stays inside the subset, and a vis
         assert.doesNotMatch(svg, /SECRET-NOTE/, where);
         if (view === "visitor") assert.doesNotMatch(svg, /SECRET-LEADER|SECRET-MISSING/, where);
       }
+    }
+  }
+});
+
+const LONG = "W".repeat(28);
+const decorationsOf: Array<[string, Partial<PublicReaderCardStyle>]> = [
+  ...MOTTO_LOOKS.flatMap((look): Array<[string, Partial<PublicReaderCardStyle>]> => [[`motto ${look}`, { motto: { text: "Per libros ad astra", look } }], [`long motto ${look}`, { motto: { text: LONG, look } }]]),
+  ...FOOTER_LEFTS.map((left): [string, Partial<PublicReaderCardStyle>] => [`left ${left}`, { footer: { left, right: "name" } }]),
+  ...FOOTER_RIGHTS.map((right): [string, Partial<PublicReaderCardStyle>] => [`right ${right}`, { footer: { left: "plate", right } }]),
+  ...CORNER_STYLES.map((corners): [string, Partial<PublicReaderCardStyle>] => [`corners ${corners}`, { corners }]),
+];
+
+test("every motto, footer and corner stays inside the subset on every plate and print, and draws the same twice", () => {
+  for (const [index, identity] of identities.entries()) for (const [name, patch] of decorationsOf) for (const print of ["paper", "reversed"] as const) {
+    const card: PublicReaderCard = { state: identity ? "settled" : "unwritten", identity, runnerUp: null, streak: PLATES[(index + 1) % PLATES.length]!.key, signal: null, coverage: ["c"], dial: { segments: dials.small! }, facts: { finished: 48, highlights: 140, series: 12, since: 2014, edition: 2026, readerNumber: 42 } };
+    const input = { card, style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), ...patch }, readerName: "andre.ribeiro", print, label: "x", seed: seedOf("andre.ribeiro"), view: "owner" as const };
+    for (const page of ["front", "record"] as const) {
+      const svg = renderReaderCard(input, page);
+      assert.deepEqual(portabilityProblems(svg), [], `${identity}/${name}/${print}/${page}`);
+      assert.equal(renderReaderCard(input, page), svg, `${identity}/${name}/${print}/${page} is deterministic`);
+    }
+  }
+});
+
+test("fifty seeded combinations of every dimension stay inside the subset", () => {
+  const next = random(seedOf("reader-card-combinations"));
+  const pick = <T,>(options: readonly T[]) => options[Math.floor(next() * options.length)]!;
+  for (let i = 0; i < 50; i++) {
+    const identity = pick(identities);
+    const card: PublicReaderCard = { state: identity ? pick(["settled", "leaning"] as const) : "unwritten", identity, runnerUp: null, streak: pick(PLATES).key, signal: null, coverage: ["c"], dial: { segments: pick(Object.values(dials)) }, facts: { finished: 48, highlights: pick([0, 140]), series: 12, since: pick([null, 2014]), edition: 2026 }, chosen: pick(Object.values(chosenSets)) };
+    const style: PublicReaderCardStyle = { counter: pick(COUNTERS), layout: "faces", trait: pick(TRAITS), motto: pick([null, { text: pick(["Per libros ad astra", LONG, "x"]), look: pick(MOTTO_LOOKS) }]), footer: { left: pick(FOOTER_LEFTS), right: pick(FOOTER_RIGHTS) }, corners: pick(CORNER_STYLES), print: pick(CARD_PRINTS) };
+    for (const page of ["front", "chosen", "record", "merged"] as const) for (const print of ["paper", "reversed"] as const) {
+      const svg = renderReaderCard({ card, style, readerName: pick(["andre", "andre.ribeiro", "a".repeat(30)]), print, label: "x", seed: seedOf(String(i)), view: pick(["owner", "visitor"] as const) }, page);
+      assert.deepEqual(portabilityProblems(svg), [], `combination ${i}/${page}/${print}`);
     }
   }
 });

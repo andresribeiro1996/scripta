@@ -4,7 +4,7 @@ import { createElement } from "react";
 import { renderToString } from "react-dom/server";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { DEFAULT_READER_CARD_STYLE, READER_CARD_STYLE_KEY, bookKey, type ReaderCardBase, type ReaderCardStyle } from "@scripta/shared";
-import { useReaderCard } from "../src/hooks/useReaderCard";
+import { READER_NUMBER_KEY, useReaderCard } from "../src/hooks/useReaderCard";
 import { useSaveReaderCardStyle } from "../src/hooks/useReaderCardStyle";
 
 const books = [{ Title: "A Wizard of Earthsea", Attribution: "Ursula K. Le Guin", ReadStatus: 2, _coverUrl: "https://covers.example.org/e.jpg" }];
@@ -51,4 +51,17 @@ test("saving shows the change at once and rolls back when the server refuses", a
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test("the owner's card carries the reader number while that footer is chosen", () => {
+  const client = queryClient();
+  client.setQueryData(READER_CARD_STYLE_KEY, { ...DEFAULT_READER_CARD_STYLE, footer: { left: "readerNumber", right: "name" } });
+  client.setQueryData(READER_NUMBER_KEY, 42);
+  let owner!: ReaderCardBase;
+  function Probe() { owner = useReaderCard(books, [], "andre"); return null; }
+  renderToString(createElement(QueryClientProvider, { client }, createElement(Probe)));
+  assert.equal(owner.card.facts?.readerNumber, 42);
+  client.setQueryData(READER_CARD_STYLE_KEY, DEFAULT_READER_CARD_STYLE);
+  renderToString(createElement(QueryClientProvider, { client }, createElement(Probe)));
+  assert.equal(owner.card.facts?.readerNumber, undefined);
 });

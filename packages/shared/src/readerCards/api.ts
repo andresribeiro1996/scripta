@@ -7,6 +7,9 @@ export function createReaderCardApi(request: ApiRequest) {
     fetchReaderCardStyle(): Promise<ReaderCardStyle> {
       return request<ReaderCardStyle>(apiPath`/library/reader-card/style`, { auth: "required" });
     },
+    fetchReaderNumber(): Promise<number | null> {
+      return request<{ readerNumber: number | null }>(apiPath`/library/reader-card/number`, { auth: "required" }).then((body) => body.readerNumber);
+    },
     updateReaderCardStyle(patch: ReaderCardStylePatch): Promise<ReaderCardStyle> {
       return request<ReaderCardStyle>(apiPath`/library/reader-card/style`, { method: "PATCH", body: patch, auth: "required" });
     },
