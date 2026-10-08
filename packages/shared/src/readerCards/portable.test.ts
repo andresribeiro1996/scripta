@@ -13,21 +13,30 @@ const ELEMENTS = new Set(["svg", "g", "defs", "path", "rect", "circle", "ellipse
 
 function portabilityProblems(svg: string): string[] {
   const problems: string[] = [];
+  let remoteImages = 0;
   for (const [, name, attrs] of svg.matchAll(/<([a-zA-Z][\w:-]*)([^>]*)>/g)) {
     if (!ELEMENTS.has(name!)) problems.push(`<${name}>`);
     for (const [, attr, value] of attrs!.matchAll(/([\w:-]+)="([^"]*)"/g)) {
       if (attr === "class" && !/^(plate|glyph) id-/.test(value!)) problems.push(`class="${value}"`);
       if (attr === "style" && value!.includes("mix-blend-mode")) problems.push("mix-blend-mode");
-      if ((attr === "href" || attr === "xlink:href") && !value!.startsWith("data:") && !(name === "image" && /^https:\/\/[^\s"'<>&]+$/.test(value!))) problems.push(`${attr}="${value!.slice(0, 40)}"`);
+      const remote = (attr === "href" || attr === "xlink:href") && name === "image" && /^https:\/\/[^\s"'<>&]+$/.test(value!);
+      if (remote) remoteImages++;
+      if ((attr === "href" || attr === "xlink:href") && !value!.startsWith("data:") && !remote) problems.push(`${attr}="${value!.slice(0, 40)}"`);
       if (attr === "id") problems.push(`id="${value}"`);
     }
   }
   if ((svg.match(/<svg\b/g) ?? []).length !== 1) problems.push("nested <svg>");
-  if ((svg.match(/<image href="https:/g) ?? []).length > 1) problems.push("more than one remote image");
-  if (/url\(#/.test(svg)) problems.push("url(#…)");
+  if (remoteImages > 1) problems.push("more than one remote image");
+  if (/url\(\s*['"]?#/.test(svg)) problems.push("url(#…)");
   if (/NaN|Infinity/.test(svg)) problems.push("NaN");
   return problems;
 }
+
+test("the guard counts every remote image and catches spaced or quoted url(#…) references", () => {
+  const twoImages = `<svg xmlns="http://www.w3.org/2000/svg"><image xlink:href="https://a.example/b" width="1"/><image x="2" href="https://a.example/c"/></svg>`;
+  assert.deepEqual(portabilityProblems(twoImages), ["more than one remote image"]);
+  assert.deepEqual(portabilityProblems(`<svg xmlns="http://www.w3.org/2000/svg"><rect fill="url( #a)"/></svg>`), ["url(#…)"]);
+});
 
 const dials: Record<string, DialSegment[]> = {
   empty: [],
