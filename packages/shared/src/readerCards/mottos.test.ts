@@ -3,6 +3,7 @@ import { test } from "node:test";
 import type { PublicReaderCard } from "../library/readerIdentity.js";
 import { EX_LIBRIS } from "./compose.js";
 import { LIFTED_EX_LIBRIS, mottoSlots } from "./mottos.js";
+import { textWidth } from "./fit.js";
 import { renderReaderCard } from "./render.js";
 import { seedOf } from "./seed.js";
 import { DEFAULT_READER_CARD_STYLE, MOTTO_LOOKS, publicStyle, type MottoLook } from "./style.js";
@@ -72,4 +73,19 @@ test("the banner draws below the emblem, after the seal", () => {
   const svg = front("bannerBelow");
   assert.ok(svg.indexOf("M80 197.5H170V210.5H80Z") > svg.indexOf(`class="glyph id-lamp`));
   assert.match(svg, />EX LIBRIS</);
+});
+
+const SLOT_WIDTH: Record<MottoLook, number> = { ribbon: 100, scroll: 94, arc: 156.8, cartouche: 86, rule: 78, bannerBelow: 84, wavyRibbon: 98, titleRules: 150, dropCap: 112, sash: 80, script: 116, plaque: 100 };
+
+test("wide letters and emoji fit the look's slot, with an ellipsis where cut", () => {
+  for (const look of MOTTO_LOOKS) for (const text of ["W".repeat(28), "🙂".repeat(28)]) {
+    const slots = mottoSlots({ text, look }, `rc-${look}-1-paper`);
+    const drawn = [...`${slots.header ?? ""}${slots.banner ?? ""}`.matchAll(/<text [^>]*font-size="([\d.]+)"[^>]*?(?: letter-spacing="([\d.]+)")?[^>]*>(?:<textPath[^>]*>)?([^<]*)</g)].at(-1)!;
+    const size = Number(drawn[1]);
+    const spacing = Number(/letter-spacing="([\d.]+)"/.exec(drawn[0])?.[1] ?? 0);
+    const font = look === "titleRules" ? "caps" : look === "script" ? "script" : "serif";
+    const fits = textWidth(drawn[3]!, { font, size, spacing }) <= SLOT_WIDTH[look] + 0.01;
+    assert.ok(fits, `${look} ${text[0]} ${drawn[3]}`);
+  }
+  assert.ok(mottoSlots({ text: "W".repeat(28), look: "ribbon" }, "rc-ribbon-1-paper").header!.includes("…<"));
 });

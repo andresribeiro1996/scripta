@@ -37,7 +37,7 @@ const LOOKS: Record<MottoLook, Draw> = {
   arc: (text, id) => ({ header: LIFTED_EX_LIBRIS + onPath(text, id, ARC_PATH, ARC_LENGTH, 8.5, 1) }),
   cartouche: (text) => ({ header: LIFTED_EX_LIBRIS + `<rect class="pgl" x="76" y="37" width="98" height="21" rx="10.5" stroke-width="1"/><rect class="pl" x="79" y="40" width="92" height="15" rx="7.5" stroke-width=".45"/><circle class="pf" cx="73" cy="47.5" r="1.4"/><circle class="pf" cx="177" cy="47.5" r="1.4"/>` + italic(text, 50.5, 7.6, 86) }),
   rule: (text) => ({ header: LIFTED_EX_LIBRIS + `<path class="pl" d="M58 47.5H84M166 47.5H192" stroke-width=".7"/><path class="pf" d="M58 45.3L60.2 47.5L58 49.7L55.8 47.5ZM192 45.3L194.2 47.5L192 49.7L189.8 47.5Z"/>` + italic(text, 50.5, 8.4, 78) }),
-  bannerBelow: (text) => ({ banner: `<path class="pf" d="M70 200H82V214H70L74 207ZM180 200H168V214H180L176 207Z" opacity=".85"/><path class="pgl" d="M80 197.5H170V210.5H80Z" stroke-width="1"/>` + italic(text, 206.6, 7.2, 84) }),
+  bannerBelow: (text) => ({ banner: `<path class="pf" d="M70 198H82V211H70L74 204.5ZM180 198H168V211H180L176 204.5Z" opacity=".85"/><path class="pgl" d="M80 197.5H170V210.5H80Z" stroke-width="1"/>` + italic(text, 206.6, 7.2, 84) }),
   wavyRibbon: (text, id) => ({ header: LIFTED_EX_LIBRIS + `<path class="pf" d="M62 46L70 44V57L62 59L66 52ZM188 46L180 44V57L188 59L184 52Z" opacity=".85"/><path class="pgl" d="M70 44C85 38 100 50 125 44S165 38 180 44V57C165 51 150 63 125 57S85 51 70 57Z" stroke-width=".9"/>` + onPath(text, id, WAVE_PATH, WAVE_LENGTH, 7.6, 0.5) }),
   titleRules: (text) => {
     const line = fitted(text.toUpperCase(), "caps", 6.8, 150, 2.4);
