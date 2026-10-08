@@ -5,6 +5,7 @@ import { renderToString } from "react-dom/server";
 import { readFileSync } from "node:fs";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
+import type { ThemeScheme } from "@scripta/shared/themes";
 import { DEFAULT_READER_CARD_STYLE, MOTTO_MAX, bookKey, readerCardInputOf } from "@scripta/shared";
 import { HighlightChoice, SignatureChoice } from "../src/components/readerCard/ReaderCardChoices";
 import { ReaderCardOptions } from "../src/components/readerCard/ReaderCardOptions";
@@ -16,7 +17,7 @@ const group = (html: string, label: string) => {
   const start = html.indexOf(`aria-label="${label}"`);
   return html.slice(start, html.indexOf("</div>", start));
 };
-const options = (style = {}) => renderToString(createElement(ReaderCardOptions, { input: readerCardInputOf(books, [], "andre.ribeiro", undefined, { style: { ...DEFAULT_READER_CARD_STYLE, counter: "beads", trait: "seal", layout: "book", ...style }, coverOf: () => null }), onChange: async () => true }));
+const options = (style = {}, scheme: ThemeScheme = "light") => renderToString(createElement(ReaderCardOptions, { scheme, input: readerCardInputOf(books, [], "andre.ribeiro", undefined, { style: { ...DEFAULT_READER_CARD_STYLE, counter: "beads", trait: "seal", layout: "book", ...style }, coverOf: () => null }), onChange: async () => true }));
 
 test("five counter thumbnails, with only the chosen one checked", () => {
   const counters = group(options(), "Counter");
@@ -58,6 +59,15 @@ test("twelve corner thumbnails and the three prints", () => {
   assert.match(corners, /viewBox="0 0 100 100"/);
   assert.match(html, /aria-pressed="true"[^>]*>Reversed</);
   for (const name of ["Follow theme", "Paper"]) assert.match(html, new RegExp(`>${name}<`));
+});
+
+test("under Follow theme each thumbnail renders the print of the app theme", () => {
+  const light = group(options({ print: "auto" }, "light"), "Corners");
+  const dark = group(options({ print: "auto" }, "dark"), "Corners");
+  assert.equal(light.match(/<svg/g)?.length, 12);
+  assert.equal(dark.match(/<svg/g)?.length, 12);
+  assert.match(light, /#f1eadb/);
+  assert.doesNotMatch(dark, /#f1eadb/);
 });
 
 const save = async () => true;
