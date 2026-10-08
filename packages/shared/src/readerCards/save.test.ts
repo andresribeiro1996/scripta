@@ -47,3 +47,12 @@ test("an empty cache starts from the default style, and a choice is normalised l
   assert.deepEqual(cache.writes[0]!.signature, { bookKey: "k", note: "lent" });
   assert.equal(cache.writes[0]!.counter, "dial");
 });
+
+test("identity does not matter: a cache that hands back copies still rolls back and takes the answer", async () => {
+  let value: ReaderCardStyle | undefined = DEFAULT_READER_CARD_STYLE;
+  const cache = { get: () => value && structuredClone(value), set: (style: ReaderCardStyle) => { value = style; } };
+  await assert.rejects(saveReaderCardStyle(cache, { layout: "book" }, async () => { throw new Error("400"); }), /400/);
+  assert.equal(cache.get()!.layout, "faces");
+  await saveReaderCardStyle(cache, { layout: "book" }, async () => ({ ...DEFAULT_READER_CARD_STYLE, layout: "book", trait: "seal" }));
+  assert.equal(cache.get()!.trait, "seal");
+});

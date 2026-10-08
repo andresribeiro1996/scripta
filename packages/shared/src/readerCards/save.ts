@@ -2,15 +2,17 @@ import { DEFAULT_READER_CARD_STYLE, normalizeReaderCardStyle, type ReaderCardSty
 
 export interface ReaderCardStyleCache { get(): ReaderCardStyle | undefined; set(style: ReaderCardStyle): void }
 
+let generation = 0;
+
 export async function saveReaderCardStyle(cache: ReaderCardStyleCache, patch: ReaderCardStylePatch, update: (patch: ReaderCardStylePatch) => Promise<ReaderCardStyle>): Promise<void> {
+  const mine = ++generation;
   const before = cache.get() ?? DEFAULT_READER_CARD_STYLE;
-  const optimistic = normalizeReaderCardStyle({ ...before, ...patch });
-  cache.set(optimistic);
+  cache.set(normalizeReaderCardStyle({ ...before, ...patch }));
   try {
     const saved = await update(patch);
-    if (cache.get() === optimistic) cache.set(saved);
+    if (generation === mine) cache.set(saved);
   } catch (error) {
-    if (cache.get() === optimistic) cache.set(before);
+    if (generation === mine) cache.set(before);
     throw error;
   }
 }
