@@ -1,11 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
-import { ownGlyphPreview, readerIdentity } from "@scripta/shared";
 import { DEFAULT_FEED_SETTINGS, type FeedCategory, type FeedSettings } from "@scripta/shared/community";
 import { Button, Dialog, Toast, ToggleSwitch, minimumTouchTarget, spacing, typography, useTheme } from "../../ui";
-import { useLibrary } from "../library/hooks/useLibrary";
-import { ReaderGlyph } from "./ReaderGlyph";
 import { updateFeedSettings } from "./api";
 
 const FEED_SETTING_ROWS: Array<{ key: FeedCategory; label: string; caption: string }> = [
@@ -30,15 +27,9 @@ function SettingRow({ label, caption, value, onValueChange }: { label: string; c
 
 export function FeedSettingsDialog({ visible, settings, onClose }: { visible: boolean; settings: FeedSettings; onClose: () => void }) {
   const { colors } = useTheme();
-  const { data: library } = useLibrary();
   const [local, setLocal] = useState<FeedSettings>(DEFAULT_FEED_SETTINGS);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const preview = useMemo(
-    () => ownGlyphPreview(readerIdentity(library?.data.books ?? [], library?.data.groups ?? [])),
-    [library],
-  );
 
   useEffect(() => {
     if (visible) {
@@ -73,16 +64,6 @@ export function FeedSettingsDialog({ visible, settings, onClose }: { visible: bo
             onValueChange={() => setLocal((current) => ({ ...current, [key]: !current[key] }))}
           />
         ))}
-        <SettingRow
-          label="Reader glyph"
-          caption="Shown next to your name"
-          value={local.readerGlyph ?? false}
-          onValueChange={() => setLocal((current) => ({ ...current, readerGlyph: !(current.readerGlyph ?? false) }))}
-        />
-        <View accessible accessibilityLabel={preview.line} style={styles.previewRow}>
-          <ReaderGlyph identity={preview.glyph ?? undefined} />
-          <Text style={[typography.caption, styles.previewLine, { color: colors.textDim }]}>{preview.line}</Text>
-        </View>
         {error ? <Toast visible message={error} tone="error" /> : null}
         <Button label="Save" loading={busy} onPress={() => void save()} />
       </View>
@@ -94,6 +75,4 @@ const styles = StyleSheet.create({
   gap: { gap: spacing.md },
   row: { flexDirection: "row", alignItems: "center", gap: spacing.md, minHeight: minimumTouchTarget },
   grow: { flex: 1 },
-  previewRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  previewLine: { flexShrink: 1 },
 });
