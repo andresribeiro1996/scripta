@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
 import { DEFAULT_READER_CARD_STYLE, bookKey, readerCardInputOf } from "@scripta/shared";
-import { HighlightChoice, SignatureChoice } from "../src/components/readerCard/ReaderCardChoices";
+import { HighlightChoice, SignatureChoice, noteToSend } from "../src/components/readerCard/ReaderCardChoices";
 import { ReaderCardOptions } from "../src/components/readerCard/ReaderCardOptions";
 import { ReaderGlyphSetting } from "../src/components/readerCard/ReaderGlyphSetting";
 import { ToastProvider } from "../src/components/Toaster";
@@ -75,4 +75,16 @@ test("the glyph switch is gone from the shelf's profile sheet", () => {
 test("the editor has its route and a way in from Settings", () => {
   assert.match(readFileSync("src/App.tsx", "utf8"), /path="\/dashboard\/reader-card" element={<ReaderCardPage \/>}/);
   assert.match(readFileSync("src/pages/SettingsPage.tsx", "utf8"), /to="\/dashboard\/reader-card"/);
+});
+
+test("a note is sent trimmed, cleared as null, and never twice in a row", () => {
+  assert.equal(noteToSend("  lent twice ", null), "lent twice");
+  assert.equal(noteToSend("   ", "lent twice"), null);
+  assert.equal(noteToSend("lent twice", "lent twice"), undefined);
+  assert.equal(noteToSend("", null), undefined);
+});
+
+test("the toggle only animates when motion is allowed", () => {
+  const source = readFileSync("src/components/ToggleSwitch.tsx", "utf8");
+  assert.doesNotMatch(source, /(?<!motion-safe:)transition-/);
 });

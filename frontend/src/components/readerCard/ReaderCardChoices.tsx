@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SIGNATURE_NOTE_MAX, bookKey, bookPassages, isFinishedBook, searchPassages, type ChosenHighlight, type ChosenSignature, type Passage, type ReaderCardChosen, type ReaderCardStylePatch } from "@scripta/shared";
 import { BookSearchList } from "../murals/pickers";
 
@@ -9,16 +9,35 @@ const NOTE_DELAY_MS = 600;
 const LINK = "text-xs font-semibold text-(--color-accent)";
 const DIM = "text-sm text-(--color-text-dim)";
 
+export function noteToSend(value: string, lastSent: string | null): string | null | undefined {
+  const note = value.trim() || null;
+  return note === lastSent ? undefined : note;
+}
+
 function NoteField({ signature, onChange }: { signature: ChosenSignature; onChange: SaveStyle }) {
   const [draft, setDraft] = useState(signature.note ?? "");
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  useEffect(() => () => clearTimeout(timer.current), []);
-  const save = (value: string) => {
+  const sent = useRef(signature.note);
+  const pending = useRef<string | null>(null);
+  const latest = useRef({ signature, onChange });
+  useEffect(() => { latest.current = { signature, onChange }; });
+  const save = useCallback((value: string) => {
     clearTimeout(timer.current);
-    const note = value.trim() || null;
-    if (note === signature.note) return;
-    void onChange({ signature: { bookKey: signature.bookKey, note } }).then((saved) => { if (!saved) setDraft(signature.note ?? ""); });
-  };
+    pending.current = null;
+    const note = noteToSend(value, sent.current);
+    if (note === undefined) return;
+    const previous = sent.current;
+    sent.current = note;
+    void latest.current.onChange({ signature: { bookKey: latest.current.signature.bookKey, note } }).then((saved) => {
+      if (saved) return;
+      sent.current = previous;
+      setDraft((current) => (current === value ? (previous ?? "") : current));
+    });
+  }, []);
+  useEffect(() => () => {
+    clearTimeout(timer.current);
+    if (pending.current !== null) save(pending.current);
+  }, [save]);
   return (
     <label className="mt-3 block text-xs text-(--color-text-dim)">
       Note
@@ -29,6 +48,7 @@ function NoteField({ signature, onChange }: { signature: ChosenSignature; onChan
           const value = event.target.value;
           setDraft(value);
           clearTimeout(timer.current);
+          pending.current = value;
           timer.current = setTimeout(() => save(value), NOTE_DELAY_MS);
         }}
         onBlur={() => save(draft)}
