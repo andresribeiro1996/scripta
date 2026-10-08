@@ -81,3 +81,7 @@ test("the toggle only animates when motion is allowed", () => {
   const source = readFileSync("src/components/ToggleSwitch.tsx", "utf8");
   assert.doesNotMatch(source, /(?<!motion-safe:)transition-/);
 });
+
+test("the editor's turner sits in a full-width wrapper so its widths resolve", () => {
+  assert.match(readFileSync("src/pages/ReaderCardPage.tsx", "utf8"), /<div className="w-full">\s*<ReaderCardTurner /);
+});

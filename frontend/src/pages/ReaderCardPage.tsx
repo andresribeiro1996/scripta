@@ -54,7 +54,9 @@ export function ReaderCardPage() {
           <div className="w-full max-w-[18rem]">
             <Segmented label="Preview as" options={AUDIENCES} labels={AUDIENCE_LABELS} value={audience} onChange={setAudience} />
           </div>
-          <ReaderCardTurner key={`${preview.view}-${preview.style.layout}-${hasChosen(preview.card.chosen)}`} input={preview} cardWidth="w-[min(100%,18rem)]" spreadWidth="w-full" />
+          <div className="w-full">
+            <ReaderCardTurner key={`${preview.view}-${preview.style.layout}-${hasChosen(preview.card.chosen)}`} input={preview} cardWidth="w-[min(100%,18rem)]" spreadWidth="w-full" />
+          </div>
           {input.card.state === "unwritten" && input.missing ? <p className="text-sm text-(--color-text-dim)">{input.missing}</p> : null}
         </div>
         <div className="space-y-6">
