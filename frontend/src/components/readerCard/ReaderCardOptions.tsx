@@ -59,8 +59,12 @@ export function ReaderCardOptions({ input, onChange }: { input: ReaderCardBase; 
   const mottoThumbs = useMemo(() => new Map(MOTTO_LOOKS.map((option) => [option, styleThumbnail(deferred, { motto: { text: deferred.style.motto?.text ?? SAMPLE_MOTTO, look: option } }, "motto")])), [deferred]);
   const cornerThumbs = useMemo(() => new Map(CORNER_STYLES.map((option) => [option, styleThumbnail(deferred, { corners: option }, "corner")])), [deferred]);
   const saveMotto = (text: string | null) => {
+    const previous = lastText.current;
     lastText.current = text;
-    return onChange({ motto: text ? { text, look } : null });
+    return onChange({ motto: text ? { text, look } : null }).then((saved) => {
+      if (!saved && lastText.current === text) lastText.current = previous;
+      return saved;
+    });
   };
   const pickLook = (next: MottoLook) => {
     const previous = look;
