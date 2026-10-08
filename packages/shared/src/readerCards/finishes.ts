@@ -46,7 +46,17 @@ function blob(next: () => number, cx: number, cy: number, rx: number, ry: number
 
 const plain: Builder = (p) => ({ palette: [p.ground, p.line], slots: {} });
 
-const BUILDERS: Partial<Record<Finish, Builder>> = {
+const HOLO = ["#7f6bd6", "#4fb3c9", "#83d18a", "#e7c766", "#e07fb0"];
+const GOLD: Array<[number, string]> = [[0, "#7d5e1c"], [0.35, "#e7cd78"], [0.5, "#f6e7b0"], [0.65, "#e7cd78"], [1, "#8f6d22"]];
+const RISO_RED = "#e4572e";
+
+function gradient(id: string, stops: Array<[number, string]>, [x1, y1, x2, y2] = [0, 0, 250, 350]): string {
+  return `<linearGradient id="${id}" gradientUnits="userSpaceOnUse" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}">${stops.map(([offset, colour]) => `<stop offset="${offset}" stop-color="${colour}"/>`).join("")}</linearGradient>`;
+}
+
+const copyOf = (body: string) => body.replace(/<defs>[\s\S]*?<\/defs>/g, "");
+
+const BUILDERS: Record<Finish, Builder> = {
   paper: plain,
   aged: (p) => {
     const next = random(seedOf(`${p.seed}:aged`));
@@ -76,6 +86,60 @@ const BUILDERS: Partial<Record<Finish, Builder>> = {
   kraft: (p) => {
     const fibres = textured("kraft", p.id, p.paper ? "#5b4024" : "#000000", p.paper ? 0.3 : 0.35);
     return { palette: p.paper ? ["#caa97c", mix(p.plate, "#000000", 0.35)] : ["#3a2a1a", "#e9d6b4"], slots: { underlay: `<defs>${fibres.defs}</defs>${fibres.layer}` } };
+  },
+  letterpress: (p) => {
+    const fibres = textured("fibre", p.id, p.paper ? p.line : "#ffffff", p.paper ? 0.1 : 0.06);
+    const edge = p.paper ? "#ffffff" : "#000000";
+    return {
+      palette: [p.paper ? "#f5f0e6" : p.ground, p.line],
+      slots: { underlay: `<defs>${fibres.defs}</defs>${fibres.layer}` },
+      wrapInk: (body) => `<g transform="translate(.6 .7)" opacity="${p.paper ? 0.8 : 0.45}">${withStyle(copyOf(body), [p.ground, edge])}</g>\n${body}`,
+    };
+  },
+  foil: (p) => {
+    const id = p.id("foilInk");
+    const stops: Array<[number, string]> = p.paper
+      ? [[0, p.deep], [0.3, mix(p.plate, "#ffffff", 0.55)], [0.5, p.plate], [0.7, mix(p.plate, "#ffffff", 0.4)], [1, p.deep]]
+      : [[0, "#a59d8c"], [0.3, "#f6f1e4"], [0.5, "#cfc7b4"], [0.7, "#ffffff"], [1, "#a59d8c"]];
+    return { palette: [p.ground, `url(#${id})`], slots: { underlay: `<defs>${gradient(id, stops)}</defs>` } };
+  },
+  holo: (p) => {
+    const ink = p.id("holoInk"), sheen = p.id("holoSheen");
+    const inkStops = HOLO.map((colour, i): [number, string] => [i / (HOLO.length - 1), mix(colour, p.line, 0.45)]);
+    const sheenStops = HOLO.map((colour, i): [number, string] => [i / (HOLO.length - 1), colour]);
+    return {
+      palette: [p.ground, `url(#${ink})`],
+      slots: { underlay: `<defs>${gradient(ink, inkStops)}${gradient(sheen, sheenStops, [250, 0, 0, 350])}</defs>`, overlay: `<rect ${SHEET} fill="url(#${sheen})" opacity="${p.paper ? 0.14 : 0.1}"/>` },
+    };
+  },
+  gilt: (p) => {
+    const id = p.id("goldInk"), gold = `url(#${id})`;
+    return {
+      palette: [p.ground, p.line],
+      slots: {
+        underlay: `<defs>${gradient(id, GOLD)}</defs>`,
+        frame: withStyle(FRAME_MARKUP, [p.ground, gold]),
+        corners: withStyle(p.corners, [p.ground, gold]),
+        overlay: `<rect x=".75" y=".75" width="248.5" height="348.5" rx="3.4" fill="none" stroke="${gold}" stroke-width="1.5"/>`,
+      },
+    };
+  },
+  stamp: (p) => {
+    const tile = p.id("speckleTile"), mask = p.id("stampMask");
+    return {
+      palette: [p.ground, p.line],
+      slots: { underlay: `<defs><pattern id="${tile}" patternUnits="userSpaceOnUse" width="${TILE}" height="${TILE}"><image href="${TEXTURES.speckle}" width="${TILE}" height="${TILE}" preserveAspectRatio="none"/></pattern><mask id="${mask}" maskUnits="userSpaceOnUse" x="-10" y="-10" width="270" height="370"><rect x="-10" y="-10" width="270" height="370" fill="url(#${tile})"/></mask></defs>` },
+      wrapInk: (body) => `<g mask="url(#${mask})" transform="rotate(-1.2 125 175)" opacity=".94">\n${body}\n</g>`,
+    };
+  },
+  riso: (p) => {
+    const second = p.streak ? INKS[p.streak][1] : RISO_RED;
+    const grain = textured("grain", p.id, p.line, p.paper ? 0.1 : 0.06);
+    return {
+      palette: [p.ground, p.line],
+      slots: { overlay: `<defs>${grain.defs}</defs>${grain.layer}` },
+      wrapInk: (body) => `<g transform="translate(1.4 .9)" opacity=".6">${withStyle(copyOf(body), [p.ground, p.paper ? second : mix(second, "#ffffff", 0.35)])}</g>\n<g opacity=".9">\n${body}\n</g>`,
+    };
   },
 };
 
