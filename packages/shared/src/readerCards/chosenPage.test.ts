@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { PublicReaderCard } from "../library/readerIdentity.js";
+import { cover } from "./pages.js";
 import { renderReaderCard, type ReaderCardInput } from "./render.js";
 import { seedOf } from "./seed.js";
 import type { ReaderCardChosen } from "./style.js";
@@ -59,4 +60,10 @@ test("with nothing chosen the owner sees an invitation and a visitor sees an emp
 
 test("an annotation smuggled into the highlight is never drawn", () => {
   assert.doesNotMatch(page({ highlight: { ...highlight, annotation: "SECRET-NOTE" } as never }), /SECRET-NOTE/);
+});
+
+test("an https cover sits on a solid board so a dead URL leaves no empty frame", () => {
+  const svg = cover(signature, 10, 20, 52, 77);
+  assert.ok(svg.startsWith(`<rect class="pf"`));
+  assert.ok(svg.indexOf(`<rect class="pf"`) < svg.indexOf("<image"));
 });

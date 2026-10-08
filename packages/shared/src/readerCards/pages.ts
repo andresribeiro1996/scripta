@@ -125,7 +125,7 @@ type Highlight = NonNullable<ReaderCardChosen["highlight"]>;
 export function cover(signature: Signature, x: number, y: number, w: number, h: number): string {
   const frame = `<rect class="pl" x="${x}" y="${y}" width="${w}" height="${h}" rx="1.2" stroke-width=".4"/>`;
   if (signature.coverUrl && COVER_URL.test(signature.coverUrl)) {
-    return `<image href="${signature.coverUrl}" x="${x}" y="${y}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid meet"/>${frame}`;
+    return `<rect class="pf" x="${x}" y="${y}" width="${w}" height="${h}" rx="1.2"/><image href="${signature.coverUrl}" x="${x}" y="${y}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid meet"/>${frame}`;
   }
   const s = w / 52;
   const title = wrapLines(signature.title.toUpperCase(), { font: "caps", size: 4.6 * s, width: w - 8, lines: 4 });
