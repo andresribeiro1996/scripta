@@ -43,7 +43,7 @@ export function PerCardStyleFields({ draft, canvasColor, onApply, onSaveNow }: {
       <Section title="Looks">
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.wrap}>
           {FRAME_LOOKS.map((look) => (
-            <Tile key={look.key} label={look.label} selected={FRAME_LOOK_FIELDS.every((key) => key === "cardBorderSides" ? matchSides(draft[key]) === matchSides(look.style[key]) : draft[key] === look.style[key])} onPress={() => onSaveNow(look.style)}>
+            <Tile key={look.key} label={look.label} width={88} selected={FRAME_LOOK_FIELDS.every((key) => key === "cardBorderSides" ? matchSides(draft[key]) === matchSides(look.style[key]) : draft[key] === look.style[key])} onPress={() => onSaveNow(look.style)}>
               <View style={[styles.look, { backgroundColor: colors.border, borderRadius: Math.min(look.style.cardRadius, radii.lg), borderColor: draft.cardBorderColor ?? colors.text, borderTopWidth: look.style.cardBorderSides.top ? look.style.cardBorderWidth : 0, borderRightWidth: look.style.cardBorderSides.right ? look.style.cardBorderWidth : 0, borderBottomWidth: look.style.cardBorderSides.bottom ? look.style.cardBorderWidth : 0, borderLeftWidth: look.style.cardBorderSides.left ? look.style.cardBorderWidth : 0, boxShadow: look.style.cardShadow ? "0 2px 4px rgba(0,0,0,0.2)" : undefined }]}>
                 <Text style={{ color: colors.text, fontFamily: cardFontFamily(draft.cardFontFamily), fontSize: 12 }}>Aa</Text>
               </View>

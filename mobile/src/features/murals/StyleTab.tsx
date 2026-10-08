@@ -74,7 +74,7 @@ function LookCard({ look, style, palette, onPress }: { look: Look; style: BlockS
       <View style={[styles.look, { backgroundColor: background, borderColor: preview.cardBorderWidth ? border : palette.border, borderWidth: Math.max(1, preview.cardBorderWidth), borderStyle: preview.cardBorderWidth ? "solid" : "dashed", borderRadius: Math.min(preview.cardRadius, radii.lg) }]}>
         <Text style={{ color: text, fontFamily: blockFontFamily(preview.fontFamily), fontWeight: preview.bold ? "700" : "400", fontSize: 16 }}>Aa</Text>
       </View>
-      <Text style={[typography.caption, { color: colors.textDim }]}>{look.label}</Text>
+      <Text style={[typography.caption, { color: colors.textDim, alignSelf: "stretch", textAlign: "center" }]}>{look.label}</Text>
     </Pressable>
   );
 }
@@ -224,7 +224,7 @@ const styles = StyleSheet.create({
   swatch: { width: minimumTouchTarget, height: minimumTouchTarget, borderRadius: radii.full },
   custom: { alignItems: "center", justifyContent: "center" },
   looks: { gap: spacing.sm },
-  lookWrap: { alignItems: "center", gap: spacing.xs },
+  lookWrap: { width: 88, alignItems: "center", gap: spacing.xs },
   look: { width: 64, height: 44, alignItems: "center", justifyContent: "center" },
   footer: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
 });
