@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useDeferredValue, useMemo, useRef, useState } from "react";
 import { CARD_PRINTS, CORNER_LABELS, CORNER_STYLES, COUNTERS, COUNTER_LABELS, FOOTER_LEFTS, FOOTER_LEFT_LABELS, FOOTER_RIGHTS, FOOTER_RIGHT_LABELS, LAYOUTS, LAYOUT_LABELS, MOTTO_LOOKS, MOTTO_LOOK_LABELS, MOTTO_MAX, PRINT_LABELS, TRAITS, TRAIT_LABELS, counterThumbnail, styleThumbnail, type MottoLook, type ReaderCardBase } from "@scripta/shared";
 import { DraftField } from "./DraftField";
 import { ReaderCardImage } from "./ReaderCardImage";
@@ -53,12 +53,22 @@ function Chips<T extends string>({ label, options, labels, value, onPick }: { la
 export function ReaderCardOptions({ input, onChange }: { input: ReaderCardBase; onChange: SaveStyle }) {
   const { counter, trait, layout, motto, footer, corners, print } = input.style;
   const [look, setLook] = useState<MottoLook>(motto?.look ?? "ribbon");
-  const counterThumbs = useMemo(() => COUNTERS.map((option) => ({ option, input: counterThumbnail(input, option) })), [input]);
-  const mottoThumbs = useMemo(() => new Map(MOTTO_LOOKS.map((option) => [option, styleThumbnail(input, { motto: { text: motto?.text ?? SAMPLE_MOTTO, look: option } }, "motto")])), [input, motto?.text]);
-  const cornerThumbs = useMemo(() => new Map(CORNER_STYLES.map((option) => [option, styleThumbnail(input, { corners: option }, "corner")])), [input]);
+  const lastText = useRef(motto?.text ?? null);
+  const deferred = useDeferredValue(input);
+  const counterThumbs = useMemo(() => COUNTERS.map((option) => ({ option, input: counterThumbnail(deferred, option) })), [deferred]);
+  const mottoThumbs = useMemo(() => new Map(MOTTO_LOOKS.map((option) => [option, styleThumbnail(deferred, { motto: { text: deferred.style.motto?.text ?? SAMPLE_MOTTO, look: option } }, "motto")])), [deferred]);
+  const cornerThumbs = useMemo(() => new Map(CORNER_STYLES.map((option) => [option, styleThumbnail(deferred, { corners: option }, "corner")])), [deferred]);
+  const saveMotto = (text: string | null) => {
+    lastText.current = text;
+    return onChange({ motto: text ? { text, look } : null });
+  };
   const pickLook = (next: MottoLook) => {
+    const previous = look;
     setLook(next);
-    if (motto) void onChange({ motto: { text: motto.text, look: next } });
+    if (!lastText.current) return;
+    void onChange({ motto: { text: lastText.current, look: next } }).then((saved) => {
+      if (!saved) setLook(previous);
+    });
   };
   return (
     <>
@@ -79,7 +89,7 @@ export function ReaderCardOptions({ input, onChange }: { input: ReaderCardBase; 
       </section>
       <section>
         <h3 className="mb-2 text-sm font-semibold">Motto</h3>
-        <DraftField label="Your motto" initial={motto?.text ?? null} max={MOTTO_MAX} onSave={(text) => onChange({ motto: text ? { text, look } : null })} />
+        <DraftField label="Your motto" initial={motto?.text ?? null} max={MOTTO_MAX} onSave={saveMotto} />
         <div className="mt-3">
           <Thumbnails label="Motto look" options={MOTTO_LOOKS} labels={MOTTO_LOOK_LABELS} value={motto?.look ?? look} thumbnail={(option) => mottoThumbs.get(option)!} onPick={pickLook} columns="grid-cols-3 sm:grid-cols-4" />
         </div>

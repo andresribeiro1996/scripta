@@ -122,3 +122,12 @@ test("the editor is gated on the cached style, not on the latest fetch failing",
   assert.doesNotMatch(source, /isError/);
   assert.match(source, /if \(!style\) \{\s*if \(isPending\) return/);
 });
+
+test("thumbnails render from a deferred input, and a picked look pairs with the last typed motto", () => {
+  const source = readFileSync("src/components/readerCard/ReaderCardOptions.tsx", "utf8");
+  assert.match(source, /const deferred = useDeferredValue\(input\)/);
+  assert.doesNotMatch(source, /(?:counterThumbnail|styleThumbnail)\(input,/);
+  const pick = source.slice(source.indexOf("const pickLook"), source.indexOf("return (", source.indexOf("const pickLook")));
+  assert.match(pick, /lastText\.current/);
+  assert.doesNotMatch(pick, /motto[.?]/);
+});
