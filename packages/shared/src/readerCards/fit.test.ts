@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { fitLine, textWidth, wrapLines } from "./fit.js";
+import { fitLine, fitSize, textWidth, wrapLines } from "./fit.js";
 
 const body = { font: "serif", size: 11, width: 190 } as const;
 
@@ -43,4 +43,13 @@ test("one overlong word is cut, and blank text gives no lines", () => {
   assert.equal(lines.length, 1);
   assert.ok(lines[0]!.endsWith("…"));
   assert.deepEqual(wrapLines("   ", { ...body, lines: 2 }), []);
+});
+
+test("fitSize keeps a size that fits and shrinks one that does not, never below the minimum", () => {
+  assert.equal(fitSize("Per libros", { font: "serif", size: 8, width: 100, min: 5 }), 8);
+  const shrunk = fitSize("W".repeat(28), { font: "serif", size: 8, width: 100, spacing: 0.6, min: 5 });
+  assert.ok(shrunk < 8 && shrunk >= 5, String(shrunk));
+  assert.ok(textWidth("W".repeat(28), { font: "serif", size: shrunk, spacing: 0.6 }) <= 100);
+  assert.equal(fitLine("W".repeat(28), { font: "serif", size: shrunk, width: 100, spacing: 0.6 }), "W".repeat(28));
+  assert.equal(fitSize("W".repeat(200), { font: "serif", size: 8, width: 100, min: 5 }), 5);
 });

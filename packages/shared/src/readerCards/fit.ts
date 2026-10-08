@@ -8,6 +8,13 @@ export function textWidth(text: string, { font, size, spacing = 0 }: Omit<FitOpt
   return count * EM[font] * size + Math.max(0, count - 1) * spacing;
 }
 
+export function fitSize(text: string, { font, size, width, spacing = 0, min }: FitOptions & { min: number }): number {
+  if (textWidth(text, { font, size, spacing }) <= width) return size;
+  const count = [...text].length;
+  const room = width - Math.max(0, count - 1) * spacing;
+  return Math.max(min, Math.floor((room / (count * EM[font])) * 100) / 100);
+}
+
 export function fitLine(text: string, options: FitOptions): string {
   const chars = [...text];
   const spacing = options.spacing ?? 0;
