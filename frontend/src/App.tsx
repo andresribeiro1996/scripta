@@ -28,6 +28,7 @@ import { PlayQuizPage } from "./pages/PlayQuizPage";
 import { PrivacyPage } from "./pages/PrivacyPage";
 import { OAuthSuccessPage } from "./pages/OAuthSuccessPage";
 import { PeoplePage } from "./pages/PeoplePage";
+import { ReaderCardPage } from "./pages/ReaderCardPage";
 import { SeriesPage } from "./pages/SeriesPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { SharedLibraryPage } from "./pages/SharedLibraryPage";
@@ -91,6 +92,7 @@ export function App() {
               <Route path="/dashboard/arena/:id/seed" element={<ArenaSeedPage />} />
               <Route path="/dashboard/style" element={<LibraryStylePage />} />
               <Route path="/dashboard/settings" element={<SettingsPage />} />
+              <Route path="/dashboard/reader-card" element={<ReaderCardPage />} />
               <Route path="/community" element={<Navigate to="/dashboard" replace />} />
               <Route path="/community/discover" element={<DiscoverPage />} />
               <Route path="/community/people" element={<PeoplePage />} />

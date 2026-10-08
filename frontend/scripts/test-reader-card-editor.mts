@@ -71,3 +71,8 @@ test("the glyph switch reads the profile and says it waits for a published shelf
 test("the glyph switch is gone from the shelf's profile sheet", () => {
   assert.doesNotMatch(readFileSync("src/components/OwnShelfView.tsx", "utf8"), /readerGlyph/);
 });
+
+test("the editor has its route and a way in from Settings", () => {
+  assert.match(readFileSync("src/App.tsx", "utf8"), /path="\/dashboard\/reader-card" element={<ReaderCardPage \/>}/);
+  assert.match(readFileSync("src/pages/SettingsPage.tsx", "utf8"), /to="\/dashboard\/reader-card"/);
+});
