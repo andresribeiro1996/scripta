@@ -23,6 +23,7 @@ export function ReaderCardViewer({ input, onClose }: { input: ReaderCardBase; on
   const summary = useMemo(() => readerCardSummary(input), [input]);
   const focusRef = useRef<HTMLElement | null>(null);
   const scroller = useRef<HTMLDivElement | null>(null);
+  const settle = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
     const previous = document.activeElement;
@@ -39,6 +40,15 @@ export function ReaderCardViewer({ input, onClose }: { input: ReaderCardBase; on
     if (Math.abs(element.scrollLeft - left) > 1) element.scrollTo({ left, behavior: reducedMotion() ? "auto" : "smooth" });
   }, [turn.index]);
 
+  useEffect(() => () => clearTimeout(settle.current), []);
+
+  const syncIndex = (element: HTMLElement) => {
+    clearTimeout(settle.current);
+    settle.current = setTimeout(() => {
+      const index = Math.round(element.scrollLeft / element.clientWidth);
+      setTurn((state) => (state.index === index ? state : { ...state, index }));
+    }, 100);
+  };
   const go = (by: 1 | -1) => setTurn((state) => turnBy(state, by, count));
   const goTo = (to: number) => setTurn((state) => turnTo(state, to, to > state.index ? 1 : -1));
   const setFocus = (element: HTMLElement | null) => { focusRef.current = element; };
@@ -63,7 +73,7 @@ export function ReaderCardViewer({ input, onClose }: { input: ReaderCardBase; on
         aria-label="Reader card pages"
         tabIndex={0}
         onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); go(1); } }}
-        onScroll={(event) => { const element = event.currentTarget; const index = Math.round(element.scrollLeft / element.clientWidth); setTurn((state) => (state.index === index ? state : { ...state, index })); }}
+        onScroll={(event) => syncIndex(event.currentTarget)}
         className={`flex ${CARD_WIDTH} snap-x snap-mandatory overflow-x-auto [scrollbar-width:none]`}
       >
         {pages.map((page, i) => <div key={i} aria-hidden="true" className="w-full shrink-0 snap-center"><ReaderCardImage input={input} page={page} className="w-full" /></div>)}
@@ -104,7 +114,7 @@ export function ReaderCardViewer({ input, onClose }: { input: ReaderCardBase; on
         <div className="flex" role="group" aria-label="Pages">
           {Array.from({ length: count }, (_, i) => (
             <button key={i} type="button" aria-label={`Page ${i + 1}`} aria-current={i === turn.index ? "true" : undefined} onClick={() => goTo(i)} className="flex h-11 w-11 items-center justify-center">
-              <span className={`block h-2 w-2 rounded-full ${i === turn.index ? "bg-(--color-surface)" : "bg-(--color-surface)/40"}`} />
+              <span className={`block h-2 w-2 rounded-full ${i === turn.index ? "bg-white" : "bg-white/40"}`} />
             </button>
           ))}
         </div>

@@ -42,3 +42,11 @@ test("a book on a narrow screen is a pager of every page", () => {
   assert.match(html, />Page 1 of 3</);
   assert.match(html, /snap-x/);
 });
+
+test("the page dots are white on the scrim, whatever the theme's surface is", () => {
+  const html = viewer(visitor("faces"));
+  const dots = html.slice(html.indexOf('aria-label="Pages"'));
+  assert.match(dots, /rounded-full bg-white"/);
+  assert.match(dots, /rounded-full bg-white\/40"/);
+  assert.doesNotMatch(dots, /bg-\(--color-surface\)/);
+});
