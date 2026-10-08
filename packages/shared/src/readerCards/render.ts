@@ -5,7 +5,7 @@ import { cornersSlot } from "./corners.js";
 import { drawCounter, SEAL_ANGLE } from "./counters.js";
 import { footerSlots, GENRE_LEADS, truncateName } from "./footer.js";
 import { mottoSlots } from "./mottos.js";
-import { INKS, PAPER, PLATES, REVERSED_LINE, emblems, glyph, glyphBody, type IdentityKey } from "./plates.js";
+import { INKS, PAPER, PLATES, REVERSED_LINE, emblem, glyph, glyphBody, type IdentityKey } from "./plates.js";
 import { chosenBody, mergedBody, recordBody, type ReaderCardPage, type ReaderCardView } from "./pages.js";
 import type { PublicReaderCardStyle } from "./style.js";
 import { escape } from "./svgText.js";
@@ -57,10 +57,10 @@ function faceOf({ identity, state, readerName, label, unwrittenLine, width = 250
   const reader = escape(truncateName(readerName).toUpperCase());
   const safeLabel = escape(label);
   if (state === "unwritten" || !identity) {
-    return { ink: "graph", face: { key: "none", emblemSvg: emblems.none(), name: "Unwritten", eyebrow: "NOT YET", epithet: escape(unwrittenLine ?? "five finished books to begin"), numeral: "—", reader, width, label: safeLabel, ...(crop ? { viewBox: CARD_CROPS[crop] } : {}) } };
+    return { ink: "graph", face: { key: "none", emblemSvg: emblem("none"), name: "Unwritten", eyebrow: "NOT YET", epithet: escape(unwrittenLine ?? "five finished books to begin"), numeral: "—", reader, width, label: safeLabel, ...(crop ? { viewBox: CARD_CROPS[crop] } : {}) } };
   }
   const p = PLATES.find((item) => item.key === identity)!;
-  return { ink: identity, face: { key: identity, emblemSvg: emblems[identity](), name: p.name, eyebrow: state === "leaning" ? "LEANING TOWARD" : "THE", epithet: p.epithet, numeral: p.numeral, reader, width, label: safeLabel, ...(crop ? { viewBox: CARD_CROPS[crop] } : {}) } };
+  return { ink: identity, face: { key: identity, emblemSvg: emblem(identity), name: p.name, eyebrow: state === "leaning" ? "LEANING TOWARD" : "THE", epithet: p.epithet, numeral: p.numeral, reader, width, label: safeLabel, ...(crop ? { viewBox: CARD_CROPS[crop] } : {}) } };
 }
 
 export function renderPlate(options: RenderPlateOptions): string {

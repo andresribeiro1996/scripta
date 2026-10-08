@@ -216,7 +216,7 @@ const ellipse = (cx: number, cy: number, rx: number, ry: number) => `M${cx - rx}
 const circle = (cx: number, cy: number, r: number) => ellipse(cx, cy, r, r);
 const fourPointStar = (x: number, y: number, r = 4) => `M${x} ${y - r}L${x + r / 4} ${y - r / 4}L${x + r} ${y}L${x + r / 4} ${y + r / 4}L${x} ${y + r}L${x - r / 4} ${y + r / 4}L${x - r} ${y}L${x - r / 4} ${y - r / 4}Z`;
 
-export const emblems: Record<IdentityKey | "none", () => string> = {
+const drawEmblem: Record<IdentityKey | "none", () => string> = {
   carto: () => {
     const graticule = [ellipse(125, 134, 55, 20), ellipse(125, 134, 55, 40), ellipse(125, 134, 20, 55), ellipse(125, 134, 40, 55), "M70 134H180M125 79V189"].map((d) => ink(d, 0.5));
     const s = 21.2;
@@ -363,6 +363,17 @@ export const emblems: Record<IdentityKey | "none", () => string> = {
   none: () => `<circle class="pl" cx="125" cy="134" r="38" stroke-width=".8" stroke-dasharray="2 4"/><text class="pt" x="125" y="137.5" text-anchor="middle" font-size="9" letter-spacing="2.4" font-family="${SANS}">NOT YET</text>`,
 };
 
+const drawn = new Map<IdentityKey | "none", string>();
+
+export function emblem(key: IdentityKey | "none"): string {
+  let svg = drawn.get(key);
+  if (svg === undefined) {
+    svg = drawEmblem[key]();
+    drawn.set(key, svg);
+  }
+  return svg;
+}
+
 interface PlateOptions {
   key: IdentityKey | "none";
   emblem?: IdentityKey | "none";
@@ -375,8 +386,8 @@ interface PlateOptions {
   label?: string;
 }
 
-export function plate({ key, emblem = key, name, eyebrow = "THE", epithet, numeral, reader = "EXAMPLE READER", width = 250, label }: PlateOptions): string {
-  return composePlate({ key, emblemSvg: emblems[emblem](), name, eyebrow, epithet, numeral, reader, width, label: label ?? `${eyebrow.toLowerCase()} ${name} identity plate` });
+export function plate({ key, emblem: emblemKey = key, name, eyebrow = "THE", epithet, numeral, reader = "EXAMPLE READER", width = 250, label }: PlateOptions): string {
+  return composePlate({ key, emblemSvg: emblem(emblemKey), name, eyebrow, epithet, numeral, reader, width, label: label ?? `${eyebrow.toLowerCase()} ${name} identity plate` });
 }
 
 const glyphShapes: Record<IdentityKey, string> = {

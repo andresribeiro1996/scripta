@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { hasChosen, readerCardInputOf, saveFailureMessage, visitorView, type ReaderCardStylePatch } from "@scripta/shared";
+import { themes } from "@scripta/shared/themes";
 import { useAuth } from "../auth/AuthContext";
 import { HighlightChoice, SignatureChoice } from "../components/readerCard/ReaderCardChoices";
 import { ReaderCardOptions, Segmented } from "../components/readerCard/ReaderCardOptions";
@@ -9,6 +10,7 @@ import { useToast } from "../components/Toaster";
 import { useLibrary } from "../hooks/useLibrary";
 import { NO_GROUPS, useOwnCardStyle } from "../hooks/useReaderCard";
 import { useReaderCardStyle, useSaveReaderCardStyle } from "../hooks/useReaderCardStyle";
+import { useResolvedTheme } from "../lib/theme";
 
 const NO_BOOKS: Array<Record<string, unknown>> = [];
 const AUDIENCES = ["you", "visitors"] as const;
@@ -24,6 +26,7 @@ export function ReaderCardPage() {
   const own = useOwnCardStyle();
   const save = useSaveReaderCardStyle();
   const toast = useToast();
+  const scheme = themes[useResolvedTheme()].scheme;
   const [audience, setAudience] = useState<(typeof AUDIENCES)[number]>("you");
   const input = useMemo(() => readerCardInputOf(books, groups, readerName, undefined, own), [books, groups, readerName, own]);
   const preview = useMemo(() => (audience === "you" ? input : visitorView(input)), [audience, input]);
@@ -61,7 +64,7 @@ export function ReaderCardPage() {
           {input.card.state === "unwritten" && input.missing ? <p className="text-sm text-(--color-text-dim)">{input.missing}</p> : null}
         </div>
         <div className="space-y-6">
-          <ReaderCardOptions input={input} onChange={change} />
+          <ReaderCardOptions input={input} scheme={scheme} onChange={change} />
           <SignatureChoice books={books} signature={style.signature} chosen={input.card.chosen?.signature} onChange={change} />
           <HighlightChoice books={books} highlight={style.highlight} chosen={input.card.chosen?.highlight} onChange={change} />
           <ReaderGlyphSetting username={readerName} books={books} groups={groups} />

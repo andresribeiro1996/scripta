@@ -1,5 +1,6 @@
 import { useDeferredValue, useMemo, useRef, useState } from "react";
 import { CARD_PRINTS, CORNER_LABELS, CORNER_STYLES, COUNTERS, COUNTER_LABELS, FOOTER_LEFTS, FOOTER_LEFT_LABELS, FOOTER_RIGHTS, FOOTER_RIGHT_LABELS, LAYOUTS, LAYOUT_LABELS, MOTTO_LOOKS, MOTTO_LOOK_LABELS, MOTTO_MAX, PRINT_LABELS, TRAITS, TRAIT_LABELS, counterThumbnail, styleThumbnail, type MottoLook, type ReaderCardBase } from "@scripta/shared";
+import type { ThemeScheme } from "@scripta/shared/themes";
 import { DraftField } from "./DraftField";
 import { ReaderCardImage } from "./ReaderCardImage";
 import type { SaveStyle } from "./ReaderCardChoices";
@@ -50,14 +51,15 @@ function Chips<T extends string>({ label, options, labels, value, onPick }: { la
   );
 }
 
-export function ReaderCardOptions({ input, onChange }: { input: ReaderCardBase; onChange: SaveStyle }) {
+export function ReaderCardOptions({ input, scheme, onChange }: { input: ReaderCardBase; scheme: ThemeScheme; onChange: SaveStyle }) {
   const { counter, trait, layout, motto, footer, corners, print } = input.style;
   const [look, setLook] = useState<MottoLook>(motto?.look ?? "ribbon");
   const lastText = useRef(motto?.text ?? null);
   const deferred = useDeferredValue(input);
-  const counterThumbs = useMemo(() => COUNTERS.map((option) => ({ option, input: counterThumbnail(deferred, option) })), [deferred]);
-  const mottoThumbs = useMemo(() => new Map(MOTTO_LOOKS.map((option) => [option, styleThumbnail(deferred, { motto: { text: deferred.style.motto?.text ?? SAMPLE_MOTTO, look: option } }, "motto")])), [deferred]);
-  const cornerThumbs = useMemo(() => new Map(CORNER_STYLES.map((option) => [option, styleThumbnail(deferred, { corners: option }, "corner")])), [deferred]);
+  const base = useMemo(() => ({ ...deferred, style: { ...deferred.style, print: deferred.style.print === "auto" ? (scheme === "dark" ? "reversed" : "paper") : deferred.style.print } }), [deferred, scheme]);
+  const counterThumbs = useMemo(() => COUNTERS.map((option) => ({ option, input: counterThumbnail(base, option) })), [base]);
+  const mottoThumbs = useMemo(() => new Map(MOTTO_LOOKS.map((option) => [option, styleThumbnail(base, { motto: { text: base.style.motto?.text ?? SAMPLE_MOTTO, look: option } }, "motto")])), [base]);
+  const cornerThumbs = useMemo(() => new Map(CORNER_STYLES.map((option) => [option, styleThumbnail(base, { corners: option }, "corner")])), [base]);
   const saveMotto = (text: string | null) => {
     const previous = lastText.current;
     lastText.current = text;
