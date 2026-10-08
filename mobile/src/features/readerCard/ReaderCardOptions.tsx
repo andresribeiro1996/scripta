@@ -3,9 +3,12 @@ import { FlatList, StyleSheet } from "react-native";
 import { COUNTERS, COUNTER_LABELS, LAYOUTS, LAYOUT_LABELS, TRAITS, TRAIT_LABELS, counterThumbnail, type ReaderCardBase, type ReaderCardStylePatch } from "@scripta/shared";
 import { Segmented, spacing } from "../../ui";
 import { Section, Tile } from "../library/components/StyleControls";
-import { ReaderCardImage } from "../murals/ReaderCardImage";
+import { PLATE_RATIO, ReaderCardImage } from "../murals/ReaderCardImage";
 
 const THUMB_WIDTH = 72;
+const TILE_PADDING = 8;
+const TILE_WIDTH = THUMB_WIDTH + TILE_PADDING;
+const TILE_HEIGHT = THUMB_WIDTH * PLATE_RATIO + TILE_PADDING;
 const TRAIT_OPTIONS = TRAITS.map((value) => ({ value, label: TRAIT_LABELS[value] }));
 const LAYOUT_OPTIONS = LAYOUTS.map((value) => ({ value, label: LAYOUT_LABELS[value] }));
 
@@ -24,7 +27,7 @@ export function ReaderCardOptions({ input, onChange }: { input: ReaderCardBase; 
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.row}
           renderItem={({ item }) => (
-            <Tile label={COUNTER_LABELS[item.option]} selected={counter === item.option} onPress={() => onChange({ counter: item.option })}>
+            <Tile width={TILE_WIDTH} tileWidth={TILE_WIDTH} height={TILE_HEIGHT} label={COUNTER_LABELS[item.option]} selected={counter === item.option} onPress={() => onChange({ counter: item.option })}>
               <ReaderCardImage input={item.input} width={THUMB_WIDTH} />
             </Tile>
           )}
