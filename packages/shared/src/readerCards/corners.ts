@@ -33,11 +33,11 @@ const DRAW: Record<Exclude<CornerStyle, "diamonds" | "none">, Draw> = {
   volute: (sx, sy, cx, cy) => {
     const p = (u: number, v: number) => `${n(cx + u * sx)} ${n(cy + v * sy)}`;
     const sweep = sx * sy > 0 ? 0 : 1;
-    return `<path class="pl" d="M${p(28, 3)}Q${p(10, 3)} ${p(8, 8)}A4 4 0 1 ${sweep} ${p(13, 11)}A2 2 0 1 ${sweep} ${p(10, 8.5)}M${p(3, 28)}Q${p(3, 10)} ${p(8, 8)}" stroke-width=".9" stroke-linecap="round"/>`;
+    return `<path class="pl" d="M${p(28, 3)}Q${p(10, 3)} ${p(6, 6)}A2.4 2.4 0 1 ${sweep} ${p(9, 7.8)}A1.2 1.2 0 1 ${sweep} ${p(7.2, 6.3)}M${p(3, 28)}Q${p(3, 10)} ${p(6, 6)}" stroke-width=".9" stroke-linecap="round"/>`;
   },
   meander: (sx, sy, cx, cy) => {
     const p = (u: number, v: number) => `${cx + u * sx} ${cy + v * sy}`;
-    return `<path class="pl" d="M${p(2, 26)}V${cy + 2 * sy}H${cx + 26 * sx}M${p(6, 22)}V${cy + 6 * sy}H${cx + 22 * sx}V${cy + 14 * sy}H${cx + 14 * sx}V${cy + 10 * sy}H${cx + 18 * sx}" stroke-width=".8" stroke-linejoin="miter"/>`;
+    return `<path class="pl" d="M${p(2, 26)}V${cy + 2 * sy}H${cx + 26 * sx}M${p(6, 22)}V${cy + 6 * sy}H${cx + 22 * sx}V${cy + 9 * sy}H${cx + 17 * sx}" stroke-width=".8" stroke-linejoin="miter"/>`;
   },
   rosette: (_sx, _sy, cx, cy) => {
     let petals = "";
