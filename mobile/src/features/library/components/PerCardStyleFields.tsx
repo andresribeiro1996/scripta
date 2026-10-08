@@ -84,7 +84,7 @@ export function PerCardStyleFields({ draft, canvasColor, onApply, onSaveNow }: {
           <View style={styles.wrap}>
             {BORDER_SIDE_PRESETS.map(({ key, label, value }) => {
               const edge = (on: boolean) => on ? colors.text : colors.border;
-              return <Tile key={key} label={label} selected={matchSides(draft.cardBorderSides) === key} onPress={() => onSaveNow({ cardBorderSides: value })}><View style={[styles.sides, { borderTopColor: edge(value.top), borderRightColor: edge(value.right), borderBottomColor: edge(value.bottom), borderLeftColor: edge(value.left) }]} /></Tile>;
+              return <Tile key={key} label={label} width={88} selected={matchSides(draft.cardBorderSides) === key} onPress={() => onSaveNow({ cardBorderSides: value })}><View style={[styles.sides, { borderTopColor: edge(value.top), borderRightColor: edge(value.right), borderBottomColor: edge(value.bottom), borderLeftColor: edge(value.left) }]} /></Tile>;
             })}
           </View>
           <ColorSwatchRow label="Border color" value={draft.cardBorderColor} defaultColor={colors.border} onChange={(cardBorderColor) => onSaveNow({ cardBorderColor })} />
