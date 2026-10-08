@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AccessibilityInfo, Pressable, StyleSheet, View } from "react-native";
 import PagerView from "react-native-pager-view";
 import Animated, { Easing, ReduceMotion, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
-import { hasChosen, readerCardPages, readerCardSummary, startTurn, turnBy, turnTo, type ReaderCardBase } from "@scripta/shared";
+import { hasChosen, readerCardPages, readerCardSummary, startTurn, turnBy, turnTo, type ReaderCardBase, type ReaderCardPage, type TurnState } from "@scripta/shared";
 import { MOTION } from "@scripta/shared/themes";
 import { minimumTouchTarget, radii, spacing, useReducedMotion, useTheme } from "../../ui";
 import { PLATE_RATIO, ReaderCardImage } from "./ReaderCardImage";
@@ -11,12 +11,23 @@ const EASE = Easing.bezier(MOTION.ease[0], MOTION.ease[1], MOTION.ease[2], MOTIO
 const TURN_MS = 450;
 const DOT_ON_SCRIM = "#ffffff";
 
-export function ReaderCardTurner({ input, width, onScrim = false }: { input: ReaderCardBase; width: number; onScrim?: boolean }) {
+function turnToPage(state: TurnState, pages: ReaderCardPage[], page: ReaderCardPage): TurnState {
+  const index = [pages.indexOf(page), pages.indexOf("merged")].find((found) => found >= 0) ?? 1;
+  return turnTo(state, index, index > state.index ? 1 : -1);
+}
+
+export function ReaderCardTurner({ input, width, onScrim = false, page }: { input: ReaderCardBase; width: number; onScrim?: boolean; page?: { page: ReaderCardPage } }) {
   const { colors } = useTheme();
   const reduced = useReducedMotion();
-  const pages = useMemo(() => readerCardPages(input.style.layout, input.view ?? "visitor", hasChosen(input.card.chosen)).flat(), [input]);
+  const chosen = hasChosen(input.card.chosen);
+  const pages = useMemo(() => readerCardPages(input.style.layout, input.view ?? "visitor", chosen).flat(), [input.style.layout, input.view, chosen]);
   const summary = useMemo(() => readerCardSummary(input).join(" "), [input]);
-  const [turn, setTurn] = useState(() => startTurn(pages.length));
+  const [turn, setTurn] = useState(() => (page ? turnToPage(startTurn(pages.length), pages, page.page) : startTurn(pages.length)));
+  const [asked, setAsked] = useState(page);
+  if (page !== asked) {
+    setAsked(page);
+    if (page) setTurn((state) => turnToPage(state, pages, page.page));
+  }
   const rotation = useSharedValue(0);
   const pager = useRef<PagerView>(null);
   const announced = useRef(false);
