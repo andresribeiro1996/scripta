@@ -135,7 +135,7 @@ export function WorkScreen({ id }: { id: string }) {
                       <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, styles.name, { color: colors.text }]}>{row.username}</Text>
                       <ReaderGlyph identity={row.readerGlyph} />
                     </View>
-                    <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{row.status}</Text>
+                    <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{row.status}</Text>
                   </>
                 );
                 return row.linksToProfile && inTabs ? (

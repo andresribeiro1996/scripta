@@ -195,7 +195,7 @@ function DiscoverRow({ item, onPreviewBooks, linkAuthor }: { item: DiscoverItem;
               <StatusBadge label={status.label} tone={status.tone} />
               {status.votedBadge ? <StatusBadge label="Voted" tone="info" /> : null}
               {contentStats(content).map((stat) => (
-                <Text key={stat.label} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
+                <Text key={stat.label} numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
                   <Text style={[styles.strong, { color: colors.text }]}>{stat.value}</Text> {stat.label}
                 </Text>
               ))}
@@ -207,7 +207,7 @@ function DiscoverRow({ item, onPreviewBooks, linkAuthor }: { item: DiscoverItem;
                   onPress={() => onPreviewBooks({ id: content.id, name: content.name })}
                   style={styles.rowAction}
                 >
-                  <Text {...dynamicType} style={[typography.caption, styles.strong, { color: colors.accent }]}>See books</Text>
+                  <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.strong, { color: colors.accent }]}>See books</Text>
                 </Pressable>
               ) : null}
             </View>
@@ -229,7 +229,7 @@ function StatusBadge({ label, tone }: { label: string; tone: ContentTone }) {
   }[tone];
   return (
     <View style={[styles.badge, { borderColor: palette.borderColor, backgroundColor: palette.backgroundColor }]}>
-      <Text {...dynamicType} style={[typography.caption, styles.strong, { color: palette.color }]}>
+      <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.strong, { color: palette.color }]}>
         {label}
       </Text>
     </View>

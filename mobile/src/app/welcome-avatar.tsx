@@ -40,7 +40,7 @@ export default function WelcomeAvatarRoute() {
 
   return <View style={[styles.screen, { backgroundColor: colors.background }]}>
     <Text accessibilityRole="header" style={[styles.title, { color: colors.text }]}>Make it yours</Text>
-    <Text style={[typography.body, { color: colors.textDim }]}>{user.avatarId ? "Looking good. Continue, or choose a different photo." : "Add a profile picture, or skip this for now."}</Text>
+    <Text style={[typography.body, { color: colors.textDim, alignSelf: "stretch", textAlign: "center" }]}>{user.avatarId ? "Looking good. Continue, or choose a different photo." : "Add a profile picture, or skip this for now."}</Text>
     {user.avatarId ? <Image source={{ uri: `${API_URL}/auth/avatar/${user.avatarId}/file` }} style={styles.avatar} /> : <View style={[styles.avatar, styles.initial, { backgroundColor: colors.accentSoft }]}><Text style={[styles.initialText, { color: colors.accent }]}>{(user.username ?? user.email)[0]?.toUpperCase()}</Text></View>}
     {error ? <Text accessibilityRole="alert" style={[typography.caption, { color: colors.danger }]}>{error}</Text> : null}
     {user.avatarId

@@ -103,7 +103,7 @@ export function FeedRow({ item, onOpen, onFollowBack, following, isNew = false }
               </Text>
               <View style={styles.stamp}>
                 {isNew ? <View style={[styles.newDot, { backgroundColor: colors.accent }]} /> : null}
-                <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
+                <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
                   {relativeTime(item.createdAt)}
                 </Text>
               </View>

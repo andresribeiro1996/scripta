@@ -34,7 +34,7 @@ export function AddBookSheet({
     return (
       <Sheet visible title="Add to library" onClose={onClose}>
         <View style={styles.signedOut}>
-          <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>Sign in to add books to your library.</Text>
+          <Text {...dynamicType} style={[typography.body, { color: colors.textDim, textAlign: "center" }]}>Sign in to add books to your library.</Text>
           <Button label="Sign in" onPress={() => router.push({ pathname: "/(public)/login", params: { returnTo: pathWithQuery(pathname, params) } } as never)} />
         </View>
       </Sheet>
@@ -82,7 +82,7 @@ export function AddBookSheet({
 }
 
 const styles = StyleSheet.create({
-  signedOut: { gap: spacing.md, paddingVertical: spacing.lg, alignItems: "center" },
+  signedOut: { gap: spacing.md, paddingVertical: spacing.lg },
   book: { flexDirection: "row", gap: spacing.md, paddingVertical: spacing.md },
   text: { flex: 1, gap: spacing.xs, justifyContent: "center" },
   actions: { gap: spacing.sm, paddingTop: spacing.sm },
