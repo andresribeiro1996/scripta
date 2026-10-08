@@ -989,6 +989,14 @@ test("a visitor's reader card carries the public style and the resolved choices,
   assert.deepEqual(result.books, []);
 });
 
+test("a visitor's reader card carries the owner's chosen finish", () => {
+  const owner = "card-finish";
+  service.saveLibrary(owner, { books: [earthsea], groups: [] });
+  assert.equal(resolvePublicLibraryData(owner, cardRequest).readerCard!.style?.finish, "paper");
+  service.patchReaderCardStyle(owner, { finish: "gilt" });
+  assert.equal(resolvePublicLibraryData(owner, cardRequest).readerCard!.style?.finish, "gilt");
+});
+
 test("a chosen highlight whose book left the library drops out of the visitor's card", () => {
   const owner = "card-gone";
   const first = service.saveLibrary(owner, { books: [earthsea], groups: [] });

@@ -1,5 +1,5 @@
 import type { Counter } from "./counters.js";
-import type { CardPrint, CornerStyle, FooterLeft, FooterRight, Layout, MottoLook, Trait } from "./style.js";
+import type { CardPrint, CornerStyle, Finish, FooterLeft, FooterRight, Layout, MottoLook, Trait } from "./style.js";
 
 export const COUNTER_LABELS: Record<Counter, string> = { dial: "Dial", beads: "Beads", shelf: "Shelf", frame: "Frame", ring: "Ring" };
 export const TRAIT_LABELS: Record<Trait, string> = { both: "Both", seal: "Seal", line: "Line", none: "None" };
@@ -9,3 +9,4 @@ export const FOOTER_LEFT_LABELS: Record<FooterLeft, string> = { plate: "Plate", 
 export const FOOTER_RIGHT_LABELS: Record<FooterRight, string> = { name: "Name", firstName: "First name", lastName: "Last name", firstInitial: "First name, initial", initials: "Initials", catalog: "Catalogue", handle: "Handle", nameItalic: "Name in italics", signature: "Signature", monogram: "Monogram", monogramDiamond: "Diamond monogram", none: "None" };
 export const CORNER_LABELS: Record<CornerStyle, string> = { diamonds: "Diamonds", deco: "Art deco", fleuron: "Fleuron", photo: "Photo corners", stars: "Stars", laurel: "Laurel", knot: "Knot", volute: "Volute", meander: "Meander", rosette: "Rosette", register: "Register mark", none: "None" };
 export const PRINT_LABELS: Record<CardPrint, string> = { auto: "Theme", paper: "Paper", reversed: "Reversed" };
+export const FINISH_LABELS: Record<Finish, string> = { paper: "Plain", aged: "Aged", linen: "Linen", letterpress: "Letterpress", foil: "Foil", holo: "Holographic", vellum: "Vellum", watercolor: "Watercolour", gilt: "Gilt edge", stamp: "Stamp", kraft: "Kraft", riso: "Riso" };

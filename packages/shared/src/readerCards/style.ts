@@ -38,6 +38,8 @@ export const CORNER_STYLES = ["diamonds", "deco", "fleuron", "photo", "stars", "
 export type CornerStyle = (typeof CORNER_STYLES)[number];
 export const CARD_PRINTS = ["auto", "paper", "reversed"] as const;
 export type CardPrint = (typeof CARD_PRINTS)[number];
+export const FINISHES = ["paper", "aged", "linen", "letterpress", "foil", "holo", "vellum", "watercolor", "gilt", "stamp", "kraft", "riso"] as const;
+export type Finish = (typeof FINISHES)[number];
 
 export interface CardMotto { text: string; look: MottoLook }
 export interface CardFooter { left: FooterLeft; right: FooterRight }
@@ -52,20 +54,21 @@ export interface ReaderCardStyle {
   motto: CardMotto | null;
   footer: CardFooter;
   corners: CornerStyle;
+  finish: Finish;
   print: CardPrint;
   signature: ChosenSignature | null;
   highlight: ChosenHighlight | null;
 }
 
 export type ReaderCardStylePatch = Partial<ReaderCardStyle>;
-export type PublicReaderCardStyle = Pick<ReaderCardStyle, "counter" | "layout" | "trait" | "motto" | "footer" | "corners" | "print">;
+export type PublicReaderCardStyle = Pick<ReaderCardStyle, "counter" | "layout" | "trait" | "motto" | "footer" | "corners" | "finish" | "print">;
 
 export interface ReaderCardChosen {
   signature?: { title: string; author: string; workId: string | null; coverUrl: string | null; note: string | null };
   highlight?: { text: string; title: string; author: string };
 }
 
-export const DEFAULT_READER_CARD_STYLE: ReaderCardStyle = { counter: "dial", layout: "faces", trait: "both", motto: null, footer: { left: "plate", right: "name" }, corners: "diamonds", print: "auto", signature: null, highlight: null };
+export const DEFAULT_READER_CARD_STYLE: ReaderCardStyle = { counter: "dial", layout: "faces", trait: "both", motto: null, footer: { left: "plate", right: "name" }, corners: "diamonds", finish: "paper", print: "auto", signature: null, highlight: null };
 
 function oneOf<T extends string>(options: readonly T[], value: unknown, fallback: T): T {
   return options.includes(value as T) ? (value as T) : fallback;
@@ -108,6 +111,7 @@ export function normalizeReaderCardStyle(value: unknown): ReaderCardStyle {
     motto: mottoOf(raw.motto),
     footer: footerOf(raw.footer),
     corners: oneOf(CORNER_STYLES, raw.corners, DEFAULT_READER_CARD_STYLE.corners),
+    finish: oneOf(FINISHES, raw.finish, DEFAULT_READER_CARD_STYLE.finish),
     print: oneOf(CARD_PRINTS, raw.print, DEFAULT_READER_CARD_STYLE.print),
     signature: signatureOf(raw.signature),
     highlight: highlightOf(raw.highlight),
@@ -115,7 +119,7 @@ export function normalizeReaderCardStyle(value: unknown): ReaderCardStyle {
 }
 
 export function publicStyle(style: ReaderCardStyle): PublicReaderCardStyle {
-  return { counter: style.counter, layout: style.layout, trait: style.trait, motto: style.motto, footer: style.footer, corners: style.corners, print: style.print };
+  return { counter: style.counter, layout: style.layout, trait: style.trait, motto: style.motto, footer: style.footer, corners: style.corners, finish: style.finish, print: style.print };
 }
 
 export function resolvePrint(print: CardPrint, dark: boolean): PlatePrint {

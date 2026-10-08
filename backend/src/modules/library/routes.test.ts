@@ -495,7 +495,7 @@ test("GET reader card style returns the default before any change", async () => 
   const { app } = await setup();
   const response = await app.inject({ method: "GET", url: styleUrl, headers: asUser("u1") });
   assert.equal(response.statusCode, 200);
-  assert.deepEqual(response.json(), { counter: "dial", layout: "faces", trait: "both", motto: null, footer: { left: "plate", right: "name" }, corners: "diamonds", print: "auto", signature: null, highlight: null });
+  assert.deepEqual(response.json(), { counter: "dial", layout: "faces", trait: "both", motto: null, footer: { left: "plate", right: "name" }, corners: "diamonds", finish: "paper", print: "auto", signature: null, highlight: null });
   await app.close();
 });
 
@@ -504,7 +504,7 @@ test("PATCH reader card style merges each change into the stored style", async (
   await app.inject({ method: "PATCH", url: styleUrl, headers: asUser("u1"), payload: { counter: "shelf" } });
   const response = await app.inject({ method: "PATCH", url: styleUrl, headers: asUser("u1"), payload: { trait: "seal" } });
   assert.equal(response.statusCode, 200);
-  assert.deepEqual(response.json(), { counter: "shelf", layout: "faces", trait: "seal", motto: null, footer: { left: "plate", right: "name" }, corners: "diamonds", print: "auto", signature: null, highlight: null });
+  assert.deepEqual(response.json(), { counter: "shelf", layout: "faces", trait: "seal", motto: null, footer: { left: "plate", right: "name" }, corners: "diamonds", finish: "paper", print: "auto", signature: null, highlight: null });
   await app.close();
 });
 
@@ -518,7 +518,7 @@ test("PATCH reader card style rejects unknown options and unknown fields", async
     assert.equal(typeof response.json().error, "string");
   }
   const stored = await app.inject({ method: "GET", url: styleUrl, headers: asUser("u1") });
-  assert.deepEqual(stored.json(), { counter: "dial", layout: "faces", trait: "both", motto: null, footer: { left: "plate", right: "name" }, corners: "diamonds", print: "auto", signature: null, highlight: null });
+  assert.deepEqual(stored.json(), { counter: "dial", layout: "faces", trait: "both", motto: null, footer: { left: "plate", right: "name" }, corners: "diamonds", finish: "paper", print: "auto", signature: null, highlight: null });
   await app.close();
 });
 
@@ -572,7 +572,7 @@ test("a counter or trait change keeps the stored signature and highlight", async
   await patch({ highlight: { bookKey: bookKey(wizard), highlightId: "h1" } });
   const response = await patch({ counter: "ring" });
   assert.equal(response.statusCode, 200);
-  const expected = { counter: "ring", layout: "faces", trait: "both", motto: null, footer: { left: "plate", right: "name" }, corners: "diamonds", print: "auto", signature: { bookKey: bookKey(wizard), note: "why" }, highlight: { bookKey: bookKey(wizard), highlightId: "h1" } };
+  const expected = { counter: "ring", layout: "faces", trait: "both", motto: null, footer: { left: "plate", right: "name" }, corners: "diamonds", finish: "paper", print: "auto", signature: { bookKey: bookKey(wizard), note: "why" }, highlight: { bookKey: bookKey(wizard), highlightId: "h1" } };
   assert.deepEqual(response.json(), expected);
   const stored = await app.inject({ method: "GET", url: styleUrl, headers: asUser("u1") });
   assert.deepEqual(stored.json(), expected);
@@ -639,7 +639,7 @@ test("the reader card style needs a signed-in user", async () => {
   assert.equal((await app.inject({ method: "GET", url: styleUrl })).statusCode, 401);
   assert.equal((await app.inject({ method: "PATCH", url: styleUrl, payload: { counter: "shelf" } })).statusCode, 401);
   const stored = await app.inject({ method: "GET", url: styleUrl, headers: asUser("u1") });
-  assert.deepEqual(stored.json(), { counter: "dial", layout: "faces", trait: "both", motto: null, footer: { left: "plate", right: "name" }, corners: "diamonds", print: "auto", signature: null, highlight: null });
+  assert.deepEqual(stored.json(), { counter: "dial", layout: "faces", trait: "both", motto: null, footer: { left: "plate", right: "name" }, corners: "diamonds", finish: "paper", print: "auto", signature: null, highlight: null });
   await app.close();
 });
 
@@ -654,5 +654,17 @@ test("GET reader card number answers the owner's rank, or null without an accoun
   assert.ok(after.json().readerNumber >= 1);
   const anonymous = await app.inject({ method: "GET", url: "/library/reader-card/number" });
   assert.equal(anonymous.statusCode, 401);
+  await app.close();
+});
+
+test("PATCH reader card style stores a finish, keeps the rest, and rejects an unknown one", async () => {
+  const { app } = await setup();
+  await app.inject({ method: "PATCH", url: styleUrl, headers: asUser("u1"), payload: { corners: "laurel" } });
+  const response = await app.inject({ method: "PATCH", url: styleUrl, headers: asUser("u1"), payload: { finish: "foil" } });
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.json().finish, "foil");
+  assert.equal(response.json().corners, "laurel");
+  const bad = await app.inject({ method: "PATCH", url: styleUrl, headers: asUser("u1"), payload: { finish: "neon" } });
+  assert.equal(bad.statusCode, 400);
   await app.close();
 });
