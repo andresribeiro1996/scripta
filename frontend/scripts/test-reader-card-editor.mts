@@ -85,3 +85,9 @@ test("the toggle only animates when motion is allowed", () => {
 test("the editor's turner sits in a full-width wrapper so its widths resolve", () => {
   assert.match(readFileSync("src/pages/ReaderCardPage.tsx", "utf8"), /<div className="w-full">\s*<ReaderCardTurner /);
 });
+
+test("the editor is gated on the cached style, not on the latest fetch failing", () => {
+  const source = readFileSync("src/pages/ReaderCardPage.tsx", "utf8");
+  assert.doesNotMatch(source, /isError/);
+  assert.match(source, /if \(!style\) \{\s*if \(isPending\) return/);
+});

@@ -1,11 +1,3 @@
-/** A real switch, not a styled checkbox — `role="switch"` + `aria-checked`
- *  so it's announced correctly, a `<button>` (not an `<input>`) since
- *  there's no plain form value being submitted here, just an on/off
- *  action each way (see SocialsSection's handleEnable/handleDisable).
- *  Flat pill + circle thumb, no shadow, matching the same minimalist
- *  redesign StyleControls.tsx's range sliders already went through
- *  (hand-drawn `appearance: none` controls over the native browser
- *  shape) rather than a plain `<input type="checkbox">`. */
 export function ToggleSwitch({
   checked,
   disabled,

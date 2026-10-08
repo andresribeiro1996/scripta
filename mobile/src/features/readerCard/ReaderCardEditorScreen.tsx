@@ -24,7 +24,7 @@ export function ReaderCardEditorScreen() {
   const { data: library } = useLibrary();
   const books = library?.data.books ?? NO_BOOKS;
   const groups = library?.data.groups ?? NO_GROUPS;
-  const { data: style, isPending, isError, refetch } = useReaderCardStyle();
+  const { data: style, isPending, refetch } = useReaderCardStyle();
   const save = useSaveReaderCardStyle();
   const [audience, setAudience] = useState<"you" | "visitors">("you");
   const [error, setError] = useState<string | null>(null);
@@ -43,8 +43,10 @@ export function ReaderCardEditorScreen() {
     }
   };
 
-  if (isPending) return <Text style={[typography.body, styles.pad, { color: colors.textDim }]}>Loading your reader card…</Text>;
-  if (isError || !style) return <View style={styles.pad}><Button label="Couldn't load your reader card. Try again" onPress={() => void refetch()} /></View>;
+  if (!style) {
+    if (isPending) return <Text style={[typography.body, styles.pad, { color: colors.textDim }]}>Loading your reader card…</Text>;
+    return <View style={styles.pad}><Button label="Couldn't load your reader card. Try again" onPress={() => void refetch()} /></View>;
+  }
 
   return (
     <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.page}>

@@ -20,7 +20,7 @@ export function ReaderCardPage() {
   const { data: library } = useLibrary();
   const books = library?.data.books ?? NO_BOOKS;
   const groups = library?.data.groups ?? NO_GROUPS;
-  const { data: style, isPending, isError, refetch } = useReaderCardStyle();
+  const { data: style, isPending, refetch } = useReaderCardStyle();
   const save = useSaveReaderCardStyle();
   const toast = useToast();
   const [audience, setAudience] = useState<(typeof AUDIENCES)[number]>("you");
@@ -37,8 +37,8 @@ export function ReaderCardPage() {
     }
   };
 
-  if (isPending) return <p className="px-5 py-8 text-sm text-(--color-text-dim)">Loading your reader card…</p>;
-  if (isError || !style) {
+  if (!style) {
+    if (isPending) return <p className="px-5 py-8 text-sm text-(--color-text-dim)">Loading your reader card…</p>;
     return (
       <div className="px-5 py-8">
         <button type="button" onClick={() => void refetch()} className="text-sm font-semibold text-(--color-accent)">Couldn't load your reader card. Try again</button>
