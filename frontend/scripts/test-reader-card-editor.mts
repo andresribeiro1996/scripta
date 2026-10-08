@@ -28,7 +28,7 @@ test("five counter thumbnails, with only the chosen one checked", () => {
 
 test("trait and layout show their names and press the current one", () => {
   const html = options();
-  for (const name of ["Both", "Seal", "Line", "None", "Three faces", "Book", "One back"]) assert.match(html, new RegExp(`>${name}<`));
+  for (const name of ["Both", "Seal", "Line", "None", "Flip", "Book", "One back"]) assert.match(html, new RegExp(`>${name}<`));
   assert.match(html, /aria-pressed="true"[^>]*>Seal</);
   assert.match(html, /aria-pressed="true"[^>]*>Book</);
 });
@@ -57,11 +57,11 @@ test("twelve corner thumbnails and the three prints", () => {
   assert.equal(corners.match(/role="radio"/g)?.length, 12);
   assert.match(corners, /aria-checked="true"[^>]*>(?:(?!<\/button>).)*Laurel/s);
   assert.match(corners, /viewBox="0 0 100 100"/);
-  assert.match(html, /aria-pressed="true"[^>]*>Reversed</);
-  for (const name of ["Theme", "Paper"]) assert.match(html, new RegExp(`>${name}<`));
+  assert.match(html, /aria-pressed="true"[^>]*>Dark</);
+  for (const name of ["Auto", "Light"]) assert.match(html, new RegExp(`>${name}<`));
 });
 
-test("under Theme each thumbnail renders the print of the app theme", () => {
+test("under Auto each thumbnail renders the print of the app theme", () => {
   const light = group(options({ print: "auto" }, "light"), "Corners");
   const dark = group(options({ print: "auto" }, "dark"), "Corners");
   assert.equal(light.match(/<svg/g)?.length, 12);

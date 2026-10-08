@@ -34,7 +34,14 @@
 
 **Starting point:**
 - A5 (#214) and the thumbnail perf work (#215) are on `main`.
-- The editor-layout branch `claude/hello-e28136` must be merged to `main` first. It pins the preview and turns the mobile `TileRow` into a 4-column grid without a `width` prop, and Task 7 builds on that. This plan is committed on that branch, so it lands on `main` with it.
+- The editor-layout branch `claude/hello-e28136` (#216, merged) pins the preview and turns the mobile `TileRow` into a 4-column grid.
+- The branch `claude/reader-card-sheets` must be merged to `main` first. On mobile it:
+  - moves the 12-option sections into an inline panel below the pinned card (`PanelId`, `ReaderCardPanel`, `TileRow`'s `available` width prop);
+  - groups the options by face and turns the card to the face being edited;
+  - removes the You/Visitors toggle;
+  - changes `PRINT_LABELS` to Auto/Light/Dark.
+
+  Task 7 builds on that. The current version of this plan is committed on that branch.
 - Cut the A6 worktree from `origin/main` after that merge.
 
 ## Decisions this plan takes
@@ -1304,24 +1311,34 @@ Check `rotation.sensor.get()` against `node_modules/react-native-reanimated/lib/
   const shine = readerCardShine(input.style.finish);
   const shineOn = (page: ReaderCardPage) => (shine && page === "front" ? <CardShine kind={shine} width={width} height={width * PLATE_RATIO} live={liveShine} /> : null);
   ```
-- After the `ReaderCardImage` in each flip face `Animated.View`, add `{shineOn(pages[turn.faces[0]]!)}` or `{shineOn(pages[turn.faces[1]]!)}`.
+- The flip faces are the two entries of `CardFaces`' `faces` array. That child is keyed by the rotation it last settled at, because Reanimated re-applies first-render values after a re-render. Make each entry a fragment holding its `ReaderCardImage` followed by `shineOn(pages[turn.faces[0]]!)` or `shineOn(pages[turn.faces[1]]!)`.
 - After the `ReaderCardImage` in each pager page `View`, add `{shineOn(page)}`.
 
 `ReaderCardViewer.tsx:33`: pass `liveShine` to `ReaderCardTurner`.
 
-`ReaderCardOptions.tsx`:
-- Add `FINISHES`, `FINISH_LABELS` to the import, and `finish` to the destructure.
-- Add:
-  ```tsx
-  const finishThumbs = useMemo(() => FINISHES.map((option) => ({ option, input: styleThumbnail(deferred, { finish: option }) })), [deferred]);
-  ```
-- Insert this between the Corners and Print sections:
+`ReaderCardOptions.tsx`: the mobile editor opens 12-option sections in an inline panel below the pinned card (`PanelId`, `PANEL_TITLES`, `PanelTrigger`, `ReaderCardPanel`, and per-section panels such as `CornersPanel`). Finish follows that pattern:
+- Add `FINISHES`, `FINISH_LABELS` to the `@scripta/shared` import.
+- Add `"finish"` to `PanelId`, and `finish: "Finish"` to `PANEL_TITLES`.
+- Add a panel next to `CornersPanel`:
+
+```tsx
+function FinishPanel({ input, available, onChange }: { input: ReaderCardBase; available: number; onChange: SaveStyle }) {
+  const deferred = useDeferredValue(input);
+  const thumbs = useMemo(() => FINISHES.map((option) => ({ option, input: styleThumbnail(deferred, { finish: option }) })), [deferred]);
+  return <TileRow items={thumbs} value={input.style.finish} labels={FINISH_LABELS} available={available} onPick={(next) => void onChange({ finish: next })} />;
+}
+```
+
+- In `ReaderCardPanel`, render `<FinishPanel input={input} available={available} onChange={onChange} />` for `panel === "finish"`.
+- In `FrontOptions`, add `finish` to the `input.style` destructure, and add this section right after Corners:
 
 ```tsx
       <Section title="Finish">
-        <TileRow items={finishThumbs} value={finish} labels={FINISH_LABELS} onPick={(next) => void onChange({ finish: next })} />
+        <PanelTrigger title="Finish" current={FINISH_LABELS[finish]} onPress={() => onOpen("finish")} />
       </Section>
 ```
+
+Picking a finish saves it, keeps the panel open, and updates the pinned card live. The finish is a front option, so the editor's existing `change()` already turns the card to the front.
 
 - [ ] **Step 4: Run the checks**
 
@@ -1364,14 +1381,14 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
      - With reduced motion emulated, it sits still and ignores the pointer.
      - The gradient ink renders (not black or blank) with the viewer open over a mural that shows the same card, in both themes.
    - **Back pages:** turn the card. Every finish keeps its paper, and the record rows are plain and legible.
-   - **Print:** `Reversed` and `Paper` each with aged, kraft and foil.
+   - **Print:** `Dark` and `Light` each with aged, kraft and foil.
    - **Visitors preview and a shared mural:** the chosen finish shows to visitors.
-5. Restore the fixture account's style when you finish (Finish `Plain`, Print `Theme`).
+5. Restore the fixture account's style when you finish (Finish `Plain`, Print `Auto`).
 
 - [ ] **Step 2: Device pass**
 
 Run `node scripts/dev-status.mjs --json` once. If no other worktree holds the emulator, dispatch `device-checker` for the mobile editor and the My shelf block:
-- The Finish grid: 12 tiles, 4 per row, nothing clipped. Report the grid's mount and scroll smoothness, since the editor now renders 41 full-card thumbnails eagerly.
+- The Finish row opens the inline panel: 12 tiles, 4 per row, nothing clipped. Picking one keeps the panel open and updates the pinned card. Report how long the panel takes to fill: it mounts 12 textured full-card thumbnails at once.
 - Each finish in the pinned preview in light and dark themes:
   - foil and holo ink visibly a gradient (react-native-svg must accept `fill:url(#…)` inside `style`);
   - the vellum and kraft textures visible;
