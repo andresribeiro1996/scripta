@@ -17,6 +17,7 @@ import { ChevronLeftIcon, FullscreenIcon, PaletteIcon, PencilIcon, ShareIcon, to
 import { useGalleryImages } from "../hooks/useGalleryImages";
 import { useLibrary } from "../hooks/useLibrary";
 import { useMuralFullscreen } from "../hooks/useMuralFullscreen";
+import { NO_GROUPS } from "../hooks/useReaderCard";
 import { MuralConflictError, useMurals } from "../hooks/useMurals";
 import { useTierlists } from "../hooks/useTierlists";
 import { useWorkBooks } from "../hooks/useWorkBooks";
@@ -607,7 +608,7 @@ export function MuralEditorPage() {
             mural={view}
             editMode={editMode}
             onDragChange={setDragging}
-            groups={library?.data.groups ?? []}
+            groups={library?.data.groups ?? NO_GROUPS}
             books={books}
             images={images}
             profile={session?.user.username ? { username: session.user.username, avatarUrl: session.user.avatarId ? avatarUrlFor(session.user.avatarId) : null } : undefined}
@@ -639,7 +640,7 @@ export function MuralEditorPage() {
       {configuringBlock && (
         <BlockConfigPanel
           block={configuringBlock}
-          groups={library?.data.groups ?? []}
+          groups={library?.data.groups ?? NO_GROUPS}
           books={books}
           images={images}
           onSave={(block) => void guard(handleSaveBlockConfig(block), "Couldn't save those settings.")}
@@ -655,7 +656,7 @@ export function MuralEditorPage() {
             editMode={false}
             books={books}
             images={images}
-            groups={library?.data.groups ?? []}
+            groups={library?.data.groups ?? NO_GROUPS}
             profile={session?.user.username ? { username: session.user.username, avatarUrl: session.user.avatarId ? avatarUrlFor(session.user.avatarId) : null } : undefined}
             tierlistData={tierlistData}
           />}

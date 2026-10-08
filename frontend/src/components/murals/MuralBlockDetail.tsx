@@ -1,5 +1,5 @@
 import { useRef, useState, type ReactNode } from "react";
-import { READER_PLATES, type Group, type PublicReaderCard, booksByWork, workIdOf } from "@scripta/shared";
+import { type Group, type PublicReaderCard, booksByWork, workIdOf } from "@scripta/shared";
 import { Link } from "react-router-dom";
 import type { ThemeId } from "@scripta/shared/themes";
 import type { GalleryImage } from "../../api/gallery";
@@ -21,45 +21,16 @@ import { CoverImage } from "../BookCard";
 import { BookSummary } from "../BookSummary";
 import { Sheet } from "../Sheet";
 import { ProfileBlockView } from "./blocks/MiscBlocks";
-import { ReaderCardDetail, ReaderCardPlate } from "./blocks/ReaderCardBlock";
-import { useReaderCard } from "../../hooks/useReaderCard";
+import { NO_GROUPS, useReaderCard } from "../../hooks/useReaderCard";
+import { ReaderCardViewer } from "../readerCard/ReaderCardViewer";
 
 function detailSheetStyle(theme: ThemeId) {
   return { ...muralThemeStyle(theme), backgroundColor: "var(--color-surface)" };
 }
 
-function ReaderCardDetailSheet({
-  theme,
-  books,
-  groups,
-  readerCardOverride,
-  readerName,
-  onClose,
-  actions
-}: {
-  theme: ThemeId;
-  books: Array<Record<string, unknown>>;
-  groups: Group[];
-  readerCardOverride?: PublicReaderCard;
-  readerName: string;
-  onClose: () => void;
-  actions?: ReactNode;
-}) {
-  const { card, own } = useReaderCard(books, groups, readerCardOverride);
-  const title = card.identity ? `The ${READER_PLATES.find((item) => item.key === card.identity)?.name}` : "Unwritten";
-  return (
-    <Sheet title={title} onClose={onClose} style={detailSheetStyle(theme)}>
-      {actions}
-      <div className="max-h-[min(70dvh,40rem)] overflow-y-auto overscroll-contain px-3 pt-1 pb-5 text-base">
-        <div className="space-y-5">
-          <div className="mx-auto aspect-[5/7] w-full max-w-[320px]">
-            <ReaderCardPlate card={card} own={own} readerName={readerName} fill={false} />
-          </div>
-          <ReaderCardDetail card={card} own={own} />
-        </div>
-      </div>
-    </Sheet>
-  );
+function ReaderCardDetailViewer({ books, groups, readerCardOverride, readerName, onClose }: { books: Array<Record<string, unknown>>; groups: Group[]; readerCardOverride?: PublicReaderCard; readerName: string; onClose: () => void }) {
+  const input = useReaderCard(books, groups, readerName, readerCardOverride);
+  return <ReaderCardViewer input={input} onClose={onClose} />;
 }
 
 export function MuralBlockDetail({
@@ -93,7 +64,7 @@ export function MuralBlockDetail({
   const contentRef = useRef<HTMLDivElement>(null);
   const collectionScroll = useRef(0);
   if (block.type === "readerCard") {
-    return <ReaderCardDetailSheet theme={theme} books={books} groups={libraryGroups ?? []} readerCardOverride={readerCardOverride} readerName={profile?.username || "reader"} onClose={onClose} actions={actions} />;
+    return <ReaderCardDetailViewer books={books} groups={libraryGroups ?? NO_GROUPS} readerCardOverride={readerCardOverride} readerName={profile?.username || "reader"} onClose={onClose} />;
   }
   const spotlight = block.type === "spotlight" ? books.find((book) => bookKey(book) === block.bookKey) : undefined;
   const book = selectedBook ?? spotlight;

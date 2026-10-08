@@ -1,6 +1,7 @@
 import type { Group, PublicReaderCard } from "@scripta/shared";
 import type { GalleryImage } from "../../api/gallery";
 import type { ResolvedTierlist } from "../../api/tierlists";
+import { NO_GROUPS } from "../../hooks/useReaderCard";
 import { bookKey } from "../../lib/merge";
 import { computeStat } from "../../lib/muralStats";
 import { blockBooks, calculateShelfTheme, muralBlockTitle, resolveQuote, resolveQuoteCollection, type MuralBlock, type ReaderProfile, type ShelfTheme } from "../../lib/murals";
@@ -57,7 +58,7 @@ export function MobileBlockPreview({
   if (block.type === "readerCard") {
     return (
       <div className="flex h-full items-center justify-center overflow-hidden block-p-1">
-        <ReaderCardBlockView books={books} groups={groups ?? []} readerCardOverride={readerCardOverride} readerName={profile?.username || "reader"} />
+        <ReaderCardBlockView books={books} groups={groups ?? NO_GROUPS} readerCardOverride={readerCardOverride} readerName={profile?.username || "reader"} />
       </div>
     );
   }
