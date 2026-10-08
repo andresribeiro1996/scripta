@@ -48,7 +48,7 @@ function leftSlot(value: FooterLeft, ctx: FooterContext, width: number): string 
   if (value === "none") return "";
   if (value === "glyph") {
     const plate = plateOf(ctx.card);
-    return plate ? ctx.glyph(plate.key, 29, 310.5, 14) : undefined;
+    return plate ? ctx.glyph(plate.key, 30, 309.5, 13) : undefined;
   }
   const text = leftText(value, ctx.card);
   return text ? caps(text, 30, false, width) : undefined;
@@ -80,8 +80,8 @@ function rightSlot(value: FooterRight, readerName: string): Right {
       const shown = fitLine(displayName(readerName), { font: "script", size: 12, width: MAX_RIGHT });
       return { svg: `<text class="pt" x="221" y="323" text-anchor="end" font-size="12" font-family="${SCRIPT}">${escapeText(shown)}</text>`, width: textWidth(shown, { font: "script", size: 12 }) };
     }
-    case "monogram": return { svg: `<circle class="pl" cx="214" cy="318" r="7.5" stroke-width=".8"/><circle class="pl" cx="214" cy="318" r="6" stroke-width=".35"/><text class="pt" x="214" y="320.4" text-anchor="middle" font-size="6.4" font-family="${SERIF}">${monogram}</text>`, width: 16 };
-    case "monogramDiamond": return { svg: `<path class="pl" d="M214 309L223 318L214 327L205 318Z" stroke-width=".8"/><text class="pt" x="214" y="320.3" text-anchor="middle" font-size="6" font-family="${SERIF}">${monogram}</text>`, width: 18 };
+    case "monogram": return { svg: `<circle class="pl" cx="212" cy="316" r="7" stroke-width=".8"/><circle class="pl" cx="212" cy="316" r="5.6" stroke-width=".35"/><text class="pt" x="212" y="318.2" text-anchor="middle" font-size="6" font-family="${SERIF}">${monogram}</text>`, width: 15 };
+    case "monogramDiamond": return { svg: `<path class="pl" d="M212 309L219 316L212 323L205 316Z" stroke-width=".8"/><text class="pt" x="212" y="318.1" text-anchor="middle" font-size="5.6" font-family="${SERIF}">${monogram}</text>`, width: 15 };
     case "none": return { svg: "", width: 0 };
   }
   return { width: textWidth(truncateName(readerName).toUpperCase(), CAPS) };

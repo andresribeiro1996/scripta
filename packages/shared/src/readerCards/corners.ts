@@ -8,8 +8,8 @@ const at = (draw: Draw) => CORNERS.map(([cx, cy, sx, sy]) => draw(sx, sy, cx, cy
 const star4 = (x: number, y: number, r: number, k = 0.24) => `M${n(x)} ${n(y - r)}L${n(x + r * k)} ${n(y - r * k)}L${n(x + r)} ${n(y)}L${n(x + r * k)} ${n(y + r * k)}L${n(x)} ${n(y + r)}L${n(x - r * k)} ${n(y + r * k)}L${n(x - r)} ${n(y)}L${n(x - r * k)} ${n(y - r * k)}Z`;
 
 const DRAW: Record<Exclude<CornerStyle, "diamonds" | "none">, Draw> = {
-  deco: (sx, sy, cx, cy) => `<path class="pl" d="M${cx + 6 * sx} ${cy + 22 * sy}V${cy + 6 * sy}H${cx + 22 * sx}M${cx + 10 * sx} ${cy + 16 * sy}V${cy + 10 * sy}H${cx + 16 * sx}" stroke-width=".9"/><rect class="pf" x="${cx + (sx > 0 ? 2 : -5)}" y="${cy + (sy > 0 ? 2 : -5)}" width="3" height="3"/>`,
-  fleuron: (sx, sy, cx, cy) => `<circle class="pf" cx="${cx + 7 * sx}" cy="${cy + 7 * sy}" r="2.6"/><path class="pf" d="M${cx + 10 * sx} ${cy + 7 * sy}Q${cx + 20 * sx} ${cy + 3 * sy} ${cx + 26 * sx} ${cy + 8 * sy}Q${cx + 18 * sx} ${cy + 11 * sy} ${cx + 10 * sx} ${cy + 7 * sy}ZM${cx + 7 * sx} ${cy + 10 * sy}Q${cx + 3 * sx} ${cy + 20 * sy} ${cx + 8 * sx} ${cy + 26 * sy}Q${cx + 11 * sx} ${cy + 18 * sy} ${cx + 7 * sx} ${cy + 10 * sy}Z" opacity=".85"/>`,
+  deco: (sx, sy, cx, cy) => `<path class="pl" d="M${cx + 6 * sx} ${cy + 22 * sy}V${cy + 6 * sy}H${cx + 22 * sx}M${cx + 8 * sx} ${cy + 14 * sy}V${cy + 8 * sy}H${cx + 14 * sx}" stroke-width=".9"/><rect class="pf" x="${cx + (sx > 0 ? 2 : -5)}" y="${cy + (sy > 0 ? 2 : -5)}" width="3" height="3"/>`,
+  fleuron: (sx, sy, cx, cy) => `<circle class="pf" cx="${cx + 7 * sx}" cy="${cy + 7 * sy}" r="2.6"/><path class="pf" d="M${cx + 10 * sx} ${cy + 7 * sy}Q${cx + 20 * sx} ${cy + 3 * sy} ${cx + 26 * sx} ${cy + 8 * sy}Q${cx + 18 * sx} ${cy + 10 * sy} ${cx + 10 * sx} ${cy + 7 * sy}ZM${cx + 7 * sx} ${cy + 10 * sy}Q${cx + 3 * sx} ${cy + 20 * sy} ${cx + 8 * sx} ${cy + 26 * sy}Q${cx + 11 * sx} ${cy + 18 * sy} ${cx + 7 * sx} ${cy + 10 * sy}Z" opacity=".85"/>`,
   photo: (sx, sy) => {
     const x0 = sx > 0 ? 10 : 240, y0 = sy > 0 ? 10 : 340;
     return `<path class="pf" d="M${x0} ${y0}L${x0 + 28 * sx} ${y0}L${x0} ${y0 + 28 * sy}Z"/><path class="pgs" d="M${x0 + 22 * sx} ${n(y0 + 2.5 * sy)}L${n(x0 + 2.5 * sx)} ${y0 + 22 * sy}" stroke-width=".7"/>`;
@@ -20,7 +20,7 @@ const DRAW: Record<Exclude<CornerStyle, "diamonds" | "none">, Draw> = {
     const q = (t: number, k: 0 | 1) => (1 - t) ** 2 * A[k]! + 2 * (1 - t) * t * C[k]! + t * t * B[k]!;
     const dq = (t: number, k: 0 | 1) => 2 * (1 - t) * (C[k]! - A[k]!) + 2 * t * (B[k]! - C[k]!);
     let leaves = "";
-    for (const t of [0.12, 0.26, 0.4, 0.6, 0.74, 0.88]) {
+    for (const t of [0.1, 0.18, 0.46, 0.6, 0.74, 0.88]) {
       const x = n(q(t, 0)), y = n(q(t, 1)), angle = (Math.atan2(dq(t, 1), dq(t, 0)) * 180) / Math.PI;
       for (const side of [-1, 1]) leaves += `<ellipse class="pf" cx="${x}" cy="${y}" rx="3" ry="1.15" transform="rotate(${(angle + side * 38).toFixed(1)} ${x} ${y}) translate(2.4 0)"/>`;
     }
@@ -37,7 +37,7 @@ const DRAW: Record<Exclude<CornerStyle, "diamonds" | "none">, Draw> = {
   },
   meander: (sx, sy, cx, cy) => {
     const p = (u: number, v: number) => `${cx + u * sx} ${cy + v * sy}`;
-    return `<path class="pl" d="M${p(2, 26)}V${cy + 2 * sy}H${cx + 26 * sx}M${p(6, 22)}V${cy + 6 * sy}H${cx + 22 * sx}V${cy + 9 * sy}H${cx + 17 * sx}" stroke-width=".8" stroke-linejoin="miter"/>`;
+    return `<path class="pl" d="M${p(2, 26)}V${cy + 2 * sy}H${cx + 26 * sx}M${p(6, 22)}V${cy + 6 * sy}H${cx + 22 * sx}V${cy + 8 * sy}H${cx + 17 * sx}" stroke-width=".8" stroke-linejoin="miter"/>`;
   },
   rosette: (_sx, _sy, cx, cy) => {
     let petals = "";

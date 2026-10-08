@@ -22,7 +22,7 @@ test("every ornament draws in all four corners, mirrored", () => {
     assert.ok(svg.length > 0, corners);
     assert.doesNotMatch(svg, /NaN|undefined/, corners);
   }
-  assert.match(cornersSlot("deco")!, /M22 38V22H38M26 32V26H32.*M228 38V22H212M224 32V26H218.*M22 312V328H38.*M228 312V328H212/s);
+  assert.match(cornersSlot("deco")!, /M22 38V22H38M24 30V24H30.*M228 38V22H212M226 30V24H220.*M22 312V328H38.*M228 312V328H212/s);
   assert.match(cornersSlot("photo")!, /M10 10L38 10L10 38Z.*M240 10L212 10L240 38Z.*M10 340L38 340L10 312Z.*M240 340L212 340L240 312Z/s);
   assert.match(cornersSlot("register")!, /M8 16H24M16 8V24.*M226 16H242M234 8V24.*M8 334H24M16 326V342.*M226 334H242M234 326V342/s);
   assert.match(cornersSlot("laurel")!, /M46 19Q21 21 19 46.*M204 19Q229 21 231 46/s);

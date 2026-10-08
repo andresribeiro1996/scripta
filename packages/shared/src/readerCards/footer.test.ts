@@ -32,7 +32,7 @@ test("each left value prints its fact", () => {
   assert.equal(text(left("genre")), "FANTASY &amp; SF");
   assert.equal(text(left("edition")), "EDITION MMXXVI");
   assert.equal(text(left("readerNumber")), "Nº XLII");
-  assert.equal(left("glyph"), `<g data-glyph="star 29 310.5 14"/>`);
+  assert.equal(left("glyph"), `<g data-glyph="star 30 309.5 13"/>`);
   assert.equal(left("none"), "");
 });
 
@@ -54,8 +54,8 @@ test("each right value prints the username's parts", () => {
   assert.equal(text(right("handle")), "@ANDRE.RIBEIRO");
   assert.match(right("nameItalic")!, /font-style="italic" font-family="'Playfair Display'[^"]*">Andre Ribeiro</);
   assert.match(right("signature")!, /font-family="'Pinyon Script'[^"]*">Andre Ribeiro</);
-  assert.match(right("monogram")!, /<circle class="pl" cx="214" cy="318" r="7.5".*>AR<\/text>/);
-  assert.match(right("monogramDiamond")!, /M214 309L223 318L214 327L205 318Z.*>AR<\/text>/);
+  assert.match(right("monogram")!, /<circle class="pl" cx="212" cy="316" r="7".*>AR<\/text>/);
+  assert.match(right("monogramDiamond")!, /M212 309L219 316L212 323L205 316Z.*>AR<\/text>/);
   assert.equal(right("none"), "");
 });
 
@@ -84,5 +84,5 @@ test("the chosen footer draws on the front and on every back page", () => {
 
 test("the glyph footer is the identity's glyph, inked like the seal", () => {
   const svg = renderReaderCard({ card: card(), style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), footer: { left: "glyph", right: "name" } }, readerName: "andre", print: "paper", label: "x", seed: seedOf("andre") });
-  assert.match(svg, /<g class="glyph id-star" transform="translate\(29.00 310.50\) scale\(0.2917\)">/);
+  assert.match(svg, /<g class="glyph id-star" transform="translate\(30.00 309.50\) scale\(0.2708\)">/);
 });
