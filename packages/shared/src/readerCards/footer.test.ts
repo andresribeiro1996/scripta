@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { PublicReaderCard } from "../library/readerIdentity.js";
-import { footerSlots, type FooterContext } from "./footer.js";
+import { footerLeftText, footerRightText, footerSlots, type FooterContext } from "./footer.js";
 import { renderReaderCard } from "./render.js";
 import { seedOf } from "./seed.js";
-import { DEFAULT_READER_CARD_STYLE, publicStyle, type CardFooter, type FooterLeft, type FooterRight } from "./style.js";
+import { DEFAULT_READER_CARD_STYLE, FOOTER_LEFTS, FOOTER_RIGHTS, publicStyle, type CardFooter, type FooterLeft, type FooterRight } from "./style.js";
+import { escapeText } from "./svgText.js";
 
 const card = (fields: Partial<PublicReaderCard> = {}): PublicReaderCard => ({
   state: "settled", identity: "star", runnerUp: null, streak: "lamp", signal: null, coverage: [],
@@ -85,4 +86,50 @@ test("the chosen footer draws on the front and on every back page", () => {
 test("the glyph footer is the identity's glyph, inked like the seal", () => {
   const svg = renderReaderCard({ card: card(), style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), footer: { left: "glyph", right: "name" } }, readerName: "andre", print: "paper", label: "x", seed: seedOf("andre") });
   assert.match(svg, /<g class="glyph id-star" transform="translate\(30.00 309.50\) scale\(0.2708\)">/);
+});
+
+const unwritten = { state: "unwritten", identity: null, dial: null, facts: undefined } as const;
+const bare = { facts: { finished: 0, highlights: 0, series: 0, since: null, edition: 2026 } };
+
+test("footerLeftText says what each corner will print", () => {
+  assert.equal(footerLeftText("plate", card()), "PLATE IV");
+  assert.equal(footerLeftText("plate", card(unwritten)), "PLATE —");
+  assert.equal(footerLeftText("plateName", card()), "IV · STARGAZER");
+  assert.equal(footerLeftText("since", card()), "READER SINCE 2014");
+  assert.equal(footerLeftText("volumes", card()), "XLVIII VOLUMES");
+  assert.equal(footerLeftText("readerNumber", card()), "Nº XLII");
+  for (const value of ["since", "volumes", "readerNumber"] as const) assert.equal(footerLeftText(value, card(bare)), null, value);
+  assert.equal(footerLeftText("plateName", card(unwritten)), null);
+  assert.equal(footerLeftText("glyph", card()), null);
+  assert.equal(footerLeftText("none", card()), null);
+});
+
+test("footerRightText says what each corner will print", () => {
+  assert.equal(footerRightText("name", "andre.ribeiro"), "ANDRE.RIBEIRO");
+  assert.equal(footerRightText("name", "a".repeat(20)), `${"A".repeat(16)}…`);
+  assert.equal(footerRightText("firstName", "andre.ribeiro"), "ANDRE");
+  assert.equal(footerRightText("initials", "andre.ribeiro"), "A. R.");
+  assert.equal(footerRightText("catalog", "andre.ribeiro"), "RIBEIRO, A.");
+  assert.equal(footerRightText("handle", "andre.ribeiro"), "@ANDRE.RIBEIRO");
+  assert.equal(footerRightText("nameItalic", "andre.ribeiro"), "Andre Ribeiro");
+  assert.equal(footerRightText("signature", "andre.ribeiro"), "Andre Ribeiro");
+  assert.equal(footerRightText("monogram", "andre.ribeiro"), "AR");
+  assert.equal(footerRightText("monogramDiamond", "andre"), "A");
+  for (const value of ["firstName", "lastName", "firstInitial", "initials", "catalog"] as const) assert.equal(footerRightText(value, "andre"), null, value);
+  assert.equal(footerRightText("none", "andre.ribeiro"), null);
+});
+
+test("every printed text the editor shows is on the rendered front", () => {
+  const render = (footer: CardFooter, fields: Partial<PublicReaderCard>, readerName: string) =>
+    renderReaderCard({ card: card(fields), style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), footer }, readerName, print: "paper", label: "x", seed: seedOf("andre") });
+  for (const [fields, readerName] of [[{}, "andre.ribeiro"], [bare, "andre"], [unwritten, "a".repeat(30)]] as const) {
+    for (const value of FOOTER_LEFTS) {
+      const printed = footerLeftText(value, card(fields));
+      if (printed !== null) assert.ok(render({ left: value, right: "none" }, fields, readerName).includes(`>${escapeText(printed)}<`), `${value} ${printed}`);
+    }
+    for (const value of FOOTER_RIGHTS) {
+      const printed = footerRightText(value, readerName);
+      if (printed !== null) assert.ok(render({ left: "plate", right: value }, fields, readerName).includes(`>${escapeText(printed)}<`), `${value} ${printed}`);
+    }
+  }
 });

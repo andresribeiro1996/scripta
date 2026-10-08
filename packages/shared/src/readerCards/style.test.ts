@@ -124,5 +124,5 @@ test("every decoration option has a name", () => {
   assert.deepEqual(FOOTER_LEFTS.map((key) => FOOTER_LEFT_LABELS[key]), ["Plate", "Plate and name", "Reader since", "Established", "Volumes", "Highlights", "Series", "Genre", "Edition", "Reader number", "Glyph", "None"]);
   assert.deepEqual(FOOTER_RIGHTS.map((key) => FOOTER_RIGHT_LABELS[key]), ["Name", "First name", "Last name", "First name, initial", "Initials", "Catalogue", "Handle", "Name in italics", "Signature", "Monogram", "Diamond monogram", "None"]);
   assert.deepEqual(CORNER_STYLES.map((key) => CORNER_LABELS[key]), ["Diamonds", "Art deco", "Fleuron", "Photo corners", "Stars", "Laurel", "Knot", "Volute", "Meander", "Rosette", "Register mark", "None"]);
-  assert.deepEqual(CARD_PRINTS.map((key) => PRINT_LABELS[key]), ["Theme", "Paper", "Reversed"]);
+  assert.deepEqual(CARD_PRINTS.map((key) => PRINT_LABELS[key]), ["Auto", "Light", "Dark"]);
 });

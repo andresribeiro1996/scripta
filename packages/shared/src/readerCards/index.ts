@@ -10,3 +10,4 @@ export { THUMBNAIL_MARKS, counterThumbnail, styleThumbnail, thumbnailSegments } 
 export { CORNER_LABELS, COUNTER_LABELS, FOOTER_LEFT_LABELS, FOOTER_RIGHT_LABELS, LAYOUT_LABELS, MOTTO_LOOK_LABELS, PRINT_LABELS, TRAIT_LABELS } from "./labels.js";
 export { READER_CARD_STYLE_KEY, saveReaderCardStyle, saveReaderCardStyleIn, type ReaderCardStyleCache, type ReaderCardStyleQueries } from "./save.js";
 export { roman, nameParts, displayName } from "./numerals.js";
+export { footerLeftText, footerRightText } from "./footer.js";
