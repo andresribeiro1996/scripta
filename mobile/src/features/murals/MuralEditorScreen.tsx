@@ -24,6 +24,7 @@ import Animated, { useAnimatedReaction, useAnimatedRef, useAnimatedScrollHandler
 import { scheduleOnRN } from "react-native-worklets";
 import { Text } from "../../ui/Text";
 import { Button, Dialog, EditorHeading, EmptyState, ErrorState, Fab, HeaderActions, Icon, IconButton, Input, SaveStateButton, Sheet, Toast } from "../../ui";
+import { BookPickerList } from "../library/components/BookPickerList";
 import { ThemeGrid } from "../../ui/ThemeGrid";
 import { MuralThemeScope, radii, spacing, typography } from "../../ui/theme";
 import { MuralScreen } from "./MuralScreen";
@@ -92,7 +93,6 @@ export function MuralEditorScreen({ id }: { id: string }) {
   const [draftName, setDraftName] = useState("");
   const [nameError, setNameError] = useState<string | undefined>();
   const [picking, setPicking] = useState<PickerKind | null>(null);
-  const [search, setSearch] = useState("");
   const [quoteBook, setQuoteBook] = useState<Record<string, unknown> | null>(null);
   const [busy, setBusy] = useState(false);
   const [shareFor, setShareFor] = useState<Mural | null>(null);
@@ -107,8 +107,6 @@ export function MuralEditorScreen({ id }: { id: string }) {
   const groups = library?.data.groups ?? NO_GROUPS;
   const { width: windowWidth } = useWindowDimensions();
   const profile = user?.username ? { username: user.username, avatarUrl: user.avatarId ? `${API_URL}/auth/avatar/${user.avatarId}/file` : null } : undefined;
-  const needle = search.trim().toLowerCase();
-  const filteredBooks = needle ? books.filter((book) => `${book.Title ?? ""} ${book.Attribution ?? ""}`.toLowerCase().includes(needle)) : books;
 
   useFocusEffect(useCallback(() => {
     void muralQuery.refetch().then(({ data }) => {
@@ -310,15 +308,24 @@ export function MuralEditorScreen({ id }: { id: string }) {
             updateSelected((block) => block.type === "quote" ? { ...block, ...ref, mode: undefined } : block.type === "quoteCollection" ? { ...block, quotes: block.quotes.some((quote) => quote.bookKey === ref.bookKey && quote.highlightId === ref.highlightId) ? block.quotes : [...block.quotes, ref] } : block);
             setQuoteBook(null); setPicking(null);
           }} />)}{!Array.isArray(quoteBook.highlights) || quoteBook.highlights.length === 0 ? <Text style={{ color: colors.text }}>No saved passages in this book.</Text> : null}</> : null}
-          {picking === "book" && !quoteBook ? <><Input label="Search books" value={search} onChangeText={setSearch} autoCapitalize="none" autoCorrect={false} clearButtonMode="while-editing" returnKeyType="search" />{filteredBooks.map((book) => <Button key={bookKey(book)} label={String(book.Title ?? "Untitled")} variant="secondary" onPress={() => { if (selected?.type === "quote" || selected?.type === "quoteCollection") { setQuoteBook(book); return; } updateSelected((block) => {
-            const key = bookKey(book);
-            if (block.type === "spotlight") return { ...block, bookKey: key };
-            if (block.type === "shelf") return { ...block, collectionId: undefined, bookKeys: block.bookKeys.includes(key) ? block.bookKeys.filter((item) => item !== key) : [...block.bookKeys, key] };
-            return block;
-          }); if (selected?.type !== "shelf") setPicking(null); }} />)}</> : null}
+          {picking === "book" && !quoteBook ? <BookPickerList
+            books={books}
+            label="Search books"
+            isSelected={selected?.type === "shelf" ? (book) => selected.bookKeys.includes(bookKey(book)) : undefined}
+            onSelect={(book) => {
+              if (selected?.type === "quote" || selected?.type === "quoteCollection") { setQuoteBook(book); return; }
+              updateSelected((block) => {
+                const key = bookKey(book);
+                if (block.type === "spotlight") return { ...block, bookKey: key };
+                if (block.type === "shelf") return { ...block, collectionId: undefined, bookKeys: block.bookKeys.includes(key) ? block.bookKeys.filter((item) => item !== key) : [...block.bookKeys, key] };
+                return block;
+              });
+              if (selected?.type !== "shelf") setPicking(null);
+            }}
+          /> : null}
           {picking === "image" ? (gallery.data ?? []).map((image) => <Pressable accessibilityLabel={`Choose ${image.filename}`} accessibilityRole="button" key={image.id} onPress={() => { updateSelected((block) => block.type === "image" ? { ...block, imageId: image.id } : block); setPicking(null); }}><Text style={[typography.body, { color: colors.text }]}>{image.filename}</Text></Pressable>) : null}
           {picking === "tierlist" ? (tierlists.data ?? []).map((tierlist) => <Button key={tierlist.id} label={tierlist.name} variant="secondary" onPress={() => { updateSelected((block) => block.type === "tierlist" ? { ...block, tierlistId: tierlist.id } : block); setPicking(null); }} />) : null}
-          {picking && ((picking === "book" && filteredBooks.length === 0) || (picking === "image" && !gallery.data?.length) || (picking === "tierlist" && !tierlists.data?.length)) ? <EmptyState title="Nothing available" /> : null}
+          {picking && ((picking === "book" && books.length === 0) || (picking === "image" && !gallery.data?.length) || (picking === "tierlist" && !tierlists.data?.length)) ? <EmptyState title="Nothing available" /> : null}
         </ScrollView>
       </Sheet>
     </MuralScreen>

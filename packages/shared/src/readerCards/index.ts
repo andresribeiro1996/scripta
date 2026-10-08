@@ -6,3 +6,6 @@ export * from "./api.js";
 export { COUNTERS, drawCounter, type Counter, type CounterLayer } from "./counters.js";
 export { seedOf } from "./seed.js";
 export { hasChosen, readerCardPages, readerCardSummary, startTurn, turnBy, turnTo, type ReaderCardPage, type ReaderCardStep, type ReaderCardView, type TurnState } from "./pages.js";
+export { THUMBNAIL_MARKS, counterThumbnail, thumbnailSegments } from "./thumbnail.js";
+export { COUNTER_LABELS, LAYOUT_LABELS, TRAIT_LABELS } from "./labels.js";
+export { saveReaderCardStyle, type ReaderCardStyleCache } from "./save.js";

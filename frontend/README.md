@@ -21,6 +21,7 @@ Skim layer over the detailed sections below. Everything under `/dashboard/*` sit
 | `/dashboard/arena`, `/dashboard/arena/:id/seed` | `ArenaListPage.tsx` / `ArenaSeedPage.tsx` | book-bracket tournaments (owner side) |
 | `/arena`, `/arena/:id` | `PublicDiscoverPage` in `DiscoverPage.tsx` / `ArenaViewPage.tsx` | public and accountless: Discover, which sends signed-in visitors to `/community/discover`, and a single tournament |
 | `/dashboard/style` | `LibraryStylePage.tsx` | card/page styling for the three book-grid pages |
+| `/dashboard/reader-card` | `ReaderCardPage.tsx` | the reader card editor: counter, trait, layout, signature book and note, highlight, glyph; reached from "Edit card" in your own card's viewer and from Settings |
 | `/dashboard/settings` | `SettingsPage.tsx` | account + username + socials connections |
 | `/shared/library/:token`, `/shared/murals/:token` | `SharedLibraryPage.tsx` / `SharedMuralPage.tsx` | public share-link views, no account needed |
 

@@ -15,7 +15,7 @@ import { API_URL } from "../../../core/config";
 import { coverUrlForApi } from "../lib/coverUrl";
 import { ensureCoversHydrated, forgetResolvedCover, peekResolvedCover, resolveCover, type ResolveCoverParams } from "../api/covers";
 
-function coverParamsFor(book: Record<string, unknown>): ResolveCoverParams {
+export function coverParamsFor(book: Record<string, unknown>): ResolveCoverParams {
   const isbn = normalizeIsbn(book.ISBN);
   const imageId = normalizeImageId(book.ImageId);
   const title = String(book.Title ?? "").trim();

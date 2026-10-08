@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Group } from "./groups.js";
 import { bookKey } from "./merge.js";
-import { publicReaderCardOf, readerCardFacts, readerCardInputOf } from "./readerCardFacts.js";
+import { publicReaderCardOf, readerCardFacts, readerCardInputOf, visitorView } from "./readerCardFacts.js";
 import type { PublicReaderCard } from "./readerIdentity.js";
 
 type Book = Record<string, unknown>;
@@ -93,4 +93,40 @@ test("an older or newer server style still draws: missing fields and unknown opt
   const card: PublicReaderCard = { state: "settled", identity: "star", runnerUp: null, signal: null, coverage: [] };
   assert.deepEqual(readerCardInputOf([], [], "x", card).style, { counter: "dial", layout: "faces", trait: "both" });
   assert.equal(readerCardInputOf([], [], "x", { ...card, style: { counter: "dial", layout: "scroll" as never, trait: "both" } }).style.layout, "faces");
+});
+
+test("the owner's input draws their saved style and resolves their choices from the local library", () => {
+  const books = Array.from({ length: 6 }, (_, i) => book(i, { _genres: ["Fantasy"], highlights: mark(2) }));
+  const style = { counter: "ring", layout: "book", trait: "seal", signature: { bookKey: bookKey(books[0]!), note: "lent twice" }, highlight: { bookKey: bookKey(books[1]!), highlightId: "h1" } } as const;
+  const covers: string[] = [];
+  const input = readerCardInputOf(books, [], "andre", undefined, { style, coverOf: (item) => { covers.push(String(item.Title)); return "https://covers.example.org/0.jpg"; } });
+  assert.deepEqual(input.style, { counter: "ring", layout: "book", trait: "seal" });
+  assert.deepEqual(input.card.chosen, {
+    signature: { title: "Book 0", author: "Author 0", workId: null, coverUrl: "https://covers.example.org/0.jpg", note: "lent twice" },
+    highlight: { text: "line 1", title: "Book 1", author: "Author 1" },
+  });
+  assert.deepEqual(covers, ["Book 0"]);
+  assert.equal(input.view, "owner");
+});
+
+test("a choice whose book or highlight is gone is left out, and no style means the default with nothing chosen", () => {
+  const books = [book(1, { highlights: [{ Type: "note", Text: "mine", BookmarkID: "n1" }] })];
+  const style = { counter: "dial", layout: "faces", trait: "both", signature: { bookKey: "isbn:gone", note: null }, highlight: { bookKey: bookKey(books[0]!), highlightId: "n1" } } as const;
+  assert.deepEqual(readerCardInputOf(books, [], "andre", undefined, { style, coverOf: () => null }).card.chosen, {});
+  const plain = readerCardInputOf(books, [], "andre");
+  assert.equal("chosen" in plain.card, false);
+  assert.deepEqual(plain.style, { counter: "dial", layout: "faces", trait: "both" });
+});
+
+test("the visitors' preview of the owner's card drops the leaders, the missing line and the owner's plate line", () => {
+  const books = Array.from({ length: 2 }, (_, i) => book(i, { _genres: ["Fantasy"] }));
+  const owner = readerCardInputOf(books, [], "andre", undefined, { style: { counter: "beads", layout: "merged", trait: "line", signature: null, highlight: null }, coverOf: () => null });
+  const visitor = visitorView(owner);
+  assert.ok(owner.missing);
+  assert.equal(visitor.view, "visitor");
+  assert.equal(visitor.leaders, undefined);
+  assert.equal(visitor.missing, undefined);
+  assert.equal(visitor.unwrittenLine, "yet to be written");
+  assert.deepEqual(visitor.style, owner.style);
+  assert.deepEqual(visitor.card, { ...owner.card, style: owner.style });
 });

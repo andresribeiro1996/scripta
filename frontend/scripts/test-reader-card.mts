@@ -4,6 +4,7 @@ import { createElement } from "react";
 import { renderToString } from "react-dom/server";
 import { readerCardInputOf, type Layout, type PublicReaderCard } from "@scripta/shared";
 import { ReaderCardImage } from "../src/components/readerCard/ReaderCardImage";
+import { ReaderCardTurner } from "../src/components/readerCard/ReaderCardTurner";
 import { ReaderCardViewer } from "../src/components/readerCard/ReaderCardViewer";
 
 const card: PublicReaderCard = {
@@ -49,4 +50,21 @@ test("the page dots are white on the scrim, whatever the theme's surface is", ()
   assert.match(dots, /rounded-full bg-white"/);
   assert.match(dots, /rounded-full bg-white\/40"/);
   assert.doesNotMatch(dots, /bg-\(--color-surface\)/);
+});
+
+test("the turner is inline: no dialog, and off the scrim its dots take the page's text colour", () => {
+  const html = renderToString(createElement(ReaderCardTurner, { input: visitor("faces"), cardWidth: "w-64", spreadWidth: "w-full" }));
+  assert.doesNotMatch(html, /role="dialog"/);
+  assert.match(html, />Page 1 of 3</);
+  const dots = html.slice(html.indexOf('aria-label="Pages"'));
+  assert.match(dots, /bg-\(--color-text\)/);
+  assert.doesNotMatch(dots, /bg-white/);
+});
+
+test("only the owner's viewer offers Edit card, and only when it can go somewhere", () => {
+  const owner = readerCardInputOf([], [], "andre");
+  const noop = () => undefined;
+  assert.match(renderToString(createElement(ReaderCardViewer, { input: owner, onClose: noop, onEdit: noop })), />Edit card</);
+  assert.doesNotMatch(renderToString(createElement(ReaderCardViewer, { input: owner, onClose: noop })), /Edit card/);
+  assert.doesNotMatch(renderToString(createElement(ReaderCardViewer, { input: visitor("faces"), onClose: noop, onEdit: noop })), /Edit card/);
 });

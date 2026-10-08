@@ -1,6 +1,7 @@
 import { AccountSecuritySection } from "../auth/AccountSecuritySection";
 import { DeleteAccountSection } from "../auth/DeleteAccountSection";
 import { useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { Avatar } from "../components/Avatar";
 import { FontPicker } from "../components/FontPicker";
@@ -165,6 +166,12 @@ export function SettingsPage() {
           {error && <p className="mt-2 text-xs text-(--color-danger)">{error}</p>}
           {success && <p className="mt-2 text-xs text-(--color-accent)">Username updated.</p>}
         </div>
+      </section>
+
+      <section className="mt-5 rounded-xl border border-(--color-border) bg-(--color-surface) p-5">
+        <h3 className="mb-1 text-sm font-semibold">Reader card</h3>
+        <p className="mb-3 text-xs text-(--color-text-dim)">Choose your card's counter, layout, signature book and highlight.</p>
+        <Link to="/dashboard/reader-card" className="text-xs font-semibold text-(--color-accent)">Edit card</Link>
       </section>
 
       <AccountSecuritySection />

@@ -31,11 +31,11 @@ export function Chip({ label, selected, onPress, fontFamily }: { label: string; 
   );
 }
 
-export function Tile({ label, selected, onPress, width = 64, children }: { label: string; selected: boolean; onPress: () => void; width?: number; children: ReactNode }) {
+export function Tile({ label, selected, onPress, width = 64, tileWidth = 64, height = 48, children }: { label: string; selected: boolean; onPress: () => void; width?: number; tileWidth?: number; height?: number; children: ReactNode }) {
   const { colors } = useTheme();
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected }} onPress={onPress} style={[styles.tileWrap, { width }]}>
-      <View style={[styles.tile, { borderColor: selected ? colors.accent : colors.border, borderWidth: selected ? 2 : 1, backgroundColor: selected ? colors.accentSoft : colors.surface }]}>{children}</View>
+      <View style={[styles.tile, { width: tileWidth, height, borderColor: selected ? colors.accent : colors.border, borderWidth: selected ? 2 : 1, backgroundColor: selected ? colors.accentSoft : colors.surface }]}>{children}</View>
       <Text style={[typography.caption, { color: colors.textDim, alignSelf: "stretch", textAlign: "center" }]}>{label}</Text>
     </Pressable>
   );
@@ -190,7 +190,7 @@ const styles = StyleSheet.create({
   sectionTitle: { ...typography.caption, fontWeight: "700", letterSpacing: 0.4 },
   chip: { minHeight: minimumTouchTarget, justifyContent: "center", borderWidth: 1, borderRadius: radii.md, paddingHorizontal: spacing.md },
   tileWrap: { alignItems: "center", gap: spacing.xs },
-  tile: { width: 64, height: 48, borderRadius: radii.md, alignItems: "center", justifyContent: "center" },
+  tile: { borderRadius: radii.md, alignItems: "center", justifyContent: "center" },
   custom: { alignItems: "center", justifyContent: "center" },
   row: { gap: spacing.sm },
   rowLabel: { fontWeight: "600" },
