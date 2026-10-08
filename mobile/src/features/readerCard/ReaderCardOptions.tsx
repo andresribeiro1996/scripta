@@ -28,7 +28,7 @@ const FINISH_HINTS: Record<Finish, string> = {
   foil: "Metallic ink",
   holo: "Iridescent ink and sheen",
   vellum: "Translucent, mottled",
-  watercolor: "Washes of the plate ink behind the emblem and name, runner-up ink behind the seal",
+  watercolor: "Soft washes behind the emblem and name",
   gilt: "Gold frame, corners and edge",
   stamp: "Uneven, broken, slightly rotated ink",
   kraft: "Brown wrapping paper",
