@@ -1,7 +1,7 @@
 import fastifyMultipart from "@fastify/multipart";
 import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { COUNTERS, LAYOUTS, SIGNATURE_NOTE_MAX, TRAITS, type LibraryChange } from "@scripta/shared";
+import { CARD_PRINTS, CORNER_STYLES, COUNTERS, FOOTER_LEFTS, FOOTER_RIGHTS, LAYOUTS, MOTTO_LOOKS, MOTTO_MAX, SIGNATURE_NOTE_MAX, TRAITS, type LibraryChange } from "@scripta/shared";
 import { createWriteStream } from "node:fs";
 import { mkdtemp, readdir, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -99,6 +99,10 @@ const readerCardStylePatchSchema = z.object({
   counter: z.enum(COUNTERS).optional(),
   layout: z.enum(LAYOUTS).optional(),
   trait: z.enum(TRAITS).optional(),
+  motto: z.object({ text: z.string().trim().min(1).max(MOTTO_MAX), look: z.enum(MOTTO_LOOKS) }).strict().nullable().optional(),
+  footer: z.object({ left: z.enum(FOOTER_LEFTS), right: z.enum(FOOTER_RIGHTS) }).strict().optional(),
+  corners: z.enum(CORNER_STYLES).optional(),
+  print: z.enum(CARD_PRINTS).optional(),
   signature: z.object({ bookKey: bookKeySchema, note: z.string().trim().max(SIGNATURE_NOTE_MAX).nullable().default(null) }).strict().nullable().optional(),
   highlight: z.object({ bookKey: bookKeySchema, highlightId: z.string().min(1).max(200) }).strict().nullable().optional(),
 }).strict();

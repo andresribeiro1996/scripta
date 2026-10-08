@@ -530,6 +530,40 @@ test("PATCH reader card style stores a known layout", async () => {
   await app.close();
 });
 
+test("PATCH reader card style stores a motto, both footer corners, the corners and the print", async () => {
+  const { app } = await setup();
+  const payload = { motto: { text: "  Per libros ad astra ", look: "arc" }, footer: { left: "since", right: "initials" }, corners: "laurel", print: "reversed" };
+  const response = await app.inject({ method: "PATCH", url: styleUrl, headers: asUser("u1"), payload });
+  assert.equal(response.statusCode, 200);
+  const body = response.json();
+  assert.deepEqual(body.motto, { text: "Per libros ad astra", look: "arc" });
+  assert.deepEqual(body.footer, { left: "since", right: "initials" });
+  assert.equal(body.corners, "laurel");
+  assert.equal(body.print, "reversed");
+  const cleared = await app.inject({ method: "PATCH", url: styleUrl, headers: asUser("u1"), payload: { motto: null } });
+  assert.equal(cleared.json().motto, null);
+  assert.equal(cleared.json().corners, "laurel");
+  await app.close();
+});
+
+test("PATCH reader card style rejects a bad motto, half a footer and unknown decorations", async () => {
+  const { app } = await setup();
+  for (const payload of [
+    { motto: { text: "a".repeat(29), look: "arc" } },
+    { motto: { text: "   ", look: "arc" } },
+    { motto: { text: "x", look: "neon" } },
+    { motto: { text: "x", look: "arc", colour: "red" } },
+    { footer: { left: "since" } },
+    { footer: { left: "since", right: "neon" } },
+    { corners: "neon" },
+    { print: "dark" },
+  ]) {
+    const response = await app.inject({ method: "PATCH", url: styleUrl, headers: asUser("u1"), payload });
+    assert.equal(response.statusCode, 400, JSON.stringify(payload));
+  }
+  await app.close();
+});
+
 test("a counter or trait change keeps the stored signature and highlight", async () => {
   const { app, service } = await setup();
   service.saveLibrary("u1", { books: [wizard], groups: [] });
