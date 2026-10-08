@@ -1,5 +1,5 @@
 import { useDeferredValue, useMemo, useRef, useState } from "react";
-import { CARD_PRINTS, CORNER_LABELS, CORNER_STYLES, COUNTERS, COUNTER_LABELS, FOOTER_LEFTS, FOOTER_LEFT_LABELS, FOOTER_RIGHTS, FOOTER_RIGHT_LABELS, LAYOUTS, LAYOUT_LABELS, MOTTO_LOOKS, MOTTO_LOOK_LABELS, MOTTO_MAX, PRINT_LABELS, TRAITS, TRAIT_LABELS, counterThumbnail, styleThumbnail, type MottoLook, type ReaderCardBase } from "@scripta/shared";
+import { CARD_PRINTS, CORNER_LABELS, CORNER_STYLES, COUNTERS, COUNTER_LABELS, FINISHES, FINISH_LABELS, FOOTER_LEFTS, FOOTER_LEFT_LABELS, FOOTER_RIGHTS, FOOTER_RIGHT_LABELS, LAYOUTS, LAYOUT_LABELS, MOTTO_LOOKS, MOTTO_LOOK_LABELS, MOTTO_MAX, PRINT_LABELS, TRAITS, TRAIT_LABELS, counterThumbnail, styleThumbnail, type MottoLook, type ReaderCardBase } from "@scripta/shared";
 import type { ThemeScheme } from "@scripta/shared/themes";
 import { DraftField } from "./DraftField";
 import { ReaderCardImage } from "./ReaderCardImage";
@@ -52,7 +52,7 @@ function Chips<T extends string>({ label, options, labels, value, onPick }: { la
 }
 
 export function ReaderCardOptions({ input, scheme, onChange }: { input: ReaderCardBase; scheme: ThemeScheme; onChange: SaveStyle }) {
-  const { counter, trait, layout, motto, footer, corners, print } = input.style;
+  const { counter, trait, layout, motto, footer, corners, finish, print } = input.style;
   const [look, setLook] = useState<MottoLook>(motto?.look ?? "ribbon");
   const lastText = useRef(motto?.text ?? null);
   const deferred = useDeferredValue(input);
@@ -60,6 +60,7 @@ export function ReaderCardOptions({ input, scheme, onChange }: { input: ReaderCa
   const counterThumbs = useMemo(() => COUNTERS.map((option) => ({ option, input: counterThumbnail(base, option) })), [base]);
   const mottoThumbs = useMemo(() => new Map(MOTTO_LOOKS.map((option) => [option, styleThumbnail(base, { motto: { text: base.style.motto?.text ?? SAMPLE_MOTTO, look: option } }, "motto")])), [base]);
   const cornerThumbs = useMemo(() => new Map(CORNER_STYLES.map((option) => [option, styleThumbnail(base, { corners: option }, "corner")])), [base]);
+  const finishThumbs = useMemo(() => new Map(FINISHES.map((option) => [option, styleThumbnail(base, { finish: option })])), [base]);
   const saveMotto = (text: string | null) => {
     const previous = lastText.current;
     lastText.current = text;
@@ -110,6 +111,10 @@ export function ReaderCardOptions({ input, scheme, onChange }: { input: ReaderCa
       <section>
         <h3 className="mb-2 text-sm font-semibold">Corners</h3>
         <Thumbnails label="Corners" options={CORNER_STYLES} labels={CORNER_LABELS} value={corners} thumbnail={(option) => cornerThumbs.get(option)!} onPick={(next) => void onChange({ corners: next })} columns="grid-cols-4 sm:grid-cols-6" />
+      </section>
+      <section>
+        <h3 className="mb-2 text-sm font-semibold">Finish</h3>
+        <Thumbnails label="Finish" options={FINISHES} labels={FINISH_LABELS} value={finish} thumbnail={(option) => finishThumbs.get(option)!} onPick={(next) => void onChange({ finish: next })} columns="grid-cols-4 sm:grid-cols-6" />
       </section>
       <section>
         <h3 className="mb-2 text-sm font-semibold">Print</h3>

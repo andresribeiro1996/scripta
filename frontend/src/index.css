@@ -381,7 +381,19 @@ input[type="range"]:focus-visible::-moz-range-thumb {
    reports `finished`, and the element stays pinned at the FROM values
    forever. Measured, not guessed — it left every dialog in the app at
    opacity 0. */
+@keyframes card-shine-sweep {
+  from {
+    background-position: 25% 0;
+  }
+  to {
+    background-position: 75% 0;
+  }
+}
+
 @media (prefers-reduced-motion: no-preference) {
+  .card-shine-idle {
+    animation: card-shine-sweep 9s ease-in-out infinite alternate;
+  }
   html {
     scroll-behavior: smooth;
   }

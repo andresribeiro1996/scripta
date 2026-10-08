@@ -141,3 +141,11 @@ test("thumbnails render from a deferred input, and a picked look pairs with the 
   assert.match(pick, /lastText\.current/);
   assert.doesNotMatch(pick, /motto[.?]/);
 });
+
+test("twelve finish thumbnails between corners and print, with the stored one checked", () => {
+  const html = options({ finish: "gilt" });
+  const finishes = group(html, "Finish");
+  assert.equal(finishes.match(/role="radio"/g)?.length, 12);
+  assert.match(finishes, /aria-checked="true"[^>]*>(?:(?!<\/button>).)*Gilt edge/s);
+  assert.ok(html.indexOf(`aria-label="Corners"`) < html.indexOf(`aria-label="Finish"`) && html.indexOf(`aria-label="Finish"`) < html.indexOf(`aria-label="Print"`));
+});
