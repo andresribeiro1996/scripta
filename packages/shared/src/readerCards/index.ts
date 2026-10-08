@@ -5,7 +5,7 @@ export * from "./style.js";
 export * from "./api.js";
 export { COUNTERS, drawCounter, type Counter, type CounterLayer } from "./counters.js";
 export { seedOf } from "./seed.js";
-export { hasChosen, readerCardPages, readerCardSummary, startTurn, turnBy, turnTo, type ReaderCardPage, type ReaderCardStep, type ReaderCardView, type TurnState } from "./pages.js";
+export { hasChosen, readerCardPages, readerCardSummary, startTurn, turnBy, turnTo, turnToPage, type ReaderCardPage, type ReaderCardStep, type ReaderCardView, type TurnState } from "./pages.js";
 export { THUMBNAIL_MARKS, counterThumbnail, styleThumbnail, thumbnailSegments } from "./thumbnail.js";
 export { CORNER_LABELS, COUNTER_LABELS, FOOTER_LEFT_LABELS, FOOTER_RIGHT_LABELS, LAYOUT_LABELS, MOTTO_LOOK_LABELS, PRINT_LABELS, TRAIT_LABELS } from "./labels.js";
 export { READER_CARD_STYLE_KEY, saveReaderCardStyle, saveReaderCardStyleIn, type ReaderCardStyleCache, type ReaderCardStyleQueries } from "./save.js";

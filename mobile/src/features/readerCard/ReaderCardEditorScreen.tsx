@@ -16,7 +16,7 @@ import { useOwnCardStyle, useReaderCardStyle, useSaveReaderCardStyle } from "./u
 const NO_BOOKS: Array<Record<string, unknown>> = [];
 const PREVIEW_MAX = 280;
 const PIN_SHARE = 0.4;
-const BACK_KEYS = ["layout", "signature", "highlight"];
+const pageFor = (patch: ReaderCardStylePatch): ReaderCardPage => ("layout" in patch || "signature" in patch || "highlight" in patch ? "chosen" : "front");
 const PIN_CHROME = minimumTouchTarget + spacing.md + spacing.sm * 2;
 
 export function ReaderCardEditorScreen() {
@@ -38,9 +38,9 @@ export function ReaderCardEditorScreen() {
 
   const change = async (patch: ReaderCardStylePatch) => {
     setError(null);
+    setFace({ page: pageFor(patch) });
     try {
       await save(patch);
-      setFace({ page: Object.keys(patch).some((key) => BACK_KEYS.includes(key)) ? "chosen" : "front" });
       return true;
     } catch (reason) {
       setError(saveFailureMessage(reason, "Couldn't save your reader card."));

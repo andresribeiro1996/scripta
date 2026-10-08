@@ -25,7 +25,7 @@ const TRAIT_OPTIONS = options(TRAITS, TRAIT_LABELS);
 const LAYOUT_OPTIONS = options(LAYOUTS, LAYOUT_LABELS);
 const PRINT_OPTIONS = options(CARD_PRINTS, PRINT_LABELS);
 
-const leftDetail = (value: FooterLeft, text: string | null) => (value === "glyph" ? "Your glyph" : value === "none" ? "Nothing" : text ?? UNAVAILABLE);
+const leftDetail = (value: FooterLeft, text: string | null, hasPlate: boolean) => (value === "glyph" ? (hasPlate ? "Your glyph" : UNAVAILABLE) : value === "none" ? "Nothing" : text ?? UNAVAILABLE);
 const rightDetail = (value: FooterRight, text: string | null) => (value === "none" ? "Nothing" : text ?? UNAVAILABLE);
 const withText = (label: string, text: string | null) => (text ? `${label} · ${text}` : label);
 
@@ -60,6 +60,11 @@ export function GroupHeader({ title }: { title: string }) {
 export function useMotto(input: ReaderCardBase, onChange: SaveStyle) {
   const motto = input.style.motto;
   const [look, setLook] = useState<MottoLook>(motto?.look ?? "ribbon");
+  const [seen, setSeen] = useState(motto?.look);
+  if (motto && motto.look !== seen) {
+    setSeen(motto.look);
+    setLook(motto.look);
+  }
   const lastText = useRef(motto?.text ?? null);
   const saveMotto = (text: string | null) => {
     const previous = lastText.current;
@@ -77,7 +82,7 @@ export function useMotto(input: ReaderCardBase, onChange: SaveStyle) {
       if (!saved) setLook(previous);
     });
   };
-  return { look: motto?.look ?? look, saveMotto, pickLook };
+  return { look, saveMotto, pickLook };
 }
 
 type Motto = ReturnType<typeof useMotto>;
@@ -158,7 +163,7 @@ function FooterPanel({ side, input, onChange }: { side: "footerLeft" | "footerRi
   return (
     <View accessibilityRole="radiogroup" style={styles.list}>
       {side === "footerLeft"
-        ? FOOTER_LEFTS.map((value) => <OptionRow key={value} label={FOOTER_LEFT_LABELS[value]} detail={leftDetail(value, footerLeftText(value, input.card))} selected={footer.left === value} onPress={() => void onChange({ footer: { ...footer, left: value } })} />)
+        ? FOOTER_LEFTS.map((value) => <OptionRow key={value} label={FOOTER_LEFT_LABELS[value]} detail={leftDetail(value, footerLeftText(value, input.card), input.card.state !== "unwritten" && Boolean(input.card.identity))} selected={footer.left === value} onPress={() => void onChange({ footer: { ...footer, left: value } })} />)
         : FOOTER_RIGHTS.map((value) => <OptionRow key={value} label={FOOTER_RIGHT_LABELS[value]} detail={rightDetail(value, footerRightText(value, input.readerName))} selected={footer.right === value} onPress={() => void onChange({ footer: { ...footer, right: value } })} />)}
     </View>
   );

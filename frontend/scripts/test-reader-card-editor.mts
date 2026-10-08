@@ -28,7 +28,7 @@ test("five counter thumbnails, with only the chosen one checked", () => {
 
 test("trait and layout show their names and press the current one", () => {
   const html = options();
-  for (const name of ["Both", "Seal", "Line", "None", "Three faces", "Book", "One back"]) assert.match(html, new RegExp(`>${name}<`));
+  for (const name of ["Both", "Seal", "Line", "None", "Flip", "Book", "One back"]) assert.match(html, new RegExp(`>${name}<`));
   assert.match(html, /aria-pressed="true"[^>]*>Seal</);
   assert.match(html, /aria-pressed="true"[^>]*>Book</);
 });

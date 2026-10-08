@@ -47,7 +47,7 @@ test("a card without a dial stays without one", () => {
 test("every option has a name", () => {
   assert.deepEqual(COUNTERS.map((key) => COUNTER_LABELS[key]), ["Dial", "Beads", "Shelf", "Frame", "Ring"]);
   assert.deepEqual(TRAITS.map((key) => TRAIT_LABELS[key]), ["Both", "Seal", "Line", "None"]);
-  assert.deepEqual(LAYOUTS.map((key) => LAYOUT_LABELS[key]), ["Three faces", "Book", "One back"]);
+  assert.deepEqual(LAYOUTS.map((key) => LAYOUT_LABELS[key]), ["Flip", "Book", "One back"]);
 });
 
 test("a style thumbnail swaps any option, scales the dial and can crop to a region", () => {

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AccessibilityInfo, Pressable, StyleSheet, View } from "react-native";
 import PagerView from "react-native-pager-view";
 import Animated, { Easing, ReduceMotion, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
-import { hasChosen, readerCardPages, readerCardSummary, startTurn, turnBy, turnTo, type ReaderCardBase, type ReaderCardPage, type TurnState } from "@scripta/shared";
+import { hasChosen, readerCardPages, readerCardSummary, startTurn, turnBy, turnTo, turnToPage, type ReaderCardBase, type ReaderCardPage } from "@scripta/shared";
 import { MOTION } from "@scripta/shared/themes";
 import { minimumTouchTarget, radii, spacing, useReducedMotion, useTheme } from "../../ui";
 import { PLATE_RATIO, ReaderCardImage } from "./ReaderCardImage";
@@ -10,11 +10,6 @@ import { PLATE_RATIO, ReaderCardImage } from "./ReaderCardImage";
 const EASE = Easing.bezier(MOTION.ease[0], MOTION.ease[1], MOTION.ease[2], MOTION.ease[3]);
 const TURN_MS = 450;
 const DOT_ON_SCRIM = "#ffffff";
-
-function turnToPage(state: TurnState, pages: ReaderCardPage[], page: ReaderCardPage): TurnState {
-  const index = [pages.indexOf(page), pages.indexOf("merged")].find((found) => found >= 0) ?? 1;
-  return turnTo(state, index, index > state.index ? 1 : -1);
-}
 
 export function ReaderCardTurner({ input, width, onScrim = false, page }: { input: ReaderCardBase; width: number; onScrim?: boolean; page?: { page: ReaderCardPage } }) {
   const { colors } = useTheme();
@@ -28,7 +23,8 @@ export function ReaderCardTurner({ input, width, onScrim = false, page }: { inpu
     setAsked(page);
     if (page) setTurn((state) => turnToPage(state, pages, page.page));
   }
-  const rotation = useSharedValue(0);
+  const [initialPage] = useState(turn.index);
+  const rotation = useSharedValue(turn.rotation);
   const pager = useRef<PagerView>(null);
   const announced = useRef(false);
   const isPager = input.style.layout === "book";
@@ -59,7 +55,7 @@ export function ReaderCardTurner({ input, width, onScrim = false, page }: { inpu
   return (
     <View style={styles.turner}>
       {isPager ? (
-        <PagerView ref={pager} initialPage={0} onPageSelected={(event) => { const index = event.nativeEvent.position; setTurn((state) => (state.index === index ? state : { ...state, index })); }} style={size}>
+        <PagerView ref={pager} initialPage={initialPage} onPageSelected={(event) => { const index = event.nativeEvent.position; setTurn((state) => (state.index === index ? state : { ...state, index })); }} style={size}>
           {pages.map((page, i) => (
             <View key={i} collapsable={false} accessible accessibilityRole="image" accessibilityLabel={i === 0 ? `${summary} Page 1 of ${pages.length}.` : `Page ${i + 1} of ${pages.length}`}>
               <ReaderCardImage input={input} page={page} width={width} />
