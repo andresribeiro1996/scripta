@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { SIGNATURE_NOTE_MAX, bookKey, bookPassages, isFinishedBook, searchPassages, type ChosenHighlight, type ChosenSignature, type Passage, type ReaderCardChosen, type ReaderCardStylePatch } from "@scripta/shared";
+import { SIGNATURE_NOTE_MAX, bookKey, bookPassages, isFinishedBook, noteToSend, searchPassages, type ChosenHighlight, type ChosenSignature, type Passage, type ReaderCardChosen, type ReaderCardStylePatch } from "@scripta/shared";
 import { BookSearchList } from "../murals/pickers";
 
 export type SaveStyle = (patch: ReaderCardStylePatch) => Promise<boolean>;
@@ -8,11 +8,6 @@ type Book = Record<string, unknown>;
 const NOTE_DELAY_MS = 600;
 const LINK = "text-xs font-semibold text-(--color-accent)";
 const DIM = "text-sm text-(--color-text-dim)";
-
-export function noteToSend(value: string, lastSent: string | null): string | null | undefined {
-  const note = value.trim() || null;
-  return note === lastSent ? undefined : note;
-}
 
 function NoteField({ signature, onChange }: { signature: ChosenSignature; onChange: SaveStyle }) {
   const [draft, setDraft] = useState(signature.note ?? "");

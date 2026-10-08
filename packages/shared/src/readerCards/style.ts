@@ -6,6 +6,11 @@ export const LAYOUTS = ["faces", "book", "merged"] as const;
 export type Layout = (typeof LAYOUTS)[number];
 export const SIGNATURE_NOTE_MAX = 60;
 
+export function noteToSend(value: string, lastSent: string | null): string | null | undefined {
+  const note = value.trim() || null;
+  return note === lastSent ? undefined : note;
+}
+
 export interface ChosenSignature { bookKey: string; note: string | null }
 export interface ChosenHighlight { bookKey: string; highlightId: string }
 

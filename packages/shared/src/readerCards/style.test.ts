@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { DEFAULT_READER_CARD_STYLE, normalizeReaderCardStyle, publicStyle, rekeyReaderCardStyle } from "./style.js";
+import { DEFAULT_READER_CARD_STYLE, noteToSend, normalizeReaderCardStyle, publicStyle, rekeyReaderCardStyle } from "./style.js";
 
 test("the default style chooses no book and no highlight", () => {
   assert.deepEqual(DEFAULT_READER_CARD_STYLE, { counter: "dial", layout: "faces", trait: "both", signature: null, highlight: null });
@@ -45,4 +45,11 @@ test("a layout is kept when known and falls back to faces otherwise", () => {
   assert.equal(normalizeReaderCardStyle({ layout: "book" }).layout, "book");
   assert.equal(normalizeReaderCardStyle({ layout: "scroll" }).layout, "faces");
   assert.deepEqual(publicStyle(normalizeReaderCardStyle({ layout: "merged", signature: { bookKey: "k" } })), { counter: "dial", layout: "merged", trait: "both" });
+});
+
+test("a note is sent trimmed, cleared as null, and never twice in a row", () => {
+  assert.equal(noteToSend("  lent twice ", null), "lent twice");
+  assert.equal(noteToSend("   ", "lent twice"), null);
+  assert.equal(noteToSend("lent twice", "lent twice"), undefined);
+  assert.equal(noteToSend("", null), undefined);
 });
