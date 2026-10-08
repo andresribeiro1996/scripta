@@ -28,6 +28,7 @@ import { Button, EmptyState, ErrorState, IconButton, Input, Menu, Screen, Sheet,
 import { spacing, typography, useTheme } from "../../../ui/theme";
 import { useMurals } from "../../murals/useMurals";
 import { useLibrary } from "../hooks/useLibrary";
+import { BookPickerList } from "./BookPickerList";
 import { assertSaved, attemptUpdate } from "../lib/attemptUpdate";
 import { BookCard } from "./BookCard";
 import { BookWrapGrid } from "./BookWrapGrid";
@@ -248,38 +249,12 @@ function BookPickerSheet({
   onToggle: (book: Record<string, unknown>, inGroup: boolean) => void;
   onClose: () => void;
 }) {
-  const { colors } = useTheme();
-  const [search, setSearch] = useState("");
   const memberKeys = new Set(group.bookKeys);
-  const needle = search.trim().toLowerCase();
-  const filtered = needle
-    ? allBooks.filter((b) => String(b.Title ?? "").toLowerCase().includes(needle) || String(b.Attribution ?? "").toLowerCase().includes(needle))
-    : allBooks;
 
   return (
     <Sheet visible title={`Books in "${group.name}"`} onClose={onClose}>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: spacing.xs, paddingBottom: spacing.xl }}>
-        <Input label="Search your library" value={search} onChangeText={setSearch} autoCapitalize="none" autoCorrect={false} clearButtonMode="while-editing" returnKeyType="search" />
-        {filtered.length === 0 && <Text style={[typography.body, { color: colors.textDim }]}>No books match.</Text>}
-        {filtered.map((book, i) => {
-          const key = bookKey(book);
-          const inGroup = memberKeys.has(key);
-          return (
-            <Pressable
-              accessibilityLabel={`${inGroup ? "Remove" : "Add"} ${String(book.Title ?? "book")}`}
-              accessibilityRole="checkbox"
-              accessibilityState={{ checked: inGroup }}
-              key={String(book.ContentID ?? i)}
-              onPress={() => onToggle(book, inGroup)}
-              style={[styles.pickerRow, { backgroundColor: inGroup ? colors.accentSoft : "transparent" }]}
-            >
-              <Text style={[typography.body, { color: colors.text, flex: 1 }]} numberOfLines={1}>
-                {String(book.Title ?? "Untitled")} — <Text style={{ color: colors.textDim }}>{String(book.Attribution ?? "Unknown author")}</Text>
-              </Text>
-              <Text style={{ color: colors.accent, fontWeight: "700" }}>{inGroup ? "✓" : ""}</Text>
-            </Pressable>
-          );
-        })}
+        <BookPickerList books={allBooks} isSelected={(book) => memberKeys.has(bookKey(book))} onSelect={(book) => onToggle(book, memberKeys.has(bookKey(book)))} />
       </ScrollView>
     </Sheet>
   );
@@ -289,5 +264,4 @@ const styles = StyleSheet.create({
   content: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.huge },
   topRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   nameFlex: { flex: 1 },
-  pickerRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, minHeight: 44, paddingHorizontal: spacing.sm, borderRadius: 8 },
 });
