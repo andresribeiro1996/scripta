@@ -17,6 +17,7 @@ export interface PlateFace {
   reader: string;
   width: number;
   label: string;
+  viewBox?: readonly [number, number, number, number];
 }
 
 export interface PlateSlots {
@@ -36,7 +37,11 @@ export interface PlateSlots {
 
 const DIAMONDS = [[16, 16], [234, 16], [16, 334], [234, 334]].map(([x, y]) => `M${x} ${y! - 4.5}L${x! + 4.5} ${y}L${x} ${y! + 4.5}L${x! - 4.5} ${y}Z`).join("");
 
-const openSvg = (face: PlateFace) => `<svg xmlns="http://www.w3.org/2000/svg" class="plate id-${face.key}" viewBox="0 0 250 350" width="${face.width}" height="${+(face.width * 1.4).toFixed(2)}" role="img" aria-label="${face.label}">`;
+const openSvg = (face: PlateFace) => {
+  const [x, y, w, h] = face.viewBox ?? [0, 0, 250, 350];
+  const height = face.viewBox ? +((face.width * h) / w).toFixed(2) : +(face.width * 1.4).toFixed(2);
+  return `<svg xmlns="http://www.w3.org/2000/svg" class="plate id-${face.key}" viewBox="${x} ${y} ${w} ${h}" width="${face.width}" height="${height}" role="img" aria-label="${face.label}">`;
+};
 const GROUND = `<rect class="pg" width="250" height="350" rx="4"/>`;
 const FRAME = [`<rect class="pl" x="10" y="10" width="230" height="330" stroke-width="1.6"/>`, `<rect class="pl" x="16" y="16" width="218" height="318" stroke-width=".6"/>`];
 const corners = (slots: PlateSlots) => slots.corners ?? `<path class="pf" d="${DIAMONDS}"/>`;

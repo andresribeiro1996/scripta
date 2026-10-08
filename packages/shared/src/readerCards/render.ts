@@ -11,6 +11,13 @@ import type { PublicReaderCardStyle } from "./style.js";
 import { escape } from "./svgText.js";
 
 export type PlatePrint = "paper" | "reversed";
+export type CardCrop = "motto" | "corner";
+export const CARD_CROPS: Record<CardCrop, readonly [number, number, number, number]> = { motto: [30, 18, 190, 210], corner: [0, 0, 100, 100] };
+export function cardRatio(crop?: CardCrop): number {
+  if (!crop) return 1.4;
+  const [, , w, h] = CARD_CROPS[crop];
+  return h / w;
+}
 export type CardState = "settled" | "leaning" | "unwritten";
 
 export interface RenderPlateOptions {
@@ -21,6 +28,7 @@ export interface RenderPlateOptions {
   label: string;
   unwrittenLine?: string;
   width?: number;
+  crop?: CardCrop;
 }
 
 function inks(key: IdentityKey | "graph", print: PlatePrint): [string, string] {
@@ -45,14 +53,14 @@ const withStyle = (svg: string, [g, l]: [string, string]) => {
   }));
 };
 
-function faceOf({ identity, state, readerName, label, unwrittenLine, width = 250 }: RenderPlateOptions): { face: PlateFace; ink: IdentityKey | "graph" } {
+function faceOf({ identity, state, readerName, label, unwrittenLine, width = 250, crop }: RenderPlateOptions): { face: PlateFace; ink: IdentityKey | "graph" } {
   const reader = escape(truncateName(readerName).toUpperCase());
   const safeLabel = escape(label);
   if (state === "unwritten" || !identity) {
-    return { ink: "graph", face: { key: "none", emblemSvg: emblems.none(), name: "Unwritten", eyebrow: "NOT YET", epithet: escape(unwrittenLine ?? "five finished books to begin"), numeral: "—", reader, width, label: safeLabel } };
+    return { ink: "graph", face: { key: "none", emblemSvg: emblems.none(), name: "Unwritten", eyebrow: "NOT YET", epithet: escape(unwrittenLine ?? "five finished books to begin"), numeral: "—", reader, width, label: safeLabel, ...(crop ? { viewBox: CARD_CROPS[crop] } : {}) } };
   }
   const p = PLATES.find((item) => item.key === identity)!;
-  return { ink: identity, face: { key: identity, emblemSvg: emblems[identity](), name: p.name, eyebrow: state === "leaning" ? "LEANING TOWARD" : "THE", epithet: p.epithet, numeral: p.numeral, reader, width, label: safeLabel } };
+  return { ink: identity, face: { key: identity, emblemSvg: emblems[identity](), name: p.name, eyebrow: state === "leaning" ? "LEANING TOWARD" : "THE", epithet: p.epithet, numeral: p.numeral, reader, width, label: safeLabel, ...(crop ? { viewBox: CARD_CROPS[crop] } : {}) } };
 }
 
 export function renderPlate(options: RenderPlateOptions): string {
@@ -69,6 +77,7 @@ export interface ReaderCardInput {
   unwrittenLine?: string;
   seed: number;
   width?: number;
+  crop?: CardCrop;
   view?: ReaderCardView;
   leaders?: ReaderLeader[];
   missing?: string | null;
