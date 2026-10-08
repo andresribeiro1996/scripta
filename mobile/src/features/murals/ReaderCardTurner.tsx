@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AccessibilityInfo, Pressable, StyleSheet, View } from "react-native";
 import PagerView from "react-native-pager-view";
-import Animated, { Easing, ReduceMotion, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import Animated, { Easing, ReduceMotion, useAnimatedStyle, useSharedValue, withTiming, type SharedValue } from "react-native-reanimated";
 import { hasChosen, readerCardPages, readerCardSummary, startTurn, turnBy, turnTo, turnToPage, type ReaderCardBase, type ReaderCardPage } from "@scripta/shared";
 import { MOTION } from "@scripta/shared/themes";
 import { minimumTouchTarget, radii, spacing, useReducedMotion, useTheme } from "../../ui";
@@ -29,8 +29,12 @@ export function ReaderCardTurner({ input, width, onScrim = false, page }: { inpu
   const announced = useRef(false);
   const isPager = input.style.layout === "book";
 
+  const [rest, setRest] = useState(turn.rotation);
+
   useEffect(() => {
     rotation.set(reduced ? turn.rotation : withTiming(turn.rotation, { duration: TURN_MS, easing: EASE, reduceMotion: ReduceMotion.System }));
+    const timer = setTimeout(() => setRest(turn.rotation), reduced ? 0 : TURN_MS + 100);
+    return () => clearTimeout(timer);
   }, [turn.rotation, reduced, rotation]);
 
   useEffect(() => {
@@ -47,8 +51,6 @@ export function ReaderCardTurner({ input, width, onScrim = false, page }: { inpu
     AccessibilityInfo.announceForAccessibility(`Page ${turn.index + 1} of ${pages.length}`);
   }, [turn.index, pages.length]);
 
-  const faceA = useAnimatedStyle(() => ({ transform: [{ perspective: 1600 }, { rotateY: `${-rotation.get()}deg` }] }));
-  const faceB = useAnimatedStyle(() => ({ transform: [{ perspective: 1600 }, { rotateY: `${180 - rotation.get()}deg` }] }));
   const size = { width, height: width * PLATE_RATIO };
   const dotColor = onScrim ? DOT_ON_SCRIM : colors.text;
 
@@ -64,8 +66,7 @@ export function ReaderCardTurner({ input, width, onScrim = false, page }: { inpu
         </PagerView>
       ) : (
         <Pressable accessibilityRole="button" accessibilityLabel={`${summary} Page ${turn.index + 1} of ${pages.length}.`} accessibilityHint="Turns the card" onPress={() => setTurn((state) => turnBy(state, 1, pages.length))} style={size}>
-          <Animated.View style={[styles.face, faceA]}><ReaderCardImage input={input} page={pages[turn.faces[0]]!} width={width} /></Animated.View>
-          <Animated.View style={[styles.face, faceB]}><ReaderCardImage input={input} page={pages[turn.faces[1]]!} width={width} /></Animated.View>
+          <CardFaces key={rest} rotation={rotation} faces={[<ReaderCardImage key="a" input={input} page={pages[turn.faces[0]]!} width={width} />, <ReaderCardImage key="b" input={input} page={pages[turn.faces[1]]!} width={width} />]} />
         </Pressable>
       )}
       <View style={styles.dots}>
@@ -76,6 +77,17 @@ export function ReaderCardTurner({ input, width, onScrim = false, page }: { inpu
         ))}
       </View>
     </View>
+  );
+}
+
+function CardFaces({ rotation, faces }: { rotation: SharedValue<number>; faces: [ReactNode, ReactNode] }) {
+  const faceA = useAnimatedStyle(() => ({ transform: [{ perspective: 1600 }, { rotateY: `${-rotation.get()}deg` }] }));
+  const faceB = useAnimatedStyle(() => ({ transform: [{ perspective: 1600 }, { rotateY: `${180 - rotation.get()}deg` }] }));
+  return (
+    <>
+      <Animated.View style={[styles.face, faceA]}>{faces[0]}</Animated.View>
+      <Animated.View style={[styles.face, faceB]}>{faces[1]}</Animated.View>
+    </>
   );
 }
 

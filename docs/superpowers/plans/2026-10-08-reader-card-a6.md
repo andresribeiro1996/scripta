@@ -1311,7 +1311,7 @@ Check `rotation.sensor.get()` against `node_modules/react-native-reanimated/lib/
   const shine = readerCardShine(input.style.finish);
   const shineOn = (page: ReaderCardPage) => (shine && page === "front" ? <CardShine kind={shine} width={width} height={width * PLATE_RATIO} live={liveShine} /> : null);
   ```
-- After the `ReaderCardImage` in each flip face `Animated.View`, add `{shineOn(pages[turn.faces[0]]!)}` or `{shineOn(pages[turn.faces[1]]!)}`.
+- The flip faces are the two entries of `CardFaces`' `faces` array. That child is keyed by the rotation it last settled at, because Reanimated re-applies first-render values after a re-render. Make each entry a fragment holding its `ReaderCardImage` followed by `shineOn(pages[turn.faces[0]]!)` or `shineOn(pages[turn.faces[1]]!)`.
 - After the `ReaderCardImage` in each pager page `View`, add `{shineOn(page)}`.
 
 `ReaderCardViewer.tsx:33`: pass `liveShine` to `ReaderCardTurner`.
