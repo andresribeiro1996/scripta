@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { ReaderCardBase } from "@scripta/shared";
+import { hasChosen, type ReaderCardBase } from "@scripta/shared";
 import { useDismissible } from "../../hooks/useDismissible";
 import { useScrollLock } from "../../hooks/useScrollLock";
 import { keepTabInside } from "../../lib/keepTabInside";
@@ -24,7 +24,7 @@ export function ReaderCardViewer({ input, onClose, onEdit }: { input: ReaderCard
           {onEdit && input.view === "owner" ? <button type="button" onClick={onEdit} className={PILL}>Edit card</button> : null}
           <button type="button" onClick={onClose} className={PILL}>Close</button>
         </div>
-        <ReaderCardTurner input={input} cardWidth={CARD_WIDTH} spreadWidth={SPREAD_WIDTH} onScrim autoFocus />
+        <ReaderCardTurner key={`${input.view}-${input.style.layout}-${hasChosen(input.card.chosen)}`} input={input} cardWidth={CARD_WIDTH} spreadWidth={SPREAD_WIDTH} onScrim autoFocus />
       </div>
     </div>
   );
