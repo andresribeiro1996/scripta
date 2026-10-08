@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { DEFAULT_READER_CARD_STYLE, noteToSend, normalizeReaderCardStyle, publicStyle, rekeyReaderCardStyle } from "./style.js";
+import { DEFAULT_READER_CARD_STYLE, noteSaver, noteToSend, normalizeReaderCardStyle, publicStyle, rekeyReaderCardStyle, type ReaderCardStylePatch } from "./style.js";
 
 test("the default style chooses no book and no highlight", () => {
   assert.deepEqual(DEFAULT_READER_CARD_STYLE, { counter: "dial", layout: "faces", trait: "both", signature: null, highlight: null });
@@ -52,4 +52,34 @@ test("a note is sent trimmed, cleared as null, and never twice in a row", () => 
   assert.equal(noteToSend("   ", "lent twice"), null);
   assert.equal(noteToSend("lent twice", "lent twice"), undefined);
   assert.equal(noteToSend("", null), undefined);
+});
+
+test("the note saver sends nothing for an unchanged note, null for whitespace, and the book key every time", () => {
+  const patches: ReaderCardStylePatch[] = [];
+  const change = async (patch: ReaderCardStylePatch) => { patches.push(patch); return true; };
+  const save = noteSaver({ bookKey: "k", note: "lent" }, () => {});
+  save("lent", change);
+  save("  fresh ", change);
+  save("fresh", change);
+  save("   ", change);
+  assert.deepEqual(patches, [{ signature: { bookKey: "k", note: "fresh" } }, { signature: { bookKey: "k", note: null } }]);
+});
+
+test("a refused note rolls the draft back only while it is unchanged, and the same text can be sent again", async () => {
+  let draft = "lent";
+  const results = [false, false];
+  const patches: ReaderCardStylePatch[] = [];
+  const change = async (patch: ReaderCardStylePatch) => { patches.push(patch); return results.shift()!; };
+  const save = noteSaver({ bookKey: "k", note: null }, (failed, previous) => {
+    if (draft === failed) draft = previous ?? "";
+  });
+  save("lent", change);
+  draft = "lent twice";
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(draft, "lent twice");
+  draft = "lent";
+  save("lent", change);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(patches.length, 2);
+  assert.equal(draft, "");
 });
