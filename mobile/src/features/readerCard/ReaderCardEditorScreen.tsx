@@ -55,7 +55,7 @@ export function ReaderCardEditorScreen() {
       <ReaderCardTurner key={`${preview.view}-${preview.style.layout}-${hasChosen(preview.card.chosen)}`} input={preview} width={width} />
       {input.card.state === "unwritten" && input.missing ? <Text style={[typography.body, { color: colors.textDim }]}>{input.missing}</Text> : null}
       {error ? <Toast visible message={error} tone="error" /> : null}
-      <ReaderCardOptions input={input} onChange={(patch) => void change(patch)} />
+      <ReaderCardOptions input={input} onChange={change} />
       <SignatureChoice books={books} signature={style.signature} chosen={input.card.chosen?.signature} onChange={change} />
       <HighlightChoice books={books} highlight={style.highlight} chosen={input.card.chosen?.highlight} onChange={change} />
       <ReaderGlyphSetting username={readerName} books={books} groups={groups} />

@@ -26,7 +26,7 @@ export function Chip({ label, selected, onPress, fontFamily }: { label: string; 
   const { colors } = useTheme();
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected }} onPress={onPress} style={[styles.chip, { borderColor: selected ? colors.accent : colors.border, backgroundColor: selected ? colors.accentSoft : colors.surface }]}>
-      <Text style={{ color: selected ? colors.accent : colors.text, fontSize: 14, fontWeight: selected ? "700" : "500", fontFamily }}>{label}</Text>
+      <Text numberOfLines={1} style={{ color: selected ? colors.accent : colors.text, fontSize: 14, fontWeight: selected ? "700" : "500", fontFamily }}>{label}</Text>
     </Pressable>
   );
 }
