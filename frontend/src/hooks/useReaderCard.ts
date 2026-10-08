@@ -1,8 +1,8 @@
 import { useMemo } from "react";
-import { readerCardFacts, readerIdentity, type Group, type PublicReaderCard } from "@scripta/shared";
+import { readerCardInputOf, type Group, type PublicReaderCard } from "@scripta/shared";
 
-export function useReaderCard(books: Array<Record<string, unknown>>, groups: Group[], override?: PublicReaderCard) {
-  const own = useMemo(() => (override ? null : readerIdentity(books, groups)), [books, groups, override]);
-  const card = useMemo<PublicReaderCard>(() => override ?? { ...own!, ...readerCardFacts(books, groups, own!.identity) }, [override, own, books, groups]);
-  return { card, own };
+export const NO_GROUPS: Group[] = [];
+
+export function useReaderCard(books: Array<Record<string, unknown>>, groups: Group[], readerName: string, override?: PublicReaderCard) {
+  return useMemo(() => readerCardInputOf(books, groups, readerName, override), [books, groups, readerName, override]);
 }

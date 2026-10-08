@@ -22,3 +22,9 @@ test("card and mural fonts use registered native assets", () => {
     assert.ok(existsSync(`assets/fonts/${name}.ttf`), name);
   }
 });
+
+test("the reader card's typewriter font is bundled", () => {
+  const source = readFileSync("src/ui/fontAssets.ts", "utf8");
+  assert.ok(source.includes(`"courierPrime-400": require("../../assets/fonts/courierPrime-400.ttf")`));
+  assert.ok(existsSync("assets/fonts/courierPrime-400.ttf"));
+});

@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Group } from "./groups.js";
 import { bookKey } from "./merge.js";
-import { publicReaderCardOf, readerCardFacts } from "./readerCardFacts.js";
+import { publicReaderCardOf, readerCardFacts, readerCardInputOf } from "./readerCardFacts.js";
+import type { PublicReaderCard } from "./readerIdentity.js";
 
 type Book = Record<string, unknown>;
 const book = (i: number, fields: Book = {}): Book => ({ Title: `Book ${i}`, Attribution: `Author ${i}`, ReadStatus: 2, ...fields });
@@ -68,4 +69,28 @@ test("the public card carries the identity fields and the facts, never the leade
   assert.deepEqual(card.dial?.segments, [{ group: "star", books: 6, marked: 0 }]);
   assert.equal("leaders" in card, false);
   assert.equal("missing" in card, false);
+});
+
+test("the owner's input carries leaders and facts beside a public card; a visitor's carries neither leaders nor missing", () => {
+  const books = Array.from({ length: 6 }, (_, i) => book(i, { _genres: ["Fantasy"] }));
+  const owner = readerCardInputOf(books, [], "andre");
+  assert.equal(owner.view, "owner");
+  assert.equal(owner.card.identity, "star");
+  assert.equal(owner.card.facts?.finished, 6);
+  assert.ok(Array.isArray(owner.leaders));
+  assert.equal("leaders" in owner.card, false);
+  assert.equal("missing" in owner.card, false);
+  assert.deepEqual(owner.style, { counter: "dial", layout: "faces", trait: "both" });
+  const visitor = readerCardInputOf([], [], "andre", { ...owner.card, style: { counter: "ring", layout: "book", trait: "seal" } });
+  assert.equal(visitor.view, "visitor");
+  assert.equal(visitor.leaders, undefined);
+  assert.equal(visitor.missing, undefined);
+  assert.deepEqual(visitor.style, { counter: "ring", layout: "book", trait: "seal" });
+  assert.equal(visitor.seed, owner.seed);
+});
+
+test("an older or newer server style still draws: missing fields and unknown options fall back", () => {
+  const card: PublicReaderCard = { state: "settled", identity: "star", runnerUp: null, signal: null, coverage: [] };
+  assert.deepEqual(readerCardInputOf([], [], "x", card).style, { counter: "dial", layout: "faces", trait: "both" });
+  assert.equal(readerCardInputOf([], [], "x", { ...card, style: { counter: "dial", layout: "scroll" as never, trait: "both" } }).style.layout, "faces");
 });

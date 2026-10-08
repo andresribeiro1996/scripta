@@ -51,6 +51,7 @@ import type { Tierlist } from "../tierlists/api";
 import { selectionBorderColor } from "./blockStyleOptions";
 import { MURAL_ROW_HEIGHT, muralCanvasHeight, muralDragCell, muralDragPosition, muralPreviewScale } from "./layout";
 
+export const NO_GROUPS: Group[] = [];
 const LIFT_SPRING = { duration: 300, dampingRatio: 0.8 } as const;
 const MOVE_SPRING = { duration: 220, dampingRatio: 1, overshootClamping: true } as const;
 const ROW_HEIGHT = MURAL_ROW_HEIGHT;
@@ -233,7 +234,7 @@ export function BlockContent({ block, books, images, tierlists, profile, groups,
     </View>;
   }
   if (block.type === "tierlist") { const tierlist = tierlists.find((item) => item.id === block.tierlistId); return <>{eyebrow(tierlist?.name ?? "Tier list unavailable")}{tierlist?.data.tiers.map((tier) => <Text key={tier.id} style={text.body}>{tier.label}: {tier.workIds.length}</Text>)}</>; }
-  if (block.type === "readerCard") return <ReaderCardBlock books={books} groups={groups ?? []} readerName={profile?.username || "reader"} publicCard={readerCardOverride} editable={editable} />;
+  if (block.type === "readerCard") return <ReaderCardBlock books={books} groups={groups ?? NO_GROUPS} readerName={profile?.username || "reader"} publicCard={readerCardOverride} editable={editable} />;
   return <Text style={text.body}>{blockLabel(block.type)}</Text>;
 }
 
@@ -350,7 +351,7 @@ const CanvasBlock = memo(function CanvasBlock({ block, columnWidth, editable, se
   return editable ? <GestureDetector gesture={gesture}>{content}</GestureDetector> : content;
 });
 
-export function BlockPreview({ theme, block, canvasWidth, maxHeight, books, images, tierlists, profile, groups = [] }: {
+export function BlockPreview({ theme, block, canvasWidth, maxHeight, books, images, tierlists, profile, groups = NO_GROUPS }: {
   theme: ThemeId;
   block: MuralBlock;
   canvasWidth: number;
@@ -393,7 +394,7 @@ export function BlockPreview({ theme, block, canvasWidth, maxHeight, books, imag
   );
 }
 
-export function MuralCanvas({ mural, books, images, tierlists, profile, shelfThemeOverride, readerCardOverride, statsOverride, editable = false, selectedBlockId, onSelectBlock, onLayoutChange, onImageReadyChange, onDragChange, groups = [], dragScroll }: {
+export function MuralCanvas({ mural, books, images, tierlists, profile, shelfThemeOverride, readerCardOverride, statsOverride, editable = false, selectedBlockId, onSelectBlock, onLayoutChange, onImageReadyChange, onDragChange, groups = NO_GROUPS, dragScroll }: {
   mural: Mural;
   groups?: Group[];
   books: Array<Record<string, unknown>>;

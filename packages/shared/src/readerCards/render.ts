@@ -1,9 +1,11 @@
 import type { DialGroup } from "../library/readerCardFacts.js";
-import type { PublicReaderCard } from "../library/readerIdentity.js";
-import { composePlate, SANS, type PlateFace, type PlateSlots } from "./compose.js";
+import type { PublicReaderCard, ReaderLeader } from "../library/readerIdentity.js";
+import { composePage, composePlate, SANS, type PlateFace, type PlateSlots } from "./compose.js";
 import { drawCounter, SEAL_ANGLE } from "./counters.js";
 import { INKS, PAPER, PLATES, REVERSED_LINE, emblems, glyph, glyphBody, type IdentityKey } from "./plates.js";
-import type { ReaderCardStyle } from "./style.js";
+import { chosenBody, mergedBody, recordBody, type ReaderCardPage, type ReaderCardView } from "./pages.js";
+import type { PublicReaderCardStyle } from "./style.js";
+import { escape } from "./svgText.js";
 
 export type PlatePrint = "paper" | "reversed";
 export type CardState = "settled" | "leaning" | "unwritten";
@@ -23,8 +25,6 @@ function inks(key: IdentityKey | "graph", print: PlatePrint): [string, string] {
   return print === "paper" ? [PAPER, ink] : [deep, REVERSED_LINE];
 }
 
-const escape = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-
 const truncateName = (name: string) => (name.length > 16 ? `${name.slice(0, 16)}…` : name);
 
 const rules = (g: string, l: string): Record<string, string> => ({
@@ -37,11 +37,11 @@ const rules = (g: string, l: string): Record<string, string> => ({
 
 const withStyle = (svg: string, [g, l]: [string, string]) => {
   const r = rules(g, l);
-  return svg.replace(/ class="(\w+)"/g, (_, c: string) => {
+  return svg.replace(/<[^>]*>/g, (tag) => tag.replace(/ class="(\w+)"/g, (_, c: string) => {
     const style = r[c];
     if (!style) throw new Error(`No print rule for class "${c}"`);
     return ` style="${style}"`;
-  });
+  }));
 };
 
 function faceOf({ identity, state, readerName, label, unwrittenLine, width = 250 }: RenderPlateOptions): { face: PlateFace; ink: IdentityKey | "graph" } {
@@ -61,14 +61,19 @@ export function renderPlate(options: RenderPlateOptions): string {
 
 export interface ReaderCardInput {
   card: PublicReaderCard;
-  style: Pick<ReaderCardStyle, "counter" | "trait">;
+  style: PublicReaderCardStyle;
   readerName: string;
   print: PlatePrint;
   label: string;
   unwrittenLine?: string;
   seed: number;
   width?: number;
+  view?: ReaderCardView;
+  leaders?: ReaderLeader[];
+  missing?: string | null;
 }
+
+export type ReaderCardBase = Omit<ReaderCardInput, "print">;
 
 const GENRE_LEADS: ReadonlySet<string> = new Set(["lamp", "star", "arch", "corr"]);
 const SEAL_SIZE = 26;
@@ -86,9 +91,12 @@ function traitLine(streak: IdentityKey): string {
   return `<text class="pt" x="125" y="297" text-anchor="middle" font-size="5.6" letter-spacing="1.5" font-family="${SANS}" font-weight="600">WITH A STREAK OF THE ${name}</text>`;
 }
 
-export function renderReaderCard(input: ReaderCardInput): string {
+export function renderReaderCard(input: ReaderCardInput, page: ReaderCardPage = "front"): string {
   const { card, style, print, seed } = input;
   const { face, ink } = faceOf({ ...input, identity: card.identity, state: card.state });
+  if (page === "record") return withStyle(composePage({ ...face, label: `${face.label}, reader’s record` }, recordBody(input)), inks(ink, print));
+  if (page === "chosen") return withStyle(composePage({ ...face, label: `${face.label}, chosen by the reader` }, chosenBody(input)), inks(ink, print));
+  if (page === "merged") return withStyle(composePage({ ...face, label: `${face.label}, back` }, mergedBody(input)), inks(ink, print));
   const streak = card.state === "unwritten" ? null : card.streak ?? null;
   const seal = streak !== null && (style.trait === "both" || style.trait === "seal");
   const line = streak !== null && (style.trait === "both" || style.trait === "line");

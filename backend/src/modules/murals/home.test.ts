@@ -125,7 +125,7 @@ test("public mural payload carries the reader card without leaking titles or ser
       streak: null,
       signal: { counted: 3, of: 10, label: "3 of 10 finished books are in a series" },
       coverage: ["genres known for 0 of 10 finished books"],
-      style: { counter: "dial", trait: "both" },
+      style: { counter: "dial", layout: "faces", trait: "both" },
       chosen: {}
     });
     assert.ok(dial && facts);
