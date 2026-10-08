@@ -174,7 +174,7 @@ export function StyleTab({ style, palette, onChange, onReset, onCopy, onPaste, c
             {BORDER_SIDE_PRESETS.map(({ key, label, value: sides }) => {
               const edge = (on: boolean) => (on ? colors.text : colors.border);
               return (
-                <Tile key={key} label={label} selected={matchSides(style.cardBorderSides) === key} onPress={() => set({ cardBorderSides: sides })}>
+                <Tile key={key} label={label} width={88} selected={matchSides(style.cardBorderSides) === key} onPress={() => set({ cardBorderSides: sides })}>
                   <View style={[styles.sides, { borderTopColor: edge(sides.top), borderRightColor: edge(sides.right), borderBottomColor: edge(sides.bottom), borderLeftColor: edge(sides.left) }]} />
                 </Tile>
               );
