@@ -1,6 +1,7 @@
 import type { DialGroup } from "../library/readerCardFacts.js";
 import type { PublicReaderCard, ReaderLeader } from "../library/readerIdentity.js";
 import { composePage, composePlate, SANS, type PlateFace, type PlateSlots } from "./compose.js";
+import { cornersSlot } from "./corners.js";
 import { drawCounter, SEAL_ANGLE } from "./counters.js";
 import { INKS, PAPER, PLATES, REVERSED_LINE, emblems, glyph, glyphBody, type IdentityKey } from "./plates.js";
 import { chosenBody, mergedBody, recordBody, type ReaderCardPage, type ReaderCardView } from "./pages.js";
@@ -91,17 +92,22 @@ function traitLine(streak: IdentityKey): string {
   return `<text class="pt" x="125" y="297" text-anchor="middle" font-size="5.6" letter-spacing="1.5" font-family="${SANS}" font-weight="600">WITH A STREAK OF THE ${name}</text>`;
 }
 
+function decorations(input: ReaderCardInput, _print: PlatePrint): PlateSlots {
+  const corners = cornersSlot(input.style.corners);
+  return corners === undefined ? {} : { corners };
+}
+
 export function renderReaderCard(input: ReaderCardInput, page: ReaderCardPage = "front"): string {
   const { card, style, print, seed } = input;
   const { face, ink } = faceOf({ ...input, identity: card.identity, state: card.state });
-  if (page === "record") return withStyle(composePage({ ...face, label: `${face.label}, reader’s record` }, recordBody(input)), inks(ink, print));
-  if (page === "chosen") return withStyle(composePage({ ...face, label: `${face.label}, chosen by the reader` }, chosenBody(input)), inks(ink, print));
-  if (page === "merged") return withStyle(composePage({ ...face, label: `${face.label}, back` }, mergedBody(input)), inks(ink, print));
+  if (page === "record") return withStyle(composePage({ ...face, label: `${face.label}, reader’s record` }, recordBody(input), decorations(input, print)), inks(ink, print));
+  if (page === "chosen") return withStyle(composePage({ ...face, label: `${face.label}, chosen by the reader` }, chosenBody(input), decorations(input, print)), inks(ink, print));
+  if (page === "merged") return withStyle(composePage({ ...face, label: `${face.label}, back` }, mergedBody(input), decorations(input, print)), inks(ink, print));
   const streak = card.state === "unwritten" ? null : card.streak ?? null;
   const seal = streak !== null && (style.trait === "both" || style.trait === "seal");
   const line = streak !== null && (style.trait === "both" || style.trait === "line");
   const lead = card.identity && GENRE_LEADS.has(card.identity) ? (card.identity as DialGroup) : null;
-  const slots: PlateSlots = {};
+  const slots: PlateSlots = decorations(input, print);
   const counter = card.dial ? drawCounter(style.counter, card.dial.segments, { seed, sealGap: seal, lead }) : null;
   if (counter) slots[counter.slot] = counter.svg;
   if (streak && seal) slots.seal = sealSlot(streak, print);
