@@ -13,15 +13,11 @@ export function useSaveReaderCardStyle() {
   const client = useQueryClient();
   return useCallback(async (patch: ReaderCardStylePatch) => {
     await client.cancelQueries({ queryKey: READER_CARD_STYLE_KEY });
-    let written: ReaderCardStyle | undefined;
-    const get = () => {
-      const stored = client.getQueryData<ReaderCardStyle>(READER_CARD_STYLE_KEY);
-      return written && JSON.stringify(stored) === JSON.stringify(written) ? written : stored;
-    };
-    const set = (style: ReaderCardStyle) => {
-      written = style;
-      client.setQueryData(READER_CARD_STYLE_KEY, style);
-    };
-    await saveReaderCardStyle({ get, set }, patch, updateReaderCardStyle);
+    try {
+      await saveReaderCardStyle({ get: () => client.getQueryData<ReaderCardStyle>(READER_CARD_STYLE_KEY), set: (style) => client.setQueryData(READER_CARD_STYLE_KEY, style) }, patch, updateReaderCardStyle);
+    } catch (error) {
+      void client.invalidateQueries({ queryKey: READER_CARD_STYLE_KEY });
+      throw error;
+    }
   }, [client]);
 }

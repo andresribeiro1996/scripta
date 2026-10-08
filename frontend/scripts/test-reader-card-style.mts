@@ -47,6 +47,7 @@ test("saving shows the change at once and rolls back when the server refuses", a
     await assert.rejects(save({ layout: "book" }));
     assert.equal(seen?.layout, "book");
     assert.equal(client.getQueryData<ReaderCardStyle>(READER_CARD_STYLE_KEY)?.layout, "faces");
+    assert.equal(client.getQueryState(READER_CARD_STYLE_KEY)?.isInvalidated, true);
   } finally {
     globalThis.fetch = originalFetch;
   }
