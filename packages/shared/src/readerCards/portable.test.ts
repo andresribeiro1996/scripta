@@ -19,7 +19,7 @@ function portabilityProblems(svg: string): string[] {
     for (const [, attr, value] of attrs!.matchAll(/([\w:-]+)="([^"]*)"/g)) {
       if (attr === "class" && !/^(plate|glyph) id-/.test(value!)) problems.push(`class="${value}"`);
       if (attr === "style" && value!.includes("mix-blend-mode")) problems.push("mix-blend-mode");
-      const remote = (attr === "href" || attr === "xlink:href") && name === "image" && /^https:\/\/[^\s"'<>&]+$/.test(value!);
+      const remote = (attr === "href" || attr === "xlink:href") && name === "image" && /^https:\/\/[^\s"'<>&\\]+$/.test(value!);
       if (remote) remoteImages++;
       if ((attr === "href" || attr === "xlink:href") && !value!.startsWith("data:") && !remote) problems.push(`${attr}="${value!.slice(0, 40)}"`);
       if (attr === "id") problems.push(`id="${value}"`);

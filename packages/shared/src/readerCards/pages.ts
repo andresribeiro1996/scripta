@@ -117,7 +117,7 @@ export function recordBody(input: ReaderCardInput): string {
   return out + coverageLines(card.coverage);
 }
 
-export const COVER_URL = /^https:\/\/[^\s"'<>&]+$/;
+export const COVER_URL = /^https:\/\/[^\s"'<>&\\]+$/;
 
 type Signature = NonNullable<ReaderCardChosen["signature"]>;
 type Highlight = NonNullable<ReaderCardChosen["highlight"]>;

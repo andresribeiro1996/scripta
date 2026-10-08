@@ -22,7 +22,7 @@ test("with both chosen, the page shows the book, its note, a divider and the hig
 });
 
 test("only a plain https cover becomes an image", () => {
-  for (const coverUrl of ["http://covers.example.org/a.jpg", "javascript:alert(1)", "https://x.example/a\"onload=\"b", "https://x.example/a?b=1&c=2", null]) {
+  for (const coverUrl of ["http://covers.example.org/a.jpg", "javascript:alert(1)", "https://x.example/a\"onload=\"b", "https://x.example/a\\", "https://x.example/a?b=1&c=2", null]) {
     const svg = page({ signature: { ...signature, coverUrl } });
     assert.doesNotMatch(svg, /<image/, String(coverUrl));
     assert.ok(texts(svg).includes("A WIZARD OF"), String(coverUrl));
