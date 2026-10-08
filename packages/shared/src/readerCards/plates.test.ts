@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { PLATE_INKS, READER_PLATES, renderGlyph, renderPlate } from "./index.js";
-import { PAPER, REVERSED_LINE, glyph, plate, printStyle } from "./plates.js";
+import { PAPER, PLATES, REVERSED_LINE, emblem, glyph, plate, printStyle } from "./plates.js";
 
 const masters = join(dirname(fileURLToPath(import.meta.url)), "../../../../design/reader-cards");
 const standalone = (svg: string, ground: string, line: string) => svg.replace(">", `>${printStyle(ground, line)}`);
@@ -110,5 +110,12 @@ test("every ink clears 5:1 against paper", () => {
   for (const [key, [, ink]] of Object.entries(PLATE_INKS)) {
     const ratio = (luminance(PAPER) + 0.05) / (luminance(ink) + 0.05);
     assert.ok(ratio >= 5, `${key} is ${ratio.toFixed(2)}:1`);
+  }
+});
+
+test("every emblem is drawn once and served from the cache", () => {
+  for (const k of [...PLATES.map((p) => p.key), "none" as const]) {
+    assert.notEqual(emblem(k), "", k);
+    assert.equal(emblem(k), emblem(k), k);
   }
 });
