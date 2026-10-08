@@ -34,7 +34,8 @@
 
 **Starting point:**
 - A5 (#214) and the thumbnail perf work (#215) are on `main`.
-- The editor-layout branch `claude/hello-e28136` must be merged to `main` first. It pins the preview and turns the mobile `TileRow` into a 4-column grid without a `width` prop, and Task 7 builds on that. This plan is committed on that branch, so it lands on `main` with it.
+- The editor-layout branch `claude/hello-e28136` (#216, merged) pins the preview and turns the mobile `TileRow` into a 4-column grid.
+- The branch `claude/reader-card-sheets` must be merged to `main` first. It moves the mobile 12-option sections into bottom sheets (`OptionSheet`, `TileRow`'s `available` width prop) and removes the You/Visitors toggle, and Task 7 builds on that. The current version of this plan is committed on that branch.
 - Cut the A6 worktree from `origin/main` after that merge.
 
 ## Decisions this plan takes
@@ -1319,9 +1320,13 @@ Check `rotation.sensor.get()` against `node_modules/react-native-reanimated/lib/
 
 ```tsx
       <Section title="Finish">
-        <TileRow items={finishThumbs} value={finish} labels={FINISH_LABELS} onPick={(next) => void onChange({ finish: next })} />
+        <OptionSheet title="Finish" current={FINISH_LABELS[finish]}>
+          {(available, close) => <TileRow items={finishThumbs} value={finish} labels={FINISH_LABELS} available={available} onPick={(next) => { close(); void onChange({ finish: next }); }} />}
+        </OptionSheet>
       </Section>
 ```
+
+Finish has 12 options, so it uses the same `OptionSheet` as Motto look, Footer and Corners: a row showing the current finish that opens a bottom sheet of thumbnails, which closes on a pick. The thumbnails mount only while the sheet is open.
 
 - [ ] **Step 4: Run the checks**
 
@@ -1371,7 +1376,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - [ ] **Step 2: Device pass**
 
 Run `node scripts/dev-status.mjs --json` once. If no other worktree holds the emulator, dispatch `device-checker` for the mobile editor and the My shelf block:
-- The Finish grid: 12 tiles, 4 per row, nothing clipped. Report the grid's mount and scroll smoothness, since the editor now renders 41 full-card thumbnails eagerly.
+- The Finish row opens a sheet of 12 tiles, 4 per row, with nothing clipped. Picking one closes the sheet and updates the pinned preview. Report how long the sheet takes to fill: it mounts 12 textured full-card thumbnails at once.
 - Each finish in the pinned preview in light and dark themes:
   - foil and holo ink visibly a gradient (react-native-svg must accept `fill:url(#…)` inside `style`);
   - the vellum and kraft textures visible;
