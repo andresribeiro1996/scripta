@@ -1,6 +1,6 @@
 import { useRef, useState, type ReactNode } from "react";
 import { type Group, type PublicReaderCard, booksByWork, workIdOf } from "@scripta/shared";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import type { ThemeId } from "@scripta/shared/themes";
 import type { GalleryImage } from "../../api/gallery";
 import type { ResolvedTierlist } from "../../api/tierlists";
@@ -30,7 +30,8 @@ function detailSheetStyle(theme: ThemeId) {
 
 function ReaderCardDetailViewer({ books, groups, readerCardOverride, readerName, onClose }: { books: Array<Record<string, unknown>>; groups: Group[]; readerCardOverride?: PublicReaderCard; readerName: string; onClose: () => void }) {
   const input = useReaderCard(books, groups, readerName, readerCardOverride);
-  return <ReaderCardViewer input={input} onClose={onClose} />;
+  const navigate = useNavigate();
+  return <ReaderCardViewer input={input} onClose={onClose} onEdit={readerCardOverride ? undefined : () => navigate("/dashboard/reader-card")} />;
 }
 
 export function MuralBlockDetail({
