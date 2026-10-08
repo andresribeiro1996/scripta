@@ -7,7 +7,7 @@ import { ReaderCardTurner } from "../components/readerCard/ReaderCardTurner";
 import { ReaderGlyphSetting } from "../components/readerCard/ReaderGlyphSetting";
 import { useToast } from "../components/Toaster";
 import { useLibrary } from "../hooks/useLibrary";
-import { NO_GROUPS, coverOf } from "../hooks/useReaderCard";
+import { NO_GROUPS, useOwnCardStyle } from "../hooks/useReaderCard";
 import { useReaderCardStyle, useSaveReaderCardStyle } from "../hooks/useReaderCardStyle";
 
 const NO_BOOKS: Array<Record<string, unknown>> = [];
@@ -21,10 +21,11 @@ export function ReaderCardPage() {
   const books = library?.data.books ?? NO_BOOKS;
   const groups = library?.data.groups ?? NO_GROUPS;
   const { data: style, isPending, refetch } = useReaderCardStyle();
+  const own = useOwnCardStyle();
   const save = useSaveReaderCardStyle();
   const toast = useToast();
   const [audience, setAudience] = useState<(typeof AUDIENCES)[number]>("you");
-  const input = useMemo(() => readerCardInputOf(books, groups, readerName, undefined, style ? { style, coverOf } : undefined), [books, groups, readerName, style]);
+  const input = useMemo(() => readerCardInputOf(books, groups, readerName, undefined, own), [books, groups, readerName, own]);
   const preview = useMemo(() => (audience === "you" ? input : visitorView(input)), [audience, input]);
 
   const change = async (patch: ReaderCardStylePatch) => {

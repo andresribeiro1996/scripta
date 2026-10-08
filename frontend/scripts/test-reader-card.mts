@@ -15,7 +15,7 @@ const card: PublicReaderCard = {
   style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), counter: "dial", layout: "faces", trait: "both" },
   chosen: { highlight: { text: "To light a candle", title: "A Wizard of Earthsea", author: "Ursula K. Le Guin" } },
 };
-const visitor = (layout: Layout, fields: Partial<PublicReaderCard> = {}) => readerCardInputOf([], [], "andre", { ...card, ...fields, style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), counter: "dial", layout, trait: "both" } });
+const visitor = (layout: Layout, fields: Partial<PublicReaderCard> = {}) => readerCardInputOf([], [], "andre", { ...card, style: { ...card.style!, layout }, ...fields });
 const viewer = (input: ReturnType<typeof visitor>) => renderToString(createElement(ReaderCardViewer, { input, onClose: () => undefined }));
 
 test("the image draws both prints, each hidden by the other theme", () => {
@@ -23,6 +23,20 @@ test("the image draws both prints, each hidden by the other theme", () => {
   assert.equal(html.match(/<svg /g)?.length, 2);
   assert.match(html, /dark:hidden/);
   assert.match(html, /hidden h-full w-full dark:block/);
+});
+
+test("a fixed print draws one copy whatever the theme, and auto draws both", () => {
+  const fixed = renderToString(createElement(ReaderCardImage, { input: visitor("faces", { style: { ...card.style!, print: "reversed" } }) }));
+  assert.equal(fixed.match(/<svg /g)?.length, 1);
+  assert.doesNotMatch(fixed, /dark:hidden|dark:block/);
+  assert.match(fixed, /#efe5d1/);
+  assert.equal(renderToString(createElement(ReaderCardImage, { input: visitor("faces") })).match(/<svg /g)?.length, 2);
+});
+
+test("a cropped image keeps the crop's proportions", () => {
+  const html = renderToString(createElement(ReaderCardImage, { input: { ...visitor("faces"), crop: "corner" } }));
+  assert.match(html, /aspect-ratio:1/);
+  assert.match(html, /viewBox="0 0 100 100"/);
 });
 
 test("the viewer is a modal dialog that announces its page and carries the card as text", () => {
