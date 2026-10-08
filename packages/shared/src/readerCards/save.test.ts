@@ -56,3 +56,19 @@ test("identity does not matter: a cache that hands back copies still rolls back 
   await saveReaderCardStyle(cache, { layout: "book" }, async () => ({ ...DEFAULT_READER_CARD_STYLE, layout: "book", trait: "seal" }));
   assert.equal(cache.get()!.trait, "seal");
 });
+
+test("only the newest refused save asks the cache to refresh", async () => {
+  let refreshed = 0;
+  const base = memory(DEFAULT_READER_CARD_STYLE);
+  const cache = { ...base, refresh: () => { refreshed += 1; } };
+  let failFirst!: (error: Error) => void;
+  let failSecond!: (error: Error) => void;
+  const first = saveReaderCardStyle(cache, { counter: "ring" }, () => new Promise((_, reject) => { failFirst = reject; }));
+  const second = saveReaderCardStyle(cache, { trait: "none" }, () => new Promise((_, reject) => { failSecond = reject; }));
+  failFirst(new Error("a"));
+  await assert.rejects(first);
+  assert.equal(refreshed, 0);
+  failSecond(new Error("b"));
+  await assert.rejects(second);
+  assert.equal(refreshed, 1);
+});

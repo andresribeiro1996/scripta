@@ -1,6 +1,6 @@
 import { DEFAULT_READER_CARD_STYLE, normalizeReaderCardStyle, type ReaderCardStyle, type ReaderCardStylePatch } from "./style.js";
 
-export interface ReaderCardStyleCache { get(): ReaderCardStyle | undefined; set(style: ReaderCardStyle): void }
+export interface ReaderCardStyleCache { get(): ReaderCardStyle | undefined; set(style: ReaderCardStyle): void; refresh?(): void }
 
 let generation = 0;
 
@@ -12,7 +12,10 @@ export async function saveReaderCardStyle(cache: ReaderCardStyleCache, patch: Re
     const saved = await update(patch);
     if (generation === mine) cache.set(saved);
   } catch (error) {
-    if (generation === mine) cache.set(before);
+    if (generation === mine) {
+      cache.set(before);
+      cache.refresh?.();
+    }
     throw error;
   }
 }
