@@ -28,3 +28,10 @@ test("the reader card's typewriter font is bundled", () => {
   assert.ok(source.includes(`"courierPrime-400": require("../../assets/fonts/courierPrime-400.ttf")`));
   assert.ok(existsSync("assets/fonts/courierPrime-400.ttf"));
 });
+
+test("the reader card's script font is bundled", () => {
+  const source = readFileSync("src/ui/fontAssets.ts", "utf8");
+  assert.ok(source.includes(`"pinyonScript-400": require("../../assets/fonts/pinyonScript-400.ttf")`));
+  assert.ok(existsSync("assets/fonts/pinyonScript-400.ttf"));
+  assert.ok(existsSync("assets/fonts/licenses/pinyonScript.txt"));
+});

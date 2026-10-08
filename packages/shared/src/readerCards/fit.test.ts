@@ -53,3 +53,7 @@ test("fitSize keeps a size that fits and shrinks one that does not, never below 
   assert.equal(fitLine("W".repeat(28), { font: "serif", size: shrunk, width: 100, spacing: 0.6 }), "W".repeat(28));
   assert.equal(fitSize("W".repeat(200), { font: "serif", size: 8, width: 100, min: 5 }), 5);
 });
+
+test("script text is estimated narrower than the serif", () => {
+  assert.ok(textWidth("Andre Ribeiro", { font: "script", size: 12 }) < textWidth("Andre Ribeiro", { font: "serif", size: 12 }));
+});

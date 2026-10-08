@@ -3,6 +3,7 @@ import type { IdentityKey } from "./plates.js";
 export const SERIF = "'Playfair Display', Georgia, 'Times New Roman', serif";
 export const SANS = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
 export const MONO = "'Courier Prime', 'Courier New', Courier, monospace";
+export const SCRIPT = "'Pinyon Script', 'Snell Roundhand', cursive";
 
 export interface PlateFace {
   key: IdentityKey | "none";

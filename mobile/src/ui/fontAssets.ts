@@ -15,6 +15,8 @@ export const FONT_ASSETS: Record<string, number> = {
   "jetbrainsMono-400": require("../../assets/fonts/jetbrainsMono-400.ttf"),
   "jetbrainsMono-700": require("../../assets/fonts/jetbrainsMono-700.ttf"),
   "courierPrime-400": require("../../assets/fonts/courierPrime-400.ttf"),
+  "pinyonScript-400": require("../../assets/fonts/pinyonScript-400.ttf"),
 };
 
 export const CARD_MONO_FAMILY = "courierPrime-400";
+export const CARD_SCRIPT_FAMILY = "pinyonScript-400";

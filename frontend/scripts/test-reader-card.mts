@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { existsSync, readFileSync } from "node:fs";
 import { test } from "node:test";
 import { createElement } from "react";
 import { renderToString } from "react-dom/server";
@@ -67,4 +68,10 @@ test("only the owner's viewer offers Edit card, and only when it can go somewher
   assert.match(renderToString(createElement(ReaderCardViewer, { input: owner, onClose: noop, onEdit: noop })), />Edit card</);
   assert.doesNotMatch(renderToString(createElement(ReaderCardViewer, { input: owner, onClose: noop })), /Edit card/);
   assert.doesNotMatch(renderToString(createElement(ReaderCardViewer, { input: visitor("faces"), onClose: noop, onEdit: noop })), /Edit card/);
+});
+
+test("the script font is served and declared", () => {
+  assert.match(readFileSync("src/index.css", "utf8"), /font-family: "Pinyon Script";\s*src: url\("\/fonts\/pinyon-script-400\.ttf"\) format\("truetype"\);/);
+  assert.ok(existsSync("public/fonts/pinyon-script-400.ttf"));
+  assert.ok(existsSync("public/fonts/licenses/pinyonScript.txt"));
 });

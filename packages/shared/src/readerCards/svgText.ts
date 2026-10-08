@@ -1,12 +1,12 @@
-import { MONO, SANS, SERIF } from "./compose.js";
+import { MONO, SANS, SCRIPT, SERIF } from "./compose.js";
 
 export const escape = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 export const escapeText = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-export type TextFont = "serif" | "sans" | "mono";
+export type TextFont = "serif" | "sans" | "mono" | "script";
 export interface TextOptions { size: number; font?: TextFont; anchor?: "start" | "middle" | "end"; spacing?: number; weight?: number; italic?: boolean; opacity?: number; cls?: "pt" | "pg" }
 
-const FAMILIES: Record<TextFont, string> = { serif: SERIF, sans: SANS, mono: MONO };
+const FAMILIES: Record<TextFont, string> = { serif: SERIF, sans: SANS, mono: MONO, script: SCRIPT };
 const n2 = (value: number) => +value.toFixed(2);
 
 export function svgText(x: number, y: number, content: string, { size, font = "sans", anchor = "middle", spacing, weight, italic, opacity, cls = "pt" }: TextOptions): string {

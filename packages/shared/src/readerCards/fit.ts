@@ -1,7 +1,7 @@
-export type FitFont = "serif" | "sans" | "caps" | "mono";
+export type FitFont = "serif" | "sans" | "caps" | "mono" | "script";
 export interface FitOptions { font: FitFont; size: number; width: number; spacing?: number }
 
-const EM: Record<FitFont, number> = { serif: 0.5, sans: 0.55, caps: 0.68, mono: 0.6 };
+const EM: Record<FitFont, number> = { serif: 0.5, sans: 0.55, caps: 0.68, mono: 0.6, script: 0.42 };
 
 export function textWidth(text: string, { font, size, spacing = 0 }: Omit<FitOptions, "width">): number {
   const count = [...text].length;
