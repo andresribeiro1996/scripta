@@ -1,13 +1,12 @@
 import { useRef, type PointerEvent } from "react";
 import { shineGradientCss, type ShineKind } from "@scripta/shared";
-
-const reducedMotion = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+import { prefersReducedMotion } from "../../lib/theme";
 
 export function CardShine({ kind }: { kind: ShineKind }) {
   const ref = useRef<HTMLSpanElement>(null);
   const follow = (event: PointerEvent<HTMLSpanElement>) => {
     const element = ref.current;
-    if (!element || reducedMotion()) return;
+    if (!element || prefersReducedMotion()) return;
     const box = element.getBoundingClientRect();
     element.classList.remove("card-shine-idle");
     element.style.backgroundPosition = `${75 - 50 * ((event.clientX - box.left) / box.width)}% 0`;

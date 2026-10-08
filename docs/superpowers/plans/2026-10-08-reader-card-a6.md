@@ -22,7 +22,7 @@
   - Each editor gains a Finish section of 12 thumbnails between Corners and Print.
   - Each turner draws a `CardShine` over the front face when the finish shines:
     - on web, it follows the pointer and sweeps slowly when idle;
-    - on mobile, it follows Reanimated's rotation sensor in the full-screen viewer and is a still band elsewhere.
+    - on mobile, it follows Reanimated's gravity sensor in the full-screen viewer and is a still band elsewhere.
 
 **Tech Stack:** TypeScript, `node:test` via tsx, `node:zlib` for the PNG encoder, Fastify + zod (backend), React 19 + Tailwind 4 (web, SSR tests), Expo Router / React Native 0.86 + react-native-svg 15.15.4 + Reanimated 4.5.1 (mobile).
 

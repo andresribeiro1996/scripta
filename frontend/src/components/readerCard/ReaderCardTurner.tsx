@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { hasChosen, readerCardPages, readerCardShine, readerCardSummary, startTurn, turnBy, turnTo, type ReaderCardBase, type ReaderCardPage } from "@scripta/shared";
+import { prefersReducedMotion } from "../../lib/theme";
 import { CardShine } from "./CardShine";
 import { ReaderCardImage } from "./ReaderCardImage";
 
 const TURN = "motion-safe:transition-transform motion-safe:duration-500 motion-safe:ease-[cubic-bezier(0.32,0.72,0,1)]";
 const wideScreen = () => typeof window !== "undefined" && window.innerWidth >= 768 && !window.matchMedia?.("(pointer: coarse)").matches;
-const reducedMotion = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 
 export function ReaderCardTurner({ input, cardWidth, spreadWidth, onScrim = false, autoFocus = false }: { input: ReaderCardBase; cardWidth: string; spreadWidth: string; onScrim?: boolean; autoFocus?: boolean }) {
   const [wide] = useState(wideScreen);
@@ -28,7 +28,7 @@ export function ReaderCardTurner({ input, cardWidth, spreadWidth, onScrim = fals
     const element = scroller.current;
     if (!element) return;
     const left = turn.index * element.clientWidth;
-    if (Math.abs(element.scrollLeft - left) > 1) element.scrollTo({ left, behavior: reducedMotion() ? "auto" : "smooth" });
+    if (Math.abs(element.scrollLeft - left) > 1) element.scrollTo({ left, behavior: prefersReducedMotion() ? "auto" : "smooth" });
   }, [turn.index]);
 
   useEffect(() => () => clearTimeout(settle.current), []);

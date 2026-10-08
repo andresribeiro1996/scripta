@@ -295,7 +295,7 @@ readerCardSummary(input): string[]      // text alternative for screen readers
 - **Merged:** tap toggles front and back.
 - **Shine** (when `readerCardShine` is not null): a gradient layer over the card.
   - **Web:** follows the pointer, and sweeps slowly when the pointer is idle.
-  - **Mobile:** follows `useAnimatedSensor(SensorType.ROTATION)` from Reanimated, which needs no new native dependency. The sensor runs only while the viewer is open.
+  - **Mobile:** follows the x component of `useAnimatedSensor(SensorType.GRAVITY)` from Reanimated (the rotation sensor's roll is singular when the phone is held upright), which needs no new native dependency. The sensor runs only while the viewer is open.
 - **Reduced motion:** the shine stays still and turning is an instant swap.
 - **Owner:** sees an "Edit card" button.
 - **Accessibility:** `role="img"` with a label, a live region announcing "page 2 of 3", and the `readerCardSummary` lines as a text alternative.

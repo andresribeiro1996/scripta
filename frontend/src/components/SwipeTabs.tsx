@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type TouchEvent } from "react";
+import { prefersReducedMotion } from "../lib/theme";
 
 const EDGE_ZONE_PX = 24;
 const AXIS_LOCK_PX = 8;
@@ -11,10 +12,6 @@ function ownsHorizontalGesture(target: EventTarget | null, root: HTMLElement): b
     if ((overflowX === "auto" || overflowX === "scroll") && el.scrollWidth > el.clientWidth) return true;
   }
   return false;
-}
-
-function prefersReducedMotion(): boolean {
-  return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 }
 
 export function SwipeTabs<T extends string>({
