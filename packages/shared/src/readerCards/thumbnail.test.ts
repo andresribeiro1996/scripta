@@ -6,7 +6,7 @@ import { COUNTERS } from "./counters.js";
 import { COUNTER_LABELS, LAYOUT_LABELS, TRAIT_LABELS } from "./labels.js";
 import { renderReaderCard, type ReaderCardBase } from "./render.js";
 import { seedOf } from "./seed.js";
-import { LAYOUTS, TRAITS } from "./style.js";
+import { DEFAULT_READER_CARD_STYLE, LAYOUTS, TRAITS, publicStyle } from "./style.js";
 import { THUMBNAIL_MARKS, counterThumbnail, thumbnailSegments } from "./thumbnail.js";
 
 const large: DialSegment[] = [{ group: "corr", books: 146, marked: 60 }, { group: "star", books: 47, marked: 20 }, { group: "lamp", books: 53, marked: 7 }, { group: "unknown", books: 12, marked: 0 }];
@@ -30,7 +30,7 @@ test("a small dial is drawn as it is", () => {
 
 test("a thumbnail swaps the counter and draws far fewer marks than the card", () => {
   const card: PublicReaderCard = { state: "settled", identity: "corr", runnerUp: null, signal: null, coverage: [], dial: { segments: large }, facts: { finished: 258, highlights: 300, series: 0, since: null, edition: 2026 } };
-  const input: ReaderCardBase = { card, style: { counter: "dial", layout: "faces", trait: "both" }, readerName: "andre", label: "Reader card", seed: seedOf("andre"), view: "owner" };
+  const input: ReaderCardBase = { card, style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), counter: "dial", layout: "faces", trait: "both" }, readerName: "andre", label: "Reader card", seed: seedOf("andre"), view: "owner" };
   const thumb = counterThumbnail(input, "beads");
   assert.equal(thumb.style.counter, "beads");
   assert.equal(thumb.card.facts, card.facts);
@@ -40,7 +40,7 @@ test("a thumbnail swaps the counter and draws far fewer marks than the card", ()
 
 test("a card without a dial stays without one", () => {
   const card: PublicReaderCard = { state: "unwritten", identity: null, runnerUp: null, signal: null, coverage: [] };
-  const input: ReaderCardBase = { card, style: { counter: "dial", layout: "faces", trait: "both" }, readerName: "andre", label: "Reader card", seed: seedOf("andre") };
+  const input: ReaderCardBase = { card, style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), counter: "dial", layout: "faces", trait: "both" }, readerName: "andre", label: "Reader card", seed: seedOf("andre") };
   assert.equal(counterThumbnail(input, "ring").card, card);
 });
 

@@ -4,6 +4,7 @@ import type { PublicReaderCard } from "../library/readerIdentity.js";
 import { PLATES } from "./plates.js";
 import { renderReaderCard, type ReaderCardInput } from "./render.js";
 import { seedOf } from "./seed.js";
+import { DEFAULT_READER_CARD_STYLE, publicStyle } from "./style.js";
 
 const card: PublicReaderCard = {
   state: "settled", identity: "star", runnerUp: null, streak: "lamp",
@@ -12,7 +13,7 @@ const card: PublicReaderCard = {
   dial: { segments: [{ group: "star", books: 22, marked: 9 }, { group: "lamp", books: 8, marked: 1 }, { group: "unknown", books: 4, marked: 0 }] },
   facts: { finished: 34, highlights: 40, series: 2, since: 2014, edition: 2026 },
 };
-const input = (fields: Partial<ReaderCardInput> = {}): ReaderCardInput => ({ card, style: { counter: "dial", layout: "faces", trait: "both" }, readerName: "andre", print: "paper", label: "Reader card", seed: seedOf("andre"), view: "visitor", ...fields });
+const input = (fields: Partial<ReaderCardInput> = {}): ReaderCardInput => ({ card, style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), counter: "dial", layout: "faces", trait: "both" }, readerName: "andre", print: "paper", label: "Reader card", seed: seedOf("andre"), view: "visitor", ...fields });
 const texts = (svg: string) => [...svg.matchAll(/<text[^>]*>([^<]*)<\/text>/g)].map((match) => match[1]!);
 
 test("the record lists finished, each genre segment with the lead's share, highlights and the runner-up", () => {
@@ -25,7 +26,7 @@ test("the record lists finished, each genre segment with the lead's share, highl
 });
 
 test("the legend follows the counter", () => {
-  assert.ok(texts(renderReaderCard(input({ style: { counter: "ring", layout: "faces", trait: "both" } }), "record")).includes("the ring: one arc per genre,"));
+  assert.ok(texts(renderReaderCard(input({ style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), counter: "ring", layout: "faces", trait: "both" } }), "record")).includes("the ring: one arc per genre,"));
 });
 
 test("only the owner sees the leaders and, when leaning, the missing line", () => {

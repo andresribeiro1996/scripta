@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createElement } from "react";
 import { renderToString } from "react-dom/server";
-import { readerCardInputOf, type Layout, type PublicReaderCard } from "@scripta/shared";
+import { DEFAULT_READER_CARD_STYLE, publicStyle, readerCardInputOf, type Layout, type PublicReaderCard } from "@scripta/shared";
 import { ReaderCardImage } from "../src/components/readerCard/ReaderCardImage";
 import { ReaderCardTurner } from "../src/components/readerCard/ReaderCardTurner";
 import { ReaderCardViewer } from "../src/components/readerCard/ReaderCardViewer";
@@ -11,10 +11,10 @@ const card: PublicReaderCard = {
   state: "settled", identity: "star", runnerUp: null, streak: "lamp", signal: null, coverage: ["genres known for 3 of 3 finished books"],
   dial: { segments: [{ group: "star", books: 3, marked: 1 }] },
   facts: { finished: 3, highlights: 2, series: 0, since: 2020, edition: 2026 },
-  style: { counter: "dial", layout: "faces", trait: "both" },
+  style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), counter: "dial", layout: "faces", trait: "both" },
   chosen: { highlight: { text: "To light a candle", title: "A Wizard of Earthsea", author: "Ursula K. Le Guin" } },
 };
-const visitor = (layout: Layout, fields: Partial<PublicReaderCard> = {}) => readerCardInputOf([], [], "andre", { ...card, ...fields, style: { counter: "dial", layout, trait: "both" } });
+const visitor = (layout: Layout, fields: Partial<PublicReaderCard> = {}) => readerCardInputOf([], [], "andre", { ...card, ...fields, style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), counter: "dial", layout, trait: "both" } });
 const viewer = (input: ReturnType<typeof visitor>) => renderToString(createElement(ReaderCardViewer, { input, onClose: () => undefined }));
 
 test("the image draws both prints, each hidden by the other theme", () => {
