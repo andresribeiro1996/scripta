@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createElement } from "react";
 import { renderToString } from "react-dom/server";
-import { DEFAULT_READER_CARD_STYLE, readerCardInputOf } from "@scripta/shared";
+import { DEFAULT_READER_CARD_STYLE, bookKey, readerCardInputOf } from "@scripta/shared";
+import { HighlightChoice, SignatureChoice } from "../src/components/readerCard/ReaderCardChoices";
 import { ReaderCardOptions } from "../src/components/readerCard/ReaderCardOptions";
 
 const books = Array.from({ length: 6 }, (_, i) => ({ Title: `Book ${i}`, Attribution: `Author ${i}`, ReadStatus: 2, _genres: ["Fantasy"] }));
@@ -21,4 +22,35 @@ test("trait and layout show their names and press the current one", () => {
   for (const name of ["Line and seal", "Seal", "Line", "None", "Three faces", "Book", "One back"]) assert.match(html, new RegExp(`>${name}<`));
   assert.match(html, /aria-pressed="true"[^>]*>Seal</);
   assert.match(html, /aria-pressed="true"[^>]*>Book</);
+});
+
+const save = async () => true;
+const finished = { Title: "A Wizard of Earthsea", Attribution: "Ursula K. Le Guin", ReadStatus: 2, highlights: [{ Type: "highlight", Text: "To light a candle", BookmarkID: "h1" }] };
+
+test("a reader with no finished books is told how to get a signature book", () => {
+  assert.match(renderToString(createElement(SignatureChoice, { books: [{ Title: "Reading", ReadStatus: 1 }], signature: null, onChange: save })), /Finish a book to choose your signature book\./);
+});
+
+test("the chosen signature book shows with its note, capped at sixty characters", () => {
+  const html = renderToString(createElement(SignatureChoice, { books: [finished], signature: { bookKey: bookKey(finished), note: "lent twice" }, chosen: { title: "A Wizard of Earthsea", author: "Ursula K. Le Guin", workId: null, coverUrl: null, note: "lent twice" }, onChange: save }));
+  assert.match(html, /A Wizard of Earthsea/);
+  assert.match(html, /value="lent twice"/);
+  assert.match(html, /maxLength="60"/i);
+  assert.match(html, />10\/60</);
+  assert.match(html, />Change</);
+  assert.match(html, />Remove</);
+});
+
+test("a stored choice the library lost says so and can be removed", () => {
+  const book = renderToString(createElement(SignatureChoice, { books: [finished], signature: { bookKey: "isbn:gone", note: null }, onChange: save }));
+  assert.match(book, /No longer in your library\./);
+  assert.match(book, />Remove</);
+  const quote = renderToString(createElement(HighlightChoice, { books: [finished], highlight: { bookKey: "isbn:gone", highlightId: "x" }, onChange: save }));
+  assert.match(quote, /No longer in your library\./);
+});
+
+test("a reader with no Kobo highlights is told so; a chosen highlight shows as a quote", () => {
+  assert.match(renderToString(createElement(HighlightChoice, { books: [{ Title: "Notes only", highlights: [{ Type: "note", Text: "mine", BookmarkID: "n1" }] }], highlight: null, onChange: save })), /No Kobo highlights yet\./);
+  const html = renderToString(createElement(HighlightChoice, { books: [finished], highlight: { bookKey: bookKey(finished), highlightId: "h1" }, chosen: { text: "To light a candle", title: "A Wizard of Earthsea", author: "Ursula K. Le Guin" }, onChange: save }));
+  assert.match(html, /“To light a candle”/);
 });
