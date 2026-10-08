@@ -61,7 +61,7 @@ export function ReaderCardPage() {
           {input.card.state === "unwritten" && input.missing ? <p className="text-sm text-(--color-text-dim)">{input.missing}</p> : null}
         </div>
         <div className="space-y-6">
-          <ReaderCardOptions input={input} onChange={(patch) => void change(patch)} />
+          <ReaderCardOptions input={input} onChange={change} />
           <SignatureChoice books={books} signature={style.signature} chosen={input.card.chosen?.signature} onChange={change} />
           <HighlightChoice books={books} highlight={style.highlight} chosen={input.card.chosen?.highlight} onChange={change} />
           <ReaderGlyphSetting username={readerName} books={books} groups={groups} />

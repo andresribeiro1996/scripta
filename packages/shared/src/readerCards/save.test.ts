@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { READER_CARD_STYLE_KEY, saveReaderCardStyle, saveReaderCardStyleIn, type ReaderCardStyleQueries } from "./save.js";
-import { DEFAULT_READER_CARD_STYLE, noteSaver, normalizeReaderCardStyle, type ReaderCardStyle, type ReaderCardStylePatch } from "./style.js";
+import { DEFAULT_READER_CARD_STYLE, draftSaver, normalizeReaderCardStyle, type ReaderCardStyle, type ReaderCardStylePatch } from "./style.js";
 
 const tick = () => new Promise((resolve) => setImmediate(resolve));
 
@@ -130,7 +130,7 @@ test("a removal sent right after a note save cannot be undone by that note reach
   };
   const saved: Promise<void>[] = [];
   const change = (patch: ReaderCardStylePatch) => { const request = saveReaderCardStyle(cache, patch, update); saved.push(request); return request.then(() => true); };
-  noteSaver({ bookKey: "k", note: null }, () => {})("lent", change);
+  draftSaver(null, () => {})("lent", (note) => change({ signature: { bookKey: "k", note } }));
   void change({ signature: null });
   await tick();
   assert.equal(sent.length, 1);

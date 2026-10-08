@@ -12,14 +12,14 @@ export function noteToSend(value: string, lastSent: string | null): string | nul
   return note === lastSent ? undefined : note;
 }
 
-export function noteSaver(signature: ChosenSignature, rollback: (failed: string, previous: string | null) => void): (value: string, onChange: (patch: ReaderCardStylePatch) => Promise<boolean>) => void {
-  let sent = signature.note;
-  return (value, onChange) => {
-    const note = noteToSend(value, sent);
-    if (note === undefined) return;
+export function draftSaver(initial: string | null, rollback: (failed: string, previous: string | null) => void): (value: string, save: (next: string | null) => Promise<boolean>) => void {
+  let sent = initial;
+  return (value, save) => {
+    const next = noteToSend(value, sent);
+    if (next === undefined) return;
     const previous = sent;
-    sent = note;
-    void onChange({ signature: { bookKey: signature.bookKey, note } }).then((saved) => {
+    sent = next;
+    void save(next).then((saved) => {
       if (saved) return;
       sent = previous;
       rollback(value, previous);

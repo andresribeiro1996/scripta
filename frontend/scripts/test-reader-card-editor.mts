@@ -5,28 +5,59 @@ import { renderToString } from "react-dom/server";
 import { readFileSync } from "node:fs";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
-import { DEFAULT_READER_CARD_STYLE, bookKey, readerCardInputOf } from "@scripta/shared";
+import { DEFAULT_READER_CARD_STYLE, MOTTO_MAX, bookKey, readerCardInputOf } from "@scripta/shared";
 import { HighlightChoice, SignatureChoice } from "../src/components/readerCard/ReaderCardChoices";
 import { ReaderCardOptions } from "../src/components/readerCard/ReaderCardOptions";
 import { ReaderGlyphSetting } from "../src/components/readerCard/ReaderGlyphSetting";
 import { ToastProvider } from "../src/components/Toaster";
 
 const books = Array.from({ length: 6 }, (_, i) => ({ Title: `Book ${i}`, Attribution: `Author ${i}`, ReadStatus: 2, _genres: ["Fantasy"] }));
-const owner = readerCardInputOf(books, [], "andre", undefined, { style: { ...DEFAULT_READER_CARD_STYLE, counter: "beads", trait: "seal", layout: "book" }, coverOf: () => null });
+const group = (html: string, label: string) => {
+  const start = html.indexOf(`aria-label="${label}"`);
+  return html.slice(start, html.indexOf("</div>", start));
+};
+const options = (style = {}) => renderToString(createElement(ReaderCardOptions, { input: readerCardInputOf(books, [], "andre.ribeiro", undefined, { style: { ...DEFAULT_READER_CARD_STYLE, counter: "beads", trait: "seal", layout: "book", ...style }, coverOf: () => null }), onChange: async () => true }));
 
 test("five counter thumbnails, with only the chosen one checked", () => {
-  const html = renderToString(createElement(ReaderCardOptions, { input: owner, onChange: () => undefined }));
-  assert.equal(html.match(/role="radio"/g)?.length, 5);
-  assert.equal(html.match(/aria-checked="true"/g)?.length, 1);
-  assert.match(html, /aria-checked="true"[^>]*>(?:(?!<\/button>).)*Beads/s);
-  for (const name of ["Dial", "Beads", "Shelf", "Frame", "Ring"]) assert.match(html, new RegExp(`>${name}<`));
+  const counters = group(options(), "Counter");
+  assert.equal(counters.match(/role="radio"/g)?.length, 5);
+  assert.equal(counters.match(/aria-checked="true"/g)?.length, 1);
+  assert.match(counters, /aria-checked="true"[^>]*>(?:(?!<\/button>).)*Beads/s);
 });
 
 test("trait and layout show their names and press the current one", () => {
-  const html = renderToString(createElement(ReaderCardOptions, { input: owner, onChange: () => undefined }));
+  const html = options();
   for (const name of ["Line and seal", "Seal", "Line", "None", "Three faces", "Book", "One back"]) assert.match(html, new RegExp(`>${name}<`));
   assert.match(html, /aria-pressed="true"[^>]*>Seal</);
   assert.match(html, /aria-pressed="true"[^>]*>Book</);
+});
+
+test("twelve motto looks, checked on the stored one, under a 28-character field", () => {
+  const html = options({ motto: { text: "Per libros", look: "arc" } });
+  const looks = group(html, "Motto look");
+  assert.equal(looks.match(/role="radio"/g)?.length, 12);
+  assert.match(looks, /aria-checked="true"[^>]*>(?:(?!<\/button>).)*Arc/s);
+  assert.match(html, new RegExp(`maxLength="${MOTTO_MAX}"`, "i"));
+  assert.match(html, /value="Per libros"/);
+});
+
+test("both footer corners offer twelve chips and check the stored ones", () => {
+  const html = options({ footer: { left: "since", right: "initials" } });
+  for (const [label, checked] of [["Footer left", "Reader since"], ["Footer right", "Initials"]] as const) {
+    const chips = group(html, label);
+    assert.equal(chips.match(/role="radio"/g)?.length, 12, label);
+    assert.match(chips, new RegExp(`aria-checked="true"[^>]*>${checked}<`), label);
+  }
+});
+
+test("twelve corner thumbnails and the three prints", () => {
+  const html = options({ corners: "laurel", print: "reversed" });
+  const corners = group(html, "Corners");
+  assert.equal(corners.match(/role="radio"/g)?.length, 12);
+  assert.match(corners, /aria-checked="true"[^>]*>(?:(?!<\/button>).)*Laurel/s);
+  assert.match(corners, /viewBox="0 0 100 100"/);
+  assert.match(html, /aria-pressed="true"[^>]*>Reversed</);
+  for (const name of ["Follow theme", "Paper"]) assert.match(html, new RegExp(`>${name}<`));
 });
 
 const save = async () => true;

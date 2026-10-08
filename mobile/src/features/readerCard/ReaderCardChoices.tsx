@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
-import { SIGNATURE_NOTE_MAX, bookKey, bookPassages, isFinishedBook, noteSaver, searchPassages, type ChosenHighlight, type ChosenSignature, type Passage, type ReaderCardChosen, type ReaderCardStylePatch } from "@scripta/shared";
+import { SIGNATURE_NOTE_MAX, bookKey, bookPassages, draftSaver, isFinishedBook, searchPassages, type ChosenHighlight, type ChosenSignature, type Passage, type ReaderCardChosen, type ReaderCardStylePatch } from "@scripta/shared";
 import { Button, Input, Sheet, minimumTouchTarget, spacing, typography, useTheme } from "../../ui";
 import { Text } from "../../ui/Text";
 import { BookPickerList } from "../library/components/BookPickerList";
@@ -14,8 +14,8 @@ const NOTE_DELAY_MS = 600;
 
 function NoteField({ signature, onChange, flushRef }: { signature: ChosenSignature; onChange: SaveStyle; flushRef: RefObject<() => void> }) {
   const [draft, setDraft] = useState(signature.note ?? "");
-  const [save] = useState(() => noteSaver(signature, (failed, previous) => setDraft((current) => (current === failed ? (previous ?? "") : current))));
-  const { schedule, flush } = useDebouncedCallback((value: string) => save(value, onChange), NOTE_DELAY_MS);
+  const [save] = useState(() => draftSaver(signature.note, (failed, previous) => setDraft((current) => (current === failed ? (previous ?? "") : current))));
+  const { schedule, flush } = useDebouncedCallback((value: string) => save(value, (note) => onChange({ signature: { bookKey: signature.bookKey, note } })), NOTE_DELAY_MS);
   useEffect(() => {
     flushRef.current = flush;
     return () => { flushRef.current = () => {}; };

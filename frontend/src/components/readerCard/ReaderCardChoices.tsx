@@ -1,49 +1,16 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { SIGNATURE_NOTE_MAX, bookKey, bookPassages, isFinishedBook, noteSaver, searchPassages, type ChosenHighlight, type ChosenSignature, type Passage, type ReaderCardChosen, type ReaderCardStylePatch } from "@scripta/shared";
+import { useMemo, useState } from "react";
+import { SIGNATURE_NOTE_MAX, bookKey, bookPassages, isFinishedBook, searchPassages, type ChosenHighlight, type ChosenSignature, type Passage, type ReaderCardChosen, type ReaderCardStylePatch } from "@scripta/shared";
 import { BookSearchList } from "../murals/pickers";
+import { DraftField } from "./DraftField";
 
 export type SaveStyle = (patch: ReaderCardStylePatch) => Promise<boolean>;
 type Book = Record<string, unknown>;
 
-const NOTE_DELAY_MS = 600;
 const LINK = "text-xs font-semibold text-(--color-accent)";
 const DIM = "text-sm text-(--color-text-dim)";
 
 function NoteField({ signature, onChange }: { signature: ChosenSignature; onChange: SaveStyle }) {
-  const [draft, setDraft] = useState(signature.note ?? "");
-  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const pending = useRef<string | null>(null);
-  const latest = useRef(onChange);
-  useEffect(() => { latest.current = onChange; });
-  const [send] = useState(() => noteSaver(signature, (failed, previous) => setDraft((current) => (current === failed ? (previous ?? "") : current))));
-  const save = useCallback((value: string) => {
-    clearTimeout(timer.current);
-    pending.current = null;
-    send(value, latest.current);
-  }, [send]);
-  useEffect(() => () => {
-    clearTimeout(timer.current);
-    if (pending.current !== null) save(pending.current);
-  }, [save]);
-  return (
-    <label className="mt-3 block text-xs text-(--color-text-dim)">
-      Note
-      <input
-        value={draft}
-        maxLength={SIGNATURE_NOTE_MAX}
-        onChange={(event) => {
-          const value = event.target.value;
-          setDraft(value);
-          clearTimeout(timer.current);
-          pending.current = value;
-          timer.current = setTimeout(() => save(value), NOTE_DELAY_MS);
-        }}
-        onBlur={() => save(draft)}
-        className="mt-1 w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm text-(--color-text)"
-      />
-      <span className="mt-1 block text-right">{`${draft.length}/${SIGNATURE_NOTE_MAX}`}</span>
-    </label>
-  );
+  return <DraftField label="Note" initial={signature.note} max={SIGNATURE_NOTE_MAX} onSave={(note) => onChange({ signature: { bookKey: signature.bookKey, note } })} />;
 }
 
 export function SignatureChoice({ books, signature, chosen, onChange }: { books: Book[]; signature: ChosenSignature | null; chosen?: ReaderCardChosen["signature"]; onChange: SaveStyle }) {

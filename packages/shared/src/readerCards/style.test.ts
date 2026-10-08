@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { CORNER_LABELS, FOOTER_LEFT_LABELS, FOOTER_RIGHT_LABELS, MOTTO_LOOK_LABELS, PRINT_LABELS } from "./labels.js";
-import { CARD_PRINTS, CORNER_STYLES, DEFAULT_READER_CARD_STYLE, FOOTER_LEFTS, FOOTER_RIGHTS, MOTTO_LOOKS, noteSaver, noteToSend, normalizeReaderCardStyle, publicStyle, rekeyReaderCardStyle, resolvePrint, type ReaderCardStylePatch } from "./style.js";
+import { CARD_PRINTS, CORNER_STYLES, DEFAULT_READER_CARD_STYLE, FOOTER_LEFTS, FOOTER_RIGHTS, MOTTO_LOOKS, draftSaver, noteToSend, normalizeReaderCardStyle, publicStyle, rekeyReaderCardStyle, resolvePrint } from "./style.js";
 
 const PUBLIC_DEFAULTS = { motto: null, footer: { left: "plate", right: "name" }, corners: "diamonds", print: "auto" };
 
@@ -57,23 +57,23 @@ test("a note is sent trimmed, cleared as null, and never twice in a row", () => 
   assert.equal(noteToSend("", null), undefined);
 });
 
-test("the note saver sends nothing for an unchanged note, null for whitespace, and the book key every time", () => {
-  const patches: ReaderCardStylePatch[] = [];
-  const change = async (patch: ReaderCardStylePatch) => { patches.push(patch); return true; };
-  const save = noteSaver({ bookKey: "k", note: "lent" }, () => {});
+test("the draft saver sends nothing for an unchanged value and null for whitespace", () => {
+  const sent: (string | null)[] = [];
+  const change = async (next: string | null) => { sent.push(next); return true; };
+  const save = draftSaver("lent", () => {});
   save("lent", change);
   save("  fresh ", change);
   save("fresh", change);
   save("   ", change);
-  assert.deepEqual(patches, [{ signature: { bookKey: "k", note: "fresh" } }, { signature: { bookKey: "k", note: null } }]);
+  assert.deepEqual(sent, ["fresh", null]);
 });
 
-test("a refused note rolls the draft back only while it is unchanged, and the same text can be sent again", async () => {
+test("a refused draft rolls the draft back only while it is unchanged, and the same text can be sent again", async () => {
   let draft = "lent";
   const results = [false, false];
-  const patches: ReaderCardStylePatch[] = [];
-  const change = async (patch: ReaderCardStylePatch) => { patches.push(patch); return results.shift()!; };
-  const save = noteSaver({ bookKey: "k", note: null }, (failed, previous) => {
+  const sent: (string | null)[] = [];
+  const change = async (next: string | null) => { sent.push(next); return results.shift()!; };
+  const save = draftSaver(null, (failed, previous) => {
     if (draft === failed) draft = previous ?? "";
   });
   save("lent", change);
@@ -83,7 +83,7 @@ test("a refused note rolls the draft back only while it is unchanged, and the sa
   draft = "lent";
   save("lent", change);
   await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(patches.length, 2);
+  assert.equal(sent.length, 2);
   assert.equal(draft, "");
 });
 
