@@ -32,4 +32,5 @@ export * from "./bookGenres.js";
 export * from "./finish.js";
 export * from "./readerIdentity.js";
 export * from "./readerCardFacts.js";
+export * from "./passages.js";
 export * from "./saveFailure.js";
