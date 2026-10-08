@@ -320,7 +320,7 @@ readerCardSummary(input): string[]      // text alternative for screen readers
     - Motto: a text field of up to 28 characters plus 12 look thumbnails.
     - Footer: 12 chips per corner.
     - Corners: 12 cropped thumbnails.
-    - Finish: 12 thumbnails.
+    - Finish: 12 chips. The pinned preview shows the pick, because 12 full-card thumbnails made the phone editor slow to open.
     - Print: 3 segments.
     - Trait: 4 segments.
   - **Back:**

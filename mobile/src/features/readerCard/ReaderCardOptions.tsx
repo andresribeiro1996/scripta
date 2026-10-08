@@ -45,7 +45,6 @@ export function ReaderCardOptions({ input, onChange }: { input: ReaderCardBase; 
   const counterThumbs = useMemo(() => COUNTERS.map((option) => ({ option, input: deferred && counterThumbnail(deferred, option) })), [deferred]);
   const mottoThumbs = useMemo(() => MOTTO_LOOKS.map((option) => ({ option, input: deferred && styleThumbnail(deferred, { motto: { text: deferred.style.motto?.text ?? SAMPLE_MOTTO, look: option } }, "motto") })), [deferred]);
   const cornerThumbs = useMemo(() => CORNER_STYLES.map((option) => ({ option, input: deferred && styleThumbnail(deferred, { corners: option }, "corner") })), [deferred]);
-  const finishThumbs = useMemo(() => FINISHES.map((option) => ({ option, input: deferred && styleThumbnail(deferred, { finish: option }) })), [deferred]);
   const saveMotto = (text: string | null) => {
     const previous = lastText.current;
     lastText.current = text;
@@ -84,7 +83,7 @@ export function ReaderCardOptions({ input, onChange }: { input: ReaderCardBase; 
         <TileRow crop="corner" items={cornerThumbs} value={corners} labels={CORNER_LABELS} onPick={(next) => void onChange({ corners: next })} />
       </Section>
       <Section title="Finish">
-        <TileRow items={finishThumbs} value={finish} labels={FINISH_LABELS} onPick={(next) => void onChange({ finish: next })} />
+        <ChipRow keys={FINISHES} labels={FINISH_LABELS} value={finish} onPick={(next) => void onChange({ finish: next })} />
       </Section>
       <Section title="Print">
         <Segmented accessibilityLabel="Print" options={PRINT_OPTIONS} value={print} onChange={(next) => void onChange({ print: next })} />

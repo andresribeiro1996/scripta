@@ -60,7 +60,6 @@ export function ReaderCardOptions({ input, scheme, onChange }: { input: ReaderCa
   const counterThumbs = useMemo(() => COUNTERS.map((option) => ({ option, input: counterThumbnail(base, option) })), [base]);
   const mottoThumbs = useMemo(() => new Map(MOTTO_LOOKS.map((option) => [option, styleThumbnail(base, { motto: { text: base.style.motto?.text ?? SAMPLE_MOTTO, look: option } }, "motto")])), [base]);
   const cornerThumbs = useMemo(() => new Map(CORNER_STYLES.map((option) => [option, styleThumbnail(base, { corners: option }, "corner")])), [base]);
-  const finishThumbs = useMemo(() => new Map(FINISHES.map((option) => [option, styleThumbnail(base, { finish: option })])), [base]);
   const saveMotto = (text: string | null) => {
     const previous = lastText.current;
     lastText.current = text;
@@ -114,7 +113,7 @@ export function ReaderCardOptions({ input, scheme, onChange }: { input: ReaderCa
       </section>
       <section>
         <h3 className="mb-2 text-sm font-semibold">Finish</h3>
-        <Thumbnails label="Finish" options={FINISHES} labels={FINISH_LABELS} value={finish} thumbnail={(option) => finishThumbs.get(option)!} onPick={(next) => void onChange({ finish: next })} columns="grid-cols-4 sm:grid-cols-6" />
+        <Chips label="Finish" options={FINISHES} labels={FINISH_LABELS} value={finish} onPick={(next) => void onChange({ finish: next })} />
       </section>
       <section>
         <h3 className="mb-2 text-sm font-semibold">Print</h3>
