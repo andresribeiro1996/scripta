@@ -130,7 +130,7 @@ test("a removal sent right after a note save cannot be undone by that note reach
   };
   const saved: Promise<void>[] = [];
   const change = (patch: ReaderCardStylePatch) => { const request = saveReaderCardStyle(cache, patch, update); saved.push(request); return request.then(() => true); };
-  noteSaver({ bookKey: "k", note: null }, change, () => {})("lent");
+  noteSaver({ bookKey: "k", note: null }, () => {})("lent", change);
   void change({ signature: null });
   await tick();
   assert.equal(sent.length, 1);

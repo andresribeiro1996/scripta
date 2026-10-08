@@ -14,10 +14,8 @@ const NOTE_DELAY_MS = 600;
 
 function NoteField({ signature, onChange, flushRef }: { signature: ChosenSignature; onChange: SaveStyle; flushRef: RefObject<() => void> }) {
   const [draft, setDraft] = useState(signature.note ?? "");
-  const latest = useRef(onChange);
-  useEffect(() => { latest.current = onChange; });
-  const [save] = useState(() => noteSaver(signature, (patch) => latest.current(patch), (failed, previous) => setDraft((current) => (current === failed ? (previous ?? "") : current))));
-  const { schedule, flush } = useDebouncedCallback(save, NOTE_DELAY_MS);
+  const [save] = useState(() => noteSaver(signature, (failed, previous) => setDraft((current) => (current === failed ? (previous ?? "") : current))));
+  const { schedule, flush } = useDebouncedCallback((value: string) => save(value, onChange), NOTE_DELAY_MS);
   useEffect(() => {
     flushRef.current = flush;
     return () => { flushRef.current = () => {}; };

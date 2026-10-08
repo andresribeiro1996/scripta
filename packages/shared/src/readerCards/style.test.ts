@@ -56,11 +56,12 @@ test("a note is sent trimmed, cleared as null, and never twice in a row", () => 
 
 test("the note saver sends nothing for an unchanged note, null for whitespace, and the book key every time", () => {
   const patches: ReaderCardStylePatch[] = [];
-  const save = noteSaver({ bookKey: "k", note: "lent" }, async (patch) => { patches.push(patch); return true; }, () => {});
-  save("lent");
-  save("  fresh ");
-  save("fresh");
-  save("   ");
+  const change = async (patch: ReaderCardStylePatch) => { patches.push(patch); return true; };
+  const save = noteSaver({ bookKey: "k", note: "lent" }, () => {});
+  save("lent", change);
+  save("  fresh ", change);
+  save("fresh", change);
+  save("   ", change);
   assert.deepEqual(patches, [{ signature: { bookKey: "k", note: "fresh" } }, { signature: { bookKey: "k", note: null } }]);
 });
 
@@ -68,15 +69,16 @@ test("a refused note rolls the draft back only while it is unchanged, and the sa
   let draft = "lent";
   const results = [false, false];
   const patches: ReaderCardStylePatch[] = [];
-  const save = noteSaver({ bookKey: "k", note: null }, async (patch) => { patches.push(patch); return results.shift()!; }, (failed, previous) => {
+  const change = async (patch: ReaderCardStylePatch) => { patches.push(patch); return results.shift()!; };
+  const save = noteSaver({ bookKey: "k", note: null }, (failed, previous) => {
     if (draft === failed) draft = previous ?? "";
   });
-  save("lent");
+  save("lent", change);
   draft = "lent twice";
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(draft, "lent twice");
   draft = "lent";
-  save("lent");
+  save("lent", change);
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(patches.length, 2);
   assert.equal(draft, "");

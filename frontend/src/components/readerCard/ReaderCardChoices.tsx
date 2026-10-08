@@ -15,11 +15,11 @@ function NoteField({ signature, onChange }: { signature: ChosenSignature; onChan
   const pending = useRef<string | null>(null);
   const latest = useRef(onChange);
   useEffect(() => { latest.current = onChange; });
-  const [send] = useState(() => noteSaver(signature, (patch) => latest.current(patch), (failed, previous) => setDraft((current) => (current === failed ? (previous ?? "") : current))));
+  const [send] = useState(() => noteSaver(signature, (failed, previous) => setDraft((current) => (current === failed ? (previous ?? "") : current))));
   const save = useCallback((value: string) => {
     clearTimeout(timer.current);
     pending.current = null;
-    send(value);
+    send(value, latest.current);
   }, [send]);
   useEffect(() => () => {
     clearTimeout(timer.current);

@@ -11,9 +11,9 @@ export function noteToSend(value: string, lastSent: string | null): string | nul
   return note === lastSent ? undefined : note;
 }
 
-export function noteSaver(signature: ChosenSignature, onChange: (patch: ReaderCardStylePatch) => Promise<boolean>, rollback: (failed: string, previous: string | null) => void): (value: string) => void {
+export function noteSaver(signature: ChosenSignature, rollback: (failed: string, previous: string | null) => void): (value: string, onChange: (patch: ReaderCardStylePatch) => Promise<boolean>) => void {
   let sent = signature.note;
-  return (value) => {
+  return (value, onChange) => {
     const note = noteToSend(value, sent);
     if (note === undefined) return;
     const previous = sent;
