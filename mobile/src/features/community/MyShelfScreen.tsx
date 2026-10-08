@@ -10,6 +10,7 @@ import { Button, Dialog, dynamicType, EmptyState, ErrorState, HeaderActions, Ico
 import { fetchGalleryImages } from "../gallery/api";
 import { useLibrary } from "../library/hooks/useLibrary";
 import { MuralCanvas } from "../murals";
+import { NO_GROUPS } from "../murals/MuralCanvas";
 import { fetchMural } from "../murals/api";
 import { useMurals } from "../murals/useMurals";
 import { fetchTierlists } from "../tierlists/api";
@@ -58,7 +59,7 @@ export function MyShelfScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const books = library?.data.books ?? [];
-  const groups = library?.data.groups ?? [];
+  const groups = library?.data.groups ?? NO_GROUPS;
   const images = gallery.data ?? [];
   const tierlists = tierlistsQuery.data ?? [];
   const profile = user?.username

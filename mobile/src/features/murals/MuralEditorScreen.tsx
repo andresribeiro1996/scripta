@@ -35,7 +35,7 @@ import { BlockActionBar, type BlockAction } from "./BlockActionBar";
 import { BlockSheet, type SheetTab } from "./BlockSheet";
 import { ContentTab, type PickerKind } from "./ContentTab";
 import { LayoutTab } from "./LayoutTab";
-import { BlockPreview, MuralCanvas } from "./MuralCanvas";
+import { BlockPreview, MuralCanvas, NO_GROUPS } from "./MuralCanvas";
 import { MuralShareSheet } from "./MuralShareSheet";
 import { StyleTab } from "./StyleTab";
 import { fetchMural, shareMural, unshareMural, updateMural } from "./api";
@@ -104,7 +104,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
   const colors = themes[currentTheme].colors;
   const selected = currentBlocks.find((block) => block.id === selectedId) ?? null;
   const books = library?.data.books ?? [];
-  const groups = library?.data.groups ?? [];
+  const groups = library?.data.groups ?? NO_GROUPS;
   const { width: windowWidth } = useWindowDimensions();
   const profile = user?.username ? { username: user.username, avatarUrl: user.avatarId ? `${API_URL}/auth/avatar/${user.avatarId}/file` : null } : undefined;
   const needle = search.trim().toLowerCase();
