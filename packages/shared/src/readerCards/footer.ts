@@ -54,16 +54,17 @@ function leftSlot(value: FooterLeft, ctx: FooterContext, width: number): string 
   return text ? caps(text, 30, false, width) : undefined;
 }
 
-interface Right { svg?: string; width: number }
+interface Right { svg?: string; width: number; text: string | null }
 
 function rightSlot(value: FooterRight, readerName: string): Right {
   const { first, last } = nameParts(readerName);
   const F = first.toUpperCase();
   const L = last?.toUpperCase() ?? null;
-  const monogram = escapeText(`${initial(F)}${L ? initial(L) : ""}`);
+  const letters = `${initial(F)}${L ? initial(L) : ""}`;
+  const monogram = escapeText(letters);
   const text = (content: string): Right => {
     const shown = fitLine(content, { ...CAPS, width: MAX_RIGHT });
-    return { svg: caps(shown, 220, true, MAX_RIGHT), width: textWidth(shown, CAPS) };
+    return { svg: caps(shown, 220, true, MAX_RIGHT), width: textWidth(shown, CAPS), text: shown };
   };
   switch (value) {
     case "firstName": if (L) return text(F); break;
@@ -74,17 +75,26 @@ function rightSlot(value: FooterRight, readerName: string): Right {
     case "handle": return text(`@${readerName.toUpperCase()}`);
     case "nameItalic": {
       const shown = fitLine(displayName(readerName), { font: "serif", size: 9, width: MAX_RIGHT });
-      return { svg: `<text class="pt" x="220" y="321" text-anchor="end" font-size="9" font-style="italic" font-family="${SERIF}">${escapeText(shown)}</text>`, width: textWidth(shown, { font: "serif", size: 9 }) };
+      return { svg: `<text class="pt" x="220" y="321" text-anchor="end" font-size="9" font-style="italic" font-family="${SERIF}">${escapeText(shown)}</text>`, width: textWidth(shown, { font: "serif", size: 9 }), text: shown };
     }
     case "signature": {
       const shown = fitLine(displayName(readerName), { font: "script", size: 12, width: MAX_RIGHT });
-      return { svg: `<text class="pt" x="221" y="323" text-anchor="end" font-size="12" font-family="${SCRIPT}">${escapeText(shown)}</text>`, width: textWidth(shown, { font: "script", size: 12 }) };
+      return { svg: `<text class="pt" x="221" y="323" text-anchor="end" font-size="12" font-family="${SCRIPT}">${escapeText(shown)}</text>`, width: textWidth(shown, { font: "script", size: 12 }), text: shown };
     }
-    case "monogram": return { svg: `<circle class="pl" cx="212" cy="316" r="7" stroke-width=".8"/><circle class="pl" cx="212" cy="316" r="5.6" stroke-width=".35"/><text class="pt" x="212" y="318.2" text-anchor="middle" font-size="6" font-family="${SERIF}">${monogram}</text>`, width: 15 };
-    case "monogramDiamond": return { svg: `<path class="pl" d="M212 309L219 316L212 323L205 316Z" stroke-width=".8"/><text class="pt" x="212" y="318.1" text-anchor="middle" font-size="5.6" font-family="${SERIF}">${monogram}</text>`, width: 15 };
-    case "none": return { svg: "", width: 0 };
+    case "monogram": return { svg: `<circle class="pl" cx="212" cy="316" r="7" stroke-width=".8"/><circle class="pl" cx="212" cy="316" r="5.6" stroke-width=".35"/><text class="pt" x="212" y="318.2" text-anchor="middle" font-size="6" font-family="${SERIF}">${monogram}</text>`, width: 15, text: letters };
+    case "monogramDiamond": return { svg: `<path class="pl" d="M212 309L219 316L212 323L205 316Z" stroke-width=".8"/><text class="pt" x="212" y="318.1" text-anchor="middle" font-size="5.6" font-family="${SERIF}">${monogram}</text>`, width: 15, text: letters };
+    case "none": return { svg: "", width: 0, text: null };
   }
-  return { width: textWidth(truncateName(readerName).toUpperCase(), CAPS) };
+  const fallback = truncateName(readerName).toUpperCase();
+  return { width: textWidth(fallback, CAPS), text: value === "name" ? fallback : null };
+}
+
+export function footerLeftText(value: FooterLeft, card: PublicReaderCard): string | null {
+  return value === "plate" ? `PLATE ${plateOf(card)?.numeral ?? "—"}` : leftText(value, card);
+}
+
+export function footerRightText(value: FooterRight, readerName: string): string | null {
+  return rightSlot(value, readerName).text;
 }
 
 export function footerSlots(footer: CardFooter, ctx: FooterContext): Pick<PlateSlots, "footerLeft" | "footerRight"> {

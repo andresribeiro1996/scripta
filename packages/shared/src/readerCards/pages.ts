@@ -36,6 +36,11 @@ export function turnTo(state: TurnState, to: number, direction: 1 | -1): TurnSta
   return { index: to, rotation, faces };
 }
 
+export function turnToPage(state: TurnState, pages: readonly ReaderCardPage[], page: ReaderCardPage): TurnState {
+  const index = [pages.indexOf(page), pages.indexOf("merged")].find((found) => found >= 0) ?? 1;
+  return turnTo(state, index, index > state.index ? 1 : -1);
+}
+
 export function turnBy(state: TurnState, by: 1 | -1, count: number): TurnState {
   return turnTo(state, (state.index + by + count) % count, by);
 }

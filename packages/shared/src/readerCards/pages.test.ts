@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { hasChosen, readerCardPages, startTurn, turnBy, turnTo } from "./pages.js";
+import { hasChosen, readerCardPages, startTurn, turnBy, turnTo, turnToPage } from "./pages.js";
 
 test("faces turn front, chosen, record, and a visitor with nothing chosen skips the chosen page", () => {
   assert.deepEqual(readerCardPages("faces", "visitor", true), ["front", "chosen", "record"]);
@@ -44,4 +44,28 @@ test("a single page never turns", () => {
   const state = startTurn(1);
   assert.deepEqual(state.faces, [0, 0]);
   assert.equal(turnBy(state, 1, 1), state);
+});
+
+test("turning to a page lands on its first index, else the merged back, else the second page", () => {
+  const flat = (layout: "faces" | "book" | "merged", view: "owner" | "visitor", chosen: boolean) => readerCardPages(layout, view, chosen).flat();
+  const at = (pages: ReturnType<typeof flat>, page: "front" | "chosen" | "record" | "merged") => turnToPage(startTurn(pages.length), pages, page).index;
+  const faces = flat("faces", "owner", false);
+  assert.deepEqual([at(faces, "front"), at(faces, "chosen"), at(faces, "record"), at(faces, "merged")], [0, 1, 2, 1]);
+  const book = flat("book", "owner", true);
+  assert.deepEqual([at(book, "front"), at(book, "chosen"), at(book, "record")], [0, 1, 2]);
+  const merged = flat("merged", "owner", false);
+  assert.deepEqual([at(merged, "front"), at(merged, "chosen"), at(merged, "record"), at(merged, "merged")], [0, 1, 1, 1]);
+  const bare = flat("faces", "visitor", false);
+  assert.deepEqual([at(bare, "front"), at(bare, "chosen"), at(bare, "record")], [0, 1, 1]);
+  const shown = flat("faces", "visitor", true);
+  assert.equal(at(shown, "chosen"), 1);
+});
+
+test("turning to a page keeps the turn state consistent in both directions", () => {
+  const pages = readerCardPages("faces", "owner", true).flat();
+  const forward = turnToPage(startTurn(3), pages, "record");
+  assert.deepEqual(forward, { index: 2, rotation: 180, faces: [0, 2] });
+  const back = turnToPage(forward, pages, "front");
+  assert.deepEqual(back, { index: 0, rotation: 0, faces: [0, 2] });
+  assert.equal(turnToPage(back, pages, "front"), back);
 });
