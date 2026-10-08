@@ -16,7 +16,7 @@ import { useOwnCardStyle, useReaderCardStyle, useSaveReaderCardStyle } from "./u
 const NO_BOOKS: Array<Record<string, unknown>> = [];
 const PREVIEW_MAX = 280;
 const PIN_SHARE = 0.4;
-const PIN_CHROME = minimumTouchTarget * 2 + spacing.md * 2 + spacing.lg * 2;
+const PIN_CHROME = minimumTouchTarget + spacing.md + spacing.sm * 2;
 const AUDIENCES = [{ value: "you", label: "You" }, { value: "visitors", label: "Visitors" }] as const;
 
 export function ReaderCardEditorScreen() {
@@ -55,10 +55,10 @@ export function ReaderCardEditorScreen() {
   return (
     <View style={styles.screen}>
       <View style={[styles.pinned, { backgroundColor: colors.background }]}>
-        <Segmented accessibilityLabel="Preview as" options={AUDIENCES} value={audience} onChange={setAudience} />
         <ReaderCardTurner key={`${preview.view}-${preview.style.layout}-${hasChosen(preview.card.chosen)}`} input={preview} width={width} />
       </View>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.page}>
+        <Segmented accessibilityLabel="Preview as" options={AUDIENCES} value={audience} onChange={setAudience} />
         {input.card.state === "unwritten" && input.missing ? <Text style={[typography.body, { color: colors.textDim }]}>{input.missing}</Text> : null}
         {error ? <Toast visible message={error} tone="error" /> : null}
         <ReaderCardOptions input={input} onChange={change} />
@@ -72,7 +72,7 @@ export function ReaderCardEditorScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  pinned: { paddingHorizontal: spacing.xl, paddingTop: spacing.lg, paddingBottom: spacing.lg, gap: spacing.md },
+  pinned: { paddingTop: spacing.sm, paddingBottom: spacing.sm },
   page: { padding: spacing.xl, gap: spacing.lg, paddingBottom: spacing.huge },
   pad: { padding: spacing.xl },
 });
