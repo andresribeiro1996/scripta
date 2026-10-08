@@ -50,7 +50,7 @@ export function ReaderCardViewer({ input, onClose }: { input: ReaderCardBase; on
   return (
     <Modal animationType={reduced ? "none" : "fade"} onRequestClose={onClose} statusBarTranslucent transparent visible>
       <View style={[styles.backdrop, { backgroundColor: colors.scrim, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
-        <Pressable accessibilityLabel="Close reader card" accessibilityRole="button" onPress={onClose} style={StyleSheet.absoluteFill} />
+        <Pressable accessible={false} importantForAccessibility="no" onPress={onClose} style={StyleSheet.absoluteFill} />
         <View accessibilityViewIsModal style={styles.content}>
           <Pressable accessibilityLabel="Close reader card" accessibilityRole="button" hitSlop={8} onPress={onClose} style={[styles.close, { backgroundColor: colors.surface }]}>
             <Icon name="close" color={colors.text} />
