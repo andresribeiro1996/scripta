@@ -10,6 +10,8 @@ import { PLATE_RATIO, ReaderCardImage } from "./ReaderCardImage";
 
 const EASE = Easing.bezier(MOTION.ease[0], MOTION.ease[1], MOTION.ease[2], MOTION.ease[3]);
 const TURN_MS = 450;
+const BACKDROP = "rgba(0, 0, 0, 0.7)";
+const DOT_MARK = "#ffffff";
 
 export function ReaderCardViewer({ input, onClose }: { input: ReaderCardBase; onClose: () => void }) {
   const { colors } = useTheme();
@@ -49,7 +51,7 @@ export function ReaderCardViewer({ input, onClose }: { input: ReaderCardBase; on
 
   return (
     <Modal animationType={reduced ? "none" : "fade"} onRequestClose={onClose} statusBarTranslucent transparent visible>
-      <View style={[styles.backdrop, { backgroundColor: colors.scrim, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+      <View style={[styles.backdrop, { backgroundColor: BACKDROP, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
         <Pressable accessible={false} importantForAccessibility="no" onPress={onClose} style={StyleSheet.absoluteFill} />
         <View accessibilityViewIsModal style={styles.content}>
           <Pressable accessibilityLabel="Close reader card" accessibilityRole="button" hitSlop={8} onPress={onClose} style={[styles.close, { backgroundColor: colors.surface }]}>
@@ -72,7 +74,7 @@ export function ReaderCardViewer({ input, onClose }: { input: ReaderCardBase; on
           <View style={styles.dots}>
             {pages.map((_, i) => (
               <Pressable key={i} accessibilityLabel={`Page ${i + 1}`} accessibilityRole="button" accessibilityState={{ selected: i === turn.index }} onPress={() => setTurn((state) => turnTo(state, i, i > state.index ? 1 : -1))} style={styles.dot}>
-                <View style={[styles.dotMark, { backgroundColor: colors.text, opacity: i === turn.index ? 1 : 0.4 }]} />
+                <View style={[styles.dotMark, { backgroundColor: DOT_MARK, opacity: i === turn.index ? 1 : 0.4 }]} />
               </Pressable>
             ))}
           </View>
