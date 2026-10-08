@@ -137,3 +137,11 @@ test("the visitors' preview of the owner's card drops the leaders, the missing l
   assert.deepEqual(visitor.style, owner.style);
   assert.deepEqual(visitor.card, { ...owner.card, style: owner.style });
 });
+
+test("the owner's reader number joins the facts only when given", () => {
+  const books = Array.from({ length: 6 }, (_, i) => book(i, { _genres: ["Fantasy"] }));
+  const style = { ...DEFAULT_READER_CARD_STYLE, footer: { left: "readerNumber", right: "name" } } as const;
+  assert.equal(readerCardInputOf(books, [], "andre", undefined, { style, coverOf: () => null, readerNumber: 42 }).card.facts?.readerNumber, 42);
+  assert.equal("readerNumber" in readerCardInputOf(books, [], "andre", undefined, { style, coverOf: () => null }).card.facts!, false);
+  assert.equal("readerNumber" in readerCardInputOf(books, [], "andre", undefined, { style, coverOf: () => null, readerNumber: null }).card.facts!, false);
+});

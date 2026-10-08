@@ -3,6 +3,7 @@ import type { PublicReaderCard, ReaderLeader } from "../library/readerIdentity.j
 import { composePage, composePlate, SANS, type PlateFace, type PlateSlots } from "./compose.js";
 import { cornersSlot } from "./corners.js";
 import { drawCounter, SEAL_ANGLE } from "./counters.js";
+import { footerSlots, GENRE_LEADS, truncateName } from "./footer.js";
 import { INKS, PAPER, PLATES, REVERSED_LINE, emblems, glyph, glyphBody, type IdentityKey } from "./plates.js";
 import { chosenBody, mergedBody, recordBody, type ReaderCardPage, type ReaderCardView } from "./pages.js";
 import type { PublicReaderCardStyle } from "./style.js";
@@ -25,8 +26,6 @@ function inks(key: IdentityKey | "graph", print: PlatePrint): [string, string] {
   const [, ink, deep] = INKS[key];
   return print === "paper" ? [PAPER, ink] : [deep, REVERSED_LINE];
 }
-
-const truncateName = (name: string) => (name.length > 16 ? `${name.slice(0, 16)}…` : name);
 
 const rules = (g: string, l: string): Record<string, string> => ({
   pg: `fill:${g}`, pgf: `fill:${g}`, gg: `fill:${g}`,
@@ -76,15 +75,17 @@ export interface ReaderCardInput {
 
 export type ReaderCardBase = Omit<ReaderCardInput, "print">;
 
-const GENRE_LEADS: ReadonlySet<string> = new Set(["lamp", "star", "arch", "corr"]);
 const SEAL_SIZE = 26;
 const SEAL_RADIUS = 64;
+
+function glyphAt(key: IdentityKey, x: number, y: number, size: number, print: PlatePrint): string {
+  return `<g class="glyph id-${key}" transform="translate(${x.toFixed(2)} ${y.toFixed(2)}) scale(${(size / 48).toFixed(4)})">${withStyle(glyphBody(key), inks(key, print))}</g>`;
+}
 
 function sealSlot(streak: IdentityKey, print: PlatePrint): string {
   const rad = (SEAL_ANGLE * Math.PI) / 180;
   const cx = 125 + SEAL_RADIUS * Math.sin(rad), cy = 134 - SEAL_RADIUS * Math.cos(rad);
-  const glyphSvg = `<g class="glyph id-${streak}" transform="translate(${(cx - SEAL_SIZE / 2).toFixed(2)} ${(cy - SEAL_SIZE / 2).toFixed(2)}) scale(${(SEAL_SIZE / 48).toFixed(4)})">${withStyle(glyphBody(streak), inks(streak, print))}</g>`;
-  return `<circle class="pg" cx="${cx.toFixed(2)}" cy="${cy.toFixed(2)}" r="${SEAL_SIZE / 2 + 2.5}"/>${glyphSvg}`;
+  return `<circle class="pg" cx="${cx.toFixed(2)}" cy="${cy.toFixed(2)}" r="${SEAL_SIZE / 2 + 2.5}"/>${glyphAt(streak, cx - SEAL_SIZE / 2, cy - SEAL_SIZE / 2, SEAL_SIZE, print)}`;
 }
 
 function traitLine(streak: IdentityKey): string {
@@ -92,9 +93,10 @@ function traitLine(streak: IdentityKey): string {
   return `<text class="pt" x="125" y="297" text-anchor="middle" font-size="5.6" letter-spacing="1.5" font-family="${SANS}" font-weight="600">WITH A STREAK OF THE ${name}</text>`;
 }
 
-function decorations(input: ReaderCardInput, _print: PlatePrint): PlateSlots {
+function decorations(input: ReaderCardInput, print: PlatePrint): PlateSlots {
   const corners = cornersSlot(input.style.corners);
-  return corners === undefined ? {} : { corners };
+  const footer = footerSlots(input.style.footer, { card: input.card, readerName: input.readerName, glyph: (key, x, y, size) => glyphAt(key, x, y, size, print) });
+  return { ...(corners === undefined ? {} : { corners }), ...footer };
 }
 
 export function renderReaderCard(input: ReaderCardInput, page: ReaderCardPage = "front"): string {

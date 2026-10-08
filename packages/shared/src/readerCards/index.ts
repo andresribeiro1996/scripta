@@ -9,3 +9,4 @@ export { hasChosen, readerCardPages, readerCardSummary, startTurn, turnBy, turnT
 export { THUMBNAIL_MARKS, counterThumbnail, thumbnailSegments } from "./thumbnail.js";
 export { CORNER_LABELS, COUNTER_LABELS, FOOTER_LEFT_LABELS, FOOTER_RIGHT_LABELS, LAYOUT_LABELS, MOTTO_LOOK_LABELS, PRINT_LABELS, TRAIT_LABELS } from "./labels.js";
 export { READER_CARD_STYLE_KEY, saveReaderCardStyle, saveReaderCardStyleIn, type ReaderCardStyleCache, type ReaderCardStyleQueries } from "./save.js";
+export { roman, nameParts, displayName } from "./numerals.js";
