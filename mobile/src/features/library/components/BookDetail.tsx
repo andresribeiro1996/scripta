@@ -85,9 +85,9 @@ export function BookDetail({
         ) : null}
 
         <View style={styles.actions}>
-          <Button label="Style" variant="secondary" onPress={() => onOpenStyle(book)} />
-          <Button label="Cover" variant="secondary" onPress={() => onOpenCoverPicker(book)} />
-          {onOpenWork ? <Button label="About this book" variant="secondary" onPress={onOpenWork} /> : null}
+          <View style={styles.action}><Button label="Style" variant="secondary" onPress={() => onOpenStyle(book)} /></View>
+          <View style={styles.action}><Button label="Cover" variant="secondary" onPress={() => onOpenCoverPicker(book)} /></View>
+          {onOpenWork ? <View style={styles.action}><Button label="About this book" variant="secondary" onPress={onOpenWork} /></View> : null}
         </View>
 
         <View>
@@ -129,5 +129,6 @@ const styles = StyleSheet.create({
   cover: { width: 96, aspectRatio: 2 / 3, borderRadius: 8, overflow: "hidden" },
   headerText: { flex: 1, justifyContent: "center" },
   actions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  action: { flexGrow: 1 },
   highlight: { borderLeftWidth: 2, paddingLeft: spacing.md },
 });

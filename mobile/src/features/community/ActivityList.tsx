@@ -97,7 +97,7 @@ function ActivityRowView({ item, day }: { item: ActivityItem; day: string | null
           <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.strong, styles.label, { color: toneColor }]}>
             {row.label}
           </Text>
-          <Text {...dynamicType} style={[typography.caption, styles.time, { color: colors.textDim }]}>
+          <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.time, { color: colors.textDim }]}>
             {relativeTime(item.createdAt)}
           </Text>
         </View>

@@ -160,7 +160,7 @@ export function ArenaSeedScreen({ tournament, onStarted }: { tournament?: Tourna
           ListEmptyComponent={<EmptyState title="No slots" />}
           renderItem={({ item, index }) => (
             <Pressable accessibilityRole="button" accessibilityLabel={item ? `Slot ${index + 1}, ${item.title}. Change book` : `Assign slot ${index + 1}`} onPress={() => setSlotToAssign(index)} style={[styles.slot, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Slot {index + 1}</Text>
+              <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Slot {index + 1}</Text>
               <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.grow, { color: colors.text }]}>{item?.title ?? "Empty — tap to assign"}</Text>
             </Pressable>
           )}
