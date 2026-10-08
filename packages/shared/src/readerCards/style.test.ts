@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { CORNER_LABELS, FOOTER_LEFT_LABELS, FOOTER_RIGHT_LABELS, MOTTO_LOOK_LABELS, PRINT_LABELS } from "./labels.js";
-import { CARD_PRINTS, CORNER_STYLES, DEFAULT_READER_CARD_STYLE, FOOTER_LEFTS, FOOTER_RIGHTS, MOTTO_LOOKS, draftSaver, noteToSend, normalizeReaderCardStyle, publicStyle, rekeyReaderCardStyle, resolvePrint } from "./style.js";
+import { CORNER_LABELS, FINISH_LABELS, FOOTER_LEFT_LABELS, FOOTER_RIGHT_LABELS, MOTTO_LOOK_LABELS, PRINT_LABELS } from "./labels.js";
+import { CARD_PRINTS, CORNER_STYLES, DEFAULT_READER_CARD_STYLE, FINISHES, FOOTER_LEFTS, FOOTER_RIGHTS, MOTTO_LOOKS, draftSaver, noteToSend, normalizeReaderCardStyle, publicStyle, rekeyReaderCardStyle, resolvePrint } from "./style.js";
 
-const PUBLIC_DEFAULTS = { motto: null, footer: { left: "plate", right: "name" }, corners: "diamonds", print: "auto" };
+const PUBLIC_DEFAULTS = { motto: null, footer: { left: "plate", right: "name" }, corners: "diamonds", finish: "paper", print: "auto" };
 
 test("the default style chooses no book, no highlight and no motto, and keeps today's footer, corners and print", () => {
   assert.deepEqual(DEFAULT_READER_CARD_STYLE, { counter: "dial", layout: "faces", trait: "both", ...PUBLIC_DEFAULTS, signature: null, highlight: null });
@@ -125,4 +125,14 @@ test("every decoration option has a name", () => {
   assert.deepEqual(FOOTER_RIGHTS.map((key) => FOOTER_RIGHT_LABELS[key]), ["Name", "First name", "Last name", "First name, initial", "Initials", "Catalogue", "Handle", "Name in italics", "Signature", "Monogram", "Diamond monogram", "None"]);
   assert.deepEqual(CORNER_STYLES.map((key) => CORNER_LABELS[key]), ["Diamonds", "Art deco", "Fleuron", "Photo corners", "Stars", "Laurel", "Knot", "Volute", "Meander", "Rosette", "Register mark", "None"]);
   assert.deepEqual(CARD_PRINTS.map((key) => PRINT_LABELS[key]), ["Auto", "Light", "Dark"]);
+});
+
+test("a finish must be one of the twelve; anything else, or none, is plain paper", () => {
+  assert.equal(FINISHES.length, 12);
+  assert.equal(normalizeReaderCardStyle({ finish: "foil" }).finish, "foil");
+  assert.equal(normalizeReaderCardStyle({ finish: "neon" }).finish, "paper");
+  assert.equal(normalizeReaderCardStyle({}).finish, "paper");
+  assert.equal(publicStyle(normalizeReaderCardStyle({ finish: "gilt" })).finish, "gilt");
+  assert.deepEqual(Object.keys(FINISH_LABELS), [...FINISHES]);
+  assert.equal(FINISH_LABELS.paper, "Plain");
 });

@@ -30,7 +30,7 @@ export function ReaderCardViewer({ input, onClose, onEdit }: { input: ReaderCard
               <Icon name="close" color={colors.text} />
             </Pressable>
           </View>
-          <ReaderCardTurner key={`${input.view}-${input.style.layout}-${hasChosen(input.card.chosen)}`} input={input} width={width} onScrim />
+          <ReaderCardTurner key={`${input.view}-${input.style.layout}-${hasChosen(input.card.chosen)}`} input={input} width={width} onScrim liveShine />
         </View>
       </View>
     </Modal>

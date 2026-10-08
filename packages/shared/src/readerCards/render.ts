@@ -1,11 +1,13 @@
 import type { DialGroup } from "../library/readerCardFacts.js";
 import type { PublicReaderCard, ReaderLeader } from "../library/readerIdentity.js";
-import { composePage, composePlate, SANS, type PlateFace, type PlateSlots } from "./compose.js";
+import { composePage, composePlate, cornerMarkup, SANS, type PlateFace, type PlateSlots } from "./compose.js";
 import { cornersSlot } from "./corners.js";
 import { drawCounter, SEAL_ANGLE } from "./counters.js";
+import { finishLayers } from "./finishes.js";
 import { footerSlots, GENRE_LEADS, truncateName } from "./footer.js";
 import { mottoSlots } from "./mottos.js";
-import { INKS, PAPER, PLATES, REVERSED_LINE, emblem, glyph, glyphBody, type IdentityKey } from "./plates.js";
+import { inks, withStyle } from "./paint.js";
+import { PLATES, emblem, glyph, glyphBody, type IdentityKey } from "./plates.js";
 import { chosenBody, mergedBody, recordBody, type ReaderCardPage, type ReaderCardView } from "./pages.js";
 import type { PublicReaderCardStyle } from "./style.js";
 import { escape } from "./svgText.js";
@@ -30,28 +32,6 @@ export interface RenderPlateOptions {
   width?: number;
   crop?: CardCrop;
 }
-
-function inks(key: IdentityKey | "graph", print: PlatePrint): [string, string] {
-  const [, ink, deep] = INKS[key];
-  return print === "paper" ? [PAPER, ink] : [deep, REVERSED_LINE];
-}
-
-const rules = (g: string, l: string): Record<string, string> => ({
-  pg: `fill:${g}`, pgf: `fill:${g}`, gg: `fill:${g}`,
-  pf: `fill:${l}`, pt: `fill:${l}`, gd: `fill:${l}`, gi: `fill:${l}`,
-  pl: `stroke:${l};fill:none`, gk: `stroke:${l};fill:none`,
-  pgs: `stroke:${g};fill:none`, gr: `stroke:${g};fill:none`, gs: `stroke:${g};fill:none`,
-  pgl: `fill:${g};stroke:${l}`,
-});
-
-const withStyle = (svg: string, [g, l]: [string, string]) => {
-  const r = rules(g, l);
-  return svg.replace(/<[^>]*>/g, (tag) => tag.replace(/ class="(\w+)"/g, (_, c: string) => {
-    const style = r[c];
-    if (!style) throw new Error(`No print rule for class "${c}"`);
-    return ` style="${style}"`;
-  }));
-};
 
 function faceOf({ identity, state, readerName, label, unwrittenLine, width = 250, crop }: RenderPlateOptions): { face: PlateFace; ink: IdentityKey | "graph" } {
   const reader = escape(truncateName(readerName).toUpperCase());
@@ -92,9 +72,13 @@ function glyphAt(key: IdentityKey, x: number, y: number, size: number, print: Pl
   return `<g class="glyph id-${key}" transform="translate(${x.toFixed(2)} ${y.toFixed(2)}) scale(${(size / 48).toFixed(4)})">${withStyle(glyphBody(key), inks(key, print))}</g>`;
 }
 
-function sealSlot(streak: IdentityKey, print: PlatePrint): string {
+function sealCentre(): { x: number; y: number } {
   const rad = (SEAL_ANGLE * Math.PI) / 180;
-  const cx = 125 + SEAL_RADIUS * Math.sin(rad), cy = 134 - SEAL_RADIUS * Math.cos(rad);
+  return { x: 125 + SEAL_RADIUS * Math.sin(rad), y: 134 - SEAL_RADIUS * Math.cos(rad) };
+}
+
+function sealSlot(streak: IdentityKey, print: PlatePrint): string {
+  const { x: cx, y: cy } = sealCentre();
   return `<circle class="pg" cx="${cx.toFixed(2)}" cy="${cy.toFixed(2)}" r="${SEAL_SIZE / 2 + 2.5}"/>${glyphAt(streak, cx - SEAL_SIZE / 2, cy - SEAL_SIZE / 2, SEAL_SIZE, print)}`;
 }
 
@@ -109,22 +93,27 @@ function decorations(input: ReaderCardInput, print: PlatePrint): PlateSlots {
   return { ...(corners === undefined ? {} : { corners }), ...footer };
 }
 
+const BACKS = { record: [", reader’s record", recordBody], chosen: [", chosen by the reader", chosenBody], merged: [", back", mergedBody] } as const;
+
 export function renderReaderCard(input: ReaderCardInput, page: ReaderCardPage = "front"): string {
   const { card, style, print, seed } = input;
   const { face, ink } = faceOf({ ...input, identity: card.identity, state: card.state });
-  if (page === "record") return withStyle(composePage({ ...face, label: `${face.label}, reader’s record` }, recordBody(input), decorations(input, print)), inks(ink, print));
-  if (page === "chosen") return withStyle(composePage({ ...face, label: `${face.label}, chosen by the reader` }, chosenBody(input), decorations(input, print)), inks(ink, print));
-  if (page === "merged") return withStyle(composePage({ ...face, label: `${face.label}, back` }, mergedBody(input), decorations(input, print)), inks(ink, print));
   const streak = card.state === "unwritten" ? null : card.streak ?? null;
   const seal = streak !== null && (style.trait === "both" || style.trait === "seal");
+  const decorated: PlateSlots = { ...decorations(input, print), ...(page === "front" ? mottoSlots(style.motto, `rc-${style.motto?.look ?? "none"}-${seed}-${print}`) : {}) };
+  const finish = finishLayers(style.finish, { print, ink, streak, seed, front: page === "front", seal: page === "front" && seal ? sealCentre() : null, corners: cornerMarkup(decorated) });
+  if (page !== "front") {
+    const [suffix, body] = BACKS[page];
+    return withStyle(composePage({ ...face, label: `${face.label}${suffix}` }, body(input), { ...decorated, ...finish.slots }), finish.palette);
+  }
   const line = streak !== null && (style.trait === "both" || style.trait === "line");
   const lead = card.identity && GENRE_LEADS.has(card.identity) ? (card.identity as DialGroup) : null;
-  const slots: PlateSlots = { ...decorations(input, print), ...mottoSlots(style.motto, `rc-${style.motto?.look ?? "none"}-${seed}-${print}`) };
+  const slots: PlateSlots = { ...decorated, ...finish.slots };
   const counter = card.dial ? drawCounter(style.counter, card.dial.segments, { seed, sealGap: seal, lead }) : null;
   if (counter) slots[counter.slot] = counter.svg;
   if (streak && seal) slots.seal = sealSlot(streak, print);
   if (streak && line) slots.trait = traitLine(streak);
-  return withStyle(composePlate(face, slots), inks(ink, print));
+  return withStyle(composePlate(face, slots, finish.wrapInk), finish.palette);
 }
 
 export function renderGlyph(identity: IdentityKey, size: number, print: PlatePrint): string {

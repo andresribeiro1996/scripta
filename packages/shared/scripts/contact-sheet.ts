@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { DialSegment, PublicReaderCard } from "../src/library/index.js";
-import { CORNER_STYLES, COUNTERS, DEFAULT_READER_CARD_STYLE, FOOTER_LEFTS, FOOTER_RIGHTS, MOTTO_LOOKS, READER_PLATES, TRAITS, renderReaderCard, seedOf, type PlatePrint, type ReaderCardChosen, type ReaderCardPage, type ReaderCardStyle, type ReaderCardView } from "../src/readerCards/index.js";
+import { CORNER_STYLES, COUNTERS, DEFAULT_READER_CARD_STYLE, FINISHES, FOOTER_LEFTS, FOOTER_RIGHTS, MOTTO_LOOKS, READER_PLATES, TRAITS, renderReaderCard, seedOf, type PlatePrint, type ReaderCardChosen, type ReaderCardPage, type ReaderCardStyle, type ReaderCardView } from "../src/readerCards/index.js";
 
 const out = process.argv[2] ?? join(tmpdir(), "reader-card-sheet");
 const SEGMENTS: DialSegment[] = [
@@ -22,6 +22,7 @@ const dimensions: Record<string, Array<[string, ReaderCardStyle]>> = {
   "footer-left": FOOTER_LEFTS.map((left) => [left, { ...DEFAULT_READER_CARD_STYLE, footer: { left, right: "name" } }]),
   "footer-right": FOOTER_RIGHTS.map((right) => [right, { ...DEFAULT_READER_CARD_STYLE, footer: { left: "plate", right } }]),
   corners: CORNER_STYLES.map((corners) => [corners, { ...DEFAULT_READER_CARD_STYLE, corners }]),
+  finishes: FINISHES.map((finish) => [finish, { ...DEFAULT_READER_CARD_STYLE, finish }]),
 };
 
 const cardOf = (index: number): PublicReaderCard => ({

@@ -7,7 +7,7 @@ import type { ReaderCardPage } from "./pages.js";
 import { PLATES, type IdentityKey } from "./plates.js";
 import { renderReaderCard } from "./render.js";
 import { random, seedOf } from "./seed.js";
-import { CARD_PRINTS, CORNER_STYLES, DEFAULT_READER_CARD_STYLE, FOOTER_LEFTS, FOOTER_RIGHTS, MOTTO_LOOKS, TRAITS, publicStyle, type PublicReaderCardStyle, type ReaderCardChosen } from "./style.js";
+import { CARD_PRINTS, CORNER_STYLES, DEFAULT_READER_CARD_STYLE, FINISHES, FOOTER_LEFTS, FOOTER_RIGHTS, MOTTO_LOOKS, TRAITS, publicStyle, type PublicReaderCardStyle, type ReaderCardChosen } from "./style.js";
 
 const ELEMENTS = new Set(["svg", "g", "defs", "path", "rect", "circle", "ellipse", "line", "polyline", "polygon", "text", "tspan", "textPath", "linearGradient", "radialGradient", "stop", "pattern", "clipPath", "mask", "image", "filter", "feOffset", "feFlood", "feComposite", "feMerge", "feMergeNode", "feGaussianBlur", "feColorMatrix", "feBlend", "feDropShadow"]);
 
@@ -30,15 +30,16 @@ function portabilityProblems(svg: string): string[] {
   }
   if ((svg.match(/<svg\b/g) ?? []).length !== 1) problems.push("nested <svg>");
   if (remoteImages > 1) problems.push("more than one remote image");
-  if (/url\(\s*['"]?#/.test(svg)) problems.push("url(#…)");
+  for (const [, ref] of svg.matchAll(/url\(\s*['"]?#([^)'"\s]+)/g)) if (!ids.includes(ref!)) problems.push(`url(#${ref})`);
   if (/NaN|Infinity|undefined/.test(svg)) problems.push("NaN");
   return problems;
 }
 
-test("the guard counts every remote image and catches spaced or quoted url(#…) references", () => {
+test("the guard counts every remote image and lets url(#…) point only at the card's own ids", () => {
   const twoImages = `<svg xmlns="http://www.w3.org/2000/svg"><image xlink:href="https://a.example/b" width="1"/><image x="2" href="https://a.example/c"/></svg>`;
   assert.deepEqual(portabilityProblems(twoImages), ["more than one remote image"]);
-  assert.deepEqual(portabilityProblems(`<svg xmlns="http://www.w3.org/2000/svg"><rect fill="url( #a)"/></svg>`), ["url(#…)"]);
+  assert.deepEqual(portabilityProblems(`<svg xmlns="http://www.w3.org/2000/svg"><rect fill="url( #a)"/></svg>`), ["url(#a)"]);
+  assert.deepEqual(portabilityProblems(`<svg xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="rc-foilInk-1-paper"/></defs><rect style="fill:url(#rc-foilInk-1-paper)"/></svg>`), []);
 });
 
 test("the guard allows only card ids and textPath references to them", () => {
@@ -96,6 +97,7 @@ const decorationsOf: Array<[string, Partial<PublicReaderCardStyle>]> = [
   ...FOOTER_LEFTS.map((left): [string, Partial<PublicReaderCardStyle>] => [`left ${left}`, { footer: { left, right: "name" } }]),
   ...FOOTER_RIGHTS.map((right): [string, Partial<PublicReaderCardStyle>] => [`right ${right}`, { footer: { left: "plate", right } }]),
   ...CORNER_STYLES.map((corners): [string, Partial<PublicReaderCardStyle>] => [`corners ${corners}`, { corners }]),
+  ...FINISHES.map((finish): [string, Partial<PublicReaderCardStyle>] => [`finish ${finish}`, { finish }]),
 ];
 
 test("every motto, footer and corner stays inside the subset on every plate and print, and draws the same twice", () => {
@@ -116,7 +118,7 @@ test("fifty seeded combinations of every dimension stay inside the subset", () =
   for (let i = 0; i < 50; i++) {
     const identity = pick(identities);
     const card: PublicReaderCard = { state: identity ? pick(["settled", "leaning"] as const) : "unwritten", identity, runnerUp: null, streak: pick(PLATES).key, signal: null, coverage: ["c"], dial: { segments: pick(Object.values(dials)) }, facts: { finished: 48, highlights: pick([0, 140]), series: 12, since: pick([null, 2014]), edition: 2026 }, chosen: pick(Object.values(chosenSets)) };
-    const style: PublicReaderCardStyle = { counter: pick(COUNTERS), layout: "faces", trait: pick(TRAITS), motto: pick([null, { text: pick(["Per libros ad astra", LONG, "x"]), look: pick(MOTTO_LOOKS) }]), footer: { left: pick(FOOTER_LEFTS), right: pick(FOOTER_RIGHTS) }, corners: pick(CORNER_STYLES), print: pick(CARD_PRINTS) };
+    const style: PublicReaderCardStyle = { counter: pick(COUNTERS), layout: "faces", trait: pick(TRAITS), motto: pick([null, { text: pick(["Per libros ad astra", LONG, "x"]), look: pick(MOTTO_LOOKS) }]), footer: { left: pick(FOOTER_LEFTS), right: pick(FOOTER_RIGHTS) }, corners: pick(CORNER_STYLES), finish: pick(FINISHES), print: pick(CARD_PRINTS) };
     for (const page of ["front", "chosen", "record", "merged"] as const) for (const print of ["paper", "reversed"] as const) {
       const svg = renderReaderCard({ card, style, readerName: pick(["andre", "andre.ribeiro", "a".repeat(30)]), print, label: "x", seed: seedOf(String(i)), view: pick(["owner", "visitor"] as const) }, page);
       assert.deepEqual(portabilityProblems(svg), [], `combination ${i}/${page}/${print}`);

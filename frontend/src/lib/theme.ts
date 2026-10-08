@@ -36,6 +36,10 @@ export function muralThemeStyle(id: ThemeId): CSSProperties {
 const STORAGE_KEY = "theme";
 const CHANGE_EVENT = "themechange";
 
+export function prefersReducedMotion(): boolean {
+  return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+}
+
 export function osScheme(): ThemeScheme {
   return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }

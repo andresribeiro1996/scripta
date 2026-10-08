@@ -295,7 +295,7 @@ readerCardSummary(input): string[]      // text alternative for screen readers
 - **Merged:** tap toggles front and back.
 - **Shine** (when `readerCardShine` is not null): a gradient layer over the card.
   - **Web:** follows the pointer, and sweeps slowly when the pointer is idle.
-  - **Mobile:** follows `useAnimatedSensor(SensorType.ROTATION)` from Reanimated, which needs no new native dependency. The sensor runs only while the viewer is open.
+  - **Mobile:** follows the x component of `useAnimatedSensor(SensorType.GRAVITY)` from Reanimated (the rotation sensor's roll is singular when the phone is held upright), which needs no new native dependency. The sensor runs only while the viewer is open.
 - **Reduced motion:** the shine stays still and turning is an instant swap.
 - **Owner:** sees an "Edit card" button.
 - **Accessibility:** `role="img"` with a label, a live region announcing "page 2 of 3", and the `readerCardSummary` lines as a text alternative.
@@ -320,7 +320,7 @@ readerCardSummary(input): string[]      // text alternative for screen readers
     - Motto: a text field of up to 28 characters plus 12 look thumbnails.
     - Footer: 12 chips per corner.
     - Corners: 12 cropped thumbnails.
-    - Finish: 12 thumbnails.
+    - Finish: 12 chips. The pinned preview shows the pick, because 12 full-card thumbnails made the phone editor slow to open.
     - Print: 3 segments.
     - Trait: 4 segments.
   - **Back:**

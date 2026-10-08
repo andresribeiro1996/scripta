@@ -1,6 +1,6 @@
 import { useDeferredValue, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
-import { CARD_PRINTS, CORNER_LABELS, CORNER_STYLES, COUNTERS, COUNTER_LABELS, FOOTER_LEFTS, FOOTER_LEFT_LABELS, FOOTER_RIGHTS, FOOTER_RIGHT_LABELS, LAYOUTS, LAYOUT_LABELS, MOTTO_LOOKS, MOTTO_LOOK_LABELS, MOTTO_MAX, PRINT_LABELS, TRAITS, TRAIT_LABELS, cardRatio, counterThumbnail, footerLeftText, footerRightText, styleThumbnail, type FooterLeft, type FooterRight, type Layout, type MottoLook, type ReaderCardBase } from "@scripta/shared";
+import { CARD_PRINTS, CORNER_LABELS, CORNER_STYLES, COUNTERS, COUNTER_LABELS, FINISHES, FINISH_LABELS, FOOTER_LEFTS, FOOTER_LEFT_LABELS, FOOTER_RIGHTS, FOOTER_RIGHT_LABELS, LAYOUTS, LAYOUT_LABELS, MOTTO_LOOKS, MOTTO_LOOK_LABELS, MOTTO_MAX, PRINT_LABELS, TRAITS, TRAIT_LABELS, cardRatio, counterThumbnail, footerLeftText, footerRightText, styleThumbnail, type Finish, type FooterLeft, type FooterRight, type Layout, type MottoLook, type ReaderCardBase } from "@scripta/shared";
 import { Button, Icon, Segmented, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import { Text } from "../../ui/Text";
 import { Caption, Section, Tile } from "../library/components/StyleControls";
@@ -8,9 +8,9 @@ import { ReaderCardImage } from "../murals/ReaderCardImage";
 import { DraftField } from "./DraftField";
 import type { SaveStyle } from "./ReaderCardChoices";
 
-export type PanelId = "look" | "corners" | "footerLeft" | "footerRight";
+export type PanelId = "look" | "corners" | "finish" | "footerLeft" | "footerRight";
 
-const PANEL_TITLES: Record<PanelId, string> = { look: "Motto look", corners: "Corners", footerLeft: "Bottom-left text", footerRight: "Bottom-right text" };
+const PANEL_TITLES: Record<PanelId, string> = { look: "Motto look", corners: "Corners", finish: "Finish", footerLeft: "Bottom-left text", footerRight: "Bottom-right text" };
 const TILE_COLUMNS = 4;
 const TILE_PADDING = 8;
 const SAMPLE_MOTTO = "Per libros ad astra";
@@ -19,6 +19,20 @@ const LAYOUT_HINTS: Record<Layout, string> = {
   faces: "Tap the card to turn through the front, your picks and your record",
   book: "Opens like a book, with your picks and record inside",
   merged: "One back page with your picks and record together",
+};
+const FINISH_HINTS: Record<Finish, string> = {
+  paper: "Today's card",
+  aged: "Warm paper, foxing, vignette",
+  linen: "Fine weave",
+  letterpress: "Cotton paper, debossed ink",
+  foil: "Metallic ink",
+  holo: "Iridescent ink and sheen",
+  vellum: "Translucent, mottled",
+  watercolor: "Soft washes behind the emblem and name",
+  gilt: "Gold frame, corners and edge",
+  stamp: "Uneven, broken, slightly rotated ink",
+  kraft: "Brown wrapping paper",
+  riso: "Two misregistered inks",
 };
 const options = <T extends string>(keys: readonly T[], labels: Record<T, string>) => keys.map((value) => ({ value, label: labels[value] }));
 const TRAIT_OPTIONS = options(TRAITS, TRAIT_LABELS);
@@ -89,7 +103,7 @@ type Motto = ReturnType<typeof useMotto>;
 
 export function FrontOptions({ input, motto, onChange, onOpen }: { input: ReaderCardBase; motto: Motto; onChange: SaveStyle; onOpen: (panel: PanelId) => void }) {
   const { width: windowWidth } = useWindowDimensions();
-  const { counter, trait, motto: saved, footer, corners, print } = input.style;
+  const { counter, trait, motto: saved, footer, corners, finish, print } = input.style;
   const deferred = useDeferredValue(input);
   const counterThumbs = useMemo(() => COUNTERS.map((option) => ({ option, input: counterThumbnail(deferred, option) })), [deferred]);
   return (
@@ -109,6 +123,9 @@ export function FrontOptions({ input, motto, onChange, onOpen }: { input: Reader
       </Section>
       <Section title="Corners">
         <PanelTrigger title="Corners" current={CORNER_LABELS[corners]} onPress={() => onOpen("corners")} />
+      </Section>
+      <Section title="Finish">
+        <PanelTrigger title="Finish" current={FINISH_LABELS[finish]} onPress={() => onOpen("finish")} />
       </Section>
       <Section title="Bottom-left text">
         <PanelTrigger title="Bottom-left text" current={withText(FOOTER_LEFT_LABELS[footer.left], footerLeftText(footer.left, input.card))} onPress={() => onOpen("footerLeft")} />
@@ -169,6 +186,14 @@ function FooterPanel({ side, input, onChange }: { side: "footerLeft" | "footerRi
   );
 }
 
+function FinishPanel({ finish, onChange }: { finish: Finish; onChange: SaveStyle }) {
+  return (
+    <View accessibilityRole="radiogroup" style={styles.list}>
+      {FINISHES.map((value) => <OptionRow key={value} label={FINISH_LABELS[value]} detail={FINISH_HINTS[value]} selected={finish === value} onPress={() => void onChange({ finish: value })} />)}
+    </View>
+  );
+}
+
 export function ReaderCardPanel({ panel, input, motto, onChange, onClose }: { panel: PanelId; input: ReaderCardBase; motto: Motto; onChange: SaveStyle; onClose: () => void }) {
   const { colors } = useTheme();
   const [available, setAvailable] = useState(0);
@@ -179,7 +204,7 @@ export function ReaderCardPanel({ panel, input, motto, onChange, onClose }: { pa
         <Button label="Done" variant="secondary" onPress={onClose} />
       </View>
       <ScrollView onLayout={(event) => setAvailable(event.nativeEvent.layout.width - spacing.xl * 2)} contentContainerStyle={styles.panelBody}>
-        {available <= 0 ? null : panel === "look" ? <LookPanel input={input} motto={motto} available={available} /> : panel === "corners" ? <CornersPanel input={input} available={available} onChange={onChange} /> : <FooterPanel side={panel} input={input} onChange={onChange} />}
+        {available <= 0 ? null : panel === "look" ? <LookPanel input={input} motto={motto} available={available} /> : panel === "corners" ? <CornersPanel input={input} available={available} onChange={onChange} /> : panel === "finish" ? <FinishPanel finish={input.style.finish} onChange={onChange} /> : <FooterPanel side={panel} input={input} onChange={onChange} />}
       </ScrollView>
     </View>
   );

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { composePlate, type PlateFace } from "./compose.js";
+import { composePage, composePlate, type PlateFace } from "./compose.js";
 
 const face: PlateFace = { key: "star", emblemSvg: `<g id="emblem"/>`, name: "Stargazer", eyebrow: "THE", epithet: "lives half in other worlds", numeral: "IV", reader: "ANDRE", width: 250, label: "x" };
 
@@ -23,4 +23,24 @@ test("a slot replaces its default, and an empty string removes it", () => {
   assert.doesNotMatch(svg, />ANDRE</);
   assert.doesNotMatch(svg, /M16 11\.5/);
   assert.match(svg, /<text>MOTTO<\/text>/);
+});
+
+test("the ink wrapper holds everything from the frame to the footer, between the underlay and the overlay", () => {
+  const svg = composePlate(face, { underlay: `<g id="u"/>`, overlay: `<g id="o"/>` }, (body) => `<g id="ink">\n${body}\n</g>`);
+  const inside = svg.slice(svg.indexOf(`<g id="ink">`), svg.indexOf(`<g id="o"/>`));
+  for (const part of [`x="10" y="10"`, "EX LIBRIS", `r="60"`, `id="emblem"`, ">ANDRE<"]) assert.ok(inside.includes(part), part);
+  assert.ok(svg.indexOf(`id="u"`) < svg.indexOf(`id="ink"`));
+  assert.doesNotMatch(inside, /id="u"|id="o"/);
+});
+
+test("without a wrapper the plate is unchanged", () => {
+  const slots = { underlay: `<g id="u"/>`, top: `<g id="t"/>` };
+  assert.equal(composePlate(face, slots, (body) => body), composePlate(face, slots));
+});
+
+test("a frame slot replaces both frame rules on the front and on a back page", () => {
+  for (const svg of [composePlate(face, { frame: `<g id="gold"/>` }), composePage(face, "<g/>", { frame: `<g id="gold"/>` })]) {
+    assert.match(svg, /<g id="gold"\/>/);
+    assert.doesNotMatch(svg, /x="10" y="10"/);
+  }
 });

@@ -27,9 +27,9 @@ function split(css: string): { inside: string; outside: string } {
 
 test("mark entrances and the theme fade only exist for people who didn't ask for less motion", () => {
   const { inside, outside } = split(readFileSync(new URL("../src/index.css", import.meta.url), "utf8"));
-  for (const selector of [".mark-scan", ".mark-rise", ".mark-fan .mark-layer", ".mark-register .mark-layer", ".mark-gild .mark-gild-frame", ".mark-gild .mark-gild-mark", "::view-transition-old(root)", "::view-transition-new(root)"]) {
+  for (const selector of [".mark-scan", ".mark-rise", ".mark-fan .mark-layer", ".mark-register .mark-layer", ".mark-gild .mark-gild-frame", ".mark-gild .mark-gild-mark", ".card-shine-idle", "::view-transition-old(root)", "::view-transition-new(root)"]) {
     assert.ok(inside.includes(selector), `${selector} missing from the no-preference block`);
     assert.ok(!outside.includes(selector), `${selector} applies outside the no-preference block`);
   }
-  for (const name of ["scripta-mark-scan", "scripta-mark-rise", "scripta-mark-layer", "scripta-mark-draw"]) assert.ok(outside.includes(`@keyframes ${name}`), name);
+  for (const name of ["scripta-mark-scan", "scripta-mark-rise", "scripta-mark-layer", "scripta-mark-draw", "card-shine-sweep"]) assert.ok(outside.includes(`@keyframes ${name}`), name);
 });

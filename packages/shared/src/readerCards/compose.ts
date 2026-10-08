@@ -22,6 +22,7 @@ export interface PlateFace {
 
 export interface PlateSlots {
   underlay?: string;
+  frame?: string;
   frameBand?: string;
   corners?: string;
   header?: string;
@@ -43,8 +44,10 @@ const openSvg = (face: PlateFace) => {
   return `<svg xmlns="http://www.w3.org/2000/svg" class="plate id-${face.key}" viewBox="${x} ${y} ${w} ${h}" width="${face.width}" height="${height}" role="img" aria-label="${face.label}">`;
 };
 const GROUND = `<rect class="pg" width="250" height="350" rx="4"/>`;
-const FRAME = [`<rect class="pl" x="10" y="10" width="230" height="330" stroke-width="1.6"/>`, `<rect class="pl" x="16" y="16" width="218" height="318" stroke-width=".6"/>`];
-const corners = (slots: PlateSlots) => slots.corners ?? `<path class="pf" d="${DIAMONDS}"/>`;
+export const FRAME_MARKUP = [`<rect class="pl" x="10" y="10" width="230" height="330" stroke-width="1.6"/>`, `<rect class="pl" x="16" y="16" width="218" height="318" stroke-width=".6"/>`].join("\n");
+export const cornerMarkup = (slots: PlateSlots) => slots.corners ?? `<path class="pf" d="${DIAMONDS}"/>`;
+export type InkWrap = (body: string) => string;
+const bare: InkWrap = (body) => body;
 const footer = (face: PlateFace, slots: PlateSlots) => [
   `<path class="pl" d="M30 305H220" stroke-width=".5"/>`,
   slots.footerLeft ?? `<text class="pt" x="30" y="321" font-size="7.5" letter-spacing="1.8" font-family="${SANS}" font-weight="600">PLATE ${face.numeral}</text>`,
@@ -52,14 +55,11 @@ const footer = (face: PlateFace, slots: PlateSlots) => [
 ];
 const join = (parts: Array<string | undefined>) => parts.filter((line): line is string => Boolean(line)).join("\n");
 
-export function composePlate(face: PlateFace, slots: PlateSlots = {}): string {
-  return join([
-    openSvg(face),
-    GROUND,
-    slots.underlay,
-    ...FRAME,
+export function composePlate(face: PlateFace, slots: PlateSlots = {}, wrapInk: InkWrap = bare): string {
+  const ink = join([
+    slots.frame ?? FRAME_MARKUP,
     slots.frameBand,
-    corners(slots),
+    cornerMarkup(slots),
     slots.header ?? EX_LIBRIS,
     slots.top,
     `<circle class="pl" cx="125" cy="134" r="60" stroke-width="1.4"/>`,
@@ -74,11 +74,10 @@ export function composePlate(face: PlateFace, slots: PlateSlots = {}): string {
     `<text class="pt" x="125" y="283" text-anchor="middle" font-size="11" font-style="italic" font-family="${SERIF}">${face.epithet}</text>`,
     slots.trait,
     ...footer(face, slots),
-    slots.overlay,
-    `</svg>`,
   ]);
+  return join([openSvg(face), GROUND, slots.underlay, wrapInk(ink), slots.overlay, `</svg>`]);
 }
 
 export function composePage(face: PlateFace, body: string, slots: PlateSlots = {}): string {
-  return join([openSvg(face), GROUND, slots.underlay, ...FRAME, corners(slots), body, ...footer(face, slots), slots.overlay, `</svg>`]);
+  return join([openSvg(face), GROUND, slots.underlay, slots.frame ?? FRAME_MARKUP, cornerMarkup(slots), body, ...footer(face, slots), slots.overlay, `</svg>`]);
 }
