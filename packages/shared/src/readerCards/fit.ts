@@ -1,7 +1,7 @@
-export type FitFont = "serif" | "sans" | "caps" | "mono" | "script";
+export type FitFont = "serif" | "sans" | "caps" | "mono" | "script" | "italic";
 export interface FitOptions { font: FitFont; size: number; width: number; spacing?: number }
 
-const EM: Record<FitFont, number> = { serif: 0.5, sans: 0.55, caps: 0.68, mono: 0.6, script: 0.42 };
+const EM: Record<FitFont, number> = { serif: 0.5, sans: 0.55, caps: 0.68, mono: 0.6, script: 0.42, italic: 0.44 };
 
 const WIDE_EM = 0.95;
 const isWide = (char: string) => /[WMwm]/.test(char) || char.codePointAt(0)! >= 0x2e80;

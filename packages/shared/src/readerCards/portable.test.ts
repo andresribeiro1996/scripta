@@ -31,7 +31,7 @@ function portabilityProblems(svg: string): string[] {
   if ((svg.match(/<svg\b/g) ?? []).length !== 1) problems.push("nested <svg>");
   if (remoteImages > 1) problems.push("more than one remote image");
   if (/url\(\s*['"]?#/.test(svg)) problems.push("url(#…)");
-  if (/NaN|Infinity/.test(svg)) problems.push("NaN");
+  if (/NaN|Infinity|undefined/.test(svg)) problems.push("NaN");
   return problems;
 }
 

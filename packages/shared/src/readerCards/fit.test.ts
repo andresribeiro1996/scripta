@@ -74,3 +74,9 @@ test("a wide-letter line is cut with an ellipsis inside the width", () => {
 test("script text is estimated narrower than the serif", () => {
   assert.ok(textWidth("Andre Ribeiro", { font: "script", size: 12 }) < textWidth("Andre Ribeiro", { font: "serif", size: 12 }));
 });
+
+test("italic is estimated narrower than serif for ordinary text and as wide for wide glyphs", () => {
+  const options = { size: 10 } as const;
+  assert.ok(textWidth("Per libros ad astra", { ...options, font: "italic" }) < textWidth("Per libros ad astra", { ...options, font: "serif" }));
+  assert.equal(textWidth("WW", { ...options, font: "italic" }), textWidth("WW", { ...options, font: "serif" }));
+});

@@ -24,8 +24,8 @@ function italic(text: string, y: number, size: number, width: number, cls: "pt" 
 }
 
 function onPath(text: string, id: string, d: string, length: number, size: number, spacing: number): string {
-  const line = fitted(text, "serif", size, length - 12, spacing);
-  const offset = n2((length - textWidth(line.text, { font: "serif", size: line.size, spacing })) / 2);
+  const line = fitted(text, "italic", size, length - 12, spacing);
+  const offset = n2((length - textWidth(line.text, { font: "italic", size: line.size, spacing })) / 2);
   return `<defs><path id="${id}" d="${d}"/></defs><text class="pt" font-size="${line.size}" font-style="italic" font-family="${SERIF}" letter-spacing="${spacing}"><textPath href="#${id}" startOffset="${offset}">${escapeText(line.text)}</textPath></text>`;
 }
 
