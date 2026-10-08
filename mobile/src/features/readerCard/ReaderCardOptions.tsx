@@ -15,14 +15,14 @@ const TRAIT_OPTIONS = options(TRAITS, TRAIT_LABELS);
 const LAYOUT_OPTIONS = options(LAYOUTS, LAYOUT_LABELS);
 const PRINT_OPTIONS = options(CARD_PRINTS, PRINT_LABELS);
 
-function TileRow<T extends string>({ items, value, labels, onPick }: { items: Array<{ option: T; input: ReaderCardBase }>; value: T | null; labels: Record<T, string>; onPick: (option: T) => void }) {
+function TileRow<T extends string>({ items, crop, value, labels, onPick }: { items: Array<{ option: T; input: ReaderCardBase | null }>; crop: ReaderCardBase["crop"]; value: T | null; labels: Record<T, string>; onPick: (option: T) => void }) {
   const { width: windowWidth } = useWindowDimensions();
   const width = Math.floor((windowWidth - spacing.xl * 2 - (TILE_COLUMNS - 1) * spacing.sm) / TILE_COLUMNS) - TILE_PADDING;
   return (
     <View style={styles.row}>
       {items.map((item) => (
-        <Tile key={item.option} width={width + TILE_PADDING} tileWidth={width + TILE_PADDING} height={width * cardRatio(item.input.crop) + TILE_PADDING} label={labels[item.option]} selected={value === item.option} onPress={() => onPick(item.option)}>
-          <ReaderCardImage input={item.input} width={width} />
+        <Tile key={item.option} width={width + TILE_PADDING} tileWidth={width + TILE_PADDING} height={width * cardRatio((item.input ?? { crop }).crop) + TILE_PADDING} label={labels[item.option]} selected={value === item.option} onPress={() => onPick(item.option)}>
+          {item.input ? <ReaderCardImage input={item.input} width={width} /> : null}
         </Tile>
       ))}
     </View>
@@ -41,11 +41,11 @@ export function ReaderCardOptions({ input, onChange }: { input: ReaderCardBase; 
   const { counter, trait, layout, motto, footer, corners, finish, print } = input.style;
   const [look, setLook] = useState<MottoLook>(motto?.look ?? "ribbon");
   const lastText = useRef(motto?.text ?? null);
-  const deferred = useDeferredValue(input);
-  const counterThumbs = useMemo(() => COUNTERS.map((option) => ({ option, input: counterThumbnail(deferred, option) })), [deferred]);
-  const mottoThumbs = useMemo(() => MOTTO_LOOKS.map((option) => ({ option, input: styleThumbnail(deferred, { motto: { text: deferred.style.motto?.text ?? SAMPLE_MOTTO, look: option } }, "motto") })), [deferred]);
-  const cornerThumbs = useMemo(() => CORNER_STYLES.map((option) => ({ option, input: styleThumbnail(deferred, { corners: option }, "corner") })), [deferred]);
-  const finishThumbs = useMemo(() => FINISHES.map((option) => ({ option, input: styleThumbnail(deferred, { finish: option }) })), [deferred]);
+  const deferred = useDeferredValue(input, null);
+  const counterThumbs = useMemo(() => COUNTERS.map((option) => ({ option, input: deferred && counterThumbnail(deferred, option) })), [deferred]);
+  const mottoThumbs = useMemo(() => MOTTO_LOOKS.map((option) => ({ option, input: deferred && styleThumbnail(deferred, { motto: { text: deferred.style.motto?.text ?? SAMPLE_MOTTO, look: option } }, "motto") })), [deferred]);
+  const cornerThumbs = useMemo(() => CORNER_STYLES.map((option) => ({ option, input: deferred && styleThumbnail(deferred, { corners: option }, "corner") })), [deferred]);
+  const finishThumbs = useMemo(() => FINISHES.map((option) => ({ option, input: deferred && styleThumbnail(deferred, { finish: option }) })), [deferred]);
   const saveMotto = (text: string | null) => {
     const previous = lastText.current;
     lastText.current = text;
@@ -65,14 +65,14 @@ export function ReaderCardOptions({ input, onChange }: { input: ReaderCardBase; 
   return (
     <>
       <Section title="Counter">
-        <TileRow items={counterThumbs} value={counter} labels={COUNTER_LABELS} onPick={(next) => void onChange({ counter: next })} />
+        <TileRow crop={input.crop} items={counterThumbs} value={counter} labels={COUNTER_LABELS} onPick={(next) => void onChange({ counter: next })} />
       </Section>
       <Section title="Second trait">
         <Segmented accessibilityLabel="Second trait" options={TRAIT_OPTIONS} value={trait} onChange={(next) => void onChange({ trait: next })} />
       </Section>
       <Section title="Motto">
         <DraftField label="Your motto" initial={motto?.text ?? null} max={MOTTO_MAX} onSave={saveMotto} />
-        <TileRow items={mottoThumbs} value={motto?.look ?? look} labels={MOTTO_LOOK_LABELS} onPick={pickLook} />
+        <TileRow crop={input.crop} items={mottoThumbs} value={motto?.look ?? look} labels={MOTTO_LOOK_LABELS} onPick={pickLook} />
       </Section>
       <Section title="Footer, left">
         <ChipRow keys={FOOTER_LEFTS} labels={FOOTER_LEFT_LABELS} value={footer.left} onPick={(left) => void onChange({ footer: { ...footer, left } })} />
@@ -81,10 +81,10 @@ export function ReaderCardOptions({ input, onChange }: { input: ReaderCardBase; 
         <ChipRow keys={FOOTER_RIGHTS} labels={FOOTER_RIGHT_LABELS} value={footer.right} onPick={(right) => void onChange({ footer: { ...footer, right } })} />
       </Section>
       <Section title="Corners">
-        <TileRow items={cornerThumbs} value={corners} labels={CORNER_LABELS} onPick={(next) => void onChange({ corners: next })} />
+        <TileRow crop={input.crop} items={cornerThumbs} value={corners} labels={CORNER_LABELS} onPick={(next) => void onChange({ corners: next })} />
       </Section>
       <Section title="Finish">
-        <TileRow items={finishThumbs} value={finish} labels={FINISH_LABELS} onPick={(next) => void onChange({ finish: next })} />
+        <TileRow crop={input.crop} items={finishThumbs} value={finish} labels={FINISH_LABELS} onPick={(next) => void onChange({ finish: next })} />
       </Section>
       <Section title="Print">
         <Segmented accessibilityLabel="Print" options={PRINT_OPTIONS} value={print} onChange={(next) => void onChange({ print: next })} />

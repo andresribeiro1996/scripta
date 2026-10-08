@@ -9,3 +9,7 @@ test("the shine reads the tilt sensor only when live and motion is allowed", () 
   assert.match(readFileSync("src/features/murals/ReaderCardViewer.tsx", "utf8"), /<ReaderCardTurner[^>]*liveShine/);
   assert.doesNotMatch(readFileSync("src/features/readerCard/ReaderCardEditorScreen.tsx", "utf8"), /liveShine/);
 });
+
+test("the editor options defer the first thumbnail mount", () => {
+  assert.match(readFileSync("src/features/readerCard/ReaderCardOptions.tsx", "utf8"), /useDeferredValue\(input, null\)/);
+});
