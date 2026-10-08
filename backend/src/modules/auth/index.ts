@@ -28,5 +28,6 @@ export {
   searchUsernameOwners,
   getDashboardSeenAt,
   setDashboardSeenAt,
-  getUserTheme
+  getUserTheme,
+  readerNumberOf
 } from "./publicProfile.js";

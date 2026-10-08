@@ -642,3 +642,17 @@ test("the reader card style needs a signed-in user", async () => {
   assert.deepEqual(stored.json(), { counter: "dial", layout: "faces", trait: "both", motto: null, footer: { left: "plate", right: "name" }, corners: "diamonds", print: "auto", signature: null, highlight: null });
   await app.close();
 });
+
+test("GET reader card number answers the owner's rank, or null without an account row", async () => {
+  const { app } = await setup();
+  const { openAuthDb } = await import("../auth/adapters/sqlite/connection.js");
+  const before = await app.inject({ method: "GET", url: "/library/reader-card/number", headers: asUser("ranked") });
+  assert.deepEqual(before.json(), { readerNumber: null });
+  openAuthDb().prepare(`INSERT INTO users (id, email, username, auth_version, created_at) VALUES (?, ?, ?, 0, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`).run("ranked", "ranked@test.dev", "ranked");
+  const after = await app.inject({ method: "GET", url: "/library/reader-card/number", headers: asUser("ranked") });
+  assert.equal(after.statusCode, 200);
+  assert.ok(after.json().readerNumber >= 1);
+  const anonymous = await app.inject({ method: "GET", url: "/library/reader-card/number" });
+  assert.equal(anonymous.statusCode, 401);
+  await app.close();
+});

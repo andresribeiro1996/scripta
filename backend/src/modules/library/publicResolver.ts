@@ -1,6 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import { isGroup, normalizeImageId, normalizeReaderCardStyle, publicReaderCard, publicStyle, readerIdentity, type Group, type IdentityKey, type PublicBookData, type PublicHighlight, type PublicLibraryData, type PublicReaderCard, type ReaderCardChosen, type ReaderCardStyle, type ShelfTheme } from "@scripta/shared";
 import type { SharedBook } from "@scripta/shared/community";
+import { readerNumberOf } from "../auth/index.js";
 import { peekCachedCoverUrl, peekCachedCoverUrls } from "../books/index.js";
 import { openLibraryDb } from "./adapters/sqlite/connection.js";
 import { canonicalWorkIds, copyKeysForWorks } from "./works.js";
@@ -184,6 +185,12 @@ function chosenOf(userId: string, style: ReaderCardStyle, byKey: Map<string, Boo
   return chosen;
 }
 
+function publicCardOf(userId: string, stored: string, style: ReaderCardStyle, byKey: Map<string, BookRowRecord>): PublicReaderCard {
+  const card = JSON.parse(stored) as PublicReaderCard;
+  const readerNumber = style.footer.left === "readerNumber" ? readerNumberOf(userId) : undefined;
+  return { ...card, ...(readerNumber && card.facts ? { facts: { ...card.facts, readerNumber } } : {}), style: publicStyle(style), chosen: chosenOf(userId, style, byKey) };
+}
+
 export function resolvePublicLibraryData(userId: string, req: PublicDataRequest): PublicLibraryData {
   const summary = readSummary(userId);
   if (!summary || summary.meta === null) return emptyResult(req);
@@ -252,7 +259,7 @@ export function resolvePublicLibraryData(userId: string, req: PublicDataRequest)
     currentlyReading,
     stats,
     ...(req.needsShelfTheme ? { shelfTheme: JSON.parse(summary.shelf_theme as string) as ShelfTheme } : {}),
-    ...(req.needsReaderCard ? { readerCard: { ...(JSON.parse(summary.reader_card as string) as PublicReaderCard), style: publicStyle(style!), chosen: chosenOf(userId, style!, byKey) } } : {}),
+    ...(req.needsReaderCard ? { readerCard: publicCardOf(userId, summary.reader_card as string, style!, byKey) } : {}),
     ...(req.collectionIds ? { collectionBooks } : {})
   };
 }

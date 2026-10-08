@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { z } from "zod";
 import { env } from "../../config/env.js";
-import { authGuard, rateLimitKey } from "../auth/index.js";
+import { authGuard, rateLimitKey, readerNumberOf } from "../auth/index.js";
 import { LIBRARY_SMALL_SAVE_MAX_BYTES } from "./domain/constants.js";
 import { InvalidReaderCardChoiceError, LibraryChangeNotFoundError, LibraryConflictError, LibraryTooLargeError, NoLibraryDocumentError } from "./domain/errors.js";
 import type { LibraryDocumentText } from "./domain/types.js";
@@ -264,6 +264,7 @@ export function buildLibraryRoutes(service: LibraryService) {
       await cards.register(fastifyRateLimit, { max: 120, timeWindow: "1 minute", keyGenerator: rateLimitKey });
 
       cards.get("/library/reader-card/style", { preHandler: authGuard }, async (request) => service.getReaderCardStyle(request.user.id));
+      cards.get("/library/reader-card/number", { preHandler: authGuard }, async (request) => ({ readerNumber: readerNumberOf(request.user.id) ?? null }));
 
       cards.patch("/library/reader-card/style", { preHandler: authGuard }, async (request, reply) => {
         const parsed = readerCardStylePatchSchema.safeParse(request.body);

@@ -1040,3 +1040,18 @@ test("a reader who never styled their card gets the default public style and no 
   assert.deepEqual(card.style, { ...publicStyle(DEFAULT_READER_CARD_STYLE), counter: "dial", layout: "faces", trait: "both" });
   assert.deepEqual(card.chosen, {});
 });
+
+test("the reader number reaches visitors only when the owner chose that footer", async () => {
+  const { openAuthDb } = await import("../auth/adapters/sqlite/connection.js");
+  const owner = "card-number";
+  openAuthDb().prepare(`INSERT INTO users (id, email, username, auth_version, created_at) VALUES (?, ?, ?, 0, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`).run(owner, "number@test.dev", "numbered");
+  service.saveLibrary(owner, { books: [earthsea], groups: [] });
+  assert.equal("readerNumber" in (resolvePublicLibraryData(owner, cardRequest).readerCard!.facts ?? {}), false);
+  service.patchReaderCardStyle(owner, { footer: { left: "readerNumber", right: "name" } });
+  const card = resolvePublicLibraryData(owner, cardRequest).readerCard!;
+  assert.equal(typeof card.facts?.readerNumber, "number");
+  assert.ok(card.facts!.readerNumber! >= 1);
+  assert.deepEqual(card.style?.footer, { left: "readerNumber", right: "name" });
+  service.patchReaderCardStyle(owner, { footer: { left: "since", right: "name" } });
+  assert.equal("readerNumber" in (resolvePublicLibraryData(owner, cardRequest).readerCard!.facts ?? {}), false);
+});

@@ -20,8 +20,9 @@ insertUser.run("u1", "alice@test.dev", "alice");
 insertUser.run("u2", "noname@test.dev", null);
 insertUser.run("u3", "bob@test.dev", "bobby");
 insertUser.run("u4", "alina@test.dev", "alina");
+db.prepare(`INSERT INTO users (id, email, username, auth_version, created_at) VALUES (?, ?, ?, 0, ?)`).run("u0", "first@test.dev", "first", "2020-01-01T00:00:00.000Z");
 
-const { setAvatarUrlFor, getUserTheme, resolvePublicReaderProfile, resolvePublicReaderProfiles, userHasUsername, findUserIdByUsername, searchUsernameOwners } = await import("./publicProfile.js");
+const { setAvatarUrlFor, getUserTheme, resolvePublicReaderProfile, resolvePublicReaderProfiles, userHasUsername, findUserIdByUsername, searchUsernameOwners, readerNumberOf } = await import("./publicProfile.js");
 
 test("resolvePublicReaderProfile keeps its existing shape", () => {
   assert.deepEqual(resolvePublicReaderProfile("u1"), { username: "alice", avatarUrl: null });
@@ -74,4 +75,10 @@ test("avatarUrl comes from the injected avatarUrlFor", () => {
   setAvatarUrlFor((id) => `https://images.test/avatars/${id}.webp`);
   assert.equal(resolvePublicReaderProfile("u3")?.avatarUrl, "https://images.test/avatars/av-1.webp");
   assert.equal(resolvePublicReaderProfiles(["u3"]).get("u3")?.avatarUrl, "https://images.test/avatars/av-1.webp");
+});
+
+test("readerNumberOf ranks accounts by creation, ties by insertion, and knows no stranger", () => {
+  assert.equal(readerNumberOf("u0"), 1);
+  assert.deepEqual(["u1", "u2", "u3", "u4"].map(readerNumberOf), [2, 3, 4, 5]);
+  assert.equal(readerNumberOf("missing"), undefined);
 });
