@@ -1,3 +1,4 @@
+import { withOpacity } from "../themes/decor.js";
 import type { Finish } from "./style.js";
 
 export type ShineKind = "foil" | "holo" | "gilt";
@@ -12,8 +13,6 @@ export function readerCardShine(finish: Finish | undefined): ShineKind | null {
   return finish === "foil" || finish === "holo" || finish === "gilt" ? finish : null;
 }
 
-const rgba = (hex: string, opacity: number) => `rgba(${[1, 3, 5].map((at) => parseInt(hex.slice(at, at + 2), 16)).join(", ")}, ${opacity})`;
-
 export function shineGradientCss(kind: ShineKind): string {
-  return `linear-gradient(110deg, ${SHINE_STOPS[kind].map(([offset, colour, opacity]) => `${rgba(colour, opacity)} ${Math.round(offset * 100)}%`).join(", ")})`;
+  return `linear-gradient(110deg, ${SHINE_STOPS[kind].map(([offset, colour, opacity]) => `${withOpacity(colour, opacity)} ${Math.round(offset * 100)}%`).join(", ")})`;
 }
