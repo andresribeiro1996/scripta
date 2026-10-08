@@ -3,9 +3,9 @@ import { test } from "node:test";
 import { createElement } from "react";
 import { renderToString } from "react-dom/server";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { DEFAULT_READER_CARD_STYLE, bookKey, type ReaderCardBase, type ReaderCardStyle } from "@scripta/shared";
+import { DEFAULT_READER_CARD_STYLE, READER_CARD_STYLE_KEY, bookKey, type ReaderCardBase, type ReaderCardStyle } from "@scripta/shared";
 import { useReaderCard } from "../src/hooks/useReaderCard";
-import { READER_CARD_STYLE_KEY, useSaveReaderCardStyle } from "../src/hooks/useReaderCardStyle";
+import { useSaveReaderCardStyle } from "../src/hooks/useReaderCardStyle";
 
 const books = [{ Title: "A Wizard of Earthsea", Attribution: "Ursula K. Le Guin", ReadStatus: 2, _coverUrl: "https://covers.example.org/e.jpg" }];
 const queryClient = () => new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });

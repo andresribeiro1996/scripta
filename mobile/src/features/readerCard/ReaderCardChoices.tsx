@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
-import { SIGNATURE_NOTE_MAX, bookKey, bookPassages, isFinishedBook, noteToSend, searchPassages, type ChosenHighlight, type ChosenSignature, type Passage, type ReaderCardChosen, type ReaderCardStylePatch } from "@scripta/shared";
+import { SIGNATURE_NOTE_MAX, bookKey, bookPassages, isFinishedBook, noteSaver, searchPassages, type ChosenHighlight, type ChosenSignature, type Passage, type ReaderCardChosen, type ReaderCardStylePatch } from "@scripta/shared";
 import { Button, Input, Sheet, minimumTouchTarget, spacing, typography, useTheme } from "../../ui";
 import { Text } from "../../ui/Text";
 import { BookPickerList } from "../library/components/BookPickerList";
@@ -14,18 +14,10 @@ const NOTE_DELAY_MS = 600;
 
 function NoteField({ signature, onChange, flushRef }: { signature: ChosenSignature; onChange: SaveStyle; flushRef: RefObject<() => void> }) {
   const [draft, setDraft] = useState(signature.note ?? "");
-  const sent = useRef(signature.note);
-  const { schedule, flush } = useDebouncedCallback((value: string) => {
-    const note = noteToSend(value, sent.current);
-    if (note === undefined) return;
-    const previous = sent.current;
-    sent.current = note;
-    void onChange({ signature: { bookKey: signature.bookKey, note } }).then((saved) => {
-      if (saved) return;
-      sent.current = previous;
-      setDraft((current) => (current === value ? (previous ?? "") : current));
-    });
-  }, NOTE_DELAY_MS);
+  const latest = useRef(onChange);
+  useEffect(() => { latest.current = onChange; });
+  const [save] = useState(() => noteSaver(signature, (patch) => latest.current(patch), (failed, previous) => setDraft((current) => (current === failed ? (previous ?? "") : current))));
+  const { schedule, flush } = useDebouncedCallback(save, NOTE_DELAY_MS);
   useEffect(() => {
     flushRef.current = flush;
     return () => { flushRef.current = () => {}; };

@@ -11,6 +11,21 @@ export function noteToSend(value: string, lastSent: string | null): string | nul
   return note === lastSent ? undefined : note;
 }
 
+export function noteSaver(signature: ChosenSignature, onChange: (patch: ReaderCardStylePatch) => Promise<boolean>, rollback: (failed: string, previous: string | null) => void): (value: string) => void {
+  let sent = signature.note;
+  return (value) => {
+    const note = noteToSend(value, sent);
+    if (note === undefined) return;
+    const previous = sent;
+    sent = note;
+    void onChange({ signature: { bookKey: signature.bookKey, note } }).then((saved) => {
+      if (saved) return;
+      sent = previous;
+      rollback(value, previous);
+    });
+  };
+}
+
 export interface ChosenSignature { bookKey: string; note: string | null }
 export interface ChosenHighlight { bookKey: string; highlightId: string }
 

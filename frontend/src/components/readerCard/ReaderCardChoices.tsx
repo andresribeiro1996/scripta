@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { SIGNATURE_NOTE_MAX, bookKey, bookPassages, isFinishedBook, noteToSend, searchPassages, type ChosenHighlight, type ChosenSignature, type Passage, type ReaderCardChosen, type ReaderCardStylePatch } from "@scripta/shared";
+import { SIGNATURE_NOTE_MAX, bookKey, bookPassages, isFinishedBook, noteSaver, searchPassages, type ChosenHighlight, type ChosenSignature, type Passage, type ReaderCardChosen, type ReaderCardStylePatch } from "@scripta/shared";
 import { BookSearchList } from "../murals/pickers";
 
 export type SaveStyle = (patch: ReaderCardStylePatch) => Promise<boolean>;
@@ -12,23 +12,15 @@ const DIM = "text-sm text-(--color-text-dim)";
 function NoteField({ signature, onChange }: { signature: ChosenSignature; onChange: SaveStyle }) {
   const [draft, setDraft] = useState(signature.note ?? "");
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const sent = useRef(signature.note);
   const pending = useRef<string | null>(null);
-  const latest = useRef({ signature, onChange });
-  useEffect(() => { latest.current = { signature, onChange }; });
+  const latest = useRef(onChange);
+  useEffect(() => { latest.current = onChange; });
+  const [send] = useState(() => noteSaver(signature, (patch) => latest.current(patch), (failed, previous) => setDraft((current) => (current === failed ? (previous ?? "") : current))));
   const save = useCallback((value: string) => {
     clearTimeout(timer.current);
     pending.current = null;
-    const note = noteToSend(value, sent.current);
-    if (note === undefined) return;
-    const previous = sent.current;
-    sent.current = note;
-    void latest.current.onChange({ signature: { bookKey: latest.current.signature.bookKey, note } }).then((saved) => {
-      if (saved) return;
-      sent.current = previous;
-      setDraft((current) => (current === value ? (previous ?? "") : current));
-    });
-  }, []);
+    send(value);
+  }, [send]);
   useEffect(() => () => {
     clearTimeout(timer.current);
     if (pending.current !== null) save(pending.current);

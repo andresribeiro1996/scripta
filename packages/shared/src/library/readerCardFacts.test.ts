@@ -89,6 +89,12 @@ test("the owner's input carries leaders and facts beside a public card; a visito
   assert.equal(visitor.seed, owner.seed);
 });
 
+test("the owner's own card for a library with few finished books is unwritten and says what is missing", () => {
+  const owner = readerCardInputOf([book(1), book(2)], [], "andre");
+  assert.equal(owner.card.state, "unwritten");
+  assert.ok(owner.missing);
+});
+
 test("an older or newer server style still draws: missing fields and unknown options fall back", () => {
   const card: PublicReaderCard = { state: "settled", identity: "star", runnerUp: null, signal: null, coverage: [] };
   assert.deepEqual(readerCardInputOf([], [], "x", card).style, { counter: "dial", layout: "faces", trait: "both" });
