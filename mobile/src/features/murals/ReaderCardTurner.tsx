@@ -2,16 +2,17 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AccessibilityInfo, Pressable, StyleSheet, View } from "react-native";
 import PagerView from "react-native-pager-view";
 import Animated, { Easing, ReduceMotion, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
-import { hasChosen, readerCardPages, readerCardSummary, startTurn, turnBy, turnTo, type ReaderCardBase } from "@scripta/shared";
+import { hasChosen, readerCardPages, readerCardShine, readerCardSummary, startTurn, turnBy, turnTo, type ReaderCardBase, type ReaderCardPage } from "@scripta/shared";
 import { MOTION } from "@scripta/shared/themes";
 import { minimumTouchTarget, radii, spacing, useReducedMotion, useTheme } from "../../ui";
+import { CardShine } from "./CardShine";
 import { PLATE_RATIO, ReaderCardImage } from "./ReaderCardImage";
 
 const EASE = Easing.bezier(MOTION.ease[0], MOTION.ease[1], MOTION.ease[2], MOTION.ease[3]);
 const TURN_MS = 450;
 const DOT_ON_SCRIM = "#ffffff";
 
-export function ReaderCardTurner({ input, width, onScrim = false }: { input: ReaderCardBase; width: number; onScrim?: boolean }) {
+export function ReaderCardTurner({ input, width, onScrim = false, liveShine = false }: { input: ReaderCardBase; width: number; onScrim?: boolean; liveShine?: boolean }) {
   const { colors } = useTheme();
   const reduced = useReducedMotion();
   const pages = useMemo(() => readerCardPages(input.style.layout, input.view ?? "visitor", hasChosen(input.card.chosen)).flat(), [input]);
@@ -43,6 +44,8 @@ export function ReaderCardTurner({ input, width, onScrim = false }: { input: Rea
   const faceA = useAnimatedStyle(() => ({ transform: [{ perspective: 1600 }, { rotateY: `${-rotation.get()}deg` }] }));
   const faceB = useAnimatedStyle(() => ({ transform: [{ perspective: 1600 }, { rotateY: `${180 - rotation.get()}deg` }] }));
   const size = { width, height: width * PLATE_RATIO };
+  const shine = readerCardShine(input.style.finish);
+  const shineOn = (page: ReaderCardPage) => (shine && page === "front" ? <CardShine kind={shine} width={width} height={width * PLATE_RATIO} live={liveShine} /> : null);
   const dotColor = onScrim ? DOT_ON_SCRIM : colors.text;
 
   return (
@@ -52,13 +55,14 @@ export function ReaderCardTurner({ input, width, onScrim = false }: { input: Rea
           {pages.map((page, i) => (
             <View key={i} collapsable={false} accessible accessibilityRole="image" accessibilityLabel={i === 0 ? `${summary} Page 1 of ${pages.length}.` : `Page ${i + 1} of ${pages.length}`}>
               <ReaderCardImage input={input} page={page} width={width} />
+              {shineOn(page)}
             </View>
           ))}
         </PagerView>
       ) : (
         <Pressable accessibilityRole="button" accessibilityLabel={`${summary} Page ${turn.index + 1} of ${pages.length}.`} accessibilityHint="Turns the card" onPress={() => setTurn((state) => turnBy(state, 1, pages.length))} style={size}>
-          <Animated.View style={[styles.face, faceA]}><ReaderCardImage input={input} page={pages[turn.faces[0]]!} width={width} /></Animated.View>
-          <Animated.View style={[styles.face, faceB]}><ReaderCardImage input={input} page={pages[turn.faces[1]]!} width={width} /></Animated.View>
+          <Animated.View style={[styles.face, faceA]}><ReaderCardImage input={input} page={pages[turn.faces[0]]!} width={width} />{shineOn(pages[turn.faces[0]]!)}</Animated.View>
+          <Animated.View style={[styles.face, faceB]}><ReaderCardImage input={input} page={pages[turn.faces[1]]!} width={width} />{shineOn(pages[turn.faces[1]]!)}</Animated.View>
         </Pressable>
       )}
       <View style={styles.dots}>

@@ -1,6 +1,6 @@
 import { useDeferredValue, useMemo, useRef, useState } from "react";
 import { StyleSheet, View, useWindowDimensions } from "react-native";
-import { CARD_PRINTS, CORNER_LABELS, CORNER_STYLES, COUNTERS, COUNTER_LABELS, FOOTER_LEFTS, FOOTER_LEFT_LABELS, FOOTER_RIGHTS, FOOTER_RIGHT_LABELS, LAYOUTS, LAYOUT_LABELS, MOTTO_LOOKS, MOTTO_LOOK_LABELS, MOTTO_MAX, PRINT_LABELS, TRAITS, TRAIT_LABELS, cardRatio, counterThumbnail, styleThumbnail, type MottoLook, type ReaderCardBase } from "@scripta/shared";
+import { CARD_PRINTS, CORNER_LABELS, CORNER_STYLES, COUNTERS, COUNTER_LABELS, FINISHES, FINISH_LABELS, FOOTER_LEFTS, FOOTER_LEFT_LABELS, FOOTER_RIGHTS, FOOTER_RIGHT_LABELS, LAYOUTS, LAYOUT_LABELS, MOTTO_LOOKS, MOTTO_LOOK_LABELS, MOTTO_MAX, PRINT_LABELS, TRAITS, TRAIT_LABELS, cardRatio, counterThumbnail, styleThumbnail, type MottoLook, type ReaderCardBase } from "@scripta/shared";
 import { Segmented, spacing } from "../../ui";
 import { Chip, Section, Tile } from "../library/components/StyleControls";
 import { ReaderCardImage } from "../murals/ReaderCardImage";
@@ -38,13 +38,14 @@ function ChipRow<T extends string>({ keys, labels, value, onPick }: { keys: read
 }
 
 export function ReaderCardOptions({ input, onChange }: { input: ReaderCardBase; onChange: SaveStyle }) {
-  const { counter, trait, layout, motto, footer, corners, print } = input.style;
+  const { counter, trait, layout, motto, footer, corners, finish, print } = input.style;
   const [look, setLook] = useState<MottoLook>(motto?.look ?? "ribbon");
   const lastText = useRef(motto?.text ?? null);
   const deferred = useDeferredValue(input);
   const counterThumbs = useMemo(() => COUNTERS.map((option) => ({ option, input: counterThumbnail(deferred, option) })), [deferred]);
   const mottoThumbs = useMemo(() => MOTTO_LOOKS.map((option) => ({ option, input: styleThumbnail(deferred, { motto: { text: deferred.style.motto?.text ?? SAMPLE_MOTTO, look: option } }, "motto") })), [deferred]);
   const cornerThumbs = useMemo(() => CORNER_STYLES.map((option) => ({ option, input: styleThumbnail(deferred, { corners: option }, "corner") })), [deferred]);
+  const finishThumbs = useMemo(() => FINISHES.map((option) => ({ option, input: styleThumbnail(deferred, { finish: option }) })), [deferred]);
   const saveMotto = (text: string | null) => {
     const previous = lastText.current;
     lastText.current = text;
@@ -81,6 +82,9 @@ export function ReaderCardOptions({ input, onChange }: { input: ReaderCardBase; 
       </Section>
       <Section title="Corners">
         <TileRow items={cornerThumbs} value={corners} labels={CORNER_LABELS} onPick={(next) => void onChange({ corners: next })} />
+      </Section>
+      <Section title="Finish">
+        <TileRow items={finishThumbs} value={finish} labels={FINISH_LABELS} onPick={(next) => void onChange({ finish: next })} />
       </Section>
       <Section title="Print">
         <Segmented accessibilityLabel="Print" options={PRINT_OPTIONS} value={print} onChange={(next) => void onChange({ print: next })} />
