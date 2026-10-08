@@ -1,6 +1,6 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
-import { SIGNATURE_NOTE_MAX, bookKey, bookPassages, isFinishedBook, searchPassages, type ChosenHighlight, type ChosenSignature, type Passage, type ReaderCardChosen, type ReaderCardStylePatch } from "@scripta/shared";
+import { SIGNATURE_NOTE_MAX, bookKey, bookPassages, isFinishedBook, noteToSend, searchPassages, type ChosenHighlight, type ChosenSignature, type Passage, type ReaderCardChosen, type ReaderCardStylePatch } from "@scripta/shared";
 import { Button, Input, Sheet, minimumTouchTarget, spacing, typography, useTheme } from "../../ui";
 import { Text } from "../../ui/Text";
 import { BookPickerList } from "../library/components/BookPickerList";
@@ -12,12 +12,12 @@ type Book = Record<string, unknown>;
 
 const NOTE_DELAY_MS = 600;
 
-function NoteField({ signature, onChange }: { signature: ChosenSignature; onChange: SaveStyle }) {
+function NoteField({ signature, onChange, flushRef }: { signature: ChosenSignature; onChange: SaveStyle; flushRef: RefObject<() => void> }) {
   const [draft, setDraft] = useState(signature.note ?? "");
   const sent = useRef(signature.note);
-  const { schedule } = useDebouncedCallback((value: string) => {
-    const note = value.trim() || null;
-    if (note === sent.current) return;
+  const { schedule, flush } = useDebouncedCallback((value: string) => {
+    const note = noteToSend(value, sent.current);
+    if (note === undefined) return;
     const previous = sent.current;
     sent.current = note;
     void onChange({ signature: { bookKey: signature.bookKey, note } }).then((saved) => {
@@ -26,6 +26,10 @@ function NoteField({ signature, onChange }: { signature: ChosenSignature; onChan
       setDraft((current) => (current === value ? (previous ?? "") : current));
     });
   }, NOTE_DELAY_MS);
+  useEffect(() => {
+    flushRef.current = flush;
+    return () => { flushRef.current = () => {}; };
+  });
   return <Input label="Note" value={draft} maxLength={SIGNATURE_NOTE_MAX} hint={`${draft.length}/${SIGNATURE_NOTE_MAX}`} onChangeText={(value) => { setDraft(value); schedule(value); }} />;
 }
 
@@ -33,6 +37,7 @@ export function SignatureChoice({ books, signature, chosen, onChange }: { books:
   const { colors } = useTheme();
   const finished = useMemo(() => books.filter(isFinishedBook), [books]);
   const [picking, setPicking] = useState(false);
+  const flushNote = useRef<() => void>(() => {});
   return (
     <Section title="Signature book">
       {signature && chosen ? <Text style={[typography.body, { color: colors.text }]}>{chosen.title} <Text style={{ color: colors.textDim }}>— {chosen.author}</Text></Text> : null}
@@ -40,9 +45,9 @@ export function SignatureChoice({ books, signature, chosen, onChange }: { books:
       {!signature && finished.length === 0 ? <Text style={[typography.body, { color: colors.textDim }]}>Finish a book to choose your signature book.</Text> : null}
       <View style={styles.actions}>
         {finished.length > 0 ? <Button label={signature ? "Change" : "Choose"} variant="secondary" onPress={() => setPicking(true)} /> : null}
-        {signature ? <Button label="Remove" variant="secondary" onPress={() => void onChange({ signature: null })} /> : null}
+        {signature ? <Button label="Remove" variant="secondary" onPress={() => { flushNote.current(); void onChange({ signature: null }); }} /> : null}
       </View>
-      {signature && chosen ? <NoteField key={signature.bookKey} signature={signature} onChange={onChange} /> : null}
+      {signature && chosen ? <NoteField key={signature.bookKey} signature={signature} onChange={onChange} flushRef={flushNote} /> : null}
       <Sheet visible={picking} title="Choose your signature book" onClose={() => setPicking(false)}>
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheet}>
           <BookPickerList
@@ -50,6 +55,7 @@ export function SignatureChoice({ books, signature, chosen, onChange }: { books:
             isSelected={(book) => bookKey(book) === signature?.bookKey}
             onSelect={(book) => {
               const key = bookKey(book);
+              flushNote.current();
               setPicking(false);
               void onChange({ signature: { bookKey: key, note: key === signature?.bookKey ? signature.note : null } });
             }}
