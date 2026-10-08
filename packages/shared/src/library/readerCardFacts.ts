@@ -3,11 +3,12 @@ import { readerCardLabel, readerCardPlateLine } from "../readerCards/card.js";
 import type { IdentityKey } from "../readerCards/plates.js";
 import type { ReaderCardBase } from "../readerCards/render.js";
 import { seedOf } from "../readerCards/seed.js";
-import { DEFAULT_READER_CARD_STYLE, normalizeReaderCardStyle, publicStyle } from "../readerCards/style.js";
+import { DEFAULT_READER_CARD_STYLE, normalizeReaderCardStyle, publicStyle, type ReaderCardChosen, type ReaderCardStyle } from "../readerCards/style.js";
 import { genresForBook } from "./bookGenres.js";
 import type { Group } from "./groups.js";
 import { parseBookDate } from "./libraryView.js";
 import { bookKey } from "./merge.js";
+import { bookLabel, bookPassages } from "./passages.js";
 import { GENRE_SIGNALS, publicReaderCard, readerIdentity, uniqueFinished, type GenreIdentity, type PublicReaderCard } from "./readerIdentity.js";
 
 type Book = Record<string, unknown>;
@@ -52,12 +53,30 @@ export function publicReaderCardOf(books: Book[], groups: Group[], now: Date = n
   return { ...publicReaderCard(identity), ...readerCardFacts(books, groups, identity.identity, now) };
 }
 
-export function readerCardInputOf(books: Book[], groups: Group[], readerName: string, override?: PublicReaderCard): ReaderCardBase {
+export type CoverOf = (book: Book) => string | null;
+export interface OwnCardStyle { style: ReaderCardStyle; coverOf: CoverOf }
+
+export function ownChosen(books: Book[], style: ReaderCardStyle, coverOf: CoverOf): ReaderCardChosen {
+  const chosen: ReaderCardChosen = {};
+  const { signature, highlight } = style;
+  const signed = signature ? books.find((item) => bookKey(item) === signature.bookKey) : undefined;
+  if (signature && signed) chosen.signature = { ...bookLabel(signed), workId: null, coverUrl: coverOf(signed), note: signature.note };
+  const marked = highlight ? books.find((item) => bookKey(item) === highlight.bookKey) : undefined;
+  const passage = highlight && marked ? bookPassages(marked).find((item) => item.highlightId === highlight.highlightId) : undefined;
+  if (passage) chosen.highlight = { text: passage.text, title: passage.title, author: passage.author };
+  return chosen;
+}
+
+export function readerCardInputOf(books: Book[], groups: Group[], readerName: string, override?: PublicReaderCard, own?: OwnCardStyle): ReaderCardBase {
   const seed = seedOf(readerName);
   if (override) {
     return { card: override, style: publicStyle(normalizeReaderCardStyle(override.style)), view: "visitor", readerName, label: readerCardLabel(override), unwrittenLine: "yet to be written", seed };
   }
-  const own = readerIdentity(books, groups);
-  const card: PublicReaderCard = { ...publicReaderCard(own), ...readerCardFacts(books, groups, own.identity) };
-  return { card, style: publicStyle(DEFAULT_READER_CARD_STYLE), view: "owner", leaders: own.leaders, missing: own.missing, readerName, label: readerCardLabel(card), unwrittenLine: readerCardPlateLine(own.missing), seed };
+  const identity = readerIdentity(books, groups);
+  const card: PublicReaderCard = { ...publicReaderCard(identity), ...readerCardFacts(books, groups, identity.identity), ...(own ? { chosen: ownChosen(books, own.style, own.coverOf) } : {}) };
+  return { card, style: publicStyle(own?.style ?? DEFAULT_READER_CARD_STYLE), view: "owner", leaders: identity.leaders, missing: identity.missing, readerName, label: readerCardLabel(card), unwrittenLine: readerCardPlateLine(identity.missing), seed };
+}
+
+export function visitorView(input: ReaderCardBase): ReaderCardBase {
+  return readerCardInputOf([], [], input.readerName, { ...input.card, style: input.style });
 }
