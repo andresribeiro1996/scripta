@@ -5,7 +5,8 @@ import { cornersSlot } from "./corners.js";
 import { drawCounter, SEAL_ANGLE } from "./counters.js";
 import { footerSlots, GENRE_LEADS, truncateName } from "./footer.js";
 import { mottoSlots } from "./mottos.js";
-import { INKS, PAPER, PLATES, REVERSED_LINE, emblem, glyph, glyphBody, type IdentityKey } from "./plates.js";
+import { inks, withStyle } from "./paint.js";
+import { PLATES, emblem, glyph, glyphBody, type IdentityKey } from "./plates.js";
 import { chosenBody, mergedBody, recordBody, type ReaderCardPage, type ReaderCardView } from "./pages.js";
 import type { PublicReaderCardStyle } from "./style.js";
 import { escape } from "./svgText.js";
@@ -30,28 +31,6 @@ export interface RenderPlateOptions {
   width?: number;
   crop?: CardCrop;
 }
-
-function inks(key: IdentityKey | "graph", print: PlatePrint): [string, string] {
-  const [, ink, deep] = INKS[key];
-  return print === "paper" ? [PAPER, ink] : [deep, REVERSED_LINE];
-}
-
-const rules = (g: string, l: string): Record<string, string> => ({
-  pg: `fill:${g}`, pgf: `fill:${g}`, gg: `fill:${g}`,
-  pf: `fill:${l}`, pt: `fill:${l}`, gd: `fill:${l}`, gi: `fill:${l}`,
-  pl: `stroke:${l};fill:none`, gk: `stroke:${l};fill:none`,
-  pgs: `stroke:${g};fill:none`, gr: `stroke:${g};fill:none`, gs: `stroke:${g};fill:none`,
-  pgl: `fill:${g};stroke:${l}`,
-});
-
-const withStyle = (svg: string, [g, l]: [string, string]) => {
-  const r = rules(g, l);
-  return svg.replace(/<[^>]*>/g, (tag) => tag.replace(/ class="(\w+)"/g, (_, c: string) => {
-    const style = r[c];
-    if (!style) throw new Error(`No print rule for class "${c}"`);
-    return ` style="${style}"`;
-  }));
-};
 
 function faceOf({ identity, state, readerName, label, unwrittenLine, width = 250, crop }: RenderPlateOptions): { face: PlateFace; ink: IdentityKey | "graph" } {
   const reader = escape(truncateName(readerName).toUpperCase());

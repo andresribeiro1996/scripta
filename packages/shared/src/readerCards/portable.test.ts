@@ -30,15 +30,16 @@ function portabilityProblems(svg: string): string[] {
   }
   if ((svg.match(/<svg\b/g) ?? []).length !== 1) problems.push("nested <svg>");
   if (remoteImages > 1) problems.push("more than one remote image");
-  if (/url\(\s*['"]?#/.test(svg)) problems.push("url(#…)");
+  for (const [, ref] of svg.matchAll(/url\(\s*['"]?#([^)'"\s]+)/g)) if (!ids.includes(ref!)) problems.push(`url(#${ref})`);
   if (/NaN|Infinity|undefined/.test(svg)) problems.push("NaN");
   return problems;
 }
 
-test("the guard counts every remote image and catches spaced or quoted url(#…) references", () => {
+test("the guard counts every remote image and lets url(#…) point only at the card's own ids", () => {
   const twoImages = `<svg xmlns="http://www.w3.org/2000/svg"><image xlink:href="https://a.example/b" width="1"/><image x="2" href="https://a.example/c"/></svg>`;
   assert.deepEqual(portabilityProblems(twoImages), ["more than one remote image"]);
-  assert.deepEqual(portabilityProblems(`<svg xmlns="http://www.w3.org/2000/svg"><rect fill="url( #a)"/></svg>`), ["url(#…)"]);
+  assert.deepEqual(portabilityProblems(`<svg xmlns="http://www.w3.org/2000/svg"><rect fill="url( #a)"/></svg>`), ["url(#a)"]);
+  assert.deepEqual(portabilityProblems(`<svg xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="rc-foilInk-1-paper"/></defs><rect style="fill:url(#rc-foilInk-1-paper)"/></svg>`), []);
 });
 
 test("the guard allows only card ids and textPath references to them", () => {
