@@ -39,3 +39,8 @@ test("only the owner's summary names the leaders and the missing line", () => {
 test("an unwritten card says so", () => {
   assert.equal(readerCardSummary(base({ card: { state: "unwritten", identity: null, runnerUp: null, signal: null, coverage: [] } }))[0], "An unwritten reader card.");
 });
+
+test("the motto is read out after the plate", () => {
+  const lines = readerCardSummary(base({ style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), motto: { text: "Per libros ad astra", look: "arc" } } }));
+  assert.equal(lines[1], "Motto: “Per libros ad astra”.");
+});

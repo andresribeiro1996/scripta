@@ -14,15 +14,18 @@ const ELEMENTS = new Set(["svg", "g", "defs", "path", "rect", "circle", "ellipse
 function portabilityProblems(svg: string): string[] {
   const problems: string[] = [];
   let remoteImages = 0;
+  const ids = [...svg.matchAll(/ id="([^"]*)"/g)].map((match) => match[1]!);
+  if (new Set(ids).size !== ids.length) problems.push("duplicate id");
   for (const [, name, attrs] of svg.matchAll(/<([a-zA-Z][\w:-]*)([^>]*)>/g)) {
     if (!ELEMENTS.has(name!)) problems.push(`<${name}>`);
     for (const [, attr, value] of attrs!.matchAll(/([\w:-]+)="([^"]*)"/g)) {
       if (attr === "class" && !/^(plate|glyph) id-/.test(value!)) problems.push(`class="${value}"`);
       if (attr === "style" && value!.includes("mix-blend-mode")) problems.push("mix-blend-mode");
       const remote = (attr === "href" || attr === "xlink:href") && name === "image" && /^https:\/\/[^\s"'<>&\\]+$/.test(value!);
+      const local = attr === "href" && name === "textPath" && value!.startsWith("#") && ids.includes(value!.slice(1));
       if (remote) remoteImages++;
-      if ((attr === "href" || attr === "xlink:href") && !value!.startsWith("data:") && !remote) problems.push(`${attr}="${value!.slice(0, 40)}"`);
-      if (attr === "id") problems.push(`id="${value}"`);
+      if ((attr === "href" || attr === "xlink:href") && !value!.startsWith("data:") && !remote && !local) problems.push(`${attr}="${value!.slice(0, 40)}"`);
+      if (attr === "id" && !/^rc-[a-zA-Z]+-\d+-(paper|reversed)$/.test(value!)) problems.push(`id="${value}"`);
     }
   }
   if ((svg.match(/<svg\b/g) ?? []).length !== 1) problems.push("nested <svg>");
@@ -36,6 +39,14 @@ test("the guard counts every remote image and catches spaced or quoted url(#…)
   const twoImages = `<svg xmlns="http://www.w3.org/2000/svg"><image xlink:href="https://a.example/b" width="1"/><image x="2" href="https://a.example/c"/></svg>`;
   assert.deepEqual(portabilityProblems(twoImages), ["more than one remote image"]);
   assert.deepEqual(portabilityProblems(`<svg xmlns="http://www.w3.org/2000/svg"><rect fill="url( #a)"/></svg>`), ["url(#…)"]);
+});
+
+test("the guard allows only card ids and textPath references to them", () => {
+  const ok = `<svg xmlns="http://www.w3.org/2000/svg"><defs><path id="rc-arc-1-paper" d="M0 0"/></defs><text><textPath href="#rc-arc-1-paper">a</textPath></text></svg>`;
+  assert.deepEqual(portabilityProblems(ok), []);
+  assert.deepEqual(portabilityProblems(ok.replace(`href="#rc-arc-1-paper"`, `href="#elsewhere"`)), [`href="#elsewhere"`]);
+  assert.ok(portabilityProblems(ok.replaceAll("rc-arc-1-paper", "x")).includes(`id="x"`));
+  assert.ok(portabilityProblems(ok.replace("</defs>", `<path id="rc-arc-1-paper" d="M1 1"/></defs>`)).includes("duplicate id"));
 });
 
 const dials: Record<string, DialSegment[]> = {

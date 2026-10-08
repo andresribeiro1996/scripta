@@ -211,6 +211,7 @@ export function readerCardSummary(input: ReaderCardBase): string[] {
   const { card } = input;
   const plate = card.identity && card.state !== "unwritten" ? PLATES.find((item) => item.key === card.identity) : undefined;
   const lines = [plate ? `${card.state === "leaning" ? "Leaning toward the" : "The"} ${plate.name}, plate ${plate.numeral}: ${plate.epithet}.` : "An unwritten reader card."];
+  if (input.style.motto) lines.push(`Motto: “${input.style.motto.text}”.`);
   const second = card.state === "unwritten" ? null : card.streak ?? null;
   if (second) lines.push(`With a streak of the ${nameOf(second)}.`);
   if (card.signal) lines.push(`${card.signal.label}.`);

@@ -4,6 +4,7 @@ import { composePage, composePlate, SANS, type PlateFace, type PlateSlots } from
 import { cornersSlot } from "./corners.js";
 import { drawCounter, SEAL_ANGLE } from "./counters.js";
 import { footerSlots, GENRE_LEADS, truncateName } from "./footer.js";
+import { mottoSlots } from "./mottos.js";
 import { INKS, PAPER, PLATES, REVERSED_LINE, emblems, glyph, glyphBody, type IdentityKey } from "./plates.js";
 import { chosenBody, mergedBody, recordBody, type ReaderCardPage, type ReaderCardView } from "./pages.js";
 import type { PublicReaderCardStyle } from "./style.js";
@@ -109,7 +110,7 @@ export function renderReaderCard(input: ReaderCardInput, page: ReaderCardPage = 
   const seal = streak !== null && (style.trait === "both" || style.trait === "seal");
   const line = streak !== null && (style.trait === "both" || style.trait === "line");
   const lead = card.identity && GENRE_LEADS.has(card.identity) ? (card.identity as DialGroup) : null;
-  const slots: PlateSlots = decorations(input, print);
+  const slots: PlateSlots = { ...decorations(input, print), ...mottoSlots(style.motto, `rc-${style.motto?.look ?? "none"}-${seed}-${print}`) };
   const counter = card.dial ? drawCounter(style.counter, card.dial.segments, { seed, sealGap: seal, lead }) : null;
   if (counter) slots[counter.slot] = counter.svg;
   if (streak && seal) slots.seal = sealSlot(streak, print);
