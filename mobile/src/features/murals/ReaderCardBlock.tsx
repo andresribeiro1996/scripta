@@ -1,3 +1,4 @@
+import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, View, type LayoutChangeEvent } from "react-native";
 import { readerCardInputOf, type Group, type PublicReaderCard } from "@scripta/shared";
@@ -21,7 +22,7 @@ export function ReaderCardBlock({ books, groups, readerName, publicCard, editabl
       <View pointerEvents={editable ? "none" : "auto"} onLayout={onLayout} style={styles.plateBox}>
         {editable ? image : <Pressable accessibilityRole="button" accessibilityLabel={input.label} accessibilityHint="Opens the reader card" onPress={() => setOpen(true)} style={{ width, height: width * PLATE_RATIO }}>{image}</Pressable>}
       </View>
-      {open ? <ReaderCardViewer input={input} onClose={() => setOpen(false)} /> : null}
+      {open ? <ReaderCardViewer input={input} onClose={() => setOpen(false)} onEdit={publicCard ? undefined : () => { setOpen(false); router.push("/reader-card" as never); }} /> : null}
     </>
   );
 }
