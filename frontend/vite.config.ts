@@ -1,10 +1,27 @@
 import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
-import { defineConfig, loadEnv } from 'vite'
+import { defineConfig, loadEnv, type Plugin } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import { escapeRegExp, libraryCacheKey, libraryCachePattern, libraryFreshPattern } from './swLibraryPattern.ts'
 import { CERT_PATH, KEY_PATH, mobileCertsExist } from '../scripts/mobileCertPaths.mjs'
+
+const SHARED_DIST = fileURLToPath(new URL('../packages/shared/dist/', import.meta.url))
+
+function reloadOnSharedBuild(): Plugin {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  return {
+    name: 'reload-on-shared-build',
+    apply: 'serve',
+    hotUpdate({ file }) {
+      if (this.environment.name !== 'client' || !file.startsWith(SHARED_DIST)) return
+      clearTimeout(timer)
+      timer = setTimeout(() => this.environment.hot.send({ type: 'full-reload' }), 300)
+      return []
+    }
+  }
+}
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
@@ -34,6 +51,7 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       tailwindcss(),
+      reloadOnSharedBuild(),
       VitePWA({
         registerType: 'autoUpdate',
         manifest: {
