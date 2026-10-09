@@ -4,6 +4,7 @@ import type { DialSegment } from "../library/readerCardFacts.js";
 import type { PublicReaderCard } from "../library/readerIdentity.js";
 import { COUNTERS } from "./counters.js";
 import { COUNTER_LABELS, LAYOUT_LABELS, TRAIT_LABELS } from "./labels.js";
+import { emblem } from "./plates.js";
 import { CARD_CROPS, cardRatio, renderReaderCard, type ReaderCardBase } from "./render.js";
 import { seedOf } from "./seed.js";
 import { CORNER_STYLES, DEFAULT_READER_CARD_STYLE, LAYOUTS, TRAITS, publicStyle } from "./style.js";
@@ -66,4 +67,15 @@ test("crop ratios", () => {
   assert.equal(cardRatio(), 1.4);
   assert.equal(cardRatio("corner"), 1);
   assert.equal(cardRatio("motto"), CARD_CROPS.motto[3] / CARD_CROPS.motto[2]);
+});
+
+test("a corner thumbnail leaves out the emblem it crops away", () => {
+  const card: PublicReaderCard = { state: "settled", identity: "corr", runnerUp: null, signal: null, coverage: [], dial: { segments: large }, facts: { finished: 258, highlights: 300, series: 0, since: null, edition: 2026 } };
+  const input: ReaderCardBase = { card, style: publicStyle(DEFAULT_READER_CARD_STYLE), readerName: "andre", label: "Reader card", seed: seedOf("andre"), view: "owner" };
+  const stroke = emblem("corr").match(/ d="([^"]{60})/)![1]!;
+  const corner = renderReaderCard({ ...styleThumbnail(input, { corners: "laurel" }, "corner"), print: "paper", width: 64 });
+  assert.ok(!corner.includes(stroke));
+  assert.ok(corner.length < 15_000, String(corner.length));
+  assert.ok(renderReaderCard({ ...styleThumbnail(input, { corners: "laurel" }, "motto"), print: "paper", width: 64 }).includes(stroke));
+  assert.ok(renderReaderCard({ ...input, print: "paper" }).includes(stroke));
 });
