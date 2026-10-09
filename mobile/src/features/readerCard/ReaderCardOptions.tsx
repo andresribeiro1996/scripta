@@ -1,6 +1,6 @@
 import { useDeferredValue, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
-import { CARD_PRINTS, CORNER_LABELS, CORNER_STYLES, COUNTERS, COUNTER_LABELS, FINISHES, FINISH_LABELS, FOOTER_LEFTS, FOOTER_LEFT_LABELS, FOOTER_RIGHTS, FOOTER_RIGHT_LABELS, LAYOUTS, LAYOUT_LABELS, MOTTO_LOOKS, MOTTO_LOOK_LABELS, MOTTO_MAX, PRINT_LABELS, TRAITS, TRAIT_LABELS, cardRatio, counterThumbnail, footerLeftText, footerRightText, styleThumbnail, type Finish, type FooterLeft, type FooterRight, type Layout, type MottoLook, type ReaderCardBase } from "@scripta/shared";
+import { CARD_PRINTS, CORNER_LABELS, CORNER_STYLES, COUNTERS, COUNTER_LABELS, FINISHES, FINISH_LABELS, FOOTER_LEFTS, FOOTER_LEFT_LABELS, FOOTER_RIGHTS, FOOTER_RIGHT_LABELS, LAYOUTS, LAYOUT_LABELS, MOTTO_LOOKS, MOTTO_LOOK_LABELS, MOTTO_MAX, PRINT_LABELS, TRAITS, TRAIT_LABELS, cardRatio, counterThumbnail, footerLeftText, footerRightText, styleThumbnail, type CardCrop, type Finish, type FooterLeft, type FooterRight, type Layout, type MottoLook, type ReaderCardBase } from "@scripta/shared";
 import { Button, Icon, Segmented, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import { Text } from "../../ui/Text";
 import { Caption, Section, Tile } from "../library/components/StyleControls";
@@ -43,13 +43,13 @@ const leftDetail = (value: FooterLeft, text: string | null, hasPlate: boolean) =
 const rightDetail = (value: FooterRight, text: string | null) => (value === "none" ? "Nothing" : text ?? UNAVAILABLE);
 const withText = (label: string, text: string | null) => (text ? `${label} · ${text}` : label);
 
-function TileRow<T extends string>({ items, value, labels, available, onPick }: { items: Array<{ option: T; input: ReaderCardBase }>; value: T | null; labels: Record<T, string>; available: number; onPick: (option: T) => void }) {
+function TileRow<T extends string>({ items, value, labels, available, crop, onPick }: { items: Array<{ option: T; input: ReaderCardBase | null }>; value: T | null; labels: Record<T, string>; available: number; crop?: CardCrop; onPick: (option: T) => void }) {
   const width = Math.floor((available - (TILE_COLUMNS - 1) * spacing.sm) / TILE_COLUMNS) - TILE_PADDING;
   return (
     <View style={styles.row}>
       {items.map((item) => (
-        <Tile key={item.option} width={width + TILE_PADDING} tileWidth={width + TILE_PADDING} height={width * cardRatio(item.input.crop) + TILE_PADDING} label={labels[item.option]} selected={value === item.option} onPress={() => onPick(item.option)}>
-          <ReaderCardImage input={item.input} width={width} />
+        <Tile key={item.option} width={width + TILE_PADDING} tileWidth={width + TILE_PADDING} height={width * cardRatio(crop) + TILE_PADDING} label={labels[item.option]} selected={value === item.option} onPress={() => onPick(item.option)}>
+          {item.input ? <ReaderCardImage input={item.input} width={width} /> : null}
         </Tile>
       ))}
     </View>
@@ -164,15 +164,15 @@ function OptionRow({ label, detail, selected, onPress }: { label: string; detail
 }
 
 function LookPanel({ input, motto, available }: { input: ReaderCardBase; motto: Motto; available: number }) {
-  const deferred = useDeferredValue(input);
-  const thumbs = useMemo(() => MOTTO_LOOKS.map((option) => ({ option, input: styleThumbnail(deferred, { motto: { text: deferred.style.motto?.text ?? SAMPLE_MOTTO, look: option } }, "motto") })), [deferred]);
-  return <TileRow items={thumbs} value={motto.look} labels={MOTTO_LOOK_LABELS} available={available} onPick={motto.pickLook} />;
+  const deferred = useDeferredValue(input, null);
+  const thumbs = useMemo(() => MOTTO_LOOKS.map((option) => ({ option, input: deferred && styleThumbnail(deferred, { motto: { text: deferred.style.motto?.text ?? SAMPLE_MOTTO, look: option } }, "motto") })), [deferred]);
+  return <TileRow items={thumbs} value={motto.look} labels={MOTTO_LOOK_LABELS} available={available} crop="motto" onPick={motto.pickLook} />;
 }
 
 function CornersPanel({ input, available, onChange }: { input: ReaderCardBase; available: number; onChange: SaveStyle }) {
-  const deferred = useDeferredValue(input);
-  const thumbs = useMemo(() => CORNER_STYLES.map((option) => ({ option, input: styleThumbnail(deferred, { corners: option }, "corner") })), [deferred]);
-  return <TileRow items={thumbs} value={input.style.corners} labels={CORNER_LABELS} available={available} onPick={(next) => void onChange({ corners: next })} />;
+  const deferred = useDeferredValue(input, null);
+  const thumbs = useMemo(() => CORNER_STYLES.map((option) => ({ option, input: deferred && styleThumbnail(deferred, { corners: option }, "corner") })), [deferred]);
+  return <TileRow items={thumbs} value={input.style.corners} labels={CORNER_LABELS} available={available} crop="corner" onPick={(next) => void onChange({ corners: next })} />;
 }
 
 function FooterPanel({ side, input, onChange }: { side: "footerLeft" | "footerRight"; input: ReaderCardBase; onChange: SaveStyle }) {

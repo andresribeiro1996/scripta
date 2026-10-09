@@ -34,13 +34,14 @@ export interface RenderPlateOptions {
 }
 
 function faceOf({ identity, state, readerName, label, unwrittenLine, width = 250, crop }: RenderPlateOptions): { face: PlateFace; ink: IdentityKey | "graph" } {
+  const cropped = crop === "corner";
   const reader = escape(truncateName(readerName).toUpperCase());
   const safeLabel = escape(label);
   if (state === "unwritten" || !identity) {
-    return { ink: "graph", face: { key: "none", emblemSvg: emblem("none"), name: "Unwritten", eyebrow: "NOT YET", epithet: escape(unwrittenLine ?? "five finished books to begin"), numeral: "—", reader, width, label: safeLabel, ...(crop ? { viewBox: CARD_CROPS[crop] } : {}) } };
+    return { ink: "graph", face: { key: "none", emblemSvg: cropped ? "" : emblem("none"), name: "Unwritten", eyebrow: "NOT YET", epithet: escape(unwrittenLine ?? "five finished books to begin"), numeral: "—", reader, width, label: safeLabel, ...(crop ? { viewBox: CARD_CROPS[crop] } : {}) } };
   }
   const p = PLATES.find((item) => item.key === identity)!;
-  return { ink: identity, face: { key: identity, emblemSvg: emblem(identity), name: p.name, eyebrow: state === "leaning" ? "LEANING TOWARD" : "THE", epithet: p.epithet, numeral: p.numeral, reader, width, label: safeLabel, ...(crop ? { viewBox: CARD_CROPS[crop] } : {}) } };
+  return { ink: identity, face: { key: identity, emblemSvg: cropped ? "" : emblem(identity), name: p.name, eyebrow: state === "leaning" ? "LEANING TOWARD" : "THE", epithet: p.epithet, numeral: p.numeral, reader, width, label: safeLabel, ...(crop ? { viewBox: CARD_CROPS[crop] } : {}) } };
 }
 
 export function renderPlate(options: RenderPlateOptions): string {
