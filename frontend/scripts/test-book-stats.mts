@@ -16,11 +16,13 @@ const tiles = (stats: BookStats | null, ol: typeof rating | null) =>
   renderToString(createElement(MemoryRouter, null, createElement(StatsTiles, { tiles: bookStatsModel(stats, ol).tiles, to: "/work/w/stats" })));
 const sections = (stats: BookStats | null, ol: typeof rating | null) => renderToString(createElement(StatsSections, { model: bookStatsModel(stats, ol) }));
 
-test("tiles link to the stats page with a big value and caption each", () => {
+test("tiles link to the stats page as one caption line", () => {
   const html = tiles(full, rating);
   assert.ok(html.includes('href="/work/w/stats"'));
   assert.ok(html.includes("Book stats: "));
-  for (const text of ["3.8", "Loved it", "Upper", "tiers · 4 lists", "🏆", "Winner"]) assert.ok(html.includes(text), text);
+  for (const text of ["3.8 Loved it", "Upper tiers · 4 lists", "🏆 Winner", "›"]) assert.ok(html.includes(text), text);
+  assert.ok(html.includes("whitespace-nowrap"));
+  assert.ok(!html.includes("border"));
 });
 
 test("no tiles, nothing rendered, even with an Open Library rating", () => {

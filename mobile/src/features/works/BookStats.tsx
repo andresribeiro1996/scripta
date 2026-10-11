@@ -1,17 +1,17 @@
 import { Pressable, StyleSheet, View } from "react-native";
 import type { BookStatsModel } from "@scripta/shared";
 import { Text } from "../../ui/Text";
-import { dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { Icon, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 
 export function StatsTiles({ tiles, onPress }: { tiles: BookStatsModel["tiles"]; onPress: () => void }) {
   const { colors } = useTheme();
   if (tiles.length === 0) return null;
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={`Book stats: ${tiles.map((tile) => `${tile.value} ${tile.caption}`).join("; ")}`} onPress={onPress} style={styles.tiles}>
-      {tiles.map((tile) => (
-        <View key={tile.key} style={[styles.tile, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-          <Text adjustsFontSizeToFit minimumFontScale={0.8} numberOfLines={1} {...dynamicType} style={[typography.title, styles.strong, styles.center, { color: colors.text }]}>{tile.value}</Text>
-          <Text numberOfLines={2} {...dynamicType} style={[typography.caption, styles.center, { color: colors.textDim }]}>{tile.caption}</Text>
+    <Pressable accessibilityRole="button" accessibilityLabel={`Book stats: ${tiles.map((tile) => `${tile.value} ${tile.caption}`).join("; ")}`} hitSlop={{ top: 14, bottom: 14 }} onPress={onPress} style={styles.tiles}>
+      {tiles.map((tile, index) => (
+        <View key={tile.key} style={styles.tile}>
+          <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{`${tile.value} ${tile.caption}${index < tiles.length - 1 ? " ·" : ""}`}</Text>
+          {index === tiles.length - 1 ? <Icon name="chevronRight" size={12} color={colors.textDim} /> : null}
         </View>
       ))}
     </Pressable>
@@ -90,9 +90,8 @@ export function StatsSections({ model }: { model: BookStatsModel }) {
 }
 
 const styles = StyleSheet.create({
-  tiles: { alignSelf: "stretch", flexDirection: "row", gap: spacing.xs, marginTop: spacing.sm },
-  tile: { flex: 1, minWidth: 0, borderWidth: 1, borderRadius: radii.lg, paddingVertical: spacing.sm, paddingHorizontal: spacing.xs, alignItems: "center" },
-  center: { textAlign: "center", alignSelf: "stretch" },
+  tiles: { alignSelf: "stretch", flexDirection: "row", flexWrap: "wrap", justifyContent: "center", alignItems: "center", columnGap: spacing.xs },
+  tile: { flexShrink: 1, flexDirection: "row", alignItems: "center" },
   strong: { fontWeight: "700" },
   sections: { gap: spacing.xxl },
   section: { gap: spacing.sm },
