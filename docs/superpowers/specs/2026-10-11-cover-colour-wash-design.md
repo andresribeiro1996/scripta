@@ -15,7 +15,7 @@ Make the top of the book screen feel like the book: a soft gradient of the cover
 
 `coverColor(image: Buffer): Promise<string | null>` in `backend/src/modules/books/domain/images.ts`, next to `encodeCover`, using sharp (already a dependency):
 
-1. Flatten on white, sRGB, resize to fit 64×64, raw pixels.
+1. Flatten on white, sRGB, resize to fit 128×128 (default kernel), raw pixels.
 2. Drop pixels that are near-grey (HSV saturation < 0.25), near-black (value < 0.15) or near-white (value > 0.95 with saturation < 0.1).
 3. Bucket the rest into 12 hue bins, weighting each pixel by saturation × value.
 4. Take the heaviest bin. If its weight is under 1% of the total pixel count, return `null`: the cover is effectively greyscale.

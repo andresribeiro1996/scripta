@@ -42,7 +42,7 @@
 - Test: `backend/src/modules/books/domain/images.test.ts` (create if absent, and add to the `test` list), plus the repository test for the migration
 
 **Algorithm (from the spec):**
-1. Flatten on white, convert to sRGB, resize to fit 64×64, take raw pixels.
+1. Flatten on white, convert to sRGB, resize to fit 128×128 (default kernel), take raw pixels.
 2. Drop pixels with saturation < 0.25 or value < 0.15 (near-white falls under the saturation rule).
 3. Bucket the rest into 12 hue bins, weighted by saturation × value.
 4. If the heaviest bin's weight is under 1% of the pixel count, return `null`.
