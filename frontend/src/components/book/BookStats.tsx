@@ -7,12 +7,12 @@ const dim = "text-sm text-(--color-text-dim)";
 export function StatsTiles({ tiles, to }: { tiles: BookStatsModel["tiles"]; to: string }) {
   if (tiles.length === 0) return null;
   return (
-    <Link to={to} className="mt-3 flex flex-wrap gap-2 rounded-xl text-center hover:opacity-90">
+    <Link to={to} className="mt-1 flex flex-wrap items-center justify-center gap-x-1.5 text-xs text-(--color-text-dim) hover:opacity-90 sm:justify-start">
       <span className="sr-only">Book stats: </span>
-      {tiles.map((tile) => (
-        <span key={tile.key} className="min-w-0 grow basis-[4.5rem] rounded-xl border border-(--color-border) bg-(--color-surface) px-2 py-2">
-          <span className="block truncate text-lg font-bold">{tile.value}</span>
-          <span className="line-clamp-2 block text-xs text-(--color-text-dim)">{tile.caption}</span>
+      {tiles.map((tile, index) => (
+        <span key={tile.key} className="whitespace-nowrap">
+          {`${tile.value} ${tile.caption}`}
+          <span aria-hidden="true">{index < tiles.length - 1 ? " ·" : " ›"}</span>
         </span>
       ))}
     </Link>
