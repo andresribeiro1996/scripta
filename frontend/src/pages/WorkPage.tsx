@@ -16,7 +16,7 @@ export function WorkPage() {
   const { session } = useAuth();
   const toast = useToast();
   const { page, isLoading, isNotFound, refetch } = useWork(id);
-  const { data: library, isLoading: libraryLoading } = useLibrary({ enabled: Boolean(session) });
+  const libraryQuery = useLibrary({ enabled: Boolean(session) });
   const [adding, setAdding] = useState(false);
 
   useEffect(() => {
@@ -28,9 +28,9 @@ export function WorkPage() {
   const onBack = hasHistory ? () => navigate(-1) : null;
   const back = <BackLink backTo={backTo} onBack={onBack} />;
   const mineKey = page?.mine?.bookKey;
-  const book = mineKey ? library?.data.books.find((b) => bookKey(b) === mineKey) ?? null : null;
+  const book = mineKey ? libraryQuery.data?.data.books.find((b) => bookKey(b) === mineKey) ?? null : null;
 
-  if (isLoading || (mineKey && !book && libraryLoading)) return <main className="mx-auto max-w-5xl px-5 py-8">{back}<p className="text-sm text-(--color-text-dim)">Loading…</p></main>;
+  if (isLoading || (mineKey && !book && libraryQuery.isFetching)) return <main className="mx-auto max-w-5xl px-5 py-8">{back}<p className="text-sm text-(--color-text-dim)">Loading…</p></main>;
   if (!page && isNotFound) return <main className="mx-auto max-w-5xl px-5 py-8">{back}<p className="text-sm text-(--color-text-dim)">No book with that id.</p></main>;
   if (!page) {
     return (
@@ -39,6 +39,18 @@ export function WorkPage() {
         <EmptyState
           title="Couldn't load this book."
           action={<button type="button" onClick={() => void refetch()} className="rounded-lg border border-(--color-border) px-3 py-1.5 text-sm hover:border-(--color-accent)">Retry</button>}
+        />
+      </main>
+    );
+  }
+
+  if (mineKey && !book && libraryQuery.isError) {
+    return (
+      <main className="mx-auto max-w-5xl px-5 py-8">
+        {back}
+        <EmptyState
+          title="Couldn't load your library."
+          action={<button type="button" onClick={() => void libraryQuery.refetch()} className="rounded-lg border border-(--color-border) px-3 py-1.5 text-sm hover:border-(--color-accent)">Retry</button>}
         />
       </main>
     );

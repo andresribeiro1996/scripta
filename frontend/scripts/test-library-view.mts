@@ -1,4 +1,4 @@
-import { filterBooks, setReadStatus, sortBooks } from "../src/lib/libraryView";
+import { bookHref, filterBooks, setReadStatus, sortBooks } from "../src/lib/libraryView";
 
 let failed = 0;
 function check(name: string, ok: boolean) {
@@ -29,6 +29,9 @@ const finishedBook = setReadStatus({ ReadStatus: 1 }, 2, "2026-09-25");
 check("setReadStatus records the finish day", finishedBook.ReadStatus === 2 && finishedBook.DateLastRead === "2026-09-25" && finishedBook.___PercentRead === 100);
 const same = { ReadStatus: 2 };
 check("setReadStatus returns the same book when nothing changes", setReadStatus(same, 2, "2026-09-25") === same);
+check("bookHref goes to the work page when the key resolved", bookHref("isbn:1", { "isbn:1": "w1" }) === "/work/w1");
+check("bookHref falls back to the key route when unresolved", bookHref("isbn:2", { "isbn:1": "w1" }) === "/book/isbn%3A2");
+check("bookHref falls back when there is no works map", bookHref("title:a b/c", undefined) === "/book/title%3Aa%20b%2Fc");
 
 if (failed > 0) {
   console.error(`${failed} check(s) failed`);

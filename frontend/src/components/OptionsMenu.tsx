@@ -9,6 +9,7 @@ export interface OptionsMenuItem {
    *  action in the app already uses (ConfirmDialog's own confirm button,
    *  GroupsPage's "Delete" text link). */
   danger?: boolean;
+  checked?: boolean;
 }
 
 const MENU_WIDTH = 132;
@@ -104,16 +105,19 @@ export function OptionsMenu({
             {items.map((item) => (
               <button
                 key={item.label}
+                role={item.checked === undefined ? undefined : "menuitemradio"}
+                aria-checked={item.checked}
                 onClick={(e) => {
                   e.stopPropagation();
-                  item.onClick();
+                  if (!item.checked) item.onClick();
                   setOpen(false);
                 }}
-                className={`block w-full px-3 py-1.5 text-left ${
+                className={`flex w-full items-center justify-between gap-3 px-3 py-1.5 text-left ${
                   item.danger ? "text-(--color-danger) hover:bg-(--color-danger-soft)" : "hover:bg-(--color-surface-hover)"
                 }`}
               >
                 {item.label}
+                {item.checked ? <span aria-hidden="true">✓</span> : null}
               </button>
             ))}
           </div>,

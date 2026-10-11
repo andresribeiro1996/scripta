@@ -35,7 +35,7 @@ import { parseImportedFile } from "../lib/fileImport";
 import { removeBooksFromAllGroups } from "../lib/groups";
 import { orderLibraryBooks, reorderOnDrop, seriesGroupByBookKey } from "../lib/libraryOrder";
 import { effectiveCardStyle, resolveLibraryStyle, type PerCardStyle } from "../lib/libraryStyle";
-import { bookHref, filterBooks, sortBooks, type SortKey, type StatusFilter } from "../lib/libraryView";
+import { bookHref, filterBooks, SORT_OPTIONS, sortBooks, STATUS_FILTER_OPTIONS, type SortKey, type StatusFilter } from "../lib/libraryView";
 import { bookKey } from "../lib/merge";
 import { saveWithViewTransition } from "../lib/viewTransition";
 import { restoreDeletedBooks } from "../lib/restoreDeletedBooks";
@@ -51,7 +51,7 @@ export function LibraryPage() {
     link.download = "atmyshelf-library.csv";
     link.click();
   }
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { scrubBooks } = useMurals();
   const saver = useLibrarySaver();
   const { data: library, isLoading, updateLibrary, share: shareLibraryDoc, unshare: unshareLibraryDoc } = useLibrary();
@@ -81,10 +81,26 @@ export function LibraryPage() {
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [sharing, setSharing] = useState(false);
-  const [query, setQuery] = useState(searchParams.get("q") ?? "");
-  useEffect(() => { setQuery(searchParams.get("q") ?? ""); setAddingBook(searchParams.get("action") === "add"); }, [searchParams]);
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [sortKey, setSortKey] = useState<SortKey>("manual");
+  useEffect(() => { setAddingBook(searchParams.get("action") === "add"); }, [searchParams]);
+  const query = searchParams.get("q") ?? "";
+  const statusParam = searchParams.get("status");
+  const statusFilter = STATUS_FILTER_OPTIONS.find((option) => option.value === statusParam)?.value ?? "all";
+  const sortParam = searchParams.get("sort");
+  const sortKey = SORT_OPTIONS.find((option) => option.value === sortParam)?.value ?? "manual";
+  function updateView(changes: { q?: string; status?: StatusFilter; sort?: SortKey }) {
+    const defaults = { q: "", status: "all", sort: "manual" };
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        for (const [name, value] of Object.entries(changes)) {
+          if (value === defaults[name as keyof typeof defaults]) next.delete(name);
+          else next.set(name, value);
+        }
+        return next;
+      },
+      { replace: true }
+    );
+  }
 
   async function handleRenameLibrary() {
     const name = nameDraft.trim();
@@ -448,11 +464,11 @@ export function LibraryPage() {
       {books.length > 0 && (
         <LibraryToolbar
           query={query}
-          onQueryChange={setQuery}
+          onQueryChange={(q) => updateView({ q })}
           status={statusFilter}
-          onStatusChange={setStatusFilter}
+          onStatusChange={(status) => updateView({ status })}
           sort={sortKey}
-          onSortChange={setSortKey}
+          onSortChange={(sort) => updateView({ sort })}
           // Phone-only; see the `actionItems` definition above.
           actions={selectionMode ? undefined : actionItems}
         />
@@ -512,9 +528,7 @@ export function LibraryPage() {
             toolbarActive && (
               <button
                 onClick={() => {
-                  setQuery("");
-                  setStatusFilter("all");
-                  setSortKey("manual");
+                  updateView({ q: "", status: "all", sort: "manual" });
                 }}
                 className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3.5 py-2.5 text-sm hover:bg-(--color-surface-hover)"
               >

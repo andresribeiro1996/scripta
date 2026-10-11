@@ -190,18 +190,14 @@ export function BookScreen({ page, book, signedIn, onAdd, onShare, onBack, backT
                 title="Reading status"
                 trigger={`${model.status.label} ▾`}
                 triggerClassName={`${controlClass} text-(--color-accent)`}
-                items={model.status.options
-                  .filter((option) => !option.selected)
-                  .map((option) => ({ label: option.label, onClick: () => void pickStatus(option.value) }))}
+                items={model.status.options.map((option) => ({ label: option.label, checked: option.selected, onClick: () => void pickStatus(option.value) }))}
               />
               {model.feeling ? (
                 <OptionsMenu
                   title="How it landed"
                   trigger={`${model.feeling.label} ▾`}
                   triggerClassName={controlClass}
-                  items={model.feeling.options
-                    .filter((option) => !option.selected)
-                    .map((option) => ({ label: option.label, onClick: () => void actions.setRating(book!, option.rating) }))}
+                  items={model.feeling.options.map((option) => ({ label: option.label, checked: option.selected, onClick: () => void actions.setRating(book!, option.rating) }))}
                 />
               ) : null}
             </div>
