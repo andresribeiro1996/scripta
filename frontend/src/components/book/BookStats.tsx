@@ -11,7 +11,7 @@ export function StatsTiles({ tiles, to }: { tiles: BookStatsModel["tiles"]; to: 
       <span className="sr-only">Book stats: </span>
       {tiles.map((tile) => (
         <span key={tile.key} className="min-w-0 grow basis-[4.5rem] rounded-xl border border-(--color-border) bg-(--color-surface) px-2 py-2">
-          <span className="block truncate text-xl font-bold">{tile.value}</span>
+          <span className="block truncate text-lg font-bold">{tile.value}</span>
           <span className="line-clamp-2 block text-xs text-(--color-text-dim)">{tile.caption}</span>
         </span>
       ))}
@@ -30,9 +30,9 @@ export function StatsSections({ model }: { model: BookStatsModel }) {
           <>
             <p className="text-2xl font-bold">{ratings.community.feeling}</p>
             <p className={dim}>{ratings.community.summary}</p>
-            <div className="mt-3 flex h-24 items-end gap-2">
+            <div role="img" aria-label={`Ratings by feeling: ${ratings.community.columns.map((column) => `${column.label} ${column.count}`).join(", ")}`} className="mt-3 flex h-24 items-end gap-2">
               {ratings.community.columns.map((column) => (
-                <span key={column.label} aria-label={`${column.label}: ${column.count}`} className={`min-h-[2px] flex-1 rounded-t ${column.top ? "bg-(--color-accent)" : "bg-(--color-border)"}`} style={{ height: `${Math.round(column.fraction * 100)}%` }} />
+                <span key={column.label} className={`min-h-[2px] flex-1 rounded-t ${column.top ? "bg-(--color-accent)" : "bg-(--color-text-dim)/75"}`} style={{ height: `${Math.round(column.fraction * 100)}%` }} />
               ))}
             </div>
             <div className="mt-1 flex gap-2 text-center text-xs text-(--color-text-dim)">
@@ -70,12 +70,18 @@ export function StatsSections({ model }: { model: BookStatsModel }) {
               <ol className="flex flex-wrap items-center gap-1.5 text-sm">
                 {tournamentRun.path.map((step) => (
                   <li key={step.label} className="flex items-center gap-1.5">
-                    <span className={`rounded-full border px-2.5 py-0.5 ${step.reached ? "border-(--color-accent) bg-(--color-accent-soft) font-semibold text-(--color-accent)" : "border-(--color-border) text-(--color-text-dim)"}`}>{step.label}</span>
+                    <span className={`rounded-full border px-2.5 py-0.5 ${step.reached ? "border-(--color-accent) bg-(--color-accent-soft) font-semibold text-(--color-accent)" : "border-(--color-border) text-(--color-text-dim)"}`}>
+                      {step.label}
+                      <span className="sr-only"> {step.reached ? "(reached)" : "(not reached)"}</span>
+                    </span>
                     <span aria-hidden="true" className="text-(--color-text-dim)">→</span>
                   </li>
                 ))}
                 <li>
-                  <span className={`rounded-full border px-2.5 py-0.5 ${tournamentRun.champion ? "border-(--color-accent) bg-(--color-accent-soft)" : "border-(--color-border) opacity-50"}`}>🏆</span>
+                  <span className={`rounded-full border px-2.5 py-0.5 ${tournamentRun.champion ? "border-(--color-accent) bg-(--color-accent-soft)" : "border-(--color-border) opacity-50"}`}>
+                    <span aria-hidden="true">🏆</span>
+                    <span className="sr-only">{tournamentRun.champion ? "Won a title" : "No title"}</span>
+                  </span>
                 </li>
               </ol>
             ) : null}

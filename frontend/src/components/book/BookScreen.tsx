@@ -183,7 +183,7 @@ export function BookScreen({ page, book, signedIn, onAdd, onShare, onBack, backT
               ))}
             </ul>
           ) : null}
-          {page ? <StatsTiles tiles={statsTiles}to={`/work/${page.work.id}/stats`} /> : null}
+          {page ? <StatsTiles tiles={statsTiles} to={`/work/${page.work.id}/stats`} /> : null}
           {model.meta ? <p className="mt-3 text-xs text-(--color-text-dim)">{model.meta}</p> : null}
           {coverError ? (
             <p role="alert" className="mt-2 text-sm text-(--color-danger)">
