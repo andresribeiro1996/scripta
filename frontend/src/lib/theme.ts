@@ -83,7 +83,7 @@ function subscribe(onChange: () => void): () => void {
 }
 
 export function useThemePreference(): ThemePreference {
-  return useSyncExternalStore(subscribe, readThemePreference);
+  return useSyncExternalStore(subscribe, readThemePreference, () => "system");
 }
 
 export function useResolvedTheme(): ThemeId {

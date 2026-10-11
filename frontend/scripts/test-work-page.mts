@@ -20,6 +20,8 @@ const page: WorkPage = {
 };
 const owned = { Title: "Dune", Attribution: "Frank Herbert", ISBN: "9780441013593", ReadStatus: 2, Rating: 4, highlights: [{ BookmarkID: "h1", Text: "Fear is the mind-killer." }] };
 
+Object.defineProperty(globalThis, "matchMedia", { value: () => ({ matches: false }), configurable: true });
+
 type Props = Parameters<typeof BookScreen>[0];
 const base: Props = { page, book: null, signedIn: true, backTo: "/", onBack: null, onAdd: () => undefined, onShare: () => undefined };
 function render(props: Partial<Props>) {
@@ -125,4 +127,12 @@ test("the hero carries the Open Library rating as stars with a count caption", (
 
 test("a library-only book has no stats tiles", () => {
   assert.ok(!render({ page: null, book: owned, onShare: null }).includes("/stats"));
+});
+
+test("a cover colour washes the header and hero; no colour, no wash", () => {
+  const washed = render({ page: { ...page, work: { ...page.work, coverColor: "#e0a82e" } } });
+  assert.ok(washed.includes("linear-gradient(to bottom"));
+  assert.ok(washed.includes('aria-hidden="true"'));
+  assert.ok(!render({}).includes("linear-gradient"));
+  assert.ok(!render({ page: null, book: owned, onShare: null }).includes("linear-gradient"));
 });
