@@ -45,7 +45,8 @@ test("not owned: add button, About and Community tabs, no highlights tab, no men
   assert.ok(!html.includes("Highlights"));
   assert.ok(!html.includes("⋯"));
   assert.ok(html.includes("Science Fiction"));
-  assert.ok(html.includes("★ 4.3 · 2.3K ratings · 1965 · 412 pages"));
+  assert.ok(html.includes("1965 · 412 pages"));
+  assert.ok(!html.includes("★ 4.3 · 2.3K ratings"));
 });
 
 test("owned and finished: status and feeling menus, highlights tab, more menu", () => {
