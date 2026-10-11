@@ -19,7 +19,7 @@ const FLAT_MIN_RATIO = 0.75;
 const WHITE_CANVAS_MEAN = 235;
 const CANVAS_KEPT = 0.97;
 const BLANK_STDEV = 8;
-const COLOR_SAMPLE_DIMENSION = 64;
+const COLOR_SAMPLE_DIMENSION = 128;
 const COLOR_MIN_SATURATION = 0.25;
 const COLOR_MIN_VALUE = 0.15;
 const COLOR_HUE_BINS = 12;
@@ -50,7 +50,7 @@ export async function coverColor(input: Buffer): Promise<string | null> {
       .rotate()
       .flatten({ background: "#ffffff" })
       .toColourspace("srgb")
-      .resize({ width: COLOR_SAMPLE_DIMENSION, height: COLOR_SAMPLE_DIMENSION, fit: "inside", kernel: "nearest" })
+      .resize({ width: COLOR_SAMPLE_DIMENSION, height: COLOR_SAMPLE_DIMENSION, fit: "inside" })
       .raw()
       .toBuffer({ resolveWithObject: true });
   } catch {

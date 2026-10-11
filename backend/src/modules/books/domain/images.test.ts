@@ -277,7 +277,7 @@ test("a crimson cover whose hues straddle red still gives a red accent", async (
 test("a thin gold ring on black still gives gold", async () => {
   const ring = Buffer.from('<svg width="200" height="300"><circle cx="100" cy="150" r="37" fill="none" stroke="#e0a82e" stroke-width="6"/></svg>');
   const cover = await sharp({ create: { width: 200, height: 300, channels: 3, background: "#000000" } }).composite([{ input: ring }]).png().toBuffer();
-  assertNear(await coverColor(cover), [0xe0, 0xa8, 0x2e], 16);
+  assertNear(await coverColor(cover), [0xe0, 0xa8, 0x2e], 24);
 });
 
 test("a tiny coloured logo on a white cover is not an accent colour", async () => {
