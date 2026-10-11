@@ -92,6 +92,7 @@ test("meta line drops what is missing and disappears when nothing is known", () 
   assert.equal(bookMetaLine({ rating: { value: 4.27, count: 2310 }, year: 1965, pages: 412 }), "★ 4.3 · 2.3K ratings · 1965 · 412 pages");
   assert.equal(bookMetaLine({ rating: { value: 5, count: 1 }, year: null, pages: null }), "★ 5.0 · 1 rating");
   assert.equal(bookMetaLine({ rating: null, year: null, pages: 90 }), "90 pages");
+  assert.equal(bookMetaLine({ rating: null, year: null, pages: 1 }), "1 page");
   assert.equal(bookMetaLine({ rating: null, year: null, pages: null }), null);
 });
 
