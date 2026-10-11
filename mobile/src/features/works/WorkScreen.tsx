@@ -11,13 +11,14 @@ import { LIBRARY_QUERY_KEY, useLibrary } from "../library/hooks/useLibrary";
 import { ContentShareSheet } from "../sharing/ContentShareSheet";
 import { publicContentUrl } from "../sharing/links";
 import { fetchWork } from "./api";
-import { BookScreen, bookMenuItems } from "./BookScreen";
+import { BookScreen, HEADER_TINT_STEPS, bookMenuItems } from "./BookScreen";
 import { workPath } from "./workPath";
 
 export function WorkScreen({ id }: { id: string }) {
   const [adding, setAdding] = useState(false);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [shareError, setShareError] = useState<string | null>(null);
+  const [headerTint, setHeaderTint] = useState(HEADER_TINT_STEPS);
   const segments = useSegments();
   const { colors, mode } = useTheme();
   const signedIn = useAuth().user !== null;
@@ -68,7 +69,7 @@ export function WorkScreen({ id }: { id: string }) {
   const model = bookScreenModel(page, book, { isAdmin: false });
   const menuItems = book && page.mine ? bookMenuItems(model, page.mine.bookKey, segments) : [];
   const wash = coverWash(work.coverColor, mode);
-  const headerStyle = wash && work.coverColor ? { backgroundColor: blendHex(colors.background, work.coverColor, wash.topAlpha) } : undefined;
+  const headerStyle = wash && work.coverColor ? { backgroundColor: blendHex(colors.background, work.coverColor, (wash.topAlpha * headerTint) / HEADER_TINT_STEPS) } : undefined;
   const firstEdition = work.editions.find((edition) => edition.isbn) ?? work.editions[0];
 
   async function share() {
@@ -96,7 +97,7 @@ export function WorkScreen({ id }: { id: string }) {
         }}
       />
       {shareError ? <Toast visible message={shareError} tone="error" /> : null}
-      <BookScreen page={page} book={book} model={model} signedIn={signedIn} onAdd={() => setAdding(true)} />
+      <BookScreen page={page} book={book} model={model} signedIn={signedIn} onAdd={() => setAdding(true)} onHeaderTint={setHeaderTint} />
       <ContentShareSheet visible={shareUrl !== null} onClose={() => setShareUrl(null)} title={work.title} url={shareUrl} />
       {adding ? (
         <AddBookSheet

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { router, useSegments } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
-import { Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Alert, Pressable, ScrollView, StyleSheet, View, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import { bookKey, bookStatsModel, coverWash, editionLabel, readSnapshot, type BookScreenModel, type BookScreenTabKey, type ReadStatus, type WorkPage } from "@scripta/shared";
 import { Text } from "../../ui/Text";
@@ -17,6 +17,8 @@ import { AuthorAvatar, openProfile } from "../community/AuthorAvatar";
 import { ReaderGlyph } from "../community/ReaderGlyph";
 
 const WASH_HEIGHT = 420;
+const HEADER_FADE_DISTANCE = 160;
+export const HEADER_TINT_STEPS = 16;
 
 const TAB_ICONS: Record<BookScreenTabKey, IconName> = { about: "info", highlights: "quote", community: "community" };
 
@@ -80,8 +82,9 @@ function DeleteNote({ book, bookmarkId }: { book: Record<string, unknown>; bookm
   );
 }
 
-export function BookScreen({ page, book, model, signedIn, onAdd }: { page: WorkPage | null; book: Record<string, unknown> | null; model: BookScreenModel; signedIn: boolean; onAdd: () => void }) {
+export function BookScreen({ page, book, model, signedIn, onAdd, onHeaderTint }: { page: WorkPage | null; book: Record<string, unknown> | null; model: BookScreenModel; signedIn: boolean; onAdd: () => void; onHeaderTint?: (level: number) => void }) {
   const { colors, mode } = useTheme();
+  const { width: windowWidth } = useWindowDimensions();
   const coverColor = page?.work.coverColor ?? null;
   const wash = coverWash(coverColor, mode);
   const segments = useSegments();
@@ -97,11 +100,14 @@ export function BookScreen({ page, book, model, signedIn, onAdd }: { page: WorkP
     <Text accessibilityRole="header" {...dynamicType} style={[typography.title, { color: colors.text }]}>{title}</Text>
   );
   const { about, community } = model;
+  const trackHeaderTint = onHeaderTint
+    ? (event: NativeSyntheticEvent<NativeScrollEvent>) => onHeaderTint(Math.round(Math.min(1, Math.max(0, 1 - event.nativeEvent.contentOffset.y / HEADER_FADE_DISTANCE)) * HEADER_TINT_STEPS))
+    : undefined;
 
   return (
-    <ScrollView contentContainerStyle={styles.content}>
+    <ScrollView contentContainerStyle={styles.content} onScroll={trackHeaderTint} scrollEventThrottle={16}>
       {wash && coverColor ? (
-        <Svg pointerEvents="none" accessible={false} importantForAccessibility="no-hide-descendants" style={styles.wash} width="100%" height={WASH_HEIGHT}>
+        <Svg pointerEvents="none" accessible={false} importantForAccessibility="no-hide-descendants" style={styles.wash} width={windowWidth} height={WASH_HEIGHT}>
           <Defs>
             <LinearGradient id="wash" x1="0" y1="0" x2="0" y2="1">
               <Stop offset="0" stopColor={coverColor} stopOpacity={wash.topAlpha} />
@@ -251,7 +257,7 @@ export function BookScreen({ page, book, model, signedIn, onAdd }: { page: WorkP
 
 const styles = StyleSheet.create({
   content: { padding: spacing.lg, gap: spacing.xl, paddingBottom: spacing.huge },
-  wash: { position: "absolute", top: 0, left: 0, right: 0 },
+  wash: { position: "absolute", top: 0, left: 0 },
   heroCentered: { alignItems: "center", gap: spacing.xs },
   cover: { width: 112, height: 168, borderRadius: radii.sm, overflow: "hidden" },
   centeredText: { alignSelf: "stretch", textAlign: "center" },
