@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { bookKey } from "@scripta/shared";
 import { useAuth } from "../auth/AuthContext";
 import { AddBookSheet } from "../components/AddBookSheet";
@@ -15,6 +16,7 @@ export function WorkPage() {
   const navigate = useNavigate();
   const { session } = useAuth();
   const toast = useToast();
+  const queryClient = useQueryClient();
   const { page, isLoading, isNotFound, refetch } = useWork(id);
   const libraryQuery = useLibrary({ enabled: Boolean(session) });
   const [adding, setAdding] = useState(false);
@@ -85,6 +87,7 @@ export function WorkPage() {
       {adding ? <AddBookSheet book={{ title: page.work.title, author: page.work.author, isbn: firstEdition?.isbn ?? null, coverUrl: page.work.coverUrl }} onClose={() => {
         setAdding(false);
         void refetch();
+        void queryClient.invalidateQueries({ queryKey: ["library"] });
       }} /> : null}
     </>
   );

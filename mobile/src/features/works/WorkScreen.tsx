@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { router, Stack, useSegments } from "expo-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { StyleSheet } from "react-native";
 import { bookKey, bookScreenModel } from "@scripta/shared";
 import { isPermanentError } from "../../core/apiClient";
 import { ErrorState, HeaderActions, IconButton, Screen, Skeleton, Toast, spacing } from "../../ui";
 import { AddBookSheet } from "../community/AddBookSheet";
-import { useLibrary } from "../library/hooks/useLibrary";
+import { LIBRARY_QUERY_KEY, useLibrary } from "../library/hooks/useLibrary";
 import { ContentShareSheet } from "../sharing/ContentShareSheet";
 import { publicContentUrl } from "../sharing/links";
 import { fetchWork } from "./api";
@@ -17,7 +17,8 @@ export function WorkScreen({ id }: { id: string }) {
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [shareError, setShareError] = useState<string | null>(null);
   const signedIn = useSegments()[0] === "(app)";
-  const { data: library } = useLibrary({ enabled: signedIn });
+  const libraryQuery = useLibrary({ enabled: signedIn });
+  const queryClient = useQueryClient();
   const query = useQuery({ queryKey: ["works", id], queryFn: () => fetchWork(id), retry: false });
   const canonicalId = query.data?.work.id;
 
@@ -44,7 +45,21 @@ export function WorkScreen({ id }: { id: string }) {
 
   const page = query.data;
   const { work } = page;
-  const book = page.mine ? library?.data.books.find((b) => bookKey(b) === page.mine!.bookKey) ?? null : null;
+  const book = page.mine ? libraryQuery.data?.data.books.find((b) => bookKey(b) === page.mine!.bookKey) ?? null : null;
+  if (page.mine && !book && libraryQuery.isFetching) return <Screen bottom top={false} style={styles.centered}>{untitled}<Skeleton height={160} /></Screen>;
+  if (page.mine && !book && libraryQuery.isError) {
+    return (
+      <Screen bottom top={false} style={styles.centered}>
+        {untitled}
+        <ErrorState
+          title="Library unavailable"
+          body={libraryQuery.error instanceof Error ? libraryQuery.error.message : "Couldn't load your library."}
+          actionLabel="Retry"
+          onAction={() => void libraryQuery.refetch()}
+        />
+      </Screen>
+    );
+  }
   const model = bookScreenModel(page, book, { isAdmin: false });
   const firstEdition = work.editions.find((edition) => edition.isbn) ?? work.editions[0];
 
@@ -79,6 +94,7 @@ export function WorkScreen({ id }: { id: string }) {
           onClose={() => {
             setAdding(false);
             void query.refetch();
+            void queryClient.invalidateQueries({ queryKey: LIBRARY_QUERY_KEY });
           }}
         />
       ) : null}
