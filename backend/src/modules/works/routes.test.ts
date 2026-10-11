@@ -13,7 +13,8 @@ process.env.COVERS_DB_PATH = join(scratch, "covers.sqlite");
 process.env.JWT_ACCESS_SECRET = "a".repeat(64);
 process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
-const { buildWorkRoutes } = await import("./routes.js");
+const { buildWorkRoutes, buildWorkStatsRoutes } = await import("./routes.js");
+const { worksPlugin } = await import("./plugin.js");
 const { WorkResolutionError } = await import("../library/index.js");
 
 function appWith(getPage: (id: string, viewerId: string | null) => unknown, getStats: (id: string) => unknown = () => undefined) {
@@ -24,7 +25,8 @@ function appWith(getPage: (id: string, viewerId: string | null) => unknown, getS
     const statusCode = typeof error.statusCode === "number" && error.statusCode >= 400 && error.statusCode < 500 ? error.statusCode : 500;
     return statusCode === 500 ? reply.code(500).send({ error: "Internal server error" }) : reply.code(statusCode).send({ error: error.message });
   });
-  void app.register(buildWorkRoutes({ getPage } as never, { getStats } as never));
+  void app.register(buildWorkRoutes({ getPage } as never));
+  void app.register(buildWorkStatsRoutes({ getStats } as never));
   return app;
 }
 
@@ -73,5 +75,20 @@ test("stats: 404 for an unknown work, the stats otherwise, never cached, viewer 
 test("stats: a catalog outage is a 503", async () => {
   const app = appWith(() => undefined, () => { throw new WorkResolutionError(new Error("disk")); });
   assert.equal((await app.inject({ url: "/works/w/stats" })).statusCode, 503);
+  await app.close();
+});
+
+test("the page and stats routes have separate rate-limit budgets", async () => {
+  const app = Fastify();
+  app.decorate("authenticateAccessToken", () => null);
+  void app.register(worksPlugin, {
+    getWorkPage: () => undefined,
+    communityRatings: () => [],
+    tierPlacements: () => [],
+    tournamentRecord: () => ({ entered: 0, titles: 0, wins: 0, losses: 0, best: null })
+  } as never);
+  for (let i = 0; i < 30; i += 1) assert.equal((await app.inject({ url: "/works/w" })).statusCode, 404);
+  assert.equal((await app.inject({ url: "/works/w" })).statusCode, 429);
+  assert.equal((await app.inject({ url: "/works/w/stats" })).statusCode, 404);
   await app.close();
 });
