@@ -103,3 +103,14 @@ test("a keyless work with no summary or cover answers nulls", () => {
   const page = getWorkPageWith(repo, () => "never", id!)!;
   assert.deepEqual(page.editions.map((e) => [e.summary, e.coverUrl]), [[null, null]]);
 });
+
+test("a work page edition carries normalised genres, rating and pages", () => {
+  const { db, repo } = freshRepo();
+  const [work] = resolveWorksWith(repo, [{ isbn: "9780441013593", title: "Dune", author: "Frank Herbert" }]);
+  db.prepare("UPDATE books SET genres = ?, rating = 4.25, rating_count = 120, pages = 412 WHERE work_id = ?").run(JSON.stringify(["Science Fiction", "Space opera"]), work!);
+  const [edition] = getWorkPageWith(repo, () => "x", work!)!.editions;
+  assert.deepEqual(edition!.genres, ["Science Fiction"]);
+  assert.equal(edition!.rating, 4.25);
+  assert.equal(edition!.ratingCount, 120);
+  assert.equal(edition!.pages, 412);
+});

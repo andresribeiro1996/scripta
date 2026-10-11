@@ -1,3 +1,4 @@
+import { normalizeBookGenres } from "@scripta/shared";
 import { findOrCreateBook } from "./domain/findOrCreate.js";
 import type { BookLookup } from "./domain/normalize.js";
 import type { BooksRepository } from "./domain/ports.js";
@@ -33,7 +34,7 @@ export type CatalogWorkPage = {
   author: string;
   summary: string | null;
   aliasIds: string[];
-  editions: Array<{ bookId: string; title: string; language: string | null; year: number | null; isbn: string | null; summary: string | null; coverUrl: string | null }>;
+  editions: Array<{ bookId: string; title: string; language: string | null; year: number | null; isbn: string | null; summary: string | null; coverUrl: string | null; genres: string[]; rating: number | null; ratingCount: number; pages: number | null }>;
 };
 
 export function getWorkPageWith(books: BooksRepository, coverUrl: (imageId: string) => string, id: string): CatalogWorkPage | undefined {
@@ -50,7 +51,11 @@ export function getWorkPageWith(books: BooksRepository, coverUrl: (imageId: stri
       year: edition.year,
       isbn: edition.isbn,
       summary: edition.summary?.trim() ? edition.summary : null,
-      coverUrl: edition.cover_image_id ? coverUrl(edition.cover_image_id) : null
+      coverUrl: edition.cover_image_id ? coverUrl(edition.cover_image_id) : null,
+      genres: normalizeBookGenres(JSON.parse(edition.genres)),
+      rating: edition.rating,
+      ratingCount: edition.rating_count,
+      pages: edition.pages
     }))
   };
 }

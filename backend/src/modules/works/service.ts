@@ -1,4 +1,4 @@
-import { plainDescription, type IdentityKey, type ReaderProfile, type WorkGameRef, type WorkPage, type WorkReader } from "@scripta/shared";
+import { plainDescription, validBookRating, type IdentityKey, type ReaderProfile, type WorkGameRef, type WorkPage, type WorkReader } from "@scripta/shared";
 import type { CatalogWorkPage } from "../books/index.js";
 import type { ViewerCopy } from "../library/index.js";
 
@@ -21,6 +21,29 @@ const READER_CAP = 50;
 const GAME_CAP = 20;
 const isbnKey = (isbn: string | null) => (isbn ? isbn.replace(/[\s-]/g, "") : null);
 const byUsername = (a: WorkReader, b: WorkReader) => a.username.toLowerCase().localeCompare(b.username.toLowerCase());
+
+const GENRE_CAP = 3;
+type CatalogEdition = CatalogWorkPage["editions"][number];
+
+function topGenres(editions: CatalogEdition[]): string[] {
+  const counts = new Map<string, number>();
+  for (const edition of editions) for (const genre of edition.genres) counts.set(genre, (counts.get(genre) ?? 0) + 1);
+  return [...counts].sort((a, b) => b[1] - a[1]).slice(0, GENRE_CAP).map(([genre]) => genre);
+}
+
+function bestRating(editions: CatalogEdition[]): WorkPage["work"]["rating"] {
+  let best: WorkPage["work"]["rating"] = null;
+  for (const edition of editions) {
+    const value = validBookRating(edition.rating);
+    if (value !== null && edition.ratingCount > 0 && (!best || edition.ratingCount > best.count)) best = { value, count: edition.ratingCount };
+  }
+  return best;
+}
+
+function earliestYear(editions: CatalogEdition[]): number | null {
+  const years = editions.flatMap((edition) => (edition.year === null ? [] : [edition.year]));
+  return years.length > 0 ? Math.min(...years) : null;
+}
 
 export function createWorksService(deps: WorksDeps) {
   function games(workIds: string[]) {
@@ -74,7 +97,11 @@ export function createWorksService(deps: WorksDeps) {
           author: work.author,
           summary: summary && plainDescription(summary),
           coverUrl,
-          editions: work.editions.map((edition) => ({ bookId: edition.bookId, title: edition.title, language: edition.language, year: edition.year, isbn: edition.isbn, mine: edition === mineEdition }))
+          editions: work.editions.map((edition) => ({ bookId: edition.bookId, title: edition.title, language: edition.language, year: edition.year, isbn: edition.isbn, mine: edition === mineEdition })),
+          genres: topGenres(work.editions),
+          rating: bestRating(work.editions),
+          year: earliestYear(work.editions),
+          pages: mineEdition?.pages ?? work.editions.find((edition) => edition.pages !== null)?.pages ?? null
         },
         mine: copy ? { bookKey: copy.bookKey, readStatus: copy.readStatus, rating: copy.rating, highlightCount: copy.highlightCount } : null,
         readers: readers(work.aliasIds, viewerId),

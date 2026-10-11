@@ -6,7 +6,7 @@ import type { WorkPage, WorkReader } from "@scripta/shared";
 import { workPath, workScreenSections } from "./workScreenModel.js";
 
 const page: WorkPage = {
-  work: { id: "w", title: "Dune", author: "Frank Herbert", summary: null, coverUrl: null, editions: [] },
+  work: { id: "w", title: "Dune", author: "Frank Herbert", summary: null, coverUrl: null, editions: [], genres: [], rating: null, year: null, pages: null },
   mine: { bookKey: "isbn:1", readStatus: 2, rating: 5, highlightCount: 1 },
   readers: { followed: [{ username: "ana", avatarUrl: null, readStatus: 1, published: false }], others: [], counts: { readers: 1, finished: 0 } },
   games: { tierlists: [], arenas: [{ id: "a1", name: "SF", owner: { username: "bo", avatarUrl: null }, path: "/arena/a1" }], quizzes: [] }
