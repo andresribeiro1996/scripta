@@ -2,10 +2,10 @@ import { useEffect, useState } from "react";
 import { router, Stack, useSegments } from "expo-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { StyleSheet } from "react-native";
-import { bookKey, bookScreenModel } from "@scripta/shared";
+import { blendHex, bookKey, bookScreenModel, coverWash } from "@scripta/shared";
 import { isPermanentError } from "../../core/apiClient";
 import { useAuth } from "../../core/auth";
-import { ErrorState, HeaderActions, IconButton, Menu, Screen, Skeleton, Toast, spacing } from "../../ui";
+import { ErrorState, HeaderActions, IconButton, Menu, Screen, Skeleton, Toast, spacing, useTheme } from "../../ui";
 import { AddBookSheet } from "../community/AddBookSheet";
 import { LIBRARY_QUERY_KEY, useLibrary } from "../library/hooks/useLibrary";
 import { ContentShareSheet } from "../sharing/ContentShareSheet";
@@ -19,6 +19,7 @@ export function WorkScreen({ id }: { id: string }) {
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [shareError, setShareError] = useState<string | null>(null);
   const segments = useSegments();
+  const { colors, mode } = useTheme();
   const signedIn = useAuth().user !== null;
   const libraryQuery = useLibrary({ enabled: signedIn });
   const queryClient = useQueryClient();
@@ -66,6 +67,8 @@ export function WorkScreen({ id }: { id: string }) {
   }
   const model = bookScreenModel(page, book, { isAdmin: false });
   const menuItems = book && page.mine ? bookMenuItems(model, page.mine.bookKey, segments) : [];
+  const wash = coverWash(work.coverColor, mode);
+  const headerStyle = wash && work.coverColor ? { backgroundColor: blendHex(colors.background, work.coverColor, wash.topAlpha) } : undefined;
   const firstEdition = work.editions.find((edition) => edition.isbn) ?? work.editions[0];
 
   async function share() {
@@ -83,6 +86,7 @@ export function WorkScreen({ id }: { id: string }) {
         options={{
           headerShown: true,
           title: work.title,
+          ...(headerStyle ? { headerStyle } : {}),
           headerRight: () => (
             <HeaderActions>
               <IconButton framed name="share" accessibilityLabel="Share book" onPress={() => void share()} />

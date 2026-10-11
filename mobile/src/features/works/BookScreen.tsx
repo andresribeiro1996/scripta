@@ -2,7 +2,8 @@ import { useState } from "react";
 import { router, useSegments } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
-import { bookKey, bookStatsModel, editionLabel, readSnapshot, type BookScreenModel, type BookScreenTabKey, type ReadStatus, type WorkPage } from "@scripta/shared";
+import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
+import { bookKey, bookStatsModel, coverWash, editionLabel, readSnapshot, type BookScreenModel, type BookScreenTabKey, type ReadStatus, type WorkPage } from "@scripta/shared";
 import { Text } from "../../ui/Text";
 import { Button, Icon, Menu, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme, type IconName, type MenuItem } from "../../ui";
 import { useLibraryActions } from "../library/hooks/useLibraryActions";
@@ -14,6 +15,8 @@ import { RatingStars } from "./RatingStars";
 import { bookToolPath, workStatsPath } from "./workPath";
 import { AuthorAvatar, openProfile } from "../community/AuthorAvatar";
 import { ReaderGlyph } from "../community/ReaderGlyph";
+
+const WASH_HEIGHT = 420;
 
 const TAB_ICONS: Record<BookScreenTabKey, IconName> = { about: "info", highlights: "quote", community: "community" };
 
@@ -78,7 +81,8 @@ function DeleteNote({ book, bookmarkId }: { book: Record<string, unknown>; bookm
 }
 
 export function BookScreen({ page, book, model, signedIn, onAdd }: { page: WorkPage | null; book: Record<string, unknown> | null; model: BookScreenModel; signedIn: boolean; onAdd: () => void }) {
-  const { colors } = useTheme();
+  const { colors, mode } = useTheme();
+  const wash = coverWash(page?.work.coverColor ?? null, mode);
   const segments = useSegments();
   const workId = page?.work.id;
   const statsQuery = useQuery({ queryKey: ["works", workId, "stats"], queryFn: () => fetchWorkStats(workId!), enabled: Boolean(workId), retry: false });
@@ -95,6 +99,18 @@ export function BookScreen({ page, book, model, signedIn, onAdd }: { page: WorkP
 
   return (
     <ScrollView contentContainerStyle={styles.content}>
+      {wash ? (
+        <Svg pointerEvents="none" accessible={false} importantForAccessibility="no-hide-descendants" style={styles.wash} width="100%" height={WASH_HEIGHT}>
+          <Defs>
+            <LinearGradient id="wash" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0" stopColor={wash.top} />
+              <Stop offset="0.45" stopColor={wash.mid} />
+              <Stop offset="1" stopColor={wash.mid} stopOpacity={0} />
+            </LinearGradient>
+          </Defs>
+          <Rect x="0" y="0" width="100%" height={WASH_HEIGHT} fill="url(#wash)" />
+        </Svg>
+      ) : null}
       <View style={styles.heroCentered}>
         {book ? (
           <View style={[styles.cover, { backgroundColor: colors.border }]}>
@@ -234,6 +250,7 @@ export function BookScreen({ page, book, model, signedIn, onAdd }: { page: WorkP
 
 const styles = StyleSheet.create({
   content: { padding: spacing.lg, gap: spacing.xl, paddingBottom: spacing.huge },
+  wash: { position: "absolute", top: 0, left: 0, right: 0 },
   heroCentered: { alignItems: "center", gap: spacing.xs },
   cover: { width: 112, height: 168, borderRadius: radii.sm, overflow: "hidden" },
   centeredText: { alignSelf: "stretch", textAlign: "center" },
