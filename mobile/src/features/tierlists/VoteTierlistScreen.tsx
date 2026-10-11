@@ -166,7 +166,7 @@ export function VoteTierlistScreen({ code, startInRank = false }: { code: string
 const styles = StyleSheet.create({
   screen: { padding: spacing.lg, gap: spacing.md },
   page: { flex: 1, gap: spacing.sm, paddingTop: spacing.lg },
-  community: { flex: 1, paddingTop: spacing.lg },
+  community: { flex: 1 },
   complete: { gap: spacing.sm },
   fabClearance: { paddingBottom: 72 },
   strong: { fontWeight: "700" },
