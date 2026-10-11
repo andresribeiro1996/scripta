@@ -4,13 +4,13 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { StyleSheet } from "react-native";
 import { bookKey, bookScreenModel } from "@scripta/shared";
 import { isPermanentError } from "../../core/apiClient";
-import { ErrorState, HeaderActions, IconButton, Screen, Skeleton, Toast, spacing } from "../../ui";
+import { ErrorState, HeaderActions, IconButton, Menu, Screen, Skeleton, Toast, spacing } from "../../ui";
 import { AddBookSheet } from "../community/AddBookSheet";
 import { LIBRARY_QUERY_KEY, useLibrary } from "../library/hooks/useLibrary";
 import { ContentShareSheet } from "../sharing/ContentShareSheet";
 import { publicContentUrl } from "../sharing/links";
 import { fetchWork } from "./api";
-import { BookScreen } from "./BookScreen";
+import { BookScreen, bookMenuItems } from "./BookScreen";
 
 export function WorkScreen({ id }: { id: string }) {
   const [adding, setAdding] = useState(false);
@@ -61,6 +61,7 @@ export function WorkScreen({ id }: { id: string }) {
     );
   }
   const model = bookScreenModel(page, book, { isAdmin: false });
+  const menuItems = book && page.mine ? bookMenuItems(model, page.mine.bookKey) : [];
   const firstEdition = work.editions.find((edition) => edition.isbn) ?? work.editions[0];
 
   async function share() {
@@ -81,6 +82,7 @@ export function WorkScreen({ id }: { id: string }) {
           headerRight: () => (
             <HeaderActions>
               <IconButton framed name="share" accessibilityLabel="Share book" onPress={() => void share()} />
+              {menuItems.length > 0 ? <Menu title={work.title} items={menuItems}><IconButton framed accessibilityLabel="Book actions" name="more" /></Menu> : null}
             </HeaderActions>
           ),
         }}

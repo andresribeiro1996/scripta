@@ -1,12 +1,66 @@
 import { useState } from "react";
 import { router } from "expo-router";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
-import { editionLabel, type BookScreenModel, type BookScreenTabKey, type WorkPage } from "@scripta/shared";
+import { Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { bookKey, editionLabel, readSnapshot, type BookScreenModel, type BookScreenTabKey, type ReadStatus, type WorkPage } from "@scripta/shared";
 import { Text } from "../../ui/Text";
-import { Button, Segmented, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { Button, Menu, Segmented, dynamicType, radii, spacing, typography, useTheme, type MenuItem } from "../../ui";
+import { useLibraryActions } from "../library/hooks/useLibraryActions";
 import { BookCover } from "../arena/BookCover";
 import { AuthorAvatar, openProfile } from "../community/AuthorAvatar";
 import { ReaderGlyph } from "../community/ReaderGlyph";
+
+export function bookMenuItems(model: BookScreenModel, key: string): MenuItem[] {
+  const to = (suffix: string) => () => router.push(`/book/${encodeURIComponent(key)}/${suffix}` as never);
+  return model.menu.flatMap((item) => (item === "style" ? [{ label: "Card style", onPress: to("style") }] : item === "cover" ? [{ label: "Change cover", onPress: to("cover") }] : []));
+}
+
+function confirmDeleteNote(onConfirm: () => void) {
+  Alert.alert("Delete this note?", "This can't be undone.", [
+    { text: "Cancel", style: "cancel" },
+    { text: "Delete", style: "destructive", onPress: onConfirm },
+  ]);
+}
+
+function OwnerRow({ book, model }: { book: Record<string, unknown>; model: BookScreenModel }) {
+  const { colors } = useTheme();
+  const { setStatus, setRating } = useLibraryActions();
+
+  async function changeStatus(status: ReadStatus) {
+    const before = readSnapshot(book);
+    const wasFinished = book.ReadStatus === 2;
+    const saved = await setStatus(book, status);
+    if (saved && status === 2 && !wasFinished) router.push(`/book/${encodeURIComponent(bookKey(book))}/finished?before=${encodeURIComponent(JSON.stringify(before))}` as never);
+  }
+
+  const { status, feeling } = model;
+  if (!status) return null;
+  return (
+    <View style={styles.primaryRow}>
+      <Menu title="Reading status" items={status.options.map((o) => ({ label: o.label, selected: o.selected, onPress: o.selected ? () => {} : () => void changeStatus(o.value) }))}>
+        <View style={[styles.menuButton, { borderColor: colors.accent, backgroundColor: colors.accentSoft }]}>
+          <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, { color: colors.accent }]}>{status.label} ▾</Text>
+        </View>
+      </Menu>
+      {feeling ? (
+        <Menu title="How it landed" items={feeling.options.map((o) => ({ label: o.label, selected: o.selected, onPress: o.selected ? () => {} : () => void setRating(book, o.rating) }))}>
+          <View style={[styles.menuButton, { borderColor: colors.border }]}>
+            <Text numberOfLines={1} {...dynamicType} style={[typography.body, { color: colors.text }]}>{feeling.label} ▾</Text>
+          </View>
+        </Menu>
+      ) : null}
+    </View>
+  );
+}
+
+function DeleteNote({ book, bookmarkId }: { book: Record<string, unknown>; bookmarkId: string }) {
+  const { colors } = useTheme();
+  const { deleteNote } = useLibraryActions();
+  return (
+    <Text accessibilityRole="button" {...dynamicType} onPress={() => confirmDeleteNote(() => void deleteNote(book, bookmarkId))} style={[typography.caption, styles.strong, { color: colors.danger }]}>
+      Delete
+    </Text>
+  );
+}
 
 export function BookScreen({ page, book, model, signedIn, onAdd }: { page: WorkPage | null; book: Record<string, unknown> | null; model: BookScreenModel; signedIn: boolean; onAdd: () => void }) {
   const { colors } = useTheme();
@@ -40,6 +94,7 @@ export function BookScreen({ page, book, model, signedIn, onAdd }: { page: WorkP
       </View>
 
       {model.primary === "add" ? <Button label="Add to library" variant="primary" onPress={onAdd} /> : null}
+      {model.primary === "owner" && book ? <OwnerRow book={book} model={model} /> : null}
 
       {model.tabs.length > 1 && tab ? (
         <Segmented accessibilityLabel="Book sections" options={model.tabs.map((t) => ({ value: t.key, label: t.label }))} value={tab} onChange={setSelected} />
@@ -80,6 +135,7 @@ export function BookScreen({ page, book, model, signedIn, onAdd }: { page: WorkP
               {String(h.Annotation ?? "").trim() !== "" ? (
                 <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{String(h.Annotation)}</Text>
               ) : null}
+              {book && String(h.BookmarkID ?? "").startsWith("note:") ? <DeleteNote book={book} bookmarkId={String(h.BookmarkID)} /> : null}
             </View>
           ))}
         </View>
@@ -142,6 +198,8 @@ const styles = StyleSheet.create({
   chip: { borderWidth: 1, borderRadius: radii.full, paddingHorizontal: spacing.sm },
   section: { gap: spacing.sm },
   group: { gap: spacing.sm },
+  primaryRow: { flexDirection: "row", gap: spacing.sm },
+  menuButton: { flex: 1, minHeight: 44, borderWidth: 1, borderRadius: radii.md, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.md },
   strong: { fontWeight: "700" },
   quote: { fontStyle: "italic" },
   highlight: { borderLeftWidth: 2, paddingLeft: spacing.md, gap: spacing.xs },
