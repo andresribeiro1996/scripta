@@ -60,6 +60,8 @@ const GLYPHS = {
   expandVertical: { ios: "arrow.up.and.down", android: "swap_vert" },
   moveToTop: { ios: "arrow.up.to.line", android: "vertical_align_top" },
   duplicate: { ios: "plus.square.on.square", android: "content_copy" },
+  info: { ios: "info.circle", android: "info" },
+  quote: { ios: "quote.opening", android: "format_quote" },
 } as const satisfies Record<string, Glyph>;
 
 /** Only these five have a solid counterpart worth using; the rest read the
