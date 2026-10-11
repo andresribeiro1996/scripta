@@ -37,7 +37,7 @@ export function StatsSections({ model }: { model: BookStatsModel }) {
                 <View key={column.label} style={[styles.column, { height: `${Math.round(column.fraction * 100)}%`, backgroundColor: column.top ? colors.accent : colors.textDim, opacity: column.top ? 1 : 0.75 }]} />
               ))}
             </View>
-            <View style={styles.columnLabels}>
+            <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.columnLabels}>
               {ratings.community.columns.map((column) => (
                 <Text key={column.label} numberOfLines={2} {...dynamicType} style={[typography.caption, styles.columnLabel, { color: colors.textDim }]}>{column.label}</Text>
               ))}
@@ -54,9 +54,9 @@ export function StatsSections({ model }: { model: BookStatsModel }) {
             <View style={[styles.track, { backgroundColor: colors.border }]}>
               <View style={[styles.dot, { left: `${Math.round(tierBar.marker * 100)}%`, backgroundColor: colors.accent }]} />
             </View>
-            <View style={styles.trackLabels}>
-              <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Top</Text>
-              <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Bottom</Text>
+            <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.trackLabels}>
+              <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Top</Text>
+              <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Bottom</Text>
             </View>
             {dim(tierBar.summary)}
           </>
@@ -71,13 +71,13 @@ export function StatsSections({ model }: { model: BookStatsModel }) {
                 {tournamentRun.path.map((step) => (
                   <View key={step.label} style={styles.step}>
                     <View accessible accessibilityLabel={`${step.label}, ${step.reached ? "reached" : "not reached"}`} style={[styles.pill, { borderColor: step.reached ? colors.accent : colors.border }]}>
-                      <Text {...dynamicType} style={[typography.caption, step.reached ? styles.strong : null, { color: step.reached ? colors.accent : colors.textDim }]}>{step.label}</Text>
+                      <Text numberOfLines={1} {...dynamicType} style={[typography.caption, step.reached ? styles.strong : null, { color: step.reached ? colors.accent : colors.textDim }]}>{step.label}</Text>
                     </View>
-                    <Text accessibilityElementsHidden importantForAccessibility="no-hide-descendants" {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>→</Text>
+                    <Text numberOfLines={1} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>→</Text>
                   </View>
                 ))}
                 <View accessible accessibilityLabel={tournamentRun.champion ? "Won a title" : "No title"} style={[styles.pill, { borderColor: tournamentRun.champion ? colors.accent : colors.border, opacity: tournamentRun.champion ? 1 : 0.5 }]}>
-                  <Text {...dynamicType} style={typography.caption}>🏆</Text>
+                  <Text numberOfLines={1} {...dynamicType} style={typography.caption}>🏆</Text>
                 </View>
               </View>
             ) : null}

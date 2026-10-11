@@ -51,7 +51,7 @@ test("the feeling columns are one image with every count, and only the top colum
 });
 
 test("the tournament path says which steps were reached and whether a title was won", () => {
-  const lost = sections({ ...full, tournaments: { entered: 2, titles: 0, wins: 3, losses: 2, best: { round: 2, duels: 3 } } }, rating);
+  const lost = sections({ ...full, tournaments: { entered: 2, titles: 0, wins: 3, losses: 2, best: { round: 2, duels: 2 } } }, rating);
   assert.ok(lost.includes("(reached)"));
   assert.ok(lost.includes("(not reached)"));
   assert.ok(lost.includes("No title"));

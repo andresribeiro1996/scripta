@@ -35,7 +35,7 @@ export function StatsSections({ model }: { model: BookStatsModel }) {
                 <span key={column.label} className={`min-h-[2px] flex-1 rounded-t ${column.top ? "bg-(--color-accent)" : "bg-(--color-text-dim)/75"}`} style={{ height: `${Math.round(column.fraction * 100)}%` }} />
               ))}
             </div>
-            <div className="mt-1 flex gap-2 text-center text-xs text-(--color-text-dim)">
+            <div aria-hidden="true" className="mt-1 flex gap-2 text-center text-xs text-(--color-text-dim)">
               {ratings.community.columns.map((column) => (
                 <span key={column.label} className="flex-1">{column.label}</span>
               ))}
@@ -52,7 +52,7 @@ export function StatsSections({ model }: { model: BookStatsModel }) {
             <div className="relative mt-3 h-2 rounded-full bg-(--color-border)">
               <span className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-(--color-accent)" style={{ left: `${Math.round(tierBar.marker * 100)}%` }} />
             </div>
-            <div className="mt-1 flex justify-between text-xs text-(--color-text-dim)">
+            <div aria-hidden="true" className="mt-1 flex justify-between text-xs text-(--color-text-dim)">
               <span>Top</span>
               <span>Bottom</span>
             </div>
