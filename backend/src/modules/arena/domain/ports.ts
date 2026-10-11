@@ -4,6 +4,7 @@
 // covers, arena has no separate blob store, so there's nothing to split
 // a second port out for.
 
+import type { TournamentRecord } from "@scripta/shared";
 import type { DuelRow, SeedPreview, TournamentDiscoverRow, TournamentGameRow, TournamentRow, TournamentSlotRow, VoteRow } from "./types.js";
 
 export interface ArenaRepository {
@@ -18,6 +19,7 @@ export interface ArenaRepository {
   discoverWindow(needle: string, limit: number): TournamentDiscoverRow[];
   listPublicByIds(ids: string[]): TournamentRow[];
   listPublishedByWorks(workIds: string[], limit: number): TournamentGameRow[];
+  tournamentRecord(workIds: string[]): TournamentRecord;
   votedAmong(voterUserId: string, ids: string[]): string[];
   updateTournamentStatus(id: string, status: TournamentRow["status"], currentRound: number): void;
   /** Renames only — nothing else about a tournament is editable after

@@ -444,3 +444,33 @@ test("started tournaments seeding any of the given works, newest first; seeding 
     { id: "old", name: "Old", path: "/arena/old", ownerUserId: "u1" }
   ]);
 });
+
+test("tournament record: started brackets only, wins, losses, titles and the furthest round", () => {
+  const db = freshDb();
+  const repo = createSqliteArenaRepository(db);
+  const slot = (tournamentId: string, index: number, workId: string): TournamentSlotRow => ({ tournament_id: tournamentId, slot_index: index, work_id: workId, title: "T", author: "A", cover_url: null });
+  const duel = db.prepare(`INSERT INTO duels (id, tournament_id, round_number, duel_index, book_a_work_id, book_a_title, book_a_author, book_b_work_id, book_b_title, book_b_author, winner_side, status, opens_at, closes_at)
+    VALUES (?, ?, ?, 0, ?, 'A', 'x', ?, 'B', 'y', ?, ?, '2026-01-01', '2026-01-02')`);
+  repo.insertTournament(tournament({ id: "won", status: "completed", bracket_size: 4 }));
+  repo.insertTournament(tournament({ id: "live", status: "active", bracket_size: 8 }));
+  repo.insertTournament(tournament({ id: "draft", status: "seeding", bracket_size: 4 }));
+  repo.replaceSlots("won", [slot("won", 0, "w-old"), slot("won", 1, "w-x")]);
+  repo.replaceSlots("live", [slot("live", 0, "w-new"), slot("live", 1, "w-y")]);
+  repo.replaceSlots("draft", [slot("draft", 0, "w-new")]);
+  duel.run("d1", "won", 1, "w-old", "w-x", "a", "settled");
+  duel.run("d2", "won", 2, "w-z", "w-old", "b", "settled");
+  duel.run("d3", "live", 1, "w-new", "w-y", "b", "settled");
+  duel.run("d4", "draft", 1, "w-new", "w-q", "a", "settled");
+  assert.deepEqual(repo.tournamentRecord(["w-new", "w-old"]), { entered: 2, titles: 1, wins: 2, losses: 1, best: { round: 2, duels: 1 } });
+  assert.deepEqual(repo.tournamentRecord(["w-none"]), { entered: 0, titles: 0, wins: 0, losses: 0, best: null });
+});
+
+test("an entered book whose first duel is still open has a best round but no result", () => {
+  const db = freshDb();
+  const repo = createSqliteArenaRepository(db);
+  repo.insertTournament(tournament({ id: "live", status: "active", bracket_size: 8 }));
+  repo.replaceSlots("live", [{ tournament_id: "live", slot_index: 0, work_id: "w", title: "T", author: "A", cover_url: null }]);
+  db.prepare(`INSERT INTO duels (id, tournament_id, round_number, duel_index, book_a_work_id, book_a_title, book_a_author, book_b_work_id, book_b_title, book_b_author, winner_side, status, opens_at, closes_at)
+    VALUES ('d', 'live', 1, 0, 'w', 'A', 'x', 'o', 'B', 'y', NULL, 'active', '2026-01-01', '2026-01-02')`).run();
+  assert.deepEqual(repo.tournamentRecord(["w"]), { entered: 1, titles: 0, wins: 0, losses: 0, best: { round: 1, duels: 4 } });
+});
