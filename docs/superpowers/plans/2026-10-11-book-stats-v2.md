@@ -157,7 +157,7 @@ git add backend packages/shared && git commit -m "Let a tier list rank its worst
 <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Can't be changed later.</Text>
 ```
 
-- [ ] **Step 4: Mobile voter caption** — in the `TierHead` caption text, prefix `{board.ranksWorstFirst ? "Top tier = worst · " : ""}` before the status expression.
+- [ ] **Step 4: Mobile voter caption** — in `VoteTierlistScreen`, render `{board.ranksWorstFirst ? <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Top tier = worst</Text> : null}` as its own row above `TierHead` on the My board page and above `TierlistResults` on the Community page.
 
 - [ ] **Step 5: Verify** — `npm run typecheck --workspace frontend && npm run lint --workspace frontend && npm test --workspace frontend`; `cd mobile && EXPO_PUBLIC_API_URL=http://localhost:3000 npm run typecheck && EXPO_PUBLIC_API_URL=http://localhost:3000 npm test`. Browser check (dev slot per `docs/dev-workflow.md`, release after): create a public worst-first tier list on web → its vote page shows "Top tier = worst"; a best-first one doesn't; the creation step shows the control and hint.
 
@@ -166,7 +166,7 @@ git add backend packages/shared && git commit -m "Let a tier list rank its worst
 git add frontend mobile && git commit -m "Choose a tier list's direction at creation and show worst-first lists to voters" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
-- [ ] **Step 7: Device pass** — `device-checker` (after `node scripts/dev-status.mjs --json` shows the emulator free): mobile creation step 3 shows "Top tier means" Best/Worst + hint; creating a public worst-first list → its vote screen caption starts "Top tier = worst ·"; Android text not clipped.
+- [ ] **Step 7: Device pass** — `device-checker` (after `node scripts/dev-status.mjs --json` shows the emulator free): mobile creation step 3 shows "Top tier means" Best/Worst + hint; creating a public worst-first list → its vote screen shows "Top tier = worst" as its own caption above the board header on both the My board and Community tabs; Android text not clipped.
 
 ### Ship PR C
 

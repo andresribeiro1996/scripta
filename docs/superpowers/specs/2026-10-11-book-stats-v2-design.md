@@ -27,7 +27,7 @@ Follows `docs/superpowers/specs/2026-10-11-book-stats-design.md` (shipped in #22
 
 ### Voters
 
-- When `ranksWorstFirst` is true, the voting screen shows "Top tier = worst" next to the list's status: under the title on web `VoteTierlistPage` (both the voting and results views), in the `TierHead` caption on mobile `VoteTierlistScreen`. Best-first lists show nothing new.
+- When `ranksWorstFirst` is true, the voting screen shows "Top tier = worst" next to the list's status: under the title on web `VoteTierlistPage` (both the voting and results views), as its own one-line caption above the board header on mobile `VoteTierlistScreen`, on both the My board and Community tabs. Best-first lists show nothing new.
 
 ### Stats
 
