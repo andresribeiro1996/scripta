@@ -27,7 +27,7 @@ const { createSqliteLibraryRepository } = await import("./adapters/sqlite/sqlite
 const { applyLibrarySchema, openLibraryDb } = await import("./adapters/sqlite/connection.js");
 const { LibraryChangeNotFoundError, LibraryConflictError, LibraryTooLargeError, NoLibraryDocumentError } = await import("./domain/errors.js");
 const { backfillLibraryDerived, readEmbeddedMurals } = await import("./migration.js");
-const { LIBRARY_DERIVED_VERSION, LIBRARY_MATCH_BOOK_CAP, LIBRARY_PUT_HEADROOM_BYTES } = await import("./domain/constants.js");
+const { LIBRARY_DERIVED_VERSION, LIBRARY_MATCH_BOOK_CAP, LIBRARY_ROWS_VERSION, LIBRARY_PUT_HEADROOM_BYTES } = await import("./domain/constants.js");
 const { createLibraryService, deriveGlyph, deriveLibraryData, deriveLibraryRows } = await import("./service.js");
 const { readerGlyphFor, resolvePublicLibrary, sharedBookCounts, sharedBooks } = await import("./publicResolver.js");
 const { peekCachedCoverUrl } = await import("../books/index.js");
@@ -1556,6 +1556,21 @@ test("a different book at the same position does not inherit the work id", () =>
   assert.equal((db.prepare("SELECT work_id FROM library_books WHERE user_id = 'u1'").get() as { work_id: string | null }).work_id, null);
 });
 
+test("a book row keeps a 1-5 rating and drops anything else", () => {
+  const { db, service } = setup();
+  service.saveLibrary("u1", { books: [{ Title: "A", Rating: 4 }, { Title: "B", Rating: 9 }, { Title: "C", Rating: "4" }, { Title: "D" }, { Title: "E", Rating: 2.5 }] });
+  assert.deepEqual(rowsInDb(db, "u1").books.map((row) => row.rating), [4, null, null, null, null]);
+  db.close();
+});
+
+test("an existing database gains library_books.rating", () => {
+  const db = new DatabaseSync(":memory:");
+  db.exec("CREATE TABLE library_books (user_id TEXT NOT NULL, position INTEGER NOT NULL, book_key TEXT NOT NULL, title TEXT, author TEXT, isbn TEXT, image_id TEXT, read_status REAL, series_number REAL, sort_order REAL, cover_url TEXT, finished_year INTEGER, row_hash TEXT NOT NULL, PRIMARY KEY (user_id, position))");
+  applyLibrarySchema(db);
+  const columns = (db.prepare("PRAGMA table_info(library_books)").all() as Array<{ name: string }>).map((column) => column.name);
+  assert.ok(columns.includes("rating"));
+});
+
 test("an existing database gains library_books.work_id", () => {
   const db = new DatabaseSync(":memory:");
   db.exec("CREATE TABLE library_books (user_id TEXT NOT NULL, position INTEGER NOT NULL, book_key TEXT NOT NULL, title TEXT, author TEXT, isbn TEXT, image_id TEXT, read_status REAL, series_number REAL, sort_order REAL, cover_url TEXT, finished_year INTEGER, row_hash TEXT NOT NULL, PRIMARY KEY (user_id, position))");
@@ -1565,7 +1580,7 @@ test("an existing database gains library_books.work_id", () => {
 });
 
 const rowsInDb = (db: DatabaseSync, userId: string) => ({
-  books: (db.prepare(`SELECT position, book_key, title, author, isbn, image_id, read_status, series_number, sort_order, cover_url, finished_year, work_id, row_hash FROM library_books WHERE user_id = ? ORDER BY position`).all(userId) as Array<Record<string, unknown>>).map((row) => ({ ...row })),
+  books: (db.prepare(`SELECT position, book_key, title, author, isbn, image_id, read_status, series_number, sort_order, cover_url, finished_year, rating, work_id, row_hash FROM library_books WHERE user_id = ? ORDER BY position`).all(userId) as Array<Record<string, unknown>>).map((row) => ({ ...row })),
   highlights: (db.prepare(`SELECT position, highlight_id, text, annotation FROM library_highlights WHERE user_id = ? ORDER BY position, highlight_id`).all(userId) as Array<Record<string, unknown>>).map((row) => ({ ...row })),
   summary: { ...(db.prepare(`SELECT meta, reader_card, shelf_theme, total_books, finished_count, in_progress_count, total_highlights, source_updated_at FROM library_summary WHERE user_id = ?`).get(userId) as Record<string, unknown> | undefined) }
 });
@@ -1956,24 +1971,24 @@ test("raising the rows version rebuilds every account and rewrites every book ro
 
   backfillLibraryDerived();
 
-  assert.deepEqual(users.map(version), [1, 1]);
+  assert.deepEqual(users.map(version), [LIBRARY_ROWS_VERSION, LIBRARY_ROWS_VERSION]);
   users.forEach((userId, index) => {
     const rebuilt = hashes(userId);
     assert.equal(rebuilt.length, 2);
     assert.ok(rebuilt.every((hash, position) => hash !== old[index]![position]));
   });
-  assert.deepEqual(staleUsers(1), []);
+  assert.deepEqual(staleUsers(LIBRARY_ROWS_VERSION), []);
   for (const userId of users) assert.deepEqual(highlightTexts(userId), ["Alpha 0", "Beta 0"]);
   const settledHashes = users.map(hashes);
 
   backfillLibraryDerived();
   assert.deepEqual(users.map(hashes), settledHashes);
 
-  assert.deepEqual(staleUsers(2), users);
-  backfillLibraryDerived(2);
-  assert.deepEqual(users.map(version), [2, 2]);
+  assert.deepEqual(staleUsers(LIBRARY_ROWS_VERSION + 1), users);
+  backfillLibraryDerived(LIBRARY_ROWS_VERSION + 1);
+  assert.deepEqual(users.map(version), [LIBRARY_ROWS_VERSION + 1, LIBRARY_ROWS_VERSION + 1]);
   users.forEach((userId, index) => assert.ok(hashes(userId).every((hash, position) => hash !== settledHashes[index]![position])));
-  assert.deepEqual(staleUsers(2), []);
+  assert.deepEqual(staleUsers(LIBRARY_ROWS_VERSION + 1), []);
 });
 
 const titleWorks = (lookups: Array<{ title?: string | null }>) => lookups.map((lookup) => `w-${lookup.title}`);

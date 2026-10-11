@@ -38,6 +38,9 @@ export function applyLibrarySchema(db: DatabaseSync, derivedVersion = LIBRARY_DE
   if (!bookColumns.some((c) => c.name === "work_id")) {
     db.exec(`ALTER TABLE library_books ADD COLUMN work_id TEXT`);
   }
+  if (!bookColumns.some((c) => c.name === "rating")) {
+    db.exec(`ALTER TABLE library_books ADD COLUMN rating INTEGER`);
+  }
   db.exec(`CREATE INDEX IF NOT EXISTS idx_library_books_work ON library_books (work_id, user_id)`);
   if (rederive) db.exec(`PRAGMA user_version = ${derivedVersion}`);
 }

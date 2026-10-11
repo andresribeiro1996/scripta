@@ -132,6 +132,7 @@ export function bookRow(book: Record<string, unknown>, position: number, report:
       sort_order: number(book._order),
       cover_url: text(book._coverUrl) ?? null,
       finished_year: finishedYear(book),
+      rating: typeof book.Rating === "number" && Number.isInteger(book.Rating) && book.Rating >= 1 && book.Rating <= 5 ? book.Rating : null,
       work_id: null,
       row_hash: bookRowHash(book, rowsVersion)
     },

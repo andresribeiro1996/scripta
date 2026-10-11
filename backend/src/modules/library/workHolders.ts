@@ -10,6 +10,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> => typeof va
 export function createWorkHolders(db: DatabaseSync) {
   const holdersStmt = db.prepare(`SELECT user_id, position, read_status FROM library_books WHERE work_id IN (SELECT value FROM json_each(?)) ORDER BY user_id, position`);
   const copyStmt = db.prepare(`SELECT position, book_key, read_status, isbn, cover_url FROM library_books WHERE user_id = ? AND work_id IN (SELECT value FROM json_each(?)) ORDER BY position LIMIT 1`);
+  const ratingsStmt = db.prepare(`SELECT user_id, rating FROM library_books WHERE work_id IN (SELECT value FROM json_each(?)) AND read_status = 2 AND rating IS NOT NULL ORDER BY user_id, position`);
   const documentStmt = db.prepare(`SELECT data FROM library_documents WHERE user_id = ?`);
 
   function holdersOfWorks(workIds: string[]): Array<{ userId: string; readStatus: HolderStatus }> {
@@ -36,7 +37,19 @@ export function createWorkHolders(db: DatabaseSync) {
     return { bookKey: row.book_key, readStatus: statusOf(row.read_status), rating, highlightCount: highlights, isbn: row.isbn, coverUrl: row.cover_url };
   }
 
-  return { holdersOfWorks, copyOfWork };
+  function communityRatings(workIds: string[]): Array<{ userId: string; rating: number }> {
+    if (workIds.length === 0) return [];
+    const seen = new Set<string>();
+    const ratings: Array<{ userId: string; rating: number }> = [];
+    for (const row of ratingsStmt.all(JSON.stringify(workIds)) as Array<{ user_id: string; rating: number }>) {
+      if (seen.has(row.user_id)) continue;
+      seen.add(row.user_id);
+      ratings.push({ userId: row.user_id, rating: row.rating });
+    }
+    return ratings;
+  }
+
+  return { holdersOfWorks, copyOfWork, communityRatings };
 }
 
 let holders: ReturnType<typeof createWorkHolders> | null = null;
@@ -49,4 +62,9 @@ export function holdersOfWorks(workIds: string[]) {
 export function copyOfWork(userId: string, workIds: string[]) {
   holders ??= createWorkHolders(openLibraryDb());
   return holders.copyOfWork(userId, workIds);
+}
+
+export function communityRatings(workIds: string[]) {
+  holders ??= createWorkHolders(openLibraryDb());
+  return holders.communityRatings(workIds);
 }
