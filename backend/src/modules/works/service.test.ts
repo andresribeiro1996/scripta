@@ -9,8 +9,8 @@ function deps(overrides: Partial<WorksDeps> = {}): WorksDeps {
     getWorkPage: (id) => (id === "old" || id === "w" ? {
       id: "w", title: "Dune", author: "Frank Herbert", summary: null, aliasIds: ["w", "old"],
       editions: [
-        { bookId: "e1", title: "Dune", language: "en", year: 1965, isbn: "9780441013593", summary: null, coverUrl: null, genres: [], rating: null, ratingCount: 0, pages: null },
-        { bookId: "e2", title: "Duna", language: "pt-BR", year: 2017, isbn: "9788576573135", summary: "Especiaria.", coverUrl: "cover:e2", genres: [], rating: null, ratingCount: 0, pages: null }
+        { bookId: "e1", title: "Dune", language: "en", year: 1965, isbn: "9780441013593", summary: null, coverUrl: null, coverColor: null, genres: [], rating: null, ratingCount: 0, pages: null },
+        { bookId: "e2", title: "Duna", language: "pt-BR", year: 2017, isbn: "9788576573135", summary: "Especiaria.", coverUrl: "cover:e2", coverColor: "#e0a82e", genres: [], rating: null, ratingCount: 0, pages: null }
       ]
     } : undefined),
     holdersOfWorks: () => [
@@ -59,12 +59,19 @@ test("signed in: own copy, followed first, never yourself, and your edition driv
   assert.equal(page.work.coverUrl, "https://c/mine.webp");
 });
 
+test("cover colour follows the cover that is shown", () => {
+  const copyOfWork = (coverUrl: string | null): WorksDeps["copyOfWork"] => (userId) => (userId === "viewer" ? { bookKey: "k", readStatus: 2, rating: null, highlightCount: 0, isbn: null, coverUrl } : undefined);
+  assert.equal(createWorksService(deps()).getPage("w", null)!.work.coverColor, "#e0a82e");
+  assert.equal(createWorksService(deps({ copyOfWork: copyOfWork("https://c/mine.webp") })).getPage("w", "viewer")!.work.coverColor, null);
+  assert.equal(createWorksService(deps({ copyOfWork: copyOfWork("cover:e2") })).getPage("w", "viewer")!.work.coverColor, "#e0a82e");
+});
+
 function pageWith(summary: string | null, editionSummaries: [string | null, string | null]): WorksDeps["getWorkPage"] {
   return () => ({
     id: "w", title: "Dune", author: "Frank Herbert", summary, aliasIds: ["w"],
     editions: [
-      { bookId: "e1", title: "Dune", language: "en", year: 1965, isbn: "9780441013593", summary: editionSummaries[0], coverUrl: null, genres: [], rating: null, ratingCount: 0, pages: null },
-      { bookId: "e2", title: "Duna", language: "pt-BR", year: 2017, isbn: "9788576573135", summary: editionSummaries[1], coverUrl: null, genres: [], rating: null, ratingCount: 0, pages: null }
+      { bookId: "e1", title: "Dune", language: "en", year: 1965, isbn: "9780441013593", summary: editionSummaries[0], coverUrl: null, coverColor: null, genres: [], rating: null, ratingCount: 0, pages: null },
+      { bookId: "e2", title: "Duna", language: "pt-BR", year: 2017, isbn: "9788576573135", summary: editionSummaries[1], coverUrl: null, coverColor: null, genres: [], rating: null, ratingCount: 0, pages: null }
     ]
   });
 }
@@ -126,7 +133,7 @@ test("readers are capped at 50, followed first, while counts cover everyone visi
 
 type Edition = NonNullable<ReturnType<WorksDeps["getWorkPage"]>>["editions"][number];
 const edition = (bookId: string, isbn: string | null, extra: Partial<Edition>): Edition => ({
-  bookId, title: "Dune", language: "en", year: null, isbn, summary: null, coverUrl: null, genres: [], rating: null, ratingCount: 0, pages: null, ...extra
+  bookId, title: "Dune", language: "en", year: null, isbn, summary: null, coverUrl: null, coverColor: null, genres: [], rating: null, ratingCount: 0, pages: null, ...extra
 });
 const pageOf = (editions: Edition[]): WorksDeps["getWorkPage"] => () => ({ id: "w", title: "Dune", author: "Frank Herbert", summary: null, aliasIds: ["w"], editions });
 

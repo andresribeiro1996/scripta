@@ -90,6 +90,7 @@ export function createWorksService(deps: WorksDeps) {
       const mineEdition = mineIsbn ? work.editions.find((edition) => isbnKey(edition.isbn) === mineIsbn) : undefined;
       const summary = work.summary ?? mineEdition?.summary ?? work.editions.find((edition) => edition.summary)?.summary ?? null;
       const coverUrl = copy?.coverUrl ?? mineEdition?.coverUrl ?? work.editions.find((edition) => edition.coverUrl)?.coverUrl ?? null;
+      const coverColor = coverUrl ? work.editions.find((edition) => edition.coverUrl === coverUrl)?.coverColor ?? null : null;
       return {
         work: {
           id: work.id,
@@ -97,6 +98,7 @@ export function createWorksService(deps: WorksDeps) {
           author: work.author,
           summary: summary && plainDescription(summary),
           coverUrl,
+          coverColor,
           editions: work.editions.map((edition) => ({ bookId: edition.bookId, title: edition.title, language: edition.language, year: edition.year, isbn: edition.isbn, mine: edition === mineEdition })),
           genres: topGenres(work.editions),
           rating: bestRating(work.editions),

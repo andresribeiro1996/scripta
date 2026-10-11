@@ -13,7 +13,7 @@ import { createWebLibrarySaver, LibrarySaverContext } from "../src/hooks/useLibr
 
 const edition = (n: number) => ({ bookId: `e${n}`, title: `Dune ${n}`, language: "en", year: 1965 + n, isbn: n === 1 ? "9780441013593" : null, mine: n === 1 });
 const page: WorkPage = {
-  work: { id: "w", title: "Dune", author: "Frank Herbert", summary: null, coverUrl: null, editions: [1, 2, 3, 4, 5].map(edition), genres: ["Science Fiction", "Classics"], rating: { value: 4.27, count: 2310 }, year: 1965, pages: 412 },
+  work: { id: "w", title: "Dune", author: "Frank Herbert", summary: null, coverUrl: null, coverColor: null, editions: [1, 2, 3, 4, 5].map(edition), genres: ["Science Fiction", "Classics"], rating: { value: 4.27, count: 2310 }, year: 1965, pages: 412 },
   mine: null,
   readers: { followed: [], others: [], counts: { readers: 0, finished: 0 } },
   games: { tierlists: [], arenas: [], quizzes: [] }

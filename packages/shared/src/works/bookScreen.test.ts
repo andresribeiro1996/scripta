@@ -6,7 +6,7 @@ import type { WorkPage } from "./types.js";
 const edition = (n: number) => ({ bookId: `e${n}`, title: "Dune", language: "en", year: 1965 + n, isbn: null, mine: n === 1 });
 function page(overrides: Partial<WorkPage["work"]> = {}): WorkPage {
   return {
-    work: { id: "w", title: "Dune", author: "Frank Herbert", summary: "Spice.", coverUrl: null, editions: [1, 2, 3, 4, 5].map(edition), genres: ["Science Fiction"], rating: { value: 4.27, count: 2310 }, year: 1965, pages: 412, ...overrides },
+    work: { id: "w", title: "Dune", author: "Frank Herbert", summary: "Spice.", coverUrl: null, coverColor: null, editions: [1, 2, 3, 4, 5].map(edition), genres: ["Science Fiction"], rating: { value: 4.27, count: 2310 }, year: 1965, pages: 412, ...overrides },
     mine: null,
     readers: { followed: [{ username: "ana", avatarUrl: null, readStatus: 2, published: false }], others: [{ username: "bo", avatarUrl: null, readStatus: 1, published: true }], counts: { readers: 2, finished: 1 } },
     games: { tierlists: [{ id: "t", name: "Best SF", owner: "app", path: "/vote/abc" }], arenas: [], quizzes: [] }

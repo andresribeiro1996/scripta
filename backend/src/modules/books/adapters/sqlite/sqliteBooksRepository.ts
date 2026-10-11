@@ -85,7 +85,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const editionCountStmt = db.prepare(`SELECT COUNT(*) AS n FROM books WHERE work_id = ?`);
   const workStmt = db.prepare(`SELECT id, ol_work_key, title, author, summary FROM works WHERE id = ?`);
   const aliasStmt = db.prepare(`SELECT id FROM works WHERE merged_into = ?`);
-  const pageEditionsStmt = db.prepare(`SELECT id, title, language, year, isbn, summary, cover_image_id, genres, rating, rating_count, pages FROM books WHERE work_id = ? ORDER BY created_at, rowid`);
+  const pageEditionsStmt = db.prepare(`SELECT books.id, books.title, books.language, books.year, books.isbn, books.summary, books.cover_image_id, ci.color AS cover_color, books.genres, books.rating, books.rating_count, books.pages FROM books LEFT JOIN cover_images ci ON ci.id = books.cover_image_id WHERE books.work_id = ? ORDER BY books.created_at, books.rowid`);
   const workEditionsStmt = db.prepare(`SELECT id, isbn, title, author, ol_work_key FROM books WHERE work_id = ? ORDER BY created_at, rowid`);
   const groupablePairsStmt = db.prepare(`
     WITH candidates AS (

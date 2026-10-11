@@ -34,7 +34,7 @@ export type CatalogWorkPage = {
   author: string;
   summary: string | null;
   aliasIds: string[];
-  editions: Array<{ bookId: string; title: string; language: string | null; year: number | null; isbn: string | null; summary: string | null; coverUrl: string | null; genres: string[]; rating: number | null; ratingCount: number; pages: number | null }>;
+  editions: Array<{ bookId: string; title: string; language: string | null; year: number | null; isbn: string | null; summary: string | null; coverUrl: string | null; coverColor: string | null; genres: string[]; rating: number | null; ratingCount: number; pages: number | null }>;
 };
 
 export function getWorkPageWith(books: BooksRepository, coverUrl: (imageId: string) => string, id: string): CatalogWorkPage | undefined {
@@ -52,6 +52,7 @@ export function getWorkPageWith(books: BooksRepository, coverUrl: (imageId: stri
       isbn: edition.isbn,
       summary: edition.summary?.trim() ? edition.summary : null,
       coverUrl: edition.cover_image_id ? coverUrl(edition.cover_image_id) : null,
+      coverColor: edition.cover_color || null,
       genres: normalizeBookGenres(JSON.parse(edition.genres)),
       rating: edition.rating,
       ratingCount: edition.rating_count,

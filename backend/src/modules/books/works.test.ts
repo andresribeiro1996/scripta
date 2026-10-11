@@ -104,6 +104,24 @@ test("a keyless work with no summary or cover answers nulls", () => {
   assert.deepEqual(page.editions.map((e) => [e.summary, e.coverUrl]), [[null, null]]);
 });
 
+test("a work page edition carries the colour of its cover image, empty and missing as null", () => {
+  const { db, repo } = freshRepo();
+  const [work] = resolveWorksWith(repo, [
+    { isbn: "9780441013593", title: "Dune", author: "Frank Herbert" },
+    { isbn: "9788576573135", title: "Duna", author: "Frank Herbert" },
+    { isbn: "9780441172719", title: "Dune Messiah", author: "Frank Herbert" }
+  ]);
+  const ids = (db.prepare("SELECT id FROM books ORDER BY rowid").all() as Array<{ id: string }>).map((row) => row.id);
+  db.prepare("UPDATE books SET work_id = ? WHERE work_id IS NOT ?").run(work!, work!);
+  const now = new Date().toISOString();
+  repo.insertImage({ id: "tinted", book_id: ids[0]!, source: "apple", source_url: null, width: 900, height: 1400, byte_size: 10, color: "#e0a82e", created_at: now });
+  repo.insertImage({ id: "plain", book_id: ids[1]!, source: "apple", source_url: null, width: 900, height: 1400, byte_size: 10, color: "", created_at: now });
+  repo.setCover(ids[0]!, { imageId: "tinted", status: "good", checkedAt: now });
+  repo.setCover(ids[1]!, { imageId: "plain", status: "good", checkedAt: now });
+  const editions = getWorkPageWith(repo, (imageId) => `cover:${imageId}`, work!)!.editions;
+  assert.deepEqual(editions.map((e) => [e.coverUrl, e.coverColor]), [["cover:tinted", "#e0a82e"], ["cover:plain", null], [null, null]]);
+});
+
 test("a work page edition carries normalised genres, rating and pages", () => {
   const { db, repo } = freshRepo();
   const [work] = resolveWorksWith(repo, [{ isbn: "9780441013593", title: "Dune", author: "Frank Herbert" }]);
