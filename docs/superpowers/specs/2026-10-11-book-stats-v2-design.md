@@ -46,8 +46,8 @@ Follows `docs/superpowers/specs/2026-10-11-book-stats-design.md` (shipped in #22
 
 ### Shared model (`bookStats.ts`)
 
-- `tierLetter` and `TierLetter` go; `tierBand(score)` returns `"Top tier" | "Upper tiers" | "Middle" | "Lower tiers" | "Bottom tier"` using the same five equal bands (`Math.min(4, Math.floor(score * 5))`).
-- The backend stats response drops `tiers.letter`; `score`, `lists`, `ballots` stay. Safe because neither #221 nor #224 is deployed.
+- `tierBand(score)` returns `"Top tier" | "Upper tiers" | "Middle" | "Lower tiers" | "Bottom tier"` using the same five equal bands (`Math.min(4, Math.floor(score * 5))`).
+- The stats response keeps `tiers.letter` (and shared `tierLetter`/`TierLetter`) because installed builds from the previous release read it (backend/CLAUDE.md additive-API rule); clients no longer display it. Removal is a follow-up once no shipped build reads it.
 - `bookStatsModel` returns:
   - `tiles`: up to four `{ key, value, caption }`, in this order, each only when its data exists:
     - Open Library: `4.4` / `★ Open Library`
@@ -72,5 +72,5 @@ Follows `docs/superpowers/specs/2026-10-11-book-stats-design.md` (shipped in #22
 ### Tests
 
 - Shared: `tierBand` edges; tiles for each combination and the singular/plural captions; columns `top` with ties; path for brackets of 4, 8 and 64 with best round 1, the semis and a title.
-- Backend: stats no longer returns `letter`.
+- Backend: the stats response keeps `letter`; clients no longer display it. Removal is a follow-up once no shipped build reads it.
 - Web render tests for the tiles and the three sections; mobile typecheck/tests; emulator pass of the tiles (Android text in narrow tiles) and the three sections.

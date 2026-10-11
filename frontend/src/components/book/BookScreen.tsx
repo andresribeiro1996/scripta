@@ -29,7 +29,7 @@ import { PerCardStylePanel } from "../PerCardStylePanel";
 import { ReaderGlyph } from "../ReaderGlyph";
 import { BackLink } from "../work/BackLink";
 import { CommunityIcon, InfoIcon, QuoteIcon } from "../NavIcons";
-import { StatsStrip } from "./BookStats";
+import { StatsTiles } from "./BookStats";
 
 type Props = {
   page: WorkPage | null;
@@ -61,7 +61,7 @@ export function BookScreen({ page, book, signedIn, onAdd, onShare, onBack, backT
   const { data: library } = useLibrary({ enabled: Boolean(book) });
   const model = bookScreenModel(page, book, { isAdmin });
   const statsQuery = useWorkStats(page?.work.id);
-  const statsStrip = bookStatsModel(statsQuery.data ?? null, page?.work.rating ?? null).strip;
+  const statsTiles = bookStatsModel(statsQuery.data ?? null, page?.work.rating ?? null).tiles;
   const [tab, setTab] = useState<BookScreenTabKey>(model.tabs[0]!.key);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [allEditions, setAllEditions] = useState(false);
@@ -183,7 +183,7 @@ export function BookScreen({ page, book, signedIn, onAdd, onShare, onBack, backT
               ))}
             </ul>
           ) : null}
-          {page ? <StatsStrip cells={statsStrip} to={`/work/${page.work.id}/stats`} /> : null}
+          {page ? <StatsTiles tiles={statsTiles} to={`/work/${page.work.id}/stats`} /> : null}
           {model.meta ? <p className="mt-3 text-xs text-(--color-text-dim)">{model.meta}</p> : null}
           {coverError ? (
             <p role="alert" className="mt-2 text-sm text-(--color-danger)">

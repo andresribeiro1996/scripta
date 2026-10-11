@@ -116,12 +116,13 @@ test("BackLink renders on its own, as used by the loading and not-found states",
   assert.ok(html.includes('href="/"'));
 });
 
-test("the hero carries a stats strip with the Open Library rating that links to the stats page", () => {
+test("the hero carries stats tiles with the Open Library rating that links to the stats page", () => {
   const html = render({});
   assert.ok(html.includes('href="/work/w/stats"'));
-  assert.ok(html.includes("★ 4.3"));
+  assert.ok(html.includes("4.3"));
+  assert.ok(html.includes("★ Open Library"));
 });
 
-test("a library-only book has no stats strip", () => {
+test("a library-only book has no stats tiles", () => {
   assert.ok(!render({ page: null, book: owned, onShare: null }).includes("/stats"));
 });
