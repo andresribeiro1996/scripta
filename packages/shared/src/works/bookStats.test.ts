@@ -45,6 +45,15 @@ test("the ratings section has an Open Library line, a feeling, a summary and bar
   assert.equal(ratings.empty, null);
 });
 
+test("the Open Library count is abbreviated without Intl", () => {
+  const line = (count: number) => bookStatsModel(null, { value: 4, count }).ratings.openLibrary;
+  assert.equal(line(999), "★ 4.0 · 999 ratings on Open Library");
+  assert.equal(line(1000), "★ 4.0 · 1K ratings on Open Library");
+  assert.equal(line(2310), "★ 4.0 · 2.3K ratings on Open Library");
+  assert.equal(line(999_960), "★ 4.0 · 1M ratings on Open Library");
+  assert.equal(line(1_250_000), "★ 4.0 · 1.3M ratings on Open Library");
+});
+
 test("tiers and tournaments sections", () => {
   const model = bookStatsModel(full, openLibrary);
   assert.deepEqual(model.tiers, { letter: "B", summary: "Average across 4 published tier lists · 23 votes" });
