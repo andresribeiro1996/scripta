@@ -2,6 +2,7 @@ import { genresForBook } from "../library/bookGenres.js";
 import { statusLabel } from "../library/covers.js";
 import { FINISH_FEELINGS, type FinishRating } from "../library/finish.js";
 import type { IdentityKey } from "../readerCards/index.js";
+import { ratingCountLabel } from "./bookStats.js";
 import { gameOwnerLabel, readerCountsLabel, readerStatusLabel, summaryPreview } from "./labels.js";
 import type { WorkEdition, WorkGameRef, WorkPage, WorkReader } from "./types.js";
 
@@ -14,6 +15,7 @@ export type BookScreenModel = {
   title: string;
   author: string;
   genres: string[];
+  rating: { value: number; label: string } | null;
   meta: string | null;
   primary: "owner" | "add" | null;
   status: { label: string; options: Array<{ value: 0 | 1 | 2; label: string; selected: boolean }> } | null;
@@ -69,6 +71,7 @@ export function bookScreenModel(page: WorkPage | null, book: Book | null, viewer
     title: work?.title ?? String(book?.Title ?? "Untitled"),
     author: work?.author ?? String(book?.Attribution ?? "Unknown author"),
     genres: work ? work.genres ?? [] : book ? genresForBook(book).slice(0, GENRE_CAP) : [],
+    rating: work?.rating ? { value: work.rating.value, label: `${work.rating.value.toFixed(1)} · ${ratingCountLabel(work.rating.count)}` } : null,
     meta: work ? bookMetaLine(work) : null,
     primary: book ? "owner" : page?.mine ? null : "add",
     status: readStatus === null ? null : { label: statusLabel(readStatus), options: STATUSES.map((value) => ({ value, label: statusLabel(value), selected: value === readStatus })) },

@@ -10,6 +10,7 @@ import { BookCover } from "../arena/BookCover";
 import { CoverImage } from "../library/components/CoverImage";
 import { fetchWorkStats } from "./api";
 import { StatsTiles } from "./BookStats";
+import { RatingStars } from "./RatingStars";
 import { bookToolPath, workStatsPath } from "./workPath";
 import { AuthorAvatar, openProfile } from "../community/AuthorAvatar";
 import { ReaderGlyph } from "../community/ReaderGlyph";
@@ -113,6 +114,7 @@ export function BookScreen({ page, book, model, signedIn, onAdd }: { page: WorkP
             ))}
           </View>
         ) : null}
+        {model.rating ? <RatingStars value={model.rating.value} label={model.rating.label} /> : null}
         {page ? <StatsTiles tiles={statsTiles} onPress={() => router.push(workStatsPath(page.work.id, segments) as never)} /> : null}
         {model.meta ? <Text {...dynamicType} style={[typography.caption, styles.centeredText, { color: colors.textDim }]}>{model.meta}</Text> : null}
       </View>

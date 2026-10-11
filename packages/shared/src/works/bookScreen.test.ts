@@ -53,6 +53,7 @@ test("a page from a backend without genres, rating, year or pages renders withou
   const { genres, rating, year, pages, ...work } = page().work;
   const model = bookScreenModel({ ...page(), work: work as WorkPage["work"] }, null, { isAdmin: false });
   assert.deepEqual(model.genres, []);
+  assert.equal(model.rating, null);
   assert.equal(model.meta, null);
 });
 
@@ -94,6 +95,13 @@ test("meta line is year and pages, dropping what is missing", () => {
   assert.equal(bookMetaLine({ year: null, pages: 1 }), "1 page");
   assert.equal(bookMetaLine({ year: 1965, pages: null }), "1965");
   assert.equal(bookMetaLine({ year: null, pages: null }), null);
+});
+
+test("the rating is its own value with a count label, absent without one", () => {
+  assert.deepEqual(bookScreenModel(page(), null, { isAdmin: false }).rating, { value: 4.27, label: "4.3 · 2.3K ratings" });
+  const one = page({ rating: { value: 5, count: 1 } });
+  assert.deepEqual(bookScreenModel(one, null, { isAdmin: false }).rating, { value: 5, label: "5.0 · 1 rating" });
+  assert.equal(bookScreenModel(page({ rating: null }), null, { isAdmin: false }).rating, null);
 });
 
 test("reader groups are titled only when both have rows", () => {

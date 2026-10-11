@@ -1,9 +1,9 @@
 import { Link } from "react-router-dom";
 import { ChevronLeftIcon } from "../Toolbar";
 
-const backClass = "mb-2 inline-flex items-center gap-1 text-xs text-(--color-text-dim) hover:text-(--color-text)";
+const backClass = "inline-flex items-center gap-1 text-xs text-(--color-text-dim) hover:text-(--color-text)";
 
-export function BackLink({ backTo, onBack }: { backTo: string; onBack: (() => void) | null }) {
+export function BackLink({ backTo, onBack, className = "mb-2" }: { backTo: string; onBack: (() => void) | null; className?: string }) {
   const content = (
     <>
       <ChevronLeftIcon size={13} />
@@ -11,8 +11,8 @@ export function BackLink({ backTo, onBack }: { backTo: string; onBack: (() => vo
     </>
   );
   return onBack ? (
-    <button type="button" onClick={onBack} className={backClass}>{content}</button>
+    <button type="button" onClick={onBack} className={`${backClass} ${className}`}>{content}</button>
   ) : (
-    <Link to={backTo} className={backClass}>{content}</Link>
+    <Link to={backTo} className={`${backClass} ${className}`}>{content}</Link>
   );
 }

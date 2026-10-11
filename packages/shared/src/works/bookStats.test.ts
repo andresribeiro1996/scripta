@@ -52,7 +52,6 @@ test("tier bands split the range into five equal parts", () => {
 
 test("tiles: big value and caption for each stat that exists", () => {
   assert.deepEqual(bookStatsModel(full, openLibrary).tiles, [
-    { key: "openLibrary", value: "4.1", caption: "★ Open Library" },
     { key: "community", value: "3.8", caption: "Loved it" },
     { key: "tiers", value: "Upper", caption: "tiers · 4 lists" },
     { key: "tournaments", value: "🏆", caption: "Winner" }
@@ -67,7 +66,7 @@ test("tile captions follow the band and the counts", () => {
   const run = (best: { round: number; duels: number } | null) => bookStatsModel({ community: null, tiers: null, tournaments: { entered: 1, titles: 0, wins: 0, losses: 0, best } }, null).tiles[0];
   assert.deepEqual(run({ round: 2, duels: 2 }), { key: "tournaments", value: "🏆", caption: "Semis" });
   assert.deepEqual(run(null), { key: "tournaments", value: "🏆", caption: "Entered" });
-  assert.deepEqual(bookStatsModel(null, openLibrary).tiles.map((t) => t.key), ["openLibrary"]);
+  assert.deepEqual(bookStatsModel(null, openLibrary).tiles, []);
 });
 
 test("feeling columns run from Not for me to All-time and mark the tallest", () => {

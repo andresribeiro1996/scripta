@@ -20,14 +20,12 @@ test("tiles link to the stats page with a big value and caption each", () => {
   const html = tiles(full, rating);
   assert.ok(html.includes('href="/work/w/stats"'));
   assert.ok(html.includes("Book stats: "));
-  for (const text of ["4.1", "★ Open Library", "3.8", "Loved it", "Upper", "tiers · 4 lists", "🏆", "Winner"]) assert.ok(html.includes(text), text);
+  for (const text of ["3.8", "Loved it", "Upper", "tiers · 4 lists", "🏆", "Winner"]) assert.ok(html.includes(text), text);
 });
 
-test("no tiles, nothing rendered; loading shows only Open Library", () => {
+test("no tiles, nothing rendered, even with an Open Library rating", () => {
   assert.equal(tiles(null, null), "");
-  const html = tiles(null, rating);
-  assert.ok(html.includes("★ Open Library"));
-  assert.ok(!html.includes("Loved it"));
+  assert.equal(tiles(null, rating), "");
 });
 
 test("sections: feeling columns, tier bar, bracket path", () => {

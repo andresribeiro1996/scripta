@@ -8,10 +8,11 @@ export type CommunityRating = { average: number; count: number; distribution: [n
 export type TierStanding = { score: number; letter: TierLetter; lists: number; ballots: number };
 export type TournamentRecord = { entered: number; titles: number; wins: number; losses: number; best: { round: number; duels: number } | null };
 export type BookStats = { community: CommunityRating | null; tiers: TierStanding | null; tournaments: TournamentRecord | null };
-type TileKey = "openLibrary" | "community" | "tiers" | "tournaments";
+type TileKey = "community" | "tiers" | "tournaments";
 
 const scaled = (n: number, unit: number, suffix: string) => `${Math.round((n / unit) * 10) / 10}${suffix}`;
 const compactCount = (n: number) => (n < 1000 ? String(n) : n < 999_950 ? scaled(n, 1000, "K") : scaled(n, 1_000_000, "M"));
+export const ratingCountLabel = (count: number) => `${compactCount(count)} ${count === 1 ? "rating" : "ratings"}`;
 const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
 const feelingFor = (average: number) => FINISH_FEELINGS.find((feeling) => feeling.rating === Math.round(average))!.label as string;
 
@@ -53,7 +54,6 @@ export function bookStatsModel(stats: BookStats | null, openLibrary: { value: nu
   const tournaments = stats?.tournaments ?? null;
   const rounded = community ? Math.round(community.average * 10) / 10 : 0;
   const tiles: Array<{ key: TileKey; value: string; caption: string }> = [];
-  if (openLibrary) tiles.push({ key: "openLibrary", value: openLibrary.value.toFixed(1), caption: "★ Open Library" });
   if (community) tiles.push({ key: "community", value: rounded.toFixed(1), caption: feelingFor(rounded) });
   if (tiers) tiles.push({ key: "tiers", ...tierTile(tierBand(tiers.score), tiers.lists) });
   if (tournaments) tiles.push({ key: "tournaments", value: "🏆", caption: bestFinish(tournaments) ?? "Entered" });
@@ -61,7 +61,7 @@ export function bookStatsModel(stats: BookStats | null, openLibrary: { value: nu
   return {
     tiles,
     ratings: {
-      openLibrary: openLibrary ? `★ ${openLibrary.value.toFixed(1)} · ${compactCount(openLibrary.count)} ${openLibrary.count === 1 ? "rating" : "ratings"} on Open Library` : null,
+      openLibrary: openLibrary ? `★ ${openLibrary.value.toFixed(1)} · ${ratingCountLabel(openLibrary.count)} on Open Library` : null,
       community: community ? {
         feeling: feelingFor(rounded),
         summary: `${rounded.toFixed(1)} average · ${plural(community.count, "rating", "ratings")}`,

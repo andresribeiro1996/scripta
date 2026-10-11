@@ -29,7 +29,9 @@ import { PerCardStylePanel } from "../PerCardStylePanel";
 import { ReaderGlyph } from "../ReaderGlyph";
 import { BackLink } from "../work/BackLink";
 import { CommunityIcon, InfoIcon, QuoteIcon } from "../NavIcons";
+import { MoreIcon, ShareIcon } from "../Toolbar";
 import { StatsTiles } from "./BookStats";
+import { RatingStars } from "./RatingStars";
 
 type Props = {
   page: WorkPage | null;
@@ -45,6 +47,7 @@ const TAB_ICONS: Record<BookScreenTabKey, typeof InfoIcon> = { about: InfoIcon, 
 
 const rowClass = "flex items-center gap-3 rounded-xl border border-(--color-border) bg-(--color-surface) p-4";
 const sectionHeading = "mb-3 text-lg font-bold";
+const roundButtonClass = "flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-(--color-border) bg-(--color-surface) text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)";
 const controlClass = "inline-flex min-h-11 items-center justify-center rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm font-semibold hover:bg-(--color-surface-hover)";
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -135,21 +138,16 @@ export function BookScreen({ page, book, signedIn, onAdd, onShare, onBack, backT
 
   return (
     <main className="mx-auto max-w-5xl px-5 py-8">
-      <div className="flex items-start justify-between gap-3">
-        <BackLink backTo={backTo} onBack={onBack} />
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <BackLink backTo={backTo} onBack={onBack} className="" />
         <div className="flex items-center gap-2">
           {onShare ? (
-            <button type="button" onClick={onShare} className={`${controlClass} font-normal hover:border-(--color-accent)`}>
-              Share
+            <button type="button" onClick={onShare} aria-label="Share" title="Share" className={roundButtonClass}>
+              <ShareIcon />
             </button>
           ) : null}
           {menuItems.length > 0 ? (
-            <OptionsMenu
-              items={menuItems}
-              title="More"
-              trigger="⋯"
-              triggerClassName={`${controlClass} min-w-11 text-lg`}
-            />
+            <OptionsMenu items={menuItems} title="More" trigger={<><MoreIcon /><span className="sr-only">More</span></>} triggerClassName={roundButtonClass} />
           ) : null}
         </div>
       </div>
@@ -183,6 +181,7 @@ export function BookScreen({ page, book, signedIn, onAdd, onShare, onBack, backT
               ))}
             </ul>
           ) : null}
+          {model.rating ? <RatingStars value={model.rating.value} label={model.rating.label} /> : null}
           {page ? <StatsTiles tiles={statsTiles} to={`/work/${page.work.id}/stats`} /> : null}
           {model.meta ? <p className="mt-3 text-xs text-(--color-text-dim)">{model.meta}</p> : null}
           {coverError ? (
@@ -194,7 +193,7 @@ export function BookScreen({ page, book, signedIn, onAdd, onShare, onBack, backT
 
         <div className="min-w-0">
           {model.primary === "owner" && model.status ? (
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
               <OptionsMenu
                 title="Reading status"
                 trigger={`${model.status.label} ▾`}

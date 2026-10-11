@@ -43,10 +43,10 @@ test("not owned: add button, About and Community tabs, no highlights tab, no men
   assert.ok(html.includes("About"));
   assert.ok(html.includes("Community"));
   assert.ok(!html.includes("Highlights"));
-  assert.ok(!html.includes("⋯"));
+  assert.ok(!html.includes('title="More"'));
   assert.ok(html.includes("Science Fiction"));
   assert.ok(html.includes("1965 · 412 pages"));
-  assert.ok(!html.includes("★ 4.3 · 2.3K ratings"));
+  assert.ok(html.includes('aria-label="Share"'));
 });
 
 test("owned and finished: status and feeling menus, highlights tab, more menu", () => {
@@ -55,7 +55,7 @@ test("owned and finished: status and feeling menus, highlights tab, more menu", 
   assert.ok(html.includes("Finished ▾"));
   assert.ok(html.includes("Loved it ▾"));
   assert.ok(html.includes("Highlights (1)"));
-  assert.ok(html.includes("⋯"));
+  assert.ok(html.includes('title="More"'));
 });
 
 test("a long summary shows its preview and Show more; editions list three with Show all", () => {
@@ -80,6 +80,7 @@ test("a library-only book opens on Highlights with no About or Community", () =>
   assert.ok(html.includes("Fear is the mind-killer."));
   assert.ok(!html.includes("Community"));
   assert.ok(!html.includes("Share"));
+  assert.ok(!html.includes("Rated"));
 });
 
 test("Back links to the given fallback without history, and is a button with it", () => {
@@ -116,11 +117,10 @@ test("BackLink renders on its own, as used by the loading and not-found states",
   assert.ok(html.includes('href="/"'));
 });
 
-test("the hero carries stats tiles with the Open Library rating that links to the stats page", () => {
+test("the hero carries the Open Library rating as stars with a count caption", () => {
   const html = render({});
-  assert.ok(html.includes('href="/work/w/stats"'));
-  assert.ok(html.includes("4.3"));
-  assert.ok(html.includes("★ Open Library"));
+  assert.ok(html.includes('aria-label="Rated 4.3 out of 5"'));
+  assert.ok(html.includes("4.3 · 2.3K ratings"));
 });
 
 test("a library-only book has no stats tiles", () => {
