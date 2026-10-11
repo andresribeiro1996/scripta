@@ -28,6 +28,7 @@ import { OptionsMenu } from "../OptionsMenu";
 import { PerCardStylePanel } from "../PerCardStylePanel";
 import { ReaderGlyph } from "../ReaderGlyph";
 import { BackLink } from "../work/BackLink";
+import { CommunityIcon, InfoIcon, QuoteIcon } from "../NavIcons";
 import { StatsStrip } from "./BookStats";
 
 type Props = {
@@ -39,6 +40,8 @@ type Props = {
   onBack: (() => void) | null;
   backTo: string;
 };
+
+const TAB_ICONS: Record<BookScreenTabKey, typeof InfoIcon> = { about: InfoIcon, highlights: QuoteIcon, community: CommunityIcon };
 
 const rowClass = "flex items-center gap-3 rounded-xl border border-(--color-border) bg-(--color-surface) p-4";
 const sectionHeading = "mb-3 text-lg font-bold";
@@ -225,17 +228,20 @@ export function BookScreen({ page, book, signedIn, onAdd, onShare, onBack, backT
             >
               {model.tabs.map((t, i) => {
                 const checked = t.key === activeTab;
+                const Icon = TAB_ICONS[t.key];
                 return (
                   <button
                     key={t.key}
                     type="button"
                     aria-pressed={checked}
+                    aria-label={t.label}
+                    title={t.label}
                     onClick={() => setTab(t.key)}
-                    className={`flex min-h-11 flex-1 items-center justify-center gap-1.5 px-3 text-sm font-semibold ${
+                    className={`flex min-h-11 flex-1 items-center justify-center px-3 ${
                       i > 0 ? "border-l border-(--color-border)" : ""
                     } ${checked ? "bg-(--color-accent-soft) text-(--color-accent)" : "text-(--color-text-dim) hover:bg-(--color-surface-hover)"}`}
                   >
-                    {t.label}
+                    <Icon />
                   </button>
                 );
               })}

@@ -137,3 +137,22 @@ export function MoreIcon({ size = 22 }: IconProps) {
     </svg>
   );
 }
+
+export function InfoIcon({ size = 22 }: IconProps) {
+  return (
+    <svg {...svgProps(size)}>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 11v5.5" />
+      <path d="M12 7.6v.1" />
+    </svg>
+  );
+}
+
+export function QuoteIcon({ size = 22 }: IconProps) {
+  return (
+    <svg {...svgProps(size)}>
+      <path d="M10 6.5c-3 1-5 3.6-5 7v3.5h4.5v-4.5H6" />
+      <path d="M19 6.5c-3 1-5 3.6-5 7v3.5h4.5v-4.5H15" />
+    </svg>
+  );
+}

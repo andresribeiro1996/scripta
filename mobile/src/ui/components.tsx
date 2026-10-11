@@ -462,7 +462,7 @@ export function Segmented<T extends string>({
             {options.map((option, position) => (
               <SegmentedButton key={option.value} selected={position === index} onClick={() => onChange(option.value)} colors={segmentColors}>
                 <SegmentedButton.Label>
-                  <ComposeText>{option.label}</ComposeText>
+                  <ComposeText maxLines={1} overflow="ellipsis" softWrap={false}>{option.label}</ComposeText>
                 </SegmentedButton.Label>
               </SegmentedButton>
             ))}

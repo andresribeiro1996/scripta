@@ -32,7 +32,7 @@ const STATUSES = [0, 1, 2] as const;
 export function bookMetaLine(work: Pick<WorkPage["work"], "year" | "pages">): string | null {
   const parts = [
     typeof work.year === "number" ? String(work.year) : null,
-    typeof work.pages === "number" ? `${work.pages} pages` : null
+    typeof work.pages === "number" ? `${work.pages} ${work.pages === 1 ? "page" : "pages"}` : null
   ].filter((part): part is string => part !== null);
   return parts.length > 0 ? parts.join(" · ") : null;
 }

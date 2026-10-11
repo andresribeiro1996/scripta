@@ -91,6 +91,7 @@ test("community lists followed then others and the games", () => {
 test("meta line is year and pages, dropping what is missing", () => {
   assert.equal(bookMetaLine({ year: 1965, pages: 412 }), "1965 · 412 pages");
   assert.equal(bookMetaLine({ year: null, pages: 90 }), "90 pages");
+  assert.equal(bookMetaLine({ year: null, pages: 1 }), "1 page");
   assert.equal(bookMetaLine({ year: 1965, pages: null }), "1965");
   assert.equal(bookMetaLine({ year: null, pages: null }), null);
 });
