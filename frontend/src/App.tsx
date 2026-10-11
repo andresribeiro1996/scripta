@@ -18,6 +18,7 @@ import { CommunityProfilePage } from "./pages/CommunityProfilePage";
 import { DiscoverPage, PublicDiscoverPage } from "./pages/DiscoverPage";
 import { GalleryPage } from "./pages/GalleryPage";
 import { LandingPage } from "./pages/LandingPage";
+import { BookKeyPage } from "./pages/BookKeyPage";
 import { LibraryPage } from "./pages/LibraryPage";
 import { LibraryStylePage } from "./pages/LibraryStylePage";
 import { LoginPage } from "./pages/LoginPage";
@@ -76,6 +77,7 @@ export function App() {
           <Route path="/welcome-avatar" element={<WelcomeAvatarPage />} />
 
           <Route element={<RequireUsername />}>
+            <Route path="/book/:key" element={<BookKeyPage />} />
             <Route element={<DashboardLayout />}>
               <Route path="/dashboard" element={<HomePage />} />
               <Route path="/dashboard/library" element={<LibraryPage />} />

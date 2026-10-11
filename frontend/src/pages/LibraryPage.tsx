@@ -6,19 +6,15 @@ import {
   buildMergedLibrary,
   findDuplicates,
   LIBRARY_CSV_TEMPLATE,
-  readSnapshot,
-  saveFailureMessage,
-  type ReadSnapshot
+  saveFailureMessage
 } from "@scripta/shared";
 import type { LibraryData, LibraryDocument } from "../api/library";
 import { AddBookModal } from "../components/AddBookModal";
 import { BookCard } from "../components/BookCard";
-import { BookDetailSheet } from "../components/BookDetailSheet";
 import { BookGrid } from "../components/BookGrid";
 import { CoverPickerModal } from "../components/CoverPickerModal";
 import { DuplicatesSheet } from "../components/DuplicatesSheet";
 import { EmptyState } from "../components/EmptyState";
-import { FinishSheet } from "../components/FinishSheet";
 import { LibraryCanvas } from "../components/LibraryCanvas";
 import { LibraryToolbar } from "../components/LibraryToolbar";
 import { LibraryIcon } from "../components/NavIcons";
@@ -39,7 +35,7 @@ import { parseImportedFile } from "../lib/fileImport";
 import { removeBooksFromAllGroups } from "../lib/groups";
 import { orderLibraryBooks, reorderOnDrop, seriesGroupByBookKey } from "../lib/libraryOrder";
 import { effectiveCardStyle, resolveLibraryStyle, type PerCardStyle } from "../lib/libraryStyle";
-import { filterBooks, sortBooks, type SortKey, type StatusFilter } from "../lib/libraryView";
+import { bookHref, filterBooks, sortBooks, type SortKey, type StatusFilter } from "../lib/libraryView";
 import { bookKey } from "../lib/merge";
 import { saveWithViewTransition } from "../lib/viewTransition";
 import { restoreDeletedBooks } from "../lib/restoreDeletedBooks";
@@ -55,7 +51,7 @@ export function LibraryPage() {
     link.download = "atmyshelf-library.csv";
     link.click();
   }
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const { scrubBooks } = useMurals();
   const saver = useLibrarySaver();
   const { data: library, isLoading, updateLibrary, share: shareLibraryDoc, unshare: unshareLibraryDoc } = useLibrary();
@@ -82,8 +78,6 @@ export function LibraryPage() {
   const [nameDraft, setNameDraft] = useState("");
   const [styleBookKey, setStyleBookKey] = useState<string | null>(null);
   const [coverBookKey, setCoverBookKey] = useState<string | null>(null);
-  const [detailBookKey, setDetailBookKey] = useState<string | null>(null);
-  const [finishing, setFinishing] = useState<{ key: string; before: ReadSnapshot } | null>(null);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [sharing, setSharing] = useState(false);
@@ -273,9 +267,6 @@ export function LibraryPage() {
   const bookSeriesGroup = useMemo(() => seriesGroupByBookKey(library?.data.books ?? [], library?.data.groups ?? []), [library]);
   const styleBook = styleBookKey ? books.find((b) => bookKey(b) === styleBookKey) : null;
   const coverBook = coverBookKey ? books.find((b) => bookKey(b) === coverBookKey) : null;
-  const detailKey = detailBookKey ?? searchParams.get("book");
-  const detailBook = detailKey ? books.find((b) => bookKey(b) === detailKey) : null;
-  const finishingBook = finishing ? books.find((b) => bookKey(b) === finishing.key) : null;
 
   // The phone's only route to these actions — there is no header on a
   // phone to hold them. Passed to LibraryToolbar as ITEMS rather than a
@@ -568,7 +559,7 @@ export function LibraryPage() {
                         suppressClickAfterDragRef.current = false;
                         return;
                       }
-                      setDetailBookKey(bookKey(book));
+                      navigate(bookHref(bookKey(book), library?.works));
                     }}
                     style={cardStyle}
                     reorderable={!selectionMode}
@@ -583,42 +574,6 @@ export function LibraryPage() {
             </BookGrid>
           </LibraryCanvas>
         </DndContext>
-      )}
-
-      {detailBook && (
-        <BookDetailSheet
-          book={detailBook}
-          workId={library?.works?.[bookKey(detailBook)]}
-          onOpenStyle={(b) => setStyleBookKey(bookKey(b))}
-          onOpenCoverPicker={(b) => setCoverBookKey(bookKey(b))}
-          onSetStatus={async (b, status) => {
-            const before = readSnapshot(b);
-            const wasFinished = b.ReadStatus === 2;
-            if ((await bookActions.setStatus(b, status)) && status === 2 && !wasFinished) setFinishing({ key: bookKey(b), before });
-          }}
-          onSetRating={(b, rating) => void bookActions.setRating(b, rating)}
-          onDeleteNote={(b, bookmarkId) => void bookActions.deleteNote(b, bookmarkId)}
-          onClose={() => {
-            setDetailBookKey(null);
-            if (searchParams.has("book")) {
-              const next = new URLSearchParams(searchParams);
-              next.delete("book");
-              setSearchParams(next, { replace: true });
-            }
-          }}
-        />
-      )}
-
-      {finishingBook && finishing && (
-        <FinishSheet
-          book={finishingBook}
-          books={books}
-          before={finishing.before}
-          onSetRating={bookActions.setRating}
-          onAddNote={bookActions.addNote}
-          onRestoreRead={bookActions.restoreRead}
-          onClose={() => setFinishing(null)}
-        />
       )}
 
       {styleBook && (

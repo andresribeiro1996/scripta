@@ -13,6 +13,7 @@ import { AuthorAvatar } from "../components/CommunityAuthorAvatar";
 import { PickNextSheet } from "../components/PickNextSheet";
 import { ReaderGlyph } from "../components/ReaderGlyph";
 import { resolveLibraryStyle } from "../lib/libraryStyle";
+import { bookHref } from "../lib/libraryView";
 
 const button = "inline-flex min-h-11 items-center justify-center rounded-lg border border-(--color-border) px-4 py-2 text-sm hover:bg-(--color-surface-hover) disabled:opacity-50";
 
@@ -83,7 +84,7 @@ export function HomePage() {
                   ) : null}
                 </div>
                 <BookGrid style={style}>
-                  {sectionBooks.map((book) => <BookCard key={bookKey(book)} book={book} onClick={() => navigate(`/dashboard/library?book=${encodeURIComponent(bookKey(book))}`)} style={style} />)}
+                  {sectionBooks.map((book) => <BookCard key={bookKey(book)} book={book} onClick={() => navigate(bookHref(bookKey(book), library.data?.works))} style={style} />)}
                 </BookGrid>
               </section>;
             }
