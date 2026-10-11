@@ -3,6 +3,7 @@
 // ArenaRepository interface this fulfills.
 
 import { normalizeWords } from "@scripta/shared";
+import type { TournamentRecord } from "@scripta/shared";
 import type { DatabaseSync } from "node:sqlite";
 import type { ArenaRepository } from "../../domain/ports.js";
 import type { DuelRow, SeedPreview, TournamentDiscoverRow, TournamentGameRow, TournamentRow, TournamentSlotRow, VoteRow } from "../../domain/types.js";
@@ -25,6 +26,16 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
     FROM tournament_slots s JOIN tournaments t ON t.id = s.tournament_id
     WHERE s.work_id IN (SELECT value FROM json_each(?)) AND t.status != 'seeding'
     ORDER BY t.created_at DESC LIMIT ?
+  `);
+  const enteredByWorksStmt = db.prepare(`
+    SELECT DISTINCT t.id, t.status, t.bracket_size
+    FROM tournament_slots s JOIN tournaments t ON t.id = s.tournament_id
+    WHERE s.work_id IN (SELECT value FROM json_each(?)) AND t.status != 'seeding'
+  `);
+  const duelsOfTournamentsStmt = db.prepare(`
+    SELECT d.tournament_id, d.round_number, d.winner_side, d.book_a_work_id, d.book_b_work_id
+    FROM duels d
+    WHERE d.tournament_id IN (SELECT value FROM json_each(?))
   `);
   const listPublicByIdsStmt = db.prepare(`SELECT * FROM tournaments WHERE status != 'seeding' AND id IN (SELECT value FROM json_each(?))`);
   const updateStatusStmt = db.prepare(`
@@ -186,6 +197,37 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
     listPublishedByWorks(workIds, limit) {
       if (workIds.length === 0) return [];
       return listPublishedByWorksStmt.all(JSON.stringify(workIds), limit) as unknown as TournamentGameRow[];
+    },
+    tournamentRecord(workIds) {
+      const record: TournamentRecord = { entered: 0, titles: 0, wins: 0, losses: 0, best: null };
+      if (workIds.length === 0) return record;
+      const works = new Set(workIds);
+      const tournaments = new Map(
+        (enteredByWorksStmt.all(JSON.stringify(workIds)) as unknown as Array<{ id: string; status: string; bracket_size: number }>).map((row) => [row.id, row])
+      );
+      record.entered = tournaments.size;
+      if (tournaments.size === 0) return record;
+      const duels = duelsOfTournamentsStmt.all(JSON.stringify([...tournaments.keys()])) as unknown as Array<{
+        tournament_id: string;
+        round_number: number;
+        winner_side: "a" | "b" | null;
+        book_a_work_id: string | null;
+        book_b_work_id: string | null;
+      }>;
+      for (const duel of duels) {
+        const side = duel.book_a_work_id && works.has(duel.book_a_work_id) ? "a" : duel.book_b_work_id && works.has(duel.book_b_work_id) ? "b" : null;
+        const tournament = tournaments.get(duel.tournament_id);
+        if (!side || !tournament) continue;
+        const duelsInRound = tournament.bracket_size / 2 ** duel.round_number;
+        if (!record.best || duelsInRound < record.best.duels) record.best = { round: duel.round_number, duels: duelsInRound };
+        if (duel.winner_side === null) continue;
+        if (duel.winner_side !== side) record.losses += 1;
+        else {
+          record.wins += 1;
+          if (tournament.status === "completed" && duelsInRound === 1) record.titles += 1;
+        }
+      }
+      return record;
     },
     listPublicByIds(ids) {
       return listPublicByIdsStmt.all(JSON.stringify(ids)) as unknown as TournamentRow[];
