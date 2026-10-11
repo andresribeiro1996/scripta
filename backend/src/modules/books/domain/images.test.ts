@@ -262,7 +262,7 @@ test("an encoded cover carries its accent colour", async () => {
 });
 
 test("a crimson cover whose hues straddle red still gives a red accent", async () => {
-  const patch = (background: string) => sharp({ create: { width: 50, height: 30, channels: 3, background } }).png().toBuffer();
+  const patch = (background: string) => sharp({ create: { width: 32, height: 16, channels: 3, background } }).png().toBuffer();
   const cover = await sharp({ create: { width: 200, height: 300, channels: 3, background: "#ffffff" } })
     .composite([
       { input: await patch("#d0102a"), left: 20, top: 40 },
@@ -272,4 +272,16 @@ test("a crimson cover whose hues straddle red still gives a red accent", async (
     .toBuffer();
   const [r, g, b] = channels(await coverColor(cover));
   assert.ok(r > 180 && g < 60 && b < 60, `expected a red, got ${r},${g},${b}`);
+});
+
+test("a thin gold ring on black still gives gold", async () => {
+  const ring = Buffer.from('<svg width="200" height="300"><circle cx="100" cy="150" r="37" fill="none" stroke="#e0a82e" stroke-width="6"/></svg>');
+  const cover = await sharp({ create: { width: 200, height: 300, channels: 3, background: "#000000" } }).composite([{ input: ring }]).png().toBuffer();
+  assertNear(await coverColor(cover), [0xe0, 0xa8, 0x2e], 16);
+});
+
+test("a tiny coloured logo on a white cover is not an accent colour", async () => {
+  const logo = await sharp({ create: { width: 10, height: 10, channels: 3, background: "#cc2222" } }).png().toBuffer();
+  const cover = await sharp({ create: { width: 200, height: 300, channels: 3, background: "#ffffff" } }).composite([{ input: logo, left: 20, top: 20 }]).png().toBuffer();
+  assert.equal(await coverColor(cover), null);
 });

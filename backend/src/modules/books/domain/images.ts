@@ -24,7 +24,7 @@ const COLOR_MIN_SATURATION = 0.25;
 const COLOR_MIN_VALUE = 0.15;
 const COLOR_HUE_BINS = 12;
 const HUE_BIN_OFFSET = 3 / COLOR_HUE_BINS;
-const COLOR_MIN_SHARE = 0.03;
+const COLOR_MIN_SHARE = 0.01;
 
 export interface EncodedCover {
   full: Buffer;
@@ -50,7 +50,7 @@ export async function coverColor(input: Buffer): Promise<string | null> {
       .rotate()
       .flatten({ background: "#ffffff" })
       .toColourspace("srgb")
-      .resize({ width: COLOR_SAMPLE_DIMENSION, height: COLOR_SAMPLE_DIMENSION, fit: "inside" })
+      .resize({ width: COLOR_SAMPLE_DIMENSION, height: COLOR_SAMPLE_DIMENSION, fit: "inside", kernel: "nearest" })
       .raw()
       .toBuffer({ resolveWithObject: true });
   } catch {

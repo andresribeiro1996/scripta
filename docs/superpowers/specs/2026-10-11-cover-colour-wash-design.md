@@ -18,7 +18,7 @@ Make the top of the book screen feel like the book: a soft gradient of the cover
 1. Flatten on white, sRGB, resize to fit 64×64, raw pixels.
 2. Drop pixels that are near-grey (HSV saturation < 0.25), near-black (value < 0.15) or near-white (value > 0.95 with saturation < 0.1).
 3. Bucket the rest into 12 hue bins, weighting each pixel by saturation × value.
-4. Take the heaviest bin. If its weight is under 3% of the total pixel count, return `null`: the cover is effectively greyscale.
+4. Take the heaviest bin. If its weight is under 1% of the total pixel count, return `null`: the cover is effectively greyscale.
 5. Return the weighted mean RGB of that bin as `#rrggbb`.
 
 The Fellowship cover (black field, gold ring) yields gold, not black. A grey or monochrome cover yields `null`: no wash.

@@ -45,7 +45,7 @@
 1. Flatten on white, convert to sRGB, resize to fit 64×64, take raw pixels.
 2. Drop pixels with saturation < 0.25 or value < 0.15 (near-white falls under the saturation rule).
 3. Bucket the rest into 12 hue bins, weighted by saturation × value.
-4. If the heaviest bin's weight is under 3% of the pixel count, return `null`.
+4. If the heaviest bin's weight is under 1% of the pixel count, return `null`.
 5. Otherwise return the bin's weighted mean RGB as lowercase `#rrggbb`.
 6. Garbage input returns `null` (catch the sharp decode failure only).
 
