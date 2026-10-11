@@ -10,8 +10,12 @@ export interface ObjectStore {
 
 const OBJECT_KEY = /^(covers|gallery|avatars)\/[0-9a-f-]{36}(-thumb)?\.webp$/;
 
+export function isObjectKey(key: string): boolean {
+  return OBJECT_KEY.test(key);
+}
+
 export function assertObjectKey(key: string): void {
-  if (!OBJECT_KEY.test(key)) throw new Error("Invalid object key");
+  if (!isObjectKey(key)) throw new Error("Invalid object key");
 }
 
 function isMissing(error: unknown): boolean {

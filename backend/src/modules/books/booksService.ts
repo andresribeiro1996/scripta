@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { isObjectKey } from "../../storage/objectStore.js";
 import { canonicalIsbn, looksLikeIsbnQuery, type BookGenre, type BookMetadata, type BookSearchResult } from "@scripta/shared";
 import { findBestCover, type CoverSources, type FetchCoverImage } from "./coverResolver.js";
 import { MIN_GOOD_WIDTH } from "./domain/constants.js";
@@ -334,7 +335,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
     async fillCoverColors(limit) {
       const ids = deps.repo.listPendingColorImageIds(limit);
       for (const id of ids) {
-        const thumb = await deps.blobs.read(`${id}-thumb`, COVER_EXTENSION);
+        const thumb = isObjectKey(`covers/${id}-thumb.${COVER_EXTENSION}`) ? await deps.blobs.read(`${id}-thumb`, COVER_EXTENSION) : null;
         deps.repo.setImageColor(id, (thumb && await coverColor(thumb)) ?? "");
       }
       return ids.length;

@@ -1647,38 +1647,48 @@ async function pendingColorHarness(overrides: Partial<Deps> = {}) {
 
 test("fillCoverColors colours an image from its thumb, marks one with no thumb as having none, and does nothing the second time", async () => {
   const h = await pendingColorHarness();
-  h.addImage("image-a");
-  h.addImage("image-b");
-  h.files.set("image-a-thumb.webp", h.red);
+  h.addImage("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+  h.addImage("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
+  h.files.set("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa-thumb.webp", h.red);
   assert.equal(await h.service.fillCoverColors(10), 2);
-  assert.match(h.repo.getImage("image-a")!.color!, /^#[0-9a-f]{6}$/);
-  assert.equal(h.repo.getImage("image-b")!.color, "");
+  assert.match(h.repo.getImage("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!.color!, /^#[0-9a-f]{6}$/);
+  assert.equal(h.repo.getImage("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")!.color, "");
   assert.equal(await h.service.fillCoverColors(10), 0);
 });
 
 test("fillCoverColors marks a thumb with no usable colour as having none", async () => {
   const h = await pendingColorHarness();
-  h.addImage("image-a");
-  h.files.set("image-a-thumb.webp", Buffer.from("not an image"));
+  h.addImage("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+  h.files.set("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa-thumb.webp", Buffer.from("not an image"));
   assert.equal(await h.service.fillCoverColors(10), 1);
-  assert.equal(h.repo.getImage("image-a")!.color, "");
+  assert.equal(h.repo.getImage("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!.color, "");
 });
 
 test("fillCoverColors stops on a store error other than a missing object and leaves the row pending", async () => {
   const h = await pendingColorHarness({
     blobs: { save: async () => {}, read: async () => { throw new Error("R2 GET failed: HTTP 500"); } }
   });
-  h.addImage("image-a");
+  h.addImage("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
   await assert.rejects(h.service.fillCoverColors(10), /HTTP 500/);
-  assert.equal(h.repo.getImage("image-a")!.color, null);
-  assert.deepEqual(h.repo.listPendingColorImageIds(10), ["image-a"]);
+  assert.equal(h.repo.getImage("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!.color, null);
+  assert.deepEqual(h.repo.listPendingColorImageIds(10), ["aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"]);
 });
 
 test("fillCoverColors takes at most the limit", async () => {
   const h = await pendingColorHarness();
-  h.addImage("image-a");
-  h.addImage("image-b");
-  h.addImage("image-c");
+  h.addImage("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+  h.addImage("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
+  h.addImage("cccccccc-cccc-4ccc-8ccc-cccccccccccc");
   assert.equal(await h.service.fillCoverColors(2), 2);
   assert.equal(h.repo.listPendingColorImageIds(10).length, 1);
+});
+
+test("fillCoverColors gives an id that cannot be a stored object no colour and carries on to the next row", async () => {
+  const h = await pendingColorHarness();
+  h.addImage("legacy-123");
+  h.addImage("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+  h.files.set("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa-thumb.webp", h.red);
+  assert.equal(await h.service.fillCoverColors(10), 2);
+  assert.equal(h.repo.getImage("legacy-123")!.color, "");
+  assert.match(h.repo.getImage("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!.color!, /^#[0-9a-f]{6}$/);
 });

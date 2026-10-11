@@ -437,6 +437,8 @@ test("an existing database gains publisher_url, created_by and cover_images.orig
   assert.equal(book.summary_source, null);
   assert.equal(book.apple_checked_at, null);
   assert.equal(repo.getImage("img")!.origin, null);
+  assert.equal(repo.getImage("img")!.color, null);
+  assert.deepEqual(repo.listPendingColorImageIds(10), ["img"]);
 });
 
 const WORK_COLUMNS = ["work_id", "language", "work_checked_at"];
