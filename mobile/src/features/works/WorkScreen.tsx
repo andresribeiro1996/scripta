@@ -11,14 +11,14 @@ import { LIBRARY_QUERY_KEY, useLibrary } from "../library/hooks/useLibrary";
 import { ContentShareSheet } from "../sharing/ContentShareSheet";
 import { publicContentUrl } from "../sharing/links";
 import { fetchWork } from "./api";
-import { BookScreen, HEADER_TINT_STEPS, bookMenuItems } from "./BookScreen";
+import { BookScreen, bookMenuItems, washAlphaAt } from "./BookScreen";
 import { workPath } from "./workPath";
 
 export function WorkScreen({ id }: { id: string }) {
   const [adding, setAdding] = useState(false);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [shareError, setShareError] = useState<string | null>(null);
-  const [headerTint, setHeaderTint] = useState(HEADER_TINT_STEPS);
+  const [scrolledHeaderColor, setScrolledHeaderColor] = useState<string | null>(null);
   const segments = useSegments();
   const { colors, mode } = useTheme();
   const signedIn = useAuth().user !== null;
@@ -69,7 +69,9 @@ export function WorkScreen({ id }: { id: string }) {
   const model = bookScreenModel(page, book, { isAdmin: false });
   const menuItems = book && page.mine ? bookMenuItems(model, page.mine.bookKey, segments) : [];
   const wash = coverWash(work.coverColor, mode);
-  const headerStyle = wash && work.coverColor ? { backgroundColor: blendHex(colors.background, work.coverColor, (wash.topAlpha * headerTint) / HEADER_TINT_STEPS) } : undefined;
+  const headerColorAt = (y: number) => (wash && work.coverColor ? blendHex(colors.background, work.coverColor, washAlphaAt(wash.topAlpha, y)) : null);
+  const headerColor = scrolledHeaderColor ?? headerColorAt(0);
+  const headerStyle = headerColor ? { backgroundColor: headerColor } : undefined;
   const firstEdition = work.editions.find((edition) => edition.isbn) ?? work.editions[0];
 
   async function share() {
@@ -97,7 +99,7 @@ export function WorkScreen({ id }: { id: string }) {
         }}
       />
       {shareError ? <Toast visible message={shareError} tone="error" /> : null}
-      <BookScreen page={page} book={book} model={model} signedIn={signedIn} onAdd={() => setAdding(true)} onHeaderTint={setHeaderTint} />
+      <BookScreen page={page} book={book} model={model} signedIn={signedIn} onAdd={() => setAdding(true)} onScrollY={(y) => setScrolledHeaderColor(headerColorAt(y))} />
       <ContentShareSheet visible={shareUrl !== null} onClose={() => setShareUrl(null)} title={work.title} url={shareUrl} />
       {adding ? (
         <AddBookSheet

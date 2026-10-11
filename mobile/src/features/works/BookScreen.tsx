@@ -17,8 +17,17 @@ import { AuthorAvatar, openProfile } from "../community/AuthorAvatar";
 import { ReaderGlyph } from "../community/ReaderGlyph";
 
 const WASH_HEIGHT = 420;
-const HEADER_FADE_DISTANCE = 160;
-export const HEADER_TINT_STEPS = 16;
+const WASH_MID_OFFSET = 0.45;
+const WASH_MID_FACTOR = 0.5;
+
+export function washAlphaAt(topAlpha: number, y: number): number {
+  const midY = WASH_MID_OFFSET * WASH_HEIGHT;
+  const midAlpha = topAlpha * WASH_MID_FACTOR;
+  if (y <= 0) return topAlpha;
+  if (y < midY) return topAlpha + ((midAlpha - topAlpha) * y) / midY;
+  if (y < WASH_HEIGHT) return midAlpha * (1 - (y - midY) / (WASH_HEIGHT - midY));
+  return 0;
+}
 
 const TAB_ICONS: Record<BookScreenTabKey, IconName> = { about: "info", highlights: "quote", community: "community" };
 
@@ -82,7 +91,7 @@ function DeleteNote({ book, bookmarkId }: { book: Record<string, unknown>; bookm
   );
 }
 
-export function BookScreen({ page, book, model, signedIn, onAdd, onHeaderTint }: { page: WorkPage | null; book: Record<string, unknown> | null; model: BookScreenModel; signedIn: boolean; onAdd: () => void; onHeaderTint?: (level: number) => void }) {
+export function BookScreen({ page, book, model, signedIn, onAdd, onScrollY }: { page: WorkPage | null; book: Record<string, unknown> | null; model: BookScreenModel; signedIn: boolean; onAdd: () => void; onScrollY?: (y: number) => void }) {
   const { colors, mode } = useTheme();
   const { width: windowWidth } = useWindowDimensions();
   const coverColor = page?.work.coverColor ?? null;
@@ -100,18 +109,16 @@ export function BookScreen({ page, book, model, signedIn, onAdd, onHeaderTint }:
     <Text accessibilityRole="header" {...dynamicType} style={[typography.title, { color: colors.text }]}>{title}</Text>
   );
   const { about, community } = model;
-  const trackHeaderTint = onHeaderTint
-    ? (event: NativeSyntheticEvent<NativeScrollEvent>) => onHeaderTint(Math.round(Math.min(1, Math.max(0, 1 - event.nativeEvent.contentOffset.y / HEADER_FADE_DISTANCE)) * HEADER_TINT_STEPS))
-    : undefined;
+  const trackScroll = onScrollY ? (event: NativeSyntheticEvent<NativeScrollEvent>) => onScrollY(event.nativeEvent.contentOffset.y) : undefined;
 
   return (
-    <ScrollView contentContainerStyle={styles.content} onScroll={trackHeaderTint} scrollEventThrottle={16}>
+    <ScrollView contentContainerStyle={styles.content} onScroll={trackScroll} scrollEventThrottle={16}>
       {wash && coverColor ? (
         <Svg pointerEvents="none" accessible={false} importantForAccessibility="no-hide-descendants" style={styles.wash} width={windowWidth} height={WASH_HEIGHT}>
           <Defs>
             <LinearGradient id="wash" x1="0" y1="0" x2="0" y2="1">
               <Stop offset="0" stopColor={coverColor} stopOpacity={wash.topAlpha} />
-              <Stop offset="0.45" stopColor={coverColor} stopOpacity={wash.topAlpha / 2} />
+              <Stop offset={WASH_MID_OFFSET} stopColor={coverColor} stopOpacity={wash.topAlpha * WASH_MID_FACTOR} />
               <Stop offset="1" stopColor={coverColor} stopOpacity={0} />
             </LinearGradient>
           </Defs>
