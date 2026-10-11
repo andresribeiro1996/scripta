@@ -33,6 +33,7 @@ export function applyTierlistsMigrations(db: DatabaseSync): void {
     if (!has("source_tierlist_id")) db.exec(`ALTER TABLE tierlists ADD COLUMN source_tierlist_id TEXT`);
     if (!has("promoted_at")) db.exec(`ALTER TABLE tierlists ADD COLUMN promoted_at TEXT`);
     if (!has("public_books")) db.exec(`ALTER TABLE tierlists ADD COLUMN public_books TEXT`);
+    if (!has("ranks_worst_first")) db.exec(`ALTER TABLE tierlists ADD COLUMN ranks_worst_first INTEGER NOT NULL DEFAULT 0`);
     if (!has("name_key")) db.exec(`ALTER TABLE tierlists ADD COLUMN name_key TEXT`);
     if (!has("origin_user_id")) {
       db.exec(`ALTER TABLE tierlists ADD COLUMN origin_user_id TEXT`);

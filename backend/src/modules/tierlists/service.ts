@@ -21,6 +21,7 @@ function toTierlist(row: TierlistRow): Tierlist {
     sourceTierlistId: row.source_tierlist_id,
     promotedAt: row.promoted_at,
     originCreatorId: row.origin_user_id,
+    ranksWorstFirst: row.ranks_worst_first === 1,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
@@ -47,6 +48,7 @@ export interface VotingBoard {
   eligibleVoteCount: number;
   promotedAt: string | null;
   publicBooks: unknown[] | null;
+  ranksWorstFirst: boolean;
 }
 
 export interface PublicTierlistSummary {
@@ -89,7 +91,7 @@ export interface GameByWork {
 
 export interface TierlistsService {
   listTierlists(userId: string): Tierlist[];
-  createTierlist(userId: string, name: string, data?: TierlistDocument, access?: VoteAccess, publicBooks?: unknown[]): Tierlist;
+  createTierlist(userId: string, name: string, data?: TierlistDocument, access?: VoteAccess, publicBooks?: unknown[], ranksWorstFirst?: boolean): Tierlist;
   /** undefined if no tier list with that id is owned by userId — a
    *  caller-facing 404, not a server error. Same convention as
    *  modules/murals/service.ts's getMural. */
@@ -216,7 +218,7 @@ export function createTierlistsService(repo: TierlistsRepository, emitPublished?
       return repo.listByUser(userId).map(toTierlist);
     },
 
-    createTierlist(userId, name, data, access, publicBooks) {
+    createTierlist(userId, name, data, access, publicBooks, ranksWorstFirst = false) {
       const now = new Date().toISOString();
       const row: TierlistRow = {
         id: randomUUID(),
@@ -233,6 +235,7 @@ export function createTierlistsService(repo: TierlistsRepository, emitPublished?
         source_tierlist_id: null,
         promoted_at: null,
         public_books: access ? JSON.stringify(publicBooks ?? []) : null,
+        ranks_worst_first: ranksWorstFirst ? 1 : 0,
         created_at: now,
         updated_at: now
       };
@@ -384,7 +387,8 @@ export function createTierlistsService(repo: TierlistsRepository, emitPublished?
         // Corrupt JSON here omits the field rather than 500ing the whole
         // public voting board — same defensive stance as murals' shared
         // route and library's getPublicByToken.
-        publicBooks: parsePublicBooks(row.public_books)
+        publicBooks: parsePublicBooks(row.public_books),
+        ranksWorstFirst: row.ranks_worst_first === 1
       };
     },
 

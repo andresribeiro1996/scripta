@@ -141,6 +141,7 @@ export function VoteTierlistPage() {
             </button>
           </div>
         </header>
+        {board.ranksWorstFirst ? <p className="mb-2 text-xs text-(--color-text-dim)">Top tier = worst</p> : null}
         <p className="mb-4 text-sm text-(--color-text-dim)">
           {justSubmitted ? "Your ballot is in. " : alreadySubmitted ? "You've already ranked this one. " : ""}
           {board.promotedAt ? "Permanent public reference." : board.votingOpen ? "Voting is still open." : "Voting is closed."}
@@ -218,6 +219,7 @@ export function VoteTierlistPage() {
           </button>
         </div>
       </header>
+      {board.ranksWorstFirst ? <p className="mb-2 text-xs text-(--color-text-dim)">Top tier = worst</p> : null}
       <p className="mb-4 text-sm text-(--color-text-dim)">
         {membersOnlyBlocked
           ? "This tier list only accepts votes from signed-in members — rank away, then sign in to cast your ballot."

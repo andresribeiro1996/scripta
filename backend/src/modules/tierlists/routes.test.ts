@@ -83,6 +83,7 @@ test("an OPEN poll's board withholds the histogram from anyone reading it", asyn
   // directory publishes it for every poll, open or closed.
   assert.equal(board.ballotCount, 1);
   assert.equal(board.votingOpen, true);
+  assert.equal(board.ranksWorstFirst, false);
   assert.equal("id" in board, false);
 });
 
@@ -527,5 +528,32 @@ test("a PUT and a voting toggle with the catalog down are 503 and change nothing
   assert.equal(service.getTierlist("m2", id)!.votingOpen, open);
   assert.equal((await app.inject({ method: "PUT", url: `/tierlists/${id}/voting`, headers: headers("m2"), payload: { open: !open } })).statusCode, 200);
   assert.equal((await app.inject({ method: "PUT", url: `/tierlists/${id}/voting`, headers: headers("m3"), payload: { open: open } })).statusCode, 404);
+  await app.close();
+});
+
+test("ranksWorstFirst is set at creation, returned, and cannot be changed by an update", async () => {
+  const { app } = await ownerApp();
+  const created = await app.inject({ method: "POST", url: "/tierlists", headers: headers("w1"), payload: { name: "Worst of 2024", ranksWorstFirst: true } });
+  assert.equal(created.statusCode, 201);
+  assert.equal(created.json().ranksWorstFirst, true);
+  const id = created.json().id;
+  const updated = await app.inject({ method: "PUT", url: `/tierlists/${id}`, headers: headers("w1"), payload: { name: "Renamed", ranksWorstFirst: false } });
+  assert.equal(updated.statusCode, 200);
+  assert.equal(updated.json().ranksWorstFirst, true);
+  const plain = await app.inject({ method: "POST", url: "/tierlists", headers: headers("w1"), payload: { name: "Best of 2024" } });
+  assert.equal(plain.json().ranksWorstFirst, false);
+  await app.close();
+});
+
+test("a published worst-first list's voting board says so", async () => {
+  const works = ["Worst Board A", "Worst Board B"].map(titleWork) as [string, string];
+  works.forEach((work, index) => copy("w2", index, `ta:worst board ${index}|someone`, work));
+  summarize("w2");
+  const { app, service } = await ownerApp();
+  const created = await app.inject({ method: "POST", url: "/tierlists", headers: headers("w2"), payload: { name: "Worst", data: { tiers: [tier([])], pool: works }, access: "anonymous", ranksWorstFirst: true } });
+  assert.equal(created.statusCode, 201);
+  const voter = await publicApp(service);
+  const board = await voter.inject({ method: "GET", url: `/tierlists/voting/${created.json().voteCode}` });
+  assert.equal(board.json().board.ranksWorstFirst, true);
   await app.close();
 });
