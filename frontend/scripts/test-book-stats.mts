@@ -4,7 +4,7 @@ import { createElement } from "react";
 import { renderToString } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import { bookStatsModel, type BookStats } from "@scripta/shared";
-import { StatsSections, StatsStrip } from "../src/components/book/BookStats";
+import { StatsSections, StatsTiles } from "../src/components/book/BookStats";
 
 const full: BookStats = {
   community: { average: 3.8, count: 12, distribution: [1, 0, 2, 6, 3] },
@@ -12,32 +12,29 @@ const full: BookStats = {
   tournaments: { entered: 3, titles: 1, wins: 7, losses: 2, best: { round: 3, duels: 1 } }
 };
 const rating = { value: 4.12, count: 2310 };
-const strip = (stats: BookStats | null, ol: typeof rating | null) =>
-  renderToString(createElement(MemoryRouter, null, createElement(StatsStrip, { cells: bookStatsModel(stats, ol).strip, to: "/work/w/stats" })));
+const tiles = (stats: BookStats | null, ol: typeof rating | null) =>
+  renderToString(createElement(MemoryRouter, null, createElement(StatsTiles, { tiles: bookStatsModel(stats, ol).tiles, to: "/work/w/stats" })));
 const sections = (stats: BookStats | null, ol: typeof rating | null) => renderToString(createElement(StatsSections, { model: bookStatsModel(stats, ol) }));
 
-test("the strip links to the stats page and shows each cell", () => {
-  const html = strip(full, rating);
+test("tiles link to the stats page with a big value and caption each", () => {
+  const html = tiles(full, rating);
   assert.ok(html.includes('href="/work/w/stats"'));
-  for (const text of ["★ 4.1", "Open Library", "Loved it", "12 readers", "B tier", "4 lists", "1 title", "3 tournaments"]) assert.ok(html.includes(text), text);
+  assert.ok(html.includes("Book stats: "));
+  for (const text of ["4.1", "★ Open Library", "3.8", "Loved it", "Upper", "tiers · 4 lists", "🏆", "Winner"]) assert.ok(html.includes(text), text);
 });
 
-test("while stats load or fail, the strip shows only Open Library", () => {
-  const html = strip(null, rating);
-  assert.ok(html.includes("★ 4.1"));
-  assert.ok(!html.includes("readers"));
+test("no tiles, nothing rendered; loading shows only Open Library", () => {
+  assert.equal(tiles(null, null), "");
+  const html = tiles(null, rating);
+  assert.ok(html.includes("★ Open Library"));
+  assert.ok(!html.includes("Loved it"));
 });
 
-test("with nothing to show, the strip renders nothing", () => {
-  assert.equal(strip(null, null), "");
-  assert.equal(strip({ community: null, tiers: null, tournaments: null }, null), "");
-});
-
-test("the stats sections show feelings with bars, the tier letter and the tournament record", () => {
+test("sections: feeling columns, tier bar, bracket path", () => {
   const html = sections(full, rating);
-  for (const text of ["Ratings", "★ 4.1 · 2.3K ratings on Open Library", "Loved it", "3.8 average · 12 ratings", "All-time", "Not for me", "Tier lists", "Average across 4 published tier lists · 23 votes", "Tournaments", "Won–lost", "7–2", "Winner"]) assert.ok(html.includes(text), text);
-  assert.ok(html.includes("width:50%"));
-  assert.ok(html.includes("width:100%"));
+  for (const text of ["Ratings", "Loved it", "3.8 average · 12 ratings", "Not for me", "All-time", "Tier lists", "Upper tiers", "Top", "Bottom", "Across 4 published tier lists · 23 votes", "Tournaments", "Final", "3 tournaments · 7 won, 2 lost · 1 title"]) assert.ok(html.includes(text), text);
+  assert.ok(html.includes("left:31%"));
+  assert.ok(html.includes("height:100%"));
 });
 
 test("empty sections say why", () => {

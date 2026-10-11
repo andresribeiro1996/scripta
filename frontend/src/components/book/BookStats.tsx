@@ -4,15 +4,15 @@ import type { BookStatsModel } from "@scripta/shared";
 const sectionHeading = "mb-3 text-lg font-bold";
 const dim = "text-sm text-(--color-text-dim)";
 
-export function StatsStrip({ cells, to }: { cells: BookStatsModel["strip"]; to: string }) {
-  if (cells.length === 0) return null;
+export function StatsTiles({ tiles, to }: { tiles: BookStatsModel["tiles"]; to: string }) {
+  if (tiles.length === 0) return null;
   return (
-    <Link to={to} className="mt-3 flex flex-wrap gap-x-3 gap-y-2 rounded-xl border border-(--color-border) bg-(--color-surface) p-3 text-left hover:border-(--color-accent)">
+    <Link to={to} className="mt-3 flex flex-wrap gap-2 rounded-xl text-center hover:opacity-90">
       <span className="sr-only">Book stats: </span>
-      {cells.map((cell) => (
-        <span key={cell.key} className="min-w-0 grow basis-[45%]">
-          <span className="block truncate text-sm font-semibold">{cell.value}</span>
-          <span className="block truncate text-xs text-(--color-text-dim)">{cell.label}</span>
+      {tiles.map((tile) => (
+        <span key={tile.key} className="min-w-0 grow basis-[4.5rem] rounded-xl border border-(--color-border) bg-(--color-surface) px-2 py-2">
+          <span className="block truncate text-xl font-bold">{tile.value}</span>
+          <span className="line-clamp-2 block text-xs text-(--color-text-dim)">{tile.caption}</span>
         </span>
       ))}
     </Link>
@@ -20,7 +20,7 @@ export function StatsStrip({ cells, to }: { cells: BookStatsModel["strip"]; to: 
 }
 
 export function StatsSections({ model }: { model: BookStatsModel }) {
-  const { ratings, tiers, tiersEmpty, tournaments, tournamentsEmpty } = model;
+  const { ratings, tierBar, tiersEmpty, tournamentRun, tournamentsEmpty } = model;
   return (
     <div className="flex flex-col gap-8">
       <section>
@@ -29,44 +29,58 @@ export function StatsSections({ model }: { model: BookStatsModel }) {
         {ratings.community ? (
           <>
             <p className="text-2xl font-bold">{ratings.community.feeling}</p>
-            <p className={`${dim} mb-3`}>{ratings.community.summary}</p>
-            <ul className="flex flex-col gap-2">
-              {ratings.community.bars.map((bar) => (
-                <li key={bar.label} className="flex items-center gap-3 text-sm">
-                  <span className="w-24 shrink-0">{bar.label}</span>
-                  <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-(--color-border)">
-                    <span className="block h-full bg-(--color-accent)" style={{ width: `${Math.round(bar.fraction * 100)}%` }} />
-                  </span>
-                  <span className="w-8 shrink-0 text-right text-(--color-text-dim)">{bar.count}</span>
-                </li>
+            <p className={dim}>{ratings.community.summary}</p>
+            <div className="mt-3 flex h-24 items-end gap-2">
+              {ratings.community.columns.map((column) => (
+                <span key={column.label} aria-label={`${column.label}: ${column.count}`} className={`min-h-[2px] flex-1 rounded-t ${column.top ? "bg-(--color-accent)" : "bg-(--color-border)"}`} style={{ height: `${Math.round(column.fraction * 100)}%` }} />
               ))}
-            </ul>
+            </div>
+            <div className="mt-1 flex gap-2 text-center text-xs text-(--color-text-dim)">
+              {ratings.community.columns.map((column) => (
+                <span key={column.label} className="flex-1">{column.label}</span>
+              ))}
+            </div>
           </>
         ) : null}
         {ratings.empty ? <p className={dim}>{ratings.empty}</p> : null}
       </section>
       <section>
         <h2 className={sectionHeading}>Tier lists</h2>
-        {tiers ? (
-          <div className="flex items-center gap-4">
-            <span className="text-3xl font-bold">{tiers.letter}</span>
-            <p className={dim}>{tiers.summary}</p>
-          </div>
+        {tierBar ? (
+          <>
+            <p className="text-2xl font-bold">{tierBar.band}</p>
+            <div className="relative mt-3 h-2 rounded-full bg-(--color-border)">
+              <span className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-(--color-accent)" style={{ left: `${Math.round(tierBar.marker * 100)}%` }} />
+            </div>
+            <div className="mt-1 flex justify-between text-xs text-(--color-text-dim)">
+              <span>Top</span>
+              <span>Bottom</span>
+            </div>
+            <p className={`${dim} mt-2`}>{tierBar.summary}</p>
+          </>
         ) : (
           <p className={dim}>{tiersEmpty}</p>
         )}
       </section>
       <section>
         <h2 className={sectionHeading}>Tournaments</h2>
-        {tournaments ? (
-          <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {tournaments.map((cell) => (
-              <div key={cell.label} className="rounded-xl border border-(--color-border) bg-(--color-surface) p-3">
-                <dt className="text-xs text-(--color-text-dim)">{cell.label}</dt>
-                <dd className="text-lg font-semibold">{cell.value}</dd>
-              </div>
-            ))}
-          </dl>
+        {tournamentRun ? (
+          <>
+            {tournamentRun.path.length > 0 ? (
+              <ol className="flex flex-wrap items-center gap-1.5 text-sm">
+                {tournamentRun.path.map((step) => (
+                  <li key={step.label} className="flex items-center gap-1.5">
+                    <span className={`rounded-full border px-2.5 py-0.5 ${step.reached ? "border-(--color-accent) bg-(--color-accent-soft) font-semibold text-(--color-accent)" : "border-(--color-border) text-(--color-text-dim)"}`}>{step.label}</span>
+                    <span aria-hidden="true" className="text-(--color-text-dim)">→</span>
+                  </li>
+                ))}
+                <li>
+                  <span className={`rounded-full border px-2.5 py-0.5 ${tournamentRun.champion ? "border-(--color-accent) bg-(--color-accent-soft)" : "border-(--color-border) opacity-50"}`}>🏆</span>
+                </li>
+              </ol>
+            ) : null}
+            <p className={`${dim} mt-2`}>{tournamentRun.summary}</p>
+          </>
         ) : (
           <p className={dim}>{tournamentsEmpty}</p>
         )}
