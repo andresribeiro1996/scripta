@@ -78,6 +78,12 @@ test("owned items summarise each kind for its card", () => {
     { id: "a", label: "A", color: "#d98a3d", workIds: ["c"] },
   ], pool: [] } });
   assert.equal(itemDetail(ownedItems("tierlists", [], [sorted])), "3 books · 2 tiers");
+
+  const partlySorted = tierlist({ data: { tiers: [{ id: "s", label: "S", color: "#c9482f", workIds: ["a"] }], pool: ["b", "c"] } });
+  assert.equal(itemDetail(ownedItems("tierlists", [], [partlySorted])), "3 books · 1 tier");
+
+  const published = tierlist({ voteCode: "abc", votingOpen: true, data: { tiers: [{ id: "s", label: "S", color: "#c9482f", workIds: [] }, { id: "a", label: "A", color: "#d98a3d", workIds: [] }], pool: ["a", "b", "c"] } });
+  assert.equal(itemDetail(ownedItems("tierlists", [], [published])), "3 books · 2 tiers · voting open");
 });
 
 test("owned quiz items summarise book count and stage", () => {
