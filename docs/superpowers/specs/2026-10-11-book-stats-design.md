@@ -29,6 +29,7 @@ All three stats count signed-in accounts only. Tournaments are the one exception
 - Aggregate over the work's `aliasIds`: rows with `read_status = 2` and `rating IS NOT NULL`, one per user: a user holding two finished, rated editions counts once, using their lowest-`position` such row (the same ordering `copyOfWork` and `holdersOfWorks` use).
 - Returned only when `count >= 3`; otherwise `null`. The viewer's own rating counts.
 - Shape: `{ average: number; count: number; distribution: [number, number, number, number, number] }`, `distribution[i]` = ratings equal to `i + 1`.
+- Known limit: the average and distribution are exact and live, so someone who sees a reader's `book_finished` event (followers do) can compare the stats before and after and recover that reader's exact rating; the 3-rating minimum does not prevent this. Accepted by the owner on 2026-10-11 rather than coarsening or snapshotting the numbers.
 
 ### Average tier
 
