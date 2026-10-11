@@ -7,10 +7,10 @@ const dim = "text-sm text-(--color-text-dim)";
 export function StatsStrip({ cells, to }: { cells: BookStatsModel["strip"]; to: string }) {
   if (cells.length === 0) return null;
   return (
-    <Link to={to} className="mt-3 grid grid-cols-[repeat(auto-fit,minmax(7rem,1fr))] gap-2 rounded-xl border border-(--color-border) bg-(--color-surface) p-3 text-left hover:border-(--color-accent)">
+    <Link to={to} className="mt-3 flex flex-wrap gap-x-3 gap-y-2 rounded-xl border border-(--color-border) bg-(--color-surface) p-3 text-left hover:border-(--color-accent)">
       <span className="sr-only">Book stats: </span>
       {cells.map((cell) => (
-        <span key={cell.key} className="min-w-0">
+        <span key={cell.key} className="min-w-0 grow basis-[45%]">
           <span className="block truncate text-sm font-semibold">{cell.value}</span>
           <span className="block truncate text-xs text-(--color-text-dim)">{cell.label}</span>
         </span>
