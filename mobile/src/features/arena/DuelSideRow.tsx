@@ -3,7 +3,7 @@ import { StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { duelWinner, sharePercent, type Duel, type DuelSide } from "@scripta/shared";
 import { Button, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
-import { workPath } from "../works/workScreenModel";
+import { workPath } from "../works/workPath";
 import { BookCover } from "./BookCover";
 
 export function DuelSideRow({ side, duel, onClose }: { side: DuelSide; duel: Duel; onClose: () => void }) {

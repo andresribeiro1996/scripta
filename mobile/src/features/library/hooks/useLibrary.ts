@@ -23,9 +23,9 @@ export function useLibrarySaver(): LibrarySaver {
   return saver;
 }
 
-export function useLibrary() {
+export function useLibrary({ enabled = true }: { enabled?: boolean } = {}) {
   const saver = useLibrarySaver();
-  const query = useQuery({ queryKey: LIBRARY_QUERY_KEY, queryFn: () => saver.fetch() });
+  const query = useQuery({ queryKey: LIBRARY_QUERY_KEY, queryFn: () => saver.fetch(), enabled });
 
   function updateLibrary(updater: (current: LibraryData) => LibraryData, source?: "import"): Promise<LibraryDocument> {
     return saver.saveWhole(updater, { source });

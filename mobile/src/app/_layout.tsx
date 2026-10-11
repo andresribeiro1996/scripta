@@ -11,7 +11,7 @@ import { AuthProvider, useAuth } from "../core/auth";
 import { createAccountLibrarySaver, LibrarySaverContext } from "../features/library/hooks/useLibrary";
 import { FONT_ASSETS } from "../ui/fontAssets";
 import { ThemeProvider, useTheme } from "../ui/theme";
-import { useScreenOptions } from "../ui/navigation";
+import { useScreenOptions, useSheetOptions } from "../ui/navigation";
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -46,7 +46,15 @@ function ThemedStatusBar() {
 // public arena, the shared-link screens) get the same themed chrome as the tab
 // stacks. Headers stay off by default: most root routes are full-bleed.
 function RootStack() {
-  return <Stack screenOptions={{ ...useScreenOptions(), headerShown: false }} />;
+  const sheet = { ...useSheetOptions(), headerShown: true };
+  return (
+    <Stack screenOptions={{ ...useScreenOptions(), headerShown: false }}>
+      <Stack.Screen name="(app)" />
+      <Stack.Screen name="(public)/book/[key]/style" options={{ ...sheet, title: "Card style" }} />
+      <Stack.Screen name="(public)/book/[key]/cover" options={{ ...sheet, title: "Cover" }} />
+      <Stack.Screen name="(public)/book/[key]/finished" options={{ ...sheet, title: "Finished" }} />
+    </Stack>
+  );
 }
 
 function HideSplash() {

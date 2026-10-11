@@ -9,8 +9,8 @@ function deps(overrides: Partial<WorksDeps> = {}): WorksDeps {
     getWorkPage: (id) => (id === "old" || id === "w" ? {
       id: "w", title: "Dune", author: "Frank Herbert", summary: null, aliasIds: ["w", "old"],
       editions: [
-        { bookId: "e1", title: "Dune", language: "en", year: 1965, isbn: "9780441013593", summary: null, coverUrl: null },
-        { bookId: "e2", title: "Duna", language: "pt-BR", year: 2017, isbn: "9788576573135", summary: "Especiaria.", coverUrl: "cover:e2" }
+        { bookId: "e1", title: "Dune", language: "en", year: 1965, isbn: "9780441013593", summary: null, coverUrl: null, genres: [], rating: null, ratingCount: 0, pages: null },
+        { bookId: "e2", title: "Duna", language: "pt-BR", year: 2017, isbn: "9788576573135", summary: "Especiaria.", coverUrl: "cover:e2", genres: [], rating: null, ratingCount: 0, pages: null }
       ]
     } : undefined),
     holdersOfWorks: () => [
@@ -63,8 +63,8 @@ function pageWith(summary: string | null, editionSummaries: [string | null, stri
   return () => ({
     id: "w", title: "Dune", author: "Frank Herbert", summary, aliasIds: ["w"],
     editions: [
-      { bookId: "e1", title: "Dune", language: "en", year: 1965, isbn: "9780441013593", summary: editionSummaries[0], coverUrl: null },
-      { bookId: "e2", title: "Duna", language: "pt-BR", year: 2017, isbn: "9788576573135", summary: editionSummaries[1], coverUrl: null }
+      { bookId: "e1", title: "Dune", language: "en", year: 1965, isbn: "9780441013593", summary: editionSummaries[0], coverUrl: null, genres: [], rating: null, ratingCount: 0, pages: null },
+      { bookId: "e2", title: "Duna", language: "pt-BR", year: 2017, isbn: "9788576573135", summary: editionSummaries[1], coverUrl: null, genres: [], rating: null, ratingCount: 0, pages: null }
     ]
   });
 }
@@ -122,4 +122,45 @@ test("readers are capped at 50, followed first, while counts cover everyone visi
   assert.equal(page.readers.followed[0]!.username, "u59");
   assert.equal(page.readers.followed.length + page.readers.others.length, 50);
   assert.deepEqual(page.readers.counts, { readers: 60, finished: 60 });
+});
+
+type Edition = NonNullable<ReturnType<WorksDeps["getWorkPage"]>>["editions"][number];
+const edition = (bookId: string, isbn: string | null, extra: Partial<Edition>): Edition => ({
+  bookId, title: "Dune", language: "en", year: null, isbn, summary: null, coverUrl: null, genres: [], rating: null, ratingCount: 0, pages: null, ...extra
+});
+const pageOf = (editions: Edition[]): WorksDeps["getWorkPage"] => () => ({ id: "w", title: "Dune", author: "Frank Herbert", summary: null, aliasIds: ["w"], editions });
+
+test("genres: most editions first, capped at three", () => {
+  const getWorkPage = pageOf([
+    edition("e1", null, { genres: ["Fantasy", "Classics"] }),
+    edition("e2", null, { genres: ["Classics", "Horror", "Romance"] }),
+    edition("e3", null, { genres: ["Classics", "Horror"] })
+  ]);
+  assert.deepEqual(createWorksService(deps({ getWorkPage })).getPage("w", null)!.work.genres, ["Classics", "Horror", "Fantasy"]);
+});
+
+test("rating comes from the edition with the most ratings, ignoring invalid ones", () => {
+  const getWorkPage = pageOf([
+    edition("e1", null, { rating: 4.5, ratingCount: 10 }),
+    edition("e2", null, { rating: 3.9, ratingCount: 300 }),
+    edition("e3", null, { rating: 7, ratingCount: 900 })
+  ]);
+  assert.deepEqual(createWorksService(deps({ getWorkPage })).getPage("w", null)!.work.rating, { value: 3.9, count: 300 });
+});
+
+test("year is the earliest edition's; pages prefer the viewer's edition", () => {
+  const getWorkPage = pageOf([
+    edition("e1", "9788576573135", { year: 2017, pages: 680 }),
+    edition("e2", "9780441013593", { year: 1965, pages: 412 })
+  ]);
+  const signedIn = createWorksService(deps({ getWorkPage })).getPage("w", "viewer")!.work;
+  const signedOut = createWorksService(deps({ getWorkPage })).getPage("w", null)!.work;
+  assert.equal(signedIn.year, 1965);
+  assert.equal(signedIn.pages, 412);
+  assert.equal(signedOut.pages, 680);
+});
+
+test("editions without details give no genres, rating, year or pages", () => {
+  const work = createWorksService(deps({ getWorkPage: pageOf([edition("e1", null, {})]) })).getPage("w", null)!.work;
+  assert.deepEqual([work.genres, work.rating, work.year, work.pages], [[], null, null, null]);
 });

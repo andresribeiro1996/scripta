@@ -1,33 +1,34 @@
 import { useEffect, useState } from "react";
 import { router, Stack, useSegments } from "expo-router";
-import { useQuery } from "@tanstack/react-query";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
-import { editionLabel } from "@scripta/shared";
-import { Text } from "../../ui/Text";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { StyleSheet } from "react-native";
+import { bookKey, bookScreenModel } from "@scripta/shared";
 import { isPermanentError } from "../../core/apiClient";
-import { Button, ErrorState, HeaderActions, IconButton, Screen, Skeleton, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
-import { BookCover } from "../arena/BookCover";
+import { useAuth } from "../../core/auth";
+import { ErrorState, HeaderActions, IconButton, Menu, Screen, Skeleton, Toast, spacing } from "../../ui";
 import { AddBookSheet } from "../community/AddBookSheet";
-import { AuthorAvatar, openProfile } from "../community/AuthorAvatar";
-import { ReaderGlyph } from "../community/ReaderGlyph";
+import { LIBRARY_QUERY_KEY, useLibrary } from "../library/hooks/useLibrary";
 import { ContentShareSheet } from "../sharing/ContentShareSheet";
 import { publicContentUrl } from "../sharing/links";
 import { fetchWork } from "./api";
-import { workScreenSections } from "./workScreenModel";
+import { BookScreen, bookMenuItems } from "./BookScreen";
+import { workPath } from "./workPath";
 
 export function WorkScreen({ id }: { id: string }) {
-  const { colors } = useTheme();
   const [adding, setAdding] = useState(false);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [shareError, setShareError] = useState<string | null>(null);
-  const [aboutOpen, setAboutOpen] = useState(false);
-  const inTabs = useSegments()[0] === "(app)";
+  const segments = useSegments();
+  const signedIn = useAuth().user !== null;
+  const libraryQuery = useLibrary({ enabled: signedIn });
+  const queryClient = useQueryClient();
   const query = useQuery({ queryKey: ["works", id], queryFn: () => fetchWork(id), retry: false });
   const canonicalId = query.data?.work.id;
+  const canonicalPath = canonicalId && canonicalId !== id ? workPath(canonicalId, segments) : null;
 
   useEffect(() => {
-    if (canonicalId && canonicalId !== id) router.replace(`/work/${canonicalId}` as never);
-  }, [canonicalId, id]);
+    if (canonicalPath) router.replace(canonicalPath as never);
+  }, [canonicalPath]);
 
   const untitled = <Stack.Screen options={{ headerShown: true, title: "" }} />;
   if (!query.data && query.isError) {
@@ -48,7 +49,23 @@ export function WorkScreen({ id }: { id: string }) {
 
   const page = query.data;
   const { work } = page;
-  const model = workScreenSections(page);
+  const book = page.mine ? libraryQuery.data?.data.books.find((b) => bookKey(b) === page.mine!.bookKey) ?? null : null;
+  if (page.mine && !book && libraryQuery.isFetching) return <Screen bottom top={false} style={styles.centered}>{untitled}<Skeleton height={160} /></Screen>;
+  if (page.mine && !book && libraryQuery.isError) {
+    return (
+      <Screen bottom top={false} style={styles.centered}>
+        {untitled}
+        <ErrorState
+          title="Library unavailable"
+          body={libraryQuery.error instanceof Error ? libraryQuery.error.message : "Couldn't load your library."}
+          actionLabel="Retry"
+          onAction={() => void libraryQuery.refetch()}
+        />
+      </Screen>
+    );
+  }
+  const model = bookScreenModel(page, book, { isAdmin: false });
+  const menuItems = book && page.mine ? bookMenuItems(model, page.mine.bookKey, segments) : [];
   const firstEdition = work.editions.find((edition) => edition.isbn) ?? work.editions[0];
 
   async function share() {
@@ -60,11 +77,6 @@ export function WorkScreen({ id }: { id: string }) {
     }
   }
 
-  const heading = (title: string) => (
-    <Text accessibilityRole="header" {...dynamicType} style={[typography.title, { color: colors.text }]}>{title}</Text>
-  );
-  const card = [styles.card, { backgroundColor: colors.surface, borderColor: colors.border }];
-
   return (
     <Screen bottom top={false}>
       <Stack.Screen
@@ -74,96 +86,13 @@ export function WorkScreen({ id }: { id: string }) {
           headerRight: () => (
             <HeaderActions>
               <IconButton framed name="share" accessibilityLabel="Share book" onPress={() => void share()} />
+              {menuItems.length > 0 ? <Menu title={work.title} items={menuItems}><IconButton framed accessibilityLabel="Book actions" name="more" /></Menu> : null}
             </HeaderActions>
           ),
         }}
       />
       {shareError ? <Toast visible message={shareError} tone="error" /> : null}
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.hero}>
-          <BookCover cover={work.coverUrl} title={work.title} width={96} height={138} />
-          <View style={styles.grow}>
-            <Text {...dynamicType} style={[typography.heading, { color: colors.text }]}>{work.title}</Text>
-            <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{work.author}</Text>
-          </View>
-        </View>
-
-        {model.about ? (
-          <View style={styles.section}>
-            {heading("About this book")}
-            <Text {...dynamicType} style={[typography.body, { color: colors.text }]}>{aboutOpen || !model.aboutPreview ? model.about : model.aboutPreview}</Text>
-            {model.aboutPreview ? <Button label={aboutOpen ? "Show less" : "Show more"} variant="secondary" onPress={() => setAboutOpen(!aboutOpen)} /> : null}
-          </View>
-        ) : null}
-
-        <View style={styles.section}>
-          {heading("Editions")}
-          {work.editions.map((edition) => (
-            <Text key={edition.bookId} {...dynamicType} style={[typography.body, { color: colors.textDim }]}>
-              <Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>{edition.title}</Text>
-              {` · ${editionLabel(edition)}${edition.mine ? " · Yours" : ""}`}
-            </Text>
-          ))}
-        </View>
-
-        <View style={styles.section}>
-          {heading("Your copy")}
-          {model.mine ? (
-            <View style={card}>
-              <Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>{model.mine.status}</Text>
-              <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{model.mine.detail}</Text>
-            </View>
-          ) : (
-            <View style={card}>
-              <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>Not in your library</Text>
-              <Button label="Add to library" variant="primary" onPress={() => setAdding(true)} />
-            </View>
-          )}
-        </View>
-
-        <View style={styles.section}>
-          {heading("Readers")}
-          <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{model.countsLabel}</Text>
-          {model.readerGroups.map((group) => (
-            <View key={group.key} style={styles.group}>
-              {group.title ? <Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.textDim }]}>{group.title}</Text> : null}
-              {group.rows.map((row) => {
-                const body = (
-                  <>
-                    <AuthorAvatar username={row.username} avatarUrl={row.avatarUrl} />
-                    <View style={styles.nameRow}>
-                      <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, styles.name, { color: colors.text }]}>{row.username}</Text>
-                      <ReaderGlyph identity={row.readerGlyph} />
-                    </View>
-                    <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{row.status}</Text>
-                  </>
-                );
-                return row.linksToProfile && inTabs ? (
-                  <Pressable key={row.username} accessibilityRole="button" accessibilityLabel={`Open ${row.username}'s profile, ${row.status}`} onPress={() => openProfile(row.username)} style={[card, styles.row]}>
-                    {body}
-                  </Pressable>
-                ) : (
-                  <View key={row.username} style={[card, styles.row]}>{body}</View>
-                );
-              })}
-            </View>
-          ))}
-        </View>
-
-        <View style={styles.section}>
-          {heading("Games")}
-          {model.gamesEmpty ? (
-            <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>No public games use this book yet.</Text>
-          ) : (
-            model.games.map((game) => (
-              <Pressable key={game.key} accessibilityRole="button" accessibilityLabel={`${game.title}, ${game.detail}`} onPress={() => router.push(game.path as never)} style={card}>
-                <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>{game.title}</Text>
-                <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{game.detail}</Text>
-              </Pressable>
-            ))
-          )}
-        </View>
-      </ScrollView>
+      <BookScreen page={page} book={book} model={model} signedIn={signedIn} onAdd={() => setAdding(true)} />
       <ContentShareSheet visible={shareUrl !== null} onClose={() => setShareUrl(null)} title={work.title} url={shareUrl} />
       {adding ? (
         <AddBookSheet
@@ -171,6 +100,7 @@ export function WorkScreen({ id }: { id: string }) {
           onClose={() => {
             setAdding(false);
             void query.refetch();
+            void queryClient.invalidateQueries({ queryKey: LIBRARY_QUERY_KEY });
           }}
         />
       ) : null}
@@ -180,14 +110,4 @@ export function WorkScreen({ id }: { id: string }) {
 
 const styles = StyleSheet.create({
   centered: { padding: spacing.lg, gap: spacing.md },
-  content: { padding: spacing.lg, gap: spacing.xl, paddingBottom: spacing.huge },
-  hero: { flexDirection: "row", gap: spacing.lg },
-  grow: { flex: 1, gap: spacing.xs },
-  section: { gap: spacing.sm },
-  group: { gap: spacing.sm },
-  strong: { fontWeight: "700" },
-  card: { borderWidth: 1, borderRadius: radii.lg, padding: spacing.md, gap: spacing.sm },
-  row: { flexDirection: "row", alignItems: "center" },
-  nameRow: { flex: 1, flexDirection: "row", alignItems: "center", gap: spacing.xs },
-  name: { flexShrink: 1 },
 });

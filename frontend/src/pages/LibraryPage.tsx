@@ -3,29 +3,18 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
-  addReaderNote,
   buildMergedLibrary,
   findDuplicates,
   LIBRARY_CSV_TEMPLATE,
-  newId,
-  readSnapshot,
-  removeReaderNote,
-  restoreReadState,
-  saveFailureMessage,
-  setRating,
-  type FinishRating,
-  type ReadSnapshot
+  saveFailureMessage
 } from "@scripta/shared";
-import type { GalleryImage } from "../api/gallery";
 import type { LibraryData, LibraryDocument } from "../api/library";
 import { AddBookModal } from "../components/AddBookModal";
 import { BookCard } from "../components/BookCard";
-import { BookDetailSheet } from "../components/BookDetailSheet";
 import { BookGrid } from "../components/BookGrid";
 import { CoverPickerModal } from "../components/CoverPickerModal";
 import { DuplicatesSheet } from "../components/DuplicatesSheet";
 import { EmptyState } from "../components/EmptyState";
-import { FinishSheet } from "../components/FinishSheet";
 import { LibraryCanvas } from "../components/LibraryCanvas";
 import { LibraryToolbar } from "../components/LibraryToolbar";
 import { LibraryIcon } from "../components/NavIcons";
@@ -37,16 +26,16 @@ import { SyncGoodreadsModal } from "../components/SyncGoodreadsModal";
 import { SkeletonBookGrid } from "../components/Skeleton";
 import { useToast } from "../components/Toaster";
 import { FilterIcon } from "../components/Toolbar";
+import { useBookActions } from "../hooks/useBookActions";
 import { useDelayedShow } from "../hooks/useDelayedShow";
 import { useLibrary } from "../hooks/useLibrary";
 import { useLibrarySaver } from "../hooks/useLibrarySaver";
 import { useMurals } from "../hooks/useMurals";
-import { clearBookCover, setBookCover } from "../lib/bookCovers";
 import { parseImportedFile } from "../lib/fileImport";
 import { removeBooksFromAllGroups } from "../lib/groups";
 import { orderLibraryBooks, reorderOnDrop, seriesGroupByBookKey } from "../lib/libraryOrder";
 import { effectiveCardStyle, resolveLibraryStyle, type PerCardStyle } from "../lib/libraryStyle";
-import { filterBooks, localDay, sortBooks, type ReadStatus, type SortKey, type StatusFilter } from "../lib/libraryView";
+import { bookHref, filterBooks, SORT_OPTIONS, sortBooks, STATUS_FILTER_OPTIONS, type SortKey, type StatusFilter } from "../lib/libraryView";
 import { bookKey } from "../lib/merge";
 import { saveWithViewTransition } from "../lib/viewTransition";
 import { restoreDeletedBooks } from "../lib/restoreDeletedBooks";
@@ -72,6 +61,7 @@ export function LibraryPage() {
     return [...certain, ...likely];
   }, [library]);
   const toast = useToast();
+  const bookActions = useBookActions();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const suppressClickAfterDragRef = useRef(false);
   const sensors = useSensors(
@@ -88,15 +78,31 @@ export function LibraryPage() {
   const [nameDraft, setNameDraft] = useState("");
   const [styleBookKey, setStyleBookKey] = useState<string | null>(null);
   const [coverBookKey, setCoverBookKey] = useState<string | null>(null);
-  const [detailBookKey, setDetailBookKey] = useState<string | null>(null);
-  const [finishing, setFinishing] = useState<{ key: string; before: ReadSnapshot } | null>(null);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [sharing, setSharing] = useState(false);
-  const [query, setQuery] = useState(searchParams.get("q") ?? "");
-  useEffect(() => { setQuery(searchParams.get("q") ?? ""); setAddingBook(searchParams.get("action") === "add"); }, [searchParams]);
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [sortKey, setSortKey] = useState<SortKey>("manual");
+  const urlQuery = searchParams.get("q") ?? "";
+  const [query, setQuery] = useState(urlQuery);
+  useEffect(() => { setQuery(urlQuery); }, [urlQuery]);
+  useEffect(() => { setAddingBook(searchParams.get("action") === "add"); }, [searchParams]);
+  const statusParam = searchParams.get("status");
+  const statusFilter = STATUS_FILTER_OPTIONS.find((option) => option.value === statusParam)?.value ?? "all";
+  const sortParam = searchParams.get("sort");
+  const sortKey = SORT_OPTIONS.find((option) => option.value === sortParam)?.value ?? "manual";
+  function updateView(changes: { status?: StatusFilter; sort?: SortKey }) {
+    const defaults = { status: "all", sort: "manual" };
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        for (const [name, value] of Object.entries(changes)) {
+          if (value === defaults[name as keyof typeof defaults]) next.delete(name);
+          else next.set(name, value);
+        }
+        return next;
+      },
+      { replace: true }
+    );
+  }
 
   async function handleRenameLibrary() {
     const name = nameDraft.trim();
@@ -186,126 +192,6 @@ export function LibraryPage() {
       handleReorder(String(e.active.id), String(e.over.id));
     }
     if (e.activatorEvent instanceof KeyboardEvent) suppressClickAfterDragRef.current = true;
-  }
-
-  // A book's own style override — highest priority, takes effect
-  // everywhere that book renders (this page, Series, Collections). See
-  // BookCard.tsx's "Style" button and lib/libraryStyle.ts's
-  // effectiveCardStyle for the full priority chain.
-  async function handleSaveBookStyle(book: Record<string, unknown>, bookStyle: PerCardStyle | undefined) {
-    const current = queryClient.getQueryData<LibraryDocument>(["library"]);
-    if (!current) return;
-    const key = bookKey(book);
-    try {
-      await updateLibrary((data) => ({
-        ...data,
-        books: data.books.map((b) => (bookKey(b) === key ? { ...b, _style: bookStyle } : b))
-      }));
-    } catch (error) {
-      toast({ message: saveFailureMessage(error, "Couldn't save the style change."), kind: "error" });
-    }
-  }
-
-  async function handleSetBookStatus(book: Record<string, unknown>, status: ReadStatus): Promise<boolean> {
-    const current = queryClient.getQueryData<LibraryDocument>(["library"]);
-    if (!current) return false;
-    const key = bookKey(book);
-    const day = localDay();
-    const result = await saver.submit(status === 2 ? { kind: "book", bookKey: key, readStatus: 2, day } : { kind: "book", bookKey: key, readStatus: status });
-    if (!result.ok) toast({ message: saveFailureMessage(result.error, "Couldn't save the status change."), kind: "error" });
-    return result.ok;
-  }
-
-  async function handleSetRating(book: Record<string, unknown>, rating: FinishRating): Promise<boolean> {
-    const current = queryClient.getQueryData<LibraryDocument>(["library"]);
-    if (!current) return false;
-    const key = bookKey(book);
-    if (setRating(book, rating) === book) return true;
-    const result = await saver.submit({ kind: "book", bookKey: key, rating });
-    if (!result.ok) toast({ message: saveFailureMessage(result.error, "Couldn't save the rating."), kind: "error" });
-    return result.ok;
-  }
-
-  async function handleAddNote(book: Record<string, unknown>, text: string): Promise<boolean> {
-    const current = queryClient.getQueryData<LibraryDocument>(["library"]);
-    if (!current) return false;
-    const key = bookKey(book);
-    try {
-      await updateLibrary((data) => ({
-        ...data,
-        books: data.books.map((b) => (bookKey(b) === key ? addReaderNote(b, text, localDay(), newId()) : b))
-      }));
-      return true;
-    } catch (error) {
-      toast({ message: saveFailureMessage(error, "Couldn't save your note."), kind: "error" });
-      return false;
-    }
-  }
-
-  async function handleDeleteNote(book: Record<string, unknown>, bookmarkId: string): Promise<boolean> {
-    const current = queryClient.getQueryData<LibraryDocument>(["library"]);
-    if (!current) return false;
-    const key = bookKey(book);
-    try {
-      await updateLibrary((data) => ({
-        ...data,
-        books: data.books.map((b) => (bookKey(b) === key ? removeReaderNote(b, bookmarkId) : b))
-      }));
-      return true;
-    } catch (error) {
-      toast({ message: saveFailureMessage(error, "Couldn't delete the note."), kind: "error" });
-      return false;
-    }
-  }
-
-  async function handleRestoreRead(book: Record<string, unknown>, before: ReadSnapshot): Promise<boolean> {
-    const current = queryClient.getQueryData<LibraryDocument>(["library"]);
-    if (!current) return false;
-    const key = bookKey(book);
-    try {
-      await updateLibrary((data) => ({
-        ...data,
-        books: data.books.map((b) => (bookKey(b) === key ? restoreReadState(b, before) : b))
-      }));
-      return true;
-    } catch (error) {
-      toast({ message: saveFailureMessage(error, "Couldn't undo the status change."), kind: "error" });
-      return false;
-    }
-  }
-
-  // Assigning/clearing a gallery image as a book's cover — see
-  // lib/bookCovers.ts. Same read-current/mutate/save shape as
-  // handleSaveBookStyle above; CoverPickerModal.tsx itself owns the
-  // gallery-side upload/delete calls (hooks/useGalleryImages.ts /
-  // useDeleteGalleryImage.ts), these two only ever touch this one book's
-  // fields on the library document.
-  async function handleSaveBookCover(book: Record<string, unknown>, image: GalleryImage) {
-    const current = queryClient.getQueryData<LibraryDocument>(["library"]);
-    if (!current) return;
-    const key = bookKey(book);
-    try {
-      await updateLibrary((data) => ({
-        ...data,
-        books: data.books.map((b) => (bookKey(b) === key ? setBookCover(b, image.id, image.url) : b))
-      }));
-    } catch (error) {
-      toast({ message: saveFailureMessage(error, "Couldn't save the cover change."), kind: "error" });
-    }
-  }
-
-  async function handleRemoveBookCover(book: Record<string, unknown>) {
-    const current = queryClient.getQueryData<LibraryDocument>(["library"]);
-    if (!current) return;
-    const key = bookKey(book);
-    try {
-      await updateLibrary((data) => ({
-        ...data,
-        books: data.books.map((b) => (bookKey(b) === key ? clearBookCover(b) : b))
-      }));
-    } catch (error) {
-      toast({ message: saveFailureMessage(error, "Couldn't save the cover change."), kind: "error" });
-    }
   }
 
   // Select mode: turn it on, tap cards to build up a selection, then
@@ -399,9 +285,6 @@ export function LibraryPage() {
   const bookSeriesGroup = useMemo(() => seriesGroupByBookKey(library?.data.books ?? [], library?.data.groups ?? []), [library]);
   const styleBook = styleBookKey ? books.find((b) => bookKey(b) === styleBookKey) : null;
   const coverBook = coverBookKey ? books.find((b) => bookKey(b) === coverBookKey) : null;
-  const detailKey = detailBookKey ?? searchParams.get("book");
-  const detailBook = detailKey ? books.find((b) => bookKey(b) === detailKey) : null;
-  const finishingBook = finishing ? books.find((b) => bookKey(b) === finishing.key) : null;
 
   // The phone's only route to these actions — there is no header on a
   // phone to hold them. Passed to LibraryToolbar as ITEMS rather than a
@@ -585,9 +468,9 @@ export function LibraryPage() {
           query={query}
           onQueryChange={setQuery}
           status={statusFilter}
-          onStatusChange={setStatusFilter}
+          onStatusChange={(status) => updateView({ status })}
           sort={sortKey}
-          onSortChange={setSortKey}
+          onSortChange={(sort) => updateView({ sort })}
           // Phone-only; see the `actionItems` definition above.
           actions={selectionMode ? undefined : actionItems}
         />
@@ -648,8 +531,7 @@ export function LibraryPage() {
               <button
                 onClick={() => {
                   setQuery("");
-                  setStatusFilter("all");
-                  setSortKey("manual");
+                  updateView({ status: "all", sort: "manual" });
                 }}
                 className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3.5 py-2.5 text-sm hover:bg-(--color-surface-hover)"
               >
@@ -694,7 +576,7 @@ export function LibraryPage() {
                         suppressClickAfterDragRef.current = false;
                         return;
                       }
-                      setDetailBookKey(bookKey(book));
+                      navigate(bookHref(bookKey(book), library?.works));
                     }}
                     style={cardStyle}
                     reorderable={!selectionMode}
@@ -711,42 +593,6 @@ export function LibraryPage() {
         </DndContext>
       )}
 
-      {detailBook && (
-        <BookDetailSheet
-          book={detailBook}
-          workId={library?.works?.[bookKey(detailBook)]}
-          onOpenStyle={(b) => setStyleBookKey(bookKey(b))}
-          onOpenCoverPicker={(b) => setCoverBookKey(bookKey(b))}
-          onSetStatus={async (b, status) => {
-            const before = readSnapshot(b);
-            const wasFinished = b.ReadStatus === 2;
-            if ((await handleSetBookStatus(b, status)) && status === 2 && !wasFinished) setFinishing({ key: bookKey(b), before });
-          }}
-          onSetRating={(b, rating) => void handleSetRating(b, rating)}
-          onDeleteNote={(b, bookmarkId) => void handleDeleteNote(b, bookmarkId)}
-          onClose={() => {
-            setDetailBookKey(null);
-            if (searchParams.has("book")) {
-              const next = new URLSearchParams(searchParams);
-              next.delete("book");
-              setSearchParams(next, { replace: true });
-            }
-          }}
-        />
-      )}
-
-      {finishingBook && finishing && (
-        <FinishSheet
-          book={finishingBook}
-          books={books}
-          before={finishing.before}
-          onSetRating={handleSetRating}
-          onAddNote={handleAddNote}
-          onRestoreRead={handleRestoreRead}
-          onClose={() => setFinishing(null)}
-        />
-      )}
-
       {styleBook && (
         <PerCardStylePanel
           idPrefix="book"
@@ -757,7 +603,7 @@ export function LibraryPage() {
           // the chain — its series' style if it's in a customized one,
           // not from a blank slate.
           seedStyle={effectiveCardStyle(style, bookSeriesGroup.get(styleBookKey ?? "")?.style)}
-          onSave={(bookStyle) => handleSaveBookStyle(styleBook, bookStyle)}
+          onSave={(bookStyle) => bookActions.saveStyle(styleBook, bookStyle)}
           onClose={() => setStyleBookKey(null)}
         />
       )}
@@ -767,8 +613,8 @@ export function LibraryPage() {
           title={String(coverBook.Title ?? "Untitled")}
           currentImageId={typeof coverBook._coverImageId === "string" ? coverBook._coverImageId : null}
           removeCoverLabel="Remove custom cover — go back to the normal auto-detected one"
-          onSelect={(image) => void handleSaveBookCover(coverBook, image)}
-          onRemoveCover={() => void handleRemoveBookCover(coverBook)}
+          onSelect={(image) => void bookActions.saveCover(coverBook, image)}
+          onRemoveCover={() => void bookActions.removeCover(coverBook)}
           onClose={() => setCoverBookKey(null)}
         />
       )}

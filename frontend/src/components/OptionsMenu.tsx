@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useDismissible } from "../hooks/useDismissible";
 
@@ -9,6 +9,7 @@ export interface OptionsMenuItem {
    *  action in the app already uses (ConfirmDialog's own confirm button,
    *  GroupsPage's "Delete" text link). */
   danger?: boolean;
+  checked?: boolean;
 }
 
 const MENU_WIDTH = 132;
@@ -53,7 +54,8 @@ function GearIcon() {
 export function OptionsMenu({
   items,
   title = "Settings",
-  triggerClassName = "flex h-6 w-6 items-center justify-center rounded-full bg-[rgba(10,8,6,0.72)] text-white backdrop-blur-xs"
+  triggerClassName = "flex h-6 w-6 items-center justify-center rounded-full bg-[rgba(10,8,6,0.72)] text-white backdrop-blur-xs",
+  trigger
 }: {
   items: OptionsMenuItem[];
   title?: string;
@@ -63,6 +65,7 @@ export function OptionsMenu({
    *  what's underneath), a plain ghost icon for one sitting on a flat
    *  card background — only the gear glyph inside is fixed. */
   triggerClassName?: string;
+  trigger?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
@@ -82,36 +85,39 @@ export function OptionsMenu({
   function toggle(e: React.MouseEvent<HTMLButtonElement>) {
     e.stopPropagation();
     const rect = e.currentTarget.getBoundingClientRect();
-    setPosition({ top: rect.bottom + 4, left: rect.right - MENU_WIDTH });
+    setPosition({ top: rect.bottom + 4, left: Math.max(8, rect.width > MENU_WIDTH ? rect.left : rect.right - MENU_WIDTH) });
     setOpen((o) => !o);
   }
 
   return (
     <>
       <button onClick={toggle} title={title} className={triggerClassName}>
-        <GearIcon />
+        {trigger ?? <GearIcon />}
       </button>
       {open &&
         position &&
         createPortal(
           <div
             ref={menuRef}
-            style={{ top: position.top, left: position.left, width: MENU_WIDTH }}
+            style={{ top: position.top, left: position.left, minWidth: MENU_WIDTH }}
             className="menu-in fixed z-50 overflow-hidden rounded-lg border border-(--color-border) bg-(--color-surface) py-1 text-sm shadow-lg"
           >
             {items.map((item) => (
               <button
                 key={item.label}
+                role={item.checked === undefined ? undefined : "menuitemradio"}
+                aria-checked={item.checked}
                 onClick={(e) => {
                   e.stopPropagation();
-                  item.onClick();
+                  if (!item.checked) item.onClick();
                   setOpen(false);
                 }}
-                className={`block w-full px-3 py-1.5 text-left ${
+                className={`flex w-full items-center justify-between gap-3 px-3 py-1.5 text-left ${
                   item.danger ? "text-(--color-danger) hover:bg-(--color-danger-soft)" : "hover:bg-(--color-surface-hover)"
                 }`}
               >
                 {item.label}
+                {item.checked ? <span aria-hidden="true">✓</span> : null}
               </button>
             ))}
           </div>,

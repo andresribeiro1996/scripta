@@ -8,15 +8,6 @@ import { keepTabInside } from "../lib/keepTabInside";
  *  click-outside dismissal, and the bottom-anchored-on-mobile /
  *  centered-on-desktop positioning.
  *
- *  Factored out at the third usage, not the second. OptionSheet arrived
- *  alone and copied BookDetailSheet's shell deliberately — with two
- *  usages the right seam wasn't obvious. ActionSheet below made three,
- *  and by then the shell was the same three times over, so it moved
- *  here. BookDetailSheet deliberately still has its own: it needs a
- *  scrolling body with a max height and a header row with a Close
- *  button, and bending this to cover that would make it a worse fit for
- *  both. What matters is that they don't LOOK like different systems.
- *
  *  Not portaled, unlike OptionsMenu. That component portals because its
  *  trigger can sit inside a transformed, overflow-hidden mural block,
  *  which would both clip it and silently re-anchor its `fixed`
@@ -51,9 +42,8 @@ export function Sheet({
     <div className="overlay-in fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center sm:p-4" onClick={onClose}>
       <div
         // The bottom padding carries the safe-area inset: a sheet's rows
-        // run to the very bottom edge (unlike BookDetailSheet's
-        // scrolling body), so without it the last row sits under a
-        // gesture bar.
+        // run to the very bottom edge, so without it the last row sits
+        // under a gesture bar.
         className="flex max-h-[90dvh] w-full flex-col overflow-hidden rounded-t-3xl bg-(--color-surface) pb-[env(safe-area-inset-bottom,0px)] shadow-xl sm:max-w-md sm:rounded-2xl sm:pb-0"
         style={style}
         onClick={(e) => e.stopPropagation()}

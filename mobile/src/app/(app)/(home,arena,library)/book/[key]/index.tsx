@@ -1,0 +1,51 @@
+import { useCallback } from "react";
+import { router, Stack, useFocusEffect, useLocalSearchParams, useSegments } from "expo-router";
+import { bookScreenModel } from "@scripta/shared";
+import { BookScreen, bookMenuItems } from "@/features/works/BookScreen";
+import { useBook } from "@/features/library/hooks/useBook";
+import { useLibrary } from "@/features/library/hooks/useLibrary";
+import { ErrorState, HeaderActions, IconButton, Menu, Screen, Skeleton } from "@/ui";
+
+export default function BookRoute() {
+  const { key } = useLocalSearchParams<{ key: string }>();
+  const { book, loading, workId } = useBook(key);
+  const { isError, refetch } = useLibrary();
+
+  const segments = useSegments();
+
+  useFocusEffect(useCallback(() => {
+    if (workId) router.replace(`/work/${workId}` as never);
+  }, [workId]));
+
+  const model = book ? bookScreenModel(null, book, { isAdmin: false }) : null;
+  const menuItems = model && key ? bookMenuItems(model, decodeURIComponent(key), segments) : [];
+
+  return (
+    <Screen bottom top={false}>
+      <Stack.Screen
+        options={{
+          headerShown: true,
+          title: "",
+          headerRight: menuItems.length > 0
+            ? () => (
+                <HeaderActions>
+                  <Menu items={menuItems}>
+                    <IconButton framed accessibilityLabel="Book actions" name="more" />
+                  </Menu>
+                </HeaderActions>
+              )
+            : undefined,
+        }}
+      />
+      {loading || workId ? (
+        <Skeleton height={180} />
+      ) : book && model ? (
+        <BookScreen page={null} book={book} model={model} signedIn onAdd={() => {}} />
+      ) : isError ? (
+        <ErrorState body="Couldn't load your library." actionLabel="Retry" onAction={() => void refetch()} />
+      ) : (
+        <ErrorState title="Book not found" body="It may have been removed from your library." actionLabel="Back" onAction={() => router.back()} />
+      )}
+    </Screen>
+  );
+}
