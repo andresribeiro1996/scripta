@@ -18,10 +18,10 @@ Replace both with one book screen: a hero, the one or two controls used often, t
 ## Routing
 
 - `/work/:id` (web and mobile, signed in and public) renders the merged screen. It keeps its canonical-id redirect.
-- Library entry points (mobile `LibraryScreen`, `HomeScreen`, `GroupDetail`, `OwnLibraryPane`; web `LibraryPage`) navigate to `/work/<workId>` when `library.works[bookKey]` is set, else to `/book/<key>`.
+- Mobile library entry points (`LibraryScreen`, `HomeScreen`, `GroupDetail`, `OwnLibraryPane`) keep pushing `/book/<key>`; that route replaces itself with `/work/<workId>` when `library.works[bookKey]` is set. Web entry points (`LibraryPage` cards, `HomePage`) navigate straight to `/work/<workId>`, else to the new signed-in web route `/book/:key`.
 - `/book/<key>` with a resolved work id redirects (replace) to `/work/<workId>`. Unresolved, it renders the merged screen in library-only mode: hero from the library book, owner controls, Highlights tab only, no About details or Community.
 - Mobile: a pushed full screen, not a sheet. Web: a page; `BookDetailSheet` and the library's modal state go away.
-- `/book/<key>/style`, `/cover`, `/finished` stay as they are; the merged screen links to them using `mine.bookKey`.
+- `/book/<key>/style`, `/cover`, `/finished` stay as they are; the merged screen links to them using `mine.bookKey`. On mobile the `book/[key]` folder moves from `(home,library)` to `(home,arena,library)` so a book opened from the Arena tab reaches them in its own stack.
 - Web has no `/book/<key>/…` routes today: Style and Cover open as modals from `LibraryPage` state (`styleBookKey`, `CoverPickerModal`). The web screen needs the same actions reachable from `/work/:id`; the plan decides whether that is a route or the existing picker components mounted by the page.
 
 ## Data
@@ -61,7 +61,7 @@ Top to bottom (mobile; web narrow is the same):
 1. **Header** — back; right side: Share (existing behaviour), ⋯.
 2. **Hero** — centred cover (not tappable), title, author, up to 3 genre chips (not tappable), one meta line `★ 4.1 · 2.3k ratings · 2020 · 245 pages` with missing parts dropped and the line hidden when all are missing.
 3. **Primary row**
-   - Owned: status button showing the current status, opening a menu Want to read / Reading / Finished with a check on the current one. Picking Finished from another status runs the existing finish flow (`/book/<key>/finished?before=…`). When finished, a feeling button beside it opens the five `FINISH_FEELINGS`; unset it reads "How did it land?".
+   - Owned: status button showing the current status, opening a menu with the three `statusLabel` values (To read / Reading / Finished) with a check on the current one. Picking Finished from another status runs the existing finish flow (`/book/<key>/finished?before=…`). When finished, a feeling button beside it opens the five `FINISH_FEELINGS`; unset it reads "How did it land?".
    - Not owned: full-width "Add to library" → existing `AddBookSheet`.
 4. **Tab switch** — About · Highlights (n) · Community (n). Always opens on About (Highlights when it is the only tab). Tab content renders below in the same scroll.
 5. **About** — summary with the existing `summaryPreview` and Show more; "Editions" listing the first 3 (`editionLabel`, "Yours" marker) and "Show all N" expanding in place.
