@@ -15,15 +15,14 @@ test("tier letters split the range into five equal bands", () => {
 
 test("the strip shows every stat that exists, in a fixed order", () => {
   assert.deepEqual(bookStatsModel(full, openLibrary).strip, [
-    { key: "openLibrary", value: "★ 4.1", label: "Open Library" },
     { key: "community", value: "Loved it", label: "12 readers" },
     { key: "tiers", value: "B tier", label: "4 lists" },
     { key: "tournaments", value: "1 title", label: "3 tournaments" }
   ]);
 });
 
-test("while stats load, or with none, only Open Library shows", () => {
-  assert.deepEqual(bookStatsModel(null, openLibrary).strip.map((cell) => cell.key), ["openLibrary"]);
+test("while stats load, or with none, the strip is empty whatever Open Library says", () => {
+  assert.deepEqual(bookStatsModel(null, openLibrary).strip, []);
   assert.deepEqual(bookStatsModel({ community: null, tiers: null, tournaments: null }, null).strip, []);
 });
 

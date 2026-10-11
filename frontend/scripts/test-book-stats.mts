@@ -19,13 +19,11 @@ const sections = (stats: BookStats | null, ol: typeof rating | null) => renderTo
 test("the strip links to the stats page and shows each cell", () => {
   const html = strip(full, rating);
   assert.ok(html.includes('href="/work/w/stats"'));
-  for (const text of ["★ 4.1", "Open Library", "Loved it", "12 readers", "B tier", "4 lists", "1 title", "3 tournaments"]) assert.ok(html.includes(text), text);
+  for (const text of ["Loved it", "12 readers", "B tier", "4 lists", "1 title", "3 tournaments"]) assert.ok(html.includes(text), text);
 });
 
-test("while stats load or fail, the strip shows only Open Library", () => {
-  const html = strip(null, rating);
-  assert.ok(html.includes("★ 4.1"));
-  assert.ok(!html.includes("readers"));
+test("while stats load or fail, the strip renders nothing even with an Open Library rating", () => {
+  assert.equal(strip(null, rating), "");
 });
 
 test("with nothing to show, the strip renders nothing", () => {
