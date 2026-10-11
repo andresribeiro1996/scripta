@@ -3,13 +3,15 @@ import { router, useSegments } from "expo-router";
 import { Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { bookKey, editionLabel, readSnapshot, type BookScreenModel, type BookScreenTabKey, type ReadStatus, type WorkPage } from "@scripta/shared";
 import { Text } from "../../ui/Text";
-import { Button, Menu, Segmented, dynamicType, radii, spacing, typography, useTheme, type MenuItem } from "../../ui";
+import { Button, Icon, Menu, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme, type IconName, type MenuItem } from "../../ui";
 import { useLibraryActions } from "../library/hooks/useLibraryActions";
 import { BookCover } from "../arena/BookCover";
 import { CoverImage } from "../library/components/CoverImage";
 import { bookToolPath } from "./workPath";
 import { AuthorAvatar, openProfile } from "../community/AuthorAvatar";
 import { ReaderGlyph } from "../community/ReaderGlyph";
+
+const TAB_ICONS: Record<BookScreenTabKey, IconName> = { about: "info", highlights: "quote", community: "community" };
 
 export function bookMenuItems(model: BookScreenModel, key: string, segments: readonly string[]): MenuItem[] {
   const to = (tool: "style" | "cover") => () => router.push(bookToolPath(key, tool, segments) as never);
@@ -111,7 +113,23 @@ export function BookScreen({ page, book, model, signedIn, onAdd }: { page: WorkP
       {model.primary === "owner" && book ? <OwnerRow book={book} model={model} /> : null}
 
       {model.tabs.length > 1 && tab ? (
-        <Segmented accessibilityLabel="Book sections" options={model.tabs.map((t) => ({ value: t.key, label: t.label }))} value={tab} onChange={setSelected} />
+        <View accessibilityLabel="Book sections" accessibilityRole="tablist" style={[styles.tabs, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+          {model.tabs.map((t, i) => {
+            const checked = t.key === tab;
+            return (
+              <Pressable
+                key={t.key}
+                accessibilityLabel={t.label}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: checked }}
+                onPress={() => setSelected(t.key)}
+                style={({ pressed }) => [styles.tab, i > 0 ? { borderLeftWidth: 1, borderColor: colors.border } : null, { backgroundColor: checked ? colors.accentSoft : pressed ? colors.surfacePressed : "transparent" }]}
+              >
+                <Icon name={TAB_ICONS[t.key]} size={22} color={checked ? colors.accent : colors.textDim} />
+              </Pressable>
+            );
+          })}
+        </View>
       ) : null}
 
       {tab === "about" && about ? (
@@ -214,6 +232,8 @@ const styles = StyleSheet.create({
   section: { gap: spacing.sm },
   group: { gap: spacing.sm },
   primaryRow: { flexDirection: "row", gap: spacing.sm, minHeight: 44 },
+  tabs: { flexDirection: "row", borderWidth: 1, borderRadius: radii.md, overflow: "hidden" },
+  tab: { flex: 1, minHeight: minimumTouchTarget, alignItems: "center", justifyContent: "center" },
   menuButton: { minHeight: 44, borderWidth: 1, borderRadius: radii.md, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.md },
   strong: { fontWeight: "700" },
   quote: { fontStyle: "italic" },

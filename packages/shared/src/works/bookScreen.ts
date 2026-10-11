@@ -44,7 +44,7 @@ export function bookMetaLine(work: Pick<WorkPage["work"], "rating" | "year" | "p
   const parts = [
     work.rating ? `★ ${work.rating.value.toFixed(1)} · ${compactCount(work.rating.count)} ${work.rating.count === 1 ? "rating" : "ratings"}` : null,
     typeof work.year === "number" ? String(work.year) : null,
-    typeof work.pages === "number" ? `${work.pages} pages` : null
+    typeof work.pages === "number" ? `${work.pages} ${work.pages === 1 ? "page" : "pages"}` : null
   ].filter((part): part is string => part !== null);
   return parts.length > 0 ? parts.join(" · ") : null;
 }

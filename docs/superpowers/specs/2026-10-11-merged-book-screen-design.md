@@ -63,7 +63,7 @@ Top to bottom (mobile; web narrow is the same):
 3. **Primary row**
    - Owned: status button showing the current status, opening a menu with the three `statusLabel` values (To read / Reading / Finished) with a check on the current one. Picking Finished from another status runs the existing finish flow (`/book/<key>/finished?before=…`). When finished, a feeling button beside it opens the five `FINISH_FEELINGS`; unset it reads "How did it land?".
    - Not owned: full-width "Add to library" → existing `AddBookSheet`.
-4. **Tab switch** — About · Highlights (n) · Community (n). Always opens on About (Highlights when it is the only tab). Tab content renders below in the same scroll.
+4. **Tab switch** — icon-only: About (info), Highlights (quote), Community (people). No visible text; each tab's accessible name is its label with the count, "Highlights (n)" / "Community (n)" (also the web tooltip), and the selected tab is exposed as pressed/selected. Always opens on About (Highlights when it is the only tab). Tab content renders below in the same scroll.
 5. **About** — summary with the existing `summaryPreview` and Show more; "Editions" listing the first 3 (`editionLabel`, "Yours" marker) and "Show all N" expanding in place.
 6. **Highlights** — the current list unchanged: quote, annotation, Delete on notes with the existing confirm.
 7. **Community** — counts line, "People you follow", "Others" (current rows, privacy and profile links), then "Games" (moved from the work page) with its current empty copy.
@@ -72,8 +72,8 @@ Web wide (`sm` and up): two columns — left column holds cover and hero and sta
 
 ## Components
 
-- Mobile: `Menu`/`MenuItem` (native) for status, feeling and ⋯; `Segmented` as the tab switch; `IconButton` + `HeaderActions` in the header; existing `ContentShareSheet`, `AddBookSheet`, `ReaderGlyph`, `AuthorAvatar`.
-- Web: `OptionsMenu` for the three menus — it only has a gear trigger today, so it gains a way to pass the trigger content; tab switch as plain buttons matching the current status group styling; existing `AddBookSheet`, `useConfirm`, share code from `WorkPage`.
+- Mobile: `Menu`/`MenuItem` (native) for status, feeling and ⋯; a row of `Icon` toggle buttons as the tab switch (the native segmented controls take text labels only); `IconButton` + `HeaderActions` in the header; existing `ContentShareSheet`, `AddBookSheet`, `ReaderGlyph`, `AuthorAvatar`.
+- Web: `OptionsMenu` for the three menus — it only has a gear trigger today, so it gains a way to pass the trigger content; tab switch as plain icon buttons matching the current status group styling; existing `AddBookSheet`, `useConfirm`, share code from `WorkPage`.
 - Deleted: mobile `BookDetail`, the mobile `book/[key]/index.tsx` body (becomes the redirect/fallback), web `BookDetailSheet`, web `WorkPageView`, mobile `workScreenModel` (folded into the shared model). `BookSummary` and `FeelingChips` stay (murals and finish flow use them).
 - Removed from the UI: reading percentage, always-visible status segmented control, inline feeling chips, "Book details" header bar, "Your copy" card.
 
