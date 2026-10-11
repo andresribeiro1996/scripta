@@ -88,21 +88,12 @@ test("community lists followed then others and the games", () => {
   assert.deepEqual(community!.games.map((g) => [g.title, g.detail, g.path]), [["Best SF", "Tier list · Scripta", "/vote/abc"]]);
 });
 
-test("meta line drops what is missing and disappears when nothing is known", () => {
-  assert.equal(bookMetaLine({ rating: { value: 4.27, count: 2310 }, year: 1965, pages: 412 }), "★ 4.3 · 2.3K ratings · 1965 · 412 pages");
-  assert.equal(bookMetaLine({ rating: { value: 5, count: 1 }, year: null, pages: null }), "★ 5.0 · 1 rating");
-  assert.equal(bookMetaLine({ rating: null, year: null, pages: 90 }), "90 pages");
-  assert.equal(bookMetaLine({ rating: null, year: null, pages: 1 }), "1 page");
-  assert.equal(bookMetaLine({ rating: null, year: null, pages: null }), null);
-});
-
-test("rating counts are abbreviated without Intl compact notation", () => {
-  const line = (count: number) => bookMetaLine({ rating: { value: 4, count }, year: null, pages: null });
-  assert.equal(line(999), "★ 4.0 · 999 ratings");
-  assert.equal(line(2000), "★ 4.0 · 2K ratings");
-  assert.equal(line(2310), "★ 4.0 · 2.3K ratings");
-  assert.equal(line(999_999), "★ 4.0 · 1M ratings");
-  assert.equal(line(1_200_000), "★ 4.0 · 1.2M ratings");
+test("meta line is year and pages, dropping what is missing", () => {
+  assert.equal(bookMetaLine({ year: 1965, pages: 412 }), "1965 · 412 pages");
+  assert.equal(bookMetaLine({ year: null, pages: 90 }), "90 pages");
+  assert.equal(bookMetaLine({ year: null, pages: 1 }), "1 page");
+  assert.equal(bookMetaLine({ year: 1965, pages: null }), "1965");
+  assert.equal(bookMetaLine({ year: null, pages: null }), null);
 });
 
 test("reader groups are titled only when both have rows", () => {

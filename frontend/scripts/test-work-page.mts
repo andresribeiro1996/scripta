@@ -45,7 +45,8 @@ test("not owned: add button, About and Community tabs, no highlights tab, no men
   assert.ok(!html.includes("Highlights"));
   assert.ok(!html.includes("⋯"));
   assert.ok(html.includes("Science Fiction"));
-  assert.ok(html.includes("★ 4.3 · 2.3K ratings · 1965 · 412 pages"));
+  assert.ok(html.includes("1965 · 412 pages"));
+  assert.ok(!html.includes("★ 4.3 · 2.3K ratings"));
 });
 
 test("owned and finished: status and feeling menus, highlights tab, more menu", () => {
@@ -113,4 +114,14 @@ test("BackLink renders on its own, as used by the loading and not-found states",
   const html = renderToString(createElement(MemoryRouter, null, createElement(BackLink, { backTo: "/", onBack: null })));
   assert.ok(html.includes("Back"));
   assert.ok(html.includes('href="/"'));
+});
+
+test("the hero carries a stats strip with the Open Library rating that links to the stats page", () => {
+  const html = render({});
+  assert.ok(html.includes('href="/work/w/stats"'));
+  assert.ok(html.includes("★ 4.3"));
+});
+
+test("a library-only book has no stats strip", () => {
+  assert.ok(!render({ page: null, book: owned, onShare: null }).includes("/stats"));
 });

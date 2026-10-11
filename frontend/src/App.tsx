@@ -10,6 +10,7 @@ import { TierListCreatePage } from "./pages/TierListCreatePage";
 import { ArenaSeedPage } from "./pages/ArenaSeedPage";
 import { ArenaViewPage } from "./pages/ArenaViewPage";
 import { WorkPage } from "./pages/WorkPage";
+import { WorkStatsPage } from "./pages/WorkStatsPage";
 import { QuizCreatePage } from "./pages/QuizCreatePage";
 import { QuizEditorPage } from "./pages/QuizEditorPage";
 import { ChooseUsernamePage } from "./pages/ChooseUsernamePage";
@@ -53,6 +54,7 @@ export function App() {
         <Route path="/arena" element={<PublicDiscoverPage />} />
         <Route path="/arena/:id" element={<ArenaViewPage />} />
         <Route path="/work/:id" element={<WorkPage />} />
+        <Route path="/work/:id/stats" element={<WorkStatsPage />} />
         {/* Public share-viewer pages — no session at all, so these must sit
             outside every RequireAuth/RequireUsername wrapper below, same as
             /login. The token itself is the access control (see each public

@@ -1,13 +1,16 @@
 import { useState } from "react";
 import { router, useSegments } from "expo-router";
+import { useQuery } from "@tanstack/react-query";
 import { Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
-import { bookKey, editionLabel, readSnapshot, type BookScreenModel, type BookScreenTabKey, type ReadStatus, type WorkPage } from "@scripta/shared";
+import { bookKey, bookStatsModel, editionLabel, readSnapshot, type BookScreenModel, type BookScreenTabKey, type ReadStatus, type WorkPage } from "@scripta/shared";
 import { Text } from "../../ui/Text";
 import { Button, Icon, Menu, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme, type IconName, type MenuItem } from "../../ui";
 import { useLibraryActions } from "../library/hooks/useLibraryActions";
 import { BookCover } from "../arena/BookCover";
 import { CoverImage } from "../library/components/CoverImage";
-import { bookToolPath } from "./workPath";
+import { fetchWorkStats } from "./api";
+import { StatsStrip } from "./BookStats";
+import { bookToolPath, workStatsPath } from "./workPath";
 import { AuthorAvatar, openProfile } from "../community/AuthorAvatar";
 import { ReaderGlyph } from "../community/ReaderGlyph";
 
@@ -75,6 +78,10 @@ function DeleteNote({ book, bookmarkId }: { book: Record<string, unknown>; bookm
 
 export function BookScreen({ page, book, model, signedIn, onAdd }: { page: WorkPage | null; book: Record<string, unknown> | null; model: BookScreenModel; signedIn: boolean; onAdd: () => void }) {
   const { colors } = useTheme();
+  const segments = useSegments();
+  const workId = page?.work.id;
+  const statsQuery = useQuery({ queryKey: ["works", workId, "stats"], queryFn: () => fetchWorkStats(workId!), enabled: Boolean(workId), retry: false });
+  const statsStrip = bookStatsModel(statsQuery.data ?? null, page?.work.rating ?? null).strip;
   const [selected, setSelected] = useState<BookScreenTabKey | null>(null);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [editionsOpen, setEditionsOpen] = useState(false);
@@ -106,6 +113,7 @@ export function BookScreen({ page, book, model, signedIn, onAdd }: { page: WorkP
             ))}
           </View>
         ) : null}
+        {page ? <StatsStrip cells={statsStrip} onPress={() => router.push(workStatsPath(page.work.id, segments) as never)} /> : null}
         {model.meta ? <Text {...dynamicType} style={[typography.caption, styles.centeredText, { color: colors.textDim }]}>{model.meta}</Text> : null}
       </View>
 
