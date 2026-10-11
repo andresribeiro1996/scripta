@@ -16,13 +16,11 @@ import { clearBookCover, setBookCover } from "../lib/bookCovers";
 import type { PerCardStyle } from "../lib/libraryStyle";
 import { localDay, type LibraryBook as Book, type ReadStatus } from "../lib/libraryView";
 import { bookKey } from "../lib/merge";
-import { useLibrary } from "./useLibrary";
 import { useLibrarySaver } from "./useLibrarySaver";
 
 export function useBookActions() {
   const queryClient = useQueryClient();
   const saver = useLibrarySaver();
-  const { updateLibrary } = useLibrary();
   const toast = useToast();
 
   async function saveStyle(book: Book, style: PerCardStyle | undefined) {
@@ -30,7 +28,7 @@ export function useBookActions() {
     if (!current) return;
     const key = bookKey(book);
     try {
-      await updateLibrary((data) => ({
+      await saver.saveWhole((data) => ({
         ...data,
         books: data.books.map((b) => (bookKey(b) === key ? { ...b, _style: style } : b))
       }));
@@ -64,7 +62,7 @@ export function useBookActions() {
     if (!current) return false;
     const key = bookKey(book);
     try {
-      await updateLibrary((data) => ({
+      await saver.saveWhole((data) => ({
         ...data,
         books: data.books.map((b) => (bookKey(b) === key ? addReaderNote(b, text, localDay(), newId()) : b))
       }));
@@ -80,7 +78,7 @@ export function useBookActions() {
     if (!current) return false;
     const key = bookKey(book);
     try {
-      await updateLibrary((data) => ({
+      await saver.saveWhole((data) => ({
         ...data,
         books: data.books.map((b) => (bookKey(b) === key ? removeReaderNote(b, bookmarkId) : b))
       }));
@@ -96,7 +94,7 @@ export function useBookActions() {
     if (!current) return false;
     const key = bookKey(book);
     try {
-      await updateLibrary((data) => ({
+      await saver.saveWhole((data) => ({
         ...data,
         books: data.books.map((b) => (bookKey(b) === key ? restoreReadState(b, before) : b))
       }));
@@ -112,7 +110,7 @@ export function useBookActions() {
     if (!current) return;
     const key = bookKey(book);
     try {
-      await updateLibrary((data) => ({
+      await saver.saveWhole((data) => ({
         ...data,
         books: data.books.map((b) => (bookKey(b) === key ? setBookCover(b, image.id, image.url) : b))
       }));
@@ -126,7 +124,7 @@ export function useBookActions() {
     if (!current) return;
     const key = bookKey(book);
     try {
-      await updateLibrary((data) => ({
+      await saver.saveWhole((data) => ({
         ...data,
         books: data.books.map((b) => (bookKey(b) === key ? clearBookCover(b) : b))
       }));
