@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import sharp from "sharp";
-import { classifyPublisherImage, encodeCover, isAcceptableCover } from "./images.js";
+import { classifyPublisherImage, coverColor, encodeCover, isAcceptableCover } from "./images.js";
 
 function jpeg(width: number, height: number) {
   return sharp({ create: { width, height, channels: 3, background: "#886644" } }).jpeg().toBuffer();
@@ -220,4 +220,68 @@ test("the crop is measured after the image is rotated upright", async () => {
   const result = await classifyPublisherImage(stored);
   assert.equal(result?.kind, "cropped");
   assert.ok(Math.abs((await ratioOf(result!.input)) - 1600 / 1100) < 0.01);
+});
+
+function channels(hex: string | null): [number, number, number] {
+  assert.ok(hex);
+  assert.match(hex, /^#[0-9a-f]{6}$/);
+  return [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
+}
+
+function assertNear(hex: string | null, expected: [number, number, number], tolerance: number) {
+  channels(hex).forEach((value, index) => assert.ok(Math.abs(value - expected[index]!) <= tolerance, `${hex} channel ${index} is not within ${tolerance} of ${expected[index]}`));
+}
+
+const solidRed = () => sharp({ create: { width: 200, height: 300, channels: 3, background: "#cc2222" } }).png().toBuffer();
+
+test("a solid red cover gives its red as the accent colour", async () => {
+  assertNear(await coverColor(await solidRed()), [0xcc, 0x22, 0x22], 8);
+});
+
+test("a gold circle on black gives gold, not the black", async () => {
+  const circle = Buffer.from('<svg width="200" height="300"><circle cx="100" cy="150" r="60" fill="#e0a82e"/></svg>');
+  const cover = await sharp({ create: { width: 200, height: 300, channels: 3, background: "#000000" } }).composite([{ input: circle }]).png().toBuffer();
+  assertNear(await coverColor(cover), [0xe0, 0xa8, 0x2e], 12);
+});
+
+test("a grey gradient has no accent colour", async () => {
+  const ramp = Buffer.alloc(256 * 3);
+  for (let x = 0; x < 256; x++) ramp.fill(x, x * 3, x * 3 + 3);
+  const gradient = await sharp(ramp, { raw: { width: 256, height: 1, channels: 3 } }).resize(256, 300, { kernel: "nearest" }).png().toBuffer();
+  assert.equal(await coverColor(gradient), null);
+});
+
+test("bytes that are not an image have no accent colour", async () => {
+  assert.equal(await coverColor(Buffer.from("nope")), null);
+});
+
+test("an encoded cover carries its accent colour", async () => {
+  const encoded = await encodeCover(await solidRed());
+  assert.ok(encoded);
+  assertNear(encoded.color, [0xcc, 0x22, 0x22], 12);
+});
+
+test("a crimson cover whose hues straddle red still gives a red accent", async () => {
+  const patch = (background: string) => sharp({ create: { width: 32, height: 16, channels: 3, background } }).png().toBuffer();
+  const cover = await sharp({ create: { width: 200, height: 300, channels: 3, background: "#ffffff" } })
+    .composite([
+      { input: await patch("#d0102a"), left: 20, top: 40 },
+      { input: await patch("#d02a10"), left: 120, top: 200 }
+    ])
+    .png()
+    .toBuffer();
+  const [r, g, b] = channels(await coverColor(cover));
+  assert.ok(r > 180 && g < 60 && b < 60, `expected a red, got ${r},${g},${b}`);
+});
+
+test("a thin gold ring on black still gives gold", async () => {
+  const ring = Buffer.from('<svg width="200" height="300"><circle cx="100" cy="150" r="37" fill="none" stroke="#e0a82e" stroke-width="6"/></svg>');
+  const cover = await sharp({ create: { width: 200, height: 300, channels: 3, background: "#000000" } }).composite([{ input: ring }]).png().toBuffer();
+  assertNear(await coverColor(cover), [0xe0, 0xa8, 0x2e], 24);
+});
+
+test("a tiny coloured logo on a white cover is not an accent colour", async () => {
+  const logo = await sharp({ create: { width: 10, height: 10, channels: 3, background: "#cc2222" } }).png().toBuffer();
+  const cover = await sharp({ create: { width: 200, height: 300, channels: 3, background: "#ffffff" } }).composite([{ input: logo, left: 20, top: 20 }]).png().toBuffer();
+  assert.equal(await coverColor(cover), null);
 });

@@ -1,6 +1,7 @@
 export const BACKFILL_INTERVAL_MS = 10 * 60 * 1000;
 export const DETAILS_BATCH_SIZE = 50;
 const WORKS_BATCH_SIZE = 250;
+const COLOR_BATCH_SIZE = 50;
 
 interface Timers {
   setInterval: (callback: () => void, delay: number) => NodeJS.Timeout;
@@ -54,14 +55,14 @@ export interface WorksSteps {
   fillTitleKeys: (limit: number) => number;
 }
 
-async function drainBatches(step: (limit: number) => number, signal: AbortSignal): Promise<number> {
+async function drainBatches(step: (limit: number) => number | Promise<number>, signal: AbortSignal, size: number = WORKS_BATCH_SIZE): Promise<number> {
   let total = 0;
   for (;;) {
     await new Promise(setImmediate);
     if (signal.aborted) return total;
-    const batch = step(WORKS_BATCH_SIZE);
+    const batch = await step(size);
     total += batch;
-    if (batch < WORKS_BATCH_SIZE) return total;
+    if (batch < size) return total;
   }
 }
 
@@ -78,6 +79,20 @@ export function startWorksBackfill(
       if (assigned + titleKeyed > 0) log.info({ assigned, titleKeyed }, "updated works for existing editions");
     },
     (error) => log.error({ err: error }, "works backfill failed"),
+    intervalMs,
+    timers
+  );
+}
+
+export function startCoverColorBackfill(
+  step: (limit: number) => Promise<number>,
+  onError: (error: unknown) => void,
+  intervalMs?: number,
+  timers?: Timers
+): () => void {
+  return startDetailsBackfill(
+    async (signal) => { await drainBatches(step, signal, COLOR_BATCH_SIZE); },
+    onError,
     intervalMs,
     timers
   );

@@ -32,7 +32,7 @@ function makeService(overrides: Partial<Deps> = {}) {
   const repo = createSqliteBooksRepository(db);
   const service = createBooksService({
     repo,
-    blobs: { save: async () => {} },
+    blobs: { save: async () => {}, read: async () => null },
     sources: { isbndb: null, apple: empty, openlibrary: empty },
     catalog: { fetchDetails: async () => null, search: async () => [] },
     backgroundCatalog: { fetchDetails: async () => null, search: async () => [] },

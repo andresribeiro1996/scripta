@@ -15,7 +15,7 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
 const { applyBooksMigrations } = await import("./adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("./adapters/sqlite/sqliteBooksRepository.js");
-const { createBooksService, COVER_ENQUEUE_BATCH } = await import("./booksService.js");
+const { createBooksService, storeCoverImage, COVER_ENQUEUE_BATCH } = await import("./booksService.js");
 const { default: sharp } = await import("sharp");
 const { BookNotFoundError, FileTooLargeError, InvalidImageError, SourcePausedError, SourceUnavailableError } = await import("./domain/errors.js");
 const { createCoverWorker } = await import("./worker.js");
@@ -46,7 +46,8 @@ function harness(overrides: Partial<Deps> = {}) {
   const repo = createSqliteBooksRepository(db);
   const files = new Map<string, Buffer>();
   const blobs = {
-    save: async (id: string, extension: string, bytes: Buffer) => { files.set(`${id}.${extension}`, bytes); }
+    save: async (id: string, extension: string, bytes: Buffer) => { files.set(`${id}.${extension}`, bytes); },
+    read: async (id: string, extension: string) => files.get(`${id}.${extension}`) ?? null
   };
   const enqueued: Array<{ bookId: string; priority: string }> = [];
   const warnings: Array<{ details: Record<string, unknown>; message: string }> = [];
@@ -67,7 +68,7 @@ function harness(overrides: Partial<Deps> = {}) {
     editionRecords: { fetchEditionRecord: async () => { throw new Error("edition records not expected"); } },
     fetchImage: async (candidate) => {
       const size = sizes.get(candidate.url);
-      return size ? { full: Buffer.from(`full:${candidate.url}`), thumb: Buffer.from(`thumb:${candidate.url}`), width: size[0], height: size[1] } : null;
+      return size ? { full: Buffer.from(`full:${candidate.url}`), thumb: Buffer.from(`thumb:${candidate.url}`), width: size[0], height: size[1], color: null } : null;
     },
     enqueue: (bookId, priority = "normal") => { enqueued.push({ bookId, priority }); },
     publicUrlFor: (id, size) => `https://api.test/covers/cached/${id}/${size}`,
@@ -145,6 +146,7 @@ test("a cover set while the worker uploaded is not overwritten", async () => {
   const h: ReturnType<typeof harness> = harness({
     sources: { isbndb: null, apple: isbnSource("https://a/1"), openlibrary: emptySource },
     blobs: {
+      read: async () => null,
       save: async () => {
         if (rivalSet) return;
         rivalSet = true;
@@ -487,7 +489,7 @@ test("a migrated book with no title gets its title from the first lookup that ha
 test("a cover whose blob save rejects stores no image row and no cover pointer", async () => {
   const h = harness({
     sources: { isbndb: null, apple: isbnSource("https://a/1"), openlibrary: emptySource },
-    blobs: { save: async () => { throw new Error("R2 PUT failed: HTTP 403"); } }
+    blobs: { read: async () => null, save: async () => { throw new Error("R2 PUT failed: HTTP 403"); } }
   });
   h.sizes.set("https://a/1", [600, 900]);
   h.service.resolveCover(orlando);
@@ -817,7 +819,7 @@ test("rejecting a cover blocks its URL, clears the pointer and queues the book f
 test("rejecting a migrated cover with no recorded URL just clears it", () => {
   const h = harness();
   const book = h.repo.createBook({ title: "", author: "", isbn: "9780141184272" }, ["isbn:9780141184272"], "2026-01-01T00:00:00.000Z");
-  h.repo.insertImage({ id: "legacy", book_id: book.id, source: "openlibrary", source_url: null, width: 300, height: 460, byte_size: 1, created_at: "2026-01-01T00:00:00.000Z" });
+  h.repo.insertImage({ id: "legacy", book_id: book.id, source: "openlibrary", source_url: null, width: 300, height: 460, byte_size: 1, color: "", created_at: "2026-01-01T00:00:00.000Z" });
   h.repo.setCover(book.id, { imageId: "legacy", status: "low_res", checkedAt: "1970-01-01T00:00:00.000Z" });
   h.service.rejectCover(orlando);
   assert.equal(h.repo.getBook(book.id)!.cover_image_id, null);
@@ -954,7 +956,7 @@ function unavailable(name: SourceName, calls: string[]): CoverSource {
 
 function withCover(h: ReturnType<typeof harness>, id: string, source: SourceName, width: number, status: "good" | "low_res" = "good") {
   const imageId = `existing-${source}-${width}`;
-  h.repo.insertImage({ id: imageId, book_id: id, source, source_url: `https://${source}/existing`, width, height: Math.round(width * 1.5), byte_size: 1, created_at: "2026-09-01T00:00:00.000Z" });
+  h.repo.insertImage({ id: imageId, book_id: id, source, source_url: `https://${source}/existing`, width, height: Math.round(width * 1.5), byte_size: 1, color: "", created_at: "2026-09-01T00:00:00.000Z" });
   h.repo.setCover(id, { imageId, status, checkedAt: "2026-09-01T00:00:00.000Z" });
   return imageId;
 }
@@ -1621,4 +1623,72 @@ test("a publisher summary overrides the work's", async () => {
   h.repo.setPublisherUrl(id, "https://antigona.pt/products/dune");
   const details = await h.service.getDetails(dune);
   assert.deepEqual([details?.summary, details?.summarySource, details?.sourceUrl], ["Sinopse da editora.", "publisher", "https://antigona.pt/products/dune"]);
+});
+
+test("storeCoverImage stores an empty colour when none was found and the colour when one was", async () => {
+  const h = harness();
+  const book = h.repo.createBook({ title: "", author: "", isbn: "9780141184272" }, ["isbn:9780141184272"], "2026-01-01T00:00:00.000Z");
+  const image = { full: Buffer.alloc(1), thumb: Buffer.alloc(1), width: 900, height: 1400 };
+  const at = "2026-01-01T00:00:00.000Z";
+  const deps = { repo: h.repo, blobs: { save: async () => {} } };
+  const plain = await storeCoverImage(deps, book.id, "apple", null, { ...image, color: null }, at);
+  const tinted = await storeCoverImage(deps, book.id, "apple", null, { ...image, color: "#cc2222" }, at);
+  assert.equal(h.repo.getImage(plain)!.color, "");
+  assert.equal(h.repo.getImage(tinted)!.color, "#cc2222");
+});
+
+async function pendingColorHarness(overrides: Partial<Deps> = {}) {
+  const h = harness(overrides);
+  const book = h.repo.createBook({ title: "", author: "", isbn: "9780141184272" }, ["isbn:9780141184272"], "2026-01-01T00:00:00.000Z");
+  const addImage = (id: string) => h.repo.insertImage({ id, book_id: book.id, source: "apple", source_url: null, width: 900, height: 1400, byte_size: 1, color: null, created_at: "2026-01-01T00:00:00.000Z" });
+  const red = await sharp({ create: { width: 40, height: 60, channels: 3, background: "#cc2222" } }).webp().toBuffer();
+  return { ...h, addImage, red };
+}
+
+test("fillCoverColors colours an image from its thumb, marks one with no thumb as having none, and does nothing the second time", async () => {
+  const h = await pendingColorHarness();
+  h.addImage("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+  h.addImage("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
+  h.files.set("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa-thumb.webp", h.red);
+  assert.equal(await h.service.fillCoverColors(10), 2);
+  assert.match(h.repo.getImage("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!.color!, /^#[0-9a-f]{6}$/);
+  assert.equal(h.repo.getImage("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")!.color, "");
+  assert.equal(await h.service.fillCoverColors(10), 0);
+});
+
+test("fillCoverColors marks a thumb with no usable colour as having none", async () => {
+  const h = await pendingColorHarness();
+  h.addImage("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+  h.files.set("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa-thumb.webp", Buffer.from("not an image"));
+  assert.equal(await h.service.fillCoverColors(10), 1);
+  assert.equal(h.repo.getImage("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!.color, "");
+});
+
+test("fillCoverColors stops on a store error other than a missing object and leaves the row pending", async () => {
+  const h = await pendingColorHarness({
+    blobs: { save: async () => {}, read: async () => { throw new Error("R2 GET failed: HTTP 500"); } }
+  });
+  h.addImage("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+  await assert.rejects(h.service.fillCoverColors(10), /HTTP 500/);
+  assert.equal(h.repo.getImage("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!.color, null);
+  assert.deepEqual(h.repo.listPendingColorImageIds(10), ["aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"]);
+});
+
+test("fillCoverColors takes at most the limit", async () => {
+  const h = await pendingColorHarness();
+  h.addImage("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+  h.addImage("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
+  h.addImage("cccccccc-cccc-4ccc-8ccc-cccccccccccc");
+  assert.equal(await h.service.fillCoverColors(2), 2);
+  assert.equal(h.repo.listPendingColorImageIds(10).length, 1);
+});
+
+test("fillCoverColors gives an id that cannot be a stored object no colour and carries on to the next row", async () => {
+  const h = await pendingColorHarness();
+  h.addImage("legacy-123");
+  h.addImage("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+  h.files.set("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa-thumb.webp", h.red);
+  assert.equal(await h.service.fillCoverColors(10), 2);
+  assert.equal(h.repo.getImage("legacy-123")!.color, "");
+  assert.match(h.repo.getImage("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!.color!, /^#[0-9a-f]{6}$/);
 });

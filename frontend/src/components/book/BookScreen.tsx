@@ -5,6 +5,7 @@ import {
   bookKey,
   bookScreenModel,
   bookStatsModel,
+  coverWash,
   editionLabel,
   readSnapshot,
   seriesGroupByBookKey,
@@ -13,12 +14,14 @@ import {
   type ReadSnapshot,
   type WorkPage
 } from "@scripta/shared";
+import { themes } from "@scripta/shared/themes";
 import { fetchIsAdmin, rejectSharedCover, uploadSharedCover } from "../../api/books";
 import { forgetResolvedCover, rememberResolvedCover } from "../../api/covers";
 import { useBookActions } from "../../hooks/useBookActions";
 import { useLibrary } from "../../hooks/useLibrary";
 import { useWorkStats } from "../../hooks/useWorkStats";
 import { effectiveCardStyle, resolveLibraryStyle, type PerCardStyle } from "../../lib/libraryStyle";
+import { useResolvedTheme } from "../../lib/theme";
 import { AuthorAvatar } from "../CommunityAuthorAvatar";
 import { CoverImage, coverParamsFor } from "../BookCard";
 import { CoverPickerModal } from "../CoverPickerModal";
@@ -76,6 +79,7 @@ export function BookScreen({ page, book, signedIn, onAdd, onShare, onBack, backT
   const coverFile = useRef<HTMLInputElement>(null);
   const actions = useBookActions();
   const confirm = useConfirm();
+  const wash = coverWash(page?.work.coverColor ?? null, themes[useResolvedTheme()].scheme);
 
   const work = page?.work;
   const isbn = work?.editions.find((edition) => edition.isbn)?.isbn;
@@ -137,238 +141,247 @@ export function BookScreen({ page, book, signedIn, onAdd, onShare, onBack, backT
   const editions = model.about ? (allEditions ? model.about.editions : model.about.editionsPreview) : [];
 
   return (
-    <main className="mx-auto max-w-5xl px-5 py-8">
-      <div className="mb-2 flex items-center justify-between gap-3">
-        <BackLink backTo={backTo} onBack={onBack} className="" />
-        <div className="flex items-center gap-2">
-          {onShare ? (
-            <button type="button" onClick={onShare} aria-label="Share" title="Share" className={roundButtonClass}>
-              <ShareIcon />
-            </button>
-          ) : null}
-          {menuItems.length > 0 ? (
-            <OptionsMenu items={menuItems} title="More" trigger={<><MoreIcon /><span className="sr-only">More</span></>} triggerClassName={roundButtonClass} />
-          ) : null}
-        </div>
-      </div>
-      {model.menu.includes("replaceCover") ? (
-        <input
-          ref={coverFile}
-          type="file"
-          accept="image/*"
-          hidden
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            event.target.value = "";
-            if (file) void replaceCover(file);
-          }}
+    <div className="relative isolate">
+      {wash ? (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[520px]"
+          style={{ background: `linear-gradient(to bottom, ${wash.top}, ${wash.mid} 45%, transparent)` }}
         />
       ) : null}
-
-      <div className="grid gap-6 sm:grid-cols-[220px_1fr]">
-        <div className="self-start text-center sm:sticky sm:top-6 sm:text-left">
-          <div className="relative mx-auto aspect-[2/3] w-32 overflow-hidden rounded-xl bg-(--color-border) sm:mx-0 sm:w-full">
-            <CoverImage key={coverVersion} book={heroBook} size="full" />
+      <main className="mx-auto max-w-5xl px-5 py-8">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <BackLink backTo={backTo} onBack={onBack} className="" />
+          <div className="flex items-center gap-2">
+            {onShare ? (
+              <button type="button" onClick={onShare} aria-label="Share" title="Share" className={roundButtonClass}>
+                <ShareIcon />
+              </button>
+            ) : null}
+            {menuItems.length > 0 ? (
+              <OptionsMenu items={menuItems} title="More" trigger={<><MoreIcon /><span className="sr-only">More</span></>} triggerClassName={roundButtonClass} />
+            ) : null}
           </div>
-          <h1 className="mt-4 text-2xl font-bold">{model.title}</h1>
-          <p className="mt-1 text-sm text-(--color-text-dim)">{model.author}</p>
-          {model.genres.length > 0 ? (
-            <ul className="mt-3 flex flex-wrap justify-center gap-1.5 sm:justify-start">
-              {model.genres.map((genre) => (
-                <li key={genre} className="rounded-full border border-(--color-border) px-2 text-xs text-(--color-text-dim)">
-                  {genre}
-                </li>
-              ))}
-            </ul>
-          ) : null}
-          {model.rating ? <RatingStars value={model.rating.value} label={model.rating.label} /> : null}
-          {page ? <StatsTiles tiles={statsTiles} to={`/work/${page.work.id}/stats`} /> : null}
-          {model.meta ? <p className="mt-3 text-xs text-(--color-text-dim)">{model.meta}</p> : null}
-          {coverError ? (
-            <p role="alert" className="mt-2 text-sm text-(--color-danger)">
-              {coverError}
-            </p>
-          ) : null}
         </div>
+        {model.menu.includes("replaceCover") ? (
+          <input
+            ref={coverFile}
+            type="file"
+            accept="image/*"
+            hidden
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = "";
+              if (file) void replaceCover(file);
+            }}
+          />
+        ) : null}
 
-        <div className="min-w-0">
-          {model.primary === "owner" && model.status ? (
-            <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
-              <OptionsMenu
-                title="Reading status"
-                trigger={`${model.status.label} ▾`}
-                triggerClassName={`${controlClass} text-(--color-accent)`}
-                items={model.status.options.map((option) => ({ label: option.label, checked: option.selected, onClick: () => void pickStatus(option.value) }))}
-              />
-              {model.feeling ? (
+        <div className="grid gap-6 sm:grid-cols-[220px_1fr]">
+          <div className="self-start text-center sm:sticky sm:top-6 sm:text-left">
+            <div className="relative mx-auto aspect-[2/3] w-32 overflow-hidden rounded-xl bg-(--color-border) sm:mx-0 sm:w-full">
+              <CoverImage key={coverVersion} book={heroBook} size="full" />
+            </div>
+            <h1 className="mt-4 text-2xl font-bold">{model.title}</h1>
+            <p className="mt-1 text-sm text-(--color-text-dim)">{model.author}</p>
+            {model.genres.length > 0 ? (
+              <ul className="mt-3 flex flex-wrap justify-center gap-1.5 sm:justify-start">
+                {model.genres.map((genre) => (
+                  <li key={genre} className="rounded-full border border-(--color-border) px-2 text-xs text-(--color-text-dim)">
+                    {genre}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            {model.rating ? <RatingStars value={model.rating.value} label={model.rating.label} /> : null}
+            {page ? <StatsTiles tiles={statsTiles} to={`/work/${page.work.id}/stats`} /> : null}
+            {model.meta ? <p className="mt-3 text-xs text-(--color-text-dim)">{model.meta}</p> : null}
+            {coverError ? (
+              <p role="alert" className="mt-2 text-sm text-(--color-danger)">
+                {coverError}
+              </p>
+            ) : null}
+          </div>
+
+          <div className="min-w-0">
+            {model.primary === "owner" && model.status ? (
+              <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
                 <OptionsMenu
-                  title="How it landed"
-                  trigger={`${model.feeling.label} ▾`}
-                  triggerClassName={controlClass}
-                  items={model.feeling.options.map((option) => ({ label: option.label, checked: option.selected, onClick: () => void actions.setRating(book!, option.rating) }))}
+                  title="Reading status"
+                  trigger={`${model.status.label} ▾`}
+                  triggerClassName={`${controlClass} text-(--color-accent)`}
+                  items={model.status.options.map((option) => ({ label: option.label, checked: option.selected, onClick: () => void pickStatus(option.value) }))}
                 />
-              ) : null}
-            </div>
-          ) : model.primary === "add" ? (
-            <button
-              type="button"
-              onClick={onAdd}
-              className="min-h-11 w-full rounded-lg bg-(--color-accent) px-4 py-2 text-sm font-semibold text-(--color-on-accent) hover:opacity-90"
-            >
-              Add to library
-            </button>
-          ) : null}
+                {model.feeling ? (
+                  <OptionsMenu
+                    title="How it landed"
+                    trigger={`${model.feeling.label} ▾`}
+                    triggerClassName={controlClass}
+                    items={model.feeling.options.map((option) => ({ label: option.label, checked: option.selected, onClick: () => void actions.setRating(book!, option.rating) }))}
+                  />
+                ) : null}
+              </div>
+            ) : model.primary === "add" ? (
+              <button
+                type="button"
+                onClick={onAdd}
+                className="min-h-11 w-full rounded-lg bg-(--color-accent) px-4 py-2 text-sm font-semibold text-(--color-on-accent) hover:opacity-90"
+              >
+                Add to library
+              </button>
+            ) : null}
 
-          {model.tabs.length > 1 ? (
-            <div
-              role="group"
-              aria-label="Book sections"
-              className="mt-4 flex items-stretch overflow-hidden rounded-lg border border-(--color-border) bg-(--color-surface)"
-            >
-              {model.tabs.map((t, i) => {
-                const checked = t.key === activeTab;
-                const Icon = TAB_ICONS[t.key];
-                return (
-                  <button
-                    key={t.key}
-                    type="button"
-                    aria-pressed={checked}
-                    aria-label={t.label}
-                    title={t.label}
-                    onClick={() => setTab(t.key)}
-                    className={`flex min-h-11 flex-1 items-center justify-center px-3 ${
-                      i > 0 ? "border-l border-(--color-border)" : ""
-                    } ${checked ? "bg-(--color-accent-soft) text-(--color-accent)" : "text-(--color-text-dim) hover:bg-(--color-surface-hover)"}`}
-                  >
-                    <Icon />
-                  </button>
-                );
-              })}
-            </div>
-          ) : null}
+            {model.tabs.length > 1 ? (
+              <div
+                role="group"
+                aria-label="Book sections"
+                className="mt-4 flex items-stretch overflow-hidden rounded-lg border border-(--color-border) bg-(--color-surface)"
+              >
+                {model.tabs.map((t, i) => {
+                  const checked = t.key === activeTab;
+                  const Icon = TAB_ICONS[t.key];
+                  return (
+                    <button
+                      key={t.key}
+                      type="button"
+                      aria-pressed={checked}
+                      aria-label={t.label}
+                      title={t.label}
+                      onClick={() => setTab(t.key)}
+                      className={`flex min-h-11 flex-1 items-center justify-center px-3 ${
+                        i > 0 ? "border-l border-(--color-border)" : ""
+                      } ${checked ? "bg-(--color-accent-soft) text-(--color-accent)" : "text-(--color-text-dim) hover:bg-(--color-surface-hover)"}`}
+                    >
+                      <Icon />
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
 
-          <div className="mt-6">
-            {activeTab === "about" && model.about ? (
-              <>
-                {aboutSummary ? (
-                  <Section title="About this book">
-                    <p className="text-sm leading-6 whitespace-pre-wrap break-words">{aboutOpen || !model.about.preview ? aboutSummary : model.about.preview}</p>
-                    {model.about.preview ? (
-                      <button type="button" aria-expanded={aboutOpen} onClick={() => setAboutOpen(!aboutOpen)} className="min-h-11 text-sm font-semibold text-(--color-accent)">
-                        {aboutOpen ? "Show less" : "Show more"}
+            <div className="mt-6">
+              {activeTab === "about" && model.about ? (
+                <>
+                  {aboutSummary ? (
+                    <Section title="About this book">
+                      <p className="text-sm leading-6 whitespace-pre-wrap break-words">{aboutOpen || !model.about.preview ? aboutSummary : model.about.preview}</p>
+                      {model.about.preview ? (
+                        <button type="button" aria-expanded={aboutOpen} onClick={() => setAboutOpen(!aboutOpen)} className="min-h-11 text-sm font-semibold text-(--color-accent)">
+                          {aboutOpen ? "Show less" : "Show more"}
+                        </button>
+                      ) : null}
+                    </Section>
+                  ) : null}
+                  <Section title="Editions">
+                    <ul className="flex flex-col gap-2">
+                      {editions.map((e) => (
+                        <li key={e.bookId} className="text-sm">
+                          <span className="font-semibold">{e.title}</span>
+                          <span className="text-(--color-text-dim)"> · {editionLabel(e)}{e.mine ? " · Yours" : ""}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    {model.about.editions.length > model.about.editionsPreview.length && !allEditions ? (
+                      <button type="button" onClick={() => setAllEditions(true)} className="min-h-11 text-sm font-semibold text-(--color-accent)">
+                        Show all {model.about.editions.length}
                       </button>
                     ) : null}
                   </Section>
-                ) : null}
-                <Section title="Editions">
-                  <ul className="flex flex-col gap-2">
-                    {editions.map((e) => (
-                      <li key={e.bookId} className="text-sm">
-                        <span className="font-semibold">{e.title}</span>
-                        <span className="text-(--color-text-dim)"> · {editionLabel(e)}{e.mine ? " · Yours" : ""}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  {model.about.editions.length > model.about.editionsPreview.length && !allEditions ? (
-                    <button type="button" onClick={() => setAllEditions(true)} className="min-h-11 text-sm font-semibold text-(--color-accent)">
-                      Show all {model.about.editions.length}
-                    </button>
-                  ) : null}
-                </Section>
-              </>
-            ) : null}
+                </>
+              ) : null}
 
-            {activeTab === "highlights" ? (
-              <>
-                {model.highlights.length === 0 ? <p className="text-sm text-(--color-text-dim)">No highlights yet.</p> : null}
-                <div className="flex flex-col gap-3">
-                  {model.highlights.map((h, i) => {
-                    const bookmarkId = String(h.BookmarkID ?? "");
-                    const isNote = bookmarkId.startsWith("note:");
-                    return (
-                      <div key={bookmarkId || i} className="border-l-2 border-(--color-border) pl-3">
-                        <p className="text-sm italic">{String(h.Text)}</p>
-                        {String(h.Annotation ?? "").trim() !== "" && (
-                          <p className="mt-1 text-xs text-(--color-text-dim)">{String(h.Annotation)}</p>
-                        )}
-                        {isNote && (
-                          <button
-                            type="button"
-                            onClick={() => void handleDeleteNote(bookmarkId)}
-                            className="mt-1 text-xs font-semibold text-(--color-danger) hover:opacity-80"
-                          >
-                            Delete
-                          </button>
-                        )}
+              {activeTab === "highlights" ? (
+                <>
+                  {model.highlights.length === 0 ? <p className="text-sm text-(--color-text-dim)">No highlights yet.</p> : null}
+                  <div className="flex flex-col gap-3">
+                    {model.highlights.map((h, i) => {
+                      const bookmarkId = String(h.BookmarkID ?? "");
+                      const isNote = bookmarkId.startsWith("note:");
+                      return (
+                        <div key={bookmarkId || i} className="border-l-2 border-(--color-border) pl-3">
+                          <p className="text-sm italic">{String(h.Text)}</p>
+                          {String(h.Annotation ?? "").trim() !== "" && (
+                            <p className="mt-1 text-xs text-(--color-text-dim)">{String(h.Annotation)}</p>
+                          )}
+                          {isNote && (
+                            <button
+                              type="button"
+                              onClick={() => void handleDeleteNote(bookmarkId)}
+                              className="mt-1 text-xs font-semibold text-(--color-danger) hover:opacity-80"
+                            >
+                              Delete
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              ) : null}
+
+              {activeTab === "community" && model.community ? (
+                <>
+                  <p className="mb-3 text-sm text-(--color-text-dim)">{model.community.countsLabel}</p>
+                  {model.community.groups.map((group) => (
+                    <ReaderList key={group.key} title={group.title} rows={group.rows} signedIn={signedIn} />
+                  ))}
+                  <Section title="Games">
+                    {model.community.games.length > 0 ? (
+                      <div className="grid grid-cols-1 gap-3">
+                        {model.community.games.map((game) => (
+                          <Link key={game.key} to={game.path} className={`${rowClass} justify-between hover:border-(--color-accent)`}>
+                            <span className="min-w-0 truncate text-sm font-semibold">{game.title}</span>
+                            <span className="shrink-0 text-xs text-(--color-text-dim)">{game.detail}</span>
+                          </Link>
+                        ))}
                       </div>
-                    );
-                  })}
-                </div>
-              </>
-            ) : null}
-
-            {activeTab === "community" && model.community ? (
-              <>
-                <p className="mb-3 text-sm text-(--color-text-dim)">{model.community.countsLabel}</p>
-                {model.community.groups.map((group) => (
-                  <ReaderList key={group.key} title={group.title} rows={group.rows} signedIn={signedIn} />
-                ))}
-                <Section title="Games">
-                  {model.community.games.length > 0 ? (
-                    <div className="grid grid-cols-1 gap-3">
-                      {model.community.games.map((game) => (
-                        <Link key={game.key} to={game.path} className={`${rowClass} justify-between hover:border-(--color-accent)`}>
-                          <span className="min-w-0 truncate text-sm font-semibold">{game.title}</span>
-                          <span className="shrink-0 text-xs text-(--color-text-dim)">{game.detail}</span>
-                        </Link>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-(--color-text-dim)">No public games use this book yet.</p>
-                  )}
-                </Section>
-              </>
-            ) : null}
+                    ) : (
+                      <p className="text-sm text-(--color-text-dim)">No public games use this book yet.</p>
+                    )}
+                  </Section>
+                </>
+              ) : null}
+            </div>
           </div>
         </div>
-      </div>
 
-      {book && styling ? (
-        <PerCardStylePanel
-          idPrefix="book"
-          name={String(book.Title ?? "Untitled")}
-          priorityText="the series and library-wide"
-          currentOverride={book._style as PerCardStyle | undefined}
-          seedStyle={effectiveCardStyle(
-            resolveLibraryStyle(library?.data.style),
-            seriesGroupByBookKey(books, library?.data.groups ?? []).get(bookKey(book))?.style
-          )}
-          onSave={(style) => actions.saveStyle(book, style)}
-          onClose={() => setStyling(false)}
-        />
-      ) : null}
-      {book && pickingCover ? (
-        <CoverPickerModal
-          title={String(book.Title ?? "Untitled")}
-          currentImageId={typeof book._coverImageId === "string" ? book._coverImageId : null}
-          removeCoverLabel="Remove custom cover — go back to the normal auto-detected one"
-          onSelect={(image) => void actions.saveCover(book, image)}
-          onRemoveCover={() => void actions.removeCover(book)}
-          onClose={() => setPickingCover(false)}
-        />
-      ) : null}
-      {book && finishing ? (
-        <FinishSheet
-          book={book}
-          books={books}
-          before={finishing}
-          onSetRating={actions.setRating}
-          onAddNote={actions.addNote}
-          onRestoreRead={actions.restoreRead}
-          onClose={() => setFinishing(null)}
-        />
-      ) : null}
-    </main>
+        {book && styling ? (
+          <PerCardStylePanel
+            idPrefix="book"
+            name={String(book.Title ?? "Untitled")}
+            priorityText="the series and library-wide"
+            currentOverride={book._style as PerCardStyle | undefined}
+            seedStyle={effectiveCardStyle(
+              resolveLibraryStyle(library?.data.style),
+              seriesGroupByBookKey(books, library?.data.groups ?? []).get(bookKey(book))?.style
+            )}
+            onSave={(style) => actions.saveStyle(book, style)}
+            onClose={() => setStyling(false)}
+          />
+        ) : null}
+        {book && pickingCover ? (
+          <CoverPickerModal
+            title={String(book.Title ?? "Untitled")}
+            currentImageId={typeof book._coverImageId === "string" ? book._coverImageId : null}
+            removeCoverLabel="Remove custom cover — go back to the normal auto-detected one"
+            onSelect={(image) => void actions.saveCover(book, image)}
+            onRemoveCover={() => void actions.removeCover(book)}
+            onClose={() => setPickingCover(false)}
+          />
+        ) : null}
+        {book && finishing ? (
+          <FinishSheet
+            book={book}
+            books={books}
+            before={finishing}
+            onSetRating={actions.setRating}
+            onAddNote={actions.addNote}
+            onRestoreRead={actions.restoreRead}
+            onClose={() => setFinishing(null)}
+          />
+        ) : null}
+      </main>
+    </div>
   );
 }
 

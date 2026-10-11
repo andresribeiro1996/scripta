@@ -1,4 +1,4 @@
-import sharp from "sharp";
+import sharp, { type OutputInfo } from "sharp";
 
 const MAX_INPUT_DIMENSION = 8000;
 const FULL_MAX_DIMENSION = 1600;
@@ -19,12 +19,19 @@ const FLAT_MIN_RATIO = 0.75;
 const WHITE_CANVAS_MEAN = 235;
 const CANVAS_KEPT = 0.97;
 const BLANK_STDEV = 8;
+const COLOR_SAMPLE_DIMENSION = 128;
+const COLOR_MIN_SATURATION = 0.25;
+const COLOR_MIN_VALUE = 0.15;
+const COLOR_HUE_BINS = 12;
+const HUE_BIN_OFFSET = 3 / COLOR_HUE_BINS;
+const COLOR_MIN_SHARE = 0.01;
 
 export interface EncodedCover {
   full: Buffer;
   thumb: Buffer;
   width: number;
   height: number;
+  color: string | null;
 }
 
 async function decodedSize(input: Buffer): Promise<{ width: number; height: number } | null> {
@@ -34,6 +41,47 @@ async function decodedSize(input: Buffer): Promise<{ width: number; height: numb
   } catch {
     return null;
   }
+}
+
+export async function coverColor(input: Buffer): Promise<string | null> {
+  let decoded: { data: Buffer; info: OutputInfo };
+  try {
+    decoded = await sharp(input, { limitInputPixels: MAX_INPUT_DIMENSION * MAX_INPUT_DIMENSION })
+      .rotate()
+      .flatten({ background: "#ffffff" })
+      .toColourspace("srgb")
+      .resize({ width: COLOR_SAMPLE_DIMENSION, height: COLOR_SAMPLE_DIMENSION, fit: "inside" })
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+  } catch {
+    return null;
+  }
+  const { channels, width, height } = decoded.info;
+  const weights = new Array<number>(COLOR_HUE_BINS).fill(0);
+  const sums = Array.from({ length: COLOR_HUE_BINS }, () => [0, 0, 0]);
+  for (let offset = 0; offset < width * height * channels; offset += channels) {
+    const r = decoded.data[offset] ?? 0;
+    const g = decoded.data[offset + 1] ?? 0;
+    const b = decoded.data[offset + 2] ?? 0;
+    const max = Math.max(r, g, b);
+    const delta = max - Math.min(r, g, b);
+    const saturation = max === 0 ? 0 : delta / max;
+    const value = max / 255;
+    if (saturation < COLOR_MIN_SATURATION || value < COLOR_MIN_VALUE) continue;
+    const hue = max === r ? ((g - b) / delta + 6) % 6 : max === g ? (b - r) / delta + 2 : (r - g) / delta + 4;
+    const bin = Math.floor((((hue + HUE_BIN_OFFSET) % 6) / 6) * COLOR_HUE_BINS);
+    const weight = saturation * value;
+    weights[bin] = (weights[bin] ?? 0) + weight;
+    const sum = sums[bin] ?? [0, 0, 0];
+    sum[0] = (sum[0] ?? 0) + r * weight;
+    sum[1] = (sum[1] ?? 0) + g * weight;
+    sum[2] = (sum[2] ?? 0) + b * weight;
+  }
+  const heaviest = weights.reduce((best, weight, bin) => (weight > (weights[best] ?? 0) ? bin : best), 0);
+  const total = weights[heaviest] ?? 0;
+  if (total < COLOR_MIN_SHARE * width * height) return null;
+  const mean = (sums[heaviest] ?? [0, 0, 0]).map((channel) => Math.round(channel / total).toString(16).padStart(2, "0"));
+  return `#${mean.join("")}`;
 }
 
 export async function encodeCover(input: Buffer): Promise<EncodedCover | null> {
@@ -49,7 +97,7 @@ export async function encodeCover(input: Buffer): Promise<EncodedCover | null> {
       .resize({ width: THUMB_MAX_WIDTH, height: THUMB_MAX_HEIGHT, fit: "inside", withoutEnlargement: true })
       .webp({ quality: THUMB_QUALITY })
       .toBuffer();
-    return { full: full.data, thumb, width: full.info.width, height: full.info.height };
+    return { full: full.data, thumb, width: full.info.width, height: full.info.height, color: await coverColor(thumb) };
   } catch {
     return null;
   }

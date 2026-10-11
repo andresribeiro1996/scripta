@@ -1,13 +1,14 @@
 import { randomUUID } from "node:crypto";
+import { isObjectKey } from "../../storage/objectStore.js";
 import { canonicalIsbn, looksLikeIsbnQuery, type BookGenre, type BookMetadata, type BookSearchResult } from "@scripta/shared";
 import { findBestCover, type CoverSources, type FetchCoverImage } from "./coverResolver.js";
 import { MIN_GOOD_WIDTH } from "./domain/constants.js";
 import { BookNotFoundError, FileTooLargeError, InvalidImageError, SourcePausedError, SourceUnavailableError, WorkMergeError } from "./domain/errors.js";
-import { encodeCover, type EncodedCover } from "./domain/images.js";
+import { coverColor, encodeCover, type EncodedCover } from "./domain/images.js";
 import { findExisting, findOrCreateBook, keysOf } from "./domain/findOrCreate.js";
 import { editionLanguage, findByIdentity, isPortugueseIsbn, lookupIdentity, SEARCH_LIMIT, searchTokens, type BookIdentity, type BookLookup } from "./domain/normalize.js";
 import { summaryMatchesLanguage } from "./adapters/catalog/languageFilter.js";
-import type { BookCatalog, BooksRepository, CatalogSearchHit, CoverBlobStore, CoverSource, EditionRecordSource, PageCursor } from "./domain/ports.js";
+import type { BookCatalog, BooksRepository, CatalogSearchHit, CoverBlobReader, CoverBlobStore, CoverSource, EditionRecordSource, PageCursor } from "./domain/ports.js";
 import type { BookRow, CoverSourceName, CoverStatus, WorkView } from "./domain/types.js";
 import type { CoverPriority } from "./worker.js";
 
@@ -33,7 +34,7 @@ export interface ResolvedCover {
 
 export interface BooksServiceDeps {
   repo: BooksRepository;
-  blobs: CoverBlobStore;
+  blobs: CoverBlobStore & CoverBlobReader;
   sources: CoverSources;
   catalog: BookCatalog;
   backgroundCatalog: BookCatalog;
@@ -54,6 +55,7 @@ export interface BooksService {
   getDetails(lookup: BookLookup): Promise<BookMetadata | null>;
   backfillDetails(limit: number, signal?: AbortSignal): Promise<number | null>;
   backfillWorkKeys(limit: number, signal?: AbortSignal): Promise<number | null>;
+  fillCoverColors(limit: number): Promise<number>;
   search(query: string): BookSearchResult[];
   searchExternal(query: string): Promise<BookSearchResult[]>;
   isAdmin(userId: string): boolean;
@@ -75,7 +77,7 @@ export async function storeCoverImage(
   const id = randomUUID();
   await deps.blobs.save(id, COVER_EXTENSION, image.full);
   await deps.blobs.save(`${id}-thumb`, COVER_EXTENSION, image.thumb);
-  deps.repo.insertImage({ id, book_id: bookId, source, source_url: sourceUrl, origin, width: image.width, height: image.height, byte_size: image.full.byteLength, created_at: at });
+  deps.repo.insertImage({ id, book_id: bookId, source, source_url: sourceUrl, origin, width: image.width, height: image.height, byte_size: image.full.byteLength, color: image.color ?? "", created_at: at });
   return id;
 }
 
@@ -328,6 +330,15 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
         deps.repo.markWorkChecked(id, now().toISOString());
       }
       return null;
+    },
+
+    async fillCoverColors(limit) {
+      const ids = deps.repo.listPendingColorImageIds(limit);
+      for (const id of ids) {
+        const thumb = isObjectKey(`covers/${id}-thumb.${COVER_EXTENSION}`) ? await deps.blobs.read(`${id}-thumb`, COVER_EXTENSION) : null;
+        deps.repo.setImageColor(id, (thumb && await coverColor(thumb)) ?? "");
+      }
+      return ids.length;
     },
 
     search(query) {

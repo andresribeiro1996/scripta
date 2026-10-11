@@ -85,7 +85,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const editionCountStmt = db.prepare(`SELECT COUNT(*) AS n FROM books WHERE work_id = ?`);
   const workStmt = db.prepare(`SELECT id, ol_work_key, title, author, summary FROM works WHERE id = ?`);
   const aliasStmt = db.prepare(`SELECT id FROM works WHERE merged_into = ?`);
-  const pageEditionsStmt = db.prepare(`SELECT id, title, language, year, isbn, summary, cover_image_id, genres, rating, rating_count, pages FROM books WHERE work_id = ? ORDER BY created_at, rowid`);
+  const pageEditionsStmt = db.prepare(`SELECT books.id, books.title, books.language, books.year, books.isbn, books.summary, books.cover_image_id, ci.color AS cover_color, books.genres, books.rating, books.rating_count, books.pages FROM books LEFT JOIN cover_images ci ON ci.id = books.cover_image_id WHERE books.work_id = ? ORDER BY books.created_at, books.rowid`);
   const workEditionsStmt = db.prepare(`SELECT id, isbn, title, author, ol_work_key FROM books WHERE work_id = ? ORDER BY created_at, rowid`);
   const groupablePairsStmt = db.prepare(`
     WITH candidates AS (
@@ -128,9 +128,11 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   `);
   const imageStmt = db.prepare(`SELECT * FROM cover_images WHERE id = ?`);
   const insertImageStmt = db.prepare(`
-    INSERT INTO cover_images (id, book_id, source, source_url, origin, width, height, byte_size, created_at)
-    VALUES ($id, $book_id, $source, $source_url, $origin, $width, $height, $byte_size, $created_at)
+    INSERT INTO cover_images (id, book_id, source, source_url, origin, width, height, byte_size, color, created_at)
+    VALUES ($id, $book_id, $source, $source_url, $origin, $width, $height, $byte_size, $color, $created_at)
   `);
+  const pendingColorStmt = db.prepare(`SELECT id FROM cover_images WHERE color IS NULL LIMIT ?`);
+  const setImageColorStmt = db.prepare(`UPDATE cover_images SET color = ? WHERE id = ?`);
   const setCoverStmt = db.prepare(`UPDATE books SET cover_image_id = ?, cover_status = ?, cover_checked_at = ? WHERE id = ?`);
   const setCoverIfStmt = db.prepare(`UPDATE books SET cover_image_id = ?, cover_status = ?, cover_checked_at = ? WHERE id = ? AND cover_image_id IS ?`);
   const addRejectionStmt = db.prepare(`INSERT OR IGNORE INTO cover_rejections (book_id, source_url, created_at) VALUES (?, ?, ?)`);
@@ -291,6 +293,12 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
 
     getImage: (id) => imageStmt.get(id) as CoverImageRow | undefined,
 
+    listPendingColorImageIds: (limit) => (pendingColorStmt.all(limit) as Array<{ id: string }>).map((row) => row.id),
+
+    setImageColor(id, color) {
+      setImageColorStmt.run(color, id);
+    },
+
     insertImage(row) {
       insertImageStmt.run({
         $id: row.id,
@@ -301,6 +309,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
         $width: row.width,
         $height: row.height,
         $byte_size: row.byte_size,
+        $color: row.color,
         $created_at: row.created_at
       });
     },

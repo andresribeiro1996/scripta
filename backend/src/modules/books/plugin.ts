@@ -16,7 +16,7 @@ import { createIsbndbSource } from "./adapters/sources/isbndb.js";
 import { createOpenLibraryCoverSource } from "./adapters/sources/openLibrary.js";
 import { openBooksDb } from "./adapters/sqlite/connection.js";
 import { createSqliteBooksRepository } from "./adapters/sqlite/sqliteBooksRepository.js";
-import { DETAILS_BATCH_SIZE, startBackfill, startDetailsBackfill, startWorksBackfill, startWorksGrouping } from "./backfill.js";
+import { DETAILS_BATCH_SIZE, startBackfill, startCoverColorBackfill, startDetailsBackfill, startWorksBackfill, startWorksGrouping } from "./backfill.js";
 import { createBooksService, MAX_UPLOAD_BYTES, type BooksService } from "./booksService.js";
 import type { FetchCoverImage } from "./coverResolver.js";
 import { encodeCover } from "./domain/images.js";
@@ -65,7 +65,10 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
   const backgroundOpenLibrary = createOpenLibraryCatalog(openLibraryThrottle, false);
   const service = createBooksService({
     repo,
-    blobs: { save: (id, extension, bytes) => createObjectStore().put(`covers/${id}.${extension}`, bytes, "image/webp") },
+    blobs: {
+      save: (id, extension, bytes) => createObjectStore().put(`covers/${id}.${extension}`, bytes, "image/webp"),
+      read: (id, extension) => createObjectStore().get(`covers/${id}.${extension}`)
+    },
     sources: {
       isbndb: isbndbConfigured ? createIsbndbSource(env.ISBNDB_API_KEY, isbndbThrottle, isbndbGate) : null,
       apple: createAppleSource(createThrottle(APPLE_GAP_MS)),
@@ -103,6 +106,10 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
     (signal) => service.backfillWorkKeys(DETAILS_BATCH_SIZE, signal),
     (error) => app.log.error({ err: error }, "work key backfill failed")
   );
+  const stopColorBackfill = startCoverColorBackfill(
+    (limit) => service.fillCoverColors(limit),
+    (error) => app.log.error({ err: error }, "cover colour backfill failed")
+  );
   activeService = service;
   app.addHook("onClose", async () => {
     activeService = null;
@@ -111,6 +118,7 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
     stopWorksBackfill();
     grouping.stop();
     stopWorkKeyBackfill();
+    stopColorBackfill();
     worker.stop();
   });
 

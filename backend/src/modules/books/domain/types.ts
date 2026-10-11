@@ -50,6 +50,7 @@ export interface CoverImageRow {
   width: number;
   height: number;
   byte_size: number;
+  color: string | null;
   created_at: string;
 }
 
@@ -69,7 +70,7 @@ export interface NewBook {
 export type WorkPageRows = {
   work: { id: string; title: string; author: string; summary: string | null };
   aliasIds: string[];
-  editions: Array<{ id: string; title: string; language: string | null; year: number | null; isbn: string | null; summary: string | null; cover_image_id: string | null; genres: string; rating: number | null; rating_count: number; pages: number | null }>;
+  editions: Array<{ id: string; title: string; language: string | null; year: number | null; isbn: string | null; summary: string | null; cover_image_id: string | null; cover_color: string | null; genres: string; rating: number | null; rating_count: number; pages: number | null }>;
 };
 
 export interface WorkView {
