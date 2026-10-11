@@ -79,7 +79,7 @@ export function WorkPage() {
         page={page}
         book={book}
         signedIn={Boolean(session)}
-        onAdd={() => (session ? setAdding(true) : navigate("/login"))}
+        onAdd={() => setAdding(true)}
         onShare={() => void share()}
         onBack={onBack}
         backTo={backTo}

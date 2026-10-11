@@ -44,6 +44,18 @@ test("not owned: add to library, no highlights tab, no menu", () => {
   assert.deepEqual(model.menu, []);
 });
 
+test("an owned work whose library book is missing offers no primary action", () => {
+  const model = bookScreenModel({ ...page(), mine: { bookKey: "k", readStatus: 1, rating: null, highlightCount: 0 } }, null, { isAdmin: false });
+  assert.equal(model.primary, null);
+});
+
+test("a page from a backend without genres, rating, year or pages renders without them", () => {
+  const { genres, rating, year, pages, ...work } = page().work;
+  const model = bookScreenModel({ ...page(), work: work as WorkPage["work"] }, null, { isAdmin: false });
+  assert.deepEqual(model.genres, []);
+  assert.equal(model.meta, null);
+});
+
 test("admins get the cover moderation items whether or not they own the book", () => {
   assert.deepEqual(bookScreenModel(page(), null, { isAdmin: true }).menu, ["rejectCover", "replaceCover"]);
   assert.deepEqual(bookScreenModel(page(), owned(), { isAdmin: true }).menu, ["style", "cover", "rejectCover", "replaceCover"]);

@@ -15,7 +15,7 @@ export type BookScreenModel = {
   author: string;
   genres: string[];
   meta: string | null;
-  primary: "owner" | "add";
+  primary: "owner" | "add" | null;
   status: { label: string; options: Array<{ value: 0 | 1 | 2; label: string; selected: boolean }> } | null;
   feeling: { label: string; options: Array<{ rating: FinishRating; label: string; selected: boolean }> } | null;
   tabs: Array<{ key: BookScreenTabKey; label: string }>;
@@ -43,8 +43,8 @@ function compactCount(count: number): string {
 export function bookMetaLine(work: Pick<WorkPage["work"], "rating" | "year" | "pages">): string | null {
   const parts = [
     work.rating ? `★ ${work.rating.value.toFixed(1)} · ${compactCount(work.rating.count)} ${work.rating.count === 1 ? "rating" : "ratings"}` : null,
-    work.year === null ? null : String(work.year),
-    work.pages === null ? null : `${work.pages} pages`
+    typeof work.year === "number" ? String(work.year) : null,
+    typeof work.pages === "number" ? `${work.pages} pages` : null
   ].filter((part): part is string => part !== null);
   return parts.length > 0 ? parts.join(" · ") : null;
 }
@@ -80,9 +80,9 @@ export function bookScreenModel(page: WorkPage | null, book: Book | null, viewer
   return {
     title: work?.title ?? String(book?.Title ?? "Untitled"),
     author: work?.author ?? String(book?.Attribution ?? "Unknown author"),
-    genres: work ? work.genres : book ? genresForBook(book).slice(0, GENRE_CAP) : [],
+    genres: work ? work.genres ?? [] : book ? genresForBook(book).slice(0, GENRE_CAP) : [],
     meta: work ? bookMetaLine(work) : null,
-    primary: book ? ("owner" as const) : ("add" as const),
+    primary: book ? "owner" : page?.mine ? null : "add",
     status: readStatus === null ? null : { label: statusLabel(readStatus), options: STATUSES.map((value) => ({ value, label: statusLabel(value), selected: value === readStatus })) },
     feeling: readStatus === 2 ? {
       label: FINISH_FEELINGS.find((feeling) => feeling.rating === rating)?.label ?? "How did it land?",

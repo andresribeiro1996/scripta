@@ -201,7 +201,7 @@ export function BookScreen({ page, book, signedIn, onAdd, onShare, onBack, backT
                 />
               ) : null}
             </div>
-          ) : (
+          ) : model.primary === "add" ? (
             <button
               type="button"
               onClick={onAdd}
@@ -209,30 +209,32 @@ export function BookScreen({ page, book, signedIn, onAdd, onShare, onBack, backT
             >
               Add to library
             </button>
-          )}
+          ) : null}
 
-          <div
-            role="group"
-            aria-label="Book sections"
-            className="mt-4 flex items-stretch overflow-hidden rounded-lg border border-(--color-border) bg-(--color-surface)"
-          >
-            {model.tabs.map((t, i) => {
-              const checked = t.key === activeTab;
-              return (
-                <button
-                  key={t.key}
-                  type="button"
-                  aria-pressed={checked}
-                  onClick={() => setTab(t.key)}
-                  className={`flex min-h-11 flex-1 items-center justify-center gap-1.5 px-3 text-sm font-semibold ${
-                    i > 0 ? "border-l border-(--color-border)" : ""
-                  } ${checked ? "bg-(--color-accent-soft) text-(--color-accent)" : "text-(--color-text-dim) hover:bg-(--color-surface-hover)"}`}
-                >
-                  {t.label}
-                </button>
-              );
-            })}
-          </div>
+          {model.tabs.length > 1 ? (
+            <div
+              role="group"
+              aria-label="Book sections"
+              className="mt-4 flex items-stretch overflow-hidden rounded-lg border border-(--color-border) bg-(--color-surface)"
+            >
+              {model.tabs.map((t, i) => {
+                const checked = t.key === activeTab;
+                return (
+                  <button
+                    key={t.key}
+                    type="button"
+                    aria-pressed={checked}
+                    onClick={() => setTab(t.key)}
+                    className={`flex min-h-11 flex-1 items-center justify-center gap-1.5 px-3 text-sm font-semibold ${
+                      i > 0 ? "border-l border-(--color-border)" : ""
+                    } ${checked ? "bg-(--color-accent-soft) text-(--color-accent)" : "text-(--color-text-dim) hover:bg-(--color-surface-hover)"}`}
+                  >
+                    {t.label}
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
 
           <div className="mt-6">
             {activeTab === "about" && model.about ? (
