@@ -1,8 +1,9 @@
 import type { FastifyInstance } from "fastify";
 import { getOptionalAuthenticatedUser } from "../auth/index.js";
 import type { WorksService } from "./service.js";
+import type { BookStatsService } from "./stats.js";
 
-export function buildWorkRoutes(service: WorksService) {
+export function buildWorkRoutes(service: WorksService, stats: BookStatsService) {
   return async function workRoutes(app: FastifyInstance) {
     app.get("/works/:id", async (request, reply) => {
       const { id } = request.params as { id: string };
@@ -11,6 +12,14 @@ export function buildWorkRoutes(service: WorksService) {
       reply.header("Cache-Control", "no-store");
       if (!page) return reply.code(404).send({ error: "No book with that id." });
       return reply.send(page);
+    });
+    app.get("/works/:id/stats", async (request, reply) => {
+      const { id } = request.params as { id: string };
+      getOptionalAuthenticatedUser(request);
+      const result = stats.getStats(id);
+      reply.header("Cache-Control", "no-store");
+      if (!result) return reply.code(404).send({ error: "No book with that id." });
+      return reply.send(result);
     });
   };
 }
