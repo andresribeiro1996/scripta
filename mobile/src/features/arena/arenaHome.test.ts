@@ -39,6 +39,7 @@ const tierlist = (over: Partial<Tierlist> = {}): Tierlist => ({
   sourceTierlistId: null,
   promotedAt: null,
   originCreatorId: "u1",
+  ranksWorstFirst: false,
   ...over,
 });
 

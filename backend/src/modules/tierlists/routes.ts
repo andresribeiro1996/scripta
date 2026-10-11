@@ -30,7 +30,8 @@ const worksBoardSchema = z.object({ tiers: z.array(worksTierSchema), pool: z.arr
 const createTierlistSchema = z.object({
   name: z.string().trim().min(1, "name is required and must be non-empty.").max(200),
   data: worksBoardSchema.extend({ tiers: z.array(worksTierSchema).min(1) }).optional(),
-  access: z.enum(["anonymous", "members"]).optional()
+  access: z.enum(["anonymous", "members"]).optional(),
+  ranksWorstFirst: z.boolean().optional()
 });
 
 const updateTierlistSchema = z
@@ -90,7 +91,7 @@ export function buildTierlistRoutes(service: TierlistsService) {
     app.post("/tierlists", { preHandler: authGuard }, async (request, reply) => {
       const parsed = createTierlistSchema.safeParse(request.body);
       if (!parsed.success) return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? "Invalid request." });
-      const { name, data, access } = parsed.data;
+      const { name, data, access, ranksWorstFirst } = parsed.data;
       if (access && !data) return reply.code(400).send({ error: "Choose books and tiers before publishing." });
       if (data) {
         const ids = data.tiers.map((tier) => tier.id);
@@ -102,7 +103,7 @@ export function buildTierlistRoutes(service: TierlistsService) {
         if (board && "error" in board) return reply.code(board.status).send({ error: board.error });
         const publicBooks = access && board ? booksInOrder(request.user.id, board.data.pool) : [];
         if (access && board && publicBooks.length !== board.data.pool.length) return reply.code(400).send({ error: "A selected book is no longer in your library." });
-        const tierlist = service.createTierlist(request.user.id, name, board?.data, access, publicBooks);
+        const tierlist = service.createTierlist(request.user.id, name, board?.data, access, publicBooks, ranksWorstFirst);
         return reply.code(201).send(board ? ({ ...tierlist, data: board.data } satisfies WireTierlist) : tierlist);
       } catch (err) {
         return sendWorksError(reply, err);
@@ -305,6 +306,7 @@ export function buildPublicTierlistRoutes(service: TierlistsService) {
           ballotCount: board.ballotCount,
           eligibleVoteCount: board.eligibleVoteCount,
           promotedAt: board.promotedAt,
+          ranksWorstFirst: board.ranksWorstFirst,
           ...(board.votingOpen ? {} : { histogram: histogramToWorks(board.histogram, canonical, first) })
         } satisfies VotingBoard,
         books: boardBooks(pool, board.publicBooks, () => booksInOrder(board.ownerUserId, pool))

@@ -15,8 +15,8 @@ export function createTierlistsApi(request: ApiRequest) {
     fetchTierlist(id: string): Promise<Tierlist> {
       return request<Tierlist>(apiPath`/tierlists/${id}`, { auth: "required" });
     },
-    createTierlist(name: string, data?: TierlistData, access?: Access): Promise<Tierlist> {
-      return request<Tierlist>("/tierlists", { method: "POST", body: { name, data, access }, auth: "required" });
+    createTierlist(name: string, data?: TierlistData, access?: Access, ranksWorstFirst?: boolean): Promise<Tierlist> {
+      return request<Tierlist>("/tierlists", { method: "POST", body: { name, data, access, ranksWorstFirst }, auth: "required" });
     },
     updateTierlist(id: string, patch: { name?: string; data?: TierlistData }): Promise<Tierlist> {
       return request<Tierlist>(apiPath`/tierlists/${id}`, { method: "PUT", body: patch, auth: "required" });
