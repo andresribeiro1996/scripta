@@ -82,3 +82,12 @@ test("meta line drops what is missing and disappears when nothing is known", () 
   assert.equal(bookMetaLine({ rating: null, year: null, pages: 90 }), "90 pages");
   assert.equal(bookMetaLine({ rating: null, year: null, pages: null }), null);
 });
+
+test("rating counts are abbreviated without Intl compact notation", () => {
+  const line = (count: number) => bookMetaLine({ rating: { value: 4, count }, year: null, pages: null });
+  assert.equal(line(999), "★ 4.0 · 999 ratings");
+  assert.equal(line(2000), "★ 4.0 · 2K ratings");
+  assert.equal(line(2310), "★ 4.0 · 2.3K ratings");
+  assert.equal(line(999_999), "★ 4.0 · 1M ratings");
+  assert.equal(line(1_200_000), "★ 4.0 · 1.2M ratings");
+});

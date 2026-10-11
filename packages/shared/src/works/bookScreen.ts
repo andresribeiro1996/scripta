@@ -28,11 +28,21 @@ export type BookScreenModel = {
 const GENRE_CAP = 3;
 const EDITIONS_PREVIEW = 3;
 const STATUSES = [0, 1, 2] as const;
-const compact = new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 });
+const COMPACT_UNITS = ["", "K", "M", "B"];
+
+function compactCount(count: number): string {
+  let value = count;
+  let unit = 0;
+  while (Math.round(value * 10) / 10 >= 1000 && unit < COMPACT_UNITS.length - 1) {
+    value /= 1000;
+    unit += 1;
+  }
+  return `${Number(value.toFixed(unit === 0 ? 0 : 1))}${COMPACT_UNITS[unit]}`;
+}
 
 export function bookMetaLine(work: Pick<WorkPage["work"], "rating" | "year" | "pages">): string | null {
   const parts = [
-    work.rating ? `★ ${work.rating.value.toFixed(1)} · ${compact.format(work.rating.count)} ${work.rating.count === 1 ? "rating" : "ratings"}` : null,
+    work.rating ? `★ ${work.rating.value.toFixed(1)} · ${compactCount(work.rating.count)} ${work.rating.count === 1 ? "rating" : "ratings"}` : null,
     work.year === null ? null : String(work.year),
     work.pages === null ? null : `${work.pages} pages`
   ].filter((part): part is string => part !== null);
