@@ -23,6 +23,7 @@ const COLOR_SAMPLE_DIMENSION = 64;
 const COLOR_MIN_SATURATION = 0.25;
 const COLOR_MIN_VALUE = 0.15;
 const COLOR_HUE_BINS = 12;
+const HUE_BIN_OFFSET = 3 / COLOR_HUE_BINS;
 const COLOR_MIN_SHARE = 0.03;
 
 export interface EncodedCover {
@@ -68,7 +69,7 @@ export async function coverColor(input: Buffer): Promise<string | null> {
     const value = max / 255;
     if (saturation < COLOR_MIN_SATURATION || value < COLOR_MIN_VALUE) continue;
     const hue = max === r ? ((g - b) / delta + 6) % 6 : max === g ? (b - r) / delta + 2 : (r - g) / delta + 4;
-    const bin = Math.min(COLOR_HUE_BINS - 1, Math.floor((hue / 6) * COLOR_HUE_BINS));
+    const bin = Math.floor((((hue + HUE_BIN_OFFSET) % 6) / 6) * COLOR_HUE_BINS);
     const weight = saturation * value;
     weights[bin] = (weights[bin] ?? 0) + weight;
     const sum = sums[bin] ?? [0, 0, 0];

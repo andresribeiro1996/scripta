@@ -119,7 +119,7 @@ function addBook(repo: ReturnType<typeof createSqliteBooksRepository>, isbn: str
 
 function addCover(repo: ReturnType<typeof createSqliteBooksRepository>, bookId: string, source: "upload" | "apple", width: number, sourceUrl: string | null, status: "good" | "manual" | "low_res" = "manual") {
   const id = `00000000-0000-4000-8000-${String(Math.floor(Math.random() * 1e12)).padStart(12, "0")}`;
-  repo.insertImage({ id, book_id: bookId, source, source_url: sourceUrl, width, height: Math.round(width * 1.5), byte_size: 1, created_at: NOW.toISOString() });
+  repo.insertImage({ id, book_id: bookId, source, source_url: sourceUrl, width, height: Math.round(width * 1.5), byte_size: 1, color: "", created_at: NOW.toISOString() });
   repo.setCover(bookId, { imageId: id, status, checkedAt: NOW.toISOString() });
   return id;
 }

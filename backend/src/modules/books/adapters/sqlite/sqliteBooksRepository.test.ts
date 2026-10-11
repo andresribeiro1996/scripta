@@ -143,7 +143,7 @@ test("search is diacritic-insensitive, requires every token and ignores an empty
 test("covers, rejections and details round-trip", () => {
   const { repo } = freshRepo();
   const book = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: null }, ["ta:dune|frank herbert|"], NOW);
-  repo.insertImage({ id: "img-1", book_id: book.id, source: "apple", source_url: "https://img.test/1", width: 900, height: 1400, byte_size: 10, created_at: NOW });
+  repo.insertImage({ id: "img-1", book_id: book.id, source: "apple", source_url: "https://img.test/1", width: 900, height: 1400, byte_size: 10, color: "", created_at: NOW });
   repo.setCover(book.id, { imageId: "img-1", status: "good", checkedAt: NOW });
   assert.equal(repo.getBook(book.id)!.cover_image_id, "img-1");
   assert.equal(repo.getImage("img-1")!.width, 900);
@@ -219,9 +219,7 @@ test("a stored image row carries its colour", () => {
   const { repo } = freshRepo();
   const book = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: null }, ["ta:dune|frank herbert|"], NOW);
   repo.insertImage({ id: "tinted", book_id: book.id, source: "apple", source_url: null, width: 900, height: 1400, byte_size: 10, color: "#cc2222", created_at: NOW });
-  repo.insertImage({ id: "plain", book_id: book.id, source: "apple", source_url: null, width: 900, height: 1400, byte_size: 10, created_at: NOW });
   assert.equal(repo.getImage("tinted")!.color, "#cc2222");
-  assert.equal(repo.getImage("plain")!.color, null);
 });
 
 test("backfill adds a title key to existing rows once", () => {
@@ -239,7 +237,7 @@ test("listUncheckedCoverIds returns only never-checked books, oldest first", () 
   const older = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: null }, ["ta:dune|frank herbert|"], "2026-10-01T00:00:00.000Z");
   const good = repo.createBook({ title: "Orlando", author: "Virginia Woolf", isbn: null }, ["ta:orlando|virginia woolf|"], NOW);
   const missing = repo.createBook({ title: "Ulysses", author: "James Joyce", isbn: null }, ["ta:ulysses|james joyce|"], NOW);
-  repo.insertImage({ id: "img-1", book_id: good.id, source: "apple", source_url: null, width: 900, height: 1400, byte_size: 10, created_at: NOW });
+  repo.insertImage({ id: "img-1", book_id: good.id, source: "apple", source_url: null, width: 900, height: 1400, byte_size: 10, color: "", created_at: NOW });
   repo.setCover(good.id, { imageId: "img-1", status: "good", checkedAt: NOW });
   repo.setCover(missing.id, { imageId: null, status: "missing", checkedAt: NOW });
   assert.deepEqual(repo.listUncheckedCoverIds(null, 100).ids, [older.id, newer.id]);
@@ -249,9 +247,9 @@ test("listUncheckedCoverIds includes a low-res cover stored without a check time
   const { repo } = freshRepo();
   const low = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: null }, ["ta:dune|frank herbert|"], NOW);
   const manual = repo.createBook({ title: "Emma", author: "Jane Austen", isbn: null }, ["ta:emma|jane austen|"], NOW);
-  repo.insertImage({ id: "img-low", book_id: low.id, source: "apple", source_url: null, width: 300, height: 460, byte_size: 10, created_at: NOW });
+  repo.insertImage({ id: "img-low", book_id: low.id, source: "apple", source_url: null, width: 300, height: 460, byte_size: 10, color: "", created_at: NOW });
   repo.setCover(low.id, { imageId: "img-low", status: "low_res", checkedAt: null });
-  repo.insertImage({ id: "img-manual", book_id: manual.id, source: "upload", source_url: null, width: 300, height: 460, byte_size: 10, created_at: NOW });
+  repo.insertImage({ id: "img-manual", book_id: manual.id, source: "upload", source_url: null, width: 300, height: 460, byte_size: 10, color: "", created_at: NOW });
   repo.setCover(manual.id, { imageId: "img-manual", status: "manual", checkedAt: null });
   assert.deepEqual(repo.listUncheckedCoverIds(null, 100).ids, [low.id]);
   repo.setCover(low.id, { imageId: "img-low", status: "low_res", checkedAt: NOW });
@@ -764,8 +762,8 @@ test("insertImage stores the origin and createBook stores its creator", () => {
   const plain = repo.createBook({ title: "B", author: "B", isbn: null }, ["ta:b|b|"], NOW);
   assert.equal(book.created_by, "publisher");
   assert.equal(plain.created_by, null);
-  repo.insertImage({ id: "with", book_id: book.id, source: "publisher", source_url: "https://antigona.pt/a.jpg", origin: "https://antigona.pt", width: 900, height: 1400, byte_size: 10, created_at: NOW });
-  repo.insertImage({ id: "without", book_id: book.id, source: "apple", source_url: null, width: 900, height: 1400, byte_size: 10, created_at: NOW });
+  repo.insertImage({ id: "with", book_id: book.id, source: "publisher", source_url: "https://antigona.pt/a.jpg", origin: "https://antigona.pt", width: 900, height: 1400, byte_size: 10, color: "", created_at: NOW });
+  repo.insertImage({ id: "without", book_id: book.id, source: "apple", source_url: null, width: 900, height: 1400, byte_size: 10, color: "", created_at: NOW });
   assert.equal(repo.getImage("with")!.origin, "https://antigona.pt");
   assert.equal(repo.getImage("without")!.origin, null);
 });

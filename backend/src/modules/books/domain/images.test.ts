@@ -260,3 +260,16 @@ test("an encoded cover carries its accent colour", async () => {
   assert.ok(encoded);
   assertNear(encoded.color, [0xcc, 0x22, 0x22], 12);
 });
+
+test("a crimson cover whose hues straddle red still gives a red accent", async () => {
+  const patch = (background: string) => sharp({ create: { width: 50, height: 30, channels: 3, background } }).png().toBuffer();
+  const cover = await sharp({ create: { width: 200, height: 300, channels: 3, background: "#ffffff" } })
+    .composite([
+      { input: await patch("#d0102a"), left: 20, top: 40 },
+      { input: await patch("#d02a10"), left: 120, top: 200 }
+    ])
+    .png()
+    .toBuffer();
+  const [r, g, b] = channels(await coverColor(cover));
+  assert.ok(r > 180 && g < 60 && b < 60, `expected a red, got ${r},${g},${b}`);
+});

@@ -301,7 +301,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
         $width: row.width,
         $height: row.height,
         $byte_size: row.byte_size,
-        $color: row.color ?? null,
+        $color: row.color,
         $created_at: row.created_at
       });
     },

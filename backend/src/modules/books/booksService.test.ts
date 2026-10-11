@@ -15,7 +15,7 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
 const { applyBooksMigrations } = await import("./adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("./adapters/sqlite/sqliteBooksRepository.js");
-const { createBooksService, COVER_ENQUEUE_BATCH } = await import("./booksService.js");
+const { createBooksService, storeCoverImage, COVER_ENQUEUE_BATCH } = await import("./booksService.js");
 const { default: sharp } = await import("sharp");
 const { BookNotFoundError, FileTooLargeError, InvalidImageError, SourcePausedError, SourceUnavailableError } = await import("./domain/errors.js");
 const { createCoverWorker } = await import("./worker.js");
@@ -817,7 +817,7 @@ test("rejecting a cover blocks its URL, clears the pointer and queues the book f
 test("rejecting a migrated cover with no recorded URL just clears it", () => {
   const h = harness();
   const book = h.repo.createBook({ title: "", author: "", isbn: "9780141184272" }, ["isbn:9780141184272"], "2026-01-01T00:00:00.000Z");
-  h.repo.insertImage({ id: "legacy", book_id: book.id, source: "openlibrary", source_url: null, width: 300, height: 460, byte_size: 1, created_at: "2026-01-01T00:00:00.000Z" });
+  h.repo.insertImage({ id: "legacy", book_id: book.id, source: "openlibrary", source_url: null, width: 300, height: 460, byte_size: 1, color: "", created_at: "2026-01-01T00:00:00.000Z" });
   h.repo.setCover(book.id, { imageId: "legacy", status: "low_res", checkedAt: "1970-01-01T00:00:00.000Z" });
   h.service.rejectCover(orlando);
   assert.equal(h.repo.getBook(book.id)!.cover_image_id, null);
@@ -954,7 +954,7 @@ function unavailable(name: SourceName, calls: string[]): CoverSource {
 
 function withCover(h: ReturnType<typeof harness>, id: string, source: SourceName, width: number, status: "good" | "low_res" = "good") {
   const imageId = `existing-${source}-${width}`;
-  h.repo.insertImage({ id: imageId, book_id: id, source, source_url: `https://${source}/existing`, width, height: Math.round(width * 1.5), byte_size: 1, created_at: "2026-09-01T00:00:00.000Z" });
+  h.repo.insertImage({ id: imageId, book_id: id, source, source_url: `https://${source}/existing`, width, height: Math.round(width * 1.5), byte_size: 1, color: "", created_at: "2026-09-01T00:00:00.000Z" });
   h.repo.setCover(id, { imageId, status, checkedAt: "2026-09-01T00:00:00.000Z" });
   return imageId;
 }
@@ -1621,4 +1621,16 @@ test("a publisher summary overrides the work's", async () => {
   h.repo.setPublisherUrl(id, "https://antigona.pt/products/dune");
   const details = await h.service.getDetails(dune);
   assert.deepEqual([details?.summary, details?.summarySource, details?.sourceUrl], ["Sinopse da editora.", "publisher", "https://antigona.pt/products/dune"]);
+});
+
+test("storeCoverImage stores an empty colour when none was found and the colour when one was", async () => {
+  const h = harness();
+  const book = h.repo.createBook({ title: "", author: "", isbn: "9780141184272" }, ["isbn:9780141184272"], "2026-01-01T00:00:00.000Z");
+  const image = { full: Buffer.alloc(1), thumb: Buffer.alloc(1), width: 900, height: 1400 };
+  const at = "2026-01-01T00:00:00.000Z";
+  const deps = { repo: h.repo, blobs: { save: async () => {} } };
+  const plain = await storeCoverImage(deps, book.id, "apple", null, { ...image, color: null }, at);
+  const tinted = await storeCoverImage(deps, book.id, "apple", null, { ...image, color: "#cc2222" }, at);
+  assert.equal(h.repo.getImage(plain)!.color, "");
+  assert.equal(h.repo.getImage(tinted)!.color, "#cc2222");
 });
