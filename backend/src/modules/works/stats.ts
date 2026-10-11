@@ -3,7 +3,7 @@ import { BOOK_STATS_MINIMUM, tierLetter, type BookStats, type CommunityRating, t
 export type BookStatsDeps = {
   getWorkPage(id: string): { aliasIds: string[] } | undefined;
   communityRatings(workIds: string[]): Array<{ userId: string; rating: number }>;
-  tierPlacements(workIds: string[]): Array<{ tierlistId: string; tierIndex: number; tierCount: number }>;
+  tierPlacements(workIds: string[]): Array<{ tierlistId: string; tierIndex: number; tierCount: number; ranksWorstFirst: boolean }>;
   tournamentRecord(workIds: string[]): TournamentRecord;
 };
 
@@ -16,11 +16,12 @@ function community(ratings: Array<{ rating: number }>): CommunityRating | null {
   return { average: mean(ratings.map((r) => r.rating)), count: ratings.length, distribution };
 }
 
-function tiers(placements: Array<{ tierlistId: string; tierIndex: number; tierCount: number }>): TierStanding | null {
+function tiers(placements: Array<{ tierlistId: string; tierIndex: number; tierCount: number; ranksWorstFirst: boolean }>): TierStanding | null {
   const byList = new Map<string, number[]>();
   for (const placement of placements) {
     if (placement.tierCount < 2) continue;
-    byList.set(placement.tierlistId, [...(byList.get(placement.tierlistId) ?? []), placement.tierIndex / (placement.tierCount - 1)]);
+    const position = placement.tierIndex / (placement.tierCount - 1);
+    byList.set(placement.tierlistId, [...(byList.get(placement.tierlistId) ?? []), placement.ranksWorstFirst ? 1 - position : position]);
   }
   const ballots = [...byList.values()].reduce((sum, positions) => sum + positions.length, 0);
   if (ballots < BOOK_STATS_MINIMUM) return null;

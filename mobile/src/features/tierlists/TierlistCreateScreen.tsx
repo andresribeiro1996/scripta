@@ -9,6 +9,7 @@ import { Button, ErrorState, Input, Screen, Segmented, Skeleton, Toast, dynamicT
 import { createTierlist, type Tierlist } from "./api";
 
 const VISIBILITY = [{ value: "private", label: "Private" }, { value: "public", label: "Public" }] as const;
+const DIRECTION = [{ value: "best", label: "Best" }, { value: "worst", label: "Worst" }] as const;
 const ACCESS = [{ value: "anonymous", label: "Anyone" }, { value: "members", label: "Members" }] as const;
 
 export function TierlistCreateScreen() {
@@ -21,6 +22,7 @@ export function TierlistCreateScreen() {
   const [tiers, setTiers] = useState<TierlistData["tiers"]>(() => DEFAULT_TIER_PRESET.map((tier) => createTier(tier.label, tier.color)));
   const [visibility, setVisibility] = useState<"private" | "public">("private");
   const [access, setAccess] = useState<"anonymous" | "members">("anonymous");
+  const [direction, setDirection] = useState<"best" | "worst">("best");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const library = useLibrary();
@@ -33,7 +35,7 @@ export function TierlistCreateScreen() {
     setBusy(true);
     setError(null);
     try {
-      const created = await createTierlist(name.trim() || "Untitled tier list", { tiers, pool }, visibility === "public" ? access : undefined);
+      const created = await createTierlist(name.trim() || "Untitled tier list", { tiers, pool }, visibility === "public" ? access : undefined, direction === "worst");
       queryClient.setQueryData<Tierlist[]>(["tierlists"], (items = []) => [created, ...items]);
       router.replace((created.voteCode ? `/vote/${created.voteCode}` : `/tierlist/${created.id}?rank=1`) as never);
     } catch (reason) {
@@ -74,7 +76,10 @@ export function TierlistCreateScreen() {
       </View>)}
       <Button label="Add tier" variant="secondary" onPress={() => setTiers((value) => [...value, createTier("New tier", "#8a8580")])} />
     </ScrollView> : null}
-    {step === 2 ? <View style={styles.settings}>
+    {step === 2 ? <ScrollView style={styles.grow} contentContainerStyle={styles.settings} keyboardShouldPersistTaps="handled">
+      <Text accessible={false} {...dynamicType} style={[typography.body, { color: colors.text }]}>Top tier means</Text>
+      <Segmented accessibilityLabel="Top tier means" options={DIRECTION} value={direction} onChange={setDirection} />
+      <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Can't be changed later.</Text>
       <Segmented accessibilityLabel="Visibility" options={VISIBILITY} value={visibility} onChange={setVisibility} />
       {visibility === "public" ? <>
         <Text {...dynamicType} style={[typography.body, { color: colors.text }]}>Open for voting</Text>
@@ -82,7 +87,7 @@ export function TierlistCreateScreen() {
         <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>This tier list becomes public and its books, name, and tiers are locked. At 100 distinct signed-in voters, it becomes an app-owned reference that stays available for everyone to consult.</Text>
       </> : <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>Only you can see this list. You can edit it and open voting later.</Text>}
       <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{pool.length} {pool.length === 1 ? "book" : "books"} · {tiers.length} tiers</Text>
-    </View> : null}
+    </ScrollView> : null}
     <View style={styles.actions}>
       {step > 0 ? <Button label="Back" variant="secondary" onPress={() => setStep((value) => value - 1)} /> : null}
       {step < 2 ? <Button label="Next" disabled={step === 0 ? pool.length === 0 || library.isError : tiers.some((tier) => !tier.label.trim())} onPress={() => setStep((value) => value + 1)} /> : <Button label="Create tier list" loading={busy} onPress={() => void create()} />}
@@ -97,6 +102,6 @@ const styles = StyleSheet.create({
   tiers: { gap: spacing.sm, paddingBottom: spacing.lg },
   tier: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   swatch: { width: 20, height: 44, borderRadius: radii.sm },
-  settings: { flex: 1, gap: spacing.md },
+  settings: { gap: spacing.md, paddingBottom: spacing.lg },
   actions: { flexDirection: "row", justifyContent: "flex-end", gap: spacing.sm },
 });
