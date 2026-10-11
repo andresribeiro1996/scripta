@@ -15,9 +15,11 @@ export function WorkStatsScreen({ id }: { id: string }) {
   const canonicalId = work.data?.work.id;
   const stats = useQuery({ queryKey: ["works", id, "stats"], queryFn: () => fetchWorkStats(id), enabled: canonicalId === id, retry: false });
 
+  const canonicalPath = canonicalId && canonicalId !== id ? workStatsPath(canonicalId, segments) : null;
+
   useEffect(() => {
-    if (canonicalId && canonicalId !== id) router.replace(workStatsPath(canonicalId, segments) as never);
-  }, [canonicalId, id, segments]);
+    if (canonicalPath) router.replace(canonicalPath as never);
+  }, [canonicalPath]);
 
   const untitled = <Stack.Screen options={{ headerShown: true, title: "Stats" }} />;
   const failed = work.isError && !work.data ? work : stats.isError && !stats.data ? stats : null;
