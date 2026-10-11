@@ -60,13 +60,13 @@ export function createSqliteLibraryRepository(db: DatabaseSync, rowsVersion = LI
   const workIdsStmt = db.prepare(`SELECT book_key, work_id FROM library_books WHERE user_id = ? AND work_id IS NOT NULL ORDER BY position`);
   const listRowHashesStmt = db.prepare(`SELECT position, row_hash FROM library_books WHERE user_id = ?`);
   const upsertBookStmt = db.prepare(`
-    INSERT INTO library_books (user_id, position, book_key, title, author, isbn, image_id, read_status, series_number, sort_order, cover_url, finished_year, row_hash, work_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO library_books (user_id, position, book_key, title, author, isbn, image_id, read_status, series_number, sort_order, cover_url, finished_year, rating, row_hash, work_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT (user_id, position) DO UPDATE SET
       book_key = excluded.book_key, title = excluded.title, author = excluded.author, isbn = excluded.isbn,
       image_id = excluded.image_id, read_status = excluded.read_status, series_number = excluded.series_number,
       sort_order = excluded.sort_order, cover_url = excluded.cover_url, finished_year = excluded.finished_year,
-      row_hash = excluded.row_hash,
+      rating = excluded.rating, row_hash = excluded.row_hash,
       work_id = COALESCE(excluded.work_id, CASE WHEN library_books.book_key = excluded.book_key THEN library_books.work_id END)
   `);
   const deleteBookStmt = db.prepare(`DELETE FROM library_books WHERE user_id = ? AND position = ?`);
@@ -104,7 +104,7 @@ export function createSqliteLibraryRepository(db: DatabaseSync, rowsVersion = LI
       const unchanged = stored.get(book.position) === book.row_hash;
       stored.delete(book.position);
       if (unchanged) continue;
-      upsertBookStmt.run(userId, book.position, book.book_key, book.title, book.author, book.isbn, book.image_id, book.read_status, book.series_number, book.sort_order, book.cover_url, book.finished_year, book.row_hash, book.work_id);
+      upsertBookStmt.run(userId, book.position, book.book_key, book.title, book.author, book.isbn, book.image_id, book.read_status, book.series_number, book.sort_order, book.cover_url, book.finished_year, book.rating, book.row_hash, book.work_id);
       deletePositionHighlightsStmt.run(userId, book.position);
       for (const highlight of highlights) insertHighlightStmt.run(userId, book.position, highlight.highlight_id, highlight.text, highlight.annotation);
     }
@@ -131,7 +131,7 @@ export function createSqliteLibraryRepository(db: DatabaseSync, rowsVersion = LI
     });
     if (result.changes === 0) return;
     for (const book of rows.books) {
-      upsertBookStmt.run(userId, book.position, book.book_key, book.title, book.author, book.isbn, book.image_id, book.read_status, book.series_number, book.sort_order, book.cover_url, book.finished_year, book.row_hash, book.work_id);
+      upsertBookStmt.run(userId, book.position, book.book_key, book.title, book.author, book.isbn, book.image_id, book.read_status, book.series_number, book.sort_order, book.cover_url, book.finished_year, book.rating, book.row_hash, book.work_id);
     }
   }
 

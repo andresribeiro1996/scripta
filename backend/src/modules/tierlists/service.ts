@@ -6,7 +6,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { DEFAULT_TIER_PRESET, type ResolvedTierlist, type VotedTierlist } from "@scripta/shared";
 import type { GameParticipation } from "@scripta/shared/community";
 import type { TierlistsRepository } from "./domain/ports.js";
-import type { BallotRow, HistogramCell, Placement, Tierlist, TierlistGameRow, TierlistRow, VoteAccess } from "./domain/types.js";
+import type { BallotRow, HistogramCell, Placement, Tierlist, TierlistGameRow, TierlistRow, TierPlacement, VoteAccess } from "./domain/types.js";
 import { canonicalBoard } from "./wire.js";
 
 function toTierlist(row: TierlistRow): Tierlist {
@@ -111,6 +111,7 @@ export interface TierlistsService {
   discoverWindow(needle: string, limit: number): TierlistDiscoverRef[];
   getPublishedRefs(ids: string[]): PublishedTierlistRef[];
   listPublishedByWorks(workIds: string[], limit: number): TierlistGameRow[];
+  tierPlacements(workIds: string[]): TierPlacement[];
   votedAmong(voterUserId: string, ids: string[]): string[];
   getPublishedRef(id: string): PublishedTierlistRef | undefined;
   listPublishedRefsByOwner(ownerUserId: string): PublishedTierlistRef[];
@@ -409,6 +410,8 @@ export function createTierlistsService(repo: TierlistsRepository, emitPublished?
 
     listPublishedByWorks: (workIds, limit) => repo.listPublishedByWorks(workIds, limit),
 
+    tierPlacements: (workIds) => repo.tierPlacements(workIds),
+
     votedAmong(voterUserId, ids) {
       return repo.votedAmong(voterUserId, ids);
     },
@@ -454,6 +457,7 @@ export interface TierlistsPublicApi {
   getPublishedMany(ids: string[]): PublishedTierlistRef[];
   votedAmong(voterUserId: string, ids: string[]): string[];
   publishedByWorks(workIds: string[], limit: number): GameByWork[];
+  tierPlacements(workIds: string[]): TierPlacement[];
   getPublished(id: string): PublishedTierlistRef | undefined;
   listPublishedByOwner(ownerUserId: string): PublishedTierlistRef[];
   participationByOwner(ownerUserId: string, since: string): GameParticipation[];
@@ -479,6 +483,7 @@ export function createTierlistsPublicApi(service: TierlistsService): TierlistsPu
         path: `/vote/${row.vote_code}`,
         ownerUserId: row.owner_user_id === "__app__" ? null : row.origin_user_id
       })),
+    tierPlacements: (workIds) => service.tierPlacements(workIds),
     getPublished: (id) => service.getPublishedRef(id),
     listPublishedByOwner: (ownerUserId) => service.listPublishedRefsByOwner(ownerUserId),
     participationByOwner: (ownerUserId, since) => service.participationByOwner(ownerUserId, since)

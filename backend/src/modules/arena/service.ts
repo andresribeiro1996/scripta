@@ -11,7 +11,7 @@
 // whether closes_at must already have passed.
 
 import { randomUUID } from "node:crypto";
-import type { Duel, DuelSide, SeedBook, Tournament, TournamentView } from "@scripta/shared";
+import type { Duel, DuelSide, SeedBook, Tournament, TournamentRecord, TournamentView } from "@scripta/shared";
 import type { GameParticipation } from "@scripta/shared/community";
 import {
   AlreadyVotedError,
@@ -47,6 +47,7 @@ export interface ArenaService {
   discoverWindow(needle: string, limit: number): TournamentDiscoverRef[];
   listPublicByIds(ids: string[]): Tournament[];
   listPublishedByWorks(workIds: string[], limit: number): TournamentGameRow[];
+  tournamentRecord(workIds: string[]): TournamentRecord;
   votedAmong(voterUserId: string, ids: string[]): string[];
   getTournamentView(id: string, voterToken?: string, viewerUserId?: string | null): TournamentView | null;
   setSlotsManual(tournamentId: string, ownerUserId: string, entries: Array<{ slotIndex: number; book: SeedBookInput }>): void;
@@ -302,6 +303,8 @@ export function createArenaService(
 
     listPublishedByWorks: (workIds, limit) => repo.listPublishedByWorks(workIds, limit),
 
+    tournamentRecord: (workIds) => repo.tournamentRecord(workIds),
+
     listPublicByIds(ids) {
       return summariesWithPreviews(repo, repo.listPublicByIds(ids));
     },
@@ -495,6 +498,7 @@ export interface ArenaPublicApi {
   getPublishedMany(ids: string[]): PublishedTournamentRef[];
   votedAmong(voterUserId: string, ids: string[]): string[];
   publishedByWorks(workIds: string[], limit: number): GameByWork[];
+  tournamentRecord(workIds: string[]): TournamentRecord;
   getPublished(id: string): PublishedTournamentRef | undefined;
   listPublishedByOwner(ownerUserId: string): PublishedTournamentRef[];
   participationByOwner(ownerUserId: string, since: string): GameParticipation[];
@@ -524,6 +528,7 @@ export function createArenaPublicApi(service: ArenaService): ArenaPublicApi {
         path: `/arena/${row.id}`,
         ownerUserId: row.owner_user_id
       })),
+    tournamentRecord: (workIds) => service.tournamentRecord(workIds),
     getPublished: (id) => {
       const summary = service.getPublicSummary(id);
       return summary ? toPublishedRef(summary) : undefined;

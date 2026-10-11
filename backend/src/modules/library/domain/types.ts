@@ -65,6 +65,7 @@ export interface LibraryBookRow {
   sort_order: number | null;
   cover_url: string | null;
   finished_year: number | null;
+  rating: number | null;
   work_id: string | null;
   row_hash: string;
 }

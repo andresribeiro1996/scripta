@@ -43,3 +43,18 @@ test("the viewer's copy carries feeling and highlights without notes", () => {
   assert.deepEqual(copyOfWork("ana", ["w-new", "w-old"]), { bookKey: "isbn:111", readStatus: 2, rating: 4, highlightCount: 1, isbn: "111", coverUrl: "https://c/ana.webp" });
   assert.equal(copyOfWork("cy", ["w-new"]), undefined);
 });
+
+test("community ratings: finished and rated only, one per user from their first such copy", () => {
+  const db = new DatabaseSync(":memory:");
+  applyLibrarySchema(db);
+  const row = db.prepare("INSERT INTO library_books (user_id, position, book_key, read_status, rating, row_hash, work_id) VALUES (?, ?, ?, ?, ?, 'h', ?)");
+  row.run("ana", 3, "isbn:1", 2, 5, "w-old");
+  row.run("ana", 1, "isbn:2", 2, 3, "w-new");
+  row.run("bo", 0, "isbn:3", 1, 4, "w-new");
+  row.run("cy", 0, "isbn:4", 2, null, "w-new");
+  row.run("di", 0, "isbn:5", 2, 1, "w-other");
+  row.run("ed", 2, "isbn:6", 2, 2, "w-old");
+  const { communityRatings } = createWorkHolders(db);
+  assert.deepEqual(communityRatings(["w-new", "w-old"]), [{ userId: "ana", rating: 3 }, { userId: "ed", rating: 2 }]);
+  assert.deepEqual(communityRatings([]), []);
+});

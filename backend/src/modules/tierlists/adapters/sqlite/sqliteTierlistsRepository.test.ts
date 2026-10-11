@@ -540,3 +540,24 @@ test("published tier lists holding any of the given works, newest first; drafts 
     { id: "old", name: "Old", path: "/vote/code-old", ownerUserId: "u1" }
   ]);
 });
+
+test("tier placements: signed-in ballots on published lists, mapped through the list's own tiers", () => {
+  const repo = createSqliteTierlistsRepository(freshDb());
+  const tiers = (ids: string[]) => JSON.stringify({ tiers: ids.map((id) => ({ id, label: id, color: "#fff", workIds: [] })), pool: ["w-new", "w-old"] });
+  repo.insert(row({ id: "big", vote_code: "code-big", voting_open: 1, data: tiers(["s", "a", "b"]) }));
+  repo.insert(row({ id: "tiny", vote_code: "code-tiny", voting_open: 1, data: tiers(["only"]) }));
+  repo.insert(row({ id: "private", data: tiers(["s", "a"]) }));
+  repo.saveBallot(ballot({ id: "b1", tierlist_id: "big", voter_user_id: "u1" }), [{ workId: "w-new", tierId: "a" }]);
+  repo.saveBallot(ballot({ id: "b2", tierlist_id: "big", voter_user_id: "u2" }), [{ workId: "w-old", tierId: "s" }]);
+  repo.saveBallot(ballot({ id: "b3", tierlist_id: "big", voter_user_id: null }), [{ workId: "w-new", tierId: "b" }]);
+  repo.saveBallot(ballot({ id: "b4", tierlist_id: "big", voter_user_id: "u3" }), [{ workId: "w-new", tierId: "deleted-tier" }]);
+  repo.saveBallot(ballot({ id: "b5", tierlist_id: "tiny", voter_user_id: "u1" }), [{ workId: "w-new", tierId: "only" }]);
+  repo.saveBallot(ballot({ id: "b6", tierlist_id: "private", voter_user_id: "u1" }), [{ workId: "w-new", tierId: "s" }]);
+  const sorted = (rows: Array<{ tierlistId: string; tierIndex: number; tierCount: number }>) => [...rows].sort((a, b) => a.tierIndex - b.tierIndex || a.tierlistId.localeCompare(b.tierlistId));
+  assert.deepEqual(sorted(repo.tierPlacements(["w-new", "w-old"])), [
+    { tierlistId: "big", tierIndex: 0, tierCount: 3 },
+    { tierlistId: "tiny", tierIndex: 0, tierCount: 1 },
+    { tierlistId: "big", tierIndex: 1, tierCount: 3 }
+  ]);
+  assert.deepEqual(repo.tierPlacements([]), []);
+});

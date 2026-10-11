@@ -41,7 +41,7 @@ import { deleteArenaUserData, getArenaPublicApi, registerArenaModule } from "./m
 import { createBestEffortRecorder, deleteCommunityUserData, getCommunityPublicApi, registerCommunityModule } from "./modules/community/index.js";
 import { enqueueBookCovers, getWorkPage, registerBooksModule } from "./modules/books/index.js";
 import { deleteGalleryUserData, registerGalleryModule } from "./modules/gallery/index.js";
-import { copyOfWork, deleteLibraryUserData, holdersOfWorks, registerLibraryModule, resolvePublicLibrary, readerGlyphFor, resolveEntryWorks, WorkResolutionError, sharedBookCounts, sharedBooks, startWorksSweep, sweepLibraryWorks, type BookEvent } from "./modules/library/index.js";
+import { communityRatings, copyOfWork, deleteLibraryUserData, holdersOfWorks, registerLibraryModule, resolvePublicLibrary, readerGlyphFor, resolveEntryWorks, WorkResolutionError, sharedBookCounts, sharedBooks, startWorksSweep, sweepLibraryWorks, type BookEvent } from "./modules/library/index.js";
 import { deleteMuralsUserData, getMuralsPublicApi, registerMuralsModule, rekeyMuralsBooks, sweepMuralsWorks } from "./modules/murals/index.js";
 import { deleteQuizzesUserData, getQuizzesPublicApi, registerQuizzesModule } from "./modules/quizzes/index.js";
 import { deleteSocialsUserData, registerSocialsModule } from "./modules/socials/index.js";
@@ -241,7 +241,10 @@ export function buildApp() {
     readerGlyphFor,
     tierlists: (workIds: string[], limit: number) => getTierlistsPublicApi().publishedByWorks(workIds, limit),
     arenas: (workIds: string[], limit: number) => getArenaPublicApi().publishedByWorks(workIds, limit),
-    quizzes: (workIds: string[], limit: number) => getQuizzesPublicApi().publishedByWorks(workIds, limit)
+    quizzes: (workIds: string[], limit: number) => getQuizzesPublicApi().publishedByWorks(workIds, limit),
+    communityRatings,
+    tierPlacements: (workIds: string[]) => getTierlistsPublicApi().tierPlacements(workIds),
+    tournamentRecord: (workIds: string[]) => getArenaPublicApi().tournamentRecord(workIds)
   });
 
   const sweepSteps = { library: sweepLibraryWorks, murals: sweepMuralsWorks };
