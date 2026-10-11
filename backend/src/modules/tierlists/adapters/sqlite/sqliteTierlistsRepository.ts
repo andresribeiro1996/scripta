@@ -46,10 +46,11 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
   `);
   const tierPlacementsStmt = db.prepare(`
     SELECT p.tierlist_id, p.tier_id, t.data
-    FROM tierlist_ballot_placements p
-    JOIN tierlist_ballots b ON b.id = p.ballot_id
-    JOIN tierlists t ON t.id = p.tierlist_id
-    WHERE p.work_id IN (SELECT value FROM json_each(?)) AND b.voter_user_id IS NOT NULL AND t.vote_code IS NOT NULL
+    FROM tierlist_works w
+    JOIN tierlists t ON t.id = w.tierlist_id AND t.vote_code IS NOT NULL
+    JOIN tierlist_ballot_placements p ON p.tierlist_id = w.tierlist_id AND p.work_id = w.work_id
+    JOIN tierlist_ballots b ON b.id = p.ballot_id AND b.voter_user_id IS NOT NULL
+    WHERE w.work_id IN (SELECT value FROM json_each(?))
   `);
   const ballotTotalsForStmt = db.prepare(`
     SELECT b.tierlist_id,

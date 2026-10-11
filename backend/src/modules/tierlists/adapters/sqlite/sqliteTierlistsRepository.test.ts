@@ -543,7 +543,7 @@ test("published tier lists holding any of the given works, newest first; drafts 
 
 test("tier placements: signed-in ballots on published lists, mapped through the list's own tiers", () => {
   const repo = createSqliteTierlistsRepository(freshDb());
-  const tiers = (ids: string[]) => JSON.stringify({ tiers: ids.map((id) => ({ id, label: id, color: "#fff", workIds: [] })), pool: [] });
+  const tiers = (ids: string[]) => JSON.stringify({ tiers: ids.map((id) => ({ id, label: id, color: "#fff", workIds: [] })), pool: ["w-new", "w-old"] });
   repo.insert(row({ id: "big", vote_code: "code-big", voting_open: 1, data: tiers(["s", "a", "b"]) }));
   repo.insert(row({ id: "tiny", vote_code: "code-tiny", voting_open: 1, data: tiers(["only"]) }));
   repo.insert(row({ id: "private", data: tiers(["s", "a"]) }));

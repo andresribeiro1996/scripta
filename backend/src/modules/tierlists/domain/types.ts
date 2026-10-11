@@ -32,13 +32,13 @@ export interface TierlistRow {
 }
 
 export type TierlistDiscoverRow = Pick<TierlistRow, "id" | "created_at" | "origin_user_id" | "promoted_at">;
+export type TierlistGameRow = Pick<TierlistRow, "id" | "name" | "vote_code" | "owner_user_id" | "origin_user_id" | "created_at">;
+
 export interface TierPlacement {
   tierlistId: string;
   tierIndex: number;
   tierCount: number;
 }
-
-export type TierlistGameRow =Pick<TierlistRow, "id" | "name" | "vote_code" | "owner_user_id" | "origin_user_id" | "created_at">;
 
 export interface BallotTotals {
   ballots: number;
