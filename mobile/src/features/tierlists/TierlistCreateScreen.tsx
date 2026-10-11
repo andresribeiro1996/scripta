@@ -77,7 +77,7 @@ export function TierlistCreateScreen() {
       <Button label="Add tier" variant="secondary" onPress={() => setTiers((value) => [...value, createTier("New tier", "#8a8580")])} />
     </ScrollView> : null}
     {step === 2 ? <View style={styles.settings}>
-      <Text {...dynamicType} style={[typography.body, { color: colors.text }]}>Top tier means</Text>
+      <Text accessible={false} {...dynamicType} style={[typography.body, { color: colors.text }]}>Top tier means</Text>
       <Segmented accessibilityLabel="Top tier means" options={DIRECTION} value={direction} onChange={setDirection} />
       <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Can't be changed later.</Text>
       <Segmented accessibilityLabel="Visibility" options={VISIBILITY} value={visibility} onChange={setVisibility} />

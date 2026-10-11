@@ -77,7 +77,7 @@ export function TierListCreatePage() {
       </>}
       {step === 2 && <>
         <fieldset className="flex flex-col gap-3"><legend className="mb-2 font-semibold">Top tier means</legend>
-          {([false, true] as const).map((value) => <label key={String(value)} className="flex items-center gap-2 rounded-lg border border-(--color-border) p-3"><input type="radio" checked={worstFirst === value} onChange={() => setWorstFirst(value)} />{value ? "Worst" : "Best"}</label>)}
+          {([false, true] as const).map((value) => <label key={String(value)} className="flex items-center gap-2 rounded-lg border border-(--color-border) p-3"><input type="radio" name="direction" checked={worstFirst === value} onChange={() => setWorstFirst(value)} />{value ? "Worst" : "Best"}</label>)}
           <p className="text-sm text-(--color-text-dim)">Can't be changed later.</p>
         </fieldset>
         <fieldset className="flex flex-col gap-3"><legend className="mb-2 font-semibold">Visibility</legend>
