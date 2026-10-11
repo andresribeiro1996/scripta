@@ -5,9 +5,9 @@ import type { LibrarySaveOptions } from "@scripta/shared";
 import { shareLibrary, unshareLibrary, type LibraryData, type LibraryDocument } from "../api/library";
 import { useLibrarySaver } from "./useLibrarySaver";
 
-export function useLibrary() {
+export function useLibrary({ enabled = true }: { enabled?: boolean } = {}) {
   const saver = useLibrarySaver();
-  const query = useQuery({ queryKey: ["library"], queryFn: () => saver.fetch() });
+  const query = useQuery({ queryKey: ["library"], queryFn: () => saver.fetch(), enabled });
 
   function updateLibrary(updater: (current: LibraryData) => LibraryData, options?: LibrarySaveOptions): Promise<LibraryDocument> {
     return saver.saveWhole(updater, options);
