@@ -46,7 +46,8 @@ function harness(overrides: Partial<Deps> = {}) {
   const repo = createSqliteBooksRepository(db);
   const files = new Map<string, Buffer>();
   const blobs = {
-    save: async (id: string, extension: string, bytes: Buffer) => { files.set(`${id}.${extension}`, bytes); }
+    save: async (id: string, extension: string, bytes: Buffer) => { files.set(`${id}.${extension}`, bytes); },
+    read: async (id: string, extension: string) => files.get(`${id}.${extension}`) ?? null
   };
   const enqueued: Array<{ bookId: string; priority: string }> = [];
   const warnings: Array<{ details: Record<string, unknown>; message: string }> = [];
@@ -145,6 +146,7 @@ test("a cover set while the worker uploaded is not overwritten", async () => {
   const h: ReturnType<typeof harness> = harness({
     sources: { isbndb: null, apple: isbnSource("https://a/1"), openlibrary: emptySource },
     blobs: {
+      read: async () => null,
       save: async () => {
         if (rivalSet) return;
         rivalSet = true;
@@ -487,7 +489,7 @@ test("a migrated book with no title gets its title from the first lookup that ha
 test("a cover whose blob save rejects stores no image row and no cover pointer", async () => {
   const h = harness({
     sources: { isbndb: null, apple: isbnSource("https://a/1"), openlibrary: emptySource },
-    blobs: { save: async () => { throw new Error("R2 PUT failed: HTTP 403"); } }
+    blobs: { read: async () => null, save: async () => { throw new Error("R2 PUT failed: HTTP 403"); } }
   });
   h.sizes.set("https://a/1", [600, 900]);
   h.service.resolveCover(orlando);
@@ -1633,4 +1635,50 @@ test("storeCoverImage stores an empty colour when none was found and the colour 
   const tinted = await storeCoverImage(deps, book.id, "apple", null, { ...image, color: "#cc2222" }, at);
   assert.equal(h.repo.getImage(plain)!.color, "");
   assert.equal(h.repo.getImage(tinted)!.color, "#cc2222");
+});
+
+async function pendingColorHarness(overrides: Partial<Deps> = {}) {
+  const h = harness(overrides);
+  const book = h.repo.createBook({ title: "", author: "", isbn: "9780141184272" }, ["isbn:9780141184272"], "2026-01-01T00:00:00.000Z");
+  const addImage = (id: string) => h.repo.insertImage({ id, book_id: book.id, source: "apple", source_url: null, width: 900, height: 1400, byte_size: 1, color: null, created_at: "2026-01-01T00:00:00.000Z" });
+  const red = await sharp({ create: { width: 40, height: 60, channels: 3, background: "#cc2222" } }).webp().toBuffer();
+  return { ...h, addImage, red };
+}
+
+test("fillCoverColors colours an image from its thumb, marks one with no thumb as having none, and does nothing the second time", async () => {
+  const h = await pendingColorHarness();
+  h.addImage("image-a");
+  h.addImage("image-b");
+  h.files.set("image-a-thumb.webp", h.red);
+  assert.equal(await h.service.fillCoverColors(10), 2);
+  assert.match(h.repo.getImage("image-a")!.color!, /^#[0-9a-f]{6}$/);
+  assert.equal(h.repo.getImage("image-b")!.color, "");
+  assert.equal(await h.service.fillCoverColors(10), 0);
+});
+
+test("fillCoverColors marks a thumb with no usable colour as having none", async () => {
+  const h = await pendingColorHarness();
+  h.addImage("image-a");
+  h.files.set("image-a-thumb.webp", Buffer.from("not an image"));
+  assert.equal(await h.service.fillCoverColors(10), 1);
+  assert.equal(h.repo.getImage("image-a")!.color, "");
+});
+
+test("fillCoverColors stops on a store error other than a missing object and leaves the row pending", async () => {
+  const h = await pendingColorHarness({
+    blobs: { save: async () => {}, read: async () => { throw new Error("R2 GET failed: HTTP 500"); } }
+  });
+  h.addImage("image-a");
+  await assert.rejects(h.service.fillCoverColors(10), /HTTP 500/);
+  assert.equal(h.repo.getImage("image-a")!.color, null);
+  assert.deepEqual(h.repo.listPendingColorImageIds(10), ["image-a"]);
+});
+
+test("fillCoverColors takes at most the limit", async () => {
+  const h = await pendingColorHarness();
+  h.addImage("image-a");
+  h.addImage("image-b");
+  h.addImage("image-c");
+  assert.equal(await h.service.fillCoverColors(2), 2);
+  assert.equal(h.repo.listPendingColorImageIds(10).length, 1);
 });

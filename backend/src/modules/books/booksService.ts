@@ -3,11 +3,11 @@ import { canonicalIsbn, looksLikeIsbnQuery, type BookGenre, type BookMetadata, t
 import { findBestCover, type CoverSources, type FetchCoverImage } from "./coverResolver.js";
 import { MIN_GOOD_WIDTH } from "./domain/constants.js";
 import { BookNotFoundError, FileTooLargeError, InvalidImageError, SourcePausedError, SourceUnavailableError, WorkMergeError } from "./domain/errors.js";
-import { encodeCover, type EncodedCover } from "./domain/images.js";
+import { coverColor, encodeCover, type EncodedCover } from "./domain/images.js";
 import { findExisting, findOrCreateBook, keysOf } from "./domain/findOrCreate.js";
 import { editionLanguage, findByIdentity, isPortugueseIsbn, lookupIdentity, SEARCH_LIMIT, searchTokens, type BookIdentity, type BookLookup } from "./domain/normalize.js";
 import { summaryMatchesLanguage } from "./adapters/catalog/languageFilter.js";
-import type { BookCatalog, BooksRepository, CatalogSearchHit, CoverBlobStore, CoverSource, EditionRecordSource, PageCursor } from "./domain/ports.js";
+import type { BookCatalog, BooksRepository, CatalogSearchHit, CoverBlobReader, CoverBlobStore, CoverSource, EditionRecordSource, PageCursor } from "./domain/ports.js";
 import type { BookRow, CoverSourceName, CoverStatus, WorkView } from "./domain/types.js";
 import type { CoverPriority } from "./worker.js";
 
@@ -33,7 +33,7 @@ export interface ResolvedCover {
 
 export interface BooksServiceDeps {
   repo: BooksRepository;
-  blobs: CoverBlobStore;
+  blobs: CoverBlobStore & CoverBlobReader;
   sources: CoverSources;
   catalog: BookCatalog;
   backgroundCatalog: BookCatalog;
@@ -54,6 +54,7 @@ export interface BooksService {
   getDetails(lookup: BookLookup): Promise<BookMetadata | null>;
   backfillDetails(limit: number, signal?: AbortSignal): Promise<number | null>;
   backfillWorkKeys(limit: number, signal?: AbortSignal): Promise<number | null>;
+  fillCoverColors(limit: number): Promise<number>;
   search(query: string): BookSearchResult[];
   searchExternal(query: string): Promise<BookSearchResult[]>;
   isAdmin(userId: string): boolean;
@@ -328,6 +329,15 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
         deps.repo.markWorkChecked(id, now().toISOString());
       }
       return null;
+    },
+
+    async fillCoverColors(limit) {
+      const ids = deps.repo.listPendingColorImageIds(limit);
+      for (const id of ids) {
+        const thumb = await deps.blobs.read(`${id}-thumb`, COVER_EXTENSION);
+        deps.repo.setImageColor(id, (thumb && await coverColor(thumb)) ?? "");
+      }
+      return ids.length;
     },
 
     search(query) {

@@ -7,6 +7,10 @@ export interface CoverBlobStore {
   save(id: string, extension: string, bytes: Buffer): Promise<void>;
 }
 
+export interface CoverBlobReader {
+  read(id: string, extension: string): Promise<Buffer | null>;
+}
+
 export interface PageCursor { at: string; row: number }
 export interface IdPage { ids: string[]; next: PageCursor | null }
 
@@ -21,6 +25,8 @@ export interface BooksRepository {
   makeSearchable(id: string): void;
   getImage(id: string): CoverImageRow | undefined;
   insertImage(row: CoverImageRow): void;
+  listPendingColorImageIds(limit: number): string[];
+  setImageColor(id: string, color: string): void;
   setCover(bookId: string, cover: { imageId: string | null; status: CoverStatus | null; checkedAt: string | null }): void;
   setCoverIf(bookId: string, expectedImageId: string | null, cover: { imageId: string | null; status: CoverStatus | null; checkedAt: string | null }): boolean;
   addRejection(bookId: string, sourceUrl: string, createdAt: string): void;

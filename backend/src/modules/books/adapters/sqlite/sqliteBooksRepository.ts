@@ -131,6 +131,8 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     INSERT INTO cover_images (id, book_id, source, source_url, origin, width, height, byte_size, color, created_at)
     VALUES ($id, $book_id, $source, $source_url, $origin, $width, $height, $byte_size, $color, $created_at)
   `);
+  const pendingColorStmt = db.prepare(`SELECT id FROM cover_images WHERE color IS NULL LIMIT ?`);
+  const setImageColorStmt = db.prepare(`UPDATE cover_images SET color = ? WHERE id = ?`);
   const setCoverStmt = db.prepare(`UPDATE books SET cover_image_id = ?, cover_status = ?, cover_checked_at = ? WHERE id = ?`);
   const setCoverIfStmt = db.prepare(`UPDATE books SET cover_image_id = ?, cover_status = ?, cover_checked_at = ? WHERE id = ? AND cover_image_id IS ?`);
   const addRejectionStmt = db.prepare(`INSERT OR IGNORE INTO cover_rejections (book_id, source_url, created_at) VALUES (?, ?, ?)`);
@@ -290,6 +292,12 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     },
 
     getImage: (id) => imageStmt.get(id) as CoverImageRow | undefined,
+
+    listPendingColorImageIds: (limit) => (pendingColorStmt.all(limit) as Array<{ id: string }>).map((row) => row.id),
+
+    setImageColor(id, color) {
+      setImageColorStmt.run(color, id);
+    },
 
     insertImage(row) {
       insertImageStmt.run({

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { GROUPING_INTERVAL_MS, startBackfill, startDetailsBackfill, startWorksBackfill, startWorksGrouping } from "./backfill.js";
+import { GROUPING_INTERVAL_MS, startBackfill, startCoverColorBackfill, startDetailsBackfill, startWorksBackfill, startWorksGrouping } from "./backfill.js";
 
 function fakeTimers() {
   const state = { callback: null as (() => void) | null, delay: 0, unrefs: 0, cleared: [] as object[] };
@@ -285,4 +285,35 @@ test("stopping works grouping ends a run at the next batch boundary and clears t
   await until(() => batches > 1);
   assert.equal(batches, 1);
   assert.deepEqual(state.cleared, [handle]);
+});
+
+test("the cover colour backfill drains in batches of 50 until one comes back short, and retries on the next tick", async () => {
+  const { state, timers } = fakeTimers();
+  const sizes = [50, 50, 7];
+  const limits: number[] = [];
+  const errors: unknown[] = [];
+  startCoverColorBackfill(async (limit) => { limits.push(limit); return sizes.shift() ?? 0; }, (error) => errors.push(error), undefined, timers);
+  assert.equal(state.delay, 600_000);
+  await until(() => limits.length === 3);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(limits, [50, 50, 50]);
+  assert.deepEqual(errors, []);
+});
+
+test("the cover colour backfill stops draining when aborted and reports a failed batch", async () => {
+  const { state, timers } = fakeTimers();
+  const limits: number[] = [];
+  const errors: unknown[] = [];
+  const stop = startCoverColorBackfill(async (limit) => { limits.push(limit); return limit; }, (error) => errors.push(error), undefined, timers);
+  await until(() => limits.length === 2);
+  stop();
+  const seen = limits.length;
+  await until(() => false);
+  assert.equal(limits.length, seen);
+  assert.equal(state.cleared.length, 1);
+
+  const failing = fakeTimers();
+  startCoverColorBackfill(async () => { throw new Error("R2 GET failed: HTTP 500"); }, (error) => errors.push(error), undefined, failing.timers);
+  await until(() => errors.length > 0);
+  assert.equal((errors[0] as Error).message, "R2 GET failed: HTTP 500");
 });
