@@ -7,7 +7,8 @@ const dim = "text-sm text-(--color-text-dim)";
 export function StatsStrip({ cells, to }: { cells: BookStatsModel["strip"]; to: string }) {
   if (cells.length === 0) return null;
   return (
-    <Link to={to} aria-label="Book stats" className="mt-3 grid grid-cols-2 gap-2 rounded-xl border border-(--color-border) bg-(--color-surface) p-3 text-left hover:border-(--color-accent)">
+    <Link to={to} className="mt-3 grid grid-cols-[repeat(auto-fit,minmax(7rem,1fr))] gap-2 rounded-xl border border-(--color-border) bg-(--color-surface) p-3 text-left hover:border-(--color-accent)">
+      <span className="sr-only">Book stats: </span>
       {cells.map((cell) => (
         <span key={cell.key} className="min-w-0">
           <span className="block truncate text-sm font-semibold">{cell.value}</span>
@@ -48,7 +49,7 @@ export function StatsSections({ model }: { model: BookStatsModel }) {
         <h2 className={sectionHeading}>Tier lists</h2>
         {tiers ? (
           <div className="flex items-center gap-4">
-            <span className="text-4xl font-bold">{tiers.letter}</span>
+            <span className="text-3xl font-bold">{tiers.letter}</span>
             <p className={dim}>{tiers.summary}</p>
           </div>
         ) : (
