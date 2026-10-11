@@ -5,7 +5,7 @@ import { router, useSegments } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { Button, Sheet, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
-import { workPath } from "../works/workScreenModel";
+import { workPath } from "../works/workPath";
 import { authorOf, TierCover, TierHead, TierRowScroll, titleOf, type TierBook } from "./TierBoard";
 
 const hitSlop = { top: 14, bottom: 14, left: 8, right: 8 };

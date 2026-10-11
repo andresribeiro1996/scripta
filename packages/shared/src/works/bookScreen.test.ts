@@ -91,3 +91,28 @@ test("rating counts are abbreviated without Intl compact notation", () => {
   assert.equal(line(999_999), "★ 4.0 · 1M ratings");
   assert.equal(line(1_200_000), "★ 4.0 · 1.2M ratings");
 });
+
+test("reader groups are titled only when both have rows", () => {
+  const base = page();
+  const onlyOthers = bookScreenModel({ ...base, readers: { ...base.readers, followed: [] } }, null, { isAdmin: false });
+  assert.deepEqual(onlyOthers.community!.groups.map((g) => g.title), [null]);
+  const onlyFollowed = bookScreenModel({ ...base, readers: { ...base.readers, others: [] } }, null, { isAdmin: false });
+  assert.deepEqual(onlyFollowed.community!.groups.map((g) => [g.title, g.rows.map((r) => [r.username, r.status, r.linksToProfile])]), [[null, [["ana", "Finished", false]]]]);
+});
+
+test("games list every kind and an empty page has none", () => {
+  const base = page();
+  const games = { tierlists: [], arenas: [{ id: "a1", name: "SF", owner: { username: "bo", avatarUrl: null }, path: "/arena/a1" }], quizzes: [{ id: "q1", name: "Trivia", owner: "app" as const, path: "/quiz/q1" }] };
+  assert.deepEqual(bookScreenModel({ ...base, games }, null, { isAdmin: false }).community!.games, [
+    { key: "arena-a1", title: "SF", detail: "Tournament · bo", path: "/arena/a1" },
+    { key: "quiz-q1", title: "Trivia", detail: "Quiz · Scripta", path: "/quiz/q1" }
+  ]);
+  assert.deepEqual(bookScreenModel({ ...base, games: { tierlists: [], arenas: [], quizzes: [] } }, null, { isAdmin: false }).community!.games, []);
+});
+
+test("a long summary gets a preview, a short one does not", () => {
+  const long = `${"Spice and sand. ".repeat(40)}The end.`;
+  const preview = bookScreenModel(page({ summary: long }), null, { isAdmin: false }).about!.preview;
+  assert.ok(preview && preview.endsWith("…") && !preview.includes("The end."));
+  assert.equal(bookScreenModel(page({ summary: "Spice." }), null, { isAdmin: false }).about!.preview, null);
+});
