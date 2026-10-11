@@ -82,7 +82,8 @@ function DeleteNote({ book, bookmarkId }: { book: Record<string, unknown>; bookm
 
 export function BookScreen({ page, book, model, signedIn, onAdd }: { page: WorkPage | null; book: Record<string, unknown> | null; model: BookScreenModel; signedIn: boolean; onAdd: () => void }) {
   const { colors, mode } = useTheme();
-  const wash = coverWash(page?.work.coverColor ?? null, mode);
+  const coverColor = page?.work.coverColor ?? null;
+  const wash = coverWash(coverColor, mode);
   const segments = useSegments();
   const workId = page?.work.id;
   const statsQuery = useQuery({ queryKey: ["works", workId, "stats"], queryFn: () => fetchWorkStats(workId!), enabled: Boolean(workId), retry: false });
@@ -99,13 +100,13 @@ export function BookScreen({ page, book, model, signedIn, onAdd }: { page: WorkP
 
   return (
     <ScrollView contentContainerStyle={styles.content}>
-      {wash ? (
+      {wash && coverColor ? (
         <Svg pointerEvents="none" accessible={false} importantForAccessibility="no-hide-descendants" style={styles.wash} width="100%" height={WASH_HEIGHT}>
           <Defs>
             <LinearGradient id="wash" x1="0" y1="0" x2="0" y2="1">
-              <Stop offset="0" stopColor={wash.top} />
-              <Stop offset="0.45" stopColor={wash.mid} />
-              <Stop offset="1" stopColor={wash.mid} stopOpacity={0} />
+              <Stop offset="0" stopColor={coverColor} stopOpacity={wash.topAlpha} />
+              <Stop offset="0.45" stopColor={coverColor} stopOpacity={wash.topAlpha / 2} />
+              <Stop offset="1" stopColor={coverColor} stopOpacity={0} />
             </LinearGradient>
           </Defs>
           <Rect x="0" y="0" width="100%" height={WASH_HEIGHT} fill="url(#wash)" />
