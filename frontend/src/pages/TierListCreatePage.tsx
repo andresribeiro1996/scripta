@@ -17,6 +17,7 @@ export function TierListCreatePage() {
   const [tiers, setTiers] = useState<TierlistData["tiers"]>(() => DEFAULT_TIER_PRESET.map((tier) => createTier(tier.label, tier.color)));
   const [visibility, setVisibility] = useState<"private" | "public">("private");
   const [access, setAccess] = useState<"anonymous" | "members">("anonymous");
+  const [worstFirst, setWorstFirst] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const workBooks = useWorkBooks(library);
@@ -28,7 +29,7 @@ export function TierListCreatePage() {
     setBusy(true);
     setError(null);
     try {
-      const created = await create(name.trim() || "Untitled tier list", { tiers, pool }, visibility === "public" ? access : undefined);
+      const created = await create(name.trim() || "Untitled tier list", { tiers, pool }, visibility === "public" ? access : undefined, worstFirst);
       navigate(created.voteCode ? `/vote/${created.voteCode}` : `/dashboard/arena/tierlist/${created.id}`, { replace: true });
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Couldn't create the tier list.");
@@ -75,6 +76,10 @@ export function TierListCreatePage() {
         <button type="button" onClick={() => setTiers((value) => [...value, createTier("New tier", "#8a8580")])} className="min-h-10 rounded-lg border border-(--color-border) px-3">Add tier</button>
       </>}
       {step === 2 && <>
+        <fieldset className="flex flex-col gap-3"><legend className="mb-2 font-semibold">Top tier means</legend>
+          {([false, true] as const).map((value) => <label key={String(value)} className="flex items-center gap-2 rounded-lg border border-(--color-border) p-3"><input type="radio" checked={worstFirst === value} onChange={() => setWorstFirst(value)} />{value ? "Worst" : "Best"}</label>)}
+          <p className="text-sm text-(--color-text-dim)">Can't be changed later.</p>
+        </fieldset>
         <fieldset className="flex flex-col gap-3"><legend className="mb-2 font-semibold">Visibility</legend>
           {(["private", "public"] as const).map((value) => <label key={value} className="flex items-center gap-2 rounded-lg border border-(--color-border) p-3"><input type="radio" checked={visibility === value} onChange={() => setVisibility(value)} />{value === "private" ? "Private" : "Public · open for voting"}</label>)}
         </fieldset>

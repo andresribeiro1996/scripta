@@ -9,6 +9,7 @@ import { Button, ErrorState, Input, Screen, Segmented, Skeleton, Toast, dynamicT
 import { createTierlist, type Tierlist } from "./api";
 
 const VISIBILITY = [{ value: "private", label: "Private" }, { value: "public", label: "Public" }] as const;
+const DIRECTION = [{ value: "best", label: "Best" }, { value: "worst", label: "Worst" }] as const;
 const ACCESS = [{ value: "anonymous", label: "Anyone" }, { value: "members", label: "Members" }] as const;
 
 export function TierlistCreateScreen() {
@@ -21,6 +22,7 @@ export function TierlistCreateScreen() {
   const [tiers, setTiers] = useState<TierlistData["tiers"]>(() => DEFAULT_TIER_PRESET.map((tier) => createTier(tier.label, tier.color)));
   const [visibility, setVisibility] = useState<"private" | "public">("private");
   const [access, setAccess] = useState<"anonymous" | "members">("anonymous");
+  const [direction, setDirection] = useState<"best" | "worst">("best");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const library = useLibrary();
@@ -33,7 +35,7 @@ export function TierlistCreateScreen() {
     setBusy(true);
     setError(null);
     try {
-      const created = await createTierlist(name.trim() || "Untitled tier list", { tiers, pool }, visibility === "public" ? access : undefined);
+      const created = await createTierlist(name.trim() || "Untitled tier list", { tiers, pool }, visibility === "public" ? access : undefined, direction === "worst");
       queryClient.setQueryData<Tierlist[]>(["tierlists"], (items = []) => [created, ...items]);
       router.replace((created.voteCode ? `/vote/${created.voteCode}` : `/tierlist/${created.id}?rank=1`) as never);
     } catch (reason) {
@@ -75,6 +77,9 @@ export function TierlistCreateScreen() {
       <Button label="Add tier" variant="secondary" onPress={() => setTiers((value) => [...value, createTier("New tier", "#8a8580")])} />
     </ScrollView> : null}
     {step === 2 ? <View style={styles.settings}>
+      <Text {...dynamicType} style={[typography.body, { color: colors.text }]}>Top tier means</Text>
+      <Segmented accessibilityLabel="Top tier means" options={DIRECTION} value={direction} onChange={setDirection} />
+      <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Can't be changed later.</Text>
       <Segmented accessibilityLabel="Visibility" options={VISIBILITY} value={visibility} onChange={setVisibility} />
       {visibility === "public" ? <>
         <Text {...dynamicType} style={[typography.body, { color: colors.text }]}>Open for voting</Text>
