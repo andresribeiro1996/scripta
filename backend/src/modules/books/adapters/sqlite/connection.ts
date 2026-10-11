@@ -50,6 +50,8 @@ export function applyBooksMigrations(db: DatabaseSync): void {
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_work_lookup ON books(work_checked_at IS NOT NULL, created_by IS NOT NULL, work_checked_at, created_at) WHERE ol_work_key IS NULL AND isbn IS NOT NULL AND details_status IS NOT NULL");
   const imageColumns = db.prepare("PRAGMA table_info(cover_images)").all() as Array<{ name: string }>;
   if (!imageColumns.some((column) => column.name === "origin")) db.exec("ALTER TABLE cover_images ADD COLUMN origin TEXT");
+  if (!imageColumns.some((column) => column.name === "color")) db.exec("ALTER TABLE cover_images ADD COLUMN color TEXT");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_cover_images_color_pending ON cover_images(id) WHERE color IS NULL");
   const legacy = db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'cover_cache'`).get();
   if (legacy) {
     const rows = db.prepare(`SELECT id, cache_key, source, width, height, byte_size, created_at FROM cover_cache`).all() as unknown as LegacyCoverRow[];

@@ -128,8 +128,8 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   `);
   const imageStmt = db.prepare(`SELECT * FROM cover_images WHERE id = ?`);
   const insertImageStmt = db.prepare(`
-    INSERT INTO cover_images (id, book_id, source, source_url, origin, width, height, byte_size, created_at)
-    VALUES ($id, $book_id, $source, $source_url, $origin, $width, $height, $byte_size, $created_at)
+    INSERT INTO cover_images (id, book_id, source, source_url, origin, width, height, byte_size, color, created_at)
+    VALUES ($id, $book_id, $source, $source_url, $origin, $width, $height, $byte_size, $color, $created_at)
   `);
   const setCoverStmt = db.prepare(`UPDATE books SET cover_image_id = ?, cover_status = ?, cover_checked_at = ? WHERE id = ?`);
   const setCoverIfStmt = db.prepare(`UPDATE books SET cover_image_id = ?, cover_status = ?, cover_checked_at = ? WHERE id = ? AND cover_image_id IS ?`);
@@ -301,6 +301,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
         $width: row.width,
         $height: row.height,
         $byte_size: row.byte_size,
+        $color: row.color ?? null,
         $created_at: row.created_at
       });
     },

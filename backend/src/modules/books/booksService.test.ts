@@ -67,7 +67,7 @@ function harness(overrides: Partial<Deps> = {}) {
     editionRecords: { fetchEditionRecord: async () => { throw new Error("edition records not expected"); } },
     fetchImage: async (candidate) => {
       const size = sizes.get(candidate.url);
-      return size ? { full: Buffer.from(`full:${candidate.url}`), thumb: Buffer.from(`thumb:${candidate.url}`), width: size[0], height: size[1] } : null;
+      return size ? { full: Buffer.from(`full:${candidate.url}`), thumb: Buffer.from(`thumb:${candidate.url}`), width: size[0], height: size[1], color: null } : null;
     },
     enqueue: (bookId, priority = "normal") => { enqueued.push({ bookId, priority }); },
     publicUrlFor: (id, size) => `https://api.test/covers/cached/${id}/${size}`,

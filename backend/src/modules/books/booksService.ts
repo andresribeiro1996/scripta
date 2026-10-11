@@ -75,7 +75,7 @@ export async function storeCoverImage(
   const id = randomUUID();
   await deps.blobs.save(id, COVER_EXTENSION, image.full);
   await deps.blobs.save(`${id}-thumb`, COVER_EXTENSION, image.thumb);
-  deps.repo.insertImage({ id, book_id: bookId, source, source_url: sourceUrl, origin, width: image.width, height: image.height, byte_size: image.full.byteLength, created_at: at });
+  deps.repo.insertImage({ id, book_id: bookId, source, source_url: sourceUrl, origin, width: image.width, height: image.height, byte_size: image.full.byteLength, color: image.color ?? "", created_at: at });
   return id;
 }
 

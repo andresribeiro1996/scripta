@@ -207,6 +207,23 @@ test("createBook registers every key and addKey aliases an existing book", () =>
   assert.equal(repo.findBookByKey("isbn:9780593099322")?.id, book.id);
 });
 
+test("cover_images gains a colour column and a pending-colour index", () => {
+  const { db } = freshRepo();
+  const columns = db.prepare("PRAGMA table_info(cover_images)").all() as Array<{ name: string }>;
+  const indexes = db.prepare("PRAGMA index_list(cover_images)").all() as Array<{ name: string }>;
+  assert.ok(columns.some((column) => column.name === "color"));
+  assert.ok(indexes.some((index) => index.name === "idx_cover_images_color_pending"));
+});
+
+test("a stored image row carries its colour", () => {
+  const { repo } = freshRepo();
+  const book = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: null }, ["ta:dune|frank herbert|"], NOW);
+  repo.insertImage({ id: "tinted", book_id: book.id, source: "apple", source_url: null, width: 900, height: 1400, byte_size: 10, color: "#cc2222", created_at: NOW });
+  repo.insertImage({ id: "plain", book_id: book.id, source: "apple", source_url: null, width: 900, height: 1400, byte_size: 10, created_at: NOW });
+  assert.equal(repo.getImage("tinted")!.color, "#cc2222");
+  assert.equal(repo.getImage("plain")!.color, null);
+});
+
 test("backfill adds a title key to existing rows once", () => {
   const db = new DatabaseSync(":memory:");
   applyBooksMigrations(db);

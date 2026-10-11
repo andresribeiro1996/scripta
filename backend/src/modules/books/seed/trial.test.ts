@@ -12,7 +12,7 @@ const giving = (source: "apple" | "isbndb" | "openlibrary", url: string): CoverS
 const failing: CoverSource = { byIsbn: async () => { throw new SourceUnavailableError("isbndb", "HTTP 429"); }, byTitle: async () => [] };
 const sized = (sizes: Record<string, [number, number]>): FetchCoverImage => async (candidate) => {
   const size = sizes[candidate.url];
-  return size ? { full: Buffer.alloc(0), thumb: Buffer.alloc(0), width: size[0], height: size[1] } : null;
+  return size ? { full: Buffer.alloc(0), thumb: Buffer.alloc(0), width: size[0], height: size[1], color: null } : null;
 };
 
 test("records the free chain's cover and ISBNdb's width separately", async () => {

@@ -26,7 +26,7 @@ function source(options: { isbn?: CoverCandidate[] | Error; titled?: TitledCandi
 function images(sizes: Record<string, [number, number]>): FetchCoverImage {
   return async (candidate) => {
     const size = sizes[candidate.url];
-    return size ? { full: Buffer.alloc(8), thumb: Buffer.alloc(4), width: size[0], height: size[1] } : null;
+    return size ? { full: Buffer.alloc(8), thumb: Buffer.alloc(4), width: size[0], height: size[1], color: null } : null;
   };
 }
 

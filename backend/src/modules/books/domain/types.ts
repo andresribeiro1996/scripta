@@ -50,6 +50,7 @@ export interface CoverImageRow {
   width: number;
   height: number;
   byte_size: number;
+  color?: string | null;
   created_at: string;
 }
 
