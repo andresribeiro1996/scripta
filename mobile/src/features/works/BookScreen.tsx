@@ -1,16 +1,18 @@
 import { useState } from "react";
-import { router } from "expo-router";
+import { router, useSegments } from "expo-router";
 import { Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { bookKey, editionLabel, readSnapshot, type BookScreenModel, type BookScreenTabKey, type ReadStatus, type WorkPage } from "@scripta/shared";
 import { Text } from "../../ui/Text";
 import { Button, Menu, Segmented, dynamicType, radii, spacing, typography, useTheme, type MenuItem } from "../../ui";
 import { useLibraryActions } from "../library/hooks/useLibraryActions";
 import { BookCover } from "../arena/BookCover";
+import { CoverImage } from "../library/components/CoverImage";
+import { bookToolPath } from "./workPath";
 import { AuthorAvatar, openProfile } from "../community/AuthorAvatar";
 import { ReaderGlyph } from "../community/ReaderGlyph";
 
-export function bookMenuItems(model: BookScreenModel, key: string): MenuItem[] {
-  const to = (suffix: string) => () => router.push(`/book/${encodeURIComponent(key)}/${suffix}` as never);
+export function bookMenuItems(model: BookScreenModel, key: string, segments: readonly string[]): MenuItem[] {
+  const to = (tool: "style" | "cover") => () => router.push(bookToolPath(key, tool, segments) as never);
   return model.menu.flatMap((item) => (item === "style" ? [{ label: "Card style", onPress: to("style") }] : item === "cover" ? [{ label: "Change cover", onPress: to("cover") }] : []));
 }
 
@@ -24,29 +26,36 @@ function confirmDeleteNote(onConfirm: () => void) {
 function OwnerRow({ book, model }: { book: Record<string, unknown>; model: BookScreenModel }) {
   const { colors } = useTheme();
   const { setStatus, setRating } = useLibraryActions();
+  const segments = useSegments();
+  const [rowWidth, setRowWidth] = useState(0);
 
   async function changeStatus(status: ReadStatus) {
     const before = readSnapshot(book);
     const wasFinished = book.ReadStatus === 2;
     const saved = await setStatus(book, status);
-    if (saved && status === 2 && !wasFinished) router.push(`/book/${encodeURIComponent(bookKey(book))}/finished?before=${encodeURIComponent(JSON.stringify(before))}` as never);
+    if (saved && status === 2 && !wasFinished) router.push(`${bookToolPath(bookKey(book), "finished", segments)}?before=${encodeURIComponent(JSON.stringify(before))}` as never);
   }
 
   const { status, feeling } = model;
   if (!status) return null;
+  const width = feeling ? (rowWidth - spacing.sm) / 2 : rowWidth;
   return (
-    <View style={styles.primaryRow}>
-      <Menu title="Reading status" items={status.options.map((o) => ({ label: o.label, selected: o.selected, onPress: o.selected ? () => {} : () => void changeStatus(o.value) }))}>
-        <View style={[styles.menuButton, { borderColor: colors.accent, backgroundColor: colors.accentSoft }]}>
-          <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, { color: colors.accent }]}>{status.label} ▾</Text>
-        </View>
-      </Menu>
-      {feeling ? (
-        <Menu title="How it landed" items={feeling.options.map((o) => ({ label: o.label, selected: o.selected, onPress: o.selected ? () => {} : () => void setRating(book, o.rating) }))}>
-          <View style={[styles.menuButton, { borderColor: colors.border }]}>
-            <Text numberOfLines={1} {...dynamicType} style={[typography.body, { color: colors.text }]}>{feeling.label} ▾</Text>
-          </View>
-        </Menu>
+    <View style={styles.primaryRow} onLayout={(event) => setRowWidth(event.nativeEvent.layout.width)}>
+      {rowWidth > 0 ? (
+        <>
+          <Menu key={`status-${width}`} title="Reading status" items={status.options.map((o) => ({ label: o.label, selected: o.selected, onPress: o.selected ? () => {} : () => void changeStatus(o.value) }))}>
+            <View style={[styles.menuButton, { width, borderColor: colors.accent, backgroundColor: colors.accentSoft }]}>
+              <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, styles.centeredText, { color: colors.accent }]}>{status.label} ▾</Text>
+            </View>
+          </Menu>
+          {feeling ? (
+            <Menu key={`feeling-${width}`} title="How it landed" items={feeling.options.map((o) => ({ label: o.label, selected: o.selected, onPress: o.selected ? () => {} : () => void setRating(book, o.rating) }))}>
+              <View style={[styles.menuButton, { width, borderColor: colors.border }]}>
+                <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.centeredText, { color: colors.text }]}>{feeling.label} ▾</Text>
+              </View>
+            </Menu>
+          ) : null}
+        </>
       ) : null}
     </View>
   );
@@ -72,13 +81,18 @@ export function BookScreen({ page, book, model, signedIn, onAdd }: { page: WorkP
   const heading = (title: string) => (
     <Text accessibilityRole="header" {...dynamicType} style={[typography.title, { color: colors.text }]}>{title}</Text>
   );
-  const cover = (typeof book?._coverUrl === "string" ? book._coverUrl : null) ?? page?.work.coverUrl ?? null;
   const { about, community } = model;
 
   return (
     <ScrollView contentContainerStyle={styles.content}>
       <View style={styles.heroCentered}>
-        <BookCover cover={cover} title={model.title} width={112} height={168} />
+        {book ? (
+          <View style={[styles.cover, { backgroundColor: colors.border }]}>
+            <CoverImage book={book} size="full" />
+          </View>
+        ) : (
+          <BookCover cover={page?.work.coverUrl ?? null} title={model.title} width={112} height={168} />
+        )}
         <Text {...dynamicType} style={[typography.heading, styles.centeredText, { color: colors.text }]}>{model.title}</Text>
         <Text {...dynamicType} style={[typography.body, styles.centeredText, { color: colors.textDim }]}>{model.author}</Text>
         {model.genres.length > 0 ? (
@@ -193,13 +207,14 @@ export function BookScreen({ page, book, model, signedIn, onAdd }: { page: WorkP
 const styles = StyleSheet.create({
   content: { padding: spacing.lg, gap: spacing.xl, paddingBottom: spacing.huge },
   heroCentered: { alignItems: "center", gap: spacing.xs },
-  centeredText: { textAlign: "center" },
+  cover: { width: 112, height: 168, borderRadius: radii.sm, overflow: "hidden" },
+  centeredText: { alignSelf: "stretch", textAlign: "center" },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs, justifyContent: "center" },
   chip: { borderWidth: 1, borderRadius: radii.full, paddingHorizontal: spacing.sm },
   section: { gap: spacing.sm },
   group: { gap: spacing.sm },
-  primaryRow: { flexDirection: "row", gap: spacing.sm },
-  menuButton: { flex: 1, minHeight: 44, borderWidth: 1, borderRadius: radii.md, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.md },
+  primaryRow: { flexDirection: "row", gap: spacing.sm, minHeight: 44 },
+  menuButton: { minHeight: 44, borderWidth: 1, borderRadius: radii.md, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.md },
   strong: { fontWeight: "700" },
   quote: { fontStyle: "italic" },
   highlight: { borderLeftWidth: 2, paddingLeft: spacing.md, gap: spacing.xs },

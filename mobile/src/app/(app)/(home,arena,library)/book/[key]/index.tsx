@@ -1,5 +1,5 @@
-import { useEffect } from "react";
-import { router, Stack, useLocalSearchParams } from "expo-router";
+import { useCallback } from "react";
+import { router, Stack, useFocusEffect, useLocalSearchParams, useSegments } from "expo-router";
 import { bookScreenModel } from "@scripta/shared";
 import { BookScreen, bookMenuItems } from "@/features/works/BookScreen";
 import { useBook } from "@/features/library/hooks/useBook";
@@ -11,12 +11,14 @@ export default function BookRoute() {
   const { book, loading, workId } = useBook(key);
   const { isError, refetch } = useLibrary();
 
-  useEffect(() => {
+  const segments = useSegments();
+
+  useFocusEffect(useCallback(() => {
     if (workId) router.replace(`/work/${workId}` as never);
-  }, [workId]);
+  }, [workId]));
 
   const model = book ? bookScreenModel(null, book, { isAdmin: false }) : null;
-  const menuItems = model && key ? bookMenuItems(model, decodeURIComponent(key)) : [];
+  const menuItems = model && key ? bookMenuItems(model, decodeURIComponent(key), segments) : [];
 
   return (
     <Screen bottom top={false}>

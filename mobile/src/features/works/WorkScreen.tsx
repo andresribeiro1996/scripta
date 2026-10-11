@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { StyleSheet } from "react-native";
 import { bookKey, bookScreenModel } from "@scripta/shared";
 import { isPermanentError } from "../../core/apiClient";
+import { useAuth } from "../../core/auth";
 import { ErrorState, HeaderActions, IconButton, Menu, Screen, Skeleton, Toast, spacing } from "../../ui";
 import { AddBookSheet } from "../community/AddBookSheet";
 import { LIBRARY_QUERY_KEY, useLibrary } from "../library/hooks/useLibrary";
@@ -11,20 +12,23 @@ import { ContentShareSheet } from "../sharing/ContentShareSheet";
 import { publicContentUrl } from "../sharing/links";
 import { fetchWork } from "./api";
 import { BookScreen, bookMenuItems } from "./BookScreen";
+import { workPath } from "./workPath";
 
 export function WorkScreen({ id }: { id: string }) {
   const [adding, setAdding] = useState(false);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [shareError, setShareError] = useState<string | null>(null);
-  const signedIn = useSegments()[0] === "(app)";
+  const segments = useSegments();
+  const signedIn = useAuth().user !== null;
   const libraryQuery = useLibrary({ enabled: signedIn });
   const queryClient = useQueryClient();
   const query = useQuery({ queryKey: ["works", id], queryFn: () => fetchWork(id), retry: false });
   const canonicalId = query.data?.work.id;
+  const canonicalPath = canonicalId && canonicalId !== id ? workPath(canonicalId, segments) : null;
 
   useEffect(() => {
-    if (canonicalId && canonicalId !== id) router.replace(`/work/${canonicalId}` as never);
-  }, [canonicalId, id]);
+    if (canonicalPath) router.replace(canonicalPath as never);
+  }, [canonicalPath]);
 
   const untitled = <Stack.Screen options={{ headerShown: true, title: "" }} />;
   if (!query.data && query.isError) {
@@ -61,7 +65,7 @@ export function WorkScreen({ id }: { id: string }) {
     );
   }
   const model = bookScreenModel(page, book, { isAdmin: false });
-  const menuItems = book && page.mine ? bookMenuItems(model, page.mine.bookKey) : [];
+  const menuItems = book && page.mine ? bookMenuItems(model, page.mine.bookKey, segments) : [];
   const firstEdition = work.editions.find((edition) => edition.isbn) ?? work.editions[0];
 
   async function share() {
