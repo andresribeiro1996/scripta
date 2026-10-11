@@ -123,6 +123,6 @@ test("the hero carries the Open Library rating as stars with a count caption", (
   assert.ok(html.includes("4.3 · 2.3K ratings"));
 });
 
-test("a library-only book has no stats strip", () => {
+test("a library-only book has no stats tiles", () => {
   assert.ok(!render({ page: null, book: owned, onShare: null }).includes("/stats"));
 });

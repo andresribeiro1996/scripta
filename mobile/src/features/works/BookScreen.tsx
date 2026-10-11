@@ -9,7 +9,7 @@ import { useLibraryActions } from "../library/hooks/useLibraryActions";
 import { BookCover } from "../arena/BookCover";
 import { CoverImage } from "../library/components/CoverImage";
 import { fetchWorkStats } from "./api";
-import { StatsStrip } from "./BookStats";
+import { StatsTiles } from "./BookStats";
 import { RatingStars } from "./RatingStars";
 import { bookToolPath, workStatsPath } from "./workPath";
 import { AuthorAvatar, openProfile } from "../community/AuthorAvatar";
@@ -82,7 +82,7 @@ export function BookScreen({ page, book, model, signedIn, onAdd }: { page: WorkP
   const segments = useSegments();
   const workId = page?.work.id;
   const statsQuery = useQuery({ queryKey: ["works", workId, "stats"], queryFn: () => fetchWorkStats(workId!), enabled: Boolean(workId), retry: false });
-  const statsStrip = bookStatsModel(statsQuery.data ?? null, page?.work.rating ?? null).strip;
+  const statsTiles = bookStatsModel(statsQuery.data ?? null, page?.work.rating ?? null).tiles;
   const [selected, setSelected] = useState<BookScreenTabKey | null>(null);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [editionsOpen, setEditionsOpen] = useState(false);
@@ -115,7 +115,7 @@ export function BookScreen({ page, book, model, signedIn, onAdd }: { page: WorkP
           </View>
         ) : null}
         {model.rating ? <RatingStars value={model.rating.value} label={model.rating.label} /> : null}
-        {page ? <StatsStrip cells={statsStrip} onPress={() => router.push(workStatsPath(page.work.id, segments) as never)} /> : null}
+        {page ? <StatsTiles tiles={statsTiles} onPress={() => router.push(workStatsPath(page.work.id, segments) as never)} /> : null}
         {model.meta ? <Text {...dynamicType} style={[typography.caption, styles.centeredText, { color: colors.textDim }]}>{model.meta}</Text> : null}
       </View>
 

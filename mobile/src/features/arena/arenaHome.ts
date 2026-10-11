@@ -73,7 +73,7 @@ export function ownedItems(tab: ArenaTab, tournaments: Tournament[], tierlists: 
   }
   return tierlists.map((source) => {
     const tiers = source.data.tiers.length;
-    const books = source.data.tiers.reduce((total, tier) => total + tier.workIds.length, 0);
+    const books = source.data.tiers.reduce((total, tier) => total + tier.workIds.length, source.data.pool.length);
     const voting = source.voteCode ? ` · voting ${source.votingOpen ? "open" : "closed"}` : "";
     return {
       id: source.id,

@@ -98,6 +98,7 @@ function row(overrides: Partial<TierlistRow> & { id: string }): TierlistRow {
     source_tierlist_id: null,
     promoted_at: null,
     public_books: null,
+    ranks_worst_first: 0,
     created_at: "2026-01-01T00:00:00.000Z",
     updated_at: "2026-01-01T00:00:00.000Z",
     ...overrides
@@ -553,11 +554,28 @@ test("tier placements: signed-in ballots on published lists, mapped through the 
   repo.saveBallot(ballot({ id: "b4", tierlist_id: "big", voter_user_id: "u3" }), [{ workId: "w-new", tierId: "deleted-tier" }]);
   repo.saveBallot(ballot({ id: "b5", tierlist_id: "tiny", voter_user_id: "u1" }), [{ workId: "w-new", tierId: "only" }]);
   repo.saveBallot(ballot({ id: "b6", tierlist_id: "private", voter_user_id: "u1" }), [{ workId: "w-new", tierId: "s" }]);
-  const sorted = (rows: Array<{ tierlistId: string; tierIndex: number; tierCount: number }>) => [...rows].sort((a, b) => a.tierIndex - b.tierIndex || a.tierlistId.localeCompare(b.tierlistId));
+  const sorted = (rows: Array<{ tierlistId: string; tierIndex: number; tierCount: number; ranksWorstFirst: boolean }>) => [...rows].sort((a, b) => a.tierIndex - b.tierIndex || a.tierlistId.localeCompare(b.tierlistId));
   assert.deepEqual(sorted(repo.tierPlacements(["w-new", "w-old"])), [
-    { tierlistId: "big", tierIndex: 0, tierCount: 3 },
-    { tierlistId: "tiny", tierIndex: 0, tierCount: 1 },
-    { tierlistId: "big", tierIndex: 1, tierCount: 3 }
+    { tierlistId: "big", tierIndex: 0, tierCount: 3, ranksWorstFirst: false },
+    { tierlistId: "tiny", tierIndex: 0, tierCount: 1, ranksWorstFirst: false },
+    { tierlistId: "big", tierIndex: 1, tierCount: 3, ranksWorstFirst: false }
   ]);
   assert.deepEqual(repo.tierPlacements([]), []);
+});
+
+test("an existing tierlists table gains ranks_worst_first, defaulting to best-first", () => {
+  const db = new DatabaseSync(":memory:");
+  db.exec(`CREATE TABLE tierlists (id TEXT PRIMARY KEY, owner_user_id TEXT NOT NULL, name TEXT NOT NULL, data TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`);
+  db.prepare(`INSERT INTO tierlists (id, owner_user_id, name, created_at, updated_at) VALUES ('old', 'u1', 'Old', '2026-01-01', '2026-01-01')`).run();
+  applyTierlistsMigrations(db);
+  assert.equal((db.prepare(`SELECT ranks_worst_first FROM tierlists WHERE id = 'old'`).get() as { ranks_worst_first: number }).ranks_worst_first, 0);
+});
+
+test("insert stores ranks_worst_first and tierPlacements reports it", () => {
+  const repo = createSqliteTierlistsRepository(freshDb());
+  const tiers = JSON.stringify({ tiers: [{ id: "s", label: "S", color: "#fff", workIds: [] }, { id: "d", label: "D", color: "#000", workIds: [] }], pool: ["w"] });
+  repo.insert(row({ id: "worst", vote_code: "code-worst", voting_open: 1, data: tiers, ranks_worst_first: 1 }));
+  repo.saveBallot(ballot({ id: "b1", tierlist_id: "worst", voter_user_id: "u1" }), [{ workId: "w", tierId: "s" }]);
+  assert.equal(repo.getOwned("worst", "u1")!.ranks_worst_first, 1);
+  assert.deepEqual(repo.tierPlacements(["w"]), [{ tierlistId: "worst", tierIndex: 0, tierCount: 2, ranksWorstFirst: true }]);
 });

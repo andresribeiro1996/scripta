@@ -25,6 +25,7 @@ export interface Tierlist {
   sourceTierlistId: string | null;
   promotedAt: string | null;
   originCreatorId: string;
+  ranksWorstFirst: boolean;
 }
 
 export interface VotingBoard {
@@ -36,6 +37,7 @@ export interface VotingBoard {
   ballotCount: number;
   eligibleVoteCount: number;
   promotedAt: string | null;
+  ranksWorstFirst: boolean;
   histogram?: HistogramCell[];
 }
 

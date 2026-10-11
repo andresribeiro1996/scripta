@@ -3,15 +3,15 @@ import type { BookStatsModel } from "@scripta/shared";
 import { Text } from "../../ui/Text";
 import { dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 
-export function StatsStrip({ cells, onPress }: { cells: BookStatsModel["strip"]; onPress: () => void }) {
+export function StatsTiles({ tiles, onPress }: { tiles: BookStatsModel["tiles"]; onPress: () => void }) {
   const { colors } = useTheme();
-  if (cells.length === 0) return null;
+  if (tiles.length === 0) return null;
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={`Book stats: ${cells.map((cell) => `${cell.value}, ${cell.label}`).join("; ")}`} onPress={onPress} style={[styles.strip, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-      {cells.map((cell) => (
-        <View key={cell.key} style={styles.cell}>
-          <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>{cell.value}</Text>
-          <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{cell.label}</Text>
+    <Pressable accessibilityRole="button" accessibilityLabel={`Book stats: ${tiles.map((tile) => `${tile.value} ${tile.caption}`).join("; ")}`} onPress={onPress} style={styles.tiles}>
+      {tiles.map((tile) => (
+        <View key={tile.key} style={[styles.tile, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+          <Text adjustsFontSizeToFit minimumFontScale={0.8} numberOfLines={1} {...dynamicType} style={[typography.title, styles.strong, styles.center, { color: colors.text }]}>{tile.value}</Text>
+          <Text numberOfLines={2} {...dynamicType} style={[typography.caption, styles.center, { color: colors.textDim }]}>{tile.caption}</Text>
         </View>
       ))}
     </Pressable>
@@ -20,7 +20,7 @@ export function StatsStrip({ cells, onPress }: { cells: BookStatsModel["strip"];
 
 export function StatsSections({ model }: { model: BookStatsModel }) {
   const { colors } = useTheme();
-  const { ratings, tiers, tiersEmpty, tournaments, tournamentsEmpty } = model;
+  const { ratings, tierBar, tiersEmpty, tournamentRun, tournamentsEmpty } = model;
   const heading = (title: string) => <Text accessibilityRole="header" {...dynamicType} style={[typography.title, { color: colors.text }]}>{title}</Text>;
   const dim = (text: string) => <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{text}</Text>;
   return (
@@ -32,39 +32,57 @@ export function StatsSections({ model }: { model: BookStatsModel }) {
           <>
             <Text {...dynamicType} style={[typography.heading, { color: colors.text }]}>{ratings.community.feeling}</Text>
             {dim(ratings.community.summary)}
-            {ratings.community.bars.map((bar) => (
-              <View key={bar.label} style={styles.barRow}>
-                <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.barLabel, { color: colors.text }]}>{bar.label}</Text>
-                <View style={[styles.barTrack, { backgroundColor: colors.border }]}>
-                  <View style={{ width: `${Math.round(bar.fraction * 100)}%`, backgroundColor: colors.accent }} />
-                </View>
-                <Text {...dynamicType} style={[typography.caption, styles.barCount, { color: colors.textDim }]}>{bar.count}</Text>
-              </View>
-            ))}
+            <View accessible accessibilityRole="image" accessibilityLabel={`Ratings by feeling: ${ratings.community.columns.map((column) => `${column.label} ${column.count}`).join(", ")}`} style={styles.columns}>
+              {ratings.community.columns.map((column) => (
+                <View key={column.label} style={[styles.column, { height: `${Math.round(column.fraction * 100)}%`, backgroundColor: column.top ? colors.accent : colors.textDim, opacity: column.top ? 1 : 0.75 }]} />
+              ))}
+            </View>
+            <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.columnLabels}>
+              {ratings.community.columns.map((column) => (
+                <Text key={column.label} numberOfLines={2} {...dynamicType} style={[typography.caption, styles.columnLabel, { color: colors.textDim }]}>{column.label}</Text>
+              ))}
+            </View>
           </>
         ) : null}
         {ratings.empty ? dim(ratings.empty) : null}
       </View>
       <View style={styles.section}>
         {heading("Tier lists")}
-        {tiers ? (
-          <View style={styles.tierRow}>
-            <Text {...dynamicType} style={[typography.heading, styles.strong, { color: colors.text }]}>{tiers.letter}</Text>
-            <View style={styles.flex}>{dim(tiers.summary)}</View>
-          </View>
+        {tierBar ? (
+          <>
+            <Text {...dynamicType} style={[typography.heading, { color: colors.text }]}>{tierBar.band}</Text>
+            <View style={[styles.track, { backgroundColor: colors.border }]}>
+              <View style={[styles.dot, { left: `${Math.round(tierBar.marker * 100)}%`, backgroundColor: colors.accent }]} />
+            </View>
+            <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.trackLabels}>
+              <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Top</Text>
+              <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Bottom</Text>
+            </View>
+            {dim(tierBar.summary)}
+          </>
         ) : dim(tiersEmpty ?? "")}
       </View>
       <View style={styles.section}>
         {heading("Tournaments")}
-        {tournaments ? (
-          <View style={styles.grid}>
-            {tournaments.map((cell) => (
-              <View key={cell.label} style={[styles.gridCell, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-                <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{cell.label}</Text>
-                <Text {...dynamicType} style={[typography.title, { color: colors.text }]}>{cell.value}</Text>
+        {tournamentRun ? (
+          <>
+            {tournamentRun.path.length > 0 ? (
+              <View style={styles.path}>
+                {tournamentRun.path.map((step) => (
+                  <View key={step.label} style={styles.step}>
+                    <View accessible accessibilityLabel={`${step.label}, ${step.reached ? "reached" : "not reached"}`} style={[styles.pill, { borderColor: step.reached ? colors.accent : colors.border }]}>
+                      <Text numberOfLines={1} {...dynamicType} style={[typography.caption, step.reached ? styles.strong : null, { color: step.reached ? colors.accent : colors.textDim }]}>{step.label}</Text>
+                    </View>
+                    <Text numberOfLines={1} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>→</Text>
+                  </View>
+                ))}
+                <View accessible accessibilityLabel={tournamentRun.champion ? "Won a title" : "No title"} style={[styles.pill, { borderColor: tournamentRun.champion ? colors.accent : colors.border, opacity: tournamentRun.champion ? 1 : 0.5 }]}>
+                  <Text numberOfLines={1} {...dynamicType} style={typography.caption}>🏆</Text>
+                </View>
               </View>
-            ))}
-          </View>
+            ) : null}
+            {dim(tournamentRun.summary)}
+          </>
         ) : dim(tournamentsEmpty ?? "")}
       </View>
     </View>
@@ -72,17 +90,20 @@ export function StatsSections({ model }: { model: BookStatsModel }) {
 }
 
 const styles = StyleSheet.create({
-  strip: { alignSelf: "stretch", flexDirection: "row", flexWrap: "wrap", rowGap: spacing.sm, borderWidth: 1, borderRadius: radii.lg, padding: spacing.md, marginTop: spacing.sm },
-  cell: { flexGrow: 1, flexBasis: "45%", minWidth: 0, paddingRight: spacing.sm },
+  tiles: { alignSelf: "stretch", flexDirection: "row", gap: spacing.xs, marginTop: spacing.sm },
+  tile: { flex: 1, minWidth: 0, borderWidth: 1, borderRadius: radii.lg, paddingVertical: spacing.sm, paddingHorizontal: spacing.xs, alignItems: "center" },
+  center: { textAlign: "center", alignSelf: "stretch" },
   strong: { fontWeight: "700" },
   sections: { gap: spacing.xxl },
   section: { gap: spacing.sm },
-  barRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, minHeight: 28 },
-  barLabel: { width: 84 },
-  barTrack: { flex: 1, height: 8, flexDirection: "row", borderRadius: radii.full, overflow: "hidden" },
-  barCount: { width: 32, textAlign: "right" },
-  tierRow: { flexDirection: "row", alignItems: "center", gap: spacing.lg },
-  flex: { flex: 1 },
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
-  gridCell: { width: "48%", borderWidth: 1, borderRadius: radii.lg, padding: spacing.md, gap: spacing.xs },
+  columns: { flexDirection: "row", alignItems: "flex-end", height: 96, gap: spacing.sm },
+  column: { flex: 1, minHeight: 2, borderTopLeftRadius: radii.sm, borderTopRightRadius: radii.sm },
+  columnLabels: { flexDirection: "row", gap: spacing.sm },
+  columnLabel: { flex: 1, textAlign: "center" },
+  track: { height: 8, borderRadius: radii.full, marginTop: spacing.sm },
+  dot: { position: "absolute", top: -4, width: 16, height: 16, borderRadius: 8, marginLeft: -8 },
+  trackLabels: { flexDirection: "row", justifyContent: "space-between" },
+  path: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: spacing.xs },
+  step: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
+  pill: { borderWidth: 1, borderRadius: radii.full, paddingHorizontal: spacing.sm, paddingVertical: 2 },
 });

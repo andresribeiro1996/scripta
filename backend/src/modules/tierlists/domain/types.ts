@@ -27,6 +27,7 @@ export interface TierlistRow {
   source_tierlist_id: string | null;
   promoted_at: string | null;
   public_books: string | null;
+  ranks_worst_first: number;
   created_at: string;
   updated_at: string;
 }
@@ -38,6 +39,7 @@ export interface TierPlacement {
   tierlistId: string;
   tierIndex: number;
   tierCount: number;
+  ranksWorstFirst: boolean;
 }
 
 export interface BallotTotals {
@@ -57,6 +59,7 @@ export interface Tierlist {
   sourceTierlistId: string | null;
   promotedAt: string | null;
   originCreatorId: string;
+  ranksWorstFirst: boolean;
   createdAt: string;
   updatedAt: string;
 }

@@ -128,6 +128,7 @@ export function VoteTierlistScreen({ code, startInRank = false }: { code: string
     {error ? <Toast visible message={error} tone="error" /> : null}
     <SwipeableTabs accessibilityLabel="Tier list view" options={[{ value: "board", label: "My board" }, { value: "community", label: "Community" }]} value={view === "community" ? "community" : "board"} onChange={setView} renderPage={(page, active) => {
       if (page !== "community") return <View style={styles.page}>
+        {board.ranksWorstFirst ? <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Top tier = worst</Text> : null}
         <TierHead>
         <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{board.promotedAt ? "Permanent reference" : board.votingOpen ? "Voting open" : "Voting closed"} · {ballot ? dirty ? "Unsaved changes" : "Votes submitted" : "Not submitted"}</Text>
         {showRank ? <Pressable accessibilityRole="button" accessibilityLabel="Back to board" onPress={() => { setSelectedWorkId(null); setView("board"); }}><Text {...dynamicType} style={[typography.body, { color: colors.accent }]}>‹ Board</Text></Pressable> : <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{placements.length} of {cleanBoard.pool.length} ranked</Text>}
@@ -137,7 +138,10 @@ export function VoteTierlistScreen({ code, startInRank = false }: { code: string
         {canEdit && (data.pool.length === 0 || placements.length > 0) ? <View style={[styles.complete, view === "board" && data.pool.length > 0 ? styles.fabClearance : null]}>{data.pool.length === 0 ? <Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>All books ranked</Text> : null}<Button label={ballot ? "Update votes" : "Submit votes"} loading={busy} disabled={!dirty || !placements.length} onPress={() => void submit()} /></View> : null}
       </View>;
       if (!histogram) return <EmptyState title="No results yet" body="Live results stay hidden while voting is open. Submit your votes to see them as soon as they exist." />;
-      return <TierlistResults histogram={histogram} tiers={board.tiers} pool={cleanBoard.pool} books={books} ballotCount={board.ballotCount} eligibleVoteCount={board.eligibleVoteCount} votingOpen={board.votingOpen} promoted={Boolean(board.promotedAt)} ownPlacements={ballot?.placements ?? []} active={active} mode={resultMode} onModeChange={setResultMode} />;
+      return <View style={styles.community}>
+        {board.ranksWorstFirst ? <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Top tier = worst</Text> : null}
+        <TierlistResults histogram={histogram} tiers={board.tiers} pool={cleanBoard.pool} books={books} ballotCount={board.ballotCount} eligibleVoteCount={board.eligibleVoteCount} votingOpen={board.votingOpen} promoted={Boolean(board.promotedAt)} ownPlacements={ballot?.placements ?? []} active={active} mode={resultMode} onModeChange={setResultMode} />
+      </View>;
     }} />
     {board.votingOpen && !board.promotedAt && !blocked && view === "board" && (ballot && !editing || canEdit && data.pool.length > 0) ? <Fab icon="tierlist" label={ballot && !editing ? data.pool.length ? "Continue ranking" : "Edit votes" : `Rank · ${data.pool.length} left`} onPress={() => { if (ballot) setEditing(true); setView(data.pool.length ? "rank" : "board"); }} /> : null}
     <Sheet visible={booksOpen} title="Books" onClose={() => setBooksOpen(false)}>
@@ -162,6 +166,7 @@ export function VoteTierlistScreen({ code, startInRank = false }: { code: string
 const styles = StyleSheet.create({
   screen: { padding: spacing.lg, gap: spacing.md },
   page: { flex: 1, gap: spacing.sm, paddingTop: spacing.lg },
+  community: { flex: 1 },
   complete: { gap: spacing.sm },
   fabClearance: { paddingBottom: 72 },
   strong: { fontWeight: "700" },

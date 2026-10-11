@@ -10,8 +10,8 @@ import type { TierlistRow, BallotRow, BallotTotals, Placement, TierlistDiscoverR
 
 export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepository {
   const insertStmt = db.prepare(`
-    INSERT INTO tierlists (id, owner_user_id, origin_user_id, name, name_key, data, vote_code, vote_access, voting_open, source_tierlist_id, promoted_at, public_books, created_at, updated_at)
-    VALUES ($id, $owner_user_id, $origin_user_id, $name, $name_key, $data, $vote_code, $vote_access, $voting_open, $source_tierlist_id, $promoted_at, $public_books, $created_at, $updated_at)
+    INSERT INTO tierlists (id, owner_user_id, origin_user_id, name, name_key, data, vote_code, vote_access, voting_open, source_tierlist_id, promoted_at, public_books, ranks_worst_first, created_at, updated_at)
+    VALUES ($id, $owner_user_id, $origin_user_id, $name, $name_key, $data, $vote_code, $vote_access, $voting_open, $source_tierlist_id, $promoted_at, $public_books, $ranks_worst_first, $created_at, $updated_at)
   `);
   const listStmt = db.prepare(`SELECT * FROM tierlists WHERE owner_user_id = ? AND promoted_at IS NULL ORDER BY created_at DESC`);
   const getOwnedStmt = db.prepare(`SELECT * FROM tierlists WHERE id = ? AND owner_user_id = ? AND promoted_at IS NULL`);
@@ -45,7 +45,7 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
     ORDER BY t.created_at DESC LIMIT ?
   `);
   const tierPlacementsStmt = db.prepare(`
-    SELECT p.tierlist_id, p.tier_id, t.data
+    SELECT p.tierlist_id, p.tier_id, t.data, t.ranks_worst_first
     FROM tierlist_works w
     JOIN tierlists t ON t.id = w.tierlist_id AND t.vote_code IS NOT NULL
     JOIN tierlist_ballot_placements p ON p.tierlist_id = w.tierlist_id AND p.work_id = w.work_id
@@ -203,6 +203,7 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
           $source_tierlist_id: row.source_tierlist_id,
           $promoted_at: row.promoted_at,
           $public_books: row.public_books,
+          $ranks_worst_first: row.ranks_worst_first,
           $created_at: row.created_at,
           $updated_at: row.updated_at
         });
@@ -317,14 +318,14 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
     tierPlacements(workIds) {
       if (workIds.length === 0) return [];
       const tiersOf = new Map<string, string[]>();
-      return (tierPlacementsStmt.all(JSON.stringify(workIds)) as unknown as Array<{ tierlist_id: string; tier_id: string; data: string }>).flatMap((row): TierPlacement[] => {
+      return (tierPlacementsStmt.all(JSON.stringify(workIds)) as unknown as Array<{ tierlist_id: string; tier_id: string; data: string; ranks_worst_first: number }>).flatMap((row): TierPlacement[] => {
         let ids = tiersOf.get(row.tierlist_id);
         if (!ids) {
           ids = (JSON.parse(row.data) as { tiers: Array<{ id: string }> }).tiers.map((tier) => tier.id);
           tiersOf.set(row.tierlist_id, ids);
         }
         const tierIndex = ids.indexOf(row.tier_id);
-        return tierIndex === -1 ? [] : [{ tierlistId: row.tierlist_id, tierIndex, tierCount: ids.length }];
+        return tierIndex === -1 ? [] : [{ tierlistId: row.tierlist_id, tierIndex, tierCount: ids.length, ranksWorstFirst: row.ranks_worst_first === 1 }];
       });
     },
 
