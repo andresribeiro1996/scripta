@@ -198,6 +198,9 @@ function createInMemoryRepo(): TierlistsRepository {
     listPublishedByWorks() {
       return [];
     },
+    tierPlacements() {
+      return [];
+    },
     listParticipation() {
       return [];
     },

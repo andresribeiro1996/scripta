@@ -3,7 +3,7 @@
 // service.ts is written against this interface only, with no idea whether
 // SQLite, Postgres, or an in-memory fake is on the other side.
 
-import type { TierlistRow, BallotRow, BallotTotals, HistogramCell, Placement, TierlistDiscoverRow, TierlistGameRow, VoteAccess } from "./types.js";
+import type { TierlistRow, BallotRow, BallotTotals, HistogramCell, Placement, TierlistDiscoverRow, TierlistGameRow, TierPlacement, VoteAccess } from "./types.js";
 
 export interface TierlistsRepository {
   deleteUserData(userId: string): void;
@@ -42,6 +42,7 @@ export interface TierlistsRepository {
   discoverWindow(needle: string, limit: number): TierlistDiscoverRow[];
   listPublicByIds(ids: string[]): TierlistRow[];
   listPublishedByWorks(workIds: string[], limit: number): TierlistGameRow[];
+  tierPlacements(workIds: string[]): TierPlacement[];
   ballotTotalsFor(ids: string[]): Map<string, BallotTotals>;
   votedAmong(voterUserId: string, ids: string[]): string[];
   getBallotById(tierlistId: string, ballotId: string): BallotRow | undefined;

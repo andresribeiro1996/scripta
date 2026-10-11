@@ -6,7 +6,7 @@ import { normalizeWords } from "@scripta/shared";
 import type { DatabaseSync } from "node:sqlite";
 import { boardWorks } from "../../domain/boardKeys.js";
 import type { TierlistsRepository } from "../../domain/ports.js";
-import type { TierlistRow, BallotRow, BallotTotals, Placement, TierlistDiscoverRow, TierlistGameRow } from "../../domain/types.js";
+import type { TierlistRow, BallotRow, BallotTotals, Placement, TierlistDiscoverRow, TierlistGameRow, TierPlacement } from "../../domain/types.js";
 
 export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepository {
   const insertStmt = db.prepare(`
@@ -43,6 +43,13 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
     FROM tierlist_works w JOIN tierlists t ON t.id = w.tierlist_id
     WHERE w.work_id IN (SELECT value FROM json_each(?)) AND t.vote_code IS NOT NULL
     ORDER BY t.created_at DESC LIMIT ?
+  `);
+  const tierPlacementsStmt = db.prepare(`
+    SELECT p.tierlist_id, p.tier_id, t.data
+    FROM tierlist_ballot_placements p
+    JOIN tierlist_ballots b ON b.id = p.ballot_id
+    JOIN tierlists t ON t.id = p.tierlist_id
+    WHERE p.work_id IN (SELECT value FROM json_each(?)) AND b.voter_user_id IS NOT NULL AND t.vote_code IS NOT NULL
   `);
   const ballotTotalsForStmt = db.prepare(`
     SELECT b.tierlist_id,
@@ -304,6 +311,20 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
     listPublishedByWorks(workIds, limit) {
       if (workIds.length === 0) return [];
       return listPublishedByWorksStmt.all(JSON.stringify(workIds), limit) as unknown as TierlistGameRow[];
+    },
+
+    tierPlacements(workIds) {
+      if (workIds.length === 0) return [];
+      const tiersOf = new Map<string, string[]>();
+      return (tierPlacementsStmt.all(JSON.stringify(workIds)) as unknown as Array<{ tierlist_id: string; tier_id: string; data: string }>).flatMap((row): TierPlacement[] => {
+        let ids = tiersOf.get(row.tierlist_id);
+        if (!ids) {
+          ids = (JSON.parse(row.data) as { tiers: Array<{ id: string }> }).tiers.map((tier) => tier.id);
+          tiersOf.set(row.tierlist_id, ids);
+        }
+        const tierIndex = ids.indexOf(row.tier_id);
+        return tierIndex === -1 ? [] : [{ tierlistId: row.tierlist_id, tierIndex, tierCount: ids.length }];
+      });
     },
 
     listPublicByIds(ids) {
