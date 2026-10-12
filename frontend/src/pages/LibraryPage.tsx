@@ -1,7 +1,7 @@
 import { closestCenter, DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate, useNavigationType, useSearchParams } from "react-router-dom";
 import {
   buildMergedLibrary,
   findDuplicates,
@@ -40,9 +40,14 @@ import { bookKey } from "../lib/merge";
 import { saveWithViewTransition } from "../lib/viewTransition";
 import { restoreDeletedBooks } from "../lib/restoreDeletedBooks";
 
+const scrollPositions = new Map<string, number>();
+
 export function LibraryPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const { key: locationKey } = useLocation();
+  const navigationType = useNavigationType();
+  const restorePendingRef = useRef(navigationType === "POP" && scrollPositions.has(locationKey));
   const csvTemplateUrl = `data:text/csv;charset=utf-8,${encodeURIComponent(LIBRARY_CSV_TEMPLATE)}`;
 
   function downloadCsvTemplate() {
@@ -276,6 +281,19 @@ export function LibraryPage() {
     () => sortBooks(filterBooks(ordered, query, statusFilter), sortKey),
     [ordered, query, statusFilter, sortKey]
   );
+  const gridReady = books.length > 0 && displayBooks.length > 0;
+  useLayoutEffect(() => {
+    function remember() {
+      if (!restorePendingRef.current) scrollPositions.set(locationKey, window.scrollY);
+    }
+    window.addEventListener("scroll", remember, { passive: true });
+    return () => window.removeEventListener("scroll", remember);
+  }, [locationKey]);
+  useLayoutEffect(() => {
+    if (!restorePendingRef.current || !gridReady) return;
+    restorePendingRef.current = false;
+    window.scrollTo({ top: scrollPositions.get(locationKey), behavior: "instant" });
+  }, [gridReady, locationKey]);
   const toolbarActive = query.trim() !== "" || statusFilter !== "all" || sortKey !== "manual";
   // Which series (if any) each book belongs to, for style priority — a
   // series' own style panel (GroupsPage.tsx, series only) overrides the
