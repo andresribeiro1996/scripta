@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
-import { bookKey, buildDashboardCards, isNewDigestItem, newCountLabel, resolveQuote } from "@scripta/shared";
+import { bookKey, buildDashboardCards, isNewDigestItem, localDay, newCountLabel, resolveQuote } from "@scripta/shared";
 import { BrandMark, Button, EmptyState, ErrorState, IconButton, Screen, Skeleton, Toast, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import { useAuth } from "../../core/auth";
 import { useLibrary } from "../library/hooks/useLibrary";
@@ -16,7 +16,7 @@ export function HomeScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const library = useLibrary();
-  const [day, setDay] = useState(() => new Date().toISOString().slice(0, 10));
+  const [day, setDay] = useState(localDay);
   const [offset, setOffset] = useState(0);
   const [pulling, setPulling] = useState(false);
   const [picking, setPicking] = useState(false);
@@ -24,7 +24,7 @@ export function HomeScreen() {
   const { followingId, followError, followBack } = useFollowBack(dashboard.refetch);
 
   useFocusEffect(useCallback(() => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDay();
     if (today !== day) {
       setDay(today);
       setOffset(0);
