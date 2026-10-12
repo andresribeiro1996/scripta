@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import { router, Stack, useSegments } from "expo-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { StyleSheet } from "react-native";
-import { blendHex, bookKey, bookScreenModel, coverWash } from "@scripta/shared";
+import { useSharedValue } from "react-native-reanimated";
+import { useHeaderHeight } from "expo-router/react-navigation";
+import { bookKey, bookScreenModel, coverWash } from "@scripta/shared";
 import { isPermanentError } from "../../core/apiClient";
 import { useAuth } from "../../core/auth";
 import { ErrorState, HeaderActions, IconButton, Menu, Screen, Skeleton, Toast, spacing, useTheme } from "../../ui";
@@ -11,16 +13,17 @@ import { LIBRARY_QUERY_KEY, useLibrary } from "../library/hooks/useLibrary";
 import { ContentShareSheet } from "../sharing/ContentShareSheet";
 import { publicContentUrl } from "../sharing/links";
 import { fetchWork } from "./api";
-import { BookScreen, bookMenuItems, washAlphaAt } from "./BookScreen";
+import { BookScreen, HeaderWash, bookMenuItems } from "./BookScreen";
 import { workPath } from "./workPath";
 
 export function WorkScreen({ id }: { id: string }) {
   const [adding, setAdding] = useState(false);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [shareError, setShareError] = useState<string | null>(null);
-  const [scrolledHeaderColor, setScrolledHeaderColor] = useState<string | null>(null);
+  const scrollY = useSharedValue(0);
+  const headerHeight = useHeaderHeight();
   const segments = useSegments();
-  const { colors, mode } = useTheme();
+  const { mode } = useTheme();
   const signedIn = useAuth().user !== null;
   const libraryQuery = useLibrary({ enabled: signedIn });
   const queryClient = useQueryClient();
@@ -69,9 +72,7 @@ export function WorkScreen({ id }: { id: string }) {
   const model = bookScreenModel(page, book, { isAdmin: false });
   const menuItems = book && page.mine ? bookMenuItems(model, page.mine.bookKey, segments) : [];
   const wash = coverWash(work.coverColor, mode);
-  const headerColorAt = (y: number) => (wash && work.coverColor ? blendHex(colors.background, work.coverColor, washAlphaAt(wash.topAlpha, y)) : null);
-  const headerColor = scrolledHeaderColor ?? headerColorAt(0);
-  const headerStyle = headerColor ? { backgroundColor: headerColor } : undefined;
+  const tint = wash && work.coverColor ? { color: work.coverColor, topAlpha: wash.topAlpha } : null;
   const firstEdition = work.editions.find((edition) => edition.isbn) ?? work.editions[0];
 
   async function share() {
@@ -89,7 +90,7 @@ export function WorkScreen({ id }: { id: string }) {
         options={{
           headerShown: true,
           title: work.title,
-          ...(headerStyle ? { headerStyle } : {}),
+          ...(tint ? { headerTransparent: true, headerLargeTitleEnabled: false, headerShadowVisible: false } : {}),
           headerRight: () => (
             <HeaderActions>
               <IconButton framed name="share" accessibilityLabel="Share book" onPress={() => void share()} />
@@ -99,7 +100,8 @@ export function WorkScreen({ id }: { id: string }) {
         }}
       />
       {shareError ? <Toast visible message={shareError} tone="error" /> : null}
-      <BookScreen page={page} book={book} model={model} signedIn={signedIn} onAdd={() => setAdding(true)} onScrollY={(y) => setScrolledHeaderColor(headerColorAt(y))} />
+      <BookScreen page={page} book={book} model={model} signedIn={signedIn} onAdd={() => setAdding(true)} scrollY={scrollY} headerInset={tint ? headerHeight : 0} />
+      {tint ? <HeaderWash color={tint.color} topAlpha={tint.topAlpha} scrollY={scrollY} height={headerHeight} /> : null}
       <ContentShareSheet visible={shareUrl !== null} onClose={() => setShareUrl(null)} title={work.title} url={shareUrl} />
       {adding ? (
         <AddBookSheet

@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { router, useSegments } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
-import { Alert, Pressable, ScrollView, StyleSheet, View, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
+import { Alert, Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
+import Animated, { useAnimatedScrollHandler, useAnimatedStyle, type SharedValue } from "react-native-reanimated";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import { bookKey, bookStatsModel, coverWash, editionLabel, readSnapshot, type BookScreenModel, type BookScreenTabKey, type ReadStatus, type WorkPage } from "@scripta/shared";
 import { Text } from "../../ui/Text";
@@ -21,12 +22,23 @@ const WASH_MID_OFFSET = 0.45;
 const WASH_MID_FACTOR = 0.5;
 
 export function washAlphaAt(topAlpha: number, y: number): number {
+  "worklet";
   const midY = WASH_MID_OFFSET * WASH_HEIGHT;
   const midAlpha = topAlpha * WASH_MID_FACTOR;
   if (y <= 0) return topAlpha;
   if (y < midY) return topAlpha + ((midAlpha - topAlpha) * y) / midY;
   if (y < WASH_HEIGHT) return midAlpha * (1 - (y - midY) / (WASH_HEIGHT - midY));
   return 0;
+}
+
+export function HeaderWash({ color, topAlpha, scrollY, height }: { color: string; topAlpha: number; scrollY: SharedValue<number>; height: number }) {
+  const { colors } = useTheme();
+  const tint = useAnimatedStyle(() => ({ opacity: washAlphaAt(topAlpha, scrollY.get()) }));
+  return (
+    <View pointerEvents="none" accessible={false} importantForAccessibility="no-hide-descendants" style={[styles.headerWash, { height, backgroundColor: colors.background }]}>
+      <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: color }, tint]} />
+    </View>
+  );
 }
 
 const TAB_ICONS: Record<BookScreenTabKey, IconName> = { about: "info", highlights: "quote", community: "community" };
@@ -91,7 +103,7 @@ function DeleteNote({ book, bookmarkId }: { book: Record<string, unknown>; bookm
   );
 }
 
-export function BookScreen({ page, book, model, signedIn, onAdd, onScrollY }: { page: WorkPage | null; book: Record<string, unknown> | null; model: BookScreenModel; signedIn: boolean; onAdd: () => void; onScrollY?: (y: number) => void }) {
+export function BookScreen({ page, book, model, signedIn, onAdd, scrollY, headerInset = 0 }: { page: WorkPage | null; book: Record<string, unknown> | null; model: BookScreenModel; signedIn: boolean; onAdd: () => void; scrollY?: SharedValue<number>; headerInset?: number }) {
   const { colors, mode } = useTheme();
   const { width: windowWidth } = useWindowDimensions();
   const coverColor = page?.work.coverColor ?? null;
@@ -109,12 +121,14 @@ export function BookScreen({ page, book, model, signedIn, onAdd, onScrollY }: { 
     <Text accessibilityRole="header" {...dynamicType} style={[typography.title, { color: colors.text }]}>{title}</Text>
   );
   const { about, community } = model;
-  const trackScroll = onScrollY ? (event: NativeSyntheticEvent<NativeScrollEvent>) => onScrollY(event.nativeEvent.contentOffset.y) : undefined;
+  const onScroll = useAnimatedScrollHandler((event) => {
+    if (scrollY) scrollY.set(event.contentOffset.y);
+  });
 
   return (
-    <ScrollView contentContainerStyle={styles.content} onScroll={trackScroll} scrollEventThrottle={16}>
+    <Animated.ScrollView contentContainerStyle={[styles.content, { paddingTop: spacing.lg + headerInset }]} onScroll={onScroll} scrollEventThrottle={16}>
       {wash && coverColor ? (
-        <Svg pointerEvents="none" accessible={false} importantForAccessibility="no-hide-descendants" style={styles.wash} width={windowWidth} height={WASH_HEIGHT}>
+        <Svg pointerEvents="none" accessible={false} importantForAccessibility="no-hide-descendants" style={[styles.wash, { top: headerInset }]} width={windowWidth} height={WASH_HEIGHT}>
           <Defs>
             <LinearGradient id="wash" x1="0" y1="0" x2="0" y2="1">
               <Stop offset="0" stopColor={coverColor} stopOpacity={wash.topAlpha} />
@@ -258,13 +272,14 @@ export function BookScreen({ page, book, model, signedIn, onAdd, onScrollY }: { 
           </View>
         </>
       ) : null}
-    </ScrollView>
+    </Animated.ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   content: { padding: spacing.lg, gap: spacing.xl, paddingBottom: spacing.huge },
-  wash: { position: "absolute", top: 0, left: 0 },
+  wash: { position: "absolute", left: 0 },
+  headerWash: { position: "absolute", top: 0, left: 0, right: 0 },
   heroCentered: { alignItems: "center", gap: spacing.xs },
   cover: { width: 112, height: 168, borderRadius: radii.sm, overflow: "hidden" },
   centeredText: { alignSelf: "stretch", textAlign: "center" },
