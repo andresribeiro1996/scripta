@@ -1,7 +1,6 @@
 // Resolves the book a `/book/[key]` route is about, plus the style it would
 // inherit if it had no override of its own. The three book routes each need
-// both, and the key arrives percent-encoded because a bookKey can contain
-// characters that are not URL-safe.
+// both.
 import { useMemo } from "react";
 import {
   bookKey,
@@ -12,7 +11,7 @@ import {
 } from "@scripta/shared";
 import { useLibrary } from "./useLibrary";
 
-export function useBook(rawKey: string | undefined): {
+export function useBook(key: string | undefined): {
   book: Record<string, unknown> | null;
   /** The style this book falls back to: library-wide, overlaid by its series. */
   seedStyle: LibraryStyleSettings;
@@ -23,7 +22,6 @@ export function useBook(rawKey: string | undefined): {
   workId: string | null;
 } {
   const { data: library, isPending } = useLibrary();
-  const key = rawKey ? decodeURIComponent(rawKey) : undefined;
 
   return useMemo(() => {
     const books = library?.data.books ?? [];
