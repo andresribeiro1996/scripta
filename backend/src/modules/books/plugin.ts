@@ -106,10 +106,7 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
     (signal) => service.backfillWorkKeys(DETAILS_BATCH_SIZE, signal),
     (error) => app.log.error({ err: error }, "work key backfill failed")
   );
-  const stopColorBackfill = startCoverColorBackfill(
-    (limit) => service.fillCoverColors(limit),
-    (error) => app.log.error({ err: error }, "cover colour backfill failed")
-  );
+  const stopColorBackfill = startCoverColorBackfill((limit) => service.fillCoverColors(limit), app.log);
   activeService = service;
   app.addHook("onClose", async () => {
     activeService = null;
