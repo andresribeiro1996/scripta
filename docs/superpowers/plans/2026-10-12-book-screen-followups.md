@@ -101,3 +101,24 @@ Covers Tasks 1 and 2. Dev fixture books with cover colours: The Fellowship of th
 - [ ] A book with no cover colour: opaque default header, as before.
 - [ ] A library-only book (`/book/<key>`, no work), if the fixture has one: unchanged, no tint.
 - [ ] No LogBox toast on the book screen.
+
+## Task 7: Header and wash in one backdrop layer (amends Task 1 after the device pass)
+
+**Files:** `mobile/src/features/works/WorkScreen.tsx`, `mobile/src/features/works/BookScreen.tsx`, `docs/superpowers/specs/2026-10-11-cover-colour-wash-design.md`.
+
+Why: Task 6 measured a mid-fling seam up to 48 (Dracula, light) and a 3–4px untinted band on overscroll. A Reanimated style still lands a frame or more after the native scroll moves the in-content wash, so a header tinted from the scroll offset can never match a wash that the ScrollView moves natively. Fix the geometry instead: draw the header band and the wash in one non-scrolling layer behind the ScrollView, both driven from the same shared value in the same frame, so they always agree with each other whatever the latency. The wash's small lag behind the content is invisible because it is a soft gradient with no edge against content.
+
+- [ ] Extract the wash `Svg` (the `Defs`/`LinearGradient`/`Rect` block in `BookScreen`) into a small `WashGradient({ color, topAlpha, width })` component in `BookScreen.tsx`, used by both the in-content wash and the backdrop. No change to its stops.
+- [ ] Replace `HeaderWash` with `WashBackdrop({ color, topAlpha, scrollY, headerHeight })`: an absolutely positioned full-screen (`StyleSheet.absoluteFill`), `pointerEvents="none"`, accessibility-hidden `View` with `backgroundColor: colors.background`, containing:
+  - a band at `top: 0`, `height: headerHeight`: an `Animated.View` with `backgroundColor: color` and `opacity: washAlphaAt(topAlpha, scrollY)` from `useAnimatedStyle`;
+  - below it, a container at `top: headerHeight` to the bottom with `overflow: "hidden"`, holding an `Animated.View` with `transform: [{ translateY: -Math.max(scrollY, 0) }]` from `useAnimatedStyle`, which holds `<WashGradient>`.
+  Both styles read the same `scrollY` (via `.get()` in the worklets). Clamping at 0 means overscroll never opens a gap: the wash stays under the header and the band stays at `topAlpha`.
+- [ ] `WorkScreen` renders `<WashBackdrop>` **before** `<BookScreen>` in the tinted case (behind it), instead of `HeaderWash` after it.
+- [ ] `BookScreen`: when `scrollY` is given it does not draw the in-content wash (the backdrop draws it). `headerInset` becomes the ScrollView's `marginTop` (so the ScrollView starts at the header bottom and its content clips there), not extra `paddingTop`; content `paddingTop` goes back to `spacing.lg`. The ScrollView keeps a transparent background so the backdrop shows through. The library-only route (no `scrollY`, `headerInset` 0) renders exactly as before, in-content wash included.
+- [ ] Header options (final-review finding): `<Stack.Screen options>` merges into the existing options, so tinted keys stick when `tint` later becomes null (a web admin rejects the cover and the refetch returns no colour; or Add sends the screen to its skeleton). Set the four keys explicitly in both states: tinted `{ headerTransparent: true, headerStyle: { backgroundColor: "transparent" }, headerLargeTitleEnabled: false, headerShadowVisible: false }`; untinted the same four keys with the values from `useScreenOptions()` (`mobile/src/ui/navigation.tsx`), and `headerTransparent: false`. Use the untinted set in the early-return `untitled` `Stack.Screen` too.
+- [ ] Keep the tinted share-error toast at `top: headerHeight` (it now sits above the ScrollView, which starts there).
+- [ ] Spec: in `2026-10-11-cover-colour-wash-design.md`, update the Mobile bullet to describe this (transparent header on a tinted book screen; a backdrop layer draws the header band and the wash, driven by the scroll offset on the UI thread; library-only route keeps the in-content wash). One or two sentences.
+
+Invariant: at every frame the band's colour equals the backdrop wash's row at the header bottom, because both come from the same `scrollY` read in the same frame: band alpha `washAlphaAt(topAlpha, max(y,0))`, wash row at the header bottom = gradient row `max(y,0)`.
+
+Verify: `npm run typecheck --workspace mobile`, `npm test --workspace mobile`. Device recheck follows (controller dispatches).
