@@ -31,12 +31,34 @@ export function washAlphaAt(topAlpha: number, y: number): number {
   return 0;
 }
 
-export function HeaderWash({ color, topAlpha, scrollY, height }: { color: string; topAlpha: number; scrollY: SharedValue<number>; height: number }) {
-  const { colors } = useTheme();
-  const tint = useAnimatedStyle(() => ({ opacity: washAlphaAt(topAlpha, scrollY.get()) }));
+function WashGradient({ color, topAlpha, width }: { color: string; topAlpha: number; width: number }) {
   return (
-    <View pointerEvents="none" accessible={false} importantForAccessibility="no-hide-descendants" style={[styles.headerWash, { height, backgroundColor: colors.background }]}>
-      <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: color }, tint]} />
+    <Svg pointerEvents="none" accessible={false} importantForAccessibility="no-hide-descendants" style={styles.wash} width={width} height={WASH_HEIGHT}>
+      <Defs>
+        <LinearGradient id="wash" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor={color} stopOpacity={topAlpha} />
+          <Stop offset={WASH_MID_OFFSET} stopColor={color} stopOpacity={topAlpha * WASH_MID_FACTOR} />
+          <Stop offset="1" stopColor={color} stopOpacity={0} />
+        </LinearGradient>
+      </Defs>
+      <Rect x="0" y="0" width="100%" height={WASH_HEIGHT} fill="url(#wash)" />
+    </Svg>
+  );
+}
+
+export function WashBackdrop({ color, topAlpha, scrollY, headerHeight }: { color: string; topAlpha: number; scrollY: SharedValue<number>; headerHeight: number }) {
+  const { colors } = useTheme();
+  const { width } = useWindowDimensions();
+  const band = useAnimatedStyle(() => ({ opacity: washAlphaAt(topAlpha, scrollY.get()) }));
+  const wash = useAnimatedStyle(() => ({ transform: [{ translateY: -Math.max(scrollY.get(), 0) }] }));
+  return (
+    <View pointerEvents="none" accessible={false} importantForAccessibility="no-hide-descendants" style={[StyleSheet.absoluteFill, { backgroundColor: colors.background }]}>
+      <Animated.View style={[styles.backdropBand, { height: headerHeight, backgroundColor: color }, band]} />
+      <View style={[styles.backdropWash, { top: headerHeight }]}>
+        <Animated.View style={[styles.washLayer, wash]}>
+          <WashGradient color={color} topAlpha={topAlpha} width={width} />
+        </Animated.View>
+      </View>
     </View>
   );
 }
@@ -126,19 +148,8 @@ export function BookScreen({ page, book, model, signedIn, onAdd, scrollY, header
   });
 
   return (
-    <Animated.ScrollView contentContainerStyle={[styles.content, { paddingTop: spacing.lg + headerInset }]} onScroll={onScroll} scrollEventThrottle={16}>
-      {wash && coverColor ? (
-        <Svg pointerEvents="none" accessible={false} importantForAccessibility="no-hide-descendants" style={[styles.wash, { top: headerInset }]} width={windowWidth} height={WASH_HEIGHT}>
-          <Defs>
-            <LinearGradient id="wash" x1="0" y1="0" x2="0" y2="1">
-              <Stop offset="0" stopColor={coverColor} stopOpacity={wash.topAlpha} />
-              <Stop offset={WASH_MID_OFFSET} stopColor={coverColor} stopOpacity={wash.topAlpha * WASH_MID_FACTOR} />
-              <Stop offset="1" stopColor={coverColor} stopOpacity={0} />
-            </LinearGradient>
-          </Defs>
-          <Rect x="0" y="0" width="100%" height={WASH_HEIGHT} fill="url(#wash)" />
-        </Svg>
-      ) : null}
+    <Animated.ScrollView style={{ marginTop: headerInset }} contentContainerStyle={styles.content} onScroll={onScroll} scrollEventThrottle={16}>
+      {wash && coverColor && !scrollY ? <WashGradient color={coverColor} topAlpha={wash.topAlpha} width={windowWidth} /> : null}
       <View style={styles.heroCentered}>
         {book ? (
           <View style={[styles.cover, { backgroundColor: colors.border }]}>
@@ -278,8 +289,10 @@ export function BookScreen({ page, book, model, signedIn, onAdd, scrollY, header
 
 const styles = StyleSheet.create({
   content: { padding: spacing.lg, gap: spacing.xl, paddingBottom: spacing.huge },
-  wash: { position: "absolute", left: 0 },
-  headerWash: { position: "absolute", top: 0, left: 0, right: 0 },
+  wash: { position: "absolute", top: 0, left: 0 },
+  washLayer: { position: "absolute", top: 0, left: 0 },
+  backdropBand: { position: "absolute", top: 0, left: 0, right: 0 },
+  backdropWash: { position: "absolute", left: 0, right: 0, bottom: 0, overflow: "hidden" },
   heroCentered: { alignItems: "center", gap: spacing.xs },
   cover: { width: 112, height: 168, borderRadius: radii.sm, overflow: "hidden" },
   centeredText: { alignSelf: "stretch", textAlign: "center" },

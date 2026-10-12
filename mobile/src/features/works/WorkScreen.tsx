@@ -7,13 +7,14 @@ import { useHeaderHeight } from "expo-router/react-navigation";
 import { bookKey, bookScreenModel, coverWash } from "@scripta/shared";
 import { isPermanentError } from "../../core/apiClient";
 import { useAuth } from "../../core/auth";
+import { useScreenOptions } from "../../ui/navigation";
 import { ErrorState, HeaderActions, IconButton, Menu, Screen, Skeleton, Toast, spacing, useTheme } from "../../ui";
 import { AddBookSheet } from "../community/AddBookSheet";
 import { LIBRARY_QUERY_KEY, useLibrary } from "../library/hooks/useLibrary";
 import { ContentShareSheet } from "../sharing/ContentShareSheet";
 import { publicContentUrl } from "../sharing/links";
 import { fetchWork } from "./api";
-import { BookScreen, HeaderWash, bookMenuItems } from "./BookScreen";
+import { BookScreen, WashBackdrop, bookMenuItems } from "./BookScreen";
 import { workPath } from "./workPath";
 
 export function WorkScreen({ id }: { id: string }) {
@@ -24,6 +25,7 @@ export function WorkScreen({ id }: { id: string }) {
   const headerHeight = useHeaderHeight();
   const segments = useSegments();
   const { mode } = useTheme();
+  const screenOptions = useScreenOptions();
   const signedIn = useAuth().user !== null;
   const libraryQuery = useLibrary({ enabled: signedIn });
   const queryClient = useQueryClient();
@@ -35,7 +37,13 @@ export function WorkScreen({ id }: { id: string }) {
     if (canonicalPath) router.replace(canonicalPath as never);
   }, [canonicalPath]);
 
-  const untitled = <Stack.Screen options={{ headerShown: true, title: "" }} />;
+  const plainHeader = {
+    headerTransparent: false,
+    headerStyle: screenOptions.headerStyle,
+    headerLargeTitleEnabled: screenOptions.headerLargeTitleEnabled,
+    headerShadowVisible: screenOptions.headerShadowVisible,
+  };
+  const untitled = <Stack.Screen options={{ headerShown: true, title: "", ...plainHeader }} />;
   if (!query.data && query.isError) {
     const permanent = isPermanentError(query.error);
     return (
@@ -90,7 +98,7 @@ export function WorkScreen({ id }: { id: string }) {
         options={{
           headerShown: true,
           title: work.title,
-          ...(tint ? { headerTransparent: true, headerStyle: { backgroundColor: "transparent" }, headerLargeTitleEnabled: false, headerShadowVisible: false } : {}),
+          ...(tint ? { headerTransparent: true, headerStyle: { backgroundColor: "transparent" }, headerLargeTitleEnabled: false, headerShadowVisible: false } : plainHeader),
           headerRight: () => (
             <HeaderActions>
               <IconButton framed name="share" accessibilityLabel="Share book" onPress={() => void share()} />
@@ -100,8 +108,8 @@ export function WorkScreen({ id }: { id: string }) {
         }}
       />
       {shareError && !tint ? <Toast visible message={shareError} tone="error" /> : null}
+      {tint ? <WashBackdrop color={tint.color} topAlpha={tint.topAlpha} scrollY={scrollY} headerHeight={headerHeight} /> : null}
       <BookScreen page={page} book={book} model={model} signedIn={signedIn} onAdd={() => setAdding(true)} scrollY={scrollY} headerInset={tint ? headerHeight : 0} />
-      {tint ? <HeaderWash color={tint.color} topAlpha={tint.topAlpha} scrollY={scrollY} height={headerHeight} /> : null}
       {shareError && tint ? <View pointerEvents="box-none" style={[styles.toastBelowHeader, { top: headerHeight }]}><Toast visible message={shareError} tone="error" /></View> : null}
       <ContentShareSheet visible={shareUrl !== null} onClose={() => setShareUrl(null)} title={work.title} url={shareUrl} />
       {adding ? (
