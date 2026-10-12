@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { router, Stack, useSegments } from "expo-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { StyleSheet } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { useSharedValue } from "react-native-reanimated";
 import { useHeaderHeight } from "expo-router/react-navigation";
 import { bookKey, bookScreenModel, coverWash } from "@scripta/shared";
@@ -90,7 +90,7 @@ export function WorkScreen({ id }: { id: string }) {
         options={{
           headerShown: true,
           title: work.title,
-          ...(tint ? { headerTransparent: true, headerLargeTitleEnabled: false, headerShadowVisible: false } : {}),
+          ...(tint ? { headerTransparent: true, headerStyle: { backgroundColor: "transparent" }, headerLargeTitleEnabled: false, headerShadowVisible: false } : {}),
           headerRight: () => (
             <HeaderActions>
               <IconButton framed name="share" accessibilityLabel="Share book" onPress={() => void share()} />
@@ -99,9 +99,10 @@ export function WorkScreen({ id }: { id: string }) {
           ),
         }}
       />
-      {shareError ? <Toast visible message={shareError} tone="error" /> : null}
+      {shareError && !tint ? <Toast visible message={shareError} tone="error" /> : null}
       <BookScreen page={page} book={book} model={model} signedIn={signedIn} onAdd={() => setAdding(true)} scrollY={scrollY} headerInset={tint ? headerHeight : 0} />
       {tint ? <HeaderWash color={tint.color} topAlpha={tint.topAlpha} scrollY={scrollY} height={headerHeight} /> : null}
+      {shareError && tint ? <View pointerEvents="box-none" style={[styles.toastBelowHeader, { top: headerHeight }]}><Toast visible message={shareError} tone="error" /></View> : null}
       <ContentShareSheet visible={shareUrl !== null} onClose={() => setShareUrl(null)} title={work.title} url={shareUrl} />
       {adding ? (
         <AddBookSheet
@@ -118,5 +119,6 @@ export function WorkScreen({ id }: { id: string }) {
 }
 
 const styles = StyleSheet.create({
+  toastBelowHeader: { position: "absolute", left: 0, right: 0 },
   centered: { padding: spacing.lg, gap: spacing.md },
 });
