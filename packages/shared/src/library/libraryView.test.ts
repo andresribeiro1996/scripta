@@ -3,6 +3,8 @@ import { test } from "node:test";
 import { statusLabel } from "./covers.js";
 import { LIBRARY_STATUS_TABS, STATUS_FILTER_OPTIONS, localDay, readingPercent, setReadStatus } from "./libraryView.js";
 
+process.env.TZ = "America/Sao_Paulo";
+
 test("finishing a book records the day and full progress", () => {
   const book = { Title: "A", ReadStatus: 1, ___PercentRead: 40, DateLastRead: "2024-01-01" };
   assert.deepEqual(setReadStatus(book, 2, "2026-09-25"), { Title: "A", ReadStatus: 2, ___PercentRead: 100, DateLastRead: "2026-09-25" });
