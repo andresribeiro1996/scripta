@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQueryClient, type InfiniteData } from "@tanstack/react-query";
-import { bookKey, buildDashboardCards, clearDashboardCounts, digestAction, digestHeading, digestTarget, isNewDigestItem, newCountLabel, resolveQuote, type DashboardFeedPage } from "@scripta/shared";
+import { bookKey, buildDashboardCards, clearDashboardCounts, digestAction, digestHeading, digestTarget, isNewDigestItem, localDay, newCountLabel, resolveQuote, type DashboardFeedPage } from "@scripta/shared";
 import { markDashboardSeen } from "../api/community";
 import { DASHBOARD_QUERY_KEY, useDashboard } from "../hooks/useDashboard";
 import { useLibrary } from "../hooks/useLibrary";
@@ -23,7 +23,7 @@ export function HomePage() {
   const queryClient = useQueryClient();
   const dashboard = useDashboard();
   const library = useLibrary();
-  const [day] = useState(() => new Date().toISOString().slice(0, 10));
+  const [day] = useState(localDay);
   const [picking, setPicking] = useState(false);
   const [activity, setActivity] = useState<HTMLElement | null>(null);
   const markedRef = useRef(false);
