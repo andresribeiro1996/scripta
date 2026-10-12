@@ -286,14 +286,19 @@ export function LibraryPage() {
     function remember() {
       if (!restorePendingRef.current) scrollPositions.set(locationKey, window.scrollY);
     }
+    remember();
     window.addEventListener("scroll", remember, { passive: true });
     return () => window.removeEventListener("scroll", remember);
   }, [locationKey]);
   useLayoutEffect(() => {
-    if (!restorePendingRef.current || !gridReady) return;
-    restorePendingRef.current = false;
-    window.scrollTo({ top: scrollPositions.get(locationKey), behavior: "instant" });
-  }, [gridReady, locationKey]);
+    if (!restorePendingRef.current) return;
+    if (gridReady) {
+      restorePendingRef.current = false;
+      window.scrollTo({ top: scrollPositions.get(locationKey), behavior: "instant" });
+    } else if (!isLoading) {
+      restorePendingRef.current = false;
+    }
+  }, [gridReady, isLoading, locationKey]);
   const toolbarActive = query.trim() !== "" || statusFilter !== "all" || sortKey !== "manual";
   // Which series (if any) each book belongs to, for style priority — a
   // series' own style panel (GroupsPage.tsx, series only) overrides the
