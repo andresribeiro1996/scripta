@@ -52,10 +52,12 @@ export function WashBackdrop({ color, topAlpha, scrollY, headerHeight }: { color
   const band = useAnimatedStyle(() => ({ opacity: washAlphaAt(topAlpha, scrollY.get()) }));
   const wash = useAnimatedStyle(() => ({ transform: [{ translateY: -Math.max(scrollY.get(), 0) }] }));
   return (
-    <View pointerEvents="none" accessible={false} importantForAccessibility="no-hide-descendants" style={[StyleSheet.absoluteFill, { backgroundColor: colors.background }]}>
-      <Animated.View style={[styles.backdropBand, { height: headerHeight, backgroundColor: color }, band]} />
+    <View pointerEvents="none" accessible={false} importantForAccessibility="no-hide-descendants" style={StyleSheet.absoluteFill}>
+      <View style={[styles.backdropBand, { height: headerHeight, backgroundColor: colors.background }]}>
+        <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: color }, band]} />
+      </View>
       <View style={[styles.backdropWash, { top: headerHeight }]}>
-        <Animated.View style={[styles.washLayer, wash]}>
+        <Animated.View style={[styles.washLayer, { width, height: WASH_HEIGHT }, wash]}>
           <WashGradient color={color} topAlpha={topAlpha} width={width} />
         </Animated.View>
       </View>
