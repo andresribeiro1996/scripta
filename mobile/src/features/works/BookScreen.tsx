@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { router, useSegments } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { Alert, Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
@@ -145,6 +145,9 @@ export function BookScreen({ page, book, model, signedIn, onAdd, scrollY, header
     <Text accessibilityRole="header" {...dynamicType} style={[typography.title, { color: colors.text }]}>{title}</Text>
   );
   const { about, community } = model;
+  useEffect(() => {
+    scrollY?.set(0);
+  }, [scrollY]);
   const onScroll = useAnimatedScrollHandler((event) => {
     if (scrollY) scrollY.set(event.contentOffset.y);
   });
