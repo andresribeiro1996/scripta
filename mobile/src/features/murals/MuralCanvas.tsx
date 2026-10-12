@@ -15,6 +15,7 @@ import {
   bookKey,
   computeStat,
   libraryBreakdown,
+  localDay,
   muralThemeId,
   moveMuralBlock,
   muralDragScrollSpeed,
@@ -364,7 +365,7 @@ export function BlockPreview({ theme, block, canvasWidth, maxHeight, books, imag
 }) {
   const colors = themes[theme].colors;
   const [boxWidth, setBoxWidth] = useState(0);
-  const [day] = useState(() => new Date().toISOString().slice(0, 10));
+  const [day] = useState(localDay);
   const resolved = useMemo(() => resolveHomeBlock(block, books, groups, day), [block, books, groups, day]);
   const style = resolveBlockStyle(resolved.style);
   const width = block.layout.w * gridColumnWidth(canvasWidth) - GAP;
@@ -465,7 +466,7 @@ export function MuralCanvas({ mural, books, images, tierlists, profile, shelfThe
     const next = Math.max(0, Math.min(dragScroll.contentHeight.get() - viewport.height, offset + speed * elapsed / 1000));
     if (next !== offset) scrollTo(dragScroll.ref, 0, next, false);
   }, editable);
-  const [day] = useState(() => new Date().toISOString().slice(0, 10));
+  const [day] = useState(localDay);
   const [readyAssets, setReadyAssets] = useState<Set<string>>(() => new Set());
   const onAssetReady = useCallback((key: string) => setReadyAssets((current) => current.has(key) ? current : new Set(current).add(key)), []);
   const resolvedBlocks = useMemo(() => mural.blocks.map((block) => resolveHomeBlock(block, books, groups, day)), [mural.blocks, books, groups, day]);

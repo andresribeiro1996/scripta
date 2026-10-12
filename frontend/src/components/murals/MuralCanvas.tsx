@@ -1,5 +1,5 @@
 import { MuralBlockDetail } from "./MuralBlockDetail";
-import { blockEffects, blockTextColors, resolveBlockColor, resolveHomeBlock, type Group, type PublicReaderCard } from "@scripta/shared";
+import { blockEffects, blockTextColors, localDay, resolveBlockColor, resolveHomeBlock, type Group, type PublicReaderCard } from "@scripta/shared";
 import { themes } from "@scripta/shared/themes";
 import GridLayout from "react-grid-layout";
 import { DndContext } from "@dnd-kit/core";
@@ -82,7 +82,7 @@ export function MuralCanvas({
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const drag = useMuralDrag(originalMural.blocks, canvasRef, onLayoutChange, 1, onDragChange);
-  const [day] = useState(() => new Date().toISOString().slice(0, 10));
+  const [day] = useState(localDay);
   const mural = { ...originalMural, theme: muralThemeId(originalMural.theme), blocks: originalMural.blocks.map((block) => resolveHomeBlock(block, books, groups, day)) };
   const originalBlock = (block: MuralBlock) => originalMural.blocks.find((item) => item.id === block.id) ?? block;
   const themeColors = themes[mural.theme].colors;
