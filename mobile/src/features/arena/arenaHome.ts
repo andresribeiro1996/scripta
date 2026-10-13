@@ -95,11 +95,6 @@ export function ownedItems(tab: ArenaTab, tournaments: Tournament[], tierlists: 
   });
 }
 
-export function filterItems(items: OwnedItem[], search: string): OwnedItem[] {
-  const needle = search.trim().toLowerCase();
-  return needle ? items.filter((item) => item.name.toLowerCase().includes(needle)) : items;
-}
-
 export const OWNER_FILTERS = [
   { value: "all", label: "All" },
   { value: "mine", label: "Created by you" },
@@ -149,7 +144,7 @@ export function emptyCopy(tab: ArenaTab, searching: boolean, owner: OwnerFilter 
   if (searching) return { title: "Nothing matches", body: "Try a different search." };
   if (owner === "voted") {
     const noun = tab === "tournaments" ? "tournaments" : "tier lists";
-    return { title: `You haven't voted in any ${noun} yet.`, body: `${noun[0]!.toUpperCase()}${noun.slice(1)} you vote in will show up here.` };
+    return { title: `You haven't voted in any ${noun} yet`, body: `${noun[0]!.toUpperCase()}${noun.slice(1)} you vote in will show up here.` };
   }
   if (tab === "quizzes") return { title: "No quizzes yet", body: "Create one and turn your books into trivia." };
   return tab === "tournaments"

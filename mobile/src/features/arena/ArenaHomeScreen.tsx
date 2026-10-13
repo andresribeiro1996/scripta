@@ -32,7 +32,7 @@ import {
 
 type Doomed = { kind: "tournament" | "tierlist" | "quiz"; id: string; name: string };
 
-const noVoted = { data: [], isRefetching: false, isError: false, refetch: () => {} };
+const noVoted = { data: [], isPending: false, isRefetching: false, isError: false, refetch: () => {} };
 
 const OWNER_FILTER_ICONS: Record<OwnerFilter, IconName> = { all: "filter", mine: "profile", voted: "vote" };
 
@@ -158,7 +158,7 @@ function ArenaList({
 }: {
   tab: ArenaTab;
   query: UseQueryResult<unknown>;
-  votedQuery: { isRefetching: boolean; isError: boolean; refetch: () => void };
+  votedQuery: { isPending: boolean; isRefetching: boolean; isError: boolean; refetch: () => void };
   owned: OwnedItem[];
   votedTournaments: Tournament[];
   votedTierlists: VotedTierlist[];
@@ -170,8 +170,10 @@ function ArenaList({
   const [search, setSearch] = useState("");
   const [owner, setOwner] = useState<OwnerFilter>("all");
   const filtering = rowCount > 0;
-  const visible = homeSections(tab, owned, votedTournaments, votedTierlists, owner, filtering ? search : "");
-  const empty = emptyCopy(tab, filtering && search.trim() !== "", filtering ? owner : "all");
+  const activeOwner = filtering ? owner : "all";
+  const visible = homeSections(tab, owned, votedTournaments, votedTierlists, activeOwner, filtering ? search : "");
+  const empty = emptyCopy(tab, filtering && search.trim() !== "", activeOwner);
+  const votedUnknown = activeOwner === "voted" && (votedQuery.isPending || votedQuery.isError);
   const noun = tab === "tournaments" ? "tournaments" : tab === "tierlists" ? "tier lists" : "quizzes";
   const ownerOption = OWNER_FILTERS.find((option) => option.value === owner)!;
 
@@ -193,45 +195,45 @@ function ArenaList({
     }}
   >
     {(scrollProps) => <FlatList
-    {...scrollProps}
-    data={visible}
-    keyExtractor={(item) => item.key}
-    contentContainerStyle={styles.list}
-    refreshing={query.isRefetching || votedQuery.isRefetching}
-    onRefresh={() => {
-      void query.refetch();
-      void votedQuery.refetch();
-    }}
-    ListEmptyComponent={<EmptyState title={empty.title} body={empty.body} />}
-    ListFooterComponent={votedQuery.isError ? <ErrorState body="Couldn't load the games you voted in." actionLabel="Retry" onAction={() => void votedQuery.refetch()} /> : null}
-    renderItem={({ item }) => {
-      if (item.kind === "header") {
-        return <Text {...dynamicType} style={[typography.title, styles.sectionHeader, styles.strong, { color: colors.text }]}>{item.title}</Text>;
-      }
-      if (item.kind === "owned") {
-        return <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Pressable accessibilityRole="button" accessibilityLabel={`Open ${item.item.name}`} onPress={() => onOpen(item.item)} style={styles.grow}>
-            {item.item.kind === "tournament" ? <TournamentBody tournament={item.item.source} /> : item.item.kind === "quiz" ? <QuizBody item={item.item} /> : <TierlistBody item={item.item} />}
-          </Pressable>
-          <IconButton
-            accessibilityLabel={`Delete ${item.item.name}`}
-            name="delete"
-            tone="danger"
-            onPress={() => onDelete({ kind: item.item.kind, id: item.item.id, name: item.item.name })}
-          />
-        </View>;
-      }
-      const name = item.kind === "votedTournament" ? item.tournament.name : item.tierlist.name;
-      return <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`Open ${name}`}
-        onPress={() => router.push(item.target as never)}
-        style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
-      >
-        {item.kind === "votedTournament" ? <TournamentBody tournament={item.tournament} /> : <VotedTierlistBody tierlist={item.tierlist} />}
-      </Pressable>;
-    }}
-  />}
+      {...scrollProps}
+      data={visible}
+      keyExtractor={(item) => item.key}
+      contentContainerStyle={styles.list}
+      refreshing={query.isRefetching || votedQuery.isRefetching}
+      onRefresh={() => {
+        void query.refetch();
+        void votedQuery.refetch();
+      }}
+      ListEmptyComponent={votedUnknown ? null : <EmptyState title={empty.title} body={empty.body} />}
+      ListFooterComponent={votedQuery.isError ? <ErrorState body="Couldn't load the games you voted in." actionLabel="Retry" onAction={() => void votedQuery.refetch()} /> : null}
+      renderItem={({ item }) => {
+        if (item.kind === "header") {
+          return <Text {...dynamicType} style={[typography.title, styles.sectionHeader, styles.strong, { color: colors.text }]}>{item.title}</Text>;
+        }
+        if (item.kind === "owned") {
+          return <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Pressable accessibilityRole="button" accessibilityLabel={`Open ${item.item.name}`} onPress={() => onOpen(item.item)} style={styles.grow}>
+              {item.item.kind === "tournament" ? <TournamentBody tournament={item.item.source} /> : item.item.kind === "quiz" ? <QuizBody item={item.item} /> : <TierlistBody item={item.item} />}
+            </Pressable>
+            <IconButton
+              accessibilityLabel={`Delete ${item.item.name}`}
+              name="delete"
+              tone="danger"
+              onPress={() => onDelete({ kind: item.item.kind, id: item.item.id, name: item.item.name })}
+            />
+          </View>;
+        }
+        const name = item.kind === "votedTournament" ? item.tournament.name : item.tierlist.name;
+        return <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Open ${name}`}
+          onPress={() => router.push(item.target as never)}
+          style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        >
+          {item.kind === "votedTournament" ? <TournamentBody tournament={item.tournament} /> : <VotedTierlistBody tierlist={item.tierlist} />}
+        </Pressable>;
+      }}
+    />}
   </SearchDock>;
 }
 

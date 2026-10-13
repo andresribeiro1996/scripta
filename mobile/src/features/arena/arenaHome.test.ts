@@ -5,7 +5,7 @@ import { test } from "node:test";
 import type { Quiz } from "../quizzes/api.js";
 import type { Tierlist, VotedTierlist } from "../tierlists/api.js";
 import type { Tournament } from "./api.js";
-import { ARENA_TABS, GAMES_TABS, NEW_GAMES, coverRemainder, emptyCopy, filterItems, homeSections, nextOwnerFilter, ownedItems, previewCovers, tabAtIndex, tabIndex, tierDistribution, tournamentProgress, votedTierlistDetail, type OwnedItem, type SectionedItem } from "./arenaHome.js";
+import { ARENA_TABS, GAMES_TABS, NEW_GAMES, coverRemainder, emptyCopy, homeSections, nextOwnerFilter, ownedItems, previewCovers, tabAtIndex, tabIndex, tierDistribution, tournamentProgress, votedTierlistDetail, type OwnedItem, type SectionedItem } from "./arenaHome.js";
 
 const itemDetail = (items: OwnedItem[]): string | undefined => {
   const first = items[0];
@@ -95,12 +95,6 @@ test("owned quiz items summarise book count and stage", () => {
 test("the quizzes tab has no voted section and its own empty copy", () => {
   assert.deepEqual(kinds(homeSections("quizzes", ownedItems("quizzes", [], [], [quiz()]), [], [])), ["header:Created by you · 1", "owned"]);
   assert.equal(emptyCopy("quizzes", false).title, "No quizzes yet");
-});
-
-test("search filters on name, case-insensitively, and ignores surrounding space", () => {
-  const items = ownedItems("tournaments", [tournament({ id: "a", name: "Best of 2025" }), tournament({ id: "b", name: "Sci-fi cup" })], []);
-  assert.deepEqual(filterItems(items, "  BEST ").map((item) => item.id), ["a"]);
-  assert.deepEqual(filterItems(items, "   ").map((item) => item.id), ["a", "b"]);
 });
 
 test("empty copy distinguishes an empty tab from an unmatched search", () => {
@@ -237,8 +231,8 @@ test("the ownership filter cycles All, Created by you, Voted on and back", () =>
 });
 
 test("an empty voted filter says so per tab, and search still reads as no match", () => {
-  assert.equal(emptyCopy("tournaments", false, "voted").title, "You haven't voted in any tournaments yet.");
-  assert.equal(emptyCopy("tierlists", false, "voted").title, "You haven't voted in any tier lists yet.");
+  assert.equal(emptyCopy("tournaments", false, "voted").title, "You haven't voted in any tournaments yet");
+  assert.equal(emptyCopy("tierlists", false, "voted").title, "You haven't voted in any tier lists yet");
   assert.equal(emptyCopy("tierlists", false, "mine").title, "No tier lists yet");
   assert.equal(emptyCopy("tierlists", true, "voted").title, "Nothing matches");
 });
