@@ -4,13 +4,15 @@ import { Stack, router } from "expo-router";
 import { FlatList, Pressable, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { Image } from "expo-image";
-import { Button, Dialog, EmptyState, ErrorState, Fab, Icon, IconButton, Input, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { Button, Dialog, EmptyState, ErrorState, Fab, Icon, IconButton, Input, Screen, Sheet, Skeleton, SwipeableTabs, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { DiscoverPane } from "../community/DiscoverPane";
 import { deleteQuiz, fetchQuizzes, type Quiz } from "../quizzes/api";
 import { deleteTierlist, fetchTierlists, fetchVotedTierlists, type Tierlist, type VotedTierlist } from "../tierlists/api";
 import { deleteTournament, fetchMyTournaments, fetchVotedTournaments, type Tournament } from "./api";
 import {
-  ARENA_TABS,
   DELETE_EFFECT,
+  GAMES_TABS,
+  NEW_GAMES,
   TOURNAMENT_STATUS_LABEL,
   coverRemainder,
   emptyCopy,
@@ -22,6 +24,7 @@ import {
   tournamentProgress,
   votedTierlistDetail,
   type ArenaTab,
+  type GamesTab,
   type OwnedItem,
   type SectionedItem,
 } from "./arenaHome";
@@ -33,7 +36,8 @@ const noVoted = { data: [], isRefetching: false, isError: false, refetch: () => 
 export function ArenaHomeScreen() {
   const { colors } = useTheme();
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState<ArenaTab>("tournaments");
+  const [tab, setTab] = useState<GamesTab>(GAMES_TABS[0].value);
+  const [choosing, setChoosing] = useState(false);
   const [deleting, setDeleting] = useState<Doomed | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -82,16 +86,17 @@ export function ArenaHomeScreen() {
         // The bottom tab already reads "Arena"; a large title spends a third of
         // the screen repeating it above a list that has nowhere else to go.
         headerLargeTitleEnabled: false,
-        headerRight: () => <IconButton framed accessibilityLabel="Browse games" label="Browse" name="public" onPress={() => router.push("/discover" as never)} />,
+        headerRight: tab === "browse" ? () => <IconButton framed accessibilityLabel="New game" label="New" name="add" onPress={() => setChoosing(true)} /> : undefined,
       }}
     />
     {error ? <Toast visible message={error} tone="error" /> : null}
     <SwipeableTabs
       accessibilityLabel="Games section"
-      options={ARENA_TABS}
+      options={GAMES_TABS}
       value={tab}
       onChange={setTab}
       renderPage={(pageTab) => {
+        if (pageTab === "browse") return <DiscoverPane />;
         const owned = ownedItems(pageTab, tournaments.data ?? [], tierlists.data ?? [], quizzes.data ?? []);
         const voted = pageTab === "tournaments" ? votedTournaments : pageTab === "tierlists" ? votedTierlists : noVoted;
         return <ArenaList
@@ -105,13 +110,30 @@ export function ArenaHomeScreen() {
         />;
       }}
     />
-    <Fab
-      label="New"
-      accessibilityLabel={tab === "tournaments" ? "New tournament" : tab === "quizzes" ? "New quiz" : "New tier list"}
-      loading={busy && !deleting}
-      onPress={() => tab === "tournaments" ? router.push("/seed/new" as never) : tab === "quizzes" ? router.push("/quiz/new" as never) : router.push("/tierlist/new" as never)}
-    />
+    {tab === "browse" ? null : (
+      <Fab
+        label="New"
+        accessibilityLabel={tab === "tournaments" ? "New tournament" : tab === "quizzes" ? "New quiz" : "New tier list"}
+        loading={busy && !deleting}
+        onPress={() => router.push(NEW_GAMES.find((option) => option.tab === tab)!.href as never)}
+      />
+    )}
     <Dialog visible={deleting !== null} title={`Delete “${deleting?.name ?? ""}”?`} onClose={() => setDeleting(null)}><View style={styles.dialog}><Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{deleting ? `${DELETE_EFFECT[deleting.kind]} This can't be undone.` : ""}</Text><Button label="Delete" variant="destructive" loading={busy} onPress={() => void remove()} /></View></Dialog>
+    <Sheet visible={choosing} title="New game" onClose={() => setChoosing(false)}>
+      <View style={styles.dialog}>
+        {NEW_GAMES.map((option) => (
+          <Button
+            key={option.href}
+            label={option.label}
+            variant="secondary"
+            onPress={() => {
+              setChoosing(false);
+              router.push(option.href as never);
+            }}
+          />
+        ))}
+      </View>
+    </Sheet>
   </Screen>;
 }
 
