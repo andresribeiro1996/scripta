@@ -3,10 +3,11 @@ import { router, useSegments } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { Alert, Pressable, ScrollView, StyleSheet, View, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
-import { bookKey, bookStatsModel, coverWash, editionLabel, readSnapshot, type BookScreenModel, type BookScreenTabKey, type ReadStatus, type WorkPage } from "@scripta/shared";
+import { bookStatsModel, coverWash, editionLabel, type BookScreenModel, type BookScreenTabKey, type WorkPage } from "@scripta/shared";
 import { Text } from "../../ui/Text";
 import { Button, Icon, Menu, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme, type IconName, type MenuItem } from "../../ui";
 import { useLibraryActions } from "../library/hooks/useLibraryActions";
+import { useChangeStatus } from "../library/hooks/useChangeStatus";
 import { BookCover } from "../arena/BookCover";
 import { CoverImage } from "../library/components/CoverImage";
 import { fetchWorkStats } from "./api";
@@ -45,16 +46,9 @@ function confirmDeleteNote(onConfirm: () => void) {
 
 function OwnerRow({ book, model }: { book: Record<string, unknown>; model: BookScreenModel }) {
   const { colors } = useTheme();
-  const { setStatus, setRating } = useLibraryActions();
-  const segments = useSegments();
+  const { setRating } = useLibraryActions();
+  const changeStatus = useChangeStatus();
   const [rowWidth, setRowWidth] = useState(0);
-
-  async function changeStatus(status: ReadStatus) {
-    const before = readSnapshot(book);
-    const wasFinished = book.ReadStatus === 2;
-    const saved = await setStatus(book, status);
-    if (saved && status === 2 && !wasFinished) router.push(`${bookToolPath(bookKey(book), "finished", segments)}?before=${encodeURIComponent(JSON.stringify(before))}` as never);
-  }
 
   const { status, feeling } = model;
   if (!status) return null;
@@ -63,7 +57,7 @@ function OwnerRow({ book, model }: { book: Record<string, unknown>; model: BookS
     <View style={styles.primaryRow} onLayout={(event) => setRowWidth(event.nativeEvent.layout.width)}>
       {rowWidth > 0 ? (
         <>
-          <Menu key={`status-${width}`} title="Reading status" items={status.options.map((o) => ({ label: o.label, selected: o.selected, onPress: o.selected ? () => {} : () => void changeStatus(o.value) }))}>
+          <Menu key={`status-${width}`} title="Reading status" items={status.options.map((o) => ({ label: o.label, selected: o.selected, onPress: o.selected ? () => {} : () => void changeStatus(book, o.value) }))}>
             <View style={[styles.menuButton, { width, borderColor: colors.accent, backgroundColor: colors.accentSoft }]}>
               <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, styles.centeredText, { color: colors.accent }]}>{status.label} ▾</Text>
             </View>
