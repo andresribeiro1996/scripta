@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { statusLabel } from "./covers.js";
-import { LIBRARY_STATUS_TABS, STATUS_FILTER_OPTIONS, localDay, readingPercent, setReadStatus } from "./libraryView.js";
+import { LIBRARY_STATUS_TABS, STATUS_FILTER_OPTIONS, localDay, matchesSearch, readingPercent, setReadStatus } from "./libraryView.js";
 
 process.env.TZ = "America/Sao_Paulo";
 
@@ -60,4 +60,23 @@ test("readingPercent is null when progress is unknown", () => {
 
 test("library shelves read Reading, To read, Finished", () => {
   assert.deepEqual(LIBRARY_STATUS_TABS.map((tab) => tab.label), ["Reading", "To read", "Finished"]);
+});
+
+test("a library search matches the start of any title or author word, ignoring case and accents", () => {
+  const dune = { Title: "Dune", Attribution: "Frank Herbert", ISBN: "0441013597" };
+  assert.equal(matchesSearch(dune, "dun"), true);
+  assert.equal(matchesSearch(dune, "HERB"), true);
+  assert.equal(matchesSearch(dune, "dune herb"), true);
+  assert.equal(matchesSearch(dune, "une"), false);
+  assert.equal(matchesSearch(dune, "dune asimov"), false);
+  assert.equal(matchesSearch({ Title: "Hábitos Atómicos", Attribution: "James Clear" }, "habitos"), true);
+  assert.equal(matchesSearch(dune, "   "), false);
+});
+
+test("a library search for an ISBN matches either form of the book's ISBN", () => {
+  const dune = { Title: "Dune", Attribution: "Frank Herbert", ISBN: "0441013597" };
+  assert.equal(matchesSearch(dune, "978-0-441-01359-3"), true);
+  assert.equal(matchesSearch(dune, "0441013597"), true);
+  assert.equal(matchesSearch(dune, "9780441013594"), false);
+  assert.equal(matchesSearch({ Title: "No ISBN" }, "9780441013593"), false);
 });
