@@ -8,8 +8,10 @@ export function startAuthNavigation(returnTo: unknown, signup: boolean) {
   avatarPending = signup;
 }
 
-export function afterSignIn(username: string | null): string {
-  return !username ? "/choose-username" : avatarPending ? "/welcome-avatar" : destination;
+export function afterSignIn(username: string | null): { href: string; withAnchor: boolean } {
+  if (!username) return { href: "/choose-username", withAnchor: false };
+  if (avatarPending) return { href: "/welcome-avatar", withAnchor: false };
+  return { href: destination, withAnchor: true };
 }
 
 export function finishAuthNavigation(): string {
@@ -24,7 +26,7 @@ export function authDestination(): string { return destination; }
 export function pathWithQuery(pathname: string, params: Record<string, string | string[] | undefined>): string {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
-    if (key === "returnTo" || value === undefined) continue;
+    if (key === "returnTo" || key === "initial" || value === undefined) continue;
     for (const item of Array.isArray(value) ? value : [value]) query.append(key, item);
   }
   return safeAuthReturnTo(`${pathname}${query.size ? `?${query}` : ""}`, "/");

@@ -4,13 +4,13 @@ import { afterSignIn, authDestination, finishAuthNavigation, pathWithQuery, star
 
 test("login, Google setup and avatar onboarding retain the requested destination", () => {
   startAuthNavigation("/vote/book?edition=2", false);
-  assert.equal(afterSignIn("reader"), "/vote/book?edition=2");
-  assert.equal(afterSignIn(null), "/choose-username");
+  assert.deepEqual(afterSignIn("reader"), { href: "/vote/book?edition=2", withAnchor: true });
+  assert.deepEqual(afterSignIn(null), { href: "/choose-username", withAnchor: false });
   startAuthNavigation(authDestination(), true);
-  assert.equal(afterSignIn("reader"), "/welcome-avatar");
+  assert.deepEqual(afterSignIn("reader"), { href: "/welcome-avatar", withAnchor: false });
   assert.equal(finishAuthNavigation(), "/vote/book?edition=2");
   assert.equal(authDestination(), "/");
   startAuthNavigation("//evil.test", false);
-  assert.equal(afterSignIn("reader"), "/");
-  assert.equal(pathWithQuery("/library", { search: "a book", returnTo: "/login" }), "/library?search=a+book");
+  assert.deepEqual(afterSignIn("reader"), { href: "/", withAnchor: true });
+  assert.equal(pathWithQuery("/library", { search: "a book", returnTo: "/login", initial: "false" }), "/library?search=a+book");
 });
