@@ -48,6 +48,8 @@ type LibraryTab = LibraryStatusTab | "collections";
 
 const LIBRARY_TABS: readonly { value: LibraryTab; label: string }[] = [...LIBRARY_STATUS_TABS, { value: "collections", label: "Collections" }];
 
+let lastShelf: LibraryTab = LIBRARY_STATUS_TABS[0].value;
+
 export function LibraryScreen() {
   const { colors } = useTheme();
   const { data: library, isPending, isError, error, refetch, isRefetching } = useLibrary();
@@ -59,7 +61,7 @@ export function LibraryScreen() {
   useEffect(() => {
     setQuery(q ?? "");
   }, [q]);
-  const [statusFilter, setStatusFilter] = useState<LibraryTab>(LIBRARY_STATUS_TABS[0].value);
+  const [statusFilter, setStatusFilter] = useState<LibraryTab>(lastShelf);
   const [sortKey, setSortKey] = useState<SortKey>("manual");
   const [groupQuery, setGroupQuery] = useState("");
   const groupsView = useRef<GroupsViewHandle>(null);
@@ -89,6 +91,11 @@ export function LibraryScreen() {
   function clearSearchAndFilters() {
     setQuery("");
     setSortKey("manual");
+  }
+
+  function changeShelf(next: LibraryTab) {
+    lastShelf = next;
+    setStatusFilter(next);
   }
 
   async function handleRenameLibrary() {
@@ -229,7 +236,7 @@ export function LibraryScreen() {
           accessibilityLabel="Library shelf"
           options={LIBRARY_TABS}
           value={statusFilter}
-          onChange={setStatusFilter}
+          onChange={changeShelf}
         renderPage={(status) => {
           if (status === "collections") return <GroupsView ref={groupsView} search={groupQuery} onSearchChange={setGroupQuery} />;
           const pageBooks = sortBooks(filterBooks(ordered, query, status), sortKey);
