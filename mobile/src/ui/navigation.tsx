@@ -1,5 +1,5 @@
 // One place where the native stack chrome is dressed in the app's tokens, so
-// the four tab stacks can't drift from each other. Every screen used to draw
+// the tab stacks can't drift from each other. Every screen used to draw
 // its own header View instead, which is why none of them had a back gesture.
 import type { NativeStackNavigationOptions } from "expo-router";
 import { fontStyleFor } from "./fontStyle";

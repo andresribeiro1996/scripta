@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { router, useGlobalSearchParams, usePathname, useSegments } from "expo-router";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
@@ -8,7 +9,7 @@ import { Button, Sheet, Toast, dynamicType, minimumTouchTarget, spacing, typogra
 import { BookCover } from "../arena/BookCover";
 import { FinishedScreen } from "../library/FinishedScreen";
 import { addBookToLibrary } from "../library/api/client";
-import { useLibrary } from "../library/hooks/useLibrary";
+import { LIBRARY_QUERY_KEY, useLibrary } from "../library/hooks/useLibrary";
 import { toRecommendation } from "../library/lib/recommendation";
 import { pathWithQuery } from "../auth/navigation";
 import { workPath } from "../works/workPath";
@@ -31,6 +32,7 @@ export function AddBookSheet({
   const pathname = usePathname();
   const params = useGlobalSearchParams();
   const segments = useSegments();
+  const queryClient = useQueryClient();
   const library = useLibrary({ enabled: false });
   const [busyStatus, setBusyStatus] = useState<0 | 1 | 2 | null>(null);
   const [toast, setToast] = useState<{ message: string; tone: "success" | "error" } | null>(null);
@@ -52,6 +54,7 @@ export function AddBookSheet({
     setToast(null);
     try {
       const { key, updated } = await addBookToLibrary({ ...toRecommendation(book, readStatus), day: localDay() });
+      if (readStatus !== 2) void queryClient.invalidateQueries({ queryKey: LIBRARY_QUERY_KEY });
       if (readStatus === 2) {
         const { data, error: reloadError } = await library.refetch();
         if (reloadError) {

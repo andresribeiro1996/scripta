@@ -1,4 +1,4 @@
-import { bookKey, canonicalIsbn, type BookSearchResult, type LibraryBook } from "@scripta/shared";
+import { bookKey, canonicalIsbn, statusLabel, type BookSearchResult, type LibraryBook } from "@scripta/shared";
 import type { DiscoverItem, PersonResult } from "@scripta/shared/community";
 
 export const SEARCH_SCOPES = [
@@ -109,9 +109,10 @@ function itemRows(section: ResultSection, input: ResultsInput, cap: number): Sea
 }
 
 export function libraryStatus(book: LibraryBook): { label: string; tone: "accent" | "neutral" | "success" } {
-  if (book.ReadStatus === 1) return { label: "Reading", tone: "accent" };
-  if (book.ReadStatus === 2) return { label: "Finished", tone: "success" };
-  return { label: "To read", tone: "neutral" };
+  const label = statusLabel(book.ReadStatus);
+  if (book.ReadStatus === 1) return { label, tone: "accent" };
+  if (book.ReadStatus === 2) return { label, tone: "success" };
+  return { label, tone: "neutral" };
 }
 
 export interface OwnedBooks {
