@@ -165,7 +165,7 @@ All in one commit. The moves, the layouts and the tab list only work together.
   - `mobile/src/app/(app)/_layout.tsx:49-61`
   - `mobile/src/app/(app)/(library)/_layout.tsx`
   - `mobile/src/ui/icon.tsx:69-76`
-  - `mobile/src/app/dashboard/murals/[muralId].tsx:5`
+  - `mobile/src/app/dashboard/murals/[muralId].tsx:5`, `mobile/src/app/dashboard/murals/index.tsx:4`, `mobile/src/app/dashboard/settings.tsx:4`
   - the five `(public)` re-exports
 
 - [ ] **Step 1: Move routes** (from the repo root; quote every path):
@@ -198,13 +198,17 @@ Then remove the now-empty `(library,murals)`, `(murals)` and `(settings)` folder
 
   It must print nothing.
 
-- [ ] **Step 3: Dashboard mural redirect.** In `mobile/src/app/dashboard/murals/[muralId].tsx`, change the href to:
+- [ ] **Step 3: Dashboard redirects.** Murals and Settings are no longer the first screen of their stack. Without `withAnchor`, a cold deep link would leave them alone in an unopened You stack, with no way back to the hub.
+  - In `mobile/src/app/dashboard/murals/[muralId].tsx`, change the href to:
 
-```tsx
-return <Redirect href={`/(app)/(you)/murals/${muralId}` as never} withAnchor />;
-```
+    ```tsx
+    return <Redirect href={`/(app)/(you)/murals/${muralId}` as never} withAnchor />;
+    ```
 
-`withAnchor` now loads the You hub beneath the editor.
+  - In `mobile/src/app/dashboard/murals/index.tsx`, change it to `<Redirect href="/murals" withAnchor />`.
+  - In `mobile/src/app/dashboard/settings.tsx`, change it to `<Redirect href="/settings" withAnchor />`.
+
+  `withAnchor` loads the You hub beneath each of them.
 
 - [ ] **Step 4: `(you)` stack.** Create `mobile/src/app/(app)/(you)/_layout.tsx`:
 
@@ -252,16 +256,16 @@ import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { useAuth } from "../../core/auth";
 import { API_URL } from "../../core/config";
-import { Icon, IconButton, Screen, dynamicType, radii, spacing, typography, useTheme, type IconName } from "../../ui";
+import { Icon, IconButton, Screen, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { AuthorAvatar } from "../community/AuthorAvatar";
 import { fetchOwnProfile } from "../community/api";
 
-const ROWS: Array<{ label: string; icon: IconName; href: string }> = [
-  { label: "Your shelf", icon: "library", href: "/me" },
-  { label: "Murals", icon: "murals", href: "/murals" },
-  { label: "Reader card", icon: "book", href: "/reader-card" },
-  { label: "Gallery", icon: "image", href: "/gallery" },
-];
+const ROWS = [
+  { label: "Your shelf", href: "/me" },
+  { label: "Murals", href: "/murals" },
+  { label: "Reader card", href: "/reader-card" },
+  { label: "Gallery", href: "/gallery" },
+] as const;
 
 export function YouScreen() {
   const { colors } = useTheme();
@@ -301,7 +305,6 @@ export function YouScreen() {
                 pressed ? { backgroundColor: colors.surfacePressed } : null,
               ]}
             >
-              <Icon name={row.icon} size={22} color={colors.textDim} />
               <Text {...dynamicType} style={[typography.body, styles.rowLabel, { color: colors.text }]}>{row.label}</Text>
               <Icon name="chevronRight" size={18} color={colors.textDim} />
             </Pressable>
@@ -360,7 +363,7 @@ npm run typecheck --workspace mobile && npm test --workspace mobile
 Then check that nothing still names a removed group:
 
 ```bash
-rg -n "\(murals\)|\(settings\)|\(library,murals\)|\(home,library\)/" mobile/src
+rg -n '\((murals|settings)\)[/"]|\(library,murals\)|\(home,library\)/' mobile/src
 ```
 
 It must print nothing.
@@ -432,7 +435,7 @@ git add -A mobile/src/features/community mobile/src/features/settings && git com
     - `/dashboard/gallery`, `/dashboard/murals`, `/dashboard/settings` → "`/gallery`, `/murals`, `/settings`, reached from the You tab"
     - `/dashboard/arena` → "Games tab `/my-arena`"
 
-- [ ] **Step 2: Maestro flow.** Replace everything after the `extendedWaitUntil` that waits for "Library":
+- [ ] **Step 2: Maestro flow.** The login screen no longer shows "server ok", so the first `extendedWaitUntil` becomes `visible: "Your bookshelf, everywhere."`. Then replace everything after the `extendedWaitUntil` that waits for "Library":
 
 ```yaml
 - tapOn: "Games"
@@ -479,7 +482,10 @@ cd mobile && npx expo-doctor
      - An Activity row for a book opens its book screen in the You stack.
   5. **Murals.** The list opens a mural; back goes to the list, then to You.
   6. **Settings.** It has no Reader card or Open gallery buttons; Account and Sign out still work.
-  7. **Mural deep link.** Opening `exp://127.0.0.1:<metro>/--/dashboard/murals/<a mural id>` lands in the You tab on the editor, and back shows the You hub.
+  7. **Dashboard deep links.** Cold-open each of these as `exp://127.0.0.1:<metro>/--/<path>`. Each lands in the You tab, and back shows the You hub:
+     - `dashboard/murals/<a mural id>` (the editor)
+     - `dashboard/murals` (the list)
+     - `dashboard/settings`
   8. **Library stack unchanged.** A book from the Library opens its screen. ⋯ → Card style opens as a sheet, still in the Library stack.
 
   Fix findings before Phase 2.
@@ -514,6 +520,7 @@ test("an empty library shows no section", () => {
 });
 
 test("every reading book becomes a card, in shelf order", () => {
+  assert.deepEqual(sectionsFor([book("a", 1)]).readingKeys, ["a"]);
   assert.deepEqual(sectionsFor([book("a", 1), book("b", 0), book("c", 1), book("d", 2), book("e", 1)]).readingKeys, ["a", "c", "e"]);
 });
 
@@ -828,7 +835,7 @@ export function HomeScreen() {
     seenSent.current = true;
     void markDashboardSeen().then(
       () => queryClient.setQueryData<InfiniteData<DashboardFeedPage>>(DASHBOARD_QUERY_KEY, (data) => (data ? clearDashboardCounts(data) : data)),
-      () => { seenSent.current = false; },
+      () => {},
     );
   };
   useEffect(() => {
@@ -898,7 +905,7 @@ export function HomeScreen() {
     <View style={styles.sectionPad}><Skeleton height={80} /></View>
   ) : dashboard.isError && !dashboard.data ? (
     <View style={styles.sectionPad}><ErrorState body="Couldn't load activity." actionLabel="Retry" onAction={() => void dashboard.refetch()} /></View>
-  ) : (
+  ) : dashboard.hasNextPage ? null : (
     <View style={styles.sectionPad}><EmptyState title="Nothing here yet" body="Follow readers to see what they finish and publish." actionLabel="Find readers" onAction={findReaders} /></View>
   );
 
@@ -998,11 +1005,11 @@ test("the tabs read Discover and People", () => {
   assert.deepEqual(COMMUNITY_TABS.map((tab) => tab.label), ["Discover", "People"]);
 });
 
-test("a tab param opens that tab, and anything else is left to the default", () => {
+test("a tab param opens that tab, and anything else opens People", () => {
   assert.equal(parseCommunityTab("discover"), "discover");
   assert.equal(parseCommunityTab("people"), "people");
-  assert.equal(parseCommunityTab("activity"), undefined);
-  assert.equal(parseCommunityTab(undefined), undefined);
+  assert.equal(parseCommunityTab("activity"), "people");
+  assert.equal(parseCommunityTab(undefined), "people");
 });
 ```
 
@@ -1018,8 +1025,8 @@ export const COMMUNITY_TABS = [
 
 export type CommunityTab = (typeof COMMUNITY_TABS)[number]["value"];
 
-export function parseCommunityTab(value: string | undefined): CommunityTab | undefined {
-  return COMMUNITY_TABS.find((tab) => tab.value === value)?.value;
+export function parseCommunityTab(value: string | undefined): CommunityTab {
+  return COMMUNITY_TABS.find((tab) => tab.value === value)?.value ?? "people";
 }
 ```
 
@@ -1033,8 +1040,8 @@ import { DiscoverPane } from "../community/DiscoverPane";
 import { PeoplePane } from "../community/PeoplePane";
 import { COMMUNITY_TABS, type CommunityTab } from "./communityTabs";
 
-export function CommunityScreen({ initialTab }: { initialTab?: CommunityTab }) {
-  const [tab, setTab] = useState<CommunityTab>(initialTab ?? "people");
+export function CommunityScreen({ initialTab }: { initialTab: CommunityTab }) {
+  const [tab, setTab] = useState<CommunityTab>(initialTab);
   return (
     <Screen top={false}>
       <Stack.Screen options={{ title: "Community", headerShown: true }} />

@@ -40,7 +40,7 @@ Search joins between Library and Games in phase 3. Until then the bar has four t
 - Every route a You-stack screen pushes must exist in the You stack, the way book routes already sit in the shared `(home,arena,library)` group. Otherwise a push jumps tabs or lands with no back chevron, which is the "stranded cross-tab screen" bug fixed in PR #196. So:
   - The shared group becomes `(home,arena,library,you)` and holds `book/*`, `work/*`, `u/*` and the mural editor `murals/[id]`. My shelf can render in any of those four stacks through `/u/<your username>`, and its "Edit shelf" pushes the editor.
   - `add-book` and `import` move to `(home,library,you)`, because My shelf's empty state pushes them.
-  - The `dashboard/murals/<id>` redirect lands in the You stack, with the You hub beneath the editor.
+  - The `dashboard/murals/<id>`, `dashboard/murals` and `dashboard/settings` redirects land in the You stack with the hub beneath (`withAnchor`). Without it, a cold deep link leaves Murals or Settings alone in the stack, with no way back to the hub.
 
 ## Phase 1 — Library and You tabs
 
