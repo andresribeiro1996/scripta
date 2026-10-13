@@ -6,7 +6,7 @@
 
 **Architecture:**
 - **Part A, backend (PR 1).**
-  - The search index gains seeded, publisher and source-confirmed books. A `searchable` column tracks membership: a one-time rebuild fills it, and the writes that add books keep it current.
+  - The search index gains seeded, publisher and source-confirmed books. A `books_search` table tracks membership: a one-time backfill fills it, and the writes that add books keep it current.
   - The last word of a query matches as a prefix.
   - `GET /books/search?by=work` returns one row per work.
   - Every result carries its canonical `workId`.
@@ -97,9 +97,10 @@
 
 These deviate from the spec's wording. Each keeps the intent, and was decided while planning against the code.
 
-1. **Index membership is a `searchable` column on `books`, not the rowid.**
+1. **Index membership is a `books_search` table keyed by book id, not the rowid.**
    - The spec keyed the index by rowid so that "is it indexed?" is a lookup. `books` has a TEXT primary key, so a future `VACUUM` may renumber its rowids and silently break that mapping.
-   - A flag column is just as fast and can't drift.
+   - The plan's dry run tried a `searchable` column on `books`. Filling it rewrote almost every page of `books`: on a synthetic copy the size of production's catalog, the write-ahead log peaked at 67 MB, and Litestream copies those pages again. A full volume crash-looped production on 2026-10-04.
+   - A separate table writes only its own small rows and is just as fast to look up.
 2. **The ISBN branch of `GET /books/search` answers from any indexed book**, the same rule text search uses. Before, it needed `data_sources` to be set.
    - Seeded books are created without sources. So scanning a seeded book's barcode would always have gone to Open Library, even though the book is in the catalog.
 3. **The four scope "chips" are the kit's `Segmented` control.** DESIGN.md has no chip control (its "chips" are badges), and `Segmented` is the kit's filter control.
@@ -109,25 +110,34 @@ These deviate from the spec's wording. Each keeps the intent, and was decided wh
 5. **On Browse, "New" is a framed header button**, because the floating button would cover Browse's docked search and filter. The three lists keep their floating "New".
 6. **The field's clear button is an icon button beside the field.** Android text inputs have no built-in clear button, and the kit's `Input` has no trailing slot.
 7. **Recent searches:** a failed read leaves the list empty, and a failed write logs a warning. That's how the theme already treats its own AsyncStorage writes.
+8. **Add book's "Add book" button no longer waits for the camera to close.**
+   - The scanner now owns its denial and mount-error messages, so the form can't tell a running camera from a refused one.
+   - Enabling the button keeps the README's promise that manual entry works after a denied camera. A scan still fills the form and closes the camera.
+9. **A scan made on the People or Games chip switches to Books.** A barcode is always a book, and the spec doesn't cover this case.
 
 ## Review Focus
 
 1. **A new account with no saved library.**
    - `GET /library` answers 404, and `fetchLibrary` turns that into `null`.
    - Expected: Search shows network results, shows no library error, and offers no "In your library" section.
-   - Pinned in the Task 14 device pass with the fixture account's library unloaded; the screen code reads `library.data?.data.books ?? []`.
+   - Pinned by Task 11's screen code, which reads `library.data?.data.books ?? []` and reports a failure only when `library.isError` and there is no data. Task 14's device pass checks it with a freshly signed-up account.
 2. **Typing straight after pressing Search.**
    - The Open Library line belongs to the submitted text. New typing clears it, so stale external results never mix into a new query.
-   - Pinned by Task 7's model tests (`openLibrary` only follows a submitted query) and the Task 14 device pass.
+   - Pinned by Task 7's model test (the Open Library line shows only for a submitted query), the screen's external query keyed by the submitted text, and the Task 14 device pass.
 3. **A catalog result for a work you own whose library copy points at an older, merged work id.**
    - `GET /library`'s `works` map and every search result are both canonical, so the result is left out of Books.
    - Pinned by Task 2's canonical-after-merge test and Task 7's owned-work test.
 4. **Browse, Search and the New games list all spend Discover's limit.**
    - Expected: one person typing never hits it, and a second account isn't affected by the first.
    - Pinned by Task 3's limit test.
-5. **The one-time index rebuild runs on the first boot** against ~78k books.
+5. **The one-time index backfill runs on the first boot** against ~78k books.
    - Expected: it runs in one transaction, never runs again, and leaves library-only titles out.
-   - Pinned by Task 1's rebuild test. The rebuild is five set-based statements, about one pass over `books`. The index's growth on the volume is checked before deploying (Task 14, step 1).
+   - Pinned by Task 1's backfill test, which adds a book between two migration runs to prove the second run does nothing. The backfill writes only new index rows and membership rows, and never rewrites `books`. The volume's free space is checked before deploying (Task 14, step 1).
+
+**Watch item, no change:**
+- About 78k books are indexed, so a query on a common word ranks most of the index. The dry run measured 85–170 ms per query, and `node:sqlite` blocks the event loop while it runs.
+- Search runs two such queries per settled query: Books, and Discover's `matchWorks`.
+- If the backend feels slow while people search, raise the network minimum to 3 characters or cap the scan in a follow-up.
 
 ---
 
@@ -135,9 +145,10 @@ These deviate from the spec's wording. Each keeps the intent, and was decided wh
 
 | File | Change |
 |---|---|
-| `backend/src/modules/books/adapters/sqlite/connection.ts` | `searchable` column; one-time index rebuild (user_version 3) |
-| `backend/src/modules/books/adapters/sqlite/sqliteBooksRepository.ts` | Index on write; prefix matching; `aliasesOf` |
-| `backend/src/modules/books/domain/types.ts`, `domain/ports.ts`, `domain/normalize.ts` | `searchable` field; `aliasesOf`; work search limits |
+| `backend/src/modules/books/adapters/sqlite/books.sql` | `books_search` membership table |
+| `backend/src/modules/books/adapters/sqlite/connection.ts` | One-time index backfill (user_version 3) |
+| `backend/src/modules/books/adapters/sqlite/sqliteBooksRepository.ts` | Index on write; `isSearchable`; prefix matching; `aliasesOf` |
+| `backend/src/modules/books/domain/ports.ts`, `domain/normalize.ts` | `isSearchable` and `aliasesOf`; work search limits |
 | `backend/src/modules/books/domain/workSearch.ts` (new) | One edition per work from ranked rows |
 | `backend/src/modules/books/booksService.ts`, `routes.ts` | ISBN rule; `by=work`; `workId` on results |
 | `backend/src/modules/books/works.ts`, `index.ts` | `matchWorks` |
@@ -165,7 +176,8 @@ These deviate from the spec's wording. Each keeps the intent, and was decided wh
 ### Task 1: The search index holds the catalog
 
 **Files:**
-- Modify: `backend/src/modules/books/domain/types.ts`
+- Modify: `backend/src/modules/books/adapters/sqlite/books.sql`
+- Modify: `backend/src/modules/books/domain/ports.ts`
 - Modify: `backend/src/modules/books/adapters/sqlite/sqliteBooksRepository.ts`
 - Modify: `backend/src/modules/books/adapters/sqlite/connection.ts`
 - Modify: `backend/src/modules/books/booksService.ts` (ISBN branch only)
@@ -173,7 +185,8 @@ These deviate from the spec's wording. Each keeps the intent, and was decided wh
 
 **Interfaces:**
 - Produces:
-  - `BookRow.searchable: number` (0 or 1).
+  - Table `books_search (book_id TEXT PRIMARY KEY) WITHOUT ROWID`: the books in `books_fts`.
+  - `BooksRepository.isSearchable(id: string): boolean`.
   - `export const CONFIRMED_SQL` in `sqliteBooksRepository.ts`.
   - `makeSearchable(id)` keeps its signature.
 
@@ -206,21 +219,30 @@ test("a confirmed book without a title is indexed once it gets one", () => {
   assert.deepEqual(repo.searchBooks(["orlando"], 12).map((row) => row.id), [book.id]);
 });
 
-test("the one-time rebuild indexes the confirmed catalog, keeps earlier search hits and leaves library-only books out", () => {
+test("the one-time backfill indexes the confirmed catalog once, keeps earlier search hits and leaves library-only books out", () => {
   const { db, repo } = freshRepo();
   const insert = db.prepare("INSERT INTO books (id, title, author, data_sources, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?)");
   insert.run("seed-1", "Orlando", "Virginia Woolf", "[]", "seed", NOW);
   insert.run("confirmed-1", "Mrs Dalloway", "Virginia Woolf", '["isbndb"]', null, NOW);
   insert.run("hit-1", "To the Lighthouse", "Virginia Woolf", "[]", null, NOW);
+  insert.run("both-1", "The Waves", "Virginia Woolf", '["openlibrary"]', null, NOW);
   insert.run("private-1", "My Private Manuscript", "Virginia Woolf", "[]", null, NOW);
-  db.prepare("INSERT INTO books_fts (book_id, title, author) VALUES (?, ?, ?)").run("hit-1", "To the Lighthouse", "Virginia Woolf");
+  const fts = db.prepare("INSERT INTO books_fts (book_id, title, author) VALUES (?, ?, ?)");
+  fts.run("hit-1", "To the Lighthouse", "Virginia Woolf");
+  fts.run("both-1", "The Waves", "Virginia Woolf");
   db.exec("PRAGMA user_version = 2");
   applyBooksMigrations(db);
-  assert.deepEqual(repo.searchBooks(["woolf"], 12).map((book) => book.id).sort(), ["confirmed-1", "hit-1", "seed-1"]);
+  assert.deepEqual(repo.searchBooks(["woolf"], 12).map((book) => book.id).sort(), ["both-1", "confirmed-1", "hit-1", "seed-1"]);
+  assert.equal(countOf(db, "books_fts"), 4);
+  assert.equal(repo.isSearchable("hit-1"), true);
+  assert.equal(repo.isSearchable("private-1"), false);
+  insert.run("seed-2", "Jacob's Room", "Virginia Woolf", "[]", "seed", NOW);
   applyBooksMigrations(db);
-  assert.equal(countOf(db, "books_fts"), 3);
+  assert.equal(countOf(db, "books_fts"), 4);
 });
 ```
+
+In the same file, the existing test "the ISBN-10 pass runs once" asserts the migrations stop at version 2. Change its `.user_version, 2);` to `.user_version, 3);`, because the backfill is version 3.
 
 Append to `booksService.test.ts`, after the test "an unknown ISBN searched inside finds nothing and never calls Open Library":
 
@@ -242,10 +264,19 @@ npm exec --workspace backend -- tsx --test src/modules/books/adapters/sqlite/sql
 
 The four repository tests and the ISBN test fail, because seeded and confirmed books are not indexed. The existing test "createBook alone does not make a book searchable" must keep passing.
 
-- [ ] **Step 3: `BookRow` gains the flag.** In `domain/types.ts`, inside `interface BookRow`, after `title_group_blocked_at: string | null;`, add:
+- [ ] **Step 3: Membership table and port.**
+  - Append to `books.sql`:
+
+```sql
+CREATE TABLE IF NOT EXISTS books_search (
+  book_id TEXT PRIMARY KEY
+) WITHOUT ROWID;
+```
+
+  - In `domain/ports.ts` `interface BooksRepository`, after `makeSearchable(id: string): void;`, add:
 
 ```ts
-  searchable: number;
+  isSearchable(id: string): boolean;
 ```
 
 - [ ] **Step 4: Repository.** In `sqliteBooksRepository.ts`:
@@ -261,9 +292,11 @@ export const CONFIRMED_SQL = "(created_by IS NOT NULL OR data_sources <> '[]')";
 ```ts
   const makeSearchableStmt = db.prepare(`
     INSERT INTO books_fts (book_id, title, author)
-    SELECT id, title, author FROM books WHERE id = ? AND title <> '' AND searchable = 0
+    SELECT id, title, author FROM books
+    WHERE id = ? AND title <> '' AND NOT EXISTS (SELECT 1 FROM books_search WHERE book_id = books.id)
   `);
-  const markSearchableStmt = db.prepare(`UPDATE books SET searchable = 1 WHERE id = ?`);
+  const markSearchableStmt = db.prepare(`INSERT OR IGNORE INTO books_search (book_id) VALUES (?)`);
+  const searchableStmt = db.prepare(`SELECT 1 FROM books_search WHERE book_id = ?`);
   const confirmedStmt = db.prepare(`SELECT 1 FROM books WHERE id = ? AND ${CONFIRMED_SQL}`);
 ```
 
@@ -304,6 +337,8 @@ export const CONFIRMED_SQL = "(created_by IS NOT NULL OR data_sources <> '[]')";
 
 ```ts
     makeSearchable,
+
+    isSearchable: (id) => searchableStmt.get(id) !== undefined,
 ```
 
   7. In `saveDetails`, after the `saveDetailsStmt.run(...)` line and inside the same `inTransaction`, add:
@@ -315,26 +350,22 @@ export const CONFIRMED_SQL = "(created_by IS NOT NULL OR data_sources <> '[]')";
 - [ ] **Step 5: Migration.** In `connection.ts`:
 
   1. Add the import `import { CONFIRMED_SQL } from "./sqliteBooksRepository.js";`.
-  2. After the `title_group_blocked_at` `ALTER TABLE` line, add:
+  2. Add `indexConfirmedBooks(db);` after `joinIsbn10Editions(db);` in `applyBooksMigrations`.
+  3. Add this function after `joinIsbn10Editions`:
 
 ```ts
-  if (!columns.some((column) => column.name === "searchable")) db.exec("ALTER TABLE books ADD COLUMN searchable INTEGER NOT NULL DEFAULT 0");
-```
-
-  3. Add `rebuildSearchIndex(db);` after `joinIsbn10Editions(db);` in `applyBooksMigrations`.
-  4. Add this function after `joinIsbn10Editions`:
-
-```ts
-function rebuildSearchIndex(db: DatabaseSync): void {
+function indexConfirmedBooks(db: DatabaseSync): void {
   const { user_version: version } = db.prepare("PRAGMA user_version").get() as { user_version: number };
   if (version >= 3) return;
   db.exec("BEGIN IMMEDIATE");
   try {
-    db.exec("UPDATE books SET searchable = 1 WHERE id IN (SELECT book_id FROM books_fts)");
-    db.exec(`UPDATE books SET searchable = 1 WHERE ${CONFIRMED_SQL}`);
-    db.exec("UPDATE books SET searchable = 0 WHERE title = ''");
-    db.exec("DELETE FROM books_fts");
-    db.exec("INSERT INTO books_fts (book_id, title, author) SELECT id, title, author FROM books WHERE searchable = 1");
+    db.exec("INSERT OR IGNORE INTO books_search (book_id) SELECT book_id FROM books_fts");
+    db.exec(`
+      INSERT INTO books_fts (book_id, title, author)
+      SELECT id, title, author FROM books
+      WHERE title <> '' AND ${CONFIRMED_SQL} AND id NOT IN (SELECT book_id FROM books_search)
+    `);
+    db.exec(`INSERT OR IGNORE INTO books_search (book_id) SELECT id FROM books WHERE title <> '' AND ${CONFIRMED_SQL}`);
     db.exec("PRAGMA user_version = 3");
     db.exec("COMMIT");
   } catch (error) {
@@ -353,7 +384,7 @@ function rebuildSearchIndex(db: DatabaseSync): void {
 with
 
 ```ts
-        return saved && saved.searchable === 1 ? [toSearchResult(saved)] : [];
+        return saved && deps.repo.isSearchable(saved.id) ? [toSearchResult(saved)] : [];
 ```
 
 - [ ] **Step 7: Run and expect PASS.**
@@ -362,12 +393,12 @@ with
 npm run typecheck --workspace backend && npm test --workspace backend
 ```
 
-The existing tests stay green. These include "an ISBN search ignores a saved row with no external details so the outside search can fill it in", because a library-created row is still unconfirmed, and "search never returns a book that only came from an account's library".
+The existing tests stay green, apart from the `user_version` expectation Step 1 changes. They include "an ISBN search ignores a saved row with no external details so the outside search can fill it in", because a library-created row is still unconfirmed, and "search never returns a book that only came from an account's library".
 
 - [ ] **Step 8: Commit.**
 
 ```bash
-git add backend/src/modules/books/domain/types.ts backend/src/modules/books/adapters/sqlite/sqliteBooksRepository.ts backend/src/modules/books/adapters/sqlite/connection.ts backend/src/modules/books/booksService.ts backend/src/modules/books/adapters/sqlite/sqliteBooksRepository.test.ts backend/src/modules/books/booksService.test.ts && git commit -m "Index the seeded catalog and confirmed books for search" -m "Only books someone had already found through Open Library were searchable, so the 77.8k seeded and publisher books never showed up. Seeded, publisher and source-confirmed books are now indexed, once by a rebuild and then as they are written. Membership is a column rather than the rowid because a VACUUM can renumber rowids. A book only an account's library created stays out, which keeps d0087a52's privacy rule. The ISBN branch now answers from the same index, so scanning a seeded book no longer goes to Open Library."
+git add backend/src/modules/books/adapters/sqlite/books.sql backend/src/modules/books/domain/ports.ts backend/src/modules/books/adapters/sqlite/sqliteBooksRepository.ts backend/src/modules/books/adapters/sqlite/connection.ts backend/src/modules/books/booksService.ts backend/src/modules/books/adapters/sqlite/sqliteBooksRepository.test.ts backend/src/modules/books/booksService.test.ts && git commit -m "Index the seeded catalog and confirmed books for search" -m "Only books someone had already found through Open Library were searchable, so the 77.8k seeded and publisher books never showed up. Seeded, publisher and source-confirmed books are now indexed, once by a backfill and then as they are written. Membership lives in its own table. The rowid can be renumbered by a VACUUM, and filling a column on books would rewrite nearly every page of a table whose volume has filled up before. A book only an account's library created stays out, which keeps d0087a52's privacy rule. The ISBN branch now answers from the same index, so scanning a seeded book no longer goes to Open Library."
 ```
 
 ---
@@ -430,12 +461,17 @@ test("the inside search finds a book from the start of its last word", async () 
   assert.deepEqual(h.service.search("du"), []);
 });
 
-test("search hits saved from outside carry their work id", async () => {
+test("search hits saved from outside carry their canonical work id", async () => {
   const { catalog } = recordingCatalog();
   const h = harness({ catalog });
-  const outside = await h.service.searchExternal("dune");
-  assert.equal(outside[0]!.workId, h.repo.findBookByKey("isbn:9780441013593")!.work_id);
-  assert.ok(outside.every((result) => typeof result.workId === "string"));
+  const first = await h.service.searchExternal("dune");
+  const dune = h.repo.findBookByKey("isbn:9780441013593")!;
+  assert.equal(first[0]!.workId, dune.work_id);
+  assert.ok(first.every((result) => typeof result.workId === "string"));
+  const target = h.repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780593099322", createdBy: "seed" }, ["isbn:9780593099322"], "2026-10-01T00:00:00.000Z");
+  h.db.prepare("UPDATE works SET merged_into = ? WHERE id = ?").run(target.work_id, dune.work_id);
+  const again = await h.service.searchExternal("dune");
+  assert.equal(again[0]!.workId, target.work_id);
 });
 ```
 
@@ -568,7 +604,7 @@ function matchExpression(tokens: string[]): string {
       if (!trimmed) return [];
       if (looksLikeIsbnQuery(trimmed)) {
         const saved = deps.repo.findBookByKey(`isbn:${canonicalIsbn(trimmed)}`);
-        return saved && saved.searchable === 1 ? withWorkIds([saved]) : [];
+        return saved && deps.repo.isSearchable(saved.id) ? withWorkIds([saved]) : [];
       }
       const tokens = searchTokens(trimmed);
       if (tokens.length === 0) return [];
@@ -619,7 +655,7 @@ git add packages/shared/src/library/bookSearch.ts backend/src/modules/books/doma
 - Modify: `backend/src/modules/community/service.ts`, `routes.ts`, `plugin.ts`
 - Modify: `backend/src/app.ts`
 - Test: `backend/src/modules/books/works.test.ts`, `backend/src/modules/community/service.test.ts`, `backend/src/modules/community/routes.test.ts`
-- Fixtures: `backend/src/modules/community/archive.test.ts`, `backend/src/modules/community/backfill.test.ts`
+- Fixtures: `backend/src/modules/community/archive.test.ts`, `backend/src/modules/community/backfill.test.ts`, `backend/src/modules/community/adapters/sqlite/sqliteCommunityRepository.test.ts`
 
 **Interfaces:**
 - Consumes: from Task 2, `firstEditionPerWork`, `workIdsOf` and `WORK_SCAN_LIMIT`.
@@ -674,11 +710,12 @@ test("matchWorks returns the best matching works and the works merged into them"
 Then append the test:
 
 ```ts
-test("a discover search also finds games that contain a matching book, once each, newest first", () => {
+test("a discover search also finds games that contain a matching book, once each, newest first, paged with the name matches", () => {
   const { repo } = createRepoFake();
   const { deps, readerProfiles, tierlistRefs, tournamentRefs, workMatches, gameWorks } = createDeps(repo);
   const service = createCommunityService(deps);
   readerProfiles.set("alice", reader("alice"));
+  tierlistRefs.set("t3", tierRef("t3", "alice", { name: "Frankly speaking", createdAt: at(4) }));
   tierlistRefs.set("t1", tierRef("t1", "alice", { name: "Gothic classics, ranked", createdAt: at(3) }));
   tierlistRefs.set("t2", tierRef("t2", "alice", { name: "Frankenstein and friends", createdAt: at(2) }));
   tournamentRefs.set("g1", tournRef("g1", "alice", { name: "Horror bracket", createdAt: at(1) }));
@@ -686,15 +723,20 @@ test("a discover search also finds games that contain a matching book, once each
   gameWorks.set("tierlist:t1", ["w-frankenstein"]);
   gameWorks.set("tierlist:t2", ["w-frankenstein"]);
   gameWorks.set("tournament:g1", ["w-dracula"]);
-  assert.deepEqual(service.getDiscover("all", "frank", 10, 0).items.map((item) => item.content.id), ["t1", "t2"]);
+  const first = service.getDiscover("all", "frank", 2, 0);
+  assert.deepEqual(first.items.map((item) => item.content.id), ["t3", "t1"]);
+  assert.equal(first.nextOffset, 2);
+  const second = service.getDiscover("all", "frank", 2, 2);
+  assert.deepEqual(second.items.map((item) => item.content.id), ["t2"]);
+  assert.equal(second.nextOffset, null);
   assert.deepEqual(service.getDiscover("tournament", "frank", 10, 0).items, []);
-  assert.deepEqual(service.getDiscover("all", "", 10, 0).items.map((item) => item.content.id), ["t1", "t2", "g1"]);
+  assert.deepEqual(service.getDiscover("all", "", 10, 0).items.map((item) => item.content.id), ["t3", "t1", "t2", "g1"]);
 });
 ```
 
 `community/routes.test.ts`:
 - Change `const { buildCommunityRoutes, buildPublicCommunityRoutes } = await import("./routes.js");` to `const { buildCommunityRoutes, buildDiscoverRoutes, buildPublicCommunityRoutes } = await import("./routes.js");`.
-- In the four tests whose names start with "discover", replace `buildPublicCommunityRoutes(` with `buildDiscoverRoutes(`.
+- In the five tests whose names start with "discover", replace `buildPublicCommunityRoutes(` with `buildDiscoverRoutes(`. Left on the public builder, the route is gone and they answer 404.
 - Append:
 
 ```ts
@@ -710,9 +752,11 @@ test("discover allows 60 requests a minute per account", async () => {
 });
 ```
 
-`archive.test.ts` and `backfill.test.ts`, in each deps object:
+In each `CommunityDeps` fixture, the deps object in `archive.test.ts`, `backfill.test.ts` and `adapters/sqlite/sqliteCommunityRepository.test.ts`:
+- Add `matchWorks: unused,` after `searchUsernameOwners: unused,`.
 - Add `publishedByWorks: unused` to the `tierlists`, `tournaments` and `quizzes` objects.
-- Add `matchWorks: unused,` beside them.
+
+`tsx --test` doesn't typecheck. Without the third file, the tests pass and `npm run typecheck --workspace backend` fails.
 
 - [ ] **Step 2: Run and expect FAIL.**
 
@@ -843,10 +887,10 @@ npm run typecheck --workspace backend && npm test --workspace backend
 - [ ] **Step 9: Commit.**
 
 ```bash
-git add backend/src/modules/books/domain/ports.ts backend/src/modules/books/adapters/sqlite/sqliteBooksRepository.ts backend/src/modules/books/works.ts backend/src/modules/books/index.ts backend/src/modules/community/service.ts backend/src/modules/community/routes.ts backend/src/modules/community/plugin.ts backend/src/app.ts backend/src/modules/books/works.test.ts backend/src/modules/community/service.test.ts backend/src/modules/community/routes.test.ts backend/src/modules/community/archive.test.ts backend/src/modules/community/backfill.test.ts && git commit -m "Let a Discover search find games by the books in them" -m "Searching \"frank\" should find a tier list of gothic classics with Frankenstein in it. A Discover query now also returns published games that hold one of the 20 best-matching works, and the works merged into them, as the work page does. They are deduplicated with the name matches and paged the same way. Search now calls Discover as you type, so Discover gets its own limit of 60 a minute keyed by account, instead of sharing the public scope's 30 a minute per IP."
+git add backend/src/modules/books/domain/ports.ts backend/src/modules/books/adapters/sqlite/sqliteBooksRepository.ts backend/src/modules/books/works.ts backend/src/modules/books/index.ts backend/src/modules/community/service.ts backend/src/modules/community/routes.ts backend/src/modules/community/plugin.ts backend/src/app.ts backend/src/modules/books/works.test.ts backend/src/modules/community/service.test.ts backend/src/modules/community/routes.test.ts backend/src/modules/community/archive.test.ts backend/src/modules/community/backfill.test.ts backend/src/modules/community/adapters/sqlite/sqliteCommunityRepository.test.ts && git commit -m "Let a Discover search find games by the books in them" -m "Searching \"frank\" should find a tier list of gothic classics with Frankenstein in it. A Discover query now also returns published games that hold one of the 20 best-matching works, and the works merged into them, as the work page does. They are deduplicated with the name matches and paged the same way. Search now calls Discover as you type, so Discover gets its own limit of 60 a minute keyed by account, instead of sharing the public scope's 30 a minute per IP."
 ```
 
-PR 1 ends here. Push, open it against `main`, and let CI run. It is additive, so it can merge and deploy on its own. Before deploying, check the Railway volume's free space and the rebuild time (Task 14, step 1).
+PR 1 ends here. Push, open it against `main`, and let CI run. It is additive, so it can merge and deploy on its own. Before deploying, check the Railway volume's free space (Task 14, step 1).
 
 ---
 
@@ -856,7 +900,7 @@ PR 1 ends here. Push, open it against `main`, and let CI run. It is additive, so
 
 **Files:**
 - Modify: `mobile/src/features/arena/arenaHome.ts`, `mobile/src/features/arena/ArenaHomeScreen.tsx`
-- Modify: `mobile/src/features/community/DiscoverScreen.tsx`, `mobile/src/app/arena/index.tsx`
+- Modify: `mobile/src/features/community/DiscoverScreen.tsx`, `mobile/src/features/community/DiscoverPane.tsx` (one label), `mobile/src/app/arena/index.tsx`
 - Delete: `mobile/src/app/(app)/(arena)/discover.tsx`
 - Test: `mobile/src/features/arena/arenaHome.test.ts`
 
@@ -987,12 +1031,14 @@ rg -n '"/discover"|DiscoverScreen inTabs' mobile/src
 
 The `rg` must print nothing.
 
+In `DiscoverPane.tsx`, change the search field's `accessibilityLabel` from `"Search tier lists, tournaments and quizzes by name"` to `"Search tier lists, tournaments and quizzes by name or book"`. Since Task 3, Discover also matches the books in a game.
+
 - [ ] **Step 6: Verify** (mobile commands). Every test passes.
 
-- [ ] **Step 7: Commit.**
+- [ ] **Step 7: Commit.** `git rm` already staged the deleted route, so it isn't listed here; `git add` on a removed path stops with "pathspec did not match".
 
 ```bash
-git add mobile/src/features/arena/arenaHome.ts mobile/src/features/arena/arenaHome.test.ts mobile/src/features/arena/ArenaHomeScreen.tsx mobile/src/features/community/DiscoverScreen.tsx mobile/src/app/arena/index.tsx "mobile/src/app/(app)/(arena)/discover.tsx" && git commit -m "Open Games on Browse, with your own lists beside it" -m "Discover lived twice, as Community's tab and behind Games' Browse button. Games now opens on Browse, and Tournaments, Tier lists and Quizzes follow it, so there is one Discover. On Browse, New is a header button that asks which kind to make, because the floating button would cover Browse's docked search and filter. The lists keep their floating New."
+git add mobile/src/features/arena/arenaHome.ts mobile/src/features/arena/arenaHome.test.ts mobile/src/features/arena/ArenaHomeScreen.tsx mobile/src/features/community/DiscoverScreen.tsx mobile/src/features/community/DiscoverPane.tsx mobile/src/app/arena/index.tsx && git commit -m "Open Games on Browse, with your own lists beside it" -m "Discover lived twice, as Community's tab and behind Games' Browse button. Games now opens on Browse, and Tournaments, Tier lists and Quizzes follow it, so there is one Discover. On Browse, New is a header button that asks which kind to make, because the floating button would cover Browse's docked search and filter. The lists keep their floating New."
 ```
 
 ---
@@ -1048,10 +1094,10 @@ The `rg` must print nothing.
 
 - [ ] **Step 5: Verify** (mobile commands).
 
-- [ ] **Step 6: Commit.**
+- [ ] **Step 6: Commit.** Step 4's `git rm` already staged the four deletions.
 
 ```bash
-git add mobile/src/features/community/PeopleScreen.tsx "mobile/src/app/(app)/(home)/people.tsx" mobile/src/features/home/HomeScreen.tsx "mobile/src/app/(app)/(home)/community.tsx" mobile/src/features/home/CommunityScreen.tsx mobile/src/features/home/communityTabs.ts mobile/src/features/home/communityTabs.test.ts && git commit -m "Retire the Community screen; Find readers opens People" -m "With Discover in Games and people search on its way to the Search tab, Community had nothing of its own left. Home's Find readers opens the People pane in the Home stack, rather than switching tabs, because a cross-tab push would land on whatever the other stack has open."
+git add mobile/src/features/community/PeopleScreen.tsx "mobile/src/app/(app)/(home)/people.tsx" mobile/src/features/home/HomeScreen.tsx && git commit -m "Retire the Community screen; Find readers opens People" -m "With Discover in Games and people search on its way to the Search tab, Community had nothing of its own left. Home's Find readers opens the People pane in the Home stack, rather than switching tabs, because a cross-tab push would land on whatever the other stack has open."
 ```
 
 PR 2 ends here. Push, then open it against `main`, or stacked on PR 1 and retargeted to `main` before `--auto`.
@@ -1207,6 +1253,7 @@ test("a kind's chip shows only that kind, every row", () => {
 
 test("Books offers Open Library until the query is submitted, then follows it", () => {
   assert.deepEqual(kinds(searchRows(input({ scope: "books" }))), ["header:books", "catalogEmpty", "addByHand"]);
+  assert.deepEqual(kinds(searchRows(input({ scope: "books", openLibrary: "pending" }))), ["header:books", "catalogEmpty", "addByHand"]);
   assert.deepEqual(kinds(searchRows(input({ scope: "books", submitted: true, openLibrary: "pending" }))), ["header:books", "openLibrary", "addByHand"]);
   assert.deepEqual(kinds(searchRows(input({ scope: "books", submitted: true, books: done([result("1", "w1")]), openLibrary: "failed" }))), ["header:books", "book", "openLibrary", "addByHand"]);
 });
@@ -1355,7 +1402,7 @@ function sectionRows(section: ResultSection, input: ResultsInput, cap: number): 
   const seeAll = state.rows.length > cap;
   if (section !== "books") return items.length > 0 ? [header(seeAll), ...items] : [];
   const addByHand: SearchRow = { kind: "addByHand", key: "addByHand" };
-  const openLibrary: SearchRow[] = input.openLibrary === "idle" ? [] : [{ kind: "openLibrary", key: "openLibrary", state: input.openLibrary }];
+  const openLibrary: SearchRow[] = input.submitted && input.openLibrary !== "idle" ? [{ kind: "openLibrary", key: "openLibrary", state: input.openLibrary }] : [];
   if (items.length > 0 || openLibrary.length > 0) return [header(seeAll), ...items, ...openLibrary, addByHand];
   return input.submitted ? [] : [header(false), { kind: "catalogEmpty", key: "catalogEmpty" }, addByHand];
 }
@@ -1460,7 +1507,8 @@ No behaviour change in Browse or People.
   - Move these out of `DiscoverPane.tsx` unchanged:
     - the functions `StatusBadge`, `FanThumb`, `TournamentThumb` and `Cover`;
     - the constants from `THUMB_WIDTH` through `VERSUS_WIDTH`;
-    - these style entries: `grow`, `shrink`, `strong`, `row`, `metaRow`, `nameRow`, `metaName`, `statusRow`, `rowAction`, `badge`, `thumb`, `ladder`, `cover`, `versus`, `versusText`.
+    - these style entries: `shrink`, `strong`, `row`, `metaRow`, `nameRow`, `metaName`, `statusRow`, `rowAction`, `badge`, `thumb`, `ladder`, `cover`, `versus`, `versusText`.
+    - Copy `grow` into `DiscoverRow.tsx` as well. Both files use it.
   - Export `StatusBadge`.
   - `DiscoverRow` changes its signature and two spots:
 
@@ -1612,7 +1660,7 @@ const styles = StyleSheet.create({
           renderItem={({ item }) => <PersonRow person={item} busy={busyId === item.user.userId} onToggleFollow={() => void toggle(item)} />}
 ```
 
-    - Drops the styles and imports only the moved code used. It keeps `grow`, `page`, `list` and `suggestionsCaption`.
+    - Drops the styles and imports only the moved code used. It keeps only `page`, `list` and `suggestionsCaption`; `grow` moves with the row.
 
 - [ ] **Step 3b: Check the moves.** Confirm nothing outside the new files and the two panes still refers to the moved code:
 
@@ -1801,7 +1849,9 @@ const styles = StyleSheet.create({
         )}
 ```
 
-  7. **Add book:** its `disabled` becomes `disabled={scanning || title.trim() === "" || author.trim() === ""}`.
+  7. **Add book:** its `disabled` becomes `disabled={title.trim() === "" || author.trim() === ""}`.
+     - The scanner now shows its own denial and mount-error messages, so `scanning` stays true while they are on screen. Keeping `scanning ||` would leave Add book disabled after a denied camera.
+     - `mobile/README.md` promises that manual entry stays available in that case.
 
 - [ ] **Step 3: Verify** (mobile commands).
 
@@ -2119,9 +2169,9 @@ export function SectionTitle({ title, caption, action }: { title: string; captio
   return (
     <View style={styles.title}>
       <Text accessibilityRole="header" {...dynamicType} numberOfLines={1} style={[typography.body, styles.strong, styles.shrink, { color: colors.text }]}>{title}</Text>
-      {caption ? <Text {...dynamicType} numberOfLines={1} style={[typography.caption, styles.shrink, { color: colors.textDim }]}>{caption}</Text> : null}
+      {caption ? <Text {...dynamicType} numberOfLines={1} style={[typography.caption, styles.shrink, styles.right, { color: colors.textDim }]}>{caption}</Text> : null}
       {action ? (
-        <Pressable accessibilityRole="button" hitSlop={12} onPress={action.onPress} style={styles.titleAction}>
+        <Pressable accessibilityRole="button" hitSlop={12} onPress={action.onPress} style={caption ? undefined : styles.right}>
           <Text {...dynamicType} style={[typography.body, { color: colors.accent }]}>{action.label}</Text>
         </Pressable>
       ) : null}
@@ -2189,7 +2239,7 @@ const styles = StyleSheet.create({
   stack: { gap: spacing.sm, paddingVertical: spacing.sm },
   link: { minHeight: 44, justifyContent: "center" },
   title: { flexDirection: "row", alignItems: "baseline", gap: spacing.sm, paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.xs },
-  titleAction: { marginLeft: "auto" },
+  right: { marginLeft: "auto" },
   row: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderBottomWidth: 1 },
   bookOpen: { flex: 1, flexDirection: "row", alignItems: "center", gap: spacing.md, minHeight: 60 },
   cover: { width: 40, aspectRatio: 2 / 3, borderRadius: radii.sm, overflow: "hidden" },
@@ -2350,7 +2400,7 @@ export function SearchScreen() {
   const external = useQuery({
     queryKey: ["search", "external", submitted],
     queryFn: () => bookSearchApi.outside(submitted ?? ""),
-    enabled: wantsBooks && submitted !== null && !(looksLikeIsbnQuery(submitted) && (catalog.data?.length ?? 0) > 0),
+    enabled: wantsBooks && submitted !== null && (!looksLikeIsbnQuery(submitted) || (catalog.isSuccess && !catalog.isPlaceholderData && catalog.data.length === 0)),
     retry: false,
   });
   const people = useQuery({ queryKey: ["community", "people", "search", needle], queryFn: () => searchPeople(needle), enabled: wantsPeople, placeholderData: keepPreviousData, retry: false });
@@ -2566,7 +2616,7 @@ export default function SearchRoute() {
 `search` has no `FILLED` entry, so `filled` changes nothing and the tint marks the focused tab.
 
 - [ ] **Step 4: Docs.**
-  - `mobile/README.md`: change "auth-guarded tab shell (Home, Library, Games, You)" to "auth-guarded tab shell (Home, Library, Search, Games, You)".
+  - `mobile/README.md`: change "auth-guarded tab shell (Home, Library, Games, You)" to "auth-guarded tab shell (Home, Library, Search, Games, You)". The README's route table stays as it is: no web route maps to Search.
   - `.claude/agents/beta-tester.md`: change "Then each tab (Home, Library, Games, You)" to "Then each tab (Home, Library, Search, Games, You)".
   - `mobile/.maestro/login-navigation.yaml`: before `- tapOn: "Games"`, add:
 
@@ -2704,8 +2754,13 @@ In `(search)/_layout.tsx`, after `<Stack.Screen name="search" />`, add:
 ```tsx
   const submitRef = useRef(submit);
   submitRef.current = submit;
-  useEffect(() => receiveScans((isbn) => submitRef.current(isbn)), []);
+  useEffect(() => receiveScans((isbn) => {
+    setScope((current) => (current === "people" || current === "games" ? "books" : current));
+    submitRef.current(isbn);
+  }), []);
 ```
+
+A scan is always a book. On the People or Games chip it would otherwise end at "No results for “978…”", so the receiver switches to Books.
 
   - In the field row, after the clear button, add:
 
@@ -2726,8 +2781,12 @@ git add mobile/src/features/search/scanBridge.ts mobile/src/features/search/scan
 ### Task 14: Checks and the device pass
 
 - [ ] **Step 1: Backend deploy check** before PR 1 deploys.
-  - Ask the user to run `railway volume list --json` and confirm the free space. Production reads are the user's to run. A full volume once crashed production; see the `railway-volume-500mb` memory.
-  - The rebuild adds a title-and-author entry for each of the ~78k books.
+  - Ask the user to run `railway volume list --json` and `railway ssh -- ls -l /data/covers.sqlite`. Production reads are the user's to run.
+  - **The backfill's writes:**
+    - It writes one index entry and one membership row per indexed book, about 78k of each.
+    - The plan's dry run measured 13 MB of file growth on a synthetic catalog that size, mostly the index. The membership table adds a few MB on top.
+    - The write-ahead log grows by about as much again during the transaction, and Litestream copies those pages once more.
+  - **Required headroom:** at least 100 MB free, and at least half the size of `covers.sqlite`. If either is short, resize the volume before deploying. A full volume crash-loops the backend at boot; see the `railway-volume-500mb` memory.
 
 - [ ] **Step 2: Phase checks.**
 
@@ -2763,13 +2822,20 @@ cd mobile && npx expo-doctor
      - Type a nonsense word, wait, and see "Nothing in the catalog yet." with Search Open Library.
      - Pressing the keyboard's Search key shows "Still searching Open Library…".
      - Typing again clears it.
-  7. **Add it by hand.** It opens Add book with the query in its search field.
+  7. **Add it by hand.**
+     - It opens Add book with the query in its search field.
+     - On Add book, tap "Scan ISBN with camera" and deny the camera. Revoke it first with `adb shell pm revoke host.exp.exponent android.permission.CAMERA` if it was granted.
+     - The denial message shows, and typing a title and author still enables "Add book".
   8. **Games.**
      - Games opens on Browse, and the header shows New. New offers Tournament, Tier list and Quiz.
      - On Tournaments, the floating New is back.
   9. **People.**
      - Home's Find readers opens People in the Home stack, with a back chevron.
      - No screen titled Community exists anywhere.
-  10. **Scan** needs a real camera. Leave it to the owner on a phone. Report it as NOT CHECKED.
+  10. **A new account.**
+      - Sign up a throwaway account on the local backend through the app, as the beta-tester agent's first run does.
+      - Open Search and type a word. Expected: no library error, no "In your library" section, and Books, People and Games still answer.
+      - Sign back in to the fixture account afterwards.
+  11. **Scan** needs a real camera. Leave it to the owner on a phone. Report it as NOT CHECKED.
 
 - [ ] **Step 4: Whole-branch review.** Run `branch-reviewer` once for each PR before it merges, then the `ship` skill.
