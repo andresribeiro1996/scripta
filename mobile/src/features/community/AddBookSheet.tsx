@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { router, useGlobalSearchParams, usePathname, useSegments } from "expo-router";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
-import { bookKey, localDay, saveFailureMessage } from "@scripta/shared";
+import { localDay, saveFailureMessage } from "@scripta/shared";
 import { useAuth } from "../../core/auth";
 import { Button, Sheet, Toast, dynamicType, minimumTouchTarget, spacing, typography, useTheme } from "../../ui";
 import { BookCover } from "../arena/BookCover";
@@ -62,7 +62,7 @@ export function AddBookSheet({
           setTimeout(onClose, 1600);
           return;
         }
-        const added = data?.data.books.find((entry) => bookKey(entry) === key);
+        const added = data?.data.books.find((entry) => entry.ContentID === key);
         if (added) {
           setFinished(added);
           return;
