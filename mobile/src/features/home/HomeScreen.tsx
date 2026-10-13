@@ -1,27 +1,34 @@
-import { useCallback, useState } from "react";
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, View, type ViewToken } from "react-native";
 import { Text } from "../../ui/Text";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
-import { bookKey, buildDashboardCards, isNewDigestItem, localDay, newCountLabel, resolveQuote } from "@scripta/shared";
-import { BrandMark, Button, EmptyState, ErrorState, IconButton, Screen, Skeleton, Toast, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
+import { useIsFocused } from "expo-router/react-navigation";
+import { useQueryClient, type InfiniteData } from "@tanstack/react-query";
+import { buildDashboardCards, clearDashboardCounts, isNewDigestItem, localDay, newCountLabel, resolveQuote, type DashboardFeedPage } from "@scripta/shared";
+import { BrandMark, Button, EmptyState, ErrorState, Screen, Skeleton, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { useAuth } from "../../core/auth";
 import { useLibrary } from "../library/hooks/useLibrary";
-import { CoverImage } from "../library/components/CoverImage";
-import { FeedRow, useDashboardFeed, useFollowBack, useSkipEmptyPages } from "./FeedRow";
+import { markDashboardSeen } from "../community/api";
+import { DASHBOARD_QUERY_KEY, FeedRow, useDashboardFeed, useFollowBack, useSkipEmptyPages } from "./FeedRow";
 import { digestRoute } from "./feedRowModel";
-import { PickNextSheet } from "./PickNextSheet";
+import { homeSections, shouldMarkFeedSeen } from "./homeModel";
+import { NextReadCard } from "./NextReadCard";
+import { ReadingCards } from "./ReadingCards";
 
 export function HomeScreen() {
   const { colors } = useTheme();
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const focused = useIsFocused();
   const { user } = useAuth();
   const library = useLibrary();
   const [day, setDay] = useState(localDay);
   const [offset, setOffset] = useState(0);
   const [pulling, setPulling] = useState(false);
-  const [picking, setPicking] = useState(false);
   const dashboard = useDashboardFeed();
   const { followingId, followError, followBack } = useFollowBack(dashboard.refetch);
+  const seenSent = useRef(false);
+  const rowVisible = useRef(false);
 
   useFocusEffect(useCallback(() => {
     const today = localDay();
@@ -29,24 +36,40 @@ export function HomeScreen() {
       setDay(today);
       setOffset(0);
     }
+    seenSent.current = false;
     void library.refetch();
     void dashboard.refetch();
   }, [day, library.refetch, dashboard.refetch]));
 
   const books = library.data?.data.books ?? [];
-  const cards = user ? buildDashboardCards(books, day, `${user.id}:${offset}`) : [];
-  const readingCard = cards.find((card) => card.kind === "currentlyReading");
-  const upNextCard = cards.find((card) => card.kind === "upNext");
-  const rediscoverCard = cards.find((card) => card.kind === "rediscover");
-  const quote = rediscoverCard ? resolveQuote({ type: "quote", bookKey: rediscoverCard.bookKey, highlightId: rediscoverCard.highlightId } as never, books) : null;
+  const sections = homeSections(user ? buildDashboardCards(books, day, `${user.id}:${offset}`) : []);
+  const quote = sections.highlight ? resolveQuote({ type: "quote", bookKey: sections.highlight.bookKey, highlightId: sections.highlight.highlightId } as never, books) : null;
 
-  const feedItems = dashboard.data?.pages.flatMap((page) => page.items).slice(0, 3) ?? [];
+  const feedItems = dashboard.data?.pages.flatMap((page) => page.items) ?? [];
   const newLabel = newCountLabel(dashboard.data?.pages[0]?.personalNewCount ?? 0);
   const seenAt = dashboard.data?.pages[0]?.seenAt ?? null;
   const feedLoading = dashboard.isPending || (dashboard.hasNextPage && !dashboard.isError && !feedItems.length);
   useSkipEmptyPages(dashboard, feedItems.length);
 
+  const markSeen = useRef(() => {});
+  markSeen.current = () => {
+    if (!shouldMarkFeedSeen({ focused, rowVisible: rowVisible.current, loaded: dashboard.data !== undefined, failed: dashboard.isError, fetching: dashboard.isFetching, sent: seenSent.current })) return;
+    seenSent.current = true;
+    void markDashboardSeen().then(
+      () => queryClient.setQueryData<InfiniteData<DashboardFeedPage>>(DASHBOARD_QUERY_KEY, (data) => (data ? clearDashboardCounts(data) : data)),
+      () => {},
+    );
+  };
+  useEffect(() => {
+    markSeen.current();
+  }, [focused, dashboard.data, dashboard.isError, dashboard.isFetching]);
+  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
+    rowVisible.current = viewableItems.length > 0;
+    markSeen.current();
+  }).current;
+
   const openBook = (key: string) => router.push(`/book/${encodeURIComponent(key)}` as never);
+  const findReaders = () => router.push("/community?tab=people" as never);
 
   async function onRefresh() {
     setPulling(true);
@@ -57,111 +80,94 @@ export function HomeScreen() {
     }
   }
 
-  return (
-    <Screen top={false}>
-      <Stack.Screen
-        options={{
-          title: "Home",
-          headerShown: true,
-          headerLeft: () => <View style={styles.mark}><BrandMark size={24} /></View>,
-          headerRight: () => (
-            <IconButton framed name="community" label="Community" accessibilityLabel="Community" badge={newLabel} onPress={() => router.push("/community" as never)} />
-          ),
-        }}
-      />
-      {library.isPending ? (
-        <View style={styles.page}>
-          <ActivityIndicator accessibilityLabel="Loading home" />
+  const header = (
+    <View style={styles.sections}>
+      {!library.data ? (
+        <View style={styles.sectionPad}>
+          {library.isError
+            ? <ErrorState body="Couldn't load your home." actionLabel="Retry" onAction={() => void library.refetch()} />
+            : <ActivityIndicator accessibilityLabel="Loading home" />}
         </View>
-      ) : library.isError ? (
-        <View style={styles.page}>
-          <ErrorState body="Couldn't load your home." actionLabel="Retry" onAction={() => void library.refetch()} />
+      ) : !books.length ? (
+        <View style={styles.sectionPad}>
+          <EmptyState title="Start your library" body="Import your existing collection, or add your first book manually." actionLabel="Import library" onAction={() => router.push("/import" as never)} secondaryActionLabel="Add a book manually" onSecondaryAction={() => router.push("/add-book" as never)} />
         </View>
       ) : (
-        <View style={styles.grow}>
-          {followError ? <Toast visible message={followError} tone="error" /> : null}
-          <ScrollView
-            contentContainerStyle={styles.sections}
-            refreshControl={<RefreshControl refreshing={pulling} onRefresh={() => void onRefresh()} />}
-          >
-            {!books.length ? (
-              <View style={styles.sectionPad}>
-                <EmptyState title="Start your library" body="Import your existing collection, or add your first book manually." actionLabel="Import library" onAction={() => router.push("/import" as never)} secondaryActionLabel="Add a book manually" onSecondaryAction={() => router.push("/add-book" as never)} />
-              </View>
-            ) : (
-              <>
-                {readingCard ? (
-                  <View style={styles.section}>
-                    <SectionHeader title="Reading now" count={String(readingCard.bookKeys.length)} />
-                    <BookRow keys={readingCard.bookKeys} books={books} onOpen={openBook} />
-                  </View>
-                ) : null}
-                {quote ? (
-                  <View style={styles.sectionPad}>
-                    <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                      <Text {...dynamicType} style={[typography.title, styles.heading, { color: colors.text }]}>Rediscover</Text>
-                      <Text {...dynamicType} display={false} style={[typography.title, { color: colors.text }]}>{String(quote.highlight.Text)}</Text>
-                      <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
-                        {String(quote.book.Title)} · {String(quote.book.Attribution ?? "")}
-                      </Text>
-                      <Button label="Show another" variant="secondary" onPress={() => setOffset((value) => value + 1)} />
-                    </View>
-                  </View>
-                ) : null}
-                {upNextCard ? (
-                  <View style={styles.section}>
-                    <SectionHeader
-                      title="Up next"
-                      count={String(upNextCard.bookKeys.length)}
-                      action={upNextCard.bookKeys.length >= 2 ? { label: "Can't choose?", onPress: () => setPicking(true) } : undefined}
-                    />
-                    <BookRow keys={upNextCard.bookKeys.slice(0, 10)} books={books} onOpen={openBook} />
-                  </View>
-                ) : null}
-              </>
-            )}
+        <>
+          {sections.readingKeys.length ? (
             <View style={styles.section}>
-              {feedLoading ? (
-                <>
-                  <SectionHeader title="Activity" />
-                  <View style={styles.sectionPad}>
-                    <Skeleton height={80} />
-                  </View>
-                </>
-              ) : dashboard.isError && !dashboard.data ? (
-                <>
-                  <SectionHeader title="Activity" />
-                  <View style={styles.sectionPad}>
-                    <ErrorState body="Couldn't load activity." actionLabel="Retry" onAction={() => void dashboard.refetch()} />
-                  </View>
-                </>
-              ) : feedItems.length ? (
-                <>
-                  <SectionHeader title="Activity" count={newLabel ? `· ${newLabel} new` : undefined} />
-                  {feedItems.map((item) => (
-                    <FeedRow
-                      key={`${item.kind}:${item.id}`}
-                      item={item}
-                      onOpen={() => router.push(digestRoute(item) as never)}
-                      onFollowBack={() => { if (item.kind === "follow") void followBack(item.actor.userId); }}
-                      following={item.kind === "follow" && followingId === item.actor.userId}
-                      isNew={isNewDigestItem(item, seenAt)}
-                    />
-                  ))}
-                  <Pressable accessibilityRole="button" onPress={() => router.push("/community?tab=activity" as never)} style={styles.linkRow}>
-                    <Text {...dynamicType} style={[typography.body, styles.heading, { color: colors.accent }]}>All activity</Text>
-                  </Pressable>
-                </>
-              ) : (
-                <Pressable accessibilityRole="button" onPress={() => router.push("/community?tab=people" as never)} style={styles.linkRow}>
-                  <Text {...dynamicType} style={[typography.body, styles.heading, { color: colors.accent }]}>Find readers</Text>
-                </Pressable>
-              )}
+              <SectionHeader title="Continue reading" count={String(sections.readingKeys.length)} />
+              <ReadingCards keys={sections.readingKeys} books={books} onOpen={openBook} />
             </View>
-          </ScrollView>
-        </View>
+          ) : null}
+          {sections.nextKeys ? (
+            <View style={styles.sectionPad}>
+              <NextReadCard keys={sections.nextKeys} books={books} />
+            </View>
+          ) : null}
+          {quote ? (
+            <View style={styles.sectionPad}>
+              <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <Text {...dynamicType} style={[typography.title, styles.heading, { color: colors.text }]}>From your highlights</Text>
+                <Text {...dynamicType} display={false} style={[typography.title, { color: colors.text }]}>{String(quote.highlight.Text)}</Text>
+                <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
+                  {String(quote.book.Title)} · {String(quote.book.Attribution ?? "")}
+                </Text>
+                <Button label="Another" variant="secondary" onPress={() => setOffset((value) => value + 1)} />
+              </View>
+            </View>
+          ) : null}
+        </>
       )}
-      {upNextCard ? <PickNextSheet visible={picking && upNextCard.bookKeys.length >= 2} keys={upNextCard.bookKeys} books={books} onClose={() => setPicking(false)} /> : null}
+      <SectionHeader title="From people you follow" count={newLabel ? `· ${newLabel} new` : undefined} action={{ label: "Find readers", onPress: findReaders }} />
+    </View>
+  );
+
+  const feedEmpty = feedLoading ? (
+    <View style={styles.sectionPad}><Skeleton height={80} /></View>
+  ) : dashboard.isError && !dashboard.data ? (
+    <View style={styles.sectionPad}><ErrorState body="Couldn't load activity." actionLabel="Retry" onAction={() => void dashboard.refetch()} /></View>
+  ) : dashboard.hasNextPage ? null : (
+    <View style={styles.sectionPad}><EmptyState title="Nothing here yet" body="Follow readers to see what they finish and publish." actionLabel="Find readers" onAction={findReaders} /></View>
+  );
+
+  const feedFooter = dashboard.isFetchingNextPage ? (
+    <View style={styles.sectionPad}><Skeleton height={80} /></View>
+  ) : dashboard.isFetchNextPageError ? (
+    <View style={styles.sectionPad}><ErrorState body="Couldn't load more." actionLabel="Retry" onAction={() => void dashboard.fetchNextPage()} /></View>
+  ) : null;
+
+  return (
+    <Screen top={false}>
+      <Stack.Screen options={{ title: "Home", headerShown: true, headerLeft: () => <View style={styles.mark}><BrandMark size={24} /></View> }} />
+      {followError ? (
+        <Toast visible message={followError} tone="error" />
+      ) : dashboard.isRefetchError && !dashboard.isRefetching ? (
+        <Toast visible message="Couldn't refresh activity." tone="error" />
+      ) : null}
+      <FlatList
+        data={feedItems}
+        keyExtractor={(item) => `${item.kind}:${item.id}`}
+        ListHeaderComponent={header}
+        ListEmptyComponent={feedEmpty}
+        ListFooterComponent={feedFooter}
+        contentContainerStyle={styles.list}
+        renderItem={({ item }) => (
+          <FeedRow
+            item={item}
+            onOpen={() => router.push(digestRoute(item) as never)}
+            onFollowBack={() => { if (item.kind === "follow") void followBack(item.actor.userId); }}
+            following={item.kind === "follow" && followingId === item.actor.userId}
+            isNew={isNewDigestItem(item, seenAt)}
+          />
+        )}
+        onEndReached={() => {
+          if (dashboard.hasNextPage && !dashboard.isFetchingNextPage && !dashboard.isFetchNextPageError) void dashboard.fetchNextPage();
+        }}
+        onEndReachedThreshold={0.4}
+        onViewableItemsChanged={onViewableItemsChanged}
+        refreshControl={<RefreshControl refreshing={pulling} onRefresh={() => void onRefresh()} />}
+      />
     </Screen>
   );
 }
@@ -181,39 +187,15 @@ function SectionHeader({ title, count, action }: { title: string; count?: string
   );
 }
 
-function BookRow({ keys, books, onOpen }: { keys: string[]; books: Array<Record<string, unknown>>; onOpen: (key: string) => void }) {
-  const byKey = new Map(books.map((book) => [bookKey(book), book] as const));
-  const items = keys.flatMap((key) => { const book = byKey.get(key); return book ? [{ key, book }] : []; });
-  return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
-      {items.map(({ key, book }) => (
-        <Pressable
-          key={key}
-          accessibilityRole="button"
-          accessibilityLabel={`${String(book.Title ?? "Untitled")} by ${String(book.Attribution ?? "Unknown author")}`}
-          onPress={() => onOpen(key)}
-          style={styles.cover}
-        >
-          <CoverImage book={book} />
-        </Pressable>
-      ))}
-    </ScrollView>
-  );
-}
-
 const styles = StyleSheet.create({
-  page: { padding: spacing.lg, gap: spacing.md },
   mark: { marginRight: spacing.sm },
   sectionPad: { paddingHorizontal: spacing.lg },
   heading: { fontWeight: "700" },
   headerTitle: { flexShrink: 1 },
   card: { borderWidth: 1, borderRadius: radii.lg, padding: spacing.lg, gap: spacing.sm },
-  grow: { flex: 1 },
+  list: { paddingBottom: spacing.huge },
   sections: { paddingVertical: spacing.lg, gap: spacing.lg },
   section: { gap: spacing.sm },
   sectionHeader: { flexDirection: "row", alignItems: "baseline", gap: spacing.xs, paddingHorizontal: spacing.lg },
   sectionAction: { marginLeft: "auto" },
-  row: { gap: spacing.sm, paddingHorizontal: spacing.lg },
-  cover: { width: 72, aspectRatio: 2 / 3, borderRadius: radii.md, overflow: "hidden" },
-  linkRow: { minHeight: minimumTouchTarget, justifyContent: "center", paddingHorizontal: spacing.lg },
 });
