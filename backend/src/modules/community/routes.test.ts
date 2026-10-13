@@ -16,7 +16,7 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 process.env.NODE_ENV = "test";
 
 const { FollowLimitError, MuralNotOwnedError, ProfileNotFoundError } = await import("./domain/errors.js");
-const { buildCommunityRoutes, buildPublicCommunityRoutes } = await import("./routes.js");
+const { buildCommunityRoutes, buildDiscoverRoutes, buildPublicCommunityRoutes } = await import("./routes.js");
 
 function fakeService(overrides: Partial<CommunityService> = {}): CommunityService {
   return {
@@ -63,7 +63,7 @@ test("discover passes type/q/limit/offset through", async () => {
   const seen: Array<Record<string, unknown>> = [];
   const app = Fastify();
   await app.register(
-    buildPublicCommunityRoutes(
+    buildDiscoverRoutes(
       fakeService({
         getDiscover: (type, q, limit, offset) => {
           seen.push({ type, q, limit, offset });
@@ -82,7 +82,7 @@ test("discover accepts the quiz type", async () => {
   const seen: unknown[] = [];
   const app = Fastify();
   await app.register(
-    buildPublicCommunityRoutes(
+    buildDiscoverRoutes(
       fakeService({
         getDiscover: (type) => {
           seen.push(type);
@@ -102,7 +102,7 @@ test("discover passes the viewer through when signed in", async () => {
   const app = Fastify();
   app.decorate("authenticateAccessToken", () => ({ id: "viewer", email: "v@example.test", username: "v", avatarId: null }));
   await app.register(
-    buildPublicCommunityRoutes(
+    buildDiscoverRoutes(
       fakeService({
         getDiscover: (_type, _q, _limit, _offset, viewerId) => {
           seen.push(viewerId);
@@ -120,7 +120,7 @@ test("discover passes the viewer through when signed in", async () => {
 test("discover answers 401 for a rejected token and 200 anonymously with no header", async () => {
   const app = Fastify();
   app.decorate("authenticateAccessToken", () => null);
-  await app.register(buildPublicCommunityRoutes(fakeService()));
+  await app.register(buildDiscoverRoutes(fakeService()));
   const rejected = await app.inject({ method: "GET", url: "/community/discover", headers: { authorization: "Bearer expired" } });
   assert.equal(rejected.statusCode, 401);
   const anonymous = await app.inject({ method: "GET", url: "/community/discover" });
@@ -130,7 +130,7 @@ test("discover answers 401 for a rejected token and 200 anonymously with no head
 
 test("discover rejects a bad type with 400", async () => {
   const app = Fastify();
-  await app.register(buildPublicCommunityRoutes(fakeService()));
+  await app.register(buildDiscoverRoutes(fakeService()));
   const res = await app.inject({ method: "GET", url: "/community/discover?type=nope" });
   assert.equal(res.statusCode, 400);
   await app.close();
@@ -606,4 +606,15 @@ test("library endpoint returns the owner's library and 404s when unpublished", a
   const res = await hidden.inject({ method: "GET", url: "/community/profiles/ghost/library" });
   assert.equal(res.statusCode, 404);
   await hidden.close();
+});
+
+test("discover allows 60 requests a minute per account", async () => {
+  const app = Fastify();
+  app.decorate("authenticateAccessToken", (token: string) => ({ id: token, email: `${token}@example.test`, username: token, avatarId: null }));
+  await app.register(buildDiscoverRoutes(fakeService()));
+  const as = (token: string) => app.inject({ method: "GET", url: "/community/discover", headers: { authorization: `Bearer ${token}` } });
+  for (let i = 0; i < 60; i++) assert.equal((await as("alice")).statusCode, 200);
+  assert.equal((await as("alice")).statusCode, 429);
+  assert.equal((await as("bob")).statusCode, 200);
+  await app.close();
 });

@@ -15,6 +15,7 @@ import type { EventRow, FollowRow } from "./domain/types.js";
 import { createVisibility, readerListing, type ReaderListing } from "./domain/visibility.js";
 
 const DISCOVER_SCAN_CAP = 500;
+const DISCOVER_BOOK_WORKS = 20;
 const SUGGESTION_SCAN_CAP = 500;
 const SUGGESTION_OVERLAP_FLOOR = 5;
 const SHARED_BOOKS_SHOWN = 3;
@@ -108,6 +109,7 @@ export interface CommunityDeps {
   userHasUsername(userId: string): boolean;
   findUserIdByUsername(username: string): string | undefined;
   searchUsernameOwners(query: string, limit: number): string[];
+  matchWorks(query: string, limit: number): string[];
   murals: Pick<MuralsPublicApi, "ownsMural" | "getMuralPublicPayload">;
   tierlists: {
     discoverWindow(needle: string, limit: number): TierlistDiscoverRef[];
@@ -115,6 +117,7 @@ export interface CommunityDeps {
     votedAmong(viewerId: string, ids: string[]): string[];
     get(id: string): PublishedTierlistRef | undefined;
     listByOwner(ownerUserId: string): PublishedTierlistRef[];
+    publishedByWorks(workIds: string[], limit: number): Array<{ id: string }>;
   };
   tournaments: {
     discoverWindow(needle: string, limit: number): TournamentDiscoverRef[];
@@ -122,6 +125,7 @@ export interface CommunityDeps {
     votedAmong(viewerId: string, ids: string[]): string[];
     get(id: string): PublishedTournamentRef | undefined;
     listByOwner(ownerUserId: string): PublishedTournamentRef[];
+    publishedByWorks(workIds: string[], limit: number): Array<{ id: string }>;
   };
   quizzes: {
     discoverWindow(needle: string, limit: number): QuizDiscoverRef[];
@@ -129,6 +133,7 @@ export interface CommunityDeps {
     votedAmong(viewerId: string, ids: string[]): string[];
     get(id: string): PublishedQuizRef | undefined;
     listByOwner(ownerUserId: string): PublishedQuizRef[];
+    publishedByWorks(workIds: string[], limit: number): Array<{ id: string }>;
   };
   participation: {
     tierlists(userId: string, since: string): GameParticipation[];
@@ -447,18 +452,24 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
     getDiscover(type, q, limit, offset, viewerId) {
       const needle = normalizeWords(q);
       const window = needle ? DISCOVER_SCAN_CAP : Math.min(offset + limit + 1, DISCOVER_SCAN_CAP);
-      const entries: Array<{ kind: "tierlist" | "tournament" | "quiz"; id: string; userId: string; createdAt: string; promoted: boolean }> = [];
+      const workIds = needle ? deps.matchWorks(q, DISCOVER_BOOK_WORKS) : [];
+      const byBook = <T>(kind: { publishedByWorks(workIds: string[], limit: number): Array<{ id: string }>; getPublishedMany(ids: string[]): T[] }): T[] =>
+        workIds.length === 0 ? [] : kind.getPublishedMany(kind.publishedByWorks(workIds, DISCOVER_SCAN_CAP).map((game) => game.id));
+      const entries = new Map<string, { kind: "tierlist" | "tournament" | "quiz"; id: string; userId: string; createdAt: string; promoted: boolean }>();
+      const add = (kind: "tierlist" | "tournament" | "quiz", ref: { id: string; ownerUserId: string; createdAt: string }, promoted: boolean) => {
+        entries.set(`${kind}:${ref.id}`, { kind, id: ref.id, userId: ref.ownerUserId, createdAt: ref.createdAt, promoted });
+      };
       if (type === "all" || type === "tierlist") {
-        for (const ref of deps.tierlists.discoverWindow(needle, window)) entries.push({ kind: "tierlist", id: ref.id, userId: ref.ownerUserId, createdAt: ref.createdAt, promoted: ref.promotedAt !== null });
+        for (const ref of [...deps.tierlists.discoverWindow(needle, window), ...byBook(deps.tierlists)]) add("tierlist", ref, ref.promotedAt !== null);
       }
       if (type === "all" || type === "tournament") {
-        for (const ref of deps.tournaments.discoverWindow(needle, window)) entries.push({ kind: "tournament", id: ref.id, userId: ref.ownerUserId, createdAt: ref.createdAt, promoted: false });
+        for (const ref of [...deps.tournaments.discoverWindow(needle, window), ...byBook(deps.tournaments)]) add("tournament", ref, false);
       }
       if (type === "all" || type === "quiz") {
-        for (const ref of deps.quizzes.discoverWindow(needle, window)) entries.push({ kind: "quiz", id: ref.id, userId: ref.ownerUserId, createdAt: ref.createdAt, promoted: false });
+        for (const ref of [...deps.quizzes.discoverWindow(needle, window), ...byBook(deps.quizzes)]) add("quiz", ref, false);
       }
-      const authors = deps.resolveProfiles([...new Set(entries.map((e) => e.userId))]);
-      const visible = entries
+      const authors = deps.resolveProfiles([...new Set([...entries.values()].map((e) => e.userId))]);
+      const visible = [...entries.values()]
         .flatMap((entry) => {
           const author = authors.get(entry.userId) ?? (entry.promoted ? { username: "Original creator unavailable", avatarUrl: null, unavailable: true } : undefined);
           return author ? [{ ...entry, author }] : [];

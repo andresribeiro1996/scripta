@@ -148,6 +148,9 @@ function createDeps(repo: CommunityRepository) {
   const tierlistRefs = new Map<string, PublishedTierlistRef>();
   const tournamentRefs = new Map<string, PublishedTournamentRef>();
   const quizRefs = new Map<string, PublishedQuizRef>();
+  const workMatches = new Map<string, string[]>();
+  const gameWorks = new Map<string, string[]>();
+  const byWorks = (kind: string, ids: string[]) => (workIds: string[]) => ids.filter((id) => (gameWorks.get(`${kind}:${id}`) ?? []).some((work) => workIds.includes(work))).map((id) => ({ id }));
   const byNewest = <T extends { createdAt: string }>(a: T, b: T) => b.createdAt.localeCompare(a.createdAt);
   const seenAt = { value: null as string | null };
   const votes = new Set<string>();
@@ -203,6 +206,7 @@ function createDeps(repo: CommunityRepository) {
         .filter(([, n]) => n.toLowerCase().includes(q.toLowerCase()))
         .map(([id]) => id)
         .slice(0, limit),
+    matchWorks: (query) => workMatches.get(normalizeWords(query)) ?? [],
     murals: {
       ownsMural: (userId, muralId) => ownedMurals.has(`${userId}:${muralId}`),
       getMuralPublicPayload: (userId, muralId) => muralPayloads.get(`${userId}:${muralId}`) ?? null
@@ -225,7 +229,8 @@ function createDeps(repo: CommunityRepository) {
         return ids.filter((id) => votes.has(`${viewerId}:${id}`));
       },
       get: (id) => tierlistRefs.get(id),
-      listByOwner: (owner) => [...tierlistRefs.values()].filter((r) => r.ownerUserId === owner).sort(byNewest)
+      listByOwner: (owner) => [...tierlistRefs.values()].filter((r) => r.ownerUserId === owner).sort(byNewest),
+      publishedByWorks: (workIds) => byWorks("tierlist", [...tierlistRefs.keys()])(workIds)
     },
     tournaments: {
       discoverWindow: (needle, limit) => {
@@ -245,7 +250,8 @@ function createDeps(repo: CommunityRepository) {
         return ids.filter((id) => tournamentVotes.has(`${viewerId}:${id}`));
       },
       get: (id) => tournamentRefs.get(id),
-      listByOwner: (owner) => [...tournamentRefs.values()].filter((r) => r.ownerUserId === owner).sort(byNewest)
+      listByOwner: (owner) => [...tournamentRefs.values()].filter((r) => r.ownerUserId === owner).sort(byNewest),
+      publishedByWorks: (workIds) => byWorks("tournament", [...tournamentRefs.keys()])(workIds)
     },
     quizzes: {
       discoverWindow: (needle, limit) => {
@@ -265,7 +271,8 @@ function createDeps(repo: CommunityRepository) {
         return ids.filter((id) => quizPlays.has(`${viewerId}:${id}`));
       },
       get: (id) => quizRefs.get(id),
-      listByOwner: (owner) => [...quizRefs.values()].filter((r) => r.ownerUserId === owner).sort(byNewest)
+      listByOwner: (owner) => [...quizRefs.values()].filter((r) => r.ownerUserId === owner).sort(byNewest),
+      publishedByWorks: (workIds) => byWorks("quiz", [...quizRefs.keys()])(workIds)
     },
     participation: {
       tierlists: () => tierlistParticipation,
@@ -273,7 +280,7 @@ function createDeps(repo: CommunityRepository) {
       quizzes: () => quizParticipation
     }
   };
-  return { deps, readerProfiles, usernames, ownedMurals, muralPayloads, libraries, libraryCalls, sharedCounts, sharedShelves, sharedBookCountsCalls, sharedBooksCalls, tierlistRefs, tournamentRefs, quizRefs, seenAt, votes, tournamentVotes, quizPlays, readerGlyphs, readerGlyphCalls, tierlistParticipation, tournamentParticipation, quizParticipation, windowCalls, publishedManyCalls, votedAmongCalls };
+  return { deps, readerProfiles, usernames, ownedMurals, muralPayloads, libraries, libraryCalls, sharedCounts, sharedShelves, sharedBookCountsCalls, sharedBooksCalls, tierlistRefs, tournamentRefs, quizRefs, seenAt, votes, tournamentVotes, quizPlays, readerGlyphs, readerGlyphCalls, tierlistParticipation, tournamentParticipation, quizParticipation, windowCalls, publishedManyCalls, votedAmongCalls, workMatches, gameWorks };
 }
 
 function profileRow(userId: string, overrides: Partial<ProfileRow> = {}): ProfileRow {
@@ -2698,4 +2705,27 @@ test("discover leaves out a quiz that was deleted between the window and the pag
   };
 
   assert.deepEqual(service.getDiscover("quiz", "", 10, 0).items, []);
+});
+
+test("a discover search also finds games that contain a matching book, once each, newest first, paged with the name matches", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs, tournamentRefs, workMatches, gameWorks } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  tierlistRefs.set("t3", tierRef("t3", "alice", { name: "Frankly speaking", createdAt: at(4) }));
+  tierlistRefs.set("t1", tierRef("t1", "alice", { name: "Gothic classics, ranked", createdAt: at(3) }));
+  tierlistRefs.set("t2", tierRef("t2", "alice", { name: "Frankenstein and friends", createdAt: at(2) }));
+  tournamentRefs.set("g1", tournRef("g1", "alice", { name: "Horror bracket", createdAt: at(1) }));
+  workMatches.set("frank", ["w-frankenstein"]);
+  gameWorks.set("tierlist:t1", ["w-frankenstein"]);
+  gameWorks.set("tierlist:t2", ["w-frankenstein"]);
+  gameWorks.set("tournament:g1", ["w-dracula"]);
+  const first = service.getDiscover("all", "frank", 2, 0);
+  assert.deepEqual(first.items.map((item) => item.content.id), ["t3", "t1"]);
+  assert.equal(first.nextOffset, 2);
+  const second = service.getDiscover("all", "frank", 2, 2);
+  assert.deepEqual(second.items.map((item) => item.content.id), ["t2"]);
+  assert.equal(second.nextOffset, null);
+  assert.deepEqual(service.getDiscover("tournament", "frank", 10, 0).items, []);
+  assert.deepEqual(service.getDiscover("all", "", 10, 0).items.map((item) => item.content.id), ["t3", "t1", "t2", "g1"]);
 });

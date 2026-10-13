@@ -56,6 +56,7 @@ export interface BooksRepository {
   setWorkSummary(bookId: string, summary: string): void;
   getWorkSummary(bookId: string): { summary: string | null; olWorkKey: string | null } | undefined;
   canonicalWorkIds(ids: string[]): Map<string, string>;
+  aliasesOf(workIds: string[]): string[];
   setLanguage(id: string, tag: string | null): void;
   setPublisherUrl(id: string, url: string): void;
   listUpgradeWantedIds(after: PageCursor | null, limit: number): IdPage;
