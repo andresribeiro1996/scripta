@@ -3,14 +3,12 @@ import { router } from "expo-router";
 import { Image } from "expo-image";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
-import { DEFAULT_TIER_PRESET, readerGlyphLabel } from "@scripta/shared";
+import { readerGlyphLabel } from "@scripta/shared";
 import { dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import type { ContentTone, DiscoverItem, PublishedContent } from "@scripta/shared/community";
-import { contentKindLabel, contentStats, contentStatus, contentTarget } from "./communityHome";
+import { TIER_LADDER, contentKindLabel, contentStats, contentStatus, contentTarget } from "./communityHome";
 import { openProfile } from "./AuthorAvatar";
 import { ReaderGlyph } from "./ReaderGlyph";
-
-const TIER_LADDER = DEFAULT_TIER_PRESET.map((tier) => tier.color);
 
 export function DiscoverRow({ item, linkAuthor, onPreviewBooks, onOpen }: { item: DiscoverItem; linkAuthor: boolean; onPreviewBooks?: (tournament: { id: string; name: string }) => void; onOpen?: () => void }) {
   const { colors } = useTheme();
@@ -82,16 +80,10 @@ export function GameRow({ kind, name, meta, badges, caption, stats = [], covers,
       accessibilityRole={accessibilityRole}
       accessibilityLabel={`Open ${name}`}
       onPress={onPress}
-      {...(onDelete
-        ? {
-            onLongPress: onDelete,
-            accessibilityHint: "Long-press to delete",
-            accessibilityActions: [{ name: "delete", label: "Delete" }],
-            onAccessibilityAction: (event: { nativeEvent: { actionName: string } }) => {
-              if (event.nativeEvent.actionName === "delete") onDelete();
-            },
-          }
-        : null)}
+      onLongPress={onDelete}
+      accessibilityHint={onDelete ? "Long-press to delete" : undefined}
+      accessibilityActions={onDelete ? [{ name: "delete", label: "Delete" }] : undefined}
+      onAccessibilityAction={onDelete ? (event) => { if (event.nativeEvent.actionName === "delete") onDelete(); } : undefined}
     >
       {({ pressed }) => (
         <View style={[styles.row, { backgroundColor: pressed ? colors.surfacePressed : "transparent", borderBottomColor: colors.border }]}>
@@ -167,7 +159,7 @@ function FanThumb({ covers, ladder }: { covers: PublishedContent["covers"]; ladd
       ) : null}
       {fan.map((cover, index) => (
         <Cover
-          key={cover ?? index}
+          key={index}
           uri={cover}
           style={{
             left: FAN_INSET + index * FAN_STEP + (3 - fan.length) * (FAN_STEP / 2),

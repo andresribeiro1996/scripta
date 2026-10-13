@@ -220,8 +220,6 @@ const styles = StyleSheet.create({
   // flex so a centred EmptyState/ErrorState has a height to centre within —
   // StatePanel grows and centres itself, which needs a parent that has room.
   page: { flex: 1, padding: spacing.lg },
-  // Rows run edge to edge like Browse's; paddingBottom clears the search dock
-  // so the last row isn't sitting under it.
   list: { paddingTop: spacing.lg - spacing.md, paddingBottom: searchDockClearance, flexGrow: 1 },
   sectionHeader: { marginTop: spacing.lg, marginBottom: spacing.xs, paddingHorizontal: spacing.lg },
   dialog: { gap: spacing.md },

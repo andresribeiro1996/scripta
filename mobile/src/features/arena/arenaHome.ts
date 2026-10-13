@@ -1,5 +1,5 @@
-import { DEFAULT_TIER_PRESET } from "@scripta/shared";
-import type { ContentTone } from "@scripta/shared/community";
+import { TIER_LADDER } from "../community/communityHome";
+import { CONTENT_STATUS, type ContentTone } from "@scripta/shared/community";
 import type { Quiz } from "../quizzes/api";
 import type { Tierlist, VotedTierlist } from "../tierlists/api";
 import type { Tournament } from "./api";
@@ -22,8 +22,6 @@ export const NEW_GAMES = [
   { tab: "quizzes", label: "Quiz", href: "/quiz/new" },
 ] as const satisfies ReadonlyArray<{ tab: ArenaTab; label: string; href: string }>;
 
-// A tournament's row draws its own status and progress from the summary, so
-// it has no detail string; a tier list's detail is a plain count and stays one.
 export type OwnedItem =
   | { id: string; name: string; kind: "tournament"; source: Tournament }
   | { id: string; name: string; detail: string; kind: "tierlist"; source: Tierlist }
@@ -48,25 +46,19 @@ export const DELETE_EFFECT: Record<OwnedItem["kind"], string> = {
 
 type Badge = { label: string; tone: ContentTone };
 
+const DRAFT_BADGE: Badge = { label: "Draft", tone: "neutral" };
+
 const TOURNAMENT_BADGE: Record<Tournament["status"], Badge> = {
   seeding: { label: "Seeding", tone: "neutral" },
-  active: { label: "In progress", tone: "info" },
-  completed: { label: "Completed", tone: "success" },
+  active: CONTENT_STATUS.inProgress,
+  completed: CONTENT_STATUS.completed,
 };
 
 type Stage = "draft" | "open" | "closed";
 
-const TIERLIST_BADGE: Record<Stage, Badge> = {
-  draft: { label: "Draft", tone: "neutral" },
-  open: { label: "Voting open", tone: "accent" },
-  closed: { label: "Closed", tone: "neutral" },
-};
+const TIERLIST_BADGE: Record<Stage, Badge> = { draft: DRAFT_BADGE, open: CONTENT_STATUS.votingOpen, closed: CONTENT_STATUS.closed };
 
-const QUIZ_BADGE: Record<Stage, Badge> = {
-  draft: { label: "Draft", tone: "neutral" },
-  open: { label: "Open", tone: "accent" },
-  closed: { label: "Closed", tone: "neutral" },
-};
+const QUIZ_BADGE: Record<Stage, Badge> = { draft: DRAFT_BADGE, open: CONTENT_STATUS.open, closed: CONTENT_STATUS.closed };
 
 const VOTED_BADGE: Badge = { label: "Voted", tone: "info" };
 
@@ -182,7 +174,6 @@ export function tournamentProgress(tournament: Tournament): {
   if (tournament.status === "seeding") {
     return { label: `${tournament.filledSlots} of ${tournament.bracketSize} slots filled`, totalRounds, completedRounds: 0 };
   }
-  // No caption: the Completed badge beside it already says this.
   if (tournament.status === "completed") {
     return { label: "", totalRounds, completedRounds: totalRounds };
   }
@@ -190,8 +181,6 @@ export function tournamentProgress(tournament: Tournament): {
   return { label: `Round ${round} of ${totalRounds}`, totalRounds, completedRounds: round - 1 };
 }
 
-/** Detail line for someone else's poll the account voted on; its status
- *  is the row's badge. */
 export function votedTierlistDetail(tierlist: VotedTierlist): string {
   return `${tierlist.poolSize} books · ${tierlist.ballotCount} ballots`;
 }
@@ -217,10 +206,6 @@ function tournamentRow(tournament: Tournament): GameRowModel {
   };
 }
 
-/** What a Games-tab row shows for each non-header entry. Tier lists carry
- *  only work ids, so an owned one has no covers to fan; quizzes snapshot
- *  theirs at publish. A voted tier list's tiers are the owner's answer key,
- *  so it keeps the preset ladder. */
 export function gameRow(row: Exclude<SectionedItem, { kind: "header" }>): GameRowModel {
   if (row.kind === "votedTournament") {
     const model = tournamentRow(row.tournament);
@@ -234,7 +219,7 @@ export function gameRow(row: Exclude<SectionedItem, { kind: "header" }>): GameRo
       meta: votedTierlistDetail(tierlist),
       badges: [TIERLIST_BADGE[tierlist.votingOpen ? "open" : "closed"], VOTED_BADGE],
       covers: tierlist.covers,
-      ladder: DEFAULT_TIER_PRESET.map((tier) => tier.color),
+      ladder: TIER_LADDER,
     };
   }
   const { item } = row;

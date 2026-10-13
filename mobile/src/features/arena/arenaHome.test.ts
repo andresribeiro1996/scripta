@@ -104,7 +104,6 @@ test("empty copy distinguishes an empty tab from an unmatched search", () => {
 
 test("tournament progress reads differently at each stage", () => {
   assert.equal(tournamentProgress(tournament({ status: "seeding", bracketSize: 8, filledSlots: 3 })).label, "3 of 8 slots filled");
-  // Completed says nothing: the Completed badge does.
   assert.equal(tournamentProgress(tournament({ status: "completed", bracketSize: 8 })).label, "");
 
   // 16 books is four rounds; round 2 is halfway.
