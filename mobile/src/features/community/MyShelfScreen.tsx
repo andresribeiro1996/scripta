@@ -16,14 +16,12 @@ import { useMurals } from "../murals/useMurals";
 import { fetchTierlists } from "../tierlists/api";
 import { ActivityList } from "./ActivityList";
 import { FeedSettingsDialog } from "./FeedSettingsDialog";
-import { OwnLibraryPane } from "./OwnLibraryPane";
 import { ShelfPreview } from "./ShelfPreview";
 import { fetchOwnProfile, publishProfile, setShelfMural, unpublishProfile } from "./api";
 import { MuralPicker } from "./ProfileScreen";
 
 const MY_SHELF_TABS = [
   { value: "shelf", label: "Shelf" },
-  { value: "library", label: "Library" },
   { value: "activity", label: "Activity" },
 ] as const;
 
@@ -171,7 +169,6 @@ export function MyShelfScreen() {
 
   const menuItems: MenuItem[] = [
     ...(hasMural ? [{ label: "Edit shelf", onPress: () => router.push(`/murals/${ownData.muralId}` as never) }] : []),
-    { label: "Manage library…", onPress: () => router.push("/library" as never) },
     { label: "Switch shelf mural…", onPress: () => setSwitchingMural(true) },
     { label: "Feed settings…", onPress: () => setSettingsOpen(true) },
   ];
@@ -201,7 +198,6 @@ export function MyShelfScreen() {
         value={tab}
         onChange={handleTabChange}
         renderPage={(value) => {
-          if (value === "library") return <OwnLibraryPane />;
           if (value === "activity") return <ActivityList username={username} />;
           if (hasMural && mural.isPending) return <View style={styles.tabPad}><Skeleton height={240} /></View>;
           if (hasMural && mural.isError) return <ErrorState body="Couldn't load your shelf." actionLabel="Retry" onAction={() => void mural.refetch()} />;

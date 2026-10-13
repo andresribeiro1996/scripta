@@ -7,7 +7,7 @@ tags:
 - launchApp:
     clearState: true
 - extendedWaitUntil:
-    visible: "server ok"
+    visible: "Your bookshelf, everywhere."
     timeout: 15000
 - tapOn: "Email or username"
 - inputText: ${USERNAME}
@@ -17,11 +17,9 @@ tags:
 - extendedWaitUntil:
     visible: "Library"
     timeout: 15000
-- tapOn: "Arena"
-- assertVisible: "Arena"
-- tapOn: "Murals"
-- assertVisible: "Murals"
-- tapOn: "Settings"
-- assertVisible: "Settings"
-- tapOn: "Open gallery"
-- assertVisible: "Gallery"
+- tapOn: "Games"
+- assertVisible: "Games"
+- tapOn: "You"
+- assertVisible: "Your shelf"
+- tapOn: "Gallery"
+- assertVisible: "Upload"

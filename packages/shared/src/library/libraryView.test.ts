@@ -3,6 +3,8 @@ import { test } from "node:test";
 import { statusLabel } from "./covers.js";
 import { LIBRARY_STATUS_TABS, STATUS_FILTER_OPTIONS, localDay, readingPercent, setReadStatus } from "./libraryView.js";
 
+process.env.TZ = "America/Sao_Paulo";
+
 test("finishing a book records the day and full progress", () => {
   const book = { Title: "A", ReadStatus: 1, ___PercentRead: 40, DateLastRead: "2024-01-01" };
   assert.deepEqual(setReadStatus(book, 2, "2026-09-25"), { Title: "A", ReadStatus: 2, ___PercentRead: 100, DateLastRead: "2026-09-25" });
@@ -54,4 +56,8 @@ test("readingPercent is null when progress is unknown", () => {
   assert.equal(readingPercent({ ___PercentRead: null }), null);
   assert.equal(readingPercent({ ___PercentRead: Number.NaN }), null);
   assert.equal(readingPercent({ ___PercentRead: Number.POSITIVE_INFINITY }), null);
+});
+
+test("library shelves read Reading, To read, Finished", () => {
+  assert.deepEqual(LIBRARY_STATUS_TABS.map((tab) => tab.label), ["Reading", "To read", "Finished"]);
 });

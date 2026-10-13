@@ -13,9 +13,9 @@ export const STATUS_FILTER_OPTIONS: Array<{ value: StatusFilter; label: string }
 // atop the mobile Library screen — unlike STATUS_FILTER_OPTIONS above,
 // there's no "all" tab: a shelf is always exactly one of these three.
 export const LIBRARY_STATUS_TABS = [
-  { value: "finished", label: "Finished" },
   { value: "reading", label: "Reading" },
-  { value: "unread", label: "To read" }
+  { value: "unread", label: "To read" },
+  { value: "finished", label: "Finished" }
 ] as const;
 
 export type LibraryStatusTab = (typeof LIBRARY_STATUS_TABS)[number]["value"];

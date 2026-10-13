@@ -44,8 +44,8 @@ export default function WelcomeAvatarRoute() {
     {user.avatarId ? <Image source={{ uri: `${API_URL}/auth/avatar/${user.avatarId}/file` }} style={styles.avatar} /> : <View style={[styles.avatar, styles.initial, { backgroundColor: colors.accentSoft }]}><Text style={[styles.initialText, { color: colors.accent }]}>{(user.username ?? user.email)[0]?.toUpperCase()}</Text></View>}
     {error ? <Text accessibilityRole="alert" style={[typography.caption, { color: colors.danger }]}>{error}</Text> : null}
     {user.avatarId
-      ? <View style={styles.actions}><Button label="Continue" disabled={busy} onPress={() => router.replace(finishAuthNavigation() as never)} /><Button label="Choose a different photo" variant="secondary" loading={busy} onPress={() => void choosePhoto()} /></View>
-      : <View style={styles.actions}><Button label="Choose a photo" loading={busy} onPress={() => void choosePhoto()} /><Button label="Skip for now" variant="secondary" disabled={busy} onPress={() => router.replace(finishAuthNavigation() as never)} /></View>}
+      ? <View style={styles.actions}><Button label="Continue" disabled={busy} onPress={() => router.replace(finishAuthNavigation() as never, { withAnchor: true })} /><Button label="Choose a different photo" variant="secondary" loading={busy} onPress={() => void choosePhoto()} /></View>
+      : <View style={styles.actions}><Button label="Choose a photo" loading={busy} onPress={() => void choosePhoto()} /><Button label="Skip for now" variant="secondary" disabled={busy} onPress={() => router.replace(finishAuthNavigation() as never, { withAnchor: true })} /></View>}
   </View>;
 }
 

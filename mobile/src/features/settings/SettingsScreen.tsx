@@ -75,8 +75,6 @@ export function SettingsScreen() {
         </> : <><Text style={[typography.body, { color: colors.text }]}>@{user?.username}</Text><Button label="Change username" variant="secondary" onPress={() => setEditing(true)} /></>}
         {error ? <Text accessibilityRole="alert" style={[typography.caption, { color: colors.danger }]}>{error}</Text> : null}
       </View>
-      <Button label="Reader card" variant="secondary" onPress={() => router.push("/reader-card" as never)} />
-      <Button label="Open gallery" variant="secondary" onPress={() => router.push("/gallery")} />
       <Button label="Account" variant="secondary" onPress={() => router.push("/account-security")} />
       <SocialsSection />
       <Button label="Sign out" variant="destructive" onPress={confirmSignOut} />

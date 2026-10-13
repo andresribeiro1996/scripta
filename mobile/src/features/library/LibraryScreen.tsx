@@ -84,8 +84,6 @@ export function LibraryScreen() {
   }, [library]);
   // The status shown is a shelf (one of the three tabs), not a clearable
   // filter — only search and sort get reset here.
-  const toolbarActive = query.trim() !== "" || sortKey !== "manual";
-
   function clearSearchAndFilters() {
     setQuery("");
     setSortKey("manual");
@@ -273,12 +271,16 @@ export function LibraryScreen() {
                 </View>
               }
               ListEmptyComponent={
-                <EmptyState
-                  title="No books match."
-                  body="Every book is still here — the search above just doesn't match any of them."
-                  actionLabel={toolbarActive ? "Clear search and sort" : undefined}
-                  onAction={toolbarActive ? clearSearchAndFilters : undefined}
-                />
+                query.trim() ? (
+                  <EmptyState
+                    title="No books match."
+                    body="Every book is still here — the search above just doesn't match any of them."
+                    actionLabel="Clear search and sort"
+                    onAction={clearSearchAndFilters}
+                  />
+                ) : (
+                  <EmptyState title="Nothing on this shelf yet." />
+                )
               }
               renderItem={(book) => {
                 const seriesGroup = bookSeriesGroup.get(bookKey(book));

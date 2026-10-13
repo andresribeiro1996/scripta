@@ -9,7 +9,8 @@
   ],
   "overrides": {
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "@expo/ui": "57.0.22"
   },
   "scripts": {
     "backend": "npm run dev:claim && npm run dev --workspace backend",
