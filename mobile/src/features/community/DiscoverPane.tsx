@@ -84,7 +84,11 @@ export function DiscoverPane({ linkAuthors = true }: { linkAuthors?: boolean }) 
               onRefresh={() => void discover.refetch()}
               ListEmptyComponent={
                 <View style={styles.page}>
-                  <EmptyState title="Nothing published yet" body="Check back later for new tier lists, tournaments and quizzes." />
+                  {needle ? (
+                    <EmptyState title={`No games match “${needle}”.`} body="Try another name or book." />
+                  ) : (
+                    <EmptyState title="Nothing published yet" body="Check back later for new tier lists, tournaments and quizzes." />
+                  )}
                 </View>
               }
               onEndReached={() => {

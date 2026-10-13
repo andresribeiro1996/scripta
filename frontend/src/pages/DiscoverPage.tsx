@@ -92,7 +92,7 @@ function DiscoverPane() {
 
   return (
     <div>
-      <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search tier lists, tournaments and quizzes" aria-label="Search tier lists, tournaments and quizzes by name" className={searchInput} />
+      <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search tier lists, tournaments and quizzes" aria-label="Search tier lists, tournaments and quizzes by name or book" className={searchInput} />
       <div className="mb-4 flex items-stretch overflow-x-auto rounded-lg border border-(--color-border) bg-(--color-surface) sm:w-96">
         {DISCOVER_FILTERS.map((f, i) => (
           <button key={f.value} onClick={() => setType(f.value)} aria-pressed={type === f.value} className={segmented(type === f.value, i === 0)}>
@@ -103,7 +103,11 @@ function DiscoverPane() {
       {isLoading && <SkeletonCardGrid count={4} label="Loading published games" tileClassName="min-h-[110px]" />}
       {!isLoading && error && items.length === 0 && <EmptyState title="Couldn't load published games." action={retryButton(refetch)} />}
       {!isLoading && !error && items.length === 0 && (
-        <EmptyState icon={CommunityIcon} title="Nothing published yet." body="Published tier lists, tournaments and quizzes show up here." />
+        needle ? (
+          <EmptyState icon={CommunityIcon} title={`No games match “${needle}”.`} body="Try another name or book." />
+        ) : (
+          <EmptyState icon={CommunityIcon} title="Nothing published yet." body="Published tier lists, tournaments and quizzes show up here." />
+        )
       )}
       {!isLoading && items.length > 0 && (
         <>
