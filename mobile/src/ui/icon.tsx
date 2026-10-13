@@ -72,6 +72,7 @@ const FILLED = {
   arena: { ios: "trophy.fill", android: "trophy" },
   community: { ios: "person.3.fill", android: "group" },
   murals: { ios: "paintpalette.fill", android: "palette" },
+  profile: { ios: "person.circle.fill", android: "account_circle" },
   settings: { ios: "gearshape.fill", android: "settings" },
 } as const satisfies Partial<Record<IconName, Glyph>>;
 

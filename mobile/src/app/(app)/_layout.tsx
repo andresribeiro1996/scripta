@@ -55,10 +55,9 @@ function AppTabs() {
             tabBarIcon: ({ color, focused, size }) => <Icon name="home" filled={focused} color={color} size={size} />,
           }}
         />
-        <Tabs.Screen name="(library)" options={{ title: "My shelf", tabBarIcon: ({ color, focused, size }) => <Icon name="library" filled={focused} color={color} size={size} /> }} />
+        <Tabs.Screen name="(library)" options={{ title: "Library", tabBarIcon: ({ color, focused, size }) => <Icon name="library" filled={focused} color={color} size={size} /> }} />
         <Tabs.Screen name="(arena)" options={{ title: "Games", tabBarIcon: ({ color, focused, size }) => <Icon name="arena" filled={focused} color={color} size={size} /> }} />
-        <Tabs.Screen name="(murals)" options={{ title: "Murals", tabBarIcon: ({ color, focused, size }) => <Icon name="murals" filled={focused} color={color} size={size} /> }} />
-        <Tabs.Screen name="(settings)" options={{ title: "Settings", tabBarIcon: ({ color, focused, size }) => <Icon name="settings" filled={focused} color={color} size={size} /> }} />
+        <Tabs.Screen name="(you)" options={{ title: "You", tabBarIcon: ({ color, focused, size }) => <Icon name="profile" filled={focused} color={color} size={size} /> }} />
       </Tabs>
     </>
   );
