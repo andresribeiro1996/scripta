@@ -121,7 +121,7 @@ adb — see "Running" above.
 ## Layout
 
 - `src/core/` — config (validated API URL), token store (refresh token in `expo-secure-store`, access token in memory only), API client, `AuthProvider` (cold-start refresh).
-- `src/app/` — Expo Router file routes. `(public)/` unauthenticated (login), `(app)/` auth-guarded tab shell (Home, Library, Games, You). The guard redirects to login when no session.
+- `src/app/` — Expo Router file routes. `(public)/` unauthenticated (login), `(app)/` auth-guarded tab shell (Home, Library, Search, Games, You). The guard redirects to login when no session.
 - Public share, arena, and ballot routes are outside the authenticated `(app)` group. Dashboard URLs redirect into guarded native screens.
 
 ## Route adaptations

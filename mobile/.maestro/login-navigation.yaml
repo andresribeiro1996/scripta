@@ -17,6 +17,8 @@ tags:
 - extendedWaitUntil:
     visible: "Library"
     timeout: 15000
+- tapOn: "Search"
+- assertVisible: "All"
 - tapOn: "Games"
 - assertVisible: "Games"
 - tapOn: "You"

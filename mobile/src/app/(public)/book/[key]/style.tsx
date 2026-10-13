@@ -1,1 +1,1 @@
-export { default } from "../../../(app)/(home,arena,library,you)/book/[key]/style";
+export { default } from "../../../(app)/(home,arena,library,search,you)/book/[key]/style";
