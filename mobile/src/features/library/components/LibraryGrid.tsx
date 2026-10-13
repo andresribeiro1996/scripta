@@ -22,7 +22,6 @@ export function LibraryGrid<T>({
   style,
   ListEmptyComponent,
   ListHeaderComponent,
-  ListFooterComponent,
   refreshControl,
   topInset = 0,
 }: {
@@ -32,7 +31,6 @@ export function LibraryGrid<T>({
   style: LibraryStyleSettings;
   ListEmptyComponent?: FlatListProps<T>["ListEmptyComponent"];
   ListHeaderComponent?: FlatListProps<T>["ListHeaderComponent"];
-  ListFooterComponent?: FlatListProps<T>["ListFooterComponent"];
   refreshControl?: FlatListProps<T>["refreshControl"];
   topInset?: number;
 }) {
@@ -49,7 +47,6 @@ export function LibraryGrid<T>({
       refreshControl={refreshControl}
       ListEmptyComponent={ListEmptyComponent}
       ListHeaderComponent={ListHeaderComponent}
-      ListFooterComponent={ListFooterComponent}
       columnWrapperStyle={{ gap: style.cardGap }}
       // A search field can sit in this grid's header: without this the
       // first tap on a card only dismisses the keyboard.

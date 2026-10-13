@@ -57,3 +57,7 @@ test("readingPercent is null when progress is unknown", () => {
   assert.equal(readingPercent({ ___PercentRead: Number.NaN }), null);
   assert.equal(readingPercent({ ___PercentRead: Number.POSITIVE_INFINITY }), null);
 });
+
+test("library shelves read Reading, To read, Finished", () => {
+  assert.deepEqual(LIBRARY_STATUS_TABS.map((tab) => tab.label), ["Reading", "To read", "Finished"]);
+});

@@ -64,15 +64,13 @@ const GLYPHS = {
   quote: { ios: "quote.opening", android: "format_quote" },
 } as const satisfies Record<string, Glyph>;
 
-/** Only these five have a solid counterpart worth using; the rest read the
+/** Only the tab icons have a solid counterpart worth using; the rest read the
  *  same either way, and `plus.fill` etc. aren't the iOS convention anyway. */
 const FILLED = {
   home: { ios: "house.fill", android: "home" },
   library: { ios: "books.vertical.fill", android: "library_books" },
   arena: { ios: "trophy.fill", android: "trophy" },
-  community: { ios: "person.3.fill", android: "group" },
-  murals: { ios: "paintpalette.fill", android: "palette" },
-  settings: { ios: "gearshape.fill", android: "settings" },
+  profile: { ios: "person.circle.fill", android: "account_circle" },
 } as const satisfies Partial<Record<IconName, Glyph>>;
 
 export type IconName = keyof typeof GLYPHS;

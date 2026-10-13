@@ -1,1 +1,1 @@
-export { default } from "../../../(app)/(home,arena,library)/work/[id]/stats";
+export { default } from "../../../(app)/(home,arena,library,you)/work/[id]/stats";
