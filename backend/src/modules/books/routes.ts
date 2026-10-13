@@ -10,6 +10,7 @@ const lookupSchema = z.object({
   author: z.string().max(500).optional()
 });
 const searchSchema = z.object({ q: z.string().max(200) });
+const catalogSearchSchema = searchSchema.extend({ by: z.literal("work").optional() });
 const fileParamsSchema = z.object({ id: z.string().uuid(), size: z.enum(["file", "thumb"]) });
 
 const FORBIDDEN = { error: "Only the admin can change shared covers." };
@@ -69,9 +70,9 @@ export function buildCatalogRoutes(service: BooksService) {
     });
 
     app.get("/books/search", { preHandler: authGuard }, async (request, reply) => {
-      const parsed = searchSchema.safeParse(request.query);
+      const parsed = catalogSearchSchema.safeParse(request.query);
       if (!parsed.success) return reply.code(400).send({ error: "Send a search query as q." });
-      return reply.send({ results: service.search(parsed.data.q) });
+      return reply.send({ results: service.search(parsed.data.q, { byWork: parsed.data.by === "work" }) });
     });
 
     app.get("/books/search/external", { preHandler: authGuard }, async (request, reply) => {

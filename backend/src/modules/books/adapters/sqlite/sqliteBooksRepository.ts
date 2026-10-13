@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync, StatementSync } from "node:sqlite";
-import { normalizeWorkKey, workTitleKey } from "../../domain/normalize.js";
+import { MIN_PREFIX_LENGTH, normalizeWorkKey, workTitleKey } from "../../domain/normalize.js";
 import type { BooksRepository, IdPage, MergeableDetails, PageCursor } from "../../domain/ports.js";
 import { WorkMergeError } from "../../domain/errors.js";
 import type { BookRow, CoverImageRow, DataSource, SummarySource, WorkPageRows, WorkView } from "../../domain/types.js";
@@ -28,11 +28,16 @@ export const WORK_LOOKUP_SQL = `
   ORDER BY work_checked_at IS NOT NULL, created_by IS NOT NULL, work_checked_at, created_at, rowid
   LIMIT ?
 `;
+export const CONFIRMED_SQL = "(created_by IS NOT NULL OR data_sources <> '[]')";
 
 function idPage(stmt: StatementSync, after: PageCursor | null, limit: number): IdPage {
   const rows = stmt.all(after?.at ?? "", after?.row ?? 0, limit) as Array<{ id: string; at: string; row: number }>;
   const last = rows[rows.length - 1];
   return { ids: rows.map((row) => row.id), next: rows.length === limit && last ? { at: last.at, row: last.row } : null };
+}
+
+function matchExpression(tokens: string[]): string {
+  return tokens.map((token, index) => (index === tokens.length - 1 && token.length >= MIN_PREFIX_LENGTH ? `"${token}"*` : `"${token}"`)).join(" ");
 }
 
 export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
@@ -61,6 +66,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const missingTitleKeyStmt = db.prepare(`SELECT id, title, author FROM books WHERE title_key IS NULL AND title <> '' LIMIT ?`);
   const setTitleKeyStmt = db.prepare(`UPDATE books SET title_key = ? WHERE id = ?`);
   const unassignedStmt = db.prepare(`SELECT id, ol_work_key, title, author, created_at FROM books WHERE work_id IS NULL LIMIT ?`);
+  const aliasesOfStmt = db.prepare(`SELECT id FROM works WHERE merged_into IN (SELECT value FROM json_each(?))`);
   const canonicalWorksStmt = db.prepare(`SELECT id, COALESCE(merged_into, id) AS canonical FROM works WHERE id IN (SELECT value FROM json_each(?))`);
   const moveBookStmt = db.prepare(`UPDATE books SET work_id = ? WHERE id = ?`);
   const mergeEmptyWorkStmt = db.prepare(`UPDATE works SET merged_into = ? WHERE id = ? AND NOT EXISTS (SELECT 1 FROM books WHERE work_id = works.id)`);
@@ -124,8 +130,12 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const replaceLanguageStmt = db.prepare(`UPDATE books SET language = ? WHERE id = ?`);
   const makeSearchableStmt = db.prepare(`
     INSERT INTO books_fts (book_id, title, author)
-    SELECT id, title, author FROM books WHERE id = ? AND title != '' AND NOT EXISTS (SELECT 1 FROM books_fts WHERE book_id = ?)
+    SELECT id, title, author FROM books
+    WHERE id = ? AND title <> '' AND NOT EXISTS (SELECT 1 FROM books_search WHERE book_id = books.id)
   `);
+  const markSearchableStmt = db.prepare(`INSERT OR IGNORE INTO books_search (book_id) VALUES (?)`);
+  const searchableStmt = db.prepare(`SELECT 1 FROM books_search WHERE book_id = ?`);
+  const confirmedStmt = db.prepare(`SELECT 1 FROM books WHERE id = ? AND ${CONFIRMED_SQL}`);
   const imageStmt = db.prepare(`SELECT * FROM cover_images WHERE id = ?`);
   const insertImageStmt = db.prepare(`
     INSERT INTO cover_images (id, book_id, source, source_url, origin, width, height, byte_size, color, created_at)
@@ -194,6 +204,16 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     }
   }
 
+  function makeSearchable(id: string) {
+    inTransaction(() => {
+      if (makeSearchableStmt.run(id).changes > 0) markSearchableStmt.run(id);
+    });
+  }
+
+  function makeSearchableIfConfirmed(id: string) {
+    if (confirmedStmt.get(id)) makeSearchable(id);
+  }
+
   function insertWork(workKey: string | null, title: string, author: string, createdAt: string): string {
     const id = randomUUID();
     insertWorkStmt.run(id, workKey, title, author, createdAt);
@@ -236,6 +256,9 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       const rows = canonicalWorksStmt.all(JSON.stringify(ids)) as Array<{ id: string; canonical: string }>;
       return new Map(rows.map((row) => [row.id, row.canonical]));
     },
+    aliasesOf(workIds) {
+      return (aliasesOfStmt.all(JSON.stringify(workIds)) as Array<{ id: string }>).map((row) => row.id);
+    },
 
     findBookByKey: (key) => byKeyStmt.get(key) as BookRow | undefined,
 
@@ -272,6 +295,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
         });
         for (const key of keys) insertKeyIfMissingStmt.run(key, id);
         if (held) fillWorkIdentityStmt.run(id);
+        makeSearchableIfConfirmed(id);
         return byIdStmt.get(id) as unknown as BookRow;
       });
     },
@@ -284,12 +308,13 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       inTransaction(() => {
         fillIdentityStmt.run(title, author, title ? workTitleKey(title, author) : null, id);
         fillWorkIdentityStmt.run(id);
+        makeSearchableIfConfirmed(id);
       });
     },
 
-    makeSearchable(id) {
-      makeSearchableStmt.run(id, id);
-    },
+    makeSearchable,
+
+    isSearchable: (id) => searchableStmt.get(id) !== undefined,
 
     getImage: (id) => imageStmt.get(id) as CoverImageRow | undefined,
 
@@ -335,6 +360,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
         mergeDetails(bookId, details, summarySource);
         const stored = JSON.parse((byIdStmt.get(bookId) as BookRow | undefined)?.data_sources ?? "[]") as DataSource[];
         saveDetailsStmt.run(details.rating, details.ratingCount, JSON.stringify(details.genres), JSON.stringify([...new Set([...stored, ...sources])]), details.sourceUrl, checkedAt, bookId);
+        makeSearchableIfConfirmed(bookId);
       });
     },
 
@@ -350,7 +376,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
 
     searchBooks(tokens, limit) {
       if (tokens.length === 0) return [];
-      return searchStmt.all(tokens.map((token) => `"${token}"`).join(" "), limit) as unknown as BookRow[];
+      return searchStmt.all(matchExpression(tokens), limit) as unknown as BookRow[];
     },
 
     listUncheckedCoverIds(after, limit) {

@@ -8,6 +8,7 @@ import { env } from "../../../../config/env.js";
 import { openSqlite } from "../../../../db/openSqlite.js";
 import { MIN_GOOD_WIDTH } from "../../domain/constants.js";
 import { catalogTitleKey } from "../../domain/normalize.js";
+import { CONFIRMED_SQL } from "./sqliteBooksRepository.js";
 
 const adapterDir = dirname(fileURLToPath(import.meta.url));
 
@@ -84,6 +85,7 @@ export function applyBooksMigrations(db: DatabaseSync): void {
   }
   backfillTitleKeys(db);
   joinIsbn10Editions(db);
+  indexConfirmedBooks(db);
 }
 
 function moveOpenLibrarySummariesToWorks(db: DatabaseSync): void {
@@ -170,6 +172,26 @@ function joinIsbn10Editions(db: DatabaseSync): void {
       }
     }
     db.exec("PRAGMA user_version = 2");
+    db.exec("COMMIT");
+  } catch (error) {
+    if (db.isTransaction) db.exec("ROLLBACK");
+    throw error;
+  }
+}
+
+function indexConfirmedBooks(db: DatabaseSync): void {
+  const { user_version: version } = db.prepare("PRAGMA user_version").get() as { user_version: number };
+  if (version >= 3) return;
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    db.exec("INSERT OR IGNORE INTO books_search (book_id) SELECT book_id FROM books_fts");
+    db.exec(`
+      INSERT INTO books_fts (book_id, title, author)
+      SELECT id, title, author FROM books
+      WHERE title <> '' AND ${CONFIRMED_SQL} AND id NOT IN (SELECT book_id FROM books_search)
+    `);
+    db.exec(`INSERT OR IGNORE INTO books_search (book_id) SELECT id FROM books WHERE title <> '' AND ${CONFIRMED_SQL}`);
+    db.exec("PRAGMA user_version = 3");
     db.exec("COMMIT");
   } catch (error) {
     if (db.isTransaction) db.exec("ROLLBACK");

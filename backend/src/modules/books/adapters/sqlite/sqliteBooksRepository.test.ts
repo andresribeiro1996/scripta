@@ -1145,7 +1145,7 @@ test("the ISBN-10 pass leaves two keyed works that disagree alone", () => {
 
 test("the ISBN-10 pass runs once", () => {
   const { db } = freshRepo();
-  assert.equal((db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version, 2);
+  assert.equal((db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version, 3);
 });
 
 test("listUncheckedCoverIds pages by created_at then insert order, and a short page ends the cycle", () => {
@@ -1232,4 +1232,61 @@ test("the works.summary migration moves Open Library edition summaries onto the 
   assert.deepEqual(edition("b3"), { summary: "Publisher text.", summary_source: "publisher" });
   assert.deepEqual(edition("b4"), { summary: "ISBNdb text.", summary_source: "isbndb" });
   assert.deepEqual(edition("b5"), { summary: "Orphan text.", summary_source: "openlibrary" });
+});
+
+test("seeded and publisher books are searchable from the moment they are created", () => {
+  const { repo } = freshRepo();
+  repo.createBook({ title: "Orlando", author: "Virginia Woolf", isbn: "9780141184272", createdBy: "seed" }, ["isbn:9780141184272"], NOW);
+  repo.createBook({ title: "Ensaio sobre a Cegueira", author: "José Saramago", isbn: "9789722113002", createdBy: "publisher" }, ["isbn:9789722113002"], NOW);
+  assert.deepEqual(repo.searchBooks(["orlando"], 12).map((book) => book.title), ["Orlando"]);
+  assert.deepEqual(repo.searchBooks(["cegueira"], 12).map((book) => book.title), ["Ensaio sobre a Cegueira"]);
+});
+
+test("a library book becomes searchable once a source returns its details, and only once", () => {
+  const { db, repo } = freshRepo();
+  const book = repo.createBook({ title: "Orlando", author: "Virginia Woolf", isbn: "9780141184272" }, ["isbn:9780141184272"], NOW);
+  assert.deepEqual(repo.searchBooks(["orlando"], 12), []);
+  repo.saveDetails(book.id, richDetails, ["openlibrary"], "openlibrary", NOW);
+  repo.saveDetails(book.id, richDetails, ["isbndb"], "isbndb", NOW);
+  assert.deepEqual(repo.searchBooks(["orlando"], 12).map((row) => row.id), [book.id]);
+  assert.equal(countOf(db, "books_fts"), 1);
+});
+
+test("a confirmed book without a title is indexed once it gets one", () => {
+  const { repo } = freshRepo();
+  const book = repo.createBook({ title: "", author: "", isbn: "9780141184272", createdBy: "seed" }, ["isbn:9780141184272"], NOW);
+  assert.deepEqual(repo.searchBooks(["orlando"], 12), []);
+  repo.fillIdentity(book.id, "Orlando", "Virginia Woolf");
+  assert.deepEqual(repo.searchBooks(["orlando"], 12).map((row) => row.id), [book.id]);
+});
+
+test("the one-time backfill indexes the confirmed catalog once, keeps earlier search hits and leaves library-only books out", () => {
+  const { db, repo } = freshRepo();
+  const insert = db.prepare("INSERT INTO books (id, title, author, data_sources, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?)");
+  insert.run("seed-1", "Orlando", "Virginia Woolf", "[]", "seed", NOW);
+  insert.run("confirmed-1", "Mrs Dalloway", "Virginia Woolf", '["isbndb"]', null, NOW);
+  insert.run("hit-1", "To the Lighthouse", "Virginia Woolf", "[]", null, NOW);
+  insert.run("both-1", "The Waves", "Virginia Woolf", '["openlibrary"]', null, NOW);
+  insert.run("private-1", "My Private Manuscript", "Virginia Woolf", "[]", null, NOW);
+  const fts = db.prepare("INSERT INTO books_fts (book_id, title, author) VALUES (?, ?, ?)");
+  fts.run("hit-1", "To the Lighthouse", "Virginia Woolf");
+  fts.run("both-1", "The Waves", "Virginia Woolf");
+  db.exec("PRAGMA user_version = 2");
+  applyBooksMigrations(db);
+  assert.deepEqual(repo.searchBooks(["woolf"], 12).map((book) => book.id).sort(), ["both-1", "confirmed-1", "hit-1", "seed-1"]);
+  assert.equal(countOf(db, "books_fts"), 4);
+  assert.equal(repo.isSearchable("hit-1"), true);
+  assert.equal(repo.isSearchable("private-1"), false);
+  insert.run("seed-2", "Jacob's Room", "Virginia Woolf", "[]", "seed", NOW);
+  applyBooksMigrations(db);
+  assert.equal(countOf(db, "books_fts"), 4);
+});
+
+test("the last word matches as a prefix once it has three letters", () => {
+  const { repo } = freshRepo();
+  repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593", createdBy: "seed" }, ["isbn:9780441013593"], NOW);
+  assert.deepEqual(repo.searchBooks(["dun"], 12).map((book) => book.title), ["Dune"]);
+  assert.deepEqual(repo.searchBooks(["du"], 12), []);
+  assert.deepEqual(repo.searchBooks(["dune", "herb"], 12).map((book) => book.title), ["Dune"]);
+  assert.deepEqual(repo.searchBooks(["dun", "herbert"], 12), []);
 });

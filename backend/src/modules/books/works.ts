@@ -1,7 +1,8 @@
 import { normalizeBookGenres } from "@scripta/shared";
 import { findOrCreateBook } from "./domain/findOrCreate.js";
-import type { BookLookup } from "./domain/normalize.js";
+import { searchTokens, WORK_SCAN_LIMIT, type BookLookup } from "./domain/normalize.js";
 import type { BooksRepository } from "./domain/ports.js";
+import { firstEditionPerWork, workIdsOf } from "./domain/workSearch.js";
 import { booksRepository, coverUrlFor } from "./publicCoverLookup.js";
 
 export type WorkLookup = BookLookup;
@@ -26,6 +27,20 @@ export function resolveWorks(lookups: WorkLookup[]): Array<string | null> {
 
 export function canonicalWorks(ids: string[]): Map<string, string> {
   return canonicalWorksWith(booksRepository(), ids);
+}
+
+export function matchWorksWith(books: BooksRepository, query: string, limit: number): string[] {
+  const tokens = searchTokens(query);
+  if (tokens.length === 0) return [];
+  const rows = books.searchBooks(tokens, WORK_SCAN_LIMIT);
+  const works = firstEditionPerWork(rows, canonicalWorksWith(books, workIdsOf(rows)))
+    .flatMap(({ workId }) => (workId ? [workId] : []))
+    .slice(0, limit);
+  return works.length === 0 ? [] : [...works, ...books.aliasesOf(works)];
+}
+
+export function matchWorks(query: string, limit: number): string[] {
+  return matchWorksWith(booksRepository(), query, limit);
 }
 
 export type CatalogWorkPage = {

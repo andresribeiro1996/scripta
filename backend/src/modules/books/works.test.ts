@@ -15,7 +15,7 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
 const { applyBooksMigrations } = await import("./adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("./adapters/sqlite/sqliteBooksRepository.js");
-const { resolveWorksWith, canonicalWorksWith, getWorkPageWith } = await import("./works.js");
+const { resolveWorksWith, canonicalWorksWith, getWorkPageWith, matchWorksWith } = await import("./works.js");
 
 function freshRepo() {
   const db = new DatabaseSync(":memory:");
@@ -131,4 +131,16 @@ test("a work page edition carries normalised genres, rating and pages", () => {
   assert.equal(edition!.rating, 4.25);
   assert.equal(edition!.ratingCount, 120);
   assert.equal(edition!.pages, 412);
+});
+
+test("matchWorks returns the best matching works and the works merged into them", () => {
+  const { repo, db } = freshRepo();
+  const at = "2026-10-04T00:00:00.000Z";
+  const dune = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593", createdBy: "seed" }, ["isbn:9780441013593"], at);
+  const older = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780593099322", createdBy: "seed" }, ["isbn:9780593099322"], at);
+  repo.createBook({ title: "Orlando", author: "Virginia Woolf", isbn: "9780141184272", createdBy: "seed" }, ["isbn:9780141184272"], at);
+  db.prepare("UPDATE works SET merged_into = ? WHERE id = ?").run(dune.work_id, older.work_id);
+  assert.deepEqual(matchWorksWith(repo, "dun", 20), [dune.work_id, older.work_id]);
+  assert.deepEqual(matchWorksWith(repo, "zzz", 20), []);
+  assert.deepEqual(matchWorksWith(repo, "", 20), []);
 });

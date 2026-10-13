@@ -73,3 +73,7 @@ CREATE VIRTUAL TABLE IF NOT EXISTS books_fts USING fts5(
   author,
   tokenize = 'unicode61 remove_diacritics 2'
 );
+
+CREATE TABLE IF NOT EXISTS books_search (
+  book_id TEXT PRIMARY KEY
+) WITHOUT ROWID;

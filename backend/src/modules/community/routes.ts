@@ -192,7 +192,12 @@ export function buildPublicCommunityRoutes(service: CommunityService) {
         throw err;
       }
     });
+  };
+}
 
+export function buildDiscoverRoutes(service: CommunityService) {
+  return async function discoverRoutes(app: FastifyInstance) {
+    await app.register(fastifyRateLimit, { max: 60, timeWindow: "1 minute", keyGenerator: rateLimitKey });
     app.get("/community/discover", async (request, reply) => {
       const parsed = discoverQuerySchema.safeParse(request.query);
       if (!parsed.success) return reply.code(400).send({ error: "Invalid type/q/limit/offset." });

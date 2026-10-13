@@ -39,7 +39,7 @@ import {
 } from "./modules/auth/index.js";
 import { deleteArenaUserData, getArenaPublicApi, registerArenaModule } from "./modules/arena/index.js";
 import { createBestEffortRecorder, deleteCommunityUserData, getCommunityPublicApi, registerCommunityModule } from "./modules/community/index.js";
-import { enqueueBookCovers, getWorkPage, registerBooksModule } from "./modules/books/index.js";
+import { enqueueBookCovers, getWorkPage, matchWorks, registerBooksModule } from "./modules/books/index.js";
 import { deleteGalleryUserData, registerGalleryModule } from "./modules/gallery/index.js";
 import { communityRatings, copyOfWork, deleteLibraryUserData, holdersOfWorks, registerLibraryModule, resolvePublicLibrary, readerGlyphFor, resolveEntryWorks, WorkResolutionError, sharedBookCounts, sharedBooks, startWorksSweep, sweepLibraryWorks, type BookEvent } from "./modules/library/index.js";
 import { deleteMuralsUserData, getMuralsPublicApi, registerMuralsModule, rekeyMuralsBooks, sweepMuralsWorks } from "./modules/murals/index.js";
@@ -192,6 +192,7 @@ export function buildApp() {
     userHasUsername,
     findUserIdByUsername,
     searchUsernameOwners,
+    matchWorks,
     getDashboardSeenAt,
     setDashboardSeenAt,
     murals: getMuralsPublicApi(getTierlistsPublicApi().getTierlistData),
@@ -200,21 +201,24 @@ export function buildApp() {
       getPublishedMany: getTierlistsPublicApi().getPublishedMany,
       votedAmong: getTierlistsPublicApi().votedAmong,
       get: getTierlistsPublicApi().getPublished,
-      listByOwner: getTierlistsPublicApi().listPublishedByOwner
+      listByOwner: getTierlistsPublicApi().listPublishedByOwner,
+      publishedByWorks: getTierlistsPublicApi().publishedByWorks
     },
     tournaments: {
       discoverWindow: getArenaPublicApi().discoverWindow,
       getPublishedMany: getArenaPublicApi().getPublishedMany,
       votedAmong: getArenaPublicApi().votedAmong,
       get: getArenaPublicApi().getPublished,
-      listByOwner: getArenaPublicApi().listPublishedByOwner
+      listByOwner: getArenaPublicApi().listPublishedByOwner,
+      publishedByWorks: getArenaPublicApi().publishedByWorks
     },
     quizzes: {
       discoverWindow: getQuizzesPublicApi().discoverWindow,
       getPublishedMany: getQuizzesPublicApi().getPublishedMany,
       votedAmong: getQuizzesPublicApi().votedAmong,
       get: getQuizzesPublicApi().getPublished,
-      listByOwner: getQuizzesPublicApi().listPublishedByOwner
+      listByOwner: getQuizzesPublicApi().listPublishedByOwner,
+      publishedByWorks: getQuizzesPublicApi().publishedByWorks
     },
     participation: {
       tierlists: getTierlistsPublicApi().participationByOwner,

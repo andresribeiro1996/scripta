@@ -44,10 +44,11 @@ const baseDeps: Omit<CommunityDeps, "repo" | "background"> = {
   userHasUsername: () => true,
   findUserIdByUsername: unused,
   searchUsernameOwners: unused,
+  matchWorks: unused,
   murals: { ownsMural: unused, getMuralPublicPayload: unused },
-  tierlists: { discoverWindow: unused, getPublishedMany: unused, votedAmong: unused, get: unused, listByOwner: unused },
-  tournaments: { discoverWindow: unused, getPublishedMany: unused, votedAmong: unused, get: unused, listByOwner: unused },
-  quizzes: { discoverWindow: unused, getPublishedMany: unused, votedAmong: unused, get: unused, listByOwner: unused },
+  tierlists: { discoverWindow: unused, getPublishedMany: unused, votedAmong: unused, get: unused, listByOwner: unused, publishedByWorks: unused },
+  tournaments: { discoverWindow: unused, getPublishedMany: unused, votedAmong: unused, get: unused, listByOwner: unused, publishedByWorks: unused },
+  quizzes: { discoverWindow: unused, getPublishedMany: unused, votedAmong: unused, get: unused, listByOwner: unused, publishedByWorks: unused },
   participation: { tierlists: unused, tournaments: unused, quizzes: unused }
 };
 
