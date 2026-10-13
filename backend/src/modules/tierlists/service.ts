@@ -461,6 +461,7 @@ export interface TierlistsPublicApi {
   getPublishedMany(ids: string[]): PublishedTierlistRef[];
   votedAmong(voterUserId: string, ids: string[]): string[];
   publishedByWorks(workIds: string[], limit: number): GameByWork[];
+  discoverByWorks(workIds: string[], limit: number): TierlistDiscoverRef[];
   tierPlacements(workIds: string[]): TierPlacement[];
   getPublished(id: string): PublishedTierlistRef | undefined;
   listPublishedByOwner(ownerUserId: string): PublishedTierlistRef[];
@@ -487,6 +488,8 @@ export function createTierlistsPublicApi(service: TierlistsService): TierlistsPu
         path: `/vote/${row.vote_code}`,
         ownerUserId: row.owner_user_id === "__app__" ? null : row.origin_user_id
       })),
+    discoverByWorks: (workIds, limit) =>
+      service.listPublishedByWorks(workIds, limit).map((row) => ({ id: row.id, createdAt: row.created_at, ownerUserId: row.origin_user_id, promotedAt: row.promoted_at })),
     tierPlacements: (workIds) => service.tierPlacements(workIds),
     getPublished: (id) => service.getPublishedRef(id),
     listPublishedByOwner: (ownerUserId) => service.listPublishedRefsByOwner(ownerUserId),

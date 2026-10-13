@@ -787,9 +787,9 @@ test("the dashboard service pages through a real inbox newest first, narrowed to
     searchUsernameOwners: unused,
     matchWorks: unused,
     murals: { ownsMural: unused, getMuralPublicPayload: unused },
-    tierlists: { discoverWindow: unused, getPublishedMany: unused, votedAmong: unused, get: (id) => refs.get(id), listByOwner: unused, publishedByWorks: unused },
-    tournaments: { discoverWindow: unused, getPublishedMany: unused, votedAmong: unused, get: () => undefined, listByOwner: unused, publishedByWorks: unused },
-    quizzes: { discoverWindow: unused, getPublishedMany: unused, votedAmong: unused, get: () => undefined, listByOwner: unused, publishedByWorks: unused },
+    tierlists: { discoverWindow: unused, getPublishedMany: unused, votedAmong: unused, get: (id) => refs.get(id), listByOwner: unused, discoverByWorks: unused },
+    tournaments: { discoverWindow: unused, getPublishedMany: unused, votedAmong: unused, get: () => undefined, listByOwner: unused, discoverByWorks: unused },
+    quizzes: { discoverWindow: unused, getPublishedMany: unused, votedAmong: unused, get: () => undefined, listByOwner: unused, discoverByWorks: unused },
     participation: { tierlists: () => [], tournaments: () => [], quizzes: () => [] }
   });
   const at = (day: number) => `2026-09-0${day}T00:00:00.000Z`;

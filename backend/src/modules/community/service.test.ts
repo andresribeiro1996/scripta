@@ -150,7 +150,8 @@ function createDeps(repo: CommunityRepository) {
   const quizRefs = new Map<string, PublishedQuizRef>();
   const workMatches = new Map<string, string[]>();
   const gameWorks = new Map<string, string[]>();
-  const byWorks = (kind: string, ids: string[]) => (workIds: string[]) => ids.filter((id) => (gameWorks.get(`${kind}:${id}`) ?? []).some((work) => workIds.includes(work))).map((id) => ({ id }));
+  const byWorks = <R extends { id: string }, D>(kind: string, refs: Map<string, R>, toRef: (ref: R) => D) => (workIds: string[]) =>
+    [...refs.keys()].filter((id) => (gameWorks.get(`${kind}:${id}`) ?? []).some((work) => workIds.includes(work))).map((id) => toRef(refs.get(id)!));
   const byNewest = <T extends { createdAt: string }>(a: T, b: T) => b.createdAt.localeCompare(a.createdAt);
   const seenAt = { value: null as string | null };
   const votes = new Set<string>();
@@ -230,7 +231,7 @@ function createDeps(repo: CommunityRepository) {
       },
       get: (id) => tierlistRefs.get(id),
       listByOwner: (owner) => [...tierlistRefs.values()].filter((r) => r.ownerUserId === owner).sort(byNewest),
-      publishedByWorks: (workIds) => byWorks("tierlist", [...tierlistRefs.keys()])(workIds)
+      discoverByWorks: byWorks("tierlist", tierlistRefs, (r) => ({ id: r.id, createdAt: r.createdAt, ownerUserId: r.ownerUserId, promotedAt: r.promotedAt }))
     },
     tournaments: {
       discoverWindow: (needle, limit) => {
@@ -251,7 +252,7 @@ function createDeps(repo: CommunityRepository) {
       },
       get: (id) => tournamentRefs.get(id),
       listByOwner: (owner) => [...tournamentRefs.values()].filter((r) => r.ownerUserId === owner).sort(byNewest),
-      publishedByWorks: (workIds) => byWorks("tournament", [...tournamentRefs.keys()])(workIds)
+      discoverByWorks: byWorks("tournament", tournamentRefs, (r) => ({ id: r.id, createdAt: r.createdAt, ownerUserId: r.ownerUserId }))
     },
     quizzes: {
       discoverWindow: (needle, limit) => {
@@ -272,7 +273,7 @@ function createDeps(repo: CommunityRepository) {
       },
       get: (id) => quizRefs.get(id),
       listByOwner: (owner) => [...quizRefs.values()].filter((r) => r.ownerUserId === owner).sort(byNewest),
-      publishedByWorks: (workIds) => byWorks("quiz", [...quizRefs.keys()])(workIds)
+      discoverByWorks: byWorks("quiz", quizRefs, (r) => ({ id: r.id, createdAt: r.createdAt, ownerUserId: r.ownerUserId }))
     },
     participation: {
       tierlists: () => tierlistParticipation,
@@ -2728,4 +2729,20 @@ test("a discover search also finds games that contain a matching book, once each
   assert.equal(second.nextOffset, null);
   assert.deepEqual(service.getDiscover("tournament", "frank", 10, 0).items, []);
   assert.deepEqual(service.getDiscover("all", "", 10, 0).items.map((item) => item.content.id), ["t3", "t1", "t2", "g1"]);
+});
+
+test("a book match keeps the game's origin owner and promoted flag, and only the returned page is hydrated", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs, workMatches, gameWorks, publishedManyCalls } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  tierlistRefs.set("t1", tierRef("t1", "alice", { name: "Gothic", createdAt: at(3), promotedAt: at(4) }));
+  tierlistRefs.set("t2", tierRef("t2", "gone", { name: "Lost origin", createdAt: at(2), promotedAt: at(4) }));
+  tierlistRefs.set("t3", tierRef("t3", "gone", { name: "Private origin", createdAt: at(1) }));
+  tierlistRefs.set("t4", tierRef("t4", "alice", { name: "Older", createdAt: at(0) }));
+  workMatches.set("frank", ["w-frankenstein"]);
+  for (const id of ["t1", "t2", "t3", "t4"]) gameWorks.set(`tierlist:${id}`, ["w-frankenstein"]);
+  const page = service.getDiscover("tierlist", "frank", 2, 0);
+  assert.deepEqual(page.items.map((item) => [item.content.id, item.author.username]), [["t1", "user-alice"], ["t2", "Original creator unavailable"]]);
+  assert.deepEqual(publishedManyCalls, [{ kind: "tierlist", ids: ["t1", "t2"] }, { kind: "tournament", ids: [] }, { kind: "quiz", ids: [] }]);
 });

@@ -202,7 +202,7 @@ export function buildApp() {
       votedAmong: getTierlistsPublicApi().votedAmong,
       get: getTierlistsPublicApi().getPublished,
       listByOwner: getTierlistsPublicApi().listPublishedByOwner,
-      publishedByWorks: getTierlistsPublicApi().publishedByWorks
+      discoverByWorks: getTierlistsPublicApi().discoverByWorks
     },
     tournaments: {
       discoverWindow: getArenaPublicApi().discoverWindow,
@@ -210,7 +210,7 @@ export function buildApp() {
       votedAmong: getArenaPublicApi().votedAmong,
       get: getArenaPublicApi().getPublished,
       listByOwner: getArenaPublicApi().listPublishedByOwner,
-      publishedByWorks: getArenaPublicApi().publishedByWorks
+      discoverByWorks: getArenaPublicApi().discoverByWorks
     },
     quizzes: {
       discoverWindow: getQuizzesPublicApi().discoverWindow,
@@ -218,7 +218,7 @@ export function buildApp() {
       votedAmong: getQuizzesPublicApi().votedAmong,
       get: getQuizzesPublicApi().getPublished,
       listByOwner: getQuizzesPublicApi().listPublishedByOwner,
-      publishedByWorks: getQuizzesPublicApi().publishedByWorks
+      discoverByWorks: getQuizzesPublicApi().discoverByWorks
     },
     participation: {
       tierlists: getTierlistsPublicApi().participationByOwner,

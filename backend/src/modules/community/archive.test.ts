@@ -50,9 +50,9 @@ const inertDeps: Omit<CommunityDeps, "repo"> = {
   searchUsernameOwners: unused,
   matchWorks: unused,
   murals: { ownsMural: unused, getMuralPublicPayload: unused },
-  tierlists: { discoverWindow: unused, getPublishedMany: unused, votedAmong: unused, get: unused, listByOwner: unused, publishedByWorks: unused },
-  tournaments: { discoverWindow: unused, getPublishedMany: unused, votedAmong: unused, get: unused, listByOwner: unused, publishedByWorks: unused },
-  quizzes: { discoverWindow: unused, getPublishedMany: unused, votedAmong: unused, get: unused, listByOwner: unused, publishedByWorks: unused },
+  tierlists: { discoverWindow: unused, getPublishedMany: unused, votedAmong: unused, get: unused, listByOwner: unused, discoverByWorks: unused },
+  tournaments: { discoverWindow: unused, getPublishedMany: unused, votedAmong: unused, get: unused, listByOwner: unused, discoverByWorks: unused },
+  quizzes: { discoverWindow: unused, getPublishedMany: unused, votedAmong: unused, get: unused, listByOwner: unused, discoverByWorks: unused },
   participation: { tierlists: unused, tournaments: unused, quizzes: unused }
 };
 

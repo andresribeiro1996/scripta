@@ -443,6 +443,10 @@ test("started tournaments seeding any of the given works, newest first; seeding 
     { id: "both", name: "Both", path: "/arena/both", ownerUserId: "u2" },
     { id: "old", name: "Old", path: "/arena/old", ownerUserId: "u1" }
   ]);
+  assert.deepEqual(api.discoverByWorks(["w-new", "w-old"], 20), [
+    { id: "both", createdAt: "2026-02-01T00:00:00.000Z", ownerUserId: "u2" },
+    { id: "old", createdAt: "2026-01-01T00:00:00.000Z", ownerUserId: "u1" }
+  ]);
 });
 
 test("tournament record: started brackets only, wins, losses, titles and the furthest round", () => {

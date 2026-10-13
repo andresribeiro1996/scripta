@@ -540,6 +540,11 @@ test("published tier lists holding any of the given works, newest first; drafts 
     { id: "both", name: "Both", path: "/vote/code-both", ownerUserId: "u1" },
     { id: "old", name: "Old", path: "/vote/code-old", ownerUserId: "u1" }
   ]);
+  assert.deepEqual(api.discoverByWorks(["w-new", "w-old"], 20), [
+    { id: "promoted", createdAt: "2026-03-01T00:00:00.000Z", ownerUserId: "u2", promotedAt: "2026-03-02T00:00:00.000Z" },
+    { id: "both", createdAt: "2026-02-01T00:00:00.000Z", ownerUserId: "u1", promotedAt: null },
+    { id: "old", createdAt: "2026-01-01T00:00:00.000Z", ownerUserId: "u1", promotedAt: null }
+  ]);
 });
 
 test("tier placements: signed-in ballots on published lists, mapped through the list's own tiers", () => {
