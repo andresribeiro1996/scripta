@@ -28,6 +28,7 @@ export const WORK_LOOKUP_SQL = `
   ORDER BY work_checked_at IS NOT NULL, created_by IS NOT NULL, work_checked_at, created_at, rowid
   LIMIT ?
 `;
+export const CONFIRMED_SQL = "(created_by IS NOT NULL OR data_sources <> '[]')";
 
 function idPage(stmt: StatementSync, after: PageCursor | null, limit: number): IdPage {
   const rows = stmt.all(after?.at ?? "", after?.row ?? 0, limit) as Array<{ id: string; at: string; row: number }>;
@@ -124,8 +125,12 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const replaceLanguageStmt = db.prepare(`UPDATE books SET language = ? WHERE id = ?`);
   const makeSearchableStmt = db.prepare(`
     INSERT INTO books_fts (book_id, title, author)
-    SELECT id, title, author FROM books WHERE id = ? AND title != '' AND NOT EXISTS (SELECT 1 FROM books_fts WHERE book_id = ?)
+    SELECT id, title, author FROM books
+    WHERE id = ? AND title <> '' AND NOT EXISTS (SELECT 1 FROM books_search WHERE book_id = books.id)
   `);
+  const markSearchableStmt = db.prepare(`INSERT OR IGNORE INTO books_search (book_id) VALUES (?)`);
+  const searchableStmt = db.prepare(`SELECT 1 FROM books_search WHERE book_id = ?`);
+  const confirmedStmt = db.prepare(`SELECT 1 FROM books WHERE id = ? AND ${CONFIRMED_SQL}`);
   const imageStmt = db.prepare(`SELECT * FROM cover_images WHERE id = ?`);
   const insertImageStmt = db.prepare(`
     INSERT INTO cover_images (id, book_id, source, source_url, origin, width, height, byte_size, color, created_at)
@@ -192,6 +197,16 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       if (db.isTransaction) db.exec("ROLLBACK");
       throw error;
     }
+  }
+
+  function makeSearchable(id: string) {
+    inTransaction(() => {
+      if (makeSearchableStmt.run(id).changes > 0) markSearchableStmt.run(id);
+    });
+  }
+
+  function makeSearchableIfConfirmed(id: string) {
+    if (confirmedStmt.get(id)) makeSearchable(id);
   }
 
   function insertWork(workKey: string | null, title: string, author: string, createdAt: string): string {
@@ -272,6 +287,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
         });
         for (const key of keys) insertKeyIfMissingStmt.run(key, id);
         if (held) fillWorkIdentityStmt.run(id);
+        makeSearchableIfConfirmed(id);
         return byIdStmt.get(id) as unknown as BookRow;
       });
     },
@@ -284,12 +300,13 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       inTransaction(() => {
         fillIdentityStmt.run(title, author, title ? workTitleKey(title, author) : null, id);
         fillWorkIdentityStmt.run(id);
+        makeSearchableIfConfirmed(id);
       });
     },
 
-    makeSearchable(id) {
-      makeSearchableStmt.run(id, id);
-    },
+    makeSearchable,
+
+    isSearchable: (id) => searchableStmt.get(id) !== undefined,
 
     getImage: (id) => imageStmt.get(id) as CoverImageRow | undefined,
 
@@ -335,6 +352,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
         mergeDetails(bookId, details, summarySource);
         const stored = JSON.parse((byIdStmt.get(bookId) as BookRow | undefined)?.data_sources ?? "[]") as DataSource[];
         saveDetailsStmt.run(details.rating, details.ratingCount, JSON.stringify(details.genres), JSON.stringify([...new Set([...stored, ...sources])]), details.sourceUrl, checkedAt, bookId);
+        makeSearchableIfConfirmed(bookId);
       });
     },
 

@@ -346,7 +346,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       if (!trimmed) return [];
       if (looksLikeIsbnQuery(trimmed)) {
         const saved = deps.repo.findBookByKey(`isbn:${canonicalIsbn(trimmed)}`);
-        return saved && saved.data_sources !== "[]" ? [toSearchResult(saved)] : [];
+        return saved && deps.repo.isSearchable(saved.id) ? [toSearchResult(saved)] : [];
       }
       const tokens = searchTokens(trimmed);
       return tokens.length === 0 ? [] : deps.repo.searchBooks(tokens, SEARCH_LIMIT).map(toSearchResult);

@@ -694,6 +694,14 @@ test("an unknown ISBN searched inside finds nothing and never calls Open Library
   assert.deepEqual(calls, []);
 });
 
+test("an ISBN search answers from any book in the search index, seeded ones included", () => {
+  const { calls, catalog } = recordingCatalog();
+  const h = harness({ catalog });
+  h.repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593", createdBy: "seed" }, ["isbn:9780441013593"], "2026-10-01T00:00:00.000Z");
+  assert.equal(h.service.search("978-0-441-01359-3")[0]!.title, "Dune");
+  assert.deepEqual(calls, []);
+});
+
 test("an outside ISBN search goes to Open Library and saves the results", async () => {
   const { calls, catalog } = recordingCatalog();
   const h = harness({ catalog });

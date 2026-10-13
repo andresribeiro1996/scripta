@@ -23,6 +23,7 @@ export interface BooksRepository {
   addKey(key: string, bookId: string): void;
   fillIdentity(id: string, title: string, author: string): void;
   makeSearchable(id: string): void;
+  isSearchable(id: string): boolean;
   getImage(id: string): CoverImageRow | undefined;
   insertImage(row: CoverImageRow): void;
   listPendingColorImageIds(limit: number): string[];

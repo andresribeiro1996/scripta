@@ -1145,7 +1145,7 @@ test("the ISBN-10 pass leaves two keyed works that disagree alone", () => {
 
 test("the ISBN-10 pass runs once", () => {
   const { db } = freshRepo();
-  assert.equal((db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version, 2);
+  assert.equal((db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version, 3);
 });
 
 test("listUncheckedCoverIds pages by created_at then insert order, and a short page ends the cycle", () => {
