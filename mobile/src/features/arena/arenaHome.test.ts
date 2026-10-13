@@ -237,6 +237,14 @@ test("an empty voted filter says so per tab, and search still reads as no match"
   assert.equal(emptyCopy("tierlists", true, "voted").title, "Nothing matches");
 });
 
+test("only an empty tab offers to create one", () => {
+  assert.equal(emptyCopy("tournaments", false).action, "Create tournament");
+  assert.equal(emptyCopy("tierlists", false, "mine").action, "Create tier list");
+  assert.equal(emptyCopy("quizzes", false).action, "Create quiz");
+  assert.equal(emptyCopy("tournaments", true).action, undefined);
+  assert.equal(emptyCopy("tournaments", false, "voted").action, undefined);
+});
+
 test("voted tier list cards read like the public directory's", () => {
   assert.equal(votedTierlistDetail(votedTierlist()), "6 books · 3 ballots");
   assert.equal(votedTierlistDetail(votedTierlist({ votingOpen: false })), "6 books · 3 ballots · closed");
