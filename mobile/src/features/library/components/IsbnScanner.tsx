@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, AppState, Linking, StyleSheet, View } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useIsFocused } from "expo-router/react-navigation";
@@ -22,14 +22,18 @@ export function IsbnScanner({ hint, onIsbn }: { hint: string; onIsbn: (isbn: str
     return () => subscription.remove();
   }, []);
 
-  useEffect(() => {
-    if (!permission || permission.granted || asked.current) return;
-    asked.current = true;
+  const ask = useCallback(() => {
     setRequesting(true);
     requestPermission()
       .catch((err: unknown) => setError(err instanceof Error ? err.message : "Couldn't access the camera. Type the ISBN instead."))
       .finally(() => setRequesting(false));
-  }, [permission, requestPermission]);
+  }, [requestPermission]);
+
+  useEffect(() => {
+    if (!permission || permission.granted || asked.current) return;
+    asked.current = true;
+    ask();
+  }, [permission, ask]);
 
   if (error) return <Text selectable accessibilityRole="alert" style={[typography.caption, { color: colors.danger }]}>{error}</Text>;
   if (!permission || requesting) return <View style={styles.pending}><ActivityIndicator accessibilityLabel="Starting the camera" color={colors.accent} /></View>;
@@ -41,7 +45,9 @@ export function IsbnScanner({ hint, onIsbn }: { hint: string; onIsbn: (isbn: str
             ? "Allow camera access to scan a book, or type the ISBN instead."
             : "Camera access is disabled. Enable it in Settings, or type the ISBN instead."}
         </Text>
-        {permission.canAskAgain ? null : (
+        {permission.canAskAgain ? (
+          <Button label="Allow camera" variant="secondary" onPress={ask} />
+        ) : (
           <Button label="Open Settings" variant="secondary" onPress={() => {
             void Linking.openSettings().catch((err: unknown) => setError(err instanceof Error ? err.message : "Couldn't open Settings."));
           }} />
