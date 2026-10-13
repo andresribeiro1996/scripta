@@ -24,6 +24,8 @@ export function LibraryGrid<T>({
   ListHeaderComponent,
   refreshControl,
   topInset = 0,
+  bottomInset = spacing.xxxl,
+  ...scrollProps
 }: {
   data: T[];
   keyExtractor: (item: T, index: number) => string;
@@ -33,7 +35,8 @@ export function LibraryGrid<T>({
   ListHeaderComponent?: FlatListProps<T>["ListHeaderComponent"];
   refreshControl?: FlatListProps<T>["refreshControl"];
   topInset?: number;
-}) {
+  bottomInset?: number;
+} & Pick<FlatListProps<T>, "onScrollBeginDrag" | "onScrollEndDrag" | "onMomentumScrollBegin" | "onMomentumScrollEnd">) {
   const { colors } = useTheme();
   const { columns, contentWidth } = useLibraryGridColumns(style);
   const cellWidth = (contentWidth - style.cardGap * (columns - 1)) / columns;
@@ -45,11 +48,12 @@ export function LibraryGrid<T>({
       keyExtractor={keyExtractor}
       numColumns={columns}
       refreshControl={refreshControl}
+      {...scrollProps}
       ListEmptyComponent={ListEmptyComponent}
       ListHeaderComponent={ListHeaderComponent}
       columnWrapperStyle={{ gap: style.cardGap }}
-      // A search field can sit in this grid's header: without this the
-      // first tap on a card only dismisses the keyboard.
+      // The search field sits over this grid: without this the first tap on
+      // a card only dismisses the keyboard.
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
       contentContainerStyle={[
@@ -58,7 +62,7 @@ export function LibraryGrid<T>({
           backgroundColor: style.backgroundColor ?? undefined,
           paddingHorizontal: SCREEN_PADDING + style.contentPaddingX,
           paddingTop: style.contentPaddingY + topInset,
-          paddingBottom: style.contentPaddingY + spacing.xxxl,
+          paddingBottom: style.contentPaddingY + bottomInset,
           gap: style.rowGap,
         },
       ]}
