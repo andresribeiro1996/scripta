@@ -608,7 +608,7 @@ test("library endpoint returns the owner's library and 404s when unpublished", a
   await hidden.close();
 });
 
-test("discover allows 60 requests a minute per account", async () => {
+test("discover allows 60 requests a minute per account and 30 per anonymous address", async () => {
   const app = Fastify();
   app.decorate("authenticateAccessToken", (token: string) => ({ id: token, email: `${token}@example.test`, username: token, avatarId: null }));
   await app.register(buildDiscoverRoutes(fakeService()));
@@ -616,5 +616,7 @@ test("discover allows 60 requests a minute per account", async () => {
   for (let i = 0; i < 60; i++) assert.equal((await as("alice")).statusCode, 200);
   assert.equal((await as("alice")).statusCode, 429);
   assert.equal((await as("bob")).statusCode, 200);
+  for (let i = 0; i < 30; i++) assert.equal((await app.inject({ method: "GET", url: "/community/discover" })).statusCode, 200);
+  assert.equal((await app.inject({ method: "GET", url: "/community/discover" })).statusCode, 429);
   await app.close();
 });

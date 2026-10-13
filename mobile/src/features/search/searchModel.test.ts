@@ -57,6 +57,10 @@ test("No results shows once every section is done and empty, with Add it by hand
   assert.deepEqual(kinds(searchRows(input({ scope: "people" }))), ["noResults"]);
 });
 
+test("a failed catalog hides its rows so Retry shows even when Open Library answered", () => {
+  assert.deepEqual(kinds(searchRows(input({ scope: "books", submitted: true, books: { rows: [result("1")], loading: false, failed: true }, openLibrary: "idle" }))), ["header:books", "failed:books"]);
+});
+
 test("a loading or failed section keeps its heading", () => {
   assert.deepEqual(kinds(searchRows(input({ scope: "people", people: { rows: [], loading: true, failed: false } }))), ["header:people", "loading:people"]);
   assert.deepEqual(kinds(searchRows(input({ scope: "games", games: { rows: [], loading: false, failed: true } }))), ["header:games", "failed:games"]);

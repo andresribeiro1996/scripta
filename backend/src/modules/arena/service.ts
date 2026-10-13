@@ -498,6 +498,7 @@ export interface ArenaPublicApi {
   getPublishedMany(ids: string[]): PublishedTournamentRef[];
   votedAmong(voterUserId: string, ids: string[]): string[];
   publishedByWorks(workIds: string[], limit: number): GameByWork[];
+  discoverByWorks(workIds: string[], limit: number): TournamentDiscoverRef[];
   tournamentRecord(workIds: string[]): TournamentRecord;
   getPublished(id: string): PublishedTournamentRef | undefined;
   listPublishedByOwner(ownerUserId: string): PublishedTournamentRef[];
@@ -528,6 +529,8 @@ export function createArenaPublicApi(service: ArenaService): ArenaPublicApi {
         path: `/arena/${row.id}`,
         ownerUserId: row.owner_user_id
       })),
+    discoverByWorks: (workIds, limit) =>
+      service.listPublishedByWorks(workIds, limit).map((row) => ({ id: row.id, createdAt: row.created_at, ownerUserId: row.owner_user_id })),
     tournamentRecord: (workIds) => service.tournamentRecord(workIds),
     getPublished: (id) => {
       const summary = service.getPublicSummary(id);

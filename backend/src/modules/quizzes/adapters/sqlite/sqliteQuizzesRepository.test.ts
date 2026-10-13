@@ -265,6 +265,10 @@ test("published quizzes about any of the given works, newest first; drafts never
     { id: "both", name: "Both", path: "/play/code-both", ownerUserId: "u2" },
     { id: "old", name: "Old", path: "/play/code-old", ownerUserId: "u1" }
   ]);
+  assert.deepEqual(api.discoverByWorks(["w-new", "w-old"], 20), [
+    { id: "both", createdAt: "2026-02-01T00:00:00Z", ownerUserId: "u2" },
+    { id: "old", createdAt: "2026-01-01T00:00:00Z", ownerUserId: "u1" }
+  ]);
 });
 
 function seedPublished() {

@@ -386,6 +386,7 @@ export interface GameByWork {
 export interface QuizzesPublicApi {
   participationByOwner(ownerUserId: string, since: string): GameParticipation[];
   publishedByWorks(workIds: string[], limit: number): GameByWork[];
+  discoverByWorks(workIds: string[], limit: number): QuizDiscoverRef[];
   getPublished(id: string): PublishedQuizRef | undefined;
   listPublishedByOwner(ownerUserId: string): PublishedQuizRef[];
   getPublishedMany(ids: string[]): PublishedQuizRef[];
@@ -403,6 +404,8 @@ export function createQuizzesPublicApi(service: QuizzesService): QuizzesPublicAp
         path: `/play/${row.vote_code}`,
         ownerUserId: row.owner_user_id
       })),
+    discoverByWorks: (workIds, limit) =>
+      service.listPublishedByWorks(workIds, limit).map((row) => ({ id: row.id, createdAt: row.created_at, ownerUserId: row.owner_user_id })),
     getPublished: (id) => service.getPublishedRef(id),
     listPublishedByOwner: (ownerUserId) => service.listPublishedRefsByOwner(ownerUserId),
     getPublishedMany: (ids) => service.getPublishedRefs(ids),

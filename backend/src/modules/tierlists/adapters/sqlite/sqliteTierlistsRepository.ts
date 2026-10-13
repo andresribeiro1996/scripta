@@ -39,7 +39,7 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
   );
   const listPublicByIdsStmt = db.prepare(`SELECT * FROM tierlists WHERE vote_code IS NOT NULL AND id IN (SELECT value FROM json_each(?))`);
   const listPublishedByWorksStmt = db.prepare(`
-    SELECT DISTINCT t.id, t.name, t.vote_code, t.owner_user_id, t.origin_user_id, t.created_at
+    SELECT DISTINCT t.id, t.name, t.vote_code, t.owner_user_id, t.origin_user_id, t.promoted_at, t.created_at
     FROM tierlist_works w JOIN tierlists t ON t.id = w.tierlist_id
     WHERE w.work_id IN (SELECT value FROM json_each(?)) AND t.vote_code IS NOT NULL
     ORDER BY t.created_at DESC LIMIT ?

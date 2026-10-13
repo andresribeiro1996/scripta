@@ -117,7 +117,7 @@ export interface CommunityDeps {
     votedAmong(viewerId: string, ids: string[]): string[];
     get(id: string): PublishedTierlistRef | undefined;
     listByOwner(ownerUserId: string): PublishedTierlistRef[];
-    publishedByWorks(workIds: string[], limit: number): Array<{ id: string }>;
+    discoverByWorks(workIds: string[], limit: number): TierlistDiscoverRef[];
   };
   tournaments: {
     discoverWindow(needle: string, limit: number): TournamentDiscoverRef[];
@@ -125,7 +125,7 @@ export interface CommunityDeps {
     votedAmong(viewerId: string, ids: string[]): string[];
     get(id: string): PublishedTournamentRef | undefined;
     listByOwner(ownerUserId: string): PublishedTournamentRef[];
-    publishedByWorks(workIds: string[], limit: number): Array<{ id: string }>;
+    discoverByWorks(workIds: string[], limit: number): TournamentDiscoverRef[];
   };
   quizzes: {
     discoverWindow(needle: string, limit: number): QuizDiscoverRef[];
@@ -133,7 +133,7 @@ export interface CommunityDeps {
     votedAmong(viewerId: string, ids: string[]): string[];
     get(id: string): PublishedQuizRef | undefined;
     listByOwner(ownerUserId: string): PublishedQuizRef[];
-    publishedByWorks(workIds: string[], limit: number): Array<{ id: string }>;
+    discoverByWorks(workIds: string[], limit: number): QuizDiscoverRef[];
   };
   participation: {
     tierlists(userId: string, since: string): GameParticipation[];
@@ -453,8 +453,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
       const needle = normalizeWords(q);
       const window = needle ? DISCOVER_SCAN_CAP : Math.min(offset + limit + 1, DISCOVER_SCAN_CAP);
       const workIds = needle ? deps.matchWorks(q, DISCOVER_BOOK_WORKS) : [];
-      const byBook = <T>(kind: { publishedByWorks(workIds: string[], limit: number): Array<{ id: string }>; getPublishedMany(ids: string[]): T[] }): T[] =>
-        workIds.length === 0 ? [] : kind.getPublishedMany(kind.publishedByWorks(workIds, DISCOVER_SCAN_CAP).map((game) => game.id));
+      const byBook = <T>(kind: { discoverByWorks(workIds: string[], limit: number): T[] }): T[] => (workIds.length === 0 ? [] : kind.discoverByWorks(workIds, DISCOVER_SCAN_CAP));
       const entries = new Map<string, { kind: "tierlist" | "tournament" | "quiz"; id: string; userId: string; createdAt: string; promoted: boolean }>();
       const add = (kind: "tierlist" | "tournament" | "quiz", ref: { id: string; ownerUserId: string; createdAt: string }, promoted: boolean) => {
         entries.set(`${kind}:${ref.id}`, { kind, id: ref.id, userId: ref.ownerUserId, createdAt: ref.createdAt, promoted });
