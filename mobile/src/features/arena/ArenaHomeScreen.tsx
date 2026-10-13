@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
 import { Stack, router } from "expo-router";
-import { FlatList, Pressable, StyleSheet, View } from "react-native";
+import { FlatList, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
-import { Image } from "expo-image";
-import { Button, Dialog, EmptyState, ErrorState, Icon, IconButton, Screen, SearchDock, Sheet, Skeleton, SwipeableTabs, Toast, dynamicType, radii, searchDockClearance, spacing, typography, useTheme, type IconName } from "../../ui";
+import { Button, Dialog, EmptyState, ErrorState, IconButton, Screen, SearchDock, Sheet, Skeleton, SwipeableTabs, Toast, dynamicType, searchDockClearance, spacing, typography, useTheme, type IconName } from "../../ui";
 import { DiscoverPane } from "../community/DiscoverPane";
+import { GameRow } from "../community/DiscoverRow";
 import { deleteQuiz, fetchQuizzes, type Quiz } from "../quizzes/api";
 import { deleteTierlist, fetchTierlists, fetchVotedTierlists, type Tierlist, type VotedTierlist } from "../tierlists/api";
 import { deleteTournament, fetchMyTournaments, fetchVotedTournaments, type Tournament } from "./api";
@@ -14,16 +14,11 @@ import {
   GAMES_TABS,
   NEW_GAMES,
   OWNER_FILTERS,
-  TOURNAMENT_STATUS_LABEL,
-  coverRemainder,
   emptyCopy,
+  gameRow,
   homeSections,
   nextOwnerFilter,
   ownedItems,
-  previewCovers,
-  tierDistribution,
-  tournamentProgress,
-  votedTierlistDetail,
   type ArenaTab,
   type GamesTab,
   type OwnedItem,
@@ -204,151 +199,28 @@ function ArenaList({
         void query.refetch();
         void votedQuery.refetch();
       }}
-      ListEmptyComponent={votedUnknown ? null : <EmptyState title={empty.title} body={empty.body} actionLabel={empty.action} onAction={empty.action ? () => router.push(NEW_GAMES.find((option) => option.tab === tab)!.href as never) : undefined} />}
-      ListFooterComponent={votedQuery.isError ? <ErrorState body="Couldn't load the games you voted in." actionLabel="Retry" onAction={() => void votedQuery.refetch()} /> : null}
+      ListEmptyComponent={votedUnknown ? null : <View style={styles.page}><EmptyState title={empty.title} body={empty.body} actionLabel={empty.action} onAction={empty.action ? () => router.push(NEW_GAMES.find((option) => option.tab === tab)!.href as never) : undefined} /></View>}
+      ListFooterComponent={votedQuery.isError ? <View style={styles.page}><ErrorState body="Couldn't load the games you voted in." actionLabel="Retry" onAction={() => void votedQuery.refetch()} /></View> : null}
       renderItem={({ item }) => {
         if (item.kind === "header") {
           return <Text {...dynamicType} style={[typography.title, styles.sectionHeader, styles.strong, { color: colors.text }]}>{item.title}</Text>;
         }
+        const row = gameRow(item);
         if (item.kind === "owned") {
-          return <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Pressable accessibilityRole="button" accessibilityLabel={`Open ${item.item.name}`} onPress={() => onOpen(item.item)} style={styles.grow}>
-              {item.item.kind === "tournament" ? <TournamentBody tournament={item.item.source} /> : item.item.kind === "quiz" ? <QuizBody item={item.item} /> : <TierlistBody item={item.item} />}
-            </Pressable>
-            <IconButton
-              accessibilityLabel={`Delete ${item.item.name}`}
-              name="delete"
-              tone="danger"
-              onPress={() => onDelete({ kind: item.item.kind, id: item.item.id, name: item.item.name })}
-            />
-          </View>;
+          return <GameRow {...row} onPress={() => onOpen(item.item)} onDelete={() => onDelete({ kind: item.item.kind, id: item.item.id, name: item.item.name })} />;
         }
-        const name = item.kind === "votedTournament" ? item.tournament.name : item.tierlist.name;
-        return <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Open ${name}`}
-          onPress={() => router.push(item.target as never)}
-          style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
-        >
-          {item.kind === "votedTournament" ? <TournamentBody tournament={item.tournament} /> : <VotedTierlistBody tierlist={item.tierlist} />}
-        </Pressable>;
+        return <GameRow {...row} onPress={() => router.push(item.target as never)} />;
       }}
     />}
   </SearchDock>;
 }
 
-
-// Covers when the pool has art, a bracket-size tile when it doesn't: a
-// tournament seeded from books whose covers never resolved would otherwise
-// leave an empty strip where the art should be.
-function TournamentBody({ tournament }: { tournament: Tournament }) {
-  const { colors } = useTheme();
-  const progress = tournamentProgress(tournament);
-  const remainder = coverRemainder(tournament);
-  const covers = previewCovers(tournament);
-  const tone = tournament.status === "active"
-    ? { backgroundColor: colors.accentSoft, color: colors.accent }
-    : tournament.status === "completed"
-      ? { backgroundColor: colors.successSoft, color: colors.success }
-      : { backgroundColor: colors.border, color: colors.textDim };
-
-  return <View style={styles.row}>
-    {tournament.winner ? (
-      tournament.winner.cover ? <Image
-        accessibilityLabel={`Winner: ${tournament.winner.title}`}
-        source={{ uri: tournament.winner.cover }}
-        contentFit="cover"
-        style={[styles.tile, styles.winnerTile, { borderWidth: 2, borderColor: colors.success }]}
-      /> : <View accessibilityLabel={`Winner: ${tournament.winner.title}`} style={[styles.tile, styles.winnerTile, { backgroundColor: colors.successSoft, borderWidth: 2, borderColor: colors.success }]}>
-        <Icon filled name="arena" size={24} color={colors.success} />
-      </View>
-    ) : tournament.covers.length === 0 ? <View style={[styles.tile, { backgroundColor: colors.accentSoft }]}>
-      <Text {...dynamicType} display={false} style={[styles.tileCount, { color: colors.accent }]}>{tournament.bracketSize}</Text>
-      <Text {...dynamicType} style={[styles.tileLabel, { color: colors.accent }]}>Books</Text>
-    </View> : null}
-    <View style={styles.grow}>
-      <Text numberOfLines={1} {...dynamicType} style={[typography.title, styles.strong, { color: colors.text }]}>{tournament.name}</Text>
-      {covers.length ? <View style={styles.covers}>
-        {covers.map((cover, index) => <Image
-          key={cover}
-          source={{ uri: cover }}
-          contentFit="cover"
-          style={[styles.cover, { borderColor: colors.border }, index > 0 ? styles.coverOverlap : null]}
-        />)}
-        {remainder ? <Text {...dynamicType} style={[typography.caption, styles.coverMore, { color: colors.textDim }]}>{`+${remainder}`}</Text> : null}
-      </View> : null}
-      <View style={styles.statusLine}>
-        <View style={[styles.pill, { backgroundColor: tone.backgroundColor }]}>
-          <Text {...dynamicType} style={[styles.pillText, { color: tone.color }]}>{TOURNAMENT_STATUS_LABEL[tournament.status]}</Text>
-        </View>
-        {progress.label ? <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.grow, { color: colors.textDim }]}>{progress.label}</Text> : null}
-      </View>
-    </View>
-  </View>;
-}
-
-function QuizBody({ item }: { item: Extract<OwnedItem, { kind: "quiz" }> }) {
-  const { colors } = useTheme();
-  return <View style={styles.grow}>
-    <Text numberOfLines={1} {...dynamicType} style={[typography.title, styles.strong, { color: colors.text }]}>{item.name}</Text>
-    <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{item.detail}</Text>
-  </View>;
-}
-
-function TierlistBody({ item }: { item: Extract<OwnedItem, { kind: "tierlist" }> }) {
-  const { colors } = useTheme();
-  const segments = tierDistribution(item.source.data.tiers);
-
-  return <View>
-    <Text numberOfLines={1} {...dynamicType} style={[typography.title, styles.strong, { color: colors.text }]}>{item.name}</Text>
-    <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{item.detail}</Text>
-    {segments.length ? <View
-      accessibilityRole="image"
-      accessibilityLabel={`${segments.length} tiers`}
-      style={styles.distribution}
-    >
-      {segments.map((segment, index) => <View
-        key={`${segment.color}-${index}`}
-        style={[styles.segment, { backgroundColor: segment.color, flexGrow: segment.weight }]}
-      />)}
-    </View> : null}
-  </View>;
-}
-
-// Someone else's poll the account voted on — its ladder is the owner's
-// answer key, not the viewer's ballot, so no tier distribution here.
-function VotedTierlistBody({ tierlist }: { tierlist: VotedTierlist }) {
-  const { colors } = useTheme();
-  return <View style={styles.grow}>
-    <Text numberOfLines={1} {...dynamicType} style={[typography.title, styles.strong, { color: colors.text }]}>{tierlist.name}</Text>
-    <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{votedTierlistDetail(tierlist)}</Text>
-  </View>;
-}
-
 const styles = StyleSheet.create({
-  grow: { flex: 1 },
   strong: { fontWeight: "700" },
   // flex so a centred EmptyState/ErrorState has a height to centre within —
   // StatePanel grows and centres itself, which needs a parent that has room.
   page: { flex: 1, padding: spacing.lg },
-  // flexGrow does the same job for the list's own empty state; paddingBottom
-  // clears the search dock so the last card isn't sitting under it.
-  list: { padding: spacing.lg, gap: spacing.sm, paddingBottom: searchDockClearance, flexGrow: 1 },
-  card: { minHeight: 92, borderWidth: 1, borderRadius: radii.lg, padding: spacing.md, flexDirection: "row", alignItems: "center", gap: spacing.md },
-  row: { flexDirection: "row", alignItems: "center", gap: spacing.md },
-  covers: { flexDirection: "row", alignItems: "center", marginTop: spacing.sm },
-  cover: { width: 26, height: 38, borderRadius: radii.sm, borderWidth: 1 },
-  coverOverlap: { marginLeft: -9 },
-  coverMore: { marginLeft: spacing.sm },
-  statusLine: { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginTop: spacing.xs },
-  sectionHeader: { marginTop: spacing.lg, marginBottom: spacing.xs },
-  pill: { paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: radii.full },
-  pillText: { fontSize: 11, lineHeight: 15, fontWeight: "700" },
-  tile: { width: 56, height: 56, borderRadius: radii.md, alignItems: "center", justifyContent: "center" },
-  winnerTile: { height: 84 },
-  tileCount: { fontSize: 20, lineHeight: 24, fontWeight: "700" },
-  tileLabel: { fontSize: 9, lineHeight: 12 },
-  distribution: { flexDirection: "row", gap: 2, height: 6, marginTop: spacing.sm },
-  segment: { borderRadius: 3, flexBasis: 0 },
+  list: { paddingTop: spacing.lg - spacing.md, paddingBottom: searchDockClearance, flexGrow: 1 },
+  sectionHeader: { marginTop: spacing.lg, marginBottom: spacing.xs, paddingHorizontal: spacing.lg },
   dialog: { gap: spacing.md },
 });
