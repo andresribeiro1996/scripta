@@ -757,6 +757,8 @@ const styles = StyleSheet.create({
 
 - [ ] **Step 3: Rewrite `HomeScreen.tsx`.** It keeps today's `SectionHeader`, `day`/`offset` handling, the highlight card markup and the empty-library state. `BookRow`, the Community button, `PickNextSheet`, the "Up next" section and the "All activity" link go.
 
+`day` comes from `localDay()`, as main has had since PR #233; the highlight turns over at local midnight. If main's `HomeScreen` has moved on again, keep whatever it does for `day`.
+
 ```tsx
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, View, type ViewToken } from "react-native";
@@ -764,7 +766,7 @@ import { Text } from "../../ui/Text";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
 import { useIsFocused } from "expo-router/react-navigation";
 import { useQueryClient, type InfiniteData } from "@tanstack/react-query";
-import { buildDashboardCards, clearDashboardCounts, isNewDigestItem, newCountLabel, resolveQuote, type DashboardFeedPage } from "@scripta/shared";
+import { buildDashboardCards, clearDashboardCounts, isNewDigestItem, localDay, newCountLabel, resolveQuote, type DashboardFeedPage } from "@scripta/shared";
 import { BrandMark, Button, EmptyState, ErrorState, Screen, Skeleton, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { useAuth } from "../../core/auth";
 import { useLibrary } from "../library/hooks/useLibrary";
@@ -782,7 +784,7 @@ export function HomeScreen() {
   const focused = useIsFocused();
   const { user } = useAuth();
   const library = useLibrary();
-  const [day, setDay] = useState(() => new Date().toISOString().slice(0, 10));
+  const [day, setDay] = useState(localDay);
   const [offset, setOffset] = useState(0);
   const [pulling, setPulling] = useState(false);
   const dashboard = useDashboardFeed();
@@ -791,7 +793,7 @@ export function HomeScreen() {
   const rowVisible = useRef(false);
 
   useFocusEffect(useCallback(() => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDay();
     if (today !== day) {
       setDay(today);
       setOffset(0);
