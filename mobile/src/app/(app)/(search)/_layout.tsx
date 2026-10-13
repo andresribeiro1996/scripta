@@ -10,6 +10,7 @@ export default function SearchStackLayout() {
   return (
     <Stack screenOptions={useScreenOptions()}>
       <Stack.Screen name="search" />
+      <Stack.Screen name="scan" options={{ title: "Scan" }} />
       <Stack.Screen name="add-book" options={{ ...sheet, title: "Add a book" }} />
       <Stack.Screen name="import" options={{ ...sheet, title: "Import library" }} />
       <Stack.Screen name="book/[key]/index" options={{ title: "" }} />

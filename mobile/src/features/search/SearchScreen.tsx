@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FlatList, StyleSheet, View } from "react-native";
 import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import { Stack } from "expo-router";
+import { Stack, router } from "expo-router";
 import { looksLikeIsbnQuery, matchesSearch, type BookSearchResult } from "@scripta/shared";
 import { ErrorState, IconButton, Input, Screen, Segmented, Skeleton, Toast, spacing } from "../../ui";
 import { AddBookSheet } from "../community/AddBookSheet";
@@ -10,6 +10,7 @@ import { useFollowToggle } from "../community/useFollowToggle";
 import { bookSearchApi, searchCatalogWorks } from "../library/api/search";
 import { useLibrary } from "../library/hooks/useLibrary";
 import { useDebouncedValue } from "../library/lib/debounce";
+import { receiveScans } from "./scanBridge";
 import { SearchIdle } from "./SearchIdle";
 import { SearchResultRow, type ResultActions } from "./SearchResultRow";
 import { SEARCH_SCOPES, isNetworkQuery, mergeBookResults, ownedBooks, searchRows, type ResultSection, type SearchScope } from "./searchModel";
@@ -72,6 +73,13 @@ export function SearchScreen() {
     recent.record(next);
   }
 
+  const submitRef = useRef(submit);
+  submitRef.current = submit;
+  useEffect(() => receiveScans((isbn) => {
+    setScope((current) => (current === "people" || current === "games" ? "books" : current));
+    submitRef.current(isbn);
+  }), []);
+
   const retries: Record<ResultSection, () => unknown> = { library: library.refetch, books: catalog.refetch, people: people.refetch, games: games.refetch };
   const actions: ResultActions = {
     query: needle,
@@ -115,6 +123,7 @@ export function SearchScreen() {
               }}
             />
           ) : null}
+          <IconButton framed name="scan" label="Scan" accessibilityLabel="Scan a book's barcode" onPress={() => router.push("/scan" as never)} />
         </View>
         <Segmented accessibilityLabel="Search in" options={SEARCH_SCOPES} value={scope} onChange={setScope} />
       </View>
