@@ -4,7 +4,7 @@ import { Stack, router } from "expo-router";
 import { FlatList, Pressable, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { Image } from "expo-image";
-import { Button, Dialog, EmptyState, ErrorState, Fab, Icon, IconButton, Input, Screen, Sheet, Skeleton, SwipeableTabs, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { Button, Dialog, EmptyState, ErrorState, Icon, IconButton, Screen, SearchDock, Sheet, Skeleton, SwipeableTabs, Toast, dynamicType, radii, searchDockClearance, spacing, typography, useTheme, type IconName } from "../../ui";
 import { DiscoverPane } from "../community/DiscoverPane";
 import { deleteQuiz, fetchQuizzes, type Quiz } from "../quizzes/api";
 import { deleteTierlist, fetchTierlists, fetchVotedTierlists, type Tierlist, type VotedTierlist } from "../tierlists/api";
@@ -13,11 +13,12 @@ import {
   DELETE_EFFECT,
   GAMES_TABS,
   NEW_GAMES,
+  OWNER_FILTERS,
   TOURNAMENT_STATUS_LABEL,
   coverRemainder,
   emptyCopy,
-  filterSections,
   homeSections,
+  nextOwnerFilter,
   ownedItems,
   previewCovers,
   tierDistribution,
@@ -26,12 +27,14 @@ import {
   type ArenaTab,
   type GamesTab,
   type OwnedItem,
-  type SectionedItem,
+  type OwnerFilter,
 } from "./arenaHome";
 
 type Doomed = { kind: "tournament" | "tierlist" | "quiz"; id: string; name: string };
 
 const noVoted = { data: [], isRefetching: false, isError: false, refetch: () => {} };
+
+const OWNER_FILTER_ICONS: Record<OwnerFilter, IconName> = { all: "filter", mine: "profile", voted: "vote" };
 
 export function ArenaHomeScreen() {
   const { colors } = useTheme();
@@ -86,7 +89,15 @@ export function ArenaHomeScreen() {
         // The bottom tab already reads "Arena"; a large title spends a third of
         // the screen repeating it above a list that has nowhere else to go.
         headerLargeTitleEnabled: false,
-        headerRight: tab === "browse" ? () => <IconButton framed accessibilityLabel="New game" label="New" name="add" onPress={() => setChoosing(true)} /> : undefined,
+        headerRight: () => tab === "browse"
+          ? <IconButton framed accessibilityLabel="New game" label="New" name="add" onPress={() => setChoosing(true)} />
+          : <IconButton
+            framed
+            accessibilityLabel={tab === "tournaments" ? "New tournament" : tab === "quizzes" ? "New quiz" : "New tier list"}
+            label="New"
+            name="add"
+            onPress={() => router.push(NEW_GAMES.find((option) => option.tab === tab)!.href as never)}
+          />,
       }}
     />
     {error ? <Toast visible message={error} tone="error" /> : null}
@@ -103,21 +114,15 @@ export function ArenaHomeScreen() {
           tab={pageTab}
           query={pageTab === "tournaments" ? tournaments : pageTab === "tierlists" ? tierlists : quizzes}
           votedQuery={voted}
-          sections={homeSections(pageTab, owned, votedTournaments.data ?? [], votedTierlists.data ?? [])}
+          owned={owned}
+          votedTournaments={votedTournaments.data ?? []}
+          votedTierlists={votedTierlists.data ?? []}
           rowCount={owned.length + (voted.data?.length ?? 0)}
           onOpen={open}
           onDelete={setDeleting}
         />;
       }}
     />
-    {tab === "browse" ? null : (
-      <Fab
-        label="New"
-        accessibilityLabel={tab === "tournaments" ? "New tournament" : tab === "quizzes" ? "New quiz" : "New tier list"}
-        loading={busy && !deleting}
-        onPress={() => router.push(NEW_GAMES.find((option) => option.tab === tab)!.href as never)}
-      />
-    )}
     <Dialog visible={deleting !== null} title={`Delete “${deleting?.name ?? ""}”?`} onClose={() => setDeleting(null)}><View style={styles.dialog}><Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{deleting ? `${DELETE_EFFECT[deleting.kind]} This can't be undone.` : ""}</Text><Button label="Delete" variant="destructive" loading={busy} onPress={() => void remove()} /></View></Dialog>
     <Sheet visible={choosing} title="New game" onClose={() => setChoosing(false)}>
       <View style={styles.dialog}>
@@ -144,7 +149,9 @@ function ArenaList({
   tab,
   query,
   votedQuery,
-  sections,
+  owned,
+  votedTournaments,
+  votedTierlists,
   rowCount,
   onOpen,
   onDelete,
@@ -152,20 +159,41 @@ function ArenaList({
   tab: ArenaTab;
   query: UseQueryResult<unknown>;
   votedQuery: { isRefetching: boolean; isError: boolean; refetch: () => void };
-  sections: SectionedItem[];
+  owned: OwnedItem[];
+  votedTournaments: Tournament[];
+  votedTierlists: VotedTierlist[];
   rowCount: number;
   onOpen: (item: OwnedItem) => void;
   onDelete: (doomed: Doomed) => void;
 }) {
   const { colors } = useTheme();
   const [search, setSearch] = useState("");
-  const visible = filterSections(sections, search);
-  const empty = emptyCopy(tab, rowCount > 0);
+  const [owner, setOwner] = useState<OwnerFilter>("all");
+  const filtering = rowCount > 0;
+  const visible = homeSections(tab, owned, votedTournaments, votedTierlists, owner, filtering ? search : "");
+  const empty = emptyCopy(tab, filtering && search.trim() !== "", filtering ? owner : "all");
+  const noun = tab === "tournaments" ? "tournaments" : tab === "tierlists" ? "tier lists" : "quizzes";
+  const ownerOption = OWNER_FILTERS.find((option) => option.value === owner)!;
 
   if (query.isPending) return <View style={styles.page}><Skeleton height={160} /></View>;
   if (query.isError) return <View style={styles.page}><ErrorState body={query.error instanceof Error ? query.error.message : "Couldn't load this list."} actionLabel="Retry" onAction={() => void query.refetch()} /></View>;
 
-  return <FlatList
+  return <SearchDock
+    value={search}
+    onChangeText={setSearch}
+    accessibilityLabel={`Search ${noun}`}
+    placeholder={`Search ${noun}`}
+    hidden={!filtering}
+    cycle={tab === "quizzes" ? undefined : {
+      icon: OWNER_FILTER_ICONS[owner],
+      active: owner !== "all",
+      accessibilityLabel: `Showing ${ownerOption.label.toLowerCase()}`,
+      accessibilityHint: "Switches to the next filter",
+      onPress: () => setOwner(nextOwnerFilter(owner)),
+    }}
+  >
+    {(scrollProps) => <FlatList
+    {...scrollProps}
     data={visible}
     keyExtractor={(item) => item.key}
     contentContainerStyle={styles.list}
@@ -174,16 +202,11 @@ function ArenaList({
       void query.refetch();
       void votedQuery.refetch();
     }}
-    keyboardShouldPersistTaps="handled"
-    // In the list header rather than pinned above it: searching is something
-    // you reach for, and as fixed chrome it appearing with the first item
-    // shoved the whole screen down.
-    ListHeaderComponent={rowCount ? <Input icon="search" accessibilityLabel={`Search ${tab === "tournaments" ? "tournaments" : tab === "tierlists" ? "tier lists" : "quizzes"}`} value={search} onChangeText={setSearch} placeholder={`Search ${tab === "tournaments" ? "tournaments" : tab === "tierlists" ? "tier lists" : "quizzes"}`} autoCapitalize="none" autoCorrect={false} clearButtonMode="while-editing" returnKeyType="search" /> : null}
     ListEmptyComponent={<EmptyState title={empty.title} body={empty.body} />}
     ListFooterComponent={votedQuery.isError ? <ErrorState body="Couldn't load the games you voted in." actionLabel="Retry" onAction={() => void votedQuery.refetch()} /> : null}
     renderItem={({ item }) => {
       if (item.kind === "header") {
-        return <Text {...dynamicType} style={[typography.caption, styles.sectionHeader, styles.strong, { color: colors.textDim }]}>{item.title}</Text>;
+        return <Text {...dynamicType} style={[typography.title, styles.sectionHeader, styles.strong, { color: colors.text }]}>{item.title}</Text>;
       }
       if (item.kind === "owned") {
         return <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -208,7 +231,8 @@ function ArenaList({
         {item.kind === "votedTournament" ? <TournamentBody tournament={item.tournament} /> : <VotedTierlistBody tierlist={item.tierlist} />}
       </Pressable>;
     }}
-  />;
+  />}
+  </SearchDock>;
 }
 
 
@@ -306,8 +330,8 @@ const styles = StyleSheet.create({
   // StatePanel grows and centres itself, which needs a parent that has room.
   page: { flex: 1, padding: spacing.lg },
   // flexGrow does the same job for the list's own empty state; paddingBottom
-  // clears the extended FAB so the last card isn't sitting under it.
-  list: { padding: spacing.lg, gap: spacing.sm, paddingBottom: 96, flexGrow: 1 },
+  // clears the search dock so the last card isn't sitting under it.
+  list: { padding: spacing.lg, gap: spacing.sm, paddingBottom: searchDockClearance, flexGrow: 1 },
   card: { minHeight: 92, borderWidth: 1, borderRadius: radii.lg, padding: spacing.md, flexDirection: "row", alignItems: "center", gap: spacing.md },
   row: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   covers: { flexDirection: "row", alignItems: "center", marginTop: spacing.sm },
