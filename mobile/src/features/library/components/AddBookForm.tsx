@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { AppState, Keyboard, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { useCallback, useRef, useState } from "react";
+import { Keyboard, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useFocusEffect } from "expo-router";
 import { Text } from "../../../ui/Text";
 import { Image } from "expo-image";
@@ -50,13 +50,6 @@ export function AddBookForm({
     setSearching(false);
     setOutsidePending(false);
   }, []));
-
-  useEffect(() => {
-    const subscription = AppState.addEventListener("change", (state) => {
-      if (state === "background") setScanning(false);
-    });
-    return () => subscription.remove();
-  }, []);
 
   function toggleScanner() {
     if (scanning) {
