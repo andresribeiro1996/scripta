@@ -1,4 +1,5 @@
-import type { TierDefinition } from "@scripta/shared";
+import { DEFAULT_TIER_PRESET } from "@scripta/shared";
+import type { ContentTone } from "@scripta/shared/community";
 import type { Quiz } from "../quizzes/api";
 import type { Tierlist, VotedTierlist } from "../tierlists/api";
 import type { Tournament } from "./api";
@@ -21,9 +22,8 @@ export const NEW_GAMES = [
   { tab: "quizzes", label: "Quiz", href: "/quiz/new" },
 ] as const satisfies ReadonlyArray<{ tab: ArenaTab; label: string; href: string }>;
 
-// A tournament card draws its own status pill and progress line from the
-// summary, so it has no caption string; a tier list's caption is a plain
-// count and stays one.
+// A tournament's row draws its own status and progress from the summary, so
+// it has no detail string; a tier list's detail is a plain count and stays one.
 export type OwnedItem =
   | { id: string; name: string; kind: "tournament"; source: Tournament }
   | { id: string; name: string; detail: string; kind: "tierlist"; source: Tierlist }
@@ -46,11 +46,33 @@ export const DELETE_EFFECT: Record<OwnedItem["kind"], string> = {
   quiz: "Its plays and leaderboard are deleted, and its link stops working.",
 };
 
-export const TOURNAMENT_STATUS_LABEL: Record<Tournament["status"], string> = {
-  seeding: "Seeding",
-  active: "Active",
-  completed: "Completed",
+type Badge = { label: string; tone: ContentTone };
+
+const TOURNAMENT_BADGE: Record<Tournament["status"], Badge> = {
+  seeding: { label: "Seeding", tone: "neutral" },
+  active: { label: "In progress", tone: "info" },
+  completed: { label: "Completed", tone: "success" },
 };
+
+type Stage = "draft" | "open" | "closed";
+
+const TIERLIST_BADGE: Record<Stage, Badge> = {
+  draft: { label: "Draft", tone: "neutral" },
+  open: { label: "Voting open", tone: "accent" },
+  closed: { label: "Closed", tone: "neutral" },
+};
+
+const QUIZ_BADGE: Record<Stage, Badge> = {
+  draft: { label: "Draft", tone: "neutral" },
+  open: { label: "Open", tone: "accent" },
+  closed: { label: "Closed", tone: "neutral" },
+};
+
+const VOTED_BADGE: Badge = { label: "Voted", tone: "info" };
+
+function stage(voteCode: string | null, open: boolean): Stage {
+  return !voteCode ? "draft" : open ? "open" : "closed";
+}
 
 export function tabIndex(tab: ArenaTab): number {
   return Math.max(0, ARENA_TABS.findIndex((option) => option.value === tab));
@@ -71,11 +93,10 @@ export function ownedItems(tab: ArenaTab, tournaments: Tournament[], tierlists: 
   }
   if (tab === "quizzes") {
     return quizzes.map((source) => {
-      const status = source.voteCode === null ? "draft" : source.playOpen ? "open" : "closed";
       return {
         id: source.id,
         name: source.name,
-        detail: `${source.data.books.length} ${source.data.books.length === 1 ? "book" : "books"} · ${status}`,
+        detail: `${source.data.books.length} ${source.data.books.length === 1 ? "book" : "books"} · ${stage(source.voteCode, source.playOpen)}`,
         kind: "quiz",
         source,
       };
@@ -84,7 +105,8 @@ export function ownedItems(tab: ArenaTab, tournaments: Tournament[], tierlists: 
   return tierlists.map((source) => {
     const tiers = source.data.tiers.length;
     const books = source.data.tiers.reduce((total, tier) => total + tier.workIds.length, source.data.pool.length);
-    const voting = source.voteCode ? ` · voting ${source.votingOpen ? "open" : "closed"}` : "";
+    const current = stage(source.voteCode, source.votingOpen);
+    const voting = current === "draft" ? "" : ` · voting ${current}`;
     return {
       id: source.id,
       name: source.name,
@@ -152,17 +174,6 @@ export function emptyCopy(tab: ArenaTab, searching: boolean, owner: OwnerFilter 
     : { title: "No tier lists yet", body: "Create one to rank books into tiers.", action: "Create tier list" };
 }
 
-export type TierSegment = { color: string; weight: number };
-
-/** Segment widths in proportion to how many books sit in each tier. A list
- *  nobody has sorted yet would otherwise collapse to nothing, so an empty
- *  ladder draws even segments — the palette still reads, the proportions
- *  just aren't claiming anything. */
-export function tierDistribution(tiers: TierDefinition[]): TierSegment[] {
-  const sorted = tiers.reduce((total, tier) => total + tier.workIds.length, 0);
-  return tiers.map((tier) => ({ color: tier.color, weight: sorted === 0 ? 1 : tier.workIds.length }));
-}
-
 export function tournamentProgress(tournament: Tournament): {
   label: string;
   totalRounds: number;
@@ -173,8 +184,7 @@ export function tournamentProgress(tournament: Tournament): {
   if (tournament.status === "seeding") {
     return { label: `${tournament.filledSlots} of ${tournament.bracketSize} slots filled`, totalRounds, completedRounds: 0 };
   }
-  // No caption: the COMPLETED pill beside it already says this, and the
-  // champion is on the card as its own cover.
+  // No caption: the Completed badge beside it already says this.
   if (tournament.status === "completed") {
     return { label: "", totalRounds, completedRounds: totalRounds };
   }
@@ -182,24 +192,70 @@ export function tournamentProgress(tournament: Tournament): {
   return { label: `Round ${round} of ${totalRounds}`, totalRounds, completedRounds: round - 1 };
 }
 
-/** The thumbnail stack under the name. A finished tournament draws its
- *  champion as the card's own cover, so keeping it in the stack too spends
- *  a slot on a book already shown. */
-export function previewCovers(tournament: Tournament): string[] {
-  const champion = tournament.winner?.cover;
-  return champion ? tournament.covers.filter((cover) => cover !== champion) : tournament.covers;
-}
-
-/** Seeded books beyond what the card shows — the stack plus the winner
- *  cover, which is one of them. Slots seeded without art are counted but
- *  never previewed, so this can't be derived from the bracket size. */
-export function coverRemainder(tournament: Tournament): number {
-  const shown = previewCovers(tournament).length + (tournament.winner ? 1 : 0);
-  return Math.max(0, tournament.filledSlots - shown);
-}
-
-/** Card caption for someone else's poll the account voted on — same
+/** Detail line for someone else's poll the account voted on — same
  *  format the public directory uses. */
 export function votedTierlistDetail(tierlist: VotedTierlist): string {
   return `${tierlist.poolSize} books · ${tierlist.ballotCount} ballots${tierlist.votingOpen ? "" : " · closed"}`;
+}
+
+export type GameRowModel = {
+  kind: OwnedItem["kind"];
+  name: string;
+  meta: string;
+  badges: Badge[];
+  caption?: string;
+  covers: string[];
+  ladder?: string[];
+};
+
+function tournamentRow(tournament: Tournament): GameRowModel {
+  return {
+    kind: "tournament",
+    name: tournament.name,
+    meta: `${tournament.bracketSize}-book bracket`,
+    badges: [TOURNAMENT_BADGE[tournament.status]],
+    caption: tournamentProgress(tournament).label,
+    covers: tournament.covers,
+  };
+}
+
+/** What a Games-tab row shows for each non-header entry. Tier lists carry
+ *  only work ids, so an owned one has no covers to fan; quizzes snapshot
+ *  theirs at publish. A voted tier list's tiers are the owner's answer key,
+ *  so it keeps the preset ladder. */
+export function gameRow(row: Exclude<SectionedItem, { kind: "header" }>): GameRowModel {
+  if (row.kind === "votedTournament") {
+    const model = tournamentRow(row.tournament);
+    return { ...model, badges: [...model.badges, VOTED_BADGE] };
+  }
+  if (row.kind === "votedTierlist") {
+    const { tierlist } = row;
+    return {
+      kind: "tierlist",
+      name: tierlist.name,
+      meta: votedTierlistDetail(tierlist),
+      badges: [TIERLIST_BADGE[tierlist.votingOpen ? "open" : "closed"], VOTED_BADGE],
+      covers: tierlist.covers,
+      ladder: DEFAULT_TIER_PRESET.map((tier) => tier.color),
+    };
+  }
+  const { item } = row;
+  if (item.kind === "tournament") return tournamentRow(item.source);
+  if (item.kind === "quiz") {
+    return {
+      kind: "quiz",
+      name: item.name,
+      meta: item.detail,
+      badges: [QUIZ_BADGE[stage(item.source.voteCode, item.source.playOpen)]],
+      covers: item.source.data.books.flatMap((book) => (book.coverUrl ? [book.coverUrl] : [])),
+    };
+  }
+  return {
+    kind: "tierlist",
+    name: item.name,
+    meta: item.detail,
+    badges: [TIERLIST_BADGE[stage(item.source.voteCode, item.source.votingOpen)]],
+    covers: [],
+    ladder: item.source.data.tiers.map((tier) => tier.color),
+  };
 }
