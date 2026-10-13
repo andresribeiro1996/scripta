@@ -53,7 +53,12 @@ export function AddBookSheet({
     try {
       const { key, updated } = await addBookToLibrary({ ...toRecommendation(book, readStatus), day: localDay() });
       if (readStatus === 2) {
-        const { data } = await library.refetch();
+        const { data, error: reloadError } = await library.refetch();
+        if (reloadError) {
+          setToast({ message: "Added to your library, but couldn't open the finish step.", tone: "error" });
+          setTimeout(onClose, 1600);
+          return;
+        }
         const added = data?.data.books.find((entry) => bookKey(entry) === key);
         if (added) {
           setFinished(added);
