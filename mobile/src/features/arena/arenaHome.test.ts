@@ -71,7 +71,7 @@ test("owned items summarise each kind for its card", () => {
   assert.equal(tourney?.name, "Best of 2025");
 
   assert.equal(itemDetail(ownedItems("tierlists", [], [tierlist()])), "0 books · 1 tier");
-  assert.equal(itemDetail(ownedItems("tierlists", [], [tierlist({ voteCode: "abc", votingOpen: true })])), "0 books · 1 tier · voting open");
+  assert.equal(itemDetail(ownedItems("tierlists", [], [tierlist({ voteCode: "abc", votingOpen: true })])), "0 books · 1 tier");
 
   const sorted = tierlist({ data: { tiers: [
     { id: "s", label: "S", color: "#c9482f", workIds: ["a", "b"] },
@@ -83,13 +83,11 @@ test("owned items summarise each kind for its card", () => {
   assert.equal(itemDetail(ownedItems("tierlists", [], [partlySorted])), "3 books · 1 tier");
 
   const published = tierlist({ voteCode: "abc", votingOpen: true, data: { tiers: [{ id: "s", label: "S", color: "#c9482f", workIds: [] }, { id: "a", label: "A", color: "#d98a3d", workIds: [] }], pool: ["a", "b", "c"] } });
-  assert.equal(itemDetail(ownedItems("tierlists", [], [published])), "3 books · 2 tiers · voting open");
+  assert.equal(itemDetail(ownedItems("tierlists", [], [published])), "3 books · 2 tiers");
 });
 
-test("owned quiz items summarise book count and stage", () => {
-  assert.equal(itemDetail(ownedItems("quizzes", [], [], [quiz()])), "1 book · draft");
-  assert.equal(itemDetail(ownedItems("quizzes", [], [], [quiz({ voteCode: "abc", playOpen: true })])), "1 book · open");
-  assert.equal(itemDetail(ownedItems("quizzes", [], [], [quiz({ voteCode: "abc", playOpen: false })])), "1 book · closed");
+test("owned quiz items summarise book count", () => {
+  assert.equal(itemDetail(ownedItems("quizzes", [], [], [quiz()])), "1 book");
 });
 
 test("the quizzes tab has no voted section and its own empty copy", () => {
@@ -205,7 +203,7 @@ test("only an empty tab offers to create one", () => {
 
 test("voted tier list cards read like the public directory's", () => {
   assert.equal(votedTierlistDetail(votedTierlist()), "6 books · 3 ballots");
-  assert.equal(votedTierlistDetail(votedTierlist({ votingOpen: false })), "6 books · 3 ballots · closed");
+  assert.equal(votedTierlistDetail(votedTierlist({ votingOpen: false })), "6 books · 3 ballots");
 });
 
 test("Games opens on Browse, with your three lists beside it, and New offers each kind", () => {
@@ -245,7 +243,7 @@ test("an owned quiz row fans the covers its books carry", () => {
   const draft = row({ data: { ...quiz().data, books: [book("a"), book(null), book("b")] } });
   assert.deepEqual(draft.covers, ["a", "b"]);
   assert.equal(draft.ladder, undefined);
-  assert.equal(draft.meta, "3 books · draft");
+  assert.equal(draft.meta, "3 books");
   assert.deepEqual(draft.badges, [{ label: "Draft", tone: "neutral" }]);
   assert.deepEqual(row({ voteCode: "abc", playOpen: true }).badges, [{ label: "Open", tone: "accent" }]);
   assert.deepEqual(row({ voteCode: "abc", playOpen: false }).badges, [{ label: "Closed", tone: "neutral" }]);
@@ -257,7 +255,7 @@ test("voted rows carry a Voted badge beside their status", () => {
   assert.deepEqual(voted.covers, ["a"]);
 
   const list = gameRow({ kind: "votedTierlist", key: "voted:p1", target: "/vote/abc12345", tierlist: votedTierlist({ covers: ["a", "b"], votingOpen: false }) });
-  assert.equal(list.meta, "6 books · 3 ballots · closed");
+  assert.equal(list.meta, "6 books · 3 ballots");
   assert.deepEqual(list.badges, [{ label: "Closed", tone: "neutral" }, { label: "Voted", tone: "info" }]);
   assert.deepEqual(list.covers, ["a", "b"]);
   assert.ok(list.ladder && list.ladder.length > 0);

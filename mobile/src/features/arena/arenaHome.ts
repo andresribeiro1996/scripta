@@ -96,7 +96,7 @@ export function ownedItems(tab: ArenaTab, tournaments: Tournament[], tierlists: 
       return {
         id: source.id,
         name: source.name,
-        detail: `${source.data.books.length} ${source.data.books.length === 1 ? "book" : "books"} · ${stage(source.voteCode, source.playOpen)}`,
+        detail: `${source.data.books.length} ${source.data.books.length === 1 ? "book" : "books"}`,
         kind: "quiz",
         source,
       };
@@ -105,12 +105,10 @@ export function ownedItems(tab: ArenaTab, tournaments: Tournament[], tierlists: 
   return tierlists.map((source) => {
     const tiers = source.data.tiers.length;
     const books = source.data.tiers.reduce((total, tier) => total + tier.workIds.length, source.data.pool.length);
-    const current = stage(source.voteCode, source.votingOpen);
-    const voting = current === "draft" ? "" : ` · voting ${current}`;
     return {
       id: source.id,
       name: source.name,
-      detail: `${books} ${books === 1 ? "book" : "books"} · ${tiers} ${tiers === 1 ? "tier" : "tiers"}${voting}`,
+      detail: `${books} ${books === 1 ? "book" : "books"} · ${tiers} ${tiers === 1 ? "tier" : "tiers"}`,
       kind: "tierlist",
       source,
     };
@@ -192,10 +190,10 @@ export function tournamentProgress(tournament: Tournament): {
   return { label: `Round ${round} of ${totalRounds}`, totalRounds, completedRounds: round - 1 };
 }
 
-/** Detail line for someone else's poll the account voted on — same
- *  format the public directory uses. */
+/** Detail line for someone else's poll the account voted on; its status
+ *  is the row's badge. */
 export function votedTierlistDetail(tierlist: VotedTierlist): string {
-  return `${tierlist.poolSize} books · ${tierlist.ballotCount} ballots${tierlist.votingOpen ? "" : " · closed"}`;
+  return `${tierlist.poolSize} books · ${tierlist.ballotCount} ballots`;
 }
 
 export type GameRowModel = {
