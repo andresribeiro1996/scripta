@@ -84,7 +84,7 @@ export function HomeScreen() {
 
   const header = (
     <View style={styles.sections}>
-      {!library.data ? (
+      {library.data === undefined ? (
         <View style={styles.sectionPad}>
           {library.isError
             ? <ErrorState body="Couldn't load your home." actionLabel="Retry" onAction={() => void library.refetch()} />
