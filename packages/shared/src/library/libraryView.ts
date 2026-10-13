@@ -1,3 +1,6 @@
+import { canonicalIsbn, normalizeWords } from "./bookMatch.js";
+import { looksLikeIsbnQuery } from "./bookSearch.js";
+
 export type LibraryBook = Record<string, unknown>;
 export type StatusFilter = "all" | "unread" | "reading" | "finished";
 export type SortKey = "manual" | "title" | "author";
@@ -38,6 +41,15 @@ export function filterBooks(books: LibraryBook[], query: string, status: StatusF
     if (!q) return true;
     return String(b.Title ?? "").toLowerCase().includes(q) || String(b.Attribution ?? "").toLowerCase().includes(q);
   });
+}
+
+export function matchesSearch(book: LibraryBook, query: string): boolean {
+  const trimmed = query.trim();
+  if (looksLikeIsbnQuery(trimmed)) return canonicalIsbn(trimmed) === canonicalIsbn(book.ISBN);
+  const words = normalizeWords(trimmed).split(" ").filter(Boolean);
+  if (words.length === 0) return false;
+  const candidates = normalizeWords(`${String(book.Title ?? "")} ${String(book.Attribution ?? "")}`).split(" ").filter(Boolean);
+  return words.every((word) => candidates.some((candidate) => candidate.startsWith(word)));
 }
 
 export function sortBooks(books: LibraryBook[], key: SortKey): LibraryBook[] {

@@ -56,6 +56,7 @@ function AppTabs() {
           }}
         />
         <Tabs.Screen name="(library)" options={{ title: "Library", tabBarIcon: ({ color, focused, size }) => <Icon name="library" filled={focused} color={color} size={size} /> }} />
+        <Tabs.Screen name="(search)" options={{ title: "Search", tabBarIcon: ({ color, focused, size }) => <Icon name="search" filled={focused} color={color} size={size} /> }} />
         <Tabs.Screen name="(arena)" options={{ title: "Games", tabBarIcon: ({ color, focused, size }) => <Icon name="arena" filled={focused} color={color} size={size} /> }} />
         <Tabs.Screen name="(you)" options={{ title: "You", tabBarIcon: ({ color, focused, size }) => <Icon name="profile" filled={focused} color={color} size={size} /> }} />
       </Tabs>
