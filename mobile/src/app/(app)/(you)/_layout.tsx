@@ -10,9 +10,6 @@ export default function YouStackLayout() {
   return (
     <Stack screenOptions={useScreenOptions()}>
       <Stack.Screen name="you" />
-      <Stack.Screen name="me" />
-      <Stack.Screen name="murals/index" />
-      <Stack.Screen name="settings" />
       <Stack.Screen name="add-book" options={{ ...sheet, title: "Add a book" }} />
       <Stack.Screen name="import" options={{ ...sheet, title: "Import library" }} />
       <Stack.Screen name="book/[key]/index" options={{ title: "" }} />
