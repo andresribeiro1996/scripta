@@ -48,7 +48,8 @@ Search joins between Library and Games in phase 3. Until then the bar has four t
 
 - The tab opens LibraryScreen, not MyShelfScreen.
 - Shelves read Reading · To read · Finished, then Collections.
-- It opens on the shelf last used in this app session. That is kept in memory, the way My shelf keeps its tab. The first open of a session lands on Reading.
+- It opens on Reading. A visited tab stays mounted, so it keeps whichever shelf you left until the app restarts or another account signs in. Nothing is stored for this.
+- An empty shelf with no search reads "Nothing on this shelf yet." Now that people land on Reading, that is common. "No books match." and its Clear button stay for a search that finds nothing.
 - Nothing else on the screen changes: heading, Add, ⋯ menu, search, sort, duplicates, selection.
 
 ### You
@@ -136,7 +137,7 @@ Top to bottom:
   - A pure Home model deciding which sections show for: an empty library; nothing Reading; one and several books Reading; 0, 1 and 2 books To read; with and without a highlight.
   - The seen-marker rule: focused, a row on screen, loaded, no error, nothing fetching, not yet sent.
   - Community tabs without Activity, including the `?tab=` fallback.
-  - Library shelf order and the opening shelf.
+  - Library shelf order. Reading comes first, which is the opening shelf.
 - **Checks:** `npm run typecheck --workspace mobile` and `npx expo-doctor` in `mobile/`.
 - **Device pass** (`device-checker`, Android emulator) after each phase:
   - Phase 1: tabs, the Library landing shelf, the You rows, back chevrons inside You, and the murals editor.

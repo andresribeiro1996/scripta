@@ -59,7 +59,7 @@
 | File | Change |
 |---|---|
 | `packages/shared/src/library/libraryView.ts`, `libraryView.test.ts` | Shelves in Reading · To read · Finished order |
-| `mobile/src/features/library/LibraryScreen.tsx` | Opens on the last shelf used this session |
+| `mobile/src/features/library/LibraryScreen.tsx` | Opens on Reading; empty-shelf copy that doesn't blame a search |
 | `mobile/src/app/(app)/_layout.tsx` | Tabs Home · Library · Games · You |
 | `mobile/src/app/(app)/(library)/_layout.tsx` | Root `library`; `me` leaves |
 | `mobile/src/app/(app)/(you)/_layout.tsx` (new) | The You stack |
@@ -87,7 +87,7 @@
 
 ## Phase 1 — Library and You tabs
 
-### Task 1: Library shelves — order and remembered shelf
+### Task 1: Library shelves — order and empty shelf (done: `fc9a799`, then the review fix)
 
 **Files:**
 - Modify: `packages/shared/src/library/libraryView.ts:15-19`
@@ -114,30 +114,13 @@ export const LIBRARY_STATUS_TABS = [
 ] as const;
 ```
 
-In `LibraryScreen.tsx`:
-
-1. After the `LIBRARY_TABS` constant, add the module-level memory:
-
-```ts
-let lastShelf: LibraryTab = LIBRARY_STATUS_TABS[0].value;
-```
-
-2. Replace the `statusFilter` state line with:
-
-```ts
-const [statusFilter, setStatusFilter] = useState<LibraryTab>(lastShelf);
-```
-
-3. Add this beside the other handlers:
-
-```ts
-function changeShelf(next: LibraryTab) {
-  lastShelf = next;
-  setStatusFilter(next);
-}
-```
-
-4. Pass `onChange={changeShelf}` to the `SwipeableTabs`, replacing `onChange={setStatusFilter}`.
+`LibraryScreen.tsx` keeps opening on `LIBRARY_STATUS_TABS[0]`, which is now Reading.
+- A visited tab stays mounted, so it keeps its shelf without any memory of its own.
+- A module-level `lastShelf` (first landed in `fc9a799`, removed after review) only mattered across a sign-out. There it carried one account's Collections shelf into another account's empty library.
+- Its empty state splits on the search:
+  - With a search, it keeps "No books match." and "Clear search and sort".
+  - With none, it reads `<EmptyState title="Nothing on this shelf yet." />`.
+  - Landing on Reading makes an empty shelf common, and the old copy blamed a search nobody typed.
 
 - [ ] **Step 4: Run and expect PASS.**
 

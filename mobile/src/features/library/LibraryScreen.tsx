@@ -48,8 +48,6 @@ type LibraryTab = LibraryStatusTab | "collections";
 
 const LIBRARY_TABS: readonly { value: LibraryTab; label: string }[] = [...LIBRARY_STATUS_TABS, { value: "collections", label: "Collections" }];
 
-let lastShelf: LibraryTab = LIBRARY_STATUS_TABS[0].value;
-
 export function LibraryScreen() {
   const { colors } = useTheme();
   const { data: library, isPending, isError, error, refetch, isRefetching } = useLibrary();
@@ -61,7 +59,7 @@ export function LibraryScreen() {
   useEffect(() => {
     setQuery(q ?? "");
   }, [q]);
-  const [statusFilter, setStatusFilter] = useState<LibraryTab>(lastShelf);
+  const [statusFilter, setStatusFilter] = useState<LibraryTab>(LIBRARY_STATUS_TABS[0].value);
   const [sortKey, setSortKey] = useState<SortKey>("manual");
   const [groupQuery, setGroupQuery] = useState("");
   const groupsView = useRef<GroupsViewHandle>(null);
@@ -86,16 +84,9 @@ export function LibraryScreen() {
   }, [library]);
   // The status shown is a shelf (one of the three tabs), not a clearable
   // filter — only search and sort get reset here.
-  const toolbarActive = query.trim() !== "" || sortKey !== "manual";
-
   function clearSearchAndFilters() {
     setQuery("");
     setSortKey("manual");
-  }
-
-  function changeShelf(next: LibraryTab) {
-    lastShelf = next;
-    setStatusFilter(next);
   }
 
   async function handleRenameLibrary() {
@@ -236,7 +227,7 @@ export function LibraryScreen() {
           accessibilityLabel="Library shelf"
           options={LIBRARY_TABS}
           value={statusFilter}
-          onChange={changeShelf}
+          onChange={setStatusFilter}
         renderPage={(status) => {
           if (status === "collections") return <GroupsView ref={groupsView} search={groupQuery} onSearchChange={setGroupQuery} />;
           const pageBooks = sortBooks(filterBooks(ordered, query, status), sortKey);
@@ -280,12 +271,16 @@ export function LibraryScreen() {
                 </View>
               }
               ListEmptyComponent={
-                <EmptyState
-                  title="No books match."
-                  body="Every book is still here — the search above just doesn't match any of them."
-                  actionLabel={toolbarActive ? "Clear search and sort" : undefined}
-                  onAction={toolbarActive ? clearSearchAndFilters : undefined}
-                />
+                query.trim() ? (
+                  <EmptyState
+                    title="No books match."
+                    body="Every book is still here — the search above just doesn't match any of them."
+                    actionLabel="Clear search and sort"
+                    onAction={clearSearchAndFilters}
+                  />
+                ) : (
+                  <EmptyState title="Nothing on this shelf yet." />
+                )
               }
               renderItem={(book) => {
                 const seriesGroup = bookSeriesGroup.get(bookKey(book));
