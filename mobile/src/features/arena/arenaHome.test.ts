@@ -5,7 +5,7 @@ import { test } from "node:test";
 import type { Quiz } from "../quizzes/api.js";
 import type { Tierlist, VotedTierlist } from "../tierlists/api.js";
 import type { Tournament } from "./api.js";
-import { ARENA_TABS, GAMES_TABS, NEW_GAMES, coverRemainder, emptyCopy, filterItems, filterSections, homeSections, ownedItems, previewCovers, tabAtIndex, tabIndex, tierDistribution, tournamentProgress, votedTierlistDetail, type OwnedItem, type SectionedItem } from "./arenaHome.js";
+import { ARENA_TABS, GAMES_TABS, NEW_GAMES, coverRemainder, emptyCopy, homeSections, nextOwnerFilter, ownedItems, previewCovers, tabAtIndex, tabIndex, tierDistribution, tournamentProgress, votedTierlistDetail, type OwnedItem, type SectionedItem } from "./arenaHome.js";
 
 const itemDetail = (items: OwnedItem[]): string | undefined => {
   const first = items[0];
@@ -93,14 +93,8 @@ test("owned quiz items summarise book count and stage", () => {
 });
 
 test("the quizzes tab has no voted section and its own empty copy", () => {
-  assert.deepEqual(homeSections("quizzes", ownedItems("quizzes", [], [], [quiz()]), [], []).length, 1);
+  assert.deepEqual(kinds(homeSections("quizzes", ownedItems("quizzes", [], [], [quiz()]), [], [])), ["header:Created by you · 1", "owned"]);
   assert.equal(emptyCopy("quizzes", false).title, "No quizzes yet");
-});
-
-test("search filters on name, case-insensitively, and ignores surrounding space", () => {
-  const items = ownedItems("tournaments", [tournament({ id: "a", name: "Best of 2025" }), tournament({ id: "b", name: "Sci-fi cup" })], []);
-  assert.deepEqual(filterItems(items, "  BEST ").map((item) => item.id), ["a"]);
-  assert.deepEqual(filterItems(items, "   ").map((item) => item.id), ["a", "b"]);
 });
 
 test("empty copy distinguishes an empty tab from an unmatched search", () => {
@@ -184,33 +178,63 @@ const votedTierlist = (over: Partial<VotedTierlist> = {}): VotedTierlist => ({
 
 const kinds = (sections: SectionedItem[]): string[] => sections.map((s) => ("title" in s ? `header:${s.title}` : s.kind));
 
-test("a tab with no participation stays the flat owned list it always was", () => {
-  const owned = ownedItems("tournaments", [tournament()], []);
-  assert.deepEqual(kinds(homeSections("tournaments", owned, [], [])), ["owned"]);
-  assert.deepEqual(kinds(homeSections("tierlists", ownedItems("tierlists", [], [tierlist()]), [], [])), ["owned"]);
+test("Created by you always heads the owned rows, with a count, even with nothing voted on", () => {
+  const owned = ownedItems("tournaments", [tournament({ id: "a" }), tournament({ id: "b" })], []);
+  assert.deepEqual(kinds(homeSections("tournaments", owned, [], [])), ["header:Created by you · 2", "owned", "owned"]);
+  assert.deepEqual(kinds(homeSections("tierlists", ownedItems("tierlists", [], [tierlist()]), [], [])), ["header:Created by you · 1", "owned"]);
 });
 
-test("a non-empty voted section gains headers on both sides", () => {
+test("a voted section gets its own counted heading after the owned one", () => {
   const sections = homeSections("tournaments", ownedItems("tournaments", [tournament()], []), [tournament({ id: "t2", name: "Public cup" })], []);
-  assert.deepEqual(kinds(sections), ["header:Created by you", "owned", "header:Voting in", "votedTournament"]);
+  assert.deepEqual(kinds(sections), ["header:Created by you · 1", "owned", "header:Voting in · 1", "votedTournament"]);
 
-  const tierlistSections = homeSections("tierlists", ownedItems("tierlists", [], [tierlist()]), [], [votedTierlist()]);
-  assert.deepEqual(kinds(tierlistSections), ["header:Created by you", "owned", "header:Voted on", "votedTierlist"]);
+  const tierlistSections = homeSections("tierlists", ownedItems("tierlists", [], [tierlist()]), [], [votedTierlist(), votedTierlist({ id: "p2", voteCode: "zzz" })]);
+  assert.deepEqual(kinds(tierlistSections), ["header:Created by you · 1", "owned", "header:Voted on · 2", "votedTierlist", "votedTierlist"]);
 
   const voted = tierlistSections[3];
   assert.ok(voted && voted.kind === "votedTierlist");
   assert.equal(voted.target, "/vote/abc12345");
 });
 
-test("an active search collapses to a flat hit list across both sections", () => {
-  const sections = homeSections(
-    "tournaments",
-    ownedItems("tournaments", [tournament({ id: "mine", name: "My cup" })], []),
-    [tournament({ id: "theirs", name: "Public cup" })],
-    []
-  );
-  assert.deepEqual(filterSections(sections, "cup").map((s) => s.key), ["mine", "voted:theirs"]);
-  assert.deepEqual(filterSections(sections, "   "), sections);
+test("a section with no rows has no heading", () => {
+  assert.deepEqual(kinds(homeSections("tournaments", [], [tournament({ id: "t2" })], [])), ["header:Voting in · 1", "votedTournament"]);
+  assert.deepEqual(homeSections("tournaments", [], [], []), []);
+});
+
+test("search narrows each section's rows and count, and drops a section it empties", () => {
+  const owned = ownedItems("tournaments", [tournament({ id: "mine", name: "My cup" }), tournament({ id: "other", name: "Sci-fi" })], []);
+  const voted = [tournament({ id: "theirs", name: "Public cup" })];
+  const sections = homeSections("tournaments", owned, voted, [], "all", " CUP ");
+  assert.deepEqual(sections.map((s) => s.key), ["created", "mine", "participating", "voted:theirs"]);
+  assert.deepEqual(kinds(sections).filter((k) => k.startsWith("header")), ["header:Created by you · 1", "header:Voting in · 1"]);
+
+  assert.deepEqual(kinds(homeSections("tournaments", owned, voted, [], "all", "sci")), ["header:Created by you · 1", "owned"]);
+  assert.deepEqual(kinds(homeSections("tournaments", owned, voted, [], "all", "public")), ["header:Voting in · 1", "votedTournament"]);
+  assert.deepEqual(homeSections("tournaments", owned, voted, [], "all", "nothing"), []);
+  assert.deepEqual(homeSections("tournaments", owned, voted, []), homeSections("tournaments", owned, voted, [], "all", "   "));
+});
+
+test("the ownership filter keeps only created or only voted rows, still headed and counted", () => {
+  const owned = ownedItems("tierlists", [], [tierlist({ id: "l1" }), tierlist({ id: "l2" })]);
+  const voted = [votedTierlist()];
+  assert.deepEqual(kinds(homeSections("tierlists", owned, [], voted, "mine")), ["header:Created by you · 2", "owned", "owned"]);
+  assert.deepEqual(kinds(homeSections("tierlists", owned, [], voted, "voted")), ["header:Voted on · 1", "votedTierlist"]);
+  assert.deepEqual(homeSections("tierlists", owned, [], [], "voted"), []);
+  assert.deepEqual(kinds(homeSections("tierlists", owned, [], voted, "voted", "space")), ["header:Voted on · 1", "votedTierlist"]);
+  assert.deepEqual(homeSections("tierlists", owned, [], voted, "voted", "fantasy"), []);
+});
+
+test("the ownership filter cycles All, Created by you, Voted on and back", () => {
+  assert.equal(nextOwnerFilter("all"), "mine");
+  assert.equal(nextOwnerFilter("mine"), "voted");
+  assert.equal(nextOwnerFilter("voted"), "all");
+});
+
+test("an empty voted filter says so per tab, and search still reads as no match", () => {
+  assert.equal(emptyCopy("tournaments", false, "voted").title, "You haven't voted in any tournaments yet");
+  assert.equal(emptyCopy("tierlists", false, "voted").title, "You haven't voted in any tier lists yet");
+  assert.equal(emptyCopy("tierlists", false, "mine").title, "No tier lists yet");
+  assert.equal(emptyCopy("tierlists", true, "voted").title, "Nothing matches");
 });
 
 test("voted tier list cards read like the public directory's", () => {

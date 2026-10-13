@@ -95,65 +95,57 @@ export function ownedItems(tab: ArenaTab, tournaments: Tournament[], tierlists: 
   });
 }
 
-export function filterItems(items: OwnedItem[], search: string): OwnedItem[] {
-  const needle = search.trim().toLowerCase();
-  return needle ? items.filter((item) => item.name.toLowerCase().includes(needle)) : items;
+export const OWNER_FILTERS = [
+  { value: "all", label: "All" },
+  { value: "mine", label: "Created by you" },
+  { value: "voted", label: "Voted on" },
+] as const;
+
+export type OwnerFilter = (typeof OWNER_FILTERS)[number]["value"];
+
+export function nextOwnerFilter(filter: OwnerFilter): OwnerFilter {
+  const index = OWNER_FILTERS.findIndex((option) => option.value === filter);
+  return OWNER_FILTERS[(index + 1) % OWNER_FILTERS.length]!.value;
 }
 
-/** With no participation the tab stays the flat owned list it always was;
- *  section headers only appear around a non-empty voted section. */
+function section(key: string, title: string, rows: SectionedItem[]): SectionedItem[] {
+  return rows.length ? [{ kind: "header", key, title: `${title} · ${rows.length}` }, ...rows] : [];
+}
+
+/** A section's heading shows whenever it has rows and counts the rows left
+ *  after the ownership filter and search, so a section the needle or filter
+ *  emptied loses its heading rather than leaving an orphaned title. */
 export function homeSections(
   tab: ArenaTab,
   owned: OwnedItem[],
   votedTournaments: Tournament[],
-  votedTierlists: VotedTierlist[]
+  votedTierlists: VotedTierlist[],
+  owner: OwnerFilter = "all",
+  search = ""
 ): SectionedItem[] {
-  const voted = tab === "tournaments" ? votedTournaments : tab === "tierlists" ? votedTierlists : [];
-  if (voted.length === 0) return owned.map((item) => ({ kind: "owned", key: item.id, item }));
+  const needle = search.trim().toLowerCase();
+  const matches = (name: string) => !needle || name.toLowerCase().includes(needle);
+  const mine: SectionedItem[] =
+    owner === "voted" ? [] : owned.filter((item) => matches(item.name)).map((item) => ({ kind: "owned", key: item.id, item }));
+  if (tab === "quizzes" || owner === "mine") return section("created", CREATED_BY_YOU, mine);
 
-  const sectionTitle = tab === "tournaments" ? "Voting in" : "Voted on";
   const votedRows: SectionedItem[] =
     tab === "tournaments"
-      ? votedTournaments.map((tournament) => ({
-          kind: "votedTournament" as const,
-          key: `voted:${tournament.id}`,
-          target: `/arena/${tournament.id}`,
-          tournament,
-        }))
-      : votedTierlists.map((tierlist) => ({
-          kind: "votedTierlist" as const,
-          key: `voted:${tierlist.id}`,
-          target: `/vote/${tierlist.voteCode}`,
-          tierlist,
-        }));
-  return [
-    { kind: "header", key: "created", title: CREATED_BY_YOU },
-    ...owned.map((item) => ({ kind: "owned" as const, key: item.id, item })),
-    { kind: "header", key: "participating", title: sectionTitle },
-    ...votedRows,
-  ];
+      ? votedTournaments
+          .filter((tournament) => matches(tournament.name))
+          .map((tournament) => ({ kind: "votedTournament", key: `voted:${tournament.id}`, target: `/arena/${tournament.id}`, tournament }))
+      : votedTierlists
+          .filter((tierlist) => matches(tierlist.name))
+          .map((tierlist) => ({ kind: "votedTierlist", key: `voted:${tierlist.id}`, target: `/vote/${tierlist.voteCode}`, tierlist }));
+  return [...section("created", CREATED_BY_YOU, mine), ...section("participating", tab === "tournaments" ? "Voting in" : "Voted on", votedRows)];
 }
 
-function sectionItemName(item: SectionedItem): string | null {
-  if (item.kind === "header") return null;
-  if (item.kind === "owned") return item.item.name;
-  if (item.kind === "votedTournament") return item.tournament.name;
-  return item.tierlist.name;
-}
-
-/** Active search collapses to a flat hit list — headers would leave
- *  orphaned titles above sections the needle emptied. */
-export function filterSections(sections: SectionedItem[], search: string): SectionedItem[] {
-  const needle = search.trim().toLowerCase();
-  if (!needle) return sections;
-  return sections.filter((item) => {
-    const name = sectionItemName(item);
-    return name !== null && name.toLowerCase().includes(needle);
-  });
-}
-
-export function emptyCopy(tab: ArenaTab, searching: boolean): { title: string; body: string } {
+export function emptyCopy(tab: ArenaTab, searching: boolean, owner: OwnerFilter = "all"): { title: string; body: string } {
   if (searching) return { title: "Nothing matches", body: "Try a different search." };
+  if (owner === "voted") {
+    const noun = tab === "tournaments" ? "tournaments" : "tier lists";
+    return { title: `You haven't voted in any ${noun} yet`, body: `${noun[0]!.toUpperCase()}${noun.slice(1)} you vote in will show up here.` };
+  }
   if (tab === "quizzes") return { title: "No quizzes yet", body: "Create one and turn your books into trivia." };
   return tab === "tournaments"
     ? { title: "No tournaments yet", body: "Create one and seed it from your library." }
