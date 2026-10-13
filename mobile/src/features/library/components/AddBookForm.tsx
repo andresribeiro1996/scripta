@@ -19,12 +19,14 @@ const STATUS_OPTIONS = [
 export function AddBookForm({
   onAdd,
   onClose,
+  initialQuery = "",
 }: {
   onAdd: (book: Record<string, unknown>) => Promise<void>;
   onClose: () => void;
+  initialQuery?: string;
 }) {
   const { colors } = useTheme();
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initialQuery);
   const [results, setResults] = useState<BookSearchResult[] | null>(null);
   const [searching, setSearching] = useState(false);
   const [outsidePending, setOutsidePending] = useState(false);
