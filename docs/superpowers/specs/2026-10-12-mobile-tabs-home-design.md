@@ -154,5 +154,10 @@ Top to bottom:
 - **Actions on feed rows** ("Rank it", "Vote", "Play"): dashboard rows don't carry `viewerVoted` today, so an action would still offer "Rank it" after you ranked. It needs that field added to the dashboard response (an additive backend change).
 - **"See all" from Home into the Library's Reading shelf:** needs a jump to another tab's root that doesn't push a second Library screen when that tab has a screen open.
 - **Your own profile:** whether `/u/<your username>` should open in the You tab.
+- **Signing back in after a session expires:**
+  - `(public)/login.tsx` sends you back to the screen you were on, without `withAnchor`.
+  - Restored on `/me`, `/murals` or `/settings`, that screen has no You hub beneath it, and the hub can't be reached until a restart. This already happens to `/book/<key>` and `/collections` today.
+  - The fix is anchoring the post-sign-in redirect without anchoring `/choose-username` and `/welcome-avatar`. The `(app)` guard would redirect from underneath those.
+  - It touches the sign-in journey, so it is its own change.
 - **Library header compaction:** the name in the bar and Add as a floating button. This is a DESIGN.md change.
 - **The web phone bar.**
