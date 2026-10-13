@@ -71,7 +71,7 @@ export function HomeScreen() {
   }).current;
 
   const openBook = (key: string) => router.push(`/book/${encodeURIComponent(key)}` as never);
-  const findReaders = () => router.push("/community?tab=people" as never);
+  const findReaders = () => router.push("/people" as never);
 
   async function onRefresh() {
     setPulling(true);
