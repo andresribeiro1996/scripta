@@ -8,8 +8,10 @@ export function startAuthNavigation(returnTo: unknown, signup: boolean) {
   avatarPending = signup;
 }
 
-export function afterSignIn(username: string | null): string {
-  return !username ? "/choose-username" : avatarPending ? "/welcome-avatar" : destination;
+export function afterSignIn(username: string | null): { href: string; withAnchor: boolean } {
+  if (!username) return { href: "/choose-username", withAnchor: false };
+  if (avatarPending) return { href: "/welcome-avatar", withAnchor: false };
+  return { href: destination, withAnchor: true };
 }
 
 export function finishAuthNavigation(): string {

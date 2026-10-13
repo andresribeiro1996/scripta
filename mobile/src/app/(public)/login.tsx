@@ -54,7 +54,10 @@ export default function LoginPage() {
       </Screen>
     );
   }
-  if (user) return <Redirect href={afterSignIn(user.username) as never} />;
+  if (user) {
+    const next = afterSignIn(user.username);
+    return <Redirect href={next.href as never} withAnchor={next.withAnchor} />;
+  }
 
   const onSubmit = async () => {
     if (locked.current) return;
