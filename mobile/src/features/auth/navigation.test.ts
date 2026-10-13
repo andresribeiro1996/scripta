@@ -12,5 +12,5 @@ test("login, Google setup and avatar onboarding retain the requested destination
   assert.equal(authDestination(), "/");
   startAuthNavigation("//evil.test", false);
   assert.deepEqual(afterSignIn("reader"), { href: "/", withAnchor: true });
-  assert.equal(pathWithQuery("/library", { search: "a book", returnTo: "/login" }), "/library?search=a+book");
+  assert.equal(pathWithQuery("/library", { search: "a book", returnTo: "/login", initial: "false" }), "/library?search=a+book");
 });

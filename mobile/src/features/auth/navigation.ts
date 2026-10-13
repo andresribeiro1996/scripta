@@ -26,7 +26,7 @@ export function authDestination(): string { return destination; }
 export function pathWithQuery(pathname: string, params: Record<string, string | string[] | undefined>): string {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
-    if (key === "returnTo" || value === undefined) continue;
+    if (key === "returnTo" || key === "initial" || value === undefined) continue;
     for (const item of Array.isArray(value) ? value : [value]) query.append(key, item);
   }
   return safeAuthReturnTo(`${pathname}${query.size ? `?${query}` : ""}`, "/");
