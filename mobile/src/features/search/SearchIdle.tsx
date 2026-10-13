@@ -49,10 +49,10 @@ export function SearchIdle({ scope, recent, onRecent, onClearRecent, follow }: {
           ))}
         </View>
       ) : null}
-      {show.readers && (readers.isError || readers.isPending || readers.data.length > 0) ? (
+      {show.readers && (readers.isPending || !readers.data || readers.data.length > 0) ? (
         <View>
           <SectionTitle title="Readers you might like" />
-          {readers.isError ? (
+          {!readers.data && readers.isError ? (
             <View style={styles.pad}><ErrorState body="Couldn't load readers." actionLabel="Retry" onAction={() => void readers.refetch()} /></View>
           ) : readers.isPending ? (
             <View style={styles.pad}><Skeleton height={150} /></View>
@@ -65,10 +65,10 @@ export function SearchIdle({ scope, recent, onRecent, onClearRecent, follow }: {
           )}
         </View>
       ) : null}
-      {show.newGames && (games.isError || games.isPending || newGames.length > 0) ? (
+      {show.newGames && (games.isPending || !games.data || newGames.length > 0) ? (
         <View>
           <SectionTitle title="New games" />
-          {games.isError ? (
+          {!games.data && games.isError ? (
             <View style={styles.pad}><ErrorState body="Couldn't load games." actionLabel="Retry" onAction={() => void games.refetch()} /></View>
           ) : games.isPending ? (
             <View style={styles.pad}><Skeleton height={120} /></View>

@@ -3,7 +3,7 @@ import { FlatList, StyleSheet, View } from "react-native";
 import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import { looksLikeIsbnQuery, matchesSearch, type BookSearchResult } from "@scripta/shared";
-import { IconButton, Input, Screen, Segmented, Skeleton, Toast, spacing } from "../../ui";
+import { ErrorState, IconButton, Input, Screen, Segmented, Skeleton, Toast, spacing } from "../../ui";
 import { AddBookSheet } from "../community/AddBookSheet";
 import { fetchDiscover, searchPeople } from "../community/api";
 import { useFollowToggle } from "../community/useFollowToggle";
@@ -25,7 +25,7 @@ export function SearchScreen() {
   const library = useLibrary();
   const trimmed = query.trim();
   const debounced = useDebouncedValue(trimmed, 300);
-  const needle = submitted ?? debounced;
+  const needle = submitted ?? (isNetworkQuery(trimmed) ? debounced : trimmed);
   const network = isNetworkQuery(needle);
   const wantsBooks = network && (scope === "all" || scope === "books");
   const wantsPeople = network && (scope === "all" || scope === "people");
@@ -36,6 +36,7 @@ export function SearchScreen() {
     queryKey: ["search", "external", submitted],
     queryFn: () => bookSearchApi.outside(submitted ?? ""),
     enabled: wantsBooks && submitted !== null && (!looksLikeIsbnQuery(submitted) || (catalog.isSuccess && !catalog.isPlaceholderData && catalog.data.length === 0)),
+    staleTime: Infinity,
     retry: false,
   });
   const people = useQuery({ queryKey: ["community", "people", "search", needle], queryFn: () => searchPeople(needle), enabled: wantsPeople, placeholderData: keepPreviousData, retry: false });
@@ -128,7 +129,13 @@ export function SearchScreen() {
             if (scope === "games" && games.hasNextPage && !games.isFetchingNextPage && !games.isFetchNextPageError) void games.fetchNextPage();
           }}
           onEndReachedThreshold={0.4}
-          ListFooterComponent={scope === "games" && games.isFetchingNextPage ? <View style={styles.footer}><Skeleton height={80} /></View> : null}
+          ListFooterComponent={
+            scope !== "games" ? null : games.isFetchingNextPage ? (
+              <View style={styles.footer}><Skeleton height={80} /></View>
+            ) : games.isFetchNextPageError ? (
+              <View style={styles.footer}><ErrorState body="Couldn't load more." actionLabel="Retry" onAction={() => void games.fetchNextPage()} /></View>
+            ) : null
+          }
           renderItem={({ item }) => <SearchResultRow row={item} actions={actions} />}
         />
       ) : (

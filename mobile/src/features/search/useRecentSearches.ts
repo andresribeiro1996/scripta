@@ -19,7 +19,7 @@ export function useRecentSearches() {
 
   return {
     searches: recent.data ?? [],
-    record: (query: string) => save(recordRecentSearch(queryClient.getQueryData<string[]>(queryKey) ?? [], query)),
+    record: (query: string) => recent.isSuccess && save(recordRecentSearch(queryClient.getQueryData<string[]>(queryKey) ?? [], query)),
     clear: () => save([]),
   };
 }

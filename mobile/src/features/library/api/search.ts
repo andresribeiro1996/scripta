@@ -3,10 +3,10 @@ import { apiClient } from "../../../core/api";
 
 export type { BookSearchResult } from "@scripta/shared";
 
-async function fetchResults(path: string, query: string): Promise<BookSearchResult[]> {
+async function fetchResults(path: string, query: string, extra: Record<string, string> = {}): Promise<BookSearchResult[]> {
   const trimmed = query.trim();
   if (!trimmed) return [];
-  return (await apiClient.request<{ results: BookSearchResult[] }>(`${path}?${new URLSearchParams({ q: trimmed })}`, { auth: true })).results;
+  return (await apiClient.request<{ results: BookSearchResult[] }>(`${path}?${new URLSearchParams({ q: trimmed, ...extra })}`, { auth: true })).results;
 }
 
 export const bookSearchApi: BookSearchApi = {
@@ -14,8 +14,4 @@ export const bookSearchApi: BookSearchApi = {
   outside: (query) => fetchResults("/books/search/external", query),
 };
 
-export async function searchCatalogWorks(query: string): Promise<BookSearchResult[]> {
-  const trimmed = query.trim();
-  if (!trimmed) return [];
-  return (await apiClient.request<{ results: BookSearchResult[] }>(`/books/search?${new URLSearchParams({ q: trimmed, by: "work" })}`, { auth: true })).results;
-}
+export const searchCatalogWorks = (query: string) => fetchResults("/books/search", query, { by: "work" });
