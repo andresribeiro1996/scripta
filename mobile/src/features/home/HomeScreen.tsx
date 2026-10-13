@@ -15,6 +15,8 @@ import { homeSections, shouldMarkFeedSeen } from "./homeModel";
 import { NextReadCard } from "./NextReadCard";
 import { ReadingCards } from "./ReadingCards";
 
+const FEED_VIEWABILITY = { itemVisiblePercentThreshold: 50 };
+
 export function HomeScreen() {
   const { colors } = useTheme();
   const router = useRouter();
@@ -53,7 +55,7 @@ export function HomeScreen() {
 
   const markSeen = useRef(() => {});
   markSeen.current = () => {
-    if (!shouldMarkFeedSeen({ focused, rowVisible: rowVisible.current, loaded: dashboard.data !== undefined, failed: dashboard.isError, fetching: dashboard.isFetching, sent: seenSent.current })) return;
+    if (!shouldMarkFeedSeen({ focused, rowVisible: rowVisible.current && feedItems.length > 0, loaded: dashboard.data !== undefined, failed: dashboard.isError, fetching: dashboard.isFetching, sent: seenSent.current })) return;
     seenSent.current = true;
     void markDashboardSeen().then(
       () => queryClient.setQueryData<InfiniteData<DashboardFeedPage>>(DASHBOARD_QUERY_KEY, (data) => (data ? clearDashboardCounts(data) : data)),
@@ -131,7 +133,7 @@ export function HomeScreen() {
     <View style={styles.sectionPad}><EmptyState title="Nothing here yet" body="Follow readers to see what they finish and publish." actionLabel="Find readers" onAction={findReaders} /></View>
   );
 
-  const feedFooter = dashboard.isFetchingNextPage ? (
+  const feedFooter = dashboard.isFetchingNextPage && feedItems.length > 0 ? (
     <View style={styles.sectionPad}><Skeleton height={80} /></View>
   ) : dashboard.isFetchNextPageError ? (
     <View style={styles.sectionPad}><ErrorState body="Couldn't load more." actionLabel="Retry" onAction={() => void dashboard.fetchNextPage()} /></View>
@@ -166,6 +168,7 @@ export function HomeScreen() {
         }}
         onEndReachedThreshold={0.4}
         onViewableItemsChanged={onViewableItemsChanged}
+        viewabilityConfig={FEED_VIEWABILITY}
         refreshControl={<RefreshControl refreshing={pulling} onRefresh={() => void onRefresh()} />}
       />
     </Screen>
