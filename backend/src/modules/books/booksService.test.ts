@@ -1700,3 +1700,37 @@ test("fillCoverColors gives an id that cannot be a stored object no colour and c
   assert.equal(h.repo.getImage("legacy-123")!.color, "");
   assert.match(h.repo.getImage("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!.color!, /^#[0-9a-f]{6}$/);
 });
+
+test("a search by work returns one edition per work, with its canonical work id", () => {
+  const h = harness();
+  const at = "2026-10-01T00:00:00.000Z";
+  const dune = h.repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593", workKey: "OL893415W", createdBy: "seed" }, ["isbn:9780441013593"], at);
+  h.repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780593099322", workKey: "OL893415W", createdBy: "seed" }, ["isbn:9780593099322"], at);
+  const messiah = h.repo.createBook({ title: "Dune Messiah", author: "Frank Herbert", isbn: "9780593098233", createdBy: "seed" }, ["isbn:9780593098233"], at);
+  assert.equal(h.service.search("dune").length, 3);
+  assert.deepEqual(h.service.search("dune", { byWork: true }).map((result) => result.workId).sort(), [dune.work_id, messiah.work_id].sort());
+  h.db.prepare("UPDATE works SET merged_into = ? WHERE id = ?").run(dune.work_id, messiah.work_id);
+  assert.deepEqual(h.service.search("dune", { byWork: true }).map((result) => result.workId), [dune.work_id]);
+  assert.ok(h.service.search("dune").every((result) => result.workId === dune.work_id));
+});
+
+test("the inside search finds a book from the start of its last word", async () => {
+  const { catalog } = recordingCatalog();
+  const h = harness({ catalog });
+  await h.service.searchExternal("dune");
+  assert.deepEqual(h.service.search("dun").map((result) => result.title).sort(), ["Dune", "Dune Encyclopedia"]);
+  assert.deepEqual(h.service.search("du"), []);
+});
+
+test("search hits saved from outside carry their canonical work id", async () => {
+  const { catalog } = recordingCatalog();
+  const h = harness({ catalog });
+  const first = await h.service.searchExternal("dune");
+  const dune = h.repo.findBookByKey("isbn:9780441013593")!;
+  assert.equal(first[0]!.workId, dune.work_id);
+  assert.ok(first.every((result) => typeof result.workId === "string"));
+  const target = h.repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780593099322", createdBy: "seed" }, ["isbn:9780593099322"], "2026-10-01T00:00:00.000Z");
+  h.db.prepare("UPDATE works SET merged_into = ? WHERE id = ?").run(target.work_id, dune.work_id);
+  const again = await h.service.searchExternal("dune");
+  assert.equal(again[0]!.workId, target.work_id);
+});

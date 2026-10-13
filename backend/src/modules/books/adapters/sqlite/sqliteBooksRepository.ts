@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync, StatementSync } from "node:sqlite";
-import { normalizeWorkKey, workTitleKey } from "../../domain/normalize.js";
+import { MIN_PREFIX_LENGTH, normalizeWorkKey, workTitleKey } from "../../domain/normalize.js";
 import type { BooksRepository, IdPage, MergeableDetails, PageCursor } from "../../domain/ports.js";
 import { WorkMergeError } from "../../domain/errors.js";
 import type { BookRow, CoverImageRow, DataSource, SummarySource, WorkPageRows, WorkView } from "../../domain/types.js";
@@ -34,6 +34,10 @@ function idPage(stmt: StatementSync, after: PageCursor | null, limit: number): I
   const rows = stmt.all(after?.at ?? "", after?.row ?? 0, limit) as Array<{ id: string; at: string; row: number }>;
   const last = rows[rows.length - 1];
   return { ids: rows.map((row) => row.id), next: rows.length === limit && last ? { at: last.at, row: last.row } : null };
+}
+
+function matchExpression(tokens: string[]): string {
+  return tokens.map((token, index) => (index === tokens.length - 1 && token.length >= MIN_PREFIX_LENGTH ? `"${token}"*` : `"${token}"`)).join(" ");
 }
 
 export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
@@ -368,7 +372,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
 
     searchBooks(tokens, limit) {
       if (tokens.length === 0) return [];
-      return searchStmt.all(tokens.map((token) => `"${token}"`).join(" "), limit) as unknown as BookRow[];
+      return searchStmt.all(matchExpression(tokens), limit) as unknown as BookRow[];
     },
 
     listUncheckedCoverIds(after, limit) {

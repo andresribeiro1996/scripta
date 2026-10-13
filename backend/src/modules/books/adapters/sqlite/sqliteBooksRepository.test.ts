@@ -1281,3 +1281,12 @@ test("the one-time backfill indexes the confirmed catalog once, keeps earlier se
   applyBooksMigrations(db);
   assert.equal(countOf(db, "books_fts"), 4);
 });
+
+test("the last word matches as a prefix once it has three letters", () => {
+  const { repo } = freshRepo();
+  repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593", createdBy: "seed" }, ["isbn:9780441013593"], NOW);
+  assert.deepEqual(repo.searchBooks(["dun"], 12).map((book) => book.title), ["Dune"]);
+  assert.deepEqual(repo.searchBooks(["du"], 12), []);
+  assert.deepEqual(repo.searchBooks(["dune", "herb"], 12).map((book) => book.title), ["Dune"]);
+  assert.deepEqual(repo.searchBooks(["dun", "herbert"], 12), []);
+});

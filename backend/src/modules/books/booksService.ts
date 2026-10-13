@@ -6,7 +6,8 @@ import { MIN_GOOD_WIDTH } from "./domain/constants.js";
 import { BookNotFoundError, FileTooLargeError, InvalidImageError, SourcePausedError, SourceUnavailableError, WorkMergeError } from "./domain/errors.js";
 import { coverColor, encodeCover, type EncodedCover } from "./domain/images.js";
 import { findExisting, findOrCreateBook, keysOf } from "./domain/findOrCreate.js";
-import { editionLanguage, findByIdentity, isPortugueseIsbn, lookupIdentity, SEARCH_LIMIT, searchTokens, type BookIdentity, type BookLookup } from "./domain/normalize.js";
+import { firstEditionPerWork, workIdsOf } from "./domain/workSearch.js";
+import { editionLanguage, findByIdentity, isPortugueseIsbn, lookupIdentity, SEARCH_LIMIT, searchTokens, WORK_SCAN_LIMIT, WORK_SEARCH_LIMIT, type BookIdentity, type BookLookup } from "./domain/normalize.js";
 import { summaryMatchesLanguage } from "./adapters/catalog/languageFilter.js";
 import type { BookCatalog, BooksRepository, CatalogSearchHit, CoverBlobReader, CoverBlobStore, CoverSource, EditionRecordSource, PageCursor } from "./domain/ports.js";
 import type { BookRow, CoverSourceName, CoverStatus, WorkView } from "./domain/types.js";
@@ -56,7 +57,7 @@ export interface BooksService {
   backfillDetails(limit: number, signal?: AbortSignal): Promise<number | null>;
   backfillWorkKeys(limit: number, signal?: AbortSignal): Promise<number | null>;
   fillCoverColors(limit: number): Promise<number>;
-  search(query: string): BookSearchResult[];
+  search(query: string, options?: { byWork?: boolean }): BookSearchResult[];
   searchExternal(query: string): Promise<BookSearchResult[]>;
   isAdmin(userId: string): boolean;
   rejectCover(lookup: BookLookup): ResolvedCover;
@@ -145,7 +146,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
     };
   }
 
-  function toSearchResult(book: BookRow): BookSearchResult {
+  function toSearchResult(book: BookRow, workId: string | null): BookSearchResult {
     return {
       title: book.title,
       authors: book.author ? book.author.split(", ") : [],
@@ -153,15 +154,21 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       isbn: book.isbn,
       publisher: book.publisher,
       coverUrl: book.cover_image_id ? deps.publicUrlFor(book.cover_image_id, "thumb") : openLibraryThumb(book.ol_cover_id),
-      genres: JSON.parse(book.genres) as BookGenre[]
+      genres: JSON.parse(book.genres) as BookGenre[],
+      ...(workId ? { workId } : {})
     };
   }
 
+  function withWorkIds(rows: BookRow[]): BookSearchResult[] {
+    const canonical = deps.repo.canonicalWorkIds(workIdsOf(rows));
+    return rows.map((row) => toSearchResult(row, row.work_id ? canonical.get(row.work_id) ?? row.work_id : null));
+  }
+
   function saveHits(hits: CatalogSearchHit[]): BookSearchResult[] {
-    return hits.map(({ result, olCoverId, workKey, source }) => {
+    const saved = hits.map(({ result, olCoverId, workKey, source }) => {
       const author = result.authors.join(", ");
       const identity = lookupIdentity({ isbn: result.isbn, title: result.title, author });
-      if (!identity) return result;
+      if (!identity) return { result, book: null };
       const book = findExisting(deps.repo, identity) ?? deps.repo.createBook(
         { title: result.title, author, isbn: identity.isbn, year: result.year, publisher: result.publisher, olCoverId, workKey, genres: result.genres, sources: [source] },
         keysOf(deps.repo, identity),
@@ -170,8 +177,10 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       if (!book.title) deps.repo.fillIdentity(book.id, result.title, author);
       deps.repo.setWorkKey(book.id, workKey);
       deps.repo.makeSearchable(book.id);
-      return book.cover_image_id ? { ...result, coverUrl: deps.publicUrlFor(book.cover_image_id, "thumb") } : result;
+      return { result: book.cover_image_id ? { ...result, coverUrl: deps.publicUrlFor(book.cover_image_id, "thumb") } : result, book: deps.repo.getBook(book.id) ?? book };
     });
+    const canonical = deps.repo.canonicalWorkIds(workIdsOf(saved.flatMap(({ book }) => (book ? [book] : []))));
+    return saved.map(({ result, book }) => (book?.work_id ? { ...result, workId: canonical.get(book.work_id) ?? book.work_id } : result));
   }
 
   function existingEdition(lookup: BookLookup): BookRow {
@@ -341,15 +350,20 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       return ids.length;
     },
 
-    search(query) {
+    search(query, options = {}) {
       const trimmed = query.trim();
       if (!trimmed) return [];
       if (looksLikeIsbnQuery(trimmed)) {
         const saved = deps.repo.findBookByKey(`isbn:${canonicalIsbn(trimmed)}`);
-        return saved && deps.repo.isSearchable(saved.id) ? [toSearchResult(saved)] : [];
+        return saved && deps.repo.isSearchable(saved.id) ? withWorkIds([saved]) : [];
       }
       const tokens = searchTokens(trimmed);
-      return tokens.length === 0 ? [] : deps.repo.searchBooks(tokens, SEARCH_LIMIT).map(toSearchResult);
+      if (tokens.length === 0) return [];
+      if (!options.byWork) return withWorkIds(deps.repo.searchBooks(tokens, SEARCH_LIMIT));
+      const rows = deps.repo.searchBooks(tokens, WORK_SCAN_LIMIT);
+      return firstEditionPerWork(rows, deps.repo.canonicalWorkIds(workIdsOf(rows)))
+        .slice(0, WORK_SEARCH_LIMIT)
+        .map(({ row, workId }) => toSearchResult(row, workId));
     },
 
     async searchExternal(query) {

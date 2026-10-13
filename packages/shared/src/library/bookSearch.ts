@@ -30,6 +30,7 @@ export interface BookSearchResult {
   publisher: string | null;
   coverUrl: string | null;
   genres: BookGenre[];
+  workId?: string;
 }
 
 /** True when the query is nothing but an ISBN (10 or 13, dashes/spaces

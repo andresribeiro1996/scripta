@@ -230,3 +230,9 @@ test("the admin runs works grouping and gets the count, or 409 while a run is go
   assert.equal(busy.statusCode, 409);
   assert.deepEqual(busy.json(), { error: "Grouping is already running." });
 });
+
+test("catalog search accepts by=work and refuses any other grouping", async () => {
+  const { service } = makeService();
+  assert.equal((await call(service, { method: "GET", url: "/books/search?q=dune&by=work" }, "u1")).statusCode, 200);
+  assert.equal((await call(service, { method: "GET", url: "/books/search?q=dune&by=edition" }, "u1")).statusCode, 400);
+});
