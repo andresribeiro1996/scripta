@@ -115,7 +115,7 @@ export function DiscoverPane({ linkAuthors = true }: { linkAuthors?: boolean }) 
           <View style={styles.grow}>
             <Input
               icon="search"
-              accessibilityLabel="Search tier lists, tournaments and quizzes by name"
+              accessibilityLabel="Search tier lists, tournaments and quizzes by name or book"
               value={search}
               onChangeText={setSearch}
               placeholder="Search"

@@ -11,6 +11,16 @@ export const ARENA_TABS = [
 
 export type ArenaTab = (typeof ARENA_TABS)[number]["value"];
 
+export const GAMES_TABS = [{ value: "browse", label: "Browse" }, ...ARENA_TABS] as const;
+
+export type GamesTab = (typeof GAMES_TABS)[number]["value"];
+
+export const NEW_GAMES = [
+  { tab: "tournaments", label: "Tournament", href: "/seed/new" },
+  { tab: "tierlists", label: "Tier list", href: "/tierlist/new" },
+  { tab: "quizzes", label: "Quiz", href: "/quiz/new" },
+] as const satisfies ReadonlyArray<{ tab: ArenaTab; label: string; href: string }>;
+
 // A tournament card draws its own status pill and progress line from the
 // summary, so it has no caption string; a tier list's caption is a plain
 // count and stays one.

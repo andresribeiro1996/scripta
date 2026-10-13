@@ -5,7 +5,7 @@ import { test } from "node:test";
 import type { Quiz } from "../quizzes/api.js";
 import type { Tierlist, VotedTierlist } from "../tierlists/api.js";
 import type { Tournament } from "./api.js";
-import { ARENA_TABS, coverRemainder, emptyCopy, filterItems, filterSections, homeSections, ownedItems, previewCovers, tabAtIndex, tabIndex, tierDistribution, tournamentProgress, votedTierlistDetail, type OwnedItem, type SectionedItem } from "./arenaHome.js";
+import { ARENA_TABS, GAMES_TABS, NEW_GAMES, coverRemainder, emptyCopy, filterItems, filterSections, homeSections, ownedItems, previewCovers, tabAtIndex, tabIndex, tierDistribution, tournamentProgress, votedTierlistDetail, type OwnedItem, type SectionedItem } from "./arenaHome.js";
 
 const itemDetail = (items: OwnedItem[]): string | undefined => {
   const first = items[0];
@@ -216,4 +216,14 @@ test("an active search collapses to a flat hit list across both sections", () =>
 test("voted tier list cards read like the public directory's", () => {
   assert.equal(votedTierlistDetail(votedTierlist()), "6 books · 3 ballots");
   assert.equal(votedTierlistDetail(votedTierlist({ votingOpen: false })), "6 books · 3 ballots · closed");
+});
+
+test("Games opens on Browse, with your three lists beside it, and New offers each kind", () => {
+  assert.deepEqual(GAMES_TABS.map((tab) => tab.label), ["Browse", "Tournaments", "Tier lists", "Quizzes"]);
+  assert.equal(GAMES_TABS[0].value, "browse");
+  assert.deepEqual(NEW_GAMES.map((option) => [option.tab, option.label, option.href]), [
+    ["tournaments", "Tournament", "/seed/new"],
+    ["tierlists", "Tier list", "/tierlist/new"],
+    ["quizzes", "Quiz", "/quiz/new"],
+  ]);
 });
