@@ -204,7 +204,7 @@ function ArenaList({
         void query.refetch();
         void votedQuery.refetch();
       }}
-      ListEmptyComponent={votedUnknown ? null : <EmptyState title={empty.title} body={empty.body} />}
+      ListEmptyComponent={votedUnknown ? null : <EmptyState title={empty.title} body={empty.body} actionLabel={empty.action} onAction={empty.action ? () => router.push(NEW_GAMES.find((option) => option.tab === tab)!.href as never) : undefined} />}
       ListFooterComponent={votedQuery.isError ? <ErrorState body="Couldn't load the games you voted in." actionLabel="Retry" onAction={() => void votedQuery.refetch()} /> : null}
       renderItem={({ item }) => {
         if (item.kind === "header") {

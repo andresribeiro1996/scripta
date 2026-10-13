@@ -140,16 +140,16 @@ export function homeSections(
   return [...section("created", CREATED_BY_YOU, mine), ...section("participating", tab === "tournaments" ? "Voting in" : "Voted on", votedRows)];
 }
 
-export function emptyCopy(tab: ArenaTab, searching: boolean, owner: OwnerFilter = "all"): { title: string; body: string } {
+export function emptyCopy(tab: ArenaTab, searching: boolean, owner: OwnerFilter = "all"): { title: string; body: string; action?: string } {
   if (searching) return { title: "Nothing matches", body: "Try a different search." };
   if (owner === "voted") {
     const noun = tab === "tournaments" ? "tournaments" : "tier lists";
     return { title: `You haven't voted in any ${noun} yet`, body: `${noun[0]!.toUpperCase()}${noun.slice(1)} you vote in will show up here.` };
   }
-  if (tab === "quizzes") return { title: "No quizzes yet", body: "Create one and turn your books into trivia." };
+  if (tab === "quizzes") return { title: "No quizzes yet", body: "Create one and turn your books into trivia.", action: "Create quiz" };
   return tab === "tournaments"
-    ? { title: "No tournaments yet", body: "Create one and seed it from your library." }
-    : { title: "No tier lists yet", body: "Create one to rank books into tiers." };
+    ? { title: "No tournaments yet", body: "Create one and seed it from your library.", action: "Create tournament" }
+    : { title: "No tier lists yet", body: "Create one to rank books into tiers.", action: "Create tier list" };
 }
 
 export type TierSegment = { color: string; weight: number };
