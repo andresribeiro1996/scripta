@@ -287,24 +287,31 @@ test("stopping works grouping ends a run at the next batch boundary and clears t
   assert.deepEqual(state.cleared, [handle]);
 });
 
-test("the cover colour backfill drains in batches of 50 until one comes back short, and retries on the next tick", async () => {
+test("the cover colour backfill drains in batches of 50 until one comes back short, logs the total, and drains again on the next tick", async () => {
   const { state, timers } = fakeTimers();
+  const { log, info, error } = fakeLog();
   const sizes = [50, 50, 7];
   const limits: number[] = [];
-  const errors: unknown[] = [];
-  startCoverColorBackfill(async (limit) => { limits.push(limit); return sizes.shift() ?? 0; }, (error) => errors.push(error), undefined, timers);
+  startCoverColorBackfill(async (limit) => { limits.push(limit); return sizes.shift() ?? 0; }, log, undefined, timers);
   assert.equal(state.delay, 600_000);
-  await until(() => limits.length === 3);
+  await until(() => info.length === 1);
   await new Promise((resolve) => setImmediate(resolve));
   assert.deepEqual(limits, [50, 50, 50]);
-  assert.deepEqual(errors, []);
+  assert.deepEqual(info, [{ details: { coloured: 107 }, message: "coloured cover images" }]);
+
+  state.callback!();
+  await until(() => limits.length === 4);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(limits, [50, 50, 50, 50]);
+  assert.equal(info.length, 1);
+  assert.deepEqual(error, []);
 });
 
-test("the cover colour backfill stops draining when aborted and reports a failed batch", async () => {
+test("the cover colour backfill stops draining when stopped and logs a failed batch as an error", async () => {
   const { state, timers } = fakeTimers();
+  const { log } = fakeLog();
   const limits: number[] = [];
-  const errors: unknown[] = [];
-  const stop = startCoverColorBackfill(async (limit) => { limits.push(limit); return limit; }, (error) => errors.push(error), undefined, timers);
+  const stop = startCoverColorBackfill(async (limit) => { limits.push(limit); return limit; }, log, undefined, timers);
   await until(() => limits.length === 2);
   stop();
   const seen = limits.length;
@@ -312,8 +319,12 @@ test("the cover colour backfill stops draining when aborted and reports a failed
   assert.equal(limits.length, seen);
   assert.equal(state.cleared.length, 1);
 
-  const failing = fakeTimers();
-  startCoverColorBackfill(async () => { throw new Error("R2 GET failed: HTTP 500"); }, (error) => errors.push(error), undefined, failing.timers);
-  await until(() => errors.length > 0);
-  assert.equal((errors[0] as Error).message, "R2 GET failed: HTTP 500");
+  const failing = fakeLog();
+  startCoverColorBackfill(async () => { throw new Error("R2 GET failed: HTTP 500"); }, failing.log, undefined, fakeTimers().timers);
+  await until(() => failing.error.length > 0);
+  assert.equal(failing.error.length, 1);
+  const [failure] = failing.error;
+  assert.equal(failure?.message, "cover colour backfill failed");
+  assert.equal((failure?.details as { err: Error }).err.message, "R2 GET failed: HTTP 500");
+  assert.deepEqual(failing.info, []);
 });

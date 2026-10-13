@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   bookKey,
   bookScreenModel,
@@ -77,6 +77,7 @@ export function BookScreen({ page, book, signedIn, onAdd, onShare, onBack, backT
   const [coverVersion, setCoverVersion] = useState(0);
   const [coverError, setCoverError] = useState<string | null>(null);
   const coverFile = useRef<HTMLInputElement>(null);
+  const queryClient = useQueryClient();
   const actions = useBookActions();
   const confirm = useConfirm();
   const wash = coverWash(page?.work.coverColor ?? null, themes[useResolvedTheme()].scheme);
@@ -113,6 +114,7 @@ export function BookScreen({ page, book, signedIn, onAdd, onShare, onBack, backT
       forgetResolvedCover(params);
       setCoverError(null);
       setCoverVersion((v) => v + 1);
+      if (page) void queryClient.invalidateQueries({ queryKey: ["works", page.work.id] });
     } catch (error) {
       setCoverError(error instanceof Error ? error.message : "Couldn't reject the cover.");
     }
@@ -124,6 +126,7 @@ export function BookScreen({ page, book, signedIn, onAdd, onShare, onBack, backT
       rememberResolvedCover(params, await uploadSharedCover(params, file));
       setCoverError(null);
       setCoverVersion((v) => v + 1);
+      if (page) void queryClient.invalidateQueries({ queryKey: ["works", page.work.id] });
     } catch (error) {
       setCoverError(error instanceof Error ? error.message : "Couldn't upload the cover.");
     }

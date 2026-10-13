@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { router, useSegments } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
-import { Alert, Pressable, ScrollView, StyleSheet, View, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
+import { Alert, Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
+import Animated, { useAnimatedScrollHandler, useAnimatedStyle, type SharedValue } from "react-native-reanimated";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import { bookStatsModel, coverWash, editionLabel, type BookScreenModel, type BookScreenTabKey, type WorkPage } from "@scripta/shared";
 import { Text } from "../../ui/Text";
@@ -22,12 +23,47 @@ const WASH_MID_OFFSET = 0.45;
 const WASH_MID_FACTOR = 0.5;
 
 export function washAlphaAt(topAlpha: number, y: number): number {
+  "worklet";
   const midY = WASH_MID_OFFSET * WASH_HEIGHT;
   const midAlpha = topAlpha * WASH_MID_FACTOR;
   if (y <= 0) return topAlpha;
   if (y < midY) return topAlpha + ((midAlpha - topAlpha) * y) / midY;
   if (y < WASH_HEIGHT) return midAlpha * (1 - (y - midY) / (WASH_HEIGHT - midY));
   return 0;
+}
+
+function WashGradient({ color, topAlpha, width }: { color: string; topAlpha: number; width: number }) {
+  return (
+    <Svg pointerEvents="none" accessible={false} importantForAccessibility="no-hide-descendants" style={styles.wash} width={width} height={WASH_HEIGHT}>
+      <Defs>
+        <LinearGradient id="wash" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor={color} stopOpacity={topAlpha} />
+          <Stop offset={WASH_MID_OFFSET} stopColor={color} stopOpacity={topAlpha * WASH_MID_FACTOR} />
+          <Stop offset="1" stopColor={color} stopOpacity={0} />
+        </LinearGradient>
+      </Defs>
+      <Rect x="0" y="0" width="100%" height={WASH_HEIGHT} fill="url(#wash)" />
+    </Svg>
+  );
+}
+
+export function WashBackdrop({ color, topAlpha, scrollY, headerHeight }: { color: string; topAlpha: number; scrollY: SharedValue<number>; headerHeight: number }) {
+  const { colors } = useTheme();
+  const { width } = useWindowDimensions();
+  const band = useAnimatedStyle(() => ({ opacity: washAlphaAt(topAlpha, scrollY.get()) }));
+  const wash = useAnimatedStyle(() => ({ transform: [{ translateY: -Math.max(scrollY.get(), 0) }] }));
+  return (
+    <View pointerEvents="none" accessible={false} importantForAccessibility="no-hide-descendants" style={StyleSheet.absoluteFill}>
+      <View style={[styles.backdropBand, { height: headerHeight, backgroundColor: colors.background }]}>
+        <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: color }, band]} />
+      </View>
+      <View style={[styles.backdropWash, { top: headerHeight }]}>
+        <Animated.View style={[styles.washLayer, { width, height: WASH_HEIGHT }, wash]}>
+          <WashGradient color={color} topAlpha={topAlpha} width={width} />
+        </Animated.View>
+      </View>
+    </View>
+  );
 }
 
 const TAB_ICONS: Record<BookScreenTabKey, IconName> = { about: "info", highlights: "quote", community: "community" };
@@ -85,7 +121,7 @@ function DeleteNote({ book, bookmarkId }: { book: Record<string, unknown>; bookm
   );
 }
 
-export function BookScreen({ page, book, model, signedIn, onAdd, onScrollY }: { page: WorkPage | null; book: Record<string, unknown> | null; model: BookScreenModel; signedIn: boolean; onAdd: () => void; onScrollY?: (y: number) => void }) {
+export function BookScreen({ page, book, model, signedIn, onAdd, scrollY, headerInset = 0 }: { page: WorkPage | null; book: Record<string, unknown> | null; model: BookScreenModel; signedIn: boolean; onAdd: () => void; scrollY?: SharedValue<number>; headerInset?: number }) {
   const { colors, mode } = useTheme();
   const { width: windowWidth } = useWindowDimensions();
   const coverColor = page?.work.coverColor ?? null;
@@ -103,22 +139,16 @@ export function BookScreen({ page, book, model, signedIn, onAdd, onScrollY }: { 
     <Text accessibilityRole="header" {...dynamicType} style={[typography.title, { color: colors.text }]}>{title}</Text>
   );
   const { about, community } = model;
-  const trackScroll = onScrollY ? (event: NativeSyntheticEvent<NativeScrollEvent>) => onScrollY(event.nativeEvent.contentOffset.y) : undefined;
+  useEffect(() => {
+    scrollY?.set(0);
+  }, [scrollY]);
+  const onScroll = useAnimatedScrollHandler((event) => {
+    if (scrollY) scrollY.set(event.contentOffset.y);
+  });
 
   return (
-    <ScrollView contentContainerStyle={styles.content} onScroll={trackScroll} scrollEventThrottle={16}>
-      {wash && coverColor ? (
-        <Svg pointerEvents="none" accessible={false} importantForAccessibility="no-hide-descendants" style={styles.wash} width={windowWidth} height={WASH_HEIGHT}>
-          <Defs>
-            <LinearGradient id="wash" x1="0" y1="0" x2="0" y2="1">
-              <Stop offset="0" stopColor={coverColor} stopOpacity={wash.topAlpha} />
-              <Stop offset={WASH_MID_OFFSET} stopColor={coverColor} stopOpacity={wash.topAlpha * WASH_MID_FACTOR} />
-              <Stop offset="1" stopColor={coverColor} stopOpacity={0} />
-            </LinearGradient>
-          </Defs>
-          <Rect x="0" y="0" width="100%" height={WASH_HEIGHT} fill="url(#wash)" />
-        </Svg>
-      ) : null}
+    <Animated.ScrollView style={{ marginTop: headerInset }} contentContainerStyle={styles.content} onScroll={onScroll} scrollEventThrottle={16}>
+      {wash && coverColor && !scrollY ? <WashGradient color={coverColor} topAlpha={wash.topAlpha} width={windowWidth} /> : null}
       <View style={styles.heroCentered}>
         {book ? (
           <View style={[styles.cover, { backgroundColor: colors.border }]}>
@@ -252,13 +282,16 @@ export function BookScreen({ page, book, model, signedIn, onAdd, onScrollY }: { 
           </View>
         </>
       ) : null}
-    </ScrollView>
+    </Animated.ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   content: { padding: spacing.lg, gap: spacing.xl, paddingBottom: spacing.huge },
   wash: { position: "absolute", top: 0, left: 0 },
+  washLayer: { position: "absolute", top: 0, left: 0 },
+  backdropBand: { position: "absolute", top: 0, left: 0, right: 0 },
+  backdropWash: { position: "absolute", left: 0, right: 0, bottom: 0, overflow: "hidden" },
   heroCentered: { alignItems: "center", gap: spacing.xs },
   cover: { width: 112, height: 168, borderRadius: radii.sm, overflow: "hidden" },
   centeredText: { alignSelf: "stretch", textAlign: "center" },

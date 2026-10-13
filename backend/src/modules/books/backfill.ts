@@ -86,13 +86,16 @@ export function startWorksBackfill(
 
 export function startCoverColorBackfill(
   step: (limit: number) => Promise<number>,
-  onError: (error: unknown) => void,
+  log: WorksLog,
   intervalMs?: number,
   timers?: Timers
 ): () => void {
   return startDetailsBackfill(
-    async (signal) => { await drainBatches(step, signal, COLOR_BATCH_SIZE); },
-    onError,
+    async (signal) => {
+      const coloured = await drainBatches(step, signal, COLOR_BATCH_SIZE);
+      if (coloured > 0) log.info({ coloured }, "coloured cover images");
+    },
+    (error) => log.error({ err: error }, "cover colour backfill failed"),
     intervalMs,
     timers
   );

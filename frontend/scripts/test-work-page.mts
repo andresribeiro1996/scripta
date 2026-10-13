@@ -130,9 +130,8 @@ test("a library-only book has no stats tiles", () => {
 });
 
 test("a cover colour washes the header and hero; no colour, no wash", () => {
-  const washed = render({ page: { ...page, work: { ...page.work, coverColor: "#e0a82e" } } });
-  assert.ok(washed.includes("linear-gradient(to bottom"));
-  assert.ok(washed.includes('aria-hidden="true"'));
-  assert.ok(!render({}).includes("linear-gradient"));
-  assert.ok(!render({ page: null, book: owned, onShare: null }).includes("linear-gradient"));
+  const wash = /<div(?=[^>]*aria-hidden="true")(?=[^>]*h-\[520px\])(?=[^>]*linear-gradient\(to bottom)[^>]*>/;
+  assert.match(render({ page: { ...page, work: { ...page.work, coverColor: "#e0a82e" } } }), wash);
+  assert.doesNotMatch(render({}), wash);
+  assert.doesNotMatch(render({ page: null, book: owned, onShare: null }), wash);
 });

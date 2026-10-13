@@ -18,7 +18,7 @@ export default function BookRoute() {
   }, [workId]));
 
   const model = book ? bookScreenModel(null, book, { isAdmin: false }) : null;
-  const menuItems = model && key ? bookMenuItems(model, decodeURIComponent(key), segments) : [];
+  const menuItems = model && key ? bookMenuItems(model, key, segments) : [];
 
   return (
     <Screen bottom top={false}>
