@@ -59,7 +59,7 @@ export function SearchScreen() {
     query: needle,
     submitted: submitted !== null,
     library: { rows: books.filter((book) => matchesSearch(book, trimmed)), loading: library.isLoading, failed: library.isError && !library.data },
-    books: { rows: bookRows, loading: catalog.isLoading && bookRows.length === 0, failed: catalog.isError && bookRows.length === 0 },
+    books: { rows: bookRows, loading: catalog.isLoading && bookRows.length === 0, failed: catalog.isError && !catalog.data },
     people: { rows: people.data ?? [], loading: people.isLoading, failed: people.isError && !people.data },
     games: { rows: gameRows, loading: games.isLoading, failed: games.isError && gameRows.length === 0 },
     openLibrary: external.isError ? "failed" : external.isFetching ? "pending" : "idle",
