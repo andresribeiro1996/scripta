@@ -157,6 +157,7 @@ Top to bottom:
 - **Signing back in after a session expires:**
   - `(public)/login.tsx` sends you back to the screen you were on, without `withAnchor`.
   - Restored on `/me`, `/murals` or `/settings`, that screen has no You hub beneath it, and the hub can't be reached until a restart. This already happens to `/book/<key>` and `/collections` today.
+  - The mural editor (`/murals/<id>`) is worse: the bare path resolves to the first shared group, so it reopens in the Games tab. It needs a group-qualified link, as the `dashboard/murals/<id>` redirect uses, not only `withAnchor`.
   - The fix is anchoring the post-sign-in redirect without anchoring `/choose-username` and `/welcome-avatar`. The `(app)` guard would redirect from underneath those.
   - It touches the sign-in journey, so it is its own change.
 - **Library header compaction:** the name in the bar and Add as a floating button. This is a DESIGN.md change.

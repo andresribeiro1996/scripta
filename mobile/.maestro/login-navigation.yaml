@@ -22,4 +22,4 @@ tags:
 - tapOn: "You"
 - assertVisible: "Your shelf"
 - tapOn: "Gallery"
-- assertVisible: "Gallery"
+- assertVisible: "Upload"
