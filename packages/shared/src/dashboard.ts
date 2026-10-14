@@ -74,7 +74,7 @@ export function withKnownDigestItems(page: DashboardFeedPage): DashboardFeedPage
 }
 
 export function dashboardQuery(cursor?: string): string {
-  const query = `?kinds=${Object.keys(DIGEST_KINDS).join(",")}`;
+  const query = `?kinds=${[...Object.keys(DIGEST_KINDS), "started"].join(",")}`;
   return cursor ? `${query}&cursor=${encodeURIComponent(cursor)}` : query;
 }
 

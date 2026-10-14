@@ -338,6 +338,22 @@ test("Home opts into current public murals and shared reading starts, rechecking
   assert.throws(() => service.resolveEvent("viewer", event), ProfileNotFoundError);
 });
 
+test("book_started rows reach the dashboard only when the client lists started", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  repo.upsertProfile(profileRow("alice"));
+  repo.updateFeedSettings("alice", { ...DEFAULT_FEED_SETTINGS, reading: true });
+  repo.insertFollow({ follower_id: "viewer", followee_id: "alice", created_at: at(1) });
+  const payload = JSON.stringify({ title: "Dune", author: "Frank Herbert", status: 1 });
+  repo.insertEvent({ id: "started", user_id: "alice", type: "book_started", ref_type: "book", ref_id: "b1", payload, created_at: at(13) });
+  assert.deepEqual(service.getDashboard("viewer", undefined, 20).items, []);
+  assert.deepEqual(service.getDashboard("viewer", undefined, 20, new Set(["reading"])).items, []);
+  const item = service.getDashboard("viewer", undefined, 20, new Set(["reading", "started"])).items[0];
+  assert.equal(item?.kind === "reading" && item.started, true);
+});
+
 test("completed joined tournaments page with other events and count as personal notifications", () => {
   const { repo } = createRepoFake();
   const { deps, readerProfiles, seenAt } = createDeps(repo);

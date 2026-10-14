@@ -98,7 +98,7 @@ test("a quiz vote reads as played, and a publication of an unknown content kind 
 });
 
 test("the dashboard query lists every kind this build can draw, then carries the cursor encoded", () => {
-  const kinds = "?kinds=publication,vote,reading,follow,participation,mural,completion";
+  const kinds = "?kinds=publication,vote,reading,follow,participation,mural,completion,started";
   assert.equal(dashboardQuery(), kinds);
   assert.equal(dashboardQuery("a b/c"), `${kinds}&cursor=a%20b%2Fc`);
 });
