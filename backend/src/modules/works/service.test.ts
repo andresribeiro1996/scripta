@@ -55,6 +55,7 @@ test("signed in: own copy, followed first, never yourself, and your edition driv
   assert.deepEqual(page.readers.counts, { readers: 3, finished: 1 });
   assert.equal(page.readers.others[0]!.readerGlyph, "lamp");
   assert.deepEqual(page.work.editions.map((e) => e.mine), [true, false]);
+  assert.deepEqual(page.work.editions.map((e) => [e.coverUrl, e.coverColor, e.pages]), [[null, null, null], ["cover:e2", "#e0a82e", null]]);
   assert.equal(page.work.summary, "Especiaria.");
   assert.equal(page.work.coverUrl, "https://c/mine.webp");
 });

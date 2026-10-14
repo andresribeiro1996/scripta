@@ -3,7 +3,7 @@ import type { IdentityKey } from "../readerCards/index.js";
 
 export type WorkReadStatus = 0 | 1 | 2;
 
-export type WorkEdition = { bookId: string; title: string; language: string | null; year: number | null; isbn: string | null; mine: boolean };
+export type WorkEdition = { bookId: string; title: string; language: string | null; year: number | null; isbn: string | null; coverUrl: string | null; coverColor: string | null; pages: number | null; mine: boolean };
 
 export type WorkMine = { bookKey: string; readStatus: WorkReadStatus; rating: number | null; highlightCount: number };
 

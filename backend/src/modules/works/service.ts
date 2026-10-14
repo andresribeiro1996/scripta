@@ -99,7 +99,7 @@ export function createWorksService(deps: WorksDeps) {
           summary: summary && plainDescription(summary),
           coverUrl,
           coverColor,
-          editions: work.editions.map((edition) => ({ bookId: edition.bookId, title: edition.title, language: edition.language, year: edition.year, isbn: edition.isbn, mine: edition === mineEdition })),
+          editions: work.editions.map((edition) => ({ bookId: edition.bookId, title: edition.title, language: edition.language, year: edition.year, isbn: edition.isbn, coverUrl: edition.coverUrl, coverColor: edition.coverColor, pages: edition.pages, mine: edition === mineEdition })),
           genres: topGenres(work.editions),
           rating: bestRating(work.editions),
           year: earliestYear(work.editions),
