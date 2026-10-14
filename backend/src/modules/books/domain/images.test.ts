@@ -205,6 +205,75 @@ test("a shadow band stays outside the crop and a pale cover edge stays inside it
   assert.ok(Math.abs((await ratioOf(paleResult!.input)) - 1.5) < 0.01);
 });
 
+async function gradient(width: number, height: number, from: string, to: string, vertical: boolean, left: number, top: number): Promise<Layer> {
+  const [x2, y2] = vertical ? ["0", "1"] : ["1", "0"];
+  const svg = `<svg width="${width}" height="${height}"><defs><linearGradient id="g" x1="0" y1="0" x2="${x2}" y2="${y2}"><stop offset="0" stop-color="${from}"/><stop offset="1" stop-color="${to}"/></linearGradient></defs><rect width="${width}" height="${height}" fill="url(#g)"/></svg>`;
+  return { input: await sharp(Buffer.from(svg)).png().toBuffer(), left, top };
+}
+
+test("a soft drop shadow on a grey canvas is cropped away, leaving only the book", async () => {
+  const image = await canvas(2048, 2048, "#dcdcdc", [
+    await gradient(430, 1600, "#dcdcdc", "#4d4d4d", false, 44, 224),
+    await gradient(1100, 170, "#7d7d7d", "#dcdcdc", true, 474, 1824),
+    await rectangle(1100, 1600, "#2a6f97", 474, 224),
+  ]);
+  const result = await classifyPublisherImage(image);
+  assert.equal(result?.kind, "cropped");
+  const { width } = await sharp(result!.input).metadata();
+  assert.ok(Math.abs(width! - 1100) <= 22, `width ${width}`);
+  assert.ok(Math.abs((await ratioOf(result!.input)) - 1600 / 1100) < 0.02);
+});
+
+test("a flat colour band at the cover's shadowed edge stays inside the crop", async () => {
+  const image = await canvas(2048, 2048, "#dcdcdc", [
+    await gradient(430, 1600, "#dcdcdc", "#4d4d4d", false, 44, 224),
+    await gradient(1100, 170, "#7d7d7d", "#dcdcdc", true, 474, 1824),
+    await rectangle(1100, 1360, "#2a6f97", 474, 224),
+    await rectangle(1100, 240, "#b2af90", 474, 1584),
+  ]);
+  const result = await classifyPublisherImage(image);
+  assert.equal(result?.kind, "cropped");
+  assert.ok(Math.abs((await ratioOf(result!.input)) - 1600 / 1100) < 0.02);
+});
+
+test("a book on a lightly vignetted coloured canvas is cropped, not kept as a square", async () => {
+  const image = await canvas(2048, 2048, "rgb(150,222,228)", [
+    await rectangle(400, 400, "rgb(140,198,214)", 0, 1648),
+    await rectangle(1100, 1500, "#f2ead8", 474, 274),
+  ]);
+  const result = await classifyPublisherImage(image);
+  assert.equal(result?.kind, "cropped");
+  assert.ok(Math.abs((await ratioOf(result!.input)) - 1500 / 1100) < 0.02);
+});
+
+test("a cover edge that differs from its art only in colour is not cut into", async () => {
+  const image = await canvas(2048, 2048, "#ffffff", [
+    await rectangle(1100, 1500, "rgb(255,255,150)", 474, 274),
+    await rectangle(980, 1400, "#222222", 534, 324),
+  ]);
+  const result = await classifyPublisherImage(image);
+  assert.equal(result?.kind, "cropped");
+  const { width } = await sharp(result!.input).metadata();
+  assert.ok(Math.abs(width! - 1100) <= 22, `width ${width}`);
+  assert.ok(Math.abs((await ratioOf(result!.input)) - 1500 / 1100) < 0.02);
+});
+
+test("a plain book on a white canvas is cropped to exactly its own size", async () => {
+  const image = await canvas(2048, 2048, "#ffffff", [await rectangle(1100, 1500, "#2a6f97", 474, 274)]);
+  const result = await classifyPublisherImage(image);
+  const { width, height } = await sharp(result!.input).metadata();
+  assert.deepEqual([width, height], [1100, 1500]);
+});
+
+test("a square cover whose art reaches all four edges stays flat on a slightly uneven background", async () => {
+  const image = await canvas(2048, 2048, "#f4e9d2", [
+    await rectangle(400, 400, "#ddd2bb", 0, 1648),
+    await rectangle(248, 2048, "#1d3557", 900, 0),
+    await rectangle(2048, 248, "#e63946", 0, 900),
+  ]);
+  assert.equal((await classifyPublisherImage(image))?.kind, "flat");
+});
+
 test("a crop that keeps too little of the canvas is refused even when its ratio is right", async () => {
   assert.equal(await classifyPublisherImage(await canvas(2048, 2048, "#ffffff", [await rectangle(100, 150, "#222222", 974, 949)])), null);
   assert.equal(await classifyPublisherImage(await canvas(1000, 1000, "#ffffff", [await rectangle(432, 648, "#2a6f97", 284, 176)])), null);
