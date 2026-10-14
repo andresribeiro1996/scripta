@@ -1238,6 +1238,19 @@ test("applyChange emits started and finished once for status transitions", () =>
   db.close();
 });
 
+test("applyChange emits book_started when an unread book becomes reading", () => {
+  const { db, service, events } = setup();
+  service.saveLibrary("u1", changeLibrary());
+  service.applyChange("u1", { kind: "book", bookKey: keyOf(10), readStatus: 0 });
+  events.length = 0;
+
+  service.applyChange("u1", { kind: "book", bookKey: keyOf(10), readStatus: 1 });
+  assert.deepEqual(events, [
+    { userId: "u1", type: "book_started", refId: "k10", payload: { title: "Book 10", author: "Author 10", isbn: null, coverUrl: null, status: 1, workId: null } }
+  ]);
+  db.close();
+});
+
 test("applyChange parses the stored document once, whatever it emits", () => {
   const { db, service, events } = setup();
   service.saveLibrary("u1", changeLibrary());

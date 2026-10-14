@@ -241,6 +241,10 @@ function flippedBooks(before: LibraryData, after: LibraryData): Array<Record<str
   return after.books.filter((book, i) => book !== before.books[i] && isFinishedBook(book) !== isFinishedBook(before.books[i]!));
 }
 
+function statusAdvancedBooks(before: LibraryData, after: LibraryData): Array<Record<string, unknown>> {
+  return after.books.filter((book, i) => book !== before.books[i] && book.ReadStatus !== before.books[i]!.ReadStatus && (book.ReadStatus === 1 || book.ReadStatus === 2));
+}
+
 function seriesGroupChanged(before: LibraryData, after: LibraryData): boolean {
   return (after.groups ?? []).some((group, i) => group !== before.groups?.[i] && isGroup(group) && group.type === "series");
 }
@@ -504,6 +508,7 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
       if (row && !result.changed) return { updatedAt: row.updated_at, baseUpdatedAt: row.updated_at };
       const json = serializeWithinLimit(result.data);
       const flipped = change.kind === "book" ? flippedBooks(previous, result.data) : [];
+      const advanced = change.kind === "book" ? statusAdvancedBooks(previous, result.data) : [];
       const glyph = flipped.length > 0 || (change.kind === "membership" && seriesGroupChanged(previous, result.data)) ? deriveGlyph(result.data) : "keep";
       const small = row && change.kind !== "add" ? smallSave(userId, previous, result.data, change, glyph !== "keep") : undefined;
       if (small) withWorks(userId, small.books);
@@ -512,7 +517,7 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
           ? repo.updateDocumentData(userId, json, row!.updated_at, glyph, small)
           : repo.upsertDocument(userId, json, deriveLibraryData(result.data), rowsWithWorks(userId, result.data), row?.updated_at)?.updated_at;
       if (!updatedAt) throw new LibraryConflictError();
-      if (emitBookEvents && (change.kind === "add" || flipped.some((book) => isFinishedBook(book) || book.ReadStatus === 1))) {
+      if (emitBookEvents && (change.kind === "add" || advanced.length > 0)) {
         try {
           const events = diffBookEvents(previous, result.data, workOfUser(userId)).slice(0, BOOK_EVENTS_PER_SAVE);
           if (events.length > 0) emitBookEvents(userId, events);

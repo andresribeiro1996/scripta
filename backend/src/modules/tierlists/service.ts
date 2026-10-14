@@ -347,7 +347,10 @@ export function createTierlistsService(repo: TierlistsRepository, emitPublished?
           const book = entry as Record<string, unknown>;
           return typeof book.workId === "string" && typeof book.title === "string" ? [[book.workId, { title: book.title, coverUrl: typeof book.coverUrl === "string" ? book.coverUrl : null }] as const] : [];
         }));
-        const ranking = tiers.slice(0, 3).map((tier) => ({ label: tier.label, color: tier.color, books: placements.filter((placement) => placement.tierId === tier.id).slice(0, 2).flatMap((placement) => { const book = books.get(placement.workId); return book ? [book] : []; }) }));
+        const ranking = tiers
+          .map((tier) => ({ label: tier.label, color: tier.color, books: placements.filter((placement) => placement.tierId === tier.id).slice(0, 2).flatMap((placement) => { const book = books.get(placement.workId); return book ? [book] : []; }) }))
+          .filter((tier) => tier.books.length > 0)
+          .slice(0, 3);
         emitVotedOn(voter.userId, row.id, row.name, ranking);
       }
       if (voter.kind === "user" && voter.userId !== row.origin_user_id && row.promoted_at === null && repo.eligibleVoteCount(row.id, row.origin_user_id) >= 100) {
