@@ -30,8 +30,8 @@ export const BOOK_GENRES = [
 export type BookGenre = (typeof BOOK_GENRES)[number];
 
 const RULES: Array<[BookGenre, RegExp]> = [
-  ["Historical Fiction", /\bromances? historic\w*\b/],
-  ["Mystery", /\bromances? polic\w*\b/],
+  ["Historical Fiction", /\bromances? historicos?\b/],
+  ["Mystery", /\bromances? policia(?:l|is)\b/],
   ["Science Fiction", /\b(?:science fiction|sci fi|scifi|ficcao cientifica)\b/],
   ["Historical Fiction", /\bhistorical fiction\b|\bfiction historical\b|\bficcao historica\b/],
   ["Literary Fiction", /\bliterary fiction\b|\bfiction literary\b|\bficcao literaria\b/],

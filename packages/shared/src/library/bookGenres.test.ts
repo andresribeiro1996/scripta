@@ -109,6 +109,8 @@ test("normalizeBookGenres maps Portuguese subjects and tags", () => {
   for (const [subject, genre] of cases) assert.deepEqual(normalizeBookGenres([subject]), [genre], subject);
   assert.deepEqual(normalizeBookGenres(["Romance"]), ["Romance"]);
   assert.deepEqual(normalizeBookGenres(["Histórias"]), []);
+  assert.deepEqual(normalizeBookGenres(["Fiction / Romance / Historical / General"]), ["Romance"]);
+  assert.deepEqual(normalizeBookGenres(["Romance / Police Procedural"]), ["Romance"]);
 });
 
 test("every canonical genre name normalizes to itself", () => {
