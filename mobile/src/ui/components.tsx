@@ -310,6 +310,7 @@ export function Input({
       ]}>
       {icon ? <View style={styles.inputIcon} pointerEvents="none"><Icon name={icon} size={18} color={colors.textDim} /></View> : null}
       <TextInput
+        numberOfLines={props.multiline ? undefined : 1}
         {...props}
         ref={(node) => { inputRef.current = node; if (typeof ref === "function") ref(node); else if (ref) ref.current = node; }}
         secureTextEntry={secureTextEntry && !visible}
