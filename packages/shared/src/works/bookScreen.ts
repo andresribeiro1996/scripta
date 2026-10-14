@@ -61,11 +61,15 @@ function gameRows(games: WorkPage["games"]) {
 
 const withCount = (label: string, count: number) => (count > 0 ? `${label} (${count})` : label);
 
-function editionState(work: WorkPage["work"], selected: WorkEdition | undefined) {
+function defaultEditionIndex(work: WorkPage["work"]) {
+  const mineIndex = work.editions.findIndex((edition) => edition.mine);
+  const coverIndex = work.coverUrl === null ? -1 : work.editions.findIndex((edition) => edition.coverUrl === work.coverUrl);
+  return [mineIndex, coverIndex].find((found) => found !== -1) ?? 0;
+}
+
+function editionState(work: WorkPage["work"], index: number) {
   const { editions } = work;
   const mineIndex = editions.findIndex((edition) => edition.mine);
-  const coverIndex = work.coverUrl === null ? -1 : editions.findIndex((edition) => edition.coverUrl === work.coverUrl);
-  const index = selected ? editions.indexOf(selected) : [mineIndex, coverIndex].find((found) => found !== -1) ?? 0;
   const position = `${index + 1} of ${editions.length}`;
   return {
     index,
@@ -81,14 +85,15 @@ export function bookScreenModel(page: WorkPage | null, book: Book | null, viewer
   const readStatus = book ? (book.ReadStatus === 1 || book.ReadStatus === 2 ? book.ReadStatus : 0) : null;
   const rating = typeof book?.Rating === "number" ? book.Rating : null;
   const work = page?.work;
-  const selected = editionId === null ? undefined : work?.editions.find((edition) => edition.bookId === editionId);
+  const picked = editionId === null ? undefined : work?.editions.find((edition) => edition.bookId === editionId);
+  const selected = work && picked && work.editions.indexOf(picked) !== defaultEditionIndex(work) ? picked : undefined;
   const primary = book ? "owner" : page?.mine ? null : "add";
   const tabs: Array<{ key: BookScreenTabKey; label: string }> = [
     ...(page ? [{ key: "about" as const, label: "About" }] : []),
     ...(book ? [{ key: "highlights" as const, label: withCount("Highlights", highlights.length) }] : []),
     ...(page ? [{ key: "community" as const, label: withCount("Community", page.readers.counts.readers) }] : [])
   ];
-  const menu: BookScreenMenuKey[] = [...(book ? (["style", "cover"] as const) : []), ...(viewer.isAdmin ? (["rejectCover", "replaceCover"] as const) : [])];
+  const menu: BookScreenMenuKey[] = [...(book ? (["style", "cover"] as const) : []), ...(viewer.isAdmin && !selected ? (["rejectCover", "replaceCover"] as const) : [])];
   return {
     title: selected?.title ?? work?.title ?? String(book?.Title ?? "Untitled"),
     author: work?.author ?? String(book?.Attribution ?? "Unknown author"),
@@ -96,7 +101,7 @@ export function bookScreenModel(page: WorkPage | null, book: Book | null, viewer
     rating: work?.rating ? { value: work.rating.value, label: `${work.rating.value.toFixed(1)} · ${ratingCountLabel(work.rating.count)}` } : null,
     meta: selected ? bookMetaLine(selected, selected.language) : work ? bookMetaLine(work) : null,
     cover: selected ? { url: selected.coverUrl, color: selected.coverColor } : { url: work?.coverUrl ?? null, color: work?.coverColor ?? null },
-    edition: work && work.editions.length >= 2 ? editionState(work, selected) : null,
+    edition: work && work.editions.length >= 2 ? editionState(work, selected ? work.editions.indexOf(selected) : defaultEditionIndex(work)) : null,
     addBook: work && primary === "add" ? { title: work.title, author: work.author, isbn: selected ? selected.isbn : work.editions.find((edition) => edition.isbn)?.isbn ?? null, coverUrl: selected ? selected.coverUrl : work.coverUrl } : null,
     primary,
     status: readStatus === null ? null : { label: statusLabel(readStatus), options: STATUSES.map((value) => ({ value, label: statusLabel(value), selected: value === readStatus })) },

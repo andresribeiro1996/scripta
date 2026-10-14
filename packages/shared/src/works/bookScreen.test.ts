@@ -156,6 +156,19 @@ test("a selected edition overrides the hero and the add-book details but not the
   assert.deepEqual(sameAsDefault(picked), sameAsDefault(base));
 });
 
+test("selecting the default edition is the default view, so going back restores it exactly", () => {
+  const p = page({ editions: editions(5, 1), coverUrl: "cover:3", coverColor: "#abc" });
+  assert.deepEqual(bookScreenModel(p, owned(), viewer, "e1"), bookScreenModel(p, owned(), viewer));
+  assert.deepEqual(bookScreenModel(p, null, { isAdmin: true }, "e1"), bookScreenModel(p, null, { isAdmin: true }));
+});
+
+test("admin cover tools hide while another edition is shown, since they act on the default cover", () => {
+  const p = page({ editions: editions(5, 1), coverUrl: "cover:1" });
+  assert.deepEqual(bookScreenModel(p, owned(), { isAdmin: true }, null).menu, ["style", "cover", "rejectCover", "replaceCover"]);
+  assert.deepEqual(bookScreenModel(p, owned(), { isAdmin: true }, "e2").menu, ["style", "cover"]);
+  assert.deepEqual(bookScreenModel(p, null, { isAdmin: true }, "e2").menu, []);
+});
+
 test("selecting an edition without a cover shows the placeholder, and without year, pages or language has no meta", () => {
   const p = page({ editions: [{ ...editions(1)[0]!, coverUrl: null, coverColor: null }, ...editions(3).slice(1)], coverUrl: "cover:1" });
   const picked = bookScreenModel(p, null, viewer, "e0");

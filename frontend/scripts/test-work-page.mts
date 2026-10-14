@@ -11,12 +11,17 @@ import { ToastProvider } from "../src/components/Toaster";
 import { BackLink } from "../src/components/work/BackLink";
 import { createWebLibrarySaver, LibrarySaverContext } from "../src/hooks/useLibrarySaver";
 
-const edition = (n: number) => ({ bookId: `e${n}`, title: `Dune ${n}`, language: "en", year: 1965 + n, isbn: n === 1 ? "9780441013593" : null, coverUrl: null, coverColor: null, pages: 400 + n, mine: n === 1 });
+const edition = (n: number, mine = false) => ({ bookId: `e${n}`, title: `Dune ${n}`, language: "en", year: 1965 + n, isbn: n === 1 ? "9780441013593" : null, coverUrl: null, coverColor: null, pages: 400 + n, mine });
 const page: WorkPage = {
-  work: { id: "w", title: "Dune", author: "Frank Herbert", summary: null, coverUrl: null, coverColor: null, editions: [1, 2, 3, 4, 5].map(edition), genres: ["Science Fiction", "Classics"], rating: { value: 4.27, count: 2310 }, year: 1965, pages: 412 },
+  work: { id: "w", title: "Dune", author: "Frank Herbert", summary: null, coverUrl: null, coverColor: null, editions: [1, 2, 3, 4, 5].map((n) => edition(n)), genres: ["Science Fiction", "Classics"], rating: { value: 4.27, count: 2310 }, year: 1965, pages: 412 },
   mine: null,
   readers: { followed: [], others: [], counts: { readers: 0, finished: 0 } },
   games: { tierlists: [], arenas: [], quizzes: [] }
+};
+const ownedPage: WorkPage = {
+  ...page,
+  work: { ...page.work, editions: [1, 2, 3, 4, 5].map((n) => edition(n, n === 1)) },
+  mine: { bookKey: "isbn:9780441013593", readStatus: 2, rating: 4, highlightCount: 1 }
 };
 const owned = { Title: "Dune", Attribution: "Frank Herbert", ISBN: "9780441013593", ReadStatus: 2, Rating: 4, highlights: [{ BookmarkID: "h1", Text: "Fear is the mind-killer." }] };
 
@@ -52,7 +57,7 @@ test("not owned: add button, About and Community tabs, no highlights tab, no men
 });
 
 test("owned and finished: status and feeling menus, highlights tab, more menu", () => {
-  const html = render({ book: owned, page: { ...page, mine: { bookKey: "isbn:9780441013593", readStatus: 2, rating: 4, highlightCount: 1 } } });
+  const html = render({ book: owned, page: ownedPage });
   assert.ok(!html.includes("Add to library"));
   assert.ok(html.includes("Finished ▾"));
   assert.ok(html.includes("Loved it ▾"));
@@ -68,22 +73,33 @@ test("a long summary shows its preview and Show more; editions list three with S
   assert.ok(html.includes('font-semibold">Dune 3'));
   assert.ok(!html.includes('font-semibold">Dune 4'));
   assert.ok(/Show all (<!-- -->)?5/.test(html));
-  assert.ok(html.includes("Yours"));
 });
 
-test("several editions show the swipeable strip, its counter and Add this edition", () => {
+test("not owned with several editions: the strip, an unowned counter and Add this edition", () => {
   const html = render({});
   assert.ok(html.includes('aria-roledescription="carousel"'));
-  assert.ok(html.includes("Your edition · 1 of 5"));
+  assert.ok(html.includes("Edition 1 of 5"));
+  assert.ok(!html.includes("Your edition"));
   assert.ok(html.includes("Add this edition"));
   assert.ok(!html.includes("Add to library"));
 });
 
-test("a selected edition moves the counter and offers the way back to your edition", () => {
-  const html = render({ editionId: "e3" });
+test("owned: the strip marks your edition, with owner controls and no add button", () => {
+  const html = render({ book: owned, page: ownedPage });
+  assert.ok(html.includes("Your edition · 1 of 5"));
+  assert.ok(html.includes("Yours"));
+  assert.ok(!html.includes("Back to your edition"));
+  assert.ok(html.includes("Finished ▾"));
+  assert.ok(!html.includes("Add this edition"));
+});
+
+test("owned with another edition selected: moved counter, way back, same owner controls", () => {
+  const html = render({ book: owned, page: ownedPage, editionId: "e3" });
   assert.ok(html.includes("Edition 3 of 5"));
   assert.ok(html.includes("Back to your edition"));
   assert.ok(html.includes("1968 · 403 pages"));
+  assert.ok(html.includes("Finished ▾"));
+  assert.ok(!html.includes("Add this edition"));
 });
 
 test("a single edition has no strip and keeps Add to library", () => {

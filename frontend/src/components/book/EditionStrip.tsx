@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { editionLabel, type BookScreenModel, type WorkEdition } from "@scripta/shared";
 import { CoverImage } from "../BookCard";
 import { OptionsMenu } from "../OptionsMenu";
@@ -13,6 +13,8 @@ type Props = {
 
 const SETTLE_MS = 120;
 
+const centreOf = (slide: HTMLElement) => slide.offsetLeft + slide.offsetWidth / 2;
+
 export function EditionStrip({ editions, author, edition, mineBook, onSelect }: Props) {
   const strip = useRef<HTMLDivElement>(null);
   const { index, mineIndex } = edition;
@@ -22,14 +24,18 @@ export function EditionStrip({ editions, author, edition, mineBook, onSelect }: 
     latest.current = { index, editions, onSelect };
   });
 
+  const coverBooks = useMemo(
+    () => editions.map((e) => ({ Title: e.title, Attribution: author, ISBN: e.isbn ?? undefined, _coverUrl: e.coverUrl ?? undefined })),
+    [editions, author]
+  );
+
   function centre(target: number, behavior: ScrollBehavior) {
     const el = strip.current;
     const slide = el?.children[target] as HTMLElement | undefined;
-    if (el && slide) el.scrollTo({ left: slide.offsetLeft + slide.offsetWidth / 2 - el.clientWidth / 2, behavior });
+    if (el && slide) el.scrollTo({ left: centreOf(slide) - el.clientWidth / 2, behavior });
   }
 
   function choose(target: number) {
-    centre(target, "smooth");
     onSelect(editions[target]!.bookId);
   }
 
@@ -46,7 +52,7 @@ export function EditionStrip({ editions, author, edition, mineBook, onSelect }: 
       clearTimeout(timer);
       const middle = el!.scrollLeft + el!.clientWidth / 2;
       const slides = Array.from(el!.children) as HTMLElement[];
-      const nearest = slides.reduce((best, slide, i) => (Math.abs(slide.offsetLeft + slide.offsetWidth / 2 - middle) < Math.abs(slides[best]!.offsetLeft + slides[best]!.offsetWidth / 2 - middle) ? i : best), 0);
+      const nearest = slides.reduce((best, slide, i) => (Math.abs(centreOf(slide) - middle) < Math.abs(centreOf(slides[best]!) - middle) ? i : best), 0);
       const current = latest.current;
       if (nearest !== current.index) current.onSelect(current.editions[nearest]!.bookId);
     }
@@ -54,16 +60,17 @@ export function EditionStrip({ editions, author, edition, mineBook, onSelect }: 
       clearTimeout(timer);
       timer = setTimeout(settle, SETTLE_MS);
     }
-    el.addEventListener("scroll", onScroll);
-    el.addEventListener("scrollend", settle);
+    const event = "onscrollend" in window ? "scrollend" : "scroll";
+    const handler = event === "scrollend" ? settle : onScroll;
+    el.addEventListener(event, handler);
     return () => {
       clearTimeout(timer);
-      el.removeEventListener("scroll", onScroll);
-      el.removeEventListener("scrollend", settle);
+      el.removeEventListener(event, handler);
     };
   }, []);
 
   function onKeyDown(event: React.KeyboardEvent) {
+    if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
     const target = event.key === "ArrowLeft" ? index - 1 : event.key === "ArrowRight" ? index + 1 : index;
     if (target === index || target < 0 || target >= editions.length) return;
     event.preventDefault();
@@ -83,7 +90,7 @@ export function EditionStrip({ editions, author, edition, mineBook, onSelect }: 
       >
         {editions.map((e, i) => {
           const selected = i === index;
-          const coverBook = i === mineIndex && mineBook ? mineBook : { Title: e.title, Attribution: author, ISBN: e.isbn ?? undefined, _coverUrl: e.coverUrl ?? undefined };
+          const coverBook = i === mineIndex && mineBook ? mineBook : coverBooks[i]!;
           return (
             <button
               key={e.bookId}
