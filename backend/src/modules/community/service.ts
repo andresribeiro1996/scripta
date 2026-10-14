@@ -145,6 +145,7 @@ export interface CommunityDeps {
 
 export interface CommunityService {
   resolveEvent(viewerId: string, event: EventRow): DigestItem;
+  visibleEventIds(viewerId: string, events: readonly EventRow[]): Set<string>;
   resolveSavedContent(viewerId: string, ref: SavedContentRef, savedAt: string): DigestItem;
   follow(followerId: string, followeeId: string): void;
   unfollow(followerId: string, followeeId: string): void;
@@ -336,11 +337,21 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
   };
   const countItems = (rows: DigestRow[], viewerId: string): number => buildItems(rows, viewerId, DASHBOARD_COUNT_CAP, () => null).items.length;
 
+  const visibleEventIds = (viewerId: string, events: readonly EventRow[]): Set<string> => {
+    const visibility = createVisibility(repo, viewerId);
+    const others = events.filter((event) => {
+      if (event.user_id === viewerId) return false;
+      const standing = visibility.standing(event.user_id);
+      return standing.published || standing.followedByViewer;
+    });
+    const shown = new Set(repo.shownEventIds(others));
+    return new Set(events.filter((event) => event.user_id === viewerId || shown.has(event.id)).map((event) => event.id));
+  };
+
   return {
+    visibleEventIds,
     resolveEvent(viewerId, event) {
-      const standing = createVisibility(repo, viewerId).standing(event.user_id);
-      const category = categoryFor(event.type);
-      if (!standing.isViewer && (!standing.settings[category] || (!standing.published && !standing.followedByViewer))) throw new ProfileNotFoundError();
+      if (!visibleEventIds(viewerId, [event]).has(event.id)) throw new ProfileNotFoundError();
       const item = toDigestItem({ id: event.id, createdAt: event.created_at, event }, deps.resolveProfiles([event.user_id]), glyphLookup(), viewerId);
       if (!item) throw new ProfileNotFoundError();
       return item;

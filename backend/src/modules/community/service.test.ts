@@ -86,6 +86,9 @@ function createRepoFake() {
       if (events.some((e) => e.ref_type === row.ref_type && e.ref_id === row.ref_id)) return;
       events.push({ ...row });
     },
+    shownEventIds(list) {
+      return list.filter((e) => FEED_EVENT_TYPES.includes(e.type) && (repo.getFeedSettings(e.user_id) ?? DEFAULT_FEED_SETTINGS)[categoryFor(e.type)]).map((e) => e.id);
+    },
     countEventsSince(userId, since, types, limit) {
       return Math.min(events.filter((e) => e.user_id === userId && e.created_at >= since && types.includes(e.type)).length, limit);
     },

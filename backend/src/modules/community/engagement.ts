@@ -7,7 +7,7 @@ import type { EngagementRepository } from "./domain/ports.js";
 import { InvalidCursorError, ProfileNotFoundError, UsernameRequiredError } from "./domain/errors.js";
 import type { CommunityService } from "./service.js";
 
-export function createEngagementService({ repo, community, resolveProfiles, now = Date.now }: { repo: EngagementRepository; community: Pick<CommunityService, "resolveEvent" | "resolveSavedContent">; resolveProfiles: (ids: string[]) => Map<string, ReaderProfile>; now?: () => number }) {
+export function createEngagementService({ repo, community, resolveProfiles, now = Date.now }: { repo: EngagementRepository; community: Pick<CommunityService, "resolveEvent" | "visibleEventIds" | "resolveSavedContent">; resolveProfiles: (ids: string[]) => Map<string, ReaderProfile>; now?: () => number }) {
   function requireEvent(viewerId: string, id: string) {
     const event = repo.getEvent(id);
     if (!event) throw new ProfileNotFoundError();
@@ -21,11 +21,7 @@ export function createEngagementService({ repo, community, resolveProfiles, now 
   return {
     getSavedState: (viewerId: string, refs: SavedContentRef[]) => repo.savedState(viewerId, refs),
     getEngagement(viewerId: string, ids: string[]) {
-      const visible = ids.filter((id) => {
-        try { requireEvent(viewerId, id); return true; }
-        catch (error) { if (error instanceof ProfileNotFoundError) return false; throw error; }
-      });
-      return repo.summaries(viewerId, visible);
+      return repo.summaries(viewerId, [...community.visibleEventIds(viewerId, repo.getEvents(ids))]);
     },
     setLiked(viewerId: string, id: string, liked: boolean) {
       requireEvent(viewerId, id);

@@ -3,6 +3,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
+import { DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
 import Fastify from "fastify";
 import type { DigestItem, ReaderProfile } from "@scripta/shared";
 
@@ -16,6 +17,7 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 const { openCommunityDb } = await import("./adapters/sqlite/connection.js");
 const { createSqliteCommunityRepository } = await import("./adapters/sqlite/sqliteCommunityRepository.js");
 const { createSqliteEngagementRepository } = await import("./adapters/sqlite/sqliteEngagementRepository.js");
+const { createCommunityService } = await import("./service.js");
 const { createEngagementService } = await import("./engagement.js");
 const { buildEngagementRoutes } = await import("./engagementRoutes.js");
 const { ProfileNotFoundError, InvalidCursorError } = await import("./domain/errors.js");
@@ -33,6 +35,7 @@ test("authenticated reactions, comments and saved content persist and enforce ow
   let clock = Date.parse(createdAt);
   const service = createEngagementService({ repo, now: () => clock++, resolveProfiles: ids => new Map(ids.flatMap(id => profiles.has(id) ? [[id, profiles.get(id)!]] : [])), community: {
     resolveEvent: () => { if (!visible) throw new ProfileNotFoundError(); return item; },
+    visibleEventIds: (_viewer, events) => new Set(visible ? events.map(event => event.id) : []),
     resolveSavedContent: (_viewer, ref, at) => { if (!contentExists) throw new ProfileNotFoundError(); return { ...item, id: `saved:${ref.kind}:${ref.id}`, createdAt: at }; }
   } });
   communityRepo.insertEvent({ id: item.id, user_id: "author", type: "quiz_published", ref_type: "quiz", ref_id: "quiz", payload: null, created_at: createdAt });
@@ -82,4 +85,42 @@ test("authenticated reactions, comments and saved content persist and enforce ow
     communityRepo.deleteUserData("author");
     assert.deepEqual(repo.summaries("reader", ["event"]).event, { likes: 0, comments: 0, liked: false });
   } finally { await app.close(); db.close(); }
+});
+
+test("engagement counts only the events whose author's switch shows them, in one batch", () => {
+  const db = openCommunityDb();
+  const communityRepo = createSqliteCommunityRepository(db);
+  const repo = createSqliteEngagementRepository(db);
+  const unused = () => { throw new Error("engagement does not read this"); };
+  const community = createCommunityService({
+    repo: communityRepo, background: unused, getDashboardSeenAt: unused, setDashboardSeenAt: unused, resolveProfile: unused,
+    resolveProfiles: ids => new Map(ids.map(id => [id, { username: id, avatarUrl: null }])),
+    resolveLibrary: unused, readerGlyphFor: () => null, sharedBookCounts: unused, sharedBooks: unused, userHasUsername: unused, findUserIdByUsername: unused, searchUsernameOwners: unused, matchWorks: unused,
+    murals: { ownsMural: unused, getMuralPublicPayload: unused, getMuralSummary: unused },
+    tierlists: { discoverWindow: unused, getPublishedMany: unused, votedAmong: unused, get: unused, listByOwner: unused, discoverByWorks: unused },
+    tournaments: { completedForParticipant: unused, discoverWindow: unused, getPublishedMany: unused, votedAmong: unused, get: unused, listByOwner: unused, discoverByWorks: unused },
+    quizzes: { discoverWindow: unused, getPublishedMany: unused, votedAmong: unused, get: unused, listByOwner: unused, discoverByWorks: unused },
+    participation: { tierlists: unused, tournaments: unused, quizzes: unused }
+  });
+  const service = createEngagementService({ repo, community, resolveProfiles: ids => new Map(ids.map(id => [id, { username: id, avatarUrl: null }])) });
+  const at = "2026-10-14T10:00:00.000Z";
+  const book = (id: string, userId: string) => communityRepo.insertEvent({ id, user_id: userId, type: "book_added", ref_type: "book", ref_id: id, payload: JSON.stringify({ title: id, author: "A" }), created_at: at });
+  communityRepo.upsertProfile({ user_id: "shown", published: 1, mural_id: null, published_at: at, updated_at: at, feed_settings: null });
+  communityRepo.upsertProfile({ user_id: "hidden", published: 1, mural_id: null, published_at: at, updated_at: at, feed_settings: null });
+  communityRepo.upsertProfile({ user_id: "private", published: 0, mural_id: null, published_at: null, updated_at: at, feed_settings: null });
+  communityRepo.updateFeedSettings("shown", { ...DEFAULT_FEED_SETTINGS, reading: true });
+  communityRepo.updateFeedSettings("hidden", DEFAULT_FEED_SETTINGS);
+  communityRepo.updateFeedSettings("private", { ...DEFAULT_FEED_SETTINGS, reading: true });
+  communityRepo.updateFeedSettings("reader", DEFAULT_FEED_SETTINGS);
+  book("a", "shown"); book("b", "shown"); book("c", "hidden"); book("d", "private"); book("own", "reader");
+  communityRepo.moveEventsBefore("2027-01-01T00:00:00.000Z", 10);
+  book("e", "shown");
+  try {
+    assert.deepEqual(Object.keys(service.getEngagement("reader", ["a", "b", "c", "d", "e", "own", "missing"])).sort(), ["a", "b", "e", "own"]);
+    service.setLiked("reader", "a", true);
+    assert.equal(service.getEngagement("reader", ["a", "b"]).a?.likes, 1);
+    assert.throws(() => service.setLiked("reader", "c", true), ProfileNotFoundError);
+    assert.throws(() => service.setLiked("reader", "d", true), ProfileNotFoundError);
+    assert.deepEqual(service.getEngagement("reader", ["c"]), {});
+  } finally { db.close(); }
 });

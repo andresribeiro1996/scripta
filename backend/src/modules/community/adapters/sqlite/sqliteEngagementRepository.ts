@@ -5,6 +5,7 @@ import type { EventRow } from "../../domain/types.js";
 
 export function createSqliteEngagementRepository(db: DatabaseSync): EngagementRepository {
   const event = db.prepare("SELECT * FROM events WHERE id = ? UNION ALL SELECT * FROM events_history WHERE id = ? LIMIT 1");
+  const events = db.prepare("SELECT * FROM events WHERE id IN (SELECT value FROM json_each(?)) UNION ALL SELECT * FROM events_history WHERE id IN (SELECT value FROM json_each(?))");
   const summaries = db.prepare(`SELECT value AS id,
     (SELECT COUNT(*) FROM activity_likes WHERE event_id = value) AS likes,
     (SELECT COUNT(*) FROM activity_comments WHERE event_id = value) AS comments,
@@ -24,6 +25,11 @@ export function createSqliteEngagementRepository(db: DatabaseSync): EngagementRe
   const savedState = db.prepare("SELECT s.kind, s.ref_id FROM json_each(?) f JOIN saved_content s ON s.user_id = ? AND s.kind = json_extract(f.value, '$.kind') AND s.ref_id = json_extract(f.value, '$.id')");
   return {
     getEvent: (id) => event.get(id, id) as EventRow | undefined,
+    getEvents(ids) {
+      if (ids.length === 0) return [];
+      const json = JSON.stringify(ids);
+      return events.all(json, json) as unknown as EventRow[];
+    },
     summaries(viewerId, ids) {
       const rows = summaries.all(viewerId, JSON.stringify(ids)) as Array<{ id: string; likes: number; comments: number; liked: number }>;
       return Object.fromEntries(rows.map((row) => [row.id, { likes: Number(row.likes), comments: Number(row.comments), liked: row.liked === 1 } satisfies ActivityEngagement]));

@@ -15,6 +15,7 @@ export interface CommentRow { id: string; event_id: string; user_id: string; tex
 export interface SavedContentRow { kind: SavedContentRef["kind"]; ref_id: string; owner_id: string | null; saved_at: string }
 export interface EngagementRepository {
   getEvent(id: string): EventRow | undefined;
+  getEvents(ids: string[]): EventRow[];
   summaries(viewerId: string, ids: string[]): Record<string, ActivityEngagement>;
   setLiked(viewerId: string, eventId: string, liked: boolean, at: string): void;
   insertComment(row: CommentRow): void;
@@ -51,6 +52,7 @@ export interface CommunityRepository {
   visibilityRows(userIds: string[]): VisibilityRow[];
 
   insertEvent(row: EventRow): void;
+  shownEventIds(events: ReadonlyArray<Pick<EventRow, "id" | "user_id" | "type">>): string[];
   countEventsSince(userId: string, since: string, types: readonly ActivityEventType[], limit: number): number;
   listEventsByUser(userId: string, keyset: CursorKeyset | undefined, limit: number, hiddenTypes: readonly ActivityEventType[]): EventRow[];
   listHistoryEventsByUser(userId: string, keyset: CursorKeyset | undefined, limit: number, hiddenTypes: readonly ActivityEventType[]): EventRow[];

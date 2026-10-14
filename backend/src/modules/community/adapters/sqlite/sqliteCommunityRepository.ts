@@ -74,6 +74,12 @@ export function createSqliteCommunityRepository(db: DatabaseSync): CommunityRepo
     ) e
     WHERE f.followee_id = $author_id AND f.follower_id IN (SELECT value FROM json_each($follower_ids))
   `);
+  const shownEventsStmt = db.prepare(`
+    SELECT e.id FROM (
+      SELECT json_extract(value, '$.id') AS id, json_extract(value, '$.user_id') AS user_id, json_extract(value, '$.type') AS type FROM json_each(?)
+    ) e LEFT JOIN profiles p ON p.user_id = e.user_id
+    WHERE ${authorShows}
+  `);
   const deleteInboxFromAuthorStmt = db.prepare(`DELETE FROM feed_inbox WHERE viewer_id = ? AND author_id = ?`);
   const listInboxStmt = db.prepare(`SELECT e.* ${inboxFrom} WHERE ${inboxWhere} ORDER BY i.created_at DESC, i.event_id DESC LIMIT ?`);
   const listInboxBeforeStmt = db.prepare(`SELECT e.* ${inboxFrom} WHERE ${inboxWhere} AND (i.created_at, i.event_id) < (?, ?) ORDER BY i.created_at DESC, i.event_id DESC LIMIT ?`);
@@ -234,6 +240,11 @@ export function createSqliteCommunityRepository(db: DatabaseSync): CommunityRepo
         }).changes > 0;
         if (inserted && FEED_EVENT_TYPES.includes(row.type)) fanOutStmt.run({ $id: row.id });
       });
+    },
+    shownEventIds(events) {
+      if (events.length === 0) return [];
+      const rows = shownEventsStmt.all(JSON.stringify(events.map(({ id, user_id, type }) => ({ id, user_id, type })))) as Array<{ id: string }>;
+      return rows.map((row) => row.id);
     },
     countEventsSince(userId, since, types, limit) {
       return (countEventsSinceStmt.get(userId, since, JSON.stringify(types), limit) as { n: number }).n;
