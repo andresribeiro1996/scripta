@@ -1,5 +1,6 @@
 import type { BookGenre } from "@scripta/shared";
 import { SourceUnavailableError } from "../../domain/errors.js";
+import { readBody } from "../http/http.js";
 
 export const JEV_MODEL = "jev-1.13.0";
 const ENDPOINT = "https://api.typesafe.ai/v1/systemone";
@@ -68,24 +69,22 @@ export function createJevGenreClassifier(apiKey: string, sleep: (ms: number) => 
   return async (book) => {
     const body = JSON.stringify({ state: stateOf(book), model: JEV_MODEL, questions: { genre: { type: "choice", instructions: INSTRUCTIONS, criteria: CRITERIA } } });
     for (let attempt = 0; ; attempt++) {
-      let response: Response;
-      try {
-        response = await fetch(ENDPOINT, { method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" }, body, signal: AbortSignal.timeout(TIMEOUT_MS) });
-      } catch (error) {
-        if (error instanceof TypeError || (error instanceof DOMException && error.name === "TimeoutError")) throw new SourceUnavailableError("typesafe", error.message);
-        throw error;
-      }
+      const response = await readBody("typesafe", () => fetch(ENDPOINT, { method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" }, body, signal: AbortSignal.timeout(TIMEOUT_MS) }));
       if ((response.status === 429 || response.status === 529) && attempt < RETRIES) {
+        await response.body?.cancel();
         await sleep(500 * 2 ** attempt);
         continue;
       }
-      if (!response.ok) throw new SourceUnavailableError("typesafe", `HTTP ${response.status}`, { status: response.status });
+      if (!response.ok) {
+        await response.body?.cancel();
+        throw new SourceUnavailableError("typesafe", `HTTP ${response.status}`, { status: response.status });
+      }
       let parsed: unknown;
       try {
-        parsed = await response.json();
+        parsed = await readBody("typesafe", () => response.json());
       } catch (error) {
-        if (!(error instanceof SyntaxError)) throw error;
-        throw new SourceUnavailableError("typesafe", "invalid JSON");
+        if (error instanceof SyntaxError) throw new SourceUnavailableError("typesafe", "invalid JSON");
+        throw error;
       }
       return judgmentOf(parsed);
     }

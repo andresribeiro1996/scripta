@@ -67,3 +67,8 @@ test("an option the adapter doesn't know is an error, not a genre", async () => 
   stub([answer("novel")]);
   await assert.rejects(createJevGenreClassifier("key", noSleep)(book), /unexpected answer/);
 });
+
+test("a body that fails mid-read is an outage", async () => {
+  stub([() => new Response(new ReadableStream({ pull(controller) { controller.error(new TypeError("terminated")); } }), { status: 200 })]);
+  await assert.rejects(createJevGenreClassifier("key", noSleep)(book), (error: unknown) => error instanceof SourceUnavailableError && /terminated/.test(error.message));
+});
