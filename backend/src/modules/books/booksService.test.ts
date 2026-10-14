@@ -763,6 +763,14 @@ test("a saved search hit is tagged with its source, and an existing row is left 
   assert.equal(existing.repo.findBookByKey("isbn:9780441013593")!.data_sources, "[]");
 });
 
+test("a search hit fills the author of a saved book that has a title but no author", async () => {
+  const hit = { result: { title: "Poemas", authors: ["Sophia de Mello Breyner Andresen"], year: null, isbn: "9789896414672", publisher: null, coverUrl: null, genres: [] }, olCoverId: null, source: "openlibrary" as const };
+  const h = harness({ catalog: recordingCatalog({ search: async () => [hit] }).catalog });
+  const authorless = h.repo.createBook({ title: "Poemas", author: "", isbn: "9789896414672" }, ["isbn:9789896414672"], "2026-10-01T00:00:00.000Z");
+  await h.service.searchExternal("poemas");
+  assert.equal(h.repo.getBook(authorless.id)!.author, "Sophia de Mello Breyner Andresen");
+});
+
 test("a saved book's own cover is used in search results", async () => {
   const { catalog } = recordingCatalog();
   const h = harness({ catalog, sources: { isbndb: null, apple: isbnSource("https://a/1"), openlibrary: emptySource } });

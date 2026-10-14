@@ -5,7 +5,7 @@ import type { BookRow } from "./types.js";
 export function keysOf(repo: BooksRepository, identity: BookIdentity): string[] {
   const titleKey = identity.titleKey;
   const own = [identity.key, ...identity.aliasKeys];
-  return titleKey && titleKey !== identity.key && !repo.findBookByKey(titleKey) ? [...own, titleKey] : own;
+  return identity.author && titleKey && titleKey !== identity.key && !repo.findBookByKey(titleKey) ? [...own, titleKey] : own;
 }
 
 export function findExisting(repo: BooksRepository, identity: BookIdentity): BookRow | undefined {

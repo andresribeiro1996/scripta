@@ -136,7 +136,31 @@ test("fillIdentity with a title and no author makes a blank book searchable with
   assert.equal(row.title, "Hamlet");
   assert.equal(row.author, "");
   assert.equal(row.title_key, "");
+  assert.equal(repo.isSearchable(book.id), true);
   assert.deepEqual(repo.searchBooks(["hamlet"], 12).map((found) => found.title), ["Hamlet"]);
+});
+
+test("findOrCreateBook gives a titled, authorless ISBN book its author and the authored title key", () => {
+  const { repo } = freshRepo();
+  const first = findOrCreateBook(repo, { isbn: "9789896414672", title: "Poemas", author: "" }, NOW)!;
+  const filled = findOrCreateBook(repo, { isbn: "9789896414672", title: "Poemas", author: "Sophia de Mello Breyner Andresen" }, NOW)!;
+  assert.equal(filled.id, first.id);
+  assert.equal(filled.author, "Sophia de Mello Breyner Andresen");
+  assert.equal(repo.findBookByKey("ta:poemas|sophia de mello breyner andresen|")?.id, first.id);
+});
+
+test("findOrCreateBook does not store the authorless title key for an ISBN book", () => {
+  const { repo } = freshRepo();
+  findOrCreateBook(repo, { isbn: "9789896414672", title: "Poemas", author: "" }, NOW);
+  assert.equal(repo.findBookByKey("ta:poemas||"), undefined);
+});
+
+test("findOrCreateBook still matches an ISBN-less authorless lookup by its own key", () => {
+  const { repo } = freshRepo();
+  const first = findOrCreateBook(repo, { isbn: null, title: "Poemas", author: "" }, NOW)!;
+  const second = findOrCreateBook(repo, { isbn: null, title: "Poemas", author: "" }, NOW)!;
+  assert.equal(second.id, first.id);
+  assert.equal(repo.findBookByKey("ta:poemas||")?.id, first.id);
 });
 
 test("createBook alone does not make a book searchable", () => {
