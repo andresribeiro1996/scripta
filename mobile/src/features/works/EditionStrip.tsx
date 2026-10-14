@@ -1,8 +1,8 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
 import { editionLabel, type BookScreenModel, type WorkEdition } from "@scripta/shared";
 import { Text } from "../../ui/Text";
-import { Menu, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { Menu, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import { BookCover } from "../arena/BookCover";
 import { CoverImage } from "../library/components/CoverImage";
 
@@ -17,19 +17,21 @@ export function EditionStrip({ editions, book, edition, onSelect }: { editions: 
   const { colors } = useTheme();
   const { width: windowWidth } = useWindowDimensions();
   const scroll = useRef<ScrollView>(null);
-  const mounted = useRef(false);
   const { index, label, showDots, mineIndex } = edition;
+  const [initialOffset] = useState({ x: index * INTERVAL, y: 0 });
   const select = (i: number) => {
-    const target = editions[Math.min(Math.max(i, 0), editions.length - 1)];
-    if (target) onSelect(target.bookId);
+    onSelect(editions[Math.min(Math.max(i, 0), editions.length - 1)].bookId);
   };
 
   useEffect(() => {
-    scroll.current?.scrollTo({ x: index * INTERVAL, animated: mounted.current });
-    mounted.current = true;
+    scroll.current?.scrollTo({ x: index * INTERVAL, animated: true });
   }, [index]);
 
   const onSettle = (event: NativeSyntheticEvent<NativeScrollEvent>) => select(Math.round(event.nativeEvent.contentOffset.x / INTERVAL));
+  const onDragEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { x } = event.nativeEvent.contentOffset;
+    if (Math.abs(x - Math.round(x / INTERVAL) * INTERVAL) < 1) select(Math.round(x / INTERVAL));
+  };
 
   return (
     <View style={styles.root}>
@@ -39,8 +41,9 @@ export function EditionStrip({ editions, book, edition, onSelect }: { editions: 
         showsHorizontalScrollIndicator={false}
         snapToInterval={INTERVAL}
         decelerationRate="fast"
-        contentOffset={{ x: index * INTERVAL, y: 0 }}
+        contentOffset={initialOffset}
         onMomentumScrollEnd={onSettle}
+        onScrollEndDrag={onDragEnd}
         accessible
         accessibilityRole="adjustable"
         accessibilityLabel="Editions"
@@ -72,7 +75,7 @@ export function EditionStrip({ editions, book, edition, onSelect }: { editions: 
         })}
       </ScrollView>
       {showDots ? (
-        <View accessible={false} importantForAccessibility="no-hide-descendants" style={styles.dots}>
+        <View importantForAccessibility="no-hide-descendants" style={styles.dots}>
           {editions.map((item, i) => (
             <View key={item.bookId} style={[styles.dot, { backgroundColor: i === index ? colors.text : colors.border }]} />
           ))}
@@ -86,12 +89,14 @@ export function EditionStrip({ editions, book, edition, onSelect }: { editions: 
           onPress: () => select(i),
         }))}
       >
-        <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{label} ▾</Text>
+        <View style={styles.target}>
+          <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{label} ▾</Text>
+        </View>
       </Menu>
       {mineIndex !== null && index !== mineIndex ? (
-        <Text accessibilityRole="button" numberOfLines={1} {...dynamicType} onPress={() => select(mineIndex)} style={[typography.caption, styles.back, { color: colors.accent }]}>
-          Back to your edition
-        </Text>
+        <Pressable accessibilityRole="button" onPress={() => select(mineIndex)} style={styles.target}>
+          <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.back, { color: colors.accent }]}>Back to your edition</Text>
+        </Pressable>
       ) : null}
     </View>
   );
@@ -103,5 +108,6 @@ const styles = StyleSheet.create({
   cover: { width: COVER_WIDTH, height: COVER_HEIGHT, borderRadius: radii.sm, overflow: "hidden" },
   dots: { flexDirection: "row", gap: spacing.xs },
   dot: { width: DOT, height: DOT, borderRadius: radii.full },
-  back: { fontWeight: "700", paddingVertical: spacing.xs },
+  target: { minHeight: minimumTouchTarget, alignItems: "center", justifyContent: "center" },
+  back: { fontWeight: "700" },
 });
