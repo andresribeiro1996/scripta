@@ -57,6 +57,10 @@ export interface BooksRepository {
   setWorkSummary(bookId: string, summary: string): void;
   getWorkSummary(bookId: string): { summary: string | null; olWorkKey: string | null } | undefined;
   canonicalWorkIds(ids: string[]): Map<string, string>;
+  worksNeedingGenreJudgment(workIds: string[], limit: number): string[];
+  saveGenreJudgment(judgment: { workId: string; model: string; genre: string | null; confidence: number; askedAt: string }): void;
+  genreJudgments(workIds: string[]): Map<string, { genre: string | null; confidence: number }>;
+  applyGenreJudgments(saveLine: number): void;
   genreEvidence(workId: string): GenreEvidence | undefined;
   setManualGenres(workId: string, genres: string[]): number;
   aliasesOf(workIds: string[]): string[];

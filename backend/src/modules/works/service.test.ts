@@ -138,6 +138,12 @@ const edition = (bookId: string, isbn: string | null, extra: Partial<Edition>): 
 });
 const pageOf = (editions: Edition[]): WorksDeps["getWorkPage"] => () => ({ id: "w", title: "Dune", author: "Frank Herbert", summary: null, aliasIds: ["w"], editions });
 
+test("genres only a Jev guess below the confident line carries are possible, after the others", () => {
+  const getWorkPage = pageOf([edition("e1", null, { genres: ["History"] }), edition("e2", null, { genres: ["Biography & Memoir"], possible: true })]);
+  const work = createWorksService(deps({ getWorkPage })).getPage("w", null)!.work;
+  assert.deepEqual([work.genres, work.possibleGenres], [["History"], ["Biography & Memoir"]]);
+});
+
 test("genres: most editions first, capped at three", () => {
   const getWorkPage = pageOf([
     edition("e1", null, { genres: ["Fantasy", "Classics"] }),

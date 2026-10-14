@@ -16,6 +16,7 @@ export type GenrePassWork = {
   synopsis: string | null;
   finished: boolean;
   holders: number;
+  jev: { genre: string | null; confidence: number } | null;
 };
 export type GenreImportReport = { works: number; editions: number; skipped: string[] };
 
@@ -37,12 +38,13 @@ export function genrePassWorksWith(books: BooksRepository, held: HeldWork[]): Ge
     merged.set(id, { holders: entry.holders + work.holders, finished: entry.finished || work.finished });
   }
   const genres = catalogGenresWith(books, [...merged.keys()]);
+  const judgments = books.genreJudgments([...merged.keys()]);
   return [...merged]
     .flatMap(([workId, entry]) => {
-      const evidence = genres.has(workId) ? undefined : books.genreEvidence(workId);
+      const evidence = (genres.get(workId)?.genres.length ?? 0) > 0 ? undefined : books.genreEvidence(workId);
       if (!evidence) return [];
       const editions = [...new Map(evidence.editions.map((edition) => [`${edition.title}|${edition.language}|${edition.isbn}`, { title: edition.title, language: edition.language, isbn: edition.isbn, publisher: edition.publisher, year: edition.year }])).values()].slice(0, EDITION_LIMIT);
-      return [{ workId, title: evidence.work.title, author: evidence.work.author, editions, synopsis: longestSynopsis(evidence), ...entry }];
+      return [{ workId, title: evidence.work.title, author: evidence.work.author, editions, synopsis: longestSynopsis(evidence), ...entry, jev: judgments.get(workId) ?? null }];
     })
     .sort((a, b) => Number(b.finished) - Number(a.finished) || b.holders - a.holders || a.title.localeCompare(b.title));
 }
@@ -73,7 +75,9 @@ export function importGenreLabelsWith(books: BooksRepository, input: unknown): G
   return books.transaction(() => {
     const report: GenreImportReport = { works: 0, editions: 0, skipped: [] };
     for (const label of labels) {
-      const changed = label.genres.length === 0 ? 0 : books.setManualGenres(canonical.get(label.workId)!, label.genres);
+      const workId = canonical.get(label.workId)!;
+      if (label.genres.length === 0) books.saveGenreJudgment({ workId, model: "manual", genre: null, confidence: 1, askedAt: new Date().toISOString() });
+      const changed = label.genres.length === 0 ? 0 : books.setManualGenres(workId, label.genres);
       if (changed === 0) report.skipped.push(label.workId);
       else {
         report.works += 1;

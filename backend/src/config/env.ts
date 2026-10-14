@@ -131,6 +131,7 @@ const envSchema = z.object({
   OAUTH_SUCCESS_REDIRECT_URL: z.string().optional().default(""),
 
   ISBNDB_API_KEY: z.string().optional().default(""),
+  TYPESAFE_API_KEY: z.string().optional().default(""),
   ALERT_EMAIL: z.string().optional().default(""),
   ADMIN_USER_ID: z.string().optional().default(""),
 
@@ -216,6 +217,7 @@ export const googleOAuthConfigured =
   env.GOOGLE_CLIENT_ID !== "" && env.GOOGLE_CLIENT_SECRET !== "" && env.GOOGLE_CALLBACK_URL !== "";
 
 export const isbndbConfigured = env.ISBNDB_API_KEY !== "";
+export const typesafeConfigured = env.TYPESAFE_API_KEY !== "";
 
 // modules/socials — same "all three or none" shape as googleOAuthConfigured
 // above, one per platform. See modules/socials/providerConfig.ts for where

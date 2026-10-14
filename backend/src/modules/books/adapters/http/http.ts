@@ -5,7 +5,7 @@ export const USER_AGENT = "Atmyshelf/1.0 (+https://atmyshelf.com)";
 
 export type Throttle = <T>(task: () => Promise<T>, options?: { urgent?: boolean }) => Promise<T>;
 
-async function readBody<T>(source: string, read: () => Promise<T>): Promise<T> {
+export async function readBody<T>(source: string, read: () => Promise<T>): Promise<T> {
   try {
     return await read();
   } catch (error) {
