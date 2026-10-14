@@ -162,6 +162,15 @@ test("selecting the default edition is the default view, so going back restores 
   assert.deepEqual(bookScreenModel(p, null, { isAdmin: true }, "e1"), bookScreenModel(p, null, { isAdmin: true }));
 });
 
+test("an owned book matching no edition is shown at the default edition, so it keeps its own cover", () => {
+  const p = page({ editions: editions(5), coverUrl: "cover:2" });
+  assert.deepEqual(bookScreenModel(p, owned(), viewer).edition, { index: 2, count: 5, label: "Your edition · 3 of 5", showDots: true, mineIndex: 2 });
+  assert.deepEqual(bookScreenModel(p, owned(), viewer, "e2"), bookScreenModel(p, owned(), viewer));
+  const away = bookScreenModel(p, owned(), viewer, "e4").edition!;
+  assert.deepEqual([away.index, away.label, away.mineIndex], [4, "Edition 5 of 5", 2]);
+  assert.equal(bookScreenModel(p, null, viewer).edition!.mineIndex, null);
+});
+
 test("admin cover tools hide while another edition is shown, since they act on the default cover", () => {
   const p = page({ editions: editions(5, 1), coverUrl: "cover:1" });
   assert.deepEqual(bookScreenModel(p, owned(), { isAdmin: true }, null).menu, ["style", "cover", "rejectCover", "replaceCover"]);

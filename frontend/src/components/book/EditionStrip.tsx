@@ -25,7 +25,7 @@ export function EditionStrip({ editions, author, edition, mineBook, onSelect }: 
   });
 
   const coverBooks = useMemo(
-    () => editions.map((e) => ({ Title: e.title, Attribution: author, ISBN: e.isbn ?? undefined, _coverUrl: e.coverUrl ?? undefined })),
+    () => editions.map((e) => (e.coverUrl ? { Title: e.title, Attribution: author, ISBN: e.isbn ?? undefined, _coverUrl: e.coverUrl } : {})),
     [editions, author]
   );
 
@@ -109,13 +109,13 @@ export function EditionStrip({ editions, author, edition, mineBook, onSelect }: 
       {edition.showDots ? (
         <div aria-hidden="true" className="mt-2 flex justify-center gap-1.5">
           {editions.map((e, i) => (
-            <span key={e.bookId} className={`h-1.5 w-1.5 rounded-full ${i === index ? "bg-(--color-accent)" : "bg-(--color-border)"}`} />
+            <span key={e.bookId} className={`h-1.5 w-1.5 rounded-full ${i === index ? "bg-(--color-text)" : "bg-(--color-border)"}`} />
           ))}
         </div>
       ) : null}
       <div aria-live="polite" className="flex justify-center">
         <OptionsMenu
-          title="Choose edition"
+          title="Editions"
           trigger={`${edition.label} ▾`}
           triggerClassName="inline-flex min-h-11 items-center px-2 text-xs text-(--color-text-dim) hover:text-(--color-text)"
           items={editions.map((e, i) => ({ label: `${e.title} · ${editionLabel(e)}${e.mine ? " · Yours" : ""}`, checked: i === index, onClick: () => choose(i) }))}

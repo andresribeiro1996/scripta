@@ -93,6 +93,16 @@ test("owned: the strip marks your edition, with owner controls and no add button
   assert.ok(!html.includes("Add this edition"));
 });
 
+test("owned with no matching edition: the library cover shows at the default edition, labelled yours", () => {
+  const withCover = { ...page, work: { ...page.work, editions: [1, 2, 3, 4, 5].map((n) => ({ ...edition(n), coverUrl: `https://covers.test/${n}.jpg` })) } };
+  const html = render({ book: { ...owned, _coverUrl: "https://library.test/mine.jpg" }, page: { ...withCover, mine: ownedPage.mine } });
+  assert.ok(html.includes("Your edition · 1 of 5"));
+  assert.ok(html.includes("https://library.test/mine.jpg"));
+  assert.ok(!html.includes("https://covers.test/1.jpg"));
+  assert.ok(html.includes("https://covers.test/2.jpg"));
+  assert.ok(!html.includes("Back to your edition"));
+});
+
 test("owned with another edition selected: moved counter, way back, same owner controls", () => {
   const html = render({ book: owned, page: ownedPage, editionId: "e3" });
   assert.ok(html.includes("Edition 3 of 5"));

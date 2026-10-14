@@ -67,9 +67,10 @@ function defaultEditionIndex(work: WorkPage["work"]) {
   return [mineIndex, coverIndex].find((found) => found !== -1) ?? 0;
 }
 
-function editionState(work: WorkPage["work"], index: number) {
+function editionState(work: WorkPage["work"], index: number, owned: boolean) {
   const { editions } = work;
-  const mineIndex = editions.findIndex((edition) => edition.mine);
+  const found = editions.findIndex((edition) => edition.mine);
+  const mineIndex = found === -1 && owned ? defaultEditionIndex(work) : found;
   const position = `${index + 1} of ${editions.length}`;
   return {
     index,
@@ -101,7 +102,7 @@ export function bookScreenModel(page: WorkPage | null, book: Book | null, viewer
     rating: work?.rating ? { value: work.rating.value, label: `${work.rating.value.toFixed(1)} · ${ratingCountLabel(work.rating.count)}` } : null,
     meta: selected ? bookMetaLine(selected, selected.language) : work ? bookMetaLine(work) : null,
     cover: selected ? { url: selected.coverUrl, color: selected.coverColor } : { url: work?.coverUrl ?? null, color: work?.coverColor ?? null },
-    edition: work && work.editions.length >= 2 ? editionState(work, selected ? work.editions.indexOf(selected) : defaultEditionIndex(work)) : null,
+    edition: work && work.editions.length >= 2 ? editionState(work, selected ? work.editions.indexOf(selected) : defaultEditionIndex(work), book !== null) : null,
     addBook: work && primary === "add" ? { title: work.title, author: work.author, isbn: selected ? selected.isbn : work.editions.find((edition) => edition.isbn)?.isbn ?? null, coverUrl: selected ? selected.coverUrl : work.coverUrl } : null,
     primary,
     status: readStatus === null ? null : { label: statusLabel(readStatus), options: STATUSES.map((value) => ({ value, label: statusLabel(value), selected: value === readStatus })) },
