@@ -8,10 +8,10 @@ export interface ResetReport {
   skipped: number;
 }
 
-export async function resetPublisherCovers(
-  deps: { db: DatabaseSync; deleteBlob: (key: string) => Promise<void>; now: () => Date },
+export function resetPublisherCovers(
+  deps: { db: DatabaseSync; now: () => Date },
   options: { origin: string; since: string; apply: boolean }
-): Promise<ResetReport> {
+): ResetReport {
   const affected = deps.db
     .prepare(
       `SELECT b.id AS bookId, b.cover_image_id AS imageId FROM books b JOIN cover_images ci ON ci.id = b.cover_image_id
@@ -20,6 +20,7 @@ export async function resetPublisherCovers(
     .all(options.origin, options.since) as Array<{ bookId: string; imageId: string }>;
   const previousStmt = deps.db.prepare(
     `SELECT id, width FROM cover_images WHERE book_id = ? AND id <> ? AND created_at < (SELECT created_at FROM cover_images WHERE id = ?)
+       AND source <> 'upload'
        AND (source_url IS NULL OR source_url NOT IN (SELECT source_url FROM cover_rejections WHERE book_id = ?))
      ORDER BY created_at DESC LIMIT 1`
   );
@@ -30,8 +31,6 @@ export async function resetPublisherCovers(
   for (const { bookId, imageId } of affected) {
     const previous = previousStmt.get(bookId, imageId, imageId, bookId) as { id: string; width: number } | undefined;
     if (options.apply) {
-      await deps.deleteBlob(`covers/${imageId}.webp`);
-      await deps.deleteBlob(`covers/${imageId}-thumb.webp`);
       const status = previous ? (previous.width >= MIN_GOOD_WIDTH ? "good" : "low_res") : "missing";
       deps.db.exec("BEGIN IMMEDIATE");
       let changed: number | bigint;
@@ -40,7 +39,7 @@ export async function resetPublisherCovers(
         if (changed !== 0) deleteImageStmt.run(imageId);
         deps.db.exec("COMMIT");
       } catch (error) {
-        deps.db.exec("ROLLBACK");
+        if (deps.db.isTransaction) deps.db.exec("ROLLBACK");
         throw error;
       }
       if (changed === 0) {

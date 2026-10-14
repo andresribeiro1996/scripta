@@ -268,26 +268,28 @@ EOF
 - Consumes:
   - the `books`, `cover_images` and `cover_rejections` tables (`books.sql`);
   - `applyBooksMigrations(db)` and `createSqliteBooksRepository(db)` for tests;
-  - `ObjectStore.delete(key)` (`backend/src/storage/objectStore.ts`).
+  - `MIN_GOOD_WIDTH` (`backend/src/modules/books/domain/constants.ts`).
 - Produces:
   ```ts
-  export interface ResetReport { matched: number; restoredLowRes: number; markedMissing: number; skipped: number }
-  export async function resetPublisherCovers(
-    deps: { db: DatabaseSync; deleteBlob: (key: string) => Promise<void>; now: () => Date },
+  export interface ResetReport { matched: number; restored: number; markedMissing: number; skipped: number }
+  export function resetPublisherCovers(
+    deps: { db: DatabaseSync; now: () => Date },
     options: { origin: string; since: string; apply: boolean }
-  ): Promise<ResetReport>
+  ): ResetReport
   ```
 
 **Behaviour:**
 - **Which books.** Every book whose *current* cover image has `source = 'publisher'`, `origin = options.origin` and `created_at >= options.since`, and whose `cover_status = 'manual'`.
 - **What each book gets back.** Its previous cover state:
-  - **Previous image found.** The newest *other* `cover_images` row for that book with `created_at < options.since` whose `source_url` is not in that book's `cover_rejections`. The book gets `cover_image_id` = that row and `cover_status = 'low_res'`. A classified cover only ever filled `missing` or `low_res` books, so an older image means it was `low_res`.
+  - **Previous image found.** The newest *other* `cover_images` row for that book with `created_at` before the publisher image's own `created_at`, whose `source` is not `upload` (an upload that is not current was rejected or replaced by the user, and `rejectCover` records no rejection for a null `source_url`), and whose `source_url` is not in that book's `cover_rejections`. The book gets `cover_image_id` = that row and `cover_status = 'good'` if its width is at least `MIN_GOOD_WIDTH` (400), else `'low_res'`: a plain publisher image can replace a good cover, so the status comes from the restored image, not from an assumption.
   - **None found.** `cover_image_id = NULL` and `cover_status = 'missing'`.
   - **Either way.** `cover_checked_at` = `now()`.
-- **Race guard.** The update is guarded on `cover_image_id` still being the publisher image. A miss counts as `skipped`, and that book's image is not deleted.
-- **Clean-up.** After a successful update, delete the publisher image's `cover_images` row and its blobs, `covers/<id>.webp` and `covers/<id>-thumb.webp`.
+- **Race guard.** The update is guarded on `cover_image_id` still being the publisher image. A miss counts as `skipped`, and that book's image row is not deleted.
+- **Clean-up.** In the same `BEGIN IMMEDIATE` transaction as a successful update, delete the publisher image's `cover_images` row. The files `covers/<id>.webp` and `covers/<id>-thumb.webp` are not deleted: other stores (library, arena, quizzes, tier lists, events) keep copies of the cover URL, and deleting the files would turn them into 404s.
 - **Dry run.** `apply: false` counts only and writes nothing. Every counter is filled as if applied, except `skipped`, which is 0.
 - **Rejections.** It never adds a `cover_rejections` row. The re-run must be free to fetch the same URL and classify it with the new code.
+
+The code blocks in Steps 1-4 below are the first draft and predate these rules; `resetPublisherCovers.ts` and its test as committed are authoritative.
 
 - [ ] **Step 1: Write the failing tests** in `resetPublisherCovers.test.ts`
 
@@ -579,7 +581,7 @@ The container has no `nohup`. Start background jobs with `setsid … &` followed
 
 - [ ] **Step 1: Dry-run the reset.** `cd /app/backend && node scripts/reset-publisher-covers.mjs --origin https://www.edicoesafrontamento.pt --since 2026-10-13T20:30:00Z`
   Expected: `matched` about 1,171 (the run's Afrontamento `coversSet`). Stop and investigate if it is far off.
-- [ ] **Step 2: Apply.** Run the same command with `--apply`. Expected: `skipped` 0 or near 0, and `restoredLowRes + markedMissing = matched - skipped`.
+- [ ] **Step 2: Apply.** Run the same command with `--apply`. Expected: `skipped` 0 or near 0, and `restored + markedMissing = matched - skipped`.
 - [ ] **Step 3: Re-run the importer for Afrontamento only.**
   `cd /app/backend && setsid node scripts/import-publisher-covers.mjs --site "Edições Afrontamento" > /data/publisher-import-afrontamento-<date>.json 2> /data/publisher-import-afrontamento-<date>.log < /dev/null & sleep 3; ls -la /data/publisher-import-afrontamento-<date>.*`
   The last Afrontamento pass took a few hours. Hold deploys until the `.json` file has content.

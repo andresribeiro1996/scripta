@@ -8,11 +8,9 @@ if (!values.origin || !values.since || !values.since.endsWith("Z") || Number.isN
 
 const { openBooksDb } = await import("../dist/modules/books/adapters/sqlite/connection.js");
 const { resetPublisherCovers } = await import("../dist/modules/books/seed/resetPublisherCovers.js");
-const { createObjectStore } = await import("../dist/storage/createObjectStore.js");
 
-const store = createObjectStore();
-const report = await resetPublisherCovers(
-  { db: openBooksDb(), deleteBlob: (key) => store.delete(key), now: () => new Date() },
+const report = resetPublisherCovers(
+  { db: openBooksDb(), now: () => new Date() },
   { origin: values.origin, since: new Date(values.since).toISOString(), apply: values.apply }
 );
 console.log(JSON.stringify({ apply: values.apply, ...report }));
