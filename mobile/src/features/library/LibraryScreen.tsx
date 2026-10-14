@@ -158,6 +158,11 @@ export function LibraryScreen() {
           ? {
               headerShown: true,
               title: `${selectedKeys.size} selected`,
+              headerTitle: () => (
+                <Text display accessibilityRole="header" numberOfLines={1} {...dynamicType} style={[styles.selectionTitle, { color: colors.text }]}>
+                  {`${selectedKeys.size} selected`}
+                </Text>
+              ),
               // Selection is a mode, not a place — its own back is Cancel, so
               // the stack's back chevron would be the wrong affordance here.
               headerBackVisible: false,
@@ -183,6 +188,7 @@ export function LibraryScreen() {
               title: library?.data.name || "Library",
               headerLargeTitleEnabled: false,
               headerBackVisible: undefined,
+              headerTitle: undefined,
               headerLeft: undefined,
               headerRight: () => (
                 <Menu title={library?.data.name || "Library"} items={actionItems}>
@@ -330,6 +336,7 @@ export function LibraryScreen() {
 
 const styles = StyleSheet.create({
   grow: { flex: 1 },
+  selectionTitle: { fontSize: 17, fontVariant: ["lining-nums"], marginLeft: spacing.md },
   loading: { padding: spacing.lg, gap: spacing.md },
   loadingRow: { flexDirection: "row", gap: spacing.md },
   shelfHead: { paddingBottom: spacing.md },
