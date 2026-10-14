@@ -1,16 +1,10 @@
-import { useMemo } from "react";
 import { StyleSheet, View, useWindowDimensions } from "react-native";
 import { Image } from "expo-image";
-import { useQuery } from "@tanstack/react-query";
-import { contrastRatio, ensureBookBlockHeights, type DigestItem, type Mural } from "@scripta/shared";
+import { contrastRatio, type DigestItem } from "@scripta/shared";
 import { Text } from "../../ui/Text";
-import { Icon, Skeleton, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { Icon, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { BookCover } from "../arena/BookCover";
-import { fetchProfile } from "../community/api";
 import { CoverFan, SLOT_HEIGHT, SLOT_WIDTH } from "../community/CoverFan";
-import { MuralThumbnail } from "../murals/MuralCanvas";
-import { reconstructBooks, reconstructTierlists } from "../public/adapters";
-import type { GalleryImage } from "../gallery/api";
 import { feedRowModel } from "./feedRowModel";
 
 export function FeedPreview({ item }: { item: DigestItem }) {
@@ -42,14 +36,8 @@ function MuralPreview({ item }: { item: Extract<DigestItem, { kind: "mural" }> }
   const { colors } = useTheme();
   const { width } = useWindowDimensions();
   const size = Math.min(240, width - spacing.lg * 2);
-  const profile = useQuery({ queryKey: ["community", "profile", item.actor.username], queryFn: () => fetchProfile(item.actor.username), enabled: !item.mural.coverImageUrl, retry: false });
-  const data = profile.data?.mural?.mural.id === item.mural.id ? profile.data.mural : null;
-  const books = useMemo(() => data ? reconstructBooks(data.library.books, data.library.currentlyReading, data.library.highlights) : [], [data]);
-  const images = useMemo<GalleryImage[]>(() => data ? Object.entries(data.imageUrls).flatMap(([id, url]) => url ? [{ id, url, filename: "", mimeType: "", width: 0, height: 0, byteSize: 0, createdAt: "" }] : []) : [], [data]);
-  const tierlists = useMemo(() => reconstructTierlists(data?.tierlists ?? {}), [data]);
-  const mural: Mural | null = data ? { ...data.mural, blocks: ensureBookBlockHeights(data.mural.blocks), createdAt: "", updatedAt: "", coverImageUrl: data.mural.coverImageUrl ?? undefined, shareToken: null, shareUrl: null, folderId: null } : null;
   return <View style={[styles.mural, { width: size, height: size, backgroundColor: colors.surface }]}>
-    {item.mural.coverImageUrl ? <Image source={item.mural.coverImageUrl} style={StyleSheet.absoluteFill} contentFit="cover" /> : mural && mural.blocks.length > 0 && data ? <MuralThumbnail mural={mural} canvasWidth={width - spacing.lg * 2} books={books} images={images} tierlists={tierlists} profile={data.profile} shelfThemeOverride={data.library.shelfTheme} readerCardOverride={data.library.readerCard} statsOverride={data.library.stats} /> : profile.isPending ? <Skeleton height={size} /> : <Icon name="murals" size={48} color={colors.accent} />}
+    {item.mural.coverImageUrl ? <Image source={item.mural.coverImageUrl} style={StyleSheet.absoluteFill} contentFit="cover" /> : <Icon name="murals" size={48} color={colors.accent} />}
   </View>;
 }
 
