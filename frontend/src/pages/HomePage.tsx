@@ -123,6 +123,11 @@ export function HomePage() {
                           )}
                           <span className="text-sm font-semibold">{digestHeading(item)}</span>
                         </>
+                      ) : item.kind === "completion" ? (
+                        <>
+                          <AuthorAvatar author={item.actor} />
+                          <span className="text-sm font-semibold">{digestHeading(item)}</span>
+                        </>
                       ) : (
                         <>
                           <AuthorAvatar author={item.actor} />
