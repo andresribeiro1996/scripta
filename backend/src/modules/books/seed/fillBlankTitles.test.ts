@@ -107,3 +107,13 @@ test("a feed product with an author fills both, so the book can group into a wor
   assert.equal(row.author, "William Shakespeare");
   assert.notEqual(row.title_key, "");
 });
+
+test("two blank books sharing one publisher_url are both filled from the one feed product", async () => {
+  const h = setup({ "https://shop.test/products.json?limit=250&page=1": page1([product("hamlet", "Hamlet", "9789896414672")]) });
+  const first = h.blank("9789896414672", "https://shop.test/products/hamlet");
+  const second = h.blank("9789722379915", "https://shop.test/products/hamlet");
+  const report = await fillBlankTitles(h.deps, [SHOP], { dryRun: false });
+  assert.deepEqual(report, { sites: { "Test Shop": { products: 1, matched: 2, filled: 2 } }, blankBefore: 2, leftBlank: 0 });
+  assert.equal(h.repo.getBook(first)!.title, "Hamlet");
+  assert.equal(h.repo.getBook(second)!.title, "Hamlet");
+});

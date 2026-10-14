@@ -21,8 +21,12 @@ export async function fillBlankTitles(
   sites: PublisherSite[],
   options: { dryRun: boolean }
 ): Promise<TitleFillReport> {
-  const blank = new Map(deps.repo.listBlankTitled().map((row) => [row.publisher_url, row.id]));
-  const blankBefore = blank.size;
+  const blank = new Map<string, string[]>();
+  let blankBefore = 0;
+  for (const row of deps.repo.listBlankTitled()) {
+    blank.set(row.publisher_url, [...(blank.get(row.publisher_url) ?? []), row.id]);
+    blankBefore++;
+  }
   const reports: Record<string, TitleFillSiteReport> = {};
   for (const site of sites) {
     const report: TitleFillSiteReport = { products: 0, matched: 0, filled: 0 };
@@ -31,18 +35,18 @@ export async function fillBlankTitles(
       const feed = await readSiteFeed(site, deps.fetchText, createThrottle(deps.sleep));
       report.products = feed.products;
       for (const book of feed.books) {
-        const id = blank.get(book.productUrl);
-        if (!id) continue;
+        const ids = blank.get(book.productUrl);
+        if (!ids) continue;
         blank.delete(book.productUrl);
-        report.matched++;
+        report.matched += ids.length;
         if (options.dryRun) continue;
-        deps.repo.fillIdentity(id, book.title, book.author ?? "");
-        report.filled++;
+        for (const id of ids) deps.repo.fillIdentity(id, book.title, book.author ?? "");
+        report.filled += ids.length;
       }
     } catch (error) {
       if (!(error instanceof SiteSkipped || error instanceof SourceUnavailableError)) throw error;
       report.skipped = error.message;
     }
   }
-  return { sites: reports, blankBefore, leftBlank: blank.size };
+  return { sites: reports, blankBefore, leftBlank: [...blank.values()].reduce((total, ids) => total + ids.length, 0) };
 }

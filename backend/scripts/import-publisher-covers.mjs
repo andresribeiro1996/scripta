@@ -58,22 +58,21 @@ if (values["fill-titles"]) {
     { dryRun: values["dry-run"] }
   );
   console.log(JSON.stringify(report, null, 2));
-  process.exit(0);
+} else {
+  const store = createObjectStore();
+  const reports = await importPublisherCovers(
+    {
+      fetchText,
+      fetchBytes,
+      lookupOpenLibrary,
+      repo: createSqliteBooksRepository(openBooksDb()),
+      blobs: { save: (id, extension, bytes) => store.put(`covers/${id}.${extension}`, bytes, "image/webp") },
+      now: () => new Date(),
+      sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+      log: (line) => console.error(`${line} rss=${Math.round(process.memoryUsage.rss() / 1048576)}MB`)
+    },
+    sites,
+    { dryRun: values["dry-run"] }
+  );
+  console.log(JSON.stringify(reports, null, 2));
 }
-
-const store = createObjectStore();
-const reports = await importPublisherCovers(
-  {
-    fetchText,
-    fetchBytes,
-    lookupOpenLibrary,
-    repo: createSqliteBooksRepository(openBooksDb()),
-    blobs: { save: (id, extension, bytes) => store.put(`covers/${id}.${extension}`, bytes, "image/webp") },
-    now: () => new Date(),
-    sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
-    log: (line) => console.error(`${line} rss=${Math.round(process.memoryUsage.rss() / 1048576)}MB`)
-  },
-  sites,
-  { dryRun: values["dry-run"] }
-);
-console.log(JSON.stringify(reports, null, 2));
