@@ -9,47 +9,48 @@
 // target for e.g. the Home mural's "Open collection" button.
 //
 // Rendered both as the Library screen's "Collections" tab and as the
-// standalone /collections route. Both hosts own the search text and a "New"
-// button in their header (see LibraryScreen.tsx and
-// app/(app)/(library)/collections.tsx) — `search` is a controlled prop
-// and `startCreating` is exposed via ref so those headers can drive this list
-// without it needing its own header.
+// standalone /collections route. Both hosts own the search text, the type
+// filter and a "New" control (see LibraryScreen.tsx and
+// app/(app)/(library)/collections.tsx) — `search` and `typeFilter` are
+// controlled props and `startCreating` is exposed via ref so those controls
+// can drive this list without it needing its own chrome.
 
 import { forwardRef, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../../ui/Text";
 import { router } from "expo-router";
 import { makeGroup, orderedGroupBooks, saveFailureMessage, type GroupType } from "@scripta/shared";
-import { EmptyState, Input, Segmented } from "../../../ui/components";
-import { Icon } from "../../../ui/icon";
+import { EmptyState, Input } from "../../../ui/components";
+import { Icon, type IconName } from "../../../ui/icon";
+import type { SearchDockScrollProps } from "../../../ui/SearchDock";
 import { spacing, typography, useTheme } from "../../../ui/theme";
 import { useLibrary } from "../hooks/useLibrary";
 import { attemptUpdate } from "../lib/attemptUpdate";
 import { CoverImage } from "./CoverImage";
 
-type TypeFilter = GroupType | "all";
+export type TypeFilter = GroupType | "all";
 
-const TYPE_FILTER_OPTIONS: readonly { value: TypeFilter; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "series", label: "Series" },
-  { value: "collection", label: "Collections" },
+export const TYPE_FILTER_OPTIONS: readonly { value: TypeFilter; label: string; icon: IconName }[] = [
+  { value: "all", label: "All", icon: "filter" },
+  { value: "series", label: "Series", icon: "library" },
+  { value: "collection", label: "Collections", icon: "folder" },
 ];
 
 const COPY: Record<TypeFilter, { noun: string; emptyTitle: string; emptyBody: string }> = {
   all: {
     noun: "collection",
     emptyTitle: "No collections yet.",
-    emptyBody: "Series are picked up automatically from your books' Series field on import — or create your own collection with the + button above.",
+    emptyBody: "Series are picked up automatically from your books' Series field on import — or create your own collection with the New button.",
   },
   series: {
     noun: "series",
     emptyTitle: "No series yet.",
-    emptyBody: "Series are picked up automatically from your books' Series field on import — or add one with the + button above.",
+    emptyBody: "Series are picked up automatically from your books' Series field on import — or add one with the New button.",
   },
   collection: {
     noun: "collection",
     emptyTitle: "No collections yet.",
-    emptyBody: "Use the + button above to start organizing your books your own way.",
+    emptyBody: "Use the New button to start organizing your books your own way.",
   },
 };
 
@@ -57,9 +58,14 @@ const GROUP_TYPE_LABEL: Record<GroupType, string> = { series: "Series", collecti
 
 export type GroupsViewHandle = { startCreating: () => void };
 
-export const GroupsView = forwardRef<GroupsViewHandle, { search: string; onSearchChange: (value: string) => void }>(function GroupsView({ search, onSearchChange }, ref) {
+type GroupsViewProps = Partial<SearchDockScrollProps> & {
+  search: string;
+  typeFilter: TypeFilter;
+  bottomInset: number;
+};
+
+export const GroupsView = forwardRef<GroupsViewHandle, GroupsViewProps>(function GroupsView({ search, typeFilter, bottomInset, ...scrollProps }, ref) {
   const { data: library, updateLibrary } = useLibrary();
-  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   // "All" has no single creatable type; a manually-added group there is a
   // collection like any other — series are meant to come from import.
   const draftType: GroupType = typeFilter === "series" ? "series" : "collection";
@@ -101,10 +107,7 @@ export const GroupsView = forwardRef<GroupsViewHandle, { search: string; onSearc
   }
 
   return (
-    <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
-      <Input icon="search" accessibilityLabel="Search collections" placeholder="Search collections" value={search} onChangeText={onSearchChange} autoCapitalize="none" autoCorrect={false} clearButtonMode="while-editing" returnKeyType="search" />
-      <Segmented accessibilityLabel="Filter by type" options={TYPE_FILTER_OPTIONS} value={typeFilter} onChange={setTypeFilter} />
-
+    <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.content, { paddingBottom: bottomInset }]} {...scrollProps} keyboardDismissMode="none">
       {drafting && (
         <View style={[styles.draftRow, { borderColor: colors.accent }]}>
           <Input
@@ -150,7 +153,7 @@ export const GroupsView = forwardRef<GroupsViewHandle, { search: string; onSearc
 });
 
 const styles = StyleSheet.create({
-  content: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.huge },
+  content: { padding: spacing.lg, gap: spacing.md },
   draftRow: { borderWidth: 2, borderStyle: "dashed", borderRadius: 12, padding: spacing.md },
   row: { flexDirection: "row", alignItems: "center", gap: spacing.md, borderWidth: 1, borderRadius: 12, padding: spacing.sm },
   thumb: { width: 44, height: 66, borderRadius: 6, overflow: "hidden" },

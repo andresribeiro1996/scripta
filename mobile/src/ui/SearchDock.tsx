@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Animated, Dimensions, Keyboard, KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from "react-native";
 import { Icon, type IconName } from "./icon";
-import { Input } from "./components";
+import { Input, Menu, type MenuItem } from "./components";
 import { minimumTouchTarget, radii, spacing, useReducedMotion, useTheme } from "./theme";
 
+const FAB_HEIGHT = 56;
+
 export const searchDockClearance = minimumTouchTarget + spacing.lg * 2;
+export const searchDockFabClearance = searchDockClearance + FAB_HEIGHT + spacing.lg;
 
 export type SearchDockScrollProps = {
   keyboardShouldPersistTaps: "handled";
@@ -21,6 +24,7 @@ export function SearchDock({
   accessibilityLabel,
   placeholder,
   cycle,
+  fab,
   hidden = false,
   children,
 }: {
@@ -28,7 +32,15 @@ export function SearchDock({
   onChangeText: (text: string) => void;
   accessibilityLabel: string;
   placeholder: string;
-  cycle?: { icon: IconName; active: boolean; accessibilityLabel: string; accessibilityHint: string; onPress: () => void };
+  cycle?: {
+    icon: IconName;
+    active: boolean;
+    accessibilityLabel: string;
+    accessibilityHint?: string;
+    onPress?: () => void;
+    menu?: { title: string; items: MenuItem[] };
+  };
+  fab?: ReactNode;
   hidden?: boolean;
   children: (scrollProps: SearchDockScrollProps) => ReactNode;
 }) {
@@ -69,6 +81,18 @@ export function SearchDock({
     onMomentumScrollEnd: () => setScrolling(false),
   };
 
+  const cycleButton = cycle ? (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={cycle.accessibilityLabel}
+      accessibilityHint={cycle.accessibilityHint}
+      onPress={cycle.onPress}
+      style={[styles.cycle, { borderColor: colors.border, backgroundColor: cycle.active ? colors.accentSoft : colors.surface }]}
+    >
+      <Icon name={cycle.icon} size={20} color={cycle.active ? colors.text : colors.textDim} />
+    </Pressable>
+  ) : null;
+
   return (
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.grow}>
       <View ref={frame} style={styles.grow}>
@@ -78,31 +102,24 @@ export function SearchDock({
             pointerEvents={scrolling ? "none" : "box-none"}
             style={[styles.dock, { bottom: overlap, opacity: dock, transform: [{ translateY: dock.interpolate({ inputRange: [0, 1], outputRange: [minimumTouchTarget, 0] }) }] }]}
           >
-            <View style={styles.grow}>
-              <Input
-                icon="search"
-                accessibilityLabel={accessibilityLabel}
-                value={value}
-                onChangeText={onChangeText}
-                placeholder={placeholder}
-                autoCapitalize="none"
-                autoCorrect={false}
-                clearButtonMode="while-editing"
-                returnKeyType="search"
-                style={styles.searchField}
-              />
+            {fab ? <View pointerEvents="box-none" style={styles.fabArea}>{fab}</View> : null}
+            <View style={styles.row}>
+              <View style={styles.grow}>
+                <Input
+                  icon="search"
+                  accessibilityLabel={accessibilityLabel}
+                  value={value}
+                  onChangeText={onChangeText}
+                  placeholder={placeholder}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  clearButtonMode="while-editing"
+                  returnKeyType="search"
+                  style={styles.searchField}
+                />
+              </View>
+              {cycleButton && cycle?.menu ? <Menu title={cycle.menu.title} items={cycle.menu.items}>{cycleButton}</Menu> : cycleButton}
             </View>
-            {cycle ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={cycle.accessibilityLabel}
-                accessibilityHint={cycle.accessibilityHint}
-                onPress={cycle.onPress}
-                style={[styles.cycle, { borderColor: colors.border, backgroundColor: cycle.active ? colors.accentSoft : colors.surface }]}
-              >
-                <Icon name={cycle.icon} size={20} color={cycle.active ? colors.text : colors.textDim} />
-              </Pressable>
-            ) : null}
           </Animated.View>
         )}
       </View>
@@ -112,7 +129,9 @@ export function SearchDock({
 
 const styles = StyleSheet.create({
   grow: { flex: 1 },
-  dock: { position: "absolute", left: 0, right: 0, flexDirection: "row", alignItems: "center", gap: spacing.sm, padding: spacing.md },
+  dock: { position: "absolute", left: 0, right: 0 },
+  fabArea: { height: FAB_HEIGHT + spacing.lg },
+  row: { flexDirection: "row", alignItems: "center", gap: spacing.sm, padding: spacing.md },
   searchField: { borderRadius: radii.full },
   cycle: { alignItems: "center", justifyContent: "center", width: minimumTouchTarget, height: minimumTouchTarget, borderWidth: 1, borderRadius: radii.full },
 });

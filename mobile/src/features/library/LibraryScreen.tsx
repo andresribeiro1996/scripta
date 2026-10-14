@@ -2,8 +2,9 @@
 // panel it used to present as a modal (book detail, add, import, reorder,
 // share, per-book style and cover) is now a sibling route presented as a form
 // sheet, so each one is a real UISheetPresentationController the user can drag
-// away. Status lives in the swipeable tabs, and search and sort in the head of
-// the grid they act on, so what is left here is the grid and selection mode.
+// away. Status lives in the swipeable tabs, and one bottom dock below them
+// holds the search and the sort or type control of the tab in view, so what is
+// left here is the grid and selection mode.
 //
 // "Collections" is one more page in the same swipeable strip as the shelf
 // tabs, not a separate destination behind the overflow menu — Series and
@@ -11,8 +12,8 @@
 // both (they're the same underlying resource) as tappable rows into
 // GroupDetail; the standalone /collections route still exists for deep
 // links (e.g. Home's "Open collection", which goes straight to a group's
-// detail screen). The header's "New" button is re-pointed at groups instead of
-// books while this tab is active.
+// detail screen). The dock's search and the floating action button are
+// re-pointed at groups instead of books while this tab is active.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Pressable, RefreshControl, StyleSheet, View } from "react-native";
@@ -33,15 +34,15 @@ import {
   type PerCardStyle,
   type SortKey,
 } from "@scripta/shared";
-import { Button, EditorHeading, EmptyState, ErrorState, HeaderActions, IconButton, Input, Menu, Screen, Sheet, Skeleton, SwipeableTabs, type MenuItem } from "../../ui/components";
-import { Icon, dynamicType, useTheme } from "../../ui";
+import { Button, EmptyState, ErrorState, Fab, IconButton, Input, Menu, Screen, Sheet, Skeleton, SwipeableTabs, type MenuItem } from "../../ui/components";
+import { SearchDock, dynamicType, searchDockClearance, searchDockFabClearance, useTheme } from "../../ui";
 import { radii, spacing, typography } from "../../ui/theme";
 import { useMurals } from "../murals/useMurals";
 import { useLibrary } from "./hooks/useLibrary";
 import { useLibraryActions } from "./hooks/useLibraryActions";
 import { BookCard } from "./components/BookCard";
 import { DuplicatesSheetBody } from "./components/DuplicatesSheet";
-import { GroupsView, type GroupsViewHandle } from "./components/GroupsView";
+import { GroupsView, TYPE_FILTER_OPTIONS, type GroupsViewHandle, type TypeFilter } from "./components/GroupsView";
 import { LibraryGrid } from "./components/LibraryGrid";
 
 type LibraryTab = LibraryStatusTab | "collections";
@@ -62,8 +63,12 @@ export function LibraryScreen() {
   const [statusFilter, setStatusFilter] = useState<LibraryTab>(LIBRARY_STATUS_TABS[0].value);
   const [sortKey, setSortKey] = useState<SortKey>("manual");
   const [groupQuery, setGroupQuery] = useState("");
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const groupsView = useRef<GroupsViewHandle>(null);
   const onCollectionsTab = statusFilter === "collections";
+  const typeFilterIndex = TYPE_FILTER_OPTIONS.findIndex((option) => option.value === typeFilter);
+  const typeFilterOption = TYPE_FILTER_OPTIONS[typeFilterIndex];
+  const nextTypeFilter = TYPE_FILTER_OPTIONS[(typeFilterIndex + 1) % TYPE_FILTER_OPTIONS.length];
 
   // Renaming stays a modal: it is one field, and a form sheet for it would be
   // more ceremony than the edit.
@@ -175,19 +180,14 @@ export function LibraryScreen() {
             }
           : {
               headerShown: true,
-              title: "",
+              title: library?.data.name || "Library",
               headerLargeTitleEnabled: false,
               headerBackVisible: undefined,
               headerLeft: undefined,
               headerRight: () => (
-                <HeaderActions>
-                  {onCollectionsTab
-                    ? <IconButton framed accessibilityLabel="New collection" label="New" name="add" onPress={() => groupsView.current?.startCreating()} />
-                    : <IconButton framed accessibilityLabel="Add book" label="Add" name="add" onPress={() => router.push("/add-book" as never)} />}
-                  <Menu title={library?.data.name || "Library"} items={actionItems}>
-                    <IconButton framed accessibilityLabel="Library actions" name="more" />
-                  </Menu>
-                </HeaderActions>
+                <Menu title={library?.data.name || "Library"} items={actionItems}>
+                  <IconButton framed accessibilityLabel="Library actions" name="more" />
+                </Menu>
               ),
             }}
       />
@@ -221,86 +221,100 @@ export function LibraryScreen() {
       )}
 
       {!isPending && !isError && books.length > 0 && (
-        <>
-        <View style={styles.heading}><EditorHeading name={library?.data.name || "Library"} accessibilityLabel={`Rename library, ${library?.data.name || "Library"}`} onRename={startRenamingLibrary} /></View>
-        <SwipeableTabs
-          accessibilityLabel="Library shelf"
-          options={LIBRARY_TABS}
-          value={statusFilter}
-          onChange={setStatusFilter}
-        renderPage={(status) => {
-          if (status === "collections") return <GroupsView ref={groupsView} search={groupQuery} onSearchChange={setGroupQuery} />;
-          const pageBooks = sortBooks(filterBooks(ordered, query, status), sortKey);
-          return (
-            <LibraryGrid
-              data={pageBooks}
-              keyExtractor={(book, i) => String(book.ContentID ?? i)}
-              style={style}
-              topInset={spacing.lg}
-              refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} />}
-              ListHeaderComponent={
-                <View style={styles.shelfHead}>
-                  <Input icon="search" accessibilityLabel="Search title or author" placeholder="Search title or author" value={query} onChangeText={setQuery} autoCapitalize="none" autoCorrect={false} clearButtonMode="while-editing" returnKeyType="search" />
-                  {/* Sort sits above the grid, not in the overflow menu: it acts on
-                      the shelf you're looking at, so it belongs next to it. */}
-                  <View style={styles.shelfToolbar}>
-                    <Menu title="Sort books" items={sortItems}>
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel={`Sort books, currently ${sortLabel}`}
-                        style={({ pressed }) => [styles.sortPill, { borderColor: colors.border }, pressed ? { backgroundColor: colors.surfacePressed } : null]}
-                      >
-                        <Icon name="filter" size={14} color={colors.textDim} />
-                        <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.strong, { color: colors.text }]}>
-                          Sort · {sortLabel}
-                        </Text>
-                      </Pressable>
-                    </Menu>
-                  </View>
-                  {possibleDuplicates.length > 0 ? (
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={() => setReviewingDuplicates(true)}
-                      style={({ pressed }) => [styles.sortPill, { borderColor: colors.border }, pressed ? { backgroundColor: colors.surfacePressed } : null]}
-                    >
-                      <Text {...dynamicType} style={[typography.caption, styles.strong, { color: colors.text }]}>
-                        {possibleDuplicates.length === 1 ? "1 possible duplicate · Review" : `${possibleDuplicates.length} possible duplicates · Review`}
-                      </Text>
-                    </Pressable>
-                  ) : null}
-                </View>
-              }
-              ListEmptyComponent={
-                query.trim() ? (
-                  <EmptyState
-                    title="No books match."
-                    body="Every book is still here — the search above just doesn't match any of them."
-                    actionLabel="Clear search and sort"
-                    onAction={clearSearchAndFilters}
-                  />
-                ) : (
-                  <EmptyState title="Nothing on this shelf yet." />
-                )
-              }
-              renderItem={(book) => {
-                const seriesGroup = bookSeriesGroup.get(bookKey(book));
-                const cardStyle = effectiveCardStyle(style, seriesGroup?.style, book._style as PerCardStyle | undefined);
+        <SearchDock
+          value={onCollectionsTab ? groupQuery : query}
+          onChangeText={onCollectionsTab ? setGroupQuery : setQuery}
+          accessibilityLabel={onCollectionsTab ? "Search collections" : "Search title or author"}
+          placeholder={onCollectionsTab ? "Search collections" : "Search title or author"}
+          cycle={
+            onCollectionsTab
+              ? {
+                  icon: typeFilterOption.icon,
+                  active: typeFilter !== "all",
+                  accessibilityLabel: `Showing ${typeFilterOption.label.toLowerCase()}`,
+                  accessibilityHint: "Switches to the next type",
+                  onPress: () => setTypeFilter(nextTypeFilter.value),
+                }
+              : {
+                  icon: "filter",
+                  active: sortKey !== "manual",
+                  accessibilityLabel: `Sort books, currently ${sortLabel}`,
+                  menu: { title: "Sort books", items: sortItems },
+                }
+          }
+          fab={
+            selectionMode ? undefined : onCollectionsTab ? (
+              <Fab label="New" accessibilityLabel="New collection" onPress={() => groupsView.current?.startCreating()} />
+            ) : (
+              <Fab label="Add" accessibilityLabel="Add book" onPress={() => router.push("/add-book" as never)} />
+            )
+          }
+        >
+          {(scrollProps) => (
+            <SwipeableTabs
+              accessibilityLabel="Library shelf"
+              options={LIBRARY_TABS}
+              value={statusFilter}
+              onChange={setStatusFilter}
+              renderPage={(status) => {
+                if (status === "collections") return <GroupsView ref={groupsView} search={groupQuery} typeFilter={typeFilter} bottomInset={selectionMode ? searchDockClearance : searchDockFabClearance} {...scrollProps} />;
+                const pageBooks = sortBooks(filterBooks(ordered, query, status), sortKey);
                 return (
-                  <BookCard
-                    book={book}
-                    onPress={() => router.push(`/book/${encodeURIComponent(bookKey(book))}` as never)}
-                    style={cardStyle}
-                    selectable={selectionMode}
-                    selected={selectedKeys.has(bookKey(book))}
-                    onToggleSelect={handleToggleSelect}
+                  <LibraryGrid
+                    data={pageBooks}
+                    keyExtractor={(book, i) => String(book.ContentID ?? i)}
+                    style={style}
+                    topInset={spacing.lg}
+                    bottomInset={selectionMode ? searchDockClearance : searchDockFabClearance}
+                    {...scrollProps}
+                    refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} />}
+                    ListHeaderComponent={
+                      possibleDuplicates.length > 0 ? (
+                        <View style={styles.shelfHead}>
+                          <Pressable
+                            accessibilityRole="button"
+                            onPress={() => setReviewingDuplicates(true)}
+                            style={({ pressed }) => [styles.sortPill, { borderColor: colors.border }, pressed ? { backgroundColor: colors.surfacePressed } : null]}
+                          >
+                            <Text {...dynamicType} style={[typography.caption, styles.strong, { color: colors.text }]}>
+                              {possibleDuplicates.length === 1 ? "1 possible duplicate · Review" : `${possibleDuplicates.length} possible duplicates · Review`}
+                            </Text>
+                          </Pressable>
+                        </View>
+                      ) : undefined
+                    }
+                    ListEmptyComponent={
+                      query.trim() ? (
+                        <EmptyState
+                          title="No books match."
+                          body="Every book is still here — the search below just doesn't match any of them."
+                          actionLabel="Clear search and sort"
+                          onAction={clearSearchAndFilters}
+                        />
+                      ) : (
+                        <EmptyState title="Nothing on this shelf yet." />
+                      )
+                    }
+                    renderItem={(book) => {
+                      const seriesGroup = bookSeriesGroup.get(bookKey(book));
+                      const cardStyle = effectiveCardStyle(style, seriesGroup?.style, book._style as PerCardStyle | undefined);
+                      return (
+                        <BookCard
+                          book={book}
+                          onPress={() => router.push(`/book/${encodeURIComponent(bookKey(book))}` as never)}
+                          style={cardStyle}
+                          selectable={selectionMode}
+                          selected={selectedKeys.has(bookKey(book))}
+                          onToggleSelect={handleToggleSelect}
+                        />
+                      );
+                    }}
                   />
                 );
               }}
             />
-          );
-        }}
-        />
-        </>
+          )}
+        </SearchDock>
       )}
 
       <Sheet visible={editingName} title="Rename library" onClose={() => setEditingName(false)}>
@@ -315,11 +329,10 @@ export function LibraryScreen() {
 }
 
 const styles = StyleSheet.create({
-  heading: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
+  grow: { flex: 1 },
   loading: { padding: spacing.lg, gap: spacing.md },
   loadingRow: { flexDirection: "row", gap: spacing.md },
-  shelfHead: { gap: spacing.md },
-  shelfToolbar: { flexDirection: "row" },
+  shelfHead: { paddingBottom: spacing.md },
   sortPill: { flexDirection: "row", alignItems: "center", gap: spacing.xs, alignSelf: "flex-start", minHeight: 32, paddingHorizontal: spacing.md, borderRadius: radii.full, borderWidth: 1 },
   strong: { fontWeight: "700" },
 });
