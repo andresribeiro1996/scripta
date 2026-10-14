@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { bookMetaLine, bookScreenModel } from "./bookScreen.js";
 import type { WorkPage } from "./types.js";
 
-const edition = (n: number) => ({ bookId: `e${n}`, title: "Dune", language: "en", year: 1965 + n, isbn: null, mine: n === 1 });
+const edition = (n: number) => ({ bookId: `e${n}`, title: "Dune", language: "en", year: 1965 + n, isbn: null, coverUrl: null, coverColor: null, pages: null, mine: n === 1 });
 function page(overrides: Partial<WorkPage["work"]> = {}): WorkPage {
   return {
     work: { id: "w", title: "Dune", author: "Frank Herbert", summary: "Spice.", coverUrl: null, coverColor: null, editions: [1, 2, 3, 4, 5].map(edition), genres: ["Science Fiction"], rating: { value: 4.27, count: 2310 }, year: 1965, pages: 412, ...overrides },
@@ -127,4 +127,88 @@ test("a long summary gets a preview, a short one does not", () => {
   const preview = bookScreenModel(page({ summary: long }), null, { isAdmin: false }).about!.preview;
   assert.ok(preview && preview.endsWith("…") && !preview.includes("The end."));
   assert.equal(bookScreenModel(page({ summary: "Spice." }), null, { isAdmin: false }).about!.preview, null);
+});
+
+const editions = (count: number, mineAt = -1): WorkPage["work"]["editions"] => Array.from({ length: count }, (_, i) => ({
+  bookId: `e${i}`, title: `Dune ${i}`, language: i === 0 ? null : "pt-BR", year: i === 0 ? null : 2000 + i, isbn: i === 0 ? null : `isbn${i}`, coverUrl: `cover:${i}`, coverColor: `#00000${i}`, pages: i === 2 ? 300 : null, mine: i === mineAt
+}));
+const viewer = { isAdmin: false };
+
+test("default view has the work cover and picks the edition index from mine, then the matching cover, then the first", () => {
+  const withMine = bookScreenModel(page({ editions: editions(5, 3), coverUrl: "cover:1" }), null, viewer);
+  assert.deepEqual(withMine.cover, { url: "cover:1", color: null });
+  assert.deepEqual(withMine.edition, { index: 3, count: 5, label: "Your edition · 4 of 5", showDots: true, mineIndex: 3 });
+  assert.deepEqual(bookScreenModel(page({ editions: editions(5), coverUrl: "cover:2" }), null, viewer).edition, { index: 2, count: 5, label: "Edition 3 of 5", showDots: true, mineIndex: null });
+  assert.equal(bookScreenModel(page({ editions: editions(5), coverUrl: "cover:x" }), null, viewer).edition!.index, 0);
+  assert.equal(bookScreenModel(page({ editions: editions(5), coverUrl: null }), null, viewer).edition!.index, 0);
+  assert.deepEqual(bookScreenModel(null, owned(), viewer).cover, { url: null, color: null });
+});
+
+test("a selected edition overrides the hero and the add-book details but not the owner controls, about or community", () => {
+  const p = page({ editions: editions(5, 1), coverUrl: "cover:1", coverColor: "#abc" });
+  const base = bookScreenModel(p, owned({ ReadStatus: 2, Rating: 4 }), viewer, null);
+  const picked = bookScreenModel(p, owned({ ReadStatus: 2, Rating: 4 }), viewer, "e2");
+  assert.equal(picked.title, "Dune 2");
+  assert.equal(picked.meta, "2002 · 300 pages · pt-BR");
+  assert.deepEqual(picked.cover, { url: "cover:2", color: "#000002" });
+  assert.deepEqual(picked.edition, { index: 2, count: 5, label: "Edition 3 of 5", showDots: true, mineIndex: 1 });
+  const sameAsDefault = (model: typeof base) => ({ ...model, title: "", meta: null, cover: base.cover, edition: null });
+  assert.deepEqual(sameAsDefault(picked), sameAsDefault(base));
+});
+
+test("selecting the default edition is the default view, so going back restores it exactly", () => {
+  const p = page({ editions: editions(5, 1), coverUrl: "cover:3", coverColor: "#abc" });
+  assert.deepEqual(bookScreenModel(p, owned(), viewer, "e1"), bookScreenModel(p, owned(), viewer));
+  assert.deepEqual(bookScreenModel(p, null, { isAdmin: true }, "e1"), bookScreenModel(p, null, { isAdmin: true }));
+});
+
+test("an owned book matching no edition is shown at the default edition, so it keeps its own cover", () => {
+  const p = page({ editions: editions(5), coverUrl: "cover:2" });
+  assert.deepEqual(bookScreenModel(p, owned(), viewer).edition, { index: 2, count: 5, label: "Your edition · 3 of 5", showDots: true, mineIndex: 2 });
+  assert.deepEqual(bookScreenModel(p, owned(), viewer, "e2"), bookScreenModel(p, owned(), viewer));
+  const away = bookScreenModel(p, owned(), viewer, "e4").edition!;
+  assert.deepEqual([away.index, away.label, away.mineIndex], [4, "Edition 5 of 5", 2]);
+  assert.equal(bookScreenModel(p, null, viewer).edition!.mineIndex, null);
+});
+
+test("admin cover tools hide while another edition is shown, since they act on the default cover", () => {
+  const p = page({ editions: editions(5, 1), coverUrl: "cover:1" });
+  assert.deepEqual(bookScreenModel(p, owned(), { isAdmin: true }, null).menu, ["style", "cover", "rejectCover", "replaceCover"]);
+  assert.deepEqual(bookScreenModel(p, owned(), { isAdmin: true }, "e2").menu, ["style", "cover"]);
+  assert.deepEqual(bookScreenModel(p, null, { isAdmin: true }, "e2").menu, []);
+});
+
+test("selecting an edition without a cover shows the placeholder, and without year, pages or language has no meta", () => {
+  const p = page({ editions: [{ ...editions(1)[0]!, coverUrl: null, coverColor: null }, ...editions(3).slice(1)], coverUrl: "cover:1" });
+  const picked = bookScreenModel(p, null, viewer, "e0");
+  assert.deepEqual(picked.cover, { url: null, color: null });
+  assert.equal(picked.meta, null);
+});
+
+test("add book defaults to the first edition with an isbn and the work cover, and follows the selected edition", () => {
+  const p = page({ editions: editions(4), coverUrl: "cover:3" });
+  assert.deepEqual(bookScreenModel(p, null, viewer).addBook, { title: "Dune", author: "Frank Herbert", isbn: "isbn1", coverUrl: "cover:3" });
+  assert.deepEqual(bookScreenModel(p, null, viewer, "e2").addBook, { title: "Dune", author: "Frank Herbert", isbn: "isbn2", coverUrl: "cover:2" });
+  assert.deepEqual(bookScreenModel(p, null, viewer, "e0").addBook, { title: "Dune", author: "Frank Herbert", isbn: null, coverUrl: "cover:0" });
+  assert.equal(bookScreenModel(page({ editions: editions(1).map((e) => ({ ...e, isbn: null })) }), null, viewer).addBook!.isbn, null);
+  assert.equal(bookScreenModel(p, owned(), viewer).addBook, null);
+  assert.equal(bookScreenModel({ ...p, mine: { bookKey: "k", readStatus: 1, rating: null, highlightCount: 0 } }, null, viewer, "e2").addBook, null);
+  assert.equal(bookScreenModel(null, null, viewer).addBook, null);
+});
+
+test("edition dots show up to seven editions", () => {
+  assert.equal(bookScreenModel(page({ editions: editions(7) }), null, viewer).edition!.showDots, true);
+  assert.equal(bookScreenModel(page({ editions: editions(8) }), null, viewer).edition!.showDots, false);
+  assert.equal(bookScreenModel(page({ editions: editions(12) }), null, viewer, "e2").edition!.label, "Edition 3 of 12");
+});
+
+test("an unknown edition id is the default view", () => {
+  const p = page({ editions: editions(5, 1), coverUrl: "cover:1" });
+  assert.deepEqual(bookScreenModel(p, owned(), viewer, "nope"), bookScreenModel(p, owned(), viewer));
+});
+
+test("one edition or no page has no edition strip", () => {
+  assert.equal(bookScreenModel(page({ editions: editions(1) }), null, viewer, "e0").edition, null);
+  assert.equal(bookScreenModel(page({ editions: [] }), null, viewer).edition, null);
+  assert.equal(bookScreenModel(null, owned(), viewer).edition, null);
 });

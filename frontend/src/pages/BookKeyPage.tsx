@@ -16,7 +16,7 @@ export function BookKeyPage() {
   const hasHistory = (window.history.state?.idx ?? 0) > 0;
   const onBack = hasHistory ? () => navigate(-1) : null;
   if (workId) return <Navigate to={`/work/${workId}`} replace />;
-  if (book) return <BookScreen page={null} book={book} signedIn onAdd={() => {}} onShare={null} onBack={onBack} backTo={backTo} />;
+  if (book) return <BookScreen page={null} book={book} signedIn editionId={null} onSelectEdition={() => {}} onAdd={() => {}} onShare={null} onBack={onBack} backTo={backTo} />;
   const back = <BackLink backTo={backTo} onBack={onBack} />;
   if (library.isFetching) return <main className="mx-auto max-w-5xl px-5 py-8">{back}<p className="text-sm text-(--color-text-dim)">Loading…</p></main>;
   if (library.isError) {

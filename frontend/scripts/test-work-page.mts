@@ -11,19 +11,24 @@ import { ToastProvider } from "../src/components/Toaster";
 import { BackLink } from "../src/components/work/BackLink";
 import { createWebLibrarySaver, LibrarySaverContext } from "../src/hooks/useLibrarySaver";
 
-const edition = (n: number) => ({ bookId: `e${n}`, title: `Dune ${n}`, language: "en", year: 1965 + n, isbn: n === 1 ? "9780441013593" : null, mine: n === 1 });
+const edition = (n: number, mine = false) => ({ bookId: `e${n}`, title: `Dune ${n}`, language: "en", year: 1965 + n, isbn: n === 1 ? "9780441013593" : null, coverUrl: null, coverColor: null, pages: 400 + n, mine });
 const page: WorkPage = {
-  work: { id: "w", title: "Dune", author: "Frank Herbert", summary: null, coverUrl: null, coverColor: null, editions: [1, 2, 3, 4, 5].map(edition), genres: ["Science Fiction", "Classics"], rating: { value: 4.27, count: 2310 }, year: 1965, pages: 412 },
+  work: { id: "w", title: "Dune", author: "Frank Herbert", summary: null, coverUrl: null, coverColor: null, editions: [1, 2, 3, 4, 5].map((n) => edition(n)), genres: ["Science Fiction", "Classics"], rating: { value: 4.27, count: 2310 }, year: 1965, pages: 412 },
   mine: null,
   readers: { followed: [], others: [], counts: { readers: 0, finished: 0 } },
   games: { tierlists: [], arenas: [], quizzes: [] }
+};
+const ownedPage: WorkPage = {
+  ...page,
+  work: { ...page.work, editions: [1, 2, 3, 4, 5].map((n) => edition(n, n === 1)) },
+  mine: { bookKey: "isbn:9780441013593", readStatus: 2, rating: 4, highlightCount: 1 }
 };
 const owned = { Title: "Dune", Attribution: "Frank Herbert", ISBN: "9780441013593", ReadStatus: 2, Rating: 4, highlights: [{ BookmarkID: "h1", Text: "Fear is the mind-killer." }] };
 
 Object.defineProperty(globalThis, "matchMedia", { value: () => ({ matches: false }), configurable: true });
 
 type Props = Parameters<typeof BookScreen>[0];
-const base: Props = { page, book: null, signedIn: true, backTo: "/", onBack: null, onAdd: () => undefined, onShare: () => undefined };
+const base: Props = { page, book: null, signedIn: true, backTo: "/", onBack: null, editionId: null, onSelectEdition: () => undefined, onAdd: () => undefined, onShare: () => undefined };
 function render(props: Partial<Props>) {
   const client = new QueryClient();
   return renderToString(
@@ -40,7 +45,7 @@ function render(props: Partial<Props>) {
 }
 
 test("not owned: add button, About and Community tabs, no highlights tab, no menu", () => {
-  const html = render({});
+  const html = render({ page: { ...page, work: { ...page.work, editions: [edition(1)] } } });
   assert.ok(html.includes("Add to library"));
   assert.ok(html.includes("About"));
   assert.ok(html.includes("Community"));
@@ -52,7 +57,7 @@ test("not owned: add button, About and Community tabs, no highlights tab, no men
 });
 
 test("owned and finished: status and feeling menus, highlights tab, more menu", () => {
-  const html = render({ book: owned, page: { ...page, mine: { bookKey: "isbn:9780441013593", readStatus: 2, rating: 4, highlightCount: 1 } } });
+  const html = render({ book: owned, page: ownedPage });
   assert.ok(!html.includes("Add to library"));
   assert.ok(html.includes("Finished ▾"));
   assert.ok(html.includes("Loved it ▾"));
@@ -65,10 +70,52 @@ test("a long summary shows its preview and Show more; editions list three with S
   const html = render({ page: { ...page, work: { ...page.work, summary: long } } });
   assert.ok(html.includes("Show more"));
   assert.ok(!html.includes("The end."));
-  assert.ok(html.includes("Dune 3"));
-  assert.ok(!html.includes("Dune 4"));
+  assert.ok(html.includes('font-semibold">Dune 3'));
+  assert.ok(!html.includes('font-semibold">Dune 4'));
   assert.ok(/Show all (<!-- -->)?5/.test(html));
+});
+
+test("not owned with several editions: the strip, an unowned counter and Add this edition", () => {
+  const html = render({});
+  assert.ok(html.includes('aria-roledescription="carousel"'));
+  assert.ok(html.includes("Edition 1 of 5"));
+  assert.ok(!html.includes("Your edition"));
+  assert.ok(html.includes("Add this edition"));
+  assert.ok(!html.includes("Add to library"));
+});
+
+test("owned: the strip marks your edition, with owner controls and no add button", () => {
+  const html = render({ book: owned, page: ownedPage });
+  assert.ok(html.includes("Your edition · 1 of 5"));
   assert.ok(html.includes("Yours"));
+  assert.ok(!html.includes("Back to your edition"));
+  assert.ok(html.includes("Finished ▾"));
+  assert.ok(!html.includes("Add this edition"));
+});
+
+test("owned with no matching edition: the library cover shows at the default edition, labelled yours", () => {
+  const withCover = { ...page, work: { ...page.work, editions: [1, 2, 3, 4, 5].map((n) => ({ ...edition(n), coverUrl: `https://covers.test/${n}.jpg` })) } };
+  const html = render({ book: { ...owned, _coverUrl: "https://library.test/mine.jpg" }, page: { ...withCover, mine: ownedPage.mine } });
+  assert.ok(html.includes("Your edition · 1 of 5"));
+  assert.ok(html.includes("https://library.test/mine.jpg"));
+  assert.ok(!html.includes("https://covers.test/1.jpg"));
+  assert.ok(html.includes("https://covers.test/2.jpg"));
+  assert.ok(!html.includes("Back to your edition"));
+});
+
+test("owned with another edition selected: moved counter, way back, same owner controls", () => {
+  const html = render({ book: owned, page: ownedPage, editionId: "e3" });
+  assert.ok(html.includes("Edition 3 of 5"));
+  assert.ok(html.includes("Back to your edition"));
+  assert.ok(html.includes("1968 · 403 pages"));
+  assert.ok(html.includes("Finished ▾"));
+  assert.ok(!html.includes("Add this edition"));
+});
+
+test("a single edition has no strip and keeps Add to library", () => {
+  const html = render({ page: { ...page, work: { ...page.work, editions: [edition(1)] } } });
+  assert.ok(!html.includes("carousel"));
+  assert.ok(html.includes("Add to library"));
 });
 
 test("a short summary renders whole, with no Show more", () => {

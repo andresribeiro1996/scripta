@@ -20,8 +20,8 @@ test("a promoted game is owned by Scripta", () => {
 });
 
 test("an edition label joins what is known", () => {
-  assert.equal(editionLabel({ bookId: "b", title: "Dune", language: "pt-BR", year: 1965, isbn: "9780441013593", mine: false }), "pt-BR · 1965 · 9780441013593");
-  assert.equal(editionLabel({ bookId: "b", title: "Dune", language: null, year: null, isbn: null, mine: false }), "Edition details unknown");
+  assert.equal(editionLabel({ bookId: "b", title: "Dune", language: "pt-BR", year: 1965, isbn: "9780441013593", coverUrl: null, coverColor: null, pages: null, mine: false }), "pt-BR · 1965 · 9780441013593");
+  assert.equal(editionLabel({ bookId: "b", title: "Dune", language: null, year: null, isbn: null, coverUrl: null, coverColor: null, pages: null, mine: false }), "Edition details unknown");
 });
 
 test("a long summary previews whole words up to a cut, a short one needs no preview", () => {

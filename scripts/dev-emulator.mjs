@@ -51,7 +51,7 @@ import { fileURLToPath } from "node:url";
 import { androidEnv } from "./androidSdk.mjs";
 import { devDataDirEnv } from "./devDataDir.mjs";
 import { DEV_USERNAME } from "./dev-account.mjs";
-import { assertAdoptedBackendMatches, ensureSharedBuilt, resetDevDataIfRequested, seedCommunityGraph, seedDevAccount, seedFixtureUsers } from "./devFixtureSetup.mjs";
+import { assertAdoptedBackendMatches, ensureSharedBuilt, resetDevDataIfRequested, seedCommunityGraph, seedDevAccount, seedEditionWorks, seedFixtureUsers } from "./devFixtureSetup.mjs";
 import { claimThisWorktreeSlot } from "./devClaim.mjs";
 import { assertHoldsDevice, recordDeviceSerial, registryPath, takeDevice } from "./devRegistry.mjs";
 import { isReachableOn, worktreeIdentity } from "./devHost.mjs";
@@ -302,6 +302,7 @@ async function main() {
 
   resetDevDataIfRequested(resetRequested, log);
   seedDevAccount(resetRequested, log);
+  seedEditionWorks(log);
   seedFixtureUsers(log);
   seedCommunityGraph(log);
   await ensureBackendRunning();
