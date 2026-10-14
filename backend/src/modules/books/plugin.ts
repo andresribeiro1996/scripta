@@ -1,7 +1,7 @@
 import fastifyMultipart from "@fastify/multipart";
 import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
-import { env, isbndbConfigured } from "../../config/env.js";
+import { env, isbndbConfigured, typesafeConfigured } from "../../config/env.js";
 import { timeStep, timeSync, timedMethods } from "../../stallLog.js";
 import { createObjectStore } from "../../storage/createObjectStore.js";
 import { createCompositeCatalog } from "./adapters/catalog/compositeCatalog.js";
@@ -10,12 +10,14 @@ import { createThrottle, fetchBytes } from "./adapters/http/http.js";
 import { createIsbndbCatalog } from "./adapters/isbndb/isbndbCatalog.js";
 import { capDailyCalls } from "./adapters/isbndb/isbndbDailyCap.js";
 import { createIsbndbGate } from "./adapters/isbndb/isbndbGate.js";
+import { createJevGenreClassifier } from "./adapters/typesafe/jevGenres.js";
 import { createOpenLibraryCatalog } from "./adapters/openlibrary/openLibraryCatalog.js";
 import { createAppleSource } from "./adapters/sources/apple.js";
 import { createIsbndbSource } from "./adapters/sources/isbndb.js";
 import { createOpenLibraryCoverSource } from "./adapters/sources/openLibrary.js";
 import { openBooksDb } from "./adapters/sqlite/connection.js";
 import { createSqliteBooksRepository } from "./adapters/sqlite/sqliteBooksRepository.js";
+import { GENRE_JUDGMENT_BATCH, judgeGenres } from "./genreJudgments.js";
 import { DETAILS_BATCH_SIZE, startBackfill, startCoverColorBackfill, startDetailsBackfill, startWorksBackfill, startWorksGrouping } from "./backfill.js";
 import { createBooksService, MAX_UPLOAD_BYTES, type BooksService } from "./booksService.js";
 import type { FetchCoverImage } from "./coverResolver.js";
@@ -40,6 +42,7 @@ export function enqueueBookCovers(lookups: BookLookup[]) {
 
 export interface BooksPluginOptions {
   alert?: (subject: string, text: string) => Promise<void>;
+  heldWorkIds?: () => string[];
 }
 
 export async function booksPlugin(app: FastifyInstance, options: BooksPluginOptions = {}) {
@@ -107,6 +110,22 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
     (error) => app.log.error({ err: error }, "work key backfill failed")
   );
   const stopColorBackfill = startCoverColorBackfill((limit) => service.fillCoverColors(limit), app.log);
+  const heldWorkIds = options.heldWorkIds;
+  const classify = typesafeConfigured ? createJevGenreClassifier(env.TYPESAFE_API_KEY) : null;
+  const stopGenreJudgments = classify && heldWorkIds
+    ? startDetailsBackfill(
+        (signal) => judgeGenres({
+          repo,
+          classify,
+          heldWorkIds,
+          now: Date.now,
+          alert: (subject, text) => {
+            options.alert?.(subject, text).catch((error: unknown) => app.log.error({ err: error }, "TypeSafe key alert failed"));
+          }
+        }, GENRE_JUDGMENT_BATCH, signal),
+        (error) => app.log.error({ err: error }, "genre judgments failed")
+      )
+    : () => undefined;
   activeService = service;
   app.addHook("onClose", async () => {
     activeService = null;
@@ -116,6 +135,7 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
     grouping.stop();
     stopWorkKeyBackfill();
     stopColorBackfill();
+    stopGenreJudgments();
     worker.stop();
   });
 
