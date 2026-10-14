@@ -120,6 +120,7 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
           heldWorkIds,
           now: Date.now,
           alert: (subject, text) => {
+            app.log.warn({ subject }, text);
             options.alert?.(subject, text).catch((error: unknown) => app.log.error({ err: error }, "TypeSafe key alert failed"));
           }
         }, GENRE_JUDGMENT_BATCH, signal),

@@ -75,3 +75,16 @@ test("Jev reads the work's title, author, edition languages, publishers and long
     { title: "Os Anões", language: "pt-PT", isbn: null, publisher: "Relógio", year: null, summary: null }
   ] }), { title: "Os Anões", author: "Harold Pinter", editionLanguages: ["pt-PT", "en"], publishers: ["Relógio"], synopsis: "x".repeat(1200) });
 });
+
+test("answers that arrived beside a failed request are stored and applied before the failure is rethrown", async () => {
+  const { db, repo, workIds } = seeded(["B1", "B2", "B3", "B4", "B5", "B6"]);
+  let calls = 0;
+  const flaky: Classify = async () => {
+    calls += 1;
+    if (calls === 1) throw new SourceUnavailableError("typesafe", "HTTP 529", { status: 529 });
+    return { genre: "History", confidence: 0.9, model: "jev-1.13.0" };
+  };
+  await assert.rejects(judgeGenres(deps(repo, workIds, flaky), 50, new AbortController().signal), SourceUnavailableError);
+  assert.equal(repo.genreJudgments(workIds).size, 3);
+  assert.equal((db.prepare("SELECT COUNT(*) AS n FROM books WHERE genres = ?").get(JSON.stringify(["History"])) as { n: number }).n, 3);
+});
