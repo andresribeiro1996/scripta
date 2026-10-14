@@ -10,7 +10,12 @@ const MIN_ASPECT_RATIO = 1.2;
 const MAX_ASPECT_RATIO = 1.9;
 const ISBNDB_PLACEHOLDER = { width: 200, height: 248 };
 const CLASSIFY_MAX_DIMENSION = 400;
-const CORNER_TOLERANCE = 20;
+const CORNER_TOLERANCE = 32;
+const EDGE_STEP = 15;
+const EDGE_GAP = 2;
+const EDGE_SHARE = 0.6;
+const EDGE_SEARCH = 0.3;
+const SHADOW_ROUGHNESS = 12;
 const TRIM_THRESHOLD = 50;
 const LIGHT_CANVAS_MEAN = 170;
 const PHOTO_KEPT = 0.85;
@@ -108,6 +113,58 @@ export interface PublisherImage {
   input: Buffer;
 }
 
+interface Box {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+function refineToBookEdges(luma: Float32Array, width: number, height: number, box: Box): Box {
+  const at = (x: number, y: number) => luma[y * width + x] ?? 0;
+  const columnIsEdge = (x: number, outward: -1 | 1) => {
+    const neighbour = x + outward * EDGE_GAP;
+    if (neighbour < 0 || neighbour >= width) return false;
+    let strong = 0;
+    for (let y = box.top; y <= box.bottom; y++) if (Math.abs(at(x, y) - at(neighbour, y)) >= EDGE_STEP) strong++;
+    return strong >= EDGE_SHARE * (box.bottom - box.top + 1);
+  };
+  const rowIsEdge = (y: number, outward: -1 | 1) => {
+    const neighbour = y + outward * EDGE_GAP;
+    if (neighbour < 0 || neighbour >= height) return false;
+    let strong = 0;
+    for (let x = box.left; x <= box.right; x++) if (Math.abs(at(x, y) - at(x, neighbour)) >= EDGE_STEP) strong++;
+    return strong >= EDGE_SHARE * (box.right - box.left + 1);
+  };
+  const roughness = (left: number, top: number, right: number, bottom: number) => {
+    let total = 0;
+    let count = 0;
+    for (let y = top; y <= bottom; y++) {
+      for (let x = left; x <= right; x++) {
+        total += Math.abs(at(Math.min(x + 1, width - 1), y) - at(x, y)) + Math.abs(at(x, Math.min(y + 1, height - 1)) - at(x, y));
+        count++;
+      }
+    }
+    return count === 0 ? 0 : total / count;
+  };
+  const firstEdge = (from: number, steps: number, direction: 1 | -1, isEdge: (value: number) => boolean) => {
+    for (let step = 0; step <= steps; step++) if (isEdge(from + direction * step)) return from + direction * step;
+    return null;
+  };
+  const reachX = Math.floor((box.right - box.left) * EDGE_SEARCH);
+  const reachY = Math.floor((box.bottom - box.top) * EDGE_SEARCH);
+  const left = firstEdge(box.left, reachX, 1, (x) => columnIsEdge(x, -1));
+  const right = firstEdge(box.right, reachX, -1, (x) => columnIsEdge(x, 1));
+  const top = firstEdge(box.top, reachY, 1, (y) => rowIsEdge(y, -1));
+  const bottom = firstEdge(box.bottom, reachY, -1, (y) => rowIsEdge(y, 1));
+  return {
+    left: left !== null && roughness(box.left, box.top, left - 1, box.bottom) < SHADOW_ROUGHNESS ? left : box.left,
+    right: right !== null && roughness(right + 1, box.top, box.right, box.bottom) < SHADOW_ROUGHNESS ? right : box.right,
+    top: top !== null && roughness(box.left, box.top, box.right, top - 1) < SHADOW_ROUGHNESS ? top : box.top,
+    bottom: bottom !== null && roughness(box.left, bottom + 1, box.right, box.bottom) < SHADOW_ROUGHNESS ? bottom : box.bottom,
+  };
+}
+
 export async function classifyPublisherImage(input: Buffer): Promise<PublisherImage | null> {
   try {
     const decoded = await sharp(input, { limitInputPixels: MAX_INPUT_DIMENSION * MAX_INPUT_DIMENSION })
@@ -145,11 +202,28 @@ export async function classifyPublisherImage(input: Buffer): Promise<PublisherIm
     const keptHeight = trimmed.info.height / height;
     const photoOnCanvas = uniform && (keptWidth < PHOTO_KEPT || keptHeight < PHOTO_KEPT);
     if (photoOnCanvas && cornerMean >= LIGHT_CANVAS_MEAN) {
-      const ratio = trimmed.info.height / trimmed.info.width;
-      if (ratio < MIN_ASPECT_RATIO || ratio > MAX_ASPECT_RATIO || keptWidth * keptHeight < MIN_CROP_AREA) return null;
-      const cropped = await sharp(trimmed.data, { raw: { width: trimmed.info.width, height: trimmed.info.height, channels: trimmed.info.channels } })
-        .png()
-        .toBuffer();
+      const luma = new Float32Array(smallWidth * smallHeight);
+      for (let i = 0; i < luma.length; i++) {
+        const offset = i * smallChannels;
+        luma[i] = 0.299 * (small.data[offset] ?? 0) + 0.587 * (small.data[offset + 1] ?? 0) + 0.114 * (small.data[offset + 2] ?? 0);
+      }
+      const scaleX = smallWidth / width;
+      const scaleY = smallHeight / height;
+      const trimLeft = -(trimmed.info.trimOffsetLeft ?? 0);
+      const trimTop = -(trimmed.info.trimOffsetTop ?? 0);
+      const book = refineToBookEdges(luma, smallWidth, smallHeight, {
+        left: Math.floor(trimLeft * scaleX),
+        top: Math.floor(trimTop * scaleY),
+        right: Math.min(smallWidth - 1, Math.ceil((trimLeft + trimmed.info.width) * scaleX) - 1),
+        bottom: Math.min(smallHeight - 1, Math.ceil((trimTop + trimmed.info.height) * scaleY) - 1),
+      });
+      const left = Math.round(book.left / scaleX);
+      const top = Math.round(book.top / scaleY);
+      const cropWidth = Math.min(width - left, Math.round((book.right + 1) / scaleX) - left);
+      const cropHeight = Math.min(height - top, Math.round((book.bottom + 1) / scaleY) - top);
+      const ratio = cropHeight / cropWidth;
+      if (ratio < MIN_ASPECT_RATIO || ratio > MAX_ASPECT_RATIO || (cropWidth * cropHeight) / (width * height) < MIN_CROP_AREA) return null;
+      const cropped = await sharp(decoded.data, rawOptions).extract({ left, top, width: cropWidth, height: cropHeight }).png().toBuffer();
       return { kind: "cropped", input: cropped };
     }
     if (photoOnCanvas && cornerMean < LIGHT_CANVAS_MEAN) return null;
