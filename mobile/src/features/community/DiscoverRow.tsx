@@ -6,7 +6,7 @@ import { Text } from "../../ui/Text";
 import { readerGlyphLabel } from "@scripta/shared";
 import { dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import type { ContentTone, DiscoverItem, PublishedContent } from "@scripta/shared/community";
-import { TIER_LADDER, contentKindLabel, contentStats, contentStatus, contentTarget } from "./communityHome";
+import { FAN_SIZE, TIER_LADDER, contentKindLabel, contentStats, contentStatus, contentTarget } from "./communityHome";
 import { openProfile } from "./AuthorAvatar";
 import { ReaderGlyph } from "./ReaderGlyph";
 import { CoverImage } from "../library/components/CoverImage";
@@ -149,7 +149,7 @@ export function StatusBadge({ label, tone }: { label: string; tone: ContentTone 
 
 function FanThumb({ covers, ladder }: { covers: RowCover[]; ladder?: string[] }) {
   const { colors } = useTheme();
-  const fan: Array<RowCover | null> = covers.length ? covers.slice(0, 3) : [null];
+  const fan: Array<RowCover | null> = covers.length ? covers.slice(0, FAN_SIZE) : [null];
   const middle = (fan.length - 1) / 2;
   return (
     <View style={styles.thumb} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
@@ -165,7 +165,7 @@ function FanThumb({ covers, ladder }: { covers: RowCover[]; ladder?: string[] })
           key={index}
           cover={cover}
           style={{
-            left: FAN_INSET + index * FAN_STEP + (3 - fan.length) * (FAN_STEP / 2),
+            left: FAN_INSET + index * FAN_STEP + (FAN_SIZE - fan.length) * (FAN_STEP / 2),
             top: (THUMB_HEIGHT - FAN_HEIGHT) / 2,
             width: FAN_WIDTH,
             height: FAN_HEIGHT,

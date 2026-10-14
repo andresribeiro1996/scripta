@@ -1,4 +1,4 @@
-import { TIER_LADDER } from "../community/communityHome";
+import { FAN_SIZE, TIER_LADDER } from "../community/communityHome";
 import { CONTENT_STATUS, type ContentTone } from "@scripta/shared/community";
 import type { Quiz } from "../quizzes/api";
 import type { Tierlist, VotedTierlist } from "../tierlists/api";
@@ -181,15 +181,14 @@ export function tournamentProgress(tournament: Tournament): {
   return { label: `Round ${round} of ${totalRounds}`, totalRounds, completedRounds: round - 1 };
 }
 
-const FAN_SIZE = 3;
-
-export function previewWorkIds(data: Tierlist["data"]): string[] {
-  const ids = new Set<string>();
+export function tierlistCovers(data: Tierlist["data"], byWork: Map<string, Record<string, unknown>>): Array<Record<string, unknown>> {
+  const books = new Set<Record<string, unknown>>();
   for (const workId of [...data.tiers.flatMap((tier) => tier.workIds), ...data.pool]) {
-    ids.add(workId);
-    if (ids.size === FAN_SIZE) break;
+    const book = byWork.get(workId);
+    if (book) books.add(book);
+    if (books.size === FAN_SIZE) break;
   }
-  return [...ids];
+  return [...books];
 }
 
 export function votedTierlistDetail(tierlist: VotedTierlist): string {
