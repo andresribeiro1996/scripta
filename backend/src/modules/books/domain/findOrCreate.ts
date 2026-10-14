@@ -29,8 +29,8 @@ export function findOrCreateBook(repo: BooksRepository, lookup: BookLookup, crea
   if (!identity) return null;
   const existing = findExisting(repo, identity);
   if (!existing) return repo.createBook({ title: identity.title, author: identity.author, isbn: identity.isbn }, keysOf(repo, identity), createdAt);
-  if (!existing.title && identity.title) {
-    if (identity.titleKey) repo.addKey(identity.titleKey, existing.id);
+  if ((!existing.title && identity.title) || (!existing.author && identity.author)) {
+    if (identity.author && identity.titleKey) repo.addKey(identity.titleKey, existing.id);
     repo.fillIdentity(existing.id, identity.title, identity.author);
     return repo.getBook(existing.id) ?? existing;
   }
