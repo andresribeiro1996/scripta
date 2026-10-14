@@ -9,6 +9,7 @@ import {
   editionLabel,
   readSnapshot,
   seriesGroupByBookKey,
+  type BookScreenModel,
   type BookScreenReaderRow,
   type BookScreenTabKey,
   type ReadSnapshot,
@@ -34,13 +35,16 @@ import { BackLink } from "../work/BackLink";
 import { CommunityIcon, InfoIcon, QuoteIcon } from "../NavIcons";
 import { MoreIcon, ShareIcon } from "../Toolbar";
 import { StatsTiles } from "./BookStats";
+import { EditionStrip } from "./EditionStrip";
 import { RatingStars } from "./RatingStars";
 
 type Props = {
   page: WorkPage | null;
   book: Record<string, unknown> | null;
   signedIn: boolean;
-  onAdd: () => void;
+  editionId: string | null;
+  onSelectEdition: (bookId: string) => void;
+  onAdd: (addBook: NonNullable<BookScreenModel["addBook"]>) => void;
   onShare: (() => void) | null;
   onBack: (() => void) | null;
   backTo: string;
@@ -62,10 +66,10 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-export function BookScreen({ page, book, signedIn, onAdd, onShare, onBack, backTo }: Props) {
+export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, onAdd, onShare, onBack, backTo }: Props) {
   const { data: isAdmin = false } = useQuery({ queryKey: ["books-admin"], queryFn: fetchIsAdmin, staleTime: Infinity, enabled: signedIn });
   const { data: library } = useLibrary({ enabled: Boolean(book) });
-  const model = bookScreenModel(page, book, { isAdmin });
+  const model = bookScreenModel(page, book, { isAdmin }, editionId);
   const statsQuery = useWorkStats(page?.work.id);
   const statsTiles = bookStatsModel(statsQuery.data ?? null, page?.work.rating ?? null).tiles;
   const [tab, setTab] = useState<BookScreenTabKey>(model.tabs[0]!.key);
@@ -80,7 +84,7 @@ export function BookScreen({ page, book, signedIn, onAdd, onShare, onBack, backT
   const queryClient = useQueryClient();
   const actions = useBookActions();
   const confirm = useConfirm();
-  const wash = coverWash(page?.work.coverColor ?? null, themes[useResolvedTheme()].scheme);
+  const wash = coverWash(model.cover.color, themes[useResolvedTheme()].scheme);
 
   const work = page?.work;
   const isbn = work?.editions.find((edition) => edition.isbn)?.isbn;
@@ -182,9 +186,13 @@ export function BookScreen({ page, book, signedIn, onAdd, onShare, onBack, backT
 
         <div className="grid gap-6 sm:grid-cols-[220px_1fr]">
           <div className="self-start text-center sm:sticky sm:top-6 sm:text-left">
-            <div className="relative mx-auto aspect-[2/3] w-32 overflow-hidden rounded-xl bg-(--color-border) sm:mx-0 sm:w-full">
-              <CoverImage key={coverVersion} book={heroBook} size="full" />
-            </div>
+            {model.edition && work ? (
+              <EditionStrip key={coverVersion} editions={work.editions} author={work.author} edition={model.edition} mineBook={book} onSelect={onSelectEdition} />
+            ) : (
+              <div className="relative mx-auto aspect-[2/3] w-32 overflow-hidden rounded-xl bg-(--color-border) sm:mx-0 sm:w-full">
+                <CoverImage key={coverVersion} book={heroBook} size="full" />
+              </div>
+            )}
             <h1 className="mt-4 text-2xl font-bold">{model.title}</h1>
             <p className="mt-1 text-sm text-(--color-text-dim)">{model.author}</p>
             {model.genres.length > 0 ? (
@@ -224,13 +232,13 @@ export function BookScreen({ page, book, signedIn, onAdd, onShare, onBack, backT
                   />
                 ) : null}
               </div>
-            ) : model.primary === "add" ? (
+            ) : model.primary === "add" && model.addBook ? (
               <button
                 type="button"
-                onClick={onAdd}
+                onClick={() => onAdd(model.addBook!)}
                 className="min-h-11 w-full rounded-lg bg-(--color-accent) px-4 py-2 text-sm font-semibold text-(--color-on-accent) hover:opacity-90"
               >
-                Add to library
+                {model.edition ? "Add this edition" : "Add to library"}
               </button>
             ) : null}
 

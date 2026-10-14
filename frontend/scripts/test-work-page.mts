@@ -11,7 +11,7 @@ import { ToastProvider } from "../src/components/Toaster";
 import { BackLink } from "../src/components/work/BackLink";
 import { createWebLibrarySaver, LibrarySaverContext } from "../src/hooks/useLibrarySaver";
 
-const edition = (n: number) => ({ bookId: `e${n}`, title: `Dune ${n}`, language: "en", year: 1965 + n, isbn: n === 1 ? "9780441013593" : null, mine: n === 1 });
+const edition = (n: number) => ({ bookId: `e${n}`, title: `Dune ${n}`, language: "en", year: 1965 + n, isbn: n === 1 ? "9780441013593" : null, coverUrl: null, coverColor: null, pages: 400 + n, mine: n === 1 });
 const page: WorkPage = {
   work: { id: "w", title: "Dune", author: "Frank Herbert", summary: null, coverUrl: null, coverColor: null, editions: [1, 2, 3, 4, 5].map(edition), genres: ["Science Fiction", "Classics"], rating: { value: 4.27, count: 2310 }, year: 1965, pages: 412 },
   mine: null,
@@ -23,7 +23,7 @@ const owned = { Title: "Dune", Attribution: "Frank Herbert", ISBN: "978044101359
 Object.defineProperty(globalThis, "matchMedia", { value: () => ({ matches: false }), configurable: true });
 
 type Props = Parameters<typeof BookScreen>[0];
-const base: Props = { page, book: null, signedIn: true, backTo: "/", onBack: null, onAdd: () => undefined, onShare: () => undefined };
+const base: Props = { page, book: null, signedIn: true, backTo: "/", onBack: null, editionId: null, onSelectEdition: () => undefined, onAdd: () => undefined, onShare: () => undefined };
 function render(props: Partial<Props>) {
   const client = new QueryClient();
   return renderToString(
@@ -40,7 +40,7 @@ function render(props: Partial<Props>) {
 }
 
 test("not owned: add button, About and Community tabs, no highlights tab, no menu", () => {
-  const html = render({});
+  const html = render({ page: { ...page, work: { ...page.work, editions: [edition(1)] } } });
   assert.ok(html.includes("Add to library"));
   assert.ok(html.includes("About"));
   assert.ok(html.includes("Community"));
@@ -65,10 +65,31 @@ test("a long summary shows its preview and Show more; editions list three with S
   const html = render({ page: { ...page, work: { ...page.work, summary: long } } });
   assert.ok(html.includes("Show more"));
   assert.ok(!html.includes("The end."));
-  assert.ok(html.includes("Dune 3"));
-  assert.ok(!html.includes("Dune 4"));
+  assert.ok(html.includes('font-semibold">Dune 3'));
+  assert.ok(!html.includes('font-semibold">Dune 4'));
   assert.ok(/Show all (<!-- -->)?5/.test(html));
   assert.ok(html.includes("Yours"));
+});
+
+test("several editions show the swipeable strip, its counter and Add this edition", () => {
+  const html = render({});
+  assert.ok(html.includes('aria-roledescription="carousel"'));
+  assert.ok(html.includes("Your edition · 1 of 5"));
+  assert.ok(html.includes("Add this edition"));
+  assert.ok(!html.includes("Add to library"));
+});
+
+test("a selected edition moves the counter and offers the way back to your edition", () => {
+  const html = render({ editionId: "e3" });
+  assert.ok(html.includes("Edition 3 of 5"));
+  assert.ok(html.includes("Back to your edition"));
+  assert.ok(html.includes("1968 · 403 pages"));
+});
+
+test("a single edition has no strip and keeps Add to library", () => {
+  const html = render({ page: { ...page, work: { ...page.work, editions: [edition(1)] } } });
+  assert.ok(!html.includes("carousel"));
+  assert.ok(html.includes("Add to library"));
 });
 
 test("a short summary renders whole, with no Show more", () => {

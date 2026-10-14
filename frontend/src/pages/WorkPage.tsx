@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { bookKey } from "@scripta/shared";
+import { bookKey, type BookScreenModel } from "@scripta/shared";
 import { useAuth } from "../auth/AuthContext";
 import { AddBookSheet } from "../components/AddBookSheet";
 import { EmptyState } from "../components/EmptyState";
@@ -19,7 +19,8 @@ export function WorkPage() {
   const queryClient = useQueryClient();
   const { page, isLoading, isNotFound, refetch } = useWork(id);
   const libraryQuery = useLibrary({ enabled: Boolean(session) });
-  const [adding, setAdding] = useState(false);
+  const [adding, setAdding] = useState<BookScreenModel["addBook"]>(null);
+  const [editionId, setEditionId] = useState<string | null>(null);
 
   useEffect(() => {
     if (page && id && page.work.id !== id) navigate(`/work/${page.work.id}`, { replace: true });
@@ -71,7 +72,6 @@ export function WorkPage() {
       if (reason.name !== "AbortError") toast({ kind: "error", message: "Couldn't share the link." });
     }
   };
-  const firstEdition = page.work.editions.find((edition) => edition.isbn) ?? page.work.editions[0];
 
   return (
     <>
@@ -79,13 +79,15 @@ export function WorkPage() {
         page={page}
         book={book}
         signedIn={Boolean(session)}
-        onAdd={() => setAdding(true)}
+        editionId={editionId}
+        onSelectEdition={setEditionId}
+        onAdd={setAdding}
         onShare={() => void share()}
         onBack={onBack}
         backTo={backTo}
       />
-      {adding ? <AddBookSheet book={{ title: page.work.title, author: page.work.author, isbn: firstEdition?.isbn ?? null, coverUrl: page.work.coverUrl }} onClose={() => {
-        setAdding(false);
+      {adding ? <AddBookSheet book={adding} onClose={() => {
+        setAdding(null);
         void refetch();
         void queryClient.invalidateQueries({ queryKey: ["library"] });
       }} /> : null}
