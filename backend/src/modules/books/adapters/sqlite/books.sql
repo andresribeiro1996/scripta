@@ -45,6 +45,14 @@ CREATE TABLE IF NOT EXISTS books (
   created_at          TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS genre_judgments (
+  work_id    TEXT PRIMARY KEY,
+  model      TEXT NOT NULL,
+  genre      TEXT,
+  confidence REAL NOT NULL,
+  asked_at   TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS book_keys (
   key      TEXT PRIMARY KEY,
   book_id  TEXT NOT NULL REFERENCES books(id)

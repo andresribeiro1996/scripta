@@ -1354,3 +1354,51 @@ test("the last word matches as a prefix once it has three letters", () => {
   assert.deepEqual(repo.searchBooks(["dune", "herb"], 12).map((book) => book.title), ["Dune"]);
   assert.deepEqual(repo.searchBooks(["dun", "herbert"], 12), []);
 });
+
+const genreRow = (db: DatabaseSync, id: string) => ({ ...db.prepare("SELECT genres, genres_source, genres_confidence FROM books WHERE id = ?").get(id) });
+const titled = (repo: ReturnType<typeof freshRepo>["repo"], title: string) => repo.createBook({ title, author: "A", isbn: null }, [`ta:${title.toLowerCase()}|a|`], NOW);
+
+test("works needing a genre judgment have no genres, a finished details lookup and no judgment", () => {
+  const { db, repo } = freshRepo();
+  const [ready, tagged, unchecked, judged] = ["Ready", "Tagged", "Unchecked", "Judged"].map((title) => titled(repo, title));
+  for (const book of [ready, tagged, judged]) repo.markDetailsMissing(book!.id, NOW);
+  db.prepare("UPDATE books SET genres = ? WHERE id = ?").run(JSON.stringify(["Poetry"]), tagged!.id);
+  repo.saveGenreJudgment({ workId: judged!.work_id!, model: "jev-1.13.0", genre: null, confidence: 0.9, askedAt: NOW });
+  const ids = [ready, tagged, unchecked, judged].map((book) => book!.work_id!);
+  assert.deepEqual(repo.worksNeedingGenreJudgment(ids, 10), [ready!.work_id]);
+  assert.deepEqual(repo.worksNeedingGenreJudgment(ids, 0), []);
+  assert.deepEqual(repo.genreJudgments(ids), new Map([[judged!.work_id!, { genre: null, confidence: 0.9 }]]));
+});
+
+test("applying judgments writes Jev genres at or above the save line, idempotently, and undoes them when the line rises", () => {
+  const { db, repo } = freshRepo();
+  const [sure, unsure, none, manual] = ["Sure", "Unsure", "None", "Manual"].map((title) => titled(repo, title));
+  const judge = (book: { work_id: string | null } | undefined, genre: string | null, confidence: number) => repo.saveGenreJudgment({ workId: book!.work_id!, model: "jev-1.13.0", genre, confidence, askedAt: NOW });
+  judge(sure, "History", 0.9);
+  judge(unsure, "Poetry", 0.3);
+  judge(none, null, 0.95);
+  judge(manual, "Romance", 0.9);
+  db.prepare("UPDATE books SET genres = ?, genres_source = 'manual' WHERE id = ?").run(JSON.stringify(["Classics"]), manual!.id);
+  repo.applyGenreJudgments(0.5);
+  repo.applyGenreJudgments(0.5);
+  assert.deepEqual(genreRow(db, sure!.id), { genres: JSON.stringify(["History"]), genres_source: "jev", genres_confidence: 0.9 });
+  assert.deepEqual(genreRow(db, unsure!.id), { genres: "[]", genres_source: null, genres_confidence: null });
+  assert.deepEqual(genreRow(db, none!.id), { genres: "[]", genres_source: null, genres_confidence: null });
+  assert.deepEqual(genreRow(db, manual!.id), { genres: JSON.stringify(["Classics"]), genres_source: "manual", genres_confidence: null });
+  repo.applyGenreJudgments(0.95);
+  assert.deepEqual(genreRow(db, sure!.id), { genres: "[]", genres_source: null, genres_confidence: null });
+});
+
+test("Open Library genres replace a Jev guess, an empty answer keeps it, and manual genres stay", () => {
+  const { db, repo } = freshRepo();
+  const jev = titled(repo, "Guessed");
+  const manual = titled(repo, "Labelled");
+  db.prepare("UPDATE books SET genres = ?, genres_source = 'jev', genres_confidence = 0.6 WHERE id = ?").run(JSON.stringify(["History"]), jev.id);
+  db.prepare("UPDATE books SET genres = ?, genres_source = 'manual' WHERE id = ?").run(JSON.stringify(["Poetry"]), manual.id);
+  repo.saveDetails(jev.id, { ...richDetails, genres: [] }, ["openlibrary"], "openlibrary", NOW);
+  assert.deepEqual(genreRow(db, jev.id), { genres: JSON.stringify(["History"]), genres_source: "jev", genres_confidence: 0.6 });
+  repo.saveDetails(jev.id, richDetails, ["openlibrary"], "openlibrary", NOW);
+  assert.deepEqual(genreRow(db, jev.id), { genres: JSON.stringify(["Fantasy"]), genres_source: null, genres_confidence: null });
+  repo.saveDetails(manual.id, richDetails, ["openlibrary"], "openlibrary", NOW);
+  assert.deepEqual(genreRow(db, manual.id), { genres: JSON.stringify(["Poetry"]), genres_source: "manual", genres_confidence: null });
+});
