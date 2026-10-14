@@ -31,9 +31,9 @@ function setup() {
     db.prepare("INSERT INTO books (id, title, author, isbn, cover_status, created_at) VALUES (?, ?, '', ?, ?, ?)").run(id, `Book ${n}`, `97897236${String(n).padStart(5, "0")}`, status, "2026-10-01T00:00:00.000Z");
     return id;
   };
-  const image = (bookId: string, source: string, origin: string | null, createdAt: string, sourceUrl = `https://img.test/${++n}.jpg`) => {
+  const image = (bookId: string, source: string, origin: string | null, createdAt: string, sourceUrl = `https://img.test/${++n}.jpg`, width = 300) => {
     const id = `10000000-0000-4000-8000-${String(++n).padStart(12, "0")}`;
-    db.prepare("INSERT INTO cover_images (id, book_id, source, source_url, origin, width, height, byte_size, color, created_at) VALUES (?, ?, ?, ?, ?, 500, 750, 1, '', ?)").run(id, bookId, source, sourceUrl, origin, createdAt);
+    db.prepare("INSERT INTO cover_images (id, book_id, source, source_url, origin, width, height, byte_size, color, created_at) VALUES (?, ?, ?, ?, ?, ?, 750, 1, '', ?)").run(id, bookId, source, sourceUrl, origin, width, createdAt);
     return id;
   };
   const point = (bookId: string, imageId: string | null, status: string) => db.prepare("UPDATE books SET cover_image_id = ?, cover_status = ? WHERE id = ?").run(imageId, status, bookId);
@@ -49,7 +49,7 @@ test("a publisher cover over a low-res one is reset to the low-res cover and its
   const bad = h.image(id, "publisher", ORIGIN, "2026-10-14T01:00:00.000Z");
   h.point(id, bad, "manual");
   const report = await resetPublisherCovers(h.deps, { origin: ORIGIN, since: SINCE, apply: true });
-  assert.deepEqual(report, { matched: 1, restoredLowRes: 1, markedMissing: 0, skipped: 0 });
+  assert.deepEqual(report, { matched: 1, restored: 1, markedMissing: 0, skipped: 0 });
   assert.deepEqual(h.row(id), { cover_image_id: lowRes, cover_status: "low_res", cover_checked_at: NOW.toISOString() });
   assert.equal(h.imageExists(bad), false);
   assert.deepEqual(h.deleted.sort(), [`covers/${bad}-thumb.webp`, `covers/${bad}.webp`]);
@@ -61,7 +61,7 @@ test("a publisher cover on a book that had none is reset to missing", async () =
   const bad = h.image(id, "publisher", ORIGIN, "2026-10-14T01:00:00.000Z");
   h.point(id, bad, "manual");
   const report = await resetPublisherCovers(h.deps, { origin: ORIGIN, since: SINCE, apply: true });
-  assert.deepEqual(report, { matched: 1, restoredLowRes: 0, markedMissing: 1, skipped: 0 });
+  assert.deepEqual(report, { matched: 1, restored: 0, markedMissing: 1, skipped: 0 });
   assert.deepEqual(h.row(id), { cover_image_id: null, cover_status: "missing", cover_checked_at: NOW.toISOString() });
 });
 
@@ -87,7 +87,7 @@ test("covers from another publisher, an earlier run, or another source are left 
   h.point(upload, h.image(upload, "upload", ORIGIN, "2026-10-14T01:00:00.000Z"), "manual");
   const before = [other, earlier, upload].map(h.row);
   const report = await resetPublisherCovers(h.deps, { origin: ORIGIN, since: SINCE, apply: true });
-  assert.deepEqual(report, { matched: 0, restoredLowRes: 0, markedMissing: 0, skipped: 0 });
+  assert.deepEqual(report, { matched: 0, restored: 0, markedMissing: 0, skipped: 0 });
   assert.deepEqual([other, earlier, upload].map(h.row), before);
   assert.deepEqual(h.deleted, []);
 });
@@ -98,7 +98,7 @@ test("a dry run counts the books and writes nothing", async () => {
   const bad = h.image(id, "publisher", ORIGIN, "2026-10-14T01:00:00.000Z");
   h.point(id, bad, "manual");
   const report = await resetPublisherCovers(h.deps, { origin: ORIGIN, since: SINCE, apply: false });
-  assert.deepEqual(report, { matched: 1, restoredLowRes: 0, markedMissing: 1, skipped: 0 });
+  assert.deepEqual(report, { matched: 1, restored: 0, markedMissing: 1, skipped: 0 });
   assert.equal(h.row(id).cover_image_id, bad);
   assert.equal(h.imageExists(bad), true);
   assert.deepEqual(h.deleted, []);
@@ -118,4 +118,51 @@ test("a book whose cover changed after the reset started is skipped and keeps it
   assert.equal(report.skipped, 1);
   assert.equal(h.row(second).cover_image_id, upload);
   assert.equal(h.imageExists(secondBad), true);
+});
+
+test("a previous image wide enough to be good is restored as good", async () => {
+  const h = setup();
+  const id = h.book("manual");
+  const wide = h.image(id, "apple", null, "2026-10-05T00:00:00.000Z", undefined, 800);
+  const bad = h.image(id, "publisher", ORIGIN, "2026-10-14T01:00:00.000Z");
+  h.point(id, bad, "manual");
+  const report = await resetPublisherCovers(h.deps, { origin: ORIGIN, since: SINCE, apply: true });
+  assert.deepEqual(report, { matched: 1, restored: 1, markedMissing: 0, skipped: 0 });
+  assert.deepEqual(h.row(id), { cover_image_id: wide, cover_status: "good", cover_checked_at: NOW.toISOString() });
+});
+
+test("the cover restored is the newest one stored before the publisher image, even after the run started", async () => {
+  const h = setup();
+  const id = h.book("low_res");
+  h.image(id, "apple", null, "2026-10-05T00:00:00.000Z");
+  const between = h.image(id, "apple", null, "2026-10-13T21:00:00.000Z");
+  const bad = h.image(id, "publisher", ORIGIN, "2026-10-14T01:00:00.000Z");
+  h.point(id, bad, "manual");
+  await resetPublisherCovers(h.deps, { origin: ORIGIN, since: SINCE, apply: true });
+  assert.equal(h.row(id).cover_image_id, between);
+});
+
+test("a run that fails on a blob delete can be rerun and finishes every book", async () => {
+  const h = setup();
+  const first = h.book("missing");
+  const firstBad = h.image(first, "publisher", ORIGIN, "2026-10-14T01:00:00.000Z");
+  h.point(first, firstBad, "manual");
+  const second = h.book("missing");
+  const secondBad = h.image(second, "publisher", ORIGIN, "2026-10-14T01:00:01.000Z");
+  h.point(second, secondBad, "manual");
+  const third = h.book("missing");
+  const thirdBad = h.image(third, "publisher", ORIGIN, "2026-10-14T01:00:02.000Z");
+  h.point(third, thirdBad, "manual");
+  const failing = { ...h.deps, deleteBlob: async (key: string) => { if (key === `covers/${secondBad}.webp`) throw new Error("store down"); await h.deps.deleteBlob(key); } };
+  await assert.rejects(resetPublisherCovers(failing, { origin: ORIGIN, since: SINCE, apply: true }), /store down/);
+  assert.equal(h.row(second).cover_image_id, secondBad);
+  assert.equal(h.imageExists(secondBad), true);
+  const report = await resetPublisherCovers(h.deps, { origin: ORIGIN, since: SINCE, apply: true });
+  assert.deepEqual(report, { matched: 2, restored: 0, markedMissing: 2, skipped: 0 });
+  for (const bad of [firstBad, secondBad, thirdBad]) {
+    assert.equal(h.imageExists(bad), false);
+    assert.ok(h.deleted.includes(`covers/${bad}.webp`));
+    assert.ok(h.deleted.includes(`covers/${bad}-thumb.webp`));
+  }
+  for (const id of [first, second, third]) assert.equal(h.row(id).cover_status, "missing");
 });
