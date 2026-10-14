@@ -6,7 +6,7 @@ import { normalizeWords } from "@scripta/shared";
 import type { TournamentRecord } from "@scripta/shared";
 import type { DatabaseSync } from "node:sqlite";
 import type { ArenaRepository } from "../../domain/ports.js";
-import type { DuelRow, SeedPreview, TournamentDiscoverRow, TournamentGameRow, TournamentRow, TournamentSlotRow, VoteRow } from "../../domain/types.js";
+import type { CompletedVotedRow, DuelRow, SeedPreview, TournamentDiscoverRow, TournamentGameRow, TournamentRow, TournamentSlotRow, VoteRow } from "../../domain/types.js";
 
 export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
   const insertTournamentStmt = db.prepare(`
@@ -124,6 +124,19 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
     WHERE v.voter_user_id = ? AND t.owner_user_id != ?
     GROUP BY t.id
     ORDER BY last_vote_at DESC
+  `);
+  const completedVotedSinceStmt = db.prepare(`
+    SELECT t.*, f.winner_side, f.settled_at,
+      f.book_a_title, f.book_a_author, f.book_a_cover, f.book_a_work_id,
+      f.book_b_title, f.book_b_author, f.book_b_cover, f.book_b_work_id
+    FROM tournaments t
+    JOIN duels f ON f.tournament_id = t.id
+      AND f.round_number = (SELECT MAX(d2.round_number) FROM duels d2 WHERE d2.tournament_id = t.id)
+    WHERE t.id IN (
+        SELECT d.tournament_id FROM votes v JOIN duels d ON d.id = v.duel_id WHERE v.voter_user_id = ?
+      )
+      AND t.owner_user_id != ? AND t.status = 'completed'
+      AND f.status = 'settled' AND f.winner_side IS NOT NULL AND f.settled_at >= ?
   `);
   const votedAmongStmt = db.prepare(`
     SELECT t.id FROM tournaments t
@@ -342,6 +355,9 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
     },
     listVotedByUser(voterUserId) {
       return listVotedByUserStmt.all(voterUserId, voterUserId) as unknown as TournamentRow[];
+    },
+    listCompletedVotedSince(voterUserId, since) {
+      return completedVotedSinceStmt.all(voterUserId, voterUserId, since) as unknown as CompletedVotedRow[];
     },
     votedAmong(voterUserId, ids) {
       return (votedAmongStmt.all(JSON.stringify(ids), voterUserId, voterUserId) as unknown as Array<{ id: string }>).map((row) => row.id);

@@ -185,6 +185,14 @@ function createInMemoryArenaRepository(): ArenaRepository {
         .sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0))
         .map(({ tournament }) => tournament);
     },
+    listCompletedVotedSince(voterUserId, since) {
+      const voted = this.listVotedByUser(voterUserId).filter((t) => t.status === "completed");
+      return this.getFinalDuels(voted.map((t) => t.id)).flatMap((final) => {
+        const tournament = voted.find((t) => t.id === final.tournament_id);
+        if (!tournament || final.status !== "settled" || !final.winner_side || !final.settled_at || final.settled_at < since) return [];
+        return [{ ...tournament, ...final, id: tournament.id, status: tournament.status, winner_side: final.winner_side, settled_at: final.settled_at }];
+      });
+    },
     votedAmong(voterUserId, ids) {
       return ids.filter((id) => {
         const tournament = tournaments.get(id);

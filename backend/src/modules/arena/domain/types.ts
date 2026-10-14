@@ -63,6 +63,16 @@ export interface DuelRow {
   settled_at: string | null;
 }
 
+export type FinalWinnerFields = Pick<
+  DuelRow,
+  "book_a_title" | "book_a_author" | "book_a_cover" | "book_a_work_id" | "book_b_title" | "book_b_author" | "book_b_cover" | "book_b_work_id"
+>;
+
+export interface CompletedVotedRow extends TournamentRow, FinalWinnerFields {
+  winner_side: "a" | "b";
+  settled_at: string;
+}
+
 /** voter_token is a random UUID the frontend generates once per browser
  *  (see frontend/src/lib/arenaVoter.ts) — this is what makes "anyone can
  *  vote, no account needed" possible at all. voter_user_id is set when

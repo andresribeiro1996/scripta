@@ -117,6 +117,32 @@ test("listVotedByUser returns others' tournaments with a stamped vote, latest vo
   assert.deepEqual(repo.listVotedByUser("nobody"), []);
 });
 
+test("listCompletedVotedSince keeps only recent settled finals the account voted in, excluding its own", () => {
+  const db = freshDb();
+  seedTournament(db, "old", "u1", "Old");
+  seedTournament(db, "recent", "u1", "Recent");
+  seedTournament(db, "own", "voter-1", "Own");
+  seedTournament(db, "unvoted", "u1", "Unvoted");
+  seedTournament(db, "tied", "u1", "Tied");
+  seedTournament(db, "running", "u1", "Running");
+  db.prepare(`UPDATE duels SET settled_at = '2026-01-02T00:00:00.000Z' WHERE id = 'duel-old'`).run();
+  db.prepare(`UPDATE duels SET settled_at = '2026-09-20T00:00:00.000Z', winner_side = 'b' WHERE id = 'duel-recent'`).run();
+  db.prepare(`UPDATE duels SET settled_at = '2026-09-20T00:00:00.000Z' WHERE id IN ('duel-own', 'duel-unvoted')`).run();
+  db.prepare(`UPDATE duels SET settled_at = NULL, winner_side = NULL, status = 'tied_pending_tiebreak' WHERE id = 'duel-tied'`).run();
+  db.prepare(`UPDATE tournaments SET status = 'active' WHERE id = 'running'`).run();
+  const repo = createSqliteArenaRepository(db);
+  for (const id of ["old", "recent", "own", "tied", "running"]) repo.insertVote(vote(`v-${id}`, `duel-${id}`, "tok-1", "voter-1", "2026-09-21T00:00:00.000Z"));
+  repo.insertVote(vote("v-anon", "duel-unvoted", "tok-2", null, "2026-09-21T00:00:00.000Z"));
+
+  const rows = repo.listCompletedVotedSince("voter-1", "2026-09-01T00:00:00.000Z");
+  assert.deepEqual(rows.map((r) => r.id), ["recent"]);
+  assert.equal(rows[0]?.settled_at, "2026-09-20T00:00:00.000Z");
+  assert.equal(rows[0]?.winner_side, "b");
+  assert.equal(rows[0]?.book_b_work_id, "w-b");
+  assert.deepEqual(repo.listCompletedVotedSince("voter-1", "2026-01-01T00:00:00.000Z").map((r) => r.id).sort(), ["old", "recent"]);
+  assert.deepEqual(repo.listCompletedVotedSince("nobody", "2026-01-01T00:00:00.000Z"), []);
+});
+
 test("settling a duel records the winning side and counting reads votes per side", () => {
   const db = freshDb();
   seedTournament(db, "t1", "u1", "Side winner");

@@ -30,7 +30,7 @@ import {
 } from "./domain/errors.js";
 import { canonicalWorkIds } from "../library/index.js";
 import type { ArenaRepository } from "./domain/ports.js";
-import type { DuelRow, SeedBookInput, SeedPreview, TournamentGameRow, TournamentRow, TournamentSlotRow } from "./domain/types.js";
+import type { DuelRow, FinalWinnerFields, SeedBookInput, SeedPreview, TournamentGameRow, TournamentRow, TournamentSlotRow } from "./domain/types.js";
 
 export interface TournamentDiscoverRef {
   id: string;
@@ -133,7 +133,7 @@ function summariesWithPreviews(repo: ArenaRepository, rows: TournamentRow[]): To
   return rows.map((row) => toTournamentSummary(row, previews.get(row.id) ?? EMPTY_PREVIEW, winners.get(row.id) ?? null));
 }
 
-function winnerBookFromDuel(d: DuelRow): SeedBook {
+function winnerBookFromDuel(d: FinalWinnerFields & { winner_side: "a" | "b" | null }): SeedBook {
   return d.winner_side === "a"
     ? { title: d.book_a_title, author: d.book_a_author, cover: d.book_a_cover, workId: d.book_a_work_id }
     : { title: d.book_b_title, author: d.book_b_author, cover: d.book_b_cover, workId: d.book_b_work_id };
@@ -284,13 +284,9 @@ export function createArenaService(
     },
 
     completedForParticipant(voterUserId, since) {
-      const rows = repo.listVotedByUser(voterUserId).filter((row) => row.status === "completed");
-      const finals = new Map(repo.getFinalDuels(rows.map((row) => row.id)).map((duel) => [duel.tournament_id, duel]));
-      return rows.flatMap((row) => {
-        const final = finals.get(row.id);
-        if (!final || final.status !== "settled" || !final.winner_side || !final.settled_at || final.settled_at < since) return [];
-        const winner = winnerBookFromDuel(final);
-        return [{ id: row.id, ownerUserId: row.owner_user_id, createdAt: row.created_at, name: row.name, bracketSize: row.bracket_size, status: "completed" as const, covers: winner.cover ? [winner.cover] : [], completedAt: final.settled_at, winner }];
+      return repo.listCompletedVotedSince(voterUserId, since).map((row) => {
+        const winner = winnerBookFromDuel(row);
+        return { id: row.id, ownerUserId: row.owner_user_id, createdAt: row.created_at, name: row.name, bracketSize: row.bracket_size, status: "completed" as const, covers: winner.cover ? [winner.cover] : [], completedAt: row.settled_at, winner };
       });
     },
 
