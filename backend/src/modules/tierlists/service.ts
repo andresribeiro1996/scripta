@@ -4,7 +4,7 @@
 
 import { randomBytes, randomUUID } from "node:crypto";
 import { DEFAULT_TIER_PRESET, type ResolvedTierlist, type VotedTierlist } from "@scripta/shared";
-import type { GameParticipation } from "@scripta/shared/community";
+import type { GameParticipation, RankingTierPreview } from "@scripta/shared/community";
 import type { TierlistsRepository } from "./domain/ports.js";
 import type { BallotRow, HistogramCell, Placement, Tierlist, TierlistGameRow, TierlistRow, TierPlacement, VoteAccess } from "./domain/types.js";
 import { canonicalBoard } from "./wire.js";
@@ -210,7 +210,7 @@ function toPublishedRef(row: TierlistRow, ballotCount: number): PublishedTierlis
 
 export type EmitPublished = (tierlistId: string, ownerUserId: string) => void;
 
-export type EmitVotedOn = (voterUserId: string, tierlistId: string, tierlistName: string) => void;
+export type EmitVotedOn = (voterUserId: string, tierlistId: string, tierlistName: string, ranking: RankingTierPreview[]) => void;
 
 export function createTierlistsService(repo: TierlistsRepository, emitPublished?: EmitPublished, emitVotedOn?: EmitVotedOn): TierlistsService {
   return {
@@ -341,7 +341,14 @@ export function createTierlistsService(repo: TierlistsRepository, emitPublished?
 
       repo.saveBallot(ballot, placements);
       if (!existing && voter.kind === "user" && emitVotedOn) {
-        emitVotedOn(voter.userId, row.id, row.name);
+        const snapshot = parsePublicBooks(row.public_books);
+        const books = new Map((Array.isArray(snapshot) ? snapshot : []).flatMap((entry) => {
+          if (!entry || typeof entry !== "object") return [];
+          const book = entry as Record<string, unknown>;
+          return typeof book.workId === "string" && typeof book.title === "string" ? [[book.workId, { title: book.title, coverUrl: typeof book.coverUrl === "string" ? book.coverUrl : null }] as const] : [];
+        }));
+        const ranking = tiers.slice(0, 3).map((tier) => ({ label: tier.label, color: tier.color, books: placements.filter((placement) => placement.tierId === tier.id).slice(0, 2).flatMap((placement) => { const book = books.get(placement.workId); return book ? [book] : []; }) }));
+        emitVotedOn(voter.userId, row.id, row.name, ranking);
       }
       if (voter.kind === "user" && voter.userId !== row.origin_user_id && row.promoted_at === null && repo.eligibleVoteCount(row.id, row.origin_user_id) >= 100) {
         repo.promote(row.id, now);

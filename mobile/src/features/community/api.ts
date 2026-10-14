@@ -7,6 +7,14 @@ export type { CommunityProfileView } from "@scripta/shared/community";
 export type CommunityPage<T> = Page<T>;
 
 export const {
+  fetchActivityEngagement,
+  likeActivity,
+  fetchActivityComments,
+  addActivityComment,
+  deleteActivityComment,
+  fetchSavedState,
+  saveContent,
+  fetchSavedContent,
   fetchDashboard,
   markDashboardSeen,
   fetchDiscover,

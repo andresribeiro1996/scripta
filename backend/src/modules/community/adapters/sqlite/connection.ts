@@ -17,6 +17,16 @@ export function openCommunityDb(): DatabaseSync {
   if (tableExists(db, "feed_inbox")) db.exec(schema);
   else applySchemaAndFillInbox(db, schema);
   migrateSchema(db, schema);
+  if ((db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version < 1) {
+    inTransaction(db, () => {
+      db.prepare(`INSERT OR IGNORE INTO feed_inbox (viewer_id, created_at, event_id, author_id)
+        SELECT f.follower_id, e.created_at, e.id, e.user_id FROM events e
+        JOIN follows f ON f.followee_id = e.user_id JOIN profiles p ON p.user_id = e.user_id
+        WHERE e.type = 'mural_published' AND e.ref_id = p.mural_id AND p.published = 1 AND p.show_publications = 1 AND e.created_at >= ?
+      `).run(new Date(Date.now() - FEED_WINDOW_MS).toISOString());
+      db.exec("PRAGMA user_version = 1");
+    });
+  }
 
   return db;
 }

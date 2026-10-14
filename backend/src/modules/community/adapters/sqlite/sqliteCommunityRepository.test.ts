@@ -363,7 +363,7 @@ test("an event is written to the inbox of each follower only if its author shows
   }
 
   for (const author of ["write-no-profile", "write-published"]) {
-    assert.deepEqual(inboxEventIds(db, `${author}-fan-1`).sort(), [`${author}-quiz_published`, `${author}-tierlist_published`, `${author}-tournament_published`, `${author}-voted_on`]);
+    assert.deepEqual(inboxEventIds(db, `${author}-fan-1`).sort(), [`${author}-mural_published`, `${author}-quiz_published`, `${author}-tierlist_published`, `${author}-tournament_published`, `${author}-voted_on`]);
   }
   assert.equal(inboxEventIds(db, "write-all-on-fan-1").length, FEED_EVENT_TYPES.length);
   assert.deepEqual(inboxEventIds(db, "write-all-off-fan-1"), []);
@@ -788,7 +788,7 @@ test("the dashboard service pages through a real inbox newest first, narrowed to
     matchWorks: unused,
     murals: { ownsMural: unused, getMuralPublicPayload: unused },
     tierlists: { discoverWindow: unused, getPublishedMany: unused, votedAmong: unused, get: (id) => refs.get(id), listByOwner: unused, discoverByWorks: unused },
-    tournaments: { discoverWindow: unused, getPublishedMany: unused, votedAmong: unused, get: () => undefined, listByOwner: unused, discoverByWorks: unused },
+    tournaments: { completedForParticipant: () => [], discoverWindow: unused, getPublishedMany: unused, votedAmong: unused, get: () => undefined, listByOwner: unused, discoverByWorks: unused },
     quizzes: { discoverWindow: unused, getPublishedMany: unused, votedAmong: unused, get: () => undefined, listByOwner: unused, discoverByWorks: unused },
     participation: { tierlists: () => [], tournaments: () => [], quizzes: () => [] }
   });

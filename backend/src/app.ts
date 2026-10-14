@@ -39,6 +39,7 @@ import {
 } from "./modules/auth/index.js";
 import { deleteArenaUserData, getArenaPublicApi, registerArenaModule } from "./modules/arena/index.js";
 import { createBestEffortRecorder, deleteCommunityUserData, getCommunityPublicApi, registerCommunityModule } from "./modules/community/index.js";
+import type { RankingTierPreview } from "@scripta/shared/community";
 import { enqueueBookCovers, getWorkPage, matchWorks, registerBooksModule } from "./modules/books/index.js";
 import { deleteGalleryUserData, registerGalleryModule } from "./modules/gallery/index.js";
 import { communityRatings, copyOfWork, deleteLibraryUserData, holdersOfWorks, registerLibraryModule, resolvePublicLibrary, readerGlyphFor, resolveEntryWorks, WorkResolutionError, sharedBookCounts, sharedBooks, startWorksSweep, sweepLibraryWorks, type BookEvent } from "./modules/library/index.js";
@@ -205,6 +206,7 @@ export function buildApp() {
       discoverByWorks: getTierlistsPublicApi().discoverByWorks
     },
     tournaments: {
+      completedForParticipant: getArenaPublicApi().completedForParticipant,
       discoverWindow: getArenaPublicApi().discoverWindow,
       getPublishedMany: getArenaPublicApi().getPublishedMany,
       votedAmong: getArenaPublicApi().votedAmong,
@@ -228,8 +230,8 @@ export function buildApp() {
   });
   app.register(registerTierlistsModule, {
     emitPublished: (copyId: string, ownerUserId: string) => recordActivity(ownerUserId, "tierlist_published", "tierlist", copyId),
-    emitVotedOn: (voterUserId: string, tierlistId: string, tierlistName: string) =>
-      recordActivity(voterUserId, "voted_on", "tierlist", tierlistId, { game: "tierlist", id: tierlistId, name: tierlistName })
+    emitVotedOn: (voterUserId: string, tierlistId: string, tierlistName: string, ranking: RankingTierPreview[]) =>
+      recordActivity(voterUserId, "voted_on", "tierlist", tierlistId, { game: "tierlist", id: tierlistId, name: tierlistName, ranking })
   });
   app.register(registerQuizzesModule, {
     emitPublished: (quizId: string, ownerUserId: string) => recordActivity(ownerUserId, "quiz_published", "quiz", quizId),

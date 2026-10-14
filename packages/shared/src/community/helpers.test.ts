@@ -1,5 +1,18 @@
 import assert from "node:assert/strict";
+import { parseRankingPreview } from "./helpers.js";
 import { test } from "node:test";
+
+test("ranking previews keep real book placements and discard malformed or empty tiers", () => {
+  const tier = { label: "S", color: "#c9482f", books: [{ title: "Dune", coverUrl: null }] };
+  assert.deepEqual(parseRankingPreview([tier, { ...tier, color: "invalid" }, { ...tier, books: [] }]), [tier]);
+  assert.deepEqual(parseRankingPreview(null), []);
+  assert.equal(parseRankingPreview(Array(10).fill({ ...tier, books: Array(5).fill(tier.books[0]) })).length, 3);
+  assert.equal(parseRankingPreview([{ ...tier, books: Array(5).fill(tier.books[0]) }])[0]?.books.length, 2);
+});
+
+test("a reading start uses a familiar wire event with an additive flag", () => {
+  assert.equal(activityRow({ id: "start", type: "book_added", payload: { title: "Dune", status: 1, started: true }, createdAt: "2026-10-14T10:00:00Z" })?.label, "Started reading");
+});
 import { activityRow, contentDetail, contentKindLabel, contentStats, contentStatus, contentTarget, feedAction, followFailureMessage, isKnownContent, personCaption, suggestionReason } from "./helpers.js";
 import type { FeedItem, PersonResult, PublishedContent, QuizSummary, SuggestedReader } from "./types.js";
 

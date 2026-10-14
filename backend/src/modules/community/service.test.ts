@@ -233,7 +233,7 @@ function createDeps(repo: CommunityRepository) {
       listByOwner: (owner) => [...tierlistRefs.values()].filter((r) => r.ownerUserId === owner).sort(byNewest),
       discoverByWorks: byWorks("tierlist", tierlistRefs, (r) => ({ id: r.id, createdAt: r.createdAt, ownerUserId: r.ownerUserId, promotedAt: r.promotedAt }))
     },
-    tournaments: {
+    tournaments: { completedForParticipant: () => [],
       discoverWindow: (needle, limit) => {
         windowCalls.push({ kind: "tournament", needle, limit });
         return [...tournamentRefs.values()]
@@ -305,6 +305,57 @@ const at = (day: number) => `2026-09-${String(day).padStart(2, "0")}T00:00:00.00
 const NOW = Date.parse("2026-09-30T00:00:00.000Z");
 
 const ALL_KINDS: ReadonlySet<string> = new Set(["publication", "vote", "reading", "follow", "participation"]);
+
+test("Home opts into current public murals and shared reading starts, rechecking privacy", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, muralPayloads } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  repo.upsertProfile(profileRow("alice", { mural_id: "m1" }));
+  repo.insertFollow({ follower_id: "viewer", followee_id: "alice", created_at: at(1) });
+  const mural = { id: "m1", name: "Shelf", theme: "paper", coverImageUrl: null };
+  muralPayloads.set("alice:m1", { mural } as MuralPublicPayload);
+  const event: EventRow = { id: "mural", user_id: "alice", type: "mural_published", ref_type: "mural", ref_id: "m1", payload: null, created_at: at(12) };
+  repo.insertEvent(event);
+  assert.equal(service.getDashboard("viewer", undefined, 20).items.length, 0);
+  const kinds = new Set(["mural", "reading"]);
+  assert.equal(service.getDashboard("viewer", undefined, 20, kinds).items[0]?.kind, "mural");
+  repo.updateFeedSettings("alice", { ...DEFAULT_FEED_SETTINGS, reading: true });
+  const start: EventRow = { id: "started", user_id: "alice", type: "book_started", ref_type: "book", ref_id: "b1", payload: JSON.stringify({ title: "Dune", author: "Frank Herbert", isbn: "9780441172719", status: 1 }), created_at: at(13) };
+  repo.insertEvent(start);
+  const reading = service.resolveEvent("viewer", start);
+  assert.equal(reading.kind === "reading" && reading.started, true);
+  assert.equal(reading.kind === "reading" && reading.book.isbn, "9780441172719");
+  deps.findUserIdByUsername = () => "alice";
+  const activity = service.getActivity("alice", "viewer", undefined, 20).items.find(item => item.id === start.id);
+  assert.equal(activity?.type, "book_added");
+  assert.equal(activity?.payload.started, true);
+  repo.updateFeedSettings("alice", DEFAULT_FEED_SETTINGS);
+  assert.throws(() => service.resolveEvent("viewer", start), ProfileNotFoundError);
+  repo.upsertProfile(profileRow("alice", { published: 0, mural_id: "m1" }));
+  assert.throws(() => service.resolveEvent("viewer", event), ProfileNotFoundError);
+  repo.upsertProfile(profileRow("alice", { mural_id: "m2" }));
+  assert.throws(() => service.resolveEvent("viewer", event), ProfileNotFoundError);
+});
+
+test("completed joined tournaments page with other events and count as personal notifications", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, seenAt } = createDeps(repo);
+  readerProfiles.set("alice", reader("alice"));
+  repo.upsertProfile(profileRow("alice"));
+  deps.tournaments.completedForParticipant = () => [1, 2].map(n => ({ ...tournRef(`cup-${n}`, "alice"), status: "completed", completedAt: at(10 + n), winner: { workId: "w1", title: "Dune", author: "Frank Herbert", cover: null } }));
+  const service = createCommunityService(deps);
+  const kinds = new Set(["completion"]);
+  const first = service.getDashboard("viewer", undefined, 1, kinds);
+  assert.equal(first.items[0]?.kind, "completion");
+  assert.equal(first.items[0]?.id, "completed:cup-2");
+  assert.equal(first.personalNewCount, 2);
+  assert.ok(first.nextCursor);
+  assert.deepEqual(service.getDashboard("viewer", first.nextCursor!, 1, kinds).items.map(item => item.id), ["completed:cup-1"]);
+  seenAt.value = at(11);
+  assert.equal(service.getDashboard("viewer", undefined, 20, kinds).personalNewCount, 1);
+  assert.equal(service.getDashboard("viewer", undefined, 20).items.length, 0);
+});
 
 const pageThrough = (service: CommunityService, limit: number, kinds?: ReadonlySet<string>): string[] => {
   const ids: string[] = [];
@@ -2022,7 +2073,7 @@ test("a visitor's activity page asks the repository to leave out the types the o
   repo.insertEvent(event("follow-2", "following", 31.5));
   repo.insertEvent(event("follow-3", "following", 50.5));
   const reads = recordActivityReads(repo);
-  const books = ["book_added", "book_finished"];
+  const books = ["book_added", "book_finished", "book_started"];
 
   const first = service.getActivity("alice", undefined, undefined, 2);
   assert.deepEqual(first.items.map((item) => item.id), ["follow-3", "follow-2"]);
@@ -2061,9 +2112,9 @@ test("a visitor's read leaves out exactly the types of the categories the owner 
   };
 
   assert.deepEqual(hiddenWith({ publications: true, reading: true, votes: true, follows: true }), []);
-  assert.deepEqual(hiddenWith(DEFAULT_FEED_SETTINGS), ["book_added", "book_finished"]);
+  assert.deepEqual(hiddenWith(DEFAULT_FEED_SETTINGS), ["book_added", "book_finished", "book_started"]);
   assert.deepEqual(hiddenWith({ publications: false, reading: true, votes: true, follows: false }), ["following", "mural_published", "quiz_published", "tierlist_published", "tournament_published"]);
-  assert.deepEqual(hiddenWith({ publications: false, reading: false, votes: false, follows: false }), ["book_added", "book_finished", "following", "mural_published", "quiz_published", "tierlist_published", "tournament_published", "voted_on"]);
+  assert.deepEqual(hiddenWith({ publications: false, reading: false, votes: false, follows: false }), ["book_added", "book_finished", "book_started", "following", "mural_published", "quiz_published", "tierlist_published", "tournament_published", "voted_on"]);
 });
 
 test("a row the repository returns although its category is switched off is still left out of a visitor's page, and the page reads on past it", () => {
@@ -2198,7 +2249,7 @@ function withBackgroundTasks(deps: CommunityDeps): Promise<void>[] {
   return tasks;
 }
 
-const READING_TYPES: ActivityEventType[] = ["book_added", "book_finished"];
+const READING_TYPES: ActivityEventType[] = ["book_added", "book_started", "book_finished"];
 const ALL_OFF = { publications: false, reading: false, votes: false, follows: false };
 
 test("turning a category on backfills the feed types of that category from the 30 days before now, and none of it runs inside the request", async () => {
@@ -2230,7 +2281,7 @@ test("only the categories that came on are backfilled, each turn-on in its own t
   service.updateFeedSettings("alice", { ...ALL_OFF, publications: true, votes: true });
   service.updateFeedSettings("alice", { ...ALL_OFF, publications: true, votes: true, reading: true });
   await Promise.all(tasks);
-  assert.deepEqual(backfills.map((backfill) => backfill.types), [["tierlist_published", "tournament_published", "quiz_published", "voted_on"], READING_TYPES]);
+  assert.deepEqual(backfills.map((backfill) => backfill.types), [["tierlist_published", "tournament_published", "quiz_published", "voted_on", "mural_published"], READING_TYPES]);
 
   service.updateFeedSettings("alice", ALL_OFF);
   service.updateFeedSettings("alice", { publications: true, reading: true, votes: true, follows: true });

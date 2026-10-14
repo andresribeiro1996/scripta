@@ -2,6 +2,9 @@ import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
 import { openCommunityDb } from "./adapters/sqlite/connection.js";
 import { createSqliteCommunityRepository } from "./adapters/sqlite/sqliteCommunityRepository.js";
+import { createSqliteEngagementRepository } from "./adapters/sqlite/sqliteEngagementRepository.js";
+import { createEngagementService } from "./engagement.js";
+import { buildEngagementRoutes } from "./engagementRoutes.js";
 import { buildCommunityRoutes, buildDiscoverRoutes, buildPublicCommunityRoutes } from "./routes.js";
 import type { CommunityDeps, CommunityPublicApi } from "./service.js";
 import { createCommunityPublicApi, createCommunityService } from "./service.js";
@@ -15,6 +18,7 @@ export async function communityPlugin(app: FastifyInstance, opts: Omit<Community
     task().catch((err) => app.log.error(err, "community feed backfill failed"));
   };
   const service = createCommunityService({ ...opts, repo, background });
+  const engagement = createEngagementService({ repo: createSqliteEngagementRepository(db), community: service, resolveProfiles: opts.resolveProfiles });
 
   const archive = async () => {
     try {
@@ -32,6 +36,7 @@ export async function communityPlugin(app: FastifyInstance, opts: Omit<Community
   });
 
   await app.register(buildCommunityRoutes(service));
+  await app.register(buildEngagementRoutes(engagement));
   await app.register(buildDiscoverRoutes(service));
 
   await app.register(async (scoped) => {

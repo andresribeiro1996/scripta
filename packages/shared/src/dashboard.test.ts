@@ -18,7 +18,7 @@ test("digestHeading is the actor's username followed by digestAction, for every 
   }
   assert.equal(digestAction(items[0]!), "published a tier list");
   assert.equal(digestAction(items[1]!), "ranked books on Fantasy doorstoppers");
-  assert.equal(digestAction(items[2]!), "finished Hyperion");
+  assert.equal(digestAction(items[2]!), "finished reading Hyperion");
   assert.equal(digestAction(items[3]!), "started following you");
 });
 
@@ -98,7 +98,7 @@ test("a quiz vote reads as played, and a publication of an unknown content kind 
 });
 
 test("the dashboard query lists every kind this build can draw, then carries the cursor encoded", () => {
-  const kinds = "?kinds=publication,vote,reading,follow,participation";
+  const kinds = "?kinds=publication,vote,reading,follow,participation,mural,completion";
   assert.equal(dashboardQuery(), kinds);
   assert.equal(dashboardQuery("a b/c"), `${kinds}&cursor=a%20b%2Fc`);
 });

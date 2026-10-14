@@ -65,6 +65,7 @@ export interface ArenaService {
    *  own tournaments excluded (listMine already shows those). */
   listVoted(voterUserId: string): Tournament[];
   participationByOwner(ownerUserId: string, since: string): GameParticipation[];
+  completedForParticipant(voterUserId: string, since: string): CompletedTournamentRef[];
   settleEarly(tournamentId: string, ownerUserId: string, duelId: string): void;
   tiebreak(tournamentId: string, ownerUserId: string, duelId: string, workId: string): void;
   /** Renames a tournament. Allowed at ANY status, unlike seeding or
@@ -282,6 +283,17 @@ export function createArenaService(
       return summariesWithPreviews(repo, repo.listVotedByUser(voterUserId));
     },
 
+    completedForParticipant(voterUserId, since) {
+      const rows = repo.listVotedByUser(voterUserId).filter((row) => row.status === "completed");
+      const finals = new Map(repo.getFinalDuels(rows.map((row) => row.id)).map((duel) => [duel.tournament_id, duel]));
+      return rows.flatMap((row) => {
+        const final = finals.get(row.id);
+        if (!final || final.status !== "settled" || !final.winner_side || !final.settled_at || final.settled_at < since) return [];
+        const winner = winnerBookFromDuel(final);
+        return [{ id: row.id, ownerUserId: row.owner_user_id, createdAt: row.created_at, name: row.name, bracketSize: row.bracket_size, status: "completed" as const, covers: winner.cover ? [winner.cover] : [], completedAt: final.settled_at, winner }];
+      });
+    },
+
     participationByOwner(ownerUserId, since) {
       return repo.listParticipation(ownerUserId, since).map((row) => ({
         id: row.id,
@@ -486,6 +498,11 @@ export interface PublishedTournamentRef {
   covers: string[];
 }
 
+export interface CompletedTournamentRef extends PublishedTournamentRef {
+  completedAt: string;
+  winner: NonNullable<Tournament["winner"]>;
+}
+
 export interface GameByWork {
   id: string;
   name: string;
@@ -503,6 +520,7 @@ export interface ArenaPublicApi {
   getPublished(id: string): PublishedTournamentRef | undefined;
   listPublishedByOwner(ownerUserId: string): PublishedTournamentRef[];
   participationByOwner(ownerUserId: string, since: string): GameParticipation[];
+  completedForParticipant(voterUserId: string, since: string): CompletedTournamentRef[];
 }
 
 function toPublishedRef(summary: Tournament): PublishedTournamentRef {
@@ -538,6 +556,7 @@ export function createArenaPublicApi(service: ArenaService): ArenaPublicApi {
     },
     listPublishedByOwner: (ownerUserId) =>
       service.listMine(ownerUserId).filter((s) => s.status !== "seeding").map(toPublishedRef),
-    participationByOwner: (ownerUserId, since) => service.participationByOwner(ownerUserId, since)
+    participationByOwner: (ownerUserId, since) => service.participationByOwner(ownerUserId, since),
+    completedForParticipant: (voterUserId, since) => service.completedForParticipant(voterUserId, since)
   };
 }

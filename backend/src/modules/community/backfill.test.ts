@@ -47,7 +47,7 @@ const baseDeps: Omit<CommunityDeps, "repo" | "background"> = {
   matchWorks: unused,
   murals: { ownsMural: unused, getMuralPublicPayload: unused },
   tierlists: { discoverWindow: unused, getPublishedMany: unused, votedAmong: unused, get: unused, listByOwner: unused, discoverByWorks: unused },
-  tournaments: { discoverWindow: unused, getPublishedMany: unused, votedAmong: unused, get: unused, listByOwner: unused, discoverByWorks: unused },
+  tournaments: { completedForParticipant: () => [], discoverWindow: unused, getPublishedMany: unused, votedAmong: unused, get: unused, listByOwner: unused, discoverByWorks: unused },
   quizzes: { discoverWindow: unused, getPublishedMany: unused, votedAmong: unused, get: unused, listByOwner: unused, discoverByWorks: unused },
   participation: { tierlists: unused, tournaments: unused, quizzes: unused }
 };

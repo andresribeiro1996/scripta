@@ -41,7 +41,7 @@ function memoryDb(): DatabaseSync {
   return db;
 }
 
-type RecordedEvent = { userId: string; type: "book_added" | "book_finished"; refId: string; payload: Record<string, unknown> };
+type RecordedEvent = { userId: string; type: "book_added" | "book_started" | "book_finished"; refId: string; payload: Record<string, unknown> };
 
 const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024;
 const PUBLIC_VIEW_BUDGET_MS = 1000;
@@ -194,6 +194,20 @@ test("addBook with no match, finished with a given day, records that day", () =>
   db.close();
 });
 
+test("Want to read preserves a matched book and its existing reading status", () => {
+  const { db, service, events } = setup();
+  for (const readStatus of [1, 2]) {
+    const id = `reader-${readStatus}`;
+    service.saveLibrary(id, { books: [{ ContentID: "k1", Title: "Dune", Attribution: "Frank Herbert", ReadStatus: readStatus, ___PercentRead: 67, Rating: 5 }] });
+    const saved = service.getLibrary(id);
+    events.length = 0;
+    assert.deepEqual(service.addBook(id, { title: "Dune", author: "Frank Herbert", readStatus: 0, preserveExisting: true }), { key: "k1", updated: false });
+    assert.deepEqual(service.getLibrary(id), saved);
+    assert.deepEqual(events, []);
+  }
+  db.close();
+});
+
 test("addBook matches by trimmed ISBN, finishing records the given day and 100%", () => {
   const { db, service, events } = setup();
   service.saveLibrary("user-1", {
@@ -246,7 +260,7 @@ test("addBook moving out of Finished keeps DateLastRead and ___PercentRead", () 
   db.close();
 });
 
-test("addBook to an unfinished status updates in place but emits nothing", () => {
+test("addBook to an unfinished status updates in place and announces started reading", () => {
   const { db, service, events } = setup();
   service.saveLibrary("user-1", {
     books: [{ ContentID: "k1", Title: "Stoner", Attribution: "John Williams", ISBN: "9780394729685", ReadStatus: 0, ___PercentRead: 0, DateLastRead: null }]
@@ -260,7 +274,7 @@ test("addBook to an unfinished status updates in place but emits nothing", () =>
   assert.equal(book?.ReadStatus, 1);
   assert.equal(book?.___PercentRead, 0);
   assert.equal(book?.DateLastRead, null);
-  assert.deepEqual(events, []);
+  assert.deepEqual(events.map(event => event.type), ["book_started"]);
   db.close();
 });
 
@@ -1204,7 +1218,7 @@ test("a change to a library whose derived rows were already stale leaves them st
   assert.equal(storedGlyph(fileDb, "change-stale"), null);
 });
 
-test("applyChange emits book_finished for a status that reaches Finished and nothing for any other change", () => {
+test("applyChange emits started and finished once for status transitions", () => {
   const { db, service, events } = setup();
   service.saveLibrary("u1", changeLibrary());
   events.length = 0;
@@ -1214,7 +1228,8 @@ test("applyChange emits book_finished for a status that reaches Finished and not
   service.applyChange("u1", { kind: "book", bookKey: keyOf(5), readStatus: 1 });
   service.applyChange("u1", { kind: "book", bookKey: keyOf(10), readStatus: 0 });
   service.applyChange("u1", { kind: "book", bookKey: keyOf(0), readStatus: 2, day: "2026-10-02" });
-  assert.deepEqual(events, []);
+  assert.deepEqual(events.map(event => event.type), ["book_started"]);
+  events.length = 0;
 
   service.applyChange("u1", { kind: "book", bookKey: keyOf(10), readStatus: 2, day: "2026-10-02" });
   assert.deepEqual(events, [

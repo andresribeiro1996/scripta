@@ -18,6 +18,14 @@ const settings = {} as FeedSettings;
 const input = {} as PublishProfileInput;
 
 const cases: Array<[string, (api: CommunityApi) => Promise<unknown>, string, ApiRequestInit]> = [
+  ["fetchActivityEngagement", api => api.fetchActivityEngagement(["e1"]), "/community/activity/engagement", { method: "POST", body: { ids: ["e1"] }, auth: "required" }],
+  ["likeActivity", api => api.likeActivity("a/b", true), "/community/activity/a%2Fb/like", { method: "PUT", body: { liked: true }, auth: "required" }],
+  ["fetchActivityComments", api => api.fetchActivityComments("a/b", "c 1"), "/community/activity/a%2Fb/comments?cursor=c%201", { auth: "required" }],
+  ["addActivityComment", api => api.addActivityComment("a/b", "Hello"), "/community/activity/a%2Fb/comments", { method: "POST", body: { text: "Hello" }, auth: "required" }],
+  ["deleteActivityComment", api => api.deleteActivityComment("a/b"), "/community/activity/comments/a%2Fb", { method: "DELETE", auth: "required" }],
+  ["fetchSavedState", api => api.fetchSavedState([{ kind: "quiz", id: "q" }]), "/community/saved/state", { method: "POST", body: { refs: [{ kind: "quiz", id: "q" }] }, auth: "required" }],
+  ["saveContent", api => api.saveContent({ kind: "quiz", id: "q" }, true), "/community/saved", { method: "PUT", body: { ref: { kind: "quiz", id: "q" }, saved: true }, auth: "required" }],
+  ["fetchSavedContent", api => api.fetchSavedContent("c 1"), "/community/saved?cursor=c%201", { auth: "required" }],
   ["fetchDashboard", (api) => api.fetchDashboard(), "/community/dashboard" + dashboardQuery(), { auth: "required" }],
   ["markDashboardSeen", (api) => api.markDashboardSeen(), "/community/dashboard/seen", { method: "POST", auth: "required" }],
   ["fetchDiscover", (api) => api.fetchDiscover("tierlist" as never, "q", 20), "/community/discover?type=tierlist&q=q&offset=20", { auth: "optional" }],

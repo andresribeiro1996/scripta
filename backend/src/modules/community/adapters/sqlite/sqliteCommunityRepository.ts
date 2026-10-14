@@ -125,6 +125,10 @@ export function createSqliteCommunityRepository(db: DatabaseSync): CommunityRepo
   return {
     deleteUserData(userId) {
       inTransaction(db, () => {
+        const owned = "SELECT id FROM events WHERE user_id = ? UNION SELECT id FROM events_history WHERE user_id = ?";
+        db.prepare(`DELETE FROM activity_likes WHERE user_id = ? OR event_id IN (${owned})`).run(userId, userId, userId);
+        db.prepare(`DELETE FROM activity_comments WHERE user_id = ? OR event_id IN (${owned})`).run(userId, userId, userId);
+        db.prepare("DELETE FROM saved_content WHERE user_id = ? OR owner_id = ?").run(userId, userId);
         db.prepare("DELETE FROM follows WHERE follower_id = ? OR followee_id = ?").run(userId, userId);
         db.prepare("DELETE FROM feed_inbox WHERE viewer_id = ? OR author_id = ?").run(userId, userId);
         db.prepare("DELETE FROM profiles WHERE user_id = ?").run(userId);

@@ -215,6 +215,14 @@ function makeService() {
   return createTierlistsService(createInMemoryRepo());
 }
 
+test("a published ballot event captures actual ranked books from its frozen snapshot", () => {
+  const ranking: unknown[] = [];
+  const service = createTierlistsService(createInMemoryRepo(), undefined, (_user, _id, _name, preview) => { ranking.push(preview); });
+  const board = service.createTierlist("owner", "Pool", { tiers: [{ id: "s", label: "S", color: "#c9482f", workIds: [] }, { id: "a", label: "A", color: "#f2aa20", workIds: [] }], pool: ["w1", "w2"] }, "members", [{ workId: "w1", title: "Dune", author: "Frank Herbert", coverUrl: "https://covers.test/dune.jpg" }, { workId: "w2", title: "Emma", author: "Jane Austen", coverUrl: null }]);
+  assert.equal(service.submitBallot(board.voteCode!, [{ workId: "w2", tierId: "a" }], { kind: "user", userId: "reader" }).ok, true);
+  assert.deepEqual(ranking, [[{ label: "S", color: "#c9482f", books: [] }, { label: "A", color: "#f2aa20", books: [{ title: "Emma", coverUrl: null }] }]]);
+});
+
 test("createTierlist stores a tier list and getTierlist round-trips it", () => {
   const service = makeService();
   const created = service.createTierlist("u1", "Favorites");

@@ -20,6 +20,8 @@ const { buildCommunityRoutes, buildDiscoverRoutes, buildPublicCommunityRoutes } 
 
 function fakeService(overrides: Partial<CommunityService> = {}): CommunityService {
   return {
+    resolveEvent: () => { throw new ProfileNotFoundError(); },
+    resolveSavedContent: () => { throw new ProfileNotFoundError(); },
     follow: () => {},
     unfollow: () => {},
     getFollowState: () => ({ following: false, followerCount: 0, followingCount: 0 }),

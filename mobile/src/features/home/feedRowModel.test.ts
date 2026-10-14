@@ -1,5 +1,19 @@
 import assert from "node:assert/strict";
+import { feedPrimaryLabel, feedShareTarget, hasActivityThread, readingShelfBook } from "./feedRowModel.js";
 import { test } from "node:test";
+
+test("Home actions use public share links and preserve an existing shelf match", () => {
+  const item: DigestItem = { kind: "reading", id: "r", actor, book: { title: "Dune", author: "Frank Herbert", isbn: "9780441172719", coverUrl: null }, finished: false, started: true, createdAt: "2026-10-14T10:00:00Z" };
+  const owned = { ContentID: "b1", Title: "Dune", Attribution: "Frank Herbert", ISBN: "9780441172719", ReadStatus: 2 };
+  assert.equal(readingShelfBook(item.book, [owned]), owned);
+  assert.equal(feedRowModel(item).label, "Started");
+  assert.equal(hasActivityThread(item), true);
+  const personal: ParticipationItem = { kind: "participation", id: "quiz:q", game: { kind: "quiz", id: "q", voteCode: "code", name: "Quiz", covers: [] }, actors: [], count: 2, createdAt: item.createdAt };
+  assert.equal(feedPrimaryLabel(personal), "View results");
+  assert.equal(feedShareTarget(personal), "/play/code");
+  assert.equal(hasActivityThread(personal), false);
+  assert.equal(feedShareTarget({ ...personal, game: { ...personal.game, voteCode: undefined } }), null);
+});
 import { digestHeading, digestTarget, type DigestItem, type ParticipationItem } from "@scripta/shared";
 import { digestRoute, feedRowAccessibilityLabel, feedRowModel, relativeTime } from "./feedRowModel.js";
 

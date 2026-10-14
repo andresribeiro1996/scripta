@@ -408,7 +408,8 @@ test("random fill counts distinct works against the bracket size", () => {
 });
 
 test("a completed tournament's summary carries the champion book", () => {
-  const service = createArenaService(createInMemoryArenaRepository());
+  const repo = createInMemoryArenaRepository();
+  const service = createArenaService(repo);
   const tournament = service.createTournament("owner-1", { name: "Test", bracketSize: 2, roundDurationMinutes: 60 });
   service.setSlotsManual(tournament.id, "owner-1", [
     { slotIndex: 0, book: makeBookWithCover(1) },
@@ -416,12 +417,20 @@ test("a completed tournament's summary carries the champion book", () => {
   ]);
   service.start(tournament.id, "owner-1");
   const duel = service.getTournamentView(tournament.id)!.duels[0]!;
-  service.vote(tournament.id, duel.id, "voter-1", "w1");
+  service.vote(tournament.id, duel.id, "voter-1", "w1", "voter-1");
   service.settleEarly(tournament.id, "owner-1", duel.id);
 
   const summary = service.listMine("owner-1")[0];
   assert.equal(summary?.status, "completed");
   assert.deepEqual(summary?.winner, makeBookWithCover(1));
+  const completed = service.completedForParticipant("voter-1", "2020-01-01T00:00:00.000Z");
+  assert.equal(completed.length, 1);
+  assert.deepEqual(completed[0]?.winner, makeBookWithCover(1));
+  assert.equal(completed[0]?.completedAt, repo.getDuel(duel.id)?.settled_at);
+  assert.deepEqual(service.completedForParticipant("nonparticipant", "2020-01-01T00:00:00.000Z"), []);
+  assert.deepEqual(service.completedForParticipant("voter-1", "2099-01-01T00:00:00.000Z"), []);
+  service.renameTournament(tournament.id, "owner-1", "Renamed");
+  assert.equal(service.completedForParticipant("voter-1", "2020-01-01T00:00:00.000Z")[0]?.completedAt, completed[0]?.completedAt);
 });
 
 test("a seeding or active tournament's summary has no winner yet", () => {
@@ -448,15 +457,18 @@ test("a tied duel waits for the owner's tie-break instead of auto-advancing", ()
   service.start(tournament.id, "owner-1");
   const duel = service.getTournamentView(tournament.id)!.duels[0]!;
 
-  service.vote(tournament.id, duel.id, "voter-1", "w1");
+  service.vote(tournament.id, duel.id, "voter-1", "w1", "voter-1");
   service.vote(tournament.id, duel.id, "voter-2", "w2");
   service.settleEarly(tournament.id, "owner-1", duel.id);
 
   let view = service.getTournamentView(tournament.id);
   assert.equal(view?.duels[0]?.status, "tied_pending_tiebreak");
+  assert.deepEqual(service.completedForParticipant("voter-1", "2020-01-01T00:00:00.000Z"), []);
   assert.equal(view?.status, "active"); // not yet completed — waiting on the owner
 
   service.tiebreak(tournament.id, "owner-1", duel.id, "w2");
+  assert.equal(service.completedForParticipant("voter-1", "2020-01-01T00:00:00.000Z")[0]?.winner.workId, "w2");
+  assert.deepEqual(service.completedForParticipant("voter-2", "2020-01-01T00:00:00.000Z"), []);
 
   view = service.getTournamentView(tournament.id);
   assert.equal(view?.duels[0]?.status, "settled");
