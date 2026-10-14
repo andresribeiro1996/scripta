@@ -91,7 +91,8 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const editionCountStmt = db.prepare(`SELECT COUNT(*) AS n FROM books WHERE work_id = ?`);
   const workStmt = db.prepare(`SELECT id, ol_work_key, title, author, summary FROM works WHERE id = ?`);
   const aliasStmt = db.prepare(`SELECT id FROM works WHERE merged_into = ?`);
-  const pageEditionsStmt = db.prepare(`SELECT books.id, books.title, books.language, books.year, books.isbn, books.summary, books.cover_image_id, ci.color AS cover_color, books.genres, books.rating, books.rating_count, books.pages FROM books LEFT JOIN cover_images ci ON ci.id = books.cover_image_id WHERE books.work_id = ? ORDER BY books.created_at, books.rowid`);
+  const editionGenresStmt = db.prepare(`SELECT work_id, genres, genres_source, genres_confidence FROM books WHERE work_id IN (SELECT value FROM json_each(?)) AND genres <> '[]' ORDER BY created_at, rowid`);
+  const pageEditionsStmt = db.prepare(`SELECT books.id, books.title, books.language, books.year, books.isbn, books.summary, books.cover_image_id, ci.color AS cover_color, books.genres, books.rating, books.rating_count, books.pages, books.genres_source, books.genres_confidence FROM books LEFT JOIN cover_images ci ON ci.id = books.cover_image_id WHERE books.work_id = ? ORDER BY books.created_at, books.rowid`);
   const workEditionsStmt = db.prepare(`SELECT id, isbn, title, author, ol_work_key FROM books WHERE work_id = ? ORDER BY created_at, rowid`);
   const groupablePairsStmt = db.prepare(`
     WITH candidates AS (
@@ -260,6 +261,9 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     },
     aliasesOf(workIds) {
       return (aliasesOfStmt.all(JSON.stringify(workIds)) as Array<{ id: string }>).map((row) => row.id);
+    },
+    editionGenres(workIds) {
+      return editionGenresStmt.all(JSON.stringify(workIds)) as unknown as ReturnType<BooksRepository["editionGenres"]>;
     },
 
     findBookByKey: (key) => byKeyStmt.get(key) as BookRow | undefined,

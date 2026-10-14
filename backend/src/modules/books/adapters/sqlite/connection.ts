@@ -41,6 +41,8 @@ export function applyBooksMigrations(db: DatabaseSync): void {
   if (!columns.some((column) => column.name === "work_checked_at")) db.exec("ALTER TABLE books ADD COLUMN work_checked_at TEXT");
   if (!columns.some((column) => column.name === "title_key")) db.exec("ALTER TABLE books ADD COLUMN title_key TEXT");
   if (!columns.some((column) => column.name === "title_group_blocked_at")) db.exec("ALTER TABLE books ADD COLUMN title_group_blocked_at TEXT");
+  if (!columns.some((column) => column.name === "genres_source")) db.exec("ALTER TABLE books ADD COLUMN genres_source TEXT");
+  if (!columns.some((column) => column.name === "genres_confidence")) db.exec("ALTER TABLE books ADD COLUMN genres_confidence REAL");
   moveOpenLibrarySummariesToWorks(db);
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_work ON books(work_id)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_title_key ON books(title_key)");
