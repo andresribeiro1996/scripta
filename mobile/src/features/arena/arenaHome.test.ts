@@ -5,7 +5,7 @@ import { test } from "node:test";
 import type { Quiz } from "../quizzes/api.js";
 import type { Tierlist, VotedTierlist } from "../tierlists/api.js";
 import type { Tournament } from "./api.js";
-import { ARENA_TABS, GAMES_TABS, NEW_GAMES, emptyCopy, gameRow, homeSections, nextOwnerFilter, ownedItems, tabAtIndex, tabIndex, tournamentProgress, votedTierlistDetail, type OwnedItem, type SectionedItem } from "./arenaHome.js";
+import { ARENA_TABS, GAMES_TABS, NEW_GAMES, emptyCopy, gameRow, homeSections, previewWorkIds, nextOwnerFilter, ownedItems, tabAtIndex, tabIndex, tournamentProgress, votedTierlistDetail, type OwnedItem, type SectionedItem } from "./arenaHome.js";
 
 const itemDetail = (items: OwnedItem[]): string | undefined => {
   const first = items[0];
@@ -234,6 +234,14 @@ test("an owned tier list row uses its own tier colours and has no covers to fan"
   assert.deepEqual(draft.covers, []);
   assert.deepEqual(row({ voteCode: "abc", votingOpen: true }).badges, [{ label: "Voting open", tone: "accent" }]);
   assert.deepEqual(row({ voteCode: "abc", votingOpen: false }).badges, [{ label: "Closed", tone: "neutral" }]);
+});
+
+test("previewWorkIds takes tier books in order, then the pool, without repeats, capped at three", () => {
+  const tier = (id: string, workIds: string[]) => ({ id, label: id, color: "#000", workIds });
+  assert.deepEqual(previewWorkIds({ tiers: [tier("s", ["a", "b"]), tier("a", ["c", "d"])], pool: ["e"] }), ["a", "b", "c"]);
+  assert.deepEqual(previewWorkIds({ tiers: [tier("s", ["a"]), tier("a", [])], pool: ["a", "b", "c", "d"] }), ["a", "b", "c"]);
+  assert.deepEqual(previewWorkIds({ tiers: [tier("s", [])], pool: ["x", "x"] }), ["x"]);
+  assert.deepEqual(previewWorkIds({ tiers: [], pool: [] }), []);
 });
 
 test("an owned quiz row fans the covers its books carry", () => {

@@ -181,6 +181,17 @@ export function tournamentProgress(tournament: Tournament): {
   return { label: `Round ${round} of ${totalRounds}`, totalRounds, completedRounds: round - 1 };
 }
 
+const FAN_SIZE = 3;
+
+export function previewWorkIds(data: Tierlist["data"]): string[] {
+  const ids = new Set<string>();
+  for (const workId of [...data.tiers.flatMap((tier) => tier.workIds), ...data.pool]) {
+    ids.add(workId);
+    if (ids.size === FAN_SIZE) break;
+  }
+  return [...ids];
+}
+
 export function votedTierlistDetail(tierlist: VotedTierlist): string {
   return `${tierlist.poolSize} books · ${tierlist.ballotCount} ballots`;
 }

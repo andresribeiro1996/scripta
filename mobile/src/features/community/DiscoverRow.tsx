@@ -9,6 +9,7 @@ import type { ContentTone, DiscoverItem, PublishedContent } from "@scripta/share
 import { TIER_LADDER, contentKindLabel, contentStats, contentStatus, contentTarget } from "./communityHome";
 import { openProfile } from "./AuthorAvatar";
 import { ReaderGlyph } from "./ReaderGlyph";
+import { CoverImage } from "../library/components/CoverImage";
 
 export function DiscoverRow({ item, linkAuthor, onPreviewBooks, onOpen }: { item: DiscoverItem; linkAuthor: boolean; onPreviewBooks?: (tournament: { id: string; name: string }) => void; onOpen?: () => void }) {
   const { colors } = useTheme();
@@ -58,6 +59,8 @@ export function DiscoverRow({ item, linkAuthor, onPreviewBooks, onOpen }: { item
   );
 }
 
+export type RowCover = string | Record<string, unknown>;
+
 export type GameRowProps = {
   kind: PublishedContent["kind"];
   name: string;
@@ -65,7 +68,7 @@ export type GameRowProps = {
   badges: Array<{ label: string; tone: ContentTone }>;
   caption?: string;
   stats?: Array<{ value: number; label: string }>;
-  covers: string[];
+  covers: RowCover[];
   ladder?: string[];
   seeBooks?: { label: string; onPress: () => void };
   accessibilityRole?: "link" | "button";
@@ -144,9 +147,9 @@ export function StatusBadge({ label, tone }: { label: string; tone: ContentTone 
   );
 }
 
-function FanThumb({ covers, ladder }: { covers: PublishedContent["covers"]; ladder?: string[] }) {
+function FanThumb({ covers, ladder }: { covers: RowCover[]; ladder?: string[] }) {
   const { colors } = useTheme();
-  const fan: Array<string | null> = covers.length ? covers.slice(0, 3) : [null];
+  const fan: Array<RowCover | null> = covers.length ? covers.slice(0, 3) : [null];
   const middle = (fan.length - 1) / 2;
   return (
     <View style={styles.thumb} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
@@ -160,7 +163,7 @@ function FanThumb({ covers, ladder }: { covers: PublishedContent["covers"]; ladd
       {fan.map((cover, index) => (
         <Cover
           key={index}
-          uri={cover}
+          cover={cover}
           style={{
             left: FAN_INSET + index * FAN_STEP + (3 - fan.length) * (FAN_STEP / 2),
             top: (THUMB_HEIGHT - FAN_HEIGHT) / 2,
@@ -176,14 +179,14 @@ function FanThumb({ covers, ladder }: { covers: PublishedContent["covers"]; ladd
   );
 }
 
-function TournamentThumb({ covers }: { covers: PublishedContent["covers"] }) {
+function TournamentThumb({ covers }: { covers: RowCover[] }) {
   const { colors } = useTheme();
   return (
     <View style={styles.thumb} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
       {[covers[0] ?? null, covers[1] ?? null].map((cover, index) => (
         <Cover
           key={index}
-          uri={cover}
+          cover={cover}
           style={{ left: index * (PAIR_WIDTH + PAIR_GAP), top: (THUMB_HEIGHT - PAIR_HEIGHT) / 2, width: PAIR_WIDTH, height: PAIR_HEIGHT, borderColor: colors.background }}
         />
       ))}
@@ -194,12 +197,13 @@ function TournamentThumb({ covers }: { covers: PublishedContent["covers"] }) {
   );
 }
 
-function Cover({ uri, style }: { uri: string | null; style: object }) {
+function Cover({ cover, style }: { cover: RowCover | null; style: object }) {
   const { colors } = useTheme();
-  return uri ? (
-    <Image source={{ uri }} contentFit="cover" style={[styles.cover, style]} />
-  ) : (
-    <View style={[styles.cover, style, { backgroundColor: colors.border }]} />
+  if (typeof cover === "string") return <Image source={{ uri: cover }} contentFit="cover" style={[styles.cover, style]} />;
+  return (
+    <View style={[styles.cover, style, { backgroundColor: colors.border }, cover && styles.clip]}>
+      {cover ? <CoverImage book={cover} /> : null}
+    </View>
   );
 }
 
@@ -230,6 +234,7 @@ const styles = StyleSheet.create({
   thumb: { width: THUMB_WIDTH, height: THUMB_HEIGHT },
   ladder: { position: "absolute", left: 0, top: (THUMB_HEIGHT - FAN_HEIGHT) / 2, width: LADDER_WIDTH, height: FAN_HEIGHT, borderRadius: 2, overflow: "hidden" },
   cover: { position: "absolute", borderRadius: 3, borderWidth: 1 },
+  clip: { overflow: "hidden" },
   versus: { position: "absolute", left: (THUMB_WIDTH - VERSUS_WIDTH) / 2, top: THUMB_HEIGHT / 2 - 9, width: VERSUS_WIDTH, height: 18, borderRadius: radii.full, borderWidth: 1, alignItems: "center", justifyContent: "center", zIndex: 10 },
   versusText: { fontSize: 10, fontWeight: "700", letterSpacing: 1 },
 });

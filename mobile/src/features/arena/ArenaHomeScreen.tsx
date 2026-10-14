@@ -1,11 +1,13 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
 import { Stack, router } from "expo-router";
+import { booksByWork } from "@scripta/shared";
 import { FlatList, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { Button, Dialog, EmptyState, ErrorState, IconButton, Screen, SearchDock, Sheet, Skeleton, SwipeableTabs, Toast, dynamicType, searchDockClearance, spacing, typography, useTheme, type IconName } from "../../ui";
+import { useLibrary, useWorkBooks } from "../library";
 import { DiscoverPane } from "../community/DiscoverPane";
-import { GameRow } from "../community/DiscoverRow";
+import { GameRow, type RowCover } from "../community/DiscoverRow";
 import { deleteQuiz, fetchQuizzes, type Quiz } from "../quizzes/api";
 import { deleteTierlist, fetchTierlists, fetchVotedTierlists, type Tierlist, type VotedTierlist } from "../tierlists/api";
 import { deleteTournament, fetchMyTournaments, fetchVotedTournaments, type Tournament } from "./api";
@@ -19,6 +21,7 @@ import {
   homeSections,
   nextOwnerFilter,
   ownedItems,
+  previewWorkIds,
   type ArenaTab,
   type GamesTab,
   type OwnedItem,
@@ -44,6 +47,9 @@ export function ArenaHomeScreen() {
   const quizzes = useQuery({ queryKey: ["quizzes"], queryFn: fetchQuizzes, retry: false });
   const votedTournaments = useQuery({ queryKey: ["arena", "voted"], queryFn: fetchVotedTournaments, retry: false });
   const votedTierlists = useQuery({ queryKey: ["tierlists", "voted"], queryFn: fetchVotedTierlists, retry: false });
+  const library = useLibrary();
+  const libraryBooks = useWorkBooks(library.data);
+  const byWork = useMemo(() => booksByWork(libraryBooks), [libraryBooks]);
 
   async function remove() {
     if (!deleting) return;
@@ -112,6 +118,7 @@ export function ArenaHomeScreen() {
           owned={owned}
           votedTournaments={votedTournaments.data ?? []}
           votedTierlists={votedTierlists.data ?? []}
+          byWork={byWork}
           rowCount={owned.length + (voted.data?.length ?? 0)}
           onOpen={open}
           onDelete={setDeleting}
@@ -147,6 +154,7 @@ function ArenaList({
   owned,
   votedTournaments,
   votedTierlists,
+  byWork,
   rowCount,
   onOpen,
   onDelete,
@@ -157,6 +165,7 @@ function ArenaList({
   owned: OwnedItem[];
   votedTournaments: Tournament[];
   votedTierlists: VotedTierlist[];
+  byWork: Map<string, Record<string, unknown>>;
   rowCount: number;
   onOpen: (item: OwnedItem) => void;
   onDelete: (doomed: Doomed) => void;
@@ -207,7 +216,8 @@ function ArenaList({
         }
         const row = gameRow(item);
         if (item.kind === "owned") {
-          return <GameRow {...row} onPress={() => onOpen(item.item)} onDelete={() => onDelete({ kind: item.item.kind, id: item.item.id, name: item.item.name })} />;
+          const covers: RowCover[] = item.item.kind === "tierlist" ? previewWorkIds(item.item.source.data).flatMap((workId) => { const book = byWork.get(workId); return book ? [book] : []; }) : row.covers;
+          return <GameRow {...row} covers={covers} onPress={() => onOpen(item.item)} onDelete={() => onDelete({ kind: item.item.kind, id: item.item.id, name: item.item.name })} />;
         }
         return <GameRow {...row} onPress={() => router.push(item.target as never)} />;
       }}
