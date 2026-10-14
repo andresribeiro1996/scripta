@@ -237,7 +237,6 @@ async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryR
           author = result.edition.author;
         } else {
           report.noAuthor++;
-          title = "";
           author = "";
         }
       }
