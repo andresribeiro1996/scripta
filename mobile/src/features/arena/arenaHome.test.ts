@@ -5,7 +5,7 @@ import { test } from "node:test";
 import type { Quiz } from "../quizzes/api.js";
 import type { Tierlist, VotedTierlist } from "../tierlists/api.js";
 import type { Tournament } from "./api.js";
-import { ARENA_TABS, GAMES_TABS, NEW_GAMES, emptyCopy, gameRow, homeSections, nextOwnerFilter, ownedItems, tabAtIndex, tabIndex, tournamentProgress, votedTierlistDetail, type OwnedItem, type SectionedItem } from "./arenaHome.js";
+import { ARENA_TABS, GAMES_TABS, NEW_GAMES, emptyCopy, gameRow, homeSections, nextOwnerFilter, ownedItems, tierlistCovers, tabAtIndex, tabIndex, tournamentProgress, votedTierlistDetail, type OwnedItem, type SectionedItem } from "./arenaHome.js";
 
 const itemDetail = (items: OwnedItem[]): string | undefined => {
   const first = items[0];
@@ -234,6 +234,17 @@ test("an owned tier list row uses its own tier colours and has no covers to fan"
   assert.deepEqual(draft.covers, []);
   assert.deepEqual(row({ voteCode: "abc", votingOpen: true }).badges, [{ label: "Voting open", tone: "accent" }]);
   assert.deepEqual(row({ voteCode: "abc", votingOpen: false }).badges, [{ label: "Closed", tone: "neutral" }]);
+});
+
+test("tierlistCovers takes library books tier by tier, then the pool, skipping missing and repeated ones, capped at the fan", () => {
+  const tier = (id: string, workIds: string[]) => ({ id, label: id, color: "#000", workIds });
+  const byWork = new Map(["a", "b", "c", "d", "e"].map((id) => [id, { workId: id }]));
+  const ids = (data: Tierlist["data"], books = byWork) => tierlistCovers(data, books).map((book) => book.workId);
+  assert.deepEqual(ids({ tiers: [tier("s", ["a", "b"]), tier("a", ["c", "d"])], pool: ["e"] }), ["a", "b", "c"]);
+  assert.deepEqual(ids({ tiers: [tier("s", ["a"]), tier("a", [])], pool: ["a", "b", "c", "d"] }), ["a", "b", "c"]);
+  assert.deepEqual(ids({ tiers: [tier("s", ["x", "a", "y"])], pool: ["z", "b", "c", "d"] }), ["a", "b", "c"]);
+  assert.deepEqual(ids({ tiers: [tier("s", ["a"])], pool: ["b"] }, new Map()), []);
+  assert.deepEqual(ids({ tiers: [], pool: [] }), []);
 });
 
 test("an owned quiz row fans the covers its books carry", () => {
