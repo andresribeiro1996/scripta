@@ -3,7 +3,7 @@ import type { DatabaseSync, StatementSync } from "node:sqlite";
 import { MIN_PREFIX_LENGTH, normalizeWorkKey, workTitleKey } from "../../domain/normalize.js";
 import type { BooksRepository, IdPage, MergeableDetails, PageCursor } from "../../domain/ports.js";
 import { WorkMergeError } from "../../domain/errors.js";
-import type { BookRow, CoverImageRow, DataSource, SummarySource, WorkPageRows, WorkView } from "../../domain/types.js";
+import type { BookRow, CoverImageRow, DataSource, GenreEvidence, SummarySource, WorkPageRows, WorkView } from "../../domain/types.js";
 
 export const UNCHECKED_COVERS_SQL = `
   SELECT id, created_at AS at, rowid AS row FROM books
@@ -90,6 +90,13 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const blockTitleGroupStmt = db.prepare(`UPDATE books SET title_group_blocked_at = ? WHERE id = ?`);
   const editionCountStmt = db.prepare(`SELECT COUNT(*) AS n FROM books WHERE work_id = ?`);
   const workStmt = db.prepare(`SELECT id, ol_work_key, title, author, summary FROM works WHERE id = ?`);
+  const evidenceEditionsStmt = db.prepare(`SELECT title, language, isbn, publisher, year, summary FROM books WHERE work_id = ? ORDER BY created_at, rowid`);
+  const setManualGenresStmt = db.prepare(`
+    UPDATE books SET genres = $genres, genres_source = 'manual', genres_confidence = NULL
+    WHERE work_id = $work_id
+      AND (genres = '[]' OR genres_source IN ('jev', 'manual'))
+      AND NOT (genres = $genres AND genres_source = 'manual')
+  `);
   const aliasStmt = db.prepare(`SELECT id FROM works WHERE merged_into = ?`);
   const editionGenresStmt = db.prepare(`SELECT work_id, genres, genres_source, genres_confidence FROM books WHERE work_id IN (SELECT value FROM json_each(?)) AND genres <> '[]' ORDER BY created_at, rowid`);
   const pageEditionsStmt = db.prepare(`SELECT books.id, books.title, books.language, books.year, books.isbn, books.summary, books.cover_image_id, ci.color AS cover_color, books.genres, books.rating, books.rating_count, books.pages, books.genres_source, books.genres_confidence FROM books LEFT JOIN cover_images ci ON ci.id = books.cover_image_id WHERE books.work_id = ? ORDER BY books.created_at, books.rowid`);
@@ -480,6 +487,16 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
         author: work.author,
         editions: editions.map((edition) => ({ id: edition.id, isbn: edition.isbn, title: edition.title, author: edition.author, olWorkKey: edition.ol_work_key }))
       } satisfies WorkView;
+    },
+
+    genreEvidence(workId) {
+      const work = workStmt.get(workId) as { id: string; title: string; author: string; summary: string | null } | undefined;
+      if (!work) return undefined;
+      return { work: { id: work.id, title: work.title, author: work.author, summary: work.summary }, editions: evidenceEditionsStmt.all(workId) as GenreEvidence["editions"] };
+    },
+
+    setManualGenres(workId, genres) {
+      return Number(setManualGenresStmt.run({ $genres: JSON.stringify(genres), $work_id: workId }).changes);
     },
 
     workPageRows(id) {

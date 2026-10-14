@@ -84,3 +84,8 @@ export interface WorkView {
   author: string;
   editions: Array<{ id: string; isbn: string | null; title: string; author: string; olWorkKey: string | null }>;
 }
+
+export type GenreEvidence = {
+  work: { id: string; title: string; author: string; summary: string | null };
+  editions: Array<{ title: string; language: string | null; isbn: string | null; publisher: string | null; year: number | null; summary: string | null }>;
+};

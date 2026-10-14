@@ -250,6 +250,31 @@ The list is `PUBLISHERS` in `seed/publishers.ts`; each shop's quirks, the candid
 - **What it never replaces.** A current cover from any publisher, an admin upload, or a URL the admin rejected. Otherwise a cover at least 400 px wide replaces whatever the book has; a narrower one is used only if the book has none. The book is read again after the download, before the write, so a cover set meanwhile isn't overwritten. The image goes through the same re-encode and the same portrait check as every cover, and is stored as `cover_images.source` `publisher` with `books.cover_status` `manual`. An image that fails that portrait check gets one more look: a product photo on a light canvas (corners all alike, average brightness 170 or more) is cropped to the book, and a square cover (ratio 0.75 to 1.2) is kept as it is. A mock-up on a dark or mid-tone canvas (a book on a coloured background, even a saturated one) is rejected, since it can't be told from a solid-colour square cover and would otherwise be stored uncropped as a permanent cover. A cover recovered this way (counted as `cropped` and `squareAccepted`) fills only a book the cover backfill has already checked and found wanting, `cover_status` `missing` or `low_res`; it never replaces a `good` cover, and a book whose `cover_status` is still null (not yet checked, including a book this run has just created) is skipped and counted as `awaitingCheck`, so re-run the importer after the backfill has worked through the catalog. The cover write is conditional on the book's cover being the one read before the image was uploaded: when the backfill or an admin set a cover meanwhile, the importer keeps theirs, counts the book as `unchanged` and leaves the uploaded files as unreferenced orphans (the worker's own cover write is conditional the same way). Rerunning is safe: books already covered by a publisher count as `unchanged`.
 - **Takedown of one publisher's covers.** Same steps as the ISBNdb deletion above, but select by that site's origin: list the ids, `SELECT id FROM cover_images WHERE source = 'publisher' AND origin = '<origin>'` (the shop's `origin` in `PUBLISHERS`, `seed/publishers.ts`, with its scheme; for covers stored before `origin` existed, fall back to `AND origin IS NULL AND source_url LIKE '<imageUrlPrefix>%'`); delete each id's `covers/<id>.webp` and `covers/<id>-thumb.webp` from the bucket and purge the URLs from Cloudflare's cache; clear the pointers (`UPDATE books SET cover_image_id = NULL, cover_status = NULL, cover_checked_at = NULL WHERE cover_image_id IN (…)`); then `DELETE FROM cover_images WHERE id IN (…)` for the same ids. The books re-resolve from Apple, ISBNdb and Open Library through the backfill. Never use the bare `https://cdn.shopify.com/` as the prefix in the fallback: every Shopify shop shares it, so it would match another publisher's covers. Also clear its synopses, then drop its product links, in that order because the first matches on the link: `UPDATE books SET summary = NULL, summary_source = NULL, details_status = NULL WHERE summary_source = 'publisher' AND publisher_url LIKE '<origin>/%'` (it misses synopses stored where no URL was recorded), then `UPDATE books SET publisher_url = NULL WHERE publisher_url LIKE '<origin>/%'`.
 
+#### Genre pass
+
+Fills catalog genres for works people own that Open Library and ISBNdb couldn't classify. Run it after a large import, or when the count of books without genres grows. The owner runs both commands; Claude classifies in between.
+
+1. Export (read-only). The JSON between `---BEGIN---` and `---END---` lists each work's id, title, author, up to four editions, longest synopsis (1,200 characters), whether anyone finished it, and how many libraries hold it.
+
+   ```bash
+   npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && node scripts/genre-pass-export.mjs' > genre-export.txt
+   ```
+
+2. Classify in a Claude session. Each work gets a main genre and up to two more from `BOOK_GENRES`, or none:
+   - **Romance** only when a love story is the book's main thrust. Portuguese "romance" means *novel*.
+   - **Classics** for canonical older works; **Literary Fiction** for other literary novels.
+   - **Historical Fiction**, not Biography & Memoir, for novels about real historical figures.
+   - **None** when nothing fits (pets, art books) or the book is unknown. No guessing from the title alone.
+   - The owner reviews low-confidence, no-fit and unknown rows before importing.
+
+   Write `labels.json` as `[{ "workId": "…", "genres": ["Main", "Other"] }]`. An empty `genres` leaves the work alone.
+
+3. Import. The import rejects the whole file on an unknown genre or work. It writes only editions whose genres are empty, from Jev, or from an earlier pass, never Open Library, ISBNdb or search genres. It prints what it filled. Libraries pick the genres up on their owners' next load.
+
+   ```bash
+   npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c "echo $(base64 < labels.json | tr -d '\n') | base64 -d > /tmp/genre-labels.json && cd /app/backend && node scripts/genre-pass-import.mjs /tmp/genre-labels.json; rm -f /tmp/genre-labels.json"
+   ```
+
 #### Known limitations of covers, details and search, and the options for each
 
 Measured on production on 2026-09-30, after a tester imported a 167-book library and waited about 20 minutes for covers. The server itself was never slow: `/covers/resolve` p50 was 1 ms and `PUT /library` about 5 ms. The time goes into the pipeline around it. Recheck the numbers below before relying on them.

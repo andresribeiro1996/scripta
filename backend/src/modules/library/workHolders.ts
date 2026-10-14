@@ -4,6 +4,8 @@ import { openLibraryDb } from "./adapters/sqlite/connection.js";
 export type HolderStatus = 0 | 1 | 2;
 export type ViewerCopy = { bookKey: string; readStatus: HolderStatus; rating: number | null; highlightCount: number; isbn: string | null; coverUrl: string | null };
 
+export type HeldWork = { workId: string; holders: number; finished: boolean };
+
 const statusOf = (value: unknown): HolderStatus => (value === 2 ? 2 : value === 1 ? 1 : 0);
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 
@@ -11,6 +13,7 @@ export function createWorkHolders(db: DatabaseSync) {
   const holdersStmt = db.prepare(`SELECT user_id, position, read_status FROM library_books WHERE work_id IN (SELECT value FROM json_each(?)) ORDER BY user_id, position`);
   const copyStmt = db.prepare(`SELECT position, book_key, read_status, isbn, cover_url FROM library_books WHERE user_id = ? AND work_id IN (SELECT value FROM json_each(?)) ORDER BY position LIMIT 1`);
   const ratingsStmt = db.prepare(`SELECT user_id, rating FROM library_books WHERE work_id IN (SELECT value FROM json_each(?)) AND read_status = 2 AND rating IS NOT NULL ORDER BY user_id, position`);
+  const heldStmt = db.prepare(`SELECT work_id, COUNT(DISTINCT user_id) AS holders, MAX(read_status = 2) AS finished FROM library_books WHERE work_id IS NOT NULL GROUP BY work_id`);
   const documentStmt = db.prepare(`SELECT data FROM library_documents WHERE user_id = ?`);
 
   function holdersOfWorks(workIds: string[]): Array<{ userId: string; readStatus: HolderStatus }> {
@@ -49,7 +52,11 @@ export function createWorkHolders(db: DatabaseSync) {
     return ratings;
   }
 
-  return { holdersOfWorks, copyOfWork, communityRatings };
+  function heldWorks(): HeldWork[] {
+    return (heldStmt.all() as Array<{ work_id: string; holders: number; finished: number | null }>).map((row) => ({ workId: row.work_id, holders: row.holders, finished: row.finished === 1 }));
+  }
+
+  return { holdersOfWorks, copyOfWork, communityRatings, heldWorks };
 }
 
 let holders: ReturnType<typeof createWorkHolders> | null = null;
@@ -67,4 +74,9 @@ export function copyOfWork(userId: string, workIds: string[]) {
 export function communityRatings(workIds: string[]) {
   holders ??= createWorkHolders(openLibraryDb());
   return holders.communityRatings(workIds);
+}
+
+export function heldWorks() {
+  holders ??= createWorkHolders(openLibraryDb());
+  return holders.heldWorks();
 }
