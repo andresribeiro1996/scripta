@@ -179,7 +179,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const needingJudgmentStmt = db.prepare(`
     SELECT w.value AS id FROM json_each(?) AS w
     WHERE NOT EXISTS (SELECT 1 FROM genre_judgments j WHERE j.work_id = w.value)
-      AND NOT EXISTS (SELECT 1 FROM books b WHERE b.work_id = w.value AND b.genres <> '[]')
+      AND NOT EXISTS (SELECT 1 FROM books b WHERE b.work_id = w.value AND b.genres <> '[]' AND b.genres_source IS NOT 'jev')
       AND EXISTS (SELECT 1 FROM books b WHERE b.work_id = w.value AND b.details_status IS NOT NULL)
     LIMIT ?
   `);
@@ -190,6 +190,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     FROM genre_judgments AS j
     WHERE books.work_id = j.work_id AND j.genre IS NOT NULL AND j.confidence >= ?
       AND (books.genres = '[]' OR books.genres_source = 'jev')
+      AND NOT (books.genres = json_array(j.genre) AND books.genres_source = 'jev' AND books.genres_confidence IS j.confidence)
   `);
   const undoJudgmentsStmt = db.prepare(`
     UPDATE books SET genres = '[]', genres_source = NULL, genres_confidence = NULL

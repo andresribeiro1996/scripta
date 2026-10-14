@@ -85,3 +85,15 @@ test("the export also lists works whose only genres are Jev's possible ones, wit
   const rows = genrePassWorksWith(repo, [{ workId: blank, holders: 1, finished: true }, { workId: tagged, holders: 1, finished: true }]);
   assert.deepEqual(rows.map((entry) => [entry.workId, entry.jev]), [[blank, { genre: "Biography & Memoir", confidence: 0.6 }]]);
 });
+
+test("an empty label records a manual none judgment so Jev is not asked, and repeats as a no-op", () => {
+  const { db, repo, blank } = seeded();
+  db.prepare("UPDATE books SET details_status = 'missing' WHERE work_id = ?").run(blank);
+  assert.deepEqual(repo.worksNeedingGenreJudgment([blank], 10), [blank]);
+  assert.deepEqual(importGenreLabelsWith(repo, [{ workId: blank, genres: [] }]), { works: 0, editions: 0, skipped: [blank] });
+  assert.equal(repo.genreJudgments([blank]).get(blank)?.genre, null);
+  assert.equal(repo.genreJudgments([blank]).get(blank)?.confidence, 1);
+  assert.deepEqual(repo.worksNeedingGenreJudgment([blank], 10), []);
+  assert.deepEqual(importGenreLabelsWith(repo, [{ workId: blank, genres: [] }]), { works: 0, editions: 0, skipped: [blank] });
+  assert.equal(row(db, blank).genres, "[]");
+});

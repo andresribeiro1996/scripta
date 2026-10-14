@@ -1370,6 +1370,17 @@ test("works needing a genre judgment have no genres, a finished details lookup a
   assert.deepEqual(repo.genreJudgments(ids), new Map([[judged!.work_id!, { genre: null, confidence: 0.9 }]]));
 });
 
+test("deleting the judgment of a work with an applied Jev genre makes it selectable again", () => {
+  const { db, repo } = freshRepo();
+  const book = titled(repo, "Applied");
+  repo.markDetailsMissing(book.id, NOW);
+  repo.saveGenreJudgment({ workId: book.work_id!, model: "jev-1.13.0", genre: "History", confidence: 0.9, askedAt: NOW });
+  repo.applyGenreJudgments(0.5);
+  assert.deepEqual(repo.worksNeedingGenreJudgment([book.work_id!], 10), []);
+  db.prepare("DELETE FROM genre_judgments WHERE work_id = ?").run(book.work_id);
+  assert.deepEqual(repo.worksNeedingGenreJudgment([book.work_id!], 10), [book.work_id]);
+});
+
 test("applying judgments writes Jev genres at or above the save line, idempotently, and undoes them when the line rises", () => {
   const { db, repo } = freshRepo();
   const [sure, unsure, none, manual] = ["Sure", "Unsure", "None", "Manual"].map((title) => titled(repo, title));
@@ -1380,7 +1391,9 @@ test("applying judgments writes Jev genres at or above the save line, idempotent
   judge(manual, "Romance", 0.9);
   db.prepare("UPDATE books SET genres = ?, genres_source = 'manual' WHERE id = ?").run(JSON.stringify(["Classics"]), manual!.id);
   repo.applyGenreJudgments(0.5);
+  const changesBefore = (db.prepare("SELECT total_changes() AS n").get() as { n: number }).n;
   repo.applyGenreJudgments(0.5);
+  assert.equal((db.prepare("SELECT total_changes() AS n").get() as { n: number }).n, changesBefore);
   assert.deepEqual(genreRow(db, sure!.id), { genres: JSON.stringify(["History"]), genres_source: "jev", genres_confidence: 0.9 });
   assert.deepEqual(genreRow(db, unsure!.id), { genres: "[]", genres_source: null, genres_confidence: null });
   assert.deepEqual(genreRow(db, none!.id), { genres: "[]", genres_source: null, genres_confidence: null });

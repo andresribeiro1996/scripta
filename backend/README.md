@@ -270,7 +270,7 @@ Fills catalog genres for works people own that Open Library and ISBNdb couldn't 
    - **None** when nothing fits (pets, art books) or the book is unknown. No guessing from the title alone.
    - The owner reviews low-confidence, no-fit and unknown rows before importing.
 
-   Write `labels.json` as `[{ "workId": "…", "genres": ["Main", "Other"] }]`. An empty `genres` leaves the work alone.
+   Write `labels.json` as `[{ "workId": "…", "genres": ["Main", "Other"] }]`. An empty `genres` marks the work as having no genre, so Jev won't classify it.
 
 3. Import. The import rejects the whole file on an unknown genre or work. It writes only editions whose genres are empty, from Jev, or from an earlier pass, never Open Library, ISBNdb or search genres. It prints what it filled. Libraries pick the genres up on their owners' next load.
 

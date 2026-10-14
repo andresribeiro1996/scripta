@@ -75,7 +75,9 @@ export function importGenreLabelsWith(books: BooksRepository, input: unknown): G
   return books.transaction(() => {
     const report: GenreImportReport = { works: 0, editions: 0, skipped: [] };
     for (const label of labels) {
-      const changed = label.genres.length === 0 ? 0 : books.setManualGenres(canonical.get(label.workId)!, label.genres);
+      const workId = canonical.get(label.workId)!;
+      if (label.genres.length === 0) books.saveGenreJudgment({ workId, model: "manual", genre: null, confidence: 1, askedAt: new Date().toISOString() });
+      const changed = label.genres.length === 0 ? 0 : books.setManualGenres(workId, label.genres);
       if (changed === 0) report.skipped.push(label.workId);
       else {
         report.works += 1;
