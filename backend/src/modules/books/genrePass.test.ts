@@ -42,7 +42,7 @@ test("the export lists held works with no genres, finished ones first", () => {
     { workId: tagged, holders: 1, finished: true }
   ]);
   assert.deepEqual(rows.map((entry) => entry.workId), [blank, other]);
-  assert.deepEqual(rows[0], { workId: blank, title: "Os Anões", author: "Harold Pinter", editions: [{ title: "Os Anões", language: "pt-PT", isbn: "9789722031240", publisher: "Relógio", year: null }], synopsis: "Um romance.", finished: true, holders: 2 });
+  assert.deepEqual(rows[0], { workId: blank, title: "Os Anões", author: "Harold Pinter", editions: [{ title: "Os Anões", language: "pt-PT", isbn: "9789722031240", publisher: "Relógio", year: null }], synopsis: "Um romance.", finished: true, holders: 2, jev: null });
 });
 
 test("the export merges the holders of works merged into one", () => {
@@ -75,4 +75,13 @@ test("an import fills empty, Jev and earlier manual editions, never source genre
   assert.deepEqual(row(db, tagged), { genres: JSON.stringify(["Science Fiction"]), genres_source: null, genres_confidence: null });
   assert.deepEqual(importGenreLabelsWith(repo, labels), { works: 0, editions: 0, skipped: [blank, tagged, other] });
   assert.deepEqual(importGenreLabelsWith(repo, [{ workId: other, genres: ["History"] }, { workId: blank, genres: [] }]), { works: 1, editions: 1, skipped: [blank] });
+});
+
+test("the export also lists works whose only genres are Jev's possible ones, with Jev's answer", () => {
+  const { db, repo, blank, tagged } = seeded();
+  repo.saveGenreJudgment({ workId: blank, model: "jev-1.13.0", genre: "Biography & Memoir", confidence: 0.6, askedAt: "2026-10-14T00:00:00.000Z" });
+  repo.applyGenreJudgments(0.5);
+  db.prepare("UPDATE books SET genres = ?, genres_source = 'jev', genres_confidence = 0.95 WHERE work_id = ?").run(JSON.stringify(["Science Fiction"]), tagged);
+  const rows = genrePassWorksWith(repo, [{ workId: blank, holders: 1, finished: true }, { workId: tagged, holders: 1, finished: true }]);
+  assert.deepEqual(rows.map((entry) => [entry.workId, entry.jev]), [[blank, { genre: "Biography & Memoir", confidence: 0.6 }]]);
 });

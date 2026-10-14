@@ -14,7 +14,7 @@ export type WorkGameRef = { id: string; name: string; owner: ReaderProfile | "ap
 export type WorkRating = { value: number; count: number };
 
 export type WorkPage = {
-  work: { id: string; title: string; author: string; summary: string | null; coverUrl: string | null; coverColor: string | null; editions: WorkEdition[]; genres: string[]; rating: WorkRating | null; year: number | null; pages: number | null };
+  work: { id: string; title: string; author: string; summary: string | null; coverUrl: string | null; coverColor: string | null; editions: WorkEdition[]; genres: string[]; possibleGenres?: string[]; rating: WorkRating | null; year: number | null; pages: number | null };
   mine: WorkMine | null;
   readers: { followed: WorkReader[]; others: WorkReader[]; counts: { readers: number; finished: number } };
   games: { tierlists: WorkGameRef[]; arenas: WorkGameRef[]; quizzes: WorkGameRef[] };
