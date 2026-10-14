@@ -40,6 +40,8 @@ CREATE TABLE IF NOT EXISTS books (
   work_checked_at     TEXT,
   title_key           TEXT,
   title_group_blocked_at TEXT,
+  genres_source TEXT,
+  genres_confidence REAL,
   created_at          TEXT NOT NULL
 );
 

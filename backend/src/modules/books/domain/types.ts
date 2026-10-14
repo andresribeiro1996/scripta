@@ -38,8 +38,12 @@ export interface BookRow {
   work_checked_at: string | null;
   title_key: string | null;
   title_group_blocked_at: string | null;
+  genres_source: GenresSource | null;
+  genres_confidence: number | null;
   created_at: string;
 }
+
+export type GenresSource = "jev" | "manual";
 
 export interface CoverImageRow {
   id: string;
@@ -70,7 +74,7 @@ export interface NewBook {
 export type WorkPageRows = {
   work: { id: string; title: string; author: string; summary: string | null };
   aliasIds: string[];
-  editions: Array<{ id: string; title: string; language: string | null; year: number | null; isbn: string | null; summary: string | null; cover_image_id: string | null; cover_color: string | null; genres: string; rating: number | null; rating_count: number; pages: number | null }>;
+  editions: Array<{ id: string; title: string; language: string | null; year: number | null; isbn: string | null; summary: string | null; cover_image_id: string | null; cover_color: string | null; genres: string; rating: number | null; rating_count: number; pages: number | null; genres_source: GenresSource | null; genres_confidence: number | null }>;
 };
 
 export interface WorkView {
@@ -80,3 +84,8 @@ export interface WorkView {
   author: string;
   editions: Array<{ id: string; isbn: string | null; title: string; author: string; olWorkKey: string | null }>;
 }
+
+export type GenreEvidence = {
+  work: { id: string; title: string; author: string; summary: string | null };
+  editions: Array<{ title: string; language: string | null; isbn: string | null; publisher: string | null; year: number | null; summary: string | null }>;
+};

@@ -1,5 +1,5 @@
 import type { BookMetadata, BookSearchResult, CatalogBookMetadata } from "@scripta/shared";
-import type { BookRow, CoverImageRow, CoverSourceName, CoverStatus, DataSource, NewBook, SummarySource, WorkPageRows, WorkView } from "./types.js";
+import type { BookRow, CoverImageRow, CoverSourceName, CoverStatus, DataSource, GenreEvidence, GenresSource, NewBook, SummarySource, WorkPageRows, WorkView } from "./types.js";
 
 export type MergeableDetails = Pick<BookMetadata, "summary" | "pages" | "year" | "publisher" | "translator">;
 
@@ -57,7 +57,10 @@ export interface BooksRepository {
   setWorkSummary(bookId: string, summary: string): void;
   getWorkSummary(bookId: string): { summary: string | null; olWorkKey: string | null } | undefined;
   canonicalWorkIds(ids: string[]): Map<string, string>;
+  genreEvidence(workId: string): GenreEvidence | undefined;
+  setManualGenres(workId: string, genres: string[]): number;
   aliasesOf(workIds: string[]): string[];
+  editionGenres(workIds: string[]): Array<{ work_id: string; genres: string; genres_source: GenresSource | null; genres_confidence: number | null }>;
   setLanguage(id: string, tag: string | null): void;
   setPublisherUrl(id: string, url: string): void;
   listUpgradeWantedIds(after: PageCursor | null, limit: number): IdPage;

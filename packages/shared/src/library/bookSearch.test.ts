@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mergeSearchResults, searchInsideOutside, type BookSearchResult, type BookSearchState } from "./bookSearch.js";
+import { buildManualBook, mergeSearchResults, searchInsideOutside, type BookSearchResult, type BookSearchState } from "./bookSearch.js";
 
 function result(title: string, authors: string[], isbn: string | null): BookSearchResult {
   return { title, authors, year: null, isbn, publisher: null, coverUrl: null, genres: [] };
@@ -83,4 +83,18 @@ test("outside failing with nothing inside rejects with its error", async () => {
 
 test("inside failing rejects even when outside would succeed", async () => {
   await assert.rejects(run("dune", async () => { throw new Error("local"); }, async () => [dune]), /local/);
+});
+
+const manualFields = { title: "Dune", author: "Frank Herbert", isbn: "", publisher: null, readStatus: 0, dateRead: null, rating: null };
+
+test("a book added with search genres marks them as from the catalog", () => {
+  const book = buildManualBook({ ...manualFields, genres: ["Science Fiction"] }, "1");
+  assert.deepEqual(book._genres, ["Science Fiction"]);
+  assert.equal(book._genresFrom, "catalog");
+});
+
+test("a book added without genres carries neither genres nor the marker", () => {
+  const book = buildManualBook(manualFields, "1");
+  assert.equal("_genres" in book, false);
+  assert.equal("_genresFrom" in book, false);
 });

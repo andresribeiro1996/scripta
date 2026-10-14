@@ -17,7 +17,7 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 const { applyBooksMigrations } = await import("./adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("./adapters/sqlite/sqliteBooksRepository.js");
 const { booksRepository, useBooksRepository, peekCachedCoverUrls } = await import("./publicCoverLookup.js");
-const { resolveWorks, canonicalWorks, getWorkPage } = await import("./works.js");
+const { resolveWorks, canonicalWorks, getWorkPage, catalogGenres } = await import("./works.js");
 
 test("registering a repository closes the lazy fallback it replaces", () => {
   const lazy = booksRepository();
@@ -54,6 +54,10 @@ test("the public reads go through the repository registered with useBooksReposit
   calls.length = 0;
   assert.equal(getWorkPage(workId)?.id, workId);
   assert.deepEqual(calls, ["workPageRows"]);
+
+  calls.length = 0;
+  assert.deepEqual(catalogGenres([workId]), new Map());
+  assert.deepEqual(calls, ["editionGenres"]);
 
   calls.length = 0;
   assert.deepEqual(peekCachedCoverUrls([{ isbn: "9780441013593" }]), [null]);

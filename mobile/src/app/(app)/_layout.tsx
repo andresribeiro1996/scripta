@@ -15,7 +15,7 @@ import { useTheme } from "../../ui/theme";
 
 function GenreEnrichment() {
   const { data: library, updateLibrary } = useLibrary();
-  useGenreEnrichment(library?.data.books ?? [], updateLibrary);
+  useGenreEnrichment(library?.data.books ?? [], library?.genres, updateLibrary);
   return null;
 }
 

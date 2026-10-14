@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { setTimeout as delay } from "node:timers/promises";
-import { GENRE_LOOKUP_BATCH, genreLookupOrder, normalizeBookGenres, settleWithConcurrency } from "./bookGenres.js";
+import { BOOK_GENRES, GENRE_LOOKUP_BATCH, genreLookupOrder, normalizeBookGenres, settleWithConcurrency } from "./bookGenres.js";
 
 test("genreLookupOrder puts finished books first, unread/reading after, both in stable order", () => {
   const unread = { Title: "A", ReadStatus: 0 };
@@ -66,4 +66,53 @@ test("normalizeBookGenres maps BISAC-style subject paths", () => {
   ];
   for (const [subject, genre] of cases) assert.deepEqual(normalizeBookGenres([subject]), [genre], subject);
   assert.deepEqual(normalizeBookGenres(["Fiction / General"]), []);
+});
+
+test("normalizeBookGenres maps Portuguese subjects and tags", () => {
+  const cases: Array<[string, string]> = [
+    ["Ficção científica", "Science Fiction"],
+    ["Ficção científica e fantasia", "Science Fiction"],
+    ["Ficção histórica", "Historical Fiction"],
+    ["Romances históricos", "Historical Fiction"],
+    ["Romance histórico", "Historical Fiction"],
+    ["Ficção literária", "Literary Fiction"],
+    ["Clássicos", "Classics"],
+    ["Biografias e memórias", "Biography & Memoir"],
+    ["Autobiografia", "Biography & Memoir"],
+    ["Banda desenhada", "Comics & Graphic Novels"],
+    ["Quadrinhos", "Comics & Graphic Novels"],
+    ["Literatura juvenil", "Young Adult"],
+    ["Livros infantis", "Children's"],
+    ["Fantasia", "Fantasy"],
+    ["Policial", "Mystery"],
+    ["Policiais e thrillers", "Mystery"],
+    ["Romance policial", "Mystery"],
+    ["Mistérios e suspenses", "Mystery"],
+    ["Suspenses", "Thriller"],
+    ["Terror", "Horror"],
+    ["Crimes", "Crime"],
+    ["História", "History"],
+    ["Filosofia", "Philosophy"],
+    ["Psicologia", "Psychology"],
+    ["Informática", "Technology"],
+    ["Ciências", "Science"],
+    ["Economia e gestão", "Business"],
+    ["Autoajuda", "Self-Help"],
+    ["Auto-ajuda", "Self-Help"],
+    ["Desenvolvimento pessoal", "Self-Help"],
+    ["Poesia", "Poetry"],
+    ["Poemas", "Poetry"],
+    ["Religião", "Religion"],
+    ["Viagem: Ásia", "Travel"],
+    ["Culinária", "Cooking"]
+  ];
+  for (const [subject, genre] of cases) assert.deepEqual(normalizeBookGenres([subject]), [genre], subject);
+  assert.deepEqual(normalizeBookGenres(["Romance"]), ["Romance"]);
+  assert.deepEqual(normalizeBookGenres(["Histórias"]), []);
+  assert.deepEqual(normalizeBookGenres(["Fiction / Romance / Historical / General"]), ["Romance"]);
+  assert.deepEqual(normalizeBookGenres(["Romance / Police Procedural"]), ["Romance"]);
+});
+
+test("every canonical genre name normalizes to itself", () => {
+  for (const genre of BOOK_GENRES) assert.deepEqual(normalizeBookGenres([genre]), [genre], genre);
 });

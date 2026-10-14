@@ -10,5 +10,5 @@ export { booksPlugin as registerBooksModule, enqueueBookCovers } from "./plugin.
 // queued lookup does that.
 export { peekCachedCoverUrl, peekCachedCoverUrls } from "./publicCoverLookup.js";
 export type { PeekCachedCoverParams } from "./publicCoverLookup.js";
-export { canonicalWorks, getWorkPage, matchWorks, resolveWorks } from "./works.js";
+export { canonicalWorks, catalogGenres, getWorkPage, matchWorks, resolveWorks } from "./works.js";
 export type { CatalogWorkPage, WorkLookup } from "./works.js";

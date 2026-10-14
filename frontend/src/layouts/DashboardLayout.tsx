@@ -71,7 +71,7 @@ export function DashboardLayout() {
   const { session, logout } = useAuth();
   const { data: library, updateLibrary } = useLibrary();
   const { personalNewCount } = useDashboard();
-  useGenreEnrichment(library?.data.books ?? [], updateLibrary);
+  useGenreEnrichment(library?.data.books ?? [], library?.genres, updateLibrary);
   useAccountAppearanceSync();
   const [drawerOpen, setDrawerOpen] = useState(false);
   // Set by the mural editor while it's in edit mode: the canvas is the

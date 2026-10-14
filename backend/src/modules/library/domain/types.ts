@@ -29,6 +29,7 @@ export interface LibraryDocument {
    *  publicUrlFor closure" pattern as modules/gallery's GalleryImage.url. */
   shareUrl: string | null;
   works: Record<string, string>;
+  genres: Record<string, string[]>;
 }
 
 export interface LibraryDocumentText {
@@ -37,6 +38,7 @@ export interface LibraryDocumentText {
   shareToken: string | null;
   shareUrl: string | null;
   works: Record<string, string>;
+  genres: Record<string, string[]>;
 }
 
 export interface LibraryMatchKeyRow {

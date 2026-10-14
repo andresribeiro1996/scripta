@@ -15,7 +15,7 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
 const { applyBooksMigrations } = await import("./adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("./adapters/sqlite/sqliteBooksRepository.js");
-const { resolveWorksWith, canonicalWorksWith, getWorkPageWith, matchWorksWith } = await import("./works.js");
+const { resolveWorksWith, canonicalWorksWith, getWorkPageWith, matchWorksWith, catalogGenresWith } = await import("./works.js");
 
 function freshRepo() {
   const db = new DatabaseSync(":memory:");
@@ -143,4 +143,41 @@ test("matchWorks returns the best matching works and the works merged into them"
   assert.deepEqual(matchWorksWith(repo, "dun", 20), [dune.work_id, older.work_id]);
   assert.deepEqual(matchWorksWith(repo, "zzz", 20), []);
   assert.deepEqual(matchWorksWith(repo, "", 20), []);
+});
+
+test("catalog genres rank each work's editions and split Jev guesses below the confident line", () => {
+  const { db, repo } = freshRepo();
+  const [dune, orlando, blank] = resolveWorksWith(repo, [
+    { isbn: "9780441013593", title: "Dune", author: "Frank Herbert" },
+    { isbn: null, title: "Orlando", author: "Virginia Woolf" },
+    { isbn: null, title: "Blank", author: "Nobody" }
+  ]);
+  db.prepare("UPDATE books SET genres = ? WHERE work_id = ?").run(JSON.stringify(["Science Fiction"]), dune!);
+  db.prepare("UPDATE books SET genres = ?, genres_source = 'jev', genres_confidence = 0.6 WHERE work_id = ?").run(JSON.stringify(["Biography & Memoir"]), orlando!);
+  const genres = catalogGenresWith(repo, [dune!, orlando!, blank!]);
+  assert.deepEqual(genres.get(dune!), { genres: ["Science Fiction"], possibleGenres: [] });
+  assert.deepEqual(genres.get(orlando!), { genres: [], possibleGenres: ["Biography & Memoir"] });
+  assert.equal(genres.has(blank!), false);
+  assert.deepEqual(catalogGenresWith(repo, []), new Map());
+});
+
+test("a work page marks Jev editions below the confident line as possible", () => {
+  const { db, repo } = freshRepo();
+  const [work] = resolveWorksWith(repo, [{ isbn: null, title: "Orlando", author: "Virginia Woolf" }]);
+  db.prepare("UPDATE books SET genres = ?, genres_source = 'jev', genres_confidence = 0.6 WHERE work_id = ?").run(JSON.stringify(["Biography & Memoir"]), work!);
+  assert.equal(getWorkPageWith(repo, () => "x", work!)!.editions[0]!.possible, true);
+  db.prepare("UPDATE books SET genres_confidence = 0.9 WHERE work_id = ?").run(work!);
+  assert.equal(getWorkPageWith(repo, () => "x", work!)!.editions[0]!.possible, false);
+});
+
+test("the genre source columns are added to an existing database once", () => {
+  const db = new DatabaseSync(":memory:");
+  applyBooksMigrations(db);
+  db.exec("ALTER TABLE books DROP COLUMN genres_source");
+  db.exec("ALTER TABLE books DROP COLUMN genres_confidence");
+  applyBooksMigrations(db);
+  applyBooksMigrations(db);
+  const names = (db.prepare("PRAGMA table_info(books)").all() as Array<{ name: string }>).map((column) => column.name);
+  assert.ok(names.includes("genres_source"));
+  assert.ok(names.includes("genres_confidence"));
 });
