@@ -40,10 +40,18 @@ export function contentDetail(content: PublishedContent): string {
 
 export type ContentTone = "neutral" | "accent" | "info" | "success" | "reference";
 
+export const CONTENT_STATUS = {
+  inProgress: { label: "In progress", tone: "info" },
+  completed: { label: "Completed", tone: "success" },
+  votingOpen: { label: "Voting open", tone: "accent" },
+  open: { label: "Open", tone: "accent" },
+  closed: { label: "Closed", tone: "neutral" }
+} as const satisfies Record<string, { label: string; tone: ContentTone }>;
+
 export function contentStatus(content: PublishedContent): { label: string; tone: ContentTone; votedBadge?: boolean } {
   switch (content.kind) {
     case "tournament": {
-      const base = content.status === "active" ? { label: "In progress", tone: "info" as const } : { label: "Completed", tone: "success" as const };
+      const base = content.status === "active" ? CONTENT_STATUS.inProgress : CONTENT_STATUS.completed;
       // Tier lists fold the vote into the status itself ("Voted"); a tournament's
       // status still matters after voting, so it travels as a second badge.
       return content.viewerVoted ? { ...base, votedBadge: true } : base;
@@ -51,10 +59,10 @@ export function contentStatus(content: PublishedContent): { label: string; tone:
     case "tierlist":
       if (content.promotedAt) return { label: "Reference", tone: "reference" };
       if (content.votingOpen && content.viewerVoted) return { label: "Voted", tone: "info" };
-      return content.votingOpen ? { label: "Voting open", tone: "accent" } : { label: "Closed", tone: "neutral" };
+      return content.votingOpen ? CONTENT_STATUS.votingOpen : CONTENT_STATUS.closed;
     case "quiz":
       if (content.playOpen && content.viewerVoted) return { label: "Played", tone: "info" };
-      return content.playOpen ? { label: "Open", tone: "accent" } : { label: "Closed", tone: "neutral" };
+      return content.playOpen ? CONTENT_STATUS.open : CONTENT_STATUS.closed;
   }
 }
 

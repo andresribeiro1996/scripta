@@ -1,4 +1,7 @@
+import { DEFAULT_TIER_PRESET } from "@scripta/shared";
 import { activityRow, contentDetail, contentKindLabel, contentStats, contentStatus, contentTarget, feedHeading, feedTarget, type ActivityItem } from "@scripta/shared/community";
+
+export const TIER_LADDER = DEFAULT_TIER_PRESET.map((tier) => tier.color);
 
 export { contentDetail, contentKindLabel, contentStats, contentStatus, contentTarget, feedHeading, feedTarget };
 

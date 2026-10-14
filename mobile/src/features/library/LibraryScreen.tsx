@@ -16,7 +16,7 @@
 // re-pointed at groups instead of books while this tab is active.
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, KeyboardAvoidingView, Platform, Pressable, RefreshControl, StyleSheet, View } from "react-native";
+import { Alert, Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import {
@@ -35,7 +35,7 @@ import {
   type SortKey,
 } from "@scripta/shared";
 import { Button, EmptyState, ErrorState, Fab, IconButton, Input, Menu, Screen, Sheet, Skeleton, SwipeableTabs, type MenuItem } from "../../ui/components";
-import { CycleButton, RoundButton, SearchDock, dockClearance, dockFabClearance, dynamicType, useDockScroll, useTheme } from "../../ui";
+import { SearchDock, dynamicType, searchDockClearance, searchDockFabClearance, useTheme } from "../../ui";
 import { radii, spacing, typography } from "../../ui/theme";
 import { useMurals } from "../murals/useMurals";
 import { useLibrary } from "./hooks/useLibrary";
@@ -64,9 +64,11 @@ export function LibraryScreen() {
   const [sortKey, setSortKey] = useState<SortKey>("manual");
   const [groupQuery, setGroupQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
-  const { scrolling, scrollProps } = useDockScroll();
   const groupsView = useRef<GroupsViewHandle>(null);
   const onCollectionsTab = statusFilter === "collections";
+  const typeFilterIndex = TYPE_FILTER_OPTIONS.findIndex((option) => option.value === typeFilter);
+  const typeFilterOption = TYPE_FILTER_OPTIONS[typeFilterIndex];
+  const nextTypeFilter = TYPE_FILTER_OPTIONS[(typeFilterIndex + 1) % TYPE_FILTER_OPTIONS.length];
 
   // Renaming stays a modal: it is one field, and a form sheet for it would be
   // more ceremony than the edit.
@@ -219,15 +221,43 @@ export function LibraryScreen() {
       )}
 
       {!isPending && !isError && books.length > 0 && (
-        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.grow}>
-          <View style={styles.grow}>
+        <SearchDock
+          value={onCollectionsTab ? groupQuery : query}
+          onChangeText={onCollectionsTab ? setGroupQuery : setQuery}
+          accessibilityLabel={onCollectionsTab ? "Search collections" : "Search title or author"}
+          placeholder={onCollectionsTab ? "Search collections" : "Search title or author"}
+          cycle={
+            onCollectionsTab
+              ? {
+                  icon: typeFilterOption.icon,
+                  active: typeFilter !== "all",
+                  accessibilityLabel: `Showing ${typeFilterOption.label.toLowerCase()}`,
+                  accessibilityHint: "Switches to the next type",
+                  onPress: () => setTypeFilter(nextTypeFilter.value),
+                }
+              : {
+                  icon: "filter",
+                  active: sortKey !== "manual",
+                  accessibilityLabel: `Sort books, currently ${sortLabel}`,
+                  menu: { title: "Sort books", items: sortItems },
+                }
+          }
+          fab={
+            selectionMode ? undefined : onCollectionsTab ? (
+              <Fab label="New" accessibilityLabel="New collection" onPress={() => groupsView.current?.startCreating()} />
+            ) : (
+              <Fab label="Add" accessibilityLabel="Add book" onPress={() => router.push("/add-book" as never)} />
+            )
+          }
+        >
+          {(scrollProps) => (
             <SwipeableTabs
               accessibilityLabel="Library shelf"
               options={LIBRARY_TABS}
               value={statusFilter}
               onChange={setStatusFilter}
               renderPage={(status) => {
-                if (status === "collections") return <GroupsView ref={groupsView} search={groupQuery} typeFilter={typeFilter} bottomInset={dockFabClearance} {...scrollProps} />;
+                if (status === "collections") return <GroupsView ref={groupsView} search={groupQuery} typeFilter={typeFilter} bottomInset={selectionMode ? searchDockClearance : searchDockFabClearance} {...scrollProps} />;
                 const pageBooks = sortBooks(filterBooks(ordered, query, status), sortKey);
                 return (
                   <LibraryGrid
@@ -235,7 +265,7 @@ export function LibraryScreen() {
                     keyExtractor={(book, i) => String(book.ContentID ?? i)}
                     style={style}
                     topInset={spacing.lg}
-                    bottomInset={selectionMode ? dockClearance : dockFabClearance}
+                    bottomInset={selectionMode ? searchDockClearance : searchDockFabClearance}
                     {...scrollProps}
                     refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} />}
                     ListHeaderComponent={
@@ -283,33 +313,8 @@ export function LibraryScreen() {
                 );
               }}
             />
-            {onCollectionsTab ? (
-              <SearchDock
-                hidden={scrolling}
-                accessibilityLabel="Search collections"
-                placeholder="Search collections"
-                value={groupQuery}
-                onChangeText={setGroupQuery}
-                fab={selectionMode ? undefined : <Fab label="New" accessibilityLabel="New collection" onPress={() => groupsView.current?.startCreating()} />}
-                trailing={<CycleButton options={TYPE_FILTER_OPTIONS} value={typeFilter} onChange={setTypeFilter} />}
-              />
-            ) : (
-              <SearchDock
-                hidden={scrolling}
-                accessibilityLabel="Search title or author"
-                placeholder="Search title or author"
-                value={query}
-                onChangeText={setQuery}
-                fab={selectionMode ? undefined : <Fab label="Add" accessibilityLabel="Add book" onPress={() => router.push("/add-book" as never)} />}
-                trailing={
-                  <Menu title="Sort books" items={sortItems}>
-                    <RoundButton icon="filter" active={sortKey !== "manual"} accessibilityLabel={`Sort books, currently ${sortLabel}`} />
-                  </Menu>
-                }
-              />
-            )}
-          </View>
-        </KeyboardAvoidingView>
+          )}
+        </SearchDock>
       )}
 
       <Sheet visible={editingName} title="Rename library" onClose={() => setEditingName(false)}>

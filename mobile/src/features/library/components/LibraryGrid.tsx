@@ -1,6 +1,7 @@
 import { useMemo, type ReactElement } from "react";
 import { FlatList, type FlatListProps, StyleSheet, useWindowDimensions, View } from "react-native";
 import type { LibraryStyleSettings } from "@scripta/shared";
+import type { SearchDockScrollProps } from "../../../ui/SearchDock";
 import { spacing, useTheme } from "../../../ui/theme";
 import { libraryGridColumns } from "../lib/gridColumns";
 
@@ -36,7 +37,7 @@ export function LibraryGrid<T>({
   refreshControl?: FlatListProps<T>["refreshControl"];
   topInset?: number;
   bottomInset?: number;
-} & Pick<FlatListProps<T>, "onScrollBeginDrag" | "onScrollEndDrag" | "onMomentumScrollBegin" | "onMomentumScrollEnd">) {
+} & Partial<Pick<SearchDockScrollProps, "onScrollBeginDrag" | "onScrollEndDrag" | "onMomentumScrollBegin" | "onMomentumScrollEnd">>) {
   const { colors } = useTheme();
   const { columns, contentWidth } = useLibraryGridColumns(style);
   const cellWidth = (contentWidth - style.cardGap * (columns - 1)) / columns;

@@ -1,50 +1,63 @@
-import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from "react";
-import { Animated, Dimensions, Keyboard, Pressable, StyleSheet, View } from "react-native";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Animated, Dimensions, Keyboard, KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from "react-native";
 import { Icon, type IconName } from "./icon";
-import { Input } from "./components";
+import { Input, Menu, type MenuItem } from "./components";
 import { minimumTouchTarget, radii, spacing, useReducedMotion, useTheme } from "./theme";
 
-const DOCK_HEIGHT = minimumTouchTarget + spacing.md * 2;
 const FAB_HEIGHT = 56;
 
-export const dockClearance = minimumTouchTarget + spacing.lg * 2;
-export const dockFabClearance = DOCK_HEIGHT + FAB_HEIGHT + spacing.lg * 2;
+export const searchDockClearance = minimumTouchTarget + spacing.lg * 2;
+export const searchDockFabClearance = searchDockClearance + FAB_HEIGHT + spacing.lg;
 
-export function useDockScroll() {
-  const [scrolling, setScrolling] = useState(false);
-  return {
-    scrolling,
-    scrollProps: {
-      onScrollBeginDrag: () => setScrolling(true),
-      onScrollEndDrag: () => setScrolling(false),
-      onMomentumScrollBegin: () => setScrolling(true),
-      onMomentumScrollEnd: () => setScrolling(false),
-    },
-  };
-}
+export type SearchDockScrollProps = {
+  keyboardShouldPersistTaps: "handled";
+  keyboardDismissMode: "on-drag";
+  onScrollBeginDrag: () => void;
+  onScrollEndDrag: () => void;
+  onMomentumScrollBegin: () => void;
+  onMomentumScrollEnd: () => void;
+};
 
 export function SearchDock({
-  hidden,
+  value,
+  onChangeText,
+  accessibilityLabel,
+  placeholder,
+  cycle,
   fab,
-  trailing,
-  ...input
-}: Pick<ComponentProps<typeof Input>, "value" | "onChangeText" | "placeholder" | "accessibilityLabel"> & {
-  hidden: boolean;
+  hidden = false,
+  children,
+}: {
+  value: string;
+  onChangeText: (text: string) => void;
+  accessibilityLabel: string;
+  placeholder: string;
+  cycle?: {
+    icon: IconName;
+    active: boolean;
+    accessibilityLabel: string;
+    accessibilityHint?: string;
+    onPress?: () => void;
+    menu?: { title: string; items: MenuItem[] };
+  };
   fab?: ReactNode;
-  trailing: ReactNode;
+  hidden?: boolean;
+  children: (scrollProps: SearchDockScrollProps) => ReactNode;
 }) {
+  const { colors } = useTheme();
   const frame = useRef<View>(null);
   const [overlap, setOverlap] = useState(0);
+  const [scrolling, setScrolling] = useState(false);
   const reducedMotion = useReducedMotion();
-  const visibility = useRef(new Animated.Value(1)).current;
+  const dock = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     if (reducedMotion) {
-      visibility.setValue(hidden ? 0 : 1);
+      dock.setValue(scrolling ? 0 : 1);
       return;
     }
-    Animated.timing(visibility, { duration: 180, toValue: hidden ? 0 : 1, useNativeDriver: true }).start();
-  }, [visibility, reducedMotion, hidden]);
+    Animated.timing(dock, { duration: 180, toValue: scrolling ? 0 : 1, useNativeDriver: true }).start();
+  }, [dock, reducedMotion, scrolling]);
 
   useEffect(() => {
     const shown = Keyboard.addListener("keyboardDidShow", (event) => {
@@ -52,86 +65,73 @@ export function SearchDock({
         setOverlap(Math.max(0, Math.min(height, y + height - (Dimensions.get("window").height - event.endCoordinates.height))));
       });
     });
-    const hiddenListener = Keyboard.addListener("keyboardDidHide", () => setOverlap(0));
+    const hiding = Keyboard.addListener("keyboardDidHide", () => setOverlap(0));
     return () => {
       shown.remove();
-      hiddenListener.remove();
+      hiding.remove();
     };
   }, []);
 
-  return (
-    <View ref={frame} pointerEvents="box-none" style={StyleSheet.absoluteFill}>
-      <Animated.View
-        pointerEvents={hidden ? "none" : "box-none"}
-        style={[styles.layer, { bottom: overlap, opacity: visibility, transform: [{ translateY: visibility.interpolate({ inputRange: [0, 1], outputRange: [minimumTouchTarget, 0] }) }] }]}
-      >
-        {fab ? <View pointerEvents="box-none" style={[styles.fabArea, { bottom: DOCK_HEIGHT }]}>{fab}</View> : null}
-        <View style={styles.dock}>
-          <View style={styles.grow}>
-            <Input icon="search" {...input} autoCapitalize="none" autoCorrect={false} clearButtonMode="while-editing" returnKeyType="search" style={styles.searchField} />
-          </View>
-          {trailing}
-        </View>
-      </Animated.View>
-    </View>
-  );
-}
+  const scrollProps: SearchDockScrollProps = {
+    keyboardShouldPersistTaps: "handled",
+    keyboardDismissMode: "on-drag",
+    onScrollBeginDrag: () => setScrolling(true),
+    onScrollEndDrag: () => setScrolling(false),
+    onMomentumScrollBegin: () => setScrolling(true),
+    onMomentumScrollEnd: () => setScrolling(false),
+  };
 
-export function RoundButton({
-  icon,
-  active,
-  accessibilityLabel,
-  accessibilityHint,
-  onPress,
-}: {
-  icon: IconName;
-  active: boolean;
-  accessibilityLabel: string;
-  accessibilityHint?: string;
-  onPress?: () => void;
-}) {
-  const { colors } = useTheme();
-  return (
+  const cycleButton = cycle ? (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-      accessibilityHint={accessibilityHint}
-      onPress={onPress}
-      style={[styles.round, { borderColor: colors.border, backgroundColor: active ? colors.accentSoft : colors.surface }]}
+      accessibilityLabel={cycle.accessibilityLabel}
+      accessibilityHint={cycle.accessibilityHint}
+      onPress={cycle.onPress}
+      style={[styles.cycle, { borderColor: colors.border, backgroundColor: cycle.active ? colors.accentSoft : colors.surface }]}
     >
-      <Icon name={icon} size={20} color={active ? colors.text : colors.textDim} />
+      <Icon name={cycle.icon} size={20} color={cycle.active ? colors.text : colors.textDim} />
     </Pressable>
-  );
-}
+  ) : null;
 
-export function CycleButton<T extends string>({
-  options,
-  value,
-  onChange,
-}: {
-  options: readonly { value: T; label: string; icon: IconName }[];
-  value: T;
-  onChange: (value: T) => void;
-}) {
-  const index = options.findIndex((option) => option.value === value);
-  const current = options[index];
-  const next = options[(index + 1) % options.length];
   return (
-    <RoundButton
-      icon={current.icon}
-      active={index > 0}
-      accessibilityLabel={`Showing ${current.label.toLowerCase()}`}
-      accessibilityHint="Switches to the next type"
-      onPress={() => onChange(next.value)}
-    />
+    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.grow}>
+      <View ref={frame} style={styles.grow}>
+        <View style={styles.grow}>{children(scrollProps)}</View>
+        {hidden ? null : (
+          <Animated.View
+            pointerEvents={scrolling ? "none" : "box-none"}
+            style={[styles.dock, { bottom: overlap, opacity: dock, transform: [{ translateY: dock.interpolate({ inputRange: [0, 1], outputRange: [minimumTouchTarget, 0] }) }] }]}
+          >
+            {fab ? <View pointerEvents="box-none" style={styles.fabArea}>{fab}</View> : null}
+            <View style={styles.row}>
+              <View style={styles.grow}>
+                <Input
+                  icon="search"
+                  accessibilityLabel={accessibilityLabel}
+                  value={value}
+                  onChangeText={onChangeText}
+                  placeholder={placeholder}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  clearButtonMode="while-editing"
+                  returnKeyType="search"
+                  style={styles.searchField}
+                />
+              </View>
+              {cycleButton && cycle?.menu ? <Menu title={cycle.menu.title} items={cycle.menu.items}>{cycleButton}</Menu> : cycleButton}
+            </View>
+          </Animated.View>
+        )}
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   grow: { flex: 1 },
-  layer: { position: "absolute", top: 0, left: 0, right: 0 },
-  fabArea: { position: "absolute", top: 0, left: 0, right: 0 },
-  dock: { position: "absolute", bottom: 0, left: 0, right: 0, flexDirection: "row", alignItems: "center", gap: spacing.sm, padding: spacing.md },
+  dock: { position: "absolute", left: 0, right: 0 },
+  fabArea: { height: FAB_HEIGHT + spacing.lg },
+  row: { flexDirection: "row", alignItems: "center", gap: spacing.sm, padding: spacing.md },
   searchField: { borderRadius: radii.full },
-  round: { alignItems: "center", justifyContent: "center", width: minimumTouchTarget, height: minimumTouchTarget, borderWidth: 1, borderRadius: radii.full },
+  cycle: { alignItems: "center", justifyContent: "center", width: minimumTouchTarget, height: minimumTouchTarget, borderWidth: 1, borderRadius: radii.full },
 });

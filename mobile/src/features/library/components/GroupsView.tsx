@@ -16,12 +16,13 @@
 // can drive this list without it needing its own chrome.
 
 import { forwardRef, useImperativeHandle, useMemo, useRef, useState } from "react";
-import { Alert, Pressable, ScrollView, type ScrollViewProps, StyleSheet, View } from "react-native";
+import { Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../../ui/Text";
 import { router } from "expo-router";
 import { makeGroup, orderedGroupBooks, saveFailureMessage, type GroupType } from "@scripta/shared";
 import { EmptyState, Input } from "../../../ui/components";
 import { Icon, type IconName } from "../../../ui/icon";
+import type { SearchDockScrollProps } from "../../../ui/SearchDock";
 import { spacing, typography, useTheme } from "../../../ui/theme";
 import { useLibrary } from "../hooks/useLibrary";
 import { attemptUpdate } from "../lib/attemptUpdate";
@@ -57,7 +58,7 @@ const GROUP_TYPE_LABEL: Record<GroupType, string> = { series: "Series", collecti
 
 export type GroupsViewHandle = { startCreating: () => void };
 
-type GroupsViewProps = Pick<ScrollViewProps, "onScrollBeginDrag" | "onScrollEndDrag" | "onMomentumScrollBegin" | "onMomentumScrollEnd"> & {
+type GroupsViewProps = Partial<SearchDockScrollProps> & {
   search: string;
   typeFilter: TypeFilter;
   bottomInset: number;
@@ -106,7 +107,7 @@ export const GroupsView = forwardRef<GroupsViewHandle, GroupsViewProps>(function
   }
 
   return (
-    <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.content, { paddingBottom: bottomInset }]} {...scrollProps}>
+    <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.content, { paddingBottom: bottomInset }]} {...scrollProps} keyboardDismissMode="none">
       {drafting && (
         <View style={[styles.draftRow, { borderColor: colors.accent }]}>
           <Input
