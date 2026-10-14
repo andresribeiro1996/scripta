@@ -109,6 +109,70 @@ test("fillIdentity only fills an empty title and does not make the book searchab
   assert.deepEqual(repo.searchBooks(["orlando"], 12), []);
 });
 
+test("fillIdentity gives a titled book with no author its author, and keeps the title", () => {
+  const { repo } = freshRepo();
+  const book = repo.createBook({ title: "Hamlet", author: "", isbn: "9789896414672", createdBy: "publisher" }, ["isbn:9789896414672"], NOW);
+  repo.fillIdentity(book.id, "Hamlet: edição bilingue", "William Shakespeare");
+  const row = repo.getBook(book.id)!;
+  assert.equal(row.title, "Hamlet");
+  assert.equal(row.author, "William Shakespeare");
+  assert.equal(row.title_key, "ta:hamlet|william shakespeare|");
+});
+
+test("fillIdentity never overwrites a title or author that is already there", () => {
+  const { repo } = freshRepo();
+  const book = repo.createBook({ title: "Hamlet", author: "William Shakespeare", isbn: "9789896414672", createdBy: "publisher" }, ["isbn:9789896414672"], NOW);
+  repo.fillIdentity(book.id, "Other", "Someone");
+  const row = repo.getBook(book.id)!;
+  assert.equal(row.title, "Hamlet");
+  assert.equal(row.author, "William Shakespeare");
+});
+
+test("fillIdentity with a title and no author makes a blank book searchable without a work title key", () => {
+  const { repo } = freshRepo();
+  const book = repo.createBook({ title: "", author: "", isbn: "9789896414672", createdBy: "publisher" }, ["isbn:9789896414672"], NOW);
+  repo.fillIdentity(book.id, "Hamlet", "");
+  const row = repo.getBook(book.id)!;
+  assert.equal(row.title, "Hamlet");
+  assert.equal(row.author, "");
+  assert.equal(row.title_key, "");
+  assert.equal(repo.isSearchable(book.id), true);
+  assert.deepEqual(repo.searchBooks(["hamlet"], 12).map((found) => found.title), ["Hamlet"]);
+});
+
+test("findOrCreateBook gives a titled, authorless ISBN book its author and the authored title key", () => {
+  const { repo } = freshRepo();
+  const first = findOrCreateBook(repo, { isbn: "9789896414672", title: "Poemas", author: "" }, NOW)!;
+  const filled = findOrCreateBook(repo, { isbn: "9789896414672", title: "Poemas", author: "Sophia de Mello Breyner Andresen" }, NOW)!;
+  assert.equal(filled.id, first.id);
+  assert.equal(filled.author, "Sophia de Mello Breyner Andresen");
+  assert.equal(repo.findBookByKey("ta:poemas|sophia de mello breyner andresen|")?.id, first.id);
+});
+
+test("findOrCreateBook does not store the authorless title key for an ISBN book", () => {
+  const { repo } = freshRepo();
+  findOrCreateBook(repo, { isbn: "9789896414672", title: "Poemas", author: "" }, NOW);
+  assert.equal(repo.findBookByKey("ta:poemas||"), undefined);
+});
+
+test("findOrCreateBook still matches an ISBN-less authorless lookup by its own key", () => {
+  const { repo } = freshRepo();
+  const first = findOrCreateBook(repo, { isbn: null, title: "Poemas", author: "" }, NOW)!;
+  const second = findOrCreateBook(repo, { isbn: null, title: "Poemas", author: "" }, NOW)!;
+  assert.equal(second.id, first.id);
+  assert.equal(repo.findBookByKey("ta:poemas||")?.id, first.id);
+});
+
+test("fillIdentity adds a later author to the search index of an already searchable book, without a second entry", () => {
+  const { repo } = freshRepo();
+  const book = repo.createBook({ title: "Hamlet", author: "", isbn: "9789896414672", createdBy: "publisher" }, ["isbn:9789896414672"], NOW);
+  assert.equal(repo.isSearchable(book.id), true);
+  assert.deepEqual(repo.searchBooks(["shakespeare"], 10), []);
+  repo.fillIdentity(book.id, "Hamlet", "William Shakespeare");
+  assert.deepEqual(repo.searchBooks(["shakespeare"], 10).map((found) => found.id), [book.id]);
+  assert.deepEqual(repo.searchBooks(["hamlet"], 10).map((found) => found.id), [book.id]);
+});
+
 test("createBook alone does not make a book searchable", () => {
   const { repo } = freshRepo();
   repo.createBook({ title: "Orlando", author: "Virginia Woolf", isbn: "9780141184272" }, ["isbn:9780141184272"], NOW);

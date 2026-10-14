@@ -99,6 +99,25 @@ test("seedBook leaves a titled row alone and does not steal a taken title key", 
   assert.equal(repo.findBookByKey(catalogTitleKey("Two", "Author")!)?.id, titled.id);
 });
 
+test("two authorless books with the same title stay separate and neither claims the title key", () => {
+  const { repo } = setup();
+  const first = seedBook({ isbn: "9789720000019", title: "Poemas", author: "" }, repo, () => NOW, "publisher").book!;
+  const second = seedBook({ isbn: "9789720000026", title: "Poemas", author: "" }, repo, () => NOW, "publisher").book!;
+  assert.notEqual(first.id, second.id);
+  assert.notEqual(first.work_id, second.work_id);
+  assert.equal(repo.findBookByKey("ta:poemas||"), undefined);
+});
+
+test("a blank seeded book gets the title from a later seed, then the author from another", () => {
+  const { repo } = setup();
+  const blank = seedBook({ isbn: "9789720000019", title: "", author: "" }, repo, () => NOW, "publisher").book!;
+  seedBook({ isbn: "9789720000019", title: "Poemas", author: "" }, repo, () => NOW, "publisher");
+  assert.equal(repo.getBook(blank.id)!.title, "Poemas");
+  assert.equal(repo.findBookByKey("ta:poemas||"), undefined);
+  seedBook({ isbn: "9789720000019", title: "Poemas", author: "Sophia de Mello Breyner Andresen" }, repo, () => NOW, "publisher");
+  assert.equal(repo.getBook(blank.id)!.author, "Sophia de Mello Breyner Andresen");
+});
+
 test("seed entries store their work key on created rows, fill empty ones, and never replace one", () => {
   const { repo } = setup();
   const created = seedBook({ isbn: "9780141184272", title: "One", author: "Author", workKey: "/works/OL1W" }, repo, () => NOW);

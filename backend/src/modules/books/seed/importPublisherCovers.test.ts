@@ -266,7 +266,7 @@ test("a new book keeps the shop's title when Open Library has no edition title",
   assert.equal(row.author, "Bruno Maçães");
 });
 
-test("a book with no author anywhere is still created, blank, and gets its cover", async () => {
+test("a book with no author anywhere keeps the shop title, gets its cover and is searchable", async () => {
   const h = await harness();
 
   const reports = await importPublisherCovers(h.deps, [relogio], { dryRun: false });
@@ -275,10 +275,11 @@ test("a book with no author anywhere is still created, blank, and gets its cover
   assert.equal(reports["Relógio d'Água"]!.created, 6);
   assert.equal(reports["Relógio d'Água"]!.coversSet, 6);
   const row = h.repo.findBookByKey(`isbn:${GUERRA}`)!;
-  assert.equal(row.title, "");
+  assert.equal(row.title, "GUERRA BRANCA — NA FRENTE ÁRTICA DO CONFLITO MUNDIAL");
   assert.equal(row.author, "");
   assert.equal(row.cover_status, "manual");
   assert.equal(h.repo.getImage(row.cover_image_id!)!.source, "publisher");
+  assert.equal(h.repo.isSearchable(row.id), true);
 });
 
 test("a WooCommerce book with an Autor attribute needs no Open Library lookup", async () => {
@@ -814,14 +815,15 @@ test("a looked-up work key lands on the created row and a book that needed no lo
   assert.equal(h.repo.findBookByKey("isbn:9789899061354")!.ol_work_key, null);
 });
 
-test("a work key with no author still lands on the blank row", async () => {
+test("a work key with no author lands on the titled row", async () => {
   const h = await harness({ lookup: async () => ({ title: null, author: "", workKey: "/works/OL7W" }) });
 
   const reports = await importPublisherCovers(h.deps, [relogio], { dryRun: false });
 
   assert.equal(reports["Relógio d'Água"]!.noAuthor, 5);
   const row = h.repo.findBookByKey(`isbn:${GUERRA}`)!;
-  assert.equal(row.title, "");
+  assert.equal(row.title, "GUERRA BRANCA — NA FRENTE ÁRTICA DO CONFLITO MUNDIAL");
+  assert.equal(row.author, "");
   assert.equal(row.ol_work_key, "OL7W");
   assert.equal((h.db.prepare("SELECT COUNT(DISTINCT work_id) AS n FROM books WHERE ol_work_key = 'OL7W'").get() as { n: number }).n, 1);
   assert.equal((h.db.prepare("SELECT COUNT(*) AS n FROM works WHERE merged_into IS NOT NULL").get() as { n: number }).n, 0);

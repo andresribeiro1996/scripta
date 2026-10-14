@@ -174,7 +174,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
         keysOf(deps.repo, identity),
         now().toISOString()
       );
-      if (!book.title) deps.repo.fillIdentity(book.id, result.title, author);
+      if (!book.title || !book.author) deps.repo.fillIdentity(book.id, result.title, author);
       deps.repo.setWorkKey(book.id, workKey);
       deps.repo.makeSearchable(book.id);
       return { result: book.cover_image_id ? { ...result, coverUrl: deps.publicUrlFor(book.cover_image_id, "thumb") } : result, book: deps.repo.getBook(book.id) ?? book };

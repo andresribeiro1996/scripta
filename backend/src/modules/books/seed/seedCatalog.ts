@@ -20,13 +20,13 @@ export function seedBook(input: SeedInput, repo: SeedRepo, now: () => Date, crea
   if (existing) {
     repo.setWorkKey(existing.id, input.workKey);
     repo.setLanguage(existing.id, language);
-    if (!existing.title && identity.title) {
-      if (identity.titleKey && !repo.findBookByKey(identity.titleKey)) repo.addKey(identity.titleKey, existing.id);
+    if ((!existing.title && identity.title) || (!existing.author && identity.author)) {
+      if (identity.author && identity.titleKey && !repo.findBookByKey(identity.titleKey)) repo.addKey(identity.titleKey, existing.id);
       repo.fillIdentity(existing.id, identity.title, identity.author);
     }
     return { outcome: "existing", book: existing };
   }
-  const { titleKey } = identity;
+  const titleKey = identity.author ? identity.titleKey : null;
   const keys = titleKey && titleKey !== identity.key && !repo.findBookByKey(titleKey) ? [identity.key, titleKey] : [identity.key];
   const book = repo.createBook({ title: identity.title, author: identity.author, isbn: identity.isbn, workKey: input.workKey, createdBy }, keys, now().toISOString());
   repo.setLanguage(book.id, language);

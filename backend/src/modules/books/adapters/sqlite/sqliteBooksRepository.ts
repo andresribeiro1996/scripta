@@ -49,7 +49,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     VALUES ($id, $title, $author, $year, $publisher, $isbn, $ol_cover_id, $ol_work_key, $work_id, $genres, $data_sources, $created_by, $title_key, $created_at)
   `);
   const insertKeyIfMissingStmt = db.prepare(`INSERT OR IGNORE INTO book_keys (key, book_id) VALUES (?, ?)`);
-  const fillIdentityStmt = db.prepare(`UPDATE books SET title = ?, author = ?, title_key = ? WHERE id = ? AND title = ''`);
+  const fillIdentityStmt = db.prepare(`UPDATE books SET title = ?, author = ?, title_key = ? WHERE id = ? AND (title = '' OR author = '')`);
   const workByKeyStmt = db.prepare(`SELECT id FROM works WHERE ol_work_key = ?`);
   const insertWorkStmt = db.prepare(`INSERT INTO works (id, ol_work_key, title, author, created_at) VALUES (?, ?, ?, ?, ?)`);
   const fillWorkIdentityStmt = db.prepare(`
@@ -133,6 +133,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     SELECT id, title, author FROM books
     WHERE id = ? AND title <> '' AND NOT EXISTS (SELECT 1 FROM books_search WHERE book_id = books.id)
   `);
+  const refreshSearchStmt = db.prepare(`UPDATE books_fts SET title = ?, author = ? WHERE book_id = ?`);
   const markSearchableStmt = db.prepare(`INSERT OR IGNORE INTO books_search (book_id) VALUES (?)`);
   const searchableStmt = db.prepare(`SELECT 1 FROM books_search WHERE book_id = ?`);
   const confirmedStmt = db.prepare(`SELECT 1 FROM books WHERE id = ? AND ${CONFIRMED_SQL}`);
@@ -176,6 +177,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const setAppleCheckedStmt = db.prepare(`UPDATE books SET apple_checked_at = ? WHERE id = ?`);
   const setWorkKeyStmt = db.prepare(`UPDATE books SET ol_work_key = ? WHERE id = ? AND ol_work_key IS NULL`);
   const setLanguageStmt = db.prepare(`UPDATE books SET language = ? WHERE id = ? AND language IS NULL`);
+  const blankTitledStmt = db.prepare(`SELECT id, publisher_url FROM books WHERE title = '' AND publisher_url IS NOT NULL`);
   const setPublisherUrlStmt = db.prepare(`UPDATE books SET publisher_url = ? WHERE id = ? AND publisher_url IS NULL`);
   const upgradeWantedStmt = db.prepare(UPGRADE_WANTED_SQL);
 
@@ -306,14 +308,23 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
 
     fillIdentity(id, title, author) {
       inTransaction(() => {
-        fillIdentityStmt.run(title, author, title ? workTitleKey(title, author) : null, id);
+        const row = byIdStmt.get(id) as BookRow | undefined;
+        if (!row || (row.title !== "" && row.author !== "")) return;
+        const nextTitle = row.title || title;
+        const nextAuthor = row.author || author;
+        if (nextTitle === row.title && nextAuthor === row.author) return;
+        fillIdentityStmt.run(nextTitle, nextAuthor, nextTitle ? workTitleKey(nextTitle, nextAuthor) : null, id);
         fillWorkIdentityStmt.run(id);
-        makeSearchableIfConfirmed(id);
+        if (searchableStmt.get(id)) refreshSearchStmt.run(nextTitle, nextAuthor, id);
+        else makeSearchableIfConfirmed(id);
       });
     },
 
     makeSearchable,
 
+    listBlankTitled() {
+      return blankTitledStmt.all() as Array<{ id: string; publisher_url: string }>;
+    },
     isSearchable: (id) => searchableStmt.get(id) !== undefined,
 
     getImage: (id) => imageStmt.get(id) as CoverImageRow | undefined,
