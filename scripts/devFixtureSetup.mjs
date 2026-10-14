@@ -86,3 +86,15 @@ export function seedCommunityGraph(log) {
   const result = spawnSync("node", ["--import", "tsx", "scripts/dev-community.mjs"], { cwd: repoRoot, env, stdio: "inherit" });
   if (result.status !== 0) throw new Error("scripts/dev-community.mjs failed — see output above.");
 }
+
+/** Adds catalog works with several editions (The Hobbit, which the dev
+ *  account owns, and Dune, which nobody does) so the work page's edition
+ *  strip appears. Runs right after seedDevAccount and before anything that
+ *  boots the backend, so the dev library resolves onto these works (its owned
+ *  edition last) instead of creating The Hobbit's work on its own. */
+export function seedEditionWorks(log) {
+  log("Seeding catalog works with several editions...");
+  const env = { ...process.env, ...devDataDirEnv() };
+  const result = spawnSync("node", ["--import", "tsx", "scripts/dev-editions.mjs"], { cwd: repoRoot, env, stdio: "inherit" });
+  if (result.status !== 0) throw new Error("scripts/dev-editions.mjs failed — see output above.");
+}
