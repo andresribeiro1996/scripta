@@ -195,11 +195,16 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
             )}
             <h1 className="mt-4 text-2xl font-bold">{model.title}</h1>
             <p className="mt-1 text-sm text-(--color-text-dim)">{model.author}</p>
-            {model.genres.length > 0 ? (
+            {model.genres.length + model.possibleGenres.length > 0 ? (
               <ul className="mt-3 flex flex-wrap justify-center gap-1.5 sm:justify-start">
                 {model.genres.map((genre) => (
                   <li key={genre} className="rounded-full border border-(--color-border) px-2 text-xs text-(--color-text-dim)">
                     {genre}
+                  </li>
+                ))}
+                {model.possibleGenres.map((genre) => (
+                  <li key={genre} className="rounded-full border border-dashed border-(--color-border) px-2 text-xs text-(--color-text-dim)">
+                    {`Possibly ${genre}`}
                   </li>
                 ))}
               </ul>
