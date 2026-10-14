@@ -2096,3 +2096,14 @@ test("merging duplicates moves the reader card's chosen book and highlight to th
   assert.equal(style.signature?.bookKey, bookKey(kept));
   assert.equal(style.highlight?.bookKey, bookKey(kept));
 });
+
+test("every library document answer carries the catalog genres of each copy's work", () => {
+  const byWork = new Map([["w-Dune", { genres: ["Science Fiction"], possibleGenres: ["Classics"] }]]);
+  const service = createLibraryService(createSqliteLibraryRepository(memoryDb()), () => "", 10_000_000, undefined, undefined, undefined, undefined, titleWorks, (ids) => new Map(ids.map((id) => [id, id])), (ids) => new Map(ids.flatMap((id) => (byWork.has(id) ? [[id, byWork.get(id)!]] : []))));
+  const saved = service.saveLibrary("u1", { books: [{ Title: "Dune", Attribution: "Frank Herbert" }, { Title: "Orlando", Attribution: "Virginia Woolf" }] });
+  const genres = { "ta:dune|frank herbert": ["Science Fiction", "Classics"] };
+  assert.deepEqual(saved.genres, genres);
+  assert.deepEqual(service.getLibraryText("u1")!.genres, genres);
+  assert.deepEqual(service.getLibrary("u1")!.genres, genres);
+  assert.deepEqual(service.share("u1").genres, genres);
+});

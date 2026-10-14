@@ -134,7 +134,7 @@ function applyChange(service: LibraryService, userId: string, change: LibraryCha
 }
 
 function sendDocumentText(reply: FastifyReply, document: LibraryDocumentText) {
-  const body = `{"data":${document.data},"updatedAt":${JSON.stringify(document.updatedAt)},"shareToken":${JSON.stringify(document.shareToken)},"shareUrl":${JSON.stringify(document.shareUrl)},"works":${JSON.stringify(document.works)}}`;
+  const body = `{"data":${document.data},"updatedAt":${JSON.stringify(document.updatedAt)},"shareToken":${JSON.stringify(document.shareToken)},"shareUrl":${JSON.stringify(document.shareUrl)},"works":${JSON.stringify(document.works)},"genres":${JSON.stringify(document.genres)}}`;
   return reply.type("application/json; charset=utf-8").send(body);
 }
 
