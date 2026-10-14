@@ -27,6 +27,7 @@ interface Candidate { key: IdentityKey; strength: number; signal: ReaderSignal; 
 
 const EPSILON = 1e-9;
 const MIN_BOOKS = 5;
+const MIN_GENRE_BOOKS = 20;
 
 export const GENRE_SIGNALS: Array<{ key: GenreIdentity; genres: BookGenre[]; threshold: number; words: string }> = [
   { key: "lamp", genres: ["Mystery", "Crime", "Thriller", "Horror"], threshold: 0.35, words: "mystery, crime, thriller or horror" },
@@ -126,7 +127,8 @@ export function readerIdentity(books: Book[], groups: Group[]): ReaderIdentity {
     gap: `${pct(byLoyal / n)} of finished books are by authors you keep returning to; 40% settles it`,
   });
 
-  if (known.length * 2 >= n) {
+  const genresKnown = known.length * 2 >= n || known.length >= MIN_GENRE_BOOKS;
+  if (genresKnown) {
     const m = known.length;
     const groupShares: number[] = [];
     for (const signal of GENRE_SIGNALS) {
@@ -159,7 +161,7 @@ export function readerIdentity(books: Book[], groups: Group[]): ReaderIdentity {
 
   const [best, second] = [...candidates].sort((a, b) => b.strength - a.strength);
   if (!best || best.strength < 0.75 - EPSILON) {
-    return unwritten(known.length * 2 < n ? `Genres known for ${known.length} of ${n} books` : "No reading pattern stands out yet");
+    return unwritten(genresKnown ? "No reading pattern stands out yet" : `Genres known for ${known.length} of ${n} books`);
   }
   const clears = (candidate: Candidate | undefined) => Boolean(candidate && candidate.strength >= 1 - EPSILON);
   const tie = clears(best) && clears(second) && second!.strength >= best.strength * 0.95 - EPSILON;

@@ -71,6 +71,29 @@ test("genre signals wait until genres are known for half the finished books", ()
   assert.deepEqual(result.coverage, ["genres known for 4 of 10 finished books"]);
 });
 
+test("genre signals count once 20 finished books have known genres, even under half", () => {
+  const books = shelf(60, (i) => (i < 10 ? { _genres: ["History"] } : i < 20 ? { _genres: ["Romance"] } : {}));
+  const result = readerIdentity(books, []);
+  assert.equal(result.state, "settled");
+  assert.equal(result.identity, "arch");
+  assert.equal(result.missing, null);
+  assert.deepEqual(result.coverage, ["genres known for 20 of 60 finished books"]);
+});
+
+test("one book under the genre floor and under half stays unwritten", () => {
+  const books = shelf(60, (i) => (i < 10 ? { _genres: ["History"] } : i < 19 ? { _genres: ["Romance"] } : {}));
+  const result = readerIdentity(books, []);
+  assert.equal(result.state, "unwritten");
+  assert.equal(result.missing, "Genres known for 19 of 60 books");
+});
+
+test("past the genre floor with no clear pattern says no pattern, not genre coverage", () => {
+  const books = shelf(60, (i) => (i < 13 ? { _genres: ["Romance"] } : i < 25 ? { _genres: ["Psychology"] } : {}));
+  const result = readerIdentity(books, []);
+  assert.equal(result.state, "unwritten");
+  assert.equal(result.missing, "No reading pattern stands out yet");
+});
+
 test("40% fantasy or science fiction settles the Stargazer", () => {
   const others = ["Romance", "Philosophy", "Science", "Travel", "Cooking", "Psychology"];
   const books = shelf(10, (i) => ({ _genres: [i < 4 ? (i % 2 ? "Fantasy" : "Science Fiction") : others[i - 4]!] }));
