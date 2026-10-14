@@ -109,7 +109,7 @@ export function EditionStrip({ editions, author, edition, mineBook, onSelect }: 
       {edition.showDots ? (
         <div aria-hidden="true" className="mt-2 flex justify-center gap-1.5">
           {editions.map((e, i) => (
-            <span key={e.bookId} className={`h-1.5 w-1.5 rounded-full ${i === index ? "bg-(--color-text)" : "bg-(--color-border)"}`} />
+            <span key={e.bookId} className={`h-1.5 w-1.5 rounded-full ${i === index ? "bg-(--color-text)" : "bg-(--color-text-dim) opacity-40"}`} />
           ))}
         </div>
       ) : null}

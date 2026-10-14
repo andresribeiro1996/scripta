@@ -77,7 +77,7 @@ export function EditionStrip({ editions, book, edition, onSelect }: { editions: 
       {showDots ? (
         <View importantForAccessibility="no-hide-descendants" style={styles.dots}>
           {editions.map((item, i) => (
-            <View key={item.bookId} style={[styles.dot, { backgroundColor: i === index ? colors.text : colors.border }]} />
+            <View key={item.bookId} style={[styles.dot, { backgroundColor: i === index ? colors.text : colors.textDim, opacity: i === index ? 1 : 0.4 }]} />
           ))}
         </View>
       ) : null}
