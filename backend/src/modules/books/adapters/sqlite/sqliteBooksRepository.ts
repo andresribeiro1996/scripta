@@ -133,6 +133,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     SELECT id, title, author FROM books
     WHERE id = ? AND title <> '' AND NOT EXISTS (SELECT 1 FROM books_search WHERE book_id = books.id)
   `);
+  const refreshSearchStmt = db.prepare(`UPDATE books_fts SET title = ?, author = ? WHERE book_id = ?`);
   const markSearchableStmt = db.prepare(`INSERT OR IGNORE INTO books_search (book_id) VALUES (?)`);
   const searchableStmt = db.prepare(`SELECT 1 FROM books_search WHERE book_id = ?`);
   const confirmedStmt = db.prepare(`SELECT 1 FROM books WHERE id = ? AND ${CONFIRMED_SQL}`);
@@ -313,7 +314,8 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
         if (nextTitle === row.title && nextAuthor === row.author) return;
         fillIdentityStmt.run(nextTitle, nextAuthor, nextTitle ? workTitleKey(nextTitle, nextAuthor) : null, id);
         fillWorkIdentityStmt.run(id);
-        makeSearchableIfConfirmed(id);
+        if (searchableStmt.get(id)) refreshSearchStmt.run(nextTitle, nextAuthor, id);
+        else makeSearchableIfConfirmed(id);
       });
     },
 

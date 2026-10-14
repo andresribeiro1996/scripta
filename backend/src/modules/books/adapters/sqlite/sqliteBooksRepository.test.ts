@@ -163,6 +163,16 @@ test("findOrCreateBook still matches an ISBN-less authorless lookup by its own k
   assert.equal(repo.findBookByKey("ta:poemas||")?.id, first.id);
 });
 
+test("fillIdentity adds a later author to the search index of an already searchable book, without a second entry", () => {
+  const { repo } = freshRepo();
+  const book = repo.createBook({ title: "Hamlet", author: "", isbn: "9789896414672", createdBy: "publisher" }, ["isbn:9789896414672"], NOW);
+  assert.equal(repo.isSearchable(book.id), true);
+  assert.deepEqual(repo.searchBooks(["shakespeare"], 10), []);
+  repo.fillIdentity(book.id, "Hamlet", "William Shakespeare");
+  assert.deepEqual(repo.searchBooks(["shakespeare"], 10).map((found) => found.id), [book.id]);
+  assert.deepEqual(repo.searchBooks(["hamlet"], 10).map((found) => found.id), [book.id]);
+});
+
 test("createBook alone does not make a book searchable", () => {
   const { repo } = freshRepo();
   repo.createBook({ title: "Orlando", author: "Virginia Woolf", isbn: "9780141184272" }, ["isbn:9780141184272"], NOW);
