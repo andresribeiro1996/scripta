@@ -29,6 +29,7 @@ export * from "./bookCovers.js";
 export * from "./bookMetadata.js";
 export * from "./bookSearch.js";
 export * from "./bookGenres.js";
+export * from "./catalogGenres.js";
 export * from "./finish.js";
 export * from "./readerIdentity.js";
 export * from "./readerCardFacts.js";
