@@ -4,7 +4,7 @@ import sharp from "sharp";
 sharp.cache(false);
 sharp.concurrency(1);
 
-const { values } = parseArgs({ options: { "dry-run": { type: "boolean", default: false } } });
+const { values } = parseArgs({ options: { "dry-run": { type: "boolean", default: false }, site: { type: "string" } } });
 
 const TIMEOUT_MS = 30_000;
 const OPEN_LIBRARY_GAP_MS = 1000;
@@ -44,6 +44,12 @@ async function lookupOpenLibrary(isbn) {
   return { title: authors.length > 0 ? edition.title || null : null, author: authors.join(", "), workKey: edition.workKey, languages: edition.languages };
 }
 
+const sites = values.site ? PUBLISHERS.filter((site) => site.name === values.site) : PUBLISHERS;
+if (sites.length === 0) {
+  console.error(`unknown site "${values.site}"; names are: ${PUBLISHERS.map((site) => site.name).join(", ")}`);
+  process.exit(1);
+}
+
 const store = createObjectStore();
 const reports = await importPublisherCovers(
   {
@@ -56,7 +62,7 @@ const reports = await importPublisherCovers(
     sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
     log: (line) => console.error(`${line} rss=${Math.round(process.memoryUsage.rss() / 1048576)}MB`)
   },
-  PUBLISHERS,
+  sites,
   { dryRun: values["dry-run"] }
 );
 console.log(JSON.stringify(reports, null, 2));
