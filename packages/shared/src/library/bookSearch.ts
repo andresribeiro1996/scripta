@@ -19,6 +19,7 @@
 // pure query-shape, merge and result-mapping logic.
 
 import { normalizeBookGenres, type BookGenre } from "./bookGenres.js";
+import { GENRES_FROM_CATALOG } from "./catalogGenres.js";
 import { normalizeIsbn } from "./covers.js";
 import { bookKey } from "./merge.js";
 
@@ -165,6 +166,6 @@ export function buildManualBook(fields: ManualBookFields, id: string): Record<st
     MimeType: null,
     ImageId: null,
     highlights: [] as Array<Record<string, unknown>>,
-    ...(fields.genres?.length ? { _genres: fields.genres } : {})
+    ...(fields.genres?.length ? { _genres: fields.genres, _genresFrom: GENRES_FROM_CATALOG } : {})
   };
 }
