@@ -120,20 +120,27 @@ interface Box {
   bottom: number;
 }
 
-function refineToBookEdges(luma: Float32Array, width: number, height: number, box: Box): Box {
+function refineToBookEdges(rgb: Buffer, channels: number, luma: Float32Array, width: number, height: number, box: Box): Box {
   const at = (x: number, y: number) => luma[y * width + x] ?? 0;
+  const step = (x1: number, y1: number, x2: number, y2: number) => {
+    let largest = 0;
+    for (let channel = 0; channel < 3; channel++) {
+      largest = Math.max(largest, Math.abs((rgb[(y1 * width + x1) * channels + channel] ?? 0) - (rgb[(y2 * width + x2) * channels + channel] ?? 0)));
+    }
+    return largest;
+  };
   const columnIsEdge = (x: number, outward: -1 | 1) => {
     const neighbour = x + outward * EDGE_GAP;
     if (neighbour < 0 || neighbour >= width) return false;
     let strong = 0;
-    for (let y = box.top; y <= box.bottom; y++) if (Math.abs(at(x, y) - at(neighbour, y)) >= EDGE_STEP) strong++;
+    for (let y = box.top; y <= box.bottom; y++) if (step(x, y, neighbour, y) >= EDGE_STEP) strong++;
     return strong >= EDGE_SHARE * (box.bottom - box.top + 1);
   };
   const rowIsEdge = (y: number, outward: -1 | 1) => {
     const neighbour = y + outward * EDGE_GAP;
     if (neighbour < 0 || neighbour >= height) return false;
     let strong = 0;
-    for (let x = box.left; x <= box.right; x++) if (Math.abs(at(x, y) - at(x, neighbour)) >= EDGE_STEP) strong++;
+    for (let x = box.left; x <= box.right; x++) if (step(x, y, x, neighbour) >= EDGE_STEP) strong++;
     return strong >= EDGE_SHARE * (box.right - box.left + 1);
   };
   const roughness = (left: number, top: number, right: number, bottom: number) => {
@@ -211,16 +218,19 @@ export async function classifyPublisherImage(input: Buffer): Promise<PublisherIm
       const scaleY = smallHeight / height;
       const trimLeft = -(trimmed.info.trimOffsetLeft ?? 0);
       const trimTop = -(trimmed.info.trimOffsetTop ?? 0);
-      const book = refineToBookEdges(luma, smallWidth, smallHeight, {
+      const trimBox = {
         left: Math.floor(trimLeft * scaleX),
         top: Math.floor(trimTop * scaleY),
         right: Math.min(smallWidth - 1, Math.ceil((trimLeft + trimmed.info.width) * scaleX) - 1),
         bottom: Math.min(smallHeight - 1, Math.ceil((trimTop + trimmed.info.height) * scaleY) - 1),
-      });
-      const left = Math.round(book.left / scaleX);
-      const top = Math.round(book.top / scaleY);
-      const cropWidth = Math.min(width - left, Math.round((book.right + 1) / scaleX) - left);
-      const cropHeight = Math.min(height - top, Math.round((book.bottom + 1) / scaleY) - top);
+      };
+      const book = refineToBookEdges(small.data, smallChannels, luma, smallWidth, smallHeight, trimBox);
+      const left = book.left === trimBox.left ? trimLeft : Math.round(book.left / scaleX);
+      const top = book.top === trimBox.top ? trimTop : Math.round(book.top / scaleY);
+      const right = book.right === trimBox.right ? trimLeft + trimmed.info.width : Math.round((book.right + 1) / scaleX);
+      const bottom = book.bottom === trimBox.bottom ? trimTop + trimmed.info.height : Math.round((book.bottom + 1) / scaleY);
+      const cropWidth = Math.min(width - left, right - left);
+      const cropHeight = Math.min(height - top, bottom - top);
       const ratio = cropHeight / cropWidth;
       if (ratio < MIN_ASPECT_RATIO || ratio > MAX_ASPECT_RATIO || (cropWidth * cropHeight) / (width * height) < MIN_CROP_AREA) return null;
       const cropped = await sharp(decoded.data, rawOptions).extract({ left, top, width: cropWidth, height: cropHeight }).png().toBuffer();

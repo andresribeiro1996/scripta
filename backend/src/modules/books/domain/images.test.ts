@@ -246,6 +246,25 @@ test("a book on a lightly vignetted coloured canvas is cropped, not kept as a sq
   assert.ok(Math.abs((await ratioOf(result!.input)) - 1500 / 1100) < 0.02);
 });
 
+test("a cover edge that differs from its art only in colour is not cut into", async () => {
+  const image = await canvas(2048, 2048, "#ffffff", [
+    await rectangle(1100, 1500, "rgb(255,255,150)", 474, 274),
+    await rectangle(980, 1400, "#222222", 534, 324),
+  ]);
+  const result = await classifyPublisherImage(image);
+  assert.equal(result?.kind, "cropped");
+  const { width } = await sharp(result!.input).metadata();
+  assert.ok(Math.abs(width! - 1100) <= 22, `width ${width}`);
+  assert.ok(Math.abs((await ratioOf(result!.input)) - 1500 / 1100) < 0.02);
+});
+
+test("a plain book on a white canvas is cropped to exactly its own size", async () => {
+  const image = await canvas(2048, 2048, "#ffffff", [await rectangle(1100, 1500, "#2a6f97", 474, 274)]);
+  const result = await classifyPublisherImage(image);
+  const { width, height } = await sharp(result!.input).metadata();
+  assert.deepEqual([width, height], [1100, 1500]);
+});
+
 test("a square cover whose art reaches all four edges stays flat on a slightly uneven background", async () => {
   const image = await canvas(2048, 2048, "#f4e9d2", [
     await rectangle(400, 400, "#ddd2bb", 0, 1648),
