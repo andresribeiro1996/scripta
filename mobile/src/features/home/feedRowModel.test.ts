@@ -166,3 +166,13 @@ test("no other row kind carries an action", () => {
   assert.equal(feedRowModel({ kind: "vote", id: "e2", actor, content: tierlist, createdAt: "2026-09-17T00:00:00.000Z" }).action, null);
   assert.equal(feedRowModel({ kind: "reading", id: "e3", actor, book: { title: "Hyperion", author: "Dan Simmons", coverUrl: null }, finished: true, createdAt: "2026-09-17T00:00:00.000Z" }).action, null);
 });
+
+test("only rows with a public page can be shared", () => {
+  const createdAt = "2026-09-30T00:00:00.000Z";
+  const reading: DigestItem = { kind: "reading", id: "e3", actor, book: { title: "Hyperion", author: "Dan Simmons", coverUrl: null }, finished: true, createdAt };
+  assert.equal(feedShareTarget({ kind: "follow", id: "f1", actor, createdAt, viewerFollows: false }), null);
+  assert.equal(feedShareTarget({ kind: "mural", id: "m1", actor, mural: { id: "m", name: "Mural", theme: "light", coverImageUrl: null }, createdAt }), null);
+  assert.equal(feedShareTarget(reading), null);
+  assert.equal(feedShareTarget({ ...reading, book: { ...reading.book, workId: "w1" } }), "/work/w1");
+  assert.equal(feedShareTarget({ kind: "publication", id: "e5", actor, type: "quiz_published", content: quiz, createdAt }), "/play/qc");
+});

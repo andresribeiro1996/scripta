@@ -125,6 +125,7 @@ export function readingShelfBook(book: DigestBook, books: Array<Record<string, u
 }
 
 export function feedShareTarget(item: DigestItem): string | null {
+  if (item.kind === "follow" || item.kind === "mural" || (item.kind === "reading" && !item.book.workId)) return null;
   if (item.kind !== "participation") return digestTarget(item);
   if (item.game.kind === "tournament") return `/arena/${item.game.id}`;
   return item.game.voteCode ? `/${item.game.kind === "tierlist" ? "vote" : "play"}/${item.game.voteCode}` : null;

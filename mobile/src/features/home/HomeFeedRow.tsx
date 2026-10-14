@@ -7,7 +7,7 @@ import { Button, Icon, dynamicType, minimumTouchTarget, radii, spacing, typograp
 import { AuthorAvatar, openProfile } from "../community/AuthorAvatar";
 import { ReaderGlyph } from "../community/ReaderGlyph";
 import { FeedPreview } from "./FeedPreview";
-import { feedEventLabel, feedPrimaryLabel, feedRowAccessibilityLabel, feedRowModel, hasActivityThread, readingShelfBook, relativeTime } from "./feedRowModel";
+import { feedEventLabel, feedPrimaryLabel, feedRowAccessibilityLabel, feedRowModel, feedShareTarget, hasActivityThread, readingShelfBook, relativeTime } from "./feedRowModel";
 import type { HomeActions } from "./useHomeActions";
 
 export function FeedRow({ item, onOpen, onFollowBack, following = false, isNew = false, actions, onComments, isSaved, onOpenProfile = openProfile }: { item: DigestItem; onOpen: () => void; onFollowBack?: () => void; following?: boolean; isNew?: boolean; actions: HomeActions; onComments?: () => void; isSaved?: boolean; onOpenProfile?: (username: string) => void }) {
@@ -56,7 +56,7 @@ export function FeedRow({ item, onOpen, onFollowBack, following = false, isNew =
         <Pressable accessibilityRole="button" accessibilityLabel={engagement?.liked ? "Unlike this post" : "Like this post"} accessibilityState={{ selected: engagement?.liked, disabled: !engagement || actions.liking }} disabled={!engagement || actions.liking} onPress={() => actions.toggleLike(item)} style={({ pressed }) => [styles.reaction, { backgroundColor: pressed ? colors.surfacePressed : "transparent" }]}><Icon name="like" filled={engagement?.liked} size={18} color={engagement?.liked ? colors.accent : colors.textDim} /><Text {...dynamicType} style={[typography.caption, styles.count, { color: colors.textDim }]}>{engagement?.likes ?? "…"}</Text></Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel={engagement ? `Comments, ${engagement.comments}` : "Comments"} onPress={onComments} style={({ pressed }) => [styles.reaction, { backgroundColor: pressed ? colors.surfacePressed : "transparent" }]}><Icon name="comment" size={18} color={colors.textDim} /><Text {...dynamicType} style={[typography.caption, styles.count, { color: colors.textDim }]}>{engagement?.comments ?? "…"}</Text></Pressable>
       </> : null}
-      <Pressable accessibilityRole="button" accessibilityLabel={`Share ${title || "reader"}`} onPress={() => actions.share(item)} style={({ pressed }) => [styles.share, { backgroundColor: pressed ? colors.surfacePressed : "transparent" }]}><Icon name="share" size={18} color={colors.textDim} /><Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Share</Text></Pressable>
+      {feedShareTarget(item) ? <Pressable accessibilityRole="button" accessibilityLabel={`Share ${title || "reader"}`} onPress={() => actions.share(item)} style={({ pressed }) => [styles.share, { backgroundColor: pressed ? colors.surfacePressed : "transparent" }]}><Icon name="share" size={18} color={colors.textDim} /><Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Share</Text></Pressable> : null}
     </View>
   </View>;
 }
