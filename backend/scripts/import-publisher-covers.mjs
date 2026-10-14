@@ -4,7 +4,7 @@ import sharp from "sharp";
 sharp.cache(false);
 sharp.concurrency(1);
 
-const { values } = parseArgs({ options: { "dry-run": { type: "boolean", default: false }, site: { type: "string" } } });
+const { values } = parseArgs({ options: { "dry-run": { type: "boolean", default: false }, site: { type: "string" }, "fill-titles": { type: "boolean", default: false } } });
 
 const TIMEOUT_MS = 30_000;
 const OPEN_LIBRARY_GAP_MS = 1000;
@@ -14,6 +14,7 @@ const { USER_AGENT, createThrottle, fetchJson } = await import("../dist/modules/
 const { parseEditionRecord } = await import("../dist/modules/books/adapters/openlibrary/openLibraryCatalog.js");
 const { openBooksDb } = await import("../dist/modules/books/adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("../dist/modules/books/adapters/sqlite/sqliteBooksRepository.js");
+const { fillBlankTitles } = await import("../dist/modules/books/seed/fillBlankTitles.js");
 const { importPublisherCovers } = await import("../dist/modules/books/seed/importPublisherCovers.js");
 const { PUBLISHERS } = await import("../dist/modules/books/seed/publishers.js");
 const { createObjectStore } = await import("../dist/storage/createObjectStore.js");
@@ -48,6 +49,16 @@ const sites = values.site ? PUBLISHERS.filter((site) => site.name === values.sit
 if (sites.length === 0) {
   console.error(`unknown site "${values.site}"; names are: ${PUBLISHERS.map((site) => site.name).join(", ")}`);
   process.exit(1);
+}
+
+if (values["fill-titles"]) {
+  const report = await fillBlankTitles(
+    { fetchText, sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)), repo: createSqliteBooksRepository(openBooksDb()) },
+    sites,
+    { dryRun: values["dry-run"] }
+  );
+  console.log(JSON.stringify(report, null, 2));
+  process.exit(0);
 }
 
 const store = createObjectStore();

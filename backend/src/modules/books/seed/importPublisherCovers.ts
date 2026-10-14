@@ -54,7 +54,7 @@ export interface ImportDeps {
   log: (line: string) => void;
 }
 
-class SiteSkipped extends Error {}
+export class SiteSkipped extends Error {}
 
 const emptyReport = (): SiteReport => ({ products: 0, books: 0, fromPage: 0, pagesNoIsbn: 0, pagesBlocked: 0, pagesDeferred: 0, pageAmbiguous: 0, pageTitleMismatch: 0, coversSet: 0, created: 0, noAuthor: 0, unchanged: 0, rejectedImage: 0, cropped: 0, squareAccepted: 0, awaitingCheck: 0, failed: 0 });
 
@@ -91,48 +91,75 @@ function createExclusive(): <T>(task: () => Promise<T>) => Promise<T> {
   };
 }
 
-async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryRun: boolean }, exclusive: ReturnType<typeof createExclusive>): Promise<SiteReport> {
-  const report = emptyReport();
+export interface Throttle {
+  request<T>(call: () => Promise<T>): Promise<T>;
+  slowTo(ms: number): void;
+}
+
+export function createThrottle(sleep: (ms: number) => Promise<void>): Throttle {
   let waitMs = MIN_WAIT_MS;
   let requested = false;
-  const request = async <T>(call: () => Promise<T>): Promise<T> => {
-    if (requested) await deps.sleep(waitMs);
-    requested = true;
-    return call();
-  };
-
-  const books: PublisherBook[] = [];
-  let disallow: string[] = [];
-  try {
-    const robots = await request(() => deps.fetchText(`${site.origin}/robots.txt`));
-    if (robots.status !== 200 && robots.status !== 404) throw new SiteSkipped(`robots.txt answered HTTP ${robots.status}`);
-    const rules = robots.status === 200 ? parseRobots(robots.text) : { disallow: [], crawlDelayMs: null };
-    const feed = new URL(feedUrl(site, 1));
-    disallow = rules.disallow;
-    if (isDisallowed(feed.pathname + feed.search, disallow)) throw new SiteSkipped("robots.txt disallows the feed");
-    waitMs = Math.max(MIN_WAIT_MS, rules.crawlDelayMs ?? 0);
-    for (let page = 1; ; page++) {
-      if (page > MAX_PAGES) throw new SiteSkipped("feed has no end");
-      const response = await request(() => deps.fetchText(feedUrl(site, page)));
-      if (response.status === 400 && page > 1) break;
-      if (response.status !== 200) throw new SiteSkipped(`feed answered HTTP ${response.status}`);
-      let json: unknown;
-      try {
-        json = JSON.parse(response.text);
-      } catch (error) {
-        if (error instanceof SyntaxError) throw new SiteSkipped("feed is not JSON");
-        throw error;
-      }
-      const products = feedProducts(json, site);
-      if (!products) throw new SiteSkipped("feed is not a product list");
-      if (products.length === 0) break;
-      report.products += products.length;
-      books.push(...(site.platform === "shopify" ? parseShopifyProducts(json, site) : parseWooProducts(json, site)));
+  return {
+    async request(call) {
+      if (requested) await sleep(waitMs);
+      requested = true;
+      return call();
+    },
+    slowTo(ms) {
+      waitMs = Math.max(MIN_WAIT_MS, ms);
     }
+  };
+}
+
+export interface SiteFeed {
+  books: PublisherBook[];
+  disallow: string[];
+  products: number;
+}
+
+export async function readSiteFeed(site: PublisherSite, fetchText: ImportDeps["fetchText"], throttle: Throttle): Promise<SiteFeed> {
+  const robots = await throttle.request(() => fetchText(`${site.origin}/robots.txt`));
+  if (robots.status !== 200 && robots.status !== 404) throw new SiteSkipped(`robots.txt answered HTTP ${robots.status}`);
+  const rules = robots.status === 200 ? parseRobots(robots.text) : { disallow: [], crawlDelayMs: null };
+  const feed = new URL(feedUrl(site, 1));
+  if (isDisallowed(feed.pathname + feed.search, rules.disallow)) throw new SiteSkipped("robots.txt disallows the feed");
+  throttle.slowTo(rules.crawlDelayMs ?? 0);
+  const books: PublisherBook[] = [];
+  let products = 0;
+  for (let page = 1; ; page++) {
+    if (page > MAX_PAGES) throw new SiteSkipped("feed has no end");
+    const response = await throttle.request(() => fetchText(feedUrl(site, page)));
+    if (response.status === 400 && page > 1) break;
+    if (response.status !== 200) throw new SiteSkipped(`feed answered HTTP ${response.status}`);
+    let json: unknown;
+    try {
+      json = JSON.parse(response.text);
+    } catch (error) {
+      if (error instanceof SyntaxError) throw new SiteSkipped("feed is not JSON");
+      throw error;
+    }
+    const listed = feedProducts(json, site);
+    if (!listed) throw new SiteSkipped("feed is not a product list");
+    if (listed.length === 0) break;
+    products += listed.length;
+    books.push(...(site.platform === "shopify" ? parseShopifyProducts(json, site) : parseWooProducts(json, site)));
+  }
+  return { books, disallow: rules.disallow, products };
+}
+
+async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryRun: boolean }, exclusive: ReturnType<typeof createExclusive>): Promise<SiteReport> {
+  const report = emptyReport();
+  const throttle = createThrottle(deps.sleep);
+  const request = throttle.request;
+  let feed: SiteFeed;
+  try {
+    feed = await readSiteFeed(site, deps.fetchText, throttle);
   } catch (error) {
     if (error instanceof SiteSkipped || error instanceof SourceUnavailableError) return { ...emptyReport(), skipped: error.message };
     throw error;
   }
+  report.products = feed.products;
+  const { books, disallow } = feed;
 
   const resolved: ResolvedBook[] = [];
   const pagesTotal = books.filter((book) => !book.isbn).length;

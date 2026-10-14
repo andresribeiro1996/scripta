@@ -22,6 +22,7 @@ export interface BooksRepository {
   createBook(input: NewBook, keys: string[], createdAt: string): BookRow;
   addKey(key: string, bookId: string): void;
   fillIdentity(id: string, title: string, author: string): void;
+  listBlankTitled(): Array<{ id: string; publisher_url: string }>;
   makeSearchable(id: string): void;
   isSearchable(id: string): boolean;
   getImage(id: string): CoverImageRow | undefined;
