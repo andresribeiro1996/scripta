@@ -21,6 +21,7 @@ export function WorkScreen({ id }: { id: string }) {
   const [adding, setAdding] = useState(false);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [shareError, setShareError] = useState<string | null>(null);
+  const [editionId, setEditionId] = useState<string | null>(null);
   const scrollY = useSharedValue(0);
   const headerHeight = useHeaderHeight();
   const segments = useSegments();
@@ -77,11 +78,10 @@ export function WorkScreen({ id }: { id: string }) {
       </Screen>
     );
   }
-  const model = bookScreenModel(page, book, { isAdmin: false });
+  const model = bookScreenModel(page, book, { isAdmin: false }, editionId);
   const menuItems = book && page.mine ? bookMenuItems(model, page.mine.bookKey, segments) : [];
-  const wash = coverWash(work.coverColor, mode);
-  const tint = wash && work.coverColor ? { color: work.coverColor, topAlpha: wash.topAlpha } : null;
-  const firstEdition = work.editions.find((edition) => edition.isbn) ?? work.editions[0];
+  const wash = coverWash(model.cover.color, mode);
+  const tint = wash && model.cover.color ? { color: model.cover.color, topAlpha: wash.topAlpha } : null;
 
   async function share() {
     setShareError(null);
@@ -109,12 +109,12 @@ export function WorkScreen({ id }: { id: string }) {
       />
       {shareError && !tint ? <Toast visible message={shareError} tone="error" /> : null}
       {tint ? <WashBackdrop color={tint.color} topAlpha={tint.topAlpha} scrollY={scrollY} headerHeight={headerHeight} /> : null}
-      <BookScreen page={page} book={book} model={model} signedIn={signedIn} onAdd={() => setAdding(true)} scrollY={scrollY} headerInset={tint ? headerHeight : 0} />
+      <BookScreen page={page} book={book} model={model} signedIn={signedIn} onAdd={() => setAdding(true)} onSelectEdition={setEditionId} scrollY={scrollY} headerInset={tint ? headerHeight : 0} />
       {shareError && tint ? <View pointerEvents="box-none" style={[styles.toastBelowHeader, { top: headerHeight }]}><Toast visible message={shareError} tone="error" /></View> : null}
       <ContentShareSheet visible={shareUrl !== null} onClose={() => setShareUrl(null)} title={work.title} url={shareUrl} />
-      {adding ? (
+      {adding && model.addBook ? (
         <AddBookSheet
-          book={{ title: work.title, author: work.author, isbn: firstEdition?.isbn ?? null, coverUrl: work.coverUrl }}
+          book={model.addBook}
           onClose={() => {
             setAdding(false);
             void query.refetch();

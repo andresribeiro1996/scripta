@@ -11,6 +11,7 @@ import { useLibraryActions } from "../library/hooks/useLibraryActions";
 import { useChangeStatus } from "../library/hooks/useChangeStatus";
 import { BookCover } from "../arena/BookCover";
 import { CoverImage } from "../library/components/CoverImage";
+import { EditionStrip } from "./EditionStrip";
 import { fetchWorkStats } from "./api";
 import { StatsTiles } from "./BookStats";
 import { RatingStars } from "./RatingStars";
@@ -121,10 +122,10 @@ function DeleteNote({ book, bookmarkId }: { book: Record<string, unknown>; bookm
   );
 }
 
-export function BookScreen({ page, book, model, signedIn, onAdd, scrollY, headerInset = 0 }: { page: WorkPage | null; book: Record<string, unknown> | null; model: BookScreenModel; signedIn: boolean; onAdd: () => void; scrollY?: SharedValue<number>; headerInset?: number }) {
+export function BookScreen({ page, book, model, signedIn, onAdd, onSelectEdition, scrollY, headerInset = 0 }: { page: WorkPage | null; book: Record<string, unknown> | null; model: BookScreenModel; signedIn: boolean; onAdd: () => void; onSelectEdition?: (bookId: string) => void; scrollY?: SharedValue<number>; headerInset?: number }) {
   const { colors, mode } = useTheme();
   const { width: windowWidth } = useWindowDimensions();
-  const coverColor = page?.work.coverColor ?? null;
+  const coverColor = model.cover.color;
   const wash = coverWash(coverColor, mode);
   const segments = useSegments();
   const workId = page?.work.id;
@@ -150,7 +151,9 @@ export function BookScreen({ page, book, model, signedIn, onAdd, scrollY, header
     <Animated.ScrollView style={{ marginTop: headerInset }} contentContainerStyle={styles.content} onScroll={onScroll} scrollEventThrottle={16}>
       {wash && coverColor && !scrollY ? <WashGradient color={coverColor} topAlpha={wash.topAlpha} width={windowWidth} /> : null}
       <View style={styles.heroCentered}>
-        {book ? (
+        {page && model.edition && onSelectEdition ? (
+          <EditionStrip editions={page.work.editions} book={book} edition={model.edition} onSelect={onSelectEdition} />
+        ) : book ? (
           <View style={[styles.cover, { backgroundColor: colors.border }]}>
             <CoverImage book={book} size="full" />
           </View>
@@ -173,7 +176,7 @@ export function BookScreen({ page, book, model, signedIn, onAdd, scrollY, header
         {model.meta ? <Text {...dynamicType} style={[typography.caption, styles.centeredText, { color: colors.textDim }]}>{model.meta}</Text> : null}
       </View>
 
-      {model.primary === "add" ? <Button label="Add to library" variant="primary" onPress={onAdd} /> : null}
+      {model.primary === "add" ? <Button label={model.edition ? "Add this edition" : "Add to library"} variant="primary" onPress={onAdd} /> : null}
       {model.primary === "owner" && book ? <OwnerRow book={book} model={model} /> : null}
 
       {model.tabs.length > 1 && tab ? (
