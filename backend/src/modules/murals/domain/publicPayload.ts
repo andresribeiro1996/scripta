@@ -6,6 +6,10 @@ import type { MuralRow } from "./types.js";
 
 export type { MuralPublicPayload };
 
+export function muralCoverImageUrl(row: MuralRow): string | null {
+  return row.cover_image_id ? `${env.PUBLIC_API_URL}/gallery/${row.cover_image_id}/file` : row.cover_image_url;
+}
+
 export function resolveMuralPublicPayload(
   row: MuralRow,
   blocks: unknown,
@@ -65,7 +69,7 @@ export function resolveMuralPublicPayload(
         }
         return block;
       }) as MuralBlock[],
-      coverImageUrl: row.cover_image_id ? imageUrls[row.cover_image_id]! : row.cover_image_url
+      coverImageUrl: muralCoverImageUrl(row)
     },
     library: libraryData,
     profile: refs.needsShelfTheme || refs.needsReaderCard ? resolvePublicReaderProfile(row.user_id) : undefined,

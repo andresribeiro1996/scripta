@@ -210,7 +210,8 @@ function createDeps(repo: CommunityRepository) {
     matchWorks: (query) => workMatches.get(normalizeWords(query)) ?? [],
     murals: {
       ownsMural: (userId, muralId) => ownedMurals.has(`${userId}:${muralId}`),
-      getMuralPublicPayload: (userId, muralId) => muralPayloads.get(`${userId}:${muralId}`) ?? null
+      getMuralPublicPayload: (userId, muralId) => muralPayloads.get(`${userId}:${muralId}`) ?? null,
+      getMuralSummary: (userId, muralId) => muralPayloads.get(`${userId}:${muralId}`)?.mural ?? null
     },
     tierlists: {
       discoverWindow: (needle, limit) => {

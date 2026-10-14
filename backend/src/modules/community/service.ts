@@ -110,7 +110,7 @@ export interface CommunityDeps {
   findUserIdByUsername(username: string): string | undefined;
   searchUsernameOwners(query: string, limit: number): string[];
   matchWorks(query: string, limit: number): string[];
-  murals: Pick<MuralsPublicApi, "ownsMural" | "getMuralPublicPayload">;
+  murals: Pick<MuralsPublicApi, "ownsMural" | "getMuralPublicPayload" | "getMuralSummary">;
   tierlists: {
     discoverWindow(needle: string, limit: number): TierlistDiscoverRef[];
     getPublishedMany(ids: string[]): PublishedTierlistRef[];
@@ -290,8 +290,8 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
         if (content && actor) return { kind: "vote", id: event.id, actor: withGlyph(actor, event.user_id, glyphOf), content, ...(ranking.length ? { ranking } : {}), createdAt: event.created_at };
       } else if (event.type === "mural_published" && actor) {
         const profile = repo.getProfileRow(event.user_id);
-        const payload = profile?.mural_id === event.ref_id && (profile.published === 1 || viewerId === event.user_id) ? deps.murals.getMuralPublicPayload(event.user_id, event.ref_id) : null;
-        if (payload) return { kind: "mural", id: event.id, actor: withGlyph(actor, event.user_id, glyphOf), mural: { id: payload.mural.id, name: payload.mural.name, theme: payload.mural.theme, coverImageUrl: payload.mural.coverImageUrl }, createdAt: event.created_at };
+        const mural = profile?.mural_id === event.ref_id && (profile.published === 1 || viewerId === event.user_id) ? deps.murals.getMuralSummary(event.user_id, event.ref_id) : null;
+        if (mural) return { kind: "mural", id: event.id, actor: withGlyph(actor, event.user_id, glyphOf), mural, createdAt: event.created_at };
       } else if (event.type === "book_added" || event.type === "book_started" || event.type === "book_finished") {
         const payload = parseEventPayload(event.payload);
         if (payload && actor) {
