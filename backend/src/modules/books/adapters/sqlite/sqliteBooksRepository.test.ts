@@ -1210,7 +1210,7 @@ test("the ISBN-10 pass leaves two keyed works that disagree alone", () => {
 
 test("the ISBN-10 pass runs once", () => {
   const { db } = freshRepo();
-  assert.equal((db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version, 3);
+  assert.equal((db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version, 4);
 });
 
 test("listUncheckedCoverIds pages by created_at then insert order, and a short page ends the cycle", () => {
@@ -1345,6 +1345,68 @@ test("the one-time backfill indexes the confirmed catalog once, keeps earlier se
   insert.run("seed-2", "Jacob's Room", "Virginia Woolf", "[]", "seed", NOW);
   applyBooksMigrations(db);
   assert.equal(countOf(db, "books_fts"), 4);
+});
+
+const userVersion = (db: DatabaseSync) => (db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version;
+const authorOf = (db: DatabaseSync, id: string) => (db.prepare("SELECT author FROM books WHERE id = ?").get(id) as { author: string }).author;
+
+test("the ISBNdb-first author pass turns a surname-first name with its title key, search row and work", () => {
+  const { db, repo } = freshRepo();
+  const book = repo.createBook({ title: "Dune", author: "Herbert, Frank", isbn: "9780000000002", sources: ["isbndb"] }, ["isbn:9780000000002", "ta:dune|herbert|"], NOW);
+  assert.equal(repo.isSearchable(book.id), true);
+  db.exec("PRAGMA user_version = 3");
+  applyBooksMigrations(db);
+  assert.deepEqual({ ...db.prepare("SELECT author, title_key FROM books WHERE id = ?").get(book.id) }, { author: "Frank Herbert", title_key: "ta:dune|frank herbert|" });
+  assert.equal(repo.findBookByKey("ta:dune|frank herbert|")?.id, book.id);
+  assert.equal(repo.findBookByKey("ta:dune|herbert|")?.id, book.id);
+  assert.deepEqual({ ...db.prepare("SELECT author FROM books_fts WHERE book_id = ?").get(book.id) }, { author: "Frank Herbert" });
+  assert.equal(workById(db, book.work_id).author, "Frank Herbert");
+  assert.equal(userVersion(db), 4);
+});
+
+test("the ISBNdb-first author pass changes a work only when its author is the turned book's own text", () => {
+  const { db, repo } = freshRepo();
+  const seeded = repo.createBook({ title: "Dune", author: "Herbert, Brian", isbn: "9780000000002", createdBy: "seed", workKey: "OL1W" }, ["isbn:9780000000002"], NOW);
+  const book = repo.createBook({ title: "Dune Messiah", author: "Herbert, Frank", isbn: "9780000000019", sources: ["isbndb"], workKey: "OL1W" }, ["isbn:9780000000019"], NOW);
+  assert.equal(book.work_id, seeded.work_id);
+  db.exec("PRAGMA user_version = 3");
+  applyBooksMigrations(db);
+  assert.equal(authorOf(db, book.id), "Frank Herbert");
+  assert.equal(workById(db, seeded.work_id).author, "Herbert, Brian");
+});
+
+test("the ISBNdb-first author pass turns a row a lookup created and ISBNdb alone answered", () => {
+  const { db, repo } = freshRepo();
+  const book = findOrCreateBook(repo, { isbn: "9780000000002", title: "Dune", author: "Herbert, Frank" }, NOW)!;
+  repo.saveDetails(book.id, { ...richDetails, rating: null, ratingCount: 0, sourceUrl: "https://isbndb.com/book/9780000000002" }, ["isbndb"], "isbndb", NOW);
+  assert.deepEqual([book.created_by, repo.getBook(book.id)?.data_sources], [null, '["isbndb"]']);
+  db.exec("PRAGMA user_version = 3");
+  applyBooksMigrations(db);
+  assert.equal(authorOf(db, book.id), "Frank Herbert");
+});
+
+test("the ISBNdb-first author pass leaves the same text alone when the row is not ISBNdb-first", () => {
+  const { db, repo } = freshRepo();
+  repo.createBook({ title: "Dune", author: "Herbert, Frank", isbn: "9780000000002", createdBy: "seed", sources: ["isbndb"] }, ["isbn:9780000000002"], NOW);
+  repo.createBook({ title: "Dune Messiah", author: "Herbert, Frank", isbn: "9780000000019", sources: ["openlibrary", "isbndb"] }, ["isbn:9780000000019"], NOW);
+  repo.createBook({ title: "Children of Dune", author: "Herbert, Frank", isbn: "9780000000026" }, ["isbn:9780000000026"], NOW);
+  const rows = () => [db.prepare("SELECT id, author, title_key FROM books ORDER BY rowid").all(), db.prepare("SELECT id, author FROM works ORDER BY rowid").all(), db.prepare("SELECT * FROM books_fts ORDER BY rowid").all()];
+  const before = rows();
+  db.exec("PRAGMA user_version = 3");
+  applyBooksMigrations(db);
+  assert.deepEqual(rows(), before);
+  assert.equal(userVersion(db), 4);
+});
+
+test("the ISBNdb-first author pass runs once, so a row saved after it is left as stored", () => {
+  const { db, repo } = freshRepo();
+  const before = repo.createBook({ title: "Dune", author: "Herbert, Frank", isbn: "9780000000002", sources: ["isbndb"] }, ["isbn:9780000000002"], NOW);
+  db.exec("PRAGMA user_version = 3");
+  applyBooksMigrations(db);
+  const after = repo.createBook({ title: "Republic", author: "Plato, Aristotle", isbn: "9780000000019", sources: ["isbndb"] }, ["isbn:9780000000019"], NOW);
+  applyBooksMigrations(db);
+  assert.equal(authorOf(db, before.id), "Frank Herbert");
+  assert.equal(authorOf(db, after.id), "Plato, Aristotle");
 });
 
 test("the last word matches as a prefix once it has three letters", () => {

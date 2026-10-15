@@ -36,10 +36,9 @@ function setup() {
   };
   const stored = (id: string) => ({ ...(db.prepare("SELECT title, author, title_key FROM books WHERE id = ?").get(id) as { title: string; author: string; title_key: string | null }) });
   const searchText = (id: string) => ({ ...(db.prepare("SELECT title, author FROM books_fts WHERE book_id = ?").get(id) as { title: string; author: string }) });
-  const workText = (id: string | null) => ({ ...(db.prepare("SELECT title, author FROM works WHERE id = ?").get(id) as { title: string; author: string }) });
   const keys = (id: string) => (db.prepare("SELECT key FROM book_keys WHERE book_id = ? ORDER BY key").all(id) as Array<{ key: string }>).map((row) => row.key);
   const dump = () => ["books", "works", "book_keys", "books_fts"].map((table) => db.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all());
-  return { db, repo, book, stored, searchText, workText, keys, dump };
+  return { db, repo, book, stored, searchText, keys, dump };
 }
 
 test("repairs a mis-decoded book and everything derived from it", () => {
@@ -212,7 +211,7 @@ test("the report counts repairs, groups them by origin, lists every repair and c
   const plan = planMojibakeRepairs(h.db);
   const report = mojibakeReport(plan, null);
   assert.equal(report.dryRun, true);
-  assert.deepEqual(report.books, { scanned: 36, repaired: 25, titles: 24, authors: 2, names: 0, markers: 0 });
+  assert.deepEqual(report.books, { scanned: 36, repaired: 25, titles: 24, authors: 2, markers: 0 });
   assert.deepEqual(report.works, { scanned: 36, repaired: 25 });
   assert.deepEqual(report.origins, { seed: 25 });
   assert.equal(report.repairs.length, 25);
@@ -228,7 +227,7 @@ test("the report counts the books whose markers were stripped, and the printed r
   h.book("\u0098A \u009cLivro da fÃ©", "Ana Lima", null);
   h.book("Â\u0098O Â\u009cLivro de FÃ©", "Ana Lima", null);
   const report = mojibakeReport(planMojibakeRepairs(h.db), null);
-  assert.deepEqual(report.books, { scanned: 4, repaired: 4, titles: 4, authors: 1, names: 0, markers: 3 });
+  assert.deepEqual(report.books, { scanned: 4, repaired: 4, titles: 4, authors: 1, markers: 3 });
   const printed = reportJson(report);
   assert.equal(/[\u0080-\u009f]/.test(printed), false);
   assert.equal(printed.includes("\\u0098O \\u009cNatal de Teste"), true);
@@ -247,73 +246,6 @@ test("a book's origin is its creator, else its sources joined, else lookup", () 
 test("a repairable book with unreadable sources fails the plan instead of being skipped", () => {
   const h = setup();
   const created = h.book("Livro da fÃ©", "Ana Lima", null, {});
-  h.db.prepare("UPDATE books SET data_sources = 'not json' WHERE id = ?").run(created.id);
-  assert.throws(() => planMojibakeRepairs(h.db), SyntaxError);
-});
-
-test("turns around the author of a book ISBNdb search created, with its title key, search row and work", () => {
-  const h = setup();
-  const created = h.book("Dune", "Herbert, Frank", "9780000000002", { sources: ["isbndb"] });
-  assert.deepEqual(h.keys(created.id), ["isbn:9780000000002", "ta:dune|herbert|"]);
-  const plan = planMojibakeRepairs(h.db);
-  assert.deepEqual(plan.books.map(({ id, repairedAuthor, origin }) => ({ id, repairedAuthor, origin })), [{ id: created.id, repairedAuthor: "Frank Herbert", origin: "isbndb" }]);
-  const applied = applyMojibakeRepairs(h.db, plan);
-  assert.deepEqual(applied, { books: 1, works: 1, skipped: 0 });
-  assert.deepEqual(h.stored(created.id), { title: "Dune", author: "Frank Herbert", title_key: "ta:dune|frank herbert|" });
-  assert.deepEqual(h.keys(created.id), ["isbn:9780000000002", "ta:dune|frank herbert|", "ta:dune|herbert|"]);
-  assert.deepEqual(h.searchText(created.id), { title: "Dune", author: "Frank Herbert" });
-  assert.deepEqual(h.workText(created.work_id), { title: "Dune", author: "Frank Herbert" });
-  assert.deepEqual(mojibakeReport(plan, applied).repairs, [{ id: created.id, from: "Dune — Herbert, Frank", to: "Dune — Frank Herbert" }]);
-  const rerun = planMojibakeRepairs(h.db);
-  assert.deepEqual([rerun.books, rerun.works], [[], []]);
-});
-
-test("leaves the same author text alone on a book ISBNdb search did not create", () => {
-  const h = setup();
-  h.book("Dune", "Herbert, Frank", "9780000000002", { sources: ["openlibrary"] });
-  h.book("Dune Messiah", "Herbert, Frank", "9780000000019");
-  h.book("Children of Dune", "Herbert, Frank", "9780000000026", { sources: ["openlibrary", "isbndb"] });
-  h.book("God Emperor of Dune", "Herbert, Frank", "9780000000033", { createdBy: "seed", sources: ["isbndb"] });
-  h.book("Heretics of Dune", "Herbert, Frank", "9780000000040", {});
-  h.book("Chapterhouse: Dune", "Herbert, Frank", "9780000000057", { createdBy: "publisher" });
-  const before = h.dump();
-  const plan = planMojibakeRepairs(h.db);
-  assert.deepEqual([plan.books, plan.works], [[], []]);
-  assert.deepEqual(applyMojibakeRepairs(h.db, plan), { books: 0, works: 0, skipped: 0 });
-  assert.deepEqual(h.dump(), before);
-});
-
-test("turns the author around when ISBNdb is the first of several sources, and cleans the text first", () => {
-  const h = setup();
-  const created = h.book("Ensaio sobre a Cegueira", "Saramago, JosÃ©", "9780000000002", { sources: ["isbndb", "openlibrary"] });
-  applyMojibakeRepairs(h.db, planMojibakeRepairs(h.db));
-  assert.equal(h.stored(created.id).author, "José Saramago");
-  assert.deepEqual(h.workText(created.work_id), { title: "Ensaio sobre a Cegueira", author: "José Saramago" });
-});
-
-test("a work takes the turned name only when its author is the turned book's own text", () => {
-  const h = setup();
-  const seeded = h.book("Dune", "Herbert, Brian", "9780000000002", { createdBy: "seed", workKey: "OL1W" });
-  const created = h.book("Dune Messiah", "Herbert, Frank", "9780000000019", { sources: ["isbndb"], workKey: "OL1W" });
-  assert.equal(created.work_id, seeded.work_id);
-  const plan = planMojibakeRepairs(h.db);
-  assert.deepEqual([plan.books.map((book) => book.id), plan.works], [[created.id], []]);
-  assert.deepEqual(applyMojibakeRepairs(h.db, plan), { books: 1, works: 0, skipped: 0 });
-  assert.deepEqual(h.workText(seeded.work_id), { title: "Dune", author: "Herbert, Brian" });
-});
-
-test("the report counts turned names apart from stripped markers", () => {
-  const h = setup();
-  h.book("Dune", "Herbert, Frank", "9780000000002", { sources: ["isbndb"] });
-  h.book("Ensaio sobre a Cegueira", "Saramago, JosÃ©", "9780000000019", { sources: ["isbndb"] });
-  h.book("\u0098O \u009cNatal de Teste", "Ana Lima", null);
-  const report = mojibakeReport(planMojibakeRepairs(h.db), null);
-  assert.deepEqual(report.books, { scanned: 3, repaired: 3, titles: 1, authors: 2, names: 2, markers: 1 });
-});
-
-test("a name that would be turned on a book with unreadable sources fails the plan instead of being skipped", () => {
-  const h = setup();
-  const created = h.book("Dune", "Herbert, Frank", null, {});
   h.db.prepare("UPDATE books SET data_sources = 'not json' WHERE id = ?").run(created.id);
   assert.throws(() => planMojibakeRepairs(h.db), SyntaxError);
 });

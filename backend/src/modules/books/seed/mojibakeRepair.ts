@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import { cleanCatalogText, hasMojibake, repairMojibake } from "@scripta/shared";
-import { catalogTitleKey, givenNameFirst, workTitleKey } from "../domain/normalize.js";
+import { catalogTitleKey, workTitleKey } from "../domain/normalize.js";
 
 export interface RowRepair {
   id: string;
@@ -34,7 +34,6 @@ interface WorkScan {
 }
 
 interface BookScan extends WorkScan {
-  work_id: string | null;
   created_by: string | null;
   data_sources: string;
 }
@@ -42,27 +41,18 @@ interface BookScan extends WorkScan {
 const repairRow = ({ id, title, author }: WorkScan): RowRepair => ({ id, title, author, repairedTitle: cleanCatalogText(title), repairedAuthor: cleanCatalogText(author) });
 const isChanged = (row: RowRepair) => row.repairedTitle !== row.title || row.repairedAuthor !== row.author;
 const originOf = (row: BookScan) => row.created_by ?? ((JSON.parse(row.data_sources) as string[]).join("+") || "lookup");
-const createdByIsbndbSearch = (row: BookScan) => row.created_by === null && (JSON.parse(row.data_sources) as string[])[0] === "isbndb";
-const strippedMarkers = (text: string) => cleanCatalogText(text) !== repairMojibake(text);
 
 export function planMojibakeRepairs(db: DatabaseSync): MojibakePlan {
   const plan: MojibakePlan = { scanned: { books: 0, works: 0 }, books: [], works: [], stillBroken: [] };
-  const turnedAuthors = new Map<string, string[]>();
-  for (const row of db.prepare("SELECT id, title, author, work_id, created_by, data_sources FROM books").iterate() as Iterable<BookScan>) {
+  for (const row of db.prepare("SELECT id, title, author, created_by, data_sources FROM books").iterate() as Iterable<BookScan>) {
     plan.scanned.books++;
     const repair = repairRow(row);
-    const turned = givenNameFirst(repair.repairedAuthor);
-    if (turned !== repair.repairedAuthor && createdByIsbndbSearch(row)) {
-      if (row.work_id) turnedAuthors.set(row.work_id, [...(turnedAuthors.get(row.work_id) ?? []), repair.repairedAuthor]);
-      repair.repairedAuthor = turned;
-    }
     if (isChanged(repair)) plan.books.push({ ...repair, origin: originOf(row) });
     if (hasMojibake(repair.repairedTitle) || hasMojibake(repair.repairedAuthor)) plan.stillBroken.push({ id: row.id, title: repair.repairedTitle, author: repair.repairedAuthor });
   }
   for (const row of db.prepare("SELECT id, title, author FROM works").iterate() as Iterable<WorkScan>) {
     plan.scanned.works++;
     const repair = repairRow(row);
-    if (turnedAuthors.get(row.id)?.includes(repair.repairedAuthor)) repair.repairedAuthor = givenNameFirst(repair.repairedAuthor);
     if (isChanged(repair)) plan.works.push(repair);
   }
   return plan;
@@ -115,8 +105,7 @@ export function mojibakeReport(plan: MojibakePlan, applied: MojibakeApplied | nu
       repaired: plan.books.length,
       titles: plan.books.filter((book) => book.repairedTitle !== book.title).length,
       authors: plan.books.filter((book) => book.repairedAuthor !== book.author).length,
-      names: plan.books.filter((book) => book.repairedAuthor !== cleanCatalogText(book.author)).length,
-      markers: plan.books.filter((book) => strippedMarkers(book.title) || strippedMarkers(book.author)).length
+      markers: plan.books.filter((book) => book.repairedTitle !== repairMojibake(book.title) || book.repairedAuthor !== repairMojibake(book.author)).length
     },
     works: { scanned: plan.scanned.works, repaired: plan.works.length },
     origins,
