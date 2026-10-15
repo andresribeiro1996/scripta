@@ -15,7 +15,8 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
 const { applyBooksMigrations } = await import("./adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("./adapters/sqlite/sqliteBooksRepository.js");
-const { scoreSynopses, synopsisSample } = await import("./calibration.js");
+const { answerEach, scoreSynopses, synopsisSample } = await import("./calibration.js");
+const { SourceUnavailableError, UnusableAnswerError } = await import("./domain/errors.js");
 
 type Repo = ReturnType<typeof createSqliteBooksRepository>;
 
@@ -61,4 +62,16 @@ test("the score counts labelled not-usable texts per decision band", () => {
     { decision: "jev 0.3 to 0.5", items: 1, notUsable: 1 },
     { decision: "jev 0.5 and above", items: 1, notUsable: 0 }
   ]);
+});
+
+test("a text Jev can't answer is left out of the score instead of ending the run, and an outage still ends it", async () => {
+  const ask = async (n: number) => {
+    if (n === 2) throw new UnusableAnswerError("typesafe", "unexpected answer");
+    if (n === 3) throw new SourceUnavailableError("typesafe", "HTTP 422", { status: 422 });
+    return n * 10;
+  };
+  const { answers, skipped } = await answerEach([1, 2, 3, 4], ask);
+  assert.deepEqual([...answers].sort((a, b) => a - b), [10, 40]);
+  assert.equal(skipped, 2);
+  await assert.rejects(answerEach([1], async () => { throw new SourceUnavailableError("typesafe", "HTTP 503", { status: 503 }); }), SourceUnavailableError);
 });

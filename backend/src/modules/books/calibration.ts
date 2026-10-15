@@ -1,7 +1,9 @@
 import type { BooksRepository } from "./domain/ports.js";
 import { isFragment, SYNOPSIS_HIDE_BELOW, SYNOPSIS_REVIEW_BELOW } from "./domain/synopsis.js";
+import { failureKind } from "./typesafe.js";
 
 export const TASKS = ["synopses"] as const;
+const IN_FLIGHT = 4;
 
 export type SynopsisSampleItem = { hash: string; stratum: string; title: string; author: string; text: string };
 export type SynopsisLabel = { hash: string; usable: boolean; kind: string };
@@ -39,4 +41,22 @@ export function scoreSynopses(sample: SynopsisSampleItem[], labels: SynopsisLabe
     row(`jev ${SYNOPSIS_HIDE_BELOW} to ${SYNOPSIS_REVIEW_BELOW}`, asked.filter((item) => usable(item) >= SYNOPSIS_HIDE_BELOW && usable(item) < SYNOPSIS_REVIEW_BELOW)),
     row(`jev ${SYNOPSIS_REVIEW_BELOW} and above`, asked.filter((item) => usable(item) >= SYNOPSIS_REVIEW_BELOW))
   ];
+}
+
+export async function answerEach<T, A>(items: T[], ask: (item: T) => Promise<A>): Promise<{ answers: A[]; skipped: number }> {
+  const answers: A[] = [];
+  let skipped = 0;
+  let next = 0;
+  await Promise.all(Array.from({ length: IN_FLIGHT }, async () => {
+    while (next < items.length) {
+      const item = items[next++]!;
+      try {
+        answers.push(await ask(item));
+      } catch (error) {
+        if (failureKind(error) !== "book") throw error;
+        skipped += 1;
+      }
+    }
+  }));
+  return { answers, skipped };
 }
