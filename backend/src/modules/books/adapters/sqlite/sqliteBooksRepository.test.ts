@@ -1861,3 +1861,41 @@ test("an undone translation merge stays undone through the next title-key groupi
   assert.equal(workById(db, pt.work_id).merged_into, null);
   assert.equal(repo.getBook(pt.id)!.work_id, pt.work_id);
 });
+
+test("createBook marks a new lossy book with a valid ISBN for a re-title, and no other", () => {
+  const { repo } = freshRepo();
+  const lossyTitle = repo.createBook({ title: "P©ssaro Azul", author: "Ana Lima", isbn: "9789720000101" }, ["isbn:9789720000101"], NOW);
+  const lossyAuthor = repo.createBook({ title: "Pássaro Azul", author: "In©s Duarte", isbn: "9789720000118" }, ["isbn:9789720000118"], NOW);
+  const clean = repo.createBook({ title: "Pássaro Verde", author: "Ana Lima", isbn: "9789720000125" }, ["isbn:9789720000125"], NOW);
+  const noIsbn = repo.createBook({ title: "P©ssaro Branco", author: "Ana Lima", isbn: null }, ["ta:p ssaro branco|ana lima|"], NOW);
+  const existing = repo.createBook({ title: "P©ssaro Verde", author: "Ana Lima", isbn: "9789720000125" }, ["isbn:9789720000125"], NOW);
+  assert.deepEqual([lossyTitle, lossyAuthor, clean, noIsbn].map((book) => book.retitle_wanted_at), [NOW, NOW, null, null]);
+  assert.equal(existing.id, clean.id);
+  assert.equal(existing.retitle_wanted_at, null);
+});
+
+test("listRetitleWanted lists marked books oldest first with their work's text, and clearRetitleWanted unmarks one", () => {
+  const { repo } = freshRepo();
+  const later = repo.createBook({ title: "P©ssaro Azul", author: "Ana Lima", isbn: "9789720000101" }, ["isbn:9789720000101"], at(1));
+  const earlier = repo.createBook({ title: "Can©o", author: "In©s Duarte", isbn: "9789720000118" }, ["isbn:9789720000118"], NOW);
+  repo.createBook({ title: "Pássaro Verde", author: "Ana Lima", isbn: "9789720000125" }, ["isbn:9789720000125"], NOW);
+  assert.deepEqual(repo.listRetitleWanted(10).map((row) => ({ ...row })), [
+    { id: earlier.id, title: "Can©o", author: "In©s Duarte", isbn: "9789720000118", work_id: earlier.work_id, work_title: "Can©o", work_author: "In©s Duarte" },
+    { id: later.id, title: "P©ssaro Azul", author: "Ana Lima", isbn: "9789720000101", work_id: later.work_id, work_title: "P©ssaro Azul", work_author: "Ana Lima" }
+  ]);
+  assert.deepEqual(repo.listRetitleWanted(1).map((row) => row.id), [earlier.id]);
+  repo.clearRetitleWanted(earlier.id);
+  assert.deepEqual(repo.listRetitleWanted(10).map((row) => row.id), [later.id]);
+});
+
+test("retitle_wanted_at and its index are added to an existing database once", () => {
+  const db = new DatabaseSync(":memory:");
+  applyBooksMigrations(db);
+  db.exec("DROP INDEX idx_books_retitle_wanted");
+  db.exec("ALTER TABLE books DROP COLUMN retitle_wanted_at");
+  applyBooksMigrations(db);
+  applyBooksMigrations(db);
+  const columns = (db.prepare("PRAGMA table_info(books)").all() as Array<{ name: string }>).map((column) => column.name);
+  assert.ok(columns.includes("retitle_wanted_at"));
+  assert.ok(db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'idx_books_retitle_wanted'").get());
+});

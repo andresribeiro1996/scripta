@@ -4,9 +4,10 @@ import { MIN_PREFIX_LENGTH, normalizeWorkKey, workTitleKey } from "../../domain/
 import type { BooksRepository, IdPage, MergeableDetails, PageCursor } from "../../domain/ports.js";
 import { GENRE_SAVE_LINE } from "../../domain/constants.js";
 import { WorkMergeError } from "../../domain/errors.js";
+import { wantsRetitle } from "../../domain/lossy.js";
 import { summaryHashOf, type SynopsisKind } from "../../domain/synopsis.js";
 import { originalTitleIn } from "../../domain/translation.js";
-import type { BookRow, CoverImageRow, DataSource, GenreEvidence, MergeSource, SummarySource, WorkPageRows, WorkView } from "../../domain/types.js";
+import type { BookRow, CoverImageRow, DataSource, GenreEvidence, LossyBook, MergeSource, SummarySource, WorkPageRows, WorkView } from "../../domain/types.js";
 
 export const UNCHECKED_COVERS_SQL = `
   SELECT id, created_at AS at, rowid AS row FROM books
@@ -48,8 +49,8 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const byKeysStmt = db.prepare(`SELECT book_keys.key AS key, books.* FROM book_keys JOIN books ON books.id = book_keys.book_id WHERE book_keys.key IN (SELECT value FROM json_each(?))`);
   const byIdStmt = db.prepare(`SELECT * FROM books WHERE id = ?`);
   const insertBookStmt = db.prepare(`
-    INSERT INTO books (id, title, author, year, publisher, isbn, ol_cover_id, ol_work_key, work_id, genres, data_sources, created_by, title_key, created_at)
-    VALUES ($id, $title, $author, $year, $publisher, $isbn, $ol_cover_id, $ol_work_key, $work_id, $genres, $data_sources, $created_by, $title_key, $created_at)
+    INSERT INTO books (id, title, author, year, publisher, isbn, ol_cover_id, ol_work_key, work_id, genres, data_sources, created_by, title_key, retitle_wanted_at, created_at)
+    VALUES ($id, $title, $author, $year, $publisher, $isbn, $ol_cover_id, $ol_work_key, $work_id, $genres, $data_sources, $created_by, $title_key, $retitle_wanted_at, $created_at)
   `);
   const insertKeyIfMissingStmt = db.prepare(`INSERT OR IGNORE INTO book_keys (key, book_id) VALUES (?, ?)`);
   const fillIdentityStmt = db.prepare(`UPDATE books SET title = ?, author = ?, title_key = ? WHERE id = ? AND (title = '' OR author = '')`);
@@ -391,6 +392,13 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const blankTitledStmt = db.prepare(`SELECT id, publisher_url FROM books WHERE title = '' AND publisher_url IS NOT NULL`);
   const setPublisherUrlStmt = db.prepare(`UPDATE books SET publisher_url = ? WHERE id = ? AND publisher_url IS NULL`);
   const upgradeWantedStmt = db.prepare(UPGRADE_WANTED_SQL);
+  const retitleWantedStmt = db.prepare(`
+    SELECT books.id, books.title, books.author, books.isbn, books.work_id, works.title AS work_title, works.author AS work_author
+    FROM books LEFT JOIN works ON works.id = books.work_id
+    WHERE books.retitle_wanted_at IS NOT NULL
+    ORDER BY books.retitle_wanted_at, books.rowid LIMIT ?
+  `);
+  const clearRetitleWantedStmt = db.prepare(`UPDATE books SET retitle_wanted_at = NULL WHERE id = ?`);
 
   function mergeDetails(bookId: string, details: MergeableDetails, summarySource: SummarySource | null) {
     mergeDetailsStmt.run({
@@ -550,6 +558,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
           $data_sources: JSON.stringify(input.sources ?? []),
           $created_by: input.createdBy ?? null,
           $title_key: input.title ? workTitleKey(input.title, input.author) : null,
+          $retitle_wanted_at: wantsRetitle(input) ? createdAt : null,
           $created_at: createdAt
         });
         for (const key of keys) insertKeyIfMissingStmt.run(key, id);
@@ -988,6 +997,14 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
 
     listUpgradeWantedIds(after, limit) {
       return idPage(upgradeWantedStmt, after, limit);
+    },
+
+    listRetitleWanted(limit) {
+      return retitleWantedStmt.all(limit) as unknown as LossyBook[];
+    },
+
+    clearRetitleWanted(id) {
+      clearRetitleWantedStmt.run(id);
     }
   };
 }

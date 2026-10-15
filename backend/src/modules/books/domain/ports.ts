@@ -1,6 +1,6 @@
 import type { BookMetadata, BookSearchResult, CatalogBookMetadata } from "@scripta/shared";
 import type { SynopsisJudgment, SynopsisKind } from "./synopsis.js";
-import type { BookRow, CoverImageRow, CoverSourceName, CoverStatus, DataSource, GenreEvidence, GenresSource, JevRejection, JevTask, NewBook, SummarySource, WorkMatchJudgment, WorkPageRows, WorkView } from "./types.js";
+import type { BookRow, CoverImageRow, CoverSourceName, CoverStatus, DataSource, GenreEvidence, GenresSource, JevRejection, JevTask, LossyBook, NewBook, SummarySource, WorkMatchJudgment, WorkPageRows, WorkView } from "./types.js";
 
 export type MergeableDetails = Pick<BookMetadata, "summary" | "pages" | "year" | "publisher" | "translator">;
 
@@ -108,6 +108,8 @@ export interface BooksRepository {
   setLanguage(id: string, tag: string | null): void;
   setPublisherUrl(id: string, url: string): void;
   listUpgradeWantedIds(after: PageCursor | null, limit: number): IdPage;
+  listRetitleWanted(limit: number): LossyBook[];
+  clearRetitleWanted(id: string): void;
 }
 
 export interface CoverCandidate {

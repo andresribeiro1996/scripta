@@ -31,6 +31,8 @@ import { encodeCover } from "./domain/images.js";
 import type { BookLookup } from "./domain/normalize.js";
 import { coverUrlFor, useBooksRepository } from "./publicCoverLookup.js";
 import { buildAdminRoutes, buildCatalogRoutes, buildCoverFileRoutes, buildGenreReviewRoutes, buildResolveRoutes, buildSynopsisReviewRoutes, buildTranslationReviewRoutes } from "./routes.js";
+import { RETITLE_BATCH_SIZE, retitleWanted } from "./retitleJob.js";
+import { applyMojibakeRepairs } from "./seed/mojibakeRepair.js";
 import { createCoverWorker } from "./worker.js";
 
 const ISBNDB_GAP_MS = 1100;
@@ -61,7 +63,8 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
         .catch((error: unknown) => app.log.error({ err: error }, "ISBNdb key alert failed"));
     }
   });
-  const repo = timedMethods(createSqliteBooksRepository(timeStep(app.log, "startup:books-open", openBooksDb)), app.log, "books");
+  const booksDb = timeStep(app.log, "startup:books-open", openBooksDb);
+  const repo = timedMethods(createSqliteBooksRepository(booksDb), app.log, "books");
   useBooksRepository(repo);
   const heldWorks = options.heldWorks;
   const alertTypesafe = (subject: string, text: string) => {
@@ -160,6 +163,19 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
     (error) => app.log.error({ err: error }, "work key backfill failed")
   );
   const stopColorBackfill = startCoverColorBackfill((limit) => service.fillCoverColors(limit), app.log);
+  const retitleIsbndb = isbndbConfigured ? createIsbndbCatalog(env.ISBNDB_API_KEY, isbndbThrottle, isbndbGate, false) : null;
+  const stopRetitleJob = retitleIsbndb
+    ? startDetailsBackfill(
+        (signal) => retitleWanted({
+          repo,
+          isbndb: retitleIsbndb,
+          write: (plan) => applyMojibakeRepairs(booksDb, plan),
+          info: (details, message) => app.log.info(details, message),
+          warn: (details, message) => app.log.warn(details, message)
+        }, RETITLE_BATCH_SIZE, signal),
+        (error) => app.log.error({ err: error }, "lossy retitle failed")
+      )
+    : null;
   activeService = service;
   app.addHook("onClose", async () => {
     activeService = null;
@@ -169,6 +185,7 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
     grouping.stop();
     stopWorkKeyBackfill();
     stopColorBackfill();
+    stopRetitleJob?.();
     genreJobs?.stop();
     synopsisJobs?.stop();
     translationJobs?.stop();

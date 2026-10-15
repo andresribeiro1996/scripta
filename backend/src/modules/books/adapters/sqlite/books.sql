@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS books (
   genres_confidence REAL,
   summary_hash        TEXT,
   original_title      TEXT,
+  retitle_wanted_at   TEXT,
   created_at          TEXT NOT NULL
 );
 

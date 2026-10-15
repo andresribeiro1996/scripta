@@ -42,6 +42,7 @@ export interface BookRow {
   title_group_blocked_at: string | null;
   genres_source: GenresSource | null;
   genres_confidence: number | null;
+  retitle_wanted_at: string | null;
   created_at: string;
 }
 
@@ -71,6 +72,16 @@ export interface NewBook {
   genres?: string[];
   sources?: DataSource[];
   createdBy?: BookCreator;
+}
+
+export interface LossyBook {
+  id: string;
+  title: string;
+  author: string;
+  isbn: string | null;
+  work_id: string | null;
+  work_title: string | null;
+  work_author: string | null;
 }
 
 export type WorkPageRows = {
