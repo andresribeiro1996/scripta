@@ -1261,10 +1261,10 @@ test("setWorkSummary keeps the first summary, assigns a missing work and follows
   repo.setWorkSummary(a.id, "First.");
   repo.setWorkSummary(a.id, "Second.");
   assert.equal(workById(db, a.work_id).summary, "First.");
-  assert.deepEqual({ ...repo.getWorkSummary(a.id) }, { summary: "First.", olWorkKey: null });
+  assert.deepEqual({ ...repo.getWorkSummary(a.id) }, { summary: "First.", olWorkKey: null, summaryHash: summaryHashOf("First.") });
 
   repo.mergeWorks(a.work_id!, b.work_id!);
-  assert.deepEqual({ ...repo.getWorkSummary(a.id) }, { summary: "First.", olWorkKey: "OL2W" });
+  assert.deepEqual({ ...repo.getWorkSummary(a.id) }, { summary: "First.", olWorkKey: "OL2W", summaryHash: summaryHashOf("First.") });
   repo.setWorkSummary(b.id, "Third.");
   assert.equal(workById(db, b.work_id).summary, "First.");
 

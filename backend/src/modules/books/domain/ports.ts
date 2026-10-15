@@ -56,7 +56,7 @@ export interface BooksRepository {
   workPageRows(id: string): WorkPageRows | undefined;
   assignWork(bookId: string): string;
   setWorkSummary(bookId: string, summary: string): void;
-  getWorkSummary(bookId: string): { summary: string | null; olWorkKey: string | null } | undefined;
+  getWorkSummary(bookId: string): { summary: string | null; olWorkKey: string | null; summaryHash: string | null } | undefined;
   canonicalWorkIds(ids: string[]): Map<string, string>;
   worksNeedingGenreJudgment(workIds: string[], limit: number, rejectionLimit: number): string[];
   saveGenreJudgment(judgment: { workId: string; model: string; genre: string | null; confidence: number; askedAt: string }): void;

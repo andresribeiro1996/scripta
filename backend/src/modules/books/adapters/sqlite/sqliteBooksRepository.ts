@@ -82,7 +82,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const setWorkSummaryStmt = db.prepare(`UPDATE works SET summary = ?, summary_hash = ? WHERE id = ? AND summary IS NULL`);
   const carryWorkSummaryStmt = db.prepare(`UPDATE works SET (summary, summary_hash) = (SELECT summary, summary_hash FROM works WHERE id = ?) WHERE id = ? AND summary IS NULL`);
   const workSummaryStmt = db.prepare(`
-    SELECT target.summary AS summary, target.ol_work_key AS olWorkKey
+    SELECT target.summary AS summary, target.ol_work_key AS olWorkKey, target.summary_hash AS summaryHash
     FROM books JOIN works AS own ON own.id = books.work_id JOIN works AS target ON target.id = COALESCE(own.merged_into, own.id)
     WHERE books.id = ?
   `);
@@ -90,7 +90,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const repointMergedStmt = db.prepare(`UPDATE works SET merged_into = ? WHERE merged_into = ?`);
   const blockTitleGroupStmt = db.prepare(`UPDATE books SET title_group_blocked_at = ? WHERE id = ?`);
   const editionCountStmt = db.prepare(`SELECT COUNT(*) AS n FROM books WHERE work_id = ?`);
-  const workStmt = db.prepare(`SELECT id, ol_work_key, title, author, summary FROM works WHERE id = ?`);
+  const workStmt = db.prepare(`SELECT id, ol_work_key, title, author, summary, summary_hash FROM works WHERE id = ?`);
   const evidenceEditionsStmt = db.prepare(`SELECT title, language, isbn, publisher, year, summary FROM books WHERE work_id = ? ORDER BY created_at, rowid`);
   const setManualGenresStmt = db.prepare(`
     UPDATE books SET genres = $genres, genres_source = 'manual', genres_confidence = NULL
@@ -115,7 +115,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   `);
   const jevJudgedStmt = db.prepare(`SELECT work_id FROM genre_judgments WHERE model <> 'manual'`);
   const countEmptyGenreEditionsStmt = db.prepare(`SELECT COUNT(*) AS n FROM books WHERE work_id = ? AND genres = '[]'`);
-  const pageEditionsStmt = db.prepare(`SELECT books.id, books.title, books.language, books.year, books.isbn, books.summary, books.cover_image_id, ci.color AS cover_color, books.genres, books.rating, books.rating_count, books.pages, books.genres_source, books.genres_confidence FROM books LEFT JOIN cover_images ci ON ci.id = books.cover_image_id WHERE books.work_id = ? ORDER BY books.created_at, books.rowid`);
+  const pageEditionsStmt = db.prepare(`SELECT books.id, books.title, books.language, books.year, books.isbn, books.summary, books.summary_hash, books.cover_image_id, ci.color AS cover_color, books.genres, books.rating, books.rating_count, books.pages, books.genres_source, books.genres_confidence FROM books LEFT JOIN cover_images ci ON ci.id = books.cover_image_id WHERE books.work_id = ? ORDER BY books.created_at, books.rowid`);
   const workEditionsStmt = db.prepare(`SELECT id, isbn, title, author, ol_work_key FROM books WHERE work_id = ? ORDER BY created_at, rowid`);
   const groupablePairsStmt = db.prepare(`
     WITH candidates AS (
@@ -668,11 +668,11 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     workPageRows(id) {
       const canonical = liveWorkId(id);
       if (canonical === null) return undefined;
-      const work = workStmt.get(canonical) as { id: string; title: string; author: string; summary: string | null } | undefined;
+      const work = workStmt.get(canonical) as { id: string; title: string; author: string; summary: string | null; summary_hash: string | null } | undefined;
       if (!work) return undefined;
       const aliases = (aliasStmt.all(canonical) as Array<{ id: string }>).map((row) => row.id);
       return {
-        work: { id: work.id, title: work.title, author: work.author, summary: work.summary },
+        work: { id: work.id, title: work.title, author: work.author, summary: work.summary, summary_hash: work.summary_hash },
         aliasIds: [canonical, ...aliases],
         editions: pageEditionsStmt.all(canonical) as WorkPageRows["editions"]
       };
@@ -715,7 +715,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       });
     },
 
-    getWorkSummary: (bookId) => workSummaryStmt.get(bookId) as { summary: string | null; olWorkKey: string | null } | undefined,
+    getWorkSummary: (bookId) => workSummaryStmt.get(bookId) as { summary: string | null; olWorkKey: string | null; summaryHash: string | null } | undefined,
 
     setLanguage(id, tag) {
       if (tag) setLanguageStmt.run(tag, id);

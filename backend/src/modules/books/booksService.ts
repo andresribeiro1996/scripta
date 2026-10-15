@@ -5,6 +5,7 @@ import { findBestCover, type CoverSources, type FetchCoverImage } from "./coverR
 import { MIN_GOOD_WIDTH } from "./domain/constants.js";
 import { BookNotFoundError, FileTooLargeError, InvalidImageError, SourcePausedError, SourceUnavailableError, WorkMergeError } from "./domain/errors.js";
 import { coverColor, encodeCover, type EncodedCover } from "./domain/images.js";
+import { hiddenSynopsisHashes } from "./domain/synopsis.js";
 import { findExisting, findOrCreateBook, keysOf } from "./domain/findOrCreate.js";
 import { firstEditionPerWork, workIdsOf } from "./domain/workSearch.js";
 import { editionLanguage, findByIdentity, isPortugueseIsbn, lookupIdentity, SEARCH_LIMIT, searchTokens, WORK_SCAN_LIMIT, WORK_SEARCH_LIMIT, type BookIdentity, type BookLookup } from "./domain/normalize.js";
@@ -124,17 +125,18 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
   }
 
   function workSummaryOf(book: BookRow): { summary: string; sourceUrl: string } | null {
-    if (book.summary) return null;
     const work = deps.repo.getWorkSummary(book.id);
     if (!work?.summary || !work.olWorkKey) return null;
+    if (hiddenSynopsisHashes(deps.repo, [work.summaryHash]).size > 0) return null;
     if (!summaryMatchesLanguage(work.summary, book.language ?? (isPortugueseIsbn(book.isbn) ? "pt" : null))) return null;
     return { summary: work.summary, sourceUrl: `https://openlibrary.org/works/${work.olWorkKey}` };
   }
 
   function detailsOf(book: BookRow): BookMetadata {
-    const fromWork = workSummaryOf(book);
+    const own = book.summary && hiddenSynopsisHashes(deps.repo, [book.summary_hash]).size === 0 ? book.summary : null;
+    const fromWork = own ? null : workSummaryOf(book);
     return {
-      summary: fromWork?.summary ?? book.summary,
+      summary: fromWork?.summary ?? own,
       rating: book.rating,
       ratingCount: book.rating_count,
       sourceUrl: fromWork?.sourceUrl ?? summaryLink(book),
@@ -143,7 +145,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       publisher: book.publisher,
       year: book.year,
       translator: book.translator,
-      summarySource: fromWork ? "openlibrary" : book.summary_source
+      summarySource: fromWork ? "openlibrary" : own ? book.summary_source : null
     };
   }
 

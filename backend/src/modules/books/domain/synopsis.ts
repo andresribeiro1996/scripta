@@ -23,3 +23,10 @@ export function isHiddenSynopsis(judgment: Pick<SynopsisJudgment, "model" | "usa
   if (judgment.model === "manual") return judgment.usable === 0;
   return judgment.usable < SYNOPSIS_HIDE_BELOW;
 }
+
+export function hiddenSynopsisHashes(source: { synopsisJudgments(hashes: string[]): Map<string, SynopsisJudgment> }, hashes: Array<string | null>): Set<string> {
+  const wanted = [...new Set(hashes.filter((hash): hash is string => hash !== null))];
+  if (wanted.length === 0) return new Set();
+  const judgments = source.synopsisJudgments(wanted);
+  return new Set(wanted.filter((hash) => isHiddenSynopsis(judgments.get(hash))));
+}

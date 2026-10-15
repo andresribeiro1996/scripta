@@ -16,6 +16,7 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 const { applyBooksMigrations } = await import("./adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("./adapters/sqlite/sqliteBooksRepository.js");
 const { createBooksService, storeCoverImage, COVER_ENQUEUE_BATCH } = await import("./booksService.js");
+const { summaryHashOf } = await import("./domain/synopsis.js");
 const { default: sharp } = await import("sharp");
 const { BookNotFoundError, FileTooLargeError, InvalidImageError, SourcePausedError, SourceUnavailableError } = await import("./domain/errors.js");
 const { createCoverWorker } = await import("./worker.js");
@@ -1776,4 +1777,44 @@ test("a finished details lookup reports the edition, from a request and from the
   const emma = h.repo.createBook({ title: "Emma", author: "Jane Austen", isbn: null }, ["ta:emma|jane austen|"], "2026-10-01T00:00:00.000Z");
   await h.service.backfillDetails(50);
   assert.deepEqual(checked[1], { id: emma.id, status: "missing" });
+});
+
+test("a hidden edition summary gives way to the work's summary, never to a hidden or wrong-language one", async () => {
+  const h = harness();
+  const meta = (summary: string) => ({ summary, rating: null, ratingCount: 0, sourceUrl: "", genres: [], pages: null, publisher: null, year: null, translator: null });
+  const englishWork = "The whole story of a family across three generations, told with the help of letters and the memories of the people who were there.";
+  const seeded = (isbn: string, workKey: string, summary: string) => {
+    const book = h.repo.createBook({ title: `Book ${isbn}`, author: "Author", isbn, workKey }, [`isbn:${isbn}`], "2026-10-01T00:00:00.000Z");
+    h.repo.saveDetails(book.id, meta(summary), ["isbndb"], "isbndb", "2026-10-01T00:00:00.000Z");
+    h.repo.setWorkSummary(book.id, englishWork);
+    return { isbn, title: `Book ${isbn}`, author: "Author" };
+  };
+  const hide = (text: string) => h.repo.saveSynopsisJudgment(summaryHashOf(text)!, { model: "jev-1.13.0", usable: 0.1, kind: "praise", askedAt: "2026-10-02T00:00:00.000Z" });
+
+  const english = seeded("9780441013593", "OL1W", "Praise for the book, in quotes.");
+  assert.equal((await h.service.getDetails(english))?.summary, "Praise for the book, in quotes.");
+  hide("Praise for the book, in quotes.");
+  const fallback = await h.service.getDetails(english);
+  assert.equal(fallback?.summary, englishWork);
+  assert.equal(fallback?.summarySource, "openlibrary");
+
+  const portuguese = seeded("9789720000031", "OL31W", "Elogios ao livro, entre aspas.");
+  hide("Elogios ao livro, entre aspas.");
+  const none = await h.service.getDetails(portuguese);
+  assert.equal(none?.summary, null);
+  assert.equal(none?.summarySource, null);
+
+  hide(englishWork);
+  assert.equal((await h.service.getDetails(english))?.summary, null);
+});
+
+test("a changed summary is shown until it is judged again", async () => {
+  const h = harness();
+  const orlando = { title: "Orlando", author: "Virginia Woolf", isbn: "9780141184272" };
+  const book = h.repo.createBook(orlando, ["isbn:9780141184272"], "2026-10-01T00:00:00.000Z");
+  h.repo.saveDetails(book.id, { summary: "Old praise.", rating: null, ratingCount: 0, sourceUrl: "", genres: [], pages: null, publisher: null, year: null, translator: null }, ["isbndb"], "isbndb", "2026-10-01T00:00:00.000Z");
+  h.repo.saveSynopsisJudgment(summaryHashOf("Old praise.")!, { model: "manual", usable: 0, kind: "praise", askedAt: "2026-10-02T00:00:00.000Z" });
+  assert.equal((await h.service.getDetails(orlando))?.summary, null);
+  h.repo.mergeDetails(book.id, { summary: "A new publisher synopsis.", pages: null, year: null, publisher: null, translator: null }, "publisher");
+  assert.equal((await h.service.getDetails(orlando))?.summary, "A new publisher synopsis.");
 });
