@@ -60,8 +60,22 @@ test("a dry run writes nothing but counts what it would label, and a repeat labe
   const s = setup();
   const dune = s.book("Dune", "9780441013593", "OL1W");
   const entries = [entry("9780441013593", "/works/OL1W", ["Science fiction"])];
-  assert.deepEqual(fillSeedGenres(entries, s.repo, { dryRun: true }), { fetched: 1, matched: 1, labelled: 1, editions: 0, noGenre: 0, unmatched: 0 });
+  assert.deepEqual(fillSeedGenres(entries, s.repo, { dryRun: true }), { fetched: 1, matched: 1, labelled: 1, editions: 1, noGenre: 0, unmatched: 0 });
   assert.equal(s.genres(dune.id).genres, "[]");
   fillSeedGenres(entries, s.repo, { dryRun: false });
   assert.deepEqual(fillSeedGenres(entries, s.repo, { dryRun: false }), { fetched: 1, matched: 1, labelled: 0, editions: 0, noGenre: 0, unmatched: 0 });
+});
+
+test("a work with a labelled and an empty edition reports the same counts dry and real", () => {
+  const s = setup();
+  const labelled = s.book("Dune", "9780441013593", "OL1W");
+  const empty = s.book("Duna", "9789722345671", "OL1W");
+  s.db.prepare("UPDATE books SET genres = ?, genres_source = 'manual' WHERE id = ?").run(JSON.stringify(["Classics"]), labelled.id);
+  const entries = [entry("9780441013593", "/works/OL1W", ["Science fiction"])];
+  const expected = { fetched: 1, matched: 1, labelled: 1, editions: 1, noGenre: 0, unmatched: 0 };
+  assert.deepEqual(fillSeedGenres(entries, s.repo, { dryRun: true }), expected);
+  assert.equal(s.genres(empty.id).genres, "[]");
+  assert.deepEqual(fillSeedGenres(entries, s.repo, { dryRun: false }), expected);
+  assert.deepEqual(s.genres(labelled.id), { genres: JSON.stringify(["Classics"]), genres_source: "manual" });
+  assert.deepEqual(s.genres(empty.id), { genres: JSON.stringify(["Science Fiction"]), genres_source: null });
 });

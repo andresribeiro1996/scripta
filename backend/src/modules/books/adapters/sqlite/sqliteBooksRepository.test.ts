@@ -1431,6 +1431,21 @@ test("source genres fill only editions without genres, and repeat as a no-op", (
   assert.equal(repo.fillSourceGenres(work, ["Fantasy"]), 0);
 });
 
+test("empty-genre editions of a work are counted", () => {
+  const { db, repo } = freshRepo();
+  const a = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593", workKey: "OL1W" }, ["isbn:9780441013593"], NOW);
+  const b = repo.createBook({ title: "Duna", author: "Frank Herbert", isbn: "9789722345671", workKey: "OL1W" }, ["isbn:9789722345671"], NOW);
+  const other = repo.createBook({ title: "Emma", author: "Jane Austen", isbn: "9780141439587", workKey: "OL2W" }, ["isbn:9780141439587"], NOW);
+  const work = a.work_id!;
+  assert.equal(b.work_id, work);
+  assert.equal(repo.countEmptyGenreEditions(work), 2);
+  db.prepare("UPDATE books SET genres = ?, genres_source = 'manual' WHERE id = ?").run(JSON.stringify(["Classics"]), b.id);
+  assert.equal(repo.countEmptyGenreEditions(work), 1);
+  assert.equal(repo.countEmptyGenreEditions(other.work_id!), 1);
+  repo.fillSourceGenres(work, ["Fantasy"]);
+  assert.equal(repo.countEmptyGenreEditions(work), 0);
+});
+
 test("work keys map to work ids, and publisher URLs list with their works", () => {
   const { repo } = freshRepo();
   const keyed = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593", workKey: "OL1W" }, ["isbn:9780441013593"], NOW);

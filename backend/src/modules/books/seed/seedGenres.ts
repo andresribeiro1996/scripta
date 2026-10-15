@@ -11,7 +11,7 @@ const isbnKey = (entry: SeedEntry) => `isbn:${canonicalIsbn(entry.isbn)}`;
 
 export function fillSeedGenres(
   entries: SeedEntry[],
-  repo: Pick<BooksRepository, "workIdsByWorkKeys" | "findBooksByKeys" | "editionGenres" | "fillSourceGenres" | "transaction">,
+  repo: Pick<BooksRepository, "workIdsByWorkKeys" | "findBooksByKeys" | "countEmptyGenreEditions" | "fillSourceGenres" | "transaction">,
   options: { dryRun: boolean }
 ): SeedGenresReport {
   const report: SeedGenresReport = { fetched: entries.length, matched: 0, labelled: 0, editions: 0, noGenre: 0, unmatched: 0 };
@@ -37,7 +37,11 @@ export function fillSeedGenres(
           continue;
         }
         if (options.dryRun) {
-          if (repo.editionGenres([workId]).length === 0) report.labelled += 1;
+          const empty = repo.countEmptyGenreEditions(workId);
+          if (empty > 0) {
+            report.labelled += 1;
+            report.editions += empty;
+          }
           continue;
         }
         const changed = repo.fillSourceGenres(workId, genres);

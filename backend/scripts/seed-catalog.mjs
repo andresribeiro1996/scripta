@@ -11,6 +11,11 @@ const { values } = parseArgs({
   }
 });
 
+if (values["dry-run"] && !values["fill-genres"]) {
+  console.error("--dry-run only applies to --fill-genres");
+  process.exit(1);
+}
+
 const CHUNK = 500;
 const log = (line) => console.log(line);
 
