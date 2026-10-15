@@ -7,6 +7,7 @@ import { GENRE_SAVE_LINE, longestSynopsis } from "./genrePass.js";
 import { dailySpend, failureKind, nextUtcMidnight, TypesafeBudgetSpentError } from "./typesafe.js";
 import { createWorkQueue } from "./workQueue.js";
 
+export { GENRE_SAVE_LINE };
 export const GENRE_SOURCE = "genres";
 export const GENRE_DAILY_BUDGET = 1000;
 export const GENRE_REJECTION_LIMIT = 3;
