@@ -52,6 +52,11 @@ if (sites.length === 0) {
   process.exit(1);
 }
 
+if (values["fill-titles"] && values["fill-genres"]) {
+  console.error("--fill-titles and --fill-genres can't run together");
+  process.exit(1);
+}
+
 if (values["fill-titles"]) {
   const report = await fillBlankTitles(
     { fetchText, sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)), repo: createSqliteBooksRepository(openBooksDb()) },

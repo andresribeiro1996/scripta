@@ -82,3 +82,13 @@ test("a dry run writes nothing, a repeat labels nothing, a down site is skipped,
   await fillFeedGenres(h.deps, [SHOP], { dryRun: false });
   assert.deepEqual((await fillFeedGenres(h.deps, [SHOP], { dryRun: false })).sites["Test Shop"], { products: 2, matched: 2, labelled: 0, editions: 0 });
 });
+
+test("a work reached by two products is counted once, in a dry run and in the real run", async () => {
+  const h = setup({ [PAGE1]: page([product("first", "9789896414672", ["Policial"]), product("second", "9789896414672", ["Policial"])]) });
+  const id = h.book("Twice", "9789896414672", null);
+  const dry = await fillFeedGenres(h.deps, [SHOP], { dryRun: true });
+  assert.deepEqual(dry.sites["Test Shop"], { products: 2, matched: 2, labelled: 1, editions: 1 });
+  assert.equal(h.genres(id), "[]");
+  const real = await fillFeedGenres(h.deps, [SHOP], { dryRun: false });
+  assert.deepEqual(real.sites["Test Shop"], { products: 2, matched: 2, labelled: 1, editions: 1 });
+});

@@ -8,8 +8,7 @@ const CHUNK = 250;
 const CENSUS_SIZE = 50;
 const AGE = "(?:[1-9]|1[0-2])";
 const FEED_LABEL_GENRES: Array<[BookGenre, RegExp]> = [
-  ["Children's", new RegExp(`^\\+?\\s*${AGE}(?:\\s*-\\s*${AGE})?\\s*anos$`)],
-  ["Children's", /^tag_kids$/]
+  ["Children's", new RegExp(`^\\+?\\s*${AGE}(?:\\s*-\\s*${AGE})?\\s*anos$`)]
 ];
 
 export interface GenreFillSiteReport {
@@ -51,6 +50,7 @@ export async function fillFeedGenres(
     if (row.work_id) byUrl.set(row.publisher_url, (byUrl.get(row.publisher_url) ?? new Set()).add(row.work_id));
   }
   const unmatched = new Map<string, number>();
+  const counted = new Set<string>();
   const reports: Record<string, GenreFillSiteReport> = {};
   for (const site of sites) {
     const report: GenreFillSiteReport = { products: 0, matched: 0, labelled: 0, editions: 0 };
@@ -74,8 +74,10 @@ export async function fillFeedGenres(
             if (genres.length === 0) continue;
             for (const workId of workIds) {
               if (options.dryRun) {
+                if (counted.has(workId)) continue;
                 const empty = deps.repo.countEmptyGenreEditions(workId);
                 if (empty > 0) {
+                  counted.add(workId);
                   report.labelled += 1;
                   report.editions += empty;
                 }
