@@ -46,6 +46,7 @@ export function enqueueBookCovers(lookups: BookLookup[]) {
 export interface BooksPluginOptions {
   alert?: (subject: string, text: string) => Promise<void>;
   heldWorks?: () => HeldWork[];
+  worksShareAnArena?: (aIds: string[], bIds: string[]) => boolean;
 }
 
 export async function booksPlugin(app: FastifyInstance, options: BooksPluginOptions = {}) {

@@ -166,6 +166,7 @@ export function buildApp() {
   app.register(registerGalleryModule);
   app.register(registerBooksModule, {
     heldWorks,
+    worksShareAnArena: (aIds: string[], bIds: string[]) => getArenaPublicApi().worksShareATournament(aIds, bIds),
     alert: emailEnabled && env.ALERT_EMAIL
       ? (subject: string, text: string) => {
           const mail = renderEmail({ heading: subject, paragraphs: [text] }, env.FRONTEND_URL);
