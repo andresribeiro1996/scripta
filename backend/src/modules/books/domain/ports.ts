@@ -79,6 +79,9 @@ export interface BooksRepository {
   jevRejections(task: JevTask, subjects: string[]): Map<string, JevRejection>;
   recordJevRejection(rejection: { task: JevTask; subject: string; status: number | null; reason: string; at: string }): void;
   clearJevRejection(task: JevTask, subject: string): void;
+  synopsesNeedingJudgment(workIds: string[], limit: number, rejectionLimit: number): string[];
+  worksNeedingSynopsisJudgment(workIds: string[], limit: number, rejectionLimit: number): string[];
+  synopsisText(hash: string): { text: string; title: string; author: string } | undefined;
   workIdsByWorkKeys(keys: string[]): Map<string, string>;
   listPublisherUrls(): Array<{ work_id: string | null; publisher_url: string }>;
   fillSourceGenres(workId: string, genres: string[]): number;

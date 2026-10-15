@@ -251,6 +251,32 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     ON CONFLICT (task, subject) DO UPDATE SET status = excluded.status, reason = excluded.reason, attempts = attempts + 1, last_at = excluded.last_at
   `);
   const clearJevRejectionStmt = db.prepare(`DELETE FROM jev_rejections WHERE task = ? AND subject = ?`);
+  const synopsesNeedingJudgmentStmt = db.prepare(`
+    SELECT hash FROM (
+      SELECT summary_hash AS hash FROM books WHERE work_id IN (SELECT value FROM json_each(?)) AND summary_hash IS NOT NULL
+      UNION
+      SELECT summary_hash FROM works WHERE id IN (SELECT value FROM json_each(?)) AND summary_hash IS NOT NULL
+    ) AS t
+    WHERE NOT EXISTS (SELECT 1 FROM synopsis_judgments j WHERE j.text_hash = t.hash)
+      AND NOT EXISTS (SELECT 1 FROM jev_rejections r WHERE r.task = 'synopses' AND r.subject = t.hash AND r.attempts >= ?)
+    LIMIT ?
+  `);
+  const worksNeedingSynopsisJudgmentStmt = db.prepare(`
+    SELECT w.value AS id FROM json_each(?) AS w
+    WHERE EXISTS (
+        SELECT 1 FROM books b WHERE b.work_id = w.value AND b.summary_hash IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM synopsis_judgments j WHERE j.text_hash = b.summary_hash)
+          AND NOT EXISTS (SELECT 1 FROM jev_rejections r WHERE r.task = 'synopses' AND r.subject = b.summary_hash AND r.attempts >= ?)
+      )
+      OR EXISTS (
+        SELECT 1 FROM works x WHERE x.id = w.value AND x.summary_hash IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM synopsis_judgments j WHERE j.text_hash = x.summary_hash)
+          AND NOT EXISTS (SELECT 1 FROM jev_rejections r WHERE r.task = 'synopses' AND r.subject = x.summary_hash AND r.attempts >= ?)
+      )
+    LIMIT ?
+  `);
+  const synopsisBookCarrierStmt = db.prepare(`SELECT summary AS text, title, author FROM books WHERE summary_hash = ? ORDER BY created_at, rowid LIMIT 1`);
+  const synopsisWorkCarrierStmt = db.prepare(`SELECT summary AS text, title, author FROM works WHERE summary_hash = ? ORDER BY created_at, rowid LIMIT 1`);
   const detailsMissingStmt = db.prepare(`UPDATE books SET details_status = 'missing', details_checked_at = ? WHERE id = ?`);
   const detailsAttemptedStmt = db.prepare(`UPDATE books SET details_checked_at = ? WHERE id = ?`);
   const searchStmt = db.prepare(`
@@ -653,6 +679,17 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     },
     clearJevRejection(task, subject) {
       clearJevRejectionStmt.run(task, subject);
+    },
+    synopsesNeedingJudgment(workIds, limit, rejectionLimit) {
+      const ids = JSON.stringify(workIds);
+      return (synopsesNeedingJudgmentStmt.all(ids, ids, rejectionLimit, limit) as Array<{ hash: string }>).map((row) => row.hash);
+    },
+    worksNeedingSynopsisJudgment(workIds, limit, rejectionLimit) {
+      return (worksNeedingSynopsisJudgmentStmt.all(JSON.stringify(workIds), rejectionLimit, rejectionLimit, limit) as Array<{ id: string }>).map((row) => row.id);
+    },
+    synopsisText(hash) {
+      const row = (synopsisBookCarrierStmt.get(hash) ?? synopsisWorkCarrierStmt.get(hash)) as { text: string; title: string; author: string } | undefined;
+      return row ? { text: row.text, title: row.title, author: row.author } : undefined;
     },
 
     genreEvidence(workId) {

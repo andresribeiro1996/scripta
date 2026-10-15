@@ -18,6 +18,7 @@ import { openBooksDb } from "./adapters/sqlite/connection.js";
 import { createSqliteBooksRepository } from "./adapters/sqlite/sqliteBooksRepository.js";
 import { startGenreJobsIfConfigured } from "./genreJudgments.js";
 import { genreReviewWith, reviewGenreWith } from "./genreReview.js";
+import { startSynopsisJobsIfConfigured } from "./synopsisJudgments.js";
 import type { HeldWork } from "./genrePass.js";
 import { DETAILS_BATCH_SIZE, startBackfill, startCoverColorBackfill, startDetailsBackfill, startWorksBackfill, startWorksGrouping } from "./backfill.js";
 import { createBooksService, MAX_UPLOAD_BYTES, type BooksService } from "./booksService.js";
@@ -58,17 +59,28 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
   const repo = timedMethods(createSqliteBooksRepository(timeStep(app.log, "startup:books-open", openBooksDb)), app.log, "books");
   useBooksRepository(repo);
   const heldWorks = options.heldWorks;
+  const alertTypesafe = (subject: string, text: string) => {
+    app.log.warn({ subject }, text);
+    options.alert?.(subject, text).catch((error: unknown) => app.log.error({ err: error }, "TypeSafe key alert failed"));
+  };
   const genreJobs = heldWorks
     ? startGenreJobsIfConfigured(env.TYPESAFE_API_KEY, {
         repo,
         heldWorkIds: () => heldWorks().map((work) => work.workId),
         now: Date.now,
-        alert: (subject, text) => {
-          app.log.warn({ subject }, text);
-          options.alert?.(subject, text).catch((error: unknown) => app.log.error({ err: error }, "TypeSafe key alert failed"));
-        },
+        alert: alertTypesafe,
         onError: (error, workId) => app.log.error({ err: error, workId }, "genre judgment failed"),
         info: (details, message) => app.log.info(details, message)
+      })
+    : null;
+  const synopsisJobs = heldWorks
+    ? startSynopsisJobsIfConfigured(env.TYPESAFE_API_KEY, {
+        repo,
+        heldWorkIds: () => heldWorks().map((work) => work.workId),
+        now: Date.now,
+        alert: alertTypesafe,
+        info: (details, message) => app.log.info(details, message),
+        onError: (error, workId) => app.log.error({ err: error, workId }, "synopsis judgment failed")
       })
     : null;
   const isbndbThrottle = createThrottle(ISBNDB_GAP_MS);
@@ -107,7 +119,11 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
     publicUrlFor: coverUrlFor,
     adminUserId: env.ADMIN_USER_ID,
     warn: (details, message) => app.log.warn(details, message),
-    onDetailsChecked: (book) => { if (book.work_id) genreJobs?.add(book.work_id); }
+    onDetailsChecked: (book) => {
+      if (!book.work_id) return;
+      genreJobs?.add(book.work_id);
+      synopsisJobs?.add(book.work_id);
+    }
   });
   const worker = createCoverWorker(
     (bookId, lane) => service.processBook(bookId, lane),
@@ -136,6 +152,7 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
     stopWorkKeyBackfill();
     stopColorBackfill();
     genreJobs?.stop();
+    synopsisJobs?.stop();
     worker.stop();
   });
 
