@@ -21,6 +21,7 @@ import { genreReviewWith, reviewGenreWith } from "./genreReview.js";
 import { startSynopsisJobsIfConfigured } from "./synopsisJudgments.js";
 import { reviewSynopsisWith, synopsisReviewWith } from "./synopsisReview.js";
 import { startTranslationJobsIfConfigured } from "./translationJudgments.js";
+import { reviewTranslationWith, translationReviewWith } from "./translationReview.js";
 import { isPortuguese } from "./domain/translation.js";
 import type { HeldWork } from "./genrePass.js";
 import { DETAILS_BATCH_SIZE, startBackfill, startCoverColorBackfill, startDetailsBackfill, startWorksBackfill, startWorksGrouping } from "./backfill.js";
@@ -29,7 +30,7 @@ import type { FetchCoverImage } from "./coverResolver.js";
 import { encodeCover } from "./domain/images.js";
 import type { BookLookup } from "./domain/normalize.js";
 import { coverUrlFor, useBooksRepository } from "./publicCoverLookup.js";
-import { buildAdminRoutes, buildCatalogRoutes, buildCoverFileRoutes, buildGenreReviewRoutes, buildResolveRoutes, buildSynopsisReviewRoutes } from "./routes.js";
+import { buildAdminRoutes, buildCatalogRoutes, buildCoverFileRoutes, buildGenreReviewRoutes, buildResolveRoutes, buildSynopsisReviewRoutes, buildTranslationReviewRoutes } from "./routes.js";
 import { createCoverWorker } from "./worker.js";
 
 const ISBNDB_GAP_MS = 1100;
@@ -199,6 +200,11 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
         isAdmin: (userId) => service.isAdmin(userId),
         review: () => synopsisReviewWith(repo, heldWorks(), (imageId) => coverUrlFor(imageId, "thumb")),
         decide: (hash, decision) => reviewSynopsisWith(repo, hash, decision, Date.now)
+      }));
+      await scoped.register(buildTranslationReviewRoutes({
+        isAdmin: (userId) => service.isAdmin(userId),
+        review: () => translationReviewWith(repo, heldWorks(), (imageId) => coverUrlFor(imageId, "thumb")),
+        decide: (workId, action) => reviewTranslationWith({ repo, sharesArena, now: Date.now }, workId, action)
       }));
     });
   }

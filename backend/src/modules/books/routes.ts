@@ -1,4 +1,4 @@
-import type { GenreReview, GenreReviewAction, SynopsisDecision, SynopsisReview } from "@scripta/shared";
+import type { GenreReview, GenreReviewAction, SynopsisDecision, SynopsisReview, TranslationReview, TranslationReviewAction } from "@scripta/shared";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { authGuard } from "../auth/index.js";
@@ -26,6 +26,13 @@ const reviewActionSchema = z.union([z.object({ genres: z.array(z.string().max(64
 const SYNOPSES_FORBIDDEN = { error: "Only the admin can review synopses." };
 const synopsisParamsSchema = z.object({ hash: z.string().regex(/^[0-9a-f]{40}$/) });
 const synopsisDecisionSchema = z.object({ decision: z.enum(["keep", "hide"]) }).strict();
+const TRANSLATIONS_FORBIDDEN = { error: "Only the admin can review translations." };
+const translationParamsSchema = z.object({ workId: z.string().min(1).max(64) });
+const translationActionSchema = z.union([
+  z.object({ merge: z.string().min(1).max(64) }).strict(),
+  z.object({ reject: z.literal(true) }).strict(),
+  z.object({ undo: z.literal(true) }).strict()
+]);
 
 const MAX_BATCH = 100;
 const batchSchema = z.array(lookupSchema).max(MAX_BATCH);
@@ -218,6 +225,33 @@ export function buildSynopsisReviewRoutes(deps: {
         return reply.send(deps.decide(params.data.hash, body.data.decision));
       } catch (error) {
         if (error instanceof BookNotFoundError) return reply.code(404).send({ error: "No such synopsis." });
+        throw error;
+      }
+    });
+  };
+}
+
+export function buildTranslationReviewRoutes(deps: {
+  isAdmin: (userId: string) => boolean;
+  review: () => TranslationReview;
+  decide: (workId: string, action: TranslationReviewAction) => { workId: string };
+}) {
+  return async function translationReviewRoutes(app: FastifyInstance) {
+    app.get("/books/translation-review", { preHandler: authGuard }, async (request, reply) => {
+      if (!deps.isAdmin(request.user.id)) return reply.code(403).send(TRANSLATIONS_FORBIDDEN);
+      return reply.send(deps.review());
+    });
+
+    app.post("/books/translation-review/:workId", { preHandler: authGuard }, async (request, reply) => {
+      if (!deps.isAdmin(request.user.id)) return reply.code(403).send(TRANSLATIONS_FORBIDDEN);
+      const params = translationParamsSchema.safeParse(request.params);
+      const body = translationActionSchema.safeParse(request.body);
+      if (!params.success || !body.success) return reply.code(400).send({ error: "Send { merge: workId }, { reject: true } or { undo: true }." });
+      try {
+        return reply.send(deps.decide(params.data.workId, body.data));
+      } catch (error) {
+        if (error instanceof BookNotFoundError) return reply.code(404).send({ error: "No such work." });
+        if (error instanceof WorkMergeError) return reply.code(409).send({ error: error.message });
         throw error;
       }
     });

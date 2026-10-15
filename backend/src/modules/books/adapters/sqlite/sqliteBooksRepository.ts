@@ -123,6 +123,23 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     WHERE w.id IN (SELECT value FROM json_each(?))
     GROUP BY w.id
   `);
+  const translationReviewRowsStmt = db.prepare(`
+    SELECT j.work_id AS work_id, j.into_work_id AS into_id, j.model AS model, j.confidence AS confidence, NULL AS merged_at,
+      CASE WHEN j.model = 'code' OR j.confidence >= $merge THEN 'blocked' ELSE 'possible' END AS grp
+    FROM work_match_judgments j JOIN works w ON w.id = j.work_id
+    WHERE w.merged_into IS NULL AND j.into_work_id IS NOT NULL AND j.model <> 'manual' AND (j.model = 'code' OR j.confidence >= $review)
+    UNION ALL
+    SELECT m.from_work, m.into_work, m.source, m.confidence, m.merged_at, 'merged'
+    FROM work_merges m JOIN works w ON w.id = m.from_work
+    WHERE m.source IN ('code', 'jev', 'manual') AND m.undone_at IS NULL AND w.merged_into = m.into_work
+  `);
+  const translationReviewWorksStmt = db.prepare(`
+    SELECT w.id, w.title, w.author,
+      (SELECT b.cover_image_id FROM books b WHERE b.work_id = w.id AND b.cover_image_id IS NOT NULL ORDER BY b.created_at, b.rowid LIMIT 1) AS cover_image_id,
+      (SELECT b.original_title FROM books b WHERE b.work_id = w.id AND b.original_title IS NOT NULL ORDER BY b.created_at, b.rowid LIMIT 1) AS original_title,
+      (SELECT b.summary FROM books b WHERE b.work_id = w.id AND trim(coalesce(b.summary, '')) <> '' ORDER BY b.created_at, b.rowid LIMIT 1) AS summary
+    FROM works w WHERE w.id IN (SELECT value FROM json_each(?))
+  `);
   const genreJudgmentOwnedStmt = db.prepare(`SELECT 1 AS owned FROM genre_judgments WHERE work_id = ?`);
   const moveGenreJudgmentStmt = db.prepare(`UPDATE genre_judgments SET work_id = ? WHERE work_id = ?`);
   const dropGenreJudgmentStmt = db.prepare(`DELETE FROM genre_judgments WHERE work_id = ?`);
@@ -726,6 +743,13 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     },
     matchCandidates(workIds) {
       return (matchCandidatesStmt.all(JSON.stringify(workIds)) as Array<{ id: string; title: string; author: string; year: number | null; editions: number; languages: string }>).map((row) => ({ id: row.id, title: row.title, author: row.author, year: row.year, editions: row.editions, languages: (JSON.parse(row.languages) as string[]).filter(Boolean) }));
+    },
+    translationReviewRows(mergeAt, reviewAt) {
+      return (translationReviewRowsStmt.all({ $merge: mergeAt, $review: reviewAt }) as Array<{ work_id: string; into_id: string; model: string; confidence: number | null; merged_at: string | null; grp: "possible" | "blocked" | "merged" }>).map((row) => ({ workId: row.work_id, intoWorkId: row.into_id, model: row.model, confidence: row.confidence, mergedAt: row.merged_at, group: row.grp }));
+    },
+    translationReviewWorks(workIds) {
+      const rows = translationReviewWorksStmt.all(JSON.stringify(workIds)) as Array<{ id: string; title: string; author: string; cover_image_id: string | null; original_title: string | null; summary: string | null }>;
+      return new Map(rows.map((row) => [row.id, { title: row.title, author: row.author, coverImageId: row.cover_image_id, originalTitle: row.original_title, synopsis: row.summary }]));
     },
 
     detachEdition(bookId, at) {

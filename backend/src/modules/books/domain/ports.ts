@@ -97,6 +97,8 @@ export interface BooksRepository {
   titleCandidates(pattern: string): string[];
   authorCandidates(pattern: string): string[];
   matchCandidates(workIds: string[]): Array<{ id: string; title: string; author: string; year: number | null; editions: number; languages: string[] }>;
+  translationReviewRows(mergeAt: number, reviewAt: number): Array<{ workId: string; intoWorkId: string; model: string; confidence: number | null; mergedAt: string | null; group: "possible" | "blocked" | "merged" }>;
+  translationReviewWorks(workIds: string[]): Map<string, { title: string; author: string; coverImageId: string | null; originalTitle: string | null; synopsis: string | null }>;
   workIdsByWorkKeys(keys: string[]): Map<string, string>;
   listPublisherUrls(): Array<{ work_id: string | null; publisher_url: string }>;
   fillSourceGenres(workId: string, genres: string[]): number;
