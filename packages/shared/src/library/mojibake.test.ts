@@ -12,7 +12,7 @@ test("repairs UTF-8 that was read as Windows-1252", () => {
 });
 
 test("repairs a mis-decoded lowercase letter that follows a capital", () => {
-  for (const text of ["Arturo Pérez-Reverte", "Idade Média", "Sérgio Martel", "Técnica fiscal", "Sûr"]) {
+  for (const text of ["Arturo Pérez-Reverte", "Idade Média", "Sérgio Martel", "Técnica fiscal", "Sûr", "Pé de Meia", "A Fé", "Zé Povinho", "Sé de Braga", "Dîner"]) {
     assert.equal(repairMojibake(asWindows1252(text)), text);
   }
 });
@@ -33,9 +33,13 @@ test("leaves correct text alone", () => {
 });
 
 test("leaves an accented capital before word-final punctuation alone", () => {
-  for (const text of ["NESCAFÉ® Receitas", "CAFÉ’S", "CAFÉ’s", "JOSÉ’s house", "IRMÃ…", "A IRMÃ…", "Zu Fuß…", "irmã…»"]) {
+  for (const text of ["NESCAFÉ® Receitas", "CAFÉ’S", "CAFÉ’s", "JOSÉ’s house", "IRMÃ…", "A IRMÃ…", "Zu Fuß…", "irmã…»", "JOSÉ\xa0de Alencar", "Groß\xa0und klein", "CAFÉ\xa0noir", "MANHÃ\xa0cedo", "NESCAFÉ®receitas", "A IRMÃ»"]) {
     assert.equal(repairMojibake(text), text);
   }
+});
+
+test("stops after one repair when the result is correct text", () => {
+  assert.equal(repairMojibake(asWindows1252("NESCAFÉ®receitas")), "NESCAFÉ®receitas");
 });
 
 test("leaves text it cannot repair whole", () => {

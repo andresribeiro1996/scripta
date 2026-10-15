@@ -7,7 +7,6 @@ for (let index = 0; index < WINDOWS_1252_HIGH.length; index++) BYTE_OF.set(WINDO
 const CONTINUATION = `[\\u0080-\\u00bf${WINDOWS_1252_HIGH}]`;
 const SEQUENCE = new RegExp(`[\\u00c2-\\u00df]${CONTINUATION}|[\\u00e0-\\u00ef]${CONTINUATION}{2}|[\\u00f0-\\u00f4]${CONTINUATION}{3}`, "g");
 const WORD_END = /^[\xa0©®»–—’”…™]+$/;
-const LOWERCASE_CONTINUATION = /[\xa0©®»]/;
 const LOWERCASE_LETTER = /\p{Ll}/u;
 const LETTER = /\p{L}/u;
 const LOSSY = /�|\p{L}©\p{L}/u;
@@ -20,8 +19,8 @@ function suspiciousSequences(text: string): number {
     const before = text[index - 1] ?? "";
     const after = text[index + sequence.length] ?? "";
     const continuation = sequence.slice(1);
-    const spellsLowercaseInsideAWord = LOWERCASE_CONTINUATION.test(continuation) && LOWERCASE_LETTER.test(after);
-    const endsAWord = LETTER.test(before) && isUpper(before) === isUpper(sequence[0]!) && WORD_END.test(continuation) && !spellsLowercaseInsideAWord;
+    const notText = sequence[0] === "Ã" && (continuation === "©" || continuation === "®" || (continuation === "»" && LOWERCASE_LETTER.test(after)));
+    const endsAWord = !notText && LETTER.test(before) && isUpper(before) === isUpper(sequence[0]!) && WORD_END.test(continuation);
     if (!endsAWord) count++;
   }
   return count;
