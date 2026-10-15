@@ -81,7 +81,7 @@ export function createWorksService(deps: WorksDeps) {
       const copy = viewerId ? deps.copyOfWork(viewerId, work.aliasIds) : undefined;
       const mineIsbn = isbnKey(copy?.isbn ?? null);
       const mineEdition = mineIsbn ? work.editions.find((edition) => isbnKey(edition.isbn) === mineIsbn) : undefined;
-      const summary = work.summary ?? mineEdition?.summary ?? work.editions.find((edition) => edition.summary)?.summary ?? null;
+      const summary = mineEdition?.summary ?? work.summary ?? work.editions.find((edition) => edition.summary)?.summary ?? null;
       const coverUrl = copy?.coverUrl ?? mineEdition?.coverUrl ?? work.editions.find((edition) => edition.coverUrl)?.coverUrl ?? null;
       const coverColor = coverUrl ? work.editions.find((edition) => edition.coverUrl === coverUrl)?.coverColor ?? null : null;
       return {

@@ -82,9 +82,9 @@ test("the work's own summary beats the first edition's", () => {
   assert.equal(page.work.summary, "Spice.");
 });
 
-test("the work's summary beats the viewer's edition summary", () => {
+test("the viewer's edition summary beats the work's summary", () => {
   const page = createWorksService(deps({ getWorkPage: pageWith("Spice.", ["Mine.", "Especiaria."]) })).getPage("w", "viewer")!;
-  assert.equal(page.work.summary, "Spice.");
+  assert.equal(page.work.summary, "Mine.");
 });
 
 test("with no work summary the viewer's edition summary beats the first edition's", () => {
@@ -177,4 +177,14 @@ test("year is the earliest edition's; pages prefer the viewer's edition", () => 
 test("editions without details give no genres, rating, year or pages", () => {
   const work = createWorksService(deps({ getWorkPage: pageOf([edition("e1", null, {})]) })).getPage("w", null)!.work;
   assert.deepEqual([work.genres, work.rating, work.year, work.pages], [[], null, null, null]);
+});
+
+test("your own edition's summary comes before the work summary", () => {
+  const work = {
+    id: "w", title: "Dune", author: "Frank Herbert", summary: "Work text.", aliasIds: ["w"],
+    editions: [{ bookId: "e2", title: "Duna", language: "pt-BR", year: 2017, isbn: "9788576573135", summary: "Especiaria.", coverUrl: null, coverColor: null, genres: [], rating: null, ratingCount: 0, pages: null }]
+  };
+  const own = { bookKey: "isbn:9788576573135", readStatus: 2 as const, rating: null, highlightCount: 0, isbn: "9788576573135", coverUrl: null };
+  assert.equal(createWorksService(deps({ getWorkPage: () => work, copyOfWork: () => own })).getPage("w", "viewer")!.work.summary, "Especiaria.");
+  assert.equal(createWorksService(deps({ getWorkPage: () => work })).getPage("w", null)!.work.summary, "Work text.");
 });

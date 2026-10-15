@@ -17,6 +17,7 @@ const { applyBooksMigrations, openBooksDb } = await import("./connection.js");
 const { findOrCreateBook } = await import("../../domain/findOrCreate.js");
 const { createSqliteBooksRepository, UNCHECKED_COVERS_SQL, UPGRADE_WANTED_SQL, UNCHECKED_DETAILS_SQL, WORK_LOOKUP_SQL } = await import("./sqliteBooksRepository.js");
 const { WorkMergeError } = await import("../../domain/errors.js");
+const { summaryHashOf } = await import("../../domain/synopsis.js");
 
 const NOW = "2026-10-01T00:00:00.000Z";
 const richDetails = { summary: "Open Library synopsis.", rating: 4, ratingCount: 3, sourceUrl: "https://openlibrary.org/works/OL1W", genres: ["Fantasy" as const], pages: 300, publisher: "Bantam", year: 1975, translator: null };
@@ -509,7 +510,7 @@ const WORK_COLUMNS = ["work_id", "language", "work_checked_at"];
 
 function assertWorkSchema(db: DatabaseSync) {
   const names = (sql: string) => (db.prepare(sql).all() as Array<{ name: string }>).map((row) => row.name);
-  assert.deepEqual(names("PRAGMA table_info(works)"), ["id", "ol_work_key", "title", "author", "merged_into", "created_at", "summary"]);
+  assert.deepEqual(names("PRAGMA table_info(works)"), ["id", "ol_work_key", "title", "author", "merged_into", "created_at", "summary", "summary_hash"]);
   assert.deepEqual(names("PRAGMA table_info(books)").filter((name) => WORK_COLUMNS.includes(name)), WORK_COLUMNS);
   assert.deepEqual(names("PRAGMA index_info(idx_books_work)"), ["work_id"]);
   assert.throws(() => db.prepare("INSERT INTO books (id, title, author, work_id, created_at) VALUES ('orphan', 'A', 'A', 'missing', ?)").run(NOW), /FOREIGN KEY constraint failed/);
@@ -1260,10 +1261,10 @@ test("setWorkSummary keeps the first summary, assigns a missing work and follows
   repo.setWorkSummary(a.id, "First.");
   repo.setWorkSummary(a.id, "Second.");
   assert.equal(workById(db, a.work_id).summary, "First.");
-  assert.deepEqual({ ...repo.getWorkSummary(a.id) }, { summary: "First.", olWorkKey: null });
+  assert.deepEqual({ ...repo.getWorkSummary(a.id) }, { summary: "First.", olWorkKey: null, summaryHash: summaryHashOf("First.") });
 
   repo.mergeWorks(a.work_id!, b.work_id!);
-  assert.deepEqual({ ...repo.getWorkSummary(a.id) }, { summary: "First.", olWorkKey: "OL2W" });
+  assert.deepEqual({ ...repo.getWorkSummary(a.id) }, { summary: "First.", olWorkKey: "OL2W", summaryHash: summaryHashOf("First.") });
   repo.setWorkSummary(b.id, "Third.");
   assert.equal(workById(db, b.work_id).summary, "First.");
 
@@ -1505,4 +1506,82 @@ test("work keys map to work ids, and publisher URLs list with their works", () =
   repo.setPublisherUrl(shop.id, "https://shop.test/products/shop-book");
   assert.deepEqual(repo.workIdsByWorkKeys(["OL1W", "OL2W"]), new Map([["OL1W", keyed.work_id!]]));
   assert.deepEqual(repo.listPublisherUrls(), [{ work_id: shop.work_id, publisher_url: "https://shop.test/products/shop-book" }]);
+});
+
+test("summary hashes are written with every summary and follow a merge", () => {
+  const { db, repo } = freshRepo();
+  const details = (summary: string | null) => ({ summary, pages: null, year: null, publisher: null, translator: null });
+  const hashOf = (table: string, id: string | null) => (db.prepare(`SELECT summary_hash FROM ${table} WHERE id = ?`).get(id) as { summary_hash: string | null }).summary_hash;
+  const a = repo.createBook({ title: "A", author: "X", isbn: "9789720000021" }, ["isbn:9789720000021"], NOW);
+  repo.mergeDetails(a.id, details("  A long publisher\n\nsynopsis. "), "publisher");
+  assert.equal(hashOf("books", a.id), summaryHashOf("A long publisher synopsis."));
+  repo.mergeDetails(a.id, details("An ISBNdb text."), "isbndb");
+  assert.equal(hashOf("books", a.id), summaryHashOf("A long publisher synopsis."));
+  repo.mergeDetails(a.id, details("A newer publisher text."), "publisher");
+  assert.equal(hashOf("books", a.id), summaryHashOf("A newer publisher text."));
+  repo.setWorkSummary(a.id, "Work text.");
+  assert.equal(hashOf("works", a.work_id), summaryHashOf("Work text."));
+  const b = repo.createBook({ title: "B", author: "X", isbn: "9789720000022" }, ["isbn:9789720000022"], NOW);
+  repo.mergeWorks(a.work_id!, b.work_id!);
+  assert.equal(hashOf("works", b.work_id), summaryHashOf("Work text."));
+  const c = repo.createBook({ title: "C", author: "X", isbn: "9789720000023" }, ["isbn:9789720000023"], NOW);
+  repo.mergeDetails(c.id, details("   "), "publisher");
+  assert.equal(hashOf("books", c.id), null);
+});
+
+test("the summary hash migration hashes stored summaries once", () => {
+  const db = new DatabaseSync(":memory:");
+  applyBooksMigrations(db);
+  db.exec("DROP INDEX idx_books_summary_hash; ALTER TABLE books DROP COLUMN summary_hash; DROP INDEX idx_works_summary_hash; ALTER TABLE works DROP COLUMN summary_hash");
+  db.prepare("INSERT INTO works (id, title, author, created_at, summary) VALUES ('w1', 'T', 'A', ?, ' Work  text. ')").run(NOW);
+  db.prepare("INSERT INTO books (id, title, author, work_id, summary, created_at) VALUES ('b1', 'T', 'A', 'w1', 'Edition text.', ?), ('b2', 'T', 'A', 'w1', NULL, ?), ('b3', 'T', 'A', 'w1', '  ', ?)").run(NOW, NOW, NOW);
+
+  applyBooksMigrations(db);
+  applyBooksMigrations(db);
+
+  const hash = (sql: string) => (db.prepare(sql).get() as { h: string | null }).h;
+  assert.equal(hash("SELECT summary_hash AS h FROM works WHERE id = 'w1'"), summaryHashOf("Work text."));
+  assert.equal(hash("SELECT summary_hash AS h FROM books WHERE id = 'b1'"), summaryHashOf("Edition text."));
+  assert.equal(hash("SELECT summary_hash AS h FROM books WHERE id = 'b2'"), null);
+  assert.equal(hash("SELECT summary_hash AS h FROM books WHERE id = 'b3'"), null);
+});
+
+test("synopsis judgments are stored by text hash, replaced and read back", () => {
+  const { repo } = freshRepo();
+  repo.saveSynopsisJudgment("h1", { model: "rule", usable: 0, kind: "fragment", askedAt: NOW });
+  repo.saveSynopsisJudgment("h2", { model: "jev-1.13.0", usable: 0.12, kind: "praise", askedAt: NOW });
+  repo.saveSynopsisJudgment("h2", { model: "manual", usable: 1, kind: "praise", askedAt: "2026-10-02T00:00:00.000Z" });
+  const judgments = repo.synopsisJudgments(["h1", "h2", "h3"]);
+  assert.equal(judgments.size, 2);
+  assert.deepEqual(judgments.get("h1"), { model: "rule", usable: 0, kind: "fragment", askedAt: NOW });
+  assert.deepEqual(judgments.get("h2"), { model: "manual", usable: 1, kind: "praise", askedAt: "2026-10-02T00:00:00.000Z" });
+});
+
+test("Jev rejections count attempts per task and subject, and clear one task only", () => {
+  const { repo } = freshRepo();
+  repo.recordJevRejection({ task: "synopses", subject: "h1", status: 400, reason: "HTTP 400", at: NOW });
+  repo.recordJevRejection({ task: "synopses", subject: "h1", status: null, reason: "unexpected answer", at: "2026-10-02T00:00:00.000Z" });
+  repo.recordJevRejection({ task: "works", subject: "h1", status: 422, reason: "HTTP 422", at: NOW });
+  assert.deepEqual(repo.jevRejections("synopses", ["h1", "h2"]).get("h1"), { status: null, reason: "unexpected answer", attempts: 2, lastAt: "2026-10-02T00:00:00.000Z" });
+  assert.equal(repo.jevRejections("works", ["h1"]).get("h1")?.attempts, 1);
+  repo.clearJevRejection("synopses", "h1");
+  assert.equal(repo.jevRejections("synopses", ["h1"]).size, 0);
+  assert.equal(repo.jevRejections("works", ["h1"]).size, 1);
+});
+
+test("a summary cleared by hand leaves no text to judge or list, even with its hash left behind", () => {
+  const { db, repo } = freshRepo();
+  const book = repo.createBook({ title: "Cleared", author: "X", isbn: "9789720000099" }, ["isbn:9789720000099"], NOW);
+  repo.mergeDetails(book.id, { summary: "A publisher text the owner later cleared by hand.", pages: null, year: null, publisher: null, translator: null }, "publisher");
+  repo.setWorkSummary(book.id, "A work text the owner later cleared by hand too.");
+  const { summary_hash: bookHash, work_id: workId } = repo.getBook(book.id)!;
+  const workHash = summaryHashOf("A work text the owner later cleared by hand too.")!;
+  db.exec("UPDATE books SET summary = NULL; UPDATE works SET summary = NULL");
+  assert.equal(repo.synopsisText(bookHash!), undefined);
+  assert.equal(repo.synopsisText(workHash), undefined);
+  assert.deepEqual(repo.synopsesNeedingJudgment([workId!], 10, 3), []);
+  assert.deepEqual(repo.worksNeedingSynopsisJudgment([workId!], 10, 3), []);
+  assert.deepEqual(repo.synopsisBacklog(3), []);
+  assert.deepEqual(repo.synopsisCarriers([bookHash!, workHash]), []);
+  assert.deepEqual(repo.synopsisTexts(), []);
 });

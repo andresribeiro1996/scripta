@@ -1,5 +1,6 @@
 import type { BookMetadata, BookSearchResult, CatalogBookMetadata } from "@scripta/shared";
-import type { BookRow, CoverImageRow, CoverSourceName, CoverStatus, DataSource, GenreEvidence, GenresSource, NewBook, SummarySource, WorkPageRows, WorkView } from "./types.js";
+import type { SynopsisJudgment, SynopsisKind } from "./synopsis.js";
+import type { BookRow, CoverImageRow, CoverSourceName, CoverStatus, DataSource, GenreEvidence, GenresSource, JevRejection, JevTask, NewBook, SummarySource, WorkPageRows, WorkView } from "./types.js";
 
 export type MergeableDetails = Pick<BookMetadata, "summary" | "pages" | "year" | "publisher" | "translator">;
 
@@ -55,7 +56,7 @@ export interface BooksRepository {
   workPageRows(id: string): WorkPageRows | undefined;
   assignWork(bookId: string): string;
   setWorkSummary(bookId: string, summary: string): void;
-  getWorkSummary(bookId: string): { summary: string | null; olWorkKey: string | null } | undefined;
+  getWorkSummary(bookId: string): { summary: string | null; olWorkKey: string | null; summaryHash: string | null } | undefined;
   canonicalWorkIds(ids: string[]): Map<string, string>;
   worksNeedingGenreJudgment(workIds: string[], limit: number, rejectionLimit: number): string[];
   saveGenreJudgment(judgment: { workId: string; model: string; genre: string | null; confidence: number; askedAt: string }): void;
@@ -73,6 +74,18 @@ export interface BooksRepository {
   editionGenres(workIds: string[]): Array<{ work_id: string; genres: string; genres_source: GenresSource | null; genres_confidence: number | null }>;
   spendTypesafe(day: string, source: string, limit: number): boolean;
   typesafeUsage(day: string, source: string): number;
+  synopsisJudgments(hashes: string[]): Map<string, SynopsisJudgment>;
+  saveSynopsisJudgment(hash: string, judgment: SynopsisJudgment): void;
+  jevRejections(task: JevTask, subjects: string[]): Map<string, JevRejection>;
+  recordJevRejection(rejection: { task: JevTask; subject: string; status: number | null; reason: string; at: string }): void;
+  clearJevRejection(task: JevTask, subject: string): void;
+  synopsesNeedingJudgment(workIds: string[], limit: number, rejectionLimit: number): string[];
+  worksNeedingSynopsisJudgment(workIds: string[], limit: number, rejectionLimit: number): string[];
+  synopsisText(hash: string): { text: string; title: string; author: string } | undefined;
+  synopsisBacklog(rejectionLimit: number): Array<{ hash: string; workId: string | null; source: string | null; createdAt: string }>;
+  flaggedSynopses(reviewBelow: number): Array<{ hash: string; model: string; usable: number; kind: SynopsisKind }>;
+  synopsisCarriers(hashes: string[]): Array<{ hash: string; workId: string | null; title: string; author: string; coverImageId: string | null; source: string | null; text: string; isEdition: boolean }>;
+  synopsisTexts(): Array<{ hash: string; source: string; title: string; author: string; text: string }>;
   workIdsByWorkKeys(keys: string[]): Map<string, string>;
   listPublisherUrls(): Array<{ work_id: string | null; publisher_url: string }>;
   fillSourceGenres(workId: string, genres: string[]): number;

@@ -3,6 +3,7 @@ import type { DatabaseSync, StatementSync } from "node:sqlite";
 import { MIN_PREFIX_LENGTH, normalizeWorkKey, workTitleKey } from "../../domain/normalize.js";
 import type { BooksRepository, IdPage, MergeableDetails, PageCursor } from "../../domain/ports.js";
 import { WorkMergeError } from "../../domain/errors.js";
+import { summaryHashOf, type SynopsisKind } from "../../domain/synopsis.js";
 import type { BookRow, CoverImageRow, DataSource, GenreEvidence, SummarySource, WorkPageRows, WorkView } from "../../domain/types.js";
 
 export const UNCHECKED_COVERS_SQL = `
@@ -78,10 +79,10 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
         author = CASE WHEN author = '' THEN COALESCE((SELECT author FROM books WHERE work_id = works.id AND author <> '' ORDER BY created_at, rowid LIMIT 1), '') ELSE author END
     WHERE id = ? AND (title = '' OR author = '')
   `);
-  const setWorkSummaryStmt = db.prepare(`UPDATE works SET summary = ? WHERE id = ? AND summary IS NULL`);
-  const carryWorkSummaryStmt = db.prepare(`UPDATE works SET summary = (SELECT summary FROM works WHERE id = ?) WHERE id = ? AND summary IS NULL`);
+  const setWorkSummaryStmt = db.prepare(`UPDATE works SET summary = ?, summary_hash = ? WHERE id = ? AND summary IS NULL`);
+  const carryWorkSummaryStmt = db.prepare(`UPDATE works SET (summary, summary_hash) = (SELECT summary, summary_hash FROM works WHERE id = ?) WHERE id = ? AND summary IS NULL`);
   const workSummaryStmt = db.prepare(`
-    SELECT target.summary AS summary, target.ol_work_key AS olWorkKey
+    SELECT target.summary AS summary, target.ol_work_key AS olWorkKey, target.summary_hash AS summaryHash
     FROM books JOIN works AS own ON own.id = books.work_id JOIN works AS target ON target.id = COALESCE(own.merged_into, own.id)
     WHERE books.id = ?
   `);
@@ -89,7 +90,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const repointMergedStmt = db.prepare(`UPDATE works SET merged_into = ? WHERE merged_into = ?`);
   const blockTitleGroupStmt = db.prepare(`UPDATE books SET title_group_blocked_at = ? WHERE id = ?`);
   const editionCountStmt = db.prepare(`SELECT COUNT(*) AS n FROM books WHERE work_id = ?`);
-  const workStmt = db.prepare(`SELECT id, ol_work_key, title, author, summary FROM works WHERE id = ?`);
+  const workStmt = db.prepare(`SELECT id, ol_work_key, title, author, summary, summary_hash FROM works WHERE id = ?`);
   const evidenceEditionsStmt = db.prepare(`SELECT title, language, isbn, publisher, year, summary FROM books WHERE work_id = ? ORDER BY created_at, rowid`);
   const setManualGenresStmt = db.prepare(`
     UPDATE books SET genres = $genres, genres_source = 'manual', genres_confidence = NULL
@@ -114,7 +115,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   `);
   const jevJudgedStmt = db.prepare(`SELECT work_id FROM genre_judgments WHERE model <> 'manual'`);
   const countEmptyGenreEditionsStmt = db.prepare(`SELECT COUNT(*) AS n FROM books WHERE work_id = ? AND genres = '[]'`);
-  const pageEditionsStmt = db.prepare(`SELECT books.id, books.title, books.language, books.year, books.isbn, books.summary, books.cover_image_id, ci.color AS cover_color, books.genres, books.rating, books.rating_count, books.pages, books.genres_source, books.genres_confidence FROM books LEFT JOIN cover_images ci ON ci.id = books.cover_image_id WHERE books.work_id = ? ORDER BY books.created_at, books.rowid`);
+  const pageEditionsStmt = db.prepare(`SELECT books.id, books.title, books.language, books.year, books.isbn, books.summary, books.summary_hash, books.cover_image_id, ci.color AS cover_color, books.genres, books.rating, books.rating_count, books.pages, books.genres_source, books.genres_confidence FROM books LEFT JOIN cover_images ci ON ci.id = books.cover_image_id WHERE books.work_id = ? ORDER BY books.created_at, books.rowid`);
   const workEditionsStmt = db.prepare(`SELECT id, isbn, title, author, ol_work_key FROM books WHERE work_id = ? ORDER BY created_at, rowid`);
   const groupablePairsStmt = db.prepare(`
     WITH candidates AS (
@@ -177,6 +178,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     UPDATE books
     SET summary_source = CASE WHEN ${takesSummary} THEN $summary_source ELSE summary_source END,
         summary = CASE WHEN ${takesSummary} THEN $summary ELSE summary END,
+        summary_hash = CASE WHEN ${takesSummary} THEN $summary_hash ELSE summary_hash END,
         pages = COALESCE(pages, $pages),
         year = COALESCE(year, $year),
         publisher = COALESCE(publisher, $publisher),
@@ -241,6 +243,69 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     ON CONFLICT (day, source) DO UPDATE SET requests = requests + 1 WHERE requests < ?
   `);
   const typesafeUsageStmt = db.prepare(`SELECT requests FROM typesafe_usage WHERE day = ? AND source = ?`);
+  const synopsisJudgmentsStmt = db.prepare(`SELECT text_hash, model, usable, kind, asked_at FROM synopsis_judgments WHERE text_hash IN (SELECT value FROM json_each(?))`);
+  const saveSynopsisJudgmentStmt = db.prepare(`INSERT OR REPLACE INTO synopsis_judgments (text_hash, model, usable, kind, asked_at) VALUES (?, ?, ?, ?, ?)`);
+  const jevRejectionsStmt = db.prepare(`SELECT subject, status, reason, attempts, last_at FROM jev_rejections WHERE task = ? AND subject IN (SELECT value FROM json_each(?))`);
+  const recordJevRejectionStmt = db.prepare(`
+    INSERT INTO jev_rejections (task, subject, status, reason, attempts, last_at) VALUES (?, ?, ?, ?, 1, ?)
+    ON CONFLICT (task, subject) DO UPDATE SET status = excluded.status, reason = excluded.reason, attempts = attempts + 1, last_at = excluded.last_at
+  `);
+  const clearJevRejectionStmt = db.prepare(`DELETE FROM jev_rejections WHERE task = ? AND subject = ?`);
+  const synopsesNeedingJudgmentStmt = db.prepare(`
+    SELECT hash FROM (
+      SELECT summary_hash AS hash FROM books WHERE work_id IN (SELECT value FROM json_each(?)) AND summary_hash IS NOT NULL AND summary IS NOT NULL
+      UNION
+      SELECT summary_hash FROM works WHERE id IN (SELECT value FROM json_each(?)) AND summary_hash IS NOT NULL AND summary IS NOT NULL
+    ) AS t
+    WHERE NOT EXISTS (SELECT 1 FROM synopsis_judgments j WHERE j.text_hash = t.hash)
+      AND NOT EXISTS (SELECT 1 FROM jev_rejections r WHERE r.task = 'synopses' AND r.subject = t.hash AND r.attempts >= ?)
+    LIMIT ?
+  `);
+  const worksNeedingSynopsisJudgmentStmt = db.prepare(`
+    SELECT w.value AS id FROM json_each(?) AS w
+    WHERE EXISTS (
+        SELECT 1 FROM books b WHERE b.work_id = w.value AND b.summary_hash IS NOT NULL AND b.summary IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM synopsis_judgments j WHERE j.text_hash = b.summary_hash)
+          AND NOT EXISTS (SELECT 1 FROM jev_rejections r WHERE r.task = 'synopses' AND r.subject = b.summary_hash AND r.attempts >= ?)
+      )
+      OR EXISTS (
+        SELECT 1 FROM works x WHERE x.id = w.value AND x.summary_hash IS NOT NULL AND x.summary IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM synopsis_judgments j WHERE j.text_hash = x.summary_hash)
+          AND NOT EXISTS (SELECT 1 FROM jev_rejections r WHERE r.task = 'synopses' AND r.subject = x.summary_hash AND r.attempts >= ?)
+      )
+    LIMIT ?
+  `);
+  const synopsisBookCarrierStmt = db.prepare(`SELECT summary AS text, title, author FROM books WHERE summary_hash = ? AND summary IS NOT NULL ORDER BY created_at, rowid LIMIT 1`);
+  const synopsisWorkCarrierStmt = db.prepare(`SELECT summary AS text, title, author FROM works WHERE summary_hash = ? AND summary IS NOT NULL ORDER BY created_at, rowid LIMIT 1`);
+  const synopsisBacklogStmt = db.prepare(`
+    SELECT t.hash AS hash, COALESCE(w.merged_into, w.id) AS work_id, t.source AS source, t.created_at AS created_at
+    FROM (
+      SELECT summary_hash AS hash, work_id, summary_source AS source, created_at, rowid AS ord FROM books WHERE summary_hash IS NOT NULL AND summary IS NOT NULL
+      UNION ALL
+      SELECT summary_hash, id, 'openlibrary', created_at, rowid FROM works WHERE summary_hash IS NOT NULL AND summary IS NOT NULL
+    ) AS t
+    LEFT JOIN works w ON w.id = t.work_id
+    WHERE NOT EXISTS (SELECT 1 FROM synopsis_judgments j WHERE j.text_hash = t.hash)
+      AND NOT EXISTS (SELECT 1 FROM jev_rejections r WHERE r.task = 'synopses' AND r.subject = t.hash AND r.attempts >= ?)
+    ORDER BY t.created_at, t.ord
+  `);
+  const flaggedSynopsesStmt = db.prepare(`SELECT text_hash, model, usable, kind FROM synopsis_judgments WHERE model = 'rule' OR (model <> 'manual' AND usable < ?)`);
+  const synopsisCarriersStmt = db.prepare(`
+    SELECT b.summary_hash AS hash, COALESCE(w.merged_into, w.id) AS work_id, b.title AS title, b.author AS author, b.cover_image_id AS cover_image_id, b.summary_source AS source, b.summary AS text, 1 AS is_edition, b.created_at AS created_at, b.rowid AS ord
+    FROM books b LEFT JOIN works w ON w.id = b.work_id
+    WHERE b.summary_hash IN (SELECT value FROM json_each(?)) AND b.summary IS NOT NULL
+    UNION ALL
+    SELECT w.summary_hash, COALESCE(w.merged_into, w.id), w.title, w.author, NULL, 'openlibrary', w.summary, 0, w.created_at, w.rowid
+    FROM works w
+    WHERE w.summary_hash IN (SELECT value FROM json_each(?)) AND w.summary IS NOT NULL
+    ORDER BY created_at, ord
+  `);
+  const synopsisTextsStmt = db.prepare(`
+    SELECT summary_hash AS hash, COALESCE(summary_source, 'unknown') AS source, title, author, summary AS text, created_at, rowid AS ord FROM books WHERE summary_hash IS NOT NULL AND summary IS NOT NULL
+    UNION ALL
+    SELECT summary_hash, 'openlibrary', title, author, summary, created_at, rowid FROM works WHERE summary_hash IS NOT NULL AND summary IS NOT NULL
+    ORDER BY created_at, ord
+  `);
   const detailsMissingStmt = db.prepare(`UPDATE books SET details_status = 'missing', details_checked_at = ? WHERE id = ?`);
   const detailsAttemptedStmt = db.prepare(`UPDATE books SET details_checked_at = ? WHERE id = ?`);
   const searchStmt = db.prepare(`
@@ -263,6 +328,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       $id: bookId,
       $summary: details.summary,
       $summary_source: summarySource,
+      $summary_hash: summaryHashOf(details.summary),
       $pages: details.pages,
       $year: details.year,
       $publisher: details.publisher,
@@ -626,6 +692,60 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     typesafeUsage(day, source) {
       return (typesafeUsageStmt.get(day, source) as { requests: number } | undefined)?.requests ?? 0;
     },
+    synopsisJudgments(hashes) {
+      const rows = synopsisJudgmentsStmt.all(JSON.stringify(hashes)) as Array<{ text_hash: string; model: string; usable: number; kind: SynopsisKind; asked_at: string }>;
+      return new Map(rows.map((row) => [row.text_hash, { model: row.model, usable: row.usable, kind: row.kind, askedAt: row.asked_at }]));
+    },
+    saveSynopsisJudgment(hash, judgment) {
+      saveSynopsisJudgmentStmt.run(hash, judgment.model, judgment.usable, judgment.kind, judgment.askedAt);
+    },
+    jevRejections(task, subjects) {
+      const rows = jevRejectionsStmt.all(task, JSON.stringify(subjects)) as Array<{ subject: string; status: number | null; reason: string; attempts: number; last_at: string }>;
+      return new Map(rows.map((row) => [row.subject, { status: row.status, reason: row.reason, attempts: row.attempts, lastAt: row.last_at }]));
+    },
+    recordJevRejection(rejection) {
+      recordJevRejectionStmt.run(rejection.task, rejection.subject, rejection.status, rejection.reason, rejection.at);
+    },
+    clearJevRejection(task, subject) {
+      clearJevRejectionStmt.run(task, subject);
+    },
+    synopsesNeedingJudgment(workIds, limit, rejectionLimit) {
+      const ids = JSON.stringify(workIds);
+      return (synopsesNeedingJudgmentStmt.all(ids, ids, rejectionLimit, limit) as Array<{ hash: string }>).map((row) => row.hash);
+    },
+    worksNeedingSynopsisJudgment(workIds, limit, rejectionLimit) {
+      return (worksNeedingSynopsisJudgmentStmt.all(JSON.stringify(workIds), rejectionLimit, rejectionLimit, limit) as Array<{ id: string }>).map((row) => row.id);
+    },
+    synopsisText(hash) {
+      const row = (synopsisBookCarrierStmt.get(hash) ?? synopsisWorkCarrierStmt.get(hash)) as { text: string; title: string; author: string } | undefined;
+      return row ? { text: row.text, title: row.title, author: row.author } : undefined;
+    },
+    synopsisBacklog(rejectionLimit) {
+      return (synopsisBacklogStmt.all(rejectionLimit) as Array<{ hash: string; work_id: string | null; source: string | null; created_at: string }>).map((row) => ({ hash: row.hash, workId: row.work_id, source: row.source, createdAt: row.created_at }));
+    },
+    flaggedSynopses(reviewBelow) {
+      return (flaggedSynopsesStmt.all(reviewBelow) as Array<{ text_hash: string; model: string; usable: number; kind: SynopsisKind }>).map((row) => ({ hash: row.text_hash, model: row.model, usable: row.usable, kind: row.kind }));
+    },
+    synopsisCarriers(hashes) {
+      const ids = JSON.stringify(hashes);
+      return (synopsisCarriersStmt.all(ids, ids) as Array<{ hash: string; work_id: string | null; title: string; author: string; cover_image_id: string | null; source: string | null; text: string; is_edition: number }>).map((row) => ({
+        hash: row.hash,
+        workId: row.work_id,
+        title: row.title,
+        author: row.author,
+        coverImageId: row.cover_image_id,
+        source: row.source,
+        text: row.text,
+        isEdition: row.is_edition === 1
+      }));
+    },
+    synopsisTexts() {
+      const seen = new Map<string, { hash: string; source: string; title: string; author: string; text: string }>();
+      for (const row of synopsisTextsStmt.all() as Array<{ hash: string; source: string; title: string; author: string; text: string }>) {
+        if (!seen.has(row.hash)) seen.set(row.hash, { hash: row.hash, source: row.source, title: row.title, author: row.author, text: row.text });
+      }
+      return [...seen.values()];
+    },
 
     genreEvidence(workId) {
       const work = workStmt.get(workId) as { id: string; title: string; author: string; summary: string | null } | undefined;
@@ -640,11 +760,11 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     workPageRows(id) {
       const canonical = liveWorkId(id);
       if (canonical === null) return undefined;
-      const work = workStmt.get(canonical) as { id: string; title: string; author: string; summary: string | null } | undefined;
+      const work = workStmt.get(canonical) as { id: string; title: string; author: string; summary: string | null; summary_hash: string | null } | undefined;
       if (!work) return undefined;
       const aliases = (aliasStmt.all(canonical) as Array<{ id: string }>).map((row) => row.id);
       return {
-        work: { id: work.id, title: work.title, author: work.author, summary: work.summary },
+        work: { id: work.id, title: work.title, author: work.author, summary: work.summary, summary_hash: work.summary_hash },
         aliasIds: [canonical, ...aliases],
         editions: pageEditionsStmt.all(canonical) as WorkPageRows["editions"]
       };
@@ -683,11 +803,11 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
         const book = byIdStmt.get(bookId) as unknown as (UnassignedBook & { work_id: string | null }) | undefined;
         if (!book) throw new Error(`Unknown book ${bookId}`);
         const workId = liveWorkId(book.work_id ?? giveWork(book));
-        if (workId) setWorkSummaryStmt.run(summary, workId);
+        if (workId) setWorkSummaryStmt.run(summary, summaryHashOf(summary), workId);
       });
     },
 
-    getWorkSummary: (bookId) => workSummaryStmt.get(bookId) as { summary: string | null; olWorkKey: string | null } | undefined,
+    getWorkSummary: (bookId) => workSummaryStmt.get(bookId) as { summary: string | null; olWorkKey: string | null; summaryHash: string | null } | undefined,
 
     setLanguage(id, tag) {
       if (tag) setLanguageStmt.run(tag, id);
