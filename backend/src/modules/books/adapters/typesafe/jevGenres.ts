@@ -1,5 +1,6 @@
 import type { BookGenre } from "@scripta/shared";
-import { SourceUnavailableError } from "../../domain/errors.js";
+import { SourceUnavailableError, UnusableAnswerError } from "../../domain/errors.js";
+import type { Spend } from "../../typesafe.js";
 import { readBody } from "../http/http.js";
 
 export const JEV_MODEL = "jev-1.13.0";
@@ -60,15 +61,16 @@ function judgmentOf(body: unknown): GenreJudgment {
   const answer = (body as { answers?: { genre?: { choice?: unknown; confidence?: unknown } } } | null)?.answers?.genre;
   const model = (body as { model?: unknown } | null)?.model;
   if (typeof answer?.choice !== "string" || !GENRE_BY_OPTION.has(answer.choice) || typeof answer.confidence !== "number" || typeof model !== "string") {
-    throw new SourceUnavailableError("typesafe", "unexpected answer");
+    throw new UnusableAnswerError("typesafe", "unexpected answer");
   }
   return { genre: GENRE_BY_OPTION.get(answer.choice) ?? null, confidence: answer.confidence, model };
 }
 
-export function createJevGenreClassifier(apiKey: string, sleep: (ms: number) => Promise<void> = (ms) => new Promise((resolve) => setTimeout(resolve, ms))): ClassifyGenre {
+export function createJevGenreClassifier(apiKey: string, spend: Spend, sleep: (ms: number) => Promise<void> = (ms) => new Promise((resolve) => setTimeout(resolve, ms))): ClassifyGenre {
   return async (book) => {
     const body = JSON.stringify({ state: stateOf(book), model: JEV_MODEL, questions: { genre: { type: "choice", instructions: INSTRUCTIONS, criteria: CRITERIA } } });
     for (let attempt = 0; ; attempt++) {
+      spend();
       const response = await readBody("typesafe", () => fetch(ENDPOINT, { method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" }, body, signal: AbortSignal.timeout(TIMEOUT_MS) }));
       if ((response.status === 429 || response.status === 529) && attempt < RETRIES) {
         await response.body?.cancel();
@@ -83,7 +85,7 @@ export function createJevGenreClassifier(apiKey: string, sleep: (ms: number) => 
       try {
         parsed = await readBody("typesafe", () => response.json());
       } catch (error) {
-        if (error instanceof SyntaxError) throw new SourceUnavailableError("typesafe", "invalid JSON");
+        if (error instanceof SyntaxError) throw new UnusableAnswerError("typesafe", "invalid JSON");
         throw error;
       }
       return judgmentOf(parsed);

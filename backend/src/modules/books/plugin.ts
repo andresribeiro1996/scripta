@@ -1,7 +1,7 @@
 import fastifyMultipart from "@fastify/multipart";
 import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
-import { env, isbndbConfigured, typesafeConfigured } from "../../config/env.js";
+import { env, isbndbConfigured } from "../../config/env.js";
 import { timeStep, timeSync, timedMethods } from "../../stallLog.js";
 import { createObjectStore } from "../../storage/createObjectStore.js";
 import { createCompositeCatalog } from "./adapters/catalog/compositeCatalog.js";
@@ -10,21 +10,22 @@ import { createThrottle, fetchBytes } from "./adapters/http/http.js";
 import { createIsbndbCatalog } from "./adapters/isbndb/isbndbCatalog.js";
 import { capDailyCalls } from "./adapters/isbndb/isbndbDailyCap.js";
 import { createIsbndbGate } from "./adapters/isbndb/isbndbGate.js";
-import { createJevGenreClassifier } from "./adapters/typesafe/jevGenres.js";
 import { createOpenLibraryCatalog } from "./adapters/openlibrary/openLibraryCatalog.js";
 import { createAppleSource } from "./adapters/sources/apple.js";
 import { createIsbndbSource } from "./adapters/sources/isbndb.js";
 import { createOpenLibraryCoverSource } from "./adapters/sources/openLibrary.js";
 import { openBooksDb } from "./adapters/sqlite/connection.js";
 import { createSqliteBooksRepository } from "./adapters/sqlite/sqliteBooksRepository.js";
-import { GENRE_JUDGMENT_BATCH, judgeGenres } from "./genreJudgments.js";
+import { startGenreJobsIfConfigured } from "./genreJudgments.js";
+import { genreReviewWith, reviewGenreWith } from "./genreReview.js";
+import type { HeldWork } from "./genrePass.js";
 import { DETAILS_BATCH_SIZE, startBackfill, startCoverColorBackfill, startDetailsBackfill, startWorksBackfill, startWorksGrouping } from "./backfill.js";
 import { createBooksService, MAX_UPLOAD_BYTES, type BooksService } from "./booksService.js";
 import type { FetchCoverImage } from "./coverResolver.js";
 import { encodeCover } from "./domain/images.js";
 import type { BookLookup } from "./domain/normalize.js";
 import { coverUrlFor, useBooksRepository } from "./publicCoverLookup.js";
-import { buildAdminRoutes, buildCatalogRoutes, buildCoverFileRoutes, buildResolveRoutes } from "./routes.js";
+import { buildAdminRoutes, buildCatalogRoutes, buildCoverFileRoutes, buildGenreReviewRoutes, buildResolveRoutes } from "./routes.js";
 import { createCoverWorker } from "./worker.js";
 
 const ISBNDB_GAP_MS = 1100;
@@ -42,7 +43,7 @@ export function enqueueBookCovers(lookups: BookLookup[]) {
 
 export interface BooksPluginOptions {
   alert?: (subject: string, text: string) => Promise<void>;
-  heldWorkIds?: () => string[];
+  heldWorks?: () => HeldWork[];
 }
 
 export async function booksPlugin(app: FastifyInstance, options: BooksPluginOptions = {}) {
@@ -56,6 +57,20 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
   });
   const repo = timedMethods(createSqliteBooksRepository(timeStep(app.log, "startup:books-open", openBooksDb)), app.log, "books");
   useBooksRepository(repo);
+  const heldWorks = options.heldWorks;
+  const genreJobs = heldWorks
+    ? startGenreJobsIfConfigured(env.TYPESAFE_API_KEY, {
+        repo,
+        heldWorkIds: () => heldWorks().map((work) => work.workId),
+        now: Date.now,
+        alert: (subject, text) => {
+          app.log.warn({ subject }, text);
+          options.alert?.(subject, text).catch((error: unknown) => app.log.error({ err: error }, "TypeSafe key alert failed"));
+        },
+        onError: (error, workId) => app.log.error({ err: error, workId }, "genre judgment failed"),
+        info: (details, message) => app.log.info(details, message)
+      })
+    : null;
   const isbndbThrottle = createThrottle(ISBNDB_GAP_MS);
   const openLibraryThrottle = createThrottle(OPEN_LIBRARY_GAP_MS);
   const openLibraryCoverThrottle = createThrottle(OPEN_LIBRARY_COVER_GAP_MS);
@@ -91,7 +106,8 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
     enqueue: (bookId, priority) => worker.enqueue(bookId, priority),
     publicUrlFor: coverUrlFor,
     adminUserId: env.ADMIN_USER_ID,
-    warn: (details, message) => app.log.warn(details, message)
+    warn: (details, message) => app.log.warn(details, message),
+    onDetailsChecked: (book) => { if (book.work_id) genreJobs?.add(book.work_id); }
   });
   const worker = createCoverWorker(
     (bookId, lane) => service.processBook(bookId, lane),
@@ -110,23 +126,6 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
     (error) => app.log.error({ err: error }, "work key backfill failed")
   );
   const stopColorBackfill = startCoverColorBackfill((limit) => service.fillCoverColors(limit), app.log);
-  const heldWorkIds = options.heldWorkIds;
-  const classify = typesafeConfigured ? createJevGenreClassifier(env.TYPESAFE_API_KEY) : null;
-  const stopGenreJudgments = classify && heldWorkIds
-    ? startDetailsBackfill(
-        (signal) => judgeGenres({
-          repo,
-          classify,
-          heldWorkIds,
-          now: Date.now,
-          alert: (subject, text) => {
-            app.log.warn({ subject }, text);
-            options.alert?.(subject, text).catch((error: unknown) => app.log.error({ err: error }, "TypeSafe key alert failed"));
-          }
-        }, GENRE_JUDGMENT_BATCH, signal),
-        (error) => app.log.error({ err: error }, "genre judgments failed")
-      )
-    : () => undefined;
   activeService = service;
   app.addHook("onClose", async () => {
     activeService = null;
@@ -136,7 +135,7 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
     grouping.stop();
     stopWorkKeyBackfill();
     stopColorBackfill();
-    stopGenreJudgments();
+    genreJobs?.stop();
     worker.stop();
   });
 
@@ -153,5 +152,15 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
     await scoped.register(fastifyMultipart, { limits: { fileSize: MAX_UPLOAD_BYTES, files: 1 } });
     await scoped.register(buildAdminRoutes(service, () => grouping.runNow()));
   });
+  if (heldWorks) {
+    await app.register(async (scoped) => {
+      await scoped.register(fastifyRateLimit, { max: 300, timeWindow: "1 minute" });
+      await scoped.register(buildGenreReviewRoutes({
+        isAdmin: (userId) => service.isAdmin(userId),
+        review: () => genreReviewWith(repo, heldWorks(), (imageId) => coverUrlFor(imageId, "thumb")),
+        decide: (workId, action) => reviewGenreWith(repo, workId, action, Date.now, (id) => genreJobs?.add(id))
+      }));
+    });
+  }
   await app.register(buildCoverFileRoutes(coverUrlFor));
 }

@@ -165,7 +165,7 @@ export function buildApp() {
   });
   app.register(registerGalleryModule);
   app.register(registerBooksModule, {
-    heldWorkIds: () => heldWorks().map((work) => work.workId),
+    heldWorks,
     alert: emailEnabled && env.ALERT_EMAIL
       ? (subject: string, text: string) => {
           const mail = renderEmail({ heading: subject, paragraphs: [text] }, env.FRONTEND_URL);
