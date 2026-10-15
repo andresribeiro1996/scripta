@@ -78,6 +78,7 @@ test("a dry run writes nothing, a repeat labels nothing, a down site is skipped,
   assert.deepEqual(dry.sites["Test Shop"], { products: 2, matched: 2, labelled: 1, editions: 1 });
   assert.equal(dry.sites["Down Shop"]?.skipped, "feed answered HTTP 500");
   assert.deepEqual(dry.unmatchedLabels, [["Ensaio", 2], ["Livro", 2]]);
+  assert.deepEqual(dry.matchedLabels, [["Policial", "Mystery", 1]]);
   assert.equal(h.genres(a), "[]");
   await fillFeedGenres(h.deps, [SHOP], { dryRun: false });
   assert.deepEqual((await fillFeedGenres(h.deps, [SHOP], { dryRun: false })).sites["Test Shop"], { products: 2, matched: 2, labelled: 0, editions: 0 });

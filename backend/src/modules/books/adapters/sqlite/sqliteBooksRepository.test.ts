@@ -1446,6 +1446,14 @@ test("empty-genre editions of a work are counted", () => {
   assert.equal(repo.countEmptyGenreEditions(work), 0);
 });
 
+test("a work key whose work was merged away maps to the merge target", () => {
+  const { db, repo } = freshRepo();
+  const keyed = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593", workKey: "OL1W" }, ["isbn:9780441013593"], NOW);
+  const target = titled(repo, "Duna");
+  db.prepare("UPDATE works SET merged_into = ? WHERE id = ?").run(target.work_id, keyed.work_id);
+  assert.deepEqual(repo.workIdsByWorkKeys(["OL1W"]), new Map([["OL1W", target.work_id!]]));
+});
+
 test("work keys map to work ids, and publisher URLs list with their works", () => {
   const { repo } = freshRepo();
   const keyed = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593", workKey: "OL1W" }, ["isbn:9780441013593"], NOW);

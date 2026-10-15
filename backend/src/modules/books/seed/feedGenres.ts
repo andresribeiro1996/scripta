@@ -5,7 +5,7 @@ import { createThrottle, readSiteFeed, SiteSkipped, type ImportDeps } from "./im
 import type { PublisherSite } from "./publishers.js";
 
 const CHUNK = 250;
-const CENSUS_SIZE = 50;
+const CENSUS_SIZE = 200;
 const AGE = "(?:[1-9]|1[0-2])";
 const FEED_LABEL_GENRES: Array<[BookGenre, RegExp]> = [
   ["Children's", new RegExp(`^\\+?\\s*${AGE}(?:\\s*-\\s*${AGE})?\\s*anos$`)]
@@ -22,6 +22,7 @@ export interface GenreFillSiteReport {
 export interface GenreFillReport {
   sites: Record<string, GenreFillSiteReport>;
   unmatchedLabels: Array<[string, number]>;
+  matchedLabels: Array<[string, string, number]>;
 }
 
 export function feedLabelGenres(labels: string[]): BookGenre[] {
@@ -50,6 +51,7 @@ export async function fillFeedGenres(
     if (row.work_id) byUrl.set(row.publisher_url, (byUrl.get(row.publisher_url) ?? new Set()).add(row.work_id));
   }
   const unmatched = new Map<string, number>();
+  const matched = new Map<string, number>();
   const counted = new Set<string>();
   const reports: Record<string, GenreFillSiteReport> = {};
   for (const site of sites) {
@@ -64,7 +66,8 @@ export async function fillFeedGenres(
         deps.repo.transaction(() => {
           for (const book of feed.books.slice(start, start + CHUNK)) {
             for (const label of book.labels) {
-              if (feedLabelGenres([label]).length === 0) unmatched.set(label, (unmatched.get(label) ?? 0) + 1);
+              const census = feedLabelGenres([label]).length === 0 ? unmatched : matched;
+              census.set(label, (census.get(label) ?? 0) + 1);
             }
             const byIsbnWork = book.isbn ? byIsbn.get(isbnKey(book.isbn))?.work_id : undefined;
             const workIds = byUrl.get(book.productUrl) ?? new Set(byIsbnWork ? [byIsbnWork] : []);
@@ -98,5 +101,9 @@ export async function fillFeedGenres(
     }
   }
   const unmatchedLabels = [...unmatched].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, CENSUS_SIZE);
-  return { sites: reports, unmatchedLabels };
+  const matchedLabels = [...matched]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, CENSUS_SIZE)
+    .map(([label, count]): [string, string, number] => [label, feedLabelGenres([label]).join(", "), count]);
+  return { sites: reports, unmatchedLabels, matchedLabels };
 }

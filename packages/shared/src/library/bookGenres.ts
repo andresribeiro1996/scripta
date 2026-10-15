@@ -63,7 +63,7 @@ const RULES: Array<[BookGenre, RegExp]> = [
   ["Cooking", /\b(?:cooking|cookbooks?|food|culinaria|receitas|gastronomia)\b/]
 ];
 
-const NOT_GENRES = /\b(?:food for thought|reading history)\b/;
+const NOT_GENRES = /^(?:food for thought|reading history)$/;
 
 function valuesOf(value: unknown): string[] {
   if (Array.isArray(value)) return value.filter((item): item is string => typeof item === "string");

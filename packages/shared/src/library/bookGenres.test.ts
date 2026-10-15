@@ -167,6 +167,7 @@ test("common Goodreads shelves and StoryGraph tags map to genres, and non-genre 
   for (const [shelf, genre] of shelves) assert.deepEqual(normalizeBookGenres([shelf]), genre ? [genre] : [], shelf);
   assert.deepEqual(normalizeBookGenres(["Food"]), ["Cooking"]);
   assert.deepEqual(normalizeBookGenres(["World history"]), ["History"]);
+  assert.deepEqual(normalizeBookGenres(["Books and reading -- History"]), ["History"]);
   assert.deepEqual(normalizeBookGenres(["Travel"]), ["Travel"]);
 });
 
