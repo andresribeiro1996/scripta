@@ -89,3 +89,9 @@ test("keeps the languages the edition states, in order, and none when it states 
   assert.deepEqual(parseRankedWorks(withEdition({ language: ["fre", "eng", 7], isbn: ["9789896370107"] }), "por", "978989")[0]?.languages, ["fre", "eng"]);
   assert.deepEqual(parseRankedWorks(withEdition({ isbn: ["9789896370107"] }), "por", "978989")[0]?.languages, []);
 });
+
+test("a ranked work keeps every subject, as the details lookup reads them", () => {
+  const subjects = Array.from({ length: 12 }, (_, index) => `Subject ${index}`);
+  const [entry] = parseRankedWorks({ docs: [{ key: "/works/OL1W", title: "Dune", author_name: ["Frank Herbert"], subject: subjects, editions: { docs: [{ title: "Dune", isbn: ["9780441013593"], language: ["eng"] }] } }] }, "eng");
+  assert.deepEqual(entry?.subjects, subjects);
+});

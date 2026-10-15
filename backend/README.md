@@ -278,6 +278,22 @@ Fills catalog genres for works people own that Open Library and ISBNdb couldn't 
    npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c "echo $(base64 < labels.json | tr -d '\n') | base64 -d > /tmp/genre-labels.json && cd /app/backend && node scripts/genre-pass-import.mjs /tmp/genre-labels.json; rm -f /tmp/genre-labels.json"
    ```
 
+#### Catalog genre backfill
+
+One-off passes that label catalog works with no genres. Each writes only to editions whose genres are empty, never overwrites a genre, repeats as a no-op, and prints a JSON report. Run each with `--dry-run` first. Check the volume's free space first (`railway volume list --json`), and hold merges to `main` while a pass runs, because a deploy kills `railway ssh` jobs.
+
+1. Seed subjects: re-reads the seed's Open Library lists (about 60–100 requests, one a second) and stores each work's subjects as genres. Use the same `--eng`/`--por` the catalog was seeded with (defaults 35000/15000).
+
+   ```bash
+   npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && node scripts/seed-catalog.mjs --fill-genres --dry-run'
+   ```
+
+2. Feed labels: re-reads the 15 publisher feeds (robots.txt respected, the importer's throttle) and stores each product's tags and categories as genres on the books at its URL, else its ISBN. The dry run's `unmatchedLabels` (labels that map to nothing) and `matchedLabels` (label, the genres it maps to, product count) are the census: review both before the real run, adding real genre words to the Portuguese rules or `FEED_LABEL_GENRES` and fixing any label that maps to the wrong genre.
+
+   ```bash
+   npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && node scripts/import-publisher-covers.mjs --fill-genres --dry-run'
+   ```
+
 #### Mojibake repair
 
 Some Open Library records store titles and authors already mis-decoded (`fÃ©` for `fé`). New rows are repaired as they enter (`lookupIdentity`, `mapOpenLibraryDoc`). `scripts/repair-mojibake.mjs` repairs the rows stored earlier: `title`, `author`, `title_key`, the corrected `ta:` key (added for rows that hold the mis-decoded one, which stays, so a lookup with the old text still lands on the row), the search index and the works' copies.

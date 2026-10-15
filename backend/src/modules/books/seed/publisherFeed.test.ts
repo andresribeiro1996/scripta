@@ -378,3 +378,14 @@ test("the fixture descriptions are live-shaped paragraphs: the notice goes, the 
   assert.ok(details[2]?.summary?.startsWith("VENCEDOR DO COSTA BOOK AWARD DE LIVRO DO ANO\n\nParis, 1785."));
   assert.equal(details[3]?.summary, null);
 });
+
+test("products carry their tags, types and categories as labels", () => {
+  const shop = { name: "Shop", origin: "https://shop.test", platform: "shopify" as const, authorFromVendor: false };
+  const wooSite = { name: "Woo", origin: "https://woo.test", platform: "woocommerce" as const, authorFromVendor: false };
+  const shopifyBooks = parseShopifyProducts(shopify, shop);
+  assert.deepEqual(shopifyBooks.find((book) => book.title === "O Museu dos Esforços Inúteis")?.labels, ["américa latina", "Contos", "Livro"]);
+  const wooBooks = parseWooProducts(woo, wooSite);
+  assert.ok(wooBooks.some((book) => book.labels.length === 1 && book.labels[0] === "Ensaios"));
+  const stringTags = parseShopifyProducts({ products: [{ title: "Tagged", handle: "tagged", product_type: "", tags: "Romance,  Policial ", variants: [], images: [{ src: "https://shop.test/files/9789722031240.jpg" }] }] }, shop);
+  assert.deepEqual(stringTags[0]?.labels, ["Romance", "Policial"]);
+});
