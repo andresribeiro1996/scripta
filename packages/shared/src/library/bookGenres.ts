@@ -38,10 +38,10 @@ const RULES: Array<[BookGenre, RegExp]> = [
   ["Classics", /\bclassics?\b|\bclassic literature\b|\bclassicos?\b/],
   ["Biography & Memoir", /\b(?:biograph\w*|autobiograph\w*|memoirs?|biografias?|autobiografias?|memorias)\b/],
   ["Comics & Graphic Novels", /\b(?:comics?|graphic novels?|manga|banda desenhada|quadrinhos)\b/],
-  ["Children's", /\binfanto ?juvenil\b/],
-  ["Young Adult", /\b(?:young adult|ya|juvenil|jovens adultos)\b/],
+  ["Children's", /\binfanto ?juvenil\b|\binfantil (?:e )?juvenil\b|\binfantis e juvenis\b/],
+  ["Young Adult", /\b(?:young adult|ya|juvenil|jove(?:m|ns) adultos?)\b/],
   ["Children's", /\b(?:children s|childrens|juvenile fiction|picture books?|infantil|infantis|middle grade|kids|kid ?lit)\b/],
-  ["Fantasy", /\b(?:fantasy|fantasia|romantasy)\b/],
+  ["Fantasy", /\b(?:fantasy|fantasia|romantasy|literatura fantastica)\b/],
   ["Romance", /\bromance\b|\bliteratura romantica\b|\brom ?com\b/],
   ["Mystery", /\bmyst(?:ery|eries)\b|\bdetective fiction\b|\bpolicia(?:l|is)\b|\bmisterios?\b/],
   ["Thriller", /\bthrillers?\b|\bsuspenses?\b/],
@@ -70,10 +70,14 @@ function valuesOf(value: unknown): string[] {
   return typeof value === "string" ? value.split(/[,;|]/) : [];
 }
 
+export function normalizeGenreLabel(raw: string): string {
+  return raw.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
 export function normalizeBookGenres(value: unknown): BookGenre[] {
   const found = new Set<BookGenre>();
   for (const raw of valuesOf(value)) {
-    const subject = raw.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    const subject = normalizeGenreLabel(raw);
     if (NOT_GENRES.test(subject)) continue;
     const match = RULES.find(([, pattern]) => pattern.test(subject));
     if (match) found.add(match[0]);

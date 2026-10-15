@@ -1,4 +1,4 @@
-import { BOOK_GENRES, canonicalIsbn, normalizeBookGenres, type BookGenre } from "@scripta/shared";
+import { BOOK_GENRES, canonicalIsbn, normalizeBookGenres, normalizeGenreLabel, type BookGenre } from "@scripta/shared";
 import { SourceUnavailableError } from "../domain/errors.js";
 import type { BooksRepository } from "../domain/ports.js";
 import { createThrottle, readSiteFeed, SiteSkipped, type ImportDeps } from "./importPublisherCovers.js";
@@ -6,10 +6,29 @@ import type { PublisherSite } from "./publishers.js";
 
 const CHUNK = 250;
 const CENSUS_SIZE = 200;
-const AGE = "(?:[1-9]|1[0-2])";
-const FEED_LABEL_GENRES: Array<[BookGenre, RegExp]> = [
-  ["Children's", new RegExp(`^\\+?\\s*${AGE}(?:\\s*-\\s*${AGE})?\\s*anos$`)]
+const FEED_LABEL_GENRES: Array<[RegExp, BookGenre | null]> = [
+  [/\bstilton\b/, "Children's"],
+  [/^(?:nome)?autor\b/, null],
+  [/^politicaparamiudos/, null],
+  [/^(?:(?:tema )?romance(?: contemporaneo)?|colecao manuscrito romance|romance \d+)$/, null],
+  [/^romance grafico$/, "Comics & Graphic Novels"],
+  [/^romance biografico$/, null],
+  [/^(?:tema )?ciencias sociais(?: e humanas)?$/, null],
+  [/^(?:tema fantastico ficcao cientifica terror|literatura romantica e nao so)$/, null],
+  [/^(?:ciencia militar e estrategia|historia alternativa)$/, null],
+  [/^bd$/, "Comics & Graphic Novels"]
 ];
+const AGE_BANDS = [/^(?:categoria )?(\d{1,2})(?: (?:a )?\d{1,2})? ?anos$/, /^tema [a-z ]+ (\d{1,2}) \d{1,2}$/];
+
+function ageGenre(label: string): BookGenre | undefined {
+  for (const pattern of AGE_BANDS) {
+    const lower = pattern.exec(label)?.[1];
+    if (lower === undefined) continue;
+    if (Number(lower) <= 12) return "Children's";
+    if (Number(lower) <= 17) return "Young Adult";
+  }
+  return undefined;
+}
 
 export interface GenreFillSiteReport {
   products: number;
@@ -29,9 +48,11 @@ export function feedLabelGenres(labels: string[]): BookGenre[] {
   const found = new Set<BookGenre>();
   const rest: string[] = [];
   for (const label of labels) {
-    const rule = FEED_LABEL_GENRES.find(([, pattern]) => pattern.test(label.trim().toLowerCase()));
-    if (rule) found.add(rule[0]);
-    else rest.push(label);
+    const normalized = normalizeGenreLabel(label);
+    const rule = FEED_LABEL_GENRES.find(([pattern]) => pattern.test(normalized));
+    const genre = rule ? rule[1] : ageGenre(normalized);
+    if (genre) found.add(genre);
+    else if (!rule && !genre) rest.push(label);
   }
   for (const genre of normalizeBookGenres(rest)) found.add(genre);
   return BOOK_GENRES.filter((genre) => found.has(genre));
