@@ -96,6 +96,18 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const unmergeStmt = db.prepare(`UPDATE works SET merged_into = NULL WHERE id = ?`);
   const repointBackStmt = db.prepare(`UPDATE works SET merged_into = ? WHERE merged_into = ? AND id IN (SELECT value FROM json_each(?))`);
   const markUndoneStmt = db.prepare(`UPDATE work_merges SET undone_at = ? WHERE id = ?`);
+  const moveGroupedBackStmt = db.prepare(`
+    UPDATE books SET work_id = $from
+    WHERE work_id = $into AND ol_work_key IS NULL AND title_key IN (SELECT title_key FROM books WHERE work_id = $from AND title_key <> '')
+  `);
+  const repointGroupedBackStmt = db.prepare(`
+    UPDATE works SET merged_into = $from
+    WHERE merged_into = $into AND id IN (
+      SELECT m.from_work FROM work_merges m
+      WHERE m.into_work = $into AND m.source = 'title-key' AND m.undone_at IS NULL
+        AND EXISTS (SELECT 1 FROM json_each(m.moved_book_ids) j JOIN books b ON b.id = j.value WHERE b.work_id = $from)
+    )
+  `);
   const workMatchJudgmentsStmt = db.prepare(`SELECT work_id, model, into_work_id, confidence, asked_at FROM work_match_judgments WHERE work_id IN (SELECT value FROM json_each(?))`);
   const saveWorkMatchJudgmentStmt = db.prepare(`INSERT OR REPLACE INTO work_match_judgments (work_id, model, into_work_id, confidence, asked_at) VALUES (?, ?, ?, ?, ?)`);
   const portugueseWorkFilter = `
@@ -715,9 +727,11 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
         const merge = latestMergeStmt.get(fromId) as { id: number; into_work: string; moved_book_ids: string; repointed_work_ids: string } | undefined;
         const from = workLinkStmt.get(fromId) as WorkLink | undefined;
         if (!merge || !from || from.merged_into !== merge.into_work) throw new WorkMergeError("That merge can no longer be undone.");
-        const editions = Number(moveBackStmt.run(from.id, merge.into_work, merge.moved_book_ids, from.ol_work_key, from.ol_work_key).changes);
+        const moved = Number(moveBackStmt.run(from.id, merge.into_work, merge.moved_book_ids, from.ol_work_key, from.ol_work_key).changes);
+        const editions = moved + Number(moveGroupedBackStmt.run({ $from: from.id, $into: merge.into_work }).changes);
         unmergeStmt.run(from.id);
         repointBackStmt.run(from.id, merge.into_work, merge.repointed_work_ids);
+        repointGroupedBackStmt.run({ $from: from.id, $into: merge.into_work });
         markUndoneStmt.run(at, merge.id);
         return { into: merge.into_work, editions };
       });

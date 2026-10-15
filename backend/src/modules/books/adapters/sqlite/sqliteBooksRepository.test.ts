@@ -1723,3 +1723,20 @@ test("undo refuses once the target itself merged elsewhere", () => {
   repo.mergeTranslation(en.work_id!, other.work_id!, "manual", null, AT);
   assert.throws(() => repo.undoMerge(pt.work_id!, AT), WorkMergeError);
 });
+
+test("an undone translation merge stays undone through the next title-key grouping, and takes back a later keyless copy", () => {
+  const { db, repo } = freshRepo();
+  const pt = repo.createBook({ title: "Poemas", author: "John Keats", isbn: "9789720000351" }, ["isbn:9789720000351"], NOW);
+  const en = repo.createBook({ title: "Poems", author: "Emily Dickinson", isbn: "9780000000352", workKey: "OL930W" }, ["isbn:9780000000352"], NOW);
+  repo.mergeTranslation(pt.work_id!, en.work_id!, "jev", 0.92, AT);
+  const copy = repo.createBook({ title: "Poemas", author: "John Keats", isbn: "9789720000353" }, ["isbn:9789720000353"], NOW);
+  assert.equal(repo.groupKeylessWorks(10, AT), 1);
+  assert.equal(repo.getBook(copy.id)!.work_id, en.work_id);
+
+  repo.undoMerge(pt.work_id!, "2026-10-16T00:00:00.000Z");
+  assert.equal(repo.getBook(copy.id)!.work_id, pt.work_id);
+  assert.equal(workById(db, copy.work_id).merged_into, pt.work_id);
+  assert.equal(repo.groupKeylessWorks(10, "2026-10-17T00:00:00.000Z"), 0);
+  assert.equal(workById(db, pt.work_id).merged_into, null);
+  assert.equal(repo.getBook(pt.id)!.work_id, pt.work_id);
+});
