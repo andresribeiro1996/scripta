@@ -188,3 +188,17 @@ test("your own edition's summary comes before the work summary", () => {
   assert.equal(createWorksService(deps({ getWorkPage: () => work, copyOfWork: () => own })).getPage("w", "viewer")!.work.summary, "Especiaria.");
   assert.equal(createWorksService(deps({ getWorkPage: () => work })).getPage("w", null)!.work.summary, "Work text.");
 });
+
+test("a reader whose own edition has no synopsis gets one in their edition's language, never the original's English", () => {
+  const english = "The story of a family and the house where they spend their summers, told over ten years.";
+  const portuguese = "A história de uma família e da casa onde passam os verões, contada ao longo de dez anos.";
+  const edition = (bookId: string, isbn: string, language: string, summary: string | null) => ({ bookId, title: bookId, language, year: 2000, isbn, summary, coverUrl: null, coverColor: null, genres: [], rating: null, ratingCount: 0, pages: null });
+  const work = (editions: ReturnType<typeof edition>[]) => () => ({ id: "w", title: "To the Lighthouse", author: "Virginia Woolf", summary: english, aliasIds: ["w"], editions });
+  const own = { bookKey: "isbn:9789720000701", readStatus: 2 as const, rating: null, highlightCount: 0, isbn: "9789720000701", coverUrl: null };
+  const mine = edition("mine", "9789720000701", "pt-PT", null);
+  const sibling = edition("sibling", "9789720000702", "pt-BR", portuguese);
+  const original = edition("original", "9780156907391", "en", english);
+  assert.equal(createWorksService(deps({ getWorkPage: work([original, mine, sibling]), copyOfWork: () => own })).getPage("w", "viewer")!.work.summary, portuguese);
+  assert.equal(createWorksService(deps({ getWorkPage: work([original, mine]), copyOfWork: () => own })).getPage("w", "viewer")!.work.summary, null);
+  assert.equal(createWorksService(deps({ getWorkPage: work([original, mine]) })).getPage("w", null)!.work.summary, english);
+});
