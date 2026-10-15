@@ -51,6 +51,17 @@ test("a held work with no genres is asked once, stored, applied, and its strikes
   assert.equal(await judgeWork(deps(repo, workIds, async () => { throw new Error("asked twice"); }), workIds[0]!), null);
 });
 
+test("a Jev answer that lands after the owner's no-genre judgment leaves it standing", async () => {
+  const { db, repo, workIds } = seeded(["Owned"]);
+  const ownerFirst: Classify = async () => {
+    repo.saveGenreJudgment({ workId: workIds[0]!, model: "manual", genre: null, confidence: 1, askedAt: new Date(NOW).toISOString() });
+    return { genre: "History", confidence: 0.9, model: "jev-1.13.0" };
+  };
+  assert.equal(await judgeWork(deps(repo, workIds, ownerFirst), workIds[0]!), null);
+  assert.deepEqual(repo.genreJudgments(workIds).get(workIds[0]!), { model: "manual", genre: null, confidence: 1 });
+  assert.equal(genresOf(db, "Owned"), "[]");
+});
+
 test("a work no library holds is skipped without asking", async () => {
   const { repo, workIds } = seeded(["Catalog only"]);
   assert.equal(await judgeWork(deps(repo, [], async () => { throw new Error("asked"); }), workIds[0]!), null);

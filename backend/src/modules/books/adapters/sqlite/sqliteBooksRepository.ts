@@ -189,7 +189,11 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       AND NOT EXISTS (SELECT 1 FROM genre_rejections r WHERE r.work_id = w.value AND r.attempts >= ?)
     LIMIT ?
   `);
-  const saveJudgmentStmt = db.prepare(`INSERT OR REPLACE INTO genre_judgments (work_id, model, genre, confidence, asked_at) VALUES (?, ?, ?, ?, ?)`);
+  const saveJudgmentStmt = db.prepare(`
+    INSERT INTO genre_judgments (work_id, model, genre, confidence, asked_at) VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(work_id) DO UPDATE SET model = excluded.model, genre = excluded.genre, confidence = excluded.confidence, asked_at = excluded.asked_at
+    WHERE genre_judgments.model <> 'manual' OR excluded.model = 'manual'
+  `);
   const judgmentsStmt = db.prepare(`SELECT work_id, model, genre, confidence FROM genre_judgments WHERE work_id IN (SELECT value FROM json_each(?))`);
   const applyJudgmentsStmt = db.prepare(`
     UPDATE books SET genres = json_array(j.genre), genres_source = 'jev', genres_confidence = j.confidence
