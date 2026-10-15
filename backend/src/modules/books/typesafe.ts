@@ -14,10 +14,7 @@ export function utcDay(at: number): string {
   return new Date(at).toISOString().slice(0, 10);
 }
 
-export function nextUtcMidnight(at: number): number {
-  const date = new Date(at);
-  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + 1);
-}
+export { nextUtcMidnight } from "./adapters/isbndb/isbndbGate.js";
 
 export function dailySpend(repo: Pick<BooksRepository, "spendTypesafe">, source: string, limit: number, now: () => number): Spend {
   return () => {
