@@ -198,15 +198,19 @@ Every answer is stored in `work_match_judgments`, with the chosen work in `into_
    - `mergeInto` writes a `work_merges` row for every merge it makes: the daily title-key grouping, the admin route, and this feature.
    - The row records the editions it moved and the works it repointed.
    - It's written in the same transaction as the merge.
-6. **Undo** (review page, sources `code`, `jev` and `manual`) works while `from` is still merged into `into`. In one transaction it:
+6. **Genre state follows the merge.**
+   - The genre tables are keyed by work id, so today a merged-away work's rows are orphaned. The Jev genres already written to its moved editions then match no judgment on the canonical work.
+   - In the same transaction, `mergeInto` moves `from`'s `genre_judgments` and `genre_rejections` rows to `into` when `into` has none of its own, and deletes them otherwise.
+   - This applies to every merge, including the existing title-key grouping and admin merges.
+7. **Undo** (review page, sources `code`, `jev` and `manual`) works while `from` is still merged into `into`. In one transaction it:
    - clears `from.merged_into`;
    - moves back the recorded editions still on `into`, and any edition on `into` carrying `from`'s Open Library key;
    - points the recorded works back at `from`;
    - sets `undone_at`;
    - stores a `manual` judgment with `into_work_id = NULL`, so the pair isn't merged again.
 
-   Title and author blanks the merge filled on `into` stay filled.
-7. **Nothing else to recompute.** The edition strip, genres (the union of the editions' genres), readers and the games all resolve the canonical work when read. `library_books.work_id` is left as stored.
+   Title and author blanks the merge filled on `into` stay filled. Genre rows moved by the merge stay on `into`. If the restored work still qualifies, the genre queue asks about it again.
+8. **Nothing else to recompute.** The edition strip, genres (the union of the editions' genres), readers and the games all resolve the canonical work when read. `library_books.work_id` is left as stored.
 
 ### Triggers
 
@@ -383,6 +387,7 @@ Runbook in `backend/README.md`, beside the genre pass.
   - no summary carried by a translation merge;
   - the arena check blocks;
   - a `work_merges` row for every `mergeInto` caller;
+  - genre judgment and rejection rows moved to a target that has none, and deleted when it has its own;
   - the admin route still refuses keyed works.
 - **Undo:**
   - restores editions, including later arrivals with the key, and repointed works;
