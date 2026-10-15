@@ -86,6 +86,8 @@ export interface BooksRepository {
   flaggedSynopses(reviewBelow: number): Array<{ hash: string; model: string; usable: number; kind: SynopsisKind }>;
   synopsisCarriers(hashes: string[]): Array<{ hash: string; workId: string | null; title: string; author: string; coverImageId: string | null; source: string | null; text: string; isEdition: boolean }>;
   synopsisTexts(): Array<{ hash: string; source: string; title: string; author: string; text: string }>;
+  fillOriginalTitle(bookId: string, title: string): void;
+  fillOriginalTitlesFromSummaries(workId?: string): number;
   workIdsByWorkKeys(keys: string[]): Map<string, string>;
   listPublisherUrls(): Array<{ work_id: string | null; publisher_url: string }>;
   fillSourceGenres(workId: string, genres: string[]): number;

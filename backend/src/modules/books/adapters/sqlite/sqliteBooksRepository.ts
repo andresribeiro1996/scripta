@@ -4,6 +4,7 @@ import { MIN_PREFIX_LENGTH, normalizeWorkKey, workTitleKey } from "../../domain/
 import type { BooksRepository, IdPage, MergeableDetails, PageCursor } from "../../domain/ports.js";
 import { WorkMergeError } from "../../domain/errors.js";
 import { summaryHashOf, type SynopsisKind } from "../../domain/synopsis.js";
+import { originalTitleIn } from "../../domain/translation.js";
 import type { BookRow, CoverImageRow, DataSource, GenreEvidence, SummarySource, WorkPageRows, WorkView } from "../../domain/types.js";
 
 export const UNCHECKED_COVERS_SQL = `
@@ -306,6 +307,9 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     SELECT summary_hash, 'openlibrary', title, author, summary, created_at, rowid FROM works WHERE summary_hash IS NOT NULL AND summary IS NOT NULL
     ORDER BY created_at, ord
   `);
+  const fillOriginalTitleStmt = db.prepare(`UPDATE books SET original_title = ? WHERE id = ? AND original_title IS NULL`);
+  const labelledSummariesStmt = db.prepare(`SELECT id, summary FROM books WHERE original_title IS NULL AND summary LIKE '%tulo original%'`);
+  const labelledWorkSummariesStmt = db.prepare(`SELECT id, summary FROM books WHERE work_id = ? AND original_title IS NULL AND summary LIKE '%tulo original%'`);
   const detailsMissingStmt = db.prepare(`UPDATE books SET details_status = 'missing', details_checked_at = ? WHERE id = ?`);
   const detailsAttemptedStmt = db.prepare(`UPDATE books SET details_checked_at = ? WHERE id = ?`);
   const searchStmt = db.prepare(`
@@ -745,6 +749,20 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
         if (!seen.has(row.hash)) seen.set(row.hash, { hash: row.hash, source: row.source, title: row.title, author: row.author, text: row.text });
       }
       return [...seen.values()];
+    },
+    fillOriginalTitle(bookId, title) {
+      fillOriginalTitleStmt.run(title, bookId);
+    },
+    fillOriginalTitlesFromSummaries(workId) {
+      return inTransaction(() => {
+        const rows = (workId === undefined ? labelledSummariesStmt.all() : labelledWorkSummariesStmt.all(workId)) as Array<{ id: string; summary: string }>;
+        let filled = 0;
+        for (const row of rows) {
+          const title = originalTitleIn(row.summary);
+          if (title && fillOriginalTitleStmt.run(title, row.id).changes > 0) filled += 1;
+        }
+        return filled;
+      });
     },
 
     genreEvidence(workId) {

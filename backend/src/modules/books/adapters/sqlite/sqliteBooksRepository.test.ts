@@ -1585,3 +1585,19 @@ test("a summary cleared by hand leaves no text to judge or list, even with its h
   assert.deepEqual(repo.synopsisCarriers([bookHash!, workHash]), []);
   assert.deepEqual(repo.synopsisTexts(), []);
 });
+
+test("original titles fill only empty columns, from the feed or from stored summaries", () => {
+  const { repo } = freshRepo();
+  const a = repo.createBook({ title: "Passeio ao Farol", author: "Virginia Woolf", isbn: "9789720000111" }, ["isbn:9789720000111"], NOW);
+  repo.fillOriginalTitle(a.id, "To the Lighthouse");
+  repo.fillOriginalTitle(a.id, "Something else");
+  assert.equal(repo.getBook(a.id)!.original_title, "To the Lighthouse");
+  const b = repo.createBook({ title: "O Passeio", author: "Robert Walser", isbn: "9789720000112" }, ["isbn:9789720000112"], NOW);
+  repo.mergeDetails(b.id, { summary: "Um passeio por uma cidade suíça, narrado por um escritor.\n\nTítulo original: Der Spaziergang", pages: null, year: null, publisher: null, translator: null }, "publisher");
+  const c = repo.createBook({ title: "Sem rótulo", author: "X", isbn: "9789720000113" }, ["isbn:9789720000113"], NOW);
+  repo.mergeDetails(c.id, { summary: "Uma sinopse sem rótulo de origem em parte alguma do texto.", pages: null, year: null, publisher: null, translator: null }, "publisher");
+  assert.equal(repo.fillOriginalTitlesFromSummaries(c.work_id!), 0);
+  assert.equal(repo.fillOriginalTitlesFromSummaries(), 1);
+  assert.equal(repo.getBook(b.id)!.original_title, "Der Spaziergang");
+  assert.equal(repo.fillOriginalTitlesFromSummaries(), 0);
+});
