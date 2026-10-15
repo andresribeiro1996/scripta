@@ -20,6 +20,8 @@ import { startGenreJobsIfConfigured } from "./genreJudgments.js";
 import { genreReviewWith, reviewGenreWith } from "./genreReview.js";
 import { startSynopsisJobsIfConfigured } from "./synopsisJudgments.js";
 import { reviewSynopsisWith, synopsisReviewWith } from "./synopsisReview.js";
+import { startTranslationJobsIfConfigured } from "./translationJudgments.js";
+import { isPortuguese } from "./domain/translation.js";
 import type { HeldWork } from "./genrePass.js";
 import { DETAILS_BATCH_SIZE, startBackfill, startCoverColorBackfill, startDetailsBackfill, startWorksBackfill, startWorksGrouping } from "./backfill.js";
 import { createBooksService, MAX_UPLOAD_BYTES, type BooksService } from "./booksService.js";
@@ -85,6 +87,18 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
         onError: (error, workId) => app.log.error({ err: error, workId }, "synopsis judgment failed")
       })
     : null;
+  const sharesArena = (a: string, b: string) => options.worksShareAnArena?.([a, ...repo.aliasesOf([a])], [b, ...repo.aliasesOf([b])]) ?? false;
+  const translationJobs = heldWorks
+    ? startTranslationJobsIfConfigured(env.TYPESAFE_API_KEY, {
+        repo,
+        sharesArena,
+        heldWorkIds: () => heldWorks().map((work) => work.workId),
+        now: Date.now,
+        alert: alertTypesafe,
+        info: (details, message) => app.log.info(details, message),
+        onError: (error, workId) => app.log.error({ err: error, workId }, "translation matching failed")
+      })
+    : null;
   const isbndbThrottle = createThrottle(ISBNDB_GAP_MS);
   const openLibraryThrottle = createThrottle(OPEN_LIBRARY_GAP_MS);
   const openLibraryCoverThrottle = createThrottle(OPEN_LIBRARY_COVER_GAP_MS);
@@ -125,6 +139,7 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
       if (!book.work_id) return;
       genreJobs?.add(book.work_id);
       synopsisJobs?.add(book.work_id);
+      if (isPortuguese(book.language)) translationJobs?.add(book.work_id);
     }
   });
   const worker = createCoverWorker(
@@ -155,6 +170,7 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
     stopColorBackfill();
     genreJobs?.stop();
     synopsisJobs?.stop();
+    translationJobs?.stop();
     worker.stop();
   });
 

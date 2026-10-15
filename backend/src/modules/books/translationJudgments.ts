@@ -1,8 +1,11 @@
-import type { ClassifyMatch } from "./adapters/typesafe/jevWorkMatch.js";
+import { createJevMatchClassifier, type ClassifyMatch } from "./adapters/typesafe/jevWorkMatch.js";
+import { startDetailsBackfill } from "./backfill.js";
 import { WorkMergeError } from "./domain/errors.js";
 import type { BooksRepository } from "./domain/ports.js";
 import { authorPattern, evidenceOf, MATCH_MERGE_AT, MAX_CANDIDATES, mentionsSurname, sameMainTitle, surnameOf, titlePattern, type TranslationEvidence } from "./domain/translation.js";
-import { failureKind, nextUtcMidnight, strikeReason } from "./typesafe.js";
+import { JEV_REJECTION_LIMIT } from "./synopsisJudgments.js";
+import { dailySpend, failureKind, nextUtcMidnight, strikeReason } from "./typesafe.js";
+import { createWorkQueue } from "./workQueue.js";
 
 export type MatchCandidate = { id: string; title: string; author: string; year: number | null };
 export type MatchPlan = { kind: "original" } | { kind: "none" } | { kind: "code"; intoWorkId: string } | { kind: "ask"; evidence: TranslationEvidence; candidates: MatchCandidate[] };
@@ -88,4 +91,74 @@ export async function matchWork(deps: TranslationDeps, workId: string): Promise<
     }
     throw error;
   }
+}
+
+export const WORK_MATCH_SOURCE = "works";
+export const WORK_MATCH_DAILY_BUDGET = 1000;
+const IN_FLIGHT = 4;
+const SWEEP_LIMIT = 1000;
+const SWEEP_INTERVAL_MS = 24 * 60 * 60 * 1000;
+const HELD_CACHE_MS = 60 * 1000;
+
+type HeldDeps = TranslationDeps & { heldWorkIds: () => string[] };
+export type TranslationJobs = { add(workId: string): void; stop(): void };
+
+function heldCanonical(deps: HeldDeps): Set<string> {
+  return new Set(deps.repo.canonicalWorkIds(deps.heldWorkIds()).values());
+}
+
+export async function judgeWorkMatch(deps: HeldDeps, workId: string, held: () => Set<string> = () => heldCanonical(deps)): Promise<number | null> {
+  const canonical = deps.repo.canonicalWorkIds([workId]).get(workId);
+  if (!canonical || !held().has(canonical)) return null;
+  if (deps.repo.portugueseWorksNeedingMatch([canonical], 1, JEV_REJECTION_LIMIT, null).length === 0) return null;
+  return matchWork(deps, canonical);
+}
+
+export function startTranslationJobs(deps: HeldDeps & { info: (details: Record<string, unknown>, message: string) => void; onError: (error: unknown, workId?: string) => void }): TranslationJobs {
+  let quietUntil = 0;
+  let budgetLoggedUntil = 0;
+  let heldCache: { at: number; works: Set<string> } | null = null;
+  const alert = (subject: string, text: string) => {
+    if (deps.now() < quietUntil) return;
+    quietUntil = deps.now() + KEY_PAUSE_MS;
+    deps.alert(subject, text);
+  };
+  const held = () => {
+    if (!heldCache || deps.now() - heldCache.at >= HELD_CACHE_MS) heldCache = { at: deps.now(), works: heldCanonical(deps) };
+    return heldCache.works;
+  };
+  const classify: ClassifyMatch = async (input) => {
+    try {
+      return await deps.classify(input);
+    } catch (error) {
+      if (failureKind(error) === "budget" && deps.now() >= budgetLoggedUntil) {
+        budgetLoggedUntil = nextUtcMidnight(deps.now());
+        deps.info({ source: WORK_MATCH_SOURCE, until: new Date(budgetLoggedUntil).toISOString() }, "TypeSafe budget spent; translation matching waits for the next UTC day");
+      }
+      throw error;
+    }
+  };
+  const judged = { ...deps, alert, classify };
+  const queue = createWorkQueue({ concurrency: IN_FLIGHT, now: deps.now, run: (workId) => judgeWorkMatch(judged, workId, held), onError: deps.onError });
+  const stopSweep = startDetailsBackfill(
+    async () => {
+      heldCache = { at: deps.now(), works: heldCanonical(deps) };
+      for (const workId of deps.repo.portugueseWorksNeedingMatch([...heldCache.works], SWEEP_LIMIT, JEV_REJECTION_LIMIT, null)) queue.add(workId);
+      return null;
+    },
+    (error) => deps.onError(error),
+    SWEEP_INTERVAL_MS
+  );
+  return {
+    add: (workId) => queue.add(workId),
+    stop: () => {
+      stopSweep();
+      queue.stop();
+    }
+  };
+}
+
+export function startTranslationJobsIfConfigured(apiKey: string, deps: Omit<Parameters<typeof startTranslationJobs>[0], "classify">): TranslationJobs | null {
+  if (apiKey === "") return null;
+  return startTranslationJobs({ ...deps, classify: createJevMatchClassifier(apiKey, dailySpend(deps.repo, WORK_MATCH_SOURCE, WORK_MATCH_DAILY_BUDGET, deps.now)) });
 }

@@ -15,11 +15,14 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
 const { applyBooksMigrations } = await import("./adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("./adapters/sqlite/sqliteBooksRepository.js");
-const { matchWork, planMatch } = await import("./translationJudgments.js");
+const { judgeWorkMatch, matchWork, planMatch, startTranslationJobs } = await import("./translationJudgments.js");
 const { SourceUnavailableError, UnusableAnswerError } = await import("./domain/errors.js");
 
 type Repo = ReturnType<typeof createSqliteBooksRepository>;
 const AT = "2026-10-15T12:00:00.000Z";
+const flush = async () => {
+  for (let tick = 0; tick < 10; tick++) await new Promise(setImmediate);
+};
 
 function freshRepo(): Repo {
   const db = new DatabaseSync(":memory:");
@@ -170,4 +173,28 @@ test("an unusable answer is a strike under works; a 401 pauses and alerts; nothi
   assert.equal(await matchWork(key.deps, pt.work_id!), NOW + 24 * 60 * 60 * 1000);
   assert.deepEqual(key.alerts, ["TypeSafe rejected the translation requests"]);
   assert.equal(repo.workMatchJudgments([pt.work_id!]).size, 0);
+});
+
+test("only a held, Portuguese work that still needs a match is judged, through its canonical id", async () => {
+  const repo = freshRepo();
+  const { en, pt } = lighthouse(repo, "Virginia Woolf");
+  const { deps } = matching(repo, async () => ({ choice: 0, confidence: 1, model: "jev-1.13.0" }));
+  assert.equal(await judgeWorkMatch({ ...deps, heldWorkIds: () => [] }, pt.work_id!), null);
+  assert.equal(repo.workMatchJudgments([pt.work_id!]).size, 0);
+  assert.equal(await judgeWorkMatch({ ...deps, heldWorkIds: () => [en.work_id!] }, en.work_id!), null);
+  assert.equal(repo.workMatchJudgments([en.work_id!]).size, 0);
+  await judgeWorkMatch({ ...deps, heldWorkIds: () => [pt.work_id!] }, pt.work_id!);
+  assert.equal(repo.getBook(pt.id)!.work_id, en.work_id);
+});
+
+test("adding a work only queues it; matching happens after the caller returns", async () => {
+  const repo = freshRepo();
+  const { pt } = lighthouse(repo, "");
+  const { deps, asked } = matching(repo, async () => ({ choice: null, confidence: 0.9, model: "jev-1.13.0" }));
+  const jobs = startTranslationJobs({ ...deps, heldWorkIds: () => [pt.work_id!], info: () => {}, onError: (error) => { throw error; } });
+  jobs.add(pt.work_id!);
+  assert.equal(asked.length, 0);
+  await flush();
+  assert.equal(asked.length, 1);
+  jobs.stop();
 });
