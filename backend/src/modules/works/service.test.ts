@@ -1,6 +1,19 @@
 import assert from "node:assert/strict";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { test } from "node:test";
-import { createWorksService, type WorksDeps } from "./service.js";
+import type { WorksDeps } from "./service.js";
+
+const scratch = mkdtempSync(join(tmpdir(), "works-service-test-"));
+process.env.AUTH_DB_PATH = join(scratch, "auth.sqlite");
+process.env.LIBRARY_DB_PATH = join(scratch, "library.sqlite");
+process.env.GALLERY_DB_PATH = join(scratch, "gallery.sqlite");
+process.env.COVERS_DB_PATH = join(scratch, "covers.sqlite");
+process.env.JWT_ACCESS_SECRET = "a".repeat(64);
+process.env.JWT_REFRESH_SECRET = "b".repeat(64);
+
+const { createWorksService } = await import("./service.js");
 
 const profile = (username: string) => ({ username, avatarUrl: null });
 
