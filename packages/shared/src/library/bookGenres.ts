@@ -32,17 +32,18 @@ export type BookGenre = (typeof BOOK_GENRES)[number];
 const RULES: Array<[BookGenre, RegExp]> = [
   ["Historical Fiction", /\bromances? historicos?\b/],
   ["Mystery", /\bromances? policia(?:l|is)\b/],
-  ["Science Fiction", /\b(?:science fiction|sci fi|scifi|ficcao cientifica)\b/],
+  ["Science Fiction", /\b(?:science fiction|sci fi|scifi|ficcao cientifica|dystopi(?:a|an|as)|space opera|cyberpunk|time travel)\b/],
   ["Historical Fiction", /\bhistorical fiction\b|\bfiction historical\b|\bficcao historica\b/],
-  ["Literary Fiction", /\bliterary fiction\b|\bfiction literary\b|\bficcao literaria\b/],
+  ["Literary Fiction", /\bliterary fiction\b|\bfiction literary\b|\bficcao literaria\b|\blit ?fic\b/],
   ["Classics", /\bclassics?\b|\bclassic literature\b|\bclassicos?\b/],
   ["Biography & Memoir", /\b(?:biograph\w*|autobiograph\w*|memoirs?|biografias?|autobiografias?|memorias)\b/],
   ["Comics & Graphic Novels", /\b(?:comics?|graphic novels?|manga|banda desenhada|quadrinhos)\b/],
   ["Children's", /\binfanto ?juvenil\b/],
-  ["Young Adult", /\b(?:young adult|ya fiction|juvenil|jovens adultos)\b/],
-  ["Children's", /\b(?:children s|childrens|juvenile fiction|picture books?|infantil|infantis)\b/],
-  ["Fantasy", /\b(?:fantasy|fantasia)\b/],
-  ["Romance", /\bromance\b|\bliteratura romantica\b/],
+  ["Young Adult", /\b(?:young adult|ya|juvenil|jovens adultos)\b/],
+  ["Children's", /\b(?:children s|childrens|juvenile fiction|picture books?|infantil|infantis|middle grade|kids|kid ?lit)\b/],
+  ["Romance", /\b(?:paranormal romance|romance paranormal)\b/],
+  ["Fantasy", /\b(?:fantasy|fantasia|romantasy|paranormal)\b/],
+  ["Romance", /\bromance\b|\bliteratura romantica\b|\brom ?com\b/],
   ["Mystery", /\bmyst(?:ery|eries)\b|\bdetective fiction\b|\bpolicia(?:l|is)\b|\bmisterios?\b/],
   ["Thriller", /\bthrillers?\b|\bsuspenses?\b/],
   ["Horror", /\b(?:horror|terror)\b/],
@@ -61,6 +62,8 @@ const RULES: Array<[BookGenre, RegExp]> = [
   ["Cooking", /\b(?:cooking|cookbooks?|food|culinaria|receitas|gastronomia)\b/]
 ];
 
+const NOT_GENRES = /\b(?:food for thought|reading history)\b/;
+
 function valuesOf(value: unknown): string[] {
   if (Array.isArray(value)) return value.filter((item): item is string => typeof item === "string");
   return typeof value === "string" ? value.split(/[,;|]/) : [];
@@ -70,6 +73,7 @@ export function normalizeBookGenres(value: unknown): BookGenre[] {
   const found = new Set<BookGenre>();
   for (const raw of valuesOf(value)) {
     const subject = raw.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    if (NOT_GENRES.test(subject)) continue;
     const match = RULES.find(([, pattern]) => pattern.test(subject));
     if (match) found.add(match[0]);
   }

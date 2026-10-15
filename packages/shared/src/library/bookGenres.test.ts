@@ -124,3 +124,48 @@ test("Portuguese romantic literature and children's-and-youth labels", () => {
   assert.deepEqual(normalizeBookGenres(["Infanto-juvenil"]), ["Children's"]);
   assert.deepEqual(normalizeBookGenres(["Literatura juvenil"]), ["Young Adult"]);
 });
+
+test("common Goodreads shelves and StoryGraph tags map to genres, and non-genre shelves to nothing", () => {
+  const shelves: Array<[string, string | null]> = [
+    ["ya", "Young Adult"],
+    ["ya-fantasy", "Young Adult"],
+    ["lit-fic", "Literary Fiction"],
+    ["litfic", "Literary Fiction"],
+    ["dystopian", "Science Fiction"],
+    ["dystopia", "Science Fiction"],
+    ["space-opera", "Science Fiction"],
+    ["cyberpunk", "Science Fiction"],
+    ["time-travel", "Science Fiction"],
+    ["rom-com", "Romance"],
+    ["romcom", "Romance"],
+    ["romantasy", "Fantasy"],
+    ["paranormal", "Fantasy"],
+    ["paranormal-romance", "Romance"],
+    ["Fiction / Romance / Paranormal", "Romance"],
+    ["middle-grade", "Children's"],
+    ["kids", "Children's"],
+    ["kidlit", "Children's"],
+    ["sci-fi-faves", "Science Fiction"],
+    ["fantasy-to-read", "Fantasy"],
+    ["cozy-mystery", "Mystery"],
+    ["true-crime", "Crime"],
+    ["graphic-novels", "Comics & Graphic Novels"],
+    ["to-read", null],
+    ["currently-reading", null],
+    ["read-in-2024", null],
+    ["owned", null],
+    ["favorites", null],
+    ["2023", null],
+    ["kindle", null],
+    ["audiobook", null],
+    ["book-club", null],
+    ["dnf", null],
+    ["food-for-thought", null],
+    ["reading-history", null],
+    ["Billy, the Kid, 1859-1881", null]
+  ];
+  for (const [shelf, genre] of shelves) assert.deepEqual(normalizeBookGenres([shelf]), genre ? [genre] : [], shelf);
+  assert.deepEqual(normalizeBookGenres(["Food"]), ["Cooking"]);
+  assert.deepEqual(normalizeBookGenres(["World history"]), ["History"]);
+  assert.deepEqual(normalizeBookGenres(["Travel"]), ["Travel"]);
+});
