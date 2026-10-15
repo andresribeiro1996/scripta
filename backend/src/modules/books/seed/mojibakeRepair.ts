@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import { hasMojibake, repairMojibake } from "@scripta/shared";
-import { workTitleKey } from "../domain/normalize.js";
+import { catalogTitleKey, workTitleKey } from "../domain/normalize.js";
 
 export interface RowRepair {
   id: string;
@@ -60,19 +60,25 @@ export function planMojibakeRepairs(db: DatabaseSync): MojibakePlan {
 
 export function applyMojibakeRepairs(db: DatabaseSync, plan: MojibakePlan): MojibakeApplied {
   const applied: MojibakeApplied = { books: 0, works: 0, skipped: 0 };
+  const searchRows = db.prepare("SELECT book_id, rowid FROM books_fts WHERE book_id IN (SELECT value FROM json_each(?))").all(JSON.stringify(plan.books.map((book) => book.id))) as Array<{ book_id: string; rowid: number }>;
+  const searchRowids = new Map(searchRows.map((row) => [row.book_id, row.rowid]));
   const updateBook = db.prepare("UPDATE books SET title = ?, author = ?, title_key = ? WHERE id = ? AND title = ? AND author = ?");
+  const holdsKey = db.prepare("SELECT 1 FROM book_keys WHERE key = ? AND book_id = ?");
   const addKey = db.prepare("INSERT OR IGNORE INTO book_keys (key, book_id) VALUES (?, ?)");
-  const refreshSearch = db.prepare("UPDATE books_fts SET title = ?, author = ? WHERE book_id = ?");
+  const refreshSearch = db.prepare("UPDATE books_fts SET title = ?, author = ? WHERE rowid = ? AND book_id = ?");
   const updateWork = db.prepare("UPDATE works SET title = ?, author = ? WHERE id = ? AND title = ? AND author = ?");
   for (const book of plan.books) {
-    const titleKey = workTitleKey(book.repairedTitle, book.repairedAuthor);
+    const titleKey = book.repairedTitle ? workTitleKey(book.repairedTitle, book.repairedAuthor) : null;
+    const oldKey = catalogTitleKey(book.title, book.author);
+    const newKey = catalogTitleKey(book.repairedTitle, book.repairedAuthor);
+    const searchRowid = searchRowids.get(book.id);
     let changed: number | bigint;
     db.exec("BEGIN IMMEDIATE");
     try {
-      changed = updateBook.run(book.repairedTitle, book.repairedAuthor, book.repairedTitle ? titleKey : null, book.id, book.title, book.author).changes;
+      changed = updateBook.run(book.repairedTitle, book.repairedAuthor, titleKey, book.id, book.title, book.author).changes;
       if (changed !== 0) {
-        if (titleKey) addKey.run(titleKey, book.id);
-        refreshSearch.run(book.repairedTitle, book.repairedAuthor, book.id);
+        if (oldKey && newKey && holdsKey.get(oldKey, book.id)) addKey.run(newKey, book.id);
+        if (searchRowid !== undefined) refreshSearch.run(book.repairedTitle, book.repairedAuthor, searchRowid, book.id);
       }
       db.exec("COMMIT");
     } catch (error) {

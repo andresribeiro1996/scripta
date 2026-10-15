@@ -280,10 +280,10 @@ Fills catalog genres for works people own that Open Library and ISBNdb couldn't 
 
 #### Mojibake repair
 
-Some Open Library records store titles and authors already mis-decoded (`fÃ©` for `fé`). New rows are repaired as they enter (`lookupIdentity`, `mapOpenLibraryDoc`). `scripts/repair-mojibake.mjs` repairs the rows stored earlier: `title`, `author`, `title_key`, the corrected `ta:` key (the mis-decoded key stays, so a lookup with the old text still lands on the row), the search index and the works' copies.
+Some Open Library records store titles and authors already mis-decoded (`fÃ©` for `fé`). New rows are repaired as they enter (`lookupIdentity`, `mapOpenLibraryDoc`). `scripts/repair-mojibake.mjs` repairs the rows stored earlier: `title`, `author`, `title_key`, the corrected `ta:` key (added for rows that hold the mis-decoded one, which stays, so a lookup with the old text still lands on the row), the search index and the works' copies.
 
 - It repairs only text that round-trips. Text where every accented letter became `©` (`N©o`) is lossy; the report lists those books under `stillBroken` and leaves them alone.
-- Run it after the deploy that contains it: first `--dry-run` (opens the database read-only), then for real. Reruns are safe; a second run finds nothing. Each book is its own short transaction, and a row edited since the scan is skipped and counted in `applied.skipped`. A corrected `ta:` key that already belongs to another book stays with that book. Editions that now share a title key join one work at the next works grouping (boot, daily, or `POST /books/works/group`).
+- Run it right after the deploy that contains it: first `--dry-run` (opens the database read-only), then for real. Until it runs, a lookup for an ISBN-less book stored with mis-decoded text keys on the repaired text, misses that row and would create a second one. Reruns are safe; a second run finds nothing. The search-index rows are found in one read before any write; then each book is its own short transaction, and a row edited since the scan is skipped and counted in `applied.skipped`. A corrected `ta:` key that already belongs to another book stays with that book. Editions that now share a title key join one work at the next works grouping (boot, daily, or `POST /books/works/group`).
 - The JSON report has `books` and `works` counts (`scanned`, `repaired`), `origins` (the repaired books by `created_by`, else by data source, else `lookup`), the first 20 `examples`, `stillBroken` and `applied` (`null` on a dry run).
 
 ```bash

@@ -36,8 +36,9 @@ function setup() {
   };
   const stored = (id: string) => ({ ...(db.prepare("SELECT title, author, title_key FROM books WHERE id = ?").get(id) as { title: string; author: string; title_key: string | null }) });
   const searchText = (id: string) => ({ ...(db.prepare("SELECT title, author FROM books_fts WHERE book_id = ?").get(id) as { title: string; author: string }) });
+  const keys = (id: string) => (db.prepare("SELECT key FROM book_keys WHERE book_id = ? ORDER BY key").all(id) as Array<{ key: string }>).map((row) => row.key);
   const dump = () => ["books", "works", "book_keys", "books_fts"].map((table) => db.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all());
-  return { db, repo, book, stored, searchText, dump };
+  return { db, repo, book, stored, searchText, keys, dump };
 }
 
 test("repairs a mis-decoded book and everything derived from it", () => {
@@ -116,6 +117,36 @@ test("a repaired title key held by another book stays with that book", () => {
   assert.deepEqual(applyMojibakeRepairs(h.db, planMojibakeRepairs(h.db)), { books: 1, works: 1, skipped: 0 });
   assert.equal(h.repo.findBookByKey(TITLE_KEY)?.id, holder.id);
   assert.deepEqual(h.stored(broken.id), { title: TITLE, author: AUTHOR, title_key: TITLE_KEY });
+});
+
+test("an ISBN-less book with a blank author is found under its corrected title key", () => {
+  const h = setup();
+  const created = h.book("Livro da fÃ©", "", null);
+  assert.deepEqual(h.keys(created.id), ["ta:livro da fa||"]);
+  applyMojibakeRepairs(h.db, planMojibakeRepairs(h.db));
+  assert.equal(h.repo.findBookByKey("ta:livro da fe||")?.id, created.id);
+  assert.equal(h.repo.findBookByKey("ta:livro da fa||")?.id, created.id);
+});
+
+test("an ISBN book with a blank author is given no title key", () => {
+  const h = setup();
+  const created = h.repo.createBook({ title: "Outro livro da fÃ©", author: "", isbn: "9780000000057", createdBy: "seed" }, ["isbn:9780000000057"], NOW);
+  applyMojibakeRepairs(h.db, planMojibakeRepairs(h.db));
+  assert.equal(h.stored(created.id).title, "Outro livro da fé");
+  assert.deepEqual(h.keys(created.id), ["isbn:9780000000057"]);
+});
+
+test("search rows follow their own books, and a book that is not searchable gains none", () => {
+  const h = setup();
+  const first = h.book("Livro 1 da fÃ©", "Ana Lima", "9780000000002");
+  const hidden = h.book("Livro 2 da fÃ©", "Ana Lima", "9780000000019", {});
+  const last = h.book("Livro 3 da fÃ©", "Ana Lima", "9780000000026");
+  assert.equal(h.repo.isSearchable(hidden.id), false);
+  assert.deepEqual(applyMojibakeRepairs(h.db, planMojibakeRepairs(h.db)), { books: 3, works: 3, skipped: 0 });
+  assert.deepEqual(h.searchText(first.id), { title: "Livro 1 da fé", author: "Ana Lima" });
+  assert.deepEqual(h.searchText(last.id), { title: "Livro 3 da fé", author: "Ana Lima" });
+  assert.deepEqual(h.searchText(hidden.id), {});
+  assert.equal(h.stored(hidden.id).title, "Livro 2 da fé");
 });
 
 test("reports what it cannot repair", () => {
