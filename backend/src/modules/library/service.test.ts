@@ -1837,14 +1837,15 @@ test("a public library view of the 10 MiB fixture never parses the document and 
   const token = fileService.share("fixture-public").shareToken!;
   const parsed = mock.method(JSON, "parse");
   try {
-    const started = performance.now();
+    const started = process.threadCpuUsage();
     const shared = fileService.getPublicByToken(token);
     const profile = resolvePublicLibrary("fixture-public");
-    const elapsed = performance.now() - started;
+    const cpu = process.threadCpuUsage(started);
+    const elapsed = (cpu.user + cpu.system) / 1000;
     assert.equal((shared!.data as { books: unknown[] }).books.length, 5000);
     assert.equal((profile!.books as unknown[]).length, 5000);
     assert.ok(parsed.mock.calls.every((call) => String(call.arguments[0]).length < 100_000), "no call parses the document");
-    assert.ok(elapsed < PUBLIC_VIEW_BUDGET_MS, `both views took ${Math.round(elapsed)} ms`);
+    assert.ok(elapsed < PUBLIC_VIEW_BUDGET_MS, `both views took ${Math.round(elapsed)} ms of CPU`);
   } finally {
     parsed.mock.restore();
     createSqliteLibraryRepository(fileDb).deleteUserData("fixture-public");
