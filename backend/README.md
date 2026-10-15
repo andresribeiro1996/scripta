@@ -399,7 +399,7 @@ Some Open Library records lost every accented letter to `©` (`N©o Abras Este L
 
 - A title, or one author name, changes only when the source has the same characters, ignoring case, with a non-ASCII letter at each `©`. The source's text is written, capitals included. An all-caps source can't replace mixed-case text. Two characters for one letter (`Tri©Øngulo`) and source typos stay.
 - Writes are the repair's (`applyMojibakeRepairs`): one transaction per book, `title_key`, the corrected `ta:` key, the search row, and the work when it holds the book's old text. A book edited since it was read is skipped.
-- Run it after the repair's real run. `--max` is required and caps the ISBNdb requests; `--max 0` reads the feeds only. The dry run opens the database read-only and makes the same lookups as the real run. A run takes about 5 minutes, mostly the feeds; hold deploys meanwhile.
+- Run it after the repair's real run. `--max` is required and caps the ISBNdb requests; `--max 0` reads the feeds only. The dry run opens the database read-only and makes the same lookups as the real run. A run takes about 10 minutes, mostly Penguin's feed (60 pages). Every feed request is logged to stderr, and a shop whose feed is still being read after 15 minutes is skipped, so its books go to ISBNdb. Hold deploys meanwhile.
 - The JSON report has `targets`, `feeds` (per shop read: `products` and `matched`, or `skipped`), `isbndb` (`max`, `asked`, `unavailable`, `notAsked`, `pausedUntil`), `retitles` (every planned change as `{ id, isbn, from, to, source }`), `stillLossy` (each book left with a `©`, why ISBNdb didn't fix it, and the candidates it was compared against) and `applied` (`null` on a dry run). Save the real run's output: it holds the original text.
 
 ```bash

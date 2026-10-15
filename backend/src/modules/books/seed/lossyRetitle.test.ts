@@ -40,20 +40,28 @@ const hit = (title: string, authors: string[]): CatalogSearchHit => ({
   source: "isbndb"
 });
 
-function setup(options: { feeds?: Record<string, { status: number; text: string } | Error>; isbndb?: (isbn: string) => Promise<CatalogSearchHit[]> } = {}) {
+type Reply = { status: number; text: string };
+
+function setup(options: { feeds?: Record<string, Reply | Error>; fallback?: (url: string, clock: { ms: number }) => Reply; isbndb?: (isbn: string) => Promise<CatalogSearchHit[]> } = {}) {
   const db = new DatabaseSync(":memory:");
   applyBooksMigrations(db);
   const repo = createSqliteBooksRepository(db);
   const requested: string[] = [];
   const asked: string[] = [];
+  const logged: string[] = [];
+  const clock = { ms: 1_000_000 };
   const deps = {
     sleep: async () => {},
-    log: () => {},
+    now: () => clock.ms,
+    log: (line: string) => {
+      logged.push(line);
+    },
     fetchText: async (url: string) => {
       requested.push(url);
       const entry = options.feeds?.[url];
       if (entry instanceof Error) throw entry;
       if (entry) return entry;
+      if (options.fallback) return options.fallback(url, clock);
       if (url.endsWith("/robots.txt")) return { status: 404, text: "" };
       return { status: 200, text: JSON.stringify({ products: [] }) };
     },
@@ -74,7 +82,7 @@ function setup(options: { feeds?: Record<string, { status: number; text: string 
   const stored = (id: string) => ({ ...(db.prepare("SELECT title, author, title_key FROM books WHERE id = ?").get(id) as { title: string; author: string; title_key: string | null }) });
   const dump = () => ["books", "works", "book_keys", "books_fts"].map((table) => db.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all());
   const plan = (max = 10, sites: Site[] = [SHOP]) => planLossyRetitles(db, deps, sites, { max });
-  return { db, repo, requested, asked, book, stored, dump, plan };
+  return { db, repo, requested, asked, logged, book, stored, dump, plan };
 }
 
 test("the shop's title fixes a publisher book, and ISBNdb isn't asked when nothing is left", async () => {
@@ -139,6 +147,35 @@ test("a shop that can't be read is reported, and its books go to ISBNdb", async 
   const plan = await h.plan();
   assert.deepEqual(plan.feeds, { Loja: { skipped: "robots.txt answered HTTP 503" } });
   assert.deepEqual(plan.books.map((book) => book.origin), ["isbndb"]);
+});
+
+test("a shop whose feed runs past the deadline is skipped and its books go to ISBNdb", async () => {
+  const h = setup({
+    fallback: (url, clock) => {
+      clock.ms += 4 * 60_000;
+      return url.endsWith("/robots.txt") ? { status: 404, text: "" } : page1([product("passaro", "Pássaro Azul")]);
+    },
+    isbndb: async () => [hit("Pássaro Azul", ["Ana Lima"])]
+  });
+  h.book("P©ssaro Azul", "Ana Lima", "9789890000109", "https://loja.test/products/passaro");
+  const plan = await h.plan();
+  assert.deepEqual(plan.feeds, { Loja: { skipped: "feed read stopped after 15 minutes" } });
+  assert.deepEqual(h.asked, ["9789890000109"]);
+  assert.deepEqual(plan.books.map((book) => book.origin), ["isbndb"]);
+  assert.ok(h.requested.length <= 6);
+});
+
+test("each feed request logs the shop, the URL, the status and the time it took", async () => {
+  const h = setup({
+    feeds: { [FEED]: page1([product("passaro", "Pássaro Azul")]) },
+    fallback: (url, clock) => {
+      clock.ms += 1500;
+      return url.endsWith("/robots.txt") ? { status: 404, text: "" } : { status: 200, text: JSON.stringify({ products: [] }) };
+    }
+  });
+  h.book("P©ssaro Azul", "Ana Lima", "9789890000109", "https://loja.test/products/passaro");
+  await h.plan();
+  assert.deepEqual(h.logged.slice(0, 2), ["Loja: https://loja.test/robots.txt → 404 in 1500 ms", "Loja: https://loja.test/products.json?limit=250&page=1 → 200 in 0 ms"]);
 });
 
 test("--max caps the ISBNdb requests, and the rest count as not asked", async () => {

@@ -30,7 +30,7 @@ const isbndb = createIsbndbCatalog(env.ISBNDB_API_KEY, createThrottle(ISBNDB_GAP
 const db = dryRun ? new DatabaseSync(env.COVERS_DB_PATH, { readOnly: true }) : openBooksDb();
 const plan = await planLossyRetitles(
   db,
-  { fetchText, sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)), isbndb, log: (line) => console.error(line) },
+  { fetchText, sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)), now: Date.now, isbndb, log: (line) => console.error(line) },
   PUBLISHERS,
   { max }
 );
