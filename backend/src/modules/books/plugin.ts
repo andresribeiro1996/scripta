@@ -17,7 +17,7 @@ import { createIsbndbSource } from "./adapters/sources/isbndb.js";
 import { createOpenLibraryCoverSource } from "./adapters/sources/openLibrary.js";
 import { openBooksDb } from "./adapters/sqlite/connection.js";
 import { createSqliteBooksRepository } from "./adapters/sqlite/sqliteBooksRepository.js";
-import { GENRE_JUDGMENT_BATCH, judgeGenres } from "./genreJudgments.js";
+import { GENRE_DAILY_BUDGET, GENRE_JUDGMENT_BATCH, GENRE_SOURCE, judgeGenres } from "./genreJudgments.js";
 import { DETAILS_BATCH_SIZE, startBackfill, startCoverColorBackfill, startDetailsBackfill, startWorksBackfill, startWorksGrouping } from "./backfill.js";
 import { createBooksService, MAX_UPLOAD_BYTES, type BooksService } from "./booksService.js";
 import type { FetchCoverImage } from "./coverResolver.js";
@@ -25,6 +25,7 @@ import { encodeCover } from "./domain/images.js";
 import type { BookLookup } from "./domain/normalize.js";
 import { coverUrlFor, useBooksRepository } from "./publicCoverLookup.js";
 import { buildAdminRoutes, buildCatalogRoutes, buildCoverFileRoutes, buildResolveRoutes } from "./routes.js";
+import { dailySpend } from "./typesafe.js";
 import { createCoverWorker } from "./worker.js";
 
 const ISBNDB_GAP_MS = 1100;
@@ -111,7 +112,7 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
   );
   const stopColorBackfill = startCoverColorBackfill((limit) => service.fillCoverColors(limit), app.log);
   const heldWorkIds = options.heldWorkIds;
-  const classify = typesafeConfigured ? createJevGenreClassifier(env.TYPESAFE_API_KEY) : null;
+  const classify = typesafeConfigured ? createJevGenreClassifier(env.TYPESAFE_API_KEY, dailySpend(repo, GENRE_SOURCE, GENRE_DAILY_BUDGET, Date.now)) : null;
   const stopGenreJudgments = classify && heldWorkIds
     ? startDetailsBackfill(
         (signal) => judgeGenres({

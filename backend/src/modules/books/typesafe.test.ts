@@ -15,7 +15,8 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
 const { applyBooksMigrations } = await import("./adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("./adapters/sqlite/sqliteBooksRepository.js");
-const { dailySpend, nextUtcMidnight, TypesafeBudgetSpentError, utcDay } = await import("./typesafe.js");
+const { SourceUnavailableError, UnusableAnswerError } = await import("./domain/errors.js");
+const { dailySpend, failureKind, nextUtcMidnight, TypesafeBudgetSpentError, utcDay } = await import("./typesafe.js");
 
 function repoAt(path: string) {
   const db = new DatabaseSync(path);
@@ -61,4 +62,15 @@ test("UTC day and next UTC midnight", () => {
   assert.equal(utcDay(Date.parse("2026-10-15T23:30:00.000-03:00")), "2026-10-16");
   assert.equal(nextUtcMidnight(Date.parse("2026-10-15T12:34:56.000Z")), Date.parse("2026-10-16T00:00:00.000Z"));
   assert.equal(nextUtcMidnight(Date.parse("2026-12-31T23:59:59.000Z")), Date.parse("2027-01-01T00:00:00.000Z"));
+});
+
+test("failures sort into budget, key, book and outage", () => {
+  const status = (code: number) => new SourceUnavailableError("typesafe", `HTTP ${code}`, { status: code });
+  assert.equal(failureKind(new TypesafeBudgetSpentError("genres")), "budget");
+  assert.equal(failureKind(status(401)), "key");
+  for (const code of [400, 403, 404, 413, 422]) assert.equal(failureKind(status(code)), "book", String(code));
+  assert.equal(failureKind(new UnusableAnswerError("typesafe", "unexpected answer")), "book");
+  for (const code of [429, 500, 529]) assert.equal(failureKind(status(code)), "outage", String(code));
+  assert.equal(failureKind(new SourceUnavailableError("typesafe", "fetch failed")), "outage");
+  assert.equal(failureKind(new TypeError("boom")), null);
 });

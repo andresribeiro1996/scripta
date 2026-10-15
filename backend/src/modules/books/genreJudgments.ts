@@ -5,6 +5,8 @@ import type { GenreEvidence } from "./domain/types.js";
 import { longestSynopsis } from "./genrePass.js";
 
 export const GENRE_SAVE_LINE = 0.5;
+export const GENRE_SOURCE = "genres";
+export const GENRE_DAILY_BUDGET = 1000;
 export const GENRE_JUDGMENT_BATCH = 50;
 const IN_FLIGHT = 4;
 const KEY_PAUSE_MS = 24 * 60 * 60 * 1000;

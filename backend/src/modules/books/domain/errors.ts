@@ -27,6 +27,13 @@ export class SourcePausedError extends SourceUnavailableError {
   }
 }
 
+export class UnusableAnswerError extends SourceUnavailableError {
+  constructor(source: string, readonly detail: string) {
+    super(source, detail);
+    this.name = "UnusableAnswerError";
+  }
+}
+
 export class BookNotFoundError extends Error {
   constructor() {
     super("No such book.");

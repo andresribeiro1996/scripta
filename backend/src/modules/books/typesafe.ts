@@ -1,3 +1,4 @@
+import { SourceUnavailableError, UnusableAnswerError } from "./domain/errors.js";
 import type { BooksRepository } from "./domain/ports.js";
 
 export class TypesafeBudgetSpentError extends Error {
@@ -22,4 +23,15 @@ export function dailySpend(repo: Pick<BooksRepository, "spendTypesafe">, source:
   return () => {
     if (!repo.spendTypesafe(utcDay(now()), source, limit)) throw new TypesafeBudgetSpentError(source);
   };
+}
+
+export type FailureKind = "budget" | "key" | "book" | "outage";
+
+export function failureKind(error: unknown): FailureKind | null {
+  if (error instanceof TypesafeBudgetSpentError) return "budget";
+  if (error instanceof UnusableAnswerError) return "book";
+  if (!(error instanceof SourceUnavailableError)) return null;
+  if (error.status === 401) return "key";
+  if (error.status !== undefined && error.status >= 400 && error.status < 500 && error.status !== 429) return "book";
+  return "outage";
 }
