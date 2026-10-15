@@ -81,3 +81,15 @@ test("automatic merges are listed newest first", () => {
   repo.mergeTranslation(newer.pt.work_id!, newer.en.work_id!, "code", null, "2026-10-15T00:00:00.000Z");
   assert.deepEqual(translationReviewWith(repo, [], (id) => id).items.map((item) => item.title), ["Livro 8", "Livro 7"]);
 });
+
+test("a doubt whose proposed original has since been folded into another work is listed against that work", () => {
+  const repo = freshRepo();
+  const pt = repo.createBook({ title: "O Passeio", author: "Robert Walser", isbn: "9789720000611" }, ["isbn:9789720000611"], AT);
+  repo.setLanguage(pt.id, "pt-PT");
+  const loose = repo.createBook({ title: "The Walk", author: "Robert Walser", isbn: "9780000000611" }, ["isbn:9780000000611"], AT);
+  const keyed = repo.createBook({ title: "The Walk", author: "Robert Walser", isbn: "9780000000612", workKey: "OL990W" }, ["isbn:9780000000612"], AT);
+  repo.saveWorkMatchJudgment(pt.work_id!, { model: "jev-1.13.0", intoWorkId: loose.work_id, confidence: 0.74, askedAt: AT });
+  repo.mergeWorks(loose.work_id!, keyed.work_id!, AT);
+  const review = translationReviewWith(repo, [], (id) => id);
+  assert.deepEqual(review.items.map((item) => [item.title, item.group, item.proposed.workId]), [["O Passeio", "possible", keyed.work_id]]);
+});

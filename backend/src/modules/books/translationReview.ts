@@ -10,8 +10,10 @@ const GROUP_ORDER = { possible: 0, blocked: 1, merged: 2 } as const;
 
 export function translationReviewWith(books: BooksRepository, held: HeldWork[], coverUrl: (imageId: string) => string): TranslationReview {
   const rows = books.translationReviewRows(MATCH_MERGE_AT, MATCH_REVIEW_AT);
-  const works = books.translationReviewWorks([...new Set(rows.flatMap((row) => [row.workId, row.intoWorkId]))]);
-  const originals = new Map(books.matchCandidates([...new Set(rows.map((row) => row.intoWorkId))]).map((candidate) => [candidate.id, candidate]));
+  const live = books.canonicalWorkIds(rows.map((row) => row.intoWorkId));
+  const liveInto = (row: { intoWorkId: string }) => live.get(row.intoWorkId) ?? row.intoWorkId;
+  const works = books.translationReviewWorks([...new Set(rows.map((row) => row.workId))]);
+  const originals = new Map(books.matchCandidates([...new Set(rows.map(liveInto))]).map((candidate) => [candidate.id, candidate]));
   const canonical = books.canonicalWorkIds(held.map((work) => work.workId));
   const holding = new Map<string, { holders: number; finished: boolean }>();
   for (const work of held) {
@@ -21,9 +23,9 @@ export function translationReviewWith(books: BooksRepository, held: HeldWork[], 
   }
   const listed = rows.flatMap((row): TranslationReviewItem[] => {
     const own = works.get(row.workId);
-    const target = originals.get(row.intoWorkId);
+    const target = originals.get(liveInto(row));
     if (!own || !target) return [];
-    const holder = holding.get(row.group === "merged" ? row.intoWorkId : row.workId);
+    const holder = holding.get(row.group === "merged" ? liveInto(row) : row.workId);
     return [{
       workId: row.workId,
       title: own.title,
