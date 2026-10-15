@@ -5,7 +5,9 @@ const { values } = parseArgs({
   options: {
     eng: { type: "string", default: "35000" },
     por: { type: "string", default: "15000" },
-    status: { type: "boolean", default: false }
+    status: { type: "boolean", default: false },
+    "fill-genres": { type: "boolean", default: false },
+    "dry-run": { type: "boolean", default: false }
   }
 });
 
@@ -28,7 +30,7 @@ function printStatus() {
   db.close();
 }
 
-async function seed() {
+function seedCounts() {
   const counts = { eng: Number(values.eng), por: Number(values.por) };
   for (const [flag, count] of Object.entries(counts)) {
     if (!Number.isFinite(count) || count < 0) {
@@ -36,6 +38,11 @@ async function seed() {
       process.exit(1);
     }
   }
+  return counts;
+}
+
+async function seed() {
+  const counts = seedCounts();
   const { collectRanked } = await import("../dist/modules/books/seed/fetchRankedWorks.js");
   const { mergeSeedLists } = await import("../dist/modules/books/seed/seedList.js");
   const { seedCatalog } = await import("../dist/modules/books/seed/seedCatalog.js");
@@ -55,5 +62,18 @@ async function seed() {
   log(JSON.stringify(total));
 }
 
+async function fillGenres() {
+  const counts = seedCounts();
+  const { collectRanked } = await import("../dist/modules/books/seed/fetchRankedWorks.js");
+  const { mergeSeedLists } = await import("../dist/modules/books/seed/seedList.js");
+  const { fillSeedGenres } = await import("../dist/modules/books/seed/seedGenres.js");
+  const { openBooksDb } = await import("../dist/modules/books/adapters/sqlite/connection.js");
+  const { createSqliteBooksRepository } = await import("../dist/modules/books/adapters/sqlite/sqliteBooksRepository.js");
+  const merged = mergeSeedLists(await collectRanked("por", counts.por, log), await collectRanked("eng", counts.eng, log), counts);
+  log(`list ready: ${merged.length} entries`);
+  console.log(JSON.stringify(fillSeedGenres(merged, createSqliteBooksRepository(openBooksDb()), { dryRun: values["dry-run"] }), null, 2));
+}
+
 if (values.status) printStatus();
+else if (values["fill-genres"]) await fillGenres();
 else await seed();
