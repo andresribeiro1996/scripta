@@ -94,3 +94,5 @@ export type GenreEvidence = {
 
 export type JevTask = "synopses" | "works";
 export type JevRejection = { status: number | null; reason: string; attempts: number; lastAt: string };
+
+export type MergeSource = "title-key" | "admin" | "code" | "jev" | "manual";

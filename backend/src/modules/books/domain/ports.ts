@@ -46,11 +46,11 @@ export interface BooksRepository {
   setWorkKey(id: string, key: string | null | undefined): void;
   assignMissingWorks(limit: number): number;
   fillTitleKeys(limit: number): number;
-  groupKeylessWorks(limit: number): number;
+  groupKeylessWorks(limit: number, at?: string): number;
   listWorkLookupIds(limit: number, recheckBefore: string): string[];
   markWorkChecked(id: string, at: string): void;
   replaceLanguage(id: string, tag: string): void;
-  mergeWorks(fromId: string, intoId: string): string;
+  mergeWorks(fromId: string, intoId: string, at?: string): string;
   detachEdition(bookId: string, at: string): string;
   getWorkView(id: string): WorkView | undefined;
   workPageRows(id: string): WorkPageRows | undefined;
@@ -88,6 +88,7 @@ export interface BooksRepository {
   synopsisTexts(): Array<{ hash: string; source: string; title: string; author: string; text: string }>;
   fillOriginalTitle(bookId: string, title: string): void;
   fillOriginalTitlesFromSummaries(workId?: string): number;
+  mergeTranslation(fromId: string, intoId: string, source: "code" | "jev" | "manual", confidence: number | null, at: string): string;
   workIdsByWorkKeys(keys: string[]): Map<string, string>;
   listPublisherUrls(): Array<{ work_id: string | null; publisher_url: string }>;
   fillSourceGenres(workId: string, genres: string[]): number;

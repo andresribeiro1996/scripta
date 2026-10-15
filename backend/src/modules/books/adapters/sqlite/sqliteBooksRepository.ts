@@ -5,7 +5,7 @@ import type { BooksRepository, IdPage, MergeableDetails, PageCursor } from "../.
 import { WorkMergeError } from "../../domain/errors.js";
 import { summaryHashOf, type SynopsisKind } from "../../domain/synopsis.js";
 import { originalTitleIn } from "../../domain/translation.js";
-import type { BookRow, CoverImageRow, DataSource, GenreEvidence, SummarySource, WorkPageRows, WorkView } from "../../domain/types.js";
+import type { BookRow, CoverImageRow, DataSource, GenreEvidence, MergeSource, SummarySource, WorkPageRows, WorkView } from "../../domain/types.js";
 
 export const UNCHECKED_COVERS_SQL = `
   SELECT id, created_at AS at, rowid AS row FROM books
@@ -52,7 +52,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   `);
   const insertKeyIfMissingStmt = db.prepare(`INSERT OR IGNORE INTO book_keys (key, book_id) VALUES (?, ?)`);
   const fillIdentityStmt = db.prepare(`UPDATE books SET title = ?, author = ?, title_key = ? WHERE id = ? AND (title = '' OR author = '')`);
-  const workByKeyStmt = db.prepare(`SELECT id FROM works WHERE ol_work_key = ?`);
+  const workByKeyStmt = db.prepare(`SELECT COALESCE(merged_into, id) AS id FROM works WHERE ol_work_key = ?`);
   const insertWorkStmt = db.prepare(`INSERT INTO works (id, ol_work_key, title, author, created_at) VALUES (?, ?, ?, ?, ?)`);
   const fillWorkIdentityStmt = db.prepare(`
     UPDATE works
@@ -89,6 +89,14 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   `);
   const markMergedStmt = db.prepare(`UPDATE works SET merged_into = ? WHERE id = ?`);
   const repointMergedStmt = db.prepare(`UPDATE works SET merged_into = ? WHERE merged_into = ?`);
+  const workEditionIdsStmt = db.prepare(`SELECT id FROM books WHERE work_id = ? ORDER BY created_at, rowid`);
+  const recordMergeStmt = db.prepare(`INSERT INTO work_merges (from_work, into_work, source, confidence, moved_book_ids, repointed_work_ids, merged_at) VALUES (?, ?, ?, ?, ?, ?, ?)`);
+  const genreJudgmentOwnedStmt = db.prepare(`SELECT 1 AS owned FROM genre_judgments WHERE work_id = ?`);
+  const moveGenreJudgmentStmt = db.prepare(`UPDATE genre_judgments SET work_id = ? WHERE work_id = ?`);
+  const dropGenreJudgmentStmt = db.prepare(`DELETE FROM genre_judgments WHERE work_id = ?`);
+  const genreRejectionOwnedStmt = db.prepare(`SELECT 1 AS owned FROM genre_rejections WHERE work_id = ?`);
+  const moveGenreRejectionStmt = db.prepare(`UPDATE genre_rejections SET work_id = ? WHERE work_id = ?`);
+  const dropGenreRejectionStmt = db.prepare(`DELETE FROM genre_rejections WHERE work_id = ?`);
   const blockTitleGroupStmt = db.prepare(`UPDATE books SET title_group_blocked_at = ? WHERE id = ?`);
   const editionCountStmt = db.prepare(`SELECT COUNT(*) AS n FROM books WHERE work_id = ?`);
   const workStmt = db.prepare(`SELECT id, ol_work_key, title, author, summary, summary_hash FROM works WHERE id = ?`);
@@ -380,12 +388,25 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     return target.id;
   }
 
-  function mergeInto(from: string, into: string) {
+  type MergeRecord = { source: MergeSource; confidence: number | null; at: string; carrySummary: boolean };
+
+  function carryGenreState(from: string, into: string) {
+    if (genreJudgmentOwnedStmt.get(into)) dropGenreJudgmentStmt.run(from);
+    else moveGenreJudgmentStmt.run(into, from);
+    if (genreRejectionOwnedStmt.get(into)) dropGenreRejectionStmt.run(from);
+    else moveGenreRejectionStmt.run(into, from);
+  }
+
+  function mergeInto(from: string, into: string, record: MergeRecord) {
+    const moved = (workEditionIdsStmt.all(from) as Array<{ id: string }>).map((row) => row.id);
+    const repointed = (aliasStmt.all(from) as Array<{ id: string }>).map((row) => row.id);
     moveWorkEditionsStmt.run(into, from);
-    carryWorkSummaryStmt.run(from, into);
+    if (record.carrySummary) carryWorkSummaryStmt.run(from, into);
     fillWorkFromEditionsStmt.run(into);
     markMergedStmt.run(into, from);
     repointMergedStmt.run(into, from);
+    carryGenreState(from, into);
+    recordMergeStmt.run(from, into, record.source, record.confidence, JSON.stringify(moved), JSON.stringify(repointed), record.at);
   }
 
   type UnassignedBook = { id: string; ol_work_key: string | null; title: string; author: string; created_at: string };
@@ -586,7 +607,10 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
         if (!held && book.work_id && keyOwnWorkStmt.run(workKey, book.work_id, id).changes === 1) return;
         const target = held?.id ?? insertWork(workKey, book.title, book.author, book.created_at);
         moveBookStmt.run(target, id);
-        if (book.work_id && mergeEmptyWorkStmt.run(target, book.work_id).changes === 1) repointMergedStmt.run(target, book.work_id);
+        if (book.work_id && mergeEmptyWorkStmt.run(target, book.work_id).changes === 1) {
+          repointMergedStmt.run(target, book.work_id);
+          carryGenreState(book.work_id, target);
+        }
         fillWorkIdentityStmt.run(id);
       });
     },
@@ -607,7 +631,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       });
     },
 
-    mergeWorks(fromId, intoId) {
+    mergeWorks(fromId, intoId, at = new Date().toISOString()) {
       return inTransaction(() => {
         const from = workLinkStmt.get(fromId) as WorkLink | undefined;
         if (!from) throw new WorkMergeError("No such work.");
@@ -616,7 +640,18 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
         const into = liveWorkId(intoId);
         if (!into) throw new WorkMergeError("No such work.");
         if (into === from.id) throw new WorkMergeError("Those editions already share a work.");
-        mergeInto(from.id, into);
+        mergeInto(from.id, into, { source: "admin", confidence: null, at, carrySummary: true });
+        return into;
+      });
+    },
+
+    mergeTranslation(fromId, intoId, source, confidence, at) {
+      return inTransaction(() => {
+        const from = workLinkStmt.get(fromId) as WorkLink | undefined;
+        if (!from || from.merged_into) throw new WorkMergeError("That work is gone or was already merged.");
+        const into = liveWorkId(intoId);
+        if (!into || into === from.id) throw new WorkMergeError("That work can't be merged there.");
+        mergeInto(from.id, into, { source, confidence, at, carrySummary: false });
         return into;
       });
     },
@@ -788,10 +823,10 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       };
     },
 
-    groupKeylessWorks(limit) {
+    groupKeylessWorks(limit, at = new Date().toISOString()) {
       return inTransaction(() => {
         const pairs = groupablePairsStmt.all(limit) as Array<{ source: string; target: string }>;
-        for (const pair of pairs) mergeInto(pair.source, pair.target);
+        for (const pair of pairs) mergeInto(pair.source, pair.target, { source: "title-key", confidence: null, at, carrySummary: true });
         return pairs.length;
       });
     },

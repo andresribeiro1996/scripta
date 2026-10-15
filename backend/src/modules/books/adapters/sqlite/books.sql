@@ -123,3 +123,15 @@ CREATE TABLE IF NOT EXISTS jev_rejections (
   last_at  TEXT NOT NULL,
   PRIMARY KEY (task, subject)
 );
+
+CREATE TABLE IF NOT EXISTS work_merges (
+  id                 INTEGER PRIMARY KEY,
+  from_work          TEXT NOT NULL,
+  into_work          TEXT NOT NULL,
+  source             TEXT NOT NULL,
+  confidence         REAL,
+  moved_book_ids     TEXT NOT NULL,
+  repointed_work_ids TEXT NOT NULL,
+  merged_at          TEXT NOT NULL,
+  undone_at          TEXT
+);
