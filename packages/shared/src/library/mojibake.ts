@@ -20,7 +20,7 @@ function suspiciousSequences(text: string): number {
     const after = text[index + sequence.length] ?? "";
     const continuation = sequence.slice(1);
     const notText = sequence[0] === "Ã" && (continuation === "©" || continuation === "®" || (continuation === "»" && LOWERCASE_LETTER.test(after)));
-    const endsAWord = !notText && LETTER.test(before) && isUpper(before) === isUpper(sequence[0]!) && WORD_END.test(continuation);
+    const endsAWord = !notText && LETTER.test(before) && !(isUpper(sequence[0]!) && !isUpper(before)) && WORD_END.test(continuation);
     if (!endsAWord) count++;
   }
   return count;

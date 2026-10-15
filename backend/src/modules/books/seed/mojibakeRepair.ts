@@ -108,7 +108,7 @@ export function mojibakeReport(plan: MojibakePlan, applied: MojibakeApplied | nu
     },
     works: { scanned: plan.scanned.works, repaired: plan.works.length },
     origins,
-    examples: plan.books.slice(0, 20).map((book) => ({ id: book.id, from: `${book.title} — ${book.author}`, to: `${book.repairedTitle} — ${book.repairedAuthor}` })),
+    repairs: plan.books.map((book) => ({ id: book.id, from: `${book.title} — ${book.author}`, to: `${book.repairedTitle} — ${book.repairedAuthor}` })),
     stillBroken: { count: plan.stillBroken.length, examples: plan.stillBroken.slice(0, 10).map((book) => `${book.title} — ${book.author}`) },
     applied
   };

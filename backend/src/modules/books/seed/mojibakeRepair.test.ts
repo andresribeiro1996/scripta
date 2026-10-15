@@ -57,7 +57,7 @@ test("repairs a mis-decoded book and everything derived from it", () => {
   const report = mojibakeReport(plan, applied);
   assert.equal(report.dryRun, false);
   assert.deepEqual(report.applied, applied);
-  assert.deepEqual(report.examples, [{ id: created.id, from: `${BROKEN_TITLE} — ${BROKEN_AUTHOR}`, to: `${TITLE} — ${AUTHOR}` }]);
+  assert.deepEqual(report.repairs, [{ id: created.id, from: `${BROKEN_TITLE} — ${BROKEN_AUTHOR}`, to: `${TITLE} — ${AUTHOR}` }]);
   const rerun = planMojibakeRepairs(h.db);
   assert.deepEqual([rerun.books, rerun.works], [[], []]);
 });
@@ -158,7 +158,7 @@ test("reports what it cannot repair", () => {
   assert.deepEqual(mojibakeReport(plan, null).stillBroken, { count: 1, examples: ["P©ssaro Azul — Ana Lima"] });
 });
 
-test("the report counts repairs, groups them by origin and caps the examples", () => {
+test("the report counts repairs, groups them by origin, lists every repair and caps the unrepaired examples", () => {
   const h = setup();
   for (let n = 1; n <= 25; n++) h.book(n === 2 ? "Livro 2 da fé" : `Livro ${n} da fÃ©`, n <= 2 ? BROKEN_AUTHOR : "Ana Lima", null);
   for (let n = 1; n <= 11; n++) h.book(`P©ssaro ${n} Azul`, "Ana Lima", null);
@@ -168,7 +168,7 @@ test("the report counts repairs, groups them by origin and caps the examples", (
   assert.deepEqual(report.books, { scanned: 36, repaired: 25, titles: 24, authors: 2 });
   assert.deepEqual(report.works, { scanned: 36, repaired: 25 });
   assert.deepEqual(report.origins, { seed: 25 });
-  assert.equal(report.examples.length, 20);
+  assert.equal(report.repairs.length, 25);
   assert.equal(report.stillBroken.count, 11);
   assert.equal(report.stillBroken.examples.length, 10);
   assert.equal(report.applied, null);

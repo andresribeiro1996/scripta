@@ -12,7 +12,7 @@ test("repairs UTF-8 that was read as Windows-1252", () => {
 });
 
 test("repairs a mis-decoded lowercase letter that follows a capital", () => {
-  for (const text of ["Arturo Pérez-Reverte", "Idade Média", "Sérgio Martel", "Técnica fiscal", "Sûr", "Pé de Meia", "A Fé", "Zé Povinho", "Sé de Braga", "Dîner"]) {
+  for (const text of ["Arturo Pérez-Reverte", "Idade Média", "Sérgio Martel", "Técnica fiscal", "Sûr", "Pé de Meia", "A Fé", "Zé Povinho", "Sé de Braga", "Dîner", "I’m Here"]) {
     assert.equal(repairMojibake(asWindows1252(text)), text);
   }
 });
@@ -34,6 +34,12 @@ test("leaves correct text alone", () => {
 
 test("leaves an accented capital before word-final punctuation alone", () => {
   for (const text of ["NESCAFÉ® Receitas", "CAFÉ’S", "CAFÉ’s", "JOSÉ’s house", "IRMÃ…", "A IRMÃ…", "Zu Fuß…", "irmã…»", "JOSÉ\xa0de Alencar", "Groß\xa0und klein", "CAFÉ\xa0noir", "MANHÃ\xa0cedo", "NESCAFÉ®receitas", "A IRMÃ»"]) {
+    assert.equal(repairMojibake(text), text);
+  }
+});
+
+test("leaves a lowercase letter that follows a capital before word-final punctuation alone", () => {
+  for (const text of ["A Fé\xa0– Poemas", "Já\xa0– Poemas", "Ilha da Sé\xa0— Guia", "DER GROß\xa0UND KLEIN"]) {
     assert.equal(repairMojibake(text), text);
   }
 });
