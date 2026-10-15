@@ -1,5 +1,6 @@
 import type { BookMetadata, BookSearchResult, CatalogBookMetadata } from "@scripta/shared";
-import type { BookRow, CoverImageRow, CoverSourceName, CoverStatus, DataSource, GenreEvidence, GenresSource, NewBook, SummarySource, WorkPageRows, WorkView } from "./types.js";
+import type { SynopsisJudgment } from "./synopsis.js";
+import type { BookRow, CoverImageRow, CoverSourceName, CoverStatus, DataSource, GenreEvidence, GenresSource, JevRejection, JevTask, NewBook, SummarySource, WorkPageRows, WorkView } from "./types.js";
 
 export type MergeableDetails = Pick<BookMetadata, "summary" | "pages" | "year" | "publisher" | "translator">;
 
@@ -73,6 +74,11 @@ export interface BooksRepository {
   editionGenres(workIds: string[]): Array<{ work_id: string; genres: string; genres_source: GenresSource | null; genres_confidence: number | null }>;
   spendTypesafe(day: string, source: string, limit: number): boolean;
   typesafeUsage(day: string, source: string): number;
+  synopsisJudgments(hashes: string[]): Map<string, SynopsisJudgment>;
+  saveSynopsisJudgment(hash: string, judgment: SynopsisJudgment): void;
+  jevRejections(task: JevTask, subjects: string[]): Map<string, JevRejection>;
+  recordJevRejection(rejection: { task: JevTask; subject: string; status: number | null; reason: string; at: string }): void;
+  clearJevRejection(task: JevTask, subject: string): void;
   workIdsByWorkKeys(keys: string[]): Map<string, string>;
   listPublisherUrls(): Array<{ work_id: string | null; publisher_url: string }>;
   fillSourceGenres(workId: string, genres: string[]): number;

@@ -90,3 +90,6 @@ export type GenreEvidence = {
   work: { id: string; title: string; author: string; summary: string | null };
   editions: Array<{ title: string; language: string | null; isbn: string | null; publisher: string | null; year: number | null; summary: string | null }>;
 };
+
+export type JevTask = "synopses" | "works";
+export type JevRejection = { status: number | null; reason: string; attempts: number; lastAt: string };

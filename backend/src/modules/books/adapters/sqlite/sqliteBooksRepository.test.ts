@@ -1545,3 +1545,26 @@ test("the summary hash migration hashes stored summaries once", () => {
   assert.equal(hash("SELECT summary_hash AS h FROM books WHERE id = 'b2'"), null);
   assert.equal(hash("SELECT summary_hash AS h FROM books WHERE id = 'b3'"), null);
 });
+
+test("synopsis judgments are stored by text hash, replaced and read back", () => {
+  const { repo } = freshRepo();
+  repo.saveSynopsisJudgment("h1", { model: "rule", usable: 0, kind: "fragment", askedAt: NOW });
+  repo.saveSynopsisJudgment("h2", { model: "jev-1.13.0", usable: 0.12, kind: "praise", askedAt: NOW });
+  repo.saveSynopsisJudgment("h2", { model: "manual", usable: 1, kind: "praise", askedAt: "2026-10-02T00:00:00.000Z" });
+  const judgments = repo.synopsisJudgments(["h1", "h2", "h3"]);
+  assert.equal(judgments.size, 2);
+  assert.deepEqual(judgments.get("h1"), { model: "rule", usable: 0, kind: "fragment", askedAt: NOW });
+  assert.deepEqual(judgments.get("h2"), { model: "manual", usable: 1, kind: "praise", askedAt: "2026-10-02T00:00:00.000Z" });
+});
+
+test("Jev rejections count attempts per task and subject, and clear one task only", () => {
+  const { repo } = freshRepo();
+  repo.recordJevRejection({ task: "synopses", subject: "h1", status: 400, reason: "HTTP 400", at: NOW });
+  repo.recordJevRejection({ task: "synopses", subject: "h1", status: null, reason: "unexpected answer", at: "2026-10-02T00:00:00.000Z" });
+  repo.recordJevRejection({ task: "works", subject: "h1", status: 422, reason: "HTTP 422", at: NOW });
+  assert.deepEqual(repo.jevRejections("synopses", ["h1", "h2"]).get("h1"), { status: null, reason: "unexpected answer", attempts: 2, lastAt: "2026-10-02T00:00:00.000Z" });
+  assert.equal(repo.jevRejections("works", ["h1"]).get("h1")?.attempts, 1);
+  repo.clearJevRejection("synopses", "h1");
+  assert.equal(repo.jevRejections("synopses", ["h1"]).size, 0);
+  assert.equal(repo.jevRejections("works", ["h1"]).size, 1);
+});

@@ -104,3 +104,21 @@ CREATE VIRTUAL TABLE IF NOT EXISTS books_fts USING fts5(
 CREATE TABLE IF NOT EXISTS books_search (
   book_id TEXT PRIMARY KEY
 ) WITHOUT ROWID;
+
+CREATE TABLE IF NOT EXISTS synopsis_judgments (
+  text_hash TEXT PRIMARY KEY,
+  model     TEXT NOT NULL,
+  usable    REAL NOT NULL,
+  kind      TEXT NOT NULL,
+  asked_at  TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS jev_rejections (
+  task     TEXT NOT NULL,
+  subject  TEXT NOT NULL,
+  status   INTEGER,
+  reason   TEXT NOT NULL,
+  attempts INTEGER NOT NULL,
+  last_at  TEXT NOT NULL,
+  PRIMARY KEY (task, subject)
+);

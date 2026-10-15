@@ -3,7 +3,7 @@ import type { DatabaseSync, StatementSync } from "node:sqlite";
 import { MIN_PREFIX_LENGTH, normalizeWorkKey, workTitleKey } from "../../domain/normalize.js";
 import type { BooksRepository, IdPage, MergeableDetails, PageCursor } from "../../domain/ports.js";
 import { WorkMergeError } from "../../domain/errors.js";
-import { summaryHashOf } from "../../domain/synopsis.js";
+import { summaryHashOf, type SynopsisKind } from "../../domain/synopsis.js";
 import type { BookRow, CoverImageRow, DataSource, GenreEvidence, SummarySource, WorkPageRows, WorkView } from "../../domain/types.js";
 
 export const UNCHECKED_COVERS_SQL = `
@@ -243,6 +243,14 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     ON CONFLICT (day, source) DO UPDATE SET requests = requests + 1 WHERE requests < ?
   `);
   const typesafeUsageStmt = db.prepare(`SELECT requests FROM typesafe_usage WHERE day = ? AND source = ?`);
+  const synopsisJudgmentsStmt = db.prepare(`SELECT text_hash, model, usable, kind, asked_at FROM synopsis_judgments WHERE text_hash IN (SELECT value FROM json_each(?))`);
+  const saveSynopsisJudgmentStmt = db.prepare(`INSERT OR REPLACE INTO synopsis_judgments (text_hash, model, usable, kind, asked_at) VALUES (?, ?, ?, ?, ?)`);
+  const jevRejectionsStmt = db.prepare(`SELECT subject, status, reason, attempts, last_at FROM jev_rejections WHERE task = ? AND subject IN (SELECT value FROM json_each(?))`);
+  const recordJevRejectionStmt = db.prepare(`
+    INSERT INTO jev_rejections (task, subject, status, reason, attempts, last_at) VALUES (?, ?, ?, ?, 1, ?)
+    ON CONFLICT (task, subject) DO UPDATE SET status = excluded.status, reason = excluded.reason, attempts = attempts + 1, last_at = excluded.last_at
+  `);
+  const clearJevRejectionStmt = db.prepare(`DELETE FROM jev_rejections WHERE task = ? AND subject = ?`);
   const detailsMissingStmt = db.prepare(`UPDATE books SET details_status = 'missing', details_checked_at = ? WHERE id = ?`);
   const detailsAttemptedStmt = db.prepare(`UPDATE books SET details_checked_at = ? WHERE id = ?`);
   const searchStmt = db.prepare(`
@@ -628,6 +636,23 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     },
     typesafeUsage(day, source) {
       return (typesafeUsageStmt.get(day, source) as { requests: number } | undefined)?.requests ?? 0;
+    },
+    synopsisJudgments(hashes) {
+      const rows = synopsisJudgmentsStmt.all(JSON.stringify(hashes)) as Array<{ text_hash: string; model: string; usable: number; kind: SynopsisKind; asked_at: string }>;
+      return new Map(rows.map((row) => [row.text_hash, { model: row.model, usable: row.usable, kind: row.kind, askedAt: row.asked_at }]));
+    },
+    saveSynopsisJudgment(hash, judgment) {
+      saveSynopsisJudgmentStmt.run(hash, judgment.model, judgment.usable, judgment.kind, judgment.askedAt);
+    },
+    jevRejections(task, subjects) {
+      const rows = jevRejectionsStmt.all(task, JSON.stringify(subjects)) as Array<{ subject: string; status: number | null; reason: string; attempts: number; last_at: string }>;
+      return new Map(rows.map((row) => [row.subject, { status: row.status, reason: row.reason, attempts: row.attempts, lastAt: row.last_at }]));
+    },
+    recordJevRejection(rejection) {
+      recordJevRejectionStmt.run(rejection.task, rejection.subject, rejection.status, rejection.reason, rejection.at);
+    },
+    clearJevRejection(task, subject) {
+      clearJevRejectionStmt.run(task, subject);
     },
 
     genreEvidence(workId) {
