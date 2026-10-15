@@ -9,7 +9,7 @@ import { openSqlite } from "../../../../db/openSqlite.js";
 import { MIN_GOOD_WIDTH } from "../../domain/constants.js";
 import { catalogTitleKey, givenNameFirst } from "../../domain/normalize.js";
 import { summaryHashOf } from "../../domain/synopsis.js";
-import { applyMojibakeRepairs, type BookRepair, type RowRepair } from "../../seed/mojibakeRepair.js";
+import { applyMojibakeRepairs, type RowRepair } from "../../seed/mojibakeRepair.js";
 import { CONFIRMED_SQL } from "./sqliteBooksRepository.js";
 
 const adapterDir = dirname(fileURLToPath(import.meta.url));
@@ -240,16 +240,17 @@ function turnIsbndbFirstAuthors(db: DatabaseSync): void {
     WHERE created_by IS NULL AND json_extract(data_sources, '$[0]') = 'isbndb' AND instr(author, ',') > 0
   `).all() as Array<{ id: string; title: string; author: string; work_id: string | null }>;
   const workWithAuthor = db.prepare("SELECT id, title, author FROM works WHERE id = ? AND author = ?");
-  const books: BookRepair[] = [];
+  const books: RowRepair[] = [];
   const works = new Map<string, RowRepair>();
   for (const { id, title, author, work_id: workId } of rows) {
     const repairedAuthor = givenNameFirst(author);
     if (repairedAuthor === author) continue;
-    books.push({ id, title, author, repairedTitle: title, repairedAuthor, origin: "isbndb" });
+    books.push({ id, title, author, repairedTitle: title, repairedAuthor });
     const work = workId ? (workWithAuthor.get(workId, author) as { id: string; title: string; author: string } | undefined) : undefined;
     if (work) works.set(work.id, { ...work, repairedTitle: work.title, repairedAuthor });
   }
-  applyMojibakeRepairs(db, { scanned: { books: rows.length, works: works.size }, books, works: [...works.values()], stillBroken: [] });
+  applyMojibakeRepairs(db, { books: [], works: [...works.values()] });
+  applyMojibakeRepairs(db, { books, works: [] });
   db.exec("PRAGMA user_version = 4");
 }
 

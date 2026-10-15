@@ -1409,6 +1409,20 @@ test("the ISBNdb-first author pass runs once, so a row saved after it is left as
   assert.equal(authorOf(db, after.id), "Plato, Aristotle");
 });
 
+test("the ISBNdb-first author pass can stop part way and finish on the next boot", () => {
+  const { db, repo } = freshRepo();
+  const first = repo.createBook({ title: "Dune", author: "Herbert, Frank", isbn: "9780000000002", sources: ["isbndb"] }, ["isbn:9780000000002"], NOW);
+  const second = repo.createBook({ title: "Dune Messiah", author: "Herbert, Frank", isbn: "9780000000019", sources: ["isbndb"] }, ["isbn:9780000000019"], NOW);
+  db.exec("PRAGMA user_version = 3");
+  db.exec(`CREATE TRIGGER stop_second BEFORE UPDATE OF author ON books WHEN NEW.id = '${second.id}' BEGIN SELECT RAISE(ABORT, 'stopped'); END`);
+  assert.throws(() => applyBooksMigrations(db), /stopped/);
+  assert.deepEqual([userVersion(db), authorOf(db, second.id), workById(db, second.work_id).author], [3, "Herbert, Frank", "Frank Herbert"]);
+  db.exec("DROP TRIGGER stop_second");
+  applyBooksMigrations(db);
+  for (const book of [first, second]) assert.deepEqual([authorOf(db, book.id), workById(db, book.work_id).author], ["Frank Herbert", "Frank Herbert"]);
+  assert.equal(userVersion(db), 4);
+});
+
 test("the last word matches as a prefix once it has three letters", () => {
   const { repo } = freshRepo();
   repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593", createdBy: "seed" }, ["isbn:9780441013593"], NOW);
