@@ -15,7 +15,8 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
 const { applyBooksMigrations } = await import("./adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("./adapters/sqlite/sqliteBooksRepository.js");
-const { planMatch } = await import("./translationJudgments.js");
+const { matchWork, planMatch } = await import("./translationJudgments.js");
+const { SourceUnavailableError, UnusableAnswerError } = await import("./domain/errors.js");
 
 type Repo = ReturnType<typeof createSqliteBooksRepository>;
 const AT = "2026-10-15T12:00:00.000Z";
@@ -96,4 +97,77 @@ test("only live, all-Portuguese, unjudged works under the strike limit need a ma
   assert.deepEqual(repo.portugueseWorksNeedingMatch(null, 10, 3, "2026-09-15T00:00:00.000Z").sort(), [pt.work_id, old.work_id].sort());
   assert.deepEqual(repo.portugueseWorksNeedingMatch([mixed.work_id!, pt.work_id!], 10, 3, null), [pt.work_id]);
   assert.deepEqual(repo.workMatchJudgments([judged.work_id!]).get(judged.work_id!), { model: "code", intoWorkId: null, confidence: null, askedAt: AT });
+});
+
+const NOW = Date.parse(AT);
+function matching(repo: Repo, answer: () => Promise<{ choice: number | null; confidence: number; model: string }>, blocked = false) {
+  const asked: Array<{ candidates: Array<{ title: string }> }> = [];
+  const alerts: string[] = [];
+  const deps = {
+    repo,
+    classify: async (input: { candidates: Array<{ title: string; author: string; year: number | null }> }) => {
+      asked.push(input);
+      return answer();
+    },
+    sharesArena: () => blocked,
+    now: () => NOW,
+    alert: (subject: string) => { alerts.push(subject); }
+  };
+  return { deps, asked, alerts };
+}
+
+function lighthouse(repo: Repo, ptAuthor: string) {
+  const en = edition(repo, "9780156907450", { title: "To the Lighthouse", author: "Virginia Woolf", workKey: "OL950W" });
+  const orlando = edition(repo, "9780156907451", { title: "Orlando", author: "Virginia Woolf", workKey: "OL951W" });
+  const pt = edition(repo, "9789720000450", { title: "Passeio ao Farol", author: ptAuthor, language: "pt-PT", originalTitle: "To the Lighthouse", workKey: "OL952W" });
+  return { en, orlando, pt };
+}
+
+test("a code match merges without asking Jev, and is recorded as code", async () => {
+  const repo = freshRepo();
+  const { en, pt } = lighthouse(repo, "Virginia Woolf");
+  const { deps, asked } = matching(repo, async () => ({ choice: 0, confidence: 1, model: "jev-1.13.0" }));
+  assert.equal(await matchWork(deps, pt.work_id!), null);
+  assert.equal(asked.length, 0);
+  assert.equal(repo.getBook(pt.id)!.work_id, en.work_id);
+  assert.deepEqual(repo.workMatchJudgments([pt.work_id!]).get(pt.work_id!), { model: "code", intoWorkId: en.work_id, confidence: null, askedAt: AT });
+});
+
+test("an arena holding both works blocks the merge but keeps the decision", async () => {
+  const repo = freshRepo();
+  const { en, pt } = lighthouse(repo, "Virginia Woolf");
+  const { deps } = matching(repo, async () => ({ choice: 0, confidence: 1, model: "jev-1.13.0" }), true);
+  await matchWork(deps, pt.work_id!);
+  assert.equal(repo.getBook(pt.id)!.work_id, pt.work_id);
+  assert.equal(repo.workMatchJudgments([pt.work_id!]).get(pt.work_id!)?.intoWorkId, en.work_id);
+});
+
+test("Jev merges at 0.9, stores a doubt below it, and stores none as no work", async () => {
+  const high = freshRepo();
+  const sure = lighthouse(high, "");
+  const { deps, asked } = matching(high, async () => ({ choice: asked[0]!.candidates.findIndex((candidate) => candidate.title === "To the Lighthouse"), confidence: 0.93, model: "jev-1.13.0" }));
+  await matchWork(deps, sure.pt.work_id!);
+  assert.equal(high.getBook(sure.pt.id)!.work_id, sure.en.work_id);
+
+  const mid = freshRepo();
+  const doubt = lighthouse(mid, "");
+  await matchWork(matching(mid, async () => ({ choice: 0, confidence: 0.74, model: "jev-1.13.0" })).deps, doubt.pt.work_id!);
+  assert.equal(mid.getBook(doubt.pt.id)!.work_id, doubt.pt.work_id);
+  assert.equal(mid.workMatchJudgments([doubt.pt.work_id!]).get(doubt.pt.work_id!)?.confidence, 0.74);
+
+  const none = freshRepo();
+  const nothing = lighthouse(none, "");
+  await matchWork(matching(none, async () => ({ choice: null, confidence: 0.88, model: "jev-1.13.0" })).deps, nothing.pt.work_id!);
+  assert.deepEqual(none.workMatchJudgments([nothing.pt.work_id!]).get(nothing.pt.work_id!), { model: "jev-1.13.0", intoWorkId: null, confidence: 0.88, askedAt: AT });
+});
+
+test("an unusable answer is a strike under works; a 401 pauses and alerts; nothing is stored", async () => {
+  const repo = freshRepo();
+  const { pt } = lighthouse(repo, "");
+  assert.equal(await matchWork(matching(repo, async () => { throw new UnusableAnswerError("typesafe", "unexpected answer"); }).deps, pt.work_id!), null);
+  assert.equal(repo.jevRejections("works", [pt.work_id!]).get(pt.work_id!)?.attempts, 1);
+  const key = matching(repo, async () => { throw new SourceUnavailableError("typesafe", "HTTP 401", { status: 401 }); });
+  assert.equal(await matchWork(key.deps, pt.work_id!), NOW + 24 * 60 * 60 * 1000);
+  assert.deepEqual(key.alerts, ["TypeSafe rejected the translation requests"]);
+  assert.equal(repo.workMatchJudgments([pt.work_id!]).size, 0);
 });
