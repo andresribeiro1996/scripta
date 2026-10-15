@@ -337,7 +337,7 @@ The report's `bySource` counts, per summary source: `texts` selected, hidden by 
 
 Claude sets and checks the thresholds Jev's answers are read against; it never judges the backlog itself. Calibrate once on production before the first backlog run of each task, and again whenever the Jev model version or a question's wording changes.
 
-1. **Export.** Read-only, catalog fields only. The JSON between `---BEGIN---` and `---END---` is a sample spread over summary sources, with the texts the 40-letter rule hid as their own stratum.
+1. **Export.** Read-only, catalog fields only. The JSON between `---BEGIN---` and `---END---` is a sample spread over summary sources, with the texts the 40-letter rule would hide as their own stratum. It carries no stored judgment, so the labellers stay blind to Jev's answers.
 
    ```bash
    npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && node scripts/jev-calibration-export.mjs --task synopses --n 200' > synopsis-sample.txt

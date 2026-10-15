@@ -17,7 +17,7 @@ const { createJevSynopsisClassifier } = await import("../dist/modules/books/adap
 const sample = JSON.parse(readFileSync(samplePath, "utf8"));
 const labels = JSON.parse(readFileSync(labelsPath, "utf8"));
 const classify = createJevSynopsisClassifier(process.env.TYPESAFE_API_KEY, () => {});
-const asked = sample.filter((item) => item.judgment?.model !== "rule");
+const asked = sample.filter((item) => item.stratum !== "rule");
 const answers = [];
 let next = 0;
 await Promise.all(Array.from({ length: 4 }, async () => {
