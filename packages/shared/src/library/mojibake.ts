@@ -6,6 +6,7 @@ for (let index = 0; index < WINDOWS_1252_HIGH.length; index++) BYTE_OF.set(WINDO
 
 const CONTINUATION = `[\\u0080-\\u00bf${WINDOWS_1252_HIGH}]`;
 const SEQUENCE = new RegExp(`[\\u00c2-\\u00df]${CONTINUATION}|[\\u00e0-\\u00ef]${CONTINUATION}{2}|[\\u00f0-\\u00f4]${CONTINUATION}{3}`, "g");
+const NON_SORTING_MARKER = new RegExp(`(${SEQUENCE.source})|[\\u0098\\u009c]`, "g");
 const WORD_END = /^[\xa0©®»–—’”…™]+$/;
 const LOWERCASE_LETTER = /\p{Ll}/u;
 const LETTER = /\p{L}/u;
@@ -46,4 +47,13 @@ export function repairMojibake(text: string): string {
 
 export function hasMojibake(text: string): boolean {
   return suspiciousSequences(text) > 0 || LOSSY.test(text);
+}
+
+export function stripNonSortingMarkers(text: string): string {
+  return text.replace(NON_SORTING_MARKER, "$1");
+}
+
+export function cleanCatalogText(text: string): string {
+  for (let next = repairMojibake(stripNonSortingMarkers(text)); next !== text; next = repairMojibake(stripNonSortingMarkers(text))) text = next;
+  return text;
 }
