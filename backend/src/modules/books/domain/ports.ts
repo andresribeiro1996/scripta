@@ -1,6 +1,6 @@
 import type { BookMetadata, BookSearchResult, CatalogBookMetadata } from "@scripta/shared";
 import type { SynopsisJudgment, SynopsisKind } from "./synopsis.js";
-import type { BookRow, CoverImageRow, CoverSourceName, CoverStatus, DataSource, GenreEvidence, GenresSource, JevRejection, JevTask, NewBook, SummarySource, WorkPageRows, WorkView } from "./types.js";
+import type { BookRow, CoverImageRow, CoverSourceName, CoverStatus, DataSource, GenreEvidence, GenresSource, JevRejection, JevTask, NewBook, SummarySource, WorkMatchJudgment, WorkPageRows, WorkView } from "./types.js";
 
 export type MergeableDetails = Pick<BookMetadata, "summary" | "pages" | "year" | "publisher" | "translator">;
 
@@ -46,11 +46,11 @@ export interface BooksRepository {
   setWorkKey(id: string, key: string | null | undefined): void;
   assignMissingWorks(limit: number): number;
   fillTitleKeys(limit: number): number;
-  groupKeylessWorks(limit: number): number;
+  groupKeylessWorks(limit: number, at?: string): number;
   listWorkLookupIds(limit: number, recheckBefore: string): string[];
   markWorkChecked(id: string, at: string): void;
   replaceLanguage(id: string, tag: string): void;
-  mergeWorks(fromId: string, intoId: string): string;
+  mergeWorks(fromId: string, intoId: string, at?: string): string;
   detachEdition(bookId: string, at: string): string;
   getWorkView(id: string): WorkView | undefined;
   workPageRows(id: string): WorkPageRows | undefined;
@@ -85,6 +85,20 @@ export interface BooksRepository {
   flaggedSynopses(reviewBelow: number): Array<{ hash: string; model: string; usable: number; kind: SynopsisKind }>;
   synopsisCarriers(hashes: string[]): Array<{ hash: string; workId: string | null; title: string; author: string; coverImageId: string | null; source: string | null; text: string; isEdition: boolean }>;
   synopsisTexts(): Array<{ hash: string; source: string; title: string; author: string; text: string }>;
+  fillOriginalTitle(bookId: string, title: string): void;
+  fillOriginalTitlesFromSummaries(workId?: string): number;
+  mergeTranslation(fromId: string, intoId: string, source: "code" | "jev" | "manual", confidence: number | null, at: string): string;
+  undoMerge(fromId: string, at: string): { into: string; editions: number };
+  workMatchJudgments(workIds: string[]): Map<string, WorkMatchJudgment>;
+  saveWorkMatchJudgment(workId: string, judgment: WorkMatchJudgment): void;
+  portugueseWorksNeedingMatch(workIds: string[] | null, limit: number, rejectionLimit: number, recheckBefore: string | null): string[];
+  translationEvidence(workId: string): { workId: string; workAuthor: string; editions: Array<{ title: string; author: string; publisher: string | null; summary: string | null; originalTitle: string | null }> } | undefined;
+  titleCandidates(pattern: string): string[];
+  authorCandidates(pattern: string): string[];
+  matchCandidates(workIds: string[]): Array<{ id: string; title: string; author: string; year: number | null; editions: number; languages: string[] }>;
+  translationReviewRows(mergeAt: number, reviewAt: number): Array<{ workId: string; intoWorkId: string; model: string; confidence: number | null; mergedAt: string | null; group: "possible" | "blocked" | "merged" }>;
+  translationReviewWorks(workIds: string[]): Map<string, { title: string; author: string; coverImageId: string | null; originalTitle: string | null; synopsis: string | null }>;
+  portugueseWorksWithEvidence(): string[];
   workIdsByWorkKeys(keys: string[]): Map<string, string>;
   listPublisherUrls(): Array<{ work_id: string | null; publisher_url: string }>;
   fillSourceGenres(workId: string, genres: string[]): number;

@@ -2,7 +2,8 @@ import { Link } from "react-router-dom";
 
 const LINKS = [
   { to: "/admin/genres", label: "Genre review" },
-  { to: "/admin/synopses", label: "Synopsis review" }
+  { to: "/admin/synopses", label: "Synopsis review" },
+  { to: "/admin/translations", label: "Translation review" }
 ];
 
 export function AdminLinks({ isAdmin, onNavigate }: { isAdmin: boolean; onNavigate?: () => void }) {

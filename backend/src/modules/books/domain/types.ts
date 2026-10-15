@@ -16,6 +16,7 @@ export interface BookRow {
   ol_cover_id: number | null;
   summary: string | null;
   summary_hash: string | null;
+  original_title: string | null;
   rating: number | null;
   rating_count: number;
   genres: string;
@@ -93,3 +94,7 @@ export type GenreEvidence = {
 
 export type JevTask = "synopses" | "works";
 export type JevRejection = { status: number | null; reason: string; attempts: number; lastAt: string };
+
+export type MergeSource = "title-key" | "admin" | "code" | "jev" | "manual";
+
+export type WorkMatchJudgment = { model: string; intoWorkId: string | null; confidence: number | null; askedAt: string };

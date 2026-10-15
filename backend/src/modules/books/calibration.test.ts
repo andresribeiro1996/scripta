@@ -15,7 +15,7 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
 const { applyBooksMigrations } = await import("./adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("./adapters/sqlite/sqliteBooksRepository.js");
-const { answerEach, scoreSynopses, synopsisSample } = await import("./calibration.js");
+const { answerEach, scoreSynopses, scoreTranslations, synopsisSample, translationSample } = await import("./calibration.js");
 const { SourceUnavailableError, UnusableAnswerError } = await import("./domain/errors.js");
 
 type Repo = ReturnType<typeof createSqliteBooksRepository>;
@@ -74,4 +74,49 @@ test("a text Jev can't answer is left out of the score instead of ending the run
   assert.deepEqual([...answers].sort((a, b) => a - b), [10, 40]);
   assert.equal(skipped, 2);
   await assert.rejects(answerEach([1], async () => { throw new SourceUnavailableError("typesafe", "HTTP 503", { status: 503 }); }), SourceUnavailableError);
+});
+
+test("the translation sample mixes code matches and Jev questions, each with its candidates", () => {
+  const repo = freshRepo();
+  const add = (isbn: string, title: string, author: string, extra: { workKey?: string; language?: string; originalTitle?: string } = {}) => {
+    const row = repo.createBook({ title, author, isbn, workKey: extra.workKey }, [`isbn:${isbn}`], "2026-10-01T00:00:00.000Z");
+    if (extra.language) repo.setLanguage(row.id, extra.language);
+    if (extra.originalTitle) repo.fillOriginalTitle(row.id, extra.originalTitle);
+    return repo.getBook(row.id)!;
+  };
+  const en = add("9780156907601", "To the Lighthouse", "Virginia Woolf", { workKey: "OL980W" });
+  add("9780000000602", "The Idiot", "Fyodor Dostoevsky", { workKey: "OL981W" });
+  const code = add("9789720000601", "Passeio ao Farol", "Virginia Woolf", { language: "pt-PT", originalTitle: "To the Lighthouse" });
+  add("9789720000602", "O Idiota", "Fyodor Dostoevsky", { language: "pt-PT" });
+  add("9789720000603", "Sem Autor", "", { language: "pt-PT" });
+  const sample = translationSample(repo, 4, () => 0.5);
+  assert.deepEqual(sample.map((item) => item.stratum).sort(), ["ask", "code"]);
+  assert.equal(sample.find((item) => item.stratum === "code")?.codePick, en.work_id);
+  assert.equal(sample.find((item) => item.stratum === "code")?.workId, code.work_id);
+  assert.equal(sample.find((item) => item.stratum === "ask")?.candidates[0]?.title, "The Idiot");
+  assert.equal(repo.workMatchJudgments(sample.map((item) => item.workId)).size, 0);
+});
+
+test("the translation score counts right picks per decision band", () => {
+  const item = (workId: string, stratum: "code" | "ask", codePick: string | null) => ({ workId, stratum, edition: { title: "T", author: "A", originalTitle: null, publisher: null, description: null }, candidates: [{ id: "x", title: "X", author: "A", year: null }], codePick });
+  const sample = [item("c", "code", "x"), item("h", "ask", null), item("m", "ask", null), item("l", "ask", null)];
+  const labels = [{ workId: "c", match: "x" }, { workId: "h", match: "x" }, { workId: "m", match: null }, { workId: "l", match: null }];
+  const answers = [{ workId: "h", pick: "x", confidence: 0.95 }, { workId: "m", pick: "x", confidence: 0.7 }, { workId: "l", pick: null, confidence: 0.3 }];
+  assert.deepEqual(scoreTranslations(sample, labels, answers), [
+    { decision: "code", items: 1, correct: 1 },
+    { decision: "jev 0.9 and above", items: 1, correct: 1 },
+    { decision: "jev 0.5 to 0.9", items: 1, correct: 0 },
+    { decision: "jev below 0.5", items: 1, correct: 1 }
+  ]);
+});
+
+test("a code match in the translation sample carries the evidence code decided on, original titles read from summaries included", () => {
+  const repo = freshRepo();
+  repo.createBook({ title: "To the Lighthouse", author: "Virginia Woolf", isbn: "9780156907611", workKey: "OL985W" }, ["isbn:9780156907611"], "2026-10-01T00:00:00.000Z");
+  const pt = repo.createBook({ title: "Passeio ao Farol", author: "Virginia Woolf", isbn: "9789720000611" }, ["isbn:9789720000611"], "2026-10-01T00:00:00.000Z");
+  repo.setLanguage(pt.id, "pt-PT");
+  repo.mergeDetails(pt.id, { summary: "Uma família numa casa de férias.\n\nTítulo original: To the Lighthouse", pages: null, year: null, publisher: null, translator: null }, "publisher");
+  const [item] = translationSample(repo, 2, () => 0.5);
+  assert.equal(item?.stratum, "code");
+  assert.equal(item?.edition.originalTitle, "To the Lighthouse");
 });

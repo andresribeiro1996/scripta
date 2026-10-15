@@ -1630,3 +1630,158 @@ test("a summary cleared by hand leaves no text to judge or list, even with its h
   assert.deepEqual(repo.synopsisCarriers([bookHash!, workHash]), []);
   assert.deepEqual(repo.synopsisTexts(), []);
 });
+
+test("original titles fill only empty columns, from the feed or from stored summaries", () => {
+  const { repo } = freshRepo();
+  const a = repo.createBook({ title: "Passeio ao Farol", author: "Virginia Woolf", isbn: "9789720000111" }, ["isbn:9789720000111"], NOW);
+  repo.fillOriginalTitle(a.id, "To the Lighthouse");
+  repo.fillOriginalTitle(a.id, "Something else");
+  assert.equal(repo.getBook(a.id)!.original_title, "To the Lighthouse");
+  const b = repo.createBook({ title: "O Passeio", author: "Robert Walser", isbn: "9789720000112" }, ["isbn:9789720000112"], NOW);
+  repo.mergeDetails(b.id, { summary: "Um passeio por uma cidade suíça, narrado por um escritor.\n\nTítulo original: Der Spaziergang", pages: null, year: null, publisher: null, translator: null }, "publisher");
+  const c = repo.createBook({ title: "Sem rótulo", author: "X", isbn: "9789720000113" }, ["isbn:9789720000113"], NOW);
+  repo.mergeDetails(c.id, { summary: "Uma sinopse sem rótulo de origem em parte alguma do texto.", pages: null, year: null, publisher: null, translator: null }, "publisher");
+  assert.equal(repo.fillOriginalTitlesFromSummaries(c.work_id!), 0);
+  assert.equal(repo.fillOriginalTitlesFromSummaries(), 1);
+  assert.equal(repo.getBook(b.id)!.original_title, "Der Spaziergang");
+  assert.equal(repo.fillOriginalTitlesFromSummaries(), 0);
+});
+
+const AT = "2026-10-15T12:00:00.000Z";
+const mergeRows = (db: DatabaseSync) => (db.prepare("SELECT from_work, into_work, source, confidence, moved_book_ids, repointed_work_ids, merged_at, undone_at FROM work_merges ORDER BY id").all() as Array<Record<string, unknown>>).map((row) => ({ ...row }));
+
+test("a new edition carrying a merged work's key lands on the original, by every path", () => {
+  const { db, repo } = freshRepo();
+  const pt = repo.createBook({ title: "Passeio ao Farol", author: "Virginia Woolf", isbn: "9789720000201", workKey: "OL900W" }, ["isbn:9789720000201"], NOW);
+  const en = repo.createBook({ title: "To the Lighthouse", author: "Virginia Woolf", isbn: "9780156907392", workKey: "OL901W" }, ["isbn:9780156907392"], NOW);
+  assert.equal(repo.mergeTranslation(pt.work_id!, en.work_id!, "jev", 0.95, AT), en.work_id);
+  const created = repo.createBook({ title: "Passeio ao Farol", author: "Virginia Woolf", isbn: "9789720000202", workKey: "OL900W" }, ["isbn:9789720000202"], NOW);
+  assert.equal(created.work_id, en.work_id);
+  const keyed = repo.createBook({ title: "Rumo ao Farol", author: "Virginia Woolf", isbn: "9789720000203" }, ["isbn:9789720000203"], NOW);
+  repo.setWorkKey(keyed.id, "OL900W");
+  assert.equal(repo.getBook(keyed.id)!.work_id, en.work_id);
+  db.exec(`UPDATE books SET work_id = NULL WHERE id = '${created.id}'`);
+  assert.equal(repo.assignWork(created.id), en.work_id);
+  assert.equal(workById(db, pt.work_id).merged_into, en.work_id);
+});
+
+test("a translation merge keeps the original's own summary empty; title-key and admin merges still carry it", () => {
+  const { db, repo } = freshRepo();
+  const pt = repo.createBook({ title: "Passeio ao Farol", author: "Virginia Woolf", isbn: "9789720000204", workKey: "OL902W" }, ["isbn:9789720000204"], NOW);
+  const en = repo.createBook({ title: "To the Lighthouse", author: "Virginia Woolf", isbn: "9780156907393", workKey: "OL903W" }, ["isbn:9780156907393"], NOW);
+  repo.setWorkSummary(pt.id, "Uma família numa casa de férias na Escócia.");
+  repo.mergeTranslation(pt.work_id!, en.work_id!, "code", null, AT);
+  assert.equal(workById(db, en.work_id).summary, null);
+  const a = repo.createBook({ title: "A", author: "X", isbn: "9789720000205" }, ["isbn:9789720000205"], NOW);
+  const b = repo.createBook({ title: "B", author: "X", isbn: "9789720000206" }, ["isbn:9789720000206"], NOW);
+  repo.setWorkSummary(a.id, "Carried.");
+  repo.mergeWorks(a.work_id!, b.work_id!, AT);
+  assert.equal(workById(db, b.work_id).summary, "Carried.");
+});
+
+test("every merge is recorded with the editions it moved and the works it repointed", () => {
+  const { db, repo } = freshRepo();
+  const alias = repo.createBook({ title: "Alias", author: "X", isbn: "9789720000207" }, ["isbn:9789720000207"], NOW);
+  const pt = repo.createBook({ title: "Passeio", author: "X", isbn: "9789720000208" }, ["isbn:9789720000208"], NOW);
+  const en = repo.createBook({ title: "Walk", author: "X", isbn: "9789720000209", workKey: "OL904W" }, ["isbn:9789720000209"], NOW);
+  repo.mergeWorks(alias.work_id!, pt.work_id!, AT);
+  repo.mergeTranslation(pt.work_id!, en.work_id!, "jev", 0.93, AT);
+  const twin1 = repo.createBook({ title: "Twin", author: "Y", isbn: "9789720000219" }, ["isbn:9789720000219"], NOW);
+  const twin2 = repo.createBook({ title: "Twin", author: "Y", isbn: "9789720000210" }, ["isbn:9789720000210"], NOW);
+  assert.equal(repo.groupKeylessWorks(10, AT), 1);
+  const rows = mergeRows(db);
+  assert.deepEqual(rows.map((row) => row.source), ["admin", "jev", "title-key"]);
+  assert.deepEqual(rows[0], { from_work: alias.work_id, into_work: pt.work_id, source: "admin", confidence: null, moved_book_ids: JSON.stringify([alias.id]), repointed_work_ids: "[]", merged_at: AT, undone_at: null });
+  assert.deepEqual(JSON.parse(String(rows[1]!.moved_book_ids)).sort(), [alias.id, pt.id].sort());
+  assert.deepEqual(rows[1]!.repointed_work_ids, JSON.stringify([alias.work_id]));
+  assert.equal(rows[1]!.confidence, 0.93);
+  assert.ok([twin1.work_id, twin2.work_id].includes(String(rows[2]!.from_work)));
+});
+
+test("genre state follows a merge: it moves to a target without any, and drops when the target has its own", () => {
+  const { repo } = freshRepo();
+  const pt = repo.createBook({ title: "Passeio", author: "X", isbn: "9789720000211", workKey: "OL905W" }, ["isbn:9789720000211"], NOW);
+  const en = repo.createBook({ title: "Walk", author: "X", isbn: "9789720000212", workKey: "OL906W" }, ["isbn:9789720000212"], NOW);
+  repo.saveGenreJudgment({ workId: pt.work_id!, model: "jev-1.13.0", genre: "Literary Fiction", confidence: 0.86, askedAt: AT });
+  repo.recordGenreRejection({ workId: pt.work_id!, status: 400, reason: "HTTP 400", at: AT });
+  repo.mergeTranslation(pt.work_id!, en.work_id!, "code", null, AT);
+  assert.equal(repo.genreJudgments([en.work_id!]).get(en.work_id!)?.genre, "Literary Fiction");
+  assert.equal(repo.genreJudgments([pt.work_id!]).size, 0);
+  assert.equal(repo.genreRejections([en.work_id!]).get(en.work_id!)?.attempts, 1);
+
+  const other = repo.createBook({ title: "Outro", author: "Z", isbn: "9789720000213", workKey: "OL907W" }, ["isbn:9789720000213"], NOW);
+  const target = repo.createBook({ title: "Other", author: "Z", isbn: "9789720000214", workKey: "OL908W" }, ["isbn:9789720000214"], NOW);
+  repo.saveGenreJudgment({ workId: other.work_id!, model: "jev-1.13.0", genre: "Poetry", confidence: 0.9, askedAt: AT });
+  repo.saveGenreJudgment({ workId: target.work_id!, model: "manual", genre: null, confidence: 1, askedAt: AT });
+  repo.mergeTranslation(other.work_id!, target.work_id!, "manual", null, AT);
+  assert.equal(repo.genreJudgments([target.work_id!]).get(target.work_id!)?.model, "manual");
+  assert.equal(repo.genreJudgments([other.work_id!]).size, 0);
+});
+
+test("setWorkKey's emptied work hands its genre state to the work it joined", () => {
+  const { repo } = freshRepo();
+  const keyed = repo.createBook({ title: "Kept", author: "X", isbn: "9789720000215", workKey: "OL909W" }, ["isbn:9789720000215"], NOW);
+  const loose = repo.createBook({ title: "Kept", author: "X", isbn: "9789720000216" }, ["isbn:9789720000216"], NOW);
+  repo.saveGenreJudgment({ workId: loose.work_id!, model: "jev-1.13.0", genre: "History", confidence: 0.7, askedAt: AT });
+  repo.setWorkKey(loose.id, "OL909W");
+  assert.equal(repo.genreJudgments([keyed.work_id!]).get(keyed.work_id!)?.genre, "History");
+  assert.equal(repo.genreJudgments([loose.work_id!]).size, 0);
+});
+
+test("mergeTranslation refuses a merged or missing work and a work into itself; mergeWorks still refuses keyed works", () => {
+  const { repo } = freshRepo();
+  const a = repo.createBook({ title: "A", author: "X", isbn: "9789720000217", workKey: "OL910W" }, ["isbn:9789720000217"], NOW);
+  const b = repo.createBook({ title: "B", author: "X", isbn: "9789720000218", workKey: "OL911W" }, ["isbn:9789720000218"], NOW);
+  assert.throws(() => repo.mergeTranslation(a.work_id!, a.work_id!, "manual", null, AT), WorkMergeError);
+  assert.throws(() => repo.mergeTranslation("missing", b.work_id!, "manual", null, AT), WorkMergeError);
+  assert.throws(() => repo.mergeWorks(a.work_id!, b.work_id!, AT), WorkMergeError);
+  repo.mergeTranslation(a.work_id!, b.work_id!, "manual", null, AT);
+  assert.throws(() => repo.mergeTranslation(a.work_id!, b.work_id!, "manual", null, AT), WorkMergeError);
+});
+
+test("undo reverses a translation merge, later arrivals with the key and repointed aliases included", () => {
+  const { db, repo } = freshRepo();
+  const alias = repo.createBook({ title: "Alias", author: "X", isbn: "9789720000301" }, ["isbn:9789720000301"], NOW);
+  const pt = repo.createBook({ title: "Passeio", author: "X", isbn: "9789720000302", workKey: "OL920W" }, ["isbn:9789720000302"], NOW);
+  const en = repo.createBook({ title: "Walk", author: "X", isbn: "9789720000303", workKey: "OL921W" }, ["isbn:9789720000303"], NOW);
+  repo.mergeWorks(alias.work_id!, pt.work_id!, AT);
+  repo.mergeTranslation(pt.work_id!, en.work_id!, "jev", 0.92, AT);
+  const later = repo.createBook({ title: "Passeio", author: "X", isbn: "9789720000304", workKey: "OL920W" }, ["isbn:9789720000304"], NOW);
+  assert.equal(later.work_id, en.work_id);
+
+  assert.deepEqual(repo.undoMerge(pt.work_id!, "2026-10-16T00:00:00.000Z"), { into: en.work_id, editions: 3 });
+  assert.equal(workById(db, pt.work_id).merged_into, null);
+  for (const id of [alias.id, pt.id, later.id]) assert.equal(repo.getBook(id)!.work_id, pt.work_id);
+  assert.equal(repo.getBook(en.id)!.work_id, en.work_id);
+  assert.equal(workById(db, alias.work_id).merged_into, pt.work_id);
+  assert.equal((db.prepare("SELECT undone_at FROM work_merges WHERE from_work = ? AND source = 'jev'").get(pt.work_id) as { undone_at: string }).undone_at, "2026-10-16T00:00:00.000Z");
+  assert.equal(repo.createBook({ title: "Passeio", author: "X", isbn: "9789720000305", workKey: "OL920W" }, ["isbn:9789720000305"], NOW).work_id, pt.work_id);
+  assert.throws(() => repo.undoMerge(pt.work_id!, AT), WorkMergeError);
+});
+
+test("undo refuses once the target itself merged elsewhere", () => {
+  const { repo } = freshRepo();
+  const pt = repo.createBook({ title: "Passeio", author: "X", isbn: "9789720000306", workKey: "OL922W" }, ["isbn:9789720000306"], NOW);
+  const en = repo.createBook({ title: "Walk", author: "X", isbn: "9789720000307", workKey: "OL923W" }, ["isbn:9789720000307"], NOW);
+  const other = repo.createBook({ title: "Walking", author: "X", isbn: "9789720000308", workKey: "OL924W" }, ["isbn:9789720000308"], NOW);
+  repo.mergeTranslation(pt.work_id!, en.work_id!, "code", null, AT);
+  repo.mergeTranslation(en.work_id!, other.work_id!, "manual", null, AT);
+  assert.throws(() => repo.undoMerge(pt.work_id!, AT), WorkMergeError);
+});
+
+test("an undone translation merge stays undone through the next title-key grouping, and takes back a later keyless copy", () => {
+  const { db, repo } = freshRepo();
+  const pt = repo.createBook({ title: "Poemas", author: "John Keats", isbn: "9789720000351" }, ["isbn:9789720000351"], NOW);
+  const en = repo.createBook({ title: "Poems", author: "Emily Dickinson", isbn: "9780000000352", workKey: "OL930W" }, ["isbn:9780000000352"], NOW);
+  repo.mergeTranslation(pt.work_id!, en.work_id!, "jev", 0.92, AT);
+  const copy = repo.createBook({ title: "Poemas", author: "John Keats", isbn: "9789720000353" }, ["isbn:9789720000353"], NOW);
+  assert.equal(repo.groupKeylessWorks(10, AT), 1);
+  assert.equal(repo.getBook(copy.id)!.work_id, en.work_id);
+
+  repo.undoMerge(pt.work_id!, "2026-10-16T00:00:00.000Z");
+  assert.equal(repo.getBook(copy.id)!.work_id, pt.work_id);
+  assert.equal(workById(db, copy.work_id).merged_into, pt.work_id);
+  assert.equal(repo.groupKeylessWorks(10, "2026-10-17T00:00:00.000Z"), 0);
+  assert.equal(workById(db, pt.work_id).merged_into, null);
+  assert.equal(repo.getBook(pt.id)!.work_id, pt.work_id);
+});
