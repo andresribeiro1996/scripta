@@ -45,6 +45,7 @@ export function applyBooksMigrations(db: DatabaseSync): void {
   if (!columns.some((column) => column.name === "genres_source")) db.exec("ALTER TABLE books ADD COLUMN genres_source TEXT");
   if (!columns.some((column) => column.name === "genres_confidence")) db.exec("ALTER TABLE books ADD COLUMN genres_confidence REAL");
   if (!columns.some((column) => column.name === "original_title")) db.exec("ALTER TABLE books ADD COLUMN original_title TEXT");
+  if (!columns.some((column) => column.name === "retitle_wanted_at")) db.exec("ALTER TABLE books ADD COLUMN retitle_wanted_at TEXT");
   moveOpenLibrarySummariesToWorks(db);
   addSummaryHashes(db);
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_work ON books(work_id)");
@@ -52,6 +53,7 @@ export function applyBooksMigrations(db: DatabaseSync): void {
   db.exec("CREATE INDEX IF NOT EXISTS idx_works_merged_into ON works(merged_into)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_cover_unchecked ON books(created_at) WHERE cover_checked_at IS NULL AND (cover_status IS NULL OR cover_status = 'low_res')");
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_cover_upgrade ON books(cover_upgrade_wanted_at) WHERE cover_upgrade_wanted_at IS NOT NULL");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_books_retitle_wanted ON books(retitle_wanted_at) WHERE retitle_wanted_at IS NOT NULL");
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_details_unchecked ON books(details_checked_at IS NOT NULL, created_by IS NOT NULL, details_checked_at, created_at) WHERE details_status IS NULL");
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_work_lookup ON books(work_checked_at IS NOT NULL, created_by IS NOT NULL, work_checked_at, created_at) WHERE ol_work_key IS NULL AND isbn IS NOT NULL AND details_status IS NOT NULL");
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_summary_hash ON books(summary_hash)");

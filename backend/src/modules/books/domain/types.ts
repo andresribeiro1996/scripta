@@ -42,6 +42,7 @@ export interface BookRow {
   title_group_blocked_at: string | null;
   genres_source: GenresSource | null;
   genres_confidence: number | null;
+  retitle_wanted_at: string | null;
   created_at: string;
 }
 
