@@ -1,5 +1,5 @@
 import type { BookMetadata, BookSearchResult, CatalogBookMetadata } from "@scripta/shared";
-import type { SynopsisJudgment } from "./synopsis.js";
+import type { SynopsisJudgment, SynopsisKind } from "./synopsis.js";
 import type { BookRow, CoverImageRow, CoverSourceName, CoverStatus, DataSource, GenreEvidence, GenresSource, JevRejection, JevTask, NewBook, SummarySource, WorkPageRows, WorkView } from "./types.js";
 
 export type MergeableDetails = Pick<BookMetadata, "summary" | "pages" | "year" | "publisher" | "translator">;
@@ -83,6 +83,8 @@ export interface BooksRepository {
   worksNeedingSynopsisJudgment(workIds: string[], limit: number, rejectionLimit: number): string[];
   synopsisText(hash: string): { text: string; title: string; author: string } | undefined;
   synopsisBacklog(rejectionLimit: number): Array<{ hash: string; workId: string | null; source: string | null; createdAt: string }>;
+  flaggedSynopses(reviewBelow: number): Array<{ hash: string; model: string; usable: number; kind: SynopsisKind }>;
+  synopsisCarriers(hashes: string[]): Array<{ hash: string; workId: string | null; title: string; author: string; coverImageId: string | null; source: string | null; text: string; isEdition: boolean }>;
   workIdsByWorkKeys(keys: string[]): Map<string, string>;
   listPublisherUrls(): Array<{ work_id: string | null; publisher_url: string }>;
   fillSourceGenres(workId: string, genres: string[]): number;

@@ -289,6 +289,17 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       AND NOT EXISTS (SELECT 1 FROM jev_rejections r WHERE r.task = 'synopses' AND r.subject = t.hash AND r.attempts >= ?)
     ORDER BY t.created_at, t.ord
   `);
+  const flaggedSynopsesStmt = db.prepare(`SELECT text_hash, model, usable, kind FROM synopsis_judgments WHERE model = 'rule' OR (model <> 'manual' AND usable < ?)`);
+  const synopsisCarriersStmt = db.prepare(`
+    SELECT b.summary_hash AS hash, COALESCE(w.merged_into, w.id) AS work_id, b.title AS title, b.author AS author, b.cover_image_id AS cover_image_id, b.summary_source AS source, b.summary AS text, 1 AS is_edition, b.created_at AS created_at, b.rowid AS ord
+    FROM books b LEFT JOIN works w ON w.id = b.work_id
+    WHERE b.summary_hash IN (SELECT value FROM json_each(?))
+    UNION ALL
+    SELECT w.summary_hash, COALESCE(w.merged_into, w.id), w.title, w.author, NULL, 'openlibrary', w.summary, 0, w.created_at, w.rowid
+    FROM works w
+    WHERE w.summary_hash IN (SELECT value FROM json_each(?))
+    ORDER BY created_at, ord
+  `);
   const detailsMissingStmt = db.prepare(`UPDATE books SET details_status = 'missing', details_checked_at = ? WHERE id = ?`);
   const detailsAttemptedStmt = db.prepare(`UPDATE books SET details_checked_at = ? WHERE id = ?`);
   const searchStmt = db.prepare(`
@@ -705,6 +716,22 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     },
     synopsisBacklog(rejectionLimit) {
       return (synopsisBacklogStmt.all(rejectionLimit) as Array<{ hash: string; work_id: string | null; source: string | null; created_at: string }>).map((row) => ({ hash: row.hash, workId: row.work_id, source: row.source, createdAt: row.created_at }));
+    },
+    flaggedSynopses(reviewBelow) {
+      return (flaggedSynopsesStmt.all(reviewBelow) as Array<{ text_hash: string; model: string; usable: number; kind: SynopsisKind }>).map((row) => ({ hash: row.text_hash, model: row.model, usable: row.usable, kind: row.kind }));
+    },
+    synopsisCarriers(hashes) {
+      const ids = JSON.stringify(hashes);
+      return (synopsisCarriersStmt.all(ids, ids) as Array<{ hash: string; work_id: string | null; title: string; author: string; cover_image_id: string | null; source: string | null; text: string; is_edition: number }>).map((row) => ({
+        hash: row.hash,
+        workId: row.work_id,
+        title: row.title,
+        author: row.author,
+        coverImageId: row.cover_image_id,
+        source: row.source,
+        text: row.text,
+        isEdition: row.is_edition === 1
+      }));
     },
 
     genreEvidence(workId) {
