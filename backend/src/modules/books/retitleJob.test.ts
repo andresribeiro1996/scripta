@@ -105,6 +105,18 @@ test("an outage keeps the mark and the run goes on to the next book", async () =
   assert.equal(h.warns.length, 1);
 });
 
+test("a definitive 4xx answer clears the mark and leaves the title", async () => {
+  const h = setup(async () => {
+    throw new SourceUnavailableError("isbndb", "HTTP 400", { status: 400 });
+  });
+  const created = h.book("P©ssaro Azul", "Ana Lima", "9789890000109");
+  assert.equal(await h.run(), null);
+  assert.deepEqual(h.marked(), []);
+  assert.equal(h.repo.getBook(created.id)!.title, "P©ssaro Azul");
+  assert.deepEqual(h.infos.map(([, message]) => message), ["lossy book left"]);
+  assert.deepEqual(h.warns, []);
+});
+
 test("a pause returns its retry time and keeps every mark", async () => {
   const retryAt = Date.parse("2026-10-02T00:00:00.000Z");
   const h = setup(async () => {

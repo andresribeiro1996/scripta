@@ -231,6 +231,17 @@ test("a book's work is planned only while it holds the book's old text", async (
   assert.deepEqual(plan.works.map((work) => work.id), [follows.work_id]);
 });
 
+test("a work shared by two planned editions is planned once", async () => {
+  const h = setup({ isbndb: async () => [hit("Pássaro Azul", ["Ana Lima"])] });
+  const edition = (isbn: string) => h.repo.createBook({ title: "P©ssaro Azul", author: "Ana Lima", isbn, workKey: "OL1W", createdBy: "publisher" }, [`isbn:${isbn}`], NOW);
+  const first = edition("9789890000109");
+  assert.equal(edition("9789890000116").work_id, first.work_id);
+  const plan = await h.plan();
+  assert.equal(plan.books.length, 2);
+  assert.equal(plan.works.length, 1);
+  assert.deepEqual(applyMojibakeRepairs(h.db, plan), { books: 2, works: 1, skipped: 0 });
+});
+
 test("planning writes nothing", async () => {
   const h = setup({ feeds: { [FEED]: page1([product("passaro", "Pássaro Azul")]) }, isbndb: async () => [hit("Pássaro Azul", ["Inês Duarte"])] });
   h.book("P©ssaro Azul", "In©s Duarte", "9789890000109", "https://loja.test/products/passaro");

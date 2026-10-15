@@ -37,8 +37,12 @@ export async function retitleWanted(deps: RetitleJobDeps, limit: number, signal?
       } catch (error) {
         if (error instanceof SourcePausedError) return error.retryAt;
         if (!(error instanceof SourceUnavailableError)) throw error;
-        deps.warn({ bookId: book.id, source: error.source, error: error.message }, "lossy title source unavailable");
-        continue;
+        if (error.status !== undefined && error.status !== 429 && error.status < 500) {
+          deps.info({ bookId: book.id, text: textOf(book) }, "lossy book left");
+        } else {
+          deps.warn({ bookId: book.id, source: error.source, error: error.message }, "lossy title source unavailable");
+          continue;
+        }
       }
     }
     deps.repo.clearRetitleWanted(book.id);
