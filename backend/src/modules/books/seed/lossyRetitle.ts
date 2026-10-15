@@ -14,6 +14,7 @@ type IsbndbStatus = "answered" | "no record" | "unavailable" | "not asked";
 export interface RetitleDeps {
   fetchText: ImportDeps["fetchText"];
   sleep: (ms: number) => Promise<void>;
+  now: () => number;
   isbndb: Pick<BookCatalog, "search">;
   log: (line: string) => void;
 }
@@ -34,6 +35,8 @@ const TARGETS_SQL = `
   ORDER BY books.rowid
 `;
 
+const FEED_DEADLINE_MS = 15 * 60_000;
+
 const hostOf = (url: string) => (URL.canParse(url) ? new URL(url).hostname.replace(/^www\./, "") : null);
 
 async function readFeeds(targets: LossyTarget[], deps: RetitleDeps, sites: PublisherSite[], plan: LossyPlan, candidates: Map<string, RetitleCandidates>) {
@@ -42,7 +45,15 @@ async function readFeeds(targets: LossyTarget[], deps: RetitleDeps, sites: Publi
   const hosts = new Set([...byUrl.keys()].map(hostOf));
   for (const site of sites.filter((site) => hosts.has(hostOf(site.origin)))) {
     try {
-      const feed = await readSiteFeed(site, deps.fetchText, createThrottle(deps.sleep));
+      const deadline = deps.now() + FEED_DEADLINE_MS;
+      const fetchText: RetitleDeps["fetchText"] = async (url) => {
+        if (deps.now() > deadline) throw new SiteSkipped(`feed read stopped after ${FEED_DEADLINE_MS / 60_000} minutes`);
+        const started = deps.now();
+        const response = await deps.fetchText(url);
+        deps.log(`${site.name}: ${url} → ${response.status} in ${deps.now() - started} ms`);
+        return response;
+      };
+      const feed = await readSiteFeed(site, fetchText, createThrottle(deps.sleep));
       let matched = 0;
       for (const product of feed.books) {
         for (const book of byUrl.get(product.productUrl) ?? []) {
