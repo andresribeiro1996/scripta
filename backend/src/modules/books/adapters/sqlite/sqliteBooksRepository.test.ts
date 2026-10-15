@@ -1415,3 +1415,27 @@ test("Open Library genres replace a Jev guess, an empty answer keeps it, and man
   repo.saveDetails(manual.id, richDetails, ["openlibrary"], "openlibrary", NOW);
   assert.deepEqual(genreRow(db, manual.id), { genres: JSON.stringify(["Poetry"]), genres_source: "manual", genres_confidence: null });
 });
+
+test("source genres fill only editions without genres, and repeat as a no-op", () => {
+  const { db, repo } = freshRepo();
+  const a = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593", workKey: "OL1W" }, ["isbn:9780441013593"], NOW);
+  const b = repo.createBook({ title: "Duna", author: "Frank Herbert", isbn: "9789722345671", workKey: "OL1W" }, ["isbn:9789722345671"], NOW);
+  const c = repo.createBook({ title: "Dune Messiah", author: "Frank Herbert", isbn: "9780441172696", workKey: "OL1W" }, ["isbn:9780441172696"], NOW);
+  db.prepare("UPDATE books SET genres = ?, genres_source = 'manual' WHERE id = ?").run(JSON.stringify(["Classics"]), c.id);
+  const work = a.work_id!;
+  assert.equal(b.work_id, work);
+  assert.equal(repo.fillSourceGenres(work, ["Science Fiction"]), 2);
+  assert.deepEqual(genreRow(db, a.id), { genres: JSON.stringify(["Science Fiction"]), genres_source: null, genres_confidence: null });
+  assert.deepEqual(genreRow(db, b.id), { genres: JSON.stringify(["Science Fiction"]), genres_source: null, genres_confidence: null });
+  assert.deepEqual(genreRow(db, c.id), { genres: JSON.stringify(["Classics"]), genres_source: "manual", genres_confidence: null });
+  assert.equal(repo.fillSourceGenres(work, ["Fantasy"]), 0);
+});
+
+test("work keys map to work ids, and publisher URLs list with their works", () => {
+  const { repo } = freshRepo();
+  const keyed = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593", workKey: "OL1W" }, ["isbn:9780441013593"], NOW);
+  const shop = titled(repo, "Shop Book");
+  repo.setPublisherUrl(shop.id, "https://shop.test/products/shop-book");
+  assert.deepEqual(repo.workIdsByWorkKeys(["OL1W", "OL2W"]), new Map([["OL1W", keyed.work_id!]]));
+  assert.deepEqual(repo.listPublisherUrls(), [{ work_id: shop.work_id, publisher_url: "https://shop.test/products/shop-book" }]);
+});

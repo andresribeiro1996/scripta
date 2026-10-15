@@ -99,6 +99,9 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   `);
   const aliasStmt = db.prepare(`SELECT id FROM works WHERE merged_into = ?`);
   const editionGenresStmt = db.prepare(`SELECT work_id, genres, genres_source, genres_confidence FROM books WHERE work_id IN (SELECT value FROM json_each(?)) AND genres <> '[]' ORDER BY created_at, rowid`);
+  const workIdsByKeysStmt = db.prepare(`SELECT ol_work_key AS key, COALESCE(merged_into, id) AS id FROM works WHERE ol_work_key IN (SELECT value FROM json_each(?))`);
+  const publisherUrlsStmt = db.prepare(`SELECT work_id, publisher_url FROM books WHERE publisher_url IS NOT NULL ORDER BY created_at, rowid`);
+  const fillSourceGenresStmt = db.prepare(`UPDATE books SET genres = ?, genres_source = NULL, genres_confidence = NULL WHERE work_id = ? AND genres = '[]'`);
   const pageEditionsStmt = db.prepare(`SELECT books.id, books.title, books.language, books.year, books.isbn, books.summary, books.cover_image_id, ci.color AS cover_color, books.genres, books.rating, books.rating_count, books.pages, books.genres_source, books.genres_confidence FROM books LEFT JOIN cover_images ci ON ci.id = books.cover_image_id WHERE books.work_id = ? ORDER BY books.created_at, books.rowid`);
   const workEditionsStmt = db.prepare(`SELECT id, isbn, title, author, ol_work_key FROM books WHERE work_id = ? ORDER BY created_at, rowid`);
   const groupablePairsStmt = db.prepare(`
@@ -295,6 +298,17 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     },
     editionGenres(workIds) {
       return editionGenresStmt.all(JSON.stringify(workIds)) as unknown as ReturnType<BooksRepository["editionGenres"]>;
+    },
+    workIdsByWorkKeys(keys) {
+      const rows = workIdsByKeysStmt.all(JSON.stringify(keys)) as Array<{ key: string; id: string }>;
+      return new Map(rows.map((row) => [row.key, row.id]));
+    },
+    listPublisherUrls() {
+      const rows = publisherUrlsStmt.all() as Array<{ work_id: string | null; publisher_url: string }>;
+      return rows.map((row) => ({ work_id: row.work_id, publisher_url: row.publisher_url }));
+    },
+    fillSourceGenres(workId, genres) {
+      return Number(fillSourceGenresStmt.run(JSON.stringify(genres), workId).changes);
     },
 
     findBookByKey: (key) => byKeyStmt.get(key) as BookRow | undefined,
