@@ -166,6 +166,40 @@ test("the sweep runs at boot and again after 24 hours", async () => {
   assert.equal(cleared.length, 1);
 });
 
+test("the held set is read once a minute, however many works are judged, and a newly held work is judged after it refreshes", async () => {
+  const { db, repo, workIds } = seeded(["Skip One", "Skip Two", "Became"]);
+  const held: string[] = [];
+  let clock = NOW;
+  let reads = 0;
+  const jobs = startGenreJobs({
+    ...deps(repo, held, answer("History", 0.9)),
+    heldWorkIds: () => { reads += 1; return held; },
+    now: () => clock,
+    onError: (error) => { throw error; },
+    info: () => {}
+  });
+  await flush();
+  assert.equal(reads, 1);
+  clock += 60 * 1000;
+  reads = 0;
+  jobs.add(workIds[0]!);
+  jobs.add(workIds[1]!);
+  await flush();
+  assert.equal(reads, 1);
+  held.push(workIds[2]!);
+  jobs.add(workIds[2]!);
+  await flush();
+  assert.equal(reads, 1);
+  assert.equal(genresOf(db, "Became"), "[]");
+  clock += 60 * 1000;
+  jobs.add(workIds[2]!);
+  await flush();
+  jobs.stop();
+  assert.equal(reads, 2);
+  assert.equal(genresOf(db, "Became"), JSON.stringify(["History"]));
+  assert.equal(genresOf(db, "Skip One"), "[]");
+});
+
 test("without a key nothing starts", () => {
   const { repo } = seeded([]);
   assert.equal(startGenreJobsIfConfigured("", { repo, heldWorkIds: () => [], now: () => NOW, alert: () => {}, onError: () => {}, info: () => {} }), null);

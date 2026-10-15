@@ -14,6 +14,7 @@ export const GENRE_REJECTION_LIMIT = 3;
 export const GENRE_IN_FLIGHT = 4;
 const GENRE_SWEEP_LIMIT = 1000;
 const GENRE_SWEEP_INTERVAL_MS = 24 * 60 * 60 * 1000;
+const HELD_CACHE_MS = 60 * 1000;
 const OUTAGE_PAUSE_MS = 10 * 60 * 1000;
 const KEY_PAUSE_MS = 24 * 60 * 60 * 1000;
 
@@ -76,9 +77,9 @@ function heldCanonical(deps: HeldDeps): Set<string> {
   return new Set(deps.repo.canonicalWorkIds(deps.heldWorkIds()).values());
 }
 
-export async function judgeWork(deps: HeldDeps, workId: string): Promise<number | null> {
+export async function judgeWork(deps: HeldDeps, workId: string, held: () => Set<string> = () => heldCanonical(deps)): Promise<number | null> {
   const canonical = deps.repo.canonicalWorkIds([workId]).get(workId);
-  if (!canonical || !heldCanonical(deps).has(canonical)) return null;
+  if (!canonical || !held().has(canonical)) return null;
   if (deps.repo.worksNeedingGenreJudgment([canonical], 1, GENRE_REJECTION_LIMIT).length === 0) return null;
   return classifyWork(deps, canonical);
 }
@@ -106,13 +107,21 @@ export function startGenreJobs(
       throw error;
     }
   };
+  let heldSince = 0;
+  let heldSet: Set<string> | null = null;
+  const refreshHeld = () => {
+    heldSet = heldCanonical(deps);
+    heldSince = deps.now();
+    return heldSet;
+  };
+  const held = () => (!heldSet || deps.now() - heldSince >= HELD_CACHE_MS ? refreshHeld() : heldSet);
   const judged = { ...deps, alert, classify };
-  const queue = createWorkQueue({ concurrency: GENRE_IN_FLIGHT, now: deps.now, run: (workId) => judgeWork(judged, workId), onError: deps.onError });
+  const queue = createWorkQueue({ concurrency: GENRE_IN_FLIGHT, now: deps.now, run: (workId) => judgeWork(judged, workId, held), onError: deps.onError });
   const stopSweep = startDetailsBackfill(
     async () => {
       deps.repo.applyGenreJudgments(GENRE_SAVE_LINE);
-      const held = [...heldCanonical(deps)];
-      for (const workId of deps.repo.worksNeedingGenreJudgment(held, GENRE_SWEEP_LIMIT, GENRE_REJECTION_LIMIT)) queue.add(workId);
+      const sweepHeld = [...refreshHeld()];
+      for (const workId of deps.repo.worksNeedingGenreJudgment(sweepHeld, GENRE_SWEEP_LIMIT, GENRE_REJECTION_LIMIT)) queue.add(workId);
       return null;
     },
     (error) => deps.onError(error),
