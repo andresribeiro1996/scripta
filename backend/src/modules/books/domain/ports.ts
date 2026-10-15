@@ -73,6 +73,10 @@ export interface BooksRepository {
   editionGenres(workIds: string[]): Array<{ work_id: string; genres: string; genres_source: GenresSource | null; genres_confidence: number | null }>;
   spendTypesafe(day: string, source: string, limit: number): boolean;
   typesafeUsage(day: string, source: string): number;
+  workIdsByWorkKeys(keys: string[]): Map<string, string>;
+  listPublisherUrls(): Array<{ work_id: string | null; publisher_url: string }>;
+  fillSourceGenres(workId: string, genres: string[]): number;
+  countEmptyGenreEditions(workId: string): number;
   setLanguage(id: string, tag: string | null): void;
   setPublisherUrl(id: string, url: string): void;
   listUpgradeWantedIds(after: PageCursor | null, limit: number): IdPage;

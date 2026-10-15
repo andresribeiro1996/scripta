@@ -34,14 +34,15 @@ const RULES: Array<[BookGenre, RegExp]> = [
   ["Mystery", /\bromances? policia(?:l|is)\b/],
   ["Science Fiction", /\b(?:science fiction|sci fi|scifi|ficcao cientifica)\b/],
   ["Historical Fiction", /\bhistorical fiction\b|\bfiction historical\b|\bficcao historica\b/],
-  ["Literary Fiction", /\bliterary fiction\b|\bfiction literary\b|\bficcao literaria\b/],
+  ["Literary Fiction", /\bliterary fiction\b|\bfiction literary\b|\bficcao literaria\b|\blit ?fic\b/],
   ["Classics", /\bclassics?\b|\bclassic literature\b|\bclassicos?\b/],
   ["Biography & Memoir", /\b(?:biograph\w*|autobiograph\w*|memoirs?|biografias?|autobiografias?|memorias)\b/],
   ["Comics & Graphic Novels", /\b(?:comics?|graphic novels?|manga|banda desenhada|quadrinhos)\b/],
-  ["Young Adult", /\b(?:young adult|ya fiction|juvenil|jovens adultos)\b/],
-  ["Children's", /\b(?:children s|childrens|juvenile fiction|picture books?|infantil|infantis)\b/],
-  ["Fantasy", /\b(?:fantasy|fantasia)\b/],
-  ["Romance", /\bromance\b/],
+  ["Children's", /\binfanto ?juvenil\b/],
+  ["Young Adult", /\b(?:young adult|ya|juvenil|jovens adultos)\b/],
+  ["Children's", /\b(?:children s|childrens|juvenile fiction|picture books?|infantil|infantis|middle grade|kids|kid ?lit)\b/],
+  ["Fantasy", /\b(?:fantasy|fantasia|romantasy)\b/],
+  ["Romance", /\bromance\b|\bliteratura romantica\b|\brom ?com\b/],
   ["Mystery", /\bmyst(?:ery|eries)\b|\bdetective fiction\b|\bpolicia(?:l|is)\b|\bmisterios?\b/],
   ["Thriller", /\bthrillers?\b|\bsuspenses?\b/],
   ["Horror", /\b(?:horror|terror)\b/],
@@ -56,9 +57,13 @@ const RULES: Array<[BookGenre, RegExp]> = [
   ["Self-Help", /\bself help\b|\bpersonal development\b|\bauto ?ajuda\b|\bdesenvolvimento pessoal\b/],
   ["Poetry", /\bpoetry\b|\bpoems?\b|\bpoesia\b|\bpoemas?\b/],
   ["Religion", /\b(?:religion|theology|spirituality|religiao|teologia|espiritualidade)\b/],
+  ["Science Fiction", /\b(?:dystopi(?:a|an|as)|space opera|cyberpunk|time travel)\b/],
+  ["Fantasy", /\bparanormal\b/],
   ["Travel", /\b(?:travel|viage(?:m|ns))\b/],
   ["Cooking", /\b(?:cooking|cookbooks?|food|culinaria|receitas|gastronomia)\b/]
 ];
+
+const NOT_GENRES = /^(?:food for thought|reading history)$/;
 
 function valuesOf(value: unknown): string[] {
   if (Array.isArray(value)) return value.filter((item): item is string => typeof item === "string");
@@ -69,6 +74,7 @@ export function normalizeBookGenres(value: unknown): BookGenre[] {
   const found = new Set<BookGenre>();
   for (const raw of valuesOf(value)) {
     const subject = raw.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    if (NOT_GENRES.test(subject)) continue;
     const match = RULES.find(([, pattern]) => pattern.test(subject));
     if (match) found.add(match[0]);
   }

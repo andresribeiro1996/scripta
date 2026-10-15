@@ -13,7 +13,6 @@ export interface SeedEntry {
   languages: string[];
 }
 
-const MAX_SUBJECTS = 10;
 const FIELDS = "key,title,author_name,readinglog_count,subject,editions,editions.title,editions.isbn,editions.language";
 
 export function rankedWorksUrl(lang: SeedLanguage, offset: number, limit: number, isbnPrefix?: string): string {
@@ -48,7 +47,7 @@ export function parseRankedWorks(json: unknown, lang: SeedLanguage, isbnPrefix?:
       lang,
       workKey: work.key,
       readers: typeof work.readinglog_count === "number" ? work.readinglog_count : 0,
-      subjects: strings(work.subject).slice(0, MAX_SUBJECTS),
+      subjects: strings(work.subject),
       languages: strings(edition?.language)
     }];
   });
