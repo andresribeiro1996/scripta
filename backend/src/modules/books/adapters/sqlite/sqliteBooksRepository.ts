@@ -140,6 +140,12 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       (SELECT b.summary FROM books b WHERE b.work_id = w.id AND trim(coalesce(b.summary, '')) <> '' ORDER BY b.created_at, b.rowid LIMIT 1) AS summary
     FROM works w WHERE w.id IN (SELECT value FROM json_each(?))
   `);
+  const portugueseWithEvidenceStmt = db.prepare(`
+    SELECT w.id FROM works w
+    WHERE ${portugueseWorkFilter}
+      AND (w.author <> '' OR EXISTS (SELECT 1 FROM books b WHERE b.work_id = w.id AND (b.original_title IS NOT NULL OR b.author <> '' OR b.summary LIKE '%tulo original%')))
+    ORDER BY w.created_at, w.rowid
+  `);
   const genreJudgmentOwnedStmt = db.prepare(`SELECT 1 AS owned FROM genre_judgments WHERE work_id = ?`);
   const moveGenreJudgmentStmt = db.prepare(`UPDATE genre_judgments SET work_id = ? WHERE work_id = ?`);
   const dropGenreJudgmentStmt = db.prepare(`DELETE FROM genre_judgments WHERE work_id = ?`);
@@ -750,6 +756,9 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     translationReviewWorks(workIds) {
       const rows = translationReviewWorksStmt.all(JSON.stringify(workIds)) as Array<{ id: string; title: string; author: string; cover_image_id: string | null; original_title: string | null; summary: string | null }>;
       return new Map(rows.map((row) => [row.id, { title: row.title, author: row.author, coverImageId: row.cover_image_id, originalTitle: row.original_title, synopsis: row.summary }]));
+    },
+    portugueseWorksWithEvidence() {
+      return (portugueseWithEvidenceStmt.all({ $recheck: null, $rejections: Number.MAX_SAFE_INTEGER }) as Array<{ id: string }>).map((row) => row.id);
     },
 
     detachEdition(bookId, at) {

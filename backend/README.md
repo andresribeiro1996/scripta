@@ -371,6 +371,13 @@ Claude sets and checks the thresholds Jev's answers are read against; it never j
    - The bar for hiding is at least 95% right. A band that misses gets a stricter threshold; a threshold is never loosened without a new labelled sample. A code rule that misses is removed.
    - The sample and label files are never committed.
 
+**Translations** follow the same four steps with `--task translations`:
+
+- **Export:** `node scripts/jev-calibration-export.mjs --task translations --n 200` draws live, unjudged Portuguese works, half that code would merge and half that Jev would be asked about, each with the edition's evidence and the candidates it would see. It writes nothing.
+- **Label:** give the labellers each item's `edition` and `candidates` only, not its `stratum` or `codePick`. Labels are `[{ "workId": "…", "match": "<candidate id>" | null }]`: the candidate that is the same work as the Portuguese edition, or none, using the wording in `adapters/typesafe/jevWorkMatch.ts`. A pick that is the same book under a duplicate Open Library work is noted and counts as right.
+- **Score:** `--task translations` prints, for `code`, `jev 0.9 and above`, `jev 0.5 to 0.9` and `jev below 0.5`, how many labelled works fall in the band and how many of them it picked right.
+- **The bar:** automatic merging (code, and Jev at 0.9 or more) needs at least 98% right once Open Library duplicate works are set aside.
+
 #### Mojibake repair
 
 Some Open Library records store titles and authors already mis-decoded (`fÃ©` for `fé`). New rows are repaired as they enter (`lookupIdentity`, `mapOpenLibraryDoc`). `scripts/repair-mojibake.mjs` repairs the rows stored earlier: `title`, `author`, `title_key`, the corrected `ta:` key (added for rows that hold the mis-decoded one, which stays, so a lookup with the old text still lands on the row), the search index and the works' copies.

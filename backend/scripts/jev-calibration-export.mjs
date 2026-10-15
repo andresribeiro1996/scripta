@@ -16,5 +16,6 @@ if (!process.env.COVERS_DB_PATH) {
 const { createSqliteBooksRepository } = await import("../dist/modules/books/adapters/sqlite/sqliteBooksRepository.js");
 const books = createSqliteBooksRepository(new DatabaseSync(process.env.COVERS_DB_PATH, { readOnly: true }));
 console.log("---BEGIN---");
-console.log(JSON.stringify(synopsisSample(books, n)));
+const { translationSample } = await import("../dist/modules/books/calibration.js");
+console.log(JSON.stringify(values.task === "translations" ? translationSample(books, n) : synopsisSample(books, n)));
 console.log("---END---");
