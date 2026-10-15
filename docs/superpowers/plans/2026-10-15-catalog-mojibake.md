@@ -422,3 +422,11 @@ git commit -m "Add an owner-run repair for mis-decoded catalog titles" -m "<why:
 - Lossy `©` titles (`N©o`): they need a title from another source for the same ISBN (ISBNdb or a publisher feed). That would be a separate change.
 - Open Library titles carrying MARC non-sorting markers U+0098/U+009C around a leading article (`\u0098O \u009cNatal…`). This affects 3.7% of the public sample, is invisible in most renderers, and is a separate clean-up.
 - ISBNdb's `plainText` decodes only six entities, so a numeric entity in an ISBNdb title would stay literal.
+
+## Amendments after review
+
+These changes were made after review; the code, not the task text above, is authoritative.
+
+- **Task 1 rule.** A sequence also counts as suspicious when its continuation holds U+00A0, ©, ® or » (the bytes that spell lowercase à, é, î and û after `Ã`) and a lowercase letter follows it. Without this, mis-decoded text right after a capital (`PÃ©rez`, `MÃ©dia`, `SÃ©rgio`) was left alone. Re-encoding 10,239 accented public strings: unrepaired cases fell from 140 to 8. The output on 28,776 real strings is unchanged.
+- **Task 3 search index.** `books_fts.book_id` is UNINDEXED, so updating by `book_id` scanned the whole index inside each write transaction. At about 19 ms per book, that held the write lock almost continuously and starved the live API. The rowids are now read in one query before any write, and each transaction updates by `rowid`. 150 repairs on 78k index rows went from 2.8 s to 73 ms.
+- **Task 3 title key.** The corrected `ta:` key is `catalogTitleKey(repaired)`, added only when the row holds `catalogTitleKey(original)`. An ISBN-less book with a blank author now gets its corrected key. An ISBN book with a blank author still gets no authorless key.
