@@ -57,10 +57,15 @@ export interface BooksRepository {
   setWorkSummary(bookId: string, summary: string): void;
   getWorkSummary(bookId: string): { summary: string | null; olWorkKey: string | null } | undefined;
   canonicalWorkIds(ids: string[]): Map<string, string>;
-  worksNeedingGenreJudgment(workIds: string[], limit: number): string[];
+  worksNeedingGenreJudgment(workIds: string[], limit: number, rejectionLimit: number): string[];
   saveGenreJudgment(judgment: { workId: string; model: string; genre: string | null; confidence: number; askedAt: string }): void;
-  genreJudgments(workIds: string[]): Map<string, { genre: string | null; confidence: number }>;
+  genreJudgments(workIds: string[]): Map<string, { model: string; genre: string | null; confidence: number }>;
   applyGenreJudgments(saveLine: number): void;
+  applyGenreJudgment(workId: string, saveLine: number): void;
+  deleteGenreJudgment(workId: string): void;
+  recordGenreRejection(rejection: { workId: string; status: number | null; reason: string; at: string }): void;
+  clearGenreRejection(workId: string): void;
+  genreRejections(workIds: string[]): Map<string, { status: number | null; reason: string; attempts: number; lastAt: string }>;
   genreEvidence(workId: string): GenreEvidence | undefined;
   setManualGenres(workId: string, genres: string[]): number;
   aliasesOf(workIds: string[]): string[];

@@ -1365,9 +1365,9 @@ test("works needing a genre judgment have no genres, a finished details lookup a
   db.prepare("UPDATE books SET genres = ? WHERE id = ?").run(JSON.stringify(["Poetry"]), tagged!.id);
   repo.saveGenreJudgment({ workId: judged!.work_id!, model: "jev-1.13.0", genre: null, confidence: 0.9, askedAt: NOW });
   const ids = [ready, tagged, unchecked, judged].map((book) => book!.work_id!);
-  assert.deepEqual(repo.worksNeedingGenreJudgment(ids, 10), [ready!.work_id]);
-  assert.deepEqual(repo.worksNeedingGenreJudgment(ids, 0), []);
-  assert.deepEqual(repo.genreJudgments(ids), new Map([[judged!.work_id!, { genre: null, confidence: 0.9 }]]));
+  assert.deepEqual(repo.worksNeedingGenreJudgment(ids, 10, 3), [ready!.work_id]);
+  assert.deepEqual(repo.worksNeedingGenreJudgment(ids, 0, 3), []);
+  assert.deepEqual(repo.genreJudgments(ids), new Map([[judged!.work_id!, { model: "jev-1.13.0", genre: null, confidence: 0.9 }]]));
 });
 
 test("deleting the judgment of a work with an applied Jev genre makes it selectable again", () => {
@@ -1376,9 +1376,9 @@ test("deleting the judgment of a work with an applied Jev genre makes it selecta
   repo.markDetailsMissing(book.id, NOW);
   repo.saveGenreJudgment({ workId: book.work_id!, model: "jev-1.13.0", genre: "History", confidence: 0.9, askedAt: NOW });
   repo.applyGenreJudgments(0.5);
-  assert.deepEqual(repo.worksNeedingGenreJudgment([book.work_id!], 10), []);
+  assert.deepEqual(repo.worksNeedingGenreJudgment([book.work_id!], 10, 3), []);
   db.prepare("DELETE FROM genre_judgments WHERE work_id = ?").run(book.work_id);
-  assert.deepEqual(repo.worksNeedingGenreJudgment([book.work_id!], 10), [book.work_id]);
+  assert.deepEqual(repo.worksNeedingGenreJudgment([book.work_id!], 10, 3), [book.work_id]);
 });
 
 test("applying judgments writes Jev genres at or above the save line, idempotently, and undoes them when the line rises", () => {
@@ -1414,4 +1414,48 @@ test("Open Library genres replace a Jev guess, an empty answer keeps it, and man
   assert.deepEqual(genreRow(db, jev.id), { genres: JSON.stringify(["Fantasy"]), genres_source: null, genres_confidence: null });
   repo.saveDetails(manual.id, richDetails, ["openlibrary"], "openlibrary", NOW);
   assert.deepEqual(genreRow(db, manual.id), { genres: JSON.stringify(["Poetry"]), genres_source: "manual", genres_confidence: null });
+});
+
+test("strikes count per work, keep the latest failure, and stop selection at the limit", () => {
+  const { repo } = freshRepo();
+  const book = titled(repo, "Struck");
+  repo.markDetailsMissing(book.id, NOW);
+  const work = book.work_id!;
+  repo.recordGenreRejection({ workId: work, status: 400, reason: "HTTP 400", at: NOW });
+  repo.recordGenreRejection({ workId: work, status: null, reason: "unexpected answer", at: "2026-10-02T00:00:00.000Z" });
+  assert.deepEqual(repo.genreRejections([work]).get(work), { status: null, reason: "unexpected answer", attempts: 2, lastAt: "2026-10-02T00:00:00.000Z" });
+  assert.deepEqual(repo.worksNeedingGenreJudgment([work], 10, 3), [work]);
+  repo.recordGenreRejection({ workId: work, status: 422, reason: "HTTP 422", at: NOW });
+  assert.deepEqual(repo.worksNeedingGenreJudgment([work], 10, 3), []);
+  repo.clearGenreRejection(work);
+  assert.deepEqual(repo.worksNeedingGenreJudgment([work], 10, 3), [work]);
+  assert.equal(repo.genreRejections([work]).size, 0);
+});
+
+test("applying one work's judgment touches only that work and repeats as a no-op", () => {
+  const { db, repo } = freshRepo();
+  const [one, two] = ["One", "Two"].map((title) => titled(repo, title));
+  for (const book of [one, two]) repo.saveGenreJudgment({ workId: book!.work_id!, model: "jev-1.13.0", genre: "History", confidence: 0.9, askedAt: NOW });
+  repo.applyGenreJudgment(one!.work_id!, 0.5);
+  assert.deepEqual(genreRow(db, one!.id), { genres: JSON.stringify(["History"]), genres_source: "jev", genres_confidence: 0.9 });
+  assert.deepEqual(genreRow(db, two!.id), { genres: "[]", genres_source: null, genres_confidence: null });
+  const changes = () => (db.prepare("SELECT total_changes() AS n").get() as { n: number }).n;
+  const before = changes();
+  repo.applyGenreJudgment(one!.work_id!, 0.5);
+  assert.equal(changes(), before);
+  repo.saveGenreJudgment({ workId: one!.work_id!, model: "jev-1.13.0", genre: null, confidence: 0.9, askedAt: NOW });
+  repo.applyGenreJudgment(one!.work_id!, 0.5);
+  assert.deepEqual(genreRow(db, one!.id), { genres: "[]", genres_source: null, genres_confidence: null });
+});
+
+test("deleting a judgment removes Jev's answer and keeps the owner's", () => {
+  const { repo } = freshRepo();
+  const [jev, manual] = ["Jev", "Manual"].map((title) => titled(repo, title));
+  repo.saveGenreJudgment({ workId: jev!.work_id!, model: "jev-1.13.0", genre: "Poetry", confidence: 0.3, askedAt: NOW });
+  repo.saveGenreJudgment({ workId: manual!.work_id!, model: "manual", genre: null, confidence: 1, askedAt: NOW });
+  repo.deleteGenreJudgment(jev!.work_id!);
+  repo.deleteGenreJudgment(manual!.work_id!);
+  const judgments = repo.genreJudgments([jev!.work_id!, manual!.work_id!]);
+  assert.equal(judgments.has(jev!.work_id!), false);
+  assert.deepEqual(judgments.get(manual!.work_id!), { model: "manual", genre: null, confidence: 1 });
 });

@@ -181,21 +181,30 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     WHERE NOT EXISTS (SELECT 1 FROM genre_judgments j WHERE j.work_id = w.value)
       AND NOT EXISTS (SELECT 1 FROM books b WHERE b.work_id = w.value AND b.genres <> '[]' AND b.genres_source IS NOT 'jev')
       AND EXISTS (SELECT 1 FROM books b WHERE b.work_id = w.value AND b.details_status IS NOT NULL)
+      AND NOT EXISTS (SELECT 1 FROM genre_rejections r WHERE r.work_id = w.value AND r.attempts >= ?)
     LIMIT ?
   `);
   const saveJudgmentStmt = db.prepare(`INSERT OR REPLACE INTO genre_judgments (work_id, model, genre, confidence, asked_at) VALUES (?, ?, ?, ?, ?)`);
-  const judgmentsStmt = db.prepare(`SELECT work_id, genre, confidence FROM genre_judgments WHERE work_id IN (SELECT value FROM json_each(?))`);
+  const judgmentsStmt = db.prepare(`SELECT work_id, model, genre, confidence FROM genre_judgments WHERE work_id IN (SELECT value FROM json_each(?))`);
   const applyJudgmentsStmt = db.prepare(`
     UPDATE books SET genres = json_array(j.genre), genres_source = 'jev', genres_confidence = j.confidence
     FROM genre_judgments AS j
-    WHERE books.work_id = j.work_id AND j.genre IS NOT NULL AND j.confidence >= ?
+    WHERE books.work_id = j.work_id AND ($workId IS NULL OR books.work_id = $workId) AND j.genre IS NOT NULL AND j.confidence >= $saveLine
       AND (books.genres = '[]' OR books.genres_source = 'jev')
       AND NOT (books.genres = json_array(j.genre) AND books.genres_source = 'jev' AND books.genres_confidence IS j.confidence)
   `);
   const undoJudgmentsStmt = db.prepare(`
     UPDATE books SET genres = '[]', genres_source = NULL, genres_confidence = NULL
-    WHERE genres_source = 'jev' AND work_id IN (SELECT work_id FROM genre_judgments WHERE genre IS NULL OR confidence < ?)
+    WHERE genres_source = 'jev' AND ($workId IS NULL OR work_id = $workId)
+      AND work_id IN (SELECT work_id FROM genre_judgments WHERE genre IS NULL OR confidence < $saveLine)
   `);
+  const deleteJudgmentStmt = db.prepare(`DELETE FROM genre_judgments WHERE work_id = ? AND model <> 'manual'`);
+  const recordGenreRejectionStmt = db.prepare(`
+    INSERT INTO genre_rejections (work_id, status, reason, attempts, last_at) VALUES (?, ?, ?, 1, ?)
+    ON CONFLICT (work_id) DO UPDATE SET status = excluded.status, reason = excluded.reason, attempts = attempts + 1, last_at = excluded.last_at
+  `);
+  const clearGenreRejectionStmt = db.prepare(`DELETE FROM genre_rejections WHERE work_id = ?`);
+  const genreRejectionsStmt = db.prepare(`SELECT work_id, status, reason, attempts, last_at FROM genre_rejections WHERE work_id IN (SELECT value FROM json_each(?))`);
   const spendTypesafeStmt = db.prepare(`
     INSERT INTO typesafe_usage (day, source, requests) VALUES (?, ?, 1)
     ON CONFLICT (day, source) DO UPDATE SET requests = requests + 1 WHERE requests < ?
@@ -227,6 +236,13 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       $year: details.year,
       $publisher: details.publisher,
       $translator: details.translator
+    });
+  }
+
+  function applyJudgments(workId: string | null, saveLine: number) {
+    inTransaction(() => {
+      undoJudgmentsStmt.run({ $workId: workId, $saveLine: saveLine });
+      applyJudgmentsStmt.run({ $workId: workId, $saveLine: saveLine });
     });
   }
 
@@ -518,21 +534,34 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       } satisfies WorkView;
     },
 
-    worksNeedingGenreJudgment(workIds, limit) {
-      return (needingJudgmentStmt.all(JSON.stringify(workIds), limit) as Array<{ id: string }>).map((row) => row.id);
+    worksNeedingGenreJudgment(workIds, limit, rejectionLimit) {
+      return (needingJudgmentStmt.all(JSON.stringify(workIds), rejectionLimit, limit) as Array<{ id: string }>).map((row) => row.id);
     },
     saveGenreJudgment(judgment) {
       saveJudgmentStmt.run(judgment.workId, judgment.model, judgment.genre, judgment.confidence, judgment.askedAt);
     },
     genreJudgments(workIds) {
-      const rows = judgmentsStmt.all(JSON.stringify(workIds)) as Array<{ work_id: string; genre: string | null; confidence: number }>;
-      return new Map(rows.map((row) => [row.work_id, { genre: row.genre, confidence: row.confidence }]));
+      const rows = judgmentsStmt.all(JSON.stringify(workIds)) as Array<{ work_id: string; model: string; genre: string | null; confidence: number }>;
+      return new Map(rows.map((row) => [row.work_id, { model: row.model, genre: row.genre, confidence: row.confidence }]));
     },
     applyGenreJudgments(saveLine) {
-      inTransaction(() => {
-        undoJudgmentsStmt.run(saveLine);
-        applyJudgmentsStmt.run(saveLine);
-      });
+      applyJudgments(null, saveLine);
+    },
+    applyGenreJudgment(workId, saveLine) {
+      applyJudgments(workId, saveLine);
+    },
+    deleteGenreJudgment(workId) {
+      deleteJudgmentStmt.run(workId);
+    },
+    recordGenreRejection(rejection) {
+      recordGenreRejectionStmt.run(rejection.workId, rejection.status, rejection.reason, rejection.at);
+    },
+    clearGenreRejection(workId) {
+      clearGenreRejectionStmt.run(workId);
+    },
+    genreRejections(workIds) {
+      const rows = genreRejectionsStmt.all(JSON.stringify(workIds)) as Array<{ work_id: string; status: number | null; reason: string; attempts: number; last_at: string }>;
+      return new Map(rows.map((row) => [row.work_id, { status: row.status, reason: row.reason, attempts: row.attempts, lastAt: row.last_at }]));
     },
     spendTypesafe(day, source, limit) {
       return Number(spendTypesafeStmt.run(day, source, limit).changes) > 0;

@@ -44,7 +44,7 @@ test("judges held works, stores every answer, saves the ones at or above the sav
   const genres = (title: string) => (db.prepare("SELECT genres FROM books WHERE title = ?").get(title) as { genres: string }).genres;
   assert.equal(genres("Sure"), JSON.stringify(["History"]));
   assert.equal(genres("Unsure"), "[]");
-  assert.deepEqual(repo.genreJudgments(workIds).get(workIds[1]!), { genre: "Poetry", confidence: 0.3 });
+  assert.deepEqual(repo.genreJudgments(workIds).get(workIds[1]!), { model: "jev-1.13.0", genre: "Poetry", confidence: 0.3 });
   assert.equal(await judgeGenres(deps(repo, workIds, async () => { throw new Error("asked twice"); }), 50, new AbortController().signal), null);
 });
 

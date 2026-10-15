@@ -7,6 +7,7 @@ import { longestSynopsis } from "./genrePass.js";
 export const GENRE_SAVE_LINE = 0.5;
 export const GENRE_SOURCE = "genres";
 export const GENRE_DAILY_BUDGET = 1000;
+export const GENRE_REJECTION_LIMIT = 3;
 export const GENRE_JUDGMENT_BATCH = 50;
 const IN_FLIGHT = 4;
 const KEY_PAUSE_MS = 24 * 60 * 60 * 1000;
@@ -33,7 +34,7 @@ export function jevBookOf(evidence: GenreEvidence): JevBook {
 
 export async function judgeGenres(deps: GenreJudgmentDeps, limit: number, signal: AbortSignal): Promise<number | null> {
   const held = [...new Set(deps.repo.canonicalWorkIds(deps.heldWorkIds()).values())];
-  const workIds = deps.repo.worksNeedingGenreJudgment(held, limit);
+  const workIds = deps.repo.worksNeedingGenreJudgment(held, limit, GENRE_REJECTION_LIMIT);
   const failures: unknown[] = [];
   let next = 0;
   const worker = async () => {

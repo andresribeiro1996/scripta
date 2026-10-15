@@ -44,7 +44,7 @@ export function genrePassWorksWith(books: BooksRepository, held: HeldWork[]): Ge
       const evidence = (genres.get(workId)?.genres.length ?? 0) > 0 ? undefined : books.genreEvidence(workId);
       if (!evidence) return [];
       const editions = [...new Map(evidence.editions.map((edition) => [`${edition.title}|${edition.language}|${edition.isbn}`, { title: edition.title, language: edition.language, isbn: edition.isbn, publisher: edition.publisher, year: edition.year }])).values()].slice(0, EDITION_LIMIT);
-      return [{ workId, title: evidence.work.title, author: evidence.work.author, editions, synopsis: longestSynopsis(evidence), ...entry, jev: judgments.get(workId) ?? null }];
+      return [{ workId, title: evidence.work.title, author: evidence.work.author, editions, synopsis: longestSynopsis(evidence), ...entry, jev: judgments.has(workId) ? { genre: judgments.get(workId)!.genre, confidence: judgments.get(workId)!.confidence } : null }];
     })
     .sort((a, b) => Number(b.finished) - Number(a.finished) || b.holders - a.holders || a.title.localeCompare(b.title));
 }
