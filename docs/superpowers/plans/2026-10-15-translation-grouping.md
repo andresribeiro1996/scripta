@@ -1906,24 +1906,24 @@ export function runCodeSteps(deps: TranslationDeps, workIds: string[]): CodeStep
 }
 
 export async function runTranslationBacklog(deps: TranslationDeps, workIds: string[]): Promise<{ asked: string[]; stoppedBy: TranslationBacklogStop }> {
-  let lastFailure: FailureKind | null = null;
-  const classify: ClassifyMatch = async (input) => {
-    try {
-      return await deps.classify(input);
-    } catch (error) {
-      lastFailure = failureKind(error);
-      throw error;
-    }
-  };
   const asked: string[] = [];
   let stoppedBy: TranslationBacklogStop = "done";
   let next = 0;
   const worker = async () => {
     while (stoppedBy === "done" && next < workIds.length) {
       const workId = workIds[next++]!;
+      const call: { failure: FailureKind | null } = { failure: null };
+      const classify: ClassifyMatch = async (input) => {
+        try {
+          return await deps.classify(input);
+        } catch (error) {
+          call.failure = failureKind(error);
+          throw error;
+        }
+      };
       const pause = await matchWork({ ...deps, classify }, workId);
       if (pause === null) asked.push(workId);
-      else if (stoppedBy === "done") stoppedBy = lastFailure === "budget" || lastFailure === "key" ? lastFailure : "outage";
+      else if (stoppedBy === "done") stoppedBy = call.failure === "budget" || call.failure === "key" ? call.failure : "outage";
     }
   };
   await Promise.all(Array.from({ length: IN_FLIGHT }, worker));
