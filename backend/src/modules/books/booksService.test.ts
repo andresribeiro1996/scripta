@@ -771,6 +771,28 @@ test("a search hit fills the author of a saved book that has a title but no auth
   assert.equal(h.repo.getBook(authorless.id)!.author, "Sophia de Mello Breyner Andresen");
 });
 
+test("a search hit with mis-decoded text is saved repaired, under the keys made from the repaired text", async () => {
+  const hit = { result: { title: "Entre a fÃ© e a crenÃ§a", authors: ["JosÃ© Silva"], year: null, isbn: "9780000000002", publisher: null, coverUrl: null, genres: [] }, olCoverId: null, source: "isbndb" as const };
+  const h = harness({ catalog: recordingCatalog({ search: async () => [hit] }).catalog });
+  await h.service.searchExternal("fe");
+  const row = h.repo.findBookByKey("isbn:9780000000002")!;
+  assert.equal(row.title, "Entre a fé e a crença");
+  assert.equal(row.author, "José Silva");
+  assert.equal(row.title_key, "ta:entre a fe e a crenca|jose silva|");
+  assert.equal(h.repo.findBookByKey("ta:entre a fe e a crenca|jose silva|")?.id, row.id);
+});
+
+test("a search hit with mis-decoded text fills a saved blank row with the repaired text", async () => {
+  const hit = { result: { title: "Entre a fÃ© e a crenÃ§a", authors: ["JosÃ© Silva"], year: null, isbn: "9780000000002", publisher: null, coverUrl: null, genres: [] }, olCoverId: null, source: "isbndb" as const };
+  const h = harness({ catalog: recordingCatalog({ search: async () => [hit] }).catalog });
+  const blank = h.repo.createBook({ title: "", author: "", isbn: "9780000000002" }, ["isbn:9780000000002"], "2026-10-01T00:00:00.000Z");
+  await h.service.searchExternal("fe");
+  const row = h.repo.getBook(blank.id)!;
+  assert.equal(row.title, "Entre a fé e a crença");
+  assert.equal(row.author, "José Silva");
+  assert.equal(row.title_key, "ta:entre a fe e a crenca|jose silva|");
+});
+
 test("a saved book's own cover is used in search results", async () => {
   const { catalog } = recordingCatalog();
   const h = harness({ catalog, sources: { isbndb: null, apple: isbnSource("https://a/1"), openlibrary: emptySource } });

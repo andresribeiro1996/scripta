@@ -171,11 +171,11 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       const identity = lookupIdentity({ isbn: result.isbn, title: result.title, author });
       if (!identity) return { result, book: null };
       const book = findExisting(deps.repo, identity) ?? deps.repo.createBook(
-        { title: result.title, author, isbn: identity.isbn, year: result.year, publisher: result.publisher, olCoverId, workKey, genres: result.genres, sources: [source] },
+        { title: identity.title, author: identity.author, isbn: identity.isbn, year: result.year, publisher: result.publisher, olCoverId, workKey, genres: result.genres, sources: [source] },
         keysOf(deps.repo, identity),
         now().toISOString()
       );
-      if (!book.title || !book.author) deps.repo.fillIdentity(book.id, result.title, author);
+      if (!book.title || !book.author) deps.repo.fillIdentity(book.id, identity.title, identity.author);
       deps.repo.setWorkKey(book.id, workKey);
       deps.repo.makeSearchable(book.id);
       return { result: book.cover_image_id ? { ...result, coverUrl: deps.publicUrlFor(book.cover_image_id, "thumb") } : result, book: deps.repo.getBook(book.id) ?? book };
