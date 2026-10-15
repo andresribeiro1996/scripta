@@ -39,6 +39,14 @@ export function planMatch(repo: PlanRepo, workId: string): MatchPlan | null {
 const OUTAGE_PAUSE_MS = 10 * 60 * 1000;
 const KEY_PAUSE_MS = 24 * 60 * 60 * 1000;
 
+export function arenaCheck(repo: Pick<BooksRepository, "canonicalWorkIds" | "aliasesOf">, worksShareAnArena: (aIds: string[], bIds: string[]) => boolean): (fromWorkId: string, intoWorkId: string) => boolean {
+  const ids = (id: string) => {
+    const live = repo.canonicalWorkIds([id]).get(id) ?? id;
+    return [live, ...repo.aliasesOf([live])];
+  };
+  return (fromWorkId, intoWorkId) => worksShareAnArena(ids(fromWorkId), ids(intoWorkId));
+}
+
 export type TranslationDeps = {
   repo: BooksRepository;
   classify: ClassifyMatch;

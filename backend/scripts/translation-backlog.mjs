@@ -25,7 +25,8 @@ const arena = createSqliteArenaRepository(new DatabaseSync(process.env.ARENA_DB_
 const held = createWorkHolders(new DatabaseSync(process.env.LIBRARY_DB_PATH, { readOnly: true })).heldWorks().map((work) => work.workId);
 const recheckBefore = values["recheck-none"] ? new Date(Date.now() - RECHECK_AFTER_MS).toISOString() : null;
 const works = translationBacklogWorks(repo, held, recheckBefore);
-const sharesArena = (a, b) => arena.worksShareATournament([a, ...repo.aliasesOf([a])], [b, ...repo.aliasesOf([b])]);
+const { arenaCheck } = await import("../dist/modules/books/translationJudgments.js");
+const sharesArena = arenaCheck(repo, (a, b) => arena.worksShareATournament(a, b));
 
 if (values["dry-run"]) {
   console.log(JSON.stringify(translationDryRun(repo, works, max), null, 2));

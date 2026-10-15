@@ -20,7 +20,7 @@ import { startGenreJobsIfConfigured } from "./genreJudgments.js";
 import { genreReviewWith, reviewGenreWith } from "./genreReview.js";
 import { startSynopsisJobsIfConfigured } from "./synopsisJudgments.js";
 import { reviewSynopsisWith, synopsisReviewWith } from "./synopsisReview.js";
-import { startTranslationJobsIfConfigured } from "./translationJudgments.js";
+import { arenaCheck, startTranslationJobsIfConfigured } from "./translationJudgments.js";
 import { reviewTranslationWith, translationReviewWith } from "./translationReview.js";
 import { isPortuguese } from "./domain/translation.js";
 import type { HeldWork } from "./genrePass.js";
@@ -88,7 +88,7 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
         onError: (error, workId) => app.log.error({ err: error, workId }, "synopsis judgment failed")
       })
     : null;
-  const sharesArena = (a: string, b: string) => options.worksShareAnArena?.([a, ...repo.aliasesOf([a])], [b, ...repo.aliasesOf([b])]) ?? false;
+  const sharesArena = options.worksShareAnArena ? arenaCheck(repo, options.worksShareAnArena) : () => false;
   const translationJobs = heldWorks
     ? startTranslationJobsIfConfigured(env.TYPESAFE_API_KEY, {
         repo,

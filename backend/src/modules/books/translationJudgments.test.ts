@@ -15,7 +15,7 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
 const { applyBooksMigrations } = await import("./adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("./adapters/sqlite/sqliteBooksRepository.js");
-const { judgeWorkMatch, matchWork, planMatch, startTranslationJobs } = await import("./translationJudgments.js");
+const { arenaCheck, judgeWorkMatch, matchWork, planMatch, startTranslationJobs } = await import("./translationJudgments.js");
 const { SourceUnavailableError, UnusableAnswerError } = await import("./domain/errors.js");
 
 type Repo = ReturnType<typeof createSqliteBooksRepository>;
@@ -197,4 +197,17 @@ test("adding a work only queues it; matching happens after the caller returns", 
   await flush();
   assert.equal(asked.length, 1);
   jobs.stop();
+});
+
+test("the arena check looks at each work's live id and all its aliases, however stale the ids it is given", () => {
+  const repo = freshRepo();
+  const pt = edition(repo, "9789720000460", { title: "O Passeio", author: "Robert Walser", language: "pt-PT" });
+  const loose = edition(repo, "9780000000460", { title: "The Walk", author: "Robert Walser" });
+  const keyed = edition(repo, "9780000000461", { title: "The Walk", author: "Robert Walser", workKey: "OL991W" });
+  repo.mergeWorks(loose.work_id!, keyed.work_id!, AT);
+  const seen: Array<[string[], string[]]> = [];
+  const shares = arenaCheck(repo, (a, b) => { seen.push([a, b]); return b.includes(keyed.work_id!); });
+  assert.equal(shares(pt.work_id!, loose.work_id!), true);
+  assert.deepEqual(seen[0]![0], [pt.work_id]);
+  assert.deepEqual([...seen[0]![1]].sort(), [keyed.work_id, loose.work_id].sort());
 });
