@@ -1536,8 +1536,10 @@ EOF
   - `options.worksShareAnArena` (Task 4).
 - Produces:
   - `WORK_MATCH_SOURCE = "works"`, `WORK_MATCH_DAILY_BUDGET = 1000`
-  - `judgeWorkMatch(deps: TranslationDeps & { heldWorkIds: () => string[] }, workId: string): Promise<number | null>`: canonical, held, Portuguese and still needing a match, then `matchWork`.
-  - `startTranslationJobs(deps: TranslationDeps & { heldWorkIds: () => string[]; onError: (error: unknown, workId?: string) => void }): TranslationJobs`, where `TranslationJobs = { add(workId: string): void; stop(): void }`.
+  - `judgeWorkMatch(deps: TranslationDeps & { heldWorkIds: () => string[] }, workId: string, held?: () => Set<string>): Promise<number | null>`: canonical, held, Portuguese and still needing a match, then `matchWork`.
+  - `startTranslationJobs(deps: TranslationDeps & { heldWorkIds: () => string[]; info: (details: Record<string, unknown>, message: string) => void; onError: (error: unknown, workId?: string) => void }): TranslationJobs`, where `TranslationJobs = { add(workId: string): void; stop(): void }`. Like the genre and synopsis jobs:
+    - it caches the held canonical set for 60 seconds and refreshes it at each sweep;
+    - it logs a spent budget once per pause through `info`.
   - `startTranslationJobsIfConfigured(apiKey: string, deps: Omit<Parameters<typeof startTranslationJobs>[0], "classify">): TranslationJobs | null`
   - `onDetailsChecked` adds the work of a book with a Portuguese language.
 
@@ -1564,7 +1566,7 @@ test("adding a work only queues it; matching happens after the caller returns", 
   const repo = freshRepo();
   const { pt } = lighthouse(repo, "");
   const { deps, asked } = matching(repo, async () => ({ choice: null, confidence: 0.9, model: "jev-1.13.0" }));
-  const jobs = startTranslationJobs({ ...deps, heldWorkIds: () => [pt.work_id!], onError: (error) => { throw error; } });
+  const jobs = startTranslationJobs({ ...deps, heldWorkIds: () => [pt.work_id!], info: () => {}, onError: (error) => { throw error; } });
   jobs.add(pt.work_id!);
   assert.equal(asked.length, 0);
   await new Promise((resolve) => setTimeout(resolve, 20));
@@ -1591,7 +1593,7 @@ import { dailySpend } from "./typesafe.js";
 import { createWorkQueue } from "./workQueue.js";
 ```
 
-  Merge `dailySpend` into the existing `./typesafe.js` import instead of adding a second line.
+  Merge `dailySpend` into the existing `./typesafe.js` import, and `createJevMatchClassifier` into the existing `./adapters/typesafe/jevWorkMatch.js` import, instead of adding second lines. `ClassifyMatch`, `failureKind` and `nextUtcMidnight` are already imported from Task 6.
 - Then append:
 
 ```ts
@@ -1600,6 +1602,7 @@ export const WORK_MATCH_DAILY_BUDGET = 1000;
 const IN_FLIGHT = 4;
 const SWEEP_LIMIT = 1000;
 const SWEEP_INTERVAL_MS = 24 * 60 * 60 * 1000;
+const HELD_CACHE_MS = 60 * 1000;
 
 type HeldDeps = TranslationDeps & { heldWorkIds: () => string[] };
 export type TranslationJobs = { add(workId: string): void; stop(): void };
@@ -1608,25 +1611,43 @@ function heldCanonical(deps: HeldDeps): Set<string> {
   return new Set(deps.repo.canonicalWorkIds(deps.heldWorkIds()).values());
 }
 
-export async function judgeWorkMatch(deps: HeldDeps, workId: string): Promise<number | null> {
+export async function judgeWorkMatch(deps: HeldDeps, workId: string, held: () => Set<string> = () => heldCanonical(deps)): Promise<number | null> {
   const canonical = deps.repo.canonicalWorkIds([workId]).get(workId);
-  if (!canonical || !heldCanonical(deps).has(canonical)) return null;
+  if (!canonical || !held().has(canonical)) return null;
   if (deps.repo.portugueseWorksNeedingMatch([canonical], 1, JEV_REJECTION_LIMIT, null).length === 0) return null;
   return matchWork(deps, canonical);
 }
 
-export function startTranslationJobs(deps: HeldDeps & { onError: (error: unknown, workId?: string) => void }): TranslationJobs {
+export function startTranslationJobs(deps: HeldDeps & { info: (details: Record<string, unknown>, message: string) => void; onError: (error: unknown, workId?: string) => void }): TranslationJobs {
   let quietUntil = 0;
+  let budgetLoggedUntil = 0;
+  let heldCache: { at: number; works: Set<string> } | null = null;
   const alert = (subject: string, text: string) => {
     if (deps.now() < quietUntil) return;
     quietUntil = deps.now() + KEY_PAUSE_MS;
     deps.alert(subject, text);
   };
-  const judged = { ...deps, alert };
-  const queue = createWorkQueue({ concurrency: IN_FLIGHT, now: deps.now, run: (workId) => judgeWorkMatch(judged, workId), onError: deps.onError });
+  const held = () => {
+    if (!heldCache || deps.now() - heldCache.at >= HELD_CACHE_MS) heldCache = { at: deps.now(), works: heldCanonical(deps) };
+    return heldCache.works;
+  };
+  const classify: ClassifyMatch = async (input) => {
+    try {
+      return await deps.classify(input);
+    } catch (error) {
+      if (failureKind(error) === "budget" && deps.now() >= budgetLoggedUntil) {
+        budgetLoggedUntil = nextUtcMidnight(deps.now());
+        deps.info({ source: WORK_MATCH_SOURCE, until: new Date(budgetLoggedUntil).toISOString() }, "TypeSafe budget spent; translation matching waits for the next UTC day");
+      }
+      throw error;
+    }
+  };
+  const judged = { ...deps, alert, classify };
+  const queue = createWorkQueue({ concurrency: IN_FLIGHT, now: deps.now, run: (workId) => judgeWorkMatch(judged, workId, held), onError: deps.onError });
   const stopSweep = startDetailsBackfill(
     async () => {
-      for (const workId of deps.repo.portugueseWorksNeedingMatch([...heldCanonical(deps)], SWEEP_LIMIT, JEV_REJECTION_LIMIT, null)) queue.add(workId);
+      heldCache = { at: deps.now(), works: heldCanonical(deps) };
+      for (const workId of deps.repo.portugueseWorksNeedingMatch([...heldCache.works], SWEEP_LIMIT, JEV_REJECTION_LIMIT, null)) queue.add(workId);
       return null;
     },
     (error) => deps.onError(error),
@@ -1660,6 +1681,7 @@ In `plugin.ts`:
         heldWorkIds: () => heldWorks().map((work) => work.workId),
         now: Date.now,
         alert: alertTypesafe,
+        info: (details, message) => app.log.info(details, message),
         onError: (error, workId) => app.log.error({ err: error, workId }, "translation matching failed")
       })
     : null;

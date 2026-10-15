@@ -952,8 +952,10 @@ EOF
   - `type SynopsisJudgmentDeps = { repo: BooksRepository; classify: ClassifySynopsis; now: () => number; alert: (subject: string, text: string) => void }`
   - `applySynopsisRule(repo, hash: string, at: string): boolean`
   - `classifyText(deps: SynopsisJudgmentDeps, hash: string): Promise<number | null>`
-  - `judgeWorkSynopses(deps: SynopsisJudgmentDeps & { heldWorkIds: () => string[] }, workId: string): Promise<number | null>`
-  - `startSynopsisJobs(deps: SynopsisJudgmentDeps & { heldWorkIds: () => string[]; onError: (error: unknown, workId?: string) => void }): SynopsisJobs`, where `SynopsisJobs = { add(workId: string): void; stop(): void }`
+  - `judgeWorkSynopses(deps: SynopsisJudgmentDeps & { heldWorkIds: () => string[] }, workId: string, held?: () => Set<string>): Promise<number | null>`
+  - `startSynopsisJobs(deps: SynopsisJudgmentDeps & { heldWorkIds: () => string[]; info: (details: Record<string, unknown>, message: string) => void; onError: (error: unknown, workId?: string) => void }): SynopsisJobs`, where `SynopsisJobs = { add(workId: string): void; stop(): void }`. It mirrors the genre jobs as built:
+    - it caches the held canonical set for 60 seconds and refreshes it at each sweep;
+    - it logs a spent budget once per pause through `info`, with no alert.
   - `startSynopsisJobsIfConfigured(apiKey: string, deps: Omit<Parameters<typeof startSynopsisJobs>[0], "classify">): SynopsisJobs | null`
 
 - [ ] **Step 1: Write the failing tests**
@@ -1087,7 +1089,7 @@ test("adding a work only queues it; judging happens after the caller returns", a
   const repo = freshRepo();
   const book = seed(repo, "9789720000048", SYNOPSIS);
   const { deps, asked } = judging(repo, keep, [book.work_id!]);
-  const jobs = startSynopsisJobs({ ...deps, onError: (error) => { throw error; } });
+  const jobs = startSynopsisJobs({ ...deps, info: () => {}, onError: (error) => { throw error; } });
   jobs.add(book.work_id!);
   assert.deepEqual(asked, []);
   await new Promise((resolve) => setTimeout(resolve, 20));
@@ -1095,17 +1097,30 @@ test("adding a work only queues it; judging happens after the caller returns", a
   jobs.stop();
 });
 
+test("a spent budget is logged once per pause, at info level, without an alert", async () => {
+  const repo = freshRepo();
+  const books = [seed(repo, "9789720000081", SYNOPSIS), seed(repo, "9789720000082", `${SYNOPSIS} Two.`)];
+  const logged: string[] = [];
+  const { deps, alerts } = judging(repo, async () => { throw new TypesafeBudgetSpentError("synopses"); }, books.map((book) => book.work_id!));
+  const jobs = startSynopsisJobs({ ...deps, info: (_details, message) => { logged.push(message); }, onError: (error) => { throw error; } });
+  for (const book of books) jobs.add(book.work_id!);
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  jobs.stop();
+  assert.deepEqual(logged, ["TypeSafe budget spent; synopsis checks wait for the next UTC day"]);
+  assert.deepEqual(alerts, []);
+});
+
 test("synopsis requests are counted under the synopses source, not genres", async () => {
   const repo = freshRepo();
   const book = seed(repo, "9789720000049", SYNOPSIS);
   globalThis.fetch = (async () => Response.json({ model: "jev-1.13.0", answers: { usable: { noul: 0.9 }, kind: { choice: "synopsis" } } })) as typeof fetch;
-  const jobs = startSynopsisJobsIfConfigured("key", { repo, heldWorkIds: () => [book.work_id!], now: () => NOW, alert: () => {}, onError: (error) => { throw error; } })!;
+  const jobs = startSynopsisJobsIfConfigured("key", { repo, heldWorkIds: () => [book.work_id!], now: () => NOW, alert: () => {}, info: () => {}, onError: (error) => { throw error; } })!;
   jobs.add(book.work_id!);
   await new Promise((resolve) => setTimeout(resolve, 20));
   jobs.stop();
   assert.equal(repo.typesafeUsage(utcDay(NOW), "synopses"), 1);
   assert.equal(repo.typesafeUsage(utcDay(NOW), "genres"), 0);
-  assert.equal(startSynopsisJobsIfConfigured("", { repo, heldWorkIds: () => [], now: () => NOW, alert: () => {}, onError: () => {} }), null);
+  assert.equal(startSynopsisJobsIfConfigured("", { repo, heldWorkIds: () => [], now: () => NOW, alert: () => {}, info: () => {}, onError: () => {} }), null);
 });
 ```
 
@@ -1203,6 +1218,7 @@ export const SYNOPSIS_IN_FLIGHT = 4;
 const WORK_TEXT_LIMIT = 50;
 const SWEEP_LIMIT = 1000;
 const SWEEP_INTERVAL_MS = 24 * 60 * 60 * 1000;
+const HELD_CACHE_MS = 60 * 1000;
 const OUTAGE_PAUSE_MS = 10 * 60 * 1000;
 const KEY_PAUSE_MS = 24 * 60 * 60 * 1000;
 
@@ -1254,9 +1270,9 @@ function heldCanonical(deps: HeldDeps): Set<string> {
   return new Set(deps.repo.canonicalWorkIds(deps.heldWorkIds()).values());
 }
 
-export async function judgeWorkSynopses(deps: HeldDeps, workId: string): Promise<number | null> {
+export async function judgeWorkSynopses(deps: HeldDeps, workId: string, held: () => Set<string> = () => heldCanonical(deps)): Promise<number | null> {
   const canonical = deps.repo.canonicalWorkIds([workId]).get(workId);
-  if (!canonical || !heldCanonical(deps).has(canonical)) return null;
+  if (!canonical || !held().has(canonical)) return null;
   for (const hash of deps.repo.synopsesNeedingJudgment([canonical], WORK_TEXT_LIMIT, JEV_REJECTION_LIMIT)) {
     const pause = await classifyText(deps, hash);
     if (pause !== null) return pause;
@@ -1264,18 +1280,36 @@ export async function judgeWorkSynopses(deps: HeldDeps, workId: string): Promise
   return null;
 }
 
-export function startSynopsisJobs(deps: HeldDeps & { onError: (error: unknown, workId?: string) => void }): SynopsisJobs {
+export function startSynopsisJobs(deps: HeldDeps & { info: (details: Record<string, unknown>, message: string) => void; onError: (error: unknown, workId?: string) => void }): SynopsisJobs {
   let quietUntil = 0;
+  let budgetLoggedUntil = 0;
+  let heldCache: { at: number; works: Set<string> } | null = null;
   const alert = (subject: string, text: string) => {
     if (deps.now() < quietUntil) return;
     quietUntil = deps.now() + KEY_PAUSE_MS;
     deps.alert(subject, text);
   };
-  const judged = { ...deps, alert };
-  const queue = createWorkQueue({ concurrency: SYNOPSIS_IN_FLIGHT, now: deps.now, run: (workId) => judgeWorkSynopses(judged, workId), onError: deps.onError });
+  const held = () => {
+    if (!heldCache || deps.now() - heldCache.at >= HELD_CACHE_MS) heldCache = { at: deps.now(), works: heldCanonical(deps) };
+    return heldCache.works;
+  };
+  const classify: ClassifySynopsis = async (input) => {
+    try {
+      return await deps.classify(input);
+    } catch (error) {
+      if (failureKind(error) === "budget" && deps.now() >= budgetLoggedUntil) {
+        budgetLoggedUntil = nextUtcMidnight(deps.now());
+        deps.info({ source: SYNOPSIS_SOURCE, until: new Date(budgetLoggedUntil).toISOString() }, "TypeSafe budget spent; synopsis checks wait for the next UTC day");
+      }
+      throw error;
+    }
+  };
+  const judged = { ...deps, alert, classify };
+  const queue = createWorkQueue({ concurrency: SYNOPSIS_IN_FLIGHT, now: deps.now, run: (workId) => judgeWorkSynopses(judged, workId, held), onError: deps.onError });
   const stopSweep = startDetailsBackfill(
     async () => {
-      for (const workId of deps.repo.worksNeedingSynopsisJudgment([...heldCanonical(deps)], SWEEP_LIMIT, JEV_REJECTION_LIMIT)) queue.add(workId);
+      heldCache = { at: deps.now(), works: heldCanonical(deps) };
+      for (const workId of deps.repo.worksNeedingSynopsisJudgment([...heldCache.works], SWEEP_LIMIT, JEV_REJECTION_LIMIT)) queue.add(workId);
       return null;
     },
     (error) => deps.onError(error),
@@ -1317,6 +1351,7 @@ In `plugin.ts`:
         heldWorkIds: () => heldWorks().map((work) => work.workId),
         now: Date.now,
         alert: alertTypesafe,
+        info: (details, message) => app.log.info(details, message),
         onError: (error, workId) => app.log.error({ err: error, workId }, "synopsis judgment failed")
       })
     : null;
