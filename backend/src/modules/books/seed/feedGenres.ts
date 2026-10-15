@@ -8,12 +8,13 @@ const CHUNK = 250;
 const CENSUS_SIZE = 200;
 const FEED_LABEL_GENRES: Array<[RegExp, BookGenre | null]> = [
   [/\bstilton\b/, "Children's"],
-  [/^(?:nome)?autor/, null],
+  [/^(?:nome)?autor\b/, null],
   [/^politicaparamiudos/, null],
   [/^(?:(?:tema )?romance(?: contemporaneo)?|colecao manuscrito romance|romance \d+)$/, null],
   [/^romance grafico$/, "Comics & Graphic Novels"],
   [/^romance biografico$/, null],
-  [/^(?:ciencias sociais|(?:tema )?ciencias sociais e humanas)$/, null],
+  [/^(?:tema )?ciencias sociais(?: e humanas)?$/, null],
+  [/^(?:tema fantastico ficcao cientifica terror|literatura romantica e nao so)$/, null],
   [/^(?:ciencia militar e estrategia|historia alternativa)$/, null],
   [/^bd$/, "Comics & Graphic Novels"]
 ];
@@ -51,7 +52,7 @@ export function feedLabelGenres(labels: string[]): BookGenre[] {
     const rule = FEED_LABEL_GENRES.find(([pattern]) => pattern.test(normalized));
     const genre = rule ? rule[1] : ageGenre(normalized);
     if (genre) found.add(genre);
-    else if (!rule && genre === undefined) rest.push(label);
+    else if (!rule && !genre) rest.push(label);
   }
   for (const genre of normalizeBookGenres(rest)) found.add(genre);
   return BOOK_GENRES.filter((genre) => found.has(genre));
