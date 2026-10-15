@@ -211,3 +211,11 @@ test("the arena check looks at each work's live id and all its aliases, however 
   assert.deepEqual(seen[0]![0], [pt.work_id]);
   assert.deepEqual([...seen[0]![1]].sort(), [keyed.work_id, loose.work_id].sort());
 });
+
+test("a queued work stores the original title its summary names before it is matched", async () => {
+  const repo = freshRepo();
+  const pt = edition(repo, "9789720000470", { title: "Solaris", author: "", language: "pt-PT", summary: "Um planeta oceano e uma estação de investigação.\n\nTítulo original: Solaris" });
+  const { deps } = matching(repo, async () => ({ choice: null, confidence: 0.9, model: "jev-1.13.0" }));
+  await judgeWorkMatch({ ...deps, heldWorkIds: () => [pt.work_id!] }, pt.work_id!);
+  assert.equal(repo.getBook(pt.id)!.original_title, "Solaris");
+});

@@ -119,6 +119,7 @@ export async function judgeWorkMatch(deps: HeldDeps, workId: string, held: () =>
   const canonical = deps.repo.canonicalWorkIds([workId]).get(workId);
   if (!canonical || !held().has(canonical)) return null;
   if (deps.repo.portugueseWorksNeedingMatch([canonical], 1, JEV_REJECTION_LIMIT, null).length === 0) return null;
+  deps.repo.fillOriginalTitlesFromSummaries(canonical);
   return matchWork(deps, canonical);
 }
 
