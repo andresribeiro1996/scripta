@@ -1,4 +1,4 @@
-import type { GenreReview, GenreReviewAction } from "@scripta/shared";
+import type { GenreReview, GenreReviewAction, SynopsisDecision, SynopsisReview } from "@scripta/shared";
 import { apiFetch } from "./client";
 import type { ResolveCoverParams } from "./covers";
 
@@ -33,4 +33,12 @@ export async function fetchGenreReview(): Promise<GenreReview> {
 
 export async function reviewGenre(workId: string, action: GenreReviewAction): Promise<{ workId: string; editions: number }> {
   return (await apiFetch(`/books/genre-review/${encodeURIComponent(workId)}`, { method: "POST", body: JSON.stringify(action) })) as { workId: string; editions: number };
+}
+
+export async function fetchSynopsisReview(): Promise<SynopsisReview> {
+  return (await apiFetch("/books/synopsis-review")) as SynopsisReview;
+}
+
+export async function reviewSynopsis(hash: string, decision: SynopsisDecision): Promise<{ hash: string }> {
+  return (await apiFetch(`/books/synopsis-review/${encodeURIComponent(hash)}`, { method: "POST", body: JSON.stringify({ decision }) })) as { hash: string };
 }
