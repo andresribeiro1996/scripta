@@ -156,3 +156,11 @@ test("the catalog scope lists every work Jev doubted, held or not, and nothing J
     [tagged, 0, { genre: "History", confidence: 0.6 }]
   ]);
 });
+
+test("the catalog scope lists a work judged before it was merged into a held work once, with the holders", () => {
+  const { repo, blank, other } = seeded();
+  repo.saveGenreJudgment({ workId: other, model: "jev-1.13.0", genre: null, confidence: 0.9, askedAt: "2026-10-15T00:00:00.000Z" });
+  repo.mergeWorks(other, blank);
+  const rows = catalogDoubtsWith(repo, [{ workId: blank, holders: 2, finished: true }]);
+  assert.deepEqual(rows.map((entry) => [entry.workId, entry.holders, entry.finished]), [[blank, 2, true]]);
+});

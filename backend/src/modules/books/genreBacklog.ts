@@ -1,13 +1,12 @@
 import type { ClassifyGenre } from "./adapters/typesafe/jevGenres.js";
 import type { BooksRepository } from "./domain/ports.js";
-import { classifyWork, GENRE_REJECTION_LIMIT, type GenreJudgmentDeps } from "./genreJudgments.js";
+import { classifyWork, GENRE_REJECTION_LIMIT, GENRE_SAVE_LINE, type GenreJudgmentDeps } from "./genreJudgments.js";
 import { failureKind, type FailureKind } from "./typesafe.js";
+import { CONFIDENT_GENRE_LINE } from "./works.js";
 
 export const GENRE_BACKLOG_SOURCE = "genres-backlog";
 export const BACKLOG_MIN_SYNOPSIS = 40;
 const IN_FLIGHT = 4;
-const CONFIDENT = 0.8;
-const SAVE = 0.5;
 const COST_PER_REQUEST_USD = 0.00012;
 
 export type BacklogStop = "done" | "budget" | "outage" | "key";
@@ -49,8 +48,8 @@ export function backlogReport(repo: Pick<BooksRepository, "genreJudgments" | "ge
   const report: BacklogReport = { selected, asked: result.asked.length, confident: 0, possible: 0, unsure: 0, none: 0, strikes: repo.genreRejections(result.asked).size, stoppedBy: result.stoppedBy, requests, estimatedCostUsd: Number((requests * COST_PER_REQUEST_USD).toFixed(2)) };
   for (const judgment of repo.genreJudgments(result.asked).values()) {
     if (judgment.genre === null) report.none += 1;
-    else if (judgment.confidence >= CONFIDENT) report.confident += 1;
-    else if (judgment.confidence >= SAVE) report.possible += 1;
+    else if (judgment.confidence >= CONFIDENT_GENRE_LINE) report.confident += 1;
+    else if (judgment.confidence >= GENRE_SAVE_LINE) report.possible += 1;
     else report.unsure += 1;
   }
   return report;
