@@ -307,6 +307,12 @@ One-off passes that label catalog works with no genres. Each writes only to edit
    npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && node scripts/import-publisher-covers.mjs --fill-genres --dry-run'
    ```
 
+3. Jev backlog (needs `TYPESAFE_API_KEY`): classifies catalog works with no genres and a synopsis of at least 40 characters, held works first. `--max` is a hard limit on TypeSafe requests, retries included, recorded under `genres-backlog` in `typesafe_usage` (the daily `genres` budget is untouched). An outage or a rejected key ends the run; re-running continues where it stopped. About 0.24 s per request at 4 in flight, about $0.00012 a request.
+
+   ```bash
+   npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && node scripts/genre-backlog.mjs --max 12000 --dry-run'
+   ```
+
 #### Known limitations of covers, details and search, and the options for each
 
 Measured on production on 2026-09-30, after a tester imported a 167-book library and waited about 20 minutes for covers. The server itself was never slow: `/covers/resolve` p50 was 1 ms and `PUT /library` about 5 ms. The time goes into the pipeline around it. Recheck the numbers below before relying on them.
