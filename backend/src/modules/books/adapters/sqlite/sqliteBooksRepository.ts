@@ -189,14 +189,25 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const applyJudgmentsStmt = db.prepare(`
     UPDATE books SET genres = json_array(j.genre), genres_source = 'jev', genres_confidence = j.confidence
     FROM genre_judgments AS j
-    WHERE books.work_id = j.work_id AND ($workId IS NULL OR books.work_id = $workId) AND j.genre IS NOT NULL AND j.confidence >= $saveLine
+    WHERE books.work_id = j.work_id AND j.genre IS NOT NULL AND j.confidence >= ?
       AND (books.genres = '[]' OR books.genres_source = 'jev')
       AND NOT (books.genres = json_array(j.genre) AND books.genres_source = 'jev' AND books.genres_confidence IS j.confidence)
   `);
   const undoJudgmentsStmt = db.prepare(`
     UPDATE books SET genres = '[]', genres_source = NULL, genres_confidence = NULL
-    WHERE genres_source = 'jev' AND ($workId IS NULL OR work_id = $workId)
-      AND work_id IN (SELECT work_id FROM genre_judgments WHERE genre IS NULL OR confidence < $saveLine)
+    WHERE genres_source = 'jev' AND work_id IN (SELECT work_id FROM genre_judgments WHERE genre IS NULL OR confidence < ?)
+  `);
+  const applyJudgmentForWorkStmt = db.prepare(`
+    UPDATE books SET genres = json_array(j.genre), genres_source = 'jev', genres_confidence = j.confidence
+    FROM genre_judgments AS j
+    WHERE books.work_id = ? AND j.work_id = books.work_id AND j.genre IS NOT NULL AND j.confidence >= ?
+      AND (books.genres = '[]' OR books.genres_source = 'jev')
+      AND NOT (books.genres = json_array(j.genre) AND books.genres_source = 'jev' AND books.genres_confidence IS j.confidence)
+  `);
+  const undoJudgmentForWorkStmt = db.prepare(`
+    UPDATE books SET genres = '[]', genres_source = NULL, genres_confidence = NULL
+    WHERE work_id = ? AND genres_source = 'jev'
+      AND EXISTS (SELECT 1 FROM genre_judgments j WHERE j.work_id = books.work_id AND (j.genre IS NULL OR j.confidence < ?))
   `);
   const deleteJudgmentStmt = db.prepare(`DELETE FROM genre_judgments WHERE work_id = ? AND model <> 'manual'`);
   const recordGenreRejectionStmt = db.prepare(`
@@ -236,13 +247,6 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       $year: details.year,
       $publisher: details.publisher,
       $translator: details.translator
-    });
-  }
-
-  function applyJudgments(workId: string | null, saveLine: number) {
-    inTransaction(() => {
-      undoJudgmentsStmt.run({ $workId: workId, $saveLine: saveLine });
-      applyJudgmentsStmt.run({ $workId: workId, $saveLine: saveLine });
     });
   }
 
@@ -545,10 +549,16 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       return new Map(rows.map((row) => [row.work_id, { model: row.model, genre: row.genre, confidence: row.confidence }]));
     },
     applyGenreJudgments(saveLine) {
-      applyJudgments(null, saveLine);
+      inTransaction(() => {
+        undoJudgmentsStmt.run(saveLine);
+        applyJudgmentsStmt.run(saveLine);
+      });
     },
     applyGenreJudgment(workId, saveLine) {
-      applyJudgments(workId, saveLine);
+      inTransaction(() => {
+        undoJudgmentForWorkStmt.run(workId, saveLine);
+        applyJudgmentForWorkStmt.run(workId, saveLine);
+      });
     },
     deleteGenreJudgment(workId) {
       deleteJudgmentStmt.run(workId);
