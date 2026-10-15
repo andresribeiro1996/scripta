@@ -116,3 +116,11 @@ test("normalizeBookGenres maps Portuguese subjects and tags", () => {
 test("every canonical genre name normalizes to itself", () => {
   for (const genre of BOOK_GENRES) assert.deepEqual(normalizeBookGenres([genre]), [genre], genre);
 });
+
+test("Portuguese romantic literature and children's-and-youth labels", () => {
+  assert.deepEqual(normalizeBookGenres(["Literatura Romântica"]), ["Romance"]);
+  assert.deepEqual(normalizeBookGenres(["Literatura Romântica e Erótica"]), ["Romance"]);
+  assert.deepEqual(normalizeBookGenres(["Infantojuvenil"]), ["Children's"]);
+  assert.deepEqual(normalizeBookGenres(["Infanto-juvenil"]), ["Children's"]);
+  assert.deepEqual(normalizeBookGenres(["Literatura juvenil"]), ["Young Adult"]);
+});
