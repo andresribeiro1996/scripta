@@ -96,6 +96,33 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const unmergeStmt = db.prepare(`UPDATE works SET merged_into = NULL WHERE id = ?`);
   const repointBackStmt = db.prepare(`UPDATE works SET merged_into = ? WHERE merged_into = ? AND id IN (SELECT value FROM json_each(?))`);
   const markUndoneStmt = db.prepare(`UPDATE work_merges SET undone_at = ? WHERE id = ?`);
+  const workMatchJudgmentsStmt = db.prepare(`SELECT work_id, model, into_work_id, confidence, asked_at FROM work_match_judgments WHERE work_id IN (SELECT value FROM json_each(?))`);
+  const saveWorkMatchJudgmentStmt = db.prepare(`INSERT OR REPLACE INTO work_match_judgments (work_id, model, into_work_id, confidence, asked_at) VALUES (?, ?, ?, ?, ?)`);
+  const portugueseWorkFilter = `
+    w.merged_into IS NULL
+    AND EXISTS (SELECT 1 FROM books b WHERE b.work_id = w.id)
+    AND NOT EXISTS (SELECT 1 FROM books b WHERE b.work_id = w.id AND (b.language IS NULL OR (b.language <> 'pt' AND b.language NOT LIKE 'pt-%')))
+    AND NOT EXISTS (SELECT 1 FROM work_match_judgments j WHERE j.work_id = w.id AND NOT ($recheck IS NOT NULL AND j.into_work_id IS NULL AND j.model <> 'manual' AND j.asked_at < $recheck))
+    AND NOT EXISTS (SELECT 1 FROM jev_rejections r WHERE r.task = 'works' AND r.subject = w.id AND r.attempts >= $rejections)
+  `;
+  const allPortugueseNeedingMatchStmt = db.prepare(`SELECT w.id FROM works w WHERE ${portugueseWorkFilter} ORDER BY w.created_at, w.rowid LIMIT $limit`);
+  const somePortugueseNeedingMatchStmt = db.prepare(`SELECT w.id FROM works w WHERE w.id IN (SELECT value FROM json_each($ids)) AND ${portugueseWorkFilter} ORDER BY w.created_at, w.rowid LIMIT $limit`);
+  const translationEditionsStmt = db.prepare(`SELECT title, author, publisher, summary, original_title FROM books WHERE work_id = ? ORDER BY created_at, rowid`);
+  const titleCandidatesStmt = db.prepare(`SELECT DISTINCT COALESCE(w.merged_into, w.id) AS id FROM books b JOIN works w ON w.id = b.work_id WHERE b.title_key GLOB ?`);
+  const authorCandidatesStmt = db.prepare(`
+    SELECT COALESCE(w.merged_into, w.id) AS id, COUNT(*) AS editions
+    FROM books b JOIN works w ON w.id = b.work_id
+    WHERE b.title_key GLOB ?
+    GROUP BY COALESCE(w.merged_into, w.id)
+    HAVING SUM(CASE WHEN b.language IS NULL OR (b.language <> 'pt' AND b.language NOT LIKE 'pt-%') THEN 1 ELSE 0 END) > 0
+    ORDER BY editions DESC, id
+  `);
+  const matchCandidatesStmt = db.prepare(`
+    SELECT w.id, w.title, w.author, MIN(b.year) AS year, COUNT(b.id) AS editions, json_group_array(DISTINCT COALESCE(b.language, '')) AS languages
+    FROM works w JOIN books b ON b.work_id = w.id
+    WHERE w.id IN (SELECT value FROM json_each(?))
+    GROUP BY w.id
+  `);
   const genreJudgmentOwnedStmt = db.prepare(`SELECT 1 AS owned FROM genre_judgments WHERE work_id = ?`);
   const moveGenreJudgmentStmt = db.prepare(`UPDATE genre_judgments SET work_id = ? WHERE work_id = ?`);
   const dropGenreJudgmentStmt = db.prepare(`DELETE FROM genre_judgments WHERE work_id = ?`);
@@ -671,6 +698,34 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
         markUndoneStmt.run(at, merge.id);
         return { into: merge.into_work, editions };
       });
+    },
+    workMatchJudgments(workIds) {
+      const rows = workMatchJudgmentsStmt.all(JSON.stringify(workIds)) as Array<{ work_id: string; model: string; into_work_id: string | null; confidence: number | null; asked_at: string }>;
+      return new Map(rows.map((row) => [row.work_id, { model: row.model, intoWorkId: row.into_work_id, confidence: row.confidence, askedAt: row.asked_at }]));
+    },
+    saveWorkMatchJudgment(workId, judgment) {
+      saveWorkMatchJudgmentStmt.run(workId, judgment.model, judgment.intoWorkId, judgment.confidence, judgment.askedAt);
+    },
+    portugueseWorksNeedingMatch(workIds, limit, rejectionLimit, recheckBefore) {
+      const params = { $recheck: recheckBefore, $rejections: rejectionLimit, $limit: limit };
+      const rows = workIds === null ? allPortugueseNeedingMatchStmt.all(params) : somePortugueseNeedingMatchStmt.all({ ...params, $ids: JSON.stringify(workIds) });
+      return (rows as Array<{ id: string }>).map((row) => row.id);
+    },
+    translationEvidence(workId) {
+      const work = workLinkStmt.get(workId) as WorkLink | undefined;
+      if (!work) return undefined;
+      const author = (workStmt.get(workId) as { author: string } | undefined)?.author ?? "";
+      const editions = (translationEditionsStmt.all(workId) as Array<{ title: string; author: string; publisher: string | null; summary: string | null; original_title: string | null }>).map((row) => ({ title: row.title, author: row.author, publisher: row.publisher, summary: row.summary, originalTitle: row.original_title }));
+      return { workId, workAuthor: author, editions };
+    },
+    titleCandidates(pattern) {
+      return (titleCandidatesStmt.all(pattern) as Array<{ id: string }>).map((row) => row.id);
+    },
+    authorCandidates(pattern) {
+      return (authorCandidatesStmt.all(pattern) as Array<{ id: string }>).map((row) => row.id);
+    },
+    matchCandidates(workIds) {
+      return (matchCandidatesStmt.all(JSON.stringify(workIds)) as Array<{ id: string; title: string; author: string; year: number | null; editions: number; languages: string }>).map((row) => ({ id: row.id, title: row.title, author: row.author, year: row.year, editions: row.editions, languages: (JSON.parse(row.languages) as string[]).filter(Boolean) }));
     },
 
     detachEdition(bookId, at) {

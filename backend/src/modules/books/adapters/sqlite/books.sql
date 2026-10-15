@@ -135,3 +135,11 @@ CREATE TABLE IF NOT EXISTS work_merges (
   merged_at          TEXT NOT NULL,
   undone_at          TEXT
 );
+
+CREATE TABLE IF NOT EXISTS work_match_judgments (
+  work_id      TEXT PRIMARY KEY,
+  model        TEXT NOT NULL,
+  into_work_id TEXT,
+  confidence   REAL,
+  asked_at     TEXT NOT NULL
+);
