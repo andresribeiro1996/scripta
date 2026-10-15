@@ -73,6 +73,16 @@ export interface NewBook {
   createdBy?: BookCreator;
 }
 
+export interface LossyBook {
+  id: string;
+  title: string;
+  author: string;
+  isbn: string | null;
+  work_id: string | null;
+  work_title: string | null;
+  work_author: string | null;
+}
+
 export type WorkPageRows = {
   work: { id: string; title: string; author: string; summary: string | null; summary_hash: string | null };
   aliasIds: string[];
