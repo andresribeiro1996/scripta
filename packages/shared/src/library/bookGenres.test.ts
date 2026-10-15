@@ -169,3 +169,12 @@ test("common Goodreads shelves and StoryGraph tags map to genres, and non-genre 
   assert.deepEqual(normalizeBookGenres(["World history"]), ["History"]);
   assert.deepEqual(normalizeBookGenres(["Travel"]), ["Travel"]);
 });
+
+test("shelf words that name a theme never beat the genre they modify", () => {
+  assert.deepEqual(normalizeBookGenres(["Fiction / Romance / Time Travel"]), ["Romance"]);
+  assert.deepEqual(normalizeBookGenres(["Dystopian romance"]), ["Romance"]);
+  assert.deepEqual(normalizeBookGenres(["Young adult dystopian"]), ["Young Adult"]);
+  assert.deepEqual(normalizeBookGenres(["paranormal-mystery"]), ["Mystery"]);
+  assert.deepEqual(normalizeBookGenres(["Fiction / Mystery & Detective / Paranormal"]), ["Mystery"]);
+  assert.deepEqual(normalizeBookGenres(["paranormal-horror"]), ["Horror"]);
+});
