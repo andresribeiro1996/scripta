@@ -32,3 +32,15 @@ export function failureKind(error: unknown): FailureKind | null {
   if (error.status !== undefined && error.status >= 400 && error.status < 500 && error.status !== 429) return "book";
   return "outage";
 }
+
+export function runBudget(repo: Pick<BooksRepository, "spendTypesafe">, source: string, max: number, now: () => number): { spend: Spend; used: () => number } {
+  let used = 0;
+  return {
+    spend: () => {
+      if (used >= max) throw new TypesafeBudgetSpentError(source);
+      used += 1;
+      repo.spendTypesafe(utcDay(now()), source, Number.MAX_SAFE_INTEGER);
+    },
+    used: () => used
+  };
+}

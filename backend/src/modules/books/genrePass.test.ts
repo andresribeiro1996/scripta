@@ -16,7 +16,7 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 const { applyBooksMigrations } = await import("./adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("./adapters/sqlite/sqliteBooksRepository.js");
 const { resolveWorksWith } = await import("./works.js");
-const { GenreLabelsError, genrePassWorksWith, importGenreLabelsWith, labelProblem, labelWork, longestSynopsis } = await import("./genrePass.js");
+const { GenreLabelsError, catalogDoubtsWith, genrePassWorksWith, importGenreLabelsWith, labelProblem, labelWork, longestSynopsis } = await import("./genrePass.js");
 
 function seeded() {
   const db = new DatabaseSync(":memory:");
@@ -138,4 +138,29 @@ test("the export leaves out works the owner labelled no genre", () => {
   labelWork(repo, other, [], "2026-10-15T00:00:00.000Z");
   const rows = genrePassWorksWith(repo, [{ workId: blank, holders: 1, finished: false }, { workId: other, holders: 1, finished: false }]);
   assert.deepEqual(rows.map((entry) => entry.workId), [blank]);
+});
+
+test("the catalog scope lists every work Jev doubted, held or not, and nothing Jev hasn't judged", () => {
+  const { db, repo, blank, tagged, other } = seeded();
+  const judge = (workId: string, genre: string | null, confidence: number) => {
+    repo.saveGenreJudgment({ workId, model: "jev-1.13.0", genre, confidence, askedAt: "2026-10-15T00:00:00.000Z" });
+    repo.applyGenreJudgments(0.5);
+  };
+  db.prepare("UPDATE books SET genres = '[]' WHERE work_id = ?").run(tagged);
+  judge(blank, null, 0.9);
+  judge(tagged, "History", 0.6);
+  judge(other, "Poetry", 0.95);
+  const rows = catalogDoubtsWith(repo, [{ workId: blank, holders: 2, finished: true }]);
+  assert.deepEqual(rows.map((entry) => [entry.workId, entry.holders, entry.jev]), [
+    [blank, 2, { genre: null, confidence: 0.9 }],
+    [tagged, 0, { genre: "History", confidence: 0.6 }]
+  ]);
+});
+
+test("the catalog scope lists a work judged before it was merged into a held work once, with the holders", () => {
+  const { repo, blank, other } = seeded();
+  repo.saveGenreJudgment({ workId: other, model: "jev-1.13.0", genre: null, confidence: 0.9, askedAt: "2026-10-15T00:00:00.000Z" });
+  repo.mergeWorks(other, blank);
+  const rows = catalogDoubtsWith(repo, [{ workId: blank, holders: 2, finished: true }]);
+  assert.deepEqual(rows.map((entry) => [entry.workId, entry.holders, entry.finished]), [[blank, 2, true]]);
 });
