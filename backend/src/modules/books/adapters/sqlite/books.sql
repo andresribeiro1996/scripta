@@ -5,7 +5,8 @@ CREATE TABLE IF NOT EXISTS works (
   author       TEXT NOT NULL,
   merged_into  TEXT REFERENCES works(id),
   created_at   TEXT NOT NULL,
-  summary      TEXT
+  summary      TEXT,
+  summary_hash TEXT
 );
 
 CREATE TABLE IF NOT EXISTS books (
@@ -42,6 +43,7 @@ CREATE TABLE IF NOT EXISTS books (
   title_group_blocked_at TEXT,
   genres_source TEXT,
   genres_confidence REAL,
+  summary_hash        TEXT,
   created_at          TEXT NOT NULL
 );
 

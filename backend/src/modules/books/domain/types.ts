@@ -15,6 +15,7 @@ export interface BookRow {
   isbn: string | null;
   ol_cover_id: number | null;
   summary: string | null;
+  summary_hash: string | null;
   rating: number | null;
   rating_count: number;
   genres: string;

@@ -3,6 +3,7 @@ import type { DatabaseSync, StatementSync } from "node:sqlite";
 import { MIN_PREFIX_LENGTH, normalizeWorkKey, workTitleKey } from "../../domain/normalize.js";
 import type { BooksRepository, IdPage, MergeableDetails, PageCursor } from "../../domain/ports.js";
 import { WorkMergeError } from "../../domain/errors.js";
+import { summaryHashOf } from "../../domain/synopsis.js";
 import type { BookRow, CoverImageRow, DataSource, GenreEvidence, SummarySource, WorkPageRows, WorkView } from "../../domain/types.js";
 
 export const UNCHECKED_COVERS_SQL = `
@@ -78,8 +79,8 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
         author = CASE WHEN author = '' THEN COALESCE((SELECT author FROM books WHERE work_id = works.id AND author <> '' ORDER BY created_at, rowid LIMIT 1), '') ELSE author END
     WHERE id = ? AND (title = '' OR author = '')
   `);
-  const setWorkSummaryStmt = db.prepare(`UPDATE works SET summary = ? WHERE id = ? AND summary IS NULL`);
-  const carryWorkSummaryStmt = db.prepare(`UPDATE works SET summary = (SELECT summary FROM works WHERE id = ?) WHERE id = ? AND summary IS NULL`);
+  const setWorkSummaryStmt = db.prepare(`UPDATE works SET summary = ?, summary_hash = ? WHERE id = ? AND summary IS NULL`);
+  const carryWorkSummaryStmt = db.prepare(`UPDATE works SET (summary, summary_hash) = (SELECT summary, summary_hash FROM works WHERE id = ?) WHERE id = ? AND summary IS NULL`);
   const workSummaryStmt = db.prepare(`
     SELECT target.summary AS summary, target.ol_work_key AS olWorkKey
     FROM books JOIN works AS own ON own.id = books.work_id JOIN works AS target ON target.id = COALESCE(own.merged_into, own.id)
@@ -177,6 +178,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     UPDATE books
     SET summary_source = CASE WHEN ${takesSummary} THEN $summary_source ELSE summary_source END,
         summary = CASE WHEN ${takesSummary} THEN $summary ELSE summary END,
+        summary_hash = CASE WHEN ${takesSummary} THEN $summary_hash ELSE summary_hash END,
         pages = COALESCE(pages, $pages),
         year = COALESCE(year, $year),
         publisher = COALESCE(publisher, $publisher),
@@ -263,6 +265,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       $id: bookId,
       $summary: details.summary,
       $summary_source: summarySource,
+      $summary_hash: summaryHashOf(details.summary),
       $pages: details.pages,
       $year: details.year,
       $publisher: details.publisher,
@@ -683,7 +686,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
         const book = byIdStmt.get(bookId) as unknown as (UnassignedBook & { work_id: string | null }) | undefined;
         if (!book) throw new Error(`Unknown book ${bookId}`);
         const workId = liveWorkId(book.work_id ?? giveWork(book));
-        if (workId) setWorkSummaryStmt.run(summary, workId);
+        if (workId) setWorkSummaryStmt.run(summary, summaryHashOf(summary), workId);
       });
     },
 

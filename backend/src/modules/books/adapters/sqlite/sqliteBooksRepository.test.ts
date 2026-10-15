@@ -17,6 +17,7 @@ const { applyBooksMigrations, openBooksDb } = await import("./connection.js");
 const { findOrCreateBook } = await import("../../domain/findOrCreate.js");
 const { createSqliteBooksRepository, UNCHECKED_COVERS_SQL, UPGRADE_WANTED_SQL, UNCHECKED_DETAILS_SQL, WORK_LOOKUP_SQL } = await import("./sqliteBooksRepository.js");
 const { WorkMergeError } = await import("../../domain/errors.js");
+const { summaryHashOf } = await import("../../domain/synopsis.js");
 
 const NOW = "2026-10-01T00:00:00.000Z";
 const richDetails = { summary: "Open Library synopsis.", rating: 4, ratingCount: 3, sourceUrl: "https://openlibrary.org/works/OL1W", genres: ["Fantasy" as const], pages: 300, publisher: "Bantam", year: 1975, translator: null };
@@ -509,7 +510,7 @@ const WORK_COLUMNS = ["work_id", "language", "work_checked_at"];
 
 function assertWorkSchema(db: DatabaseSync) {
   const names = (sql: string) => (db.prepare(sql).all() as Array<{ name: string }>).map((row) => row.name);
-  assert.deepEqual(names("PRAGMA table_info(works)"), ["id", "ol_work_key", "title", "author", "merged_into", "created_at", "summary"]);
+  assert.deepEqual(names("PRAGMA table_info(works)"), ["id", "ol_work_key", "title", "author", "merged_into", "created_at", "summary", "summary_hash"]);
   assert.deepEqual(names("PRAGMA table_info(books)").filter((name) => WORK_COLUMNS.includes(name)), WORK_COLUMNS);
   assert.deepEqual(names("PRAGMA index_info(idx_books_work)"), ["work_id"]);
   assert.throws(() => db.prepare("INSERT INTO books (id, title, author, work_id, created_at) VALUES ('orphan', 'A', 'A', 'missing', ?)").run(NOW), /FOREIGN KEY constraint failed/);
@@ -1505,4 +1506,42 @@ test("work keys map to work ids, and publisher URLs list with their works", () =
   repo.setPublisherUrl(shop.id, "https://shop.test/products/shop-book");
   assert.deepEqual(repo.workIdsByWorkKeys(["OL1W", "OL2W"]), new Map([["OL1W", keyed.work_id!]]));
   assert.deepEqual(repo.listPublisherUrls(), [{ work_id: shop.work_id, publisher_url: "https://shop.test/products/shop-book" }]);
+});
+
+test("summary hashes are written with every summary and follow a merge", () => {
+  const { db, repo } = freshRepo();
+  const details = (summary: string | null) => ({ summary, pages: null, year: null, publisher: null, translator: null });
+  const hashOf = (table: string, id: string | null) => (db.prepare(`SELECT summary_hash FROM ${table} WHERE id = ?`).get(id) as { summary_hash: string | null }).summary_hash;
+  const a = repo.createBook({ title: "A", author: "X", isbn: "9789720000021" }, ["isbn:9789720000021"], NOW);
+  repo.mergeDetails(a.id, details("  A long publisher\n\nsynopsis. "), "publisher");
+  assert.equal(hashOf("books", a.id), summaryHashOf("A long publisher synopsis."));
+  repo.mergeDetails(a.id, details("An ISBNdb text."), "isbndb");
+  assert.equal(hashOf("books", a.id), summaryHashOf("A long publisher synopsis."));
+  repo.mergeDetails(a.id, details("A newer publisher text."), "publisher");
+  assert.equal(hashOf("books", a.id), summaryHashOf("A newer publisher text."));
+  repo.setWorkSummary(a.id, "Work text.");
+  assert.equal(hashOf("works", a.work_id), summaryHashOf("Work text."));
+  const b = repo.createBook({ title: "B", author: "X", isbn: "9789720000022" }, ["isbn:9789720000022"], NOW);
+  repo.mergeWorks(a.work_id!, b.work_id!);
+  assert.equal(hashOf("works", b.work_id), summaryHashOf("Work text."));
+  const c = repo.createBook({ title: "C", author: "X", isbn: "9789720000023" }, ["isbn:9789720000023"], NOW);
+  repo.mergeDetails(c.id, details("   "), "publisher");
+  assert.equal(hashOf("books", c.id), null);
+});
+
+test("the summary hash migration hashes stored summaries once", () => {
+  const db = new DatabaseSync(":memory:");
+  applyBooksMigrations(db);
+  db.exec("DROP INDEX idx_books_summary_hash; ALTER TABLE books DROP COLUMN summary_hash; DROP INDEX idx_works_summary_hash; ALTER TABLE works DROP COLUMN summary_hash");
+  db.prepare("INSERT INTO works (id, title, author, created_at, summary) VALUES ('w1', 'T', 'A', ?, ' Work  text. ')").run(NOW);
+  db.prepare("INSERT INTO books (id, title, author, work_id, summary, created_at) VALUES ('b1', 'T', 'A', 'w1', 'Edition text.', ?), ('b2', 'T', 'A', 'w1', NULL, ?), ('b3', 'T', 'A', 'w1', '  ', ?)").run(NOW, NOW, NOW);
+
+  applyBooksMigrations(db);
+  applyBooksMigrations(db);
+
+  const hash = (sql: string) => (db.prepare(sql).get() as { h: string | null }).h;
+  assert.equal(hash("SELECT summary_hash AS h FROM works WHERE id = 'w1'"), summaryHashOf("Work text."));
+  assert.equal(hash("SELECT summary_hash AS h FROM books WHERE id = 'b1'"), summaryHashOf("Edition text."));
+  assert.equal(hash("SELECT summary_hash AS h FROM books WHERE id = 'b2'"), null);
+  assert.equal(hash("SELECT summary_hash AS h FROM books WHERE id = 'b3'"), null);
 });
