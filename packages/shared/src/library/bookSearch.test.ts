@@ -108,3 +108,13 @@ test("mapOpenLibraryDoc repairs mojibake in the title and authors", () => {
 test("mapOpenLibraryDoc repairs a title ending in a mis-decoded à", () => {
   assert.equal(mapOpenLibraryDoc({ title: "VoilÃ\xa0" })?.title, "Voilà");
 });
+
+test("mapOpenLibraryDoc drops non-sorting markers from the title and authors", () => {
+  const result = mapOpenLibraryDoc({ title: "\u0098O \u009cNatal de Teste", author_name: ["Ana Co\u0098sta"] });
+  assert.equal(result?.title, "O Natal de Teste");
+  assert.deepEqual(result?.authors, ["Ana Costa"]);
+});
+
+test("mapOpenLibraryDoc drops non-sorting markers before repairing mojibake", () => {
+  assert.equal(mapOpenLibraryDoc({ title: "\u0098A \u009cfÃ© e a crenÃ§a" })?.title, "A fé e a crença");
+});
