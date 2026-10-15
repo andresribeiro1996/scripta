@@ -1,4 +1,5 @@
 import { normalizeBookGenres, normalizeIsbn, positiveInteger, type BookSearchResult } from "@scripta/shared";
+import { givenNameFirst } from "../../domain/normalize.js";
 import type { BookCatalog } from "../../domain/ports.js";
 import type { Throttle } from "../http/http.js";
 import { createIsbndbGet, isbndbRecords } from "../sources/isbndb.js";
@@ -33,7 +34,7 @@ function toResult(record: Record<string, unknown>): BookSearchResult | null {
   if (!title) return null;
   return {
     title,
-    authors: Array.isArray(record.authors) ? record.authors.filter((name): name is string => typeof name === "string" && name.trim() !== "") : [],
+    authors: Array.isArray(record.authors) ? record.authors.filter((name): name is string => typeof name === "string" && name.trim() !== "").map(givenNameFirst) : [],
     year: yearOf(record.date_published),
     isbn: isbnOf(record),
     publisher: plainText(record.publisher),
