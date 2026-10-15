@@ -71,6 +71,15 @@ export function genrePassWorksWith(books: BooksRepository, held: HeldWork[]): Ge
     .sort((a, b) => Number(b.finished) - Number(a.finished) || b.holders - a.holders || a.title.localeCompare(b.title));
 }
 
+export function catalogDoubtsWith(books: BooksRepository, held: HeldWork[]): GenrePassWork[] {
+  const judged = new Set(books.jevJudgedWorkIds());
+  const canonical = books.canonicalWorkIds(held.map((work) => work.workId));
+  const heldJudged = held.filter((work) => judged.has(canonical.get(work.workId) ?? ""));
+  const heldIds = new Set(heldJudged.map((work) => canonical.get(work.workId)));
+  const others = [...judged].filter((workId) => !heldIds.has(workId)).map((workId) => ({ workId, holders: 0, finished: false }));
+  return genrePassWorksWith(books, [...heldJudged, ...others]);
+}
+
 function labelsOf(input: unknown): Array<{ workId: string; genres: string[] }> {
   if (!Array.isArray(input)) throw new GenreLabelsError("The labels file must be a JSON array of { workId, genres }.");
   const problems: string[] = [];

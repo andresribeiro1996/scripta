@@ -112,6 +112,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     ORDER BY w.created_at, w.rowid
     LIMIT ?
   `);
+  const jevJudgedStmt = db.prepare(`SELECT work_id FROM genre_judgments WHERE model <> 'manual'`);
   const countEmptyGenreEditionsStmt = db.prepare(`SELECT COUNT(*) AS n FROM books WHERE work_id = ? AND genres = '[]'`);
   const pageEditionsStmt = db.prepare(`SELECT books.id, books.title, books.language, books.year, books.isbn, books.summary, books.cover_image_id, ci.color AS cover_color, books.genres, books.rating, books.rating_count, books.pages, books.genres_source, books.genres_confidence FROM books LEFT JOIN cover_images ci ON ci.id = books.cover_image_id WHERE books.work_id = ? ORDER BY books.created_at, books.rowid`);
   const workEditionsStmt = db.prepare(`SELECT id, isbn, title, author, ol_work_key FROM books WHERE work_id = ? ORDER BY created_at, rowid`);
@@ -353,6 +354,9 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     },
     genreBacklogWorks(limit, minSynopsis, rejectionLimit) {
       return (genreBacklogStmt.all(rejectionLimit, minSynopsis, minSynopsis, limit) as Array<{ id: string }>).map((row) => row.id);
+    },
+    jevJudgedWorkIds() {
+      return (jevJudgedStmt.all() as Array<{ work_id: string }>).map((row) => row.work_id);
     },
     countEmptyGenreEditions(workId) {
       return Number((countEmptyGenreEditionsStmt.get(workId) as { n: number }).n);

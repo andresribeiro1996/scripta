@@ -313,6 +313,12 @@ One-off passes that label catalog works with no genres. Each writes only to edit
    npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && node scripts/genre-backlog.mjs --max 12000 --dry-run'
    ```
 
+4. Claude doubts pass: export Jev's doubts across the catalog, label them as in "Genre pass" (Sonnet subagents, at most 100 works each; Haiku subagents produced unusable labels on long batches), and import.
+
+   ```bash
+   npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && node scripts/genre-pass-export.mjs --scope catalog' > genre-doubts.txt
+   ```
+
 #### Known limitations of covers, details and search, and the options for each
 
 Measured on production on 2026-09-30, after a tester imported a 167-book library and waited about 20 minutes for covers. The server itself was never slow: `/covers/resolve` p50 was 1 ms and `PUT /library` about 5 ms. The time goes into the pipeline around it. Recheck the numbers below before relying on them.
