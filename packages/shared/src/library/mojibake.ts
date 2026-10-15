@@ -50,5 +50,9 @@ export function hasMojibake(text: string): boolean {
 }
 
 export function stripNonSortingMarkers(text: string): string {
-  return text.replace(NON_SORTING_MARKER, (_marker, sequence: string | undefined) => sequence ?? "");
+  return text.replace(NON_SORTING_MARKER, "$1");
+}
+
+export function cleanCatalogText(text: string): string {
+  return stripNonSortingMarkers(repairMojibake(stripNonSortingMarkers(text)));
 }

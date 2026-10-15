@@ -99,6 +99,15 @@ test("strips markers and repairs mojibake in one pass", () => {
   assert.deepEqual({ title, author }, { title: "A fé e a crença", author: "José Silva" });
 });
 
+test("markers mis-decoded with the text are gone after one run", () => {
+  const h = setup();
+  const created = h.book("Â\u0098O Â\u009cNatal de FÃ©", "Ana Lima", null);
+  applyMojibakeRepairs(h.db, planMojibakeRepairs(h.db));
+  assert.equal(h.stored(created.id).title, "O Natal de Fé");
+  const rerun = planMojibakeRepairs(h.db);
+  assert.deepEqual([rerun.books, rerun.works], [[], []]);
+});
+
 test("leaves correct and guarded text alone", () => {
   const h = setup();
   h.book("Coração", "Ana Lima", "9780000000026");

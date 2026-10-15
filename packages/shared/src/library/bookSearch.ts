@@ -22,7 +22,7 @@ import { normalizeBookGenres, type BookGenre } from "./bookGenres.js";
 import { GENRES_FROM_CATALOG } from "./catalogGenres.js";
 import { normalizeIsbn } from "./covers.js";
 import { bookKey } from "./merge.js";
-import { repairMojibake, stripNonSortingMarkers } from "./mojibake.js";
+import { cleanCatalogText } from "./mojibake.js";
 
 export interface BookSearchResult {
   title: string;
@@ -117,8 +117,8 @@ export function mapOpenLibraryDoc(doc: Record<string, unknown>): BookSearchResul
   const isbn10 = isbns.find((v): v is string => typeof v === "string" && /^\d{9}[\dXx]$/.test(v));
   const publishers = Array.isArray(doc.publisher) ? doc.publisher : [];
   return {
-    title: repairMojibake(stripNonSortingMarkers(doc.title)).trim(),
-    authors: Array.isArray(doc.author_name) ? doc.author_name.filter((a): a is string => typeof a === "string").map((a) => repairMojibake(stripNonSortingMarkers(a))) : [],
+    title: cleanCatalogText(doc.title).trim(),
+    authors: Array.isArray(doc.author_name) ? doc.author_name.filter((a): a is string => typeof a === "string").map(cleanCatalogText) : [],
     year: typeof doc.first_publish_year === "number" ? doc.first_publish_year : null,
     isbn: isbn13 ?? isbn10 ?? null,
     publisher: typeof publishers[0] === "string" ? publishers[0] : null,

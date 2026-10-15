@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { hasMojibake, repairMojibake, stripNonSortingMarkers } from "./mojibake.js";
+import { cleanCatalogText, hasMojibake, repairMojibake, stripNonSortingMarkers } from "./mojibake.js";
 
 const asWindows1252 = (text: string) => new TextDecoder("windows-1252").decode(new TextEncoder().encode(text));
 const asLatin1 = (text: string) => Buffer.from(text, "utf8").toString("latin1");
@@ -80,4 +80,11 @@ test("stripNonSortingMarkers keeps the bytes of text mis-decoded as Latin-1", ()
 test("text with markers and mojibake is repaired once the markers are gone", () => {
   assert.equal(repairMojibake("\u0098A \u009cfÃ© e a crenÃ§a"), "\u0098A \u009cfÃ© e a crenÃ§a");
   assert.equal(repairMojibake(stripNonSortingMarkers("\u0098A \u009cfÃ© e a crenÃ§a")), "A fé e a crença");
+});
+
+test("cleanCatalogText also drops markers that were mis-decoded with the text", () => {
+  assert.equal(cleanCatalogText("Â\u0098O Â\u009cNatal de FÃ©"), "O Natal de Fé");
+  assert.equal(cleanCatalogText("\u0098A \u009cfÃ© e a crenÃ§a"), "A fé e a crença");
+  assert.equal(cleanCatalogText(asLatin1("Über “Teste”")), "Über “Teste”");
+  assert.equal(cleanCatalogText("Coração"), "Coração");
 });

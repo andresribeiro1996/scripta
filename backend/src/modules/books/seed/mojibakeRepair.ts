@@ -1,5 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
-import { hasMojibake, repairMojibake, stripNonSortingMarkers } from "@scripta/shared";
+import { cleanCatalogText, hasMojibake, stripNonSortingMarkers } from "@scripta/shared";
 import { catalogTitleKey, workTitleKey } from "../domain/normalize.js";
 
 export interface RowRepair {
@@ -38,7 +38,7 @@ interface BookScan extends WorkScan {
   data_sources: string;
 }
 
-const repairRow = ({ id, title, author }: WorkScan): RowRepair => ({ id, title, author, repairedTitle: repairMojibake(stripNonSortingMarkers(title)), repairedAuthor: repairMojibake(stripNonSortingMarkers(author)) });
+const repairRow = ({ id, title, author }: WorkScan): RowRepair => ({ id, title, author, repairedTitle: cleanCatalogText(title), repairedAuthor: cleanCatalogText(author) });
 const isChanged = (row: RowRepair) => row.repairedTitle !== row.title || row.repairedAuthor !== row.author;
 const originOf = (row: BookScan) => row.created_by ?? ((JSON.parse(row.data_sources) as string[]).join("+") || "lookup");
 

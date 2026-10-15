@@ -1,4 +1,4 @@
-import { canonicalIsbn, firstAuthor, normalizeIsbn, normalizeTitle, normalizeWords, repairMojibake, stripNonSortingMarkers, titleNumbers } from "@scripta/shared";
+import { canonicalIsbn, cleanCatalogText, firstAuthor, normalizeIsbn, normalizeTitle, normalizeWords, titleNumbers } from "@scripta/shared";
 import type { BooksRepository } from "./ports.js";
 import type { BookRow } from "./types.js";
 
@@ -102,8 +102,8 @@ export function workTitleKey(title: string, author: string): string {
 export function lookupIdentity(lookup: BookLookup): BookIdentity | null {
   const raw = normalizeIsbn(lookup.isbn ?? "").toUpperCase();
   const isbn = canonicalIsbn(raw) || null;
-  const title = repairMojibake(stripNonSortingMarkers(lookup.title ?? "")).trim();
-  const author = repairMojibake(stripNonSortingMarkers(lookup.author ?? "")).trim();
+  const title = cleanCatalogText(lookup.title ?? "").trim();
+  const author = cleanCatalogText(lookup.author ?? "").trim();
   const titleKey = catalogTitleKey(title, author);
   if (isbn) return { key: `isbn:${isbn}`, aliasKeys: raw.length === 10 ? [`isbn:${raw}`] : [], titleKey, isbn, title, author };
   return titleKey ? { key: titleKey, aliasKeys: [], titleKey, isbn: null, title, author } : null;
