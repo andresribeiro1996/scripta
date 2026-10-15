@@ -65,6 +65,8 @@ export interface BooksRepository {
   setManualGenres(workId: string, genres: string[]): number;
   aliasesOf(workIds: string[]): string[];
   editionGenres(workIds: string[]): Array<{ work_id: string; genres: string; genres_source: GenresSource | null; genres_confidence: number | null }>;
+  spendTypesafe(day: string, source: string, limit: number): boolean;
+  typesafeUsage(day: string, source: string): number;
   setLanguage(id: string, tag: string | null): void;
   setPublisherUrl(id: string, url: string): void;
   listUpgradeWantedIds(after: PageCursor | null, limit: number): IdPage;

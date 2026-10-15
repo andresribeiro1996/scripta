@@ -196,6 +196,11 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     UPDATE books SET genres = '[]', genres_source = NULL, genres_confidence = NULL
     WHERE genres_source = 'jev' AND work_id IN (SELECT work_id FROM genre_judgments WHERE genre IS NULL OR confidence < ?)
   `);
+  const spendTypesafeStmt = db.prepare(`
+    INSERT INTO typesafe_usage (day, source, requests) VALUES (?, ?, 1)
+    ON CONFLICT (day, source) DO UPDATE SET requests = requests + 1 WHERE requests < ?
+  `);
+  const typesafeUsageStmt = db.prepare(`SELECT requests FROM typesafe_usage WHERE day = ? AND source = ?`);
   const detailsMissingStmt = db.prepare(`UPDATE books SET details_status = 'missing', details_checked_at = ? WHERE id = ?`);
   const detailsAttemptedStmt = db.prepare(`UPDATE books SET details_checked_at = ? WHERE id = ?`);
   const searchStmt = db.prepare(`
@@ -528,6 +533,12 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
         undoJudgmentsStmt.run(saveLine);
         applyJudgmentsStmt.run(saveLine);
       });
+    },
+    spendTypesafe(day, source, limit) {
+      return Number(spendTypesafeStmt.run(day, source, limit).changes) > 0;
+    },
+    typesafeUsage(day, source) {
+      return (typesafeUsageStmt.get(day, source) as { requests: number } | undefined)?.requests ?? 0;
     },
 
     genreEvidence(workId) {
