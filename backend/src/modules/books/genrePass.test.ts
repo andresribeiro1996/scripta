@@ -80,7 +80,7 @@ test("an import fills empty, Jev and earlier manual editions, never source genre
 test("the export also lists works whose only genres are Jev's possible ones, with Jev's answer", () => {
   const { db, repo, blank, tagged } = seeded();
   repo.saveGenreJudgment({ workId: blank, model: "jev-1.13.0", genre: "Biography & Memoir", confidence: 0.6, askedAt: "2026-10-14T00:00:00.000Z" });
-  repo.applyGenreJudgments(0.5);
+  repo.applyGenreJudgment(blank, 0.5);
   db.prepare("UPDATE books SET genres = ?, genres_source = 'jev', genres_confidence = 0.95 WHERE work_id = ?").run(JSON.stringify(["Science Fiction"]), tagged);
   const rows = genrePassWorksWith(repo, [{ workId: blank, holders: 1, finished: true }, { workId: tagged, holders: 1, finished: true }]);
   assert.deepEqual(rows.map((entry) => [entry.workId, entry.jev]), [[blank, { genre: "Biography & Memoir", confidence: 0.6 }]]);
@@ -124,7 +124,7 @@ test("labelling writes manual genres, and an empty label records the owner's no-
 test("labelling no genre clears Jev's possible genres and leaves manual and source genres alone", () => {
   const { db, repo, other, tagged } = seeded();
   repo.saveGenreJudgment({ workId: other, model: "jev-1.13.0", genre: "Biography & Memoir", confidence: 0.6, askedAt: "2026-10-14T00:00:00.000Z" });
-  repo.applyGenreJudgments(0.5);
+  repo.applyGenreJudgment(other, 0.5);
   assert.equal(row(db, other).genres_source, "jev");
   assert.equal(labelWork(repo, other, [], "2026-10-15T00:00:00.000Z"), 0);
   assert.deepEqual(row(db, other), { genres: "[]", genres_source: null, genres_confidence: null });
@@ -144,7 +144,7 @@ test("the catalog scope lists every work Jev doubted, held or not, and nothing J
   const { db, repo, blank, tagged, other } = seeded();
   const judge = (workId: string, genre: string | null, confidence: number) => {
     repo.saveGenreJudgment({ workId, model: "jev-1.13.0", genre, confidence, askedAt: "2026-10-15T00:00:00.000Z" });
-    repo.applyGenreJudgments(0.5);
+    repo.applyGenreJudgment(workId, 0.5);
   };
   db.prepare("UPDATE books SET genres = '[]' WHERE work_id = ?").run(tagged);
   judge(blank, null, 0.9);

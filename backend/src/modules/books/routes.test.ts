@@ -19,8 +19,8 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 const { applyBooksMigrations } = await import("./adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("./adapters/sqlite/sqliteBooksRepository.js");
 const { createBooksService, MAX_UPLOAD_BYTES } = await import("./booksService.js");
-const { BookNotFoundError, SourceUnavailableError } = await import("./domain/errors.js");
-const { buildAdminRoutes, buildCatalogRoutes, buildGenreReviewRoutes, buildSynopsisReviewRoutes, buildCoverFileRoutes, buildResolveRoutes } = await import("./routes.js");
+const { BookNotFoundError, SourceUnavailableError, WorkMergeError } = await import("./domain/errors.js");
+const { buildAdminRoutes, buildCatalogRoutes, buildGenreReviewRoutes, buildSynopsisReviewRoutes, buildTranslationReviewRoutes, buildCoverFileRoutes, buildResolveRoutes } = await import("./routes.js");
 
 type Deps = Parameters<typeof createBooksService>[0];
 const publicUrlFor = (id: string, size: string) => `https://images.test/covers/${id}${size === "thumb" ? "-thumb" : ""}.webp`;
@@ -303,4 +303,26 @@ test("a synopsis decision needs a hash and keep or hide, and maps not found", as
   assert.deepEqual(saved.json(), { hash });
   const missing = await callSynopsisReview({ method: "POST", url: `/books/synopsis-review/${hash}`, payload: { decision: "keep" } }, "admin", () => { throw new BookNotFoundError(); });
   assert.equal(missing.statusCode, 404);
+});
+
+async function callTranslationReview(options: InjectOptions, signedInAs?: string, decide: (workId: string) => { workId: string } = (workId) => ({ workId })) {
+  const app = Fastify();
+  app.decorate("authenticateAccessToken", (token: string) => (token === signedInAs ? { id: token, email: `${token}@example.test`, username: token, avatarId: null } : null));
+  await app.register(buildTranslationReviewRoutes({ isAdmin: (userId) => userId === "admin", review: () => ({ items: [], total: 0 }), decide }));
+  const res = await app.inject(signedInAs ? { ...options, headers: { ...options.headers, authorization: `Bearer ${signedInAs}` } } : options);
+  await app.close();
+  return res;
+}
+
+test("the translation review is the admin's only, and maps validation, not found and stale merges", async () => {
+  assert.equal((await callTranslationReview({ method: "GET", url: "/books/translation-review" })).statusCode, 401);
+  assert.equal((await callTranslationReview({ method: "GET", url: "/books/translation-review" }, "reader")).statusCode, 403);
+  assert.equal((await callTranslationReview({ method: "GET", url: "/books/translation-review" }, "admin")).statusCode, 200);
+  for (const payload of [{}, { merge: "" }, { reject: false }, { undo: true, reject: true }, { merge: "w", extra: 1 }]) {
+    assert.equal((await callTranslationReview({ method: "POST", url: "/books/translation-review/w1", payload }, "admin")).statusCode, 400, JSON.stringify(payload));
+  }
+  assert.equal((await callTranslationReview({ method: "POST", url: "/books/translation-review/w1", payload: { reject: true } }, "reader")).statusCode, 403);
+  assert.equal((await callTranslationReview({ method: "POST", url: "/books/translation-review/w1", payload: { undo: true } }, "admin")).statusCode, 200);
+  assert.equal((await callTranslationReview({ method: "POST", url: "/books/translation-review/w1", payload: { reject: true } }, "admin", () => { throw new BookNotFoundError(); })).statusCode, 404);
+  assert.equal((await callTranslationReview({ method: "POST", url: "/books/translation-review/w1", payload: { merge: "w2" } }, "admin", () => { throw new WorkMergeError("Both works are in an arena."); })).statusCode, 409);
 });

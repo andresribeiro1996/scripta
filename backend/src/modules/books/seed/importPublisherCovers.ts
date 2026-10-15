@@ -47,7 +47,7 @@ export interface ImportDeps {
   fetchText(url: string): Promise<{ status: number; text: string }>;
   fetchBytes(url: string): Promise<Buffer | null>;
   lookupOpenLibrary(isbn: string): Promise<OpenLibraryEdition | null>;
-  repo: Pick<BooksRepository, "findBookByKey" | "getBook" | "createBook" | "addKey" | "fillIdentity" | "mergeDetails" | "setWorkKey" | "setLanguage" | "setPublisherUrl" | "getImage" | "insertImage" | "setCoverIf" | "listRejectedUrls" | "setUpgradeWanted">;
+  repo: Pick<BooksRepository, "findBookByKey" | "getBook" | "createBook" | "addKey" | "fillIdentity" | "mergeDetails" | "setWorkKey" | "setLanguage" | "setPublisherUrl" | "getImage" | "insertImage" | "setCoverIf" | "listRejectedUrls" | "setUpgradeWanted" | "fillOriginalTitle">;
   blobs: CoverBlobStore;
   now: () => Date;
   sleep: (ms: number) => Promise<void>;
@@ -277,6 +277,7 @@ async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryR
     if (!options.dryRun) {
       deps.repo.setLanguage(row.id, importedLanguage(memo.looked?.edition?.languages ?? [], book.isbn));
       deps.repo.mergeDetails(row.id, { ...book.details, publisher: site.name }, "publisher");
+      if (book.details.originalTitle) deps.repo.fillOriginalTitle(row.id, book.details.originalTitle);
       if (isWebUrl(book.productUrl)) deps.repo.setPublisherUrl(row.id, book.productUrl);
     }
 

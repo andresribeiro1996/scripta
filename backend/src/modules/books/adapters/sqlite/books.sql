@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS books (
   genres_source TEXT,
   genres_confidence REAL,
   summary_hash        TEXT,
+  original_title      TEXT,
   created_at          TEXT NOT NULL
 );
 
@@ -121,4 +122,24 @@ CREATE TABLE IF NOT EXISTS jev_rejections (
   attempts INTEGER NOT NULL,
   last_at  TEXT NOT NULL,
   PRIMARY KEY (task, subject)
+);
+
+CREATE TABLE IF NOT EXISTS work_merges (
+  id                 INTEGER PRIMARY KEY,
+  from_work          TEXT NOT NULL,
+  into_work          TEXT NOT NULL,
+  source             TEXT NOT NULL,
+  confidence         REAL,
+  moved_book_ids     TEXT NOT NULL,
+  repointed_work_ids TEXT NOT NULL,
+  merged_at          TEXT NOT NULL,
+  undone_at          TEXT
+);
+
+CREATE TABLE IF NOT EXISTS work_match_judgments (
+  work_id      TEXT PRIMARY KEY,
+  model        TEXT NOT NULL,
+  into_work_id TEXT,
+  confidence   REAL,
+  asked_at     TEXT NOT NULL
 );
