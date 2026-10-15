@@ -4,7 +4,7 @@ import sharp from "sharp";
 sharp.cache(false);
 sharp.concurrency(1);
 
-const { values } = parseArgs({ options: { "dry-run": { type: "boolean", default: false }, site: { type: "string" }, "fill-titles": { type: "boolean", default: false } } });
+const { values } = parseArgs({ options: { "dry-run": { type: "boolean", default: false }, site: { type: "string" }, "fill-titles": { type: "boolean", default: false }, "fill-genres": { type: "boolean", default: false } } });
 
 const TIMEOUT_MS = 30_000;
 const OPEN_LIBRARY_GAP_MS = 1000;
@@ -15,6 +15,7 @@ const { parseEditionRecord } = await import("../dist/modules/books/adapters/open
 const { openBooksDb } = await import("../dist/modules/books/adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("../dist/modules/books/adapters/sqlite/sqliteBooksRepository.js");
 const { fillBlankTitles } = await import("../dist/modules/books/seed/fillBlankTitles.js");
+const { fillFeedGenres } = await import("../dist/modules/books/seed/feedGenres.js");
 const { importPublisherCovers } = await import("../dist/modules/books/seed/importPublisherCovers.js");
 const { PUBLISHERS } = await import("../dist/modules/books/seed/publishers.js");
 const { createObjectStore } = await import("../dist/storage/createObjectStore.js");
@@ -53,6 +54,13 @@ if (sites.length === 0) {
 
 if (values["fill-titles"]) {
   const report = await fillBlankTitles(
+    { fetchText, sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)), repo: createSqliteBooksRepository(openBooksDb()) },
+    sites,
+    { dryRun: values["dry-run"] }
+  );
+  console.log(JSON.stringify(report, null, 2));
+} else if (values["fill-genres"]) {
+  const report = await fillFeedGenres(
     { fetchText, sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)), repo: createSqliteBooksRepository(openBooksDb()) },
     sites,
     { dryRun: values["dry-run"] }

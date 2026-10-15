@@ -10,6 +10,7 @@ export interface PublisherBook {
   productUrl: string;
   rank: number;
   details: ProductDetails;
+  labels: string[];
 }
 
 export interface ProductDetails {
@@ -194,6 +195,11 @@ function items(list: unknown): unknown[] {
   return Array.isArray(list) ? list : [];
 }
 
+function labelList(value: unknown): string[] {
+  const raw = typeof value === "string" ? value.split(",") : items(value).map((entry) => (typeof entry === "string" ? entry : text(record(entry)?.name)));
+  return raw.map((label) => decodeEntities(label).trim()).filter(Boolean);
+}
+
 export function feedProducts(json: unknown, site: PublisherSite): unknown[] | null {
   const list = site.platform === "shopify" ? record(json)?.products : json;
   return Array.isArray(list) ? list : null;
@@ -223,7 +229,7 @@ export function parseShopifyProducts(json: unknown, site: PublisherSite): Publis
     const author = site.authorFromVendor && vendor && normalizeWords(vendor) !== normalizeWords(site.name) ? vendor : null;
     const lines = textLines(text(product.body_html));
     const details = { summary: synopsis(lines), year: null, ...feedTextDetails(lines) };
-    return [{ isbn: found?.isbn ?? null, rank: found?.rank ?? PAGE_RANK, title, author, imageUrl, productUrl, details }];
+    return [{ isbn: found?.isbn ?? null, rank: found?.rank ?? PAGE_RANK, title, author, imageUrl, productUrl, details, labels: [...labelList(product.tags), ...labelList(product.product_type)] }];
   });
 }
 
@@ -258,7 +264,7 @@ export function parseWooProducts(json: unknown, site: PublisherSite): PublisherB
     if (!imageUrl || !productUrl || !title) return [];
     const found = firstIsbn([[text(product.sku)], [fileName(imageUrl)], [JSON.stringify(product)]]);
     if (!found && !URL.canParse(productUrl)) return [];
-    return [{ isbn: found?.isbn ?? null, rank: found?.rank ?? PAGE_RANK, title, author: wooAttribute(product, /^autor/i), imageUrl, productUrl, details: wooDetails(product) }];
+    return [{ isbn: found?.isbn ?? null, rank: found?.rank ?? PAGE_RANK, title, author: wooAttribute(product, /^autor/i), imageUrl, productUrl, details: wooDetails(product), labels: [...labelList(product.categories), ...labelList(product.tags)] }];
   });
 }
 

@@ -288,6 +288,12 @@ One-off passes that label catalog works with no genres. Each writes only to edit
    npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && node scripts/seed-catalog.mjs --fill-genres --dry-run'
    ```
 
+2. Feed labels: re-reads the 15 publisher feeds (robots.txt respected, the importer's throttle) and stores each product's tags and categories as genres on the books at its URL, else its ISBN. The dry run's `unmatchedLabels` is the census: review it and add any real genre words to the Portuguese rules or `FEED_LABEL_GENRES` before the real run.
+
+   ```bash
+   npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && node scripts/import-publisher-covers.mjs --fill-genres --dry-run'
+   ```
+
 #### Known limitations of covers, details and search, and the options for each
 
 Measured on production on 2026-09-30, after a tester imported a 167-book library and waited about 20 minutes for covers. The server itself was never slow: `/covers/resolve` p50 was 1 ms and `PUT /library` about 5 ms. The time goes into the pipeline around it. Recheck the numbers below before relying on them.
