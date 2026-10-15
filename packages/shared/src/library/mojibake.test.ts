@@ -85,6 +85,10 @@ test("text with markers and mojibake is repaired once the markers are gone", () 
 test("cleanCatalogText also drops markers that were mis-decoded with the text", () => {
   assert.equal(cleanCatalogText("Â\u0098O Â\u009cNatal de FÃ©"), "O Natal de Fé");
   assert.equal(cleanCatalogText("\u0098A \u009cfÃ© e a crenÃ§a"), "A fé e a crença");
+  assert.equal(cleanCatalogText(asLatin1("\u0098A \u009cfÃ© e a crenÃ§a")), "A fé e a crença");
   assert.equal(cleanCatalogText(asLatin1("Über “Teste”")), "Über “Teste”");
   assert.equal(cleanCatalogText("Coração"), "Coração");
+  for (const input of ["Â\u0098O Â\u009cNatal de FÃ©", "\u0098A \u009cfÃ© e a crenÃ§a", asLatin1("\u0098A \u009cfÃ© e a crenÃ§a"), asLatin1("Über “Teste”"), "Coração"]) {
+    assert.equal(cleanCatalogText(cleanCatalogText(input)), cleanCatalogText(input));
+  }
 });

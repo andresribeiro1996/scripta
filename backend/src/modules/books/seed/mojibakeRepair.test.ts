@@ -225,8 +225,9 @@ test("the report counts the books whose markers were stripped, and the printed r
   h.book("\u0098O \u009cNatal de Teste", "Ana Lima", null);
   h.book(BROKEN_TITLE, BROKEN_AUTHOR, null);
   h.book("\u0098A \u009cLivro da fÃ©", "Ana Lima", null);
+  h.book("Â\u0098O Â\u009cLivro de FÃ©", "Ana Lima", null);
   const report = mojibakeReport(planMojibakeRepairs(h.db), null);
-  assert.deepEqual(report.books, { scanned: 3, repaired: 3, titles: 3, authors: 1, markers: 2 });
+  assert.deepEqual(report.books, { scanned: 4, repaired: 4, titles: 4, authors: 1, markers: 3 });
   const printed = reportJson(report);
   assert.equal(/[\u0080-\u009f]/.test(printed), false);
   assert.equal(printed.includes("\\u0098O \\u009cNatal de Teste"), true);

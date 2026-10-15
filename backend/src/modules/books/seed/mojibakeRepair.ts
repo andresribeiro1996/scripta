@@ -1,5 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
-import { cleanCatalogText, hasMojibake, stripNonSortingMarkers } from "@scripta/shared";
+import { cleanCatalogText, hasMojibake, repairMojibake } from "@scripta/shared";
 import { catalogTitleKey, workTitleKey } from "../domain/normalize.js";
 
 export interface RowRepair {
@@ -105,7 +105,7 @@ export function mojibakeReport(plan: MojibakePlan, applied: MojibakeApplied | nu
       repaired: plan.books.length,
       titles: plan.books.filter((book) => book.repairedTitle !== book.title).length,
       authors: plan.books.filter((book) => book.repairedAuthor !== book.author).length,
-      markers: plan.books.filter((book) => stripNonSortingMarkers(book.title) !== book.title || stripNonSortingMarkers(book.author) !== book.author).length
+      markers: plan.books.filter((book) => book.repairedTitle !== repairMojibake(book.title) || book.repairedAuthor !== repairMojibake(book.author)).length
     },
     works: { scanned: plan.scanned.works, repaired: plan.works.length },
     origins,

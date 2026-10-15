@@ -54,5 +54,6 @@ export function stripNonSortingMarkers(text: string): string {
 }
 
 export function cleanCatalogText(text: string): string {
-  return stripNonSortingMarkers(repairMojibake(stripNonSortingMarkers(text)));
+  for (let next = repairMojibake(stripNonSortingMarkers(text)); next !== text; next = repairMojibake(stripNonSortingMarkers(text))) text = next;
+  return text;
 }
