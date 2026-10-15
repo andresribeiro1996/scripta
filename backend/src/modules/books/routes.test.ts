@@ -19,8 +19,8 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 const { applyBooksMigrations } = await import("./adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("./adapters/sqlite/sqliteBooksRepository.js");
 const { createBooksService, MAX_UPLOAD_BYTES } = await import("./booksService.js");
-const { SourceUnavailableError } = await import("./domain/errors.js");
-const { buildAdminRoutes, buildCatalogRoutes, buildCoverFileRoutes, buildResolveRoutes } = await import("./routes.js");
+const { BookNotFoundError, SourceUnavailableError } = await import("./domain/errors.js");
+const { buildAdminRoutes, buildCatalogRoutes, buildGenreReviewRoutes, buildCoverFileRoutes, buildResolveRoutes } = await import("./routes.js");
 
 type Deps = Parameters<typeof createBooksService>[0];
 const publicUrlFor = (id: string, size: string) => `https://images.test/covers/${id}${size === "thumb" ? "-thumb" : ""}.webp`;
@@ -235,4 +235,41 @@ test("catalog search accepts by=work and refuses any other grouping", async () =
   const { service } = makeService();
   assert.equal((await call(service, { method: "GET", url: "/books/search?q=dune&by=work" }, "u1")).statusCode, 200);
   assert.equal((await call(service, { method: "GET", url: "/books/search?q=dune&by=edition" }, "u1")).statusCode, 400);
+});
+
+async function callReview(options: InjectOptions, signedInAs?: string, decided: Array<[string, unknown]> = []) {
+  const app = Fastify();
+  app.decorate("authenticateAccessToken", (token: string) => (token === signedInAs ? { id: token, email: `${token}@example.test`, username: token, avatarId: null } : null));
+  await app.register(buildGenreReviewRoutes({
+    isAdmin: (userId) => userId === "admin",
+    review: () => ({ items: [], total: 0 }),
+    decide: (workId, action) => {
+      if (workId === "missing") throw new BookNotFoundError();
+      decided.push([workId, action]);
+      return { workId, editions: 1 };
+    }
+  }));
+  const res = await app.inject(signedInAs ? { ...options, headers: { ...options.headers, authorization: `Bearer ${signedInAs}` } } : options);
+  await app.close();
+  return res;
+}
+
+test("only the signed-in admin may list or decide genre reviews", async () => {
+  assert.equal((await callReview({ method: "GET", url: "/books/genre-review" })).statusCode, 401);
+  assert.equal((await callReview({ method: "GET", url: "/books/genre-review" }, "u1")).statusCode, 403);
+  assert.equal((await callReview({ method: "POST", url: "/books/genre-review/w1", payload: { genres: ["History"] } }, "u1")).statusCode, 403);
+  assert.deepEqual((await callReview({ method: "GET", url: "/books/genre-review" }, "admin")).json(), { items: [], total: 0 });
+});
+
+test("a genre review decision is validated before it is applied", async () => {
+  const decided: Array<[string, unknown]> = [];
+  const post = (payload: unknown, workId = "w1") => callReview({ method: "POST", url: `/books/genre-review/${workId}`, payload: payload as object }, "admin", decided);
+  assert.equal((await post({ genres: ["History", "Poetry"] })).statusCode, 200);
+  assert.equal((await post({ genres: [] })).statusCode, 200);
+  assert.equal((await post({ retry: true })).statusCode, 200);
+  for (const bad of [{ genres: ["Novel"] }, { genres: ["History", "History"] }, { genres: ["History", "Poetry", "Classics", "Religion"] }, { retry: false }, { genres: ["History"], retry: true }, {}]) {
+    assert.equal((await post(bad)).statusCode, 400, JSON.stringify(bad));
+  }
+  assert.equal((await post({ genres: ["History"] }, "missing")).statusCode, 404);
+  assert.deepEqual(decided, [["w1", { genres: ["History", "Poetry"] }], ["w1", { genres: [] }], ["w1", { retry: true }]]);
 });

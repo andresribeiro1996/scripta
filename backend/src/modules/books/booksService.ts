@@ -45,6 +45,7 @@ export interface BooksServiceDeps {
   publicUrlFor: (imageId: string, size: CoverFileSize) => string;
   adminUserId: string;
   warn: (details: Record<string, unknown>, message: string) => void;
+  onDetailsChecked?: (book: BookRow) => void;
   now?: () => Date;
 }
 
@@ -297,6 +298,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
         throw error;
       }
       const latest = deps.repo.getBook(book.id) ?? book;
+      deps.onDetailsChecked?.(latest);
       return latest.details_status === "found" || latest.summary ? detailsOf(latest) : null;
     },
 
@@ -307,6 +309,8 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
         if (!book || book.details_status !== null) continue;
         try {
           await lookupDetails(book, deps.backgroundCatalog);
+          const latest = deps.repo.getBook(id);
+          if (latest) deps.onDetailsChecked?.(latest);
         } catch (error) {
           if (error instanceof SourcePausedError) return error.retryAt;
           if (!(error instanceof SourceUnavailableError)) throw error;

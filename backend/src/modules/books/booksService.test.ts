@@ -1764,3 +1764,16 @@ test("search hits saved from outside carry their canonical work id", async () =>
   const again = await h.service.searchExternal("dune");
   assert.equal(again[0]!.workId, target.work_id);
 });
+
+test("a finished details lookup reports the edition, from a request and from the backfill", async () => {
+  const checked: Array<{ id: string; status: string | null }> = [];
+  const quiet = { fetchDetails: async () => null, search: async () => [] };
+  const h = harness({ catalog: quiet, backgroundCatalog: quiet, onDetailsChecked: (book) => { checked.push({ id: book.id, status: book.details_status }); } });
+  await h.service.getDetails({ isbn: "9780441013593", title: "Dune", author: "Frank Herbert" });
+  assert.deepEqual(checked, [{ id: h.bookId("isbn:9780441013593"), status: "missing" }]);
+  await h.service.getDetails({ isbn: "9780441013593", title: "Dune", author: "Frank Herbert" });
+  assert.equal(checked.length, 1);
+  const emma = h.repo.createBook({ title: "Emma", author: "Jane Austen", isbn: null }, ["ta:emma|jane austen|"], "2026-10-01T00:00:00.000Z");
+  await h.service.backfillDetails(50);
+  assert.deepEqual(checked[1], { id: emma.id, status: "missing" });
+});

@@ -16,7 +16,7 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 const { applyBooksMigrations } = await import("./adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("./adapters/sqlite/sqliteBooksRepository.js");
 const { resolveWorksWith } = await import("./works.js");
-const { GenreLabelsError, genrePassWorksWith, importGenreLabelsWith, longestSynopsis } = await import("./genrePass.js");
+const { GenreLabelsError, genrePassWorksWith, importGenreLabelsWith, labelProblem, labelWork, longestSynopsis } = await import("./genrePass.js");
 
 function seeded() {
   const db = new DatabaseSync(":memory:");
@@ -89,11 +89,53 @@ test("the export also lists works whose only genres are Jev's possible ones, wit
 test("an empty label records a manual none judgment so Jev is not asked, and repeats as a no-op", () => {
   const { db, repo, blank } = seeded();
   db.prepare("UPDATE books SET details_status = 'missing' WHERE work_id = ?").run(blank);
-  assert.deepEqual(repo.worksNeedingGenreJudgment([blank], 10), [blank]);
+  assert.deepEqual(repo.worksNeedingGenreJudgment([blank], 10, 3), [blank]);
   assert.deepEqual(importGenreLabelsWith(repo, [{ workId: blank, genres: [] }]), { works: 0, editions: 0, skipped: [blank] });
   assert.equal(repo.genreJudgments([blank]).get(blank)?.genre, null);
   assert.equal(repo.genreJudgments([blank]).get(blank)?.confidence, 1);
-  assert.deepEqual(repo.worksNeedingGenreJudgment([blank], 10), []);
+  assert.deepEqual(repo.worksNeedingGenreJudgment([blank], 10, 3), []);
   assert.deepEqual(importGenreLabelsWith(repo, [{ workId: blank, genres: [] }]), { works: 0, editions: 0, skipped: [blank] });
   assert.equal(row(db, blank).genres, "[]");
+});
+
+test("a label is up to three distinct known genres", () => {
+  assert.equal(labelProblem(["History", "Poetry", "Classics"]), null);
+  assert.equal(labelProblem([]), null);
+  assert.equal(labelProblem(["Novel"]), "has unknown genres: Novel");
+  assert.equal(labelProblem(["History", "History"]), "repeats a genre");
+  assert.equal(labelProblem(["History", "Poetry", "Classics", "Religion"]), "has more than 3 genres");
+});
+
+test("an import rejects a repeated genre or a fourth one without writing", () => {
+  const { db, repo, blank } = seeded();
+  assert.throws(() => importGenreLabelsWith(repo, [{ workId: blank, genres: ["Poetry", "Poetry"] }]), GenreLabelsError);
+  assert.throws(() => importGenreLabelsWith(repo, [{ workId: blank, genres: ["Poetry", "History", "Classics", "Religion"] }]), GenreLabelsError);
+  assert.equal(row(db, blank).genres, "[]");
+});
+
+test("labelling writes manual genres, and an empty label records the owner's no-genre", () => {
+  const { db, repo, blank, other } = seeded();
+  assert.equal(labelWork(repo, blank, ["Poetry"], "2026-10-15T00:00:00.000Z"), 1);
+  assert.deepEqual(row(db, blank), { genres: JSON.stringify(["Poetry"]), genres_source: "manual", genres_confidence: null });
+  assert.equal(labelWork(repo, other, [], "2026-10-15T00:00:00.000Z"), 0);
+  assert.deepEqual(repo.genreJudgments([other]).get(other), { model: "manual", genre: null, confidence: 1 });
+});
+
+test("labelling no genre clears Jev's possible genres and leaves manual and source genres alone", () => {
+  const { db, repo, other, tagged } = seeded();
+  repo.saveGenreJudgment({ workId: other, model: "jev-1.13.0", genre: "Biography & Memoir", confidence: 0.6, askedAt: "2026-10-14T00:00:00.000Z" });
+  repo.applyGenreJudgments(0.5);
+  assert.equal(row(db, other).genres_source, "jev");
+  assert.equal(labelWork(repo, other, [], "2026-10-15T00:00:00.000Z"), 0);
+  assert.deepEqual(row(db, other), { genres: "[]", genres_source: null, genres_confidence: null });
+  db.prepare("UPDATE books SET genres = ?, genres_source = 'manual' WHERE work_id = ?").run(JSON.stringify(["Poetry"]), tagged);
+  labelWork(repo, tagged, [], "2026-10-15T00:00:00.000Z");
+  assert.deepEqual(row(db, tagged), { genres: JSON.stringify(["Poetry"]), genres_source: "manual", genres_confidence: null });
+});
+
+test("the export leaves out works the owner labelled no genre", () => {
+  const { repo, blank, other } = seeded();
+  labelWork(repo, other, [], "2026-10-15T00:00:00.000Z");
+  const rows = genrePassWorksWith(repo, [{ workId: blank, holders: 1, finished: false }, { workId: other, holders: 1, finished: false }]);
+  assert.deepEqual(rows.map((entry) => entry.workId), [blank]);
 });

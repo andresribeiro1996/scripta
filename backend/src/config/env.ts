@@ -217,7 +217,6 @@ export const googleOAuthConfigured =
   env.GOOGLE_CLIENT_ID !== "" && env.GOOGLE_CLIENT_SECRET !== "" && env.GOOGLE_CALLBACK_URL !== "";
 
 export const isbndbConfigured = env.ISBNDB_API_KEY !== "";
-export const typesafeConfigured = env.TYPESAFE_API_KEY !== "";
 
 // modules/socials — same "all three or none" shape as googleOAuthConfigured
 // above, one per platform. See modules/socials/providerConfig.ts for where

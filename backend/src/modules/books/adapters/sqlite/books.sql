@@ -53,6 +53,21 @@ CREATE TABLE IF NOT EXISTS genre_judgments (
   asked_at   TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS typesafe_usage (
+  day      TEXT NOT NULL,
+  source   TEXT NOT NULL,
+  requests INTEGER NOT NULL,
+  PRIMARY KEY (day, source)
+);
+
+CREATE TABLE IF NOT EXISTS genre_rejections (
+  work_id  TEXT PRIMARY KEY,
+  status   INTEGER,
+  reason   TEXT NOT NULL,
+  attempts INTEGER NOT NULL,
+  last_at  TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS book_keys (
   key      TEXT PRIMARY KEY,
   book_id  TEXT NOT NULL REFERENCES books(id)
