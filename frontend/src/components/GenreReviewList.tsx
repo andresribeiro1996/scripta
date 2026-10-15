@@ -48,7 +48,7 @@ export function GenreReviewRowView({
                 type="button"
                 aria-pressed={picked.includes(genre)}
                 onClick={() => onToggle(genre)}
-                className={`rounded-full border px-2 text-xs ${picked.includes(genre) ? "border-(--color-accent) text-(--color-accent)" : "border-(--color-border) text-(--color-text-dim)"}`}
+                className={`rounded-full border px-2 py-1 text-xs ${picked.includes(genre) ? "border-(--color-accent) bg-(--color-accent-soft) text-(--color-accent)" : "border-(--color-border) text-(--color-text-dim)"}`}
               >
                 {genre}
               </button>
