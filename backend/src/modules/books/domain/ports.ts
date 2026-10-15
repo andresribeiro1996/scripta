@@ -89,6 +89,7 @@ export interface BooksRepository {
   fillOriginalTitle(bookId: string, title: string): void;
   fillOriginalTitlesFromSummaries(workId?: string): number;
   mergeTranslation(fromId: string, intoId: string, source: "code" | "jev" | "manual", confidence: number | null, at: string): string;
+  undoMerge(fromId: string, at: string): { into: string; editions: number };
   workIdsByWorkKeys(keys: string[]): Map<string, string>;
   listPublisherUrls(): Array<{ work_id: string | null; publisher_url: string }>;
   fillSourceGenres(workId: string, genres: string[]): number;

@@ -91,6 +91,11 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const repointMergedStmt = db.prepare(`UPDATE works SET merged_into = ? WHERE merged_into = ?`);
   const workEditionIdsStmt = db.prepare(`SELECT id FROM books WHERE work_id = ? ORDER BY created_at, rowid`);
   const recordMergeStmt = db.prepare(`INSERT INTO work_merges (from_work, into_work, source, confidence, moved_book_ids, repointed_work_ids, merged_at) VALUES (?, ?, ?, ?, ?, ?, ?)`);
+  const latestMergeStmt = db.prepare(`SELECT id, into_work, moved_book_ids, repointed_work_ids FROM work_merges WHERE from_work = ? AND undone_at IS NULL ORDER BY id DESC LIMIT 1`);
+  const moveBackStmt = db.prepare(`UPDATE books SET work_id = ? WHERE work_id = ? AND (id IN (SELECT value FROM json_each(?)) OR (? IS NOT NULL AND ol_work_key = ?))`);
+  const unmergeStmt = db.prepare(`UPDATE works SET merged_into = NULL WHERE id = ?`);
+  const repointBackStmt = db.prepare(`UPDATE works SET merged_into = ? WHERE merged_into = ? AND id IN (SELECT value FROM json_each(?))`);
+  const markUndoneStmt = db.prepare(`UPDATE work_merges SET undone_at = ? WHERE id = ?`);
   const genreJudgmentOwnedStmt = db.prepare(`SELECT 1 AS owned FROM genre_judgments WHERE work_id = ?`);
   const moveGenreJudgmentStmt = db.prepare(`UPDATE genre_judgments SET work_id = ? WHERE work_id = ?`);
   const dropGenreJudgmentStmt = db.prepare(`DELETE FROM genre_judgments WHERE work_id = ?`);
@@ -653,6 +658,18 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
         if (!into || into === from.id) throw new WorkMergeError("That work can't be merged there.");
         mergeInto(from.id, into, { source, confidence, at, carrySummary: false });
         return into;
+      });
+    },
+    undoMerge(fromId, at) {
+      return inTransaction(() => {
+        const merge = latestMergeStmt.get(fromId) as { id: number; into_work: string; moved_book_ids: string; repointed_work_ids: string } | undefined;
+        const from = workLinkStmt.get(fromId) as WorkLink | undefined;
+        if (!merge || !from || from.merged_into !== merge.into_work) throw new WorkMergeError("That merge can no longer be undone.");
+        const editions = Number(moveBackStmt.run(from.id, merge.into_work, merge.moved_book_ids, from.ol_work_key, from.ol_work_key).changes);
+        unmergeStmt.run(from.id);
+        repointBackStmt.run(from.id, merge.into_work, merge.repointed_work_ids);
+        markUndoneStmt.run(at, merge.id);
+        return { into: merge.into_work, editions };
       });
     },
 

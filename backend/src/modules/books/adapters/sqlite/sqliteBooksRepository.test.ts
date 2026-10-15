@@ -1693,3 +1693,33 @@ test("mergeTranslation refuses a merged or missing work and a work into itself; 
   repo.mergeTranslation(a.work_id!, b.work_id!, "manual", null, AT);
   assert.throws(() => repo.mergeTranslation(a.work_id!, b.work_id!, "manual", null, AT), WorkMergeError);
 });
+
+test("undo reverses a translation merge, later arrivals with the key and repointed aliases included", () => {
+  const { db, repo } = freshRepo();
+  const alias = repo.createBook({ title: "Alias", author: "X", isbn: "9789720000301" }, ["isbn:9789720000301"], NOW);
+  const pt = repo.createBook({ title: "Passeio", author: "X", isbn: "9789720000302", workKey: "OL920W" }, ["isbn:9789720000302"], NOW);
+  const en = repo.createBook({ title: "Walk", author: "X", isbn: "9789720000303", workKey: "OL921W" }, ["isbn:9789720000303"], NOW);
+  repo.mergeWorks(alias.work_id!, pt.work_id!, AT);
+  repo.mergeTranslation(pt.work_id!, en.work_id!, "jev", 0.92, AT);
+  const later = repo.createBook({ title: "Passeio", author: "X", isbn: "9789720000304", workKey: "OL920W" }, ["isbn:9789720000304"], NOW);
+  assert.equal(later.work_id, en.work_id);
+
+  assert.deepEqual(repo.undoMerge(pt.work_id!, "2026-10-16T00:00:00.000Z"), { into: en.work_id, editions: 3 });
+  assert.equal(workById(db, pt.work_id).merged_into, null);
+  for (const id of [alias.id, pt.id, later.id]) assert.equal(repo.getBook(id)!.work_id, pt.work_id);
+  assert.equal(repo.getBook(en.id)!.work_id, en.work_id);
+  assert.equal(workById(db, alias.work_id).merged_into, pt.work_id);
+  assert.equal((db.prepare("SELECT undone_at FROM work_merges WHERE from_work = ? AND source = 'jev'").get(pt.work_id) as { undone_at: string }).undone_at, "2026-10-16T00:00:00.000Z");
+  assert.equal(repo.createBook({ title: "Passeio", author: "X", isbn: "9789720000305", workKey: "OL920W" }, ["isbn:9789720000305"], NOW).work_id, pt.work_id);
+  assert.throws(() => repo.undoMerge(pt.work_id!, AT), WorkMergeError);
+});
+
+test("undo refuses once the target itself merged elsewhere", () => {
+  const { repo } = freshRepo();
+  const pt = repo.createBook({ title: "Passeio", author: "X", isbn: "9789720000306", workKey: "OL922W" }, ["isbn:9789720000306"], NOW);
+  const en = repo.createBook({ title: "Walk", author: "X", isbn: "9789720000307", workKey: "OL923W" }, ["isbn:9789720000307"], NOW);
+  const other = repo.createBook({ title: "Walking", author: "X", isbn: "9789720000308", workKey: "OL924W" }, ["isbn:9789720000308"], NOW);
+  repo.mergeTranslation(pt.work_id!, en.work_id!, "code", null, AT);
+  repo.mergeTranslation(en.work_id!, other.work_id!, "manual", null, AT);
+  assert.throws(() => repo.undoMerge(pt.work_id!, AT), WorkMergeError);
+});
