@@ -1,5 +1,5 @@
 import { plainDescription, validBookRating, workGenres, type IdentityKey, type ReaderProfile, type WorkGameRef, type WorkPage, type WorkReader } from "@scripta/shared";
-import type { CatalogWorkPage } from "../books/index.js";
+import { summaryMatchesLanguage, type CatalogWorkPage } from "../books/index.js";
 import type { ViewerCopy } from "../library/index.js";
 
 type GameByWork = { id: string; name: string; path: string; ownerUserId: string | null };
@@ -81,7 +81,8 @@ export function createWorksService(deps: WorksDeps) {
       const copy = viewerId ? deps.copyOfWork(viewerId, work.aliasIds) : undefined;
       const mineIsbn = isbnKey(copy?.isbn ?? null);
       const mineEdition = mineIsbn ? work.editions.find((edition) => isbnKey(edition.isbn) === mineIsbn) : undefined;
-      const summary = work.summary ?? mineEdition?.summary ?? work.editions.find((edition) => edition.summary)?.summary ?? null;
+      const readable = (text: string | null): text is string => text !== null && (!mineEdition || summaryMatchesLanguage(text, mineEdition.language));
+      const summary = mineEdition?.summary ?? [work.summary, ...work.editions.map((edition) => edition.summary)].find(readable) ?? null;
       const coverUrl = copy?.coverUrl ?? mineEdition?.coverUrl ?? work.editions.find((edition) => edition.coverUrl)?.coverUrl ?? null;
       const coverColor = coverUrl ? work.editions.find((edition) => edition.coverUrl === coverUrl)?.coverColor ?? null : null;
       return {

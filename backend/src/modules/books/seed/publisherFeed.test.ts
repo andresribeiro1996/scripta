@@ -263,14 +263,14 @@ test("the year comes from a year attribute, between 1900 and this year", () => {
 });
 
 test("a product with nothing to extract has all-null details", () => {
-  assert.deepEqual(wooDetails({}), { summary: null, pages: null, year: null, translator: null });
+  assert.deepEqual(wooDetails({}), { summary: null, pages: null, year: null, translator: null, originalTitle: null });
 });
 
 test("withPageText fills pages and translator the feed lacked, and keeps what the feed gave", () => {
   const page = "<html><body><p>Tradução de Ana Lima</p><p>Páginas: 240</p></body></html>";
-  const empty = { summary: SYNOPSIS, pages: null, year: 2019, translator: null };
-  assert.deepEqual(withPageText(empty, page), { summary: SYNOPSIS, pages: 240, year: 2019, translator: "Ana Lima" });
-  assert.deepEqual(withPageText({ ...empty, pages: 100, translator: "Rui" }, page), { summary: SYNOPSIS, pages: 100, year: 2019, translator: "Rui" });
+  const empty = { summary: SYNOPSIS, pages: null, year: 2019, translator: null, originalTitle: null };
+  assert.deepEqual(withPageText(empty, page), { summary: SYNOPSIS, pages: 240, year: 2019, translator: "Ana Lima", originalTitle: null });
+  assert.deepEqual(withPageText({ ...empty, pages: 100, translator: "Rui" }, page), { summary: SYNOPSIS, pages: 100, year: 2019, translator: "Rui", originalTitle: null });
 });
 
 test("the translator comes only from a line that starts with the label, and only as a name", () => {
@@ -283,7 +283,7 @@ test("the translator comes only from a line that starts with the label, and only
 });
 
 test("a product page gives only line-anchored labelled pages and a translator, never loose text", () => {
-  const empty = { summary: null, pages: null, year: null, translator: null };
+  const empty = { summary: null, pages: null, year: null, translator: null, originalTitle: null };
   const related = "<html><body><ul><li>Tradução de Poesia</li></ul><div>Outro livro 320 págs</div><p>Edição brochada, 410 págs.</p></body></html>";
   assert.deepEqual(withPageText(empty, related), empty);
   assert.equal(withPageText(empty, "<p>Páginas: 180</p>").pages, 180);
@@ -358,7 +358,7 @@ test("a dot or space is a thousands separator only before exactly three digits",
   assert.equal(wooDetails({ attributes: [attribute("Páginas", "1.2345")] }).pages, null);
   assert.equal(wooDetails({ description: "<p>Versão 3.9 240 págs</p>" }).pages, 240);
   assert.equal(wooDetails({ description: "<p>Brochado, 1 200 páginas.</p>" }).pages, 1200);
-  assert.equal(withPageText({ summary: null, pages: null, year: null, translator: null }, "<p>Páginas: 24.5</p>").pages, null);
+  assert.equal(withPageText({ summary: null, pages: null, year: null, translator: null, originalTitle: null }, "<p>Páginas: 24.5</p>").pages, null);
 });
 
 test("a numeric entity for NUL or a surrogate is left as text", () => {
@@ -388,4 +388,15 @@ test("products carry their tags, types and categories as labels", () => {
   assert.ok(wooBooks.some((book) => book.labels.length === 1 && book.labels[0] === "Ensaios"));
   const stringTags = parseShopifyProducts({ products: [{ title: "Tagged", handle: "tagged", product_type: "", tags: "Romance,  Policial ", variants: [], images: [{ src: "https://shop.test/files/9789722031240.jpg" }] }] }, shop);
   assert.deepEqual(stringTags[0]?.labels, ["Romance", "Policial"]);
+});
+
+test("the original title is captured while its line stays out of the synopsis", () => {
+  const shopify = shopifyDetails(`<p>${SYNOPSIS}</p><p>Título original: Les Misérables</p>`);
+  assert.equal(shopify.summary, SYNOPSIS);
+  assert.equal(shopify.originalTitle, "Les Misérables");
+  assert.equal(wooDetails({ description: `<p>${SYNOPSIS}</p>`, attributes: [attribute("Título original", "The Pure")] }).originalTitle, "The Pure");
+  assert.equal(wooDetails({ description: `<p>${SYNOPSIS}</p><p>Titulo original: Der Spaziergang</p>` }).originalTitle, "Der Spaziergang");
+  assert.equal(wooDetails({ description: `<p>${SYNOPSIS}</p>` }).originalTitle, null);
+  assert.equal(withPageText({ summary: null, pages: null, year: null, translator: null, originalTitle: null }, "<p>Título original: Solaris</p>").originalTitle, "Solaris");
+  assert.equal(withPageText({ summary: null, pages: null, year: null, translator: null, originalTitle: "Kept" }, "<p>Título original: Solaris</p>").originalTitle, "Kept");
 });

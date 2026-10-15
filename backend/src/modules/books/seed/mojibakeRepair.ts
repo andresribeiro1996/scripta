@@ -1,5 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
-import { hasMojibake, repairMojibake } from "@scripta/shared";
+import { cleanCatalogText, hasMojibake, repairMojibake } from "@scripta/shared";
 import { catalogTitleKey, workTitleKey } from "../domain/normalize.js";
 
 export interface RowRepair {
@@ -38,7 +38,7 @@ interface BookScan extends WorkScan {
   data_sources: string;
 }
 
-const repairRow = ({ id, title, author }: WorkScan): RowRepair => ({ id, title, author, repairedTitle: repairMojibake(title), repairedAuthor: repairMojibake(author) });
+const repairRow = ({ id, title, author }: WorkScan): RowRepair => ({ id, title, author, repairedTitle: cleanCatalogText(title), repairedAuthor: cleanCatalogText(author) });
 const isChanged = (row: RowRepair) => row.repairedTitle !== row.title || row.repairedAuthor !== row.author;
 const originOf = (row: BookScan) => row.created_by ?? ((JSON.parse(row.data_sources) as string[]).join("+") || "lookup");
 
@@ -104,7 +104,8 @@ export function mojibakeReport(plan: MojibakePlan, applied: MojibakeApplied | nu
       scanned: plan.scanned.books,
       repaired: plan.books.length,
       titles: plan.books.filter((book) => book.repairedTitle !== book.title).length,
-      authors: plan.books.filter((book) => book.repairedAuthor !== book.author).length
+      authors: plan.books.filter((book) => book.repairedAuthor !== book.author).length,
+      markers: plan.books.filter((book) => book.repairedTitle !== repairMojibake(book.title) || book.repairedAuthor !== repairMojibake(book.author)).length
     },
     works: { scanned: plan.scanned.works, repaired: plan.works.length },
     origins,
@@ -113,3 +114,5 @@ export function mojibakeReport(plan: MojibakePlan, applied: MojibakeApplied | nu
     applied
   };
 }
+
+export const reportJson = (report: object) => JSON.stringify(report, null, 2).replace(/[\u0080-\u009f]/g, (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`);

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { hasMojibake, repairMojibake } from "./mojibake.js";
+import { cleanCatalogText, hasMojibake, repairMojibake, stripNonSortingMarkers } from "./mojibake.js";
 
 const asWindows1252 = (text: string) => new TextDecoder("windows-1252").decode(new TextEncoder().encode(text));
 const asLatin1 = (text: string) => Buffer.from(text, "utf8").toString("latin1");
@@ -59,4 +59,36 @@ test("hasMojibake flags text that still looks mis-decoded", () => {
   assert.equal(hasMojibake("P©ssaro Azul"), true);
   assert.equal(hasMojibake("Caf�"), true);
   for (const text of ["Entre a fé e a crença", "IRMÃ…", "© 2010", "SÃO PAULO"]) assert.equal(hasMojibake(text), false);
+});
+
+test("stripNonSortingMarkers drops MARC non-sorting markers and keeps the text they wrap", () => {
+  assert.equal(stripNonSortingMarkers("\u0098O \u009cNatal de Teste"), "O Natal de Teste");
+  assert.equal(stripNonSortingMarkers("\u0098A \u009clíngua de teste"), "A língua de teste");
+  assert.equal(stripNonSortingMarkers("3\u0098ª\u009c classe"), "3ª classe");
+  assert.equal(stripNonSortingMarkers("Ana Co\u0098sta"), "Ana Costa");
+  assert.equal(stripNonSortingMarkers("Coração"), "Coração");
+});
+
+test("stripNonSortingMarkers keeps the bytes of text mis-decoded as Latin-1", () => {
+  for (const text of ["Über Teste", "Øre Teste", "“Edição”", "‘Teste’"]) {
+    assert.equal(stripNonSortingMarkers(asLatin1(text)), asLatin1(text));
+    assert.equal(repairMojibake(stripNonSortingMarkers(asLatin1(text))), text);
+  }
+  assert.equal(repairMojibake(stripNonSortingMarkers(`\u0098O \u009c${asLatin1("Øre Teste")}`)), "O Øre Teste");
+});
+
+test("text with markers and mojibake is repaired once the markers are gone", () => {
+  assert.equal(repairMojibake("\u0098A \u009cfÃ© e a crenÃ§a"), "\u0098A \u009cfÃ© e a crenÃ§a");
+  assert.equal(repairMojibake(stripNonSortingMarkers("\u0098A \u009cfÃ© e a crenÃ§a")), "A fé e a crença");
+});
+
+test("cleanCatalogText also drops markers that were mis-decoded with the text", () => {
+  assert.equal(cleanCatalogText("Â\u0098O Â\u009cNatal de FÃ©"), "O Natal de Fé");
+  assert.equal(cleanCatalogText("\u0098A \u009cfÃ© e a crenÃ§a"), "A fé e a crença");
+  assert.equal(cleanCatalogText(asLatin1("\u0098A \u009cfÃ© e a crenÃ§a")), "A fé e a crença");
+  assert.equal(cleanCatalogText(asLatin1("Über “Teste”")), "Über “Teste”");
+  assert.equal(cleanCatalogText("Coração"), "Coração");
+  for (const input of ["Â\u0098O Â\u009cNatal de FÃ©", "\u0098A \u009cfÃ© e a crenÃ§a", asLatin1("\u0098A \u009cfÃ© e a crenÃ§a"), asLatin1("Über “Teste”"), "Coração"]) {
+    assert.equal(cleanCatalogText(cleanCatalogText(input)), cleanCatalogText(input));
+  }
 });

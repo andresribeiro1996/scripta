@@ -17,7 +17,7 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 const { applyBooksMigrations } = await import("../adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("../adapters/sqlite/sqliteBooksRepository.js");
 const { catalogTitleKey, workTitleKey } = await import("../domain/normalize.js");
-const { applyMojibakeRepairs, mojibakeReport, planMojibakeRepairs } = await import("./mojibakeRepair.js");
+const { applyMojibakeRepairs, mojibakeReport, planMojibakeRepairs, reportJson } = await import("./mojibakeRepair.js");
 
 const NOW = "2026-10-01T00:00:00.000Z";
 const BROKEN_TITLE = "Entre a fÃ© e a crenÃ§a";
@@ -58,6 +58,52 @@ test("repairs a mis-decoded book and everything derived from it", () => {
   assert.equal(report.dryRun, false);
   assert.deepEqual(report.applied, applied);
   assert.deepEqual(report.repairs, [{ id: created.id, from: `${BROKEN_TITLE} — ${BROKEN_AUTHOR}`, to: `${TITLE} — ${AUTHOR}` }]);
+  const rerun = planMojibakeRepairs(h.db);
+  assert.deepEqual([rerun.books, rerun.works], [[], []]);
+});
+
+test("strips non-sorting markers from a book, its search row and its work", () => {
+  const h = setup();
+  const created = h.book("\u0098O \u009cNatal de Teste", "Ana Lima", "9780000000064");
+  const titleKeyBefore = h.stored(created.id).title_key;
+  const keysBefore = h.keys(created.id);
+  const applied = applyMojibakeRepairs(h.db, planMojibakeRepairs(h.db));
+  assert.deepEqual(applied, { books: 1, works: 1, skipped: 0 });
+  assert.equal(h.stored(created.id).title, "O Natal de Teste");
+  assert.equal(titleKeyBefore, workTitleKey("O Natal de Teste", "Ana Lima"));
+  assert.equal(h.stored(created.id).title_key, titleKeyBefore);
+  assert.deepEqual(h.keys(created.id), keysBefore);
+  assert.deepEqual(h.searchText(created.id), { title: "O Natal de Teste", author: "Ana Lima" });
+  assert.deepEqual({ ...(h.db.prepare("SELECT title, author FROM works WHERE id = ?").get(created.work_id) as object) }, { title: "O Natal de Teste", author: "Ana Lima" });
+  const rerun = planMojibakeRepairs(h.db);
+  assert.deepEqual([rerun.books, rerun.works], [[], []]);
+});
+
+test("re-keys a title whose marker sat inside a word", () => {
+  const h = setup();
+  const created = h.book("3\u0098ª\u009c classe de teste", "Ana Lima", null);
+  assert.deepEqual(h.keys(created.id), ["ta:3 a classe de teste|ana lima|3"]);
+  applyMojibakeRepairs(h.db, planMojibakeRepairs(h.db));
+  assert.equal(h.repo.findBookByKey("ta:3a classe de teste|ana lima|3")?.id, created.id);
+  assert.equal(h.repo.findBookByKey("ta:3 a classe de teste|ana lima|3")?.id, created.id);
+  assert.equal(h.stored(created.id).title_key, "ta:3a classe de teste|ana lima|3");
+});
+
+test("strips markers and repairs mojibake in one pass", () => {
+  const h = setup();
+  const created = h.book("\u0098A \u009cfÃ© e a crenÃ§a", BROKEN_AUTHOR, null);
+  const plan = planMojibakeRepairs(h.db);
+  assert.deepEqual(plan.stillBroken, []);
+  applyMojibakeRepairs(h.db, plan);
+  const { title, author } = h.stored(created.id);
+  assert.deepEqual({ title, author }, { title: "A fé e a crença", author: "José Silva" });
+});
+
+test("markers mis-decoded with the text are gone after one run", () => {
+  const h = setup();
+  const created = h.book("Â\u0098O Â\u009cNatal de FÃ©", "Ana Lima", null);
+  applyMojibakeRepairs(h.db, planMojibakeRepairs(h.db));
+  assert.equal(h.stored(created.id).title, "O Natal de Fé");
   const rerun = planMojibakeRepairs(h.db);
   assert.deepEqual([rerun.books, rerun.works], [[], []]);
 });
@@ -165,13 +211,27 @@ test("the report counts repairs, groups them by origin, lists every repair and c
   const plan = planMojibakeRepairs(h.db);
   const report = mojibakeReport(plan, null);
   assert.equal(report.dryRun, true);
-  assert.deepEqual(report.books, { scanned: 36, repaired: 25, titles: 24, authors: 2 });
+  assert.deepEqual(report.books, { scanned: 36, repaired: 25, titles: 24, authors: 2, markers: 0 });
   assert.deepEqual(report.works, { scanned: 36, repaired: 25 });
   assert.deepEqual(report.origins, { seed: 25 });
   assert.equal(report.repairs.length, 25);
   assert.equal(report.stillBroken.count, 11);
   assert.equal(report.stillBroken.examples.length, 10);
   assert.equal(report.applied, null);
+});
+
+test("the report counts the books whose markers were stripped, and the printed report escapes them", () => {
+  const h = setup();
+  h.book("\u0098O \u009cNatal de Teste", "Ana Lima", null);
+  h.book(BROKEN_TITLE, BROKEN_AUTHOR, null);
+  h.book("\u0098A \u009cLivro da fÃ©", "Ana Lima", null);
+  h.book("Â\u0098O Â\u009cLivro de FÃ©", "Ana Lima", null);
+  const report = mojibakeReport(planMojibakeRepairs(h.db), null);
+  assert.deepEqual(report.books, { scanned: 4, repaired: 4, titles: 4, authors: 1, markers: 3 });
+  const printed = reportJson(report);
+  assert.equal(/[\u0080-\u009f]/.test(printed), false);
+  assert.equal(printed.includes("\\u0098O \\u009cNatal de Teste"), true);
+  assert.deepEqual(JSON.parse(printed), report);
 });
 
 test("a book's origin is its creator, else its sources joined, else lookup", () => {

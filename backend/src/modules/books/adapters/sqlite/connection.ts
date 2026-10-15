@@ -8,6 +8,7 @@ import { env } from "../../../../config/env.js";
 import { openSqlite } from "../../../../db/openSqlite.js";
 import { MIN_GOOD_WIDTH } from "../../domain/constants.js";
 import { catalogTitleKey } from "../../domain/normalize.js";
+import { summaryHashOf } from "../../domain/synopsis.js";
 import { CONFIRMED_SQL } from "./sqliteBooksRepository.js";
 
 const adapterDir = dirname(fileURLToPath(import.meta.url));
@@ -43,7 +44,9 @@ export function applyBooksMigrations(db: DatabaseSync): void {
   if (!columns.some((column) => column.name === "title_group_blocked_at")) db.exec("ALTER TABLE books ADD COLUMN title_group_blocked_at TEXT");
   if (!columns.some((column) => column.name === "genres_source")) db.exec("ALTER TABLE books ADD COLUMN genres_source TEXT");
   if (!columns.some((column) => column.name === "genres_confidence")) db.exec("ALTER TABLE books ADD COLUMN genres_confidence REAL");
+  if (!columns.some((column) => column.name === "original_title")) db.exec("ALTER TABLE books ADD COLUMN original_title TEXT");
   moveOpenLibrarySummariesToWorks(db);
+  addSummaryHashes(db);
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_work ON books(work_id)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_title_key ON books(title_key)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_works_merged_into ON works(merged_into)");
@@ -51,6 +54,9 @@ export function applyBooksMigrations(db: DatabaseSync): void {
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_cover_upgrade ON books(cover_upgrade_wanted_at) WHERE cover_upgrade_wanted_at IS NOT NULL");
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_details_unchecked ON books(details_checked_at IS NOT NULL, created_by IS NOT NULL, details_checked_at, created_at) WHERE details_status IS NULL");
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_work_lookup ON books(work_checked_at IS NOT NULL, created_by IS NOT NULL, work_checked_at, created_at) WHERE ol_work_key IS NULL AND isbn IS NOT NULL AND details_status IS NOT NULL");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_books_summary_hash ON books(summary_hash)");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_works_summary_hash ON works(summary_hash)");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_work_merges_from ON work_merges(from_work)");
   const imageColumns = db.prepare("PRAGMA table_info(cover_images)").all() as Array<{ name: string }>;
   if (!imageColumns.some((column) => column.name === "origin")) db.exec("ALTER TABLE cover_images ADD COLUMN origin TEXT");
   if (!imageColumns.some((column) => column.name === "color")) db.exec("ALTER TABLE cover_images ADD COLUMN color TEXT");
@@ -112,6 +118,29 @@ function moveOpenLibrarySummariesToWorks(db: DatabaseSync): void {
   } catch (error) {
     if (db.isTransaction) db.exec("ROLLBACK");
     throw error;
+  }
+}
+
+function addSummaryHashes(db: DatabaseSync): void {
+  for (const table of ["books", "works"]) {
+    const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+    if (columns.some((column) => column.name === "summary_hash")) continue;
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN summary_hash TEXT`);
+      const page = db.prepare(`SELECT rowid, id, summary FROM ${table} WHERE summary IS NOT NULL AND rowid > ? ORDER BY rowid LIMIT 1000`);
+      const update = db.prepare(`UPDATE ${table} SET summary_hash = ? WHERE id = ?`);
+      for (let after = 0; ; ) {
+        const rows = page.all(after) as Array<{ rowid: number; id: string; summary: string }>;
+        if (rows.length === 0) break;
+        for (const row of rows) update.run(summaryHashOf(row.summary), row.id);
+        after = rows.at(-1)!.rowid;
+      }
+      db.exec("COMMIT");
+    } catch (error) {
+      if (db.isTransaction) db.exec("ROLLBACK");
+      throw error;
+    }
   }
 }
 

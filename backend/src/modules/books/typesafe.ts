@@ -44,3 +44,9 @@ export function runBudget(repo: Pick<BooksRepository, "spendTypesafe">, source: 
     used: () => used
   };
 }
+
+export function strikeReason(error: unknown): { status: number | null; reason: string } {
+  if (error instanceof UnusableAnswerError) return { status: null, reason: error.detail };
+  const status = (error as SourceUnavailableError).status ?? null;
+  return { status, reason: `HTTP ${status}` };
+}

@@ -88,6 +88,21 @@ test("lookupIdentity repairs before trimming", () => {
   assert.equal(lookupIdentity({ title: "VoilÃ\xa0", author: "Ana Lima" })?.title, "Voilà");
 });
 
+test("lookupIdentity drops non-sorting markers before keying", () => {
+  assert.deepEqual(lookupIdentity({ title: "3\u0098ª\u009c classe de teste", author: "\u0098Da \u009cSilva" }), {
+    key: "ta:3a classe de teste|da silva|3",
+    aliasKeys: [],
+    titleKey: "ta:3a classe de teste|da silva|3",
+    isbn: null,
+    title: "3ª classe de teste",
+    author: "Da Silva"
+  });
+});
+
+test("lookupIdentity drops non-sorting markers before repairing mojibake", () => {
+  assert.equal(lookupIdentity({ title: "\u0098A \u009cfÃ© e a crenÃ§a", author: "Ana Lima" })?.title, "A fé e a crença");
+});
+
 test("search tokens are plain words, safe for FTS", () => {
   assert.deepEqual(searchTokens('"Dune" -messiah* (Herbert)'), ["dune", "messiah", "herbert"]);
   assert.deepEqual(searchTokens("***"), []);

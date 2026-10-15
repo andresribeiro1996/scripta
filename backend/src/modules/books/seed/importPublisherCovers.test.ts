@@ -907,7 +907,7 @@ const richFeed = JSON.stringify([
     description: `<p>LIVRO EM PRÉ-VENDA. ENVIOS DIA 13 DE OUTUBRO.</p><p>${SYNOPSIS}</p>`,
     short_description: "",
     images: [{ src: "https://x.example/puro.jpg" }],
-    attributes: [{ name: "Núm. páginas", terms: [{ name: "240" }] }, { name: "Ano", terms: [{ name: "2019" }] }, { name: "Tradutor", terms: [{ name: "Ana Lima" }] }]
+    attributes: [{ name: "Núm. páginas", terms: [{ name: "240" }] }, { name: "Ano", terms: [{ name: "2019" }] }, { name: "Tradutor", terms: [{ name: "Ana Lima" }] }, { name: "Título original", terms: [{ name: "Pure" }] }]
   }
 ]);
 
@@ -1260,4 +1260,10 @@ test("a language Open Library states for the edition replaces the Portugal fallb
   const unmapped = await harness({ lookup: async () => ({ title: "Guerra Branca", author: "Bruno Maçães", workKey: "/works/OL7W", languages: ["/languages/lat"] }) });
   await importPublisherCovers(unmapped.deps, [relogio], { dryRun: false });
   assert.equal(unmapped.repo.findBookByKey(`isbn:${GUERRA}`)!.language, null);
+});
+
+test("a created book keeps the publisher's original title", async () => {
+  const h = await harness({ lookup: async () => ({ title: "Puro", author: "Jim Crace" }), feeds: { [WOO_FEED]: { text: richFeed } } });
+  await importPublisherCovers(h.deps, [relogio], { dryRun: false });
+  assert.equal(h.repo.findBookByKey(`isbn:${MUSEU}`)!.original_title, "Pure");
 });

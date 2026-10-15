@@ -1,4 +1,5 @@
 import { BOOK_GENRES } from "@scripta/shared";
+import { GENRE_SAVE_LINE } from "./domain/constants.js";
 import type { BooksRepository } from "./domain/ports.js";
 import type { GenreEvidence } from "./domain/types.js";
 import { catalogGenresWith } from "./works.js";
@@ -7,7 +8,7 @@ export const SYNOPSIS_LIMIT = 1200;
 const EDITION_LIMIT = 4;
 const KNOWN_GENRES = new Set<string>(BOOK_GENRES);
 
-export const GENRE_SAVE_LINE = 0.5;
+export { GENRE_SAVE_LINE };
 export const GENRE_LABEL_MAX = 3;
 
 export function labelProblem(genres: unknown[]): string | null {

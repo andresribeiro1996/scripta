@@ -15,6 +15,8 @@ export interface BookRow {
   isbn: string | null;
   ol_cover_id: number | null;
   summary: string | null;
+  summary_hash: string | null;
+  original_title: string | null;
   rating: number | null;
   rating_count: number;
   genres: string;
@@ -72,9 +74,9 @@ export interface NewBook {
 }
 
 export type WorkPageRows = {
-  work: { id: string; title: string; author: string; summary: string | null };
+  work: { id: string; title: string; author: string; summary: string | null; summary_hash: string | null };
   aliasIds: string[];
-  editions: Array<{ id: string; title: string; language: string | null; year: number | null; isbn: string | null; summary: string | null; cover_image_id: string | null; cover_color: string | null; genres: string; rating: number | null; rating_count: number; pages: number | null; genres_source: GenresSource | null; genres_confidence: number | null }>;
+  editions: Array<{ id: string; title: string; language: string | null; year: number | null; isbn: string | null; summary: string | null; summary_hash: string | null; cover_image_id: string | null; cover_color: string | null; genres: string; rating: number | null; rating_count: number; pages: number | null; genres_source: GenresSource | null; genres_confidence: number | null }>;
 };
 
 export interface WorkView {
@@ -89,3 +91,10 @@ export type GenreEvidence = {
   work: { id: string; title: string; author: string; summary: string | null };
   editions: Array<{ title: string; language: string | null; isbn: string | null; publisher: string | null; year: number | null; summary: string | null }>;
 };
+
+export type JevTask = "synopses" | "works";
+export type JevRejection = { status: number | null; reason: string; attempts: number; lastAt: string };
+
+export type MergeSource = "title-key" | "admin" | "code" | "jev" | "manual";
+
+export type WorkMatchJudgment = { model: string; intoWorkId: string | null; confidence: number | null; askedAt: string };
