@@ -382,7 +382,7 @@ Claude sets and checks the thresholds Jev's answers are read against; it never j
 
 Some Open Library records store titles and authors already mis-decoded (`fÃ©` for `fé`). New rows are repaired as they enter (`lookupIdentity`, `mapOpenLibraryDoc`). `scripts/repair-mojibake.mjs` repairs the rows stored earlier: `title`, `author`, `title_key`, the corrected `ta:` key (added for rows that hold the mis-decoded one, which stays, so a lookup with the old text still lands on the row), the search index and the works' copies.
 
-- It repairs only text that round-trips. Text where every accented letter became `©` (`N©o`) is lossy; the report lists those books under `stillBroken` and leaves them alone.
+- It repairs only text that round-trips. Text where every accented letter became `©` (`N©o`) is lossy; the report lists those books under `stillBroken` and leaves them alone, and "Lossy titles" below re-titles them from other sources.
 - It also drops MARC-21 non-sorting markers: U+0098 before a leading article and U+009C after it, which some Open Library records keep from library catalogs. New rows lose them as they enter, in the same two functions. A marker inside a word changes the title key, so those rows get the corrected `ta:` key the same way a mojibake repair does.
 - Run it right after the deploy that contains it: first `--dry-run` (opens the database read-only), then for real. Until it runs, a lookup for an ISBN-less book stored with mis-decoded text keys on the repaired text, misses that row and would create a second one. Reruns are safe; a second run finds nothing. The search-index rows are found in one read before any write; then each book is its own short transaction, and a row edited since the scan is skipped and counted in `applied.skipped`. A corrected `ta:` key that already belongs to another book stays with that book. Editions that now share a title key join one work at the next works grouping (boot, daily, or `POST /books/works/group`).
 - The JSON report has `books` and `works` counts (`scanned`, `repaired`; `books` also has `markers`, the repaired books that had markers stripped), `origins` (the repaired books by `created_by`, else by data source, else `lookup`), `repairs` (every planned book repair as `{ id, from, to }`, so the dry run shows all of them for review), `stillBroken` (its `count` and first 10 `examples`) and `applied` (`null` on a dry run). The script keeps no copy of the original text, so save the real run's output: it holds each repaired book's original title and author. Control characters are printed as `\u0098`-style escapes, so a marker-only repair is visible and the saved output still parses back to the original text.
@@ -390,6 +390,20 @@ Some Open Library records store titles and authors already mis-decoded (`fÃ©` 
 ```bash
 npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && node scripts/repair-mojibake.mjs --dry-run'
 npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && node scripts/repair-mojibake.mjs'
+```
+
+#### Lossy titles
+
+Some Open Library records lost every accented letter to `©` (`N©o Abras Este Livro`), which the repair above can't undo. `scripts/retitle-lossy.mjs` re-titles the books stored before new books were re-titled in the background (see the `books` section), from a source tied to the same book: the product at the book's `publisher_url` in its shop's feed, read as the importer reads it (robots.txt and the 3 s gap included) and only for the shops that hold such books, then ISBNdb (`GET /book/{isbn}`) for what is still lossy.
+
+- A title, or one author name, changes only when the source has the same characters, ignoring case, with a non-ASCII letter at each `©`. The source's text is written, capitals included. An all-caps source can't replace mixed-case text. Two characters for one letter (`Tri©Øngulo`) and source typos stay.
+- Writes are the repair's (`applyMojibakeRepairs`): one transaction per book, `title_key`, the corrected `ta:` key, the search row, and the work when it holds the book's old text. A book edited since it was read is skipped.
+- Run it after the repair's real run. `--max` is required and caps the ISBNdb requests; `--max 0` reads the feeds only. The dry run opens the database read-only and makes the same lookups as the real run. A run takes about 5 minutes, mostly the feeds; hold deploys meanwhile.
+- The JSON report has `targets`, `feeds` (per shop read: `products` and `matched`, or `skipped`), `isbndb` (`max`, `asked`, `unavailable`, `notAsked`, `pausedUntil`), `retitles` (every planned change as `{ id, isbn, from, to, source }`), `stillLossy` (each book left with a `©`, why ISBNdb didn't fix it, and the candidates it was compared against) and `applied` (`null` on a dry run). Save the real run's output: it holds the original text.
+
+```bash
+npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && node scripts/retitle-lossy.mjs --dry-run --max 30'
+npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && node scripts/retitle-lossy.mjs --max 30'
 ```
 
 #### Known limitations of covers, details and search, and the options for each
