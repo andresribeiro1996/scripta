@@ -58,7 +58,7 @@ export function planMojibakeRepairs(db: DatabaseSync): MojibakePlan {
   return plan;
 }
 
-export function applyMojibakeRepairs(db: DatabaseSync, plan: Pick<MojibakePlan, "books" | "works">): MojibakeApplied {
+export function applyMojibakeRepairs(db: DatabaseSync, plan: { books: RowRepair[]; works: RowRepair[] }): MojibakeApplied {
   const applied: MojibakeApplied = { books: 0, works: 0, skipped: 0 };
   const searchRows = db.prepare("SELECT book_id, rowid FROM books_fts WHERE book_id IN (SELECT value FROM json_each(?))").all(JSON.stringify(plan.books.map((book) => book.id))) as Array<{ book_id: string; rowid: number }>;
   const searchRowids = new Map(searchRows.map((row) => [row.book_id, row.rowid]));

@@ -9,6 +9,7 @@ import {
   catalogTitleKey,
   workTitleKey,
   editionLanguage,
+  givenNameFirst,
   isPortugalIsbn,
   isPortugueseIsbn,
   lookupIdentity,
@@ -38,6 +39,15 @@ test("author matching accepts any listed name, including translator-first record
   assert.equal(authorMatches("Ursula K. Le Guin", ["Ursula K. Le Guin"]), true);
   assert.equal(authorMatches("Virginia Woolf", ["Susan Sontag"]), false);
   assert.equal(authorMatches("", ["Anyone"]), false);
+});
+
+test("givenNameFirst turns a one-word surname around and leaves every other name as sent", () => {
+  assert.equal(givenNameFirst("Herbert, Frank"), "Frank Herbert");
+  assert.equal(givenNameFirst("Tolkien, J. R. R."), "J. R. R. Tolkien");
+  assert.equal(givenNameFirst(" Herbert ,  Frank "), "Frank Herbert");
+  for (const name of ["Frank Herbert", "Le Guin, Ursula K.", "Neil Gaiman, Terry Pratchett", "Martin Luther King, Jr.", "Pratchett, Terry, Gaiman, Neil", "Herbert,", ", Frank", "", "Merriam-Webster, Inc.", "Smith, Jr.", "Smith, Sr.", "Henry, II", "Henry, III", "Henry, IV", "Google, LLC", "Acme, Ltd"]) {
+    assert.equal(givenNameFirst(name), name, name);
+  }
 });
 
 test("lookup identity prefers a valid ISBN and falls back to title + author", () => {

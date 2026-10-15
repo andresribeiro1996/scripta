@@ -86,6 +86,16 @@ export function authorMatches(wantedAttribution: string, candidateAuthors: strin
   });
 }
 
+const NAME_SUFFIX = /^(jr|sr|ii|iii|iv|inc|llc|ltd)\.?$/i;
+
+export function givenNameFirst(name: string): string {
+  const parts = name.split(",");
+  if (parts.length !== 2) return name;
+  const surname = parts[0]!.trim();
+  const given = parts[1]!.trim();
+  return surname && !/\s/.test(surname) && given && !NAME_SUFFIX.test(given) ? `${given} ${surname}` : name;
+}
+
 export function searchTokens(query: string): string[] {
   return normalizeWords(query).split(" ").filter(Boolean).slice(0, MAX_SEARCH_TOKENS);
 }
