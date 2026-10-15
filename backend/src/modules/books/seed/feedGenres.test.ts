@@ -49,9 +49,79 @@ const page = (products: unknown[]) => ({ status: 200, text: JSON.stringify({ pro
 
 test("age labels up to 12 and kids tags mean Children's; other numbers don't", () => {
   for (const label of ["+ 3 anos", "+3 anos", "3-5 anos", "10 - 12 anos", "tag_kids"]) assert.deepEqual(feedLabelGenres([label]), ["Children's"], label);
-  for (const label of ["+ 13 anos", "100 anos", "Guerra dos 30 anos", "anos 80"]) assert.notDeepEqual(feedLabelGenres([label]), ["Children's"], label);
+  for (const label of ["100 anos", "Guerra dos 30 anos", "anos 80"]) assert.notDeepEqual(feedLabelGenres([label]), ["Children's"], label);
   assert.deepEqual(feedLabelGenres(["Policial", "Livro"]), ["Mystery"]);
   assert.deepEqual(feedLabelGenres(["Literatura Romântica e Erótica", "+ 6 anos"]), ["Romance", "Children's"]);
+});
+
+test("feed labels map to genres, or to none when they name an author, a campaign or a novel", () => {
+  const cases: Array<[string, string[]]> = [
+    ["COLECAO_Uma Viagem no Tempo - Geronimo Stilton", ["Children's"]],
+    ["SERIE_Clássicos do Stilton", ["Children's"]],
+    ["COLECAO_Geronimo Stilton e Os Grandes Contos Clássicos", ["Children's"]],
+    ["AUTOR_geronimo-stilton_Geronimo Stilton", ["Children's"]],
+    ["AUTOR_casal-misterio_Casal Mistério", []],
+    ["NOMEAUTOR_Casal Mistério", []],
+    ["AUTOR Academia Ciências de Lisboa", []],
+    ["AUTOR VV. AA.", []],
+    ["PoliticaParaMiudos_campanha", []],
+    ["Romance", []],
+    ["TEMA Romance", []],
+    ["Romance Contemporâneo", []],
+    ["TEMA Romance Contemporâneo", []],
+    ["COLECAO_Manuscrito Romance", []],
+    ["Romance 5", []],
+    ["Romance Paranormal", ["Romance"]],
+    ["Romance Erótico", ["Romance"]],
+    ["Dark Romance", ["Romance"]],
+    ["Romance Chic Lit", ["Romance"]],
+    ["COLECAO_Manuscrito Romance Erótico", ["Romance"]],
+    ["Literatura Romântica (e Erótica)", ["Romance"]],
+    ["Literatura Romântica e Erótica", ["Romance"]],
+    ["Romance Histórico", ["Historical Fiction"]],
+    ["TEMA_Romance Histórico", ["Historical Fiction"]],
+    ["TEMA_Romance Jovem Adulto", ["Young Adult"]],
+    ["Romance Gráfico", ["Comics & Graphic Novels"]],
+    ["Romance Biográfico", []],
+    ["Ciências Sociais", []],
+    ["Ciências Sociais e Humanas", []],
+    ["TEMA Ciências Sociais e Humanas", []],
+    ["TEMA Ciências Sociais - Biografias", ["Biography & Memoir"]],
+    ["Ciência Militar e Estratégia", []],
+    ["História Alternativa", []],
+    ["BD", ["Comics & Graphic Novels"]],
+    ["Infanto-Juvenil", ["Children's"]],
+    ["Infantil / Juvenil", ["Children's"]],
+    ["Infantil e Juvenil", ["Children's"]],
+    ["ALFAGUARA INFANTIL & JUVENIL", ["Children's"]],
+    ["COLECAO_Manuscrito Infantil e Juvenil", ["Children's"]],
+    ["TEMA Infantil e juvenil", ["Children's"]],
+    ["Literatura Juvenil", ["Young Adult"]],
+    ["Literatura Fantástica", ["Fantasy"]],
+    ["+ 3 anos", ["Children's"]],
+    ["+3 anos", ["Children's"]],
+    ["0 a 2 anos", ["Children's"]],
+    ["6 - 8 anos", ["Children's"]],
+    ["6 a 8 anos", ["Children's"]],
+    ["10-12 anos", ["Children's"]],
+    ["9-11anos", ["Children's"]],
+    ["Categoria 4 anos", ["Children's"]],
+    ["+ 12 anos", ["Children's"]],
+    ["+ 13 anos", ["Young Adult"]],
+    ["15 - 18 anos", ["Young Adult"]],
+    ["+ 17 anos", ["Young Adult"]],
+    ["+ 18 anos", []],
+    ["TEMA_Histórias 3-6", ["Children's"]],
+    ["TEMA_Ficção 7-9", ["Children's"]],
+    ["TEMA_Ficção 10-14", ["Children's"]],
+    ["TEMA_Não Ficção 7-9", ["Children's"]],
+    ["TEMA_Atividades/ Autocolantes 3-6", ["Children's"]],
+    ["TEMA_Ficção 13-17", ["Young Adult"]],
+    ["100 anos", []],
+    ["Guerra dos 30 anos", []],
+    ["anos 80", []]
+  ];
+  for (const [label, expected] of cases) assert.deepEqual(feedLabelGenres([label]), expected, label);
 });
 
 test("a product labels every book at its URL, else the book with its ISBN, only where genres are empty", () => {

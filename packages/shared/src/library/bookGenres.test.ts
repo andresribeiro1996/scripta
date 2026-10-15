@@ -125,6 +125,20 @@ test("Portuguese romantic literature and children's-and-youth labels", () => {
   assert.deepEqual(normalizeBookGenres(["Literatura juvenil"]), ["Young Adult"]);
 });
 
+test("Portuguese children's-and-youth phrases are Children's, plain juvenile labels stay Young Adult", () => {
+  for (const label of ["Infantil / Juvenil", "Infantil e Juvenil", "ALFAGUARA INFANTIL & JUVENIL", "COLECAO_Manuscrito Infantil e Juvenil", "TEMA Infantil e juvenil", "Infantis e Juvenis"]) {
+    assert.deepEqual(normalizeBookGenres([label]), ["Children's"], label);
+  }
+  for (const label of ["Literatura juvenil", "Juvenil"]) assert.deepEqual(normalizeBookGenres([label]), ["Young Adult"], label);
+});
+
+test("jovem adulto is Young Adult ahead of Romance, and literatura fantastica is Fantasy", () => {
+  assert.deepEqual(normalizeBookGenres(["Jovem Adulto"]), ["Young Adult"]);
+  assert.deepEqual(normalizeBookGenres(["Jovens adultos"]), ["Young Adult"]);
+  assert.deepEqual(normalizeBookGenres(["TEMA_Romance Jovem Adulto"]), ["Young Adult"]);
+  assert.deepEqual(normalizeBookGenres(["Literatura Fantástica"]), ["Fantasy"]);
+});
+
 test("common Goodreads shelves and StoryGraph tags map to genres, and non-genre shelves to nothing", () => {
   const shelves: Array<[string, string | null]> = [
     ["ya", "Young Adult"],
