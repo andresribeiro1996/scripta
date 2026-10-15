@@ -278,6 +278,19 @@ Fills catalog genres for works people own that Open Library and ISBNdb couldn't 
    npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c "echo $(base64 < labels.json | tr -d '\n') | base64 -d > /tmp/genre-labels.json && cd /app/backend && node scripts/genre-pass-import.mjs /tmp/genre-labels.json; rm -f /tmp/genre-labels.json"
    ```
 
+#### Mojibake repair
+
+Some Open Library records store titles and authors already mis-decoded (`fÃ©` for `fé`). New rows are repaired as they enter (`lookupIdentity`, `mapOpenLibraryDoc`). `scripts/repair-mojibake.mjs` repairs the rows stored earlier: `title`, `author`, `title_key`, the corrected `ta:` key (the mis-decoded key stays, so a lookup with the old text still lands on the row), the search index and the works' copies.
+
+- It repairs only text that round-trips. Text where every accented letter became `©` (`N©o`) is lossy; the report lists those books under `stillBroken` and leaves them alone.
+- Run it after the deploy that contains it: first `--dry-run` (opens the database read-only), then for real. Reruns are safe; a second run finds nothing. Each book is its own short transaction, and a row edited since the scan is skipped and counted in `applied.skipped`. A corrected `ta:` key that already belongs to another book stays with that book. Editions that now share a title key join one work at the next works grouping (boot, daily, or `POST /books/works/group`).
+- The JSON report has `books` and `works` counts (`scanned`, `repaired`), `origins` (the repaired books by `created_by`, else by data source, else `lookup`), the first 20 `examples`, `stillBroken` and `applied` (`null` on a dry run).
+
+```bash
+npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && node scripts/repair-mojibake.mjs --dry-run'
+npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && node scripts/repair-mojibake.mjs'
+```
+
 #### Known limitations of covers, details and search, and the options for each
 
 Measured on production on 2026-09-30, after a tester imported a 167-book library and waited about 20 minutes for covers. The server itself was never slow: `/covers/resolve` p50 was 1 ms and `PUT /library` about 5 ms. The time goes into the pipeline around it. Recheck the numbers below before relying on them.
