@@ -293,7 +293,7 @@ Fills catalog genres for works people own that Open Library and ISBNdb couldn't 
 
 #### Catalog genre backfill
 
-One-off passes that label catalog works with no genres. Each writes only to editions whose genres are empty, never overwrites a genre, repeats as a no-op, and prints a JSON report. Run each with `--dry-run` first. Check the volume's free space first (`railway volume list --json`), and hold merges to `main` while a pass runs, because a deploy kills `railway ssh` jobs.
+One-off passes that label catalog works with no genres. Each writes only to editions whose genres are empty, never overwrites a genre, repeats as a no-op, and prints a JSON report. Run each with `--dry-run` first. Check the volume's free space first (`railway volume list --json`), and don't deploy to production while a pass runs, because a deploy kills `railway ssh` jobs.
 
 1. Seed subjects: re-reads the seed's Open Library lists (about 60–100 requests, one a second) and stores each work's subjects as genres. Use the same `--eng`/`--por` the catalog was seeded with (defaults 35000/15000).
 
@@ -305,6 +305,18 @@ One-off passes that label catalog works with no genres. Each writes only to edit
 
    ```bash
    npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && node scripts/import-publisher-covers.mjs --fill-genres --dry-run'
+   ```
+
+3. Jev backlog (needs `TYPESAFE_API_KEY`): classifies catalog works with no genres and a synopsis of at least 40 characters, held works first. `--max` is a hard limit on TypeSafe requests, retries included, recorded under `genres-backlog` in `typesafe_usage` (the daily `genres` budget is untouched). An outage or a rejected key ends the run; re-running continues where it stopped. About 0.24 s per request at 4 in flight, about $0.00012 a request.
+
+   ```bash
+   npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && node scripts/genre-backlog.mjs --max 12000 --dry-run'
+   ```
+
+4. Claude doubts pass: export Jev's doubts across the catalog, label them as in "Genre pass" (Sonnet subagents, at most 100 works each; Haiku subagents produced unusable labels on long batches), and import each batch's labels separately (one file per batch of at most 100 works, matching the labelling batches), because the import inlines the file into one `sh -c` argument and Linux caps that at 128 KB, which a ~3,800-label file exceeds.
+
+   ```bash
+   npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && node scripts/genre-pass-export.mjs --scope catalog' > genre-doubts.txt
    ```
 
 #### Mojibake repair

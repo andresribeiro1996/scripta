@@ -76,6 +76,8 @@ export interface BooksRepository {
   workIdsByWorkKeys(keys: string[]): Map<string, string>;
   listPublisherUrls(): Array<{ work_id: string | null; publisher_url: string }>;
   fillSourceGenres(workId: string, genres: string[]): number;
+  genreBacklogWorks(limit: number, minSynopsis: number, rejectionLimit: number): string[];
+  jevJudgedWorkIds(): string[];
   countEmptyGenreEditions(workId: string): number;
   setLanguage(id: string, tag: string | null): void;
   setPublisherUrl(id: string, url: string): void;

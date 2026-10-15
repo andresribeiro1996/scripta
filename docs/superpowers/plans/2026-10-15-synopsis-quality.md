@@ -1609,24 +1609,24 @@ export function applyRulePass(repo: Pick<BooksRepository, "synopsisText" | "save
 }
 
 export async function runSynopsisBacklog(deps: SynopsisJudgmentDeps, hashes: string[]): Promise<{ asked: string[]; stoppedBy: SynopsisBacklogStop }> {
-  let lastFailure: FailureKind | null = null;
-  const classify: ClassifySynopsis = async (input) => {
-    try {
-      return await deps.classify(input);
-    } catch (error) {
-      lastFailure = failureKind(error);
-      throw error;
-    }
-  };
   const asked: string[] = [];
   let stoppedBy: SynopsisBacklogStop = "done";
   let next = 0;
   const worker = async () => {
     while (stoppedBy === "done" && next < hashes.length) {
       const hash = hashes[next++]!;
+      const call: { failure: FailureKind | null } = { failure: null };
+      const classify: ClassifySynopsis = async (input) => {
+        try {
+          return await deps.classify(input);
+        } catch (error) {
+          call.failure = failureKind(error);
+          throw error;
+        }
+      };
       const pause = await classifyText({ ...deps, classify }, hash);
       if (pause === null) asked.push(hash);
-      else if (stoppedBy === "done") stoppedBy = lastFailure === "budget" || lastFailure === "key" ? lastFailure : "outage";
+      else if (stoppedBy === "done") stoppedBy = call.failure === "budget" || call.failure === "key" ? call.failure : "outage";
     }
   };
   await Promise.all(Array.from({ length: IN_FLIGHT }, worker));
