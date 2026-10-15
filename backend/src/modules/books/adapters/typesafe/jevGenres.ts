@@ -1,12 +1,9 @@
 import type { BookGenre } from "@scripta/shared";
-import { SourceUnavailableError, UnusableAnswerError } from "../../domain/errors.js";
+import { UnusableAnswerError } from "../../domain/errors.js";
 import type { Spend } from "../../typesafe.js";
-import { readBody } from "../http/http.js";
+import { askJev, realSleep, type Sleep } from "./jevRequest.js";
 
-export const JEV_MODEL = "jev-1.13.0";
-const ENDPOINT = "https://api.typesafe.ai/v1/systemone";
-const TIMEOUT_MS = 10_000;
-const RETRIES = 4;
+export { JEV_MODEL } from "./jevRequest.js";
 
 export type JevBook = { title: string; author: string; editionLanguages: string[]; publishers: string[]; synopsis: string | null };
 export type GenreJudgment = { genre: BookGenre | null; confidence: number; model: string };
@@ -66,29 +63,6 @@ function judgmentOf(body: unknown): GenreJudgment {
   return { genre: GENRE_BY_OPTION.get(answer.choice) ?? null, confidence: answer.confidence, model };
 }
 
-export function createJevGenreClassifier(apiKey: string, spend: Spend, sleep: (ms: number) => Promise<void> = (ms) => new Promise((resolve) => setTimeout(resolve, ms))): ClassifyGenre {
-  return async (book) => {
-    const body = JSON.stringify({ state: stateOf(book), model: JEV_MODEL, questions: { genre: { type: "choice", instructions: INSTRUCTIONS, criteria: CRITERIA } } });
-    for (let attempt = 0; ; attempt++) {
-      spend();
-      const response = await readBody("typesafe", () => fetch(ENDPOINT, { method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" }, body, signal: AbortSignal.timeout(TIMEOUT_MS) }));
-      if ((response.status === 429 || response.status === 529) && attempt < RETRIES) {
-        await response.body?.cancel();
-        await sleep(500 * 2 ** attempt);
-        continue;
-      }
-      if (!response.ok) {
-        await response.body?.cancel();
-        throw new SourceUnavailableError("typesafe", `HTTP ${response.status}`, { status: response.status });
-      }
-      let parsed: unknown;
-      try {
-        parsed = await readBody("typesafe", () => response.json());
-      } catch (error) {
-        if (error instanceof SyntaxError) throw new UnusableAnswerError("typesafe", "invalid JSON");
-        throw error;
-      }
-      return judgmentOf(parsed);
-    }
-  };
+export function createJevGenreClassifier(apiKey: string, spend: Spend, sleep: Sleep = realSleep): ClassifyGenre {
+  return async (book) => judgmentOf(await askJev(apiKey, spend, sleep, stateOf(book), { genre: { type: "choice", instructions: INSTRUCTIONS, criteria: CRITERIA } }));
 }
