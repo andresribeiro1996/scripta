@@ -38,7 +38,7 @@ Four pieces:
 - A held book is one that at least one library holds (`library_books.work_id`, canonicalised).
 - The books service gets a hook that fires when a details lookup finishes for an edition and leaves its work with no genres other than Jev's. That covers the client's `GET /books/details` and the details backfill.
 - The hook adds the work to a genre queue when:
-  - it is held, checked through the library's existing holders lookup, passed in by `app.ts` like `heldWorkIds`;
+  - it is held, checked through the library's existing holders lookup, from the `heldWorks` the books plugin gets from `app.ts` (it replaces `heldWorkIds`);
   - it has no judgment;
   - it has fewer than 3 strikes.
 - **The queue:**
@@ -84,7 +84,7 @@ The job, queue and sweep start only when `TYPESAFE_API_KEY` is set, as today.
   - For a daily limit, `spend()` is one atomic upsert that succeeds only while that source's count for the day is below the limit.
   - Concurrent workers can't overspend.
 - **When budget runs out:**
-  - `spend()` throws `GenreBudgetSpentError`, and the request is not made.
+  - `spend()` throws `TypesafeBudgetSpentError`, and the request is not made.
   - Nothing is stored for that work, and it is not counted against the book.
   - It is logged once at info level, with no alert.
   - The queue keeps its works and pauses until the next UTC midnight.
@@ -107,7 +107,7 @@ Everything else is an outage and belongs to nobody: 5xx including 529, 429 after
   - An outage stores nothing for the failed request and pauses the queue for 10 minutes. The work stays queued.
   - A 401 alerts and pauses the queue and sweep for a day, as today.
   - A 422 is now a book failure; it no longer pauses anything.
-- The adapter keeps its retry rules and reports failures as today. The caller classifies them; the adapter doesn't.
+- The adapter keeps its retry rules. It marks an answer it can't use with `UnusableAnswerError` (a `SourceUnavailableError`), because network errors also carry no status. A shared `failureKind` sorts every failure into budget, key, book or outage for any TypeSafe caller.
 
 ## 3. Review queue
 
@@ -141,7 +141,7 @@ The response carries no user ids.
 
 ### Endpoints
 
-Both are admin-only. They follow the books routes' existing pattern: `authGuard`, then `service.isAdmin`, and 403 for anyone else.
+Both are admin-only. They follow the books routes' existing pattern: `authGuard`, then `service.isAdmin`, and 403 for anyone else. They get their own rate limit of 300 a minute, because the cover and works routes share a 30-a-minute one that a labelling session would hit.
 
 `GET /books/genre-review` returns `{ items, total }`. `total` counts every listed work, before the 200 cap.
 
@@ -169,7 +169,7 @@ A merged work id resolves to its canonical work.
 - The account menu shows a "Genre review" link only when `GET /books/admin` says the viewer is the admin.
 - The four groups appear in table order, each with a heading and its count.
 - Each row shows the cover, title, author, synopsis excerpt, holders and the evidence:
-  - "Rejected 3× · HTTP 400 · <reason>";
+  - "Rejected 3× · HTTP 400" (the reason is the status, or the adapter's detail such as "unexpected answer");
   - "Jev: none (0.91)";
   - "Jev: Poetry? (0.34)";
   - "Possibly History (0.62)".

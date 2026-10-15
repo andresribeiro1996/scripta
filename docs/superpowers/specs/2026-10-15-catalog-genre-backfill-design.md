@@ -13,7 +13,7 @@ Production on 2026-10-15:
 | Source (`books.created_by`) | Works without genres | With a synopsis |
 |---|---|---|
 | `seed` (Open Library popularity lists) | 56,081 | 0 |
-| `publisher` (16 Portuguese publisher feeds) | 20,008 | 18,910 |
+| `publisher` (15 Portuguese publisher feeds) | 20,008 | 18,910 |
 | none (added by users or search) | 183 | 39 |
 
 - The details backfill has looked up 10,635 of the genre-less works.
@@ -55,7 +55,7 @@ Then a Claude pass reviews what Jev was unsure about, and the possible genres, t
 
 ## 1. Seed subjects pass
 
-`backend/scripts/genre-seed-subjects.mjs [--eng N] [--por N] [--dry-run]`
+`backend/scripts/seed-catalog.mjs --fill-genres [--eng N] [--por N] [--dry-run]` (a flag on the existing seed script, which already has the queries and the counts)
 
 - **What it fetches:**
   - It re-runs the seed's own Open Library queries through `collectRanked`, with the same defaults as `seed-catalog.mjs` (`--eng 35000`, `--por 15000`).
@@ -69,9 +69,9 @@ Expected: about 45,000–50,000 works labelled.
 
 ## 2. Feed labels pass
 
-`backend/scripts/genre-feed-labels.mjs [--site NAME] [--dry-run]`
+`backend/scripts/import-publisher-covers.mjs --fill-genres [--site NAME] [--dry-run]` (a flag on the existing importer, like `--fill-titles`)
 
-- **What it reads:** each of the 16 sites in `PUBLISHERS`, through the importer's `readSiteFeed`, which respects robots.txt and keeps its throttle.
+- **What it reads:** each of the 15 sites in `PUBLISHERS`, through the importer's `readSiteFeed`, which respects robots.txt and keeps its throttle.
 - **Labels:** Shopify `tags` and `product_type`; WooCommerce `categories[].name` and `tags[].name`.
 - **Matching:** a product matches catalog editions by `books.publisher_url` (the product URL the importer stored), else by ISBN.
 - **Mapping:**
