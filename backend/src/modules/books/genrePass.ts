@@ -7,6 +7,26 @@ export const SYNOPSIS_LIMIT = 1200;
 const EDITION_LIMIT = 4;
 const KNOWN_GENRES = new Set<string>(BOOK_GENRES);
 
+export const GENRE_SAVE_LINE = 0.5;
+export const GENRE_LABEL_MAX = 3;
+
+export function labelProblem(genres: unknown[]): string | null {
+  const unknown = genres.filter((genre) => typeof genre !== "string" || !KNOWN_GENRES.has(genre));
+  if (unknown.length > 0) return `has unknown genres: ${unknown.join(", ")}`;
+  if (new Set(genres).size !== genres.length) return "repeats a genre";
+  if (genres.length > GENRE_LABEL_MAX) return `has more than ${GENRE_LABEL_MAX} genres`;
+  return null;
+}
+
+export function labelWork(books: BooksRepository, workId: string, genres: string[], at: string): number {
+  if (genres.length > 0) return books.setManualGenres(workId, genres);
+  books.transaction(() => {
+    books.saveGenreJudgment({ workId, model: "manual", genre: null, confidence: 1, askedAt: at });
+    books.applyGenreJudgment(workId, GENRE_SAVE_LINE);
+  });
+  return 0;
+}
+
 export type HeldWork = { workId: string; holders: number; finished: boolean };
 export type GenrePassWork = {
   workId: string;
@@ -41,10 +61,12 @@ export function genrePassWorksWith(books: BooksRepository, held: HeldWork[]): Ge
   const judgments = books.genreJudgments([...merged.keys()]);
   return [...merged]
     .flatMap(([workId, entry]) => {
+      const judgment = judgments.get(workId);
+      if (judgment?.model === "manual") return [];
       const evidence = (genres.get(workId)?.genres.length ?? 0) > 0 ? undefined : books.genreEvidence(workId);
       if (!evidence) return [];
       const editions = [...new Map(evidence.editions.map((edition) => [`${edition.title}|${edition.language}|${edition.isbn}`, { title: edition.title, language: edition.language, isbn: edition.isbn, publisher: edition.publisher, year: edition.year }])).values()].slice(0, EDITION_LIMIT);
-      return [{ workId, title: evidence.work.title, author: evidence.work.author, editions, synopsis: longestSynopsis(evidence), ...entry, jev: judgments.has(workId) ? { genre: judgments.get(workId)!.genre, confidence: judgments.get(workId)!.confidence } : null }];
+      return [{ workId, title: evidence.work.title, author: evidence.work.author, editions, synopsis: longestSynopsis(evidence), ...entry, jev: judgment ? { genre: judgment.genre, confidence: judgment.confidence } : null }];
     })
     .sort((a, b) => Number(b.finished) - Number(a.finished) || b.holders - a.holders || a.title.localeCompare(b.title));
 }
@@ -59,8 +81,8 @@ function labelsOf(input: unknown): Array<{ workId: string; genres: string[] }> {
       problems.push(`Label ${index} needs a workId and a genres array.`);
       return [];
     }
-    const unknown = genres.filter((genre) => typeof genre !== "string" || !KNOWN_GENRES.has(genre));
-    if (unknown.length > 0) problems.push(`Label ${index} (${workId}) has unknown genres: ${unknown.join(", ")}`);
+    const problem = labelProblem(genres);
+    if (problem) problems.push(`Label ${index} (${workId}) ${problem}`);
     return [{ workId, genres: genres as string[] }];
   });
   if (problems.length > 0) throw new GenreLabelsError(problems.join("\n"));
@@ -76,8 +98,7 @@ export function importGenreLabelsWith(books: BooksRepository, input: unknown): G
     const report: GenreImportReport = { works: 0, editions: 0, skipped: [] };
     for (const label of labels) {
       const workId = canonical.get(label.workId)!;
-      if (label.genres.length === 0) books.saveGenreJudgment({ workId, model: "manual", genre: null, confidence: 1, askedAt: new Date().toISOString() });
-      const changed = label.genres.length === 0 ? 0 : books.setManualGenres(workId, label.genres);
+      const changed = labelWork(books, workId, label.genres, new Date().toISOString());
       if (changed === 0) report.skipped.push(label.workId);
       else {
         report.works += 1;

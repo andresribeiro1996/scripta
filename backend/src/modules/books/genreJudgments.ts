@@ -3,11 +3,10 @@ import { startDetailsBackfill } from "./backfill.js";
 import { SourceUnavailableError, UnusableAnswerError } from "./domain/errors.js";
 import type { BooksRepository } from "./domain/ports.js";
 import type { GenreEvidence } from "./domain/types.js";
-import { longestSynopsis } from "./genrePass.js";
+import { GENRE_SAVE_LINE, longestSynopsis } from "./genrePass.js";
 import { dailySpend, failureKind, nextUtcMidnight, TypesafeBudgetSpentError } from "./typesafe.js";
 import { createWorkQueue } from "./workQueue.js";
 
-export const GENRE_SAVE_LINE = 0.5;
 export const GENRE_SOURCE = "genres";
 export const GENRE_DAILY_BUDGET = 1000;
 export const GENRE_REJECTION_LIMIT = 3;
