@@ -95,6 +95,32 @@ Added to `normalizeBookGenres`, because they are Portuguese genre words that als
 
 Everything else from the census goes to `FEED_LABEL_GENRES` unless it is a genre word in its own right. Labels with no matching genre stay unmapped; "Ensaio" (essays), "Contos" (short stories) and "Humor" have no `BOOK_GENRES` equivalent.
 
+### Shelf and tag vocabulary
+
+Imported Goodreads shelves and StoryGraph tags already go through `normalizeBookGenres` and become the reader's genres; unmapped ones are dropped. This is code only: no Jev, no stored shelves, no importer change.
+
+Many common shelves map to nothing today. Two map to the wrong genre: "food-for-thought" becomes Cooking, and "reading-history" becomes History. Additions, after slugs normalise to spaces:
+
+| Genre | Adds |
+|---|---|
+| Young Adult | ya (also covers "ya fiction", "ya fantasy") |
+| Literary Fiction | lit fic, litfic |
+| Science Fiction | dystopia(n)(s), space opera, cyberpunk, time travel |
+| Romance | rom com, romcom |
+| Fantasy | romantasy, paranormal |
+| Children's | middle grade, kids, kidlit / kid lit |
+
+Rules:
+- **Phrases that are never genres** ("food for thought", "reading history") are skipped before any rule runs. That is a short exclusion list, not regex lookbehind, because the same rules run on mobile under Hermes.
+- **First match still wins per string.**
+  - "time travel" reaches Science Fiction before the Travel rule.
+  - "ya fantasy" gives Young Adult.
+  - "paranormal romance" and BISAC "Romance / Paranormal" stay Romance, through a phrase rule placed before Fantasy. Bare "paranormal" gives Fantasy.
+- **Plural "kids" only.** Singular "kid" would catch "Billy, the Kid" subjects; "kid lit" is matched as a phrase.
+- **Non-genre shelves keep mapping to nothing:** to-read, currently-reading, owned, favorites, years, kindle, audiobook, book-club, dnf.
+
+The test is a fixture of common shelf and tag names, each with its expected genre or none, asserted against `normalizeBookGenres`.
+
 ## 3. Jev backlog pass
 
 `backend/scripts/genre-backlog.mjs --max N [--dry-run]`
@@ -128,7 +154,7 @@ Expected, using the 2026-10-14 measurement (63% at 0.8 or above, 30% from 0.5 to
 
 ## Order of work
 
-1. **Part 1 (passes 1 and 2, and the Portuguese rules)** doesn't depend on the review spec or on a key. It is built and run first.
+1. **Part 1 (passes 1 and 2, the Portuguese rules and the shelf vocabulary)** doesn't depend on the review spec or on a key. It is built and run first.
 2. **Part 2 (the backlog pass)** needs the review spec's budget table, strikes and shared classification code. It is built after them.
 3. **Part 3 (the catalog-scope export)** is a small change to the genre pass. It can ship with Part 2.
 
@@ -163,6 +189,10 @@ Running order once deployed:
   - the fill rule, repeat and dry run;
   - the unmatched-label census.
 - **Portuguese rules:** "Literatura Romântica e Erótica" → Romance; "Infantojuvenil" → Children's; the canonical-name and existing Portuguese tests still pass.
+- **Shelf vocabulary:**
+  - the shelf and tag fixture: each addition maps, non-genre shelves map to nothing, "food-for-thought" and "reading-history" map to nothing;
+  - "Food" is still Cooking and "World history" still History;
+  - the canonical-name, BISAC and Portuguese tests still pass.
 - **Backlog pass:**
   - selection: synopsis length, no judgment, strikes, held first;
   - `--max` stops at exactly N requests, retries included;

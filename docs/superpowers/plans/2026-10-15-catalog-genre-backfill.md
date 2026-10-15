@@ -13,8 +13,8 @@
 **Spec:** `docs/superpowers/specs/2026-10-15-catalog-genre-backfill-design.md`
 
 **Two phases, two PRs:**
-- **Phase 1 (Tasks 1–4):** Portuguese rules, the source fill, the seed pass and the feed pass. They don't depend on the genre review plan or on a key. Build and ship them first.
-- **Phase 2 (Tasks 5–6):** the Jev backlog pass and the catalog-scope export. They need `docs/superpowers/plans/2026-10-15-genre-review.md` merged first:
+- **Phase 1 (Tasks 1–5):** Portuguese rules, the source fill, the seed pass, the feed pass and the Goodreads/StoryGraph shelf vocabulary. They don't depend on the genre review plan or on a key. Build and ship them first.
+- **Phase 2 (Tasks 6–7):** the Jev backlog pass and the catalog-scope export. They need `docs/superpowers/plans/2026-10-15-genre-review.md` merged first:
   - `classifyWork`, `GENRE_REJECTION_LIMIT` and `GENRE_SAVE_LINE` (its Task 5);
   - `spendTypesafe`, `TypesafeBudgetSpentError`, `failureKind` and `utcDay` (Tasks 1–2);
   - `genre_rejections` and judgments with `model` (Task 3);
@@ -52,10 +52,10 @@
 ## Review Focus
 
 1. **A subject or label never overwrites a genre an edition already has**, whether from a source, Jev or the owner. Pinned in Tasks 2, 3 and 4.
-2. **Numbers in non-age labels never become Children's.** Examples: "+ 13 anos", "100 anos", "Guerra dos 30 anos". Pinned in Task 4.
+2. **Words that aren't genre labels never become genres.** Numbers in non-age labels ("+ 13 anos", "100 anos", "Guerra dos 30 anos") never become Children's, and shelves like "food-for-thought", "reading-history" or "Billy, the Kid" map to nothing. Pinned in Tasks 4 and 5.
 3. **A feed product several catalog books share labels all of them.** The importer and the title fill both attach one product URL to more than one book. Pinned in Task 4.
-4. **The backlog never sends more than `--max` requests**, retries and 4 workers included. Pinned in Task 5.
-5. **Dry runs write nothing, and the backlog's dry run calls no TypeSafe at all.** Pinned in Tasks 3, 4 and 5.
+4. **The backlog never sends more than `--max` requests**, retries and 4 workers included. Pinned in Task 6.
+5. **Dry runs write nothing, and the backlog's dry run calls no TypeSafe at all.** Pinned in Tasks 3, 4 and 6.
 
 ---
 
@@ -772,6 +772,146 @@ EOF
 )"
 ```
 
+### Task 5: Goodreads and StoryGraph shelf vocabulary
+
+**Files:**
+- Modify: `packages/shared/src/library/bookGenres.ts`. Edit `RULES`, add `NOT_GENRES`, and make one change in `normalizeBookGenres`.
+- Test: `packages/shared/src/library/bookGenres.test.ts`
+
+**Interfaces:**
+- Consumes: Task 1's Romance and infanto-juvenil rules. This task edits the Romance rule again.
+- Produces: `normalizeBookGenres` maps common shelf and tag names (spec "Shelf and tag vocabulary"). A string matching `NOT_GENRES` maps to nothing.
+
+The rules also run in the mobile app under Hermes, so use no regex lookbehind. The exclusion list replaces it.
+
+- [ ] **Step 1: Write the failing test**
+
+Append to `bookGenres.test.ts`:
+
+```ts
+test("common Goodreads shelves and StoryGraph tags map to genres, and non-genre shelves to nothing", () => {
+  const shelves: Array<[string, string | null]> = [
+    ["ya", "Young Adult"],
+    ["ya-fantasy", "Young Adult"],
+    ["lit-fic", "Literary Fiction"],
+    ["litfic", "Literary Fiction"],
+    ["dystopian", "Science Fiction"],
+    ["dystopia", "Science Fiction"],
+    ["space-opera", "Science Fiction"],
+    ["cyberpunk", "Science Fiction"],
+    ["time-travel", "Science Fiction"],
+    ["rom-com", "Romance"],
+    ["romcom", "Romance"],
+    ["romantasy", "Fantasy"],
+    ["paranormal", "Fantasy"],
+    ["paranormal-romance", "Romance"],
+    ["Fiction / Romance / Paranormal", "Romance"],
+    ["middle-grade", "Children's"],
+    ["kids", "Children's"],
+    ["kidlit", "Children's"],
+    ["sci-fi-faves", "Science Fiction"],
+    ["fantasy-to-read", "Fantasy"],
+    ["cozy-mystery", "Mystery"],
+    ["true-crime", "Crime"],
+    ["graphic-novels", "Comics & Graphic Novels"],
+    ["to-read", null],
+    ["currently-reading", null],
+    ["read-in-2024", null],
+    ["owned", null],
+    ["favorites", null],
+    ["2023", null],
+    ["kindle", null],
+    ["audiobook", null],
+    ["book-club", null],
+    ["dnf", null],
+    ["food-for-thought", null],
+    ["reading-history", null],
+    ["Billy, the Kid, 1859-1881", null]
+  ];
+  for (const [shelf, genre] of shelves) assert.deepEqual(normalizeBookGenres([shelf]), genre ? [genre] : [], shelf);
+  assert.deepEqual(normalizeBookGenres(["Food"]), ["Cooking"]);
+  assert.deepEqual(normalizeBookGenres(["World history"]), ["History"]);
+  assert.deepEqual(normalizeBookGenres(["Travel"]), ["Travel"]);
+});
+```
+
+- [ ] **Step 2: Run to verify it fails**
+
+Run: `npm test --workspace @scripta/shared`
+Expected: FAIL on the first case, "ya" (today `[]`).
+
+- [ ] **Step 3: Implement**
+
+In `bookGenres.ts`:
+
+1. Replace these `RULES` entries. Keep every other entry and the order as they are:
+
+```ts
+  ["Science Fiction", /\b(?:science fiction|sci fi|scifi|ficcao cientifica|dystopi(?:a|an|as)|space opera|cyberpunk|time travel)\b/],
+```
+
+```ts
+  ["Literary Fiction", /\bliterary fiction\b|\bfiction literary\b|\bficcao literaria\b|\blit ?fic\b/],
+```
+
+```ts
+  ["Young Adult", /\b(?:young adult|ya|juvenil|jovens adultos)\b/],
+```
+
+```ts
+  ["Children's", /\b(?:children s|childrens|juvenile fiction|picture books?|infantil|infantis|middle grade|kids|kid ?lit)\b/],
+```
+
+```ts
+  ["Fantasy", /\b(?:fantasy|fantasia|romantasy|paranormal)\b/],
+```
+
+```ts
+  ["Romance", /\bromance\b|\bliteratura romantica\b|\brom ?com\b/],
+```
+
+   The `["Children's", /\binfanto ?juvenil\b/]` entry from Task 1 stays right before the Young Adult entry. Insert one new entry right before the Fantasy entry, so paranormal romance stays Romance while bare "paranormal" goes to Fantasy:
+
+```ts
+  ["Romance", /\b(?:paranormal romance|romance paranormal)\b/],
+```
+
+2. After `RULES`, add:
+
+```ts
+const NOT_GENRES = /\b(?:food for thought|reading history)\b/;
+```
+
+3. In `normalizeBookGenres`, right after the line that computes `subject`, add:
+
+```ts
+    if (NOT_GENRES.test(subject)) continue;
+```
+
+- [ ] **Step 4: Run to verify**
+
+Run: `npm test --workspace @scripta/shared && npm run build --workspace @scripta/shared && npm test --workspace mobile && npm run typecheck --workspace backend && npm test --workspace backend`
+Expected: PASS. That includes "every canonical genre name normalizes to itself", the BISAC test (English "Fiction / Romance / Historical" still gives Romance), the Portuguese tests, and the feed tests from Task 4 that go through `normalizeBookGenres`.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add packages/shared/src/library/bookGenres.ts packages/shared/src/library/bookGenres.test.ts && git commit -m "$(cat <<'EOF'
+Map common Goodreads shelves and StoryGraph tags to genres
+
+Imported shelves like ya, lit-fic, dystopian, rom-com, romantasy and
+middle-grade mapped to nothing and were dropped, while food-for-thought
+became Cooking and reading-history became History. The rules now cover
+the common genre shelves, and a short list of phrases that are never
+genres is skipped before any rule runs. That list replaces regex
+lookbehind, because the rules also run on mobile under Hermes. Plural
+"kids" only, so "Billy, the Kid" subjects stay unlabelled.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+EOF
+)"
+```
+
 ### Phase 1 wrap-up
 
 - [ ] Run every verify command in Global Constraints. All must pass.
@@ -784,7 +924,7 @@ EOF
 
 Start a new branch from `main` once this plan's Phase 1 and the genre review plan have both merged.
 
-### Task 5: The Jev backlog pass
+### Task 6: The Jev backlog pass
 
 **Files:**
 - Modify: `backend/src/modules/books/typesafe.ts`. Add `runBudget`.
@@ -1098,7 +1238,7 @@ EOF
 )"
 ```
 
-### Task 6: The catalog-scope genre-pass export
+### Task 7: The catalog-scope genre-pass export
 
 **Files:**
 - Modify: `backend/src/modules/books/domain/ports.ts` and `adapters/sqlite/sqliteBooksRepository.ts`. Add `jevJudgedWorkIds`.
