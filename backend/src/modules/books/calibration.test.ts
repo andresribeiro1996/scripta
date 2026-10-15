@@ -109,3 +109,14 @@ test("the translation score counts right picks per decision band", () => {
     { decision: "jev below 0.5", items: 1, correct: 1 }
   ]);
 });
+
+test("a code match in the translation sample carries the evidence code decided on, original titles read from summaries included", () => {
+  const repo = freshRepo();
+  repo.createBook({ title: "To the Lighthouse", author: "Virginia Woolf", isbn: "9780156907611", workKey: "OL985W" }, ["isbn:9780156907611"], "2026-10-01T00:00:00.000Z");
+  const pt = repo.createBook({ title: "Passeio ao Farol", author: "Virginia Woolf", isbn: "9789720000611" }, ["isbn:9789720000611"], "2026-10-01T00:00:00.000Z");
+  repo.setLanguage(pt.id, "pt-PT");
+  repo.mergeDetails(pt.id, { summary: "Uma família numa casa de férias.\n\nTítulo original: To the Lighthouse", pages: null, year: null, publisher: null, translator: null }, "publisher");
+  const [item] = translationSample(repo, 2, () => 0.5);
+  assert.equal(item?.stratum, "code");
+  assert.equal(item?.edition.originalTitle, "To the Lighthouse");
+});

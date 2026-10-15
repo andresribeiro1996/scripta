@@ -1,6 +1,6 @@
 import type { BooksRepository } from "./domain/ports.js";
 import { isFragment, SYNOPSIS_HIDE_BELOW, SYNOPSIS_REVIEW_BELOW } from "./domain/synopsis.js";
-import { MATCH_MERGE_AT, MATCH_REVIEW_AT } from "./domain/translation.js";
+import { evidenceOf, MATCH_MERGE_AT, MATCH_REVIEW_AT } from "./domain/translation.js";
 import { planMatch } from "./translationJudgments.js";
 import { failureKind } from "./typesafe.js";
 
@@ -87,14 +87,12 @@ export function translationSample(repo: SampleRepo, n: number, random: () => num
     const rows = repo.translationEvidence(workId);
     if (!plan || !rows || (plan.kind !== "code" && plan.kind !== "ask")) continue;
     if (plan.kind === "code" ? code >= codeCap : ask >= askCap) continue;
-    const first = rows.editions[0]!;
+    const evidence = plan.kind === "ask" ? plan.evidence : evidenceOf(rows);
     const candidates = plan.kind === "ask" ? plan.candidates : repo.matchCandidates([plan.intoWorkId]).map(({ id, title, author, year }) => ({ id, title, author, year }));
     picked.push({
       workId,
       stratum: plan.kind,
-      edition: plan.kind === "ask"
-        ? { title: plan.evidence.title, author: plan.evidence.author, originalTitle: plan.evidence.originalTitle, publisher: plan.evidence.publisher, description: plan.evidence.summary }
-        : { title: first.title, author: first.author, originalTitle: first.originalTitle, publisher: first.publisher, description: first.summary },
+      edition: { title: evidence.title, author: evidence.author, originalTitle: evidence.originalTitle, publisher: evidence.publisher, description: evidence.summary },
       candidates,
       codePick: plan.kind === "code" ? plan.intoWorkId : null
     });
