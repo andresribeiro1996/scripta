@@ -172,6 +172,16 @@ test("seed entries take their language from the edition's Open Library languages
   assert.equal(language(unknown.book!), null);
 });
 
+test("seedCatalog repairs mojibake and keys the row by the repaired title and author", () => {
+  const { repo } = setup();
+  assert.deepEqual(seedCatalog([entry("9780000000002", "Entre a fÃ© e a crenÃ§a", "JosÃ© Silva")], repo, () => NOW), { created: 1, existing: 0, invalid: 0 });
+  const book = repo.findBookByKey("isbn:9780000000002")!;
+  assert.equal(book.title, "Entre a fé e a crença");
+  assert.equal(book.author, "José Silva");
+  assert.equal(book.title_key, "ta:entre a fe e a crenca|jose silva|");
+  assert.equal(repo.findBookByKey("ta:entre a fe e a crenca|jose silva|")?.id, book.id);
+});
+
 test("a Portuguese seed entry's language takes its region from its ISBN, and seedCatalog passes the entry's languages through", () => {
   const { repo } = setup();
   const europe = seedBook({ isbn: "9789722518888", title: "Um", author: "Author", languages: [], lang: "por" }, repo, () => NOW).book!;

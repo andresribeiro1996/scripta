@@ -73,6 +73,21 @@ test("lookupIdentity has no alias for an ISBN-13 or a title-only lookup", () => 
   assert.deepEqual(lookupIdentity({ title: "Dune", author: "Frank Herbert" })!.aliasKeys, []);
 });
 
+test("lookupIdentity repairs mojibake before keying", () => {
+  assert.deepEqual(lookupIdentity({ isbn: "978-0-00-000000-2", title: "Entre a fÃ© e a crenÃ§a", author: "JosÃ© Silva" }), {
+    key: "isbn:9780000000002",
+    aliasKeys: [],
+    titleKey: "ta:entre a fe e a crenca|jose silva|",
+    isbn: "9780000000002",
+    title: "Entre a fé e a crença",
+    author: "José Silva"
+  });
+});
+
+test("lookupIdentity repairs before trimming", () => {
+  assert.equal(lookupIdentity({ title: "VoilÃ\xa0", author: "Ana Lima" })?.title, "Voilà");
+});
+
 test("search tokens are plain words, safe for FTS", () => {
   assert.deepEqual(searchTokens('"Dune" -messiah* (Herbert)'), ["dune", "messiah", "herbert"]);
   assert.deepEqual(searchTokens("***"), []);
