@@ -1,7 +1,10 @@
 import { Fragment, useState, type ComponentType } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Link, NavLink, Outlet } from "react-router-dom";
 import { newCountLabel } from "@scripta/shared";
+import { fetchIsAdmin } from "../api/books";
 import { useAuth } from "../auth/AuthContext";
+import { AdminLinks } from "../components/AdminLinks";
 import { Avatar } from "../components/Avatar";
 import { BrandLockup } from "../components/BrandLockup";
 import {
@@ -73,6 +76,7 @@ export function DashboardLayout() {
   const { personalNewCount } = useDashboard();
   useGenreEnrichment(library?.data.books ?? [], library?.genres, updateLibrary);
   useAccountAppearanceSync();
+  const { data: isAdmin = false } = useQuery({ queryKey: ["books-admin"], queryFn: fetchIsAdmin, staleTime: Infinity, enabled: Boolean(session) });
   const [drawerOpen, setDrawerOpen] = useState(false);
   // Set by the mural editor while it's in edit mode: the canvas is the
   // whole activity then, and the fixed bottom nav both covers it and
@@ -132,6 +136,7 @@ export function DashboardLayout() {
             )}
             <p className="truncate text-xs text-(--color-text-dim)">@{session?.user.username ?? session?.user.email}</p>
           </div>
+          <AdminLinks isAdmin={isAdmin} />
           <button
             onClick={() => void logout()}
             className="w-full rounded-lg border border-(--color-danger-soft) px-3 py-2.5 text-left text-sm text-(--color-danger) hover:bg-(--color-danger-soft)"
@@ -238,6 +243,7 @@ export function DashboardLayout() {
                 )}
                 <p className="truncate text-xs text-(--color-text-dim)">@{session?.user.username ?? session?.user.email}</p>
               </div>
+              <AdminLinks isAdmin={isAdmin} onNavigate={() => setDrawerOpen(false)} />
               <button
                 onClick={() => void logout()}
                 className="w-full rounded-lg border border-(--color-danger-soft) px-3 py-2.5 text-left text-sm text-(--color-danger) hover:bg-(--color-danger-soft)"

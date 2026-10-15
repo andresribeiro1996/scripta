@@ -25,6 +25,7 @@ import { LibraryStylePage } from "./pages/LibraryStylePage";
 import { LoginPage } from "./pages/LoginPage";
 import { MuralEditorPage } from "./pages/MuralEditorPage";
 import { MuralsListPage } from "./pages/MuralsListPage";
+import { AdminGenresPage } from "./pages/AdminGenresPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { PlayQuizPage } from "./pages/PlayQuizPage";
 import { PrivacyPage } from "./pages/PrivacyPage";
@@ -97,6 +98,7 @@ export function App() {
               <Route path="/dashboard/style" element={<LibraryStylePage />} />
               <Route path="/dashboard/settings" element={<SettingsPage />} />
               <Route path="/dashboard/reader-card" element={<ReaderCardPage />} />
+              <Route path="/admin/genres" element={<AdminGenresPage />} />
               <Route path="/community" element={<Navigate to="/dashboard" replace />} />
               <Route path="/community/discover" element={<DiscoverPage />} />
               <Route path="/community/people" element={<PeoplePage />} />
