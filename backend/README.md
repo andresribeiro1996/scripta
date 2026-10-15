@@ -333,6 +333,22 @@ Checks every stored summary (edition and work) that has no synopsis judgment yet
 
 The report's `bySource` counts, per summary source: `texts` selected, hidden by the `rule`, `hidden` by Jev (below 0.3), `doubtful` (0.3 to 0.5, listed on `/admin/synopses`) and `shown`. Then `strikes`, `stoppedBy` (`done`, `budget`, `outage`, `key` or `no-key`), `requests` used and `estimatedCostUsd`.
 
+#### Translation backlog
+
+Matches every live Portuguese work (all its editions `pt`, `pt-PT` or `pt-BR`) that has no match judgment yet to its original work, held works first, then oldest. It needs `COVERS_DB_PATH`, `LIBRARY_DB_PATH` and `ARENA_DB_PATH`; the library and arena databases are opened read-only, the arena one so a tournament holding both works blocks the merge. Check the volume's free space first (`railway volume list --json`), and hold merges to main while it runs, because a deploy kills `railway ssh` jobs. Every merge it makes is listed under "Merged" on `/admin/translations`, where it can be undone.
+
+1. Dry run: counts the works selected, the original titles stored summaries would fill, the Portuguese originals, the works with no candidates, the merges code would make and how many works would go to Jev. It writes nothing and makes no TypeSafe request.
+
+   ```bash
+   npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && node scripts/translation-backlog.mjs --max 20000 --dry-run'
+   ```
+
+2. Real run: the same command without `--dry-run`, with `--max` at the dry run's `wouldAsk`. The code steps run first with no requests: original titles from stored summaries, Portuguese originals and works with no candidates recorded, and the clear matches merged. Then Jev decides the rest, 4 in flight: 0.9 or more merges, 0.5 to 0.9 waits on `/admin/translations`. `--max` is a hard limit on TypeSafe requests, retries included, recorded under `works-backlog` in `typesafe_usage` (the daily `works` budget is untouched). Without `TYPESAFE_API_KEY` only the code steps run, and the script says the Jev step was skipped. An outage or a rejected key ends the run; re-running continues where it stopped.
+
+`--recheck-none` also selects works whose answer was "none", not the owner's, and is more than 30 days old, since their original may have arrived since.
+
+The report counts `originalTitles`, `originals`, `noCandidates`, `codeMerges`, `codeBlocked` (blocked by an arena), Jev's `jevMerges`, `jevBlocked`, `possible` and `none`, then `strikes`, `stoppedBy` (`done`, `budget`, `outage`, `key` or `no-key`), `requests` used and `estimatedCostUsd`.
+
 #### Calibrating Jev
 
 Claude sets and checks the thresholds Jev's answers are read against; it never judges the backlog itself. Calibrate once on production before the first backlog run of each task, and again whenever the Jev model version or a question's wording changes.
