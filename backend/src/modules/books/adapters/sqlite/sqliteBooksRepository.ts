@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { DatabaseSync, StatementSync } from "node:sqlite";
 import { MIN_PREFIX_LENGTH, normalizeWorkKey, workTitleKey } from "../../domain/normalize.js";
 import type { BooksRepository, IdPage, MergeableDetails, PageCursor } from "../../domain/ports.js";
+import { GENRE_SAVE_LINE } from "../../domain/constants.js";
 import { WorkMergeError } from "../../domain/errors.js";
 import { summaryHashOf, type SynopsisKind } from "../../domain/synopsis.js";
 import { originalTitleIn } from "../../domain/translation.js";
@@ -284,17 +285,6 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     WHERE genre_judgments.model <> 'manual' OR excluded.model = 'manual'
   `);
   const judgmentsStmt = db.prepare(`SELECT work_id, model, genre, confidence FROM genre_judgments WHERE work_id IN (SELECT value FROM json_each(?))`);
-  const applyJudgmentsStmt = db.prepare(`
-    UPDATE books SET genres = json_array(j.genre), genres_source = 'jev', genres_confidence = j.confidence
-    FROM genre_judgments AS j
-    WHERE books.work_id = j.work_id AND j.genre IS NOT NULL AND j.confidence >= ?
-      AND (books.genres = '[]' OR books.genres_source = 'jev')
-      AND NOT (books.genres = json_array(j.genre) AND books.genres_source = 'jev' AND books.genres_confidence IS j.confidence)
-  `);
-  const undoJudgmentsStmt = db.prepare(`
-    UPDATE books SET genres = '[]', genres_source = NULL, genres_confidence = NULL
-    WHERE genres_source = 'jev' AND work_id IN (SELECT work_id FROM genre_judgments WHERE genre IS NULL OR confidence < ?)
-  `);
   const applyJudgmentForWorkStmt = db.prepare(`
     UPDATE books SET genres = json_array(j.genre), genres_source = 'jev', genres_confidence = j.confidence
     FROM genre_judgments AS j
@@ -455,6 +445,11 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     return target.id;
   }
 
+  function applyJoinedJudgment(workId: string) {
+    undoJudgmentForWorkStmt.run(workId, GENRE_SAVE_LINE);
+    applyJudgmentForWorkStmt.run(workId, GENRE_SAVE_LINE);
+  }
+
   type MergeRecord = { source: MergeSource; confidence: number | null; at: string; carrySummary: boolean };
 
   function carryGenreState(from: string, into: string) {
@@ -473,6 +468,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     markMergedStmt.run(into, from);
     repointMergedStmt.run(into, from);
     carryGenreState(from, into);
+    applyJoinedJudgment(into);
     recordMergeStmt.run(from, into, record.source, record.confidence, JSON.stringify(moved), JSON.stringify(repointed), record.at);
   }
 
@@ -482,7 +478,10 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     const held = row.ol_work_key ? (workByKeyStmt.get(row.ol_work_key) as { id: string } | undefined) : undefined;
     const workId = held?.id ?? insertWork(row.ol_work_key, row.title, row.author, row.created_at);
     moveBookStmt.run(workId, row.id);
-    if (held) fillWorkIdentityStmt.run(row.id);
+    if (held) {
+      fillWorkIdentityStmt.run(row.id);
+      applyJoinedJudgment(workId);
+    }
     return workId;
   }
 
@@ -554,7 +553,10 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
           $created_at: createdAt
         });
         for (const key of keys) insertKeyIfMissingStmt.run(key, id);
-        if (held) fillWorkIdentityStmt.run(id);
+        if (held) {
+          fillWorkIdentityStmt.run(id);
+          applyJoinedJudgment(workId);
+        }
         makeSearchableIfConfirmed(id);
         return byIdStmt.get(id) as unknown as BookRow;
       });
@@ -678,6 +680,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
           repointMergedStmt.run(target, book.work_id);
           carryGenreState(book.work_id, target);
         }
+        if (held) applyJoinedJudgment(target);
         fillWorkIdentityStmt.run(id);
       });
     },
@@ -811,12 +814,6 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     genreJudgments(workIds) {
       const rows = judgmentsStmt.all(JSON.stringify(workIds)) as Array<{ work_id: string; model: string; genre: string | null; confidence: number }>;
       return new Map(rows.map((row) => [row.work_id, { model: row.model, genre: row.genre, confidence: row.confidence }]));
-    },
-    applyGenreJudgments(saveLine) {
-      inTransaction(() => {
-        undoJudgmentsStmt.run(saveLine);
-        applyJudgmentsStmt.run(saveLine);
-      });
     },
     applyGenreJudgment(workId, saveLine) {
       inTransaction(() => {

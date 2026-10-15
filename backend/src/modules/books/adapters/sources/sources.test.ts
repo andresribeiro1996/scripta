@@ -122,6 +122,22 @@ test("Open Library ISBN covers need no API call; title search maps cover ids", a
   assert.equal(new URL(urls[0]!).searchParams.get("author"), null);
 });
 
+test("Open Library title search hands accept the doc's title and authors with mojibake and markers cleaned", async () => {
+  stub(() => Response.json({ docs: [
+    { title: "3\u0098ª\u009c classe de teste", author_name: ["Ana Co\u0098sta"], cover_i: 1 },
+    { title: "A fÃ© de teste", author_name: ["Rui FÃ©lix"], cover_i: 2 }
+  ] }));
+  const candidates: Array<{ title: string; authors: string[] }> = [];
+  await createOpenLibraryCoverSource(direct).byTitle("classe de teste", "Ana Costa", ({ title, authors }) => {
+    candidates.push({ title, authors });
+    return true;
+  });
+  assert.deepEqual(candidates, [
+    { title: "3ª classe de teste", authors: ["Ana Costa"] },
+    { title: "A fé de teste", authors: ["Rui Félix"] }
+  ]);
+});
+
 test("cover lookups stay in the normal lane", async () => {
   const lanes: Array<boolean | undefined> = [];
   const recording: Throttle = (task, options) => {
