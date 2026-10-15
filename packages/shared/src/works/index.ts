@@ -6,3 +6,5 @@ export * from "./bookStats.js";
 export * from "./coverWash.js";
 export * from "./workGenres.js";
 export * from "./genreReview.js";
+export * from "./synopsisReview.js";
+export * from "./translationReview.js";

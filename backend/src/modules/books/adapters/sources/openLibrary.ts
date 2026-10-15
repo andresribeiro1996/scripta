@@ -1,3 +1,4 @@
+import { cleanCatalogText } from "@scripta/shared";
 import type { CoverSource } from "../../domain/ports.js";
 import { fetchJson, type Throttle } from "../http/http.js";
 
@@ -18,8 +19,8 @@ export function createOpenLibraryCoverSource(throttle: Throttle): CoverSource {
         const candidate = {
           source: "openlibrary" as const,
           url: `https://covers.openlibrary.org/b/id/${doc.cover_i}-L.jpg`,
-          title: typeof doc.title === "string" ? doc.title : "",
-          authors: Array.isArray(doc.author_name) ? doc.author_name.filter((name): name is string => typeof name === "string") : []
+          title: typeof doc.title === "string" ? cleanCatalogText(doc.title) : "",
+          authors: Array.isArray(doc.author_name) ? doc.author_name.filter((name): name is string => typeof name === "string").map(cleanCatalogText) : []
         };
         return accept(candidate) ? [{ source: candidate.source, url: candidate.url }] : [];
       });

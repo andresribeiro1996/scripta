@@ -1,5 +1,6 @@
 import { canonicalIsbn } from "@scripta/shared";
 import { normalizeWords } from "../domain/normalize.js";
+import { originalTitleIn } from "../domain/translation.js";
 import type { PublisherSite } from "./publishers.js";
 
 export interface PublisherBook {
@@ -18,6 +19,7 @@ export interface ProductDetails {
   pages: number | null;
   year: number | null;
   translator: string | null;
+  originalTitle: string | null;
 }
 
 export type ResolvedBook = PublisherBook & { isbn: string };
@@ -46,6 +48,7 @@ const PAGES_LINE = new RegExp(String.raw`${LEAD}(?:n(?:[úu]m)?\.?\s*[º°]?\.?\
 const PAGES_VALUE = /^\D*(\d+(?:[. ]\d{3}(?!\d))*)(?!\d|[.,]\d)/;
 const PAGES_TEXT = /(?<![\d.])(\d{1,3}(?:[. ]\d{3}(?!\d))+|\d{2,4})(?!\d) *(?:p[áa]g(?:inas|s)?\.?)(?![a-z])/i;
 const TRANSLATOR_ATTRIBUTE = /^tradu/i;
+const ORIGINAL_TITLE_ATTRIBUTE = /^t[íi]tulo original/i;
 const TRANSLATOR_LINE = new RegExp(String.raw`${LEAD}(?:Tradu(?:ção|zido)|Tradutor(?:a)?)(?:\s+(?:de|por)\b|\s*:)\s*(.*)$`, "i");
 const NAME_WORD = /^\p{Lu}[\p{L}'’-]*$/u;
 const NAME_PARTICLES = new Set(["de", "da", "do", "dos", "das", "e"]);
@@ -157,7 +160,7 @@ function feedTextDetails(lines: string[]): Pick<ProductDetails, "pages" | "trans
 
 export function withPageText(details: ProductDetails, html: string): ProductDetails {
   const lines = textLines(html);
-  return { ...details, pages: details.pages ?? labelledPages(lines), translator: details.translator ?? labelledTranslator(lines) };
+  return { ...details, pages: details.pages ?? labelledPages(lines), translator: details.translator ?? labelledTranslator(lines), originalTitle: details.originalTitle ?? originalTitleIn(lines.join("\n")) };
 }
 
 export function findPageIsbn(html: string): string | null {
@@ -228,7 +231,7 @@ export function parseShopifyProducts(json: unknown, site: PublisherSite): Publis
     const vendor = text(product.vendor).trim();
     const author = site.authorFromVendor && vendor && normalizeWords(vendor) !== normalizeWords(site.name) ? vendor : null;
     const lines = textLines(text(product.body_html));
-    const details = { summary: synopsis(lines), year: null, ...feedTextDetails(lines) };
+    const details = { summary: synopsis(lines), year: null, originalTitle: originalTitleIn(lines.join("\n")), ...feedTextDetails(lines) };
     return [{ isbn: found?.isbn ?? null, rank: found?.rank ?? PAGE_RANK, title, author, imageUrl, productUrl, details, labels: [...labelList(product.tags), ...labelList(product.product_type)] }];
   });
 }
@@ -250,7 +253,8 @@ function wooDetails(product: Record<string, unknown>): ProductDetails {
     summary: synopsis(description) ?? synopsis(shortDescription),
     pages: pageCount(wooAttribute(product, PAGES_ATTRIBUTE)) ?? fromText.pages,
     year: publicationYear(wooAttribute(product, YEAR_ATTRIBUTE)),
-    translator: wooAttribute(product, TRANSLATOR_ATTRIBUTE) ?? fromText.translator
+    translator: wooAttribute(product, TRANSLATOR_ATTRIBUTE) ?? fromText.translator,
+    originalTitle: wooAttribute(product, ORIGINAL_TITLE_ATTRIBUTE) ?? originalTitleIn([...description, ...shortDescription].join("\n"))
   };
 }
 

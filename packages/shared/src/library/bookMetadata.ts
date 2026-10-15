@@ -7,6 +7,7 @@
 // mobile equivalent), not here.
 
 import { normalizeBookGenres, type BookGenre } from "./bookGenres.js";
+import { cleanCatalogText } from "./mojibake.js";
 
 export interface BookMetadata {
   summary: string | null;
@@ -39,8 +40,8 @@ export function findOpenLibraryMatch(data: unknown, isbn: string, title: string,
     if (!value || typeof value !== "object") return false;
     const doc = value as Record<string, unknown>;
     return typeof doc.key === "string" && /^\/works\/OL\d+W$/.test(doc.key) && (Boolean(isbn) || (
-      typeof doc.title === "string" && normalized(doc.title) === normalized(title) && Array.isArray(doc.author_name) &&
-      doc.author_name.some((name) => typeof name === "string" && normalized(name) === normalized(author))
+      typeof doc.title === "string" && normalized(cleanCatalogText(doc.title)) === normalized(title) && Array.isArray(doc.author_name) &&
+      doc.author_name.some((name) => typeof name === "string" && normalized(cleanCatalogText(name)) === normalized(author))
     ));
   }) ?? null;
 }

@@ -478,3 +478,15 @@ test("an entered book whose first duel is still open has a best round but no res
     VALUES ('d', 'live', 1, 0, 'w', 'A', 'x', 'o', 'B', 'y', NULL, 'active', '2026-01-01', '2026-01-02')`).run();
   assert.deepEqual(repo.tournamentRecord(["w"]), { entered: 1, titles: 0, wins: 0, losses: 0, best: { round: 1, duels: 4 } });
 });
+
+test("worksShareATournament finds two works in one tournament, through any of their ids", async () => {
+  const { createSqliteArenaRepository } = await import("./sqliteArenaRepository.js");
+  const db = freshDb();
+  db.exec(`INSERT INTO tournaments (id, owner_user_id, name, bracket_size, round_duration_minutes) VALUES ('t1', 'u', 'One', 4, 60), ('t2', 'u', 'Two', 4, 60)`);
+  db.exec(`INSERT INTO tournament_slots (tournament_id, slot_index, work_id, title, author) VALUES ('t1', 0, 'w-pt', 'Passeio', 'X'), ('t1', 1, 'w-en', 'Walk', 'X'), ('t2', 0, 'w-other', 'Other', 'Y')`);
+  const repo = createSqliteArenaRepository(db);
+  assert.equal(repo.worksShareATournament(["w-pt"], ["w-en"]), true);
+  assert.equal(repo.worksShareATournament(["w-pt-alias", "w-pt"], ["w-en"]), true);
+  assert.equal(repo.worksShareATournament(["w-pt"], ["w-other"]), false);
+  assert.equal(repo.worksShareATournament([], ["w-en"]), false);
+});

@@ -1,0 +1,119 @@
+import type { BooksRepository } from "./domain/ports.js";
+import { isFragment, SYNOPSIS_HIDE_BELOW, SYNOPSIS_REVIEW_BELOW } from "./domain/synopsis.js";
+import { evidenceOf, MATCH_MERGE_AT, MATCH_REVIEW_AT } from "./domain/translation.js";
+import { planMatch } from "./translationJudgments.js";
+import { failureKind } from "./typesafe.js";
+
+export const TASKS = ["synopses", "translations"] as const;
+const IN_FLIGHT = 4;
+
+export type SynopsisSampleItem = { hash: string; stratum: string; title: string; author: string; text: string };
+export type SynopsisLabel = { hash: string; usable: boolean; kind: string };
+export type SynopsisAnswerRow = { hash: string; usable: number; kind: string };
+
+function shuffled<T>(items: T[], random: () => number): T[] {
+  const copy = [...items];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j]!, copy[i]!];
+  }
+  return copy;
+}
+
+export function synopsisSample(repo: Pick<BooksRepository, "synopsisTexts">, n: number, random: () => number = Math.random): SynopsisSampleItem[] {
+  const strata = new Map<string, SynopsisSampleItem[]>();
+  for (const text of repo.synopsisTexts()) {
+    const stratum = isFragment(text.text) ? "rule" : text.source;
+    strata.set(stratum, [...(strata.get(stratum) ?? []), { hash: text.hash, stratum, title: text.title, author: text.author, text: text.text }]);
+  }
+  const quota = Math.ceil(n / Math.max(strata.size, 1));
+  return [...strata.values()].flatMap((items) => shuffled(items, random).slice(0, quota));
+}
+
+export function scoreSynopses(sample: SynopsisSampleItem[], labels: SynopsisLabel[], answers: SynopsisAnswerRow[]): Array<{ decision: string; items: number; notUsable: number }> {
+  const label = new Map(labels.map((entry) => [entry.hash, entry]));
+  const answer = new Map(answers.map((entry) => [entry.hash, entry]));
+  const labelled = sample.filter((item) => label.has(item.hash));
+  const row = (decision: string, items: SynopsisSampleItem[]) => ({ decision, items: items.length, notUsable: items.filter((item) => label.get(item.hash)!.usable === false).length });
+  const asked = labelled.filter((item) => item.stratum !== "rule" && answer.has(item.hash));
+  const usable = (item: SynopsisSampleItem) => answer.get(item.hash)!.usable;
+  return [
+    row("rule", labelled.filter((item) => item.stratum === "rule")),
+    row(`jev below ${SYNOPSIS_HIDE_BELOW}`, asked.filter((item) => usable(item) < SYNOPSIS_HIDE_BELOW)),
+    row(`jev ${SYNOPSIS_HIDE_BELOW} to ${SYNOPSIS_REVIEW_BELOW}`, asked.filter((item) => usable(item) >= SYNOPSIS_HIDE_BELOW && usable(item) < SYNOPSIS_REVIEW_BELOW)),
+    row(`jev ${SYNOPSIS_REVIEW_BELOW} and above`, asked.filter((item) => usable(item) >= SYNOPSIS_REVIEW_BELOW))
+  ];
+}
+
+export async function answerEach<T, A>(items: T[], ask: (item: T) => Promise<A>): Promise<{ answers: A[]; skipped: number }> {
+  const answers: A[] = [];
+  let skipped = 0;
+  let next = 0;
+  await Promise.all(Array.from({ length: IN_FLIGHT }, async () => {
+    while (next < items.length) {
+      const item = items[next++]!;
+      try {
+        answers.push(await ask(item));
+      } catch (error) {
+        if (failureKind(error) !== "book") throw error;
+        skipped += 1;
+      }
+    }
+  }));
+  return { answers, skipped };
+}
+
+export type TranslationSampleItem = {
+  workId: string;
+  stratum: "code" | "ask";
+  edition: { title: string; author: string; originalTitle: string | null; publisher: string | null; description: string | null };
+  candidates: Array<{ id: string; title: string; author: string; year: number | null }>;
+  codePick: string | null;
+};
+export type TranslationLabel = { workId: string; match: string | null };
+export type TranslationAnswerRow = { workId: string; pick: string | null; confidence: number };
+
+type SampleRepo = Pick<BooksRepository, "portugueseWorksWithEvidence" | "translationEvidence" | "titleCandidates" | "authorCandidates" | "matchCandidates">;
+
+export function translationSample(repo: SampleRepo, n: number, random: () => number = Math.random): TranslationSampleItem[] {
+  const codeCap = Math.ceil(n / 2);
+  const askCap = n - codeCap;
+  const picked: TranslationSampleItem[] = [];
+  let code = 0;
+  let ask = 0;
+  for (const workId of shuffled(repo.portugueseWorksWithEvidence(), random)) {
+    if (code >= codeCap && ask >= askCap) break;
+    const plan = planMatch(repo, workId);
+    const rows = repo.translationEvidence(workId);
+    if (!plan || !rows || (plan.kind !== "code" && plan.kind !== "ask")) continue;
+    if (plan.kind === "code" ? code >= codeCap : ask >= askCap) continue;
+    const evidence = plan.kind === "ask" ? plan.evidence : evidenceOf(rows);
+    const candidates = plan.kind === "ask" ? plan.candidates : repo.matchCandidates([plan.intoWorkId]).map(({ id, title, author, year }) => ({ id, title, author, year }));
+    picked.push({
+      workId,
+      stratum: plan.kind,
+      edition: { title: evidence.title, author: evidence.author, originalTitle: evidence.originalTitle, publisher: evidence.publisher, description: evidence.summary },
+      candidates,
+      codePick: plan.kind === "code" ? plan.intoWorkId : null
+    });
+    if (plan.kind === "code") code += 1;
+    else ask += 1;
+  }
+  return picked;
+}
+
+export function scoreTranslations(sample: TranslationSampleItem[], labels: TranslationLabel[], answers: TranslationAnswerRow[]): Array<{ decision: string; items: number; correct: number }> {
+  const label = new Map(labels.map((entry) => [entry.workId, entry.match]));
+  const answer = new Map(answers.map((entry) => [entry.workId, entry]));
+  const labelled = sample.filter((item) => label.has(item.workId));
+  const asked = labelled.filter((item) => item.stratum === "ask" && answer.has(item.workId));
+  const row = (decision: string, items: TranslationSampleItem[], pick: (item: TranslationSampleItem) => string | null) => ({ decision, items: items.length, correct: items.filter((item) => pick(item) === label.get(item.workId)).length });
+  const jevPick = (item: TranslationSampleItem) => answer.get(item.workId)!.pick;
+  const confidence = (item: TranslationSampleItem) => answer.get(item.workId)!.confidence;
+  return [
+    row("code", labelled.filter((item) => item.stratum === "code"), (item) => item.codePick),
+    row(`jev ${MATCH_MERGE_AT} and above`, asked.filter((item) => confidence(item) >= MATCH_MERGE_AT), jevPick),
+    row(`jev ${MATCH_REVIEW_AT} to ${MATCH_MERGE_AT}`, asked.filter((item) => confidence(item) >= MATCH_REVIEW_AT && confidence(item) < MATCH_MERGE_AT), jevPick),
+    row(`jev below ${MATCH_REVIEW_AT}`, asked.filter((item) => confidence(item) < MATCH_REVIEW_AT), jevPick)
+  ];
+}

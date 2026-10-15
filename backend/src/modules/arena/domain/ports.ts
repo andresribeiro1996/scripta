@@ -20,6 +20,7 @@ export interface ArenaRepository {
   listPublicByIds(ids: string[]): TournamentRow[];
   listPublishedByWorks(workIds: string[], limit: number): TournamentGameRow[];
   tournamentRecord(workIds: string[]): TournamentRecord;
+  worksShareATournament(aIds: string[], bIds: string[]): boolean;
   votedAmong(voterUserId: string, ids: string[]): string[];
   updateTournamentStatus(id: string, status: TournamentRow["status"], currentRound: number): void;
   /** Renames only — nothing else about a tournament is editable after

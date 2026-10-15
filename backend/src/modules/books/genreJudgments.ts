@@ -1,10 +1,9 @@
 import { createJevGenreClassifier, type ClassifyGenre, type JevBook } from "./adapters/typesafe/jevGenres.js";
 import { startDetailsBackfill } from "./backfill.js";
-import { SourceUnavailableError, UnusableAnswerError } from "./domain/errors.js";
 import type { BooksRepository } from "./domain/ports.js";
 import type { GenreEvidence } from "./domain/types.js";
 import { GENRE_SAVE_LINE, longestSynopsis } from "./genrePass.js";
-import { dailySpend, failureKind, nextUtcMidnight, TypesafeBudgetSpentError } from "./typesafe.js";
+import { dailySpend, failureKind, nextUtcMidnight, strikeReason, TypesafeBudgetSpentError } from "./typesafe.js";
 import { createWorkQueue } from "./workQueue.js";
 
 export { GENRE_SAVE_LINE };
@@ -37,12 +36,6 @@ export function jevBookOf(evidence: GenreEvidence): JevBook {
     publishers: distinct(evidence.editions.map((edition) => edition.publisher)),
     synopsis: longestSynopsis(evidence)
   };
-}
-
-function strikeReason(error: unknown): { status: number | null; reason: string } {
-  if (error instanceof UnusableAnswerError) return { status: null, reason: error.detail };
-  const status = (error as SourceUnavailableError).status ?? null;
-  return { status, reason: `HTTP ${status}` };
 }
 
 export async function classifyWork(deps: GenreJudgmentDeps, workId: string): Promise<number | null> {
@@ -119,7 +112,6 @@ export function startGenreJobs(
   const queue = createWorkQueue({ concurrency: GENRE_IN_FLIGHT, now: deps.now, run: (workId) => judgeWork(judged, workId, held), onError: deps.onError });
   const stopSweep = startDetailsBackfill(
     async () => {
-      deps.repo.applyGenreJudgments(GENRE_SAVE_LINE);
       const sweepHeld = [...refreshHeld()];
       for (const workId of deps.repo.worksNeedingGenreJudgment(sweepHeld, GENRE_SWEEP_LIMIT, GENRE_REJECTION_LIMIT)) queue.add(workId);
       return null;
