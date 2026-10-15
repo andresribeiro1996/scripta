@@ -277,6 +277,18 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   `);
   const synopsisBookCarrierStmt = db.prepare(`SELECT summary AS text, title, author FROM books WHERE summary_hash = ? ORDER BY created_at, rowid LIMIT 1`);
   const synopsisWorkCarrierStmt = db.prepare(`SELECT summary AS text, title, author FROM works WHERE summary_hash = ? ORDER BY created_at, rowid LIMIT 1`);
+  const synopsisBacklogStmt = db.prepare(`
+    SELECT t.hash AS hash, COALESCE(w.merged_into, w.id) AS work_id, t.source AS source, t.created_at AS created_at
+    FROM (
+      SELECT summary_hash AS hash, work_id, summary_source AS source, created_at, rowid AS ord FROM books WHERE summary_hash IS NOT NULL
+      UNION ALL
+      SELECT summary_hash, id, 'openlibrary', created_at, rowid FROM works WHERE summary_hash IS NOT NULL
+    ) AS t
+    LEFT JOIN works w ON w.id = t.work_id
+    WHERE NOT EXISTS (SELECT 1 FROM synopsis_judgments j WHERE j.text_hash = t.hash)
+      AND NOT EXISTS (SELECT 1 FROM jev_rejections r WHERE r.task = 'synopses' AND r.subject = t.hash AND r.attempts >= ?)
+    ORDER BY t.created_at, t.ord
+  `);
   const detailsMissingStmt = db.prepare(`UPDATE books SET details_status = 'missing', details_checked_at = ? WHERE id = ?`);
   const detailsAttemptedStmt = db.prepare(`UPDATE books SET details_checked_at = ? WHERE id = ?`);
   const searchStmt = db.prepare(`
@@ -690,6 +702,9 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     synopsisText(hash) {
       const row = (synopsisBookCarrierStmt.get(hash) ?? synopsisWorkCarrierStmt.get(hash)) as { text: string; title: string; author: string } | undefined;
       return row ? { text: row.text, title: row.title, author: row.author } : undefined;
+    },
+    synopsisBacklog(rejectionLimit) {
+      return (synopsisBacklogStmt.all(rejectionLimit) as Array<{ hash: string; work_id: string | null; source: string | null; created_at: string }>).map((row) => ({ hash: row.hash, workId: row.work_id, source: row.source, createdAt: row.created_at }));
     },
 
     genreEvidence(workId) {

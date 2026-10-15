@@ -319,6 +319,20 @@ One-off passes that label catalog works with no genres. Each writes only to edit
    npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && node scripts/genre-pass-export.mjs --scope catalog' > genre-doubts.txt
    ```
 
+#### Synopsis backlog
+
+Checks every stored summary (edition and work) that has no synopsis judgment yet, held works first, then oldest. Readers stop seeing a summary once it's judged hidden; nothing is deleted, and `/admin/synopses` can keep it again. Check the volume's free space first (`railway volume list --json`), and hold merges to main while it runs, because a deploy kills `railway ssh` jobs.
+
+1. Dry run: counts the texts per summary source and how many the 40-letter rule would hide. It writes nothing and makes no TypeSafe request.
+
+   ```bash
+   npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && node scripts/synopsis-backlog.mjs --max 20000 --dry-run'
+   ```
+
+2. Real run: the same command without `--dry-run`, with `--max` at the dry run's `wouldAsk`. The rule pass runs first with no requests; then Jev judges the rest, 4 in flight. `--max` is a hard limit on TypeSafe requests, retries included, recorded under `synopses-backlog` in `typesafe_usage` (the daily `synopses` budget is untouched). Without `TYPESAFE_API_KEY` only the rule pass runs, and the script says the Jev pass was skipped. An outage or a rejected key ends the run; re-running continues where it stopped.
+
+The report's `bySource` counts, per summary source: `texts` selected, hidden by the `rule`, `hidden` by Jev (below 0.3), `doubtful` (0.3 to 0.5, listed on `/admin/synopses`) and `shown`. Then `strikes`, `stoppedBy` (`done`, `budget`, `outage`, `key` or `no-key`), `requests` used and `estimatedCostUsd`.
+
 #### Mojibake repair
 
 Some Open Library records store titles and authors already mis-decoded (`fÃ©` for `fé`). New rows are repaired as they enter (`lookupIdentity`, `mapOpenLibraryDoc`). `scripts/repair-mojibake.mjs` repairs the rows stored earlier: `title`, `author`, `title_key`, the corrected `ta:` key (added for rows that hold the mis-decoded one, which stays, so a lookup with the old text still lands on the row), the search index and the works' copies.

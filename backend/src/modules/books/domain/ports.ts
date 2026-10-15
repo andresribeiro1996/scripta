@@ -82,6 +82,7 @@ export interface BooksRepository {
   synopsesNeedingJudgment(workIds: string[], limit: number, rejectionLimit: number): string[];
   worksNeedingSynopsisJudgment(workIds: string[], limit: number, rejectionLimit: number): string[];
   synopsisText(hash: string): { text: string; title: string; author: string } | undefined;
+  synopsisBacklog(rejectionLimit: number): Array<{ hash: string; workId: string | null; source: string | null; createdAt: string }>;
   workIdsByWorkKeys(keys: string[]): Map<string, string>;
   listPublisherUrls(): Array<{ work_id: string | null; publisher_url: string }>;
   fillSourceGenres(workId: string, genres: string[]): number;
