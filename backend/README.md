@@ -333,6 +333,28 @@ Checks every stored summary (edition and work) that has no synopsis judgment yet
 
 The report's `bySource` counts, per summary source: `texts` selected, hidden by the `rule`, `hidden` by Jev (below 0.3), `doubtful` (0.3 to 0.5, listed on `/admin/synopses`) and `shown`. Then `strikes`, `stoppedBy` (`done`, `budget`, `outage`, `key` or `no-key`), `requests` used and `estimatedCostUsd`.
 
+#### Calibrating Jev
+
+Claude sets and checks the thresholds Jev's answers are read against; it never judges the backlog itself. Calibrate once on production before the first backlog run of each task, and again whenever the Jev model version or a question's wording changes.
+
+1. **Export.** Read-only, catalog fields only. The JSON between `---BEGIN---` and `---END---` is a sample spread over summary sources, with the texts the 40-letter rule hid as their own stratum.
+
+   ```bash
+   npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && node scripts/jev-calibration-export.mjs --task synopses --n 200' > synopsis-sample.txt
+   ```
+
+2. **Label.** Claude Sonnet subagents label the sample, at most 25 items each, without seeing Jev's answers, using the question wording in `adapters/typesafe/jevSynopsis.ts`. Never Haiku. A batch whose answers are all, or nearly all, the same is redone before scoring. Labels are `[{ "hash": "…", "usable": true|false, "kind": "…" }]`.
+3. **Score.** Run where the key lives. It asks Jev about each sampled text, stores nothing, and prints, per decision band (`rule`, `jev below 0.3`, `jev 0.3 to 0.5`, `jev 0.5 and above`), how many labelled texts fall in it and how many of those are not usable.
+
+   ```bash
+   TYPESAFE_API_KEY=… node scripts/jev-calibration-score.mjs --task synopses sample.json labels.json
+   ```
+
+4. **Decide.**
+   - A threshold changes only through a PR with the score table in its description.
+   - The bar for hiding is at least 95% right. A band that misses gets a stricter threshold; a threshold is never loosened without a new labelled sample. A code rule that misses is removed.
+   - The sample and label files are never committed.
+
 #### Mojibake repair
 
 Some Open Library records store titles and authors already mis-decoded (`fÃ©` for `fé`). New rows are repaired as they enter (`lookupIdentity`, `mapOpenLibraryDoc`). `scripts/repair-mojibake.mjs` repairs the rows stored earlier: `title`, `author`, `title_key`, the corrected `ta:` key (added for rows that hold the mis-decoded one, which stays, so a lookup with the old text still lands on the row), the search index and the works' copies.

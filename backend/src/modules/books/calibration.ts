@@ -1,0 +1,45 @@
+import type { BooksRepository } from "./domain/ports.js";
+import { SYNOPSIS_HIDE_BELOW, SYNOPSIS_REVIEW_BELOW } from "./domain/synopsis.js";
+
+export const TASKS = ["synopses"] as const;
+
+export type SynopsisSampleItem = { hash: string; stratum: string; title: string; author: string; text: string; judgment: { model: string; usable: number; kind: string } | null };
+export type SynopsisLabel = { hash: string; usable: boolean; kind: string };
+export type SynopsisAnswerRow = { hash: string; usable: number; kind: string };
+
+function shuffled<T>(items: T[], random: () => number): T[] {
+  const copy = [...items];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j]!, copy[i]!];
+  }
+  return copy;
+}
+
+export function synopsisSample(repo: Pick<BooksRepository, "synopsisTexts" | "synopsisJudgments">, n: number, random: () => number = Math.random): SynopsisSampleItem[] {
+  const texts = repo.synopsisTexts();
+  const judgments = repo.synopsisJudgments(texts.map((text) => text.hash));
+  const strata = new Map<string, SynopsisSampleItem[]>();
+  for (const text of texts) {
+    const judgment = judgments.get(text.hash) ?? null;
+    const stratum = judgment?.model === "rule" ? "rule" : text.source;
+    strata.set(stratum, [...(strata.get(stratum) ?? []), { hash: text.hash, stratum, title: text.title, author: text.author, text: text.text, judgment: judgment && { model: judgment.model, usable: judgment.usable, kind: judgment.kind } }]);
+  }
+  const quota = Math.ceil(n / Math.max(strata.size, 1));
+  return [...strata.values()].flatMap((items) => shuffled(items, random).slice(0, quota));
+}
+
+export function scoreSynopses(sample: SynopsisSampleItem[], labels: SynopsisLabel[], answers: SynopsisAnswerRow[]): Array<{ decision: string; items: number; notUsable: number }> {
+  const label = new Map(labels.map((entry) => [entry.hash, entry]));
+  const answer = new Map(answers.map((entry) => [entry.hash, entry]));
+  const labelled = sample.filter((item) => label.has(item.hash));
+  const row = (decision: string, items: SynopsisSampleItem[]) => ({ decision, items: items.length, notUsable: items.filter((item) => label.get(item.hash)!.usable === false).length });
+  const asked = labelled.filter((item) => item.judgment?.model !== "rule" && answer.has(item.hash));
+  const usable = (item: SynopsisSampleItem) => answer.get(item.hash)!.usable;
+  return [
+    row("rule", labelled.filter((item) => item.judgment?.model === "rule")),
+    row(`jev below ${SYNOPSIS_HIDE_BELOW}`, asked.filter((item) => usable(item) < SYNOPSIS_HIDE_BELOW)),
+    row(`jev ${SYNOPSIS_HIDE_BELOW} to ${SYNOPSIS_REVIEW_BELOW}`, asked.filter((item) => usable(item) >= SYNOPSIS_HIDE_BELOW && usable(item) < SYNOPSIS_REVIEW_BELOW)),
+    row(`jev ${SYNOPSIS_REVIEW_BELOW} and above`, asked.filter((item) => usable(item) >= SYNOPSIS_REVIEW_BELOW))
+  ];
+}

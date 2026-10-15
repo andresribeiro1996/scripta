@@ -300,6 +300,12 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     WHERE w.summary_hash IN (SELECT value FROM json_each(?))
     ORDER BY created_at, ord
   `);
+  const synopsisTextsStmt = db.prepare(`
+    SELECT summary_hash AS hash, COALESCE(summary_source, 'unknown') AS source, title, author, summary AS text, created_at, rowid AS ord FROM books WHERE summary_hash IS NOT NULL
+    UNION ALL
+    SELECT summary_hash, 'openlibrary', title, author, summary, created_at, rowid FROM works WHERE summary_hash IS NOT NULL
+    ORDER BY created_at, ord
+  `);
   const detailsMissingStmt = db.prepare(`UPDATE books SET details_status = 'missing', details_checked_at = ? WHERE id = ?`);
   const detailsAttemptedStmt = db.prepare(`UPDATE books SET details_checked_at = ? WHERE id = ?`);
   const searchStmt = db.prepare(`
@@ -732,6 +738,13 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
         text: row.text,
         isEdition: row.is_edition === 1
       }));
+    },
+    synopsisTexts() {
+      const seen = new Map<string, { hash: string; source: string; title: string; author: string; text: string }>();
+      for (const row of synopsisTextsStmt.all() as Array<{ hash: string; source: string; title: string; author: string; text: string }>) {
+        if (!seen.has(row.hash)) seen.set(row.hash, { hash: row.hash, source: row.source, title: row.title, author: row.author, text: row.text });
+      }
+      return [...seen.values()];
     },
 
     genreEvidence(workId) {
