@@ -26,22 +26,27 @@ export function createWorkQueue(options: WorkQueueOptions): WorkQueue {
   let cancelResume: (() => void) | null = null;
   let stopped = false;
 
+  function armResume() {
+    cancelResume = setTimer(() => {
+      cancelResume = null;
+      if (now() < pausedUntil) armResume();
+      else pump();
+    }, Math.max(0, pausedUntil - now()));
+  }
+
   function pauseUntil(at: number) {
     if (at <= pausedUntil) return;
     pausedUntil = at;
     cancelResume?.();
-    cancelResume = setTimer(() => {
-      cancelResume = null;
-      pump();
-    }, Math.max(0, at - now()));
+    armResume();
   }
 
   function pump() {
     while (!stopped && now() >= pausedUntil && running < options.concurrency && waiting.length > 0) {
       const workId = waiting.shift()!;
       running += 1;
-      options
-        .run(workId)
+      Promise.resolve()
+        .then(() => options.run(workId))
         .then((resumeAt) => {
           if (resumeAt === null || stopped) {
             known.delete(workId);

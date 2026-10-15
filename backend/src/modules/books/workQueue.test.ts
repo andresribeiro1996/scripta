@@ -107,3 +107,54 @@ test("stop drops queued work and ignores later adds", async () => {
   assert.equal(queue.size(), 0);
   assert.equal(cancelled, 1);
 });
+
+test("a resume timer that fires before the pause ends re-arms for the remainder", async () => {
+  let now = 1_000;
+  const timers: Array<{ callback: () => void; ms: number }> = [];
+  const calls: string[] = [];
+  const queue = createWorkQueue({
+    concurrency: 1,
+    now: () => now,
+    setTimer: (callback, ms) => { timers.push({ callback, ms }); return () => {}; },
+    run: async (id) => {
+      calls.push(id);
+      return calls.length === 1 ? 2_000 : null;
+    },
+    onError: () => {}
+  });
+  queue.add("a");
+  await flush();
+  assert.deepEqual(calls, ["a"]);
+  assert.deepEqual(timers.map((timer) => timer.ms), [1_000]);
+  now = 1_999;
+  timers[0]!.callback();
+  await flush();
+  assert.deepEqual(calls, ["a"]);
+  assert.deepEqual(timers.map((timer) => timer.ms), [1_000, 1]);
+  assert.equal(queue.size(), 1);
+  now = 2_000;
+  timers[1]!.callback();
+  await flush();
+  assert.deepEqual(calls, ["a", "a"]);
+  assert.equal(queue.size(), 0);
+});
+
+test("a run that throws synchronously is reported and the queue goes on", async () => {
+  const errors: Array<[string, string]> = [];
+  const ran: string[] = [];
+  const queue = createWorkQueue({
+    concurrency: 1,
+    run: (id) => {
+      ran.push(id);
+      if (id === "bad") throw new Error("sync boom");
+      return Promise.resolve(null);
+    },
+    onError: (error, id) => { errors.push([id, (error as Error).message]); }
+  });
+  queue.add("bad");
+  queue.add("good");
+  await flush();
+  assert.deepEqual(errors, [["bad", "sync boom"]]);
+  assert.deepEqual(ran, ["bad", "good"]);
+  assert.equal(queue.size(), 0);
+});
