@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildManualBook, mergeSearchResults, searchInsideOutside, type BookSearchResult, type BookSearchState } from "./bookSearch.js";
+import { buildManualBook, mapOpenLibraryDoc, mergeSearchResults, searchInsideOutside, type BookSearchResult, type BookSearchState } from "./bookSearch.js";
 
 function result(title: string, authors: string[], isbn: string | null): BookSearchResult {
   return { title, authors, year: null, isbn, publisher: null, coverUrl: null, genres: [] };
@@ -97,4 +97,14 @@ test("a book added without genres carries neither genres nor the marker", () => 
   const book = buildManualBook(manualFields, "1");
   assert.equal("_genres" in book, false);
   assert.equal("_genresFrom" in book, false);
+});
+
+test("mapOpenLibraryDoc repairs mojibake in the title and authors", () => {
+  const result = mapOpenLibraryDoc({ title: "Entre a fÃ© e a crenÃ§a", author_name: ["JosÃ© Silva"], isbn: ["9780000000002"] });
+  assert.equal(result?.title, "Entre a fé e a crença");
+  assert.deepEqual(result?.authors, ["José Silva"]);
+});
+
+test("mapOpenLibraryDoc repairs a title ending in a mis-decoded à", () => {
+  assert.equal(mapOpenLibraryDoc({ title: "VoilÃ\xa0" })?.title, "Voilà");
 });
