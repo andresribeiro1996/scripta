@@ -17,6 +17,7 @@ import { createOpenLibraryCoverSource } from "./adapters/sources/openLibrary.js"
 import { openBooksDb } from "./adapters/sqlite/connection.js";
 import { createSqliteBooksRepository } from "./adapters/sqlite/sqliteBooksRepository.js";
 import { startGenreJobsIfConfigured } from "./genreJudgments.js";
+import { genreReviewWith, reviewGenreWith } from "./genreReview.js";
 import type { HeldWork } from "./genrePass.js";
 import { DETAILS_BATCH_SIZE, startBackfill, startCoverColorBackfill, startDetailsBackfill, startWorksBackfill, startWorksGrouping } from "./backfill.js";
 import { createBooksService, MAX_UPLOAD_BYTES, type BooksService } from "./booksService.js";
@@ -24,7 +25,7 @@ import type { FetchCoverImage } from "./coverResolver.js";
 import { encodeCover } from "./domain/images.js";
 import type { BookLookup } from "./domain/normalize.js";
 import { coverUrlFor, useBooksRepository } from "./publicCoverLookup.js";
-import { buildAdminRoutes, buildCatalogRoutes, buildCoverFileRoutes, buildResolveRoutes } from "./routes.js";
+import { buildAdminRoutes, buildCatalogRoutes, buildCoverFileRoutes, buildGenreReviewRoutes, buildResolveRoutes } from "./routes.js";
 import { createCoverWorker } from "./worker.js";
 
 const ISBNDB_GAP_MS = 1100;
@@ -151,5 +152,15 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
     await scoped.register(fastifyMultipart, { limits: { fileSize: MAX_UPLOAD_BYTES, files: 1 } });
     await scoped.register(buildAdminRoutes(service, () => grouping.runNow()));
   });
+  if (heldWorks) {
+    await app.register(async (scoped) => {
+      await scoped.register(fastifyRateLimit, { max: 300, timeWindow: "1 minute" });
+      await scoped.register(buildGenreReviewRoutes({
+        isAdmin: (userId) => service.isAdmin(userId),
+        review: () => genreReviewWith(repo, heldWorks(), (imageId) => coverUrlFor(imageId, "thumb")),
+        decide: (workId, action) => reviewGenreWith(repo, workId, action, Date.now, (id) => genreJobs?.add(id))
+      }));
+    });
+  }
   await app.register(buildCoverFileRoutes(coverUrlFor));
 }

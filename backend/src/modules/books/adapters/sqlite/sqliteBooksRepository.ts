@@ -156,6 +156,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const setCoverIfStmt = db.prepare(`UPDATE books SET cover_image_id = ?, cover_status = ?, cover_checked_at = ? WHERE id = ? AND cover_image_id IS ?`);
   const addRejectionStmt = db.prepare(`INSERT OR IGNORE INTO cover_rejections (book_id, source_url, created_at) VALUES (?, ?, ?)`);
   const rejectionsStmt = db.prepare(`SELECT source_url FROM cover_rejections WHERE book_id = ?`);
+  const workCoversStmt = db.prepare(`SELECT work_id, cover_image_id FROM books WHERE work_id IN (SELECT value FROM json_each(?)) AND cover_image_id IS NOT NULL ORDER BY created_at, rowid`);
   const takesSummary = `$summary IS NOT NULL AND (summary IS NULL OR summary = '' OR $summary_source = 'publisher')`;
   const mergeDetailsStmt = db.prepare(`
     UPDATE books
@@ -572,6 +573,13 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     genreRejections(workIds) {
       const rows = genreRejectionsStmt.all(JSON.stringify(workIds)) as Array<{ work_id: string; status: number | null; reason: string; attempts: number; last_at: string }>;
       return new Map(rows.map((row) => [row.work_id, { status: row.status, reason: row.reason, attempts: row.attempts, lastAt: row.last_at }]));
+    },
+    workCoverImageIds(workIds) {
+      const covers = new Map<string, string>();
+      for (const row of workCoversStmt.all(JSON.stringify(workIds)) as Array<{ work_id: string; cover_image_id: string }>) {
+        if (!covers.has(row.work_id)) covers.set(row.work_id, row.cover_image_id);
+      }
+      return covers;
     },
     spendTypesafe(day, source, limit) {
       return Number(spendTypesafeStmt.run(day, source, limit).changes) > 0;

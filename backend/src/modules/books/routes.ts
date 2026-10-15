@@ -1,8 +1,10 @@
+import type { GenreReview, GenreReviewAction } from "@scripta/shared";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { authGuard } from "../auth/index.js";
 import { MAX_UPLOAD_BYTES, type BooksService, type CoverFileSize } from "./booksService.js";
 import { BookNotFoundError, FileTooLargeError, InvalidImageError, SourceUnavailableError, WorkMergeError } from "./domain/errors.js";
+import { labelProblem } from "./genrePass.js";
 
 const lookupSchema = z.object({
   isbn: z.string().max(64).optional(),
@@ -18,6 +20,9 @@ const NOT_FOUND = { error: "No such book." };
 const WORKS_FORBIDDEN = { error: "Only the admin can change works." };
 const mergeSchema = z.object({ from: lookupSchema, into: lookupSchema });
 const detachSchema = z.object({ edition: lookupSchema });
+const GENRES_FORBIDDEN = { error: "Only the admin can review genres." };
+const reviewParamsSchema = z.object({ workId: z.string().min(1).max(64) });
+const reviewActionSchema = z.union([z.object({ genres: z.array(z.string().max(64)).max(10) }).strict(), z.object({ retry: z.literal(true) }).strict()]);
 
 const MAX_BATCH = 100;
 const batchSchema = z.array(lookupSchema).max(MAX_BATCH);
@@ -156,6 +161,34 @@ export function buildAdminRoutes(service: BooksService, groupWorks: () => Promis
       } catch (error) {
         if (error instanceof BookNotFoundError) return reply.code(404).send(NOT_FOUND);
         if (error instanceof WorkMergeError) return reply.code(409).send({ error: error.message });
+        throw error;
+      }
+    });
+  };
+}
+
+export function buildGenreReviewRoutes(deps: {
+  isAdmin: (userId: string) => boolean;
+  review: () => GenreReview;
+  decide: (workId: string, action: GenreReviewAction) => { workId: string; editions: number };
+}) {
+  return async function genreReviewRoutes(app: FastifyInstance) {
+    app.get("/books/genre-review", { preHandler: authGuard }, async (request, reply) => {
+      if (!deps.isAdmin(request.user.id)) return reply.code(403).send(GENRES_FORBIDDEN);
+      return reply.send(deps.review());
+    });
+
+    app.post("/books/genre-review/:workId", { preHandler: authGuard }, async (request, reply) => {
+      if (!deps.isAdmin(request.user.id)) return reply.code(403).send(GENRES_FORBIDDEN);
+      const params = reviewParamsSchema.safeParse(request.params);
+      const body = reviewActionSchema.safeParse(request.body);
+      if (!params.success || !body.success) return reply.code(400).send({ error: "Send { genres: [...] } with up to three genres, or { retry: true }." });
+      const problem = "genres" in body.data ? labelProblem(body.data.genres) : null;
+      if (problem) return reply.code(400).send({ error: `This label ${problem}.` });
+      try {
+        return reply.send(deps.decide(params.data.workId, body.data));
+      } catch (error) {
+        if (error instanceof BookNotFoundError) return reply.code(404).send({ error: "No such work." });
         throw error;
       }
     });

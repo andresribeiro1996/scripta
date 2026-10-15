@@ -66,6 +66,7 @@ export interface BooksRepository {
   recordGenreRejection(rejection: { workId: string; status: number | null; reason: string; at: string }): void;
   clearGenreRejection(workId: string): void;
   genreRejections(workIds: string[]): Map<string, { status: number | null; reason: string; attempts: number; lastAt: string }>;
+  workCoverImageIds(workIds: string[]): Map<string, string>;
   genreEvidence(workId: string): GenreEvidence | undefined;
   setManualGenres(workId: string, genres: string[]): number;
   aliasesOf(workIds: string[]): string[];
