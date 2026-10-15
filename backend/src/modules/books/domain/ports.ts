@@ -60,7 +60,6 @@ export interface BooksRepository {
   worksNeedingGenreJudgment(workIds: string[], limit: number, rejectionLimit: number): string[];
   saveGenreJudgment(judgment: { workId: string; model: string; genre: string | null; confidence: number; askedAt: string }): void;
   genreJudgments(workIds: string[]): Map<string, { model: string; genre: string | null; confidence: number }>;
-  applyGenreJudgments(saveLine: number): void;
   applyGenreJudgment(workId: string, saveLine: number): void;
   deleteGenreJudgment(workId: string): void;
   recordGenreRejection(rejection: { workId: string; status: number | null; reason: string; at: string }): void;

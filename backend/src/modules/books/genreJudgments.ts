@@ -119,7 +119,6 @@ export function startGenreJobs(
   const queue = createWorkQueue({ concurrency: GENRE_IN_FLIGHT, now: deps.now, run: (workId) => judgeWork(judged, workId, held), onError: deps.onError });
   const stopSweep = startDetailsBackfill(
     async () => {
-      deps.repo.applyGenreJudgments(GENRE_SAVE_LINE);
       const sweepHeld = [...refreshHeld()];
       for (const workId of deps.repo.worksNeedingGenreJudgment(sweepHeld, GENRE_SWEEP_LIMIT, GENRE_REJECTION_LIMIT)) queue.add(workId);
       return null;

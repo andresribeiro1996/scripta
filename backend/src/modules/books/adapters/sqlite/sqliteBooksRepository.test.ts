@@ -1375,7 +1375,7 @@ test("deleting the judgment of a work with an applied Jev genre makes it selecta
   const book = titled(repo, "Applied");
   repo.markDetailsMissing(book.id, NOW);
   repo.saveGenreJudgment({ workId: book.work_id!, model: "jev-1.13.0", genre: "History", confidence: 0.9, askedAt: NOW });
-  repo.applyGenreJudgments(0.5);
+  repo.applyGenreJudgment(book.work_id!, 0.5);
   assert.deepEqual(repo.worksNeedingGenreJudgment([book.work_id!], 10, 3), []);
   db.prepare("DELETE FROM genre_judgments WHERE work_id = ?").run(book.work_id);
   assert.deepEqual(repo.worksNeedingGenreJudgment([book.work_id!], 10, 3), [book.work_id]);
@@ -1390,16 +1390,61 @@ test("applying judgments writes Jev genres at or above the save line, idempotent
   judge(none, null, 0.95);
   judge(manual, "Romance", 0.9);
   db.prepare("UPDATE books SET genres = ?, genres_source = 'manual' WHERE id = ?").run(JSON.stringify(["Classics"]), manual!.id);
-  repo.applyGenreJudgments(0.5);
+  const applyAll = (line: number) => [sure, unsure, none, manual].forEach((book) => repo.applyGenreJudgment(book!.work_id!, line));
+  applyAll(0.5);
   const changesBefore = (db.prepare("SELECT total_changes() AS n").get() as { n: number }).n;
-  repo.applyGenreJudgments(0.5);
+  applyAll(0.5);
   assert.equal((db.prepare("SELECT total_changes() AS n").get() as { n: number }).n, changesBefore);
   assert.deepEqual(genreRow(db, sure!.id), { genres: JSON.stringify(["History"]), genres_source: "jev", genres_confidence: 0.9 });
   assert.deepEqual(genreRow(db, unsure!.id), { genres: "[]", genres_source: null, genres_confidence: null });
   assert.deepEqual(genreRow(db, none!.id), { genres: "[]", genres_source: null, genres_confidence: null });
   assert.deepEqual(genreRow(db, manual!.id), { genres: JSON.stringify(["Classics"]), genres_source: "manual", genres_confidence: null });
-  repo.applyGenreJudgments(0.95);
+  applyAll(0.95);
   assert.deepEqual(genreRow(db, sure!.id), { genres: "[]", genres_source: null, genres_confidence: null });
+});
+
+test("an edition created into an already judged work takes the judgment's genre without a sweep", () => {
+  const { db, repo } = freshRepo();
+  const first = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593", workKey: "OL1W" }, ["isbn:9780441013593"], NOW);
+  repo.saveGenreJudgment({ workId: first.work_id!, model: "jev-1.13.0", genre: "Science Fiction", confidence: 0.8, askedAt: NOW });
+  repo.applyGenreJudgment(first.work_id!, 0.5);
+  const second = repo.createBook({ title: "Duna", author: "Frank Herbert", isbn: "9789722046114", workKey: "OL1W" }, ["isbn:9789722046114"], NOW);
+  assert.equal(second.work_id, first.work_id);
+  assert.deepEqual(genreRow(db, second.id), { genres: JSON.stringify(["Science Fiction"]), genres_source: "jev", genres_confidence: 0.8 });
+});
+
+test("an edition moved into a judged work by a merge takes the judgment, keeps its own source and manual genres, and loses a stale Jev guess", () => {
+  const { db, repo } = freshRepo();
+  const judged = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593", workKey: "OL1W" }, ["isbn:9780441013593"], NOW);
+  const doubted = repo.createBook({ title: "Emma", author: "Jane Austen", isbn: "9780141439587", workKey: "OL2W" }, ["isbn:9780141439587"], NOW);
+  repo.saveGenreJudgment({ workId: judged.work_id!, model: "jev-1.13.0", genre: "Science Fiction", confidence: 0.8, askedAt: NOW });
+  repo.saveGenreJudgment({ workId: doubted.work_id!, model: "jev-1.13.0", genre: "Romance", confidence: 0.3, askedAt: NOW });
+  const [bare, sourced, manual, stale] = ["Bare", "Sourced", "Manual", "Stale"].map((title) => titled(repo, title));
+  db.prepare("UPDATE books SET genres = ?, genres_source = NULL WHERE id = ?").run(JSON.stringify(["Poetry"]), sourced!.id);
+  db.prepare("UPDATE books SET genres = ?, genres_source = 'manual' WHERE id = ?").run(JSON.stringify(["Classics"]), manual!.id);
+  db.prepare("UPDATE books SET genres = ?, genres_source = 'jev', genres_confidence = 0.9 WHERE id = ?").run(JSON.stringify(["History"]), stale!.id);
+  for (const book of [bare, sourced, manual]) repo.mergeWorks(book!.work_id!, judged.work_id!);
+  repo.mergeWorks(stale!.work_id!, doubted.work_id!);
+  assert.deepEqual(genreRow(db, bare!.id), { genres: JSON.stringify(["Science Fiction"]), genres_source: "jev", genres_confidence: 0.8 });
+  assert.deepEqual(genreRow(db, sourced!.id), { genres: JSON.stringify(["Poetry"]), genres_source: null, genres_confidence: null });
+  assert.deepEqual(genreRow(db, manual!.id), { genres: JSON.stringify(["Classics"]), genres_source: "manual", genres_confidence: null });
+  assert.deepEqual(genreRow(db, stale!.id), { genres: "[]", genres_source: null, genres_confidence: null });
+});
+
+test("giving a work to an edition and keying it into a judged work both apply the judgment", () => {
+  const { db, repo } = freshRepo();
+  const judged = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593", workKey: "OL1W" }, ["isbn:9780441013593"], NOW);
+  repo.saveGenreJudgment({ workId: judged.work_id!, model: "jev-1.13.0", genre: "Science Fiction", confidence: 0.8, askedAt: NOW });
+  repo.applyGenreJudgment(judged.work_id!, 0.5);
+  const keyed = titled(repo, "Duna");
+  repo.setWorkKey(keyed.id, "OL1W");
+  assert.equal(repo.getBook(keyed.id)!.work_id, judged.work_id);
+  assert.deepEqual(genreRow(db, keyed.id), { genres: JSON.stringify(["Science Fiction"]), genres_source: "jev", genres_confidence: 0.8 });
+  const unassigned = titled(repo, "Arrakis");
+  db.prepare("UPDATE books SET work_id = NULL, ol_work_key = 'OL1W' WHERE id = ?").run(unassigned.id);
+  repo.assignMissingWorks(10);
+  assert.equal(repo.getBook(unassigned.id)!.work_id, judged.work_id);
+  assert.deepEqual(genreRow(db, unassigned.id), { genres: JSON.stringify(["Science Fiction"]), genres_source: "jev", genres_confidence: 0.8 });
 });
 
 test("Open Library genres replace a Jev guess, an empty answer keeps it, and manual genres stay", () => {
