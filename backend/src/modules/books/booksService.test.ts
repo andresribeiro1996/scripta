@@ -1818,3 +1818,15 @@ test("a changed summary is shown until it is judged again", async () => {
   h.repo.mergeDetails(book.id, { summary: "A new publisher synopsis.", pages: null, year: null, publisher: null, translator: null }, "publisher");
   assert.equal((await h.service.getDetails(orlando))?.summary, "A new publisher synopsis.");
 });
+
+test("a hidden summary takes its source link with it", async () => {
+  const h = harness();
+  const lookup = { title: "Os Anões", author: "Harold Pinter", isbn: "9789720000032" };
+  const book = h.repo.createBook(lookup, ["isbn:9789720000032"], "2026-10-01T00:00:00.000Z");
+  h.repo.saveDetails(book.id, { summary: "Elogios ao livro, entre aspas.", rating: null, ratingCount: 0, sourceUrl: "", genres: [], pages: null, publisher: null, year: null, translator: null }, ["isbndb"], "isbndb", "2026-10-01T00:00:00.000Z");
+  assert.equal((await h.service.getDetails(lookup))?.sourceUrl, "https://isbndb.com/book/9789720000032");
+  h.repo.saveSynopsisJudgment(summaryHashOf("Elogios ao livro, entre aspas.")!, { model: "jev-1.13.0", usable: 0.1, kind: "praise", askedAt: "2026-10-02T00:00:00.000Z" });
+  const hidden = await h.service.getDetails(lookup);
+  assert.equal(hidden?.summary, null);
+  assert.equal(hidden?.sourceUrl, "");
+});

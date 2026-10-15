@@ -139,7 +139,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       summary: fromWork?.summary ?? own,
       rating: book.rating,
       ratingCount: book.rating_count,
-      sourceUrl: fromWork?.sourceUrl ?? summaryLink(book),
+      sourceUrl: fromWork?.sourceUrl ?? (own ? summaryLink(book) : book.source_url ?? ""),
       genres: JSON.parse(book.genres) as BookGenre[],
       pages: book.pages,
       publisher: book.publisher,
