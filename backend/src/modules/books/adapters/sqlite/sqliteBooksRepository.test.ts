@@ -1568,3 +1568,20 @@ test("Jev rejections count attempts per task and subject, and clear one task onl
   assert.equal(repo.jevRejections("synopses", ["h1"]).size, 0);
   assert.equal(repo.jevRejections("works", ["h1"]).size, 1);
 });
+
+test("a summary cleared by hand leaves no text to judge or list, even with its hash left behind", () => {
+  const { db, repo } = freshRepo();
+  const book = repo.createBook({ title: "Cleared", author: "X", isbn: "9789720000099" }, ["isbn:9789720000099"], NOW);
+  repo.mergeDetails(book.id, { summary: "A publisher text the owner later cleared by hand.", pages: null, year: null, publisher: null, translator: null }, "publisher");
+  repo.setWorkSummary(book.id, "A work text the owner later cleared by hand too.");
+  const { summary_hash: bookHash, work_id: workId } = repo.getBook(book.id)!;
+  const workHash = summaryHashOf("A work text the owner later cleared by hand too.")!;
+  db.exec("UPDATE books SET summary = NULL; UPDATE works SET summary = NULL");
+  assert.equal(repo.synopsisText(bookHash!), undefined);
+  assert.equal(repo.synopsisText(workHash), undefined);
+  assert.deepEqual(repo.synopsesNeedingJudgment([workId!], 10, 3), []);
+  assert.deepEqual(repo.worksNeedingSynopsisJudgment([workId!], 10, 3), []);
+  assert.deepEqual(repo.synopsisBacklog(3), []);
+  assert.deepEqual(repo.synopsisCarriers([bookHash!, workHash]), []);
+  assert.deepEqual(repo.synopsisTexts(), []);
+});

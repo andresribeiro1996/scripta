@@ -253,9 +253,9 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const clearJevRejectionStmt = db.prepare(`DELETE FROM jev_rejections WHERE task = ? AND subject = ?`);
   const synopsesNeedingJudgmentStmt = db.prepare(`
     SELECT hash FROM (
-      SELECT summary_hash AS hash FROM books WHERE work_id IN (SELECT value FROM json_each(?)) AND summary_hash IS NOT NULL
+      SELECT summary_hash AS hash FROM books WHERE work_id IN (SELECT value FROM json_each(?)) AND summary_hash IS NOT NULL AND summary IS NOT NULL
       UNION
-      SELECT summary_hash FROM works WHERE id IN (SELECT value FROM json_each(?)) AND summary_hash IS NOT NULL
+      SELECT summary_hash FROM works WHERE id IN (SELECT value FROM json_each(?)) AND summary_hash IS NOT NULL AND summary IS NOT NULL
     ) AS t
     WHERE NOT EXISTS (SELECT 1 FROM synopsis_judgments j WHERE j.text_hash = t.hash)
       AND NOT EXISTS (SELECT 1 FROM jev_rejections r WHERE r.task = 'synopses' AND r.subject = t.hash AND r.attempts >= ?)
@@ -264,25 +264,25 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const worksNeedingSynopsisJudgmentStmt = db.prepare(`
     SELECT w.value AS id FROM json_each(?) AS w
     WHERE EXISTS (
-        SELECT 1 FROM books b WHERE b.work_id = w.value AND b.summary_hash IS NOT NULL
+        SELECT 1 FROM books b WHERE b.work_id = w.value AND b.summary_hash IS NOT NULL AND b.summary IS NOT NULL
           AND NOT EXISTS (SELECT 1 FROM synopsis_judgments j WHERE j.text_hash = b.summary_hash)
           AND NOT EXISTS (SELECT 1 FROM jev_rejections r WHERE r.task = 'synopses' AND r.subject = b.summary_hash AND r.attempts >= ?)
       )
       OR EXISTS (
-        SELECT 1 FROM works x WHERE x.id = w.value AND x.summary_hash IS NOT NULL
+        SELECT 1 FROM works x WHERE x.id = w.value AND x.summary_hash IS NOT NULL AND x.summary IS NOT NULL
           AND NOT EXISTS (SELECT 1 FROM synopsis_judgments j WHERE j.text_hash = x.summary_hash)
           AND NOT EXISTS (SELECT 1 FROM jev_rejections r WHERE r.task = 'synopses' AND r.subject = x.summary_hash AND r.attempts >= ?)
       )
     LIMIT ?
   `);
-  const synopsisBookCarrierStmt = db.prepare(`SELECT summary AS text, title, author FROM books WHERE summary_hash = ? ORDER BY created_at, rowid LIMIT 1`);
-  const synopsisWorkCarrierStmt = db.prepare(`SELECT summary AS text, title, author FROM works WHERE summary_hash = ? ORDER BY created_at, rowid LIMIT 1`);
+  const synopsisBookCarrierStmt = db.prepare(`SELECT summary AS text, title, author FROM books WHERE summary_hash = ? AND summary IS NOT NULL ORDER BY created_at, rowid LIMIT 1`);
+  const synopsisWorkCarrierStmt = db.prepare(`SELECT summary AS text, title, author FROM works WHERE summary_hash = ? AND summary IS NOT NULL ORDER BY created_at, rowid LIMIT 1`);
   const synopsisBacklogStmt = db.prepare(`
     SELECT t.hash AS hash, COALESCE(w.merged_into, w.id) AS work_id, t.source AS source, t.created_at AS created_at
     FROM (
-      SELECT summary_hash AS hash, work_id, summary_source AS source, created_at, rowid AS ord FROM books WHERE summary_hash IS NOT NULL
+      SELECT summary_hash AS hash, work_id, summary_source AS source, created_at, rowid AS ord FROM books WHERE summary_hash IS NOT NULL AND summary IS NOT NULL
       UNION ALL
-      SELECT summary_hash, id, 'openlibrary', created_at, rowid FROM works WHERE summary_hash IS NOT NULL
+      SELECT summary_hash, id, 'openlibrary', created_at, rowid FROM works WHERE summary_hash IS NOT NULL AND summary IS NOT NULL
     ) AS t
     LEFT JOIN works w ON w.id = t.work_id
     WHERE NOT EXISTS (SELECT 1 FROM synopsis_judgments j WHERE j.text_hash = t.hash)
@@ -293,17 +293,17 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const synopsisCarriersStmt = db.prepare(`
     SELECT b.summary_hash AS hash, COALESCE(w.merged_into, w.id) AS work_id, b.title AS title, b.author AS author, b.cover_image_id AS cover_image_id, b.summary_source AS source, b.summary AS text, 1 AS is_edition, b.created_at AS created_at, b.rowid AS ord
     FROM books b LEFT JOIN works w ON w.id = b.work_id
-    WHERE b.summary_hash IN (SELECT value FROM json_each(?))
+    WHERE b.summary_hash IN (SELECT value FROM json_each(?)) AND b.summary IS NOT NULL
     UNION ALL
     SELECT w.summary_hash, COALESCE(w.merged_into, w.id), w.title, w.author, NULL, 'openlibrary', w.summary, 0, w.created_at, w.rowid
     FROM works w
-    WHERE w.summary_hash IN (SELECT value FROM json_each(?))
+    WHERE w.summary_hash IN (SELECT value FROM json_each(?)) AND w.summary IS NOT NULL
     ORDER BY created_at, ord
   `);
   const synopsisTextsStmt = db.prepare(`
-    SELECT summary_hash AS hash, COALESCE(summary_source, 'unknown') AS source, title, author, summary AS text, created_at, rowid AS ord FROM books WHERE summary_hash IS NOT NULL
+    SELECT summary_hash AS hash, COALESCE(summary_source, 'unknown') AS source, title, author, summary AS text, created_at, rowid AS ord FROM books WHERE summary_hash IS NOT NULL AND summary IS NOT NULL
     UNION ALL
-    SELECT summary_hash, 'openlibrary', title, author, summary, created_at, rowid FROM works WHERE summary_hash IS NOT NULL
+    SELECT summary_hash, 'openlibrary', title, author, summary, created_at, rowid FROM works WHERE summary_hash IS NOT NULL AND summary IS NOT NULL
     ORDER BY created_at, ord
   `);
   const detailsMissingStmt = db.prepare(`UPDATE books SET details_status = 'missing', details_checked_at = ? WHERE id = ?`);
