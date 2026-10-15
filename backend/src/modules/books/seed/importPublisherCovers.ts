@@ -2,6 +2,7 @@ import { storeCoverImage } from "../booksService.js";
 import { MIN_GOOD_WIDTH } from "../domain/constants.js";
 import { SourceUnavailableError } from "../domain/errors.js";
 import { classifyPublisherImage, encodeCover, isAcceptableCover, type EncodedCover } from "../domain/images.js";
+import { fillLossy } from "../domain/lossy.js";
 import { editionLanguage, isPortugalIsbn, normalizeTitle } from "../domain/normalize.js";
 import type { BooksRepository, CoverBlobStore } from "../domain/ports.js";
 import type { BookRow } from "../domain/types.js";
@@ -260,7 +261,7 @@ async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryR
         const result = await lookup();
         if (!result) continue;
         if (result.edition?.author) {
-          title = result.edition.title ?? title;
+          title = result.edition.title ? fillLossy(result.edition.title, title) ?? result.edition.title : title;
           author = result.edition.author;
         } else {
           report.noAuthor++;
