@@ -1267,3 +1267,34 @@ test("a created book keeps the publisher's original title", async () => {
   await importPublisherCovers(h.deps, [relogio], { dryRun: false });
   assert.equal(h.repo.findBookByKey(`isbn:${MUSEU}`)!.original_title, "Pure");
 });
+
+const loja: Site = { name: "Loja", origin: "https://loja.test", platform: "shopify", authorFromVendor: false };
+const LOJA_FEED = "https://loja.test/products.json?limit=250&page=1";
+const LOSSY_ISBN = "9789890000109";
+
+test("a lossy Open Library edition title gives way to the shop's title when only the © letters differ", async () => {
+  const h = await harness({
+    lookup: async () => ({ title: "Hist©ria Do Mar", author: "In©s Duarte" }),
+    feeds: { [LOJA_FEED]: { text: shopifyPage([product(LOSSY_ISBN, "História do Mar", "https://cdn.example/mar.jpg")]) } }
+  });
+
+  await importPublisherCovers(h.deps, [loja], { dryRun: false });
+
+  const row = h.repo.findBookByKey(`isbn:${LOSSY_ISBN}`)!;
+  assert.equal(row.title, "História do Mar");
+  assert.equal(row.author, "In©s Duarte");
+  assert.equal(row.retitle_wanted_at, NOW.toISOString());
+});
+
+test("a lossy Open Library edition title stays when the shop's title differs in more than the © letters", async () => {
+  const h = await harness({
+    lookup: async () => ({ title: "Hist©ria Do Mar", author: "Inês Duarte" }),
+    feeds: { [LOJA_FEED]: { text: shopifyPage([product(LOSSY_ISBN, "A História do Mar", "https://cdn.example/mar.jpg")]) } }
+  });
+
+  await importPublisherCovers(h.deps, [loja], { dryRun: false });
+
+  const row = h.repo.findBookByKey(`isbn:${LOSSY_ISBN}`)!;
+  assert.equal(row.title, "Hist©ria Do Mar");
+  assert.equal(row.retitle_wanted_at, NOW.toISOString());
+});
