@@ -28,7 +28,7 @@ Mockups: the "Atmyshelf mobile UX" design canvas (private to the owner). Everyth
 
 | Tab | Job | Root screen | Icon |
 |---|---|---|---|
-| Home | Your current books and what the people you follow did | `/` — HomeScreen | `home`, badge = personal new count (as today) |
+| Home | What the people you follow did, and activity around your shelf | `/` — HomeScreen | `home`, badge = personal new count (as today) |
 | Library | Your books | `/library` — LibraryScreen | `library` |
 | Games | Unchanged | `/my-arena` — ArenaHomeScreen | `arena` |
 | You | Your page and what you make | `/you` — new YouScreen | `profile` (gains a filled variant) |
@@ -73,6 +73,16 @@ Changes to existing screens:
 - **Settings** loses its "Reader card" and "Open gallery" buttons, which are now rows in You.
 
 ## Phase 2 — Home
+
+**Superseded by PR #258 (Open shelf Home).** Home no longer shows the reader's own books: Continue reading, What's next? and From your highlights (items 3–5 below) are removed, along with `ReadingCards` and `NextReadCard`. Home is now:
+
+- **Header.** Brand mark, "Home", and a framed "Saved" button that opens the reader's saved games and murals.
+- **Empty library.** "Start your library" with Import library and Add a book, above the feed.
+- **Around your shelf.** Personal rows (people who played your games, new followers, and tournaments you joined that finished), with the `· N new` count. Hidden when there are none.
+- **Your reading circle.** Everyone else's activity, with "Find readers" (opens `/people`) in its header. Empty: "Your circle starts here".
+- Rows carry likes, comments, Share (only when the row has a public page) and Save, plus Want to read on book rows.
+
+The rest of this section is the original Phase 2 design, kept for history.
 
 Top to bottom:
 
