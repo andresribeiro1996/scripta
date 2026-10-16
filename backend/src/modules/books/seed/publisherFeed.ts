@@ -22,9 +22,12 @@ export interface ProductDetails {
   originalTitle: string | null;
 }
 
-export type ResolvedBook = PublisherBook & { isbn: string };
+export type ResolvedBook = PublisherBook & { isbn: string; pageAuthor?: string | null };
 
 export const PAGE_RANK = 3;
+const AUTHOR_LINK = /<a\s+class=['"]autor_link['"]\s+href=['"]([^'"]*)['"][^>]*>([^<]+)<\/a>/g;
+const AUTHOR_PATH = /\/autor(?:es)?\//;
+const PRODUCT_END = /class=['"]w-grid-item[\s'"]|<\/main>/;
 const LABEL_REACH = 40;
 
 const ISBN_CANDIDATE = /(?<!\d)97[89](?:[\p{Pd}\s.]?\d){10}(?!\d)/gu;
@@ -172,6 +175,24 @@ export function findPageIsbn(html: string): string | null {
   return distinct.length === 1 && PORTUGAL_PREFIX.test(distinct[0]!) ? distinct[0]! : null;
 }
 
+function distinctNames(names: string[]): string | null {
+  const distinct = [...new Set(names.map((name) => name.trim()).filter(Boolean))];
+  return distinct.length > 0 ? distinct.join(", ") : null;
+}
+
+export function pageAuthors(html: string): string | null {
+  const start = html.search(/<main\b/);
+  if (start < 0) return null;
+  const main = html.slice(start);
+  const end = main.search(PRODUCT_END);
+  const product = end < 0 ? main : main.slice(0, end);
+  return distinctNames([...product.matchAll(AUTHOR_LINK)].filter((link) => AUTHOR_PATH.test(link[1]!)).map((link) => decodeEntities(link[2]!)));
+}
+
+function tagAuthors(tags: unknown, pattern: RegExp): string | null {
+  return distinctNames(labelList(tags).map((tag) => pattern.exec(tag)?.[1] ?? ""));
+}
+
 function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
 }
@@ -229,7 +250,8 @@ export function parseShopifyProducts(json: unknown, site: PublisherSite): Publis
     const productUrl = `${site.origin}/products/${handle}`;
     if (!found && !URL.canParse(productUrl)) return [];
     const vendor = text(product.vendor).trim();
-    const author = site.authorFromVendor && vendor && normalizeWords(vendor) !== normalizeWords(site.name) ? vendor : null;
+    const fromVendor = site.authorFromVendor && vendor && normalizeWords(vendor) !== normalizeWords(site.name) ? vendor : null;
+    const author = fromVendor ?? (site.authorTag ? tagAuthors(product.tags, site.authorTag) : null);
     const lines = textLines(text(product.body_html));
     const details = { summary: synopsis(lines), year: null, originalTitle: originalTitleIn(lines.join("\n")), ...feedTextDetails(lines) };
     return [{ isbn: found?.isbn ?? null, rank: found?.rank ?? PAGE_RANK, title, author, imageUrl, productUrl, details, labels: [...labelList(product.tags), ...labelList(product.product_type)] }];

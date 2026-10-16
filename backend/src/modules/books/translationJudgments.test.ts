@@ -228,3 +228,20 @@ test("a series volume's original title never settles in code on the series' firs
   assert.equal(plan?.kind, "ask");
   assert.deepEqual(plan?.kind === "ask" ? plan.candidates.map((candidate) => candidate.id) : null, [first.work_id]);
 });
+
+test("filling a book's author reopens its work's code-only no-match verdict, and keeps Jev's and the owner's", () => {
+  const repo = freshRepo();
+  const byCode = edition(repo, "9789720000419", { title: "Seis", author: "", language: "pt-PT" });
+  const byJev = edition(repo, "9789720000420", { title: "Sete", author: "", language: "pt-PT" });
+  const byOwner = edition(repo, "9789720000421", { title: "Oito", author: "", language: "pt-PT" });
+  repo.saveWorkMatchJudgment(byCode.work_id!, { model: "code", intoWorkId: null, confidence: null, askedAt: AT });
+  repo.saveWorkMatchJudgment(byJev.work_id!, { model: "jev-1.13.0", intoWorkId: null, confidence: 0.8, askedAt: AT });
+  repo.saveWorkMatchJudgment(byOwner.work_id!, { model: "manual", intoWorkId: null, confidence: null, askedAt: AT });
+  assert.deepEqual(repo.portugueseWorksNeedingMatch(null, 10, 3, null), []);
+
+  for (const book of [byCode, byJev, byOwner]) repo.fillIdentity(book.id, book.title, "Alguém Autor");
+
+  assert.deepEqual(repo.portugueseWorksNeedingMatch(null, 10, 3, null), [byCode.work_id]);
+  assert.equal(repo.workMatchJudgments([byJev.work_id!]).get(byJev.work_id!)?.model, "jev-1.13.0");
+  assert.equal(repo.workMatchJudgments([byOwner.work_id!]).get(byOwner.work_id!)?.model, "manual");
+});

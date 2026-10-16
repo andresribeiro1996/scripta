@@ -31,7 +31,15 @@ function printStatus() {
   const withImage = db.prepare("SELECT COUNT(*) AS n FROM books WHERE cover_image_id IS NOT NULL").get().n;
   const portugalRows = db.prepare("SELECT cover_status AS status, COUNT(*) AS n FROM books WHERE isbn LIKE '978972%' OR isbn LIKE '978989%' GROUP BY cover_status").all();
   const portugal = { total: portugalRows.reduce((sum, row) => sum + row.n, 0), good: 0, low_res: 0, missing: 0, manual: 0, null: 0, ...Object.fromEntries(portugalRows.map((row) => [row.status ?? "null", row.n])) };
-  log(JSON.stringify({ total, null: 0, good: 0, low_res: 0, missing: 0, manual: 0, ...counts, withImage, portugal }));
+  const blank = { untitled: 0, authorless: 0, byShop: {} };
+  for (const row of db.prepare("SELECT publisher_url AS url, title = '' AS untitled FROM books WHERE title = '' OR author = ''").all()) {
+    const shop = row.url && URL.canParse(row.url) ? new URL(row.url).host : "none";
+    const field = row.untitled ? "untitled" : "authorless";
+    blank[field]++;
+    blank.byShop[shop] ??= { untitled: 0, authorless: 0 };
+    blank.byShop[shop][field]++;
+  }
+  log(JSON.stringify({ total, null: 0, good: 0, low_res: 0, missing: 0, manual: 0, ...counts, withImage, portugal, blank }));
   db.close();
 }
 

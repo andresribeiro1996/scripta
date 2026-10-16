@@ -191,3 +191,12 @@ test("a Portuguese seed entry's language takes its region from its ISBN, and see
   seedCatalog([{ ...entry("9780141184272", "One"), languages: ["fre"] }], repo, () => NOW);
   assert.equal(repo.findBookByKey("isbn:9780141184272")!.language, "fr");
 });
+
+test("seedBook keys a filled author under the stored title, not the incoming one", () => {
+  const { repo } = setup();
+  const titled = seedBook({ isbn: "9789720000019", title: "Poemas", author: "" }, repo, () => NOW, "publisher").book!;
+  seedBook({ isbn: "9789720000019", title: "Poemas Escolhidos", author: "Sophia de Mello Breyner Andresen" }, repo, () => NOW, "publisher");
+  assert.equal(repo.getBook(titled.id)!.title, "Poemas");
+  assert.equal(repo.findBookByKey(catalogTitleKey("Poemas", "Sophia de Mello Breyner Andresen")!)?.id, titled.id);
+  assert.equal(repo.findBookByKey(catalogTitleKey("Poemas Escolhidos", "Sophia de Mello Breyner Andresen")!), undefined);
+});

@@ -6,7 +6,7 @@ import { fillLossy } from "../domain/lossy.js";
 import { editionLanguage, isPortugalIsbn, normalizeTitle } from "../domain/normalize.js";
 import type { BooksRepository, CoverBlobStore } from "../domain/ports.js";
 import type { BookRow } from "../domain/types.js";
-import { PAGE_RANK, feedProducts, feedUrl, findPageIsbn, isDisallowed, parseRobots, parseShopifyProducts, parseWooProducts, withPageText, type PublisherBook, type ResolvedBook } from "./publisherFeed.js";
+import { PAGE_RANK, feedProducts, feedUrl, findPageIsbn, isDisallowed, pageAuthors, parseRobots, parseShopifyProducts, parseWooProducts, withPageText, type PublisherBook, type ResolvedBook } from "./publisherFeed.js";
 import type { PublisherSite } from "./publishers.js";
 import { seedBook } from "./seedCatalog.js";
 
@@ -29,6 +29,7 @@ export interface SiteReport {
   coversSet: number;
   created: number;
   noAuthor: number;
+  identityFilled: number;
   unchanged: number;
   rejectedImage: number;
   cropped: number;
@@ -57,7 +58,7 @@ export interface ImportDeps {
 
 export class SiteSkipped extends Error {}
 
-const emptyReport = (): SiteReport => ({ products: 0, books: 0, fromPage: 0, pagesNoIsbn: 0, pagesBlocked: 0, pagesDeferred: 0, pageAmbiguous: 0, pageTitleMismatch: 0, coversSet: 0, created: 0, noAuthor: 0, unchanged: 0, rejectedImage: 0, cropped: 0, squareAccepted: 0, awaitingCheck: 0, failed: 0 });
+const emptyReport = (): SiteReport => ({ products: 0, books: 0, fromPage: 0, pagesNoIsbn: 0, pagesBlocked: 0, pagesDeferred: 0, pageAmbiguous: 0, pageTitleMismatch: 0, coversSet: 0, created: 0, noAuthor: 0, identityFilled: 0, unchanged: 0, rejectedImage: 0, cropped: 0, squareAccepted: 0, awaitingCheck: 0, failed: 0 });
 
 export function importedLanguage(stated: string[], isbn: string): string | null {
   if (stated.length > 0) return editionLanguage(stated, isbn);
@@ -193,7 +194,7 @@ async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryR
       return;
     }
     const isbn = findPageIsbn(response.text);
-    if (isbn) resolved.push({ ...book, isbn, details: withPageText(book.details, response.text) });
+    if (isbn) resolved.push({ ...book, isbn, pageAuthor: site.authorLinks ? pageAuthors(response.text) : null, details: withPageText(book.details, response.text) });
     else report.pagesNoIsbn++;
   };
   const retry: PublisherBook[] = [];
@@ -255,6 +256,7 @@ async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryR
       report.pageTitleMismatch++;
       continue;
     }
+    const known = book.author ?? book.pageAuthor ?? null;
     if (!row) {
       let { title, author } = book;
       if (!author) {
@@ -263,6 +265,8 @@ async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryR
         if (result.edition?.author) {
           title = result.edition.title ? fillLossy(result.edition.title, title) ?? result.edition.title : title;
           author = result.edition.author;
+        } else if (book.pageAuthor) {
+          author = book.pageAuthor;
         } else {
           report.noAuthor++;
           author = "";
@@ -274,6 +278,11 @@ async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryR
         continue;
       }
       row = seedBook({ isbn: book.isbn, title, author, workKey: memo.looked?.edition?.workKey ?? undefined }, deps.repo, deps.now, "publisher").book!;
+    } else if ((!row.title || (!row.author && known)) && (!row.title || sameTitle(row.title, book.title))) {
+      const title = row.title || book.title;
+      report.identityFilled++;
+      deps.log(`${site.name}: identity ${book.isbn} ${JSON.stringify({ title, author: row.author || known || "" })}`);
+      if (!options.dryRun) seedBook({ isbn: book.isbn, title, author: known ?? "" }, deps.repo, deps.now, "publisher");
     }
     if (!options.dryRun) {
       deps.repo.setLanguage(row.id, importedLanguage(memo.looked?.edition?.languages ?? [], book.isbn));

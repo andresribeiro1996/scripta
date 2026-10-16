@@ -217,13 +217,13 @@ npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --
 npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && nohup node scripts/import-publisher-covers.mjs > /data/import-publisher-covers.log 2>&1 & echo started'
 ```
 
-The log gets one line per site as each finishes, then a JSON report per site (`products`, `books`, `fromPage`, `pagesNoIsbn`, `pagesBlocked`, `pagesDeferred`, `pageAmbiguous`, `pageTitleMismatch`, `coversSet`, `created`, `noAuthor`, `unchanged`, `rejectedImage`, `failed`, plus `imageUrlPrefix`, or `skipped` and why). The dry run fetches the feeds and the product pages and looks authors up on Open Library, and counts what it would create and set, but writes nothing and downloads no image; check that no site is `skipped` unexpectedly before the real run. Then start the seed:
+The log gets one line per site as each finishes, then a JSON report per site (`products`, `books`, `fromPage`, `pagesNoIsbn`, `pagesBlocked`, `pagesDeferred`, `pageAmbiguous`, `pageTitleMismatch`, `coversSet`, `created`, `noAuthor`, `identityFilled`, `unchanged`, `rejectedImage`, `failed`, plus `imageUrlPrefix`, or `skipped` and why). The dry run fetches the feeds and the product pages and looks authors up on Open Library, and counts what it would create and set, but writes nothing and downloads no image; check that no site is `skipped` unexpectedly before the real run. Then start the seed:
 
 ```bash
 npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && nohup node scripts/seed-catalog.mjs > /data/seed-catalog.log 2>&1 & echo started'
 ```
 
-Check progress (log tail plus cover counts by status; `portugal` is the same breakdown for `978972`/`978989` books):
+Check progress (log tail plus cover counts by status; `portugal` is the same breakdown for `978972`/`978989` books). It also prints `blank`: books with an empty title (`untitled`) and books with a title but no author (`authorless`), in all and per `publisher_url` host:
 
 ```bash
 npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'tail -3 /data/seed-catalog.log; cd /app/backend && node scripts/seed-catalog.mjs --status'
@@ -256,6 +256,8 @@ npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --
 `--site <name>` runs the importer for one publisher only (the `name` in `seed/publishers.ts`; an unknown name exits 1 and lists them).
 
 `--fill-titles` re-reads each shop's product feed (feed pages only, no product pages or images) and fills the title, and the author if the feed has one, of every catalog book with an empty title whose `publisher_url` is a feed product's URL. With `--dry-run` it only counts; `--site` limits it to one shop.
+
+**Authors.** A book's author comes from the feed when the shop puts it there: Antígona's `vendor`, a WooCommerce `Autor` attribute, or Presença's `NOMEAUTOR_` tags (`authorTag` in `seed/publishers.ts`). Otherwise it comes from Open Library, and failing that, for shops with `authorLinks`, from the product page, but only for products whose ISBN the importer reads from that page: a product whose ISBN comes from the feed or its image file name never has its page fetched, so it gets no page author (most of Relógio d'Água's). There it is the `autor_link` anchors to `/autor/` or `/autores/` between `<main` and the first related-product card (`w-grid-item`), so related books and `/tradutor/` links never count. On every run, an existing book with an empty title or author gets the missing part from its product (never overwriting either), but only when its stored title, if it has one, matches the product's. Each fill is logged as `<site>: identity <isbn> {"title":…,"author":…}` and counted in `identityFilled`; a dry run logs and counts without writing.
 
 `scripts/reset-publisher-covers.mjs --origin <https://…> --since <ISO time ending in Z> [--apply]` undoes a publisher's imported covers so the importer can run again. It selects the books whose current cover is a `publisher` image from that origin stored at or after `--since` with status `manual`, and prints a JSON report (`matched`, `restored`, `markedMissing`, `skipped`). It is a dry run unless `--apply` is given. Each book gets back the newest image stored before the publisher one that the user has not rejected and that is not an upload (`good` if it is at least 400 px wide, else `low_res`), or `missing` when there is none, and the publisher image's `cover_images` row is deleted in the same transaction. The image files are left in place, because other stores keep copies of the cover URL. It adds no rejections, so a rerun can fetch the same URLs, and it can be rerun after a crash. Like the importer, it runs inside the production container from `/app/backend`.
 
@@ -347,6 +349,8 @@ Matches every live Portuguese work (all its editions `pt`, `pt-PT` or `pt-BR`) t
 2. Real run: the same command without `--dry-run`, with `--max` at the dry run's `wouldAsk`. The code steps run first with no requests: original titles from stored summaries, Portuguese originals and works with no candidates recorded, and the clear matches merged. Then Jev decides the rest, 4 in flight: 0.9 or more merges, 0.5 to 0.9 waits on `/admin/translations`. `--max` is a hard limit on TypeSafe requests, retries included, recorded under `works-backlog` in `typesafe_usage` (the daily `works` budget is untouched). Without `TYPESAFE_API_KEY` only the code steps run, and the script says the Jev step was skipped. An outage or a rejected key ends the run; re-running continues where it stopped.
 
 `--recheck-none` also selects works whose answer was "none", not the owner's, and is more than 30 days old, since their original may have arrived since.
+
+Filling a book's empty title or author (`fillIdentity`, e.g. from the publisher importer) drops its work's code-only "none" answer, so the next run plans that work again without `--recheck-none`; Jev's and the owner's answers stay.
 
 The report counts `originalTitles`, `originals`, `noCandidates`, `codeMerges`, `codeBlocked` (blocked by an arena), Jev's `jevMerges`, `jevBlocked`, `possible` and `none`, then `strikes`, `stoppedBy` (`done`, `budget`, `outage`, `key` or `no-key`), `requests` used and `estimatedCostUsd`.
 
