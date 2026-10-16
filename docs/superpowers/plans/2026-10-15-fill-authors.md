@@ -37,7 +37,8 @@ There is no new command. The production repair is an importer rerun.
   - Penguin links to `/autores/`, the others to `/autor/`. Penguin renders the product block twice (desktop and mobile), so names must be deduped.
   - On 29 sampled pages, 27 gave the right author (multi-author included). The 2 that gave none were a "pack" and a tote bag.
   - Pachinko's page gives "Min Jin Lee". Its feed product (`/produto/pachinko-pre-venda/`) has no attributes and no SKU.
-  - Every product on these shops lacks a feed ISBN, so the importer reads every page: Relógio 2,300, Gradiva 1,535, Guerra & Paz 1,307 and Penguin 5,840 products, at ≥3 s each per shop.
+  - Gradiva, Guerra & Paz and Penguin products lack a feed ISBN, so the importer reads every page: Gradiva 1,535, Guerra & Paz 1,307 and Penguin 5,840 products, at ≥3 s each per shop.
+  - Relógio d'Água is different (corrected during implementation): most of its products carry the ISBN in the image file name (`9789897837579-scaled.jpg`), so the importer never fetches their page and they get no page author. Only products without one, like Pachinko (`capa-pachinko.jpg`), are page-read. See Follow-ups.
 - **Downstream passes that ran on blank identities** (the "Unblocking dependent sessions" session, 2026-10-16, production on 24d915ec):
   - **Translation.** The backlog recorded 18,477 Portuguese works as `noCandidates`, mostly because they had no author or work key. Code saves each as a judgment with `model = 'code'` and `into_work_id = NULL`.
   - **Why they stay out.** `portugueseWorkFilter` (`sqliteBooksRepository.ts:115-121` on main) leaves out any work with a judgment, unless `--recheck-none` is given and the judgment is more than 30 days old. So without Task 5, filling authors would not bring them back before 2026-11-15.
@@ -719,15 +720,15 @@ Goes into the batch runbook. Run it after the mojibake repair, one job at a time
    ```bash
    npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c "cd /app/backend && node scripts/import-publisher-covers.mjs --fill-titles"
    ```
-3. **Pilot: Relógio d'Água dry run** (~2 h: 2,300 product pages at 3 s). It writes nothing and logs every fill it would make.
+3. **Pilot: Relógio d'Água dry run.** Only its products without an ISBN in the image file name are page-read, so it is much shorter than 2,300 pages; the log's `pages <n>/<total>` lines show the real count. It writes nothing and logs every fill it would make.
    ```bash
    npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c "cd /app/backend && setsid node scripts/import-publisher-covers.mjs --dry-run --site \"Relógio d'Água\" > /data/publisher-authors-relogio-dry.json 2> /data/publisher-authors-relogio-dry.log < /dev/null & sleep 3; echo started"
    ```
    When `/data/publisher-authors-relogio-dry.json` is non-empty, check:
    - `skipped` is absent, and `pagesDeferred` is 0. If any page failed, page-sourced books are deferred for the whole run, so rerun.
-   - `identityFilled` is in the hundreds or more.
+   - `identityFilled` is non-zero. It will be far below Relógio's ~1,951 blank rows, because file-name-ISBN products are never page-read.
    - About 20 random `identity` lines read right (`grep ': identity ' /data/publisher-authors-relogio-dry.log | shuf -n 20`), including Pachinko → Min Jin Lee (`grep 9789897833199 …`).
-4. **Full importer run** (~7 h, all shops, 4 at a time; Penguin's 5,840 pages are the long pole). It fills Relógio, Gradiva, Guerra & Paz, Penguin and Presença, and does the usual cover pass everywhere.
+4. **Full importer run** (~7 h, all shops, 4 at a time; Penguin's 5,840 pages are the long pole). It fills Gradiva, Guerra & Paz, Penguin and Presença, the page-read part of Relógio, and does the usual cover pass everywhere.
    ```bash
    npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c "cd /app/backend && setsid node scripts/import-publisher-covers.mjs > /data/publisher-authors.json 2> /data/publisher-authors.log < /dev/null & sleep 3; echo started"
    ```
@@ -753,4 +754,5 @@ Goes into the batch runbook. Run it after the mojibake repair, one job at a time
 - **Edições Afrontamento** (1,207): one `<p class="product-autor">` per page, e.g. "Vincenzo Russo e Sabrina Sedlmayer (orgs.)". Splitting on " e " is unsafe ("Melo e Castro"), and "(orgs.)" must be dropped. Related cards use `card-autor`.
 - **Saída de Emergência** (888): the main product links `/autor/<slug>/` without `autor_link`. Its `class="autor"` belongs to related cards.
 - **Exclamação, Kathartika, Divergência, Orfeu Negro, Pato Lógico:** no author found in the feed or page markup sampled.
+- **Relógio d'Água file-name ISBNs:** most Relógio products get their ISBN from the image file name, so the importer never reads their page and they stay authorless. Reading the page only for those whose stored row has no author would add up to ~1,951 requests at the shop's throttle, which this plan ruled out.
 - **ISBNdb** is an existing source that could cover what shops can't, against its daily quota. Decide after step 5's counts.
