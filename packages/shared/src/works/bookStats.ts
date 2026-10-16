@@ -1,5 +1,6 @@
 import { roundLabel } from "../arena/arenaBracket.js";
 import { FINISH_FEELINGS } from "../library/finish.js";
+import { plural } from "../plural.js";
 
 export const BOOK_STATS_MINIMUM = 3;
 const TIER_LETTERS = ["S", "A", "B", "C", "D"] as const;
@@ -13,7 +14,6 @@ type TileKey = "community" | "tiers" | "tournaments";
 const scaled = (n: number, unit: number, suffix: string) => `${Math.round((n / unit) * 10) / 10}${suffix}`;
 const compactCount = (n: number) => (n < 1000 ? String(n) : n < 999_950 ? scaled(n, 1000, "K") : scaled(n, 1_000_000, "M"));
 export const ratingCountLabel = (count: number) => `${compactCount(count)} ${count === 1 ? "rating" : "ratings"}`;
-const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
 const feelingFor = (average: number) => FINISH_FEELINGS.find((feeling) => feeling.rating === Math.round(average))!.label as string;
 
 export function tierLetter(score: number): TierLetter {

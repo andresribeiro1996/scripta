@@ -1,4 +1,5 @@
 import { statusLabel } from "../library/covers.js";
+import { plural } from "../plural.js";
 import type {
   ActivityEventType,
   ActivityItem,
@@ -31,11 +32,11 @@ export function contentKindLabel(content: PublishedContent): string {
 export function contentDetail(content: PublishedContent): string {
   switch (content.kind) {
     case "tierlist":
-      return `${content.poolSize} books · ${content.ballotCount} ballots${content.promotedAt ? " · permanent reference" : content.votingOpen ? "" : " · closed"}`;
+      return `${plural(content.poolSize, "book", "books")} · ${plural(content.ballotCount, "ballot", "ballots")}${content.promotedAt ? " · permanent reference" : content.votingOpen ? "" : " · closed"}`;
     case "tournament":
       return `${content.bracketSize}-book bracket · ${content.status}`;
     case "quiz":
-      return `${content.questionCount} questions · ${content.playCount} plays${content.playOpen ? "" : " · closed"}`;
+      return `${plural(content.questionCount, "question", "questions")} · ${plural(content.playCount, "play", "plays")}${content.playOpen ? "" : " · closed"}`;
   }
 }
 

@@ -86,6 +86,11 @@ test("a quiz reads as a quiz in every content helper", () => {
   assert.equal(feedAction(item), "published a quiz");
 });
 
+test("content counts of one read in the singular", () => {
+  assert.equal(contentDetail(quiz({ questionCount: 1, playCount: 1 })), "1 question · 1 play");
+  assert.equal(contentDetail({ kind: "tierlist", id: "t1", voteCode: "abc", name: "Fantasy", poolSize: 1, ballotCount: 1, votingOpen: true, promotedAt: null, covers: [] }), "1 book · 1 ballot");
+});
+
 test("a quiz is Played, Open or Closed", () => {
   assert.deepEqual(contentStatus(quiz({ viewerVoted: true })), { label: "Played", tone: "info" });
   assert.deepEqual(contentStatus(quiz()), { label: "Open", tone: "accent" });
