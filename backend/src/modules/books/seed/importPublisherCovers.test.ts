@@ -157,6 +157,7 @@ test("an existing book gets the publisher cover as a manual cover and loses its 
     created: 3,
     noAuthor: 0,
     identityFilled: 0,
+    authorPages: 0,
     unchanged: 0,
     rejectedImage: 0,
     cropped: 0,
@@ -1418,4 +1419,75 @@ test("a re-run does not fill the author when the stored title is another book's"
   assert.equal(h.repo.getBook(before.id)!.author, "");
   assert.equal(h.repo.getBook(before.id)!.title, "Os Maias");
   assert.equal(reports["Presença"]!.identityFilled, 0);
+});
+
+const PACHINKO_PAGE = pachinkoFeeds[PACHINKO_URL]!;
+const isbnImageFeeds = (page: { status?: number; text: string } = PACHINKO_PAGE) => ({
+  [WOO_FEED]: { text: JSON.stringify([{ name: "Pachinko", permalink: PACHINKO_URL, sku: "", description: "", short_description: "", images: [{ src: "https://www.relogiodagua.pt/wp-content/uploads/2023/11/9789897833199.jpg" }], attributes: [] }]) },
+  [PACHINKO_URL]: page
+});
+
+test("a feed-ISBN book with no author gets the author from its product page", async () => {
+  const h = await harness({ feeds: isbnImageFeeds() });
+  const before = publisherBook(h.repo, PACHINKO, "Pachinko", "");
+
+  const reports = await importPublisherCovers(h.deps, [relogioLinks], { dryRun: false });
+
+  assert.equal(h.repo.getBook(before.id)!.author, "Min Jin Lee");
+  assert.equal(h.repo.findBookByKey(catalogTitleKey("Pachinko", "Min Jin Lee")!)?.id, before.id);
+  assert.equal(reports["Relógio d'Água"]!.authorPages, 1);
+  assert.equal(reports["Relógio d'Água"]!.identityFilled, 1);
+  assert.equal(h.requests.filter((url) => url === PACHINKO_URL).length, 1);
+});
+
+test("a feed-ISBN book that already has an author is not page-read", async () => {
+  const h = await harness({ feeds: isbnImageFeeds() });
+  const before = publisherBook(h.repo, PACHINKO, "Pachinko", "Min J. Lee");
+
+  const reports = await importPublisherCovers(h.deps, [relogioLinks], { dryRun: false });
+
+  assert.equal(h.repo.getBook(before.id)!.author, "Min J. Lee");
+  assert.ok(!h.requests.includes(PACHINKO_URL));
+  assert.equal(reports["Relógio d'Água"]!.authorPages, 0);
+});
+
+test("a feed-ISBN book on a site without author links is not page-read", async () => {
+  const h = await harness({ feeds: isbnImageFeeds() });
+  const before = publisherBook(h.repo, PACHINKO, "Pachinko", "");
+
+  await importPublisherCovers(h.deps, [relogio], { dryRun: false });
+
+  assert.equal(h.repo.getBook(before.id)!.author, "");
+  assert.ok(!h.requests.includes(PACHINKO_URL));
+});
+
+test("an author page with another ISBN gives no author", async () => {
+  const h = await harness({ feeds: isbnImageFeeds({ text: PACHINKO_PAGE.text.replace("978-989-783-319-9", "978-989-641-467-2") }) });
+  const before = publisherBook(h.repo, PACHINKO, "Pachinko", "");
+
+  const reports = await importPublisherCovers(h.deps, [relogioLinks], { dryRun: false });
+
+  assert.equal(h.repo.getBook(before.id)!.author, "");
+  assert.equal(reports["Relógio d'Água"]!.identityFilled, 0);
+});
+
+test("a failed author page leaves the book authorless and defers nothing", async () => {
+  const h = await harness({ feeds: isbnImageFeeds({ status: 500, text: "" }) });
+  const before = publisherBook(h.repo, PACHINKO, "Pachinko", "");
+
+  const reports = await importPublisherCovers(h.deps, [relogioLinks], { dryRun: false });
+
+  assert.equal(h.repo.getBook(before.id)!.author, "");
+  assert.equal(reports["Relógio d'Água"]!.pagesDeferred, 0);
+  assert.equal(reports["Relógio d'Água"]!.authorPages, 1);
+});
+
+test("a dry run reads the author page and counts the fill without writing", async () => {
+  const h = await harness({ feeds: isbnImageFeeds() });
+  const before = publisherBook(h.repo, PACHINKO, "Pachinko", "");
+
+  const reports = await importPublisherCovers(h.deps, [relogioLinks], { dryRun: true });
+
+  assert.equal(h.repo.getBook(before.id)!.author, "");
+  assert.equal(reports["Relógio d'Água"]!.identityFilled, 1);
 });

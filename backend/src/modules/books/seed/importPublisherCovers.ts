@@ -30,6 +30,7 @@ export interface SiteReport {
   created: number;
   noAuthor: number;
   identityFilled: number;
+  authorPages: number;
   unchanged: number;
   rejectedImage: number;
   cropped: number;
@@ -58,7 +59,7 @@ export interface ImportDeps {
 
 export class SiteSkipped extends Error {}
 
-const emptyReport = (): SiteReport => ({ products: 0, books: 0, fromPage: 0, pagesNoIsbn: 0, pagesBlocked: 0, pagesDeferred: 0, pageAmbiguous: 0, pageTitleMismatch: 0, coversSet: 0, created: 0, noAuthor: 0, identityFilled: 0, unchanged: 0, rejectedImage: 0, cropped: 0, squareAccepted: 0, awaitingCheck: 0, failed: 0 });
+const emptyReport = (): SiteReport => ({ products: 0, books: 0, fromPage: 0, pagesNoIsbn: 0, pagesBlocked: 0, pagesDeferred: 0, pageAmbiguous: 0, pageTitleMismatch: 0, coversSet: 0, created: 0, noAuthor: 0, identityFilled: 0, authorPages: 0, unchanged: 0, rejectedImage: 0, cropped: 0, squareAccepted: 0, awaitingCheck: 0, failed: 0 });
 
 export function importedLanguage(stated: string[], isbn: string): string | null {
   if (stated.length > 0) return editionLanguage(stated, isbn);
@@ -197,10 +198,23 @@ async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryR
     if (isbn) resolved.push({ ...book, isbn, pageAuthor: site.authorLinks ? pageAuthors(response.text) : null, details: withPageText(book.details, response.text) });
     else report.pagesNoIsbn++;
   };
+  const readAuthorPage = async (book: PublisherBook, isbn: string) => {
+    if (!site.authorLinks || book.author || deps.repo.findBookByKey(`isbn:${isbn}`)?.author !== "") return null;
+    const page = new URL(book.productUrl);
+    if (isDisallowed(page.pathname + page.search, disallow)) return null;
+    report.authorPages++;
+    try {
+      const response = await request(() => deps.fetchText(book.productUrl));
+      return response.status === 200 && findPageIsbn(response.text) === isbn ? pageAuthors(response.text) : null;
+    } catch (error) {
+      if (!(error instanceof SourceUnavailableError)) throw error;
+      return null;
+    }
+  };
   const retry: PublisherBook[] = [];
   for (const book of books) {
     if (book.isbn) {
-      resolved.push({ ...book, isbn: book.isbn });
+      resolved.push({ ...book, isbn: book.isbn, pageAuthor: await readAuthorPage(book, book.isbn) });
       continue;
     }
     const page = new URL(book.productUrl);
