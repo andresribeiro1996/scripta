@@ -10,7 +10,7 @@ import { FeedPreview } from "./FeedPreview";
 import { feedEventLabel, feedPrimaryLabel, feedRowAccessibilityLabel, feedRowModel, feedShareTarget, hasActivityThread, readingShelfBook, relativeTime } from "./feedRowModel";
 import type { HomeActions } from "./useHomeActions";
 
-export function FeedRow({ item, onOpen, onFollowBack, following = false, isNew = false, actions, onComments, isSaved, onOpenProfile = openProfile }: { item: DigestItem; onOpen: () => void; onFollowBack?: () => void; following?: boolean; isNew?: boolean; actions: HomeActions; onComments?: () => void; isSaved?: boolean; onOpenProfile?: (username: string) => void }) {
+export function FeedRow({ item, onOpen, actions, onComments, isSaved, onOpenProfile = openProfile }: { item: DigestItem; onOpen: () => void; actions: HomeActions; onComments?: () => void; isSaved?: boolean; onOpenProfile?: (username: string) => void }) {
   const { colors } = useTheme();
   const row = feedRowModel(item);
   const actor = item.kind === "participation" ? item.actors[0] : item.actor;
@@ -36,7 +36,7 @@ export function FeedRow({ item, onOpen, onFollowBack, following = false, isNew =
           <Text {...dynamicType} style={[typography.caption, { color: item.kind === "reading" && item.finished ? colors.success : colors.textDim }]}>{feedEventLabel(item)}</Text>
         </View>
       </Pressable>
-      <View style={styles.stamp}>{isNew ? <View style={[styles.newDot, { backgroundColor: colors.accent }]} /> : null}<Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{relativeTime(item.createdAt)}</Text></View>
+      <View style={styles.stamp}><Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{relativeTime(item.createdAt)}</Text></View>
       {bookmark}
     </View>}
     {item.kind === "follow" ? null : <View style={[styles.body, dense ? styles.bodyRow : styles.bodyColumn, item.kind === "completion" && styles.winnerBody]}>
@@ -51,7 +51,6 @@ export function FeedRow({ item, onOpen, onFollowBack, following = false, isNew =
       </View>
     </View>}
     <View style={styles.reactions}>
-      {item.kind === "follow" && !item.viewerFollows ? <Pressable accessibilityRole="button" accessibilityLabel={`Follow ${item.actor.username} back`} disabled={following} onPress={onFollowBack} style={styles.textAction}><Text {...dynamicType} style={[typography.caption, styles.strong, { color: colors.accent }]}>{following ? "Following…" : "Follow back"}</Text></Pressable> : null}
       {hasActivityThread(item) ? <>
         <Pressable accessibilityRole="button" accessibilityLabel={engagement?.liked ? "Unlike this post" : "Like this post"} accessibilityState={{ selected: engagement?.liked, disabled: !engagement || actions.liking }} disabled={!engagement || actions.liking} onPress={() => actions.toggleLike(item)} style={({ pressed }) => [styles.reaction, { backgroundColor: pressed ? colors.surfacePressed : "transparent" }]}><Icon name="like" filled={engagement?.liked} size={18} color={engagement?.liked ? colors.accent : colors.textDim} /><Text {...dynamicType} style={[typography.caption, styles.count, { color: colors.textDim }]}>{engagement?.likes ?? "…"}</Text></Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel={engagement ? `Comments, ${engagement.comments}` : "Comments"} onPress={onComments} style={({ pressed }) => [styles.reaction, { backgroundColor: pressed ? colors.surfacePressed : "transparent" }]}><Icon name="comment" size={18} color={colors.textDim} /><Text {...dynamicType} style={[typography.caption, styles.count, { color: colors.textDim }]}>{engagement?.comments ?? "…"}</Text></Pressable>
@@ -71,7 +70,6 @@ const styles = StyleSheet.create({
   shrink: { flexShrink: 1 },
   strong: { fontWeight: "700" },
   stamp: { flexDirection: "row", alignItems: "center", gap: spacing.xs, maxWidth: "25%" },
-  newDot: { width: 6, height: 6, borderRadius: radii.full },
   body: { gap: spacing.md },
   bodyRow: { flexDirection: "row", alignItems: "center" },
   bodyColumn: { flexDirection: "column" },
