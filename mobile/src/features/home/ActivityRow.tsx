@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
 import { Text } from "../../ui/Text";
 import { Button, Icon, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import { AuthorAvatar } from "../community/AuthorAvatar";
@@ -7,11 +7,12 @@ import { relativeTime } from "./feedRowModel";
 
 export function ActivityRow({ item, isNew, following, onOpen, onFollowBack }: { item: PersonalItem; isNew: boolean; following: boolean; onOpen: () => void; onFollowBack: () => void }) {
   const { colors } = useTheme();
+  const stacked = useWindowDimensions().fontScale > 1;
   const row = activityRowModel(item);
   const avatar = item.kind === "follow" ? item.actor : item.kind === "participation" ? item.actors[0] : undefined;
   const time = relativeTime(item.createdAt);
-  return <View style={[styles.row, { borderBottomColor: colors.border }]}>
-    <Pressable accessibilityRole="link" accessibilityLabel={`${activitySentence(row)}, ${time}`} onPress={onOpen} style={({ pressed }) => [styles.main, { opacity: pressed ? 0.6 : 1 }]}>
+  return <View style={[styles.row, stacked ? styles.rowStacked : null, { borderBottomColor: colors.border }]}>
+    <Pressable accessibilityRole="link" accessibilityLabel={`${activitySentence(row)}, ${time}`} onPress={onOpen} style={({ pressed }) => [styles.main, stacked ? styles.mainStacked : null, { opacity: pressed ? 0.6 : 1 }]}>
       {avatar ? <AuthorAvatar username={avatar.username} avatarUrl={avatar.avatarUrl} /> : <View style={[styles.tile, { backgroundColor: colors.accentSoft }]}><Icon name={item.kind === "completion" ? "champion" : "community"} size={16} color={colors.accent} /></View>}
       <View style={styles.copy}>
         <Text {...dynamicType} style={[typography.caption, { color: colors.text }]}>{row.lead ? <Text style={styles.strong}>{row.lead} </Text> : null}{row.verb}{row.target ? <Text style={styles.strong}> {row.target}</Text> : null}</Text>
@@ -25,8 +26,10 @@ export function ActivityRow({ item, isNew, following, onOpen, onFollowBack }: { 
 }
 
 const styles = StyleSheet.create({
-  row: { marginHorizontal: spacing.lg, paddingVertical: spacing.md, borderBottomWidth: 1, flexDirection: "row", flexWrap: "wrap", justifyContent: "flex-end", alignItems: "center", gap: spacing.sm },
-  main: { flexGrow: 1, flexShrink: 1, flexBasis: 144, minWidth: 0, minHeight: minimumTouchTarget, flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  row: { marginHorizontal: spacing.lg, paddingVertical: spacing.md, borderBottomWidth: 1, flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  rowStacked: { flexDirection: "column", alignItems: "flex-end" },
+  main: { flex: 1, minWidth: 0, minHeight: minimumTouchTarget, flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  mainStacked: { flex: 0, alignSelf: "stretch" },
   link: { minHeight: minimumTouchTarget, justifyContent: "center" },
   copy: { flex: 1, minWidth: 0, gap: spacing.xs },
   tile: { width: 28, height: 28, borderRadius: radii.full, alignItems: "center", justifyContent: "center" },
