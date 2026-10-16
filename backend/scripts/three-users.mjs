@@ -6,6 +6,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 import argon2 from "argon2";
+import { devDataDirEnv } from "../../scripts/devDataDir.mjs";
 
 const flags = new Set(process.argv.slice(2));
 assert([...flags].every((flag) => ["--reset", "--seed-only", "--check", "--shared"].includes(flag)), "Use --reset, --seed-only, --check, or --shared.");
@@ -69,10 +70,7 @@ if (!shared) {
     SOCIALS_ENCRYPTION_KEY: "", X_CLIENT_ID: "", INSTAGRAM_CLIENT_ID: "", THREADS_CLIENT_ID: "", TIKTOK_CLIENT_KEY: "",
     ALLOW_LAN_ORIGINS: "true"
   });
-  for (const module of ["auth", "library", "gallery", "covers", "socials", "arena", "murals", "tierlists", "community"]) {
-    process.env[`${module.toUpperCase()}_DB_PATH`] = join(directory, `${module}.sqlite`);
-  }
-  process.env.FILES_STORAGE_PATH = join(directory, "files");
+  Object.assign(process.env, devDataDirEnv(directory));
 }
 const { buildApp } = await import("../src/app.ts");
 const { bookKey } = await import("../../packages/shared/src/library/merge.ts");
