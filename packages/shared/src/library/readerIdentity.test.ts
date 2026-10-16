@@ -244,12 +244,13 @@ test("author names normalize before counting; the first spelling seen is display
   assert.deepEqual(result.leaders[0], { label: "Terry Pratchett", count: 4 });
 });
 
-test("the sample library fixture leans Cartographer with 3 of 11 finished books in a series", () => {
+test("the sample library fixture settles as a classics reader with a fantasy streak", () => {
   const data = JSON.parse(readFileSync(fixturePath, "utf8")) as { books: Book[]; groups: Group[] };
   const result = readerIdentity(data.books, data.groups);
-  assert.equal(result.identity, "carto");
-  assert.equal(result.state, "leaning");
-  assert.deepEqual(result.signal, { counted: 3, of: 11, label: "3 of 11 finished books are in a series" });
+  assert.equal(result.state, "settled");
+  assert.equal(result.identity, "corr");
+  assert.equal(result.streak, "star");
+  assert.deepEqual(result.signal, { counted: 11, of: 12, label: "11 of 12 finished books with known genres are classics, literary fiction or poetry" });
 });
 
 test("a settled card names the second-strongest reading as its streak", () => {

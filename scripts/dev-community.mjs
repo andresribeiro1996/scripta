@@ -72,7 +72,7 @@ async function ensureFollows(follower, followee) {
 const FINISHED_BOOK = { title: "Piranesi", author: "Susanna Clarke", isbn: "9781635575637" };
 const SHARED_BOOKS = [
   { title: "The Fellowship of the Ring", author: "J.R.R. Tolkien", isbn: "9780544003415" },
-  { title: "The Two Towers", author: "J.R.R. Tolkien", isbn: "9780544003423" }
+  { title: "The Two Towers", author: "J.R.R. Tolkien", isbn: "9780547928203" }
 ];
 
 async function resolveCoverUrl(user, isbn) {
