@@ -65,6 +65,11 @@ export function codexUsage(jsonl) {
   return { model, tokens };
 }
 
+export function configuredModel(toml) {
+  const topLevel = toml.split(/^\s*\[/m)[0];
+  return /^\s*model\s*=\s*"([^"]+)"/m.exec(topLevel)?.[1] ?? null;
+}
+
 export function parseFindings(text) {
   const value = JSON.parse(text);
   if (value === null || typeof value !== "object" || Array.isArray(value)) throw new Error("the output must be a JSON object");

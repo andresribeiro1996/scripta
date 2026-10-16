@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { execFileSync, spawnSync } from "node:child_process";
 import { closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -9,6 +10,7 @@ import {
   codexFailure,
   codexUsage,
   codexVerdict,
+  configuredModel,
   parseFindings,
   parseReviewArgs,
   renderCodexReport,
@@ -17,6 +19,15 @@ import { appendRound, nextRound, roundLogPath, runsDir } from "./runLog.mjs";
 
 const CODEX_DIR = join(dirname(fileURLToPath(import.meta.url)), "codex");
 const TIMEOUT_MS = 45 * 60 * 1000;
+
+function codexConfig() {
+  try {
+    return readFileSync(join(process.env.CODEX_HOME ?? join(homedir(), ".codex"), "config.toml"), "utf8");
+  } catch (error) {
+    if (error.code === "ENOENT") return "";
+    throw error;
+  }
+}
 
 function git(cwd, args) {
   return execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
@@ -88,7 +99,8 @@ function main() {
     jsonl = readFileSync(`${base}.jsonl`, "utf8");
     error = reviewError(root, run, base, treeChanged, codexFailure(jsonl));
   }
-  const usage = codexUsage(jsonl);
+  const streamed = codexUsage(jsonl);
+  const usage = { ...streamed, model: streamed.model ?? configuredModel(codexConfig()) };
 
   let result = null;
   if (!error) {
