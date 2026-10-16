@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { migrateLegacyFiles } from "./devDataDir.mjs";
+import { devDataDirEnv, migrateLegacyFiles } from "./devDataDir.mjs";
 
 const a = "03c8eb69-9974-49fa-aca9-8a6d8a71a505";
 const b = "90da0233-de49-4fc1-a4e9-f5de94f22bcb";
@@ -71,4 +71,12 @@ test("does nothing on a directory already in the current layout", () => {
     migrateLegacyFiles(dir);
     assert.deepEqual(readdirSync(dir), []);
   });
+});
+
+test("devDataDirEnv points every database the backend declares at the dev data directory", () => {
+  const source = readFileSync(new URL("../backend/src/config/env.ts", import.meta.url), "utf8");
+  const declared = [...new Set([...source.matchAll(/^\s+([A-Z]+)_DB_PATH:/gm)].map((match) => match[1]))];
+  const env = devDataDirEnv("/dev-data");
+  assert.deepEqual(Object.keys(env).filter((key) => key.endsWith("_DB_PATH")).sort(), declared.map((name) => `${name}_DB_PATH`).sort());
+  for (const name of declared) assert.equal(env[`${name}_DB_PATH`], join("/dev-data", `${name.toLowerCase()}.sqlite`));
 });

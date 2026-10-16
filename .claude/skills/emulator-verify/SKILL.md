@@ -26,7 +26,7 @@ Read `devices[]`:
 node scripts/dev-emulator.mjs
 ```
 
-Idempotent: claims this worktree's port slot, leases an AVD, seeds the signed-in dev account (`scripta-dev@local.test`, 24-book fixture, three fixture users), starts backend and Metro, opens Expo Go. Add `--reset` only when the pass needs clean fixture data. Never ask the user to sign in.
+Idempotent: claims this worktree's port slot, leases an AVD, seeds the signed-in dev account (`scripta-dev@local.test`, 24-book fixture with ratings, genres and highlights, three fixture users, follows, quizzes, multi-edition works), starts backend and Metro, opens Expo Go. Add `--reset` only when the pass needs clean fixture data, or when `scripts/fixtures/library.json` or `backend/scripts/three-users.mjs` changed since this worktree's data was seeded. Never ask the user to sign in.
 
 Get the serial and ports for this worktree from `node scripts/dev-status.mjs --json`: the `devices[]` entry whose `worktree` is this worktree, and the `stacks[]` entry for its `ports.metro`. Never hardcode `emulator-5554`, 3000 or 8081.
 

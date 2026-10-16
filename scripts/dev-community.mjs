@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // The social graph the dev account needs before Home's Activity tab shows
 // anything: published profiles, follows in both directions, and one event
-// of each kind the feed can render.
+// of each kind the feed can render, including one play of the dev account's
+// quiz (skipped if the dev account has closed it).
 //
 // Seeding the accounts is not enough on its own. A dashboard feed is built
 // from the events of people the viewer FOLLOWS, and an unpublished profile
@@ -72,8 +73,18 @@ async function ensureFollows(follower, followee) {
 const FINISHED_BOOK = { title: "Piranesi", author: "Susanna Clarke", isbn: "9781635575637" };
 const SHARED_BOOKS = [
   { title: "The Fellowship of the Ring", author: "J.R.R. Tolkien", isbn: "9780544003415" },
-  { title: "The Two Towers", author: "J.R.R. Tolkien", isbn: "9780544003423" }
+  { title: "The Two Towers", author: "J.R.R. Tolkien", isbn: "9780547928203" }
 ];
+
+const DEV_QUIZ = {
+  name: "Guess the classic",
+  books: [
+    { title: "1984", author: "George Orwell", blurb: "A records clerk rewrites yesterday's news and keeps a diary he must never be caught with." },
+    { title: "Dracula", author: "Bram Stoker", blurb: "A young solicitor travels east to sell a London house to a count who never eats." },
+    { title: "Frankenstein", author: "Mary Shelley", blurb: "A student builds a man from the dead and runs from him the moment he opens his eyes." },
+    { title: "Pride and Prejudice", author: "Jane Austen", blurb: "Five unmarried sisters, one wealthy newcomer, and a proud friend everyone misjudges." }
+  ]
+};
 
 async function resolveCoverUrl(user, isbn) {
   const resolved = await app.inject({ method: "GET", url: `/covers/resolve?isbn=${isbn}`, headers: { authorization: `Bearer ${user.token}` } });
@@ -113,6 +124,17 @@ async function ensureSharedBooks(user) {
   if (missing.length) log(`${user.username} added ${missing.map((book) => `"${book.title}"`).join(" and ")}.`);
 }
 
+async function ensurePlayedQuiz(owner, player) {
+  const { quizzes } = await call("GET", "/quizzes", undefined, owner.token);
+  const quiz = quizzes.find((entry) => entry.name === DEV_QUIZ.name)
+    ?? await call("POST", "/quizzes", { name: DEV_QUIZ.name, data: { sourceLabel: "My shelf", questionCount: 4, allowedTypes: ["blurb_title"], books: DEV_QUIZ.books } }, owner.token);
+  const code = quiz.voteCode ?? (await call("POST", `/quizzes/${quiz.id}/publish`, {}, owner.token)).voteCode;
+  const { board } = await call("GET", `/quizzes/voting/${code}`);
+  if (!board.playOpen) return;
+  const answers = board.questions.map((question) => ({ questionId: question.id, choiceIndex: 0 }));
+  await call("POST", `/quizzes/voting/${code}/play`, { answers, durationMs: 42_000 }, player.token, [200, 409]);
+}
+
 try {
   const dev = await signIn(DEV_EMAIL, DEV_PASSWORD);
   const alice = await signIn("fixture_alice", FIXTURE_PASSWORD);
@@ -134,8 +156,9 @@ try {
 
   await ensureReadingEvent(alice);
   await ensureSharedBooks(charlie);
+  await ensurePlayedQuiz(dev, alice);
 
-  log(`${DEV_USERNAME} follows fixture_alice and fixture_bob, and fixture_alice follows back.`);
+  log(`${DEV_USERNAME} follows fixture_alice and fixture_bob, fixture_alice follows back, and fixture_alice has played "${DEV_QUIZ.name}".`);
   await app.close();
 } catch (error) {
   await app.close();

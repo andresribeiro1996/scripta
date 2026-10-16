@@ -1491,3 +1491,20 @@ test("a dry run reads the author page and counts the fill without writing", asyn
   assert.equal(h.repo.getBook(before.id)!.author, "");
   assert.equal(reports["Relógio d'Água"]!.identityFilled, 1);
 });
+
+const OVELHAS = "9789897837838";
+const OVELHAS_URL = "https://www.relogiodagua.pt/produto/ovelhas-perdidas/";
+const recordedRelogioFeeds = {
+  [WOO_FEED]: { text: readFileSync(new URL("./fixtures/relogio-products.json", import.meta.url), "utf8") },
+  [OVELHAS_URL]: { text: readFileSync(new URL("./fixtures/pages/relogio-ovelhas-perdidas.html", import.meta.url), "utf8") }
+};
+
+test("a recorded Relógio feed and product page fill a title-only book's author", async () => {
+  const h = await harness({ feeds: recordedRelogioFeeds });
+  const before = publisherBook(h.repo, OVELHAS, "Ovelhas Perdidas", "");
+
+  await importPublisherCovers(h.deps, [relogioLinks], { dryRun: false });
+
+  assert.equal(h.repo.getBook(before.id)!.author, "Madeline Cash");
+  assert.equal(h.requests.filter((url) => url === OVELHAS_URL).length, 1);
+});

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { buildPrompt, codexFailure, codexUsage, codexVerdict, parseFindings, parseReviewArgs, renderCodexReport } from "./codexReview.mjs";
+import { buildPrompt, codexFailure, codexUsage, codexVerdict, configuredModel, parseFindings, parseReviewArgs, renderCodexReport } from "./codexReview.mjs";
 
 const USAGE = { model: "gpt-6.1-sol", tokens: { input: 1300, cached: 1000, output: 350 } };
 const FINDING = { severity: "blocking", file: "backend/src/a.ts", line: 12, summary: "Token leaks", scenario: "A shared link returns the owner's token." };
@@ -30,10 +30,18 @@ test("codexUsage sums usage across turns and skips non-JSON lines", () => {
   assert.deepEqual(codexUsage(jsonl), { model: null, tokens: { input: 1300, cached: 1000, output: 350 } });
 });
 
-test("codexUsage reads the recorded Codex run", () => {
+test("codexUsage reads the recorded Codex run, which names no model", () => {
   const usage = codexUsage(readFileSync(new URL("./fixtures/codex-exec.jsonl", import.meta.url), "utf8"));
   assert.ok(usage.tokens.input > 0);
   assert.ok(usage.tokens.output > 0);
+  assert.equal(usage.model, null);
+});
+
+test("configuredModel reads the top-level model from Codex's config", () => {
+  assert.equal(configuredModel('model = "gpt-6.1-sol"\nmodel_reasoning_effort = "xhigh"\n\n[profiles.fast]\nmodel = "gpt-6.1-mini"\n'), "gpt-6.1-sol");
+  assert.equal(configuredModel('model_reasoning_effort = "xhigh"\n[profiles.fast]\nmodel = "gpt-6.1-mini"\n'), null);
+  assert.equal(configuredModel("model = 'gpt-6.1-sol'\n[profiles.fast]\nmodel = 'gpt-6.1-mini'\n"), "gpt-6.1-sol");
+  assert.equal(configuredModel(""), null);
 });
 
 test("codexFailure reads why a turn failed, which Codex's exit code hides", () => {

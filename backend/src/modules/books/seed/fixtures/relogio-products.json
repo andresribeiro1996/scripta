@@ -1,0 +1,121 @@
+[
+  {
+    "id": 22368,
+    "name": "OVELHAS PERDIDAS",
+    "permalink": "https://www.relogiodagua.pt/produto/ovelhas-perdidas/",
+    "sku": "",
+    "description": "<p>Sinopse omitida.</p>",
+    "short_description": "",
+    "images": [
+      {
+        "src": "https://www.relogiodagua.pt/wp-content/uploads/2026/10/9789897837838-scaled.jpg"
+      }
+    ],
+    "attributes": [],
+    "categories": [],
+    "tags": []
+  },
+  {
+    "id": 22362,
+    "name": "GRANDE ANGULAR — CRÓNICAS",
+    "permalink": "https://www.relogiodagua.pt/produto/grande-angular-cronicas/",
+    "sku": "",
+    "description": "<p>Sinopse omitida.</p>",
+    "short_description": "",
+    "images": [
+      {
+        "src": "https://www.relogiodagua.pt/wp-content/uploads/2026/10/9789897837920.jpg"
+      }
+    ],
+    "attributes": [],
+    "categories": [
+      {
+        "name": "Crónicas"
+      },
+      {
+        "name": "Ensaios"
+      },
+      {
+        "name": "Ensaios Portugueses"
+      }
+    ],
+    "tags": []
+  },
+  {
+    "id": 22358,
+    "name": "Virgínia Woolf",
+    "permalink": "https://www.relogiodagua.pt/produto/virginia-woolf/",
+    "sku": "1707001",
+    "description": "<p>Sinopse omitida.</p>",
+    "short_description": "",
+    "images": [
+      {
+        "src": "https://www.relogiodagua.pt/wp-content/uploads/2023/11/9789727084708.png"
+      }
+    ],
+    "attributes": [],
+    "categories": [
+      {
+        "name": "Crítica Literária"
+      },
+      {
+        "name": "Ensaios"
+      }
+    ],
+    "tags": []
+  },
+  {
+    "id": 22293,
+    "name": "SENSIBILIDADE E BOM SENSO (com sobrecapa do filme)",
+    "permalink": "https://www.relogiodagua.pt/produto/sensibilidade-e-bom-senso-com-sobrecapa-do-filme/",
+    "sku": "",
+    "description": "<p>Sinopse omitida.</p>\n<p>TRADUÇÃO DE PAULO FARIA</strong></p>",
+    "short_description": "",
+    "images": [
+      {
+        "src": "https://www.relogiodagua.pt/wp-content/uploads/2026/10/9789897837890-scaled.jpg"
+      }
+    ],
+    "attributes": [],
+    "categories": [
+      {
+        "name": "eBooks"
+      },
+      {
+        "name": "Clássicos"
+      },
+      {
+        "name": "Jovem Adulto / TikTok"
+      }
+    ],
+    "tags": [
+      {
+        "name": "price_protected"
+      }
+    ]
+  },
+  {
+    "id": 22244,
+    "name": "AQUELES MUROS ALTOS",
+    "permalink": "https://www.relogiodagua.pt/produto/aqueles-muros-altos/",
+    "sku": "",
+    "description": "<p>Sinopse omitida.</p>",
+    "short_description": "",
+    "images": [
+      {
+        "src": "https://www.relogiodagua.pt/wp-content/uploads/2026/10/9789897837364.jpg"
+      }
+    ],
+    "attributes": [],
+    "categories": [
+      {
+        "name": "Ficção Portuguesa"
+      }
+    ],
+    "tags": [
+      {
+        "name": "price_protected"
+      }
+    ]
+  }
+]
