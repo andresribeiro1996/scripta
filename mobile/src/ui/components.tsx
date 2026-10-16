@@ -178,6 +178,7 @@ export function Button({
   variant = "primary",
   loading = false,
   disabled = false,
+  numberOfLines,
   onPress,
 }: {
   label: string;
@@ -185,6 +186,7 @@ export function Button({
   variant?: ButtonVariant;
   loading?: boolean;
   disabled?: boolean;
+  numberOfLines?: number;
   /** Omitted when the button is only a trigger — see Menu. */
   onPress?: () => void;
 }) {
@@ -210,7 +212,7 @@ export function Button({
         },
       ]}
     >
-      {loading ? <ActivityIndicator color={color} /> : <Text {...dynamicType} style={[styles.buttonText, { color }]}>{label}</Text>}
+      {loading ? <ActivityIndicator color={color} /> : <Text {...dynamicType} numberOfLines={numberOfLines} style={[styles.buttonText, { color }]}>{label}</Text>}
     </Pressable>
   );
 }

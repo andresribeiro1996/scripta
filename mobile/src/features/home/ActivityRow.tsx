@@ -19,7 +19,7 @@ export function ActivityRow({ item, isNew, following, onOpen, onFollowBack }: { 
         <View style={styles.stamp}>{isNew ? <View style={[styles.newDot, { backgroundColor: colors.accent }]} /> : null}<Text {...dynamicType} numberOfLines={1} style={[typography.caption, { color: colors.textDim }]}>{time}</Text></View>
       </View>
     </Pressable>
-    {row.action.kind === "followBack" ? <Button variant="secondary" label="Follow back" accessibilityLabel={`Follow ${row.lead} back`} loading={following} onPress={onFollowBack} />
+    {row.action.kind === "followBack" ? <Button variant="secondary" label="Follow back" numberOfLines={1} accessibilityLabel={`Follow ${row.lead} back`} loading={following} onPress={onFollowBack} />
       : row.action.kind === "following" ? <Text {...dynamicType} numberOfLines={1} style={[typography.caption, { color: colors.textDim }]}>Following</Text>
       : <Pressable accessibilityRole="link" onPress={onOpen} style={({ pressed }) => [styles.link, { opacity: pressed ? 0.6 : 1 }]}><Text {...dynamicType} numberOfLines={1} style={[typography.caption, styles.strong, { color: colors.accent }]}>{row.action.label} →</Text></Pressable>}
   </View>;
