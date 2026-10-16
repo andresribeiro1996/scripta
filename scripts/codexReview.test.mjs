@@ -6,10 +6,9 @@ import { buildPrompt, codexFailure, codexUsage, codexVerdict, parseFindings, par
 const USAGE = { model: "gpt-6.1-sol", tokens: { input: 1300, cached: 1000, output: 350 } };
 const FINDING = { severity: "blocking", file: "backend/src/a.ts", line: 12, summary: "Token leaks", scenario: "A shared link returns the owner's token." };
 
-test("parseReviewArgs needs a plan in plan mode and a spec in both", () => {
-  assert.deepEqual(parseReviewArgs(["plan", "s.md", "p.md"]), { mode: "plan", spec: "s.md", plan: "p.md" });
+test("parseReviewArgs accepts only branch mode and needs a spec", () => {
+  assert.throws(() => parseReviewArgs(["plan", "s.md", "p.md"]), /usage: codex-review.mjs branch/);
   assert.deepEqual(parseReviewArgs(["branch", "s.md"]), { mode: "branch", spec: "s.md", plan: undefined });
-  assert.throws(() => parseReviewArgs(["plan", "s.md"]), /usage: .*plan <spec.md> <plan.md>/);
   assert.throws(() => parseReviewArgs(["branch"]), /usage: /);
   assert.throws(() => parseReviewArgs(["review", "s.md"]), /usage: /);
   assert.throws(() => parseReviewArgs(["constructor", "s.md"]), /usage: /);
@@ -74,14 +73,14 @@ test("a report groups findings by severity and ends on the verdict", () => {
 });
 
 test("a clean report says so and passes", () => {
-  const report = renderCodexReport({ mode: "plan", round: 1, seconds: 60, usage: { model: null, tokens: { input: 1, cached: 0, output: 1 } }, result: { verdict: "pass", findings: [] }, error: null });
+  const report = renderCodexReport({ mode: "branch", round: 1, seconds: 60, usage: { model: null, tokens: { input: 1, cached: 0, output: 1 } }, result: { verdict: "pass", findings: [] }, error: null });
   assert.match(report, /Model: unknown/);
   assert.match(report, /No findings\./);
   assert.equal(report.trimEnd().split("\n").at(-1), "CODEX: PASS");
 });
 
 test("an error report never says pass", () => {
-  const report = renderCodexReport({ mode: "plan", round: 1, seconds: 3, usage: USAGE, result: null, error: "codex exited 1" });
+  const report = renderCodexReport({ mode: "branch", round: 1, seconds: 3, usage: USAGE, result: null, error: "codex exited 1" });
   assert.equal(report.trimEnd().split("\n").at(-1), "CODEX: ERROR — codex exited 1");
   assert.doesNotMatch(report, /CODEX: PASS/);
 });

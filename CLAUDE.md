@@ -10,7 +10,7 @@ The main session plans, designs and reviews; routine work goes to the saved agen
 | Implementing a plan task | `implementer` |
 | After each task: does it match the spec? | `spec-reviewer` |
 | After spec passes: bugs and repo rules | `quality-reviewer` |
-| A plan is written, before the fresh-session handoff | `node scripts/codex-review.mjs plan <spec> <plan>` with Bash `run_in_background`; fix the plan from its report, then commit. If it reports `CODEX: ERROR`, have `branch-reviewer` review the plan instead. Each task's Files list has one backticked path per `- Create:`/`- Modify:`/`- Test:`/`- Delete:` line — the gate reads it |
+| A plan is written, before the fresh-session handoff | `branch-reviewer` on the spec and plan; fix the plan from its report, then commit. Each task's Files list has one backticked path per `- Create:`/`- Modify:`/`- Test:`/`- Delete:` line — the gate reads it |
 | Once per branch before merge | `branch-reviewer` with the spec and plan, and `node scripts/codex-review.mjs branch <spec> <plan>` in the background, in parallel |
 | Rendered mobile change needs a device pass | `device-checker` |
 | User wants emulator screenshots | `device-checker`, capture-only, `model: "haiku"`; send the PNGs with SendUserFile without reading them |

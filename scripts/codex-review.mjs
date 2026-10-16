@@ -70,12 +70,10 @@ function main() {
   let jsonl = "";
   let treeChanged = false;
   let seconds = 0;
-  if (args.mode === "branch") {
-    try {
-      git(root, ["fetch", "-q", "origin", "main"]);
-    } catch (fetchError) {
-      error = `git fetch origin main failed: ${fetchError.message.split("\n")[0]}`;
-    }
+  try {
+    git(root, ["fetch", "-q", "origin", "main"]);
+  } catch (fetchError) {
+    error = `git fetch origin main failed: ${fetchError.message.split("\n")[0]}`;
   }
 
   if (!error) {
