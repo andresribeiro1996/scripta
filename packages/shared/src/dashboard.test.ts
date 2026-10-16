@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { DigestItem, ParticipationItem } from "./dashboard.js";
-import { clearDashboardCounts, dashboardQuery, digestAction, digestHeading, digestTarget, isNewDigestItem, newCountLabel, participationLead, upNextPair, withKnownDigestItems } from "./dashboard.js";
+import { CIRCLE_DIGEST_KINDS, PERSONAL_DIGEST_KINDS, clearDashboardCounts, dashboardQuery, digestAction, digestHeading, digestTarget, isNewDigestItem, newCountLabel, participationLead, upNextPair, withKnownDigestItems } from "./dashboard.js";
 
 const actor = { userId: "u1", username: "alice", avatarUrl: null };
 const tierlist = { kind: "tierlist" as const, id: "t1", voteCode: "abc", name: "Fantasy doorstoppers", poolSize: 5, ballotCount: 1, votingOpen: true, promotedAt: null, covers: [] };
@@ -101,6 +101,13 @@ test("the dashboard query lists every kind this build can draw, then carries the
   const kinds = "?kinds=publication,vote,reading,follow,participation,mural,completion,started";
   assert.equal(dashboardQuery(), kinds);
   assert.equal(dashboardQuery("a b/c"), `${kinds}&cursor=a%20b%2Fc`);
+});
+
+test("Home and Activity ask for disjoint kinds that together cover every kind this build draws", () => {
+  const all = dashboardQuery().slice("?kinds=".length).split(",");
+  assert.deepEqual([...CIRCLE_DIGEST_KINDS, ...PERSONAL_DIGEST_KINDS].sort(), [...all].sort());
+  assert.equal(dashboardQuery(undefined, PERSONAL_DIGEST_KINDS), "?kinds=follow,participation,completion");
+  assert.equal(dashboardQuery("a b", CIRCLE_DIGEST_KINDS), "?kinds=publication,vote,reading,mural,started&cursor=a%20b");
 });
 
 test("two keys pairs both, at any offset", () => {

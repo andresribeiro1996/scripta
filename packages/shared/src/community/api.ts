@@ -32,8 +32,8 @@ export function createCommunityApi(request: ApiRequest) {
       const page = await request<Page<DigestItem>>("/community/saved" + (cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""), { auth: "required" });
       return { ...page, items: page.items.filter(isKnownDigestItem) };
     },
-    async fetchDashboard(cursor?: string): Promise<DashboardFeedPage> {
-      return withKnownDigestItems(await request<DashboardFeedPage>(`/community/dashboard${dashboardQuery(cursor)}`, { auth: "required" }));
+    async fetchDashboard(cursor?: string, kinds?: readonly string[]): Promise<DashboardFeedPage> {
+      return withKnownDigestItems(await request<DashboardFeedPage>(`/community/dashboard${dashboardQuery(cursor, kinds)}`, { auth: "required" }));
     },
     async markDashboardSeen(): Promise<void> {
       await request("/community/dashboard/seen", { method: "POST", auth: "required" });
