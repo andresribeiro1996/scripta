@@ -31,7 +31,7 @@ git push -u origin HEAD
 
 `gh pr view --json number,url,state` — if there is none, `gh pr create --base main` with a short what/why body ending in the attribution line. Then call the `ccd_pr` `get_status` tool; if it doesn't report this PR, `bind_pr` it.
 
-If the branch touches auth, tokens, OAuth, share links or visibility rules, run the `security-review` skill now and fix what it finds before merging. For a multi-task branch that hasn't had one, dispatch `branch-reviewer`.
+If the branch touches auth, tokens, OAuth, share links or visibility rules, run the `security-review` skill now and fix what it finds before merging. For a multi-task branch that hasn't had one, dispatch `branch-reviewer` and run `node scripts/codex-review.mjs branch <spec> [plan]` in the background, in parallel.
 
 ## 5. Auto-merge
 

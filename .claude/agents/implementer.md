@@ -20,10 +20,10 @@ Run git from the worktree root; `git -C` and `cd … && git` can trigger approva
 
 Before trusting any test run, `ls node_modules` at the worktree root. Missing → `npm run dev:link-deps`; afterwards `readlink node_modules/@scripta/shared` must print `../../packages/shared`. Otherwise tests resolve the main checkout's stale copy and a failure looks "pre-existing".
 
-Verify before committing — run every Verify command from each touched package's `AGENTS.md`. If you touched `packages/shared`, run `npm run build --workspace @scripta/shared` first, since consumers read `dist/`. Also run `npm run lint --workspace frontend` for frontend changes.
+Verify before committing: from the worktree root run `node scripts/gate.mjs --plan <plan file> --task <N>`, or `node scripts/gate.mjs` when there is no plan. It runs every Verify command the change needs, checks the changed files against the task's **Files:** list, and prints its report's path and `RESULT: PASS` or `RESULT: FAIL`. Read the report, fix, and run it again until it passes. If the task needs a file its list doesn't name, don't commit; report it.
 
 Do not start dev servers or take the emulator. If the task needs a device check, say so in your report and stop; the main session dispatches `device-checker`.
 
-Commit only when every check passes, with a message whose body says why the change was needed. If a check fails and you cannot fix it inside the task's scope, do not commit — report it.
+Commit only on `RESULT: PASS`, with a message whose body says why the change was needed. If a check fails and you cannot fix it inside the task's scope, do not commit — report it.
 
-Report back: files changed, each verify command with its result, the commit SHA, and anything in the plan you had to interpret or could not do.
+Report back, in this order: **Deviations and doubts** — where the plan didn't match the code, what you had to interpret, what you could not do, or "none"; files changed; the gate report's path and its `RESULT` line; the commit SHA.
