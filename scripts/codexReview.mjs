@@ -67,7 +67,7 @@ export function codexUsage(jsonl) {
 
 export function configuredModel(toml) {
   const topLevel = toml.split(/^\s*\[/m)[0];
-  return /^\s*model\s*=\s*"([^"]+)"/m.exec(topLevel)?.[1] ?? null;
+  return /^\s*model\s*=\s*(?:"([^"]+)"|'([^']+)')/m.exec(topLevel)?.slice(1).find(Boolean) ?? null;
 }
 
 export function parseFindings(text) {

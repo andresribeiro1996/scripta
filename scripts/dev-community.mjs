@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // The social graph the dev account needs before Home's Activity tab shows
 // anything: published profiles, follows in both directions, and one event
-// of each kind the feed can render.
+// of each kind the feed can render, including one play of the dev account's
+// quiz (skipped if the dev account has closed it).
 //
 // Seeding the accounts is not enough on its own. A dashboard feed is built
 // from the events of people the viewer FOLLOWS, and an unpublished profile
@@ -129,6 +130,7 @@ async function ensurePlayedQuiz(owner, player) {
     ?? await call("POST", "/quizzes", { name: DEV_QUIZ.name, data: { sourceLabel: "My shelf", questionCount: 4, allowedTypes: ["blurb_title"], books: DEV_QUIZ.books } }, owner.token);
   const code = quiz.voteCode ?? (await call("POST", `/quizzes/${quiz.id}/publish`, {}, owner.token)).voteCode;
   const { board } = await call("GET", `/quizzes/voting/${code}`);
+  if (!board.playOpen) return;
   const answers = board.questions.map((question) => ({ questionId: question.id, choiceIndex: 0 }));
   await call("POST", `/quizzes/voting/${code}/play`, { answers, durationMs: 42_000 }, player.token, [200, 409]);
 }

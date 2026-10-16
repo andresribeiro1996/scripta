@@ -40,6 +40,7 @@ test("codexUsage reads the recorded Codex run, which names no model", () => {
 test("configuredModel reads the top-level model from Codex's config", () => {
   assert.equal(configuredModel('model = "gpt-6.1-sol"\nmodel_reasoning_effort = "xhigh"\n\n[profiles.fast]\nmodel = "gpt-6.1-mini"\n'), "gpt-6.1-sol");
   assert.equal(configuredModel('model_reasoning_effort = "xhigh"\n[profiles.fast]\nmodel = "gpt-6.1-mini"\n'), null);
+  assert.equal(configuredModel("model = 'gpt-6.1-sol'\n[profiles.fast]\nmodel = 'gpt-6.1-mini'\n"), "gpt-6.1-sol");
   assert.equal(configuredModel(""), null);
 });
 

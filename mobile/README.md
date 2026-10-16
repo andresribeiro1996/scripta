@@ -82,7 +82,7 @@ account.
 
 `dev-emulator.mjs` starts a single real backend
 (`backend/src/server.ts`, same as `npm run backend`) against a dedicated
-`backend/data/dev/` directory, and seeds it with two things before that
+`backend/data/dev/` directory, and seeds it with the following before that
 server starts:
 
 - A dedicated local-only dev account (`scripta-dev@local.test` /

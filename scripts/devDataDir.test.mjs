@@ -75,7 +75,7 @@ test("does nothing on a directory already in the current layout", () => {
 
 test("devDataDirEnv points every database the backend declares at the dev data directory", () => {
   const source = readFileSync(new URL("../backend/src/config/env.ts", import.meta.url), "utf8");
-  const declared = [...new Set([...source.matchAll(/^\s+([A-Z]+)_DB_PATH:/gm)].map((match) => match[1]))].filter((name) => name !== "WAITLIST");
+  const declared = [...new Set([...source.matchAll(/^\s+([A-Z]+)_DB_PATH:/gm)].map((match) => match[1]))];
   const env = devDataDirEnv("/dev-data");
   assert.deepEqual(Object.keys(env).filter((key) => key.endsWith("_DB_PATH")).sort(), declared.map((name) => `${name}_DB_PATH`).sort());
   for (const name of declared) assert.equal(env[`${name}_DB_PATH`], join("/dev-data", `${name.toLowerCase()}.sqlite`));
