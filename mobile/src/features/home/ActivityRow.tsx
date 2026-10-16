@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
-import { Button, Icon, captionHitSlop, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
+import { Button, Icon, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import { AuthorAvatar } from "../community/AuthorAvatar";
 import { activityRowModel, activitySentence, type PersonalItem } from "./activityModel";
 import { relativeTime } from "./feedRowModel";
@@ -15,18 +15,19 @@ export function ActivityRow({ item, isNew, following, onOpen, onFollowBack }: { 
       {avatar ? <AuthorAvatar username={avatar.username} avatarUrl={avatar.avatarUrl} /> : <View style={[styles.tile, { backgroundColor: colors.accentSoft }]}><Icon name={item.kind === "completion" ? "champion" : "community"} size={16} color={colors.accent} /></View>}
       <View style={styles.copy}>
         <Text {...dynamicType} style={[typography.caption, { color: colors.text }]}>{row.lead ? <Text style={styles.strong}>{row.lead} </Text> : null}{row.verb}{row.target ? <Text style={styles.strong}> {row.target}</Text> : null}</Text>
-        <View style={styles.stamp}>{isNew ? <View style={[styles.newDot, { backgroundColor: colors.accent }]} /> : null}<Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{time}</Text></View>
+        <View style={styles.stamp}>{isNew ? <View style={[styles.newDot, { backgroundColor: colors.accent }]} /> : null}<Text {...dynamicType} numberOfLines={1} style={[typography.caption, { color: colors.textDim }]}>{time}</Text></View>
       </View>
     </Pressable>
     {row.action.kind === "followBack" ? <Button variant="secondary" label="Follow back" accessibilityLabel={`Follow ${row.lead} back`} loading={following} onPress={onFollowBack} />
-      : row.action.kind === "following" ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Following</Text>
-      : <Pressable accessibilityRole="link" hitSlop={captionHitSlop} onPress={onOpen} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}><Text {...dynamicType} style={[typography.caption, styles.strong, { color: colors.accent }]}>{row.action.label} →</Text></Pressable>}
+      : row.action.kind === "following" ? <Text {...dynamicType} numberOfLines={1} style={[typography.caption, { color: colors.textDim }]}>Following</Text>
+      : <Pressable accessibilityRole="link" onPress={onOpen} style={({ pressed }) => [styles.link, { opacity: pressed ? 0.6 : 1 }]}><Text {...dynamicType} numberOfLines={1} style={[typography.caption, styles.strong, { color: colors.accent }]}>{row.action.label} →</Text></Pressable>}
   </View>;
 }
 
 const styles = StyleSheet.create({
-  row: { marginHorizontal: spacing.lg, paddingVertical: spacing.md, borderBottomWidth: 1, flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  main: { flex: 1, minWidth: 0, minHeight: minimumTouchTarget, flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  row: { marginHorizontal: spacing.lg, paddingVertical: spacing.md, borderBottomWidth: 1, flexDirection: "row", flexWrap: "wrap", justifyContent: "flex-end", alignItems: "center", gap: spacing.sm },
+  main: { flexGrow: 1, flexShrink: 1, flexBasis: 144, minWidth: 0, minHeight: minimumTouchTarget, flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  link: { minHeight: minimumTouchTarget, justifyContent: "center" },
   copy: { flex: 1, minWidth: 0, gap: spacing.xs },
   tile: { width: 28, height: 28, borderRadius: radii.full, alignItems: "center", justifyContent: "center" },
   stamp: { flexDirection: "row", alignItems: "center", gap: spacing.xs },

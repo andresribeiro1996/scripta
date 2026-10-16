@@ -848,7 +848,7 @@ const styles = StyleSheet.create({
   tabLabel: { fontWeight: "700" },
   tabBadge: { minWidth: 20, height: 20, paddingHorizontal: spacing.xs, borderRadius: radii.full, alignItems: "center", justifyContent: "center" },
   tabBadgeText: { fontSize: 12, lineHeight: 16, fontWeight: "700" },
-  iconBadge: { position: "absolute", top: -6, right: -6 },
+  iconBadge: { position: "absolute", top: 0, right: 0 },
   tabIndicator: { position: "absolute", left: 0, bottom: 0, height: 3, width: 1 },
   fab: { position: "absolute", right: spacing.lg, bottom: spacing.lg, minHeight: 56, flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingHorizontal: spacing.lg, borderRadius: radii.full, elevation: 6, shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } },
   fabLabel: { fontWeight: "700" },
