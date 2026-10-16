@@ -29,18 +29,25 @@ A 2026-10-16 UI review of the mobile Home tab, on the signed-in fixture, found t
 - **One seen timestamp, owned by Activity on mobile.**
   - `users.dashboard_seen_at` stays the only seen state, with no database change.
   - The Activity screen marks seen. Home stops marking seen and loses its per-post "new" dots, since only Activity and web now move the timestamp.
-  - Seeing items on web clears the mobile bell. This is intended: same account, same items.
-- **A play of your own game shows only in Activity.** When the request includes `participation`, the digest drops `voted_on` events on games the viewer owns. A request without `participation` keeps them, so no client loses the event.
+  - Seeing items on web clears the mobile bell. Opening Activity on mobile clears web's "New" chips, circle posts included. This is intended: one account, one seen state.
+- **A play of your own game shows only in Activity.**
+  - Whenever the client sends `kinds`, the digest drops `voted_on` events on games the viewer owns.
+  - Only the legacy request with no `kinds` keeps them. Every client that sends `kinds` has included `participation` since `kinds` was introduced (`3c76a93e`), so none of them loses the event.
+  - A promoted tier list is the exception. Its `ownerUserId` stays the original creator, but participation rows exclude promoted lists, so votes on it are kept.
 - **One rule for actions.**
   - An action that changes something in place ("Want to read", "Follow back") is a secondary `Button`.
   - An action that opens a screen is a bold accent link ending in "→".
+  - Exception: the invitation on a published game that is still open ("Rank this list", "Play quiz") stays a filled primary `Button`. It is the post's whole point, and it is the only filled button in the feed.
 - **Activity rows are not posts.** They have no bookmark, Share, like or comment, and no preview art.
 - **Web keeps its single combined list.** It gets the dedupe and the plural fix from the backend and `@scripta/shared`, with no web UI change.
 - **Old installed mobile builds are unaffected.** They request all kinds and mark seen on Home, and both still work.
 
 ## Scope
 
-1. **Backend:** in `getDashboard`, when `kinds` has `participation`, a `voted_on` event whose content owner is the viewer produces no item. The vote branch of `toDigestItem` (`service.ts:282-291`) is the place.
+1. **Backend:**
+   - In `getDashboard`, when the client sent `kinds`, a `voted_on` event on a game the viewer owns produces no item. A promoted tier list doesn't count as owned.
+   - The vote branch of `toDigestItem` (`service.ts:282-291`) is the place. Its "no ownership check" comment goes.
+   - The community dashboard bullet in `backend/README.md` records the rule.
 2. **Shared:**
    - Export one `plural(count, one, many)` and replace the private copies in `works/bookStats.ts:16` and `library/readerIdentity.ts:41`.
    - `contentDetail` uses it for books, ballots, questions and plays.
@@ -55,7 +62,9 @@ A 2026-10-16 UI review of the mobile Home tab, on the signed-in fixture, found t
    - `clearDashboardCounts` applies to the Activity query after a successful mark-seen.
 4. **Bell:**
    - A `bell` glyph in `GLYPHS` (`mobile/src/ui/icon.tsx`).
-   - The Home header becomes brand mark, bell `IconButton` with `badge`, then "Saved". `IconButton` already supports `badge` (`mobile/src/ui/components.tsx:221-269`).
+   - The Home header becomes brand mark, then an "Activity" `IconButton` (bell glyph, `label`, `framed`, `badge`), then "Saved".
+   - `IconButton` already supports `badge` (`mobile/src/ui/components.tsx:221-269`).
+   - DESIGN.md's header rule requires a label on every header action except `⋯`, and allows two.
    - The bell pushes `/activity`.
 5. **Activity screen:**
    - Route `mobile/src/app/(app)/(home)/activity.tsx`, titled "Activity". The screen lives in `mobile/src/features/home/`.
@@ -70,40 +79,48 @@ A 2026-10-16 UI review of the mobile Home tab, on the signed-in fixture, found t
      - When the viewer already follows them, the action is "Following" in grey text.
    - Participation: `participationLead` + "played your quiz" / "ranked your tier list" / "voted in your tournament" + the game name in bold. Action "View results →" / "View rankings →" / "View tournament →".
    - Completion: "A tournament you joined has finished: <tournament name>". Action "View final bracket →".
-   - Tapping the row body opens `digestRoute(item)`.
+   - Tapping the row body opens `digestRoute(item)`. The row body is at least 44pt tall.
    - The accessibility label is the sentence plus the time.
 7. **Home posts (`HomeFeedRow`, `FeedPreview`, `HomeScreen`):**
    - Home renders one section, "Your reading circle", with "Find readers →" bold. `homeFeedSections` goes away if nothing else uses it.
-   - The heading and text links lose their 44pt `minHeight` and keep a 44pt touch area through `hitSlop`. Vertical padding tightens. The target is about 170pt for a reading or quiz post, measured on the emulator.
-   - Every dense post's preview sits in one column `SLOT_WIDTH` wide, content left-aligned.
+   - The heading, text links, bookmark and reaction buttons lose their 44pt `minHeight` and keep a 44pt touch area through `hitSlop`. Vertical padding tightens.
+   - Target heights, measured on the emulator (today about 265pt):
+     - about 180pt for a post whose action is a link;
+     - about 205pt for a reading post, since the "Want to read" `Button` stays 44pt.
+   - Every dense post's preview sits in a column at least `SLOT_WIDTH` wide, content left-aligned. A tier-list vote's 120pt ranking keeps its own width.
    - The no-cover icon fallback becomes a 48×72 surface tile, the size of a book cover.
    - "Want to read" becomes a secondary `Button`. "Open in your shelf" opens a screen, so it becomes a "→" link.
-   - A like or comment count of 0 shows the icon only. The accessibility label still says "0 likes".
+   - A like or comment count of 0 shows the icon only. Accessibility labels keep their current wording.
    - All verbs use `colors.textDim`.
    - No "new" dots on posts.
-8. **Order check:**
-   - Before changing anything, read the fixture's dashboard response and compare the `createdAt` values of the two items behind the screenshots.
-   - If the server order is wrong, write a failing backend test, then fix it.
-   - If the order is right, the time labels are stale. Write a failing test for that, then fix it.
-   - If neither reproduces, record that in the PR and change nothing.
+   - The Home section of `mobile/README.md` describes the bell and Activity instead of "Around your shelf".
+8. **Order check:** no code change.
+   - In this worktree's fixture database (`backend/data/dev/`, read 2026-10-16), the play of the dev quiz, alice's finished book and the follows were all written within 30 ms, in the order the server returned them: play newest.
+   - So the server order is right, and the 2-minute gap between the captured labels can't come from the data.
+   - The device pass checks that time labels never get younger down a list. If they do, diagnose it then, with a failing test first.
 
 ## Testing
 
 - **Backend:**
-  - A follower plays the viewer's quiz with all kinds requested: one `participation` item and no `vote` item.
-  - With `kinds` lacking `participation`: the `vote` item is returned.
+  - A follower plays the viewer's quiz:
+    - with all kinds: one `participation` item and no `vote` item;
+    - with circle kinds only: no item at all;
+    - with no `kinds` (legacy): the `vote` item.
   - A follower plays someone else's quiz: the `vote` item is still returned.
+  - A follower ranks the viewer's promoted tier list: the `vote` item is still returned.
 - **Shared:**
   - `plural` at 0, 1 and 2.
-  - `contentDetail` with a count of 1.
+  - `contentDetail` with counts of 1, for a quiz and for a tier list.
   - `dashboardQuery` with and without `kinds`. The existing string assertion in `dashboard.test.ts:100-104` moves.
 - **Mobile model tests:**
   - The Activity row's sentence and action for every personal kind, including the "Following" state.
-  - The zero-count rule.
-  - The verb colour no longer depends on kind.
+  - The zero-count rule, without hiding the loading "…".
 - **Device pass** with `device-checker`:
   - Home: header bell with badge, one section, post height, aligned titles, "Want to read" button.
-  - Activity: rows, "Follow back", empty state, and the badge clearing after the screen is seen.
+  - Activity: rows, "Follow back", and the badge clearing after the screen is seen.
+  - The empty state isn't device-checked: the fixture always has follows and a play.
+  - Both: time labels never get younger down the list.
+  - Both again at the largest system font size.
 
 ## Non-goals
 
