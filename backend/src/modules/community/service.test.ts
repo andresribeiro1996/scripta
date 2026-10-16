@@ -2715,6 +2715,27 @@ test("a follower's play of the viewer's own game is left out whenever the client
   assert.deepEqual(ids(), ["play-mine", "play-theirs", "rank-promoted"]);
 });
 
+test("a follower's vote on the viewer's own tournament or unpromoted tier list is left out whenever the client names its kinds", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs, tournamentRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  repo.upsertProfile(profileRow("alice"));
+  repo.insertFollow({ follower_id: "viewer", followee_id: "alice", created_at: at(1) });
+  tierlistRefs.set("mine-list", tierRef("mine-list", "viewer"));
+  tierlistRefs.set("theirs-list", tierRef("theirs-list", "bob"));
+  tournamentRefs.set("mine-cup", tournRef("mine-cup", "viewer"));
+  tournamentRefs.set("theirs-cup", tournRef("theirs-cup", "bob"));
+  repo.insertEvent({ id: "rank-mine", user_id: "alice", type: "voted_on", ref_type: "tierlist", ref_id: "mine-list", payload: null, created_at: at(4) });
+  repo.insertEvent({ id: "rank-theirs", user_id: "alice", type: "voted_on", ref_type: "tierlist", ref_id: "theirs-list", payload: null, created_at: at(3) });
+  repo.insertEvent({ id: "vote-mine", user_id: "alice", type: "voted_on", ref_type: "tournament", ref_id: "mine-cup", payload: null, created_at: at(2) });
+  repo.insertEvent({ id: "vote-theirs", user_id: "alice", type: "voted_on", ref_type: "tournament", ref_id: "theirs-cup", payload: null, created_at: at(1) });
+  const ids = (kinds?: ReadonlySet<string>) => service.getDashboard("viewer", undefined, 20, kinds).items.map((item) => item.id);
+
+  assert.deepEqual(ids(new Set(["publication", "vote", "reading", "mural", "started"])), ["rank-theirs", "vote-theirs"]);
+  assert.deepEqual(ids(), ["rank-mine", "rank-theirs", "vote-mine", "vote-theirs"]);
+});
+
 test("getActivity enriches quiz publications and plays with a play link, and drops them once the quiz is deleted", () => {
   const { repo } = createRepoFake();
   const { deps, usernames, quizRefs } = createDeps(repo);
