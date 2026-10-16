@@ -350,6 +350,8 @@ Matches every live Portuguese work (all its editions `pt`, `pt-PT` or `pt-BR`) t
 
 `--recheck-none` also selects works whose answer was "none", not the owner's, and is more than 30 days old, since their original may have arrived since.
 
+Filling a book's empty title or author (`fillIdentity`, e.g. from the publisher importer) drops its work's code-only "none" answer, so the next run plans that work again without `--recheck-none`; Jev's and the owner's answers stay.
+
 The report counts `originalTitles`, `originals`, `noCandidates`, `codeMerges`, `codeBlocked` (blocked by an arena), Jev's `jevMerges`, `jevBlocked`, `possible` and `none`, then `strikes`, `stoppedBy` (`done`, `budget`, `outage`, `key` or `no-key`), `requests` used and `estimatedCostUsd`.
 
 #### Calibrating Jev

@@ -112,6 +112,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   `);
   const workMatchJudgmentsStmt = db.prepare(`SELECT work_id, model, into_work_id, confidence, asked_at FROM work_match_judgments WHERE work_id IN (SELECT value FROM json_each(?))`);
   const saveWorkMatchJudgmentStmt = db.prepare(`INSERT OR REPLACE INTO work_match_judgments (work_id, model, into_work_id, confidence, asked_at) VALUES (?, ?, ?, ?, ?)`);
+  const reopenCodeNoMatchStmt = db.prepare(`DELETE FROM work_match_judgments WHERE model = 'code' AND into_work_id IS NULL AND work_id = (SELECT work_id FROM books WHERE id = ?)`);
   const portugueseWorkFilter = `
     w.merged_into IS NULL
     AND EXISTS (SELECT 1 FROM books b WHERE b.work_id = w.id)
@@ -584,6 +585,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
         if (nextTitle === row.title && nextAuthor === row.author) return;
         fillIdentityStmt.run(nextTitle, nextAuthor, nextTitle ? workTitleKey(nextTitle, nextAuthor) : null, id);
         fillWorkIdentityStmt.run(id);
+        reopenCodeNoMatchStmt.run(id);
         if (searchableStmt.get(id)) refreshSearchStmt.run(nextTitle, nextAuthor, id);
         else makeSearchableIfConfirmed(id);
       });
