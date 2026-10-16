@@ -86,13 +86,15 @@ account.
 server starts:
 
 - A dedicated local-only dev account (`scripta-dev@local.test` /
-  `scripta_dev`, seeded by `scripts/dev-account.mjs`) carrying a ~24-book
+  `scripta_dev`, seeded by `scripts/dev-account.mjs`) carrying a 24-book
   fixture library (`scripts/fixtures/library.json`) — two series, two
-  collections, mixed read statuses, and both a book-level and a
-  series-level style override, so Series/Collections/Style screens all
-  have real content to look at immediately. The Expo app auto-signs into
-  this account on boot (dev builds only — see `src/core/devSession.ts`'s
-  own comment; it never overwrites a real signed-in session).
+  collections, mixed read statuses, ratings and read dates on finished
+  books, genres on every book, four highlights, and both a book-level and a
+  series-level style override. It reads as a settled classics reader, so
+  the shelf preset offers the reader card, a passage and Favourites. The
+  Expo app auto-signs into this account on boot (dev builds only — see
+  `src/core/devSession.ts`'s own comment; it never overwrites a real
+  signed-in session).
 - The three-user fixture (`backend/scripts/three-users.mjs --shared`,
   see its own `backend/scripts/three-users.md`) — `fixture_alice`,
   `fixture_bob`, `fixture_charlie`, password `scripta123` for all three —
@@ -100,6 +102,15 @@ server starts:
   polls, Arena) against that same server and database. Sign into one of
   these manually in the app (or a second Expo Go session/device) alongside
   the auto-signed-in dev account.
+- Every boot also runs `scripts/dev-editions.mjs` (The Hobbit and Dune
+  with several editions, synopses and genres) and `scripts/dev-community.mjs`
+  (published profiles, follows, alice's finished book, and a dev-account
+  quiz that alice has played).
+
+`library.json` and the three-user fixture reach an existing
+`backend/data/dev/` only with `--reset`; the editions and community seeds
+reach it on the next boot. Feed and participation rows leave Home 30 days
+after they were seeded — `--reset` brings them back.
 
 Without `--reset`, re-running preserves both the dev account's and the
 fixture users' state, so testing progress across a session survives a

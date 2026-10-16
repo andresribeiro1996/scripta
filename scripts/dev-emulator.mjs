@@ -23,10 +23,12 @@
 //      image has no Play Store to install it from normally).
 //   3. --reset only: wipe backend/data/dev/ so every module starts clean.
 //   4. Seed the dev account + fixture library (scripts/dev-account.mjs,
-//      writing into backend/data/dev/), then seed the three fixture
-//      users (fixture_alice/bob/charlie, backend/scripts/three-users.mjs
-//      --seed-only --shared) into that SAME directory — one database,
-//      four logins.
+//      writing into backend/data/dev/), the multi-edition works
+//      (scripts/dev-editions.mjs), the three fixture users
+//      (fixture_alice/bob/charlie, backend/scripts/three-users.mjs
+//      --seed-only --shared) and the follows and quiz between them
+//      (scripts/dev-community.mjs) into that SAME directory — one
+//      database, four logins.
 //   5. Start the real backend (plain http — an emulator reaches the
 //      host's localhost through `adb reverse`, so unlike a physical
 //      phone this never needs the LAN-IP/HTTPS dance `dev-mobile.mjs`

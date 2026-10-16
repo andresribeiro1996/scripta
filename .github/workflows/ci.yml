@@ -23,6 +23,7 @@ jobs:
       - run: npm test --workspace @scripta/shared
       - run: npm run typecheck --workspace backend
       - run: npm test --workspace backend
+      - run: npm run test:fixture --workspace backend
       - run: npm run typecheck --workspace frontend
       - run: npm run lint --workspace frontend
       - run: npm test --workspace frontend
