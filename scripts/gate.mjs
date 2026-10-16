@@ -14,6 +14,8 @@ import {
 } from "./gateCore.mjs";
 import { appendRound, nextRound, roundLogPath, runsDir } from "./runLog.mjs";
 
+const CHECK_TIMEOUT_MS = 15 * 60 * 1000;
+
 function git(cwd, args) {
   return execFileSync("git", args, { cwd, encoding: "utf8" });
 }
@@ -27,9 +29,12 @@ function runCheck(root, dir, round, index, { cwd, command }) {
   const logPath = join(dir, log);
   const fd = openSync(logPath, "w");
   const started = Date.now();
-  const run = spawnSync(command, { cwd: join(root, cwd), shell: true, stdio: ["ignore", fd, fd] });
+  const run = spawnSync(command, { cwd: join(root, cwd), shell: true, timeout: CHECK_TIMEOUT_MS, stdio: ["ignore", fd, fd] });
   closeSync(fd);
-  if (run.error) writeFileSync(logPath, `${run.error.message}\n`, { flag: "a" });
+  if (run.error) {
+    const message = run.error.code === "ETIMEDOUT" ? "timed out after 15 minutes" : run.error.message;
+    writeFileSync(logPath, `${message}\n`, { flag: "a" });
+  }
   const ok = run.status === 0 && !run.error;
   const seconds = Math.round((Date.now() - started) / 1000);
   console.log(`[gate] ${ok ? "PASS" : "FAIL"} ${command} (${seconds}s)`);
