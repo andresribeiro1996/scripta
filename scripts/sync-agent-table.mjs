@@ -1,7 +1,7 @@
 import { existsSync, lstatSync, readdirSync, readFileSync, readlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { invariantProblems, parseAgentsFile, renderTable, replaceBlock } from "./agentTable.mjs";
+import { invariantProblems, parseAgentsFile, renderTable, replaceBlock, rootClaudeMdProblems } from "./agentTable.mjs";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const BLOCK = "agent-table";
@@ -53,7 +53,7 @@ function documentedDirs() {
 function collect() {
   const instructions = readJson(join(ROOT, "opencode.json")).instructions ?? [];
   const rows = [];
-  const problems = [];
+  const problems = rootClaudeMdProblems(readFileSync(join(ROOT, "CLAUDE.md"), "utf8"));
 
   for (const dir of documentedDirs()) {
     const workspaces = [dir, ...packageNamesUnder(dir)];

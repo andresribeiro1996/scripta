@@ -14,9 +14,9 @@ Scripta — personal Kobo/Goodreads e-book library app. Each subdirectory has it
 
 A new subdirectory `AGENTS.md` needs two things to reach every tool: a `CLAUDE.md` symlink beside it (`ln -s AGENTS.md <dir>/CLAUDE.md`), and an entry in `opencode.json`'s `instructions`. Codex finds it on its own.
 
-Claude Code reads no `AGENTS.md` at any level, including this one — the root `CLAUDE.md` bridges it with an `@AGENTS.md` import on its first line. Don't delete that line: without it these rules reach Codex and opencode but never a Claude session, and nothing fails loudly.
+Claude Code reads no `AGENTS.md` at any level, including this one — the root `CLAUDE.md` bridges it with an `@AGENTS.md` import on its first line. Don't delete that line: without it these rules reach Codex and opencode but never a Claude session, and the session shows no error — only `npm run check:agents` catches it.
 
-The table below is generated from those files — edit each package's own `AGENTS.md`, then run `node scripts/sync-agent-table.mjs`. `npm run check:agents` verifies the table and both requirements above without writing.
+The table below is generated from those files — edit each package's own `AGENTS.md`, then run `node scripts/sync-agent-table.mjs`. `npm run check:agents` verifies the table, both requirements above and that first line without writing.
 
 | Dir | What | Commands |
 |---|---|---|
@@ -29,6 +29,7 @@ The table below is generated from those files — edit each package's own `AGENT
 | `viewer/` | Static single-file HTML | none |
 <!-- END agent-table -->
 
-Run `typecheck` and `lint` after changes in that package. Verify with tests before claiming done: `node scripts/gate.mjs` runs every Verify command a change needs, from each package's `AGENTS.md` and the line below.
+Run `typecheck` and `lint` after changes in that package. Verify with tests before claiming done: `node scripts/gate.mjs` runs every Verify command a change needs, from each package's `AGENTS.md` and the lines below.
 
 - Verify: `npm run test:scripts` (changes under `scripts/`)
+- Verify: `npm run check:agents` (changes to `AGENTS.md`, `CLAUDE.md`, `opencode.json`, or a `<dir>/AGENTS.md` or `<dir>/CLAUDE.md`)

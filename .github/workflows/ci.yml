@@ -33,5 +33,6 @@ jobs:
         env:
           EXPO_PUBLIC_API_URL: http://localhost:3000
       - run: npm run test:scripts
+      - run: npm run check:agents
       - run: npx expo-doctor@latest
         working-directory: mobile
