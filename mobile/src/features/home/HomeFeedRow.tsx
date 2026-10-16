@@ -11,6 +11,12 @@ import { FeedPreview } from "./FeedPreview";
 import { feedEventLabel, feedPrimaryLabel, feedRowAccessibilityLabel, feedRowModel, feedShareTarget, hasActivityThread, reactionCount, readingShelfBook, relativeTime } from "./feedRowModel";
 import type { HomeActions } from "./useHomeActions";
 
+const readerHitSlop = { top: spacing.sm };
+const bookmarkHitSlop = { top: spacing.md, left: 6, right: 6 };
+const headingHitSlop = { top: spacing.sm, bottom: spacing.xs };
+const linkHitSlop = { ...captionHitSlop, top: spacing.xl, bottom: spacing.sm };
+const reactionHitSlop = { bottom: spacing.md };
+
 export function FeedRow({ item, onOpen, actions, onComments, isSaved, onOpenProfile = openProfile }: { item: DigestItem; onOpen: () => void; actions: HomeActions; onComments?: () => void; isSaved?: boolean; onOpenProfile?: (username: string) => void }) {
   const { colors } = useTheme();
   const row = feedRowModel(item);
@@ -25,14 +31,14 @@ export function FeedRow({ item, onOpen, actions, onComments, isSaved, onOpenProf
   const owned = item.kind === "reading" ? readingShelfBook(item.book, actions.library.data?.data.books ?? []) : undefined;
   const dense = item.kind === "reading" || item.kind === "vote" || item.kind === "participation" || (item.kind === "publication" && item.content.kind !== "tierlist");
   const filled = item.kind === "publication" && ((item.content.kind === "tierlist" && item.content.votingOpen) || (item.content.kind === "quiz" && item.content.playOpen));
-  const bookmark = ref ? <Pressable accessibilityRole="button" accessibilityLabel={saved ? `Remove ${title} from saved` : `Save ${title} for later`} accessibilityState={{ selected: saved, disabled: actions.saving || (isSaved === undefined && !actions.savedReady) }} disabled={actions.saving || (isSaved === undefined && !actions.savedReady)} hitSlop={6} onPress={() => actions.toggleSaved(item, saved)} style={({ pressed }) => [styles.iconAction, { backgroundColor: pressed ? colors.surfacePressed : "transparent" }]}><Icon name="bookmark" filled={saved} size={18} color={saved ? colors.accent : colors.textDim} /></Pressable> : null;
-  const action = primary ? filled ? <View style={styles.primary}><Button label={primary} onPress={onOpen} /></View> : <Pressable accessibilityRole="link" hitSlop={captionHitSlop} onPress={onOpen} style={({ pressed }) => [styles.textAction, { opacity: pressed ? 0.6 : 1 }]}><Text {...dynamicType} style={[typography.caption, styles.strong, { color: colors.accent }]}>{primary} →</Text></Pressable> : null;
-  const heading = title ? <Pressable accessibilityRole="link" accessibilityLabel={feedRowAccessibilityLabel(item)} hitSlop={10} onPress={onOpen} style={({ pressed }) => [styles.heading, { opacity: pressed ? 0.6 : 1 }]}><Text display {...dynamicType} style={[typography.title, styles.strong, { color: colors.text }]}>{title}</Text></Pressable> : null;
+  const bookmark = ref ? <Pressable accessibilityRole="button" accessibilityLabel={saved ? `Remove ${title} from saved` : `Save ${title} for later`} accessibilityState={{ selected: saved, disabled: actions.saving || (isSaved === undefined && !actions.savedReady) }} disabled={actions.saving || (isSaved === undefined && !actions.savedReady)} hitSlop={bookmarkHitSlop} onPress={() => actions.toggleSaved(item, saved)} style={({ pressed }) => [styles.iconAction, { backgroundColor: pressed ? colors.surfacePressed : "transparent" }]}><Icon name="bookmark" filled={saved} size={18} color={saved ? colors.accent : colors.textDim} /></Pressable> : null;
+  const action = primary ? filled ? <View style={styles.primary}><Button label={primary} onPress={onOpen} /></View> : <Pressable accessibilityRole="link" hitSlop={linkHitSlop} onPress={onOpen} style={({ pressed }) => [styles.textAction, { opacity: pressed ? 0.6 : 1 }]}><Text {...dynamicType} style={[typography.caption, styles.strong, { color: colors.accent }]}>{primary} →</Text></Pressable> : null;
+  const heading = title ? <Pressable accessibilityRole="link" accessibilityLabel={feedRowAccessibilityLabel(item)} hitSlop={headingHitSlop} onPress={onOpen} style={({ pressed }) => [styles.heading, { opacity: pressed ? 0.6 : 1 }]}><Text display {...dynamicType} style={[typography.title, styles.strong, { color: colors.text }]}>{title}</Text></Pressable> : null;
   const likes = reactionCount(engagement?.likes);
   const comments = reactionCount(engagement?.comments);
   return <View style={[styles.post, { borderBottomColor: colors.border }]}>
     {item.kind === "completion" ? <View style={[styles.winnerLabel, { backgroundColor: colors.accentSoft }]}><Icon name="champion" size={16} color={colors.accent} /><Text {...dynamicType} style={[typography.caption, styles.grow, { color: colors.accent }]}>{feedEventLabel(item)}</Text>{bookmark}</View> : <View style={styles.actor}>
-      <Pressable accessibilityRole="link" accessibilityLabel={actor && !actor.unavailable ? `Open ${actor.username}'s profile` : undefined} disabled={!actor || actor.unavailable} hitSlop={4} onPress={() => actor && onOpenProfile(actor.username)} style={({ pressed }) => [styles.reader, { backgroundColor: pressed ? colors.surfacePressed : "transparent" }]}>
+      <Pressable accessibilityRole="link" accessibilityLabel={actor && !actor.unavailable ? `Open ${actor.username}'s profile` : undefined} disabled={!actor || actor.unavailable} hitSlop={readerHitSlop} onPress={() => actor && onOpenProfile(actor.username)} style={({ pressed }) => [styles.reader, { backgroundColor: pressed ? colors.surfacePressed : "transparent" }]}>
         {actor ? <AuthorAvatar username={actor.username} avatarUrl={actor.avatarUrl} /> : <Icon name="community" size={28} color={colors.textDim} />}
         <View style={[styles.grow, styles.readerText]}>
           <View style={styles.readerName}><Text {...dynamicType} numberOfLines={2} style={[typography.caption, styles.strong, styles.shrink, { color: colors.text }]}>{name}</Text>{actor && item.kind !== "participation" ? <ReaderGlyph identity={actor.readerGlyph} /> : null}</View>
@@ -51,17 +57,17 @@ export function FeedRow({ item, onOpen, actions, onComments, isSaved, onOpenProf
         {item.kind === "completion" ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>You took part · {relativeTime(item.createdAt)}</Text> : null}
         {action}
         {item.kind === "reading" ? owned
-          ? <Pressable accessibilityRole="link" hitSlop={captionHitSlop} onPress={() => router.push(`/book/${encodeURIComponent(bookKey(owned))}` as never)} style={({ pressed }) => [styles.textAction, { opacity: pressed ? 0.6 : 1 }]}><Text {...dynamicType} style={[typography.caption, styles.strong, { color: colors.accent }]}>Open in your shelf →</Text></Pressable>
+          ? <Pressable accessibilityRole="link" hitSlop={linkHitSlop} onPress={() => router.push(`/book/${encodeURIComponent(bookKey(owned))}` as never)} style={({ pressed }) => [styles.textAction, !detail && styles.shelfGap, { opacity: pressed ? 0.6 : 1 }]}><Text {...dynamicType} style={[typography.caption, styles.strong, { color: colors.accent }]}>Open in your shelf →</Text></Pressable>
           : <View style={styles.primary}><Button variant="secondary" label="Want to read" loading={actions.wanting} onPress={() => actions.wantToRead(item)} /></View>
         : null}
       </View>
     </View>}
     <View style={styles.reactions}>
       {hasActivityThread(item) ? <>
-        <Pressable accessibilityRole="button" accessibilityLabel={engagement?.liked ? "Unlike this post" : "Like this post"} accessibilityState={{ selected: engagement?.liked, disabled: !engagement || actions.liking }} disabled={!engagement || actions.liking} hitSlop={6} onPress={() => actions.toggleLike(item)} style={({ pressed }) => [styles.reaction, { backgroundColor: pressed ? colors.surfacePressed : "transparent" }]}><Icon name="like" filled={engagement?.liked} size={18} color={engagement?.liked ? colors.accent : colors.textDim} />{likes ? <Text {...dynamicType} style={[typography.caption, styles.count, { color: colors.textDim }]}>{likes}</Text> : null}</Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel={engagement ? `Comments, ${engagement.comments}` : "Comments"} hitSlop={6} onPress={onComments} style={({ pressed }) => [styles.reaction, { backgroundColor: pressed ? colors.surfacePressed : "transparent" }]}><Icon name="comment" size={18} color={colors.textDim} />{comments ? <Text {...dynamicType} style={[typography.caption, styles.count, { color: colors.textDim }]}>{comments}</Text> : null}</Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel={engagement?.liked ? "Unlike this post" : "Like this post"} accessibilityState={{ selected: engagement?.liked, disabled: !engagement || actions.liking }} disabled={!engagement || actions.liking} hitSlop={reactionHitSlop} onPress={() => actions.toggleLike(item)} style={({ pressed }) => [styles.reaction, { backgroundColor: pressed ? colors.surfacePressed : "transparent" }]}><Icon name="like" filled={engagement?.liked} size={18} color={engagement?.liked ? colors.accent : colors.textDim} />{likes ? <Text {...dynamicType} style={[typography.caption, styles.count, { color: colors.textDim }]}>{likes}</Text> : null}</Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel={engagement ? `Comments, ${engagement.comments}` : "Comments"} hitSlop={reactionHitSlop} onPress={onComments} style={({ pressed }) => [styles.reaction, { backgroundColor: pressed ? colors.surfacePressed : "transparent" }]}><Icon name="comment" size={18} color={colors.textDim} />{comments ? <Text {...dynamicType} style={[typography.caption, styles.count, { color: colors.textDim }]}>{comments}</Text> : null}</Pressable>
       </> : null}
-      {feedShareTarget(item) ? <Pressable accessibilityRole="button" accessibilityLabel={`Share ${title || "reader"}`} hitSlop={6} onPress={() => actions.share(item)} style={({ pressed }) => [styles.share, { backgroundColor: pressed ? colors.surfacePressed : "transparent" }]}><Icon name="share" size={18} color={colors.textDim} /><Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Share</Text></Pressable> : null}
+      {feedShareTarget(item) ? <Pressable accessibilityRole="button" accessibilityLabel={`Share ${title || "reader"}`} hitSlop={reactionHitSlop} onPress={() => actions.share(item)} style={({ pressed }) => [styles.share, { backgroundColor: pressed ? colors.surfacePressed : "transparent" }]}><Icon name="share" size={18} color={colors.textDim} /><Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Share</Text></Pressable> : null}
     </View>
   </View>;
 }
@@ -81,9 +87,10 @@ const styles = StyleSheet.create({
   bodyColumn: { flexDirection: "column" },
   compactPreview: { minWidth: SLOT_WIDTH, alignItems: "flex-start" },
   copy: { gap: spacing.xs },
-  heading: { justifyContent: "center" },
+  heading: { minHeight: 32, justifyContent: "center" },
   primary: { alignSelf: "flex-start", paddingTop: spacing.xs },
   textAction: { alignSelf: "flex-start", justifyContent: "center" },
+  shelfGap: { marginTop: spacing.xl },
   iconAction: { width: 32, height: 32, alignItems: "center", justifyContent: "center", borderRadius: radii.md },
   winnerLabel: { flexDirection: "row", gap: spacing.sm, alignItems: "center", borderRadius: radii.md, paddingLeft: spacing.md },
   winnerBody: { flexDirection: "row-reverse", alignItems: "center" },
