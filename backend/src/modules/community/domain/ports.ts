@@ -1,4 +1,4 @@
-import type { ActivityEventType, FeedSettings } from "@scripta/shared/community";
+import type { ActivityEngagement, ActivityEventType, FeedSettings, SavedContentRef } from "@scripta/shared/community";
 import type { EventRow, FollowRow, ProfileRow } from "./types.js";
 
 export interface VisibilityRow {
@@ -9,6 +9,22 @@ export interface VisibilityRow {
   show_votes: number;
   show_follows: number;
   show_reader_glyph: number;
+}
+
+export interface CommentRow { id: string; event_id: string; user_id: string; text: string; created_at: string }
+export interface SavedContentRow { kind: SavedContentRef["kind"]; ref_id: string; owner_id: string | null; saved_at: string }
+export interface EngagementRepository {
+  getEvent(id: string): EventRow | undefined;
+  getEvents(ids: string[]): EventRow[];
+  summaries(viewerId: string, ids: string[]): Record<string, ActivityEngagement>;
+  setLiked(viewerId: string, eventId: string, liked: boolean, at: string): void;
+  insertComment(row: CommentRow): void;
+  listComments(eventId: string, keyset: CursorKeyset | undefined, limit: number): CommentRow[];
+  getComment(id: string): CommentRow | undefined;
+  deleteComment(id: string, viewerId: string): boolean;
+  setSaved(viewerId: string, ref: SavedContentRef, saved: boolean, at: string): void;
+  listSaved(viewerId: string, keyset: CursorKeyset | undefined, limit: number): SavedContentRow[];
+  savedState(viewerId: string, refs: SavedContentRef[]): string[];
 }
 
 export interface CursorKeyset {
@@ -36,6 +52,7 @@ export interface CommunityRepository {
   visibilityRows(userIds: string[]): VisibilityRow[];
 
   insertEvent(row: EventRow): void;
+  shownEventIds(events: ReadonlyArray<Pick<EventRow, "id" | "user_id" | "type">>): string[];
   countEventsSince(userId: string, since: string, types: readonly ActivityEventType[], limit: number): number;
   listEventsByUser(userId: string, keyset: CursorKeyset | undefined, limit: number, hiddenTypes: readonly ActivityEventType[]): EventRow[];
   listHistoryEventsByUser(userId: string, keyset: CursorKeyset | undefined, limit: number, hiddenTypes: readonly ActivityEventType[]): EventRow[];

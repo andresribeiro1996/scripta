@@ -13,7 +13,7 @@ import { canonicalWorks as canonicalCatalogWorks, catalogGenres as catalogCatalo
 import { canonicalWorkIds, WorkResolutionError } from "./works.js";
 import { libraryParts, resolvePublicLibrary, toReaderGroups } from "./publicResolver.js";
 
-export type BookEvent = { type: "book_added" | "book_finished"; refId: string; payload: Record<string, unknown> };
+export type BookEvent = { type: "book_added" | "book_started" | "book_finished"; refId: string; payload: Record<string, unknown> };
 
 export type EmitBookEvents = (userId: string, events: BookEvent[]) => void;
 
@@ -219,6 +219,8 @@ function diffBookEvents(previous: unknown, data: unknown, workOf: (book: Record<
       events.push({ type: "book_added", refId, payload: bookPayload(book, status, workOf(book)) });
     } else if (Number(prev.ReadStatus ?? 0) !== 2 && status === 2) {
       events.push({ type: "book_finished", refId, payload: bookPayload(book, status, workOf(book)) });
+    } else if (Number(prev.ReadStatus ?? 0) !== 1 && status === 1) {
+      events.push({ type: "book_started", refId, payload: bookPayload(book, status, workOf(book)) });
     }
   }
   return events;
@@ -237,6 +239,10 @@ function parseStoredLibrary(row: LibraryDocumentRow): LibraryData {
 
 function flippedBooks(before: LibraryData, after: LibraryData): Array<Record<string, unknown>> {
   return after.books.filter((book, i) => book !== before.books[i] && isFinishedBook(book) !== isFinishedBook(before.books[i]!));
+}
+
+function statusAdvancedBooks(before: LibraryData, after: LibraryData): Array<Record<string, unknown>> {
+  return after.books.filter((book, i) => book !== before.books[i] && book.ReadStatus !== before.books[i]!.ReadStatus && (book.ReadStatus === 1 || book.ReadStatus === 2));
 }
 
 function seriesGroupChanged(before: LibraryData, after: LibraryData): boolean {
@@ -450,14 +456,15 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
 
       if (match) {
         const key = contentId(match);
+        if (input.preserveExisting) return { key, updated: false };
         if (Number(match.ReadStatus ?? 0) === input.readStatus) return { key, updated: false };
         const updatedBook = setReadStatus(match, input.readStatus, input.day ?? localDay());
         const reshelved = { ...doc, books: books.map((b) => (b === match ? updatedBook : b)) };
         const saved = repo.upsertDocument(userId, serializeWithinLimit(reshelved), deriveLibraryData(reshelved), rowsWithWorks(userId, reshelved), row?.updated_at);
         if (!saved) throw new LibraryConflictError();
-        if (input.readStatus === 2 && emitBookEvents) {
+        if ((input.readStatus === 1 || input.readStatus === 2) && emitBookEvents) {
           try {
-            emitBookEvents(userId, [{ type: "book_finished", refId: key, payload: bookPayload(updatedBook, input.readStatus, workOfUser(userId)(updatedBook)) }]);
+            emitBookEvents(userId, [{ type: input.readStatus === 2 ? "book_finished" : "book_started", refId: key, payload: bookPayload(updatedBook, input.readStatus, workOfUser(userId)(updatedBook)) }]);
           } catch (error) {
             logError?.(error, "book events failed after a library save");
           }
@@ -519,6 +526,7 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
       if (row && !result.changed) return { updatedAt: row.updated_at, baseUpdatedAt: row.updated_at };
       const json = serializeWithinLimit(result.data);
       const flipped = change.kind === "book" ? flippedBooks(previous, result.data) : [];
+      const advanced = change.kind === "book" ? statusAdvancedBooks(previous, result.data) : [];
       const glyph = flipped.length > 0 || (change.kind === "membership" && seriesGroupChanged(previous, result.data)) ? deriveGlyph(result.data) : "keep";
       const small = row && change.kind !== "add" ? smallSave(userId, previous, result.data, change, glyph !== "keep") : undefined;
       if (small) withWorks(userId, small.books);
@@ -527,7 +535,7 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
           ? repo.updateDocumentData(userId, json, row!.updated_at, glyph, small)
           : repo.upsertDocument(userId, json, deriveLibraryData(result.data), rowsWithWorks(userId, result.data), row?.updated_at)?.updated_at;
       if (!updatedAt) throw new LibraryConflictError();
-      if (emitBookEvents && (change.kind === "add" || flipped.some(isFinishedBook))) {
+      if (emitBookEvents && (change.kind === "add" || advanced.length > 0)) {
         try {
           const events = diffBookEvents(previous, result.data, workOfUser(userId)).slice(0, BOOK_EVENTS_PER_SAVE);
           if (events.length > 0) emitBookEvents(userId, events);

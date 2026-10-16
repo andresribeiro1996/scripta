@@ -313,6 +313,20 @@ test("public payload carries the mural's theme", async () => {
   assert.equal(resolveMuralPublicPayload(row, []).mural.theme, "synthwave");
 });
 
+test("the mural summary reads the owned row only and builds the cover like the public payload", async () => {
+  const { createMuralsPublicApi } = await import("./publicApi.js");
+  const { env } = await import("../../config/env.js");
+  const repo = createInMemoryRepo();
+  const base = { user_id: "u1", blocks: "not json", share_token: null, folder_id: null, created_at: "", updated_at: "" };
+  repo.insert({ ...base, id: "m1", name: "Shelf", theme: "synthwave", cover_image_id: "img", cover_image_url: "https://old.example/c.png" });
+  repo.insert({ ...base, id: "m2", name: "Plain", theme: null, cover_image_id: null, cover_image_url: "https://old.example/c.png" });
+  const api = createMuralsPublicApi(repo);
+  assert.deepEqual(api.getMuralSummary("u1", "m1"), { id: "m1", name: "Shelf", theme: "synthwave", coverImageUrl: `${env.PUBLIC_API_URL}/gallery/img/file` });
+  assert.deepEqual(api.getMuralSummary("u1", "m2"), { id: "m2", name: "Plain", theme: "light", coverImageUrl: "https://old.example/c.png" });
+  assert.equal(api.getMuralSummary("u2", "m1"), null);
+  assert.equal(api.getMuralSummary("u1", "missing"), null);
+});
+
 test("backfillMuralThemes sets only NULL themes from each owner's resolved theme", async () => {
   const { DatabaseSync } = await import("node:sqlite");
   const { readFileSync } = await import("node:fs");

@@ -84,6 +84,7 @@ const addBookSchema = z.object({
   isbn: z.string().min(1).nullable().optional(),
   coverUrl: z.string().min(1).nullable().optional(),
   readStatus: z.union([z.literal(0), z.literal(1), z.literal(2)]),
+  preserveExisting: z.boolean().optional(),
   day: daySchema.optional()
 });
 

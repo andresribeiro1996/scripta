@@ -7,6 +7,7 @@ import type {
   FeedItem,
   PersonResult,
   PublishedContent,
+  RankingTierPreview,
   SuggestedReader
 } from "./types.js";
 
@@ -135,10 +136,25 @@ export function normalizeFeedSettings(value: unknown): FeedSettings | null {
 }
 
 export function categoryFor(type: ActivityEventType): FeedCategory {
-  if (type === "book_added" || type === "book_finished") return "reading";
+  if (type === "book_added" || type === "book_started" || type === "book_finished") return "reading";
   if (type === "voted_on") return "votes";
   if (type === "following") return "follows";
   return "publications";
+}
+
+export function parseRankingPreview(value: unknown): RankingTierPreview[] {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 3).flatMap((entry) => {
+    if (!entry || typeof entry !== "object") return [];
+    const tier = entry as Record<string, unknown>;
+    if (typeof tier.label !== "string" || typeof tier.color !== "string" || !/^#[\da-f]{6}$/i.test(tier.color) || !Array.isArray(tier.books)) return [];
+    const books = tier.books.slice(0, 2).flatMap((entry) => {
+      if (!entry || typeof entry !== "object") return [];
+      const book = entry as Record<string, unknown>;
+      return typeof book.title === "string" ? [{ title: book.title, coverUrl: typeof book.coverUrl === "string" ? book.coverUrl : null }] : [];
+    });
+    return books.length ? [{ label: tier.label, color: tier.color, books }] : [];
+  });
 }
 
 export interface ActivityRow {
@@ -173,11 +189,12 @@ export function activityRow(item: ActivityItem): ActivityRow | null {
       return { ...base, kind: "publication", label: "Published a quiz", tone: "accent", title: text(p.name), meta: text(p.detail) };
     case "book_added": {
       const cover = text(p.coverUrl);
-      return { ...base, kind: "reading", label: "Added to library", tone: "dim", title: text(p.title), meta: [text(p.author), statusLabel(Number(p.status ?? 0))].filter(Boolean).join(" · "), covers: cover ? [cover] : [], workId: text(p.workId) || null };
+      return { ...base, kind: "reading", label: p.started === true ? "Started reading" : "Added to library", tone: "dim", title: text(p.title), meta: [text(p.author), statusLabel(Number(p.status ?? 0))].filter(Boolean).join(" · "), covers: cover ? [cover] : [], workId: text(p.workId) || null };
     }
+    case "book_started":
     case "book_finished": {
       const cover = text(p.coverUrl);
-      return { ...base, kind: "reading", label: "Finished reading", tone: "success", title: text(p.title), meta: text(p.author), covers: cover ? [cover] : [], workId: text(p.workId) || null };
+      return { ...base, kind: "reading", label: item.type === "book_finished" ? "Finished reading" : "Started reading", tone: item.type === "book_finished" ? "success" : "dim", title: text(p.title), meta: text(p.author), covers: cover ? [cover] : [], workId: text(p.workId) || null };
     }
     case "following":
       return { ...base, kind: "follow", label: "Followed", tone: "dim", title: `@${text(p.username)}`, meta: "", username: text(p.username) || null };

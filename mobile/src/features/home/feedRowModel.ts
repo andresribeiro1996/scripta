@@ -1,5 +1,5 @@
 import { contentDetail, contentKindLabel, relativeTime } from "@scripta/shared/community";
-import { digestHeading, digestTarget, participationLead, readerGlyphLabel, type DigestItem } from "@scripta/shared";
+import { digestHeading, digestTarget, isCertainMatch, participationLead, readerGlyphLabel, type DigestBook, type DigestItem } from "@scripta/shared";
 import type { IconName } from "../../ui";
 
 export interface FeedRowModel {
@@ -59,7 +59,7 @@ export function feedRowModel(item: DigestItem): FeedRowModel {
       return {
         covers: item.book.coverUrl ? [item.book.coverUrl] : [],
         icon: "book",
-        label: item.finished ? "Finished" : "Added",
+        label: item.finished ? "Finished" : item.started ? "Started" : "Added",
         tone: item.finished ? "success" : "dim",
         title: item.book.title,
         detail: item.book.author || undefined,
@@ -79,6 +79,10 @@ export function feedRowModel(item: DigestItem): FeedRowModel {
         detail: participationLead(item),
         action: null
       };
+    case "mural":
+      return { covers: item.mural.coverImageUrl ? [item.mural.coverImageUrl] : [], icon: "murals", label: "Mural", tone: "accent", title: item.mural.name, action: null };
+    case "completion":
+      return { covers: item.winner.coverUrl ? [item.winner.coverUrl] : [], icon: "champion", label: "Tournament finished", tone: "accent", title: `${item.winner.title} is the winner`, detail: `${item.tournament.name} · ${item.tournament.bracketSize} books`, action: null };
   }
 }
 
@@ -90,5 +94,43 @@ export function digestRoute(item: DigestItem): string {
   if (item.kind === "participation") return item.game.kind === "tournament" ? `/arena/${item.game.id}` : `/${item.game.kind}/${item.game.id}`;
   if (item.kind === "reading") return item.book.workId ? `/work/${item.book.workId}` : `/u/${item.actor.username}`;
   if (item.kind === "follow") return `/u/${item.actor.username}`;
+  if (item.kind === "mural") return `/u/${item.actor.username}`;
   return digestTarget(item);
+}
+
+export function feedEventLabel(item: DigestItem): string {
+  if (item.kind === "publication") return `published a ${contentKindLabel(item.content).toLowerCase()}`;
+  if (item.kind === "vote") return item.content.kind === "tierlist" ? "ranked a tier list" : item.content.kind === "quiz" ? "played a quiz" : "voted in a tournament";
+  if (item.kind === "reading") return item.finished ? "finished reading" : item.started ? "started reading" : "added to their library";
+  if (item.kind === "mural") return "published a mural";
+  if (item.kind === "follow") return "followed you";
+  if (item.kind === "completion") return "A tournament you joined has finished";
+  return item.game.kind === "tierlist" ? "ranked your tier list" : item.game.kind === "quiz" ? "played your quiz" : "voted in your tournament";
+}
+
+export function feedPrimaryLabel(item: DigestItem): string | null {
+  if (item.kind === "completion") return "View final bracket";
+  if (item.kind === "mural") return "Open mural";
+  if (item.kind === "publication") {
+    const content = item.content;
+    return content.kind === "tierlist" ? content.votingOpen ? "Rank this list" : "View rankings" : content.kind === "quiz" ? content.playOpen ? "Play quiz" : "View quiz" : content.status === "active" ? "Vote in tournament" : "View final bracket";
+  }
+  if (item.kind === "vote") return item.content.kind === "tierlist" ? "View tier list" : item.content.kind === "quiz" ? "Play quiz" : "View tournament";
+  if (item.kind === "participation") return item.game.kind === "tierlist" ? "View rankings" : item.game.kind === "quiz" ? "View results" : "View tournament";
+  return null;
+}
+
+export function readingShelfBook(book: DigestBook, books: Array<Record<string, unknown>>) {
+  return books.find((entry) => isCertainMatch(entry, { Title: book.title, Attribution: book.author, ISBN: book.isbn ?? "" }));
+}
+
+export function feedShareTarget(item: DigestItem): string | null {
+  if (item.kind === "follow" || item.kind === "mural" || (item.kind === "reading" && !item.book.workId)) return null;
+  if (item.kind !== "participation") return digestTarget(item);
+  if (item.game.kind === "tournament") return `/arena/${item.game.id}`;
+  return item.game.voteCode ? `/${item.game.kind === "tierlist" ? "vote" : "play"}/${item.game.voteCode}` : null;
+}
+
+export function hasActivityThread(item: DigestItem): boolean {
+  return item.kind !== "participation" && item.kind !== "completion" && item.kind !== "follow" && !item.id.startsWith("saved:");
 }

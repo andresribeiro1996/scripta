@@ -59,3 +59,29 @@ CREATE TABLE IF NOT EXISTS feed_inbox (
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS idx_feed_inbox_author ON feed_inbox(author_id, viewer_id);
 CREATE INDEX IF NOT EXISTS idx_feed_inbox_time ON feed_inbox(created_at);
+
+CREATE TABLE IF NOT EXISTS activity_likes (
+  event_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (event_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_activity_likes_user ON activity_likes(user_id);
+CREATE TABLE IF NOT EXISTS activity_comments (
+  id TEXT PRIMARY KEY,
+  event_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  text TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_activity_comments_event ON activity_comments(event_id, created_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS idx_activity_comments_user ON activity_comments(user_id);
+CREATE TABLE IF NOT EXISTS saved_content (
+  user_id TEXT NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('tierlist', 'tournament', 'quiz', 'mural')),
+  ref_id TEXT NOT NULL,
+  owner_id TEXT,
+  saved_at TEXT NOT NULL,
+  PRIMARY KEY (user_id, kind, ref_id)
+);
+CREATE INDEX IF NOT EXISTS idx_saved_content_time ON saved_content(user_id, saved_at DESC, kind, ref_id);

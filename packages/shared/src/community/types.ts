@@ -4,6 +4,11 @@ import type { MuralPublicPayload } from "../public/types.js";
 
 export type CommunityAuthor = ReaderProfile & { userId: string; unavailable?: boolean; readerGlyph?: IdentityKey };
 
+export interface ActivityEngagement { likes: number; comments: number; liked: boolean }
+export interface RankingTierPreview { label: string; color: string; books: Array<{ title: string; coverUrl: string | null }> }
+export interface ActivityComment { id: string; author: CommunityAuthor; text: string; createdAt: string; own: boolean }
+export type SavedContentRef = { kind: ParticipationGameKind; id: string } | { kind: "mural"; id: string; ownerId: string };
+
 export interface FollowState {
   following: boolean;
   followerCount: number;
@@ -104,6 +109,7 @@ export interface Page<T> {
 export type ActivityEventType =
   | CommunityEventType
   | "book_added"
+  | "book_started"
   | "book_finished"
   | "following"
   | "mural_published"
@@ -138,6 +144,7 @@ export interface BookRecommendationInput {
   isbn?: string | null;
   coverUrl?: string | null;
   readStatus: 0 | 1 | 2;
+  preserveExisting?: boolean;
   day?: string;
 }
 

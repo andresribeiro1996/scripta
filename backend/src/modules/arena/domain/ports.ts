@@ -5,7 +5,7 @@
 // a second port out for.
 
 import type { TournamentRecord } from "@scripta/shared";
-import type { DuelRow, SeedPreview, TournamentDiscoverRow, TournamentGameRow, TournamentRow, TournamentSlotRow, VoteRow } from "./types.js";
+import type { CompletedVotedRow, DuelRow, SeedPreview, TournamentDiscoverRow, TournamentGameRow, TournamentRow, TournamentSlotRow, VoteRow } from "./types.js";
 
 export interface ArenaRepository {
   deleteUserData(userId: string): void;
@@ -80,6 +80,11 @@ export interface ArenaRepository {
    *  under listTournamentsByOwner, and "Voting in" means other people's
    *  content. */
   listVotedByUser(voterUserId: string): TournamentRow[];
+  /** Completed tournaments the account voted in (not its own) whose final
+   *  duel settled with a winner at or after `since`, each with that final
+   *  duel's winner and settled_at — filtered in SQL so the community
+   *  dashboard doesn't scan the account's whole voting history per page. */
+  listCompletedVotedSince(voterUserId: string, since: string): CompletedVotedRow[];
   listParticipation(ownerUserId: string, since: string): Array<{ id: string; name: string; participants: number; latest_at: string }>;
   listRecentVoters(tournamentId: string, ownerUserId: string, limit: number): Array<{ user_id: string; at: string }>;
 }

@@ -1,13 +1,15 @@
-import type { CommunityAuthor, FeedItem, ParticipationGameKind, PublishedContent } from "./community/types.js";
+import type { CommunityAuthor, FeedItem, ParticipationGameKind, PublishedContent, RankingTierPreview, SavedContentRef } from "./community/types.js";
 import { contentTarget, feedAction, feedTarget, isKnownContent } from "./community/helpers.js";
 import { bookKey } from "./library/merge.js";
 import { rediscoverPassage } from "./murals/home.js";
+import type { PublicMural } from "./public/types.js";
 
 export interface DigestBook {
   title: string;
   author: string;
   coverUrl: string | null;
   workId?: string | null;
+  isbn?: string | null;
 }
 
 export interface ParticipationGame {
@@ -15,6 +17,7 @@ export interface ParticipationGame {
   id: string;
   name: string;
   covers: string[];
+  voteCode?: string;
 }
 
 export type ParticipationItem = {
@@ -26,14 +29,27 @@ export type ParticipationItem = {
   createdAt: string;
 };
 
-export type DigestItem =
+export type CompletionItem = { kind: "completion"; id: string; actor: CommunityAuthor; tournament: Extract<PublishedContent, { kind: "tournament" }>; winner: DigestBook; createdAt: string };
+
+export type DigestItem = (
   | ({ kind: "publication" } & FeedItem)
-  | { kind: "vote"; id: string; actor: CommunityAuthor; content: PublishedContent; createdAt: string }
-  | { kind: "reading"; id: string; actor: CommunityAuthor; book: DigestBook; finished: boolean; createdAt: string }
+  | { kind: "vote"; id: string; actor: CommunityAuthor; content: PublishedContent; ranking?: RankingTierPreview[]; createdAt: string }
+  | { kind: "reading"; id: string; actor: CommunityAuthor; book: DigestBook; finished: boolean; started?: boolean; createdAt: string }
+  | { kind: "mural"; id: string; actor: CommunityAuthor; mural: Pick<PublicMural, "id" | "name" | "theme" | "coverImageUrl">; createdAt: string }
   // `viewerFollows` is what lets the row offer following back, and it is the
   // viewer's relationship to the actor, not the actor's to them.
   | { kind: "follow"; id: string; actor: CommunityAuthor; createdAt: string; viewerFollows: boolean }
-  | ParticipationItem;
+  | ParticipationItem
+  | CompletionItem
+);
+
+export function savedContentRef(item: DigestItem): SavedContentRef | null {
+  if (item.kind === "publication" || item.kind === "vote") return { kind: item.content.kind, id: item.content.id };
+  if (item.kind === "participation") return { kind: item.game.kind, id: item.game.id };
+  if (item.kind === "completion") return { kind: "tournament", id: item.tournament.id };
+  if (item.kind === "mural") return { kind: "mural", id: item.mural.id, ownerId: item.actor.userId };
+  return null;
+}
 
 export type DigestKind = DigestItem["kind"];
 
@@ -45,9 +61,9 @@ export interface DashboardFeedPage {
   followingNewCount: number;
 }
 
-const DIGEST_KINDS: Record<DigestKind, true> = { publication: true, vote: true, reading: true, follow: true, participation: true };
+const DIGEST_KINDS: Record<DigestKind, true> = { publication: true, vote: true, reading: true, follow: true, participation: true, mural: true, completion: true };
 
-function isKnownDigestItem(item: DigestItem): boolean {
+export function isKnownDigestItem(item: DigestItem): boolean {
   if (DIGEST_KINDS[item.kind as DigestKind] !== true) return false;
   if (item.kind === "publication" || item.kind === "vote") return isKnownContent(item.content);
   return true;
@@ -58,7 +74,7 @@ export function withKnownDigestItems(page: DashboardFeedPage): DashboardFeedPage
 }
 
 export function dashboardQuery(cursor?: string): string {
-  const query = `?kinds=${Object.keys(DIGEST_KINDS).join(",")}`;
+  const query = `?kinds=${[...Object.keys(DIGEST_KINDS), "started"].join(",")}`;
   return cursor ? `${query}&cursor=${encodeURIComponent(cursor)}` : query;
 }
 
@@ -127,7 +143,11 @@ export function digestAction(item: DigestItem): string {
           return `played ${item.content.name}`;
       }
     case "reading":
-      return `${item.finished ? "finished" : "added"} ${item.book.title}`;
+      return `${item.finished ? "finished reading" : item.started ? "started reading" : "added"} ${item.book.title}`;
+    case "mural":
+      return `published a mural, ${item.mural.name}`;
+    case "completion":
+      return `${item.tournament.name} finished; ${item.winner.title} is the winner`;
     case "follow":
       return "started following you";
     case "participation":
@@ -137,6 +157,7 @@ export function digestAction(item: DigestItem): string {
 
 export function digestHeading(item: DigestItem): string {
   if (item.kind === "participation") return `${participationLead(item)} ${digestAction(item)}`;
+  if (item.kind === "completion") return digestAction(item);
   return `${item.actor.username} ${digestAction(item)}`;
 }
 
@@ -152,5 +173,9 @@ export function digestTarget(item: DigestItem): string {
       return `/community/u/${item.actor.username}`;
     case "participation":
       return item.game.kind === "tournament" ? `/arena/${item.game.id}` : `/dashboard/arena/${item.game.kind}/${item.game.id}`;
+    case "mural":
+      return `/community/u/${item.actor.username}`;
+    case "completion":
+      return `/arena/${item.tournament.id}`;
   }
 }

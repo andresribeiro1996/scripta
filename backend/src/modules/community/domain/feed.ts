@@ -1,12 +1,14 @@
 import { categoryFor, type ActivityEventType } from "@scripta/shared/community";
 import type { DigestKind } from "@scripta/shared/dashboard";
 
-export const DIGEST_EVENT_TYPES: ReadonlyArray<readonly [ActivityEventType, DigestKind]> = [
+export const DIGEST_EVENT_TYPES: ReadonlyArray<readonly [ActivityEventType, DigestKind | "started"]> = [
   ["tierlist_published", "publication"],
   ["tournament_published", "publication"],
   ["quiz_published", "publication"],
   ["voted_on", "vote"],
   ["book_added", "reading"],
+  ["book_started", "started"],
+  ["mural_published", "mural"],
   ["book_finished", "reading"]
 ];
 
@@ -17,6 +19,7 @@ const EVERY_ACTIVITY_EVENT_TYPE = {
   tournament_published: true,
   quiz_published: true,
   book_added: true,
+  book_started: true,
   book_finished: true,
   following: true,
   mural_published: true,

@@ -64,11 +64,16 @@ const GLYPHS = {
   duplicate: { ios: "plus.square.on.square", android: "content_copy" },
   info: { ios: "info.circle", android: "info" },
   quote: { ios: "quote.opening", android: "format_quote" },
+  like: { ios: "heart", android: "favorite_border" },
+  comment: { ios: "bubble.right", android: "chat_bubble_outline" },
+  bookmark: { ios: "bookmark", android: "bookmark_border" },
 } as const satisfies Record<string, Glyph>;
 
 /** Only the tab icons have a solid counterpart worth using; the rest read the
  *  same either way, and `plus.fill` etc. aren't the iOS convention anyway. */
 const FILLED = {
+  like: { ios: "heart.fill", android: "favorite" },
+  bookmark: { ios: "bookmark.fill", android: "bookmark" },
   home: { ios: "house.fill", android: "home" },
   library: { ios: "books.vertical.fill", android: "library_books" },
   arena: { ios: "trophy.fill", android: "trophy" },

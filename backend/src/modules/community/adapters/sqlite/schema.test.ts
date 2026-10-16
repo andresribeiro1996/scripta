@@ -43,6 +43,24 @@ function removeDatabase() {
   return path;
 }
 
+test("upgrading the inbox backfills only the current public mural once", () => {
+  removeDatabase();
+  let db = openCommunityDb();
+  const repo = createSqliteCommunityRepository(db);
+  const at = new Date().toISOString();
+  repo.upsertProfile({ user_id: "author", published: 1, mural_id: "current", published_at: at, updated_at: at, feed_settings: null });
+  repo.insertFollow({ follower_id: "viewer", followee_id: "author", created_at: at });
+  for (const ref of ["current", "old"]) repo.insertEvent({ id: ref, user_id: "author", type: "mural_published", ref_type: "mural", ref_id: ref, payload: null, created_at: at });
+  db.exec("DELETE FROM feed_inbox; PRAGMA user_version = 0");
+  db.close();
+  db = openCommunityDb();
+  assert.deepEqual((db.prepare("SELECT event_id FROM feed_inbox").all() as Array<{ event_id: string }>).map(row => row.event_id), ["current"]);
+  db.close();
+  db = openCommunityDb();
+  assert.equal((db.prepare("SELECT COUNT(*) AS n FROM feed_inbox").get() as { n: number }).n, 1);
+  db.close();
+});
+
 test("fresh database gets events payload column, partial unique indexes, and profiles.feed_settings", () => {
   const db = openCommunityDb();
   assert.ok(eventTableColumns(db).includes("payload"));

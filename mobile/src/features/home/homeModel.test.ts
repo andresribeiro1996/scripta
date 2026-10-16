@@ -1,31 +1,17 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildDashboardCards } from "@scripta/shared";
-import { homeSections, shouldMarkFeedSeen } from "./homeModel.js";
+import type { DigestItem } from "@scripta/shared";
+import { homeFeedSections, shouldMarkFeedSeen } from "./homeModel.js";
 
-const book = (key: string, ReadStatus: number, highlights: unknown[] = []) => ({ _key: key, Title: key, Attribution: "Author", ReadStatus, highlights });
-const sectionsFor = (books: Array<Record<string, unknown>>) => homeSections(buildDashboardCards(books, "2026-10-12", "u1:0"));
+const actor = { userId: "u1", username: "alice", avatarUrl: null };
+const createdAt = "2026-10-14T10:00:00.000Z";
 
-test("an empty library shows no section", () => {
-  assert.deepEqual(sectionsFor([]), { readingKeys: [], nextKeys: null, highlight: null });
-});
-
-test("every reading book becomes a card, in shelf order", () => {
-  assert.deepEqual(sectionsFor([book("a", 1)]).readingKeys, ["a"]);
-  assert.deepEqual(sectionsFor([book("a", 1), book("b", 0), book("c", 1), book("d", 2), book("e", 1)]).readingKeys, ["a", "c", "e"]);
-});
-
-test("What's next shows only when nothing is reading and two or more books are to read", () => {
-  assert.deepEqual(sectionsFor([book("a", 0), book("b", 0), book("c", 2)]).nextKeys, ["a", "b"]);
-  assert.equal(sectionsFor([book("a", 0)]).nextKeys, null);
-  assert.equal(sectionsFor([book("a", 1), book("b", 0), book("c", 0)]).nextKeys, null);
-  assert.equal(sectionsFor([book("a", 2), book("b", 2)]).nextKeys, null);
-});
-
-test("a highlight shows when a book has one", () => {
-  const highlighted = book("a", 2, [{ Type: "highlight", Text: "Call me Ishmael.", BookmarkID: "h1" }]);
-  assert.equal(sectionsFor([highlighted]).highlight?.highlightId, "h1");
-  assert.equal(sectionsFor([book("b", 2)]).highlight, null);
+test("personal events precede the circle while preserving order within each section", () => {
+  const reading: DigestItem = { kind: "reading", id: "r", actor, book: { title: "Dune", author: "Frank Herbert", coverUrl: null }, finished: true, createdAt };
+  const follow: DigestItem = { kind: "follow", id: "f", actor, viewerFollows: false, createdAt };
+  const sections = homeFeedSections([reading, follow, reading]);
+  assert.deepEqual(sections.map(section => [section.title, section.data.map(item => item.id)]), [["Around your shelf", ["f"]], ["Your reading circle", ["r", "r"]]]);
+  assert.deepEqual(homeFeedSections([]), [{ title: "Your reading circle", personal: false, data: [] }]);
 });
 
 test("the feed counts as seen only when focused, a row is on screen, the data is loaded and idle, and it wasn't sent yet", () => {

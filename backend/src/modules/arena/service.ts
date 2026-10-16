@@ -30,7 +30,7 @@ import {
 } from "./domain/errors.js";
 import { canonicalWorkIds } from "../library/index.js";
 import type { ArenaRepository } from "./domain/ports.js";
-import type { DuelRow, SeedBookInput, SeedPreview, TournamentGameRow, TournamentRow, TournamentSlotRow } from "./domain/types.js";
+import type { DuelRow, FinalWinnerFields, SeedBookInput, SeedPreview, TournamentGameRow, TournamentRow, TournamentSlotRow } from "./domain/types.js";
 
 export interface TournamentDiscoverRef {
   id: string;
@@ -66,6 +66,7 @@ export interface ArenaService {
    *  own tournaments excluded (listMine already shows those). */
   listVoted(voterUserId: string): Tournament[];
   participationByOwner(ownerUserId: string, since: string): GameParticipation[];
+  completedForParticipant(voterUserId: string, since: string): CompletedTournamentRef[];
   settleEarly(tournamentId: string, ownerUserId: string, duelId: string): void;
   tiebreak(tournamentId: string, ownerUserId: string, duelId: string, workId: string): void;
   /** Renames a tournament. Allowed at ANY status, unlike seeding or
@@ -133,7 +134,7 @@ function summariesWithPreviews(repo: ArenaRepository, rows: TournamentRow[]): To
   return rows.map((row) => toTournamentSummary(row, previews.get(row.id) ?? EMPTY_PREVIEW, winners.get(row.id) ?? null));
 }
 
-function winnerBookFromDuel(d: DuelRow): SeedBook {
+function winnerBookFromDuel(d: FinalWinnerFields & { winner_side: "a" | "b" | null }): SeedBook {
   return d.winner_side === "a"
     ? { title: d.book_a_title, author: d.book_a_author, cover: d.book_a_cover, workId: d.book_a_work_id }
     : { title: d.book_b_title, author: d.book_b_author, cover: d.book_b_cover, workId: d.book_b_work_id };
@@ -281,6 +282,13 @@ export function createArenaService(
 
     listVoted(voterUserId) {
       return summariesWithPreviews(repo, repo.listVotedByUser(voterUserId));
+    },
+
+    completedForParticipant(voterUserId, since) {
+      return repo.listCompletedVotedSince(voterUserId, since).map((row) => {
+        const winner = winnerBookFromDuel(row);
+        return { id: row.id, ownerUserId: row.owner_user_id, createdAt: row.created_at, name: row.name, bracketSize: row.bracket_size, status: "completed" as const, covers: winner.cover ? [winner.cover] : [], completedAt: row.settled_at, winner };
+      });
     },
 
     participationByOwner(ownerUserId, since) {
@@ -488,6 +496,11 @@ export interface PublishedTournamentRef {
   covers: string[];
 }
 
+export interface CompletedTournamentRef extends PublishedTournamentRef {
+  completedAt: string;
+  winner: NonNullable<Tournament["winner"]>;
+}
+
 export interface GameByWork {
   id: string;
   name: string;
@@ -506,6 +519,7 @@ export interface ArenaPublicApi {
   getPublished(id: string): PublishedTournamentRef | undefined;
   listPublishedByOwner(ownerUserId: string): PublishedTournamentRef[];
   participationByOwner(ownerUserId: string, since: string): GameParticipation[];
+  completedForParticipant(voterUserId: string, since: string): CompletedTournamentRef[];
 }
 
 function toPublishedRef(summary: Tournament): PublishedTournamentRef {
@@ -542,6 +556,7 @@ export function createArenaPublicApi(service: ArenaService): ArenaPublicApi {
     },
     listPublishedByOwner: (ownerUserId) =>
       service.listMine(ownerUserId).filter((s) => s.status !== "seeding").map(toPublishedRef),
-    participationByOwner: (ownerUserId, since) => service.participationByOwner(ownerUserId, since)
+    participationByOwner: (ownerUserId, since) => service.participationByOwner(ownerUserId, since),
+    completedForParticipant: (voterUserId, since) => service.completedForParticipant(voterUserId, since)
   };
 }

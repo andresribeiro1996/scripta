@@ -215,6 +215,14 @@ function makeService() {
   return createTierlistsService(createInMemoryRepo());
 }
 
+test("a published ballot event captures actual ranked books from its frozen snapshot", () => {
+  const ranking: unknown[] = [];
+  const service = createTierlistsService(createInMemoryRepo(), undefined, (_user, _id, _name, preview) => { ranking.push(preview); });
+  const board = service.createTierlist("owner", "Pool", { tiers: [{ id: "s", label: "S", color: "#c9482f", workIds: [] }, { id: "a", label: "A", color: "#f2aa20", workIds: [] }], pool: ["w1", "w2"] }, "members", [{ workId: "w1", title: "Dune", author: "Frank Herbert", coverUrl: "https://covers.test/dune.jpg" }, { workId: "w2", title: "Emma", author: "Jane Austen", coverUrl: null }]);
+  assert.equal(service.submitBallot(board.voteCode!, [{ workId: "w2", tierId: "a" }], { kind: "user", userId: "reader" }).ok, true);
+  assert.deepEqual(ranking, [[{ label: "A", color: "#f2aa20", books: [{ title: "Emma", coverUrl: null }] }]]);
+});
+
 test("createTierlist stores a tier list and getTierlist round-trips it", () => {
   const service = makeService();
   const created = service.createTierlist("u1", "Favorites");
@@ -625,6 +633,20 @@ test("a first signed-in ballot emits voted_on once", () => {
 
   assert.equal(outcome.ok, true);
   assert.deepEqual(emitted, [["u7", tierlistId, "Fantasy"]]);
+});
+
+test("voted_on ranking skips empty top tiers and keeps the first three populated ones", () => {
+  const rankings: Array<Array<{ label: string }>> = [];
+  const service = createTierlistsService(createInMemoryRepo(), undefined, (_voterUserId, _tierlistId, _tierlistName, ranking) => {
+    rankings.push(ranking);
+  });
+  const tiers = ["S", "A", "B", "C", "D"].map((label) => ({ id: label.toLowerCase(), label, color: "#c9482f", workIds: [] }));
+  const snapshot = ["w1", "w2", "w3"].map((workId) => ({ workId, title: `Book ${workId}`, author: "A", coverUrl: null }));
+  const board = service.createTierlist("owner", "Pool", { tiers, pool: ["w1", "w2", "w3"] }, "members", snapshot);
+
+  service.submitBallot(board.voteCode!, [{ workId: "w1", tierId: "b" }, { workId: "w2", tierId: "c" }, { workId: "w3", tierId: "d" }], { kind: "user", userId: "reader" });
+
+  assert.deepEqual(rankings.map((ranking) => ranking.map((tier) => tier.label)), [["B", "C", "D"]]);
 });
 
 test("editing a signed-in ballot emits no second voted_on", () => {

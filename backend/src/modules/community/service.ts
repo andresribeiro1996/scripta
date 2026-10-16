@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { normalizeWords, type IdentityKey, type ReaderProfile } from "@scripta/shared";
-import { categoryFor, contentDetail, decodeCursor, encodeCursor, DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
-import type { ActivityEventType, ActivityItem, CommunityAuthor, CommunityProfileView, CommunityEventType, DiscoverItem, DiscoverType, FeedSettings, FollowState, GameParticipation, OwnProfile, Page, ParticipationGameKind, PersonResult, PublishProfileInput, PublishedContent, PublishedProfile, QuizSummary, SharedBook, SuggestedReader, TierlistSummary, TournamentSummary } from "@scripta/shared/community";
-import type { DashboardFeedPage, DigestItem, ParticipationItem } from "@scripta/shared/dashboard";
-import type { PublishedTournamentRef, TournamentDiscoverRef } from "../arena/service.js";
+import { categoryFor, contentDetail, decodeCursor, encodeCursor, parseRankingPreview, DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
+import type { ActivityEventType, ActivityItem, CommunityAuthor, CommunityProfileView, CommunityEventType, DiscoverItem, DiscoverType, FeedSettings, FollowState, GameParticipation, OwnProfile, Page, ParticipationGameKind, PersonResult, PublishProfileInput, PublishedContent, QuizSummary, SavedContentRef, SharedBook, SuggestedReader, TierlistSummary, TournamentSummary } from "@scripta/shared/community";
+import type { CompletionItem, DashboardFeedPage, DigestItem, ParticipationItem } from "@scripta/shared/dashboard";
+import type { CompletedTournamentRef, PublishedTournamentRef, TournamentDiscoverRef } from "../arena/service.js";
 import type { MuralsPublicApi } from "../murals/publicApi.js";
 import type { PublishedQuizRef, QuizDiscoverRef } from "../quizzes/service.js";
 import type { PublishedTierlistRef, TierlistDiscoverRef } from "../tierlists/service.js";
@@ -110,7 +110,7 @@ export interface CommunityDeps {
   findUserIdByUsername(username: string): string | undefined;
   searchUsernameOwners(query: string, limit: number): string[];
   matchWorks(query: string, limit: number): string[];
-  murals: Pick<MuralsPublicApi, "ownsMural" | "getMuralPublicPayload">;
+  murals: Pick<MuralsPublicApi, "ownsMural" | "getMuralPublicPayload" | "getMuralSummary">;
   tierlists: {
     discoverWindow(needle: string, limit: number): TierlistDiscoverRef[];
     getPublishedMany(ids: string[]): PublishedTierlistRef[];
@@ -120,6 +120,7 @@ export interface CommunityDeps {
     discoverByWorks(workIds: string[], limit: number): TierlistDiscoverRef[];
   };
   tournaments: {
+    completedForParticipant(viewerId: string, since: string): CompletedTournamentRef[];
     discoverWindow(needle: string, limit: number): TournamentDiscoverRef[];
     getPublishedMany(ids: string[]): PublishedTournamentRef[];
     votedAmong(viewerId: string, ids: string[]): string[];
@@ -143,6 +144,9 @@ export interface CommunityDeps {
 }
 
 export interface CommunityService {
+  resolveEvent(viewerId: string, event: EventRow): DigestItem;
+  visibleEventIds(viewerId: string, events: readonly EventRow[]): Set<string>;
+  resolveSavedContent(viewerId: string, ref: SavedContentRef, savedAt: string): DigestItem;
   follow(followerId: string, followeeId: string): void;
   unfollow(followerId: string, followeeId: string): void;
   getFollowState(viewerId: string, userId: string): FollowState;
@@ -208,7 +212,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
     return userId;
   };
 
-  type DigestRow = { id: string; createdAt: string; event?: EventRow; follow?: FollowRow; participation?: ParticipationItem };
+  type DigestRow = { id: string; createdAt: string; event?: EventRow; follow?: FollowRow; participation?: ParticipationItem; completion?: CompletionItem };
   type Bound = { keyset?: CursorKeyset; since?: string };
 
   const withinBound = (bound: Bound, createdAt: string, id: string): boolean =>
@@ -231,7 +235,8 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
           .filter((userId) => profiles.has(userId))
           .slice(0, NAMED_PARTICIPANTS)
           .map((userId) => withGlyph(profiles.get(userId)!, userId, glyphOf));
-        return { kind: "participation" as const, id: `${kind}:${game.id}`, game: { kind, id: game.id, name: game.name, covers: game.covers.slice(0, FEED_COVER_LIMIT) }, actors, count: game.participantCount, createdAt: game.latestAt };
+        const voteCode = kind === "tierlist" ? deps.tierlists.get(game.id)?.voteCode : kind === "quiz" ? deps.quizzes.get(game.id)?.voteCode : undefined;
+        return { kind: "participation" as const, id: `${kind}:${game.id}`, game: { kind, id: game.id, name: game.name, covers: game.covers.slice(0, FEED_COVER_LIMIT), ...(voteCode ? { voteCode } : {}) }, actors, count: game.participantCount, createdAt: game.latestAt };
       })
     );
   };
@@ -246,6 +251,15 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
 
   const participationRows = (participation: ParticipationItem[], bound: Bound): DigestRow[] =>
     participation.filter((item) => withinBound(bound, item.createdAt, item.id)).map((item) => ({ id: item.id, createdAt: item.createdAt, participation: item }));
+
+  const completionItems = (viewerId: string, since: string): CompletionItem[] => {
+    const refs = deps.tournaments.completedForParticipant(viewerId, since);
+    const profiles = deps.resolveProfiles(refs.map((ref) => ref.ownerUserId));
+    const glyphOf = glyphLookup();
+    return refs.map((ref) => ({ kind: "completion", id: `completed:${ref.id}`, actor: withGlyph(profiles.get(ref.ownerUserId) ?? { username: "Creator unavailable", avatarUrl: null, unavailable: true }, ref.ownerUserId, glyphOf), tournament: toTournamentSummary(ref), winner: { title: ref.winner.title, author: ref.winner.author, coverUrl: ref.winner.cover, workId: ref.winner.workId }, createdAt: ref.completedAt }));
+  };
+
+  const completionRows = (items: CompletionItem[], bound: Bound): DigestRow[] => items.filter((item) => withinBound(bound, item.createdAt, item.id)).map((item) => ({ id: item.id, createdAt: item.createdAt, completion: item }));
 
   const toDigestItem = (row: DigestRow, profiles: Map<string, ReaderProfile>, glyphOf: (userId: string) => IdentityKey | null, viewerId: string): DigestItem | undefined => {
     if (row.event) {
@@ -273,8 +287,13 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
           : event.ref_type === "tierlist"
             ? (() => { const ref = deps.tierlists.get(event.ref_id); return ref ? toTierlistSummary(ref) : undefined; })()
             : (() => { const ref = deps.tournaments.get(event.ref_id); return ref ? toTournamentSummary(ref) : undefined; })();
-        if (content && actor) return { kind: "vote", id: event.id, actor: withGlyph(actor, event.user_id, glyphOf), content, createdAt: event.created_at };
-      } else if (event.type === "book_added" || event.type === "book_finished") {
+        const ranking = event.ref_type === "tierlist" ? parseRankingPreview(parseEventPayload(event.payload)?.ranking) : [];
+        if (content && actor) return { kind: "vote", id: event.id, actor: withGlyph(actor, event.user_id, glyphOf), content, ...(ranking.length ? { ranking } : {}), createdAt: event.created_at };
+      } else if (event.type === "mural_published" && actor) {
+        const profile = repo.getProfileRow(event.user_id);
+        const mural = profile?.mural_id === event.ref_id && (profile.published === 1 || viewerId === event.user_id) ? deps.murals.getMuralSummary(event.user_id, event.ref_id) : null;
+        if (mural) return { kind: "mural", id: event.id, actor: withGlyph(actor, event.user_id, glyphOf), mural, createdAt: event.created_at };
+      } else if (event.type === "book_added" || event.type === "book_started" || event.type === "book_finished") {
         const payload = parseEventPayload(event.payload);
         if (payload && actor) {
           const coverUrl = typeof payload.coverUrl === "string" ? payload.coverUrl : null;
@@ -282,8 +301,9 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
             kind: "reading",
             id: event.id,
             actor: withGlyph(actor, event.user_id, glyphOf),
-            book: { title: String(payload.title ?? ""), author: String(payload.author ?? ""), coverUrl, workId: typeof payload.workId === "string" ? payload.workId : null },
-            finished: event.type === "book_finished",
+            book: { title: String(payload.title ?? ""), author: String(payload.author ?? ""), coverUrl, workId: typeof payload.workId === "string" ? payload.workId : null, ...(typeof payload.isbn === "string" ? { isbn: payload.isbn } : {}) },
+            finished: event.type === "book_finished" || payload.status === 2,
+            ...(event.type === "book_started" || payload.status === 1 ? { started: true } : {}),
             createdAt: event.created_at
           };
         }
@@ -309,7 +329,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
     let last: DigestRow | undefined;
     for (const row of rows) {
       if (items.length === limit || (horizon && withinBound({ keyset: horizon }, row.createdAt, row.id))) return { items, last, more: true };
-      const item = row.participation ?? toDigestItem(row, profiles, glyphOf, viewerId);
+      const item = row.participation ?? row.completion ?? toDigestItem(row, profiles, glyphOf, viewerId);
       if (item) items.push(item);
       last = row;
     }
@@ -317,7 +337,37 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
   };
   const countItems = (rows: DigestRow[], viewerId: string): number => buildItems(rows, viewerId, DASHBOARD_COUNT_CAP, () => null).items.length;
 
+  const visibleEventIds = (viewerId: string, events: readonly EventRow[]): Set<string> => {
+    const visibility = createVisibility(repo, viewerId);
+    const others = events.filter((event) => {
+      if (event.user_id === viewerId) return false;
+      const standing = visibility.standing(event.user_id);
+      return standing.published || standing.followedByViewer;
+    });
+    const shown = new Set(repo.shownEventIds(others));
+    return new Set(events.filter((event) => event.user_id === viewerId || shown.has(event.id)).map((event) => event.id));
+  };
+
   return {
+    visibleEventIds,
+    resolveEvent(viewerId, event) {
+      if (!visibleEventIds(viewerId, [event]).has(event.id)) throw new ProfileNotFoundError();
+      const item = toDigestItem({ id: event.id, createdAt: event.created_at, event }, deps.resolveProfiles([event.user_id]), glyphLookup(), viewerId);
+      if (!item) throw new ProfileNotFoundError();
+      return item;
+    },
+    resolveSavedContent(viewerId, ref, savedAt) {
+      if (ref.kind === "mural") {
+        const event: EventRow = { id: `saved:mural:${ref.id}`, user_id: ref.ownerId, type: "mural_published", ref_type: "mural", ref_id: ref.id, payload: null, created_at: savedAt };
+        return this.resolveEvent(viewerId, event);
+      }
+      const content = ref.kind === "tierlist" ? deps.tierlists.get(ref.id) : ref.kind === "tournament" ? deps.tournaments.get(ref.id) : deps.quizzes.get(ref.id);
+      if (!content) throw new ProfileNotFoundError();
+      const author = deps.resolveProfiles([content.ownerUserId]).get(content.ownerUserId) ?? ("promotedAt" in content && content.promotedAt ? { username: "Original creator unavailable", avatarUrl: null, unavailable: true } : undefined);
+      if (!author) throw new ProfileNotFoundError();
+      const summary = ref.kind === "tierlist" ? toTierlistSummary(content as PublishedTierlistRef) : ref.kind === "tournament" ? toTournamentSummary(content as PublishedTournamentRef) : toQuizSummary(content as PublishedQuizRef);
+      return { kind: "publication", id: `saved:${ref.kind}:${ref.id}`, actor: withGlyph(author, content.ownerUserId, glyphLookup()), type: ref.kind === "tierlist" ? "tierlist_published" : ref.kind === "tournament" ? "tournament_published" : "quiz_published", content: summary, createdAt: savedAt };
+    },
     follow(followerId, followeeId) {
       if (followerId === followeeId) throw new SelfFollowError();
       if (!deps.resolveProfiles([followeeId]).has(followeeId)) throw new ProfileNotFoundError();
@@ -422,6 +472,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
       if (cursor && !keyset) throw new InvalidCursorError();
       const start = windowStart();
       const participation = kinds.has("participation") ? participationItems(viewerId, start) : [];
+      const completions = kinds.has("completion") ? completionItems(viewerId, start) : [];
       const followers = (bound: Bound, count: number): DigestRow[] => (kinds.has("follow") ? followerRows(viewerId, bound, count, start) : []);
       const types = DIGEST_EVENT_TYPES.filter(([, kind]) => kinds.has(kind)).map(([type]) => type);
       const glyphOf = glyphLookup();
@@ -432,7 +483,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
       for (let round = 0; more && items.length < limit && round < DASHBOARD_REFILL_ROUNDS; round++) {
         const windows = [inboxRows(viewerId, pageBound.keyset, limit + 1, types), followers(pageBound, limit + 1)];
         const horizon = windows.filter((rows) => rows.length === limit + 1).map((rows) => rows[rows.length - 1]!).sort(newestFirst)[0];
-        const page = buildItems([...windows.flat(), ...participationRows(participation, pageBound)], viewerId, limit - items.length, glyphOf, horizon);
+        const page = buildItems([...windows.flat(), ...participationRows(participation, pageBound), ...completionRows(completions, pageBound)], viewerId, limit - items.length, glyphOf, horizon);
         items.push(...page.items);
         last = page.last ?? last;
         more = page.more || horizon !== undefined;
@@ -442,7 +493,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
       if (keyset) return { items, nextCursor, seenAt: null, personalNewCount: 0, followingNewCount: 0, newCount: 0 };
       const seenAt = deps.getDashboardSeenAt(viewerId);
       const countBound: Bound = seenAt ? { since: seenAt } : {};
-      const personalNewCount = countItems([...followers(countBound, DASHBOARD_COUNT_CAP), ...participationRows(participation, countBound)], viewerId);
+      const personalNewCount = countItems([...followers(countBound, DASHBOARD_COUNT_CAP), ...participationRows(participation, countBound), ...completionRows(completions, countBound)], viewerId);
       const followingNewCount = repo.countInboxSince(viewerId, seenAt ?? "", types, DASHBOARD_COUNT_CAP);
       return { items, nextCursor, seenAt, personalNewCount, followingNewCount, newCount: seenAt ? personalNewCount + followingNewCount : 0 };
     },
@@ -579,6 +630,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
             if (ref) Object.assign(payload, { covers: ref.covers.slice(0, FEED_COVER_LIMIT), href: `/arena/${ref.id}` });
           }
         }
+        if (event.type === "book_started" && payload) return { id: event.id, type: "book_added", payload: { ...payload, started: true }, createdAt: event.created_at };
         return payload === undefined ? undefined : { id: event.id, type: event.type, payload, createdAt: event.created_at };
       };
       const eventsAfter = (after: CursorKeyset | undefined, count: number): EventRow[] => {

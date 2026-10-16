@@ -1,12 +1,37 @@
 import { apiPath } from "../api/path.js";
 import type { ApiRequest } from "../api/port.js";
-import { dashboardQuery, withKnownDigestItems, type DashboardFeedPage } from "../dashboard.js";
+import { dashboardQuery, isKnownDigestItem, withKnownDigestItems, type DashboardFeedPage, type DigestItem } from "../dashboard.js";
 import type { LibraryData } from "../library/index.js";
 import { isKnownContent } from "./helpers.js";
-import type { ActivityItem, CommunityProfileView, DiscoverItem, DiscoverType, FeedSettings, OwnProfile, Page, PersonResult, PublishProfileInput, SuggestedReader } from "./types.js";
+import type { ActivityComment, ActivityEngagement, ActivityItem, CommunityProfileView, DiscoverItem, DiscoverType, FeedSettings, OwnProfile, Page, PersonResult, PublishProfileInput, SavedContentRef, SuggestedReader } from "./types.js";
 
 export function createCommunityApi(request: ApiRequest) {
   return {
+    fetchActivityEngagement(ids: string[]): Promise<Record<string, ActivityEngagement>> {
+      return request("/community/activity/engagement", { method: "POST", body: { ids }, auth: "required" });
+    },
+    likeActivity(id: string, liked: boolean): Promise<ActivityEngagement> {
+      return request(apiPath`/community/activity/${id}/like`, { method: "PUT", body: { liked }, auth: "required" });
+    },
+    fetchActivityComments(id: string, cursor?: string): Promise<Page<ActivityComment>> {
+      return request(apiPath`/community/activity/${id}/comments` + (cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""), { auth: "required" });
+    },
+    async addActivityComment(id: string, text: string): Promise<void> {
+      await request(apiPath`/community/activity/${id}/comments`, { method: "POST", body: { text }, auth: "required" });
+    },
+    async deleteActivityComment(id: string): Promise<void> {
+      await request(apiPath`/community/activity/comments/${id}`, { method: "DELETE", auth: "required" });
+    },
+    fetchSavedState(refs: SavedContentRef[]): Promise<string[]> {
+      return request("/community/saved/state", { method: "POST", body: { refs }, auth: "required" });
+    },
+    async saveContent(ref: SavedContentRef, saved: boolean): Promise<void> {
+      await request("/community/saved", { method: "PUT", body: { ref, saved }, auth: "required" });
+    },
+    async fetchSavedContent(cursor?: string): Promise<Page<DigestItem>> {
+      const page = await request<Page<DigestItem>>("/community/saved" + (cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""), { auth: "required" });
+      return { ...page, items: page.items.filter(isKnownDigestItem) };
+    },
     async fetchDashboard(cursor?: string): Promise<DashboardFeedPage> {
       return withKnownDigestItems(await request<DashboardFeedPage>(`/community/dashboard${dashboardQuery(cursor)}`, { auth: "required" }));
     },
