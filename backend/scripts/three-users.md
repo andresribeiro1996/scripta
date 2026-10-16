@@ -24,8 +24,8 @@ The isolated default mode and `--check` described below are unaffected by `--sha
 
 | Login | Starting state |
 |---|---|
-| `fixture_alice` | 12 books, shared library, shared/private freeform murals, two private source tier lists plus two open community copies, active four-book Arena |
-| `fixture_bob` | 8 books (4 overlap Alice), a ballot on each poll, one Arena vote under a separate voter token |
+| `fixture_alice` | 12 books (4 finished, each rated 4), one highlight per book, shared library, shared/private freeform murals, two private source tier lists plus two open community copies, active four-book Arena, a published four-question blurb quiz |
+| `fixture_bob` | 8 books (4 overlap Alice; 2 finished, each rated 4), a ballot on each poll, one Arena vote under a separate voter token |
 | `fixture_charlie` | Saved empty library, no murals, polls, or votes |
 
 Password for all three: `scripta123`. Emails are `<login>@example.test`. All books and annotations are synthetic; covers use the app's fallback. Each poll starts with Alice's initial ranking and Bob's different ranking (two ballots). Charlie and logged-out visitors are ready for first participation. Arena round one lasts seven days; reset if it expires, or settle early as Alice.

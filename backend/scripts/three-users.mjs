@@ -77,6 +77,12 @@ const { bookKey } = await import("../../packages/shared/src/library/merge.ts");
 const app = buildApp();
 await app.ready();
 const password = "scripta123";
+const ALICE_QUIZ = [
+  ["The Fellowship of the Ring", "Nine walkers leave a quiet country to carry a ring back to the fire that made it."],
+  ["A Game of Thrones", "A northern lord rides south to serve his king and finds the capital colder than winter."],
+  ["The Hobbit", "A comfortable homebody is hired as a burglar by thirteen dwarves and a wizard."],
+  ["Brave New World", "In a tidy future where everyone is happy by design, one man would rather be unhappy and free."]
+];
 
 async function request(method, url, payload, token, expected = 200) {
   const response = await app.inject({ method, url, ...(payload === undefined ? {} : { payload }), headers: token ? { authorization: `Bearer ${token}` } : {} });
@@ -120,8 +126,8 @@ async function seed() {
   assert(titles.length >= 16, "The shared library fixture needs at least 16 books for this fixture's 12/8/0 split.");
   const books = titles.slice(0, 16).map((book, index) => ({
     ContentID: `fixture-book-${index + 1}`, Title: book.Title, Attribution: book.Attribution, ISBN: book.ISBN ?? null,
-    ReadStatus: index % 3, ___PercentRead: [0, 45, 100][index % 3],
-    highlights: [{ BookmarkID: `fixture-highlight-${index + 1}`, Text: "A synthetic passage for testing.", Annotation: "PRIVATE_FIXTURE_NOTE" }]
+    ReadStatus: index % 3, ___PercentRead: [0, 45, 100][index % 3], ...(index % 3 === 2 ? { Rating: 4 } : {}),
+    highlights: [{ BookmarkID: `fixture-highlight-${index + 1}`, Type: "highlight", Text: "A synthetic passage for testing.", Annotation: "PRIVATE_FIXTURE_NOTE" }]
   }));
   for (const [name, libraryBooks] of [["alice", books.slice(0, 12)], ["bob", [...books.slice(0, 4), ...books.slice(12)]], ["charlie", []]]) {
     await request("PUT", "/library", { data: { source: "three-user-fixture", schema_version: 1, name: `${name}'s library`, book_count: libraryBooks.length, books: libraryBooks } }, tokens[name]);
@@ -177,7 +183,13 @@ async function seed() {
   const { tournament: arena } = await request("GET", `/arenas/${tournament.id}`);
   const voterToken = "scripta-fixture-bob";
   await request("POST", `/arenas/${arena.id}/duels/${arena.duels[0].id}/vote`, { voterToken, workId: arena.duels[0].bookA.workId }, null, 204);
-  const manifest = { users, library: { shareToken: library.shareToken }, murals, polls, arena: { id: arena.id, bobVoterToken: voterToken } };
+  const quizBooks = ALICE_QUIZ.map(([title, blurb]) => {
+    const book = aliceBooks.find((entry) => entry.Title === title);
+    return { workId: works[bookKey(book)], title, author: book.Attribution, blurb };
+  });
+  const draft = await request("POST", "/quizzes", { name: "Alice's guess-the-book quiz", data: { sourceLabel: "Alice's shelf", questionCount: 4, allowedTypes: ["blurb_title"], books: quizBooks } }, tokens.alice, 201);
+  const { voteCode: quizCode } = await request("POST", `/quizzes/${draft.id}/publish`, {}, tokens.alice, 201);
+  const manifest = { users, library: { shareToken: library.shareToken }, murals, polls, arena: { id: arena.id, bobVoterToken: voterToken }, quiz: { id: draft.id, code: quizCode } };
   writeFileSync(`${manifestPath}.tmp`, JSON.stringify(manifest, null, 2));
   renameSync(`${manifestPath}.tmp`, manifestPath);
   return manifest;
@@ -214,6 +226,11 @@ async function check(fixture) {
   await request("POST", `/tierlists/voting/${fixture.polls.anonymous.code}/ballot`, { placements: [] });
   const { tournament } = await request("GET", `/arenas/${fixture.arena.id}`);
   await request("POST", `/arenas/${tournament.id}/duels/${tournament.duels[0].id}/vote`, { voterToken: fixture.arena.bobVoterToken, workId: tournament.duels[0].bookA.workId }, null, 409);
+  const { board: quizBoard } = await request("GET", `/quizzes/voting/${fixture.quiz.code}`);
+  assert.equal(quizBoard.questions.length, 4);
+  assert.equal(quizBoard.playOpen, true);
+  const aliceRatings = (await request("GET", "/library", undefined, tokens.alice)).data.books.filter((book) => book.Rating === 4).map((book) => book.Title);
+  assert.deepEqual(aliceRatings, ["The Return of the King", "A Storm of Swords", "Brave New World", "To Kill a Mockingbird"]);
   await request("POST", "/library/unshare", {}, tokens.alice);
   await request("GET", `/library/shared/${fixture.library.shareToken}`, undefined, null, 404);
   await request("POST", `/murals/${mural.id}/unshare`, {}, tokens.alice);
