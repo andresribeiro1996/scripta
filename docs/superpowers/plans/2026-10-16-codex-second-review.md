@@ -708,6 +708,7 @@ EOF
   - `parseReviewArgs(argv: string[]) → { mode: "plan" | "branch", spec: string, plan?: string }` — throws a usage error.
   - `buildPrompt(brief: string, { spec: string, plan?: string }) → string`
   - `codexUsage(jsonl: string) → { model: string | null, tokens: { input: number, cached: number, output: number } }`
+  - `codexFailure(jsonl: string) → string | null` — the message of the run's `turn.failed` event (or, failing that, its first top-level `error` event), unwrapped from the JSON error body Codex nests in it; `null` when the turn didn't fail. Codex exits 0 when a turn fails (Task 1's `codex-exec-failed.jsonl`), so the exit code alone can't be trusted.
   - `parseFindings(text: string) → { verdict: "pass" | "fail", findings: { severity, file, line, summary, scenario }[] }` — throws on invalid JSON or shape.
   - `codexVerdict(result) → "CODEX: PASS" | "CODEX: FAIL — <n> blocking"`
   - `renderCodexReport({ mode, round, seconds, usage, result, error }) → string` — `error` is a string or `null`; with an error, `result` is ignored.
@@ -720,7 +721,7 @@ EOF
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { buildPrompt, codexUsage, codexVerdict, parseFindings, parseReviewArgs, renderCodexReport } from "./codexReview.mjs";
+import { buildPrompt, codexFailure, codexUsage, codexVerdict, parseFindings, parseReviewArgs, renderCodexReport } from "./codexReview.mjs";
 
 const USAGE = { model: "gpt-6.1-sol", tokens: { input: 1300, cached: 1000, output: 350 } };
 const FINDING = { severity: "blocking", file: "backend/src/a.ts", line: 12, summary: "Token leaks", scenario: "A shared link returns the owner's token." };
@@ -754,6 +755,13 @@ test("codexUsage reads the recorded Codex run", () => {
   const usage = codexUsage(readFileSync(new URL("./fixtures/codex-exec.jsonl", import.meta.url), "utf8"));
   assert.ok(usage.tokens.input > 0);
   assert.ok(usage.tokens.output > 0);
+});
+
+test("codexFailure reads why a turn failed, which Codex's exit code hides", () => {
+  const failed = readFileSync(new URL("./fixtures/codex-exec-failed.jsonl", import.meta.url), "utf8");
+  assert.equal(codexFailure(failed), "The 'gpt-6.1-sol' model is not supported when using Codex with a ChatGPT account.");
+  assert.equal(codexFailure(readFileSync(new URL("./fixtures/codex-exec.jsonl", import.meta.url), "utf8")), null);
+  assert.equal(codexFailure('{"type":"turn.failed","error":{"message":"plain text"}}'), "plain text");
 });
 
 test("parseFindings accepts the schema's shape", () => {
@@ -829,18 +837,39 @@ export function buildPrompt(brief, { spec, plan }) {
   return [brief.trimEnd(), "", `Spec: ${spec}`, ...(plan ? [`Plan: ${plan}`] : [])].join("\n") + "\n";
 }
 
+function parseJson(text) {
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    if (error instanceof SyntaxError) return undefined;
+    throw error;
+  }
+}
+
+function events(jsonl) {
+  return jsonl
+    .split("\n")
+    .filter((line) => line.trim())
+    .map(parseJson)
+    .filter((event) => event && typeof event === "object");
+}
+
+function innerMessage(message) {
+  return parseJson(message)?.error?.message ?? message;
+}
+
+export function codexFailure(jsonl) {
+  const all = events(jsonl);
+  const failed = all.findLast((event) => event.type === "turn.failed");
+  if (failed) return innerMessage(failed.error?.message ?? "the turn failed");
+  const error = all.find((event) => event.type === "error");
+  return error ? innerMessage(error.message ?? "codex reported an error") : null;
+}
+
 export function codexUsage(jsonl) {
   let model = null;
   const tokens = { input: 0, cached: 0, output: 0 };
-  for (const line of jsonl.split("\n")) {
-    if (!line.trim()) continue;
-    let event;
-    try {
-      event = JSON.parse(line);
-    } catch (error) {
-      if (error instanceof SyntaxError) continue;
-      throw error;
-    }
+  for (const event of events(jsonl)) {
     if (model === null && typeof event.model === "string") model = event.model;
     if (event.usage) {
       tokens.input += event.usage.input_tokens ?? 0;
@@ -965,7 +994,7 @@ EOF
 - Create: `scripts/codex-review.mjs`
 
 **Interfaces:**
-- Consumes: `MODES`, `parseReviewArgs`, `buildPrompt`, `codexUsage`, `parseFindings`, `codexVerdict`, `renderCodexReport` (Task 4); `runsDir`, `roundLogPath`, `nextRound`, `appendRound` (Task 3); `scripts/codex/findings.schema.json` (Task 1).
+- Consumes: `MODES`, `parseReviewArgs`, `buildPrompt`, `codexFailure`, `codexUsage`, `parseFindings`, `codexVerdict`, `renderCodexReport` (Task 4); `runsDir`, `roundLogPath`, `nextRound`, `appendRound` (Task 3); `scripts/codex/findings.schema.json` (Task 1).
 - Produces: `node scripts/codex-review.mjs plan <spec> <plan>` and `… branch <spec> [plan]`, writing `codex-<mode>-rN.md` (plus `.json`, `.jsonl`, `.stderr.log`) and printing `[codex-review] <report path>: <verdict line>`.
 
 - [ ] **Step 1: Write `scripts/codex-review.mjs`**
@@ -979,6 +1008,7 @@ import { fileURLToPath } from "node:url";
 import {
   MODES,
   buildPrompt,
+  codexFailure,
   codexUsage,
   codexVerdict,
   parseFindings,
@@ -1015,11 +1045,12 @@ function runCodex(root, prompt, base) {
   }
 }
 
-function reviewError(root, run, base, treeChanged) {
+function reviewError(root, run, base, treeChanged, failure) {
   if (treeChanged) return "the working tree changed during a read-only review";
   if (run.error?.code === "ETIMEDOUT") return "codex timed out after 45 minutes";
   if (run.error) return `codex did not start: ${run.error.message}`;
   if (run.status !== 0) return `codex exited ${run.status}; see ${relative(root, `${base}.stderr.log`)}`;
+  if (failure) return `codex turn failed: ${failure}`;
   return null;
 }
 
@@ -1044,9 +1075,10 @@ function main() {
   const run = runCodex(root, buildPrompt(brief, { spec, plan }), base);
   const seconds = Math.round((Date.now() - started) / 1000);
   const treeChanged = git(root, ["status", "--porcelain"]) !== before;
-  const usage = codexUsage(readFileSync(`${base}.jsonl`, "utf8"));
+  const jsonl = readFileSync(`${base}.jsonl`, "utf8");
+  const usage = codexUsage(jsonl);
 
-  let error = reviewError(root, run, base, treeChanged);
+  let error = reviewError(root, run, base, treeChanged, codexFailure(jsonl));
   let result = null;
   if (!error) {
     try {
