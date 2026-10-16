@@ -9,6 +9,8 @@ const SEVERITIES = [
   ["follow-up", "Follow-ups"],
 ];
 
+const FINDING_KEYS = ["severity", "file", "line", "summary", "scenario"];
+
 export function parseReviewArgs(argv) {
   const [mode, spec, plan] = argv;
   if (!Object.hasOwn(MODES, mode)) throw new Error(`usage: codex-review.mjs ${MODES.plan.usage} | ${MODES.branch.usage}`);
@@ -45,6 +47,7 @@ export function codexFailure(jsonl) {
   const all = events(jsonl);
   const failed = all.findLast((event) => event.type === "turn.failed");
   if (failed) return innerMessage(failed.error?.message ?? "the turn failed");
+  if (all.some((event) => event.type === "turn.completed")) return null;
   const error = all.find((event) => event.type === "error");
   return error ? innerMessage(error.message ?? "codex reported an error") : null;
 }
@@ -65,9 +68,16 @@ export function codexUsage(jsonl) {
 
 export function parseFindings(text) {
   const value = JSON.parse(text);
+  if (value === null || typeof value !== "object" || Array.isArray(value)) throw new Error("the output must be a JSON object");
+  for (const key of Object.keys(value)) {
+    if (key !== "verdict" && key !== "findings") throw new Error(`unexpected key "${key}"`);
+  }
   if (value?.verdict !== "pass" && value?.verdict !== "fail") throw new Error("verdict must be pass or fail");
   if (!Array.isArray(value.findings)) throw new Error("findings must be an array");
   for (const finding of value.findings) {
+    for (const key of Object.keys(finding ?? {})) {
+      if (!FINDING_KEYS.includes(key)) throw new Error(`a finding has an unexpected key "${key}"`);
+    }
     if (!SEVERITIES.some(([severity]) => severity === finding?.severity)) {
       throw new Error(`unknown severity ${JSON.stringify(finding?.severity)}`);
     }

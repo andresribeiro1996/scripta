@@ -85,3 +85,23 @@ test("an error report never says pass", () => {
   assert.equal(report.trimEnd().split("\n").at(-1), "CODEX: ERROR — codex exited 1");
   assert.doesNotMatch(report, /CODEX: PASS/);
 });
+
+test("parseFindings refuses keys the schema forbids and non-objects", () => {
+  assert.throws(() => parseFindings('{"verdict":"pass","findings":[],"unexpected":true}'), /unexpected key/);
+  assert.throws(() => parseFindings(JSON.stringify({ verdict: "fail", findings: [{ ...FINDING, note: "x" }] })), /unexpected key/);
+  assert.throws(() => parseFindings("null"), /JSON object/);
+  assert.throws(() => parseFindings("[]"), /JSON object/);
+});
+
+test("codexFailure ignores a non-fatal error event when the turn completed", () => {
+  const jsonl = [
+    '{"type":"error","message":"Reconnecting... 1/5"}',
+    '{"type":"turn.completed","usage":{"input_tokens":1,"cached_input_tokens":0,"output_tokens":1}}',
+  ].join("\n");
+  assert.equal(codexFailure(jsonl), null);
+  assert.equal(codexFailure('{"type":"error","message":"boom"}'), "boom");
+});
+
+test("codexUsage reads the model from an event", () => {
+  assert.equal(codexUsage('{"type":"thread.started","model":"gpt-6.1-sol"}\n').model, "gpt-6.1-sol");
+});

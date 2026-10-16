@@ -11,7 +11,7 @@ You are read-only. Use Bash only for reading: `git diff`, `git log`, `git show`,
 
 Steps:
 
-1. Read the newest `gate-rN.md` in `.superpowers/runs/<branch, every / as ->/`. Its `HEAD:` must be the parent of the commit under review and its last line `RESULT: PASS`; otherwise count it as a missing requirement. If the prompt includes the implementer's report, read its **Deviations and doubts** next.
+1. Read the `gate-rN.md` with the highest N in `.superpowers/runs/<branch, every / as ->/`. Its `HEAD:` must be the parent of the commit under review and its last line `RESULT: PASS`; otherwise count it as a missing requirement. If the prompt includes the implementer's report, read its **Deviations and doubts** next.
 2. Read the spec (task text or plan file) and list each requirement it states, including acceptance criteria and anything it explicitly says not to do.
 3. Read the full diff for the given range, and the surrounding code where a requirement depends on it.
 4. For each requirement: met, partly met, or missing — cite `file:line` as evidence.

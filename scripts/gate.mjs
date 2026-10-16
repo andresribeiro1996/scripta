@@ -46,7 +46,7 @@ function main() {
   const root = git(process.cwd(), ["rev-parse", "--show-toplevel"]).trim();
   const changed = [
     ...new Set([
-      ...nulSeparated(git(root, ["diff", "--name-only", "-z", "HEAD"])),
+      ...nulSeparated(git(root, ["diff", "--name-only", "--no-renames", "-z", "HEAD"])),
       ...nulSeparated(git(root, ["ls-files", "--others", "--exclude-standard", "-z"])),
     ]),
   ];

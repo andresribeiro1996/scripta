@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { execFileSync, spawnSync } from "node:child_process";
-import { closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -57,7 +57,6 @@ function main() {
   const root = git(process.cwd(), ["rev-parse", "--show-toplevel"]);
   const spec = repoPath(root, args.spec);
   const plan = args.plan && repoPath(root, args.plan);
-  if (args.mode === "branch") git(root, ["fetch", "-q", "origin", "main"]);
 
   const branch = git(root, ["rev-parse", "--abbrev-ref", "HEAD"]);
   const dir = runsDir(root, branch);
@@ -66,17 +65,33 @@ function main() {
   const round = nextRound(readdirSync(dir), kind);
   const base = join(dir, `${kind}-r${round}`);
 
-  const brief = readFileSync(join(CODEX_DIR, MODES[args.mode].brief), "utf8");
-  const before = git(root, ["status", "--porcelain"]);
-  const started = Date.now();
-  console.log(`[codex-review] ${args.mode} review r${round} running…`);
-  const run = runCodex(root, buildPrompt(brief, { spec, plan }), base);
-  const seconds = Math.round((Date.now() - started) / 1000);
-  const treeChanged = git(root, ["status", "--porcelain"]) !== before;
-  const jsonl = readFileSync(`${base}.jsonl`, "utf8");
+  let error = null;
+  let run = null;
+  let jsonl = "";
+  let treeChanged = false;
+  let seconds = 0;
+  if (args.mode === "branch") {
+    try {
+      git(root, ["fetch", "-q", "origin", "main"]);
+    } catch (fetchError) {
+      error = `git fetch origin main failed: ${fetchError.message.split("\n")[0]}`;
+    }
+  }
+
+  if (!error) {
+    rmSync(`${base}.json`, { force: true });
+    const brief = readFileSync(join(CODEX_DIR, MODES[args.mode].brief), "utf8");
+    const before = git(root, ["status", "--porcelain"]);
+    const started = Date.now();
+    console.log(`[codex-review] ${args.mode} review r${round} running…`);
+    run = runCodex(root, buildPrompt(brief, { spec, plan }), base);
+    seconds = Math.round((Date.now() - started) / 1000);
+    treeChanged = git(root, ["status", "--porcelain"]) !== before;
+    jsonl = readFileSync(`${base}.jsonl`, "utf8");
+    error = reviewError(root, run, base, treeChanged, codexFailure(jsonl));
+  }
   const usage = codexUsage(jsonl);
 
-  let error = reviewError(root, run, base, treeChanged, codexFailure(jsonl));
   let result = null;
   if (!error) {
     try {

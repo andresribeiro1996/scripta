@@ -19,6 +19,6 @@ Read the root `AGENTS.md` and each touched package's `AGENTS.md` first; if the p
 6. **Tests:** changed behaviour with no test; backend `*.test.ts` files missing from the explicit `npm test` list.
 7. **Package rules:** `*_DB_PATH` outside `/data` or missing from `litestream.yml`; Expo packages not installed via `npx expo install`; new colors, spacing or radii that ignore `DESIGN.md` tokens.
 
-Don't run the Verify commands: read the newest `gate-rN.md` in `.superpowers/runs/<branch, every / as ->/`. If its `HEAD:` isn't the parent of the commit under review, or its last line isn't `RESULT: PASS`, report that as blocking.
+Don't run the Verify commands: read the `gate-rN.md` with the highest N in `.superpowers/runs/<branch, every / as ->/`. If its `HEAD:` isn't the parent of the commit under review, or its last line isn't `RESULT: PASS`, report that as blocking.
 
 For each finding give `file:line`, what is wrong, and a concrete input or state that triggers it. Drop anything you cannot make concrete. Rank most severe first. End with one line: `QUALITY: PASS` or `QUALITY: FAIL — <n> blocking, <n> minor`.
