@@ -62,9 +62,14 @@ A 2026-10-16 UI review of the mobile Home tab, on the signed-in fixture, found t
    - `clearDashboardCounts` applies to the Activity query after a successful mark-seen.
 4. **Bell:**
    - A `bell` glyph in `GLYPHS` (`mobile/src/ui/icon.tsx`).
-   - The Home header becomes brand mark, then an "Activity" `IconButton` (bell glyph, `label`, `framed`, `badge`), then "Saved".
+   - The Home header becomes brand mark, then a framed bell `IconButton` with `badge` and no `label`, then "Saved".
+   - Its accessibility label is "Open activity", and `IconButton` appends ", N new".
    - `IconButton` already supports `badge` (`mobile/src/ui/components.tsx:221-269`).
-   - DESIGN.md's header rule requires a label on every header action except `⋯`, and allows two.
+   - **Why no word:** `DESIGN.md`'s header rule asks for a label on every header action except `⋯`. The bell becomes the second named exception.
+     - `framed` already draws the 44pt target the rule protects.
+     - A bell with a badge is a platform convention, not a guess.
+     - A second labelled pill crowds "Home" on a 360dp phone.
+   - `DESIGN.md` records the exception.
    - The bell pushes `/activity`.
 5. **Activity screen:**
    - Route `mobile/src/app/(app)/(home)/activity.tsx`, titled "Activity". The screen lives in `mobile/src/features/home/`.

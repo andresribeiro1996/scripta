@@ -42,6 +42,7 @@
 - **The action rule:** an action that changes something in place is a secondary `Button`. One that opens a screen is bold accent caption text ending in ` →`.
   - Exception: the filled primary `Button` on an open published game ("Rank this list", "Play quiz", `HomeFeedRow.tsx:26,28`) stays as it is.
 - **Header actions follow DESIGN.md:** an `IconButton` with `label` and `framed`, at most two per header.
+  - Exception: Home's bell is framed and glyph-only, like `⋯`. Task 6 writes that exception into `DESIGN.md`.
 - **Rebuild shared before typechecking or testing mobile and backend:** `npm run build --workspace @scripta/shared`. Both consume shared's gitignored `dist`.
 - **Old clients keep working.**
   - `fetchDashboard(cursor)` with no `kinds` sends today's query string.
@@ -703,6 +704,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - Test: `mobile/src/features/home/homeModel.test.ts`
 - Modify: `mobile/src/app/(app)/_layout.tsx`
 - Modify: `mobile/README.md`
+- Modify: `DESIGN.md`
 
 **Interfaces:**
 - Consumes: from Task 2, `CIRCLE_DIGEST_KINDS`; from Task 5, `useActivityFeed`, the `bell` glyph and the `/activity` route.
@@ -783,7 +785,7 @@ In `mobile/src/features/home/HomeScreen.tsx`, make these changes:
 6. **Header.** Change `headerRight` to:
 
 ```tsx
-headerRight: () => <HeaderActions><IconButton name="bell" label="Activity" framed accessibilityLabel="Open activity" badge={activityBadge} onPress={() => router.push("/activity" as never)} /><IconButton name="bookmark" label="Saved" framed accessibilityLabel="Open saved games and murals" onPress={() => setSavedOpen(true)} /></HeaderActions>
+headerRight: () => <HeaderActions><IconButton name="bell" framed accessibilityLabel="Open activity" badge={activityBadge} onPress={() => router.push("/activity" as never)} /><IconButton name="bookmark" label="Saved" framed accessibilityLabel="Open saved games and murals" onPress={() => setSavedOpen(true)} /></HeaderActions>
 ```
 
 7. **Section header.** Change `renderSectionHeader` to:
@@ -828,15 +830,21 @@ Update the Home section of `mobile/README.md`:
 1. Replace its first paragraph (it begins "Home uses the Open shelf feed:") with:
 
 ```markdown
-Home shows “Your reading circle”: followed readers’ publications, reading activity and murals. The labelled Activity button in the header has a bell and an unread badge. It opens the Activity screen: new followers (with Follow back), plays of your games, and winners from tournaments you joined. Seeing that screen marks them seen, which also clears the Home tab badge. Own reading/progress and next-book widgets no longer occupy Home. Posts use theme tokens, inset separators and aligned actions.
+Home shows “Your reading circle”: followed readers’ publications, reading activity and murals. The bell in the header carries an unread badge. It opens the Activity screen: new followers (with Follow back), plays of your games, and winners from tournaments you joined. Seeing that screen marks them seen, which also clears the Home tab badge. Own reading/progress and next-book widgets no longer occupy Home. Posts use theme tokens, inset separators and aligned actions.
 ```
 
 2. In the next paragraph, delete the sentence "Personal grouped notifications have sharing and their relevant primary action."
 
+In `DESIGN.md`, in the bullet under "Headers" that begins "Every header action is an **`IconButton` with `label` + `framed`**", replace the final sentence "The `⋯` menu trigger stays glyph-only (platform convention)." with:
+
+```markdown
+The `⋯` menu trigger stays glyph-only (platform convention), and so does Home's framed notification bell. Its frame draws the 44pt target, a bell with a badge is the platform convention for notifications, and its accessibility label names it. A second labelled pill would crowd the title on a 360dp phone.
+```
+
 - [ ] **Step 8: Commit**
 
 ```bash
-git add mobile/src/features/home/FeedRow.tsx mobile/src/features/home/HomeScreen.tsx mobile/src/features/home/HomeFeedRow.tsx mobile/src/features/home/homeModel.ts mobile/src/features/home/homeModel.test.ts "mobile/src/app/(app)/_layout.tsx" mobile/README.md && git commit -m "Give Home's personal items to the bell
+git add mobile/src/features/home/FeedRow.tsx mobile/src/features/home/HomeScreen.tsx mobile/src/features/home/HomeFeedRow.tsx mobile/src/features/home/homeModel.ts mobile/src/features/home/homeModel.test.ts "mobile/src/app/(app)/_layout.tsx" mobile/README.md DESIGN.md && git commit -m "Give Home's personal items to the bell
 
 Follows and plays of your games stayed on Home for 30 days whether
 seen or not, so a busy week pushed the reading circle off the first
@@ -1008,7 +1016,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 2. **Device pass.** Run `node scripts/dev-status.mjs --json` first. If another worktree holds the emulator, stop and report.
    - Otherwise dispatch `device-checker` with this worktree's path. Check against the fixture:
      - **Home:**
-       - an "Activity" button with a bell glyph and the badge sits left of "Saved";
+       - a framed bell with the badge sits left of "Saved", and "Home" isn't truncated;
        - one section, "Your reading circle", with "Find readers →";
        - no "Around your shelf";
        - alice's play of the dev quiz does not appear;
