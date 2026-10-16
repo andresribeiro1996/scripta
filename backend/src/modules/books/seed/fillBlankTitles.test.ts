@@ -16,6 +16,7 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 const { applyBooksMigrations } = await import("../adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("../adapters/sqlite/sqliteBooksRepository.js");
 const { fillBlankTitles } = await import("./fillBlankTitles.js");
+const { catalogTitleKey } = await import("../domain/normalize.js");
 
 type Site = Parameters<typeof fillBlankTitles>[1][number];
 
@@ -116,4 +117,19 @@ test("two blank books sharing one publisher_url are both filled from the one fee
   assert.deepEqual(report, { sites: { "Test Shop": { products: 1, matched: 2, filled: 2 } }, blankBefore: 2, leftBlank: 0 });
   assert.equal(h.repo.getBook(first)!.title, "Hamlet");
   assert.equal(h.repo.getBook(second)!.title, "Hamlet");
+});
+
+test("a feed product with an author also gives the book its title key", async () => {
+  const site = { ...SHOP, authorFromVendor: true };
+  const h = setup({ "https://shop.test/products.json?limit=250&page=1": page1([{ ...product("hamlet", "Hamlet", "9789896414672"), vendor: "William Shakespeare" }]) });
+  const id = h.blank("9789896414672", "https://shop.test/products/hamlet");
+  await fillBlankTitles(h.deps, [site], { dryRun: false });
+  assert.equal(h.repo.findBookByKey(catalogTitleKey("Hamlet", "William Shakespeare")!)?.id, id);
+});
+
+test("a feed product without an author fills the title and claims no title key", async () => {
+  const h = setup({ "https://shop.test/products.json?limit=250&page=1": page1([product("hamlet", "Hamlet", "9789896414672")]) });
+  h.blank("9789896414672", "https://shop.test/products/hamlet");
+  await fillBlankTitles(h.deps, [SHOP], { dryRun: false });
+  assert.equal(h.repo.findBookByKey("ta:hamlet||"), undefined);
 });

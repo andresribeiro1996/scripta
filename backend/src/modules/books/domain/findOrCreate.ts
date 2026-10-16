@@ -1,4 +1,4 @@
-import { findByIdentity, lookupIdentity, type BookIdentity, type BookLookup } from "./normalize.js";
+import { catalogTitleKey, findByIdentity, lookupIdentity, type BookIdentity, type BookLookup } from "./normalize.js";
 import type { BooksRepository } from "./ports.js";
 import type { BookRow } from "./types.js";
 
@@ -24,15 +24,19 @@ export function findExisting(repo: BooksRepository, identity: BookIdentity): Boo
   return byTitle;
 }
 
+export function fillMissingIdentity(repo: Pick<BooksRepository, "findBookByKey" | "addKey" | "fillIdentity">, book: Pick<BookRow, "id" | "title" | "author">, title: string, author: string): boolean {
+  if ((book.title || !title) && (book.author || !author)) return false;
+  const nextAuthor = book.author || author;
+  const titleKey = nextAuthor ? catalogTitleKey(book.title || title, nextAuthor) : null;
+  if (titleKey && !repo.findBookByKey(titleKey)) repo.addKey(titleKey, book.id);
+  repo.fillIdentity(book.id, title, author);
+  return true;
+}
+
 export function findOrCreateBook(repo: BooksRepository, lookup: BookLookup, createdAt: string): BookRow | null {
   const identity = lookupIdentity(lookup);
   if (!identity) return null;
   const existing = findExisting(repo, identity);
   if (!existing) return repo.createBook({ title: identity.title, author: identity.author, isbn: identity.isbn }, keysOf(repo, identity), createdAt);
-  if ((!existing.title && identity.title) || (!existing.author && identity.author)) {
-    if (identity.author && identity.titleKey) repo.addKey(identity.titleKey, existing.id);
-    repo.fillIdentity(existing.id, identity.title, identity.author);
-    return repo.getBook(existing.id) ?? existing;
-  }
-  return existing;
+  return fillMissingIdentity(repo, existing, identity.title, identity.author) ? (repo.getBook(existing.id) ?? existing) : existing;
 }

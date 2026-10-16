@@ -1,3 +1,4 @@
+import { fillMissingIdentity } from "../domain/findOrCreate.js";
 import type { BooksRepository } from "../domain/ports.js";
 import { editionLanguage, lookupIdentity } from "../domain/normalize.js";
 import type { BookCreator, BookRow } from "../domain/types.js";
@@ -20,10 +21,7 @@ export function seedBook(input: SeedInput, repo: SeedRepo, now: () => Date, crea
   if (existing) {
     repo.setWorkKey(existing.id, input.workKey);
     repo.setLanguage(existing.id, language);
-    if ((!existing.title && identity.title) || (!existing.author && identity.author)) {
-      if (identity.author && identity.titleKey && !repo.findBookByKey(identity.titleKey)) repo.addKey(identity.titleKey, existing.id);
-      repo.fillIdentity(existing.id, identity.title, identity.author);
-    }
+    fillMissingIdentity(repo, existing, identity.title, identity.author);
     return { outcome: "existing", book: existing };
   }
   const titleKey = identity.author ? identity.titleKey : null;
