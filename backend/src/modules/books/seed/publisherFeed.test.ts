@@ -462,3 +462,47 @@ test("pageAuthors stops at a single-quoted related-product card", () => {
   const html = `<main><a class='autor_link' href='https://www.relogiodagua.pt/autor/min-jin-lee/'>Min Jin Lee</a><div class='w-grid-item post-1 product'><a class='autor_link' href='https://www.relogiodagua.pt/autor/jane-austen/'>Jane Austen</a></div></main>`;
   assert.equal(pageAuthors(html), "Min Jin Lee");
 });
+
+const recordedPage = (name: string) => readFileSync(new URL(`./fixtures/pages/${name}.html`, import.meta.url), "utf8");
+const blankDetails = { summary: null, pages: null, year: null, translator: null, originalTitle: null };
+
+test("recorded product pages from the four author-link shops give the product's own author and ISBN", () => {
+  const cases: Array<[string, string, string]> = [
+    ["relogio-ovelhas-perdidas", "Madeline Cash", "9789897837838"],
+    ["gradiva-o-africano-ebook", "J. M. Leo Clèzio", "9789897855269"],
+    ["guerraepaz-a-mulher-do-veu", "Ana Paula Jardim", "9789895764952"],
+    ["penguinlivros-o-primeiro-leitor", "Luiz Schwarcz", "9789895894369"]
+  ];
+  for (const [name, author, isbn] of cases) {
+    const html = recordedPage(name);
+    assert.equal(pageAuthors(html), author, name);
+    assert.equal(findPageIsbn(html), isbn, name);
+  }
+});
+
+test("recorded product pages give the page count and translator they show", () => {
+  assert.deepEqual(withPageText(blankDetails, recordedPage("relogio-ovelhas-perdidas")), { ...blankDetails, pages: 280, translator: "Marta Mendonça" });
+  assert.equal(withPageText(blankDetails, recordedPage("guerraepaz-a-mulher-do-veu")).pages, 120);
+  assert.equal(withPageText(blankDetails, recordedPage("penguinlivros-o-primeiro-leitor")).pages, 296);
+});
+
+test("a recorded Presença feed takes every author from its tags and the ISBN from the SKU, and drops the product without an image", () => {
+  const feed = JSON.parse(readFileSync(new URL("./fixtures/presenca-products.json", import.meta.url), "utf8"));
+  assert.deepEqual(parseShopifyProducts(feed, presenca).map((book) => [book.isbn, book.rank, book.author]), [
+    ["9789722380584", 0, "Natsu Hyuga"],
+    ["9789722380577", 0, "Dan Leydon, Emily Stead, John Murray, Matt Oldfield, Seth Burkett"],
+    ["9789722380560", 0, "Dan Leydon, Matt Oldfield"],
+    ["9789722380553", 0, "G. T. Karber"]
+  ]);
+});
+
+test("a recorded Relógio feed finds each ISBN in the image file name and no author", () => {
+  const feed = JSON.parse(readFileSync(new URL("./fixtures/relogio-products.json", import.meta.url), "utf8"));
+  assert.deepEqual(parseWooProducts(feed, relogio).map((book) => [book.isbn, book.rank, book.author]), [
+    ["9789897837838", 1, null],
+    ["9789897837920", 1, null],
+    ["9789727084708", 1, null],
+    ["9789897837890", 1, null],
+    ["9789897837364", 1, null]
+  ]);
+});
