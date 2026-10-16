@@ -4,7 +4,7 @@ import { Image } from "expo-image";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { readerGlyphLabel } from "@scripta/shared";
-import { dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
+import { captionHitSlop, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import type { ContentTone, DiscoverItem, PublishedContent } from "@scripta/shared/community";
 import { FAN_SIZE, TIER_LADDER, contentKindLabel, contentStats, contentStatus, contentTarget } from "./communityHome";
 import { openProfile } from "./AuthorAvatar";
@@ -40,7 +40,7 @@ export function DiscoverRow({ item, linkAuthor, onPreviewBooks, onOpen }: { item
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={glyphLabel ? `Open ${author.username}'s profile, ${glyphLabel}` : `Open ${author.username}'s profile`}
-              hitSlop={{ top: 14, bottom: 14, left: spacing.sm, right: spacing.sm }}
+              hitSlop={captionHitSlop}
               onPress={() => openProfile(author.username)}
               style={[styles.nameRow, styles.shrink]}
             >
@@ -114,7 +114,7 @@ export function GameRow({ kind, name, meta, badges, caption, stats = [], covers,
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={seeBooks.label}
-                  hitSlop={{ top: 14, bottom: 14, left: spacing.sm, right: spacing.sm }}
+                  hitSlop={captionHitSlop}
                   onPress={seeBooks.onPress}
                   style={styles.rowAction}
                 >

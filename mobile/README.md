@@ -166,9 +166,9 @@ Long-press a block to drag it. Reanimated keeps drag positioning and collision p
 
 ### Home
 
-Home uses the Open shelf feed: “Around your shelf” groups personal participation, new followers and winners from tournaments you joined; “Your reading circle” shows followed readers’ publications, reading activity and murals. Own reading/progress and next-book widgets no longer occupy Home. Posts use theme tokens, inset separators and aligned actions.
+Home shows “Your reading circle”: followed readers’ publications, reading activity and murals. The bell in the header carries an unread badge. It opens the Activity screen: new followers (with Follow back), plays of your games, and winners from tournaments you joined. Seeing that screen marks them seen, which also clears the Home tab badge. Own reading/progress and next-book widgets no longer occupy Home. Posts use theme tokens, inset separators and aligned actions.
 
-Real activity posts support likes, comments and native sharing. Personal grouped notifications have sharing and their relevant primary action. Tier-list publications show their book pool; new ranking events show the reader’s actual mini tiers. Quizzes, tournaments and murals have content previews and direct actions. Tap a reader to open their profile, use Want to read without changing an existing book’s reading status, and bookmark games or murals into Home’s Saved sheet. Comments and saved content use Expo UI sheets with pagination and retry states.
+Real activity posts support likes, comments and native sharing. Tier-list publications show their book pool; new ranking events show the reader’s actual mini tiers. Quizzes, tournaments and murals have content previews and direct actions. Tap a reader to open their profile, use Want to read without changing an existing book’s reading status, and bookmark games or murals into Home’s Saved sheet. Comments and saved content use Expo UI sheets with pagination and retry states.
 
 ### Adding books
 

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { feedPrimaryLabel, feedShareTarget, hasActivityThread, readingShelfBook } from "./feedRowModel.js";
+import { feedPrimaryLabel, feedShareTarget, hasActivityThread, reactionCount, readingShelfBook } from "./feedRowModel.js";
 import { test } from "node:test";
 
 test("Home actions use public share links and preserve an existing shelf match", () => {
@@ -175,4 +175,11 @@ test("only rows with a public page can be shared", () => {
   assert.equal(feedShareTarget(reading), null);
   assert.equal(feedShareTarget({ ...reading, book: { ...reading.book, workId: "w1" } }), "/work/w1");
   assert.equal(feedShareTarget({ kind: "publication", id: "e5", actor, type: "quiz_published", content: quiz, createdAt }), "/play/qc");
+});
+
+test("a reaction count hides at zero but still shows the loading ellipsis", () => {
+  assert.equal(reactionCount(undefined), "…");
+  assert.equal(reactionCount(0), null);
+  assert.equal(reactionCount(1), "1");
+  assert.equal(reactionCount(12), "12");
 });

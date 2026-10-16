@@ -261,7 +261,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
 
   const completionRows = (items: CompletionItem[], bound: Bound): DigestRow[] => items.filter((item) => withinBound(bound, item.createdAt, item.id)).map((item) => ({ id: item.id, createdAt: item.createdAt, completion: item }));
 
-  const toDigestItem = (row: DigestRow, profiles: Map<string, ReaderProfile>, glyphOf: (userId: string) => IdentityKey | null, viewerId: string): DigestItem | undefined => {
+  const toDigestItem = (row: DigestRow, profiles: Map<string, ReaderProfile>, glyphOf: (userId: string) => IdentityKey | null, viewerId: string, hideOwnGameVotes = false): DigestItem | undefined => {
     if (row.event) {
       const event = row.event;
       const actor = profiles.get(event.user_id);
@@ -280,13 +280,12 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
           if (ref && ref.ownerUserId === event.user_id && actor) return { kind: "publication", id: event.id, actor: withGlyph(actor, event.user_id, glyphOf), type: event.type as CommunityEventType, content: toTournamentSummary(ref), createdAt: event.created_at };
         }
       } else if (event.type === "voted_on") {
-        // The voter is not the owner here, so there is no ownership check to
-        // make — only that the thing voted on is still published.
-        const content = event.ref_type === "quiz"
-          ? (() => { const ref = deps.quizzes.get(event.ref_id); return ref ? toQuizSummary(ref) : undefined; })()
-          : event.ref_type === "tierlist"
-            ? (() => { const ref = deps.tierlists.get(event.ref_id); return ref ? toTierlistSummary(ref) : undefined; })()
-            : (() => { const ref = deps.tournaments.get(event.ref_id); return ref ? toTournamentSummary(ref) : undefined; })();
+        const quiz = event.ref_type === "quiz" ? deps.quizzes.get(event.ref_id) : undefined;
+        const tierlist = event.ref_type === "tierlist" ? deps.tierlists.get(event.ref_id) : undefined;
+        const tournament = event.ref_type !== "quiz" && event.ref_type !== "tierlist" ? deps.tournaments.get(event.ref_id) : undefined;
+        const ownerId = quiz?.ownerUserId ?? tournament?.ownerUserId ?? (tierlist && !tierlist.promotedAt ? tierlist.ownerUserId : undefined);
+        if (hideOwnGameVotes && ownerId === viewerId) return undefined;
+        const content = quiz ? toQuizSummary(quiz) : tierlist ? toTierlistSummary(tierlist) : tournament ? toTournamentSummary(tournament) : undefined;
         const ranking = event.ref_type === "tierlist" ? parseRankingPreview(parseEventPayload(event.payload)?.ranking) : [];
         if (content && actor) return { kind: "vote", id: event.id, actor: withGlyph(actor, event.user_id, glyphOf), content, ...(ranking.length ? { ranking } : {}), createdAt: event.created_at };
       } else if (event.type === "mural_published" && actor) {
@@ -317,7 +316,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
     return undefined;
   };
 
-  const buildItems = (rows: DigestRow[], viewerId: string, limit: number, glyphOf: (userId: string) => IdentityKey | null, horizon?: CursorKeyset): { items: DigestItem[]; last?: DigestRow; more: boolean } => {
+  const buildItems = (rows: DigestRow[], viewerId: string, limit: number, glyphOf: (userId: string) => IdentityKey | null, horizon?: CursorKeyset, hideOwnGameVotes = false): { items: DigestItem[]; last?: DigestRow; more: boolean } => {
     rows.sort(newestFirst);
     const actorIds = new Set<string>();
     for (const row of rows) {
@@ -329,7 +328,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
     let last: DigestRow | undefined;
     for (const row of rows) {
       if (items.length === limit || (horizon && withinBound({ keyset: horizon }, row.createdAt, row.id))) return { items, last, more: true };
-      const item = row.participation ?? row.completion ?? toDigestItem(row, profiles, glyphOf, viewerId);
+      const item = row.participation ?? row.completion ?? toDigestItem(row, profiles, glyphOf, viewerId, hideOwnGameVotes);
       if (item) items.push(item);
       last = row;
     }
@@ -467,7 +466,8 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
       if (viewerId === userId) view.feedSettings = settingsFor(userId);
       return view;
     },
-    getDashboard(viewerId, cursor, limit, kinds = LEGACY_DIGEST_KINDS) {
+    getDashboard(viewerId, cursor, limit, requested?: ReadonlySet<string>) {
+      const kinds = requested ?? LEGACY_DIGEST_KINDS;
       const keyset = cursor ? decodeCursor(cursor) : undefined;
       if (cursor && !keyset) throw new InvalidCursorError();
       const start = windowStart();
@@ -483,7 +483,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
       for (let round = 0; more && items.length < limit && round < DASHBOARD_REFILL_ROUNDS; round++) {
         const windows = [inboxRows(viewerId, pageBound.keyset, limit + 1, types), followers(pageBound, limit + 1)];
         const horizon = windows.filter((rows) => rows.length === limit + 1).map((rows) => rows[rows.length - 1]!).sort(newestFirst)[0];
-        const page = buildItems([...windows.flat(), ...participationRows(participation, pageBound), ...completionRows(completions, pageBound)], viewerId, limit - items.length, glyphOf, horizon);
+        const page = buildItems([...windows.flat(), ...participationRows(participation, pageBound), ...completionRows(completions, pageBound)], viewerId, limit - items.length, glyphOf, horizon, requested !== undefined);
         items.push(...page.items);
         last = page.last ?? last;
         more = page.more || horizon !== undefined;

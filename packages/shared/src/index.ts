@@ -6,6 +6,7 @@
 export * from "./auth.js";
 export * from "./api/index.js";
 export * from "./dashboard.js";
+export * from "./plural.js";
 export * from "./library/index.js";
 export * from "./arena/index.js";
 export * from "./murals/index.js";

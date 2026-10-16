@@ -24,7 +24,7 @@ export function FeedPreview({ item }: { item: DigestItem }) {
   const covers = item.kind === "vote" ? item.content.covers : feedRowModel(item).covers;
   const quiz = item.kind === "publication" && item.content.kind === "quiz";
   if (!(item.kind === "publication" && item.content.kind === "tierlist")) return <View style={{ width: SLOT_WIDTH, height: SLOT_HEIGHT }}>
-    {covers.length ? <CoverFan covers={quiz ? covers.slice(0, 2) : covers} /> : <View style={styles.emptyPreview}><Icon name={feedRowModel(item).icon} size={32} color={colors.accent} /></View>}
+    {covers.length ? <CoverFan covers={quiz ? covers.slice(0, 2) : covers} /> : <View style={[styles.iconTile, { backgroundColor: colors.surface }]}><Icon name={feedRowModel(item).icon} size={24} color={colors.accent} /></View>}
     {quiz ? <View style={[styles.quizBadge, { backgroundColor: colors.surface }]}><Text display {...dynamicType} style={[typography.title, { color: colors.text }]}>?</Text></View> : null}
   </View>;
   return <View style={[styles.covers, { backgroundColor: colors.surface }]}>
@@ -43,7 +43,7 @@ function MuralPreview({ item }: { item: Extract<DigestItem, { kind: "mural" }> }
 
 const styles = StyleSheet.create({
   winner: { transform: [{ rotate: "5deg" }], marginHorizontal: spacing.xs },
-  emptyPreview: { flex: 1, alignItems: "center", justifyContent: "center" },
+  iconTile: { width: 48, height: 72, borderRadius: radii.sm, alignItems: "center", justifyContent: "center" },
   covers: { padding: spacing.md, borderRadius: radii.md, flexDirection: "row", gap: spacing.sm, alignItems: "center", justifyContent: "center", flexWrap: "wrap", position: "relative", minHeight: 96 },
   quizBadge: { position: "absolute", left: 30, top: 20, width: 32, height: 32, borderRadius: radii.full, alignItems: "center", justifyContent: "center" },
   mural: { alignSelf: "center", borderRadius: radii.md, overflow: "hidden", alignItems: "center", justifyContent: "center" },

@@ -4,7 +4,7 @@ import { ActivityIndicator, View } from "react-native";
 import { Redirect, Tabs } from "expo-router";
 import { newCountLabel } from "@scripta/shared";
 import { useAuth } from "../../core/auth";
-import { useDashboardFeed } from "../../features/home/FeedRow";
+import { useActivityFeed } from "../../features/home/FeedRow";
 import { useAccountAppearanceSync } from "../../features/settings/appearanceSync";
 import { useGenreEnrichment } from "../../features/library/hooks/useGenreEnrichment";
 import { useLibrary } from "../../features/library/hooks/useLibrary";
@@ -26,7 +26,7 @@ function AppearanceSync() {
 
 function AppTabs() {
   const { colors, fonts } = useTheme();
-  const { data } = useDashboardFeed();
+  const { data } = useActivityFeed();
   const newCount = data?.pages[0]?.personalNewCount ?? 0;
 
   // Each tab is a group holding its own Stack, so a drill-down inside a tab is

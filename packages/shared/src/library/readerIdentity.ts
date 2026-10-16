@@ -1,3 +1,4 @@
+import { plural } from "../plural.js";
 import { READER_PLATES, type CardState, type IdentityKey } from "../readerCards/index.js";
 import type { PublicReaderCardStyle, ReaderCardChosen } from "../readerCards/style.js";
 import { genresForBook, isFinishedBook, type BookGenre } from "./bookGenres.js";
@@ -38,7 +39,6 @@ export const GENRE_SIGNALS: Array<{ key: GenreIdentity; genres: BookGenre[]; thr
 
 const pct = (value: number) => `${Math.floor(value * 100)}%`;
 const pctUp = (value: number) => `${Math.ceil(value * 100)}%`;
-const plural = (n: number, word: string) => `${n} ${n === 1 ? word : `${word}s`}`;
 const nameOf = (key: IdentityKey) => READER_PLATES.find((plate) => plate.key === key)!.name;
 const normalizeAuthor = (value: unknown) => String(value ?? "").trim().toLowerCase().replace(/\s+/g, " ");
 
@@ -77,7 +77,7 @@ export function readerIdentity(books: Book[], groups: Group[]): ReaderIdentity {
   const coverage = [`genres known for ${known.length} of ${n} finished books`];
   if (finished.some((book) => /^(goodreads|storygraph):/.test(String(book.ContentID ?? "")))) coverage.push("series unknown for Goodreads and StoryGraph imports");
   const unwritten = (missing: string): ReaderIdentity => ({ state: "unwritten", identity: null, runnerUp: null, streak: null, signal: null, leaders: [], coverage, missing });
-  if (n < MIN_BOOKS) return unwritten(`Finish ${plural(MIN_BOOKS - n, "more book")}`);
+  if (n < MIN_BOOKS) return unwritten(`Finish ${plural(MIN_BOOKS - n, "more book", "more books")}`);
 
   const candidates: Candidate[] = [];
 
@@ -103,7 +103,7 @@ export function readerIdentity(books: Book[], groups: Group[]): ReaderIdentity {
     strength: Math.min(marked.length / n / 0.3, marks / 20),
     signal: { counted: marked.length, of: n, label: `${marked.length} of ${n} finished books have highlights or notes` },
     leaders: top(new Map(marked.map((book) => [String(book.Title ?? "Untitled"), markCount(book)] as const))),
-    gap: `${pct(marked.length / n)} of finished books have highlights or notes, with ${plural(marks, "mark")}; 30% and 20 marks settle it`,
+    gap: `${pct(marked.length / n)} of finished books have highlights or notes, with ${plural(marks, "mark", "marks")}; 30% and 20 marks settle it`,
   });
 
   const authorCounts = new Map<string, number>();
@@ -155,7 +155,7 @@ export function readerIdentity(books: Book[], groups: Group[]): ReaderIdentity {
       strength: Math.min(wide / 6, 0.25 / largest.share),
       signal: { counted: wide, of: all.size, label: `${wide} genres above 5% of books with known genres; the largest, ${largest.label}, is ${pctUp(largest.share)}` },
       leaders: top(all),
-      gap: `${plural(wide, "genre")} above 5% of books with known genres; the largest, ${largest.label}, at ${pctUp(largest.share)}; 6 genres with none over 25% settle it`,
+      gap: `${plural(wide, "genre", "genres")} above 5% of books with known genres; the largest, ${largest.label}, at ${pctUp(largest.share)}; 6 genres with none over 25% settle it`,
     });
   }
 

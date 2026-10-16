@@ -26,6 +26,7 @@ const GLYPHS = {
   murals: { ios: "paintpalette", android: "palette" },
   profile: { ios: "person.circle", android: "account_circle" },
   settings: { ios: "gearshape", android: "settings" },
+  bell: { ios: "bell", android: "notifications" },
   add: { ios: "plus", android: "add" },
   confirm: { ios: "checkmark", android: "check" },
   save: { ios: "square.and.arrow.down", android: "save" },

@@ -73,8 +73,12 @@ export function withKnownDigestItems(page: DashboardFeedPage): DashboardFeedPage
   return { ...page, items: page.items.filter(isKnownDigestItem) };
 }
 
-export function dashboardQuery(cursor?: string): string {
-  const query = `?kinds=${[...Object.keys(DIGEST_KINDS), "started"].join(",")}`;
+const ALL_DIGEST_KINDS: readonly string[] = [...Object.keys(DIGEST_KINDS), "started"];
+export const CIRCLE_DIGEST_KINDS = ["publication", "vote", "reading", "mural", "started"] as const;
+export const PERSONAL_DIGEST_KINDS = ["follow", "participation", "completion"] as const satisfies readonly DigestKind[];
+
+export function dashboardQuery(cursor?: string, kinds: readonly string[] = ALL_DIGEST_KINDS): string {
+  const query = `?kinds=${kinds.join(",")}`;
   return cursor ? `${query}&cursor=${encodeURIComponent(cursor)}` : query;
 }
 

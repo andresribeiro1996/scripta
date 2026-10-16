@@ -27,6 +27,7 @@ const cases: Array<[string, (api: CommunityApi) => Promise<unknown>, string, Api
   ["saveContent", api => api.saveContent({ kind: "quiz", id: "q" }, true), "/community/saved", { method: "PUT", body: { ref: { kind: "quiz", id: "q" }, saved: true }, auth: "required" }],
   ["fetchSavedContent", api => api.fetchSavedContent("c 1"), "/community/saved?cursor=c%201", { auth: "required" }],
   ["fetchDashboard", (api) => api.fetchDashboard(), "/community/dashboard" + dashboardQuery(), { auth: "required" }],
+  ["fetchDashboard with a cursor and kinds", (api) => api.fetchDashboard("c 1", ["follow"]), "/community/dashboard?kinds=follow&cursor=c%201", { auth: "required" }],
   ["markDashboardSeen", (api) => api.markDashboardSeen(), "/community/dashboard/seen", { method: "POST", auth: "required" }],
   ["fetchDiscover", (api) => api.fetchDiscover("tierlist" as never, "q", 20), "/community/discover?type=tierlist&q=q&offset=20", { auth: "optional" }],
   ["searchPeople", (api) => api.searchPeople("a b"), "/community/people?q=a%20b", { auth: "required" }],

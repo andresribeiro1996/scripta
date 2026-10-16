@@ -4,11 +4,9 @@ import { aggregate, AGGREGATION_MODES, booksByWork, type AggregationMode, type H
 import { router, useSegments } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
-import { Button, Sheet, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { Button, Sheet, captionHitSlop, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { workPath } from "../works/workPath";
 import { authorOf, TierCover, TierHead, TierRowScroll, titleOf, type TierBook } from "./TierBoard";
-
-const hitSlop = { top: 14, bottom: 14, left: 8, right: 8 };
 
 const descriptions: Record<AggregationMode, string> = {
   average: "Balances every vote into a tier.",
@@ -68,8 +66,8 @@ export function TierlistResults({ histogram, tiers, pool, books, ballotCount, el
     <TierHead>
     <View style={styles.summary}><Text {...dynamicType} style={[typography.caption, styles.strong, { color: colors.text }]}>{ballotCount} {ballotCount === 1 ? "vote" : "votes"}</Text><Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{votedBooks}/{pool.length} books · {promoted ? "Reference" : votingOpen === undefined ? "Community" : votingOpen ? "Voting open" : "Voting closed"}</Text></View>
     {(eligibleVoteCount !== undefined && !promoted || ownPlacements.length > 0) ? <View style={styles.metaActions}>
-      {eligibleVoteCount !== undefined && !promoted ? <Pressable accessibilityRole="button" accessibilityLabel={`${eligibleVoteCount} of 100 eligible voters toward reference status. Learn more`} hitSlop={hitSlop} onPress={() => setExplainProgress(true)}><Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{eligibleVoteCount}/100 eligible ⓘ</Text></Pressable> : null}
-      {ownPlacements.length ? <Pressable accessibilityRole="switch" accessibilityState={{ checked: showMine }} hitSlop={hitSlop} onPress={() => setShowMine(!showMine)} style={styles.toggle}><Text {...dynamicType} style={[typography.caption, { color: colors.text }]}>My ranks:</Text><Text {...dynamicType} style={[typography.caption, { color: colors.accent }]}>{showMine ? "On" : "Off"}</Text></Pressable> : null}
+      {eligibleVoteCount !== undefined && !promoted ? <Pressable accessibilityRole="button" accessibilityLabel={`${eligibleVoteCount} of 100 eligible voters toward reference status. Learn more`} hitSlop={captionHitSlop} onPress={() => setExplainProgress(true)}><Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{eligibleVoteCount}/100 eligible ⓘ</Text></Pressable> : null}
+      {ownPlacements.length ? <Pressable accessibilityRole="switch" accessibilityState={{ checked: showMine }} hitSlop={captionHitSlop} onPress={() => setShowMine(!showMine)} style={styles.toggle}><Text {...dynamicType} style={[typography.caption, { color: colors.text }]}>My ranks:</Text><Text {...dynamicType} style={[typography.caption, { color: colors.accent }]}>{showMine ? "On" : "Off"}</Text></Pressable> : null}
     </View> : null}
     </TierHead>
     <ScrollView ref={boardScroll} style={styles.board} contentContainerStyle={styles.rows}>
