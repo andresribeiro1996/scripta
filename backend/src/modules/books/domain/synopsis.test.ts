@@ -22,7 +22,8 @@ test("isHiddenSynopsis follows the rule, manual decisions and the Jev line", () 
   assert.equal(isHiddenSynopsis({ model: "rule", usable: 0 }), true);
   assert.equal(isHiddenSynopsis({ model: "manual", usable: 0 }), true);
   assert.equal(isHiddenSynopsis({ model: "manual", usable: 1 }), false);
-  assert.equal(isHiddenSynopsis({ model: "jev-1.13.0", usable: 0.29 }), true);
-  assert.equal(isHiddenSynopsis({ model: "jev-1.13.0", usable: 0.3 }), false);
+  assert.equal(isHiddenSynopsis({ model: "jev-1.13.0", usable: 0.14 }), true);
+  assert.equal(isHiddenSynopsis({ model: "jev-1.13.0", usable: 0.15 }), false);
+  assert.equal(isHiddenSynopsis({ model: "jev-1.13.0", usable: 0.23 }), false);
   assert.equal(isHiddenSynopsis({ model: "jev-1.13.0", usable: 0.45 }), false);
 });

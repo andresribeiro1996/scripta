@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-export const SYNOPSIS_HIDE_BELOW = 0.3;
+export const SYNOPSIS_HIDE_BELOW = 0.15;
 export const SYNOPSIS_REVIEW_BELOW = 0.5;
 export const SYNOPSIS_MIN_LETTERS = 40;
 export const SYNOPSIS_KINDS = ["synopsis", "author_bio", "praise", "collection", "product", "contents", "other_book", "fragment"] as const;

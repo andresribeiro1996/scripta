@@ -332,7 +332,7 @@ Checks every stored summary (edition and work) that has no synopsis judgment yet
 
 2. Real run: the same command without `--dry-run`, with `--max` at the dry run's `wouldAsk`. The rule pass runs first with no requests; then Jev judges the rest, 4 in flight. `--max` is a hard limit on TypeSafe requests, retries included, recorded under `synopses-backlog` in `typesafe_usage` (the daily `synopses` budget is untouched). Without `TYPESAFE_API_KEY` only the rule pass runs, and the script says the Jev pass was skipped. An outage or a rejected key ends the run; re-running continues where it stopped.
 
-The report's `bySource` counts, per summary source: `texts` selected, hidden by the `rule`, `hidden` by Jev (below 0.3), `doubtful` (0.3 to 0.5, listed on `/admin/synopses`) and `shown`. Then `strikes`, `stoppedBy` (`done`, `budget`, `outage`, `key` or `no-key`), `requests` used and `estimatedCostUsd`.
+The report's `bySource` counts, per summary source: `texts` selected, hidden by the `rule`, `hidden` by Jev (below 0.15), `doubtful` (0.15 to 0.5, listed on `/admin/synopses`) and `shown`. Then `strikes`, `stoppedBy` (`done`, `budget`, `outage`, `key` or `no-key`), `requests` used and `estimatedCostUsd`.
 
 #### Translation backlog
 
@@ -361,7 +361,7 @@ Claude sets and checks the thresholds Jev's answers are read against; it never j
    ```
 
 2. **Label.** Claude Sonnet subagents label the sample, at most 25 items each, without seeing Jev's answers, using the question wording in `adapters/typesafe/jevSynopsis.ts`. Never Haiku. A batch whose answers are all, or nearly all, the same is redone before scoring. Labels are `[{ "hash": "…", "usable": true|false, "kind": "…" }]`.
-3. **Score.** Run where the key lives. It asks Jev about each sampled text, stores nothing, and prints, per decision band (`rule`, `jev below 0.3`, `jev 0.3 to 0.5`, `jev 0.5 and above`), how many labelled texts fall in it and how many of those are not usable.
+3. **Score.** Run where the key lives. It asks Jev about each sampled text, stores nothing, and prints, per decision band (`rule`, `jev below 0.15`, `jev 0.15 to 0.5`, `jev 0.5 and above`), how many labelled texts fall in it and how many of those are not usable.
 
    ```bash
    TYPESAFE_API_KEY=… node scripts/jev-calibration-score.mjs --task synopses sample.json labels.json
