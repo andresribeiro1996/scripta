@@ -223,7 +223,7 @@ The log gets one line per site as each finishes, then a JSON report per site (`p
 npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && nohup node scripts/seed-catalog.mjs > /data/seed-catalog.log 2>&1 & echo started'
 ```
 
-Check progress (log tail plus cover counts by status; `portugal` is the same breakdown for `978972`/`978989` books):
+Check progress (log tail plus cover counts by status; `portugal` is the same breakdown for `978972`/`978989` books). It also prints `blank`: books with an empty title (`untitled`) and books with a title but no author (`authorless`), in all and per `publisher_url` host:
 
 ```bash
 npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'tail -3 /data/seed-catalog.log; cd /app/backend && node scripts/seed-catalog.mjs --status'
