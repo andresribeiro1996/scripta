@@ -1,5 +1,4 @@
 export const MODES = {
-  plan: { brief: "plan-review.md", usage: "plan <spec.md> <plan.md>" },
   branch: { brief: "branch-review.md", usage: "branch <spec.md> [plan.md]" },
 };
 
@@ -13,8 +12,8 @@ const FINDING_KEYS = ["severity", "file", "line", "summary", "scenario"];
 
 export function parseReviewArgs(argv) {
   const [mode, spec, plan] = argv;
-  if (!Object.hasOwn(MODES, mode)) throw new Error(`usage: codex-review.mjs ${MODES.plan.usage} | ${MODES.branch.usage}`);
-  if (!spec || (mode === "plan" && !plan)) throw new Error(`usage: codex-review.mjs ${MODES[mode].usage}`);
+  if (!Object.hasOwn(MODES, mode)) throw new Error(`usage: codex-review.mjs ${MODES.branch.usage}`);
+  if (!spec) throw new Error(`usage: codex-review.mjs ${MODES[mode].usage}`);
   return { mode, spec, plan };
 }
 
