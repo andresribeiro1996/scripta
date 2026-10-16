@@ -707,20 +707,20 @@ git commit -m "Reopen a work's code-only no-match verdict when its book gets a t
 
 ## Production runbook (the user runs these, after the deploy that ships this plan)
 
-Goes into the batch runbook. Run it after the mojibake repair, one job at a time, and hold deploys while any of them runs: a deploy kills a `railway ssh` job. Every step only fills empty fields, so a rerun is always safe and there is nothing to restore. The log lines are the record of what changed.
+Goes into the batch runbook. Run it after the mojibake repair, one job at a time, and hold deploys while any of them runs: a deploy kills a `railway ssh` job. Every step only fills empty fields, so a rerun is always safe. A wrong fill is never overwritten by a rerun either, so it can only be undone by hand; the log lines are the record of what changed, which is why both pilots in step 3 are dry runs.
 
 1. **Baseline.** Note `blank` in the output.
    ```bash
    npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c "cd /app/backend && node scripts/seed-catalog.mjs --status"
    ```
-2. **`--fill-titles`, dry run then real**, if it hasn't run since #257 (10–20 min each, feeds only). Since this plan, it also fills Presença's authors from tags and gives filled authors their title key.
+2. **`--fill-titles`, dry run then real**, if it hasn't run since #257 (10–20 min each, feeds only). Since this plan, it also fills Presença's authors from tags on the books whose title it fills, and gives filled authors their title key. Presença's title-only books are filled in step 4.
    ```bash
    npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c "cd /app/backend && node scripts/import-publisher-covers.mjs --fill-titles --dry-run"
    ```
    ```bash
    npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c "cd /app/backend && node scripts/import-publisher-covers.mjs --fill-titles"
    ```
-3. **Pilot: Relógio d'Água dry run.** Only its products without an ISBN in the image file name are page-read, so it is much shorter than 2,300 pages; the log's `pages <n>/<total>` lines show the real count. It writes nothing and logs every fill it would make.
+3. **Pilot: Relógio d'Água dry run.** Only its products without an ISBN in the image file name are page-read, so it is much shorter than 2,300 pages; the log's `pages <n>/<total>` lines (one every 100 pages, so none if fewer) show the real count. It writes nothing and logs every fill it would make.
    ```bash
    npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c "cd /app/backend && setsid node scripts/import-publisher-covers.mjs --dry-run --site \"Relógio d'Água\" > /data/publisher-authors-relogio-dry.json 2> /data/publisher-authors-relogio-dry.log < /dev/null & sleep 3; echo started"
    ```
@@ -728,6 +728,12 @@ Goes into the batch runbook. Run it after the mojibake repair, one job at a time
    - `skipped` is absent, and `pagesDeferred` is 0. If any page failed, page-sourced books are deferred for the whole run, so rerun.
    - `identityFilled` is non-zero. It will be far below Relógio's ~1,951 blank rows, because file-name-ISBN products are never page-read.
    - About 20 random `identity` lines read right (`grep ': identity ' /data/publisher-authors-relogio-dry.log | shuf -n 20`), including Pachinko → Min Jin Lee (`grep 9789897833199 …`).
+
+   **Then a Gradiva dry run** (~77 min: 1,535 pages at Gradiva's 3 s crawl delay). Relógio no longer tests page authors at scale, and Gradiva is fully page-read and has the `/tradutor/` links.
+   ```bash
+   npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c "cd /app/backend && setsid node scripts/import-publisher-covers.mjs --dry-run --site Gradiva > /data/publisher-authors-gradiva-dry.json 2> /data/publisher-authors-gradiva-dry.log < /dev/null & sleep 3; echo started"
+   ```
+   When `/data/publisher-authors-gradiva-dry.json` is non-empty, check the same `skipped` and `pagesDeferred` rules, that `identityFilled` is in the hundreds, and that about 20 random `identity` lines (`grep ': identity ' /data/publisher-authors-gradiva-dry.log | shuf -n 20`) name the author, not the translator or a related book's author. Open two or three of those products on gradiva.pt to compare. Log lines end with ` rss=<n>MB`; that suffix is not part of the author.
 4. **Full importer run** (~7 h, all shops, 4 at a time; Penguin's 5,840 pages are the long pole). It fills Gradiva, Guerra & Paz, Penguin and Presença, the page-read part of Relógio, and does the usual cover pass everywhere.
    ```bash
    npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c "cd /app/backend && setsid node scripts/import-publisher-covers.mjs > /data/publisher-authors.json 2> /data/publisher-authors.log < /dev/null & sleep 3; echo started"
