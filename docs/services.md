@@ -51,6 +51,7 @@ No Sentry, analytics, push notifications, crash reporting or Google Fonts.
 - Resend: `RESEND_API_KEY`, `AUTH_EMAIL_FROM`, `ALERT_EMAIL`
 - Google: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CALLBACK_URL`, `OAUTH_SUCCESS_REDIRECT_URL`, `MOBILE_OAUTH_REDIRECT_ALLOWLIST`
 - ISBNdb: `ISBNDB_API_KEY` (also a GitHub Actions secret)
+- TypeSafe (Jev genre classification): `TYPESAFE_API_KEY`
 - Socials: `SOCIALS_ENCRYPTION_KEY`, `X_*`, `INSTAGRAM_*`, `THREADS_*`, `TIKTOK_*`
 - Web build: `VITE_API_URL`, `VITE_IMAGES_URL`
 - Mobile: `EXPO_PUBLIC_API_URL`

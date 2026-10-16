@@ -4,34 +4,20 @@ import sharp from "sharp";
 sharp.cache(false);
 sharp.concurrency(1);
 
-const { values } = parseArgs({ options: { "dry-run": { type: "boolean", default: false }, site: { type: "string" }, "fill-titles": { type: "boolean", default: false } } });
+const { values } = parseArgs({ options: { "dry-run": { type: "boolean", default: false }, site: { type: "string" }, "fill-titles": { type: "boolean", default: false }, "fill-genres": { type: "boolean", default: false } } });
 
-const TIMEOUT_MS = 30_000;
 const OPEN_LIBRARY_GAP_MS = 1000;
 
-const { SourceUnavailableError } = await import("../dist/modules/books/domain/errors.js");
-const { USER_AGENT, createThrottle, fetchJson } = await import("../dist/modules/books/adapters/http/http.js");
+const { createThrottle, fetchJson } = await import("../dist/modules/books/adapters/http/http.js");
 const { parseEditionRecord } = await import("../dist/modules/books/adapters/openlibrary/openLibraryCatalog.js");
 const { openBooksDb } = await import("../dist/modules/books/adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("../dist/modules/books/adapters/sqlite/sqliteBooksRepository.js");
 const { fillBlankTitles } = await import("../dist/modules/books/seed/fillBlankTitles.js");
+const { fillFeedGenres } = await import("../dist/modules/books/seed/feedGenres.js");
 const { importPublisherCovers } = await import("../dist/modules/books/seed/importPublisherCovers.js");
+const { fetchBytes, fetchText } = await import("../dist/modules/books/seed/siteFetch.js");
 const { PUBLISHERS } = await import("../dist/modules/books/seed/publishers.js");
 const { createObjectStore } = await import("../dist/storage/createObjectStore.js");
-
-async function guarded(url, read) {
-  try {
-    const res = await fetch(url, { headers: { "User-Agent": USER_AGENT }, signal: AbortSignal.timeout(TIMEOUT_MS) });
-    if (res.status === 429 || res.status >= 500) throw new SourceUnavailableError(new URL(url).hostname, `HTTP ${res.status}`, { status: res.status });
-    return await read(res);
-  } catch (error) {
-    if (error instanceof TypeError || error?.name === "TimeoutError") throw new SourceUnavailableError(new URL(url).hostname, error.message);
-    throw error;
-  }
-}
-
-const fetchText = (url) => guarded(url, async (res) => ({ status: res.status, text: await res.text() }));
-const fetchBytes = (url) => guarded(url, async (res) => (res.ok ? Buffer.from(await res.arrayBuffer()) : null));
 
 const openLibraryThrottle = createThrottle(OPEN_LIBRARY_GAP_MS);
 
@@ -51,8 +37,20 @@ if (sites.length === 0) {
   process.exit(1);
 }
 
+if (values["fill-titles"] && values["fill-genres"]) {
+  console.error("--fill-titles and --fill-genres can't run together");
+  process.exit(1);
+}
+
 if (values["fill-titles"]) {
   const report = await fillBlankTitles(
+    { fetchText, sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)), repo: createSqliteBooksRepository(openBooksDb()) },
+    sites,
+    { dryRun: values["dry-run"] }
+  );
+  console.log(JSON.stringify(report, null, 2));
+} else if (values["fill-genres"]) {
+  const report = await fillFeedGenres(
     { fetchText, sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)), repo: createSqliteBooksRepository(openBooksDb()) },
     sites,
     { dryRun: values["dry-run"] }

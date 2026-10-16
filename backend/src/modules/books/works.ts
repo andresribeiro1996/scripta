@@ -1,6 +1,7 @@
-import { normalizeBookGenres } from "@scripta/shared";
+import { normalizeBookGenres, workGenres, type WorkGenres } from "@scripta/shared";
 import { findOrCreateBook } from "./domain/findOrCreate.js";
 import { searchTokens, WORK_SCAN_LIMIT, type BookLookup } from "./domain/normalize.js";
+import { hiddenSynopsisHashes } from "./domain/synopsis.js";
 import type { BooksRepository } from "./domain/ports.js";
 import { firstEditionPerWork, workIdsOf } from "./domain/workSearch.js";
 import { booksRepository, coverUrlFor } from "./publicCoverLookup.js";
@@ -49,15 +50,19 @@ export type CatalogWorkPage = {
   author: string;
   summary: string | null;
   aliasIds: string[];
-  editions: Array<{ bookId: string; title: string; language: string | null; year: number | null; isbn: string | null; summary: string | null; coverUrl: string | null; coverColor: string | null; genres: string[]; rating: number | null; ratingCount: number; pages: number | null }>;
+  editions: Array<{ bookId: string; title: string; language: string | null; year: number | null; isbn: string | null; summary: string | null; coverUrl: string | null; coverColor: string | null; genres: string[]; rating: number | null; ratingCount: number; pages: number | null; possible?: boolean }>;
 };
 
 export function getWorkPageWith(books: BooksRepository, coverUrl: (imageId: string) => string, id: string): CatalogWorkPage | undefined {
   const rows = books.workPageRows(id);
   if (!rows) return undefined;
+  const hidden = hiddenSynopsisHashes(books, [rows.work.summary_hash, ...rows.editions.map((edition) => edition.summary_hash)]);
+  const shown = (text: string | null, hash: string | null) => (text?.trim() && !(hash !== null && hidden.has(hash)) ? text : null);
   return {
-    ...rows.work,
-    summary: rows.work.summary?.trim() ? rows.work.summary : null,
+    id: rows.work.id,
+    title: rows.work.title,
+    author: rows.work.author,
+    summary: shown(rows.work.summary, rows.work.summary_hash),
     aliasIds: rows.aliasIds,
     editions: rows.editions.map((edition) => ({
       bookId: edition.id,
@@ -65,17 +70,38 @@ export function getWorkPageWith(books: BooksRepository, coverUrl: (imageId: stri
       language: edition.language,
       year: edition.year,
       isbn: edition.isbn,
-      summary: edition.summary?.trim() ? edition.summary : null,
+      summary: shown(edition.summary, edition.summary_hash),
       coverUrl: edition.cover_image_id ? coverUrl(edition.cover_image_id) : null,
       coverColor: edition.cover_color || null,
       genres: normalizeBookGenres(JSON.parse(edition.genres)),
       rating: edition.rating,
       ratingCount: edition.rating_count,
-      pages: edition.pages
+      pages: edition.pages,
+      possible: isPossibleGenre(edition.genres_source, edition.genres_confidence)
     }))
   };
 }
 
 export function getWorkPage(id: string): CatalogWorkPage | undefined {
   return getWorkPageWith(booksRepository(), (imageId) => coverUrlFor(imageId, "file"), id);
+}
+
+export const CONFIDENT_GENRE_LINE = 0.8;
+
+export function isPossibleGenre(source: string | null, confidence: number | null): boolean {
+  return source === "jev" && (confidence ?? 0) < CONFIDENT_GENRE_LINE;
+}
+
+export function catalogGenresWith(books: BooksRepository, workIds: string[]): Map<string, WorkGenres> {
+  const byWork = new Map<string, Array<{ genres: string[]; possible: boolean }>>();
+  for (const row of workIds.length === 0 ? [] : books.editionGenres(workIds)) {
+    const editions = byWork.get(row.work_id) ?? [];
+    editions.push({ genres: normalizeBookGenres(JSON.parse(row.genres)), possible: isPossibleGenre(row.genres_source, row.genres_confidence) });
+    byWork.set(row.work_id, editions);
+  }
+  return new Map([...byWork].map(([workId, editions]) => [workId, workGenres(editions)]));
+}
+
+export function catalogGenres(workIds: string[]): Map<string, WorkGenres> {
+  return catalogGenresWith(booksRepository(), workIds);
 }

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mergeSearchResults, searchInsideOutside, type BookSearchResult, type BookSearchState } from "./bookSearch.js";
+import { buildManualBook, mapOpenLibraryDoc, mergeSearchResults, searchInsideOutside, type BookSearchResult, type BookSearchState } from "./bookSearch.js";
 
 function result(title: string, authors: string[], isbn: string | null): BookSearchResult {
   return { title, authors, year: null, isbn, publisher: null, coverUrl: null, genres: [] };
@@ -83,4 +83,38 @@ test("outside failing with nothing inside rejects with its error", async () => {
 
 test("inside failing rejects even when outside would succeed", async () => {
   await assert.rejects(run("dune", async () => { throw new Error("local"); }, async () => [dune]), /local/);
+});
+
+const manualFields = { title: "Dune", author: "Frank Herbert", isbn: "", publisher: null, readStatus: 0, dateRead: null, rating: null };
+
+test("a book added with search genres marks them as from the catalog", () => {
+  const book = buildManualBook({ ...manualFields, genres: ["Science Fiction"] }, "1");
+  assert.deepEqual(book._genres, ["Science Fiction"]);
+  assert.equal(book._genresFrom, "catalog");
+});
+
+test("a book added without genres carries neither genres nor the marker", () => {
+  const book = buildManualBook(manualFields, "1");
+  assert.equal("_genres" in book, false);
+  assert.equal("_genresFrom" in book, false);
+});
+
+test("mapOpenLibraryDoc repairs mojibake in the title and authors", () => {
+  const result = mapOpenLibraryDoc({ title: "Entre a fÃ© e a crenÃ§a", author_name: ["JosÃ© Silva"], isbn: ["9780000000002"] });
+  assert.equal(result?.title, "Entre a fé e a crença");
+  assert.deepEqual(result?.authors, ["José Silva"]);
+});
+
+test("mapOpenLibraryDoc repairs a title ending in a mis-decoded à", () => {
+  assert.equal(mapOpenLibraryDoc({ title: "VoilÃ\xa0" })?.title, "Voilà");
+});
+
+test("mapOpenLibraryDoc drops non-sorting markers from the title and authors", () => {
+  const result = mapOpenLibraryDoc({ title: "\u0098O \u009cNatal de Teste", author_name: ["Ana Co\u0098sta"] });
+  assert.equal(result?.title, "O Natal de Teste");
+  assert.deepEqual(result?.authors, ["Ana Costa"]);
+});
+
+test("mapOpenLibraryDoc drops non-sorting markers before repairing mojibake", () => {
+  assert.equal(mapOpenLibraryDoc({ title: "\u0098A \u009cfÃ© e a crenÃ§a" })?.title, "A fé e a crença");
 });

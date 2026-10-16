@@ -1,4 +1,4 @@
-import { canonicalIsbn, firstAuthor, normalizeIsbn, normalizeTitle, normalizeWords, titleNumbers } from "@scripta/shared";
+import { canonicalIsbn, cleanCatalogText, firstAuthor, normalizeIsbn, normalizeTitle, normalizeWords, titleNumbers } from "@scripta/shared";
 import type { BooksRepository } from "./ports.js";
 import type { BookRow } from "./types.js";
 
@@ -86,6 +86,16 @@ export function authorMatches(wantedAttribution: string, candidateAuthors: strin
   });
 }
 
+const NAME_SUFFIX = /^(jr|sr|ii|iii|iv|inc|llc|ltd)\.?$/i;
+
+export function givenNameFirst(name: string): string {
+  const parts = name.split(",");
+  if (parts.length !== 2) return name;
+  const surname = parts[0]!.trim();
+  const given = parts[1]!.trim();
+  return surname && !/\s/.test(surname) && given && !NAME_SUFFIX.test(given) ? `${given} ${surname}` : name;
+}
+
 export function searchTokens(query: string): string[] {
   return normalizeWords(query).split(" ").filter(Boolean).slice(0, MAX_SEARCH_TOKENS);
 }
@@ -102,8 +112,8 @@ export function workTitleKey(title: string, author: string): string {
 export function lookupIdentity(lookup: BookLookup): BookIdentity | null {
   const raw = normalizeIsbn(lookup.isbn ?? "").toUpperCase();
   const isbn = canonicalIsbn(raw) || null;
-  const title = (lookup.title ?? "").trim();
-  const author = (lookup.author ?? "").trim();
+  const title = cleanCatalogText(lookup.title ?? "").trim();
+  const author = cleanCatalogText(lookup.author ?? "").trim();
   const titleKey = catalogTitleKey(title, author);
   if (isbn) return { key: `isbn:${isbn}`, aliasKeys: raw.length === 10 ? [`isbn:${raw}`] : [], titleKey, isbn, title, author };
   return titleKey ? { key: titleKey, aliasKeys: [], titleKey, isbn: null, title, author } : null;

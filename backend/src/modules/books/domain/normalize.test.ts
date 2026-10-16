@@ -9,6 +9,7 @@ import {
   catalogTitleKey,
   workTitleKey,
   editionLanguage,
+  givenNameFirst,
   isPortugalIsbn,
   isPortugueseIsbn,
   lookupIdentity,
@@ -38,6 +39,15 @@ test("author matching accepts any listed name, including translator-first record
   assert.equal(authorMatches("Ursula K. Le Guin", ["Ursula K. Le Guin"]), true);
   assert.equal(authorMatches("Virginia Woolf", ["Susan Sontag"]), false);
   assert.equal(authorMatches("", ["Anyone"]), false);
+});
+
+test("givenNameFirst turns a one-word surname around and leaves every other name as sent", () => {
+  assert.equal(givenNameFirst("Herbert, Frank"), "Frank Herbert");
+  assert.equal(givenNameFirst("Tolkien, J. R. R."), "J. R. R. Tolkien");
+  assert.equal(givenNameFirst(" Herbert ,  Frank "), "Frank Herbert");
+  for (const name of ["Frank Herbert", "Le Guin, Ursula K.", "Neil Gaiman, Terry Pratchett", "Martin Luther King, Jr.", "Pratchett, Terry, Gaiman, Neil", "Herbert,", ", Frank", "", "Merriam-Webster, Inc.", "Smith, Jr.", "Smith, Sr.", "Henry, II", "Henry, III", "Henry, IV", "Google, LLC", "Acme, Ltd"]) {
+    assert.equal(givenNameFirst(name), name, name);
+  }
 });
 
 test("lookup identity prefers a valid ISBN and falls back to title + author", () => {
@@ -71,6 +81,36 @@ test("lookupIdentity keys an ISBN-10 by its ISBN-13 and keeps the ISBN-10 as an 
 test("lookupIdentity has no alias for an ISBN-13 or a title-only lookup", () => {
   assert.deepEqual(lookupIdentity({ isbn: "9780441013593", title: "Dune", author: "" })!.aliasKeys, []);
   assert.deepEqual(lookupIdentity({ title: "Dune", author: "Frank Herbert" })!.aliasKeys, []);
+});
+
+test("lookupIdentity repairs mojibake before keying", () => {
+  assert.deepEqual(lookupIdentity({ isbn: "978-0-00-000000-2", title: "Entre a fÃ© e a crenÃ§a", author: "JosÃ© Silva" }), {
+    key: "isbn:9780000000002",
+    aliasKeys: [],
+    titleKey: "ta:entre a fe e a crenca|jose silva|",
+    isbn: "9780000000002",
+    title: "Entre a fé e a crença",
+    author: "José Silva"
+  });
+});
+
+test("lookupIdentity repairs before trimming", () => {
+  assert.equal(lookupIdentity({ title: "VoilÃ\xa0", author: "Ana Lima" })?.title, "Voilà");
+});
+
+test("lookupIdentity drops non-sorting markers before keying", () => {
+  assert.deepEqual(lookupIdentity({ title: "3\u0098ª\u009c classe de teste", author: "\u0098Da \u009cSilva" }), {
+    key: "ta:3a classe de teste|da silva|3",
+    aliasKeys: [],
+    titleKey: "ta:3a classe de teste|da silva|3",
+    isbn: null,
+    title: "3ª classe de teste",
+    author: "Da Silva"
+  });
+});
+
+test("lookupIdentity drops non-sorting markers before repairing mojibake", () => {
+  assert.equal(lookupIdentity({ title: "\u0098A \u009cfÃ© e a crenÃ§a", author: "Ana Lima" })?.title, "A fé e a crença");
 });
 
 test("search tokens are plain words, safe for FTS", () => {

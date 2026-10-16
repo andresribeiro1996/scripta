@@ -15,6 +15,7 @@ export type BookScreenModel = {
   title: string;
   author: string;
   genres: string[];
+  possibleGenres: string[];
   rating: { value: number; label: string } | null;
   meta: string | null;
   cover: { url: string | null; color: string | null };
@@ -99,6 +100,7 @@ export function bookScreenModel(page: WorkPage | null, book: Book | null, viewer
     title: selected?.title ?? work?.title ?? String(book?.Title ?? "Untitled"),
     author: work?.author ?? String(book?.Attribution ?? "Unknown author"),
     genres: work ? work.genres ?? [] : book ? genresForBook(book).slice(0, GENRE_CAP) : [],
+    possibleGenres: work?.possibleGenres ?? [],
     rating: work?.rating ? { value: work.rating.value, label: `${work.rating.value.toFixed(1)} · ${ratingCountLabel(work.rating.count)}` } : null,
     meta: selected ? bookMetaLine(selected, selected.language) : work ? bookMetaLine(work) : null,
     cover: selected ? { url: selected.coverUrl, color: selected.coverColor } : { url: work?.coverUrl ?? null, color: work?.coverColor ?? null },

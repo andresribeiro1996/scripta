@@ -207,6 +207,12 @@ test("an unknown edition id is the default view", () => {
   assert.deepEqual(bookScreenModel(p, owned(), viewer, "nope"), bookScreenModel(p, owned(), viewer));
 });
 
+test("possible genres pass through, and a page from a backend without them gives none", () => {
+  assert.deepEqual(bookScreenModel(page({ possibleGenres: ["History"] }), null, { isAdmin: false }).possibleGenres, ["History"]);
+  assert.deepEqual(bookScreenModel(page(), null, { isAdmin: false }).possibleGenres, []);
+  assert.deepEqual(bookScreenModel(null, owned(), { isAdmin: false }).possibleGenres, []);
+});
+
 test("one edition or no page has no edition strip", () => {
   assert.equal(bookScreenModel(page({ editions: editions(1) }), null, viewer, "e0").edition, null);
   assert.equal(bookScreenModel(page({ editions: [] }), null, viewer).edition, null);

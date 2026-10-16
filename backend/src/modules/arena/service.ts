@@ -48,6 +48,7 @@ export interface ArenaService {
   listPublicByIds(ids: string[]): Tournament[];
   listPublishedByWorks(workIds: string[], limit: number): TournamentGameRow[];
   tournamentRecord(workIds: string[]): TournamentRecord;
+  worksShareATournament(aIds: string[], bIds: string[]): boolean;
   votedAmong(voterUserId: string, ids: string[]): string[];
   getTournamentView(id: string, voterToken?: string, viewerUserId?: string | null): TournamentView | null;
   setSlotsManual(tournamentId: string, ownerUserId: string, entries: Array<{ slotIndex: number; book: SeedBookInput }>): void;
@@ -312,6 +313,7 @@ export function createArenaService(
     listPublishedByWorks: (workIds, limit) => repo.listPublishedByWorks(workIds, limit),
 
     tournamentRecord: (workIds) => repo.tournamentRecord(workIds),
+    worksShareATournament: (aIds, bIds) => repo.worksShareATournament(aIds, bIds),
 
     listPublicByIds(ids) {
       return summariesWithPreviews(repo, repo.listPublicByIds(ids));
@@ -513,6 +515,7 @@ export interface ArenaPublicApi {
   publishedByWorks(workIds: string[], limit: number): GameByWork[];
   discoverByWorks(workIds: string[], limit: number): TournamentDiscoverRef[];
   tournamentRecord(workIds: string[]): TournamentRecord;
+  worksShareATournament(aIds: string[], bIds: string[]): boolean;
   getPublished(id: string): PublishedTournamentRef | undefined;
   listPublishedByOwner(ownerUserId: string): PublishedTournamentRef[];
   participationByOwner(ownerUserId: string, since: string): GameParticipation[];
@@ -546,6 +549,7 @@ export function createArenaPublicApi(service: ArenaService): ArenaPublicApi {
     discoverByWorks: (workIds, limit) =>
       service.listPublishedByWorks(workIds, limit).map((row) => ({ id: row.id, createdAt: row.created_at, ownerUserId: row.owner_user_id })),
     tournamentRecord: (workIds) => service.tournamentRecord(workIds),
+    worksShareATournament: (aIds, bIds) => service.worksShareATournament(aIds, bIds),
     getPublished: (id) => {
       const summary = service.getPublicSummary(id);
       return summary ? toPublishedRef(summary) : undefined;

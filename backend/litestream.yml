@@ -5,6 +5,12 @@ snapshot:
   interval: 24h
   retention: 336h
 
+levels:
+  - interval: 5m
+  - interval: 1h
+
+l0-retention-check-interval: 5m
+
 dbs:
   - path: /data/auth.sqlite
     replica:

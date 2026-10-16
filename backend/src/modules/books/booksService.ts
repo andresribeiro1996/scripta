@@ -5,7 +5,8 @@ import { findBestCover, type CoverSources, type FetchCoverImage } from "./coverR
 import { MIN_GOOD_WIDTH } from "./domain/constants.js";
 import { BookNotFoundError, FileTooLargeError, InvalidImageError, SourcePausedError, SourceUnavailableError, WorkMergeError } from "./domain/errors.js";
 import { coverColor, encodeCover, type EncodedCover } from "./domain/images.js";
-import { findExisting, findOrCreateBook, keysOf } from "./domain/findOrCreate.js";
+import { hiddenSynopsisHashes } from "./domain/synopsis.js";
+import { fillMissingIdentity, findExisting, findOrCreateBook, keysOf } from "./domain/findOrCreate.js";
 import { firstEditionPerWork, workIdsOf } from "./domain/workSearch.js";
 import { editionLanguage, findByIdentity, isPortugueseIsbn, lookupIdentity, SEARCH_LIMIT, searchTokens, WORK_SCAN_LIMIT, WORK_SEARCH_LIMIT, type BookIdentity, type BookLookup } from "./domain/normalize.js";
 import { summaryMatchesLanguage } from "./adapters/catalog/languageFilter.js";
@@ -45,6 +46,7 @@ export interface BooksServiceDeps {
   publicUrlFor: (imageId: string, size: CoverFileSize) => string;
   adminUserId: string;
   warn: (details: Record<string, unknown>, message: string) => void;
+  onDetailsChecked?: (book: BookRow) => void;
   now?: () => Date;
 }
 
@@ -123,26 +125,27 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
   }
 
   function workSummaryOf(book: BookRow): { summary: string; sourceUrl: string } | null {
-    if (book.summary) return null;
     const work = deps.repo.getWorkSummary(book.id);
     if (!work?.summary || !work.olWorkKey) return null;
+    if (hiddenSynopsisHashes(deps.repo, [work.summaryHash]).size > 0) return null;
     if (!summaryMatchesLanguage(work.summary, book.language ?? (isPortugueseIsbn(book.isbn) ? "pt" : null))) return null;
     return { summary: work.summary, sourceUrl: `https://openlibrary.org/works/${work.olWorkKey}` };
   }
 
   function detailsOf(book: BookRow): BookMetadata {
-    const fromWork = workSummaryOf(book);
+    const own = book.summary && hiddenSynopsisHashes(deps.repo, [book.summary_hash]).size === 0 ? book.summary : null;
+    const fromWork = own ? null : workSummaryOf(book);
     return {
-      summary: fromWork?.summary ?? book.summary,
+      summary: fromWork?.summary ?? own,
       rating: book.rating,
       ratingCount: book.rating_count,
-      sourceUrl: fromWork?.sourceUrl ?? summaryLink(book),
+      sourceUrl: fromWork?.sourceUrl ?? (own ? summaryLink(book) : book.source_url ?? ""),
       genres: JSON.parse(book.genres) as BookGenre[],
       pages: book.pages,
       publisher: book.publisher,
       year: book.year,
       translator: book.translator,
-      summarySource: fromWork ? "openlibrary" : book.summary_source
+      summarySource: fromWork ? "openlibrary" : own ? book.summary_source : null
     };
   }
 
@@ -170,11 +173,11 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       const identity = lookupIdentity({ isbn: result.isbn, title: result.title, author });
       if (!identity) return { result, book: null };
       const book = findExisting(deps.repo, identity) ?? deps.repo.createBook(
-        { title: result.title, author, isbn: identity.isbn, year: result.year, publisher: result.publisher, olCoverId, workKey, genres: result.genres, sources: [source] },
+        { title: identity.title, author: identity.author, isbn: identity.isbn, year: result.year, publisher: result.publisher, olCoverId, workKey, genres: result.genres, sources: [source] },
         keysOf(deps.repo, identity),
         now().toISOString()
       );
-      if (!book.title || !book.author) deps.repo.fillIdentity(book.id, result.title, author);
+      fillMissingIdentity(deps.repo, book, identity.title, identity.author);
       deps.repo.setWorkKey(book.id, workKey);
       deps.repo.makeSearchable(book.id);
       return { result: book.cover_image_id ? { ...result, coverUrl: deps.publicUrlFor(book.cover_image_id, "thumb") } : result, book: deps.repo.getBook(book.id) ?? book };
@@ -297,6 +300,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
         throw error;
       }
       const latest = deps.repo.getBook(book.id) ?? book;
+      deps.onDetailsChecked?.(latest);
       return latest.details_status === "found" || latest.summary ? detailsOf(latest) : null;
     },
 
@@ -307,6 +311,8 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
         if (!book || book.details_status !== null) continue;
         try {
           await lookupDetails(book, deps.backgroundCatalog);
+          const latest = deps.repo.getBook(id);
+          if (latest) deps.onDetailsChecked?.(latest);
         } catch (error) {
           if (error instanceof SourcePausedError) return error.retryAt;
           if (!(error instanceof SourceUnavailableError)) throw error;

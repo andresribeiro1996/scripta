@@ -162,11 +162,16 @@ export function BookScreen({ page, book, model, signedIn, onAdd, onSelectEdition
         )}
         <Text {...dynamicType} style={[typography.heading, styles.centeredText, { color: colors.text }]}>{model.title}</Text>
         <Text {...dynamicType} style={[typography.body, styles.centeredText, { color: colors.textDim }]}>{model.author}</Text>
-        {model.genres.length > 0 ? (
+        {model.genres.length + model.possibleGenres.length > 0 ? (
           <View style={styles.chips}>
             {model.genres.map((genre) => (
               <View key={genre} style={[styles.chip, { borderColor: colors.border }]}>
                 <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{genre}</Text>
+              </View>
+            ))}
+            {model.possibleGenres.map((genre) => (
+              <View key={genre} style={[styles.chip, styles.possibleChip, { borderColor: colors.border }]}>
+                <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{`Possibly ${genre}`}</Text>
               </View>
             ))}
           </View>
@@ -300,6 +305,7 @@ const styles = StyleSheet.create({
   centeredText: { alignSelf: "stretch", textAlign: "center" },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs, justifyContent: "center" },
   chip: { borderWidth: 1, borderRadius: radii.full, paddingHorizontal: spacing.sm },
+  possibleChip: { borderStyle: "dashed" },
   section: { gap: spacing.sm },
   group: { gap: spacing.sm },
   primaryRow: { flexDirection: "row", gap: spacing.sm, minHeight: 44 },

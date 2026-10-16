@@ -172,6 +172,16 @@ test("seed entries take their language from the edition's Open Library languages
   assert.equal(language(unknown.book!), null);
 });
 
+test("seedCatalog repairs mojibake and keys the row by the repaired title and author", () => {
+  const { repo } = setup();
+  assert.deepEqual(seedCatalog([entry("9780000000002", "Entre a fÃ© e a crenÃ§a", "JosÃ© Silva")], repo, () => NOW), { created: 1, existing: 0, invalid: 0 });
+  const book = repo.findBookByKey("isbn:9780000000002")!;
+  assert.equal(book.title, "Entre a fé e a crença");
+  assert.equal(book.author, "José Silva");
+  assert.equal(book.title_key, "ta:entre a fe e a crenca|jose silva|");
+  assert.equal(repo.findBookByKey("ta:entre a fe e a crenca|jose silva|")?.id, book.id);
+});
+
 test("a Portuguese seed entry's language takes its region from its ISBN, and seedCatalog passes the entry's languages through", () => {
   const { repo } = setup();
   const europe = seedBook({ isbn: "9789722518888", title: "Um", author: "Author", languages: [], lang: "por" }, repo, () => NOW).book!;
@@ -180,4 +190,13 @@ test("a Portuguese seed entry's language takes its region from its ISBN, and see
 
   seedCatalog([{ ...entry("9780141184272", "One"), languages: ["fre"] }], repo, () => NOW);
   assert.equal(repo.findBookByKey("isbn:9780141184272")!.language, "fr");
+});
+
+test("seedBook keys a filled author under the stored title, not the incoming one", () => {
+  const { repo } = setup();
+  const titled = seedBook({ isbn: "9789720000019", title: "Poemas", author: "" }, repo, () => NOW, "publisher").book!;
+  seedBook({ isbn: "9789720000019", title: "Poemas Escolhidos", author: "Sophia de Mello Breyner Andresen" }, repo, () => NOW, "publisher");
+  assert.equal(repo.getBook(titled.id)!.title, "Poemas");
+  assert.equal(repo.findBookByKey(catalogTitleKey("Poemas", "Sophia de Mello Breyner Andresen")!)?.id, titled.id);
+  assert.equal(repo.findBookByKey(catalogTitleKey("Poemas Escolhidos", "Sophia de Mello Breyner Andresen")!), undefined);
 });

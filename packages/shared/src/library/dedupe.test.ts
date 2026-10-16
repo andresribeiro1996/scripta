@@ -96,3 +96,15 @@ test("rekeyKeys rewrites and de-duplicates", () => {
   const from = new Set(["old"]);
   assert.deepEqual(rekeyKeys(["old", "x", "new"], from, "new"), ["new", "x"]);
 });
+
+test("combining an own-tagged book with a catalog-marked one drops the marker", () => {
+  const keep = { Title: "Dune", _genres: ["Fantasy"] };
+  const other = { Title: "Dune", _genres: ["Science Fiction"], _genresFrom: "catalog" };
+  const combined = combineBooks(keep, other);
+  assert.equal("_genresFrom" in combined, false);
+});
+
+test("combining two catalog-marked books keeps the marker", () => {
+  const combined = combineBooks({ Title: "Dune", _genres: ["Fantasy"], _genresFrom: "catalog" }, { Title: "Dune", _genres: ["Science Fiction"], _genresFrom: "catalog" });
+  assert.equal(combined._genresFrom, "catalog");
+});

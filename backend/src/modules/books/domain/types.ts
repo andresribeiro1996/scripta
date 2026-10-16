@@ -15,6 +15,8 @@ export interface BookRow {
   isbn: string | null;
   ol_cover_id: number | null;
   summary: string | null;
+  summary_hash: string | null;
+  original_title: string | null;
   rating: number | null;
   rating_count: number;
   genres: string;
@@ -38,8 +40,13 @@ export interface BookRow {
   work_checked_at: string | null;
   title_key: string | null;
   title_group_blocked_at: string | null;
+  genres_source: GenresSource | null;
+  genres_confidence: number | null;
+  retitle_wanted_at: string | null;
   created_at: string;
 }
+
+export type GenresSource = "jev" | "manual";
 
 export interface CoverImageRow {
   id: string;
@@ -67,10 +74,20 @@ export interface NewBook {
   createdBy?: BookCreator;
 }
 
+export interface LossyBook {
+  id: string;
+  title: string;
+  author: string;
+  isbn: string | null;
+  work_id: string | null;
+  work_title: string | null;
+  work_author: string | null;
+}
+
 export type WorkPageRows = {
-  work: { id: string; title: string; author: string; summary: string | null };
+  work: { id: string; title: string; author: string; summary: string | null; summary_hash: string | null };
   aliasIds: string[];
-  editions: Array<{ id: string; title: string; language: string | null; year: number | null; isbn: string | null; summary: string | null; cover_image_id: string | null; cover_color: string | null; genres: string; rating: number | null; rating_count: number; pages: number | null }>;
+  editions: Array<{ id: string; title: string; language: string | null; year: number | null; isbn: string | null; summary: string | null; summary_hash: string | null; cover_image_id: string | null; cover_color: string | null; genres: string; rating: number | null; rating_count: number; pages: number | null; genres_source: GenresSource | null; genres_confidence: number | null }>;
 };
 
 export interface WorkView {
@@ -80,3 +97,15 @@ export interface WorkView {
   author: string;
   editions: Array<{ id: string; isbn: string | null; title: string; author: string; olWorkKey: string | null }>;
 }
+
+export type GenreEvidence = {
+  work: { id: string; title: string; author: string; summary: string | null };
+  editions: Array<{ title: string; language: string | null; isbn: string | null; publisher: string | null; year: number | null; summary: string | null }>;
+};
+
+export type JevTask = "synopses" | "works";
+export type JevRejection = { status: number | null; reason: string; attempts: number; lastAt: string };
+
+export type MergeSource = "title-key" | "admin" | "code" | "jev" | "manual";
+
+export type WorkMatchJudgment = { model: string; intoWorkId: string | null; confidence: number | null; askedAt: string };

@@ -58,3 +58,12 @@ test("community ratings: finished and rated only, one per user from their first 
   assert.deepEqual(communityRatings(["w-new", "w-old"]), [{ userId: "ana", rating: 3 }, { userId: "ed", rating: 2 }]);
   assert.deepEqual(communityRatings([]), []);
 });
+
+test("held works count each work's holders and whether anyone finished it", () => {
+  const { heldWorks } = createWorkHolders(seeded());
+  assert.deepEqual(heldWorks().sort((a, b) => a.workId.localeCompare(b.workId)), [
+    { workId: "w-new", holders: 2, finished: false },
+    { workId: "w-old", holders: 1, finished: true },
+    { workId: "w-other", holders: 1, finished: false }
+  ]);
+});

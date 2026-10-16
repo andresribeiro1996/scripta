@@ -124,6 +124,16 @@ test("a text search maps each book and skips the untitled", async () => {
   assert.deepEqual(await createIsbndbCatalog("k", direct, gate).search({ text: "nothing" }), []);
 });
 
+test("a search turns surname-first authors around and keeps the other names as ISBNdb sent them", async () => {
+  respond(200, { books: [{ ...dune, authors: ["Herbert, Frank", "Anderson, Kevin J.", "Le Guin, Ursula K.", " ", "Brian Herbert"] }] });
+  const [hit] = await createIsbndbCatalog("k", direct, gate).search({ text: "dune" });
+  assert.deepEqual(hit!.result.authors, ["Frank Herbert", "Kevin J. Anderson", "Le Guin, Ursula K.", "Brian Herbert"]);
+
+  respond(200, { book: { ...dune, authors: ["Herbert, Frank"] } });
+  const [byIsbn] = await createIsbndbCatalog("k", direct, gate).search({ isbn: "9780441013593" });
+  assert.deepEqual(byIsbn!.result.authors, ["Frank Herbert"]);
+});
+
 test("catalog calls use the urgent lane", async () => {
   const lanes: Array<boolean | undefined> = [];
   const recording: Throttle = (task, options) => {

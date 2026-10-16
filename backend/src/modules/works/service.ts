@@ -1,5 +1,5 @@
-import { plainDescription, validBookRating, type IdentityKey, type ReaderProfile, type WorkGameRef, type WorkPage, type WorkReader } from "@scripta/shared";
-import type { CatalogWorkPage } from "../books/index.js";
+import { plainDescription, validBookRating, workGenres, type IdentityKey, type ReaderProfile, type WorkGameRef, type WorkPage, type WorkReader } from "@scripta/shared";
+import { summaryMatchesLanguage, type CatalogWorkPage } from "../books/index.js";
 import type { ViewerCopy } from "../library/index.js";
 
 type GameByWork = { id: string; name: string; path: string; ownerUserId: string | null };
@@ -22,14 +22,7 @@ const GAME_CAP = 20;
 const isbnKey = (isbn: string | null) => (isbn ? isbn.replace(/[\s-]/g, "") : null);
 const byUsername = (a: WorkReader, b: WorkReader) => a.username.toLowerCase().localeCompare(b.username.toLowerCase());
 
-const GENRE_CAP = 3;
 type CatalogEdition = CatalogWorkPage["editions"][number];
-
-function topGenres(editions: CatalogEdition[]): string[] {
-  const counts = new Map<string, number>();
-  for (const edition of editions) for (const genre of edition.genres) counts.set(genre, (counts.get(genre) ?? 0) + 1);
-  return [...counts].sort((a, b) => b[1] - a[1]).slice(0, GENRE_CAP).map(([genre]) => genre);
-}
 
 function bestRating(editions: CatalogEdition[]): WorkPage["work"]["rating"] {
   let best: WorkPage["work"]["rating"] = null;
@@ -88,7 +81,8 @@ export function createWorksService(deps: WorksDeps) {
       const copy = viewerId ? deps.copyOfWork(viewerId, work.aliasIds) : undefined;
       const mineIsbn = isbnKey(copy?.isbn ?? null);
       const mineEdition = mineIsbn ? work.editions.find((edition) => isbnKey(edition.isbn) === mineIsbn) : undefined;
-      const summary = work.summary ?? mineEdition?.summary ?? work.editions.find((edition) => edition.summary)?.summary ?? null;
+      const readable = (text: string | null): text is string => text !== null && (!mineEdition || summaryMatchesLanguage(text, mineEdition.language));
+      const summary = mineEdition?.summary ?? [work.summary, ...work.editions.map((edition) => edition.summary)].find(readable) ?? null;
       const coverUrl = copy?.coverUrl ?? mineEdition?.coverUrl ?? work.editions.find((edition) => edition.coverUrl)?.coverUrl ?? null;
       const coverColor = coverUrl ? work.editions.find((edition) => edition.coverUrl === coverUrl)?.coverColor ?? null : null;
       return {
@@ -100,7 +94,7 @@ export function createWorksService(deps: WorksDeps) {
           coverUrl,
           coverColor,
           editions: work.editions.map((edition) => ({ bookId: edition.bookId, title: edition.title, language: edition.language, year: edition.year, isbn: edition.isbn, coverUrl: edition.coverUrl, coverColor: edition.coverColor, pages: edition.pages, mine: edition === mineEdition })),
-          genres: topGenres(work.editions),
+          ...workGenres(work.editions),
           rating: bestRating(work.editions),
           year: earliestYear(work.editions),
           pages: mineEdition?.pages ?? work.editions.find((edition) => edition.pages !== null)?.pages ?? null

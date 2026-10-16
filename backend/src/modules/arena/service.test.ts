@@ -205,6 +205,7 @@ function createInMemoryArenaRepository(): ArenaRepository {
     tournamentRecord() {
       return { entered: 0, titles: 0, wins: 0, losses: 0, best: null };
     },
+    worksShareATournament: () => false,
     listParticipation() {
       return [];
     },

@@ -1,5 +1,6 @@
 import { canonicalIsbn } from "@scripta/shared";
 import { normalizeWords } from "../domain/normalize.js";
+import { originalTitleIn } from "../domain/translation.js";
 import type { PublisherSite } from "./publishers.js";
 
 export interface PublisherBook {
@@ -10,6 +11,7 @@ export interface PublisherBook {
   productUrl: string;
   rank: number;
   details: ProductDetails;
+  labels: string[];
 }
 
 export interface ProductDetails {
@@ -17,11 +19,15 @@ export interface ProductDetails {
   pages: number | null;
   year: number | null;
   translator: string | null;
+  originalTitle: string | null;
 }
 
-export type ResolvedBook = PublisherBook & { isbn: string };
+export type ResolvedBook = PublisherBook & { isbn: string; pageAuthor?: string | null };
 
 export const PAGE_RANK = 3;
+const AUTHOR_LINK = /<a\s+class=['"]autor_link['"]\s+href=['"]([^'"]*)['"][^>]*>([^<]+)<\/a>/g;
+const AUTHOR_PATH = /\/autor(?:es)?\//;
+const PRODUCT_END = /class=['"]w-grid-item[\s'"]|<\/main>/;
 const LABEL_REACH = 40;
 
 const ISBN_CANDIDATE = /(?<!\d)97[89](?:[\p{Pd}\s.]?\d){10}(?!\d)/gu;
@@ -45,6 +51,7 @@ const PAGES_LINE = new RegExp(String.raw`${LEAD}(?:n(?:[úu]m)?\.?\s*[º°]?\.?\
 const PAGES_VALUE = /^\D*(\d+(?:[. ]\d{3}(?!\d))*)(?!\d|[.,]\d)/;
 const PAGES_TEXT = /(?<![\d.])(\d{1,3}(?:[. ]\d{3}(?!\d))+|\d{2,4})(?!\d) *(?:p[áa]g(?:inas|s)?\.?)(?![a-z])/i;
 const TRANSLATOR_ATTRIBUTE = /^tradu/i;
+const ORIGINAL_TITLE_ATTRIBUTE = /^t[íi]tulo original/i;
 const TRANSLATOR_LINE = new RegExp(String.raw`${LEAD}(?:Tradu(?:ção|zido)|Tradutor(?:a)?)(?:\s+(?:de|por)\b|\s*:)\s*(.*)$`, "i");
 const NAME_WORD = /^\p{Lu}[\p{L}'’-]*$/u;
 const NAME_PARTICLES = new Set(["de", "da", "do", "dos", "das", "e"]);
@@ -156,7 +163,7 @@ function feedTextDetails(lines: string[]): Pick<ProductDetails, "pages" | "trans
 
 export function withPageText(details: ProductDetails, html: string): ProductDetails {
   const lines = textLines(html);
-  return { ...details, pages: details.pages ?? labelledPages(lines), translator: details.translator ?? labelledTranslator(lines) };
+  return { ...details, pages: details.pages ?? labelledPages(lines), translator: details.translator ?? labelledTranslator(lines), originalTitle: details.originalTitle ?? originalTitleIn(lines.join("\n")) };
 }
 
 export function findPageIsbn(html: string): string | null {
@@ -166,6 +173,24 @@ export function findPageIsbn(html: string): string | null {
   const labelled = found.filter(({ index }) => labelEnds.some((end) => index >= end && index - end <= LABEL_REACH));
   const distinct = [...new Set((labelled.length > 0 ? labelled : found).map(({ isbn }) => isbn))];
   return distinct.length === 1 && PORTUGAL_PREFIX.test(distinct[0]!) ? distinct[0]! : null;
+}
+
+function distinctNames(names: string[]): string | null {
+  const distinct = [...new Set(names.map((name) => name.trim()).filter(Boolean))];
+  return distinct.length > 0 ? distinct.join(", ") : null;
+}
+
+export function pageAuthors(html: string): string | null {
+  const start = html.search(/<main\b/);
+  if (start < 0) return null;
+  const main = html.slice(start);
+  const end = main.search(PRODUCT_END);
+  const product = end < 0 ? main : main.slice(0, end);
+  return distinctNames([...product.matchAll(AUTHOR_LINK)].filter((link) => AUTHOR_PATH.test(link[1]!)).map((link) => decodeEntities(link[2]!)));
+}
+
+function tagAuthors(tags: unknown, pattern: RegExp): string | null {
+  return distinctNames(labelList(tags).map((tag) => pattern.exec(tag)?.[1] ?? ""));
 }
 
 function record(value: unknown): Record<string, unknown> | null {
@@ -194,6 +219,11 @@ function items(list: unknown): unknown[] {
   return Array.isArray(list) ? list : [];
 }
 
+function labelList(value: unknown): string[] {
+  const raw = typeof value === "string" ? value.split(",") : items(value).map((entry) => (typeof entry === "string" ? entry : text(record(entry)?.name)));
+  return raw.map((label) => decodeEntities(label).trim()).filter(Boolean);
+}
+
 export function feedProducts(json: unknown, site: PublisherSite): unknown[] | null {
   const list = site.platform === "shopify" ? record(json)?.products : json;
   return Array.isArray(list) ? list : null;
@@ -220,10 +250,11 @@ export function parseShopifyProducts(json: unknown, site: PublisherSite): Publis
     const productUrl = `${site.origin}/products/${handle}`;
     if (!found && !URL.canParse(productUrl)) return [];
     const vendor = text(product.vendor).trim();
-    const author = site.authorFromVendor && vendor && normalizeWords(vendor) !== normalizeWords(site.name) ? vendor : null;
+    const fromVendor = site.authorFromVendor && vendor && normalizeWords(vendor) !== normalizeWords(site.name) ? vendor : null;
+    const author = fromVendor ?? (site.authorTag ? tagAuthors(product.tags, site.authorTag) : null);
     const lines = textLines(text(product.body_html));
-    const details = { summary: synopsis(lines), year: null, ...feedTextDetails(lines) };
-    return [{ isbn: found?.isbn ?? null, rank: found?.rank ?? PAGE_RANK, title, author, imageUrl, productUrl, details }];
+    const details = { summary: synopsis(lines), year: null, originalTitle: originalTitleIn(lines.join("\n")), ...feedTextDetails(lines) };
+    return [{ isbn: found?.isbn ?? null, rank: found?.rank ?? PAGE_RANK, title, author, imageUrl, productUrl, details, labels: [...labelList(product.tags), ...labelList(product.product_type)] }];
   });
 }
 
@@ -244,7 +275,8 @@ function wooDetails(product: Record<string, unknown>): ProductDetails {
     summary: synopsis(description) ?? synopsis(shortDescription),
     pages: pageCount(wooAttribute(product, PAGES_ATTRIBUTE)) ?? fromText.pages,
     year: publicationYear(wooAttribute(product, YEAR_ATTRIBUTE)),
-    translator: wooAttribute(product, TRANSLATOR_ATTRIBUTE) ?? fromText.translator
+    translator: wooAttribute(product, TRANSLATOR_ATTRIBUTE) ?? fromText.translator,
+    originalTitle: wooAttribute(product, ORIGINAL_TITLE_ATTRIBUTE) ?? originalTitleIn([...description, ...shortDescription].join("\n"))
   };
 }
 
@@ -258,7 +290,7 @@ export function parseWooProducts(json: unknown, site: PublisherSite): PublisherB
     if (!imageUrl || !productUrl || !title) return [];
     const found = firstIsbn([[text(product.sku)], [fileName(imageUrl)], [JSON.stringify(product)]]);
     if (!found && !URL.canParse(productUrl)) return [];
-    return [{ isbn: found?.isbn ?? null, rank: found?.rank ?? PAGE_RANK, title, author: wooAttribute(product, /^autor/i), imageUrl, productUrl, details: wooDetails(product) }];
+    return [{ isbn: found?.isbn ?? null, rank: found?.rank ?? PAGE_RANK, title, author: wooAttribute(product, /^autor/i), imageUrl, productUrl, details: wooDetails(product), labels: [...labelList(product.categories), ...labelList(product.tags)] }];
   });
 }
 

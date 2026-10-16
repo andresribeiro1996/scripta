@@ -1,4 +1,5 @@
-import { normalizeBookGenres } from "./bookGenres.js";
+import { genresForBook, normalizeBookGenres } from "./bookGenres.js";
+import { GENRES_FROM_CATALOG } from "./catalogGenres.js";
 import { certainFacts, likelyFacts, matchFacts, type MatchFacts } from "./bookMatch.js";
 import { bookKey, unionHighlights, withIdentityOf } from "./merge.js";
 import type { LibraryData } from "./types.js";
@@ -89,6 +90,9 @@ export function combineBooks(keep: Book, other: Book): Book {
   if ("_genres" in keep || "_genres" in other) {
     const list = (value: unknown) => (Array.isArray(value) ? value : []);
     combined._genres = normalizeBookGenres([...list(keep._genres), ...list(other._genres)]);
+    const tagged = [keep, other].filter((side) => genresForBook(side).length > 0);
+    if (tagged.length > 0 && tagged.every((side) => side._genresFrom === GENRES_FROM_CATALOG)) combined._genresFrom = GENRES_FROM_CATALOG;
+    else delete combined._genresFrom;
   }
   return combined;
 }

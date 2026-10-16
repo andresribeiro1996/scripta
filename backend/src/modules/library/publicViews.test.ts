@@ -910,7 +910,7 @@ test("GET /library sends the stored document as UTF-8 JSON", async () => {
   const res = await app.inject({ method: "GET", url: "/library", headers: { authorization: `Bearer ${users.main}` } });
   assert.equal(res.statusCode, 200);
   assert.equal(res.headers["content-type"], "application/json; charset=utf-8");
-  assert.equal(res.body, JSON.stringify({ data: stored.data, updatedAt: saved.main.updatedAt, shareToken: tokens.main, shareUrl: `https://scripta.test/shared/${tokens.main}`, works: stored.works }));
+  assert.equal(res.body, JSON.stringify({ data: stored.data, updatedAt: saved.main.updatedAt, shareToken: tokens.main, shareUrl: `https://scripta.test/shared/${tokens.main}`, works: stored.works, genres: stored.genres }));
   assert.deepEqual(JSON.parse(res.body).data, json(mainDocument));
   await app.close();
 });
@@ -921,7 +921,7 @@ test("GET /library sends null share fields for an unshared library", async () =>
   const stored = service.getLibrary("pv-private")!;
   const res = await app.inject({ method: "GET", url: "/library", headers: { authorization: "Bearer pv-private" } });
   assert.equal(res.headers["content-type"], "application/json; charset=utf-8");
-  assert.equal(res.body, JSON.stringify({ data: { books: [{ Title: "Mine" }] }, updatedAt: stored.updatedAt, shareToken: null, shareUrl: null, works: stored.works }));
+  assert.equal(res.body, JSON.stringify({ data: { books: [{ Title: "Mine" }] }, updatedAt: stored.updatedAt, shareToken: null, shareUrl: null, works: stored.works, genres: stored.genres }));
   await app.close();
 });
 

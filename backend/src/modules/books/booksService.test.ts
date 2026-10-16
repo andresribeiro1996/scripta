@@ -16,6 +16,7 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 const { applyBooksMigrations } = await import("./adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("./adapters/sqlite/sqliteBooksRepository.js");
 const { createBooksService, storeCoverImage, COVER_ENQUEUE_BATCH } = await import("./booksService.js");
+const { summaryHashOf } = await import("./domain/synopsis.js");
 const { default: sharp } = await import("sharp");
 const { BookNotFoundError, FileTooLargeError, InvalidImageError, SourcePausedError, SourceUnavailableError } = await import("./domain/errors.js");
 const { createCoverWorker } = await import("./worker.js");
@@ -769,6 +770,36 @@ test("a search hit fills the author of a saved book that has a title but no auth
   const authorless = h.repo.createBook({ title: "Poemas", author: "", isbn: "9789896414672" }, ["isbn:9789896414672"], "2026-10-01T00:00:00.000Z");
   await h.service.searchExternal("poemas");
   assert.equal(h.repo.getBook(authorless.id)!.author, "Sophia de Mello Breyner Andresen");
+});
+
+test("a search hit that fills a saved book's author also claims its title key", async () => {
+  const hit = { result: { title: "Poemas", authors: ["Sophia de Mello Breyner Andresen"], year: null, isbn: "9789896414672", publisher: null, coverUrl: null, genres: [] }, olCoverId: null, source: "openlibrary" as const };
+  const h = harness({ catalog: recordingCatalog({ search: async () => [hit] }).catalog });
+  const authorless = h.repo.createBook({ title: "Poemas", author: "", isbn: "9789896414672" }, ["isbn:9789896414672"], "2026-10-01T00:00:00.000Z");
+  await h.service.searchExternal("poemas");
+  assert.equal(h.repo.findBookByKey("ta:poemas|sophia de mello breyner andresen|")?.id, authorless.id);
+});
+
+test("a search hit with mis-decoded text is saved repaired, under the keys made from the repaired text", async () => {
+  const hit = { result: { title: "Entre a fÃ© e a crenÃ§a", authors: ["JosÃ© Silva"], year: null, isbn: "9780000000002", publisher: null, coverUrl: null, genres: [] }, olCoverId: null, source: "isbndb" as const };
+  const h = harness({ catalog: recordingCatalog({ search: async () => [hit] }).catalog });
+  await h.service.searchExternal("fe");
+  const row = h.repo.findBookByKey("isbn:9780000000002")!;
+  assert.equal(row.title, "Entre a fé e a crença");
+  assert.equal(row.author, "José Silva");
+  assert.equal(row.title_key, "ta:entre a fe e a crenca|jose silva|");
+  assert.equal(h.repo.findBookByKey("ta:entre a fe e a crenca|jose silva|")?.id, row.id);
+});
+
+test("a search hit with mis-decoded text fills a saved blank row with the repaired text", async () => {
+  const hit = { result: { title: "Entre a fÃ© e a crenÃ§a", authors: ["JosÃ© Silva"], year: null, isbn: "9780000000002", publisher: null, coverUrl: null, genres: [] }, olCoverId: null, source: "isbndb" as const };
+  const h = harness({ catalog: recordingCatalog({ search: async () => [hit] }).catalog });
+  const blank = h.repo.createBook({ title: "", author: "", isbn: "9780000000002" }, ["isbn:9780000000002"], "2026-10-01T00:00:00.000Z");
+  await h.service.searchExternal("fe");
+  const row = h.repo.getBook(blank.id)!;
+  assert.equal(row.title, "Entre a fé e a crença");
+  assert.equal(row.author, "José Silva");
+  assert.equal(row.title_key, "ta:entre a fe e a crenca|jose silva|");
 });
 
 test("a saved book's own cover is used in search results", async () => {
@@ -1741,4 +1772,69 @@ test("search hits saved from outside carry their canonical work id", async () =>
   h.db.prepare("UPDATE works SET merged_into = ? WHERE id = ?").run(target.work_id, dune.work_id);
   const again = await h.service.searchExternal("dune");
   assert.equal(again[0]!.workId, target.work_id);
+});
+
+test("a finished details lookup reports the edition, from a request and from the backfill", async () => {
+  const checked: Array<{ id: string; status: string | null }> = [];
+  const quiet = { fetchDetails: async () => null, search: async () => [] };
+  const h = harness({ catalog: quiet, backgroundCatalog: quiet, onDetailsChecked: (book) => { checked.push({ id: book.id, status: book.details_status }); } });
+  await h.service.getDetails({ isbn: "9780441013593", title: "Dune", author: "Frank Herbert" });
+  assert.deepEqual(checked, [{ id: h.bookId("isbn:9780441013593"), status: "missing" }]);
+  await h.service.getDetails({ isbn: "9780441013593", title: "Dune", author: "Frank Herbert" });
+  assert.equal(checked.length, 1);
+  const emma = h.repo.createBook({ title: "Emma", author: "Jane Austen", isbn: null }, ["ta:emma|jane austen|"], "2026-10-01T00:00:00.000Z");
+  await h.service.backfillDetails(50);
+  assert.deepEqual(checked[1], { id: emma.id, status: "missing" });
+});
+
+test("a hidden edition summary gives way to the work's summary, never to a hidden or wrong-language one", async () => {
+  const h = harness();
+  const meta = (summary: string) => ({ summary, rating: null, ratingCount: 0, sourceUrl: "", genres: [], pages: null, publisher: null, year: null, translator: null });
+  const englishWork = "The whole story of a family across three generations, told with the help of letters and the memories of the people who were there.";
+  const seeded = (isbn: string, workKey: string, summary: string) => {
+    const book = h.repo.createBook({ title: `Book ${isbn}`, author: "Author", isbn, workKey }, [`isbn:${isbn}`], "2026-10-01T00:00:00.000Z");
+    h.repo.saveDetails(book.id, meta(summary), ["isbndb"], "isbndb", "2026-10-01T00:00:00.000Z");
+    h.repo.setWorkSummary(book.id, englishWork);
+    return { isbn, title: `Book ${isbn}`, author: "Author" };
+  };
+  const hide = (text: string) => h.repo.saveSynopsisJudgment(summaryHashOf(text)!, { model: "jev-1.13.0", usable: 0.1, kind: "praise", askedAt: "2026-10-02T00:00:00.000Z" });
+
+  const english = seeded("9780441013593", "OL1W", "Praise for the book, in quotes.");
+  assert.equal((await h.service.getDetails(english))?.summary, "Praise for the book, in quotes.");
+  hide("Praise for the book, in quotes.");
+  const fallback = await h.service.getDetails(english);
+  assert.equal(fallback?.summary, englishWork);
+  assert.equal(fallback?.summarySource, "openlibrary");
+
+  const portuguese = seeded("9789720000031", "OL31W", "Elogios ao livro, entre aspas.");
+  hide("Elogios ao livro, entre aspas.");
+  const none = await h.service.getDetails(portuguese);
+  assert.equal(none?.summary, null);
+  assert.equal(none?.summarySource, null);
+
+  hide(englishWork);
+  assert.equal((await h.service.getDetails(english))?.summary, null);
+});
+
+test("a changed summary is shown until it is judged again", async () => {
+  const h = harness();
+  const orlando = { title: "Orlando", author: "Virginia Woolf", isbn: "9780141184272" };
+  const book = h.repo.createBook(orlando, ["isbn:9780141184272"], "2026-10-01T00:00:00.000Z");
+  h.repo.saveDetails(book.id, { summary: "Old praise.", rating: null, ratingCount: 0, sourceUrl: "", genres: [], pages: null, publisher: null, year: null, translator: null }, ["isbndb"], "isbndb", "2026-10-01T00:00:00.000Z");
+  h.repo.saveSynopsisJudgment(summaryHashOf("Old praise.")!, { model: "manual", usable: 0, kind: "praise", askedAt: "2026-10-02T00:00:00.000Z" });
+  assert.equal((await h.service.getDetails(orlando))?.summary, null);
+  h.repo.mergeDetails(book.id, { summary: "A new publisher synopsis.", pages: null, year: null, publisher: null, translator: null }, "publisher");
+  assert.equal((await h.service.getDetails(orlando))?.summary, "A new publisher synopsis.");
+});
+
+test("a hidden summary takes its source link with it", async () => {
+  const h = harness();
+  const lookup = { title: "Os Anões", author: "Harold Pinter", isbn: "9789720000032" };
+  const book = h.repo.createBook(lookup, ["isbn:9789720000032"], "2026-10-01T00:00:00.000Z");
+  h.repo.saveDetails(book.id, { summary: "Elogios ao livro, entre aspas.", rating: null, ratingCount: 0, sourceUrl: "", genres: [], pages: null, publisher: null, year: null, translator: null }, ["isbndb"], "isbndb", "2026-10-01T00:00:00.000Z");
+  assert.equal((await h.service.getDetails(lookup))?.sourceUrl, "https://isbndb.com/book/9789720000032");
+  h.repo.saveSynopsisJudgment(summaryHashOf("Elogios ao livro, entre aspas.")!, { model: "jev-1.13.0", usable: 0.1, kind: "praise", askedAt: "2026-10-02T00:00:00.000Z" });
+  const hidden = await h.service.getDetails(lookup);
+  assert.equal(hidden?.summary, null);
+  assert.equal(hidden?.sourceUrl, "");
 });

@@ -42,7 +42,7 @@ import { createBestEffortRecorder, deleteCommunityUserData, getCommunityPublicAp
 import type { RankingTierPreview } from "@scripta/shared/community";
 import { enqueueBookCovers, getWorkPage, matchWorks, registerBooksModule } from "./modules/books/index.js";
 import { deleteGalleryUserData, registerGalleryModule } from "./modules/gallery/index.js";
-import { communityRatings, copyOfWork, deleteLibraryUserData, holdersOfWorks, registerLibraryModule, resolvePublicLibrary, readerGlyphFor, resolveEntryWorks, WorkResolutionError, sharedBookCounts, sharedBooks, startWorksSweep, sweepLibraryWorks, type BookEvent } from "./modules/library/index.js";
+import { communityRatings, copyOfWork, deleteLibraryUserData, heldWorks, holdersOfWorks, registerLibraryModule, resolvePublicLibrary, readerGlyphFor, resolveEntryWorks, WorkResolutionError, sharedBookCounts, sharedBooks, startWorksSweep, sweepLibraryWorks, type BookEvent } from "./modules/library/index.js";
 import { deleteMuralsUserData, getMuralsPublicApi, registerMuralsModule, rekeyMuralsBooks, sweepMuralsWorks } from "./modules/murals/index.js";
 import { deleteQuizzesUserData, getQuizzesPublicApi, registerQuizzesModule } from "./modules/quizzes/index.js";
 import { deleteSocialsUserData, registerSocialsModule } from "./modules/socials/index.js";
@@ -166,6 +166,8 @@ export function buildApp() {
   });
   app.register(registerGalleryModule);
   app.register(registerBooksModule, {
+    heldWorks,
+    worksShareAnArena: (aIds: string[], bIds: string[]) => getArenaPublicApi().worksShareATournament(aIds, bIds),
     alert: emailEnabled && env.ALERT_EMAIL
       ? (subject: string, text: string) => {
           const mail = renderEmail({ heading: subject, paragraphs: [text] }, env.FRONTEND_URL);

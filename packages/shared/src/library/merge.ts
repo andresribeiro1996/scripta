@@ -1,6 +1,7 @@
 import type { LibraryData } from "./types.js";
 import { certainFacts, matchFacts } from "./bookMatch.js";
 import { normalizeIsbn } from "./covers.js";
+import { GENRES_FROM_CATALOG } from "./catalogGenres.js";
 
 /** Identifies "the same book" across sources whose native IDs aren't
  *  comparable at all (Kobo's ContentID vs Goodreads' synthetic
@@ -68,12 +69,17 @@ function mergeBookPair(
   existingBook: Record<string, unknown>,
   incomingBook: Record<string, unknown>
 ): Record<string, unknown> {
-  return {
+  const merged: Record<string, unknown> = {
     ...existingBook,
     ...incomingBook,
     _coverUrl: (incomingBook._coverUrl as string | null | undefined) || (existingBook._coverUrl as string | null | undefined) || null,
     highlights: unionHighlights(existingBook.highlights, incomingBook.highlights)
   };
+  if ("_genres" in incomingBook) {
+    if (incomingBook._genresFrom === GENRES_FROM_CATALOG) merged._genresFrom = GENRES_FROM_CATALOG;
+    else delete merged._genresFrom;
+  }
+  return merged;
 }
 
 const IDENTITY_FIELDS = ["Title", "Attribution", "ISBN"] as const;

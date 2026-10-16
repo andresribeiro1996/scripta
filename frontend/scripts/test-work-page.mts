@@ -182,3 +182,9 @@ test("a cover colour washes the header and hero; no colour, no wash", () => {
   assert.doesNotMatch(render({}), wash);
   assert.doesNotMatch(render({ page: null, book: owned, onShare: null }), wash);
 });
+
+test("possible genres read as possible", () => {
+  const html = render({ page: { ...page, work: { ...page.work, possibleGenres: ["History"] } } });
+  assert.ok(html.includes("Possibly History"));
+  assert.ok(html.includes("Science Fiction"));
+});

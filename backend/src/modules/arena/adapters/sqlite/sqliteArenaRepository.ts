@@ -27,6 +27,11 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
     WHERE s.work_id IN (SELECT value FROM json_each(?)) AND t.status != 'seeding'
     ORDER BY t.created_at DESC LIMIT ?
   `);
+  const shareTournamentStmt = db.prepare(`
+    SELECT 1 AS shared FROM tournament_slots a JOIN tournament_slots b ON b.tournament_id = a.tournament_id
+    WHERE a.work_id IN (SELECT value FROM json_each(?)) AND b.work_id IN (SELECT value FROM json_each(?))
+    LIMIT 1
+  `);
   const enteredByWorksStmt = db.prepare(`
     SELECT DISTINCT t.id, t.status, t.bracket_size
     FROM tournament_slots s JOIN tournaments t ON t.id = s.tournament_id
@@ -206,6 +211,9 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
     discoverWindow(needle, limit) {
       const rows = needle ? discoverSearchStmt.all(needle, limit) : discoverWindowStmt.all(limit);
       return rows as unknown as TournamentDiscoverRow[];
+    },
+    worksShareATournament(aIds, bIds) {
+      return shareTournamentStmt.get(JSON.stringify(aIds), JSON.stringify(bIds)) !== undefined;
     },
     listPublishedByWorks(workIds, limit) {
       if (workIds.length === 0) return [];

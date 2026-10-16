@@ -36,4 +36,5 @@ export interface LibraryDocument {
   shareToken: string | null;
   shareUrl: string | null;
   works?: Record<string, string>;
+  genres?: Record<string, string[]>;
 }

@@ -1,3 +1,4 @@
+import type { GenreReview, GenreReviewAction, SynopsisDecision, SynopsisReview, TranslationReview, TranslationReviewAction } from "@scripta/shared";
 import { apiFetch } from "./client";
 import type { ResolveCoverParams } from "./covers";
 
@@ -24,4 +25,28 @@ export async function uploadSharedCover(params: ResolveCoverParams, file: File):
   const form = new FormData();
   form.append("image", file);
   return (await apiFetch(`/books/cover?${lookupQuery(params)}`, { method: "PUT", body: form })) as { url: string | null; fullUrl: string | null };
+}
+
+export async function fetchGenreReview(): Promise<GenreReview> {
+  return (await apiFetch("/books/genre-review")) as GenreReview;
+}
+
+export async function reviewGenre(workId: string, action: GenreReviewAction): Promise<{ workId: string; editions: number }> {
+  return (await apiFetch(`/books/genre-review/${encodeURIComponent(workId)}`, { method: "POST", body: JSON.stringify(action) })) as { workId: string; editions: number };
+}
+
+export async function fetchSynopsisReview(): Promise<SynopsisReview> {
+  return (await apiFetch("/books/synopsis-review")) as SynopsisReview;
+}
+
+export async function reviewSynopsis(hash: string, decision: SynopsisDecision): Promise<{ hash: string }> {
+  return (await apiFetch(`/books/synopsis-review/${encodeURIComponent(hash)}`, { method: "POST", body: JSON.stringify({ decision }) })) as { hash: string };
+}
+
+export async function fetchTranslationReview(): Promise<TranslationReview> {
+  return (await apiFetch("/books/translation-review")) as TranslationReview;
+}
+
+export async function reviewTranslation(workId: string, action: TranslationReviewAction): Promise<{ workId: string }> {
+  return (await apiFetch(`/books/translation-review/${encodeURIComponent(workId)}`, { method: "POST", body: JSON.stringify(action) })) as { workId: string };
 }

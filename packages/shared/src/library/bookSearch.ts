@@ -19,8 +19,10 @@
 // pure query-shape, merge and result-mapping logic.
 
 import { normalizeBookGenres, type BookGenre } from "./bookGenres.js";
+import { GENRES_FROM_CATALOG } from "./catalogGenres.js";
 import { normalizeIsbn } from "./covers.js";
 import { bookKey } from "./merge.js";
+import { cleanCatalogText } from "./mojibake.js";
 
 export interface BookSearchResult {
   title: string;
@@ -115,8 +117,8 @@ export function mapOpenLibraryDoc(doc: Record<string, unknown>): BookSearchResul
   const isbn10 = isbns.find((v): v is string => typeof v === "string" && /^\d{9}[\dXx]$/.test(v));
   const publishers = Array.isArray(doc.publisher) ? doc.publisher : [];
   return {
-    title: doc.title.trim(),
-    authors: Array.isArray(doc.author_name) ? doc.author_name.filter((a): a is string => typeof a === "string") : [],
+    title: cleanCatalogText(doc.title).trim(),
+    authors: Array.isArray(doc.author_name) ? doc.author_name.filter((a): a is string => typeof a === "string").map(cleanCatalogText) : [],
     year: typeof doc.first_publish_year === "number" ? doc.first_publish_year : null,
     isbn: isbn13 ?? isbn10 ?? null,
     publisher: typeof publishers[0] === "string" ? publishers[0] : null,
@@ -165,6 +167,6 @@ export function buildManualBook(fields: ManualBookFields, id: string): Record<st
     MimeType: null,
     ImageId: null,
     highlights: [] as Array<Record<string, unknown>>,
-    ...(fields.genres?.length ? { _genres: fields.genres } : {})
+    ...(fields.genres?.length ? { _genres: fields.genres, _genresFrom: GENRES_FROM_CATALOG } : {})
   };
 }

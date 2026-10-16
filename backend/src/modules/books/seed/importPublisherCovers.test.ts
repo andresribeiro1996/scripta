@@ -18,6 +18,7 @@ const { applyBooksMigrations } = await import("../adapters/sqlite/connection.js"
 const { createSqliteBooksRepository } = await import("../adapters/sqlite/sqliteBooksRepository.js");
 const { SourceUnavailableError } = await import("../domain/errors.js");
 const { importPublisherCovers, importedLanguage } = await import("./importPublisherCovers.js");
+const { catalogTitleKey, searchTokens } = await import("../domain/normalize.js");
 
 type Deps = Parameters<typeof importPublisherCovers>[0];
 type Site = Parameters<typeof importPublisherCovers>[1][number];
@@ -155,6 +156,8 @@ test("an existing book gets the publisher cover as a manual cover and loses its 
     coversSet: 4,
     created: 3,
     noAuthor: 0,
+    identityFilled: 0,
+    authorPages: 0,
     unchanged: 0,
     rejectedImage: 0,
     cropped: 0,
@@ -907,7 +910,7 @@ const richFeed = JSON.stringify([
     description: `<p>LIVRO EM PRÉ-VENDA. ENVIOS DIA 13 DE OUTUBRO.</p><p>${SYNOPSIS}</p>`,
     short_description: "",
     images: [{ src: "https://x.example/puro.jpg" }],
-    attributes: [{ name: "Núm. páginas", terms: [{ name: "240" }] }, { name: "Ano", terms: [{ name: "2019" }] }, { name: "Tradutor", terms: [{ name: "Ana Lima" }] }]
+    attributes: [{ name: "Núm. páginas", terms: [{ name: "240" }] }, { name: "Ano", terms: [{ name: "2019" }] }, { name: "Tradutor", terms: [{ name: "Ana Lima" }] }, { name: "Título original", terms: [{ name: "Pure" }] }]
   }
 ]);
 
@@ -1260,4 +1263,231 @@ test("a language Open Library states for the edition replaces the Portugal fallb
   const unmapped = await harness({ lookup: async () => ({ title: "Guerra Branca", author: "Bruno Maçães", workKey: "/works/OL7W", languages: ["/languages/lat"] }) });
   await importPublisherCovers(unmapped.deps, [relogio], { dryRun: false });
   assert.equal(unmapped.repo.findBookByKey(`isbn:${GUERRA}`)!.language, null);
+});
+
+test("a created book keeps the publisher's original title", async () => {
+  const h = await harness({ lookup: async () => ({ title: "Puro", author: "Jim Crace" }), feeds: { [WOO_FEED]: { text: richFeed } } });
+  await importPublisherCovers(h.deps, [relogio], { dryRun: false });
+  assert.equal(h.repo.findBookByKey(`isbn:${MUSEU}`)!.original_title, "Pure");
+});
+
+const loja: Site = { name: "Loja", origin: "https://loja.test", platform: "shopify", authorFromVendor: false };
+const LOJA_FEED = "https://loja.test/products.json?limit=250&page=1";
+const LOSSY_ISBN = "9789890000109";
+
+test("a lossy Open Library edition title gives way to the shop's title when only the © letters differ", async () => {
+  const h = await harness({
+    lookup: async () => ({ title: "Hist©ria Do Mar", author: "In©s Duarte" }),
+    feeds: { [LOJA_FEED]: { text: shopifyPage([product(LOSSY_ISBN, "História do Mar", "https://cdn.example/mar.jpg")]) } }
+  });
+
+  await importPublisherCovers(h.deps, [loja], { dryRun: false });
+
+  const row = h.repo.findBookByKey(`isbn:${LOSSY_ISBN}`)!;
+  assert.equal(row.title, "História do Mar");
+  assert.equal(row.author, "In©s Duarte");
+  assert.equal(row.retitle_wanted_at, NOW.toISOString());
+});
+
+test("a lossy Open Library edition title stays when the shop's title differs in more than the © letters", async () => {
+  const h = await harness({
+    lookup: async () => ({ title: "Hist©ria Do Mar", author: "Inês Duarte" }),
+    feeds: { [LOJA_FEED]: { text: shopifyPage([product(LOSSY_ISBN, "A História do Mar", "https://cdn.example/mar.jpg")]) } }
+  });
+
+  await importPublisherCovers(h.deps, [loja], { dryRun: false });
+
+  const row = h.repo.findBookByKey(`isbn:${LOSSY_ISBN}`)!;
+  assert.equal(row.title, "Hist©ria Do Mar");
+  assert.equal(row.retitle_wanted_at, NOW.toISOString());
+});
+
+const PACHINKO = "9789897833199";
+const PACHINKO_URL = "https://www.relogiodagua.pt/produto/pachinko-pre-venda/";
+const relogioLinks: Site = { ...relogio, authorLinks: true };
+const pachinkoFeeds = {
+  [WOO_FEED]: { text: JSON.stringify([{ name: "Pachinko", permalink: PACHINKO_URL, sku: "", description: "", short_description: "", images: [{ src: "https://www.relogiodagua.pt/wp-content/uploads/2023/02/capa-pachinko.jpg" }], attributes: [] }]) },
+  [PACHINKO_URL]: { text: `<main><a class='autor_link' href='https://www.relogiodagua.pt/autor/min-jin-lee/'>Min Jin Lee</a><h1>Pachinko</h1><p>ISBN: 978-989-783-319-9</p><div class="w-grid-item post-1 product"><a class='autor_link' href='https://www.relogiodagua.pt/autor/jane-austen/'>Jane Austen</a></div></main>` }
+};
+
+function publisherBook(repo: ReturnType<typeof createSqliteBooksRepository>, isbn: string, title: string, author: string) {
+  const book = repo.createBook({ title, author, isbn, createdBy: "publisher" }, [`isbn:${isbn}`], NOW.toISOString());
+  addCover(repo, book.id, "upload", 900, null);
+  return repo.getBook(book.id)!;
+}
+
+test("a title-only book gets its author from the product page on a re-run, keeps its cover and is found by author", async () => {
+  const h = await harness({ feeds: pachinkoFeeds });
+  const before = publisherBook(h.repo, PACHINKO, "Pachinko", "");
+
+  const reports = await importPublisherCovers(h.deps, [relogioLinks], { dryRun: false });
+
+  const row = h.repo.getBook(before.id)!;
+  assert.equal(row.title, "Pachinko");
+  assert.equal(row.author, "Min Jin Lee");
+  assert.equal(row.cover_image_id, before.cover_image_id);
+  assert.equal(reports["Relógio d'Água"]!.identityFilled, 1);
+  assert.equal(h.repo.findBookByKey(catalogTitleKey("Pachinko", "Min Jin Lee")!)?.id, before.id);
+  assert.deepEqual(h.repo.searchBooks(searchTokens("Min Jin Lee"), 10).map((found) => found.id), [before.id]);
+  assert.deepEqual(h.lookups, []);
+  assert.ok(h.logs.includes(`Relógio d'Água: identity ${PACHINKO} {"title":"Pachinko","author":"Min Jin Lee"}`));
+});
+
+test("a blank book gets its title and the page author on a re-run", async () => {
+  const h = await harness({ feeds: pachinkoFeeds });
+  const before = publisherBook(h.repo, PACHINKO, "", "");
+
+  await importPublisherCovers(h.deps, [relogioLinks], { dryRun: false });
+
+  const row = h.repo.getBook(before.id)!;
+  assert.equal(row.title, "Pachinko");
+  assert.equal(row.author, "Min Jin Lee");
+  assert.equal(h.repo.isSearchable(before.id), true);
+});
+
+test("a dry run counts and logs the identity it would fill and writes nothing", async () => {
+  const h = await harness({ feeds: pachinkoFeeds });
+  const before = publisherBook(h.repo, PACHINKO, "Pachinko", "");
+
+  const reports = await importPublisherCovers(h.deps, [relogioLinks], { dryRun: true });
+
+  assert.equal(reports["Relógio d'Água"]!.identityFilled, 1);
+  assert.ok(h.logs.some((line) => line.startsWith(`Relógio d'Água: identity ${PACHINKO}`)));
+  assert.equal(h.repo.getBook(before.id)!.author, "");
+  assert.equal(h.repo.findBookByKey(catalogTitleKey("Pachinko", "Min Jin Lee")!), undefined);
+});
+
+test("a re-run never replaces an author the book already has", async () => {
+  const h = await harness({ feeds: pachinkoFeeds });
+  const before = publisherBook(h.repo, PACHINKO, "Pachinko", "Min J. Lee");
+
+  const reports = await importPublisherCovers(h.deps, [relogioLinks], { dryRun: false });
+
+  assert.equal(h.repo.getBook(before.id)!.author, "Min J. Lee");
+  assert.equal(reports["Relógio d'Água"]!.identityFilled, 0);
+});
+
+test("a site without author links leaves a title-only book's author empty", async () => {
+  const h = await harness({ feeds: pachinkoFeeds });
+  const before = publisherBook(h.repo, PACHINKO, "Pachinko", "");
+
+  await importPublisherCovers(h.deps, [relogio], { dryRun: false });
+
+  assert.equal(h.repo.getBook(before.id)!.author, "");
+});
+
+test("a new page-shop book takes the page author when Open Library has none", async () => {
+  const h = await harness({ feeds: pachinkoFeeds });
+
+  const reports = await importPublisherCovers(h.deps, [relogioLinks], { dryRun: false });
+
+  const row = h.repo.findBookByKey(`isbn:${PACHINKO}`)!;
+  assert.equal(row.title, "Pachinko");
+  assert.equal(row.author, "Min Jin Lee");
+  assert.equal(reports["Relógio d'Água"]!.noAuthor, 0);
+  assert.deepEqual(h.lookups, [PACHINKO]);
+});
+
+test("a new page-shop book still prefers Open Library's title and author", async () => {
+  const h = await harness({ feeds: pachinkoFeeds, lookup: async () => ({ title: "Pachinko", author: "Min J. Lee" }) });
+
+  await importPublisherCovers(h.deps, [relogioLinks], { dryRun: false });
+
+  assert.equal(h.repo.findBookByKey(`isbn:${PACHINKO}`)!.author, "Min J. Lee");
+});
+
+const presenca: Site = { name: "Presença", origin: "https://www.presenca.pt", platform: "shopify", authorFromVendor: false, authorTag: /^NOMEAUTOR_(.+)$/ };
+const presencaFeeds = {
+  "https://www.presenca.pt/products.json?limit=250&page=1": { text: shopifyPage([{ title: "Pachinko", handle: "pachinko", vendor: "Presença", tags: ["EDITORA_Presença", "NOMEAUTOR_Min Jin Lee"], variants: [{ barcode: PACHINKO }], images: [{ src: "https://cdn.shopify.com/s/files/1/0000/0000/files/pachinko.jpg" }] }]) }
+};
+
+test("a title-only book gets its author from the feed's author tags on a re-run", async () => {
+  const h = await harness({ feeds: presencaFeeds });
+  const before = publisherBook(h.repo, PACHINKO, "Pachinko", "");
+
+  await importPublisherCovers(h.deps, [presenca], { dryRun: false });
+
+  assert.equal(h.repo.getBook(before.id)!.author, "Min Jin Lee");
+});
+
+test("a re-run does not fill the author when the stored title is another book's", async () => {
+  const h = await harness({ feeds: presencaFeeds });
+  const before = publisherBook(h.repo, PACHINKO, "Os Maias", "");
+
+  const reports = await importPublisherCovers(h.deps, [presenca], { dryRun: false });
+
+  assert.equal(h.repo.getBook(before.id)!.author, "");
+  assert.equal(h.repo.getBook(before.id)!.title, "Os Maias");
+  assert.equal(reports["Presença"]!.identityFilled, 0);
+});
+
+const PACHINKO_PAGE = pachinkoFeeds[PACHINKO_URL]!;
+const isbnImageFeeds = (page: { status?: number; text: string } = PACHINKO_PAGE) => ({
+  [WOO_FEED]: { text: JSON.stringify([{ name: "Pachinko", permalink: PACHINKO_URL, sku: "", description: "", short_description: "", images: [{ src: "https://www.relogiodagua.pt/wp-content/uploads/2023/11/9789897833199.jpg" }], attributes: [] }]) },
+  [PACHINKO_URL]: page
+});
+
+test("a feed-ISBN book with no author gets the author from its product page", async () => {
+  const h = await harness({ feeds: isbnImageFeeds() });
+  const before = publisherBook(h.repo, PACHINKO, "Pachinko", "");
+
+  const reports = await importPublisherCovers(h.deps, [relogioLinks], { dryRun: false });
+
+  assert.equal(h.repo.getBook(before.id)!.author, "Min Jin Lee");
+  assert.equal(h.repo.findBookByKey(catalogTitleKey("Pachinko", "Min Jin Lee")!)?.id, before.id);
+  assert.equal(reports["Relógio d'Água"]!.authorPages, 1);
+  assert.equal(reports["Relógio d'Água"]!.identityFilled, 1);
+  assert.equal(h.requests.filter((url) => url === PACHINKO_URL).length, 1);
+});
+
+test("a feed-ISBN book that already has an author is not page-read", async () => {
+  const h = await harness({ feeds: isbnImageFeeds() });
+  const before = publisherBook(h.repo, PACHINKO, "Pachinko", "Min J. Lee");
+
+  const reports = await importPublisherCovers(h.deps, [relogioLinks], { dryRun: false });
+
+  assert.equal(h.repo.getBook(before.id)!.author, "Min J. Lee");
+  assert.ok(!h.requests.includes(PACHINKO_URL));
+  assert.equal(reports["Relógio d'Água"]!.authorPages, 0);
+});
+
+test("a feed-ISBN book on a site without author links is not page-read", async () => {
+  const h = await harness({ feeds: isbnImageFeeds() });
+  const before = publisherBook(h.repo, PACHINKO, "Pachinko", "");
+
+  await importPublisherCovers(h.deps, [relogio], { dryRun: false });
+
+  assert.equal(h.repo.getBook(before.id)!.author, "");
+  assert.ok(!h.requests.includes(PACHINKO_URL));
+});
+
+test("an author page with another ISBN gives no author", async () => {
+  const h = await harness({ feeds: isbnImageFeeds({ text: PACHINKO_PAGE.text.replace("978-989-783-319-9", "978-989-641-467-2") }) });
+  const before = publisherBook(h.repo, PACHINKO, "Pachinko", "");
+
+  const reports = await importPublisherCovers(h.deps, [relogioLinks], { dryRun: false });
+
+  assert.equal(h.repo.getBook(before.id)!.author, "");
+  assert.equal(reports["Relógio d'Água"]!.identityFilled, 0);
+});
+
+test("a failed author page leaves the book authorless and defers nothing", async () => {
+  const h = await harness({ feeds: isbnImageFeeds({ status: 500, text: "" }) });
+  const before = publisherBook(h.repo, PACHINKO, "Pachinko", "");
+
+  const reports = await importPublisherCovers(h.deps, [relogioLinks], { dryRun: false });
+
+  assert.equal(h.repo.getBook(before.id)!.author, "");
+  assert.equal(reports["Relógio d'Água"]!.pagesDeferred, 0);
+  assert.equal(reports["Relógio d'Água"]!.authorPages, 1);
+});
+
+test("a dry run reads the author page and counts the fill without writing", async () => {
+  const h = await harness({ feeds: isbnImageFeeds() });
+  const before = publisherBook(h.repo, PACHINKO, "Pachinko", "");
+
+  const reports = await importPublisherCovers(h.deps, [relogioLinks], { dryRun: true });
+
+  assert.equal(h.repo.getBook(before.id)!.author, "");
+  assert.equal(reports["Relógio d'Água"]!.identityFilled, 1);
 });

@@ -1,4 +1,5 @@
 import { SourceUnavailableError } from "../domain/errors.js";
+import { fillMissingIdentity } from "../domain/findOrCreate.js";
 import type { BooksRepository } from "../domain/ports.js";
 import { createThrottle, readSiteFeed, SiteSkipped, type ImportDeps } from "./importPublisherCovers.js";
 import type { PublisherSite } from "./publishers.js";
@@ -17,7 +18,7 @@ export interface TitleFillReport {
 }
 
 export async function fillBlankTitles(
-  deps: { fetchText: ImportDeps["fetchText"]; sleep: (ms: number) => Promise<void>; repo: Pick<BooksRepository, "listBlankTitled" | "fillIdentity"> },
+  deps: { fetchText: ImportDeps["fetchText"]; sleep: (ms: number) => Promise<void>; repo: Pick<BooksRepository, "listBlankTitled" | "getBook" | "findBookByKey" | "addKey" | "fillIdentity"> },
   sites: PublisherSite[],
   options: { dryRun: boolean }
 ): Promise<TitleFillReport> {
@@ -40,7 +41,10 @@ export async function fillBlankTitles(
         blank.delete(book.productUrl);
         report.matched += ids.length;
         if (options.dryRun) continue;
-        for (const id of ids) deps.repo.fillIdentity(id, book.title, book.author ?? "");
+        for (const id of ids) {
+          const row = deps.repo.getBook(id);
+          if (row) fillMissingIdentity(deps.repo, row, book.title, book.author ?? "");
+        }
         report.filled += ids.length;
       }
     } catch (error) {

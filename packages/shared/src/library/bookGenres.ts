@@ -30,43 +30,55 @@ export const BOOK_GENRES = [
 export type BookGenre = (typeof BOOK_GENRES)[number];
 
 const RULES: Array<[BookGenre, RegExp]> = [
-  ["Science Fiction", /\b(?:science fiction|sci fi|scifi)\b/],
-  ["Historical Fiction", /\bhistorical fiction\b|\bfiction historical\b/],
-  ["Literary Fiction", /\bliterary fiction\b|\bfiction literary\b/],
-  ["Classics", /\bclassics?\b|\bclassic literature\b/],
-  ["Biography & Memoir", /\b(?:biograph\w*|autobiograph\w*|memoirs?)\b/],
-  ["Comics & Graphic Novels", /\b(?:comics?|graphic novels?|manga)\b/],
-  ["Young Adult", /\b(?:young adult|ya fiction)\b/],
-  ["Children's", /\b(?:children s|childrens|juvenile fiction|picture books?)\b/],
-  ["Fantasy", /\bfantasy\b/],
-  ["Romance", /\bromance\b/],
-  ["Mystery", /\bmyst(?:ery|eries)\b|\bdetective fiction\b/],
-  ["Thriller", /\bthrillers?\b|\bsuspense\b/],
-  ["Horror", /\bhorror\b/],
-  ["Crime", /\bcrime(?: fiction)?\b/],
-  ["History", /\bhistory\b|\bhistorical studies\b/],
+  ["Historical Fiction", /\bromances? historicos?\b/],
+  ["Mystery", /\bromances? policia(?:l|is)\b/],
+  ["Science Fiction", /\b(?:science fiction|sci fi|scifi|ficcao cientifica)\b/],
+  ["Historical Fiction", /\bhistorical fiction\b|\bfiction historical\b|\bficcao historica\b/],
+  ["Literary Fiction", /\bliterary fiction\b|\bfiction literary\b|\bficcao literaria\b|\blit ?fic\b/],
+  ["Classics", /\bclassics?\b|\bclassic literature\b|\bclassicos?\b/],
+  ["Biography & Memoir", /\b(?:biograph\w*|autobiograph\w*|memoirs?|biografias?|autobiografias?|memorias)\b/],
+  ["Comics & Graphic Novels", /\b(?:comics?|graphic novels?|manga|banda desenhada|quadrinhos)\b/],
+  ["Children's", /\binfanto ?juvenil\b|\binfantil (?:e )?juvenil\b|\binfantis e juvenis\b/],
+  ["Young Adult", /\b(?:young adult|ya|juvenil|jove(?:m|ns) adultos?)\b/],
+  ["Children's", /\b(?:children s|childrens|juvenile fiction|picture books?|infantil|infantis|middle grade|kids|kid ?lit)\b/],
+  ["Fantasy", /\b(?:fantasy|fantasia|romantasy|literatura fantastica)\b/],
+  ["Romance", /\bromance\b|\bliteratura romantica\b|\brom ?com\b/],
+  ["Mystery", /\bmyst(?:ery|eries)\b|\bdetective fiction\b|\bpolicia(?:l|is)\b|\bmisterios?\b/],
+  ["Thriller", /\bthrillers?\b|\bsuspenses?\b/],
+  ["Horror", /\b(?:horror|terror)\b/],
+  ["Crime", /\bcrimes?(?: fiction)?\b/],
+  ["History", /\bhistory\b|\bhistorical studies\b|\bhistoria\b/],
   ["Politics", /\bpolitic\w*\b|\bgovernment\b/],
-  ["Philosophy", /\bphilosoph\w*\b/],
-  ["Psychology", /\bpsycholog\w*\b/],
-  ["Technology", /\b(?:technology|computers?|programming|software)\b/],
-  ["Science", /\bscience\b|\b(?:physics|chemistry|biology|astronomy)\b/],
-  ["Business", /\b(?:business|economics|finance|entrepreneurship|management)\b/],
-  ["Self-Help", /\bself help\b|\bpersonal development\b/],
-  ["Poetry", /\bpoetry\b|\bpoems?\b/],
-  ["Religion", /\b(?:religion|theology|spirituality)\b/],
-  ["Travel", /\btravel\b/],
-  ["Cooking", /\b(?:cooking|cookbooks?|food)\b/]
+  ["Philosophy", /\b(?:philosoph\w*|filosofi\w*)\b/],
+  ["Psychology", /\b(?:psycholog\w*|psicologi\w*)\b/],
+  ["Technology", /\b(?:technology|computers?|programming|software|tecnologi\w*|informatica)\b/],
+  ["Science", /\bscience\b|\b(?:physics|chemistry|biology|astronomy|ciencias?|fisica|quimica|biologia|astronomia)\b/],
+  ["Business", /\b(?:business|economics|finance|entrepreneurship|management|economia|gestao|financas|negocios|empreendedorismo)\b/],
+  ["Self-Help", /\bself help\b|\bpersonal development\b|\bauto ?ajuda\b|\bdesenvolvimento pessoal\b/],
+  ["Poetry", /\bpoetry\b|\bpoems?\b|\bpoesia\b|\bpoemas?\b/],
+  ["Religion", /\b(?:religion|theology|spirituality|religiao|teologia|espiritualidade)\b/],
+  ["Science Fiction", /\b(?:dystopi(?:a|an|as)|space opera|cyberpunk|time travel)\b/],
+  ["Fantasy", /\bparanormal\b/],
+  ["Travel", /\b(?:travel|viage(?:m|ns))\b/],
+  ["Cooking", /\b(?:cooking|cookbooks?|food|culinaria|receitas|gastronomia)\b/]
 ];
+
+const NOT_GENRES = /^(?:food for thought|reading history)$/;
 
 function valuesOf(value: unknown): string[] {
   if (Array.isArray(value)) return value.filter((item): item is string => typeof item === "string");
   return typeof value === "string" ? value.split(/[,;|]/) : [];
 }
 
+export function normalizeGenreLabel(raw: string): string {
+  return raw.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
 export function normalizeBookGenres(value: unknown): BookGenre[] {
   const found = new Set<BookGenre>();
   for (const raw of valuesOf(value)) {
-    const subject = raw.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    const subject = normalizeGenreLabel(raw);
+    if (NOT_GENRES.test(subject)) continue;
     const match = RULES.find(([, pattern]) => pattern.test(subject));
     if (match) found.add(match[0]);
   }

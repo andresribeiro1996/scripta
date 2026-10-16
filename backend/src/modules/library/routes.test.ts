@@ -453,6 +453,18 @@ test("PUT and GET /library answer each copy's work id", async () => {
   await app.close();
 });
 
+test("GET /library answers the catalog genres of each copy's work", async () => {
+  const { app, put } = await setup();
+  const saved = await put(JSON.stringify({ data: { books: [kobo] } }));
+  const workId = saved.json().works["ta:dune|frank herbert"];
+  const catalog = new DatabaseSync(process.env.COVERS_DB_PATH!);
+  catalog.prepare("UPDATE books SET genres = ? WHERE work_id = ?").run(JSON.stringify(["Science Fiction"]), workId);
+  catalog.close();
+  const read = await app.inject({ method: "GET", url: "/library", headers: { authorization: "Bearer u1" } });
+  assert.deepEqual(read.json().genres, { "ta:dune|frank herbert": ["Science Fiction"] });
+  await app.close();
+});
+
 const tagged = { Title: "Dune", Attribution: "Frank Herbert", ISBN: "9780441013593", ReadStatus: 2, _key: "isbn:9999999999999", _workId: "some-work" };
 const { _key: _ignoredKey, _workId: _ignoredWorkId, ...untagged } = tagged;
 

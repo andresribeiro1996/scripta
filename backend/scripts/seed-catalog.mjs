@@ -5,9 +5,16 @@ const { values } = parseArgs({
   options: {
     eng: { type: "string", default: "35000" },
     por: { type: "string", default: "15000" },
-    status: { type: "boolean", default: false }
+    status: { type: "boolean", default: false },
+    "fill-genres": { type: "boolean", default: false },
+    "dry-run": { type: "boolean", default: false }
   }
 });
+
+if (values["dry-run"] && !values["fill-genres"]) {
+  console.error("--dry-run only applies to --fill-genres");
+  process.exit(1);
+}
 
 const CHUNK = 500;
 const log = (line) => console.log(line);
@@ -24,11 +31,19 @@ function printStatus() {
   const withImage = db.prepare("SELECT COUNT(*) AS n FROM books WHERE cover_image_id IS NOT NULL").get().n;
   const portugalRows = db.prepare("SELECT cover_status AS status, COUNT(*) AS n FROM books WHERE isbn LIKE '978972%' OR isbn LIKE '978989%' GROUP BY cover_status").all();
   const portugal = { total: portugalRows.reduce((sum, row) => sum + row.n, 0), good: 0, low_res: 0, missing: 0, manual: 0, null: 0, ...Object.fromEntries(portugalRows.map((row) => [row.status ?? "null", row.n])) };
-  log(JSON.stringify({ total, null: 0, good: 0, low_res: 0, missing: 0, manual: 0, ...counts, withImage, portugal }));
+  const blank = { untitled: 0, authorless: 0, byShop: {} };
+  for (const row of db.prepare("SELECT publisher_url AS url, title = '' AS untitled FROM books WHERE title = '' OR author = ''").all()) {
+    const shop = row.url && URL.canParse(row.url) ? new URL(row.url).host : "none";
+    const field = row.untitled ? "untitled" : "authorless";
+    blank[field]++;
+    blank.byShop[shop] ??= { untitled: 0, authorless: 0 };
+    blank.byShop[shop][field]++;
+  }
+  log(JSON.stringify({ total, null: 0, good: 0, low_res: 0, missing: 0, manual: 0, ...counts, withImage, portugal, blank }));
   db.close();
 }
 
-async function seed() {
+function seedCounts() {
   const counts = { eng: Number(values.eng), por: Number(values.por) };
   for (const [flag, count] of Object.entries(counts)) {
     if (!Number.isFinite(count) || count < 0) {
@@ -36,6 +51,11 @@ async function seed() {
       process.exit(1);
     }
   }
+  return counts;
+}
+
+async function seed() {
+  const counts = seedCounts();
   const { collectRanked } = await import("../dist/modules/books/seed/fetchRankedWorks.js");
   const { mergeSeedLists } = await import("../dist/modules/books/seed/seedList.js");
   const { seedCatalog } = await import("../dist/modules/books/seed/seedCatalog.js");
@@ -55,5 +75,18 @@ async function seed() {
   log(JSON.stringify(total));
 }
 
+async function fillGenres() {
+  const counts = seedCounts();
+  const { collectRanked } = await import("../dist/modules/books/seed/fetchRankedWorks.js");
+  const { mergeSeedLists } = await import("../dist/modules/books/seed/seedList.js");
+  const { fillSeedGenres } = await import("../dist/modules/books/seed/seedGenres.js");
+  const { openBooksDb } = await import("../dist/modules/books/adapters/sqlite/connection.js");
+  const { createSqliteBooksRepository } = await import("../dist/modules/books/adapters/sqlite/sqliteBooksRepository.js");
+  const merged = mergeSeedLists(await collectRanked("por", counts.por, log), await collectRanked("eng", counts.eng, log), counts);
+  log(`list ready: ${merged.length} entries`);
+  console.log(JSON.stringify(fillSeedGenres(merged, createSqliteBooksRepository(openBooksDb()), { dryRun: values["dry-run"] }), null, 2));
+}
+
 if (values.status) printStatus();
+else if (values["fill-genres"]) await fillGenres();
 else await seed();

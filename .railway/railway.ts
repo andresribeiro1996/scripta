@@ -58,6 +58,7 @@ export default defineRailway(() => {
       SOCIALS_DB_PATH: preserve(),
       SOCIALS_SUCCESS_REDIRECT_URL: preserve(),
       TIERLISTS_DB_PATH: preserve(),
+      TYPESAFE_API_KEY: preserve(),
     },
   });
 

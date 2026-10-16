@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { feedProducts, feedUrl, findPageIsbn, findPortugalIsbn, isDisallowed, parseRobots, parseShopifyProducts, parseWooProducts, withPageText } from "./publisherFeed.js";
+import { feedProducts, feedUrl, findPageIsbn, findPortugalIsbn, isDisallowed, pageAuthors, parseRobots, parseShopifyProducts, parseWooProducts, withPageText } from "./publisherFeed.js";
 import type { PublisherSite } from "./publishers.js";
 
 const shopify = JSON.parse(readFileSync(new URL("./fixtures/shopify-products.json", import.meta.url), "utf8"));
@@ -263,14 +263,14 @@ test("the year comes from a year attribute, between 1900 and this year", () => {
 });
 
 test("a product with nothing to extract has all-null details", () => {
-  assert.deepEqual(wooDetails({}), { summary: null, pages: null, year: null, translator: null });
+  assert.deepEqual(wooDetails({}), { summary: null, pages: null, year: null, translator: null, originalTitle: null });
 });
 
 test("withPageText fills pages and translator the feed lacked, and keeps what the feed gave", () => {
   const page = "<html><body><p>Tradução de Ana Lima</p><p>Páginas: 240</p></body></html>";
-  const empty = { summary: SYNOPSIS, pages: null, year: 2019, translator: null };
-  assert.deepEqual(withPageText(empty, page), { summary: SYNOPSIS, pages: 240, year: 2019, translator: "Ana Lima" });
-  assert.deepEqual(withPageText({ ...empty, pages: 100, translator: "Rui" }, page), { summary: SYNOPSIS, pages: 100, year: 2019, translator: "Rui" });
+  const empty = { summary: SYNOPSIS, pages: null, year: 2019, translator: null, originalTitle: null };
+  assert.deepEqual(withPageText(empty, page), { summary: SYNOPSIS, pages: 240, year: 2019, translator: "Ana Lima", originalTitle: null });
+  assert.deepEqual(withPageText({ ...empty, pages: 100, translator: "Rui" }, page), { summary: SYNOPSIS, pages: 100, year: 2019, translator: "Rui", originalTitle: null });
 });
 
 test("the translator comes only from a line that starts with the label, and only as a name", () => {
@@ -283,7 +283,7 @@ test("the translator comes only from a line that starts with the label, and only
 });
 
 test("a product page gives only line-anchored labelled pages and a translator, never loose text", () => {
-  const empty = { summary: null, pages: null, year: null, translator: null };
+  const empty = { summary: null, pages: null, year: null, translator: null, originalTitle: null };
   const related = "<html><body><ul><li>Tradução de Poesia</li></ul><div>Outro livro 320 págs</div><p>Edição brochada, 410 págs.</p></body></html>";
   assert.deepEqual(withPageText(empty, related), empty);
   assert.equal(withPageText(empty, "<p>Páginas: 180</p>").pages, 180);
@@ -358,7 +358,7 @@ test("a dot or space is a thousands separator only before exactly three digits",
   assert.equal(wooDetails({ attributes: [attribute("Páginas", "1.2345")] }).pages, null);
   assert.equal(wooDetails({ description: "<p>Versão 3.9 240 págs</p>" }).pages, 240);
   assert.equal(wooDetails({ description: "<p>Brochado, 1 200 páginas.</p>" }).pages, 1200);
-  assert.equal(withPageText({ summary: null, pages: null, year: null, translator: null }, "<p>Páginas: 24.5</p>").pages, null);
+  assert.equal(withPageText({ summary: null, pages: null, year: null, translator: null, originalTitle: null }, "<p>Páginas: 24.5</p>").pages, null);
 });
 
 test("a numeric entity for NUL or a surrogate is left as text", () => {
@@ -377,4 +377,88 @@ test("the fixture descriptions are live-shaped paragraphs: the notice goes, the 
   assert.ok(details[1]?.summary?.startsWith("Nomeado pela The Atlantic"));
   assert.ok(details[2]?.summary?.startsWith("VENCEDOR DO COSTA BOOK AWARD DE LIVRO DO ANO\n\nParis, 1785."));
   assert.equal(details[3]?.summary, null);
+});
+
+test("products carry their tags, types and categories as labels", () => {
+  const shop = { name: "Shop", origin: "https://shop.test", platform: "shopify" as const, authorFromVendor: false };
+  const wooSite = { name: "Woo", origin: "https://woo.test", platform: "woocommerce" as const, authorFromVendor: false };
+  const shopifyBooks = parseShopifyProducts(shopify, shop);
+  assert.deepEqual(shopifyBooks.find((book) => book.title === "O Museu dos Esforços Inúteis")?.labels, ["américa latina", "Contos", "Livro"]);
+  const wooBooks = parseWooProducts(woo, wooSite);
+  assert.ok(wooBooks.some((book) => book.labels.length === 1 && book.labels[0] === "Ensaios"));
+  const stringTags = parseShopifyProducts({ products: [{ title: "Tagged", handle: "tagged", product_type: "", tags: "Romance,  Policial ", variants: [], images: [{ src: "https://shop.test/files/9789722031240.jpg" }] }] }, shop);
+  assert.deepEqual(stringTags[0]?.labels, ["Romance", "Policial"]);
+});
+
+test("the original title is captured while its line stays out of the synopsis", () => {
+  const shopify = shopifyDetails(`<p>${SYNOPSIS}</p><p>Título original: Les Misérables</p>`);
+  assert.equal(shopify.summary, SYNOPSIS);
+  assert.equal(shopify.originalTitle, "Les Misérables");
+  assert.equal(wooDetails({ description: `<p>${SYNOPSIS}</p>`, attributes: [attribute("Título original", "The Pure")] }).originalTitle, "The Pure");
+  assert.equal(wooDetails({ description: `<p>${SYNOPSIS}</p><p>Titulo original: Der Spaziergang</p>` }).originalTitle, "Der Spaziergang");
+  assert.equal(wooDetails({ description: `<p>${SYNOPSIS}</p>` }).originalTitle, null);
+  assert.equal(withPageText({ summary: null, pages: null, year: null, translator: null, originalTitle: null }, "<p>Título original: Solaris</p>").originalTitle, "Solaris");
+  assert.equal(withPageText({ summary: null, pages: null, year: null, translator: null, originalTitle: "Kept" }, "<p>Título original: Solaris</p>").originalTitle, "Kept");
+});
+
+const presenca: PublisherSite = { name: "Presença", origin: "https://www.presenca.pt", platform: "shopify", authorFromVendor: false, authorTag: /^NOMEAUTOR_(.+)$/ };
+const presencaWithoutTag: PublisherSite = { name: "Presença", origin: "https://www.presenca.pt", platform: "shopify", authorFromVendor: false };
+
+function presencaFeed(tags: string[]) {
+  return { products: [{ title: "Ultimate Football Heroes", handle: "ultimate-football-heroes", vendor: "Presença", tags, variants: [{ barcode: "9789897833199" }], images: [{ src: "https://cdn.shopify.com/s/files/1/0000/0000/files/heroes.jpg" }] }] };
+}
+
+test("a Shopify product takes its authors from the site's author tags", () => {
+  const [book] = parseShopifyProducts(presencaFeed(["AUTOR_dan-leydon_Dan Leydon", "EDITORA_Presença", "NOMEAUTOR_Dan Leydon", "NOMEAUTOR_Matt Oldfield"]), presenca);
+  assert.equal(book!.author, "Dan Leydon, Matt Oldfield");
+});
+
+test("a Shopify product with no author tag has no author", () => {
+  const [book] = parseShopifyProducts(presencaFeed(["EDITORA_Jacarandá", "TIPO_BOOK"]), presenca);
+  assert.equal(book!.author, null);
+});
+
+test("author tags count only on a site that names its tag pattern", () => {
+  const [book] = parseShopifyProducts(presencaFeed(["NOMEAUTOR_Dan Leydon"]), presencaWithoutTag);
+  assert.equal(book!.author, null);
+});
+
+const PACHINKO_PAGE = `<html><head><style>.w-grid-item{padding:0}</style></head><body>
+<header><a class='autor_link' href='https://www.relogiodagua.pt/autor/menu/'>Menu Autor</a></header>
+<main id="page-content">
+<div class="wpb_wrapper"><a class='autor_link' href='https://www.relogiodagua.pt/autor/min-jin-lee/'>Min Jin Lee</a></div>
+<h1 class="w-post-elm post_title entry-title">Pachinko</h1>
+<div class="produto_traducao"><span class="w-post-elm-before">Tradução: </span><span class="w-post-elm-value">Marta Mendonça</span></div>
+<p>ISBN: 978-989-783-319-9</p>
+<div class="w-grid-item post-7722 product"><div class="w-grid-item-h"><a class='autor_link' href='https://www.relogiodagua.pt/autor/vladimir-nabokov/'>Vladimir Nabokov</a></div></div>
+</main>
+<footer><a class='autor_link' href='https://www.relogiodagua.pt/autor/rodape/'>Rodapé</a></footer>
+</body></html>`;
+
+test("pageAuthors takes the main product's author and none from the menu, related products or footer", () => {
+  assert.equal(pageAuthors(PACHINKO_PAGE), "Min Jin Lee");
+});
+
+test("pageAuthors keeps every author once and skips translator links", () => {
+  const html = `<main><h1>Aristóteles</h1><a class='autor_link' href='https://www.gradiva.pt/autor/tassos-apostolidis/'>Tassos Apostolidis</a>, <a class='autor_link' href='https://www.gradiva.pt/autor/alecos-papadatos/'>Alecos Papadatos</a> <a class='autor_link' href='https://www.gradiva.pt/tradutor/jorge-vaz-de-carvalho/'>Jorge Vaz de Carvalho</a><h1>Aristóteles</h1><a class='autor_link' href='https://www.gradiva.pt/autor/tassos-apostolidis/'>Tassos Apostolidis</a></main>`;
+  assert.equal(pageAuthors(html), "Tassos Apostolidis, Alecos Papadatos");
+});
+
+test("pageAuthors reads /autores/ links and decodes entities in names", () => {
+  const html = `<main><h1>Os Intrusos</h1><a class='autor_link' href='https://penguinlivros.pt/autores/edna-obrien-2/'>Edna O&#8217;Brien</a></main>`;
+  assert.equal(pageAuthors(html), "Edna O’Brien");
+});
+
+test("pageAuthors finds nothing when only related products have author links", () => {
+  const html = `<main><h1>Saco de Pano</h1><div class="w-grid-item post-1 product"><a class='autor_link' href='https://www.relogiodagua.pt/autor/jane-austen/'>Jane Austen</a></div></main>`;
+  assert.equal(pageAuthors(html), null);
+});
+
+test("pageAuthors finds nothing on a page without a main element", () => {
+  assert.equal(pageAuthors(`<body><a class='autor_link' href='https://www.relogiodagua.pt/autor/a/'>Alguém</a></body>`), null);
+});
+
+test("pageAuthors stops at a single-quoted related-product card", () => {
+  const html = `<main><a class='autor_link' href='https://www.relogiodagua.pt/autor/min-jin-lee/'>Min Jin Lee</a><div class='w-grid-item post-1 product'><a class='autor_link' href='https://www.relogiodagua.pt/autor/jane-austen/'>Jane Austen</a></div></main>`;
+  assert.equal(pageAuthors(html), "Min Jin Lee");
 });

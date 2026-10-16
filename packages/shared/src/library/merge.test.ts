@@ -66,3 +66,11 @@ test("an ISBN-less existing book pairs with one of two different-ISBN imports an
   assert.equal(merged[0]!.ContentID, "b");
   assert.equal(merged[1]!.ContentID, "c");
 });
+
+test("a re-import that carries its own genres drops the catalog marker", () => {
+  const existing = { Title: "Dune", Attribution: "Frank Herbert", ISBN: "9780441013593", _genres: ["Science Fiction"], _genresFrom: "catalog" };
+  const incoming = { Title: "Dune", Attribution: "Frank Herbert", ISBN: "9780441013593", _genres: ["Fantasy"] };
+  const merged = mergeBookLists([existing], [incoming]);
+  assert.deepEqual(merged[0]!._genres, ["Fantasy"]);
+  assert.equal("_genresFrom" in merged[0]!, false);
+});

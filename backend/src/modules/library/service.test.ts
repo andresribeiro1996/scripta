@@ -1865,14 +1865,15 @@ test("a public library view of the 10 MiB fixture never parses the document and 
   const token = fileService.share("fixture-public").shareToken!;
   const parsed = mock.method(JSON, "parse");
   try {
-    const started = performance.now();
+    const started = process.threadCpuUsage();
     const shared = fileService.getPublicByToken(token);
     const profile = resolvePublicLibrary("fixture-public");
-    const elapsed = performance.now() - started;
+    const cpu = process.threadCpuUsage(started);
+    const elapsed = (cpu.user + cpu.system) / 1000;
     assert.equal((shared!.data as { books: unknown[] }).books.length, 5000);
     assert.equal((profile!.books as unknown[]).length, 5000);
     assert.ok(parsed.mock.calls.every((call) => String(call.arguments[0]).length < 100_000), "no call parses the document");
-    assert.ok(elapsed < PUBLIC_VIEW_BUDGET_MS, `both views took ${Math.round(elapsed)} ms`);
+    assert.ok(elapsed < PUBLIC_VIEW_BUDGET_MS, `both views took ${Math.round(elapsed)} ms of CPU`);
   } finally {
     parsed.mock.restore();
     createSqliteLibraryRepository(fileDb).deleteUserData("fixture-public");
@@ -2123,4 +2124,15 @@ test("merging duplicates moves the reader card's chosen book and highlight to th
   const style = service.getReaderCardStyle("u1");
   assert.equal(style.signature?.bookKey, bookKey(kept));
   assert.equal(style.highlight?.bookKey, bookKey(kept));
+});
+
+test("every library document answer carries the catalog genres of each copy's work", () => {
+  const byWork = new Map([["w-Dune", { genres: ["Science Fiction"], possibleGenres: ["Classics"] }]]);
+  const service = createLibraryService(createSqliteLibraryRepository(memoryDb()), () => "", 10_000_000, undefined, undefined, undefined, undefined, titleWorks, (ids) => new Map(ids.map((id) => [id, id])), (ids) => new Map(ids.flatMap((id) => (byWork.has(id) ? [[id, byWork.get(id)!]] : []))));
+  const saved = service.saveLibrary("u1", { books: [{ Title: "Dune", Attribution: "Frank Herbert" }, { Title: "Orlando", Attribution: "Virginia Woolf" }] });
+  const genres = { "ta:dune|frank herbert": ["Science Fiction", "Classics"] };
+  assert.deepEqual(saved.genres, genres);
+  assert.deepEqual(service.getLibraryText("u1")!.genres, genres);
+  assert.deepEqual(service.getLibrary("u1")!.genres, genres);
+  assert.deepEqual(service.share("u1").genres, genres);
 });

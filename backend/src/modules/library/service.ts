@@ -3,13 +3,13 @@
 // modules/auth/service.ts.
 
 import { createHash, randomUUID } from "node:crypto";
-import { applyLibraryChange, bookKey, bookMatchKeys, buildManualBook, calculateShelfTheme, eligiblePassages, isCertainMatch, isFinishedBook, isGroup, localDay, mergeDuplicateBooks, normalizeIsbn, normalizeReaderCardStyle, publicReaderCardOf, readerIdentity, rekeyReaderCardStyle, seedCoverLookup, setReadStatus, type CoverLookupParams, type IdentityKey, type LibraryChange, type LibraryChangeAnswer, type LibraryData, type ReaderCardStyle, type ReaderCardStylePatch } from "@scripta/shared";
+import { applyLibraryChange, bookKey, bookMatchKeys, buildManualBook, calculateShelfTheme, eligiblePassages, isCertainMatch, isFinishedBook, isGroup, localDay, mergeDuplicateBooks, normalizeIsbn, normalizeReaderCardStyle, publicReaderCardOf, readerIdentity, rekeyReaderCardStyle, seedCoverLookup, setReadStatus, type CoverLookupParams, type IdentityKey, type LibraryChange, type LibraryChangeAnswer, type LibraryData, type ReaderCardStyle, type ReaderCardStylePatch, type WorkGenres } from "@scripta/shared";
 import type { BookRecommendationInput } from "@scripta/shared/community";
 import { BOOK_EVENTS_PER_SAVE, COVER_URL_MAX_LENGTH, DISPLAY_TEXT_MAX_LENGTH, LIBRARY_MATCH_BOOK_CAP, LIBRARY_PUT_HEADROOM_BYTES, LIBRARY_ROWS_VERSION, MATCH_KEY_MAX_LENGTH } from "./domain/constants.js";
 import { InvalidReaderCardChoiceError, LibraryChangeNotFoundError, LibraryConflictError, LibraryTooLargeError, NoLibraryDocumentError } from "./domain/errors.js";
 import type { LibraryRepository } from "./domain/ports.js";
 import type { LibraryBookRow, LibraryBookRows, LibraryDerived, LibraryDocument, LibraryDocumentRow, LibraryDocumentText, LibraryHighlightRow, LibraryMatchKeyRow, LibraryRows, LibrarySmallSave } from "./domain/types.js";
-import { canonicalWorks as canonicalCatalogWorks, resolveWorks as resolveCatalogWorks } from "../books/index.js";
+import { canonicalWorks as canonicalCatalogWorks, catalogGenres as catalogCatalogGenres, resolveWorks as resolveCatalogWorks } from "../books/index.js";
 import { canonicalWorkIds, WorkResolutionError } from "./works.js";
 import { libraryParts, resolvePublicLibrary, toReaderGroups } from "./publicResolver.js";
 
@@ -249,27 +249,30 @@ function seriesGroupChanged(before: LibraryData, after: LibraryData): boolean {
   return (after.groups ?? []).some((group, i) => group !== before.groups?.[i] && isGroup(group) && group.type === "series");
 }
 
-function toLibraryDocument(row: LibraryDocumentRow, publicUrlFor: (token: string) => string, works: Record<string, string>): LibraryDocument {
+type DocumentCatalog = { works: Record<string, string>; genres: Record<string, string[]> };
+
+function toLibraryDocument(row: LibraryDocumentRow, publicUrlFor: (token: string) => string, catalog: DocumentCatalog): LibraryDocument {
   return {
     data: JSON.parse(row.data),
     updatedAt: row.updated_at,
     shareToken: row.share_token,
     shareUrl: row.share_token ? publicUrlFor(row.share_token) : null,
-    works
+    ...catalog
   };
 }
 
-function toLibraryDocumentText(row: LibraryDocumentRow, publicUrlFor: (token: string) => string, works: Record<string, string>): LibraryDocumentText {
+function toLibraryDocumentText(row: LibraryDocumentRow, publicUrlFor: (token: string) => string, catalog: DocumentCatalog): LibraryDocumentText {
   return {
     data: row.data,
     updatedAt: row.updated_at,
     shareToken: row.share_token,
     shareUrl: row.share_token ? publicUrlFor(row.share_token) : null,
-    works
+    ...catalog
   };
 }
 
 export type CanonicalWorks = (ids: string[]) => Map<string, string>;
+export type CatalogGenres = (workIds: string[]) => Map<string, WorkGenres>;
 
 export interface LibraryService {
   getLibrary(userId: string): LibraryDocument | null;
@@ -307,7 +310,7 @@ function coverLookupsOf(data: unknown): CoverLookupParams[] {
   return books.filter(isRecord).flatMap((book) => seedCoverLookup(book) ?? []);
 }
 
-export function createLibraryService(repo: LibraryRepository, publicUrlFor: (token: string) => string, maxDocumentBytes: number, emitBookEvents?: EmitBookEvents, enqueueCovers?: EnqueueCovers, rekeyBooks?: RekeyBooks, logError?: LogError, resolveWorks: ResolveWorks = resolveCatalogWorks, canonicalWorks: CanonicalWorks = canonicalCatalogWorks): LibraryService {
+export function createLibraryService(repo: LibraryRepository, publicUrlFor: (token: string) => string, maxDocumentBytes: number, emitBookEvents?: EmitBookEvents, enqueueCovers?: EnqueueCovers, rekeyBooks?: RekeyBooks, logError?: LogError, resolveWorks: ResolveWorks = resolveCatalogWorks, canonicalWorks: CanonicalWorks = canonicalCatalogWorks, catalogGenres: CatalogGenres = catalogCatalogGenres): LibraryService {
   const logSkipped = logError ?? ((error: unknown, message: string) => console.error(message, error));
 
   function rowsOf(userId: string, data: unknown): LibraryRows {
@@ -344,6 +347,21 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
     const works: Record<string, string> = {};
     for (const row of rows) works[row.book_key] ??= canonical.get(row.work_id) ?? row.work_id;
     return works;
+  }
+
+  function genresOf(works: Record<string, string>): Record<string, string[]> {
+    const byWork = catalogGenres([...new Set(Object.values(works))]);
+    const genres: Record<string, string[]> = {};
+    for (const [key, workId] of Object.entries(works)) {
+      const work = byWork.get(workId);
+      if (work) genres[key] = [...work.genres, ...work.possibleGenres];
+    }
+    return genres;
+  }
+
+  function catalogOf(userId: string): DocumentCatalog {
+    const works = worksOf(userId);
+    return { works, genres: genresOf(works) };
   }
 
   function workOfUser(userId: string): (book: Record<string, unknown>) => string | null {
@@ -391,13 +409,13 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
     getLibrary(userId) {
       const row = repo.getDocument(userId);
       if (!row) return null;
-      return toLibraryDocument(row, publicUrlFor, worksOf(userId));
+      return toLibraryDocument(row, publicUrlFor, catalogOf(userId));
     },
 
     getLibraryText(userId) {
       const row = repo.getDocument(userId);
       if (!row) return null;
-      return toLibraryDocumentText(row, publicUrlFor, worksOf(userId));
+      return toLibraryDocumentText(row, publicUrlFor, catalogOf(userId));
     },
 
     saveLibrary(userId, input, expectedUpdatedAt, source) {
@@ -405,17 +423,17 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
       const previous = source === "import" ? undefined : repo.getDocument(userId);
       const row = repo.upsertDocument(userId, JSON.stringify(data), deriveLibraryData(data), rowsWithWorks(userId, data), expectedUpdatedAt);
       if (!row) throw new LibraryConflictError();
-      const works = worksOf(userId);
+      const catalog = catalogOf(userId);
       if (previous !== undefined && emitBookEvents) {
         try {
-          const events = diffBookEvents(JSON.parse(previous.data), data, (book) => works[bookKey(book)] ?? null).slice(0, BOOK_EVENTS_PER_SAVE);
+          const events = diffBookEvents(JSON.parse(previous.data), data, (book) => catalog.works[bookKey(book)] ?? null).slice(0, BOOK_EVENTS_PER_SAVE);
           if (events.length > 0) emitBookEvents(userId, events);
         } catch (error) {
           logError?.(error, "book events failed after a library save");
         }
       }
       if (source === "import" && enqueueCovers) enqueueCovers(coverLookupsOf(data));
-      return toLibraryDocumentText(row, publicUrlFor, works);
+      return toLibraryDocumentText(row, publicUrlFor, catalog);
     },
 
     addBook(userId, input) {
@@ -486,7 +504,7 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
       if (!row) throw new NoLibraryDocumentError();
       const library = parseStoredLibrary(row);
       const next = mergeDuplicateBooks(library, keep, merge);
-      if (next === library) return toLibraryDocumentText(row, publicUrlFor, worksOf(userId));
+      if (next === library) return toLibraryDocumentText(row, publicUrlFor, catalogOf(userId));
       if (row.updated_at !== expectedUpdatedAt) throw new LibraryConflictError();
       const json = serializeWithinLimit(next);
       const present = new Set(library.books.filter(isRecord).map(bookKey));
@@ -495,7 +513,7 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
       if (fromKeys.length > 0) rekeyStyle(userId, fromKeys, keep);
       const saved = repo.upsertDocument(userId, json, deriveLibraryData(next), rowsWithWorks(userId, next), row.updated_at);
       if (!saved) throw new LibraryConflictError();
-      return toLibraryDocumentText(saved, publicUrlFor, worksOf(userId));
+      return toLibraryDocumentText(saved, publicUrlFor, catalogOf(userId));
     },
 
     applyChange(userId, input) {
@@ -531,7 +549,7 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
     share(userId) {
       const existing = repo.getDocument(userId);
       if (!existing) throw new NoLibraryDocumentError();
-      if (existing.share_token) return toLibraryDocument(existing, publicUrlFor, worksOf(userId));
+      if (existing.share_token) return toLibraryDocument(existing, publicUrlFor, catalogOf(userId));
 
       const row = repo.setShareToken(userId, randomUUID());
       // Can only be undefined if the row vanished between the getDocument
@@ -539,7 +557,7 @@ export function createLibraryService(repo: LibraryRepository, publicUrlFor: (tok
       // documents, so this is unreachable in practice, but keeps the
       // return type honest rather than asserting non-null.
       if (!row) throw new NoLibraryDocumentError();
-      return toLibraryDocument(row, publicUrlFor, worksOf(userId));
+      return toLibraryDocument(row, publicUrlFor, catalogOf(userId));
     },
 
     unshare(userId) {
