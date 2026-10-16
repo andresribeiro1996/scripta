@@ -760,5 +760,5 @@ Goes into the batch runbook. Run it after the mojibake repair, one job at a time
 - **Edições Afrontamento** (1,207): one `<p class="product-autor">` per page, e.g. "Vincenzo Russo e Sabrina Sedlmayer (orgs.)". Splitting on " e " is unsafe ("Melo e Castro"), and "(orgs.)" must be dropped. Related cards use `card-autor`.
 - **Saída de Emergência** (888): the main product links `/autor/<slug>/` without `autor_link`. Its `class="autor"` belongs to related cards.
 - **Exclamação, Kathartika, Divergência, Orfeu Negro, Pato Lógico:** no author found in the feed or page markup sampled.
-- **Relógio d'Água file-name ISBNs:** most Relógio products get their ISBN from the image file name, so the importer never reads their page and they stay authorless. Reading the page only for those whose stored row has no author would add up to ~1,951 requests at the shop's throttle, which this plan ruled out.
+- **Relógio d'Água file-name ISBNs:** most Relógio products get their ISBN from the image file name, so the importer never reads their page and they stay authorless. Done by the follow-up that reads the page only for feed-ISBN books whose stored row has no author (`authorPages`).
 - **ISBNdb** is an existing source that could cover what shops can't, against its daily quota. Decide after step 5's counts.
