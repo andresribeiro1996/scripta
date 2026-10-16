@@ -65,6 +65,7 @@ function reviewError(root, run, base, treeChanged, failure) {
 
 function main() {
   const args = parseReviewArgs(process.argv.slice(2));
+  const configModel = configuredModel(codexConfig());
   const root = git(process.cwd(), ["rev-parse", "--show-toplevel"]);
   const spec = repoPath(root, args.spec);
   const plan = args.plan && repoPath(root, args.plan);
@@ -100,7 +101,7 @@ function main() {
     error = reviewError(root, run, base, treeChanged, codexFailure(jsonl));
   }
   const streamed = codexUsage(jsonl);
-  const usage = { ...streamed, model: streamed.model ?? configuredModel(codexConfig()) };
+  const usage = { ...streamed, model: streamed.model ?? configModel };
 
   let result = null;
   if (!error) {
