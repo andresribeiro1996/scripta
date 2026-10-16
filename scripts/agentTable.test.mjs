@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { invariantProblems, parseAgentsFile, renderTable, replaceBlock } from "./agentTable.mjs";
+import { invariantProblems, parseAgentsFile, renderTable, replaceBlock, rootClaudeMdProblems } from "./agentTable.mjs";
 
 const BACKEND = `# Backend
 
@@ -171,4 +171,16 @@ test("invariantProblems reports a missing opencode.json entry", () => {
   });
   assert.equal(problems.length, 1);
   assert.match(problems[0], /opencode\.json/);
+});
+
+test("rootClaudeMdProblems is silent when the first line is the @AGENTS.md import", () => {
+  assert.deepEqual(rootClaudeMdProblems("@AGENTS.md\n\n# Subagents\n"), []);
+});
+
+test("rootClaudeMdProblems reports a first line that is not exactly @AGENTS.md", () => {
+  for (const text of ["# Subagents\n@AGENTS.md\n", " @AGENTS.md\n", "@AGENTS.md \n", "@./AGENTS.md\n", ""]) {
+    const problems = rootClaudeMdProblems(text);
+    assert.equal(problems.length, 1, JSON.stringify(text));
+    assert.match(problems[0], /@AGENTS\.md/);
+  }
 });

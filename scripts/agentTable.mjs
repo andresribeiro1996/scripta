@@ -72,6 +72,11 @@ export function invariantProblems({ dir, claudeMd, instructions }) {
   return problems;
 }
 
+export function rootClaudeMdProblems(text) {
+  if (text.split("\n")[0] === "@AGENTS.md") return [];
+  return ["the root CLAUDE.md's first line must be exactly @AGENTS.md — without it no Claude session reads AGENTS.md"];
+}
+
 export function renderTable(rows) {
   return rows
     .map(({ dir, what, commands }) => {

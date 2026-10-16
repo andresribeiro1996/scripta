@@ -37,7 +37,7 @@ function packageAgentsFor(top) {
 
 function agentsFor(file) {
   if (ROOT_MANIFESTS.has(file)) return AGENTS_ORDER;
-  if (file === "AGENTS.md" || file === "opencode.json") return ["AGENTS.md"];
+  if (file === "AGENTS.md" || file === "CLAUDE.md" || file === "opencode.json") return ["AGENTS.md"];
   const [top, ...rest] = file.split("/");
   if (rest.length === 0) return [];
   const agentConfig = rest.length === 1 && AGENT_CONFIG.has(rest[0]) ? ["AGENTS.md"] : [];
