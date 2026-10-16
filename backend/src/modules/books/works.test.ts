@@ -195,6 +195,6 @@ test("getWorkPage leaves out hidden summaries and keeps the rest", () => {
   const page = getWorkPageWith(repo, (id) => id, book.work_id!)!;
   assert.equal(page.summary, "Spice must flow.");
   assert.equal(page.editions[0]!.summary, null);
-  judge("Spice must flow.", 0.2);
+  judge("Spice must flow.", 0.1);
   assert.equal(getWorkPageWith(repo, (id) => id, book.work_id!)!.summary, null);
 });

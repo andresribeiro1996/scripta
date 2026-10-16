@@ -58,8 +58,8 @@ test("the score counts labelled not-usable texts per decision band", () => {
   const answers = [{ hash: "a", usable: 0.1, kind: "praise" }, { hash: "b", usable: 0.2, kind: "synopsis" }, { hash: "c", usable: 0.4, kind: "author_bio" }, { hash: "d", usable: 0.9, kind: "synopsis" }];
   assert.deepEqual(scoreSynopses(sample, labels, answers), [
     { decision: "rule", items: 1, notUsable: 1 },
-    { decision: "jev below 0.3", items: 2, notUsable: 1 },
-    { decision: "jev 0.3 to 0.5", items: 1, notUsable: 1 },
+    { decision: "jev below 0.15", items: 1, notUsable: 1 },
+    { decision: "jev 0.15 to 0.5", items: 2, notUsable: 1 },
     { decision: "jev 0.5 and above", items: 1, notUsable: 0 }
   ]);
 });
