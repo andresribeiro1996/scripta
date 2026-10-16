@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { feedProducts, feedUrl, findPageIsbn, findPortugalIsbn, isDisallowed, parseRobots, parseShopifyProducts, parseWooProducts, withPageText } from "./publisherFeed.js";
+import { feedProducts, feedUrl, findPageIsbn, findPortugalIsbn, isDisallowed, pageAuthors, parseRobots, parseShopifyProducts, parseWooProducts, withPageText } from "./publisherFeed.js";
 import type { PublisherSite } from "./publishers.js";
 
 const shopify = JSON.parse(readFileSync(new URL("./fixtures/shopify-products.json", import.meta.url), "utf8"));
@@ -399,4 +399,61 @@ test("the original title is captured while its line stays out of the synopsis", 
   assert.equal(wooDetails({ description: `<p>${SYNOPSIS}</p>` }).originalTitle, null);
   assert.equal(withPageText({ summary: null, pages: null, year: null, translator: null, originalTitle: null }, "<p>Título original: Solaris</p>").originalTitle, "Solaris");
   assert.equal(withPageText({ summary: null, pages: null, year: null, translator: null, originalTitle: "Kept" }, "<p>Título original: Solaris</p>").originalTitle, "Kept");
+});
+
+const presenca: PublisherSite = { name: "Presença", origin: "https://www.presenca.pt", platform: "shopify", authorFromVendor: false, authorTag: /^NOMEAUTOR_(.+)$/ };
+const presencaWithoutTag: PublisherSite = { name: "Presença", origin: "https://www.presenca.pt", platform: "shopify", authorFromVendor: false };
+
+function presencaFeed(tags: string[]) {
+  return { products: [{ title: "Ultimate Football Heroes", handle: "ultimate-football-heroes", vendor: "Presença", tags, variants: [{ barcode: "9789897833199" }], images: [{ src: "https://cdn.shopify.com/s/files/1/0000/0000/files/heroes.jpg" }] }] };
+}
+
+test("a Shopify product takes its authors from the site's author tags", () => {
+  const [book] = parseShopifyProducts(presencaFeed(["AUTOR_dan-leydon_Dan Leydon", "EDITORA_Presença", "NOMEAUTOR_Dan Leydon", "NOMEAUTOR_Matt Oldfield"]), presenca);
+  assert.equal(book!.author, "Dan Leydon, Matt Oldfield");
+});
+
+test("a Shopify product with no author tag has no author", () => {
+  const [book] = parseShopifyProducts(presencaFeed(["EDITORA_Jacarandá", "TIPO_BOOK"]), presenca);
+  assert.equal(book!.author, null);
+});
+
+test("author tags count only on a site that names its tag pattern", () => {
+  const [book] = parseShopifyProducts(presencaFeed(["NOMEAUTOR_Dan Leydon"]), presencaWithoutTag);
+  assert.equal(book!.author, null);
+});
+
+const PACHINKO_PAGE = `<html><head><style>.w-grid-item{padding:0}</style></head><body>
+<header><a class='autor_link' href='https://www.relogiodagua.pt/autor/menu/'>Menu Autor</a></header>
+<main id="page-content">
+<div class="wpb_wrapper"><a class='autor_link' href='https://www.relogiodagua.pt/autor/min-jin-lee/'>Min Jin Lee</a></div>
+<h1 class="w-post-elm post_title entry-title">Pachinko</h1>
+<div class="produto_traducao"><span class="w-post-elm-before">Tradução: </span><span class="w-post-elm-value">Marta Mendonça</span></div>
+<p>ISBN: 978-989-783-319-9</p>
+<div class="w-grid-item post-7722 product"><div class="w-grid-item-h"><a class='autor_link' href='https://www.relogiodagua.pt/autor/vladimir-nabokov/'>Vladimir Nabokov</a></div></div>
+</main>
+<footer><a class='autor_link' href='https://www.relogiodagua.pt/autor/rodape/'>Rodapé</a></footer>
+</body></html>`;
+
+test("pageAuthors takes the main product's author and none from the menu, related products or footer", () => {
+  assert.equal(pageAuthors(PACHINKO_PAGE), "Min Jin Lee");
+});
+
+test("pageAuthors keeps every author once and skips translator links", () => {
+  const html = `<main><h1>Aristóteles</h1><a class='autor_link' href='https://www.gradiva.pt/autor/tassos-apostolidis/'>Tassos Apostolidis</a>, <a class='autor_link' href='https://www.gradiva.pt/autor/alecos-papadatos/'>Alecos Papadatos</a> <a class='autor_link' href='https://www.gradiva.pt/tradutor/jorge-vaz-de-carvalho/'>Jorge Vaz de Carvalho</a><h1>Aristóteles</h1><a class='autor_link' href='https://www.gradiva.pt/autor/tassos-apostolidis/'>Tassos Apostolidis</a></main>`;
+  assert.equal(pageAuthors(html), "Tassos Apostolidis, Alecos Papadatos");
+});
+
+test("pageAuthors reads /autores/ links and decodes entities in names", () => {
+  const html = `<main><h1>Os Intrusos</h1><a class='autor_link' href='https://penguinlivros.pt/autores/edna-obrien-2/'>Edna O&#8217;Brien</a></main>`;
+  assert.equal(pageAuthors(html), "Edna O’Brien");
+});
+
+test("pageAuthors finds nothing when only related products have author links", () => {
+  const html = `<main><h1>Saco de Pano</h1><div class="w-grid-item post-1 product"><a class='autor_link' href='https://www.relogiodagua.pt/autor/jane-austen/'>Jane Austen</a></div></main>`;
+  assert.equal(pageAuthors(html), null);
+});
+
+test("pageAuthors finds nothing on a page without a main element", () => {
+  assert.equal(pageAuthors(`<body><a class='autor_link' href='https://www.relogiodagua.pt/autor/a/'>Alguém</a></body>`), null);
 });
