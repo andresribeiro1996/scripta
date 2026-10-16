@@ -29,6 +29,7 @@ The table below is generated from those files — edit each package's own `AGENT
 | `viewer/` | Static single-file HTML | none |
 <!-- END agent-table -->
 
-Run `typecheck` and `lint` after changes in that package. Verify with tests before claiming done: `node scripts/gate.mjs` runs every Verify command a change needs, from each package's `AGENTS.md` and the line below.
+Run `typecheck` and `lint` after changes in that package. Verify with tests before claiming done: `node scripts/gate.mjs` runs every Verify command a change needs, from each package's `AGENTS.md` and the lines below.
 
 - Verify: `npm run test:scripts` (changes under `scripts/`)
+- Verify: `npm run check:agents` (changes to `AGENTS.md`, `opencode.json`, or a `<dir>/AGENTS.md` or `<dir>/CLAUDE.md`)

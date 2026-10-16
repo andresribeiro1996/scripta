@@ -78,6 +78,14 @@ test("agentsFilesFor maps each file to the AGENTS.md that governs it", () => {
   );
 });
 
+test("agentsFilesFor sends agent instruction files to the root AGENTS.md", () => {
+  for (const file of ["AGENTS.md", "opencode.json", "viewer/AGENTS.md", "exporter/CLAUDE.md"]) {
+    assert.deepEqual(agentsFilesFor([file]), ["AGENTS.md"], file);
+  }
+  assert.deepEqual(agentsFilesFor(["backend/CLAUDE.md"]), ["backend/AGENTS.md", "AGENTS.md"]);
+  assert.deepEqual(agentsFilesFor(["docs/notes/AGENTS.md", "viewer/docs/CLAUDE.md"]), []);
+});
+
 test("a shared package change checks every consumer too", () => {
   assert.deepEqual(agentsFilesFor(["packages/shared/src/library/a.ts"]), [
     "packages/AGENTS.md",

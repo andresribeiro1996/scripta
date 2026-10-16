@@ -1,6 +1,7 @@
 const AGENTS_ORDER = ["packages/AGENTS.md", "backend/AGENTS.md", "frontend/AGENTS.md", "mobile/AGENTS.md", "AGENTS.md"];
 const APPS = ["backend", "frontend", "mobile"];
 const ROOT_MANIFESTS = new Set(["package.json", "package-lock.json"]);
+const AGENT_CONFIG = new Set(["AGENTS.md", "CLAUDE.md"]);
 const FILE_LINE = /^- (Create|Modify|Test|Delete):/;
 
 export function parseGateArgs(argv) {
@@ -27,14 +28,20 @@ export function parseVerifyCommands(text) {
   });
 }
 
-function agentsFor(file) {
-  if (ROOT_MANIFESTS.has(file)) return AGENTS_ORDER;
-  const [top, ...rest] = file.split("/");
-  if (rest.length === 0) return [];
+function packageAgentsFor(top) {
   if (top === "packages") return ["packages/AGENTS.md", ...APPS.map((dir) => `${dir}/AGENTS.md`)];
   if (APPS.includes(top)) return [`${top}/AGENTS.md`];
   if (top === "scripts") return ["AGENTS.md"];
   return [];
+}
+
+function agentsFor(file) {
+  if (ROOT_MANIFESTS.has(file)) return AGENTS_ORDER;
+  if (file === "AGENTS.md" || file === "opencode.json") return ["AGENTS.md"];
+  const [top, ...rest] = file.split("/");
+  if (rest.length === 0) return [];
+  const agentConfig = rest.length === 1 && AGENT_CONFIG.has(rest[0]) ? ["AGENTS.md"] : [];
+  return [...agentConfig, ...packageAgentsFor(top)];
 }
 
 export function agentsFilesFor(changedFiles) {
