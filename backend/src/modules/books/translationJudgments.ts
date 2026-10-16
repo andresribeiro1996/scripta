@@ -2,7 +2,7 @@ import { createJevMatchClassifier, type ClassifyMatch } from "./adapters/typesaf
 import { startDetailsBackfill } from "./backfill.js";
 import { WorkMergeError } from "./domain/errors.js";
 import type { BooksRepository } from "./domain/ports.js";
-import { authorPattern, evidenceOf, MATCH_MERGE_AT, MAX_CANDIDATES, mentionsSurname, sameMainTitle, surnameOf, titlePattern, type TranslationEvidence } from "./domain/translation.js";
+import { authorPattern, evidenceOf, hasVolumeMarker, MATCH_MERGE_AT, MAX_CANDIDATES, mentionsSurname, sameMainTitle, surnameOf, titlePattern, type TranslationEvidence } from "./domain/translation.js";
 import { JEV_REJECTION_LIMIT } from "./synopsisJudgments.js";
 import { dailySpend, failureKind, nextUtcMidnight, strikeReason } from "./typesafe.js";
 import { createWorkQueue } from "./workQueue.js";
@@ -22,7 +22,7 @@ export function planMatch(repo: PlanRepo, workId: string): MatchPlan | null {
   const byAuthorPattern = authorPattern(evidence.workAuthor || evidence.author);
   const byAuthor = byAuthorPattern ? repo.authorCandidates(byAuthorPattern).filter((id) => id !== workId && !byTitle.includes(id)) : [];
   if (byTitle.length === 0 && byAuthor.length === 0) return { kind: "none" };
-  if (byTitle.length === 1) {
+  if (byTitle.length === 1 && !hasVolumeMarker(evidence.originalTitle ?? "")) {
     const [only] = repo.matchCandidates(byTitle);
     const surname = only ? surnameOf(only.author) : null;
     if (only && surname && mentionsSurname([evidence.workAuthor, evidence.author, ...evidence.summaries], surname)) return { kind: "code", intoWorkId: only.id };

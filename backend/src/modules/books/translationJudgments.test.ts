@@ -219,3 +219,12 @@ test("a queued work stores the original title its summary names before it is mat
   await judgeWorkMatch({ ...deps, heldWorkIds: () => [pt.work_id!] }, pt.work_id!);
   assert.equal(repo.getBook(pt.id)!.original_title, "Solaris");
 });
+
+test("a series volume's original title never settles in code on the series' first book", () => {
+  const repo = freshRepo();
+  const first = edition(repo, "9780062059932", { title: "The Selection", author: "Kiera Cass", workKey: "OL995W" });
+  const pt = edition(repo, "9789722349938", { title: "A Elite", author: "", language: "pt-PT", originalTitle: "The Selection: The Elite (Book 2)", summary: "O segundo livro da série de Kiera Cass, com as seis raparigas que restam no palácio." });
+  const plan = planMatch(repo, pt.work_id!);
+  assert.equal(plan?.kind, "ask");
+  assert.deepEqual(plan?.kind === "ask" ? plan.candidates.map((candidate) => candidate.id) : null, [first.work_id]);
+});

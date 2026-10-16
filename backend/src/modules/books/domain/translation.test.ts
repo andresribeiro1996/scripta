@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { authorPattern, evidenceOf, isPortuguese, mainTitle, mentionsSurname, originalTitleIn, sameMainTitle, surnameOf, titlePattern } from "./translation.js";
+import { authorPattern, evidenceOf, hasVolumeMarker, isPortuguese, mainTitle, mentionsSurname, originalTitleIn, sameMainTitle, surnameOf, titlePattern } from "./translation.js";
 
 test("originalTitleIn reads the labelled value to the end of its line", () => {
   assert.equal(originalTitleIn("Uma sinopse.\n\nTítulo original: Les Misérables"), "Les Misérables");
@@ -57,4 +57,13 @@ test("evidence takes each field from the oldest edition that has it, and reads o
     ]
   });
   assert.deepEqual(evidence, { workId: "w", title: "O Passeio", author: "Robert Walser", workAuthor: "Robert Walser", publisher: "Relógio d'Água", summary: "Um passeio.\n\nTítulo original: Der Spaziergang", originalTitle: "Der Spaziergang", summaries: ["Um passeio.\n\nTítulo original: Der Spaziergang", "Outra sinopse."] });
+});
+
+test("a volume marker is found wherever the catalog's title key would drop it", () => {
+  for (const title of ["The Selection: The Elite (Book 2)", "The Selection: The One (book3)", "The Selection #2", "Saga, Vol. 2", "A Seleção - Livro 2", "Dune: Book Two", "Les Rois maudits, tome IV", "Volume One"]) {
+    assert.equal(hasVolumeMarker(title), true, title);
+  }
+  for (const title of ["To the Lighthouse: A Novel", "The Book Thief", "1984", "Fahrenheit 451", "The Book of Two Ways", "C# in Depth", "A Civil Action"]) {
+    assert.equal(hasVolumeMarker(title), false, title);
+  }
 });
