@@ -134,3 +134,7 @@ export function feedShareTarget(item: DigestItem): string | null {
 export function hasActivityThread(item: DigestItem): boolean {
   return item.kind !== "participation" && item.kind !== "completion" && item.kind !== "follow" && !item.id.startsWith("saved:");
 }
+
+export function reactionCount(count: number | undefined): string | null {
+  return count === undefined ? "…" : count === 0 ? null : String(count);
+}
