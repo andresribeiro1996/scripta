@@ -6,7 +6,7 @@ import { MIN_GOOD_WIDTH } from "./domain/constants.js";
 import { BookNotFoundError, FileTooLargeError, InvalidImageError, SourcePausedError, SourceUnavailableError, WorkMergeError } from "./domain/errors.js";
 import { coverColor, encodeCover, type EncodedCover } from "./domain/images.js";
 import { hiddenSynopsisHashes } from "./domain/synopsis.js";
-import { findExisting, findOrCreateBook, keysOf } from "./domain/findOrCreate.js";
+import { fillMissingIdentity, findExisting, findOrCreateBook, keysOf } from "./domain/findOrCreate.js";
 import { firstEditionPerWork, workIdsOf } from "./domain/workSearch.js";
 import { editionLanguage, findByIdentity, isPortugueseIsbn, lookupIdentity, SEARCH_LIMIT, searchTokens, WORK_SCAN_LIMIT, WORK_SEARCH_LIMIT, type BookIdentity, type BookLookup } from "./domain/normalize.js";
 import { summaryMatchesLanguage } from "./adapters/catalog/languageFilter.js";
@@ -177,7 +177,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
         keysOf(deps.repo, identity),
         now().toISOString()
       );
-      if (!book.title || !book.author) deps.repo.fillIdentity(book.id, identity.title, identity.author);
+      fillMissingIdentity(deps.repo, book, identity.title, identity.author);
       deps.repo.setWorkKey(book.id, workKey);
       deps.repo.makeSearchable(book.id);
       return { result: book.cover_image_id ? { ...result, coverUrl: deps.publicUrlFor(book.cover_image_id, "thumb") } : result, book: deps.repo.getBook(book.id) ?? book };

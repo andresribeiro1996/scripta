@@ -27,7 +27,7 @@ export type ResolvedBook = PublisherBook & { isbn: string; pageAuthor?: string |
 export const PAGE_RANK = 3;
 const AUTHOR_LINK = /<a\s+class=['"]autor_link['"]\s+href=['"]([^'"]*)['"][^>]*>([^<]+)<\/a>/g;
 const AUTHOR_PATH = /\/autor(?:es)?\//;
-const PRODUCT_END = /class="w-grid-item[\s"]|<\/main>/;
+const PRODUCT_END = /class=['"]w-grid-item[\s'"]|<\/main>/;
 const LABEL_REACH = 40;
 
 const ISBN_CANDIDATE = /(?<!\d)97[89](?:[\p{Pd}\s.]?\d){10}(?!\d)/gu;

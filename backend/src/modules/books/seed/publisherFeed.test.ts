@@ -457,3 +457,8 @@ test("pageAuthors finds nothing when only related products have author links", (
 test("pageAuthors finds nothing on a page without a main element", () => {
   assert.equal(pageAuthors(`<body><a class='autor_link' href='https://www.relogiodagua.pt/autor/a/'>Alguém</a></body>`), null);
 });
+
+test("pageAuthors stops at a single-quoted related-product card", () => {
+  const html = `<main><a class='autor_link' href='https://www.relogiodagua.pt/autor/min-jin-lee/'>Min Jin Lee</a><div class='w-grid-item post-1 product'><a class='autor_link' href='https://www.relogiodagua.pt/autor/jane-austen/'>Jane Austen</a></div></main>`;
+  assert.equal(pageAuthors(html), "Min Jin Lee");
+});

@@ -772,6 +772,14 @@ test("a search hit fills the author of a saved book that has a title but no auth
   assert.equal(h.repo.getBook(authorless.id)!.author, "Sophia de Mello Breyner Andresen");
 });
 
+test("a search hit that fills a saved book's author also claims its title key", async () => {
+  const hit = { result: { title: "Poemas", authors: ["Sophia de Mello Breyner Andresen"], year: null, isbn: "9789896414672", publisher: null, coverUrl: null, genres: [] }, olCoverId: null, source: "openlibrary" as const };
+  const h = harness({ catalog: recordingCatalog({ search: async () => [hit] }).catalog });
+  const authorless = h.repo.createBook({ title: "Poemas", author: "", isbn: "9789896414672" }, ["isbn:9789896414672"], "2026-10-01T00:00:00.000Z");
+  await h.service.searchExternal("poemas");
+  assert.equal(h.repo.findBookByKey("ta:poemas|sophia de mello breyner andresen|")?.id, authorless.id);
+});
+
 test("a search hit with mis-decoded text is saved repaired, under the keys made from the repaired text", async () => {
   const hit = { result: { title: "Entre a fÃ© e a crenÃ§a", authors: ["JosÃ© Silva"], year: null, isbn: "9780000000002", publisher: null, coverUrl: null, genres: [] }, olCoverId: null, source: "isbndb" as const };
   const h = harness({ catalog: recordingCatalog({ search: async () => [hit] }).catalog });
