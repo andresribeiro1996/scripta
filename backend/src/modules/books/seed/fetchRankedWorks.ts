@@ -20,6 +20,7 @@ function numFoundOf(json: unknown): number | undefined {
 
 function emptyBeforeTheEnd(json: unknown, offset: number, listSize: number | undefined): boolean {
   if (docsOf(json).length > 0) return false;
+  if (offset === 0) return true;
   if (listSize !== undefined) return offset < listSize;
   const { numFound, start } = (json && typeof json === "object" ? json : {}) as { numFound?: unknown; start?: unknown };
   return typeof numFound === "number" && typeof start === "number" && start < numFound;

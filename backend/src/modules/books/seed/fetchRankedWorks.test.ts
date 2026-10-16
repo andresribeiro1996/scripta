@@ -200,3 +200,21 @@ test("without a first-page numFound an empty page ends the list", async () => {
   assert.equal(attempts.get(1000), 1);
   assert.ok(lines.includes("eng: end of list at offset 1000 of unknown"));
 });
+
+test("retries an empty first page that reports numFound 0 and uses the next answer", async () => {
+  const attempts = scriptedOpenLibrary((offset, attempt) => {
+    if (offset > 0) return page([], offset, 1);
+    return attempt < 2 ? page([], 0, 0) : page([work("OL1W", 5, "9780306406157", ["eng"])], 0, 1);
+  });
+  const lines: string[] = [];
+  const entries = await settled(collectRanked("eng", 1, (line) => lines.push(line)));
+  assert.equal(attempts.get(0), 3);
+  assert.equal(entries.length, 1);
+  assert.equal(lines.filter((line) => line.includes("after empty page")).length, 2);
+});
+
+test("throws when the first page stays empty", async () => {
+  const attempts = scriptedOpenLibrary(() => bare([]));
+  await assert.rejects(settled(collectRanked("eng", 1, () => {})), /no results/);
+  assert.equal(attempts.get(0), 6);
+});
