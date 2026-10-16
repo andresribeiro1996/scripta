@@ -13,12 +13,19 @@ function docsOf(json: unknown): unknown[] {
   return Array.isArray(docs) ? docs : [];
 }
 
-function emptyBeforeTheEnd(json: unknown): boolean {
-  const { numFound, start } = (json && typeof json === "object" ? json : {}) as { numFound?: unknown; start?: unknown };
-  return docsOf(json).length === 0 && typeof numFound === "number" && typeof start === "number" && start < numFound;
+function numFoundOf(json: unknown): number | undefined {
+  const numFound = json && typeof json === "object" ? (json as { numFound?: unknown }).numFound : undefined;
+  return typeof numFound === "number" ? numFound : undefined;
 }
 
-async function fetchPage(url: string, log: (line: string) => void): Promise<unknown> {
+function emptyBeforeTheEnd(json: unknown, offset: number, listSize: number | undefined): boolean {
+  if (docsOf(json).length > 0) return false;
+  if (listSize !== undefined) return offset < listSize;
+  const { numFound, start } = (json && typeof json === "object" ? json : {}) as { numFound?: unknown; start?: unknown };
+  return typeof numFound === "number" && typeof start === "number" && start < numFound;
+}
+
+async function fetchPage(url: string, offset: number, listSize: number | undefined, log: (line: string) => void): Promise<unknown> {
   for (let attempt = 0; ; attempt++) {
     let failure: Error;
     let reason: string;
@@ -26,7 +33,7 @@ async function fetchPage(url: string, log: (line: string) => void): Promise<unkn
       const res = await fetch(url, { headers: { "User-Agent": USER_AGENT }, signal: AbortSignal.timeout(TIMEOUT_MS) });
       if (res.ok) {
         const json = await res.json();
-        if (!emptyBeforeTheEnd(json)) return json;
+        if (!emptyBeforeTheEnd(json, offset, listSize)) return json;
         failure = new Error(`Open Library returned no results before the end of the list for ${url}`);
         reason = "empty page";
       } else {
@@ -48,12 +55,18 @@ async function fetchPage(url: string, log: (line: string) => void): Promise<unkn
 async function collectPrefix(lang: SeedLanguage, wanted: number, isbnPrefix: string | undefined, log: (line: string) => void): Promise<SeedEntry[]> {
   const entries: SeedEntry[] = [];
   const isbns = new Set<string>();
+  const label = isbnPrefix ?? lang;
+  let listSize: number | undefined;
   for (let offset = 0; isbns.size < wanted * 1.1; offset += PAGE) {
-    const json = await throttle(() => fetchPage(rankedWorksUrl(lang, offset, PAGE, isbnPrefix), log));
-    if (docsOf(json).length === 0) break;
+    const json = await throttle(() => fetchPage(rankedWorksUrl(lang, offset, PAGE, isbnPrefix), offset, listSize, log));
+    if (offset === 0) listSize = numFoundOf(json);
+    if (docsOf(json).length === 0) {
+      log(`${label}: end of list at offset ${offset} of ${listSize ?? "unknown"}`);
+      break;
+    }
     const page = parseRankedWorks(json, lang, isbnPrefix);
     for (const entry of page) if (!isbns.has(entry.isbn)) { isbns.add(entry.isbn); entries.push(entry); }
-    log(`${isbnPrefix ?? lang}: offset ${offset}, ${isbns.size} unique`);
+    log(`${label}: offset ${offset}, ${isbns.size} unique`);
   }
   return entries;
 }

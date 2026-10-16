@@ -150,3 +150,53 @@ test("a page whose works are all filtered out does not end the list", async () =
   assert.deepEqual(entries.map((entry) => entry.isbn), ["9780306406164"]);
   assert.equal(attempts.get(1000), 1);
 });
+
+const bare = (docs: unknown[]) => new Response(JSON.stringify({ docs }), { status: 200 });
+
+test("retries a later empty page that reports numFound 0 while the first page said more exist", async () => {
+  const attempts = scriptedOpenLibrary((offset, attempt) => {
+    if (offset === 0) return page([work("OL1W", 5, "9780306406157", ["eng"])], 0, 5000);
+    if (offset === 1000) return attempt < 2 ? page([], 1000, 0) : page([work("OL2W", 4, "9780306406164", ["eng"])], 1000, 5000);
+    return page([], offset, 5000);
+  });
+  const lines: string[] = [];
+  const entries = await settled(collectRanked("eng", 1, (line) => lines.push(line)));
+  assert.equal(attempts.get(1000), 3);
+  assert.deepEqual(entries.map((entry) => entry.isbn), ["9780306406157", "9780306406164"]);
+  assert.equal(lines.filter((line) => line.includes("after empty page")).length, 2);
+});
+
+test("retries a later empty page that reports no numFound or start while the first page said more exist", async () => {
+  const attempts = scriptedOpenLibrary((offset, attempt) => {
+    if (offset === 0) return page([work("OL1W", 5, "9780306406157", ["eng"])], 0, 5000);
+    if (offset === 1000) return attempt < 1 ? bare([]) : page([work("OL2W", 4, "9780306406164", ["eng"])], 1000, 5000);
+    return page([], offset, 5000);
+  });
+  const entries = await settled(collectRanked("eng", 1, () => {}));
+  assert.equal(attempts.get(1000), 2);
+  assert.equal(entries.length, 2);
+});
+
+test("throws when a later empty page never fills before the first page's numFound", async () => {
+  const attempts = scriptedOpenLibrary((offset) => (offset === 0 ? page([work("OL1W", 5, "9780306406157", ["eng"])], 0, 5000) : bare([])));
+  await assert.rejects(settled(collectRanked("eng", 1, () => {})), /no results/);
+  assert.equal(attempts.get(1000), 6);
+});
+
+test("an empty page at or past the first page's numFound ends the list and says so", async () => {
+  const attempts = scriptedOpenLibrary((offset) => (offset === 0 ? page([work("OL1W", 5, "9780306406157", ["eng"])], 0, 1) : page([], offset, 5000)));
+  const lines: string[] = [];
+  const entries = await settled(collectRanked("eng", 100, (line) => lines.push(line)));
+  assert.equal(entries.length, 1);
+  assert.equal(attempts.get(1000), 1);
+  assert.ok(lines.includes("eng: end of list at offset 1000 of 1"));
+});
+
+test("without a first-page numFound an empty page ends the list", async () => {
+  const attempts = scriptedOpenLibrary((offset) => (offset === 0 ? bare([work("OL1W", 5, "9780306406157", ["eng"])]) : bare([])));
+  const lines: string[] = [];
+  const entries = await settled(collectRanked("eng", 100, (line) => lines.push(line)));
+  assert.equal(entries.length, 1);
+  assert.equal(attempts.get(1000), 1);
+  assert.ok(lines.includes("eng: end of list at offset 1000 of unknown"));
+});
