@@ -23,11 +23,11 @@ node scripts/gate.mjs [--plan <plan.md> --task <N>]
 
 Run from the worktree root, before committing. It looks at uncommitted and untracked changes against `HEAD` (`git diff --name-only HEAD` plus `git ls-files --others --exclude-standard`).
 
-**Checks.** Each changed file maps to the `AGENTS.md` that governs it: `backend/`, `frontend/`, `mobile/`, `packages/` → that directory's `AGENTS.md`; `scripts/` → the root `AGENTS.md`; a root `package.json` or `package-lock.json` → every package. Other paths (`docs/`, `.claude/`, `exporter/`, `viewer/`) add no checks. The gate runs each mapped file's Verify lines — any line starting `- Verify` and ending in a backticked command, which includes mobile's `- Verify Expo configuration: \`cd mobile && npx expo-doctor\`` — in file order, deduplicated across files, so `npm run build --workspace @scripta/shared` runs once and first. A Verify line whose command starts with `cd <dir> &&` runs in that directory.
+**Checks.** Each changed file maps to the `AGENTS.md` that governs it: `backend/`, `frontend/`, `mobile/` → that directory's `AGENTS.md`; `packages/` → its own `AGENTS.md` plus backend's, frontend's and mobile's, since they consume its `dist/`; `scripts/` → the root `AGENTS.md`; a root `package.json` or `package-lock.json` → all five. Other paths (`docs/`, `.claude/`, `exporter/`, `viewer/`) add no checks. The gate runs each mapped file's Verify lines — any line starting `- Verify`, whose first backticked span is the command, which includes mobile's `- Verify Expo configuration: \`cd mobile && npx expo-doctor\`` — in file order, deduplicated across files, so `npm run build --workspace @scripta/shared` runs once and first. A Verify line whose command starts with `cd <dir> &&` runs in that directory.
 
 The root `AGENTS.md` gets `- Verify: \`npm run test:scripts\``, so script changes are checked from the same source of truth as packages. `npm run check:agents` must still pass.
 
-**Scope.** With `--plan` and `--task N`, the gate reads task N's `**Files:**` list from the plan (`### Task N` heading through the next `### Task`; every backticked path on a `- Create:`, `- Modify:` or `- Test:` line, with any `:lines` suffix dropped). Every changed file must be on the list. Without `--plan`, no scope check runs and the report says so.
+**Scope.** With `--plan` and `--task N`, the gate reads task N's `**Files:**` list from the plan (`### Task N` heading through the next `### Task`; every backticked token on a `- Create:`, `- Modify:`, `- Test:` or `- Delete:` line that has no whitespace and contains a `/` or `.`, with any `:lines` suffix dropped — so a parenthetical like ``(add to `backend/package.json`'s `test` list)`` allows that file too, and inline code doesn't). Every changed file must be on the list. Without `--plan`, no scope check runs and the report says so.
 
 **Output.** Round N is one more than the existing `gate-r*.md` files in `.superpowers/runs/<branch>/` (gitignored). The gate writes:
 
@@ -54,7 +54,7 @@ The schema is `{ verdict: "pass" | "fail", findings: [{ severity: "blocking" | "
 
 The script renders that JSON into `.superpowers/runs/<branch>/codex-<mode>-rN.md`, findings grouped by severity, ending in `CODEX: PASS` or `CODEX: FAIL — <n> blocking`. As a backstop to the sandbox, it records `git status --porcelain` before and after, and fails if they differ.
 
-A non-zero Codex exit, output that doesn't match the schema, or a changed working tree writes a report ending `CODEX: ERROR — <reason>` and exits 2. The main session then tells the user that the second review did not run; it never reads an error as a pass.
+A non-zero Codex exit, output that doesn't match the schema, or a changed working tree writes a report ending `CODEX: ERROR — <reason>` and exits 2; otherwise it exits 0 on `PASS` and 1 on `FAIL`. On an error, the main session tells the user that the second review did not run; it never reads an error as a pass.
 
 ### 3. Round log
 
