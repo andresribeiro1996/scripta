@@ -56,16 +56,23 @@ const isPath = (token) => !/\s/.test(token) && /[/.]/.test(token);
 
 export function taskFiles(planText, taskNumber) {
   const lines = planText.split("\n");
-  const heading = new RegExp(`^### Task ${taskNumber}(?!\\d)`);
+  const heading = new RegExp(`^#{2,3} Task ${taskNumber}(?!\\d)`);
   const start = lines.findIndex((line) => heading.test(line));
   if (start === -1) throw new Error(`the plan has no "### Task ${taskNumber}" heading.`);
   const end = lines.findIndex((line, index) => index > start && /^#{1,3} /.test(line));
-  const files = lines
+  let inFileRun = false;
+  const tokens = lines
     .slice(start + 1, end === -1 ? undefined : end)
-    .filter((line) => FILE_LINE.test(line))
+    .filter((line) => {
+      if (FILE_LINE.test(line)) inFileRun = true;
+      else if (!/^\s+- /.test(line)) inFileRun = false;
+      return inFileRun;
+    })
     .flatMap((line) => [...line.matchAll(/`([^`]+)`/g)].map(([, token]) => token))
-    .filter(isPath)
-    .map((token) => token.replace(/:\d[\d,-]*$/, ""));
+    .filter(isPath);
+  const glob = tokens.find((token) => /[*{]/.test(token));
+  if (glob) throw new Error(`task ${taskNumber} lists a glob (${glob}); list its files one by one.`);
+  const files = tokens.map((token) => token.replace(/:\d[\d,-]*$/, ""));
   if (files.length === 0) throw new Error(`task ${taskNumber} lists no files.`);
   return [...new Set(files)];
 }

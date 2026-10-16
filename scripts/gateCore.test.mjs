@@ -137,6 +137,31 @@ test("taskFiles reads a real plan from this repo", () => {
   assert.ok(taskFiles(plan, 3).includes("backend/scripts/repair-mojibake.mjs"));
 });
 
+test("taskFiles finds a ## heading", () => {
+  assert.deepEqual(taskFiles("## Task 2: Next\n\n- Create: `a/b.ts`\n\n## Task 3: x\n\n- Create: `c/d.ts`", 2), ["a/b.ts"]);
+});
+
+test("taskFiles reads indented sub-bullets under a bare file line", () => {
+  const plan = [
+    "### Task 1: Nested",
+    "",
+    "- Modify:",
+    "  - `a/one.ts`",
+    "    - `a/two.ts` (note)",
+    "- [ ] **Step 1:** edit `a/three.ts`",
+  ].join("\n");
+  assert.deepEqual(taskFiles(plan, 1), ["a/one.ts", "a/two.ts"]);
+});
+
+test("taskFiles refuses a glob", () => {
+  assert.throws(() => taskFiles("### Task 1: G\n\n- Create: `packages/shared/src/community/*`", 1), /lists a glob/);
+});
+
+test("taskFiles reads a real ## plan", () => {
+  const plan = readFileSync(new URL("../docs/superpowers/plans/2026-08-29-bookarena.md", import.meta.url), "utf8");
+  assert.ok(taskFiles(plan, 1).length > 0);
+});
+
 test("outOfScope lists changed files the task does not name", () => {
   assert.deepEqual(outOfScope(["a/b.ts", "a/c.ts", "docs/d.md"], ["a/b.ts", "docs/"]), ["a/c.ts"]);
 });
