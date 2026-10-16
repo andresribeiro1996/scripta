@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
+import { PERSONAL_DIGEST_KINDS } from "@scripta/shared";
 import { ApiError } from "../../core/api";
 import { fetchDashboard, followUser } from "../community/api";
 
@@ -9,6 +10,18 @@ export function useDashboardFeed() {
   return useInfiniteQuery({
     queryKey: DASHBOARD_QUERY_KEY,
     queryFn: ({ pageParam }) => fetchDashboard(pageParam),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    refetchOnMount: "always",
+  });
+}
+
+export const ACTIVITY_QUERY_KEY = ["community", "dashboard", "activity"] as const;
+
+export function useActivityFeed() {
+  return useInfiniteQuery({
+    queryKey: ACTIVITY_QUERY_KEY,
+    queryFn: ({ pageParam }) => fetchDashboard(pageParam, PERSONAL_DIGEST_KINDS),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     refetchOnMount: "always",

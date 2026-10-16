@@ -30,6 +30,7 @@ export const typography = {
   heading: { fontSize: 24, lineHeight: 30 },
 } as const;
 export const minimumTouchTarget = 44;
+export const captionHitSlop = { top: (minimumTouchTarget - typography.caption.lineHeight) / 2, bottom: (minimumTouchTarget - typography.caption.lineHeight) / 2, left: spacing.sm, right: spacing.sm };
 export const dynamicType = { allowFontScaling: true } as const;
 
 type ActiveVeil = Veil & { opacity: Animated.Value };
