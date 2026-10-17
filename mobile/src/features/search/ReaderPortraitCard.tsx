@@ -1,6 +1,7 @@
-import { useMemo } from "react";
+import { useId, useMemo } from "react";
 import { Image } from "expo-image";
 import { Pressable, StyleSheet, View } from "react-native";
+import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import { ensureBookBlockHeights, readerCardInputOf, readerGlyphLabel, type Mural } from "@scripta/shared";
 import { themes } from "@scripta/shared/themes";
 import { personCaption, type SuggestedReader } from "@scripta/shared/community";
@@ -15,6 +16,7 @@ import { reconstructBooks, reconstructTierlists } from "../public/adapters";
 
 export function ReaderPortraitCard({ person, width, canvasWidth, busy, onToggleFollow }: { person: SuggestedReader; width: number; canvasWidth: number; busy: boolean; onToggleFollow: () => void }) {
   const { colors } = useTheme();
+  const fadeId = useId();
   const payload = person.private ? null : person.mural;
   const preview = useMemo(() => {
     if (!payload) return null;
@@ -28,17 +30,26 @@ export function ReaderPortraitCard({ person, width, canvasWidth, busy, onToggleF
   const caption = personCaption(person);
   const palette = preview ? themes[preview.mural.theme].colors : colors;
   return (
-    <View style={[styles.card, { width, backgroundColor: colors.surface, borderColor: colors.border }]}>
+    <View style={[styles.card, { width, backgroundColor: colors.surface }]}>
       <Pressable accessibilityRole="button" accessibilityLabel={[`Open ${person.user.username}'s profile`, glyphLabel, caption].filter(Boolean).join(", ")} onPress={() => openProfile(person.user.username)} style={({ pressed }) => [styles.open, { opacity: pressed ? 0.75 : 1 }]}>
-        <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[styles.preview, { backgroundColor: palette.background }]}>
+        <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[styles.preview, { height: width * 0.8, backgroundColor: palette.background }]}>
           {preview?.mural.coverImageUrl ? <Image source={{ uri: preview.mural.coverImageUrl }} contentFit="cover" style={StyleSheet.absoluteFill} /> : preview?.mural.blocks.length ? (
             <MuralThumbnail mural={preview.mural} canvasWidth={canvasWidth} books={preview.books} images={preview.images} tierlists={preview.tierlists} profile={person.user} shelfThemeOverride={payload?.library.shelfTheme} readerCardOverride={payload?.library.readerCard ?? fallback.card} statsOverride={payload?.library.stats} />
-          ) : <View style={styles.fallback}><ReaderCardImage input={fallback} width={width - spacing.xl * 2} /></View>}
+          ) : <View style={styles.fallback}><ReaderCardImage input={fallback} width={width} /></View>}
+          <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" viewBox="0 0 1 1" preserveAspectRatio="none">
+            <Defs><LinearGradient id={fadeId} x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0" stopColor={colors.surface} stopOpacity={0.12} />
+              <Stop offset="0.4" stopColor={colors.surface} stopOpacity={0.18} />
+              <Stop offset="0.7" stopColor={colors.surface} stopOpacity={0.65} />
+              <Stop offset="1" stopColor={colors.surface} stopOpacity={1} />
+            </LinearGradient></Defs>
+            <Rect width="1" height="1" fill={`url(#${fadeId})`} />
+          </Svg>
         </View>
         <View style={styles.details}>
           <View style={[styles.avatar, { borderColor: colors.surface, backgroundColor: colors.surface }]}>
             <AuthorAvatar username={person.user.username} avatarUrl={person.user.avatarUrl} size={48} />
-            {glyphLabel ? <View style={[styles.badge, { backgroundColor: colors.surface, borderColor: colors.surface }]}><ReaderGlyph identity={identity} /></View> : null}
+            {glyphLabel ? <View style={[styles.badge, { backgroundColor: colors.surface, borderColor: colors.surface }]}><ReaderGlyph identity={identity} size={14} /></View> : null}
           </View>
           <Text numberOfLines={2} {...dynamicType} style={[typography.body, styles.name, { color: colors.text }]}>{person.user.username}</Text>
           <Text numberOfLines={2} {...dynamicType} style={[typography.caption, styles.caption, { color: colors.textDim }]}>{caption}</Text>
@@ -50,14 +61,14 @@ export function ReaderPortraitCard({ person, width, canvasWidth, busy, onToggleF
 }
 
 const styles = StyleSheet.create({
-  card: { borderWidth: 1, borderRadius: radii.lg, overflow: "hidden" },
+  card: { borderRadius: radii.xl, overflow: "hidden", boxShadow: "0 4px 12px rgba(0, 0, 0, 0.12)" },
   open: { flex: 1 },
-  preview: { height: 88, overflow: "hidden" },
-  fallback: { alignItems: "center", marginTop: -spacing.xl },
+  preview: { overflow: "hidden" },
+  fallback: { alignItems: "center", marginTop: -spacing.huge },
   details: { alignItems: "center", gap: spacing.xs, paddingHorizontal: spacing.md },
-  avatar: { marginTop: -spacing.xxl, marginBottom: spacing.xs, borderWidth: 3, borderRadius: radii.full },
-  badge: { position: "absolute", right: -spacing.xs, bottom: -spacing.xs, borderWidth: 2, borderRadius: radii.full },
-  name: { fontWeight: "700", textAlign: "center", minHeight: typography.body.lineHeight * 2 },
-  caption: { textAlign: "center", minHeight: typography.caption.lineHeight * 2 },
+  avatar: { marginTop: -spacing.xxxl, marginBottom: spacing.xs, borderWidth: 2, borderRadius: radii.full, boxShadow: "0 2px 6px rgba(0, 0, 0, 0.12)" },
+  badge: { position: "absolute", right: 0, bottom: 0, borderWidth: 1, borderRadius: radii.full },
+  name: { fontWeight: "700", textAlign: "center" },
+  caption: { textAlign: "center" },
   action: { padding: spacing.md },
 });

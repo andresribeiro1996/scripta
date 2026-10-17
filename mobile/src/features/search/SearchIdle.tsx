@@ -18,7 +18,7 @@ export function SearchIdle({ scope, recent, onRecent, onClearRecent, follow }: {
 }) {
   const { colors } = useTheme();
   const { width } = useWindowDimensions();
-  const readerWidth = Math.min(180, (width - spacing.lg * 2 - spacing.md) / 2);
+  const readerWidth = Math.min(220, (width - spacing.lg * 2) * 0.68);
   const show = idleSections(scope);
   const readers = useQuery({ queryKey: ["community", "people", "suggested", "portraits"], queryFn: fetchSuggestedReaderPortraits, enabled: show.readers, retry: false });
   const games = useInfiniteQuery({
@@ -56,7 +56,7 @@ export function SearchIdle({ scope, recent, onRecent, onClearRecent, follow }: {
           {!readers.data && readers.isError ? (
             <View style={styles.pad}><ErrorState body="Couldn't load readers." actionLabel="Retry" onAction={() => void readers.refetch()} /></View>
           ) : readers.isPending ? (
-            <View style={styles.pad}><Skeleton height={250} /></View>
+            <View style={styles.pad}><Skeleton height={280} /></View>
           ) : (
             <FlatList
               horizontal
@@ -94,5 +94,5 @@ const styles = StyleSheet.create({
   pad: { paddingHorizontal: spacing.lg },
   list: { paddingBottom: spacing.huge },
   recent: { flexDirection: "row", alignItems: "center", gap: spacing.md, minHeight: 44, paddingHorizontal: spacing.lg },
-  readers: { gap: spacing.md, paddingHorizontal: spacing.lg },
+  readers: { gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
 });
