@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { FlatList, StyleSheet, View } from "react-native";
 import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import { Stack, router } from "expo-router";
+import { Stack } from "expo-router";
 import { looksLikeIsbnQuery, matchesSearch, type BookSearchResult } from "@scripta/shared";
 import { ErrorState, IconButton, Input, Screen, Segmented, Skeleton, Toast, spacing } from "../../ui";
 import { AddBookSheet } from "../community/AddBookSheet";
@@ -123,7 +123,6 @@ export function SearchScreen() {
               }}
             />
           ) : null}
-          <IconButton framed name="scan" label="Scan" accessibilityLabel="Scan a book's barcode" onPress={() => router.push("/scan" as never)} />
         </View>
         <Segmented accessibilityLabel="Search in" options={SEARCH_SCOPES} value={scope} onChange={setScope} />
       </View>

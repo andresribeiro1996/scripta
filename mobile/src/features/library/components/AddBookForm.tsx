@@ -20,10 +20,12 @@ export function AddBookForm({
   onAdd,
   onClose,
   initialQuery = "",
+  initialScanning = false,
 }: {
   onAdd: (book: Record<string, unknown>) => Promise<void>;
   onClose: () => void;
   initialQuery?: string;
+  initialScanning?: boolean;
 }) {
   const { colors } = useTheme();
   const [query, setQuery] = useState(initialQuery);
@@ -33,7 +35,7 @@ export function AddBookForm({
   const [outsideFailed, setOutsideFailed] = useState(false);
   const searchRun = useRef(0);
   const [searchError, setSearchError] = useState<string | null>(null);
-  const [scanning, setScanning] = useState(false);
+  const [scanning, setScanning] = useState(initialScanning);
 
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
@@ -150,7 +152,7 @@ export function AddBookForm({
             <Button label={searching ? "…" : "Search"} loading={searching} disabled={query.trim() === ""} onPress={() => void runSearch()} />
           </View>
         </View>
-        <Button label={scanning ? "Stop scanning" : "Scan ISBN with camera"} variant="secondary" disabled={saving} onPress={toggleScanner} />
+        {initialScanning ? <Button label={scanning ? "Stop scanning" : "Scan again"} variant="secondary" disabled={saving} onPress={toggleScanner} /> : null}
         {scanning && (
           <IsbnScanner
             hint="Point at the ISBN barcode on the back cover."

@@ -5,12 +5,12 @@ import { Screen, SheetHeader } from "@/ui";
 
 export default function AddBookRoute() {
   const { addBook } = useLibraryActions();
-  const { q } = useLocalSearchParams<{ q?: string }>();
+  const { q, scan } = useLocalSearchParams<{ q?: string; scan?: string }>();
   return (
     <Screen top={false}>
       <Stack.Screen options={{ headerShown: false }} />
       <SheetHeader title="Add a book" onClose={() => router.back()} />
-      <AddBookForm onAdd={addBook} onClose={() => router.back()} initialQuery={q ?? ""} />
+      <AddBookForm onAdd={addBook} onClose={() => router.back()} initialQuery={q ?? ""} initialScanning={scan === "1"} />
     </Screen>
   );
 }
