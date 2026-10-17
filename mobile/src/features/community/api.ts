@@ -20,6 +20,7 @@ export const {
   fetchDiscover,
   searchPeople,
   fetchSuggestedPeople,
+  fetchSuggestedReaderPortraits,
   fetchProfile,
   fetchActivity,
   fetchProfileLibrary,

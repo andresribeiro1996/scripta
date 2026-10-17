@@ -49,6 +49,9 @@ export function createCommunityApi(request: ApiRequest) {
     async fetchSuggestedPeople(): Promise<SuggestedReader[]> {
       return (await request<{ people: SuggestedReader[] }>("/community/people/suggested", { auth: "required" })).people;
     },
+    async fetchSuggestedReaderPortraits(): Promise<SuggestedReader[]> {
+      return (await request<{ people: SuggestedReader[] }>("/community/people/suggested?previews=1", { auth: "required" })).people;
+    },
     fetchProfile(username: string): Promise<CommunityProfileView> {
       return request<CommunityProfileView>(apiPath`/community/profiles/${username}`, { auth: "optional" });
     },

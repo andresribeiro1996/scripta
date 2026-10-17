@@ -3,16 +3,16 @@ import { SvgXml } from "react-native-svg";
 import { readerGlyphLabel, renderGlyph, type IdentityKey } from "@scripta/shared";
 import { useTheme } from "../../ui";
 
-export function ReaderGlyph({ identity }: { identity?: IdentityKey }) {
+export function ReaderGlyph({ identity, size = 24 }: { identity?: IdentityKey; size?: number }) {
   const { mode } = useTheme();
   if (!identity || !readerGlyphLabel(identity)) return null;
   return (
     <View
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
-      style={{ width: 24, height: 24 }}
+      style={{ width: size, height: size }}
     >
-      <SvgXml xml={renderGlyph(identity, 24, mode === "dark" ? "reversed" : "paper")} width={24} height={24} />
+      <SvgXml xml={renderGlyph(identity, size, mode === "dark" ? "reversed" : "paper")} width={size} height={size} />
     </View>
   );
 }

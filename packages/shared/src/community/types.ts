@@ -86,6 +86,7 @@ export interface SharedBook {
 export interface SuggestedReader extends PersonResult {
   sharedCount: number;
   sharedBooks: SharedBook[];
+  mural?: MuralPublicPayload | null;
 }
 
 export interface PublishedProfile {

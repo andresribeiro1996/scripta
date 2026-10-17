@@ -160,7 +160,7 @@ export interface CommunityService {
   markDashboardSeen(viewerId: string): void;
   getDiscover(type: DiscoverType, q: string, limit: number, offset: number, viewerId?: string): { items: DiscoverItem[]; nextOffset: number | null };
   searchPeople(viewerId: string, q: string, limit: number): PersonResult[];
-  suggestPeople(viewerId: string, limit: number): SuggestedReader[];
+  suggestPeople(viewerId: string, limit: number, previews?: boolean): SuggestedReader[];
   getActivity(username: string, viewerId: string | undefined, cursor: string | undefined, limit: number): Page<ActivityItem>;
   getLibrary(username: string, viewerId?: string): { data: Record<string, unknown> | null };
   getFeedSettings(userId: string): FeedSettings;
@@ -559,7 +559,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
         return [{ user: withGlyph(user, id, glyphOf), followerCount: repo.countFollowers(id), viewerFollows: repo.getFollow(viewerId, id) !== undefined, private: visibility.isPrivate(id) }];
       });
     },
-    suggestPeople(viewerId, limit) {
+    suggestPeople(viewerId, limit, previews = false) {
       const followees = new Set(repo.listFollowees(viewerId));
       const candidates = repo
         .listPublishedProfiles(SUGGESTION_SCAN_CAP)
@@ -575,14 +575,21 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
       const fill = overlapping.length < SUGGESTION_OVERLAP_FLOOR ? scored.filter((entry) => entry.shared === 0) : [];
       const glyphOf = glyphLookup();
       const visibility = createVisibility(repo, viewerId);
-      return [...overlapping, ...fill].slice(0, limit).map((entry) => ({
-        user: withGlyph(entry.user, entry.id, glyphOf),
-        followerCount: repo.countFollowers(entry.id),
-        viewerFollows: false,
-        private: visibility.isPrivate(entry.id),
-        sharedCount: entry.shared,
-        sharedBooks: entry.shared > 0 ? deps.sharedBooks(viewerId, entry.id, SHARED_BOOKS_SHOWN) : []
-      }));
+      return [...overlapping, ...fill].slice(0, limit).map((entry) => {
+        const person: SuggestedReader = {
+          user: withGlyph(entry.user, entry.id, glyphOf),
+          followerCount: repo.countFollowers(entry.id),
+          viewerFollows: false,
+          private: visibility.isPrivate(entry.id),
+          sharedCount: entry.shared,
+          sharedBooks: entry.shared > 0 ? deps.sharedBooks(viewerId, entry.id, SHARED_BOOKS_SHOWN) : []
+        };
+        if (previews) {
+          const muralId = !person.private ? repo.getProfileRow(entry.id)?.mural_id : null;
+          person.mural = muralId ? deps.murals.getMuralPublicPayload(entry.id, muralId) : null;
+        }
+        return person;
+      });
     },
     getLibrary(username, viewerId) {
       return { data: deps.resolveLibrary(contentOwner(username, viewerId)) };

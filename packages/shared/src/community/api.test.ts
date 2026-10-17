@@ -32,6 +32,7 @@ const cases: Array<[string, (api: CommunityApi) => Promise<unknown>, string, Api
   ["fetchDiscover", (api) => api.fetchDiscover("tierlist" as never, "q", 20), "/community/discover?type=tierlist&q=q&offset=20", { auth: "optional" }],
   ["searchPeople", (api) => api.searchPeople("a b"), "/community/people?q=a%20b", { auth: "required" }],
   ["fetchSuggestedPeople", (api) => api.fetchSuggestedPeople(), "/community/people/suggested", { auth: "required" }],
+  ["fetchSuggestedReaderPortraits", (api) => api.fetchSuggestedReaderPortraits(), "/community/people/suggested?previews=1", { auth: "required" }],
   ["fetchProfile", (api) => api.fetchProfile("zoë"), "/community/profiles/zo%C3%AB", { auth: "optional" }],
   ["fetchActivity", (api) => api.fetchActivity("u", "c 1"), "/community/profiles/u/activity?cursor=c%201", { auth: "optional" }],
   ["fetchActivity without cursor", (api) => api.fetchActivity("u"), "/community/profiles/u/activity", { auth: "optional" }],
