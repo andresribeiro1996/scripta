@@ -2630,6 +2630,51 @@ test("suggested readers scan at most the 500 most recently active published prof
   assert.deepEqual(requested, [500]);
 });
 
+test("portrait previews resolve only the returned readers' selected public murals and remain opt-in", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, muralPayloads, sharedCounts, libraryCalls } = createDeps(repo);
+  for (const [id, shared] of [["first", 3], ["second", 2], ["plain", 1]] as const) {
+    readerProfiles.set(id, reader(id));
+    sharedCounts.set(id, shared);
+    repo.upsertProfile(profileRow(id, { mural_id: id === "plain" ? null : `m-${id}` }));
+  }
+  const payload = { mural: { id: "m-first", name: "My shelf", theme: "light", blocks: [], coverImageUrl: null }, library: { books: [], currentlyReading: [], highlights: [], stats: {} }, imageUrls: {}, tierlists: {} } satisfies MuralPublicPayload;
+  muralPayloads.set("first:m-first", payload);
+  const calls: string[] = [];
+  const resolve = deps.murals.getMuralPublicPayload;
+  deps.murals.getMuralPublicPayload = (owner, muralId) => {
+    calls.push(`${owner}:${muralId}`);
+    return resolve(owner, muralId);
+  };
+  const service = createCommunityService(deps);
+  assert.equal("mural" in service.suggestPeople("viewer", 1)[0]!, false);
+  assert.deepEqual(calls, []);
+  assert.deepEqual(service.suggestPeople("viewer", 1, true)[0]?.mural, payload);
+  assert.deepEqual(calls, ["first:m-first"]);
+  assert.deepEqual(service.suggestPeople("viewer", 3, true).map(person => person.mural), [payload, null, null]);
+  assert.deepEqual(libraryCalls, []);
+  repo.upsertProfile(profileRow("first", { published: 0, mural_id: "m-first" }));
+  calls.length = 0;
+  assert.equal(service.suggestPeople("viewer", 3, true).some(person => person.user.userId === "first"), false);
+  assert.deepEqual(calls, ["second:m-second"]);
+});
+
+test("portrait previews recheck visibility and propagate resolver failures", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles } = createDeps(repo);
+  readerProfiles.set("reader", reader("reader"));
+  const row = profileRow("reader", { mural_id: "m-reader" });
+  repo.upsertProfile({ ...row, published: 0 });
+  repo.listPublishedProfiles = () => [row];
+  let calls = 0;
+  deps.murals.getMuralPublicPayload = () => { calls++; throw new Error("Preview unavailable"); };
+  const service = createCommunityService(deps);
+  assert.equal(service.suggestPeople("viewer", 1, true)[0]?.mural, null);
+  assert.equal(calls, 0);
+  repo.upsertProfile(row);
+  assert.throws(() => service.suggestPeople("viewer", 1, true), /Preview unavailable/);
+});
+
 test("a follower's dashboard shows a quiz publication and a quiz play, each under its own switch", () => {
   const { repo } = createRepoFake();
   const { deps, readerProfiles, quizRefs } = createDeps(repo);

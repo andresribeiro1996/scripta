@@ -3,18 +3,21 @@ import type { PerCardStyle } from "@scripta/shared";
 import { PerCardStyleForm } from "@/features/library/components/PerCardStyleForm";
 import { useBook } from "@/features/library/hooks/useBook";
 import { useLibraryActions } from "@/features/library/hooks/useLibraryActions";
-import { ErrorState, Screen, Skeleton } from "@/ui";
-import { spacing } from "@/ui/theme";
+import { ErrorState, Screen, SheetHeader, Skeleton } from "@/ui";
+import { spacing, useTheme } from "@/ui/theme";
 
 export default function BookStyleRoute() {
+  const { colors } = useTheme();
   const { key } = useLocalSearchParams<{ key: string }>();
   const { book, seedStyle, inheritedFrom, loading } = useBook(key);
   const { saveBookStyle } = useLibraryActions();
   const name = String(book?.Title ?? "");
+  const title = "Card style";
 
   return (
-    <Screen top={false}>
-      <Stack.Screen options={{ title: name ? `Style for "${name}"` : "Card style", sheetAllowedDetents: [0.85, 1], contentStyle: { paddingHorizontal: spacing.lg, paddingTop: spacing.md } }} />
+    <Screen top={false} style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.md }}>
+      <Stack.Screen options={{ title, headerShown: false, sheetAllowedDetents: [0.85, 1], contentStyle: { backgroundColor: colors.background } }} />
+      <SheetHeader title={title} onClose={() => router.back()} />
       {loading ? (
         <Skeleton height={180} />
       ) : !book ? (

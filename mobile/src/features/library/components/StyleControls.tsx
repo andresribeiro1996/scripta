@@ -3,7 +3,7 @@ import { normalizeHexColor } from "@scripta/shared";
 import { ColorEditor } from "../../murals/ColorEditor";
 import { matchPreset, type Preset } from "../../murals/blockStyleOptions";
 import { Icon } from "../../../ui";
-import { Pressable, StyleSheet, Switch, View } from "react-native";
+import { Pressable, StyleSheet, Switch, View, type DimensionValue } from "react-native";
 import { Text } from "../../../ui/Text";
 import { minimumTouchTarget, radii, spacing, typography, useTheme } from "../../../ui/theme";
 
@@ -31,7 +31,7 @@ export function Chip({ label, selected, onPress, fontFamily }: { label: string; 
   );
 }
 
-export function Tile({ label, selected, onPress, width = 64, tileWidth = 64, height = 48, children }: { label: string; selected: boolean; onPress: () => void; width?: number; tileWidth?: number; height?: number; children: ReactNode }) {
+export function Tile({ label, selected, onPress, width = 64, tileWidth = 64, height = 48, children }: { label: string; selected: boolean; onPress: () => void; width?: DimensionValue; tileWidth?: number; height?: number; children: ReactNode }) {
   const { colors } = useTheme();
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected }} onPress={onPress} style={[styles.tileWrap, { width }]}>

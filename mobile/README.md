@@ -170,6 +170,10 @@ Home shows “Your reading circle”: followed readers’ publications, reading 
 
 Real activity posts support likes, comments and native sharing. Tier-list publications show their book pool; new ranking events show the reader’s actual mini tiers. Quizzes, tournaments and murals have content previews and direct actions. Tap a reader to open their profile, use Want to read without changing an existing book’s reading status, and bookmark games or murals into Home’s Saved sheet. Comments and saved content use Expo UI sheets with pagination and retry states.
 
+### Reader suggestions
+
+Search shows portrait cards with a cropped preview of each reader's published shelf mural, an overlapping avatar, their reader glyph when shared, the overlap reason and Follow. The header reuses mural thumbnails and cover images; readers without a populated mural get reader-card artwork based only on their public glyph. The horizontal list renders nearby cards as they come into view. Preview data arrives with the suggestions through `?previews=1`; older responses still render the artwork fallback.
+
 ### Adding books
 
 Library → Add → Scan ISBN with camera opens the rear camera and searches the detected ISBN through the same catalog lookup as a typed search. The first book barcode stops scanning and fills the form when an edition is found. Other product barcodes are ignored. Camera access is requested when scanning starts; denied access leaves manual entry available, with an Open Settings action when permission cannot be requested again. Leaving the screen or backgrounding the app stops scanning.
