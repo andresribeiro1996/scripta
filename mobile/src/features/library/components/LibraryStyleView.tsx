@@ -36,6 +36,21 @@ export function CardStylePreview({ books, style, layout = false }: { books: Arra
   const shown = (books.length ? books : PREVIEW_BOOKS).slice(0, layout ? 4 : 2);
   const gridWidth = contentWidth + style.contentPaddingX * 2;
   const scale = Math.min(1, 160 / Math.max(1, gridHeight));
+  if (!layout && books.length === 1) {
+    const book = books[0];
+    return (
+      <View style={[styles.bookPreview, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <View style={{ width: 96, borderRadius: radii.md, backgroundColor: style.backgroundColor ?? colors.background }}>
+          <BookCard book={book} style={style} onPress={() => {}} />
+        </View>
+        <View style={{ flex: 1, gap: spacing.xs }}>
+          <Caption>Live preview</Caption>
+          <Text numberOfLines={3} style={[typography.body, { color: colors.text, fontWeight: "600" }]}>{String(book.Title ?? "Untitled")}</Text>
+          <Text numberOfLines={2} style={[typography.caption, { color: colors.textDim }]}>{String(book.Attribution ?? "Unknown author")}</Text>
+        </View>
+      </View>
+    );
+  }
   return (
     <View style={{ gap: spacing.sm }}>
       <Caption>{`${layout ? "Grid" : "Card"} preview${books.length ? "" : " · sample books"}`}</Caption>
@@ -105,6 +120,7 @@ export function LibraryStyleView({ savedStyle, previewBooks, onSave }: {
 }
 
 const styles = StyleSheet.create({
+  bookPreview: { flexDirection: "row", alignItems: "center", gap: spacing.lg, padding: spacing.md, borderWidth: 1, borderRadius: radii.lg },
   screen: { flex: 1, padding: spacing.lg, gap: spacing.md },
   content: { gap: spacing.xl, paddingBottom: spacing.huge },
   preview: { flexDirection: "row", justifyContent: "center", gap: spacing.md, padding: spacing.sm, borderRadius: radii.lg },
