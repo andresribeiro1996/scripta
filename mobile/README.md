@@ -176,7 +176,7 @@ Search shows portrait cards with a cropped preview of each reader's published sh
 
 ### Adding books
 
-Library → Add → Scan ISBN with camera opens the rear camera and searches the detected ISBN through the same catalog lookup as a typed search. The first book barcode stops scanning and fills the form when an edition is found. Other product barcodes are ignored. Camera access is requested when scanning starts; denied access leaves manual entry available, with an Open Settings action when permission cannot be requested again. Leaving the screen or backgrounding the app stops scanning.
+Library → Add opens a native chooser with Search by title and Scan barcode. Search opens the Add Book form; Scan barcode opens it with the rear camera active and searches the detected ISBN through the same catalog lookup. Search has no separate Scan action. The first book barcode stops scanning and fills the form when an edition is found. Other product barcodes are ignored. Camera access is requested when scanning starts; denied access leaves manual entry available, with an Open Settings action when permission cannot be requested again. Leaving the screen or backgrounding the app stops scanning.
 
 `expo-camera` works in Expo Go. Existing standalone builds need a new native release before they can use this module; an OTA update alone cannot add it.
 

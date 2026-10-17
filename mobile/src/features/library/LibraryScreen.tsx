@@ -41,6 +41,7 @@ import { useMurals } from "../murals/useMurals";
 import { useLibrary } from "./hooks/useLibrary";
 import { useLibraryActions } from "./hooks/useLibraryActions";
 import { BookCard } from "./components/BookCard";
+import { AddBookOptionsSheet } from "./components/AddBookOptionsSheet";
 import { DuplicatesSheetBody } from "./components/DuplicatesSheet";
 import { GroupsView, TYPE_FILTER_OPTIONS, type GroupsViewHandle, type TypeFilter } from "./components/GroupsView";
 import { LibraryGrid } from "./components/LibraryGrid";
@@ -75,6 +76,7 @@ export function LibraryScreen() {
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
   const [reviewingDuplicates, setReviewingDuplicates] = useState(false);
+  const [addingBook, setAddingBook] = useState(false);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
 
@@ -218,11 +220,11 @@ export function LibraryScreen() {
       {!isPending && !isError && books.length === 0 && (
         <EmptyState
           title="Start your library"
-          body="Import your existing collection, or add your first book manually."
+          body="Import your existing collection, or find a book by title or barcode."
           actionLabel="Import library…"
           onAction={() => router.push("/import" as never)}
-          secondaryActionLabel="Add a book manually"
-          onSecondaryAction={() => router.push("/add-book" as never)}
+          secondaryActionLabel="Add a book"
+          onSecondaryAction={() => setAddingBook(true)}
         />
       )}
 
@@ -252,7 +254,7 @@ export function LibraryScreen() {
             selectionMode ? undefined : onCollectionsTab ? (
               <Fab label="New" accessibilityLabel="New collection" onPress={() => groupsView.current?.startCreating()} />
             ) : (
-              <Fab label="Add" accessibilityLabel="Add book" onPress={() => router.push("/add-book" as never)} />
+              <Fab label="Add" accessibilityLabel="Add book" onPress={() => setAddingBook(true)} />
             )
           }
         >
@@ -322,6 +324,8 @@ export function LibraryScreen() {
           )}
         </SearchDock>
       )}
+
+      {addingBook ? <AddBookOptionsSheet onClose={() => setAddingBook(false)} /> : null}
 
       <Sheet visible={editingName} title="Rename library" onClose={() => setEditingName(false)}>
         <Input label="Library name" autoFocus value={nameDraft} onChangeText={setNameDraft} onSubmitEditing={() => void handleRenameLibrary()} onBlur={() => void handleRenameLibrary()} />
