@@ -172,7 +172,7 @@ export function findPageIsbn(html: string): string | null {
   const labelEnds = [...content.matchAll(/ISBN/gi)].map((label) => label.index + label[0].length);
   const labelled = found.filter(({ index }) => labelEnds.some((end) => index >= end && index - end <= LABEL_REACH));
   const distinct = [...new Set((labelled.length > 0 ? labelled : found).map(({ isbn }) => isbn))];
-  return distinct.length === 1 && PORTUGAL_PREFIX.test(distinct[0]!) ? distinct[0]! : null;
+  return distinct.length === 1 && PORTUGAL_PREFIX.test(distinct[0]!) ? structuredClone(distinct[0]!) : null;
 }
 
 function distinctNames(names: string[]): string | null {
@@ -186,7 +186,8 @@ export function pageAuthors(html: string): string | null {
   const main = html.slice(start);
   const end = main.search(PRODUCT_END);
   const product = end < 0 ? main : main.slice(0, end);
-  return distinctNames([...product.matchAll(AUTHOR_LINK)].filter((link) => AUTHOR_PATH.test(link[1]!)).map((link) => decodeEntities(link[2]!)));
+  const names = distinctNames([...product.matchAll(AUTHOR_LINK)].filter((link) => AUTHOR_PATH.test(link[1]!)).map((link) => decodeEntities(link[2]!)));
+  return names === null ? null : structuredClone(names);
 }
 
 function tagAuthors(tags: unknown, pattern: RegExp): string | null {
