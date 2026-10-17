@@ -57,7 +57,7 @@ Evidence for each rule (markup, sample sizes, accuracy) is in the research note 
 - `seed/publisherFeed.ts`: the credit cleaner; the INCM tag rule; four page extractors next to `pageAuthors`; all return `string | null` copied with `structuredClone` (#295).
 - `seed/publishers.ts`: `PublisherSite` names its page rule and its tag rule; the five shops get theirs.
 - `seed/importPublisherCovers.ts`: page-author read for any site with a page rule; the ISBN check becomes "not a different ISBN".
-- `seed/isbndbAuthors.ts` + `scripts/fill-authors-isbndb.mjs`: plan-then-fill like `lossyRetitle.ts`, report `{ selected, asked, filled, noRecord, noAuthor, titleMismatch, placeholder, next, isbndb: { max, asked, unavailable, notAsked, pausedUntil }, fills: [{ id, isbn, title, author }] }`.
+- `seed/isbndbAuthors.ts` + `scripts/fill-authors-isbndb.mjs`: plan-then-fill like `lossyRetitle.ts`, report `{ selected, noRecord, noAuthor, titleMismatch, placeholder, next, isbndb: { max, asked, unavailable, notAsked, pausedUntil }, fills: [{ id, isbn, title, author }], wouldFill, applied }`.
 - Docs: `backend/README.md` (Authors paragraph, new script section), `docs/publisher-catalog.md` "Author from" cells.
 
 ## Testing
