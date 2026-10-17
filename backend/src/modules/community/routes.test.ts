@@ -381,8 +381,8 @@ test("suggested people GET is authed, defaults the limit to 20, and validates it
   await app.register(
     buildCommunityRoutes(
       fakeService({
-        suggestPeople: (viewerId, limit) => {
-          seen.push({ viewerId, limit });
+        suggestPeople: (viewerId, limit, previews) => {
+          seen.push({ viewerId, limit, previews });
           return [suggestion];
         }
       })
@@ -395,9 +395,11 @@ test("suggested people GET is authed, defaults the limit to 20, and validates it
   assert.equal(res.statusCode, 200);
   assert.deepEqual(res.json(), { people: [suggestion] });
   assert.equal((await app.inject({ method: "GET", url: "/community/people/suggested?limit=5", headers: auth })).statusCode, 200);
+  assert.equal((await app.inject({ method: "GET", url: "/community/people/suggested?previews=1", headers: auth })).statusCode, 200);
+  assert.equal((await app.inject({ method: "GET", url: "/community/people/suggested?previews=true", headers: auth })).statusCode, 400);
   assert.equal((await app.inject({ method: "GET", url: "/community/people/suggested?limit=0", headers: auth })).statusCode, 400);
   assert.equal((await app.inject({ method: "GET", url: "/community/people/suggested?limit=51", headers: auth })).statusCode, 400);
-  assert.deepEqual(seen, [{ viewerId: "viewer", limit: 20 }, { viewerId: "viewer", limit: 5 }]);
+  assert.deepEqual(seen, [{ viewerId: "viewer", limit: 20, previews: false }, { viewerId: "viewer", limit: 5, previews: false }, { viewerId: "viewer", limit: 20, previews: true }]);
   await app.close();
 });
 

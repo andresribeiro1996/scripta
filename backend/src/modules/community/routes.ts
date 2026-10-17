@@ -18,7 +18,8 @@ const peopleQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(20)
 });
 const suggestedQuerySchema = z.object({
-  limit: z.coerce.number().int().min(1).max(50).default(20)
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+  previews: z.literal("1").optional()
 });
 const discoverQuerySchema = z.object({
   type: z.enum(["all", "tierlist", "tournament", "quiz"]).default("all"),
@@ -143,8 +144,8 @@ export function buildCommunityRoutes(service: CommunityService) {
       await scoped.register(fastifyRateLimit, { max: 30, timeWindow: "1 minute" });
       scoped.get("/community/people/suggested", { preHandler: authGuard }, async (request, reply) => {
         const parsed = suggestedQuerySchema.safeParse(request.query);
-        if (!parsed.success) return reply.code(400).send({ error: "Expected optional ?limit= between 1 and 50." });
-        return reply.send({ people: service.suggestPeople(request.user.id, parsed.data.limit) });
+        if (!parsed.success) return reply.code(400).send({ error: "Expected optional ?limit= between 1 and 50 and ?previews=1." });
+        return reply.send({ people: service.suggestPeople(request.user.id, parsed.data.limit, parsed.data.previews === "1") });
       });
     });
   };

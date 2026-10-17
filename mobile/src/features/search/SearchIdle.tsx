@@ -1,14 +1,13 @@
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { FlatList, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import { personCaption, type SuggestedReader } from "@scripta/shared/community";
 import { Text } from "../../ui/Text";
-import { Button, ErrorState, Icon, Skeleton, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
-import { AuthorAvatar, openProfile } from "../community/AuthorAvatar";
+import { ErrorState, Icon, Skeleton, dynamicType, spacing, typography, useTheme } from "../../ui";
 import { DiscoverRow } from "../community/DiscoverRow";
-import { fetchDiscover, fetchSuggestedPeople } from "../community/api";
+import { fetchDiscover, fetchSuggestedReaderPortraits } from "../community/api";
 import type { useFollowToggle } from "../community/useFollowToggle";
 import { NEW_GAMES, idleSections, type SearchScope } from "./searchModel";
 import { SectionTitle } from "./SearchResultRow";
+import { ReaderPortraitCard } from "./ReaderPortraitCard";
 
 export function SearchIdle({ scope, recent, onRecent, onClearRecent, follow }: {
   scope: SearchScope;
@@ -18,8 +17,10 @@ export function SearchIdle({ scope, recent, onRecent, onClearRecent, follow }: {
   follow: ReturnType<typeof useFollowToggle>;
 }) {
   const { colors } = useTheme();
+  const { width } = useWindowDimensions();
+  const readerWidth = Math.min(180, (width - spacing.lg * 2 - spacing.md) / 2);
   const show = idleSections(scope);
-  const readers = useQuery({ queryKey: ["community", "people", "suggested"], queryFn: fetchSuggestedPeople, enabled: show.readers, retry: false });
+  const readers = useQuery({ queryKey: ["community", "people", "suggested", "portraits"], queryFn: fetchSuggestedReaderPortraits, enabled: show.readers, retry: false });
   const games = useInfiniteQuery({
     queryKey: ["community", "discover", "all", ""],
     queryFn: ({ pageParam }) => fetchDiscover("all", "", pageParam),
@@ -55,13 +56,20 @@ export function SearchIdle({ scope, recent, onRecent, onClearRecent, follow }: {
           {!readers.data && readers.isError ? (
             <View style={styles.pad}><ErrorState body="Couldn't load readers." actionLabel="Retry" onAction={() => void readers.refetch()} /></View>
           ) : readers.isPending ? (
-            <View style={styles.pad}><Skeleton height={150} /></View>
+            <View style={styles.pad}><Skeleton height={250} /></View>
           ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.readers}>
-              {readers.data.map((person) => (
-                <ReaderCard key={person.user.userId} person={person} busy={follow.busyId === person.user.userId} onToggleFollow={() => void follow.toggle(person)} />
-              ))}
-            </ScrollView>
+            <FlatList
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.readers}
+              data={readers.data}
+              keyExtractor={(person) => person.user.userId}
+              initialNumToRender={3}
+              maxToRenderPerBatch={2}
+              windowSize={3}
+              extraData={follow.busyId}
+              renderItem={({ item }) => <ReaderPortraitCard person={item} width={readerWidth} canvasWidth={width - spacing.sm * 2} busy={follow.busyId === item.user.userId} onToggleFollow={() => void follow.toggle(item)} />}
+            />
           )}
         </View>
       ) : null}
@@ -81,29 +89,10 @@ export function SearchIdle({ scope, recent, onRecent, onClearRecent, follow }: {
   );
 }
 
-function ReaderCard({ person, busy, onToggleFollow }: { person: SuggestedReader; busy: boolean; onToggleFollow: () => void }) {
-  const { colors } = useTheme();
-  const caption = personCaption(person);
-  return (
-    <View style={[styles.reader, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <Pressable accessibilityRole="button" accessibilityLabel={`Open ${person.user.username}'s profile, ${caption}`} onPress={() => openProfile(person.user.username)} style={styles.readerOpen}>
-        <AuthorAvatar username={person.user.username} avatarUrl={person.user.avatarUrl} size={44} />
-        <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>{person.user.username}</Text>
-        <Text numberOfLines={2} {...dynamicType} style={[typography.caption, styles.center, { color: colors.textDim }]}>{caption}</Text>
-      </Pressable>
-      {person.private ? null : <Button label={person.viewerFollows ? "Following" : "Follow"} variant="secondary" loading={busy} onPress={onToggleFollow} />}
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   grow: { flex: 1 },
-  strong: { fontWeight: "700" },
-  center: { textAlign: "center" },
   pad: { paddingHorizontal: spacing.lg },
   list: { paddingBottom: spacing.huge },
   recent: { flexDirection: "row", alignItems: "center", gap: spacing.md, minHeight: 44, paddingHorizontal: spacing.lg },
   readers: { gap: spacing.md, paddingHorizontal: spacing.lg },
-  reader: { width: 136, gap: spacing.sm, padding: spacing.md, borderWidth: 1, borderRadius: radii.lg },
-  readerOpen: { alignItems: "center", gap: spacing.xs },
 });
