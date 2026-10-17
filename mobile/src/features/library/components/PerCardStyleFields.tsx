@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { useState, type ReactNode } from "react";
+import { StyleSheet, View } from "react-native";
 import {
   CARD_ASPECT_RATIO_OPTIONS, CARD_BORDER_OPACITY_RANGE, CARD_BORDER_STYLE_OPTIONS, CARD_BORDER_WIDTH_RANGE,
   CARD_FONT_FAMILY_OPTIONS, CARD_FONT_SIZE_RANGE, CARD_OPACITY_RANGE, CARD_RADIUS_RANGE, OVERLAY_INTENSITY_RANGE,
@@ -13,7 +13,7 @@ import {
   BORDER_SIDE_PRESETS, BORDER_STRENGTH_PRESETS, BORDER_STYLE_CHOICES, BORDER_WIDTH_PRESETS, CORNER_PRESETS, FADE_PRESETS,
   FRAME_LOOK_FIELDS, FRAME_LOOKS, matchPreset, matchSides,
 } from "../../murals/blockStyleOptions";
-import { Caption, Chip, ColorSwatchRow, PresetRow, Section, SelectRow, StepperRow, Tile } from "./StyleControls";
+import { Caption, Chip, ColorSwatchRow, PresetRow, SelectRow, StepperRow, Tile } from "./StyleControls";
 import { cardTextMayBeHardToRead } from "./scrim";
 
 const TEXT_SIZES = [
@@ -30,6 +30,16 @@ const OVERLAY_PRESETS = [
 ];
 const BORDER_SIDES = ["top", "right", "bottom", "left"] as const;
 
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  const { colors } = useTheme();
+  return (
+    <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <Text accessibilityRole="header" style={[typography.body, { color: colors.text, fontWeight: "600" }]}>{title}</Text>
+      {children}
+    </View>
+  );
+}
+
 export function PerCardStyleFields({ draft, canvasColor, onApply, onSaveNow }: {
   draft: PerCardStyle;
   canvasColor: string;
@@ -41,21 +51,27 @@ export function PerCardStyleFields({ draft, canvasColor, onApply, onSaveNow }: {
   return (
     <View style={styles.body}>
       <Section title="Looks">
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.wrap}>
+        <View style={styles.looks}>
           {FRAME_LOOKS.map((look) => (
-            <Tile key={look.key} label={look.label} width={88} selected={FRAME_LOOK_FIELDS.every((key) => key === "cardBorderSides" ? matchSides(draft[key]) === matchSides(look.style[key]) : draft[key] === look.style[key])} onPress={() => onSaveNow(look.style)}>
+            <Tile key={look.key} label={look.label} width="30%" selected={FRAME_LOOK_FIELDS.every((key) => key === "cardBorderSides" ? matchSides(draft[key]) === matchSides(look.style[key]) : draft[key] === look.style[key])} onPress={() => onSaveNow(look.style)}>
               <View style={[styles.look, { backgroundColor: colors.border, borderRadius: Math.min(look.style.cardRadius, radii.lg), borderColor: draft.cardBorderColor ?? colors.text, borderTopWidth: look.style.cardBorderSides.top ? look.style.cardBorderWidth : 0, borderRightWidth: look.style.cardBorderSides.right ? look.style.cardBorderWidth : 0, borderBottomWidth: look.style.cardBorderSides.bottom ? look.style.cardBorderWidth : 0, borderLeftWidth: look.style.cardBorderSides.left ? look.style.cardBorderWidth : 0, boxShadow: look.style.cardShadow ? "0 2px 4px rgba(0,0,0,0.2)" : undefined }]}>
                 <Text style={{ color: colors.text, fontFamily: cardFontFamily(draft.cardFontFamily), fontSize: 12 }}>Aa</Text>
               </View>
             </Tile>
           ))}
-        </ScrollView>
-        <Caption>Changes the frame; keeps your cover and text choices.</Caption>
+        </View>
+        <Caption>Cover and text choices stay as they are.</Caption>
       </Section>
       <Section title="Cover">
-        <SelectRow label="Shape" value={draft.cardAspectRatio} options={CARD_ASPECT_RATIO_OPTIONS} onChange={(cardAspectRatio) => onSaveNow({ cardAspectRatio })} />
+        <View style={styles.looks}>
+          {CARD_ASPECT_RATIO_OPTIONS.map((option) => (
+            <Tile key={option.value} label={option.label} width="30%" selected={draft.cardAspectRatio === option.value} onPress={() => onSaveNow({ cardAspectRatio: option.value })}>
+              <View style={{ width: 24, aspectRatio: option.value, borderWidth: 1, borderRadius: radii.sm, borderColor: colors.text }} />
+            </Tile>
+          ))}
+        </View>
         <SelectRow label="Title & author" value={draft.showTitleAuthor ? "show" : "hide"} options={[{ value: "show", label: "Show" }, { value: "hide", label: "Hide" }]} onChange={(value) => onSaveNow({ showTitleAuthor: value === "show" })} />
-        <Caption>Books without a cover always show their title and author.</Caption>
+        <Caption>Title and author stay visible when there’s no cover.</Caption>
         {draft.showTitleAuthor ? <PresetRow label="Text backdrop" presets={OVERLAY_PRESETS} value={draft.overlayIntensity} onChange={(overlayIntensity) => onSaveNow({ overlayIntensity })} /> : null}
       </Section>
       <Section title="Text">
@@ -110,7 +126,9 @@ export function PerCardStyleFields({ draft, canvasColor, onApply, onSaveNow }: {
 }
 
 const styles = StyleSheet.create({
-  body: { gap: spacing.xl },
+  body: { gap: spacing.lg },
+  section: { gap: spacing.lg, padding: spacing.lg, borderWidth: 1, borderRadius: radii.lg },
+  looks: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", gap: spacing.sm },
   wrap: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   label: { fontWeight: "600" },
   look: { width: 28, height: 38, alignItems: "center", justifyContent: "center" },
