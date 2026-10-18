@@ -165,7 +165,7 @@ test("a combined stored translator credit keeps its names out of the author, who
 
   const plan = await planIsbndbAuthors(h.db, h.isbndb, { max: 10, after: "" });
 
-  assert.deepEqual(plan.fills.map((fill) => [fill.id, fill.author]), [[one.id, "Tullio Forgiarini"], [two.id, "Outro Autor"]]);
+  assert.deepEqual(new Map(plan.fills.map((fill) => [fill.id, fill.author])), new Map([[one.id, "Tullio Forgiarini"], [two.id, "Outro Autor"]]));
 });
 
 test("mojibake in ISBNdb's title and names is repaired before matching and filling", async () => {
