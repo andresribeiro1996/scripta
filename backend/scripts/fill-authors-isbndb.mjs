@@ -28,7 +28,7 @@ const { applyIsbndbAuthors, isbndbAuthorReport, planIsbndbAuthors } = await impo
 const gate = createIsbndbGate({ onPause: ({ reason, until }) => console.error(`ISBNdb paused (${reason}) until ${new Date(until).toISOString()}`) });
 const db = dryRun ? new DatabaseSync(env.COVERS_DB_PATH, { readOnly: true }) : openBooksDb();
 const repo = createSqliteBooksRepository(dryRun ? openSqlite(env.COVERS_DB_PATH) : db);
-const spend = createIsbndbBudget(repo, ISBNDB_DAILY_QUOTA - ISBNDB_SEARCH_RESERVE);
+const spend = createIsbndbBudget(repo, ISBNDB_DAILY_QUOTA - ISBNDB_SEARCH_RESERVE, console.error);
 const isbndb = createIsbndbCatalog(env.ISBNDB_API_KEY, createThrottle(ISBNDB_GAP_MS), gate, false, { details: spend, search: spend });
 const plan = await planIsbndbAuthors(db, isbndb, { max, after: values.after });
 const applied = dryRun ? null : applyIsbndbAuthors(repo, plan);

@@ -67,7 +67,7 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
   const booksDb = timeStep(app.log, "startup:books-open", openBooksDb);
   const repo = timedMethods(createSqliteBooksRepository(booksDb), app.log, "books");
   useBooksRepository(repo);
-  const isbndbSpend = createIsbndbBudget(repo, ISBNDB_DAILY_QUOTA - ISBNDB_SEARCH_RESERVE);
+  const isbndbSpend = createIsbndbBudget(repo, ISBNDB_DAILY_QUOTA - ISBNDB_SEARCH_RESERVE, (message) => app.log.warn(message));
   const heldWorks = options.heldWorks;
   const alertTypesafe = (subject: string, text: string) => {
     app.log.warn({ subject }, text);
