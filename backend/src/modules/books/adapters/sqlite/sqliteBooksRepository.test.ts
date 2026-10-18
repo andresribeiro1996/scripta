@@ -1307,16 +1307,15 @@ test("fillSubjectGenres fills empty or Jev genres and keeps source genres", () =
   db.prepare("UPDATE books SET genres_source = 'jev', genres_confidence = 0.8 WHERE id = ?").run(judged);
   const sourced = make("Sourced", ["Fantasy"]);
 
+  repo.fillSubjectGenres(judged, []);
   repo.fillSubjectGenres(empty, []);
+  assert.deepEqual({ ...genresOf(judged) }, { genres: '["Romance"]', genres_source: "jev", genres_confidence: 0.8 });
   assert.deepEqual({ ...genresOf(empty) }, { genres: "[]", genres_source: null, genres_confidence: null });
 
   for (const id of [empty, judged, sourced]) repo.fillSubjectGenres(id, ["Mystery"]);
   assert.deepEqual({ ...genresOf(empty) }, { genres: '["Mystery"]', genres_source: null, genres_confidence: null });
   assert.deepEqual({ ...genresOf(judged) }, { genres: '["Mystery"]', genres_source: null, genres_confidence: null });
   assert.deepEqual({ ...genresOf(sourced) }, { genres: '["Fantasy"]', genres_source: null, genres_confidence: null });
-
-  repo.fillSubjectGenres(judged, []);
-  assert.equal(genresOf(judged).genres, '["Mystery"]');
 });
 
 test("confirmWithSource makes an unconfirmed book searchable once", () => {
