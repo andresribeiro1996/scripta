@@ -83,7 +83,7 @@ The steps, in order. The exact regexes are the builder's.
 3. **HTML.** If the text still contains tags or entities, run it through the shared `htmlToText` (below). Decode first and then strip tags, so escaped HTML (`&lt;b&gt;`) goes too.
 4. **Open Library Markdown.** The existing `plainDescription` steps (reference lines, rules, links, emphasis, escapes) move here. `plainDescription` becomes a thin wrapper, or is replaced at its call sites. The trailing-section rules in step 5 are new.
 5. **Trailing non-synopsis sections**, cut from a marker line to the end of the text:
-   - Open Library: "Also contained in:", "Contains:", a line that is only a Markdown rule, "Source: <url>", "(From <url>)", "([source][n])".
+   - Open Library: "Also contained in:", "Contains:", "Source: <url>", "(From <url>)", "([source][n])". A line that is only a Markdown rule is removed by step 4, not used as a cut marker, because publisher texts use `***` before the critics' quotes and author bios this design keeps.
    - Presença: a line that is exactly "Detalhes", when it is followed by a label line in the next few lines.
 6. **Whole-line removals.** Each line is short (builder's limit, around 80 characters):
    - Shop chrome: "Adicionar aos Favoritos", "Já se encontra nos favoritos", and the same text glued onto the end of a line.
@@ -93,7 +93,7 @@ The steps, in order. The exact regexes are the builder's.
    - The empty headings Citações, Críticas and Prémios when they are the last lines.
    - Move `METADATA_LABEL` from `publisherFeed.ts` to shared and extend it, rather than keeping two lists. Today it lacks Categoria, Sub-categoria, Série, Formato Capa, Autores, EAN and Nº de Páginas, and it only matches a label followed by a colon, a dash or the end of the line.
    - **My call:** in `cleanSummary` the label rule is narrower than the feed's, because it now runs on every source. A line is removed only when all of these hold: it is short, it starts with a label, and it doesn't end in sentence punctuation (`.`, `!`, `?`, `»`, `"`). The broad labels the feed also matches (Edição, Data, Ano, Preço, Autor) need a colon here, or a value shaped like a date, number or measurement. The feed's own `synopsis()` filter keeps its current reach.
-7. **Leading labels.** Remove a first line that is only "Sinopse", "Synopsis", "Resumo", "Descrição", "Description", "Sobre o livro" or "About the book", or that prefix on the first line.
+7. **Leading labels.** Remove a first line that is only "Sinopse", "Synopsis", "Resumo", "Descrição", "Description", "Sobre o livro" or "About the book". Remove that prefix on the first line only when a colon or dash follows it, or when it is in capitals, so "Sinopse da editora." and "Resumo de uma vida, …" survive.
 8. **Hard-wrapped prose.** Join a line break that is clearly a wrap, not a verse break:
    - A hyphen at the end of a line followed by a lowercase letter joins with no space ("rigoro-\nso" becomes "rigoroso").
    - A run of three or more consecutive lines that look like wrapped prose is joined with spaces. The lines are long (builder's threshold, around 45 characters or more), most end without sentence punctuation, and the next line starts lowercase.
@@ -110,6 +110,8 @@ The steps, in order. The exact regexes are the builder's.
 The shared HTML-to-text step, built from `publisherFeed.ts`'s `textLines` and `decodeEntities` and moved into `@scripta/shared`:
 
 - Block tags (`p`, `div`, `li`, headings and so on) become a paragraph break, `\n\n`.
+- Text with no block tag and no `<br>` keeps its own newlines; only its inline tags are stripped. This covers stored rows with a stray `<i>` and ISBNdb's plain-text synopses.
+- Comments and `<?…>` declarations are stripped. Entities decode until the text stops changing, so double-escaped markup goes too.
 - `<br>` becomes a single `\n`. This is the change from today's behaviour, where `<br>` became a paragraph. It keeps a verse line as a line, and lets step 8 join a wrapped prose line.
 - `script` and `style` are dropped. Every numeric entity is decoded, and named entities from one shared table, which grows to cover `&euro;`, `&sect;`, `&times;`, `&shy;`.
 - ISBNdb's `plainText` and the publisher feed both use it. ISBNdb keeps its own `plainText` for titles and publishers only if that is simpler (builder's call).
@@ -117,6 +119,8 @@ The shared HTML-to-text step, built from `publisherFeed.ts`'s `textLines` and `d
 ### Where the cleaner runs on new data
 
 **My call:** at the storage boundary, in `sqliteBooksRepository.ts`, on the only two summary writes: `mergeDetails` (where `$summary_hash` is computed, guarded by `takesSummary`) and `setWorkSummary`. The stored text and its hash then always agree, and every source and future source is covered, whatever its adapter does.
+
+**Original titles.** The cleaner strips "Título original X" lines, and `fillOriginalTitlesFromSummaries` and translation grouping read them from the stored summary. So `mergeDetails` fills a NULL `books.original_title` from the raw text (`originalTitleIn`) before it stores the cleaned text, and the backfill does the same for every book it changes.
 
 If `cleanSummary` returns null in `mergeDetails`, the incoming summary counts as absent, and `takesSummary` keeps the stored one. That is intended: the backfill cleans the stored one.
 
@@ -137,9 +141,10 @@ For every row in `books` and in `works` (including merged works, which are harml
 1. `cleaned = cleanSummary(summary)`. If `cleaned === summary`, skip the row.
 2. Set `summary = cleaned` and `summary_hash = summaryHashOf(cleaned)`. If `cleaned` is null, set both to NULL, and on `books` also set `summary_source` to NULL.
 3. **Carry the judgment.** If the old hash has a `synopsis_judgments` row and the new hash has none, insert a copy under the new hash with the same `model`, `usable`, `kind` and `asked_at`. If the new hash already has one, keep it, except that a `manual` judgment on the old hash replaces a non-manual one on the new hash. When several old hashes clean to the same new hash, choose in this order: a manual judgment, then a rule judgment, then the most recent `asked_at`. Two exceptions, applied in this order:
-   - **Fragment after cleaning.** If the cleaned text is a fragment (`isFragment`) and the chosen judgment is not `manual`, write a `rule` judgment instead, exactly as `applySynopsisRule` would. A `manual` keep still wins.
-   - **Hidden by Jev, text changed.** If the chosen judgment is a Jev hide (model neither `manual` nor `rule`, `usable < SYNOPSIS_HIDE_BELOW`), don't carry it. The new hash is left without a judgment, and the boot sweep re-asks Jev about the cleaned text. **Owner's decision (2026-10-18):** Jev may have hidden the text because of the chrome the cleaning removed. The 2026-10-16 backlog asked about 19,400 texts for about $4, so a couple of thousand re-asks costs well under $1. The report counts these as `jevHidesDropped`.
-4. Don't delete old judgment rows. They are keyed by text, cost nothing, and another row may still carry the old text until it is cleaned.
+   - **Fragment after cleaning.** If the cleaned text is a fragment (`isFragment`) and the chosen judgment is missing or not `manual`, write a `rule` judgment instead, exactly as `applySynopsisRule` would. A `manual` keep still wins.
+   - **Hidden by Jev, text changed.** If the chosen judgment is a Jev hide (model neither `manual` nor `rule`, `usable < SYNOPSIS_HIDE_BELOW`), don't carry it. The new hash is left without a judgment. The background sweep only judges works someone holds, so the runbook runs `synopsis-backlog.mjs` right after the backfill to re-ask Jev about the rest. **Owner's decision (2026-10-18):** Jev may have hidden the text because of the chrome the cleaning removed. The 2026-10-16 backlog asked about 19,400 texts for about $4, so a couple of thousand re-asks costs well under $1. The report counts these as `jevHidesDropped`.
+4. Write all the judgments before any row, so a crash mid-run loses no decision: a rerun skips rows already cleaned.
+5. Don't delete old judgment rows. They are keyed by text, cost nothing, and another row may still carry the old text until it is cleaned.
 
 **My call:** `jev_rejections` rows are not carried. The cleaned text may now pass. The few hashes affected go to Jev on the next sweep.
 
@@ -152,12 +157,14 @@ A whitespace-only change keeps the same hash, because `summaryHashOf` already co
 - for the dry run, 3 before/after samples per publisher host and per non-publisher source, truncated.
 
 **Running it:** the owner runs it after the deploy that ships the cleaner, as one entry in the post-deploy runbook:
+0. No publisher import (`import-publisher-covers`) between the deploy and the backfill. It would rewrite publisher rows first, and their judgments would not be carried.
 1. A read-only check of the volume's free space.
 2. `--dry-run` over `railway ssh`.
 3. A review of its samples.
 4. The real run. Save its output, because it is the only copy of the original texts.
+5. `synopsis-backlog.mjs`, dry run then for real, for the dropped Jev hides and anything left unjudged.
 
-Hold merges to main while it runs, because a deploy kills the job. The commands go in `backend/README.md` next to "Mojibake repair".
+Hold production deploys while it runs, because a deploy kills the job. The commands go in `backend/README.md` next to "Mojibake repair".
 
 ## Tests
 
