@@ -25,7 +25,8 @@ export function decodeHtmlEntities(text: string): string {
       const unusable = codePoint === 0 || codePoint > MAX_CODE_POINT || (codePoint >= FIRST_SURROGATE && codePoint <= LAST_SURROGATE);
       return unusable ? whole : String.fromCodePoint(codePoint);
     }
-    return NAMED_ENTITIES[name] ?? NAMED_ENTITIES[name.toLowerCase()] ?? whole;
+    const key = Object.hasOwn(NAMED_ENTITIES, name) ? name : name.toLowerCase();
+    return Object.hasOwn(NAMED_ENTITIES, key) ? NAMED_ENTITIES[key]! : whole;
   });
 }
 
