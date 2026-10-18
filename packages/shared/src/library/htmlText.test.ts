@@ -33,5 +33,5 @@ test("script, style and table cells", () => {
 });
 
 test("entities", () => {
-  assert.equal(decodeHtmlEntities("&#8211; &#x2014; &hellip; &euro; &sect; &times; a&shy;b &nbsp;x &#99999999;"), "– — … € § × ab \xa0x &#99999999;");
+  assert.equal(decodeHtmlEntities("&#8211; &#x2014; &hellip; &euro; &sect; &times; a&shy;b &nbsp;x &#99999999;"), "– — … € § × ab  x &#99999999;");
 });

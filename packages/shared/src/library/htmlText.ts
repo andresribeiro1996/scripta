@@ -11,7 +11,7 @@ const COMMENT = /<!--[\s\S]*?-->/g;
 const DECLARATION = /<[?!][^>]*>/g;
 const TAG = /<\/?[a-z][a-z0-9]*\b[^<>]*>/gi;
 const NAMED_ENTITIES: Record<string, string> = {
-  amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: "\xa0", shy: "",
+  amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", shy: "",
   hellip: "…", ndash: "–", mdash: "—", laquo: "«", raquo: "»", lsquo: "‘", rsquo: "’", ldquo: "“", rdquo: "”", ordm: "º", ordf: "ª",
   euro: "€", sect: "§", times: "×",
   aacute: "á", eacute: "é", iacute: "í", oacute: "ó", uacute: "ú", agrave: "à", atilde: "ã", otilde: "õ", acirc: "â", ecirc: "ê", ocirc: "ô", ccedil: "ç",
