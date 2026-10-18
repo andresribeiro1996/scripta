@@ -7,7 +7,7 @@ import { createObjectStore } from "../../storage/createObjectStore.js";
 import { createCompositeCatalog } from "./adapters/catalog/compositeCatalog.js";
 import { onlyMatchingLanguage } from "./adapters/catalog/languageFilter.js";
 import { createThrottle, fetchBytes } from "./adapters/http/http.js";
-import { createIsbndbBudget } from "./adapters/isbndb/isbndbBudget.js";
+import { createIsbndbBudget, ISBNDB_DAILY_QUOTA, ISBNDB_SEARCH_RESERVE } from "./adapters/isbndb/isbndbBudget.js";
 import { createIsbndbCatalog } from "./adapters/isbndb/isbndbCatalog.js";
 import { capDailyCalls } from "./adapters/isbndb/isbndbDailyCap.js";
 import { createIsbndbGate } from "./adapters/isbndb/isbndbGate.js";
@@ -41,8 +41,6 @@ const APPLE_GAP_MS = 3200;
 const OPEN_LIBRARY_GAP_MS = 1000;
 const OPEN_LIBRARY_COVER_GAP_MS = 3100;
 const BACKGROUND_ISBNDB_DAILY_CAP = 500;
-const ISBNDB_DAILY_QUOTA = 5000;
-const ISBNDB_SEARCH_RESERVE = 200;
 
 let activeService: BooksService | null = null;
 
