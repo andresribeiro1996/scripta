@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { router, useGlobalSearchParams, usePathname, useSegments } from "expo-router";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
-import { localDay, saveFailureMessage } from "@scripta/shared";
+import { localDay, saveFailureMessage, searchResultByline } from "@scripta/shared";
 import { useAuth } from "../../core/auth";
 import { Button, Sheet, Toast, dynamicType, minimumTouchTarget, spacing, typography, useTheme } from "../../ui";
 import { BookCover } from "../arena/BookCover";
@@ -24,7 +24,7 @@ export function AddBookSheet({
   book,
   onClose,
 }: {
-  book: { title: string; author: string; isbn?: string | null; coverUrl?: string | null; year?: number | null; workId?: string };
+  book: { title: string; author: string; isbn?: string | null; coverUrl?: string | null; year?: number | null; publisher?: string | null; workId?: string };
   onClose: () => void;
 }) {
   const { colors } = useTheme();
@@ -92,7 +92,7 @@ export function AddBookSheet({
         <BookCover cover={book.coverUrl ?? null} title={book.title} width={96} height={138} />
         <View style={styles.text}>
           <Text numberOfLines={2} {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>{book.title}</Text>
-          <Text numberOfLines={2} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{[book.author, book.year].filter(Boolean).join(" · ")}</Text>
+          <Text numberOfLines={2} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{searchResultByline({ authors: [book.author], publisher: book.publisher ?? null, year: book.year ?? null })}</Text>
         </View>
       </View>
       <Text {...dynamicType} style={[typography.caption, styles.strong, { color: colors.textDim }]}>Add to your library as</Text>

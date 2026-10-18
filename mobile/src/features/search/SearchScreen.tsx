@@ -152,7 +152,7 @@ export function SearchScreen() {
       {follow.error ? <Toast visible message={follow.error} tone="error" /> : null}
       {adding ? (
         <AddBookSheet
-          book={{ title: adding.title, author: adding.authors.join(", "), isbn: adding.isbn, coverUrl: adding.coverUrl, year: adding.year, workId: adding.workId }}
+          book={{ title: adding.title, author: adding.authors.join(", "), isbn: adding.isbn, coverUrl: adding.coverUrl, year: adding.year, publisher: adding.publisher, workId: adding.workId }}
           onClose={() => setAdding(null)}
         />
       ) : null}
