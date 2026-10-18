@@ -161,3 +161,30 @@ test("a title mismatch is listed with ISBNdb's title", async () => {
 
   assert.deepEqual(plan.mismatches, [{ id: row.id, title: "Os Cus de Judas", isbndbTitle: "Memória de Elefante" }]);
 });
+
+test("a translator with a role mark is not an author, but another role mark is only cleaned", async () => {
+  const h = setup({
+    [CUS]: async () => [hit("Amok", ["Tullio Forgiarini", "Maria Bochicchio (Tradutora)"])],
+    [ORIANA]: async () => [hit("Amok Dois", ["Tullio Forgiarini", "Ana Lima (Translator)"])],
+    [SARAGOCA]: async () => [hit("Livro", ["Rui Zink (org.)"])]
+  });
+  const one = h.book(CUS, "Amok");
+  h.book(ORIANA, "Amok Dois");
+  h.book(SARAGOCA, "Livro");
+  h.db.prepare("UPDATE books SET translator = ? WHERE id = ?").run("Maria Bochicchio", one.id);
+
+  const plan = await planIsbndbAuthors(h.db, h.isbndb, { max: 10, after: "" });
+
+  assert.deepEqual(plan.fills.map((fill) => fill.author).sort(), ["Rui Zink", "Tullio Forgiarini", "Tullio Forgiarini"]);
+});
+
+test("a selected book whose stored ISBN is invalid is not asked and counts as passed", async () => {
+  const h = setup({});
+  const bad = h.book("123", "Inválido");
+  const good = h.book(CUS, "Válido");
+
+  const plan = await planIsbndbAuthors(h.db, h.isbndb, { max: 10, after: "" });
+
+  assert.deepEqual(h.asked, [CUS]);
+  assert.deepEqual([plan.selected, plan.isbndb.asked, plan.isbndb.notAsked, plan.next], [2, 1, 0, [bad.id, good.id].sort()[1]]);
+});

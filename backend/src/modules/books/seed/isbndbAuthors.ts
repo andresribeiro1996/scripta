@@ -20,6 +20,8 @@ export interface IsbndbAuthorPlan {
   fills: Array<{ id: string; isbn: string; title: string; author: string }>;
 }
 
+const TRANSLATOR_MARK = /\(\s*(trad|transl)/i;
+
 const TARGETS_SQL = `SELECT id, title, isbn, translator FROM books WHERE author = '' AND title <> '' AND isbn IS NOT NULL AND isbn <> '' AND id > ? ORDER BY id`;
 
 export async function planIsbndbAuthors(db: DatabaseSync, isbndb: Pick<BookCatalog, "search">, options: { max: number; after: string }): Promise<IsbndbAuthorPlan> {
@@ -52,7 +54,8 @@ export async function planIsbndbAuthors(db: DatabaseSync, isbndb: Pick<BookCatal
     } else if (hit.authors.some((name) => name.includes(","))) plan.commaName++;
     else {
       const translators = new Set((book.translator ?? "").split(", ").map(normalizeWords).filter(Boolean));
-      const author = cleanCredit(hit.authors.filter((name) => !translators.has(normalizeWords(name))).join(", "));
+      const names = hit.authors.filter((name) => !TRANSLATOR_MARK.test(name) && !translators.has(normalizeWords(cleanCredit(name) ?? "")));
+      const author = cleanCredit(names.join(", "));
       if (author) plan.fills.push({ id: book.id, isbn, title: book.title, author });
       else plan.placeholder++;
     }
