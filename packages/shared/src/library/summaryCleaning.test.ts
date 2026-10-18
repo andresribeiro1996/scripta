@@ -83,6 +83,13 @@ const unchanged = [
   "Sinopse da editora.",
   "Resumo de uma vida, contado pela filha.",
   "Os E.U.A. e o Sr.Silva.",
+  "Contains: the complete trilogy of the saga.\n\nUma história sobre três irmãos que partem para o mar em busca de fortuna.",
+  "Source: https://x.org/a\n\nA história continua com muita acção e aventura pelo mundo.",
+  "Série Negra\n\nUm detective chega a uma cidade em silêncio.",
+  "Peso Pesado\n\nUm pugilista tenta voltar ao ringue.",
+  "Autores Portugueses do século XX reunidos neste volume\n\nTexto.",
+  "Ano 2000: o mundo muda para sempre\n\nUma crónica do fim de século.",
+  "Data 1922 foi o ano\n\nOutra frase.",
   P
 ];
 

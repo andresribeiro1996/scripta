@@ -18,8 +18,10 @@ const SHOP_CHROME = /(?:[^\S\n]*(?:Adicionar aos Favoritos|J[áa] se encontra no
 const PLACEHOLDER_LINE = /^\[data_lancamento\]/i;
 const STRICT_LABEL = new RegExp(`^(?:${STRICT_METADATA_LABEL})`, "i");
 const LOOSE_LABEL = new RegExp(`^(?:${LOOSE_METADATA_LABEL})`, "i");
-const AFTER_STRICT_LABEL = /^\s*$|^\s*[:–—-]|^\s+[\p{Lu}\d(\[]/u;
-const AFTER_LOOSE_LABEL = /^\s*:|^\s+\d/;
+const NAME_LABEL = /^(?:T[íi]tulo\s+original|Tradu[çc][ãa]o|Tradutor[a]?|Traduzido|Cole[çc][ãa]o)/i;
+const AFTER_STRICT_LABEL = /^\s*$|^\s*[:–—-]|^\s+\d/;
+const AFTER_NAME_LABEL = /^\s+[\p{Lu}(\[]/u;
+const AFTER_LOOSE_LABEL = /^:|^\s+(?:\d[\d\s./,:–-]*(?:\s?(?:€|mm|cm|kg|g|pp?))?|\d{1,2}\s+de\s+\p{L}+\s+de\s+\d{4})$/u;
 const EDITION_LINE = /^\d{1,2}\s*\.?\s*[ªº°]?\s*(?:edi[çc][ãa]o|reimpress[ãa]o)(?:\s+\p{L}+)?(?:\s+(?:de\s+)?\d{4})?$/iu;
 const EMPTY_HEADING = /^(?:Cita[çc][õo]es|Cr[íi]ticas|Pr[ée]mios)$/i;
 const LEADING_LABEL = /^(?:sinopse|synopsis|resumo|descri[çc][ãa]o|description|sobre o livro|about the book)(?=\s|:|[–—-]|$)/i;
@@ -29,7 +31,10 @@ const GLUED_SENTENCE = /(\p{Ll}{2}[.!?])(?=\p{Lu}\p{Ll})/gu;
 function isMetadataLabelLine(line: string): boolean {
   if (line.length > MAX_LABEL_LINE || SENTENCE_END.test(line)) return false;
   const strict = STRICT_LABEL.exec(line);
-  if (strict) return AFTER_STRICT_LABEL.test(line.slice(strict[0].length));
+  if (strict) {
+    const rest = line.slice(strict[0].length);
+    return AFTER_STRICT_LABEL.test(rest) || (NAME_LABEL.test(line) && AFTER_NAME_LABEL.test(rest));
+  }
   const loose = LOOSE_LABEL.exec(line);
   return loose !== null && AFTER_LOOSE_LABEL.test(line.slice(loose[0].length));
 }
@@ -40,6 +45,7 @@ function isRemovableLine(line: string): boolean {
 
 function tailStart(lines: string[]): number {
   return lines.findIndex((line, index) => {
+    if (!lines.slice(0, index).some((before) => before.trim() !== "")) return false;
     const text = line.trim();
     if (text.length <= MAX_LABEL_LINE && TAIL_MARKER.test(text)) return true;
     return text === "Detalhes" && lines.slice(index + 1, index + 1 + DETAILS_REACH).some((next) => isMetadataLabelLine(next.trim()));
@@ -122,9 +128,11 @@ function joinWraps(text: string): string {
 
 function separateGluedSentences(text: string): string {
   return text.replace(GLUED_SENTENCE, (match, head: string, offset: number) => {
-    const start = text.slice(0, offset).search(/\S*$/);
-    const end = text.indexOf(" ", offset);
-    const token = text.slice(start, end < 0 ? undefined : end).split("\n")[0]!;
+    let start = offset;
+    while (start > 0 && !/\s/.test(text[start - 1]!)) start -= 1;
+    let end = offset;
+    while (end < text.length && !/\s/.test(text[end]!)) end += 1;
+    const token = text.slice(start, end);
     return /:\/\/|www\./i.test(token) ? match : `${head} `;
   });
 }
