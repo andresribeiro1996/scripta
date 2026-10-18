@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
-import { SourceUnavailableError } from "../../domain/errors.js";
+import { SourcePausedError, SourceUnavailableError } from "../../domain/errors.js";
 import type { Throttle } from "../http/http.js";
 import { createIsbndbCatalog } from "./isbndbCatalog.js";
 import { createIsbndbGate } from "./isbndbGate.js";
@@ -156,4 +156,32 @@ test("a catalog built for the background uses the normal lane", async () => {
   respond(200, { book: dune });
   await createIsbndbCatalog("k", recording, gate, false).fetchDetails({ isbn: "9780441013593", title: "", author: "" });
   assert.deepEqual(lanes, [false]);
+});
+
+test("a details budget is spent by details lookups and never by a user's search", async () => {
+  respond(200, { book: dune });
+  let spent = 0;
+  const catalog = createIsbndbCatalog("k", direct, gate, true, { details: () => { spent++; } });
+  await catalog.search({ text: "dune" });
+  await catalog.search({ isbn: "9780441013593" });
+  assert.equal(spent, 0);
+  await catalog.fetchDetails({ isbn: "9780441013593", title: "", author: "" });
+  assert.equal(spent, 1);
+});
+
+test("a spent details budget stops details lookups but not text searches", async () => {
+  const requests = respond(200, { books: [dune] });
+  const retryAt = Date.parse("2026-10-19T00:00:00.000Z");
+  const catalog = createIsbndbCatalog("k", direct, gate, true, { details: () => { throw new SourcePausedError("isbndb", "daily budget reached", { retryAt }); } });
+  await assert.rejects(catalog.fetchDetails({ isbn: "9780441013593", title: "", author: "" }), (error: unknown) => error instanceof SourcePausedError && error.retryAt === retryAt);
+  assert.equal(requests.length, 0);
+  assert.equal((await catalog.search({ text: "dune" })).length, 1);
+  assert.equal(requests.length, 1);
+});
+
+test("a search budget is spent by an ISBN search", async () => {
+  respond(200, { book: dune });
+  let spent = 0;
+  await createIsbndbCatalog("k", direct, gate, true, { search: () => { spent++; } }).search({ isbn: "9780441013593" });
+  assert.equal(spent, 1);
 });

@@ -46,6 +46,23 @@ test("ISBNdb lookups send the key and treat 404 as no candidates", async () => {
   assert.deepEqual(await source.byIsbn("9780441013593"), []);
 });
 
+test("an ISBNdb lookup spends once, and a spent budget stops it before the request without pausing the gate", async () => {
+  const urls = stub(() => Response.json({ book: { title: "Dune", authors: ["Frank Herbert"], image_original: "https://i/o.jpg" } }));
+  const sharedGate = createIsbndbGate({ onPause: () => {} });
+  let spent = 0;
+  await createIsbndbSource("k", direct, sharedGate, () => { spent++; }).byIsbn("9780441013593");
+  assert.equal(spent, 1);
+  assert.equal(urls.length, 1);
+
+  const retryAt = Date.parse("2026-10-19T00:00:00.000Z");
+  const exhausted = createIsbndbSource("k", direct, sharedGate, () => { throw new SourcePausedError("isbndb", "daily budget reached", { retryAt }); });
+  await assert.rejects(exhausted.byIsbn("9780441013593"), (error: unknown) => error instanceof SourcePausedError && error.retryAt === retryAt);
+  assert.equal(urls.length, 1);
+
+  assert.deepEqual(await createIsbndbSource("k", direct, sharedGate, () => {}).byIsbn("9780441013593"), [{ source: "isbndb", url: "https://i/o.jpg" }]);
+  assert.equal(urls.length, 2);
+});
+
 test("ISBNdb title search keeps only accepted books", async () => {
   const urls = stub(() => Response.json({ books: [
     { title: "Dune", authors: ["Frank Herbert"], image: "https://i/1.jpg" },

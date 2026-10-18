@@ -7,6 +7,7 @@ import { createObjectStore } from "../../storage/createObjectStore.js";
 import { createCompositeCatalog } from "./adapters/catalog/compositeCatalog.js";
 import { onlyMatchingLanguage } from "./adapters/catalog/languageFilter.js";
 import { createThrottle, fetchBytes } from "./adapters/http/http.js";
+import { createIsbndbBudget } from "./adapters/isbndb/isbndbBudget.js";
 import { createIsbndbCatalog } from "./adapters/isbndb/isbndbCatalog.js";
 import { capDailyCalls } from "./adapters/isbndb/isbndbDailyCap.js";
 import { createIsbndbGate } from "./adapters/isbndb/isbndbGate.js";
@@ -40,6 +41,8 @@ const APPLE_GAP_MS = 3200;
 const OPEN_LIBRARY_GAP_MS = 1000;
 const OPEN_LIBRARY_COVER_GAP_MS = 3100;
 const BACKGROUND_ISBNDB_DAILY_CAP = 500;
+const ISBNDB_DAILY_QUOTA = 5000;
+const ISBNDB_SEARCH_RESERVE = 200;
 
 let activeService: BooksService | null = null;
 
@@ -66,6 +69,7 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
   const booksDb = timeStep(app.log, "startup:books-open", openBooksDb);
   const repo = timedMethods(createSqliteBooksRepository(booksDb), app.log, "books");
   useBooksRepository(repo);
+  const isbndbSpend = createIsbndbBudget(repo, ISBNDB_DAILY_QUOTA - ISBNDB_SEARCH_RESERVE);
   const heldWorks = options.heldWorks;
   const alertTypesafe = (subject: string, text: string) => {
     app.log.warn({ subject }, text);
@@ -120,17 +124,17 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
       read: (id, extension) => createObjectStore().get(`covers/${id}.${extension}`)
     },
     sources: {
-      isbndb: isbndbConfigured ? createIsbndbSource(env.ISBNDB_API_KEY, isbndbThrottle, isbndbGate) : null,
+      isbndb: isbndbConfigured ? createIsbndbSource(env.ISBNDB_API_KEY, isbndbThrottle, isbndbGate, isbndbSpend) : null,
       apple: createAppleSource(createThrottle(APPLE_GAP_MS)),
       openlibrary: createOpenLibraryCoverSource(openLibraryThrottle)
     },
     catalog: createCompositeCatalog(
       onlyMatchingLanguage(createOpenLibraryCatalog(openLibraryThrottle)),
-      isbndbConfigured ? onlyMatchingLanguage(createIsbndbCatalog(env.ISBNDB_API_KEY, isbndbThrottle, isbndbGate)) : null
+      isbndbConfigured ? onlyMatchingLanguage(createIsbndbCatalog(env.ISBNDB_API_KEY, isbndbThrottle, isbndbGate, true, { details: isbndbSpend })) : null
     ),
     backgroundCatalog: createCompositeCatalog(
       onlyMatchingLanguage(backgroundOpenLibrary),
-      isbndbConfigured ? onlyMatchingLanguage(capDailyCalls(createIsbndbCatalog(env.ISBNDB_API_KEY, isbndbThrottle, isbndbGate, false), BACKGROUND_ISBNDB_DAILY_CAP)) : null,
+      isbndbConfigured ? onlyMatchingLanguage(capDailyCalls(createIsbndbCatalog(env.ISBNDB_API_KEY, isbndbThrottle, isbndbGate, false, { details: isbndbSpend }), BACKGROUND_ISBNDB_DAILY_CAP)) : null,
       true
     ),
     editionRecords: backgroundOpenLibrary,
@@ -163,7 +167,7 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
     (error) => app.log.error({ err: error }, "work key backfill failed")
   );
   const stopColorBackfill = startCoverColorBackfill((limit) => service.fillCoverColors(limit), app.log);
-  const retitleIsbndb = isbndbConfigured ? createIsbndbCatalog(env.ISBNDB_API_KEY, isbndbThrottle, isbndbGate, false) : null;
+  const retitleIsbndb = isbndbConfigured ? createIsbndbCatalog(env.ISBNDB_API_KEY, isbndbThrottle, isbndbGate, false, { details: isbndbSpend, search: isbndbSpend }) : null;
   const stopRetitleJob = retitleIsbndb
     ? startDetailsBackfill(
         (signal) => retitleWanted({
