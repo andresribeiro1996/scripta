@@ -1236,14 +1236,17 @@ function groupingFixture() {
   const english = add("mixed-english", "Blindness", "José Saramago", undefined, at(0));
   const portuguese = add("mixed-portuguese", "Ensaio sobre a Cegueira", "José Saramago", undefined, at(1));
   repo.mergeWorks(portuguese.work_id!, english.work_id!, at(1));
-  add("mixed-newer", "Ensaio sobre a Cegueira", "José Saramago", undefined, at(2));
+  add("mixed-newer", "Blindness", "José Saramago", undefined, at(2));
 
   add("empty-a", "Orlando", "", undefined, at(0));
   add("empty-b", "Orlando", "", undefined, at(1));
 
-  add("null-a", "Middlemarch", "George Eliot", undefined, at(0));
-  const nullKey = add("null-b", "Middlemarch", "George Eliot", undefined, at(1));
-  db.prepare("UPDATE books SET title_key = NULL WHERE id = ?").run(nullKey.id);
+  const nullA = add("null-a", "Middlemarch", "George Eliot", undefined, at(0));
+  const nullB = add("null-b", "Middlemarch", "George Eliot", undefined, at(1));
+  const nullWork = nullA.work_id!;
+  repo.mergeWorks(nullB.work_id!, nullWork, at(1));
+  db.prepare("UPDATE books SET title_key = NULL WHERE id = ?").run(nullB.id);
+  add("null-c", "Middlemarch", "George Eliot", undefined, at(2));
 
   return { db, repo, label };
 }
@@ -1262,7 +1265,9 @@ test("grouping picks the same source and target for every rule case", () => {
 
 test("batches of one merge the same pairs as one call, oldest first within a title key", () => {
   const one = groupingFixture();
-  while (one.repo.groupKeylessWorks(1, NOW) === 1);
+  let merged = 0;
+  while (merged < 20 && one.repo.groupKeylessWorks(1, NOW) === 1) merged++;
+  assert.equal(merged, 7);
   const all = groupingFixture();
   all.repo.groupKeylessWorks(250, NOW);
   assert.deepEqual(mergedPairs(one.db, one.label).sort(), mergedPairs(all.db, all.label).sort());
@@ -1277,8 +1282,15 @@ test("shared title keys that never pair don't end a batch early", () => {
   edition(repo, "9780000000004", "Bravo Tale", "Ann Author", "OL4W");
   edition(repo, "9780000000005", "Charlie Tale", "Ann Author", "OL5W");
   edition(repo, "9780000000006", "Charlie Tale", "Ann Author", "OL6W");
-  const oldest = edition(repo, "9780000000007", "Zulu Tale", "Ann Author", undefined, at(0));
-  const newest = edition(repo, "9780000000008", "Zulu Tale", "Ann Author", undefined, at(1));
+  const detached = edition(repo, "9780000000007", "Delta Tale", "Ann Author", undefined, at(0));
+  repo.detachEdition(detached.id, at(1));
+  edition(repo, "9780000000008", "Delta Tale", "Ann Author", undefined, at(1));
+  const echo = edition(repo, "9780000000009", "Echo Tale", "Ann Author", undefined, at(0));
+  const foxtrot = edition(repo, "9780000000010", "Foxtrot Tale", "Ann Author", undefined, at(1));
+  repo.mergeWorks(foxtrot.work_id!, echo.work_id!, at(1));
+  edition(repo, "9780000000011", "Echo Tale", "Ann Author", undefined, at(2));
+  const oldest = edition(repo, "9780000000012", "Zulu Tale", "Ann Author", undefined, at(0));
+  const newest = edition(repo, "9780000000013", "Zulu Tale", "Ann Author", undefined, at(1));
   assert.equal(repo.groupKeylessWorks(1, NOW), 1);
   assert.equal(workById(db, newest.work_id).merged_into, oldest.work_id);
   assert.equal(repo.groupKeylessWorks(1, NOW), 0);
