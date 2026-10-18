@@ -22,7 +22,7 @@ const { applyBooksMigrations } = await import("../adapters/sqlite/connection.js"
 const { createSqliteBooksRepository } = await import("../adapters/sqlite/sqliteBooksRepository.js");
 const { SourceUnavailableError } = await import("../domain/errors.js");
 const { catalogTitleKey } = await import("../domain/normalize.js");
-const { applyBnpRecord, fetchBnpScan, importBnp, logBnpSync, monthWindows, planBnpRecord, syncBnp, utcDate } = await import("./bnpImport.js");
+const { applyBnpRecord, BNP_ISBN_URL, fetchBnpScan, importBnp, logBnpSync, lookupBnpIsbn, monthWindows, planBnpRecord, syncBnp, utcDate } = await import("./bnpImport.js");
 const { mapBnpRecord, readMarcRecords } = await import("./bnpRecord.js");
 
 process.env.TZ = "America/Sao_Paulo";
@@ -919,4 +919,44 @@ test("a clean sync is logged at info", async () => {
 
 test("a sync with a failed window is logged as an error", async () => {
   assert.deepEqual(await syncLogs([unavailable(), unavailable()]), [["error", { through: null, kept: 0, created: 0, failedWindows: ["2026-10-17..2026-10-18"] }, "bnp sync failed windows"]]);
+});
+
+const lookupUrl = (isbn: string) => `${BNP_ISBN_URL}${isbn}`;
+const urnWithout = (...tags: string[]) => tags.reduce((xml, tag) => xml.replace(new RegExp(`<datafield [^>]*tag="${tag}">.*?</datafield>`, "g"), ""), fixture("urn-9789720044457.xml"));
+
+test("a Portugal ISBN lookup saves the record with its scan under the asked ISBN", async () => {
+  const { repo, deps } = harvestSetup({ [lookupUrl(PORTUGUESE)]: fixture("urn-9789720044457.xml") });
+
+  const book = await lookupBnpIsbn(deps, PORTUGUESE);
+
+  assert.equal(book!.isbn, PORTUGUESE);
+  assert.equal(book!.created_by, "bnp");
+  assert.equal(book!.cover_status, "good");
+  assert.equal(repo.getImage(book!.cover_image_id!)!.source, "bnp");
+  assert.equal(repo.findBookByKey(`isbn:${PORTUGUESE}`)!.id, book!.id);
+});
+
+test("a lookup keeps a textbook and a record with no person", async () => {
+  const xml = urnWithout("700", "702").replace('821.134.2(83)-31"19/20"', "373.3(075)");
+  const { deps } = harvestSetup({ [lookupUrl(PORTUGUESE)]: xml });
+
+  const book = await lookupBnpIsbn(deps, PORTUGUESE);
+
+  assert.equal(book!.title, "A casa dos espíritos");
+  assert.equal(book!.author, "");
+  assert.equal(book!.created_by, "bnp");
+});
+
+test("a lookup miss returns null and saves nothing", async () => {
+  const { db, deps } = harvestSetup({ [lookupUrl(PORTUGUESE)]: fixture("urn-missing.xml") });
+
+  assert.equal(await lookupBnpIsbn(deps, PORTUGUESE), null);
+  assert.equal(bookCount(db), 0);
+});
+
+test("a lookup answered with a server error is reported as unavailable", async () => {
+  const { db, deps } = harvestSetup({ [lookupUrl(PORTUGUESE)]: { status: 503, text: "" } });
+
+  await assert.rejects(lookupBnpIsbn(deps, PORTUGUESE), (error) => error instanceof SourceUnavailableError && error.source === "urn.porbase.org");
+  assert.equal(bookCount(db), 0);
 });

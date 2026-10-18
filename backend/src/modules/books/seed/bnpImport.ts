@@ -135,6 +135,7 @@ export interface BnpImportReport {
 }
 
 export const BNP_OAI = "https://oai.bnportugal.gov.pt/servlet/OAIHandler";
+export const BNP_ISBN_URL = "https://urn.porbase.org/isbn/unimarc/marcxchange?id=";
 export const BNP_SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
 const SCAN_POOL = 2;
@@ -331,6 +332,14 @@ export function logBnpSync(log: BnpSyncLog, report: BnpImportReport): void {
   const details = { through, kept, created, failedWindows };
   if (failedWindows.length > 0) log.error(details, "bnp sync failed windows");
   else log.info(details, "bnp sync");
+}
+
+export async function lookupBnpIsbn(deps: BnpHarvestDeps, isbn: string): Promise<BookRow | null> {
+  const { status, text } = await deps.fetchText(BNP_ISBN_URL + isbn);
+  if (status !== 200) throw new SourceUnavailableError("urn.porbase.org", `HTTP ${status}`, { status });
+  const record = readMarcRecords(text)[0];
+  if (record === undefined) return null;
+  return (await applyBnpRecord(deps, planBnpRecord(deps.repo, mapBnpRecord(record), isbn)!)).book;
 }
 
 export async function syncBnp(deps: BnpHarvestDeps): Promise<BnpImportReport | null> {

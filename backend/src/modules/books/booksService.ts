@@ -8,7 +8,7 @@ import { coverColor, encodeCover, type EncodedCover } from "./domain/images.js";
 import { hiddenSynopsisHashes } from "./domain/synopsis.js";
 import { fillMissingIdentity, findExisting, findOrCreateBook, keysOf } from "./domain/findOrCreate.js";
 import { firstEditionPerWork, workIdsOf } from "./domain/workSearch.js";
-import { editionLanguage, findByIdentity, isPortugueseIsbn, lookupIdentity, SEARCH_LIMIT, searchTokens, WORK_SCAN_LIMIT, WORK_SEARCH_LIMIT, type BookIdentity, type BookLookup } from "./domain/normalize.js";
+import { editionLanguage, findByIdentity, isPortugalIsbn, isPortugueseIsbn, isValidIsbn, lookupIdentity, SEARCH_LIMIT, searchTokens, WORK_SCAN_LIMIT, WORK_SEARCH_LIMIT, type BookIdentity, type BookLookup } from "./domain/normalize.js";
 import { summaryMatchesLanguage } from "./adapters/catalog/languageFilter.js";
 import type { BookCatalog, BooksRepository, CatalogSearchHit, CoverBlobReader, CoverBlobStore, CoverSource, EditionRecordSource, PageCursor } from "./domain/ports.js";
 import type { BookRow, CoverSourceName, CoverStatus, WorkView } from "./domain/types.js";
@@ -47,6 +47,7 @@ export interface BooksServiceDeps {
   adminUserId: string;
   warn: (details: Record<string, unknown>, message: string) => void;
   onDetailsChecked?: (book: BookRow) => void;
+  bnpLookup?: (isbn: string) => Promise<BookRow | null>;
   now?: () => Date;
 }
 
@@ -166,6 +167,19 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
   function withWorkIds(rows: BookRow[]): BookSearchResult[] {
     const canonical = deps.repo.canonicalWorkIds(workIdsOf(rows));
     return rows.map((row) => toSearchResult(row, row.work_id ? canonical.get(row.work_id) ?? row.work_id : null));
+  }
+
+  async function nationalBibliographyBook(query: string, isbn: string): Promise<BookRow | null> {
+    if (!deps.bnpLookup || !isPortugalIsbn(isbn) || !isValidIsbn(query)) return null;
+    const held = deps.repo.findBookByKey(`isbn:${isbn}`);
+    if (held?.created_by === "bnp") return held;
+    try {
+      return await deps.bnpLookup(isbn);
+    } catch (error) {
+      if (!(error instanceof SourceUnavailableError)) throw error;
+      deps.warn({ isbn, source: error.source, error: error.message }, "bnp lookup unavailable");
+      return null;
+    }
   }
 
   function saveHits(hits: CatalogSearchHit[]): BookSearchResult[] {
@@ -376,7 +390,11 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
     async searchExternal(query) {
       const trimmed = query.trim();
       if (!trimmed) return [];
-      if (looksLikeIsbnQuery(trimmed)) return saveHits(await deps.catalog.search({ isbn: canonicalIsbn(trimmed) }));
+      if (looksLikeIsbnQuery(trimmed)) {
+        const isbn = canonicalIsbn(trimmed);
+        const national = await nationalBibliographyBook(trimmed, isbn);
+        return national ? withWorkIds([national]) : saveHits(await deps.catalog.search({ isbn }));
+      }
       if (searchTokens(trimmed).length === 0) return [];
       return saveHits(await deps.catalog.search({ text: trimmed }));
     },

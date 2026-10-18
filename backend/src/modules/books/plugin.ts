@@ -34,7 +34,7 @@ import type { CoverBlobReader, CoverBlobStore } from "./domain/ports.js";
 import { coverUrlFor, useBooksRepository } from "./publicCoverLookup.js";
 import { buildAdminRoutes, buildCatalogRoutes, buildCoverFileRoutes, buildGenreReviewRoutes, buildResolveRoutes, buildSynopsisReviewRoutes, buildTranslationReviewRoutes } from "./routes.js";
 import { RETITLE_BATCH_SIZE, retitleWanted } from "./retitleJob.js";
-import { BNP_SYNC_INTERVAL_MS, fetchBnpScan, logBnpSync, syncBnp, type BnpHarvestDeps } from "./seed/bnpImport.js";
+import { BNP_SYNC_INTERVAL_MS, fetchBnpScan, logBnpSync, lookupBnpIsbn, syncBnp, type BnpHarvestDeps } from "./seed/bnpImport.js";
 import { applyMojibakeRepairs } from "./seed/mojibakeRepair.js";
 import { fetchText } from "./seed/siteFetch.js";
 import { createCoverWorker } from "./worker.js";
@@ -122,6 +122,14 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
     save: (id, extension, bytes) => createObjectStore().put(`covers/${id}.${extension}`, bytes, "image/webp"),
     read: (id, extension) => createObjectStore().get(`covers/${id}.${extension}`)
   };
+  const bnpDeps: BnpHarvestDeps = {
+    repo,
+    blobs,
+    fetchScan: fetchBnpScan,
+    fetchText,
+    now: () => new Date(),
+    log: (line) => app.log.info({ bnp: line }, "bnp sync window")
+  };
   const service = createBooksService({
     repo,
     blobs,
@@ -145,6 +153,7 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
     publicUrlFor: coverUrlFor,
     adminUserId: env.ADMIN_USER_ID,
     warn: (details, message) => app.log.warn(details, message),
+    bnpLookup: (isbn) => lookupBnpIsbn(bnpDeps, isbn),
     onDetailsChecked: (book) => {
       if (!book.work_id) return;
       genreJobs?.add(book.work_id);
@@ -182,14 +191,6 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
         (error) => app.log.error({ err: error }, "lossy retitle failed")
       )
     : null;
-  const bnpDeps: BnpHarvestDeps = {
-    repo,
-    blobs,
-    fetchScan: fetchBnpScan,
-    fetchText,
-    now: () => new Date(),
-    log: (line) => app.log.info({ bnp: line }, "bnp sync window")
-  };
   const stopBnpSync = startDetailsBackfill(
     async () => {
       const report = await syncBnp(bnpDeps);
