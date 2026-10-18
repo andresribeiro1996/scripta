@@ -1,5 +1,5 @@
 import { LOOSE_METADATA_LABEL, STRICT_METADATA_LABEL, canonicalIsbn, cleanSummary, decodeHtmlEntities, htmlToText } from "@scripta/shared";
-import { normalizeWords } from "../domain/normalize.js";
+import { checksumOk, isbn10Ok, normalizeWords } from "../domain/normalize.js";
 import { originalTitleIn } from "../domain/translation.js";
 import type { PublisherSite } from "./publishers.js";
 
@@ -56,16 +56,6 @@ const NAME_PARTICLES = new Set(["de", "da", "do", "dos", "das", "e"]);
 const MAX_NAME_WORDS = 6;
 const YEAR_ATTRIBUTE = /^(?:ano|data|edi[cç][aã]o)\b/i;
 const YEAR_VALUE = /(?<!\d)(?:19|20)\d{2}(?!\d)/;
-
-function checksumOk(digits: string): boolean {
-  const sum = [...digits].reduce((total, digit, index) => total + Number(digit) * (index % 2 === 0 ? 1 : 3), 0);
-  return sum % 10 === 0;
-}
-
-function isbn10Ok(digits: string): boolean {
-  const sum = [...digits].reduce((total, digit, index) => total + (digit === "X" ? 10 : Number(digit)) * (10 - index), 0);
-  return sum % 11 === 0;
-}
 
 function isbn13s(text: string): { isbn: string; index: number }[] {
   return [...text.matchAll(ISBN_CANDIDATE)].flatMap((match) => {

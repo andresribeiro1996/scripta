@@ -57,6 +57,22 @@ export function titleMatches(wanted: string, candidate: string): boolean {
   return normalized !== "" && normalized === normalizeTitle(candidate);
 }
 
+export function checksumOk(digits: string): boolean {
+  const sum = [...digits].reduce((total, digit, index) => total + Number(digit) * (index % 2 === 0 ? 1 : 3), 0);
+  return sum % 10 === 0;
+}
+
+export function isbn10Ok(digits: string): boolean {
+  const sum = [...digits].reduce((total, digit, index) => total + (digit === "X" ? 10 : Number(digit)) * (10 - index), 0);
+  return sum % 11 === 0;
+}
+
+export function isValidIsbn(raw: string): boolean {
+  const compact = raw.replace(/[-\s]/g, "").toUpperCase();
+  if (/^\d{13}$/.test(compact)) return checksumOk(compact);
+  return /^\d{9}[\dX]$/.test(compact) && isbn10Ok(compact);
+}
+
 function hasIsbnPrefix(isbn: string | null, prefixes13: string[], prefixes10: string[]): boolean {
   const normalized = normalizeIsbn(isbn ?? "");
   const prefixes = normalized.length === 13 ? prefixes13 : prefixes10;
