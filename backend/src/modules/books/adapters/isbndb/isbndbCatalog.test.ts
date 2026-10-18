@@ -179,6 +179,19 @@ test("a spent details budget stops details lookups but not text searches", async
   assert.equal(requests.length, 1);
 });
 
+test("an ISBN with a wrong check digit is never sent to ISBNdb and spends nothing", async () => {
+  const requests = respond(200, { book: dune });
+  let spent = 0;
+  const spend = () => { spent++; };
+  const catalog = createIsbndbCatalog("k", direct, gate, true, { details: spend, search: spend });
+  assert.equal(await catalog.fetchDetails({ isbn: "9780441013594", title: "Dune", author: "" }), null);
+  assert.equal(await catalog.fetchDetails({ isbn: "0441013598", title: "Dune", author: "" }), null);
+  assert.deepEqual(await catalog.search({ isbn: "9780441013594" }), []);
+  assert.deepEqual(await catalog.search({ isbn: "0441013598" }), []);
+  assert.equal(requests.length, 0);
+  assert.equal(spent, 0);
+});
+
 test("a search budget is spent by an ISBN search", async () => {
   respond(200, { book: dune });
   let spent = 0;

@@ -73,6 +73,54 @@ test("ISBNdb title search keeps only accepted books", async () => {
   assert.equal(urls[0], "https://api2.isbndb.com/books/Dune?page=1&pageSize=20&column=title");
 });
 
+test("an ISBN with a wrong check digit is never sent to ISBNdb and spends nothing", async () => {
+  const urls = stub(() => Response.json({}));
+  let spent = 0;
+  const source = createIsbndbSource("k", direct, gate, () => { spent++; });
+  assert.deepEqual(await source.byIsbn("9780441013594"), []);
+  assert.deepEqual(await source.byIsbn("0441013598"), []);
+  assert.equal(urls.length, 0);
+  assert.equal(spent, 0);
+});
+
+test("a valid ISBN-10 is still looked up, lowercase check letter included", async () => {
+  const urls = stub(() => Response.json({ book: { title: "Dune", image_original: "https://i/o.jpg" } }));
+  let spent = 0;
+  assert.deepEqual(await createIsbndbSource("k", direct, gate, () => { spent++; }).byIsbn("080442957x"), [{ source: "isbndb", url: "https://i/o.jpg" }]);
+  assert.deepEqual(urls, ["https://api2.isbndb.com/book/080442957x"]);
+  assert.equal(spent, 1);
+});
+
+test("a title longer than ISBNdb's 150 character limit is cut at a word boundary", async () => {
+  const urls = stub(() => Response.json({ books: [] }));
+  const title = Array.from({ length: 30 }, (_, index) => `palavra${index}`).join(" ");
+  assert.ok(title.length > 150);
+  await createIsbndbSource("k", direct, gate).byTitle(title, "", acceptAll);
+  const query = decodeURIComponent(new URL(urls[0]!).pathname.slice("/books/".length));
+  assert.ok(query.length <= 150 && query.length > 100);
+  assert.ok(title.startsWith(`${query} `));
+});
+
+test("a long title with no spaces is cut to its first 150 characters", async () => {
+  const urls = stub(() => Response.json({ books: [] }));
+  const source = createIsbndbSource("k", direct, gate);
+  await source.byTitle("ã".repeat(200), "", acceptAll);
+  await source.byTitle(` ${"a".repeat(200)}`, "", acceptAll);
+  assert.deepEqual(urls.map((url) => decodeURIComponent(new URL(url).pathname.slice("/books/".length))), ["ã".repeat(150), ` ${"a".repeat(149)}`]);
+});
+
+test("a title of 150 characters is sent unchanged, and the full title still decides what is accepted", async () => {
+  const exact = `${"ã".repeat(149)}b`;
+  const urls = stub(() => Response.json({ books: [{ title: exact, image: "https://i/1.jpg" }] }));
+  const found = await createIsbndbSource("k", direct, gate).byTitle(exact, "", (candidate) => candidate.title === exact);
+  assert.deepEqual(found, [{ source: "isbndb", url: "https://i/1.jpg" }]);
+  assert.equal(urls[0], `https://api2.isbndb.com/books/${encodeURIComponent(exact)}?page=1&pageSize=20&column=title`);
+
+  const longer = `${exact} e mais`;
+  stub(() => Response.json({ books: [{ title: exact, image: "https://i/1.jpg" }, { title: longer, image: "https://i/2.jpg" }] }));
+  assert.deepEqual(await createIsbndbSource("k", direct, gate).byTitle(longer, "", (candidate) => candidate.title === longer), [{ source: "isbndb", url: "https://i/2.jpg" }]);
+});
+
 test("Apple artwork is requested at 1400px", () => {
   assert.equal(appleArtworkUrl("https://is1.mzstatic.com/image/thumb/a/b.jpg/100x100bb.jpg"), "https://is1.mzstatic.com/image/thumb/a/b.jpg/1400x1400bb.jpg");
   assert.deepEqual(parseAppleResults({ results: [{ trackName: "Solaris", artistName: "Stanisław Lem", artworkUrl100: "https://x/100x100bb.png" }, { trackName: "No art" }] }), [
