@@ -6,7 +6,7 @@ import { fillLossy } from "../domain/lossy.js";
 import { editionLanguage, isPortugalIsbn, normalizeTitle } from "../domain/normalize.js";
 import type { BooksRepository, CoverBlobStore } from "../domain/ports.js";
 import type { BookRow } from "../domain/types.js";
-import { PAGE_RANK, feedProducts, feedUrl, findPageIsbn, isDisallowed, pageAuthors, parseRobots, parseShopifyProducts, parseWooProducts, withPageText, type PublisherBook, type ResolvedBook } from "./publisherFeed.js";
+import { PAGE_RANK, feedProducts, feedUrl, findPageIsbn, shownPageIsbns, isDisallowed, pageAuthor, parseRobots, parseShopifyProducts, parseWooProducts, withPageText, type PublisherBook, type ResolvedBook } from "./publisherFeed.js";
 import type { PublisherSite } from "./publishers.js";
 import { seedBook } from "./seedCatalog.js";
 
@@ -66,7 +66,7 @@ export function importedLanguage(stated: string[], isbn: string): string | null 
   return isPortugalIsbn(isbn) ? editionLanguage(["por"], isbn) : null;
 }
 
-function sameTitle(known: string, productTitle: string): boolean {
+export function sameTitle(known: string, productTitle: string): boolean {
   const [short, long] = [normalizeTitle(known), normalizeTitle(productTitle)].sort((a, b) => a.length - b.length) as [string, string];
   return short !== "" && (short === long || (short.includes(" ") && long.startsWith(`${short} `)));
 }
@@ -195,19 +195,25 @@ async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryR
       return;
     }
     const isbn = findPageIsbn(response.text);
-    if (isbn) resolved.push({ ...book, isbn, pageAuthor: site.authorLinks ? pageAuthors(response.text) : null, details: withPageText(book.details, response.text) });
+    if (isbn) resolved.push({ ...book, isbn, pageAuthor: site.pageAuthor ? pageAuthor(site.pageAuthor, response.text) : null, details: withPageText(book.details, response.text) });
     else report.pagesNoIsbn++;
   };
   const readAuthorPage = async (book: PublisherBook, isbn: string) => {
-    if (!site.authorLinks || book.author || deps.repo.findBookByKey(`isbn:${isbn}`)?.author !== "") return null;
+    const rule = site.pageAuthor;
+    if (!rule || book.author || deps.repo.findBookByKey(`isbn:${isbn}`)?.author !== "") return null;
     const page = new URL(book.productUrl);
     if (isDisallowed(page.pathname + page.search, disallow)) return null;
     report.authorPages++;
     try {
       const response = await request(() => deps.fetchText(book.productUrl));
-      return response.status === 200 && findPageIsbn(response.text) === isbn ? pageAuthors(response.text) : null;
+      if (response.status !== 200) {
+        if (response.status !== 404) report.pagesBlocked++;
+        return null;
+      }
+      return shownPageIsbns(response.text).every((shown) => shown === isbn) ? pageAuthor(rule, response.text) : null;
     } catch (error) {
       if (!(error instanceof SourceUnavailableError)) throw error;
+      report.failed++;
       return null;
     }
   };
