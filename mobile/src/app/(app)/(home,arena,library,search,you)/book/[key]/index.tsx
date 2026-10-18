@@ -30,7 +30,7 @@ export default function BookRoute() {
             ? () => (
                 <HeaderActions>
                   <Menu items={menuItems}>
-                    <IconButton framed accessibilityLabel="Book actions" name="more" />
+                    <IconButton accessibilityLabel="Book actions" name="more" />
                   </Menu>
                 </HeaderActions>
               )

@@ -28,7 +28,7 @@ export function YouScreen() {
         options={{
           headerShown: true,
           title: "You",
-          headerRight: () => <IconButton framed name="settings" label="Settings" accessibilityLabel="Settings" onPress={() => router.push("/settings" as never)} />,
+          headerRight: () => <IconButton name="settings" accessibilityLabel="Settings" onPress={() => router.push("/settings" as never)} />,
         }}
       />
       <ScrollView contentContainerStyle={styles.page}>
