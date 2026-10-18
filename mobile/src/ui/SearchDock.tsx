@@ -118,7 +118,7 @@ export function SearchDock({
                   style={styles.searchField}
                 />
               </View>
-              {cycleButton && cycle?.menu ? <Menu title={cycle.menu.title} items={cycle.menu.items}>{cycleButton}</Menu> : cycleButton}
+              {cycleButton ? <View style={styles.cycleSlot}>{cycle?.menu ? <Menu title={cycle.menu.title} items={cycle.menu.items}>{cycleButton}</Menu> : cycleButton}</View> : null}
             </View>
           </Animated.View>
         )}
@@ -133,5 +133,6 @@ const styles = StyleSheet.create({
   fabArea: { height: FAB_HEIGHT + spacing.lg },
   row: { flexDirection: "row", alignItems: "center", gap: spacing.sm, padding: spacing.md },
   searchField: { borderRadius: radii.full },
+  cycleSlot: { minWidth: 48, minHeight: 48, alignItems: "center", justifyContent: "center" },
   cycle: { alignItems: "center", justifyContent: "center", width: minimumTouchTarget, height: minimumTouchTarget, borderWidth: 1, borderRadius: radii.full },
 });

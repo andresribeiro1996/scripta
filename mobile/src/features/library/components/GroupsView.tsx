@@ -19,11 +19,11 @@ import { forwardRef, useImperativeHandle, useMemo, useRef, useState } from "reac
 import { Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../../ui/Text";
 import { router } from "expo-router";
-import { makeGroup, orderedGroupBooks, saveFailureMessage, type GroupType } from "@scripta/shared";
+import { bookKey, makeGroup, orderedGroupBooks, saveFailureMessage, type GroupType } from "@scripta/shared";
 import { EmptyState, Input } from "../../../ui/components";
 import { Icon, type IconName } from "../../../ui/icon";
 import type { SearchDockScrollProps } from "../../../ui/SearchDock";
-import { spacing, typography, useTheme } from "../../../ui/theme";
+import { radii, spacing, typography, useTheme } from "../../../ui/theme";
 import { useLibrary } from "../hooks/useLibrary";
 import { attemptUpdate } from "../lib/attemptUpdate";
 import { CoverImage } from "./CoverImage";
@@ -126,25 +126,33 @@ export const GroupsView = forwardRef<GroupsViewHandle, GroupsViewProps>(function
 
       {groups.map((group) => {
         const members = orderedGroupBooks(group, books);
+        const preview = members.slice(0, 5);
         return (
           <Pressable
             key={group.id}
-            accessibilityLabel={`Open ${group.name}`}
+            accessibilityLabel={`Open ${group.name}, ${GROUP_TYPE_LABEL[group.type].toLowerCase()}, ${members.length} book${members.length === 1 ? "" : "s"}`}
             accessibilityRole="button"
             onPress={() => router.push(`/collection/${group.id}` as never)}
-            style={({ pressed }) => [styles.row, { borderColor: colors.border, backgroundColor: pressed ? colors.surfacePressed : colors.surface }]}
+            style={({ pressed }) => [styles.row, { opacity: pressed ? 0.7 : 1 }]}
           >
-            <View style={[styles.thumb, { backgroundColor: colors.border }]}>{members[0] && <CoverImage book={members[0]} />}</View>
-            <View style={styles.rowText}>
-              <Text style={[typography.body, { color: colors.text, fontWeight: "600" }]} numberOfLines={1}>
+            <View style={styles.heading}>
+              <Text style={[styles.name, typography.title, { color: colors.text, fontWeight: "700" }]} numberOfLines={2}>
                 {group.name}
               </Text>
-              <Text style={[typography.caption, { color: colors.textDim }]}>
-                {typeFilter === "all" ? `${GROUP_TYPE_LABEL[group.type]} · ` : ""}
-                {members.length} book{members.length === 1 ? "" : "s"}
-              </Text>
+              <View style={styles.meta}>
+                <Text style={[typography.caption, { color: colors.textDim }]}>
+                  {members.length} book{members.length === 1 ? "" : "s"}
+                </Text>
+                <Icon name="chevronRight" size={14} color={colors.textDim} />
+              </View>
             </View>
-            <Icon name="chevronRight" size={18} color={colors.textDim} />
+            <View style={[styles.shelf, { borderBottomColor: colors.border }]} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+              {preview.length ? preview.map((book, index) => (
+                <View key={bookKey(book)} style={[styles.cover, index % 2 ? styles.shortCover : null, { backgroundColor: colors.border }]}>
+                  <CoverImage book={book} />
+                </View>
+              )) : <View style={[styles.emptyCover, { backgroundColor: colors.surface }]}><Icon name={group.type === "series" ? "library" : "folder"} size={28} color={colors.textDim} /></View>}
+            </View>
           </Pressable>
         );
       })}
@@ -153,9 +161,14 @@ export const GroupsView = forwardRef<GroupsViewHandle, GroupsViewProps>(function
 });
 
 const styles = StyleSheet.create({
-  content: { padding: spacing.lg, gap: spacing.md },
+  content: { padding: spacing.lg, gap: spacing.xxl },
   draftRow: { borderWidth: 2, borderStyle: "dashed", borderRadius: 12, padding: spacing.md },
-  row: { flexDirection: "row", alignItems: "center", gap: spacing.md, borderWidth: 1, borderRadius: 12, padding: spacing.sm },
-  thumb: { width: 44, height: 66, borderRadius: 6, overflow: "hidden" },
-  rowText: { flex: 1, gap: 2 },
+  row: { gap: spacing.md },
+  heading: { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  name: { flex: 1 },
+  meta: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
+  shelf: { flexDirection: "row", alignItems: "flex-end", gap: spacing.sm, minHeight: 88, paddingHorizontal: spacing.xs, paddingBottom: spacing.md, borderBottomWidth: 3 },
+  cover: { width: "17%", maxWidth: 64, aspectRatio: 2 / 3, borderRadius: radii.sm, overflow: "hidden" },
+  shortCover: { aspectRatio: 0.72 },
+  emptyCover: { width: 48, height: 72, borderRadius: radii.sm, alignItems: "center", justifyContent: "center" },
 });

@@ -169,14 +169,14 @@ export function LibraryScreen() {
               // the stack's back chevron would be the wrong affordance here.
               headerBackVisible: false,
               headerLeft: () => (
-                <Button
-                  label="Cancel"
-                  variant="secondary"
+                <IconButton
+                  name="close"
+                  accessibilityLabel="Cancel selection"
                   onPress={() => { setSelectionMode(false); setSelectedKeys(new Set()); }}
                 />
               ),
               headerRight: () => (
-                <IconButton framed
+                <IconButton
                   accessibilityLabel={`Delete ${selectedKeys.size} selected`}
                   name="delete"
                   disabled={selectedKeys.size === 0}
@@ -194,7 +194,7 @@ export function LibraryScreen() {
               headerLeft: undefined,
               headerRight: () => (
                 <Menu title={library?.data.name || "Library"} items={actionItems}>
-                  <IconButton framed accessibilityLabel="Library actions" name="more" />
+                  <IconButton accessibilityLabel="Library actions" name="more" />
                 </Menu>
               ),
             }}

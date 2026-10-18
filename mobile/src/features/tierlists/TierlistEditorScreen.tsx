@@ -142,8 +142,8 @@ export function TierlistEditorScreen({ tierlist, onUpdated, startInRank = false 
       headerLargeTitleEnabled: false,
       headerRight: () => <HeaderActions>
         {!frozen ? <SaveStateButton busy={busy} unsaved={dirty} onPress={() => void save()} /> : null}
-        <IconButton framed accessibilityLabel="Share tier list" name="share" onPress={showShare} />
-        <Menu title={current.name} items={actionItems}><IconButton framed accessibilityLabel="Tier list actions" name="more" /></Menu>
+        <IconButton accessibilityLabel="Share tier list" name="share" onPress={showShare} />
+        <Menu title={current.name} items={actionItems}><IconButton accessibilityLabel="Tier list actions" name="more" /></Menu>
       </HeaderActions>,
     }} />
     {error ? <Toast visible message={error} tone="error" /> : null}
