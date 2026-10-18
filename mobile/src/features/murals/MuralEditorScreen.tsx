@@ -233,8 +233,8 @@ export function MuralEditorScreen({ id }: { id: string }) {
           headerLargeTitleEnabled: false,
           headerRight: () => dragging ? null : <MuralThemeScope theme={currentTheme}><HeaderActions>
             <SaveStateButton busy={busy} unsaved={unsaved} onPress={() => void save()} />
-            <IconButton framed accessibilityLabel="Mural theme" name="theme" onPress={() => setThemeOpen(true)} />
-            <IconButton framed accessibilityLabel="Share mural" name="share" onPress={() => setShareFor(draftMural)} />
+            <IconButton accessibilityLabel="Mural theme" name="theme" onPress={() => setThemeOpen(true)} />
+            <IconButton accessibilityLabel="Share mural" name="share" onPress={() => setShareFor(draftMural)} />
           </HeaderActions></MuralThemeScope>,
         }}
       />

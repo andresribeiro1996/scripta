@@ -16,7 +16,7 @@ export default function CollectionsRoute() {
       <Stack.Screen
         options={{
           headerShown: true,
-          headerRight: () => <IconButton framed accessibilityLabel="New collection" label="New" name="add" onPress={() => groupsView.current?.startCreating()} />,
+          headerRight: () => <IconButton accessibilityLabel="New collection" name="add" onPress={() => groupsView.current?.startCreating()} />,
         }}
       />
       <SearchDock

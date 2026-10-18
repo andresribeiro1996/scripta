@@ -136,7 +136,7 @@ function BookResultRow({ result, onOpen, onAdd }: { result: BookSearchResult; on
           {byline ? <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{byline}</Text> : null}
         </View>
       </Pressable>
-      <IconButton framed name="add" accessibilityLabel={`Add ${result.title}`} onPress={() => onAdd(result)} />
+      <IconButton name="add" accessibilityLabel={`Add ${result.title}`} onPress={() => onAdd(result)} />
     </View>
   );
 }

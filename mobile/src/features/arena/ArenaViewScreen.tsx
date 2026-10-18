@@ -185,7 +185,7 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
           title: data.name,
           headerRight: () => (
             <HeaderActions>
-            <IconButton framed name="share" accessibilityLabel="Share tournament" onPress={() => void action("share", async () => setShareUrl(await publicContentUrl(`/arena/${encodeURIComponent(id)}`)))} />
+            <IconButton name="share" accessibilityLabel="Share tournament" onPress={() => void action("share", async () => setShareUrl(await publicContentUrl(`/arena/${encodeURIComponent(id)}`)))} />
             <Menu
               title={data.name}
               items={[
@@ -193,7 +193,7 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
                 ...(isOwner ? [{ label: "Rename…", onPress: () => { setName(data.name); setRenaming(true); } }] : []),
               ]}
             >
-              <IconButton accessibilityLabel={`Actions for ${data.name}`} framed name="more" />
+              <IconButton accessibilityLabel={`Actions for ${data.name}`} name="more" />
             </Menu>
             </HeaderActions>
           ),

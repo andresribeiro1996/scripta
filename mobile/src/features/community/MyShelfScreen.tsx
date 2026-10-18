@@ -176,14 +176,12 @@ export function MyShelfScreen() {
   const headerRight = () => (
     <HeaderActions>
       <IconButton
-        framed
-        label={ownData.published ? "Published" : "Private"}
         name={ownData.published ? "public" : "lock"}
         accessibilityLabel={ownData.published ? "Published. Tap to unpublish" : "Private. Tap to publish"}
         onPress={handleChipPress}
       />
       <Menu title="My shelf" items={menuItems}>
-        <IconButton framed accessibilityLabel="Shelf options" name="more" />
+        <IconButton accessibilityLabel="Shelf options" name="more" />
       </Menu>
     </HeaderActions>
   );
