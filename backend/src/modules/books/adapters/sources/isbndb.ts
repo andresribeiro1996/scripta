@@ -1,7 +1,16 @@
+import { isValidIsbn } from "../../domain/normalize.js";
 import type { CoverCandidate, CoverSource, TitledCandidate } from "../../domain/ports.js";
 import type { Spend } from "../../typesafe.js";
 import { fetchJson, type Throttle } from "../http/http.js";
 import type { IsbndbGate } from "../isbndb/isbndbGate.js";
+
+const MAX_TITLE_QUERY = 150;
+
+function titleQuery(title: string): string {
+  if (title.length <= MAX_TITLE_QUERY) return title;
+  const head = title.slice(0, MAX_TITLE_QUERY + 1);
+  return head.slice(0, head.lastIndexOf(" ")).trim() || title.slice(0, MAX_TITLE_QUERY);
+}
 
 const strip = ({ source, url }: TitledCandidate): CoverCandidate => ({ source, url });
 
@@ -33,10 +42,11 @@ export function createIsbndbSource(apiKey: string, throttle: Throttle, gate: Isb
   const get = createIsbndbGet(apiKey, throttle, gate, false, spend);
   return {
     async byIsbn(isbn) {
+      if (!isValidIsbn(isbn)) return [];
       return parseIsbndbBooks(await get(`https://api2.isbndb.com/book/${encodeURIComponent(isbn)}`)).map(strip);
     },
     async byTitle(title, _author, accept) {
-      const url = `https://api2.isbndb.com/books/${encodeURIComponent(title)}?page=1&pageSize=20&column=title`;
+      const url = `https://api2.isbndb.com/books/${encodeURIComponent(titleQuery(title))}?page=1&pageSize=20&column=title`;
       return parseIsbndbBooks(await get(url)).filter(accept).map(strip);
     }
   };

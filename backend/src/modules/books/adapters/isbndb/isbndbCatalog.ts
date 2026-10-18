@@ -1,5 +1,5 @@
 import { htmlToText, normalizeBookGenres, normalizeIsbn, positiveInteger, type BookSearchResult } from "@scripta/shared";
-import { givenNameFirst } from "../../domain/normalize.js";
+import { givenNameFirst, isValidIsbn } from "../../domain/normalize.js";
 import type { BookCatalog } from "../../domain/ports.js";
 import type { Spend } from "../../typesafe.js";
 import type { Throttle } from "../http/http.js";
@@ -40,7 +40,7 @@ export function createIsbndbCatalog(apiKey: string, throttle: Throttle, gate: Is
   const getSearch = createIsbndbGet(apiKey, throttle, gate, urgent, spends.search);
   return {
     async fetchDetails({ isbn }) {
-      if (!isbn) return null;
+      if (!isbn || !isValidIsbn(isbn)) return null;
       const [record] = isbndbRecords(await getDetails(`${API}/book/${encodeURIComponent(isbn)}`));
       if (!record) return null;
       const summary = plainText(record.synopsis) ?? plainText(record.overview);
@@ -57,6 +57,7 @@ export function createIsbndbCatalog(apiKey: string, throttle: Throttle, gate: Is
     },
 
     async search(query) {
+      if ("isbn" in query && !isValidIsbn(query.isbn)) return [];
       const url = "isbn" in query
         ? `${API}/book/${encodeURIComponent(query.isbn)}`
         : `${API}/books/${encodeURIComponent(query.text)}?page=1&pageSize=20`;
