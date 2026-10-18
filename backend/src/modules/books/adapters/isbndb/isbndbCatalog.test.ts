@@ -41,7 +41,7 @@ test("details come from the synopsis and subjects of the ISBN lookup", async () 
   const requests = respond(200, { book: dune });
   assert.deepEqual(await createIsbndbCatalog("secret", direct, gate).fetchDetails({ isbn: "9780441013593", title: "Dune", author: "Frank Herbert" }), {
     metadata: {
-      summary: 'Set on the desert planet Arrakis.\nPaul & Jessica "flee".\nThe spice must flow.',
+      summary: 'Set on the desert planet Arrakis.\nPaul & Jessica "flee".\n\nThe spice must flow.',
       rating: null,
       ratingCount: 0,
       sourceUrl: "https://isbndb.com/book/9780441013593",

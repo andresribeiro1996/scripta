@@ -36,3 +36,4 @@ export * from "./readerIdentity.js";
 export * from "./readerCardFacts.js";
 export * from "./passages.js";
 export * from "./saveFailure.js";
+export * from "./htmlText.js";
