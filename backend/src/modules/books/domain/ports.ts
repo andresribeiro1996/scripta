@@ -41,6 +41,7 @@ export interface BooksRepository {
   searchBooks(tokens: string[], limit: number): BookRow[];
   listUncheckedCoverIds(after: PageCursor | null, limit: number): IdPage;
   listUncheckedDetailIds(limit: number): string[];
+  listHeldBnpDetailIds(workIds: string[], limit: number): string[];
   fillSubjectGenres(bookId: string, genres: string[]): void;
   confirmWithSource(bookId: string, source: DataSource): void;
   getHarvestCursor(feed: string): string | null;

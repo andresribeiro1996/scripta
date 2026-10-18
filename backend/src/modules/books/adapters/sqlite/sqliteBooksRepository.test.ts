@@ -15,7 +15,7 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
 const { applyBooksMigrations, openBooksDb } = await import("./connection.js");
 const { findOrCreateBook } = await import("../../domain/findOrCreate.js");
-const { createSqliteBooksRepository, UNCHECKED_COVERS_SQL, UPGRADE_WANTED_SQL, UNCHECKED_DETAILS_SQL, WORK_LOOKUP_SQL } = await import("./sqliteBooksRepository.js");
+const { createSqliteBooksRepository, UNCHECKED_COVERS_SQL, UPGRADE_WANTED_SQL, UNCHECKED_DETAILS_SQL, HELD_BNP_DETAILS_SQL, WORK_LOOKUP_SQL } = await import("./sqliteBooksRepository.js");
 const { WorkMergeError } = await import("../../domain/errors.js");
 const { summaryHashOf } = await import("../../domain/synopsis.js");
 
@@ -1357,6 +1357,33 @@ test("the details queue skips bnp books", () => {
   repo.createBook({ title: "Imported", author: "X", isbn: null, createdBy: "bnp" }, ["ta:imported|x|"], NOW);
   const plain = repo.createBook({ title: "Plain", author: "X", isbn: null }, ["ta:plain|x|"], NOW);
   assert.deepEqual(repo.listUncheckedDetailIds(10), [plain.id]);
+});
+
+test("listHeldBnpDetailIds returns unchecked bnp books in the given works, untried first, up to the limit", () => {
+  const { repo } = freshRepo();
+  const bnp = (title: string, at: string) => repo.createBook({ title, author: "X", isbn: null, createdBy: "bnp" }, [`ta:${title.toLowerCase()}|x|`], at);
+  const failed = bnp("Failed", "2026-09-01T00:00:00.000Z");
+  const older = bnp("Older", "2026-09-02T00:00:00.000Z");
+  const newer = bnp("Newer", "2026-09-03T00:00:00.000Z");
+  const found = bnp("Found", NOW);
+  const missing = bnp("Missing", NOW);
+  const elsewhere = bnp("Elsewhere", NOW);
+  const plain = repo.createBook({ title: "Plain", author: "X", isbn: null }, ["ta:plain|x|"], NOW);
+  repo.markDetailsAttempted(failed.id, NOW);
+  repo.saveDetails(found.id, richDetails, ["openlibrary"], "openlibrary", NOW);
+  repo.markDetailsMissing(missing.id, NOW);
+  const held = [failed, older, newer, found, missing, plain].map((book) => book.work_id!);
+
+  assert.deepEqual(repo.listHeldBnpDetailIds(held, 10), [older.id, newer.id, failed.id]);
+  assert.deepEqual(repo.listHeldBnpDetailIds(held, 1), [older.id]);
+  assert.deepEqual(repo.listHeldBnpDetailIds([], 10), []);
+  assert.ok(!repo.listHeldBnpDetailIds(held, 10).includes(elsewhere.id));
+});
+
+test("the held bnp read goes through the work index", () => {
+  const { db } = freshRepo();
+  const plan = (db.prepare(`EXPLAIN QUERY PLAN ${HELD_BNP_DETAILS_SQL}`).all("[]", 50) as Array<{ detail: string }>).map((row) => row.detail).join(" | ");
+  assert.match(plan, /USING INDEX idx_books_work\b/, plan);
 });
 
 test("setWorkSummary keeps the first summary, assigns a missing work and follows merged_into", () => {
