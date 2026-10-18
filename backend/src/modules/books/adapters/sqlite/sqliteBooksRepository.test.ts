@@ -1288,7 +1288,7 @@ test("every backfill query reads through its own partial index, with no temp sor
   const cases: Array<[string, Array<string | number>, string]> = [
     [UNCHECKED_COVERS_SQL, ["", 0, 500], "idx_books_cover_unchecked"],
     [UPGRADE_WANTED_SQL, ["", 0, 500], "idx_books_cover_upgrade"],
-    [UNCHECKED_DETAILS_SQL, [50], "idx_books_details_unchecked"],
+    [UNCHECKED_DETAILS_SQL, [50], "idx_books_details_pending"],
     [WORK_LOOKUP_SQL, [NOW, 50], "idx_books_work_lookup"]
   ];
   for (const [sql, params, index] of cases) {
@@ -1296,6 +1296,67 @@ test("every backfill query reads through its own partial index, with no temp sor
     assert.match(plan, new RegExp(`USING INDEX ${index}\\b`), plan);
     assert.doesNotMatch(plan, /TEMP B-TREE/, plan);
   }
+});
+
+test("fillSubjectGenres fills empty or Jev genres and keeps source genres", () => {
+  const { db, repo } = freshRepo();
+  const genresOf = (id: string) => db.prepare("SELECT genres, genres_source, genres_confidence FROM books WHERE id = ?").get(id) as { genres: string; genres_source: string | null; genres_confidence: number | null };
+  const make = (title: string, genres: string[]) => repo.createBook({ title, author: "X", isbn: null, genres }, [`ta:${title}|x|`], NOW).id;
+  const empty = make("Empty", []);
+  const judged = make("Judged", ["Romance"]);
+  db.prepare("UPDATE books SET genres_source = 'jev', genres_confidence = 0.8 WHERE id = ?").run(judged);
+  const sourced = make("Sourced", ["Fantasy"]);
+
+  repo.fillSubjectGenres(judged, []);
+  repo.fillSubjectGenres(empty, []);
+  assert.deepEqual({ ...genresOf(judged) }, { genres: '["Romance"]', genres_source: "jev", genres_confidence: 0.8 });
+  assert.deepEqual({ ...genresOf(empty) }, { genres: "[]", genres_source: null, genres_confidence: null });
+
+  for (const id of [empty, judged, sourced]) repo.fillSubjectGenres(id, ["Mystery"]);
+  assert.deepEqual({ ...genresOf(empty) }, { genres: '["Mystery"]', genres_source: null, genres_confidence: null });
+  assert.deepEqual({ ...genresOf(judged) }, { genres: '["Mystery"]', genres_source: null, genres_confidence: null });
+  assert.deepEqual({ ...genresOf(sourced) }, { genres: '["Fantasy"]', genres_source: null, genres_confidence: null });
+});
+
+test("confirmWithSource makes an unconfirmed book searchable once", () => {
+  const { db, repo } = freshRepo();
+  const sourcesOf = (id: string) => (db.prepare("SELECT data_sources FROM books WHERE id = ?").get(id) as { data_sources: string }).data_sources;
+  const book = repo.createBook({ title: "Orlando", author: "Virginia Woolf", isbn: null }, ["ta:orlando|virginia woolf|"], NOW);
+  assert.equal(repo.isSearchable(book.id), false);
+
+  repo.confirmWithSource(book.id, "bnp");
+  assert.equal(repo.isSearchable(book.id), true);
+  assert.equal(sourcesOf(book.id), '["bnp"]');
+
+  repo.confirmWithSource(book.id, "bnp");
+  assert.equal(sourcesOf(book.id), '["bnp"]');
+});
+
+test("confirmWithSource leaves a confirmed book unchanged", () => {
+  const { db, repo } = freshRepo();
+  const seeded = repo.createBook({ title: "Seeded", author: "X", isbn: null, createdBy: "seed" }, ["ta:seeded|x|"], NOW);
+  const sourced = repo.createBook({ title: "Sourced", author: "X", isbn: null, sources: ["openlibrary"] }, ["ta:sourced|x|"], NOW);
+  repo.confirmWithSource(seeded.id, "bnp");
+  repo.confirmWithSource(sourced.id, "bnp");
+  const sources = (id: string) => (db.prepare("SELECT data_sources FROM books WHERE id = ?").get(id) as { data_sources: string }).data_sources;
+  assert.equal(sources(seeded.id), "[]");
+  assert.equal(sources(sourced.id), '["openlibrary"]');
+});
+
+test("the harvest cursor starts empty and keeps the last value", () => {
+  const { repo } = freshRepo();
+  assert.equal(repo.getHarvestCursor("bnp"), null);
+  repo.setHarvestCursor("bnp", "2026-10-17");
+  repo.setHarvestCursor("bnp", "2026-10-18");
+  assert.equal(repo.getHarvestCursor("bnp"), "2026-10-18");
+  assert.equal(repo.getHarvestCursor("other"), null);
+});
+
+test("the details queue skips bnp books", () => {
+  const { repo } = freshRepo();
+  repo.createBook({ title: "Imported", author: "X", isbn: null, createdBy: "bnp" }, ["ta:imported|x|"], NOW);
+  const plain = repo.createBook({ title: "Plain", author: "X", isbn: null }, ["ta:plain|x|"], NOW);
+  assert.deepEqual(repo.listUncheckedDetailIds(10), [plain.id]);
 });
 
 test("setWorkSummary keeps the first summary, assigns a missing work and follows merged_into", () => {

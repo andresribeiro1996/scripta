@@ -12,6 +12,7 @@ import {
   givenNameFirst,
   isPortugalIsbn,
   isPortugueseIsbn,
+  isValidIsbn,
   lookupIdentity,
   normalizeTitle,
   searchTokens,
@@ -185,4 +186,13 @@ test("workTitleKey is the catalog title key only when both the title and the fir
   assert.equal(workTitleKey("Dune", ""), "");
   assert.equal(workTitleKey("Dune", "—"), "");
   assert.equal(workTitleKey("?!", "Frank Herbert"), "");
+});
+
+test("isValidIsbn checks the check digit of both lengths", () => {
+  assert.equal(isValidIsbn("978-972-0-04445-7"), true);
+  assert.equal(isValidIsbn("9789720044458"), false);
+  assert.equal(isValidIsbn("972-708-948-8"), true);
+  assert.equal(isValidIsbn("972-708-948-2"), false);
+  assert.equal(isValidIsbn("097522980X"), true);
+  assert.equal(isValidIsbn("12345"), false);
 });

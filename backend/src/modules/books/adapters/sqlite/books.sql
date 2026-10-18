@@ -137,6 +137,11 @@ CREATE TABLE IF NOT EXISTS work_merges (
   undone_at          TEXT
 );
 
+CREATE TABLE IF NOT EXISTS harvest_cursors (
+  feed    TEXT PRIMARY KEY,
+  through TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS work_match_judgments (
   work_id      TEXT PRIMARY KEY,
   model        TEXT NOT NULL,

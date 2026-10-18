@@ -587,6 +587,16 @@ test("a publisher synopsis links to the publisher's page and other synopses to t
   assert.deepEqual([details?.summarySource, details?.sourceUrl], ["openlibrary", "https://openlibrary.org/works/OL1W"]);
 });
 
+test("a bnp summary has no source link", async () => {
+  const h = harness({ catalog: recordingCatalog().catalog });
+  h.service.resolveCover(dune);
+  const id = h.bookId("isbn:9780441013593");
+  h.repo.mergeDetails(id, { summary: "Resumo da Biblioteca Nacional.", pages: null, year: null, publisher: null, translator: null }, "bnp");
+  const details = await h.service.getDetails(dune);
+  assert.equal(h.repo.getBook(id)!.source_url, "https://openlibrary.org/works/OL1W");
+  assert.deepEqual([details?.summarySource, details?.sourceUrl], ["bnp", ""]);
+});
+
 test("an ISBNdb synopsis links to ISBNdb even when Open Library supplied the rating", async () => {
   const olRating = { metadata: { summary: null, rating: 3.8, ratingCount: 42, sourceUrl: "https://openlibrary.org/works/OL5W", genres: ["Science Fiction" as const], pages: null, publisher: null, year: null, translator: null }, sources: ["openlibrary" as const], summarySource: null };
   const primary: Catalog = { fetchDetails: async () => olRating, search: async () => [] };
@@ -710,6 +720,103 @@ test("an outside ISBN search goes to Open Library and saves the results", async 
   assert.deepEqual(calls, ["search-isbn:9780441013593"]);
   assert.ok(h.repo.findBookByKey("isbn:9780441013593"));
   assert.equal(h.service.search("9780441013593")[0]!.title, "Dune");
+});
+
+const allende = "9789720044457";
+
+function withBnp(outcome: (repo: ReturnType<typeof harness>["repo"]) => ReturnType<NonNullable<Deps["bnpLookup"]>>, overrides: Partial<Deps> = {}) {
+  const asked: string[] = [];
+  const h: ReturnType<typeof harness> = harness({ ...overrides, bnpLookup: async (isbn) => { asked.push(isbn); return outcome(h.repo); } });
+  return { h, asked };
+}
+
+const saveBnpBook = (repo: ReturnType<typeof harness>["repo"], createdBy: "bnp" | "seed" = "bnp") =>
+  repo.createBook({ title: "A casa dos espíritos", author: "Isabel Allende", isbn: allende, createdBy }, [`isbn:${allende}`], "2026-10-01T00:00:00.000Z");
+
+test("a Portugal ISBN asks the BNP first and returns its book", async () => {
+  const { calls, catalog } = recordingCatalog();
+  const { h, asked } = withBnp(async (repo) => saveBnpBook(repo), { catalog });
+
+  const results = await h.service.searchExternal("978-972-0-04445-7");
+
+  assert.deepEqual(asked, [allende]);
+  assert.deepEqual(calls, []);
+  assert.deepEqual(results.map((result) => [result.title, result.isbn]), [["A casa dos espíritos", allende]]);
+});
+
+test("a BNP outage falls through to the catalog and warns", async () => {
+  const { calls, catalog } = recordingCatalog();
+  const { h, asked } = withBnp(async () => { throw new SourceUnavailableError("urn.porbase.org", "HTTP 503"); }, { catalog });
+
+  const results = await h.service.searchExternal(allende);
+
+  assert.deepEqual(asked, [allende]);
+  assert.deepEqual(calls, [`search-isbn:${allende}`]);
+  assert.equal(results[0]!.title, "Dune");
+  assert.equal(h.warnings.length, 1);
+  assert.equal(h.warnings[0]!.details.source, "urn.porbase.org");
+});
+
+test("a BNP miss falls through to the catalog", async () => {
+  const { calls, catalog } = recordingCatalog();
+  const { h, asked } = withBnp(async () => null, { catalog });
+
+  const results = await h.service.searchExternal(allende);
+
+  assert.deepEqual(asked, [allende]);
+  assert.deepEqual(calls, [`search-isbn:${allende}`]);
+  assert.equal(results[0]!.title, "Dune");
+  assert.deepEqual(h.warnings, []);
+});
+
+test("a BNP failure other than an outage is not swallowed", async () => {
+  const { calls, catalog } = recordingCatalog();
+  const { h } = withBnp(async () => { throw new Error("disk full"); }, { catalog });
+
+  await assert.rejects(h.service.searchExternal(allende), /disk full/);
+  assert.deepEqual(calls, []);
+});
+
+test("a non-Portugal ISBN never asks the BNP", async () => {
+  const { calls, catalog } = recordingCatalog();
+  const { h, asked } = withBnp(async (repo) => saveBnpBook(repo), { catalog });
+
+  await h.service.searchExternal("9780141439518");
+
+  assert.deepEqual(asked, []);
+  assert.deepEqual(calls, ["search-isbn:9780141439518"]);
+});
+
+test("a Portugal-prefixed ISBN with a wrong check digit never asks the BNP", async () => {
+  const { calls, catalog } = recordingCatalog();
+  const { h, asked } = withBnp(async (repo) => saveBnpBook(repo), { catalog });
+
+  await h.service.searchExternal("9789720044458");
+  await h.service.searchExternal("9720044458");
+
+  assert.deepEqual(asked, []);
+  assert.equal(calls.length, 2);
+});
+
+test("an ISBN already held from the BNP is returned without asking anyone", async () => {
+  const { h, asked } = withBnp(async () => { throw new Error("BNP not expected"); });
+  saveBnpBook(h.repo);
+
+  const results = await h.service.searchExternal(allende);
+
+  assert.deepEqual(asked, []);
+  assert.deepEqual(results.map((result) => result.isbn), [allende]);
+});
+
+test("a Portugal ISBN held from another source still asks the BNP", async () => {
+  const { calls, catalog } = recordingCatalog();
+  const { h, asked } = withBnp(async (repo) => repo.findBookByKey(`isbn:${allende}`)!, { catalog });
+  saveBnpBook(h.repo, "seed");
+
+  await h.service.searchExternal(allende);
+
+  assert.deepEqual(asked, [allende]);
+  assert.deepEqual(calls, []);
 });
 
 test("an inside text search only returns saved matches and never calls Open Library", () => {

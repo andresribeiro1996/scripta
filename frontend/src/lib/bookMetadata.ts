@@ -31,5 +31,6 @@ export function bookMetadataOptions(book: Record<string, unknown>) {
 
 export function summarySourceName(data: BookMetadata): string {
   if (data.summarySource === "publisher") return data.publisher ?? "Publisher";
+  if (data.summarySource === "bnp") return "Biblioteca Nacional de Portugal";
   return data.summarySource === "isbndb" ? "ISBNdb" : "Open Library";
 }

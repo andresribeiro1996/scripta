@@ -55,7 +55,8 @@ export function applyBooksMigrations(db: DatabaseSync): void {
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_cover_unchecked ON books(created_at) WHERE cover_checked_at IS NULL AND (cover_status IS NULL OR cover_status = 'low_res')");
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_cover_upgrade ON books(cover_upgrade_wanted_at) WHERE cover_upgrade_wanted_at IS NOT NULL");
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_retitle_wanted ON books(retitle_wanted_at) WHERE retitle_wanted_at IS NOT NULL");
-  db.exec("CREATE INDEX IF NOT EXISTS idx_books_details_unchecked ON books(details_checked_at IS NOT NULL, created_by IS NOT NULL, details_checked_at, created_at) WHERE details_status IS NULL");
+  db.exec("DROP INDEX IF EXISTS idx_books_details_unchecked");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_books_details_pending ON books(details_checked_at IS NOT NULL, created_by IS NOT NULL, details_checked_at, created_at) WHERE details_status IS NULL AND created_by IS NOT 'bnp'");
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_work_lookup ON books(work_checked_at IS NOT NULL, created_by IS NOT NULL, work_checked_at, created_at) WHERE ol_work_key IS NULL AND isbn IS NOT NULL AND details_status IS NOT NULL");
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_summary_hash ON books(summary_hash)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_works_summary_hash ON works(summary_hash)");

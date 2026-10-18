@@ -20,7 +20,7 @@ export interface BookMetadata {
   publisher: string | null;
   year: number | null;
   translator: string | null;
-  summarySource: "publisher" | "openlibrary" | "isbndb" | null;
+  summarySource: "publisher" | "openlibrary" | "isbndb" | "bnp" | null;
 }
 
 export type CatalogBookMetadata = Omit<BookMetadata, "summarySource">;
