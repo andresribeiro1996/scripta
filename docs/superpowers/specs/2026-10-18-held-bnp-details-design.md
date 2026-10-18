@@ -37,11 +37,12 @@ Rejected:
 - Holding is by work, so every bnp edition in a held work with no details is looked up, not only the edition the user has. A grouped Portugal title often has two or three such editions.
 - A held bnp book will usually spend an ISBNdb call, because Open Library rarely has a Portuguese summary. That spending is the point.
 - A book held and then removed keeps whatever details it got.
+- A held bnp book whose lookup failed on an outage sorts behind untried held bnp books but still ahead of every regular book. Only 50 or more held bnp books failing on every attempt could keep the regular queue waiting, and an outage hits every book alike. *(Claude's call: accepted, not capped.)*
 
 ## Testing
 
 - Repository: the new read returns only bnp books with null `details_status` in the given works, in the stated order, up to the limit; it ignores bnp books in other works, non-bnp books, and books with details. `EXPLAIN QUERY PLAN` shows `idx_books_work`.
-- Service, with `recordingCatalog` as the background catalog:
+- Service, with a recording background catalog:
   - a held bnp book is looked up before the regular queue, and the batch never exceeds the limit;
   - an un-held bnp book is never passed to the catalog;
   - a library row pointing at a merged work still counts (canonical mapping);
