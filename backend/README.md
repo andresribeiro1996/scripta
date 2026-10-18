@@ -411,6 +411,17 @@ npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --
 npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && node scripts/retitle-lossy.mjs --max 30'
 ```
 
+#### ISBNdb authors
+
+`scripts/fill-authors-isbndb.mjs` gives an author to books no shop rule could: every book with an empty author, a title and an ISBN, shop or not, in `id` order. It asks ISBNdb `GET /book/{isbn}` (one call per book, the 1.1 s gap, its own gate) and fills the author only when ISBNdb's title matches the stored one, through the same cleaning as shop credits (parentheses out, placeholders dropped). A name ISBNdb still gives as "Last, First" leaves the book alone (`commaName`), and a name equal to the book's stored translator is dropped. Each fill claims the title key and reopens the work's code-only translation "none", like every fill. `--max` is a hard limit on calls; the run stops at ISBNdb's daily pause or on an outage, and the report's `next` is the last book answered, so the next run passes it as `--after` and asks nothing twice. A dry run opens the database read-only but still spends ISBNdb calls, so keep it to a sample. The calls come out of the same daily quota as the server's cover re-checks: run it right after 00:00Z.
+
+```bash
+npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && node scripts/fill-authors-isbndb.mjs --dry-run --max 50'
+npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && setsid node scripts/fill-authors-isbndb.mjs --max 1500 > /data/isbndb-authors.json 2> /data/isbndb-authors.log < /dev/null & sleep 3; echo started'
+```
+
+The report has `selected`, `noRecord`, `noAuthor`, `titleMismatch` with `mismatches` (`{ id, title, isbndbTitle }`), `placeholder`, `commaName`, `next`, `isbndb` (`max`, `asked`, `unavailable`, `notAsked`, `pausedUntil`), `fills` (`{ id, isbn, title, author }` each), `wouldFill` and `applied` (`null` on a dry run).
+
 #### Known limitations of covers, details and search, and the options for each
 
 Measured on production on 2026-09-30, after a tester imported a 167-book library and waited about 20 minutes for covers. The server itself was never slow: `/covers/resolve` p50 was 1 ms and `PUT /library` about 5 ms. The time goes into the pipeline around it. Recheck the numbers below before relying on them.
