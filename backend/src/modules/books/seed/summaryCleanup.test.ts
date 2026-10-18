@@ -253,7 +253,7 @@ test("a plan writes nothing and a rerun finds nothing", () => {
   assert.deepEqual(planSummaryCleanup(h.db).changes, []);
 });
 
-test("the report counts, samples and keeps originals only after a real run", () => {
+test("the report counts and samples, and keeps originals on a real run but not a dry run", () => {
   const h = setup();
   const long = "x".repeat(400);
   for (let i = 0; i < 4; i++) h.book(`${LONG} ${i}${TAIL}${long}`, "publisher", { url: "https://shop.example/p/1" });

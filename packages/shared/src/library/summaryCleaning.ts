@@ -8,7 +8,7 @@ const MAX_PASSES = 5;
 const MAX_LABEL_LINE = 80;
 const DETAILS_REACH = 6;
 const MIN_WRAP_LINE = 45;
-const NOT_A_WRAP_END = /[.!?:;…»"”)]$/;
+const NOT_A_WRAP_END = /[.!?:;…»"”)-]$/;
 const SENTENCE_END = /[.!?»"]$/;
 const MARKUP = /<\/?[a-z!?][^<>]*>|&(?:#\d+|#x[0-9a-f]+|[a-z]+);/i;
 const REFERENCE_LINE = /^[ \t]*\[[^\]]+\]:[ \t]*\S.*$/;
@@ -123,7 +123,7 @@ function joinWraps(text: string): string {
   for (let index = 0; index < parts.length; index += 2) {
     const unit = parts[index]!;
     const previous = units[units.length - 1];
-    if (previous !== undefined && /\p{Ll}-$/u.test(previous) && /^\p{Ll}/u.test(unit)) units[units.length - 1] = (CLITIC_START.test(unit) ? previous : previous.slice(0, -1)) + unit;
+    if (previous !== undefined && /\p{Ll}-$/u.test(previous) && /^\p{Ll}/u.test(unit) && !CLITIC_START.test(unit)) units[units.length - 1] = previous.slice(0, -1) + unit;
     else {
       if (previous !== undefined) separators.push(parts[index - 1]!);
       units.push(unit);

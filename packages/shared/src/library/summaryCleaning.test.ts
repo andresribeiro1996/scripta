@@ -64,7 +64,8 @@ const cases: Array<[string, string, string | null]> = [
     "- The Lord of the Rings [2/2]",
     "- The Lord of the Rings [1/6]"
   ].join("\n")],
-  ["hyphen before a clitic stays", "O capitão olhou para o mar durante muito tempo e depois disse-\nlhe que partia na manhã seguinte, sem dizer mais nada a ninguém. A mãe deu-\n\nse conta do que se passava.", "O capitão olhou para o mar durante muito tempo e depois disse-lhe que partia na manhã seguinte, sem dizer mais nada a ninguém. A mãe deu-se conta do que se passava."],
+  ["hyphen before a clitic is left alone", "O capitão olhou para o mar durante muito tempo e depois disse-\nlhe que partia na manhã seguinte, sem dizer mais nada a ninguém. A mãe deu-\n\nse conta do que se passava.", "O capitão olhou para o mar durante muito tempo e depois disse-\nlhe que partia na manhã seguinte, sem dizer mais nada a ninguém. A mãe deu-\n\nse conta do que se passava."],
+  ["word split before a clitic-like syllable is left alone", "A criança chegou cedo à esco-\nla da aldeia e ficou à espera do professor.", "A criança chegou cedo à esco-\nla da aldeia e ficou à espera do professor."],
   ["contains line in running text", "A collection of stories.\n\nContains: three novellas and twelve short stories.\n\nIn the title story, a young woman leaves.", "A collection of stories.\n\nContains: three novellas and twelve short stories.\n\nIn the title story, a young woman leaves."],
   ["contains line before a list", "A collection of stories.\n\nContains: the saga\n\n- One\n- Two", "A collection of stories."],
   ["bare contains line", "A collection of stories.\n\nContains:", "A collection of stories."],
