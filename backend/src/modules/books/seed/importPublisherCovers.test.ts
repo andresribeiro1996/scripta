@@ -1304,7 +1304,7 @@ test("a lossy Open Library edition title stays when the shop's title differs in 
 
 const PACHINKO = "9789897833199";
 const PACHINKO_URL = "https://www.relogiodagua.pt/produto/pachinko-pre-venda/";
-const relogioLinks: Site = { ...relogio, authorLinks: true };
+const relogioLinks: Site = { ...relogio, pageAuthor: "autorLink" };
 const pachinkoFeeds = {
   [WOO_FEED]: { text: JSON.stringify([{ name: "Pachinko", permalink: PACHINKO_URL, sku: "", description: "", short_description: "", images: [{ src: "https://www.relogiodagua.pt/wp-content/uploads/2023/02/capa-pachinko.jpg" }], attributes: [] }]) },
   [PACHINKO_URL]: { text: `<main><a class='autor_link' href='https://www.relogiodagua.pt/autor/min-jin-lee/'>Min Jin Lee</a><h1>Pachinko</h1><p>ISBN: 978-989-783-319-9</p><div class="w-grid-item post-1 product"><a class='autor_link' href='https://www.relogiodagua.pt/autor/jane-austen/'>Jane Austen</a></div></main>` }
@@ -1507,4 +1507,43 @@ test("a recorded Relógio feed and product page fill a title-only book's author"
 
   assert.equal(h.repo.getBook(before.id)!.author, "Madeline Cash");
   assert.equal(h.requests.filter((url) => url === OVELHAS_URL).length, 1);
+});
+
+const SAIDA_ISBN = "9789897739309";
+const SAIDA_URL = "https://www.saidadeemergencia.com/produto/berengaria-o-anjo-da-noite/";
+const saida: Site = { name: "Saída de Emergência", origin: "https://www.saidadeemergencia.com", platform: "woocommerce", authorFromVendor: false, pageAuthor: "summaryAuthor" };
+const saidaPage = (extra = "") => `<h1 class="product_title entry-title">Berengária, o Anjo da Noite</h1><div class="summaryAuthor"><span class="uppercase"><a style="color:#868686" href="https://www.saidadeemergencia.com/autor/deana-barroqueiro/">Deana Barroqueiro</a></span></div>${extra}`;
+const saidaFeeds = (page: string) => ({
+  "https://www.saidadeemergencia.com/wp-json/wc/store/v1/products?per_page=100&page=1": { text: JSON.stringify([{ name: "Berengária, o Anjo da Noite", permalink: SAIDA_URL, sku: "", description: "", short_description: "", images: [{ src: `https://www.saidadeemergencia.com/wp-content/uploads/2026/10/${SAIDA_ISBN}.jpg` }], attributes: [] }]) },
+  [SAIDA_URL]: { text: page }
+});
+
+test("an author page that shows no ISBN still gives a feed-ISBN book its author", async () => {
+  const h = await harness({ feeds: saidaFeeds(saidaPage()) });
+  const before = publisherBook(h.repo, SAIDA_ISBN, "Berengária, o Anjo da Noite", "");
+
+  const reports = await importPublisherCovers(h.deps, [saida], { dryRun: false });
+
+  assert.equal(h.repo.getBook(before.id)!.author, "Deana Barroqueiro");
+  assert.equal(reports["Saída de Emergência"]!.authorPages, 1);
+});
+
+test("an author page that shows a different ISBN gives no author", async () => {
+  const h = await harness({ feeds: saidaFeeds(saidaPage(`<p>ISBN: 978-989-641-467-2</p>`)) });
+  const before = publisherBook(h.repo, SAIDA_ISBN, "Berengária, o Anjo da Noite", "");
+
+  await importPublisherCovers(h.deps, [saida], { dryRun: false });
+
+  assert.equal(h.repo.getBook(before.id)!.author, "");
+});
+
+test("a refused author page leaves the book authorless and shows in pagesBlocked", async () => {
+  const h = await harness({ feeds: { ...saidaFeeds(""), [SAIDA_URL]: { status: 403, text: "" } } });
+  const before = publisherBook(h.repo, SAIDA_ISBN, "Berengária, o Anjo da Noite", "");
+
+  const reports = await importPublisherCovers(h.deps, [saida], { dryRun: false });
+
+  assert.equal(h.repo.getBook(before.id)!.author, "");
+  assert.equal(reports["Saída de Emergência"]!.pagesBlocked, 1);
+  assert.equal(reports["Saída de Emergência"]!.pagesDeferred, 0);
 });
