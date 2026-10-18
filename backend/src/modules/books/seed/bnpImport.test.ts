@@ -450,6 +450,8 @@ const recordOf = (isbn: string) => ALLENDE_RECORD.replace("978-972-0-04445-7", i
 const run = (from: string, until: string, extra: Partial<{ dryRun: boolean; cursorOnSuccess: boolean }> = {}) => ({ from, until, dryRun: false, cursorOnSuccess: false, ...extra });
 const bookCount = (db: DatabaseSync) => (db.prepare("SELECT COUNT(*) AS n FROM books").get() as { n: number }).n;
 const unavailable = () => new SourceUnavailableError("oai.bnportugal.gov.pt", "HTTP 503");
+const UNAVAILABLE = "oai.bnportugal.gov.pt unavailable: HTTP 503";
+const TRUNCATED = oaiPage([recordOf(isbnN(2))]).slice(0, -40);
 
 type Reply = string | { status: number; text: string } | Error;
 
@@ -524,7 +526,7 @@ test("a window follows its resumption token and applies every kept record", asyn
   assert.equal(repo.findBookByKey(`isbn:${isbnN(1)}`)!.cover_status, "good");
   assert.equal(repo.findBookByKey("isbn:9789725882856"), undefined);
   assert.equal(blobs.size, 2);
-  assert.deepEqual(logs.map((line) => JSON.parse(line)), [{ window: "2026-10-16..2026-10-17", through: "2026-10-17", records: 5, kept: 3, failed: false }]);
+  assert.deepEqual(logs.map((line) => JSON.parse(line)), [{ window: "2026-10-16..2026-10-17", through: "2026-10-17", records: 5, kept: 3, failed: null }]);
 });
 
 test("a resumption token is URL-encoded in the next request", async () => {
@@ -549,7 +551,7 @@ test("a quiet window is zero records and still moves through", async () => {
     assert.equal(report.through, "2026-10-18");
     assert.deepEqual(report.failedWindows, []);
     assert.equal(repo.getHarvestCursor("bnp"), "2026-10-18");
-    assert.deepEqual(logs.map((line) => JSON.parse(line)), [{ window: "2026-10-18..2026-10-18", through: "2026-10-18", records: 0, kept: 0, failed: false }]);
+    assert.deepEqual(logs.map((line) => JSON.parse(line)), [{ window: "2026-10-18..2026-10-18", through: "2026-10-18", records: 0, kept: 0, failed: null }]);
   }
 });
 
@@ -626,11 +628,11 @@ test("a window that fails twice is listed and through stops before it", async ()
 
   assert.deepEqual(report.failedWindows, ["2026-10-01..2026-10-03"]);
   assert.equal(report.through, "2026-09-30");
-  assert.equal(asked.get(windowUrl("2026-10-01", "2026-10-03")), 2);
+  assert.equal(asked.get(windowUrl("2026-10-01", "2026-10-03")), 4);
   assert.equal(repo.getHarvestCursor("bnp"), null);
   assert.deepEqual(logs.map((line) => JSON.parse(line)), [
-    { window: "2026-09-15..2026-09-30", through: "2026-09-30", records: 1, kept: 1, failed: false },
-    { window: "2026-10-01..2026-10-03", through: "2026-09-30", records: 0, kept: 0, failed: true }
+    { window: "2026-09-15..2026-09-30", through: "2026-09-30", records: 1, kept: 1, failed: null },
+    { window: "2026-10-01..2026-10-03", through: "2026-09-30", records: 0, kept: 0, failed: UNAVAILABLE }
   ]);
 });
 
@@ -649,16 +651,15 @@ test("later windows are still harvested after a failed one, and through stays be
   assert.ok(repo.findBookByKey(`isbn:${isbnN(2)}`));
 });
 
-const FAILURES: Array<[string, Reply]> = [
-  ["an OAI error", oaiError("badResumptionToken")],
+const TRANSIENT: Array<[string, Reply]> = [
   ["a 503 answer", { status: 503, text: oaiPage([recordOf(isbnN(2))]) }],
   ["an unavailable source", unavailable()],
-  ["a truncated page", oaiPage([recordOf(isbnN(2))]).slice(0, -40)]
+  ["a truncated page", TRUNCATED]
 ];
 
-for (const [label, failure] of FAILURES) {
-  test(`a page that fails once with ${label} is retried from the window's start`, async () => {
-    const { db, blobs, asked, deps } = harvestSetup({
+for (const [label, failure] of TRANSIENT) {
+  test(`a page that fails once with ${label} is fetched again without restarting the window`, async () => {
+    const { db, blobs, asked, logs, deps } = harvestSetup({
       [windowUrl("2026-10-16", "2026-10-17")]: FIXTURE_PAGE,
       [tokenUrl("TOKEN-1")]: [failure, oaiPage([recordOf(isbnN(1))])]
     });
@@ -667,30 +668,75 @@ for (const [label, failure] of FAILURES) {
 
     assert.deepEqual(report.failedWindows, []);
     assert.equal(report.through, "2026-10-17");
-    assert.equal(asked.get(windowUrl("2026-10-16", "2026-10-17")), 2);
+    assert.equal(asked.get(windowUrl("2026-10-16", "2026-10-17")), 1);
     assert.equal(asked.get(tokenUrl("TOKEN-1")), 2);
     assert.equal(report.records, 4);
     assert.equal(report.kept, 3);
     assert.equal(report.created, 3);
     assert.equal(bookCount(db), 3);
     assert.equal(blobs.size, 2);
+    assert.equal(JSON.parse(logs[0]!).failed, null);
   });
 }
 
-test("a truncated page fails the window instead of ending it short", async () => {
-  const { db, repo, deps } = harvestSetup({
+test("a bad resumption token restarts the window from its first URL", async () => {
+  const { db, blobs, asked, deps } = harvestSetup({
     [windowUrl("2026-10-16", "2026-10-17")]: FIXTURE_PAGE,
-    [tokenUrl("TOKEN-1")]: oaiPage([recordOf(isbnN(1))]).slice(0, -40)
+    [tokenUrl("TOKEN-1")]: [oaiError("badResumptionToken"), oaiPage([recordOf(isbnN(1))])]
   });
 
-  const report = await importBnp(deps, run("2026-10-16", "2026-10-17", { cursorOnSuccess: true }));
+  const report = await importBnp(deps, run("2026-10-16", "2026-10-17"));
 
-  assert.deepEqual(report.failedWindows, ["2026-10-16..2026-10-17"]);
-  assert.equal(report.through, null);
-  assert.equal(report.records, 0);
-  assert.equal(bookCount(db), 0);
-  assert.equal(repo.getHarvestCursor("bnp"), null);
+  assert.deepEqual(report.failedWindows, []);
+  assert.equal(asked.get(windowUrl("2026-10-16", "2026-10-17")), 2);
+  assert.equal(asked.get(tokenUrl("TOKEN-1")), 2);
+  assert.equal(report.records, 4);
+  assert.equal(report.created, 3);
+  assert.equal(bookCount(db), 3);
+  assert.equal(blobs.size, 2);
 });
+
+test("a page failing twice in a row restarts the window", async () => {
+  const { db, asked, deps } = harvestSetup({
+    [windowUrl("2026-10-16", "2026-10-17")]: FIXTURE_PAGE,
+    [tokenUrl("TOKEN-1")]: [{ status: 503, text: "" }, { status: 503, text: "" }, oaiPage([recordOf(isbnN(1))])]
+  });
+
+  const report = await importBnp(deps, run("2026-10-16", "2026-10-17"));
+
+  assert.deepEqual(report.failedWindows, []);
+  assert.equal(asked.get(windowUrl("2026-10-16", "2026-10-17")), 2);
+  assert.equal(asked.get(tokenUrl("TOKEN-1")), 3);
+  assert.equal(report.records, 4);
+  assert.equal(bookCount(db), 3);
+});
+
+const PERSISTENT: Array<[string, Reply, string, number]> = [
+  ["a 503 answer", { status: 503, text: oaiPage([]) }, "HTTP 503", 4],
+  ["an unavailable source", unavailable(), UNAVAILABLE, 4],
+  ["a truncated page", TRUNCATED, "truncated", 4],
+  ["an OAI error", oaiError("badResumptionToken"), "badResumptionToken", 2]
+];
+
+for (const [label, failure, reason, attempts] of PERSISTENT) {
+  test(`a window whose page fails with ${label} on both passes is listed with the reason`, async () => {
+    const { db, repo, asked, logs, deps } = harvestSetup({
+      [windowUrl("2026-10-16", "2026-10-17")]: FIXTURE_PAGE,
+      [tokenUrl("TOKEN-1")]: failure
+    });
+
+    const report = await importBnp(deps, run("2026-10-16", "2026-10-17", { cursorOnSuccess: true }));
+
+    assert.deepEqual(report.failedWindows, ["2026-10-16..2026-10-17"]);
+    assert.equal(report.through, null);
+    assert.equal(report.records, 0);
+    assert.equal(asked.get(windowUrl("2026-10-16", "2026-10-17")), 2);
+    assert.equal(asked.get(tokenUrl("TOKEN-1")), attempts);
+    assert.equal(bookCount(db), 0);
+    assert.equal(repo.getHarvestCursor("bnp"), null);
+    assert.deepEqual(logs.map((line) => JSON.parse(line)), [{ window: "2026-10-16..2026-10-17", through: null, records: 0, kept: 0, failed: reason }]);
+  });
+}
 
 test("an error other than an unavailable source ends the run without a retry", async () => {
   const { asked, deps } = harvestSetup({ [windowUrl("2026-10-16", "2026-10-16")]: new Error("boom") });

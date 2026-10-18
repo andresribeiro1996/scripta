@@ -8,6 +8,7 @@ import type { BooksRepository, CoverBlobStore } from "../domain/ports.js";
 import type { BookRow, CoverImageRow } from "../domain/types.js";
 import { mapBnpRecord, readMarcRecords, readOaiError, readResumptionToken, type BnpBook } from "./bnpRecord.js";
 import { BNP_SKIPS, bnpSkipReason, udcGenres, type BnpSkip } from "./bnpScope.js";
+import { utcDay } from "../typesafe.js";
 import { fetchBytes } from "./siteFetch.js";
 
 export interface BnpDeps {
@@ -142,10 +143,11 @@ const OAI_END = /<\/OAI-PMH>\s*$/;
 
 type DateWindow = { from: string; until: string };
 type Harvested = { records: number; deleted: number; kept: BnpBook[]; skipped: Array<[BnpSkip, string | null]> };
+type Page = { xml: string } | { failure: string; transient: boolean };
 type Outcome = { created: boolean; replace: BnpReplace | null; cover: BnpCoverAction };
 
 export function utcDate(at: Date): string {
-  return at.toISOString().slice(0, 10);
+  return utcDay(at.getTime());
 }
 
 export function monthWindows(from: string, until: string): DateWindow[] {
@@ -162,23 +164,31 @@ export function monthWindows(from: string, until: string): DateWindow[] {
 const firstUrl = (window: DateWindow) => `${BNP_OAI}?verb=ListRecords&metadataPrefix=marcxchange&set=bibliografianacional&from=${window.from}&until=${window.until}`;
 const nextUrl = (token: string) => `${BNP_OAI}?verb=ListRecords&resumptionToken=${encodeURIComponent(token)}`;
 
-async function fetchPage(fetchText: BnpHarvestDeps["fetchText"], url: string): Promise<string | null> {
+async function tryPage(fetchText: BnpHarvestDeps["fetchText"], url: string): Promise<Page> {
   try {
     const { status, text } = await fetchText(url);
-    return status === 200 && OAI_END.test(text) && readOaiError(text) === null ? text : null;
+    if (status !== 200) return { failure: `HTTP ${status}`, transient: true };
+    const code = readOaiError(text);
+    if (code !== null) return { failure: code, transient: false };
+    return OAI_END.test(text) ? { xml: text } : { failure: "truncated", transient: true };
   } catch (error) {
-    if (error instanceof SourceUnavailableError) return null;
+    if (error instanceof SourceUnavailableError) return { failure: error.message, transient: true };
     throw error;
   }
 }
 
-async function harvestOnce(fetchText: BnpHarvestDeps["fetchText"], window: DateWindow): Promise<Harvested | null> {
+async function fetchPage(fetchText: BnpHarvestDeps["fetchText"], url: string): Promise<Page> {
+  const page = await tryPage(fetchText, url);
+  return "failure" in page && page.transient ? tryPage(fetchText, url) : page;
+}
+
+async function harvestOnce(fetchText: BnpHarvestDeps["fetchText"], window: DateWindow): Promise<Harvested | string> {
   const harvested: Harvested = { records: 0, deleted: 0, kept: [], skipped: [] };
   let url: string | null = firstUrl(window);
   while (url !== null) {
-    const xml = await fetchPage(fetchText, url);
-    if (xml === null) return null;
-    for (const record of readMarcRecords(xml)) {
+    const page = await fetchPage(fetchText, url);
+    if ("failure" in page) return page.failure;
+    for (const record of readMarcRecords(page.xml)) {
       harvested.records++;
       if (record.deleted) {
         harvested.deleted++;
@@ -189,14 +199,15 @@ async function harvestOnce(fetchText: BnpHarvestDeps["fetchText"], window: DateW
       if (reason === null) harvested.kept.push(book);
       else harvested.skipped.push([reason, book.publisher]);
     }
-    const token = readResumptionToken(xml);
+    const token = readResumptionToken(page.xml);
     url = token === null ? null : nextUrl(token);
   }
   return harvested;
 }
 
-async function harvestWindow(fetchText: BnpHarvestDeps["fetchText"], window: DateWindow): Promise<Harvested | null> {
-  return (await harvestOnce(fetchText, window)) ?? (await harvestOnce(fetchText, window));
+async function harvestWindow(fetchText: BnpHarvestDeps["fetchText"], window: DateWindow): Promise<Harvested | string> {
+  const first = await harvestOnce(fetchText, window);
+  return typeof first === "string" ? harvestOnce(fetchText, window) : first;
 }
 
 async function applyPooled(books: BnpBook[], apply: (book: BnpBook) => Promise<void>): Promise<void> {
@@ -269,7 +280,9 @@ export async function importBnp(deps: BnpHarvestDeps, options: BnpImportOptions)
   let broken = false;
   for (const window of monthWindows(options.from, options.until)) {
     const label = `${window.from}..${window.until}`;
-    const harvested = await harvestWindow(deps.fetchText, window);
+    const result = await harvestWindow(deps.fetchText, window);
+    const harvested = typeof result === "string" ? null : result;
+    const failure = typeof result === "string" ? result : null;
     if (harvested === null) {
       broken = true;
       report.failedWindows.push(label);
@@ -298,7 +311,7 @@ export async function importBnp(deps: BnpHarvestDeps, options: BnpImportOptions)
       }
     }
     if (!broken) report.through = window.until;
-    deps.log(JSON.stringify({ window: label, through: report.through, records: harvested?.records ?? 0, kept: harvested?.kept.length ?? 0, failed: harvested === null }));
+    deps.log(JSON.stringify({ window: label, through: report.through, records: harvested?.records ?? 0, kept: harvested?.kept.length ?? 0, failed: failure }));
   }
 
   report.publishers = { kept: top(keptPublishers), dropped: perSkip((reason) => top(droppedPublishers[reason])) };
