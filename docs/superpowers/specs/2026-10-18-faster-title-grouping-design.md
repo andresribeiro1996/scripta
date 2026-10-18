@@ -8,7 +8,7 @@ Almost all of a call is the `groupablePairsStmt` SELECT. Its `candidates` CTE gr
 
 ## Goal
 
-Each `groupKeylessWorks(250)` call on the scaled copy (dev `covers.sqlite` plus 240k synthetic keyless books, about 4 editions per title key) is under 1 s, aiming for under 200 ms (the stall-log threshold). A call with nothing to merge takes tens of milliseconds, not a second.
+Each `groupKeylessWorks(250)` call on the scaled copy (dev `covers.sqlite` plus 240k synthetic keyless books, about 4 editions per title key) is under 1 s, aiming for under 200 ms (the stall-log threshold). On that copy, a call with nothing to merge takes tens of milliseconds, not a second.
 
 ## Non-goals
 
@@ -29,7 +29,7 @@ The set of all pairs the new code finds equals the set the current SELECT finds,
 ## The change
 
 1. **Only title keys shared by two or more works can produce a pair.** A source and its target are distinct works that both hold an edition with that key. A covering index on `books(title_key, work_id)` lets one index-only pass find those keys (`GROUP BY title_key HAVING COUNT(DISTINCT work_id) > 1`) without touching table rows.
-2. **Work through those keys in title-key order and stop at the limit.** Each call takes the next `limit` shareable keys after a cursor. It runs today's three CTEs restricted to the works holding an edition with one of those keys, and repeats until it has `limit` pairs or runs out of keys. Early in a drain the first 250 keys yield the batch. Once the drain is done, a call is one index pass that finds nothing.
+2. **Work through those keys in title-key order and stop at the limit.** Each call takes the next `limit` shareable keys after a cursor. It runs today's three CTEs restricted to the works holding an edition with one of those keys, and repeats until it has `limit` pairs or runs out of keys. Early in a drain the first 250 keys yield the batch. Once the drain is done, a call is one index pass plus the pairs query for every key that is shared but never pairs: a key held by two keyed works, a mixed-key work, blocked editions. Each of those costs about 15 µs per call.
 3. **Pairs come back ordered by title key, then source `created_at`, then source id.** Today they come back by source `created_at` across all keys.
 
 The covering index replaces `idx_books_title_key`. Every other query that reads `title_key` (`GLOB` prefixes, `IN`, `IS NULL`) uses the same leading column.
@@ -48,6 +48,8 @@ The one exception: a keyed work that gathers sources under two or more different
 | Call with nothing to merge (drained copy) | ~900 ms | 30 ms |
 | All pairs on the undrained copy | 181,132 | 181,132, the same set |
 | Building the covering index at boot (240k books) | — | 0.64 s, once |
+
+The scale check also drained a production-shaped copy, which is deliberately pessimistic: 318k books, 37k keyed works, and 14k title keys left shared but never pairing after the drain. There, a call took p50 250 ms and max 446 ms (old code: 1,385 ms and 6.4 s). A no-merge call took about 280 ms (old code: 1,011 ms). That is under 1 s but over the 200 ms stall-log threshold. A covering index on `works` would cut the stuck-key part by about 25%, and bigger key chunks change nothing, so neither went in. Production's count of such keys is unknown; the PR gives the query to count them.
 
 A shareable-key pass through the existing `idx_books_title_key` reads table rows for `work_id` and takes about 400 ms. That's why the index changes.
 
