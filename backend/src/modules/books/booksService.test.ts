@@ -723,18 +723,19 @@ test("an outside ISBN search goes to Open Library and saves the results", async 
 });
 
 const allende = "9789720044457";
-const bnpRow = (isbn = allende, createdBy: "bnp" | "seed" = "bnp") =>
-  harness().repo.createBook({ title: "A casa dos espíritos", author: "Isabel Allende", isbn, createdBy }, [`isbn:${isbn}`], "2026-10-01T00:00:00.000Z");
 
-function bnpLookupSpy(outcome: () => ReturnType<NonNullable<Deps["bnpLookup"]>>) {
+function withBnp(outcome: (repo: ReturnType<typeof harness>["repo"]) => ReturnType<NonNullable<Deps["bnpLookup"]>>, overrides: Partial<Deps> = {}) {
   const asked: string[] = [];
-  return { asked, bnpLookup: async (isbn: string) => { asked.push(isbn); return outcome(); } };
+  const h: ReturnType<typeof harness> = harness({ ...overrides, bnpLookup: async (isbn) => { asked.push(isbn); return outcome(h.repo); } });
+  return { h, asked };
 }
+
+const saveBnpBook = (repo: ReturnType<typeof harness>["repo"], createdBy: "bnp" | "seed" = "bnp") =>
+  repo.createBook({ title: "A casa dos espíritos", author: "Isabel Allende", isbn: allende, createdBy }, [`isbn:${allende}`], "2026-10-01T00:00:00.000Z");
 
 test("a Portugal ISBN asks the BNP first and returns its book", async () => {
   const { calls, catalog } = recordingCatalog();
-  const { asked, bnpLookup } = bnpLookupSpy(async () => bnpRow());
-  const h = harness({ catalog, bnpLookup });
+  const { h, asked } = withBnp(async (repo) => saveBnpBook(repo), { catalog });
 
   const results = await h.service.searchExternal("978-972-0-04445-7");
 
@@ -745,8 +746,7 @@ test("a Portugal ISBN asks the BNP first and returns its book", async () => {
 
 test("a BNP outage falls through to the catalog and warns", async () => {
   const { calls, catalog } = recordingCatalog();
-  const { asked, bnpLookup } = bnpLookupSpy(async () => { throw new SourceUnavailableError("urn.porbase.org", "HTTP 503"); });
-  const h = harness({ catalog, bnpLookup });
+  const { h, asked } = withBnp(async () => { throw new SourceUnavailableError("urn.porbase.org", "HTTP 503"); }, { catalog });
 
   const results = await h.service.searchExternal(allende);
 
@@ -759,8 +759,7 @@ test("a BNP outage falls through to the catalog and warns", async () => {
 
 test("a BNP miss falls through to the catalog", async () => {
   const { calls, catalog } = recordingCatalog();
-  const { asked, bnpLookup } = bnpLookupSpy(async () => null);
-  const h = harness({ catalog, bnpLookup });
+  const { h, asked } = withBnp(async () => null, { catalog });
 
   const results = await h.service.searchExternal(allende);
 
@@ -772,8 +771,7 @@ test("a BNP miss falls through to the catalog", async () => {
 
 test("a BNP failure other than an outage is not swallowed", async () => {
   const { calls, catalog } = recordingCatalog();
-  const { bnpLookup } = bnpLookupSpy(async () => { throw new Error("disk full"); });
-  const h = harness({ catalog, bnpLookup });
+  const { h } = withBnp(async () => { throw new Error("disk full"); }, { catalog });
 
   await assert.rejects(h.service.searchExternal(allende), /disk full/);
   assert.deepEqual(calls, []);
@@ -781,8 +779,7 @@ test("a BNP failure other than an outage is not swallowed", async () => {
 
 test("a non-Portugal ISBN never asks the BNP", async () => {
   const { calls, catalog } = recordingCatalog();
-  const { asked, bnpLookup } = bnpLookupSpy(async () => bnpRow());
-  const h = harness({ catalog, bnpLookup });
+  const { h, asked } = withBnp(async (repo) => saveBnpBook(repo), { catalog });
 
   await h.service.searchExternal("9780141439518");
 
@@ -792,8 +789,7 @@ test("a non-Portugal ISBN never asks the BNP", async () => {
 
 test("a Portugal-prefixed ISBN with a wrong check digit never asks the BNP", async () => {
   const { calls, catalog } = recordingCatalog();
-  const { asked, bnpLookup } = bnpLookupSpy(async () => bnpRow());
-  const h = harness({ catalog, bnpLookup });
+  const { h, asked } = withBnp(async (repo) => saveBnpBook(repo), { catalog });
 
   await h.service.searchExternal("9789720044458");
   await h.service.searchExternal("9720044458");
@@ -803,9 +799,8 @@ test("a Portugal-prefixed ISBN with a wrong check digit never asks the BNP", asy
 });
 
 test("an ISBN already held from the BNP is returned without asking anyone", async () => {
-  const { asked, bnpLookup } = bnpLookupSpy(async () => { throw new Error("BNP not expected"); });
-  const h = harness({ bnpLookup });
-  h.repo.createBook({ title: "A casa dos espíritos", author: "Isabel Allende", isbn: allende, createdBy: "bnp" }, [`isbn:${allende}`], "2026-10-01T00:00:00.000Z");
+  const { h, asked } = withBnp(async () => { throw new Error("BNP not expected"); });
+  saveBnpBook(h.repo);
 
   const results = await h.service.searchExternal(allende);
 
@@ -815,9 +810,8 @@ test("an ISBN already held from the BNP is returned without asking anyone", asyn
 
 test("a Portugal ISBN held from another source still asks the BNP", async () => {
   const { calls, catalog } = recordingCatalog();
-  const { asked, bnpLookup } = bnpLookupSpy(async () => bnpRow());
-  const h = harness({ catalog, bnpLookup });
-  h.repo.createBook({ title: "Casa dos espiritos", author: "Isabel Allende", isbn: allende, createdBy: "seed" }, [`isbn:${allende}`], "2026-10-01T00:00:00.000Z");
+  const { h, asked } = withBnp(async (repo) => repo.findBookByKey(`isbn:${allende}`)!, { catalog });
+  saveBnpBook(h.repo, "seed");
 
   await h.service.searchExternal(allende);
 

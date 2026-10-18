@@ -57,3 +57,13 @@ test("requests carry the importer's user agent", async () => {
   await fetchText("https://shop.test/a");
   assert.deepEqual(agents, [USER_AGENT]);
 });
+
+test("a request that outlasts the given timeout becomes SourceUnavailableError", { timeout: 2000 }, async () => {
+  globalThis.fetch = ((_input: unknown, init?: RequestInit) =>
+    new Promise((_resolve, reject) => {
+      init!.signal!.addEventListener("abort", () => reject(init!.signal!.reason));
+    })) as typeof fetch;
+
+  await assert.rejects(fetchText("https://shop.test/a", 5), (error) => error instanceof SourceUnavailableError && error.source === "shop.test");
+  await assert.rejects(fetchBytes("https://shop.test/a.jpg", 5), SourceUnavailableError);
+});

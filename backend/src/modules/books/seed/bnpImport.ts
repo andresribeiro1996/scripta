@@ -98,8 +98,8 @@ export async function applyBnpRecord(deps: BnpDeps, plan: BnpPlan): Promise<{ bo
   return { book: deps.repo.getBook(written.id)!, created: written.created, cover };
 }
 
-export async function fetchBnpScan(url: string): Promise<EncodedCover | null> {
-  const bytes = await fetchBytes(url);
+export async function fetchBnpScan(url: string, timeoutMs?: number): Promise<EncodedCover | null> {
+  const bytes = await fetchBytes(url, timeoutMs);
   return bytes === null ? null : encodeCover(bytes);
 }
 
@@ -142,6 +142,7 @@ const SCAN_POOL = 2;
 const TOP_PUBLISHERS = 50;
 const SAMPLES = 20;
 const OAI_END = /<\/OAI-PMH>\s*$/;
+const LOOKUP_MISS = /<urn-response>\s*<error>Registo inexistente<\/error>\s*<\/urn-response>|<collection\b[^>]*(?:\/>|>\s*<\/collection>)/;
 
 type DateWindow = { from: string; until: string };
 type Harvested = { records: number; deleted: number; kept: BnpBook[]; skipped: Array<[BnpSkip, string | null]> };
@@ -338,8 +339,9 @@ export async function lookupBnpIsbn(deps: BnpHarvestDeps, isbn: string): Promise
   const { status, text } = await deps.fetchText(BNP_ISBN_URL + isbn);
   if (status !== 200) throw new SourceUnavailableError("urn.porbase.org", `HTTP ${status}`, { status });
   const record = readMarcRecords(text)[0];
-  if (record === undefined) return null;
-  return (await applyBnpRecord(deps, planBnpRecord(deps.repo, mapBnpRecord(record), isbn)!)).book;
+  if (record !== undefined) return (await applyBnpRecord(deps, planBnpRecord(deps.repo, mapBnpRecord(record), isbn)!)).book;
+  if (LOOKUP_MISS.test(text)) return null;
+  throw new SourceUnavailableError("urn.porbase.org", "unexpected reply");
 }
 
 export async function syncBnp(deps: BnpHarvestDeps): Promise<BnpImportReport | null> {

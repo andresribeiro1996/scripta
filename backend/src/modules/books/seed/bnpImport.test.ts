@@ -960,3 +960,18 @@ test("a lookup answered with a server error is reported as unavailable", async (
   await assert.rejects(lookupBnpIsbn(deps, PORTUGUESE), (error) => error instanceof SourceUnavailableError && error.source === "urn.porbase.org");
   assert.equal(bookCount(db), 0);
 });
+
+test("a lookup answered with an empty collection is a miss", async () => {
+  for (const reply of ['<collection xmlns="info:lc/xmlns/marcxchange-v2"/>', '<?xml version="1.0"?><collection xmlns="info:lc/xmlns/marcxchange-v2"></collection>']) {
+    const { deps } = harvestSetup({ [lookupUrl(PORTUGUESE)]: reply });
+    assert.equal(await lookupBnpIsbn(deps, PORTUGUESE), null);
+  }
+});
+
+test("a lookup answered with anything but a record or a known miss is reported as unavailable", async () => {
+  for (const reply of ["<html><body>Em manutenção</body></html>", "", "<urn-response><error>Erro interno</error></urn-response>"]) {
+    const { db, deps } = harvestSetup({ [lookupUrl(PORTUGUESE)]: reply });
+    await assert.rejects(lookupBnpIsbn(deps, PORTUGUESE), (error) => error instanceof SourceUnavailableError && error.source === "urn.porbase.org");
+    assert.equal(bookCount(db), 0);
+  }
+});

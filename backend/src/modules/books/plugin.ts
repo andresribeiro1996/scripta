@@ -44,6 +44,7 @@ const APPLE_GAP_MS = 3200;
 const OPEN_LIBRARY_GAP_MS = 1000;
 const OPEN_LIBRARY_COVER_GAP_MS = 3100;
 const BACKGROUND_ISBNDB_DAILY_CAP = 500;
+const BNP_LOOKUP_TIMEOUT_MS = 5_000;
 
 let activeService: BooksService | null = null;
 
@@ -130,6 +131,11 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
     now: () => new Date(),
     log: (line) => app.log.info({ bnp: line }, "bnp sync window")
   };
+  const bnpLookupDeps: BnpHarvestDeps = {
+    ...bnpDeps,
+    fetchText: (url) => fetchText(url, BNP_LOOKUP_TIMEOUT_MS),
+    fetchScan: (url) => fetchBnpScan(url, BNP_LOOKUP_TIMEOUT_MS)
+  };
   const service = createBooksService({
     repo,
     blobs,
@@ -153,7 +159,7 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
     publicUrlFor: coverUrlFor,
     adminUserId: env.ADMIN_USER_ID,
     warn: (details, message) => app.log.warn(details, message),
-    bnpLookup: (isbn) => lookupBnpIsbn(bnpDeps, isbn),
+    bnpLookup: (isbn) => lookupBnpIsbn(bnpLookupDeps, isbn),
     onDetailsChecked: (book) => {
       if (!book.work_id) return;
       genreJobs?.add(book.work_id);
