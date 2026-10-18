@@ -1,10 +1,10 @@
 export type CoverStatus = "good" | "low_res" | "missing" | "manual";
 export type DetailsStatus = "found" | "missing";
-export type DataSource = "openlibrary" | "isbndb";
+export type DataSource = "openlibrary" | "isbndb" | "bnp";
 export type SummarySource = DataSource | "publisher";
-export type CoverSourceName = "isbndb" | "apple" | "openlibrary" | "upload" | "publisher";
+export type CoverSourceName = "isbndb" | "apple" | "openlibrary" | "upload" | "publisher" | "bnp";
 
-export type BookCreator = "seed" | "publisher";
+export type BookCreator = "seed" | "publisher" | "bnp";
 
 export interface BookRow {
   id: string;

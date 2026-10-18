@@ -22,7 +22,7 @@ export const UPGRADE_WANTED_SQL = `
 `;
 
 export const UNCHECKED_DETAILS_SQL = `
-  SELECT id FROM books WHERE details_status IS NULL
+  SELECT id FROM books WHERE details_status IS NULL AND created_by IS NOT 'bnp'
   ORDER BY details_checked_at IS NOT NULL, created_by IS NOT NULL, details_checked_at, created_at, rowid LIMIT ?
 `;
 export const WORK_LOOKUP_SQL = `
@@ -388,6 +388,10 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
 
   const uncheckedStmt = db.prepare(UNCHECKED_COVERS_SQL);
   const uncheckedDetailsStmt = db.prepare(UNCHECKED_DETAILS_SQL);
+  const fillSubjectGenresStmt = db.prepare(`UPDATE books SET genres = ?, genres_source = NULL, genres_confidence = NULL WHERE id = ? AND (genres = '[]' OR genres_source = 'jev')`);
+  const confirmWithSourceStmt = db.prepare(`UPDATE books SET data_sources = json_insert(data_sources, '$[#]', ?) WHERE id = ? AND NOT ${CONFIRMED_SQL}`);
+  const harvestCursorStmt = db.prepare(`SELECT through FROM harvest_cursors WHERE feed = ?`);
+  const setHarvestCursorStmt = db.prepare(`INSERT INTO harvest_cursors (feed, through) VALUES (?, ?) ON CONFLICT (feed) DO UPDATE SET through = excluded.through`);
   const setUpgradeWantedStmt = db.prepare(`UPDATE books SET cover_upgrade_wanted_at = ? WHERE id = ?`);
   const setAppleCheckedStmt = db.prepare(`UPDATE books SET apple_checked_at = ? WHERE id = ?`);
   const setWorkKeyStmt = db.prepare(`UPDATE books SET ol_work_key = ? WHERE id = ? AND ol_work_key IS NULL`);
@@ -671,6 +675,25 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
 
     listUncheckedDetailIds(limit) {
       return (uncheckedDetailsStmt.all(limit) as Array<{ id: string }>).map((row) => row.id);
+    },
+
+    fillSubjectGenres(bookId, genres) {
+      if (genres.length === 0) return;
+      fillSubjectGenresStmt.run(JSON.stringify(genres), bookId);
+    },
+
+    confirmWithSource(bookId, source) {
+      inTransaction(() => {
+        if (confirmWithSourceStmt.run(source, bookId).changes > 0) makeSearchableIfConfirmed(bookId);
+      });
+    },
+
+    getHarvestCursor(feed) {
+      return (harvestCursorStmt.get(feed) as { through: string } | undefined)?.through ?? null;
+    },
+
+    setHarvestCursor(feed, through) {
+      setHarvestCursorStmt.run(feed, through);
     },
 
     setUpgradeWanted(bookId, at) {
