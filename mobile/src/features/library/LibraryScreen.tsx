@@ -169,9 +169,9 @@ export function LibraryScreen() {
               // the stack's back chevron would be the wrong affordance here.
               headerBackVisible: false,
               headerLeft: () => (
-                <Button
-                  label="Cancel"
-                  variant="secondary"
+                <IconButton
+                  name="close"
+                  accessibilityLabel="Cancel selection"
                   onPress={() => { setSelectionMode(false); setSelectedKeys(new Set()); }}
                 />
               ),
