@@ -39,11 +39,11 @@
 ### Task 1: One credit cleaner, and ordered author tags for Imprensa Nacional
 
 **Files:**
-- Modify: `backend/src/modules/books/seed/publisherFeed.ts`:
-  - add `cleanCredit` and a `PLACEHOLDER` constant;
-  - change `distinctNames`, `tagAuthors`, and the `author` lines in `parseShopifyProducts` and `parseWooProducts`.
-- Modify: `backend/src/modules/books/seed/publishers.ts`: `authorTag` type; the Imprensa Nacional entry.
+- Modify: `backend/src/modules/books/seed/publisherFeed.ts`
+- Modify: `backend/src/modules/books/seed/publishers.ts`
 - Test: `backend/src/modules/books/seed/publisherFeed.test.ts`
+
+What changes: in publisherFeed.ts, add cleanCredit and a PLACEHOLDER constant, and change distinctNames, tagAuthors, and the author lines in parseShopifyProducts and parseWooProducts; in publishers.ts, the authorTag type and the Imprensa Nacional entry.
 
 **Interfaces:**
 - Produces: `export function cleanCredit(credit: string | null): string | null`, exported from `seed/publisherFeed.ts`.
@@ -176,8 +176,10 @@ git commit -m "Clean every shop credit of role marks and placeholders, and read 
 ### Task 2: Four page-author extractors behind named rules
 
 **Files:**
-- Modify: `backend/src/modules/books/seed/publisherFeed.ts`: add `PageAuthorRule`, `pageCredit`, the four extractors and `pageAuthor`; `pageAuthors` uses `pageCredit`.
+- Modify: `backend/src/modules/books/seed/publisherFeed.ts`
 - Test: `backend/src/modules/books/seed/publisherFeed.test.ts`
+
+What changes: in publisherFeed.ts, add PageAuthorRule, pageCredit, the four extractors and pageAuthor; pageAuthors uses pageCredit.
 
 **Interfaces:**
 - Consumes: `cleanCredit` and the new `distinctNames` (Task 1).
@@ -305,15 +307,13 @@ git commit -m "Read the main product's author from four more shops' page markup"
 ### Task 3: Sites name their page rule; the importer uses it and accepts pages without an ISBN
 
 **Files:**
-- Modify: `backend/src/modules/books/seed/publishers.ts`: `authorLinks?: boolean` becomes `pageAuthor?: PageAuthorRule`; eight entries change.
-- Modify: `backend/src/modules/books/seed/importPublisherCovers.ts`:
-  - the import line;
-  - `readPage`'s `resolved.push`;
-  - `readAuthorPage`;
-  - export `sameTitle`.
-- Modify: `backend/README.md`: the "**Authors.**" paragraph under "Seeding the catalog".
-- Modify: `docs/publisher-catalog.md`: "Author from" cells.
+- Modify: `backend/src/modules/books/seed/publishers.ts`
+- Modify: `backend/src/modules/books/seed/importPublisherCovers.ts`
+- Modify: `backend/README.md`
+- Modify: `docs/publisher-catalog.md`
 - Test: `backend/src/modules/books/seed/importPublisherCovers.test.ts`
+
+What changes: in publishers.ts, authorLinks?: boolean becomes pageAuthor?: PageAuthorRule and eight entries change; in importPublisherCovers.ts, the import line, readPage's resolved.push, readAuthorPage, and sameTitle is exported; in the README, the "Authors." paragraph under "Seeding the catalog"; in docs/publisher-catalog.md, the "Author from" cells.
 
 **Interfaces:**
 - Consumes: `PageAuthorRule` and `pageAuthor` (Task 2).
@@ -354,6 +354,17 @@ test("an author page that shows a different ISBN gives no author", async () => {
 
   assert.equal(h.repo.getBook(before.id)!.author, "");
 });
+
+test("a refused author page leaves the book authorless and shows in pagesBlocked", async () => {
+  const h = await harness({ feeds: { ...saidaFeeds(""), [SAIDA_URL]: { status: 403, text: "" } } });
+  const before = publisherBook(h.repo, SAIDA_ISBN, "Berengária, o Anjo da Noite", "");
+
+  const reports = await importPublisherCovers(h.deps, [saida], { dryRun: false });
+
+  assert.equal(h.repo.getBook(before.id)!.author, "");
+  assert.equal(reports["Saída de Emergência"]!.pagesBlocked, 1);
+  assert.equal(reports["Saída de Emergência"]!.pagesDeferred, 0);
+});
 ```
 
 - [ ] **Step 2: Run them and confirm they fail**
@@ -390,11 +401,15 @@ Expected: a type error, because `pageAuthor` isn't a `PublisherSite` field.
     report.authorPages++;
     try {
       const response = await request(() => deps.fetchText(book.productUrl));
-      if (response.status !== 200) return null;
+      if (response.status !== 200) {
+        if (response.status !== 404) report.pagesBlocked++;
+        return null;
+      }
       const shown = findPageIsbn(response.text);
       return shown === null || shown === isbn ? pageAuthor(rule, response.text) : null;
     } catch (error) {
       if (!(error instanceof SourceUnavailableError)) throw error;
+      report.failed++;
       return null;
     }
   };
@@ -403,7 +418,7 @@ Expected: a type error, because `pageAuthor` isn't a `PublisherSite` field.
 `backend/README.md`: replace the whole "**Authors.**" paragraph with:
 
 ```markdown
-**Authors.** A book's author comes from the feed when the shop puts it there: Antígona's `vendor`, a WooCommerce `Autor` attribute, Presença's `NOMEAUTOR_` tags, or Imprensa Nacional's `AUTOR_<n>` tags in credit order, else its single `AUTOR` tag (`authorTag` in `seed/publishers.ts`). Otherwise it comes from Open Library, and failing that, for shops with a `pageAuthor` rule, from the product page. The rules read only the main product: `autorLink` takes the `autor_link` anchors to `/autor/` or `/autores/` between `<main` and the first related card (Relógio d'Água, Gradiva, Guerra & Paz, Penguin Livros); `summaryAuthor` the `/autor/` links in `div.summaryAuthor` (Saída de Emergência); `productAutor` the text of `p.product-autor`, never `card-autor` (Edições Afrontamento); `prodMainH4` the `<h4>` lines between `div.prod-main` and the description, which can include an illustrator (Orfeu Negro); `elementorAuthor` the Elementor text widget `b6a8e18` (Exclamação). Every credit, from any source, loses its parenthesised parts (`(org.)`, `(coords.)`, `(ilustração)`, `(Tradução de …)`), and placeholders (`VV. AA.`, `Vários…`, `Autor Desconhecido`, `Diversos`) count as no author; a combined "A e B" credit is kept whole, since " e " also joins surnames. A product whose ISBN comes from the feed or its image file name has its page fetched only when its stored book has no author, and the page's author is used unless the page shows a different ISBN (counted in `authorPages`). On every run, an existing book with an empty title or author gets the missing part from its product (never overwriting either), but only when its stored title, if it has one, matches the product's. Each fill is logged as `<site>: identity <isbn> {"title":…,"author":…}` and counted in `identityFilled`; a dry run logs and counts without writing. Books no shop gives an author for are left to `scripts/fill-authors-isbndb.mjs` (see "ISBNdb authors").
+**Authors.** A book's author comes from the feed when the shop puts it there: Antígona's `vendor`, a WooCommerce `Autor` attribute, Presença's `NOMEAUTOR_` tags, or Imprensa Nacional's `AUTOR_<n>` tags in credit order, else its single `AUTOR` tag (`authorTag` in `seed/publishers.ts`). Otherwise it comes from Open Library, and failing that, for shops with a `pageAuthor` rule, from the product page. The rules read only the main product: `autorLink` takes the `autor_link` anchors to `/autor/` or `/autores/` between `<main` and the first related card (Relógio d'Água, Gradiva, Guerra & Paz, Penguin Livros); `summaryAuthor` the `/autor/` links in `div.summaryAuthor` (Saída de Emergência); `productAutor` the text of `p.product-autor`, never `card-autor` (Edições Afrontamento); `prodMainH4` the `<h4>` lines between `div.prod-main` and the description, which can include an illustrator (Orfeu Negro); `elementorAuthor` the Elementor text widget `b6a8e18` (Exclamação). Every credit, from any source, loses its parenthesised parts (`(org.)`, `(coords.)`, `(ilustração)`, `(Tradução de …)`), and placeholders (`VV. AA.`, `Vários…`, `Autor Desconhecido`, `Diversos`) count as no author; a combined "A e B" credit is kept whole, since " e " also joins surnames. A product whose ISBN comes from the feed or its image file name has its page fetched only when its stored book has no author, and the page's author is used unless the page shows a different ISBN (a page whose ISBN can't be read, or that shows several, counts as showing none; the stored title must still match). These reads are counted in `authorPages`; a refused one in `pagesBlocked`, an unreachable one in `failed`. On every run, an existing book with an empty title or author gets the missing part from its product (never overwriting either), but only when its stored title, if it has one, matches the product's. Each fill is logged as `<site>: identity <isbn> {"title":…,"author":…}` and counted in `identityFilled`; a dry run logs and counts without writing. Books no shop gives an author for are left to `scripts/fill-authors-isbndb.mjs` (see "ISBNdb authors").
 ```
 
 `docs/publisher-catalog.md`, in the "Author from" column:
@@ -413,11 +428,12 @@ Expected: a type error, because `pageAuthor` isn't a `PublisherSite` field.
 - Edições Afrontamento: → `Open Library, else the page's `p.product-autor` without role marks (`productAutor`)`
 - Saída de Emergência: → `Open Library, else the page's `/autor/` links in `div.summaryAuthor` (`summaryAuthor`)`
 - Divergência, Kathartika, Pato Lógico: `Open Library` → `Open Library, else ISBNdb (`fill-authors-isbndb.mjs`)`
+- Relógio d'Água, Gradiva, Guerra & Paz, Penguin Livros: every `(`authorLinks`)` → `(`pageAuthor: "autorLink"`)`
 
 - [ ] **Step 4: Run the full backend verify**
 
 Run: `npm run build --workspace @scripta/shared && npm run typecheck --workspace backend && npm test --workspace backend && git diff --check`
-Expected: all pass. `rg -n authorLinks backend/src docs backend/README.md` finds nothing.
+Expected: all pass. `rg -n authorLinks backend/src backend/README.md docs/publisher-catalog.md` finds nothing.
 
 - [ ] **Step 5: Commit**
 
@@ -433,11 +449,14 @@ git commit -m "Give five more shops a page author rule, and accept an author pag
 **Files:**
 - Create: `backend/src/modules/books/seed/isbndbAuthors.ts`
 - Create: `backend/scripts/fill-authors-isbndb.mjs`
-- Create: `backend/src/modules/books/seed/isbndbAuthors.test.ts`, and add it to `backend/package.json`'s `test` script right after `src/modules/books/seed/lossyRetitle.test.ts`.
-- Modify: `backend/README.md`: a new "#### ISBNdb authors" section right after the "#### Lossy titles" section.
+- Test: `backend/src/modules/books/seed/isbndbAuthors.test.ts`
+- Modify: `backend/package.json`
+- Modify: `backend/README.md`
+
+What changes: the new test file is added to the backend package.json test script right after src/modules/books/seed/lossyRetitle.test.ts; the README gets a new "#### ISBNdb authors" section right after "#### Lossy titles".
 
 **Interfaces:**
-- Consumes: `cleanCredit` (Task 1), `sameTitle` (Task 3), `fillMissingIdentity` (`domain/findOrCreate.ts`), and `BookCatalog["search"]`, which returns `CatalogSearchHit[]` whose `result` has `title: string` and `authors: string[]`.
+- Consumes: `cleanCredit` (Task 1), `sameTitle` (Task 3), `fillMissingIdentity` (`domain/findOrCreate.ts`), `normalizeWords` (`domain/normalize.ts`), and `BookCatalog["search"]`, which returns `CatalogSearchHit[]` whose `result` has `title: string` and `authors: string[]`.
 - Produces:
   - `planIsbndbAuthors(db: DatabaseSync, isbndb: Pick<BookCatalog, "search">, options: { max: number; after: string }): Promise<IsbndbAuthorPlan>`
   - `applyIsbndbAuthors(repo: Pick<BooksRepository, "getBook" | "findBookByKey" | "addKey" | "fillIdentity">, plan: IsbndbAuthorPlan): number`
@@ -483,7 +502,7 @@ function setup(answers: Record<string, () => Promise<CatalogSearchHit[]>>) {
   const repo = createSqliteBooksRepository(db);
   const asked: string[] = [];
   const isbndb = { search: async (query: { isbn: string } | { text: string }) => { const isbn = "isbn" in query ? query.isbn : ""; asked.push(isbn); return answers[isbn] ? answers[isbn]() : []; } };
-  const book = (isbn: string | null, title: string, author = "") => repo.createBook({ title, author, isbn: isbn ?? undefined, createdBy: "seed" }, isbn ? [`isbn:${isbn}`] : [], NOW);
+  const book = (isbn: string | null, title: string, author = "") => repo.createBook({ title, author, isbn, createdBy: "seed" }, isbn ? [`isbn:${isbn}`] : [], NOW);
   return { db, repo, isbndb, asked, book };
 }
 
@@ -499,7 +518,7 @@ test("a matching ISBNdb record fills the author and claims the title key", async
   assert.equal(h.repo.getBook(row.id)!.author, "António Lobo Antunes");
   assert.equal(h.repo.getBook(row.id)!.title, "Os Cus de Judas");
   assert.equal(h.repo.findBookByKey(catalogTitleKey("Os Cus de Judas", "António Lobo Antunes")!)?.id, row.id);
-  assert.deepEqual(isbndbAuthorReport(plan, applied), { selected: 1, noRecord: 0, noAuthor: 0, titleMismatch: 0, placeholder: 0, next: row.id, isbndb: { max: 10, asked: 1, unavailable: 0, notAsked: 0, pausedUntil: null }, fills: [{ id: row.id, isbn: CUS, title: "Os Cus de Judas", author: "António Lobo Antunes" }], wouldFill: 1, applied: 1 });
+  assert.deepEqual(isbndbAuthorReport(plan, applied), { selected: 1, noRecord: 0, noAuthor: 0, titleMismatch: 0, placeholder: 0, commaName: 0, mismatches: [], next: row.id, isbndb: { max: 10, asked: 1, unavailable: 0, notAsked: 0, pausedUntil: null }, fills: [{ id: row.id, isbn: CUS, title: "Os Cus de Judas", author: "António Lobo Antunes" }], wouldFill: 1, applied: 1 });
 });
 
 test("a record for another title, a placeholder, no record and no authors fill nothing", async () => {
@@ -572,6 +591,45 @@ test("an author filled since the plan was made is not overwritten", async () => 
   assert.equal(applyIsbndbAuthors(h.repo, plan), 0);
   assert.equal(h.repo.getBook(row.id)!.author, "A. Lobo Antunes");
 });
+
+test("a pause on the first ask keeps next at --after, so the next night resumes there", async () => {
+  const h = setup({});
+  const rows = [h.book(CUS, "Um"), h.book(ORIANA, "Dois"), h.book(SARAGOCA, "Três")].sort((a, b) => (a.id < b.id ? -1 : 1));
+  h.isbndb.search = async () => {
+    throw new SourcePausedError("isbndb", "paused", { retryAt: Date.parse("2026-10-18T00:00:00.000Z") });
+  };
+
+  const plan = await planIsbndbAuthors(h.db, h.isbndb, { max: 10, after: rows[0]!.id });
+
+  assert.equal(plan.next, rows[0]!.id);
+  assert.equal(plan.isbndb.asked, 0);
+  assert.equal(plan.isbndb.notAsked, 2);
+});
+
+test("a name still in Last, First form fills nothing, and the stored translator is not an author", async () => {
+  const h = setup({
+    [CUS]: async () => [hit("Os Cus de Judas", ["Lobo Antunes, António"])],
+    [ORIANA]: async () => [hit("Amok", ["Tullio Forgiarini", "Maria Bochicchio"])]
+  });
+  const cus = h.book(CUS, "Os Cus de Judas");
+  const amok = h.book(ORIANA, "Amok");
+  h.db.prepare("UPDATE books SET translator = ? WHERE id = ?").run("Maria Bochicchio", amok.id);
+
+  const plan = await planIsbndbAuthors(h.db, h.isbndb, { max: 10, after: "" });
+
+  assert.equal(plan.commaName, 1);
+  assert.deepEqual(plan.fills.map((fill) => [fill.id, fill.author]), [[amok.id, "Tullio Forgiarini"]]);
+  assert.ok(!plan.fills.some((fill) => fill.id === cus.id));
+});
+
+test("a title mismatch is listed with ISBNdb's title", async () => {
+  const h = setup({ [CUS]: async () => [hit("Memória de Elefante", ["António Lobo Antunes"])] });
+  const row = h.book(CUS, "Os Cus de Judas");
+
+  const plan = await planIsbndbAuthors(h.db, h.isbndb, { max: 10, after: "" });
+
+  assert.deepEqual(plan.mismatches, [{ id: row.id, title: "Os Cus de Judas", isbndbTitle: "Memória de Elefante" }]);
+});
 ```
 
 Add `src/modules/books/seed/isbndbAuthors.test.ts` to `backend/package.json`'s `test` script right after `src/modules/books/seed/lossyRetitle.test.ts`.
@@ -590,6 +648,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { canonicalIsbn } from "@scripta/shared";
 import { SourcePausedError, SourceUnavailableError } from "../domain/errors.js";
 import { fillMissingIdentity } from "../domain/findOrCreate.js";
+import { normalizeWords } from "../domain/normalize.js";
 import type { BookCatalog, BooksRepository } from "../domain/ports.js";
 import { sameTitle } from "./importPublisherCovers.js";
 import { cleanCredit } from "./publisherFeed.js";
@@ -600,16 +659,18 @@ export interface IsbndbAuthorPlan {
   noAuthor: number;
   titleMismatch: number;
   placeholder: number;
+  commaName: number;
+  mismatches: Array<{ id: string; title: string; isbndbTitle: string }>;
   next: string | null;
   isbndb: { max: number; asked: number; unavailable: number; notAsked: number; pausedUntil: string | null };
   fills: Array<{ id: string; isbn: string; title: string; author: string }>;
 }
 
-const TARGETS_SQL = `SELECT id, title, isbn FROM books WHERE author = '' AND title <> '' AND isbn IS NOT NULL AND isbn <> '' AND id > ? ORDER BY id`;
+const TARGETS_SQL = `SELECT id, title, isbn, translator FROM books WHERE author = '' AND title <> '' AND isbn IS NOT NULL AND isbn <> '' AND id > ? ORDER BY id`;
 
 export async function planIsbndbAuthors(db: DatabaseSync, isbndb: Pick<BookCatalog, "search">, options: { max: number; after: string }): Promise<IsbndbAuthorPlan> {
-  const targets = db.prepare(TARGETS_SQL).all(options.after) as unknown as Array<{ id: string; title: string; isbn: string }>;
-  const plan: IsbndbAuthorPlan = { selected: targets.length, noRecord: 0, noAuthor: 0, titleMismatch: 0, placeholder: 0, next: null, isbndb: { max: options.max, asked: 0, unavailable: 0, notAsked: 0, pausedUntil: null }, fills: [] };
+  const targets = db.prepare(TARGETS_SQL).all(options.after) as unknown as Array<{ id: string; title: string; isbn: string; translator: string | null }>;
+  const plan: IsbndbAuthorPlan = { selected: targets.length, noRecord: 0, noAuthor: 0, titleMismatch: 0, placeholder: 0, commaName: 0, mismatches: [], next: options.after || null, isbndb: { max: options.max, asked: 0, unavailable: 0, notAsked: 0, pausedUntil: null }, fills: [] };
   for (const book of targets) {
     const isbn = canonicalIsbn(book.isbn);
     if (plan.isbndb.asked >= options.max) break;
@@ -631,9 +692,13 @@ export async function planIsbndbAuthors(db: DatabaseSync, isbndb: Pick<BookCatal
     plan.next = book.id;
     if (!hit) plan.noRecord++;
     else if (hit.authors.length === 0) plan.noAuthor++;
-    else if (!sameTitle(book.title, hit.title)) plan.titleMismatch++;
+    else if (!sameTitle(book.title, hit.title)) {
+      plan.titleMismatch++;
+      plan.mismatches.push({ id: book.id, title: book.title, isbndbTitle: hit.title });
+    } else if (hit.authors.some((name) => name.includes(","))) plan.commaName++;
     else {
-      const author = cleanCredit(hit.authors.join(", "));
+      const translators = new Set((book.translator ?? "").split(", ").map(normalizeWords).filter(Boolean));
+      const author = cleanCredit(hit.authors.filter((name) => !translators.has(normalizeWords(name))).join(", "));
       if (author) plan.fills.push({ id: book.id, isbn, title: book.title, author });
       else plan.placeholder++;
     }
@@ -657,7 +722,9 @@ export function isbndbAuthorReport(plan: IsbndbAuthorPlan, applied: number | nul
 ```
 
 Notes for the implementer:
-- `notAsked` counts the selected books after `next`. When `next` is `null`, `findIndex` returns `-1`, so it counts them all.
+- `notAsked` counts the selected books after `next`. `next` starts at `--after`, which is never among the selected ids (they are all greater), so `findIndex` returns `-1` and it counts them all.
+- A name with a comma is one `givenNameFirst` couldn't turn ("Lobo Antunes, António"). Writing it would key the work on the wrong surname, and fills are never overwritten, so the book is counted in `commaName` and left.
+- ISBNdb sometimes lists a translator as a contributor, so a name equal to the book's stored `translator` is dropped.
 - When a call fails, the counter is decremented, because that ask got no answer. The failure is counted in `unavailable` or `pausedUntil`, and `next` stays at the last book answered, so the next run asks that book again.
 
 Create `backend/scripts/fill-authors-isbndb.mjs`:
@@ -701,14 +768,14 @@ console.log(JSON.stringify(isbndbAuthorReport(plan, applied), null, 2));
 ````markdown
 #### ISBNdb authors
 
-`scripts/fill-authors-isbndb.mjs` gives an author to books no shop rule could: every book with an empty author, a title and an ISBN, shop or not, in `id` order. It asks ISBNdb `GET /book/{isbn}` (one call per book, the 1.1 s gap, its own gate) and fills the author only when ISBNdb's title matches the stored one, through the same cleaning as shop credits (parentheses out, placeholders dropped). Each fill claims the title key and reopens the work's code-only translation "none", like every fill. `--max` is a hard limit on calls; the run stops at ISBNdb's daily pause or on an outage, and the report's `next` is the last book answered, so the next run passes it as `--after` and asks nothing twice. A dry run opens the database read-only but still spends ISBNdb calls, so keep it to a sample. The calls come out of the same daily quota as the server's cover re-checks: run it right after 00:00Z.
+`scripts/fill-authors-isbndb.mjs` gives an author to books no shop rule could: every book with an empty author, a title and an ISBN, shop or not, in `id` order. It asks ISBNdb `GET /book/{isbn}` (one call per book, the 1.1 s gap, its own gate) and fills the author only when ISBNdb's title matches the stored one, through the same cleaning as shop credits (parentheses out, placeholders dropped). A name ISBNdb still gives as "Last, First" leaves the book alone (`commaName`), and a name equal to the book's stored translator is dropped. Each fill claims the title key and reopens the work's code-only translation "none", like every fill. `--max` is a hard limit on calls; the run stops at ISBNdb's daily pause or on an outage, and the report's `next` is the last book answered, so the next run passes it as `--after` and asks nothing twice. A dry run opens the database read-only but still spends ISBNdb calls, so keep it to a sample. The calls come out of the same daily quota as the server's cover re-checks: run it right after 00:00Z.
 
 ```bash
 npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && node scripts/fill-authors-isbndb.mjs --dry-run --max 50'
-npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && node scripts/fill-authors-isbndb.mjs --max 1500'
+npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && setsid node scripts/fill-authors-isbndb.mjs --max 1500 > /data/isbndb-authors.json 2> /data/isbndb-authors.log < /dev/null & sleep 3; echo started'
 ```
 
-The report has `selected`, `noRecord`, `noAuthor`, `titleMismatch`, `placeholder`, `next`, `isbndb` (`max`, `asked`, `unavailable`, `notAsked`, `pausedUntil`), `fills` (`{ id, isbn, title, author }` each), `wouldFill` and `applied` (`null` on a dry run).
+The report has `selected`, `noRecord`, `noAuthor`, `titleMismatch` with `mismatches` (`{ id, title, isbndbTitle }`), `placeholder`, `commaName`, `next`, `isbndb` (`max`, `asked`, `unavailable`, `notAsked`, `pausedUntil`), `fills` (`{ id, isbn, title, author }` each), `wouldFill` and `applied` (`null` on a dry run).
 ````
 
 - [ ] **Step 4: Run the full backend verify**
@@ -730,12 +797,13 @@ git commit -m "Add a capped, resumable ISBNdb pass for authors no shop gives"
 Run one job at a time, each with `setsid … < /dev/null &` and its output in `/data`, and hold deploys while any runs. Every fill only fills empty fields. A wrong fill can only be undone by hand from its `identity` log line or the report's `fills`.
 
 1. **Baseline:** `seed-catalog.mjs --status`, and note `blank`.
-2. **Importer dry run per shop:** run `--dry-run --site "<name>"` for Imprensa Nacional, Saída de Emergência, Edições Afrontamento, Orfeu Negro and Exclamação, with `node --max-old-space-size=5120`. For each:
-   - check that `skipped` is absent and `pagesDeferred` is 0;
+2. **Importer dry run per shop:** run `node --max-old-space-size=5120 scripts/import-publisher-covers.mjs --dry-run --site "<name>"` for Imprensa Nacional, Saída de Emergência, Edições Afrontamento, Orfeu Negro and Exclamação. For each:
+   - check that `skipped` is absent and `pagesDeferred`, `pagesBlocked` and `failed` are 0 (Saída sits behind Cloudflare; a rising `pagesBlocked` means it started refusing);
    - read 20 random `identity` lines: no translator, no related book, no placeholder.
 3. **Real importer run for those five shops**, the same commands without `--dry-run`, then `--status` again.
 4. **ISBNdb authors, after the next 00:00Z reset:**
-   - run `fill-authors-isbndb.mjs --dry-run --max 50` and read its `fills` and `titleMismatch`;
+   - run `fill-authors-isbndb.mjs --dry-run --max 50` and read its `fills` (no translators, no comma names) and `mismatches` (is the title test too strict?);
    - then run `--max 1500`;
-   - on the following nights, run `--max 1500 --after <previous next>` until `selected` reaches 0.
-5. **Then:** `--status`; the translation backlog dry run, then the real run with `--max` at `wouldAsk`; and the genre relabel of works that now have an author (README "Catalog genre backfill" step 4, batches of 25 at most).
+   - if `unavailable` > 0, the run stopped early: run it again the same night with `--after <its next>`;
+   - on the following nights, run `--max 1500 --after <previous next>` until `selected` reaches 0. Always pass the last report's `next`, even when it equals the `--after` you gave.
+5. **Then:** `--status`; the translation backlog dry run, then the real run with `--max` at `wouldAsk`.

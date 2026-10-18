@@ -25,7 +25,7 @@ Evidence for each rule (markup, sample sizes, accuracy) is in the research note 
 
 ## Decisions
 
-1. **One shared credit cleaner** for every shop author source (feed vendor, feed tags, WooCommerce `Autor` attribute, every page rule, and the seed script):
+1. **One shared credit cleaner** for every shop author source (feed vendor, feed tags, WooCommerce `Autor` attribute, every page rule, and the ISBNdb pass):
    - drop every parenthesised segment: `(org.)`, `(orgs.)`, `(coord.)`, `(coords.)`, `(texto)`, `(ilustração)`, `(trad. de …)`, `(Tradução de …)`, `(org. …)`; collapse whitespace; trim;
    - a credit whose normalised form (lower case, accents, dots and spaces removed) is `vvaa`, `aavv`, `autordesconhecido`, `diversos`, or starts with `varios`, is no author (`null`);
    - **never split on " e "**: "Alberto da Costa e Silva" and "Melo e Castro" are one person each. A combined "A e B" credit is kept as the shop wrote it. Lists the shop already separates (several tags, several links, several `<h4>`) are joined with `", "` as today.
@@ -41,7 +41,7 @@ Evidence for each rule (markup, sample sizes, accuracy) is in the research note 
 5. **Everything else, from ISBNdb.** A capped fallback script, `scripts/fill-authors-isbndb.mjs --max N [--after <id>] [--dry-run]`, run after the shop importer runs:
    - selects every book with an empty author and an ISBN, shop or not, in a stable order (`id`), starting after `--after` (1,394 seed rows, Divergência, Kathartika, Pato Lógico, Abysmo, Exclamação's books with no author on the page, and whatever the shop rules leave blank: roughly 3,000–4,000);
    - asks ISBNdb `GET /book/{isbn}` through the existing catalog search (`givenNameFirst` normalisation included), one call per book, `--max` a hard limit;
-   - fills the author only when ISBNdb's title matches the stored title (the importer's same-title test) and the cleaned credit is not a placeholder;
+   - fills the author only when ISBNdb's title matches the stored title (the importer's same-title test) and the cleaned credit is not a placeholder; a name still in "Last, First" form leaves the book alone, and a name equal to the stored translator is dropped;
    - fills through `fillMissingIdentity`, so the title key is claimed and the work's code-only translation verdict reopens, like every other fill;
    - stops on ISBNdb's daily pause and reports it, like `retitle-lossy.mjs`;
    - the report ends with `next`, the last id asked; the next night's run passes it as `--after`, so no book is asked twice and no new column is needed;
@@ -49,7 +49,7 @@ Evidence for each rule (markup, sample sizes, accuracy) is in the research note 
    - Quota: run right after a 00:00Z reset with `--max 1500` a night (~28 minutes at the 1.1 s gap), 2–3 nights; the nightly cover re-checks lose those calls on those nights. How much ISBNdb knows of small Portuguese presses is unknown until the sample.
 6. **No shop rule for:**
    - Divergência: its author is one of the genre tags, separable only by a hand-kept stoplist, and a new genre tag would become a permanent wrong author. ISBNdb covers it instead.
-   - Kathartika, Pato Lógico, Abysmo: no author found in their feed or pages (2026-10-15 sampling). ISBNdb covers them.
+   - Kathartika and Pato Lógico: no author found in their feed or pages (2026-10-15 sampling). Abysmo's feed has an `Autor` attribute, but one book lacks it. ISBNdb covers them.
    - Exclamação's uncategorised books: no author anywhere on their page (12 of 12 sampled). ISBNdb covers them.
 
 ## Components
@@ -57,7 +57,7 @@ Evidence for each rule (markup, sample sizes, accuracy) is in the research note 
 - `seed/publisherFeed.ts`: the credit cleaner; the INCM tag rule; four page extractors next to `pageAuthors`; all return `string | null` copied with `structuredClone` (#295).
 - `seed/publishers.ts`: `PublisherSite` names its page rule and its tag rule; the five shops get theirs.
 - `seed/importPublisherCovers.ts`: page-author read for any site with a page rule; the ISBN check becomes "not a different ISBN".
-- `seed/isbndbAuthors.ts` + `scripts/fill-authors-isbndb.mjs`: plan-then-fill like `lossyRetitle.ts`, report `{ selected, noRecord, noAuthor, titleMismatch, placeholder, next, isbndb: { max, asked, unavailable, notAsked, pausedUntil }, fills: [{ id, isbn, title, author }], wouldFill, applied }`.
+- `seed/isbndbAuthors.ts` + `scripts/fill-authors-isbndb.mjs`: plan-then-fill like `lossyRetitle.ts`, report `{ selected, noRecord, noAuthor, titleMismatch, mismatches, placeholder, commaName, next, isbndb: { max, asked, unavailable, notAsked, pausedUntil }, fills: [{ id, isbn, title, author }], wouldFill, applied }`.
 - Docs: `backend/README.md` (Authors paragraph, new script section), `docs/publisher-catalog.md` "Author from" cells.
 
 ## Testing
