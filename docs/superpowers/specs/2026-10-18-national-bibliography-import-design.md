@@ -68,7 +68,7 @@ The user decided 1, 2, 3 and 9 and approved the direction of the rest in convers
 
    | Book field | From |
    |---|---|
-   | `isbn` | the first valid `010 $a` (on the lookup path, the ISBN that was asked for); the record's other valid ISBNs become alias keys where free |
+   | `isbn` | the first valid `010 $a` (on the lookup path, the ISBN that was asked for); the record's other ISBNs are not used (decision 6) |
    | `title` | `200 $a` (several `$a` joined with " ; "), plus the part number `$h` and part title `$i` when present, so volumes stay distinct (`title_key` includes title numbers); no subtitle `$e` *(Claude's call)* |
    | `author` | every `700` then `701`, whatever its `$4` (these fields are main responsibility by definition, and picture-book illustrators count as authors, as in the authors fill), each as `$b $a` ("Isabel Allende"), dates `$f` dropped, joined ", "; if none, `702` with `$4 070` (author); if none, `702` with `$4 340` (editor); if none, the record is dropped (on the lookup path, kept with an empty author) |
    | `translator` | `702` with `$4 730`, formatted like `author`, joined the way existing sources store several translators |
@@ -78,7 +78,7 @@ The user decided 1, 2, 3 and 9 and approved the direction of the rest in convers
    | `pages` | `215 $a`, the main page count ("169, [7] p." → 169) |
    | `language` | `editionLanguage(101 $a codes, isbn)` (`por` on a Portugal ISBN gives `pt-PT`, `eng` gives `en`) |
    | `genres` | decision 5 |
-   | `summary` | `330 $a` when present, `summary_source = 'bnp'`, with no source link (the user asked for whatever synopses exist; 1 in 3,900 records has one) |
+   | `summary` | `330 $a` when present, `summary_source = 'bnp'`, with no source link (`summaryLink` returns `""` for `bnp`); the user asked for whatever synopses exist, and 1 in 3,900 records has one |
 
    `givenNameFirst` is not used. UNIMARC already splits surname (`$a`) and given names (`$b`), so "Miguel Serras Pereira" comes out right.
 5. **Genres from the classification (UDC, `675 $a`), at import, with no outside call.**
@@ -96,11 +96,14 @@ The user decided 1, 2, 3 and 9 and approved the direction of the rest in convers
    - These genres are library subjects, so `genres_source` stays NULL, the same as Open Library and ISBNdb subjects.
    - On an existing book they replace only `[]` or Jev genres. That is the precedence `saveDetails` applies, but the import must not call `saveDetails`: it sets `details_status = 'found'`, and `getDetails` would then never look the book up.
 6. **Dedupe on ISBN, never overwrite.**
-   - A record matches the book that holds any of its valid ISBNs as a key (`isbn:<13>`, or an ISBN-10 alias). That book is updated. It fills empty fields only:
+   - A record matches the book that holds its ISBN (above) as a key (`isbn:<13>`). That book is updated. It fills empty fields only:
      - author and title through `fillMissingIdentity`, which also helps the remaining authorless books;
      - pages, year, publisher and translator through `mergeDetails`, which `COALESCE`s them; summary through its CASE rule, which takes a summary only where there is none;
      - original title, language and genres as above;
      - the cover rule from decision 3.
+   - A record's other ISBNs are neither matched nor added as keys *(Claude's call)*.
+     - Some records list a whole collection, with up to 10 volume ISBNs, or a pair of per-volume ISBNs (`010 $b v. 1`). Keying them all would fold every volume into one book.
+     - The catalog already treats each ISBN as its own edition. A barcode for another of the record's ISBNs still finds the record through the lookup (decision 9).
    - An ISBN-less book with the same title and author is not adopted *(Claude's call)*. Which edition it is can't be known, and `seedBook` doesn't adopt either.
    - `createBook`/`NewBook` carry none of pages, translator, summary, language or original title, so new books are created and then filled through the same fill path as matched books. New repository methods are expected; the builder chooses their shape.
    - If that book was not confirmed, it becomes confirmed. The import adds `bnp` to its `data_sources`; `DataSource` gains `"bnp"`.
@@ -131,7 +134,11 @@ The user decided 1, 2, 3 and 9 and approved the direction of the rest in convers
 
 - It harvests month-sized datestamp windows from `--from` (default: the set's earliest datestamp) to `--until` (default: today). Each window is paged straight through.
 - It applies each page's records, then prints a JSON line per finished window with that window's counts and `through`, so a killed run resumes with `--from <through>`.
-- Scans are downloaded with at most 2 requests in flight *(Claude's call)*. Network calls and image encoding happen before a page's rows are written. A page is then written in one transaction, and the write lock is never held across a network call.
+- **Each window is paged straight through into mapped records first, then applied.** A `resumptionToken` lasts about a minute, and applying a page's scans takes longer than that.
+- Records are applied with at most 2 in flight *(Claude's call)*, and never two that share an ISBN at once.
+  - Each record is planned right before it is applied, so a book created earlier in the window is matched.
+  - Each record writes in its own short transactions. The write lock is never held across a network call.
+- Production runs Node 24, where a regex substring keeps its whole page alive (#295). Every value the reader keeps is copied with `structuredClone`.
 - A failed scan download leaves the book without a cover but with `cover_checked_at` set. It is counted, and re-running that window retries it, since the book still has no cover.
 - At the end, if this was not a dry run and `--until` was today, it writes the sync cursor.
 - **The dry run** opens the database read-only, harvests and maps everything, and downloads no images, which takes about 3 hours. Read-only means `new DatabaseSync(env.COVERS_DB_PATH, { readOnly: true })` as in `scripts/repair-mojibake.mjs:11`; `openBooksDb()` is read-write and runs migrations. It reports:
@@ -166,7 +173,7 @@ The user decided 1, 2, 3 and 9 and approved the direction of the rest in convers
   - A new book has its fields and a `good` `bnp` cover with `cover_checked_at` set. It is searchable, and neither `UNCHECKED_COVERS_SQL` nor `UNCHECKED_DETAILS_SQL` returns it.
   - A new book without a scan has a NULL status and `cover_checked_at` set, and `resolveCover` schedules it.
   - An existing book gets its empty fields filled and no field overwritten. Its cover is replaced for none, `low_res` and ISBNdb-on-Portugal, and kept for `manual`, Apple and Open Library `good` covers. An unconfirmed book becomes searchable.
-  - A matched book whose record has no scan keeps its cover state untouched. A record matches through its second ISBN. An ISBN-less book with the same title is not adopted.
+  - A matched book whose record has no scan keeps its cover state untouched. A record with several ISBNs creates and keys only its first. An ISBN-less book with the same title is not adopted.
   - A rejected-ratio scan counts as none, and a re-run is idempotent.
   - `EXPLAIN QUERY PLAN` for `UNCHECKED_DETAILS_SQL` uses the partial index.
 - **Sync:** with no cursor, nothing happens. With a cursor, it harvests from the cursor through today and advances. A failure mid-window leaves the cursor where it was.
@@ -175,13 +182,20 @@ The user decided 1, 2, 3 and 9 and approved the direction of the rest in convers
 ## Production (one runbook entry, run after the deploy that ships this)
 
 1. `import-bnp.mjs --dry-run`, about 3 h with nohup. The user reads the publisher lists and the counts. A deny-list change means a new deploy and a new dry run.
-2. `import-bnp.mjs`, about a day with nohup. Avoid a production deploy while it runs, since deploys kill ssh jobs (`backend/README.md`). If one happens, rerun with `--from <last through>`.
-3. The next day, check the server log for the sync's first window and spot-check `casa dos espiritos`.
+2. `import-bnp.mjs`, about a day with nohup.
+   - Before it, check `railway volume list --json` for room for about 540 MB of growth plus WAL and Litestream.
+   - Avoid a production deploy while it runs, since deploys kill ssh jobs (`backend/README.md`). If one happens, rerun with `--from <last through>` and no `--until`.
+   - If the report lists failed windows, rerun from the first failed window's `from` with no `--until`, so the run ends today and writes the cursor.
+3. The next day:
+   - check the server log for the sync's first window;
+   - spot-check `casa dos espiritos`;
+   - compare `railway logs --filter "ISBNdb paused"` on the import day with the days before (success criterion 3).
 
 ## Risks
 
 - **Search ranking.** Local search ranks only by `bm25` over title and author, with no popularity signal. With about 3× more books, one-word queries may put an obscure edition above the expected one. This is not addressed here; measure after the import.
-- **Nightly works grouping.** `groupablePairsStmt` aggregates over every keyless work. The plan must time it, and the first night's merges, on a database of about 320k books before the production run.
+- **Nightly works grouping.** `groupablePairsStmt` aggregates over every keyless work. Each call holds the write lock (`BEGIN IMMEDIATE`) and blocks the event loop. The plan must time it, and the first night's merges, on a database of about 320k books before the production run. Each call must stay under 1 s, well below the 5 s `busy_timeout` that the import's connection waits for.
+- **Translation backlog.** `translation-backlog.mjs` selects every Portuguese work, so its next run sees about 240k more. Held works still go first, and `--max` caps the spend. Check its dry-run counts before that paid run.
 - **The institutional deny-list is a heuristic.** The dry run is the check, and the cost of a miss in either direction is small.
 - **The BNP's own load.** About 1,150 OAI pages and about 165k images, at most 2 in flight. The script uses the existing `Atmyshelf/1.0` user agent.
 
