@@ -38,16 +38,17 @@ export function bnpReplaceReason(existing: BookRow | undefined, image: CoverImag
   return null;
 }
 
-type ReplaceRepo = Pick<BooksRepository, "getImage">;
+type ReplaceRepo = Pick<BooksRepository, "getImage" | "listRejectedUrls">;
 
-function replaceReasonOf(repo: ReplaceRepo, row: BookRow | undefined): BnpReplace | null {
+function replaceReasonOf(repo: ReplaceRepo, row: BookRow | undefined, scanUrl: string | null): BnpReplace | null {
+  if (row && scanUrl !== null && repo.listRejectedUrls(row.id).has(scanUrl)) return null;
   return bnpReplaceReason(row, row?.cover_image_id ? repo.getImage(row.cover_image_id) : undefined);
 }
 
-export function planBnpRecord(repo: Pick<BooksRepository, "findBookByKey" | "getImage">, book: BnpBook, isbn: string | undefined = book.isbns[0]): BnpPlan | null {
+export function planBnpRecord(repo: ReplaceRepo & Pick<BooksRepository, "findBookByKey">, book: BnpBook, isbn: string | undefined = book.isbns[0]): BnpPlan | null {
   if (isbn === undefined) return null;
   const existing = repo.findBookByKey(`isbn:${isbn}`);
-  return { book, isbn, existing, replace: replaceReasonOf(repo, existing) };
+  return { book, isbn, existing, replace: replaceReasonOf(repo, existing, book.scanUrl) };
 }
 
 export async function applyBnpRecord(deps: BnpDeps, plan: BnpPlan): Promise<{ book: BookRow; created: boolean; cover: BnpCoverAction }> {
@@ -83,7 +84,7 @@ export async function applyBnpRecord(deps: BnpDeps, plan: BnpPlan): Promise<{ bo
     deps.repo.mergeDetails(row.id, { summary: book.summary, pages: book.pages, year: book.year, publisher: book.publisher, translator: book.translator }, "bnp");
     if (book.originalTitle) deps.repo.fillOriginalTitle(row.id, book.originalTitle);
     deps.repo.setLanguage(row.id, editionLanguage(book.languages, isbn));
-    return { id: row.id, created: held === undefined, replaceable: replaceReasonOf(deps.repo, row) !== null, expected: row.cover_image_id };
+    return { id: row.id, created: held === undefined, replaceable: replaceReasonOf(deps.repo, row, book.scanUrl) !== null, expected: row.cover_image_id };
   });
 
   if (scan !== null) {

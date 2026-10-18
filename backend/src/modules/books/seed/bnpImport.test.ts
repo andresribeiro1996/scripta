@@ -222,6 +222,49 @@ test("a low-res scan is not downloaded again when its record is applied again", 
   assert.equal((db.prepare("SELECT COUNT(*) AS n FROM cover_images WHERE book_id = ?").get(first.book.id) as { n: number }).n, 1);
 });
 
+test("a scan the admin rejected is not fetched or stored again", async () => {
+  let rejected = false;
+  const { repo, blobs, deps } = setup(async () => {
+    assert.equal(rejected, false, "the rejected scan was fetched");
+    return SCAN;
+  });
+  const first = await apply(deps, ALLENDE);
+  assert.equal(first.cover, "stored");
+  assert.equal(blobs.size, 2);
+  repo.addRejection(first.book.id, ALLENDE.scanUrl!, AT);
+  repo.setCover(first.book.id, { imageId: null, status: null, checkedAt: null });
+  rejected = true;
+
+  const plan = planBnpRecord(repo, ALLENDE)!;
+  assert.equal(plan.replace, null);
+  const result = await applyBnpRecord(deps, plan);
+
+  assert.equal(result.created, false);
+  assert.equal(result.cover, "kept");
+  assert.equal(result.book.cover_image_id, null);
+  assert.equal(result.book.cover_status, null);
+  assert.equal(result.book.cover_checked_at, null);
+  assert.equal(blobs.size, 2);
+});
+
+test("a scan rejected while it downloads is not stored", async () => {
+  const holder: { repo?: BooksRepository; bookId?: string } = {};
+  const { repo, blobs, deps } = setup(async () => {
+    holder.repo!.addRejection(holder.bookId!, ALLENDE.scanUrl!, AT);
+    return SCAN;
+  });
+  holder.repo = repo;
+  holder.bookId = seed(repo, PORTUGUESE).id;
+
+  const plan = planBnpRecord(repo, ALLENDE)!;
+  assert.equal(plan.replace, "none");
+  const result = await applyBnpRecord(deps, plan);
+
+  assert.equal(result.cover, "kept");
+  assert.equal(result.book.cover_image_id, null);
+  assert.equal(blobs.size, 0);
+});
+
 test("an existing book with no scan in its record keeps its cover state", async () => {
   const { repo, deps } = setup();
   const existing = seed(repo, PORTUGUESE);
