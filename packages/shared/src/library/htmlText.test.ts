@@ -28,6 +28,11 @@ test("escaped tags are removed after decoding", () => {
   assert.equal(htmlToText("<p>I &lt;3 books</p>"), "I <3 books");
 });
 
+test("escaped structural tags keep their breaks", () => {
+  assert.equal(htmlToText("Rosa&lt;br&gt;do mar"), "Rosa\ndo mar");
+  assert.equal(htmlToText("&lt;p&gt;Um.&lt;/p&gt;&lt;p&gt;Dois.&lt;/p&gt;"), "Um.\n\nDois.");
+});
+
 test("script, style and table cells", () => {
   assert.equal(htmlToText("<style>p{}</style><script>x()</script><table><tr><td>A</td><td>B</td></tr></table>"), "A B");
 });

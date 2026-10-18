@@ -64,6 +64,12 @@ const cases: Array<[string, string, string | null]> = [
     "- The Lord of the Rings [2/2]",
     "- The Lord of the Rings [1/6]"
   ].join("\n")],
+  ["hyphen before a clitic stays", "O capitão olhou para o mar durante muito tempo e depois disse-\nlhe que partia na manhã seguinte, sem dizer mais nada a ninguém. A mãe deu-\n\nse conta do que se passava.", "O capitão olhou para o mar durante muito tempo e depois disse-lhe que partia na manhã seguinte, sem dizer mais nada a ninguém. A mãe deu-se conta do que se passava."],
+  ["contains line in running text", "A collection of stories.\n\nContains: three novellas and twelve short stories.\n\nIn the title story, a young woman leaves.", "A collection of stories.\n\nContains: three novellas and twelve short stories.\n\nIn the title story, a young woman leaves."],
+  ["contains line before a list", "A collection of stories.\n\nContains: the saga\n\n- One\n- Two", "A collection of stories."],
+  ["bare contains line", "A collection of stories.\n\nContains:", "A collection of stories."],
+  ["presença block ending in a capitalised author line", "Sinopse omitida.\n\nTítulo Original Ultimate football Heroes 2027\n\nISBN 9789722380577\n\nNº de Páginas 352\n\nAutores Emily Stead, Matt Oldfield, Dan Leydon, Seth Burkett, John Murray", "Sinopse omitida."],
+  ["detalhes block with capitalised values", "Texto bom aqui.\n\nDetalhes\n\nAutores Emily Stead, Matt Oldfield\n\nFormato Capa Mole", "Texto bom aqui."],
   ["asterisks hug the words", "5 * 3 * 2 is *thirty*, **really**.", "5 * 3 * 2 is thirty, really."],
   ["fragment kept", "Texto curto.", "Texto curto."]
 ];
@@ -93,6 +99,8 @@ const unchanged = [
   "Data 1922 foi o ano\n\nOutra frase.",
   P
 ];
+
+unchanged.push("Série Negra\n\nUm detective chega a uma cidade onde ninguém fala.", "Autores Portugueses do século XX reunidos neste volume\n\nTexto.");
 
 for (const text of unchanged) {
   test(`cleanSummary keeps: ${text.slice(0, 40)}`, () => {

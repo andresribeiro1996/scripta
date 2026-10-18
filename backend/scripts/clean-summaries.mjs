@@ -11,4 +11,9 @@ const { applySummaryCleanup, planSummaryCleanup, summaryCleanupReport } = await 
 
 const db = dryRun ? new DatabaseSync(env.COVERS_DB_PATH, { readOnly: true }) : openBooksDb();
 const plan = planSummaryCleanup(db);
-console.log(reportJson(summaryCleanupReport(plan, dryRun ? null : applySummaryCleanup(db, plan))));
+let applied = null;
+try {
+  if (!dryRun) applied = applySummaryCleanup(db, plan);
+} finally {
+  console.log(reportJson(summaryCleanupReport(plan, applied, dryRun)));
+}

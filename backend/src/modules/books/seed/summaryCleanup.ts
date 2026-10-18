@@ -134,7 +134,7 @@ export function planSummaryCleanup(db: DatabaseSync): SummaryCleanupPlan {
 export function applySummaryCleanup(db: DatabaseSync, plan: SummaryCleanupPlan): SummaryCleanupApplied {
   const applied: SummaryCleanupApplied = { books: 0, works: 0, emptied: 0, skipped: 0, originalTitles: 0, judgmentsWritten: 0 };
   const saveJudgment = db.prepare("INSERT OR IGNORE INTO synopsis_judgments (text_hash, model, usable, kind, asked_at) VALUES (?, ?, ?, ?, ?)");
-  const replaceJudgment = db.prepare("INSERT OR REPLACE INTO synopsis_judgments (text_hash, model, usable, kind, asked_at) VALUES (?, ?, ?, ?, ?)");
+  const replaceJudgment = db.prepare("INSERT INTO synopsis_judgments (text_hash, model, usable, kind, asked_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(text_hash) DO UPDATE SET model = excluded.model, usable = excluded.usable, kind = excluded.kind, asked_at = excluded.asked_at WHERE synopsis_judgments.model <> 'manual'");
   const updateBook = db.prepare("UPDATE books SET summary = ?, summary_hash = ?, summary_source = CASE WHEN ? IS NULL THEN NULL ELSE summary_source END, original_title = COALESCE(original_title, ?) WHERE id = ? AND summary = ?");
   const updateWork = db.prepare("UPDATE works SET summary = ?, summary_hash = ? WHERE id = ? AND summary = ?");
 
@@ -186,7 +186,7 @@ const tally = (values: Array<string | null>) => {
   return counts;
 };
 
-export function summaryCleanupReport(plan: SummaryCleanupPlan, applied: SummaryCleanupApplied | null) {
+export function summaryCleanupReport(plan: SummaryCleanupPlan, applied: SummaryCleanupApplied | null, dryRun: boolean) {
   const countsFor = (table: "books" | "works") => {
     const changes = plan.changes.filter((change) => change.table === table);
     return { scanned: plan.scanned[table], changed: changes.length, emptied: changes.filter((change) => change.to === null).length };
@@ -198,7 +198,7 @@ export function summaryCleanupReport(plan: SummaryCleanupPlan, applied: SummaryC
     if (list.length < SAMPLES) list.push({ table: change.table, id: change.id, from: change.from.slice(0, SAMPLE_LENGTH), to: change.to === null ? null : change.to.slice(0, SAMPLE_LENGTH) });
   }
   return {
-    dryRun: applied === null,
+    dryRun,
     books: countsFor("books"),
     works: countsFor("works"),
     bySource: tally(plan.changes.map((change) => change.source ?? change.table)),
@@ -206,6 +206,6 @@ export function summaryCleanupReport(plan: SummaryCleanupPlan, applied: SummaryC
     judgments: tally(plan.judgments.map((judgment) => judgment.outcome)),
     samples,
     applied,
-    ...(applied === null ? {} : { originals: plan.changes.map((change) => ({ table: change.table, id: change.id, summary: change.from })) })
+    ...(dryRun ? {} : { originals: plan.changes.map((change) => ({ table: change.table, id: change.id, summary: change.from })) })
   };
 }

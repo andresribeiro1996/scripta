@@ -902,6 +902,14 @@ test("a summary that cleans to nothing keeps the stored one", () => {
   assert.deepEqual([repo.getBook(book.id)!.summary, repo.getBook(book.id)!.summary_source], ["Uma sinopse.", "isbndb"]);
 });
 
+test("a summary that cleans to nothing does not fill the original title", () => {
+  const { repo } = freshRepo();
+  const book = repo.createBook({ title: "A", author: "A", isbn: null }, ["ta:a|a|"], NOW);
+  repo.mergeDetails(book.id, { ...noDetails, summary: "Uma sinopse." }, "isbndb");
+  repo.mergeDetails(book.id, { ...noDetails, summary: "Título original The Island" }, "publisher");
+  assert.deepEqual([repo.getBook(book.id)!.summary, repo.getBook(book.id)!.original_title], ["Uma sinopse.", null]);
+});
+
 test("mergeDetails fills a missing original title from the raw summary", () => {
   const { repo } = freshRepo();
   const book = repo.createBook({ title: "A", author: "A", isbn: null }, ["ta:a|a|"], NOW);

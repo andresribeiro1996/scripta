@@ -34,10 +34,14 @@ function stripTags(text: string): string {
   return text.replace(COMMENT, "").replace(DECLARATION, "").replace(TAG, "");
 }
 
+function markStructure(text: string): string {
+  return text.replace(LINE_BREAK_TAG, "\n").replace(PARAGRAPH_TAG, "\n\n").replace(CELL_TAG, " ");
+}
+
 function decodeAndStrip(text: string): string {
   let current = text;
   for (let pass = 0; pass < MAX_DECODE_PASSES; pass += 1) {
-    const next = stripTags(decodeHtmlEntities(current));
+    const next = stripTags(markStructure(decodeHtmlEntities(current)));
     if (next === current) break;
     current = next;
   }
@@ -57,11 +61,6 @@ function tidy(text: string): string {
 export function htmlToText(html: string): string {
   const source = html.replace(SCRIPT_OR_STYLE, " ");
   if (!BLOCK_TAG.test(source)) return tidy(decodeAndStrip(stripTags(source)));
-  const marked = source
-    .replace(COMMENT, "")
-    .replace(/\s+/g, " ")
-    .replace(LINE_BREAK_TAG, "\n")
-    .replace(PARAGRAPH_TAG, "\n\n")
-    .replace(CELL_TAG, " ");
+  const marked = markStructure(source.replace(COMMENT, "").replace(/\s+/g, " "));
   return tidy(decodeAndStrip(stripTags(marked)));
 }

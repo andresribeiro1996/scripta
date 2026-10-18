@@ -496,6 +496,12 @@ test("a recorded Presença feed takes every author from its tags and the ISBN fr
   ]);
 });
 
+test("a recorded Presença product whose body is only a synopsis stub and metadata has no summary", () => {
+  const feed = JSON.parse(readFileSync(new URL("./fixtures/presenca-products.json", import.meta.url), "utf8"));
+  const product = feed.products.find((candidate: { variants: Array<{ sku: string }> }) => candidate.variants[0]?.sku === "9789722380577");
+  assert.equal(shopifyDetails(product.body_html).summary, null);
+});
+
 test("a recorded Relógio feed finds each ISBN in the image file name and no author", () => {
   const feed = JSON.parse(readFileSync(new URL("./fixtures/relogio-products.json", import.meta.url), "utf8"));
   assert.deepEqual(parseWooProducts(feed, relogio).map((book) => [book.isbn, book.rank, book.author]), [

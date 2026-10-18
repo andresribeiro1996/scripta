@@ -13,13 +13,17 @@ const SENTENCE_END = /[.!?»"]$/;
 const MARKUP = /<\/?[a-z!?][^<>]*>|&(?:#\d+|#x[0-9a-f]+|[a-z]+);/i;
 const REFERENCE_LINE = /^[ \t]*\[[^\]]+\]:[ \t]*\S.*$/;
 const RULE_LINE = /^[ \t]*([-*_])(?:[ \t]*\1){2,}[ \t]*$/;
-const TAIL_MARKER = /^(?:(?:also contained in|contains)[ \t]*:.*|source[ \t]*:[ \t]*https?:\/\/\S+|\(from[ \t]+https?:\/\/[^)\s]*\)|\([ \t]*\[source\]\[\d*\][ \t]*\))$/i;
+const TAIL_MARKER = /^(?:(?:also contained in)[ \t]*:.*|source[ \t]*:[ \t]*https?:\/\/\S+|\(from[ \t]+https?:\/\/[^)\s]*\)|\([ \t]*\[source\]\[\d*\][ \t]*\))$/i;
 const SHOP_CHROME = /(?:[^\S\n]*(?:Adicionar aos Favoritos|J[áa] se encontra nos favoritos))+[^\S\n]*$/gim;
+const CONTAINS_LINE = /^contains[ \t]*:/i;
+const LIST_ITEM = /^[ \t]*[-*][ \t]/;
+const CLITIC_START = /^(?:lhes?|os?|as?|los?|las?|nos?|nas?|se|me|te|vos)(?![\p{L}\p{N}])/iu;
 const PLACEHOLDER_LINE = /^\[data_lancamento\]/i;
 const STRICT_LABEL = new RegExp(`^(?:${STRICT_METADATA_LABEL})`, "i");
 const LOOSE_LABEL = new RegExp(`^(?:${LOOSE_METADATA_LABEL})`, "i");
 const NAME_LABEL = /^(?:T[íi]tulo\s+original|Tradu[çc][ãa]o|Tradutor[a]?|Traduzido|Cole[çc][ãa]o)/i;
 const AFTER_STRICT_LABEL = /^\s*$|^\s*[:–—-]|^\s+\d/;
+const AFTER_BROAD_LABEL = /^\s*$|^\s*[:–—-]|^\s+[\d\p{Lu}(\[]/u;
 const AFTER_NAME_LABEL = /^\s+[\p{Lu}(\[]/u;
 const AFTER_LOOSE_LABEL = /^:|^\s+(?:\d[\d\s./,:–-]*(?:\s?(?:€|mm|cm|kg|g|pp?))?|\d{1,2}\s+de\s+\p{L}+\s+de\s+\d{4})$/u;
 const EDITION_LINE = /^\d{1,2}\s*\.?\s*[ªº°]?\s*(?:edi[çc][ãa]o|reimpress[ãa]o)(?:\s+\p{L}+)?(?:\s+(?:de\s+)?\d{4})?$/iu;
@@ -39,8 +43,21 @@ function isMetadataLabelLine(line: string): boolean {
   return loose !== null && AFTER_LOOSE_LABEL.test(line.slice(loose[0].length));
 }
 
+function isBroadLabelLine(line: string): boolean {
+  if (isMetadataLabelLine(line)) return true;
+  if (line.length > MAX_LABEL_LINE || SENTENCE_END.test(line)) return false;
+  const strict = STRICT_LABEL.exec(line);
+  return strict !== null && AFTER_BROAD_LABEL.test(line.slice(strict[0].length));
+}
+
 function isRemovableLine(line: string): boolean {
   return PLACEHOLDER_LINE.test(line) || isMetadataLabelLine(line) || (line.length <= MAX_LABEL_LINE && EDITION_LINE.test(line));
+}
+
+function startsContentsList(lines: string[], index: number): boolean {
+  if (lines[index]!.trim().replace(CONTAINS_LINE, "").trim() === "") return true;
+  const next = lines.slice(index + 1).find((line) => line.trim() !== "");
+  return next !== undefined && LIST_ITEM.test(next);
 }
 
 function tailStart(lines: string[]): number {
@@ -48,7 +65,8 @@ function tailStart(lines: string[]): number {
     if (!lines.slice(0, index).some((before) => before.trim() !== "")) return false;
     const text = line.trim();
     if (text.length <= MAX_LABEL_LINE && TAIL_MARKER.test(text)) return true;
-    return text === "Detalhes" && lines.slice(index + 1, index + 1 + DETAILS_REACH).some((next) => isMetadataLabelLine(next.trim()));
+    if (text.length <= MAX_LABEL_LINE && CONTAINS_LINE.test(text)) return startsContentsList(lines, index);
+    return text === "Detalhes" && lines.slice(index + 1, index + 1 + DETAILS_REACH).some((next) => isBroadLabelLine(next.trim()));
   });
 }
 
@@ -57,6 +75,9 @@ function dropLines(text: string): string {
   const cut = tailStart(lines);
   if (cut >= 0) lines = lines.slice(0, cut);
   lines = lines.map((line) => line.replace(SHOP_CHROME, "")).filter((line) => !isRemovableLine(line.trim()));
+  let end = lines.length;
+  while (end > 0 && (lines[end - 1]!.trim() === "" || EMPTY_HEADING.test(lines[end - 1]!.trim()) || isBroadLabelLine(lines[end - 1]!.trim()))) end -= 1;
+  if (lines.slice(0, end).some((line) => line.trim() !== "")) lines = lines.slice(0, end);
   while (lines.length > 0 && (lines[lines.length - 1]!.trim() === "" || EMPTY_HEADING.test(lines[lines.length - 1]!.trim()))) lines.pop();
   return lines.join("\n");
 }
@@ -102,7 +123,7 @@ function joinWraps(text: string): string {
   for (let index = 0; index < parts.length; index += 2) {
     const unit = parts[index]!;
     const previous = units[units.length - 1];
-    if (previous !== undefined && /\p{Ll}-$/u.test(previous) && /^\p{Ll}/u.test(unit)) units[units.length - 1] = previous.slice(0, -1) + unit;
+    if (previous !== undefined && /\p{Ll}-$/u.test(previous) && /^\p{Ll}/u.test(unit)) units[units.length - 1] = (CLITIC_START.test(unit) ? previous : previous.slice(0, -1)) + unit;
     else {
       if (previous !== undefined) separators.push(parts[index - 1]!);
       units.push(unit);

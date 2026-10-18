@@ -259,7 +259,7 @@ test("the report counts, samples and keeps originals only after a real run", () 
   for (let i = 0; i < 4; i++) h.book(`${LONG} ${i}${TAIL}${long}`, "publisher", { url: "https://shop.example/p/1" });
   h.book("Adicionar aos Favoritos", "isbndb");
   const plan = planSummaryCleanup(h.db);
-  const dry = summaryCleanupReport(plan, null) as Record<string, any>;
+  const dry = summaryCleanupReport(plan, null, true) as Record<string, any>;
   assert.equal(dry.applied, null);
   assert.equal(dry.originals, undefined);
   assert.deepEqual(dry.books, { scanned: 5, changed: plan.changes.length, emptied: 1 });
@@ -270,9 +270,33 @@ test("the report counts, samples and keeps originals only after a real run", () 
   assert.ok(dry.samples["shop.example"].every((sample: { from: string }) => sample.from.length <= 300));
   assert.equal(typeof dry.judgments, "object");
   const applied = applySummaryCleanup(h.db, plan);
-  const real = summaryCleanupReport(plan, applied) as Record<string, any>;
+  const real = summaryCleanupReport(plan, applied, false) as Record<string, any>;
   assert.deepEqual(real.applied, applied);
   assert.equal(real.originals.length, plan.changes.length);
   assert.deepEqual(Object.keys(real.originals[0]), ["table", "id", "summary"]);
   assert.equal(typeof reportJson(real), "string");
+});
+
+test("a real run that failed part-way still reports every original", () => {
+  const h = setup();
+  h.book(LONG + TAIL);
+  const plan = planSummaryCleanup(h.db);
+  const failed = summaryCleanupReport(plan, null, false) as Record<string, any>;
+  assert.equal(failed.dryRun, false);
+  assert.equal(failed.applied, null);
+  assert.deepEqual(failed.originals, plan.changes.map((change) => ({ table: change.table, id: change.id, summary: change.from })));
+});
+
+test("a manual judgment written after the scan is not replaced by manual-replaced", () => {
+  const h = setup();
+  const raw = LONG_B + TAIL;
+  h.book(raw);
+  h.judge(raw, "manual", 0);
+  h.judge(LONG_B, "jev", 0.9);
+  const plan = planSummaryCleanup(h.db);
+  assert.equal(plan.judgments.find((judgment) => judgment.hash === summaryHashOf(LONG_B))?.outcome, "manual-replaced");
+  h.judge(LONG_B, "manual", 1, "synopsis", "2026-10-05T00:00:00.000Z");
+  const applied = applySummaryCleanup(h.db, plan);
+  assert.equal(applied.judgmentsWritten, 0);
+  assert.deepEqual(h.judgment(LONG_B), { model: "manual", usable: 1, kind: "synopsis", asked_at: "2026-10-05T00:00:00.000Z" });
 });
