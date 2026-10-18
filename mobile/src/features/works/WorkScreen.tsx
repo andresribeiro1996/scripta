@@ -101,8 +101,8 @@ export function WorkScreen({ id }: { id: string }) {
           ...(tint ? { headerTransparent: true, headerStyle: { backgroundColor: "transparent" }, headerLargeTitleEnabled: false, headerShadowVisible: false } : plainHeader),
           headerRight: () => (
             <HeaderActions>
-              <IconButton framed name="share" accessibilityLabel="Share book" onPress={() => void share()} />
-              {menuItems.length > 0 ? <Menu title={work.title} items={menuItems}><IconButton framed accessibilityLabel="Book actions" name="more" /></Menu> : null}
+              <IconButton name="share" accessibilityLabel="Share book" onPress={() => void share()} />
+              {menuItems.length > 0 ? <Menu title={work.title} items={menuItems}><IconButton accessibilityLabel="Book actions" name="more" /></Menu> : null}
             </HeaderActions>
           ),
         }}

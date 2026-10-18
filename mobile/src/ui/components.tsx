@@ -223,25 +223,15 @@ export function Button({
 export function IconButton({
   name,
   accessibilityLabel,
-  label,
   onPress,
   tone = "default",
-  framed = false,
   badge,
   disabled = false,
 }: {
   name: IconName;
   accessibilityLabel: string;
-  /** Draws the word beside the glyph. Use wherever the glyph alone is a guess
-   *  — a globe could be public, or language, or region. */
-  label?: string;
   onPress?: () => void;
   tone?: "default" | "danger" | "accent";
-  /** Draws the 44pt target instead of leaving it implied. A bare glyph in a
-   *  header reads as smaller than it is and people aim at the ink, not the
-   *  box; a row's own overflow button doesn't want the chrome, so this is
-   *  off unless asked for. */
-  framed?: boolean;
   badge?: string | null;
   disabled?: boolean;
 }) {
@@ -256,16 +246,14 @@ export function IconButton({
       hitSlop={8}
       onPress={onPress}
       style={({ pressed }) => {
-        const background = tone === "accent" ? (pressed ? colors.accentSoft : colors.accent) : pressed ? colors.surfacePressed : framed ? colors.surface : "transparent";
+        const background = tone === "accent" ? (pressed ? colors.accentSoft : colors.accent) : pressed ? colors.surfacePressed : "transparent";
         return [
-          label ? styles.labelledIconButton : styles.iconButton,
-          framed ? { borderWidth: 1, borderColor: tone === "accent" ? background : colors.border } : null,
+          styles.iconButton,
           { backgroundColor: background, opacity: disabled ? 0.55 : 1 },
         ];
       }}
     >
       <Icon color={color} name={name} size={22} />
-      {label ? <Text {...dynamicType} numberOfLines={1} style={[typography.body, { color }]}>{label}</Text> : null}
       {badge ? <View style={[styles.tabBadge, styles.iconBadge, { backgroundColor: colors.accent }]}><Text style={[styles.tabBadgeText, { color: colors.onAccent }]}>{badge}</Text></View> : null}
     </Pressable>
   );
@@ -276,7 +264,7 @@ export function HeaderActions({ children }: { children: ReactNode }) {
 }
 
 export function SaveStateButton({ busy, unsaved, onPress }: { busy: boolean; unsaved: boolean; onPress: () => void }) {
-  return <IconButton framed label={busy ? "Saving…" : unsaved ? "Save" : "Saved"} disabled={busy || !unsaved} tone={unsaved ? "accent" : "default"} accessibilityLabel={busy ? "Saving changes" : unsaved ? "Save changes" : "All changes saved"} name={!busy && !unsaved ? "confirm" : "save"} onPress={onPress} />;
+  return <IconButton disabled={busy || !unsaved} tone={unsaved ? "accent" : "default"} accessibilityLabel={busy ? "Saving changes" : unsaved ? "Save changes" : "All changes saved"} name={!busy && !unsaved ? "confirm" : "save"} onPress={onPress} />;
 }
 
 export function Input({
@@ -841,7 +829,6 @@ const styles = StyleSheet.create({
   // clamps its subview's width — verified by probing taps either side of the
   // edge on a device, not assumed.
   menuTrigger: { minWidth: 48, minHeight: 48, alignItems: "center", justifyContent: "center" },
-  labelledIconButton: { minHeight: minimumTouchTarget, flexDirection: "row", alignItems: "center", gap: spacing.xs, paddingHorizontal: spacing.sm, borderRadius: radii.full },
   grow: { flex: 1 },
   heading: { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingHorizontal: spacing.sm, marginBottom: spacing.sm },
   headingText: { flex: 1, fontWeight: "700" },

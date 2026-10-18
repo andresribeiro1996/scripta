@@ -176,7 +176,7 @@ export function LibraryScreen() {
                 />
               ),
               headerRight: () => (
-                <IconButton framed
+                <IconButton
                   accessibilityLabel={`Delete ${selectedKeys.size} selected`}
                   name="delete"
                   disabled={selectedKeys.size === 0}
@@ -194,7 +194,7 @@ export function LibraryScreen() {
               headerLeft: undefined,
               headerRight: () => (
                 <Menu title={library?.data.name || "Library"} items={actionItems}>
-                  <IconButton framed accessibilityLabel="Library actions" name="more" />
+                  <IconButton accessibilityLabel="Library actions" name="more" />
                 </Menu>
               ),
             }}

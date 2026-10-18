@@ -110,7 +110,7 @@ export function QuizEditorScreen({ quiz, onUpdated }: { quiz: Quiz; onUpdated: (
       headerLargeTitleEnabled: false,
       headerRight: () => <HeaderActions>
         {!frozen ? <SaveStateButton busy={busy || publishing} unsaved={dirty} onPress={() => void run(() => updateQuiz(current.id, { data: dataRef.current }))} /> : null}
-        <Menu title={current.name} items={actionItems}><IconButton framed accessibilityLabel="Quiz actions" name="more" /></Menu>
+        <Menu title={current.name} items={actionItems}><IconButton accessibilityLabel="Quiz actions" name="more" /></Menu>
       </HeaderActions>,
     }} />
     {error ? <Toast visible message={error} tone="error" /> : null}

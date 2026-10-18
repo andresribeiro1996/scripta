@@ -91,11 +91,9 @@ export function ArenaHomeScreen() {
         // the screen repeating it above a list that has nowhere else to go.
         headerLargeTitleEnabled: false,
         headerRight: () => tab === "browse"
-          ? <IconButton framed accessibilityLabel="New game" label="New" name="add" onPress={() => setChoosing(true)} />
+          ? <IconButton accessibilityLabel="New game" name="add" onPress={() => setChoosing(true)} />
           : <IconButton
-            framed
             accessibilityLabel={tab === "tournaments" ? "New tournament" : tab === "quizzes" ? "New quiz" : "New tier list"}
-            label="New"
             name="add"
             onPress={() => router.push(NEW_GAMES.find((option) => option.tab === tab)!.href as never)}
           />,
