@@ -438,6 +438,32 @@ npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --
 
 The report has `selected`, `noRecord`, `noAuthor`, `titleMismatch` with `mismatches` (`{ id, title, isbndbTitle }`), `placeholder`, `commaName`, `next`, `isbndb` (`max`, `asked`, `unavailable`, `notAsked`, `pausedUntil`), `fills` (`{ id, isbn, title, author }` each), `wouldFill` and `applied` (`null` on a dry run).
 
+#### National bibliography (BNP) import
+
+`scripts/import-bnp.mjs` imports the Biblioteca Nacional de Portugal's national bibliography, the legal-deposit record of every book published in Portugal since 2002 (set `bibliografianacional` on its OAI-PMH endpoint, `marcxchange`), with the cover scan as the cover. Design and decisions: [`docs/superpowers/specs/2026-10-18-national-bibliography-import-design.md`](../docs/superpowers/specs/2026-10-18-national-bibliography-import-design.md).
+
+- It harvests month-sized datestamp windows from `--from` (default `2000-01-01`, earlier than any datestamp in the set) to `--until` (default today UTC), one OAI page at a time, and applies each window's records with at most two scan downloads in flight. A record with no ISBN, a textbook, no publisher, an institutional publisher or no person author is skipped. The rest are matched by their first ISBN: a match gets only its empty fields filled, and a new book is created with `created_by = 'bnp'`.
+- A cover is replaced only when the book has none, has a `low_res` one, or has an ISBNdb one on a Portugal ISBN. A `manual` cover and any other `good` cover stay.
+- It prints one JSON line per finished window (`window`, `through`, `records`, `kept`, `failed`, then the process's `rss`), and the report as the last line. `failedWindows` lists the windows that failed twice, as `from..until`. `through` and the cursor never move past a failed window.
+- `--dry-run` opens the database read-only, downloads no image and writes nothing. The report counts the filter rules (`skipped`), `created` versus `matched`, the cover actions it would take (`covers`, `replace`), `genres`, the top 50 `publishers` kept and dropped per rule, and 20 `samples`. Its `covers.stored` cannot know which scans the real run will reject. It needs the deploy that ships the import, since a read-only open runs no migration.
+- `--from` after `--until`, or a value that is not a real `YYYY-MM-DD` date, stops the script before it opens the database.
+
+Run order, after the deploy that ships it:
+
+1. The dry run, about 3 hours. Read the counts and the publisher lists. A deny-list change means a new deploy and a new dry run.
+2. The import itself, about a day (3 hours of harvesting, then about 165k scans). `covers.sqlite` grows by about 540 MB, so check `railway volume list --json` first for room for that plus the WAL and Litestream. Hold production deploys while it runs, because a deploy kills the job.
+3. The next day, check the server log for the sync's first window, spot-check a search for `casa dos espiritos`, and compare `railway logs --filter "ISBNdb paused"` on the import day with the days before.
+
+```bash
+npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && nohup node scripts/import-bnp.mjs --dry-run > /data/import-bnp-dry.log 2>&1 & echo started'
+npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && nohup node scripts/import-bnp.mjs > /data/import-bnp.log 2>&1 & echo started'
+npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'tail -3 /data/import-bnp.log'
+```
+
+- **Resuming.** If the job dies, rerun with `--from <through>` from its last window line and no `--until`. The run then ends today and writes the cursor. Re-reading a day is harmless, since every record is applied by ISBN.
+- **Failed windows.** If the report lists any, rerun from the first failed window's `from` with no `--until`.
+- **The cursor.** A run with no `--until` that ends with no failed window writes the sync cursor. A run given `--until`, and every dry run, writes none. The in-server sync starts only once the cursor exists, so a deploy can never start the full harvest inside the server.
+
 #### Known limitations of covers, details and search, and the options for each
 
 Measured on production on 2026-09-30, after a tester imported a 167-book library and waited about 20 minutes for covers. The server itself was never slow: `/covers/resolve` p50 was 1 ms and `PUT /library` about 5 ms. The time goes into the pipeline around it. Recheck the numbers below before relying on them.

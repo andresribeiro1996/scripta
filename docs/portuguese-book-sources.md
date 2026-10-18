@@ -98,7 +98,7 @@ The full per-provider catalog, with each shop's quirks, the contact-first list a
 | [Projecto Adamastor](https://projectoadamastor.org/) | Free ebooks of 19th–20th-century Portuguese classics with designed covers. "Creative Commons" licence. WordPress with `/catalogo/` and an RSS feed. | **Worth a follow-up.** Probably no ISBNs, so its books would match only by title and author. It's a good source of Portuguese classics for the seed, which the Open Library ranking under-weights. |
 | [Biblioteca Digital Camões](https://www.instituto-camoes.pt/activity/servicos-online/biblioteca-digital) | Instituto Camões: free full texts (literature, theses, essays, scores) plus a shared catalogue of its libraries in 54 countries. | **Not a cover source.** Metadata at most, and Open Library covers that. |
 | Plano Nacional de Leitura | The state's recommended reading lists, including school reading and Portuguese classics. | **Unexplored.** It could rank Portuguese authors better than Open Library does. |
-| PORBASE / Biblioteca Nacional | The national catalogue built from legal deposit: every book published in Portugal, with ISBNs. | **Unexplored.** Authoritative metadata, no covers, no popularity signal. |
+| PORBASE / Biblioteca Nacional | The national catalogue built from legal deposit: every book published in Portugal, with ISBNs. | **Imported.** The national bibliography's OAI-PMH feed supplies the metadata and most recent books have a cover scan; no popularity signal. See the [design](superpowers/specs/2026-10-18-national-bibliography-import-design.md). |
 
 ## Open leads
 
