@@ -160,6 +160,7 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
     adminUserId: env.ADMIN_USER_ID,
     warn: (details, message) => app.log.warn(details, message),
     bnpLookup: (isbn) => lookupBnpIsbn(bnpLookupDeps, isbn),
+    heldWorkIds: heldWorks ? () => heldWorks().map((work) => work.workId) : undefined,
     onDetailsChecked: (book) => {
       if (!book.work_id) return;
       genreJobs?.add(book.work_id);

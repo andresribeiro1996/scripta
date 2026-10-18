@@ -1563,6 +1563,92 @@ test("failing books move behind untried ones, so a second batch reaches a good n
   assert.equal(h.repo.getBook(good)!.details_status, "found");
 });
 
+function bnpBook(h: ReturnType<typeof harness>, title: string, at: string) {
+  return h.repo.createBook({ title, author: "X", isbn: null, createdBy: "bnp" }, [`ta:${title.toLowerCase()}|x|`], at);
+}
+
+function titleCatalog(seen: string[]): Catalog {
+  return { fetchDetails: async (lookup) => { seen.push(lookup.title); return spiceAnswer; }, search: async () => [] };
+}
+
+test("the details backfill looks up held bnp books before the queue", async () => {
+  const seen: string[] = [];
+  const held: string[] = [];
+  const h = harness({ backgroundCatalog: titleCatalog(seen), heldWorkIds: () => held });
+  const [regular] = backfillBooks(h, 1);
+  const bnp = bnpBook(h, "Bnp Held", "2026-10-02T00:00:00.000Z");
+  held.push(bnp.work_id!);
+  await h.service.backfillDetails(2);
+  assert.deepEqual(seen, ["Bnp Held", "Book 0"]);
+  assert.deepEqual([bnp.id, regular!].map((id) => h.repo.getBook(id)!.details_status), ["found", "found"]);
+});
+
+test("held bnp books fill the batch before the queue gets any of it", async () => {
+  const seen: string[] = [];
+  const held: string[] = [];
+  const h = harness({ backgroundCatalog: titleCatalog(seen), heldWorkIds: () => held });
+  const [regular] = backfillBooks(h, 1);
+  held.push(bnpBook(h, "Bnp First", "2026-10-02T00:00:00.000Z").work_id!, bnpBook(h, "Bnp Second", "2026-10-03T00:00:00.000Z").work_id!);
+  await h.service.backfillDetails(2);
+  assert.deepEqual(seen, ["Bnp First", "Bnp Second"]);
+  assert.equal(h.repo.getBook(regular!)!.details_status, null);
+});
+
+test("the details backfill never looks up a bnp book whose work nobody holds", async () => {
+  const seen: string[] = [];
+  const held: string[] = [];
+  const h = harness({ backgroundCatalog: titleCatalog(seen), heldWorkIds: () => held });
+  held.push(bnpBook(h, "Bnp Held", "2026-10-02T00:00:00.000Z").work_id!);
+  const idle = bnpBook(h, "Bnp Idle", "2026-10-03T00:00:00.000Z");
+  await h.service.backfillDetails(50);
+  assert.deepEqual(seen, ["Bnp Held"]);
+  const row = h.repo.getBook(idle.id)!;
+  assert.deepEqual([row.details_status, row.details_checked_at], [null, null]);
+});
+
+test("a held work that was merged still counts", async () => {
+  const seen: string[] = [];
+  const held: string[] = [];
+  const h = harness({ backgroundCatalog: titleCatalog(seen), heldWorkIds: () => held });
+  const plain = h.repo.createBook({ title: "Plain", author: "X", isbn: null }, ["ta:plain|x|"], "2026-10-01T00:00:00.000Z");
+  const bnp = bnpBook(h, "Bnp Merged", "2026-10-02T00:00:00.000Z");
+  h.repo.mergeWorks(plain.work_id!, bnp.work_id!);
+  held.push(plain.work_id!);
+  await h.service.backfillDetails(50);
+  assert.equal(seen[0], "Bnp Merged");
+  assert.equal(h.repo.getBook(bnp.id)!.details_status, "found");
+});
+
+test("with nothing held, or no heldWorkIds, the batch is the regular queue", async () => {
+  for (const heldWorkIds of [() => [], undefined]) {
+    const seen: string[] = [];
+    const h = harness({ backgroundCatalog: titleCatalog(seen), heldWorkIds });
+    bnpBook(h, "Bnp Idle", "2026-10-02T00:00:00.000Z");
+    backfillBooks(h, 2);
+    await h.service.backfillDetails(50);
+    assert.deepEqual(seen, ["Book 0", "Book 1"]);
+  }
+});
+
+test("a held bnp book keeps its BNP synopsis when looked up", async () => {
+  const held: string[] = [];
+  const h = harness({ backgroundCatalog: { fetchDetails: async () => spiceAnswer, search: async () => [] }, heldWorkIds: () => held });
+  const bnp = bnpBook(h, "Bnp Held", "2026-10-02T00:00:00.000Z");
+  held.push(bnp.work_id!);
+  h.repo.mergeDetails(bnp.id, { summary: "Sinopse da BNP.", pages: null, year: null, publisher: null, translator: null }, "bnp");
+  await h.service.backfillDetails(50);
+  const row = h.repo.getBook(bnp.id)!;
+  assert.deepEqual([row.summary, row.summary_source, row.details_status], ["Sinopse da BNP.", "bnp", "found"]);
+});
+
+test("a failing held-works read propagates and looks nothing up", async () => {
+  const seen: string[] = [];
+  const h = harness({ backgroundCatalog: titleCatalog(seen), heldWorkIds: () => { throw new Error("library db locked"); } });
+  backfillBooks(h, 1);
+  await assert.rejects(h.service.backfillDetails(50), /library db locked/);
+  assert.deepEqual(seen, []);
+});
+
 test("an attempted but unchecked book is still looked up by a user's request", async () => {
   const { calls, catalog } = recordingCatalog();
   const h = harness({ catalog, backgroundCatalog: { fetchDetails: async () => { throw new SourceUnavailableError("openlibrary", "HTTP 503"); }, search: async () => [] } });
