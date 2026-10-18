@@ -9,7 +9,8 @@ const MAX_TITLE_QUERY = 150;
 function titleQuery(title: string): string {
   if (title.length <= MAX_TITLE_QUERY) return title;
   const head = title.slice(0, MAX_TITLE_QUERY + 1);
-  return head.slice(0, head.lastIndexOf(" ")).trim() || title.slice(0, MAX_TITLE_QUERY);
+  const space = head.lastIndexOf(" ");
+  return space > 0 ? head.slice(0, space) : head.slice(0, MAX_TITLE_QUERY);
 }
 
 const strip = ({ source, url }: TitledCandidate): CoverCandidate => ({ source, url });

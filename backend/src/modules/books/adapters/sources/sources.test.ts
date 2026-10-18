@@ -103,9 +103,10 @@ test("a title longer than ISBNdb's 150 character limit is cut at a word boundary
 
 test("a long title with no spaces is cut to its first 150 characters", async () => {
   const urls = stub(() => Response.json({ books: [] }));
-  const title = "ã".repeat(200);
-  await createIsbndbSource("k", direct, gate).byTitle(title, "", acceptAll);
-  assert.equal(decodeURIComponent(new URL(urls[0]!).pathname.slice("/books/".length)), "ã".repeat(150));
+  const source = createIsbndbSource("k", direct, gate);
+  await source.byTitle("ã".repeat(200), "", acceptAll);
+  await source.byTitle(` ${"a".repeat(200)}`, "", acceptAll);
+  assert.deepEqual(urls.map((url) => decodeURIComponent(new URL(url).pathname.slice("/books/".length))), ["ã".repeat(150), ` ${"a".repeat(149)}`]);
 });
 
 test("a title of 150 characters is sent unchanged, and the full title still decides what is accepted", async () => {
