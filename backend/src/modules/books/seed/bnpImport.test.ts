@@ -8,7 +8,7 @@ import { afterEach, test } from "node:test";
 import sharp from "sharp";
 import type { BooksRepository } from "../domain/ports.js";
 import type { BnpBook } from "./bnpRecord.js";
-import type { BnpCoverAction, BnpDeps, BnpReplace } from "./bnpImport.js";
+import type { BnpCoverAction, BnpDeps, BnpHarvestDeps, BnpReplace } from "./bnpImport.js";
 
 const scratch = mkdtempSync(join(tmpdir(), "bnp-import-test-"));
 process.env.AUTH_DB_PATH = join(scratch, "auth.sqlite");
@@ -22,8 +22,10 @@ const { applyBooksMigrations } = await import("../adapters/sqlite/connection.js"
 const { createSqliteBooksRepository } = await import("../adapters/sqlite/sqliteBooksRepository.js");
 const { SourceUnavailableError } = await import("../domain/errors.js");
 const { catalogTitleKey } = await import("../domain/normalize.js");
-const { applyBnpRecord, fetchBnpScan, planBnpRecord } = await import("./bnpImport.js");
+const { applyBnpRecord, fetchBnpScan, importBnp, monthWindows, planBnpRecord, utcDate } = await import("./bnpImport.js");
 const { mapBnpRecord, readMarcRecords } = await import("./bnpRecord.js");
+
+process.env.TZ = "America/Sao_Paulo";
 
 const NOW = new Date("2026-10-18T12:00:00.000Z");
 const AT = NOW.toISOString();
@@ -424,4 +426,359 @@ test("fetchBnpScan encodes a scan and gives null for a missing or undecodable on
   assert.equal(await fetchBnpScan("https://rnod.bnportugal.gov.pt/scan"), null);
   answer(200, "not an image");
   assert.equal(await fetchBnpScan("https://rnod.bnportugal.gov.pt/scan"), null);
+});
+
+const OAI = "https://oai.bnportugal.gov.pt/servlet/OAIHandler";
+const windowUrl = (from: string, until: string) => `${OAI}?verb=ListRecords&metadataPrefix=marcxchange&set=bibliografianacional&from=${from}&until=${until}`;
+const tokenUrl = (token: string) => `${OAI}?verb=ListRecords&resumptionToken=${token}`;
+const fixture = (name: string) => readFileSync(new URL(`./fixtures/bnp/${name}`, import.meta.url), "utf8");
+const FIXTURE_PAGE = fixture("oai-page.xml");
+const EMPTY_PAGE = fixture("oai-empty.xml");
+const ALLENDE_RECORD = /<record\b[\s\S]*<\/record>/.exec(fixture("urn-9789720044457.xml"))![0];
+const ENVELOPE = '<?xml version="1.0" encoding="UTF-8" ?><OAI-PMH xmlns="http://www.openarchives.org/OAI/2.0/"><responseDate>2026-10-18T12:00:00Z</responseDate>';
+const oaiPage = (records: string[], token = "") => `${ENVELOPE}<ListRecords>${records.join("")}${token && `<resumptionToken>${token}</resumptionToken>`}</ListRecords></OAI-PMH>`;
+const oaiError = (code: string) => `${ENVELOPE}<error code="${code}">nothing</error></OAI-PMH>`;
+const DELETED_RECORD = '<record><header status="deleted"><identifier>oai:oai.bn.pt:bibliografianacional/1</identifier><datestamp>2026-10-16</datestamp></header></record>';
+
+function isbnN(n: number): string {
+  const body = `9789720${String(n).padStart(5, "0")}`;
+  const sum = [...body].reduce((total, digit, index) => total + Number(digit) * (index % 2 === 0 ? 1 : 3), 0);
+  return `${body}${(10 - (sum % 10)) % 10}`;
+}
+
+const recordOf = (isbn: string) => ALLENDE_RECORD.replace("978-972-0-04445-7", isbn).replace("doc=1858036", `doc=${isbn}`);
+const run = (from: string, until: string, extra: Partial<{ dryRun: boolean; cursorOnSuccess: boolean }> = {}) => ({ from, until, dryRun: false, cursorOnSuccess: false, ...extra });
+const bookCount = (db: DatabaseSync) => (db.prepare("SELECT COUNT(*) AS n FROM books").get() as { n: number }).n;
+const unavailable = () => new SourceUnavailableError("oai.bnportugal.gov.pt", "HTTP 503");
+
+type Reply = string | { status: number; text: string } | Error;
+
+function harvestSetup(script: Record<string, Reply | Reply[]>, scan: BnpDeps["fetchScan"] = async () => SCAN) {
+  const base = setup(scan);
+  const events: string[] = [];
+  const asked = new Map<string, number>();
+  const logs: string[] = [];
+  const deps: BnpHarvestDeps = {
+    ...base.deps,
+    fetchScan: async (url) => {
+      events.push("scan");
+      return scan(url);
+    },
+    fetchText: async (url) => {
+      events.push("text");
+      const replies = [script[url] ?? new Error(`unscripted ${url}`)].flat();
+      const turn = asked.get(url) ?? 0;
+      asked.set(url, turn + 1);
+      const reply = replies[Math.min(turn, replies.length - 1)]!;
+      if (reply instanceof Error) throw reply;
+      return typeof reply === "string" ? { status: 200, text: reply } : reply;
+    },
+    log: (line) => logs.push(line)
+  };
+  return { ...base, deps, events, asked, logs };
+}
+
+test("monthWindows splits by calendar month inclusively", () => {
+  assert.deepEqual(monthWindows("2026-09-15", "2026-10-03"), [{ from: "2026-09-15", until: "2026-09-30" }, { from: "2026-10-01", until: "2026-10-03" }]);
+  assert.deepEqual(monthWindows("2026-10-18", "2026-10-18"), [{ from: "2026-10-18", until: "2026-10-18" }]);
+  assert.deepEqual(monthWindows("2024-02-10", "2024-03-01"), [{ from: "2024-02-10", until: "2024-02-29" }, { from: "2024-03-01", until: "2024-03-01" }]);
+  assert.deepEqual(monthWindows("2025-12-20", "2026-01-05"), [{ from: "2025-12-20", until: "2025-12-31" }, { from: "2026-01-01", until: "2026-01-05" }]);
+  assert.deepEqual(monthWindows("2026-10-19", "2026-10-18"), []);
+});
+
+test("utcDate is the UTC day even west of UTC", () => {
+  assert.equal(new Date("2026-10-18T01:00:00Z").getDate(), 17);
+  assert.equal(utcDate(new Date("2026-10-18T01:00:00Z")), "2026-10-18");
+  assert.equal(utcDate(new Date("2026-10-18T23:59:59Z")), "2026-10-18");
+});
+
+test("a window follows its resumption token and applies every kept record", async () => {
+  const D = "2026-10-16";
+  const { repo, blobs, logs, deps } = harvestSetup({
+    [windowUrl(D, "2026-10-17")]: FIXTURE_PAGE,
+    [tokenUrl("TOKEN-1")]: oaiPage([recordOf(isbnN(1)), DELETED_RECORD])
+  });
+
+  const report = await importBnp(deps, run(D, "2026-10-17"));
+
+  assert.equal(report.dryRun, false);
+  assert.equal(report.from, D);
+  assert.equal(report.until, "2026-10-17");
+  assert.equal(report.through, "2026-10-17");
+  assert.equal(report.records, 5);
+  assert.equal(report.deleted, 1);
+  assert.equal(report.kept, 3);
+  assert.deepEqual(report.skipped, { noIsbn: 0, textbook: 0, noPublisher: 0, institutional: 1, noPerson: 0 });
+  assert.equal(report.created, 3);
+  assert.equal(report.matched, 0);
+  assert.deepEqual(report.covers, { stored: 1, kept: 0, noScan: 2, rejected: 0, failed: 0 });
+  assert.deepEqual(report.replace, { new: 3, none: 0, lowRes: 0, isbndb: 0 });
+  assert.equal(report.genres.Politics, 1);
+  assert.equal(report.genres.Philosophy, 1);
+  assert.deepEqual(report.publishers.dropped.institutional, [["Câmara Municipal de Viana do Castelo", 1]]);
+  assert.deepEqual(new Map(report.publishers.kept).get("Relógio d'Água"), 1);
+  assert.equal(report.samples.length, 3);
+  assert.deepEqual(report.failedWindows, []);
+  assert.equal(repo.findBookByKey("isbn:9789727089482")!.created_by, "bnp");
+  assert.equal(repo.findBookByKey("isbn:9789722328012")!.created_by, "bnp");
+  assert.equal(repo.findBookByKey(`isbn:${isbnN(1)}`)!.cover_status, "good");
+  assert.equal(repo.findBookByKey("isbn:9789725882856"), undefined);
+  assert.equal(blobs.size, 2);
+  assert.deepEqual(logs.map((line) => JSON.parse(line)), [{ window: "2026-10-16..2026-10-17", through: "2026-10-17", records: 5, kept: 3, failed: false }]);
+});
+
+test("a resumption token is URL-encoded in the next request", async () => {
+  const token = "a b/c=";
+  const { deps } = harvestSetup({
+    [windowUrl("2026-10-16", "2026-10-17")]: FIXTURE_PAGE.replace("TOKEN-1", token),
+    [tokenUrl(encodeURIComponent(token))]: EMPTY_PAGE
+  });
+  const report = await importBnp(deps, run("2026-10-16", "2026-10-17"));
+  assert.deepEqual(report.failedWindows, []);
+  assert.equal(report.records, 3);
+});
+
+test("a quiet window is zero records and still moves through", async () => {
+  for (const page of [EMPTY_PAGE, oaiError("noRecordsMatch")]) {
+    const { repo, logs, deps } = harvestSetup({ [windowUrl("2026-10-18", "2026-10-18")]: page });
+
+    const report = await importBnp(deps, run("2026-10-18", "2026-10-18", { cursorOnSuccess: true }));
+
+    assert.equal(report.records, 0);
+    assert.equal(report.kept, 0);
+    assert.equal(report.through, "2026-10-18");
+    assert.deepEqual(report.failedWindows, []);
+    assert.equal(repo.getHarvestCursor("bnp"), "2026-10-18");
+    assert.deepEqual(logs.map((line) => JSON.parse(line)), [{ window: "2026-10-18..2026-10-18", through: "2026-10-18", records: 0, kept: 0, failed: false }]);
+  }
+});
+
+test("a dry run writes and fetches nothing and still reports the plan", async () => {
+  const { db, repo, blobs, events, deps } = harvestSetup(
+    {
+      [windowUrl("2026-10-16", "2026-10-17")]: FIXTURE_PAGE,
+      [tokenUrl("TOKEN-1")]: oaiPage([recordOf(isbnN(1))])
+    },
+    async () => {
+      throw new Error("a dry run must not download a scan");
+    }
+  );
+  seed(repo, "9789727089482");
+  const lowRes = seed(repo, isbnN(1));
+  giveCover(repo, lowRes.id, "openlibrary", "low_res");
+  const before = JSON.stringify(db.prepare("SELECT * FROM books ORDER BY id").all());
+
+  const report = await importBnp(deps, run("2026-10-16", "2026-10-17", { dryRun: true, cursorOnSuccess: true }));
+
+  assert.equal(report.dryRun, true);
+  assert.equal(report.records, 4);
+  assert.equal(report.kept, 3);
+  assert.equal(report.created, 1);
+  assert.equal(report.matched, 2);
+  assert.deepEqual(report.covers, { stored: 1, kept: 0, noScan: 2, rejected: 0, failed: 0 });
+  assert.deepEqual(report.replace, { new: 1, none: 1, lowRes: 1, isbndb: 0 });
+  assert.deepEqual(report.publishers.dropped.institutional, [["Câmara Municipal de Viana do Castelo", 1]]);
+  assert.equal(report.samples.length, 3);
+  assert.equal(bookCount(db), 2);
+  assert.equal(JSON.stringify(db.prepare("SELECT * FROM books ORDER BY id").all()), before);
+  assert.equal(blobs.size, 0);
+  assert.ok(!events.includes("scan"));
+  assert.equal(repo.getHarvestCursor("bnp"), null);
+});
+
+test("a dry run counts an ISBN it has already seen as matched, with nothing to replace", async () => {
+  const isbn = isbnN(1);
+  const { deps } = harvestSetup({ [windowUrl("2026-10-16", "2026-10-16")]: oaiPage([recordOf(isbn), recordOf(isbn)]) });
+
+  const report = await importBnp(deps, run("2026-10-16", "2026-10-16", { dryRun: true }));
+
+  assert.equal(report.kept, 2);
+  assert.equal(report.created, 1);
+  assert.equal(report.matched, 1);
+  assert.deepEqual(report.covers, { stored: 1, kept: 1, noScan: 0, rejected: 0, failed: 0 });
+  assert.deepEqual(report.replace, { new: 1, none: 0, lowRes: 0, isbndb: 0 });
+});
+
+test("publisher tallies are cut to the top 50 and ordered by count", async () => {
+  const publisherOf = (name: string) => (isbn: string) => recordOf(isbn).replace("Porto Editora", name);
+  const popular = publisherOf("Editora Popular");
+  const records = [
+    ...Array.from({ length: 60 }, (_, index) => publisherOf(`Editora ${String(index).padStart(2, "0")}`)(isbnN(index + 100))),
+    popular(isbnN(1)),
+    popular(isbnN(2))
+  ];
+  const { deps } = harvestSetup({ [windowUrl("2026-10-16", "2026-10-16")]: oaiPage(records) });
+
+  const report = await importBnp(deps, run("2026-10-16", "2026-10-16", { dryRun: true }));
+
+  assert.equal(report.publishers.kept.length, 50);
+  assert.deepEqual(report.publishers.kept[0], ["Editora Popular", 2]);
+  assert.deepEqual(report.publishers.kept[1], ["Editora 00", 1]);
+});
+
+test("a window that fails twice is listed and through stops before it", async () => {
+  const { repo, asked, logs, deps } = harvestSetup({
+    [windowUrl("2026-09-15", "2026-09-30")]: oaiPage([recordOf(isbnN(1))]),
+    [windowUrl("2026-10-01", "2026-10-03")]: [unavailable(), unavailable()]
+  });
+
+  const report = await importBnp(deps, run("2026-09-15", "2026-10-03", { cursorOnSuccess: true }));
+
+  assert.deepEqual(report.failedWindows, ["2026-10-01..2026-10-03"]);
+  assert.equal(report.through, "2026-09-30");
+  assert.equal(asked.get(windowUrl("2026-10-01", "2026-10-03")), 2);
+  assert.equal(repo.getHarvestCursor("bnp"), null);
+  assert.deepEqual(logs.map((line) => JSON.parse(line)), [
+    { window: "2026-09-15..2026-09-30", through: "2026-09-30", records: 1, kept: 1, failed: false },
+    { window: "2026-10-01..2026-10-03", through: "2026-09-30", records: 0, kept: 0, failed: true }
+  ]);
+});
+
+test("later windows are still harvested after a failed one, and through stays before it", async () => {
+  const { repo, deps } = harvestSetup({
+    [windowUrl("2026-09-15", "2026-09-30")]: oaiPage([recordOf(isbnN(1))]),
+    [windowUrl("2026-10-01", "2026-10-31")]: unavailable(),
+    [windowUrl("2026-11-01", "2026-11-02")]: oaiPage([recordOf(isbnN(2))])
+  });
+
+  const report = await importBnp(deps, run("2026-09-15", "2026-11-02"));
+
+  assert.deepEqual(report.failedWindows, ["2026-10-01..2026-10-31"]);
+  assert.equal(report.through, "2026-09-30");
+  assert.equal(report.created, 2);
+  assert.ok(repo.findBookByKey(`isbn:${isbnN(2)}`));
+});
+
+const FAILURES: Array<[string, Reply]> = [
+  ["an OAI error", oaiError("badResumptionToken")],
+  ["a 503 answer", { status: 503, text: oaiPage([recordOf(isbnN(2))]) }],
+  ["an unavailable source", unavailable()],
+  ["a truncated page", oaiPage([recordOf(isbnN(2))]).slice(0, -40)]
+];
+
+for (const [label, failure] of FAILURES) {
+  test(`a page that fails once with ${label} is retried from the window's start`, async () => {
+    const { db, blobs, asked, deps } = harvestSetup({
+      [windowUrl("2026-10-16", "2026-10-17")]: FIXTURE_PAGE,
+      [tokenUrl("TOKEN-1")]: [failure, oaiPage([recordOf(isbnN(1))])]
+    });
+
+    const report = await importBnp(deps, run("2026-10-16", "2026-10-17"));
+
+    assert.deepEqual(report.failedWindows, []);
+    assert.equal(report.through, "2026-10-17");
+    assert.equal(asked.get(windowUrl("2026-10-16", "2026-10-17")), 2);
+    assert.equal(asked.get(tokenUrl("TOKEN-1")), 2);
+    assert.equal(report.records, 4);
+    assert.equal(report.kept, 3);
+    assert.equal(report.created, 3);
+    assert.equal(bookCount(db), 3);
+    assert.equal(blobs.size, 2);
+  });
+}
+
+test("a truncated page fails the window instead of ending it short", async () => {
+  const { db, repo, deps } = harvestSetup({
+    [windowUrl("2026-10-16", "2026-10-17")]: FIXTURE_PAGE,
+    [tokenUrl("TOKEN-1")]: oaiPage([recordOf(isbnN(1))]).slice(0, -40)
+  });
+
+  const report = await importBnp(deps, run("2026-10-16", "2026-10-17", { cursorOnSuccess: true }));
+
+  assert.deepEqual(report.failedWindows, ["2026-10-16..2026-10-17"]);
+  assert.equal(report.through, null);
+  assert.equal(report.records, 0);
+  assert.equal(bookCount(db), 0);
+  assert.equal(repo.getHarvestCursor("bnp"), null);
+});
+
+test("an error other than an unavailable source ends the run without a retry", async () => {
+  const { asked, deps } = harvestSetup({ [windowUrl("2026-10-16", "2026-10-16")]: new Error("boom") });
+  await assert.rejects(importBnp(deps, run("2026-10-16", "2026-10-16")), /boom/);
+  assert.equal(asked.get(windowUrl("2026-10-16", "2026-10-16")), 1);
+});
+
+test("a window's pages are all fetched before its first scan", async () => {
+  const { events, deps } = harvestSetup({
+    [windowUrl("2026-09-30", "2026-09-30")]: oaiPage([recordOf(isbnN(1))], "TOKEN-1"),
+    [tokenUrl("TOKEN-1")]: oaiPage([recordOf(isbnN(2))]),
+    [windowUrl("2026-10-01", "2026-10-01")]: EMPTY_PAGE
+  });
+
+  await importBnp(deps, run("2026-09-30", "2026-10-01"));
+
+  assert.deepEqual(events, ["text", "text", "scan", "scan", "text"]);
+});
+
+test("two records with the same ISBN in one window make one book and one upload", async () => {
+  const isbn = isbnN(1);
+  const scanned: string[] = [];
+  const { db, blobs, deps } = harvestSetup({ [windowUrl("2026-10-16", "2026-10-16")]: oaiPage([recordOf(isbn), recordOf(isbn)]) }, async (url) => {
+    scanned.push(url);
+    return SCAN;
+  });
+
+  const report = await importBnp(deps, run("2026-10-16", "2026-10-16"));
+
+  assert.equal(report.kept, 2);
+  assert.equal(report.created, 1);
+  assert.equal(report.matched, 1);
+  assert.deepEqual(report.covers, { stored: 1, kept: 1, noScan: 0, rejected: 0, failed: 0 });
+  assert.equal(bookCount(db), 1);
+  assert.equal(scanned.length, 1);
+  assert.equal(blobs.size, 2);
+});
+
+test("two scans run at once, never for the same ISBN, and the counts match a sequential run", async () => {
+  const [a, b, c, d, e] = [1, 2, 3, 4, 5].map(isbnN) as [string, string, string, string, string];
+  const fetched: string[] = [];
+  let active = 0;
+  let peak = 0;
+  const { db, blobs, deps } = harvestSetup({ [windowUrl("2026-10-16", "2026-10-16")]: oaiPage([a, b, a, c, d, e, b].map(recordOf)) }, async (url) => {
+    fetched.push(url);
+    active++;
+    peak = Math.max(peak, active);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    active--;
+    return SCAN;
+  });
+
+  const report = await importBnp(deps, run("2026-10-16", "2026-10-16"));
+
+  assert.equal(peak, 2);
+  assert.equal(fetched.length, 5);
+  assert.equal(new Set(fetched).size, 5);
+  assert.equal(report.kept, 7);
+  assert.equal(report.created, 5);
+  assert.equal(report.matched, 2);
+  assert.deepEqual(report.covers, { stored: 5, kept: 2, noScan: 0, rejected: 0, failed: 0 });
+  assert.deepEqual(report.replace, { new: 5, none: 0, lowRes: 0, isbndb: 0 });
+  assert.equal(bookCount(db), 5);
+  assert.equal(blobs.size, 10);
+});
+
+test("an error while applying stops further records and propagates", async () => {
+  const scans: string[] = [];
+  const { deps } = harvestSetup({ [windowUrl("2026-10-16", "2026-10-16")]: oaiPage([1, 2, 3, 4].map((n) => recordOf(isbnN(n)))) }, async (url) => {
+    scans.push(url);
+    throw new Error("boom");
+  });
+
+  await assert.rejects(importBnp(deps, run("2026-10-16", "2026-10-16")), /boom/);
+
+  assert.equal(scans.length, 2);
+});
+
+test("a finished run writes the cursor only when asked, never on a dry run or after a failed window", async () => {
+  const cases: Array<[string, { dryRun?: boolean; cursorOnSuccess: boolean }, Reply, string | null]> = [
+    ["asked", { cursorOnSuccess: true }, EMPTY_PAGE, "2026-10-18"],
+    ["not asked", { cursorOnSuccess: false }, EMPTY_PAGE, null],
+    ["a dry run", { cursorOnSuccess: true, dryRun: true }, EMPTY_PAGE, null],
+    ["a failed window", { cursorOnSuccess: true }, unavailable(), null]
+  ];
+  for (const [label, extra, reply, cursor] of cases) {
+    const { repo, deps } = harvestSetup({ [windowUrl("2026-10-18", "2026-10-18")]: reply });
+    await importBnp(deps, run("2026-10-18", "2026-10-18", extra));
+    assert.equal(repo.getHarvestCursor("bnp"), cursor, label);
+  }
 });

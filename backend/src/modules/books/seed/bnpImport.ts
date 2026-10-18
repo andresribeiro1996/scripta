@@ -6,8 +6,8 @@ import { encodeCover, isAcceptableCover, type EncodedCover } from "../domain/ima
 import { editionLanguage, isPortugueseIsbn, lookupIdentity } from "../domain/normalize.js";
 import type { BooksRepository, CoverBlobStore } from "../domain/ports.js";
 import type { BookRow, CoverImageRow } from "../domain/types.js";
-import type { BnpBook } from "./bnpRecord.js";
-import { udcGenres } from "./bnpScope.js";
+import { mapBnpRecord, readMarcRecords, readOaiError, readResumptionToken, type BnpBook } from "./bnpRecord.js";
+import { BNP_SKIPS, bnpSkipReason, udcGenres, type BnpSkip } from "./bnpScope.js";
 import { fetchBytes } from "./siteFetch.js";
 
 export interface BnpDeps {
@@ -100,4 +100,208 @@ export async function applyBnpRecord(deps: BnpDeps, plan: BnpPlan): Promise<{ bo
 export async function fetchBnpScan(url: string): Promise<EncodedCover | null> {
   const bytes = await fetchBytes(url);
   return bytes === null ? null : encodeCover(bytes);
+}
+
+export interface BnpHarvestDeps extends BnpDeps {
+  fetchText: (url: string) => Promise<{ status: number; text: string }>;
+  log: (line: string) => void;
+}
+
+export interface BnpImportOptions {
+  from: string;
+  until: string;
+  dryRun: boolean;
+  cursorOnSuccess: boolean;
+}
+
+export interface BnpImportReport {
+  dryRun: boolean;
+  from: string;
+  until: string;
+  through: string | null;
+  records: number;
+  deleted: number;
+  kept: number;
+  created: number;
+  matched: number;
+  skipped: Record<BnpSkip, number>;
+  covers: Record<BnpCoverAction, number>;
+  replace: Record<BnpReplace, number>;
+  genres: Record<string, number>;
+  publishers: { kept: Array<[string, number]>; dropped: Record<BnpSkip, Array<[string, number]>> };
+  samples: BnpBook[];
+  failedWindows: string[];
+}
+
+export const BNP_OAI = "https://oai.bnportugal.gov.pt/servlet/OAIHandler";
+
+const SCAN_POOL = 2;
+const TOP_PUBLISHERS = 50;
+const SAMPLES = 20;
+const OAI_END = /<\/OAI-PMH>\s*$/;
+
+type DateWindow = { from: string; until: string };
+type Harvested = { records: number; deleted: number; kept: BnpBook[]; skipped: Array<[BnpSkip, string | null]> };
+type Outcome = { created: boolean; replace: BnpReplace | null; cover: BnpCoverAction };
+
+export function utcDate(at: Date): string {
+  return at.toISOString().slice(0, 10);
+}
+
+export function monthWindows(from: string, until: string): DateWindow[] {
+  const windows: DateWindow[] = [];
+  for (let start = from; start <= until; ) {
+    const [year, month] = start.split("-").map(Number) as [number, number];
+    const monthEnd = utcDate(new Date(Date.UTC(year, month, 0)));
+    windows.push({ from: start, until: monthEnd < until ? monthEnd : until });
+    start = utcDate(new Date(Date.UTC(year, month, 1)));
+  }
+  return windows;
+}
+
+const firstUrl = (window: DateWindow) => `${BNP_OAI}?verb=ListRecords&metadataPrefix=marcxchange&set=bibliografianacional&from=${window.from}&until=${window.until}`;
+const nextUrl = (token: string) => `${BNP_OAI}?verb=ListRecords&resumptionToken=${encodeURIComponent(token)}`;
+
+async function fetchPage(fetchText: BnpHarvestDeps["fetchText"], url: string): Promise<string | null> {
+  try {
+    const { status, text } = await fetchText(url);
+    return status === 200 && OAI_END.test(text) && readOaiError(text) === null ? text : null;
+  } catch (error) {
+    if (error instanceof SourceUnavailableError) return null;
+    throw error;
+  }
+}
+
+async function harvestOnce(fetchText: BnpHarvestDeps["fetchText"], window: DateWindow): Promise<Harvested | null> {
+  const harvested: Harvested = { records: 0, deleted: 0, kept: [], skipped: [] };
+  let url: string | null = firstUrl(window);
+  while (url !== null) {
+    const xml = await fetchPage(fetchText, url);
+    if (xml === null) return null;
+    for (const record of readMarcRecords(xml)) {
+      harvested.records++;
+      if (record.deleted) {
+        harvested.deleted++;
+        continue;
+      }
+      const book = mapBnpRecord(record);
+      const reason = bnpSkipReason(book);
+      if (reason === null) harvested.kept.push(book);
+      else harvested.skipped.push([reason, book.publisher]);
+    }
+    const token = readResumptionToken(xml);
+    url = token === null ? null : nextUrl(token);
+  }
+  return harvested;
+}
+
+async function harvestWindow(fetchText: BnpHarvestDeps["fetchText"], window: DateWindow): Promise<Harvested | null> {
+  return (await harvestOnce(fetchText, window)) ?? (await harvestOnce(fetchText, window));
+}
+
+async function applyPooled(books: BnpBook[], apply: (book: BnpBook) => Promise<void>): Promise<void> {
+  const waiting = [...books];
+  const running = new Map<string, Promise<unknown>>();
+  const failures: unknown[] = [];
+  while (failures.length === 0 && (waiting.length > 0 || running.size > 0)) {
+    while (running.size < SCAN_POOL) {
+      const next = waiting.findIndex((book) => !running.has(book.isbns[0]!));
+      if (next < 0) break;
+      const book = waiting.splice(next, 1)[0]!;
+      const isbn = book.isbns[0]!;
+      running.set(isbn, apply(book).catch((error) => failures.push(error)).finally(() => running.delete(isbn)));
+    }
+    await Promise.race(running.values());
+  }
+  await Promise.all(running.values());
+  if (failures.length > 0) throw failures[0];
+}
+
+function planOutcome(plan: BnpPlan | null, seenBefore: boolean, book: BnpBook): Outcome {
+  const replace = plan?.replace ?? null;
+  const cover = book.scanUrl === null ? "noScan" : replace !== null ? "stored" : "kept";
+  return { created: !seenBefore && plan?.existing === undefined, replace, cover };
+}
+
+function perSkip<T>(make: (reason: BnpSkip) => T): Record<BnpSkip, T> {
+  return Object.fromEntries(BNP_SKIPS.map((reason) => [reason, make(reason)])) as Record<BnpSkip, T>;
+}
+
+function bump(counts: Map<string, number>, key: string): void {
+  counts.set(key, (counts.get(key) ?? 0) + 1);
+}
+
+const top = (counts: Map<string, number>): Array<[string, number]> => [...counts].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)).slice(0, TOP_PUBLISHERS);
+
+export async function importBnp(deps: BnpHarvestDeps, options: BnpImportOptions): Promise<BnpImportReport> {
+  const report: BnpImportReport = {
+    dryRun: options.dryRun,
+    from: options.from,
+    until: options.until,
+    through: null,
+    records: 0,
+    deleted: 0,
+    kept: 0,
+    created: 0,
+    matched: 0,
+    skipped: perSkip(() => 0),
+    covers: { stored: 0, kept: 0, noScan: 0, rejected: 0, failed: 0 },
+    replace: { new: 0, none: 0, lowRes: 0, isbndb: 0 },
+    genres: {},
+    publishers: { kept: [], dropped: perSkip(() => []) },
+    samples: [],
+    failedWindows: []
+  };
+  const keptPublishers = new Map<string, number>();
+  const droppedPublishers = perSkip(() => new Map<string, number>());
+  const seen = new Set<string>();
+  const tally = ({ created, replace, cover }: Outcome) => {
+    report[created ? "created" : "matched"]++;
+    report.covers[cover]++;
+    if (replace !== null) report.replace[replace]++;
+  };
+  const applyOne = async (book: BnpBook) => {
+    const plan = planBnpRecord(deps.repo, book)!;
+    const result = await applyBnpRecord(deps, plan);
+    tally({ created: result.created, replace: plan.replace, cover: result.cover });
+  };
+
+  let broken = false;
+  for (const window of monthWindows(options.from, options.until)) {
+    const label = `${window.from}..${window.until}`;
+    const harvested = await harvestWindow(deps.fetchText, window);
+    if (harvested === null) {
+      broken = true;
+      report.failedWindows.push(label);
+    } else {
+      report.records += harvested.records;
+      report.deleted += harvested.deleted;
+      report.kept += harvested.kept.length;
+      for (const [reason, publisher] of harvested.skipped) {
+        report.skipped[reason]++;
+        if (publisher !== null) bump(droppedPublishers[reason], publisher);
+      }
+      for (const book of harvested.kept) {
+        if (book.publisher !== null) bump(keptPublishers, book.publisher);
+        for (const genre of udcGenres(book.udc)) report.genres[genre] = (report.genres[genre] ?? 0) + 1;
+        if (report.samples.length < SAMPLES) report.samples.push(book);
+      }
+      if (options.dryRun) {
+        for (const book of harvested.kept) {
+          const isbn = book.isbns[0]!;
+          const seenBefore = seen.has(isbn);
+          seen.add(isbn);
+          tally(planOutcome(seenBefore ? null : planBnpRecord(deps.repo, book)!, seenBefore, book));
+        }
+      } else {
+        await applyPooled(harvested.kept, applyOne);
+      }
+    }
+    if (!broken) report.through = window.until;
+    deps.log(JSON.stringify({ window: label, through: report.through, records: harvested?.records ?? 0, kept: harvested?.kept.length ?? 0, failed: harvested === null }));
+  }
+
+  report.publishers = { kept: top(keptPublishers), dropped: perSkip((reason) => top(droppedPublishers[reason])) };
+  if (options.cursorOnSuccess && !options.dryRun && report.failedWindows.length === 0) deps.repo.setHarvestCursor("bnp", options.until);
+  return report;
 }
