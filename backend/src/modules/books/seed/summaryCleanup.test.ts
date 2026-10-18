@@ -157,6 +157,18 @@ test("an existing judgment on the new hash is kept unless a manual one replaces 
   assert.equal(h.judgment(LONG_B)?.model, "manual");
 });
 
+test("a judgment written after the scan is not overwritten", () => {
+  const h = setup();
+  const raw = LONG + TAIL;
+  h.book(raw);
+  h.judge(raw, "jev", 0.9);
+  const plan = planSummaryCleanup(h.db);
+  h.judge(LONG, "manual", 0, "product", "2026-10-05T00:00:00.000Z");
+  const applied = applySummaryCleanup(h.db, plan);
+  assert.equal(applied.judgmentsWritten, 0);
+  assert.deepEqual(h.judgment(LONG), { model: "manual", usable: 0, kind: "product", asked_at: "2026-10-05T00:00:00.000Z" });
+});
+
 test("two old texts cleaning to the same text: the manual hide wins", () => {
   const h = setup();
   const a = LONG + TAIL;

@@ -133,7 +133,8 @@ export function planSummaryCleanup(db: DatabaseSync): SummaryCleanupPlan {
 
 export function applySummaryCleanup(db: DatabaseSync, plan: SummaryCleanupPlan): SummaryCleanupApplied {
   const applied: SummaryCleanupApplied = { books: 0, works: 0, emptied: 0, skipped: 0, originalTitles: 0, judgmentsWritten: 0 };
-  const saveJudgment = db.prepare("INSERT OR REPLACE INTO synopsis_judgments (text_hash, model, usable, kind, asked_at) VALUES (?, ?, ?, ?, ?)");
+  const saveJudgment = db.prepare("INSERT OR IGNORE INTO synopsis_judgments (text_hash, model, usable, kind, asked_at) VALUES (?, ?, ?, ?, ?)");
+  const replaceJudgment = db.prepare("INSERT OR REPLACE INTO synopsis_judgments (text_hash, model, usable, kind, asked_at) VALUES (?, ?, ?, ?, ?)");
   const updateBook = db.prepare("UPDATE books SET summary = ?, summary_hash = ?, summary_source = CASE WHEN ? IS NULL THEN NULL ELSE summary_source END, original_title = COALESCE(original_title, ?) WHERE id = ? AND summary = ?");
   const updateWork = db.prepare("UPDATE works SET summary = ?, summary_hash = ? WHERE id = ? AND summary = ?");
 
@@ -149,10 +150,10 @@ export function applySummaryCleanup(db: DatabaseSync, plan: SummaryCleanupPlan):
   };
 
   inTransaction(() => {
-    for (const { hash, write } of plan.judgments) {
+    for (const { hash, outcome, write } of plan.judgments) {
       if (!write) continue;
-      saveJudgment.run(hash, write.model, write.usable, write.kind, write.askedAt);
-      applied.judgmentsWritten++;
+      const statement = outcome === "manual-replaced" ? replaceJudgment : saveJudgment;
+      if (statement.run(hash, write.model, write.usable, write.kind, write.askedAt).changes > 0) applied.judgmentsWritten++;
     }
   });
 
