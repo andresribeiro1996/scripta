@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { cleanSummary } from "@scripta/shared";
 import type { DatabaseSync, StatementSync } from "node:sqlite";
 import { MIN_PREFIX_LENGTH, normalizeWorkKey, workTitleKey } from "../../domain/normalize.js";
 import type { BooksRepository, IdPage, MergeableDetails, PageCursor } from "../../domain/ports.js";
@@ -258,6 +259,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     SET summary_source = CASE WHEN ${takesSummary} THEN $summary_source ELSE summary_source END,
         summary = CASE WHEN ${takesSummary} THEN $summary ELSE summary END,
         summary_hash = CASE WHEN ${takesSummary} THEN $summary_hash ELSE summary_hash END,
+        original_title = CASE WHEN ${takesSummary} THEN COALESCE(original_title, $original_title) ELSE original_title END,
         pages = COALESCE(pages, $pages),
         year = COALESCE(year, $year),
         publisher = COALESCE(publisher, $publisher),
@@ -402,11 +404,13 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const clearRetitleWantedStmt = db.prepare(`UPDATE books SET retitle_wanted_at = NULL WHERE id = ?`);
 
   function mergeDetails(bookId: string, details: MergeableDetails, summarySource: SummarySource | null) {
+    const summary = details.summary ? cleanSummary(details.summary) : null;
     mergeDetailsStmt.run({
       $id: bookId,
-      $summary: details.summary,
+      $summary: summary,
       $summary_source: summarySource,
-      $summary_hash: summaryHashOf(details.summary),
+      $summary_hash: summaryHashOf(summary),
+      $original_title: details.summary ? originalTitleIn(details.summary) : null,
       $pages: details.pages,
       $year: details.year,
       $publisher: details.publisher,
@@ -979,11 +983,12 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     },
 
     setWorkSummary(bookId, summary) {
+      const cleaned = cleanSummary(summary);
       inTransaction(() => {
         const book = byIdStmt.get(bookId) as unknown as (UnassignedBook & { work_id: string | null }) | undefined;
         if (!book) throw new Error(`Unknown book ${bookId}`);
         const workId = liveWorkId(book.work_id ?? giveWork(book));
-        if (workId) setWorkSummaryStmt.run(summary, summaryHashOf(summary), workId);
+        if (workId && cleaned !== null) setWorkSummaryStmt.run(cleaned, summaryHashOf(cleaned), workId);
       });
     },
 

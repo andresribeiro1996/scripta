@@ -1,4 +1,4 @@
-import { LOOSE_METADATA_LABEL, STRICT_METADATA_LABEL, canonicalIsbn, decodeHtmlEntities, htmlToText } from "@scripta/shared";
+import { LOOSE_METADATA_LABEL, STRICT_METADATA_LABEL, canonicalIsbn, cleanSummary, decodeHtmlEntities, htmlToText } from "@scripta/shared";
 import { normalizeWords } from "../domain/normalize.js";
 import { originalTitleIn } from "../domain/translation.js";
 import type { PublisherSite } from "./publishers.js";
@@ -93,9 +93,15 @@ function textLines(html: string): string[] {
     .filter((line) => line !== "");
 }
 
-function synopsis(lines: string[]): string | null {
-  const joined = lines.filter((line) => !METADATA_LINE.test(line) && !ONLY_FIGURES.test(line) && !SHOP_NOTICE.test(line.slice(0, NOTICE_REACH))).join("\n\n");
-  return joined.length >= MIN_SYNOPSIS ? joined : null;
+function synopsis(html: string): string | null {
+  const kept = htmlToText(html)
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line === "" || !(METADATA_LINE.test(line) || ONLY_FIGURES.test(line) || SHOP_NOTICE.test(line.slice(0, NOTICE_REACH))))
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n");
+  const cleaned = cleanSummary(kept);
+  return cleaned !== null && cleaned.length >= MIN_SYNOPSIS ? cleaned : null;
 }
 
 function pageCount(value: string | null | undefined): number | null {
@@ -230,7 +236,7 @@ export function parseShopifyProducts(json: unknown, site: PublisherSite): Publis
     const fromVendor = site.authorFromVendor && vendor && normalizeWords(vendor) !== normalizeWords(site.name) ? vendor : null;
     const author = fromVendor ?? (site.authorTag ? tagAuthors(product.tags, site.authorTag) : null);
     const lines = textLines(text(product.body_html));
-    const details = { summary: synopsis(lines), year: null, originalTitle: originalTitleIn(lines.join("\n")), ...feedTextDetails(lines) };
+    const details = { summary: synopsis(text(product.body_html)), year: null, originalTitle: originalTitleIn(lines.join("\n")), ...feedTextDetails(lines) };
     return [{ isbn: found?.isbn ?? null, rank: found?.rank ?? PAGE_RANK, title, author, imageUrl, productUrl, details, labels: [...labelList(product.tags), ...labelList(product.product_type)] }];
   });
 }
@@ -249,7 +255,7 @@ function wooDetails(product: Record<string, unknown>): ProductDetails {
   const shortDescription = textLines(text(product.short_description));
   const fromText = feedTextDetails([...description, ...shortDescription]);
   return {
-    summary: synopsis(description) ?? synopsis(shortDescription),
+    summary: synopsis(text(product.description)) ?? synopsis(text(product.short_description)),
     pages: pageCount(wooAttribute(product, PAGES_ATTRIBUTE)) ?? fromText.pages,
     year: publicationYear(wooAttribute(product, YEAR_ATTRIBUTE)),
     translator: wooAttribute(product, TRANSLATOR_ATTRIBUTE) ?? fromText.translator,

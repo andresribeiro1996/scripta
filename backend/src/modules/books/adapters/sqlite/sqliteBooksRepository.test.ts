@@ -885,6 +885,42 @@ test("a non-publisher synopsis only fills an empty summary and an absent one cha
   assert.deepEqual([repo.getBook(book.id)!.summary, repo.getBook(book.id)!.summary_source], ["ISBNdb synopsis.", "isbndb"]);
 });
 
+test("mergeDetails stores the cleaned summary and the hash of the cleaned text", () => {
+  const { repo } = freshRepo();
+  const book = repo.createBook({ title: "A", author: "A", isbn: null }, ["ta:a|a|"], NOW);
+  repo.mergeDetails(book.id, { ...noDetails, summary: "Sinopse da editora.\r\n\r\nAdicionar aos Favoritos" }, "publisher");
+  const row = repo.getBook(book.id)!;
+  assert.equal(row.summary, "Sinopse da editora.");
+  assert.equal(row.summary_hash, summaryHashOf("Sinopse da editora."));
+});
+
+test("a summary that cleans to nothing keeps the stored one", () => {
+  const { repo } = freshRepo();
+  const book = repo.createBook({ title: "A", author: "A", isbn: null }, ["ta:a|a|"], NOW);
+  repo.mergeDetails(book.id, { ...noDetails, summary: "Uma sinopse." }, "isbndb");
+  repo.mergeDetails(book.id, { ...noDetails, summary: "Adicionar aos Favoritos" }, "publisher");
+  assert.deepEqual([repo.getBook(book.id)!.summary, repo.getBook(book.id)!.summary_source], ["Uma sinopse.", "isbndb"]);
+});
+
+test("mergeDetails fills a missing original title from the raw summary", () => {
+  const { repo } = freshRepo();
+  const book = repo.createBook({ title: "A", author: "A", isbn: null }, ["ta:a|a|"], NOW);
+  repo.mergeDetails(book.id, { ...noDetails, summary: "Uma sinopse longa o bastante.\n\nTítulo original The Island" }, "publisher");
+  assert.equal(repo.getBook(book.id)!.original_title, "The Island");
+  assert.equal(repo.getBook(book.id)!.summary, "Uma sinopse longa o bastante.");
+  repo.mergeDetails(book.id, { ...noDetails, summary: "Outra sinopse longa o bastante.\n\nTítulo original The Other" }, "publisher");
+  assert.equal(repo.getBook(book.id)!.original_title, "The Island");
+});
+
+test("setWorkSummary stores the cleaned text", () => {
+  const { db, repo } = freshRepo();
+  const book = repo.createBook({ title: "A", author: "A", isbn: null }, ["ta:a|a|"], NOW);
+  repo.setWorkSummary(book.id, "Work text.\r\n\r\n----------\r\nAlso contained in:\r\n - X");
+  const work = workOf(db, book.id) as WorkRow & { summary_hash: string | null };
+  assert.equal(work.summary, "Work text.");
+  assert.equal(work.summary_hash, summaryHashOf("Work text."));
+});
+
 test("pages, year, publisher, translator and genres only fill what is empty, while the rating is overwritten", () => {
   const { repo } = freshRepo();
   const book = repo.createBook({ title: "A", author: "A", isbn: null, genres: ["Romance"] }, ["ta:a|a|"], NOW);
@@ -1708,13 +1744,14 @@ test("a summary cleared by hand leaves no text to judge or list, even with its h
 });
 
 test("original titles fill only empty columns, from the feed or from stored summaries", () => {
-  const { repo } = freshRepo();
+  const { db, repo } = freshRepo();
   const a = repo.createBook({ title: "Passeio ao Farol", author: "Virginia Woolf", isbn: "9789720000111" }, ["isbn:9789720000111"], NOW);
   repo.fillOriginalTitle(a.id, "To the Lighthouse");
   repo.fillOriginalTitle(a.id, "Something else");
   assert.equal(repo.getBook(a.id)!.original_title, "To the Lighthouse");
   const b = repo.createBook({ title: "O Passeio", author: "Robert Walser", isbn: "9789720000112" }, ["isbn:9789720000112"], NOW);
-  repo.mergeDetails(b.id, { summary: "Um passeio por uma cidade suíça, narrado por um escritor.\n\nTítulo original: Der Spaziergang", pages: null, year: null, publisher: null, translator: null }, "publisher");
+  repo.mergeDetails(b.id, { summary: "Um passeio por uma cidade suíça, narrado por um escritor.", pages: null, year: null, publisher: null, translator: null }, "publisher");
+  db.prepare("UPDATE books SET summary = ? WHERE id = ?").run("Um passeio por uma cidade suíça, narrado por um escritor.\n\nTítulo original: Der Spaziergang", b.id);
   const c = repo.createBook({ title: "Sem rótulo", author: "X", isbn: "9789720000113" }, ["isbn:9789720000113"], NOW);
   repo.mergeDetails(c.id, { summary: "Uma sinopse sem rótulo de origem em parte alguma do texto.", pages: null, year: null, publisher: null, translator: null }, "publisher");
   assert.equal(repo.fillOriginalTitlesFromSummaries(c.work_id!), 0);

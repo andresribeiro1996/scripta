@@ -506,3 +506,30 @@ test("a recorded Relógio feed finds each ISBN in the image file name and no aut
     ["9789897837364", 1, null]
   ]);
 });
+
+const longLine = (word: string) => `${word} `.repeat(14).trim();
+
+test("a Presença-style Detalhes block after the synopsis is cut", () => {
+  const html = `<p>${SYNOPSIS}</p>${["Detalhes", "Título Original THE LOST BROTHER", "Categoria Ficção", "Nº de Páginas 320", "Data de Lançamento 03/2024", "Formato Capa Mole", "Autores Ana Lima"].map((line) => `<p>${line}</p>`).join("")}`;
+  assert.equal(shopifyDetails(html).summary, SYNOPSIS);
+});
+
+test("a Woo description ending in a favourites button gives the synopsis only", () => {
+  assert.equal(wooDetails({ description: `<p>${SYNOPSIS}</p><p>Adicionar aos Favoritos</p>` }).summary, SYNOPSIS);
+});
+
+test("long prose lines wrapped in br tags join into one paragraph", () => {
+  const lines = [longLine("alfa"), longLine("beta"), `${longLine("gama")}.`];
+  assert.equal(wooDetails({ description: `<p>${lines.join("<br>")}</p>` }).summary, lines.join(" "));
+});
+
+test("short verse lines keep their line breaks and a later paragraph follows after a blank line", () => {
+  const verse = ["Rosa do mar,", "areia e sal,", "noite sem fim,"];
+  assert.equal(wooDetails({ description: `<p>${verse.join("<br>")}</p><p>${SYNOPSIS}</p>` }).summary, `${verse.join("\n")}\n\n${SYNOPSIS}`);
+});
+
+test("cleaning runs before the minimum length", () => {
+  const synopsis = "a".repeat(69) + ".";
+  const notice = "Adicionar aos Favoritos".padEnd(30, " ").trim();
+  assert.equal(wooDetails({ description: `<p>${synopsis}</p><p>${notice}</p>` }).summary, null);
+});
