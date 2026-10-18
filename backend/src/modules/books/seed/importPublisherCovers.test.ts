@@ -1537,6 +1537,33 @@ test("an author page that shows a different ISBN gives no author", async () => {
   assert.equal(h.repo.getBook(before.id)!.author, "");
 });
 
+test("an author page that shows a foreign labelled ISBN gives no author", async () => {
+  const h = await harness({ feeds: saidaFeeds(saidaPage(`<p>ISBN: 978-85-352-0623-4</p>`)) });
+  const before = publisherBook(h.repo, SAIDA_ISBN, "Berengária, o Anjo da Noite", "");
+
+  await importPublisherCovers(h.deps, [saida], { dryRun: false });
+
+  assert.equal(h.repo.getBook(before.id)!.author, "");
+});
+
+test("an author page that shows the feed ISBN and another Portuguese ISBN gives no author", async () => {
+  const h = await harness({ feeds: saidaFeeds(saidaPage(`<p>ISBN: ${SAIDA_ISBN}</p><p>ISBN: 978-989-641-467-2</p>`)) });
+  const before = publisherBook(h.repo, SAIDA_ISBN, "Berengária, o Anjo da Noite", "");
+
+  await importPublisherCovers(h.deps, [saida], { dryRun: false });
+
+  assert.equal(h.repo.getBook(before.id)!.author, "");
+});
+
+test("an author page that shows only the feed ISBN gives its author", async () => {
+  const h = await harness({ feeds: saidaFeeds(saidaPage(`<p>ISBN: ${SAIDA_ISBN}</p>`)) });
+  const before = publisherBook(h.repo, SAIDA_ISBN, "Berengária, o Anjo da Noite", "");
+
+  await importPublisherCovers(h.deps, [saida], { dryRun: false });
+
+  assert.equal(h.repo.getBook(before.id)!.author, "Deana Barroqueiro");
+});
+
 test("a refused author page leaves the book authorless and shows in pagesBlocked", async () => {
   const h = await harness({ feeds: { ...saidaFeeds(""), [SAIDA_URL]: { status: 403, text: "" } } });
   const before = publisherBook(h.repo, SAIDA_ISBN, "Berengária, o Anjo da Noite", "");

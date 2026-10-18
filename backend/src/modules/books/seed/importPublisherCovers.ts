@@ -6,7 +6,7 @@ import { fillLossy } from "../domain/lossy.js";
 import { editionLanguage, isPortugalIsbn, normalizeTitle } from "../domain/normalize.js";
 import type { BooksRepository, CoverBlobStore } from "../domain/ports.js";
 import type { BookRow } from "../domain/types.js";
-import { PAGE_RANK, feedProducts, feedUrl, findPageIsbn, isDisallowed, pageAuthor, parseRobots, parseShopifyProducts, parseWooProducts, withPageText, type PublisherBook, type ResolvedBook } from "./publisherFeed.js";
+import { PAGE_RANK, feedProducts, feedUrl, findPageIsbn, shownPageIsbns, isDisallowed, pageAuthor, parseRobots, parseShopifyProducts, parseWooProducts, withPageText, type PublisherBook, type ResolvedBook } from "./publisherFeed.js";
 import type { PublisherSite } from "./publishers.js";
 import { seedBook } from "./seedCatalog.js";
 
@@ -210,8 +210,7 @@ async function importSite(site: PublisherSite, deps: ImportDeps, options: { dryR
         if (response.status !== 404) report.pagesBlocked++;
         return null;
       }
-      const shown = findPageIsbn(response.text);
-      return shown === null || shown === isbn ? pageAuthor(rule, response.text) : null;
+      return shownPageIsbns(response.text).every((shown) => shown === isbn) ? pageAuthor(rule, response.text) : null;
     } catch (error) {
       if (!(error instanceof SourceUnavailableError)) throw error;
       report.failed++;

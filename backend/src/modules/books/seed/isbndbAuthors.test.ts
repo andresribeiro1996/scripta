@@ -153,6 +153,30 @@ test("a name still in Last, First form fills nothing, and the stored translator 
   assert.ok(!plan.fills.some((fill) => fill.id === cus.id));
 });
 
+test("a combined stored translator credit keeps its names out of the author, whole or split", async () => {
+  const h = setup({
+    [CUS]: async () => [hit("Os Cus de Judas", ["Tullio Forgiarini", "Ana Lima", "Rui Costa"])],
+    [ORIANA]: async () => [hit("A Fada Oriana", ["Alberto da Costa e Silva", "Outro Autor"])]
+  });
+  const one = h.book(CUS, "Os Cus de Judas");
+  const two = h.book(ORIANA, "A Fada Oriana");
+  h.db.prepare("UPDATE books SET translator = ? WHERE id = ?").run("Ana Lima e Rui Costa", one.id);
+  h.db.prepare("UPDATE books SET translator = ? WHERE id = ?").run("Alberto da Costa e Silva", two.id);
+
+  const plan = await planIsbndbAuthors(h.db, h.isbndb, { max: 10, after: "" });
+
+  assert.deepEqual(plan.fills.map((fill) => [fill.id, fill.author]), [[one.id, "Tullio Forgiarini"], [two.id, "Outro Autor"]]);
+});
+
+test("mojibake in ISBNdb's title and names is repaired before matching and filling", async () => {
+  const h = setup({ [CUS]: async () => [hit("Amor de PerdiÃ§Ã£o", ["JosÃ© Cardoso Pires"])] });
+  const row = h.book(CUS, "Amor de Perdição");
+
+  const plan = await planIsbndbAuthors(h.db, h.isbndb, { max: 10, after: "" });
+
+  assert.deepEqual(plan.fills.map((fill) => [fill.id, fill.author]), [[row.id, "José Cardoso Pires"]]);
+});
+
 test("a title mismatch is listed with ISBNdb's title", async () => {
   const h = setup({ [CUS]: async () => [hit("Memória de Elefante", ["António Lobo Antunes"])] });
   const row = h.book(CUS, "Os Cus de Judas");

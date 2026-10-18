@@ -1,5 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
-import { canonicalIsbn } from "@scripta/shared";
+import { canonicalIsbn, cleanCatalogText } from "@scripta/shared";
 import { SourcePausedError, SourceUnavailableError } from "../domain/errors.js";
 import { fillMissingIdentity } from "../domain/findOrCreate.js";
 import { normalizeWords } from "../domain/normalize.js";
@@ -48,13 +48,14 @@ export async function planIsbndbAuthors(db: DatabaseSync, isbndb: Pick<BookCatal
     plan.next = book.id;
     if (!hit) plan.noRecord++;
     else if (hit.authors.length === 0) plan.noAuthor++;
-    else if (!sameTitle(book.title, hit.title)) {
+    else if (!sameTitle(book.title, cleanCatalogText(hit.title))) {
       plan.titleMismatch++;
-      plan.mismatches.push({ id: book.id, title: book.title, isbndbTitle: hit.title });
-    } else if (hit.authors.some((name) => name.includes(","))) plan.commaName++;
+      plan.mismatches.push({ id: book.id, title: book.title, isbndbTitle: cleanCatalogText(hit.title) });
+    } else if (hit.authors.some((name) => cleanCatalogText(name).includes(","))) plan.commaName++;
     else {
-      const translators = new Set((book.translator ?? "").split(", ").map(normalizeWords).filter(Boolean));
-      const names = hit.authors.filter((name) => !TRANSLATOR_MARK.test(name) && !translators.has(normalizeWords(cleanCredit(name) ?? "")));
+      const credit = book.translator ?? "";
+      const translators = new Set([credit, ...credit.split(/, | e /)].map(normalizeWords).filter(Boolean));
+      const names = hit.authors.map(cleanCatalogText).filter((name) => !TRANSLATOR_MARK.test(name) && !translators.has(normalizeWords(cleanCredit(name) ?? "")));
       const author = cleanCredit(names.join(", "));
       if (author) plan.fills.push({ id: book.id, isbn, title: book.title, author });
       else plan.placeholder++;

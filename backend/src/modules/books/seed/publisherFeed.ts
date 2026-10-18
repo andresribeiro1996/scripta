@@ -167,12 +167,16 @@ export function withPageText(details: ProductDetails, html: string): ProductDeta
   return { ...details, pages: details.pages ?? labelledPages(lines), translator: details.translator ?? labelledTranslator(lines), originalTitle: details.originalTitle ?? originalTitleIn(lines.join("\n")) };
 }
 
-export function findPageIsbn(html: string): string | null {
+export function shownPageIsbns(html: string): string[] {
   const content = decodeEntities(html.replace(/<(script|style)\b[\s\S]*?<\/\1\s*>/gi, " ").replace(/<[^>]*>/g, " "));
   const found = pageIsbns(content);
   const labelEnds = [...content.matchAll(/ISBN/gi)].map((label) => label.index + label[0].length);
   const labelled = found.filter(({ index }) => labelEnds.some((end) => index >= end && index - end <= LABEL_REACH));
-  const distinct = [...new Set((labelled.length > 0 ? labelled : found).map(({ isbn }) => isbn))];
+  return [...new Set((labelled.length > 0 ? labelled : found).map(({ isbn }) => isbn))];
+}
+
+export function findPageIsbn(html: string): string | null {
+  const distinct = shownPageIsbns(html);
   return distinct.length === 1 && PORTUGAL_PREFIX.test(distinct[0]!) ? structuredClone(distinct[0]!) : null;
 }
 
