@@ -15,7 +15,7 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
 const { applyBooksMigrations, openBooksDb } = await import("./connection.js");
 const { findOrCreateBook } = await import("../../domain/findOrCreate.js");
-const { createSqliteBooksRepository, UNCHECKED_COVERS_SQL, UPGRADE_WANTED_SQL, UNCHECKED_DETAILS_SQL, WORK_LOOKUP_SQL } = await import("./sqliteBooksRepository.js");
+const { createSqliteBooksRepository, UNCHECKED_COVERS_SQL, UPGRADE_WANTED_SQL, UNCHECKED_DETAILS_SQL, WORK_LOOKUP_SQL, GROUPABLE_KEYS_SQL, GROUPABLE_PAIRS_SQL } = await import("./sqliteBooksRepository.js");
 const { WorkMergeError } = await import("../../domain/errors.js");
 const { summaryHashOf } = await import("../../domain/synopsis.js");
 
@@ -983,14 +983,23 @@ test("fillTitleKeys computes the keys stored rows lack, in batches, and leaves u
 test("the title key columns are added to an existing database once", () => {
   const db = new DatabaseSync(":memory:");
   applyBooksMigrations(db);
-  db.exec("DROP INDEX idx_books_title_key");
+  db.exec("DROP INDEX idx_books_title_work");
   db.exec("ALTER TABLE books DROP COLUMN title_key");
   db.exec("ALTER TABLE books DROP COLUMN title_group_blocked_at");
   applyBooksMigrations(db);
   applyBooksMigrations(db);
   const columns = (db.prepare("PRAGMA table_info(books)").all() as Array<{ name: string }>).map((column) => column.name);
   assert.ok(columns.includes("title_key") && columns.includes("title_group_blocked_at"));
-  assert.ok(db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'idx_books_title_key'").get());
+  assert.ok(db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'idx_books_title_work'").get());
+});
+
+test("the old title key index is dropped from an existing database", () => {
+  const db = new DatabaseSync(":memory:");
+  applyBooksMigrations(db);
+  db.exec("CREATE INDEX idx_books_title_key ON books(title_key)");
+  applyBooksMigrations(db);
+  assert.equal(db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'idx_books_title_key'").get(), undefined);
+  assert.ok(db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'idx_books_title_work'").get());
 });
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -1410,6 +1419,17 @@ test("every backfill query reads through its own partial index, with no temp sor
     assert.match(plan, new RegExp(`USING INDEX ${index}\\b`), plan);
     assert.doesNotMatch(plan, /TEMP B-TREE/, plan);
   }
+});
+
+test("grouping reads shared title keys from the covering index and starts from them", () => {
+  const { db } = freshRepo();
+  const plan = (sql: string, ...params: Array<string | number>) => (db.prepare(`EXPLAIN QUERY PLAN ${sql}`).all(...params) as Array<{ detail: string }>).map((row) => row.detail).join(" | ");
+  const keys = plan(GROUPABLE_KEYS_SQL, "", 250);
+  assert.match(keys, /USING COVERING INDEX idx_books_title_work\b/, keys);
+  assert.doesNotMatch(keys, /TEMP B-TREE/, keys);
+  const pairs = plan(GROUPABLE_PAIRS_SQL, "[]", 250);
+  assert.match(pairs, /SEARCH books USING COVERING INDEX idx_books_title_work \(title_key=\?\)/, pairs);
+  assert.doesNotMatch(pairs, /sqlite_autoindex_works_2/, pairs);
 });
 
 test("fillSubjectGenres fills empty or Jev genres and keeps source genres", () => {

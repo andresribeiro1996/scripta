@@ -50,7 +50,8 @@ export function applyBooksMigrations(db: DatabaseSync): void {
   moveOpenLibrarySummariesToWorks(db);
   addSummaryHashes(db);
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_work ON books(work_id)");
-  db.exec("CREATE INDEX IF NOT EXISTS idx_books_title_key ON books(title_key)");
+  db.exec("DROP INDEX IF EXISTS idx_books_title_key");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_books_title_work ON books(title_key, work_id)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_works_merged_into ON works(merged_into)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_cover_unchecked ON books(created_at) WHERE cover_checked_at IS NULL AND (cover_status IS NULL OR cover_status = 'low_res')");
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_cover_upgrade ON books(cover_upgrade_wanted_at) WHERE cover_upgrade_wanted_at IS NOT NULL");

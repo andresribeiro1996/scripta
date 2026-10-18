@@ -33,6 +33,48 @@ export const WORK_LOOKUP_SQL = `
   ORDER BY work_checked_at IS NOT NULL, created_by IS NOT NULL, work_checked_at, created_at, rowid
   LIMIT ?
 `;
+export const GROUPABLE_KEYS_SQL = `
+  SELECT title_key FROM books
+  WHERE title_key > ?
+  GROUP BY title_key
+  HAVING COUNT(DISTINCT work_id) > 1
+  ORDER BY title_key
+  LIMIT ?
+`;
+export const GROUPABLE_PAIRS_SQL = `
+  WITH candidates AS (
+    SELECT works.id AS work_id, MIN(books.title_key) AS title_key, works.created_at AS created_at
+    FROM (SELECT DISTINCT work_id FROM books WHERE title_key IN (SELECT value FROM json_each(?))) AS hits
+    CROSS JOIN works ON works.id = hits.work_id
+    CROSS JOIN books ON books.work_id = works.id
+    WHERE works.ol_work_key IS NULL AND works.merged_into IS NULL
+    GROUP BY works.id
+    HAVING COUNT(books.title_key) = COUNT(*)
+      AND COUNT(DISTINCT books.title_key) = 1
+      AND MIN(books.title_key) <> ''
+      AND COUNT(books.title_group_blocked_at) = 0
+  ),
+  keyed AS (
+    SELECT books.title_key AS title_key, MIN(works.id) AS target, COUNT(DISTINCT works.id) AS works
+    FROM books JOIN works ON works.id = books.work_id
+    WHERE works.ol_work_key IS NOT NULL AND works.merged_into IS NULL
+      AND books.title_group_blocked_at IS NULL
+      AND books.title_key IN (SELECT title_key FROM candidates)
+    GROUP BY books.title_key
+  ),
+  oldest AS (
+    SELECT title_key, work_id AS target
+    FROM (SELECT title_key, work_id, ROW_NUMBER() OVER (PARTITION BY title_key ORDER BY created_at, work_id) AS rank FROM candidates)
+    WHERE rank = 1
+  )
+  SELECT candidates.work_id AS source, COALESCE(keyed.target, oldest.target) AS target
+  FROM candidates
+  JOIN oldest ON oldest.title_key = candidates.title_key
+  LEFT JOIN keyed ON keyed.title_key = candidates.title_key
+  WHERE keyed.works = 1 OR (keyed.title_key IS NULL AND candidates.work_id <> oldest.target)
+  ORDER BY candidates.title_key, candidates.created_at, candidates.work_id
+  LIMIT ?
+`;
 export const CONFIRMED_SQL = "(created_by IS NOT NULL OR data_sources <> '[]')";
 
 function idPage(stmt: StatementSync, after: PageCursor | null, limit: number): IdPage {
@@ -197,38 +239,8 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const countEmptyGenreEditionsStmt = db.prepare(`SELECT COUNT(*) AS n FROM books WHERE work_id = ? AND genres = '[]'`);
   const pageEditionsStmt = db.prepare(`SELECT books.id, books.title, books.language, books.year, books.isbn, books.summary, books.summary_hash, books.cover_image_id, ci.color AS cover_color, books.genres, books.rating, books.rating_count, books.pages, books.genres_source, books.genres_confidence FROM books LEFT JOIN cover_images ci ON ci.id = books.cover_image_id WHERE books.work_id = ? ORDER BY books.created_at, books.rowid`);
   const workEditionsStmt = db.prepare(`SELECT id, isbn, title, author, ol_work_key FROM books WHERE work_id = ? ORDER BY created_at, rowid`);
-  const groupablePairsStmt = db.prepare(`
-    WITH candidates AS (
-      SELECT works.id AS work_id, MIN(books.title_key) AS title_key, works.created_at AS created_at
-      FROM works JOIN books ON books.work_id = works.id
-      WHERE works.ol_work_key IS NULL AND works.merged_into IS NULL
-      GROUP BY works.id
-      HAVING COUNT(books.title_key) = COUNT(*)
-        AND COUNT(DISTINCT books.title_key) = 1
-        AND MIN(books.title_key) <> ''
-        AND COUNT(books.title_group_blocked_at) = 0
-    ),
-    keyed AS (
-      SELECT books.title_key AS title_key, MIN(works.id) AS target, COUNT(DISTINCT works.id) AS works
-      FROM books JOIN works ON works.id = books.work_id
-      WHERE works.ol_work_key IS NOT NULL AND works.merged_into IS NULL
-        AND books.title_group_blocked_at IS NULL
-        AND books.title_key IN (SELECT title_key FROM candidates)
-      GROUP BY books.title_key
-    ),
-    oldest AS (
-      SELECT title_key, work_id AS target
-      FROM (SELECT title_key, work_id, ROW_NUMBER() OVER (PARTITION BY title_key ORDER BY created_at, work_id) AS rank FROM candidates)
-      WHERE rank = 1
-    )
-    SELECT candidates.work_id AS source, COALESCE(keyed.target, oldest.target) AS target
-    FROM candidates
-    JOIN oldest ON oldest.title_key = candidates.title_key
-    LEFT JOIN keyed ON keyed.title_key = candidates.title_key
-    WHERE keyed.works = 1 OR (keyed.title_key IS NULL AND candidates.work_id <> oldest.target)
-    ORDER BY candidates.created_at, candidates.work_id
-    LIMIT ?
-  `);
+  const groupableKeysStmt = db.prepare(GROUPABLE_KEYS_SQL);
+  const groupablePairsStmt = db.prepare(GROUPABLE_PAIRS_SQL);
   const workLookupStmt = db.prepare(WORK_LOOKUP_SQL);
   const workCheckedStmt = db.prepare(`UPDATE books SET work_checked_at = ? WHERE id = ?`);
   const replaceLanguageStmt = db.prepare(`UPDATE books SET language = ? WHERE id = ?`);
@@ -979,7 +991,14 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
 
     groupKeylessWorks(limit, at = new Date().toISOString()) {
       return inTransaction(() => {
-        const pairs = groupablePairsStmt.all(limit) as Array<{ source: string; target: string }>;
+        const pairs: Array<{ source: string; target: string }> = [];
+        let after = "";
+        while (pairs.length < limit) {
+          const keys = (groupableKeysStmt.all(after, limit) as Array<{ title_key: string }>).map((row) => row.title_key);
+          if (keys.length === 0) break;
+          pairs.push(...(groupablePairsStmt.all(JSON.stringify(keys), limit - pairs.length) as Array<{ source: string; target: string }>));
+          after = keys[keys.length - 1]!;
+        }
         for (const pair of pairs) mergeInto(pair.source, pair.target, { source: "title-key", confidence: null, at, carrySummary: true });
         return pairs.length;
       });
