@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { feedProducts, feedUrl, findPageIsbn, findPortugalIsbn, isDisallowed, pageAuthors, parseRobots, parseShopifyProducts, parseWooProducts, withPageText } from "./publisherFeed.js";
+import { cleanCredit, feedProducts, feedUrl, findPageIsbn, findPortugalIsbn, isDisallowed, pageAuthors, parseRobots, parseShopifyProducts, parseWooProducts, withPageText } from "./publisherFeed.js";
 import type { PublisherSite } from "./publishers.js";
 
 const shopify = JSON.parse(readFileSync(new URL("./fixtures/shopify-products.json", import.meta.url), "utf8"));
@@ -505,4 +505,46 @@ test("a recorded Relógio feed finds each ISBN in the image file name and no aut
     ["9789897837890", 1, null],
     ["9789897837364", 1, null]
   ]);
+});
+
+test("cleanCredit drops role marks and translator notes and keeps combined credits whole", () => {
+  assert.equal(cleanCredit("Miguel Barcelos e Porfírio Pinto (coords.)"), "Miguel Barcelos e Porfírio Pinto");
+  assert.equal(cleanCredit("Ana Isabel Marques (texto) e Maria João Castro (ilustração)"), "Ana Isabel Marques e Maria João Castro");
+  assert.equal(cleanCredit("Juan Gabriel Vásquez (Tradução de Pedro Rapoula)"), "Juan Gabriel Vásquez");
+  assert.equal(cleanCredit("Alberto da Costa e Silva"), "Alberto da Costa e Silva");
+  assert.equal(cleanCredit("  Teresa   Castro "), "Teresa Castro");
+});
+
+test("cleanCredit turns placeholders into no author", () => {
+  for (const credit of ["VV. AA.", " VV. AA.", "VVAA", "AA VV", "Vários", "Vários autores", "Vários (Presidência da República)", "Autor Desconhecido", "Diversos"]) assert.equal(cleanCredit(credit), null, credit);
+  assert.equal(cleanCredit("Vários, Ana Luísa Amaral"), "Ana Luísa Amaral");
+  assert.equal(cleanCredit(null), null);
+});
+
+const incm: PublisherSite = { name: "Imprensa Nacional", origin: "https://loja.incm.pt", platform: "shopify", authorFromVendor: false, authorTag: [/^AUTOR_(?<order>\d+)\s+(?<name>.+)$/, /^AUTOR\s+(?<name>.+)$/] };
+
+function incmFeed(tags: string[]) {
+  return { products: [{ title: "Cultura e Democracia", handle: "cultura-e-democracia", vendor: "Imprensa Nacional", tags, variants: [{ barcode: "" }], images: [{ src: "https://cdn.shopify.com/s/files/1/0000/0000/files/cultura.jpg" }] }] };
+}
+
+test("numbered author tags give the authors in credit order", () => {
+  const [book] = parseShopifyProducts(incmFeed(["AUTOR António Araújo", "AUTOR Pedro Lourenço", "AUTOR_1  Pedro Lourenço", "AUTOR_0 António Araújo", "AUTOR_10 Zé Último", "AUTOR_2 Ana Segunda", "EDITORA Imprensa Nacional"]), incm);
+  assert.equal(book!.author, "António Araújo, Pedro Lourenço, Ana Segunda, Zé Último");
+});
+
+test("without numbered tags the single author tag is the credit, kept whole", () => {
+  const [book] = parseShopifyProducts(incmFeed(["AUTOR Mario Soares e Maria João Avillez", "COLEÇÃO Biografias"]), incm);
+  assert.equal(book!.author, "Mario Soares e Maria João Avillez");
+});
+
+test("a placeholder author tag gives no author", () => {
+  const [book] = parseShopifyProducts(incmFeed(["AUTOR VV. AA.", "TEMA História"]), incm);
+  assert.equal(book!.author, null);
+});
+
+test("a WooCommerce Autor attribute is cleaned like any other credit", () => {
+  const site: PublisherSite = { name: "Abysmo", origin: "https://abysmo.pt", platform: "woocommerce", authorFromVendor: false };
+  const product = (terms: string[]) => [{ name: "Livro", permalink: "https://abysmo.pt/produto/livro/", sku: "", description: "", short_description: "", images: [{ src: "https://abysmo.pt/wp-content/uploads/livro.jpg" }], attributes: [{ name: "Autor", terms: terms.map((name) => ({ name })) }] }];
+  assert.equal(parseWooProducts(product(["VV. AA."]), site)[0]!.author, null);
+  assert.equal(parseWooProducts(product(["Rui Zink (org.)"]), site)[0]!.author, "Rui Zink");
 });
