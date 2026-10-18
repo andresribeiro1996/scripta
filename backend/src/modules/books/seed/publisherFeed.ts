@@ -1,4 +1,4 @@
-import { canonicalIsbn, decodeHtmlEntities, htmlToText } from "@scripta/shared";
+import { LOOSE_METADATA_LABEL, STRICT_METADATA_LABEL, canonicalIsbn, decodeHtmlEntities, htmlToText } from "@scripta/shared";
 import { normalizeWords } from "../domain/normalize.js";
 import { originalTitleIn } from "../domain/translation.js";
 import type { PublisherSite } from "./publishers.js";
@@ -35,7 +35,7 @@ const ISBN10_CANDIDATE = /(?<!\d)\d(?:[\p{Pd}\s.]?\d){8}[\p{Pd}\s.]?[\dXx](?![\d
 const PORTUGAL_PREFIX = /^978(?:972|989)/;
 const LEAD = String.raw`^[\s\-–—•*·|]*`;
 const SHOP_NOTICE = /\b(?:pr[ée][- ]?venda|envios|portes|stock|esgotad[oa])\b/i;
-const METADATA_LABEL = String.raw`T[íi]tulo original|Tradu[çc][ãa]o|Tradutor[a]?|Traduzido|P[áa]ginas|N[úu]m\.?\s*p[áa]g\w*|Dimens[õo]es|Encaderna[çc][ãa]o|Edi[çc][ãa]o|Formato|Peso|Pre[çc]o|Ano|Data|Cole[çc][ãa]o|Autor[a]?`;
+const METADATA_LABEL = `${STRICT_METADATA_LABEL}|${LOOSE_METADATA_LABEL}`;
 const METADATA_LINE = new RegExp(String.raw`${LEAD}(?:ISBN\b|(?:${METADATA_LABEL})\s*(?:[:\-–—]|$)|(?:Tradu[çc][ãa]o|Traduzido|Tradutor[a]?)\s+(?:de|por)\b)`, "i");
 const ONLY_FIGURES = /^[\d\sxX×.,€$£cm\-]+$/;
 const NOTICE_REACH = 200;
