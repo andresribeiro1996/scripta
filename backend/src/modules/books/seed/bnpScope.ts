@@ -17,6 +17,7 @@ const LITERARY_FORMS: Array<[string, BookGenre]> = [
   ["1", "Poetry"],
   ["312.4", "Crime"],
   ["311.9", "Science Fiction"],
+  ["312.9", "Fantasy"],
   ["311.6", "Historical Fiction"],
   ["94", "Biography & Memoir"],
   ["992", "Travel"]

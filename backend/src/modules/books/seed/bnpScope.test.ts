@@ -39,7 +39,7 @@ test("literary forms, exactly and not by a longer number", () => {
   assert.deepEqual(udcGenres(['821.134.3-13"20"']), []);
   assert.deepEqual(udcGenres(['821.134.3-1.09"20"']), ["Poetry"]);
   assert.deepEqual(udcGenres(['821.111(73)-311.9"19/20"']), ["Science Fiction"]);
-  assert.deepEqual(udcGenres(['821.111-312.9"19/20"']), []);
+  assert.deepEqual(udcGenres(['821.111-312.9"19/20"']), ["Fantasy"]);
   assert.deepEqual(udcGenres(['821.134.3-311.6"20"']), ["Historical Fiction"]);
   assert.deepEqual(udcGenres(['821.134.3-94"20"']), ["Biography & Memoir"]);
   assert.deepEqual(udcGenres(['821.134.3-992"19"']), ["Travel"]);

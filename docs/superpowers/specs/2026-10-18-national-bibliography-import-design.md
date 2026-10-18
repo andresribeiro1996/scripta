@@ -83,15 +83,14 @@ The user decided 1, 2, 3 and 9 and approved the direction of the rest in convers
    `givenNameFirst` is not used. UNIMARC already splits surname (`$a`) and given names (`$b`), so "Miguel Serras Pereira" comes out right.
 5. **Genres from the classification (UDC, `675 $a`), at import, with no outside call.**
    - A fixed table maps UDC codes to `BOOK_GENRES`:
-     - children's (`-93`, age auxiliaries `(0.053.2…)`/`-053.2`);
-     - young adult (`-053.6`);
+     - children's (`-93`, age auxiliaries `(0.053.2)` to `(0.053.5)`; a `-053.N` person auxiliary gives no age genre);
+     - young adult (`(0.053.6)`);
      - poetry (`821…-1`);
-     - crime (`-312.4`), science fiction (`-312.9`), historical fiction (`-311.6`);
-     - biography & memoir (`-94`, `929`);
-     - travel (`-992`, `91`);
-     - comics (`741.5`);
-     - history (`93`/`94`), philosophy (`1` except `159.9`), psychology (`159.9`), religion (`2`), politics (`32`), business (`33`, `65`), science (`5`), technology (`004`, `62`), cooking (`641.5`).
-   - The builder verifies each code against the UDC summary and the sample before relying on it, and drops any that doesn't hold.
+     - crime (`-312.4`), science fiction (`-311.9`), fantasy (`-312.9`), historical fiction (`-311.6`);
+     - biography & memoir (`-94`, `929` except `929.5`/`.6`/`.7`/`.9`);
+     - travel (`-992`, `910`);
+     - history (`93`/`94`), philosophy (`1` except `133` and `159.9`), psychology (`159.9`), religion (`2`), politics (`32`), business (`33`, `657`/`658`/`659`), science (`5`), technology (`004`, `62`), cooking (`641.5`).
+   - The table was checked against the UDC Summary and about 7,800 live BNP records on 2026-10-18; the first draft's `-312.9` (science fiction, now `-311.9`), `741.5` (comics, dropped), `91` (now `910`), `65` (now `657`/`658`/`659`), `1` (now without `133`) and `929` (now without `929.5`/`.6`/`.7`/`.9`) did not hold as drafted.
    - **A plain novel (`-31`), short story (`-32`/`-34`), drama, essay, or any unmapped code gets no genre** *(Claude's call)*. That leaves it to the existing Jev classifier once someone holds the work.
    - These genres are library subjects, so `genres_source` stays NULL, the same as Open Library and ISBNdb subjects.
    - On an existing book they replace only `[]` or Jev genres. That is the precedence `saveDetails` applies, but the import must not call `saveDetails`: it sets `details_status = 'found'`, and `getDetails` would then never look the book up.
