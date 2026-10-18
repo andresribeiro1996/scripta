@@ -1195,6 +1195,108 @@ test("groupKeylessWorks merges at most its limit per batch", () => {
   assert.equal(repo.groupKeylessWorks(1), 0);
 });
 
+function groupingFixture() {
+  const { db, repo } = freshRepo();
+  const label = new Map<string, string>();
+  let isbn = 9780000000000;
+  const add = (name: string, title: string, author: string, workKey?: string, created = NOW) => {
+    const book = edition(repo, String(++isbn), title, author, workKey, created);
+    label.set(book.work_id!, name);
+    return book;
+  };
+
+  add("keyed", "Dune", "Frank Herbert", "OL1W", at(0));
+  add("k1", "Dune", "Frank Herbert", undefined, at(2));
+  add("k2", "Dune", "Frank Herbert", undefined, at(1));
+
+  add("ambiguous-a", "Poems", "Emily Dickinson", "OL2W", at(0));
+  add("ambiguous-b", "Poems", "Emily Dickinson", "OL3W", at(0));
+  add("ambiguous-keyless", "Poems", "Emily Dickinson", undefined, at(1));
+
+  add("m3", "Os Maias", "Eça de Queirós", undefined, at(3));
+  add("m1", "Os Maias", "Eça de Queirós", undefined, at(1));
+  add("m0", "Os Maias", "Eça de Queirós", undefined, at(0));
+  add("m2", "Os Maias", "Eça de Queirós", undefined, at(2));
+
+  const first = edition(repo, String(++isbn), "Hamlet", "William Shakespeare", undefined, at(5));
+  const second = edition(repo, String(++isbn), "Hamlet", "William Shakespeare", undefined, at(5));
+  const [low, high] = first.work_id! < second.work_id! ? [first, second] : [second, first];
+  label.set(low.work_id!, "tie-lo");
+  label.set(high.work_id!, "tie-hi");
+
+  const blockedKeyed = add("blocked-keyed", "Emma", "Jane Austen", "OL4W", at(0));
+  db.prepare("UPDATE books SET title_group_blocked_at = ? WHERE id = ?").run(at(1), blockedKeyed.id);
+  add("b0", "Emma", "Jane Austen", undefined, at(0));
+  add("b1", "Emma", "Jane Austen", undefined, at(1));
+
+  add("blocked-keyless-keyed", "Persuasion", "Jane Austen", "OL5W", at(0));
+  const detached = add("blocked-keyless", "Persuasion", "Jane Austen", undefined, at(1));
+  repo.detachEdition(detached.id, at(1));
+
+  const english = add("mixed-english", "Blindness", "José Saramago", undefined, at(0));
+  const portuguese = add("mixed-portuguese", "Ensaio sobre a Cegueira", "José Saramago", undefined, at(1));
+  repo.mergeWorks(portuguese.work_id!, english.work_id!, at(1));
+  add("mixed-newer", "Ensaio sobre a Cegueira", "José Saramago", undefined, at(2));
+
+  add("empty-a", "Orlando", "", undefined, at(0));
+  add("empty-b", "Orlando", "", undefined, at(1));
+
+  add("null-a", "Middlemarch", "George Eliot", undefined, at(0));
+  const nullKey = add("null-b", "Middlemarch", "George Eliot", undefined, at(1));
+  db.prepare("UPDATE books SET title_key = NULL WHERE id = ?").run(nullKey.id);
+
+  return { db, repo, label };
+}
+
+function mergedPairs(db: DatabaseSync, label: Map<string, string>) {
+  const rows = db.prepare("SELECT from_work, into_work FROM work_merges WHERE source = 'title-key' ORDER BY id").all() as Array<{ from_work: string; into_work: string }>;
+  return rows.map((row) => `${label.get(row.from_work) ?? row.from_work}>${label.get(row.into_work) ?? row.into_work}`);
+}
+
+test("grouping picks the same source and target for every rule case", () => {
+  const { db, repo, label } = groupingFixture();
+  assert.equal(repo.groupKeylessWorks(250, NOW), 7);
+  assert.deepEqual(mergedPairs(db, label).sort(), ["b1>b0", "k1>keyed", "k2>keyed", "m1>m0", "m2>m0", "m3>m0", "tie-hi>tie-lo"]);
+  assert.equal(repo.groupKeylessWorks(250, NOW), 0);
+});
+
+test("batches of one merge the same pairs as one call, oldest first within a title key", () => {
+  const one = groupingFixture();
+  while (one.repo.groupKeylessWorks(1, NOW) === 1);
+  const all = groupingFixture();
+  all.repo.groupKeylessWorks(250, NOW);
+  assert.deepEqual(mergedPairs(one.db, one.label).sort(), mergedPairs(all.db, all.label).sort());
+  assert.deepEqual(mergedPairs(one.db, one.label).filter((pair) => pair.endsWith(">m0")), ["m1>m0", "m2>m0", "m3>m0"]);
+});
+
+test("shared title keys that never pair don't end a batch early", () => {
+  const { db, repo } = freshRepo();
+  edition(repo, "9780000000001", "Alpha Tale", "Ann Author", "OL1W");
+  edition(repo, "9780000000002", "Alpha Tale", "Ann Author", "OL2W");
+  edition(repo, "9780000000003", "Bravo Tale", "Ann Author", "OL3W");
+  edition(repo, "9780000000004", "Bravo Tale", "Ann Author", "OL4W");
+  edition(repo, "9780000000005", "Charlie Tale", "Ann Author", "OL5W");
+  edition(repo, "9780000000006", "Charlie Tale", "Ann Author", "OL6W");
+  const oldest = edition(repo, "9780000000007", "Zulu Tale", "Ann Author", undefined, at(0));
+  const newest = edition(repo, "9780000000008", "Zulu Tale", "Ann Author", undefined, at(1));
+  assert.equal(repo.groupKeylessWorks(1, NOW), 1);
+  assert.equal(workById(db, newest.work_id).merged_into, oldest.work_id);
+  assert.equal(repo.groupKeylessWorks(1, NOW), 0);
+});
+
+test("a batch never merges more than its limit when shared keys yield uneven pairs", () => {
+  const { db, repo } = freshRepo();
+  edition(repo, "9780000000001", "Alpha Tale", "Ann Author", undefined, at(0));
+  edition(repo, "9780000000002", "Alpha Tale", "Ann Author", undefined, at(1));
+  edition(repo, "9780000000003", "Bravo Tale", "Ann Author", "OL1W");
+  edition(repo, "9780000000004", "Bravo Tale", "Ann Author", "OL2W");
+  edition(repo, "9780000000005", "Charlie Tale", "Ann Author", undefined, at(0));
+  edition(repo, "9780000000006", "Charlie Tale", "Ann Author", undefined, at(1));
+  edition(repo, "9780000000007", "Charlie Tale", "Ann Author", undefined, at(2));
+  assert.deepEqual([repo.groupKeylessWorks(2, NOW), repo.groupKeylessWorks(2, NOW), repo.groupKeylessWorks(2, NOW)], [2, 1, 0]);
+  assert.equal(countOf(db, "work_merges", "source = 'title-key'"), 3);
+});
+
 function rerunPass(db: DatabaseSync) {
   db.exec("PRAGMA user_version = 1");
   applyBooksMigrations(db);
