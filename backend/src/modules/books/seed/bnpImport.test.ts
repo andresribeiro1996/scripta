@@ -63,7 +63,7 @@ function seed(repo: BooksRepository, isbn: string | null, extra: { createdBy?: "
   return repo.createBook({ title, author, isbn, createdBy, ...rest }, isbn ? [`isbn:${isbn}`] : [], AT);
 }
 
-function giveCover(repo: BooksRepository, bookId: string, source: "isbndb" | "apple" | "openlibrary" | "upload" | null, status: "good" | "low_res" | "missing" | "manual" | null) {
+function giveCover(repo: BooksRepository, bookId: string, source: "isbndb" | "apple" | "openlibrary" | "upload" | "bnp" | null, status: "good" | "low_res" | "missing" | "manual" | null) {
   if (source === null) {
     repo.setCover(bookId, { imageId: null, status, checkedAt: AT });
     return null;
@@ -157,10 +157,11 @@ test("an existing book missing its title and author takes the record's", async (
   assert.equal(result.book.author, "Isabel Allende");
 });
 
-const REPLACEMENTS: Array<[string, string, "isbndb" | "apple" | "openlibrary" | "upload" | null, "good" | "low_res" | "missing" | "manual" | null, BnpReplace | null]> = [
+const REPLACEMENTS: Array<[string, string, "isbndb" | "apple" | "openlibrary" | "upload" | "bnp" | null, "good" | "low_res" | "missing" | "manual" | null, BnpReplace | null]> = [
   ["no cover at all", PORTUGUESE, null, null, "none"],
   ["a missing cover", PORTUGUESE, null, "missing", "none"],
   ["a low-res Open Library cover", PORTUGUESE, "openlibrary", "low_res", "lowRes"],
+  ["a low-res BNP scan", PORTUGUESE, "bnp", "low_res", null],
   ["a good ISBNdb cover on a Portugal ISBN", PORTUGUESE, "isbndb", "good", "isbndb"],
   ["a manual upload", PORTUGUESE, "upload", "manual", null],
   ["a manual state without an image", PORTUGUESE, null, "manual", null],
@@ -200,6 +201,23 @@ test("a scan under the good width is stored as low-res", async () => {
   assert.equal(result.cover, "stored");
   assert.equal(result.book.cover_status, "low_res");
   assert.equal(result.book.cover_checked_at, AT);
+});
+
+test("a low-res scan is not downloaded again when its record is applied again", async () => {
+  const { db, repo, blobs, deps } = setup(async () => ({ ...SCAN, width: 300, height: 450 }));
+  const stale = [planBnpRecord(repo, ALLENDE)!, planBnpRecord(repo, ALLENDE)!];
+
+  const first = await applyBnpRecord(deps, stale[0]!);
+  const second = await applyBnpRecord(deps, stale[1]!);
+  const third = await apply(deps, ALLENDE);
+
+  assert.equal(first.cover, "stored");
+  assert.equal(first.book.cover_status, "low_res");
+  assert.equal(second.cover, "kept");
+  assert.equal(third.cover, "kept");
+  assert.equal(third.book.cover_image_id, first.book.cover_image_id);
+  assert.equal(blobs.size, 2);
+  assert.equal((db.prepare("SELECT COUNT(*) AS n FROM cover_images WHERE book_id = ?").get(first.book.id) as { n: number }).n, 1);
 });
 
 test("an existing book with no scan in its record keeps its cover state", async () => {

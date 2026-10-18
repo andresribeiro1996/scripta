@@ -31,6 +31,7 @@ export function bnpReplaceReason(existing: BookRow | undefined, image: CoverImag
   if (!existing) return "new";
   if (existing.cover_status === "manual") return null;
   if (!existing.cover_image_id) return "none";
+  if (image?.source === "bnp") return null;
   if (existing.cover_status === "low_res") return "lowRes";
   if (image?.source === "isbndb" && isPortugueseIsbn(existing.isbn)) return "isbndb";
   return null;
