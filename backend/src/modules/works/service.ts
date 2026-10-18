@@ -1,4 +1,4 @@
-import { plainDescription, validBookRating, workGenres, type IdentityKey, type ReaderProfile, type WorkGameRef, type WorkPage, type WorkReader } from "@scripta/shared";
+import { cleanSummary, validBookRating, workGenres, type IdentityKey, type ReaderProfile, type WorkGameRef, type WorkPage, type WorkReader } from "@scripta/shared";
 import { summaryMatchesLanguage, type CatalogWorkPage } from "../books/index.js";
 import type { ViewerCopy } from "../library/index.js";
 
@@ -90,7 +90,7 @@ export function createWorksService(deps: WorksDeps) {
           id: work.id,
           title: work.title,
           author: work.author,
-          summary: summary && plainDescription(summary),
+          summary: summary ? cleanSummary(summary) : null,
           coverUrl,
           coverColor,
           editions: work.editions.map((edition) => ({ bookId: edition.bookId, title: edition.title, language: edition.language, year: edition.year, isbn: edition.isbn, coverUrl: edition.coverUrl, coverColor: edition.coverColor, pages: edition.pages, mine: edition === mineEdition })),

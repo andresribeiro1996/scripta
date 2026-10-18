@@ -1,4 +1,4 @@
-import { canonicalIsbn } from "@scripta/shared";
+import { LOOSE_METADATA_LABEL, STRICT_METADATA_LABEL, canonicalIsbn, cleanSummary, decodeHtmlEntities, htmlToText } from "@scripta/shared";
 import { normalizeWords } from "../domain/normalize.js";
 import { originalTitleIn } from "../domain/translation.js";
 import type { PublisherSite } from "./publishers.js";
@@ -34,12 +34,9 @@ const PLACEHOLDER = /^(?:vvaa|aavv|autordesconhecido|diversos|varios\w*)$/;
 const ISBN_CANDIDATE = /(?<!\d)97[89](?:[\p{Pd}\s.]?\d){10}(?!\d)/gu;
 const ISBN10_CANDIDATE = /(?<!\d)\d(?:[\p{Pd}\s.]?\d){8}[\p{Pd}\s.]?[\dXx](?![\dXx])/gu;
 const PORTUGAL_PREFIX = /^978(?:972|989)/;
-const BREAK = "\u0001";
-const BLOCK_TAG = /<\/?(?:p|div|br|hr|li|ul|ol|dl|dt|dd|h[1-6]|tr|table|blockquote|section|article|figure)\b[^>]*>/gi;
-const CELL_TAG = /<\/?(?:td|th)\b[^>]*>/gi;
 const LEAD = String.raw`^[\s\-–—•*·|]*`;
 const SHOP_NOTICE = /\b(?:pr[ée][- ]?venda|envios|portes|stock|esgotad[oa])\b/i;
-const METADATA_LABEL = String.raw`T[íi]tulo original|Tradu[çc][ãa]o|Tradutor[a]?|Traduzido|P[áa]ginas|N[úu]m\.?\s*p[áa]g\w*|Dimens[õo]es|Encaderna[çc][ãa]o|Edi[çc][ãa]o|Formato|Peso|Pre[çc]o|Ano|Data|Cole[çc][ãa]o|Autor[a]?`;
+const METADATA_LABEL = `${STRICT_METADATA_LABEL}|${LOOSE_METADATA_LABEL}`;
 const METADATA_LINE = new RegExp(String.raw`${LEAD}(?:ISBN\b|(?:${METADATA_LABEL})\s*(?:[:\-–—]|$)|(?:Tradu[çc][ãa]o|Traduzido|Tradutor[a]?)\s+(?:de|por)\b)`, "i");
 const ONLY_FIGURES = /^[\d\sxX×.,€$£cm\-]+$/;
 const NOTICE_REACH = 200;
@@ -59,15 +56,6 @@ const NAME_PARTICLES = new Set(["de", "da", "do", "dos", "das", "e"]);
 const MAX_NAME_WORDS = 6;
 const YEAR_ATTRIBUTE = /^(?:ano|data|edi[cç][aã]o)\b/i;
 const YEAR_VALUE = /(?<!\d)(?:19|20)\d{2}(?!\d)/;
-const MAX_CODE_POINT = 0x10ffff;
-const FIRST_SURROGATE = 0xd800;
-const LAST_SURROGATE = 0xdfff;
-const NAMED_ENTITIES: Record<string, string> = {
-  amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ",
-  hellip: "…", ndash: "–", mdash: "—", laquo: "«", raquo: "»", lsquo: "‘", rsquo: "’", ldquo: "“", rdquo: "”", ordm: "º", ordf: "ª",
-  aacute: "á", eacute: "é", iacute: "í", oacute: "ó", uacute: "ú", agrave: "à", atilde: "ã", otilde: "õ", acirc: "â", ecirc: "ê", ocirc: "ô", ccedil: "ç",
-  Aacute: "Á", Eacute: "É", Iacute: "Í", Oacute: "Ó", Uacute: "Ú", Agrave: "À", Atilde: "Ã", Otilde: "Õ", Acirc: "Â", Ecirc: "Ê", Ocirc: "Ô", Ccedil: "Ç"
-};
 
 function checksumOk(digits: string): boolean {
   const sum = [...digits].reduce((total, digit, index) => total + Number(digit) * (index % 2 === 0 ? 1 : 3), 0);
@@ -99,28 +87,22 @@ export function findPortugalIsbn(text: string): string | null {
   return isbn13s(text).find(({ isbn }) => PORTUGAL_PREFIX.test(isbn))?.isbn ?? null;
 }
 
-function decodeEntities(text: string): string {
-  return text.replace(/&(?:#(\d+)|#x([0-9a-f]+)|([a-z]+));/gi, (whole, decimal, hex, name) => {
-    if (decimal || hex) {
-      const codePoint = decimal ? Number(decimal) : parseInt(hex, 16);
-      const unusable = codePoint === 0 || codePoint > MAX_CODE_POINT || (codePoint >= FIRST_SURROGATE && codePoint <= LAST_SURROGATE);
-      return unusable ? whole : String.fromCodePoint(codePoint);
-    }
-    return NAMED_ENTITIES[name] ?? NAMED_ENTITIES[name.toLowerCase()] ?? whole;
-  });
-}
-
 function textLines(html: string): string[] {
-  const marked = html.replace(/<(script|style)\b[\s\S]*?<\/\1\s*>/gi, " ").replace(BLOCK_TAG, BREAK).replace(CELL_TAG, " ").replace(/<[^>]*>/g, "");
-  return decodeEntities(marked)
-    .split(BREAK)
-    .map((line) => line.replace(/\s+/g, " ").trim())
+  return htmlToText(html)
+    .split("\n")
+    .map((line) => line.trim())
     .filter((line) => line !== "");
 }
 
-function synopsis(lines: string[]): string | null {
-  const joined = lines.filter((line) => !METADATA_LINE.test(line) && !ONLY_FIGURES.test(line) && !SHOP_NOTICE.test(line.slice(0, NOTICE_REACH))).join("\n\n");
-  return joined.length >= MIN_SYNOPSIS ? joined : null;
+function synopsis(html: string): string | null {
+  const kept = htmlToText(html)
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line === "" || !(METADATA_LINE.test(line) || ONLY_FIGURES.test(line) || SHOP_NOTICE.test(line.slice(0, NOTICE_REACH))))
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n");
+  const cleaned = cleanSummary(kept);
+  return cleaned !== null && cleaned.length >= MIN_SYNOPSIS ? cleaned : null;
 }
 
 function pageCount(value: string | null | undefined): number | null {
@@ -168,7 +150,7 @@ export function withPageText(details: ProductDetails, html: string): ProductDeta
 }
 
 export function shownPageIsbns(html: string): string[] {
-  const content = decodeEntities(html.replace(/<(script|style)\b[\s\S]*?<\/\1\s*>/gi, " ").replace(/<[^>]*>/g, " "));
+  const content = decodeHtmlEntities(html.replace(/<(script|style)\b[\s\S]*?<\/\1\s*>/gi, " ").replace(/<[^>]*>/g, " "));
   const found = pageIsbns(content);
   const labelEnds = [...content.matchAll(/ISBN/gi)].map((label) => label.index + label[0].length);
   const labelled = found.filter(({ index }) => labelEnds.some((end) => index >= end && index - end <= LABEL_REACH));
@@ -201,7 +183,7 @@ function pageCredit(names: string[]): string | null {
   return credit === null ? null : structuredClone(credit);
 }
 
-const markupText = (html: string) => decodeEntities(html.replace(/<[^>]*>/g, " "));
+const markupText = (html: string) => decodeHtmlEntities(html.replace(/<[^>]*>/g, " "));
 
 export function pageAuthors(html: string): string | null {
   const start = html.search(/<main\b/);
@@ -209,7 +191,7 @@ export function pageAuthors(html: string): string | null {
   const main = html.slice(start);
   const end = main.search(PRODUCT_END);
   const product = end < 0 ? main : main.slice(0, end);
-  return pageCredit([...product.matchAll(AUTHOR_LINK)].filter((link) => AUTHOR_PATH.test(link[1]!)).map((link) => decodeEntities(link[2]!)));
+  return pageCredit([...product.matchAll(AUTHOR_LINK)].filter((link) => AUTHOR_PATH.test(link[1]!)).map((link) => decodeHtmlEntities(link[2]!)));
 }
 
 function summaryAuthor(html: string): string | null {
@@ -280,7 +262,7 @@ function items(list: unknown): unknown[] {
 
 function labelList(value: unknown): string[] {
   const raw = typeof value === "string" ? value.split(",") : items(value).map((entry) => (typeof entry === "string" ? entry : text(record(entry)?.name)));
-  return raw.map((label) => decodeEntities(label).trim()).filter(Boolean);
+  return raw.map((label) => decodeHtmlEntities(label).trim()).filter(Boolean);
 }
 
 export function feedProducts(json: unknown, site: PublisherSite): unknown[] | null {
@@ -312,7 +294,7 @@ export function parseShopifyProducts(json: unknown, site: PublisherSite): Publis
     const fromVendor = site.authorFromVendor && vendor && normalizeWords(vendor) !== normalizeWords(site.name) ? cleanCredit(vendor) : null;
     const author = fromVendor ?? (site.authorTag ? tagAuthors(product.tags, site.authorTag) : null);
     const lines = textLines(text(product.body_html));
-    const details = { summary: synopsis(lines), year: null, originalTitle: originalTitleIn(lines.join("\n")), ...feedTextDetails(lines) };
+    const details = { summary: synopsis(text(product.body_html)), year: null, originalTitle: originalTitleIn(lines.join("\n")), ...feedTextDetails(lines) };
     return [{ isbn: found?.isbn ?? null, rank: found?.rank ?? PAGE_RANK, title, author, imageUrl, productUrl, details, labels: [...labelList(product.tags), ...labelList(product.product_type)] }];
   });
 }
@@ -321,7 +303,7 @@ function wooAttribute(product: Record<string, unknown>, name: RegExp): string | 
   const names = (Array.isArray(product.attributes) ? product.attributes : []).flatMap((item) => {
     const attribute = record(item);
     if (!attribute || !name.test(text(attribute.name))) return [];
-    return (Array.isArray(attribute.terms) ? attribute.terms : []).map((term) => decodeEntities(text(record(term)?.name)).trim()).filter(Boolean);
+    return (Array.isArray(attribute.terms) ? attribute.terms : []).map((term) => decodeHtmlEntities(text(record(term)?.name)).trim()).filter(Boolean);
   });
   return names.length > 0 ? names.join(", ") : null;
 }
@@ -331,7 +313,7 @@ function wooDetails(product: Record<string, unknown>): ProductDetails {
   const shortDescription = textLines(text(product.short_description));
   const fromText = feedTextDetails([...description, ...shortDescription]);
   return {
-    summary: synopsis(description) ?? synopsis(shortDescription),
+    summary: synopsis(text(product.description)) ?? synopsis(text(product.short_description)),
     pages: pageCount(wooAttribute(product, PAGES_ATTRIBUTE)) ?? fromText.pages,
     year: publicationYear(wooAttribute(product, YEAR_ATTRIBUTE)),
     translator: wooAttribute(product, TRANSLATOR_ATTRIBUTE) ?? fromText.translator,
@@ -345,7 +327,7 @@ export function parseWooProducts(json: unknown, site: PublisherSite): PublisherB
     if (!product) return [];
     const imageUrl = text(record(Array.isArray(product.images) ? product.images[0] : null)?.src);
     const productUrl = text(product.permalink);
-    const title = decodeEntities(text(product.name)).trim();
+    const title = decodeHtmlEntities(text(product.name)).trim();
     if (!imageUrl || !productUrl || !title) return [];
     const found = firstIsbn([[text(product.sku)], [fileName(imageUrl)], [JSON.stringify(product)]]);
     if (!found && !URL.canParse(productUrl)) return [];

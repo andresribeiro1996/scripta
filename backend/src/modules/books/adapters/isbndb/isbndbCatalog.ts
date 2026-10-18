@@ -1,4 +1,4 @@
-import { normalizeBookGenres, normalizeIsbn, positiveInteger, type BookSearchResult } from "@scripta/shared";
+import { htmlToText, normalizeBookGenres, normalizeIsbn, positiveInteger, type BookSearchResult } from "@scripta/shared";
 import { givenNameFirst } from "../../domain/normalize.js";
 import type { BookCatalog } from "../../domain/ports.js";
 import type { Throttle } from "../http/http.js";
@@ -6,18 +6,9 @@ import { createIsbndbGet, isbndbRecords } from "../sources/isbndb.js";
 import type { IsbndbGate } from "./isbndbGate.js";
 
 const API = "https://api2.isbndb.com";
-const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', "#39": "'", nbsp: " " };
 
 function plainText(value: unknown): string | null {
-  if (typeof value !== "string") return null;
-  const text = value
-    .replace(/<\s*(?:br|\/p)\s*\/?>/gi, "\n")
-    .replace(/<[^>]*>/g, "")
-    .replace(/&(amp|lt|gt|quot|#39|nbsp);/g, (_, name: string) => ENTITIES[name]!)
-    .replace(/[ \t]+/g, " ")
-    .replace(/\s*\n\s*/g, "\n")
-    .trim();
-  return text || null;
+  return typeof value === "string" ? htmlToText(value) || null : null;
 }
 
 function yearOf(value: unknown): number | null {

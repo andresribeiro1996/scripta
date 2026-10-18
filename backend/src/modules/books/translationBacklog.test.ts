@@ -22,16 +22,20 @@ type Repo = ReturnType<typeof createSqliteBooksRepository>;
 const AT = "2026-10-15T12:00:00.000Z";
 const NOW = Date.parse(AT);
 
+const databases = new WeakMap<Repo, DatabaseSync>();
+
 function freshRepo(): Repo {
   const db = new DatabaseSync(":memory:");
   applyBooksMigrations(db);
-  return createSqliteBooksRepository(db);
+  const repo = createSqliteBooksRepository(db);
+  databases.set(repo, db);
+  return repo;
 }
 
 function book(repo: Repo, isbn: string, title: string, author: string, extra: { workKey?: string; language?: string; summary?: string } = {}) {
   const row = repo.createBook({ title, author, isbn, workKey: extra.workKey }, [`isbn:${isbn}`], AT);
   if (extra.language) repo.setLanguage(row.id, extra.language);
-  if (extra.summary) repo.mergeDetails(row.id, { summary: extra.summary, pages: null, year: null, publisher: null, translator: null }, "publisher");
+  if (extra.summary) databases.get(repo)!.prepare("UPDATE books SET summary = ? WHERE id = ?").run(extra.summary, row.id);
   return repo.getBook(row.id)!;
 }
 
