@@ -15,7 +15,7 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
 const { applyBooksMigrations, openBooksDb } = await import("./connection.js");
 const { findOrCreateBook } = await import("../../domain/findOrCreate.js");
-const { createSqliteBooksRepository, UNCHECKED_COVERS_SQL, UPGRADE_WANTED_SQL, UNCHECKED_DETAILS_SQL, WORK_LOOKUP_SQL } = await import("./sqliteBooksRepository.js");
+const { createSqliteBooksRepository, UNCHECKED_COVERS_SQL, UPGRADE_WANTED_SQL, UNCHECKED_DETAILS_SQL, WORK_LOOKUP_SQL, GROUPABLE_KEYS_SQL, GROUPABLE_PAIRS_SQL } = await import("./sqliteBooksRepository.js");
 const { WorkMergeError } = await import("../../domain/errors.js");
 const { summaryHashOf } = await import("../../domain/synopsis.js");
 
@@ -983,14 +983,23 @@ test("fillTitleKeys computes the keys stored rows lack, in batches, and leaves u
 test("the title key columns are added to an existing database once", () => {
   const db = new DatabaseSync(":memory:");
   applyBooksMigrations(db);
-  db.exec("DROP INDEX idx_books_title_key");
+  db.exec("DROP INDEX idx_books_title_work");
   db.exec("ALTER TABLE books DROP COLUMN title_key");
   db.exec("ALTER TABLE books DROP COLUMN title_group_blocked_at");
   applyBooksMigrations(db);
   applyBooksMigrations(db);
   const columns = (db.prepare("PRAGMA table_info(books)").all() as Array<{ name: string }>).map((column) => column.name);
   assert.ok(columns.includes("title_key") && columns.includes("title_group_blocked_at"));
-  assert.ok(db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'idx_books_title_key'").get());
+  assert.ok(db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'idx_books_title_work'").get());
+});
+
+test("the old title key index is dropped from an existing database", () => {
+  const db = new DatabaseSync(":memory:");
+  applyBooksMigrations(db);
+  db.exec("CREATE INDEX idx_books_title_key ON books(title_key)");
+  applyBooksMigrations(db);
+  assert.equal(db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'idx_books_title_key'").get(), undefined);
+  assert.ok(db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'idx_books_title_work'").get());
 });
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -1195,6 +1204,120 @@ test("groupKeylessWorks merges at most its limit per batch", () => {
   assert.equal(repo.groupKeylessWorks(1), 0);
 });
 
+function groupingFixture() {
+  const { db, repo } = freshRepo();
+  const label = new Map<string, string>();
+  let isbn = 9780000000000;
+  const add = (name: string, title: string, author: string, workKey?: string, created = NOW) => {
+    const book = edition(repo, String(++isbn), title, author, workKey, created);
+    label.set(book.work_id!, name);
+    return book;
+  };
+
+  add("keyed", "Dune", "Frank Herbert", "OL1W", at(0));
+  add("k1", "Dune", "Frank Herbert", undefined, at(2));
+  add("k2", "Dune", "Frank Herbert", undefined, at(1));
+
+  add("ambiguous-a", "Poems", "Emily Dickinson", "OL2W", at(0));
+  add("ambiguous-b", "Poems", "Emily Dickinson", "OL3W", at(0));
+  add("ambiguous-keyless", "Poems", "Emily Dickinson", undefined, at(1));
+
+  add("m3", "Os Maias", "Eça de Queirós", undefined, at(3));
+  add("m1", "Os Maias", "Eça de Queirós", undefined, at(1));
+  add("m0", "Os Maias", "Eça de Queirós", undefined, at(0));
+  add("m2", "Os Maias", "Eça de Queirós", undefined, at(2));
+
+  const first = edition(repo, String(++isbn), "Hamlet", "William Shakespeare", undefined, at(5));
+  const second = edition(repo, String(++isbn), "Hamlet", "William Shakespeare", undefined, at(5));
+  const [low, high] = first.work_id! < second.work_id! ? [first, second] : [second, first];
+  label.set(low.work_id!, "tie-lo");
+  label.set(high.work_id!, "tie-hi");
+
+  const blockedKeyed = add("blocked-keyed", "Emma", "Jane Austen", "OL4W", at(0));
+  db.prepare("UPDATE books SET title_group_blocked_at = ? WHERE id = ?").run(at(1), blockedKeyed.id);
+  add("b0", "Emma", "Jane Austen", undefined, at(0));
+  add("b1", "Emma", "Jane Austen", undefined, at(1));
+
+  add("blocked-keyless-keyed", "Persuasion", "Jane Austen", "OL5W", at(0));
+  const detached = add("blocked-keyless", "Persuasion", "Jane Austen", undefined, at(1));
+  repo.detachEdition(detached.id, at(1));
+
+  const english = add("mixed-english", "Blindness", "José Saramago", undefined, at(0));
+  const portuguese = add("mixed-portuguese", "Ensaio sobre a Cegueira", "José Saramago", undefined, at(1));
+  repo.mergeWorks(portuguese.work_id!, english.work_id!, at(1));
+  add("mixed-newer", "Blindness", "José Saramago", undefined, at(2));
+
+  add("empty-a", "Orlando", "", undefined, at(0));
+  add("empty-b", "Orlando", "", undefined, at(1));
+
+  const nullA = add("null-a", "Middlemarch", "George Eliot", undefined, at(0));
+  const nullB = add("null-b", "Middlemarch", "George Eliot", undefined, at(1));
+  const nullWork = nullA.work_id!;
+  repo.mergeWorks(nullB.work_id!, nullWork, at(1));
+  db.prepare("UPDATE books SET title_key = NULL WHERE id = ?").run(nullB.id);
+  add("null-c", "Middlemarch", "George Eliot", undefined, at(2));
+
+  return { db, repo, label };
+}
+
+function mergedPairs(db: DatabaseSync, label: Map<string, string>) {
+  const rows = db.prepare("SELECT from_work, into_work FROM work_merges WHERE source = 'title-key' ORDER BY id").all() as Array<{ from_work: string; into_work: string }>;
+  return rows.map((row) => `${label.get(row.from_work) ?? row.from_work}>${label.get(row.into_work) ?? row.into_work}`);
+}
+
+test("grouping picks the same source and target for every rule case", () => {
+  const { db, repo, label } = groupingFixture();
+  assert.equal(repo.groupKeylessWorks(250, NOW), 7);
+  assert.deepEqual(mergedPairs(db, label).sort(), ["b1>b0", "k1>keyed", "k2>keyed", "m1>m0", "m2>m0", "m3>m0", "tie-hi>tie-lo"]);
+  assert.equal(repo.groupKeylessWorks(250, NOW), 0);
+});
+
+test("batches of one merge the same pairs as one call, oldest first within a title key", () => {
+  const one = groupingFixture();
+  let merged = 0;
+  while (merged < 20 && one.repo.groupKeylessWorks(1, NOW) === 1) merged++;
+  assert.equal(merged, 7);
+  const all = groupingFixture();
+  all.repo.groupKeylessWorks(250, NOW);
+  assert.deepEqual(mergedPairs(one.db, one.label).sort(), mergedPairs(all.db, all.label).sort());
+  assert.deepEqual(mergedPairs(one.db, one.label).filter((pair) => pair.endsWith(">m0")), ["m1>m0", "m2>m0", "m3>m0"]);
+});
+
+test("shared title keys that never pair don't end a batch early", () => {
+  const { db, repo } = freshRepo();
+  edition(repo, "9780000000001", "Alpha Tale", "Ann Author", "OL1W");
+  edition(repo, "9780000000002", "Alpha Tale", "Ann Author", "OL2W");
+  edition(repo, "9780000000003", "Bravo Tale", "Ann Author", "OL3W");
+  edition(repo, "9780000000004", "Bravo Tale", "Ann Author", "OL4W");
+  edition(repo, "9780000000005", "Charlie Tale", "Ann Author", "OL5W");
+  edition(repo, "9780000000006", "Charlie Tale", "Ann Author", "OL6W");
+  const detached = edition(repo, "9780000000007", "Delta Tale", "Ann Author", undefined, at(0));
+  repo.detachEdition(detached.id, at(1));
+  edition(repo, "9780000000008", "Delta Tale", "Ann Author", undefined, at(1));
+  const echo = edition(repo, "9780000000009", "Echo Tale", "Ann Author", undefined, at(0));
+  const foxtrot = edition(repo, "9780000000010", "Foxtrot Tale", "Ann Author", undefined, at(1));
+  repo.mergeWorks(foxtrot.work_id!, echo.work_id!, at(1));
+  edition(repo, "9780000000011", "Echo Tale", "Ann Author", undefined, at(2));
+  const oldest = edition(repo, "9780000000012", "Zulu Tale", "Ann Author", undefined, at(0));
+  const newest = edition(repo, "9780000000013", "Zulu Tale", "Ann Author", undefined, at(1));
+  assert.equal(repo.groupKeylessWorks(1, NOW), 1);
+  assert.equal(workById(db, newest.work_id).merged_into, oldest.work_id);
+  assert.equal(repo.groupKeylessWorks(1, NOW), 0);
+});
+
+test("a batch never merges more than its limit when shared keys yield uneven pairs", () => {
+  const { db, repo } = freshRepo();
+  edition(repo, "9780000000001", "Alpha Tale", "Ann Author", undefined, at(0));
+  edition(repo, "9780000000002", "Alpha Tale", "Ann Author", undefined, at(1));
+  edition(repo, "9780000000003", "Bravo Tale", "Ann Author", "OL1W");
+  edition(repo, "9780000000004", "Bravo Tale", "Ann Author", "OL2W");
+  edition(repo, "9780000000005", "Charlie Tale", "Ann Author", undefined, at(0));
+  edition(repo, "9780000000006", "Charlie Tale", "Ann Author", undefined, at(1));
+  edition(repo, "9780000000007", "Charlie Tale", "Ann Author", undefined, at(2));
+  assert.deepEqual([repo.groupKeylessWorks(2, NOW), repo.groupKeylessWorks(2, NOW), repo.groupKeylessWorks(2, NOW)], [2, 1, 0]);
+  assert.equal(countOf(db, "work_merges", "source = 'title-key'"), 3);
+});
+
 function rerunPass(db: DatabaseSync) {
   db.exec("PRAGMA user_version = 1");
   applyBooksMigrations(db);
@@ -1296,6 +1419,17 @@ test("every backfill query reads through its own partial index, with no temp sor
     assert.match(plan, new RegExp(`USING INDEX ${index}\\b`), plan);
     assert.doesNotMatch(plan, /TEMP B-TREE/, plan);
   }
+});
+
+test("grouping reads shared title keys from the covering index and starts from them", () => {
+  const { db } = freshRepo();
+  const plan = (sql: string, ...params: Array<string | number>) => (db.prepare(`EXPLAIN QUERY PLAN ${sql}`).all(...params) as Array<{ detail: string }>).map((row) => row.detail).join(" | ");
+  const keys = plan(GROUPABLE_KEYS_SQL, "", 250);
+  assert.match(keys, /USING COVERING INDEX idx_books_title_work\b/, keys);
+  assert.doesNotMatch(keys, /TEMP B-TREE/, keys);
+  const pairs = plan(GROUPABLE_PAIRS_SQL, "[]", 250);
+  assert.match(pairs, /SEARCH books USING COVERING INDEX idx_books_title_work \(title_key=\?\)/, pairs);
+  assert.doesNotMatch(pairs, /sqlite_autoindex_works_2/, pairs);
 });
 
 test("fillSubjectGenres fills empty or Jev genres and keeps source genres", () => {
