@@ -57,3 +57,10 @@ export function cleanCatalogText(text: string): string {
   for (let next = repairMojibake(stripNonSortingMarkers(text)); next !== text; next = repairMojibake(stripNonSortingMarkers(text))) text = next;
   return text;
 }
+
+export function fromWindows1252Controls(text: string): string {
+  return text.replace(/[\u0080-\u009f]/g, (char) => {
+    const mapped = WINDOWS_1252_HIGH[char.charCodeAt(0) - 0x80]!;
+    return mapped.charCodeAt(0) < 0xa0 ? "" : mapped;
+  });
+}

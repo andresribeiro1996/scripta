@@ -398,6 +398,21 @@ npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --
 npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && node scripts/repair-mojibake.mjs'
 ```
 
+#### Summary clean-up
+
+Stored summaries carry page chrome and catalog tails (a "Detalhes" block, "Adicionar aos Favoritos", an Open Library "Also contained in:" list). New text is cleaned as it is written (`mergeDetails`, `setWorkSummary`). `scripts/clean-summaries.mjs` re-cleans the summaries stored earlier with `cleanSummary` from `@scripta/shared`, on `books` and `works`, and moves each synopsis judgment to the cleaned text's hash.
+
+- A book whose cleaned text is empty ends with `summary`, `summary_hash` and `summary_source` all NULL. A book with no `original_title` gets one from the raw text's "Título original" line before the tail is cut. Whitespace-only changes keep the hash, so their judgments stay as they are.
+- Judgments are keyed by the text's hash, so each changed text is judged again unless a judgment is carried. For each new hash the script picks among the judgments on the old hashes that clean to it (manual first, then rule, then the latest `asked_at`) and writes one outcome: `carried` (copied to the new hash; the old row stays), `manual-replaced` (a manual judgment overwrites a non-manual one already on the new hash), `kept` (the new hash already has a judgment and it stays), `rule` (the cleaned text is a fragment and the chosen judgment is not manual: a rule hide is written), `jev-hide-dropped` (a Jev hide on changed text is not carried, so the cleaned text is judged again) or `unjudged` (no old judgment).
+- All judgments are written in one transaction before any row, then rows go in batches of 500, one transaction per batch. A crash loses no decision: a rerun skips rows already cleaned and their judgments are in place. A row edited since the scan is skipped and counted in `applied.skipped`. Reruns are safe; a second run finds nothing.
+- Run it after the deploy that ships the write-time cleaning, and before any publisher import (`import-publisher-covers`): an import would rewrite publisher rows first and their judgments would not be carried. Check the volume's free space first with `railway volume list --json`, and hold production deploys while it runs, because a deploy kills the job. Then run `--dry-run` and review the samples, run it for real with the output redirected to a local file, and run `synopsis-backlog.mjs --dry-run` and then for real, so the dropped Jev hides and any unjudged text are judged. The background sweep only covers held works.
+- The JSON report has `books` and `works` counts (`scanned`, `changed`, `emptied`), `bySource`, `byHost`, `judgments` (the outcome counts), `samples` (at most 3 per host, else source, with `from` and `to` cut to 300 characters) and `applied` (`null` on a dry run, and on a real run that failed part-way). A real run also has `originals`, every changed row's original text as `{ table, id, summary }`, about 12k texts. The report is printed even when a batch fails, before the error shows, so the file holds every original. The script keeps no other copy, so redirect the output to a file.
+
+```bash
+npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && node scripts/clean-summaries.mjs --dry-run'
+npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && node scripts/clean-summaries.mjs' > summaries-cleanup.json
+```
+
 #### Lossy titles
 
 Some Open Library records lost every accented letter to `©` (`N©o Abras Este Livro`), which the repair above can't undo. `scripts/retitle-lossy.mjs` re-titles the books stored before new books were re-titled in the background (see the `books` section), from a source tied to the same book: the product at the book's `publisher_url` in its shop's feed, read as the importer reads it (robots.txt and the 3 s gap included) and only for the shops that hold such books, then ISBNdb (`GET /book/{isbn}`) for what is still lossy.

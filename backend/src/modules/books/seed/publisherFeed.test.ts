@@ -496,6 +496,12 @@ test("a recorded Presença feed takes every author from its tags and the ISBN fr
   ]);
 });
 
+test("a recorded Presença product whose body is only a synopsis stub and metadata has no summary", () => {
+  const feed = JSON.parse(readFileSync(new URL("./fixtures/presenca-products.json", import.meta.url), "utf8"));
+  const product = feed.products.find((candidate: { variants: Array<{ sku: string }> }) => candidate.variants[0]?.sku === "9789722380577");
+  assert.equal(shopifyDetails(product.body_html).summary, null);
+});
+
 test("a recorded Relógio feed finds each ISBN in the image file name and no author", () => {
   const feed = JSON.parse(readFileSync(new URL("./fixtures/relogio-products.json", import.meta.url), "utf8"));
   assert.deepEqual(parseWooProducts(feed, relogio).map((book) => [book.isbn, book.rank, book.author]), [
@@ -505,6 +511,38 @@ test("a recorded Relógio feed finds each ISBN in the image file name and no aut
     ["9789897837890", 1, null],
     ["9789897837364", 1, null]
   ]);
+});
+
+const longLine = (word: string) => `${word} `.repeat(14).trim();
+
+test("a Presença-style Detalhes block after the synopsis is cut", () => {
+  const html = `<p>${SYNOPSIS}</p>${["Detalhes", "Título Original THE LOST BROTHER", "Categoria Ficção", "Nº de Páginas 320", "Data de Lançamento 03/2024", "Formato Capa Mole", "Autores Ana Lima"].map((line) => `<p>${line}</p>`).join("")}`;
+  assert.equal(shopifyDetails(html).summary, SYNOPSIS);
+});
+
+test("a Woo description ending in a favourites button gives the synopsis only", () => {
+  assert.equal(wooDetails({ description: `<p>${SYNOPSIS}</p><p>Adicionar aos Favoritos</p>` }).summary, SYNOPSIS);
+});
+
+test("long prose lines wrapped in br tags join into one paragraph", () => {
+  const lines = [longLine("alfa"), longLine("beta"), `${longLine("gama")}.`];
+  assert.equal(wooDetails({ description: `<p>${lines.join("<br>")}</p>` }).summary, lines.join(" "));
+});
+
+test("short verse lines keep their line breaks and a later paragraph follows after a blank line", () => {
+  const verse = ["Rosa do mar,", "areia e sal,", "noite sem fim,"];
+  assert.equal(wooDetails({ description: `<p>${verse.join("<br>")}</p><p>${SYNOPSIS}</p>` }).summary, `${verse.join("\n")}\n\n${SYNOPSIS}`);
+});
+
+test("cleaning runs before the minimum length", () => {
+  const synopsis = "a".repeat(69) + ".";
+  const notice = "Adicionar aos Favoritos";
+  assert.equal(wooDetails({ description: `<p>${synopsis}</p><p>${notice}</p>` }).summary, null);
+});
+
+test("a Detalhes heading left alone by the line filter is still cut", () => {
+  const html = `<p>${SYNOPSIS}</p><p>Detalhes</p><p>Páginas: 320</p><p>Categoria: Ficção</p><p>Citações</p>`;
+  assert.equal(shopifyDetails(html).summary, SYNOPSIS);
 });
 
 test("cleanCredit drops role marks and translator notes and keeps combined credits whole", () => {

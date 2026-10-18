@@ -90,6 +90,11 @@ function pageWith(summary: string | null, editionSummaries: [string | null, stri
   });
 }
 
+test("a summary that cleans to nothing is no summary", () => {
+  const page = createWorksService(deps({ getWorkPage: pageWith("Adicionar aos Favoritos", [null, null]) })).getPage("w", null)!;
+  assert.equal(page.work.summary, null);
+});
+
 test("the work's own summary beats the first edition's", () => {
   const page = createWorksService(deps({ getWorkPage: pageWith("Spice.", [null, "Especiaria."]) })).getPage("w", null)!;
   assert.equal(page.work.summary, "Spice.");
