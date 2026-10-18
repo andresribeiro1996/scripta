@@ -48,6 +48,7 @@ export interface BooksServiceDeps {
   warn: (details: Record<string, unknown>, message: string) => void;
   onDetailsChecked?: (book: BookRow) => void;
   bnpLookup?: (isbn: string) => Promise<BookRow | null>;
+  heldWorkIds?: () => string[];
   now?: () => Date;
 }
 
@@ -320,7 +321,11 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
     },
 
     async backfillDetails(limit, signal) {
-      for (const id of deps.repo.listUncheckedDetailIds(limit)) {
+      const held = deps.heldWorkIds
+        ? deps.repo.listHeldBnpDetailIds([...new Set(deps.repo.canonicalWorkIds(deps.heldWorkIds()).values())], limit)
+        : [];
+      const queue = held.length < limit ? deps.repo.listUncheckedDetailIds(limit - held.length) : [];
+      for (const id of [...held, ...queue]) {
         if (signal?.aborted) return null;
         const book = deps.repo.getBook(id);
         if (!book || book.details_status !== null) continue;

@@ -25,6 +25,11 @@ export const UNCHECKED_DETAILS_SQL = `
   SELECT id FROM books WHERE details_status IS NULL AND created_by IS NOT 'bnp'
   ORDER BY details_checked_at IS NOT NULL, created_by IS NOT NULL, details_checked_at, created_at, rowid LIMIT ?
 `;
+export const HELD_BNP_DETAILS_SQL = `
+  SELECT id FROM books
+  WHERE work_id IN (SELECT value FROM json_each(?)) AND created_by = 'bnp' AND details_status IS NULL
+  ORDER BY details_checked_at IS NOT NULL, details_checked_at, created_at, rowid LIMIT ?
+`;
 export const WORK_LOOKUP_SQL = `
   SELECT id FROM books
   WHERE ol_work_key IS NULL AND isbn IS NOT NULL AND details_status IS NOT NULL
@@ -400,6 +405,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
 
   const uncheckedStmt = db.prepare(UNCHECKED_COVERS_SQL);
   const uncheckedDetailsStmt = db.prepare(UNCHECKED_DETAILS_SQL);
+  const heldBnpDetailsStmt = db.prepare(HELD_BNP_DETAILS_SQL);
   const fillSubjectGenresStmt = db.prepare(`UPDATE books SET genres = ?, genres_source = NULL, genres_confidence = NULL WHERE id = ? AND (genres = '[]' OR genres_source = 'jev')`);
   const confirmWithSourceStmt = db.prepare(`UPDATE books SET data_sources = json_insert(data_sources, '$[#]', ?) WHERE id = ? AND NOT ${CONFIRMED_SQL}`);
   const harvestCursorStmt = db.prepare(`SELECT through FROM harvest_cursors WHERE feed = ?`);
@@ -687,6 +693,11 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
 
     listUncheckedDetailIds(limit) {
       return (uncheckedDetailsStmt.all(limit) as Array<{ id: string }>).map((row) => row.id);
+    },
+
+    listHeldBnpDetailIds(workIds, limit) {
+      if (workIds.length === 0) return [];
+      return (heldBnpDetailsStmt.all(JSON.stringify(workIds), limit) as Array<{ id: string }>).map((row) => row.id);
     },
 
     fillSubjectGenres(bookId, genres) {
