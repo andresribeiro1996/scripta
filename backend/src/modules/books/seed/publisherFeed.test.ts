@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { cleanCredit, feedProducts, feedUrl, findPageIsbn, findPortugalIsbn, isDisallowed, pageAuthors, parseRobots, parseShopifyProducts, parseWooProducts, withPageText } from "./publisherFeed.js";
+import { cleanCredit, feedProducts, feedUrl, findPageIsbn, findPortugalIsbn, isDisallowed, pageAuthor, pageAuthors, parseRobots, parseShopifyProducts, parseWooProducts, withPageText } from "./publisherFeed.js";
 import type { PublisherSite } from "./publishers.js";
 
 const shopify = JSON.parse(readFileSync(new URL("./fixtures/shopify-products.json", import.meta.url), "utf8"));
@@ -547,4 +547,43 @@ test("a WooCommerce Autor attribute is cleaned like any other credit", () => {
   const product = (terms: string[]) => [{ name: "Livro", permalink: "https://abysmo.pt/produto/livro/", sku: "", description: "", short_description: "", images: [{ src: "https://abysmo.pt/wp-content/uploads/livro.jpg" }], attributes: [{ name: "Autor", terms: terms.map((name) => ({ name })) }] }];
   assert.equal(parseWooProducts(product(["VV. AA."]), site)[0]!.author, null);
   assert.equal(parseWooProducts(product(["Rui Zink (org.)"]), site)[0]!.author, "Rui Zink");
+});
+
+test("summaryAuthor reads the main product's author links and nothing from the tab or related cards", () => {
+  const html = `<h1 class="product_title entry-title">Berengária, o Anjo da Noite</h1><div class="summaryAuthor"><span class="uppercase"><a style="color:#868686 !important; text-decoration: underline;" href="https://www.saidadeemergencia.com/autor/deana-barroqueiro/">Deana Barroqueiro</a></span></div><div class="summaryQuote"><p>…</p></div>
+<div class="autor_tab"><h2 class="uppercase poppins-medium"><a href="https://www.saidadeemergencia.com/autor/deana-barroqueiro/">Deana Barroqueiro</a></h2></div>
+<div class="autor"><a href="https://www.saidadeemergencia.com/autor/outro-autor/">Outro Autor</a></div>`;
+  assert.equal(pageAuthor("summaryAuthor", html), "Deana Barroqueiro");
+  assert.equal(pageAuthor("summaryAuthor", `<div class="summaryAuthor"><span class="uppercase"><a style="x" href="https://www.saidadeemergencia.com/autor/a/">Ana Uma</a> e <a style="x" href="https://www.saidadeemergencia.com/autor/b/">Bruno Dois</a></span></div>`), "Ana Uma, Bruno Dois");
+  assert.equal(pageAuthor("summaryAuthor", `<div class="autor"><a href="https://www.saidadeemergencia.com/autor/outro/">Outro</a></div>`), null);
+});
+
+test("productAutor reads the main credit without role marks, never the related cards or the subtitle", () => {
+  const html = `<h1>Pelo Buraco da Fechadura</h1><p class="product-subtitulo">Contos</p><p class="product-autor">Bando dos Gambozinos e Alberto Péssimo (ilustração)</p><div class="no-js-hidden" role="status"></div><p class="card-autor">Outro Autor</p>`;
+  assert.equal(pageAuthor("productAutor", html), "Bando dos Gambozinos e Alberto Péssimo");
+  assert.equal(pageAuthor("productAutor", `<p class="product-autor">Miguel Barcelos e Porfírio Pinto (coords.)</p>`), "Miguel Barcelos e Porfírio Pinto");
+  assert.equal(pageAuthor("productAutor", `<h1>Poemas do Inferno</h1><p class="product-subtitulo">Amadeu Baptista</p><p class="card-autor">Amadeu Baptista</p>`), null);
+});
+
+test("prodMainH4 reads the creators in the main block and stops at the description", () => {
+  const html = `<div class="prod-main"><h1 class="h2" itemprop="name"><strong>Mesmo Quando Não Me Vês</strong><br/> </h1><a class="autorilust" href="/blogs/autores-mini/marine-guerinat">Marine Guérinat</a><br><h4>Claire Wyniecki</h4> <h4>Hua Ling Xu</h4><h6 class="edicao"></h6></div></div>
+<div class="product-description"><ul><li><strong>Tradução</strong> Joana Cabral</li></ul></div><div class="related"><h4>Outro Livro</h4></div>`;
+  assert.equal(pageAuthor("prodMainH4", html), "Claire Wyniecki, Hua Ling Xu");
+  assert.equal(pageAuthor("prodMainH4", `<div class="prod-main"><h1 class="h2">Em Breve</h1><h6 class="edicao"></h6></div><div class="product-description"></div>`), null);
+  assert.equal(pageAuthor("prodMainH4", `<h4>Sem Bloco</h4>`), null);
+});
+
+test("elementorAuthor reads the author widget, not the CSS rule or the translator line", () => {
+  const html = `<style>.elementor-element.elementor-element-b6a8e18{color:#000}</style><h1 class="product_title entry-title">Amok</h1><div class="woostify-product-content-widget"> <p>Uma crónica de amor luxemburguesa</p> <p>Tradução de Maria Bochicchio</p> </div>
+<div class="elementor-element elementor-element-b6a8e18 elementor-widget elementor-widget-text-editor" data-id="b6a8e18" data-element_type="widget" data-widget_type="text-editor.default">
+  <div class="elementor-widget-container"> Tullio Forgiarini </div>
+</div>
+<div class="elementor-element elementor-element-588aaf6 woostify-product-meta"></div>`;
+  assert.equal(pageAuthor("elementorAuthor", html), "Tullio Forgiarini");
+  assert.equal(pageAuthor("elementorAuthor", `<div class="elementor-element" data-id="b6a8e18" data-element_type="widget"><div class="elementor-widget-container">  </div></div>`), null);
+  assert.equal(pageAuthor("elementorAuthor", `<div class="elementor-element" data-id="b6a8e18" data-element_type="widget"><div class="elementor-widget-container"> Vários </div></div>`), null);
+});
+
+test("the autorLink rule is the existing pageAuthors", () => {
+  assert.equal(pageAuthor("autorLink", PACHINKO_PAGE), "Min Jin Lee");
 });

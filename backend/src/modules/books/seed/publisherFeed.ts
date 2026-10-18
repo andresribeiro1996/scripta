@@ -190,14 +190,50 @@ function distinctNames(names: string[]): string | null {
   return cleanCredit([...new Set(names.map((name) => name.replace(/\s+/g, " ").trim()).filter(Boolean))].join(", "));
 }
 
+export type PageAuthorRule = "autorLink" | "summaryAuthor" | "productAutor" | "prodMainH4" | "elementorAuthor";
+
+function pageCredit(names: string[]): string | null {
+  const credit = distinctNames(names);
+  return credit === null ? null : structuredClone(credit);
+}
+
+const markupText = (html: string) => decodeEntities(html.replace(/<[^>]*>/g, " "));
+
 export function pageAuthors(html: string): string | null {
   const start = html.search(/<main\b/);
   if (start < 0) return null;
   const main = html.slice(start);
   const end = main.search(PRODUCT_END);
   const product = end < 0 ? main : main.slice(0, end);
-  const names = distinctNames([...product.matchAll(AUTHOR_LINK)].filter((link) => AUTHOR_PATH.test(link[1]!)).map((link) => decodeEntities(link[2]!)));
-  return names === null ? null : structuredClone(names);
+  return pageCredit([...product.matchAll(AUTHOR_LINK)].filter((link) => AUTHOR_PATH.test(link[1]!)).map((link) => decodeEntities(link[2]!)));
+}
+
+function summaryAuthor(html: string): string | null {
+  const block = /<div class="summaryAuthor">([\s\S]*?)<\/div>/.exec(html)?.[1];
+  return block === undefined ? null : pageCredit([...block.matchAll(/<a\b[^>]*href=["'][^"']*\/autor\/[^"']*["'][^>]*>([\s\S]*?)<\/a>/g)].map((link) => markupText(link[1]!)));
+}
+
+function productAutor(html: string): string | null {
+  const credit = /<p class="product-autor">([\s\S]*?)<\/p>/.exec(html)?.[1];
+  return credit === undefined ? null : pageCredit([markupText(credit)]);
+}
+
+function prodMainH4(html: string): string | null {
+  const start = html.indexOf('<div class="prod-main">');
+  const end = start < 0 ? -1 : html.indexOf('<div class="product-description', start);
+  if (end < 0) return null;
+  return pageCredit([...html.slice(start, end).matchAll(/<h4\b[^>]*>([\s\S]*?)<\/h4>/g)].map((heading) => markupText(heading[1]!)));
+}
+
+function elementorAuthor(html: string): string | null {
+  const credit = /data-id="b6a8e18"[^>]*>\s*<div class="elementor-widget-container">([\s\S]*?)<\/div>/.exec(html)?.[1];
+  return credit === undefined ? null : pageCredit([markupText(credit)]);
+}
+
+const PAGE_AUTHOR_RULES: Record<PageAuthorRule, (html: string) => string | null> = { autorLink: pageAuthors, summaryAuthor, productAutor, prodMainH4, elementorAuthor };
+
+export function pageAuthor(rule: PageAuthorRule, html: string): string | null {
+  return PAGE_AUTHOR_RULES[rule](html);
 }
 
 function tagAuthors(tags: unknown, patterns: RegExp | RegExp[]): string | null {
