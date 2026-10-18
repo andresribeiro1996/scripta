@@ -22,7 +22,7 @@ const { applyBooksMigrations } = await import("../adapters/sqlite/connection.js"
 const { createSqliteBooksRepository } = await import("../adapters/sqlite/sqliteBooksRepository.js");
 const { SourceUnavailableError } = await import("../domain/errors.js");
 const { catalogTitleKey } = await import("../domain/normalize.js");
-const { applyBnpRecord, fetchBnpScan, importBnp, monthWindows, planBnpRecord, syncBnp, utcDate } = await import("./bnpImport.js");
+const { applyBnpRecord, fetchBnpScan, importBnp, logBnpSync, monthWindows, planBnpRecord, syncBnp, utcDate } = await import("./bnpImport.js");
 const { mapBnpRecord, readMarcRecords } = await import("./bnpRecord.js");
 
 process.env.TZ = "America/Sao_Paulo";
@@ -884,4 +884,39 @@ test("a failed sync window leaves the cursor where it was", async () => {
   assert.equal(report!.through, null);
   assert.equal(asked.get(windowUrl("2026-10-16", "2026-10-18")), 4);
   assert.equal(repo.getHarvestCursor("bnp"), "2026-10-16");
+});
+
+test("records that need no scan still let the event loop run between them", async () => {
+  const count = 20;
+  const { events, deps } = harvestSetup({
+    [windowUrl("2026-10-16", "2026-10-16")]: oaiPage(Array.from({ length: count }, (_, index) => recordOf(isbnN(index + 1))))
+  });
+  await importBnp(deps, run("2026-10-16", "2026-10-16"));
+  assert.equal(events.filter((event) => event === "scan").length, count);
+
+  const order: string[] = [];
+  setImmediate(() => order.push("macrotask"));
+  const report = await importBnp(deps, run("2026-10-16", "2026-10-16"));
+  order.push("done");
+
+  assert.equal(events.filter((event) => event === "scan").length, count);
+  assert.deepEqual(report.covers, { stored: 0, kept: count, noScan: 0, rejected: 0, failed: 0 });
+  assert.deepEqual(order, ["macrotask", "done"]);
+});
+
+async function syncLogs(reply: Reply | Reply[]) {
+  const { repo, deps } = harvestSetup({ [windowUrl("2026-10-17", "2026-10-18")]: reply });
+  repo.setHarvestCursor("bnp", "2026-10-17");
+  const report = (await syncBnp({ ...deps, now: SYNC_NOW }))!;
+  const lines: Array<[string, object, string]> = [];
+  logBnpSync({ info: (details, message) => lines.push(["info", details, message]), error: (details, message) => lines.push(["error", details, message]) }, report);
+  return lines;
+}
+
+test("a clean sync is logged at info", async () => {
+  assert.deepEqual(await syncLogs(EMPTY_PAGE), [["info", { through: "2026-10-18", kept: 0, created: 0, failedWindows: [] }, "bnp sync"]]);
+});
+
+test("a sync with a failed window is logged as an error", async () => {
+  assert.deepEqual(await syncLogs([unavailable(), unavailable()]), [["error", { through: null, kept: 0, created: 0, failedWindows: ["2026-10-17..2026-10-18"] }, "bnp sync failed windows"]]);
 });

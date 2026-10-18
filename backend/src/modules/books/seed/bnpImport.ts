@@ -273,6 +273,7 @@ export async function importBnp(deps: BnpHarvestDeps, options: BnpImportOptions)
     if (replace !== null) report.replace[replace]++;
   };
   const applyOne = async (book: BnpBook) => {
+    await new Promise(setImmediate);
     const plan = planBnpRecord(deps.repo, book)!;
     const result = await applyBnpRecord(deps, plan);
     tally({ created: result.created, replace: plan.replace, cover: result.cover });
@@ -318,6 +319,18 @@ export async function importBnp(deps: BnpHarvestDeps, options: BnpImportOptions)
   report.publishers = { kept: top(keptPublishers), dropped: perSkip((reason) => top(droppedPublishers[reason])) };
   if (options.cursorOnSuccess && !options.dryRun && report.failedWindows.length === 0) deps.repo.setHarvestCursor("bnp", options.until);
   return report;
+}
+
+export interface BnpSyncLog {
+  info: (details: object, message: string) => void;
+  error: (details: object, message: string) => void;
+}
+
+export function logBnpSync(log: BnpSyncLog, report: BnpImportReport): void {
+  const { through, kept, created, failedWindows } = report;
+  const details = { through, kept, created, failedWindows };
+  if (failedWindows.length > 0) log.error(details, "bnp sync failed windows");
+  else log.info(details, "bnp sync");
 }
 
 export async function syncBnp(deps: BnpHarvestDeps): Promise<BnpImportReport | null> {

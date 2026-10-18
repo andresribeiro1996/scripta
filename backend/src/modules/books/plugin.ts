@@ -34,7 +34,7 @@ import type { CoverBlobReader, CoverBlobStore } from "./domain/ports.js";
 import { coverUrlFor, useBooksRepository } from "./publicCoverLookup.js";
 import { buildAdminRoutes, buildCatalogRoutes, buildCoverFileRoutes, buildGenreReviewRoutes, buildResolveRoutes, buildSynopsisReviewRoutes, buildTranslationReviewRoutes } from "./routes.js";
 import { RETITLE_BATCH_SIZE, retitleWanted } from "./retitleJob.js";
-import { BNP_SYNC_INTERVAL_MS, fetchBnpScan, syncBnp, type BnpHarvestDeps } from "./seed/bnpImport.js";
+import { BNP_SYNC_INTERVAL_MS, fetchBnpScan, logBnpSync, syncBnp, type BnpHarvestDeps } from "./seed/bnpImport.js";
 import { applyMojibakeRepairs } from "./seed/mojibakeRepair.js";
 import { fetchText } from "./seed/siteFetch.js";
 import { createCoverWorker } from "./worker.js";
@@ -193,7 +193,7 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
   const stopBnpSync = startDetailsBackfill(
     async () => {
       const report = await syncBnp(bnpDeps);
-      if (report) app.log.info({ through: report.through, kept: report.kept, created: report.created, failedWindows: report.failedWindows }, "bnp sync");
+      if (report) logBnpSync(app.log, report);
     },
     (error) => app.log.error({ err: error }, "bnp sync failed"),
     BNP_SYNC_INTERVAL_MS
