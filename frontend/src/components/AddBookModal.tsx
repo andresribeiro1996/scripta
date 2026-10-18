@@ -20,7 +20,7 @@ import type { IScannerControls } from "@zxing/browser";
 import { useDismissible } from "../hooks/useDismissible";
 import { useScrollLock } from "../hooks/useScrollLock";
 import { normalizeIsbn } from "../lib/covers";
-import { bookSearchApi, buildManualBook, searchInsideOutside, type BookSearchResult } from "../lib/bookSearch";
+import { bookSearchApi, buildManualBook, searchInsideOutside, searchResultByline, type BookSearchResult } from "../lib/bookSearch";
 
 const STATUS_OPTIONS = [
   { value: 2, label: "Finished" },
@@ -272,7 +272,7 @@ export function AddBookModal({
                 <span className="min-w-0">
                   <span className="block truncate text-sm font-semibold">{r.title}</span>
                   <span className="block truncate text-xs text-(--color-text-dim)">
-                    {[r.authors.join(", "), r.year].filter(Boolean).join(" · ")}
+                    {searchResultByline(r)}
                   </span>
                 </span>
               </button>

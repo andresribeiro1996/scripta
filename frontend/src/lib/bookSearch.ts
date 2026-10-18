@@ -2,7 +2,7 @@ import type { BookSearchApi, BookSearchResult } from "@scripta/shared";
 import { apiFetch } from "../api/client";
 
 export type { BookSearchResult, ManualBookFields } from "@scripta/shared";
-export { looksLikeIsbnQuery, mapOpenLibraryDoc, buildManualBook, searchInsideOutside } from "@scripta/shared";
+export { looksLikeIsbnQuery, mapOpenLibraryDoc, buildManualBook, searchInsideOutside, searchResultByline } from "@scripta/shared";
 
 async function fetchResults(path: string, query: string): Promise<BookSearchResult[]> {
   const trimmed = query.trim();
