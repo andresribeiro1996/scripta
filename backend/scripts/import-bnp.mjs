@@ -33,7 +33,7 @@ if (from > until) {
 const store = createObjectStore();
 const report = await importBnp(
   {
-    repo: createSqliteBooksRepository(dryRun ? new DatabaseSync(env.COVERS_DB_PATH, { readOnly: true }) : openBooksDb()),
+    repo: createSqliteBooksRepository(dryRun ? new DatabaseSync(env.COVERS_DB_PATH, { readOnly: true, timeout: 5000 }) : openBooksDb()),
     blobs: dryRun
       ? {
           save: () => {

@@ -444,7 +444,7 @@ The report has `selected`, `noRecord`, `noAuthor`, `titleMismatch` with `mismatc
 
 - It harvests month-sized datestamp windows from `--from` (default `2000-01-01`, earlier than any datestamp in the set) to `--until` (default today UTC), one OAI page at a time, and applies each window's records with at most two scan downloads in flight. A record with no ISBN, a textbook, no publisher, an institutional publisher or no person author is skipped. The rest are matched by their first ISBN: a match gets only its empty fields filled, and a new book is created with `created_by = 'bnp'`.
 - A cover is replaced only when the book has none, has a `low_res` one, or has an ISBNdb one on a Portugal ISBN. A `manual` cover and any other `good` cover stay.
-- It prints one JSON line per finished window (`window`, `through`, `records`, `kept`, `failed`, then the process's `rss`), and the report as the last line. `failedWindows` lists the windows that failed twice, as `from..until`. `through` and the cursor never move past a failed window.
+- It prints one line per finished window: a JSON object (`window`, `through`, `records`, `kept`, `failed`) followed by ` rss=<n>MB`, so the line as a whole is not JSON. The report is the last line, and is pure JSON. `failedWindows` lists the windows that failed twice, as `from..until`. `through` and the cursor never move past a failed window.
 - `--dry-run` opens the database read-only, downloads no image and writes nothing. The report counts the filter rules (`skipped`), `created` versus `matched`, the cover actions it would take (`covers`, `replace`), `genres`, the top 50 `publishers` kept and dropped per rule, and 20 `samples`. Its `covers.stored` cannot know which scans the real run will reject. It needs the deploy that ships the import, since a read-only open runs no migration.
 - `--from` after `--until`, or a value that is not a real `YYYY-MM-DD` date, stops the script before it opens the database.
 
@@ -455,10 +455,13 @@ Run order, after the deploy that ships it:
 3. The next day, check the server log for the sync's first window, spot-check a search for `casa dos espiritos`, and compare `railway logs --filter "ISBNdb paused"` on the import day with the days before.
 
 ```bash
-npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && nohup node scripts/import-bnp.mjs --dry-run > /data/import-bnp-dry.log 2>&1 & echo started'
-npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && nohup node scripts/import-bnp.mjs > /data/import-bnp.log 2>&1 & echo started'
-npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'tail -3 /data/import-bnp.log'
+npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && setsid node scripts/import-bnp.mjs --dry-run > /data/import-bnp-dry.log 2>&1 < /dev/null & sleep 3; ls -l /data/import-bnp*.log'
+npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && setsid node scripts/import-bnp.mjs > /data/import-bnp.log 2>&1 < /dev/null & sleep 3; ls -l /data/import-bnp*.log'
+npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'tail -n 3 /data/import-bnp-dry.log /data/import-bnp.log'
+npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'for f in /proc/[0-9]*/cmdline; do tr "\0" " " < $f; echo; done 2>/dev/null | grep "nod[e] scripts/import-bnp"'
 ```
+
+The container has no `nohup`, so the jobs start with `setsid`; the `ls` after the `sleep 3` shows the log file appeared. The last command prints the job's command line while it is running and nothing once it has ended; the bracket in `nod[e]` stops the check from matching itself.
 
 - **Resuming.** If the job dies, rerun with `--from <through>` from its last window line and no `--until`. The run then ends today and writes the cursor. Re-reading a day is harmless, since every record is applied by ISBN.
 - **Failed windows.** If the report lists any, rerun from the first failed window's `from` with no `--until`.
