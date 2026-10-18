@@ -1,20 +1,8 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
-
-const scratch = mkdtempSync(join(tmpdir(), "bnp-record-test-"));
-process.env.AUTH_DB_PATH = join(scratch, "auth.sqlite");
-process.env.LIBRARY_DB_PATH = join(scratch, "library.sqlite");
-process.env.GALLERY_DB_PATH = join(scratch, "gallery.sqlite");
-process.env.COVERS_DB_PATH = join(scratch, "covers.sqlite");
-process.env.JWT_ACCESS_SECRET = "a".repeat(64);
-process.env.JWT_REFRESH_SECRET = "b".repeat(64);
-
-const { mapBnpRecord, readMarcRecords, readOaiError, readResumptionToken } = await import("./bnpRecord.js");
-type MarcField = import("./bnpRecord.js").MarcField;
-type MarcRecord = import("./bnpRecord.js").MarcRecord;
+import { mapBnpRecord, readMarcRecords, readOaiError, readResumptionToken } from "./bnpRecord.js";
+import type { MarcField, MarcRecord } from "./bnpRecord.js";
 
 const fixture = (name: string) => readFileSync(new URL(`./fixtures/bnp/${name}`, import.meta.url), "utf8");
 const oaiPage = fixture("oai-page.xml");
@@ -143,6 +131,11 @@ test("a publisher loses brackets and the distrib. marker, and [s.n.] is none", (
   assert.equal(publisher("[distrib.]"), null);
   assert.equal(publisher("[Presença] [distrib.]"), "Presença");
   assert.equal(publisher("Distribuidora Nova"), "Distribuidora Nova");
+  assert.equal(publisher("Documenta ;"), "Documenta");
+  assert.equal(publisher("ICEP;"), "ICEP");
+  assert.equal(publisher("Âncora : /,"), "Âncora");
+  assert.equal(publisher("s.n. ;"), null);
+  assert.equal(publisher(";"), null);
   assert.equal(book().publisher, null);
 });
 
@@ -172,6 +165,8 @@ test("the year reads 100 $a first, then 210 $d", () => {
   assert.equal(book(field("100", ["a", "20131209d2013    m  y0pory01030103ba"])).year, 2013);
   assert.equal(book(field("100", ["a", "20131209d    "]), field("210", ["d", "D.L. 2015"])).year, 2015);
   assert.equal(book(field("210", ["d", "D.L. 2015"])).year, 2015);
+  assert.equal(book(field("100", ["a", "20000301d0000    m  y0pory01030103ba"]), field("210", ["d", "2015"])).year, 2015);
+  assert.equal(book(field("100", ["a", "20000301d0000    m  y0pory01030103ba"])).year, null);
   assert.equal(book(field("210", ["d", "s.d."])).year, null);
   assert.equal(book().year, null);
 });
@@ -196,6 +191,8 @@ test("languages, classification, summary and original title read their own field
   assert.equal(result.scanUrl, "https://rnod.bnportugal.gov.pt/ImagesBN/winlibimg.aspx?doc=1");
   assert.equal(book().summary, null);
   assert.equal(book().originalTitle, null);
+  assert.equal(book(field("304", ["a", "Tít. orig.:"])).originalTitle, null);
+  assert.equal(book(field("304", ["a", "Tít. orig.: "])).originalTitle, null);
   assert.equal(book().scanUrl, null);
   assert.equal(mapBnpRecord(record([field("200", ["a", "x"])], { "001": "42" })).recordId, "42");
   assert.equal(book().recordId, null);

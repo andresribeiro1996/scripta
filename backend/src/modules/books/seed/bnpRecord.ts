@@ -48,7 +48,8 @@ const LEADING_MARKERS = /^\?(\S+) \?/;
 const ORIGINAL_TITLE = /^T[íi]t\. orig\.:\s*/;
 const NO_PUBLISHER = /^(?:s\.\s*n\.)?$/i;
 const YEAR_IN_TEXT = /(?:1[5-9]|20)\d{2}/;
-const FOUR_DIGITS = /^\d{4}$/;
+const CODED_YEAR = /^(?:1[5-9]|20)\d{2}$/;
+const TRAILING_SEPARATORS = /[\s;:,/]+$/;
 const SCAN = "winlibimg.aspx";
 const TRANSLATOR = "730";
 const AUTHOR_FALLBACKS = ["070", "340"];
@@ -119,13 +120,13 @@ function pagesIn(extent: string | undefined): number | null {
 
 function yearOf(record: MarcRecord): number | null {
   const coded = raw(record, "100", "a")[0]?.slice(9, 13);
-  if (coded !== undefined && FOUR_DIGITS.test(coded)) return Number(coded);
+  if (coded !== undefined && CODED_YEAR.test(coded)) return Number(coded);
   const printed = YEAR_IN_TEXT.exec(values(record, "210", "d")[0] ?? "")?.[0];
   return printed === undefined ? null : Number(printed);
 }
 
 function publisherOf(record: MarcRecord): string | null {
-  const publisher = clean((values(record, "210", "c")[0] ?? "").replace(/distrib\./gi, "").replace(/[[\]]/g, ""));
+  const publisher = clean((values(record, "210", "c")[0] ?? "").replace(/distrib\./gi, "").replace(/[[\]]/g, "")).replace(TRAILING_SEPARATORS, "");
   return NO_PUBLISHER.test(publisher) ? null : publisher;
 }
 
@@ -154,7 +155,7 @@ export function mapBnpRecord(record: MarcRecord): BnpBook {
     title: title.replace(LEADING_MARKERS, "$1 "),
     author: authorOf(record),
     translator: translatorOf(record),
-    originalTitle: values(record, "304", "a").find((note) => ORIGINAL_TITLE.test(note))?.replace(ORIGINAL_TITLE, "") ?? null,
+    originalTitle: values(record, "304", "a").find((note) => ORIGINAL_TITLE.test(note))?.replace(ORIGINAL_TITLE, "") || null,
     publisher: publisherOf(record),
     year: yearOf(record),
     pages: pagesIn(values(record, "215", "a")[0]),

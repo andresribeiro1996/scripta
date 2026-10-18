@@ -68,9 +68,8 @@ export function isbn10Ok(digits: string): boolean {
 }
 
 export function isValidIsbn(raw: string): boolean {
-  const compact = raw.replace(/[-\s]/g, "").toUpperCase();
-  if (/^\d{13}$/.test(compact)) return checksumOk(compact);
-  return /^\d{9}[\dX]$/.test(compact) && isbn10Ok(compact);
+  const isbn = normalizeIsbn(raw).toUpperCase();
+  return isbn.length === 13 ? checksumOk(isbn) : isbn.length === 10 && isbn10Ok(isbn);
 }
 
 function hasIsbnPrefix(isbn: string | null, prefixes13: string[], prefixes10: string[]): boolean {
