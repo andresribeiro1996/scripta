@@ -25,12 +25,30 @@ function listsOf(attempts: Array<Attempt<CatalogSearchHit[]>>): CatalogSearchHit
   return lists;
 }
 
-function interleave(first: CatalogSearchHit[], second: CatalogSearchHit[]): CatalogSearchHit[] {
-  const merged: CatalogSearchHit[] = [];
-  for (let index = 0; index < Math.max(first.length, second.length); index++) {
-    for (const list of [first, second]) if (index < list.length) merged.push(list[index]!);
+function dropRepeats(hits: CatalogSearchHit[]): CatalogSearchHit[] {
+  const kept: CatalogSearchHit[] = [];
+  const indexOf = new Map<string, number>();
+  for (const hit of hits) {
+    const key = hitKey(hit);
+    const at = key === null ? undefined : indexOf.get(key);
+    if (at === undefined) {
+      if (key !== null) indexOf.set(key, kept.length);
+      kept.push(hit);
+      continue;
+    }
+    const existing = kept[at]!;
+    const takeWorkKey = existing.workKey == null && hit.workKey != null;
+    const takeCoverId = existing.olCoverId == null && hit.olCoverId != null;
+    const takeCoverUrl = existing.result.coverUrl == null && hit.result.coverUrl != null;
+    if (!takeWorkKey && !takeCoverId && !takeCoverUrl) continue;
+    kept[at] = {
+      ...existing,
+      workKey: takeWorkKey ? hit.workKey : existing.workKey,
+      olCoverId: takeCoverId ? hit.olCoverId : existing.olCoverId,
+      result: takeCoverUrl ? { ...existing.result, coverUrl: hit.result.coverUrl } : existing.result
+    };
   }
-  return merged;
+  return kept;
 }
 
 export function createCompositeCatalog(primary: BookCatalog, secondary: BookCatalog | null, strict = false): BookCatalog {
@@ -81,17 +99,8 @@ export function createCompositeCatalog(primary: BookCatalog, secondary: BookCata
         return listsOf([first, await attempt(primary.search(query))]).flat();
       }
       const [first, second] = await Promise.all([attempt(primary.search(query)), attempt(secondary.search(query))]);
-      const seen = new Set<string>();
       const [primaryHits, secondaryHits] = listsOf([first, second]);
-      return interleave(primaryHits!, secondaryHits!)
-        .filter((hit) => {
-          const key = hitKey(hit);
-          if (key === null) return true;
-          if (seen.has(key)) return false;
-          seen.add(key);
-          return true;
-        })
-        .slice(0, SEARCH_LIMIT);
+      return dropRepeats([...secondaryHits!, ...primaryHits!]).slice(0, SEARCH_LIMIT);
     }
   };
 }

@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, View } from "react-native";
 import { router } from "expo-router";
-import { bookKey, type BookSearchResult, type LibraryBook } from "@scripta/shared";
+import { bookKey, searchResultByline, type BookSearchResult, type LibraryBook } from "@scripta/shared";
 import { Text } from "../../ui/Text";
 import { Button, ErrorState, IconButton, Skeleton, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { BookCover } from "../arena/BookCover";
@@ -117,7 +117,7 @@ function LibraryResultRow({ book, onOpen }: { book: LibraryBook; onOpen: () => v
 
 function BookResultRow({ result, onOpen, onAdd }: { result: BookSearchResult; onOpen: () => void; onAdd: (result: BookSearchResult) => void }) {
   const { colors } = useTheme();
-  const byline = [result.authors.join(", "), result.year].filter(Boolean).join(" · ");
+  const byline = searchResultByline(result);
   return (
     <View style={[styles.row, { borderBottomColor: colors.border }]}>
       <Pressable

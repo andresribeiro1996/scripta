@@ -35,6 +35,10 @@ export interface BookSearchResult {
   workId?: string;
 }
 
+export function searchResultByline(result: Pick<BookSearchResult, "authors" | "publisher" | "year">): string {
+  return [result.authors.join(", "), result.publisher, result.year].filter(Boolean).join(" · ");
+}
+
 /** True when the query is nothing but an ISBN (10 or 13, dashes/spaces
  *  allowed) — routes the search to Open Library's exact `isbn=` field
  *  instead of the fuzzy `q=` free-text search. */

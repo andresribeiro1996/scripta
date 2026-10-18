@@ -1,6 +1,7 @@
 import { htmlToText, normalizeBookGenres, normalizeIsbn, positiveInteger, type BookSearchResult } from "@scripta/shared";
 import { givenNameFirst } from "../../domain/normalize.js";
 import type { BookCatalog } from "../../domain/ports.js";
+import type { Spend } from "../../typesafe.js";
 import type { Throttle } from "../http/http.js";
 import { createIsbndbGet, isbndbRecords } from "../sources/isbndb.js";
 import type { IsbndbGate } from "./isbndbGate.js";
@@ -34,12 +35,13 @@ function toResult(record: Record<string, unknown>): BookSearchResult | null {
   };
 }
 
-export function createIsbndbCatalog(apiKey: string, throttle: Throttle, gate: IsbndbGate, urgent = true): BookCatalog {
-  const get = createIsbndbGet(apiKey, throttle, gate, urgent);
+export function createIsbndbCatalog(apiKey: string, throttle: Throttle, gate: IsbndbGate, urgent = true, spends: { details?: Spend; search?: Spend } = {}): BookCatalog {
+  const getDetails = createIsbndbGet(apiKey, throttle, gate, urgent, spends.details);
+  const getSearch = createIsbndbGet(apiKey, throttle, gate, urgent, spends.search);
   return {
     async fetchDetails({ isbn }) {
       if (!isbn) return null;
-      const [record] = isbndbRecords(await get(`${API}/book/${encodeURIComponent(isbn)}`));
+      const [record] = isbndbRecords(await getDetails(`${API}/book/${encodeURIComponent(isbn)}`));
       if (!record) return null;
       const summary = plainText(record.synopsis) ?? plainText(record.overview);
       const genres = normalizeBookGenres(record.subjects);
@@ -58,7 +60,7 @@ export function createIsbndbCatalog(apiKey: string, throttle: Throttle, gate: Is
       const url = "isbn" in query
         ? `${API}/book/${encodeURIComponent(query.isbn)}`
         : `${API}/books/${encodeURIComponent(query.text)}?page=1&pageSize=20`;
-      return isbndbRecords(await get(url)).flatMap((record) => {
+      return isbndbRecords(await getSearch(url)).flatMap((record) => {
         const result = toResult(record);
         return result ? [{ result, olCoverId: null, source: "isbndb" as const }] : [];
       });

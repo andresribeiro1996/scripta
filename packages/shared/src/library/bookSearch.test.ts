@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildManualBook, mapOpenLibraryDoc, mergeSearchResults, searchInsideOutside, type BookSearchResult, type BookSearchState } from "./bookSearch.js";
+import { buildManualBook, mapOpenLibraryDoc, mergeSearchResults, searchInsideOutside, searchResultByline, type BookSearchResult, type BookSearchState } from "./bookSearch.js";
 
 function result(title: string, authors: string[], isbn: string | null): BookSearchResult {
   return { title, authors, year: null, isbn, publisher: null, coverUrl: null, genres: [] };
@@ -117,4 +117,11 @@ test("mapOpenLibraryDoc drops non-sorting markers from the title and authors", (
 
 test("mapOpenLibraryDoc drops non-sorting markers before repairing mojibake", () => {
   assert.equal(mapOpenLibraryDoc({ title: "\u0098A \u009cfÃ© e a crenÃ§a" })?.title, "A fé e a crença");
+});
+
+test("a search result byline reads author · publisher · year and skips what is missing", () => {
+  const base = { authors: ["Isabel Allende"], publisher: "Porto Editora", year: 2013 };
+  assert.equal(searchResultByline(base), "Isabel Allende · Porto Editora · 2013");
+  assert.equal(searchResultByline({ ...base, publisher: null }), "Isabel Allende · 2013");
+  assert.equal(searchResultByline({ authors: [], publisher: "Porto Editora", year: null }), "Porto Editora");
 });
