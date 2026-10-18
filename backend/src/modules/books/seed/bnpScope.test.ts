@@ -14,6 +14,9 @@ test("each rule skips its record, in order", () => {
   assert.equal(bnpSkipReason(book({ publisher: "Câmara Municipal de Tavira" })), "institutional");
   assert.equal(bnpSkipReason(book({ author: "" })), "noPerson");
   assert.equal(bnpSkipReason(book({})), null);
+  assert.equal(bnpSkipReason(book({ isbns: [], publisher: null })), "noIsbn");
+  assert.equal(bnpSkipReason(book({ udc: ["51(075.2)"], publisher: null })), "textbook");
+  assert.equal(bnpSkipReason(book({ publisher: "Câmara Municipal de Tavira", author: "" })), "institutional");
 });
 
 test("trade publishers a naive pattern would catch are kept", () => {
@@ -37,14 +40,24 @@ test("udc codes map to genres and a plain novel gets none", () => {
 
 test("literary forms, exactly and not by a longer number", () => {
   assert.deepEqual(udcGenres(['821.134.3-13"20"']), []);
-  assert.deepEqual(udcGenres(['821.134.3-1.09"20"']), ["Poetry"]);
+  assert.deepEqual(udcGenres(['821.134.3-1.09"20"']), []);
+  assert.deepEqual(udcGenres(["821.134.3-1Pessoa, Fernando.09(042)"]), []);
+  assert.deepEqual(udcGenres(["821.111-312.4Fleming, Ian.09"]), []);
+  assert.deepEqual(udcGenres(['821.111(73)-311.6"18".09']), []);
+  assert.deepEqual(udcGenres(["821.134.3-1Pessoa, Fernando(042)"]), ["Poetry"]);
   assert.deepEqual(udcGenres(['821.111(73)-311.9"19/20"']), ["Science Fiction"]);
   assert.deepEqual(udcGenres(['821.111-312.9"19/20"']), ["Fantasy"]);
   assert.deepEqual(udcGenres(['821.134.3-311.6"20"']), ["Historical Fiction"]);
   assert.deepEqual(udcGenres(['821.134.3-94"20"']), ["Biography & Memoir"]);
   assert.deepEqual(udcGenres(['821.134.3-992"19"']), ["Travel"]);
   assert.deepEqual(udcGenres(['821.134.3-993"20"']), []);
-  assert.deepEqual(udcGenres(['821.134.3-311.6"18".09']), ["Historical Fiction"]);
+  assert.deepEqual(udcGenres(['821.134.3-311.6"18"']), ["Historical Fiction"]);
+});
+
+test("a subject treated as a character in fiction gives its code no genre", () => {
+  assert.deepEqual(udcGenres(["821.133.1(569.3)-31", "929Leão, O Africano(0:82-31)"]), []);
+  assert.deepEqual(udcGenres(['94(469)"18"(0:82-31)']), []);
+  assert.deepEqual(udcGenres(['821.134.3-311.6"19"', '94(469)"18"(0:82-311.6)']), ["Historical Fiction"]);
 });
 
 test("age auxiliaries give children's or young adult, a person auxiliary does not", () => {

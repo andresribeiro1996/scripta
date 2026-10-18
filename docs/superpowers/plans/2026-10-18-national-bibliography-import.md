@@ -270,32 +270,36 @@ const INSTITUTIONAL = /\b(?:camara municipal|camara municpal|municipio|empresa m
 ```
 - `udcGenres` collects genres from every code and returns them in `BOOK_GENRES` order, deduped.
   - The main number is the leading `[\d.]+`. The literary form is the first `-[1-9][\d.]*` in the code. The form-of-presentation auxiliary is `(0.053.N`.
-  - Literature (main starts with `82`), by literary form:
+  - A code containing `(0:82` (the subject is a character in fiction, as in `929Leão, O Africano(0:82-31)`) gives no genre at all.
+  - Literature (main starts with `82`), by literary form, each matched exactly or followed by `.` (so `-1` is not `-13`). A form followed by `.09` (criticism or history of that form), directly or after a name qualifier as in `-1Pessoa, Fernando.09(042)`, gives no form genre:
     - `-93` → Children's
-    - `-1` → Poetry, exact or followed by `.` (so not `-13`)
+    - `-1` → Poetry
     - `-312.4` → Crime
-    - `-312.9` → Science Fiction
+    - `-311.9` → Science Fiction
+    - `-312.9` → Fantasy
     - `-311.6` → Historical Fiction
     - `-94` → Biography & Memoir
     - `-992` → Travel
     - anything else → nothing
   - Any code with `(0.053.2` through `(0.053.5` → Children's. `(0.053.6` → Young Adult. A `-053.N` person auxiliary, as in `159.942-053.2` (child psychology), gives no age genre.
-  - Other main numbers, by prefix, longest first:
-    - `741.5` → Comics & Graphic Novels
+  - Other main numbers, by prefix, longest first (a prefix mapped to nothing carves a branch out of the shorter one after it):
+    - `929.5`, `929.6`, `929.7`, `929.9` → nothing (genealogy, heraldry, nobility, flags)
     - `641.5` → Cooking
-    - `004` → Technology
     - `159.9` → Psychology
+    - `004` → Technology
+    - `133` → nothing (occult)
+    - `657`, `658`, `659` → Business
+    - `910` → Travel
     - `929` → Biography & Memoir
-    - `91` → Travel
     - `93`, `94` → History
     - `32` → Politics
-    - `33`, `65` → Business
+    - `33` → Business
     - `62` → Technology
     - `1` → Philosophy
     - `2` → Religion
     - `5` → Science
     - anything else → nothing
-- **Before relying on the table,** check every code above against the UDC Summary (udcsummary.info) and the fixture records. Delete any mapping that doesn't hold, and say which in the task report. A wrong genre is worse than none.
+- This table was checked against the UDC Summary and about 7,800 live BNP records on 2026-10-18; spec decision 5 names what changed from the first draft.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -309,6 +313,8 @@ test("each rule skips its record, in order", () => {
   assert.equal(bnpSkipReason(book({ publisher: "Câmara Municipal de Tavira" })), "institutional");
   assert.equal(bnpSkipReason(book({ author: "" })), "noPerson");
   assert.equal(bnpSkipReason(book({})), null);
+  assert.equal(bnpSkipReason(book({ isbns: [], publisher: null })), "noIsbn");
+  assert.equal(bnpSkipReason(book({ publisher: "Câmara Municipal de Tavira", author: "" })), "institutional");
 });
 
 test("trade publishers a naive pattern would catch are kept", () => {
@@ -328,6 +334,10 @@ test("udc codes map to genres and a plain novel gets none", () => {
   assert.deepEqual(udcGenres(["159.942-053.2"]), ["Psychology"]);
   assert.deepEqual(udcGenres(["793.7(0.053.4/.5)"]), ["Children's"]);
   assert.deepEqual(udcGenres(["641.5"]), ["Cooking"]);
+  assert.deepEqual(udcGenres(['821.111-312.9"19/20"']), ["Fantasy"]);
+  assert.deepEqual(udcGenres(["821.133.1(569.3)-31", "929Leão, O Africano(0:82-31)"]), []);
+  assert.deepEqual(udcGenres(["821.134.3-1Pessoa, Fernando.09(042)"]), []);
+  assert.deepEqual(udcGenres(["821.111-312.4Fleming, Ian.09"]), []);
 });
 ```
 Adjust these expected arrays only if the UDC verification deletes a mapping, and record why in the report.

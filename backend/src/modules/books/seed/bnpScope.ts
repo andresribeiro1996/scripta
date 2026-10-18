@@ -2,15 +2,17 @@ import { BOOK_GENRES, normalizeGenreLabel } from "@scripta/shared";
 import type { BookGenre } from "@scripta/shared";
 import type { BnpBook } from "./bnpRecord.js";
 
-export type BnpSkip = "noIsbn" | "textbook" | "noPublisher" | "institutional" | "noPerson";
+export const BNP_SKIPS = ["noIsbn", "textbook", "noPublisher", "institutional", "noPerson"] as const;
 
-export const BNP_SKIPS: readonly BnpSkip[] = ["noIsbn", "textbook", "noPublisher", "institutional", "noPerson"];
+export type BnpSkip = (typeof BNP_SKIPS)[number];
 
 const INSTITUTIONAL = /\b(?:camara municipal|camara municpal|municipio|empresa municipal|junta de freguesia|uniao das? (?:juntas de )?freguesias|comunidade intermunicipal|universidade|faculdade|politecnico|escola superior|agrupamento de escolas|ministerio|direc?cao geral|direc?cao regional|direc?cao de servicos|secretaria regional|governo|regiao autonoma|assembleia da republica|associacao|centro de estudos|centro de investigacao|museu|diocese|paroquia|banda musical|filarmonica|grupo coral|santa casa|conferencia episcopal|instituto (?:politecnico|nacional|superior|portugues|de )|comissao)\b/;
 
 const MAIN_NUMBER = /^[\d.]+/;
 const LITERARY_FORM = /-([1-9][\d.]*)/;
 const AGE_AUXILIARY = /\(0\.053\.([2-6])/;
+const FICTION_SUBJECT = "(0:82";
+const CRITICISM = /\.09(?!\d)/;
 
 const LITERARY_FORMS: Array<[string, BookGenre]> = [
   ["93", "Children's"],
@@ -57,14 +59,17 @@ export function bnpSkipReason(book: BnpBook): BnpSkip | null {
 }
 
 function codeGenres(code: string): BookGenre[] {
+  if (code.includes(FICTION_SUBJECT)) return [];
   const genres: BookGenre[] = [];
   const age = AGE_AUXILIARY.exec(code)?.[1];
   if (age) genres.push(age === "6" ? "Young Adult" : "Children's");
   const main = MAIN_NUMBER.exec(code)?.[0] ?? "";
   if (main.startsWith("82")) {
-    const form = LITERARY_FORM.exec(code)?.[1];
-    const literary = form && LITERARY_FORMS.find(([key]) => form === key || form.startsWith(`${key}.`));
-    if (literary) genres.push(literary[1]);
+    const found = LITERARY_FORM.exec(code);
+    if (found && !CRITICISM.test(code.slice(found.index))) {
+      const literary = LITERARY_FORMS.find(([key]) => found[1] === key || found[1]!.startsWith(`${key}.`));
+      if (literary) genres.push(literary[1]);
+    }
     return genres;
   }
   const prefix = MAIN_PREFIXES.find(([key]) => main.startsWith(key));

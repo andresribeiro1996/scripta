@@ -90,6 +90,7 @@ The user decided 1, 2, 3 and 9 and approved the direction of the rest in convers
      - biography & memoir (`-94`, `929` except `929.5`/`.6`/`.7`/`.9`);
      - travel (`-992`, `910`);
      - history (`93`/`94`), philosophy (`1` except `133` and `159.9`), psychology (`159.9`), religion (`2`), politics (`32`), business (`33`, `657`/`658`/`659`), science (`5`), technology (`004`, `62`), cooking (`641.5`).
+   - A code whose subject is a character in fiction (`(0:82`, as in `929Leão, O Africano(0:82-31)`) gives no genre, and a literary form followed by `.09` (criticism of that form, as in `-1Pessoa, Fernando.09`) gives no form genre: the first is a novel, the second a book about poetry.
    - The table was checked against the UDC Summary and about 7,800 live BNP records on 2026-10-18; the first draft's `-312.9` (science fiction, now `-311.9`), `741.5` (comics, dropped), `91` (now `910`), `65` (now `657`/`658`/`659`), `1` (now without `133`) and `929` (now without `929.5`/`.6`/`.7`/`.9`) did not hold as drafted.
    - **A plain novel (`-31`), short story (`-32`/`-34`), drama, essay, or any unmapped code gets no genre** *(Claude's call)*. That leaves it to the existing Jev classifier once someone holds the work.
    - These genres are library subjects, so `genres_source` stays NULL, the same as Open Library and ISBNdb subjects.
