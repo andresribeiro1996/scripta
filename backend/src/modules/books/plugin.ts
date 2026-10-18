@@ -30,10 +30,13 @@ import { createBooksService, MAX_UPLOAD_BYTES, type BooksService } from "./books
 import type { FetchCoverImage } from "./coverResolver.js";
 import { encodeCover } from "./domain/images.js";
 import type { BookLookup } from "./domain/normalize.js";
+import type { CoverBlobReader, CoverBlobStore } from "./domain/ports.js";
 import { coverUrlFor, useBooksRepository } from "./publicCoverLookup.js";
 import { buildAdminRoutes, buildCatalogRoutes, buildCoverFileRoutes, buildGenreReviewRoutes, buildResolveRoutes, buildSynopsisReviewRoutes, buildTranslationReviewRoutes } from "./routes.js";
 import { RETITLE_BATCH_SIZE, retitleWanted } from "./retitleJob.js";
+import { BNP_SYNC_INTERVAL_MS, fetchBnpScan, syncBnp, type BnpHarvestDeps } from "./seed/bnpImport.js";
 import { applyMojibakeRepairs } from "./seed/mojibakeRepair.js";
+import { fetchText } from "./seed/siteFetch.js";
 import { createCoverWorker } from "./worker.js";
 
 const ISBNDB_GAP_MS = 1100;
@@ -115,12 +118,13 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
     return bytes ? encodeCover(bytes) : null;
   };
   const backgroundOpenLibrary = createOpenLibraryCatalog(openLibraryThrottle, false);
+  const blobs: CoverBlobStore & CoverBlobReader = {
+    save: (id, extension, bytes) => createObjectStore().put(`covers/${id}.${extension}`, bytes, "image/webp"),
+    read: (id, extension) => createObjectStore().get(`covers/${id}.${extension}`)
+  };
   const service = createBooksService({
     repo,
-    blobs: {
-      save: (id, extension, bytes) => createObjectStore().put(`covers/${id}.${extension}`, bytes, "image/webp"),
-      read: (id, extension) => createObjectStore().get(`covers/${id}.${extension}`)
-    },
+    blobs,
     sources: {
       isbndb: isbndbConfigured ? createIsbndbSource(env.ISBNDB_API_KEY, isbndbThrottle, isbndbGate, isbndbSpend) : null,
       apple: createAppleSource(createThrottle(APPLE_GAP_MS)),
@@ -178,6 +182,22 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
         (error) => app.log.error({ err: error }, "lossy retitle failed")
       )
     : null;
+  const bnpDeps: BnpHarvestDeps = {
+    repo,
+    blobs,
+    fetchScan: fetchBnpScan,
+    fetchText,
+    now: () => new Date(),
+    log: (line) => app.log.info({ bnp: line }, "bnp sync window")
+  };
+  const stopBnpSync = startDetailsBackfill(
+    async () => {
+      const report = await syncBnp(bnpDeps);
+      if (report) app.log.info({ through: report.through, kept: report.kept, created: report.created, failedWindows: report.failedWindows }, "bnp sync");
+    },
+    (error) => app.log.error({ err: error }, "bnp sync failed"),
+    BNP_SYNC_INTERVAL_MS
+  );
   activeService = service;
   app.addHook("onClose", async () => {
     activeService = null;
@@ -188,6 +208,7 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
     stopWorkKeyBackfill();
     stopColorBackfill();
     stopRetitleJob?.();
+    stopBnpSync();
     genreJobs?.stop();
     synopsisJobs?.stop();
     translationJobs?.stop();

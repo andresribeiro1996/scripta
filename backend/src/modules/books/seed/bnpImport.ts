@@ -135,6 +135,7 @@ export interface BnpImportReport {
 }
 
 export const BNP_OAI = "https://oai.bnportugal.gov.pt/servlet/OAIHandler";
+export const BNP_SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
 const SCAN_POOL = 2;
 const TOP_PUBLISHERS = 50;
@@ -317,4 +318,10 @@ export async function importBnp(deps: BnpHarvestDeps, options: BnpImportOptions)
   report.publishers = { kept: top(keptPublishers), dropped: perSkip((reason) => top(droppedPublishers[reason])) };
   if (options.cursorOnSuccess && !options.dryRun && report.failedWindows.length === 0) deps.repo.setHarvestCursor("bnp", options.until);
   return report;
+}
+
+export async function syncBnp(deps: BnpHarvestDeps): Promise<BnpImportReport | null> {
+  const cursor = deps.repo.getHarvestCursor("bnp");
+  if (cursor === null) return null;
+  return importBnp(deps, { from: cursor, until: utcDate(deps.now()), dryRun: false, cursorOnSuccess: true });
 }

@@ -22,7 +22,7 @@ const { applyBooksMigrations } = await import("../adapters/sqlite/connection.js"
 const { createSqliteBooksRepository } = await import("../adapters/sqlite/sqliteBooksRepository.js");
 const { SourceUnavailableError } = await import("../domain/errors.js");
 const { catalogTitleKey } = await import("../domain/normalize.js");
-const { applyBnpRecord, fetchBnpScan, importBnp, monthWindows, planBnpRecord, utcDate } = await import("./bnpImport.js");
+const { applyBnpRecord, fetchBnpScan, importBnp, monthWindows, planBnpRecord, syncBnp, utcDate } = await import("./bnpImport.js");
 const { mapBnpRecord, readMarcRecords } = await import("./bnpRecord.js");
 
 process.env.TZ = "America/Sao_Paulo";
@@ -827,4 +827,61 @@ test("a finished run writes the cursor only when asked, never on a dry run or af
     await importBnp(deps, run("2026-10-18", "2026-10-18", extra));
     assert.equal(repo.getHarvestCursor("bnp"), cursor, label);
   }
+});
+
+const SYNC_NOW = () => new Date("2026-10-18T01:00:00.000Z");
+
+test("the sync does nothing without a cursor", async () => {
+  const { deps, events, asked, logs } = harvestSetup({});
+
+  const report = await syncBnp({ ...deps, now: SYNC_NOW });
+
+  assert.equal(report, null);
+  assert.deepEqual(events, []);
+  assert.equal(asked.size, 0);
+  assert.deepEqual(logs, []);
+});
+
+test("the sync harvests from the cursor to today and advances it", async () => {
+  const { repo, asked, deps } = harvestSetup({
+    [windowUrl("2026-10-16", "2026-10-18")]: FIXTURE_PAGE,
+    [tokenUrl("TOKEN-1")]: EMPTY_PAGE
+  });
+  repo.setHarvestCursor("bnp", "2026-10-16");
+
+  const report = await syncBnp({ ...deps, now: SYNC_NOW });
+
+  assert.deepEqual([...asked.keys()], [windowUrl("2026-10-16", "2026-10-18"), tokenUrl("TOKEN-1")]);
+  assert.equal(report!.from, "2026-10-16");
+  assert.equal(report!.until, "2026-10-18");
+  assert.equal(report!.through, "2026-10-18");
+  assert.equal(report!.dryRun, false);
+  assert.equal(report!.kept, 2);
+  assert.equal(report!.created, 2);
+  assert.ok(repo.findBookByKey("isbn:9789727089482"));
+  assert.deepEqual(report!.failedWindows, []);
+  assert.equal(repo.getHarvestCursor("bnp"), "2026-10-18");
+});
+
+test("a quiet day still advances the cursor", async () => {
+  const { repo, deps } = harvestSetup({ [windowUrl("2026-10-17", "2026-10-18")]: EMPTY_PAGE });
+  repo.setHarvestCursor("bnp", "2026-10-17");
+
+  const report = await syncBnp({ ...deps, now: SYNC_NOW });
+
+  assert.equal(report!.records, 0);
+  assert.equal(report!.through, "2026-10-18");
+  assert.equal(repo.getHarvestCursor("bnp"), "2026-10-18");
+});
+
+test("a failed sync window leaves the cursor where it was", async () => {
+  const { repo, asked, deps } = harvestSetup({ [windowUrl("2026-10-16", "2026-10-18")]: [unavailable(), unavailable()] });
+  repo.setHarvestCursor("bnp", "2026-10-16");
+
+  const report = await syncBnp({ ...deps, now: SYNC_NOW });
+
+  assert.deepEqual(report!.failedWindows, ["2026-10-16..2026-10-18"]);
+  assert.equal(report!.through, null);
+  assert.equal(asked.get(windowUrl("2026-10-16", "2026-10-18")), 4);
+  assert.equal(repo.getHarvestCursor("bnp"), "2026-10-16");
 });
