@@ -103,6 +103,7 @@ export function mapBnpRecord(record: MarcRecord): BnpBook;
   - `id` is the OAI header identifier, and `datestamp` the header datestamp. Both are null for the per-ISBN shape.
   - `deleted` is true when the header has `status="deleted"`.
   - It decodes `&amp; &lt; &gt; &quot; &apos;` and numeric entities (`&#x98;`, `&#152;`).
+  - Every string it returns (ids, datestamps, control and subfield values) is copied with `structuredClone`, as `publisherFeed.ts` does since #295. On Node 24 a regex substring otherwise keeps its whole ~1.3 MB page alive.
   - It returns `[]` for an empty `<ListRecords>`, a `noRecordsMatch` error, and the per-ISBN `<urn-response><error>`.
 - `readOaiError` returns the `code` attribute of an OAI `<error>`. It returns `null` when there is no error, and also for `noRecordsMatch`.
 - `mapBnpRecord`. Every text value goes through `cleanCatalogText` (`@scripta/shared`), then trim and whitespace collapse.
@@ -148,7 +149,8 @@ Trim `oai-page.xml`:
 test("isValidIsbn checks the check digit of both lengths", () => {
   assert.equal(isValidIsbn("978-972-0-04445-7"), true);
   assert.equal(isValidIsbn("9789720044458"), false);
-  assert.equal(isValidIsbn("972-708-948-2"), true);
+  assert.equal(isValidIsbn("972-708-948-8"), true);
+  assert.equal(isValidIsbn("972-708-948-2"), false);
   assert.equal(isValidIsbn("097522980X"), true);
   assert.equal(isValidIsbn("12345"), false);
 });
@@ -347,13 +349,15 @@ Adjust these expected arrays only if the UDC verification deletes a mapping, and
 - Modify: `backend/src/modules/books/adapters/sqlite/sqliteBooksRepository.ts`
 - Modify: `packages/shared/src/library/bookMetadata.ts`
 - Modify: `frontend/src/lib/bookMetadata.ts`
+- Modify: `backend/src/modules/books/booksService.ts`
 - Test: `backend/src/modules/books/adapters/sqlite/sqliteBooksRepository.test.ts`
+- Test: `backend/src/modules/books/booksService.test.ts`
 
 **Interfaces:**
 - Produces, in `packages/shared/src/library/bookMetadata.ts:23`: `summarySource` gains `"bnp"`. In `frontend/src/lib/bookMetadata.ts:32`, `summarySourceName` returns `"Biblioteca Nacional de Portugal"` for it. This is a one-line label; typecheck covers the union, and no test is added.
 - Produces, in `types.ts`: `"bnp"` added to `DataSource` (so `SummarySource` gains it), to `CoverSourceName` and to `BookCreator`.
   - No exhaustive switch or `Record` over these unions exists today (checked 2026-10-18). Typecheck confirms it.
-  - `summaryLink` (`booksService.ts:121`) already returns `book.source_url ?? ""` for other sources. The import never sets `source_url`, so a `bnp` summary has no link.
+  - `summaryLink` (`booksService.ts:121`) returns `""` for `summary_source === "bnp"`. A matched book may carry another source's `source_url`, which must not be shown as the BNP's link.
 - Produces, on `BooksRepository` (`ports.ts`) and implemented in `sqliteBooksRepository.ts`:
 ```ts
 fillSubjectGenres(bookId: string, genres: string[]): void;
@@ -379,18 +383,20 @@ test("the harvest cursor starts empty and keeps the last value", () => {
   repo.setHarvestCursor("bnp", "2026-10-17"); repo.setHarvestCursor("bnp", "2026-10-18");
   assert.equal(repo.getHarvestCursor("bnp"), "2026-10-18");
 });
-test("the details queue skips bnp books and uses its partial index", () => {
+test("the details queue skips bnp books", () => {
   /* createBook createdBy "bnp" and one with no creator; listUncheckedDetailIds(10) returns only the second */
-  const plan = db.prepare(`EXPLAIN QUERY PLAN ${UNCHECKED_DETAILS_SQL}`).all(10).map((row: any) => row.detail).join(" ");
-  assert.match(plan, /idx_books_details_pending/);
 });
 ```
 Write the bodies the comments describe.
 
-- [ ] **Step 2: Run them and confirm they fail.** `cd backend && npx tsx --test src/modules/books/adapters/sqlite/sqliteBooksRepository.test.ts` fails with missing methods.
+Then make two more changes:
+- Update the existing query-plan test at `sqliteBooksRepository.test.ts:~1291`, which asserts `idx_books_details_unchecked`, to assert `idx_books_details_pending`. Don't add a second query-plan test.
+- In `booksService.test.ts`, add `test("a bnp summary has no source link", …)`: a book with `summary_source` `bnp` and a non-empty `source_url` gives details with `sourceUrl` `""`.
+
+- [ ] **Step 2: Run them and confirm they fail.** `cd backend && npx tsx --test src/modules/books/adapters/sqlite/sqliteBooksRepository.test.ts src/modules/books/booksService.test.ts` fails with missing methods.
 - [ ] **Step 3: Implement.**
 - [ ] **Step 4: Run the test file, then the backend verify, then `npm run typecheck --workspace frontend && npm run lint --workspace frontend && npm test --workspace frontend`.** Expected: PASS.
-- [ ] **Step 5: Commit** `git add backend/src/modules/books/domain/types.ts backend/src/modules/books/domain/ports.ts backend/src/modules/books/adapters/sqlite/books.sql backend/src/modules/books/adapters/sqlite/connection.ts backend/src/modules/books/adapters/sqlite/sqliteBooksRepository.ts backend/src/modules/books/adapters/sqlite/sqliteBooksRepository.test.ts packages/shared/src/library/bookMetadata.ts frontend/src/lib/bookMetadata.ts && git commit -m "Repository support for the national bibliography import"`
+- [ ] **Step 5: Commit** `git add backend/src/modules/books/domain/types.ts backend/src/modules/books/domain/ports.ts backend/src/modules/books/adapters/sqlite/books.sql backend/src/modules/books/adapters/sqlite/connection.ts backend/src/modules/books/adapters/sqlite/sqliteBooksRepository.ts backend/src/modules/books/adapters/sqlite/sqliteBooksRepository.test.ts backend/src/modules/books/booksService.ts backend/src/modules/books/booksService.test.ts packages/shared/src/library/bookMetadata.ts frontend/src/lib/bookMetadata.ts && git commit -m "Repository support for the national bibliography import"`
 
 ---
 
@@ -423,7 +429,7 @@ export async function fetchBnpScan(url: string): Promise<EncodedCover | null>;
   - otherwise `null`.
 - `planBnpRecord`:
   - `isbn` is the given one (the lookup path) or `book.isbns[0]`. With neither it returns `null`.
-  - `existing` is the first book any of `[isbn, ...book.isbns]` maps to through `findBookByKey("isbn:" + x)`.
+  - `existing` is `findBookByKey("isbn:" + isbn)`. The record's other ISBNs are not used (spec decision 6).
   - `replace` is `bnpReplaceReason(existing, existing image)`.
 - `applyBnpRecord`, in this order:
   1. If `replace !== null` and `book.scanUrl`, await `fetchScan`.
@@ -432,16 +438,20 @@ export async function fetchBnpScan(url: string): Promise<EncodedCover | null>;
      - `!isAcceptableCover("bnp", w, h)` → `"rejected"`.
      - Otherwise there is a scan.
   2. In one `repo.transaction`:
-     - Re-run `planBnpRecord`'s lookup over `[isbn, ...book.isbns]`, so a book created meanwhile is reused. Then create or reuse:
-       - New: `createBook({ title, author, isbn, year, publisher, genres: udcGenres(book.udc), createdBy: "bnp" }, keys, at)`. The keys are `isbn:<isbn>` and the other `isbn:<x>` for `book.isbns`. Add `identity.titleKey` only when no book holds it (as `seedBook` does). Then `setCover(id, { imageId: null, status: null, checkedAt: at })`.
-       - Existing: `fillMissingIdentity(repo, existing, title, author)`, `addKey` for each of the record's ISBN keys, `fillSubjectGenres(id, udcGenres(book.udc))`, `confirmWithSource(id, "bnp")`.
+     - Re-read `findBookByKey("isbn:" + isbn)`, so a book created meanwhile is reused. Then create or reuse:
+       - New: `createBook({ title, author, isbn, year, publisher, genres: udcGenres(book.udc), createdBy: "bnp" }, keys, at)`. The keys are `isbn:<isbn>`, plus `identity.titleKey` only when no book holds it (as `seedBook` does). Then `setCover(id, { imageId: null, status: null, checkedAt: at })`.
+       - Existing: `fillMissingIdentity(repo, existing, title, author)`, `fillSubjectGenres(id, udcGenres(book.udc))`, `confirmWithSource(id, "bnp")`.
      - Both: `mergeDetails(id, { summary, pages, year, publisher, translator }, "bnp")`, `fillOriginalTitle(id, originalTitle)` when it is set, and `setLanguage(id, editionLanguage(book.languages, isbn))`.
+     - Still inside the transaction, recompute `bnpReplaceReason` on the current row and its image. The current image may have changed during the download, for example a manual upload or a good Apple cover.
+       - If the reason is now `null`, drop the scan: the cover is `"kept"`.
+       - Otherwise remember the current row's `cover_image_id` as the expected id for step 3.
   3. If there is a scan:
      - `imageId = await storeCoverImage(deps, id, "bnp", scanUrl, scan, at)`.
-     - Then `setCoverIf(id, <cover_image_id read in step 2>, { imageId, status: width >= MIN_GOOD_WIDTH ? "good" : "low_res", checkedAt: at })`.
+     - Then `setCoverIf(id, <expected id from step 2>, { imageId, status: width >= MIN_GOOD_WIDTH ? "good" : "low_res", checkedAt: at })`.
      - The cover is `"stored"` if that returned true, otherwise `"kept"`.
      - With no scan to fetch: `"noScan"` when `book.scanUrl` is null, otherwise `"kept"`.
   - Identity uses `lookupIdentity({ isbn, title: book.title, author: book.author })`.
+  - The returned `book` is `repo.getBook(id)` read **after** `setCoverIf`, so a lookup's first answer carries its new cover.
 - `fetchBnpScan`: `fetchBytes(url)` from `siteFetch.ts`, then `encodeCover`, or `null` on a `null` body.
 
 - [ ] **Step 1: Write the failing tests.** Use the same env preamble as `seedCatalog.test.ts`, an in-memory repo (`applyBooksMigrations` on `new DatabaseSync(":memory:")`), a `Map` blob store, and a `fetchScan` fake returning `{ full, thumb, width: 400, height: 600, color: "" }` or a given value.
@@ -457,12 +467,13 @@ test("the scan replaces none, low-res and Portugal ISBNdb covers and nothing els
   /* table over (status, image source) → expected: none→stored, low_res→stored, good isbndb on 978972→stored, manual→kept, good apple→kept, good openlibrary→kept */
 });
 test("an existing book with no scan in its record keeps its cover state", async () => { /* status null, cover_checked_at null before and after */ });
-test("a record matches the book held under its second ISBN", async () => { /* existing book keyed isbn:<second>; apply; no new book; first ISBN key added */ });
+test("a record with several ISBNs creates and keys only its first", async () => { /* record isbns [A, B]; a book already holds isbn:B; apply → a new book keyed isbn:A only; the isbn:B book untouched; findBookByKey("isbn:" + B) is still the old book */ });
 test("an ISBN-less book with the same title is not adopted", async () => { /* seed a ta: book; apply; a new book is created */ });
 test("applying the same record twice creates one book and uploads one scan", async () => { /* blobs size 2 after both; one book */ });
 test("a cover uploaded during the scan download is kept", async () => {
-  /* fetchScan fake that, before resolving, sets the book's cover via setCover(manual image); result cover "kept"; book keeps the manual image */
+  /* existing low_res book; fetchScan fake that, before resolving, sets the book's cover via setCover(<new image>, "manual"); result cover "kept"; book keeps the manual image; the same with a good apple image */
 });
+test("the returned book carries the stored cover", async () => { /* result.book.cover_image_id is the new image id, cover_status "good" */ });
 test("a failed or rejected scan leaves a new book stamped and coverless", async () => { /* SourceUnavailableError → "failed"; 400x420 → "rejected"; both status null, checked_at set */ });
 test("an unconfirmed existing book becomes searchable", async () => { /* createBook with no creator/sources; apply; isSearchable true */ });
 test("subject genres fill an empty book but never a manual one", async () => { /* udc poetry; book genres [] → ["Poetry"]; genres_source "manual" → unchanged */ });
@@ -507,11 +518,11 @@ export async function importBnp(deps: BnpHarvestDeps, options: BnpImportOptions)
 - `monthWindows` gives calendar-month windows clipped to `[from, until]`, inclusive, for example `2026-09-15..2026-10-03` → `[09-15..09-30, 10-01..10-03]`. If `from === until`, it gives one window.
 - A window's first URL is `${BNP_OAI}?verb=ListRecords&metadataPrefix=marcxchange&set=bibliografianacional&from=${w.from}&until=${w.until}`. Following URLs are `${BNP_OAI}?verb=ListRecords&resumptionToken=${encodeURIComponent(token)}`. Pages are fetched one at a time, with no delay.
 - A page fails when the fetch throws `SourceUnavailableError`, when `status !== 200`, or when `readOaiError` returns a code. A failure restarts the window once from its first URL. A second failure adds `"${from}..${until}"` to `failedWindows` and moves on to the next window.
-- Per page:
-  - Deleted records are counted and skipped.
-  - The others are mapped and their skip reason computed. Skipped publishers are tallied per reason. Kept records are planned.
-  - **Dry run:** count the plan only. `created` or `matched` comes from `existing`. `covers` gets `"stored"` when `replace !== null` and there is a `scanUrl`, `"noScan"` when there is no `scanUrl`, and `"kept"` otherwise. `replace` is tallied, and nothing is written or fetched.
-  - **Real run:** `applyBnpRecord` runs over the page's kept plans with at most 2 in flight (a small local pool).
+- **A window is paged straight through first.** Each page's records are read, deleted ones counted and dropped, the rest mapped and their skip reason computed. Skipped publishers are tallied per reason, and the kept `BnpBook`s collected. Only after the last page is the window applied.
+  - A `resumptionToken` lasts about a minute, and applying one page's ~200 scans takes longer than that.
+- Per kept book, after paging:
+  - **Dry run:** plan it and count the plan only. `created` or `matched` comes from `existing`, and an ISBN already seen earlier in the run counts as matched (a run-wide `Set`). `covers` gets `"stored"` when `replace !== null` and there is a `scanUrl`, `"noScan"` when there is no `scanUrl`, and `"kept"` otherwise. `replace` is tallied. Nothing is written or fetched.
+  - **Real run:** plan each book right before applying it, then `applyBnpRecord`. At most 2 run at once (a small local pool), and never two with the same ISBN at once: a book whose ISBN is in flight waits for it.
   - Genres are tallied from `udcGenres`. `samples` keeps the first 20 kept books.
 - Publisher tallies are cut to the top 50 per list.
 - After each window, `deps.log(JSON.stringify({ window, through, records, kept, failed }))`. `through` is the `until` of the last window such that it and every earlier window succeeded.
@@ -529,6 +540,8 @@ test("a window follows its resumption token and applies every kept record", asyn
 test("a dry run writes and fetches nothing and still reports the plan", async () => { /* fetchScan throws if called; book count unchanged; publishers.dropped.institutional has the Câmara */ });
 test("a window that fails twice is listed and through stops before it", async () => { /* second window's URL throws SourceUnavailableError twice; failedWindows ["2026-10-01..2026-10-03"]; through "2026-09-30"; no cursor written */ });
 test("a page that fails once is retried from the window's start", async () => { /* badResumptionToken on page 2 the first time only; window succeeds; records counted once per apply (idempotent) */ });
+test("a window's pages are all fetched before its first scan", async () => { /* log the order of fetchText and fetchScan calls; every fetchText of the window precedes the first fetchScan */ });
+test("two records with the same ISBN in one window make one book and one upload", async () => { /* page with the Allende record twice; one book; blobs size 2 */ });
 test("a finished run writes the cursor only when asked, never on a dry run or after a failed window", async () => { /* until "2026-10-18", cursorOnSuccess true → cursor "2026-10-18"; cursorOnSuccess false → null; dryRun → null; one failed window → null */ });
 ```
 - [ ] **Step 2: Run them and confirm they fail.**
@@ -553,14 +566,19 @@ test("a finished run writes the cursor only when asked, never on a dry run or af
   - Options: `--dry-run` (boolean), `--from` (default `"2000-01-01"`, the set's earliest datestamp), `--until` (default `utcDate(new Date())`).
   - Calls `importBnp({ repo, blobs, fetchScan: fetchBnpScan, fetchText, now: () => new Date(), log: console.log }, { from, until, dryRun, cursorOnSuccess: values.until === undefined })`.
   - Prints `JSON.stringify(report)` as the last line.
+  - Its `log` appends the memory in use to each window line: ``(line) => console.log(line, `rss=${Math.round(process.memoryUsage().rss / 1e6)}MB`)``.
   - On a dry run, blobs is `{ save: () => { throw new Error("dry run") } }`.
-- [ ] **Step 2: Smoke-test it locally against the dev catalog**
-  - `npm run build --workspace backend`, then from `backend/`: `node scripts/import-bnp.mjs --dry-run --from 2026-10-16 --until 2026-10-17`, using the dev env from `docs/dev-workflow.md`.
-  - Expected: one window line, then a report with `records` > 0, `kept` > 0, and `failedWindows: []`.
-  - Then run without `--dry-run` against a **scratch copy** of the dev covers DB (`COVERS_DB_PATH=<copy>`), with the object store pointed at the local dev store. Expected: `created` > 0 and `covers.stored` > 0.
-  - Do not run against production.
+- [ ] **Step 2: Smoke-test it locally on a scratch copy of the dev catalog**
+  - `npm run build --workspace backend`. Copy the dev covers DB and set `COVERS_DB_PATH=<copy>`, using the dev env from `docs/dev-workflow.md`, with the object store pointed at the local dev store. Never use production.
+  - First the real run, which opens the DB read-write and so creates `harvest_cursors`: `node scripts/import-bnp.mjs --from 2026-10-16 --until 2026-10-17`. Expected: one window line, `created` > 0, `covers.stored` > 0, `failedWindows: []`.
+  - Then the dry run on the same copy: `node scripts/import-bnp.mjs --dry-run --from 2026-10-16 --until 2026-10-17`. Expected: `matched` equals the real run's `created + matched`, and `created` is 0.
+  - Then memory on production's Node: `npx -y node@24.21.0 scripts/import-bnp.mjs --dry-run --from 2026-01-01 --until 2026-04-30`. Expected: four window lines, with `rss` flat (not climbing month over month) and under 500 MB. If it climbs, a kept string still references its page. Fix the reader before going on.
 - [ ] **Step 3: Docs**
-  - `backend/README.md`: a "National bibliography (BNP) import" section with what it imports, the three commands from the spec's Production section (with the `npx -y @railway/cli@latest ssh … nohup … > /data/import-bnp.log` form used by the other sections), how to resume with `--from <through>`, and that the in-server sync starts only once the cursor exists.
+  - `backend/README.md`: a "National bibliography (BNP) import" section with:
+    - what it imports;
+    - the three steps from the spec's Production section, in the `npx -y @railway/cli@latest ssh … nohup … > /data/import-bnp.log` form the other sections use;
+    - how to resume (`--from <through>`, no `--until`) and rerun failed windows (from the first failed window's `from`, no `--until`);
+    - that the in-server sync starts only once the cursor exists.
   - `docs/portuguese-book-sources.md:101`: PORBASE becomes "**Imported.**", with a link to the spec.
 - [ ] **Step 4: Backend verify.** `npm run test:scripts` is not needed (nothing under root `scripts/`).
 - [ ] **Step 5: Commit** `git add backend/scripts/import-bnp.mjs backend/README.md docs/portuguese-book-sources.md && git commit -m "Add the national bibliography import script"`
@@ -657,18 +675,24 @@ test("an ISBN already held from the BNP is returned without asking anyone", asyn
   - Each gets a valid ISBN-13 (`978972` + 6 digits + check), and a title and author drawn from a 60k-title pool so that about 4 editions share a title key.
   - Time the inserts. Expected: under 15 minutes.
 - [ ] **Step 2: Time the hot paths on the copy.**
-  - The nightly grouping drain: call `repo.groupKeylessWorks(WORKS_BATCH_SIZE)` (`backfill.ts`) until it returns 0, as `startWorksGrouping` does. Expected: under 5 s per call. Report the total.
+  - The nightly grouping drain: call `repo.groupKeylessWorks(250)` until it returns 0, as `startWorksGrouping` does (`WORKS_BATCH_SIZE` in `backfill.ts` is 250 and not exported). Expected: **under 1 s per call**. Each call holds the write lock and blocks the event loop, and the import's connection gives up after its 5 s `busy_timeout`. Report the total.
   - `searchBooks(searchTokens("casa"), 100)` and `searchBooks(searchTokens("amor"), 100)`: expected under 100 ms.
   - `listUncheckedDetailIds(50)`: expected under 50 ms, with `idx_books_details_pending` in its plan.
   - `listUncheckedCoverIds(null, 500)`: expected under 50 ms.
   - File size versus the original: report MB per 1,000 books.
 - [ ] **Step 3: Report the numbers in the PR description.**
-  - If grouping exceeds 5 s, or a search exceeds 100 ms, stop and report to the user with the numbers before the production run. Don't optimise speculatively.
+  - If a grouping call exceeds 1 s, or a search exceeds 100 ms, stop and report to the user with the numbers before the production run. Don't optimise speculatively.
 
 ---
 
 ## Production runbook entry (for the batch runbook, after the deploy that ships this branch)
 
 1. `nohup node scripts/import-bnp.mjs --dry-run > /data/import-bnp-dry.log 2>&1 &`, about 3 h. The user reads `publishers.kept`, `publishers.dropped`, `skipped`, `covers`, `replace` and `genres` in the last line.
-2. `nohup node scripts/import-bnp.mjs > /data/import-bnp.log 2>&1 &`, about a day. Avoid deploys meanwhile. If one happens, rerun with `--from <last through>`.
-3. The next day, check the logs: `bnp sync` with `failedWindows: []`, and an inside search for `casa dos espiritos`.
+2. Check `railway volume list --json` for room for about 540 MB of growth plus WAL. Then `nohup node scripts/import-bnp.mjs > /data/import-bnp.log 2>&1 &`, about a day.
+   - Avoid deploys meanwhile. If one happens, rerun with `--from <last through>` and no `--until`.
+   - If the report lists failed windows, rerun from the first one's `from`, with no `--until`.
+3. The next day, check:
+   - the logs, for `bnp sync` with `failedWindows: []`;
+   - an inside search for `casa dos espiritos`;
+   - `railway logs --filter "ISBNdb paused"` on the import day against the days before.
+4. Before the next paid `translation-backlog.mjs` run, read its dry-run `selected`: it now includes the imported Portuguese works. Held works still go first.
