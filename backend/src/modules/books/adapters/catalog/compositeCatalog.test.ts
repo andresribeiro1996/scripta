@@ -128,29 +128,39 @@ test("an ISBN search asks ISBNdb first and Open Library only when it finds nothi
 
 const titles = (hits: CatalogSearchHit[]) => hits.map((one) => one.result.title);
 
-test("a text search alternates Open Library and ISBNdb hits, dropping repeats", async () => {
+test("a text search lists ISBNdb hits first, then Open Library's, dropping repeats", async () => {
   const ol = fake(null, [hit("Dune", "9780441013593"), hit("Emma", null, "Jane Austen"), hit("Ubik", null, "Philip K. Dick")]);
   const bn = fake(null, [hit("Dune", "9780441013593"), hit("Emma", "9780141439587", "Jane Austen"), hit("Emma", null, "Jane Austen"), hit("Dune Messiah", "9780593098233")]);
-  assert.deepEqual(titles(await createCompositeCatalog(ol.catalog, bn.catalog).search({ text: "dune" })), ["Dune", "Emma", "Emma", "Ubik", "Dune Messiah"]);
+  assert.deepEqual(titles(await createCompositeCatalog(ol.catalog, bn.catalog).search({ text: "dune" })), ["Dune", "Emma", "Emma", "Dune Messiah", "Ubik"]);
 
   const first = fake(null, [hit("A", "9780000000001"), hit("B", "9780000000002")]);
   const second = fake(null, [hit("C", "9780000000003"), hit("D", "9780000000004")]);
-  assert.deepEqual(titles(await createCompositeCatalog(first.catalog, second.catalog).search({ text: "x" })), ["A", "C", "B", "D"]);
+  assert.deepEqual(titles(await createCompositeCatalog(first.catalog, second.catalog).search({ text: "x" })), ["C", "D", "A", "B"]);
 });
 
-test("a text search lets the longer side finish the list", async () => {
+test("a text search lets Open Library fill the places ISBNdb leaves", async () => {
   const short = fake(null, [hit("A", "9780000000001")]);
   const long = fake(null, [hit("B", "9780000000002"), hit("C", "9780000000003"), hit("D", "9780000000004")]);
-  assert.deepEqual(titles(await createCompositeCatalog(short.catalog, long.catalog).search({ text: "x" })), ["A", "B", "C", "D"]);
-  assert.deepEqual(titles(await createCompositeCatalog(long.catalog, short.catalog).search({ text: "x" })), ["B", "A", "C", "D"]);
+  assert.deepEqual(titles(await createCompositeCatalog(long.catalog, short.catalog).search({ text: "x" })), ["A", "B", "C", "D"]);
+  assert.deepEqual(titles(await createCompositeCatalog(short.catalog, long.catalog).search({ text: "x" })), ["B", "C", "D", "A"]);
 });
 
-test("a text search is capped with both sources represented", async () => {
+test("a text search is capped, and a full ISBNdb page leaves no room for Open Library", async () => {
   const many = (prefix: string) => Array.from({ length: 20 }, (_, index) => hit(`${prefix}${index}`, null, prefix));
   const hits = await createCompositeCatalog(fake(null, many("O")).catalog, fake(null, many("I")).catalog).search({ text: "book" });
   assert.equal(hits.length, 12);
-  assert.deepEqual(titles(hits).slice(0, 4), ["O0", "I0", "O1", "I1"]);
-  assert.equal(titles(hits).filter((title) => title.startsWith("I")).length, 6);
+  assert.deepEqual(titles(hits), Array.from({ length: 12 }, (_, index) => `I${index}`));
+});
+
+test("a kept ISBNdb hit takes the work key and cover id of the Open Library repeat it replaces", async () => {
+  const plain = hit("Dune", "9780441013593");
+  const olHit = { ...plain, result: { ...plain.result, coverUrl: "https://covers.openlibrary.org/b/id/42-M.jpg" }, olCoverId: 42, workKey: "/works/OL893415W" };
+  const bnHit = hit("Dune", "9780441013593", "Frank Herbert", "isbndb");
+  const [kept] = await createCompositeCatalog(fake(null, [olHit]).catalog, fake(null, [bnHit]).catalog).search({ text: "dune" });
+  assert.equal(kept!.source, "isbndb");
+  assert.equal(kept!.olCoverId, 42);
+  assert.equal(kept!.workKey, "/works/OL893415W");
+  assert.equal(kept!.result.coverUrl, "https://covers.openlibrary.org/b/id/42-M.jpg");
 });
 
 test("a text search survives one source being unavailable, but not both", async () => {
