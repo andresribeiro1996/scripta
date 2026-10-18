@@ -23,7 +23,7 @@ const AFTER_STRICT_LABEL = /^\s*$|^\s*[:–—-]|^\s+\d/;
 const AFTER_NAME_LABEL = /^\s+[\p{Lu}(\[]/u;
 const AFTER_LOOSE_LABEL = /^:|^\s+(?:\d[\d\s./,:–-]*(?:\s?(?:€|mm|cm|kg|g|pp?))?|\d{1,2}\s+de\s+\p{L}+\s+de\s+\d{4})$/u;
 const EDITION_LINE = /^\d{1,2}\s*\.?\s*[ªº°]?\s*(?:edi[çc][ãa]o|reimpress[ãa]o)(?:\s+\p{L}+)?(?:\s+(?:de\s+)?\d{4})?$/iu;
-const EMPTY_HEADING = /^(?:Cita[çc][õo]es|Cr[íi]ticas|Pr[ée]mios)$/i;
+const EMPTY_HEADING = /^(?:Cita[çc][õo]es|Cr[íi]ticas|Pr[ée]mios|Detalhes)$/i;
 const LEADING_LABEL = /^(?:sinopse|synopsis|resumo|descri[çc][ãa]o|description|sobre o livro|about the book)(?=\s|:|[–—-]|$)/i;
 const LABEL_SEPARATOR = /^\s*:\s*|^\s+[–—-]\s+/;
 const GLUED_SENTENCE = /(\p{Ll}{2}[.!?])(?=\p{Lu}\p{Ll})/gu;

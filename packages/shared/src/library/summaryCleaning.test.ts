@@ -4,6 +4,7 @@ import { cleanSummary } from "./summaryCleaning.js";
 
 const P = "Uma rapariga parte de Lisboa à procura do irmão desaparecido e descobre uma cidade que não conhecia.";
 const cases: Array<[string, string, string | null]> = [
+  ["a trailing Detalhes heading with the rest of the block gone", `${P}\n\nDetalhes\n\nCitações`, P],
   ["presença details block", `${P}\n\nDetalhes\n\nTítulo Original THE LOST BROTHER\n\nCategoria Ficção\n\nSub-categoria Romance\n\nSérie Lisboa\n\nNº de Páginas 320\n\nData de Lançamento 03/2024\n\nDimensões 230 x 150 x 20 mm\n\nFormato Capa Mole\n\nPeso 420g\n\nAutores Ana Lima\n\nCitações\n\nCríticas\n\nPrémios`, P],
   ["favourites chrome", `${P}\n\nAdicionar aos Favoritos\n\nAdicionar aos FavoritosJá se encontra nos favoritos`, P],
   ["labels without colon", `${P}\n\nTítulo original Island\n\nTradução Maria Dias\n\n3.ª reimpressão Outubro 2024\n\nPáginas 464\n\nFormato 13 x 21 cm\n\nEAN 9789898327123\n\n[data_lancamento]2024-05-01`, P],

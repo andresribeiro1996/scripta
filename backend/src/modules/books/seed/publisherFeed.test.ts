@@ -530,6 +530,11 @@ test("short verse lines keep their line breaks and a later paragraph follows aft
 
 test("cleaning runs before the minimum length", () => {
   const synopsis = "a".repeat(69) + ".";
-  const notice = "Adicionar aos Favoritos".padEnd(30, " ").trim();
+  const notice = "Adicionar aos Favoritos";
   assert.equal(wooDetails({ description: `<p>${synopsis}</p><p>${notice}</p>` }).summary, null);
+});
+
+test("a Detalhes heading left alone by the line filter is still cut", () => {
+  const html = `<p>${SYNOPSIS}</p><p>Detalhes</p><p>Páginas: 320</p><p>Categoria: Ficção</p><p>Citações</p>`;
+  assert.equal(shopifyDetails(html).summary, SYNOPSIS);
 });
