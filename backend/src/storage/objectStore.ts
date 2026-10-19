@@ -8,6 +8,13 @@ export interface ObjectStore {
   urlFor(key: string): string;
 }
 
+export class ObjectStoreUnavailableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ObjectStoreUnavailableError";
+  }
+}
+
 const OBJECT_KEY = /^(covers|gallery|avatars)\/[0-9a-f-]{36}(-thumb)?\.webp$/;
 
 export function isObjectKey(key: string): boolean {
