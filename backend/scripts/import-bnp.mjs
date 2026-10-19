@@ -10,7 +10,7 @@ const { values } = parseArgs({ options: { "dry-run": { type: "boolean", default:
 const { env } = await import("../dist/config/env.js");
 const { openBooksDb } = await import("../dist/modules/books/adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("../dist/modules/books/adapters/sqlite/sqliteBooksRepository.js");
-const { fetchBnpScan, importBnp, utcDate } = await import("../dist/modules/books/seed/bnpImport.js");
+const { BNP_PAGE_TIMEOUT_MS, fetchBnpScan, importBnp, utcDate } = await import("../dist/modules/books/seed/bnpImport.js");
 const { fetchText } = await import("../dist/modules/books/seed/siteFetch.js");
 const { createObjectStore } = await import("../dist/storage/createObjectStore.js");
 
@@ -42,7 +42,7 @@ const report = await importBnp(
         }
       : { save: (id, extension, bytes) => store.put(`covers/${id}.${extension}`, bytes, "image/webp") },
     fetchScan: fetchBnpScan,
-    fetchText,
+    fetchText: (url) => fetchText(url, BNP_PAGE_TIMEOUT_MS),
     now: () => new Date(),
     log: (line) => console.log(line, `rss=${Math.round(process.memoryUsage().rss / 1e6)}MB`)
   },

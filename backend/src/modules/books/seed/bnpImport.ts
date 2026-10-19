@@ -138,6 +138,7 @@ export interface BnpImportReport {
 export const BNP_OAI = "https://oai.bnportugal.gov.pt/servlet/OAIHandler";
 export const BNP_ISBN_URL = "https://urn.porbase.org/isbn/unimarc/marcxchange?id=";
 export const BNP_SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000;
+export const BNP_PAGE_TIMEOUT_MS = 120_000;
 
 const SCAN_POOL = 2;
 const TOP_PUBLISHERS = 50;
@@ -181,17 +182,19 @@ async function tryPage(fetchText: BnpHarvestDeps["fetchText"], url: string): Pro
   }
 }
 
-async function fetchPage(fetchText: BnpHarvestDeps["fetchText"], url: string): Promise<Page> {
+async function fetchPage(fetchText: BnpHarvestDeps["fetchText"], url: string, retry: boolean): Promise<Page> {
   const page = await tryPage(fetchText, url);
-  return "failure" in page && page.transient ? tryPage(fetchText, url) : page;
+  return retry && "failure" in page && page.transient ? tryPage(fetchText, url) : page;
 }
 
 async function harvestOnce(fetchText: BnpHarvestDeps["fetchText"], window: DateWindow): Promise<Harvested | string> {
   const harvested: Harvested = { records: 0, deleted: 0, kept: [], skipped: [] };
   let url: string | null = firstUrl(window);
+  let number = 0;
   while (url !== null) {
-    const page = await fetchPage(fetchText, url);
-    if ("failure" in page) return page.failure;
+    number++;
+    const page = await fetchPage(fetchText, url, number === 1);
+    if ("failure" in page) return `page ${number}: ${page.failure}`;
     for (const record of readMarcRecords(page.xml)) {
       harvested.records++;
       if (record.deleted) {
@@ -211,7 +214,9 @@ async function harvestOnce(fetchText: BnpHarvestDeps["fetchText"], window: DateW
 
 async function harvestWindow(fetchText: BnpHarvestDeps["fetchText"], window: DateWindow): Promise<Harvested | string> {
   const first = await harvestOnce(fetchText, window);
-  return typeof first === "string" ? harvestOnce(fetchText, window) : first;
+  if (typeof first !== "string") return first;
+  const second = await harvestOnce(fetchText, window);
+  return typeof second === "string" ? `${first}; ${second}` : second;
 }
 
 async function applyPooled(books: BnpBook[], apply: (book: BnpBook) => Promise<void>): Promise<void> {
