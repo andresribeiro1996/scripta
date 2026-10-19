@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
+import { ObjectStoreUnavailableError } from "./objectStore.js";
 import { createR2ObjectStore } from "./r2ObjectStore.js";
 
 const id = "0b6f9c1e-3a4d-4e5f-8a7b-1c2d3e4f5a6b";
@@ -26,6 +27,19 @@ function stub(status: number, body = "") {
   }) as typeof fetch;
   return calls;
 }
+
+function reject(error: Error) {
+  globalThis.fetch = (async () => {
+    throw error;
+  }) as typeof fetch;
+}
+
+const timeout = () => new DOMException("The operation was aborted due to timeout", "TimeoutError");
+const methods: Array<[string, () => Promise<unknown>]> = [
+  ["PUT", () => store.put(key, Buffer.from("img"), "image/webp")],
+  ["GET", () => store.get(key)],
+  ["DELETE", () => store.delete(key)]
+];
 
 test("put signs a PUT with the content type and the immutable cache header", async () => {
   const calls = stub(200);
@@ -59,6 +73,34 @@ test("delete accepts 204, 200 and 404 and rejects otherwise", async () => {
   }
   stub(403);
   await assert.rejects(store.delete(key), /HTTP 403/);
+});
+
+test("a timeout, an abort, a network error, a 429 and a 5xx are ObjectStoreUnavailableError on every method", async (t) => {
+  t.mock.method(Math, "random", () => 0);
+  for (const [method, call] of methods) {
+    for (const error of [timeout(), new DOMException("aborted", "AbortError"), new TypeError("fetch failed")]) {
+      reject(error);
+      await assert.rejects(call(), (thrown) => thrown instanceof ObjectStoreUnavailableError && thrown.message === `R2 ${method} ${key} failed: ${error.message}`);
+    }
+    for (const status of [429, 503]) {
+      stub(status);
+      await assert.rejects(call(), (thrown) => thrown instanceof ObjectStoreUnavailableError && thrown.message === `R2 ${method} ${key} failed: HTTP ${status}`);
+    }
+  }
+});
+
+test("a body that stalls past the timeout is ObjectStoreUnavailableError", async () => {
+  globalThis.fetch = (async () => new Response(new ReadableStream({ start: (controller) => controller.error(timeout()) }))) as typeof fetch;
+  await assert.rejects(store.get(key), ObjectStoreUnavailableError);
+});
+
+test("any other failure stays a plain Error", async () => {
+  for (const [method, call] of methods) {
+    stub(403);
+    await assert.rejects(call(), (thrown) => thrown instanceof Error && !(thrown instanceof ObjectStoreUnavailableError) && thrown.message === `R2 ${method} ${key} failed: HTTP 403`);
+  }
+  reject(new RangeError("boom"));
+  await assert.rejects(store.put(key, Buffer.from("img"), "image/webp"), RangeError);
 });
 
 test("every request carries a 15s abort signal", async (t) => {

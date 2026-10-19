@@ -21,6 +21,7 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 const { applyBooksMigrations } = await import("../adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("../adapters/sqlite/sqliteBooksRepository.js");
 const { SourceUnavailableError } = await import("../domain/errors.js");
+const { ObjectStoreUnavailableError } = await import("../../../storage/objectStore.js");
 const { catalogTitleKey } = await import("../domain/normalize.js");
 const { applyBnpRecord, BNP_ISBN_URL, fetchBnpScan, importBnp, logBnpSync, lookupBnpIsbn, monthWindows, planBnpRecord, syncBnp, utcDate } = await import("./bnpImport.js");
 const { mapBnpRecord, readMarcRecords } = await import("./bnpRecord.js");
@@ -421,6 +422,62 @@ test("a failed or rejected scan leaves a new book stamped and coverless", async 
   }
 });
 
+const imageCount = (db: DatabaseSync) => (db.prepare("SELECT COUNT(*) AS n FROM cover_images").get() as { n: number }).n;
+const storeUnavailable = () => new ObjectStoreUnavailableError("R2 PUT covers/x.webp failed: The operation was aborted due to timeout");
+
+test("a scan the store could not take leaves a new book stamped and coverless, and applying it again retries the upload", async () => {
+  const { db, repo, blobs, deps } = setup();
+  const save = deps.blobs.save;
+  deps.blobs.save = async () => {
+    throw storeUnavailable();
+  };
+
+  const result = await apply(deps, ALLENDE);
+
+  assert.equal(result.created, true);
+  assert.equal(result.cover, "failed");
+  assert.equal(result.book.cover_status, null);
+  assert.equal(result.book.cover_image_id, null);
+  assert.equal(result.book.cover_checked_at, AT);
+  assert.ok(!repo.listUncheckedCoverIds(null, 100).ids.includes(result.book.id));
+  assert.equal(blobs.size, 0);
+  assert.equal(imageCount(db), 0);
+
+  deps.blobs.save = save;
+  const again = await apply(deps, ALLENDE);
+
+  assert.equal(again.created, false);
+  assert.equal(again.cover, "stored");
+  assert.equal(again.book.cover_status, "good");
+  assert.equal(repo.getImage(again.book.cover_image_id!)!.source, "bnp");
+});
+
+test("a scan the store could not take leaves an existing book's cover as it was", async () => {
+  const { db, repo, deps } = setup();
+  const existing = seed(repo, PORTUGUESE);
+  const lowRes = giveCover(repo, existing.id, "isbndb", "low_res");
+  deps.blobs.save = async () => {
+    throw storeUnavailable();
+  };
+
+  const result = await apply(deps, ALLENDE);
+
+  assert.equal(result.created, false);
+  assert.equal(result.cover, "failed");
+  assert.equal(result.book.cover_image_id, lowRes);
+  assert.equal(result.book.cover_status, "low_res");
+  assert.equal(imageCount(db), 1);
+});
+
+test("a failure of the store other than being unavailable is not swallowed", async () => {
+  const { db, deps } = setup();
+  deps.blobs.save = async () => {
+    throw new Error("R2 PUT covers/x.webp failed: HTTP 403");
+  };
+  await assert.rejects(apply(deps, ALLENDE), /HTTP 403/);
+  assert.equal(imageCount(db), 0);
+});
+
 test("an error other than an unavailable source is not swallowed", async () => {
   const { db, deps } = setup(async () => Promise.reject(new Error("boom")));
   await assert.rejects(apply(deps, ALLENDE), /boom/);
@@ -569,7 +626,7 @@ test("a window follows its resumption token and applies every kept record", asyn
   assert.equal(repo.findBookByKey(`isbn:${isbnN(1)}`)!.cover_status, "good");
   assert.equal(repo.findBookByKey("isbn:9789725882856"), undefined);
   assert.equal(blobs.size, 2);
-  assert.deepEqual(logs.map((line) => JSON.parse(line)), [{ window: "2026-10-16..2026-10-17", through: "2026-10-17", records: 5, kept: 3, failed: null }]);
+  assert.deepEqual(logs.map((line) => JSON.parse(line)), [{ window: "2026-10-16..2026-10-17", through: "2026-10-17", records: 5, kept: 3, failed: null, coversFailed: 0 }]);
 });
 
 test("a resumption token is URL-encoded in the next request", async () => {
@@ -594,7 +651,7 @@ test("a quiet window is zero records and still moves through", async () => {
     assert.equal(report.through, "2026-10-18");
     assert.deepEqual(report.failedWindows, []);
     assert.equal(repo.getHarvestCursor("bnp"), "2026-10-18");
-    assert.deepEqual(logs.map((line) => JSON.parse(line)), [{ window: "2026-10-18..2026-10-18", through: "2026-10-18", records: 0, kept: 0, failed: null }]);
+    assert.deepEqual(logs.map((line) => JSON.parse(line)), [{ window: "2026-10-18..2026-10-18", through: "2026-10-18", records: 0, kept: 0, failed: null, coversFailed: 0 }]);
   }
 });
 
@@ -674,8 +731,8 @@ test("a window that fails twice is listed and through stops before it", async ()
   assert.equal(asked.get(windowUrl("2026-10-01", "2026-10-03")), 4);
   assert.equal(repo.getHarvestCursor("bnp"), null);
   assert.deepEqual(logs.map((line) => JSON.parse(line)), [
-    { window: "2026-09-15..2026-09-30", through: "2026-09-30", records: 1, kept: 1, failed: null },
-    { window: "2026-10-01..2026-10-03", through: "2026-09-30", records: 0, kept: 0, failed: `page 1: ${UNAVAILABLE}; page 1: ${UNAVAILABLE}` }
+    { window: "2026-09-15..2026-09-30", through: "2026-09-30", records: 1, kept: 1, failed: null, coversFailed: 0 },
+    { window: "2026-10-01..2026-10-03", through: "2026-09-30", records: 0, kept: 0, failed: `page 1: ${UNAVAILABLE}; page 1: ${UNAVAILABLE}`, coversFailed: 0 }
   ]);
 });
 
@@ -801,7 +858,7 @@ for (const [label, failure, reason] of PERSISTENT) {
     assert.equal(asked.get(tokenUrl("TOKEN-1")), 2);
     assert.equal(bookCount(db), 0);
     assert.equal(repo.getHarvestCursor("bnp"), null);
-    assert.deepEqual(logs.map((line) => JSON.parse(line)), [{ window: "2026-10-16..2026-10-17", through: null, records: 0, kept: 0, failed: `page 2: ${reason}; page 2: ${reason}` }]);
+    assert.deepEqual(logs.map((line) => JSON.parse(line)), [{ window: "2026-10-16..2026-10-17", through: null, records: 0, kept: 0, failed: `page 2: ${reason}; page 2: ${reason}`, coversFailed: 0 }]);
   });
 }
 
@@ -884,6 +941,45 @@ test("two scans run at once, never for the same ISBN, and the counts match a seq
   assert.deepEqual(report.replace, { new: 5, none: 0, lowRes: 0, isbndb: 0 });
   assert.equal(bookCount(db), 5);
   assert.equal(blobs.size, 10);
+});
+
+test("a window goes on after an upload the store could not take, and each window line counts its own failed covers", async () => {
+  const { db, repo, blobs, logs, deps } = harvestSetup({
+    [windowUrl("2026-09-30", "2026-09-30")]: oaiPage([1, 2].map((n) => recordOf(isbnN(n)))),
+    [windowUrl("2026-10-01", "2026-10-01")]: oaiPage([recordOf(isbnN(3))])
+  });
+  const save = deps.blobs.save;
+  let saves = 0;
+  deps.blobs.save = async (id, extension, bytes) => {
+    if (saves++ === 0) throw storeUnavailable();
+    await save(id, extension, bytes);
+  };
+
+  const report = await importBnp(deps, run("2026-09-30", "2026-10-01"));
+
+  assert.equal(report.created, 3);
+  assert.deepEqual(report.covers, { stored: 2, kept: 0, noScan: 0, rejected: 0, failed: 1 });
+  assert.deepEqual(report.failedWindows, []);
+  assert.equal(report.through, "2026-10-01");
+  assert.equal(bookCount(db), 3);
+  assert.equal(blobs.size, 4);
+  assert.equal(imageCount(db), 2);
+  const coverless = [1, 2, 3].map((n) => repo.findBookByKey(`isbn:${isbnN(n)}`)!).filter((book) => book.cover_image_id === null);
+  assert.equal(coverless.length, 1);
+  assert.equal(coverless[0]!.cover_checked_at, AT);
+  assert.deepEqual(logs.map((line) => JSON.parse(line)), [
+    { window: "2026-09-30..2026-09-30", through: "2026-09-30", records: 2, kept: 2, failed: null, coversFailed: 1 },
+    { window: "2026-10-01..2026-10-01", through: "2026-10-01", records: 1, kept: 1, failed: null, coversFailed: 0 }
+  ]);
+});
+
+test("any other failure of the store while applying a window ends the run", async () => {
+  const { deps } = harvestSetup({ [windowUrl("2026-10-16", "2026-10-16")]: oaiPage([recordOf(isbnN(1))]) });
+  deps.blobs.save = async () => {
+    throw new Error("R2 PUT covers/x.webp failed: HTTP 403");
+  };
+
+  await assert.rejects(importBnp(deps, run("2026-10-16", "2026-10-16")), /HTTP 403/);
 });
 
 test("an error while applying stops further records and propagates", async () => {
@@ -987,9 +1083,10 @@ test("records that need no scan still let the event loop run between them", asyn
   assert.deepEqual(order, ["macrotask", "done"]);
 });
 
-async function syncLogs(reply: Reply | Reply[]) {
+async function syncLogs(reply: Reply | Reply[], prepare: (deps: BnpHarvestDeps) => void = () => {}) {
   const { repo, deps } = harvestSetup({ [windowUrl("2026-10-17", "2026-10-18")]: reply });
   repo.setHarvestCursor("bnp", "2026-10-17");
+  prepare(deps);
   const report = (await syncBnp({ ...deps, now: SYNC_NOW }))!;
   const lines: Array<[string, object, string]> = [];
   logBnpSync({ info: (details, message) => lines.push(["info", details, message]), error: (details, message) => lines.push(["error", details, message]) }, report);
@@ -997,11 +1094,20 @@ async function syncLogs(reply: Reply | Reply[]) {
 }
 
 test("a clean sync is logged at info", async () => {
-  assert.deepEqual(await syncLogs(EMPTY_PAGE), [["info", { through: "2026-10-18", kept: 0, created: 0, failedWindows: [] }, "bnp sync"]]);
+  assert.deepEqual(await syncLogs(EMPTY_PAGE), [["info", { through: "2026-10-18", kept: 0, created: 0, coversFailed: 0, failedWindows: [] }, "bnp sync"]]);
+});
+
+test("a sync that lost a cover to the store logs how many", async () => {
+  const lines = await syncLogs(oaiPage([recordOf(isbnN(1))]), (deps) => {
+    deps.blobs.save = async () => {
+      throw storeUnavailable();
+    };
+  });
+  assert.deepEqual(lines, [["info", { through: "2026-10-18", kept: 1, created: 1, coversFailed: 1, failedWindows: [] }, "bnp sync"]]);
 });
 
 test("a sync with a failed window is logged as an error", async () => {
-  assert.deepEqual(await syncLogs([unavailable(), unavailable()]), [["error", { through: null, kept: 0, created: 0, failedWindows: ["2026-10-17..2026-10-18"] }, "bnp sync failed windows"]]);
+  assert.deepEqual(await syncLogs([unavailable(), unavailable()]), [["error", { through: null, kept: 0, created: 0, coversFailed: 0, failedWindows: ["2026-10-17..2026-10-18"] }, "bnp sync failed windows"]]);
 });
 
 const lookupUrl = (isbn: string) => `${BNP_ISBN_URL}${isbn}`;

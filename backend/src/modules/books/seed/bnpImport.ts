@@ -1,3 +1,4 @@
+import { ObjectStoreUnavailableError } from "../../../storage/objectStore.js";
 import { storeCoverImage } from "../booksService.js";
 import { MIN_GOOD_WIDTH } from "../domain/constants.js";
 import { SourceUnavailableError } from "../domain/errors.js";
@@ -89,9 +90,14 @@ export async function applyBnpRecord(deps: BnpDeps, plan: BnpPlan): Promise<{ bo
 
   if (scan !== null) {
     if (written.replaceable) {
-      const imageId = await storeCoverImage(deps, written.id, "bnp", scan.url, scan.image, at);
-      const stored = deps.repo.setCoverIf(written.id, written.expected, { imageId, status: scan.image.width >= MIN_GOOD_WIDTH ? "good" : "low_res", checkedAt: at });
-      cover = stored ? "stored" : "kept";
+      let imageId: string | null = null;
+      try {
+        imageId = await storeCoverImage(deps, written.id, "bnp", scan.url, scan.image, at);
+      } catch (error) {
+        if (!(error instanceof ObjectStoreUnavailableError)) throw error;
+      }
+      if (imageId === null) cover = "failed";
+      else cover = deps.repo.setCoverIf(written.id, written.expected, { imageId, status: scan.image.width >= MIN_GOOD_WIDTH ? "good" : "low_res", checkedAt: at }) ? "stored" : "kept";
     } else {
       cover = "kept";
     }
@@ -292,6 +298,7 @@ export async function importBnp(deps: BnpHarvestDeps, options: BnpImportOptions)
   let broken = false;
   for (const window of monthWindows(options.from, options.until)) {
     const label = `${window.from}..${window.until}`;
+    const coversFailedBefore = report.covers.failed;
     const result = await harvestWindow(deps.fetchText, window);
     const harvested = typeof result === "string" ? null : result;
     const failure = typeof result === "string" ? result : null;
@@ -323,7 +330,7 @@ export async function importBnp(deps: BnpHarvestDeps, options: BnpImportOptions)
       }
     }
     if (!broken) report.through = window.until;
-    deps.log(JSON.stringify({ window: label, through: report.through, records: harvested?.records ?? 0, kept: harvested?.kept.length ?? 0, failed: failure }));
+    deps.log(JSON.stringify({ window: label, through: report.through, records: harvested?.records ?? 0, kept: harvested?.kept.length ?? 0, failed: failure, coversFailed: report.covers.failed - coversFailedBefore }));
   }
 
   report.publishers = { kept: top(keptPublishers), dropped: perSkip((reason) => top(droppedPublishers[reason])) };
@@ -337,8 +344,8 @@ export interface BnpSyncLog {
 }
 
 export function logBnpSync(log: BnpSyncLog, report: BnpImportReport): void {
-  const { through, kept, created, failedWindows } = report;
-  const details = { through, kept, created, failedWindows };
+  const { through, kept, created, covers, failedWindows } = report;
+  const details = { through, kept, created, coversFailed: covers.failed, failedWindows };
   if (failedWindows.length > 0) log.error(details, "bnp sync failed windows");
   else log.info(details, "bnp sync");
 }

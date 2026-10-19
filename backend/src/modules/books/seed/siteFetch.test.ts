@@ -36,6 +36,16 @@ test("a 429, a 5xx, a network error and a timeout become SourceUnavailableError"
   await assert.rejects(fetchText("https://shop.test/a"), SourceUnavailableError);
 });
 
+test("the timeout Node 24 throws, from a stalled header or a stalled body, becomes SourceUnavailableError", async () => {
+  const timeout = () => new DOMException("The operation was aborted due to timeout", "TimeoutError");
+  fail(timeout());
+  await assert.rejects(fetchText("https://shop.test/a"), SourceUnavailableError);
+  await assert.rejects(fetchBytes("https://shop.test/a.jpg"), SourceUnavailableError);
+  globalThis.fetch = (async () => new Response(new ReadableStream({ start: (controller) => controller.error(timeout()) }))) as typeof fetch;
+  await assert.rejects(fetchText("https://shop.test/a"), SourceUnavailableError);
+  await assert.rejects(fetchBytes("https://shop.test/a.jpg"), SourceUnavailableError);
+});
+
 test("any other error propagates", async () => {
   fail(new RangeError("boom"));
   await assert.rejects(fetchText("https://shop.test/a"), RangeError);
