@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { once } from "node:events";
 import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -1167,21 +1166,26 @@ test("a lookup answered with anything but a record or a known miss is reported a
   }
 });
 
-test("the import's connection waits out a write lock that a 1 s busy timeout gives up on", async () => {
+test("the import's connection waits out a write lock that a connection without a busy timeout fails on", async () => {
   const path = join(scratch, "locked.sqlite");
   const seed = new DatabaseSync(path);
   seed.exec("PRAGMA journal_mode = WAL");
   seed.close();
-  const impatient = new DatabaseSync(path, { timeout: 1000 });
+  const impatient = new DatabaseSync(path, { timeout: 0 });
   const patient = waitForBnpLock(new DatabaseSync(path));
   const holder = spawn(
     process.execPath,
     ["-e", 'const db = new (require("node:sqlite").DatabaseSync)(process.argv[1]); db.exec("BEGIN IMMEDIATE"); process.stdout.write("locked"); setTimeout(() => { db.exec("COMMIT"); db.close(); }, 1500);', path],
     { stdio: ["ignore", "pipe", "inherit"] }
   );
-  const exited = once(holder, "exit");
+  const exited = new Promise((resolve) => holder.once("exit", resolve));
+  const locked = new Promise<void>((resolve, reject) => {
+    holder.once("error", reject);
+    holder.once("exit", (code) => reject(new Error(`the lock holder exited with ${code} before taking the lock`)));
+    holder.stdout.once("data", () => resolve());
+  });
   try {
-    await once(holder.stdout, "data");
+    await locked;
     assert.throws(() => impatient.exec("BEGIN IMMEDIATE"), /database is locked/);
     patient.exec("BEGIN IMMEDIATE");
     patient.exec("COMMIT");
