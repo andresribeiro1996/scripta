@@ -1083,9 +1083,10 @@ test("records that need no scan still let the event loop run between them", asyn
   assert.deepEqual(order, ["macrotask", "done"]);
 });
 
-async function syncLogs(reply: Reply | Reply[]) {
+async function syncLogs(reply: Reply | Reply[], prepare: (deps: BnpHarvestDeps) => void = () => {}) {
   const { repo, deps } = harvestSetup({ [windowUrl("2026-10-17", "2026-10-18")]: reply });
   repo.setHarvestCursor("bnp", "2026-10-17");
+  prepare(deps);
   const report = (await syncBnp({ ...deps, now: SYNC_NOW }))!;
   const lines: Array<[string, object, string]> = [];
   logBnpSync({ info: (details, message) => lines.push(["info", details, message]), error: (details, message) => lines.push(["error", details, message]) }, report);
@@ -1093,11 +1094,20 @@ async function syncLogs(reply: Reply | Reply[]) {
 }
 
 test("a clean sync is logged at info", async () => {
-  assert.deepEqual(await syncLogs(EMPTY_PAGE), [["info", { through: "2026-10-18", kept: 0, created: 0, failedWindows: [] }, "bnp sync"]]);
+  assert.deepEqual(await syncLogs(EMPTY_PAGE), [["info", { through: "2026-10-18", kept: 0, created: 0, coversFailed: 0, failedWindows: [] }, "bnp sync"]]);
+});
+
+test("a sync that lost a cover to the store logs how many", async () => {
+  const lines = await syncLogs(oaiPage([recordOf(isbnN(1))]), (deps) => {
+    deps.blobs.save = async () => {
+      throw storeUnavailable();
+    };
+  });
+  assert.deepEqual(lines, [["info", { through: "2026-10-18", kept: 1, created: 1, coversFailed: 1, failedWindows: [] }, "bnp sync"]]);
 });
 
 test("a sync with a failed window is logged as an error", async () => {
-  assert.deepEqual(await syncLogs([unavailable(), unavailable()]), [["error", { through: null, kept: 0, created: 0, failedWindows: ["2026-10-17..2026-10-18"] }, "bnp sync failed windows"]]);
+  assert.deepEqual(await syncLogs([unavailable(), unavailable()]), [["error", { through: null, kept: 0, created: 0, coversFailed: 0, failedWindows: ["2026-10-17..2026-10-18"] }, "bnp sync failed windows"]]);
 });
 
 const lookupUrl = (isbn: string) => `${BNP_ISBN_URL}${isbn}`;

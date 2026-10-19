@@ -344,8 +344,8 @@ export interface BnpSyncLog {
 }
 
 export function logBnpSync(log: BnpSyncLog, report: BnpImportReport): void {
-  const { through, kept, created, failedWindows } = report;
-  const details = { through, kept, created, failedWindows };
+  const { through, kept, created, covers, failedWindows } = report;
+  const details = { through, kept, created, coversFailed: covers.failed, failedWindows };
   if (failedWindows.length > 0) log.error(details, "bnp sync failed windows");
   else log.info(details, "bnp sync");
 }
