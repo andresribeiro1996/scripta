@@ -50,7 +50,9 @@ const NO_PUBLISHER = /^(?:s\.\s*n\.)?$/i;
 const YEAR_IN_TEXT = /(?:1[5-9]|20)\d{2}/;
 const CODED_YEAR = /^(?:1[5-9]|20)\d{2}$/;
 const TRAILING_SEPARATORS = /[\s;:,/]+$/;
+const MAX_PAGES = 99_999;
 const SCAN = "winlibimg.aspx";
+const URL_IN_TEXT = /https?:\/\/\S+/i;
 const TRANSLATOR = "730";
 const AUTHOR_FALLBACKS = ["070", "340"];
 
@@ -115,7 +117,8 @@ function names(record: MarcRecord, tag: string, role?: string): string[] {
 function pagesIn(extent: string | undefined): number | null {
   if (extent === undefined || !extent.includes("p.")) return null;
   const numbers = (extent.replace(/\[[^\]]*\]/g, "").match(/\d+/g) ?? []).map(Number);
-  return numbers.length === 0 ? null : Math.max(...numbers);
+  const pages = numbers.length === 0 ? 0 : Math.max(...numbers);
+  return pages >= 1 && pages <= MAX_PAGES ? pages : null;
 }
 
 function yearOf(record: MarcRecord): number | null {
@@ -148,7 +151,7 @@ function translatorOf(record: MarcRecord): string | null {
 
 export function mapBnpRecord(record: MarcRecord): BnpBook {
   const title = [values(record, "200", "a").join(" ; "), ...values(record, "200", "h"), ...values(record, "200", "i")].filter(Boolean).join(". ");
-  const scan = values(record, "856", "u").find((url) => url.includes(SCAN));
+  const scan = values(record, "856", "u").map((value) => URL_IN_TEXT.exec(value)?.[0]).find((url) => url?.includes(SCAN) && URL.canParse(url));
   return {
     recordId: record.controls["001"] ?? null,
     isbns: [...new Set(values(record, "010", "a").filter(isValidIsbn).map(canonicalIsbn))],
@@ -162,6 +165,6 @@ export function mapBnpRecord(record: MarcRecord): BnpBook {
     languages: values(record, "101", "a"),
     udc: values(record, "675", "a"),
     summary: values(record, "330", "a")[0] ?? null,
-    scanUrl: scan === undefined ? null : scan.replace(/^http:/, "https:")
+    scanUrl: scan === undefined ? null : scan.replace(/^http:/i, "https:")
   };
 }
