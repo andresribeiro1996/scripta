@@ -10,7 +10,7 @@ const { values } = parseArgs({ options: { "dry-run": { type: "boolean", default:
 const { env } = await import("../dist/config/env.js");
 const { openBooksDb } = await import("../dist/modules/books/adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("../dist/modules/books/adapters/sqlite/sqliteBooksRepository.js");
-const { fetchBnpPage, fetchBnpScan, importBnp, utcDate } = await import("../dist/modules/books/seed/bnpImport.js");
+const { fetchBnpPage, fetchBnpScan, importBnp, utcDate, waitForBnpLock } = await import("../dist/modules/books/seed/bnpImport.js");
 const { createObjectStore } = await import("../dist/storage/createObjectStore.js");
 
 const dryRun = values["dry-run"];
@@ -32,7 +32,7 @@ if (from > until) {
 const store = createObjectStore();
 const report = await importBnp(
   {
-    repo: createSqliteBooksRepository(dryRun ? new DatabaseSync(env.COVERS_DB_PATH, { readOnly: true, timeout: 5000 }) : openBooksDb()),
+    repo: createSqliteBooksRepository(waitForBnpLock(dryRun ? new DatabaseSync(env.COVERS_DB_PATH, { readOnly: true }) : openBooksDb())),
     blobs: dryRun
       ? {
           save: () => {
