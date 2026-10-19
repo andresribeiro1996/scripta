@@ -1,3 +1,4 @@
+import type { DatabaseSync } from "node:sqlite";
 import { ObjectStoreUnavailableError } from "../../../storage/objectStore.js";
 import { storeCoverImage } from "../booksService.js";
 import { MIN_GOOD_WIDTH } from "../domain/constants.js";
@@ -112,6 +113,11 @@ export async function fetchBnpScan(url: string, timeoutMs?: number): Promise<Enc
 
 export const fetchBnpPage = (url: string) => fetchText(url, BNP_PAGE_TIMEOUT_MS);
 
+export function waitForBnpLock(db: DatabaseSync): DatabaseSync {
+  db.exec(`PRAGMA busy_timeout = ${BNP_BUSY_TIMEOUT_MS}`);
+  return db;
+}
+
 export interface BnpHarvestDeps extends BnpDeps {
   fetchText: (url: string) => Promise<{ status: number; text: string }>;
   log: (line: string) => void;
@@ -147,6 +153,7 @@ export const BNP_OAI = "https://oai.bnportugal.gov.pt/servlet/OAIHandler";
 export const BNP_ISBN_URL = "https://urn.porbase.org/isbn/unimarc/marcxchange?id=";
 export const BNP_SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const BNP_PAGE_TIMEOUT_MS = 120_000;
+export const BNP_BUSY_TIMEOUT_MS = 120_000;
 
 const SCAN_POOL = 2;
 const TOP_PUBLISHERS = 50;

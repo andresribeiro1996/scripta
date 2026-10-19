@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { once } from "node:events";
 import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -23,7 +25,7 @@ const { createSqliteBooksRepository } = await import("../adapters/sqlite/sqliteB
 const { SourceUnavailableError } = await import("../domain/errors.js");
 const { ObjectStoreUnavailableError } = await import("../../../storage/objectStore.js");
 const { catalogTitleKey } = await import("../domain/normalize.js");
-const { applyBnpRecord, BNP_ISBN_URL, fetchBnpScan, importBnp, logBnpSync, lookupBnpIsbn, monthWindows, planBnpRecord, syncBnp, utcDate } = await import("./bnpImport.js");
+const { applyBnpRecord, BNP_BUSY_TIMEOUT_MS, BNP_ISBN_URL, fetchBnpScan, importBnp, logBnpSync, lookupBnpIsbn, monthWindows, planBnpRecord, syncBnp, utcDate, waitForBnpLock } = await import("./bnpImport.js");
 const { mapBnpRecord, readMarcRecords } = await import("./bnpRecord.js");
 
 process.env.TZ = "America/Sao_Paulo";
@@ -1162,5 +1164,33 @@ test("a lookup answered with anything but a record or a known miss is reported a
     const { db, deps } = harvestSetup({ [lookupUrl(PORTUGUESE)]: reply });
     await assert.rejects(lookupBnpIsbn(deps, PORTUGUESE), (error) => error instanceof SourceUnavailableError && error.source === "urn.porbase.org");
     assert.equal(bookCount(db), 0);
+  }
+});
+
+test("the import's connection waits out a write lock that a 1 s busy timeout gives up on", async () => {
+  const path = join(scratch, "locked.sqlite");
+  const seed = new DatabaseSync(path);
+  seed.exec("PRAGMA journal_mode = WAL");
+  seed.close();
+  const impatient = new DatabaseSync(path, { timeout: 1000 });
+  const patient = waitForBnpLock(new DatabaseSync(path));
+  const holder = spawn(
+    process.execPath,
+    ["-e", 'const db = new (require("node:sqlite").DatabaseSync)(process.argv[1]); db.exec("BEGIN IMMEDIATE"); process.stdout.write("locked"); setTimeout(() => { db.exec("COMMIT"); db.close(); }, 1500);', path],
+    { stdio: ["ignore", "pipe", "inherit"] }
+  );
+  const exited = once(holder, "exit");
+  try {
+    await once(holder.stdout, "data");
+    assert.throws(() => impatient.exec("BEGIN IMMEDIATE"), /database is locked/);
+    patient.exec("BEGIN IMMEDIATE");
+    patient.exec("COMMIT");
+    assert.deepEqual({ ...(patient.prepare("PRAGMA busy_timeout").get() as object) }, { timeout: BNP_BUSY_TIMEOUT_MS });
+    assert.equal(BNP_BUSY_TIMEOUT_MS, 120_000);
+  } finally {
+    holder.kill();
+    await exited;
+    impatient.close();
+    patient.close();
   }
 });
