@@ -675,7 +675,7 @@ test("a window that fails twice is listed and through stops before it", async ()
   assert.equal(repo.getHarvestCursor("bnp"), null);
   assert.deepEqual(logs.map((line) => JSON.parse(line)), [
     { window: "2026-09-15..2026-09-30", through: "2026-09-30", records: 1, kept: 1, failed: null },
-    { window: "2026-10-01..2026-10-03", through: "2026-09-30", records: 0, kept: 0, failed: UNAVAILABLE }
+    { window: "2026-10-01..2026-10-03", through: "2026-09-30", records: 0, kept: 0, failed: `page 1: ${UNAVAILABLE}; page 1: ${UNAVAILABLE}` }
   ]);
 });
 
@@ -700,19 +700,43 @@ const TRANSIENT: Array<[string, Reply]> = [
   ["a truncated page", TRUNCATED]
 ];
 
+const SECOND_PASS_PAGE = FIXTURE_PAGE.replace("TOKEN-1", "TOKEN-2");
+
 for (const [label, failure] of TRANSIENT) {
-  test(`a page that fails once with ${label} is fetched again without restarting the window`, async () => {
+  test(`a first URL that fails once with ${label} is fetched again without restarting the window`, async () => {
     const { db, blobs, asked, logs, deps } = harvestSetup({
-      [windowUrl("2026-10-16", "2026-10-17")]: FIXTURE_PAGE,
-      [tokenUrl("TOKEN-1")]: [failure, oaiPage([recordOf(isbnN(1))])]
+      [windowUrl("2026-10-16", "2026-10-17")]: [failure, FIXTURE_PAGE],
+      [tokenUrl("TOKEN-1")]: oaiPage([recordOf(isbnN(1))])
     });
 
     const report = await importBnp(deps, run("2026-10-16", "2026-10-17"));
 
     assert.deepEqual(report.failedWindows, []);
     assert.equal(report.through, "2026-10-17");
-    assert.equal(asked.get(windowUrl("2026-10-16", "2026-10-17")), 1);
-    assert.equal(asked.get(tokenUrl("TOKEN-1")), 2);
+    assert.equal(asked.get(windowUrl("2026-10-16", "2026-10-17")), 2);
+    assert.equal(asked.get(tokenUrl("TOKEN-1")), 1);
+    assert.equal(report.records, 4);
+    assert.equal(report.kept, 3);
+    assert.equal(report.created, 3);
+    assert.equal(bookCount(db), 3);
+    assert.equal(blobs.size, 2);
+    assert.equal(JSON.parse(logs[0]!).failed, null);
+  });
+
+  test(`a token page that fails with ${label} is never asked again, and the window restarts from its first URL`, async () => {
+    const { db, blobs, asked, logs, deps } = harvestSetup({
+      [windowUrl("2026-10-16", "2026-10-17")]: [FIXTURE_PAGE, SECOND_PASS_PAGE],
+      [tokenUrl("TOKEN-1")]: failure,
+      [tokenUrl("TOKEN-2")]: oaiPage([recordOf(isbnN(1))])
+    });
+
+    const report = await importBnp(deps, run("2026-10-16", "2026-10-17"));
+
+    assert.deepEqual(report.failedWindows, []);
+    assert.equal(report.through, "2026-10-17");
+    assert.equal(asked.get(windowUrl("2026-10-16", "2026-10-17")), 2);
+    assert.equal(asked.get(tokenUrl("TOKEN-1")), 1);
+    assert.equal(asked.get(tokenUrl("TOKEN-2")), 1);
     assert.equal(report.records, 4);
     assert.equal(report.kept, 3);
     assert.equal(report.created, 3);
@@ -739,30 +763,30 @@ test("a bad resumption token restarts the window from its first URL", async () =
   assert.equal(blobs.size, 2);
 });
 
-test("a page failing twice in a row restarts the window", async () => {
+test("a first URL failing twice in a row restarts the window", async () => {
   const { db, asked, deps } = harvestSetup({
-    [windowUrl("2026-10-16", "2026-10-17")]: FIXTURE_PAGE,
-    [tokenUrl("TOKEN-1")]: [{ status: 503, text: "" }, { status: 503, text: "" }, oaiPage([recordOf(isbnN(1))])]
+    [windowUrl("2026-10-16", "2026-10-17")]: [{ status: 503, text: "" }, { status: 503, text: "" }, FIXTURE_PAGE],
+    [tokenUrl("TOKEN-1")]: oaiPage([recordOf(isbnN(1))])
   });
 
   const report = await importBnp(deps, run("2026-10-16", "2026-10-17"));
 
   assert.deepEqual(report.failedWindows, []);
-  assert.equal(asked.get(windowUrl("2026-10-16", "2026-10-17")), 2);
-  assert.equal(asked.get(tokenUrl("TOKEN-1")), 3);
+  assert.equal(asked.get(windowUrl("2026-10-16", "2026-10-17")), 3);
+  assert.equal(asked.get(tokenUrl("TOKEN-1")), 1);
   assert.equal(report.records, 4);
   assert.equal(bookCount(db), 3);
 });
 
-const PERSISTENT: Array<[string, Reply, string, number]> = [
-  ["a 503 answer", { status: 503, text: oaiPage([]) }, "HTTP 503", 4],
-  ["an unavailable source", unavailable(), UNAVAILABLE, 4],
-  ["a truncated page", TRUNCATED, "truncated", 4],
-  ["an OAI error", oaiError("badResumptionToken"), "badResumptionToken", 2]
+const PERSISTENT: Array<[string, Reply, string]> = [
+  ["a 503 answer", { status: 503, text: oaiPage([]) }, "HTTP 503"],
+  ["an unavailable source", unavailable(), UNAVAILABLE],
+  ["a truncated page", TRUNCATED, "truncated"],
+  ["an OAI error", oaiError("badResumptionToken"), "badResumptionToken"]
 ];
 
-for (const [label, failure, reason, attempts] of PERSISTENT) {
-  test(`a window whose page fails with ${label} on both passes is listed with the reason`, async () => {
+for (const [label, failure, reason] of PERSISTENT) {
+  test(`a window whose token page fails with ${label} on both passes is listed with both reasons`, async () => {
     const { db, repo, asked, logs, deps } = harvestSetup({
       [windowUrl("2026-10-16", "2026-10-17")]: FIXTURE_PAGE,
       [tokenUrl("TOKEN-1")]: failure
@@ -774,12 +798,28 @@ for (const [label, failure, reason, attempts] of PERSISTENT) {
     assert.equal(report.through, null);
     assert.equal(report.records, 0);
     assert.equal(asked.get(windowUrl("2026-10-16", "2026-10-17")), 2);
-    assert.equal(asked.get(tokenUrl("TOKEN-1")), attempts);
+    assert.equal(asked.get(tokenUrl("TOKEN-1")), 2);
     assert.equal(bookCount(db), 0);
     assert.equal(repo.getHarvestCursor("bnp"), null);
-    assert.deepEqual(logs.map((line) => JSON.parse(line)), [{ window: "2026-10-16..2026-10-17", through: null, records: 0, kept: 0, failed: reason }]);
+    assert.deepEqual(logs.map((line) => JSON.parse(line)), [{ window: "2026-10-16..2026-10-17", through: null, records: 0, kept: 0, failed: `page 2: ${reason}; page 2: ${reason}` }]);
   });
 }
+
+test("a window failing on a different page in each pass reports both pages and reasons", async () => {
+  const { asked, logs, deps } = harvestSetup({
+    [windowUrl("2026-10-16", "2026-10-17")]: [oaiPage([recordOf(isbnN(1))], "A1"), oaiPage([recordOf(isbnN(2))], "B1")],
+    [tokenUrl("A1")]: oaiPage([recordOf(isbnN(3))], "A2"),
+    [tokenUrl("A2")]: { status: 503, text: "" },
+    [tokenUrl("B1")]: oaiError("badResumptionToken")
+  });
+
+  const report = await importBnp(deps, run("2026-10-16", "2026-10-17"));
+
+  assert.deepEqual(report.failedWindows, ["2026-10-16..2026-10-17"]);
+  assert.equal(asked.get(tokenUrl("A2")), 1);
+  assert.equal(asked.get(tokenUrl("B1")), 1);
+  assert.equal(JSON.parse(logs[0]!).failed, "page 3: HTTP 503; page 2: badResumptionToken");
+});
 
 test("an error other than an unavailable source ends the run without a retry", async () => {
   const { asked, deps } = harvestSetup({ [windowUrl("2026-10-16", "2026-10-16")]: new Error("boom") });
