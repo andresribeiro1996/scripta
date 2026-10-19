@@ -50,6 +50,7 @@ const NO_PUBLISHER = /^(?:s\.\s*n\.)?$/i;
 const YEAR_IN_TEXT = /(?:1[5-9]|20)\d{2}/;
 const CODED_YEAR = /^(?:1[5-9]|20)\d{2}$/;
 const TRAILING_SEPARATORS = /[\s;:,/]+$/;
+const MAX_PAGES = 99_999;
 const SCAN = "winlibimg.aspx";
 const URL_IN_TEXT = /https?:\/\/\S+/i;
 const TRANSLATOR = "730";
@@ -116,7 +117,8 @@ function names(record: MarcRecord, tag: string, role?: string): string[] {
 function pagesIn(extent: string | undefined): number | null {
   if (extent === undefined || !extent.includes("p.")) return null;
   const numbers = (extent.replace(/\[[^\]]*\]/g, "").match(/\d+/g) ?? []).map(Number);
-  return numbers.length === 0 ? null : Math.max(...numbers);
+  const pages = numbers.length === 0 ? 0 : Math.max(...numbers);
+  return pages >= 1 && pages <= MAX_PAGES ? pages : null;
 }
 
 function yearOf(record: MarcRecord): number | null {

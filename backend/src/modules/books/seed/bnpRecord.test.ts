@@ -161,6 +161,17 @@ test("pages read the largest arabic number before p. and need p.", () => {
   assert.equal(book().pages, null);
 });
 
+test("pages are kept only as a plausible count from 1 to 99999", () => {
+  const pages = (value: string) => book(field("215", ["a", value])).pages;
+  assert.equal(pages("99999 p."), 99999);
+  assert.equal(pages("1 p."), 1);
+  assert.equal(pages("100000 p."), null);
+  assert.equal(pages("0 p."), null);
+  assert.equal(pages("1 v. 12345678901234567 p."), null);
+  assert.equal(pages("9789727089482 p."), null);
+  assert.equal(pages(`${"9".repeat(400)} p.`), null);
+});
+
 test("the year reads 100 $a first, then 210 $d", () => {
   assert.equal(book(field("100", ["a", "20131209d2013    m  y0pory01030103ba"])).year, 2013);
   assert.equal(book(field("100", ["a", "20131209d    "]), field("210", ["d", "D.L. 2015"])).year, 2015);
