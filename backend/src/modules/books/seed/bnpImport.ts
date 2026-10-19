@@ -9,7 +9,7 @@ import type { BookRow, CoverImageRow } from "../domain/types.js";
 import { mapBnpRecord, readMarcRecords, readOaiError, readResumptionToken, type BnpBook } from "./bnpRecord.js";
 import { BNP_SKIPS, bnpSkipReason, udcGenres, type BnpSkip } from "./bnpScope.js";
 import { utcDay } from "../typesafe.js";
-import { fetchBytes } from "./siteFetch.js";
+import { fetchBytes, fetchText } from "./siteFetch.js";
 
 export interface BnpDeps {
   repo: BooksRepository;
@@ -104,6 +104,8 @@ export async function fetchBnpScan(url: string, timeoutMs?: number): Promise<Enc
   return bytes === null ? null : encodeCover(bytes);
 }
 
+export const fetchBnpPage = (url: string) => fetchText(url, BNP_PAGE_TIMEOUT_MS);
+
 export interface BnpHarvestDeps extends BnpDeps {
   fetchText: (url: string) => Promise<{ status: number; text: string }>;
   log: (line: string) => void;
@@ -138,7 +140,7 @@ export interface BnpImportReport {
 export const BNP_OAI = "https://oai.bnportugal.gov.pt/servlet/OAIHandler";
 export const BNP_ISBN_URL = "https://urn.porbase.org/isbn/unimarc/marcxchange?id=";
 export const BNP_SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000;
-export const BNP_PAGE_TIMEOUT_MS = 120_000;
+const BNP_PAGE_TIMEOUT_MS = 120_000;
 
 const SCAN_POOL = 2;
 const TOP_PUBLISHERS = 50;

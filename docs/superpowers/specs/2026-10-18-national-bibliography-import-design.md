@@ -21,7 +21,7 @@ The Biblioteca Nacional de Portugal publishes the national bibliography (legal d
   - Set `bibliografianacional` covers 2002 onward and holds 346,198 records.
   - Use the `marcxchange` format (UNIMARC). It carries name roles, structured names, the original language, the cover link and the classification. `oai_dc` lacks the roles.
   - A page holds 300 records, takes about 8 s and weighs about 1.3 MB. The whole set is about 1,150 pages, under 3 hours.
-  - `resumptionToken`s expire about a minute after they are issued. A harvest pages straight through a window, and resumes by date window, never by a saved token.
+  - A `resumptionToken` is single-use and valid for an hour from issue: requesting one a second time, even after the client aborted the first request, answers `badResumptionToken`, so a harvester never re-requests one. Idle time up to 300 s is fine. A harvest pages straight through a window, and resumes by date window, never by a saved token.
   - `from` and `until` filter on the datestamp, which is the date a record last changed, with day granularity. The datestamps spread from 2013 to now, about 100 changed records a day (1,494 between 10-01 and 10-15). Many are corrections to old records.
   - Markers: the non-sorting markers arrive as real U+0098 and U+009C. `cleanCatalogText` already strips them.
   - One record: `?verb=GetRecord&metadataPrefix=marcxchange&identifier=oai:oai.bn.pt:bibliografianacional/<id>`. The OAI header's identifier has that form, and the datestamp is in the header.
@@ -134,7 +134,7 @@ The user decided 1, 2, 3 and 9 and approved the direction of the rest in convers
 
 - It harvests month-sized datestamp windows from `--from` (default: the set's earliest datestamp) to `--until` (default: today). Each window is paged straight through.
 - It applies each page's records, then prints a JSON line per finished window with that window's counts and `through`, so a killed run resumes with `--from <through>`.
-- **Each window is paged straight through into mapped records first, then applied.** A `resumptionToken` lasts about a minute, and applying a page's scans takes longer than that.
+- **Each window is paged straight through into mapped records first, then applied.** Applying a page's scans takes minutes, and a failed chain can only restart from the window's first URL, because tokens are single-use and records aren't in datestamp order.
 - Records are applied with at most 2 in flight *(Claude's call)*, and never two that share an ISBN at once.
   - Each record is planned right before it is applied, so a book created earlier in the window is matched.
   - Each record writes in its own short transactions. The write lock is never held across a network call.

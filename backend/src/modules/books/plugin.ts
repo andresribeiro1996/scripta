@@ -34,7 +34,7 @@ import type { CoverBlobReader, CoverBlobStore } from "./domain/ports.js";
 import { coverUrlFor, useBooksRepository } from "./publicCoverLookup.js";
 import { buildAdminRoutes, buildCatalogRoutes, buildCoverFileRoutes, buildGenreReviewRoutes, buildResolveRoutes, buildSynopsisReviewRoutes, buildTranslationReviewRoutes } from "./routes.js";
 import { RETITLE_BATCH_SIZE, retitleWanted } from "./retitleJob.js";
-import { BNP_PAGE_TIMEOUT_MS, BNP_SYNC_INTERVAL_MS, fetchBnpScan, logBnpSync, lookupBnpIsbn, syncBnp, type BnpHarvestDeps } from "./seed/bnpImport.js";
+import { BNP_SYNC_INTERVAL_MS, fetchBnpPage, fetchBnpScan, logBnpSync, lookupBnpIsbn, syncBnp, type BnpHarvestDeps } from "./seed/bnpImport.js";
 import { applyMojibakeRepairs } from "./seed/mojibakeRepair.js";
 import { fetchText } from "./seed/siteFetch.js";
 import { createCoverWorker } from "./worker.js";
@@ -127,7 +127,7 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
     repo,
     blobs,
     fetchScan: fetchBnpScan,
-    fetchText: (url) => fetchText(url, BNP_PAGE_TIMEOUT_MS),
+    fetchText: fetchBnpPage,
     now: () => new Date(),
     log: (line) => app.log.info({ bnp: line }, "bnp sync window")
   };
