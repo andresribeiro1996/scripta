@@ -2453,6 +2453,72 @@ test("a series is indexed once per work and name, however many sources give it",
   ]);
 });
 
+test("filling a work's blank author with fillIdentity makes its series findable by author, and leaves other works alone", () => {
+  const { repo } = freshRepo();
+  const blank = repo.createBook({ title: "Memories of Ice", author: "", isbn: "9780765348807" }, ["isbn:9780765348807"], NOW);
+  const other = seriesBook(repo, "Return of the Crimson Guard", "9780765348821", "Ian Esslemont");
+  repo.addWorkSeries(blank.work_id!, [{ name: MALAZAN, position: "3" }], "wikidata", AT);
+  repo.addWorkSeries(other.work_id!, [{ name: MALAZAN, position: "1" }], "wikidata", AT);
+  assert.deepEqual(repo.searchSeriesWorks(["malazan", "erikson"], 12), []);
+  repo.fillIdentity(blank.id, "Memories of Ice", "Steven Erikson");
+  assert.deepEqual(repo.searchSeriesWorks(["malazan", "erikson"], 12), [blank.work_id]);
+  assert.deepEqual(repo.searchSeriesWorks(["malazan", "esslemont"], 12), [other.work_id]);
+  assert.deepEqual(new Set(repo.searchSeriesWorks(["malazan"], 12)), new Set([blank.work_id, other.work_id]));
+});
+
+test("a second edition that fills a held work's blank author makes every series on that work findable by author", () => {
+  const { repo } = freshRepo();
+  const first = repo.createBook({ title: "Memories of Ice", author: "", isbn: "9780765348807", workKey: "OL1W" }, ["isbn:9780765348807"], NOW);
+  repo.addWorkSeries(first.work_id!, [{ name: MALAZAN, position: "3" }], "wikidata", AT);
+  repo.addWorkSeries(first.work_id!, [{ name: "Malazan Empire", position: null }], "ol-subject", AT);
+  assert.deepEqual(repo.searchSeriesWorks(["empire", "erikson"], 12), []);
+  repo.createBook({ title: "Memories of Ice", author: "Steven Erikson", isbn: "9780765316974", workKey: "OL1W" }, ["isbn:9780765316974"], NOW);
+  assert.deepEqual(repo.searchSeriesWorks(["malazan", "erikson"], 12), [first.work_id]);
+  assert.deepEqual(repo.searchSeriesWorks(["empire", "erikson"], 12), [first.work_id]);
+});
+
+test("assigning a legacy edition to a held work with a blank author makes the work's series findable by author", () => {
+  const { db, repo } = freshRepo();
+  const held = repo.createBook({ title: "Memories of Ice", author: "", isbn: "9780765348807", workKey: "OL1W" }, ["isbn:9780765348807"], NOW);
+  const legacy = repo.createBook({ title: "Memories of Ice", author: "Steven Erikson", isbn: "9780765316974", workKey: "OL1W" }, ["isbn:9780765316974"], NOW);
+  db.prepare("UPDATE books SET work_id = NULL WHERE id = ?").run(legacy.id);
+  db.prepare("UPDATE works SET author = '' WHERE id = ?").run(held.work_id);
+  repo.addWorkSeries(held.work_id!, [{ name: MALAZAN, position: "3" }], "wikidata", AT);
+  assert.deepEqual(repo.searchSeriesWorks(["malazan", "erikson"], 12), []);
+  assert.equal(repo.assignMissingWorks(250), 1);
+  assert.deepEqual(repo.searchSeriesWorks(["malazan", "erikson"], 12), [held.work_id]);
+});
+
+test("keying an edition into a held work with a blank author makes the work's series findable by author", () => {
+  const { repo } = freshRepo();
+  const held = repo.createBook({ title: "Memories of Ice", author: "", isbn: "9780765348807", workKey: "OL1W" }, ["isbn:9780765348807"], NOW);
+  const edition = repo.createBook({ title: "Memories of Ice", author: "Steven Erikson", isbn: "9780765316974" }, ["isbn:9780765316974"], NOW);
+  repo.addWorkSeries(held.work_id!, [{ name: MALAZAN, position: "3" }], "wikidata", AT);
+  assert.deepEqual(repo.searchSeriesWorks(["malazan", "erikson"], 12), []);
+  repo.setWorkKey(edition.id, "OL1W");
+  assert.equal(repo.getBook(edition.id)!.work_id, held.work_id);
+  assert.deepEqual(repo.searchSeriesWorks(["malazan", "erikson"], 12), [held.work_id]);
+});
+
+test("merging an edition with an author into a blank-authored work makes the target's series findable by author", () => {
+  const { repo } = freshRepo();
+  const target = repo.createBook({ title: "Memories of Ice", author: "", isbn: "9780765348807" }, ["isbn:9780765348807"], NOW);
+  const source = repo.createBook({ title: "Memórias de Gelo", author: "Steven Erikson", isbn: "9789896414672" }, ["isbn:9789896414672"], NOW);
+  repo.addWorkSeries(target.work_id!, [{ name: MALAZAN, position: "3" }], "wikidata", AT);
+  assert.deepEqual(repo.searchSeriesWorks(["malazan", "erikson"], 12), []);
+  assert.equal(repo.mergeWorks(source.work_id!, target.work_id!), target.work_id);
+  assert.deepEqual(repo.searchSeriesWorks(["malazan", "erikson"], 12), [target.work_id]);
+});
+
+test("a work whose author is already set keeps its indexed author when a later edition has a different one", () => {
+  const { repo } = freshRepo();
+  const first = repo.createBook({ title: "Memories of Ice", author: "Steven Erikson", isbn: "9780765348807", workKey: "OL1W" }, ["isbn:9780765348807"], NOW);
+  repo.addWorkSeries(first.work_id!, [{ name: MALAZAN, position: "3" }], "wikidata", AT);
+  repo.createBook({ title: "Memories of Ice", author: "S. Erikson", isbn: "9780765316974", workKey: "OL1W" }, ["isbn:9780765316974"], NOW);
+  assert.deepEqual(repo.searchSeriesWorks(["malazan", "erikson"], 12), [first.work_id]);
+  assert.deepEqual(repo.searchSeriesWorks(["malazan", "steven"], 12), [first.work_id]);
+});
+
 test("bestSeriesOf prefers Wikidata to an Open Library subject, whichever arrived first", () => {
   const { repo } = freshRepo();
   const book = seriesBook(repo, "Memories of Ice", "9780765348807");

@@ -21,7 +21,7 @@ const TRAILING_YEAR = /^(.*)\(\s*\d{4}\s*\)$/;
 const POSITION_FORMS = [
   new RegExp(`^(.*)\\(\\s*(?:${MARKED_NUMBER}|(${SHORT_NUMBER}))\\s*\\)$`, "i"),
   new RegExp(`^(.*)#\\s*(${SHORT_NUMBER})$`),
-  new RegExp(`^(.*)(?:(?:,|;|:|--)\\s*${MARKED_NUMBER}|(?:,|;)\\s+(${SHORT_NUMBER}))$`, "i")
+  new RegExp(`^(.*)(?:(?:,|;|:|--)\\s*${MARKED_NUMBER}|(?:(?:,|;)\\s+|\\s[–—]\\s+)(${SHORT_NUMBER}))$`, "i")
 ];
 
 function entryOf(name: string, position: string | null): SeriesEntry | null {
@@ -30,9 +30,8 @@ function entryOf(name: string, position: string | null): SeriesEntry | null {
 }
 
 export function parseSeriesString(raw: string): SeriesEntry | null {
-  const text = raw.trim();
-  const year = TRAILING_YEAR.exec(text);
-  if (year) return entryOf(year[1]!, null);
+  const trimmed = raw.trim();
+  const text = (TRAILING_YEAR.exec(trimmed)?.[1] ?? trimmed).trim();
   for (const form of POSITION_FORMS) {
     const match = form.exec(text);
     if (!match) continue;
