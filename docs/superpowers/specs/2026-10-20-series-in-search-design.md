@@ -60,19 +60,19 @@ Catalog search (`GET /books/search`, with and without `by=work`) returns:
 - its current title and author matches, plus
 - the editions of works whose series name matches every typed word, with the same rules as today: diacritics ignored, the last word matched as a prefix once it has 3 letters.
 
-Both kinds of match are ranked together by match quality. A story-series match counts like a title match (my call).
+Results are grouped by kind of match, and each group keeps its own match-quality order (my call). The groups come in this order: title and author matches as today, then story-series matches, then collection matches. Scores from different indexes can't be compared, so the groups are not mixed. A book found both ways appears once, in its first group. A series name is matched together with its work's author, so "malazan erikson" finds the series too.
 
 A collection-name match ranks below title, author and series matches (my call). The national library gives about 155k books a collection, and generic names ("Clássicos", "Romance", "Obras de …") must not crowd real title hits out of the caps.
 
-With `by=work` the Search tab keeps one row per work, as today. The Portuguese editions joined to a work show through that row and the work's edition strip, not as rows of their own. The existing caps hold: 12 editions, or 20 works with `by=work`. Outside search (ISBNdb and Open Library) is unchanged.
+With `by=work` the Search tab keeps one row per work, as today, for collection matches too. A work the reader owns that is found by series or collection stays in the catalog results when the reader's library section didn't list it, so it never disappears. The Portuguese editions joined to a work show through that row and the work's edition strip, not as rows of their own. The existing caps hold: 12 editions, or 20 works with `by=work`. Outside search (ISBNdb and Open Library) is unchanged.
 
 ### Results and the book page
 
 - Each search result and each work page carries the work's series as an optional field (`name`, `kind`, `position`).
-- Clients show at most one entry, my call:
+- Search results show the entry that matched the query: a collection match shows its collection, and a title or series match shows the story series, falling back to the edition's collection. The book page shows at most one entry (my call):
     1. the work's best story series by source priority;
   2. otherwise the shown edition's collection.
-- **Format:** "Name · 3" for a series, and "Name collection · 248" for a collection. When there's no position, just the name, or "Name collection".
+- **Format:** "Name · 3" for a series, and "Name collection · 248" for a collection. When there's no position, just the name, or "Name collection". A collection whose name already says "collection", "coleção" or "colecção" isn't given the word twice.
 - **Where:**
   - the mobile Search tab row,
   - the mobile Add Book form's result rows,
@@ -85,10 +85,10 @@ With `by=work` the Search tab keeps one row per work, as today. The Portuguese e
 All are free, and all already flow through the app or have been checked:
 
 1. **Wikidata** has "part of the series" (P179) with the position as a qualifier (P1545). It is joined to the catalog only by ISBN (P212/P957 on the work or its editions) or by Open Library work ID (P648), never by title and author alone (my call). A wrong series line shows to every user, and this week's wrong translation joins came from loose matching. Measured on 2026-10-20: about 13.8k series works carry an Open Library ID, and about 18k ISBN pairs exist. All 10 Malazan books are there, in order. Wikidata can hold more than one Open Library ID for a book, because Open Library has duplicate works, so match on any of them.
-2. **The Open Library edition record** has a `series` field, for example "Malazan Book of the Fallen (3)", which gives a name and a position. The app already fetches these records in the work-key lookup (`openLibraryCatalog.ts` `fetchEditionRecord`) and drops the field. Capture it from now on.
+2. **The Open Library edition record** has a `series` field. It can be a story series, such as "Malazan Book of the Fallen (3)", which gives a name and a position, or a publisher series, such as "Penguin classics". So it is stored as that edition's collection. It becomes the work's story series only when Wikidata or an Open Library `series:` subject gives the same name (my call). The app already fetches these records in the work-key lookup (`openLibraryCatalog.ts` `fetchEditionRecord`) and drops the field. Capture it from now on.
 3. **Open Library subjects** include tags like "series:Malazan Book of the Fallen". The app already reads subjects for genres and search hits; capture the series tag there.
 4. **The national library's UNIMARC 225** gives the collection name in `$a` and the number in `$v`, for example "Bang!" and 248. That makes it a `collection`. Capture it in the BNP mapper, so the daily sync and the per-ISBN lookup fill it from now on.
-5. **The series-like original titles** from the 2026-10-20 translation guard: 200 groups such as *Princess Poppy*, *CHERUB*, *Isadora Moon* and *Diary of a Wimpy Kid*. They give a `series` with no position, on the works of the editions that claim them.
+5. **The series-like original titles** from the 2026-10-20 translation guard. These are written only after review, because a classic translated three times under different Portuguese titles looks the same (my call). The fill lists the candidates, a review approves them, as with the series-join repair, and only the approved list is written. The candidates are: 200 groups such as *Princess Poppy*, *CHERUB*, *Isadora Moon* and *Diary of a Wimpy Kid*. They give a `series` with no position, on the works of the editions that claim them.
 
 **Source priority for which series to show** (my call): Wikidata, then the Open Library edition record, then the Open Library subject, then the series-like original title. Collections are ranked on their own, and the national library is their only source for now.
 
