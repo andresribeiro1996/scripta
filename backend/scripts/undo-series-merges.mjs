@@ -26,5 +26,5 @@ if (values.list) {
   }
   const { openBooksDb } = await import("../dist/modules/books/adapters/sqlite/connection.js");
   const { undoReviewedMerges } = await import("../dist/modules/books/seriesMergeRepair.js");
-  console.log(JSON.stringify(undoReviewedMerges(createSqliteBooksRepository(openBooksDb()), undo, Date.now), null, 2));
+  console.log(JSON.stringify(undoReviewedMerges(createSqliteBooksRepository(openBooksDb()), undo, Date.now, (fromWork) => console.error(`undone ${fromWork}`)), null, 2));
 }
