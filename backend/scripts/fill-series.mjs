@@ -5,7 +5,7 @@ import { parseArgs } from "node:util";
 const MODES = ["wikidata", "originals", "bnp", "held"];
 const USAGE = [
   "Usage: node scripts/fill-series.mjs wikidata|originals|bnp|held [--dry-run]",
-  "       node scripts/fill-series.mjs wikidata [--dry-run] [--skip <names.json>]",
+  "       node scripts/fill-series.mjs wikidata --dry-run [--skip <names.json>] | --skip <names.json>",
   "       node scripts/fill-series.mjs originals --list | --apply <approved.json>",
   "       node scripts/fill-series.mjs bnp [--from YYYY-MM-DD] [--until YYYY-MM-DD]"
 ].join("\n");
@@ -44,6 +44,7 @@ const { values, positionals } = parseArgs({
 const mode = positionals[0];
 if (positionals.length !== 1 || !MODES.includes(mode)) fail(USAGE);
 if (values.skip !== undefined && mode !== "wikidata") fail(USAGE);
+if (mode === "wikidata" && !values["dry-run"] && values.skip === undefined) fail("A real wikidata fill needs --skip <names.json>: run --dry-run, review the series list, then pass the rejected names (or a file holding []).");
 if (mode === "originals" ? values.list === (values.apply !== undefined) : values.list || values.apply !== undefined) fail(USAGE);
 for (const name of mode === "held" ? ["COVERS_DB_PATH", "LIBRARY_DB_PATH"] : ["COVERS_DB_PATH"]) {
   if (!process.env[name]) fail(`Missing environment variable: ${name}`);
