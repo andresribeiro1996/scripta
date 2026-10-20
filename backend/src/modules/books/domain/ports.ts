@@ -1,6 +1,7 @@
 import type { BookMetadata, BookSearchResult, CatalogBookMetadata } from "@scripta/shared";
 import type { SynopsisJudgment, SynopsisKind } from "./synopsis.js";
-import type { BookRow, CoverImageRow, CoverSourceName, CoverStatus, DataSource, GenreEvidence, GenresSource, JevRejection, JevTask, LossyBook, NewBook, SummarySource, WorkMatchJudgment, WorkPageRows, WorkView } from "./types.js";
+import type { OriginalClaim } from "./translation.js";
+import type { BookRow, CoverImageRow, CoverSourceName, CoverStatus, DataSource, GenreEvidence, GenresSource, JevRejection, JevTask, LossyBook, MergeSource, NewBook, SummarySource, WorkMatchJudgment, WorkPageRows, WorkView } from "./types.js";
 
 export type MergeableDetails = Pick<BookMetadata, "summary" | "pages" | "year" | "publisher" | "translator">;
 
@@ -98,6 +99,9 @@ export interface BooksRepository {
   saveWorkMatchJudgment(workId: string, judgment: WorkMatchJudgment): void;
   portugueseWorksNeedingMatch(workIds: string[] | null, limit: number, rejectionLimit: number, recheckBefore: string | null): string[];
   translationEvidence(workId: string): { workId: string; workAuthor: string; editions: Array<{ title: string; author: string; publisher: string | null; summary: string | null; originalTitle: string | null }> } | undefined;
+  originalTitleClaims(): OriginalClaim[];
+  activeMerges(source: MergeSource): Array<{ id: number; fromWork: string; intoWork: string; movedBookIds: string[]; mergedAt: string }>;
+  editionsOf(workIds: string[]): Array<{ id: string; workId: string; title: string; author: string; language: string | null; isbn: string | null; originalTitle: string | null }>;
   titleCandidates(pattern: string): string[];
   authorCandidates(pattern: string): string[];
   matchCandidates(workIds: string[]): Array<{ id: string; title: string; author: string; year: number | null; editions: number; languages: string[] }>;

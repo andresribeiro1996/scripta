@@ -1,6 +1,6 @@
 import type { ClassifyMatch } from "./adapters/typesafe/jevWorkMatch.js";
 import type { BooksRepository } from "./domain/ports.js";
-import { MATCH_MERGE_AT, MATCH_REVIEW_AT } from "./domain/translation.js";
+import { MATCH_MERGE_AT, MATCH_REVIEW_AT, seriesLikeOriginals } from "./domain/translation.js";
 import { JEV_REJECTION_LIMIT } from "./synopsisJudgments.js";
 import { matchWork, planMatch, type TranslationDeps } from "./translationJudgments.js";
 import { failureKind, type FailureKind } from "./typesafe.js";
@@ -19,12 +19,18 @@ export function translationBacklogWorks(repo: Pick<BooksRepository, "canonicalWo
   return [...works.filter((id) => held.has(id)), ...works.filter((id) => !held.has(id))];
 }
 
-export function translationDryRun(repo: Pick<BooksRepository, "translationEvidence" | "titleCandidates" | "authorCandidates" | "matchCandidates">, workIds: string[], max: number) {
-  const counts = { selected: workIds.length, originalTitles: 0, originals: 0, noCandidates: 0, codeMerges: 0, wouldAsk: 0, max };
+export function translationDryRun(repo: Pick<BooksRepository, "translationEvidence" | "originalTitleClaims" | "titleCandidates" | "authorCandidates" | "matchCandidates">, workIds: string[], max: number) {
+  const counts = { selected: workIds.length, originalTitles: 0, originals: 0, noCandidates: 0, codeMerges: 0, wouldAsk: 0, seriesLike: 0, max };
+  const seriesLike = seriesLikeOriginals(repo.originalTitleClaims());
   for (const workId of workIds) {
     const rows = repo.translationEvidence(workId);
     if (rows?.editions.some((edition) => !edition.originalTitle && /t[íi]tulo original/i.test(edition.summary ?? ""))) counts.originalTitles += 1;
-    const plan = planMatch(repo, workId);
+    let blocked = false;
+    const plan = planMatch(repo, workId, (original, author) => {
+      blocked = seriesLike(original, author);
+      return blocked;
+    });
+    if (blocked) counts.seriesLike += 1;
     if (plan?.kind === "original") counts.originals += 1;
     else if (plan?.kind === "none") counts.noCandidates += 1;
     else if (plan?.kind === "code") counts.codeMerges += 1;
@@ -38,8 +44,9 @@ export function runCodeSteps(deps: TranslationDeps, workIds: string[]): CodeStep
   const steps: CodeSteps = { originals: 0, noCandidates: 0, codeMerges: 0, codeBlocked: 0, ask: [] };
   const at = new Date(deps.now()).toISOString();
   deps.repo.fillOriginalTitlesFromSummaries();
+  const seriesLike = seriesLikeOriginals(deps.repo.originalTitleClaims());
   for (const workId of workIds) {
-    const plan = planMatch(deps.repo, workId);
+    const plan = planMatch(deps.repo, workId, seriesLike);
     if (!plan) continue;
     if (plan.kind === "ask") {
       steps.ask.push(workId);
@@ -64,6 +71,7 @@ export function runCodeSteps(deps: TranslationDeps, workIds: string[]): CodeStep
 
 export async function runTranslationBacklog(deps: TranslationDeps, workIds: string[]): Promise<{ asked: string[]; stoppedBy: TranslationBacklogStop }> {
   const asked: string[] = [];
+  const seriesLike = seriesLikeOriginals(deps.repo.originalTitleClaims());
   let stoppedBy: TranslationBacklogStop = "done";
   let next = 0;
   const worker = async () => {
@@ -78,7 +86,7 @@ export async function runTranslationBacklog(deps: TranslationDeps, workIds: stri
           throw error;
         }
       };
-      const pause = await matchWork({ ...deps, classify }, workId);
+      const pause = await matchWork({ ...deps, classify }, workId, seriesLike);
       if (pause === null) asked.push(workId);
       else if (stoppedBy === "done") stoppedBy = call.failure === "budget" || call.failure === "key" ? call.failure : "outage";
     }

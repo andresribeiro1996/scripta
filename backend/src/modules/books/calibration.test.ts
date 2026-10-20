@@ -97,6 +97,19 @@ test("the translation sample mixes code matches and Jev questions, each with its
   assert.equal(repo.workMatchJudgments(sample.map((item) => item.workId)).size, 0);
 });
 
+test("the translation sample never offers a work whose original is a series name as a code match", () => {
+  const repo = freshRepo();
+  const add = (isbn: string, title: string, author: string, extra: { workKey?: string; language?: string; originalTitle?: string } = {}) => {
+    const row = repo.createBook({ title, author, isbn, workKey: extra.workKey }, [`isbn:${isbn}`], "2026-10-01T00:00:00.000Z");
+    if (extra.language) repo.setLanguage(row.id, extra.language);
+    if (extra.originalTitle) repo.fillOriginalTitle(row.id, extra.originalTitle);
+    return repo.getBook(row.id)!;
+  };
+  add("9781408300001", "Princess Poppy", "Janey Louise Jones", { workKey: "OL986W" });
+  for (const [n, title] of ["A Princesa Poppy e o Piquenique", "A Princesa Poppy e a Festa", "Poppy no Baile"].entries()) add(`978972000062${n}`, title, "Janey Louise Jones", { language: "pt-PT", originalTitle: "Princess Poppy" });
+  assert.deepEqual(translationSample(repo, 4, () => 0.5), []);
+});
+
 test("the translation score counts right picks per decision band", () => {
   const item = (workId: string, stratum: "code" | "ask", codePick: string | null) => ({ workId, stratum, edition: { title: "T", author: "A", originalTitle: null, publisher: null, description: null }, candidates: [{ id: "x", title: "X", author: "A", year: null }], codePick });
   const sample = [item("c", "code", "x"), item("h", "ask", null), item("m", "ask", null), item("l", "ask", null)];
