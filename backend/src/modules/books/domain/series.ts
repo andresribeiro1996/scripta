@@ -12,15 +12,16 @@ export function seriesNameKey(name: string): string | null {
 
 const WORD_NUMBERS = ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen", "twenty"];
 const SERIES_SUBJECT = /^series:/i;
+const NUMBER = "\\d+(?:\\.\\d+)?";
+const TRAILING_SEPARATORS = /[\s,;:–—-]+$/;
 const POSITION_FORMS = [
-  /^(.*)\(\s*(\d+)\s*\)$/,
-  /^(.*)#\s*(\d+)$/,
-  new RegExp(`^(.*),\\s*book\\s+(\\d+|${WORD_NUMBERS.join("|")})$`, "i"),
-  /^(.*);\s*(\d+)$/
+  new RegExp(`^(.*)\\(\\s*(${NUMBER})\\s*\\)$`),
+  new RegExp(`^(.*)#\\s*(${NUMBER})$`),
+  new RegExp(`^(.*)(?:,|;|:|--)\\s*(?:(?:bk\\.|book|vol\\.|v\\.|no\\.)\\s*(${NUMBER}|${WORD_NUMBERS.join("|")})|(${NUMBER}))$`, "i")
 ];
 
 function entryOf(name: string, position: string | null): SeriesEntry | null {
-  const trimmed = name.trim();
+  const trimmed = name.replace(TRAILING_SEPARATORS, "");
   return seriesNameKey(trimmed) ? { name: trimmed, position } : null;
 }
 
@@ -29,8 +30,9 @@ export function parseSeriesString(raw: string): SeriesEntry | null {
   for (const form of POSITION_FORMS) {
     const match = form.exec(text);
     if (!match) continue;
-    const word = WORD_NUMBERS.indexOf(match[2]!.toLowerCase());
-    return entryOf(match[1]!, word < 0 ? match[2]! : String(word + 1));
+    const position = (match[2] ?? match[3])!;
+    const word = WORD_NUMBERS.indexOf(position.toLowerCase());
+    return entryOf(match[1]!, word < 0 ? position : String(word + 1));
   }
   return entryOf(text, null);
 }

@@ -293,10 +293,14 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
   }
 
   function storeSeries(bookId: string, found: { editionSeries?: SeriesEntry[]; subjectSeries?: SeriesEntry[] }, at: string) {
-    for (const entry of found.editionSeries ?? []) deps.repo.addBookCollection(bookId, entry, "ol-edition", at);
+    const editions = found.editionSeries ?? [];
     const subjects = found.subjectSeries ?? [];
-    const workId = subjects.length > 0 ? deps.repo.getBook(bookId)?.work_id : null;
-    if (workId) deps.repo.addWorkSeries(workId, subjects, "ol-subject", at);
+    if (editions.length === 0 && subjects.length === 0) return;
+    deps.repo.transaction(() => {
+      for (const entry of editions) deps.repo.addBookCollection(bookId, entry, "ol-edition", at);
+      const workId = subjects.length > 0 ? deps.repo.getBook(bookId)?.work_id : null;
+      if (workId) deps.repo.addWorkSeries(workId, subjects, "ol-subject", at);
+    });
   }
 
   async function lookupDetails(book: BookRow, catalog: BookCatalog) {

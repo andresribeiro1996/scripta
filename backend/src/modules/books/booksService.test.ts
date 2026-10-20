@@ -2517,3 +2517,31 @@ test("search hits with series subjects store them on the saved book's work and s
   await h.service.searchExternal("dune");
   assert.equal(rowsOf(h, "work_series", book.work_id!).length, 1);
 });
+
+test("a book's edition and subject series are written in one transaction, and none is opened when there are none", async () => {
+  const withSeries = { title: "Memories of Ice", workKey: null, languages: [], series: [MEMORIES, { name: "Penguin classics", position: null }] };
+  const h = harness({ editionRecords: editionRecords(async (isbn) => (isbn === "9789720000001" ? withSeries : { title: "Orlando", workKey: null, languages: [] })) });
+  const [first, second] = lookupBooks(h, [{ isbn: "9789720000001" }, { isbn: "9789720000002" }]);
+  const inside: boolean[] = [];
+  const addCollection = h.repo.addBookCollection.bind(h.repo);
+  h.repo.addBookCollection = (...args) => { inside.push(h.db.isTransaction); return addCollection(...args); };
+  let opened = 0;
+  const transaction = h.repo.transaction.bind(h.repo);
+  h.repo.transaction = (write) => { opened += 1; return transaction(write); };
+  await h.service.backfillWorkKeys(50);
+  assert.deepEqual(inside, [true, true]);
+  assert.equal(opened, 1);
+  assert.equal(rowsOf(h, "book_collections", first!).length, 2);
+  assert.equal(rowsOf(h, "book_collections", second!).length, 0);
+});
+
+test("subject series are written in the same transaction as the edition's", async () => {
+  const facts = { rating: null, ratingCount: 0, sourceUrl: "https://openlibrary.org/works/OL5W", genres: [], publisher: null, year: null, translator: null, summary: "Spice.", pages: null };
+  const details = { metadata: facts, sources: ["openlibrary" as const], summarySource: null, editionSeries: [MEMORIES], subjectSeries: [{ name: MALAZAN, position: null }] };
+  const h = harness({ catalog: recordingCatalog({ fetchDetails: async () => details }).catalog });
+  const inside: boolean[] = [];
+  const addWork = h.repo.addWorkSeries.bind(h.repo);
+  h.repo.addWorkSeries = (...args) => { inside.push(h.db.isTransaction); return addWork(...args); };
+  await h.service.getDetails(dune);
+  assert.deepEqual(inside, [true]);
+});

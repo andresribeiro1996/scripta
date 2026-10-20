@@ -170,6 +170,16 @@ test("an edition record gives the series strings Open Library holds for it, and 
   for (const record of [{ title: "x" }, { title: "x", series: [] }, { title: "x", series: ["--", 7] }, { title: "x", series: "Penguin classics" }]) assert.equal("series" in parseEditionRecord(record), false, JSON.stringify(record));
 });
 
+test("an edition record reads the series strings Open Library really writes", () => {
+  const parsed = parseEditionRecord({ series: ["Harry Potter, #1", "Harry Potter, 1", "Dune chronicles -- bk. 1", "The Witcher: Book 0.5"] });
+  assert.deepEqual(parsed.series, [
+    { name: "Harry Potter", position: "1" },
+    { name: "Harry Potter", position: "1" },
+    { name: "Dune chronicles", position: "1" },
+    { name: "The Witcher", position: "0.5" }
+  ]);
+});
+
 test("details carry the edition's series strings and the work's series subjects", async () => {
   const catalog = createOpenLibraryCatalog(direct);
   respond([{ docs: [doc] }, { subjects: ["Fantasy", "series:Malazan_Book_of_the_Fallen"] }, { series: ["Penguin classics", "Malazan Book of the Fallen (3)"] }]);
