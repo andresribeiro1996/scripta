@@ -222,3 +222,19 @@ test("a scan link is kept only as a valid http(s) URL, with a literal $u marker 
   assert.equal(scan("$u http://example.com/other"), null);
   assert.equal(scan("$u http://[rnod/ImagesBN/winlibimg.aspx?doc=1", `$u http://${clean}`), `https://${clean}`);
 });
+
+test("a 225 series statement gives the collection name and its volume text", () => {
+  assert.deepEqual(mapBnpRecord(byId("1233005")).collection, { name: "Obras de Eça de Queirós", position: "2" });
+  assert.deepEqual(mapBnpRecord(byId("1704776")).collection, { name: "Antropos", position: null });
+  assert.equal(mapBnpRecord(readMarcRecords(urnAllende)[0]!).collection, null);
+  assert.equal(book().collection, null);
+});
+
+test("a collection keeps its first volume designation as written, and skips a 225 with no name", () => {
+  const collection = (...fields: MarcField[]) => book(...fields).collection;
+  assert.deepEqual(collection(field("225", ["a", "Bang!"], ["v", "248"])), { name: "Bang!", position: "248" });
+  assert.deepEqual(collection(field("225", ["a", "Clássicos"], ["v", " n.º 12 "], ["v", "13"])), { name: "Clássicos", position: "n.º 12" });
+  assert.deepEqual(collection(field("225", ["a", "Clássicos"], ["v", " "])), { name: "Clássicos", position: null });
+  assert.deepEqual(collection(field("225", ["v", "3"]), field("225", ["a", " "]), field("225", ["a", "Clássicos"], ["v", "4"])), { name: "Clássicos", position: "4" });
+  assert.equal(collection(field("225", ["v", "3"])), null);
+});

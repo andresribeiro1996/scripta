@@ -1678,7 +1678,7 @@ function lookupBooks(h: ReturnType<typeof harness>, specs: Array<{ isbn: string;
   });
 }
 
-function editionRecords(answer: (isbn: string) => Promise<{ title: string; workKey: string | null; languages: string[] } | null>, calls: string[] = []) {
+function editionRecords(answer: (isbn: string) => Promise<Awaited<ReturnType<Deps["editionRecords"]["fetchEditionRecord"]>>>, calls: string[] = []) {
   return { fetchEditionRecord: async (isbn: string) => { calls.push(isbn); return answer(isbn); } };
 }
 
@@ -2431,4 +2431,89 @@ test("search results saved from outside carry the series once the work has one",
   const [dune, encyclopedia] = await h.service.searchExternal("dune");
   assert.deepEqual(dune!.series, { name: "Dune Chronicles", kind: "series", position: "1" });
   assert.ok(!("series" in encyclopedia!));
+});
+
+const MEMORIES = { name: MALAZAN, position: "3" };
+const rowsOf = (h: Harness, table: "work_series" | "book_collections", owner: string) =>
+  h.db.prepare(`SELECT name, position, source, created_at FROM ${table} WHERE ${table === "work_series" ? "work_id" : "book_id"} = ? ORDER BY name, source`).all(owner).map((row) => ({ ...row }));
+
+test("an edition's Open Library series are stored as its ol-edition collections", async () => {
+  const h = harness({ editionRecords: editionRecords(async () => ({ title: "Memories of Ice", workKey: "/works/OL5W", languages: [], series: [MEMORIES, { name: "Penguin classics", position: null }] })) });
+  const [id] = lookupBooks(h, [{ isbn: "9789720000001" }]);
+  await h.service.backfillWorkKeys(50);
+  assert.deepEqual(rowsOf(h, "book_collections", id!), [
+    { name: MALAZAN, position: "3", source: "ol-edition", created_at: SERIES_AT },
+    { name: "Penguin classics", position: null, source: "ol-edition", created_at: SERIES_AT }
+  ]);
+  const work = h.repo.getBook(id!)!.work_id!;
+  assert.deepEqual(rowsOf(h, "work_series", work), []);
+});
+
+test("an edition series that an Open Library subject on the same work also names becomes its story series, at the edition's position", async () => {
+  const h = harness({ editionRecords: editionRecords(async () => ({ title: "Memories of Ice", workKey: "/works/OL5W", languages: [], series: [MEMORIES] })) });
+  const keyed = seeded(h, "Memories of Ice", isbnOf(1), { workKey: "OL5W" });
+  h.repo.addWorkSeries(keyed.work_id!, [{ name: MALAZAN, position: null }], "ol-subject", SERIES_AT);
+  const [id] = lookupBooks(h, [{ isbn: "9789720000001" }]);
+  await h.service.backfillWorkKeys(50);
+  assert.equal(h.repo.getBook(id!)!.work_id, keyed.work_id);
+  assert.deepEqual(h.repo.bestSeriesOf([keyed.work_id!]).get(keyed.work_id!), { name: MALAZAN, position: "3" });
+});
+
+test("a publisher collection from an edition record alone gives its work no story series", async () => {
+  const h = harness({ editionRecords: editionRecords(async () => ({ title: "Orlando", workKey: "/works/OL6W", languages: [], series: [{ name: "Penguin classics", position: null }] })) });
+  const [id] = lookupBooks(h, [{ isbn: "9789720000001" }]);
+  await h.service.backfillWorkKeys(50);
+  const work = h.repo.getBook(id!)!.work_id!;
+  assert.equal(h.repo.bestSeriesOf([work]).size, 0);
+  assert.deepEqual(h.repo.collectionsOf([id!]).get(id!), { name: "Penguin classics", position: null });
+});
+
+test("an edition record without series adds no collection, and the same series is not stored twice", async () => {
+  let record: Awaited<ReturnType<Deps["editionRecords"]["fetchEditionRecord"]>> = { title: "Orlando", workKey: null, languages: [] };
+  const h = harness({ editionRecords: editionRecords(async () => record) });
+  const [id] = lookupBooks(h, [{ isbn: "9789720000001" }]);
+  await h.service.backfillWorkKeys(50);
+  assert.deepEqual(rowsOf(h, "book_collections", id!), []);
+  record = { title: "Orlando", workKey: null, languages: [], series: [{ name: "Penguin classics", position: null }] };
+  h.advance(31 * DAY);
+  await h.service.backfillWorkKeys(50);
+  h.advance(31 * DAY);
+  await h.service.backfillWorkKeys(50);
+  assert.equal(rowsOf(h, "book_collections", id!).length, 1);
+});
+
+test("details that carry series store the edition's as collections and the work's subjects as ol-subject series", async () => {
+  const facts = { rating: null, ratingCount: 0, sourceUrl: "https://openlibrary.org/works/OL5W", genres: [], publisher: null, year: null, translator: null };
+  const answers = [{ ...facts, summary: "Spice.", pages: null }, { ...facts, summary: null, pages: 300 }];
+  for (const metadata of answers) {
+    const details = { metadata, sources: ["openlibrary" as const], summarySource: null, workKey: "/works/OL5W", editionSeries: [MEMORIES, { name: "Penguin classics", position: null }], subjectSeries: [{ name: MALAZAN, position: null }] };
+    const h = harness({ catalog: recordingCatalog({ fetchDetails: async () => details }).catalog });
+    await h.service.getDetails(dune);
+    const book = h.repo.findBookByKey("isbn:9780441013593")!;
+    assert.deepEqual(rowsOf(h, "book_collections", book.id).map(({ name, source }) => [name, source]), [[MALAZAN, "ol-edition"], ["Penguin classics", "ol-edition"]]);
+    assert.deepEqual(rowsOf(h, "work_series", book.work_id!), [{ name: MALAZAN, position: null, source: "ol-subject", created_at: SERIES_AT }]);
+    assert.deepEqual(h.repo.bestSeriesOf([book.work_id!]).get(book.work_id!), { name: MALAZAN, position: "3" });
+  }
+});
+
+test("details without series store none", async () => {
+  const h = harness({ catalog: recordingCatalog().catalog });
+  await h.service.getDetails(dune);
+  const book = h.repo.findBookByKey("isbn:9780441013593")!;
+  assert.deepEqual(rowsOf(h, "book_collections", book.id), []);
+  assert.deepEqual(rowsOf(h, "work_series", book.work_id!), []);
+});
+
+test("search hits with series subjects store them on the saved book's work and show them at once", async () => {
+  const hit = { result: { title: "Dune", authors: ["Frank Herbert"], year: 1965, isbn: "9780441013593", publisher: null, coverUrl: null, genres: [] }, olCoverId: null, workKey: "/works/OL9W", subjectSeries: [{ name: "Dune Chronicles", position: null }], source: "openlibrary" as const };
+  const plain = { result: { title: "Dune Messiah", authors: ["Frank Herbert"], year: 1969, isbn: null, publisher: null, coverUrl: null, genres: [] }, olCoverId: null, source: "openlibrary" as const };
+  const h = harness({ catalog: recordingCatalog({ search: async () => [hit, plain] }).catalog });
+  const [dune, messiah] = await h.service.searchExternal("dune");
+  const book = h.repo.findBookByKey("isbn:9780441013593")!;
+  assert.equal(book.ol_work_key, "OL9W");
+  assert.deepEqual(rowsOf(h, "work_series", book.work_id!), [{ name: "Dune Chronicles", position: null, source: "ol-subject", created_at: SERIES_AT }]);
+  assert.deepEqual(dune!.series, { name: "Dune Chronicles", kind: "series", position: null });
+  assert.ok(!("series" in messiah!));
+  await h.service.searchExternal("dune");
+  assert.equal(rowsOf(h, "work_series", book.work_id!).length, 1);
 });

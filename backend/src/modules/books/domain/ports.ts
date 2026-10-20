@@ -147,6 +147,7 @@ export interface CatalogSearchHit {
   result: BookSearchResult;
   olCoverId: number | null;
   workKey?: string | null;
+  subjectSeries?: SeriesEntry[];
   source: DataSource;
 }
 
@@ -156,6 +157,8 @@ export interface CatalogDetails {
   summarySource: DataSource | null;
   workKey?: string | null;
   workSummary?: string | null;
+  editionSeries?: SeriesEntry[];
+  subjectSeries?: SeriesEntry[];
 }
 
 export interface BookCatalog {
@@ -167,6 +170,7 @@ export interface EditionRecord {
   title: string;
   workKey: string | null;
   languages: string[];
+  series?: SeriesEntry[];
 }
 
 export interface EditionRecordSource {

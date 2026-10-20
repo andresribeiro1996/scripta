@@ -86,6 +86,7 @@ export async function applyBnpRecord(deps: BnpDeps, plan: BnpPlan): Promise<{ bo
     deps.repo.mergeDetails(row.id, { summary: book.summary, pages: book.pages, year: book.year, publisher: book.publisher, translator: book.translator }, "bnp");
     if (book.originalTitle) deps.repo.fillOriginalTitle(row.id, book.originalTitle);
     deps.repo.setLanguage(row.id, editionLanguage(book.languages, isbn));
+    if (book.collection) deps.repo.addBookCollection(row.id, book.collection, "bnp", at);
     return { id: row.id, created: held === undefined, replaceable: replaceReasonOf(deps.repo, row, book.scanUrl) !== null, expected: row.cover_image_id };
   });
 

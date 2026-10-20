@@ -5,7 +5,7 @@ import { mapBnpRecord, readMarcRecords } from "./bnpRecord.js";
 import type { BnpBook } from "./bnpRecord.js";
 import { bnpSkipReason, udcGenres } from "./bnpScope.js";
 
-const book = (over: Partial<BnpBook>): BnpBook => ({ recordId: "1", isbns: ["9789720044457"], title: "T", author: "A B", translator: null, originalTitle: null, publisher: "Porto Editora", year: 2020, pages: 100, languages: ["por"], udc: [], summary: null, scanUrl: null, ...over });
+const book = (over: Partial<BnpBook>): BnpBook => ({ recordId: "1", isbns: ["9789720044457"], title: "T", author: "A B", translator: null, originalTitle: null, publisher: "Porto Editora", year: 2020, pages: 100, languages: ["por"], udc: [], summary: null, scanUrl: null, collection: null, ...over });
 
 test("each rule skips its record, in order", () => {
   assert.equal(bnpSkipReason(book({ isbns: [] })), "noIsbn");

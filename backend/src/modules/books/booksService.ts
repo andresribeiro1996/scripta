@@ -256,7 +256,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
   }
 
   function saveHits(hits: CatalogSearchHit[]): BookSearchResult[] {
-    const saved = hits.map(({ result, olCoverId, workKey, source }) => {
+    const saved = hits.map(({ result, olCoverId, workKey, subjectSeries, source }) => {
       const author = result.authors.join(", ");
       const identity = lookupIdentity({ isbn: result.isbn, title: result.title, author });
       if (!identity) return { result, book: null };
@@ -268,6 +268,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       fillMissingIdentity(deps.repo, book, identity.title, identity.author);
       deps.repo.setWorkKey(book.id, workKey);
       deps.repo.makeSearchable(book.id);
+      storeSeries(book.id, { subjectSeries }, now().toISOString());
       return { result: book.cover_image_id ? { ...result, coverUrl: deps.publicUrlFor(book.cover_image_id, "thumb") } : result, book: deps.repo.getBook(book.id) ?? book };
     });
     const canonical = deps.repo.canonicalWorkIds(workIdsOf(saved.flatMap(({ book }) => (book ? [book] : []))));
@@ -291,6 +292,13 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
     return view;
   }
 
+  function storeSeries(bookId: string, found: { editionSeries?: SeriesEntry[]; subjectSeries?: SeriesEntry[] }, at: string) {
+    for (const entry of found.editionSeries ?? []) deps.repo.addBookCollection(bookId, entry, "ol-edition", at);
+    const subjects = found.subjectSeries ?? [];
+    const workId = subjects.length > 0 ? deps.repo.getBook(bookId)?.work_id : null;
+    if (workId) deps.repo.addWorkSeries(workId, subjects, "ol-subject", at);
+  }
+
   async function lookupDetails(book: BookRow, catalog: BookCatalog) {
     const details = await catalog.fetchDetails({ isbn: book.isbn, title: book.title, author: book.author, language: book.language ?? (isPortugueseIsbn(book.isbn) ? "pt" : null) });
     const at = now().toISOString();
@@ -298,11 +306,13 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       deps.repo.saveDetails(book.id, details.metadata, details.sources, details.summarySource, at);
       deps.repo.setWorkKey(book.id, details.workKey);
       if (details.workSummary) deps.repo.setWorkSummary(book.id, details.workSummary);
+      storeSeries(book.id, details, at);
       return;
     }
     if (details) {
       deps.repo.mergeDetails(book.id, { ...details.metadata, summary: null }, null);
       deps.repo.setWorkKey(book.id, details.workKey);
+      storeSeries(book.id, details, at);
     }
     deps.repo.markDetailsMissing(book.id, at);
   }
@@ -433,6 +443,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
             const language = editionLanguage(record.languages, book.isbn);
             if (language) deps.repo.replaceLanguage(id, language);
           }
+          if (record) storeSeries(id, { editionSeries: record.series }, now().toISOString());
         } catch (error) {
           if (!(error instanceof SourceUnavailableError)) throw error;
           if (error.retryAt !== undefined) return error.retryAt;
