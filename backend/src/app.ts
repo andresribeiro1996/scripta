@@ -205,7 +205,8 @@ export function buildApp() {
       votedAmong: getTierlistsPublicApi().votedAmong,
       get: getTierlistsPublicApi().getPublished,
       listByOwner: getTierlistsPublicApi().listPublishedByOwner,
-      discoverByWorks: getTierlistsPublicApi().discoverByWorks
+      discoverByWorks: getTierlistsPublicApi().discoverByWorks,
+      fillRankingCovers: getTierlistsPublicApi().fillRankingCovers
     },
     tournaments: {
       completedForParticipant: getArenaPublicApi().completedForParticipant,

@@ -787,7 +787,7 @@ test("the dashboard service pages through a real inbox newest first, narrowed to
     searchUsernameOwners: unused,
     matchWorks: unused,
     murals: { ownsMural: unused, getMuralPublicPayload: unused, getMuralSummary: unused },
-    tierlists: { discoverWindow: unused, getPublishedMany: unused, votedAmong: unused, get: (id) => refs.get(id), listByOwner: unused, discoverByWorks: unused },
+    tierlists: { discoverWindow: unused, getPublishedMany: unused, votedAmong: unused, get: (id) => refs.get(id), listByOwner: unused, discoverByWorks: unused, fillRankingCovers: unused },
     tournaments: { completedForParticipant: () => [], discoverWindow: unused, getPublishedMany: unused, votedAmong: unused, get: () => undefined, listByOwner: unused, discoverByWorks: unused },
     quizzes: { discoverWindow: unused, getPublishedMany: unused, votedAmong: unused, get: () => undefined, listByOwner: unused, discoverByWorks: unused },
     participation: { tierlists: () => [], tournaments: () => [], quizzes: () => [] }

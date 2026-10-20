@@ -805,3 +805,78 @@ test("votedAmong returns only the requested polls the account balloted on, never
   assert.deepEqual(service.votedAmong("u9", []), []);
   assert.deepEqual(service.votedAmong("u1", [first.copy.id, second.copy.id, third.copy.id]), []);
 });
+
+function coverFixture(peeked: Array<Array<{ isbn: string | null; title: string | null; author: string | null }>>) {
+  const ranking: unknown[] = [];
+  const peek = (params: Array<{ isbn: string | null; title: string | null; author: string | null }>) => {
+    peeked.push(params);
+    return params.map((param) => `https://covers.test/${param.title}.jpg`);
+  };
+  const service = createTierlistsService(createInMemoryRepo(), undefined, (_user, _id, _name, preview) => { ranking.push(preview); }, peek);
+  const tiers = [{ id: "s", label: "S", color: "#c9482f", workIds: [] }];
+  const snapshot = [
+    { workId: "w1", title: "Dune", author: "Frank Herbert", isbn: "123", coverUrl: null },
+    { workId: "w2", title: "Emma", author: "Jane Austen", coverUrl: "https://stored.test/emma.jpg" }
+  ];
+  const board = service.createTierlist("owner", "Pool", { tiers, pool: ["w1", "w2"] }, "members", snapshot);
+  return { service, board, ranking };
+}
+
+test("a null snapshot coverUrl is filled from the cover peek in refs, the voting board and the voted_on ranking", () => {
+  const peeked: Array<Array<{ isbn: string | null; title: string | null; author: string | null }>> = [];
+  const { service, board, ranking } = coverFixture(peeked);
+
+  assert.deepEqual(service.getPublishedRef(board.id)?.covers, ["https://covers.test/Dune.jpg", "https://stored.test/emma.jpg"]);
+  assert.deepEqual(peeked[0], [{ isbn: "123", title: "Dune", author: "Frank Herbert" }]);
+  const books = service.getVotingBoard(board.voteCode!)?.publicBooks as Array<{ coverUrl: string }>;
+  assert.deepEqual(books.map((book) => book.coverUrl), ["https://covers.test/Dune.jpg", "https://stored.test/emma.jpg"]);
+
+  service.submitBallot(board.voteCode!, [{ workId: "w1", tierId: "s" }], { kind: "user", userId: "reader" });
+  assert.deepEqual(ranking, [[{ label: "S", color: "#c9482f", books: [{ title: "Dune", coverUrl: "https://covers.test/Dune.jpg" }] }]]);
+});
+
+test("stored cover URLs are not peeked again", () => {
+  const peeked: Array<Array<{ isbn: string | null; title: string | null; author: string | null }>> = [];
+  const service = createTierlistsService(createInMemoryRepo(), undefined, undefined, (params) => { peeked.push(params); return params.map(() => null); });
+  const board = service.createTierlist("owner", "Pool", { tiers: [], pool: [] }, "members", [{ workId: "w2", title: "Emma", author: "Jane Austen", coverUrl: "https://stored.test/emma.jpg" }]);
+
+  assert.deepEqual(service.getPublishedRef(board.id)?.covers, ["https://stored.test/emma.jpg"]);
+  assert.equal(peeked.length, 0);
+});
+
+test("without a cover peek a null snapshot coverUrl stays missing", () => {
+  const service = makeService();
+  const board = service.createTierlist("owner", "Pool", { tiers: [], pool: [] }, "members", [{ workId: "w1", title: "Dune", author: "Frank Herbert", coverUrl: null }]);
+
+  assert.deepEqual(service.getPublishedRef(board.id)?.covers, []);
+});
+
+test("fillRankingCovers fills null covers by title from the snapshot and leaves unmatched ones null", () => {
+  const { service, board } = coverFixture([]);
+  const filled = service.fillRankingCovers(board.id, [{ label: "S", color: "#c9482f", books: [{ title: "Dune", coverUrl: null }, { title: "Emma", coverUrl: null }, { title: "Unknown", coverUrl: null }] }]);
+
+  assert.deepEqual(filled[0]?.books, [{ title: "Dune", coverUrl: "https://covers.test/Dune.jpg" }, { title: "Emma", coverUrl: "https://stored.test/emma.jpg" }, { title: "Unknown", coverUrl: null }]);
+});
+
+test("getPublishedRefs and participationByOwner fill snapshot covers", () => {
+  const peek = (params: Array<{ title: string | null }>) => params.map((param) => `https://covers.test/${param.title}.jpg`);
+  const repo = createInMemoryRepo();
+  const service = createTierlistsService(repo, undefined, undefined, peek);
+  const board = service.createTierlist("owner", "Pool", { tiers: [], pool: [] }, "members", [{ workId: "w1", title: "Dune", author: "Frank Herbert", coverUrl: null }]);
+
+  assert.deepEqual(service.getPublishedRefs([board.id])[0]?.covers, ["https://covers.test/Dune.jpg"]);
+  assert.deepEqual(service.listPublishedRefsByOwner("owner")[0]?.covers, ["https://covers.test/Dune.jpg"]);
+
+  const participating = createTierlistsService({ ...repo, listParticipation: () => [{ id: board.id, name: "Pool", public_books: JSON.stringify([{ title: "Dune", coverUrl: null }]), participants: 1, latest_at: "2026-10-01T00:00:00.000Z" }] }, undefined, undefined, peek);
+  assert.deepEqual(participating.participationByOwner("owner", "2026-09-01T00:00:00.000Z")[0]?.covers, ["https://covers.test/Dune.jpg"]);
+});
+
+test("a throwing cover peek leaves the ballot unsaved and emits nothing", () => {
+  const emitted: unknown[] = [];
+  const service = createTierlistsService(createInMemoryRepo(), undefined, (...args) => { emitted.push(args); }, () => { throw new Error("books db down"); });
+  const board = service.createTierlist("owner", "Pool", { tiers: [{ id: "s", label: "S", color: "#c9482f", workIds: [] }], pool: ["w1"] }, "members", [{ workId: "w1", title: "Dune", author: "A", coverUrl: null }]);
+
+  assert.throws(() => service.submitBallot(board.voteCode!, [{ workId: "w1", tierId: "s" }], { kind: "user", userId: "reader" }), /books db down/);
+  assert.equal(service.getResults(board.id).ballotCount, 0);
+  assert.equal(emitted.length, 0);
+});

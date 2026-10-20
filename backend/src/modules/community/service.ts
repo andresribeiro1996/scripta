@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { normalizeWords, type IdentityKey, type ReaderProfile } from "@scripta/shared";
 import { categoryFor, contentDetail, decodeCursor, encodeCursor, parseRankingPreview, DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
-import type { ActivityEventType, ActivityItem, CommunityAuthor, CommunityProfileView, CommunityEventType, DiscoverItem, DiscoverType, FeedSettings, FollowState, GameParticipation, OwnProfile, Page, ParticipationGameKind, PersonResult, PublishProfileInput, PublishedContent, QuizSummary, SavedContentRef, SharedBook, SuggestedReader, TierlistSummary, TournamentSummary } from "@scripta/shared/community";
+import type { ActivityEventType, ActivityItem, CommunityAuthor, CommunityProfileView, CommunityEventType, DiscoverItem, DiscoverType, FeedSettings, FollowState, GameParticipation, OwnProfile, Page, ParticipationGameKind, PersonResult, PublishProfileInput, PublishedContent, QuizSummary, RankingTierPreview, SavedContentRef, SharedBook, SuggestedReader, TierlistSummary, TournamentSummary } from "@scripta/shared/community";
 import type { CompletionItem, DashboardFeedPage, DigestItem, ParticipationItem } from "@scripta/shared/dashboard";
 import type { CompletedTournamentRef, PublishedTournamentRef, TournamentDiscoverRef } from "../arena/service.js";
 import type { MuralsPublicApi } from "../murals/publicApi.js";
@@ -118,6 +118,7 @@ export interface CommunityDeps {
     get(id: string): PublishedTierlistRef | undefined;
     listByOwner(ownerUserId: string): PublishedTierlistRef[];
     discoverByWorks(workIds: string[], limit: number): TierlistDiscoverRef[];
+    fillRankingCovers(tierlistId: string, ranking: RankingTierPreview[]): RankingTierPreview[];
   };
   tournaments: {
     completedForParticipant(viewerId: string, since: string): CompletedTournamentRef[];
@@ -286,7 +287,8 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
         const ownerId = quiz?.ownerUserId ?? tournament?.ownerUserId ?? (tierlist && !tierlist.promotedAt ? tierlist.ownerUserId : undefined);
         if (hideOwnGameVotes && ownerId === viewerId) return undefined;
         const content = quiz ? toQuizSummary(quiz) : tierlist ? toTierlistSummary(tierlist) : tournament ? toTournamentSummary(tournament) : undefined;
-        const ranking = event.ref_type === "tierlist" ? parseRankingPreview(parseEventPayload(event.payload)?.ranking) : [];
+        const parsedRanking = event.ref_type === "tierlist" ? parseRankingPreview(parseEventPayload(event.payload)?.ranking) : [];
+        const ranking = parsedRanking.some((tier) => tier.books.some((book) => !book.coverUrl)) ? deps.tierlists.fillRankingCovers(event.ref_id, parsedRanking) : parsedRanking;
         if (content && actor) return { kind: "vote", id: event.id, actor: withGlyph(actor, event.user_id, glyphOf), content, ...(ranking.length ? { ranking } : {}), createdAt: event.created_at };
       } else if (event.type === "mural_published" && actor) {
         const profile = repo.getProfileRow(event.user_id);

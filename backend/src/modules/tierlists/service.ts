@@ -116,6 +116,7 @@ export interface TierlistsService {
   tierPlacements(workIds: string[]): TierPlacement[];
   votedAmong(voterUserId: string, ids: string[]): string[];
   getPublishedRef(id: string): PublishedTierlistRef | undefined;
+  fillRankingCovers(tierlistId: string, ranking: RankingTierPreview[]): RankingTierPreview[];
   listPublishedRefsByOwner(ownerUserId: string): PublishedTierlistRef[];
   /** Public tier lists the account has a ballot on, latest ballot first —
    *  own polls excluded (openVoting seeds the owner's ballot, which is
@@ -157,29 +158,33 @@ function readDocument(tierlist: Tierlist): TierlistDocument {
 const COVER_PREVIEW_LIMIT = 8;
 const RECENT_PARTICIPANT_LIMIT = 10;
 
-/** Covers come from the published snapshot rather than the owner's live
- *  library: a stranger reading the feed can't resolve the owner's books,
- *  and the snapshot is what the vote page already shows them. */
-function publishedCovers(publicBooks: string | null): string[] {
-  if (!publicBooks) return [];
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(publicBooks);
-  } catch {
-    return [];
-  }
-  if (!Array.isArray(parsed)) return [];
-  const covers: string[] = [];
-  for (const book of parsed) {
-    if (covers.length >= COVER_PREVIEW_LIMIT) break;
-    const url = (book as Record<string, unknown> | null)?.coverUrl;
-    if (typeof url === "string" && url) covers.push(url);
-  }
-  return covers;
+export type CoverPeek = (params: Array<{ isbn: string | null; title: string | null; author: string | null }>) => Array<string | null>;
+
+function text(value: unknown): string | null {
+  return typeof value === "string" ? value : null;
 }
 
-/** The public voting board's book snapshot — null when absent or corrupt
- *  (see publishedCovers above for the same defensive JSON.parse stance). */
+function fillMissingCovers(books: unknown[], peek: CoverPeek | undefined): unknown[] {
+  if (!peek) return books;
+  const missing = books.flatMap((book, index) => {
+    if (!book || typeof book !== "object") return [];
+    const entry = book as Record<string, unknown>;
+    return typeof entry.coverUrl === "string" && entry.coverUrl ? [] : [index];
+  });
+  if (missing.length === 0) return books;
+  const urls = peek(missing.map((index) => {
+    const entry = books[index] as Record<string, unknown>;
+    return { isbn: text(entry.isbn), title: text(entry.title), author: text(entry.author) };
+  }));
+  const filled = [...books];
+  missing.forEach((index, position) => {
+    const url = urls[position];
+    if (url) filled[index] = { ...(books[index] as Record<string, unknown>), coverUrl: url };
+  });
+  return filled;
+}
+
+/** The public voting board's book snapshot — null when absent or corrupt. */
 function parsePublicBooks(value: string | null): unknown[] | null {
   if (!value) return null;
   try {
@@ -189,7 +194,32 @@ function parsePublicBooks(value: string | null): unknown[] | null {
   }
 }
 
-function toPublishedRef(row: TierlistRow, ballotCount: number): PublishedTierlistRef {
+function fillPublicBooks(books: unknown[] | null, peek: CoverPeek | undefined): unknown[] | null {
+  return Array.isArray(books) ? fillMissingCovers(books, peek) : books;
+}
+
+/** Covers come from the published snapshot rather than the owner's live
+ *  library: a stranger reading the feed can't resolve the owner's books,
+ *  and the snapshot is what the vote page already shows them. */
+function publishedCovers(publicBooks: string | null, peek: CoverPeek | undefined): string[] {
+  const parsed = parsePublicBooks(publicBooks);
+  if (!Array.isArray(parsed)) return [];
+  const wanted: unknown[] = [];
+  for (const book of parsed) {
+    if (wanted.length >= COVER_PREVIEW_LIMIT) break;
+    if (!book || typeof book !== "object") continue;
+    const url = (book as Record<string, unknown>).coverUrl;
+    if (peek || (typeof url === "string" && url)) wanted.push(book);
+  }
+  const covers: string[] = [];
+  for (const book of fillMissingCovers(wanted, peek)) {
+    const url = (book as Record<string, unknown>).coverUrl;
+    if (typeof url === "string" && url) covers.push(url);
+  }
+  return covers;
+}
+
+function toPublishedRef(row: TierlistRow, ballotCount: number, peek: CoverPeek | undefined): PublishedTierlistRef {
   const { tiers, pool } = readDocument(toTierlist(row));
   const keys = new Set(pool);
   for (const tier of tiers) for (const id of tier.workIds) keys.add(id);
@@ -204,7 +234,7 @@ function toPublishedRef(row: TierlistRow, ballotCount: number): PublishedTierlis
     eligibleVoteCount: 0,
     promotedAt: row.promoted_at,
     votingOpen: row.voting_open === 1,
-    covers: publishedCovers(row.public_books)
+    covers: publishedCovers(row.public_books, peek)
   };
 }
 
@@ -212,7 +242,7 @@ export type EmitPublished = (tierlistId: string, ownerUserId: string) => void;
 
 export type EmitVotedOn = (voterUserId: string, tierlistId: string, tierlistName: string, ranking: RankingTierPreview[]) => void;
 
-export function createTierlistsService(repo: TierlistsRepository, emitPublished?: EmitPublished, emitVotedOn?: EmitVotedOn): TierlistsService {
+export function createTierlistsService(repo: TierlistsRepository, emitPublished?: EmitPublished, emitVotedOn?: EmitVotedOn, peekCovers?: CoverPeek): TierlistsService {
   return {
     listTierlists(userId) {
       return repo.listByUser(userId).map(toTierlist);
@@ -339,20 +369,32 @@ export function createTierlistsService(repo: TierlistsRepository, emitPublished?
             updated_at: now
           };
 
-      repo.saveBallot(ballot, placements);
+      let ranking: RankingTierPreview[] | undefined;
       if (!existing && voter.kind === "user" && emitVotedOn) {
         const snapshot = parsePublicBooks(row.public_books);
         const books = new Map((Array.isArray(snapshot) ? snapshot : []).flatMap((entry) => {
           if (!entry || typeof entry !== "object") return [];
           const book = entry as Record<string, unknown>;
-          return typeof book.workId === "string" && typeof book.title === "string" ? [[book.workId, { title: book.title, coverUrl: typeof book.coverUrl === "string" ? book.coverUrl : null }] as const] : [];
+          return typeof book.workId === "string" && typeof book.title === "string" ? [[book.workId, book] as const] : [];
         }));
-        const ranking = tiers
-          .map((tier) => ({ label: tier.label, color: tier.color, books: placements.filter((placement) => placement.tierId === tier.id).slice(0, 2).flatMap((placement) => { const book = books.get(placement.workId); return book ? [book] : []; }) }))
-          .filter((tier) => tier.books.length > 0)
+        const picked = tiers
+          .map((tier) => ({ label: tier.label, color: tier.color, entries: placements.filter((placement) => placement.tierId === tier.id).slice(0, 2).flatMap((placement) => { const book = books.get(placement.workId); return book ? [book] : []; }) }))
+          .filter((tier) => tier.entries.length > 0)
           .slice(0, 3);
-        emitVotedOn(voter.userId, row.id, row.name, ranking);
+        const filled = fillMissingCovers(picked.flatMap((tier) => tier.entries), peekCovers) as Array<Record<string, unknown>>;
+        let next = 0;
+        ranking = picked.map((tier) => ({
+          label: tier.label,
+          color: tier.color,
+          books: tier.entries.map(() => {
+            const book = filled[next++]!;
+            return { title: book.title as string, coverUrl: typeof book.coverUrl === "string" ? book.coverUrl : null };
+          })
+        }));
       }
+
+      repo.saveBallot(ballot, placements);
+      if (ranking && voter.kind === "user" && emitVotedOn) emitVotedOn(voter.userId, row.id, row.name, ranking);
       if (voter.kind === "user" && voter.userId !== row.origin_user_id && row.promoted_at === null && repo.eligibleVoteCount(row.id, row.origin_user_id) >= 100) {
         repo.promote(row.id, now);
       }
@@ -397,7 +439,7 @@ export function createTierlistsService(repo: TierlistsRepository, emitPublished?
         // Corrupt JSON here omits the field rather than 500ing the whole
         // public voting board — same defensive stance as murals' shared
         // route and library's getPublicByToken.
-        publicBooks: parsePublicBooks(row.public_books),
+        publicBooks: fillPublicBooks(parsePublicBooks(row.public_books), peekCovers),
         ranksWorstFirst: row.ranks_worst_first === 1
       };
     },
@@ -405,7 +447,7 @@ export function createTierlistsService(repo: TierlistsRepository, emitPublished?
     listPublicTierlists(limit, offset) {
       const counts = repo.ballotCountsByTierlist();
       return repo.listPublic(limit, offset).map((row) => {
-        const ref = toPublishedRef(row, counts.get(row.id) ?? 0);
+        const ref = toPublishedRef(row, counts.get(row.id) ?? 0, undefined);
         return { voteCode: ref.voteCode, name: ref.name, poolSize: ref.poolSize, ballotCount: ref.ballotCount, eligibleVoteCount: repo.eligibleVoteCount(row.id, row.origin_user_id), promotedAt: ref.promotedAt, votingOpen: ref.votingOpen };
       });
     },
@@ -418,7 +460,7 @@ export function createTierlistsService(repo: TierlistsRepository, emitPublished?
       const totals = repo.ballotTotalsFor(ids);
       return repo.listPublicByIds(ids).map((row) => {
         const total = totals.get(row.id);
-        return { ...toPublishedRef(row, total?.ballots ?? 0), eligibleVoteCount: total?.eligible ?? 0 };
+        return { ...toPublishedRef(row, total?.ballots ?? 0, peekCovers), eligibleVoteCount: total?.eligible ?? 0 };
       });
     },
 
@@ -430,26 +472,39 @@ export function createTierlistsService(repo: TierlistsRepository, emitPublished?
       return repo.votedAmong(voterUserId, ids);
     },
 
+    fillRankingCovers(tierlistId, ranking) {
+      const titles = new Set(ranking.flatMap((tier) => tier.books.filter((book) => !book.coverUrl).map((book) => book.title)));
+      const snapshot = parsePublicBooks(repo.getPublicById(tierlistId)?.public_books ?? null);
+      if (titles.size === 0 || !Array.isArray(snapshot)) return ranking;
+      const candidates = snapshot.filter((entry) => !!entry && typeof entry === "object" && titles.has(text((entry as Record<string, unknown>).title) ?? ""));
+      const covers = new Map<string, string>();
+      for (const entry of fillMissingCovers(candidates, peekCovers) as Array<Record<string, unknown>>) {
+        const title = text(entry.title);
+        if (title && typeof entry.coverUrl === "string" && entry.coverUrl && !covers.has(title)) covers.set(title, entry.coverUrl);
+      }
+      return ranking.map((tier) => ({ ...tier, books: tier.books.map((book) => (book.coverUrl ? book : { ...book, coverUrl: covers.get(book.title) ?? null })) }));
+    },
+
     getPublishedRef(id) {
       const row = repo.getPublicById(id);
-      return row ? { ...toPublishedRef(row, repo.ballotCount(id)), eligibleVoteCount: repo.eligibleVoteCount(row.id, row.origin_user_id) } : undefined;
+      return row ? { ...toPublishedRef(row, repo.ballotCount(id), peekCovers), eligibleVoteCount: repo.eligibleVoteCount(row.id, row.origin_user_id) } : undefined;
     },
 
     listPublishedRefsByOwner(ownerUserId) {
       const counts = repo.ballotCountsByTierlist();
-      return repo.listPublicByUser(ownerUserId).map((row) => ({ ...toPublishedRef(row, counts.get(row.id) ?? 0), eligibleVoteCount: repo.eligibleVoteCount(row.id, row.origin_user_id) }));
+      return repo.listPublicByUser(ownerUserId).map((row) => ({ ...toPublishedRef(row, counts.get(row.id) ?? 0, peekCovers), eligibleVoteCount: repo.eligibleVoteCount(row.id, row.origin_user_id) }));
     },
 
     listVotedByUser(voterUserId) {
       const counts = repo.ballotCountsByTierlist();
-      return repo.listVotedByUser(voterUserId).map((row) => ({ ...toPublishedRef(row, counts.get(row.id) ?? 0), eligibleVoteCount: repo.eligibleVoteCount(row.id, row.origin_user_id) }));
+      return repo.listVotedByUser(voterUserId).map((row) => ({ ...toPublishedRef(row, counts.get(row.id) ?? 0, peekCovers), eligibleVoteCount: repo.eligibleVoteCount(row.id, row.origin_user_id) }));
     },
 
     participationByOwner(ownerUserId, since) {
       return repo.listParticipation(ownerUserId, since).map((row) => ({
         id: row.id,
         name: row.name,
-        covers: publishedCovers(row.public_books),
+        covers: publishedCovers(row.public_books, peekCovers),
         participantCount: row.participants,
         latestAt: row.latest_at,
         recent: repo.listRecentVoters(row.id, ownerUserId, RECENT_PARTICIPANT_LIMIT).map((r) => ({ userId: r.user_id, at: r.at }))
@@ -474,6 +529,7 @@ export interface TierlistsPublicApi {
   discoverByWorks(workIds: string[], limit: number): TierlistDiscoverRef[];
   tierPlacements(workIds: string[]): TierPlacement[];
   getPublished(id: string): PublishedTierlistRef | undefined;
+  fillRankingCovers(tierlistId: string, ranking: RankingTierPreview[]): RankingTierPreview[];
   listPublishedByOwner(ownerUserId: string): PublishedTierlistRef[];
   participationByOwner(ownerUserId: string, since: string): GameParticipation[];
 }
@@ -502,6 +558,7 @@ export function createTierlistsPublicApi(service: TierlistsService): TierlistsPu
       service.listPublishedByWorks(workIds, limit).map((row) => ({ id: row.id, createdAt: row.created_at, ownerUserId: row.origin_user_id, promotedAt: row.promoted_at })),
     tierPlacements: (workIds) => service.tierPlacements(workIds),
     getPublished: (id) => service.getPublishedRef(id),
+    fillRankingCovers: (tierlistId, ranking) => service.fillRankingCovers(tierlistId, ranking),
     listPublishedByOwner: (ownerUserId) => service.listPublishedRefsByOwner(ownerUserId),
     participationByOwner: (ownerUserId, since) => service.participationByOwner(ownerUserId, since)
   };
