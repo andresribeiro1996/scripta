@@ -3,7 +3,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { test } from "node:test";
+import { mock, test } from "node:test";
 
 const scratch = mkdtempSync(join(tmpdir(), "books-repo-test-"));
 process.env.AUTH_DB_PATH = join(scratch, "auth.sqlite");
@@ -1002,6 +1002,17 @@ test("the old title key index is dropped from an existing database", () => {
   assert.ok(db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'idx_books_title_work'").get());
 });
 
+test("the old work lookup index is replaced on an existing database and the other queue indexes stay", () => {
+  const db = new DatabaseSync(":memory:");
+  applyBooksMigrations(db);
+  db.exec("CREATE INDEX idx_books_work_lookup ON books(work_checked_at IS NOT NULL, created_by IS NOT NULL, work_checked_at, created_at) WHERE ol_work_key IS NULL AND isbn IS NOT NULL AND details_status IS NOT NULL");
+  applyBooksMigrations(db);
+  applyBooksMigrations(db);
+  const exists = (name: string) => db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = ?").get(name) !== undefined;
+  assert.equal(exists("idx_books_work_lookup"), false);
+  assert.deepEqual(["idx_books_work_queue", "idx_books_bnp_details", "idx_books_details_pending"].map(exists), [true, true, true]);
+});
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 const at = (days: number) => new Date(Date.parse(NOW) + days * DAY_MS).toISOString();
 
@@ -1412,13 +1423,19 @@ test("every backfill query reads through its own partial index, with no temp sor
     [UNCHECKED_COVERS_SQL, ["", 0, 500], "idx_books_cover_unchecked"],
     [UPGRADE_WANTED_SQL, ["", 0, 500], "idx_books_cover_upgrade"],
     [UNCHECKED_DETAILS_SQL, [50], "idx_books_details_pending"],
-    [WORK_LOOKUP_SQL, [NOW, 50], "idx_books_work_lookup"]
+    [WORK_LOOKUP_SQL, [NOW, 50], "idx_books_work_queue"]
   ];
   for (const [sql, params, index] of cases) {
     const plan = (db.prepare(`EXPLAIN QUERY PLAN ${sql}`).all(...params) as Array<{ detail: string }>).map((row) => row.detail).join(" | ");
     assert.match(plan, new RegExp(`USING INDEX ${index}\\b`), plan);
     assert.doesNotMatch(plan, /TEMP B-TREE/, plan);
   }
+});
+
+test("the work lookup seeks both flags and the check time in its index", () => {
+  const { db } = freshRepo();
+  const plan = (db.prepare(`EXPLAIN QUERY PLAN ${WORK_LOOKUP_SQL}`).all(NOW, 50) as Array<{ detail: string }>).map((row) => row.detail).join(" | ");
+  assert.match(plan, /SEARCH books USING INDEX idx_books_work_queue \(<expr>=\? AND <expr>=\? AND <expr><\?\)/, plan);
 });
 
 test("grouping reads shared title keys from the covering index and starts from them", () => {
@@ -1514,10 +1531,75 @@ test("listHeldBnpDetailIds returns unchecked bnp books in the given works, untri
   assert.ok(!repo.listHeldBnpDetailIds(held, 10).includes(elsewhere.id));
 });
 
-test("the held bnp read goes through the work index", () => {
+test("the held bnp read probes the bnp details index by work and never the work index", () => {
   const { db } = freshRepo();
   const plan = (db.prepare(`EXPLAIN QUERY PLAN ${HELD_BNP_DETAILS_SQL}`).all("[]", 50) as Array<{ detail: string }>).map((row) => row.detail).join(" | ");
-  assert.match(plan, /USING INDEX idx_books_work\b/, plan);
+  assert.match(plan, /SEARCH books USING COVERING INDEX idx_books_bnp_details \(work_id=\?/, plan);
+  assert.doesNotMatch(plan, /idx_books_work\b/, plan);
+});
+
+test("the Portuguese read for given works starts from the ids", () => {
+  const db = new DatabaseSync(":memory:");
+  applyBooksMigrations(db);
+  const prepare = mock.method(db, "prepare");
+  createSqliteBooksRepository(db);
+  const statements = prepare.mock.calls.map((call) => String(call.arguments[0])).filter((sql) => /CROSS JOIN works w ON w\.id = ids\.value/.test(sql));
+  prepare.mock.restore();
+
+  assert.equal(statements.length, 1);
+  const plan = (db.prepare(`EXPLAIN QUERY PLAN ${statements[0]}`).all({ $ids: "[]", $recheck: null, $rejections: 3, $limit: 50 }) as Array<{ detail: string }>).map((row) => row.detail).join(" | ");
+  assert.match(plan, /SEARCH w USING INDEX sqlite_autoindex_works_1 \(id=\?\)/, plan);
+  assert.doesNotMatch(plan, /idx_works_merged_into/, plan);
+});
+
+test("portugueseWorksNeedingMatch for given works returns each live work once, oldest first, up to the limit", () => {
+  const { repo } = freshRepo();
+  const portuguese = (title: string, isbn: string, createdAt: string) => {
+    const book = repo.createBook({ title, author: "X", isbn }, [`isbn:${isbn}`], createdAt);
+    repo.setLanguage(book.id, "pt-PT");
+    return book;
+  };
+  const newest = portuguese("Terceiro", "9789720000003", at(-1));
+  const oldest = portuguese("Primeiro", "9789720000001", at(-3));
+  const middle = portuguese("Segundo", "9789720000002", at(-2));
+  const absorbed = portuguese("Quarto", "9789720000004", at(-4));
+  repo.mergeWorks(absorbed.work_id!, middle.work_id!);
+
+  const ids = [newest.work_id!, oldest.work_id!, newest.work_id!, absorbed.work_id!, middle.work_id!];
+  assert.deepEqual(repo.portugueseWorksNeedingMatch(ids, 10, 3, null), [oldest.work_id, middle.work_id, newest.work_id]);
+  assert.deepEqual(repo.portugueseWorksNeedingMatch(ids, 2, 3, null), [oldest.work_id, middle.work_id]);
+  assert.deepEqual(repo.portugueseWorksNeedingMatch([absorbed.work_id!], 10, 3, null), []);
+});
+
+test("listWorkLookupIds returns due editions never-checked first, user editions before seed and bnp, oldest check first", () => {
+  const { repo } = freshRepo();
+  let next = 0;
+  const edition = (title: string, createdAt: string, options: { createdBy?: "seed" | "bnp" | "publisher"; workKey?: string; isbn?: string | null; details?: boolean; checkedAt?: string } = {}) => {
+    const isbn = options.isbn === undefined ? `97897200${String(++next).padStart(5, "0")}` : options.isbn;
+    const book = repo.createBook({ title, author: "X", isbn, createdBy: options.createdBy, workKey: options.workKey }, [isbn ? `isbn:${isbn}` : `ta:${title.toLowerCase()}|x|`], createdAt);
+    if (options.details !== false) repo.markDetailsMissing(book.id, NOW);
+    if (options.checkedAt) repo.markWorkChecked(book.id, options.checkedAt);
+    return book.id;
+  };
+  const recheckBefore = at(-30);
+
+  const seedChecked33 = edition("Seed checked 33", at(-90), { createdBy: "seed", checkedAt: at(-33) });
+  const userChecked35 = edition("User checked 35", at(-90), { checkedAt: at(-35) });
+  const bnpChecked45 = edition("Bnp checked 45", at(-90), { createdBy: "bnp", checkedAt: at(-45) });
+  const userChecked40 = edition("User checked 40", at(-90), { checkedAt: at(-40) });
+  const seedNever = edition("Seed never", at(-60), { createdBy: "seed" });
+  const tieA = edition("Tie A", at(-10));
+  const tieB = edition("Tie B", at(-10));
+  const userOld = edition("User old", at(-20));
+  edition("User checked 5", at(-90), { checkedAt: at(-5) });
+  edition("Publisher", at(-90), { createdBy: "publisher" });
+  edition("Keyed", at(-90), { workKey: "OL1W" });
+  edition("No details", at(-90), { details: false });
+  edition("No ISBN", at(-90), { isbn: null });
+
+  const due = [userOld, tieA, tieB, seedNever, userChecked40, userChecked35, bnpChecked45, seedChecked33];
+  assert.deepEqual(repo.listWorkLookupIds(50, recheckBefore), due);
+  assert.deepEqual(repo.listWorkLookupIds(5, recheckBefore), due.slice(0, 5));
 });
 
 test("setWorkSummary keeps the first summary, assigns a missing work and follows merged_into", () => {
