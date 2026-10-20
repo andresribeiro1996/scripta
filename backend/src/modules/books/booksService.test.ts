@@ -2159,9 +2159,32 @@ test("a lookup in flight when a borrowed cover is rejected does not store the re
   release();
   await inFlight;
   const row = h.repo.getBook(copy.id)!;
-  assert.deepEqual([row.cover_image_id, row.cover_status], [null, "missing"]);
-  assert.equal(h.files.size, 0);
-  assert.deepEqual(h.service.resolveCover(erosao), { url: null, fullUrl: null, pending: false, upgrading: false });
+  assert.deepEqual([row.cover_image_id, row.cover_status], [null, null]);
+  assert.deepEqual(h.service.resolveCover(erosao), { url: null, fullUrl: null, pending: true, upgrading: false });
+});
+
+test("a cover rejected while its image is uploading is not installed", async () => {
+  let release!: () => void;
+  let uploading!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const started = new Promise<void>((resolve) => { uploading = resolve; });
+  const source: CoverSource = { byIsbn: async () => [], byTitle: async () => [{ source: "apple", url: "https://a/sibling" }] };
+  const h = harness({
+    sources: { isbndb: null, apple: source, openlibrary: emptySource },
+    blobs: { read: async () => null, save: async () => { uploading(); await gate; } }
+  });
+  h.sizes.set("https://a/sibling", [900, 1400]);
+  const { sibling, copy } = erosaoEditions(h);
+  h.repo.insertImage({ id: "sibling-cover", book_id: sibling.id, source: "apple", source_url: "https://a/sibling", width: 900, height: 1400, byte_size: 1, color: "", created_at: "2026-09-01T00:00:00.000Z" });
+  const inFlight = h.service.processBook(copy.id, "background");
+  await started;
+  h.service.rejectCover(erosao);
+  release();
+  await inFlight;
+  const row = h.repo.getBook(copy.id)!;
+  assert.deepEqual([row.cover_image_id, row.cover_status], [null, null]);
+  assert.deepEqual([...h.repo.listRejectedUrls(copy.id)], ["https://a/sibling"]);
+  assert.deepEqual(h.service.resolveCover(erosao), { url: null, fullUrl: null, pending: true, upgrading: false });
 });
 
 test("rejecting a borrowed cover with no recorded URL records nothing and the copy keeps borrowing it", () => {

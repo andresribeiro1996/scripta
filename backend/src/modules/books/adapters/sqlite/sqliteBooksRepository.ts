@@ -267,7 +267,14 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const pendingColorStmt = db.prepare(`SELECT id FROM cover_images WHERE color IS NULL LIMIT ?`);
   const setImageColorStmt = db.prepare(`UPDATE cover_images SET color = ? WHERE id = ?`);
   const setCoverStmt = db.prepare(`UPDATE books SET cover_image_id = ?, cover_status = ?, cover_checked_at = ? WHERE id = ?`);
-  const setCoverIfStmt = db.prepare(`UPDATE books SET cover_image_id = ?, cover_status = ?, cover_checked_at = ? WHERE id = ? AND cover_image_id IS ?`);
+  const setCoverIfStmt = db.prepare(`
+    UPDATE books SET cover_image_id = $image, cover_status = $status, cover_checked_at = $checked
+    WHERE id = $id AND cover_image_id IS $expected
+      AND NOT EXISTS (
+        SELECT 1 FROM cover_images AS candidate JOIN cover_rejections AS rejection ON rejection.source_url = candidate.source_url
+        WHERE candidate.id = $image AND rejection.book_id = $id
+      )
+  `);
   const addRejectionStmt = db.prepare(`INSERT OR IGNORE INTO cover_rejections (book_id, source_url, created_at) VALUES (?, ?, ?)`);
   const rejectionsStmt = db.prepare(`SELECT source_url FROM cover_rejections WHERE book_id = ?`);
   const workCoversStmt = db.prepare(`SELECT work_id, cover_image_id FROM books WHERE work_id IN (SELECT value FROM json_each(?)) AND cover_image_id IS NOT NULL ORDER BY created_at, rowid`);
@@ -653,7 +660,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     },
 
     setCoverIf(bookId, expectedImageId, cover) {
-      return setCoverIfStmt.run(cover.imageId, cover.status, cover.checkedAt, bookId, expectedImageId).changes > 0;
+      return setCoverIfStmt.run({ $image: cover.imageId, $status: cover.status, $checked: cover.checkedAt, $id: bookId, $expected: expectedImageId }).changes > 0;
     },
 
     addRejection(bookId, sourceUrl, createdAt) {
