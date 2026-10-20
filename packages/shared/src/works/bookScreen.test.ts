@@ -162,6 +162,12 @@ test("selecting the default edition is the default view, so going back restores 
   assert.deepEqual(bookScreenModel(p, null, { isAdmin: true }, "e1"), bookScreenModel(p, null, { isAdmin: true }));
 });
 
+test("an edition id that is not one of the work's editions leaves the default view", () => {
+  const p = page({ editions: editions(5, 1), coverUrl: "cover:3", coverColor: "#abc" });
+  assert.deepEqual(bookScreenModel(p, owned(), viewer, "other-work-edition"), bookScreenModel(p, owned(), viewer));
+  assert.deepEqual(bookScreenModel(p, null, { isAdmin: true }, ""), bookScreenModel(p, null, { isAdmin: true }));
+});
+
 test("an owned book matching no edition is shown at the default edition, so it keeps its own cover", () => {
   const p = page({ editions: editions(5), coverUrl: "cover:2" });
   assert.deepEqual(bookScreenModel(p, owned(), viewer).edition, { index: 2, count: 5, label: "Your edition · 3 of 5", showDots: true, mineIndex: 2 });

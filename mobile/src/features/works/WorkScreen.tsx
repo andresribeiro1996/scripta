@@ -17,11 +17,11 @@ import { fetchWork } from "./api";
 import { BookScreen, WashBackdrop, bookMenuItems } from "./BookScreen";
 import { workPath } from "./workPath";
 
-export function WorkScreen({ id }: { id: string }) {
+export function WorkScreen({ id, edition = null }: { id: string; edition?: string | null }) {
   const [adding, setAdding] = useState(false);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [shareError, setShareError] = useState<string | null>(null);
-  const [editionId, setEditionId] = useState<string | null>(null);
+  const [editionId, setEditionId] = useState<string | null>(edition);
   const scrollY = useSharedValue(0);
   const headerHeight = useHeaderHeight();
   const segments = useSegments();
@@ -32,7 +32,7 @@ export function WorkScreen({ id }: { id: string }) {
   const queryClient = useQueryClient();
   const query = useQuery({ queryKey: ["works", id], queryFn: () => fetchWork(id), retry: false });
   const canonicalId = query.data?.work.id;
-  const canonicalPath = canonicalId && canonicalId !== id ? workPath(canonicalId, segments) : null;
+  const canonicalPath = canonicalId && canonicalId !== id ? workPath(canonicalId, segments, edition) : null;
 
   useEffect(() => {
     if (canonicalPath) router.replace(canonicalPath as never);
