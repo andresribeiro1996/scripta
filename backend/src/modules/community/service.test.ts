@@ -235,7 +235,8 @@ function createDeps(repo: CommunityRepository) {
       },
       get: (id) => tierlistRefs.get(id),
       listByOwner: (owner) => [...tierlistRefs.values()].filter((r) => r.ownerUserId === owner).sort(byNewest),
-      discoverByWorks: byWorks("tierlist", tierlistRefs, (r) => ({ id: r.id, createdAt: r.createdAt, ownerUserId: r.ownerUserId, promotedAt: r.promotedAt }))
+      discoverByWorks: byWorks("tierlist", tierlistRefs, (r) => ({ id: r.id, createdAt: r.createdAt, ownerUserId: r.ownerUserId, promotedAt: r.promotedAt })),
+      fillRankingCovers: (_id, ranking) => ranking.map((tier) => ({ ...tier, books: tier.books.map((book) => ({ ...book, coverUrl: book.coverUrl ?? `https://covers.test/${book.title}.jpg` })) }))
     },
     tournaments: { completedForParticipant: () => [],
       discoverWindow: (needle, limit) => {
@@ -2903,4 +2904,20 @@ test("a book match keeps the game's origin owner and promoted flag, and only the
   const page = service.getDiscover("tierlist", "frank", 2, 0);
   assert.deepEqual(page.items.map((item) => [item.content.id, item.author.username]), [["t1", "user-alice"], ["t2", "Original creator unavailable"]]);
   assert.deepEqual(publishedManyCalls, [{ kind: "tierlist", ids: ["t1", "t2"] }, { kind: "tournament", ids: [] }, { kind: "quiz", ids: [] }]);
+});
+
+test("a voted_on ranking with a null cover is filled through the tierlists API", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  repo.upsertProfile(profileRow("alice"));
+  repo.insertFollow({ follower_id: "viewer", followee_id: "alice", created_at: at(1) });
+  tierlistRefs.set("t1", tierRef("t1", "owner"));
+  const ranking = [{ label: "S", color: "#c9482f", books: [{ title: "Dune", coverUrl: null }, { title: "Emma", coverUrl: "https://stored.test/emma.jpg" }] }];
+  repo.insertEvent({ id: "e-vote", user_id: "alice", type: "voted_on", ref_type: "tierlist", ref_id: "t1", payload: JSON.stringify({ ranking }), created_at: at(2) });
+
+  const item = service.getDashboard("viewer", undefined, 20).items.find((entry) => entry.id === "e-vote") as { ranking?: typeof ranking } | undefined;
+
+  assert.deepEqual(item?.ranking?.[0]?.books, [{ title: "Dune", coverUrl: "https://covers.test/Dune.jpg" }, { title: "Emma", coverUrl: "https://stored.test/emma.jpg" }]);
 });

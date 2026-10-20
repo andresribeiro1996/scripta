@@ -850,3 +850,33 @@ test("without a cover peek a null snapshot coverUrl stays missing", () => {
 
   assert.deepEqual(service.getPublishedRef(board.id)?.covers, []);
 });
+
+test("fillRankingCovers fills null covers by title from the snapshot and leaves unmatched ones null", () => {
+  const { service, board } = coverFixture([]);
+  const filled = service.fillRankingCovers(board.id, [{ label: "S", color: "#c9482f", books: [{ title: "Dune", coverUrl: null }, { title: "Emma", coverUrl: null }, { title: "Unknown", coverUrl: null }] }]);
+
+  assert.deepEqual(filled[0]?.books, [{ title: "Dune", coverUrl: "https://covers.test/Dune.jpg" }, { title: "Emma", coverUrl: "https://stored.test/emma.jpg" }, { title: "Unknown", coverUrl: null }]);
+});
+
+test("getPublishedRefs and participationByOwner fill snapshot covers", () => {
+  const peek = (params: Array<{ title: string | null }>) => params.map((param) => `https://covers.test/${param.title}.jpg`);
+  const repo = createInMemoryRepo();
+  const service = createTierlistsService(repo, undefined, undefined, peek);
+  const board = service.createTierlist("owner", "Pool", { tiers: [], pool: [] }, "members", [{ workId: "w1", title: "Dune", author: "Frank Herbert", coverUrl: null }]);
+
+  assert.deepEqual(service.getPublishedRefs([board.id])[0]?.covers, ["https://covers.test/Dune.jpg"]);
+  assert.deepEqual(service.listPublishedRefsByOwner("owner")[0]?.covers, ["https://covers.test/Dune.jpg"]);
+
+  const participating = createTierlistsService({ ...repo, listParticipation: () => [{ id: board.id, name: "Pool", public_books: JSON.stringify([{ title: "Dune", coverUrl: null }]), participants: 1, latest_at: "2026-10-01T00:00:00.000Z" }] }, undefined, undefined, peek);
+  assert.deepEqual(participating.participationByOwner("owner", "2026-09-01T00:00:00.000Z")[0]?.covers, ["https://covers.test/Dune.jpg"]);
+});
+
+test("a throwing cover peek leaves the ballot unsaved and emits nothing", () => {
+  const emitted: unknown[] = [];
+  const service = createTierlistsService(createInMemoryRepo(), undefined, (...args) => { emitted.push(args); }, () => { throw new Error("books db down"); });
+  const board = service.createTierlist("owner", "Pool", { tiers: [{ id: "s", label: "S", color: "#c9482f", workIds: [] }], pool: ["w1"] }, "members", [{ workId: "w1", title: "Dune", author: "A", coverUrl: null }]);
+
+  assert.throws(() => service.submitBallot(board.voteCode!, [{ workId: "w1", tierId: "s" }], { kind: "user", userId: "reader" }), /books db down/);
+  assert.equal(service.getResults(board.id).ballotCount, 0);
+  assert.equal(emitted.length, 0);
+});

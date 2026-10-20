@@ -116,6 +116,7 @@ export interface TierlistsService {
   tierPlacements(workIds: string[]): TierPlacement[];
   votedAmong(voterUserId: string, ids: string[]): string[];
   getPublishedRef(id: string): PublishedTierlistRef | undefined;
+  fillRankingCovers(tierlistId: string, ranking: RankingTierPreview[]): RankingTierPreview[];
   listPublishedRefsByOwner(ownerUserId: string): PublishedTierlistRef[];
   /** Public tier lists the account has a ballot on, latest ballot first —
    *  own polls excluded (openVoting seeds the owner's ballot, which is
@@ -203,10 +204,16 @@ function fillPublicBooks(books: unknown[] | null, peek: CoverPeek | undefined): 
 function publishedCovers(publicBooks: string | null, peek: CoverPeek | undefined): string[] {
   const parsed = parsePublicBooks(publicBooks);
   if (!Array.isArray(parsed)) return [];
+  const wanted: unknown[] = [];
+  for (const book of parsed) {
+    if (wanted.length >= COVER_PREVIEW_LIMIT) break;
+    if (!book || typeof book !== "object") continue;
+    const url = (book as Record<string, unknown>).coverUrl;
+    if (peek || (typeof url === "string" && url)) wanted.push(book);
+  }
   const covers: string[] = [];
-  for (const book of fillMissingCovers(parsed, peek)) {
-    if (covers.length >= COVER_PREVIEW_LIMIT) break;
-    const url = (book as Record<string, unknown> | null)?.coverUrl;
+  for (const book of fillMissingCovers(wanted, peek)) {
+    const url = (book as Record<string, unknown>).coverUrl;
     if (typeof url === "string" && url) covers.push(url);
   }
   return covers;
@@ -362,20 +369,32 @@ export function createTierlistsService(repo: TierlistsRepository, emitPublished?
             updated_at: now
           };
 
-      repo.saveBallot(ballot, placements);
+      let ranking: RankingTierPreview[] | undefined;
       if (!existing && voter.kind === "user" && emitVotedOn) {
         const snapshot = parsePublicBooks(row.public_books);
-        const books = new Map((Array.isArray(snapshot) ? fillMissingCovers(snapshot, peekCovers) : []).flatMap((entry) => {
+        const books = new Map((Array.isArray(snapshot) ? snapshot : []).flatMap((entry) => {
           if (!entry || typeof entry !== "object") return [];
           const book = entry as Record<string, unknown>;
-          return typeof book.workId === "string" && typeof book.title === "string" ? [[book.workId, { title: book.title, coverUrl: typeof book.coverUrl === "string" ? book.coverUrl : null }] as const] : [];
+          return typeof book.workId === "string" && typeof book.title === "string" ? [[book.workId, book] as const] : [];
         }));
-        const ranking = tiers
-          .map((tier) => ({ label: tier.label, color: tier.color, books: placements.filter((placement) => placement.tierId === tier.id).slice(0, 2).flatMap((placement) => { const book = books.get(placement.workId); return book ? [book] : []; }) }))
-          .filter((tier) => tier.books.length > 0)
+        const picked = tiers
+          .map((tier) => ({ label: tier.label, color: tier.color, entries: placements.filter((placement) => placement.tierId === tier.id).slice(0, 2).flatMap((placement) => { const book = books.get(placement.workId); return book ? [book] : []; }) }))
+          .filter((tier) => tier.entries.length > 0)
           .slice(0, 3);
-        emitVotedOn(voter.userId, row.id, row.name, ranking);
+        const filled = fillMissingCovers(picked.flatMap((tier) => tier.entries), peekCovers) as Array<Record<string, unknown>>;
+        let next = 0;
+        ranking = picked.map((tier) => ({
+          label: tier.label,
+          color: tier.color,
+          books: tier.entries.map(() => {
+            const book = filled[next++]!;
+            return { title: book.title as string, coverUrl: typeof book.coverUrl === "string" ? book.coverUrl : null };
+          })
+        }));
       }
+
+      repo.saveBallot(ballot, placements);
+      if (ranking && voter.kind === "user" && emitVotedOn) emitVotedOn(voter.userId, row.id, row.name, ranking);
       if (voter.kind === "user" && voter.userId !== row.origin_user_id && row.promoted_at === null && repo.eligibleVoteCount(row.id, row.origin_user_id) >= 100) {
         repo.promote(row.id, now);
       }
@@ -428,7 +447,7 @@ export function createTierlistsService(repo: TierlistsRepository, emitPublished?
     listPublicTierlists(limit, offset) {
       const counts = repo.ballotCountsByTierlist();
       return repo.listPublic(limit, offset).map((row) => {
-        const ref = toPublishedRef(row, counts.get(row.id) ?? 0, peekCovers);
+        const ref = toPublishedRef(row, counts.get(row.id) ?? 0, undefined);
         return { voteCode: ref.voteCode, name: ref.name, poolSize: ref.poolSize, ballotCount: ref.ballotCount, eligibleVoteCount: repo.eligibleVoteCount(row.id, row.origin_user_id), promotedAt: ref.promotedAt, votingOpen: ref.votingOpen };
       });
     },
@@ -451,6 +470,19 @@ export function createTierlistsService(repo: TierlistsRepository, emitPublished?
 
     votedAmong(voterUserId, ids) {
       return repo.votedAmong(voterUserId, ids);
+    },
+
+    fillRankingCovers(tierlistId, ranking) {
+      const titles = new Set(ranking.flatMap((tier) => tier.books.filter((book) => !book.coverUrl).map((book) => book.title)));
+      const snapshot = parsePublicBooks(repo.getPublicById(tierlistId)?.public_books ?? null);
+      if (titles.size === 0 || !Array.isArray(snapshot)) return ranking;
+      const candidates = snapshot.filter((entry) => !!entry && typeof entry === "object" && titles.has(text((entry as Record<string, unknown>).title) ?? ""));
+      const covers = new Map<string, string>();
+      for (const entry of fillMissingCovers(candidates, peekCovers) as Array<Record<string, unknown>>) {
+        const title = text(entry.title);
+        if (title && typeof entry.coverUrl === "string" && entry.coverUrl && !covers.has(title)) covers.set(title, entry.coverUrl);
+      }
+      return ranking.map((tier) => ({ ...tier, books: tier.books.map((book) => (book.coverUrl ? book : { ...book, coverUrl: covers.get(book.title) ?? null })) }));
     },
 
     getPublishedRef(id) {
@@ -497,6 +529,7 @@ export interface TierlistsPublicApi {
   discoverByWorks(workIds: string[], limit: number): TierlistDiscoverRef[];
   tierPlacements(workIds: string[]): TierPlacement[];
   getPublished(id: string): PublishedTierlistRef | undefined;
+  fillRankingCovers(tierlistId: string, ranking: RankingTierPreview[]): RankingTierPreview[];
   listPublishedByOwner(ownerUserId: string): PublishedTierlistRef[];
   participationByOwner(ownerUserId: string, since: string): GameParticipation[];
 }
@@ -525,6 +558,7 @@ export function createTierlistsPublicApi(service: TierlistsService): TierlistsPu
       service.listPublishedByWorks(workIds, limit).map((row) => ({ id: row.id, createdAt: row.created_at, ownerUserId: row.origin_user_id, promotedAt: row.promoted_at })),
     tierPlacements: (workIds) => service.tierPlacements(workIds),
     getPublished: (id) => service.getPublishedRef(id),
+    fillRankingCovers: (tierlistId, ranking) => service.fillRankingCovers(tierlistId, ranking),
     listPublishedByOwner: (ownerUserId) => service.listPublishedRefsByOwner(ownerUserId),
     participationByOwner: (ownerUserId, since) => service.participationByOwner(ownerUserId, since)
   };
