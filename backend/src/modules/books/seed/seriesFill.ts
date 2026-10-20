@@ -1,12 +1,26 @@
 import { canonicalIsbn } from "@scripta/shared";
 import { SourceUnavailableError } from "../domain/errors.js";
 import type { BooksRepository, EditionRecordSource } from "../domain/ports.js";
-import type { SeriesEntry } from "../domain/series.js";
+import { seriesNameKey, type SeriesEntry } from "../domain/series.js";
 import { seriesLikeGroups } from "../domain/translation.js";
 import { harvestWindow, type BnpHarvestDeps, type DateWindow } from "./bnpImport.js";
 
 export interface FillOptions {
   dryRun: boolean;
+}
+
+export interface WikidataOptions extends FillOptions {
+  skip?: ReadonlySet<string>;
+  tally?: WikidataTally;
+}
+
+export interface HeldOptions extends FillOptions {
+  log: (line: string) => void;
+}
+
+export interface WikidataTally {
+  series: Map<string, { name: string; workIds: Set<string> }>;
+  skipped: Set<string>;
 }
 
 export interface WikidataRow {
@@ -23,6 +37,7 @@ export interface OriginalTitleCandidate {
 }
 
 const BATCH_SIZE = 300;
+const HELD_PROGRESS_EVERY = 25;
 const BATCH_PAUSE_MS = 100;
 const OPEN_LIBRARY_WORK = /^OL\d+W$/;
 
@@ -40,7 +55,7 @@ type Binding = Record<string, { value: string } | undefined>;
 const listOf = (binding: Binding, name: string) => (binding[name]?.value ?? "").split("|").map((item) => item.trim()).filter(Boolean);
 
 export function wikidataRowOf(binding: Binding): WikidataRow | null {
-  const series = [binding.en, binding.any].map((label) => label?.value.trim() ?? "").find(Boolean);
+  const series = [binding.en, binding.pt, binding.any].map((label) => label?.value.trim() ?? "").find(Boolean);
   if (series === undefined) return null;
   return {
     isbns: listOf(binding, "isbns"),
@@ -50,26 +65,45 @@ export function wikidataRowOf(binding: Binding): WikidataRow | null {
   };
 }
 
+export const wikidataTally = (): WikidataTally => ({ series: new Map(), skipped: new Set() });
+
+export function seriesCounts(tally: WikidataTally): Array<{ name: string; works: number }> {
+  return [...tally.series.values()]
+    .map(({ name, workIds }) => ({ name, works: workIds.size }))
+    .sort((left, right) => right.works - left.works || left.name.localeCompare(right.name));
+}
+
 export async function fillFromWikidata(
   repo: Pick<BooksRepository, "transaction" | "findBookByKey" | "workIdsByWorkKeys" | "addWorkSeries">,
   rows: WikidataRow[],
   at: string,
-  { dryRun }: FillOptions
+  { dryRun, skip = new Set(), tally = wikidataTally() }: WikidataOptions
 ): Promise<{ matched: number; added: number }> {
   const byOpenLibraryKey = repo.workIdsByWorkKeys([...new Set(rows.flatMap((row) => row.olWorkIds))]);
   const writes: Array<{ workId: string; entry: SeriesEntry }> = [];
   for (const row of rows) {
+    const nameKey = seriesNameKey(row.series);
+    if (nameKey === null) continue;
+    if (skip.has(nameKey)) {
+      tally.skipped.add(nameKey);
+      continue;
+    }
     const workIds = new Set<string>();
     for (const isbn of row.isbns) {
       const canonical = canonicalIsbn(isbn);
       const workId = canonical ? repo.findBookByKey(`isbn:${canonical}`)?.work_id : null;
       if (workId) workIds.add(workId);
     }
-    for (const key of row.olWorkIds) {
-      const workId = byOpenLibraryKey.get(key);
+    for (const olKey of row.olWorkIds) {
+      const workId = byOpenLibraryKey.get(olKey);
       if (workId) workIds.add(workId);
     }
-    for (const workId of workIds) writes.push({ workId, entry: { name: row.series, position: row.position } });
+    for (const workId of workIds) {
+      writes.push({ workId, entry: { name: row.series, position: row.position } });
+      const counted = tally.series.get(nameKey) ?? { name: row.series, workIds: new Set<string>() };
+      counted.workIds.add(workId);
+      tally.series.set(nameKey, counted);
+    }
   }
   const added = dryRun ? 0 : await inBatches(repo, writes, ({ workId, entry }) => repo.addWorkSeries(workId, [entry], "wikidata", at));
   return { matched: writes.length, added };
@@ -131,13 +165,13 @@ export async function fillHeldEditions(
   catalog: EditionRecordSource,
   heldWorkIds: string[],
   at: string,
-  { dryRun }: FillOptions
-): Promise<{ asked: number; added: number; failed: number }> {
+  { dryRun, log }: HeldOptions
+): Promise<{ asked: number; added: number; failedIsbns: string[] }> {
   const live = [...new Set(repo.canonicalWorkIds(heldWorkIds).values())];
   const editions = repo.editionsOf(live).flatMap((edition) => (edition.isbn === null ? [] : [{ id: edition.id, isbn: edition.isbn }]));
-  const report = { asked: editions.length, added: 0, failed: 0 };
+  const report = { asked: editions.length, added: 0, failedIsbns: [] as string[] };
   if (dryRun) return report;
-  for (const edition of editions) {
+  for (const [index, edition] of editions.entries()) {
     try {
       const record = await catalog.fetchEditionRecord(edition.isbn);
       for (const entry of record?.series ?? []) {
@@ -145,8 +179,9 @@ export async function fillHeldEditions(
       }
     } catch (error) {
       if (!(error instanceof SourceUnavailableError) || error.status === 429) throw error;
-      report.failed++;
+      report.failedIsbns.push(edition.isbn);
     }
+    if ((index + 1) % HELD_PROGRESS_EVERY === 0) log(JSON.stringify({ asked: index + 1, of: editions.length, added: report.added, failed: report.failedIsbns.length }));
   }
   return report;
 }

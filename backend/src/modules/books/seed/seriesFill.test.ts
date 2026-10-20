@@ -17,7 +17,8 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 const { applyBooksMigrations } = await import("../adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("../adapters/sqlite/sqliteBooksRepository.js");
 const { SourceUnavailableError } = await import("../domain/errors.js");
-const { fillBnpCollections, fillFromOriginalTitles, fillFromWikidata, fillHeldEditions, listOriginalTitleSeries, wikidataRowOf } = await import("./seriesFill.js");
+const { seriesNameKey } = await import("../domain/series.js");
+const { fillBnpCollections, fillFromOriginalTitles, fillFromWikidata, fillHeldEditions, listOriginalTitleSeries, seriesCounts, wikidataRowOf, wikidataTally } = await import("./seriesFill.js");
 
 const AT = "2026-10-20T12:00:00.000Z";
 const LIVE = { dryRun: false };
@@ -100,6 +101,65 @@ test("a Wikidata dry run counts the matches and writes nothing", async () => {
   assert.deepEqual(events, []);
 });
 
+test("a Wikidata fill counts the works it matched per series across pages, most works first, in a dry run as well", async () => {
+  for (const options of [LIVE, DRY]) {
+    const { db, repo } = setup();
+    book(repo, "9780441013593", "Dune", "Frank Herbert");
+    book(repo, "9780141439587", "Emma", "Jane Austen", { workKey: "OL66554W" });
+    book(repo, "9780575081406", "Gardens of the Moon", "Steven Erikson");
+    const tally = wikidataTally();
+    await fillFromWikidata(repo, [
+      wikidata("Dune Chronicles", "1", { isbns: ["9780441013593"] }),
+      wikidata("Piccola Biblioteca", null, { isbns: ["9780441013593", "9780575081406"] }),
+      wikidata("Title only", null, {})
+    ], AT, { ...options, tally });
+    await fillFromWikidata(repo, [
+      wikidata("piccola biblioteca", "2", { olWorkIds: ["OL66554W"] }),
+      wikidata("Piccola Biblioteca", null, { isbns: ["9780575081406"] }),
+      wikidata("Nobody has these", null, { isbns: ["9780000000002"] })
+    ], AT, { ...options, tally });
+    assert.deepEqual(seriesCounts(tally), [{ name: "Piccola Biblioteca", works: 3 }, { name: "Dune Chronicles", works: 1 }]);
+    assert.equal(rowsOf(db, "work_series").length, options.dryRun ? 0 : 4);
+  }
+});
+
+test("series with equally many works are listed by name, and a fill without a tally still works", async () => {
+  const { repo } = setup();
+  book(repo, "9780441013593", "Dune", "Frank Herbert");
+  const tally = wikidataTally();
+  await fillFromWikidata(repo, [wikidata("Zeta", null, { isbns: ["9780441013593"] }), wikidata("Alpha", null, { isbns: ["9780441013593"] })], AT, { ...DRY, tally });
+  assert.deepEqual(seriesCounts(tally), [{ name: "Alpha", works: 1 }, { name: "Zeta", works: 1 }]);
+  assert.deepEqual(await fillFromWikidata(repo, [wikidata("Zeta", null, { isbns: ["9780441013593"] })], AT, DRY), { matched: 1, added: 0 });
+});
+
+test("skipped series are neither written nor counted, matched by name key, in a dry run as well", async () => {
+  for (const options of [LIVE, DRY]) {
+    const { db, repo } = setup();
+    book(repo, "9780441013593", "Dune", "Frank Herbert");
+    book(repo, "9780575081406", "Gardens of the Moon", "Steven Erikson");
+    const skip = new Set(["piccola biblioteca adelphi", "decouvertes gallimard"].map((name) => seriesNameKey(name)!));
+    const tally = wikidataTally();
+    const report = await fillFromWikidata(repo, [
+      wikidata("Piccola Biblioteca Adelphi", "12", { isbns: ["9780441013593", "9780575081406"] }),
+      wikidata("Découvertes Gallimard", null, { isbns: ["9780441013593"] }),
+      wikidata("Dune Chronicles", "1", { isbns: ["9780441013593"] }),
+      wikidata("Piccola Biblioteca Adelphi", null, { olWorkIds: ["OL1W"] })
+    ], AT, { ...options, skip, tally });
+    assert.deepEqual(report, { matched: 1, added: options.dryRun ? 0 : 1 });
+    assert.deepEqual(seriesCounts(tally), [{ name: "Dune Chronicles", works: 1 }]);
+    assert.deepEqual([...tally.skipped].sort(), [...skip].sort());
+    assert.deepEqual(rowsOf(db, "work_series").map((row) => row.name), options.dryRun ? [] : ["Dune Chronicles"]);
+  }
+});
+
+test("a skip name that no row carried is absent from the tally's skipped set", async () => {
+  const { repo } = setup();
+  book(repo, "9780441013593", "Dune", "Frank Herbert");
+  const tally = wikidataTally();
+  await fillFromWikidata(repo, [wikidata("Piccola Biblioteca Adelphi", null, { isbns: ["9780441013593"] })], AT, { ...DRY, skip: new Set([seriesNameKey("Piccola Biblioteca Adelphi")!, seriesNameKey("Piccola Bibliotheca Adelphi")!]), tally });
+  assert.deepEqual([...tally.skipped], [seriesNameKey("Piccola Biblioteca Adelphi")]);
+});
+
 test("Wikidata writes go in batches of a few hundred rows, with the event loop free between them", async () => {
   const { db, repo } = setup();
   const rows = Array.from({ length: 650 }, (_, index) => {
@@ -114,12 +174,14 @@ test("Wikidata writes go in batches of a few hundred rows, with the event loop f
   assert.deepEqual(events, ["tx", "tick", "tx", "tx"]);
 });
 
-test("a Wikidata binding becomes a row with the English label, else any label, and only Open Library work IDs", () => {
+test("a Wikidata binding becomes a row with the English label, else the Portuguese one, else any label, and only Open Library work IDs", () => {
   const value = (text: string) => ({ value: text });
   assert.deepEqual(
     wikidataRowOf({ en: value("Malazan Book of the Fallen"), any: value("Malazan"), position: value(" 3 "), isbns: value("978-0-575-08140-6|0575081406"), olIds: value("OL1W|OL2M|OL3A|OL4W|") }),
     { isbns: ["978-0-575-08140-6", "0575081406"], olWorkIds: ["OL1W", "OL4W"], series: "Malazan Book of the Fallen", position: "3" }
   );
+  assert.deepEqual(wikidataRowOf({ pt: value("Malazã"), any: value("Malazan"), isbns: value("") }), { isbns: [], olWorkIds: [], series: "Malazã", position: null });
+  assert.deepEqual(wikidataRowOf({ en: value("  "), pt: value("Malazã"), any: value("Malazan") })?.series, "Malazã");
   assert.deepEqual(wikidataRowOf({ any: value("Fantômas"), isbns: value("") }), { isbns: [], olWorkIds: [], series: "Fantômas", position: null });
   assert.equal(wikidataRowOf({ any: value("  ") }), null);
   assert.equal(wikidataRowOf({}), null);
@@ -257,6 +319,8 @@ test("national library collections are written in batches too", async () => {
   assert.deepEqual(events, ["tx", "tx", "tx"]);
 });
 
+const held = (options = LIVE, logs: string[] = []) => ({ ...options, log: (line: string) => logs.push(line) });
+
 function heldSetup() {
   const { db, repo } = setup();
   const english = book(repo, "9780141439587", "Emma", "Jane Austen", { workKey: "OL66554W" });
@@ -276,13 +340,13 @@ test("held works' editions are asked of Open Library and given their edition ser
       return isbn === "9780141439587" ? h.record([{ name: "Penguin Classics", position: null }]) : isbn === "9789720000999" ? h.record([{ name: "Clássicos", position: "7" }]) : null;
     }
   };
-  const report = await fillHeldEditions(h.repo, catalog, [h.english.work_id!], AT, LIVE);
-  assert.deepEqual(report, { asked: 2, added: 2, failed: 0 });
+  const report = await fillHeldEditions(h.repo, catalog, [h.english.work_id!], AT, held());
+  assert.deepEqual(report, { asked: 2, added: 2, failedIsbns: [] });
   assert.deepEqual(h.asked.sort(), ["9780141439587", "9789720000999"]);
   assert.deepEqual(h.repo.collectionsOf([h.english.id, h.portuguese.id, h.unheld.id]), new Map([[h.english.id, { name: "Penguin Classics", position: null }], [h.portuguese.id, { name: "Clássicos", position: "7" }]]));
   assert.deepEqual(rowsOf(h.db, "book_collections").map((row) => row.source), ["ol-edition", "ol-edition"]);
   assert.equal(rowsOf(h.db, "work_series").length, 0);
-  assert.deepEqual(await fillHeldEditions(h.repo, catalog, [h.english.work_id!], AT, LIVE), { asked: 2, added: 0, failed: 0 });
+  assert.deepEqual(await fillHeldEditions(h.repo, catalog, [h.english.work_id!], AT, held()), { asked: 2, added: 0, failedIsbns: [] });
 });
 
 test("a held id that was joined into another work asks for the editions of the work it became", async () => {
@@ -291,16 +355,18 @@ test("a held id that was joined into another work asks for the editions of the w
   const english = book(repo, "9780141439518", "Pride and Prejudice", "Jane Austen", { workKey: "OL66554W" });
   repo.mergeTranslation(portuguese.work_id!, english.work_id!, "manual", null, AT);
   const asked: string[] = [];
-  const report = await fillHeldEditions(repo, { fetchEditionRecord: async (isbn) => { asked.push(isbn); return null; } }, [portuguese.work_id!], AT, LIVE);
-  assert.deepEqual(report, { asked: 2, added: 0, failed: 0 });
+  const report = await fillHeldEditions(repo, { fetchEditionRecord: async (isbn) => { asked.push(isbn); return null; } }, [portuguese.work_id!], AT, held());
+  assert.deepEqual(report, { asked: 2, added: 0, failedIsbns: [] });
   assert.deepEqual(asked.sort(), ["9780141439518", "9789720000999"]);
 });
 
 test("a held dry run counts the editions it would ask and asks none", async () => {
   const h = heldSetup();
   const catalog = { fetchEditionRecord: async (isbn: string) => { h.asked.push(isbn); return h.record([{ name: "Penguin Classics", position: null }]); } };
-  const report = await fillHeldEditions(h.repo, catalog, [h.english.work_id!], AT, DRY);
-  assert.deepEqual(report, { asked: 2, added: 0, failed: 0 });
+  const logs: string[] = [];
+  const report = await fillHeldEditions(h.repo, catalog, [h.english.work_id!], AT, held(DRY, logs));
+  assert.deepEqual(report, { asked: 2, added: 0, failedIsbns: [] });
+  assert.deepEqual(logs, []);
   assert.deepEqual(h.asked, []);
   assert.equal(rowsOf(h.db, "book_collections").length, 0);
 });
@@ -313,9 +379,30 @@ test("an Open Library failure for one edition is counted and the rest go on, but
       return h.record([{ name: "Clássicos", position: null }]);
     }
   };
-  assert.deepEqual(await fillHeldEditions(h.repo, flaky, [h.english.work_id!], AT, LIVE), { asked: 2, added: 1, failed: 1 });
+  assert.deepEqual(await fillHeldEditions(h.repo, flaky, [h.english.work_id!], AT, held()), { asked: 2, added: 1, failedIsbns: ["9780141439587"] });
   const limited = { fetchEditionRecord: async () => { throw new SourceUnavailableError("openlibrary", "HTTP 429", { status: 429 }); } };
-  await assert.rejects(fillHeldEditions(h.repo, limited, [h.english.work_id!], AT, LIVE), (error: unknown) => error instanceof SourceUnavailableError && error.status === 429);
+  await assert.rejects(fillHeldEditions(h.repo, limited, [h.english.work_id!], AT, held()), (error: unknown) => error instanceof SourceUnavailableError && error.status === 429);
   const broken = { fetchEditionRecord: async () => { throw new TypeError("boom"); } };
-  await assert.rejects(fillHeldEditions(h.repo, broken, [h.english.work_id!], AT, LIVE), TypeError);
+  await assert.rejects(fillHeldEditions(h.repo, broken, [h.english.work_id!], AT, held()), TypeError);
+});
+
+test("held progress is logged every 25 editions with what was asked, added and failed so far, and the report lists the ISBNs that failed", async () => {
+  const { repo } = setup();
+  const isbns = Array.from({ length: 60 }, (_, index) => isbnN(300 + index));
+  const first = book(repo, isbns[0]!, "Edição 0", "Alguém", { workKey: "OL7W" });
+  for (const [index, isbn] of isbns.entries()) if (index > 0) book(repo, isbn, `Edição ${index}`, "Alguém", { workKey: "OL7W" });
+  const failing = new Set([isbns[3], isbns[40]]);
+  const catalog = {
+    fetchEditionRecord: async (isbn: string) => {
+      if (failing.has(isbn)) throw new SourceUnavailableError("openlibrary", "HTTP 503", { status: 503 });
+      return { title: "", workKey: null, languages: [], series: [{ name: "Clássicos", position: isbn.slice(-3) }] } as EditionRecord;
+    }
+  };
+  const logs: string[] = [];
+  const report = await fillHeldEditions(repo, catalog, [first.work_id!], AT, held(LIVE, logs));
+  assert.deepEqual(report, { asked: 60, added: 58, failedIsbns: [isbns[3], isbns[40]] });
+  assert.deepEqual(logs.map((line) => JSON.parse(line)), [
+    { asked: 25, of: 60, added: 24, failed: 1 },
+    { asked: 50, of: 60, added: 48, failed: 2 }
+  ]);
 });
