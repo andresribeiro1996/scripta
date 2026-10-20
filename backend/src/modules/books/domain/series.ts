@@ -15,11 +15,13 @@ const SERIES_SUBJECT = /^series:/i;
 const NUMBER = "\\d+(?:\\.\\d+)?";
 const SHORT_NUMBER = "\\d{1,3}(?:\\.\\d+)?";
 const MARKER = "(?:book\\s+|(?:bk|vol|v|no)\\.\\s*)";
+const MARKED_NUMBER = `${MARKER}(${NUMBER}|${WORD_NUMBERS.join("|")})`;
 const TRAILING_SEPARATORS = /[\s,;:–—-]+$/;
+const TRAILING_YEAR = /^(.*)\(\s*\d{4}\s*\)$/;
 const POSITION_FORMS = [
-  new RegExp(`^(.*)\\(\\s*(${NUMBER})\\s*\\)$`),
-  new RegExp(`^(.*)#\\s*(${NUMBER})$`),
-  new RegExp(`^(.*)(?:(?:,|;|:|--)\\s*${MARKER}(${NUMBER}|${WORD_NUMBERS.join("|")})|(?:,|;)\\s+(${SHORT_NUMBER}))$`, "i")
+  new RegExp(`^(.*)\\(\\s*(?:${MARKED_NUMBER}|(${SHORT_NUMBER}))\\s*\\)$`, "i"),
+  new RegExp(`^(.*)#\\s*(${SHORT_NUMBER})$`),
+  new RegExp(`^(.*)(?:(?:,|;|:|--)\\s*${MARKED_NUMBER}|(?:,|;)\\s+(${SHORT_NUMBER}))$`, "i")
 ];
 
 function entryOf(name: string, position: string | null): SeriesEntry | null {
@@ -29,6 +31,8 @@ function entryOf(name: string, position: string | null): SeriesEntry | null {
 
 export function parseSeriesString(raw: string): SeriesEntry | null {
   const text = raw.trim();
+  const year = TRAILING_YEAR.exec(text);
+  if (year) return entryOf(year[1]!, null);
   for (const form of POSITION_FORMS) {
     const match = form.exec(text);
     if (!match) continue;

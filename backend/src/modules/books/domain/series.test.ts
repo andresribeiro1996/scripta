@@ -84,6 +84,27 @@ test("a position written as a word from one to twenty reads as its number", () =
   assert.deepEqual(parseSeriesString("Discworld, BOOK TWENTY"), { name: "Discworld", position: "20" });
 });
 
+test("a parenthesised or hashed position takes the same short numbers and book markers as the comma form", () => {
+  assert.deepEqual(parseSeriesString("Harry Potter (Book 7)"), { name: "Harry Potter", position: "7" });
+  assert.deepEqual(parseSeriesString("Harry Potter (book seven)"), { name: "Harry Potter", position: "7" });
+  assert.deepEqual(parseSeriesString("Discworld (bk. 7)"), { name: "Discworld", position: "7" });
+  assert.deepEqual(parseSeriesString("Discworld (vol. 2)"), { name: "Discworld", position: "2" });
+  assert.deepEqual(parseSeriesString("Discworld (v. 2)"), { name: "Discworld", position: "2" });
+  assert.deepEqual(parseSeriesString("Discworld ( no. 3 )"), { name: "Discworld", position: "3" });
+  assert.deepEqual(parseSeriesString("The Witcher (Book 0.5)"), { name: "The Witcher", position: "0.5" });
+  assert.deepEqual(parseSeriesString("Malazan Book of the Fallen (3)"), { name: "Malazan Book of the Fallen", position: "3" });
+  assert.deepEqual(parseSeriesString("Penguin classics (100)"), { name: "Penguin classics", position: "100" });
+  assert.deepEqual(parseSeriesString("Discworld #100"), { name: "Discworld", position: "100" });
+});
+
+test("a year in trailing parentheses, or a long number after a hash, is not a position", () => {
+  assert.deepEqual(parseSeriesString("Modern Library (1998)"), { name: "Modern Library", position: null });
+  assert.deepEqual(parseSeriesString("Penguin Classics ( 2004 )"), { name: "Penguin Classics", position: null });
+  assert.deepEqual(parseSeriesString("Discworld #1998"), { name: "Discworld #1998", position: null });
+  assert.deepEqual(parseSeriesString("Apollo (13)"), { name: "Apollo", position: "13" });
+  assert.deepEqual(parseSeriesString("Name (Book)"), { name: "Name (Book)", position: null });
+});
+
 test("a series string without a position is just a name, trimmed", () => {
   assert.deepEqual(parseSeriesString("Bang!"), { name: "Bang!", position: null });
   assert.deepEqual(parseSeriesString("  Penguin classics  "), { name: "Penguin classics", position: null });
@@ -91,7 +112,7 @@ test("a series string without a position is just a name, trimmed", () => {
 });
 
 test("an empty or punctuation-only series name has no entry", () => {
-  for (const raw of ["", "   ", "  ;  ", "--", "(3)", "#3", " ; 3", ", Book 1", ", 1", ", #1", "-- bk. 1"]) assert.equal(parseSeriesString(raw), null, JSON.stringify(raw));
+  for (const raw of ["", "   ", "  ;  ", "--", "(3)", "(1998)", "(Book 7)", "#3", " ; 3", ", Book 1", ", 1", ", #1", "-- bk. 1"]) assert.equal(parseSeriesString(raw), null, JSON.stringify(raw));
 });
 
 test("series subjects give their names with underscores read as spaces, and other subjects are ignored", () => {
