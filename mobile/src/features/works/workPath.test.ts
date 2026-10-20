@@ -2,7 +2,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { bookToolPath, workPath, workStatsPath } from "./workPath.js";
+import { bookToolPath, seriesSearchHref, seriesSearchMethod, workPath, workStatsPath } from "./workPath.js";
 
 test("a work opened from inside the tabs stays in them; from a root-level screen it opens above it", () => {
   assert.equal(workPath("w1", ["(app)", "(arena)", "tierlist", "[id]"]), "/work/w1");
@@ -18,4 +18,13 @@ test("book tools open over the book screen in whichever stack it sits", () => {
 test("the stats page opens in the same stack as the book it belongs to", () => {
   assert.equal(workStatsPath("w1", ["(app)", "(arena)", "work", "[id]"]), "/work/w1/stats");
   assert.equal(workStatsPath("w1", ["(public)", "work", "[id]"]), "/(public)/work/w1/stats");
+});
+
+test("a series tap reaches the Search tab's own screen by the call that works from where the book sits", () => {
+  assert.equal(seriesSearchMethod(["(app)", "(search)", "work", "[id]"]), "dismissTo");
+  assert.equal(seriesSearchMethod(["(app)", "(library)", "work", "[id]"]), "navigate");
+  assert.equal(seriesSearchMethod(["(app)", "(you)", "u", "[username]"]), "navigate");
+  assert.equal(seriesSearchMethod(["(public)", "work", "[id]"]), null);
+  assert.deepEqual(seriesSearchHref("Dune Chronicles", 5, "dismissTo"), { pathname: "/search", params: { q: "Dune Chronicles", t: "5" } });
+  assert.deepEqual(seriesSearchHref("Dune Chronicles", 5, "navigate"), { pathname: "/search", params: { q: "Dune Chronicles", t: "5", pop: "true" } });
 });

@@ -54,7 +54,7 @@ export function SearchScreen({ q, t }: { q?: string | string[]; t?: string | str
   const books = library.data?.data.books ?? [];
   const libraryRows = books.filter((book) => matchesSearch(book, trimmed));
   const listedWorks = new Set(withWorkIds(libraryRows, library.data?.works).flatMap((book) => workIdOf(book) ?? []));
-  const bookRows = mergeBookResults(catalog.data ?? [], external.data ?? [], ownedBooks(books, library.data?.works), listedWorks);
+  const bookRows = mergeBookResults(catalog.data ?? [], external.data ?? [], ownedBooks(books), listedWorks);
   const gameRows = games.data?.pages.flatMap((page) => page.items) ?? [];
   const rows = searchRows({
     scope,

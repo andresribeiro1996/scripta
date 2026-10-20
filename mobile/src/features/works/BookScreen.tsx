@@ -15,7 +15,7 @@ import { EditionStrip } from "./EditionStrip";
 import { fetchWorkStats } from "./api";
 import { StatsTiles } from "./BookStats";
 import { RatingStars } from "./RatingStars";
-import { bookToolPath, workStatsPath } from "./workPath";
+import { bookToolPath, seriesSearchHref, seriesSearchMethod, workStatsPath } from "./workPath";
 import { AuthorAvatar, openProfile } from "../community/AuthorAvatar";
 import { ReaderGlyph } from "../community/ReaderGlyph";
 
@@ -112,12 +112,13 @@ function OwnerRow({ book, model }: { book: Record<string, unknown>; model: BookS
   );
 }
 
-function SeriesLine({ series, signedIn }: { series: NonNullable<BookScreenModel["series"]>; signedIn: boolean }) {
+function SeriesLine({ series, signedIn, segments }: { series: NonNullable<BookScreenModel["series"]>; signedIn: boolean; segments: readonly string[] }) {
   const { colors } = useTheme();
   const label = seriesLabel(series);
-  if (!signedIn) return <Text {...dynamicType} style={[typography.caption, styles.centeredText, { color: colors.textDim }]}>{label}</Text>;
+  const method = signedIn ? seriesSearchMethod(segments) : null;
+  if (!method) return <Text {...dynamicType} style={[typography.caption, styles.centeredText, { color: colors.textDim }]}>{label}</Text>;
   return (
-    <Pressable accessibilityRole="link" hitSlop={captionHitSlop} onPress={() => router.navigate({ pathname: "/search", params: { q: series.name, t: String(Date.now()) } } as never)}>
+    <Pressable accessibilityRole="link" hitSlop={captionHitSlop} onPress={() => router[method](seriesSearchHref(series.name, Date.now(), method) as never)} style={styles.stretch}>
       <Text {...dynamicType} style={[typography.caption, styles.centeredText, { color: colors.text, textDecorationLine: "underline", textDecorationColor: colors.accent }]}>{label}</Text>
     </Pressable>
   );
@@ -172,7 +173,7 @@ export function BookScreen({ page, book, model, signedIn, onAdd, onSelectEdition
           <BookCover cover={page?.work.coverUrl ?? null} title={model.title} width={112} height={168} />
         )}
         <Text {...dynamicType} style={[typography.heading, styles.centeredText, { color: colors.text }]}>{model.title}</Text>
-        {model.series ? <SeriesLine series={model.series} signedIn={signedIn} /> : null}
+        {model.series ? <SeriesLine series={model.series} signedIn={signedIn} segments={segments} /> : null}
         <Text {...dynamicType} style={[typography.body, styles.centeredText, { color: colors.textDim }]}>{model.author}</Text>
         {model.genres.length + model.possibleGenres.length > 0 ? (
           <View style={styles.chips}>
@@ -315,6 +316,7 @@ const styles = StyleSheet.create({
   heroCentered: { alignItems: "center", gap: spacing.xs },
   cover: { width: 112, height: 168, borderRadius: radii.sm, overflow: "hidden" },
   centeredText: { alignSelf: "stretch", textAlign: "center" },
+  stretch: { alignSelf: "stretch" },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs, justifyContent: "center" },
   chip: { borderWidth: 1, borderRadius: radii.full, paddingHorizontal: spacing.sm },
   possibleChip: { borderStyle: "dashed" },

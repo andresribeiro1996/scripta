@@ -182,7 +182,7 @@ Library → Add opens a native chooser with Search by title and Scan barcode. Se
 
 ### Series
 
-Search and Add Book results and the book page show a book's series or collection under its title, such as "Name · 3". On the book page, signed in, the line is a link that opens the Search tab with the series name as the query and runs it, replacing any query already there.
+Search and Add Book results and the book page show a book's series or collection under its title, such as "Name · 3". On the book page, signed in and inside the tabs, the line is a link that returns the Search tab to its own screen with the series name as the query and runs it, replacing any query already there. From the Search tab that is `router.dismissTo`; from another tab it is `router.navigate` with `pop`, so a book page parked above Search is dropped and there is never a second Search screen (it would lose the scan receiver). Signed out, or on a public page above the tabs, the line is plain text.
 
 ### Account access
 
