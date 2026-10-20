@@ -2385,6 +2385,35 @@ test("collection members outside the search index never crowd out the ones insid
   assert.deepEqual(h.service.search("clássicos", { byWork: true }).map((result) => result.title), ["Livro visível 1", "Livro visível 2"]);
 });
 
+test("a collection search by work reaches past a work's many editions to the next work", () => {
+  const h = harness();
+  const editions = Array.from({ length: 25 }, (_, n) => seeded(h, `Os Lobos ${n}`, isbnOf(n), { author: "Ana Lima", workKey: "OL2W" }));
+  const other = seeded(h, "Outro Livro", isbnOf(100), { author: "Rui Costa" });
+  for (const book of [...editions, other]) h.repo.addBookCollection(book.id, { name: "Bang!", position: null }, "bnp", SERIES_AT);
+  assert.deepEqual(h.service.search("bang", { byWork: true }).map((result) => result.title), ["Os Lobos 0", "Outro Livro"]);
+  assert.deepEqual(h.service.search("bang").map((result) => result.title), editions.slice(0, 12).map((book) => book.title));
+});
+
+test("series works without a searchable edition never crowd out one that has it", () => {
+  for (const byWork of [false, true]) {
+    const h = harness();
+    for (let n = 0; n < 20; n += 1) h.repo.addWorkSeries(seeded(h, `Livro ${n}`, isbnOf(n), { author: `Escritor ${n}`, searchable: false }).work_id!, [{ name: MALAZAN, position: null }], "wikidata", SERIES_AT);
+    h.repo.addWorkSeries(seeded(h, "Livro 20", isbnOf(20), { author: "Escritor 20" }).work_id!, [{ name: MALAZAN, position: null }], "wikidata", SERIES_AT);
+    assert.deepEqual(h.service.search("malazan", { byWork }).map((result) => result.title), ["Livro 20"]);
+  }
+});
+
+test("series works are read only until the room left is filled", () => {
+  const h = harness();
+  const titleHits = [1, 2].map((n) => seeded(h, `Malazan ${n}`, isbnOf(n), { author: `Autor ${n}` }));
+  for (let n = 0; n < 30; n += 1) h.repo.addWorkSeries(seeded(h, `Livro ${n}`, isbnOf(100 + n), { author: `Escritor ${n}` }).work_id!, [{ name: MALAZAN, position: null }], "wikidata", SERIES_AT);
+  const editions = mock.method(h.repo, "editionsOf");
+  const results = h.service.search("malazan");
+  assert.equal(results.length, 12);
+  assert.deepEqual(results.slice(0, 2).map((result) => result.title), titleHits.map((book) => book.title));
+  assert.equal(editions.mock.calls.flatMap((call) => call.arguments[0]).length, 10);
+});
+
 function searchSpies(h: Harness) {
   return { series: mock.method(h.repo, "searchSeriesWorks"), collections: mock.method(h.repo, "searchCollectionBooks") };
 }

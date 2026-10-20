@@ -195,24 +195,20 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
     return resultsOf(canonicalHits(rows));
   }
 
-  function representativeEditions(workIds: string[]): Map<string, BookRow> {
-    const found = new Map<string, BookRow>();
-    for (const edition of deps.repo.editionsOf(workIds)) {
-      if (found.has(edition.workId) || !deps.repo.isSearchable(edition.id)) continue;
-      const row = deps.repo.getBook(edition.id);
-      if (row) found.set(edition.workId, row);
-    }
-    return found;
+  function representativeEdition(workId: string): BookRow | undefined {
+    const edition = deps.repo.editionsOf([workId]).find(({ id }) => deps.repo.isSearchable(id));
+    return edition ? deps.repo.getBook(edition.id) : undefined;
   }
 
-  function seriesHits(tokens: string[], present: Hit[]): Hit[] {
+  function seriesHits(tokens: string[], present: Hit[], room: number): Hit[] {
     const known = new Set(present.flatMap(({ workId }) => (workId ? [workId] : [])));
-    const workIds = deps.repo.searchSeriesWorks(tokens, WORK_SEARCH_LIMIT).filter((workId) => !known.has(workId));
-    const editions = representativeEditions(workIds);
-    return workIds.flatMap((workId) => {
-      const row = editions.get(workId);
-      return row ? [{ row, workId }] : [];
-    });
+    const hits: Hit[] = [];
+    for (const workId of deps.repo.searchSeriesWorks(tokens, WORK_SCAN_LIMIT)) {
+      if (hits.length === room) break;
+      const row = known.has(workId) ? undefined : representativeEdition(workId);
+      if (row) hits.push({ row, workId });
+    }
+    return hits;
   }
 
   function collectionHits(tokens: string[], present: Hit[], byWork: boolean, limit: number): Hit[] {
@@ -237,8 +233,8 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
     const cap = byWork ? WORK_SEARCH_LIMIT : SEARCH_LIMIT;
     const rows = deps.repo.searchBooks(tokens, byWork ? WORK_SCAN_LIMIT : SEARCH_LIMIT);
     const hits = byWork ? firstEditionPerWork(rows, deps.repo.canonicalWorkIds(workIdsOf(rows))).slice(0, cap) : canonicalHits(rows);
-    if (hits.length < cap) hits.push(...seriesHits(tokens, hits).slice(0, cap - hits.length));
-    if (hits.length < cap) hits.push(...collectionHits(tokens, hits, byWork, cap).slice(0, cap - hits.length));
+    if (hits.length < cap) hits.push(...seriesHits(tokens, hits, cap - hits.length));
+    if (hits.length < cap) hits.push(...collectionHits(tokens, hits, byWork, byWork ? WORK_SCAN_LIMIT : cap).slice(0, cap - hits.length));
     return resultsOf(hits);
   }
 
