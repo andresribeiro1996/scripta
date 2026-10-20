@@ -114,6 +114,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
         author = CASE WHEN works.author = '' THEN books.author ELSE works.author END
     FROM books
     WHERE books.id = ? AND works.id = books.work_id AND (works.title = '' OR works.author = '')
+    RETURNING works.id AS id
   `);
   const keyOwnWorkStmt = db.prepare(`
     UPDATE works SET ol_work_key = ?
@@ -453,6 +454,8 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     INSERT INTO series_fts (work_id, name, author)
     SELECT $work_id, $name, $author WHERE (SELECT COUNT(*) FROM work_series WHERE work_id = $work_id AND name_key = $name_key) = 1
   `);
+  const hasWorkSeriesStmt = db.prepare(`SELECT 1 FROM work_series WHERE work_id = ? LIMIT 1`);
+  const refreshSeriesAuthorStmt = db.prepare(`UPDATE series_fts SET author = ? WHERE work_id = ?`);
   const insertCollectionStmt = db.prepare(`
     INSERT INTO book_collections (book_id, name, name_key, position, source, created_at) VALUES (?, ?, ?, ?, ?, ?)
     ON CONFLICT (book_id, name_key, source) DO NOTHING
@@ -557,6 +560,15 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
 
   type MergeRecord = { source: MergeSource; confidence: number | null; at: string; carrySummary: boolean };
 
+  function refreshSeriesAuthor(workId: string) {
+    const work = workAuthorStmt.get(workId) as { author: string } | undefined;
+    if (work?.author && hasWorkSeriesStmt.get(workId)) refreshSeriesAuthorStmt.run(work.author, workId);
+  }
+
+  function fillWorkIdentity(bookId: string) {
+    for (const work of fillWorkIdentityStmt.all(bookId) as Array<{ id: string }>) refreshSeriesAuthor(work.id);
+  }
+
   function carryGenreState(from: string, into: string) {
     if (genreJudgmentOwnedStmt.get(into)) dropGenreJudgmentStmt.run(from);
     else moveGenreJudgmentStmt.run(into, from);
@@ -570,6 +582,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     moveWorkEditionsStmt.run(into, from);
     if (record.carrySummary) carryWorkSummaryStmt.run(from, into);
     fillWorkFromEditionsStmt.run(into);
+    refreshSeriesAuthor(into);
     markMergedStmt.run(into, from);
     repointMergedStmt.run(into, from);
     carryGenreState(from, into);
@@ -584,7 +597,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     const workId = held?.id ?? insertWork(row.ol_work_key, row.title, row.author, row.created_at);
     moveBookStmt.run(workId, row.id);
     if (held) {
-      fillWorkIdentityStmt.run(row.id);
+      fillWorkIdentity(row.id);
       applyJoinedJudgment(workId);
     }
     return workId;
@@ -655,7 +668,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
         });
         for (const key of keys) insertKeyIfMissingStmt.run(key, id);
         if (held) {
-          fillWorkIdentityStmt.run(id);
+          fillWorkIdentity(id);
           applyJoinedJudgment(workId);
         }
         makeSearchableIfConfirmed(id);
@@ -675,7 +688,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
         const nextAuthor = row.author || author;
         if (nextTitle === row.title && nextAuthor === row.author) return;
         fillIdentityStmt.run(nextTitle, nextAuthor, nextTitle ? workTitleKey(nextTitle, nextAuthor) : null, id);
-        fillWorkIdentityStmt.run(id);
+        fillWorkIdentity(id);
         reopenCodeNoMatchStmt.run(id);
         if (searchableStmt.get(id)) refreshSearchStmt.run(nextTitle, nextAuthor, id);
         else makeSearchableIfConfirmed(id);
@@ -807,7 +820,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
           carryGenreState(book.work_id, target);
         }
         if (held) applyJoinedJudgment(target);
-        fillWorkIdentityStmt.run(id);
+        fillWorkIdentity(id);
       });
     },
 

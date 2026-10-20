@@ -122,3 +122,37 @@ test("series subjects give their names with underscores read as spaces, and othe
   assert.deepEqual(seriesFromSubjects(["series:Warhammer_40,000"]), [{ name: "Warhammer 40,000", position: null }]);
   for (const nothing of [undefined, null, "series:Dune", 3, {}]) assert.deepEqual(seriesFromSubjects(nothing), [], String(nothing));
 });
+
+test("an en or em dash with space on both sides before a short number is a position, like the comma form", () => {
+  assert.deepEqual(parseSeriesString("Libro de bolsillo – 1"), { name: "Libro de bolsillo", position: "1" });
+  assert.deepEqual(parseSeriesString("Libro de bolsillo — 2"), { name: "Libro de bolsillo", position: "2" });
+  assert.deepEqual(parseSeriesString("Libro de bolsillo  –  12"), { name: "Libro de bolsillo", position: "12" });
+  assert.deepEqual(parseSeriesString("Penguin classics – 100"), { name: "Penguin classics", position: "100" });
+  assert.deepEqual(parseSeriesString("Harry Potter – 1.5"), { name: "Harry Potter", position: "1.5" });
+});
+
+test("a dash that touches the name or the number, has no number, or is followed by a long number stays part of the name", () => {
+  assert.deepEqual(parseSeriesString("Libro de bolsillo –1"), { name: "Libro de bolsillo –1", position: null });
+  assert.deepEqual(parseSeriesString("Libro de bolsillo– 1"), { name: "Libro de bolsillo– 1", position: null });
+  assert.deepEqual(parseSeriesString("Libro de bolsillo—1"), { name: "Libro de bolsillo—1", position: null });
+  assert.deepEqual(parseSeriesString("Star Wars – 1977"), { name: "Star Wars – 1977", position: null });
+  assert.deepEqual(parseSeriesString("Penguin classics – 1000"), { name: "Penguin classics – 1000", position: null });
+  assert.deepEqual(parseSeriesString("Penguin classics –"), { name: "Penguin classics", position: null });
+});
+
+test("a year after a position is dropped and the position before it is still read", () => {
+  assert.deepEqual(parseSeriesString("Harry Potter, Book 7 (2007)"), { name: "Harry Potter", position: "7" });
+  assert.deepEqual(parseSeriesString("Discworld #3 (1990)"), { name: "Discworld", position: "3" });
+  assert.deepEqual(parseSeriesString("Discworld (3) (1990)"), { name: "Discworld", position: "3" });
+  assert.deepEqual(parseSeriesString("Discworld ; 3 ( 1990 )"), { name: "Discworld", position: "3" });
+  assert.deepEqual(parseSeriesString("Libro de bolsillo – 1 (2007)"), { name: "Libro de bolsillo", position: "1" });
+  assert.deepEqual(parseSeriesString("Dune Chronicles, Book Three (1965)"), { name: "Dune Chronicles", position: "3" });
+});
+
+test("a year after a name with no position, or after a number that is not a position, leaves just the name", () => {
+  assert.deepEqual(parseSeriesString("Modern Library (1998)"), { name: "Modern Library", position: null });
+  assert.deepEqual(parseSeriesString("Star Wars: 1977 (1980)"), { name: "Star Wars: 1977", position: null });
+  assert.deepEqual(parseSeriesString("Apollo 13 (1970)"), { name: "Apollo 13", position: null });
+  assert.deepEqual(parseSeriesString("Penguin classics, (2004)"), { name: "Penguin classics", position: null });
+  assert.equal(parseSeriesString("#3 (1990)"), null);
+});
