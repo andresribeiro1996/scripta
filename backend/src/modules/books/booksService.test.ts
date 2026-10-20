@@ -1960,6 +1960,7 @@ test("search hits saved from outside carry their canonical work id", async () =>
   const first = await h.service.searchExternal("dune");
   const dune = h.repo.findBookByKey("isbn:9780441013593")!;
   assert.equal(first[0]!.workId, dune.work_id);
+  assert.equal(first[0]!.bookId, dune.id);
   assert.ok(first.every((result) => typeof result.workId === "string"));
   const target = h.repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780593099322", createdBy: "seed" }, ["isbn:9780593099322"], "2026-10-01T00:00:00.000Z");
   h.db.prepare("UPDATE works SET merged_into = ? WHERE id = ?").run(target.work_id, dune.work_id);
@@ -2363,6 +2364,18 @@ test("two editions of a work in one collection are two rows, and one row by work
   h.repo.addBookCollection(second.id, { name: "Bang!", position: "301" }, "bnp", SERIES_AT);
   assert.equal(h.service.search("bang").length, 2);
   assert.deepEqual(h.service.search("bang", { byWork: true }).map((result) => result.title), ["Os Lobos"]);
+});
+
+test("a result carries the id of the edition it shows, the collection-matched one included", () => {
+  const h = harness();
+  const english = seeded(h, "Dune", isbnOf(1), { author: "Frank Herbert", workKey: "OL3W" });
+  const duna = seeded(h, "Duna", isbnOf(2), { author: "Frank Herbert", workKey: "OL3W" });
+  h.repo.addBookCollection(duna.id, { name: "Clássicos Aleph", position: "3" }, "bnp", SERIES_AT);
+  assert.equal(h.service.search("dune", { byWork: true })[0]!.bookId, english.id);
+  const [byCollection] = h.service.search("aleph", { byWork: true });
+  assert.equal(byCollection!.workId, duna.work_id);
+  assert.equal(byCollection!.bookId, duna.id);
+  assert.equal(h.service.search(duna.isbn!)[0]!.bookId, duna.id);
 });
 
 test("a book found by title, series and collection appears once, in its first group", () => {

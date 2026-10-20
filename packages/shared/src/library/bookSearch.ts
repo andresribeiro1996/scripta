@@ -36,6 +36,7 @@ export interface BookSearchResult {
   coverUrl: string | null;
   genres: BookGenre[];
   workId?: string;
+  bookId?: string;
   series?: BookSeries;
 }
 

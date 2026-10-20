@@ -178,7 +178,8 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       const collection = matched ?? (bookId ? collections.get(bookId) : undefined);
       const asCollection: BookSeries | null = collection ? { ...collection, kind: "collection" } : null;
       const series = matched ? asCollection : story ? { ...story, kind: "series" as const } : asCollection;
-      return series ? { ...result, series } : result;
+      const edition = bookId ? { ...result, bookId } : result;
+      return series ? { ...edition, series } : edition;
     });
   }
 

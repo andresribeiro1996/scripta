@@ -82,6 +82,7 @@ export function EditionStrip({ editions, book, edition, onSelect }: { editions: 
         </View>
       ) : null}
       <Menu
+        key={label.length}
         title="Editions"
         items={editions.map((item, i) => ({
           label: `${item.title} · ${editionLabel(item)}${item.mine ? " · Yours" : ""}`,
