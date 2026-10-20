@@ -34,8 +34,9 @@ export const WORK_LOOKUP_SQL = `
   SELECT id FROM books
   WHERE ol_work_key IS NULL AND isbn IS NOT NULL AND details_status IS NOT NULL
     AND (created_by IS NULL OR created_by <> 'publisher')
-    AND (work_checked_at IS NULL OR work_checked_at < ?)
-  ORDER BY work_checked_at IS NOT NULL, created_by IS NOT NULL, work_checked_at, created_at, rowid
+    AND (work_checked_at IS NOT NULL) IN (0, 1) AND (created_by IS NOT NULL) IN (0, 1)
+    AND coalesce(work_checked_at, '') < ?
+  ORDER BY work_checked_at IS NOT NULL, created_by IS NOT NULL, coalesce(work_checked_at, ''), created_at, rowid
   LIMIT ?
 `;
 export const GROUPABLE_KEYS_SQL = `
@@ -169,7 +170,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     AND NOT EXISTS (SELECT 1 FROM jev_rejections r WHERE r.task = 'works' AND r.subject = w.id AND r.attempts >= $rejections)
   `;
   const allPortugueseNeedingMatchStmt = db.prepare(`SELECT w.id FROM works w WHERE ${portugueseWorkFilter} ORDER BY w.created_at, w.rowid LIMIT $limit`);
-  const somePortugueseNeedingMatchStmt = db.prepare(`SELECT w.id FROM works w WHERE w.id IN (SELECT value FROM json_each($ids)) AND ${portugueseWorkFilter} ORDER BY w.created_at, w.rowid LIMIT $limit`);
+  const somePortugueseNeedingMatchStmt = db.prepare(`SELECT w.id FROM (SELECT DISTINCT value FROM json_each($ids)) AS ids CROSS JOIN works w ON w.id = ids.value WHERE ${portugueseWorkFilter} ORDER BY w.created_at, w.rowid LIMIT $limit`);
   const translationEditionsStmt = db.prepare(`SELECT title, author, publisher, summary, original_title FROM books WHERE work_id = ? ORDER BY created_at, rowid`);
   const titleCandidatesStmt = db.prepare(`SELECT DISTINCT COALESCE(w.merged_into, w.id) AS id FROM books b JOIN works w ON w.id = b.work_id WHERE b.title_key GLOB ?`);
   const authorCandidatesStmt = db.prepare(`
