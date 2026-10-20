@@ -162,7 +162,7 @@ const SAMPLES = 20;
 const OAI_END = /<\/OAI-PMH>\s*$/;
 const LOOKUP_MISS = /<urn-response>\s*<error>Registo inexistente<\/error>\s*<\/urn-response>|<collection\b[^>]*(?:\/>|>\s*<\/collection>)/;
 
-type DateWindow = { from: string; until: string };
+export type DateWindow = { from: string; until: string };
 type Harvested = { records: number; deleted: number; kept: BnpBook[]; skipped: Array<[BnpSkip, string | null]> };
 type Page = { xml: string } | { failure: string; transient: boolean };
 type Outcome = { created: boolean; replace: BnpReplace | null; cover: BnpCoverAction };
@@ -228,7 +228,7 @@ async function harvestOnce(fetchText: BnpHarvestDeps["fetchText"], window: DateW
   return harvested;
 }
 
-async function harvestWindow(fetchText: BnpHarvestDeps["fetchText"], window: DateWindow): Promise<Harvested | string> {
+export async function harvestWindow(fetchText: BnpHarvestDeps["fetchText"], window: DateWindow): Promise<Harvested | string> {
   const first = await harvestOnce(fetchText, window);
   if (typeof first !== "string") return first;
   const second = await harvestOnce(fetchText, window);

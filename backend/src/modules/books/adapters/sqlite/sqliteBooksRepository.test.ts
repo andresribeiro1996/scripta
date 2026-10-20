@@ -2180,9 +2180,9 @@ test("original title claims read the column and the summary label, skip books wi
   db.prepare("UPDATE books SET original_title = '', summary = 'Título original:   ' WHERE id = ?").run(empty.id);
   const claims = repo.originalTitleClaims().sort((a, b) => a.title.localeCompare(b.title));
   assert.deepEqual(claims, [
-    { title: "O Passeio", author: "Robert Walser", language: null, originalTitle: "Der Spaziergang" },
-    { title: "Passeio ao Farol", author: "Virginia Woolf", language: "pt-PT", originalTitle: "To the Lighthouse" },
-    { title: "Solaris", author: "Stanislaw Lem", language: null, originalTitle: "Solaris" }
+    { workId: labelled.work_id, title: "O Passeio", author: "Robert Walser", language: null, originalTitle: "Der Spaziergang" },
+    { workId: column.work_id, title: "Passeio ao Farol", author: "Virginia Woolf", language: "pt-PT", originalTitle: "To the Lighthouse" },
+    { workId: both.work_id, title: "Solaris", author: "Stanislaw Lem", language: null, originalTitle: "Solaris" }
   ]);
   assert.equal(repo.getBook(labelled.id)!.original_title, null);
 });

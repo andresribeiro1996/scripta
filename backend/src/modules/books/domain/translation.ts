@@ -58,24 +58,42 @@ export function originalKey(title: string): string | null {
   return normalized === "" ? null : `${normalized}|${titleNumbers(main)}`;
 }
 
-export type OriginalClaim = { title: string; author: string; language: string | null; originalTitle: string };
+export type OriginalClaim = { workId: string | null; title: string; author: string; language: string | null; originalTitle: string };
 export type SeriesLike = (originalTitle: string, author: string) => boolean;
+export type SeriesLikeGroup = { originalTitle: string; titles: string[]; workIds: string[] };
 
-export function seriesLikeOriginals(claims: OriginalClaim[]): SeriesLike {
-  const groupOf = (original: string, author: string) => `${original}#${surnameOf(author) ?? ""}`;
-  const titlesByOriginal = new Map<string, Set<string>>();
+const groupOf = (original: string, author: string) => `${original}#${surnameOf(author) ?? ""}`;
+
+type ClaimGroup = { originalTitle: string; titles: Map<string, string>; workIds: Set<string> };
+
+function claimGroups(claims: OriginalClaim[]): Map<string, ClaimGroup> {
+  const groups = new Map<string, ClaimGroup>();
   for (const claim of claims) {
     if (!isPortuguese(claim.language) || sameMainTitle(claim.title, claim.originalTitle)) continue;
     const original = originalKey(claim.originalTitle);
     const title = originalKey(claim.title);
     if (original === null || title === null) continue;
-    const group = groupOf(original, claim.author);
-    titlesByOriginal.set(group, (titlesByOriginal.get(group) ?? new Set<string>()).add(title));
+    const key = groupOf(original, claim.author);
+    const group = groups.get(key) ?? { originalTitle: mainTitle(claim.originalTitle), titles: new Map<string, string>(), workIds: new Set<string>() };
+    if (!group.titles.has(title)) group.titles.set(title, claim.title);
+    if (claim.workId !== null) group.workIds.add(claim.workId);
+    groups.set(key, group);
   }
+  return groups;
+}
+
+export function seriesLikeOriginals(claims: OriginalClaim[]): SeriesLike {
+  const groups = claimGroups(claims);
   return (originalTitle, author) => {
     const original = originalKey(originalTitle);
-    return original !== null && (titlesByOriginal.get(groupOf(original, author))?.size ?? 0) >= SERIES_LIKE_TITLES;
+    return original !== null && (groups.get(groupOf(original, author))?.titles.size ?? 0) >= SERIES_LIKE_TITLES;
   };
+}
+
+export function seriesLikeGroups(claims: OriginalClaim[]): SeriesLikeGroup[] {
+  return [...claimGroups(claims).values()]
+    .filter((group) => group.titles.size >= SERIES_LIKE_TITLES)
+    .map(({ originalTitle, titles, workIds }) => ({ originalTitle, titles: [...titles.values()], workIds: [...workIds] }));
 }
 
 export function mentionsSurname(texts: Array<string | null>, surname: string): boolean {

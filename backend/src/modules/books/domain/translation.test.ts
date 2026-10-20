@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { authorPattern, evidenceOf, hasVolumeMarker, isPortuguese, mainTitle, mentionsSurname, originalKey, originalTitleIn, sameMainTitle, seriesLikeOriginals, surnameOf, titlePattern } from "./translation.js";
+import { authorPattern, evidenceOf, hasVolumeMarker, isPortuguese, mainTitle, mentionsSurname, originalKey, originalTitleIn, sameMainTitle, seriesLikeGroups, seriesLikeOriginals, surnameOf, titlePattern } from "./translation.js";
 
 test("originalTitleIn reads the labelled value to the end of its line", () => {
   assert.equal(originalTitleIn("Uma sinopse.\n\nTítulo original: Les Misérables"), "Les Misérables");
@@ -75,7 +75,7 @@ test("an original key is the main title the catalog compares, numbers included",
   assert.equal(originalKey("   "), null);
 });
 
-const claim = (title: string, original: string, author = "Janey Louise Jones", language: string | null = "pt-PT") => ({ title, author, language, originalTitle: original });
+const claim = (title: string, original: string, author = "Janey Louise Jones", language: string | null = "pt-PT", workId: string | null = `work-${title}`) => ({ workId, title, author, language, originalTitle: original });
 
 test("an original claimed by three distinct Portuguese titles of one author is series-like", () => {
   const titles = ["A Princesa Poppy e o Piquenique", "A Princesa Poppy e a Festa", "Poppy no Baile", "Poppy e o Cão"];
@@ -123,4 +123,36 @@ test("a claim with a blank title or original cannot make a series", () => {
   const isSeriesLike = seriesLikeOriginals([claim("", "Princess Poppy"), claim("  ", "Princess Poppy"), claim("Poppy no Baile", "Princess Poppy"), claim("A Festa", "Princess Poppy"), ...["Um", "Dois", "Três"].map((title) => claim(title, "   "))]);
   assert.equal(isSeriesLike("Princess Poppy", "Janey Louise Jones"), false);
   assert.equal(isSeriesLike("   ", "Janey Louise Jones"), false);
+});
+
+test("series-like groups name the original and list the distinct titles and the works that claim it", () => {
+  const poppy = (title: string, workId: string | null, original = "Princess Poppy", author = "Janey Louise Jones", language: string | null = "pt-PT") => claim(title, original, author, language, workId);
+  const groups = seriesLikeGroups([
+    poppy("A Princesa Poppy e o Piquenique", "w1"),
+    poppy("A Princesa Poppy e a Festa", "w2", "Princess Poppy - A Party"),
+    poppy("Poppy no Baile", "w3", "princess poppy", "J. L. Jones", "pt-BR"),
+    poppy("Poppy no Baile", "w4"),
+    poppy("Poppy e o Cão", null),
+    poppy("The Pink Party", "w5", "Princess Poppy", "Janey Louise Jones", "en"),
+    claim("O Principezinho", "Le petit prince", "Antoine de Saint-Exupéry"),
+    claim("O Pequeno Príncipe", "Le petit prince", "Antoine de Saint-Exupéry")
+  ]);
+  assert.deepEqual(groups, [
+    {
+      originalTitle: "Princess Poppy",
+      titles: ["A Princesa Poppy e o Piquenique", "A Princesa Poppy e a Festa", "Poppy no Baile", "Poppy e o Cão"],
+      workIds: ["w1", "w2", "w3", "w4"]
+    }
+  ]);
+});
+
+test("the groups are the originals the series-like predicate answers true for", () => {
+  const claims = [
+    ...["Um", "Dois", "Três"].map((title) => claim(`Volume ${title}`, "Chronicles", "Ann Jones")),
+    ...["Quatro", "Cinco"].map((title) => claim(`Volume ${title}`, "Chronicles", "Bob Smith"))
+  ];
+  assert.deepEqual(seriesLikeGroups(claims).map((group) => [group.originalTitle, group.titles.length]), [["Chronicles", 3]]);
+  const isSeriesLike = seriesLikeOriginals(claims);
+  assert.equal(isSeriesLike("Chronicles", "Ann Jones"), true);
+  assert.equal(isSeriesLike("Chronicles", "Bob Smith"), false);
 });
