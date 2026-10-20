@@ -125,7 +125,7 @@ export interface BooksRepository {
   bestSeriesOf(workIds: string[]): Map<string, SeriesEntry>;
   collectionsOf(bookIds: string[]): Map<string, SeriesEntry>;
   searchSeriesWorks(tokens: string[], limit: number): string[];
-  searchCollectionBooks(tokens: string[], limit: number): string[];
+  searchCollectionBooks(tokens: string[], limit: number): Array<{ bookId: string } & SeriesEntry>;
 }
 
 export interface CoverCandidate {

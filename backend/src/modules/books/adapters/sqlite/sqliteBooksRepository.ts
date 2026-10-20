@@ -472,10 +472,18 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const collectionsOfStmt = db.prepare(`SELECT book_id, name, position FROM book_collections WHERE book_id IN (SELECT value FROM json_each(?)) ORDER BY created_at, rowid`);
   const searchSeriesStmt = db.prepare(`SELECT work_id FROM series_fts WHERE series_fts MATCH ? ORDER BY bm25(series_fts), rowid LIMIT ?`);
   const searchCollectionsStmt = db.prepare(`
-    SELECT collections_fts.book_id AS book_id FROM collections_fts
-    JOIN books_search ON books_search.book_id = collections_fts.book_id
-    WHERE collections_fts MATCH ?
-    ORDER BY bm25(collections_fts), collections_fts.rowid LIMIT ?
+    SELECT hits.book_id AS book_id, hits.name AS name, (
+      SELECT book_collections.position FROM book_collections
+      WHERE book_collections.book_id = hits.book_id AND book_collections.name = hits.name
+      ORDER BY book_collections.position IS NULL, book_collections.created_at, book_collections.rowid LIMIT 1
+    ) AS position
+    FROM (
+      SELECT collections_fts.book_id AS book_id, collections_fts.name AS name, bm25(collections_fts) AS score, collections_fts.rowid AS fts_row
+      FROM collections_fts JOIN books_search ON books_search.book_id = collections_fts.book_id
+      WHERE collections_fts MATCH ?
+      ORDER BY score, fts_row LIMIT ?
+    ) AS hits
+    ORDER BY hits.score, hits.fts_row
   `);
 
   function mergeDetails(bookId: string, details: MergeableDetails, summarySource: SummarySource | null) {
@@ -1218,7 +1226,11 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
 
     searchCollectionBooks(tokens, limit) {
       if (tokens.length === 0) return [];
-      return [...new Set((searchCollectionsStmt.all(matchExpression(tokens), limit) as Array<{ book_id: string }>).map((row) => row.book_id))];
+      const best = new Map<string, { bookId: string; name: string; position: string | null }>();
+      for (const row of searchCollectionsStmt.all(matchExpression(tokens), limit) as Array<{ book_id: string; name: string; position: string | null }>) {
+        if (!best.has(row.book_id)) best.set(row.book_id, { bookId: row.book_id, name: row.name, position: row.position });
+      }
+      return [...best.values()];
     }
   };
 }

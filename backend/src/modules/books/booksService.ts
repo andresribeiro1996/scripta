@@ -12,6 +12,7 @@ import { firstEditionPerWork, workIdsOf } from "./domain/workSearch.js";
 import { editionLanguage, findByIdentity, isPortugalIsbn, isPortugueseIsbn, isValidIsbn, lookupIdentity, SEARCH_LIMIT, searchTokens, WORK_SCAN_LIMIT, WORK_SEARCH_LIMIT, type BookIdentity, type BookLookup } from "./domain/normalize.js";
 import { summaryMatchesLanguage } from "./adapters/catalog/languageFilter.js";
 import type { BookCatalog, BooksRepository, CatalogSearchHit, CoverBlobReader, CoverBlobStore, CoverSource, EditionRecordSource, PageCursor } from "./domain/ports.js";
+import type { SeriesEntry } from "./domain/series.js";
 import type { BookRow, CoverSourceName, CoverStatus, WorkView } from "./domain/types.js";
 import type { CoverPriority } from "./worker.js";
 
@@ -28,8 +29,8 @@ export const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
 
 export type CoverFileSize = "file" | "thumb";
 
-type Hit = { row: BookRow; workId: string | null; viaCollection?: boolean };
-type Found = { result: BookSearchResult; bookId: string | null; viaCollection?: boolean };
+type Hit = { row: BookRow; workId: string | null; matched?: SeriesEntry };
+type Found = { result: BookSearchResult; bookId: string | null; matched?: SeriesEntry };
 
 export interface ResolvedCover {
   url: string | null;
@@ -171,12 +172,12 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
   function withSeries(found: Found[]): BookSearchResult[] {
     const workIds = [...new Set(found.flatMap(({ result }) => (result.workId ? [result.workId] : [])))];
     const stories = deps.repo.bestSeriesOf(workIds);
-    const collections = deps.repo.collectionsOf(found.flatMap(({ bookId }) => (bookId ? [bookId] : [])));
-    return found.map(({ result, bookId, viaCollection }) => {
+    const collections = deps.repo.collectionsOf(found.flatMap(({ bookId, matched }) => (bookId && !matched ? [bookId] : [])));
+    return found.map(({ result, bookId, matched }) => {
       const story = result.workId ? stories.get(result.workId) : undefined;
-      const collection = bookId ? collections.get(bookId) : undefined;
+      const collection = matched ?? (bookId ? collections.get(bookId) : undefined);
       const asCollection: BookSeries | null = collection ? { ...collection, kind: "collection" } : null;
-      const series = viaCollection ? asCollection : story ? { ...story, kind: "series" as const } : asCollection;
+      const series = matched ? asCollection : story ? { ...story, kind: "series" as const } : asCollection;
       return series ? { ...result, series } : result;
     });
   }
@@ -187,7 +188,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
   }
 
   function resultsOf(hits: Hit[]): BookSearchResult[] {
-    return withSeries(hits.map(({ row, workId, viaCollection }) => ({ result: toSearchResult(row, workId), bookId: row.id, viaCollection })));
+    return withSeries(hits.map(({ row, workId, matched }) => ({ result: toSearchResult(row, workId), bookId: row.id, matched })));
   }
 
   function withWorkIds(rows: BookRow[]): BookSearchResult[] {
@@ -217,16 +218,18 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
   function collectionHits(tokens: string[], present: Hit[], byWork: boolean, limit: number): Hit[] {
     const books = new Set(present.map(({ row }) => row.id));
     const works = new Set(present.flatMap(({ workId }) => (workId ? [workId] : [])));
-    const rows = deps.repo.searchCollectionBooks(tokens, limit).filter((id) => !books.has(id)).flatMap((id) => {
-      const row = deps.repo.getBook(id);
+    const matches = deps.repo.searchCollectionBooks(tokens, limit).filter(({ bookId }) => !books.has(bookId));
+    const rows = matches.flatMap(({ bookId }) => {
+      const row = deps.repo.getBook(bookId);
       return row ? [row] : [];
     });
+    const entries = new Map(matches.map(({ bookId, name, position }) => [bookId, { name, position }]));
     return canonicalHits(rows).flatMap((hit) => {
       if (byWork && hit.workId !== null) {
         if (works.has(hit.workId)) return [];
         works.add(hit.workId);
       }
-      return [{ ...hit, viaCollection: true }];
+      return [{ ...hit, matched: entries.get(hit.row.id) }];
     });
   }
 

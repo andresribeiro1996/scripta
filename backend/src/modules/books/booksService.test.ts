@@ -2344,6 +2344,17 @@ test("a collection hit carries the collection even when its work has a story ser
   assert.deepEqual(h.service.search("lobos")[0]!.series, { name: "Saga dos Lobos", kind: "series", position: "2" });
 });
 
+test("a collection hit carries the collection that matched, not the edition's earliest", () => {
+  const h = harness();
+  const book = seeded(h, "Os Lobos", isbnOf(1), { author: "Ana Lima" });
+  h.repo.addBookCollection(book.id, { name: "Bang!", position: "248" }, "bnp", "2026-10-01T00:00:00.000Z");
+  h.repo.addBookCollection(book.id, { name: "Clássicos", position: "7" }, "ol-edition", "2026-10-02T00:00:00.000Z");
+  assert.deepEqual(h.service.search("clássicos")[0]!.series, { name: "Clássicos", kind: "collection", position: "7" });
+  assert.deepEqual(h.service.search("clássicos", { byWork: true })[0]!.series, { name: "Clássicos", kind: "collection", position: "7" });
+  assert.deepEqual(h.service.search("bang")[0]!.series, { name: "Bang!", kind: "collection", position: "248" });
+  assert.deepEqual(h.service.search("lobos")[0]!.series, { name: "Bang!", kind: "collection", position: "248" });
+});
+
 test("two editions of a work in one collection are two rows, and one row by work", () => {
   const h = harness();
   const first = seeded(h, "Os Lobos", isbnOf(1), { author: "Ana Lima", workKey: "OL2W" });

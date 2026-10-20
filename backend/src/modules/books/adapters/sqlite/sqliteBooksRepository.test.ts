@@ -2587,8 +2587,8 @@ test("addBookCollection stores a collection on an edition, and collectionsOf and
   ]);
 
   assert.deepEqual([...repo.collectionsOf([book.id, plain.id])], [[book.id, { name: "Bang!", position: "248" }]]);
-  assert.deepEqual(repo.searchCollectionBooks(["bang"], 5), [book.id]);
-  assert.deepEqual(repo.searchCollectionBooks(["ban"], 5), [book.id]);
+  assert.deepEqual(repo.searchCollectionBooks(["bang"], 5), [{ bookId: book.id, name: "Bang!", position: "248" }]);
+  assert.deepEqual(repo.searchCollectionBooks(["ban"], 5), [{ bookId: book.id, name: "Bang!", position: "248" }]);
   assert.deepEqual(repo.searchCollectionBooks(["lobos"], 5), []);
   assert.deepEqual(repo.searchCollectionBooks([], 5), []);
   assert.equal(repo.collectionsOf([]).size, 0);
@@ -2625,9 +2625,31 @@ test("searchCollectionBooks caps its result at the limit and lists an edition on
     repo.addBookCollection(book.id, { name: "Bang!", position: null }, "bnp", AT);
   }
   repo.addBookCollection(books[0]!.id, { name: "Bang! Fantasia", position: null }, "ol-edition", AT);
-  assert.equal(repo.searchCollectionBooks(["bang"], 3).length, 3);
-  assert.deepEqual([...new Set(repo.searchCollectionBooks(["bang"], 10))].sort(), books.map((book) => book.id).sort());
-  assert.equal(new Set(repo.searchCollectionBooks(["bang"], 10)).size, repo.searchCollectionBooks(["bang"], 10).length);
+  const ids = (limit: number) => repo.searchCollectionBooks(["bang"], limit).map((hit) => hit.bookId);
+  assert.equal(ids(3).length, 3);
+  assert.deepEqual([...ids(10)].sort(), books.map((book) => book.id).sort());
+  assert.equal(new Set(ids(10)).size, ids(10).length);
+});
+
+test("searchCollectionBooks returns the collection that matched, not the edition's earliest", () => {
+  const { repo } = freshRepo();
+  const book = seriesBook(repo, "Os Lobos", "9789720000405", "Ana Lima");
+  repo.makeSearchable(book.id);
+  repo.addBookCollection(book.id, { name: "Bang!", position: "248" }, "bnp", at(1));
+  repo.addBookCollection(book.id, { name: "Clássicos", position: "7" }, "ol-edition", at(2));
+  assert.deepEqual(repo.searchCollectionBooks(["bang"], 5), [{ bookId: book.id, name: "Bang!", position: "248" }]);
+  assert.deepEqual(repo.searchCollectionBooks(["classicos"], 5), [{ bookId: book.id, name: "Clássicos", position: "7" }]);
+  assert.deepEqual(repo.collectionsOf([book.id]).get(book.id), { name: "Bang!", position: "248" });
+});
+
+test("searchCollectionBooks takes the matched collection's position from any source that has one", () => {
+  const { repo } = freshRepo();
+  const book = seriesBook(repo, "Os Lobos", "9789720000405", "Ana Lima");
+  repo.makeSearchable(book.id);
+  repo.addBookCollection(book.id, { name: "Bang!", position: null }, "bnp", at(1));
+  assert.deepEqual(repo.searchCollectionBooks(["bang"], 5), [{ bookId: book.id, name: "Bang!", position: null }]);
+  repo.addBookCollection(book.id, { name: "Bang!", position: "248" }, "ol-edition", at(2));
+  assert.deepEqual(repo.searchCollectionBooks(["bang"], 5), [{ bookId: book.id, name: "Bang!", position: "248" }]);
 });
 
 test("searchCollectionBooks skips editions outside the search index before it applies the limit", () => {
@@ -2636,7 +2658,7 @@ test("searchCollectionBooks skips editions outside the search index before it ap
   const shown = seriesBook(repo, "Visível", "9789720000604", "Ana Lima");
   repo.makeSearchable(shown.id);
   for (const book of [...hidden, shown]) repo.addBookCollection(book.id, { name: "Bang!", position: null }, "bnp", AT);
-  assert.deepEqual(repo.searchCollectionBooks(["bang"], 2), [shown.id]);
+  assert.deepEqual(repo.searchCollectionBooks(["bang"], 2), [{ bookId: shown.id, name: "Bang!", position: null }]);
 });
 
 test("series and collection tables are added to an existing database once", () => {
