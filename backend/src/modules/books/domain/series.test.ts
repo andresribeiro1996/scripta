@@ -58,6 +58,26 @@ test("a name that merely ends in a number, or has a separator and no number, sta
   assert.deepEqual(parseSeriesString("Harry Potter, Book"), { name: "Harry Potter, Book", position: null });
 });
 
+test("a thousands separator, a year, or a number with no book marker after a colon or dashes is not a position", () => {
+  assert.deepEqual(parseSeriesString("Warhammer 40,000"), { name: "Warhammer 40,000", position: null });
+  assert.deepEqual(parseSeriesString("Penguin Modern Classics, 2004"), { name: "Penguin Modern Classics, 2004", position: null });
+  assert.deepEqual(parseSeriesString("Star Wars: 1977"), { name: "Star Wars: 1977", position: null });
+  assert.deepEqual(parseSeriesString("Discworld: 3"), { name: "Discworld: 3", position: null });
+  assert.deepEqual(parseSeriesString("Discworld -- 3"), { name: "Discworld -- 3", position: null });
+  assert.deepEqual(parseSeriesString("Harry Potter, Bookone"), { name: "Harry Potter, Bookone", position: null });
+  assert.deepEqual(parseSeriesString("Harry Potter, bookone"), { name: "Harry Potter, bookone", position: null });
+  assert.deepEqual(parseSeriesString("Harry Potter,1"), { name: "Harry Potter,1", position: null });
+});
+
+test("a bare number after a comma or semicolon is a position up to three digits, and a dotted marker may touch its number", () => {
+  assert.deepEqual(parseSeriesString("Penguin classics, 100"), { name: "Penguin classics", position: "100" });
+  assert.deepEqual(parseSeriesString("Harry Potter, 1.5"), { name: "Harry Potter", position: "1.5" });
+  assert.deepEqual(parseSeriesString("Discworld ; 3"), { name: "Discworld", position: "3" });
+  assert.deepEqual(parseSeriesString("Discworld, bk.3"), { name: "Discworld", position: "3" });
+  assert.deepEqual(parseSeriesString("Discworld, vol.2"), { name: "Discworld", position: "2" });
+  assert.deepEqual(parseSeriesString("Penguin classics, 1000"), { name: "Penguin classics, 1000", position: null });
+});
+
 test("a position written as a word from one to twenty reads as its number", () => {
   assert.deepEqual(parseSeriesString("Dune Chronicles, Book Three"), { name: "Dune Chronicles", position: "3" });
   assert.deepEqual(parseSeriesString("Dune Chronicles, book one"), { name: "Dune Chronicles", position: "1" });
@@ -78,5 +98,6 @@ test("series subjects give their names with underscores read as spaces, and othe
   assert.deepEqual(seriesFromSubjects(["Fantasy", "series:Malazan_Book_of_the_Fallen"]), [{ name: "Malazan Book of the Fallen", position: null }]);
   assert.deepEqual(seriesFromSubjects(["SERIES:Dune_Chronicles", "Series:Discworld_(2)", "series:", "series:--", "seriesx:Nope"]), [{ name: "Dune Chronicles", position: null }, { name: "Discworld", position: "2" }]);
   assert.deepEqual(seriesFromSubjects(["Fantasy", 7, null, { subject: "series:x" }]), []);
+  assert.deepEqual(seriesFromSubjects(["series:Warhammer_40,000"]), [{ name: "Warhammer 40,000", position: null }]);
   for (const nothing of [undefined, null, "series:Dune", 3, {}]) assert.deepEqual(seriesFromSubjects(nothing), [], String(nothing));
 });

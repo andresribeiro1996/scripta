@@ -13,11 +13,13 @@ export function seriesNameKey(name: string): string | null {
 const WORD_NUMBERS = ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen", "twenty"];
 const SERIES_SUBJECT = /^series:/i;
 const NUMBER = "\\d+(?:\\.\\d+)?";
+const SHORT_NUMBER = "\\d{1,3}(?:\\.\\d+)?";
+const MARKER = "(?:book\\s+|(?:bk|vol|v|no)\\.\\s*)";
 const TRAILING_SEPARATORS = /[\s,;:–—-]+$/;
 const POSITION_FORMS = [
   new RegExp(`^(.*)\\(\\s*(${NUMBER})\\s*\\)$`),
   new RegExp(`^(.*)#\\s*(${NUMBER})$`),
-  new RegExp(`^(.*)(?:,|;|:|--)\\s*(?:(?:bk\\.|book|vol\\.|v\\.|no\\.)\\s*(${NUMBER}|${WORD_NUMBERS.join("|")})|(${NUMBER}))$`, "i")
+  new RegExp(`^(.*)(?:(?:,|;|:|--)\\s*${MARKER}(${NUMBER}|${WORD_NUMBERS.join("|")})|(?:,|;)\\s+(${SHORT_NUMBER}))$`, "i")
 ];
 
 function entryOf(name: string, position: string | null): SeriesEntry | null {
