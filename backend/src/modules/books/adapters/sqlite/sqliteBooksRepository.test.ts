@@ -100,6 +100,19 @@ test("setCoverIf writes only while the book still has the expected cover", () =>
   assert.equal(repo.getBook(book.id)!.cover_image_id, "img-2");
 });
 
+test("setCoverIf refuses an image whose URL is rejected for that book only", () => {
+  const { repo } = freshRepo();
+  const book = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: null }, ["ta:dune|frank herbert|"], NOW);
+  const other = repo.createBook({ title: "Emma", author: "Jane Austen", isbn: null }, ["ta:emma|jane austen|"], NOW);
+  repo.insertImage({ id: "img-u", book_id: book.id, source: "apple", source_url: "https://a/u", width: 900, height: 1400, byte_size: 1, color: "", created_at: NOW });
+  repo.addRejection(book.id, "https://a/u", NOW);
+  assert.equal(repo.setCoverIf(book.id, null, { imageId: "img-u", status: "good", checkedAt: NOW }), false);
+  assert.equal(repo.getBook(book.id)!.cover_image_id, null);
+  assert.equal(repo.setCoverIf(book.id, null, { imageId: null, status: "missing", checkedAt: NOW }), true);
+  assert.equal(repo.setCoverIf(other.id, null, { imageId: "img-u", status: "good", checkedAt: NOW }), true);
+  assert.equal(repo.getBook(other.id)!.cover_image_id, "img-u");
+});
+
 test("fillIdentity only fills an empty title and does not make the book searchable", () => {
   const { repo } = freshRepo();
   const book = repo.createBook({ title: "", author: "", isbn: "9780141184272" }, ["isbn:9780141184272"], NOW);
