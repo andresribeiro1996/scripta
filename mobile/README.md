@@ -180,6 +180,10 @@ Library → Add opens a native chooser with Search by title and Scan barcode. Se
 
 `expo-camera` works in Expo Go. Existing standalone builds need a new native release before they can use this module; an OTA update alone cannot add it.
 
+### Series
+
+Search and Add Book results and the book page show a book's series or collection under its title, such as "Name · 3". On the book page, signed in, the line is a link that opens the Search tab with the series name as the query and runs it, replacing any query already there.
+
 ### Account access
 
 The shared Input supports password visibility and field hints. Login/signup validate fields before submission, preserve autofill, scroll above the keyboard, and prevent competing sign-in attempts. Sessions continue to use SecureStore and remain signed in by default.

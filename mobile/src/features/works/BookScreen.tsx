@@ -4,9 +4,9 @@ import { useQuery } from "@tanstack/react-query";
 import { Alert, Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
 import Animated, { useAnimatedScrollHandler, useAnimatedStyle, type SharedValue } from "react-native-reanimated";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
-import { bookStatsModel, coverWash, editionLabel, type BookScreenModel, type BookScreenTabKey, type WorkPage } from "@scripta/shared";
+import { bookStatsModel, coverWash, editionLabel, seriesLabel, type BookScreenModel, type BookScreenTabKey, type WorkPage } from "@scripta/shared";
 import { Text } from "../../ui/Text";
-import { Button, Icon, Menu, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme, type IconName, type MenuItem } from "../../ui";
+import { Button, Icon, Menu, captionHitSlop, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme, type IconName, type MenuItem } from "../../ui";
 import { useLibraryActions } from "../library/hooks/useLibraryActions";
 import { useChangeStatus } from "../library/hooks/useChangeStatus";
 import { BookCover } from "../arena/BookCover";
@@ -112,6 +112,17 @@ function OwnerRow({ book, model }: { book: Record<string, unknown>; model: BookS
   );
 }
 
+function SeriesLine({ series, signedIn }: { series: NonNullable<BookScreenModel["series"]>; signedIn: boolean }) {
+  const { colors } = useTheme();
+  const label = seriesLabel(series);
+  if (!signedIn) return <Text {...dynamicType} style={[typography.caption, styles.centeredText, { color: colors.textDim }]}>{label}</Text>;
+  return (
+    <Pressable accessibilityRole="link" hitSlop={captionHitSlop} onPress={() => router.navigate({ pathname: "/search", params: { q: series.name, t: String(Date.now()) } } as never)}>
+      <Text {...dynamicType} style={[typography.caption, styles.centeredText, { color: colors.text, textDecorationLine: "underline", textDecorationColor: colors.accent }]}>{label}</Text>
+    </Pressable>
+  );
+}
+
 function DeleteNote({ book, bookmarkId }: { book: Record<string, unknown>; bookmarkId: string }) {
   const { colors } = useTheme();
   const { deleteNote } = useLibraryActions();
@@ -161,6 +172,7 @@ export function BookScreen({ page, book, model, signedIn, onAdd, onSelectEdition
           <BookCover cover={page?.work.coverUrl ?? null} title={model.title} width={112} height={168} />
         )}
         <Text {...dynamicType} style={[typography.heading, styles.centeredText, { color: colors.text }]}>{model.title}</Text>
+        {model.series ? <SeriesLine series={model.series} signedIn={signedIn} /> : null}
         <Text {...dynamicType} style={[typography.body, styles.centeredText, { color: colors.textDim }]}>{model.author}</Text>
         {model.genres.length + model.possibleGenres.length > 0 ? (
           <View style={styles.chips}>

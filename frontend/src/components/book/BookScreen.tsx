@@ -9,6 +9,7 @@ import {
   editionLabel,
   readSnapshot,
   seriesGroupByBookKey,
+  seriesLabel,
   type BookScreenModel,
   type BookScreenReaderRow,
   type BookScreenTabKey,
@@ -194,6 +195,7 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
               </div>
             )}
             <h1 className="mt-4 text-2xl font-bold">{model.title}</h1>
+            {model.series ? <p className="mt-1 text-xs text-(--color-text-dim)">{seriesLabel(model.series)}</p> : null}
             <p className="mt-1 text-sm text-(--color-text-dim)">{model.author}</p>
             {model.genres.length + model.possibleGenres.length > 0 ? (
               <ul className="mt-3 flex flex-wrap justify-center gap-1.5 sm:justify-start">

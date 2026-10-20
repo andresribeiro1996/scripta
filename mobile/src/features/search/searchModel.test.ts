@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { BookSearchResult } from "@scripta/shared";
 import type { DiscoverItem, PersonResult } from "@scripta/shared/community";
-import { idleSections, libraryStatus, mergeBookResults, ownedBooks, readRecentSearches, recentSearchesKey, recordRecentSearch, searchRows, type ResultsInput, type SearchRow } from "./searchModel.js";
+import { idleSections, libraryStatus, mergeBookResults, ownedBooks, readRecentSearches, recentSearchesKey, recordRecentSearch, searchQueryFromParam, searchRows, type ResultsInput, type SearchRow } from "./searchModel.js";
 
 const result = (title: string, workId?: string, isbn: string | null = null): BookSearchResult => ({ title, authors: ["Author"], year: 2001, isbn, publisher: null, coverUrl: null, genres: [], ...(workId ? { workId } : {}) });
 const person = (userId: string) => ({ user: { userId, username: userId, avatarUrl: null }, followerCount: 0, private: false }) as unknown as PersonResult;
@@ -83,7 +83,24 @@ test("Open Library results merge into Books by work, and works you own are left 
   const owned = ownedBooks([{ Title: "Mine", ISBN: "0441013597" }], { "isbn:9780441013593": "w-owned" });
   const catalog = [result("Dune", "w-dune"), result("Owned", "w-owned")];
   const outside = [result("Dune again", "w-dune"), result("New", "w-new"), result("Owned by ISBN", undefined, "9780441013593"), result("Loose", undefined, "9781234567897")];
-  assert.deepEqual(mergeBookResults(catalog, outside, owned).map((book) => book.title), ["Dune", "New", "Loose"]);
+  assert.deepEqual(mergeBookResults(catalog, outside, owned, new Set(["w-owned"])).map((book) => book.title), ["Dune", "New", "Loose"]);
+});
+
+test("a work you own keeps its catalog row when the library section doesn't list it", () => {
+  const owned = ownedBooks([{ Title: "Mine", ISBN: "0441013597" }], { "isbn:9780441013593": "w-owned" });
+  const catalog = [result("Owned", "w-owned"), result("Other", "w-other")];
+  assert.deepEqual(mergeBookResults(catalog, [], owned, new Set()).map((book) => book.title), ["Owned", "Other"]);
+  assert.deepEqual(mergeBookResults(catalog, [], owned, new Set(["w-owned"])).map((book) => book.title), ["Other"]);
+});
+
+test("a search param reads as its trimmed text, or its first item, or nothing", () => {
+  assert.equal(searchQueryFromParam("  Malazan Book of the Fallen "), "Malazan Book of the Fallen");
+  assert.equal(searchQueryFromParam(["Dune", "Other"]), "Dune");
+  assert.equal(searchQueryFromParam(["  ", "Other"]), null);
+  assert.equal(searchQueryFromParam([]), null);
+  assert.equal(searchQueryFromParam("   "), null);
+  assert.equal(searchQueryFromParam(""), null);
+  assert.equal(searchQueryFromParam(undefined), null);
 });
 
 test("recent searches keep the newest eight, once each, ignoring case and surrounding spaces", () => {

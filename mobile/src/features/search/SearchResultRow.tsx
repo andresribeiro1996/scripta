@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, View } from "react-native";
 import { router } from "expo-router";
-import { bookKey, searchResultByline, type BookSearchResult, type LibraryBook } from "@scripta/shared";
+import { bookKey, searchResultByline, seriesLabel, type BookSearchResult, type LibraryBook } from "@scripta/shared";
 import { Text } from "../../ui/Text";
 import { Button, ErrorState, IconButton, Skeleton, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { BookCover } from "../arena/BookCover";
@@ -118,11 +118,12 @@ function LibraryResultRow({ book, onOpen }: { book: LibraryBook; onOpen: () => v
 function BookResultRow({ result, onOpen, onAdd }: { result: BookSearchResult; onOpen: () => void; onAdd: (result: BookSearchResult) => void }) {
   const { colors } = useTheme();
   const byline = searchResultByline(result);
+  const series = result.series ? seriesLabel(result.series) : null;
   return (
     <View style={[styles.row, { borderBottomColor: colors.border }]}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={byline ? `${result.title}, ${byline}` : result.title}
+        accessibilityLabel={[result.title, series, byline].filter(Boolean).join(", ")}
         onPress={() => {
           onOpen();
           if (result.workId) router.push(`/work/${result.workId}` as never);
@@ -133,6 +134,7 @@ function BookResultRow({ result, onOpen, onAdd }: { result: BookSearchResult; on
         <BookCover cover={result.coverUrl} title={result.title} width={40} height={60} />
         <View style={styles.grow}>
           <Text numberOfLines={2} {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>{result.title}</Text>
+          {series ? <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{series}</Text> : null}
           {byline ? <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{byline}</Text> : null}
         </View>
       </Pressable>
