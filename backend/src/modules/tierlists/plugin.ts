@@ -5,6 +5,7 @@
 import fastifyMultipart from "@fastify/multipart";
 import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
+import { peekCachedCoverUrls } from "../books/index.js";
 import { openTierlistsDb } from "./adapters/sqlite/connection.js";
 import { createSqliteTierlistsRepository } from "./adapters/sqlite/sqliteTierlistsRepository.js";
 import { buildPublicTierlistRoutes, buildTierlistRoutes, buildTierlistShareVideoRoutes } from "./routes.js";
@@ -21,7 +22,7 @@ export async function tierlistsPlugin(app: FastifyInstance, opts: TierlistsPlugi
   // --- composition: swap this one block to change storage technology ---
   const db = openTierlistsDb();
   const tierlistsRepository = createSqliteTierlistsRepository(db);
-  const tierlistsService = createTierlistsService(tierlistsRepository, opts.emitPublished, opts.emitVotedOn);
+  const tierlistsService = createTierlistsService(tierlistsRepository, opts.emitPublished, opts.emitVotedOn, peekCachedCoverUrls);
   // -----------------------------------------------------------------------
 
   // No rate limit on the authenticated CRUD surface — ordinary tier-list
@@ -60,7 +61,7 @@ let cachedApi: TierlistsPublicApi | null = null;
  *  one file just fine, and getTierlistData only ever reads. */
 export function getTierlistsPublicApi(): TierlistsPublicApi {
   if (!cachedApi) {
-    const service = createTierlistsService(createSqliteTierlistsRepository(openTierlistsDb()));
+    const service = createTierlistsService(createSqliteTierlistsRepository(openTierlistsDb()), undefined, undefined, peekCachedCoverUrls);
     cachedApi = createTierlistsPublicApi(service);
   }
   return cachedApi;
