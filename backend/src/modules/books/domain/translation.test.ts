@@ -34,7 +34,7 @@ test("title and author patterns match the catalog's title keys", () => {
   assert.equal(titlePattern("To the Lighthouse — A Novel"), "ta:to the lighthouse|*|");
   assert.equal(titlePattern("1984"), "ta:1984|*|1984");
   assert.equal(titlePattern("   "), null);
-  assert.equal(authorPattern("Virginia Woolf, Ana Lima"), "ta:*|virginia woolf|*");
+  assert.equal(authorPattern("Virginia Woolf, Ana Lima"), "virginia woolf|*");
   assert.equal(authorPattern(""), null);
 });
 

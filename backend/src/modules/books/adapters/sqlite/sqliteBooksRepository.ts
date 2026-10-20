@@ -176,7 +176,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const authorCandidatesStmt = db.prepare(`
     SELECT COALESCE(w.merged_into, w.id) AS id, COUNT(*) AS editions
     FROM books b JOIN works w ON w.id = b.work_id
-    WHERE b.title_key GLOB ?
+    WHERE substr(b.title_key, instr(b.title_key, '|') + 1) GLOB ?
     GROUP BY COALESCE(w.merged_into, w.id)
     HAVING SUM(CASE WHEN b.language IS NULL OR (b.language <> 'pt' AND b.language NOT LIKE 'pt-%') THEN 1 ELSE 0 END) > 0
     ORDER BY editions DESC, id
@@ -407,8 +407,13 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const detailsMissingStmt = db.prepare(`UPDATE books SET details_status = 'missing', details_checked_at = ? WHERE id = ?`);
   const detailsAttemptedStmt = db.prepare(`UPDATE books SET details_checked_at = ? WHERE id = ?`);
   const searchStmt = db.prepare(`
-    SELECT books.* FROM books_fts JOIN books ON books.id = books_fts.book_id
-    WHERE books_fts MATCH ? ORDER BY bm25(books_fts) LIMIT ?
+    SELECT books.* FROM (
+      SELECT rowid AS fts_row, bm25(books_fts) AS score FROM books_fts
+      WHERE books_fts MATCH ? ORDER BY score, fts_row LIMIT ?
+    ) AS hits
+    JOIN books_fts ON books_fts.rowid = hits.fts_row
+    JOIN books ON books.id = books_fts.book_id
+    ORDER BY hits.score, hits.fts_row
   `);
 
   const uncheckedStmt = db.prepare(UNCHECKED_COVERS_SQL);
