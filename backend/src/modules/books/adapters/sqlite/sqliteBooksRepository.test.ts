@@ -2394,3 +2394,247 @@ test("retitle_wanted_at and its index are added to an existing database once", (
   assert.ok(columns.includes("retitle_wanted_at"));
   assert.ok(db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'idx_books_retitle_wanted'").get());
 });
+
+const MALAZAN = "Malazan Book of the Fallen";
+const seriesBook = (repo: ReturnType<typeof freshRepo>["repo"], title: string, isbn: string, author = "Steven Erikson", workKey?: string) =>
+  repo.createBook({ title, author, isbn, workKey }, [`isbn:${isbn}`], NOW);
+
+test("addWorkSeries stores the name with its position, a second source adds a row, and only new rows count", () => {
+  const { db, repo } = freshRepo();
+  const book = seriesBook(repo, "Memories of Ice", "9780765348807");
+  assert.equal(repo.addWorkSeries(book.work_id!, [{ name: MALAZAN, position: "3" }], "ol-subject", AT), 1);
+  assert.deepEqual(db.prepare("SELECT name, name_key, position, source, created_at FROM work_series WHERE work_id = ?").all(book.work_id).map((row) => ({ ...row })), [
+    { name: MALAZAN, name_key: "malazan book of the fallen", position: "3", source: "ol-subject", created_at: AT }
+  ]);
+  assert.equal(repo.addWorkSeries(book.work_id!, [{ name: MALAZAN, position: "3" }], "wikidata", AT), 1);
+  assert.equal(countOf(db, "work_series"), 2);
+  assert.equal(repo.addWorkSeries(book.work_id!, [{ name: MALAZAN, position: "3" }], "wikidata", at(1)), 0);
+  assert.equal(countOf(db, "work_series"), 2);
+});
+
+test("addWorkSeries fills a missing position but never overwrites a set one", () => {
+  const { db, repo } = freshRepo();
+  const book = seriesBook(repo, "Memories of Ice", "9780765348807");
+  const position = () => (db.prepare("SELECT position FROM work_series WHERE work_id = ? AND source = 'wikidata'").get(book.work_id) as { position: string | null }).position;
+  repo.addWorkSeries(book.work_id!, [{ name: MALAZAN, position: null }], "wikidata", AT);
+  assert.equal(position(), null);
+  assert.equal(repo.addWorkSeries(book.work_id!, [{ name: MALAZAN, position: "3" }], "wikidata", at(1)), 0);
+  assert.equal(position(), "3");
+  assert.equal(repo.addWorkSeries(book.work_id!, [{ name: MALAZAN, position: "4" }], "wikidata", at(2)), 0);
+  assert.equal(repo.addWorkSeries(book.work_id!, [{ name: MALAZAN, position: null }], "wikidata", at(3)), 0);
+  assert.equal(position(), "3");
+});
+
+test("addWorkSeries stores several entries at once and drops names with no letters or digits", () => {
+  const { db, repo } = freshRepo();
+  const book = seriesBook(repo, "Gardens of the Moon", "9780765348807");
+  const added = repo.addWorkSeries(book.work_id!, [{ name: MALAZAN, position: "1" }, { name: "--", position: "2" }, { name: "  ", position: null }, { name: "Malazan Empire", position: null }], "ol-subject", AT);
+  assert.equal(added, 2);
+  assert.deepEqual(db.prepare("SELECT name_key FROM work_series ORDER BY name_key").all().map((row) => (row as { name_key: string }).name_key), ["malazan book of the fallen", "malazan empire"]);
+});
+
+test("addWorkSeries refuses a work that does not exist instead of storing an orphan", () => {
+  const { db, repo } = freshRepo();
+  assert.throws(() => repo.addWorkSeries("missing", [{ name: MALAZAN, position: null }], "wikidata", AT), /missing/);
+  assert.equal(countOf(db, "work_series"), 0);
+  assert.equal(countOf(db, "series_fts"), 0);
+});
+
+test("a series is indexed once per work and name, however many sources give it", () => {
+  const { db, repo } = freshRepo();
+  const book = seriesBook(repo, "Memories of Ice", "9780765348807");
+  repo.addWorkSeries(book.work_id!, [{ name: MALAZAN, position: "3" }], "ol-subject", AT);
+  repo.addWorkSeries(book.work_id!, [{ name: "Malazan: Book of the Fallen", position: "3" }], "wikidata", AT);
+  repo.addWorkSeries(book.work_id!, [{ name: MALAZAN, position: "3" }], "wikidata", at(1));
+  repo.addWorkSeries(book.work_id!, [{ name: "Malazan Empire", position: null }], "ol-subject", AT);
+  assert.deepEqual(db.prepare("SELECT work_id, name, author FROM series_fts ORDER BY rowid").all().map((row) => ({ ...row })), [
+    { work_id: book.work_id, name: MALAZAN, author: "Steven Erikson" },
+    { work_id: book.work_id, name: "Malazan Empire", author: "Steven Erikson" }
+  ]);
+});
+
+test("bestSeriesOf prefers Wikidata to an Open Library subject, whichever arrived first", () => {
+  const { repo } = freshRepo();
+  const book = seriesBook(repo, "Memories of Ice", "9780765348807");
+  repo.addWorkSeries(book.work_id!, [{ name: "Malazan Empire", position: "3" }], "ol-subject", AT);
+  repo.addWorkSeries(book.work_id!, [{ name: MALAZAN, position: "3" }], "wikidata", at(1));
+  repo.addWorkSeries(book.work_id!, [{ name: "Erikson saga", position: null }], "original-title", AT);
+  assert.deepEqual([...repo.bestSeriesOf([book.work_id!])], [[book.work_id, { name: MALAZAN, position: "3" }]]);
+});
+
+test("bestSeriesOf ranks by source, then by the earliest row, and leaves out works without a series", () => {
+  const { repo } = freshRepo();
+  const first = seriesBook(repo, "A", "9780000000001");
+  const plain = seriesBook(repo, "B", "9780000000002");
+  repo.addWorkSeries(first.work_id!, [{ name: "Later", position: null }], "ol-subject", at(2));
+  repo.addWorkSeries(first.work_id!, [{ name: "Earlier", position: "2" }], "ol-subject", at(1));
+  assert.deepEqual(repo.bestSeriesOf([first.work_id!, plain.work_id!]).get(first.work_id!), { name: "Earlier", position: "2" });
+  assert.equal(repo.bestSeriesOf([first.work_id!, plain.work_id!]).has(plain.work_id!), false);
+  assert.equal(repo.bestSeriesOf([]).size, 0);
+});
+
+test("bestSeriesOf takes the position from the best-ranked row of the same name that has one", () => {
+  const { repo } = freshRepo();
+  const book = seriesBook(repo, "Memories of Ice", "9780765348807");
+  repo.addWorkSeries(book.work_id!, [{ name: MALAZAN, position: null }], "wikidata", AT);
+  repo.addWorkSeries(book.work_id!, [{ name: "Malazan book of the fallen", position: "3" }], "ol-subject", AT);
+  repo.addWorkSeries(book.work_id!, [{ name: "Malazan Empire", position: "9" }], "original-title", AT);
+  assert.deepEqual(repo.bestSeriesOf([book.work_id!]).get(book.work_id!), { name: MALAZAN, position: "3" });
+});
+
+test("an Open Library edition collection becomes the work's series only when Wikidata or a subject names it too", () => {
+  const { repo } = freshRepo();
+  const book = seriesBook(repo, "Memories of Ice", "9780765348807");
+  repo.addBookCollection(book.id, { name: MALAZAN, position: "3" }, "ol-edition", AT);
+  assert.equal(repo.bestSeriesOf([book.work_id!]).size, 0);
+
+  repo.addWorkSeries(book.work_id!, [{ name: MALAZAN, position: null }], "original-title", AT);
+  assert.deepEqual(repo.bestSeriesOf([book.work_id!]).get(book.work_id!), { name: MALAZAN, position: null });
+
+  repo.addWorkSeries(book.work_id!, [{ name: "Malazan Empire", position: null }], "ol-subject", AT);
+  assert.equal(repo.bestSeriesOf([book.work_id!]).size, 1);
+  assert.deepEqual(repo.bestSeriesOf([book.work_id!]).get(book.work_id!), { name: "Malazan Empire", position: null });
+
+  repo.addWorkSeries(book.work_id!, [{ name: "malazan, book of the fallen", position: null }], "ol-subject", AT);
+  assert.deepEqual(repo.bestSeriesOf([book.work_id!]).get(book.work_id!), { name: MALAZAN, position: "3" });
+
+  repo.addWorkSeries(book.work_id!, [{ name: "Malazan Book of the Fallen.", position: "3" }], "wikidata", AT);
+  assert.deepEqual(repo.bestSeriesOf([book.work_id!]).get(book.work_id!), { name: "Malazan Book of the Fallen.", position: "3" });
+});
+
+test("a promoted collection counts from any edition of the work or its aliases, and a BNP collection never does", () => {
+  const { repo } = freshRepo();
+  const target = seriesBook(repo, "Memories of Ice", "9780765348807");
+  const alias = seriesBook(repo, "Memórias de Gelo", "9789720000401", "Steven Erikson");
+  repo.mergeTranslation(alias.work_id!, target.work_id!, "manual", null, AT);
+  repo.addWorkSeries(target.work_id!, [{ name: MALAZAN, position: null }], "ol-subject", AT);
+  repo.addBookCollection(alias.id, { name: MALAZAN, position: "3" }, "bnp", AT);
+  assert.deepEqual(repo.bestSeriesOf([target.work_id!]).get(target.work_id!), { name: MALAZAN, position: null });
+  repo.addBookCollection(alias.id, { name: MALAZAN, position: "3" }, "ol-edition", AT);
+  assert.deepEqual(repo.bestSeriesOf([target.work_id!]).get(target.work_id!), { name: MALAZAN, position: "3" });
+});
+
+test("a series follows its work through a merge and comes back with an undo", () => {
+  const { repo } = freshRepo();
+  const a = seriesBook(repo, "Passeio", "9789720000402", "X", "OL930W");
+  const b = seriesBook(repo, "Walk", "9780156907394", "X", "OL931W");
+  repo.addWorkSeries(a.work_id!, [{ name: MALAZAN, position: "3" }], "wikidata", AT);
+  assert.deepEqual(repo.bestSeriesOf([a.work_id!]).get(a.work_id!), { name: MALAZAN, position: "3" });
+
+  repo.mergeTranslation(a.work_id!, b.work_id!, "manual", null, AT);
+  assert.deepEqual(repo.bestSeriesOf([b.work_id!]).get(b.work_id!), { name: MALAZAN, position: "3" });
+
+  repo.undoMerge(a.work_id!, "2026-10-16T00:00:00.000Z");
+  assert.deepEqual(repo.bestSeriesOf([a.work_id!]).get(a.work_id!), { name: MALAZAN, position: "3" });
+  assert.equal(repo.bestSeriesOf([b.work_id!]).has(b.work_id!), false);
+});
+
+test("searchSeriesWorks finds a work by its series name, with or without its author", () => {
+  const { repo } = freshRepo();
+  const book = seriesBook(repo, "Memories of Ice", "9780765348807");
+  const other = seriesBook(repo, "Dune", "9780441013593", "Frank Herbert");
+  repo.addWorkSeries(book.work_id!, [{ name: MALAZAN, position: "3" }], "wikidata", AT);
+  repo.addWorkSeries(other.work_id!, [{ name: "Dune Chronicles", position: "1" }], "wikidata", AT);
+
+  assert.deepEqual(repo.searchSeriesWorks(["malazan"], 10), [book.work_id]);
+  assert.deepEqual(repo.searchSeriesWorks(["malazan", "erikson"], 10), [book.work_id]);
+  assert.deepEqual(repo.searchSeriesWorks(["malaz"], 10), [book.work_id]);
+  assert.deepEqual(repo.searchSeriesWorks(["malazan", "herbert"], 10), []);
+  assert.deepEqual(repo.searchSeriesWorks(["fallen", "book"], 10), [book.work_id]);
+  assert.deepEqual(repo.searchSeriesWorks([], 10), []);
+});
+
+test("searchSeriesWorks ignores diacritics in the series name", () => {
+  const { repo } = freshRepo();
+  const book = seriesBook(repo, "O Hobbit", "9789720000403", "J. R. R. Tolkien");
+  repo.addWorkSeries(book.work_id!, [{ name: "Sénior Coleção", position: null }], "wikidata", AT);
+  assert.deepEqual(repo.searchSeriesWorks(["senior", "colecao"], 10), [book.work_id]);
+});
+
+test("searchSeriesWorks returns a merged-away work as its canonical work, once", () => {
+  const { repo } = freshRepo();
+  const a = seriesBook(repo, "Passeio", "9789720000404", "Steven Erikson", "OL932W");
+  const b = seriesBook(repo, "Walk", "9780156907395", "Steven Erikson", "OL933W");
+  repo.addWorkSeries(a.work_id!, [{ name: MALAZAN, position: "3" }], "wikidata", AT);
+  assert.deepEqual(repo.searchSeriesWorks(["malazan"], 10), [a.work_id]);
+  repo.mergeTranslation(a.work_id!, b.work_id!, "manual", null, AT);
+  assert.deepEqual(repo.searchSeriesWorks(["malazan"], 10), [b.work_id]);
+  repo.addWorkSeries(b.work_id!, [{ name: MALAZAN, position: "3" }], "ol-subject", AT);
+  assert.deepEqual(repo.searchSeriesWorks(["malazan"], 10), [b.work_id]);
+});
+
+test("searchSeriesWorks dedupes merged works before it applies the limit", () => {
+  const { repo } = freshRepo();
+  const target = seriesBook(repo, "Target", "9780000000011", "Steven Erikson", "OL934W");
+  const aliases = [1, 2, 3].map((n) => seriesBook(repo, `Alias ${n}`, `978000000002${n}`, "Steven Erikson"));
+  const other = seriesBook(repo, "Other", "9780000000031", "Steven Erikson");
+  for (const alias of aliases) repo.addWorkSeries(alias.work_id!, [{ name: "Saga", position: null }], "wikidata", AT);
+  repo.addWorkSeries(other.work_id!, [{ name: "Saga", position: null }], "wikidata", AT);
+  for (const alias of aliases) repo.mergeTranslation(alias.work_id!, target.work_id!, "manual", null, AT);
+
+  assert.deepEqual(repo.searchSeriesWorks(["saga"], 2), [target.work_id, other.work_id]);
+  assert.deepEqual(repo.searchSeriesWorks(["saga"], 1), [target.work_id]);
+});
+
+test("addBookCollection stores a collection on an edition, and collectionsOf and searchCollectionBooks find it", () => {
+  const { db, repo } = freshRepo();
+  const book = seriesBook(repo, "Os Lobos", "9789720000405", "Ana Lima");
+  const plain = seriesBook(repo, "Sem Coleção", "9789720000406", "Ana Lima");
+  assert.equal(repo.addBookCollection(book.id, { name: "Bang!", position: "248" }, "bnp", AT), true);
+  assert.deepEqual(db.prepare("SELECT name, name_key, position, source, created_at FROM book_collections WHERE book_id = ?").all(book.id).map((row) => ({ ...row })), [
+    { name: "Bang!", name_key: "bang", position: "248", source: "bnp", created_at: AT }
+  ]);
+
+  assert.deepEqual([...repo.collectionsOf([book.id, plain.id])], [[book.id, { name: "Bang!", position: "248" }]]);
+  assert.deepEqual(repo.searchCollectionBooks(["bang"], 5), [book.id]);
+  assert.deepEqual(repo.searchCollectionBooks(["ban"], 5), [book.id]);
+  assert.deepEqual(repo.searchCollectionBooks(["lobos"], 5), []);
+  assert.deepEqual(repo.searchCollectionBooks([], 5), []);
+  assert.equal(repo.collectionsOf([]).size, 0);
+});
+
+test("addBookCollection fills a missing position, never overwrites one, indexes a name once and drops a name with no letters", () => {
+  const { db, repo } = freshRepo();
+  const book = seriesBook(repo, "Os Lobos", "9789720000405", "Ana Lima");
+  assert.equal(repo.addBookCollection(book.id, { name: "Bang!", position: null }, "bnp", AT), true);
+  assert.equal(repo.addBookCollection(book.id, { name: "Bang!", position: "248" }, "bnp", at(1)), false);
+  assert.equal(repo.addBookCollection(book.id, { name: "Bang!", position: "249" }, "bnp", at(2)), false);
+  assert.equal(repo.addBookCollection(book.id, { name: "bang", position: "248" }, "ol-edition", at(3)), true);
+  assert.equal(repo.addBookCollection(book.id, { name: "--", position: "1" }, "bnp", at(4)), false);
+  assert.deepEqual(db.prepare("SELECT source, position FROM book_collections ORDER BY source").all().map((row) => ({ ...row })), [
+    { source: "bnp", position: "248" },
+    { source: "ol-edition", position: "248" }
+  ]);
+  assert.equal(countOf(db, "collections_fts"), 1);
+});
+
+test("collectionsOf picks the earliest collection of each edition", () => {
+  const { repo } = freshRepo();
+  const book = seriesBook(repo, "Os Lobos", "9789720000405", "Ana Lima");
+  repo.addBookCollection(book.id, { name: "Clássicos", position: "7" }, "ol-edition", at(2));
+  repo.addBookCollection(book.id, { name: "Bang!", position: "248" }, "bnp", at(1));
+  assert.deepEqual(repo.collectionsOf([book.id]).get(book.id), { name: "Bang!", position: "248" });
+});
+
+test("searchCollectionBooks caps its result at the limit and lists an edition once", () => {
+  const { repo } = freshRepo();
+  const books = [1, 2, 3, 4].map((n) => seriesBook(repo, `Livro ${n}`, `978972000050${n}`, "Ana Lima"));
+  for (const book of books) repo.addBookCollection(book.id, { name: "Bang!", position: null }, "bnp", AT);
+  repo.addBookCollection(books[0]!.id, { name: "Bang! Fantasia", position: null }, "ol-edition", AT);
+  assert.equal(repo.searchCollectionBooks(["bang"], 3).length, 3);
+  assert.deepEqual([...new Set(repo.searchCollectionBooks(["bang"], 10))].sort(), books.map((book) => book.id).sort());
+  assert.equal(new Set(repo.searchCollectionBooks(["bang"], 10)).size, repo.searchCollectionBooks(["bang"], 10).length);
+});
+
+test("series and collection tables are added to an existing database once", () => {
+  const db = new DatabaseSync(":memory:");
+  applyBooksMigrations(db);
+  db.exec("DROP TABLE work_series");
+  db.exec("DROP TABLE book_collections");
+  db.exec("DROP TABLE series_fts");
+  db.exec("DROP TABLE collections_fts");
+  applyBooksMigrations(db);
+  applyBooksMigrations(db);
+  const names = (db.prepare("SELECT name FROM sqlite_master WHERE name IN ('work_series', 'book_collections', 'series_fts', 'collections_fts') ORDER BY name").all() as Array<{ name: string }>).map((row) => row.name);
+  assert.deepEqual(names, ["book_collections", "collections_fts", "series_fts", "work_series"]);
+});
