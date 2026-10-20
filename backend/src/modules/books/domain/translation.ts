@@ -50,6 +50,34 @@ export function hasVolumeMarker(title: string): boolean {
   return /#\s*\d/.test(title) || VOLUME_WORD.test(normalizeWords(title));
 }
 
+export const SERIES_LIKE_TITLES = 3;
+
+export function originalKey(title: string): string | null {
+  const main = mainTitle(title);
+  const normalized = normalizeTitle(main);
+  return normalized === "" ? null : `${normalized}|${titleNumbers(main)}`;
+}
+
+export type OriginalClaim = { title: string; author: string; language: string | null; originalTitle: string };
+export type SeriesLike = (originalTitle: string, author: string) => boolean;
+
+export function seriesLikeOriginals(claims: OriginalClaim[]): SeriesLike {
+  const groupOf = (original: string, author: string) => `${original}#${surnameOf(author) ?? ""}`;
+  const titlesByOriginal = new Map<string, Set<string>>();
+  for (const claim of claims) {
+    if (!isPortuguese(claim.language) || sameMainTitle(claim.title, claim.originalTitle)) continue;
+    const original = originalKey(claim.originalTitle);
+    const title = originalKey(claim.title);
+    if (original === null || title === null) continue;
+    const group = groupOf(original, claim.author);
+    titlesByOriginal.set(group, (titlesByOriginal.get(group) ?? new Set<string>()).add(title));
+  }
+  return (originalTitle, author) => {
+    const original = originalKey(originalTitle);
+    return original !== null && (titlesByOriginal.get(groupOf(original, author))?.size ?? 0) >= SERIES_LIKE_TITLES;
+  };
+}
+
 export function mentionsSurname(texts: Array<string | null>, surname: string): boolean {
   return texts.some((text) => text !== null && ` ${normalizeWords(text)} `.includes(` ${surname} `));
 }

@@ -349,6 +349,8 @@ Matches every live Portuguese work (all its editions `pt`, `pt-PT` or `pt-BR`) t
 
 2. Real run: the same command without `--dry-run`, with `--max` at the dry run's `wouldAsk`. The code steps run first with no requests: original titles from stored summaries, Portuguese originals and works with no candidates recorded, and the clear matches merged. Then Jev decides the rest, 4 in flight: 0.9 or more merges, 0.5 to 0.9 waits on `/admin/translations`. `--max` is a hard limit on TypeSafe requests, retries included, recorded under `works-backlog` in `typesafe_usage` (the daily `works` budget is untouched). Without `TYPESAFE_API_KEY` only the code steps run, and the script says the Jev step was skipped. An outage or a rejected key ends the run; re-running continues where it stopped.
 
+The code steps and the server's live matching never join on an original title that three or more distinct Portuguese main titles by one author surname carry (a series name such as *Princess Poppy*; the rule is built from the stored and summary-derived original titles, and the live path reuses it for ten minutes): the work is recorded as "none", Jev is not asked, and the dry run counts it in `seriesLike` as well as `noCandidates`. An edition whose own title has a volume marker (`Vol. 2`, `Livro 2`) is never settled in code either: it goes to Jev.
+
 `--recheck-none` also selects works whose answer was "none", not the owner's, and is more than 30 days old, since their original may have arrived since.
 
 Filling a book's empty title or author (`fillIdentity`, e.g. from the publisher importer) drops its work's code-only "none" answer, so the next run plans that work again without `--recheck-none`; Jev's and the owner's answers stay.

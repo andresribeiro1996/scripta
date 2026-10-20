@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { authorPattern, evidenceOf, hasVolumeMarker, isPortuguese, mainTitle, mentionsSurname, originalTitleIn, sameMainTitle, surnameOf, titlePattern } from "./translation.js";
+import { authorPattern, evidenceOf, hasVolumeMarker, isPortuguese, mainTitle, mentionsSurname, originalKey, originalTitleIn, sameMainTitle, seriesLikeOriginals, surnameOf, titlePattern } from "./translation.js";
 
 test("originalTitleIn reads the labelled value to the end of its line", () => {
   assert.equal(originalTitleIn("Uma sinopse.\n\nTítulo original: Les Misérables"), "Les Misérables");
@@ -66,4 +66,61 @@ test("a volume marker is found wherever the catalog's title key would drop it", 
   for (const title of ["To the Lighthouse: A Novel", "The Book Thief", "1984", "Fahrenheit 451", "The Book of Two Ways", "C# in Depth", "A Civil Action"]) {
     assert.equal(hasVolumeMarker(title), false, title);
   }
+});
+
+test("an original key is the main title the catalog compares, numbers included", () => {
+  assert.equal(originalKey("To the Lighthouse — A Novel"), "to the lighthouse|");
+  assert.equal(originalKey("1984"), "1984|1984");
+  assert.equal(originalKey("Saga: Book 2"), "saga|2");
+  assert.equal(originalKey("   "), null);
+});
+
+const claim = (title: string, original: string, author = "Janey Louise Jones", language: string | null = "pt-PT") => ({ title, author, language, originalTitle: original });
+
+test("an original claimed by three distinct Portuguese titles of one author is series-like", () => {
+  const titles = ["A Princesa Poppy e o Piquenique", "A Princesa Poppy e a Festa", "Poppy no Baile", "Poppy e o Cão"];
+  const isSeriesLike = seriesLikeOriginals(titles.map((title) => claim(title, "Princess Poppy")));
+  assert.equal(isSeriesLike("Princess Poppy", "Janey Louise Jones"), true);
+  assert.equal(isSeriesLike("princess poppy — a story", "J. L. Jones"), true);
+  assert.equal(isSeriesLike("Princess Poppy: Book 2", "Janey Louise Jones"), false);
+  const two = seriesLikeOriginals(titles.slice(0, 2).map((title) => claim(title, "Princess Poppy")));
+  assert.equal(two("Princess Poppy", "Janey Louise Jones"), false);
+});
+
+test("only Portuguese titles count, and the same title many times counts once", () => {
+  const exupery = "Antoine de Saint-Exupéry";
+  const isSeriesLike = seriesLikeOriginals([
+    claim("O Principezinho", "Le petit prince", exupery, "pt-PT"),
+    claim("O Principezinho", "Le petit prince", exupery, "pt-BR"),
+    claim("O Principezinho", "Le petit prince", exupery, "pt"),
+    claim("El principito", "Le petit prince", exupery, "es"),
+    claim("The Little Prince", "Le petit prince", exupery, "en"),
+    claim("Il piccolo principe", "Le petit prince", exupery, null)
+  ]);
+  assert.equal(isSeriesLike("Le petit prince", exupery), false);
+});
+
+test("the same original under two author surnames is grouped apart", () => {
+  const isSeriesLike = seriesLikeOriginals([
+    ...["Um", "Dois", "Três"].map((title) => claim(`Volume ${title}`, "Chronicles", "Ann Jones")),
+    ...["Quatro", "Cinco"].map((title) => claim(`Volume ${title}`, "Chronicles", "Bob Smith"))
+  ]);
+  assert.equal(isSeriesLike("Chronicles", "Ann Jones"), true);
+  assert.equal(isSeriesLike("Chronicles", "Bob Smith"), false);
+  assert.equal(isSeriesLike("Chronicles", ""), false);
+});
+
+test("an edition titled like its original does not count toward the original being a series", () => {
+  const isSeriesLike = seriesLikeOriginals([
+    claim("Princess Poppy", "Princess Poppy"),
+    claim("A Princesa Poppy e a Festa", "Princess Poppy"),
+    claim("Poppy no Baile", "Princess Poppy")
+  ]);
+  assert.equal(isSeriesLike("Princess Poppy", "Janey Louise Jones"), false);
+});
+
+test("a claim with a blank title or original cannot make a series", () => {
+  const isSeriesLike = seriesLikeOriginals([claim("", "Princess Poppy"), claim("  ", "Princess Poppy"), claim("Poppy no Baile", "Princess Poppy"), claim("A Festa", "Princess Poppy"), ...["Um", "Dois", "Três"].map((title) => claim(title, "   "))]);
+  assert.equal(isSeriesLike("Princess Poppy", "Janey Louise Jones"), false);
+  assert.equal(isSeriesLike("   ", "Janey Louise Jones"), false);
 });

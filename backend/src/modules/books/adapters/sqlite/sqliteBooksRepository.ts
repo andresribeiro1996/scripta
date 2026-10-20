@@ -172,6 +172,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const allPortugueseNeedingMatchStmt = db.prepare(`SELECT w.id FROM works w WHERE ${portugueseWorkFilter} ORDER BY w.created_at, w.rowid LIMIT $limit`);
   const somePortugueseNeedingMatchStmt = db.prepare(`SELECT w.id FROM (SELECT DISTINCT value FROM json_each($ids)) AS ids CROSS JOIN works w ON w.id = ids.value WHERE ${portugueseWorkFilter} ORDER BY w.created_at, w.rowid LIMIT $limit`);
   const translationEditionsStmt = db.prepare(`SELECT title, author, publisher, summary, original_title FROM books WHERE work_id = ? ORDER BY created_at, rowid`);
+  const originalTitleClaimsStmt = db.prepare(`SELECT title, author, language, original_title, summary FROM books WHERE (original_title IS NOT NULL AND original_title <> '') OR summary LIKE '%tulo original%'`);
   const titleCandidatesStmt = db.prepare(`SELECT DISTINCT COALESCE(w.merged_into, w.id) AS id FROM books b JOIN works w ON w.id = b.work_id WHERE b.title_key GLOB ?`);
   const authorCandidatesStmt = db.prepare(`
     SELECT COALESCE(w.merged_into, w.id) AS id, COUNT(*) AS editions
@@ -831,6 +832,13 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       const author = (workStmt.get(workId) as { author: string } | undefined)?.author ?? "";
       const editions = (translationEditionsStmt.all(workId) as Array<{ title: string; author: string; publisher: string | null; summary: string | null; original_title: string | null }>).map((row) => ({ title: row.title, author: row.author, publisher: row.publisher, summary: row.summary, originalTitle: row.original_title }));
       return { workId, workAuthor: author, editions };
+    },
+    originalTitleClaims() {
+      const rows = originalTitleClaimsStmt.all() as Array<{ title: string; author: string; language: string | null; original_title: string | null; summary: string | null }>;
+      return rows.flatMap((row) => {
+        const originalTitle = row.original_title || originalTitleIn(row.summary);
+        return originalTitle ? [{ title: row.title, author: row.author, language: row.language, originalTitle }] : [];
+      });
     },
     titleCandidates(pattern) {
       return (titleCandidatesStmt.all(pattern) as Array<{ id: string }>).map((row) => row.id);
