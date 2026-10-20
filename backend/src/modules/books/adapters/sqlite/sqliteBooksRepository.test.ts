@@ -232,7 +232,7 @@ test("search ranks inside the full-text index and reads books only for the rows 
   assert.equal(statements.length, 1);
   const steps = (db.prepare(`EXPLAIN QUERY PLAN ${statements[0]}`).all('"mar"*', 12) as Array<{ detail: string }>).map((row) => row.detail);
   const position = (pattern: RegExp) => steps.findIndex((detail) => pattern.test(detail));
-  const order = [/^CO-ROUTINE hits$/, /^SCAN books_fts VIRTUAL TABLE INDEX 0:M/, /USE TEMP B-TREE FOR ORDER BY/, /^SCAN hits$/, /^SEARCH books USING INDEX sqlite_autoindex_books_1 \(id=\?\)/].map(position);
+  const order = [/^CO-ROUTINE hits$/, /^SCAN books_fts VIRTUAL TABLE INDEX 0:M/, /USE TEMP B-TREE FOR ORDER BY/, /^SCAN hits$/, /^SCAN books_fts VIRTUAL TABLE INDEX 0:=$/, /^SEARCH books USING INDEX sqlite_autoindex_books_1 \(id=\?\)/].map(position);
   assert.ok(order.every((index) => index >= 0), steps.join(" | "));
   assert.deepEqual(order, [...order].sort((left, right) => left - right), steps.join(" | "));
 });
