@@ -157,9 +157,6 @@ function readDocument(tierlist: Tierlist): TierlistDocument {
 const COVER_PREVIEW_LIMIT = 8;
 const RECENT_PARTICIPANT_LIMIT = 10;
 
-/** Covers come from the published snapshot rather than the owner's live
- *  library: a stranger reading the feed can't resolve the owner's books,
- *  and the snapshot is what the vote page already shows them. */
 export type CoverPeek = (params: Array<{ isbn: string | null; title: string | null; author: string | null }>) => Array<string | null>;
 
 function text(value: unknown): string | null {
@@ -200,6 +197,9 @@ function fillPublicBooks(books: unknown[] | null, peek: CoverPeek | undefined): 
   return Array.isArray(books) ? fillMissingCovers(books, peek) : books;
 }
 
+/** Covers come from the published snapshot rather than the owner's live
+ *  library: a stranger reading the feed can't resolve the owner's books,
+ *  and the snapshot is what the vote page already shows them. */
 function publishedCovers(publicBooks: string | null, peek: CoverPeek | undefined): string[] {
   const parsed = parsePublicBooks(publicBooks);
   if (!Array.isArray(parsed)) return [];
