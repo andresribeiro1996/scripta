@@ -17,6 +17,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { IScannerControls } from "@zxing/browser";
+import { seriesLabel } from "@scripta/shared";
 import { useDismissible } from "../hooks/useDismissible";
 import { useScrollLock } from "../hooks/useScrollLock";
 import { normalizeIsbn } from "../lib/covers";
@@ -271,6 +272,7 @@ export function AddBookModal({
                 )}
                 <span className="min-w-0">
                   <span className="block truncate text-sm font-semibold">{r.title}</span>
+                  {r.series && <span className="block truncate text-xs text-(--color-text-dim)">{seriesLabel(r.series)}</span>}
                   <span className="block truncate text-xs text-(--color-text-dim)">
                     {searchResultByline(r)}
                   </span>

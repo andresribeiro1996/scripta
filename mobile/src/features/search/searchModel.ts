@@ -116,13 +116,11 @@ export function libraryStatus(book: LibraryBook): { label: string; tone: "accent
 }
 
 export interface OwnedBooks {
-  workIds: Set<string>;
   isbns: Set<string>;
 }
 
-export function ownedBooks(books: LibraryBook[], works: Record<string, string> = {}): OwnedBooks {
+export function ownedBooks(books: LibraryBook[]): OwnedBooks {
   return {
-    workIds: new Set(Object.values(works)),
     isbns: new Set(books.flatMap((book) => {
       const isbn = canonicalIsbn(book.ISBN);
       return isbn ? [isbn] : [];
@@ -130,17 +128,22 @@ export function ownedBooks(books: LibraryBook[], works: Record<string, string> =
   };
 }
 
-export function mergeBookResults(catalog: BookSearchResult[], outside: BookSearchResult[], owned: OwnedBooks): BookSearchResult[] {
+export function mergeBookResults(catalog: BookSearchResult[], outside: BookSearchResult[], owned: OwnedBooks, listed: ReadonlySet<string>): BookSearchResult[] {
   const works = new Set<string>();
   const isbns = new Set<string>();
   return [...catalog, ...outside].filter((result) => {
     const isbn = canonicalIsbn(result.isbn);
-    if (result.workId ? owned.workIds.has(result.workId) : isbn !== "" && owned.isbns.has(isbn)) return false;
+    if (result.workId ? listed.has(result.workId) : isbn !== "" && owned.isbns.has(isbn)) return false;
     if ((result.workId && works.has(result.workId)) || (isbn && isbns.has(isbn))) return false;
     if (result.workId) works.add(result.workId);
     if (isbn) isbns.add(isbn);
     return true;
   });
+}
+
+export function searchQueryFromParam(param: string | string[] | undefined): string | null {
+  const text = (Array.isArray(param) ? param[0] : param)?.trim();
+  return text ? text : null;
 }
 
 export function recentSearchesKey(userId: string): string {

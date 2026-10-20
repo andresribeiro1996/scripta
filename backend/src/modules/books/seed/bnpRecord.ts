@@ -1,5 +1,6 @@
 import { canonicalIsbn, cleanCatalogText, decodeHtmlEntities } from "@scripta/shared";
 import { isValidIsbn } from "../domain/normalize.js";
+import type { SeriesEntry } from "../domain/series.js";
 
 export interface MarcField {
   tag: string;
@@ -28,6 +29,7 @@ export interface BnpBook {
   udc: string[];
   summary: string | null;
   scanUrl: string | null;
+  collection: SeriesEntry | null;
 }
 
 const element = (name: string) => new RegExp(`<(?:\\w+:)?${name}\\b([^>]*?)(?:/>|>([\\s\\S]*?)</(?:\\w+:)?${name}>)`, "g");
@@ -149,6 +151,14 @@ function translatorOf(record: MarcRecord): string | null {
   return `${translators.slice(0, -1).join(", ")} e ${translators.at(-1)}`;
 }
 
+function collectionOf(record: MarcRecord): SeriesEntry | null {
+  for (const field of record.fields.filter((f) => f.tag === "225")) {
+    const [title = "", volume = ""] = ["a", "v"].map((code) => clean(field.subfields.find(([c]) => c === code)?.[1] ?? ""));
+    if (title) return { name: title, position: volume || null };
+  }
+  return null;
+}
+
 export function mapBnpRecord(record: MarcRecord): BnpBook {
   const title = [values(record, "200", "a").join(" ; "), ...values(record, "200", "h"), ...values(record, "200", "i")].filter(Boolean).join(". ");
   const scan = values(record, "856", "u").map((value) => URL_IN_TEXT.exec(value)?.[0]).find((url) => url?.includes(SCAN) && URL.canParse(url));
@@ -165,6 +175,7 @@ export function mapBnpRecord(record: MarcRecord): BnpBook {
     languages: values(record, "101", "a"),
     udc: values(record, "675", "a"),
     summary: values(record, "330", "a")[0] ?? null,
-    scanUrl: scan === undefined ? null : scan.replace(/^http:/i, "https:")
+    scanUrl: scan === undefined ? null : scan.replace(/^http:/i, "https:"),
+    collection: collectionOf(record)
   };
 }

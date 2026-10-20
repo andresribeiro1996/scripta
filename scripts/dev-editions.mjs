@@ -25,6 +25,7 @@ const WORKS = [
     workKey: "OL262758W",
     author: "J.R.R. Tolkien",
     genres: ["Fantasy", "Classics", "Children's"],
+    series: { name: "Middle-earth", position: null },
     editions: [
       { isbn: "9780261102217", title: "The Hobbit", languages: ["eng"], year: 1999, pages: 310, publisher: "HarperCollins", color: "#8a5a2b", summary: "Bilbo Baggins likes his armchair and his pantry. A wizard and thirteen dwarves talk him into a long walk east, with a dragon at the end of it and a ring he picks up on the way." },
       { isbn: "9788445077528", title: "El hobbit", languages: ["spa"], year: 2012, pages: 320, publisher: "Minotauro", color: "#b3361f", summary: "A Bilbo Bolsón le gustan su sillón y su despensa. Un mago y trece enanos lo convencen de emprender un largo viaje hacia el este, con un dragón al final del camino." },
@@ -36,9 +37,10 @@ const WORKS = [
     workKey: "OL893415W",
     author: "Frank Herbert",
     genres: ["Science Fiction", "Classics"],
+    series: { name: "Dune Chronicles", position: "1" },
     editions: [
       { isbn: "9780441172719", title: "Dune", languages: ["eng"], year: 2005, pages: 535, publisher: "Ace", color: "#c98a2b", summary: "On the desert planet that is the only source of the spice, a young duke's son survives his family's betrayal and finds a place among the people of the sand." },
-      { isbn: "9788576573135", title: "Duna", languages: ["por"], year: 2017, pages: 680, publisher: "Aleph", color: "#7a3b8c", summary: "No planeta deserto que é a única fonte da especiaria, o filho de um duque sobrevive à traição contra a sua família e encontra lugar entre o povo das areias." },
+      { isbn: "9788576573135", title: "Duna", languages: ["por"], year: 2017, pages: 680, publisher: "Aleph", collection: { name: "Clássicos Aleph", position: "12" }, color: "#7a3b8c", summary: "No planeta deserto que é a única fonte da especiaria, o filho de um duque sobrevive à traição contra a sua família e encontra lugar entre o povo das areias." },
       { isbn: "9788497595063", title: "Dune", languages: ["spa"], year: 2011, pages: 592, publisher: "Debolsillo", color: "#2c4f9e", summary: "En el planeta desierto que es la única fuente de la especia, el hijo de un duque sobrevive a la traición contra su familia y encuentra un lugar entre el pueblo de la arena." },
     ],
   },
@@ -66,6 +68,8 @@ const db = openBooksDb();
 const repo = createSqliteBooksRepository(db);
 const blobs = { save: (id, extension, bytes) => createObjectStore().put(`covers/${id}.${extension}`, bytes, "image/webp") };
 
+const at = new Date().toISOString();
+
 try {
   for (const work of WORKS) {
     for (const edition of work.editions) {
@@ -74,15 +78,16 @@ try {
       repo.mergeDetails(book.id, { summary: edition.summary, pages: edition.pages, year: edition.year, publisher: edition.publisher, translator: null }, null);
       if (!book.cover_image_id) {
         const image = await encodeCover(await sharp(coverSvg(edition.title, edition.color)).png().toBuffer());
-        const at = new Date().toISOString();
         const imageId = await storeCoverImage({ repo, blobs }, book.id, "upload", null, image, at);
         repo.setCover(book.id, { imageId, status: "manual", checkedAt: at });
       }
+      if (edition.collection) repo.addBookCollection(book.id, edition.collection, "bnp", at);
       console.log(`[dev-editions] ${outcome} ${work.workKey} ${edition.languages[0]} ${edition.isbn} ${edition.title}`);
     }
     const workId = repo.findBookByKey(`isbn:${work.editions[0].isbn}`)?.work_id;
     if (!workId) throw new Error(`No work for ${work.editions[0].title} (${work.editions[0].isbn}).`);
     repo.fillSourceGenres(workId, work.genres);
+    repo.addWorkSeries(workId, [work.series], "wikidata", at);
   }
 } finally {
   db.close();

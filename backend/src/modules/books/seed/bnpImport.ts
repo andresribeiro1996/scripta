@@ -86,6 +86,7 @@ export async function applyBnpRecord(deps: BnpDeps, plan: BnpPlan): Promise<{ bo
     deps.repo.mergeDetails(row.id, { summary: book.summary, pages: book.pages, year: book.year, publisher: book.publisher, translator: book.translator }, "bnp");
     if (book.originalTitle) deps.repo.fillOriginalTitle(row.id, book.originalTitle);
     deps.repo.setLanguage(row.id, editionLanguage(book.languages, isbn));
+    if (book.collection) deps.repo.addBookCollection(row.id, book.collection, "bnp", at);
     return { id: row.id, created: held === undefined, replaceable: replaceReasonOf(deps.repo, row, book.scanUrl) !== null, expected: row.cover_image_id };
   });
 
@@ -161,7 +162,7 @@ const SAMPLES = 20;
 const OAI_END = /<\/OAI-PMH>\s*$/;
 const LOOKUP_MISS = /<urn-response>\s*<error>Registo inexistente<\/error>\s*<\/urn-response>|<collection\b[^>]*(?:\/>|>\s*<\/collection>)/;
 
-type DateWindow = { from: string; until: string };
+export type DateWindow = { from: string; until: string };
 type Harvested = { records: number; deleted: number; kept: BnpBook[]; skipped: Array<[BnpSkip, string | null]> };
 type Page = { xml: string } | { failure: string; transient: boolean };
 type Outcome = { created: boolean; replace: BnpReplace | null; cover: BnpCoverAction };
@@ -227,7 +228,7 @@ async function harvestOnce(fetchText: BnpHarvestDeps["fetchText"], window: DateW
   return harvested;
 }
 
-async function harvestWindow(fetchText: BnpHarvestDeps["fetchText"], window: DateWindow): Promise<Harvested | string> {
+export async function harvestWindow(fetchText: BnpHarvestDeps["fetchText"], window: DateWindow): Promise<Harvested | string> {
   const first = await harvestOnce(fetchText, window);
   if (typeof first !== "string") return first;
   const second = await harvestOnce(fetchText, window);

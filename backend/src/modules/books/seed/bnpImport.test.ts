@@ -36,6 +36,7 @@ const PORTUGUESE = "9789720044457";
 const ENGLISH = "9780141184272";
 const ALLENDE = mapBnpRecord(readMarcRecords(readFileSync(new URL("./fixtures/bnp/urn-9789720044457.xml", import.meta.url), "utf8"))[0]!);
 const WITHOUT_SCAN: BnpBook = { ...ALLENDE, scanUrl: null };
+const CAPITAL = mapBnpRecord(readMarcRecords(readFileSync(new URL("./fixtures/bnp/oai-page.xml", import.meta.url), "utf8")).find((record) => record.id?.endsWith("/1233005"))!);
 
 const originalFetch = globalThis.fetch;
 afterEach(() => {
@@ -122,6 +123,29 @@ test("a new record carries its subject genres", async () => {
   const { deps } = setup();
   const result = await apply(deps, { ...WITHOUT_SCAN, udc: ["821.134.2-1"] });
   assert.deepEqual(JSON.parse(result.book.genres), ["Poetry"]);
+});
+
+test("a record's collection is stored on its edition as a bnp collection, new or matched, once", async () => {
+  const { db, repo, deps } = setup();
+  assert.deepEqual(CAPITAL.collection, { name: "Obras de Eça de Queirós", position: "2" });
+  const rows = () => db.prepare("SELECT book_id, name, position, source, created_at FROM book_collections").all().map((row) => ({ ...row }));
+
+  const created = await apply(deps, CAPITAL);
+  assert.deepEqual(rows(), [{ book_id: created.book.id, name: "Obras de Eça de Queirós", position: "2", source: "bnp", created_at: AT }]);
+  assert.deepEqual(repo.collectionsOf([created.book.id]).get(created.book.id), { name: "Obras de Eça de Queirós", position: "2" });
+  await apply(deps, CAPITAL);
+  assert.equal(rows().length, 1);
+
+  const existing = seed(repo, PORTUGUESE);
+  await apply(deps, { ...WITHOUT_SCAN, collection: { name: "Antropos", position: null } });
+  assert.deepEqual(repo.collectionsOf([existing.id]).get(existing.id), { name: "Antropos", position: null });
+  assert.equal(rows().length, 2);
+});
+
+test("a record with no collection adds none", async () => {
+  const { db, deps } = setup();
+  await apply(deps, WITHOUT_SCAN);
+  assert.equal((db.prepare("SELECT COUNT(*) AS n FROM book_collections").get() as { n: number }).n, 0);
 });
 
 test("an existing book gets empty fields filled and nothing overwritten", async () => {

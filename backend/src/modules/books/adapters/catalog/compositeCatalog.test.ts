@@ -163,6 +163,26 @@ test("a kept ISBNdb hit takes the work key and cover id of the Open Library repe
   assert.equal(kept!.result.coverUrl, "https://covers.openlibrary.org/b/id/42-M.jpg");
 });
 
+test("a kept ISBNdb hit takes the series subjects of the Open Library repeat it replaces, and keeps its own", async () => {
+  const subjectSeries = [{ name: "Dune Chronicles", position: null }];
+  const olHit = { ...hit("Dune", "9780441013593"), subjectSeries };
+  const bnHit = hit("Dune", "9780441013593", "Frank Herbert", "isbndb");
+  const [kept] = await createCompositeCatalog(fake(null, [olHit]).catalog, fake(null, [bnHit]).catalog).search({ text: "dune" });
+  assert.deepEqual(kept!.subjectSeries, subjectSeries);
+  assert.equal(kept!.source, "isbndb");
+  const own = [{ name: "Own series", position: "1" }];
+  const [stays] = await createCompositeCatalog(fake(null, [olHit]).catalog, fake(null, [{ ...bnHit, subjectSeries: own }]).catalog).search({ text: "dune" });
+  assert.deepEqual(stays!.subjectSeries, own);
+  const [none] = await createCompositeCatalog(fake(null, [hit("Dune", "9780441013593")]).catalog, fake(null, [bnHit]).catalog).search({ text: "dune" });
+  assert.equal("subjectSeries" in none!, false);
+});
+
+test("a merged details record keeps Open Library's series", async () => {
+  const series = { editionSeries: [{ name: "Penguin classics", position: null }], subjectSeries: [{ name: "Dune Chronicles", position: null }] };
+  const merged = await createCompositeCatalog(fake({ ...ol({ summary: null }), ...series }).catalog, fake(isbndb).catalog).fetchDetails(lookup);
+  assert.deepEqual([merged?.editionSeries, merged?.subjectSeries], [series.editionSeries, series.subjectSeries]);
+});
+
 test("a text search survives one source being unavailable, but not both", async () => {
   const hits = [hit("Dune", "9780441013593")];
   assert.equal((await createCompositeCatalog(fake(null, down()).catalog, fake(null, hits).catalog).search({ text: "dune" })).length, 1);

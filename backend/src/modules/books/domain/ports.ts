@@ -1,5 +1,6 @@
 import type { BookMetadata, BookSearchResult, CatalogBookMetadata } from "@scripta/shared";
 import type { SynopsisJudgment, SynopsisKind } from "./synopsis.js";
+import type { CollectionSource, SeriesEntry, SeriesSource } from "./series.js";
 import type { OriginalClaim } from "./translation.js";
 import type { BookRow, CoverImageRow, CoverSourceName, CoverStatus, DataSource, GenreEvidence, GenresSource, JevRejection, JevTask, LossyBook, MergeSource, NewBook, SummarySource, WorkMatchJudgment, WorkPageRows, WorkView } from "./types.js";
 
@@ -119,6 +120,12 @@ export interface BooksRepository {
   listUpgradeWantedIds(after: PageCursor | null, limit: number): IdPage;
   listRetitleWanted(limit: number): LossyBook[];
   clearRetitleWanted(id: string): void;
+  addWorkSeries(workId: string, entries: SeriesEntry[], source: SeriesSource, at: string): number;
+  addBookCollection(bookId: string, entry: SeriesEntry, source: CollectionSource, at: string): boolean;
+  bestSeriesOf(workIds: string[]): Map<string, SeriesEntry>;
+  collectionsOf(bookIds: string[]): Map<string, SeriesEntry>;
+  searchSeriesWorks(tokens: string[], limit: number): string[];
+  searchCollectionBooks(tokens: string[], limit: number): Array<{ bookId: string } & SeriesEntry>;
 }
 
 export interface CoverCandidate {
@@ -140,6 +147,7 @@ export interface CatalogSearchHit {
   result: BookSearchResult;
   olCoverId: number | null;
   workKey?: string | null;
+  subjectSeries?: SeriesEntry[];
   source: DataSource;
 }
 
@@ -149,6 +157,8 @@ export interface CatalogDetails {
   summarySource: DataSource | null;
   workKey?: string | null;
   workSummary?: string | null;
+  editionSeries?: SeriesEntry[];
+  subjectSeries?: SeriesEntry[];
 }
 
 export interface BookCatalog {
@@ -160,6 +170,7 @@ export interface EditionRecord {
   title: string;
   workKey: string | null;
   languages: string[];
+  series?: SeriesEntry[];
 }
 
 export interface EditionRecordSource {

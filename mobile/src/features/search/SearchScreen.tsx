@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { FlatList, StyleSheet, View } from "react-native";
 import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { Stack } from "expo-router";
-import { looksLikeIsbnQuery, matchesSearch, type BookSearchResult } from "@scripta/shared";
+import { looksLikeIsbnQuery, matchesSearch, withWorkIds, workIdOf, type BookSearchResult } from "@scripta/shared";
 import { ErrorState, IconButton, Input, Screen, Segmented, Skeleton, Toast, spacing } from "../../ui";
 import { AddBookSheet } from "../community/AddBookSheet";
 import { fetchDiscover, searchPeople } from "../community/api";
@@ -13,10 +13,10 @@ import { useDebouncedValue } from "../library/lib/debounce";
 import { receiveScans } from "./scanBridge";
 import { SearchIdle } from "./SearchIdle";
 import { SearchResultRow, type ResultActions } from "./SearchResultRow";
-import { SEARCH_SCOPES, isNetworkQuery, mergeBookResults, ownedBooks, searchRows, type ResultSection, type SearchScope } from "./searchModel";
+import { SEARCH_SCOPES, isNetworkQuery, mergeBookResults, ownedBooks, searchQueryFromParam, searchRows, type ResultSection, type SearchScope } from "./searchModel";
 import { useRecentSearches } from "./useRecentSearches";
 
-export function SearchScreen() {
+export function SearchScreen({ q, t }: { q?: string | string[]; t?: string | string[] }) {
   const [query, setQuery] = useState("");
   const [scope, setScope] = useState<SearchScope>("all");
   const [submitted, setSubmitted] = useState<string | null>(null);
@@ -52,13 +52,15 @@ export function SearchScreen() {
   });
 
   const books = library.data?.data.books ?? [];
-  const bookRows = mergeBookResults(catalog.data ?? [], external.data ?? [], ownedBooks(books, library.data?.works));
+  const libraryRows = books.filter((book) => matchesSearch(book, trimmed));
+  const listedWorks = new Set(withWorkIds(libraryRows, library.data?.works).flatMap((book) => workIdOf(book) ?? []));
+  const bookRows = mergeBookResults(catalog.data ?? [], external.data ?? [], ownedBooks(books), listedWorks);
   const gameRows = games.data?.pages.flatMap((page) => page.items) ?? [];
   const rows = searchRows({
     scope,
     query: needle,
     submitted: submitted !== null,
-    library: { rows: books.filter((book) => matchesSearch(book, trimmed)), loading: library.isLoading, failed: library.isError && !library.data },
+    library: { rows: libraryRows, loading: library.isLoading, failed: library.isError && !library.data },
     books: { rows: bookRows, loading: catalog.isLoading && bookRows.length === 0, failed: catalog.isError && !catalog.data },
     people: { rows: people.data ?? [], loading: people.isLoading, failed: people.isError && !people.data },
     games: { rows: gameRows, loading: games.isLoading, failed: games.isError && gameRows.length === 0 },
@@ -73,12 +75,20 @@ export function SearchScreen() {
     recent.record(next);
   }
 
-  const submitRef = useRef(submit);
-  submitRef.current = submit;
-  useEffect(() => receiveScans((isbn) => {
+  function searchBooks(text: string) {
     setScope((current) => (current === "people" || current === "games" ? "books" : current));
-    submitRef.current(isbn);
-  }), []);
+    submit(text);
+  }
+
+  const searchBooksRef = useRef(searchBooks);
+  searchBooksRef.current = searchBooks;
+  useEffect(() => receiveScans((isbn) => searchBooksRef.current(isbn)), []);
+
+  const incoming = searchQueryFromParam(q);
+  const nonce = searchQueryFromParam(t);
+  useEffect(() => {
+    if (incoming) searchBooksRef.current(incoming);
+  }, [incoming, nonce]);
 
   const retries: Record<ResultSection, () => unknown> = { library: library.refetch, books: catalog.refetch, people: people.refetch, games: games.refetch };
   const actions: ResultActions = {

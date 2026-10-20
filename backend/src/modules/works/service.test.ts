@@ -220,3 +220,16 @@ test("a reader whose own edition has no synopsis gets one in their edition's lan
   assert.equal(createWorksService(deps({ getWorkPage: work([original, mine]), copyOfWork: () => own })).getPage("w", "viewer")!.work.summary, null);
   assert.equal(createWorksService(deps({ getWorkPage: work([original, mine]) })).getPage("w", null)!.work.summary, english);
 });
+
+test("the work page carries the series as a series and each edition's collection as a collection, null when there is none", () => {
+  const withSeries = (): ReturnType<WorksDeps["getWorkPage"]> => ({
+    id: "w", title: "Dune", author: "Frank Herbert", summary: null, aliasIds: ["w"], series: { name: "Dune Chronicles", position: "1" },
+    editions: [edition("e1", null, { collection: { name: "Bang!", position: "248" } }), edition("e2", null, {})]
+  });
+  const work = createWorksService(deps({ getWorkPage: withSeries })).getPage("w", null)!.work;
+  assert.deepEqual(work.series, { name: "Dune Chronicles", kind: "series", position: "1" });
+  assert.deepEqual(work.editions.map((e) => e.collection), [{ name: "Bang!", kind: "collection", position: "248" }, null]);
+  const plain = createWorksService(deps({ getWorkPage: pageOf([edition("e1", null, {})]) })).getPage("w", null)!.work;
+  assert.equal(plain.series, null);
+  assert.deepEqual(plain.editions.map((e) => e.collection), [null]);
+});

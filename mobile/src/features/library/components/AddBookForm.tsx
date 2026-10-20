@@ -3,7 +3,7 @@ import { Keyboard, Pressable, ScrollView, StyleSheet, View } from "react-native"
 import { useFocusEffect } from "expo-router";
 import { Text } from "../../../ui/Text";
 import { Image } from "expo-image";
-import { buildManualBook, normalizeIsbn, searchInsideOutside, searchResultByline } from "@scripta/shared";
+import { buildManualBook, normalizeIsbn, searchInsideOutside, searchResultByline, seriesLabel } from "@scripta/shared";
 import { Button, Input } from "../../../ui/components";
 import { spacing, typography, useTheme } from "../../../ui/theme";
 import { bookSearchApi, type BookSearchResult } from "../api/search";
@@ -189,6 +189,11 @@ export function AddBookForm({
                   <Text style={[typography.body, { color: colors.text, fontWeight: "600" }]} numberOfLines={1}>
                     {r.title}
                   </Text>
+                  {r.series && (
+                    <Text style={[typography.caption, { color: colors.textDim }]} numberOfLines={1}>
+                      {seriesLabel(r.series)}
+                    </Text>
+                  )}
                   <Text style={[typography.caption, { color: colors.textDim }]} numberOfLines={1}>
                     {searchResultByline(r)}
                   </Text>

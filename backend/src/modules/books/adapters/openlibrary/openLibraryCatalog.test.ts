@@ -163,3 +163,49 @@ test("a rate-limited edition record lookup is unavailable with its retry time", 
   globalThis.fetch = (async () => new Response("slow down", { status: 429, headers: { "retry-after": "60" } })) as typeof fetch;
   await assert.rejects(catalog.fetchEditionRecord("9789725681367"), (error: unknown) => error instanceof SourceUnavailableError && error.status === 429 && typeof error.retryAt === "number");
 });
+
+test("an edition record gives the series strings Open Library holds for it, and omits the field when there are none", () => {
+  const parsed = parseEditionRecord({ title: "Memories of Ice", series: ["Malazan Book of the Fallen (3)", " Penguin classics ", "--", 7, null] });
+  assert.deepEqual(parsed.series, [{ name: "Malazan Book of the Fallen", position: "3" }, { name: "Penguin classics", position: null }]);
+  for (const record of [{ title: "x" }, { title: "x", series: [] }, { title: "x", series: ["--", 7] }, { title: "x", series: "Penguin classics" }]) assert.equal("series" in parseEditionRecord(record), false, JSON.stringify(record));
+});
+
+test("an edition record reads the series strings Open Library really writes", () => {
+  const parsed = parseEditionRecord({ series: ["Harry Potter, #1", "Harry Potter, 1", "Dune chronicles -- bk. 1", "The Witcher: Book 0.5"] });
+  assert.deepEqual(parsed.series, [
+    { name: "Harry Potter", position: "1" },
+    { name: "Harry Potter", position: "1" },
+    { name: "Dune chronicles", position: "1" },
+    { name: "The Witcher", position: "0.5" }
+  ]);
+});
+
+test("details carry the edition's series strings and the work's series subjects", async () => {
+  const catalog = createOpenLibraryCatalog(direct);
+  respond([{ docs: [doc] }, { subjects: ["Fantasy", "series:Malazan_Book_of_the_Fallen"] }, { series: ["Penguin classics", "Malazan Book of the Fallen (3)"] }]);
+  const details = await catalog.fetchDetails({ isbn: "9780553348477", title: "", author: "" });
+  assert.deepEqual(details?.editionSeries, [{ name: "Penguin classics", position: null }, { name: "Malazan Book of the Fallen", position: "3" }]);
+  assert.deepEqual(details?.subjectSeries, [{ name: "Malazan Book of the Fallen", position: null }]);
+});
+
+test("details read series subjects from the search doc when the work lists none, and omit empty series", async () => {
+  const catalog = createOpenLibraryCatalog(direct);
+  respond([{ docs: [{ ...doc, subject: ["series:Dune_Chronicles"] }] }, {}, null]);
+  const fromDoc = await catalog.fetchDetails({ isbn: "9780553348477", title: "", author: "" });
+  assert.deepEqual(fromDoc?.subjectSeries, [{ name: "Dune Chronicles", position: null }]);
+  assert.equal("editionSeries" in fromDoc!, false);
+  respond([{ docs: [doc] }, { subjects: ["Fantasy"] }, { series: [] }]);
+  const none = await catalog.fetchDetails({ isbn: "9780553348477", title: "", author: "" });
+  assert.equal("subjectSeries" in none!, false);
+  assert.equal("editionSeries" in none!, false);
+});
+
+test("search carries the series subjects of each doc", async () => {
+  respond([{ docs: [
+    { key: "/works/OL1W", title: "Dune", author_name: ["Frank Herbert"], subject: ["Fantasy", "series:Dune_Chronicles"] },
+    { key: "/works/OL2W", title: "Stoner", author_name: ["John Williams"], subject: ["Fiction"] }
+  ] }]);
+  const hits = await createOpenLibraryCatalog(direct).search({ text: "dune" });
+  assert.deepEqual(hits[0]!.subjectSeries, [{ name: "Dune Chronicles", position: null }]);
+  assert.equal("subjectSeries" in hits[1]!, false);
+});

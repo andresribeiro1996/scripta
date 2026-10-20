@@ -149,3 +149,36 @@ CREATE TABLE IF NOT EXISTS work_match_judgments (
   confidence   REAL,
   asked_at     TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS work_series (
+  work_id    TEXT NOT NULL,
+  name       TEXT NOT NULL,
+  name_key   TEXT NOT NULL,
+  position   TEXT,
+  source     TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (work_id, name_key, source)
+);
+
+CREATE TABLE IF NOT EXISTS book_collections (
+  book_id    TEXT NOT NULL,
+  name       TEXT NOT NULL,
+  name_key   TEXT NOT NULL,
+  position   TEXT,
+  source     TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (book_id, name_key, source)
+);
+
+CREATE VIRTUAL TABLE IF NOT EXISTS series_fts USING fts5(
+  work_id UNINDEXED,
+  name,
+  author,
+  tokenize = 'unicode61 remove_diacritics 2'
+);
+
+CREATE VIRTUAL TABLE IF NOT EXISTS collections_fts USING fts5(
+  book_id UNINDEXED,
+  name,
+  tokenize = 'unicode61 remove_diacritics 2'
+);

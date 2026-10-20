@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { isObjectKey } from "../../storage/objectStore.js";
-import { canonicalIsbn, looksLikeIsbnQuery, type BookGenre, type BookMetadata, type BookSearchResult } from "@scripta/shared";
+import { canonicalIsbn, looksLikeIsbnQuery, type BookGenre, type BookMetadata, type BookSearchResult, type BookSeries } from "@scripta/shared";
 import { findBestCover, type CoverSources, type FetchCoverImage } from "./coverResolver.js";
 import { MIN_GOOD_WIDTH } from "./domain/constants.js";
 import { BookNotFoundError, FileTooLargeError, InvalidImageError, SourcePausedError, SourceUnavailableError, WorkMergeError } from "./domain/errors.js";
@@ -12,6 +12,7 @@ import { firstEditionPerWork, workIdsOf } from "./domain/workSearch.js";
 import { editionLanguage, findByIdentity, isPortugalIsbn, isPortugueseIsbn, isValidIsbn, lookupIdentity, SEARCH_LIMIT, searchTokens, WORK_SCAN_LIMIT, WORK_SEARCH_LIMIT, type BookIdentity, type BookLookup } from "./domain/normalize.js";
 import { summaryMatchesLanguage } from "./adapters/catalog/languageFilter.js";
 import type { BookCatalog, BooksRepository, CatalogSearchHit, CoverBlobReader, CoverBlobStore, CoverSource, EditionRecordSource, PageCursor } from "./domain/ports.js";
+import type { SeriesEntry } from "./domain/series.js";
 import type { BookRow, CoverSourceName, CoverStatus, WorkView } from "./domain/types.js";
 import type { CoverPriority } from "./worker.js";
 
@@ -27,6 +28,9 @@ export const COVER_ENQUEUE_BATCH = 500;
 export const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
 
 export type CoverFileSize = "file" | "thumb";
+
+type Hit = { row: BookRow; workId: string | null; matched?: SeriesEntry };
+type Found = { result: BookSearchResult; bookId: string | null; matched?: SeriesEntry };
 
 export interface ResolvedCover {
   url: string | null;
@@ -165,9 +169,73 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
     };
   }
 
-  function withWorkIds(rows: BookRow[]): BookSearchResult[] {
+  function withSeries(found: Found[]): BookSearchResult[] {
+    const workIds = [...new Set(found.flatMap(({ result }) => (result.workId ? [result.workId] : [])))];
+    const stories = deps.repo.bestSeriesOf(workIds);
+    const collections = deps.repo.collectionsOf(found.flatMap(({ bookId, matched }) => (bookId && !matched ? [bookId] : [])));
+    return found.map(({ result, bookId, matched }) => {
+      const story = result.workId ? stories.get(result.workId) : undefined;
+      const collection = matched ?? (bookId ? collections.get(bookId) : undefined);
+      const asCollection: BookSeries | null = collection ? { ...collection, kind: "collection" } : null;
+      const series = matched ? asCollection : story ? { ...story, kind: "series" as const } : asCollection;
+      return series ? { ...result, series } : result;
+    });
+  }
+
+  function canonicalHits(rows: BookRow[]): Hit[] {
     const canonical = deps.repo.canonicalWorkIds(workIdsOf(rows));
-    return rows.map((row) => toSearchResult(row, row.work_id ? canonical.get(row.work_id) ?? row.work_id : null));
+    return rows.map((row) => ({ row, workId: row.work_id ? canonical.get(row.work_id) ?? row.work_id : null }));
+  }
+
+  function resultsOf(hits: Hit[]): BookSearchResult[] {
+    return withSeries(hits.map(({ row, workId, matched }) => ({ result: toSearchResult(row, workId), bookId: row.id, matched })));
+  }
+
+  function withWorkIds(rows: BookRow[]): BookSearchResult[] {
+    return resultsOf(canonicalHits(rows));
+  }
+
+  function representativeEdition(workId: string): BookRow | undefined {
+    const edition = deps.repo.editionsOf([workId]).find(({ id }) => deps.repo.isSearchable(id));
+    return edition ? deps.repo.getBook(edition.id) : undefined;
+  }
+
+  function seriesHits(tokens: string[], present: Hit[], room: number): Hit[] {
+    const known = new Set(present.flatMap(({ workId }) => (workId ? [workId] : [])));
+    const hits: Hit[] = [];
+    for (const workId of deps.repo.searchSeriesWorks(tokens, WORK_SCAN_LIMIT)) {
+      if (hits.length === room) break;
+      const row = known.has(workId) ? undefined : representativeEdition(workId);
+      if (row) hits.push({ row, workId });
+    }
+    return hits;
+  }
+
+  function collectionHits(tokens: string[], present: Hit[], byWork: boolean, limit: number): Hit[] {
+    const books = new Set(present.map(({ row }) => row.id));
+    const works = new Set(present.flatMap(({ workId }) => (workId ? [workId] : [])));
+    const matches = deps.repo.searchCollectionBooks(tokens, limit).filter(({ bookId }) => !books.has(bookId));
+    const rows = matches.flatMap(({ bookId }) => {
+      const row = deps.repo.getBook(bookId);
+      return row ? [row] : [];
+    });
+    const entries = new Map(matches.map(({ bookId, name, position }) => [bookId, { name, position }]));
+    return canonicalHits(rows).flatMap((hit) => {
+      if (byWork && hit.workId !== null) {
+        if (works.has(hit.workId)) return [];
+        works.add(hit.workId);
+      }
+      return [{ ...hit, matched: entries.get(hit.row.id) }];
+    });
+  }
+
+  function searchCatalog(tokens: string[], byWork: boolean): BookSearchResult[] {
+    const cap = byWork ? WORK_SEARCH_LIMIT : SEARCH_LIMIT;
+    const rows = deps.repo.searchBooks(tokens, byWork ? WORK_SCAN_LIMIT : SEARCH_LIMIT);
+    const hits = byWork ? firstEditionPerWork(rows, deps.repo.canonicalWorkIds(workIdsOf(rows))).slice(0, cap) : canonicalHits(rows);
+    if (hits.length < cap) hits.push(...seriesHits(tokens, hits, cap - hits.length));
+    if (hits.length < cap) hits.push(...collectionHits(tokens, hits, byWork, byWork ? WORK_SCAN_LIMIT : cap).slice(0, cap - hits.length));
+    return resultsOf(hits);
   }
 
   async function nationalBibliographyBook(query: string, isbn: string): Promise<BookRow | null> {
@@ -184,7 +252,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
   }
 
   function saveHits(hits: CatalogSearchHit[]): BookSearchResult[] {
-    const saved = hits.map(({ result, olCoverId, workKey, source }) => {
+    const saved = hits.map(({ result, olCoverId, workKey, subjectSeries, source }) => {
       const author = result.authors.join(", ");
       const identity = lookupIdentity({ isbn: result.isbn, title: result.title, author });
       if (!identity) return { result, book: null };
@@ -196,10 +264,14 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       fillMissingIdentity(deps.repo, book, identity.title, identity.author);
       deps.repo.setWorkKey(book.id, workKey);
       deps.repo.makeSearchable(book.id);
+      storeSeries(book.id, { subjectSeries }, now().toISOString());
       return { result: book.cover_image_id ? { ...result, coverUrl: deps.publicUrlFor(book.cover_image_id, "thumb") } : result, book: deps.repo.getBook(book.id) ?? book };
     });
     const canonical = deps.repo.canonicalWorkIds(workIdsOf(saved.flatMap(({ book }) => (book ? [book] : []))));
-    return saved.map(({ result, book }) => (book?.work_id ? { ...result, workId: canonical.get(book.work_id) ?? book.work_id } : result));
+    return withSeries(saved.map(({ result, book }) => ({
+      result: book?.work_id ? { ...result, workId: canonical.get(book.work_id) ?? book.work_id } : result,
+      bookId: book?.id ?? null
+    })));
   }
 
   function existingEdition(lookup: BookLookup): BookRow {
@@ -216,6 +288,17 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
     return view;
   }
 
+  function storeSeries(bookId: string, found: { editionSeries?: SeriesEntry[]; subjectSeries?: SeriesEntry[] }, at: string) {
+    const editions = found.editionSeries ?? [];
+    const subjects = found.subjectSeries ?? [];
+    if (editions.length === 0 && subjects.length === 0) return;
+    deps.repo.transaction(() => {
+      for (const entry of editions) deps.repo.addBookCollection(bookId, entry, "ol-edition", at);
+      const workId = subjects.length > 0 ? deps.repo.getBook(bookId)?.work_id : null;
+      if (workId) deps.repo.addWorkSeries(workId, subjects, "ol-subject", at);
+    });
+  }
+
   async function lookupDetails(book: BookRow, catalog: BookCatalog) {
     const details = await catalog.fetchDetails({ isbn: book.isbn, title: book.title, author: book.author, language: book.language ?? (isPortugueseIsbn(book.isbn) ? "pt" : null) });
     const at = now().toISOString();
@@ -223,11 +306,13 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       deps.repo.saveDetails(book.id, details.metadata, details.sources, details.summarySource, at);
       deps.repo.setWorkKey(book.id, details.workKey);
       if (details.workSummary) deps.repo.setWorkSummary(book.id, details.workSummary);
+      storeSeries(book.id, details, at);
       return;
     }
     if (details) {
       deps.repo.mergeDetails(book.id, { ...details.metadata, summary: null }, null);
       deps.repo.setWorkKey(book.id, details.workKey);
+      storeSeries(book.id, details, at);
     }
     deps.repo.markDetailsMissing(book.id, at);
   }
@@ -358,6 +443,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
             const language = editionLanguage(record.languages, book.isbn);
             if (language) deps.repo.replaceLanguage(id, language);
           }
+          if (record) storeSeries(id, { editionSeries: record.series }, now().toISOString());
         } catch (error) {
           if (!(error instanceof SourceUnavailableError)) throw error;
           if (error.retryAt !== undefined) return error.retryAt;
@@ -387,11 +473,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       }
       const tokens = searchTokens(trimmed);
       if (tokens.length === 0) return [];
-      if (!options.byWork) return withWorkIds(deps.repo.searchBooks(tokens, SEARCH_LIMIT));
-      const rows = deps.repo.searchBooks(tokens, WORK_SCAN_LIMIT);
-      return firstEditionPerWork(rows, deps.repo.canonicalWorkIds(workIdsOf(rows)))
-        .slice(0, WORK_SEARCH_LIMIT)
-        .map(({ row, workId }) => toSearchResult(row, workId));
+      return searchCatalog(tokens, options.byWork === true);
     },
 
     async searchExternal(query) {

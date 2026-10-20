@@ -198,3 +198,27 @@ test("getWorkPage leaves out hidden summaries and keeps the rest", () => {
   judge("Spice must flow.", 0.1);
   assert.equal(getWorkPageWith(repo, (id) => id, book.work_id!)!.summary, null);
 });
+
+test("a work page carries the work's best series and each edition's collection, also through a merged-away id", () => {
+  const { repo } = freshRepo();
+  const at = "2026-10-20T00:00:00.000Z";
+  const first = repo.createBook({ title: "Gardens of the Moon", author: "Steven Erikson", isbn: "9780765348807", workKey: "OL1W" }, ["isbn:9780765348807"], at);
+  repo.createBook({ title: "Gardens of the Moon", author: "Steven Erikson", isbn: "9780765348999", workKey: "OL1W" }, ["isbn:9780765348999"], at);
+  const alias = repo.createBook({ title: "Jardins da Lua", author: "Steven Erikson", isbn: "9789720000401" }, ["isbn:9789720000401"], at);
+  repo.addWorkSeries(first.work_id!, [{ name: "Malazan Book of the Fallen", position: "1" }], "wikidata", at);
+  repo.addBookCollection(first.id, { name: "Bang!", position: "248" }, "bnp", at);
+  repo.addWorkSeries(alias.work_id!, [{ name: "Malazan Book of the Fallen", position: "1" }], "ol-subject", at);
+  const page = getWorkPageWith(repo, () => "x", first.work_id!)!;
+  assert.deepEqual(page.series, { name: "Malazan Book of the Fallen", position: "1" });
+  assert.deepEqual(page.editions.map((e) => e.collection), [{ name: "Bang!", position: "248" }, null]);
+  repo.mergeTranslation(alias.work_id!, first.work_id!, "manual", null, at);
+  assert.deepEqual(getWorkPageWith(repo, () => "x", alias.work_id!)!.series, { name: "Malazan Book of the Fallen", position: "1" });
+});
+
+test("a work page without a series or a collection answers null for both", () => {
+  const { repo } = freshRepo();
+  const [id] = resolveWorksWith(repo, [{ isbn: "9780441013593", title: "Dune", author: "Frank Herbert" }]);
+  const page = getWorkPageWith(repo, () => "x", id!)!;
+  assert.equal(page.series, null);
+  assert.deepEqual(page.editions.map((e) => e.collection), [null]);
+});
