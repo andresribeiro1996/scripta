@@ -357,6 +357,13 @@ Filling a book's empty title or author (`fillIdentity`, e.g. from the publisher 
 
 The report counts `originalTitles`, `originals`, `noCandidates`, `codeMerges`, `codeBlocked` (blocked by an arena), Jev's `jevMerges`, `jevBlocked`, `possible` and `none`, then `strikes`, `stoppedBy` (`done`, `budget`, `outage`, `key` or `no-key`), `requests` used and `estimatedCostUsd`.
 
+Joins the code step made before those guards existed can be listed and undone with `scripts/undo-series-merges.mjs`, which needs `COVERS_DB_PATH`. `--list` opens the database read-only and prints, for every work that received a `code` join of a series-named original or a volume title, the work's own editions and each work joined into it from any source (`fromWork`, `mergeId`, `source`, its editions, and `why` it matches: `series-like`, `volume` or `null`). A reviewer decides which joins were wrong and writes their `fromWork` ids as `{ "undo": ["<fromWork>", …] }`. `--undo <file>` then undoes only the `code` and `jev` joins in that file, never a `manual` one, newest first since a chain has to be undone from its latest join, and records a code answer of "none" for each restored work so no later run joins it again; a join that can no longer be undone is reported under `failures`. A deploy kills a running job, so hold merges to main.
+
+```bash
+npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && setsid node scripts/undo-series-merges.mjs --list > /data/series-collapses.json 2> /data/series-collapses.log < /dev/null & sleep 3; echo started'
+npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && setsid node scripts/undo-series-merges.mjs --undo /data/series-undo.json > /data/series-undone.json 2> /data/series-undone.log < /dev/null & sleep 3; echo started'
+```
+
 #### Calibrating Jev
 
 Claude sets and checks the thresholds Jev's answers are read against; it never judges the backlog itself. Calibrate once on production before the first backlog run of each task, and again whenever the Jev model version or a question's wording changes.

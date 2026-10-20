@@ -2309,6 +2309,37 @@ test("undo refuses once the target itself merged elsewhere", () => {
   assert.throws(() => repo.undoMerge(pt.work_id!, AT), WorkMergeError);
 });
 
+test("active merges list one source's merges that are not undone, newest first, with the books they moved", () => {
+  const { repo } = freshRepo();
+  const target = repo.createBook({ title: "Walk", author: "X", isbn: "9780000000401", workKey: "OL940W" }, ["isbn:9780000000401"], NOW);
+  const [first, second, third, judged] = ["9789720000402", "9789720000403", "9789720000404", "9789720000405"].map((isbn) => repo.createBook({ title: `Passeio ${isbn}`, author: "X", isbn }, [`isbn:${isbn}`], NOW));
+  for (const edition of [first!, second!, third!]) repo.mergeTranslation(edition.work_id!, target.work_id!, "code", null, AT);
+  repo.mergeTranslation(judged!.work_id!, target.work_id!, "jev", 0.95, AT);
+  repo.undoMerge(second!.work_id!, "2026-10-16T00:00:00.000Z");
+  assert.deepEqual(repo.activeMerges("code"), [
+    { id: 3, fromWork: third!.work_id, intoWork: target.work_id, movedBookIds: [third!.id], mergedAt: AT },
+    { id: 1, fromWork: first!.work_id, intoWork: target.work_id, movedBookIds: [first!.id], mergedAt: AT }
+  ]);
+  assert.deepEqual(repo.activeMerges("jev").map((merge) => merge.fromWork), [judged!.work_id]);
+  assert.deepEqual(repo.activeMerges("manual"), []);
+});
+
+test("editions of works carry the original title from the column or the summary label, and only for the works asked", () => {
+  const { db, repo } = freshRepo();
+  const column = repo.createBook({ title: "Passeio ao Farol", author: "Virginia Woolf", isbn: "9789720000411" }, ["isbn:9789720000411"], NOW);
+  repo.setLanguage(column.id, "pt-PT");
+  repo.fillOriginalTitle(column.id, "To the Lighthouse");
+  const labelled = repo.createBook({ title: "O Passeio", author: "Robert Walser", isbn: "9789720000412" }, ["isbn:9789720000412"], NOW);
+  db.prepare("UPDATE books SET work_id = ?, summary = ? WHERE id = ?").run(column.work_id, "Um passeio.\n\nTítulo original: Der Spaziergang", labelled.id);
+  const bare = repo.createBook({ title: "Sem nada", author: "Y", isbn: "9789720000413" }, ["isbn:9789720000413"], NOW);
+  repo.createBook({ title: "Outro", author: "Z", isbn: "9789720000414" }, ["isbn:9789720000414"], NOW);
+  assert.deepEqual(repo.editionsOf([column.work_id!, bare.work_id!]), [
+    { id: column.id, workId: column.work_id, title: "Passeio ao Farol", author: "Virginia Woolf", language: "pt-PT", isbn: "9789720000411", originalTitle: "To the Lighthouse" },
+    { id: labelled.id, workId: column.work_id, title: "O Passeio", author: "Robert Walser", language: null, isbn: "9789720000412", originalTitle: "Der Spaziergang" },
+    { id: bare.id, workId: bare.work_id, title: "Sem nada", author: "Y", language: null, isbn: "9789720000413", originalTitle: null }
+  ]);
+});
+
 test("an undone translation merge stays undone through the next title-key grouping, and takes back a later keyless copy", () => {
   const { db, repo } = freshRepo();
   const pt = repo.createBook({ title: "Poemas", author: "John Keats", isbn: "9789720000351" }, ["isbn:9789720000351"], NOW);
