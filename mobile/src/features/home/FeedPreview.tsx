@@ -1,10 +1,16 @@
 import { StyleSheet, View, useWindowDimensions } from "react-native";
 import { Image } from "expo-image";
+import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { contrastRatio, type DigestItem } from "@scripta/shared";
 import { Text } from "../../ui/Text";
 import { Icon, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { BookCover } from "../arena/BookCover";
 import { CoverFan, SLOT_HEIGHT, SLOT_WIDTH } from "../community/CoverFan";
+import { fetchProfile } from "../community/api";
+import { MuralThumbnail } from "../murals/MuralCanvas";
+import { muralPreviewOf } from "../public/adapters";
+import { themes } from "@scripta/shared/themes";
 import { feedRowModel } from "./feedRowModel";
 
 export function FeedPreview({ item }: { item: DigestItem }) {
@@ -36,8 +42,12 @@ function MuralPreview({ item }: { item: Extract<DigestItem, { kind: "mural" }> }
   const { colors } = useTheme();
   const { width } = useWindowDimensions();
   const size = Math.min(240, width - spacing.lg * 2);
-  return <View style={[styles.mural, { width: size, height: size, backgroundColor: colors.surface }]}>
-    {item.mural.coverImageUrl ? <Image source={item.mural.coverImageUrl} style={StyleSheet.absoluteFill} contentFit="cover" /> : <Icon name="murals" size={48} color={colors.accent} />}
+  const profile = useQuery({ queryKey: ["community", "profile", item.actor.username], queryFn: () => fetchProfile(item.actor.username), enabled: !item.mural.coverImageUrl, retry: false });
+  const payload = profile.data?.mural?.mural.id === item.mural.id ? profile.data.mural : null;
+  const preview = useMemo(() => (payload?.mural.blocks.length ? muralPreviewOf(payload) : null), [payload]);
+  const background = payload ? themes[payload.mural.theme].colors.background : colors.surface;
+  return <View style={[styles.mural, { width: size, height: size, backgroundColor: background }]}>
+    {item.mural.coverImageUrl ? <Image source={item.mural.coverImageUrl} style={StyleSheet.absoluteFill} contentFit="cover" /> : preview && payload ? <MuralThumbnail mural={preview.mural} canvasWidth={width - spacing.sm * 2} books={preview.books} images={preview.images} tierlists={preview.tierlists} profile={profile.data?.profile.user} shelfThemeOverride={payload.library.shelfTheme} readerCardOverride={payload.library.readerCard ?? undefined} statsOverride={payload.library.stats} /> : <Icon name="murals" size={48} color={colors.accent} />}
   </View>;
 }
 

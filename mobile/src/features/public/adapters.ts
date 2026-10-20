@@ -1,4 +1,6 @@
-import { bookKey, type ResolvedTierlist } from "@scripta/shared";
+import { bookKey, ensureBookBlockHeights, type Mural, type ResolvedTierlist } from "@scripta/shared";
+import type { CommunityProfileView } from "@scripta/shared/community";
+import type { GalleryImage } from "../gallery/api";
 import type { Tierlist } from "../tierlists/api";
 import type { PublicBookData, PublicHighlight } from "./api";
 
@@ -22,4 +24,10 @@ export function reconstructBooks(books: PublicBookData[], reading: PublicBookDat
 
 export function reconstructTierlists(tierlists: Record<string, ResolvedTierlist>): Tierlist[] {
   return Object.entries(tierlists).map(([id, tierlist]) => ({ id, name: tierlist.name, data: { tiers: tierlist.tiers, pool: tierlist.pool }, createdAt: "", updatedAt: "", voteCode: null, voteAccess: "anonymous", votingOpen: false, sourceTierlistId: null, promotedAt: null, originCreatorId: "", ranksWorstFirst: false }));
+}
+
+export function muralPreviewOf(payload: NonNullable<CommunityProfileView["mural"]>) {
+  const mural: Mural = { ...payload.mural, blocks: ensureBookBlockHeights(payload.mural.blocks), coverImageUrl: payload.mural.coverImageUrl ?? undefined, createdAt: "", updatedAt: "", shareToken: null, shareUrl: null, folderId: null };
+  const images: GalleryImage[] = Object.entries(payload.imageUrls).flatMap(([id, url]) => url ? [{ id, url, filename: "", mimeType: "", width: 0, height: 0, byteSize: 0, createdAt: "" }] : []);
+  return { mural, images, books: reconstructBooks(payload.library.books, payload.library.currentlyReading, payload.library.highlights), tierlists: reconstructTierlists(payload.tierlists) };
 }
