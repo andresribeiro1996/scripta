@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { bookKey, workIdOf } from "@scripta/shared";
-import { reconstructBooks, reconstructTierlists } from "./adapters.js";
+import { muralPreviewOf, reconstructBooks, reconstructTierlists } from "./adapters.js";
 
 const publicBook = { key: "isbn:9780000000001", workId: "w1", title: "A Book", author: "An Author", isbn: "9780000000001", imageId: null, coverUrl: "https://example.test/cover", readStatus: 1 };
 
@@ -22,4 +22,19 @@ test("a public book with an empty author keeps the server's key for highlights a
   assert.equal(bookKey(books[0]!), "ta:orlando|");
   assert.equal(workIdOf(books[0]!), undefined);
   assert.equal((books[0]!.highlights as unknown[]).length, 1);
+});
+
+test("muralPreviewOf turns a public payload into thumbnail inputs", () => {
+  const payload = {
+    mural: { id: "m1", name: "Mural", theme: "light", blocks: [], coverImageUrl: null },
+    imageUrls: { i1: "https://example.test/i1", i2: null },
+    library: { books: [publicBook], currentlyReading: [], highlights: [] },
+    tierlists: {}
+  } as unknown as Parameters<typeof muralPreviewOf>[0];
+  const preview = muralPreviewOf(payload);
+  assert.equal(preview.mural.id, "m1");
+  assert.equal(preview.mural.coverImageUrl, undefined);
+  assert.deepEqual(preview.images.map((image) => image.id), ["i1"]);
+  assert.equal(preview.books.length, 1);
+  assert.deepEqual(preview.tierlists, []);
 });
