@@ -1,9 +1,10 @@
+import type { BookSeries } from "../library/bookSearch.js";
 import type { ReaderProfile } from "../murals/murals.js";
 import type { IdentityKey } from "../readerCards/index.js";
 
 export type WorkReadStatus = 0 | 1 | 2;
 
-export type WorkEdition = { bookId: string; title: string; language: string | null; year: number | null; isbn: string | null; coverUrl: string | null; coverColor: string | null; pages: number | null; mine: boolean };
+export type WorkEdition = { bookId: string; title: string; language: string | null; year: number | null; isbn: string | null; coverUrl: string | null; coverColor: string | null; pages: number | null; mine: boolean; collection?: BookSeries | null };
 
 export type WorkMine = { bookKey: string; readStatus: WorkReadStatus; rating: number | null; highlightCount: number };
 
@@ -14,7 +15,7 @@ export type WorkGameRef = { id: string; name: string; owner: ReaderProfile | "ap
 export type WorkRating = { value: number; count: number };
 
 export type WorkPage = {
-  work: { id: string; title: string; author: string; summary: string | null; coverUrl: string | null; coverColor: string | null; editions: WorkEdition[]; genres: string[]; possibleGenres?: string[]; rating: WorkRating | null; year: number | null; pages: number | null };
+  work: { id: string; title: string; author: string; summary: string | null; coverUrl: string | null; coverColor: string | null; editions: WorkEdition[]; genres: string[]; possibleGenres?: string[]; rating: WorkRating | null; year: number | null; pages: number | null; series?: BookSeries | null };
   mine: WorkMine | null;
   readers: { followed: WorkReader[]; others: WorkReader[]; counts: { readers: number; finished: number } };
   games: { tierlists: WorkGameRef[]; arenas: WorkGameRef[]; quizzes: WorkGameRef[] };

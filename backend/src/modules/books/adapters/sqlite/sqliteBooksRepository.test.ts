@@ -2580,6 +2580,7 @@ test("addBookCollection stores a collection on an edition, and collectionsOf and
   const { db, repo } = freshRepo();
   const book = seriesBook(repo, "Os Lobos", "9789720000405", "Ana Lima");
   const plain = seriesBook(repo, "Sem Coleção", "9789720000406", "Ana Lima");
+  repo.makeSearchable(book.id);
   assert.equal(repo.addBookCollection(book.id, { name: "Bang!", position: "248" }, "bnp", AT), true);
   assert.deepEqual(db.prepare("SELECT name, name_key, position, source, created_at FROM book_collections WHERE book_id = ?").all(book.id).map((row) => ({ ...row })), [
     { name: "Bang!", name_key: "bang", position: "248", source: "bnp", created_at: AT }
@@ -2619,11 +2620,23 @@ test("collectionsOf picks the earliest collection of each edition", () => {
 test("searchCollectionBooks caps its result at the limit and lists an edition once", () => {
   const { repo } = freshRepo();
   const books = [1, 2, 3, 4].map((n) => seriesBook(repo, `Livro ${n}`, `978972000050${n}`, "Ana Lima"));
-  for (const book of books) repo.addBookCollection(book.id, { name: "Bang!", position: null }, "bnp", AT);
+  for (const book of books) {
+    repo.makeSearchable(book.id);
+    repo.addBookCollection(book.id, { name: "Bang!", position: null }, "bnp", AT);
+  }
   repo.addBookCollection(books[0]!.id, { name: "Bang! Fantasia", position: null }, "ol-edition", AT);
   assert.equal(repo.searchCollectionBooks(["bang"], 3).length, 3);
   assert.deepEqual([...new Set(repo.searchCollectionBooks(["bang"], 10))].sort(), books.map((book) => book.id).sort());
   assert.equal(new Set(repo.searchCollectionBooks(["bang"], 10)).size, repo.searchCollectionBooks(["bang"], 10).length);
+});
+
+test("searchCollectionBooks skips editions outside the search index before it applies the limit", () => {
+  const { repo } = freshRepo();
+  const hidden = [1, 2, 3].map((n) => seriesBook(repo, `Escondido ${n}`, `978972000060${n}`, "Ana Lima"));
+  const shown = seriesBook(repo, "Visível", "9789720000604", "Ana Lima");
+  repo.makeSearchable(shown.id);
+  for (const book of [...hidden, shown]) repo.addBookCollection(book.id, { name: "Bang!", position: null }, "bnp", AT);
+  assert.deepEqual(repo.searchCollectionBooks(["bang"], 2), [shown.id]);
 });
 
 test("series and collection tables are added to an existing database once", () => {

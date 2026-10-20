@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { isObjectKey } from "../../storage/objectStore.js";
-import { canonicalIsbn, looksLikeIsbnQuery, type BookGenre, type BookMetadata, type BookSearchResult } from "@scripta/shared";
+import { canonicalIsbn, looksLikeIsbnQuery, type BookGenre, type BookMetadata, type BookSearchResult, type BookSeries } from "@scripta/shared";
 import { findBestCover, type CoverSources, type FetchCoverImage } from "./coverResolver.js";
 import { MIN_GOOD_WIDTH } from "./domain/constants.js";
 import { BookNotFoundError, FileTooLargeError, InvalidImageError, SourcePausedError, SourceUnavailableError, WorkMergeError } from "./domain/errors.js";
@@ -27,6 +27,9 @@ export const COVER_ENQUEUE_BATCH = 500;
 export const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
 
 export type CoverFileSize = "file" | "thumb";
+
+type Hit = { row: BookRow; workId: string | null; viaCollection?: boolean };
+type Found = { result: BookSearchResult; bookId: string | null; viaCollection?: boolean };
 
 export interface ResolvedCover {
   url: string | null;
@@ -165,9 +168,75 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
     };
   }
 
-  function withWorkIds(rows: BookRow[]): BookSearchResult[] {
+  function withSeries(found: Found[]): BookSearchResult[] {
+    const workIds = [...new Set(found.flatMap(({ result }) => (result.workId ? [result.workId] : [])))];
+    const stories = deps.repo.bestSeriesOf(workIds);
+    const collections = deps.repo.collectionsOf(found.flatMap(({ bookId }) => (bookId ? [bookId] : [])));
+    return found.map(({ result, bookId, viaCollection }) => {
+      const story = result.workId ? stories.get(result.workId) : undefined;
+      const collection = bookId ? collections.get(bookId) : undefined;
+      const asCollection: BookSeries | null = collection ? { ...collection, kind: "collection" } : null;
+      const series = viaCollection ? asCollection : story ? { ...story, kind: "series" as const } : asCollection;
+      return series ? { ...result, series } : result;
+    });
+  }
+
+  function canonicalHits(rows: BookRow[]): Hit[] {
     const canonical = deps.repo.canonicalWorkIds(workIdsOf(rows));
-    return rows.map((row) => toSearchResult(row, row.work_id ? canonical.get(row.work_id) ?? row.work_id : null));
+    return rows.map((row) => ({ row, workId: row.work_id ? canonical.get(row.work_id) ?? row.work_id : null }));
+  }
+
+  function resultsOf(hits: Hit[]): BookSearchResult[] {
+    return withSeries(hits.map(({ row, workId, viaCollection }) => ({ result: toSearchResult(row, workId), bookId: row.id, viaCollection })));
+  }
+
+  function withWorkIds(rows: BookRow[]): BookSearchResult[] {
+    return resultsOf(canonicalHits(rows));
+  }
+
+  function representativeEditions(workIds: string[]): Map<string, BookRow> {
+    const found = new Map<string, BookRow>();
+    for (const edition of deps.repo.editionsOf(workIds)) {
+      if (found.has(edition.workId) || !deps.repo.isSearchable(edition.id)) continue;
+      const row = deps.repo.getBook(edition.id);
+      if (row) found.set(edition.workId, row);
+    }
+    return found;
+  }
+
+  function seriesHits(tokens: string[], present: Hit[]): Hit[] {
+    const known = new Set(present.flatMap(({ workId }) => (workId ? [workId] : [])));
+    const workIds = deps.repo.searchSeriesWorks(tokens, WORK_SEARCH_LIMIT).filter((workId) => !known.has(workId));
+    const editions = representativeEditions(workIds);
+    return workIds.flatMap((workId) => {
+      const row = editions.get(workId);
+      return row ? [{ row, workId }] : [];
+    });
+  }
+
+  function collectionHits(tokens: string[], present: Hit[], byWork: boolean, limit: number): Hit[] {
+    const books = new Set(present.map(({ row }) => row.id));
+    const works = new Set(present.flatMap(({ workId }) => (workId ? [workId] : [])));
+    const rows = deps.repo.searchCollectionBooks(tokens, limit).filter((id) => !books.has(id)).flatMap((id) => {
+      const row = deps.repo.getBook(id);
+      return row ? [row] : [];
+    });
+    return canonicalHits(rows).flatMap((hit) => {
+      if (byWork && hit.workId !== null) {
+        if (works.has(hit.workId)) return [];
+        works.add(hit.workId);
+      }
+      return [{ ...hit, viaCollection: true }];
+    });
+  }
+
+  function searchCatalog(tokens: string[], byWork: boolean): BookSearchResult[] {
+    const cap = byWork ? WORK_SEARCH_LIMIT : SEARCH_LIMIT;
+    const rows = deps.repo.searchBooks(tokens, byWork ? WORK_SCAN_LIMIT : SEARCH_LIMIT);
+    const hits = byWork ? firstEditionPerWork(rows, deps.repo.canonicalWorkIds(workIdsOf(rows))).slice(0, cap) : canonicalHits(rows);
+    if (hits.length < cap) hits.push(...seriesHits(tokens, hits).slice(0, cap - hits.length));
+    if (hits.length < cap) hits.push(...collectionHits(tokens, hits, byWork, cap).slice(0, cap - hits.length));
+    return resultsOf(hits);
   }
 
   async function nationalBibliographyBook(query: string, isbn: string): Promise<BookRow | null> {
@@ -199,7 +268,10 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       return { result: book.cover_image_id ? { ...result, coverUrl: deps.publicUrlFor(book.cover_image_id, "thumb") } : result, book: deps.repo.getBook(book.id) ?? book };
     });
     const canonical = deps.repo.canonicalWorkIds(workIdsOf(saved.flatMap(({ book }) => (book ? [book] : []))));
-    return saved.map(({ result, book }) => (book?.work_id ? { ...result, workId: canonical.get(book.work_id) ?? book.work_id } : result));
+    return withSeries(saved.map(({ result, book }) => ({
+      result: book?.work_id ? { ...result, workId: canonical.get(book.work_id) ?? book.work_id } : result,
+      bookId: book?.id ?? null
+    })));
   }
 
   function existingEdition(lookup: BookLookup): BookRow {
@@ -387,11 +459,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       }
       const tokens = searchTokens(trimmed);
       if (tokens.length === 0) return [];
-      if (!options.byWork) return withWorkIds(deps.repo.searchBooks(tokens, SEARCH_LIMIT));
-      const rows = deps.repo.searchBooks(tokens, WORK_SCAN_LIMIT);
-      return firstEditionPerWork(rows, deps.repo.canonicalWorkIds(workIdsOf(rows)))
-        .slice(0, WORK_SEARCH_LIMIT)
-        .map(({ row, workId }) => toSearchResult(row, workId));
+      return searchCatalog(tokens, options.byWork === true);
     },
 
     async searchExternal(query) {

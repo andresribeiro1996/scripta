@@ -471,7 +471,12 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   `);
   const collectionsOfStmt = db.prepare(`SELECT book_id, name, position FROM book_collections WHERE book_id IN (SELECT value FROM json_each(?)) ORDER BY created_at, rowid`);
   const searchSeriesStmt = db.prepare(`SELECT work_id FROM series_fts WHERE series_fts MATCH ? ORDER BY bm25(series_fts), rowid LIMIT ?`);
-  const searchCollectionsStmt = db.prepare(`SELECT book_id FROM collections_fts WHERE collections_fts MATCH ? ORDER BY bm25(collections_fts), rowid LIMIT ?`);
+  const searchCollectionsStmt = db.prepare(`
+    SELECT collections_fts.book_id AS book_id FROM collections_fts
+    JOIN books_search ON books_search.book_id = collections_fts.book_id
+    WHERE collections_fts MATCH ?
+    ORDER BY bm25(collections_fts), collections_fts.rowid LIMIT ?
+  `);
 
   function mergeDetails(bookId: string, details: MergeableDetails, summarySource: SummarySource | null) {
     const summary = details.summary ? cleanSummary(details.summary) : null;

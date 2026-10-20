@@ -218,3 +218,32 @@ test("one edition or no page has no edition strip", () => {
   assert.equal(bookScreenModel(page({ editions: [] }), null, viewer).edition, null);
   assert.equal(bookScreenModel(null, owned(), viewer).edition, null);
 });
+
+const series = { name: "Malazan Book of the Fallen", kind: "series" as const, position: "3" };
+const collection = { name: "Bang!", kind: "collection" as const, position: "248" };
+
+test("the work's series shows, and wins over an edition's collection", () => {
+  const withCollection = editions(3).map((edition) => ({ ...edition, collection }));
+  assert.deepEqual(bookScreenModel(page({ series, editions: withCollection }), null, viewer).series, series);
+});
+
+test("an edition's collection shows when the work has no series", () => {
+  const withCollection = editions(3).map((edition, i) => ({ ...edition, collection: i === 1 ? collection : null }));
+  assert.equal(bookScreenModel(page({ editions: withCollection }), null, viewer).series, null);
+  assert.deepEqual(bookScreenModel(page({ series: null, editions: withCollection, coverUrl: "cover:1" }), null, viewer).series, collection);
+});
+
+test("the collection comes from the edition being shown", () => {
+  const other = { name: "Clássicos", kind: "collection" as const, position: null };
+  const withCollections = editions(3).map((edition, i) => ({ ...edition, collection: i === 0 ? collection : i === 2 ? other : null }));
+  const p = page({ editions: withCollections, coverUrl: "cover:0" });
+  assert.deepEqual(bookScreenModel(p, null, viewer).series, collection);
+  assert.deepEqual(bookScreenModel(p, null, viewer, "e2").series, other);
+  assert.equal(bookScreenModel(p, null, viewer, "e1").series, null);
+});
+
+test("no series, no collection and no page all read as null", () => {
+  assert.equal(bookScreenModel(page(), null, viewer).series, null);
+  assert.equal(bookScreenModel(page({ editions: [] }), null, viewer).series, null);
+  assert.equal(bookScreenModel(null, owned(), viewer).series, null);
+});

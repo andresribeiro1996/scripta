@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildManualBook, mapOpenLibraryDoc, mergeSearchResults, searchInsideOutside, searchResultByline, type BookSearchResult, type BookSearchState } from "./bookSearch.js";
+import { buildManualBook, mapOpenLibraryDoc, mergeSearchResults, searchInsideOutside, searchResultByline, seriesLabel, type BookSearchResult, type BookSearchState } from "./bookSearch.js";
 
 function result(title: string, authors: string[], isbn: string | null): BookSearchResult {
   return { title, authors, year: null, isbn, publisher: null, coverUrl: null, genres: [] };
@@ -124,4 +124,27 @@ test("a search result byline reads author · publisher · year and skips what is
   assert.equal(searchResultByline(base), "Isabel Allende · Porto Editora · 2013");
   assert.equal(searchResultByline({ ...base, publisher: null }), "Isabel Allende · 2013");
   assert.equal(searchResultByline({ authors: [], publisher: "Porto Editora", year: null }), "Porto Editora");
+});
+
+test("a story series reads its name and position, or the name alone", () => {
+  assert.equal(seriesLabel({ name: "Malazan Book of the Fallen", kind: "series", position: "1" }), "Malazan Book of the Fallen · 1");
+  assert.equal(seriesLabel({ name: "Malazan Book of the Fallen", kind: "series", position: null }), "Malazan Book of the Fallen");
+});
+
+test("a collection reads its name, the word collection and its number, or no number", () => {
+  assert.equal(seriesLabel({ name: "Bang!", kind: "collection", position: "248" }), "Bang! collection · 248");
+  assert.equal(seriesLabel({ name: "Bang!", kind: "collection", position: null }), "Bang! collection");
+});
+
+test("a collection whose name already says collection is not given the word again", () => {
+  assert.equal(seriesLabel({ name: "Penguin Collection", kind: "collection", position: null }), "Penguin Collection");
+  assert.equal(seriesLabel({ name: "PENGUIN COLLECTIONS", kind: "collection", position: "3" }), "PENGUIN COLLECTIONS · 3");
+  assert.equal(seriesLabel({ name: "Coleção Clássicos", kind: "collection", position: "12" }), "Coleção Clássicos · 12");
+  assert.equal(seriesLabel({ name: "COLEÇÃO Bang", kind: "collection", position: null }), "COLEÇÃO Bang");
+  assert.equal(seriesLabel({ name: "Colecção Mil Folhas", kind: "collection", position: null }), "Colecção Mil Folhas");
+  assert.equal(seriesLabel({ name: "Colecao Mil Folhas", kind: "collection", position: null }), "Colecao Mil Folhas");
+});
+
+test("a story series never gets the word collection", () => {
+  assert.equal(seriesLabel({ name: "Dune Chronicles", kind: "series", position: "2" }), "Dune Chronicles · 2");
 });

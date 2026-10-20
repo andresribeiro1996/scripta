@@ -1,4 +1,5 @@
 import { genresForBook } from "../library/bookGenres.js";
+import type { BookSeries } from "../library/bookSearch.js";
 import { statusLabel } from "../library/covers.js";
 import { FINISH_FEELINGS, type FinishRating } from "../library/finish.js";
 import type { IdentityKey } from "../readerCards/index.js";
@@ -16,6 +17,7 @@ export type BookScreenModel = {
   author: string;
   genres: string[];
   possibleGenres: string[];
+  series: BookSeries | null;
   rating: { value: number; label: string } | null;
   meta: string | null;
   cover: { url: string | null; color: string | null };
@@ -101,6 +103,7 @@ export function bookScreenModel(page: WorkPage | null, book: Book | null, viewer
     author: work?.author ?? String(book?.Attribution ?? "Unknown author"),
     genres: work ? work.genres ?? [] : book ? genresForBook(book).slice(0, GENRE_CAP) : [],
     possibleGenres: work?.possibleGenres ?? [],
+    series: work ? work.series ?? (selected ?? work.editions[defaultEditionIndex(work)])?.collection ?? null : null,
     rating: work?.rating ? { value: work.rating.value, label: `${work.rating.value.toFixed(1)} · ${ratingCountLabel(work.rating.count)}` } : null,
     meta: selected ? bookMetaLine(selected, selected.language) : work ? bookMetaLine(work) : null,
     cover: selected ? { url: selected.coverUrl, color: selected.coverColor } : { url: work?.coverUrl ?? null, color: work?.coverColor ?? null },

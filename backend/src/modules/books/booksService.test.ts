@@ -3,7 +3,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { test } from "node:test";
+import { mock, test } from "node:test";
 
 const scratch = mkdtempSync(join(tmpdir(), "books-service-test-"));
 process.env.AUTH_DB_PATH = join(scratch, "auth.sqlite");
@@ -2202,4 +2202,222 @@ test("a lookup with an ISBN the catalog lacks lands on the ISBN-less title recor
   assert.deepEqual(h.service.resolveCover({ ...erosao, isbn: "9780141184272" }), borrowed);
   assert.equal(h.repo.findBookByKey("isbn:9780141184272")!.id, copy.id);
   assert.deepEqual(h.enqueued, [{ bookId: copy.id, priority: "normal" }]);
+});
+
+const MALAZAN = "Malazan Book of the Fallen";
+const SERIES_AT = "2026-10-01T00:00:00.000Z";
+const isbnOf = (n: number) => `97800000${String(n).padStart(5, "0")}`;
+type Harness = ReturnType<typeof harness>;
+
+function seeded(h: Harness, title: string, isbn: string, options: { author?: string; workKey?: string; at?: string; searchable?: boolean } = {}) {
+  return h.repo.createBook({ title, author: options.author ?? "Steven Erikson", isbn, workKey: options.workKey, createdBy: options.searchable === false ? undefined : "seed" }, [`isbn:${isbn}`], options.at ?? SERIES_AT);
+}
+
+function malazanCatalog(h: Harness) {
+  const deadhouse = seeded(h, "Deadhouse Gates (The Malazan Book of the Fallen, Book 2)", "9780765348791");
+  const gardens = seeded(h, "Gardens of the Moon", "9780765348807");
+  const memories = seeded(h, "Memories of Ice", "9780765348814");
+  h.repo.addWorkSeries(gardens.work_id!, [{ name: MALAZAN, position: "1" }], "wikidata", SERIES_AT);
+  h.repo.addWorkSeries(memories.work_id!, [{ name: MALAZAN, position: "3" }], "wikidata", SERIES_AT);
+  h.repo.addWorkSeries(deadhouse.work_id!, [{ name: MALAZAN, position: "2" }], "wikidata", SERIES_AT);
+  return { deadhouse, gardens, memories };
+}
+
+function classicsCatalog(h: Harness, members: number, searchable = true) {
+  const books = Array.from({ length: members }, (_, i) => seeded(h, `Livro ${i}`, isbnOf(100 + i), { author: "Ana Lima", searchable }));
+  books.forEach((book, i) => h.repo.addBookCollection(book.id, { name: "Clássicos", position: String(i + 1) }, "bnp", SERIES_AT));
+  return books;
+}
+
+test("a series search lists the title hits first, then the series works, and every result carries the series", () => {
+  const h = harness();
+  const { deadhouse } = malazanCatalog(h);
+  const results = h.service.search("malazan");
+  assert.deepEqual(results.map((result) => result.title), [deadhouse.title, "Gardens of the Moon", "Memories of Ice"]);
+  assert.deepEqual(results.map((result) => result.series), [
+    { name: MALAZAN, kind: "series", position: "2" },
+    { name: MALAZAN, kind: "series", position: "1" },
+    { name: MALAZAN, kind: "series", position: "3" }
+  ]);
+  assert.ok(results.every((result) => typeof result.workId === "string"));
+  assert.equal(new Set(results.map((result) => result.isbn)).size, 3);
+});
+
+test("a series name is searched together with its author", () => {
+  const h = harness();
+  const { deadhouse } = malazanCatalog(h);
+  assert.deepEqual(h.service.search("malazan erikson").map((result) => result.title), [deadhouse.title, "Gardens of the Moon", "Memories of Ice"]);
+  assert.deepEqual(h.service.search("malazan herbert"), []);
+});
+
+test("a series search by work gives one row per work", () => {
+  const h = harness();
+  const { deadhouse } = malazanCatalog(h);
+  seeded(h, "Gardens of the Moon (reissue)", "9780765348999", { workKey: "OL1W" });
+  const results = h.service.search("malazan", { byWork: true });
+  assert.deepEqual(results.map((result) => result.title), [deadhouse.title, "Gardens of the Moon", "Memories of Ice"]);
+  assert.equal(new Set(results.map((result) => result.workId)).size, 3);
+  assert.ok(results.every((result) => result.series?.name === MALAZAN));
+});
+
+test("a series work shows one edition, the earliest created of those in the search index", () => {
+  const h = harness();
+  const hidden = seeded(h, "Gardens (hidden)", isbnOf(1), { workKey: "OL1W", at: "2026-10-01T00:00:00.000Z", searchable: false });
+  seeded(h, "Gardens (later)", isbnOf(2), { workKey: "OL1W", at: "2026-10-03T00:00:00.000Z" });
+  seeded(h, "Gardens (earlier)", isbnOf(3), { workKey: "OL1W", at: "2026-10-02T00:00:00.000Z" });
+  h.repo.addWorkSeries(hidden.work_id!, [{ name: MALAZAN, position: "1" }], "wikidata", SERIES_AT);
+  assert.deepEqual(h.service.search("malazan").map((result) => result.title), ["Gardens (earlier)"]);
+  assert.deepEqual(h.service.search("malazan", { byWork: true }).map((result) => result.title), ["Gardens (earlier)"]);
+});
+
+test("a series work whose editions are not in the search index returns nothing", () => {
+  const h = harness();
+  const book = seeded(h, "Gardens of the Moon", isbnOf(1), { searchable: false });
+  h.repo.addWorkSeries(book.work_id!, [{ name: MALAZAN, position: "1" }], "wikidata", SERIES_AT);
+  assert.deepEqual(h.service.search("malazan"), []);
+  assert.deepEqual(h.service.search("malazan", { byWork: true }), []);
+});
+
+test("a series written on a merged-away work finds the canonical work and its earliest edition in the search index", () => {
+  const h = harness();
+  const target = seeded(h, "Gardens of the Moon", isbnOf(1), { searchable: false });
+  const alias = seeded(h, "Jardins da Lua", isbnOf(2));
+  h.repo.addWorkSeries(alias.work_id!, [{ name: MALAZAN, position: "1" }], "wikidata", SERIES_AT);
+  h.repo.mergeTranslation(alias.work_id!, target.work_id!, "manual", null, SERIES_AT);
+  const [result, ...rest] = h.service.search("malazan");
+  assert.deepEqual(rest, []);
+  assert.equal(result!.title, "Jardins da Lua");
+  assert.equal(result!.workId, target.work_id);
+  assert.deepEqual(result!.series, { name: MALAZAN, kind: "series", position: "1" });
+});
+
+test("a title hit carries its work's series, else its edition's collection, else nothing", () => {
+  const h = harness();
+  const dune = seeded(h, "Dune", isbnOf(1), { author: "Frank Herbert" });
+  const messiah = seeded(h, "Dune Messiah", isbnOf(2), { author: "Frank Herbert" });
+  seeded(h, "Dune Encyclopedia", isbnOf(3), { author: "Willis McNelly" });
+  h.repo.addWorkSeries(dune.work_id!, [{ name: "Dune Chronicles", position: "1" }], "wikidata", SERIES_AT);
+  h.repo.addBookCollection(dune.id, { name: "Clássicos", position: "7" }, "bnp", SERIES_AT);
+  h.repo.addBookCollection(messiah.id, { name: "Ficção Científica", position: null }, "bnp", SERIES_AT);
+  const bySeries = new Map(h.service.search("dune").map((result) => [result.title, result.series]));
+  assert.deepEqual(bySeries.get("Dune"), { name: "Dune Chronicles", kind: "series", position: "1" });
+  assert.deepEqual(bySeries.get("Dune Messiah"), { name: "Ficção Científica", kind: "collection", position: null });
+  assert.equal(bySeries.get("Dune Encyclopedia"), undefined);
+  assert.ok(!("series" in h.service.search("dune").find((result) => result.title === "Dune Encyclopedia")!));
+});
+
+test("an ISBN search carries the series too", () => {
+  const h = harness();
+  const { gardens } = malazanCatalog(h);
+  assert.deepEqual(h.service.search(gardens.isbn!)[0]!.series, { name: MALAZAN, kind: "series", position: "1" });
+});
+
+test("a collection search lists title hits first and fills the rest from the collection, capped at 12 editions", () => {
+  const h = harness();
+  const titleHits = [1, 2, 3].map((n) => seeded(h, `Clássicos do Mar ${n}`, isbnOf(n), { author: "Ana Lima" }));
+  classicsCatalog(h, 200);
+  h.repo.addBookCollection(titleHits[2]!.id, { name: "Clássicos", position: "999" }, "bnp", SERIES_AT);
+  const results = h.service.search("clássicos");
+  assert.equal(results.length, 12);
+  assert.deepEqual(results.slice(0, 3).map((result) => result.title), titleHits.map((book) => book.title));
+  assert.equal(new Set(results.map((result) => result.isbn)).size, 12);
+  assert.deepEqual(results.slice(0, 3).map((result) => result.series), [undefined, undefined, { name: "Clássicos", kind: "collection", position: "999" }]);
+  assert.ok(results.slice(3).every((result) => result.series?.kind === "collection" && result.series.name === "Clássicos"));
+});
+
+test("a collection search by work is capped at 20 works with the title hits first", () => {
+  const h = harness();
+  const titleHits = [1, 2, 3].map((n) => seeded(h, `Clássicos do Mar ${n}`, isbnOf(n), { author: "Ana Lima" }));
+  classicsCatalog(h, 200);
+  const results = h.service.search("clássicos", { byWork: true });
+  assert.equal(results.length, 20);
+  assert.deepEqual(results.slice(0, 3).map((result) => result.title), titleHits.map((book) => book.title));
+  assert.equal(new Set(results.map((result) => result.workId)).size, 20);
+});
+
+test("a collection hit carries the collection even when its work has a story series", () => {
+  const h = harness();
+  const book = seeded(h, "Os Lobos", isbnOf(1), { author: "Ana Lima" });
+  h.repo.addWorkSeries(book.work_id!, [{ name: "Saga dos Lobos", position: "2" }], "wikidata", SERIES_AT);
+  h.repo.addBookCollection(book.id, { name: "Bang!", position: "248" }, "bnp", SERIES_AT);
+  assert.deepEqual(h.service.search("bang")[0]!.series, { name: "Bang!", kind: "collection", position: "248" });
+  assert.deepEqual(h.service.search("lobos")[0]!.series, { name: "Saga dos Lobos", kind: "series", position: "2" });
+});
+
+test("two editions of a work in one collection are two rows, and one row by work", () => {
+  const h = harness();
+  const first = seeded(h, "Os Lobos", isbnOf(1), { author: "Ana Lima", workKey: "OL2W" });
+  const second = seeded(h, "Os Lobos (nova edição)", isbnOf(2), { author: "Ana Lima", workKey: "OL2W" });
+  h.repo.addBookCollection(first.id, { name: "Bang!", position: "248" }, "bnp", SERIES_AT);
+  h.repo.addBookCollection(second.id, { name: "Bang!", position: "301" }, "bnp", SERIES_AT);
+  assert.equal(h.service.search("bang").length, 2);
+  assert.deepEqual(h.service.search("bang", { byWork: true }).map((result) => result.title), ["Os Lobos"]);
+});
+
+test("a book found by title, series and collection appears once, in its first group", () => {
+  const h = harness();
+  const book = seeded(h, "Bang! Fantasia", isbnOf(1), { author: "Ana Lima" });
+  h.repo.addWorkSeries(book.work_id!, [{ name: "Bang Saga", position: "1" }], "wikidata", SERIES_AT);
+  h.repo.addBookCollection(book.id, { name: "Bang!", position: "248" }, "bnp", SERIES_AT);
+  const results = h.service.search("bang");
+  assert.equal(results.length, 1);
+  assert.deepEqual(results[0]!.series, { name: "Bang Saga", kind: "series", position: "1" });
+  assert.equal(h.service.search("bang", { byWork: true }).length, 1);
+});
+
+test("collection members outside the search index never crowd out the ones inside it", () => {
+  const h = harness();
+  classicsCatalog(h, 200, false);
+  const visible = [seeded(h, "Livro visível 1", isbnOf(1), { author: "Ana Lima" }), seeded(h, "Livro visível 2", isbnOf(2), { author: "Ana Lima" })];
+  for (const book of visible) h.repo.addBookCollection(book.id, { name: "Clássicos", position: null }, "bnp", SERIES_AT);
+  assert.deepEqual(h.service.search("clássicos").map((result) => result.title), ["Livro visível 1", "Livro visível 2"]);
+  assert.deepEqual(h.service.search("clássicos", { byWork: true }).map((result) => result.title), ["Livro visível 1", "Livro visível 2"]);
+});
+
+function searchSpies(h: Harness) {
+  return { series: mock.method(h.repo, "searchSeriesWorks"), collections: mock.method(h.repo, "searchCollectionBooks") };
+}
+
+test("the series and collection indexes are not searched when title and author hits already fill the cap", () => {
+  for (const [byWork, cap] of [[false, 12], [true, 20]] as const) {
+    const h = harness();
+    for (let n = 0; n < cap; n += 1) seeded(h, `Malazan ${n}`, isbnOf(n), { author: `Autor ${n}` });
+    const spies = searchSpies(h);
+    assert.equal(h.service.search("malazan", { byWork }).length, cap);
+    assert.equal(spies.series.mock.callCount(), 0);
+    assert.equal(spies.collections.mock.callCount(), 0);
+  }
+});
+
+test("the collection index is not searched when title, author and series hits fill the cap", () => {
+  for (const [byWork, cap] of [[false, 12], [true, 20]] as const) {
+    const h = harness();
+    for (let n = 0; n < 2; n += 1) seeded(h, `Malazan ${n}`, isbnOf(n), { author: `Autor ${n}` });
+    for (let n = 0; n < cap - 2; n += 1) h.repo.addWorkSeries(seeded(h, `Livro ${n}`, isbnOf(100 + n), { author: `Escritor ${n}` }).work_id!, [{ name: MALAZAN, position: null }], "wikidata", SERIES_AT);
+    const spies = searchSpies(h);
+    const results = h.service.search("malazan", { byWork });
+    assert.equal(results.length, cap);
+    assert.equal(spies.series.mock.callCount(), 1);
+    assert.equal(spies.collections.mock.callCount(), 0);
+  }
+});
+
+test("both indexes are searched while the earlier groups leave room", () => {
+  const h = harness();
+  malazanCatalog(h);
+  const spies = searchSpies(h);
+  h.service.search("malazan");
+  assert.equal(spies.series.mock.callCount(), 1);
+  assert.equal(spies.collections.mock.callCount(), 1);
+});
+
+test("search results saved from outside carry the series once the work has one", async () => {
+  const { catalog } = recordingCatalog();
+  const h = harness({ catalog });
+  assert.ok(!("series" in (await h.service.searchExternal("dune"))[0]!));
+  const saved = h.repo.findBookByKey("isbn:9780441013593")!;
+  h.repo.addWorkSeries(saved.work_id!, [{ name: "Dune Chronicles", position: "1" }], "wikidata", SERIES_AT);
+  const [dune, encyclopedia] = await h.service.searchExternal("dune");
+  assert.deepEqual(dune!.series, { name: "Dune Chronicles", kind: "series", position: "1" });
+  assert.ok(!("series" in encyclopedia!));
 });
