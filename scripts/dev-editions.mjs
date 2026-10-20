@@ -9,12 +9,6 @@
 // so "Back to your edition" has somewhere to go back from. Dune has three
 // editions and nobody owns it: it is reached through search.
 //
-// It also gives the catalog series to show: The Hobbit is in "Middle-earth"
-// (so "middle-earth" finds the owned book only through its series), Dune is
-// book 1 of "Dune Chronicles", and the Portuguese Duna is number 12 of the
-// "Clássicos Aleph" collection, so a collection label shows too. These go in
-// through the repository, never SQL, and the add methods ignore repeats.
-//
 // Runs right after dev-account.mjs and before anything boots the backend (see
 // devFixtureSetup.mjs), against whatever backend/data/dev/ the *_DB_PATH vars point at. Idempotent:
 // an edition that already has its cover and details is left alone.
