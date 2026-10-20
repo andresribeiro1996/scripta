@@ -37,7 +37,7 @@ export function titlePattern(title: string): string | null {
 
 export function authorPattern(author: string): string | null {
   const first = firstAuthor(author);
-  return first ? `ta:*|${globLiteral(first)}|*` : null;
+  return first ? `${globLiteral(first)}|*` : null;
 }
 
 export function surnameOf(author: string): string | null {

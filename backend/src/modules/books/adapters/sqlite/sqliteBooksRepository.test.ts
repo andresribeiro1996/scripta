@@ -18,6 +18,7 @@ const { findOrCreateBook } = await import("../../domain/findOrCreate.js");
 const { createSqliteBooksRepository, UNCHECKED_COVERS_SQL, UPGRADE_WANTED_SQL, UNCHECKED_DETAILS_SQL, HELD_BNP_DETAILS_SQL, WORK_LOOKUP_SQL, GROUPABLE_KEYS_SQL, GROUPABLE_PAIRS_SQL } = await import("./sqliteBooksRepository.js");
 const { WorkMergeError } = await import("../../domain/errors.js");
 const { summaryHashOf } = await import("../../domain/synopsis.js");
+const { authorPattern } = await import("../../domain/translation.js");
 
 const NOW = "2026-10-01T00:00:00.000Z";
 const richDetails = { summary: "Open Library synopsis.", rating: 4, ratingCount: 3, sourceUrl: "https://openlibrary.org/works/OL1W", genres: ["Fantasy" as const], pages: 300, publisher: "Bantam", year: 1975, translator: null };
@@ -203,6 +204,37 @@ test("search is diacritic-insensitive, requires every token and ignores an empty
   assert.equal(repo.searchBooks(["dune", "herbert"], 12).length, 1);
   assert.equal(repo.searchBooks(["dune", "messiah"], 12).length, 0);
   assert.deepEqual(repo.searchBooks([], 12), []);
+});
+
+test("search puts the closer match first and keeps the order books became searchable for equal scores, even when the limit cuts the tie", () => {
+  const { repo } = freshRepo();
+  const searchable = (title: string, isbn: string) => {
+    const book = repo.createBook({ title, author: "Ana Lima", isbn }, [`isbn:${isbn}`], NOW);
+    repo.makeSearchable(book.id);
+    return book;
+  };
+  const firstTwin = searchable("O Mar Azul", "9789720000001");
+  const closer = searchable("Mar", "9789720000002");
+  const secondTwin = searchable("O Mar Azul", "9789720000003");
+
+  assert.deepEqual(repo.searchBooks(["mar"], 10).map((book) => book.id), [closer.id, firstTwin.id, secondTwin.id]);
+  assert.deepEqual(repo.searchBooks(["mar"], 2).map((book) => book.id), [closer.id, firstTwin.id]);
+});
+
+test("search ranks inside the full-text index and reads books only for the rows it keeps", () => {
+  const db = new DatabaseSync(":memory:");
+  applyBooksMigrations(db);
+  const prepare = mock.method(db, "prepare");
+  createSqliteBooksRepository(db);
+  const statements = prepare.mock.calls.map((call) => String(call.arguments[0])).filter((sql) => /books_fts MATCH/.test(sql));
+  prepare.mock.restore();
+
+  assert.equal(statements.length, 1);
+  const steps = (db.prepare(`EXPLAIN QUERY PLAN ${statements[0]}`).all('"mar"*', 12) as Array<{ detail: string }>).map((row) => row.detail);
+  const position = (pattern: RegExp) => steps.findIndex((detail) => pattern.test(detail));
+  const order = [/^CO-ROUTINE hits$/, /^SCAN books_fts VIRTUAL TABLE INDEX 0:M/, /USE TEMP B-TREE FOR ORDER BY/, /^SCAN hits$/, /^SEARCH books USING INDEX sqlite_autoindex_books_1 \(id=\?\)/].map(position);
+  assert.ok(order.every((index) => index >= 0), steps.join(" | "));
+  assert.deepEqual(order, [...order].sort((left, right) => left - right), steps.join(" | "));
 });
 
 test("covers, rejections and details round-trip", () => {
@@ -984,6 +1016,7 @@ test("the title key columns are added to an existing database once", () => {
   const db = new DatabaseSync(":memory:");
   applyBooksMigrations(db);
   db.exec("DROP INDEX idx_books_title_work");
+  db.exec("DROP INDEX idx_books_author_key");
   db.exec("ALTER TABLE books DROP COLUMN title_key");
   db.exec("ALTER TABLE books DROP COLUMN title_group_blocked_at");
   applyBooksMigrations(db);
@@ -991,6 +1024,7 @@ test("the title key columns are added to an existing database once", () => {
   const columns = (db.prepare("PRAGMA table_info(books)").all() as Array<{ name: string }>).map((column) => column.name);
   assert.ok(columns.includes("title_key") && columns.includes("title_group_blocked_at"));
   assert.ok(db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'idx_books_title_work'").get());
+  assert.ok(db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'idx_books_author_key'").get());
 });
 
 test("the old title key index is dropped from an existing database", () => {
@@ -1569,6 +1603,50 @@ test("portugueseWorksNeedingMatch for given works returns each live work once, o
   assert.deepEqual(repo.portugueseWorksNeedingMatch(ids, 10, 3, null), [oldest.work_id, middle.work_id, newest.work_id]);
   assert.deepEqual(repo.portugueseWorksNeedingMatch(ids, 2, 3, null), [oldest.work_id, middle.work_id]);
   assert.deepEqual(repo.portugueseWorksNeedingMatch([absorbed.work_id!], 10, 3, null), []);
+});
+
+test("authorCandidates returns the works whose first author is exactly the one asked for, with a non-Portuguese edition, most editions first then by id", () => {
+  const { repo } = freshRepo();
+  let next = 0;
+  const edition = (title: string, author: string, options: { language?: string; workKey?: string } = {}) => {
+    const isbn = `97897200${String(++next).padStart(5, "0")}`;
+    const book = repo.createBook({ title, author, isbn, workKey: options.workKey }, [`isbn:${isbn}`], NOW);
+    if (options.language) repo.setLanguage(book.id, options.language);
+    return book;
+  };
+  const twoEditions = edition("Ondas", "Ana Lima", { workKey: "OL1W" });
+  edition("Ondas", "Ana Lima, Bo Roe", { workKey: "OL1W" });
+  const coAuthored = edition("Mar Alto", "Ana Lima, Bo Roe");
+  const alone = edition("Maré Baixa", "Ana Lima");
+  edition("Terra Firme", "Ana Limao");
+  edition("Rio Longo", "Ana Lima Costa");
+  edition("Céu Aberto", "Bo Roe, Ana Lima");
+  edition("Vento Sul", "Ana Lima", { language: "pt-PT" });
+
+  assert.deepEqual(repo.authorCandidates(authorPattern("Ana Lima, Bo Roe")!), [twoEditions.work_id, ...[coAuthored.work_id, alone.work_id].sort()]);
+});
+
+test("authorCandidates reports the live work of a merged one", () => {
+  const { db, repo } = freshRepo();
+  const kept = repo.createBook({ title: "Ondas", author: "Zed Roe", isbn: "9789720000001" }, ["isbn:9789720000001"], NOW);
+  const absorbed = repo.createBook({ title: "Mar Alto", author: "Ana Lima", isbn: "9789720000002" }, ["isbn:9789720000002"], NOW);
+  repo.mergeWorks(absorbed.work_id!, kept.work_id!);
+  db.prepare("UPDATE books SET work_id = ? WHERE id = ?").run(absorbed.work_id, absorbed.id);
+
+  assert.deepEqual(repo.authorCandidates(authorPattern("Ana Lima")!), [kept.work_id]);
+});
+
+test("the author read of candidate works searches the author index", () => {
+  const db = new DatabaseSync(":memory:");
+  applyBooksMigrations(db);
+  const prepare = mock.method(db, "prepare");
+  createSqliteBooksRepository(db);
+  const statements = prepare.mock.calls.map((call) => String(call.arguments[0])).filter((sql) => /COUNT\(\*\) AS editions/.test(sql));
+  prepare.mock.restore();
+
+  assert.equal(statements.length, 1);
+  const plan = (db.prepare(`EXPLAIN QUERY PLAN ${statements[0]}`).all("x|*") as Array<{ detail: string }>).map((row) => row.detail).join(" | ");
+  assert.match(plan, /SEARCH b USING INDEX idx_books_author_key \(<expr>>\? AND <expr><\?\)/, plan);
 });
 
 test("listWorkLookupIds returns due editions never-checked first, user editions before seed and bnp, oldest check first", () => {
