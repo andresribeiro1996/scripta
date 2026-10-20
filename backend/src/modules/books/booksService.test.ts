@@ -2037,7 +2037,7 @@ const erosaoKey = "ta:dicionario da erosao|john freeman|";
 const erosaoIsbn = "9789896716844";
 const siblingThumb = "https://api.test/covers/cached/sibling-cover/thumb";
 const siblingFull = "https://api.test/covers/cached/sibling-cover/file";
-const borrowed = { url: siblingThumb, fullUrl: siblingFull, pending: false, upgrading: false };
+const borrowed = { url: siblingThumb, fullUrl: siblingFull, pending: false, upgrading: true };
 
 function erosaoEditions(h: ReturnType<typeof harness>, options: { siblingCover?: boolean; copyIsbn?: string | null } = {}) {
   const { siblingCover = true, copyIsbn = null } = options;
@@ -2117,4 +2117,31 @@ test("an ISBN-less copy whose work was merged into another finds the covered edi
   h.repo.mergeWorks(copy.work_id!, sibling.work_id!);
   h.repo.setCover(copy.id, { imageId: null, status: "missing", checkedAt: "2026-10-01T00:00:00.000Z" });
   assert.deepEqual(h.service.resolveCover(erosao), borrowed);
+});
+
+test("rejecting the cover an ISBN-less copy borrows blocks it for that copy and queues the copy first", () => {
+  const h = harness();
+  const { sibling, copy } = erosaoEditions(h);
+  h.repo.insertImage({ id: "sibling-cover", book_id: sibling.id, source: "apple", source_url: "https://a/sibling", width: 900, height: 1400, byte_size: 1, color: "", created_at: "2026-09-01T00:00:00.000Z" });
+  assert.deepEqual(h.service.resolveCover(erosao), borrowed);
+  h.enqueued.length = 0;
+  assert.deepEqual(h.service.rejectCover(erosao), { url: null, fullUrl: null, pending: true, upgrading: false });
+  assert.deepEqual(h.enqueued, [{ bookId: copy.id, priority: "front" }]);
+  assert.deepEqual([...h.repo.listRejectedUrls(copy.id)], ["https://a/sibling"]);
+  assert.deepEqual([...h.repo.listRejectedUrls(sibling.id)], []);
+  assert.deepEqual(h.service.resolveCover(erosao), { url: null, fullUrl: null, pending: true, upgrading: false });
+  assert.equal(h.repo.getBook(sibling.id)!.cover_image_id, "sibling-cover");
+});
+
+test("enqueueCovers queues an ISBN-less copy without looking for a sibling cover", () => {
+  const h = harness();
+  const { copy } = erosaoEditions(h);
+  const workCoverImageIds = h.repo.workCoverImageIds;
+  let lookups = 0;
+  h.repo.workCoverImageIds = (ids) => { lookups += 1; return workCoverImageIds(ids); };
+  h.service.enqueueCovers([erosao]);
+  assert.deepEqual(h.enqueued, [{ bookId: copy.id, priority: "normal" }]);
+  assert.equal(lookups, 0);
+  h.service.resolveCover(erosao);
+  assert.equal(lookups, 1);
 });

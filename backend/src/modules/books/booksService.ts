@@ -7,7 +7,7 @@ import { BookNotFoundError, FileTooLargeError, InvalidImageError, SourcePausedEr
 import { coverColor, encodeCover, type EncodedCover } from "./domain/images.js";
 import { hiddenSynopsisHashes } from "./domain/synopsis.js";
 import { fillMissingIdentity, findExisting, findOrCreateBook, keysOf } from "./domain/findOrCreate.js";
-import { siblingCoverImageId } from "./domain/siblingCover.js";
+import { siblingCoverImageIds } from "./domain/siblingCover.js";
 import { firstEditionPerWork, workIdsOf } from "./domain/workSearch.js";
 import { editionLanguage, findByIdentity, isPortugalIsbn, isPortugueseIsbn, isValidIsbn, lookupIdentity, SEARCH_LIMIT, searchTokens, WORK_SCAN_LIMIT, WORK_SEARCH_LIMIT, type BookIdentity, type BookLookup } from "./domain/normalize.js";
 import { summaryMatchesLanguage } from "./adapters/catalog/languageFilter.js";
@@ -95,14 +95,13 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
 
   const olderThan = (iso: string | null, ms: number) => iso === null || now().getTime() - Date.parse(iso) >= ms;
 
-  function coverOf(book: BookRow): ResolvedCover {
-    if (!book.cover_image_id) return NO_COVER;
-    return {
-      url: deps.publicUrlFor(book.cover_image_id, "thumb"),
-      fullUrl: deps.publicUrlFor(book.cover_image_id, "file"),
-      pending: false,
-      upgrading: book.cover_upgrade_wanted_at !== null
-    };
+  function coverOf(imageId: string, upgrading: boolean): ResolvedCover {
+    return { url: deps.publicUrlFor(imageId, "thumb"), fullUrl: deps.publicUrlFor(imageId, "file"), pending: false, upgrading };
+  }
+
+  function lookupDue(book: BookRow): boolean {
+    if (book.cover_image_id) return book.cover_status === "low_res" && olderThan(book.cover_checked_at, RETRY_AFTER_MS);
+    return book.cover_status !== "missing" || olderThan(book.cover_checked_at, RETRY_AFTER_MS);
   }
 
   function sourcesFor(lane: CoverPriority, book: BookRow): CoverSources {
@@ -237,19 +236,19 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
     resolveCover(lookup, front = false) {
       const book = findOrCreateBook(deps.repo, lookup, now().toISOString());
       if (!book) return NO_COVER;
-      if (book.cover_image_id) {
-        if (book.cover_status === "low_res" && olderThan(book.cover_checked_at, RETRY_AFTER_MS)) schedule(book.id, front ? "front" : "normal");
-        return coverOf(book);
-      }
-      const siblingId = siblingCoverImageId(deps.repo, book);
-      const sibling: ResolvedCover | null = siblingId ? { url: deps.publicUrlFor(siblingId, "thumb"), fullUrl: deps.publicUrlFor(siblingId, "file"), pending: false, upgrading: false } : null;
-      if (book.cover_status === "missing" && !olderThan(book.cover_checked_at, RETRY_AFTER_MS)) return sibling ?? NO_COVER;
-      schedule(book.id, front ? "front" : "normal");
-      return sibling ?? PENDING;
+      const due = lookupDue(book);
+      if (due) schedule(book.id, front ? "front" : "normal");
+      if (book.cover_image_id) return coverOf(book.cover_image_id, book.cover_upgrade_wanted_at !== null);
+      const lent = siblingCoverImageIds(deps.repo, [book]).get(book.id);
+      if (lent) return coverOf(lent, true);
+      return due ? PENDING : NO_COVER;
     },
 
     enqueueCovers(lookups) {
-      for (const lookup of lookups) this.resolveCover(lookup);
+      for (const lookup of lookups) {
+        const book = findOrCreateBook(deps.repo, lookup, now().toISOString());
+        if (book && lookupDue(book)) schedule(book.id);
+      }
     },
 
     enqueueUnchecked() {
@@ -415,7 +414,8 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       const identity = lookupIdentity(lookup);
       const book = identity ? findByIdentity(deps.repo, identity) : undefined;
       if (!book) throw new BookNotFoundError();
-      const image = book.cover_image_id ? deps.repo.getImage(book.cover_image_id) : undefined;
+      const imageId = book.cover_image_id ?? siblingCoverImageIds(deps.repo, [book]).get(book.id);
+      const image = imageId ? deps.repo.getImage(imageId) : undefined;
       if (image?.source_url) deps.repo.addRejection(book.id, image.source_url, now().toISOString());
       deps.repo.setCover(book.id, { imageId: null, status: null, checkedAt: null });
       backoffUntil.delete(book.id);
@@ -446,7 +446,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       deps.repo.setCover(book.id, { imageId, status: "manual", checkedAt: at });
       deps.repo.setUpgradeWanted(book.id, null);
       backoffUntil.delete(book.id);
-      return coverOf(deps.repo.getBook(book.id) ?? book);
+      return coverOf(imageId, false);
     }
   };
 }

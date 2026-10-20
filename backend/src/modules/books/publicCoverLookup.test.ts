@@ -16,7 +16,7 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 const { openBooksDb } = await import("./adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("./adapters/sqlite/sqliteBooksRepository.js");
 const { lookupIdentity } = await import("./domain/normalize.js");
-const { coverUrlFor, peekCachedCoverUrl, peekCachedCoverUrls } = await import("./publicCoverLookup.js");
+const { coverUrlFor, peekCachedCoverUrl, peekCachedCoverUrls, useBooksRepository } = await import("./publicCoverLookup.js");
 
 const db = openBooksDb();
 function cacheBook(id: string, imageId: string | null, keys: string[]) {
@@ -71,7 +71,7 @@ function editions(title: string, workKey: string, options: { siblingCover: boole
   if (options.siblingCover) setCover(sibling.id, SIBLING_COVER);
   const copyIsbn = options.copyIsbn ?? null;
   const copy = repo.createBook({ title, author, isbn: copyIsbn, workKey }, [copyIsbn ? `isbn:${copyIsbn}` : titleKey(title, author)], "2026-09-02T00:00:00.000Z");
-  return { copy, lookup: { isbn: copyIsbn, title, author } };
+  return { sibling, copy, lookup: { isbn: copyIsbn, title, author } };
 }
 
 test("the public peeks give an ISBN-less copy with no cover the cover of a sibling edition", () => {
@@ -98,4 +98,25 @@ test("the public peeks give an ISBN-less copy in a work with no covered edition 
   const { lookup } = editions("Erosion Maps", "OL84W", { siblingCover: false });
   assert.equal(peekCachedCoverUrl(lookup), null);
   assert.deepEqual(peekCachedCoverUrls([lookup]), [null]);
+});
+
+test("the public peeks do not lend a cover the copy has rejected", () => {
+  const { sibling, copy, lookup } = editions("Erosion Charts", "OL85W", { siblingCover: true });
+  db.prepare(`INSERT INTO cover_images (id, book_id, source, source_url, width, height, byte_size, color, created_at) VALUES (?, ?, 'apple', 'https://a/sibling', 900, 1400, 1, '', '2026-09-01T00:00:00.000Z')`).run(SIBLING_COVER, sibling.id);
+  assert.equal(peekCachedCoverUrl(lookup), coverUrlFor(SIBLING_COVER, "thumb"));
+  repo.addRejection(copy.id, "https://a/sibling", "2026-10-01T00:00:00.000Z");
+  assert.equal(peekCachedCoverUrl(lookup), null);
+  assert.deepEqual(peekCachedCoverUrls([lookup]), [null]);
+});
+
+test("peekCachedCoverUrls asks for the sibling covers of all its rows at once", () => {
+  const first = editions("Erosion Tables", "OL86W", { siblingCover: true }).lookup;
+  const second = editions("Erosion Tools", "OL87W", { siblingCover: true }).lookup;
+  const asked: string[][] = [];
+  useBooksRepository({ ...repo, workCoverImageIds: (ids) => { asked.push(ids); return repo.workCoverImageIds(ids); } });
+  const covers = peekCachedCoverUrls([first, second, { title: "Not Cached", author: "Nobody" }]);
+  useBooksRepository(repo);
+  assert.deepEqual(covers, [coverUrlFor(SIBLING_COVER, "thumb"), coverUrlFor(SIBLING_COVER, "thumb"), null]);
+  assert.equal(asked.length, 1);
+  assert.equal(asked[0]!.length, 2);
 });
