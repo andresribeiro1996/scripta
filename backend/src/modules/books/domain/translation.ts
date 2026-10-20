@@ -83,10 +83,10 @@ function claimGroups(claims: OriginalClaim[]): Map<string, ClaimGroup> {
 }
 
 export function seriesLikeOriginals(claims: OriginalClaim[]): SeriesLike {
-  const groups = claimGroups(claims);
+  const qualifying = new Set([...claimGroups(claims)].filter(([, group]) => group.titles.size >= SERIES_LIKE_TITLES).map(([key]) => key));
   return (originalTitle, author) => {
     const original = originalKey(originalTitle);
-    return original !== null && (groups.get(groupOf(original, author))?.titles.size ?? 0) >= SERIES_LIKE_TITLES;
+    return original !== null && qualifying.has(groupOf(original, author));
   };
 }
 
