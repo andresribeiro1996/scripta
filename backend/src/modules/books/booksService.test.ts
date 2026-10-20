@@ -2031,3 +2031,90 @@ test("a hidden summary takes its source link with it", async () => {
   assert.equal(hidden?.summary, null);
   assert.equal(hidden?.sourceUrl, "");
 });
+
+const erosao = { title: "Dicionário da Erosão", author: "John Freeman" };
+const erosaoKey = "ta:dicionario da erosao|john freeman|";
+const erosaoIsbn = "9789896716844";
+const siblingThumb = "https://api.test/covers/cached/sibling-cover/thumb";
+const siblingFull = "https://api.test/covers/cached/sibling-cover/file";
+const borrowed = { url: siblingThumb, fullUrl: siblingFull, pending: false, upgrading: false };
+
+function erosaoEditions(h: ReturnType<typeof harness>, options: { siblingCover?: boolean; copyIsbn?: string | null } = {}) {
+  const { siblingCover = true, copyIsbn = null } = options;
+  const sibling = h.repo.createBook({ ...erosao, isbn: erosaoIsbn, workKey: "OL77W" }, [`isbn:${erosaoIsbn}`], "2026-09-01T00:00:00.000Z");
+  if (siblingCover) h.repo.setCover(sibling.id, { imageId: "sibling-cover", status: "good", checkedAt: "2026-09-01T00:00:00.000Z" });
+  const copy = h.repo.createBook({ ...erosao, isbn: copyIsbn, workKey: "OL77W" }, [copyIsbn ? `isbn:${copyIsbn}` : erosaoKey], "2026-09-02T00:00:00.000Z");
+  return { sibling, copy };
+}
+
+test("an ISBN-less copy with no cover of its own shows the cover of a sibling edition", () => {
+  const h = harness();
+  const { copy } = erosaoEditions(h);
+  h.repo.setCover(copy.id, { imageId: null, status: "missing", checkedAt: "2026-10-01T00:00:00.000Z" });
+  assert.deepEqual(h.service.resolveCover(erosao), borrowed);
+  assert.deepEqual(h.enqueued, []);
+  const row = h.repo.getBook(copy.id)!;
+  assert.deepEqual([row.cover_image_id, row.cover_status], [null, "missing"]);
+});
+
+test("an ISBN-less copy that has not been checked shows the sibling cover and still looks for its own", () => {
+  const h = harness();
+  const { copy } = erosaoEditions(h);
+  assert.deepEqual(h.service.resolveCover(erosao), borrowed);
+  assert.deepEqual(h.enqueued, [{ bookId: copy.id, priority: "normal" }]);
+  assert.equal(h.repo.getBook(copy.id)!.cover_image_id, null);
+});
+
+test("an ISBN-less copy whose miss is over 30 days old shows the sibling cover and looks again", () => {
+  const h = harness();
+  const { copy } = erosaoEditions(h);
+  h.repo.setCover(copy.id, { imageId: null, status: "missing", checkedAt: "2026-10-01T00:00:00.000Z" });
+  h.advance(30 * DAY);
+  assert.deepEqual(h.service.resolveCover(erosao, true), borrowed);
+  assert.deepEqual(h.enqueued, [{ bookId: copy.id, priority: "front" }]);
+});
+
+test("an ISBN-less copy with its own cover keeps it", () => {
+  const h = harness();
+  const { copy } = erosaoEditions(h);
+  h.repo.setCover(copy.id, { imageId: "own-cover", status: "good", checkedAt: "2026-10-01T00:00:00.000Z" });
+  assert.deepEqual(h.service.resolveCover(erosao), { url: "https://api.test/covers/cached/own-cover/thumb", fullUrl: "https://api.test/covers/cached/own-cover/file", pending: false, upgrading: false });
+});
+
+test("a cover found later for the ISBN-less copy replaces the sibling cover", () => {
+  const h = harness();
+  const { copy } = erosaoEditions(h);
+  assert.deepEqual(h.service.resolveCover(erosao), borrowed);
+  h.repo.setCover(copy.id, { imageId: "own-cover", status: "good", checkedAt: "2026-10-01T00:00:00.000Z" });
+  assert.equal(h.service.resolveCover(erosao).url, "https://api.test/covers/cached/own-cover/thumb");
+});
+
+test("an ISBN lookup with no cover does not borrow from a sibling edition", () => {
+  const h = harness();
+  const { copy } = erosaoEditions(h, { copyIsbn: "9780141184272" });
+  const lookup = { ...erosao, isbn: "9780141184272" };
+  assert.deepEqual(h.service.resolveCover(lookup), { url: null, fullUrl: null, pending: true, upgrading: false });
+  assert.deepEqual(h.enqueued, [{ bookId: copy.id, priority: "normal" }]);
+  h.repo.setCover(copy.id, { imageId: null, status: "missing", checkedAt: "2026-10-01T00:00:00.000Z" });
+  assert.deepEqual(h.service.resolveCover(lookup), { url: null, fullUrl: null, pending: false, upgrading: false });
+});
+
+test("an ISBN-less copy in a work with no covered edition is unchanged", () => {
+  const h = harness();
+  const { copy } = erosaoEditions(h, { siblingCover: false });
+  assert.deepEqual(h.service.resolveCover(erosao), { url: null, fullUrl: null, pending: true, upgrading: false });
+  assert.deepEqual(h.enqueued, [{ bookId: copy.id, priority: "normal" }]);
+  h.repo.setCover(copy.id, { imageId: null, status: "missing", checkedAt: "2026-10-01T00:00:00.000Z" });
+  assert.deepEqual(h.service.resolveCover(erosao), { url: null, fullUrl: null, pending: false, upgrading: false });
+});
+
+test("an ISBN-less copy whose work was merged into another finds the covered edition there", () => {
+  const h = harness();
+  const sibling = h.repo.createBook({ ...erosao, isbn: erosaoIsbn, workKey: "OL77W" }, [`isbn:${erosaoIsbn}`], "2026-09-01T00:00:00.000Z");
+  h.repo.setCover(sibling.id, { imageId: "sibling-cover", status: "good", checkedAt: "2026-09-01T00:00:00.000Z" });
+  const copy = h.repo.createBook({ ...erosao, isbn: null }, [erosaoKey], "2026-09-02T00:00:00.000Z");
+  assert.notEqual(copy.work_id, sibling.work_id);
+  h.repo.mergeWorks(copy.work_id!, sibling.work_id!);
+  h.repo.setCover(copy.id, { imageId: null, status: "missing", checkedAt: "2026-10-01T00:00:00.000Z" });
+  assert.deepEqual(h.service.resolveCover(erosao), borrowed);
+});

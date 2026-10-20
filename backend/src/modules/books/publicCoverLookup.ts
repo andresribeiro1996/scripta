@@ -4,6 +4,8 @@ import { openBooksDb } from "./adapters/sqlite/connection.js";
 import { createSqliteBooksRepository } from "./adapters/sqlite/sqliteBooksRepository.js";
 import { findByIdentity, lookupIdentity } from "./domain/normalize.js";
 import type { BooksRepository } from "./domain/ports.js";
+import { siblingCoverImageId } from "./domain/siblingCover.js";
+import type { BookRow } from "./domain/types.js";
 
 export function coverUrlFor(imageId: string, size: "file" | "thumb"): string {
   return createObjectStore().urlFor(`covers/${imageId}${size === "thumb" ? "-thumb" : ""}.webp`);
@@ -32,11 +34,14 @@ export function useBooksRepository(next: BooksRepository): void {
   repo = next;
 }
 
+function thumbUrlOf(book: BookRow | undefined): string | null {
+  const imageId = book && (book.cover_image_id ?? siblingCoverImageId(booksRepository(), book));
+  return imageId ? coverUrlFor(imageId, "thumb") : null;
+}
+
 export function peekCachedCoverUrl(params: PeekCachedCoverParams): string | null {
   const identity = lookupIdentity(params);
-  if (!identity) return null;
-  const imageId = findByIdentity(booksRepository(), identity)?.cover_image_id;
-  return imageId ? coverUrlFor(imageId, "thumb") : null;
+  return identity ? thumbUrlOf(findByIdentity(booksRepository(), identity)) : null;
 }
 
 export function peekCachedCoverUrls(params: PeekCachedCoverParams[]): Array<string | null> {
@@ -45,8 +50,5 @@ export function peekCachedCoverUrls(params: PeekCachedCoverParams[]): Array<stri
   if (keys.size === 0) return identities.map(() => null);
   const found = booksRepository().findBooksByKeys([...keys]);
   const byKey = { findBookByKey: (key: string) => found.get(key) };
-  return identities.map((identity) => {
-    const imageId = identity ? findByIdentity(byKey, identity)?.cover_image_id : null;
-    return imageId ? coverUrlFor(imageId, "thumb") : null;
-  });
+  return identities.map((identity) => (identity ? thumbUrlOf(findByIdentity(byKey, identity)) : null));
 }

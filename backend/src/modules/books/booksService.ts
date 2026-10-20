@@ -7,6 +7,7 @@ import { BookNotFoundError, FileTooLargeError, InvalidImageError, SourcePausedEr
 import { coverColor, encodeCover, type EncodedCover } from "./domain/images.js";
 import { hiddenSynopsisHashes } from "./domain/synopsis.js";
 import { fillMissingIdentity, findExisting, findOrCreateBook, keysOf } from "./domain/findOrCreate.js";
+import { siblingCoverImageId } from "./domain/siblingCover.js";
 import { firstEditionPerWork, workIdsOf } from "./domain/workSearch.js";
 import { editionLanguage, findByIdentity, isPortugalIsbn, isPortugueseIsbn, isValidIsbn, lookupIdentity, SEARCH_LIMIT, searchTokens, WORK_SCAN_LIMIT, WORK_SEARCH_LIMIT, type BookIdentity, type BookLookup } from "./domain/normalize.js";
 import { summaryMatchesLanguage } from "./adapters/catalog/languageFilter.js";
@@ -240,9 +241,11 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
         if (book.cover_status === "low_res" && olderThan(book.cover_checked_at, RETRY_AFTER_MS)) schedule(book.id, front ? "front" : "normal");
         return coverOf(book);
       }
-      if (book.cover_status === "missing" && !olderThan(book.cover_checked_at, RETRY_AFTER_MS)) return NO_COVER;
+      const siblingId = siblingCoverImageId(deps.repo, book);
+      const sibling: ResolvedCover | null = siblingId ? { url: deps.publicUrlFor(siblingId, "thumb"), fullUrl: deps.publicUrlFor(siblingId, "file"), pending: false, upgrading: false } : null;
+      if (book.cover_status === "missing" && !olderThan(book.cover_checked_at, RETRY_AFTER_MS)) return sibling ?? NO_COVER;
       schedule(book.id, front ? "front" : "normal");
-      return PENDING;
+      return sibling ?? PENDING;
     },
 
     enqueueCovers(lookups) {
