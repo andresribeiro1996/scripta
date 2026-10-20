@@ -277,7 +277,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
         let width = current?.width ?? 0;
         let source = current?.source;
         const portuguese = isPortugueseIsbn(book.isbn);
-        const found = outcome.found;
+        const found = outcome.found && !deps.repo.listRejectedUrls(bookId).has(outcome.found.candidate.url) ? outcome.found : null;
         const replacesWatermark = lane === "upgrade" && found !== null && found.image.width >= MIN_GOOD_WIDTH && source === "isbndb" && portuguese;
         if (found && (found.image.width > width || replacesWatermark)) {
           imageId = await storeCoverImage(deps, bookId, found.candidate.source, found.candidate.url, found.image, at);
