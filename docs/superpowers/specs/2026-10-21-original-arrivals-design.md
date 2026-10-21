@@ -128,7 +128,7 @@ A new module, `backend/src/modules/books/originalArrivals.ts`.
 `joinArrivedOriginals(deps, limit)` takes `deps: Pick<TranslationDeps, "repo" | "sharesArena" | "now">`. It processes up to `limit` keys from `originalArrivals`, each in its own `repo.transaction` (`BEGIN IMMEDIATE`). For each title key:
 1. `K = arrivalKey(titleKey)`. When it is null, drop the key and move on.
 2. `claims = repo.originalClaimsOf(K)`. When there are none, which is almost always, drop the key and move on.
-3. Build `seriesLike = seriesLikeOriginals(claims)` (Guard 1) and `shared = sharedOriginals(claims)` (the #323 bucket rule, moved to `domain/translation.ts`).
+3. Build `seriesLike = seriesLikeOriginals(claims)` (Guard 1) and `shared = sharedOriginals(claims)` (the #323 bucket rule, see Reuse).
 4. Collect the claimant works: the canonical ids (`repo.canonicalWorkIds`) of the claims' non-null `workId`s. Filter them through `repo.portugueseWorksNeedingMatch(ids, Number.MAX_SAFE_INTEGER, JEV_REJECTION_LIMIT, new Date(deps.now()).toISOString())`. That selects:
    - live works whose editions are all Portuguese;
    - that are unjudged, or that hold a `code` or Jev "none" answered before now;
@@ -159,10 +159,13 @@ It returns `{ arrivals, claimants, codeMerges, codeBlocked }`:
 
 ### Reuse
 
-- `sameWholeTitle` moves from `seed/originalsFill.ts` to `domain/translation.ts`.
-- The fill's bucket loop becomes `sharedOriginals(claims): SeriesLike` in `domain/translation.ts`. Its group key is `originalKey(originalTitle)#surnameOf(author)`, the same as `claimGroups`. It is true when the bucket holds two or more distinct `normalizeWords(title)`, or two or more distinct `normalizeWords(originalTitle)`, over Portuguese claims whose `normalizeWords(title)` isn't empty and that aren't `sameMainTitle(title, originalTitle)`.
-- `fillOriginals` calls both and keeps its counts. Its tests pass unchanged.
-- `runCodeSteps` keeps its behaviour through `joinByCode`, which neither catches `WorkMergeError` nor adds a transaction. It stays one `repo.transaction` around the judgment and the merge.
+- `sameWholeTitle` is imported from `seed/originalsFill.ts`, where it lives today.
+- The shared-original rule is a local `sharedOriginals(claims): SeriesLike` in `originalArrivals.ts`. It is the #323 fill's bucket (`originalsFill.ts:68-77,117-121`), copied for now.
+  - The bucket key is `originalKey(originalTitle)#surnameOf(author)`, the same as `claimGroups`.
+  - The bucket counts Portuguese claims whose `normalizeWords(title)` isn't empty and that aren't `sameMainTitle(title, originalTitle)`.
+  - It is true when the bucket holds two or more distinct `normalizeWords(title)`, or two or more distinct `normalizeWords(originalTitle)`.
+- The matcher-fix session asked that neither helper be moved on this branch. Its branch exports both from `domain/translation.ts` and replaces the fill's bucket. Whichever branch merges second switches the drain to those exports and drops the copy.
+- `runCodeSteps` keeps its behaviour through `joinByCode`, extracted into `translationBacklog.ts`. It neither catches `WorkMergeError` nor adds a transaction, and it stays one `repo.transaction` around the judgment and the merge.
 
 ### Cost
 

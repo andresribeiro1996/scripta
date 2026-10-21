@@ -23,7 +23,7 @@
 - **No comments in code** (root `AGENTS.md`).
 - **The worktree's `node_modules` is already linked** (`npm run dev:link-deps`). Before backend typecheck or tests, run `npm run build --workspace @scripta/shared`.
 - **New test files** go in `backend/package.json`'s explicit `test` list.
-- **`domain/translation.ts` is shared with the matcher-fix session** (branch `claude/eloquent-franklin-d0b337`). Only append new exports and move `sameWholeTitle` in. Don't change the body of any existing function there (`mainTitle`, `titlePattern`, `originalKey`, `claimGroups`, `seriesLikeOriginals`, …).
+- **`domain/translation.ts` and `seed/originalsFill.ts` are shared with the matcher-fix session** (branch `claude/eloquent-franklin-d0b337`). In `translation.ts`, only append new exports, and change no existing function body (`mainTitle`, `titlePattern`, `originalKey`, `claimGroups`, `seriesLikeOriginals`, …). Leave `originalsFill.ts` untouched. That session asked that `sameWholeTitle` and the shared-original bucket not move on this branch.
 - **No `PRAGMA user_version` change.** The key backfill is gated on `ORIGINAL_KEY_VERSION`, stored in its own one-row table.
 - **Reuse, don't copy:**
   - from `domain/translation.ts`: `originalKey`, `titlePattern`, `mainTitle`, `sameMainTitle`, `isPortuguese`, `surnameOf`, `evidenceOf`, `seriesLikeOriginals`, `originalTitleIn`, and the type `OriginalClaim`;
@@ -152,55 +152,27 @@
   - the recompute is gated on `ORIGINAL_KEY_VERSION`, not `user_version`, so a concurrent branch's version bump can't skip it, and a change to `originalKey` re-keys every row;
   - summary-derived originals are stored first, so a claim subset read by key gives Guard 1 its full count.
 
-### Task 2: Shared whole-title helpers and the code-join helper
-
-**Files:**
-- Modify: `backend/src/modules/books/domain/translation.ts`
-- Modify: `backend/src/modules/books/seed/originalsFill.ts`
-- Modify: `backend/src/modules/books/translationBacklog.ts`
-- Test: `backend/src/modules/books/domain/translation.test.ts`
-
-**Interfaces:**
-- **`domain/translation.ts`:**
-  - Move `export function sameWholeTitle(title: string, originalTitle: string): boolean` here from `seed/originalsFill.ts`, unchanged.
-  - Append `export function sharedOriginals(claims: OriginalClaim[]): SeriesLike`. It builds buckets exactly as `fillOriginals` does now (`originalsFill.ts:68-77`):
-    - it skips claims that aren't `isPortuguese(claim.language)`, whose `originalKey(claim.originalTitle)` is null, whose `normalizeWords(claim.title)` is `""`, or where `sameMainTitle(claim.title, claim.originalTitle)`;
-    - the key is `` `${originalKey(claim.originalTitle)}#${surnameOf(claim.author) ?? ""}` ``;
-    - the sets are `titles` (`normalizeWords(claim.title)`) and `originals` (`normalizeWords(claim.originalTitle)`).
-
-    The returned function `(originalTitle, author)` is true when `originalKey(originalTitle)` is non-null and the bucket `` `${originalKey(originalTitle)}#${surnameOf(author) ?? ""}` `` has `titles.size >= 2 || originals.size >= 2`.
-- **`seed/originalsFill.ts`:**
-  - import `sameWholeTitle` and `sharedOriginals` from `domain/translation.ts`;
-  - delete the local `sameWholeTitle` and the `buckets` loop;
-  - build `const isShared = sharedOriginals(claims);` next to `isSeriesLike`;
-  - in the group loop, replace the bucket test with `isShared(group.originalTitle, group.author)`. `originalKey` and `surnameOf` are unchanged by `mainTitle` and `firstAuthor`, so the bucket is the same.
-
-  Keep `pickOriginal` and the rest unchanged. Nothing outside the module imports `sameWholeTitle` today.
-- **`translationBacklog.ts`:** extract the code-join branch of `runCodeSteps` as `export function joinByCode(deps: Pick<TranslationDeps, "repo" | "sharesArena">, workId: string, intoWorkId: string, at: string): boolean`. It returns true when merged and false when blocked by an arena. It keeps the same `deps.repo.transaction` around `saveWorkMatchJudgment` and `mergeTranslation`, and no new catch. `runCodeSteps` calls it and keeps its counts.
-
-- [ ] **Step 1: Write the failing tests** in `translation.test.ts` for `sharedOriginals` over hand-made `OriginalClaim[]`:
-  - "Passeio ao Farol" and "Rumo ao Farol" (pt-PT, Virginia Woolf, original "To the Lighthouse") → true for `("To the Lighthouse", "Virginia Woolf")`.
-  - The same title twice from two works → false.
-  - "Crónicas" claiming "Chronicles" and another "Crónicas" claiming "Chronicles: Dusk", both by Ana Silva → true for `("Chronicles", "Ana Silva")`.
-  - An English claim and a `sameMainTitle` claim ("Orlando" claiming "Orlando") don't count.
-  - Another surname's bucket is separate.
-  - Also `sameWholeTitle`: `("Dune", "Dune: Messiah")` → false, `("Dune: Messiah", "Dune: Messiah")` → true.
-- [ ] **Step 2: Run them and watch them fail** (same command as Task 1, `translation.test.ts` only).
-- [ ] **Step 3: Implement.**
-- [ ] **Step 4: Verify.** Run `npm run build --workspace @scripta/shared && npm run typecheck --workspace backend && npm test --workspace backend`. `originalsFill.test.ts` and `translationBacklog.test.ts` pass unchanged.
-- [ ] **Step 5: Commit.** Message: `Share the whole-title checks and the code join with the arrival hook`.
-
-### Task 3: The arrivals drain, its wiring and the README
+### Task 2: The arrivals drain, its wiring and the README
 
 **Files:**
 - Create: `backend/src/modules/books/originalArrivals.ts`
 - Test: `backend/src/modules/books/originalArrivals.test.ts`
+- Modify: `backend/src/modules/books/translationBacklog.ts`
 - Modify: `backend/package.json`
 - Modify: `backend/src/modules/books/plugin.ts`
 - Modify: `backend/README.md`
 
 **Interfaces:**
+- **`translationBacklog.ts`:** extract the code-join branch of `runCodeSteps` as `export function joinByCode(deps: Pick<TranslationDeps, "repo" | "sharesArena">, workId: string, intoWorkId: string, at: string): boolean`.
+  - It returns true when merged, and false when an arena blocks the merge.
+  - It keeps the same `deps.repo.transaction` around `saveWorkMatchJudgment` and `mergeTranslation`, and adds no catch.
+  - `runCodeSteps` calls it and keeps its counts; `translationBacklog.test.ts` passes unchanged.
 - **`originalArrivals.ts`:**
+  - `sameWholeTitle` comes from `./seed/originalsFill.js`, where it lives today. Don't move it.
+  - `export function sharedOriginals(claims: OriginalClaim[]): SeriesLike` is a copy of the #323 fill's bucket (`seed/originalsFill.ts:68-77` and `:117-121`). Leave `originalsFill.ts` untouched; the matcher-fix session replaces both with shared exports later. It:
+    - skips claims that aren't `isPortuguese(claim.language)`, whose `originalKey(claim.originalTitle)` is null, whose `normalizeWords(claim.title)` is `""`, or where `sameMainTitle(claim.title, claim.originalTitle)`;
+    - keys buckets on `` `${originalKey(claim.originalTitle)}#${surnameOf(claim.author) ?? ""}` ``, holding the sets `titles` (`normalizeWords(claim.title)`) and `originals` (`normalizeWords(claim.originalTitle)`);
+    - returns `(originalTitle, author) =>` true when `originalKey(originalTitle)` is non-null and the bucket `` `${originalKey(originalTitle)}#${surnameOf(author) ?? ""}` `` has `titles.size >= 2 || originals.size >= 2`.
   - `export const ORIGINAL_ARRIVALS_BATCH = 500;`
   - `export const ORIGINAL_ARRIVALS_INTERVAL_MS = 60 * 1000;`
   - `export type ArrivalSteps = { arrivals: number; claimants: number; codeMerges: number; codeBlocked: number };`
@@ -244,7 +216,14 @@
     - every join is listed under "Merged" on `/admin/translations`, and the log line is `original arrivals joined`;
   - in "Fetching missing originals", add one sentence: the server also joins unheld works naming an added original within a minute, through the same queue.
 
-- [ ] **Step 1: Write the failing tests** in `originalArrivals.test.ts`, with the env preamble and the `freshRepo` and `book` helpers copied from `translationBacklog.test.ts:8-41`.
+- [ ] **Step 1: Write the failing tests** in `originalArrivals.test.ts`, with the env preamble. Start with `sharedOriginals` unit tests over hand-made `OriginalClaim[]`:
+  - "Passeio ao Farol" and "Rumo ao Farol" (pt-PT, Virginia Woolf, original "To the Lighthouse") → true for `("To the Lighthouse", "Virginia Woolf")`;
+  - the same title twice from two works → false;
+  - "Crónicas" claiming "Chronicles" and another "Crónicas" claiming "Chronicles: Dusk", both by Ana Silva → true for `("Chronicles", "Ana Silva")`;
+  - an English claim and a `sameMainTitle` claim ("Orlando" claiming "Orlando") don't count;
+  - another surname's bucket is separate.
+
+  Then the drain tests, and the `freshRepo` and `book` helpers copied from `translationBacklog.test.ts:8-41`.
   - Each test builds only the books it names.
   - Set original titles with `repo.fillOriginalTitle(id, title)`, not raw SQL, so `original_key` is written.
   - Every arriving original gets a `workKey` (so its work has an Open Library key) unless a test says otherwise. Every Portuguese edition gets `language` "pt-PT".
@@ -289,6 +268,7 @@
 - [ ] **Step 3: Implement** the module, the wiring and the README paragraphs.
 - [ ] **Step 4: Verify.** Run `npm run build --workspace @scripta/shared && npm run typecheck --workspace backend && npm test --workspace backend`. Expected: all pass.
 - [ ] **Step 5: Commit.** Message: `Join translations when their original arrives`. The body says:
+  - `sharedOriginals` is a temporary copy of the #323 bucket, because the matcher-fix branch is moving the shared helpers;
   - only `code` joins are written, so Jev's and the owner's answers stand;
   - both #317 guards run, plus the #323 whole-title and shared-original checks, because Guard 1 needs three titles and counts colon volumes as one;
   - joins wait for the target work's Open Library key, because a later `setWorkKey` would split an unkeyed work;
