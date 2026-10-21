@@ -40,8 +40,11 @@ export function RecapScreen({ month }: { month: string }) {
   useEffect(() => {
     setShareUrl(null);
     setLinkError(null);
-    setCoversReady(false);
   }, [card]);
+
+  useEffect(() => {
+    setCoversReady(false);
+  }, [card, sharing]);
 
   useEffect(() => {
     if (!sharing || !card) return;
@@ -64,7 +67,7 @@ export function RecapScreen({ month }: { month: string }) {
   const currentMonth = recapIndex.data.currentMonth;
   const last = cards.length - 1;
   const step = (event: GestureResponderEvent) => {
-    if (event.nativeEvent.locationX < width / 2) setIndex((value) => Math.max(0, value - 1));
+    if (event.nativeEvent.pageX < width / 2) setIndex((value) => Math.max(0, value - 1));
     else if (index < last) setIndex((value) => value + 1);
     else close();
   };
@@ -97,7 +100,7 @@ function CloseButton({ top, onPress }: { top: number; onPress: () => void }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#0f1512" },
+  root: { flex: 1, backgroundColor: RECAP_COLORS.base },
   center: { alignItems: "center", justifyContent: "center" },
   fill: { flex: 1 },
   dots: { position: "absolute", left: spacing.lg, right: spacing.lg + minimumTouchTarget, flexDirection: "row", gap: spacing.xs },

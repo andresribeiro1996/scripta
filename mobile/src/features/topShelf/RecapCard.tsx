@@ -9,7 +9,7 @@ import { Text } from "../../ui/Text";
 import { cardFontFamily, dynamicType, radii, spacing, typography } from "../../ui";
 import { recapCta, recapNumber, recapTitle } from "./recapModel";
 
-export const RECAP_COLORS = { gold: "#d9a54a", text: "#e8ece9", dim: "#9aa79f", border: "#5a4a24", deep: "#3d2f12" } as const;
+export const RECAP_COLORS = { gold: "#d9a54a", text: "#e8ece9", dim: "#9aa79f", border: "#5a4a24", deep: "#3d2f12", mid: "#1a2a22", base: "#0f1512" } as const;
 
 const SERIF = cardFontFamily("serif");
 
@@ -25,8 +25,8 @@ function Background() {
       <Defs>
         <LinearGradient id="recapBg" x1="0.2" y1="0" x2="0.8" y2="1">
           <Stop offset="0" stopColor={RECAP_COLORS.deep} />
-          <Stop offset="0.55" stopColor="#1a2a22" />
-          <Stop offset="1" stopColor="#0f1512" />
+          <Stop offset="0.55" stopColor={RECAP_COLORS.mid} />
+          <Stop offset="1" stopColor={RECAP_COLORS.base} />
         </LinearGradient>
       </Defs>
       <Rect width="100%" height="100%" fill="url(#recapBg)" />
@@ -98,7 +98,7 @@ export function RecapCard({ card, month, currentMonth, url, sharing = false, onO
 }
 
 const styles = StyleSheet.create({
-  card: { overflow: "hidden", paddingHorizontal: spacing.xxl, justifyContent: "space-between", backgroundColor: "#0f1512" },
+  card: { overflow: "hidden", paddingHorizontal: spacing.xxl, justifyContent: "space-between", backgroundColor: RECAP_COLORS.base },
   sharing: { width: "100%", aspectRatio: 9 / 16 },
   full: { flex: 1 },
   main: { flex: 1, alignItems: "center", justifyContent: "center", gap: spacing.xl },
