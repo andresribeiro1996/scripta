@@ -1,22 +1,14 @@
-import { useEffect, useRef, useState, type ReactNode, type Ref } from "react";
-import { Animated, Dimensions, Keyboard, KeyboardAvoidingView, Platform, Pressable, StyleSheet, TextInput, View } from "react-native";
+import { useEffect, useRef, type ReactNode, type Ref } from "react";
+import { Keyboard, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { Icon, type IconName } from "./icon";
 import { Input, Menu, type MenuItem } from "./components";
-import { minimumTouchTarget, radii, spacing, useReducedMotion, useTheme } from "./theme";
-
-const FAB_HEIGHT = 56;
+import { ScrollDock, scrollDockFabHeight, type SearchDockScrollProps } from "./ScrollDock";
+import { minimumTouchTarget, radii, spacing, useTheme } from "./theme";
 
 export const searchDockClearance = minimumTouchTarget + spacing.lg * 2;
-export const searchDockFabClearance = searchDockClearance + FAB_HEIGHT + spacing.lg;
+export const searchDockFabClearance = searchDockClearance + scrollDockFabHeight + spacing.lg;
 
-export type SearchDockScrollProps = {
-  keyboardShouldPersistTaps: "handled";
-  keyboardDismissMode: "on-drag";
-  onScrollBeginDrag: () => void;
-  onScrollEndDrag: () => void;
-  onMomentumScrollBegin: () => void;
-  onMomentumScrollEnd: () => void;
-};
+export type { SearchDockScrollProps } from "./ScrollDock";
 
 export function SearchDock({
   value,
@@ -49,11 +41,6 @@ export function SearchDock({
   children: (scrollProps: SearchDockScrollProps) => ReactNode;
 }) {
   const { colors } = useTheme();
-  const frame = useRef<View>(null);
-  const [overlap, setOverlap] = useState(0);
-  const [scrolling, setScrolling] = useState(false);
-  const reducedMotion = useReducedMotion();
-  const dock = useRef(new Animated.Value(1)).current;
   const input = useRef<TextInput | null>(null);
   const setInput = (node: TextInput | null) => {
     input.current = node;
@@ -62,37 +49,9 @@ export function SearchDock({
   };
 
   useEffect(() => {
-    if (reducedMotion) {
-      dock.setValue(scrolling ? 0 : 1);
-      return;
-    }
-    Animated.timing(dock, { duration: 180, toValue: scrolling ? 0 : 1, useNativeDriver: true }).start();
-  }, [dock, reducedMotion, scrolling]);
-
-  useEffect(() => {
-    const shown = Keyboard.addListener("keyboardDidShow", (event) => {
-      frame.current?.measureInWindow((_x, y, _width, height) => {
-        setOverlap(Math.max(0, Math.min(height, y + height - (Dimensions.get("window").height - event.endCoordinates.height))));
-      });
-    });
-    const hiding = Keyboard.addListener("keyboardDidHide", () => {
-      setOverlap(0);
-      input.current?.blur();
-    });
-    return () => {
-      shown.remove();
-      hiding.remove();
-    };
+    const hiding = Keyboard.addListener("keyboardDidHide", () => input.current?.blur());
+    return () => hiding.remove();
   }, []);
-
-  const scrollProps: SearchDockScrollProps = {
-    keyboardShouldPersistTaps: "handled",
-    keyboardDismissMode: "on-drag",
-    onScrollBeginDrag: () => setScrolling(true),
-    onScrollEndDrag: () => setScrolling(false),
-    onMomentumScrollBegin: () => setScrolling(true),
-    onMomentumScrollEnd: () => setScrolling(false),
-  };
 
   const cycleButton = cycle ? (
     <Pressable
@@ -106,45 +65,32 @@ export function SearchDock({
     </Pressable>
   ) : null;
 
-  return (
-    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.grow}>
-      <View ref={frame} style={styles.grow}>
-        <View style={styles.grow}>{children(scrollProps)}</View>
-        {hidden && !fab ? null : (
-          <Animated.View
-            pointerEvents={scrolling ? "none" : "box-none"}
-            style={[styles.dock, { bottom: overlap, opacity: dock, transform: [{ translateY: dock.interpolate({ inputRange: [0, 1], outputRange: [minimumTouchTarget, 0] }) }] }]}
-          >
-            {fab ? <View pointerEvents="box-none" style={styles.fabArea}>{fab}</View> : null}
-            {hidden ? null : <View style={styles.row}>
-              <View style={styles.grow}>
-                <Input
-                  icon="search"
-                  accessibilityLabel={accessibilityLabel}
-                  value={value}
-                  onChangeText={onChangeText}
-                  onSubmitEditing={onSubmitEditing}
-                  ref={setInput}
-                  placeholder={placeholder}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  returnKeyType="search"
-                  style={styles.searchField}
-                />
-              </View>
-              {cycleButton ? <View style={styles.cycleSlot}>{cycle?.menu ? <Menu title={cycle.menu.title} items={cycle.menu.items}>{cycleButton}</Menu> : cycleButton}</View> : null}
-            </View>}
-          </Animated.View>
-        )}
+  const bar = (
+    <View style={styles.row}>
+      <View style={styles.grow}>
+        <Input
+          icon="search"
+          accessibilityLabel={accessibilityLabel}
+          value={value}
+          onChangeText={onChangeText}
+          onSubmitEditing={onSubmitEditing}
+          ref={setInput}
+          placeholder={placeholder}
+          autoCapitalize="none"
+          autoCorrect={false}
+          returnKeyType="search"
+          style={styles.searchField}
+        />
       </View>
-    </KeyboardAvoidingView>
+      {cycleButton ? <View style={styles.cycleSlot}>{cycle?.menu ? <Menu title={cycle.menu.title} items={cycle.menu.items}>{cycleButton}</Menu> : cycleButton}</View> : null}
+    </View>
   );
+
+  return <ScrollDock bar={bar} fab={fab} hidden={hidden}>{children}</ScrollDock>;
 }
 
 const styles = StyleSheet.create({
   grow: { flex: 1 },
-  dock: { position: "absolute", left: 0, right: 0 },
-  fabArea: { height: FAB_HEIGHT + spacing.lg },
   row: { flexDirection: "row", alignItems: "center", gap: spacing.sm, padding: spacing.md },
   searchField: { borderRadius: radii.full },
   cycleSlot: { minWidth: 48, minHeight: 48, alignItems: "center", justifyContent: "center" },

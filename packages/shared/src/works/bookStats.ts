@@ -16,6 +16,12 @@ const compactCount = (n: number) => (n < 1000 ? String(n) : n < 999_950 ? scaled
 export const ratingCountLabel = (count: number) => `${compactCount(count)} ${count === 1 ? "rating" : "ratings"}`;
 const feelingFor = (average: number) => FINISH_FEELINGS.find((feeling) => feeling.rating === Math.round(average))!.label as string;
 
+export function tierPosition({ tierIndex, tierCount, ranksWorstFirst }: { tierIndex: number; tierCount: number; ranksWorstFirst: boolean }): number | null {
+  if (tierCount < 2) return null;
+  const position = tierIndex / (tierCount - 1);
+  return ranksWorstFirst ? 1 - position : position;
+}
+
 export function tierLetter(score: number): TierLetter {
   return TIER_LETTERS[Math.min(4, Math.floor(score * 5))]!;
 }

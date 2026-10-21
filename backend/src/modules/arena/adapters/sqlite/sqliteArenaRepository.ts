@@ -6,7 +6,7 @@ import { normalizeWords } from "@scripta/shared";
 import type { TournamentRecord } from "@scripta/shared";
 import type { DatabaseSync } from "node:sqlite";
 import type { ArenaRepository } from "../../domain/ports.js";
-import type { CompletedVotedRow, DuelRow, SeedPreview, TournamentDiscoverRow, TournamentGameRow, TournamentRow, TournamentSlotRow, VoteRow } from "../../domain/types.js";
+import type { CompletedVotedRow, DuelRow, SeedPreview, TournamentDiscoverRow, TournamentGameRow, TournamentRow, TournamentShelfFacts, TournamentSlotRow, VoteRow } from "../../domain/types.js";
 
 export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
   const insertTournamentStmt = db.prepare(`
@@ -26,6 +26,26 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
     FROM tournament_slots s JOIN tournaments t ON t.id = s.tournament_id
     WHERE s.work_id IN (SELECT value FROM json_each(?)) AND t.status != 'seeding'
     ORDER BY t.created_at DESC LIMIT ?
+  `);
+  const shelfTournamentsStmt = db.prepare(`
+    SELECT t.id, t.owner_user_id, t.created_at, t.status,
+      (SELECT COUNT(DISTINCT COALESCE(v.voter_user_id, v.voter_token)) FROM votes v JOIN duels d ON d.id = v.duel_id
+        WHERE d.tournament_id = t.id AND (v.voter_user_id IS NULL OR v.voter_user_id != t.owner_user_id)) AS voters,
+      (SELECT COUNT(*) FROM votes v JOIN duels d ON d.id = v.duel_id
+        WHERE d.tournament_id = t.id AND (v.voter_user_id IS NULL OR v.voter_user_id != t.owner_user_id) AND ($since IS NULL OR v.created_at >= $since)) AS votes_since
+    FROM tournaments t WHERE t.status != 'seeding'
+  `);
+  const shelfWorksStmt = db.prepare(`
+    SELECT DISTINCT s.tournament_id, s.work_id FROM tournament_slots s JOIN tournaments t ON t.id = s.tournament_id
+    WHERE s.work_id IS NOT NULL AND t.status != 'seeding'
+  `);
+  const shelfFinalsStmt = db.prepare(`
+    SELECT d.tournament_id,
+      CASE d.winner_side WHEN 'a' THEN d.book_a_work_id ELSE d.book_b_work_id END AS work_id,
+      d.settled_at
+    FROM duels d JOIN tournaments t ON t.id = d.tournament_id AND t.status = 'completed'
+    WHERE d.round_number = (SELECT MAX(d2.round_number) FROM duels d2 WHERE d2.tournament_id = d.tournament_id)
+      AND d.winner_side IS NOT NULL AND d.settled_at IS NOT NULL
   `);
   const shareTournamentStmt = db.prepare(`
     SELECT 1 AS shared FROM tournament_slots a JOIN tournament_slots b ON b.tournament_id = a.tournament_id
@@ -249,6 +269,27 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
         }
       }
       return record;
+    },
+    topShelfFacts(since) {
+      const works = new Map<string, string[]>();
+      for (const row of shelfWorksStmt.all() as unknown as Array<{ tournament_id: string; work_id: string }>) {
+        const ids = works.get(row.tournament_id);
+        if (ids) ids.push(row.work_id);
+        else works.set(row.tournament_id, [row.work_id]);
+      }
+      const champions = new Map<string, { workId: string; settledAt: string }>();
+      for (const row of shelfFinalsStmt.all() as unknown as Array<{ tournament_id: string; work_id: string | null; settled_at: string }>) {
+        if (row.work_id) champions.set(row.tournament_id, { workId: row.work_id, settledAt: row.settled_at });
+      }
+      return (shelfTournamentsStmt.all({ since }) as unknown as Array<{ id: string; owner_user_id: string; created_at: string; voters: number; votes_since: number }>).map((row) => ({
+        id: row.id,
+        ownerUserId: row.owner_user_id,
+        createdAt: row.created_at,
+        voters: Number(row.voters),
+        votesSince: Number(row.votes_since),
+        workIds: works.get(row.id) ?? [],
+        champion: champions.get(row.id) ?? null
+      }));
     },
     listPublicByIds(ids) {
       return listPublicByIdsStmt.all(JSON.stringify(ids)) as unknown as TournamentRow[];

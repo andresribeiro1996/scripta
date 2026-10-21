@@ -31,6 +31,15 @@ const FAILED = "community feed backfill failed";
 const unused = () => {
   throw new Error("the backfill does not read this");
 };
+const topShelfDeps = {
+  tierlistFacts: () => [],
+  tournamentFacts: () => [],
+  quizFacts: () => [],
+  canonicalWorks: () => new Map<string, string>(),
+  catalogGenres: () => new Map<string, { genres: string[] }>(),
+  getWorkPage: () => undefined
+};
+
 const baseDeps: Omit<CommunityDeps, "repo" | "background"> = {
   now: () => NOW,
   getDashboardSeenAt: () => null,
@@ -324,7 +333,7 @@ test("a backfill that fails is logged as an error by the plugin, after the setti
   db.exec("CREATE TRIGGER backfill_refuses BEFORE INSERT ON feed_inbox WHEN NEW.viewer_id = 'log-fan' BEGIN SELECT RAISE(ABORT, 'inbox refuses'); END");
   t.after(() => db.exec("DROP TRIGGER IF EXISTS backfill_refuses"));
   const { app, logged } = build(t);
-  await app.register(communityPlugin, baseDeps);
+  await app.register(communityPlugin, { ...baseDeps, ...topShelfDeps });
 
   const res = await app.inject({ method: "PUT", url: "/community/profile/feed-settings", headers: { authorization: `Bearer ${author}` }, payload: READING_ON });
 
@@ -344,7 +353,7 @@ test("the plugin runs a backfill after answering 204, and logs no failure when i
   bookEvent(repo, author, "plugin-1", daysAgo(2));
   follow(repo, "plugin-fan", author);
   const { app, logged } = build(t);
-  await app.register(communityPlugin, baseDeps);
+  await app.register(communityPlugin, { ...baseDeps, ...topShelfDeps });
 
   const res = await app.inject({ method: "PUT", url: "/community/profile/feed-settings", headers: { authorization: `Bearer ${author}` }, payload: READING_ON });
 

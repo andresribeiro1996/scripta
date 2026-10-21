@@ -30,7 +30,7 @@ import {
 } from "./domain/errors.js";
 import { canonicalWorkIds } from "../library/index.js";
 import type { ArenaRepository } from "./domain/ports.js";
-import type { DuelRow, FinalWinnerFields, SeedBookInput, SeedPreview, TournamentGameRow, TournamentRow, TournamentSlotRow } from "./domain/types.js";
+import type { DuelRow, FinalWinnerFields, SeedBookInput, SeedPreview, TournamentGameRow, TournamentRow, TournamentShelfFacts, TournamentSlotRow } from "./domain/types.js";
 
 export interface TournamentDiscoverRef {
   id: string;
@@ -39,6 +39,7 @@ export interface TournamentDiscoverRef {
 }
 
 export type { Duel, DuelSide, SeedBook, Tournament, TournamentView };
+export type { TournamentShelfFacts };
 
 export interface ArenaService {
   createTournament(ownerUserId: string, input: { name: string; bracketSize: number; roundDurationMinutes: number }): Tournament;
@@ -48,6 +49,7 @@ export interface ArenaService {
   listPublicByIds(ids: string[]): Tournament[];
   listPublishedByWorks(workIds: string[], limit: number): TournamentGameRow[];
   tournamentRecord(workIds: string[]): TournamentRecord;
+  topShelfFacts(since: string | null): TournamentShelfFacts[];
   worksShareATournament(aIds: string[], bIds: string[]): boolean;
   votedAmong(voterUserId: string, ids: string[]): string[];
   getTournamentView(id: string, voterToken?: string, viewerUserId?: string | null): TournamentView | null;
@@ -313,6 +315,7 @@ export function createArenaService(
     listPublishedByWorks: (workIds, limit) => repo.listPublishedByWorks(workIds, limit),
 
     tournamentRecord: (workIds) => repo.tournamentRecord(workIds),
+    topShelfFacts: (since) => repo.topShelfFacts(since),
     worksShareATournament: (aIds, bIds) => repo.worksShareATournament(aIds, bIds),
 
     listPublicByIds(ids) {
@@ -515,6 +518,7 @@ export interface ArenaPublicApi {
   publishedByWorks(workIds: string[], limit: number): GameByWork[];
   discoverByWorks(workIds: string[], limit: number): TournamentDiscoverRef[];
   tournamentRecord(workIds: string[]): TournamentRecord;
+  topShelfFacts(since: string | null): TournamentShelfFacts[];
   worksShareATournament(aIds: string[], bIds: string[]): boolean;
   getPublished(id: string): PublishedTournamentRef | undefined;
   listPublishedByOwner(ownerUserId: string): PublishedTournamentRef[];
@@ -549,6 +553,7 @@ export function createArenaPublicApi(service: ArenaService): ArenaPublicApi {
     discoverByWorks: (workIds, limit) =>
       service.listPublishedByWorks(workIds, limit).map((row) => ({ id: row.id, createdAt: row.created_at, ownerUserId: row.owner_user_id })),
     tournamentRecord: (workIds) => service.tournamentRecord(workIds),
+    topShelfFacts: (since) => service.topShelfFacts(since),
     worksShareATournament: (aIds, bIds) => service.worksShareATournament(aIds, bIds),
     getPublished: (id) => {
       const summary = service.getPublicSummary(id);

@@ -327,3 +327,32 @@ test("votedAmong returns the published quizzes the viewer has played, owner play
   assert.deepEqual(repo.votedAmong("u2", ["habits", "fantasy"]), ["fantasy"]);
   assert.deepEqual(repo.votedAmong("u9", []), []);
 });
+
+test("topShelfFacts returns published quizzes with plays excluding the owner", () => {
+  const repo = makeRepo();
+  const doc = (...ids: string[]) => JSON.stringify({ books: ids.map((workId) => ({ workId, title: workId })), questions: null });
+  repo.insert(quizRow({ id: "pub", vote_code: "code-pub", play_open: 1, data: doc("w1", "w2") }));
+  repo.insert(quizRow({ id: "draft", data: doc("w1") }));
+  repo.savePlay(playRow("p0", "pub", "u1"), []);
+  repo.savePlay(playRow("p1", "pub", "u2"), []);
+  repo.savePlay(playRow("p2", "pub", null), []);
+  repo.savePlay(playRow("p3", "pub", null), []);
+  repo.savePlay(playRow("p4", "draft", "u2"), []);
+  const facts = repo.topShelfFacts(null);
+  assert.deepEqual(facts.map((f) => f.id), ["pub"]);
+  assert.equal(facts[0]!.ownerUserId, "u1");
+  assert.equal(facts[0]!.createdAt, "2026-01-01T00:00:00Z");
+  assert.equal(facts[0]!.voters, 3);
+  assert.equal(facts[0]!.votesSince, 3);
+  assert.deepEqual([...facts[0]!.workIds].sort(), ["w1", "w2"]);
+});
+
+test("topShelfFacts votesSince counts plays at or after since", () => {
+  const repo = makeRepo();
+  repo.insert(quizRow({ id: "pub", vote_code: "code-pub", play_open: 1 }));
+  repo.savePlay({ ...playRow("p1", "pub", "u2"), created_at: "2026-02-01T00:00:00Z" }, []);
+  repo.savePlay({ ...playRow("p2", "pub", "u3"), created_at: "2026-03-01T00:00:00Z" }, []);
+  const fact = repo.topShelfFacts("2026-03-01T00:00:00Z")[0]!;
+  assert.equal(fact.voters, 2);
+  assert.equal(fact.votesSince, 1);
+});

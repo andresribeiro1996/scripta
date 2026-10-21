@@ -6,7 +6,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { QUIZ_QUESTION_TYPES, generateQuizQuestions, gradeAnswers, type PlayBoard, type PublicQuizQuestion, type QuestionStat, type QuizBook, type QuizQuestion, type QuizQuestionType, type ResultPlay, type SubmittedAnswer } from "@scripta/shared";
 import type { GameParticipation } from "@scripta/shared/community";
 import type { QuizzesRepository } from "./domain/ports.js";
-import type { AnswerRow, PlayRow, Quiz, QuizGameRow, QuizRow } from "./domain/types.js";
+import type { AnswerRow, PlayRow, Quiz, QuizGameRow, QuizRow, QuizShelfFacts } from "./domain/types.js";
 
 function toQuiz(row: QuizRow): Quiz {
   const parsed = JSON.parse(row.data) as unknown;
@@ -63,7 +63,7 @@ export type PublishOutcome =
   | { ok: false; reason: "already-published"; error: string }
   | { ok: false; reason: "invalid"; error: string };
 
-export type { PlayBoard };
+export type { PlayBoard, QuizShelfFacts };
 
 export interface QuizResults {
   plays: ResultPlay[];
@@ -149,6 +149,7 @@ export interface QuizzesService {
   getResults(userId: string, id: string): QuizResults | undefined;
   getPublicResults(code: string): { plays: Array<Omit<ResultPlay, "playId">>; questionCount: number } | undefined;
   listPublishedByWorks(workIds: string[], limit: number): QuizGameRow[];
+  topShelfFacts(since: string | null): QuizShelfFacts[];
   participationByOwner(ownerUserId: string, since: string): GameParticipation[];
   getPublishedRef(id: string): PublishedQuizRef | undefined;
   listPublishedRefsByOwner(ownerUserId: string): PublishedQuizRef[];
@@ -341,6 +342,8 @@ export function createQuizzesService(repo: QuizzesRepository, emitPublished?: Em
 
     listPublishedByWorks: (workIds, limit) => repo.listPublishedByWorks(workIds, limit),
 
+    topShelfFacts: (since) => repo.topShelfFacts(since),
+
     getPublishedRef(id) {
       const row = repo.getPublicById(id);
       return row ? toPublishedRef(row, repo.playCount(id)) : undefined;
@@ -387,6 +390,7 @@ export interface QuizzesPublicApi {
   participationByOwner(ownerUserId: string, since: string): GameParticipation[];
   publishedByWorks(workIds: string[], limit: number): GameByWork[];
   discoverByWorks(workIds: string[], limit: number): QuizDiscoverRef[];
+  topShelfFacts(since: string | null): QuizShelfFacts[];
   getPublished(id: string): PublishedQuizRef | undefined;
   listPublishedByOwner(ownerUserId: string): PublishedQuizRef[];
   getPublishedMany(ids: string[]): PublishedQuizRef[];
@@ -397,6 +401,7 @@ export interface QuizzesPublicApi {
 export function createQuizzesPublicApi(service: QuizzesService): QuizzesPublicApi {
   return {
     participationByOwner: (ownerUserId, since) => service.participationByOwner(ownerUserId, since),
+    topShelfFacts: (since) => service.topShelfFacts(since),
     publishedByWorks: (workIds, limit) =>
       service.listPublishedByWorks(workIds, limit).map((row) => ({
         id: row.id,

@@ -4,7 +4,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import { normalizeWords, type QuestionStat } from "@scripta/shared";
 import type { QuizzesRepository } from "../../domain/ports.js";
-import type { AnswerRow, PlayRow, QuizDiscoverRow, QuizGameRow, QuizRow } from "../../domain/types.js";
+import type { AnswerRow, PlayRow, QuizDiscoverRow, QuizGameRow, QuizRow, QuizShelfFacts } from "../../domain/types.js";
 
 export function createSqliteQuizzesRepository(db: DatabaseSync): QuizzesRepository {
   const insertStmt = db.prepare(`
@@ -20,6 +20,15 @@ export function createSqliteQuizzesRepository(db: DatabaseSync): QuizzesReposito
   const deleteWorksStmt = db.prepare(`DELETE FROM quiz_works WHERE quiz_id = ?`);
   const insertWorkStmt = db.prepare(`INSERT OR IGNORE INTO quiz_works (quiz_id, work_id) VALUES (?, ?)`);
   const deleteAnswersStmt = db.prepare(`DELETE FROM quiz_play_answers WHERE quiz_id = ?`);
+  const shelfQuizzesStmt = db.prepare(`
+    SELECT q.id, q.owner_user_id, q.created_at,
+      (SELECT COUNT(*) FROM quiz_plays p WHERE p.quiz_id = q.id AND (p.voter_user_id IS NULL OR p.voter_user_id != q.owner_user_id)) AS voters,
+      (SELECT COUNT(*) FROM quiz_plays p WHERE p.quiz_id = q.id AND (p.voter_user_id IS NULL OR p.voter_user_id != q.owner_user_id) AND ($since IS NULL OR p.created_at >= $since)) AS votes_since
+    FROM quizzes q WHERE q.vote_code IS NOT NULL
+  `);
+  const shelfWorksStmt = db.prepare(`
+    SELECT w.quiz_id, w.work_id FROM quiz_works w JOIN quizzes q ON q.id = w.quiz_id AND q.vote_code IS NOT NULL
+  `);
   const listPublishedByWorksStmt = db.prepare(`
     SELECT DISTINCT q.id, q.name, q.vote_code, q.owner_user_id, q.created_at
     FROM quiz_works w JOIN quizzes q ON q.id = w.quiz_id
@@ -252,6 +261,23 @@ export function createSqliteQuizzesRepository(db: DatabaseSync): QuizzesReposito
         stat.picks.push({ choiceIndex: Number(row.choice_index), count: Number(row.picks) });
       }
       return [...byQuestion.values()];
+    },
+
+    topShelfFacts(since) {
+      const works = new Map<string, string[]>();
+      for (const row of shelfWorksStmt.all() as unknown as Array<{ quiz_id: string; work_id: string }>) {
+        const ids = works.get(row.quiz_id);
+        if (ids) ids.push(row.work_id);
+        else works.set(row.quiz_id, [row.work_id]);
+      }
+      return (shelfQuizzesStmt.all({ since }) as unknown as Array<{ id: string; owner_user_id: string; created_at: string; voters: number; votes_since: number }>).map((row) => ({
+        id: row.id,
+        ownerUserId: row.owner_user_id,
+        createdAt: row.created_at,
+        voters: Number(row.voters),
+        votesSince: Number(row.votes_since),
+        workIds: works.get(row.id) ?? []
+      }));
     },
 
     listPublishedByWorks(workIds, limit) {

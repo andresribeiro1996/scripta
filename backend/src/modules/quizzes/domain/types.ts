@@ -54,3 +54,12 @@ export interface AnswerRow {
   choice_index: number;
   correct: number;
 }
+
+export interface QuizShelfFacts {
+  id: string;
+  ownerUserId: string;
+  createdAt: string;
+  voters: number;
+  votesSince: number;
+  workIds: string[];
+}

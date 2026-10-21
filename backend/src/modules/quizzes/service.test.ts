@@ -85,6 +85,7 @@ function createInMemoryRepo(): QuizzesRepository {
       }));
     },
     listPublishedByWorks: () => [],
+    topShelfFacts: () => [],
     getPublicById: (id) => [...quizzes.values()].find((q) => q.id === id && q.vote_code !== null),
     listPublicByUser: (ownerUserId) =>
       [...quizzes.values()]

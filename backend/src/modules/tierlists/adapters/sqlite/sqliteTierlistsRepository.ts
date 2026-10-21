@@ -6,7 +6,7 @@ import { normalizeWords } from "@scripta/shared";
 import type { DatabaseSync } from "node:sqlite";
 import { boardWorks } from "../../domain/boardKeys.js";
 import type { TierlistsRepository } from "../../domain/ports.js";
-import type { TierlistRow, BallotRow, BallotTotals, Placement, TierlistDiscoverRow, TierlistGameRow, TierPlacement } from "../../domain/types.js";
+import type { TierlistRow, BallotRow, BallotTotals, Placement, TierlistDiscoverRow, TierlistGameRow, TierPlacement, TierlistShelfFacts } from "../../domain/types.js";
 
 export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepository {
   const insertStmt = db.prepare(`
@@ -51,6 +51,26 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
     JOIN tierlist_ballot_placements p ON p.tierlist_id = w.tierlist_id AND p.work_id = w.work_id
     JOIN tierlist_ballots b ON b.id = p.ballot_id AND b.voter_user_id IS NOT NULL
     WHERE w.work_id IN (SELECT value FROM json_each(?))
+  `);
+  const shelfListsStmt = db.prepare(`
+    SELECT t.id, t.origin_user_id, t.promoted_at, t.created_at,
+      (SELECT COUNT(*) FROM tierlist_ballots b WHERE b.tierlist_id = t.id AND (b.voter_user_id IS NULL OR b.voter_user_id != t.origin_user_id)) AS voters,
+      (SELECT COUNT(*) FROM tierlist_ballots b WHERE b.tierlist_id = t.id AND (b.voter_user_id IS NULL OR b.voter_user_id != t.origin_user_id) AND ($since IS NULL OR b.created_at >= $since)) AS votes_since
+    FROM tierlists t WHERE t.vote_code IS NOT NULL
+  `);
+  const shelfWorksStmt = db.prepare(`
+    SELECT w.tierlist_id, w.work_id FROM tierlist_works w JOIN tierlists t ON t.id = w.tierlist_id AND t.vote_code IS NOT NULL
+  `);
+  const shelfPlacementsStmt = db.prepare(`
+    SELECT p.tierlist_id, p.work_id, p.tier_id, b.created_at AS cast_at
+    FROM tierlist_ballot_placements p
+    JOIN tierlists t ON t.id = p.tierlist_id AND t.vote_code IS NOT NULL
+    JOIN tierlist_works w ON w.tierlist_id = p.tierlist_id AND w.work_id = p.work_id
+    JOIN tierlist_ballots b ON b.id = p.ballot_id AND b.voter_user_id IS NOT NULL
+  `);
+  const shelfBoardsStmt = db.prepare(`
+    SELECT t.id, t.data, t.ranks_worst_first FROM tierlists t
+    WHERE t.vote_code IS NOT NULL AND EXISTS (SELECT 1 FROM tierlist_ballot_placements p WHERE p.tierlist_id = t.id)
   `);
   const ballotTotalsForStmt = db.prepare(`
     SELECT b.tierlist_id,
@@ -327,6 +347,40 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
         const tierIndex = ids.indexOf(row.tier_id);
         return tierIndex === -1 ? [] : [{ tierlistId: row.tierlist_id, tierIndex, tierCount: ids.length, ranksWorstFirst: row.ranks_worst_first === 1 }];
       });
+    },
+
+    topShelfFacts(since) {
+      const works = new Map<string, string[]>();
+      for (const row of shelfWorksStmt.all() as unknown as Array<{ tierlist_id: string; work_id: string }>) {
+        const ids = works.get(row.tierlist_id);
+        if (ids) ids.push(row.work_id);
+        else works.set(row.tierlist_id, [row.work_id]);
+      }
+      const boards = new Map<string, { tierIds: string[]; ranksWorstFirst: boolean }>();
+      for (const row of shelfBoardsStmt.all() as unknown as Array<{ id: string; data: string; ranks_worst_first: number }>) {
+        boards.set(row.id, { tierIds: (JSON.parse(row.data) as { tiers: Array<{ id: string }> }).tiers.map((tier) => tier.id), ranksWorstFirst: row.ranks_worst_first === 1 });
+      }
+      const placements = new Map<string, TierlistShelfFacts["placements"]>();
+      for (const row of shelfPlacementsStmt.all() as unknown as Array<{ tierlist_id: string; work_id: string; tier_id: string; cast_at: string }>) {
+        const board = boards.get(row.tierlist_id);
+        if (!board) continue;
+        const tierIndex = board.tierIds.indexOf(row.tier_id);
+        if (tierIndex === -1) continue;
+        const entry = { workId: row.work_id, tierIndex, tierCount: board.tierIds.length, ranksWorstFirst: board.ranksWorstFirst, castAt: row.cast_at };
+        const list = placements.get(row.tierlist_id);
+        if (list) list.push(entry);
+        else placements.set(row.tierlist_id, [entry]);
+      }
+      return (shelfListsStmt.all({ since }) as unknown as Array<{ id: string; origin_user_id: string; promoted_at: string | null; created_at: string; voters: number; votes_since: number }>).map((row) => ({
+        id: row.id,
+        ownerUserId: row.origin_user_id,
+        promoted: row.promoted_at !== null,
+        createdAt: row.created_at,
+        voters: Number(row.voters),
+        votesSince: Number(row.votes_since),
+        workIds: works.get(row.id) ?? [],
+        placements: placements.get(row.id) ?? []
+      }));
     },
 
     listPublicByIds(ids) {

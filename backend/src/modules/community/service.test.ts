@@ -14,7 +14,7 @@ import type { EventRow, FollowRow, ProfileRow } from "./domain/types.js";
 import { FollowLimitError, InvalidCursorError, MuralNotOwnedError, NotFollowingError, ProfileNotFoundError, SelfFollowError, UsernameRequiredError } from "./domain/errors.js";
 import { ACTIVITY_EVENT_TYPES, FEED_EVENT_TYPES } from "./domain/feed.js";
 import { registerTrace } from "../../trace.js";
-import { createBestEffortRecorder, createCommunityPublicApi, createCommunityService, type CommunityDeps, type CommunityPublicApi, type CommunityService } from "./service.js";
+import { buildDiscoverItems, createBestEffortRecorder, createCommunityPublicApi, createCommunityService, type CommunityDeps, type CommunityPublicApi, type CommunityService } from "./service.js";
 
 function createRepoFake() {
   const follows = new Map<string, FollowRow>();
@@ -1613,6 +1613,22 @@ test("discover merges both content kinds newest first", () => {
     [["tierlist", "user-alice"], ["tournament", "user-bob"]]
   );
   assert.equal(page.nextOffset, null);
+});
+
+test("buildDiscoverItems builds items for given entries in order", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tierlistRefs, tournamentRefs } = createDeps(repo);
+  readerProfiles.set("alice", reader("alice"));
+  readerProfiles.set("bob", reader("bob"));
+  tierlistRefs.set("t1", tierRef("t1", "alice"));
+  tournamentRefs.set("g1", tournRef("g1", "bob"));
+  const at = "2026-09-02T00:00:00.000Z";
+  const items = buildDiscoverItems(deps, [
+    { kind: "tournament", id: "g1", userId: "bob", promoted: false, createdAt: at },
+    { kind: "quiz", id: "gone", userId: "bob", promoted: false, createdAt: at },
+    { kind: "tierlist", id: "t1", userId: "alice", promoted: false, createdAt: at }
+  ]);
+  assert.deepEqual(items.map((item) => [item.content.kind, item.content.id, item.author.username]), [["tournament", "g1", "user-bob"], ["tierlist", "t1", "user-alice"]]);
 });
 
 test("discover filters by type and by name substring, and paginates by offset", () => {

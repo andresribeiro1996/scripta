@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { bookStatsModel, tierBand, tierLetter, type BookStats } from "./bookStats.js";
+import { bookStatsModel, tierBand, tierLetter, tierPosition, type BookStats } from "./bookStats.js";
 
 const full: BookStats = {
   community: { average: 3.8, count: 12, distribution: [1, 0, 2, 6, 3] },
@@ -93,4 +93,10 @@ test("tournament path walks the best run from round 1 to the final", () => {
   assert.equal(won.champion, true);
   assert.equal(won.summary, "2 tournaments · 6 won, 1 lost · 1 title");
   assert.deepEqual(run(0, null, 1, 0, 0), { path: [], champion: false, summary: "1 tournament · 0 won, 0 lost · 0 titles" });
+});
+
+test("tierPosition flips worst-first lists and skips single-tier lists", () => {
+  assert.equal(tierPosition({ tierIndex: 1, tierCount: 5, ranksWorstFirst: false }), 0.25);
+  assert.equal(tierPosition({ tierIndex: 1, tierCount: 5, ranksWorstFirst: true }), 0.75);
+  assert.equal(tierPosition({ tierIndex: 0, tierCount: 1, ranksWorstFirst: false }), null);
 });
