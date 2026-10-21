@@ -16,11 +16,26 @@ function lisbonWallClock(at: number): { year: number; month: number; wallAsUtc: 
   return { year: year as number, month: month as number, wallAsUtc: Date.UTC(year as number, (month as number) - 1, day, hour, minute, second) };
 }
 
-export function topShelfMonthStart(now: Date): string {
-  const { year, month } = lisbonWallClock(now.getTime());
-  const guess = Date.UTC(year, month - 1, 1);
+export function lisbonMonth(at: Date): string {
+  const { year, month } = lisbonWallClock(at.getTime());
+  return `${year}-${String(month).padStart(2, "0")}`;
+}
+
+export function lisbonMonthStart(month: string): string {
+  const [year, m] = month.split("-").map(Number) as [number, number];
+  const guess = Date.UTC(year, m - 1, 1);
   const offset = lisbonWallClock(guess).wallAsUtc - guess;
   return new Date(guess - offset).toISOString();
+}
+
+export function addMonths(month: string, n: number): string {
+  const [year, m] = month.split("-").map(Number) as [number, number];
+  const d = new Date(Date.UTC(year, m - 1 + n, 1));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+export function topShelfMonthStart(now: Date): string {
+  return lisbonMonthStart(lisbonMonth(now));
 }
 
 export type ShelfInput = {
@@ -48,9 +63,10 @@ type Game = {
 
 type Tally = { titles: number; appearances: number; latest: number };
 
-export function rankTopShelf(input: ShelfInput, opts: { since: string | null; genre: string | null }) {
+export function rankTopShelf(input: ShelfInput, opts: { since: string | null; until?: string | null; genre: string | null }) {
   const since = opts.since === null ? null : Date.parse(opts.since);
-  const inPeriod = (at: number) => since === null || at >= since;
+  const until = opts.until == null ? null : Date.parse(opts.until);
+  const inPeriod = (at: number) => (since === null || at >= since) && (until === null || at < until);
   const canon = (id: string) => input.canonical.get(id) ?? id;
   const genresOf = (workId: string) => input.genres.get(workId)?.genres ?? [];
 
@@ -181,15 +197,14 @@ export function rankTopShelf(input: ShelfInput, opts: { since: string | null; ge
   const boards: Partial<Record<TopShelfBoard, Ranked[]>> = {};
   for (const [name, list] of Object.entries(allBoards) as Array<[TopShelfBoard, Ranked[]]>) boards[name] = opts.genre === null ? list : list.filter(inGenre(opts.genre));
 
-  const games = [...tierlistGames, ...tournamentGames, ...quizGames]
+  const visibleGames = [...tierlistGames, ...tournamentGames, ...quizGames]
     .map(({ game }) => game)
     .filter(visible)
     .map((g) => {
       const e = input.engagement.get(`${g.ref.kind}:${g.ref.id}`);
-      const likes = e?.likes ?? 0;
-      const comments = e?.comments ?? 0;
-      return { ref: g.ref, ownerUserId: g.ownerUserId, promoted: g.promoted, createdAt: g.createdAt, likes, votes: g.votesSince, comments };
-    })
+      return { ref: g.ref, works: g.works, publishedAt: g.publishedAt, ownerUserId: g.ownerUserId, promoted: g.promoted, createdAt: g.createdAt, likes: e?.likes ?? 0, votes: g.votesSince, comments: e?.comments ?? 0 };
+    });
+  const games = visibleGames
     .filter((g) => g.likes + g.votes + g.comments > 0)
     .sort((a, b) => b.likes + b.votes + b.comments - (a.likes + a.votes + a.comments) || (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0) || (`${a.ref.kind}:${a.ref.id}` < `${b.ref.kind}:${b.ref.id}` ? -1 : 1));
 
@@ -198,5 +213,5 @@ export function rankTopShelf(input: ShelfInput, opts: { since: string | null; ge
   for (const list of Object.values(allBoards)) for (const r of list) for (const genre of genresOf(r.workId)) menu.add(genre);
   const genres = [...menu].sort((a, b) => (championPoints.get(b) ?? 0) - (championPoints.get(a) ?? 0) || (a < b ? -1 : a > b ? 1 : 0));
 
-  return { boards, genres, genreChampions: opts.genre === null ? genreChampions : [], games };
+  return { boards, genres, genreChampions: opts.genre === null ? genreChampions : [], games, visibleGames };
 }

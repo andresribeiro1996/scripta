@@ -3,7 +3,7 @@ import { test } from "node:test";
 import type { QuizShelfFacts } from "../quizzes/service.js";
 import type { TierlistShelfFacts } from "../tierlists/service.js";
 import type { TournamentShelfFacts } from "../arena/service.js";
-import { rankTopShelf, topShelfMonthStart, type ShelfInput } from "./topShelf.js";
+import { addMonths, lisbonMonth, lisbonMonthStart, rankTopShelf, topShelfMonthStart, type ShelfInput } from "./topShelf.js";
 
 process.env.TZ = "America/Sao_Paulo";
 
@@ -150,4 +150,29 @@ test("hottest games sum likes votes and comments in the period and ignore the vo
     ]),
   }), { since: "2026-10-01T00:00:00.000Z", genre: null });
   assert.deepEqual(r.games.map((g) => [g.ref.kind, g.ref.id, g.likes, g.votes, g.comments]), [["quiz", "q", 2, 3, 1], ["tierlist", "t", 0, 1, 0], ["tournament", "n", 1, 0, 0]]);
+});
+
+test("lisbonMonth and lisbonMonthStart around DST and year ends", () => {
+  assert.equal(lisbonMonth(new Date("2026-10-31T23:30:00Z")), "2026-10");
+  assert.equal(lisbonMonth(new Date("2026-12-31T23:30:00Z")), "2026-12");
+  assert.equal(lisbonMonthStart("2026-11"), "2026-11-01T00:00:00.000Z");
+  assert.equal(lisbonMonthStart("2026-10"), "2026-09-30T23:00:00.000Z");
+  assert.equal(addMonths("2026-12", 1), "2027-01");
+  assert.equal(addMonths("2027-01", -1), "2026-12");
+});
+
+test("rankTopShelf with until ignores later appearances, placements and titles", () => {
+  const range = { since: "2026-10-01T00:00:00.000Z", until: "2026-11-01T00:00:00.000Z", genre: null };
+  const place = (workId: string, castAt: string) => ({ workId, tierIndex: 0, tierCount: 5, ranksWorstFirst: false, castAt });
+  const lists = ["a", "b", "c"].map((id) => tierlist({ id, placements: [place("w1", "2026-10-06T00:00:00.000Z"), place("w2", "2026-11-06T00:00:00.000Z")] }));
+  const r = rankTopShelf(input({
+    tierlists: lists,
+    quizzes: [quiz({ id: "late", createdAt: "2026-11-02T00:00:00.000Z", workIds: ["w3"] })],
+    tournaments: [tournament({ id: "t", workIds: ["w4"], champion: { workId: "w4", settledAt: "2026-11-03T00:00:00.000Z" } })],
+  }), range);
+  assert.deepEqual(ids(r.boards.highestTier), ["w1"]);
+  assert.deepEqual(ids(r.boards.quizzed), []);
+  assert.deepEqual(r.boards.crowned, []);
+  assert.equal(ids(r.boards.risingStar).includes("w3"), false);
+  assert.equal(r.visibleGames.length, 5);
 });
