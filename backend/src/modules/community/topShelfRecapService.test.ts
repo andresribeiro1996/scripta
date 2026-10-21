@@ -92,6 +92,14 @@ test("getRecap resolves links live and drops a hidden hottest game", () => {
   assert.equal(noLink?.kind === "book" && noLink.game, null);
 });
 
+test("getRecap links a card whose frozen work was merged into another", () => {
+  const { service, repo, state } = setup();
+  repo.put("2026-09", data({ books: [{ board: "champions", workId: "w-old", value: 4, candidates: [{ kind: "tierlist", id: "a" }] }] }), "x");
+  state.live = input({ tierlists: [tierlist("a", { workIds: ["w-new"] })], canonical: new Map([["w-old", "w-new"]]) });
+  const book = service.getRecap("2026-09")?.cards[1];
+  assert.equal(book?.kind === "book" && book.game?.content.id, "a");
+});
+
 test("getRecap returns null for an empty month", () => {
   const { service, repo } = setup();
   repo.put("2026-09", data({ books: [], hottest: null }), "x");

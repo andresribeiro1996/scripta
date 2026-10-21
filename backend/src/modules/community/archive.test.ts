@@ -164,6 +164,15 @@ test("the plugin runs again every 24 hours, and stops when the app closes", asyn
   assert.equal(countRows(db, "events", "id = 'tick-2'"), 1);
 });
 
+test("a recap freeze that throws is logged and does not fail registration", async (t) => {
+  const { app, logged } = build(t);
+  const failing = { ...topShelfDeps, tierlistFacts: () => { throw new Error("freeze refuses"); } };
+  await app.register(communityPlugin, { ...inertDeps, ...failing });
+  await app.ready();
+  assert.equal(logged("top shelf recap freeze failed").length, 1);
+  assert.match(logged("top shelf recap freeze failed")[0]?.err?.message ?? "", /freeze refuses/);
+});
+
 test("a failed run is logged as an error, leaves the events where they were, throws nowhere, and the next run still happens", async (t) => {
   t.mock.timers.enable({ apis: ["setInterval"] });
   const { db, repo } = openRepo();
