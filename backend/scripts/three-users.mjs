@@ -189,6 +189,23 @@ async function seed() {
   });
   const draft = await request("POST", "/quizzes", { name: "Alice's guess-the-book quiz", data: { sourceLabel: "Alice's shelf", questionCount: 4, allowedTypes: ["blurb_title"], books: quizBooks } }, tokens.alice, 201);
   const { voteCode: quizCode } = await request("POST", `/quizzes/${draft.id}/publish`, {}, tokens.alice, 201);
+  const shelfSource = await request("POST", "/tierlists", { name: "Alice's Top Shelf poll" }, tokens.alice, 201);
+  const shelfTiers = shelfSource.data.tiers.map((tier, index) => ({ ...tier, workIds: index === 0 ? [workIds[0]] : [] }));
+  await request("PUT", `/tierlists/${shelfSource.id}`, { data: { tiers: shelfTiers, pool: workIds.slice(1) } }, tokens.alice);
+  const { tierlist: shelfList } = await request("POST", `/tierlists/${shelfSource.id}/open-voting`, { access: "anonymous" }, tokens.alice, 201);
+  const shelfQuizDraft = await request("POST", "/quizzes", { name: "Alice's Top Shelf quiz", data: { sourceLabel: "Alice's shelf", questionCount: 4, allowedTypes: ["blurb_title"], books: quizBooks } }, tokens.alice, 201);
+  const { voteCode: shelfQuizCode } = await request("POST", `/quizzes/${shelfQuizDraft.id}/publish`, {}, tokens.alice, 201);
+  const { board: shelfQuizBoard } = await request("GET", `/quizzes/voting/${shelfQuizCode}`);
+  const shelfAnswers = shelfQuizBoard.questions.map((question) => ({ questionId: question.id, choiceIndex: 0 }));
+  const { tournament: shelfTournament } = await request("POST", "/arenas", { name: "Alice's Top Shelf bracket", bracketSize: 4, roundDurationMinutes: 10080 }, tokens.alice, 201);
+  await request("PUT", `/arenas/${shelfTournament.id}/slots`, { slots: pool.map((book, slotIndex) => ({ slotIndex, book: { workId: works[bookKey(book)], title: book.Title, author: book.Attribution, cover: covers.get(bookKey(book)) ?? null } })) }, tokens.alice, 204);
+  await request("POST", `/arenas/${shelfTournament.id}/start`, {}, tokens.alice, 204);
+  const { tournament: shelfArena } = await request("GET", `/arenas/${shelfTournament.id}`);
+  for (let voter = 1; voter <= 5; voter++) {
+    await request("POST", `/tierlists/voting/${shelfList.voteCode}/ballot`, { placements: [{ workId: workIds[0], tierId: shelfTiers[1].id }] });
+    await request("POST", `/quizzes/voting/${shelfQuizCode}/play`, { answers: shelfAnswers, durationMs: 20000 + voter * 1000 });
+    await request("POST", `/arenas/${shelfArena.id}/duels/${shelfArena.duels[0].id}/vote`, { voterToken: `scripta-fixture-top-shelf-${voter}`, workId: shelfArena.duels[0].bookA.workId }, null, 204);
+  }
   const manifest = { users, library: { shareToken: library.shareToken }, murals, polls, arena: { id: arena.id, bobVoterToken: voterToken }, quiz: { id: draft.id, code: quizCode } };
   writeFileSync(`${manifestPath}.tmp`, JSON.stringify(manifest, null, 2));
   renameSync(`${manifestPath}.tmp`, manifestPath);
@@ -229,6 +246,9 @@ async function check(fixture) {
   const { board: quizBoard } = await request("GET", `/quizzes/voting/${fixture.quiz.code}`);
   assert.equal(quizBoard.questions.length, 4);
   assert.equal(quizBoard.playOpen, true);
+  const topShelf = await request("GET", "/top-shelf?period=all");
+  assert(topShelf.boards.champions.length > 0, "Top Shelf champions board is empty.");
+  assert(topShelf.games.length > 0, "Top Shelf games list is empty.");
   const aliceRatings = (await request("GET", "/library", undefined, tokens.alice)).data.books.filter((book) => book.Rating === 4).map((book) => book.Title);
   assert.deepEqual(aliceRatings, ["The Return of the King", "A Storm of Swords", "Brave New World", "To Kill a Mockingbird"]);
   await request("POST", "/library/unshare", {}, tokens.alice);
