@@ -42,6 +42,7 @@ function makeService(overrides: Partial<Deps> = {}) {
     publicUrlFor,
     adminUserId: "admin",
     warn: () => {},
+    sharesArena: () => false,
     ...overrides
   });
   return { service, repo };

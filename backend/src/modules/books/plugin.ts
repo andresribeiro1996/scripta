@@ -158,6 +158,7 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
     enqueue: (bookId, priority) => worker.enqueue(bookId, priority),
     publicUrlFor: coverUrlFor,
     adminUserId: env.ADMIN_USER_ID,
+    sharesArena,
     warn: (details, message) => app.log.warn(details, message),
     bnpLookup: (isbn) => lookupBnpIsbn(bnpLookupDeps, isbn),
     heldWorkIds: heldWorks ? () => heldWorks().map((work) => work.workId) : undefined,

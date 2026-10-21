@@ -8,9 +8,10 @@ import { coverColor, encodeCover, type EncodedCover } from "./domain/images.js";
 import { hiddenSynopsisHashes } from "./domain/synopsis.js";
 import { fillMissingIdentity, findExisting, findOrCreateBook, keysOf } from "./domain/findOrCreate.js";
 import { siblingCoverImageIds } from "./domain/siblingCover.js";
-import { firstEditionPerWork, workIdsOf } from "./domain/workSearch.js";
+import { coveredFirst, firstEditionPerWork, workIdsOf } from "./domain/workSearch.js";
 import { editionLanguage, findByIdentity, isPortugalIsbn, isPortugueseIsbn, isValidIsbn, lookupIdentity, SEARCH_LIMIT, searchTokens, WORK_SCAN_LIMIT, WORK_SEARCH_LIMIT, type BookIdentity, type BookLookup } from "./domain/normalize.js";
 import { summaryMatchesLanguage } from "./adapters/catalog/languageFilter.js";
+import { mergeDuplicateWorks } from "./duplicateWorks.js";
 import type { BookCatalog, BooksRepository, CatalogSearchHit, CoverBlobReader, CoverBlobStore, CoverSource, EditionRecordSource, PageCursor } from "./domain/ports.js";
 import type { SeriesEntry } from "./domain/series.js";
 import type { BookRow, CoverSourceName, CoverStatus, WorkView } from "./domain/types.js";
@@ -20,6 +21,7 @@ const RETRY_AFTER_MS = 30 * 24 * 60 * 60 * 1000;
 const WORK_RECHECK_MS = 30 * 24 * 60 * 60 * 1000;
 const UNAVAILABLE_BACKOFF_MS = 10 * 60 * 1000;
 const COVER_EXTENSION = "webp";
+const SAVE_GROUP_LIMIT = 50;
 const NO_SOURCE: CoverSource = { byIsbn: async () => [], byTitle: async () => [] };
 const NO_COVER: ResolvedCover = { url: null, fullUrl: null, pending: false, upgrading: false };
 const PENDING: ResolvedCover = { url: null, fullUrl: null, pending: true, upgrading: false };
@@ -50,6 +52,7 @@ export interface BooksServiceDeps {
   enqueue: (bookId: string, priority?: CoverPriority) => void;
   publicUrlFor: (imageId: string, size: CoverFileSize) => string;
   adminUserId: string;
+  sharesArena: (from: string, into: string) => boolean;
   warn: (details: Record<string, unknown>, message: string) => void;
   onDetailsChecked?: (book: BookRow) => void;
   bnpLookup?: (isbn: string) => Promise<BookRow | null>;
@@ -268,11 +271,19 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       storeSeries(book.id, { subjectSeries }, now().toISOString());
       return { result: book.cover_image_id ? { ...result, coverUrl: deps.publicUrlFor(book.cover_image_id, "thumb") } : result, book: deps.repo.getBook(book.id) ?? book };
     });
-    const canonical = deps.repo.canonicalWorkIds(workIdsOf(saved.flatMap(({ book }) => (book ? [book] : []))));
-    return withSeries(saved.map(({ result, book }) => ({
+    const books = saved.flatMap(({ book }) => (book ? [book] : []));
+    const titleKeys = [...new Set(books.flatMap(({ title_key }) => (title_key ? [title_key] : [])))];
+    if (titleKeys.length > 0) {
+      mergeDuplicateWorks({ repo: deps.repo, sharesArena: deps.sharesArena, now: () => now().getTime() }, titleKeys);
+      deps.repo.groupTitleKeys(titleKeys, SAVE_GROUP_LIMIT, now().toISOString());
+    }
+    for (const book of books) if (!book.cover_image_id && lookupDue(book)) schedule(book.id);
+    const canonical = deps.repo.canonicalWorkIds(workIdsOf(books));
+    const found = withSeries(saved.map(({ result, book }) => ({
       result: book?.work_id ? { ...result, workId: canonical.get(book.work_id) ?? book.work_id } : result,
       bookId: book?.id ?? null
     })));
+    return coveredFirst(found, ({ workId }) => workId ?? null, ({ coverUrl }) => coverUrl !== null, ({ title }) => title);
   }
 
   function existingEdition(lookup: BookLookup): BookRow {
