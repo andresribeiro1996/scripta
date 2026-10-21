@@ -29,7 +29,7 @@ A script, `backend/scripts/fetch-originals.mjs`, with a dry run. Its logic is in
    - A work with such an original is left to the translation job, as before. It is counted in `subtitle` and never sent to the code step by this fill.
 6. **Missing:** a work is not looked up when `titleCandidates(titlePattern(original))` finds any work other than itself. Its original is already there, so it is counted as `present`.
    - It goes to the code step in a real run only when one of those candidates carries the whole original title (`sameWholeTitle`, the pick rule's title check, below). Those works are listed in `presentWorks`, in the dry run as well.
-   - The pattern drops a colon subtitle, so a held "Dune: Messiah" finds "Dune". Without the whole-title check the code step would join the sequel into it.
+   - The pattern drops a colon subtitle, so a held work whose original is "Dune" finds a catalog "Dune: Messiah". Without the whole-title check, the code step would join the work into the sequel. (An original that itself has a subtitle never gets here: step 5 skips it.)
 7. **Author:** skipped when `surnameOf(workAuthor || author)` is null.
 
 Works left are grouped by `originalKey(original)` plus surname, so two shelved copies of one translation share one lookup.
