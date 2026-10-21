@@ -27,8 +27,8 @@ test("originalTitleIn still reads a value on the line after a bare label, digits
 });
 
 test("isOriginalTitle needs a letter or digit and rejects another metadata label", () => {
-  for (const value of [":", "", "—", "Tradução: Ana Lima", "Tradução - Ana Lima", "ISBN: 9780000000002", "Ano: 2019"]) assert.equal(isOriginalTitle(value), false, value);
-  for (const value of ["Solaris", "1984", "Солярис", "Sapiens: A Brief History of Humankind", "Data-Driven Science"]) assert.equal(isOriginalTitle(value), true, value);
+  for (const value of [":", "", "—", "Tradução: Ana Lima", "Tradução - Ana Lima", "ISBN: 9780000000002", "Ano: 2019", "Tradução", "Páginas", "ISBN 9789720001234", "Tradução de Ana Lima"]) assert.equal(isOriginalTitle(value), false, value);
+  for (const value of ["Solaris", "1984", "Солярис", "Sapiens: A Brief History of Humankind", "Data-Driven Science", "Série noire: Les Rues"]) assert.equal(isOriginalTitle(value), true, value);
 });
 
 test("the main title stops at the first dash or full-stop separator", () => {

@@ -3,7 +3,7 @@ import { LOOSE_METADATA_LABEL, STRICT_METADATA_LABEL, firstAuthor, normalizeTitl
 const ORIGINAL_TITLE = /T[íi]tulo original\s*[:\-–—]?\s*([^\n]+)/i;
 const MAX_ORIGINAL_TITLE = 200;
 const LETTER_OR_DIGIT = /[\p{L}\p{N}]/u;
-const STARTS_WITH_LABEL = new RegExp(`^(?:${STRICT_METADATA_LABEL}|${LOOSE_METADATA_LABEL})(?:\\s*:|\\s+[-–—])`, "i");
+const STARTS_WITH_LABEL = new RegExp(String.raw`^(?:ISBN\b|(?:${STRICT_METADATA_LABEL}|${LOOSE_METADATA_LABEL})(?:\s*:|\s+[-–—]|\s*$)|(?:Tradu[çc][ãa]o|Traduzido|Tradutor[a]?)\s+(?:de|por)\b)`, "i");
 
 export function isOriginalTitle(value: string): boolean {
   return LETTER_OR_DIGIT.test(value) && !STARTS_WITH_LABEL.test(value);
