@@ -17,9 +17,13 @@ export function RecapHomeCard() {
   const [dismissed, setDismissed] = useState<boolean | null>(null);
 
   useEffect(() => {
+    setDismissed(null);
     if (!month) return;
     let live = true;
-    void AsyncStorage.getItem(dismissedKey(month)).then((stored) => { if (live) setDismissed(stored !== null); });
+    AsyncStorage.getItem(dismissedKey(month)).then(
+      (stored) => { if (live) setDismissed(stored !== null); },
+      (reason) => { console.warn("Couldn't read the recap dismissal", reason); },
+    );
     return () => { live = false; };
   }, [month]);
 
@@ -27,7 +31,7 @@ export function RecapHomeCard() {
   const name = recapMonthName(month);
   const dismiss = () => {
     setDismissed(true);
-    void AsyncStorage.setItem(dismissedKey(month), "1");
+    AsyncStorage.setItem(dismissedKey(month), "1").catch((reason) => { console.warn("Couldn't save the recap dismissal", reason); });
   };
   return (
     <View style={[styles.card, { borderColor: colors.border, backgroundColor: colors.surface }]}>

@@ -2,7 +2,7 @@ import { useState, type ReactNode } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Stack, router, useLocalSearchParams, useSegments } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
-import { recapMonthName, type TopShelfBook, TopShelfPeriod, TopShelfView } from "@scripta/shared";
+import { recapMonthName, type TopShelfBook, type TopShelfPeriod, type TopShelfView } from "@scripta/shared";
 import { Text } from "../../ui/Text";
 import { Button, EmptyState, ErrorState, Icon, Screen, ScrollDock, Skeleton, dynamicType, minimumTouchTarget, radii, searchDockClearance, spacing, typography, useTheme } from "../../ui";
 import { BookCover } from "../arena/BookCover";
@@ -40,34 +40,29 @@ export function TopShelfScreen() {
             : <View style={styles.page}><Skeleton height={200} /></View>;
         }
         const empty = emptySections(data);
-        const recapBlock = recaps.length ? (
-          <>
-            <View style={styles.recapButton}>
-              <Button label={`▶ Play ${recapMonthName(recaps[0]!)} recap`} numberOfLines={1} onPress={() => openRecap(recaps[0]!)} />
-            </View>
-            {recaps.length > 1 ? (
-              <Section title="Past recaps">
-                {recaps.slice(1).map((month) => (
-                  <Pressable key={month} accessibilityRole="button" accessibilityLabel={`${recapMonthName(month)} recap`} onPress={() => openRecap(month)} style={[styles.recapRow, { borderColor: colors.border }]}>
-                    <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.grow, { color: colors.text }]}>{`${recapMonthName(month)} recap`}</Text>
-                    <Icon name="chevronRight" size={20} color={colors.textDim} />
-                  </Pressable>
-                ))}
-              </Section>
-            ) : null}
-          </>
+        const playButton = recaps.length ? <View style={styles.recapButton}><Button label={`▶ Play ${recapMonthName(recaps[0]!)} recap`} numberOfLines={1} onPress={() => openRecap(recaps[0]!)} /></View> : null;
+        const pastRecaps = recaps.length > 1 ? (
+          <Section title="Past recaps">
+            {recaps.slice(1).map((month) => (
+              <Pressable key={month} accessibilityRole="button" accessibilityLabel={`${recapMonthName(month)} recap`} onPress={() => openRecap(month)} style={[styles.recapRow, { borderColor: colors.border }]}>
+                <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.grow, { color: colors.text }]}>{`${recapMonthName(month)} recap`}</Text>
+                <Icon name="chevronRight" size={20} color={colors.textDim} />
+              </Pressable>
+            ))}
+          </Section>
         ) : null;
         if (empty.podium && empty.records && (empty.genres || genre !== null) && empty.games) {
           return (
             <ScrollView {...scrollProps} contentContainerStyle={styles.list}>
-              {recapBlock}
+              {playButton}
               <View style={styles.page}><EmptyState title={`Nothing here yet${data.period === "month" ? " this month" : ""} — games count once 5 people vote.`} /></View>
+              {pastRecaps}
             </ScrollView>
           );
         }
         return (
         <ScrollView {...scrollProps} contentContainerStyle={styles.list}>
-          {recapBlock}
+          {playButton}
           {empty.podium ? null : <Podium books={data.boards.champions ?? []} title={data.period === "month" ? "Book of the month" : "All-time champions"} onOpen={openBook} />}
           {empty.records ? null : (
             <Section title="Records">
@@ -105,6 +100,7 @@ export function TopShelfScreen() {
               ))}
             </Section>
           )}
+          {pastRecaps}
         </ScrollView>
         );
       }}
