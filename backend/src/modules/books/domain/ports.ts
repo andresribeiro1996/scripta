@@ -1,4 +1,5 @@
 import type { BookMetadata, BookSearchResult, CatalogBookMetadata } from "@scripta/shared";
+import type { KeyedWork } from "./duplicateWorks.js";
 import type { SynopsisJudgment, SynopsisKind } from "./synopsis.js";
 import type { CollectionSource, SeriesEntry, SeriesSource } from "./series.js";
 import type { OriginalClaim } from "./translation.js";
@@ -54,10 +55,15 @@ export interface BooksRepository {
   assignMissingWorks(limit: number): number;
   fillTitleKeys(limit: number): number;
   groupKeylessWorks(limit: number, at?: string): number;
+  groupTitleKeys(keys: string[], limit: number, at?: string): number;
+  groupableTitleKeys(after: string, limit: number): string[];
+  keyedWorksWithTitleKeys(keys: string[]): KeyedWork[];
+  undoneMergeAmong(workIds: string[]): boolean;
   listWorkLookupIds(limit: number, recheckBefore: string): string[];
   markWorkChecked(id: string, at: string): void;
   replaceLanguage(id: string, tag: string): void;
   mergeWorks(fromId: string, intoId: string, at?: string): string;
+  mergeDuplicateWork(fromId: string, intoId: string, at: string): string;
   detachEdition(bookId: string, at: string): string;
   getWorkView(id: string): WorkView | undefined;
   workPageRows(id: string): WorkPageRows | undefined;

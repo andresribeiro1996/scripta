@@ -4,6 +4,7 @@ import type { DatabaseSync, StatementSync } from "node:sqlite";
 import { MIN_PREFIX_LENGTH, normalizeWorkKey, WORK_SCAN_LIMIT, workTitleKey } from "../../domain/normalize.js";
 import type { BooksRepository, IdPage, MergeableDetails, PageCursor } from "../../domain/ports.js";
 import { GENRE_SAVE_LINE } from "../../domain/constants.js";
+import { planCrowdedFolds, type KeyedWork } from "../../domain/duplicateWorks.js";
 import { WorkMergeError } from "../../domain/errors.js";
 import { wantsRetitle } from "../../domain/lossy.js";
 import { SERIES_SOURCE_RANK, seriesNameKey, type SeriesEntry, type SeriesSource } from "../../domain/series.js";
@@ -48,8 +49,7 @@ export const GROUPABLE_KEYS_SQL = `
   ORDER BY title_key
   LIMIT ?
 `;
-export const GROUPABLE_PAIRS_SQL = `
-  WITH candidates AS (
+const GROUPABLE_CANDIDATES_CTE = `candidates AS (
     SELECT works.id AS work_id, MIN(books.title_key) AS title_key, works.created_at AS created_at
     FROM (SELECT DISTINCT work_id FROM books WHERE title_key IN (SELECT value FROM json_each(?))) AS hits
     CROSS JOIN works ON works.id = hits.work_id
@@ -60,7 +60,9 @@ export const GROUPABLE_PAIRS_SQL = `
       AND COUNT(DISTINCT books.title_key) = 1
       AND MIN(books.title_key) <> ''
       AND COUNT(books.title_group_blocked_at) = 0
-  ),
+  )`;
+export const GROUPABLE_PAIRS_SQL = `
+  WITH ${GROUPABLE_CANDIDATES_CTE},
   keyed AS (
     SELECT books.title_key AS title_key, MIN(works.id) AS target, COUNT(DISTINCT works.id) AS works
     FROM books JOIN works ON works.id = books.work_id
@@ -81,6 +83,20 @@ export const GROUPABLE_PAIRS_SQL = `
   WHERE keyed.works = 1 OR (keyed.title_key IS NULL AND candidates.work_id <> oldest.target)
   ORDER BY candidates.title_key, candidates.created_at, candidates.work_id
   LIMIT ?
+`;
+export const KEYLESS_CANDIDATES_SQL = `
+  WITH ${GROUPABLE_CANDIDATES_CTE}
+  SELECT candidates.title_key AS title_key, candidates.work_id AS id, works.title AS title
+  FROM candidates JOIN works ON works.id = candidates.work_id
+  ORDER BY candidates.title_key, candidates.created_at, candidates.work_id
+`;
+export const KEYED_WORKS_SQL = `
+  SELECT hits.title_key AS title_key, works.id AS id, works.title AS title, works.author AS author,
+    (SELECT COUNT(*) FROM books WHERE work_id = works.id) AS editions, works.created_at AS created_at
+  FROM (SELECT DISTINCT title_key, work_id FROM books WHERE title_key IN (SELECT value FROM json_each(?)) AND title_group_blocked_at IS NULL) AS hits
+  CROSS JOIN works ON works.id = hits.work_id
+  WHERE works.ol_work_key IS NOT NULL AND works.merged_into IS NULL
+  ORDER BY hits.title_key, works.created_at, works.id
 `;
 export const CONFIRMED_SQL = "(created_by IS NOT NULL OR data_sources <> '[]')";
 
@@ -146,7 +162,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const repointMergedStmt = db.prepare(`UPDATE works SET merged_into = ? WHERE merged_into = ?`);
   const workEditionIdsStmt = db.prepare(`SELECT id FROM books WHERE work_id = ? ORDER BY created_at, rowid`);
   const recordMergeStmt = db.prepare(`INSERT INTO work_merges (from_work, into_work, source, confidence, moved_book_ids, repointed_work_ids, merged_at) VALUES (?, ?, ?, ?, ?, ?, ?)`);
-  const latestMergeStmt = db.prepare(`SELECT id, into_work, moved_book_ids, repointed_work_ids FROM work_merges WHERE from_work = ? AND undone_at IS NULL ORDER BY id DESC LIMIT 1`);
+  const latestMergeStmt = db.prepare(`SELECT id, into_work, source, moved_book_ids, repointed_work_ids FROM work_merges WHERE from_work = ? AND undone_at IS NULL ORDER BY id DESC LIMIT 1`);
   const moveBackStmt = db.prepare(`UPDATE books SET work_id = ? WHERE work_id = ? AND (id IN (SELECT value FROM json_each(?)) OR (? IS NOT NULL AND ol_work_key = ?))`);
   const unmergeStmt = db.prepare(`UPDATE works SET merged_into = NULL WHERE id = ?`);
   const repointBackStmt = db.prepare(`UPDATE works SET merged_into = ? WHERE merged_into = ? AND id IN (SELECT value FROM json_each(?))`);
@@ -254,6 +270,9 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const workEditionsStmt = db.prepare(`SELECT id, isbn, title, author, ol_work_key FROM books WHERE work_id = ? ORDER BY created_at, rowid`);
   const groupableKeysStmt = db.prepare(GROUPABLE_KEYS_SQL);
   const groupablePairsStmt = db.prepare(GROUPABLE_PAIRS_SQL);
+  const keylessCandidatesStmt = db.prepare(KEYLESS_CANDIDATES_SQL);
+  const keyedWorksStmt = db.prepare(KEYED_WORKS_SQL);
+  const undoneMergeAmongStmt = db.prepare(`SELECT 1 AS found FROM work_merges WHERE undone_at IS NOT NULL AND from_work IN (SELECT value FROM json_each($ids)) AND into_work IN (SELECT value FROM json_each($ids)) LIMIT 1`);
   const workLookupStmt = db.prepare(WORK_LOOKUP_SQL);
   const workCheckedStmt = db.prepare(`UPDATE books SET work_checked_at = ? WHERE id = ?`);
   const replaceLanguageStmt = db.prepare(`UPDATE books SET language = ? WHERE id = ?`);
@@ -590,6 +609,37 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     recordMergeStmt.run(from, into, record.source, record.confidence, JSON.stringify(moved), JSON.stringify(repointed), record.at);
   }
 
+  function groupableTitleKeys(after: string, limit: number): string[] {
+    return (groupableKeysStmt.all(after, limit) as Array<{ title_key: string }>).map((row) => row.title_key);
+  }
+
+  function keyedWorksWithTitleKeys(keys: string[]): KeyedWork[] {
+    const rows = keyedWorksStmt.all(JSON.stringify(keys)) as Array<{ title_key: string; id: string; title: string; author: string; editions: number; created_at: string }>;
+    return rows.map((row) => ({ titleKey: row.title_key, id: row.id, title: row.title, author: row.author, editions: row.editions, createdAt: row.created_at }));
+  }
+
+  function crowdedFolds(keys: string[]): Array<{ source: string; target: string }> {
+    const keyed = keyedWorksWithTitleKeys(keys);
+    const worksPerKey = new Map<string, number>();
+    for (const work of keyed) worksPerKey.set(work.titleKey, (worksPerKey.get(work.titleKey) ?? 0) + 1);
+    const crowded = [...worksPerKey].filter(([, works]) => works >= 2).map(([key]) => key);
+    if (crowded.length === 0) return [];
+    const keyless = keylessCandidatesStmt.all(JSON.stringify(crowded)) as Array<{ title_key: string; id: string; title: string }>;
+    return planCrowdedFolds([
+      ...keyed.map((work) => ({ titleKey: work.titleKey, workId: work.id, title: work.title, keyed: true })),
+      ...keyless.map((work) => ({ titleKey: work.title_key, workId: work.id, title: work.title, keyed: false }))
+    ]);
+  }
+
+  function groupTitleKeys(keys: string[], limit: number, at = new Date().toISOString()): number {
+    return inTransaction(() => {
+      const pairs = groupablePairsStmt.all(JSON.stringify(keys), limit) as Array<{ source: string; target: string }>;
+      if (pairs.length < limit) pairs.push(...crowdedFolds(keys).slice(0, limit - pairs.length));
+      for (const pair of pairs) mergeInto(pair.source, pair.target, { source: "title-key", confidence: null, at, carrySummary: true });
+      return pairs.length;
+    });
+  }
+
   type UnassignedBook = { id: string; ol_work_key: string | null; title: string; author: string; created_at: string };
 
   function giveWork(row: UnassignedBook): string {
@@ -607,6 +657,9 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     transaction: inTransaction,
 
     canonicalWorkIds,
+    groupTitleKeys,
+    groupableTitleKeys,
+    keyedWorksWithTitleKeys,
     aliasesOf,
     editionGenres(workIds) {
       return editionGenresStmt.all(JSON.stringify(workIds)) as unknown as ReturnType<BooksRepository["editionGenres"]>;
@@ -854,6 +907,19 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       });
     },
 
+    mergeDuplicateWork(fromId, intoId, at) {
+      return inTransaction(() => {
+        const from = workLinkStmt.get(fromId) as WorkLink | undefined;
+        const into = workLinkStmt.get(intoId) as WorkLink | undefined;
+        if (!from || !into) throw new WorkMergeError("No such work.");
+        if (from.merged_into || into.merged_into) throw new WorkMergeError("That work was already merged.");
+        if (!from.ol_work_key || !into.ol_work_key) throw new WorkMergeError("Only works with an Open Library key merge as duplicates.");
+        if (from.id === into.id) throw new WorkMergeError("A work can't merge into itself.");
+        mergeInto(from.id, into.id, { source: "ol-duplicate", confidence: null, at, carrySummary: true });
+        return into.id;
+      });
+    },
+
     mergeTranslation(fromId, intoId, source, confidence, at) {
       return inTransaction(() => {
         const from = workLinkStmt.get(fromId) as WorkLink | undefined;
@@ -866,17 +932,21 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     },
     undoMerge(fromId, at) {
       return inTransaction(() => {
-        const merge = latestMergeStmt.get(fromId) as { id: number; into_work: string; moved_book_ids: string; repointed_work_ids: string } | undefined;
+        const merge = latestMergeStmt.get(fromId) as { id: number; into_work: string; source: MergeSource; moved_book_ids: string; repointed_work_ids: string } | undefined;
         const from = workLinkStmt.get(fromId) as WorkLink | undefined;
         if (!merge || !from || from.merged_into !== merge.into_work) throw new WorkMergeError("That merge can no longer be undone.");
+        const grouped = merge.source !== "ol-duplicate";
         const moved = Number(moveBackStmt.run(from.id, merge.into_work, merge.moved_book_ids, from.ol_work_key, from.ol_work_key).changes);
-        const editions = moved + Number(moveGroupedBackStmt.run({ $from: from.id, $into: merge.into_work }).changes);
+        const editions = moved + (grouped ? Number(moveGroupedBackStmt.run({ $from: from.id, $into: merge.into_work }).changes) : 0);
         unmergeStmt.run(from.id);
         repointBackStmt.run(from.id, merge.into_work, merge.repointed_work_ids);
-        repointGroupedBackStmt.run({ $from: from.id, $into: merge.into_work });
+        if (grouped) repointGroupedBackStmt.run({ $from: from.id, $into: merge.into_work });
         markUndoneStmt.run(at, merge.id);
         return { into: merge.into_work, editions };
       });
+    },
+    undoneMergeAmong(workIds) {
+      return undoneMergeAmongStmt.get({ $ids: JSON.stringify(workIds) }) !== undefined;
     },
     workMatchJudgments(workIds) {
       const rows = workMatchJudgmentsStmt.all(JSON.stringify(workIds)) as Array<{ work_id: string; model: string; into_work_id: string | null; confidence: number | null; asked_at: string }>;
@@ -1093,16 +1163,15 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
 
     groupKeylessWorks(limit, at = new Date().toISOString()) {
       return inTransaction(() => {
-        const pairs: Array<{ source: string; target: string }> = [];
+        let merged = 0;
         let after = "";
-        while (pairs.length < limit) {
-          const keys = (groupableKeysStmt.all(after, limit) as Array<{ title_key: string }>).map((row) => row.title_key);
+        while (merged < limit) {
+          const keys = groupableTitleKeys(after, limit);
           if (keys.length === 0) break;
-          pairs.push(...(groupablePairsStmt.all(JSON.stringify(keys), limit - pairs.length) as Array<{ source: string; target: string }>));
+          merged += groupTitleKeys(keys, limit - merged, at);
           after = keys[keys.length - 1]!;
         }
-        for (const pair of pairs) mergeInto(pair.source, pair.target, { source: "title-key", confidence: null, at, carrySummary: true });
-        return pairs.length;
+        return merged;
       });
     },
 

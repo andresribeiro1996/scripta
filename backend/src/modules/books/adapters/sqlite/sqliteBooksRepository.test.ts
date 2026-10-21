@@ -15,7 +15,7 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
 const { applyBooksMigrations, openBooksDb } = await import("./connection.js");
 const { findOrCreateBook } = await import("../../domain/findOrCreate.js");
-const { createSqliteBooksRepository, UNCHECKED_COVERS_SQL, UPGRADE_WANTED_SQL, UNCHECKED_DETAILS_SQL, HELD_BNP_DETAILS_SQL, WORK_LOOKUP_SQL, GROUPABLE_KEYS_SQL, GROUPABLE_PAIRS_SQL } = await import("./sqliteBooksRepository.js");
+const { createSqliteBooksRepository, UNCHECKED_COVERS_SQL, UPGRADE_WANTED_SQL, UNCHECKED_DETAILS_SQL, HELD_BNP_DETAILS_SQL, WORK_LOOKUP_SQL, GROUPABLE_KEYS_SQL, GROUPABLE_PAIRS_SQL, KEYED_WORKS_SQL, KEYLESS_CANDIDATES_SQL } = await import("./sqliteBooksRepository.js");
 const { WorkMergeError } = await import("../../domain/errors.js");
 const { summaryHashOf } = await import("../../domain/synopsis.js");
 const { authorPattern } = await import("../../domain/translation.js");
@@ -1496,6 +1496,15 @@ test("grouping reads shared title keys from the covering index and starts from t
   assert.doesNotMatch(pairs, /sqlite_autoindex_works_2/, pairs);
 });
 
+test("looking up keyed works and keyless candidates for a title key reads through the title index, never a scan of books", () => {
+  const { db } = freshRepo();
+  for (const sql of [KEYED_WORKS_SQL, KEYLESS_CANDIDATES_SQL]) {
+    const plan = (db.prepare(`EXPLAIN QUERY PLAN ${sql}`).all("[]") as Array<{ detail: string }>).map((row) => row.detail).join(" | ");
+    assert.match(plan, /SEARCH books USING (COVERING )?INDEX idx_books_title_work \(title_key=\?\)/, plan);
+    assert.doesNotMatch(plan, /SCAN books/, plan);
+  }
+});
+
 test("fillSubjectGenres fills empty or Jev genres and keeps source genres", () => {
   const { db, repo } = freshRepo();
   const genresOf = (id: string) => db.prepare("SELECT genres, genres_source, genres_confidence FROM books WHERE id = ?").get(id) as { genres: string; genres_source: string | null; genres_confidence: number | null };
@@ -2391,6 +2400,177 @@ test("an undone translation merge stays undone through the next title-key groupi
   assert.equal(repo.groupKeylessWorks(10, "2026-10-17T00:00:00.000Z"), 0);
   assert.equal(workById(db, pt.work_id).merged_into, null);
   assert.equal(repo.getBook(pt.id)!.work_id, pt.work_id);
+});
+
+const fourthWing = () => {
+  const { db, repo } = freshRepo();
+  const novel = edition(repo, "9780000000401", "Fourth Wing", "Rebecca Yarros", "OL1W", at(0));
+  const novelAgain = edition(repo, "9780000000406", "Fourth Wing", "Rebecca Yarros", "OL1W", at(0));
+  const graphic = edition(repo, "9780000000402", "Fourth Wing: The Graphic Novel", "Rebecca Yarros", "OL2W", at(0));
+  const piatkus = edition(repo, "9780000000403", "Fourth wing", "Rebecca Yarros", undefined, at(1));
+  const graphicKeyless = edition(repo, "9780000000404", "Fourth Wing: The Graphic Novel", "Rebecca Yarros", undefined, at(2));
+  const coloring = edition(repo, "9780000000405", "Fourth Wing: The Coloring Book", "Rebecca Yarros", undefined, at(1));
+  return { db, repo, novel, novelAgain, graphic, piatkus, graphicKeyless, coloring, key: repo.getBook(novel.id)!.title_key! };
+};
+
+test("keyedWorksWithTitleKeys lists live keyed works with an edition under the key", () => {
+  const { db, repo } = freshRepo();
+  const novel = edition(repo, "9780000000501", "Fourth Wing", "Rebecca Yarros", "OL1W", at(1));
+  edition(repo, "9780000000502", "Quarta Asa", "Rebecca Yarros", "OL1W", at(1));
+  const graphic = edition(repo, "9780000000503", "Fourth Wing: The Graphic Novel", "Rebecca Yarros", "OL2W", at(2));
+  const flame = edition(repo, "9780000000504", "Iron Flame", "Rebecca Yarros", "OL3W", at(3));
+  const both = edition(repo, "9780000000505", "Fourth Wing", "Rebecca Yarros", "OL4W", at(4));
+  edition(repo, "9780000000506", "Iron Flame", "Rebecca Yarros", "OL4W", at(4));
+  edition(repo, "9780000000507", "Fourth Wing", "Rebecca Yarros", undefined, at(5));
+  const merged = edition(repo, "9780000000508", "Fourth Wing", "Rebecca Yarros", "OL5W", at(6));
+  repo.mergeTranslation(merged.work_id!, novel.work_id!, "manual", null, AT);
+  const blocked = edition(repo, "9780000000509", "Fourth Wing", "Rebecca Yarros", "OL6W", at(7));
+  db.prepare("UPDATE books SET title_group_blocked_at = ? WHERE id = ?").run(AT, blocked.id);
+  const partlyBlocked = edition(repo, "9780000000510", "Fourth Wing", "Rebecca Yarros", "OL7W", at(8));
+  const sibling = edition(repo, "9780000000511", "Fourth Wing", "Rebecca Yarros", "OL7W", at(8));
+  db.prepare("UPDATE books SET title_group_blocked_at = ? WHERE id = ?").run(AT, sibling.id);
+  const key = repo.getBook(novel.id)!.title_key!;
+  const flameKey = repo.getBook(flame.id)!.title_key!;
+  const row = (titleKey: string, book: { work_id: string | null }, title: string, editions: number, createdAt: string) => ({ titleKey, id: book.work_id, title, author: "Rebecca Yarros", editions, createdAt });
+
+  assert.deepEqual(repo.keyedWorksWithTitleKeys([key]).map((work) => ({ ...work })), [
+    row(key, novel, "Fourth Wing", 3, at(1)),
+    row(key, graphic, "Fourth Wing: The Graphic Novel", 1, at(2)),
+    row(key, both, "Fourth Wing", 2, at(4)),
+    row(key, partlyBlocked, "Fourth Wing", 2, at(8))
+  ]);
+  const pairs = repo.keyedWorksWithTitleKeys([key, flameKey]).map((work) => `${work.titleKey}>${work.id}`);
+  assert.deepEqual(pairs.sort(), [key, flameKey].flatMap((titleKey) => (titleKey === key ? [novel, graphic, both, partlyBlocked] : [flame, both]).map((book) => `${titleKey}>${book.work_id}`)).sort());
+  assert.deepEqual(repo.keyedWorksWithTitleKeys([]), []);
+});
+
+test("mergeDuplicateWork moves editions and logs an ol-duplicate merge", () => {
+  const { db, repo } = freshRepo();
+  const from = edition(repo, "9780000000601", "Fourth WIng", "Rebecca Yarros", "OL1W", at(1));
+  const fromOther = edition(repo, "9780000000602", "Quarta Asa", "Rebecca Yarros", "OL1W", at(1));
+  const into = edition(repo, "9780000000603", "Fourth Wing", "Rebecca Yarros", "OL2W", at(0));
+  repo.setWorkSummary(from.id, "Carried.");
+
+  assert.equal(repo.mergeDuplicateWork(from.work_id!, into.work_id!, AT), into.work_id);
+  assert.deepEqual(mergeRows(db), [{ from_work: from.work_id, into_work: into.work_id, source: "ol-duplicate", confidence: null, moved_book_ids: JSON.stringify([from.id, fromOther.id]), repointed_work_ids: "[]", merged_at: AT, undone_at: null }]);
+  assert.equal(repo.canonicalWorkIds([from.work_id!]).get(from.work_id!), into.work_id);
+  for (const book of [from, fromOther, into]) assert.equal(repo.getBook(book.id)!.work_id, into.work_id);
+  assert.equal(workById(db, into.work_id).summary, "Carried.");
+  assert.equal(workById(db, from.work_id).ol_work_key, "OL1W");
+
+  const later = repo.createBook({ title: "Fourth Wing", author: "Rebecca Yarros", isbn: "9780000000604" }, ["isbn:9780000000604"], NOW);
+  repo.setWorkKey(later.id, "OL1W");
+  assert.equal(repo.getBook(later.id)!.work_id, into.work_id);
+});
+
+test("mergeDuplicateWork refuses a keyless or already merged work", () => {
+  const { db, repo } = freshRepo();
+  const a = edition(repo, "9780000000701", "Fourth Wing", "Rebecca Yarros", "OL1W");
+  const b = edition(repo, "9780000000702", "Fourth Wing", "Rebecca Yarros", "OL2W");
+  const c = edition(repo, "9780000000703", "Fourth Wing", "Rebecca Yarros", "OL3W");
+  const keyless = edition(repo, "9780000000704", "Fourth Wing", "Rebecca Yarros");
+  assert.throws(() => repo.mergeDuplicateWork(keyless.work_id!, a.work_id!, AT), WorkMergeError);
+  assert.throws(() => repo.mergeDuplicateWork(a.work_id!, keyless.work_id!, AT), WorkMergeError);
+  assert.throws(() => repo.mergeDuplicateWork("no-such-work", a.work_id!, AT), WorkMergeError);
+  assert.throws(() => repo.mergeDuplicateWork(a.work_id!, "no-such-work", AT), WorkMergeError);
+  assert.throws(() => repo.mergeDuplicateWork(a.work_id!, a.work_id!, AT), WorkMergeError);
+  assert.equal(countOf(db, "work_merges"), 0);
+
+  repo.mergeDuplicateWork(b.work_id!, a.work_id!, AT);
+  assert.throws(() => repo.mergeDuplicateWork(b.work_id!, c.work_id!, AT), WorkMergeError);
+  assert.throws(() => repo.mergeDuplicateWork(c.work_id!, b.work_id!, AT), WorkMergeError);
+  assert.equal(countOf(db, "work_merges"), 1);
+  assert.equal(repo.getBook(b.id)!.work_id, a.work_id);
+  assert.equal(repo.getBook(c.id)!.work_id, c.work_id);
+});
+
+test("undoneMergeAmong is true after undoMerge, whichever way the ids are listed", () => {
+  const { repo } = freshRepo();
+  const a = edition(repo, "9780000000801", "Fourth Wing", "Rebecca Yarros", "OL1W");
+  const b = edition(repo, "9780000000802", "Fourth Wing", "Rebecca Yarros", "OL2W");
+  const c = edition(repo, "9780000000803", "Fourth Wing", "Rebecca Yarros", "OL3W");
+  const [wa, wb, wc] = [a.work_id!, b.work_id!, c.work_id!];
+  repo.mergeDuplicateWork(wb, wa, AT);
+  assert.equal(repo.undoneMergeAmong([wa, wb]), false);
+  repo.undoMerge(wb, "2026-10-16T00:00:00.000Z");
+  for (const ids of [[wa, wb], [wb, wa], [wa, wc, wb], [wc, wb, wa]]) assert.equal(repo.undoneMergeAmong(ids), true, ids.join());
+  for (const ids of [[wa, wc], [wb, wc], [wa], []]) assert.equal(repo.undoneMergeAmong(ids), false, ids.join());
+});
+
+test("undoing an ol-duplicate merge keeps the survivor's own keyless editions", () => {
+  const { db, repo } = freshRepo();
+  const survivor = edition(repo, "9780000000901", "Fourth Wing", "Rebecca Yarros", "OL2W", at(0));
+  const before = edition(repo, "9780000000902", "Fourth Wing", "Rebecca Yarros", undefined, at(1));
+  assert.equal(repo.groupKeylessWorks(10, at(2)), 1);
+  const duplicate = edition(repo, "9780000000903", "Fourth Wing", "Rebecca Yarros", "OL1W", at(3));
+  const duplicateOther = edition(repo, "9780000000904", "Quarta Asa", "Rebecca Yarros", "OL1W", at(3));
+  repo.mergeDuplicateWork(duplicate.work_id!, survivor.work_id!, at(4));
+  const after = edition(repo, "9780000000905", "Fourth Wing", "Rebecca Yarros", undefined, at(5));
+  assert.equal(repo.groupKeylessWorks(10, at(6)), 1);
+  assert.deepEqual([survivor, before, after, duplicate].map((book) => repo.getBook(book.id)!.work_id), Array(4).fill(survivor.work_id));
+
+  assert.deepEqual(repo.undoMerge(duplicate.work_id!, at(7)), { into: survivor.work_id, editions: 2 });
+  for (const book of [survivor, before, after]) assert.equal(repo.getBook(book.id)!.work_id, survivor.work_id);
+  for (const book of [duplicate, duplicateOther]) assert.equal(repo.getBook(book.id)!.work_id, duplicate.work_id);
+  assert.equal(workById(db, duplicate.work_id).merged_into, null);
+  assert.equal(workById(db, before.work_id).merged_into, survivor.work_id);
+  assert.equal((db.prepare("SELECT undone_at FROM work_merges WHERE source = 'ol-duplicate'").get() as { undone_at: string }).undone_at, at(7));
+});
+
+test("groupTitleKeys folds a keyless edition into the keyed work with its full title when a key has several keyed works", () => {
+  const { db, repo, novel, graphic, piatkus, graphicKeyless, coloring, key } = fourthWing();
+  assert.equal(repo.groupTitleKeys([key], 10, AT), 2);
+  assert.equal(repo.getBook(piatkus.id)!.work_id, novel.work_id);
+  assert.equal(repo.getBook(graphicKeyless.id)!.work_id, graphic.work_id);
+  assert.equal(repo.getBook(coloring.id)!.work_id, coloring.work_id);
+  assert.deepEqual(
+    (db.prepare("SELECT from_work, into_work, source, merged_at FROM work_merges ORDER BY id").all() as Array<Record<string, unknown>>).map((row) => ({ ...row })),
+    [
+      { from_work: piatkus.work_id, into_work: novel.work_id, source: "title-key", merged_at: AT },
+      { from_work: graphicKeyless.work_id, into_work: graphic.work_id, source: "title-key", merged_at: AT }
+    ]
+  );
+  assert.equal(repo.groupTitleKeys([key], 10, AT), 0);
+});
+
+test("groupKeylessWorks folds by full title as well when a key has several keyed works", () => {
+  const { repo, novel, graphic, piatkus, graphicKeyless, coloring } = fourthWing();
+  assert.equal(repo.groupKeylessWorks(250, AT), 2);
+  assert.deepEqual([piatkus, graphicKeyless, coloring].map((book) => repo.getBook(book.id)!.work_id), [novel.work_id, graphic.work_id, coloring.work_id]);
+  assert.equal(repo.groupKeylessWorks(250, AT), 0);
+});
+
+test("groupTitleKeys leaves a keyless edition alone when two keyed works have its full title", () => {
+  const { repo } = freshRepo();
+  edition(repo, "9780000001001", "Fourth Wing", "Rebecca Yarros", "OL1W");
+  edition(repo, "9780000001002", "Fourth WIng", "Rebecca Yarros", "OL2W");
+  const keyless = edition(repo, "9780000001003", "Fourth Wing", "Rebecca Yarros");
+  assert.equal(repo.groupTitleKeys([repo.getBook(keyless.id)!.title_key!], 10, AT), 0);
+  assert.equal(repo.getBook(keyless.id)!.work_id, keyless.work_id);
+});
+
+test("groupTitleKeys groups only the keys it is given", () => {
+  const { repo } = freshRepo();
+  const dune = edition(repo, "9780000001101", "Dune", "Frank Herbert", "OL1W");
+  const duneKeyless = edition(repo, "9780000001102", "Dune", "Frank Herbert");
+  const emma = edition(repo, "9780000001103", "Emma", "Jane Austen", "OL2W");
+  const emmaKeyless = edition(repo, "9780000001104", "Emma", "Jane Austen");
+  const keyOf = (book: { id: string }) => repo.getBook(book.id)!.title_key!;
+  assert.equal(repo.groupTitleKeys([keyOf(dune)], 10, AT), 1);
+  assert.equal(repo.getBook(duneKeyless.id)!.work_id, dune.work_id);
+  assert.equal(repo.getBook(emmaKeyless.id)!.work_id, emmaKeyless.work_id);
+  assert.equal(repo.groupTitleKeys([], 10, AT), 0);
+  assert.equal(repo.groupTitleKeys([keyOf(emma)], 10, AT), 1);
+  assert.equal(repo.getBook(emmaKeyless.id)!.work_id, emma.work_id);
+});
+
+test("groupTitleKeys stops at its limit across both rules", () => {
+  const { repo, key } = fourthWing();
+  const dune = edition(repo, "9780000001201", "Dune", "Frank Herbert", "OL9W");
+  edition(repo, "9780000001202", "Dune", "Frank Herbert", undefined, at(1));
+  edition(repo, "9780000001203", "Dune", "Frank Herbert", undefined, at(2));
+  const keys = [repo.getBook(dune.id)!.title_key!, key];
+  assert.deepEqual([repo.groupTitleKeys(keys, 3, AT), repo.groupTitleKeys(keys, 3, AT), repo.groupTitleKeys(keys, 3, AT)], [3, 1, 0]);
 });
 
 test("createBook marks a new lossy book with a valid ISBN for a re-title, and no other", () => {
