@@ -3,23 +3,21 @@ import { StyleSheet, View } from "react-native";
 import type { QuizPreview } from "@scripta/shared";
 import type { PublishedContent } from "@scripta/shared/community";
 import { API_URL } from "../../core/config";
-import { Icon, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { Icon, radii, spacing, useTheme } from "../../ui";
 import { Text } from "../../ui/Text";
 import { CoverImage } from "../library/components/CoverImage";
 import { coverUrlForApi } from "../library/lib/coverUrl";
 import type { RowCover } from "./DiscoverRow";
 
-export function GameTicketArt({ kind, covers, ladder, preview, color }: { kind: PublishedContent["kind"]; covers: RowCover[]; ladder?: string[]; preview?: QuizPreview; color: string }) {
+export function GameTicketArt({ kind, covers, ladder, preview }: { kind: PublishedContent["kind"]; covers: RowCover[]; ladder?: string[]; preview?: QuizPreview }) {
   const { colors } = useTheme();
+  const color = colors.textDim;
   if (kind === "quiz") {
     return <View style={styles.quiz} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
       {preview?.type === "cover_title" ? <>
         <Image source={{ uri: coverUrlForApi(preview.prompt, API_URL) }} contentFit="cover" blurRadius={18} style={[styles.mysteryCover, { backgroundColor: colors.border }]} />
         <Text allowFontScaling={false} style={[styles.question, styles.questionOverlay, { color: colors.text, backgroundColor: colors.surface }]}>?</Text>
-      </> : preview ? <>
-        <Icon name={preview.type === "title_cover" ? "book" : "quote"} size={22} color={color} />
-        <Text numberOfLines={5} {...dynamicType} style={[typography.caption, styles.clue, { color: colors.text }]}>{preview.prompt}</Text>
-      </> : <Text allowFontScaling={false} style={[styles.question, { color }]}>?</Text>}
+      </> : preview ? <Icon name={preview.type === "title_cover" ? "book" : "quote"} size={32} color={color} /> : <Text allowFontScaling={false} style={[styles.question, { color }]}>?</Text>}
       <View style={styles.answers}>{["A", "B", "C"].map((answer) => <Text key={answer} allowFontScaling={false} style={[styles.answer, { color, borderColor: color }]}>{answer}</Text>)}</View>
     </View>;
   }
@@ -56,7 +54,6 @@ const styles = StyleSheet.create({
   mysteryCover: { width: 54, height: 80, borderRadius: radii.sm, transform: [{ rotate: "-6deg" }] },
   question: { fontSize: 32, lineHeight: 38, minWidth: 38, textAlign: "center", borderRadius: radii.sm },
   questionOverlay: { position: "absolute", top: 38 },
-  clue: { textAlign: "center", fontStyle: "italic" },
   answers: { flexDirection: "row", gap: spacing.xs },
   answer: { fontSize: 9, lineHeight: 14, width: 17, textAlign: "center", borderWidth: 1, borderRadius: 3 },
 });

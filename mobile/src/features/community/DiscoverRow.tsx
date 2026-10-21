@@ -81,8 +81,7 @@ export type GameRowProps = {
 export function GameRow({ kind, name, meta, badges, caption, stats = [], covers, ladder, preview, actionLabel = "Open game", seeBooks, accessibilityRole = "button", onPress, onDelete }: GameRowProps) {
   const { colors } = useTheme();
   const { fontScale } = useWindowDimensions();
-  const color = kind === "quiz" ? colors.reference : kind === "tierlist" ? colors.success : colors.accent;
-  const soft = kind === "quiz" ? colors.referenceSoft : kind === "tierlist" ? colors.successSoft : colors.accentSoft;
+  const clue = kind === "quiz" && preview && preview.type !== "cover_title" ? preview : undefined;
   return (
     <View style={[styles.ticket, { backgroundColor: colors.surface }]}>
       <Pressable
@@ -95,39 +94,45 @@ export function GameRow({ kind, name, meta, badges, caption, stats = [], covers,
         onAccessibilityAction={onDelete ? (event) => { if (event.nativeEvent.actionName === "delete") onDelete(); } : undefined}
       >
         {({ pressed }) => (
-          <View style={[styles.row, { backgroundColor: pressed ? colors.surfacePressed : colors.surface }]}>
-            <View style={[styles.art, { backgroundColor: soft }]}><GameTicketArt kind={kind} covers={covers} ladder={ladder} preview={preview} color={color} /></View>
-            <View style={styles.details}>
-              <Text numberOfLines={fontScale > 1.3 ? undefined : 2} {...dynamicType} style={[typography.title, styles.strong, { color: colors.text }]}>
-                {name}
-              </Text>
-              {typeof meta === "string" ? (
-                <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
-                  {meta}
+          <View style={{ backgroundColor: pressed ? colors.surfacePressed : colors.surface }}>
+            <View style={styles.row}>
+              <View style={[styles.art, { backgroundColor: colors.surface, borderColor: colors.border }]}><GameTicketArt kind={kind} covers={covers} ladder={ladder} preview={preview} /></View>
+              <View style={styles.details}>
+                <Text numberOfLines={fontScale > 1.3 ? undefined : 2} {...dynamicType} style={[typography.title, styles.strong, { color: colors.text }]}>
+                  {name}
                 </Text>
-              ) : meta}
-              <View style={styles.statusRow}>
-                {badges.map((badge) => <StatusBadge key={badge.label} label={badge.label} tone={badge.tone} />)}
-                {caption ? (
-                  <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{caption}</Text>
-                ) : null}
-              </View>
-              <View style={styles.statsRow}>
-                {stats.map((stat) => (
-                  <Text key={stat.label} numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
-                    <Text style={[styles.strong, { color: colors.text }]}>{stat.value}</Text> {stat.label}
+                {typeof meta === "string" ? (
+                  <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
+                    {meta}
                   </Text>
-                ))}
+                ) : meta}
+                <View style={styles.statusRow}>
+                  {badges.map((badge) => <StatusBadge key={badge.label} label={badge.label} tone={badge.tone} />)}
+                  {caption ? (
+                    <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{caption}</Text>
+                  ) : null}
+                </View>
+                <View style={styles.statsRow}>
+                  {stats.map((stat) => (
+                    <Text key={stat.label} numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
+                      <Text style={[styles.strong, { color: colors.text }]}>{stat.value}</Text> {stat.label}
+                    </Text>
+                  ))}
+                </View>
               </View>
             </View>
+            {clue ? <View style={[styles.clue, { backgroundColor: colors.background, borderColor: colors.border }]}>
+              <View style={styles.clueHeading}><Icon name={clue.type === "title_cover" ? "book" : "quote"} size={18} color={colors.textDim} /><Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{clue.type === "title_cover" ? "Which cover belongs to this title?" : "Which book is this from?"}</Text></View>
+              <Text numberOfLines={fontScale > 1.3 ? undefined : 3} {...dynamicType} style={[typography.body, { color: colors.text }]}>{clue.prompt}</Text>
+            </View> : null}
           </View>
         )}
       </Pressable>
       <View style={[styles.footer, { borderColor: colors.border }]}>
         <View style={[styles.notch, styles.leftNotch, { backgroundColor: colors.background }]} />
         <View style={[styles.notch, styles.rightNotch, { backgroundColor: colors.background }]} />
-        <Pressable accessibilityRole={accessibilityRole} accessibilityLabel={`${actionLabel}: ${name}`} onPress={onPress} style={({ pressed }) => [styles.primaryAction, { backgroundColor: pressed ? colors.surfacePressed : soft }]}>
-          <Text {...dynamicType} style={[typography.body, styles.strong, styles.shrink, { color }]}>{actionLabel}</Text><Icon name="chevronRight" size={16} color={color} />
+        <Pressable accessibilityRole={accessibilityRole} accessibilityLabel={`${actionLabel}: ${name}`} onPress={onPress} style={({ pressed }) => [styles.primaryAction, { backgroundColor: pressed ? colors.accentFill : colors.accentSoft }]}>
+          {({ pressed }) => <><Text {...dynamicType} style={[typography.body, styles.strong, styles.shrink, { color: pressed ? colors.text : colors.accent }]}>{actionLabel}</Text><Icon name="chevronRight" size={16} color={pressed ? colors.text : colors.accent} /></>}
         </Pressable>
         {seeBooks ? <Pressable accessibilityRole="button" accessibilityLabel={seeBooks.label} onPress={seeBooks.onPress} style={({ pressed }) => [styles.secondaryAction, { borderColor: colors.border, backgroundColor: pressed ? colors.surfacePressed : colors.surface }]}><Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.textDim }]}>See books</Text></Pressable> : null}
       </View>
@@ -156,7 +161,7 @@ export function StatusBadge({ label, tone }: { label: string; tone: ContentTone 
 const styles = StyleSheet.create({
   ticket: { marginHorizontal: spacing.lg, marginVertical: spacing.sm, borderRadius: radii.xl, overflow: "hidden" },
   row: { flexDirection: "row", alignItems: "stretch", minHeight: 152 },
-  art: { width: 88, alignItems: "center", justifyContent: "center" },
+  art: { width: 88, alignItems: "center", justifyContent: "center", borderRightWidth: 1 },
   details: { flex: 1, padding: spacing.lg, gap: spacing.sm, justifyContent: "center" },
   shrink: { flexShrink: 1 },
   strong: { fontWeight: "600" },
@@ -165,6 +170,8 @@ const styles = StyleSheet.create({
   metaName: { flexShrink: 1 },
   statusRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: spacing.sm },
   statsRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  clue: { marginHorizontal: spacing.lg, marginVertical: spacing.lg, padding: spacing.lg, borderLeftWidth: 2, borderRadius: radii.md, gap: spacing.sm },
+  clueHeading: { flexDirection: "row", alignItems: "center", gap: spacing.sm, flexWrap: "wrap" },
   badge: { borderWidth: 1, borderRadius: radii.full, paddingHorizontal: spacing.sm },
   footer: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, padding: spacing.lg, borderTopWidth: 1, borderStyle: "dashed" },
   primaryAction: { flex: 1, minWidth: 120, minHeight: spacing.huge, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderRadius: radii.lg },
