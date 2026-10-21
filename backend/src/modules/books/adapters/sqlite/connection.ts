@@ -289,37 +289,55 @@ function clearNonTitleOriginals(db: DatabaseSync): void {
   if (cleared > 0) console.log(`books: cleared ${cleared} original titles that were not titles`);
 }
 
+export const UNKEYED_ORIGINALS_SQL = "SELECT id, original_title FROM books WHERE original_title IS NOT NULL AND original_key IS NULL";
+
+const storedOriginalKeyVersion = (db: DatabaseSync) => (db.prepare("SELECT version FROM original_key_version").get() as { version: number } | undefined)?.version;
+
 function keyOriginalTitles(db: DatabaseSync): void {
-  const stored = db.prepare("SELECT version FROM original_key_version").get() as { version: number } | undefined;
   let keyed = 0;
-  if (stored?.version !== ORIGINAL_KEY_VERSION) {
+  if (storedOriginalKeyVersion(db) !== ORIGINAL_KEY_VERSION) {
     db.exec("BEGIN IMMEDIATE");
     try {
-      const columns = db.prepare("PRAGMA table_info(books)").all() as Array<{ name: string }>;
-      if (!columns.some((column) => column.name === "original_key")) db.exec("ALTER TABLE books ADD COLUMN original_key TEXT");
-      const setTitle = db.prepare("UPDATE books SET original_title = ? WHERE id = ?");
-      const labelled = db.prepare("SELECT id, summary FROM books WHERE original_title IS NULL AND summary LIKE '%tulo original%'").all() as Array<{ id: string; summary: string }>;
-      for (const { id, summary } of labelled) {
-        const title = originalTitleIn(summary);
-        if (title !== null) setTitle.run(title, id);
+      if (storedOriginalKeyVersion(db) !== ORIGINAL_KEY_VERSION) {
+        const columns = db.prepare("PRAGMA table_info(books)").all() as Array<{ name: string }>;
+        if (!columns.some((column) => column.name === "original_key")) db.exec("ALTER TABLE books ADD COLUMN original_key TEXT");
+        const rows = db.prepare("SELECT id, original_title, original_key, summary FROM books WHERE original_title IS NOT NULL OR original_key IS NOT NULL OR summary LIKE '%tulo original%'").all() as Array<{ id: string; original_title: string | null; original_key: string | null; summary: string | null }>;
+        const update = db.prepare("UPDATE books SET original_title = ?, original_key = ? WHERE id = ?");
+        for (const row of rows) {
+          const title = row.original_title ?? originalTitleIn(row.summary);
+          const key = title === null ? null : originalKey(title);
+          if (title === row.original_title && key === row.original_key) continue;
+          update.run(title, key, row.id);
+          if (key !== null) keyed += 1;
+        }
+        db.exec("DELETE FROM original_key_version");
+        db.prepare("INSERT INTO original_key_version (version) VALUES (?)").run(ORIGINAL_KEY_VERSION);
       }
-      const setKey = db.prepare("UPDATE books SET original_key = ? WHERE id = ?");
-      const rows = db.prepare("SELECT id, original_title FROM books WHERE original_title IS NOT NULL OR original_key IS NOT NULL").all() as Array<{ id: string; original_title: string | null }>;
-      for (const { id, original_title: title } of rows) {
-        const key = title === null ? null : originalKey(title);
-        setKey.run(key, id);
-        if (key !== null) keyed += 1;
-      }
-      db.exec("DELETE FROM original_key_version");
-      db.prepare("INSERT INTO original_key_version (version) VALUES (?)").run(ORIGINAL_KEY_VERSION);
       db.exec("COMMIT");
     } catch (error) {
       if (db.isTransaction) db.exec("ROLLBACK");
       throw error;
     }
   }
-  if (keyed > 0) console.log(`books: keyed ${keyed} original titles`);
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_original_key ON books(original_key) WHERE original_key IS NOT NULL");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_books_original_key_missing ON books(id) WHERE original_title IS NOT NULL AND original_key IS NULL");
+  const unkeyed = (db.prepare(UNKEYED_ORIGINALS_SQL).all() as Array<{ id: string; original_title: string }>).flatMap((row) => {
+    const key = originalKey(row.original_title);
+    return key === null ? [] : [{ id: row.id, key }];
+  });
+  if (unkeyed.length > 0) {
+    const setKey = db.prepare("UPDATE books SET original_key = ? WHERE id = ?");
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      for (const { id, key } of unkeyed) setKey.run(key, id);
+      db.exec("COMMIT");
+    } catch (error) {
+      if (db.isTransaction) db.exec("ROLLBACK");
+      throw error;
+    }
+    keyed += unkeyed.length;
+  }
+  if (keyed > 0) console.log(`books: keyed ${keyed} original titles`);
 }
 
 export function openBooksDb(): DatabaseSync {

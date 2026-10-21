@@ -13,9 +13,9 @@ process.env.COVERS_DB_PATH = join(scratch, "covers.sqlite");
 process.env.JWT_ACCESS_SECRET = "a".repeat(64);
 process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
-const { applyBooksMigrations, openBooksDb } = await import("./connection.js");
+const { applyBooksMigrations, openBooksDb, UNKEYED_ORIGINALS_SQL } = await import("./connection.js");
 const { findOrCreateBook } = await import("../../domain/findOrCreate.js");
-const { createSqliteBooksRepository, UNCHECKED_COVERS_SQL, UPGRADE_WANTED_SQL, UNCHECKED_DETAILS_SQL, HELD_BNP_DETAILS_SQL, WORK_LOOKUP_SQL, GROUPABLE_KEYS_SQL, GROUPABLE_PAIRS_SQL } = await import("./sqliteBooksRepository.js");
+const { createSqliteBooksRepository, ORIGINAL_CLAIMS_SQL, UNCHECKED_COVERS_SQL, UPGRADE_WANTED_SQL, UNCHECKED_DETAILS_SQL, HELD_BNP_DETAILS_SQL, WORK_LOOKUP_SQL, GROUPABLE_KEYS_SQL, GROUPABLE_PAIRS_SQL } = await import("./sqliteBooksRepository.js");
 const { WorkMergeError } = await import("../../domain/errors.js");
 const { summaryHashOf } = await import("../../domain/synopsis.js");
 const { authorPattern, originalKey, seriesLikeOriginals } = await import("../../domain/translation.js");
@@ -2812,15 +2812,16 @@ test("a title key written again unchanged is not queued again", () => {
   assert.deepEqual(repo.originalArrivals(10), []);
 });
 
-test("a book's first work key queues its title key again, and a second one does not", () => {
-  const { repo } = freshRepo();
+test("a book's first work key queues its title key again, and replacing or clearing it does not", () => {
+  const { db, repo } = freshRepo();
   const book = repo.createBook({ title: "Orlando", author: "Virginia Woolf", isbn: "9780156701600" }, ["isbn:9780156701600"], NOW);
   const key = catalogTitleKey("Orlando", "Virginia Woolf")!;
   repo.dropOriginalArrival(key);
   repo.setWorkKey(book.id, "OL5W");
   assert.deepEqual(repo.originalArrivals(10), [key]);
   repo.dropOriginalArrival(key);
-  repo.setWorkKey(book.id, "OL6W");
+  db.prepare("UPDATE books SET ol_work_key = 'OL6W' WHERE id = ?").run(book.id);
+  db.prepare("UPDATE books SET ol_work_key = NULL WHERE id = ?").run(book.id);
   assert.deepEqual(repo.originalArrivals(10), []);
 });
 
@@ -2863,7 +2864,7 @@ test("originalClaimsOf reads the claims of one original key by index", () => {
   const key = originalKey("To the Lighthouse")!;
   assert.deepEqual(repo.originalClaimsOf(key), [{ workId: pt.work_id, title: "Passeio ao Farol", author: "Virginia Woolf", language: "pt-PT", originalTitle: "To the Lighthouse" }]);
   assert.deepEqual(repo.originalClaimsOf("nothing|"), []);
-  const plan = (db.prepare("EXPLAIN QUERY PLAN SELECT work_id FROM books WHERE original_key = ?").all(key) as Array<{ detail: string }>).map((row) => row.detail).join(" ");
+  const plan = (db.prepare(`EXPLAIN QUERY PLAN ${ORIGINAL_CLAIMS_SQL}`).all(key) as Array<{ detail: string }>).map((row) => row.detail).join(" ");
   assert.match(plan, /idx_books_original_key/);
 });
 
@@ -2894,6 +2895,7 @@ test("the original keys are stored once, recomputed when the version changes, an
   rawBook(db, "keyed", "Passeio ao Farol", "To the Lighthouse", null);
   rawBook(db, "labelled", "Orlando em Português", null, "Uma vida.\n\nTítulo original: Orlando");
   db.exec("DROP INDEX idx_books_original_key");
+  db.exec("DROP INDEX idx_books_original_key_missing");
   db.exec("ALTER TABLE books DROP COLUMN original_key");
   db.exec("DELETE FROM original_key_version");
   applyBooksMigrations(db);
@@ -2913,4 +2915,17 @@ test("the original keys are stored once, recomputed when the version changes, an
   assert.equal(keyOf(db, "keyed"), originalKey("To the Lighthouse"));
   assert.equal(keyOf(db, "labelled"), null);
   assert.deepEqual(versions(db), [1]);
+});
+
+test("a title stored without its key is keyed at the next boot, found through its own index", () => {
+  const { db } = freshRepo();
+  rawBook(db, "stray", "Passeio ao Farol", "To the Lighthouse", null);
+  rawBook(db, "blank", "Sem título", "   ", null);
+  assert.equal(keyOf(db, "stray"), null);
+  applyBooksMigrations(db);
+  assert.equal(keyOf(db, "stray"), originalKey("To the Lighthouse"));
+  assert.equal(keyOf(db, "blank"), null);
+  assert.deepEqual(versions(db), [1]);
+  const plan = (db.prepare(`EXPLAIN QUERY PLAN ${UNKEYED_ORIGINALS_SQL}`).all() as Array<{ detail: string }>).map((row) => row.detail).join(" ");
+  assert.match(plan, /idx_books_original_key_missing/);
 });

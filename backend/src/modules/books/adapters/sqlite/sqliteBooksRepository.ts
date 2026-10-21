@@ -22,6 +22,10 @@ export const UPGRADE_WANTED_SQL = `
   ORDER BY cover_upgrade_wanted_at, rowid LIMIT ?
 `;
 
+export const ORIGINAL_CLAIMS_SQL = `
+  SELECT work_id, title, author, language, original_title FROM books WHERE original_key = ?
+`;
+
 export const UNCHECKED_DETAILS_SQL = `
   SELECT id FROM books WHERE details_status IS NULL AND created_by IS NOT 'bnp'
   ORDER BY details_checked_at IS NOT NULL, created_by IS NOT NULL, details_checked_at, created_at, rowid LIMIT ?
@@ -410,7 +414,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     ORDER BY created_at, ord
   `);
   const fillOriginalTitleStmt = db.prepare(`UPDATE books SET original_title = ?, original_key = ? WHERE id = ? AND original_title IS NULL`);
-  const originalClaimsOfStmt = db.prepare(`SELECT work_id, title, author, language, original_title FROM books WHERE original_key = ?`);
+  const originalClaimsOfStmt = db.prepare(ORIGINAL_CLAIMS_SQL);
   const originalArrivalsStmt = db.prepare(`SELECT title_key FROM original_arrivals LIMIT ?`);
   const dropOriginalArrivalStmt = db.prepare(`DELETE FROM original_arrivals WHERE title_key = ?`);
   const labelledSummariesStmt = db.prepare(`SELECT id, summary FROM books WHERE original_title IS NULL AND summary LIKE '%tulo original%'`);
