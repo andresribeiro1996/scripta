@@ -52,7 +52,7 @@ export function TierlistCreateScreen() {
     <Text {...dynamicType} style={[typography.title, { color: colors.text }]}>{["Choose books", "Set up tiers", "Publish settings"][step]}</Text>
     {step === 0 ? <>
       <Input label="Tier list name" value={name} onChangeText={setName} placeholder="Untitled tier list" maxLength={200} />
-      <Input label={`Books in pool · ${pool.length}`} value={search} onChangeText={setSearch} placeholder="Search your library" autoCapitalize="none" autoCorrect={false} />
+      <Input label={`Books in pool · ${pool.length}`} value={search} onChangeText={setSearch} placeholder="Search your library" autoCapitalize="none" autoCorrect={false} returnKeyType="search" />
       {library.isPending ? <Skeleton height={160} /> : library.isError ? <ErrorState body="Your library couldn't be loaded." actionLabel="Retry" onAction={() => void library.refetch()} /> : <FlatList
         data={filtered}
         keyExtractor={(book) => workIdOf(book) ?? ""}
