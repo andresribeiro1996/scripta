@@ -1866,7 +1866,7 @@ const originalTitleOf = (db: DatabaseSync, id: string) => (db.prepare("SELECT or
 
 test("the original-title pass clears stored values that are not titles and keeps the rest", () => {
   const { db, repo } = freshRepo();
-  const stored = [":", "", "—", "Tradução: Ana Lima", "Tradução", "Solaris", "1984", "Солярис"];
+  const stored = [":", "", "—", "Tradução: Ana Lima", "Tradução", "• Tradução: Ana Lima", "Solaris", "1984", "Солярис"];
   const books = stored.map((value, index) => {
     const isbn = `9789720001${String(index).padStart(3, "0")}`;
     const book = repo.createBook({ title: `Livro ${index}`, author: "X", isbn }, [`isbn:${isbn}`], NOW);
@@ -1875,7 +1875,7 @@ test("the original-title pass clears stored values that are not titles and keeps
   });
   db.exec("PRAGMA user_version = 4");
   applyBooksMigrations(db);
-  assert.deepEqual(books.map((book) => originalTitleOf(db, book.id)), [null, null, null, null, null, "Solaris", "1984", "Солярис"]);
+  assert.deepEqual(books.map((book) => originalTitleOf(db, book.id)), [null, null, null, null, null, null, "Solaris", "1984", "Солярис"]);
   assert.equal(userVersion(db), 5);
 });
 

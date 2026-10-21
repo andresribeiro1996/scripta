@@ -405,6 +405,7 @@ test("an empty definition value leaves no original title, and a placeholder attr
   const empty = { summary: null, pages: null, year: null, translator: null, originalTitle: null };
   assert.equal(withPageText(empty, "<dl><dt>Título original</dt><dd></dd><dt>Tradução</dt><dd>Ana Lima</dd></dl>").originalTitle, null);
   assert.equal(wooDetails({ description: `<p>${SYNOPSIS}</p><p>Título original: Solaris</p>`, attributes: [attribute("Título original", "-")] }).originalTitle, "Solaris");
+  assert.equal(wooDetails({ description: `<p>${SYNOPSIS}</p><p>Título original: Solaris</p>`, attributes: [attribute("Título original", "The Pure")] }).originalTitle, "The Pure");
 });
 
 const presenca: PublisherSite = { name: "Presença", origin: "https://www.presenca.pt", platform: "shopify", authorFromVendor: false, authorTag: /^NOMEAUTOR_(.+)$/ };
