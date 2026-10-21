@@ -516,3 +516,65 @@ test("worksShareATournament finds two works in one tournament, through any of th
   assert.equal(repo.worksShareATournament(["w-pt"], ["w-other"]), false);
   assert.equal(repo.worksShareATournament([], ["w-en"]), false);
 });
+
+function shelfTournament(db: DatabaseSync, id: string, status: string, slots: Array<string | null>, final?: { winner: "a" | "b" | null; settledAt: string | null }) {
+  db.prepare(
+    `INSERT INTO tournaments (id, owner_user_id, name, bracket_size, round_duration_minutes, status, current_round, created_at, updated_at)
+     VALUES (?, 'owner', ?, 2, 60, ?, 1, '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')`
+  ).run(id, id, status);
+  slots.forEach((workId, index) => {
+    db.prepare(`INSERT INTO tournament_slots (tournament_id, slot_index, work_id, title, author, cover_url) VALUES (?, ?, ?, 'T', 'A', NULL)`).run(id, index, workId);
+  });
+  if (final) {
+    db.prepare(
+      `INSERT INTO duels (id, tournament_id, round_number, duel_index, book_a_work_id, book_a_title, book_a_author, book_a_cover,
+         book_b_work_id, book_b_title, book_b_author, book_b_cover, winner_side, status, opens_at, closes_at, settled_at)
+       VALUES (?, ?, 1, 0, 'w-a', 'A', 'x', NULL, 'w-b', 'B', 'y', NULL, ?, ?, 'x', 'y', ?)`
+    ).run(`duel-${id}`, id, final.winner, final.winner ? "settled" : "active", final.settledAt);
+  }
+}
+
+test("topShelfFacts skips seeding tournaments", () => {
+  const db = freshDb();
+  shelfTournament(db, "seed", "seeding", ["w1"]);
+  shelfTournament(db, "live", "active", ["w1", "w2"]);
+  const facts = createSqliteArenaRepository(db).topShelfFacts(null);
+  assert.deepEqual(facts.map((f) => f.id), ["live"]);
+  assert.equal(facts[0]!.ownerUserId, "owner");
+  assert.deepEqual([...facts[0]!.workIds].sort(), ["w1", "w2"]);
+});
+
+test("topShelfFacts counts distinct voters by user or token without the owner", () => {
+  const db = freshDb();
+  shelfTournament(db, "t", "active", ["w-a", "w-b"]);
+  for (const n of [1, 2, 3]) {
+    db.prepare(
+      `INSERT INTO duels (id, tournament_id, round_number, duel_index, book_a_work_id, book_a_title, book_a_author, book_b_work_id, book_b_title, book_b_author, status, opens_at, closes_at)
+       VALUES (?, 't', 1, ?, 'w-a', 'A', 'x', 'w-b', 'B', 'y', 'active', 'x', 'y')`
+    ).run(`d${n}`, n);
+  }
+  const repo = createSqliteArenaRepository(db);
+  for (const n of [1, 2, 3]) repo.insertVote(vote(`tok-${n}`, `d${n}`, "tok", null, `2026-02-0${n}T00:00:00.000Z`));
+  repo.insertVote(vote("u-1", "d1", "ta", "user-1", "2026-02-01T00:00:00.000Z"));
+  repo.insertVote(vote("o-1", "d1", "tb", "owner", "2026-02-01T00:00:00.000Z"));
+  const all = repo.topShelfFacts(null)[0]!;
+  assert.equal(all.voters, 2);
+  assert.equal(all.votesSince, 4);
+  const since = repo.topShelfFacts("2026-02-02T00:00:00.000Z")[0]!;
+  assert.equal(since.voters, 2);
+  assert.equal(since.votesSince, 2);
+});
+
+test("topShelfFacts champion is the final winner with its settled_at", () => {
+  const db = freshDb();
+  shelfTournament(db, "done", "completed", ["w-a", "w-b"], { winner: "b", settledAt: "2026-01-03T00:00:00.000Z" });
+  assert.deepEqual(createSqliteArenaRepository(db).topShelfFacts(null)[0]!.champion, { workId: "w-b", settledAt: "2026-01-03T00:00:00.000Z" });
+});
+
+test("topShelfFacts skips null slots and undecided finals", () => {
+  const db = freshDb();
+  shelfTournament(db, "open", "completed", ["w-a", null], { winner: null, settledAt: null });
+  const fact = createSqliteArenaRepository(db).topShelfFacts(null)[0]!;
+  assert.deepEqual(fact.workIds, ["w-a"]);
+  assert.equal(fact.champion, null);
+});

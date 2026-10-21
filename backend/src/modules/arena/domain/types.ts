@@ -96,3 +96,13 @@ export interface SeedBookInput {
   author: string;
   cover: string | null;
 }
+
+export interface TournamentShelfFacts {
+  id: string;
+  ownerUserId: string;
+  createdAt: string;
+  voters: number;
+  votesSince: number;
+  workIds: string[];
+  champion: { workId: string; settledAt: string } | null;
+}

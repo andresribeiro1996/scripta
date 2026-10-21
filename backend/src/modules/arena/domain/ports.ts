@@ -5,7 +5,7 @@
 // a second port out for.
 
 import type { TournamentRecord } from "@scripta/shared";
-import type { CompletedVotedRow, DuelRow, SeedPreview, TournamentDiscoverRow, TournamentGameRow, TournamentRow, TournamentSlotRow, VoteRow } from "./types.js";
+import type { CompletedVotedRow, DuelRow, SeedPreview, TournamentDiscoverRow, TournamentGameRow, TournamentRow, TournamentShelfFacts, TournamentSlotRow, VoteRow } from "./types.js";
 
 export interface ArenaRepository {
   deleteUserData(userId: string): void;
@@ -20,6 +20,7 @@ export interface ArenaRepository {
   listPublicByIds(ids: string[]): TournamentRow[];
   listPublishedByWorks(workIds: string[], limit: number): TournamentGameRow[];
   tournamentRecord(workIds: string[]): TournamentRecord;
+  topShelfFacts(since: string | null): TournamentShelfFacts[];
   worksShareATournament(aIds: string[], bIds: string[]): boolean;
   votedAmong(voterUserId: string, ids: string[]): string[];
   updateTournamentStatus(id: string, status: TournamentRow["status"], currentRound: number): void;
