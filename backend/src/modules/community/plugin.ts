@@ -8,16 +8,24 @@ import { buildEngagementRoutes } from "./engagementRoutes.js";
 import { buildCommunityRoutes, buildDiscoverRoutes, buildPublicCommunityRoutes } from "./routes.js";
 import type { CommunityDeps, CommunityPublicApi } from "./service.js";
 import { createCommunityPublicApi, createCommunityService } from "./service.js";
+import { buildTopShelfRoutes } from "./topShelfRoutes.js";
+import { createTopShelfService, type TopShelfDeps } from "./topShelfService.js";
 
 const ARCHIVE_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
-export async function communityPlugin(app: FastifyInstance, opts: Omit<CommunityDeps, "repo" | "background">) {
+export async function communityPlugin(app: FastifyInstance, opts: Omit<CommunityDeps, "repo" | "background"> & TopShelfDeps) {
   const db = openCommunityDb();
   const repo = createSqliteCommunityRepository(db);
   const background = (task: () => Promise<void>): void => {
     task().catch((err) => app.log.error(err, "community feed backfill failed"));
   };
   const service = createCommunityService({ ...opts, repo, background });
+  const topShelf = createTopShelfService({
+    engagementRepo: createSqliteEngagementRepository(db),
+    community: { ...opts, repo },
+    shelf: opts,
+    now: opts.now ?? Date.now
+  });
   const engagementRepo = createSqliteEngagementRepository(db);
   const engagement = createEngagementService({ repo: engagementRepo, community: service, resolveProfiles: opts.resolveProfiles });
 
@@ -39,6 +47,7 @@ export async function communityPlugin(app: FastifyInstance, opts: Omit<Community
   await app.register(buildCommunityRoutes(service));
   await app.register(buildEngagementRoutes(engagement));
   await app.register(buildDiscoverRoutes(service));
+  await app.register(buildTopShelfRoutes(topShelf));
 
   await app.register(async (scoped) => {
     await scoped.register(fastifyRateLimit, { max: 30, timeWindow: "1 minute" });

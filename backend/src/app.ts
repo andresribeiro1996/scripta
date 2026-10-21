@@ -40,7 +40,7 @@ import {
 import { deleteArenaUserData, getArenaPublicApi, registerArenaModule } from "./modules/arena/index.js";
 import { createBestEffortRecorder, deleteCommunityUserData, getCommunityPublicApi, registerCommunityModule } from "./modules/community/index.js";
 import type { RankingTierPreview } from "@scripta/shared/community";
-import { enqueueBookCovers, getWorkPage, matchWorks, registerBooksModule } from "./modules/books/index.js";
+import { canonicalWorks, catalogGenres, enqueueBookCovers, getWorkPage, matchWorks, registerBooksModule } from "./modules/books/index.js";
 import { deleteGalleryUserData, registerGalleryModule } from "./modules/gallery/index.js";
 import { communityRatings, copyOfWork, deleteLibraryUserData, heldWorks, holdersOfWorks, registerLibraryModule, resolvePublicLibrary, readerGlyphFor, resolveEntryWorks, WorkResolutionError, sharedBookCounts, sharedBooks, startWorksSweep, sweepLibraryWorks, type BookEvent } from "./modules/library/index.js";
 import { deleteMuralsUserData, getMuralsPublicApi, registerMuralsModule, rekeyMuralsBooks, sweepMuralsWorks } from "./modules/murals/index.js";
@@ -196,6 +196,12 @@ export function buildApp() {
     findUserIdByUsername,
     searchUsernameOwners,
     matchWorks,
+    canonicalWorks,
+    catalogGenres,
+    getWorkPage,
+    tierlistFacts: getTierlistsPublicApi().topShelfFacts,
+    tournamentFacts: getArenaPublicApi().topShelfFacts,
+    quizFacts: getQuizzesPublicApi().topShelfFacts,
     getDashboardSeenAt,
     setDashboardSeenAt,
     murals: getMuralsPublicApi(getTierlistsPublicApi().getTierlistData),

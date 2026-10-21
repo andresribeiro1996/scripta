@@ -32,6 +32,15 @@ const SHOWS_READING = { ...DEFAULT_FEED_SETTINGS, reading: true };
 const unused = () => {
   throw new Error("the archive does not read this");
 };
+const topShelfDeps = {
+  tierlistFacts: () => [],
+  tournamentFacts: () => [],
+  quizFacts: () => [],
+  canonicalWorks: () => new Map<string, string>(),
+  catalogGenres: () => new Map<string, { genres: string[] }>(),
+  getWorkPage: () => undefined
+};
+
 const inertDeps: Omit<CommunityDeps, "repo"> = {
   now: () => NOW,
   background: (task) => {
@@ -122,7 +131,7 @@ test("registering the plugin moves events older than 30 days to history, purges 
   event("job-recent", "2026-09-20T00:00:00.000Z");
   const { app, logged } = build(t);
 
-  await app.register(communityPlugin, inertDeps);
+  await app.register(communityPlugin, { ...inertDeps, ...topShelfDeps });
   await until(() => logged(ARCHIVED).length === 1);
 
   assert.deepEqual(logged(ARCHIVED).map(({ level, moved, purged }) => ({ level, moved, purged })), [{ level: 30, moved: 2501, purged: 2501 }]);
@@ -138,7 +147,7 @@ test("the plugin runs again every 24 hours, and stops when the app closes", asyn
   const { db, repo } = openRepo();
   const event = (id: string) => repo.insertEvent({ id, user_id: "tick-author", type: "book_added", ref_type: "book", ref_id: id, payload: null, created_at: "2026-08-15T00:00:00.000Z" });
   const { app, logged } = build(t);
-  await app.register(communityPlugin, inertDeps);
+  await app.register(communityPlugin, { ...inertDeps, ...topShelfDeps });
   await until(() => logged(ARCHIVED).length === 1);
   event("tick-1");
 
@@ -159,7 +168,7 @@ test("a failed run is logged as an error, leaves the events where they were, thr
   t.mock.timers.enable({ apis: ["setInterval"] });
   const { db, repo } = openRepo();
   const { app, logged } = build(t);
-  await app.register(communityPlugin, inertDeps);
+  await app.register(communityPlugin, { ...inertDeps, ...topShelfDeps });
   await until(() => logged(ARCHIVED).length === 1);
   repo.insertEvent({ id: "fail-1", user_id: "fail-author", type: "book_added", ref_type: "book", ref_id: "fail-1", payload: null, created_at: "2026-08-15T00:00:00.000Z" });
   db.exec("CREATE TRIGGER history_refuses BEFORE INSERT ON events_history BEGIN SELECT RAISE(ABORT, 'history refuses'); END");
