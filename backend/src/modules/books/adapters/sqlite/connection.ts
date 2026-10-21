@@ -9,7 +9,7 @@ import { openSqlite } from "../../../../db/openSqlite.js";
 import { MIN_GOOD_WIDTH } from "../../domain/constants.js";
 import { catalogTitleKey, givenNameFirst } from "../../domain/normalize.js";
 import { summaryHashOf } from "../../domain/synopsis.js";
-import { isOriginalTitle } from "../../domain/translation.js";
+import { ORIGINAL_KEY_VERSION, isOriginalTitle, originalKey, originalTitleIn } from "../../domain/translation.js";
 import { applyMojibakeRepairs, type RowRepair } from "../../seed/mojibakeRepair.js";
 import { CONFIRMED_SQL } from "./sqliteBooksRepository.js";
 
@@ -70,6 +70,9 @@ export function applyBooksMigrations(db: DatabaseSync): void {
   if (!imageColumns.some((column) => column.name === "origin")) db.exec("ALTER TABLE cover_images ADD COLUMN origin TEXT");
   if (!imageColumns.some((column) => column.name === "color")) db.exec("ALTER TABLE cover_images ADD COLUMN color TEXT");
   db.exec("CREATE INDEX IF NOT EXISTS idx_cover_images_color_pending ON cover_images(id) WHERE color IS NULL");
+  db.exec("CREATE TRIGGER IF NOT EXISTS books_original_arrival AFTER INSERT ON books WHEN NEW.title_key <> '' BEGIN INSERT OR IGNORE INTO original_arrivals (title_key) VALUES (NEW.title_key); END");
+  db.exec("CREATE TRIGGER IF NOT EXISTS books_original_retitle AFTER UPDATE OF title_key ON books WHEN NEW.title_key <> '' AND NEW.title_key IS NOT OLD.title_key BEGIN INSERT OR IGNORE INTO original_arrivals (title_key) VALUES (NEW.title_key); END");
+  db.exec("CREATE TRIGGER IF NOT EXISTS books_original_keyed AFTER UPDATE OF ol_work_key ON books WHEN NEW.title_key <> '' AND OLD.ol_work_key IS NULL AND NEW.ol_work_key IS NOT NULL BEGIN INSERT OR IGNORE INTO original_arrivals (title_key) VALUES (NEW.title_key); END");
   const legacy = db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'cover_cache'`).get();
   if (legacy) {
     const rows = db.prepare(`SELECT id, cache_key, source, width, height, byte_size, created_at FROM cover_cache`).all() as unknown as LegacyCoverRow[];
@@ -105,6 +108,7 @@ export function applyBooksMigrations(db: DatabaseSync): void {
   indexConfirmedBooks(db);
   turnIsbndbFirstAuthors(db);
   clearNonTitleOriginals(db);
+  keyOriginalTitles(db);
 }
 
 function moveOpenLibrarySummariesToWorks(db: DatabaseSync): void {
@@ -283,6 +287,57 @@ function clearNonTitleOriginals(db: DatabaseSync): void {
     throw error;
   }
   if (cleared > 0) console.log(`books: cleared ${cleared} original titles that were not titles`);
+}
+
+export const UNKEYED_ORIGINALS_SQL = "SELECT id, original_title FROM books WHERE original_title IS NOT NULL AND original_key IS NULL";
+
+const storedOriginalKeyVersion = (db: DatabaseSync) => (db.prepare("SELECT version FROM original_key_version").get() as { version: number } | undefined)?.version;
+
+function keyOriginalTitles(db: DatabaseSync): void {
+  let keyed = 0;
+  if (storedOriginalKeyVersion(db) !== ORIGINAL_KEY_VERSION) {
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      if (storedOriginalKeyVersion(db) !== ORIGINAL_KEY_VERSION) {
+        const columns = db.prepare("PRAGMA table_info(books)").all() as Array<{ name: string }>;
+        if (!columns.some((column) => column.name === "original_key")) db.exec("ALTER TABLE books ADD COLUMN original_key TEXT");
+        const rows = db.prepare("SELECT id, original_title, original_key, summary FROM books WHERE original_title IS NOT NULL OR original_key IS NOT NULL OR summary LIKE '%tulo original%'").all() as Array<{ id: string; original_title: string | null; original_key: string | null; summary: string | null }>;
+        const update = db.prepare("UPDATE books SET original_title = ?, original_key = ? WHERE id = ?");
+        for (const row of rows) {
+          const title = row.original_title ?? originalTitleIn(row.summary);
+          const key = title === null ? null : originalKey(title);
+          if (title === row.original_title && key === row.original_key) continue;
+          update.run(title, key, row.id);
+          if (key !== null) keyed += 1;
+        }
+        db.exec("DELETE FROM original_key_version");
+        db.prepare("INSERT INTO original_key_version (version) VALUES (?)").run(ORIGINAL_KEY_VERSION);
+      }
+      db.exec("COMMIT");
+    } catch (error) {
+      if (db.isTransaction) db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+  db.exec("CREATE INDEX IF NOT EXISTS idx_books_original_key ON books(original_key) WHERE original_key IS NOT NULL");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_books_original_key_missing ON books(id) WHERE original_title IS NOT NULL AND original_key IS NULL");
+  const unkeyed = (db.prepare(UNKEYED_ORIGINALS_SQL).all() as Array<{ id: string; original_title: string }>).flatMap((row) => {
+    const key = originalKey(row.original_title);
+    return key === null ? [] : [{ id: row.id, key }];
+  });
+  if (unkeyed.length > 0) {
+    const setKey = db.prepare("UPDATE books SET original_key = ? WHERE id = ?");
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      for (const { id, key } of unkeyed) setKey.run(key, id);
+      db.exec("COMMIT");
+    } catch (error) {
+      if (db.isTransaction) db.exec("ROLLBACK");
+      throw error;
+    }
+    keyed += unkeyed.length;
+  }
+  if (keyed > 0) console.log(`books: keyed ${keyed} original titles`);
 }
 
 export function openBooksDb(): DatabaseSync {

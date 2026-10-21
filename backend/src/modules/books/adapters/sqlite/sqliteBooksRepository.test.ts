@@ -13,12 +13,13 @@ process.env.COVERS_DB_PATH = join(scratch, "covers.sqlite");
 process.env.JWT_ACCESS_SECRET = "a".repeat(64);
 process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
-const { applyBooksMigrations, openBooksDb } = await import("./connection.js");
+const { applyBooksMigrations, openBooksDb, UNKEYED_ORIGINALS_SQL } = await import("./connection.js");
 const { findOrCreateBook } = await import("../../domain/findOrCreate.js");
-const { createSqliteBooksRepository, UNCHECKED_COVERS_SQL, UPGRADE_WANTED_SQL, UNCHECKED_DETAILS_SQL, HELD_BNP_DETAILS_SQL, WORK_LOOKUP_SQL, GROUPABLE_KEYS_SQL, GROUPABLE_PAIRS_SQL, KEYED_WORKS_SQL, KEYLESS_CANDIDATES_SQL } = await import("./sqliteBooksRepository.js");
+const { createSqliteBooksRepository, ORIGINAL_CLAIMS_SQL, UNCHECKED_COVERS_SQL, UPGRADE_WANTED_SQL, UNCHECKED_DETAILS_SQL, HELD_BNP_DETAILS_SQL, WORK_LOOKUP_SQL, GROUPABLE_KEYS_SQL, GROUPABLE_PAIRS_SQL, KEYED_WORKS_SQL, KEYLESS_CANDIDATES_SQL } = await import("./sqliteBooksRepository.js");
 const { WorkMergeError } = await import("../../domain/errors.js");
 const { summaryHashOf } = await import("../../domain/synopsis.js");
-const { authorPattern } = await import("../../domain/translation.js");
+const { authorPattern, originalKey, seriesLikeOriginals } = await import("../../domain/translation.js");
+const { catalogTitleKey } = await import("../../domain/normalize.js");
 
 const NOW = "2026-10-01T00:00:00.000Z";
 const richDetails = { summary: "Open Library synopsis.", rating: 4, ratingCount: 3, sourceUrl: "https://openlibrary.org/works/OL1W", genres: ["Fantasy" as const], pages: 300, publisher: "Bantam", year: 1975, translator: null };
@@ -1028,6 +1029,7 @@ test("fillTitleKeys computes the keys stored rows lack, in batches, and leaves u
 test("the title key columns are added to an existing database once", () => {
   const db = new DatabaseSync(":memory:");
   applyBooksMigrations(db);
+  db.exec("DROP TRIGGER books_original_arrival; DROP TRIGGER books_original_retitle; DROP TRIGGER books_original_keyed");
   db.exec("DROP INDEX idx_books_title_work");
   db.exec("DROP INDEX idx_books_author_key");
   db.exec("ALTER TABLE books DROP COLUMN title_key");
@@ -1036,6 +1038,8 @@ test("the title key columns are added to an existing database once", () => {
   applyBooksMigrations(db);
   const columns = (db.prepare("PRAGMA table_info(books)").all() as Array<{ name: string }>).map((column) => column.name);
   assert.ok(columns.includes("title_key") && columns.includes("title_group_blocked_at"));
+  const triggers = (db.prepare("SELECT name FROM sqlite_master WHERE type = 'trigger' ORDER BY name").all() as Array<{ name: string }>).map((row) => row.name);
+  assert.deepEqual(triggers, ["books_original_arrival", "books_original_keyed", "books_original_retitle"]);
   assert.ok(db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'idx_books_title_work'").get());
   assert.ok(db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'idx_books_author_key'").get());
 });
@@ -2988,4 +2992,154 @@ test("series and collection tables are added to an existing database once", () =
   applyBooksMigrations(db);
   const names = (db.prepare("SELECT name FROM sqlite_master WHERE name IN ('work_series', 'book_collections', 'series_fts', 'collections_fts') ORDER BY name").all() as Array<{ name: string }>).map((row) => row.name);
   assert.deepEqual(names, ["book_collections", "collections_fts", "series_fts", "work_series"]);
+});
+
+const versions = (db: DatabaseSync) => (db.prepare("SELECT version FROM original_key_version").all() as Array<{ version: number }>).map((row) => row.version);
+const keyOf = (db: DatabaseSync, id: string) => (db.prepare("SELECT original_key FROM books WHERE id = ?").get(id) as { original_key: string | null }).original_key;
+const originalsOf = (db: DatabaseSync, id: string) => ({ ...(db.prepare("SELECT original_title, original_key FROM books WHERE id = ?").get(id) as { original_title: string | null; original_key: string | null }) });
+const rawBook = (db: DatabaseSync, id: string, title: string, originalTitle: string | null, summary: string | null) =>
+  db.prepare("INSERT INTO books (id, title, author, original_title, summary, created_at) VALUES (?, ?, 'A', ?, ?, ?)").run(id, title, originalTitle, summary, NOW);
+const portuguese = (repo: ReturnType<typeof freshRepo>["repo"], title: string, author: string, isbn: string) => {
+  const book = repo.createBook({ title, author, isbn }, [`isbn:${isbn}`], NOW);
+  repo.setLanguage(book.id, "pt-PT");
+  return book;
+};
+
+test("every new title key is queued as an arrival, and a blank-author row only once it has an author", () => {
+  const { repo } = freshRepo();
+  repo.createBook({ title: "To the Lighthouse", author: "Virginia Woolf", isbn: "9780156907392" }, ["isbn:9780156907392"], NOW);
+  assert.deepEqual(repo.originalArrivals(10), [catalogTitleKey("To the Lighthouse", "Virginia Woolf")]);
+  repo.dropOriginalArrival(catalogTitleKey("To the Lighthouse", "Virginia Woolf")!);
+  assert.deepEqual(repo.originalArrivals(10), []);
+  const blank = repo.createBook({ title: "Orlando", author: "", isbn: "9780156701600" }, ["isbn:9780156701600"], NOW);
+  repo.createBook({ title: "", author: "", isbn: "9789720000001" }, ["isbn:9789720000001"], NOW);
+  assert.deepEqual(repo.originalArrivals(10), []);
+  repo.fillIdentity(blank.id, "Orlando", "Virginia Woolf");
+  assert.deepEqual(repo.originalArrivals(10), [catalogTitleKey("Orlando", "Virginia Woolf")]);
+});
+
+test("a title key written again unchanged is not queued again", () => {
+  const { db, repo } = freshRepo();
+  const book = repo.createBook({ title: "Orlando", author: "Virginia Woolf", isbn: "9780156701600" }, ["isbn:9780156701600"], NOW);
+  repo.dropOriginalArrival(catalogTitleKey("Orlando", "Virginia Woolf")!);
+  db.prepare("UPDATE books SET title_key = title_key WHERE id = ?").run(book.id);
+  assert.deepEqual(repo.originalArrivals(10), []);
+});
+
+test("a book's first work key queues its title key again, and replacing or clearing it does not", () => {
+  const { db, repo } = freshRepo();
+  const book = repo.createBook({ title: "Orlando", author: "Virginia Woolf", isbn: "9780156701600" }, ["isbn:9780156701600"], NOW);
+  const key = catalogTitleKey("Orlando", "Virginia Woolf")!;
+  repo.dropOriginalArrival(key);
+  repo.setWorkKey(book.id, "OL5W");
+  assert.deepEqual(repo.originalArrivals(10), [key]);
+  repo.dropOriginalArrival(key);
+  db.prepare("UPDATE books SET ol_work_key = 'OL6W' WHERE id = ?").run(book.id);
+  db.prepare("UPDATE books SET ol_work_key = NULL WHERE id = ?").run(book.id);
+  assert.deepEqual(repo.originalArrivals(10), []);
+});
+
+test("originalArrivals returns at most the limit", () => {
+  const { repo } = freshRepo();
+  repo.createBook({ title: "Orlando", author: "Virginia Woolf", isbn: "9780156701600" }, ["isbn:9780156701600"], NOW);
+  repo.createBook({ title: "Emma", author: "Jane Austen", isbn: "9780141439587" }, ["isbn:9780141439587"], NOW);
+  assert.equal(repo.originalArrivals(1).length, 1);
+  assert.equal(repo.originalArrivals(10).length, 2);
+});
+
+test("every writer of an original title writes its key in the same statement", () => {
+  const { db, repo } = freshRepo();
+  const filled = repo.createBook({ title: "Passeio ao Farol", author: "Virginia Woolf", isbn: "9789720000111" }, ["isbn:9789720000111"], NOW);
+  repo.fillOriginalTitle(filled.id, "To the Lighthouse");
+  assert.deepEqual(originalsOf(db, filled.id), { original_title: "To the Lighthouse", original_key: originalKey("To the Lighthouse") });
+
+  const merged = repo.createBook({ title: "Duna", author: "Frank Herbert", isbn: "9789720000112" }, ["isbn:9789720000112"], NOW);
+  repo.saveDetails(merged.id, { ...richDetails, summary: "Uma sinopse longa o bastante.\n\nTítulo original: Dune" }, ["openlibrary"], "openlibrary", NOW);
+  assert.deepEqual(originalsOf(db, merged.id), { original_title: "Dune", original_key: "dune|" });
+
+  const kept = repo.createBook({ title: "Outro", author: "X", isbn: "9789720000113" }, ["isbn:9789720000113"], NOW);
+  repo.fillOriginalTitle(kept.id, "Orlando");
+  repo.mergeDetails(kept.id, { ...noDetails, summary: "Uma sinopse longa o bastante.\n\nTítulo original: Dune" }, "publisher");
+  assert.deepEqual(originalsOf(db, kept.id), { original_title: "Orlando", original_key: "orlando|" });
+
+  const labelled = repo.createBook({ title: "O Passeio", author: "Robert Walser", isbn: "9789720000114" }, ["isbn:9789720000114"], NOW);
+  db.prepare("UPDATE books SET summary = ? WHERE id = ?").run("Um passeio.\n\nTítulo original: Der Spaziergang", labelled.id);
+  assert.equal(repo.fillOriginalTitlesFromSummaries(), 1);
+  assert.deepEqual(originalsOf(db, labelled.id), { original_title: "Der Spaziergang", original_key: originalKey("Der Spaziergang") });
+});
+
+test("originalClaimsOf reads the claims of one original key by index", () => {
+  const { db, repo } = freshRepo();
+  const pt = portuguese(repo, "Passeio ao Farol", "Virginia Woolf", "9789720000111");
+  repo.fillOriginalTitle(pt.id, "To the Lighthouse");
+  const other = portuguese(repo, "Orlando em Português", "Virginia Woolf", "9789720000112");
+  repo.fillOriginalTitle(other.id, "Orlando");
+  repo.createBook({ title: "To the Lighthouse", author: "Virginia Woolf", isbn: "9780156907392" }, ["isbn:9780156907392"], NOW);
+  const key = originalKey("To the Lighthouse")!;
+  assert.deepEqual(repo.originalClaimsOf(key), [{ workId: pt.work_id, title: "Passeio ao Farol", author: "Virginia Woolf", language: "pt-PT", originalTitle: "To the Lighthouse" }]);
+  assert.deepEqual(repo.originalClaimsOf("nothing|"), []);
+  const plan = (db.prepare(`EXPLAIN QUERY PLAN ${ORIGINAL_CLAIMS_SQL}`).all(key) as Array<{ detail: string }>).map((row) => row.detail).join(" ");
+  assert.match(plan, /idx_books_original_key/);
+});
+
+test("the series rule built from one key's claims answers like the one built from every claim", () => {
+  const { db, repo } = freshRepo();
+  const poppies = [
+    portuguese(repo, "Poppy e o Pónei", "Janey Louise Jones", "9789720000201"),
+    portuguese(repo, "Poppy no Mar", "Janey Louise Jones", "9789720000202"),
+    portuguese(repo, "Poppy na Neve", "Janey Louise Jones", "9789720000203")
+  ];
+  repo.fillOriginalTitle(poppies[0]!.id, "Princess Poppy");
+  repo.fillOriginalTitle(poppies[1]!.id, "Princess Poppy");
+  db.prepare("UPDATE books SET summary = ? WHERE id = ?").run("Um pónei.\n\nTítulo original: Princess Poppy", poppies[2]!.id);
+  repo.fillOriginalTitle(portuguese(repo, "Passeio ao Farol", "Virginia Woolf", "9789720000301").id, "To the Lighthouse");
+  repo.fillOriginalTitle(portuguese(repo, "Rumo ao Farol", "Virginia Woolf", "9789720000302").id, "To the Lighthouse");
+  db.exec("DELETE FROM original_key_version");
+  applyBooksMigrations(db);
+
+  const everything = seriesLikeOriginals(repo.originalTitleClaims());
+  const cases: Array<[string, string]> = [["Princess Poppy", "Janey Louise Jones"], ["To the Lighthouse", "Virginia Woolf"], ["Princess Poppy", "Someone Else"]];
+  for (const [original, author] of cases) assert.equal(seriesLikeOriginals(repo.originalClaimsOf(originalKey(original)!))(original, author), everything(original, author), `${original} / ${author}`);
+  assert.equal(everything("Princess Poppy", "Janey Louise Jones"), true);
+  assert.equal(everything("To the Lighthouse", "Virginia Woolf"), false);
+});
+
+test("the original keys are stored once, recomputed when the version changes, and cleared with their title", () => {
+  const { db, repo } = freshRepo();
+  rawBook(db, "keyed", "Passeio ao Farol", "To the Lighthouse", null);
+  rawBook(db, "labelled", "Orlando em Português", null, "Uma vida.\n\nTítulo original: Orlando");
+  db.exec("DROP INDEX idx_books_original_key");
+  db.exec("DROP INDEX idx_books_original_key_missing");
+  db.exec("ALTER TABLE books DROP COLUMN original_key");
+  db.exec("DELETE FROM original_key_version");
+  applyBooksMigrations(db);
+  assert.equal(keyOf(db, "keyed"), originalKey("To the Lighthouse"));
+  assert.deepEqual(originalsOf(db, "labelled"), { original_title: "Orlando", original_key: "orlando|" });
+  assert.ok(db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'idx_books_original_key'").get());
+  assert.deepEqual(versions(db), [1]);
+  assert.equal(repo.originalClaimsOf("orlando|").length, 1);
+
+  db.prepare("UPDATE books SET original_key = 'x' WHERE id = 'keyed'").run();
+  applyBooksMigrations(db);
+  assert.equal(keyOf(db, "keyed"), "x");
+
+  db.exec("UPDATE original_key_version SET version = 0");
+  db.prepare("UPDATE books SET original_title = NULL, summary = NULL WHERE id = 'labelled'").run();
+  applyBooksMigrations(db);
+  assert.equal(keyOf(db, "keyed"), originalKey("To the Lighthouse"));
+  assert.equal(keyOf(db, "labelled"), null);
+  assert.deepEqual(versions(db), [1]);
+});
+
+test("a title stored without its key is keyed at the next boot, found through its own index", () => {
+  const { db } = freshRepo();
+  rawBook(db, "stray", "Passeio ao Farol", "To the Lighthouse", null);
+  rawBook(db, "blank", "Sem título", "   ", null);
+  assert.equal(keyOf(db, "stray"), null);
+  applyBooksMigrations(db);
+  assert.equal(keyOf(db, "stray"), originalKey("To the Lighthouse"));
+  assert.equal(keyOf(db, "blank"), null);
+  assert.deepEqual(versions(db), [1]);
+  const plan = (db.prepare(`EXPLAIN QUERY PLAN ${UNKEYED_ORIGINALS_SQL}`).all() as Array<{ detail: string }>).map((row) => row.detail).join(" ");
+  assert.match(plan, /idx_books_original_key_missing/);
 });

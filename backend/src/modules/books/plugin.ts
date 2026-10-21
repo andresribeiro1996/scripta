@@ -21,6 +21,7 @@ import { startGenreJobsIfConfigured } from "./genreJudgments.js";
 import { genreReviewWith, reviewGenreWith } from "./genreReview.js";
 import { startSynopsisJobsIfConfigured } from "./synopsisJudgments.js";
 import { reviewSynopsisWith, synopsisReviewWith } from "./synopsisReview.js";
+import { startOriginalArrivals } from "./originalArrivals.js";
 import { arenaCheck, startTranslationJobsIfConfigured } from "./translationJudgments.js";
 import { reviewTranslationWith, translationReviewWith } from "./translationReview.js";
 import { isPortuguese } from "./domain/translation.js";
@@ -98,6 +99,13 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
       })
     : null;
   const sharesArena = options.worksShareAnArena ? arenaCheck(repo, options.worksShareAnArena) : () => false;
+  const stopOriginalArrivals = startOriginalArrivals({
+    repo,
+    sharesArena,
+    now: Date.now,
+    info: (details, message) => app.log.info(details, message),
+    onError: (error, titleKey) => app.log.error({ err: error, titleKey }, "original arrivals failed")
+  });
   const translationJobs = heldWorks
     ? startTranslationJobsIfConfigured(env.TYPESAFE_API_KEY, {
         repo,
@@ -221,6 +229,7 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
     genreJobs?.stop();
     synopsisJobs?.stop();
     translationJobs?.stop();
+    stopOriginalArrivals();
     worker.stop();
   });
 

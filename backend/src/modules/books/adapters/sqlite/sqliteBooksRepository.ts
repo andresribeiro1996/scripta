@@ -9,7 +9,7 @@ import { WorkMergeError } from "../../domain/errors.js";
 import { wantsRetitle } from "../../domain/lossy.js";
 import { SERIES_SOURCE_RANK, seriesNameKey, type SeriesEntry, type SeriesSource } from "../../domain/series.js";
 import { summaryHashOf, type SynopsisKind } from "../../domain/synopsis.js";
-import { isOriginalTitle, originalTitleIn } from "../../domain/translation.js";
+import { isOriginalTitle, originalKey, originalTitleIn } from "../../domain/translation.js";
 import type { BookRow, CoverImageRow, DataSource, GenreEvidence, LossyBook, MergeSource, SummarySource, WorkPageRows, WorkView } from "../../domain/types.js";
 
 export const UNCHECKED_COVERS_SQL = `
@@ -21,6 +21,10 @@ export const UPGRADE_WANTED_SQL = `
   SELECT id, cover_upgrade_wanted_at AS at, rowid AS row FROM books
   WHERE cover_upgrade_wanted_at IS NOT NULL AND (cover_upgrade_wanted_at, rowid) > (?, ?)
   ORDER BY cover_upgrade_wanted_at, rowid LIMIT ?
+`;
+
+export const ORIGINAL_CLAIMS_SQL = `
+  SELECT work_id, title, author, language, original_title FROM books WHERE original_key = ?
 `;
 
 export const UNCHECKED_DETAILS_SQL = `
@@ -311,6 +315,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
         summary = CASE WHEN ${takesSummary} THEN $summary ELSE summary END,
         summary_hash = CASE WHEN ${takesSummary} THEN $summary_hash ELSE summary_hash END,
         original_title = CASE WHEN ${takesSummary} THEN COALESCE(original_title, $original_title) ELSE original_title END,
+        original_key = CASE WHEN ${takesSummary} AND original_title IS NULL THEN $original_key ELSE original_key END,
         pages = COALESCE(pages, $pages),
         year = COALESCE(year, $year),
         publisher = COALESCE(publisher, $publisher),
@@ -427,7 +432,10 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     SELECT summary_hash, 'openlibrary', title, author, summary, created_at, rowid FROM works WHERE summary_hash IS NOT NULL AND summary IS NOT NULL
     ORDER BY created_at, ord
   `);
-  const fillOriginalTitleStmt = db.prepare(`UPDATE books SET original_title = ? WHERE id = ? AND original_title IS NULL`);
+  const fillOriginalTitleStmt = db.prepare(`UPDATE books SET original_title = ?, original_key = ? WHERE id = ? AND original_title IS NULL`);
+  const originalClaimsOfStmt = db.prepare(ORIGINAL_CLAIMS_SQL);
+  const originalArrivalsStmt = db.prepare(`SELECT title_key FROM original_arrivals LIMIT ?`);
+  const dropOriginalArrivalStmt = db.prepare(`DELETE FROM original_arrivals WHERE title_key = ?`);
   const labelledSummariesStmt = db.prepare(`SELECT id, summary FROM books WHERE original_title IS NULL AND summary LIKE '%tulo original%'`);
   const labelledWorkSummariesStmt = db.prepare(`SELECT id, summary FROM books WHERE work_id = ? AND original_title IS NULL AND summary LIKE '%tulo original%'`);
   const detailsMissingStmt = db.prepare(`UPDATE books SET details_status = 'missing', details_checked_at = ? WHERE id = ?`);
@@ -510,12 +518,14 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
 
   function mergeDetails(bookId: string, details: MergeableDetails, summarySource: SummarySource | null) {
     const summary = details.summary ? cleanSummary(details.summary) : null;
+    const originalTitle = details.summary ? originalTitleIn(details.summary) : null;
     mergeDetailsStmt.run({
       $id: bookId,
       $summary: summary,
       $summary_source: summarySource,
       $summary_hash: summaryHashOf(summary),
-      $original_title: details.summary ? originalTitleIn(details.summary) : null,
+      $original_title: originalTitle,
+      $original_key: originalTitle === null ? null : originalKey(originalTitle),
       $pages: details.pages,
       $year: details.year,
       $publisher: details.publisher,
@@ -980,6 +990,15 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
         return originalTitle ? [{ workId: row.work_id, title: row.title, author: row.author, language: row.language, originalTitle }] : [];
       });
     },
+    originalClaimsOf(key) {
+      return (originalClaimsOfStmt.all(key) as Array<{ work_id: string | null; title: string; author: string; language: string | null; original_title: string }>).map((row) => ({ workId: row.work_id, title: row.title, author: row.author, language: row.language, originalTitle: row.original_title }));
+    },
+    originalArrivals(limit) {
+      return (originalArrivalsStmt.all(limit) as Array<{ title_key: string }>).map((row) => row.title_key);
+    },
+    dropOriginalArrival(titleKey) {
+      dropOriginalArrivalStmt.run(titleKey);
+    },
     activeMerges(source) {
       return (activeMergesStmt.all(source) as Array<{ id: number; from_work: string; into_work: string; moved_book_ids: string; merged_at: string }>).map((row) => ({ id: row.id, fromWork: row.from_work, intoWork: row.into_work, movedBookIds: JSON.parse(row.moved_book_ids) as string[], mergedAt: row.merged_at }));
     },
@@ -1130,7 +1149,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       return [...seen.values()];
     },
     fillOriginalTitle(bookId, title) {
-      if (isOriginalTitle(title)) fillOriginalTitleStmt.run(title, bookId);
+      if (isOriginalTitle(title)) fillOriginalTitleStmt.run(title, originalKey(title), bookId);
     },
     fillOriginalTitlesFromSummaries(workId) {
       return inTransaction(() => {
@@ -1138,7 +1157,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
         let filled = 0;
         for (const row of rows) {
           const title = originalTitleIn(row.summary);
-          if (title && fillOriginalTitleStmt.run(title, row.id).changes > 0) filled += 1;
+          if (title && fillOriginalTitleStmt.run(title, originalKey(title), row.id).changes > 0) filled += 1;
         }
         return filled;
       });
