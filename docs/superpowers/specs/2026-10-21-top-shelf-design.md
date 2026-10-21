@@ -72,7 +72,7 @@ A book counts in every genre its work has. Books with no known genre count in "A
 
 ### What counts — visibility
 
-Only content a stranger could already see, computed from the live game tables at read time — so a game that is deleted, unpublished, or whose owner unpublishes their profile simply stops counting, in every period including All time:
+Only content a stranger could already see, computed from the live game tables at read time — so a game that is deleted or unpublished, or that Discover stops showing, simply stops counting, in every period including All time:
 
 - Published games only — the same gates the existing per-book stats and Discover use (a tier list or quiz is public once published; a tournament once it leaves seeding, so active tournaments count for appearances and votes, while Most crowned needs a completed one). Drafts never count.
 - A game counts only if Discover would list it — its owner resolves to a public reader profile, or it is a promoted tier list shown as "Original creator unavailable". Games Discover hides do not count, and neither do their likes/comments. (Checked against the code: Discover's rule is profile resolution, not the feed's `profiles.published` flag; Top Shelf sits beside Browse, so it follows Browse.)
@@ -85,7 +85,7 @@ A "▶ Play October recap" button on the podium opens full-screen cards, one per
 ## Goals
 
 - Someone opening Games can see in seconds what is hot and which books are winning, this month or ever, overall or in their favourite genre.
-- Every number uses the same definitions and words as the per-book stats page (titles, tier bands). Top Shelf counts only games past the vote bar, so a book's Top Shelf number can be lower than its own page's — that is expected, not a bug.
+- Every number uses the same definitions and words as the per-book stats page (titles, tier bands). Top Shelf counts only games past the vote bar, so a book's Top Shelf number can be lower than its own page's; "Most tiered" counts lists the book is in (its pool) while the book page counts lists with signed-in placements, so that one can also be higher. Both are expected, not bugs.
 - Same look and controls as the rest of the app (bottom bar, Library-style menu, existing game rows and book covers).
 
 ## Non-goals
@@ -98,7 +98,7 @@ A "▶ Play October recap" button on the podium opens full-screen cards, one per
 
 ## Anti-goals
 
-- Leaking anything private: a draft, a seeding tournament, or a game by someone whose profile is unpublished must never influence a number or appear.
+- Leaking anything private: a draft, a seeding tournament, or a game Discover would not show must never influence a number or appear.
 - One person or one vote deciding a record — that is what the vote bar and the "Highest tier" minimum of 3 qualifying lists are for. Any further minimum should come back to the user rather than being invented.
 - A slow screen. The catalog is ~233k books; rankings must be computed over the (much smaller) game tables and only then joined to covers and genres for the shown works, never the other way round.
 
