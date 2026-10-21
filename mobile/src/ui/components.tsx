@@ -432,7 +432,7 @@ export function ActionSheet({ title, groups, children }: {
     <>
       {children(open)}
       <Sheet visible={visible} title={title} onClose={close} onDismiss={runPending}>
-        <View style={styles.actionRows}>
+        <ScrollView style={styles.actionRows}>
           {groups.filter((group) => group.length > 0).map((group, index) => (
             <View key={index}>
               {index > 0 ? <View style={[styles.actionDivider, { backgroundColor: colors.border }]} /> : null}
@@ -451,7 +451,7 @@ export function ActionSheet({ title, groups, children }: {
               ))}
             </View>
           ))}
-        </View>
+        </ScrollView>
       </Sheet>
     </>
   );
@@ -922,7 +922,7 @@ const styles = StyleSheet.create({
   overlayTitle: { ...typography.title, fontWeight: "700", flex: 1 },
   closeButton: { minHeight: minimumTouchTarget, minWidth: minimumTouchTarget, alignItems: "center", justifyContent: "center" },
   closeText: { ...typography.body, fontWeight: "600" },
-  actionRows: { marginHorizontal: -spacing.xl },
+  actionRows: { flexShrink: 1, marginHorizontal: -spacing.xl },
   actionRow: { minHeight: minimumTouchTarget, flexDirection: "row", alignItems: "center", gap: spacing.md, paddingHorizontal: spacing.xl },
   actionTile: { width: 32, height: 32, borderRadius: radii.md, alignItems: "center", justifyContent: "center" },
   actionLabel: { flex: 1, fontWeight: "600" },

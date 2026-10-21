@@ -234,7 +234,7 @@ export function MuralsScreen() {
                         [{ label: "Delete", icon: "delete", destructive: true, onPress: () => confirmDelete(item) }],
                       ]}
                     >
-                      {(open) => <Pressable accessibilityRole="button" accessibilityLabel={`Settings for ${item.name}`} onPress={open} style={[styles.menuIcon, { backgroundColor: colors.surface, borderColor: colors.border }]}><Icon name="settings" size={16} color={colors.textDim} /></Pressable>}
+                      {(open) => <Pressable accessibilityRole="button" accessibilityLabel={`Settings for ${item.name}`} hitSlop={10} onPress={open} style={[styles.menuIcon, { backgroundColor: colors.surface, borderColor: colors.border }]}><Icon name="settings" size={16} color={colors.textDim} /></Pressable>}
                     </ActionSheet>
                   </View>
                 </View>
