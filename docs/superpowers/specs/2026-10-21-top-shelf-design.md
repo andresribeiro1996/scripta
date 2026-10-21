@@ -1,4 +1,4 @@
-# Games hall of fame — design
+# Top Shelf — design
 
 ## Why
 
@@ -6,16 +6,16 @@ The Games tab's title bar holds only its name now that "New" moved to a floating
 
 ## What it is
 
-A **hall of fame for everyone on Scripta**, opened from a trophy icon at the right of the Games title bar. Two screens in step 1, a third in step 2.
+**Top Shelf**, a hall of fame for everyone on Scripta (the user chose the name over "Hall of fame"), opened from a trophy icon at the right of the Games title bar. Two screens in step 1, a third in step 2.
 
 Mockups (brainstorm companion, kept locally under `.superpowers/brainstorm/49045-1792581822/content/`): `hall-of-fame-bottom-controls.html` is the agreed layout; `hall-of-fame-combined.html` shows the full flow including the step-2 recap.
 
-### Main screen — "Hall of fame"
+### Main screen — "Top Shelf"
 
 Top to bottom:
 
 1. **Podium.** The period's top three books, champion in the middle with its title. Overall rank is points across the book records (see Scoring).
-2. **Records strip.** A horizontal row of cards, one per book record, each showing the record's name, its leader and the leader's number ("👑 Most crowned · Dune · 5 wins"). Tapping a card opens that record's leaderboard.
+2. **Records strip.** A horizontal row of cards, one per book record, each showing the record's name, its leader and the leader's number ("👑 Most crowned · Dune · 5 titles"). Tapping a card opens that record's leaderboard.
 3. **Champions by genre.** A horizontal row of genres, each showing its top book (by the same podium points within that genre). "›" or tapping a genre opens that genre's leaderboard.
 4. **Hottest games.** The top games by interactions, as game rows with their counts shown separately (♥ likes · votes · 💬 comments). "›" opens the full games leaderboard. Tapping a game opens it, as rows do elsewhere.
 
@@ -40,7 +40,7 @@ The user explicitly asked for these at the bottom, not the top. Period and genre
 | 📊 Most tiered | published tier lists the book appears in | tier lists published this month |
 | ⭐ Highest tier | best average tier placement, minimum 3 lists | placements on ballots cast this month |
 | ❓ Most quizzed | published quizzes the book appears in | quizzes published this month |
-| 🌱 Rising star | appearances this period, among books whose first-ever appearance in any public game is this period | only shown under "This month"; hidden under "All time" |
+| 🌱 Rising star | appearances this period, among books whose first-ever appearance in any public game (vote bar or not) is this period | only shown under "This month"; hidden under "All time" |
 
 "Most tiered", "Most crowned" and "Most quizzed" were the user's; "Highest tier" and "Rising star" are additions the user accepted.
 
@@ -75,23 +75,23 @@ A book counts in every genre its work has. Books with no known genre count in "A
 Only content a stranger could already see, computed from the live game tables at read time — so a game that is deleted, unpublished, or whose owner unpublishes their profile simply stops counting, in every period including All time:
 
 - Published games only — the same gates the existing per-book stats and Discover use (a tier list or quiz is public once published; a tournament once it leaves seeding, so active tournaments count for appearances and votes, while Most crowned needs a completed one). Drafts never count.
-- A game counts only if Discover would list it — its owner resolves to a public reader profile, or it is a promoted tier list shown as "Original creator unavailable". Games Discover hides do not count, and neither do their likes/comments. (Checked against the code: Discover's rule is profile resolution, not the feed's `profiles.published` flag; the hall of fame sits beside Browse, so it follows Browse.)
+- A game counts only if Discover would list it — its owner resolves to a public reader profile, or it is a promoted tier list shown as "Original creator unavailable". Games Discover hides do not count, and neither do their likes/comments. (Checked against the code: Discover's rule is profile resolution, not the feed's `profiles.published` flag; Top Shelf sits beside Browse, so it follows Browse.)
 - Per-book placement numbers follow the existing book-stats rules (e.g. which ballots count for tier placements), so a book's hall-of-fame numbers never contradict its own stats page. Merged works count as their canonical work.
 
 ## Step 2 — recap cards
 
-A "▶ Play October recap" button on the podium opens full-screen cards, one per record for the month, tapped through like stories, each shareable. Uses the same numbers as step 1. Not built in step 1; the podium layout should leave room for the button.
+A "▶ Play October recap" button on the podium opens full-screen cards, one per record for the month, tapped through like stories, each shareable. Uses the same numbers as step 1. Not built in step 1; the podium layout should leave room for the button below the champion's title.
 
 ## Goals
 
 - Someone opening Games can see in seconds what is hot and which books are winning, this month or ever, overall or in their favourite genre.
-- Every number agrees with what the per-book stats page and the games themselves show.
+- Every number uses the same definitions and words as the per-book stats page (titles, tier bands). Top Shelf counts only games past the vote bar, so a book's Top Shelf number can be lower than its own page's — that is expected, not a bug.
 - Same look and controls as the rest of the app (bottom bar, Library-style menu, existing game rows and book covers).
 
 ## Non-goals
 
 - Web frontend (mobile only in step 1 — my call; the Games header change it builds on is mobile).
-- Personal or friends-only stats; this is everyone's hall of fame.
+- Personal or friends-only stats; this is everyone's Top Shelf.
 - "Most answered correctly in quizzes" — answers are not stored per book today. Later.
 - Per-user leaderboards (top creators, top voters).
 - Notifications or badges for record holders.
