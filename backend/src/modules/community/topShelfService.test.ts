@@ -79,6 +79,15 @@ test("reuses a cached result within 60 seconds", () => {
   assert.equal(calls.facts.length, 2);
 });
 
+test("does not reuse a cached month result after the Lisbon month rolls over", () => {
+  const { service, calls, clock } = setup({ at: Date.parse("2026-10-31T23:59:30Z") });
+  service.getTopShelf({ period: "month", genre: null });
+  clock.at += 40_000;
+  service.getTopShelf({ period: "month", genre: null });
+  assert.equal(calls.facts.length, 2);
+  assert.equal(calls.facts[1], "2026-11-01T00:00:00.000Z");
+});
+
 test("drops expired cache entries on write", () => {
   const { service, calls, clock } = setup();
   const start = clock.at;

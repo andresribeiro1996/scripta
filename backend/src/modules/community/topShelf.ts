@@ -144,9 +144,16 @@ export function rankTopShelf(input: ShelfInput, opts: { since: string | null; ge
       const pos = tierPosition(p);
       if (pos === null) continue;
       const w = canon(p.workId);
-      positions.set(w, [...(positions.get(w) ?? []), pos]);
+      const list = positions.get(w);
+      if (list) list.push(pos);
+      else positions.set(w, [pos]);
     }
-    for (const [w, list] of positions) perList.set(w, [...(perList.get(w) ?? []), list.reduce((a, b) => a + b, 0) / list.length]);
+    for (const [w, list] of positions) {
+      const avg = list.reduce((a, b) => a + b, 0) / list.length;
+      const lists = perList.get(w);
+      if (lists) lists.push(avg);
+      else perList.set(w, [avg]);
+    }
   }
   allBoards.highestTier = [...perList]
     .filter(([, lists]) => lists.length >= HIGHEST_TIER_MIN_LISTS)

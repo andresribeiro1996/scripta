@@ -33,8 +33,7 @@ export function createTopShelfService(deps: { engagementRepo: Pick<EngagementRep
   const { engagementRepo, community, shelf, now } = deps;
   const cache = new Map<string, { at: number; value: TopShelf }>();
 
-  const compute = ({ period, genre, view }: TopShelfQuery): TopShelf => {
-    const since = period === "month" ? topShelfMonthStart(new Date(now())) : null;
+  const compute = ({ period, genre, view }: TopShelfQuery, since: string | null): TopShelf => {
     const tierlists = shelf.tierlistFacts(since);
     const tournaments = shelf.tournamentFacts(since);
     const quizzes = shelf.quizFacts(since);
@@ -100,11 +99,12 @@ export function createTopShelfService(deps: { engagementRepo: Pick<EngagementRep
 
   return {
     getTopShelf(query) {
-      const key = JSON.stringify([query.period, query.genre, query.view ?? null]);
       const at = now();
+      const since = query.period === "month" ? topShelfMonthStart(new Date(at)) : null;
+      const key = JSON.stringify([since, query.period, query.genre, query.view ?? null]);
       const hit = cache.get(key);
       if (hit && at - hit.at < CACHE_MS) return hit.value;
-      const value = compute(query);
+      const value = compute(query, since);
       for (const [k, entry] of cache) if (at - entry.at >= CACHE_MS) cache.delete(k);
       cache.set(key, { at, value });
       return value;
