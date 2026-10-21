@@ -318,7 +318,7 @@ export function Input({
           { color: colors.text },
           props.multiline ? { textAlignVertical: "top" } : null,
           icon ? { paddingLeft: minimumTouchTarget } : null,
-          secureTextEntry || onClear ? { paddingRight: minimumTouchTarget + spacing.sm } : null,
+          secureTextEntry || (onClear && props.value) ? { paddingRight: minimumTouchTarget + spacing.sm } : null,
           fontStyleFor(fonts.text, "text", { fontSize: typography.input.fontSize }) ?? { fontFamily: SYSTEM_FAMILY },
         ]}
       />
