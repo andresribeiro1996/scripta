@@ -30,13 +30,18 @@ BNP notes also reach `fillOriginalTitle` (`bnpImport.ts:87`). So does a WooComme
 
 **Rule.** Add `isOriginalTitle(value)` in `domain/translation.ts`. It is true when the value:
 - contains a letter or digit (`\p{L}`/`\p{N}`, so `Солярис` and `1984` pass);
-- and does not start with another metadata label followed by a colon, or by a dash after whitespace.
+- and does not start with another metadata label. That is any of:
+  - a label alone, followed by a colon or by a dash after whitespace;
+  - `ISBN` as a word;
+  - a translator label followed by `de` or `por`.
 
-Labels come from `@scripta/shared`'s `STRICT_METADATA_LABEL | LOOSE_METADATA_LABEL`, the same set `publisherFeed`'s `METADATA_LINE` uses.
+Labels come from `@scripta/shared`'s `STRICT_METADATA_LABEL | LOOSE_METADATA_LABEL`, the same set `publisherFeed`'s `METADATA_LINE` uses. The matching is the same too, except that a dash counts only after whitespace, so `"Data-Driven Science"` stays a title.
+
+**Trade-off.** A one-word original title that equals a label is rejected, for example `"Data"`. That case is rare. The alternative is worse: an empty `<dd>` makes the next `<dt>` (`"Tradução"`) look like the original title.
 
 **Parser.** `originalTitleIn` keeps its regex. It still reads a value on the line after a bare label, because `htmlToText` turns `<dt>/<dd>` and `<div>` pairs into separate lines. It returns `null` unless `isOriginalTitle` holds and the length cap holds.
 
-**Writer guard.** `fillOriginalTitle` writes only values that pass `isOriginalTitle`. That covers the WooCommerce attribute and BNP paths. Without the guard, the next harvest would re-store what the repair cleared.
+**Writer guard.** `fillOriginalTitle` writes only values that pass `isOriginalTitle`. That covers the WooCommerce attribute and BNP paths. Without the guard, the next harvest would re-store what the repair cleared. The WooCommerce "Título original" attribute is checked before the fallback to the description text, so a placeholder attribute such as `"-"` no longer hides a title in the description.
 
 **Repair.** A once-only boot migration, `user_version` 5, after `turnIsbndbFirstAuthors`. This is the pattern PR #280 used.
 - It sets `original_title = NULL` on every row whose stored value fails `isOriginalTitle`, `''` included.
