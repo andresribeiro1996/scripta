@@ -48,3 +48,11 @@ export function recapLinkPath(card: TopShelfRecapCard): string {
     case "book": return card.game ? contentTarget(card.game.content) : `/work/${encodeURIComponent(card.book.workId)}`;
   }
 }
+
+export function recapEntries(index: { months: string[]; currentMonth: string }): { play: string | null; past: string[] } {
+  const [year, month] = index.currentMonth.split("-").map(Number) as [number, number];
+  const previous = month === 1 ? `${year - 1}-12` : `${year}-${String(month - 1).padStart(2, "0")}`;
+  const latest = index.months[0];
+  if (latest === undefined || latest < previous) return { play: null, past: index.months };
+  return { play: latest, past: index.months.slice(1) };
+}

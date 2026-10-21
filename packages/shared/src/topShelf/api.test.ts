@@ -54,6 +54,8 @@ test("fetchRecap builds the path and drops unknown game kinds", async () => {
   const { calls, api } = recorder({ month: "2026-09", cards });
   const recap = await api.fetchRecap("2026-09");
   assert.deepEqual(calls, [{ path: "/top-shelf/recaps/2026-09", init: { auth: "none" } }]);
+  await api.fetchRecap("a/b");
+  assert.equal(calls[1]!.path, "/top-shelf/recaps/a%2Fb");
   assert.deepEqual(recap.cards, [
     cards[0],
     cards[1],

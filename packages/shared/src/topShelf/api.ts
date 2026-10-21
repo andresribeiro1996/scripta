@@ -24,7 +24,7 @@ export function createTopShelfApi(request: ApiRequest) {
       return request<TopShelfRecapIndex>("/top-shelf/recaps", { auth: "none" });
     },
     async fetchRecap(month: string): Promise<TopShelfRecap> {
-      const result = await request<TopShelfRecap>(`/top-shelf/recaps/${month}`, { auth: "none" });
+      const result = await request<TopShelfRecap>(`/top-shelf/recaps/${encodeURIComponent(month)}`, { auth: "none" });
       return {
         ...result,
         cards: result.cards.flatMap((card): TopShelfRecapCard[] => {

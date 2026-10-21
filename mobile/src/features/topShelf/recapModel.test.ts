@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { TopShelfBook, TopShelfGame, TopShelfRecapCard } from "@scripta/shared";
 import type { DiscoverItem, PublishedContent } from "@scripta/shared/community";
-import { recapCta, recapLinkPath, recapNumber, recapTitle } from "./recapModel.js";
+import { recapCta, recapEntries, recapLinkPath, recapNumber, recapTitle } from "./recapModel.js";
 
 const dune: TopShelfBook = { workId: "w 1", title: "Dune", author: "Herbert", coverUrl: null, value: 5 };
 const tierlist = { kind: "tierlist", id: "t1", voteCode: "abc", name: "Sci-fi", covers: [] } as unknown as PublishedContent;
@@ -43,4 +43,18 @@ test("recapLinkPath falls back to the book page and the landing page", () => {
   assert.equal(recapLinkPath(bookCard(null)), "/work/w%201");
   assert.equal(recapLinkPath(hottest(false)), "/vote/abc");
   assert.equal(recapLinkPath(summary), "/");
+});
+
+test("recapEntries plays the latest month when it is the last completed one", () => {
+  assert.deepEqual(recapEntries({ months: ["2026-10", "2026-09"], currentMonth: "2026-11" }), { play: "2026-10", past: ["2026-09"] });
+  assert.deepEqual(recapEntries({ months: ["2025-12"], currentMonth: "2026-01" }), { play: "2025-12", past: [] });
+});
+
+test("recapEntries hides the button when the last completed month has no recap", () => {
+  assert.deepEqual(recapEntries({ months: ["2026-09", "2026-08"], currentMonth: "2026-11" }), { play: null, past: ["2026-09", "2026-08"] });
+  assert.deepEqual(recapEntries({ months: [], currentMonth: "2026-11" }), { play: null, past: [] });
+});
+
+test("recapEntries keeps the button when the latest month is the current one", () => {
+  assert.deepEqual(recapEntries({ months: ["2026-10", "2026-09"], currentMonth: "2026-10" }), { play: "2026-10", past: ["2026-09"] });
 });

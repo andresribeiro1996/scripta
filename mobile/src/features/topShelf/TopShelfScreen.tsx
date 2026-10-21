@@ -10,6 +10,7 @@ import { DiscoverRow } from "../community/DiscoverRow";
 import { workPath } from "../works/workPath";
 import { fetchRecapIndex, fetchTopShelf } from "./api";
 import { TopShelfBar } from "./TopShelfBar";
+import { recapEntries } from "./recapModel";
 import { boardTitle, emptySections, valueLabel, visibleBoards } from "./topShelfModel";
 
 function topShelfHref(view: TopShelfView, period: TopShelfPeriod, genre: string | null) {
@@ -24,7 +25,8 @@ export function TopShelfScreen() {
   const [genre, setGenre] = useState<string | null>(params.genre ?? null);
   const query = useQuery({ queryKey: ["topShelf", period, genre], queryFn: () => fetchTopShelf({ period, genre }), placeholderData: keepPreviousData, retry: false });
   const data = query.data;
-  const recaps = useQuery({ queryKey: ["topShelfRecaps"], queryFn: fetchRecapIndex, retry: false }).data?.months ?? [];
+  const recapIndex = useQuery({ queryKey: ["topShelfRecaps"], queryFn: fetchRecapIndex, retry: false }).data;
+  const { play, past } = recapIndex ? recapEntries(recapIndex) : { play: null, past: [] };
   const openRecap = (month: string) => router.push(`/recap/${month}` as never);
   const openBook = (book: TopShelfBook) => router.push(workPath(book.workId, segments) as never);
 
@@ -40,10 +42,10 @@ export function TopShelfScreen() {
             : <View style={styles.page}><Skeleton height={200} /></View>;
         }
         const empty = emptySections(data);
-        const playButton = recaps.length ? <View style={styles.recapButton}><Button label={`▶ Play ${recapMonthName(recaps[0]!)} recap`} numberOfLines={1} onPress={() => openRecap(recaps[0]!)} /></View> : null;
-        const pastRecaps = recaps.length > 1 ? (
+        const playButton = play ? <View style={styles.recapButton}><Button label={`▶ Play ${recapMonthName(play)} recap`} numberOfLines={1} onPress={() => openRecap(play)} /></View> : null;
+        const pastRecaps = past.length ? (
           <Section title="Past recaps">
-            {recaps.slice(1).map((month) => (
+            {past.map((month) => (
               <Pressable key={month} accessibilityRole="button" accessibilityLabel={`${recapMonthName(month)} recap`} onPress={() => openRecap(month)} style={[styles.recapRow, { borderColor: colors.border }]}>
                 <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.grow, { color: colors.text }]}>{`${recapMonthName(month)} recap`}</Text>
                 <Icon name="chevronRight" size={20} color={colors.textDim} />

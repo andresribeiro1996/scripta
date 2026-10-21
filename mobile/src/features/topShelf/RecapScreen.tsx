@@ -26,7 +26,7 @@ export function RecapScreen({ month }: { month: string }) {
   const [linkAttempt, setLinkAttempt] = useState(0);
   const [coversReady, setCoversReady] = useState(false);
   const recap = useQuery({ queryKey: ["topShelfRecap", month], queryFn: () => fetchRecap(month), retry: false });
-  const recapIndex = useQuery({ queryKey: ["topShelfRecapIndex"], queryFn: fetchRecapIndex, retry: false });
+  const recapIndex = useQuery({ queryKey: ["topShelfRecaps"], queryFn: fetchRecapIndex, retry: false });
   const cards = recap.data?.cards ?? [];
   const card = cards[Math.min(index, cards.length - 1)];
   const unknown = missing(recap.error) || (recap.isSuccess && cards.length === 0);
@@ -72,7 +72,7 @@ export function RecapScreen({ month }: { month: string }) {
     else close();
   };
   const open = () => {
-    if (card.kind === "book") router.push((card.game ? contentTarget(card.game.content) : workPath(card.book.workId, segments)) as never);
+    if (card.kind === "book") router.push(workPath(card.book.workId, segments) as never);
     else if (card.kind === "hottestGame") router.push(contentTarget(card.game.item.content) as never);
   };
 

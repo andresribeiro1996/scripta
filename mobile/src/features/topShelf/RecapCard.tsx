@@ -6,7 +6,7 @@ import Svg, { Defs, LinearGradient, RadialGradient, Rect, Stop } from "react-nat
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { TopShelfRecapCard } from "@scripta/shared";
 import { Text } from "../../ui/Text";
-import { cardFontFamily, dynamicType, radii, spacing, typography } from "../../ui";
+import { cardFontFamily, dynamicType, minimumTouchTarget, radii, spacing, typography } from "../../ui";
 import { recapCta, recapNumber, recapTitle } from "./recapModel";
 
 export const RECAP_COLORS = { gold: "#d9a54a", text: "#e8ece9", dim: "#9aa79f", border: "#5a4a24", deep: "#3d2f12", mid: "#1a2a22", base: "#0f1512" } as const;
@@ -64,18 +64,21 @@ export function RecapCard({ card, month, currentMonth, url, sharing = false, onO
   useEffect(() => { if (settled >= covers.length) onCoversReady?.(); }, [settled, covers.length, onCoversReady]);
   const title = card.kind === "book" ? card.book.title : card.kind === "hottestGame" ? card.game.item.content.name : "";
   const subtitle = card.kind === "book" ? card.book.author : card.kind === "hottestGame" ? `by ${card.game.item.author.username}` : "";
-  const coverWidth = card.kind === "hottestGame" ? 80 : 170;
+  const [cardHeight, setCardHeight] = useState<number | null>(null);
+  const game = card.kind === "hottestGame";
+  const coverCap = game ? 80 : 170;
+  const coverWidth = cardHeight === null ? coverCap : Math.min(coverCap, Math.floor((cardHeight * (game ? 0.2 : 0.32)) / 1.5));
   const summary = card.kind === "summary";
   const body = (
     <View style={styles.cover}>
       {summary ? null : <Glow size={coverWidth * 3.4} />}
       <View style={styles.coverRow}>
-        {covers.map((uri, index) => <CoverImage key={index} uri={uri} title={title} width={coverWidth} onSettled={onSettled} />)}
+        {covers.map((uri, index) => <CoverImage key={`${index}-${uri}`} uri={uri} title={title} width={coverWidth} onSettled={onSettled} />)}
       </View>
     </View>
   );
   return (
-    <View style={[styles.card, sharing ? styles.sharing : styles.full, { paddingTop: sharing ? spacing.xxxl : insets.top + 64, paddingBottom: sharing ? spacing.lg : insets.bottom + spacing.xxxl }]}>
+    <View onLayout={(event) => setCardHeight(event.nativeEvent.layout.height)} style={[styles.card, sharing ? styles.sharing : styles.full, { paddingTop: sharing ? spacing.xxxl : insets.top + 64, paddingBottom: sharing ? spacing.lg : insets.bottom + spacing.xxxl }]}>
       <Background />
       <View style={styles.main}>
         <Text numberOfLines={2} {...dynamicType} style={[typography.body, styles.label]}>{recapTitle(card, month)}</Text>
@@ -111,7 +114,7 @@ const styles = StyleSheet.create({
   title: { color: RECAP_COLORS.text, fontSize: 28, textAlign: "center", alignSelf: "stretch" },
   number: { color: RECAP_COLORS.gold, fontSize: 22, textAlign: "center", alignSelf: "stretch" },
   summaryNumbers: { color: RECAP_COLORS.text, fontSize: 28, textAlign: "center", alignSelf: "stretch" },
-  hint: { color: RECAP_COLORS.dim, textAlign: "center", alignSelf: "stretch" },
+  hint: { color: RECAP_COLORS.dim, textAlign: "center", alignSelf: "stretch", paddingHorizontal: minimumTouchTarget },
   strip: { flexDirection: "row", alignItems: "center", gap: spacing.lg, paddingTop: spacing.lg, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: RECAP_COLORS.border },
   qr: { padding: spacing.xs, backgroundColor: "white", borderRadius: radii.sm },
   stripText: { flex: 1, gap: spacing.xs },
