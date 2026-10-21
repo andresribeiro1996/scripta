@@ -18,6 +18,7 @@ const { createSqliteBooksRepository } = await import("./adapters/sqlite/sqliteBo
 const { WorkMergeError } = await import("./domain/errors.js");
 const { mergeDuplicateWorks, walkDuplicateWorks } = await import("./duplicateWorks.js");
 const { undoReviewedMerges } = await import("./seriesMergeRepair.js");
+const { arenaCheck } = await import("./translationJudgments.js");
 
 type Repo = ReturnType<typeof createSqliteBooksRepository>;
 const NOW = Date.parse("2026-10-21T09:00:00.000Z");
@@ -129,6 +130,24 @@ test("skips works sharing an arena, at save and in the walk", async () => {
   assert.equal(work(repo, small), small.work_id);
   assert.equal(work(repo, large), large.work_id);
   assert.deepEqual(repo.activeMerges("ol-duplicate"), []);
+});
+
+test("a work that shares an arena with one already merged into the survivor is skipped, by live aliases", () => {
+  const repo = freshRepo();
+  const survivor = edition(repo, "Fourth Wing", "OL1W", 1);
+  edition(repo, "Fourth Wing", "OL1W", 1);
+  const a = edition(repo, "Fourth Wing", "OL2W", 2);
+  const b = edition(repo, "Fourth Wing", "OL3W", 3);
+  const key = repo.getBook(survivor.id)!.title_key!;
+  const tournament = new Set([a.work_id, b.work_id]);
+  const worksShareAnArena = (left: string[], right: string[]) => left.some((id) => tournament.has(id)) && right.some((id) => tournament.has(id));
+
+  const report = mergeDuplicateWorks(deps(repo, arenaCheck(repo, worksShareAnArena)), [key]);
+
+  assert.deepEqual(report, { merges: [{ titleKey: key, from: a.work_id, into: survivor.work_id }], undone: 0, arena: 1, gone: 0 });
+  assert.equal(work(repo, a), survivor.work_id);
+  assert.equal(work(repo, b), b.work_id);
+  assert.deepEqual(repo.activeMerges("ol-duplicate").map((merge) => merge.fromWork), [a.work_id]);
 });
 
 test("walk covers keys across pages", async () => {
