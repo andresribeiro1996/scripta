@@ -235,3 +235,31 @@ A script, `backend/scripts/fetch-originals.mjs`, runs it with `--dry-run` first.
     - for `isPortuguese`: a held "Passeio ao Farol" (original "To the Lighthouse", Virginia Woolf), beside an English edition "The Lighthouse Walk" by Virginia Woolf with original "To the Lighthouse";
     - for `sameMainTitle`: a held "Rumo a Orlando" with original "Orlando", beside an unheld pt "Orlando. Uma biografia" by Virginia Woolf with original "Orlando". `mainTitle` cuts the latter at `". "`, so it equals its original and is left out. Its `title_key` (`ta:orlando uma biografia|…`) doesn't match the held work's pattern, so the held work isn't `present`, and it is looked up.
 - [ ] **Step 2: Implement, verify** (`npm run build --workspace @scripta/shared && npm run typecheck --workspace backend && npm test --workspace backend`), **commit.**
+
+### Fourth round (Codex branch review r2; user approved (a)+(b)+(c) on 2026-10-21)
+
+**Files:**
+- Modify: `backend/src/modules/books/seed/originalsFill.ts`
+- Test: `backend/src/modules/books/seed/originalsFill.test.ts`
+- Modify: `backend/README.md`
+
+**Interfaces:**
+- **(a) `subtitle`:** a new count. After `volume` and before the `present` check, a work is skipped when `normalizeWords(mainTitle(original)) !== normalizeTitle(mainTitle(original))`, i.e. the original has a colon or bracket part. Such a work is never looked up and never sent to the code step.
+- **(b) Collision bucket:** the shared-original map holds two sets per `${originalKey(claim.originalTitle)}#${surnameOf(claim.author) ?? ""}`:
+  - `titles`, of `normalizeWords(claim.title)`;
+  - `originals`, of `normalizeWords(mainTitle(claim.originalTitle))`.
+
+  Same claim filters as now. A group is dropped into `sharedOriginal` when its bucket has `titles.size >= 2 || originals.size >= 2`.
+- **(c) Before each insert:**
+  1. `const key = lookupIdentity({ isbn: "", title: found.title, author: found.author })?.key` (from `domain/normalize.ts`; it is the key `seedBook` uses), then `const row = key ? repo.findBookByKey(key) : undefined`.
+  2. If `row` exists, don't call `seedBook`, and `existing++`. The group's work ids are collected only when `sameWholeTitle(row.title, group.originalTitle)`.
+  3. Otherwise call `seedBook`. An outcome other than `created` throws an `Error` naming the title.
+- **README:** add `subtitle` to the skip list and the report fields, and describe the bucket rule and the `existing` behaviour, each in one short clause.
+
+- [ ] **Step 1: Write the failing tests:**
+  - held "O Messias de Duna" (original "Dune: Messiah", Frank Herbert) with nothing in the catalog: `subtitle` 1, no lookup. Held "O Principezinho Ilustrado" (original "Le Petit Prince (illustré)"): `subtitle` 1;
+  - the existing present "Dune: Messiah" test now expects `subtitle` 1 and `present` 0, with no join;
+  - held "Crónicas" (original "Chronicles", Ana Silva) beside an unheld pt "Crónicas" with another `workKey` and original "Chronicles: Dusk": `sharedOriginal` 1, no lookup;
+  - race with another whole title: the fake search inserts "To the Lighthouse: Annotated" by Virginia Woolf with key `lookupIdentity({ isbn: "", title: "To the Lighthouse", author: "Virginia Woolf" })!.key` before answering "To the Lighthouse". Then `existing` is 1 and `added` 0, that row's `title` and `ol_work_key` are unchanged, `codeMerges` is 0, and the pt work's judgment is unchanged;
+  - the existing exact-title race test still gives `existing` 1 and a join.
+- [ ] **Step 2: Implement, verify** (`npm run build --workspace @scripta/shared && npm run typecheck --workspace backend && npm test --workspace backend`), **commit.**

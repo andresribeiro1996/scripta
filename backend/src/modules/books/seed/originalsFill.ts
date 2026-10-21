@@ -1,6 +1,7 @@
 import { firstAuthor, normalizeTitle, normalizeWords, titleNumbers } from "@scripta/shared";
 import type { OpenLibraryWork } from "../adapters/openlibrary/openLibraryCatalog.js";
 import { SourceUnavailableError } from "../domain/errors.js";
+import { lookupIdentity } from "../domain/normalize.js";
 import { evidenceOf, hasVolumeMarker, isPortuguese, mainTitle, mentionsSurname, originalKey, sameMainTitle, seriesLikeOriginals, surnameOf, titlePattern } from "../domain/translation.js";
 import { JEV_REJECTION_LIMIT } from "../synopsisJudgments.js";
 import { runCodeSteps } from "../translationBacklog.js";
@@ -32,6 +33,7 @@ export type OriginalsReport = {
   noOriginal: number;
   seriesLike: number;
   volume: number;
+  subtitle: number;
   present: number;
   noAuthor: number;
   sharedOriginal: number;
@@ -61,16 +63,19 @@ export async function fillOriginals(
   const { repo } = deps;
   const held = new Set(repo.canonicalWorkIds(heldWorkIds).values());
   const works = repo.portugueseWorksNeedingMatch([...held], Number.MAX_SAFE_INTEGER, JEV_REJECTION_LIMIT, new Date(deps.now()).toISOString());
-  const report: OriginalsReport = { held: held.size, selected: works.length, noOriginal: 0, seriesLike: 0, volume: 0, present: 0, noAuthor: 0, sharedOriginal: 0, lookups: 0, found: 0, notFound: 0, added: 0, existing: 0, codeMerges: 0, codeBlocked: 0, noCandidates: 0, presentWorks: [], failed: [], ask: [], originals: [] };
+  const report: OriginalsReport = { held: held.size, selected: works.length, noOriginal: 0, seriesLike: 0, volume: 0, subtitle: 0, present: 0, noAuthor: 0, sharedOriginal: 0, lookups: 0, found: 0, notFound: 0, added: 0, existing: 0, codeMerges: 0, codeBlocked: 0, noCandidates: 0, presentWorks: [], failed: [], ask: [], originals: [] };
   const claims = repo.originalTitleClaims();
   const isSeriesLike = seriesLikeOriginals(claims);
-  const titlesClaiming = new Map<string, Set<string>>();
+  const buckets = new Map<string, { titles: Set<string>; originals: Set<string> }>();
   for (const claim of claims) {
     const original = originalKey(claim.originalTitle);
     const title = normalizeWords(claim.title);
     if (!isPortuguese(claim.language) || original === null || title === "" || sameMainTitle(claim.title, claim.originalTitle)) continue;
     const key = `${original}#${surnameOf(claim.author) ?? ""}`;
-    titlesClaiming.set(key, (titlesClaiming.get(key) ?? new Set()).add(title));
+    const bucket = buckets.get(key) ?? { titles: new Set(), originals: new Set() };
+    bucket.titles.add(title);
+    bucket.originals.add(normalizeWords(mainTitle(claim.originalTitle)));
+    buckets.set(key, bucket);
   }
   const groups = new Map<string, Group>();
   for (const workId of works) {
@@ -82,6 +87,7 @@ export async function fillOriginals(
     if (!original || originalKey(original) === null || sameMainTitle(original, evidence.title)) report.noOriginal++;
     else if (isSeriesLike(original, author)) report.seriesLike++;
     else if (hasVolumeMarker(evidence.title) || hasVolumeMarker(original)) report.volume++;
+    else if (normalizeWords(mainTitle(original)) !== normalizeTitle(mainTitle(original))) report.subtitle++;
     else {
       const candidates = repo.titleCandidates(titlePattern(original)!).filter((id) => id !== workId);
       if (candidates.length > 0) {
@@ -99,7 +105,8 @@ export async function fillOriginals(
   }
   const looked: Group[] = [];
   for (const [key, group] of groups) {
-    if ((titlesClaiming.get(key)?.size ?? 0) >= 2) report.sharedOriginal += group.works.length;
+    const bucket = buckets.get(key);
+    if (bucket && (bucket.titles.size >= 2 || bucket.originals.size >= 2)) report.sharedOriginal += group.works.length;
     else looked.push(group);
   }
   report.lookups = looked.length;
@@ -119,12 +126,18 @@ export async function fillOriginals(
   }
   if (dryRun) return report;
   const workIds = report.presentWorks.map((work) => work.workId);
-  for (const { found, works: served } of report.originals) {
+  for (const { originalTitle, found, works: served } of report.originals) {
     if (!found) continue;
+    const key = lookupIdentity({ isbn: "", title: found.title, author: found.author })?.key;
+    const row = key ? repo.findBookByKey(key) : undefined;
+    if (row) {
+      report.existing++;
+      if (sameWholeTitle(row.title, originalTitle)) workIds.push(...served.map((work) => work.workId));
+      continue;
+    }
     const seeded = seedBook({ isbn: "", title: found.title, author: found.author, workKey: found.key }, repo, () => new Date(deps.now()), "seed");
-    if (seeded.outcome === "invalid") throw new Error(`Could not add the original "${found.title}"`);
-    if (seeded.outcome === "created") report.added++;
-    else report.existing++;
+    if (seeded.outcome !== "created") throw new Error(`Could not add the original "${found.title}"`);
+    report.added++;
     workIds.push(...served.map((work) => work.workId));
   }
   const open = repo.portugueseWorksNeedingMatch(workIds, Number.MAX_SAFE_INTEGER, JEV_REJECTION_LIMIT, new Date(deps.now()).toISOString());

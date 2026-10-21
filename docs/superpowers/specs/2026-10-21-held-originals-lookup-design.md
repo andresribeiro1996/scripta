@@ -24,14 +24,18 @@ A script, `backend/scripts/fetch-originals.mjs`, with a dry run. Its logic is in
 2. **Original title:** the one `planMatch` would use (`evidenceOf(translationEvidence(id)).originalTitle`, which falls back to the summary's "Título original"). The work is skipped when there is none, when `originalKey` of it is null, or when it equals the work's own title (the work is itself an original).
 3. **Guard 1:** skipped when `seriesLikeOriginals(repo.originalTitleClaims())` flags the original, called exactly as `planMatch` calls it (`original`, `workAuthor || author`). No lookup is made.
 4. **Guard 2:** skipped when the edition's title or the original title has a volume marker (`hasVolumeMarker`). The code step can never join a volume, so fetching for one would only hand Jev a candidate. That candidate is most likely a series name.
-5. **Missing:** a work is not looked up when `titleCandidates(titlePattern(original))` finds any work other than itself. Its original is already there, so it is counted as `present`.
+5. **Subtitle:** skipped when the original's main title has a colon or bracket part, i.e. `normalizeWords(mainTitle(original)) !== normalizeTitle(mainTitle(original))`.
+   - The matcher's `title_key` and `titlePattern` drop that part. A fetched "Fairy Oak: Il segreto delle gemelle" row would then be the only candidate for a later volume claiming "Fairy Oak: Capitan Grisam e l'amore", and the backlog's code step would join it.
+   - A work with such an original is left to the translation job, as before. It is counted in `subtitle` and never sent to the code step by this fill.
+6. **Missing:** a work is not looked up when `titleCandidates(titlePattern(original))` finds any work other than itself. Its original is already there, so it is counted as `present`.
    - It goes to the code step in a real run only when one of those candidates carries the whole original title (`sameWholeTitle`, the pick rule's title check, below). Those works are listed in `presentWorks`, in the dry run as well.
    - The pattern drops a colon subtitle, so a held "Dune: Messiah" finds "Dune". Without the whole-title check the code step would join the sequel into it.
-6. **Author:** skipped when `surnameOf(workAuthor || author)` is null.
+7. **Author:** skipped when `surnameOf(workAuthor || author)` is null.
 
 Works left are grouped by `originalKey(original)` plus surname, so two shelved copies of one translation share one lookup.
 
-7. **Shared original:** a group is skipped when two or more distinct Portuguese main titles in the whole catalog claim its original for its surname. That is Guard 1's grouping over `repo.originalTitleClaims()`, but at two titles instead of three, and only for the fetch.
+8. **Shared original:** a group is skipped when its collision bucket holds two or more distinct Portuguese titles, or two or more distinct originals. The bucket is `originalKey(original)` plus surname over the whole catalog's `repo.originalTitleClaims()`. That is Guard 1's grouping, but at two instead of three, and only for the fetch.
+   - Counting distinct originals in the bucket keeps a bare "Chronicles" from being fetched while a "Chronicles: Dusk" claim shares its `title_key` space.
    - Titles are told apart by `normalizeWords`, the whole title, not by `originalKey`, which drops a colon subtitle. That way "Crónicas: Aurora" and "Crónicas: Crepúsculo" count as two.
    - Two different Portuguese books naming one original are either two re-translations of a classic or two volumes under a series name, and the fill can't tell which.
    - Guard 1 only stops the second case at three titles. Below that, a fetched original would also let a later backlog run join the unshelved volume into it.
@@ -64,6 +68,11 @@ A 5xx or a timeout records the original title in `failed` and moves on. A 429 st
 - **`created_by` `seed`.** Like the ranked-works seed, it is an Open Library work added by a script. It is searchable and goes through the normal details and cover queues.
 - **`createBook` joins the work that holds the same OL work key, if any.** If that is the Portuguese work itself, the original lands inside it: already joined.
 
+Right before each insert, the fill looks up the key `seedBook` would use (`lookupIdentity({ isbn: "", title, author }).key`), because the server may have added a book with that key during the lookups.
+- If a row holds that key, `seedBook` is not called, so nothing mutates it. The group counts in `existing`.
+- Its works go to the code step only when that row carries the whole original title (`sameWholeTitle`).
+- A row with the same key but another whole title (the server added "Dune: Messiah" while "Dune" was being looked up) is left alone, and so are the group's works.
+
 ### Joining
 
 After the lookups, `runCodeSteps(deps, workIds)` runs on two sets of works:
@@ -88,7 +97,7 @@ A work the code step leaves for Jev (`ask`, e.g. two title candidates) keeps its
 ### Output
 
 The dry run opens the database read-only and makes the same lookups. It prints:
-- the counts (`held`, `selected`, `noOriginal`, `seriesLike`, `volume`, `present`, `noAuthor`, `sharedOriginal`, `lookups`, `found`, `notFound`);
+- the counts (`held`, `selected`, `noOriginal`, `seriesLike`, `volume`, `subtitle`, `present`, `noAuthor`, `sharedOriginal`, `lookups`, `found`, `notFound`);
 - `presentWorks`: the works whose original is already there, which the real run hands to the code step;
 - `failed`;
 - one entry per group: the original title, the author, the Portuguese works (id and title), and the Open Library work it would add (key, title, author), or null.

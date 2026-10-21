@@ -264,6 +264,21 @@ test("an original the server added during the lookup is reused, and still joined
   assert.equal(repo.canonicalWorkIds([pt.work_id!]).get(pt.work_id!), repo.findBookByKey(lighthouseKey)!.work_id);
 });
 
+test("a book the server added under the same key but another whole title is left alone and joins nothing", async () => {
+  const repo = freshRepo();
+  const pt = portuguese(repo, "Passeio ao Farol", "Virginia Woolf", "To the Lighthouse");
+  const server = () => {
+    repo.createBook({ title: "To the Lighthouse: Annotated", author: "Virginia Woolf", isbn: null }, [lighthouseKey], AT);
+  };
+  const { deps } = setup(repo, { "To the Lighthouse": lighthouse }, server);
+  const report = await fillOriginals(deps, [pt.work_id!], LIVE);
+  assert.deepEqual([report.existing, report.added, report.codeMerges], [1, 0, 0]);
+  const row = repo.findBookByKey(lighthouseKey)!;
+  assert.deepEqual([row.title, row.ol_work_key], ["To the Lighthouse: Annotated", null]);
+  assert.equal(repo.workMatchJudgments([pt.work_id!]).size, 0);
+  assert.equal(repo.canonicalWorkIds([pt.work_id!]).get(pt.work_id!), pt.work_id);
+});
+
 test("an original that belongs to the translation's own Open Library work lands inside it", async () => {
   const repo = freshRepo();
   const pt = portuguese(repo, "Passeio ao Farol", "Virginia Woolf", "To the Lighthouse", "OL930W");
@@ -282,10 +297,22 @@ test("a held sequel is not joined into the first book that the title pattern fin
   const before = repo.workMatchJudgments([pt.work_id!]).get(pt.work_id!);
   const { deps, calls } = setup(repo, {});
   const report = await fillOriginals(deps, [pt.work_id!], LIVE);
-  assert.deepEqual([report.present, report.presentWorks, report.codeMerges, report.lookups], [1, [], 0, 0]);
+  assert.deepEqual([report.subtitle, report.present, report.presentWorks, report.codeMerges, report.lookups], [1, 0, [], 0, 0]);
   assert.equal(calls.length, 0);
   assert.equal(repo.canonicalWorkIds([pt.work_id!]).get(pt.work_id!), pt.work_id);
   assert.deepEqual(repo.workMatchJudgments([pt.work_id!]).get(pt.work_id!), before);
+});
+
+test("an original with a colon or bracket part is skipped before any lookup", async () => {
+  const repo = freshRepo();
+  const messiah = portuguese(repo, "O Messias de Duna", "Frank Herbert", "Dune: Messiah");
+  const prince = portuguese(repo, "O Principezinho Ilustrado", "Antoine de Saint-Exupéry", "Le Petit Prince (illustré)");
+  const { deps, calls } = setup(repo, { "Dune: Messiah": [workOf("Dune: Messiah", "Frank Herbert", "OL13W")], "Le Petit Prince": [workOf("Le Petit Prince (illustré)", "Antoine de Saint-Exupéry", "OL14W")] });
+  for (const pt of [messiah, prince]) {
+    const report = await fillOriginals(deps, [pt.work_id!], LIVE);
+    assert.deepEqual([report.subtitle, report.lookups, report.added], [1, 0, 0]);
+  }
+  assert.equal(calls.length, 0);
 });
 
 test("a present original under its whole title is listed in presentWorks, in a dry run too, and joined in a real run", async () => {
@@ -305,6 +332,16 @@ test("two Portuguese titles that differ only after a colon count as two titles n
   const repo = freshRepo();
   const held = portuguese(repo, "Crónicas: Aurora", "Ana Silva", "Chronicles");
   portuguese(repo, "Crónicas: Crepúsculo", "Ana Silva", "Chronicles");
+  const { deps, calls } = setup(repo, { Chronicles: [workOf("Chronicles", "Ana Silva", "OL20W")] });
+  const report = await fillOriginals(deps, [held.work_id!], LIVE);
+  assert.deepEqual([report.sharedOriginal, report.lookups, report.added], [1, 0, 0]);
+  assert.equal(calls.length, 0);
+});
+
+test("a second original in the bucket stops the lookup, since the title key can't tell them apart", async () => {
+  const repo = freshRepo();
+  const held = portuguese(repo, "Crónicas", "Ana Silva", "Chronicles", "OL21W");
+  portuguese(repo, "Crónicas", "Ana Silva", "Chronicles: Dusk", "OL22W");
   const { deps, calls } = setup(repo, { Chronicles: [workOf("Chronicles", "Ana Silva", "OL20W")] });
   const report = await fillOriginals(deps, [held.work_id!], LIVE);
   assert.deepEqual([report.sharedOriginal, report.lookups, report.added], [1, 0, 0]);
