@@ -37,7 +37,7 @@ export function SearchScreen() {
   const external = useQuery({
     queryKey: ["search", "external", submitted],
     queryFn: () => bookSearchApi.outside(submitted ?? ""),
-    enabled: network && submitted !== null && (!looksLikeIsbnQuery(submitted) || (catalog.isSuccess && !catalog.isPlaceholderData && catalog.data.length === 0)),
+    enabled: network && (scope === "all" || scope === "books") && submitted !== null && (!looksLikeIsbnQuery(submitted) || (catalog.isSuccess && !catalog.isPlaceholderData && catalog.data.length === 0)),
     staleTime: Infinity,
     retry: false,
   });

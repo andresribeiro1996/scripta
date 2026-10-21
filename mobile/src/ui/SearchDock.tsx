@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode, type Ref } from "react";
 import { Animated, Dimensions, Keyboard, KeyboardAvoidingView, Platform, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { Icon, type IconName } from "./icon";
-import { Input, Menu, type MenuItem } from "./components";
+import { IconButton, Input, Menu, type MenuItem } from "./components";
 import { minimumTouchTarget, radii, spacing, useReducedMotion, useTheme } from "./theme";
 
 const FAB_HEIGHT = 56;
@@ -54,6 +54,12 @@ export function SearchDock({
   const [scrolling, setScrolling] = useState(false);
   const reducedMotion = useReducedMotion();
   const dock = useRef(new Animated.Value(1)).current;
+  const input = useRef<TextInput | null>(null);
+  const setInput = (node: TextInput | null) => {
+    input.current = node;
+    if (typeof inputRef === "function") inputRef(node);
+    else if (inputRef) inputRef.current = node;
+  };
 
   useEffect(() => {
     if (reducedMotion) {
@@ -69,7 +75,10 @@ export function SearchDock({
         setOverlap(Math.max(0, Math.min(height, y + height - (Dimensions.get("window").height - event.endCoordinates.height))));
       });
     });
-    const hiding = Keyboard.addListener("keyboardDidHide", () => setOverlap(0));
+    const hiding = Keyboard.addListener("keyboardDidHide", () => {
+      setOverlap(0);
+      input.current?.blur();
+    });
     return () => {
       shown.remove();
       hiding.remove();
@@ -115,15 +124,15 @@ export function SearchDock({
                   value={value}
                   onChangeText={onChangeText}
                   onSubmitEditing={onSubmitEditing}
-                  ref={inputRef}
+                  ref={setInput}
                   placeholder={placeholder}
                   autoCapitalize="none"
                   autoCorrect={false}
-                  clearButtonMode="while-editing"
                   returnKeyType="search"
                   style={styles.searchField}
                 />
               </View>
+              {value ? <IconButton name="close" accessibilityLabel="Clear search" onPress={() => onChangeText("")} /> : null}
               {cycleButton ? <View style={styles.cycleSlot}>{cycle?.menu ? <Menu title={cycle.menu.title} items={cycle.menu.items}>{cycleButton}</Menu> : cycleButton}</View> : null}
             </View>
           </Animated.View>
