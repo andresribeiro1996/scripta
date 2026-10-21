@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../ui/Text";
 import {
+  ActionSheet,
   Button,
   Dialog,
   EmptyState,
@@ -77,6 +78,15 @@ function UiGalleryScreen() {
         >
           <Button label="Open menu" variant="secondary" />
         </Menu>
+        <ActionSheet
+          title="Book"
+          groups={[
+            [{ label: "Mark as read", icon: "confirm", onPress: () => undefined }, { label: "Change cover", icon: "image", onPress: () => undefined }],
+            [{ label: "Delete", icon: "delete", destructive: true, onPress: () => undefined }],
+          ]}
+        >
+          {(open) => <Button label="Open action sheet" variant="secondary" onPress={open} />}
+        </ActionSheet>
         <Sheet visible={overlay === "sheet"} title="Book details" onClose={() => setOverlay(null)}>
           <ModalBody><Input label="Book title" defaultValue="The Left Hand of Darkness" /><Button label="Save" onPress={() => setOverlay(null)} /></ModalBody>
         </Sheet>

@@ -148,7 +148,7 @@ Full guidelines, states and prop shapes live in the artifact's per-component REA
 
 ### Headers (mobile — native stack bar via `useScreenOptions()`)
 
-- A header carries the back chevron, the title, at most **two** labelled actions and the `⋯` overflow menu — everything else belongs in the menu or in screen content.
+- A header carries the back chevron, the title, at most **two** labelled actions and the `⋯` overflow menu — everything else belongs in the menu or in screen content. The `⋯` trigger opens an `ActionSheet` (grouped rows with icon tiles, the destructive group last); the native `Menu` is only for short one-of-N pickers anchored to their control.
 - Every header action is an **`IconButton` with `label` + `framed`** (icon + word in a drawn 44pt target), so the visible target matches the touch target — a bare glyph reads smaller than its hit area and people aim at the ink. The `⋯` menu trigger stays glyph-only (platform convention).
 - Creation stays on **FABs** (thumb zone), not the header; header buttons navigate (`Browse`, `Library`) or open modals (`Add`, `Upload`, `Save`).
 - The mural, tier list and quiz editors show their name as a page heading (`EditorHeading`, tap to rename where renaming exists) at the top of the content, and the editors carry a labelled Save state button — Save in accent while there are unsaved changes, Saving… while saving, and Saved with a checkmark when saved — because an editor's title can't share a narrow header with its actions.
