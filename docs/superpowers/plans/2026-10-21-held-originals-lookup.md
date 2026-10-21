@@ -24,7 +24,8 @@ A script, `backend/scripts/fetch-originals.mjs`, runs it with `--dry-run` first.
 - **Don't edit `backend/src/modules/books/domain/translation.ts` or `fillOriginalTitlesFromSummaries`.** Another session is fixing `originalTitleIn` there, and a conflict would block both PRs. Import from them, don't change them.
 - **Reuse, don't copy:**
   - From `domain/translation.ts`: `evidenceOf`, `seriesLikeOriginals`, `originalKey`, `mainTitle`, `sameMainTitle`, `hasVolumeMarker`, `titlePattern`, `surnameOf`, `mentionsSurname`.
-  - `firstAuthor`, `normalizeTitle`, `titleNumbers` from `@scripta/shared`.
+  - `firstAuthor`, `normalizeTitle`, `normalizeWords`, `titleNumbers` from `@scripta/shared`.
+  - `normalizeWorkKey` from `domain/normalize.ts`.
   - `runCodeSteps` and `TranslationDeps` from `translationBacklog.ts` / `translationJudgments.ts`.
   - `seedBook` from `seed/seedCatalog.ts`.
   - `JEV_REJECTION_LIMIT` from `synopsisJudgments.ts`.
@@ -66,7 +67,7 @@ A script, `backend/scripts/fetch-originals.mjs`, runs it with `--dry-run` first.
 - **`seed/originalsFill.ts`:**
   - `export type FoundOriginal = { key: string; title: string; author: string };`
   - `export function pickOriginal(works: OpenLibraryWork[], originalTitle: string, authorTexts: string[]): FoundOriginal | null`. It returns the first work, in Open Library's order, where:
-    - `normalizeTitle(work.title) === normalizeTitle(mainTitle(originalTitle))` and `titleNumbers(work.title) === titleNumbers(mainTitle(originalTitle))`, using the whole found title, which is what `title_key` is built from (`catalogTitleKey`, `domain/normalize.ts`);
+    - `normalizeWords`, `normalizeTitle` and `titleNumbers` of `work.title` each equal those of `mainTitle(originalTitle)`, using the whole found title. `title_key` is built from that (`catalogTitleKey`, `domain/normalize.ts`), and `normalizeWords` keeps a colon subtitle that `normalizeTitle` drops;
     - `hasVolumeMarker(work.title)` is false;
     - some name in `work.authors` has a non-null `surnameOf(name)` that `mentionsSurname(authorTexts, surname)` finds.
 
@@ -91,7 +92,11 @@ A script, `backend/scripts/fetch-originals.mjs`, runs it with `--dry-run` first.
        - its `works` (id plus `evidence.title`);
        - `authorTexts`: every `evidence.workAuthor` and `evidence.author` of its works.
 
-       A group whose works carry two or more distinct `originalKey(evidence.title)` values is dropped, and its works count in `sharedOriginal`. These are two different shelved books naming one original: a series name below Guard 1's threshold, or two re-translations. `lookups` is the number of groups left.
+       A group is dropped, and its works count in `sharedOriginal`, when two or more distinct Portuguese main titles in the whole catalog claim it. These are two different books naming one original: a series name below Guard 1's threshold, or two re-translations.
+       - Count it once per run from `repo.originalTitleClaims()`, the way Guard 1's grouping does: Portuguese claims only (`isPortuguese`), leaving out claims where `sameMainTitle(title, originalTitle)` is true.
+       - The key is `${originalKey(originalTitle)}#${surnameOf(author)}`, and the value is the set of distinct `originalKey(title)`.
+
+       `lookups` is the number of groups left.
     6. Groups are processed in order, with `found = pickOriginal(await deps.search(group.originalTitle, group.author), group.originalTitle, group.authorTexts)`.
        - A `SourceUnavailableError` whose `status` is not 429 pushes `originalTitle` to `failed` and continues. Any other error, a 429 included, propagates.
        - `found` or `notFound` counts the outcome.

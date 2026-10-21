@@ -29,7 +29,11 @@ A script, `backend/scripts/fetch-originals.mjs`, with a dry run. Its logic is in
 
 Works left are grouped by `originalKey(original)` plus surname, so two shelved copies of one translation share one lookup.
 
-7. **Shared original:** a group whose shelved works carry two or more distinct Portuguese main titles (`originalKey(evidence.title)`) is skipped. Two different shelved books naming one original is either two re-translations of a classic or two volumes under a series name, and the fill can't tell which. Guard 1 only catches the second case at three titles, so this closes the gap for the fetch. The cost is that two shelved re-translations of one book stay apart.
+7. **Shared original:** a group is skipped when two or more distinct Portuguese main titles in the whole catalog claim its original for its surname. That is Guard 1's grouping over `repo.originalTitleClaims()`, but at two titles instead of three, and only for the fetch.
+   - Two different Portuguese books naming one original are either two re-translations of a classic or two volumes under a series name, and the fill can't tell which.
+   - Guard 1 only stops the second case at three titles. Below that, a fetched original would also let a later backlog run join the unshelved volume into it.
+   - The cost: a classic with two differently titled Portuguese translations isn't fetched.
+   - The count is local to the fill because `domain/translation.ts` is being changed by another session; exporting a shared grouping helper can follow.
 
 ### Lookup
 
@@ -37,11 +41,15 @@ One fielded Open Library search per group: `search.json?title=<main original tit
 
 The first document that passes all of these is the original:
 - it has a `/works/OL…W` key;
-- its whole title has the same `normalizeTitle` and `titleNumbers` as `mainTitle(original)`, which is what the code step's `titlePattern(original)` matches against the new row's `title_key`;
+- its whole title has the same `normalizeWords`, `normalizeTitle` and `titleNumbers` as `mainTitle(original)`:
+  - `normalizeTitle` and `titleNumbers` are what the code step's `titlePattern(original)` matches against the new row's `title_key`;
+  - `normalizeWords` makes a colon subtitle count, since `normalizeTitle` cuts at `":"`. Without it, "Dune" would pass for "Dune: Messiah", and "Fairy Oak: Il segreto delle gemelle" would pass for the bare series name "Fairy Oak";
 - `doc.title` has no volume marker;
 - one of its `author_name` values has a `surnameOf` that the Portuguese work's author or work author mentions (`mentionsSurname`).
 
-The title check uses the whole title on purpose. `sameMainTitle` cuts at `". "`, so "Mrs. Dalloway's Party" would pass for "Mrs. Dalloway", but its `title_key` doesn't match the code step's pattern. The title and surname checks together are the ones `planMatch` runs after the insert. A found original therefore becomes the work's only title candidate, and the code step joins it unless an arena blocks the join.
+The title check uses the whole found title on purpose. `sameMainTitle` cuts at `". "`, so "To the Lighthouse. A Novel" would pass for "To the Lighthouse", but its `title_key` doesn't match the code step's pattern.
+
+`mainTitle` cuts the original at `". "` as well, so an original such as "Mr. Mercedes" is searched as "Mr" and never found. The code step's `titlePattern` has the same limit, so the two stay consistent. Fixing it belongs in the matcher, not here. The title and surname checks together are the ones `planMatch` runs after the insert. A found original therefore becomes the work's only title candidate, and the code step joins it unless an arena blocks the join.
 
 A 5xx or a timeout records the original title in `failed` and moves on. A 429 stops the run, as the held-editions fill does. Every step is safe to re-run: a joined work stops being selected, and so does a work whose original is now present.
 

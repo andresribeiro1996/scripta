@@ -372,7 +372,7 @@ npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --
 
 For held works only (on a reader's shelf), finds on Open Library the originals the catalog is missing, adds each as a `seed` row without ISBN or language, then runs the translation backlog's free code step on those works, so the Portuguese edition joins its original. Open Library gets one call a second; the script never calls ISBNdb or TypeSafe. It needs `COVERS_DB_PATH`, `LIBRARY_DB_PATH` and `ARENA_DB_PATH`, the library and arena databases opened read-only. Run it after the deploy that ships it, since scripts run from the deployed `dist`.
 
-It skips these before any lookup: series-like originals (the `Princess Poppy` guard above) and volume titles; originals already in the catalog, which in a real run go straight to the code step; works without an author; shelved works with different titles that name one original (`sharedOriginal`), which are two re-translations or two volumes under a series name and can't be told apart; and the owner's (`manual`) answers.
+It skips these before any lookup: series-like originals (the `Princess Poppy` guard above) and volume titles; originals already in the catalog, which in a real run go straight to the code step; works without an author; Portuguese books with different titles that name one original (`sharedOriginal`, counted over the whole catalog), which are two re-translations or two volumes under a series name and can't be told apart; and the owner's (`manual`) answers.
 
 1. Dry run: writes nothing and makes the same lookups. `originals` lists each looked-up group, the Portuguese titles and the Open Library work it would add (`found`, or null); works dropped as `sharedOriginal` are only counted. Read it before the real run.
 
@@ -380,7 +380,7 @@ It skips these before any lookup: series-like originals (the `Princess Poppy` gu
    npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && node scripts/fetch-originals.mjs --dry-run' > originals-dry.json
    ```
 
-2. Real run: the same command without `--dry-run`, detached, then read its report. Every join is listed under "Merged" on `/admin/translations`, where it can be undone. It is safe to re-run: an original added just before a kill is already in the catalog next time, so its works are joined by the code step. A work in `ask` (more than one candidate) keeps its earlier answer; `translation-backlog.mjs --recheck-none` reaches it once that answer is 30 days old. A deploy kills the job, so hold merges to main while it runs.
+2. Real run: the same command without `--dry-run`, detached, then read its report. Every join is listed under "Merged" on `/admin/translations`, where it can be undone. It is safe to re-run: an original added just before a kill is already in the catalog next time, so its works are joined by the code step. A work in `ask` (more than one candidate) keeps its earlier answer; `translation-backlog.mjs --recheck-none` reaches it once that answer is 30 days old. A deploy kills the job, so hold production deploys while it runs.
 
    ```bash
    npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && setsid node scripts/fetch-originals.mjs > /data/fetch-originals.json 2> /data/fetch-originals.log < /dev/null & sleep 3; echo started'

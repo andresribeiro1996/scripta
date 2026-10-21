@@ -1,4 +1,5 @@
 import { buildBookMetadata, findOpenLibraryMatch, mapOpenLibraryDoc, openLibraryDescription } from "@scripta/shared";
+import { normalizeWorkKey } from "../../domain/normalize.js";
 import type { BookCatalog, EditionRecord, EditionRecordSource } from "../../domain/ports.js";
 import { parseSeriesString, seriesFromSubjects } from "../../domain/series.js";
 import { fetchJson, type Throttle } from "../http/http.js";
@@ -20,8 +21,6 @@ export function parseEditionRecord(record: unknown): EditionRecord {
 
 export type OpenLibraryWork = { key: string; title: string; authors: string[] };
 
-const WORK_KEY = /^\/works\/OL\d+W$/;
-
 export async function searchOpenLibraryWorks(throttle: Throttle, title: string, author: string): Promise<OpenLibraryWork[]> {
   const params = new URLSearchParams({ title, author, fields: "key,title,author_name", limit: "10" });
   const data = await throttle(() => fetchJson("openlibrary", `https://openlibrary.org/search.json?${params}`));
@@ -30,7 +29,7 @@ export async function searchOpenLibraryWorks(throttle: Throttle, title: string, 
   return docs.flatMap((item) => {
     if (!item || typeof item !== "object") return [];
     const doc = item as { key?: unknown; title?: unknown; author_name?: unknown };
-    if (typeof doc.key !== "string" || !WORK_KEY.test(doc.key) || typeof doc.title !== "string" || doc.title === "") return [];
+    if (typeof doc.key !== "string" || normalizeWorkKey(doc.key) === null || typeof doc.title !== "string" || doc.title === "") return [];
     const authors = Array.isArray(doc.author_name) ? doc.author_name.filter((name): name is string => typeof name === "string") : [];
     return [{ key: doc.key, title: doc.title, authors }];
   });

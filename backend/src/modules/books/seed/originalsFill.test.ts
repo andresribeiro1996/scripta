@@ -97,6 +97,7 @@ test("a dry run makes the lookups and writes nothing", async () => {
   assert.deepEqual([report.found, report.added, report.existing, report.codeMerges], [1, 0, 0, 0]);
   assert.equal(repo.findBookByKey(lighthouseKey), undefined);
   assert.equal(repo.canonicalWorkIds([pt.work_id!]).get(pt.work_id!), pt.work_id);
+  assert.equal(repo.workMatchJudgments([pt.work_id!]).size, 0);
 });
 
 test("an original that names a series is skipped before any lookup", async () => {
@@ -195,6 +196,16 @@ test("two shelved books with different titles naming one original are left alone
   assert.equal(calls.length, 0);
 });
 
+test("a Portuguese book outside the shelves that names the same original also stops the lookup", async () => {
+  const repo = freshRepo();
+  const held = portuguese(repo, "A Princesa Poppy e o Pónei", "Janey Louise Jones", "Princess Poppy");
+  portuguese(repo, "A Princesa Poppy e o Bolo", "Janey Louise Jones", "Princess Poppy");
+  const { deps, calls } = setup(repo, { "Princess Poppy": [workOf("Princess Poppy", "Janey Louise Jones", "OL1W")] });
+  const report = await fillOriginals(deps, [held.work_id!], LIVE);
+  assert.deepEqual([report.sharedOriginal, report.lookups, report.added], [1, 0, 0]);
+  assert.equal(calls.length, 0);
+});
+
 test("a lookup that is unavailable is listed and the run goes on, but a rate limit stops it", async () => {
   const repo = freshRepo();
   const lighthousePt = portuguese(repo, "Passeio ao Farol", "Virginia Woolf", "To the Lighthouse");
@@ -273,6 +284,9 @@ test("progress is logged every ten lookups", async () => {
 
 test("pickOriginal needs a surname the translation mentions and the whole title", () => {
   assert.equal(pickOriginal([{ key: "/works/OL8W", title: "Anonymous", authors: ["Anonymous"] }], "Anonymous", ["Autor Desconhecido"]), null);
-  assert.equal(pickOriginal([workOf("Mrs. Dalloway's Party", "Virginia Woolf", "OL9W")], "Mrs. Dalloway", ["Virginia Woolf"]), null);
-  assert.deepEqual(pickOriginal([{ key: "/works/OL10W", title: "Orlando", authors: [] }, workOf("Orlando", "V. Woolf", "OL11W")], "Orlando: A Biography", ["Virginia Woolf"]), { key: "/works/OL11W", title: "Orlando", author: "V. Woolf" });
+  assert.equal(pickOriginal([workOf("To the Lighthouse. A Novel", "Virginia Woolf", "OL9W")], "To the Lighthouse", ["Virginia Woolf"]), null);
+  assert.equal(pickOriginal([{ key: "/works/OL1W", title: "Dune", authors: ["Frank Herbert"] }], "Dune: Messiah", ["Frank Herbert"]), null);
+  assert.equal(pickOriginal([workOf("Fairy Oak: Il segreto delle gemelle", "Elisabetta Gnone", "OL12W")], "Fairy Oak", ["Elisabetta Gnone"]), null);
+  assert.deepEqual(pickOriginal([workOf("Dune: Messiah", "Frank Herbert", "OL13W")], "Dune: Messiah", ["Frank Herbert"]), { key: "/works/OL13W", title: "Dune: Messiah", author: "Frank Herbert" });
+  assert.deepEqual(pickOriginal([{ key: "/works/OL10W", title: "Orlando", authors: [] }, workOf("Orlando", "V. Woolf", "OL11W")], "Orlando", ["Virginia Woolf"]), { key: "/works/OL11W", title: "Orlando", author: "V. Woolf" });
 });
