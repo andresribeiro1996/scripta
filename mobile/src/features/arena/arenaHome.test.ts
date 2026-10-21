@@ -247,7 +247,7 @@ test("tierlistCovers takes library books tier by tier, then the pool, skipping m
   assert.deepEqual(ids({ tiers: [], pool: [] }), []);
 });
 
-test("an owned quiz row fans the covers its books carry", () => {
+test("an owned quiz row carries its books and an actual question preview", () => {
   const book = (coverUrl: string | null) => ({ workId: "k", title: "T", author: "A", coverUrl, quote: null, blurb: null });
   const row = (over: Partial<Quiz>) => gameRow({ kind: "owned", key: "q1", item: ownedItems("quizzes", [], [], [quiz(over)])[0]! });
   const draft = row({ data: { ...quiz().data, books: [book("a"), book(null), book("b")] } });
@@ -257,6 +257,9 @@ test("an owned quiz row fans the covers its books carry", () => {
   assert.deepEqual(draft.badges, [{ label: "Draft", tone: "neutral" }]);
   assert.deepEqual(row({ voteCode: "abc", playOpen: true }).badges, [{ label: "Open", tone: "accent" }]);
   assert.deepEqual(row({ voteCode: "abc", playOpen: false }).badges, [{ label: "Closed", tone: "neutral" }]);
+  assert.equal(draft.preview, undefined);
+  const published = row({ data: { ...quiz().data, books: [{ ...book("a"), quote: "An actual quiz quote." }], questions: [{ id: "q0", workId: "k", type: "quote_title", options: ["T"], answerIndex: 0 }] } });
+  assert.deepEqual(published.preview, { type: "quote_title", prompt: "An actual quiz quote." });
 });
 
 test("voted rows carry a Voted badge beside their status", () => {

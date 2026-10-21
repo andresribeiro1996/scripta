@@ -2,6 +2,11 @@ export const QUIZ_QUESTION_TYPES = ["cover_title", "title_cover", "quote_title",
 
 export type QuizQuestionType = (typeof QUIZ_QUESTION_TYPES)[number];
 
+export interface QuizPreview {
+  type: QuizQuestionType;
+  prompt: string;
+}
+
 /** Publish-time snapshot of one book — same philosophy as tournament
  *  slots: editing the library later never mutates a live quiz. */
 export interface QuizBookContent {

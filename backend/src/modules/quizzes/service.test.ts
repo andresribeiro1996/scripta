@@ -367,7 +367,8 @@ test("published refs carry counts, play state and the first three non-empty cove
     questionCount: 2,
     playCount: 2,
     playOpen: false,
-    covers: ["https://covers.test/c1.jpg", "https://covers.test/c3.jpg", "https://covers.test/c4.jpg"]
+    covers: ["https://covers.test/c1.jpg", "https://covers.test/c3.jpg", "https://covers.test/c4.jpg"],
+    preview: { type: "title_cover", prompt: service.getPlayBoard(code)!.questions[0]!.prompt }
   });
 });
 

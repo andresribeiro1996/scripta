@@ -87,7 +87,7 @@ function toTournamentSummary(ref: PublishedTournamentRef): TournamentSummary {
 }
 
 function toQuizSummary(ref: PublishedQuizRef): QuizSummary {
-  return { kind: "quiz", id: ref.id, voteCode: ref.voteCode, name: ref.name, questionCount: ref.questionCount, playCount: ref.playCount, playOpen: ref.playOpen, covers: ref.covers.slice(0, FEED_COVER_LIMIT) };
+  return { kind: "quiz", id: ref.id, voteCode: ref.voteCode, name: ref.name, questionCount: ref.questionCount, playCount: ref.playCount, playOpen: ref.playOpen, covers: ref.covers.slice(0, FEED_COVER_LIMIT), ...(ref.preview ? { preview: ref.preview } : {}) };
 }
 
 function withVoted(content: PublishedContent, voted: Set<string> | null): PublishedContent {
