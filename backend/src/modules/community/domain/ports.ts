@@ -13,10 +13,12 @@ export interface VisibilityRow {
 
 export interface CommentRow { id: string; event_id: string; user_id: string; text: string; created_at: string }
 export interface SavedContentRow { kind: SavedContentRef["kind"]; ref_id: string; owner_id: string | null; saved_at: string }
+export type GameRef = { kind: "tierlist" | "tournament" | "quiz"; id: string };
 export interface EngagementRepository {
   getEvent(id: string): EventRow | undefined;
   getEvents(ids: string[]): EventRow[];
   summaries(viewerId: string, ids: string[]): Record<string, ActivityEngagement>;
+  gameEngagement(refs: GameRef[], since: string | null): Map<string, { publishedAt: string; likes: number; comments: number }>;
   setLiked(viewerId: string, eventId: string, liked: boolean, at: string): void;
   insertComment(row: CommentRow): void;
   listComments(eventId: string, keyset: CursorKeyset | undefined, limit: number): CommentRow[];

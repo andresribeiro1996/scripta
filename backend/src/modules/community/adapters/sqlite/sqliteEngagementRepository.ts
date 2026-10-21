@@ -23,6 +23,18 @@ export function createSqliteEngagementRepository(db: DatabaseSync): EngagementRe
   const saved = db.prepare("SELECT kind, ref_id, owner_id, saved_at FROM saved_content WHERE user_id = ? ORDER BY saved_at DESC, kind || ':' || ref_id DESC LIMIT ?");
   const olderSaved = db.prepare("SELECT kind, ref_id, owner_id, saved_at FROM saved_content WHERE user_id = ? AND (saved_at, kind || ':' || ref_id) < (?, ?) ORDER BY saved_at DESC, kind || ':' || ref_id DESC LIMIT ?");
   const savedState = db.prepare("SELECT s.kind, s.ref_id FROM json_each(?) f JOIN saved_content s ON s.user_id = ? AND s.kind = json_extract(f.value, '$.kind') AND s.ref_id = json_extract(f.value, '$.id')");
+  const publishTypes = "type IN ('tierlist_published', 'tournament_published', 'quiz_published')";
+  const gameEngagement = db.prepare(`WITH refs AS (SELECT json_extract(value, '$.kind') AS kind, json_extract(value, '$.id') AS id FROM json_each(?)),
+    pub AS (
+      SELECT e.id, e.ref_type, e.ref_id, e.created_at FROM refs r JOIN events e ON e.ref_type = r.kind AND e.ref_id = r.id WHERE e.${publishTypes}
+      UNION ALL
+      SELECT h.id, h.ref_type, h.ref_id, h.created_at FROM refs r JOIN events_history h ON h.ref_type = r.kind AND h.ref_id = r.id WHERE h.${publishTypes}
+    ),
+    first AS (SELECT ref_type, ref_id, id, MIN(created_at) AS published_at FROM pub GROUP BY ref_type, ref_id)
+    SELECT ref_type, ref_id, published_at,
+      (SELECT COUNT(*) FROM activity_likes WHERE event_id = first.id AND (? IS NULL OR created_at >= ?)) AS likes,
+      (SELECT COUNT(*) FROM activity_comments WHERE event_id = first.id AND (? IS NULL OR created_at >= ?)) AS comments
+    FROM first`);
   return {
     getEvent: (id) => event.get(id, id) as EventRow | undefined,
     getEvents(ids) {
@@ -33,6 +45,11 @@ export function createSqliteEngagementRepository(db: DatabaseSync): EngagementRe
     summaries(viewerId, ids) {
       const rows = summaries.all(viewerId, JSON.stringify(ids)) as Array<{ id: string; likes: number; comments: number; liked: number }>;
       return Object.fromEntries(rows.map((row) => [row.id, { likes: Number(row.likes), comments: Number(row.comments), liked: row.liked === 1 } satisfies ActivityEngagement]));
+    },
+    gameEngagement(refs, since) {
+      if (refs.length === 0) return new Map();
+      const rows = gameEngagement.all(JSON.stringify(refs), since, since, since, since) as Array<{ ref_type: string; ref_id: string; published_at: string; likes: number; comments: number }>;
+      return new Map(rows.map((row) => [`${row.ref_type}:${row.ref_id}`, { publishedAt: row.published_at, likes: Number(row.likes), comments: Number(row.comments) }]));
     },
     setLiked(viewerId, eventId, liked, at) { if (liked) like.run(eventId, viewerId, at); else unlike.run(eventId, viewerId); },
     insertComment: (row) => { comment.run(row.id, row.event_id, row.user_id, row.text, row.created_at); },

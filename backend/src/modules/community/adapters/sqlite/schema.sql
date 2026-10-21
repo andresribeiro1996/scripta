@@ -48,6 +48,8 @@ CREATE TABLE IF NOT EXISTS events_history (
 );
 CREATE INDEX IF NOT EXISTS idx_events_history_user_time ON events_history(user_id, created_at DESC, id DESC);
 CREATE INDEX IF NOT EXISTS idx_events_history_time ON events_history(created_at);
+CREATE INDEX IF NOT EXISTS idx_events_history_publication_ref ON events_history(ref_type, ref_id)
+  WHERE type IN ('tierlist_published', 'tournament_published', 'quiz_published');
 CREATE INDEX IF NOT EXISTS idx_events_history_user_ref ON events_history(ref_id) WHERE ref_type = 'user';
 
 CREATE TABLE IF NOT EXISTS feed_inbox (

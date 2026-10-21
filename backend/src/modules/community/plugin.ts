@@ -18,7 +18,8 @@ export async function communityPlugin(app: FastifyInstance, opts: Omit<Community
     task().catch((err) => app.log.error(err, "community feed backfill failed"));
   };
   const service = createCommunityService({ ...opts, repo, background });
-  const engagement = createEngagementService({ repo: createSqliteEngagementRepository(db), community: service, resolveProfiles: opts.resolveProfiles });
+  const engagementRepo = createSqliteEngagementRepository(db);
+  const engagement = createEngagementService({ repo: engagementRepo, community: service, resolveProfiles: opts.resolveProfiles });
 
   const archive = async () => {
     try {

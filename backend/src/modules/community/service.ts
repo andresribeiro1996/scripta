@@ -169,6 +169,47 @@ export interface CommunityService {
   archiveOldEvents(): Promise<{ moved: number; purged: number }>;
 }
 
+export type DiscoverEntry = { kind: "tierlist" | "tournament" | "quiz"; id: string; userId: string; promoted: boolean; createdAt: string };
+
+function createGlyphLookup(deps: Pick<CommunityDeps, "repo" | "readerGlyphFor">): (userId: string) => IdentityKey | null {
+  const visibility = createVisibility(deps.repo, null);
+  const cache = new Map<string, IdentityKey | null>();
+  return (userId) => {
+    if (cache.has(userId)) return cache.get(userId) ?? null;
+    const glyph = visibility.showsGlyph(userId) ? deps.readerGlyphFor(userId) : null;
+    cache.set(userId, glyph);
+    return glyph;
+  };
+}
+
+function withGlyph(author: ReaderProfile & { unavailable?: boolean }, userId: string, glyphOf: (userId: string) => IdentityKey | null): CommunityAuthor {
+  if (author.unavailable) return { ...author, userId };
+  const glyph = glyphOf(userId);
+  return glyph ? { ...author, userId, readerGlyph: glyph } : { ...author, userId };
+}
+
+export function buildDiscoverItems(deps: Pick<CommunityDeps, "repo" | "tierlists" | "tournaments" | "quizzes" | "resolveProfiles" | "readerGlyphFor">, entries: DiscoverEntry[], viewerId?: string): DiscoverItem[] {
+  const authors = deps.resolveProfiles([...new Set(entries.map((entry) => entry.userId))]);
+  const idsOf = (kind: DiscoverEntry["kind"]) => entries.filter((entry) => entry.kind === kind).map((entry) => entry.id);
+  const tierlistIds = idsOf("tierlist");
+  const tournamentIds = idsOf("tournament");
+  const quizIds = idsOf("quiz");
+  const votedTierlists = viewerId ? new Set(deps.tierlists.votedAmong(viewerId, tierlistIds)) : null;
+  const votedTournaments = viewerId ? new Set(deps.tournaments.votedAmong(viewerId, tournamentIds)) : null;
+  const votedQuizzes = viewerId ? new Set(deps.quizzes.votedAmong(viewerId, quizIds)) : null;
+  const contents = new Map<string, PublishedContent>([
+    ...deps.tierlists.getPublishedMany(tierlistIds).map((ref) => [`tierlist:${ref.id}`, withVoted(toTierlistSummary(ref), votedTierlists)] as const),
+    ...deps.tournaments.getPublishedMany(tournamentIds).map((ref) => [`tournament:${ref.id}`, withVoted(toTournamentSummary(ref), votedTournaments)] as const),
+    ...deps.quizzes.getPublishedMany(quizIds).map((ref) => [`quiz:${ref.id}`, withVoted(toQuizSummary(ref), votedQuizzes)] as const)
+  ]);
+  const glyphOf = createGlyphLookup(deps);
+  return entries.flatMap((entry) => {
+    const author = authors.get(entry.userId) ?? (entry.promoted ? { username: "Original creator unavailable", avatarUrl: null, unavailable: true } : undefined);
+    const content = contents.get(`${entry.kind}:${entry.id}`);
+    return author && content ? [{ author: withGlyph(author, entry.userId, glyphOf), content }] : [];
+  });
+}
+
 export function createCommunityService(deps: CommunityDeps): CommunityService {
   const { repo, background } = deps;
   const now = deps.now ?? Date.now;
@@ -192,21 +233,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
     const types = FEED_EVENT_TYPES.filter((type) => !before[categoryFor(type)] && after[categoryFor(type)]);
     if (types.length > 0) background(() => backfillInboxes(userId, types));
   };
-  const glyphLookup = (): ((userId: string) => IdentityKey | null) => {
-    const visibility = createVisibility(repo, null);
-    const cache = new Map<string, IdentityKey | null>();
-    return (userId) => {
-      if (cache.has(userId)) return cache.get(userId) ?? null;
-      const glyph = visibility.showsGlyph(userId) ? deps.readerGlyphFor(userId) : null;
-      cache.set(userId, glyph);
-      return glyph;
-    };
-  };
-  const withGlyph = (author: ReaderProfile & { unavailable?: boolean }, userId: string, glyphOf: (userId: string) => IdentityKey | null): CommunityAuthor => {
-    if (author.unavailable) return { ...author, userId };
-    const glyph = glyphOf(userId);
-    return glyph ? { ...author, userId, readerGlyph: glyph } : { ...author, userId };
-  };
+  const glyphLookup = () => createGlyphLookup(deps);
   const contentOwner = (username: string, viewerId: string | undefined): string => {
     const userId = deps.findUserIdByUsername(username);
     if (!userId || !createVisibility(repo, viewerId ?? null).canViewContent(userId)) throw new ProfileNotFoundError();
@@ -528,23 +555,8 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
         })
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
       const page = visible.slice(offset, offset + limit);
-      const tierlistIds = page.filter((entry) => entry.kind === "tierlist").map((entry) => entry.id);
-      const tournamentIds = page.filter((entry) => entry.kind === "tournament").map((entry) => entry.id);
-      const quizIds = page.filter((entry) => entry.kind === "quiz").map((entry) => entry.id);
-      const votedTierlists = viewerId ? new Set(deps.tierlists.votedAmong(viewerId, tierlistIds)) : null;
-      const votedTournaments = viewerId ? new Set(deps.tournaments.votedAmong(viewerId, tournamentIds)) : null;
-      const votedQuizzes = viewerId ? new Set(deps.quizzes.votedAmong(viewerId, quizIds)) : null;
-      const contents = new Map<string, PublishedContent>([
-        ...deps.tierlists.getPublishedMany(tierlistIds).map((ref) => [`tierlist:${ref.id}`, withVoted(toTierlistSummary(ref), votedTierlists)] as const),
-        ...deps.tournaments.getPublishedMany(tournamentIds).map((ref) => [`tournament:${ref.id}`, withVoted(toTournamentSummary(ref), votedTournaments)] as const),
-        ...deps.quizzes.getPublishedMany(quizIds).map((ref) => [`quiz:${ref.id}`, withVoted(toQuizSummary(ref), votedQuizzes)] as const)
-      ]);
-      const glyphOf = glyphLookup();
       return {
-        items: page.flatMap((entry) => {
-          const content = contents.get(`${entry.kind}:${entry.id}`);
-          return content ? [{ author: withGlyph(entry.author, entry.userId, glyphOf), content }] : [];
-        }),
+        items: buildDiscoverItems(deps, page, viewerId),
         nextOffset: offset + limit < visible.length ? offset + limit : null
       };
     },

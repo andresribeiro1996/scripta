@@ -124,3 +124,52 @@ test("engagement counts only the events whose author's switch shows them, in one
     assert.deepEqual(service.getEngagement("reader", ["c"]), {});
   } finally { db.close(); }
 });
+
+function gameEngagementFixture() {
+  const db = openCommunityDb();
+  const communityRepo = createSqliteCommunityRepository(db);
+  const repo = createSqliteEngagementRepository(db);
+  const publish = (id: string, kind: "tierlist" | "tournament" | "quiz", refId: string, at: string) =>
+    communityRepo.insertEvent({ id, user_id: "author", type: `${kind}_published`, ref_type: kind, ref_id: refId, payload: null, created_at: at });
+  return { db, communityRepo, repo, publish };
+}
+
+test("finds publish times in events_history", () => {
+  const { db, communityRepo, repo, publish } = gameEngagementFixture();
+  try {
+    publish("ge-old", "tierlist", "ge-t1", "2026-01-01T00:00:00.000Z");
+    communityRepo.moveEventsBefore("2026-02-01T00:00:00.000Z", 10);
+    publish("ge-new", "quiz", "ge-q1", "2026-10-01T00:00:00.000Z");
+    const found = repo.gameEngagement([{ kind: "tierlist", id: "ge-t1" }, { kind: "quiz", id: "ge-q1" }, { kind: "tournament", id: "ge-none" }], null);
+    assert.deepEqual([...found.keys()].sort(), ["quiz:ge-q1", "tierlist:ge-t1"]);
+    assert.equal(found.get("tierlist:ge-t1")?.publishedAt, "2026-01-01T00:00:00.000Z");
+    assert.equal(found.get("quiz:ge-q1")?.publishedAt, "2026-10-01T00:00:00.000Z");
+    assert.equal(repo.gameEngagement([], null).size, 0);
+  } finally { db.close(); }
+});
+
+test("counts likes and comments since a time", () => {
+  const { db, repo, publish } = gameEngagementFixture();
+  try {
+    publish("ge-pub", "tournament", "ge-g1", "2026-09-01T00:00:00.000Z");
+    repo.setLiked("u1", "ge-pub", true, "2026-09-02T00:00:00.000Z");
+    repo.setLiked("u2", "ge-pub", true, "2026-10-05T00:00:00.000Z");
+    repo.insertComment({ id: "ge-c1", event_id: "ge-pub", user_id: "u1", text: "a", created_at: "2026-09-02T00:00:00.000Z" });
+    repo.insertComment({ id: "ge-c2", event_id: "ge-pub", user_id: "u2", text: "b", created_at: "2026-10-06T00:00:00.000Z" });
+    repo.insertComment({ id: "ge-c3", event_id: "ge-pub", user_id: "u3", text: "c", created_at: "2026-10-07T00:00:00.000Z" });
+    const ref = [{ kind: "tournament" as const, id: "ge-g1" }];
+    assert.deepEqual(repo.gameEngagement(ref, null).get("tournament:ge-g1"), { publishedAt: "2026-09-01T00:00:00.000Z", likes: 2, comments: 3 });
+    assert.deepEqual(repo.gameEngagement(ref, "2026-10-01T00:00:00.000Z").get("tournament:ge-g1"), { publishedAt: "2026-09-01T00:00:00.000Z", likes: 1, comments: 2 });
+  } finally { db.close(); }
+});
+
+test("ignores non-publish events on the same ref", () => {
+  const { db, communityRepo, repo, publish } = gameEngagementFixture();
+  try {
+    communityRepo.insertEvent({ id: "ge-other", user_id: "author", type: "voted_on", ref_type: "quiz", ref_id: "ge-q2", payload: null, created_at: "2026-10-01T00:00:00.000Z" });
+    assert.equal(repo.gameEngagement([{ kind: "quiz", id: "ge-q2" }], null).size, 0);
+    publish("ge-q2-pub", "quiz", "ge-q2", "2026-10-02T00:00:00.000Z");
+    repo.setLiked("u1", "ge-other", true, "2026-10-03T00:00:00.000Z");
+    assert.deepEqual(repo.gameEngagement([{ kind: "quiz", id: "ge-q2" }], null).get("quiz:ge-q2"), { publishedAt: "2026-10-02T00:00:00.000Z", likes: 0, comments: 0 });
+  } finally { db.close(); }
+});
