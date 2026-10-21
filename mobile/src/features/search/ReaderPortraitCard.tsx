@@ -2,17 +2,16 @@ import { useId, useMemo } from "react";
 import { Image } from "expo-image";
 import { Pressable, StyleSheet, View } from "react-native";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
-import { ensureBookBlockHeights, readerCardInputOf, readerGlyphLabel, type Mural } from "@scripta/shared";
+import { readerCardInputOf, readerGlyphLabel } from "@scripta/shared";
 import { themes } from "@scripta/shared/themes";
 import { personCaption, type SuggestedReader } from "@scripta/shared/community";
 import { Button, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { Text } from "../../ui/Text";
 import { AuthorAvatar, openProfile } from "../community/AuthorAvatar";
 import { ReaderGlyph } from "../community/ReaderGlyph";
-import type { GalleryImage } from "../gallery/api";
 import { MuralThumbnail } from "../murals/MuralCanvas";
 import { ReaderCardImage } from "../murals/ReaderCardImage";
-import { reconstructBooks, reconstructTierlists } from "../public/adapters";
+import { muralPreviewOf } from "../public/adapters";
 
 export function ReaderPortraitCard({ person, width, canvasWidth, busy, onToggleFollow }: { person: SuggestedReader; width: number; canvasWidth: number; busy: boolean; onToggleFollow: () => void }) {
   const { colors } = useTheme();
@@ -20,9 +19,7 @@ export function ReaderPortraitCard({ person, width, canvasWidth, busy, onToggleF
   const payload = person.private ? null : person.mural;
   const preview = useMemo(() => {
     if (!payload) return null;
-    const mural: Mural = { ...payload.mural, blocks: ensureBookBlockHeights(payload.mural.blocks), coverImageUrl: payload.mural.coverImageUrl ?? undefined, createdAt: "", updatedAt: "", shareToken: null, shareUrl: null, folderId: null };
-    const images: GalleryImage[] = Object.entries(payload.imageUrls).flatMap(([id, url]) => url ? [{ id, url, filename: "", mimeType: "", width: 0, height: 0, byteSize: 0, createdAt: "" }] : []);
-    return { mural, images, books: reconstructBooks(payload.library.books, payload.library.currentlyReading, payload.library.highlights), tierlists: reconstructTierlists(payload.tierlists) };
+    return muralPreviewOf(payload);
   }, [payload]);
   const glyphLabel = readerGlyphLabel(person.private ? undefined : person.user.readerGlyph);
   const identity = glyphLabel ? person.user.readerGlyph : undefined;

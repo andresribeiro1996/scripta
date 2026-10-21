@@ -16,10 +16,12 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 const { applyBooksMigrations } = await import("./adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("./adapters/sqlite/sqliteBooksRepository.js");
 const { arenaCheck, judgeWorkMatch, matchWork, planMatch, startTranslationJobs } = await import("./translationJudgments.js");
+const { seriesLikeOriginals } = await import("./domain/translation.js");
 const { SourceUnavailableError, UnusableAnswerError } = await import("./domain/errors.js");
 
 type Repo = ReturnType<typeof createSqliteBooksRepository>;
 const AT = "2026-10-15T12:00:00.000Z";
+const notSeries = () => false;
 const flush = async () => {
   for (let tick = 0; tick < 10; tick++) await new Promise(setImmediate);
 };
@@ -42,28 +44,28 @@ function edition(repo: Repo, isbn: string, fields: Fields) {
 test("a work whose original title is its own title is a Portuguese original", () => {
   const repo = freshRepo();
   const pt = edition(repo, "9789720000401", { title: "Memorial do Convento", author: "José Saramago", language: "pt-PT", originalTitle: "Memorial do Convento" });
-  assert.deepEqual(planMatch(repo, pt.work_id!), { kind: "original" });
+  assert.deepEqual(planMatch(repo, pt.work_id!, notSeries), { kind: "original" });
 });
 
 test("one title match whose author's surname the work names is settled by code", () => {
   const repo = freshRepo();
   const en = edition(repo, "9780156907401", { title: "To the Lighthouse", author: "Virginia Woolf", workKey: "OL930W" });
   const pt = edition(repo, "9789720000402", { title: "Passeio ao Farol", author: "V. Woolf", language: "pt-PT", originalTitle: "To the Lighthouse — A Novel" });
-  assert.deepEqual(planMatch(repo, pt.work_id!), { kind: "code", intoWorkId: en.work_id });
+  assert.deepEqual(planMatch(repo, pt.work_id!, notSeries), { kind: "code", intoWorkId: en.work_id });
 });
 
 test("a title match the work can't vouch for, or two of them, goes to Jev", () => {
   const repo = freshRepo();
   const en = edition(repo, "9780156907402", { title: "To the Lighthouse", author: "Virginia Woolf", workKey: "OL931W", year: 1927 });
   const pt = edition(repo, "9789720000403", { title: "Passeio ao Farol", author: "", language: "pt-PT", originalTitle: "To the Lighthouse", summary: "Uma família, uma casa, um farol ao longe e dez anos de distância." });
-  const plan = planMatch(repo, pt.work_id!);
+  const plan = planMatch(repo, pt.work_id!, notSeries);
   assert.equal(plan?.kind, "ask");
   assert.deepEqual(plan?.kind === "ask" ? plan.candidates : null, [{ id: en.work_id, title: "To the Lighthouse", author: "Virginia Woolf", year: 1927 }]);
 
   edition(repo, "9780000000404", { title: "Poems", author: "Emily Dickinson", workKey: "OL932W" });
   edition(repo, "9780000000405", { title: "Poems", author: "John Keats", workKey: "OL933W" });
   const poems = edition(repo, "9789720000406", { title: "Poemas", author: "John Keats", language: "pt-PT", originalTitle: "Poems" });
-  const both = planMatch(repo, poems.work_id!);
+  const both = planMatch(repo, poems.work_id!, notSeries);
   assert.equal(both?.kind, "ask");
   assert.deepEqual(both?.kind === "ask" ? both.candidates.map((candidate) => candidate.author).sort() : null, ["Emily Dickinson", "John Keats"]);
 });
@@ -75,14 +77,14 @@ test("with no original title, the author's works with a non-Portuguese edition a
   const crime = edition(repo, "9780000000409", { title: "Crime and Punishment", author: "Fyodor Dostoevsky", workKey: "OL935W" });
   edition(repo, "9789720000410", { title: "Os Irmãos Karamázov", author: "Fyodor Dostoevsky", language: "pt-PT" });
   const pt = edition(repo, "9789720000411", { title: "O Idiota", author: "Fyodor Dostoevsky", language: "pt-PT" });
-  const plan = planMatch(repo, pt.work_id!);
+  const plan = planMatch(repo, pt.work_id!, notSeries);
   assert.deepEqual(plan?.kind === "ask" ? plan.candidates.map((candidate) => candidate.id) : plan, [idiot.work_id, crime.work_id]);
 });
 
 test("no original title and no author leaves nothing to ask", () => {
   const repo = freshRepo();
   const pt = edition(repo, "9789720000412", { title: "Livro Sem Autor", author: "", language: "pt-PT" });
-  assert.deepEqual(planMatch(repo, pt.work_id!), { kind: "none" });
+  assert.deepEqual(planMatch(repo, pt.work_id!, notSeries), { kind: "none" });
 });
 
 test("only live, all-Portuguese, unjudged works under the strike limit need a match", () => {
@@ -130,7 +132,7 @@ test("a code match merges without asking Jev, and is recorded as code", async ()
   const repo = freshRepo();
   const { en, pt } = lighthouse(repo, "Virginia Woolf");
   const { deps, asked } = matching(repo, async () => ({ choice: 0, confidence: 1, model: "jev-1.13.0" }));
-  assert.equal(await matchWork(deps, pt.work_id!), null);
+  assert.equal(await matchWork(deps, pt.work_id!, notSeries), null);
   assert.equal(asked.length, 0);
   assert.equal(repo.getBook(pt.id)!.work_id, en.work_id);
   assert.deepEqual(repo.workMatchJudgments([pt.work_id!]).get(pt.work_id!), { model: "code", intoWorkId: en.work_id, confidence: null, askedAt: AT });
@@ -140,7 +142,7 @@ test("an arena holding both works blocks the merge but keeps the decision", asyn
   const repo = freshRepo();
   const { en, pt } = lighthouse(repo, "Virginia Woolf");
   const { deps } = matching(repo, async () => ({ choice: 0, confidence: 1, model: "jev-1.13.0" }), true);
-  await matchWork(deps, pt.work_id!);
+  await matchWork(deps, pt.work_id!, notSeries);
   assert.equal(repo.getBook(pt.id)!.work_id, pt.work_id);
   assert.equal(repo.workMatchJudgments([pt.work_id!]).get(pt.work_id!)?.intoWorkId, en.work_id);
 });
@@ -149,28 +151,28 @@ test("Jev merges at 0.9, stores a doubt below it, and stores none as no work", a
   const high = freshRepo();
   const sure = lighthouse(high, "");
   const { deps, asked } = matching(high, async () => ({ choice: asked[0]!.candidates.findIndex((candidate) => candidate.title === "To the Lighthouse"), confidence: 0.93, model: "jev-1.13.0" }));
-  await matchWork(deps, sure.pt.work_id!);
+  await matchWork(deps, sure.pt.work_id!, notSeries);
   assert.equal(high.getBook(sure.pt.id)!.work_id, sure.en.work_id);
 
   const mid = freshRepo();
   const doubt = lighthouse(mid, "");
-  await matchWork(matching(mid, async () => ({ choice: 0, confidence: 0.74, model: "jev-1.13.0" })).deps, doubt.pt.work_id!);
+  await matchWork(matching(mid, async () => ({ choice: 0, confidence: 0.74, model: "jev-1.13.0" })).deps, doubt.pt.work_id!, notSeries);
   assert.equal(mid.getBook(doubt.pt.id)!.work_id, doubt.pt.work_id);
   assert.equal(mid.workMatchJudgments([doubt.pt.work_id!]).get(doubt.pt.work_id!)?.confidence, 0.74);
 
   const none = freshRepo();
   const nothing = lighthouse(none, "");
-  await matchWork(matching(none, async () => ({ choice: null, confidence: 0.88, model: "jev-1.13.0" })).deps, nothing.pt.work_id!);
+  await matchWork(matching(none, async () => ({ choice: null, confidence: 0.88, model: "jev-1.13.0" })).deps, nothing.pt.work_id!, notSeries);
   assert.deepEqual(none.workMatchJudgments([nothing.pt.work_id!]).get(nothing.pt.work_id!), { model: "jev-1.13.0", intoWorkId: null, confidence: 0.88, askedAt: AT });
 });
 
 test("an unusable answer is a strike under works; a 401 pauses and alerts; nothing is stored", async () => {
   const repo = freshRepo();
   const { pt } = lighthouse(repo, "");
-  assert.equal(await matchWork(matching(repo, async () => { throw new UnusableAnswerError("typesafe", "unexpected answer"); }).deps, pt.work_id!), null);
+  assert.equal(await matchWork(matching(repo, async () => { throw new UnusableAnswerError("typesafe", "unexpected answer"); }).deps, pt.work_id!, notSeries), null);
   assert.equal(repo.jevRejections("works", [pt.work_id!]).get(pt.work_id!)?.attempts, 1);
   const key = matching(repo, async () => { throw new SourceUnavailableError("typesafe", "HTTP 401", { status: 401 }); });
-  assert.equal(await matchWork(key.deps, pt.work_id!), NOW + 24 * 60 * 60 * 1000);
+  assert.equal(await matchWork(key.deps, pt.work_id!, notSeries), NOW + 24 * 60 * 60 * 1000);
   assert.deepEqual(key.alerts, ["TypeSafe rejected the translation requests"]);
   assert.equal(repo.workMatchJudgments([pt.work_id!]).size, 0);
 });
@@ -224,7 +226,7 @@ test("a series volume's original title never settles in code on the series' firs
   const repo = freshRepo();
   const first = edition(repo, "9780062059932", { title: "The Selection", author: "Kiera Cass", workKey: "OL995W" });
   const pt = edition(repo, "9789722349938", { title: "A Elite", author: "", language: "pt-PT", originalTitle: "The Selection: The Elite (Book 2)", summary: "O segundo livro da série de Kiera Cass, com as seis raparigas que restam no palácio." });
-  const plan = planMatch(repo, pt.work_id!);
+  const plan = planMatch(repo, pt.work_id!, notSeries);
   assert.equal(plan?.kind, "ask");
   assert.deepEqual(plan?.kind === "ask" ? plan.candidates.map((candidate) => candidate.id) : null, [first.work_id]);
 });
@@ -244,4 +246,81 @@ test("filling a book's author reopens its work's code-only no-match verdict, and
   assert.deepEqual(repo.portugueseWorksNeedingMatch(null, 10, 3, null), [byCode.work_id]);
   assert.equal(repo.workMatchJudgments([byJev.work_id!]).get(byJev.work_id!)?.model, "jev-1.13.0");
   assert.equal(repo.workMatchJudgments([byOwner.work_id!]).get(byOwner.work_id!)?.model, "manual");
+});
+
+function poppy(repo: Repo, volumes = ["A Princesa Poppy e o Piquenique", "A Princesa Poppy e a Festa", "Poppy no Baile"]) {
+  const series = edition(repo, "9781408300001", { title: "Princess Poppy", author: "Janey Louise Jones", workKey: "OL970W" });
+  const pt = volumes.map((title, n) => edition(repo, `978972000049${n}`, { title, author: "Janey Louise Jones", language: "pt-PT", originalTitle: "Princess Poppy" }));
+  return { series, pt };
+}
+
+test("a series-like original plans none even with one title match and a matching surname, and the rule is asked about that original and author", () => {
+  const repo = freshRepo();
+  const en = edition(repo, "9780156907480", { title: "To the Lighthouse", author: "Virginia Woolf", workKey: "OL960W" });
+  const pt = edition(repo, "9789720000480", { title: "Passeio ao Farol", author: "Virginia Woolf", language: "pt-PT", originalTitle: "To the Lighthouse" });
+  const seen: Array<[string, string]> = [];
+  assert.deepEqual(planMatch(repo, pt.work_id!, (original, author) => { seen.push([original, author]); return true; }), { kind: "none" });
+  assert.deepEqual(seen, [["To the Lighthouse", "Virginia Woolf"]]);
+  assert.deepEqual(planMatch(repo, pt.work_id!, notSeries), { kind: "code", intoWorkId: en.work_id });
+});
+
+test("a Portuguese original is never asked about its series", () => {
+  const repo = freshRepo();
+  const pt = edition(repo, "9789720000481", { title: "Memorial do Convento", author: "José Saramago", language: "pt-PT", originalTitle: "Memorial do Convento" });
+  assert.deepEqual(planMatch(repo, pt.work_id!, () => { throw new Error("asked"); }), { kind: "original" });
+});
+
+test("an edition whose own title is a volume never settles in code, even on its only title match", () => {
+  const repo = freshRepo();
+  const fr = edition(repo, "9782203007482", { title: "Alix Senator", author: "Valérie Mangin", workKey: "OL961W" });
+  const pt = edition(repo, "9789720000482", { title: "Alix Senator, Vol. 2 – O Último Faraó", author: "Valérie Mangin", language: "pt-PT", originalTitle: "Alix Senator" });
+  const plan = planMatch(repo, pt.work_id!, notSeries);
+  assert.equal(plan?.kind, "ask");
+  assert.deepEqual(plan?.kind === "ask" ? plan.candidates.map((candidate) => candidate.id) : null, [fr.work_id]);
+});
+
+test("the rule built from the catalog's claims stops three Portuguese titles on one original and leaves two to code", () => {
+  const repo = freshRepo();
+  const { pt: volumes } = poppy(repo);
+  const lighthouseEn = edition(repo, "9780156907483", { title: "To the Lighthouse", author: "Virginia Woolf", workKey: "OL962W" });
+  const farol = edition(repo, "9789720000483", { title: "Passeio ao Farol", author: "Virginia Woolf", language: "pt-PT", originalTitle: "To the Lighthouse" });
+  edition(repo, "9789720000484", { title: "Rumo ao Farol", author: "Virginia Woolf", language: "pt-PT", originalTitle: "To the Lighthouse" });
+  const isSeriesLike = seriesLikeOriginals(repo.originalTitleClaims());
+  for (const volume of volumes) assert.deepEqual(planMatch(repo, volume.work_id!, isSeriesLike), { kind: "none" });
+  assert.deepEqual(planMatch(repo, farol.work_id!, isSeriesLike), { kind: "code", intoWorkId: lighthouseEn.work_id });
+});
+
+test("the live path joins no volume of a series-named original and asks Jev nothing", async () => {
+  const repo = freshRepo();
+  const { series, pt } = poppy(repo);
+  const { deps, asked } = matching(repo, async () => ({ choice: 0, confidence: 1, model: "jev-1.13.0" }));
+  await judgeWorkMatch({ ...deps, heldWorkIds: () => [pt[0]!.work_id!] }, pt[0]!.work_id!);
+  assert.equal(asked.length, 0);
+  assert.notEqual(repo.getBook(pt[0]!.id)!.work_id, series.work_id);
+  assert.deepEqual(repo.workMatchJudgments([pt[0]!.work_id!]).get(pt[0]!.work_id!), { model: "code", intoWorkId: null, confidence: null, askedAt: AT });
+});
+
+test("the series rule is built only for a work that is judged, and reused for ten minutes", async () => {
+  const repo = freshRepo();
+  const works = ["Um", "Dois", "Três"].map((name, n) => edition(repo, `978972000050${n}`, { title: `Livro ${name}`, author: "", language: "pt-PT" }).work_id!);
+  let reads = 0;
+  const counting = { ...repo, originalTitleClaims: () => { reads += 1; return repo.originalTitleClaims(); } };
+  let clock = NOW;
+  const held: string[] = [];
+  const { deps } = matching(counting, async () => ({ choice: null, confidence: 0.9, model: "jev-1.13.0" }));
+  const jobs = startTranslationJobs({ ...deps, now: () => clock, heldWorkIds: () => held, info: () => {}, onError: (error) => { throw error; } });
+  const judge = async (workId: string, afterMs: number) => {
+    clock += afterMs;
+    held.push(workId);
+    jobs.add(workId);
+    await flush();
+    return reads;
+  };
+  jobs.add(works[0]!);
+  await flush();
+  assert.equal(reads, 0);
+  assert.equal(await judge(works[0]!, 61 * 1000), 1);
+  assert.equal(await judge(works[1]!, 61 * 1000), 1);
+  assert.equal(await judge(works[2]!, 10 * 60 * 1000), 2);
+  jobs.stop();
 });

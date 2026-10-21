@@ -56,7 +56,7 @@ test("the dry run counts every step and writes nothing", () => {
   const c = seedCatalog(repo);
   const works = translationBacklogWorks(repo, [c.ask.work_id!], null);
   assert.equal(works[0], c.ask.work_id);
-  assert.deepEqual(translationDryRun(repo, works, 10), { selected: 4, originalTitles: 2, originals: 1, noCandidates: 1, codeMerges: 1, wouldAsk: 1, max: 10 });
+  assert.deepEqual(translationDryRun(repo, works, 10), { selected: 4, originalTitles: 2, originals: 1, noCandidates: 1, codeMerges: 1, wouldAsk: 1, seriesLike: 0, max: 10 });
   assert.equal(repo.getBook(c.codePt.id)!.original_title, null);
   assert.equal(repo.workMatchJudgments(works).size, 0);
 });
@@ -69,6 +69,47 @@ test("the code steps fill original titles, record originals, merge clear matches
   assert.deepEqual({ ...steps, ask: steps.ask }, { originals: 1, noCandidates: 1, codeMerges: 1, codeBlocked: 0, ask: [c.ask.work_id] });
   assert.equal(repo.getBook(c.codePt.id)!.original_title, "To the Lighthouse");
   assert.equal(repo.getBook(c.codePt.id)!.work_id, c.en.work_id);
+});
+
+function poppyVolumes(repo: Repo) {
+  const series = book(repo, "9781408300001", "Princess Poppy", "Janey Louise Jones", { workKey: "OL962W" });
+  const volumes = ["A Princesa Poppy e o Piquenique", "A Princesa Poppy e a Festa", "Poppy no Baile"].map((title, n) => book(repo, `978972000060${n}`, title, "Janey Louise Jones", { language: "pt-PT", summary: "Uma história de Poppy.\n\nTítulo original: Princess Poppy" }));
+  return { series, volumes };
+}
+
+test("the dry run counts the works a series-named original blocks, among those with no candidates", () => {
+  const repo = freshRepo();
+  seedCatalog(repo);
+  poppyVolumes(repo);
+  const works = translationBacklogWorks(repo, [], null);
+  assert.deepEqual(translationDryRun(repo, works, 10), { selected: 7, originalTitles: 5, originals: 1, noCandidates: 4, codeMerges: 1, wouldAsk: 1, seriesLike: 3, max: 10 });
+});
+
+test("the code steps join no volume of a series-named original, and still join a genuine translation", () => {
+  const repo = freshRepo();
+  const c = seedCatalog(repo);
+  const { series, volumes } = poppyVolumes(repo);
+  const steps = runCodeSteps(deps(repo, async () => ({ choice: null, confidence: 0, model: "x" })), translationBacklogWorks(repo, [], null));
+  assert.deepEqual(steps, { originals: 1, noCandidates: 4, codeMerges: 1, codeBlocked: 0, ask: [c.ask.work_id] });
+  assert.equal(repo.getBook(c.codePt.id)!.work_id, c.en.work_id);
+  for (const volume of volumes) {
+    assert.equal(repo.getBook(volume.id)!.work_id, volume.work_id);
+    assert.deepEqual(repo.workMatchJudgments([volume.work_id!]).get(volume.work_id!), { model: "code", intoWorkId: null, confidence: null, askedAt: AT });
+  }
+  assert.equal(repo.getBook(series.id)!.work_id, series.work_id);
+});
+
+test("the Jev step asks nothing about a work whose original is a series name", async () => {
+  const repo = freshRepo();
+  const { series, volumes } = poppyVolumes(repo);
+  let asked = 0;
+  const result = await runTranslationBacklog(deps(repo, async () => {
+    asked += 1;
+    return { choice: 0, confidence: 0.95, model: "jev-1.13.0" };
+  }), volumes.map((volume) => volume.work_id!));
+  assert.equal(result.stoppedBy, "done");
+  assert.equal(asked, 0);
+  for (const volume of volumes) assert.notEqual(repo.getBook(volume.id)!.work_id, series.work_id);
 });
 
 test("the Jev step stops at --max under its own source, and the report counts outcomes", async () => {

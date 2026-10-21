@@ -162,6 +162,12 @@ test("selecting the default edition is the default view, so going back restores 
   assert.deepEqual(bookScreenModel(p, null, { isAdmin: true }, "e1"), bookScreenModel(p, null, { isAdmin: true }));
 });
 
+test("an edition id that is not one of the work's editions leaves the default view", () => {
+  const p = page({ editions: editions(5, 1), coverUrl: "cover:3", coverColor: "#abc" });
+  assert.deepEqual(bookScreenModel(p, owned(), viewer, "other-work-edition"), bookScreenModel(p, owned(), viewer));
+  assert.deepEqual(bookScreenModel(p, null, { isAdmin: true }, ""), bookScreenModel(p, null, { isAdmin: true }));
+});
+
 test("an owned book matching no edition is shown at the default edition, so it keeps its own cover", () => {
   const p = page({ editions: editions(5), coverUrl: "cover:2" });
   assert.deepEqual(bookScreenModel(p, owned(), viewer).edition, { index: 2, count: 5, label: "Your edition · 3 of 5", showDots: true, mineIndex: 2 });
@@ -217,4 +223,33 @@ test("one edition or no page has no edition strip", () => {
   assert.equal(bookScreenModel(page({ editions: editions(1) }), null, viewer, "e0").edition, null);
   assert.equal(bookScreenModel(page({ editions: [] }), null, viewer).edition, null);
   assert.equal(bookScreenModel(null, owned(), viewer).edition, null);
+});
+
+const series = { name: "Malazan Book of the Fallen", kind: "series" as const, position: "3" };
+const collection = { name: "Bang!", kind: "collection" as const, position: "248" };
+
+test("the work's series shows, and wins over an edition's collection", () => {
+  const withCollection = editions(3).map((edition) => ({ ...edition, collection }));
+  assert.deepEqual(bookScreenModel(page({ series, editions: withCollection }), null, viewer).series, series);
+});
+
+test("an edition's collection shows when the work has no series", () => {
+  const withCollection = editions(3).map((edition, i) => ({ ...edition, collection: i === 1 ? collection : null }));
+  assert.equal(bookScreenModel(page({ editions: withCollection }), null, viewer).series, null);
+  assert.deepEqual(bookScreenModel(page({ series: null, editions: withCollection, coverUrl: "cover:1" }), null, viewer).series, collection);
+});
+
+test("the collection comes from the edition being shown", () => {
+  const other = { name: "Clássicos", kind: "collection" as const, position: null };
+  const withCollections = editions(3).map((edition, i) => ({ ...edition, collection: i === 0 ? collection : i === 2 ? other : null }));
+  const p = page({ editions: withCollections, coverUrl: "cover:0" });
+  assert.deepEqual(bookScreenModel(p, null, viewer).series, collection);
+  assert.deepEqual(bookScreenModel(p, null, viewer, "e2").series, other);
+  assert.equal(bookScreenModel(p, null, viewer, "e1").series, null);
+});
+
+test("no series, no collection and no page all read as null", () => {
+  assert.equal(bookScreenModel(page(), null, viewer).series, null);
+  assert.equal(bookScreenModel(page({ editions: [] }), null, viewer).series, null);
+  assert.equal(bookScreenModel(null, owned(), viewer).series, null);
 });

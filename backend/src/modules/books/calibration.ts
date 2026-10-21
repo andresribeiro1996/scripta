@@ -1,6 +1,6 @@
 import type { BooksRepository } from "./domain/ports.js";
 import { isFragment, SYNOPSIS_HIDE_BELOW, SYNOPSIS_REVIEW_BELOW } from "./domain/synopsis.js";
-import { evidenceOf, MATCH_MERGE_AT, MATCH_REVIEW_AT } from "./domain/translation.js";
+import { evidenceOf, MATCH_MERGE_AT, MATCH_REVIEW_AT, seriesLikeOriginals } from "./domain/translation.js";
 import { planMatch } from "./translationJudgments.js";
 import { failureKind } from "./typesafe.js";
 
@@ -73,17 +73,18 @@ export type TranslationSampleItem = {
 export type TranslationLabel = { workId: string; match: string | null };
 export type TranslationAnswerRow = { workId: string; pick: string | null; confidence: number };
 
-type SampleRepo = Pick<BooksRepository, "portugueseWorksWithEvidence" | "translationEvidence" | "titleCandidates" | "authorCandidates" | "matchCandidates">;
+type SampleRepo = Pick<BooksRepository, "portugueseWorksWithEvidence" | "translationEvidence" | "originalTitleClaims" | "titleCandidates" | "authorCandidates" | "matchCandidates">;
 
 export function translationSample(repo: SampleRepo, n: number, random: () => number = Math.random): TranslationSampleItem[] {
   const codeCap = Math.ceil(n / 2);
   const askCap = n - codeCap;
   const picked: TranslationSampleItem[] = [];
+  const seriesLike = seriesLikeOriginals(repo.originalTitleClaims());
   let code = 0;
   let ask = 0;
   for (const workId of shuffled(repo.portugueseWorksWithEvidence(), random)) {
     if (code >= codeCap && ask >= askCap) break;
-    const plan = planMatch(repo, workId);
+    const plan = planMatch(repo, workId, seriesLike);
     const rows = repo.translationEvidence(workId);
     if (!plan || !rows || (plan.kind !== "code" && plan.kind !== "ask")) continue;
     if (plan.kind === "code" ? code >= codeCap : ask >= askCap) continue;

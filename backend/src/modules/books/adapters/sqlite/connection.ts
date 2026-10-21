@@ -9,6 +9,7 @@ import { openSqlite } from "../../../../db/openSqlite.js";
 import { MIN_GOOD_WIDTH } from "../../domain/constants.js";
 import { catalogTitleKey, givenNameFirst } from "../../domain/normalize.js";
 import { summaryHashOf } from "../../domain/synopsis.js";
+import { isOriginalTitle } from "../../domain/translation.js";
 import { applyMojibakeRepairs, type RowRepair } from "../../seed/mojibakeRepair.js";
 import { CONFIRMED_SQL } from "./sqliteBooksRepository.js";
 
@@ -52,13 +53,16 @@ export function applyBooksMigrations(db: DatabaseSync): void {
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_work ON books(work_id)");
   db.exec("DROP INDEX IF EXISTS idx_books_title_key");
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_title_work ON books(title_key, work_id)");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_books_author_key ON books(substr(title_key, instr(title_key, '|') + 1))");
   db.exec("CREATE INDEX IF NOT EXISTS idx_works_merged_into ON works(merged_into)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_cover_unchecked ON books(created_at) WHERE cover_checked_at IS NULL AND (cover_status IS NULL OR cover_status = 'low_res')");
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_cover_upgrade ON books(cover_upgrade_wanted_at) WHERE cover_upgrade_wanted_at IS NOT NULL");
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_retitle_wanted ON books(retitle_wanted_at) WHERE retitle_wanted_at IS NOT NULL");
   db.exec("DROP INDEX IF EXISTS idx_books_details_unchecked");
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_details_pending ON books(details_checked_at IS NOT NULL, created_by IS NOT NULL, details_checked_at, created_at) WHERE details_status IS NULL AND created_by IS NOT 'bnp'");
-  db.exec("CREATE INDEX IF NOT EXISTS idx_books_work_lookup ON books(work_checked_at IS NOT NULL, created_by IS NOT NULL, work_checked_at, created_at) WHERE ol_work_key IS NULL AND isbn IS NOT NULL AND details_status IS NOT NULL");
+  db.exec("DROP INDEX IF EXISTS idx_books_work_lookup");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_books_work_queue ON books(work_checked_at IS NOT NULL, created_by IS NOT NULL, coalesce(work_checked_at, ''), created_at) WHERE ol_work_key IS NULL AND isbn IS NOT NULL AND details_status IS NOT NULL AND (created_by IS NULL OR created_by <> 'publisher')");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_books_bnp_details ON books(work_id, created_by, details_status, details_checked_at, created_at, id) WHERE created_by = 'bnp' AND details_status IS NULL");
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_summary_hash ON books(summary_hash)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_works_summary_hash ON works(summary_hash)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_work_merges_from ON work_merges(from_work)");
@@ -100,6 +104,7 @@ export function applyBooksMigrations(db: DatabaseSync): void {
   joinIsbn10Editions(db);
   indexConfirmedBooks(db);
   turnIsbndbFirstAuthors(db);
+  clearNonTitleOriginals(db);
 }
 
 function moveOpenLibrarySummariesToWorks(db: DatabaseSync): void {
@@ -256,6 +261,28 @@ function turnIsbndbFirstAuthors(db: DatabaseSync): void {
   applyMojibakeRepairs(db, { books: [], works: [...works.values()] });
   applyMojibakeRepairs(db, { books, works: [] });
   db.exec("PRAGMA user_version = 4");
+}
+
+function clearNonTitleOriginals(db: DatabaseSync): void {
+  const { user_version: version } = db.prepare("PRAGMA user_version").get() as { user_version: number };
+  if (version >= 5) return;
+  const clear = db.prepare("UPDATE books SET original_title = NULL WHERE id = ?");
+  let cleared = 0;
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    const rows = db.prepare("SELECT id, original_title FROM books WHERE original_title IS NOT NULL").all() as Array<{ id: string; original_title: string }>;
+    for (const { id, original_title: title } of rows) {
+      if (isOriginalTitle(title)) continue;
+      clear.run(id);
+      cleared += 1;
+    }
+    db.exec("PRAGMA user_version = 5");
+    db.exec("COMMIT");
+  } catch (error) {
+    if (db.isTransaction) db.exec("ROLLBACK");
+    throw error;
+  }
+  if (cleared > 0) console.log(`books: cleared ${cleared} original titles that were not titles`);
 }
 
 export function openBooksDb(): DatabaseSync {

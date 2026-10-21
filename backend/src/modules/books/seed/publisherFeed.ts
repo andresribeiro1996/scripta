@@ -1,6 +1,6 @@
 import { LOOSE_METADATA_LABEL, STRICT_METADATA_LABEL, canonicalIsbn, cleanSummary, decodeHtmlEntities, htmlToText } from "@scripta/shared";
 import { checksumOk, isbn10Ok, normalizeWords } from "../domain/normalize.js";
-import { originalTitleIn } from "../domain/translation.js";
+import { isOriginalTitle, originalTitleIn } from "../domain/translation.js";
 import type { PublisherSite } from "./publishers.js";
 
 export interface PublisherBook {
@@ -302,12 +302,13 @@ function wooDetails(product: Record<string, unknown>): ProductDetails {
   const description = textLines(text(product.description));
   const shortDescription = textLines(text(product.short_description));
   const fromText = feedTextDetails([...description, ...shortDescription]);
+  const attributeTitle = wooAttribute(product, ORIGINAL_TITLE_ATTRIBUTE);
   return {
     summary: synopsis(text(product.description)) ?? synopsis(text(product.short_description)),
     pages: pageCount(wooAttribute(product, PAGES_ATTRIBUTE)) ?? fromText.pages,
     year: publicationYear(wooAttribute(product, YEAR_ATTRIBUTE)),
     translator: wooAttribute(product, TRANSLATOR_ATTRIBUTE) ?? fromText.translator,
-    originalTitle: wooAttribute(product, ORIGINAL_TITLE_ATTRIBUTE) ?? originalTitleIn([...description, ...shortDescription].join("\n"))
+    originalTitle: attributeTitle && isOriginalTitle(attributeTitle) ? attributeTitle : originalTitleIn([...description, ...shortDescription].join("\n"))
   };
 }
 

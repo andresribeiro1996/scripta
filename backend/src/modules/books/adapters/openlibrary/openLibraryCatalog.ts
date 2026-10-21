@@ -1,15 +1,20 @@
 import { buildBookMetadata, findOpenLibraryMatch, mapOpenLibraryDoc, openLibraryDescription } from "@scripta/shared";
 import type { BookCatalog, EditionRecord, EditionRecordSource } from "../../domain/ports.js";
+import { parseSeriesString, seriesFromSubjects } from "../../domain/series.js";
 import { fetchJson, type Throttle } from "../http/http.js";
 
 const keyOf = (value: unknown): string | null => (value && typeof value === "object" && typeof (value as { key?: unknown }).key === "string" ? (value as { key: string }).key : null);
 
+const subjectsOf = (work: unknown, match: Record<string, unknown>): unknown => (work && typeof work === "object" ? (work as { subjects?: unknown }).subjects : undefined) ?? match.subject;
+
 export function parseEditionRecord(record: unknown): EditionRecord {
   const fields: Record<string, unknown> = record && typeof record === "object" ? (record as Record<string, unknown>) : {};
+  const series = (Array.isArray(fields.series) ? fields.series : []).flatMap((value) => (typeof value === "string" ? parseSeriesString(value) ?? [] : []));
   return {
     title: typeof fields.title === "string" ? fields.title.trim() : "",
     workKey: Array.isArray(fields.works) ? keyOf(fields.works[0]) : null,
-    languages: Array.isArray(fields.languages) ? fields.languages.flatMap((language) => keyOf(language) ?? []) : []
+    languages: Array.isArray(fields.languages) ? fields.languages.flatMap((language) => keyOf(language) ?? []) : [],
+    ...(series.length > 0 ? { series } : {})
   };
 }
 
@@ -31,7 +36,17 @@ export function createOpenLibraryCatalog(throttle: Throttle, urgent = true): Boo
       const metadata = buildBookMetadata(match, work);
       const workSummary = metadata.summary;
       metadata.summary = openLibraryDescription(edition);
-      return { metadata, sources: ["openlibrary"], summarySource: metadata.summary ? "openlibrary" : null, workKey: String(match.key), workSummary };
+      const editionSeries = parseEditionRecord(edition).series;
+      const subjectSeries = seriesFromSubjects(subjectsOf(work, match));
+      return {
+        metadata,
+        sources: ["openlibrary"],
+        summarySource: metadata.summary ? "openlibrary" : null,
+        workKey: String(match.key),
+        workSummary,
+        ...(editionSeries ? { editionSeries } : {}),
+        ...(subjectSeries.length > 0 ? { subjectSeries } : {})
+      };
     },
 
     async search(query) {
@@ -45,7 +60,8 @@ export function createOpenLibraryCatalog(throttle: Throttle, urgent = true): Boo
         if (!item || typeof item !== "object") return [];
         const doc = item as Record<string, unknown>;
         const result = mapOpenLibraryDoc(doc);
-        return result ? [{ result, olCoverId: typeof doc.cover_i === "number" ? doc.cover_i : null, workKey: typeof doc.key === "string" ? doc.key : null, source: "openlibrary" as const }] : [];
+        const subjectSeries = seriesFromSubjects(doc.subject);
+        return result ? [{ result, olCoverId: typeof doc.cover_i === "number" ? doc.cover_i : null, workKey: typeof doc.key === "string" ? doc.key : null, source: "openlibrary" as const, ...(subjectSeries.length > 0 ? { subjectSeries } : {}) }] : [];
       });
     },
 

@@ -2,7 +2,7 @@ import { createJevMatchClassifier, type ClassifyMatch } from "./adapters/typesaf
 import { startDetailsBackfill } from "./backfill.js";
 import { WorkMergeError } from "./domain/errors.js";
 import type { BooksRepository } from "./domain/ports.js";
-import { authorPattern, evidenceOf, hasVolumeMarker, MATCH_MERGE_AT, MAX_CANDIDATES, mentionsSurname, sameMainTitle, surnameOf, titlePattern, type TranslationEvidence } from "./domain/translation.js";
+import { authorPattern, evidenceOf, hasVolumeMarker, MATCH_MERGE_AT, MAX_CANDIDATES, mentionsSurname, sameMainTitle, seriesLikeOriginals, surnameOf, titlePattern, type SeriesLike, type TranslationEvidence } from "./domain/translation.js";
 import { JEV_REJECTION_LIMIT } from "./synopsisJudgments.js";
 import { dailySpend, failureKind, nextUtcMidnight, strikeReason } from "./typesafe.js";
 import { createWorkQueue } from "./workQueue.js";
@@ -12,17 +12,18 @@ export type MatchPlan = { kind: "original" } | { kind: "none" } | { kind: "code"
 
 type PlanRepo = Pick<BooksRepository, "translationEvidence" | "titleCandidates" | "authorCandidates" | "matchCandidates">;
 
-export function planMatch(repo: PlanRepo, workId: string): MatchPlan | null {
+export function planMatch(repo: PlanRepo, workId: string, isSeriesLike: SeriesLike): MatchPlan | null {
   const rows = repo.translationEvidence(workId);
   if (!rows || rows.editions.length === 0) return null;
   const evidence = evidenceOf(rows);
   if (evidence.originalTitle && sameMainTitle(evidence.originalTitle, evidence.title)) return { kind: "original" };
+  if (evidence.originalTitle && isSeriesLike(evidence.originalTitle, evidence.workAuthor || evidence.author)) return { kind: "none" };
   const byTitlePattern = evidence.originalTitle ? titlePattern(evidence.originalTitle) : null;
   const byTitle = byTitlePattern ? repo.titleCandidates(byTitlePattern).filter((id) => id !== workId) : [];
   const byAuthorPattern = authorPattern(evidence.workAuthor || evidence.author);
   const byAuthor = byAuthorPattern ? repo.authorCandidates(byAuthorPattern).filter((id) => id !== workId && !byTitle.includes(id)) : [];
   if (byTitle.length === 0 && byAuthor.length === 0) return { kind: "none" };
-  if (byTitle.length === 1 && !hasVolumeMarker(evidence.originalTitle ?? "")) {
+  if (byTitle.length === 1 && !hasVolumeMarker(evidence.originalTitle ?? "") && !hasVolumeMarker(evidence.title)) {
     const [only] = repo.matchCandidates(byTitle);
     const surname = only ? surnameOf(only.author) : null;
     if (only && surname && mentionsSurname([evidence.workAuthor, evidence.author, ...evidence.summaries], surname)) return { kind: "code", intoWorkId: only.id };
@@ -67,9 +68,9 @@ function decide(deps: TranslationDeps, workId: string, model: string, intoWorkId
   }
 }
 
-export async function matchWork(deps: TranslationDeps, workId: string): Promise<number | null> {
+export async function matchWork(deps: TranslationDeps, workId: string, isSeriesLike: SeriesLike): Promise<number | null> {
   const at = () => new Date(deps.now()).toISOString();
-  const plan = planMatch(deps.repo, workId);
+  const plan = planMatch(deps.repo, workId, isSeriesLike);
   if (!plan) return null;
   if (plan.kind === "original" || plan.kind === "none") {
     decide(deps, workId, "code", null, null, false, at());
@@ -107,6 +108,7 @@ const IN_FLIGHT = 4;
 const SWEEP_LIMIT = 1000;
 const SWEEP_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const HELD_CACHE_MS = 60 * 1000;
+const SERIES_LIKE_CACHE_MS = 10 * 60 * 1000;
 
 type HeldDeps = TranslationDeps & { heldWorkIds: () => string[] };
 export type TranslationJobs = { add(workId: string): void; stop(): void };
@@ -115,18 +117,19 @@ function heldCanonical(deps: HeldDeps): Set<string> {
   return new Set(deps.repo.canonicalWorkIds(deps.heldWorkIds()).values());
 }
 
-export async function judgeWorkMatch(deps: HeldDeps, workId: string, held: () => Set<string> = () => heldCanonical(deps)): Promise<number | null> {
+export async function judgeWorkMatch(deps: HeldDeps, workId: string, held: () => Set<string> = () => heldCanonical(deps), seriesLike: () => SeriesLike = () => seriesLikeOriginals(deps.repo.originalTitleClaims())): Promise<number | null> {
   const canonical = deps.repo.canonicalWorkIds([workId]).get(workId);
   if (!canonical || !held().has(canonical)) return null;
   if (deps.repo.portugueseWorksNeedingMatch([canonical], 1, JEV_REJECTION_LIMIT, null).length === 0) return null;
   deps.repo.fillOriginalTitlesFromSummaries(canonical);
-  return matchWork(deps, canonical);
+  return matchWork(deps, canonical, seriesLike());
 }
 
 export function startTranslationJobs(deps: HeldDeps & { info: (details: Record<string, unknown>, message: string) => void; onError: (error: unknown, workId?: string) => void }): TranslationJobs {
   let quietUntil = 0;
   let budgetLoggedUntil = 0;
   let heldCache: { at: number; works: Set<string> } | null = null;
+  let seriesLikeCache: { at: number; rule: SeriesLike } | null = null;
   const alert = (subject: string, text: string) => {
     if (deps.now() < quietUntil) return;
     quietUntil = deps.now() + KEY_PAUSE_MS;
@@ -135,6 +138,10 @@ export function startTranslationJobs(deps: HeldDeps & { info: (details: Record<s
   const held = () => {
     if (!heldCache || deps.now() - heldCache.at >= HELD_CACHE_MS) heldCache = { at: deps.now(), works: heldCanonical(deps) };
     return heldCache.works;
+  };
+  const seriesLike = () => {
+    if (!seriesLikeCache || deps.now() - seriesLikeCache.at >= SERIES_LIKE_CACHE_MS) seriesLikeCache = { at: deps.now(), rule: seriesLikeOriginals(deps.repo.originalTitleClaims()) };
+    return seriesLikeCache.rule;
   };
   const classify: ClassifyMatch = async (input) => {
     try {
@@ -148,7 +155,7 @@ export function startTranslationJobs(deps: HeldDeps & { info: (details: Record<s
     }
   };
   const judged = { ...deps, alert, classify };
-  const queue = createWorkQueue({ concurrency: IN_FLIGHT, now: deps.now, run: (workId) => judgeWorkMatch(judged, workId, held), onError: deps.onError });
+  const queue = createWorkQueue({ concurrency: IN_FLIGHT, now: deps.now, run: (workId) => judgeWorkMatch(judged, workId, held, seriesLike), onError: deps.onError });
   const stopSweep = startDetailsBackfill(
     async () => {
       heldCache = { at: deps.now(), works: heldCanonical(deps) };
