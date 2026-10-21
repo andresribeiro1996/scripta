@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { FlatList, StyleSheet, View, type TextInput } from "react-native";
 import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import { Stack, useNavigation } from "expo-router";
+import { Stack, router, useNavigation } from "expo-router";
 import { looksLikeIsbnQuery, matchesSearch, type BookSearchResult } from "@scripta/shared";
-import { ErrorState, Screen, SearchDock, Skeleton, SwipeableTabs, Toast, searchDockClearance, spacing } from "../../ui";
+import { ErrorState, IconButton, Screen, SearchDock, Skeleton, SwipeableTabs, Toast, searchDockClearance, spacing } from "../../ui";
 import { AddBookSheet } from "../community/AddBookSheet";
 import { fetchDiscover, searchPeople } from "../community/api";
 import { useFollowToggle } from "../community/useFollowToggle";
@@ -99,7 +99,7 @@ export function SearchScreen() {
 
   return (
     <Screen top={false}>
-      <Stack.Screen options={{ title: "Search", headerShown: true, headerLargeTitleEnabled: false }} />
+      <Stack.Screen options={{ title: "Search", headerShown: true, headerLargeTitleEnabled: false, headerRight: () => <IconButton name="scan" accessibilityLabel="Scan a book's barcode" onPress={() => router.push("/scan" as never)} /> }} />
       <SearchDock
         value={query}
         onChangeText={(text) => {
