@@ -124,7 +124,6 @@ export function SearchDock({
                   value={value}
                   onChangeText={onChangeText}
                   onSubmitEditing={onSubmitEditing}
-                  onClear={() => onChangeText("")}
                   ref={setInput}
                   placeholder={placeholder}
                   autoCapitalize="none"

@@ -275,7 +275,6 @@ export function Input({
   // A leading glyph inside the field itself — for a search box, where the
   // glyph already says what a label would only repeat from the placeholder.
   icon,
-  onClear,
   accessibilityLabel = label,
   editable = true,
   style,
@@ -283,13 +282,14 @@ export function Input({
   // it there is no way to reach the underlying TextInput.
   ref,
   ...props
-}: Omit<TextInputProps, "style"> & { label?: string; error?: string; hint?: string; icon?: IconName; onClear?: () => void; ref?: Ref<TextInput>; style?: ViewStyle }) {
+}: Omit<TextInputProps, "style"> & { label?: string; error?: string; hint?: string; icon?: IconName; ref?: Ref<TextInput>; style?: ViewStyle }) {
   const { colors, fonts } = useTheme();
   const [visible, setVisible] = useState(false);
   const inputRef = useRef<TextInput>(null);
   const fieldRef = useRef<View>(null);
   const reveal = useContext(RevealField);
   const [focused, setFocused] = useState(false);
+  const clearable = props.returnKeyType === "search" && !!props.value && !!props.onChangeText;
 
   return (
     <View ref={fieldRef} style={styles.field}>
@@ -318,7 +318,7 @@ export function Input({
           { color: colors.text },
           props.multiline ? { textAlignVertical: "top" } : null,
           icon ? { paddingLeft: minimumTouchTarget } : null,
-          secureTextEntry || (onClear && props.value) ? { paddingRight: minimumTouchTarget + spacing.sm } : null,
+          secureTextEntry || clearable ? { paddingRight: minimumTouchTarget + spacing.sm } : null,
           fontStyleFor(fonts.text, "text", { fontSize: typography.input.fontSize }) ?? { fontFamily: SYSTEM_FAMILY },
         ]}
       />
@@ -327,7 +327,7 @@ export function Input({
         style={styles.inputTrailing}>
         <Icon name={visible ? "hidePassword" : "showPassword"} size={20} color={colors.textDim} />
       </Pressable>}
-      {onClear && props.value ? <Pressable accessibilityRole="button" accessibilityLabel="Clear search" onPress={onClear}
+      {clearable ? <Pressable accessibilityRole="button" accessibilityLabel="Clear search" onPress={() => props.onChangeText?.("")}
         style={styles.inputTrailing}>
         <Icon name="close" size={20} color={colors.textDim} />
       </Pressable> : null}

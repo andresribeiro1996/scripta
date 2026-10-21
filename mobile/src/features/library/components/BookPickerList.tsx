@@ -15,7 +15,7 @@ export function BookPickerList({ books, onSelect, isSelected, label = "Search yo
   }, [books, search]);
   return (
     <View style={styles.list}>
-      <Input label={label} value={search} onChangeText={setSearch} autoCapitalize="none" autoCorrect={false} clearButtonMode="while-editing" returnKeyType="search" />
+      <Input label={label} value={search} onChangeText={setSearch} autoCapitalize="none" autoCorrect={false} returnKeyType="search" />
       {filtered.length === 0 ? <Text style={[typography.body, { color: colors.textDim }]}>No books match.</Text> : null}
       {filtered.map((book, i) => {
         const selected = isSelected?.(book) ?? false;
