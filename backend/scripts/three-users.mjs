@@ -206,6 +206,9 @@ async function seed() {
     await request("POST", `/quizzes/voting/${shelfQuizCode}/play`, { answers: shelfAnswers, durationMs: 20000 + voter * 1000 });
     await request("POST", `/arenas/${shelfArena.id}/duels/${shelfArena.duels[0].id}/vote`, { voterToken: `scripta-fixture-top-shelf-${voter}`, workId: shelfArena.duels[0].bookA.workId }, null, 204);
   }
+  const { freezeTopShelfRecap } = await import("../src/modules/community/index.ts");
+  const { lisbonMonth } = await import("../src/modules/community/topShelf.ts");
+  freezeTopShelfRecap(lisbonMonth(new Date()));
   const manifest = { users, library: { shareToken: library.shareToken }, murals, polls, arena: { id: arena.id, bobVoterToken: voterToken }, quiz: { id: draft.id, code: quizCode } };
   writeFileSync(`${manifestPath}.tmp`, JSON.stringify(manifest, null, 2));
   renameSync(`${manifestPath}.tmp`, manifestPath);
@@ -249,6 +252,11 @@ async function check(fixture) {
   const topShelf = await request("GET", "/top-shelf?period=all");
   assert(topShelf.boards.champions.length > 0, "Top Shelf champions board is empty.");
   assert(topShelf.games.length > 0, "Top Shelf games list is empty.");
+  const recaps = await request("GET", "/top-shelf/recaps");
+  assert(recaps.months.includes(recaps.currentMonth), "Top Shelf recaps do not list the current month.");
+  const recap = await request("GET", `/top-shelf/recaps/${recaps.currentMonth}`);
+  assert.equal(recap.cards[0].kind, "summary");
+  assert(recap.cards.some((card) => card.kind === "book"), "Top Shelf recap has no book card.");
   const aliceRatings = (await request("GET", "/library", undefined, tokens.alice)).data.books.filter((book) => book.Rating === 4).map((book) => book.Title);
   assert.deepEqual(aliceRatings, ["The Return of the King", "A Storm of Swords", "Brave New World", "To Kill a Mockingbird"]);
   await request("POST", "/library/unshare", {}, tokens.alice);
