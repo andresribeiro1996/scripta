@@ -6,7 +6,7 @@ import Animated, { useAnimatedScrollHandler, useAnimatedStyle, type SharedValue 
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import { bookStatsModel, coverWash, editionLabel, type BookScreenModel, type BookScreenTabKey, type WorkPage } from "@scripta/shared";
 import { Text } from "../../ui/Text";
-import { Button, Icon, Menu, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme, type IconName, type MenuItem } from "../../ui";
+import { Button, Icon, Menu, dynamicType, type ActionItem, minimumTouchTarget, radii, spacing, typography, useTheme, type IconName } from "../../ui";
 import { useLibraryActions } from "../library/hooks/useLibraryActions";
 import { useChangeStatus } from "../library/hooks/useChangeStatus";
 import { BookCover } from "../arena/BookCover";
@@ -69,9 +69,9 @@ export function WashBackdrop({ color, topAlpha, scrollY, headerHeight }: { color
 
 const TAB_ICONS: Record<BookScreenTabKey, IconName> = { about: "info", highlights: "quote", community: "community" };
 
-export function bookMenuItems(model: BookScreenModel, key: string, segments: readonly string[]): MenuItem[] {
+export function bookMenuItems(model: BookScreenModel, key: string, segments: readonly string[]): ActionItem[] {
   const to = (tool: "style" | "cover") => () => router.push(bookToolPath(key, tool, segments) as never);
-  return model.menu.flatMap((item) => (item === "style" ? [{ label: "Card style", onPress: to("style") }] : item === "cover" ? [{ label: "Change cover", onPress: to("cover") }] : []));
+  return model.menu.flatMap<ActionItem>((item) => (item === "style" ? [{ label: "Card style", icon: "style", onPress: to("style") }] : item === "cover" ? [{ label: "Change cover", icon: "image", onPress: to("cover") }] : []));
 }
 
 function confirmDeleteNote(onConfirm: () => void) {

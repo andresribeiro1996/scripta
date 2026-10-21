@@ -4,7 +4,7 @@ import { bookScreenModel } from "@scripta/shared";
 import { BookScreen, bookMenuItems } from "@/features/works/BookScreen";
 import { useBook } from "@/features/library/hooks/useBook";
 import { useLibrary } from "@/features/library/hooks/useLibrary";
-import { ErrorState, HeaderActions, IconButton, Menu, Screen, Skeleton } from "@/ui";
+import { ActionSheet, ErrorState, HeaderActions, IconButton, Screen, Skeleton } from "@/ui";
 
 export default function BookRoute() {
   const { key } = useLocalSearchParams<{ key: string }>();
@@ -29,9 +29,9 @@ export default function BookRoute() {
           headerRight: menuItems.length > 0
             ? () => (
                 <HeaderActions>
-                  <Menu items={menuItems}>
-                    <IconButton framed accessibilityLabel="Book actions" name="more" />
-                  </Menu>
+                  <ActionSheet title={model?.title ?? "Book"} groups={[menuItems]}>
+                    {(open) => <IconButton framed accessibilityLabel="Book actions" name="more" onPress={open} />}
+                  </ActionSheet>
                 </HeaderActions>
               )
             : undefined,

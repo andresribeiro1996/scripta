@@ -34,7 +34,7 @@ import {
   type PerCardStyle,
   type SortKey,
 } from "@scripta/shared";
-import { Button, EmptyState, ErrorState, Fab, IconButton, Input, Menu, Screen, Sheet, Skeleton, SwipeableTabs, type MenuItem } from "../../ui/components";
+import { ActionSheet, type ActionItem, Button, EmptyState, ErrorState, Fab, IconButton, Input, Screen, Sheet, Skeleton, SwipeableTabs, type MenuItem } from "../../ui/components";
 import { SearchDock, dynamicType, searchDockClearance, searchDockFabClearance, useTheme } from "../../ui";
 import { radii, spacing, typography } from "../../ui/theme";
 import { useMurals } from "../murals/useMurals";
@@ -135,13 +135,17 @@ export function LibraryScreen() {
     setEditingName(true);
   }
 
-  const actionItems: MenuItem[] = [
-    { label: "Rename library…", onPress: startRenamingLibrary },
-    { label: "Import / sync…", onPress: () => router.push("/import" as never) },
-    ...(books.length > 1 ? [{ label: "Reorder…", onPress: () => router.push("/reorder" as never) }] : []),
-    ...(!onCollectionsTab && books.length > 0 ? [{ label: "Select…", onPress: () => setSelectionMode(true) }] : []),
-    { label: "Library style…", onPress: () => router.push("/style" as never) },
-    { label: "Share…", onPress: () => router.push("/share" as never) },
+  const actionGroups: ActionItem[][] = [
+    [
+      { label: "Rename library", icon: "edit", onPress: startRenamingLibrary },
+      ...(books.length > 1 ? [{ label: "Reorder", icon: "reorder" as const, onPress: () => router.push("/reorder" as never) }] : []),
+      ...(!onCollectionsTab && books.length > 0 ? [{ label: "Select", icon: "select" as const, onPress: () => setSelectionMode(true) }] : []),
+    ],
+    [
+      { label: "Library style", icon: "style", onPress: () => router.push("/style" as never) },
+      { label: "Import / sync", icon: "sync", onPress: () => router.push("/import" as never) },
+    ],
+    [{ label: "Share", icon: "share", onPress: () => router.push("/share" as never) }],
   ];
 
   const sortLabel = SORT_OPTIONS.find((option) => option.value === sortKey)?.label ?? sortKey;
@@ -191,9 +195,9 @@ export function LibraryScreen() {
               headerTitle: undefined,
               headerLeft: undefined,
               headerRight: () => (
-                <Menu title={library?.data.name || "Library"} items={actionItems}>
-                  <IconButton framed accessibilityLabel="Library actions" name="more" />
-                </Menu>
+                <ActionSheet title={library?.data.name || "Library"} groups={actionGroups}>
+                  {(open) => <IconButton framed accessibilityLabel="Library actions" name="more" onPress={open} />}
+                </ActionSheet>
               ),
             }}
       />

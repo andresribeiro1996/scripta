@@ -6,7 +6,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pressable, ScrollView, Share, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { API_URL } from "../../core/config";
-import { Button, Dialog, EditorHeading, ErrorState, FormScroll, HeaderActions, IconButton, Input, Menu, type MenuItem, SaveStateButton, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { ActionSheet, type ActionItem, Button, Dialog, EditorHeading, ErrorState, FormScroll, HeaderActions, IconButton, Input, SaveStateButton, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { coverUrlForApi } from "../library/lib/coverUrl";
 import { publicContentUrl } from "../sharing/links";
 import { fetchQuizResults, publishQuiz, setPlayState, updateQuiz, type Quiz } from "./api";
@@ -96,12 +96,12 @@ export function QuizEditorScreen({ quiz, onUpdated }: { quiz: Quiz; onUpdated: (
   const frozen = current.voteCode !== null;
   const dirty = !frozen && JSON.stringify(data) !== JSON.stringify(current.data);
   const lockEdits = publishing;
-  const actionItems: MenuItem[] = frozen
+  const actionGroups: ActionItem[][] = frozen
     ? [
-      { label: "Share challenge link", onPress: () => void shareChallengeLink() },
-      { label: current.playOpen ? "Close for play" : "Open for play", onPress: () => void run(() => setPlayState(current.id, !current.playOpen)) },
+      [{ label: "Share challenge link", icon: "share", onPress: () => void shareChallengeLink() }],
+      [{ label: current.playOpen ? "Close for play" : "Open for play", icon: current.playOpen ? "lock" : "public", onPress: () => void run(() => setPlayState(current.id, !current.playOpen)) }],
     ]
-    : [{ label: "Publish…", onPress: () => setConfirmingPublish(true) }];
+    : [[{ label: "Publish", icon: "public", onPress: () => setConfirmingPublish(true) }]];
 
   return <Screen top={false}>
     <Stack.Screen options={{
@@ -110,7 +110,7 @@ export function QuizEditorScreen({ quiz, onUpdated }: { quiz: Quiz; onUpdated: (
       headerLargeTitleEnabled: false,
       headerRight: () => <HeaderActions>
         {!frozen ? <SaveStateButton busy={busy || publishing} unsaved={dirty} onPress={() => void run(() => updateQuiz(current.id, { data: dataRef.current }))} /> : null}
-        <Menu title={current.name} items={actionItems}><IconButton framed accessibilityLabel="Quiz actions" name="more" /></Menu>
+        <ActionSheet title={current.name} groups={actionGroups}>{(open) => <IconButton framed accessibilityLabel="Quiz actions" name="more" onPress={open} />}</ActionSheet>
       </HeaderActions>,
     }} />
     {error ? <Toast visible message={error} tone="error" /> : null}
