@@ -126,10 +126,10 @@ The existing test that drops `books.title_key` to simulate an old database (`sql
 A new module, `backend/src/modules/books/originalArrivals.ts`.
 
 `joinArrivedOriginals(deps, limit)` takes `deps: Pick<TranslationDeps, "repo" | "sharesArena" | "now">`. It processes up to `limit` keys from `originalArrivals`, each in its own `repo.transaction` (`BEGIN IMMEDIATE`). For each title key:
-1. `K = arrivalKey(titleKey)`. When it is null, drop the key and move on.
+1. `K = arrivalKey(titleKey)` and `surname = surnameOf(<the title key's author part>)`. When either is null, drop the key and move on.
 2. `claims = repo.originalClaimsOf(K)`. When there are none, which is almost always, drop the key and move on.
 3. Build `seriesLike = seriesLikeOriginals(claims)` (Guard 1) and `shared = sharedOriginals(claims)` (the #323 bucket rule, see Reuse).
-4. Collect the claimant works: the canonical ids (`repo.canonicalWorkIds`) of the claims' non-null `workId`s. Filter them through `repo.portugueseWorksNeedingMatch(ids, Number.MAX_SAFE_INTEGER, JEV_REJECTION_LIMIT, new Date(deps.now()).toISOString())`. That selects:
+4. Collect the claimant works: the canonical ids (`repo.canonicalWorkIds`) of the non-null `workId`s of the claims whose author names `surname` (`mentionsSurname([claim.author], surname)`). A code join needs the claimant to name the candidate's author, and the candidate is the arrival's work, so this keeps a generic title such as "Poems" from planning every claimant by other authors. Guard 1 and the shared rule still read all of the key's claims. Filter them through `repo.portugueseWorksNeedingMatch(ids, Number.MAX_SAFE_INTEGER, JEV_REJECTION_LIMIT, new Date(deps.now()).toISOString())`. That selects:
    - live works whose editions are all Portuguese;
    - that are unjudged, or that hold a `code` or Jev "none" answered before now;
    - that have fewer than the limit of Jev strikes.
@@ -146,7 +146,9 @@ A new module, `backend/src/modules/books/originalArrivals.ts`.
    5. `joinByCode(deps, id, plan.intoWorkId, at)` saves the `code` judgment and merges unless an arena holds both works. It is the code-join branch of `runCodeSteps`, extracted so both share it.
 6. Drop the key.
 
-An error other than these skips propagates. The transaction rolls back and the key stays queued; the tick's `onError` logs it, and the next tick retries.
+An error inside a key's transaction rolls that key back, and the key stays queued. The error goes to `onError` with the title key and is logged at error level. The drain then carries on with the next key, so one failing key can't hold back the queue. The next tick retries it.
+
+A tick stops starting new keys once 200 ms have passed (`ORIGINAL_ARRIVALS_TICK_MS`); the rest wait for the next tick. A key's counts join the tick's totals only once its transaction commits.
 
 It returns `{ arrivals, claimants, codeMerges, codeBlocked }`:
 - `arrivals`: keys processed;
@@ -185,6 +187,8 @@ It returns `{ arrivals, claimants, codeMerges, codeBlocked }`:
   The backlog has the same race today.
 - **Not a catch-up.** Claimants whose original arrived before this deploy aren't planned until the backlog runs; only new arrivals trigger the hook.
 - **Originals without an Open Library key** are never joined by the hook (decision 6).
+- **A claimant whose own edition author doesn't name the arriving author** isn't planned. This is stricter than `planMatch`, which also reads the work author and the summaries.
+- **A single key with very many claimants by the arriving author** runs to the end even past the tick budget, with one `planMatch` per claimant.
 - **Coupling with the matcher fix.** If `originalKey` changes, bumping `ORIGINAL_KEY_VERSION` recomputes the stored keys at the next boot; the pin test says so.
   - If `titlePattern` or the `title_key` format changes, `arrivalKey` may need the same change. The equivalence test fails if one side changes without the other.
   - A migration that rewrites every `title_key` queues every changed row: about 234k keys, roughly 8 hours of draining, mostly index probes.
