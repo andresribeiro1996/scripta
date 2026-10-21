@@ -52,7 +52,7 @@ export function createTopShelfService(deps: { engagementRepo: Pick<EngagementRep
       tierlists,
       tournaments,
       quizzes,
-      engagement: engagementRepo.gameEngagement(refs, since),
+      engagement: engagementRepo.gameEngagement(refs, since, null),
       visibleOwners: new Set(community.resolveProfiles(ownerIds).keys()),
       canonical,
       genres: shelf.catalogGenres([...new Set(canonical.values())]),

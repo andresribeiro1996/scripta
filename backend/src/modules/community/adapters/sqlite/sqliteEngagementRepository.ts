@@ -32,8 +32,8 @@ export function createSqliteEngagementRepository(db: DatabaseSync): EngagementRe
     ),
     first AS (SELECT ref_type, ref_id, id, MIN(created_at) AS published_at FROM pub GROUP BY ref_type, ref_id)
     SELECT ref_type, ref_id, published_at,
-      (SELECT COUNT(*) FROM activity_likes WHERE event_id = first.id AND (? IS NULL OR created_at >= ?)) AS likes,
-      (SELECT COUNT(*) FROM activity_comments WHERE event_id = first.id AND (? IS NULL OR created_at >= ?)) AS comments
+      (SELECT COUNT(*) FROM activity_likes WHERE event_id = first.id AND (? IS NULL OR created_at >= ?) AND (? IS NULL OR created_at < ?)) AS likes,
+      (SELECT COUNT(*) FROM activity_comments WHERE event_id = first.id AND (? IS NULL OR created_at >= ?) AND (? IS NULL OR created_at < ?)) AS comments
     FROM first`);
   return {
     getEvent: (id) => event.get(id, id) as EventRow | undefined,
@@ -46,9 +46,9 @@ export function createSqliteEngagementRepository(db: DatabaseSync): EngagementRe
       const rows = summaries.all(viewerId, JSON.stringify(ids)) as Array<{ id: string; likes: number; comments: number; liked: number }>;
       return Object.fromEntries(rows.map((row) => [row.id, { likes: Number(row.likes), comments: Number(row.comments), liked: row.liked === 1 } satisfies ActivityEngagement]));
     },
-    gameEngagement(refs, since) {
+    gameEngagement(refs, since, until) {
       if (refs.length === 0) return new Map();
-      const rows = gameEngagement.all(JSON.stringify(refs), since, since, since, since) as Array<{ ref_type: string; ref_id: string; published_at: string; likes: number; comments: number }>;
+      const rows = gameEngagement.all(JSON.stringify(refs), since, since, until, until, since, since, until, until) as Array<{ ref_type: string; ref_id: string; published_at: string; likes: number; comments: number }>;
       return new Map(rows.map((row) => [`${row.ref_type}:${row.ref_id}`, { publishedAt: row.published_at, likes: Number(row.likes), comments: Number(row.comments) }]));
     },
     setLiked(viewerId, eventId, liked, at) { if (liked) like.run(eventId, viewerId, at); else unlike.run(eventId, viewerId); },
