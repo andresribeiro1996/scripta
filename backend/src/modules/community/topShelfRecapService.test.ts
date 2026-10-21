@@ -23,7 +23,7 @@ function setup(now = "2026-10-21T10:00:00Z") {
     gather: (since, until) => { state.gathered.push([since, until]); return state.gatherInput; },
     cached: () => state.live,
   };
-  const shelf = { getWorkPage: (id: string) => (id === "gone" ? undefined : { id, title: `Title ${id}`, author: "A", editions: [{ coverUrl: `https://cdn.test/${id}.jpg` }] }) } as unknown as TopShelfDeps;
+  const shelf = { getWorkPage: (id: string) => (id === "gone" || id === "w-old" ? undefined : { id, title: `Title ${id}`, author: "A", editions: [{ coverUrl: `https://cdn.test/${id}.jpg` }] }) } as unknown as TopShelfDeps;
   const community = {
     repo: { getProfileRow: () => undefined, getFeedSettings: () => undefined },
     tierlists: { getPublishedMany: (ids: string[]) => ids.map((id) => ({ id, ownerUserId: "u1", createdAt: "2026-10-05T00:00:00.000Z", voteCode: `c-${id}`, name: `List ${id}`, poolSize: 4, ballotCount: 5, eligibleVoteCount: 5, promotedAt: null, votingOpen: true, covers: [] })), votedAmong: () => [] },
@@ -90,6 +90,15 @@ test("getRecap resolves links live and drops a hidden hottest game", () => {
   assert.deepEqual(hidden?.cards.map((c) => c.kind), ["summary", "book"]);
   const noLink = hidden?.cards[1];
   assert.equal(noLink?.kind === "book" && noLink.game, null);
+});
+
+test("getRecap links a card whose frozen work was merged into another", () => {
+  const { service, repo, state } = setup();
+  repo.put("2026-09", data({ books: [{ board: "champions", workId: "w-old", value: 4, candidates: [{ kind: "tierlist", id: "a" }] }] }), "x");
+  state.live = input({ tierlists: [tierlist("a", { workIds: ["w-new"] })], canonical: new Map([["w-old", "w-new"]]) });
+  const book = service.getRecap("2026-09")?.cards[1];
+  assert.equal(book?.kind === "book" && book.game?.content.id, "a");
+  assert.equal(book?.kind === "book" && book.book.workId, "w-new");
 });
 
 test("getRecap returns null for an empty month", () => {

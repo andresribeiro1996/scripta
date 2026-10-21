@@ -15,14 +15,15 @@ const monthSchema = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/);
 export function buildTopShelfRoutes(service: TopShelfService, recaps: TopShelfRecapService) {
   return async function topShelfRoutes(app: FastifyInstance) {
     await app.register(fastifyRateLimit, { max: 30, timeWindow: "1 minute" });
+    app.addHook("onRequest", async (_request, reply) => {
+      reply.header("Cache-Control", "no-store");
+    });
     app.get("/top-shelf", async (request, reply) => {
       const parsed = querySchema.safeParse(request.query);
       if (!parsed.success) return reply.code(400).send({ error: "Invalid period/genre/view." });
-      reply.header("Cache-Control", "no-store");
       return reply.send(service.getTopShelf({ period: parsed.data.period, genre: parsed.data.genre || null, view: parsed.data.view }));
     });
     app.get("/top-shelf/recaps", async (_request, reply) => {
-      reply.header("Cache-Control", "no-store");
       return reply.send(recaps.getIndex());
     });
     app.get("/top-shelf/recaps/:month", async (request, reply) => {
@@ -30,7 +31,6 @@ export function buildTopShelfRoutes(service: TopShelfService, recaps: TopShelfRe
       if (!parsed.success) return reply.code(400).send({ error: "Invalid month." });
       const recap = recaps.getRecap(parsed.data);
       if (!recap) return reply.code(404).send({ error: "No recap for that month." });
-      reply.header("Cache-Control", "no-store");
       return reply.send(recap);
     });
   };

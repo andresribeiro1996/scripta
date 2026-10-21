@@ -30,7 +30,8 @@ export function TopShelfScreen() {
   const openRecap = (month: string) => router.push(`/recap/${month}` as never);
   const openBook = (book: TopShelfBook) => router.push(workPath(book.workId, segments) as never);
 
-  const bar = <TopShelfBar period={period} onPeriod={setPeriod} genre={genre} onGenre={setGenre} genres={data?.genres ?? []} genreDisabled={false} />;
+  const [barHeight, setBarHeight] = useState(searchDockClearance);
+  const bar = <TopShelfBar period={period} onPeriod={setPeriod} genre={genre} onGenre={setGenre} genres={data?.genres ?? []} genreDisabled={false} onHeight={setBarHeight} />;
 
   return <Screen top={false}>
     <Stack.Screen options={{ headerShown: true, title: "Top Shelf", headerLargeTitleEnabled: false }} />
@@ -55,7 +56,7 @@ export function TopShelfScreen() {
         ) : null;
         if (empty.podium && empty.records && (empty.genres || genre !== null) && empty.games) {
           return (
-            <ScrollView {...scrollProps} contentContainerStyle={styles.list}>
+            <ScrollView {...scrollProps} contentContainerStyle={[styles.list, { paddingBottom: barHeight }]}>
               {playButton}
               <View style={styles.page}><EmptyState title={`Nothing here yet${data.period === "month" ? " this month" : ""} — games count once 5 people vote.`} /></View>
               {pastRecaps}
@@ -63,7 +64,7 @@ export function TopShelfScreen() {
           );
         }
         return (
-        <ScrollView {...scrollProps} contentContainerStyle={styles.list}>
+        <ScrollView {...scrollProps} contentContainerStyle={[styles.list, { paddingBottom: barHeight }]}>
           {playButton}
           {empty.podium ? null : <Podium books={data.boards.champions ?? []} title={data.period === "month" ? "Book of the month" : "All-time champions"} onOpen={openBook} />}
           {empty.records ? null : (
@@ -152,7 +153,7 @@ const styles = StyleSheet.create({
   strong: { fontWeight: "700" },
   center: { textAlign: "center" },
   page: { flex: 1, padding: spacing.lg },
-  list: { paddingTop: spacing.md, paddingBottom: searchDockClearance },
+  list: { paddingTop: spacing.md },
   section: { marginBottom: spacing.xl },
   sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: spacing.lg, marginBottom: spacing.sm },
   more: { width: minimumTouchTarget, height: minimumTouchTarget, marginVertical: -spacing.sm, alignItems: "center", justifyContent: "center" },

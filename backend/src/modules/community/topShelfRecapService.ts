@@ -57,7 +57,7 @@ export function createTopShelfRecapService(deps: { repo: RecapRepository; gather
       const entryOf = (g: LiveGame) => ({ kind: g.ref.kind, id: g.ref.id, userId: g.ownerUserId, promoted: g.promoted, createdAt: g.createdAt });
       const canon = (id: string) => live.canonical.get(id) ?? id;
 
-      const linked = data.books.map((b) => b.candidates.map((ref) => games.get(`${ref.kind}:${ref.id}`)).find((g) => g && visible(g) && g.open && g.workIds.some((id) => canon(id) === b.workId)));
+      const linked = data.books.map((b) => b.candidates.map((ref) => games.get(`${ref.kind}:${ref.id}`)).find((g) => g && visible(g) && g.open && g.workIds.some((id) => canon(id) === canon(b.workId))));
       const hot = data.hottest ? games.get(`${data.hottest.ref.kind}:${data.hottest.ref.id}`) : undefined;
       const hottest = data.hottest && hot && visible(hot) ? { facts: data.hottest, game: hot } : null;
 
@@ -67,7 +67,7 @@ export function createTopShelfRecapService(deps: { repo: RecapRepository; gather
 
       const cards: TopShelfRecapCard[] = [{ kind: "summary", ...data.summary }];
       data.books.forEach((b, i) => {
-        const card = workCard(shelf, b.workId);
+        const card = workCard(shelf, b.workId) ?? workCard(shelf, canon(b.workId));
         if (card) cards.push({ kind: "book", board: b.board, book: { ...card, value: b.value }, game: itemOf(linked[i]) });
       });
       if (hottest) {

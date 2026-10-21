@@ -62,3 +62,11 @@ test("returns 404 for a month without a recap", async () => {
   assert.equal((await app.inject({ url: "/top-shelf/recaps/2026-10" })).statusCode, 404);
   await app.close();
 });
+
+test("400 and 404 responses are no-store too", async () => {
+  const app = appWith();
+  for (const url of ["/top-shelf", "/top-shelf/recaps/abc", "/top-shelf/recaps/2026-10"]) {
+    assert.equal((await app.inject({ url })).headers["cache-control"], "no-store", url);
+  }
+  await app.close();
+});

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { router, useSegments } from "expo-router";
-import { ActivityIndicator, Pressable, StyleSheet, View, type GestureResponderEvent } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, View, type AccessibilityActionEvent, type GestureResponderEvent } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { contentTarget } from "@scripta/shared/community";
 import { ApiError } from "../../core/api";
@@ -66,10 +66,15 @@ export function RecapScreen({ month }: { month: string }) {
 
   const currentMonth = recapIndex.data.currentMonth;
   const last = cards.length - 1;
-  const step = (event: GestureResponderEvent) => {
-    if (event.nativeEvent.pageX < width / 2) setIndex((value) => Math.max(0, value - 1));
-    else if (index < last) setIndex((value) => value + 1);
+  const back = () => setIndex((value) => Math.max(0, value - 1));
+  const forward = () => {
+    if (index < last) setIndex((value) => value + 1);
     else close();
+  };
+  const step = (event: GestureResponderEvent) => (event.nativeEvent.pageX < width / 2 ? back() : forward());
+  const onAccessibilityAction = (event: AccessibilityActionEvent) => {
+    if (event.nativeEvent.actionName === "previous") back();
+    else if (event.nativeEvent.actionName === "activate") forward();
   };
   const open = () => {
     if (card.kind === "book") router.push(workPath(card.book.workId, segments) as never);
@@ -78,7 +83,7 @@ export function RecapScreen({ month }: { month: string }) {
 
   return (
     <View style={styles.root} onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
-      <Pressable accessibilityLabel="Previous or next card" accessibilityHint="Tap the left side to go back, the right side to go on" style={styles.fill} onPress={step}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Next card" accessibilityHint="Tap the left side to go back, the right side to go on" accessibilityActions={[{ name: "activate" }, { name: "previous", label: "Previous card" }]} onAccessibilityAction={onAccessibilityAction} style={styles.fill} onPress={step}>
         <RecapCard card={card} month={month} currentMonth={currentMonth} onOpen={card.kind === "summary" ? undefined : open} />
       </Pressable>
       <View pointerEvents="none" style={[styles.dots, { top: insets.top + spacing.md }]}>
