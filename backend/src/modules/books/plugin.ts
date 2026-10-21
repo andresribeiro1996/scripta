@@ -166,6 +166,7 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
     enqueue: (bookId, priority) => worker.enqueue(bookId, priority),
     publicUrlFor: coverUrlFor,
     adminUserId: env.ADMIN_USER_ID,
+    sharesArena,
     warn: (details, message) => app.log.warn(details, message),
     bnpLookup: (isbn) => lookupBnpIsbn(bnpLookupDeps, isbn),
     heldWorkIds: heldWorks ? () => heldWorks().map((work) => work.workId) : undefined,
@@ -187,7 +188,7 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
     (error) => app.log.error({ err: error }, "details backfill failed")
   );
   const stopWorksBackfill = startWorksBackfill(repo, app.log);
-  const grouping = startWorksGrouping((limit) => repo.groupKeylessWorks(limit), app.log);
+  const grouping = startWorksGrouping((limit) => repo.groupKeylessWorks(limit, undefined, sharesArena), app.log);
   const stopWorkKeyBackfill = startDetailsBackfill(
     (signal) => service.backfillWorkKeys(DETAILS_BATCH_SIZE, signal),
     (error) => app.log.error({ err: error }, "work key backfill failed")
