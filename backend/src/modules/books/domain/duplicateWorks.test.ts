@@ -63,6 +63,13 @@ test("counts a work listed twice once", () => {
   ]), []);
 });
 
+test("never merges works whose title key is empty", () => {
+  assert.deepEqual(planDuplicateSets([
+    { titleKey: "", id: "w-a", title: "!!!", author: "Jane Doe", editions: 2, createdAt: "2026-09-01" },
+    { titleKey: "", id: "w-b", title: "???", author: "John Roe", editions: 1, createdAt: "2026-09-02" }
+  ]), []);
+});
+
 const crowded = [
   { titleKey: KEY, workId: "w-novel", title: "Fourth Wing", keyed: true },
   { titleKey: KEY, workId: "w-gn", title: "Fourth Wing: The Graphic Novel", keyed: true },
@@ -94,5 +101,12 @@ test("folds only within the keyless work's own title key", () => {
   assert.deepEqual(planCrowdedFolds([
     { titleKey: other, workId: "w-flame", title: "Iron Flame", keyed: true },
     { titleKey: KEY, workId: "k-1", title: "Iron Flame", keyed: false }
+  ]), []);
+});
+
+test("never folds works whose title key is empty", () => {
+  assert.deepEqual(planCrowdedFolds([
+    { titleKey: "", workId: "w-a", title: "!!!", keyed: true },
+    { titleKey: "", workId: "k-1", title: "!!!", keyed: false }
   ]), []);
 });

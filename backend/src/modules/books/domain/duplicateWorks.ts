@@ -52,7 +52,7 @@ function survivorFirst(a: KeyedWork, b: KeyedWork): number {
 
 function mergeable(work: KeyedWork): boolean {
   const author = firstAuthor(work.author);
-  return author !== "" && !PLACEHOLDER_AUTHORS.has(author) && workTitleKey(work.title, work.author) === work.titleKey;
+  return work.titleKey !== "" && author !== "" && !PLACEHOLDER_AUTHORS.has(author) && workTitleKey(work.title, work.author) === work.titleKey;
 }
 
 export function planDuplicateSets(works: KeyedWork[]): DuplicateSet[] {
@@ -75,7 +75,9 @@ export function planDuplicateSets(works: KeyedWork[]): DuplicateSet[] {
 
 export function planCrowdedFolds(works: KeyWork[]): Array<{ source: string; target: string }> {
   const byKey = new Map<string, KeyWork[]>();
-  for (const work of works) byKey.set(work.titleKey, [...(byKey.get(work.titleKey) ?? []), work]);
+  for (const work of works) {
+    if (work.titleKey !== "") byKey.set(work.titleKey, [...(byKey.get(work.titleKey) ?? []), work]);
+  }
   const folds: Array<{ source: string; target: string }> = [];
   for (const group of byKey.values()) {
     const keyed = group.filter((work) => work.keyed);
