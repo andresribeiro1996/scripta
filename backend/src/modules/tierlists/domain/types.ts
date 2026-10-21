@@ -76,3 +76,14 @@ export interface BallotRow {
 }
 
 export type { HistogramCell, Placement } from "@scripta/shared";
+
+export interface TierlistShelfFacts {
+  id: string;
+  ownerUserId: string;
+  promoted: boolean;
+  createdAt: string;
+  voters: number;
+  votesSince: number;
+  workIds: string[];
+  placements: Array<{ workId: string; tierIndex: number; tierCount: number; ranksWorstFirst: boolean; castAt: string }>;
+}

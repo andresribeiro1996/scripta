@@ -6,7 +6,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { DEFAULT_TIER_PRESET, type ResolvedTierlist, type VotedTierlist } from "@scripta/shared";
 import type { GameParticipation, RankingTierPreview } from "@scripta/shared/community";
 import type { TierlistsRepository } from "./domain/ports.js";
-import type { BallotRow, HistogramCell, Placement, Tierlist, TierlistGameRow, TierlistRow, TierPlacement, VoteAccess } from "./domain/types.js";
+import type { BallotRow, HistogramCell, Placement, Tierlist, TierlistGameRow, TierlistRow, TierlistShelfFacts, TierPlacement, VoteAccess } from "./domain/types.js";
 import { canonicalBoard } from "./wire.js";
 
 function toTierlist(row: TierlistRow): Tierlist {
@@ -114,6 +114,7 @@ export interface TierlistsService {
   getPublishedRefs(ids: string[]): PublishedTierlistRef[];
   listPublishedByWorks(workIds: string[], limit: number): TierlistGameRow[];
   tierPlacements(workIds: string[]): TierPlacement[];
+  topShelfFacts(since: string | null): TierlistShelfFacts[];
   votedAmong(voterUserId: string, ids: string[]): string[];
   getPublishedRef(id: string): PublishedTierlistRef | undefined;
   fillRankingCovers(tierlistId: string, ranking: RankingTierPreview[]): RankingTierPreview[];
@@ -468,6 +469,8 @@ export function createTierlistsService(repo: TierlistsRepository, emitPublished?
 
     tierPlacements: (workIds) => repo.tierPlacements(workIds),
 
+    topShelfFacts: (since) => repo.topShelfFacts(since),
+
     votedAmong(voterUserId, ids) {
       return repo.votedAmong(voterUserId, ids);
     },
@@ -528,6 +531,7 @@ export interface TierlistsPublicApi {
   publishedByWorks(workIds: string[], limit: number): GameByWork[];
   discoverByWorks(workIds: string[], limit: number): TierlistDiscoverRef[];
   tierPlacements(workIds: string[]): TierPlacement[];
+  topShelfFacts(since: string | null): TierlistShelfFacts[];
   getPublished(id: string): PublishedTierlistRef | undefined;
   fillRankingCovers(tierlistId: string, ranking: RankingTierPreview[]): RankingTierPreview[];
   listPublishedByOwner(ownerUserId: string): PublishedTierlistRef[];
@@ -557,9 +561,12 @@ export function createTierlistsPublicApi(service: TierlistsService): TierlistsPu
     discoverByWorks: (workIds, limit) =>
       service.listPublishedByWorks(workIds, limit).map((row) => ({ id: row.id, createdAt: row.created_at, ownerUserId: row.origin_user_id, promotedAt: row.promoted_at })),
     tierPlacements: (workIds) => service.tierPlacements(workIds),
+    topShelfFacts: (since) => service.topShelfFacts(since),
     getPublished: (id) => service.getPublishedRef(id),
     fillRankingCovers: (tierlistId, ranking) => service.fillRankingCovers(tierlistId, ranking),
     listPublishedByOwner: (ownerUserId) => service.listPublishedRefsByOwner(ownerUserId),
     participationByOwner: (ownerUserId, since) => service.participationByOwner(ownerUserId, since)
   };
 }
+
+export type { TierlistShelfFacts };

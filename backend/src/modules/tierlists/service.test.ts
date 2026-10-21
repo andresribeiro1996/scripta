@@ -201,6 +201,9 @@ function createInMemoryRepo(): TierlistsRepository {
     tierPlacements() {
       return [];
     },
+    topShelfFacts() {
+      return [];
+    },
     listParticipation() {
       return [];
     },
