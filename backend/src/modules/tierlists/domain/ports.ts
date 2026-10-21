@@ -43,7 +43,7 @@ export interface TierlistsRepository {
   listPublicByIds(ids: string[]): TierlistRow[];
   listPublishedByWorks(workIds: string[], limit: number): TierlistGameRow[];
   tierPlacements(workIds: string[]): TierPlacement[];
-  topShelfFacts(since: string | null): TierlistShelfFacts[];
+  topShelfFacts(since: string | null, until: string | null): TierlistShelfFacts[];
   ballotTotalsFor(ids: string[]): Map<string, BallotTotals>;
   votedAmong(voterUserId: string, ids: string[]): string[];
   getBallotById(tierlistId: string, ballotId: string): BallotRow | undefined;

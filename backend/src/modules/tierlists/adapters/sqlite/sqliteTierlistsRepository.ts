@@ -54,8 +54,9 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
   `);
   const shelfListsStmt = db.prepare(`
     SELECT t.id, t.origin_user_id, t.promoted_at, t.created_at,
-      (SELECT COUNT(*) FROM tierlist_ballots b WHERE b.tierlist_id = t.id AND (b.voter_user_id IS NULL OR b.voter_user_id != t.origin_user_id)) AS voters,
-      (SELECT COUNT(*) FROM tierlist_ballots b WHERE b.tierlist_id = t.id AND (b.voter_user_id IS NULL OR b.voter_user_id != t.origin_user_id) AND ($since IS NULL OR b.created_at >= $since)) AS votes_since
+      (t.voting_open = 1 AND t.vote_access = 'anonymous' AND t.promoted_at IS NULL) AS open,
+      (SELECT COUNT(*) FROM tierlist_ballots b WHERE b.tierlist_id = t.id AND (b.voter_user_id IS NULL OR b.voter_user_id != t.origin_user_id) AND ($until IS NULL OR b.created_at < $until)) AS voters,
+      (SELECT COUNT(*) FROM tierlist_ballots b WHERE b.tierlist_id = t.id AND (b.voter_user_id IS NULL OR b.voter_user_id != t.origin_user_id) AND ($since IS NULL OR b.created_at >= $since) AND ($until IS NULL OR b.created_at < $until)) AS votes_since
     FROM tierlists t WHERE t.vote_code IS NOT NULL
   `);
   const shelfWorksStmt = db.prepare(`
@@ -349,7 +350,7 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
       });
     },
 
-    topShelfFacts(since) {
+    topShelfFacts(since, until) {
       const works = new Map<string, string[]>();
       for (const row of shelfWorksStmt.all() as unknown as Array<{ tierlist_id: string; work_id: string }>) {
         const ids = works.get(row.tierlist_id);
@@ -371,10 +372,11 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
         if (list) list.push(entry);
         else placements.set(row.tierlist_id, [entry]);
       }
-      return (shelfListsStmt.all({ since }) as unknown as Array<{ id: string; origin_user_id: string; promoted_at: string | null; created_at: string; voters: number; votes_since: number }>).map((row) => ({
+      return (shelfListsStmt.all({ since, until }) as unknown as Array<{ id: string; origin_user_id: string; promoted_at: string | null; created_at: string; open: number; voters: number; votes_since: number }>).map((row) => ({
         id: row.id,
         ownerUserId: row.origin_user_id,
         promoted: row.promoted_at !== null,
+        open: row.open === 1,
         createdAt: row.created_at,
         voters: Number(row.voters),
         votesSince: Number(row.votes_since),

@@ -80,6 +80,7 @@ export type { HistogramCell, Placement } from "@scripta/shared";
 export interface TierlistShelfFacts {
   id: string;
   ownerUserId: string;
+  open: boolean;
   promoted: boolean;
   createdAt: string;
   voters: number;

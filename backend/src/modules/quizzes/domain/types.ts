@@ -58,6 +58,7 @@ export interface AnswerRow {
 export interface QuizShelfFacts {
   id: string;
   ownerUserId: string;
+  open: boolean;
   createdAt: string;
   voters: number;
   votesSince: number;

@@ -49,7 +49,7 @@ export interface ArenaService {
   listPublicByIds(ids: string[]): Tournament[];
   listPublishedByWorks(workIds: string[], limit: number): TournamentGameRow[];
   tournamentRecord(workIds: string[]): TournamentRecord;
-  topShelfFacts(since: string | null): TournamentShelfFacts[];
+  topShelfFacts(since: string | null, until: string | null): TournamentShelfFacts[];
   worksShareATournament(aIds: string[], bIds: string[]): boolean;
   votedAmong(voterUserId: string, ids: string[]): string[];
   getTournamentView(id: string, voterToken?: string, viewerUserId?: string | null): TournamentView | null;
@@ -315,7 +315,7 @@ export function createArenaService(
     listPublishedByWorks: (workIds, limit) => repo.listPublishedByWorks(workIds, limit),
 
     tournamentRecord: (workIds) => repo.tournamentRecord(workIds),
-    topShelfFacts: (since) => repo.topShelfFacts(since),
+    topShelfFacts: (since, until) => repo.topShelfFacts(since, until),
     worksShareATournament: (aIds, bIds) => repo.worksShareATournament(aIds, bIds),
 
     listPublicByIds(ids) {
@@ -518,7 +518,7 @@ export interface ArenaPublicApi {
   publishedByWorks(workIds: string[], limit: number): GameByWork[];
   discoverByWorks(workIds: string[], limit: number): TournamentDiscoverRef[];
   tournamentRecord(workIds: string[]): TournamentRecord;
-  topShelfFacts(since: string | null): TournamentShelfFacts[];
+  topShelfFacts(since: string | null, until: string | null): TournamentShelfFacts[];
   worksShareATournament(aIds: string[], bIds: string[]): boolean;
   getPublished(id: string): PublishedTournamentRef | undefined;
   listPublishedByOwner(ownerUserId: string): PublishedTournamentRef[];
@@ -553,7 +553,7 @@ export function createArenaPublicApi(service: ArenaService): ArenaPublicApi {
     discoverByWorks: (workIds, limit) =>
       service.listPublishedByWorks(workIds, limit).map((row) => ({ id: row.id, createdAt: row.created_at, ownerUserId: row.owner_user_id })),
     tournamentRecord: (workIds) => service.tournamentRecord(workIds),
-    topShelfFacts: (since) => service.topShelfFacts(since),
+    topShelfFacts: (since, until) => service.topShelfFacts(since, until),
     worksShareATournament: (aIds, bIds) => service.worksShareATournament(aIds, bIds),
     getPublished: (id) => {
       const summary = service.getPublicSummary(id);

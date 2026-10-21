@@ -18,7 +18,7 @@ export interface EngagementRepository {
   getEvent(id: string): EventRow | undefined;
   getEvents(ids: string[]): EventRow[];
   summaries(viewerId: string, ids: string[]): Record<string, ActivityEngagement>;
-  gameEngagement(refs: GameRef[], since: string | null): Map<string, { publishedAt: string; likes: number; comments: number }>;
+  gameEngagement(refs: GameRef[], since: string | null, until: string | null): Map<string, { publishedAt: string; likes: number; comments: number }>;
   setLiked(viewerId: string, eventId: string, liked: boolean, at: string): void;
   insertComment(row: CommentRow): void;
   listComments(eventId: string, keyset: CursorKeyset | undefined, limit: number): CommentRow[];

@@ -9,6 +9,7 @@ import { FeedRow, useActivityFeed, useDashboardFeed, useSkipEmptyPages } from ".
 import { digestRoute, feedRowModel } from "./feedRowModel";
 import { CommentsSheet } from "./CommentsSheet";
 import { SavedContentSheet } from "./SavedContentSheet";
+import { RecapHomeCard } from "../topShelf/RecapHomeCard";
 import { ENGAGEMENT_QUERY_KEY, SAVED_STATE_QUERY_KEY, useHomeActions } from "./useHomeActions";
 
 export function HomeScreen() {
@@ -47,7 +48,10 @@ export function HomeScreen() {
     <Stack.Screen options={{ title: "Home", headerShown: true, headerLeft: () => <View style={styles.mark}><BrandMark size={24} /></View>, headerRight: () => <HeaderActions><IconButton name="bell" accessibilityLabel="Open activity" badge={activityBadge} onPress={() => router.push("/activity" as never)} /><IconButton name="bookmark" accessibilityLabel="Open saved games and murals" onPress={() => setSavedOpen(true)} /></HeaderActions> }} />
     {error ? <Toast visible message={error} tone="error" /> : null}
     <SectionList sections={sections} keyExtractor={(item) => `${item.kind}:${item.id}`} stickySectionHeadersEnabled={false} maintainVisibleContentPosition={{ minIndexForVisible: 0 }} contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.list}
-      ListHeaderComponent={noLibrary ? <View style={styles.onboarding}><EmptyState title="Start your library" body="Bring your books into your reading world." actionLabel="Import library" onAction={() => router.push("/import" as never)} secondaryActionLabel="Add a book" onSecondaryAction={() => router.push("/add-book" as never)} /></View> : null}
+      ListHeaderComponent={<>
+        <RecapHomeCard />
+        {noLibrary ? <View style={styles.onboarding}><EmptyState title="Start your library" body="Bring your books into your reading world." actionLabel="Import library" onAction={() => router.push("/import" as never)} secondaryActionLabel="Add a book" onSecondaryAction={() => router.push("/add-book" as never)} /></View> : null}
+      </>}
       renderSectionHeader={({ section }) => <View style={[styles.sectionHeader, { borderBottomColor: colors.border }]}>
         <Text accessibilityRole="header" {...dynamicType} style={[typography.body, styles.strong, styles.grow, { color: colors.text }]}>{section.title}</Text>
         <Pressable accessibilityRole="link" onPress={findReaders} style={styles.sectionAction}><Text {...dynamicType} style={[typography.caption, styles.strong, { color: colors.accent }]}>Find readers →</Text></Pressable>

@@ -13,3 +13,10 @@ export type TopShelf = {
   genreChampions: Array<{ genre: string; book: TopShelfBook }>;
   games: TopShelfGame[];
 };
+
+export type TopShelfRecapCard =
+  | { kind: "summary"; gamesPublished: number; votesCast: number; booksInPlay: number }
+  | { kind: "book"; board: TopShelfBoard; book: TopShelfBook; game: DiscoverItem | null }
+  | { kind: "hottestGame"; game: TopShelfGame; open: boolean };
+export type TopShelfRecap = { month: string; cards: TopShelfRecapCard[] };
+export type TopShelfRecapIndex = { months: string[]; currentMonth: string; announce: boolean };

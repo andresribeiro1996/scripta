@@ -538,7 +538,7 @@ test("topShelfFacts skips seeding tournaments", () => {
   const db = freshDb();
   shelfTournament(db, "seed", "seeding", ["w1"]);
   shelfTournament(db, "live", "active", ["w1", "w2"]);
-  const facts = createSqliteArenaRepository(db).topShelfFacts(null);
+  const facts = createSqliteArenaRepository(db).topShelfFacts(null, null);
   assert.deepEqual(facts.map((f) => f.id), ["live"]);
   assert.equal(facts[0]!.ownerUserId, "owner");
   assert.deepEqual([...facts[0]!.workIds].sort(), ["w1", "w2"]);
@@ -557,10 +557,10 @@ test("topShelfFacts counts distinct voters by user or token without the owner", 
   for (const n of [1, 2, 3]) repo.insertVote(vote(`tok-${n}`, `d${n}`, "tok", null, `2026-02-0${n}T00:00:00.000Z`));
   repo.insertVote(vote("u-1", "d1", "ta", "user-1", "2026-02-01T00:00:00.000Z"));
   repo.insertVote(vote("o-1", "d1", "tb", "owner", "2026-02-01T00:00:00.000Z"));
-  const all = repo.topShelfFacts(null)[0]!;
+  const all = repo.topShelfFacts(null, null)[0]!;
   assert.equal(all.voters, 2);
   assert.equal(all.votesSince, 4);
-  const since = repo.topShelfFacts("2026-02-02T00:00:00.000Z")[0]!;
+  const since = repo.topShelfFacts("2026-02-02T00:00:00.000Z", null)[0]!;
   assert.equal(since.voters, 2);
   assert.equal(since.votesSince, 2);
 });
@@ -568,13 +568,40 @@ test("topShelfFacts counts distinct voters by user or token without the owner", 
 test("topShelfFacts champion is the final winner with its settled_at", () => {
   const db = freshDb();
   shelfTournament(db, "done", "completed", ["w-a", "w-b"], { winner: "b", settledAt: "2026-01-03T00:00:00.000Z" });
-  assert.deepEqual(createSqliteArenaRepository(db).topShelfFacts(null)[0]!.champion, { workId: "w-b", settledAt: "2026-01-03T00:00:00.000Z" });
+  assert.deepEqual(createSqliteArenaRepository(db).topShelfFacts(null, null)[0]!.champion, { workId: "w-b", settledAt: "2026-01-03T00:00:00.000Z" });
 });
 
 test("topShelfFacts skips null slots and undecided finals", () => {
   const db = freshDb();
   shelfTournament(db, "open", "completed", ["w-a", null], { winner: null, settledAt: null });
-  const fact = createSqliteArenaRepository(db).topShelfFacts(null)[0]!;
+  const fact = createSqliteArenaRepository(db).topShelfFacts(null, null)[0]!;
   assert.deepEqual(fact.workIds, ["w-a"]);
   assert.equal(fact.champion, null);
+});
+
+test("topShelfFacts bounds voters and votesSince by until", () => {
+  const db = freshDb();
+  shelfTournament(db, "t", "active", ["w-a", "w-b"]);
+  for (const n of [1, 2, 3, 4]) {
+    db.prepare(
+      `INSERT INTO duels (id, tournament_id, round_number, duel_index, book_a_work_id, book_a_title, book_a_author, book_b_work_id, book_b_title, book_b_author, status, opens_at, closes_at)
+       VALUES (?, 't', 1, ?, 'w-a', 'A', 'x', 'w-b', 'B', 'y', 'active', 'x', 'y')`
+    ).run(`d${n}`, n);
+  }
+  const repo = createSqliteArenaRepository(db);
+  repo.insertVote(vote("v1", "d1", "tok-1", null, "2026-01-01T00:00:00.000Z"));
+  repo.insertVote(vote("v2", "d2", "tok-2", null, "2026-02-01T00:00:00.000Z"));
+  repo.insertVote(vote("v3", "d3", "tok-3", null, "2026-03-01T00:00:00.000Z"));
+  repo.insertVote(vote("v4", "d4", "tok-4", null, "2026-04-01T00:00:00.000Z"));
+  const fact = repo.topShelfFacts("2026-01-15T00:00:00.000Z", "2026-03-01T00:00:00.000Z")[0]!;
+  assert.equal(fact.voters, 2);
+  assert.equal(fact.votesSince, 1);
+});
+
+test("topShelfFacts open is true only while active", () => {
+  const db = freshDb();
+  shelfTournament(db, "live", "active", ["w1"]);
+  shelfTournament(db, "done", "completed", ["w1"]);
+  const byId = new Map(createSqliteArenaRepository(db).topShelfFacts(null, null).map((f) => [f.id, f.open]));
+  assert.deepEqual([byId.get("live"), byId.get("done")], [true, false]);
 });

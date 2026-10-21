@@ -8,9 +8,9 @@ import { buildDiscoverItems, type CommunityDeps, type DiscoverEntry } from "./se
 import { rankTopShelf, topShelfMonthStart, type Ranked, type ShelfInput } from "./topShelf.js";
 
 export interface TopShelfDeps {
-  tierlistFacts(since: string | null): TierlistShelfFacts[];
-  tournamentFacts(since: string | null): TournamentShelfFacts[];
-  quizFacts(since: string | null): QuizShelfFacts[];
+  tierlistFacts(since: string | null, until: string | null): TierlistShelfFacts[];
+  tournamentFacts(since: string | null, until: string | null): TournamentShelfFacts[];
+  quizFacts(since: string | null, until: string | null): QuizShelfFacts[];
   canonicalWorks(ids: string[]): Map<string, string>;
   catalogGenres(workIds: string[]): Map<string, { genres: string[] }>;
   getWorkPage(id: string): CatalogWorkPage | undefined;
@@ -22,21 +22,31 @@ export interface TopShelfService {
   getTopShelf(query: TopShelfQuery): TopShelf;
 }
 
-type DiscoverDeps = Pick<CommunityDeps, "repo" | "tierlists" | "tournaments" | "quizzes" | "resolveProfiles" | "readerGlyphFor">;
+export type DiscoverDeps = Pick<CommunityDeps, "repo" | "tierlists" | "tournaments" | "quizzes" | "resolveProfiles" | "readerGlyphFor">;
 
 const CACHE_MS = 60_000;
 const PODIUM = 3;
 const BOARD_PREVIEW = 1;
 const FULL_BOARD = 10;
 
-export function createTopShelfService(deps: { engagementRepo: Pick<EngagementRepository, "gameEngagement">; community: DiscoverDeps; shelf: TopShelfDeps; now: () => number }): TopShelfService {
+export interface ShelfGatherer {
+  gather(since: string | null, until: string | null): ShelfInput;
+  cached(since: string | null): ShelfInput;
+}
+
+export function workCard(shelf: Pick<TopShelfDeps, "getWorkPage">, workId: string): Omit<TopShelfBook, "value"> | null {
+  const page = shelf.getWorkPage(workId);
+  return page ? { workId, title: page.title, author: page.author, coverUrl: page.editions.find((e) => e.coverUrl)?.coverUrl ?? null } : null;
+}
+
+export function createShelfGatherer(deps: { engagementRepo: Pick<EngagementRepository, "gameEngagement">; community: DiscoverDeps; shelf: TopShelfDeps; now: () => number }): ShelfGatherer {
   const { engagementRepo, community, shelf, now } = deps;
   const cache = new Map<string, { at: number; value: ShelfInput }>();
 
-  const gather = (since: string | null): ShelfInput => {
-    const tierlists = shelf.tierlistFacts(since);
-    const tournaments = shelf.tournamentFacts(since);
-    const quizzes = shelf.quizFacts(since);
+  const gather = (since: string | null, until: string | null): ShelfInput => {
+    const tierlists = shelf.tierlistFacts(since, until);
+    const tournaments = shelf.tournamentFacts(since, until);
+    const quizzes = shelf.quizFacts(since, until);
     const refs: GameRef[] = [
       ...tierlists.map((f) => ({ kind: "tierlist" as const, id: f.id })),
       ...tournaments.map((f) => ({ kind: "tournament" as const, id: f.id })),
@@ -52,12 +62,31 @@ export function createTopShelfService(deps: { engagementRepo: Pick<EngagementRep
       tierlists,
       tournaments,
       quizzes,
-      engagement: engagementRepo.gameEngagement(refs, since),
+      engagement: engagementRepo.gameEngagement(refs, since, until),
       visibleOwners: new Set(community.resolveProfiles(ownerIds).keys()),
       canonical,
       genres: shelf.catalogGenres([...new Set(canonical.values())]),
     };
   };
+
+  return {
+    gather,
+    cached(since) {
+      const at = now();
+      const key = String(since);
+      let hit = cache.get(key);
+      if (!hit || at - hit.at >= CACHE_MS) {
+        hit = { at, value: gather(since, null) };
+        for (const [k, entry] of cache) if (at - entry.at >= CACHE_MS) cache.delete(k);
+        cache.set(key, hit);
+      }
+      return hit.value;
+    },
+  };
+}
+
+export function createTopShelfService(deps: { gatherer: ShelfGatherer; community: DiscoverDeps; shelf: TopShelfDeps; now: () => number }): TopShelfService {
+  const { gatherer, community, shelf, now } = deps;
 
   const compute = ({ period, genre, view }: TopShelfQuery, since: string | null, input: ShelfInput): TopShelf => {
     const ranked = rankTopShelf(input, { since, genre });
@@ -71,8 +100,8 @@ export function createTopShelfService(deps: { engagementRepo: Pick<EngagementRep
     const shownWorks = new Set<string>([...picked.flatMap(([, list]) => list.map((r) => r.workId)), ...genreChampions.map((g) => g.entry.workId)]);
     const cards = new Map<string, Omit<TopShelfBook, "value">>();
     for (const id of shownWorks) {
-      const page = shelf.getWorkPage(id);
-      if (page) cards.set(id, { workId: id, title: page.title, author: page.author, coverUrl: page.editions.find((e) => e.coverUrl)?.coverUrl ?? null });
+      const card = workCard(shelf, id);
+      if (card) cards.set(id, card);
     }
     const book = (r: Ranked): TopShelfBook[] => {
       const card = cards.get(r.workId);
@@ -100,16 +129,8 @@ export function createTopShelfService(deps: { engagementRepo: Pick<EngagementRep
 
   return {
     getTopShelf(query) {
-      const at = now();
-      const since = query.period === "month" ? topShelfMonthStart(new Date(at)) : null;
-      const key = String(since);
-      let hit = cache.get(key);
-      if (!hit || at - hit.at >= CACHE_MS) {
-        hit = { at, value: gather(since) };
-        for (const [k, entry] of cache) if (at - entry.at >= CACHE_MS) cache.delete(k);
-        cache.set(key, hit);
-      }
-      return compute(query, since, hit.value);
+      const since = query.period === "month" ? topShelfMonthStart(new Date(now())) : null;
+      return compute(query, since, gatherer.cached(since));
     },
   };
 }

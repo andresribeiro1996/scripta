@@ -114,7 +114,7 @@ export interface TierlistsService {
   getPublishedRefs(ids: string[]): PublishedTierlistRef[];
   listPublishedByWorks(workIds: string[], limit: number): TierlistGameRow[];
   tierPlacements(workIds: string[]): TierPlacement[];
-  topShelfFacts(since: string | null): TierlistShelfFacts[];
+  topShelfFacts(since: string | null, until: string | null): TierlistShelfFacts[];
   votedAmong(voterUserId: string, ids: string[]): string[];
   getPublishedRef(id: string): PublishedTierlistRef | undefined;
   fillRankingCovers(tierlistId: string, ranking: RankingTierPreview[]): RankingTierPreview[];
@@ -469,7 +469,7 @@ export function createTierlistsService(repo: TierlistsRepository, emitPublished?
 
     tierPlacements: (workIds) => repo.tierPlacements(workIds),
 
-    topShelfFacts: (since) => repo.topShelfFacts(since),
+    topShelfFacts: (since, until) => repo.topShelfFacts(since, until),
 
     votedAmong(voterUserId, ids) {
       return repo.votedAmong(voterUserId, ids);
@@ -531,7 +531,7 @@ export interface TierlistsPublicApi {
   publishedByWorks(workIds: string[], limit: number): GameByWork[];
   discoverByWorks(workIds: string[], limit: number): TierlistDiscoverRef[];
   tierPlacements(workIds: string[]): TierPlacement[];
-  topShelfFacts(since: string | null): TierlistShelfFacts[];
+  topShelfFacts(since: string | null, until: string | null): TierlistShelfFacts[];
   getPublished(id: string): PublishedTierlistRef | undefined;
   fillRankingCovers(tierlistId: string, ranking: RankingTierPreview[]): RankingTierPreview[];
   listPublishedByOwner(ownerUserId: string): PublishedTierlistRef[];
@@ -561,7 +561,7 @@ export function createTierlistsPublicApi(service: TierlistsService): TierlistsPu
     discoverByWorks: (workIds, limit) =>
       service.listPublishedByWorks(workIds, limit).map((row) => ({ id: row.id, createdAt: row.created_at, ownerUserId: row.origin_user_id, promotedAt: row.promoted_at })),
     tierPlacements: (workIds) => service.tierPlacements(workIds),
-    topShelfFacts: (since) => service.topShelfFacts(since),
+    topShelfFacts: (since, until) => service.topShelfFacts(since, until),
     getPublished: (id) => service.getPublishedRef(id),
     fillRankingCovers: (tierlistId, ranking) => service.fillRankingCovers(tierlistId, ranking),
     listPublishedByOwner: (ownerUserId) => service.listPublishedRefsByOwner(ownerUserId),

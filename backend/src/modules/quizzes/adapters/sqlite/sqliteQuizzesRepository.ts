@@ -21,9 +21,9 @@ export function createSqliteQuizzesRepository(db: DatabaseSync): QuizzesReposito
   const insertWorkStmt = db.prepare(`INSERT OR IGNORE INTO quiz_works (quiz_id, work_id) VALUES (?, ?)`);
   const deleteAnswersStmt = db.prepare(`DELETE FROM quiz_play_answers WHERE quiz_id = ?`);
   const shelfQuizzesStmt = db.prepare(`
-    SELECT q.id, q.owner_user_id, q.created_at,
-      (SELECT COUNT(*) FROM quiz_plays p WHERE p.quiz_id = q.id AND (p.voter_user_id IS NULL OR p.voter_user_id != q.owner_user_id)) AS voters,
-      (SELECT COUNT(*) FROM quiz_plays p WHERE p.quiz_id = q.id AND (p.voter_user_id IS NULL OR p.voter_user_id != q.owner_user_id) AND ($since IS NULL OR p.created_at >= $since)) AS votes_since
+    SELECT q.id, q.owner_user_id, q.created_at, q.play_open AS open,
+      (SELECT COUNT(*) FROM quiz_plays p WHERE p.quiz_id = q.id AND (p.voter_user_id IS NULL OR p.voter_user_id != q.owner_user_id) AND ($until IS NULL OR p.created_at < $until)) AS voters,
+      (SELECT COUNT(*) FROM quiz_plays p WHERE p.quiz_id = q.id AND (p.voter_user_id IS NULL OR p.voter_user_id != q.owner_user_id) AND ($since IS NULL OR p.created_at >= $since) AND ($until IS NULL OR p.created_at < $until)) AS votes_since
     FROM quizzes q WHERE q.vote_code IS NOT NULL
   `);
   const shelfWorksStmt = db.prepare(`
@@ -263,17 +263,18 @@ export function createSqliteQuizzesRepository(db: DatabaseSync): QuizzesReposito
       return [...byQuestion.values()];
     },
 
-    topShelfFacts(since) {
+    topShelfFacts(since, until) {
       const works = new Map<string, string[]>();
       for (const row of shelfWorksStmt.all() as unknown as Array<{ quiz_id: string; work_id: string }>) {
         const ids = works.get(row.quiz_id);
         if (ids) ids.push(row.work_id);
         else works.set(row.quiz_id, [row.work_id]);
       }
-      return (shelfQuizzesStmt.all({ since }) as unknown as Array<{ id: string; owner_user_id: string; created_at: string; voters: number; votes_since: number }>).map((row) => ({
+      return (shelfQuizzesStmt.all({ since, until }) as unknown as Array<{ id: string; owner_user_id: string; created_at: string; open: number; voters: number; votes_since: number }>).map((row) => ({
         id: row.id,
         ownerUserId: row.owner_user_id,
         createdAt: row.created_at,
+        open: row.open === 1,
         voters: Number(row.voters),
         votesSince: Number(row.votes_since),
         workIds: works.get(row.id) ?? []
