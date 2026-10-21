@@ -11,7 +11,7 @@ import { openProfile } from "./AuthorAvatar";
 import { ReaderGlyph } from "./ReaderGlyph";
 import { CoverImage } from "../library/components/CoverImage";
 
-export function DiscoverRow({ item, linkAuthor, onPreviewBooks, onOpen }: { item: DiscoverItem; linkAuthor: boolean; onPreviewBooks?: (tournament: { id: string; name: string }) => void; onOpen?: () => void }) {
+export function DiscoverRow({ item, linkAuthor, stats, onPreviewBooks, onOpen }: { item: DiscoverItem; linkAuthor: boolean; stats?: Array<{ value: number; label: string }>; onPreviewBooks?: (tournament: { id: string; name: string }) => void; onOpen?: () => void }) {
   const { colors } = useTheme();
   const { content, author } = item;
   const status = contentStatus(content);
@@ -53,7 +53,7 @@ export function DiscoverRow({ item, linkAuthor, onPreviewBooks, onOpen }: { item
         </View>
       }
       badges={status.votedBadge ? [status, { label: "Voted", tone: "info" }] : [status]}
-      stats={contentStats(content)}
+      stats={stats ?? contentStats(content)}
       seeBooks={content.kind === "tournament" && onPreviewBooks ? { label: `See all ${content.bookCount} books in ${content.name}`, onPress: () => onPreviewBooks({ id: content.id, name: content.name }) } : undefined}
     />
   );

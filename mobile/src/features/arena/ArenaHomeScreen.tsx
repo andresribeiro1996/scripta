@@ -4,7 +4,7 @@ import { Stack, router } from "expo-router";
 import { booksByWork } from "@scripta/shared";
 import { FlatList, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
-import { Button, Dialog, EmptyState, ErrorState, Fab, Screen, SearchDock, Sheet, Skeleton, SwipeableTabs, Toast, dynamicType, searchDockFabClearance, spacing, typography, useTheme, type IconName } from "../../ui";
+import { Button, Dialog, EmptyState, ErrorState, Fab, IconButton, Screen, SearchDock, Sheet, Skeleton, SwipeableTabs, Toast, dynamicType, searchDockFabClearance, spacing, typography, useTheme, type IconName } from "../../ui";
 import { useLibrary, useWorkBooks } from "../library";
 import { DiscoverPane } from "../community/DiscoverPane";
 import { GameRow, type RowCover } from "../community/DiscoverRow";
@@ -90,6 +90,7 @@ export function ArenaHomeScreen() {
         // The bottom tab already reads "Arena"; a large title spends a third of
         // the screen repeating it above a list that has nowhere else to go.
         headerLargeTitleEnabled: false,
+        headerRight: () => <IconButton name="champion" accessibilityLabel="Top Shelf" onPress={() => router.push("/top-shelf" as never)} />,
       }}
     />
     {error ? <Toast visible message={error} tone="error" /> : null}
