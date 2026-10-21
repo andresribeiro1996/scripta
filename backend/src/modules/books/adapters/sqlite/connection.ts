@@ -9,6 +9,7 @@ import { openSqlite } from "../../../../db/openSqlite.js";
 import { MIN_GOOD_WIDTH } from "../../domain/constants.js";
 import { catalogTitleKey, givenNameFirst } from "../../domain/normalize.js";
 import { summaryHashOf } from "../../domain/synopsis.js";
+import { isOriginalTitle } from "../../domain/translation.js";
 import { applyMojibakeRepairs, type RowRepair } from "../../seed/mojibakeRepair.js";
 import { CONFIRMED_SQL } from "./sqliteBooksRepository.js";
 
@@ -103,6 +104,7 @@ export function applyBooksMigrations(db: DatabaseSync): void {
   joinIsbn10Editions(db);
   indexConfirmedBooks(db);
   turnIsbndbFirstAuthors(db);
+  clearNonTitleOriginals(db);
 }
 
 function moveOpenLibrarySummariesToWorks(db: DatabaseSync): void {
@@ -259,6 +261,28 @@ function turnIsbndbFirstAuthors(db: DatabaseSync): void {
   applyMojibakeRepairs(db, { books: [], works: [...works.values()] });
   applyMojibakeRepairs(db, { books, works: [] });
   db.exec("PRAGMA user_version = 4");
+}
+
+function clearNonTitleOriginals(db: DatabaseSync): void {
+  const { user_version: version } = db.prepare("PRAGMA user_version").get() as { user_version: number };
+  if (version >= 5) return;
+  const clear = db.prepare("UPDATE books SET original_title = NULL WHERE id = ?");
+  let cleared = 0;
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    const rows = db.prepare("SELECT id, original_title FROM books WHERE original_title IS NOT NULL").all() as Array<{ id: string; original_title: string }>;
+    for (const { id, original_title: title } of rows) {
+      if (isOriginalTitle(title)) continue;
+      clear.run(id);
+      cleared += 1;
+    }
+    db.exec("PRAGMA user_version = 5");
+    db.exec("COMMIT");
+  } catch (error) {
+    if (db.isTransaction) db.exec("ROLLBACK");
+    throw error;
+  }
+  if (cleared > 0) console.log(`books: cleared ${cleared} original titles that were not titles`);
 }
 
 export function openBooksDb(): DatabaseSync {

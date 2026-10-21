@@ -8,7 +8,7 @@ import { WorkMergeError } from "../../domain/errors.js";
 import { wantsRetitle } from "../../domain/lossy.js";
 import { SERIES_SOURCE_RANK, seriesNameKey, type SeriesEntry, type SeriesSource } from "../../domain/series.js";
 import { summaryHashOf, type SynopsisKind } from "../../domain/synopsis.js";
-import { originalTitleIn } from "../../domain/translation.js";
+import { isOriginalTitle, originalTitleIn } from "../../domain/translation.js";
 import type { BookRow, CoverImageRow, DataSource, GenreEvidence, LossyBook, MergeSource, SummarySource, WorkPageRows, WorkView } from "../../domain/types.js";
 
 export const UNCHECKED_COVERS_SQL = `
@@ -1054,7 +1054,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       return [...seen.values()];
     },
     fillOriginalTitle(bookId, title) {
-      fillOriginalTitleStmt.run(title, bookId);
+      if (isOriginalTitle(title)) fillOriginalTitleStmt.run(title, bookId);
     },
     fillOriginalTitlesFromSummaries(workId) {
       return inTransaction(() => {
