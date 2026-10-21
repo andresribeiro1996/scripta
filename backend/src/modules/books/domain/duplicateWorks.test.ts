@@ -42,7 +42,7 @@ test("leaves out a work whose own title key differs from the shared edition key"
 });
 
 test("never merges works with an empty or placeholder first author", () => {
-  for (const author of ["Anónimo", "AA.VV.", ""]) {
+  for (const author of ["Anónimo", "AA.VV.", "AAVV", "Diversos", ""]) {
     const titleKey = workTitleKey("Cantar de Mio Cid", author);
     assert.deepEqual(planDuplicateSets([
       { titleKey, id: "w-a", title: "Cantar de Mio Cid", author, editions: 2, createdAt: "2026-09-01" },

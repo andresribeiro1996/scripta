@@ -180,7 +180,7 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
     (error) => app.log.error({ err: error }, "details backfill failed")
   );
   const stopWorksBackfill = startWorksBackfill(repo, app.log);
-  const grouping = startWorksGrouping((limit) => repo.groupKeylessWorks(limit), app.log);
+  const grouping = startWorksGrouping((limit) => repo.groupKeylessWorks(limit, undefined, sharesArena), app.log);
   const stopWorkKeyBackfill = startDetailsBackfill(
     (signal) => service.backfillWorkKeys(DETAILS_BATCH_SIZE, signal),
     (error) => app.log.error({ err: error }, "work key backfill failed")

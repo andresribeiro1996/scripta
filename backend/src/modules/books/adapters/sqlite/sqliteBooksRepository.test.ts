@@ -2573,6 +2573,40 @@ test("groupTitleKeys stops at its limit across both rules", () => {
   assert.deepEqual([repo.groupTitleKeys(keys, 3, AT), repo.groupTitleKeys(keys, 3, AT), repo.groupTitleKeys(keys, 3, AT)], [3, 1, 0]);
 });
 
+test("groupTitleKeys leaves a crowded-key fold apart when skip rejects its pair, and still makes another", () => {
+  const { repo, novel, graphic, piatkus, graphicKeyless, key } = fourthWing();
+  const seen: Array<[string, string]> = [];
+  const skip = (from: string, into: string) => {
+    seen.push([from, into]);
+    return from === piatkus.work_id;
+  };
+  assert.equal(repo.groupTitleKeys([key], 10, AT, skip), 1);
+  assert.equal(repo.getBook(piatkus.id)!.work_id, piatkus.work_id);
+  assert.equal(repo.getBook(graphicKeyless.id)!.work_id, graphic.work_id);
+  assert.deepEqual(seen, [[piatkus.work_id, novel.work_id], [graphicKeyless.work_id, graphic.work_id]]);
+});
+
+test("groupTitleKeys counts only the merges it makes against its limit when skip rejects a groupable pair", () => {
+  const { repo } = freshRepo();
+  const dune = edition(repo, "9780000001301", "Dune", "Frank Herbert", "OL9W", at(0));
+  const first = edition(repo, "9780000001302", "Dune", "Frank Herbert", undefined, at(1));
+  const second = edition(repo, "9780000001303", "Dune", "Frank Herbert", undefined, at(2));
+  const key = repo.getBook(dune.id)!.title_key!;
+  assert.equal(repo.groupTitleKeys([key], 1, AT, (from) => from === first.work_id), 1);
+  assert.equal(repo.getBook(first.id)!.work_id, first.work_id);
+  assert.equal(repo.getBook(second.id)!.work_id, dune.work_id);
+});
+
+test("groupKeylessWorks leaves a crowded-key fold apart when skip rejects its pair", () => {
+  const { repo, novel, graphic, piatkus, graphicKeyless } = fourthWing();
+  const skip = (from: string) => from === piatkus.work_id;
+  assert.equal(repo.groupKeylessWorks(250, AT, skip), 1);
+  assert.deepEqual([piatkus, graphicKeyless].map((book) => repo.getBook(book.id)!.work_id), [piatkus.work_id, graphic.work_id]);
+  assert.equal(repo.groupKeylessWorks(250, AT, skip), 0);
+  assert.equal(repo.groupKeylessWorks(250, AT), 1);
+  assert.equal(repo.getBook(piatkus.id)!.work_id, novel.work_id);
+});
+
 test("createBook marks a new lossy book with a valid ISBN for a re-title, and no other", () => {
   const { repo } = freshRepo();
   const lossyTitle = repo.createBook({ title: "P©ssaro Azul", author: "Ana Lima", isbn: "9789720000101" }, ["isbn:9789720000101"], NOW);

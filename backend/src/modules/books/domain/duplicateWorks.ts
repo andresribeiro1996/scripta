@@ -17,7 +17,12 @@ const PLACEHOLDER_AUTHORS = new Set([
   "varios autores",
   "autores varios",
   "aa vv",
-  "vv aa"
+  "vv aa",
+  "aavv",
+  "vvaa",
+  "diversos",
+  "autor anonimo",
+  "autor desconocido"
 ]);
 
 export interface KeyedWork {

@@ -275,7 +275,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
     const titleKeys = [...new Set(books.flatMap(({ title_key }) => (title_key ? [title_key] : [])))];
     if (titleKeys.length > 0) {
       mergeDuplicateWorks({ repo: deps.repo, sharesArena: deps.sharesArena, now: () => now().getTime() }, titleKeys);
-      deps.repo.groupTitleKeys(titleKeys, SAVE_GROUP_LIMIT, now().toISOString());
+      deps.repo.groupTitleKeys(titleKeys, SAVE_GROUP_LIMIT, now().toISOString(), deps.sharesArena);
     }
     for (const book of books) if (!book.cover_image_id && lookupDue(book)) schedule(book.id);
     const canonical = deps.repo.canonicalWorkIds(workIdsOf(books));

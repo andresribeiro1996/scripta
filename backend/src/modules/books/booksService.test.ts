@@ -955,6 +955,45 @@ test("works sharing an arena stay apart when a search saves an edition", async (
   assert.deepEqual(h.repo.activeMerges("ol-duplicate"), []);
 });
 
+function crowdedFourthWing(overrides: Partial<Deps> = {}) {
+  const h = searchingFor([fourthWingHit("9780000000081", "isbndb")], overrides);
+  const novel = savedEdition(h, "9780000000082", "Fourth Wing", YARROS, "OL1W");
+  const graphic = savedEdition(h, "9780000000083", "Fourth Wing: The Graphic Novel", YARROS, "OL2W");
+  return { h, novel, graphic };
+}
+
+test("a search folds a keyless edition into the keyed work with its full title when a key has several", async () => {
+  const { h, novel } = crowdedFourthWing();
+  const [result] = await h.service.searchExternal("fourth wing");
+  assert.equal(h.repo.findBookByKey("isbn:9780000000081")!.work_id, novel.work_id);
+  assert.equal(result!.workId, novel.work_id);
+});
+
+test("a crowded fold whose works share an arena stays apart when a search saves an edition", async () => {
+  const { h, novel } = crowdedFourthWing({ sharesArena: () => true });
+  const [result] = await h.service.searchExternal("fourth wing");
+  const keyless = h.repo.findBookByKey("isbn:9780000000081")!;
+  assert.notEqual(keyless.work_id, novel.work_id);
+  assert.equal(result!.workId, keyless.work_id);
+  assert.deepEqual(h.repo.activeMerges("title-key"), []);
+});
+
+test("a search merges two duplicate keyed works and then folds the keyless edition it saved into the survivor", async () => {
+  const h = searchingFor([
+    fourthWingHit("9780000000091", "openlibrary", "OL1W"),
+    fourthWingHit("9780000000092", "openlibrary", "OL2W"),
+    fourthWingHit("9780000000093", "isbndb")
+  ]);
+  const first = savedEdition(h, "9780000000091", "Fourth Wing", YARROS, "OL1W");
+  const second = savedEdition(h, "9780000000092", "Fourth Wing", YARROS, "OL2W");
+  const results = await h.service.searchExternal("fourth wing");
+  const survivor = results[0]!.workId;
+  assert.ok([first.work_id, second.work_id].includes(survivor ?? null));
+  assert.deepEqual(results.map((result) => result.workId), [survivor, survivor, survivor]);
+  assert.deepEqual(h.repo.activeMerges("ol-duplicate").map((merge) => merge.intoWork), [survivor]);
+  assert.deepEqual(h.repo.activeMerges("title-key").map((merge) => merge.intoWork), [survivor]);
+});
+
 test("a search leaves another key's groupable pair apart", async () => {
   const h = searchingFor([fourthWingHit("9780000000031", "openlibrary", "OL1W")]);
   const dune = savedEdition(h, "9780000000032", "Dune", "Frank Herbert", "OL9W");

@@ -631,12 +631,18 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     ]);
   }
 
-  function groupTitleKeys(keys: string[], limit: number, at = new Date().toISOString()): number {
+  function groupTitleKeys(keys: string[], limit: number, at = new Date().toISOString(), skip?: (from: string, into: string) => boolean): number {
     return inTransaction(() => {
-      const pairs = groupablePairsStmt.all(JSON.stringify(keys), limit) as Array<{ source: string; target: string }>;
-      if (pairs.length < limit) pairs.push(...crowdedFolds(keys).slice(0, limit - pairs.length));
-      for (const pair of pairs) mergeInto(pair.source, pair.target, { source: "title-key", confidence: null, at, carrySummary: true });
-      return pairs.length;
+      const pairs = groupablePairsStmt.all(JSON.stringify(keys), skip ? -1 : limit) as Array<{ source: string; target: string }>;
+      if (skip || pairs.length < limit) pairs.push(...crowdedFolds(keys));
+      let merged = 0;
+      for (const pair of pairs) {
+        if (merged === limit) break;
+        if (skip?.(pair.source, pair.target)) continue;
+        mergeInto(pair.source, pair.target, { source: "title-key", confidence: null, at, carrySummary: true });
+        merged++;
+      }
+      return merged;
     });
   }
 
@@ -1161,14 +1167,14 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       };
     },
 
-    groupKeylessWorks(limit, at = new Date().toISOString()) {
+    groupKeylessWorks(limit, at = new Date().toISOString(), skip) {
       return inTransaction(() => {
         let merged = 0;
         let after = "";
         while (merged < limit) {
           const keys = groupableTitleKeys(after, limit);
           if (keys.length === 0) break;
-          merged += groupTitleKeys(keys, limit - merged, at);
+          merged += groupTitleKeys(keys, limit - merged, at, skip);
           after = keys[keys.length - 1]!;
         }
         return merged;
