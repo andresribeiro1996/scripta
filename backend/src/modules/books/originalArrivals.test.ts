@@ -15,6 +15,7 @@ process.env.JWT_ACCESS_SECRET = "a".repeat(64);
 process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
 const { applyBooksMigrations } = await import("./adapters/sqlite/connection.js");
+const { catalogTitleKey } = await import("./domain/normalize.js");
 const { createSqliteBooksRepository } = await import("./adapters/sqlite/sqliteBooksRepository.js");
 const { joinArrivedOriginals, sharedOriginals, startOriginalArrivals } = await import("./originalArrivals.js");
 
@@ -50,7 +51,11 @@ function arriveLighthouse(repo: Repo, workKey: string | null = "OL960W") {
   return book(repo, "9780156907501", "To the Lighthouse", "Virginia Woolf", { workKey: workKey ?? undefined });
 }
 
-const drain = (repo: Repo, limit = 500) => joinArrivedOriginals({ repo, sharesArena: () => false, now: () => NOW }, limit);
+const rethrow = (error: unknown): never => {
+  throw error;
+};
+
+const drain = (repo: Repo, limit = 500) => joinArrivedOriginals({ repo, sharesArena: () => false, now: () => NOW }, limit, rethrow);
 
 const claim = (title: string, originalTitle: string, author = "Virginia Woolf", language: string | null = "pt-PT"): OriginalClaim => ({ workId: null, title, author, language, originalTitle });
 
@@ -192,7 +197,7 @@ test("an arena that holds both works blocks the merge but records the answer", (
   const repo = freshRepo();
   const pt = claimant(repo, "9789720000501", "Passeio ao Farol", "Virginia Woolf", "To the Lighthouse");
   const en = arriveLighthouse(repo);
-  const steps = joinArrivedOriginals({ repo, sharesArena: () => true, now: () => NOW }, 500);
+  const steps = joinArrivedOriginals({ repo, sharesArena: () => true, now: () => NOW }, 500, rethrow);
   assert.deepEqual(steps, { arrivals: 1, claimants: 1, codeMerges: 0, codeBlocked: 1 });
   assert.deepEqual(repo.workMatchJudgments([pt.work_id!]).get(pt.work_id!), { model: "code", intoWorkId: en.work_id, confidence: null, askedAt: AT });
   assert.equal(repo.canonicalWorkIds([pt.work_id!]).get(pt.work_id!), pt.work_id);
@@ -260,14 +265,58 @@ test("an original without a work key waits for it", () => {
   assert.equal(repo.canonicalWorkIds([pt.work_id!]).get(pt.work_id!), repo.getBook(en.id)!.work_id);
 });
 
-test("a failed join rolls back and leaves the key queued", () => {
+test("a key that fails rolls back whole and does not hold up the next one", () => {
   const repo = freshRepo();
-  const pt = claimant(repo, "9789720000501", "Passeio ao Farol", "Virginia Woolf", "To the Lighthouse");
+  const first = claimant(repo, "9789720000501", "Passeio ao Farol", "Virginia Woolf", "To the Lighthouse", "OL91W");
+  const second = claimant(repo, "9789720000502", "Passeio ao Farol", "Virginia Woolf", "To the Lighthouse", "OL92W");
+  const duna = claimant(repo, "9789720000803", "Duna", "Frank Herbert", "Dune");
+  const lighthouse = arriveLighthouse(repo);
+  const dune = book(repo, "9780441172696", "Dune", "Frank Herbert", { workKey: "OL893415W" });
+  const lighthouseKey = catalogTitleKey("To the Lighthouse", "Virginia Woolf");
+  let toLighthouse = 0;
+  const failing = {
+    ...repo,
+    mergeTranslation: (...args: Parameters<Repo["mergeTranslation"]>) => {
+      if (args[1] === lighthouse.work_id && ++toLighthouse === 2) throw new Error("boom");
+      return repo.mergeTranslation(...args);
+    }
+  };
+  const failures: Array<{ error: unknown; titleKey: string }> = [];
+  const steps = joinArrivedOriginals({ repo: failing, sharesArena: () => false, now: () => NOW }, 500, (error, titleKey) => failures.push({ error, titleKey }));
+  assert.equal(failures.length, 1);
+  assert.match((failures[0]!.error as Error).message, /boom/);
+  assert.equal(failures[0]!.titleKey, lighthouseKey);
+  assert.deepEqual(repo.originalArrivals(10), [lighthouseKey]);
+  for (const work of [first.work_id!, second.work_id!]) {
+    assert.equal(repo.canonicalWorkIds([work]).get(work), work);
+    assert.equal(repo.workMatchJudgments([work]).size, 0);
+  }
+  assert.equal(steps.codeMerges, 1);
+  assert.equal(repo.canonicalWorkIds([duna.work_id!]).get(duna.work_id!), dune.work_id);
+});
+
+test("only works whose author is the arriving author are planned", () => {
+  const repo = freshRepo();
+  const pt = claimant(repo, "9789720000501", "Passeio ao Farol", "Ana Silva", "To the Lighthouse");
   arriveLighthouse(repo);
-  const failing = { ...repo, mergeTranslation: () => { throw new Error("boom"); } };
-  assert.throws(() => joinArrivedOriginals({ repo: failing, sharesArena: () => false, now: () => NOW }, 500), /boom/);
-  assert.equal(repo.originalArrivals(10).length, 1);
+  assert.deepEqual(drain(repo), { arrivals: 1, claimants: 0, codeMerges: 0, codeBlocked: 0 });
   assert.equal(repo.workMatchJudgments([pt.work_id!]).size, 0);
+  assert.deepEqual(repo.originalArrivals(10), []);
+});
+
+test("a tick stops starting keys once its time is up and leaves the rest queued", () => {
+  const repo = freshRepo();
+  emptyQueue(repo);
+  book(repo, "9780000000011", "First Book", "Anyone Else");
+  book(repo, "9780000000012", "Second Book", "Anyone Else");
+  book(repo, "9780000000013", "Third Book", "Anyone Else");
+  let clock = NOW;
+  const now = () => {
+    clock += 150;
+    return clock - 150;
+  };
+  assert.equal(joinArrivedOriginals({ repo, sharesArena: () => false, now }, 500, rethrow).arrivals, 1);
+  assert.equal(repo.originalArrivals(10).length, 2);
 });
 
 test("the job joins on its first tick and logs what it did", async () => {

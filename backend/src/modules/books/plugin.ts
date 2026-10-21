@@ -104,7 +104,7 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
     sharesArena,
     now: Date.now,
     info: (details, message) => app.log.info(details, message),
-    onError: (error) => app.log.error({ err: error }, "original arrivals failed")
+    onError: (error, titleKey) => app.log.error({ err: error, titleKey }, "original arrivals failed")
   });
   const translationJobs = heldWorks
     ? startTranslationJobsIfConfigured(env.TYPESAFE_API_KEY, {
