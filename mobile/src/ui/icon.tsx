@@ -67,6 +67,9 @@ const GLYPHS = {
   like: { ios: "heart", android: "favorite_border" },
   comment: { ios: "bubble.right", android: "chat_bubble_outline" },
   bookmark: { ios: "bookmark", android: "bookmark_border" },
+  sync: { ios: "arrow.triangle.2.circlepath", android: "sync" },
+  reorder: { ios: "arrow.up.arrow.down", android: "reorder" },
+  select: { ios: "checkmark.circle", android: "check_circle" },
 } as const satisfies Record<string, Glyph>;
 
 /** Only the tab icons have a solid counterpart worth using; the rest read the

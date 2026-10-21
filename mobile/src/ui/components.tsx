@@ -348,6 +348,7 @@ type OverlayProps = {
   title: string;
   children: ReactNode;
   onClose: () => void;
+  onDismiss?: () => void;
   closeAccessibilityLabel?: string;
 };
 
@@ -363,7 +364,7 @@ export function SheetHeader({ title, onClose }: { title: string; onClose: () => 
   );
 }
 
-function Overlay({ visible, title, children, onClose, closeAccessibilityLabel, sheet }: OverlayProps & { sheet: boolean }) {
+function Overlay({ visible, title, children, onClose, onDismiss, closeAccessibilityLabel, sheet }: OverlayProps & { sheet: boolean }) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const reducedMotion = useReducedMotion();
@@ -371,6 +372,7 @@ function Overlay({ visible, title, children, onClose, closeAccessibilityLabel, s
   return (
     <Modal
       animationType={reducedMotion ? "none" : sheet ? "slide" : "fade"}
+      onDismiss={onDismiss}
       onRequestClose={onClose}
       transparent
       visible={visible}
@@ -402,6 +404,57 @@ function Overlay({ visible, title, children, onClose, closeAccessibilityLabel, s
 
 export function Sheet(props: OverlayProps) {
   return <Overlay {...props} sheet />;
+}
+
+export type ActionItem = { label: string; icon: IconName; destructive?: boolean; onPress: () => void };
+
+export function ActionSheet({ title, groups, children }: {
+  title: string;
+  groups: ActionItem[][];
+  children: (open: () => void) => ReactNode;
+}) {
+  const { colors } = useTheme();
+  const [visible, setVisible] = useState(false);
+  const pending = useRef<(() => void) | null>(null);
+  const open = useCallback(() => setVisible(true), []);
+  const close = useCallback(() => setVisible(false), []);
+  const run = (item: ActionItem) => {
+    setVisible(false);
+    if (Platform.OS === "ios") pending.current = item.onPress;
+    else item.onPress();
+  };
+  const runPending = () => {
+    const action = pending.current;
+    pending.current = null;
+    action?.();
+  };
+  return (
+    <>
+      {children(open)}
+      <Sheet visible={visible} title={title} onClose={close} onDismiss={runPending}>
+        <View style={styles.actionRows}>
+          {groups.filter((group) => group.length > 0).map((group, index) => (
+            <View key={index}>
+              {index > 0 ? <View style={[styles.actionDivider, { backgroundColor: colors.border }]} /> : null}
+              {group.map((item) => (
+                <Pressable
+                  key={item.label}
+                  accessibilityRole="button"
+                  onPress={() => run(item)}
+                  style={({ pressed }) => [styles.actionRow, { backgroundColor: pressed ? colors.surfacePressed : "transparent" }]}
+                >
+                  <View style={[styles.actionTile, { backgroundColor: item.destructive ? colors.dangerSoft : colors.accentSoft }]}>
+                    <Icon name={item.icon} size={18} color={item.destructive ? colors.danger : colors.accent} />
+                  </View>
+                  <Text {...dynamicType} style={[typography.body, styles.actionLabel, { color: item.destructive ? colors.danger : colors.text }]}>{item.label}</Text>
+                </Pressable>
+              ))}
+            </View>
+          ))}
+        </View>
+      </Sheet>
+    </>
+  );
 }
 
 export function Dialog(props: OverlayProps) {
@@ -869,6 +922,11 @@ const styles = StyleSheet.create({
   overlayTitle: { ...typography.title, fontWeight: "700", flex: 1 },
   closeButton: { minHeight: minimumTouchTarget, minWidth: minimumTouchTarget, alignItems: "center", justifyContent: "center" },
   closeText: { ...typography.body, fontWeight: "600" },
+  actionRows: { marginHorizontal: -spacing.xl },
+  actionRow: { minHeight: minimumTouchTarget, flexDirection: "row", alignItems: "center", gap: spacing.md, paddingHorizontal: spacing.xl },
+  actionTile: { width: 32, height: 32, borderRadius: radii.md, alignItems: "center", justifyContent: "center" },
+  actionLabel: { flex: 1, fontWeight: "600" },
+  actionDivider: { height: StyleSheet.hairlineWidth, marginVertical: spacing.xs },
   toast: { borderRadius: radii.md, borderWidth: 1, paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
   state: { flexGrow: 1, justifyContent: "center", paddingVertical: spacing.xxl, paddingHorizontal: spacing.lg },
   emptyCard: { alignItems: "stretch", gap: spacing.md },
