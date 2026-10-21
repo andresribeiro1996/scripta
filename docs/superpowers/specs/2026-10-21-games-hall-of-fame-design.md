@@ -46,7 +46,7 @@ The user explicitly asked for these at the bottom, not the top. Period and genre
 
 ### Qualifying games — the vote bar
 
-A game only feeds the book records, the podium and the genre champions once at least **5 distinct people** have voted on it: 5 ballots on a tier list, 5 plays on a quiz, 5 different voters on a tournament (counting voters, not duel votes — one person voting through a 16-book tournament casts 15 votes). The user chose 5 to start and wants to raise it as the community grows, so it is one named constant, used in one place. It stops one enthusiastic person from topping a board with games nobody else touched. Hottest games are not filtered by it — their ranking is already by engagement. In "This month", the bar is on the game's all-time voters, not voters this month (my call: a game qualifies once, it does not drop out on the 1st).
+A game only feeds the book records, the podium and the genre champions once at least **5 distinct people** have voted on it: 5 ballots on a tier list, 5 plays on a quiz, 5 different voters on a tournament (counting voters, not duel votes — one person voting through a 16-book tournament casts 15 votes). The game's owner never counts toward its own 5; anonymous voters do (a tournament voter is a signed-in user or a voter token; each anonymous quiz play or tier list ballot is one person). The user chose 5 to start and wants to raise it as the community grows, so it is one named constant, used in one place. It stops one enthusiastic person from topping a board with games nobody else touched. Hottest games are not filtered by it — their ranking is already by engagement. In "This month", the bar is on the game's all-time voters, not voters this month (my call: a game qualifies once, it does not drop out on the 1st).
 
 ### Scoring (podium and genre champions)
 
@@ -75,7 +75,7 @@ A book counts in every genre its work has. Books with no known genre count in "A
 Only content a stranger could already see, computed from the live game tables at read time — so a game that is deleted, unpublished, or whose owner unpublishes their profile simply stops counting, in every period including All time:
 
 - Published games only — the same gates the existing per-book stats and Discover use (a tier list or quiz is public once published; a tournament once it leaves seeding, so active tournaments count for appearances and votes, while Most crowned needs a completed one). Drafts never count.
-- Games whose owner's profile is not published do not count, and their likes/comments do not either — the Discover rule.
+- A game counts only if Discover would list it — its owner resolves to a public reader profile, or it is a promoted tier list shown as "Original creator unavailable". Games Discover hides do not count, and neither do their likes/comments. (Checked against the code: Discover's rule is profile resolution, not the feed's `profiles.published` flag; the hall of fame sits beside Browse, so it follows Browse.)
 - Per-book placement numbers follow the existing book-stats rules (e.g. which ballots count for tier placements), so a book's hall-of-fame numbers never contradict its own stats page. Merged works count as their canonical work.
 
 ## Step 2 — recap cards
