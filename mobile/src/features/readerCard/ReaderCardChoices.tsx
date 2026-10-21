@@ -72,7 +72,7 @@ export function HighlightChoice({ books, highlight, chosen, onChange }: { books:
       </View>
       <Sheet visible={picking} title="Choose a highlight" onClose={close}>
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheet}>
-          <Input label="Search your highlights" value={query} onChangeText={setQuery} autoCapitalize="none" autoCorrect={false} clearButtonMode="while-editing" returnKeyType="search" />
+          <Input label="Search your highlights" value={query} onChangeText={setQuery} autoCapitalize="none" autoCorrect={false} returnKeyType="search" />
           {query.trim() ? (matches.length ? list(matches) : <Text style={[typography.body, { color: colors.textDim }]}>No highlights match.</Text>) : browsing ? (
             <>
               <Button label="Back to books" variant="secondary" onPress={() => setBrowsing(null)} />

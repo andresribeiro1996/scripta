@@ -1435,7 +1435,7 @@ test("the ISBN-10 pass leaves two keyed works that disagree alone", () => {
 
 test("the ISBN-10 pass runs once", () => {
   const { db } = freshRepo();
-  assert.equal((db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version, 4);
+  assert.equal((db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version, 5);
 });
 
 test("listUncheckedCoverIds pages by created_at then insert order, and a short page ends the cycle", () => {
@@ -1800,7 +1800,7 @@ test("the ISBNdb-first author pass turns a surname-first name with its title key
   assert.equal(repo.findBookByKey("ta:dune|herbert|")?.id, book.id);
   assert.deepEqual({ ...db.prepare("SELECT author FROM books_fts WHERE book_id = ?").get(book.id) }, { author: "Frank Herbert" });
   assert.equal(workById(db, book.work_id).author, "Frank Herbert");
-  assert.equal(userVersion(db), 4);
+  assert.equal(userVersion(db), 5);
 });
 
 test("the ISBNdb-first author pass changes a work only when its author is the turned book's own text", () => {
@@ -1834,7 +1834,7 @@ test("the ISBNdb-first author pass leaves the same text alone when the row is no
   db.exec("PRAGMA user_version = 3");
   applyBooksMigrations(db);
   assert.deepEqual(rows(), before);
-  assert.equal(userVersion(db), 4);
+  assert.equal(userVersion(db), 5);
 });
 
 test("the ISBNdb-first author pass runs once, so a row saved after it is left as stored", () => {
@@ -1859,7 +1859,34 @@ test("the ISBNdb-first author pass can stop part way and finish on the next boot
   db.exec("DROP TRIGGER stop_second");
   applyBooksMigrations(db);
   for (const book of [first, second]) assert.deepEqual([authorOf(db, book.id), workById(db, book.work_id).author], ["Frank Herbert", "Frank Herbert"]);
-  assert.equal(userVersion(db), 4);
+  assert.equal(userVersion(db), 5);
+});
+
+const originalTitleOf = (db: DatabaseSync, id: string) => (db.prepare("SELECT original_title FROM books WHERE id = ?").get(id) as { original_title: string | null }).original_title;
+
+test("the original-title pass clears stored values that are not titles and keeps the rest", () => {
+  const { db, repo } = freshRepo();
+  const stored = [":", "", "—", "Tradução: Ana Lima", "Tradução", "• Tradução: Ana Lima", "Solaris", "1984", "Солярис"];
+  const books = stored.map((value, index) => {
+    const isbn = `9789720001${String(index).padStart(3, "0")}`;
+    const book = repo.createBook({ title: `Livro ${index}`, author: "X", isbn }, [`isbn:${isbn}`], NOW);
+    db.prepare("UPDATE books SET original_title = ? WHERE id = ?").run(value, book.id);
+    return book;
+  });
+  db.exec("PRAGMA user_version = 4");
+  applyBooksMigrations(db);
+  assert.deepEqual(books.map((book) => originalTitleOf(db, book.id)), [null, null, null, null, null, null, "Solaris", "1984", "Солярис"]);
+  assert.equal(userVersion(db), 5);
+});
+
+test("the original-title pass runs once, so a value stored after it is left as stored", () => {
+  const { db, repo } = freshRepo();
+  const book = repo.createBook({ title: "Livro", author: "X", isbn: "9789720001900" }, ["isbn:9789720001900"], NOW);
+  db.exec("PRAGMA user_version = 4");
+  applyBooksMigrations(db);
+  db.prepare("UPDATE books SET original_title = ':' WHERE id = ?").run(book.id);
+  applyBooksMigrations(db);
+  assert.equal(originalTitleOf(db, book.id), ":");
 });
 
 test("the last word matches as a prefix once it has three letters", () => {
@@ -2161,6 +2188,15 @@ test("original titles fill only empty columns, from the feed or from stored summ
   assert.equal(repo.fillOriginalTitlesFromSummaries(), 1);
   assert.equal(repo.getBook(b.id)!.original_title, "Der Spaziergang");
   assert.equal(repo.fillOriginalTitlesFromSummaries(), 0);
+});
+
+test("fillOriginalTitle writes no value that is not a title, so a later real one still lands", () => {
+  const { repo } = freshRepo();
+  const book = repo.createBook({ title: "Solaris", author: "Stanislaw Lem", isbn: "9789720000131" }, ["isbn:9789720000131"], NOW);
+  repo.fillOriginalTitle(book.id, ":");
+  assert.equal(repo.getBook(book.id)!.original_title, null);
+  repo.fillOriginalTitle(book.id, "Solaris");
+  assert.equal(repo.getBook(book.id)!.original_title, "Solaris");
 });
 
 test("original title claims read the column and the summary label, skip books with neither, and write nothing", () => {

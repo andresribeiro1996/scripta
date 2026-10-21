@@ -58,8 +58,8 @@ test("readingPercent is null when progress is unknown", () => {
   assert.equal(readingPercent({ ___PercentRead: Number.POSITIVE_INFINITY }), null);
 });
 
-test("library shelves read Reading, To read, Finished", () => {
-  assert.deepEqual(LIBRARY_STATUS_TABS.map((tab) => tab.label), ["Reading", "To read", "Finished"]);
+test("library shelves read Finished, Reading, To read", () => {
+  assert.deepEqual(LIBRARY_STATUS_TABS.map((tab) => tab.label), ["Finished", "Reading", "To read"]);
 });
 
 test("a library search matches the start of any title or author word, ignoring case and accents", () => {
