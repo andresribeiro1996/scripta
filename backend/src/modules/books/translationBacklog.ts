@@ -40,6 +40,15 @@ export function translationDryRun(repo: Pick<BooksRepository, "translationEviden
   return counts;
 }
 
+export function joinByCode(deps: Pick<TranslationDeps, "repo" | "sharesArena">, workId: string, intoWorkId: string, at: string): boolean {
+  const blocked = deps.sharesArena(workId, intoWorkId);
+  deps.repo.transaction(() => {
+    deps.repo.saveWorkMatchJudgment(workId, { model: "code", intoWorkId, confidence: null, askedAt: at });
+    if (!blocked) deps.repo.mergeTranslation(workId, intoWorkId, "code", null, at);
+  });
+  return !blocked;
+}
+
 export function runCodeSteps(deps: TranslationDeps, workIds: string[]): CodeSteps {
   const steps: CodeSteps = { originals: 0, noCandidates: 0, codeMerges: 0, codeBlocked: 0, ask: [] };
   const at = new Date(deps.now()).toISOString();
@@ -53,13 +62,8 @@ export function runCodeSteps(deps: TranslationDeps, workIds: string[]): CodeStep
       continue;
     }
     if (plan.kind === "code") {
-      const blocked = deps.sharesArena(workId, plan.intoWorkId);
-      deps.repo.transaction(() => {
-        deps.repo.saveWorkMatchJudgment(workId, { model: "code", intoWorkId: plan.intoWorkId, confidence: null, askedAt: at });
-        if (!blocked) deps.repo.mergeTranslation(workId, plan.intoWorkId, "code", null, at);
-      });
-      if (blocked) steps.codeBlocked += 1;
-      else steps.codeMerges += 1;
+      if (joinByCode(deps, workId, plan.intoWorkId, at)) steps.codeMerges += 1;
+      else steps.codeBlocked += 1;
       continue;
     }
     deps.repo.saveWorkMatchJudgment(workId, { model: "code", intoWorkId: null, confidence: null, askedAt: at });
