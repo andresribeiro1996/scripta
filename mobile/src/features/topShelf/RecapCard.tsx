@@ -64,13 +64,12 @@ export function RecapCard({ card, month, currentMonth, url, sharing = false, onO
   useEffect(() => { if (settled >= covers.length) onCoversReady?.(); }, [settled, covers.length, onCoversReady]);
   const title = card.kind === "book" ? card.book.title : card.kind === "hottestGame" ? card.game.item.content.name : "";
   const subtitle = card.kind === "book" ? card.book.author : card.kind === "hottestGame" ? `by ${card.game.item.author.username}` : "";
-  const [cardHeight, setCardHeight] = useState<number | null>(null);
-  const game = card.kind === "hottestGame";
-  const coverCap = game ? 80 : 170;
-  const coverWidth = cardHeight === null ? coverCap : Math.min(coverCap, Math.floor((cardHeight * (game ? 0.2 : 0.32)) / 1.5));
+  const [coverSpace, setCoverSpace] = useState<number | null>(null);
+  const coverHeightCap = card.kind === "hottestGame" ? 120 : 255;
+  const coverWidth = Math.max(1, Math.floor(Math.min(coverSpace ?? coverHeightCap, coverHeightCap) / 1.5));
   const summary = card.kind === "summary";
   const body = (
-    <View style={styles.cover}>
+    <View style={styles.cover} onLayout={(event) => setCoverSpace(event.nativeEvent.layout.height)}>
       {summary ? null : <Glow size={coverWidth * 3.4} />}
       <View style={styles.coverRow}>
         {covers.map((uri, index) => <CoverImage key={`${index}-${uri}`} uri={uri} title={title} width={coverWidth} onSettled={onSettled} />)}
@@ -78,11 +77,11 @@ export function RecapCard({ card, month, currentMonth, url, sharing = false, onO
     </View>
   );
   return (
-    <View onLayout={(event) => setCardHeight(event.nativeEvent.layout.height)} style={[styles.card, sharing ? styles.sharing : styles.full, { paddingTop: sharing ? spacing.xxxl : insets.top + 64, paddingBottom: sharing ? spacing.lg : insets.bottom + spacing.xxxl }]}>
+    <View style={[styles.card, sharing ? styles.sharing : styles.full, { paddingTop: sharing ? spacing.xxxl : insets.top + 64, paddingBottom: sharing ? spacing.lg : insets.bottom + spacing.xxxl }]}>
       <Background />
-      <View style={styles.main}>
+      <View style={[styles.main, sharing && styles.mainSharing]}>
         <Text numberOfLines={2} {...dynamicType} style={[typography.body, styles.label]}>{recapTitle(card, month)}</Text>
-        {summary ? null : onOpen ? <Pressable accessibilityRole="button" accessibilityLabel={`Open ${title}`} onPress={onOpen}>{body}</Pressable> : body}
+        {summary ? null : onOpen ? <Pressable accessibilityRole="button" accessibilityLabel={`Open ${title}`} onPress={onOpen} style={styles.coverPress}>{body}</Pressable> : body}
         {summary ? null : <View style={styles.titles}>
           <Text numberOfLines={3} style={[styles.title, { fontFamily: SERIF }]}>{title}</Text>
           <Text numberOfLines={1} {...dynamicType} style={[typography.body, { color: RECAP_COLORS.dim, alignSelf: "stretch", textAlign: "center" }]}>{subtitle}</Text>
@@ -105,8 +104,10 @@ const styles = StyleSheet.create({
   sharing: { width: "100%", aspectRatio: 9 / 16 },
   full: { flex: 1 },
   main: { flex: 1, alignItems: "center", justifyContent: "center", gap: spacing.xl },
+  mainSharing: { gap: spacing.md },
   label: { color: RECAP_COLORS.gold, fontWeight: "700", textAlign: "center", alignSelf: "stretch" },
-  cover: { alignItems: "center", justifyContent: "center" },
+  cover: { flex: 1, minHeight: 0, alignSelf: "stretch", alignItems: "center", justifyContent: "center" },
+  coverPress: { flex: 1, minHeight: 0, alignSelf: "stretch" },
   coverRow: { flexDirection: "row", gap: spacing.sm },
   glow: { position: "absolute" },
   fallback: { alignItems: "center", justifyContent: "center", backgroundColor: RECAP_COLORS.deep },
