@@ -3,8 +3,8 @@ import type { BooksRepository } from "./domain/ports.js";
 import { hasVolumeMarker, seriesLikeOriginals } from "./domain/translation.js";
 import type { MergeSource } from "./domain/types.js";
 
-const SOURCES: MergeSource[] = ["title-key", "admin", "code", "jev", "manual"];
-const UNDOABLE: MergeSource[] = ["code", "jev"];
+const SOURCES: MergeSource[] = ["title-key", "admin", "code", "jev", "manual", "ol-duplicate"];
+const UNDOABLE: MergeSource[] = ["code", "jev", "ol-duplicate"];
 
 type Why = "series-like" | "volume";
 type Edition = ReturnType<BooksRepository["editionsOf"]>[number];
@@ -82,7 +82,7 @@ export function undoReviewedMerges(repo: UndoRepo, fromWorks: string[], now: () 
   const requested = merges.filter((merge) => UNDOABLE.includes(merge.source) && reviewed.has(merge.fromWork));
   const queued = new Set(requested.map((merge) => merge.id));
   const found = new Set(requested.map((merge) => merge.fromWork));
-  const failures: Failure[] = [...reviewed].filter((fromWork) => !found.has(fromWork)).map((fromWork) => ({ fromWork, reason: "no active code or jev join" }));
+  const failures: Failure[] = [...reviewed].filter((fromWork) => !found.has(fromWork)).map((fromWork) => ({ fromWork, reason: "no active code, jev or ol-duplicate merge" }));
   const undone: string[] = [];
   for (const { fromWork, intoWork } of requested.sort((a, b) => b.id - a.id)) {
     const blocker = onwardFrom(byFrom, intoWork).find((step) => !queued.has(step.id));

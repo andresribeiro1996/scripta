@@ -75,6 +75,7 @@ function harness(overrides: Partial<Deps> = {}) {
     publicUrlFor: (id, size) => `https://api.test/covers/cached/${id}/${size}`,
     adminUserId: "",
     warn: (details, message) => { warnings.push({ details, message }); },
+    sharesArena: () => false,
     now: () => new Date(clock),
     ...overrides
   });
@@ -907,6 +908,138 @@ test("a search hit with mis-decoded text fills a saved blank row with the repair
   assert.equal(row.title, "Entre a fé e a crença");
   assert.equal(row.author, "José Silva");
   assert.equal(row.title_key, "ta:entre a fe e a crenca|jose silva|");
+});
+
+const YARROS = "Rebecca Yarros";
+
+function fourthWingHit(isbn: string, source: "openlibrary" | "isbndb", workKey: string | null = null, olCoverId: number | null = null) {
+  const coverUrl = olCoverId === null ? null : `https://covers.openlibrary.org/b/id/${olCoverId}-M.jpg`;
+  return { result: { title: "Fourth Wing", authors: [YARROS], year: 2023, isbn, publisher: null, coverUrl, genres: [] }, olCoverId, workKey, source };
+}
+
+function searchingFor(hits: Array<ReturnType<typeof fourthWingHit>>, overrides: Partial<Deps> = {}) {
+  return harness({ catalog: recordingCatalog({ search: async () => hits }).catalog, ...overrides });
+}
+
+function savedEdition(h: ReturnType<typeof harness>, isbn: string, title: string, author: string, workKey?: string) {
+  return h.repo.createBook({ title, author, isbn, workKey }, [`isbn:${isbn}`], "2026-09-01T00:00:00.000Z");
+}
+
+function duplicateKeyedWorks(overrides: Partial<Deps> = {}) {
+  const h = searchingFor([fourthWingHit("9780000000021", "openlibrary", "OL1W"), fourthWingHit("9780000000022", "openlibrary", "OL2W")], overrides);
+  savedEdition(h, "9780000000023", "Fourth Wing", YARROS, "OL2W");
+  savedEdition(h, "9780000000024", "Fourth Wing", YARROS, "OL2W");
+  return h;
+}
+
+test("a saved ISBNdb edition joins the keyed work with its title key in the same search", async () => {
+  const h = searchingFor([fourthWingHit("9780000000011", "isbndb")]);
+  const keyed = savedEdition(h, "9780000000010", "Fourth Wing", YARROS, "OL1W");
+  const [result] = await h.service.searchExternal("fourth wing");
+  assert.equal(h.repo.findBookByKey("isbn:9780000000011")!.work_id, keyed.work_id);
+  assert.equal(result!.workId, keyed.work_id);
+});
+
+test("a search that saves an edition merges two duplicate keyed works for its key", async () => {
+  const h = duplicateKeyedWorks();
+  const survivor = h.repo.findBookByKey("isbn:9780000000023")!.work_id;
+  const results = await h.service.searchExternal("fourth wing");
+  assert.deepEqual(results.map((result) => result.workId), [survivor, survivor]);
+  assert.deepEqual(h.repo.activeMerges("ol-duplicate").map((merge) => merge.intoWork), [survivor]);
+});
+
+test("works sharing an arena stay apart when a search saves an edition", async () => {
+  const h = duplicateKeyedWorks({ sharesArena: () => true });
+  const results = await h.service.searchExternal("fourth wing");
+  assert.equal(new Set(results.map((result) => result.workId)).size, 2);
+  assert.deepEqual(h.repo.activeMerges("ol-duplicate"), []);
+});
+
+function crowdedFourthWing(overrides: Partial<Deps> = {}) {
+  const h = searchingFor([fourthWingHit("9780000000081", "isbndb")], overrides);
+  const novel = savedEdition(h, "9780000000082", "Fourth Wing", YARROS, "OL1W");
+  const graphic = savedEdition(h, "9780000000083", "Fourth Wing: The Graphic Novel", YARROS, "OL2W");
+  return { h, novel, graphic };
+}
+
+test("a search folds a keyless edition into the keyed work with its full title when a key has several", async () => {
+  const { h, novel } = crowdedFourthWing();
+  const [result] = await h.service.searchExternal("fourth wing");
+  assert.equal(h.repo.findBookByKey("isbn:9780000000081")!.work_id, novel.work_id);
+  assert.equal(result!.workId, novel.work_id);
+});
+
+test("a crowded fold whose works share an arena stays apart when a search saves an edition", async () => {
+  const { h, novel } = crowdedFourthWing({ sharesArena: () => true });
+  const [result] = await h.service.searchExternal("fourth wing");
+  const keyless = h.repo.findBookByKey("isbn:9780000000081")!;
+  assert.notEqual(keyless.work_id, novel.work_id);
+  assert.equal(result!.workId, keyless.work_id);
+  assert.deepEqual(h.repo.activeMerges("title-key"), []);
+});
+
+test("a search merges two duplicate keyed works and then folds the keyless edition it saved into the survivor", async () => {
+  const h = searchingFor([
+    fourthWingHit("9780000000091", "openlibrary", "OL1W"),
+    fourthWingHit("9780000000092", "openlibrary", "OL2W"),
+    fourthWingHit("9780000000093", "isbndb")
+  ]);
+  const first = savedEdition(h, "9780000000091", "Fourth Wing", YARROS, "OL1W");
+  const second = savedEdition(h, "9780000000092", "Fourth Wing", YARROS, "OL2W");
+  const results = await h.service.searchExternal("fourth wing");
+  const survivor = results[0]!.workId;
+  assert.ok([first.work_id, second.work_id].includes(survivor ?? null));
+  assert.deepEqual(results.map((result) => result.workId), [survivor, survivor, survivor]);
+  assert.deepEqual(h.repo.activeMerges("ol-duplicate").map((merge) => merge.intoWork), [survivor]);
+  assert.deepEqual(h.repo.activeMerges("title-key").map((merge) => merge.intoWork), [survivor]);
+});
+
+test("a search leaves another key's groupable pair apart", async () => {
+  const h = searchingFor([fourthWingHit("9780000000031", "openlibrary", "OL1W")]);
+  const dune = savedEdition(h, "9780000000032", "Dune", "Frank Herbert", "OL9W");
+  const duneKeyless = savedEdition(h, "9780000000033", "Dune", "Frank Herbert");
+  const emma = savedEdition(h, "9780000000034", "Emma", "Jane Austen", "OL7W");
+  savedEdition(h, "9780000000035", "Emma", "Jane Austen", "OL7W");
+  const emmaOther = savedEdition(h, "9780000000036", "Emma", "Jane Austen", "OL8W");
+  await h.service.searchExternal("fourth wing");
+  assert.notEqual(h.repo.getBook(duneKeyless.id)!.work_id, dune.work_id);
+  assert.notEqual(h.repo.getBook(emmaOther.id)!.work_id, emma.work_id);
+  assert.deepEqual(h.repo.activeMerges("ol-duplicate"), []);
+});
+
+test("a search folds at most 50 works per request", async () => {
+  const h = searchingFor([fourthWingHit("9780000000071", "isbndb")]);
+  savedEdition(h, "9780000000072", "Fourth Wing", YARROS, "OL1W");
+  for (let at = 0; at < 50; at++) savedEdition(h, `9780000002${String(at).padStart(3, "0")}`, "Fourth Wing", YARROS);
+  await h.service.searchExternal("fourth wing");
+  const keyless = h.db.prepare("SELECT COUNT(*) AS n FROM works WHERE ol_work_key IS NULL AND merged_into IS NULL").get() as { n: number };
+  assert.equal(keyless.n, 1);
+});
+
+test("a saved edition without a cover is queued on the normal lane", async () => {
+  const h = searchingFor([fourthWingHit("9780000000041", "isbndb")]);
+  await h.service.searchExternal("fourth wing");
+  assert.deepEqual(h.enqueued, [{ bookId: h.bookId("isbn:9780000000041"), priority: "normal" }]);
+});
+
+test("a saved edition that already has a cover is not queued", async () => {
+  const h = searchingFor([fourthWingHit("9780000000051", "isbndb")]);
+  const lowRes = savedEdition(h, "9780000000051", "Fourth Wing", YARROS, "OL1W");
+  withCover(h, lowRes.id, "isbndb", 100, "low_res");
+  h.advance(DAY);
+  h.service.resolveCover({ isbn: "9780000000051", title: "Fourth Wing", author: YARROS });
+  assert.equal(h.enqueued.length, 1);
+  h.enqueued.length = 0;
+  await h.service.searchExternal("fourth wing");
+  assert.deepEqual(h.enqueued, []);
+});
+
+test("a work's covered result comes first among results with its workId", async () => {
+  const h = searchingFor([fourthWingHit("9780000000061", "isbndb"), fourthWingHit("9780000000062", "openlibrary", "OL1W", 7)]);
+  const results = await h.service.searchExternal("fourth wing");
+  assert.deepEqual(results.map((result) => result.isbn), ["9780000000062", "9780000000061"]);
+  assert.equal(results[0]!.workId, results[1]!.workId);
+  assert.ok(results[0]!.workId);
 });
 
 test("a saved book's own cover is used in search results", async () => {

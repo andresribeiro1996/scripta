@@ -163,7 +163,7 @@ test("a jev join is undone too, and a manual join is reported and left alone", (
   joinInto(repo, coded, series);
   joinInto(repo, judged, series, "jev");
   joinInto(repo, manual, series, "manual");
-  assert.deepEqual(undoReviewedMerges(repo, volumes.map((volume) => volume.work_id!), () => NOW, quietly), { undone: [judged.work_id, coded.work_id], failures: [{ fromWork: manual.work_id, reason: "no active code or jev join" }] });
+  assert.deepEqual(undoReviewedMerges(repo, volumes.map((volume) => volume.work_id!), () => NOW, quietly), { undone: [judged.work_id, coded.work_id], failures: [{ fromWork: manual.work_id, reason: "no active code, jev or ol-duplicate merge" }] });
   assert.equal(repo.getBook(coded.id)!.work_id, coded.work_id);
   assert.equal(repo.getBook(judged.id)!.work_id, judged.work_id);
   assert.equal(repo.getBook(manual.id)!.work_id, series.work_id);
@@ -178,7 +178,7 @@ test("every requested id is reported: a typo, a manual join and a join already u
   joinInto(repo, manual, series, "manual");
   joinInto(repo, gone, series);
   repo.undoMerge(gone.work_id!, AT);
-  const reason = "no active code or jev join";
+  const reason = "no active code, jev or ol-duplicate merge";
   assert.deepEqual(undoReviewedMerges(repo, [coded.work_id!, manual.work_id!, gone.work_id!, "no-such-work"], () => NOW, quietly), {
     undone: [coded.work_id],
     failures: [{ fromWork: manual.work_id, reason }, { fromWork: gone.work_id, reason }, { fromWork: "no-such-work", reason }]
