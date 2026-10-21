@@ -46,7 +46,6 @@ export function PeoplePane() {
                 placeholder="Search by username"
                 autoCapitalize="none"
                 autoCorrect={false}
-                clearButtonMode="while-editing"
                 returnKeyType="search"
               />
               {needle.length === 0 && results.length > 0 ? (

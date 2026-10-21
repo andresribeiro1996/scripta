@@ -243,7 +243,7 @@ export function MuralsScreen() {
             <Fab label="New" accessibilityLabel="New mural" onPress={openPresets} />
           </View>
           <View style={[styles.searchRow, { bottom: overlap }]}>
-            <View style={styles.grow}><Input icon="search" accessibilityLabel="Search murals" value={search} onChangeText={setSearch} placeholder="Search murals" autoCapitalize="none" autoCorrect={false} clearButtonMode="while-editing" returnKeyType="search" style={styles.searchField} /></View>
+            <View style={styles.grow}><Input icon="search" accessibilityLabel="Search murals" value={search} onChangeText={setSearch} placeholder="Search murals" autoCapitalize="none" autoCorrect={false} returnKeyType="search" style={styles.searchField} /></View>
             <IconButton name="folder" accessibilityLabel={`Folders, ${folderLabel}`} tone={folderId === undefined || search.trim() ? "default" : "accent"} onPress={() => { Keyboard.dismiss(); setFolderPicker(true); }} />
           </View>
         </View>

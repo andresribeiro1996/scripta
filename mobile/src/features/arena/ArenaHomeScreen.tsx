@@ -1,10 +1,10 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
 import { Stack, router } from "expo-router";
 import { booksByWork } from "@scripta/shared";
 import { FlatList, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
-import { Button, Dialog, EmptyState, ErrorState, IconButton, Screen, SearchDock, Sheet, Skeleton, SwipeableTabs, Toast, dynamicType, searchDockClearance, spacing, typography, useTheme, type IconName } from "../../ui";
+import { Button, Dialog, EmptyState, ErrorState, Fab, Screen, SearchDock, Sheet, Skeleton, SwipeableTabs, Toast, dynamicType, searchDockFabClearance, spacing, typography, useTheme, type IconName } from "../../ui";
 import { useLibrary, useWorkBooks } from "../library";
 import { DiscoverPane } from "../community/DiscoverPane";
 import { GameRow, type RowCover } from "../community/DiscoverRow";
@@ -90,13 +90,6 @@ export function ArenaHomeScreen() {
         // The bottom tab already reads "Arena"; a large title spends a third of
         // the screen repeating it above a list that has nowhere else to go.
         headerLargeTitleEnabled: false,
-        headerRight: () => tab === "browse"
-          ? <IconButton accessibilityLabel="New game" name="add" onPress={() => setChoosing(true)} />
-          : <IconButton
-            accessibilityLabel={tab === "tournaments" ? "New tournament" : tab === "quizzes" ? "New quiz" : "New tier list"}
-            name="add"
-            onPress={() => router.push(NEW_GAMES.find((option) => option.tab === tab)!.href as never)}
-          />,
       }}
     />
     {error ? <Toast visible message={error} tone="error" /> : null}
@@ -106,7 +99,7 @@ export function ArenaHomeScreen() {
       value={tab}
       onChange={setTab}
       renderPage={(pageTab) => {
-        if (pageTab === "browse") return <DiscoverPane />;
+        if (pageTab === "browse") return <DiscoverPane fab={<Fab label="New" accessibilityLabel="New game" onPress={() => setChoosing(true)} />} />;
         const owned = ownedItems(pageTab, tournaments.data ?? [], tierlists.data ?? [], quizzes.data ?? []);
         const voted = pageTab === "tournaments" ? votedTournaments : pageTab === "tierlists" ? votedTierlists : noVoted;
         return <ArenaList
@@ -120,6 +113,11 @@ export function ArenaHomeScreen() {
           rowCount={owned.length + (voted.data?.length ?? 0)}
           onOpen={open}
           onDelete={setDeleting}
+          fab={<Fab
+            label="New"
+            accessibilityLabel={pageTab === "tournaments" ? "New tournament" : pageTab === "quizzes" ? "New quiz" : "New tier list"}
+            onPress={() => router.push(NEW_GAMES.find((option) => option.tab === pageTab)!.href as never)}
+          />}
         />;
       }}
     />
@@ -156,6 +154,7 @@ function ArenaList({
   rowCount,
   onOpen,
   onDelete,
+  fab,
 }: {
   tab: ArenaTab;
   query: UseQueryResult<unknown>;
@@ -167,6 +166,7 @@ function ArenaList({
   rowCount: number;
   onOpen: (item: OwnedItem) => void;
   onDelete: (doomed: Doomed) => void;
+  fab: ReactNode;
 }) {
   const { colors } = useTheme();
   const [search, setSearch] = useState("");
@@ -179,15 +179,13 @@ function ArenaList({
   const noun = tab === "tournaments" ? "tournaments" : tab === "tierlists" ? "tier lists" : "quizzes";
   const ownerOption = OWNER_FILTERS.find((option) => option.value === owner)!;
 
-  if (query.isPending) return <View style={styles.page}><Skeleton height={160} /></View>;
-  if (query.isError) return <View style={styles.page}><ErrorState body={query.error instanceof Error ? query.error.message : "Couldn't load this list."} actionLabel="Retry" onAction={() => void query.refetch()} /></View>;
-
   return <SearchDock
     value={search}
     onChangeText={setSearch}
     accessibilityLabel={`Search ${noun}`}
     placeholder={`Search ${noun}`}
     hidden={!filtering}
+    fab={filtering || query.isPending || query.isError ? fab : undefined}
     cycle={tab === "quizzes" ? undefined : {
       icon: OWNER_FILTER_ICONS[owner],
       active: owner !== "all",
@@ -196,7 +194,9 @@ function ArenaList({
       onPress: () => setOwner(nextOwnerFilter(owner)),
     }}
   >
-    {(scrollProps) => <FlatList
+    {(scrollProps) => query.isPending ? <View style={styles.page}><Skeleton height={160} /></View>
+      : query.isError ? <View style={styles.page}><ErrorState body={query.error instanceof Error ? query.error.message : "Couldn't load this list."} actionLabel="Retry" onAction={() => void query.refetch()} /></View>
+      : <FlatList
       {...scrollProps}
       data={visible}
       keyExtractor={(item) => item.key}
@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
   // flex so a centred EmptyState/ErrorState has a height to centre within —
   // StatePanel grows and centres itself, which needs a parent that has room.
   page: { flex: 1, padding: spacing.lg },
-  list: { paddingTop: spacing.lg - spacing.md, paddingBottom: searchDockClearance, flexGrow: 1 },
+  list: { paddingTop: spacing.lg - spacing.md, paddingBottom: searchDockFabClearance, flexGrow: 1 },
   sectionHeader: { marginTop: spacing.lg, marginBottom: spacing.xs, paddingHorizontal: spacing.lg },
   dialog: { gap: spacing.md },
 });
