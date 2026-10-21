@@ -81,6 +81,8 @@ export type GameRowProps = {
 export function GameRow({ kind, name, meta, badges, caption, stats = [], covers, ladder, preview, actionLabel = "Open game", seeBooks, accessibilityRole = "button", onPress, onDelete }: GameRowProps) {
   const { colors } = useTheme();
   const { fontScale } = useWindowDimensions();
+  const color = kind === "quiz" ? colors.reference : kind === "tierlist" ? colors.success : colors.accent;
+  const soft = kind === "quiz" ? colors.referenceSoft : kind === "tierlist" ? colors.successSoft : colors.accentSoft;
   const clue = kind === "quiz" && preview && preview.type !== "cover_title" ? preview : undefined;
   return (
     <View style={[styles.ticket, { backgroundColor: colors.surface }]}>
@@ -96,7 +98,7 @@ export function GameRow({ kind, name, meta, badges, caption, stats = [], covers,
         {({ pressed }) => (
           <View style={{ backgroundColor: pressed ? colors.surfacePressed : colors.surface }}>
             <View style={styles.row}>
-              <View style={[styles.art, { backgroundColor: colors.surface, borderColor: colors.border }]}><GameTicketArt kind={kind} covers={covers} ladder={ladder} preview={preview} /></View>
+              <View style={[styles.art, { backgroundColor: soft, borderColor: colors.border }]}><GameTicketArt kind={kind} covers={covers} ladder={ladder} preview={preview} color={color} /></View>
               <View style={styles.details}>
                 <Text numberOfLines={fontScale > 1.3 ? undefined : 2} {...dynamicType} style={[typography.title, styles.strong, { color: colors.text }]}>
                   {name}
@@ -131,8 +133,8 @@ export function GameRow({ kind, name, meta, badges, caption, stats = [], covers,
       <View style={[styles.footer, { borderColor: colors.border }]}>
         <View style={[styles.notch, styles.leftNotch, { backgroundColor: colors.background }]} />
         <View style={[styles.notch, styles.rightNotch, { backgroundColor: colors.background }]} />
-        <Pressable accessibilityRole={accessibilityRole} accessibilityLabel={`${actionLabel}: ${name}`} onPress={onPress} style={({ pressed }) => [styles.primaryAction, { backgroundColor: pressed ? colors.accentFill : colors.accentSoft }]}>
-          {({ pressed }) => <><Text {...dynamicType} style={[typography.body, styles.strong, styles.shrink, { color: pressed ? colors.text : colors.accent }]}>{actionLabel}</Text><Icon name="chevronRight" size={16} color={pressed ? colors.text : colors.accent} /></>}
+        <Pressable accessibilityRole={accessibilityRole} accessibilityLabel={`${actionLabel}: ${name}`} onPress={onPress} style={({ pressed }) => [styles.primaryAction, { backgroundColor: pressed ? colors.accentFill : soft }]}>
+          {({ pressed }) => <><Text {...dynamicType} style={[typography.body, styles.strong, styles.shrink, { color: pressed ? colors.text : color }]}>{actionLabel}</Text><Icon name="chevronRight" size={16} color={pressed ? colors.text : color} /></>}
         </Pressable>
         {seeBooks ? <Pressable accessibilityRole="button" accessibilityLabel={seeBooks.label} onPress={seeBooks.onPress} style={({ pressed }) => [styles.secondaryAction, { borderColor: colors.border, backgroundColor: pressed ? colors.surfacePressed : colors.surface }]}><Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.textDim }]}>See books</Text></Pressable> : null}
       </View>

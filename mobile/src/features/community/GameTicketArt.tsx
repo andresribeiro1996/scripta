@@ -9,9 +9,8 @@ import { CoverImage } from "../library/components/CoverImage";
 import { coverUrlForApi } from "../library/lib/coverUrl";
 import type { RowCover } from "./DiscoverRow";
 
-export function GameTicketArt({ kind, covers, ladder, preview }: { kind: PublishedContent["kind"]; covers: RowCover[]; ladder?: string[]; preview?: QuizPreview }) {
+export function GameTicketArt({ kind, covers, ladder, preview, color }: { kind: PublishedContent["kind"]; covers: RowCover[]; ladder?: string[]; preview?: QuizPreview; color: string }) {
   const { colors } = useTheme();
-  const color = colors.textDim;
   if (kind === "quiz") {
     return <View style={styles.quiz} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
       {preview?.type === "cover_title" ? <>
