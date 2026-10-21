@@ -10,15 +10,19 @@ const TITLE_POINTS = 3;
 
 const lisbonParts = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Lisbon", year: "numeric", month: "numeric", day: "numeric", hour: "numeric", minute: "numeric", second: "numeric", hourCycle: "h23" });
 
-function lisbonWallClock(at: number): { year: number; month: number; wallAsUtc: number } {
+function lisbonWallClock(at: number): { year: number; month: number; day: number; wallAsUtc: number } {
   const p: Record<string, number> = Object.fromEntries(lisbonParts.formatToParts(new Date(at)).map((x) => [x.type, Number(x.value)]));
   const [year, month, day, hour, minute, second] = ["year", "month", "day", "hour", "minute", "second"].map((k) => p[k] as number);
-  return { year: year as number, month: month as number, wallAsUtc: Date.UTC(year as number, (month as number) - 1, day, hour, minute, second) };
+  return { year: year as number, month: month as number, day: day as number, wallAsUtc: Date.UTC(year as number, (month as number) - 1, day, hour, minute, second) };
 }
 
 export function lisbonMonth(at: Date): string {
   const { year, month } = lisbonWallClock(at.getTime());
   return `${year}-${String(month).padStart(2, "0")}`;
+}
+
+export function lisbonDay(at: Date): number {
+  return lisbonWallClock(at.getTime()).day;
 }
 
 export function lisbonMonthStart(month: string): string {

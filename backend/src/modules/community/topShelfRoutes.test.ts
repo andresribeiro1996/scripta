@@ -6,9 +6,12 @@ import { buildTopShelfRoutes } from "./topShelfRoutes.js";
 
 const empty: TopShelf = { period: "month", genre: null, genres: [], boards: {}, genreChampions: [], games: [] };
 
+const index = { months: ["2026-09"], currentMonth: "2026-10", announce: false };
+const recaps = { freezeMonth: () => undefined, freezeDue: () => undefined, getIndex: () => index, getRecap: (month: string) => (month === "2026-09" ? { month, cards: [] } : null) };
+
 function appWith(seen: unknown[] = []) {
   const app = Fastify();
-  void app.register(buildTopShelfRoutes({ getTopShelf: (query) => { seen.push(query); return empty; } }));
+  void app.register(buildTopShelfRoutes({ getTopShelf: (query) => { seen.push(query); return empty; } }, recaps));
   return app;
 }
 
@@ -35,5 +38,27 @@ test("rejects an over-long genre with 400", async () => {
   const app = appWith();
   assert.equal((await app.inject({ url: `/top-shelf?period=all&genre=${"x".repeat(81)}` })).statusCode, 400);
   assert.equal((await app.inject({ url: `/top-shelf?period=all&genre=${"x".repeat(80)}` })).statusCode, 200);
+  await app.close();
+});
+
+test("GET /top-shelf/recaps returns the index", async () => {
+  const app = appWith();
+  const res = await app.inject({ url: "/top-shelf/recaps" });
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.headers["cache-control"], "no-store");
+  assert.deepEqual(res.json(), index);
+  assert.deepEqual((await app.inject({ url: "/top-shelf/recaps/2026-09" })).json(), { month: "2026-09", cards: [] });
+  await app.close();
+});
+
+test("rejects a malformed month with 400", async () => {
+  const app = appWith();
+  for (const month of ["2026-13", "2026-9", "abc", "2026-00"]) assert.equal((await app.inject({ url: `/top-shelf/recaps/${month}` })).statusCode, 400, month);
+  await app.close();
+});
+
+test("returns 404 for a month without a recap", async () => {
+  const app = appWith();
+  assert.equal((await app.inject({ url: "/top-shelf/recaps/2026-10" })).statusCode, 404);
   await app.close();
 });

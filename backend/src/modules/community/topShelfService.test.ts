@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { TierlistShelfFacts } from "../tierlists/service.js";
-import { createTopShelfService, type TopShelfDeps } from "./topShelfService.js";
+import { createShelfGatherer, createTopShelfService, type TopShelfDeps } from "./topShelfService.js";
 
 const facts = (id: string, workIds: string[], votesSince = 3): TierlistShelfFacts => ({ id, ownerUserId: "u1", open: true, promoted: false, createdAt: "2026-10-05T00:00:00.000Z", voters: 5, votesSince, workIds, placements: [] });
 
@@ -29,7 +29,7 @@ function setup(clock = { at: Date.parse("2026-10-21T10:00:00Z") }) {
     readerGlyphFor: () => null,
   } as never;
   const engagementRepo = { gameEngagement: () => new Map() };
-  const service = createTopShelfService({ engagementRepo, community, shelf, now: () => clock.at });
+  const service = createTopShelfService({ gatherer: createShelfGatherer({ engagementRepo, community, shelf, now: () => clock.at }), community, shelf, now: () => clock.at });
   return { service, calls, clock };
 }
 
