@@ -8,9 +8,9 @@ import { buildDiscoverItems, type CommunityDeps, type DiscoverEntry } from "./se
 import { rankTopShelf, topShelfMonthStart, type Ranked, type ShelfInput } from "./topShelf.js";
 
 export interface TopShelfDeps {
-  tierlistFacts(since: string | null): TierlistShelfFacts[];
-  tournamentFacts(since: string | null): TournamentShelfFacts[];
-  quizFacts(since: string | null): QuizShelfFacts[];
+  tierlistFacts(since: string | null, until: string | null): TierlistShelfFacts[];
+  tournamentFacts(since: string | null, until: string | null): TournamentShelfFacts[];
+  quizFacts(since: string | null, until: string | null): QuizShelfFacts[];
   canonicalWorks(ids: string[]): Map<string, string>;
   catalogGenres(workIds: string[]): Map<string, { genres: string[] }>;
   getWorkPage(id: string): CatalogWorkPage | undefined;
@@ -34,9 +34,9 @@ export function createTopShelfService(deps: { engagementRepo: Pick<EngagementRep
   const cache = new Map<string, { at: number; value: ShelfInput }>();
 
   const gather = (since: string | null): ShelfInput => {
-    const tierlists = shelf.tierlistFacts(since);
-    const tournaments = shelf.tournamentFacts(since);
-    const quizzes = shelf.quizFacts(since);
+    const tierlists = shelf.tierlistFacts(since, null);
+    const tournaments = shelf.tournamentFacts(since, null);
+    const quizzes = shelf.quizFacts(since, null);
     const refs: GameRef[] = [
       ...tierlists.map((f) => ({ kind: "tierlist" as const, id: f.id })),
       ...tournaments.map((f) => ({ kind: "tournament" as const, id: f.id })),

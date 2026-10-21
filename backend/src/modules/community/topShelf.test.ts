@@ -7,9 +7,9 @@ import { rankTopShelf, topShelfMonthStart, type ShelfInput } from "./topShelf.js
 
 process.env.TZ = "America/Sao_Paulo";
 
-const quiz = (over: Partial<QuizShelfFacts> & { id: string }): QuizShelfFacts => ({ ownerUserId: "u1", createdAt: "2026-10-05T00:00:00.000Z", voters: 5, votesSince: 0, workIds: [], ...over });
-const tierlist = (over: Partial<TierlistShelfFacts> & { id: string }): TierlistShelfFacts => ({ ownerUserId: "u1", promoted: false, createdAt: "2026-10-05T00:00:00.000Z", voters: 5, votesSince: 0, workIds: [], placements: [], ...over });
-const tournament = (over: Partial<TournamentShelfFacts> & { id: string }): TournamentShelfFacts => ({ ownerUserId: "u1", createdAt: "2026-10-05T00:00:00.000Z", voters: 5, votesSince: 0, workIds: [], champion: null, ...over });
+const quiz = (over: Partial<QuizShelfFacts> & { id: string }): QuizShelfFacts => ({ ownerUserId: "u1", open: true, createdAt: "2026-10-05T00:00:00.000Z", voters: 5, votesSince: 0, workIds: [], ...over });
+const tierlist = (over: Partial<TierlistShelfFacts> & { id: string }): TierlistShelfFacts => ({ ownerUserId: "u1", open: true, promoted: false, createdAt: "2026-10-05T00:00:00.000Z", voters: 5, votesSince: 0, workIds: [], placements: [], ...over });
+const tournament = (over: Partial<TournamentShelfFacts> & { id: string }): TournamentShelfFacts => ({ ownerUserId: "u1", open: true, createdAt: "2026-10-05T00:00:00.000Z", voters: 5, votesSince: 0, workIds: [], champion: null, ...over });
 const input = (over: Partial<ShelfInput> = {}): ShelfInput => ({ tierlists: [], tournaments: [], quizzes: [], engagement: new Map(), visibleOwners: new Set(["u1"]), canonical: new Map(), genres: new Map(), ...over });
 const all = { since: null, genre: null };
 const ids = (r: Array<{ workId: string }> | undefined) => (r ?? []).map((x) => x.workId);

@@ -593,7 +593,7 @@ test("topShelfFacts returns published lists only", () => {
   const repo = createSqliteTierlistsRepository(freshDb());
   repo.insert(row({ id: "pub", vote_code: "code-pub", voting_open: 1, data: shelfTiers(["s"], ["w1", "w2"]) }));
   repo.insert(row({ id: "draft", data: shelfTiers(["s"], ["w1"]) }));
-  const facts = repo.topShelfFacts(null);
+  const facts = repo.topShelfFacts(null, null);
   assert.deepEqual(facts.map((f) => f.id), ["pub"]);
   assert.equal(facts[0]!.ownerUserId, "u1");
   assert.deepEqual([...facts[0]!.workIds].sort(), ["w1", "w2"]);
@@ -605,8 +605,8 @@ test("topShelfFacts counts voters without the owner and with anonymous ballots",
   for (const [id, voter] of [["b0", "u1"], ["b1", "u2"], ["b2", "u3"], ["b3", null]] as const) {
     repo.saveBallot(ballot({ id, tierlist_id: "pub", voter_user_id: voter }), []);
   }
-  assert.equal(repo.topShelfFacts(null)[0]!.voters, 3);
-  assert.equal(repo.topShelfFacts(null)[0]!.votesSince, 3);
+  assert.equal(repo.topShelfFacts(null, null)[0]!.voters, 3);
+  assert.equal(repo.topShelfFacts(null, null)[0]!.votesSince, 3);
 });
 
 test("topShelfFacts votesSince counts ballots by first cast", () => {
@@ -614,7 +614,7 @@ test("topShelfFacts votesSince counts ballots by first cast", () => {
   repo.insert(row({ id: "pub", vote_code: "code-pub", voting_open: 1, data: shelfTiers(["s"], ["w1"]) }));
   repo.saveBallot(ballot({ id: "old", tierlist_id: "pub", voter_user_id: "u2", created_at: "2026-01-01T00:00:00.000Z", updated_at: "2026-03-01T00:00:00.000Z" }), []);
   repo.saveBallot(ballot({ id: "new", tierlist_id: "pub", voter_user_id: "u3", created_at: "2026-02-01T00:00:00.000Z", updated_at: "2026-02-01T00:00:00.000Z" }), []);
-  const facts = repo.topShelfFacts("2026-01-15T00:00:00.000Z")[0]!;
+  const facts = repo.topShelfFacts("2026-01-15T00:00:00.000Z", null)[0]!;
   assert.equal(facts.voters, 2);
   assert.equal(facts.votesSince, 1);
 });
@@ -627,7 +627,7 @@ test("topShelfFacts placements match tierPlacements and carry castAt", () => {
   repo.saveBallot(ballot({ id: "b2", tierlist_id: "big", voter_user_id: null }), [{ workId: "w1", tierId: "s" }]);
   repo.saveBallot(ballot({ id: "b3", tierlist_id: "big", voter_user_id: "u3" }), [{ workId: "w1", tierId: "gone" }]);
   repo.saveBallot(ballot({ id: "b4", tierlist_id: "draft", voter_user_id: "u1" }), [{ workId: "w1", tierId: "s" }]);
-  const facts = repo.topShelfFacts("2026-12-01T00:00:00.000Z");
+  const facts = repo.topShelfFacts("2026-12-01T00:00:00.000Z", null);
   assert.deepEqual(facts[0]!.placements, [{ workId: "w1", tierIndex: 1, tierCount: 3, ranksWorstFirst: true, castAt: "2026-02-01T00:00:00.000Z" }]);
   assert.equal(repo.tierPlacements(["w1"]).filter((p) => p.tierlistId === "big").length, facts[0]!.placements.length);
 });
@@ -637,6 +637,29 @@ test("topShelfFacts marks promoted lists", () => {
   repo.insert(row({ id: "a", vote_code: "code-a", voting_open: 1, data: shelfTiers(["s"], ["w1"]) }));
   repo.insert(row({ id: "b", vote_code: "code-b", voting_open: 1, data: shelfTiers(["s"], ["w1"]) }));
   repo.promote("b", "2026-04-02T00:00:00.000Z");
-  const byId = new Map(repo.topShelfFacts(null).map((f) => [f.id, f.promoted]));
+  const byId = new Map(repo.topShelfFacts(null, null).map((f) => [f.id, f.promoted]));
   assert.deepEqual([byId.get("a"), byId.get("b")], [false, true]);
+});
+
+test("topShelfFacts bounds voters and votesSince by until", () => {
+  const repo = createSqliteTierlistsRepository(freshDb());
+  repo.insert(row({ id: "pub", vote_code: "code-pub", voting_open: 1, data: shelfTiers(["s"], ["w1"]) }));
+  repo.saveBallot(ballot({ id: "before", tierlist_id: "pub", voter_user_id: "u2", created_at: "2026-01-01T00:00:00.000Z" }), []);
+  repo.saveBallot(ballot({ id: "inside", tierlist_id: "pub", voter_user_id: "u3", created_at: "2026-02-01T00:00:00.000Z" }), []);
+  repo.saveBallot(ballot({ id: "edge", tierlist_id: "pub", voter_user_id: "u4", created_at: "2026-03-01T00:00:00.000Z" }), []);
+  repo.saveBallot(ballot({ id: "after", tierlist_id: "pub", voter_user_id: "u5", created_at: "2026-04-01T00:00:00.000Z" }), []);
+  const fact = repo.topShelfFacts("2026-01-15T00:00:00.000Z", "2026-03-01T00:00:00.000Z")[0]!;
+  assert.equal(fact.voters, 2);
+  assert.equal(fact.votesSince, 1);
+});
+
+test("topShelfFacts open is false for members-only, closed and promoted lists", () => {
+  const repo = createSqliteTierlistsRepository(freshDb());
+  repo.insert(row({ id: "anon", vote_code: "code-anon", voting_open: 1, data: shelfTiers(["s"], ["w1"]) }));
+  repo.insert(row({ id: "members", vote_code: "code-members", voting_open: 1, vote_access: "members", data: shelfTiers(["s"], ["w1"]) }));
+  repo.insert(row({ id: "closed", vote_code: "code-closed", voting_open: 0, data: shelfTiers(["s"], ["w1"]) }));
+  repo.insert(row({ id: "promoted", vote_code: "code-promoted", voting_open: 1, data: shelfTiers(["s"], ["w1"]) }));
+  repo.promote("promoted", "2026-04-02T00:00:00.000Z");
+  const byId = new Map(repo.topShelfFacts(null, null).map((f) => [f.id, f.open]));
+  assert.deepEqual(["anon", "members", "closed", "promoted"].map((id) => byId.get(id)), [true, false, false, false]);
 });

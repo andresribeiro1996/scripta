@@ -20,7 +20,7 @@ export interface ArenaRepository {
   listPublicByIds(ids: string[]): TournamentRow[];
   listPublishedByWorks(workIds: string[], limit: number): TournamentGameRow[];
   tournamentRecord(workIds: string[]): TournamentRecord;
-  topShelfFacts(since: string | null): TournamentShelfFacts[];
+  topShelfFacts(since: string | null, until: string | null): TournamentShelfFacts[];
   worksShareATournament(aIds: string[], bIds: string[]): boolean;
   votedAmong(voterUserId: string, ids: string[]): string[];
   updateTournamentStatus(id: string, status: TournamentRow["status"], currentRound: number): void;

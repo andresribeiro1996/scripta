@@ -100,6 +100,7 @@ export interface SeedBookInput {
 export interface TournamentShelfFacts {
   id: string;
   ownerUserId: string;
+  open: boolean;
   createdAt: string;
   voters: number;
   votesSince: number;

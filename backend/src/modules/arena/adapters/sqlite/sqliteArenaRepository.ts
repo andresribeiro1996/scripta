@@ -28,11 +28,11 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
     ORDER BY t.created_at DESC LIMIT ?
   `);
   const shelfTournamentsStmt = db.prepare(`
-    SELECT t.id, t.owner_user_id, t.created_at, t.status,
+    SELECT t.id, t.owner_user_id, t.created_at, t.status, (t.status = 'active') AS open,
       (SELECT COUNT(DISTINCT COALESCE(v.voter_user_id, v.voter_token)) FROM votes v JOIN duels d ON d.id = v.duel_id
-        WHERE d.tournament_id = t.id AND (v.voter_user_id IS NULL OR v.voter_user_id != t.owner_user_id)) AS voters,
+        WHERE d.tournament_id = t.id AND (v.voter_user_id IS NULL OR v.voter_user_id != t.owner_user_id) AND ($until IS NULL OR v.created_at < $until)) AS voters,
       (SELECT COUNT(*) FROM votes v JOIN duels d ON d.id = v.duel_id
-        WHERE d.tournament_id = t.id AND (v.voter_user_id IS NULL OR v.voter_user_id != t.owner_user_id) AND ($since IS NULL OR v.created_at >= $since)) AS votes_since
+        WHERE d.tournament_id = t.id AND (v.voter_user_id IS NULL OR v.voter_user_id != t.owner_user_id) AND ($since IS NULL OR v.created_at >= $since) AND ($until IS NULL OR v.created_at < $until)) AS votes_since
     FROM tournaments t WHERE t.status != 'seeding'
   `);
   const shelfWorksStmt = db.prepare(`
@@ -270,7 +270,7 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
       }
       return record;
     },
-    topShelfFacts(since) {
+    topShelfFacts(since, until) {
       const works = new Map<string, string[]>();
       for (const row of shelfWorksStmt.all() as unknown as Array<{ tournament_id: string; work_id: string }>) {
         const ids = works.get(row.tournament_id);
@@ -281,10 +281,11 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
       for (const row of shelfFinalsStmt.all() as unknown as Array<{ tournament_id: string; work_id: string | null; settled_at: string }>) {
         if (row.work_id) champions.set(row.tournament_id, { workId: row.work_id, settledAt: row.settled_at });
       }
-      return (shelfTournamentsStmt.all({ since }) as unknown as Array<{ id: string; owner_user_id: string; created_at: string; voters: number; votes_since: number }>).map((row) => ({
+      return (shelfTournamentsStmt.all({ since, until }) as unknown as Array<{ id: string; owner_user_id: string; created_at: string; open: number; voters: number; votes_since: number }>).map((row) => ({
         id: row.id,
         ownerUserId: row.owner_user_id,
         createdAt: row.created_at,
+        open: row.open === 1,
         voters: Number(row.voters),
         votesSince: Number(row.votes_since),
         workIds: works.get(row.id) ?? [],

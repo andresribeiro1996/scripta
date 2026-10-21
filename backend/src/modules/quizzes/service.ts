@@ -149,7 +149,7 @@ export interface QuizzesService {
   getResults(userId: string, id: string): QuizResults | undefined;
   getPublicResults(code: string): { plays: Array<Omit<ResultPlay, "playId">>; questionCount: number } | undefined;
   listPublishedByWorks(workIds: string[], limit: number): QuizGameRow[];
-  topShelfFacts(since: string | null): QuizShelfFacts[];
+  topShelfFacts(since: string | null, until: string | null): QuizShelfFacts[];
   participationByOwner(ownerUserId: string, since: string): GameParticipation[];
   getPublishedRef(id: string): PublishedQuizRef | undefined;
   listPublishedRefsByOwner(ownerUserId: string): PublishedQuizRef[];
@@ -342,7 +342,7 @@ export function createQuizzesService(repo: QuizzesRepository, emitPublished?: Em
 
     listPublishedByWorks: (workIds, limit) => repo.listPublishedByWorks(workIds, limit),
 
-    topShelfFacts: (since) => repo.topShelfFacts(since),
+    topShelfFacts: (since, until) => repo.topShelfFacts(since, until),
 
     getPublishedRef(id) {
       const row = repo.getPublicById(id);
@@ -390,7 +390,7 @@ export interface QuizzesPublicApi {
   participationByOwner(ownerUserId: string, since: string): GameParticipation[];
   publishedByWorks(workIds: string[], limit: number): GameByWork[];
   discoverByWorks(workIds: string[], limit: number): QuizDiscoverRef[];
-  topShelfFacts(since: string | null): QuizShelfFacts[];
+  topShelfFacts(since: string | null, until: string | null): QuizShelfFacts[];
   getPublished(id: string): PublishedQuizRef | undefined;
   listPublishedByOwner(ownerUserId: string): PublishedQuizRef[];
   getPublishedMany(ids: string[]): PublishedQuizRef[];
@@ -401,7 +401,7 @@ export interface QuizzesPublicApi {
 export function createQuizzesPublicApi(service: QuizzesService): QuizzesPublicApi {
   return {
     participationByOwner: (ownerUserId, since) => service.participationByOwner(ownerUserId, since),
-    topShelfFacts: (since) => service.topShelfFacts(since),
+    topShelfFacts: (since, until) => service.topShelfFacts(since, until),
     publishedByWorks: (workIds, limit) =>
       service.listPublishedByWorks(workIds, limit).map((row) => ({
         id: row.id,

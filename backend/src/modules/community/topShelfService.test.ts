@@ -3,7 +3,7 @@ import { test } from "node:test";
 import type { TierlistShelfFacts } from "../tierlists/service.js";
 import { createTopShelfService, type TopShelfDeps } from "./topShelfService.js";
 
-const facts = (id: string, workIds: string[], votesSince = 3): TierlistShelfFacts => ({ id, ownerUserId: "u1", promoted: false, createdAt: "2026-10-05T00:00:00.000Z", voters: 5, votesSince, workIds, placements: [] });
+const facts = (id: string, workIds: string[], votesSince = 3): TierlistShelfFacts => ({ id, ownerUserId: "u1", open: true, promoted: false, createdAt: "2026-10-05T00:00:00.000Z", voters: 5, votesSince, workIds, placements: [] });
 
 function setup(clock = { at: Date.parse("2026-10-21T10:00:00Z") }) {
   const calls = { facts: [] as Array<string | null>, pages: [] as string[] };

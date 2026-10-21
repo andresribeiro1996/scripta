@@ -338,7 +338,7 @@ test("topShelfFacts returns published quizzes with plays excluding the owner", (
   repo.savePlay(playRow("p2", "pub", null), []);
   repo.savePlay(playRow("p3", "pub", null), []);
   repo.savePlay(playRow("p4", "draft", "u2"), []);
-  const facts = repo.topShelfFacts(null);
+  const facts = repo.topShelfFacts(null, null);
   assert.deepEqual(facts.map((f) => f.id), ["pub"]);
   assert.equal(facts[0]!.ownerUserId, "u1");
   assert.equal(facts[0]!.createdAt, "2026-01-01T00:00:00Z");
@@ -352,7 +352,27 @@ test("topShelfFacts votesSince counts plays at or after since", () => {
   repo.insert(quizRow({ id: "pub", vote_code: "code-pub", play_open: 1 }));
   repo.savePlay({ ...playRow("p1", "pub", "u2"), created_at: "2026-02-01T00:00:00Z" }, []);
   repo.savePlay({ ...playRow("p2", "pub", "u3"), created_at: "2026-03-01T00:00:00Z" }, []);
-  const fact = repo.topShelfFacts("2026-03-01T00:00:00Z")[0]!;
+  const fact = repo.topShelfFacts("2026-03-01T00:00:00Z", null)[0]!;
   assert.equal(fact.voters, 2);
   assert.equal(fact.votesSince, 1);
+});
+
+test("topShelfFacts bounds voters and votesSince by until", () => {
+  const repo = makeRepo();
+  repo.insert(quizRow({ id: "pub", vote_code: "code-pub", play_open: 1 }));
+  repo.savePlay({ ...playRow("p1", "pub", "u2"), created_at: "2026-01-01T00:00:00Z" }, []);
+  repo.savePlay({ ...playRow("p2", "pub", "u3"), created_at: "2026-02-01T00:00:00Z" }, []);
+  repo.savePlay({ ...playRow("p3", "pub", "u4"), created_at: "2026-03-01T00:00:00Z" }, []);
+  repo.savePlay({ ...playRow("p4", "pub", "u5"), created_at: "2026-04-01T00:00:00Z" }, []);
+  const fact = repo.topShelfFacts("2026-01-15T00:00:00Z", "2026-03-01T00:00:00Z")[0]!;
+  assert.equal(fact.voters, 2);
+  assert.equal(fact.votesSince, 1);
+});
+
+test("topShelfFacts open follows play_open", () => {
+  const repo = makeRepo();
+  repo.insert(quizRow({ id: "on", vote_code: "code-on", play_open: 1 }));
+  repo.insert(quizRow({ id: "off", vote_code: "code-off", play_open: 0 }));
+  const byId = new Map(repo.topShelfFacts(null, null).map((f) => [f.id, f.open]));
+  assert.deepEqual([byId.get("on"), byId.get("off")], [true, false]);
 });
