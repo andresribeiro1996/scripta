@@ -207,3 +207,31 @@ A script, `backend/scripts/fetch-originals.mjs`, runs it with `--dry-run` first.
   Expected: valid JSON with `held` 1 and `selected` 1. It may make one real Open Library call. A run with a bad flag prints the usage and exits 1.
 - [ ] **Step 3: Verify.** Run `npm run typecheck --workspace backend && npm test --workspace backend`. Expected: all pass.
 - [ ] **Step 4: Commit.** Message: `Add the fetch-originals script and its runbook`.
+
+### Pre-merge fixes (Codex branch review r1, branch-reviewer follow-ups)
+
+**Files:**
+- Modify: `backend/src/modules/books/seed/originalsFill.ts`
+- Test: `backend/src/modules/books/seed/originalsFill.test.ts`
+- Modify: `backend/README.md`
+
+**Interfaces:**
+- `export function sameWholeTitle(title: string, originalTitle: string): boolean`: `normalizeWords`, `normalizeTitle` and `titleNumbers` of `title` each equal those of `mainTitle(originalTitle)`. `pickOriginal` uses it.
+- **`present` works:** a work with title candidates still counts in `present`. It is sent to `runCodeSteps` only when `repo.matchCandidates(candidates).some((candidate) => sameWholeTitle(candidate.title, original))`. Those works are listed in a new report field, `presentWorks: Array<{ workId: string; title: string; originalTitle: string }>`, filled in the dry run too.
+- **`sharedOriginal`:** distinct titles are `normalizeWords(claim.title)`, not `originalKey(claim.title)`. Claims whose `normalizeWords(title)` is empty are left out. The group key is unchanged.
+- **Before `runCodeSteps`:** filter the ids through `repo.portugueseWorksNeedingMatch(ids, Number.MAX_SAFE_INTEGER, JEV_REJECTION_LIMIT, new Date(deps.now()).toISOString())`, so a `manual` answer or a join saved during the lookups takes the work out.
+- **README:**
+  - A 429 ends the run before anything is written; re-running repeats the lookups.
+  - `present` works go to the code step only under their whole original title, and `presentWorks` lists them.
+  - Run it off-peak.
+  - Add `presentWorks` to the report fields.
+
+- [ ] **Step 1: Write the failing tests:**
+  - "Dune: Messiah" held while only "Dune" by Frank Herbert is in the catalog: `present` 1, `presentWorks` empty, `codeMerges` 0, and the judgment is unchanged;
+  - an exact present original is listed in `presentWorks` in the dry run, and joined in the real run;
+  - "Crónicas: Aurora" and "Crónicas: Crepúsculo" both claim "Chronicles" by Ana Silva, one of them held: `sharedOriginal` 1 and no lookup;
+  - the fake search saves a `manual` none on the work before answering: the work is not joined, and its judgment stays `manual`;
+  - claims left out of the shared count; in each case the held work is still looked up:
+    - for `isPortuguese`: a held "Passeio ao Farol" (original "To the Lighthouse", Virginia Woolf), beside an English edition "The Lighthouse Walk" by Virginia Woolf with original "To the Lighthouse";
+    - for `sameMainTitle`: a held "Rumo a Orlando" with original "Orlando", beside an unheld pt "Orlando. Uma biografia" by Virginia Woolf with original "Orlando". `mainTitle` cuts the latter at `". "`, so it equals its original and is left out. Its `title_key` (`ta:orlando uma biografia|…`) doesn't match the held work's pattern, so the held work isn't `present`, and it is looked up.
+- [ ] **Step 2: Implement, verify** (`npm run build --workspace @scripta/shared && npm run typecheck --workspace backend && npm test --workspace backend`), **commit.**

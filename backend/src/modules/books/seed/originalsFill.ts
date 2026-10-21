@@ -9,13 +9,14 @@ import { seedBook } from "./seedCatalog.js";
 
 export type FoundOriginal = { key: string; title: string; author: string };
 
-export function pickOriginal(works: OpenLibraryWork[], originalTitle: string, authorTexts: string[]): FoundOriginal | null {
+export function sameWholeTitle(title: string, originalTitle: string): boolean {
   const main = mainTitle(originalTitle);
-  const words = normalizeWords(main);
-  const wanted = normalizeTitle(main);
-  const numbers = titleNumbers(main);
+  return normalizeWords(title) === normalizeWords(main) && normalizeTitle(title) === normalizeTitle(main) && titleNumbers(title) === titleNumbers(main);
+}
+
+export function pickOriginal(works: OpenLibraryWork[], originalTitle: string, authorTexts: string[]): FoundOriginal | null {
   for (const work of works) {
-    if (normalizeWords(work.title) !== words || normalizeTitle(work.title) !== wanted || titleNumbers(work.title) !== numbers || hasVolumeMarker(work.title)) continue;
+    if (!sameWholeTitle(work.title, originalTitle) || hasVolumeMarker(work.title)) continue;
     const author = work.authors.find((name) => {
       const surname = surnameOf(name);
       return surname !== null && mentionsSurname(authorTexts, surname);
@@ -42,6 +43,7 @@ export type OriginalsReport = {
   codeMerges: number;
   codeBlocked: number;
   noCandidates: number;
+  presentWorks: Array<{ workId: string; title: string; originalTitle: string }>;
   failed: string[];
   ask: string[];
   originals: Array<{ originalTitle: string; author: string; works: Array<{ workId: string; title: string }>; found: FoundOriginal | null }>;
@@ -59,18 +61,17 @@ export async function fillOriginals(
   const { repo } = deps;
   const held = new Set(repo.canonicalWorkIds(heldWorkIds).values());
   const works = repo.portugueseWorksNeedingMatch([...held], Number.MAX_SAFE_INTEGER, JEV_REJECTION_LIMIT, new Date(deps.now()).toISOString());
-  const report: OriginalsReport = { held: held.size, selected: works.length, noOriginal: 0, seriesLike: 0, volume: 0, present: 0, noAuthor: 0, sharedOriginal: 0, lookups: 0, found: 0, notFound: 0, added: 0, existing: 0, codeMerges: 0, codeBlocked: 0, noCandidates: 0, failed: [], ask: [], originals: [] };
+  const report: OriginalsReport = { held: held.size, selected: works.length, noOriginal: 0, seriesLike: 0, volume: 0, present: 0, noAuthor: 0, sharedOriginal: 0, lookups: 0, found: 0, notFound: 0, added: 0, existing: 0, codeMerges: 0, codeBlocked: 0, noCandidates: 0, presentWorks: [], failed: [], ask: [], originals: [] };
   const claims = repo.originalTitleClaims();
   const isSeriesLike = seriesLikeOriginals(claims);
   const titlesClaiming = new Map<string, Set<string>>();
   for (const claim of claims) {
     const original = originalKey(claim.originalTitle);
-    const title = originalKey(claim.title);
-    if (!isPortuguese(claim.language) || original === null || title === null || sameMainTitle(claim.title, claim.originalTitle)) continue;
+    const title = normalizeWords(claim.title);
+    if (!isPortuguese(claim.language) || original === null || title === "" || sameMainTitle(claim.title, claim.originalTitle)) continue;
     const key = `${original}#${surnameOf(claim.author) ?? ""}`;
     titlesClaiming.set(key, (titlesClaiming.get(key) ?? new Set()).add(title));
   }
-  const present: string[] = [];
   const groups = new Map<string, Group>();
   for (const workId of works) {
     const rows = repo.translationEvidence(workId);
@@ -81,16 +82,19 @@ export async function fillOriginals(
     if (!original || originalKey(original) === null || sameMainTitle(original, evidence.title)) report.noOriginal++;
     else if (isSeriesLike(original, author)) report.seriesLike++;
     else if (hasVolumeMarker(evidence.title) || hasVolumeMarker(original)) report.volume++;
-    else if (repo.titleCandidates(titlePattern(original)!).some((id) => id !== workId)) {
-      report.present++;
-      present.push(workId);
-    } else if (surnameOf(author) === null) report.noAuthor++;
     else {
-      const key = `${originalKey(original)}#${surnameOf(author)}`;
-      const group = groups.get(key) ?? { originalTitle: mainTitle(original), author: firstAuthor(author), works: [], authorTexts: [] };
-      group.works.push({ workId, title: evidence.title });
-      group.authorTexts.push(evidence.workAuthor, evidence.author);
-      groups.set(key, group);
+      const candidates = repo.titleCandidates(titlePattern(original)!).filter((id) => id !== workId);
+      if (candidates.length > 0) {
+        report.present++;
+        if (repo.matchCandidates(candidates).some((candidate) => sameWholeTitle(candidate.title, original))) report.presentWorks.push({ workId, title: evidence.title, originalTitle: original });
+      } else if (surnameOf(author) === null) report.noAuthor++;
+      else {
+        const key = `${originalKey(original)}#${surnameOf(author)}`;
+        const group = groups.get(key) ?? { originalTitle: mainTitle(original), author: firstAuthor(author), works: [], authorTexts: [] };
+        group.works.push({ workId, title: evidence.title });
+        group.authorTexts.push(evidence.workAuthor, evidence.author);
+        groups.set(key, group);
+      }
     }
   }
   const looked: Group[] = [];
@@ -114,7 +118,7 @@ export async function fillOriginals(
     if ((index + 1) % PROGRESS_EVERY === 0) deps.log(JSON.stringify({ looked: index + 1, of: looked.length, found: report.found }));
   }
   if (dryRun) return report;
-  const workIds = [...present];
+  const workIds = report.presentWorks.map((work) => work.workId);
   for (const { found, works: served } of report.originals) {
     if (!found) continue;
     const seeded = seedBook({ isbn: "", title: found.title, author: found.author, workKey: found.key }, repo, () => new Date(deps.now()), "seed");
@@ -123,8 +127,9 @@ export async function fillOriginals(
     else report.existing++;
     workIds.push(...served.map((work) => work.workId));
   }
-  if (workIds.length > 0) {
-    const steps = runCodeSteps(deps, workIds);
+  const open = repo.portugueseWorksNeedingMatch(workIds, Number.MAX_SAFE_INTEGER, JEV_REJECTION_LIMIT, new Date(deps.now()).toISOString());
+  if (open.length > 0) {
+    const steps = runCodeSteps(deps, open);
     report.codeMerges = steps.codeMerges;
     report.codeBlocked = steps.codeBlocked;
     report.noCandidates = steps.noCandidates;

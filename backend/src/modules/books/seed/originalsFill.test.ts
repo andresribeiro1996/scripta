@@ -269,8 +269,69 @@ test("an original that belongs to the translation's own Open Library work lands 
   const pt = portuguese(repo, "Passeio ao Farol", "Virginia Woolf", "To the Lighthouse", "OL930W");
   const { deps } = setup(repo, { "To the Lighthouse": lighthouse });
   const report = await fillOriginals(deps, [pt.work_id!], LIVE);
-  assert.deepEqual([report.added, report.codeMerges, report.noCandidates], [1, 0, 1]);
+  assert.deepEqual([report.added, report.codeMerges, report.noCandidates], [1, 0, 0]);
   assert.equal(repo.findBookByKey(lighthouseKey)!.work_id, pt.work_id);
+  assert.equal(repo.workMatchJudgments([pt.work_id!]).size, 0);
+});
+
+test("a held sequel is not joined into the first book that the title pattern finds without its subtitle", async () => {
+  const repo = freshRepo();
+  edition(repo, isbn(), { title: "Dune", author: "Frank Herbert" });
+  const pt = portuguese(repo, "O Messias de Duna", "Frank Herbert", "Dune: Messiah");
+  repo.saveWorkMatchJudgment(pt.work_id!, { model: "code", intoWorkId: null, confidence: null, askedAt: AT });
+  const before = repo.workMatchJudgments([pt.work_id!]).get(pt.work_id!);
+  const { deps, calls } = setup(repo, {});
+  const report = await fillOriginals(deps, [pt.work_id!], LIVE);
+  assert.deepEqual([report.present, report.presentWorks, report.codeMerges, report.lookups], [1, [], 0, 0]);
+  assert.equal(calls.length, 0);
+  assert.equal(repo.canonicalWorkIds([pt.work_id!]).get(pt.work_id!), pt.work_id);
+  assert.deepEqual(repo.workMatchJudgments([pt.work_id!]).get(pt.work_id!), before);
+});
+
+test("a present original under its whole title is listed in presentWorks, in a dry run too, and joined in a real run", async () => {
+  const repo = freshRepo();
+  const en = edition(repo, isbn(), { title: "To the Lighthouse", author: "Virginia Woolf" });
+  const pt = portuguese(repo, "Passeio ao Farol", "Virginia Woolf", "To the Lighthouse");
+  const listed = [{ workId: pt.work_id!, title: "Passeio ao Farol", originalTitle: "To the Lighthouse" }];
+  const { deps } = setup(repo, {});
+  const dry = await fillOriginals(deps, [pt.work_id!], DRY);
+  assert.deepEqual([dry.present, dry.presentWorks, dry.codeMerges], [1, listed, 0]);
+  const report = await fillOriginals(deps, [pt.work_id!], LIVE);
+  assert.deepEqual([report.present, report.presentWorks, report.codeMerges], [1, listed, 1]);
+  assert.equal(repo.canonicalWorkIds([pt.work_id!]).get(pt.work_id!), en.work_id);
+});
+
+test("two Portuguese titles that differ only after a colon count as two titles naming one original", async () => {
+  const repo = freshRepo();
+  const held = portuguese(repo, "Crónicas: Aurora", "Ana Silva", "Chronicles");
+  portuguese(repo, "Crónicas: Crepúsculo", "Ana Silva", "Chronicles");
+  const { deps, calls } = setup(repo, { Chronicles: [workOf("Chronicles", "Ana Silva", "OL20W")] });
+  const report = await fillOriginals(deps, [held.work_id!], LIVE);
+  assert.deepEqual([report.sharedOriginal, report.lookups, report.added], [1, 0, 0]);
+  assert.equal(calls.length, 0);
+});
+
+test("claims in other languages or equal to their own original do not count as a second title", async () => {
+  const repo = freshRepo();
+  const walk = portuguese(repo, "Passeio ao Farol", "Virginia Woolf", "To the Lighthouse");
+  edition(repo, isbn(), { title: "The Lighthouse Walk", author: "Virginia Woolf", language: "en", originalTitle: "To the Lighthouse" });
+  const orlando = portuguese(repo, "Rumo a Orlando", "Virginia Woolf", "Orlando");
+  portuguese(repo, "Orlando. Uma biografia", "Virginia Woolf", "Orlando");
+  const { deps, calls } = setup(repo, {});
+  const report = await fillOriginals(deps, [walk.work_id!, orlando.work_id!], DRY);
+  assert.deepEqual([report.sharedOriginal, report.present, report.lookups], [0, 0, 2]);
+  assert.deepEqual(calls, [["To the Lighthouse", "virginia woolf"], ["Orlando", "virginia woolf"]]);
+});
+
+test("an owner's answer saved while the lookups ran keeps the work out of the code step", async () => {
+  const repo = freshRepo();
+  const pt = portuguese(repo, "Passeio ao Farol", "Virginia Woolf", "To the Lighthouse");
+  const owner = () => repo.saveWorkMatchJudgment(pt.work_id!, { model: "manual", intoWorkId: null, confidence: null, askedAt: AT });
+  const { deps } = setup(repo, { "To the Lighthouse": lighthouse }, owner);
+  const report = await fillOriginals(deps, [pt.work_id!], LIVE);
+  assert.deepEqual([report.added, report.codeMerges], [1, 0]);
+  assert.equal(repo.workMatchJudgments([pt.work_id!]).get(pt.work_id!)!.model, "manual");
+  assert.equal(repo.canonicalWorkIds([pt.work_id!]).get(pt.work_id!), pt.work_id);
 });
 
 test("progress is logged every ten lookups", async () => {

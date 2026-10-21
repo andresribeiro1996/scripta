@@ -24,12 +24,15 @@ A script, `backend/scripts/fetch-originals.mjs`, with a dry run. Its logic is in
 2. **Original title:** the one `planMatch` would use (`evidenceOf(translationEvidence(id)).originalTitle`, which falls back to the summary's "Título original"). The work is skipped when there is none, when `originalKey` of it is null, or when it equals the work's own title (the work is itself an original).
 3. **Guard 1:** skipped when `seriesLikeOriginals(repo.originalTitleClaims())` flags the original, called exactly as `planMatch` calls it (`original`, `workAuthor || author`). No lookup is made.
 4. **Guard 2:** skipped when the edition's title or the original title has a volume marker (`hasVolumeMarker`). The code step can never join a volume, so fetching for one would only hand Jev a candidate. That candidate is most likely a series name.
-5. **Missing:** a work is not looked up when `titleCandidates(titlePattern(original))` finds any work other than itself. Its original is already there, so it is counted as `present` and handed to the code step in a real run (see Joining).
+5. **Missing:** a work is not looked up when `titleCandidates(titlePattern(original))` finds any work other than itself. Its original is already there, so it is counted as `present`.
+   - It goes to the code step in a real run only when one of those candidates carries the whole original title (`sameWholeTitle`, the pick rule's title check, below). Those works are listed in `presentWorks`, in the dry run as well.
+   - The pattern drops a colon subtitle, so a held "Dune: Messiah" finds "Dune". Without the whole-title check the code step would join the sequel into it.
 6. **Author:** skipped when `surnameOf(workAuthor || author)` is null.
 
 Works left are grouped by `originalKey(original)` plus surname, so two shelved copies of one translation share one lookup.
 
 7. **Shared original:** a group is skipped when two or more distinct Portuguese main titles in the whole catalog claim its original for its surname. That is Guard 1's grouping over `repo.originalTitleClaims()`, but at two titles instead of three, and only for the fetch.
+   - Titles are told apart by `normalizeWords`, the whole title, not by `originalKey`, which drops a colon subtitle. That way "Crónicas: Aurora" and "Crónicas: Crepúsculo" count as two.
    - Two different Portuguese books naming one original are either two re-translations of a classic or two volumes under a series name, and the fill can't tell which.
    - Guard 1 only stops the second case at three titles. Below that, a fetched original would also let a later backlog run join the unshelved volume into it.
    - The cost: a classic with two differently titled Portuguese translations isn't fetched.
@@ -65,7 +68,9 @@ A 5xx or a timeout records the original title in `failed` and moves on. A 429 st
 
 After the lookups, `runCodeSteps(deps, workIds)` runs on two sets of works:
 - the works whose original was added;
-- the `present` works, whose original is already in the catalog.
+- the `presentWorks`, whose original is already in the catalog under its whole title.
+
+Right before that call, the ids are filtered through `portugueseWorksNeedingMatch` again. An owner's `manual` answer saved while the lookups ran, or a join the server made meanwhile, takes the work out.
 
 It is the backlog's free step, with both guards and the arena check. A code join replaces the old "none" answer (`INSERT OR REPLACE`). Every join shows under "Merged" on `/admin/translations`, where it can be undone.
 
@@ -76,6 +81,7 @@ A work the code step leaves for Jev (`ask`, e.g. two title candidates) keeps its
 ### Cost
 
 - **Open Library:** one call per group, about a minute for 60 works.
+- **Write lock:** `runCodeSteps` first runs `fillOriginalTitlesFromSummaries()` over the whole catalog inside one write transaction, as the backlog does. Run the fill off-peak.
 - **ISBNdb:** the script makes no ISBNdb or TypeSafe call. The new rows have no ISBN, so their details never reach ISBNdb. Their covers go through the server's background cover queue, whose ISBNdb title lookups are capped by the non-search budget (`isbndbSpend`, `plugin.ts:74`). That is at most one lookup per new row, out of the same daily 4,800.
 - **TypeSafe, afterwards:** a joined original's work is now held, so the server's genre and synopsis jobs judge it once, within their daily budgets.
 
@@ -83,6 +89,7 @@ A work the code step leaves for Jev (`ask`, e.g. two title candidates) keeps its
 
 The dry run opens the database read-only and makes the same lookups. It prints:
 - the counts (`held`, `selected`, `noOriginal`, `seriesLike`, `volume`, `present`, `noAuthor`, `sharedOriginal`, `lookups`, `found`, `notFound`);
+- `presentWorks`: the works whose original is already there, which the real run hands to the code step;
 - `failed`;
 - one entry per group: the original title, the author, the Portuguese works (id and title), and the Open Library work it would add (key, title, author), or null.
 
