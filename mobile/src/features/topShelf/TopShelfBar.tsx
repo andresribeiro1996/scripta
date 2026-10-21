@@ -58,9 +58,9 @@ export function TopShelfBar({
 
 const styles = StyleSheet.create({
   segmented: { flexGrow: 1, flexShrink: 0, minWidth: 200 },
-  genre: { flexShrink: 1 },
-  row: { flexDirection: "row", alignItems: "center", gap: spacing.sm, padding: spacing.md },
-  pill: { flexDirection: "row", alignItems: "center", gap: spacing.xs, maxWidth: 140, height: minimumTouchTarget, paddingHorizontal: spacing.md, borderWidth: 1, borderRadius: radii.full },
+  genre: { flexShrink: 0 },
+  row: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: spacing.sm, padding: spacing.md },
+  pill: { flexDirection: "row", alignItems: "center", gap: spacing.xs, maxWidth: 140, height: minimumTouchTarget, paddingHorizontal: spacing.sm, borderWidth: 1, borderRadius: radii.full },
   chevron: { transform: [{ rotate: "90deg" }] },
   pillLabel: { flexShrink: 1 },
 });
