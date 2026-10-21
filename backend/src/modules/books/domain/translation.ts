@@ -1,11 +1,17 @@
-import { firstAuthor, normalizeTitle, normalizeWords, titleNumbers } from "@scripta/shared";
+import { LOOSE_METADATA_LABEL, STRICT_METADATA_LABEL, firstAuthor, normalizeTitle, normalizeWords, titleNumbers } from "@scripta/shared";
 
 const ORIGINAL_TITLE = /T[íi]tulo original\s*[:\-–—]?\s*([^\n]+)/i;
 const MAX_ORIGINAL_TITLE = 200;
+const LETTER_OR_DIGIT = /[\p{L}\p{N}]/u;
+const STARTS_WITH_LABEL = new RegExp(`^(?:${STRICT_METADATA_LABEL}|${LOOSE_METADATA_LABEL})(?:\\s*:|\\s+[-–—])`, "i");
+
+export function isOriginalTitle(value: string): boolean {
+  return LETTER_OR_DIGIT.test(value) && !STARTS_WITH_LABEL.test(value);
+}
 
 export function originalTitleIn(text: string | null): string | null {
   const value = (ORIGINAL_TITLE.exec(text ?? "")?.[1] ?? "").trim().replace(/[.;,\s]+$/, "");
-  return value !== "" && value.length <= MAX_ORIGINAL_TITLE ? value : null;
+  return isOriginalTitle(value) && value.length <= MAX_ORIGINAL_TITLE ? value : null;
 }
 
 export function mainTitle(title: string): string {

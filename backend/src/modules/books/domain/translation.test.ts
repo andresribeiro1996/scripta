@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { authorPattern, evidenceOf, hasVolumeMarker, isPortuguese, mainTitle, mentionsSurname, originalKey, originalTitleIn, sameMainTitle, seriesLikeGroups, seriesLikeOriginals, surnameOf, titlePattern } from "./translation.js";
+import { authorPattern, evidenceOf, hasVolumeMarker, isOriginalTitle, isPortuguese, mainTitle, mentionsSurname, originalKey, originalTitleIn, sameMainTitle, seriesLikeGroups, seriesLikeOriginals, surnameOf, titlePattern } from "./translation.js";
 
 test("originalTitleIn reads the labelled value to the end of its line", () => {
   assert.equal(originalTitleIn("Uma sinopse.\n\nTítulo original: Les Misérables"), "Les Misérables");
@@ -11,6 +11,24 @@ test("originalTitleIn reads the labelled value to the end of its line", () => {
   assert.equal(originalTitleIn(`Título original: ${"x".repeat(201)}`), null);
   assert.equal(originalTitleIn("Uma sinopse sem rótulo."), null);
   assert.equal(originalTitleIn(null), null);
+});
+
+test("originalTitleIn returns nothing when the label has no title after it", () => {
+  assert.equal(originalTitleIn("Uma sinopse.\n\nTítulo original:"), null);
+  assert.equal(originalTitleIn("Título original:\nTradução: Ana Lima"), null);
+  assert.equal(originalTitleIn("Título original:\nPáginas: 300"), null);
+  assert.equal(originalTitleIn("Título original —"), null);
+});
+
+test("originalTitleIn still reads a value on the line after a bare label, digits and non-Latin titles", () => {
+  assert.equal(originalTitleIn("Título original\n\nThe Hobbit"), "The Hobbit");
+  assert.equal(originalTitleIn("Título original: 1984"), "1984");
+  assert.equal(originalTitleIn("Título original: Солярис"), "Солярис");
+});
+
+test("isOriginalTitle needs a letter or digit and rejects another metadata label", () => {
+  for (const value of [":", "", "—", "Tradução: Ana Lima", "Tradução - Ana Lima", "ISBN: 9780000000002", "Ano: 2019"]) assert.equal(isOriginalTitle(value), false, value);
+  for (const value of ["Solaris", "1984", "Солярис", "Sapiens: A Brief History of Humankind", "Data-Driven Science"]) assert.equal(isOriginalTitle(value), true, value);
 });
 
 test("the main title stops at the first dash or full-stop separator", () => {
