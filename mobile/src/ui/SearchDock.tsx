@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Animated, Dimensions, Keyboard, KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from "react-native";
+import { useEffect, useRef, useState, type ReactNode, type Ref } from "react";
+import { Animated, Dimensions, Keyboard, KeyboardAvoidingView, Platform, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { Icon, type IconName } from "./icon";
 import { Input, Menu, type MenuItem } from "./components";
 import { minimumTouchTarget, radii, spacing, useReducedMotion, useTheme } from "./theme";
@@ -26,6 +26,8 @@ export function SearchDock({
   cycle,
   fab,
   hidden = false,
+  onSubmitEditing,
+  inputRef,
   children,
 }: {
   value: string;
@@ -42,6 +44,8 @@ export function SearchDock({
   };
   fab?: ReactNode;
   hidden?: boolean;
+  onSubmitEditing?: () => void;
+  inputRef?: Ref<TextInput>;
   children: (scrollProps: SearchDockScrollProps) => ReactNode;
 }) {
   const { colors } = useTheme();
@@ -110,6 +114,8 @@ export function SearchDock({
                   accessibilityLabel={accessibilityLabel}
                   value={value}
                   onChangeText={onChangeText}
+                  onSubmitEditing={onSubmitEditing}
+                  ref={inputRef}
                   placeholder={placeholder}
                   autoCapitalize="none"
                   autoCorrect={false}

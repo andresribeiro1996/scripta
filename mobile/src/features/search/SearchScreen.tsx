@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { FlatList, StyleSheet, View } from "react-native";
+import { FlatList, StyleSheet, View, type TextInput } from "react-native";
 import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import { Stack } from "expo-router";
+import { Stack, useNavigation } from "expo-router";
 import { looksLikeIsbnQuery, matchesSearch, type BookSearchResult } from "@scripta/shared";
-import { ErrorState, IconButton, Input, Screen, Segmented, Skeleton, Toast, spacing } from "../../ui";
+import { ErrorState, Screen, SearchDock, Skeleton, SwipeableTabs, Toast, searchDockClearance, spacing } from "../../ui";
 import { AddBookSheet } from "../community/AddBookSheet";
 import { fetchDiscover, searchPeople } from "../community/api";
 import { useFollowToggle } from "../community/useFollowToggle";
@@ -16,6 +16,8 @@ import { SearchResultRow, type ResultActions } from "./SearchResultRow";
 import { SEARCH_SCOPES, isNetworkQuery, mergeBookResults, ownedBooks, searchRows, type ResultSection, type SearchScope } from "./searchModel";
 import { useRecentSearches } from "./useRecentSearches";
 
+type TabsNavigation = { addListener: (type: "tabPress", listener: () => void) => () => void };
+
 export function SearchScreen() {
   const [query, setQuery] = useState("");
   const [scope, setScope] = useState<SearchScope>("all");
@@ -24,29 +26,28 @@ export function SearchScreen() {
   const recent = useRecentSearches();
   const follow = useFollowToggle();
   const library = useLibrary();
+  const navigation = useNavigation();
+  const inputRef = useRef<TextInput>(null);
   const trimmed = query.trim();
   const debounced = useDebouncedValue(trimmed, 300);
   const needle = submitted ?? (isNetworkQuery(trimmed) ? debounced : trimmed);
   const network = isNetworkQuery(needle);
-  const wantsBooks = network && (scope === "all" || scope === "books");
-  const wantsPeople = network && (scope === "all" || scope === "people");
-  const wantsGames = network && (scope === "all" || scope === "games");
 
-  const catalog = useQuery({ queryKey: ["search", "books", needle], queryFn: () => searchCatalogWorks(needle), enabled: wantsBooks, placeholderData: keepPreviousData, retry: false });
+  const catalog = useQuery({ queryKey: ["search", "books", needle], queryFn: () => searchCatalogWorks(needle), enabled: network, placeholderData: keepPreviousData, retry: false });
   const external = useQuery({
     queryKey: ["search", "external", submitted],
     queryFn: () => bookSearchApi.outside(submitted ?? ""),
-    enabled: wantsBooks && submitted !== null && (!looksLikeIsbnQuery(submitted) || (catalog.isSuccess && !catalog.isPlaceholderData && catalog.data.length === 0)),
+    enabled: network && submitted !== null && (!looksLikeIsbnQuery(submitted) || (catalog.isSuccess && !catalog.isPlaceholderData && catalog.data.length === 0)),
     staleTime: Infinity,
     retry: false,
   });
-  const people = useQuery({ queryKey: ["community", "people", "search", needle], queryFn: () => searchPeople(needle), enabled: wantsPeople, placeholderData: keepPreviousData, retry: false });
+  const people = useQuery({ queryKey: ["community", "people", "search", needle], queryFn: () => searchPeople(needle), enabled: network, placeholderData: keepPreviousData, retry: false });
   const games = useInfiniteQuery({
     queryKey: ["community", "discover", "all", needle],
     queryFn: ({ pageParam }) => fetchDiscover("all", needle, pageParam),
     initialPageParam: 0,
     getNextPageParam: (lastPage) => lastPage.nextOffset ?? undefined,
-    enabled: wantsGames,
+    enabled: network,
     placeholderData: keepPreviousData,
     retry: false,
   });
@@ -54,7 +55,7 @@ export function SearchScreen() {
   const books = library.data?.data.books ?? [];
   const bookRows = mergeBookResults(catalog.data ?? [], external.data ?? [], ownedBooks(books, library.data?.works));
   const gameRows = games.data?.pages.flatMap((page) => page.items) ?? [];
-  const rows = searchRows({
+  const rowsFor = (scope: SearchScope) => searchRows({
     scope,
     query: needle,
     submitted: submitted !== null,
@@ -80,6 +81,10 @@ export function SearchScreen() {
     submitRef.current(isbn);
   }), []);
 
+  useEffect(() => navigation.getParent<TabsNavigation>()?.addListener("tabPress", () => {
+    if (navigation.isFocused()) inputRef.current?.focus();
+  }), [navigation]);
+
   const retries: Record<ResultSection, () => unknown> = { library: library.refetch, books: catalog.refetch, people: people.refetch, games: games.refetch };
   const actions: ResultActions = {
     query: needle,
@@ -95,60 +100,50 @@ export function SearchScreen() {
   return (
     <Screen top={false}>
       <Stack.Screen options={{ title: "Search", headerShown: true, headerLargeTitleEnabled: false }} />
-      <View style={styles.top}>
-        <View style={styles.field}>
-          <View style={styles.grow}>
-            <Input
-              icon="search"
-              accessibilityLabel="Search books, people and games"
-              placeholder="Books, people, games"
-              value={query}
-              onChangeText={(text) => {
-                setQuery(text);
-                setSubmitted(null);
-              }}
-              onSubmitEditing={() => submit(query)}
-              autoCapitalize="none"
-              autoCorrect={false}
-              returnKeyType="search"
-            />
-          </View>
-          {query ? (
-            <IconButton
-              name="close"
-              accessibilityLabel="Clear search"
-              onPress={() => {
-                setQuery("");
-                setSubmitted(null);
-              }}
-            />
-          ) : null}
-        </View>
-        <Segmented accessibilityLabel="Search in" options={SEARCH_SCOPES} value={scope} onChange={setScope} />
-      </View>
-      {trimmed ? (
-        <FlatList
-          data={rows}
-          keyExtractor={(row) => row.key}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag"
-          contentContainerStyle={styles.list}
-          onEndReached={() => {
-            if (scope === "games" && games.hasNextPage && !games.isFetchingNextPage && !games.isFetchNextPageError) void games.fetchNextPage();
-          }}
-          onEndReachedThreshold={0.4}
-          ListFooterComponent={
-            scope !== "games" ? null : games.isFetchingNextPage ? (
-              <View style={styles.footer}><Skeleton height={80} /></View>
-            ) : games.isFetchNextPageError ? (
-              <View style={styles.footer}><ErrorState body="Couldn't load more." actionLabel="Retry" onAction={() => void games.fetchNextPage()} /></View>
-            ) : null
-          }
-          renderItem={({ item }) => <SearchResultRow row={item} actions={actions} />}
-        />
-      ) : (
-        <SearchIdle scope={scope} recent={recent.searches} onRecent={submit} onClearRecent={recent.clear} follow={follow} />
-      )}
+      <SearchDock
+        value={query}
+        onChangeText={(text) => {
+          setQuery(text);
+          setSubmitted(null);
+        }}
+        onSubmitEditing={() => submit(query)}
+        inputRef={inputRef}
+        accessibilityLabel="Search books, people and games"
+        placeholder="Books, people, games"
+      >
+        {(scrollProps) => (
+          <SwipeableTabs
+            accessibilityLabel="Search in"
+            options={SEARCH_SCOPES}
+            value={scope}
+            onChange={setScope}
+            renderPage={(pageScope) =>
+              trimmed ? (
+                <FlatList
+                  data={rowsFor(pageScope)}
+                  keyExtractor={(row) => row.key}
+                  {...scrollProps}
+                  contentContainerStyle={styles.list}
+                  onEndReached={() => {
+                    if (pageScope === "games" && games.hasNextPage && !games.isFetchingNextPage && !games.isFetchNextPageError) void games.fetchNextPage();
+                  }}
+                  onEndReachedThreshold={0.4}
+                  ListFooterComponent={
+                    pageScope !== "games" ? null : games.isFetchingNextPage ? (
+                      <View style={styles.footer}><Skeleton height={80} /></View>
+                    ) : games.isFetchNextPageError ? (
+                      <View style={styles.footer}><ErrorState body="Couldn't load more." actionLabel="Retry" onAction={() => void games.fetchNextPage()} /></View>
+                    ) : null
+                  }
+                  renderItem={({ item }) => <SearchResultRow row={item} actions={actions} />}
+                />
+              ) : (
+                <SearchIdle scope={pageScope} recent={recent.searches} onRecent={submit} onClearRecent={recent.clear} follow={follow} scrollProps={scrollProps} />
+              )
+            }
+          />
+        )}
+      </SearchDock>
       {follow.error ? <Toast visible message={follow.error} tone="error" /> : null}
       {adding ? (
         <AddBookSheet
@@ -161,9 +156,6 @@ export function SearchScreen() {
 }
 
 const styles = StyleSheet.create({
-  grow: { flex: 1 },
-  top: { gap: spacing.sm, paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.xs },
-  field: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  list: { paddingBottom: spacing.huge },
+  list: { paddingBottom: searchDockClearance },
   footer: { padding: spacing.lg },
 });
