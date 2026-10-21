@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { FlatList, StyleSheet, View } from "react-native";
-import { EmptyState, ErrorState, SearchDock, Skeleton, Toast, searchDockClearance, spacing, type IconName } from "../../ui";
+import { EmptyState, ErrorState, SearchDock, Skeleton, Toast, searchDockClearance, searchDockFabClearance, spacing, type IconName } from "../../ui";
 import { ArenaBooksSheet } from "../arena/ArenaBooksSheet";
 import { fetchDiscover } from "./api";
 import { DISCOVER_FILTERS, type DiscoverFilter } from "./communityHome";
@@ -11,7 +11,7 @@ import { DiscoverRow } from "./DiscoverRow";
 
 const FILTER_ICONS: Record<DiscoverFilter, IconName> = { all: "filter", tierlist: "tierlist", tournament: "bracket", quiz: "champion" };
 
-export function DiscoverPane({ linkAuthors = true }: { linkAuthors?: boolean }) {
+export function DiscoverPane({ linkAuthors = true, fab }: { linkAuthors?: boolean; fab?: ReactNode }) {
   const [filter, setFilter] = useState<DiscoverFilter>("all");
   const [search, setSearch] = useState("");
   const needle = useDebouncedValue(search.trim(), 300);
@@ -37,6 +37,7 @@ export function DiscoverPane({ linkAuthors = true }: { linkAuthors?: boolean }) 
         onChangeText={setSearch}
         accessibilityLabel="Search tier lists, tournaments and quizzes by name or book"
         placeholder="Search"
+        fab={fab}
         cycle={{
           icon: FILTER_ICONS[filter],
           active: filter !== "all",
@@ -58,7 +59,7 @@ export function DiscoverPane({ linkAuthors = true }: { linkAuthors?: boolean }) 
             {...scrollProps}
             data={items}
             keyExtractor={(item) => `${item.content.kind}:${item.content.id}`}
-            contentContainerStyle={styles.list}
+            contentContainerStyle={[styles.list, fab ? styles.fabClearance : null]}
             refreshing={discover.isRefetching}
             onRefresh={() => void discover.refetch()}
             ListEmptyComponent={
@@ -103,4 +104,5 @@ const styles = StyleSheet.create({
   grow: { flex: 1 },
   page: { flex: 1, padding: spacing.lg },
   list: { paddingTop: spacing.lg - spacing.md, paddingBottom: searchDockClearance, flexGrow: 1 },
+  fabClearance: { paddingBottom: searchDockFabClearance },
 });
