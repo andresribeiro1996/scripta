@@ -54,3 +54,8 @@ test("coveredFirst keeps every item and only swaps within a work", () => {
   assert.deepEqual(ordered.map((item) => item.id), ["a-cover", "n-bare", "b-bare", "n-cover", "a-bare"]);
   assert.deepEqual(items.map((item) => item.id), ["a-bare", "n-bare", "b-bare", "n-cover", "a-cover"]);
 });
+
+test("keeps a covered best match when a later edition of the work is covered too", () => {
+  const rows = [book("b-first", "Dune", "w-1", { image: "img-1" }), book("b-second", "Dune", "w-1", { image: "img-2" })];
+  assert.deepEqual(shown(rows), ["b-first"]);
+});
