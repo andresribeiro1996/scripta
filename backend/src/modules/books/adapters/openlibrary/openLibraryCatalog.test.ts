@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import { SourceUnavailableError } from "../../domain/errors.js";
 import type { Throttle } from "../http/http.js";
-import { createOpenLibraryCatalog, parseEditionRecord } from "./openLibraryCatalog.js";
+import { createOpenLibraryCatalog, parseEditionRecord, searchOpenLibraryWorks } from "./openLibraryCatalog.js";
 
 const direct: Throttle = (task) => task();
 const originalFetch = globalThis.fetch;
@@ -208,4 +208,26 @@ test("search carries the series subjects of each doc", async () => {
   const hits = await createOpenLibraryCatalog(direct).search({ text: "dune" });
   assert.deepEqual(hits[0]!.subjectSeries, [{ name: "Dune Chronicles", position: null }]);
   assert.equal("subjectSeries" in hits[1]!, false);
+});
+
+test("a work search asks for the title and author and keeps only docs with a work key and a title", async () => {
+  const requests = respond([{ docs: [{ key: "/works/OL1W", title: "To the Lighthouse", author_name: ["Virginia Woolf"] }, { key: "/books/OL2M", title: "x" }, { key: "/works/OL3W" }] }]);
+  assert.deepEqual(await searchOpenLibraryWorks(direct, "To the Lighthouse", "virginia woolf"), [{ key: "/works/OL1W", title: "To the Lighthouse", authors: ["Virginia Woolf"] }]);
+  const url = new URL(requests[0]!);
+  assert.equal(url.origin + url.pathname, "https://openlibrary.org/search.json");
+  assert.match(url.search, /title=To\+the\+Lighthouse/);
+  assert.match(url.search, /author=virginia\+woolf/);
+  assert.match(url.search, /fields=key%2Ctitle%2Cauthor_name/);
+  assert.match(url.search, /limit=10/);
+  respond([{}]);
+  assert.deepEqual(await searchOpenLibraryWorks(direct, "x", "y"), []);
+});
+
+test("a work search without author names gives an empty author list, and a rate limit propagates", async () => {
+  respond([{ docs: [{ key: "/works/OL4W", title: "Anonymous" }, { key: "/works/OL5W", title: "Mixed", author_name: ["A", 7, null] }] }]);
+  assert.deepEqual(await searchOpenLibraryWorks(direct, "x", "y"), [{ key: "/works/OL4W", title: "Anonymous", authors: [] }, { key: "/works/OL5W", title: "Mixed", authors: ["A"] }]);
+  globalThis.fetch = (async () => new Response("slow down", { status: 429 })) as typeof fetch;
+  await assert.rejects(searchOpenLibraryWorks(direct, "x", "y"), (error: unknown) => error instanceof SourceUnavailableError && error.status === 429);
+  globalThis.fetch = (async () => new Response("", { status: 404 })) as typeof fetch;
+  assert.deepEqual(await searchOpenLibraryWorks(direct, "x", "y"), []);
 });

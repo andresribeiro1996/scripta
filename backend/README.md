@@ -368,6 +368,27 @@ npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --
 npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cat /data/series-undone.json /data/series-undone.log'
 ```
 
+#### Fetching missing originals
+
+For held works only (on a reader's shelf), finds on Open Library the originals the catalog is missing, adds each as a `seed` row without ISBN or language, then runs the translation backlog's free code step on those works, so the Portuguese edition joins its original. Open Library gets one call a second; the script never calls ISBNdb or TypeSafe. It needs `COVERS_DB_PATH`, `LIBRARY_DB_PATH` and `ARENA_DB_PATH`, the library and arena databases opened read-only. Run it after the deploy that ships it, since scripts run from the deployed `dist`.
+
+It skips these before any lookup: series-like originals (the `Princess Poppy` guard above) and volume titles; originals with a part after a colon, a bracket, a full stop (`". "`) or a dash (`" - "`) (`subtitle`), since the title key or the search drops it, and a fetched "Fairy Oak: Il segreto" would become the only candidate for the next volume; originals already in the catalog (`present`), which in a real run go to the code step only under their whole original title, because title matching drops a colon subtitle and a held "Dune" would otherwise join "Dune: Messiah" (`presentWorks` lists the ones that go); works without an author; Portuguese books with different titles that name one original, or one Portuguese title with two originals that share a title key (`sharedOriginal`, counted over the whole catalog), which are two re-translations or two volumes under a series name and can't be told apart; and the owner's (`manual`) answers.
+
+1. Dry run: writes nothing and makes the same lookups. `originals` lists each looked-up group, the Portuguese titles and the Open Library work it would add (`found`, or null); works dropped as `sharedOriginal` are only counted. `presentWorks` lists the joins the real run would make from originals already there. Read both before the real run.
+
+   ```bash
+   npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && node scripts/fetch-originals.mjs --dry-run' > originals-dry.json
+   ```
+
+2. Real run: the same command without `--dry-run`, detached, then read its report. Every join is listed under "Merged" on `/admin/translations`, where it can be undone. It is safe to re-run: an original added just before a kill is already in the catalog next time, so its works are joined by the code step. A 429 from Open Library ends the run before anything is written, since all lookups finish before any insert, so re-running repeats them. The code step first runs the original-title fill over the whole catalog in one write transaction, so run it off-peak. A work in `ask` (more than one candidate) keeps its earlier answer; `translation-backlog.mjs --recheck-none` reaches it once that answer is 30 days old. A deploy kills the job, so hold production deploys while it runs.
+
+   ```bash
+   npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && setsid node scripts/fetch-originals.mjs > /data/fetch-originals.json 2> /data/fetch-originals.log < /dev/null & sleep 3; echo started'
+   npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cat /data/fetch-originals.json; tail -n 3 /data/fetch-originals.log'
+   ```
+
+The report counts `held`, `selected`, `noOriginal`, `seriesLike`, `volume`, `subtitle`, `present`, `noAuthor`, `sharedOriginal`, `lookups`, `found`, `notFound`, `added`, `existing` (a book with the insert's key was already there when the insert ran, because the server added it during the lookups; it is left untouched and its works join only if it carries the whole original title), `codeMerges`, `codeBlocked` (blocked by an arena) and `noCandidates`, then lists `presentWorks` (the `present` works the real run hands to the code step: id, title and original title), `failed` (originals whose lookup threw a `SourceUnavailableError` other than a 429: a 5xx, a timeout, invalid JSON or a 4xx other than 404), `ask` (work ids left for Jev) and `originals`. The dry run leaves `added`, `existing` and the code step's counts at 0. A 429 from Open Library ends the run with an error before anything is written.
+
 #### Calibrating Jev
 
 Claude sets and checks the thresholds Jev's answers are read against; it never judges the backlog itself. Calibrate once on production before the first backlog run of each task, and again whenever the Jev model version or a question's wording changes.
