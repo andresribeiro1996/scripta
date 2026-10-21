@@ -58,6 +58,14 @@ test("breaks ties by titles, latest appearance, work id", () => {
   assert.deepEqual(ids(r.boards.champions), ["we", "wz", "wc", "wd", "wa", "wb"]);
 });
 
+test("champions tie-break uses appearance publish time, not title settle time", () => {
+  const t = (id: string, workId: string, createdAt: string, settledAt: string) => tournament({ id, createdAt, workIds: [workId], champion: { workId, settledAt } });
+  const r = rankTopShelf(input({
+    tournaments: [t("a", "wa", "2026-10-10T00:00:00.000Z", "2026-10-12T00:00:00.000Z"), t("b", "wb", "2026-10-01T00:00:00.000Z", "2026-10-20T00:00:00.000Z")],
+  }), all);
+  assert.deepEqual(r.boards.champions, [{ workId: "wa", value: 4 }, { workId: "wb", value: 4 }]);
+});
+
 test("highest tier needs three lists and ranks lower scores first", () => {
   const place = (workId: string, tierIndex: number) => ({ workId, tierIndex, tierCount: 5, ranksWorstFirst: false, castAt: "2026-10-06T00:00:00.000Z" });
   const lists = ["a", "b", "c"].map((id) => tierlist({ id, workIds: ["w1", "w2", "w3"], placements: [place("w1", 0), place("w2", 3), place("w3", 1)] }));
@@ -119,6 +127,15 @@ test("genres lists every genre even when one is selected", () => {
   const genres = new Map([["w1", { genres: ["Fantasy"] }], ["w2", { genres: ["Horror"] }], ["w3", { genres: ["Horror"] }]]);
   const base = input({ genres, quizzes: [quiz({ id: "a", workIds: ["w1", "w2", "w3"] }), quiz({ id: "b", workIds: ["w2"] })] });
   assert.deepEqual(rankTopShelf(base, { since: null, genre: "Fantasy" }).genres, ["Horror", "Fantasy"]);
+});
+
+test("genres includes a genre whose only entries are on another board", () => {
+  const place = { workId: "w1", tierIndex: 0, tierCount: 5, ranksWorstFirst: false, castAt: "2026-10-06T00:00:00.000Z" };
+  const lists = ["a", "b", "c"].map((id) => tierlist({ id, createdAt: "2026-09-01T00:00:00.000Z", placements: [place] }));
+  const genres = new Map([["w1", { genres: ["Sci-Fi"] }], ["w2", { genres: ["Horror"] }]]);
+  const r = rankTopShelf(input({ genres, tierlists: lists, quizzes: [quiz({ id: "q", workIds: ["w2"] })] }), { since: "2026-10-01T00:00:00.000Z", genre: null });
+  assert.deepEqual(ids(r.boards.highestTier), ["w1"]);
+  assert.deepEqual(r.genres, ["Horror", "Sci-Fi"]);
 });
 
 test("hottest games sum likes votes and comments in the period and ignore the vote bar", () => {

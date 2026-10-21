@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { Stack, router, useSegments } from "expo-router";
+import { Stack, router, useLocalSearchParams, useSegments } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import type { TopShelfBook, TopShelfPeriod, TopShelfView } from "@scripta/shared";
 import { Text } from "../../ui/Text";
@@ -19,8 +19,9 @@ function topShelfHref(view: TopShelfView, period: TopShelfPeriod, genre: string 
 export function TopShelfScreen() {
   const { colors } = useTheme();
   const segments = useSegments();
-  const [period, setPeriod] = useState<TopShelfPeriod>("month");
-  const [genre, setGenre] = useState<string | null>(null);
+  const params = useLocalSearchParams<{ period?: string; genre?: string }>();
+  const [period, setPeriod] = useState<TopShelfPeriod>(params.period === "all" ? "all" : "month");
+  const [genre, setGenre] = useState<string | null>(params.genre ?? null);
   const query = useQuery({ queryKey: ["topShelf", period, genre], queryFn: () => fetchTopShelf({ period, genre }), placeholderData: keepPreviousData, retry: false });
   const data = query.data;
   const openBook = (book: TopShelfBook) => router.push(workPath(book.workId, segments) as never);

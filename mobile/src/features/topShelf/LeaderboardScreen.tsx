@@ -31,7 +31,12 @@ function Leaderboard({ view, initialPeriod, initialGenre }: { view: TopShelfView
   const query = useQuery({ queryKey: ["topShelf", period, genre, view], queryFn: () => fetchTopShelf({ period, genre, view }), placeholderData: keepPreviousData, retry: false });
   const data = query.data;
 
-  const bar = <TopShelfBar period={period} onPeriod={setPeriod} genre={genre} onGenre={setGenre} genres={data?.genres ?? []} genreDisabled={isGames} />;
+  const choosePeriod = (next: TopShelfPeriod) => {
+    if (view === "risingStar" && next === "all") router.replace({ pathname: "/top-shelf", params: { period: "all", ...(genre ? { genre } : {}) } } as never);
+    else setPeriod(next);
+  };
+
+  const bar = <TopShelfBar period={period} onPeriod={choosePeriod} genre={genre} onGenre={setGenre} genres={data?.genres ?? []} genreDisabled={isGames} />;
 
   function rows(): Row[] {
     if (!data) return [];

@@ -71,7 +71,9 @@ test("reuses a cached result within 60 seconds", () => {
   const { service, calls, clock } = setup();
   const first = service.getTopShelf({ period: "month", genre: null });
   clock.at += 59_000;
-  assert.equal(service.getTopShelf({ period: "month", genre: null }), first);
+  assert.deepEqual(service.getTopShelf({ period: "month", genre: null }), first);
+  service.getTopShelf({ period: "month", genre: "Fantasy" });
+  service.getTopShelf({ period: "month", genre: null, view: "games" });
   assert.equal(calls.facts.length, 1);
   assert.equal(calls.facts[0], "2026-09-30T23:00:00.000Z");
   clock.at += 2_000;
@@ -93,7 +95,7 @@ test("drops expired cache entries on write", () => {
   const start = clock.at;
   service.getTopShelf({ period: "all", genre: null });
   clock.at = start + 61_000;
-  service.getTopShelf({ period: "all", genre: null, view: "games" });
+  service.getTopShelf({ period: "month", genre: null });
   clock.at = start + 30_000;
   service.getTopShelf({ period: "all", genre: null });
   assert.equal(calls.facts.length, 3);

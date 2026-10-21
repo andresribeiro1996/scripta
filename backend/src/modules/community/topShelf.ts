@@ -113,7 +113,6 @@ export function rankTopShelf(input: ShelfInput, opts: { since: string | null; ge
     const w = canon(facts.champion.workId);
     const t = tally(w);
     t.titles += 1;
-    t.latest = Math.max(t.latest, settledAt);
     const c = crowned.get(w) ?? { titles: 0, appearances: 0, latest: 0 };
     c.titles += 1;
     c.latest = Math.max(c.latest, settledAt);
@@ -194,5 +193,10 @@ export function rankTopShelf(input: ShelfInput, opts: { since: string | null; ge
     .filter((g) => g.likes + g.votes + g.comments > 0)
     .sort((a, b) => b.likes + b.votes + b.comments - (a.likes + a.votes + a.comments) || (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0) || (`${a.ref.kind}:${a.ref.id}` < `${b.ref.kind}:${b.ref.id}` ? -1 : 1));
 
-  return { boards, genres: genreChampions.map((g) => g.genre), genreChampions: opts.genre === null ? genreChampions : [], games };
+  const championPoints = new Map(genreChampions.map((g) => [g.genre, g.entry.value]));
+  const menu = new Set<string>();
+  for (const list of Object.values(allBoards)) for (const r of list) for (const genre of genresOf(r.workId)) menu.add(genre);
+  const genres = [...menu].sort((a, b) => (championPoints.get(b) ?? 0) - (championPoints.get(a) ?? 0) || (a < b ? -1 : a > b ? 1 : 0));
+
+  return { boards, genres, genreChampions: opts.genre === null ? genreChampions : [], games };
 }

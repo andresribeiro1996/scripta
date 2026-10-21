@@ -5,7 +5,7 @@ import type { QuizShelfFacts } from "../quizzes/service.js";
 import type { TierlistShelfFacts } from "../tierlists/service.js";
 import type { EngagementRepository, GameRef } from "./domain/ports.js";
 import { buildDiscoverItems, type CommunityDeps, type DiscoverEntry } from "./service.js";
-import { rankTopShelf, topShelfMonthStart, type Ranked } from "./topShelf.js";
+import { rankTopShelf, topShelfMonthStart, type Ranked, type ShelfInput } from "./topShelf.js";
 
 export interface TopShelfDeps {
   tierlistFacts(since: string | null): TierlistShelfFacts[];
@@ -31,9 +31,9 @@ const FULL_BOARD = 10;
 
 export function createTopShelfService(deps: { engagementRepo: Pick<EngagementRepository, "gameEngagement">; community: DiscoverDeps; shelf: TopShelfDeps; now: () => number }): TopShelfService {
   const { engagementRepo, community, shelf, now } = deps;
-  const cache = new Map<string, { at: number; value: TopShelf }>();
+  const cache = new Map<string, { at: number; value: ShelfInput }>();
 
-  const compute = ({ period, genre, view }: TopShelfQuery, since: string | null): TopShelf => {
+  const gather = (since: string | null): ShelfInput => {
     const tierlists = shelf.tierlistFacts(since);
     const tournaments = shelf.tournamentFacts(since);
     const quizzes = shelf.quizFacts(since);
@@ -48,18 +48,19 @@ export function createTopShelfService(deps: { engagementRepo: Pick<EngagementRep
     for (const f of tierlists) for (const p of f.placements) workIds.add(p.workId);
     for (const f of tournaments) if (f.champion) workIds.add(f.champion.workId);
     const canonical = shelf.canonicalWorks([...workIds]);
-    const ranked = rankTopShelf(
-      {
-        tierlists,
-        tournaments,
-        quizzes,
-        engagement: engagementRepo.gameEngagement(refs, since),
-        visibleOwners: new Set(community.resolveProfiles(ownerIds).keys()),
-        canonical,
-        genres: shelf.catalogGenres([...new Set(canonical.values())]),
-      },
-      { since, genre },
-    );
+    return {
+      tierlists,
+      tournaments,
+      quizzes,
+      engagement: engagementRepo.gameEngagement(refs, since),
+      visibleOwners: new Set(community.resolveProfiles(ownerIds).keys()),
+      canonical,
+      genres: shelf.catalogGenres([...new Set(canonical.values())]),
+    };
+  };
+
+  const compute = ({ period, genre, view }: TopShelfQuery, since: string | null, input: ShelfInput): TopShelf => {
+    const ranked = rankTopShelf(input, { since, genre });
 
     const sizeOf = (board: TopShelfBoard) => (view === undefined ? (board === "champions" ? PODIUM : BOARD_PREVIEW) : FULL_BOARD);
     const picked: Array<[TopShelfBoard, Ranked[]]> = [];
@@ -101,13 +102,14 @@ export function createTopShelfService(deps: { engagementRepo: Pick<EngagementRep
     getTopShelf(query) {
       const at = now();
       const since = query.period === "month" ? topShelfMonthStart(new Date(at)) : null;
-      const key = JSON.stringify([since, query.period, query.genre, query.view ?? null]);
-      const hit = cache.get(key);
-      if (hit && at - hit.at < CACHE_MS) return hit.value;
-      const value = compute(query, since);
-      for (const [k, entry] of cache) if (at - entry.at >= CACHE_MS) cache.delete(k);
-      cache.set(key, { at, value });
-      return value;
+      const key = String(since);
+      let hit = cache.get(key);
+      if (!hit || at - hit.at >= CACHE_MS) {
+        hit = { at, value: gather(since) };
+        for (const [k, entry] of cache) if (at - entry.at >= CACHE_MS) cache.delete(k);
+        cache.set(key, hit);
+      }
+      return compute(query, since, hit.value);
     },
   };
 }

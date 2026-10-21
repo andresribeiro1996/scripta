@@ -62,11 +62,15 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
     SELECT w.tierlist_id, w.work_id FROM tierlist_works w JOIN tierlists t ON t.id = w.tierlist_id AND t.vote_code IS NOT NULL
   `);
   const shelfPlacementsStmt = db.prepare(`
-    SELECT p.tierlist_id, p.work_id, p.tier_id, t.data, t.ranks_worst_first, b.created_at AS cast_at
+    SELECT p.tierlist_id, p.work_id, p.tier_id, b.created_at AS cast_at
     FROM tierlist_ballot_placements p
     JOIN tierlists t ON t.id = p.tierlist_id AND t.vote_code IS NOT NULL
     JOIN tierlist_works w ON w.tierlist_id = p.tierlist_id AND w.work_id = p.work_id
     JOIN tierlist_ballots b ON b.id = p.ballot_id AND b.voter_user_id IS NOT NULL
+  `);
+  const shelfBoardsStmt = db.prepare(`
+    SELECT t.id, t.data, t.ranks_worst_first FROM tierlists t
+    WHERE t.vote_code IS NOT NULL AND EXISTS (SELECT 1 FROM tierlist_ballot_placements p WHERE p.tierlist_id = t.id)
   `);
   const ballotTotalsForStmt = db.prepare(`
     SELECT b.tierlist_id,
@@ -352,17 +356,17 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
         if (ids) ids.push(row.work_id);
         else works.set(row.tierlist_id, [row.work_id]);
       }
-      const tiersOf = new Map<string, string[]>();
+      const boards = new Map<string, { tierIds: string[]; ranksWorstFirst: boolean }>();
+      for (const row of shelfBoardsStmt.all() as unknown as Array<{ id: string; data: string; ranks_worst_first: number }>) {
+        boards.set(row.id, { tierIds: (JSON.parse(row.data) as { tiers: Array<{ id: string }> }).tiers.map((tier) => tier.id), ranksWorstFirst: row.ranks_worst_first === 1 });
+      }
       const placements = new Map<string, TierlistShelfFacts["placements"]>();
-      for (const row of shelfPlacementsStmt.all() as unknown as Array<{ tierlist_id: string; work_id: string; tier_id: string; data: string; ranks_worst_first: number; cast_at: string }>) {
-        let ids = tiersOf.get(row.tierlist_id);
-        if (!ids) {
-          ids = (JSON.parse(row.data) as { tiers: Array<{ id: string }> }).tiers.map((tier) => tier.id);
-          tiersOf.set(row.tierlist_id, ids);
-        }
-        const tierIndex = ids.indexOf(row.tier_id);
+      for (const row of shelfPlacementsStmt.all() as unknown as Array<{ tierlist_id: string; work_id: string; tier_id: string; cast_at: string }>) {
+        const board = boards.get(row.tierlist_id);
+        if (!board) continue;
+        const tierIndex = board.tierIds.indexOf(row.tier_id);
         if (tierIndex === -1) continue;
-        const entry = { workId: row.work_id, tierIndex, tierCount: ids.length, ranksWorstFirst: row.ranks_worst_first === 1, castAt: row.cast_at };
+        const entry = { workId: row.work_id, tierIndex, tierCount: board.tierIds.length, ranksWorstFirst: board.ranksWorstFirst, castAt: row.cast_at };
         const list = placements.get(row.tierlist_id);
         if (list) list.push(entry);
         else placements.set(row.tierlist_id, [entry]);
