@@ -2,13 +2,13 @@ import { useState, type ReactNode } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Stack, router, useLocalSearchParams, useSegments } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
-import type { TopShelfBook, TopShelfPeriod, TopShelfView } from "@scripta/shared";
+import { recapMonthName, type TopShelfBook, TopShelfPeriod, TopShelfView } from "@scripta/shared";
 import { Text } from "../../ui/Text";
-import { EmptyState, ErrorState, Icon, Screen, ScrollDock, Skeleton, dynamicType, minimumTouchTarget, radii, searchDockClearance, spacing, typography, useTheme } from "../../ui";
+import { Button, EmptyState, ErrorState, Icon, Screen, ScrollDock, Skeleton, dynamicType, minimumTouchTarget, radii, searchDockClearance, spacing, typography, useTheme } from "../../ui";
 import { BookCover } from "../arena/BookCover";
 import { DiscoverRow } from "../community/DiscoverRow";
 import { workPath } from "../works/workPath";
-import { fetchTopShelf } from "./api";
+import { fetchRecapIndex, fetchTopShelf } from "./api";
 import { TopShelfBar } from "./TopShelfBar";
 import { boardTitle, emptySections, valueLabel, visibleBoards } from "./topShelfModel";
 
@@ -24,6 +24,8 @@ export function TopShelfScreen() {
   const [genre, setGenre] = useState<string | null>(params.genre ?? null);
   const query = useQuery({ queryKey: ["topShelf", period, genre], queryFn: () => fetchTopShelf({ period, genre }), placeholderData: keepPreviousData, retry: false });
   const data = query.data;
+  const recaps = useQuery({ queryKey: ["topShelfRecaps"], queryFn: fetchRecapIndex, retry: false }).data?.months ?? [];
+  const openRecap = (month: string) => router.push(`/recap/${month}` as never);
   const openBook = (book: TopShelfBook) => router.push(workPath(book.workId, segments) as never);
 
   const bar = <TopShelfBar period={period} onPeriod={setPeriod} genre={genre} onGenre={setGenre} genres={data?.genres ?? []} genreDisabled={false} />;
@@ -38,11 +40,34 @@ export function TopShelfScreen() {
             : <View style={styles.page}><Skeleton height={200} /></View>;
         }
         const empty = emptySections(data);
+        const recapBlock = recaps.length ? (
+          <>
+            <View style={styles.recapButton}>
+              <Button label={`▶ Play ${recapMonthName(recaps[0]!)} recap`} numberOfLines={1} onPress={() => openRecap(recaps[0]!)} />
+            </View>
+            {recaps.length > 1 ? (
+              <Section title="Past recaps">
+                {recaps.slice(1).map((month) => (
+                  <Pressable key={month} accessibilityRole="button" accessibilityLabel={`${recapMonthName(month)} recap`} onPress={() => openRecap(month)} style={[styles.recapRow, { borderColor: colors.border }]}>
+                    <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.grow, { color: colors.text }]}>{`${recapMonthName(month)} recap`}</Text>
+                    <Icon name="chevronRight" size={20} color={colors.textDim} />
+                  </Pressable>
+                ))}
+              </Section>
+            ) : null}
+          </>
+        ) : null;
         if (empty.podium && empty.records && (empty.genres || genre !== null) && empty.games) {
-          return <View style={styles.page}><EmptyState title={`Nothing here yet${data.period === "month" ? " this month" : ""} — games count once 5 people vote.`} /></View>;
+          return (
+            <ScrollView {...scrollProps} contentContainerStyle={styles.list}>
+              {recapBlock}
+              <View style={styles.page}><EmptyState title={`Nothing here yet${data.period === "month" ? " this month" : ""} — games count once 5 people vote.`} /></View>
+            </ScrollView>
+          );
         }
         return (
         <ScrollView {...scrollProps} contentContainerStyle={styles.list}>
+          {recapBlock}
           {empty.podium ? null : <Podium books={data.boards.champions ?? []} title={data.period === "month" ? "Book of the month" : "All-time champions"} onOpen={openBook} />}
           {empty.records ? null : (
             <Section title="Records">
@@ -118,7 +143,6 @@ function Podium({ books, title, onOpen }: { books: TopShelfBook[]; title: string
             <BookCover cover={entry.book.coverUrl} title={entry.book.title} {...PODIUM_COVER[entry.place]} />
             <Text {...dynamicType} style={[typography.title, styles.strong, { color: entry.place === 1 ? colors.accent : colors.textDim }]}>{entry.place}</Text>
             {entry.place === 1 ? <Text numberOfLines={2} {...dynamicType} style={[typography.body, styles.strong, styles.center, { color: colors.text }]}>{entry.book.title}</Text> : null}
-            {entry.place === 1 ? <View style={styles.recapSpace} /> : null}
           </Pressable>
         ) : <View key={slot} style={styles.podiumSlot} />)}
       </View>
@@ -139,5 +163,7 @@ const styles = StyleSheet.create({
   podiumTitle: { paddingHorizontal: spacing.lg, marginBottom: spacing.md },
   podium: { flexDirection: "row", alignItems: "flex-end", justifyContent: "center", gap: spacing.md, paddingHorizontal: spacing.lg },
   podiumSlot: { flex: 1, alignItems: "center", gap: spacing.xs },
-  recapSpace: { height: minimumTouchTarget },
+  recapButton: { paddingHorizontal: spacing.lg, marginBottom: spacing.xl },
+  recapRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, minHeight: minimumTouchTarget, marginHorizontal: spacing.lg, borderBottomWidth: 1 },
+  grow: { flex: 1, minWidth: 0 },
 });
