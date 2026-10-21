@@ -12,6 +12,7 @@ export * from "./arena/index.js";
 export * from "./murals/index.js";
 export * from "./tierlists/index.js";
 export * from "./quizzes/index.js";
+export * from "./topShelf/index.js";
 export * from "./readerCards/index.js";
 export * from "./works/index.js";
 export * from "./public/index.js";

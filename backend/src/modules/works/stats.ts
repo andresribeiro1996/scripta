@@ -1,4 +1,4 @@
-import { BOOK_STATS_MINIMUM, tierLetter, type BookStats, type CommunityRating, type TierStanding, type TournamentRecord } from "@scripta/shared";
+import { BOOK_STATS_MINIMUM, tierLetter, tierPosition, type BookStats, type CommunityRating, type TierStanding, type TournamentRecord } from "@scripta/shared";
 
 export type BookStatsDeps = {
   getWorkPage(id: string): { aliasIds: string[] } | undefined;
@@ -19,9 +19,9 @@ function community(ratings: Array<{ rating: number }>): CommunityRating | null {
 function tiers(placements: Array<{ tierlistId: string; tierIndex: number; tierCount: number; ranksWorstFirst: boolean }>): TierStanding | null {
   const byList = new Map<string, number[]>();
   for (const placement of placements) {
-    if (placement.tierCount < 2) continue;
-    const position = placement.tierIndex / (placement.tierCount - 1);
-    byList.set(placement.tierlistId, [...(byList.get(placement.tierlistId) ?? []), placement.ranksWorstFirst ? 1 - position : position]);
+    const position = tierPosition(placement);
+    if (position === null) continue;
+    byList.set(placement.tierlistId, [...(byList.get(placement.tierlistId) ?? []), position]);
   }
   const ballots = [...byList.values()].reduce((sum, positions) => sum + positions.length, 0);
   if (ballots < BOOK_STATS_MINIMUM) return null;
