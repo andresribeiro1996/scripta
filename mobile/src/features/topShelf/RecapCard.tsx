@@ -6,7 +6,8 @@ import Svg, { Defs, LinearGradient, RadialGradient, Rect, Stop } from "react-nat
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { TopShelfRecapCard } from "@scripta/shared";
 import { Text } from "../../ui/Text";
-import { cardFontFamily, dynamicType, minimumTouchTarget, radii, spacing, typography } from "../../ui";
+import { MARK_VIEWBOX } from "@scripta/shared/themes";
+import { MarkRects, cardFontFamily, dynamicType, minimumTouchTarget, radii, spacing, typography } from "../../ui";
 import { recapCta, recapNumber, recapTitle } from "./recapModel";
 
 export const RECAP_COLORS = { gold: "#d9a54a", text: "#e8ece9", dim: "#9aa79f", border: "#5a4a24", deep: "#3d2f12", mid: "#1a2a22", base: "#0f1512" } as const;
@@ -92,7 +93,7 @@ export function RecapCard({ card, month, currentMonth, url, sharing = false, onO
         {url ? <View style={styles.qr}><QRCode value={url} size={72} quietZone={4} backgroundColor="white" color="black" /></View> : null}
         <View style={styles.stripText}>
           <Text numberOfLines={3} {...dynamicType} style={[typography.body, { color: RECAP_COLORS.text, fontWeight: "600" }]}>{recapCta(card, currentMonth)}</Text>
-          <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: RECAP_COLORS.gold, fontFamily: SERIF }]}>Scripta</Text>
+          <Svg accessibilityLabel="Scripta" width={20} height={20} viewBox={MARK_VIEWBOX}><MarkRects fill={RECAP_COLORS.gold} /></Svg>
         </View>
       </View> : <Text numberOfLines={2} {...dynamicType} style={[typography.caption, styles.hint]}>{recapCta(card, currentMonth)}</Text>}
     </View>

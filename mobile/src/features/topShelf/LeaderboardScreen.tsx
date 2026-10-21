@@ -36,7 +36,8 @@ function Leaderboard({ view, initialPeriod, initialGenre }: { view: TopShelfView
     else setPeriod(next);
   };
 
-  const bar = <TopShelfBar period={period} onPeriod={choosePeriod} genre={genre} onGenre={setGenre} genres={data?.genres ?? []} genreDisabled={isGames} />;
+  const [barHeight, setBarHeight] = useState(searchDockClearance);
+  const bar = <TopShelfBar period={period} onPeriod={choosePeriod} genre={genre} onGenre={setGenre} genres={data?.genres ?? []} genreDisabled={isGames} onHeight={setBarHeight} />;
 
   function rows(): Row[] {
     if (!data) return [];
@@ -79,7 +80,7 @@ function Leaderboard({ view, initialPeriod, initialGenre }: { view: TopShelfView
           return <View style={styles.page}><EmptyState title={`Nothing here yet${data.period === "month" ? " this month" : ""}${isGames ? "." : " — games count once 5 people vote."}`} /></View>;
         }
         return (
-          <ScrollView {...scrollProps} contentContainerStyle={styles.list}>
+          <ScrollView {...scrollProps} contentContainerStyle={{ paddingBottom: barHeight }}>
             {list.map((row, index) => (
               <Pressable key={row.key} accessibilityRole="button" accessibilityLabel={`${index + 1}. ${row.title}, ${row.label}`} onPress={row.onPress}>
                 {({ pressed }) => (
@@ -109,7 +110,6 @@ const styles = StyleSheet.create({
   grow: { flex: 1, gap: spacing.xs },
   strong: { fontWeight: "600" },
   page: { flex: 1, padding: spacing.lg },
-  list: { paddingBottom: searchDockClearance },
   row: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderBottomWidth: 1 },
   rank: { width: 24, textAlign: "center", fontWeight: "700" },
   track: { height: 6, borderRadius: radii.full, overflow: "hidden" },

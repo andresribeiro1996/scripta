@@ -66,11 +66,12 @@ export function RecapScreen({ month }: { month: string }) {
 
   const currentMonth = recapIndex.data.currentMonth;
   const last = cards.length - 1;
-  const step = (event: GestureResponderEvent) => {
-    if (event.nativeEvent.pageX < width / 2) setIndex((value) => Math.max(0, value - 1));
-    else if (index < last) setIndex((value) => value + 1);
+  const back = () => setIndex((value) => Math.max(0, value - 1));
+  const forward = () => {
+    if (index < last) setIndex((value) => value + 1);
     else close();
   };
+  const step = (event: GestureResponderEvent) => (event.nativeEvent.pageX < width / 2 ? back() : forward());
   const open = () => {
     if (card.kind === "book") router.push(workPath(card.book.workId, segments) as never);
     else if (card.kind === "hottestGame") router.push(contentTarget(card.game.item.content) as never);
@@ -78,7 +79,7 @@ export function RecapScreen({ month }: { month: string }) {
 
   return (
     <View style={styles.root} onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
-      <Pressable accessibilityLabel="Previous or next card" accessibilityHint="Tap the left side to go back, the right side to go on" style={styles.fill} onPress={step}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Next card" accessibilityHint="Tap the left side to go back, the right side to go on" accessibilityActions={[{ name: "previous", label: "Previous card" }]} onAccessibilityAction={back} style={styles.fill} onPress={step}>
         <RecapCard card={card} month={month} currentMonth={currentMonth} onOpen={card.kind === "summary" ? undefined : open} />
       </Pressable>
       <View pointerEvents="none" style={[styles.dots, { top: insets.top + spacing.md }]}>

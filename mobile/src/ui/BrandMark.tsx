@@ -17,7 +17,7 @@ function color(fill: MarkFill, colors: ThemeColors): string {
   return MARK_EXTRA_COLORS[fill];
 }
 
-function MarkRects({ fill }: { fill: string }) {
+export function MarkRects({ fill }: { fill: string }) {
   return (
     <>
       {MARK_RECTS.map((rect) => (
