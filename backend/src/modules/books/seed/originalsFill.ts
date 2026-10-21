@@ -74,7 +74,7 @@ export async function fillOriginals(
     const key = `${original}#${surnameOf(claim.author) ?? ""}`;
     const bucket = buckets.get(key) ?? { titles: new Set(), originals: new Set() };
     bucket.titles.add(title);
-    bucket.originals.add(normalizeWords(mainTitle(claim.originalTitle)));
+    bucket.originals.add(normalizeWords(claim.originalTitle));
     buckets.set(key, bucket);
   }
   const groups = new Map<string, Group>();
@@ -87,7 +87,7 @@ export async function fillOriginals(
     if (!original || originalKey(original) === null || sameMainTitle(original, evidence.title)) report.noOriginal++;
     else if (isSeriesLike(original, author)) report.seriesLike++;
     else if (hasVolumeMarker(evidence.title) || hasVolumeMarker(original)) report.volume++;
-    else if (normalizeWords(mainTitle(original)) !== normalizeTitle(mainTitle(original))) report.subtitle++;
+    else if (normalizeWords(original) !== normalizeTitle(mainTitle(original))) report.subtitle++;
     else {
       const candidates = repo.titleCandidates(titlePattern(original)!).filter((id) => id !== workId);
       if (candidates.length > 0) {
@@ -128,25 +128,29 @@ export async function fillOriginals(
   const workIds = report.presentWorks.map((work) => work.workId);
   for (const { originalTitle, found, works: served } of report.originals) {
     if (!found) continue;
-    const key = lookupIdentity({ isbn: "", title: found.title, author: found.author })?.key;
-    const row = key ? repo.findBookByKey(key) : undefined;
-    if (row) {
-      report.existing++;
-      if (sameWholeTitle(row.title, originalTitle)) workIds.push(...served.map((work) => work.workId));
-      continue;
+    repo.transaction(() => {
+      const key = lookupIdentity({ isbn: "", title: found.title, author: found.author })?.key;
+      const row = key ? repo.findBookByKey(key) : undefined;
+      if (row) {
+        report.existing++;
+        if (sameWholeTitle(row.title, originalTitle)) workIds.push(...served.map((work) => work.workId));
+        return;
+      }
+      const seeded = seedBook({ isbn: "", title: found.title, author: found.author, workKey: found.key }, repo, () => new Date(deps.now()), "seed");
+      if (seeded.outcome !== "created") throw new Error(`Could not add the original "${found.title}"`);
+      report.added++;
+      workIds.push(...served.map((work) => work.workId));
+    });
+  }
+  repo.transaction(() => {
+    const open = repo.portugueseWorksNeedingMatch(workIds, Number.MAX_SAFE_INTEGER, JEV_REJECTION_LIMIT, new Date(deps.now()).toISOString());
+    if (open.length > 0) {
+      const steps = runCodeSteps(deps, open);
+      report.codeMerges = steps.codeMerges;
+      report.codeBlocked = steps.codeBlocked;
+      report.noCandidates = steps.noCandidates;
+      report.ask = steps.ask;
     }
-    const seeded = seedBook({ isbn: "", title: found.title, author: found.author, workKey: found.key }, repo, () => new Date(deps.now()), "seed");
-    if (seeded.outcome !== "created") throw new Error(`Could not add the original "${found.title}"`);
-    report.added++;
-    workIds.push(...served.map((work) => work.workId));
-  }
-  const open = repo.portugueseWorksNeedingMatch(workIds, Number.MAX_SAFE_INTEGER, JEV_REJECTION_LIMIT, new Date(deps.now()).toISOString());
-  if (open.length > 0) {
-    const steps = runCodeSteps(deps, open);
-    report.codeMerges = steps.codeMerges;
-    report.codeBlocked = steps.codeBlocked;
-    report.noCandidates = steps.noCandidates;
-    report.ask = steps.ask;
-  }
+  });
   return report;
 }

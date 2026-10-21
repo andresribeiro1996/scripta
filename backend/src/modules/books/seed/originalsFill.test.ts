@@ -49,6 +49,32 @@ const workOf = (title: string, author: string, key: string): OpenLibraryWork => 
 const lighthouse = [workOf("To the Lighthouse", "Virginia Woolf", "OL930W")];
 const lighthouseKey = catalogTitleKey("To the Lighthouse", "Virginia Woolf")!;
 
+function recorded(repo: Repo) {
+  const calls: Array<[string, number]> = [];
+  let started = 0;
+  let current = 0;
+  const wrapped = new Proxy(repo, {
+    get(target, name, receiver) {
+      const member = Reflect.get(target, name, receiver);
+      if (typeof member !== "function") return member;
+      return (...args: unknown[]) => {
+        if (name === "transaction" && current === 0) {
+          current = ++started;
+          try {
+            return member(...args);
+          } finally {
+            current = 0;
+          }
+        }
+        calls.push([String(name), current]);
+        return member(...args);
+      };
+    }
+  });
+  const inside = (name: string) => calls.filter(([call]) => call === name).map(([, transaction]) => transaction);
+  return { repo: wrapped, inside };
+}
+
 function setup(repo: Repo, answers: Record<string, OpenLibraryWork[] | Error>, before: () => void = () => {}) {
   const calls: Array<[string, string]> = [];
   const logged: string[] = [];
@@ -315,6 +341,18 @@ test("an original with a colon or bracket part is skipped before any lookup", as
   assert.equal(calls.length, 0);
 });
 
+test("an original with a part after a full stop or a dash is skipped, and its volume joins nothing", async () => {
+  const repo = freshRepo();
+  const king = portuguese(repo, "O Rei de Ferro", "Maurice Druon", "Les rois maudits. Le roi de fer");
+  const book = portuguese(repo, "Um Livro", "Ana Silva", "Some Book - A Novel");
+  const answers = { "Les rois maudits": [workOf("Les Rois maudits", "Maurice Druon", "OL15W")], "Some Book": [workOf("Some Book", "Ana Silva", "OL16W")] };
+  const { deps, calls } = setup(repo, answers);
+  const report = await fillOriginals(deps, [king.work_id!, book.work_id!], LIVE);
+  assert.deepEqual([report.subtitle, report.lookups, report.added, report.codeMerges], [2, 0, 0, 0]);
+  assert.equal(calls.length, 0);
+  for (const pt of [king, book]) assert.equal(repo.canonicalWorkIds([pt.work_id!]).get(pt.work_id!), pt.work_id);
+});
+
 test("a present original under its whole title is listed in presentWorks, in a dry run too, and joined in a real run", async () => {
   const repo = freshRepo();
   const en = edition(repo, isbn(), { title: "To the Lighthouse", author: "Virginia Woolf" });
@@ -339,13 +377,15 @@ test("two Portuguese titles that differ only after a colon count as two titles n
 });
 
 test("a second original in the bucket stops the lookup, since the title key can't tell them apart", async () => {
-  const repo = freshRepo();
-  const held = portuguese(repo, "Crónicas", "Ana Silva", "Chronicles", "OL21W");
-  portuguese(repo, "Crónicas", "Ana Silva", "Chronicles: Dusk", "OL22W");
-  const { deps, calls } = setup(repo, { Chronicles: [workOf("Chronicles", "Ana Silva", "OL20W")] });
-  const report = await fillOriginals(deps, [held.work_id!], LIVE);
-  assert.deepEqual([report.sharedOriginal, report.lookups, report.added], [1, 0, 0]);
-  assert.equal(calls.length, 0);
+  for (const second of ["Chronicles: Dusk", "Chronicles. Dusk"]) {
+    const repo = freshRepo();
+    const held = portuguese(repo, "Crónicas", "Ana Silva", "Chronicles", "OL21W");
+    portuguese(repo, "Crónicas", "Ana Silva", second, "OL22W");
+    const { deps, calls } = setup(repo, { Chronicles: [workOf("Chronicles", "Ana Silva", "OL20W")] });
+    const report = await fillOriginals(deps, [held.work_id!], LIVE);
+    assert.deepEqual([report.sharedOriginal, report.lookups, report.added], [1, 0, 0]);
+    assert.equal(calls.length, 0);
+  }
 });
 
 test("claims in other languages or equal to their own original do not count as a second title", async () => {
@@ -369,6 +409,21 @@ test("an owner's answer saved while the lookups ran keeps the work out of the co
   assert.deepEqual([report.added, report.codeMerges], [1, 0]);
   assert.equal(repo.workMatchJudgments([pt.work_id!]).get(pt.work_id!)!.model, "manual");
   assert.equal(repo.canonicalWorkIds([pt.work_id!]).get(pt.work_id!), pt.work_id);
+});
+
+test("the check and the insert of an original share one transaction, and so do the re-filter and the code step", async () => {
+  const repo = freshRepo();
+  const pt = portuguese(repo, "Passeio ao Farol", "Virginia Woolf", "To the Lighthouse");
+  const watched = recorded(repo);
+  const { deps } = setup(watched.repo, { "To the Lighthouse": lighthouse });
+  const report = await fillOriginals(deps, [pt.work_id!], LIVE);
+  assert.deepEqual([report.added, report.codeMerges], [1, 1]);
+  const insert = new Set([...watched.inside("findBookByKey"), ...watched.inside("createBook")]);
+  assert.equal(insert.size, 1);
+  assert.ok(!insert.has(0));
+  const settle = new Set([watched.inside("portugueseWorksNeedingMatch").at(-1), ...watched.inside("fillOriginalTitlesFromSummaries"), ...watched.inside("saveWorkMatchJudgment")]);
+  assert.equal(settle.size, 1);
+  assert.ok(!settle.has(0));
 });
 
 test("progress is logged every ten lookups", async () => {

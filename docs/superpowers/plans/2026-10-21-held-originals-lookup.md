@@ -263,3 +263,25 @@ A script, `backend/scripts/fetch-originals.mjs`, runs it with `--dry-run` first.
   - race with another whole title: the fake search inserts "To the Lighthouse: Annotated" by Virginia Woolf with key `lookupIdentity({ isbn: "", title: "To the Lighthouse", author: "Virginia Woolf" })!.key` before answering "To the Lighthouse". Then `existing` is 1 and `added` 0, that row's `title` and `ol_work_key` are unchanged, `codeMerges` is 0, and the pt work's judgment is unchanged;
   - the existing exact-title race test still gives `existing` 1 and a join.
 - [ ] **Step 2: Implement, verify** (`npm run build --workspace @scripta/shared && npm run typecheck --workspace backend && npm test --workspace backend`), **commit.**
+
+### Fifth and last round (branch-reviewer r2, Codex r3; user approved steps 1–5 on 2026-10-21)
+
+**Files:**
+- Modify: `backend/src/modules/books/seed/originalsFill.ts`
+- Test: `backend/src/modules/books/seed/originalsFill.test.ts`
+- Modify: `backend/README.md`
+
+**Interfaces:**
+1. **`subtitle`:** skip when `normalizeWords(original) !== normalizeTitle(mainTitle(original))`, which replaces the round-4 test on `mainTitle(original)`. A part after `". "` or `" - "` now counts as well as a colon or bracket part.
+2. **Bucket originals:** the set holds `normalizeWords(claim.originalTitle)`, the whole original, not `normalizeWords(mainTitle(...))`.
+3. **Transactions** (`repo.transaction` is `BEGIN IMMEDIATE` and nests):
+   - wrap the `lookupIdentity`/`findBookByKey` check together with `seedBook` in one `repo.transaction` per found group;
+   - wrap the final `portugueseWorksNeedingMatch` re-filter together with `runCodeSteps` in one `repo.transaction`.
+4. **README:** `failed` lists originals whose lookup threw a `SourceUnavailableError` other than a 429: a 5xx, a timeout, invalid JSON, or a 4xx other than 404. Update the `subtitle` skip clause to say a part after `". "` or `" - "` counts too.
+
+- [ ] **Step 1: Write the failing tests:**
+  - held "O Rei de Ferro" (original "Les rois maudits. Le roi de fer", Maurice Druon), with search answering "Les Rois maudits": `subtitle` 1, no lookup, no join;
+  - held "Um Livro" with original "Some Book - A Novel": `subtitle` 1;
+  - held "Crónicas" (original "Chronicles"), beside an unheld pt "Crónicas" with another `workKey` and original "Chronicles. Dusk": `sharedOriginal` 1, no lookup;
+  - transactions: assert through a repo wrapper that records calls. Each `findBookByKey` from the pre-insert check and its `seedBook`'s `createBook`, and the re-filter's `portugueseWorksNeedingMatch` and `runCodeSteps`' `saveWorkMatchJudgment`, run while `db.isTransaction` is true. Pick the lightest way the test file's fixtures allow, for example a `transaction` spy that sets a flag.
+- [ ] **Step 2: Implement, verify** (`npm run build --workspace @scripta/shared && npm run typecheck --workspace backend && npm test --workspace backend`), **commit.**
