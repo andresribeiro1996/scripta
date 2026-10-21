@@ -179,16 +179,13 @@ function ArenaList({
   const noun = tab === "tournaments" ? "tournaments" : tab === "tierlists" ? "tier lists" : "quizzes";
   const ownerOption = OWNER_FILTERS.find((option) => option.value === owner)!;
 
-  if (query.isPending) return <View style={styles.page}><Skeleton height={160} /></View>;
-  if (query.isError) return <View style={styles.page}><ErrorState body={query.error instanceof Error ? query.error.message : "Couldn't load this list."} actionLabel="Retry" onAction={() => void query.refetch()} /></View>;
-
   return <SearchDock
     value={search}
     onChangeText={setSearch}
     accessibilityLabel={`Search ${noun}`}
     placeholder={`Search ${noun}`}
     hidden={!filtering}
-    fab={fab}
+    fab={filtering || query.isPending || query.isError ? fab : undefined}
     cycle={tab === "quizzes" ? undefined : {
       icon: OWNER_FILTER_ICONS[owner],
       active: owner !== "all",
@@ -197,7 +194,9 @@ function ArenaList({
       onPress: () => setOwner(nextOwnerFilter(owner)),
     }}
   >
-    {(scrollProps) => <FlatList
+    {(scrollProps) => query.isPending ? <View style={styles.page}><Skeleton height={160} /></View>
+      : query.isError ? <View style={styles.page}><ErrorState body={query.error instanceof Error ? query.error.message : "Couldn't load this list."} actionLabel="Retry" onAction={() => void query.refetch()} /></View>
+      : <FlatList
       {...scrollProps}
       data={visible}
       keyExtractor={(item) => item.key}

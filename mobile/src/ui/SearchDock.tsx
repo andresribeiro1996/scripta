@@ -110,13 +110,13 @@ export function SearchDock({
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.grow}>
       <View ref={frame} style={styles.grow}>
         <View style={styles.grow}>{children(scrollProps)}</View>
-        {hidden ? null : (
+        {hidden && !fab ? null : (
           <Animated.View
             pointerEvents={scrolling ? "none" : "box-none"}
             style={[styles.dock, { bottom: overlap, opacity: dock, transform: [{ translateY: dock.interpolate({ inputRange: [0, 1], outputRange: [minimumTouchTarget, 0] }) }] }]}
           >
             {fab ? <View pointerEvents="box-none" style={styles.fabArea}>{fab}</View> : null}
-            <View style={styles.row}>
+            {hidden ? null : <View style={styles.row}>
               <View style={styles.grow}>
                 <Input
                   icon="search"
@@ -133,7 +133,7 @@ export function SearchDock({
                 />
               </View>
               {cycleButton ? <View style={styles.cycleSlot}>{cycle?.menu ? <Menu title={cycle.menu.title} items={cycle.menu.items}>{cycleButton}</Menu> : cycleButton}</View> : null}
-            </View>
+            </View>}
           </Animated.View>
         )}
       </View>
