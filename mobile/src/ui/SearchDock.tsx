@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode, type Ref } from "react";
 import { Animated, Dimensions, Keyboard, KeyboardAvoidingView, Platform, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { Icon, type IconName } from "./icon";
-import { IconButton, Input, Menu, type MenuItem } from "./components";
+import { Input, Menu, type MenuItem } from "./components";
 import { minimumTouchTarget, radii, spacing, useReducedMotion, useTheme } from "./theme";
 
 const FAB_HEIGHT = 56;
@@ -124,6 +124,7 @@ export function SearchDock({
                   value={value}
                   onChangeText={onChangeText}
                   onSubmitEditing={onSubmitEditing}
+                  onClear={() => onChangeText("")}
                   ref={setInput}
                   placeholder={placeholder}
                   autoCapitalize="none"
@@ -132,7 +133,6 @@ export function SearchDock({
                   style={styles.searchField}
                 />
               </View>
-              {value ? <IconButton name="close" accessibilityLabel="Clear search" onPress={() => onChangeText("")} /> : null}
               {cycleButton ? <View style={styles.cycleSlot}>{cycle?.menu ? <Menu title={cycle.menu.title} items={cycle.menu.items}>{cycleButton}</Menu> : cycleButton}</View> : null}
             </View>
           </Animated.View>

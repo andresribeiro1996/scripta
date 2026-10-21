@@ -275,6 +275,7 @@ export function Input({
   // A leading glyph inside the field itself — for a search box, where the
   // glyph already says what a label would only repeat from the placeholder.
   icon,
+  onClear,
   accessibilityLabel = label,
   editable = true,
   style,
@@ -282,7 +283,7 @@ export function Input({
   // it there is no way to reach the underlying TextInput.
   ref,
   ...props
-}: Omit<TextInputProps, "style"> & { label?: string; error?: string; hint?: string; icon?: IconName; ref?: Ref<TextInput>; style?: ViewStyle }) {
+}: Omit<TextInputProps, "style"> & { label?: string; error?: string; hint?: string; icon?: IconName; onClear?: () => void; ref?: Ref<TextInput>; style?: ViewStyle }) {
   const { colors, fonts } = useTheme();
   const [visible, setVisible] = useState(false);
   const inputRef = useRef<TextInput>(null);
@@ -317,15 +318,19 @@ export function Input({
           { color: colors.text },
           props.multiline ? { textAlignVertical: "top" } : null,
           icon ? { paddingLeft: minimumTouchTarget } : null,
-          secureTextEntry ? { paddingRight: minimumTouchTarget + spacing.sm } : null,
+          secureTextEntry || onClear ? { paddingRight: minimumTouchTarget + spacing.sm } : null,
           fontStyleFor(fonts.text, "text", { fontSize: typography.input.fontSize }) ?? { fontFamily: SYSTEM_FAMILY },
         ]}
       />
       {secureTextEntry && <Pressable accessibilityRole="button" accessibilityLabel={visible ? "Hide password" : "Show password"} accessibilityState={{ disabled: !editable }}
         disabled={!editable} onPress={() => { setVisible(!visible); inputRef.current?.focus(); }}
-        style={{ position: "absolute", right: 0, top: 0, bottom: 0, minWidth: minimumTouchTarget, minHeight: minimumTouchTarget, alignItems: "center", justifyContent: "center" }}>
+        style={styles.inputTrailing}>
         <Icon name={visible ? "hidePassword" : "showPassword"} size={20} color={colors.textDim} />
       </Pressable>}
+      {onClear && props.value ? <Pressable accessibilityRole="button" accessibilityLabel="Clear search" onPress={onClear}
+        style={styles.inputTrailing}>
+        <Icon name="close" size={20} color={colors.textDim} />
+      </Pressable> : null}
       </View>
       {hint ? <Text {...dynamicType} style={[styles.help, { color: colors.textDim }]}>{hint}</Text> : null}
       {error ? <Text accessibilityLiveRegion="polite" {...dynamicType} style={[styles.help, { color: colors.danger }]}>{error}</Text> : null}
@@ -847,6 +852,7 @@ const styles = StyleSheet.create({
   label: { ...typography.body, fontWeight: "600" },
   inputBox: { position: "relative", minHeight: minimumTouchTarget, borderWidth: 1, borderRadius: radii.md },
   input: { flexGrow: 1, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, ...typography.input },
+  inputTrailing: { position: "absolute", right: 0, top: 0, bottom: 0, minWidth: minimumTouchTarget, minHeight: minimumTouchTarget, alignItems: "center", justifyContent: "center" },
   inputIcon: { position: "absolute", left: 0, top: 0, bottom: 0, width: minimumTouchTarget, alignItems: "center", justifyContent: "center", zIndex: 1 },
   help: { ...typography.caption },
   overlay: { flex: 1 },
