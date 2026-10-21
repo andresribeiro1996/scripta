@@ -98,7 +98,13 @@ A new step runs last in `applyBooksMigrations`, after `clearNonTitleOriginals`. 
 3. sets `original_key` to `originalKey(original_title)` on every row with an `original_title`, and to NULL on the rest;
 4. replaces the stored version with the constant.
 
-It logs `books: keyed N original titles`. Because it runs after every version step, the v5 clear can never leave a stale key behind. Then, on every boot, it creates the partial index (`IF NOT EXISTS`).
+It logs `books: keyed N original titles`. Because it runs after every version step, the v5 clear can never leave a stale key behind. It re-reads the version after taking the lock, so a second process that waited for it does no work.
+
+Then, on every boot:
+- it creates the partial index (`IF NOT EXISTS`);
+- it keys any row that has an `original_title` but no `original_key`, through a second partial index, `idx_books_original_key_missing`. That index covers exactly those rows, so the check is one index read that usually finds nothing.
+
+An older build, for example after a production rollback, writes original titles without keys. Without this step those rows would be missing from `originalClaimsOf`, and Guard 1 would undercount.
 
 On a fresh database the column comes from `books.sql`. The step runs once over no rows and records the version.
 
@@ -205,7 +211,14 @@ It returns `{ arrivals, claimants, codeMerges, codeBlocked }`:
 
 No production command. The backfill and the triggers come with the next deploy.
 
-After the batch deploy:
-- The boot log shows `books: keyed N original titles` once. N should be roughly the number of books with an original title, a few tens of thousands.
-- `startup:books-open` takes one extra full read of `books`, once.
-- Afterwards, `original arrivals joined` lines show each join the hook makes. Every join is listed under "Merged" on `/admin/translations`, where it can be undone.
+**After the batch deploy:**
+- The boot log shows `books: keyed N original titles` once. N is roughly the number of books with an original title, a few tens of thousands.
+- `startup:books-open` grows once:
+  - the first boot reads `books` in full three times: the backfill, and one `CREATE INDEX` per new partial index;
+  - if #321's `user_version` 5 clear runs on the same boot, that is a fourth read;
+  - on a synthetic 234k-book copy with 60k originals, and v5 on the same boot, it took 0.9 s warm and +56 MB heap;
+  - later boots add about 1 ms.
+- Joins show only on `/admin/translations`, under "Merged", where each can be undone. The `original arrivals joined` log line carries one tick's counts, not the works. A key that fails logs `original arrivals failed` with its title key, and it stays queued.
+- **Optional check, run by the user:** `SELECT COUNT(*) FROM original_arrivals;` should stay near 0 once the first ticks have run.
+
+**Rollback:** an older build leaves the new column, tables and triggers alone. The triggers keep filling `original_arrivals` with nothing draining it. The next forward deploy drains the queue, and its boot keys any original titles the older build wrote.
