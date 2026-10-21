@@ -10,24 +10,24 @@ import { contentTarget } from "../community/communityHome";
 import { workPath } from "../works/workPath";
 import { fetchTopShelf } from "./api";
 import { TopShelfBar } from "./TopShelfBar";
-import { BOARD_ORDER, barFraction, boardTitle, gameScore, gameScoreLabel, valueLabel } from "./topShelfModel";
+import { barFraction, boardTitle, gameScore, gameScoreLabel, isTopShelfView, valueLabel } from "./topShelfModel";
 
-const VIEWS: readonly string[] = [...BOARD_ORDER, "champions", "games"];
 const COVER = { width: 40, height: 60 } as const;
 
 type Row = { key: string; cover: string | null; title: string; subtitle: string; label: string; fraction: number; onPress: () => void };
 
 export function LeaderboardScreen({ view, period: initialPeriod, genre: initialGenre }: { view: string; period: TopShelfPeriod; genre: string | null }) {
-  if (!VIEWS.includes(view)) return <Redirect href={"/top-shelf" as never} />;
-  return <Leaderboard view={view as TopShelfView} initialPeriod={initialPeriod} initialGenre={initialGenre} />;
+  if (!isTopShelfView(view)) return <Redirect href={"/top-shelf" as never} />;
+  return <Leaderboard view={view} initialPeriod={initialPeriod} initialGenre={initialGenre} />;
 }
 
 function Leaderboard({ view, initialPeriod, initialGenre }: { view: TopShelfView; initialPeriod: TopShelfPeriod; initialGenre: string | null }) {
   const { colors } = useTheme();
   const segments = useSegments();
   const [period, setPeriod] = useState(initialPeriod);
-  const [genre, setGenre] = useState(initialGenre);
+  const [chosenGenre, setGenre] = useState(initialGenre);
   const isGames = view === "games";
+  const genre = isGames ? null : chosenGenre;
   const query = useQuery({ queryKey: ["topShelf", period, genre, view], queryFn: () => fetchTopShelf({ period, genre, view }), placeholderData: keepPreviousData, retry: false });
   const data = query.data;
 
@@ -64,14 +64,14 @@ function Leaderboard({ view, initialPeriod, initialGenre }: { view: TopShelfView
     <Stack.Screen options={{ headerShown: true, title: boardTitle(view, genre), headerLargeTitleEnabled: false }} />
     <ScrollDock bar={bar}>
       {(scrollProps) => {
-        if (!data) {
+        if (query.isError || !data) {
           return query.isError
             ? <View style={styles.page}><ErrorState body={query.error instanceof Error ? query.error.message : "Couldn't load this leaderboard."} actionLabel="Retry" onAction={() => void query.refetch()} /></View>
             : <View style={styles.page}><Skeleton height={200} /></View>;
         }
         const list = rows();
         if (list.length === 0) {
-          return <View style={styles.page}><EmptyState title={`Nothing here yet${data.period === "month" ? " this month" : ""} — games count once 5 people vote.`} /></View>;
+          return <View style={styles.page}><EmptyState title={`Nothing here yet${data.period === "month" ? " this month" : ""}${isGames ? "." : " — games count once 5 people vote."}`} /></View>;
         }
         return (
           <ScrollView {...scrollProps} contentContainerStyle={styles.list}>
@@ -82,7 +82,7 @@ function Leaderboard({ view, initialPeriod, initialGenre }: { view: TopShelfView
                     <Text {...dynamicType} style={[typography.title, styles.rank, { color: index === 0 ? colors.accent : colors.textDim }]}>{index + 1}</Text>
                     <BookCover cover={row.cover} title={row.title} {...COVER} />
                     <View style={styles.grow}>
-                      <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>{row.title}</Text>
+                      <Text numberOfLines={2} {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>{row.title}</Text>
                       <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{row.subtitle}</Text>
                       <View style={[styles.track, { backgroundColor: colors.surface }]}>
                         <View style={[styles.fill, { width: `${row.fraction * 100}%`, backgroundColor: colors.accent }]} />

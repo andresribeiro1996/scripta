@@ -11,6 +11,10 @@ const TITLES: Record<Exclude<TopShelfView, "champions">, string> = {
   games: "Hottest games",
 };
 
+const VIEWS: readonly string[] = [...BOARD_ORDER, "champions", "games"];
+
+export const isTopShelfView = (view: string): view is TopShelfView => VIEWS.includes(view);
+
 const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
 
 export function boardTitle(view: TopShelfView, genre: string | null): string {

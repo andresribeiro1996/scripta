@@ -42,22 +42,25 @@ export function TopShelfBar({
 
   return (
     <View style={styles.row}>
-      <View style={styles.grow}>
+      <View style={styles.segmented}>
         <Segmented options={PERIODS} value={period} onChange={onPeriod} accessibilityLabel="Period" />
       </View>
-      {genreDisabled ? (
-        <Pressable accessibilityRole="button" accessibilityLabel="Genre" accessibilityState={{ disabled: true }} disabled>{pill}</Pressable>
-      ) : (
-        <Menu key={label.length} title="Genre" items={items}>{pill}</Menu>
-      )}
+      <View style={styles.genre}>
+        {genreDisabled ? (
+          <Pressable accessibilityRole="button" accessibilityLabel="Genre" accessibilityState={{ disabled: true }} disabled>{pill}</Pressable>
+        ) : (
+          <Menu key={label.length} title="Genre" items={items}>{pill}</Menu>
+        )}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  grow: { flex: 1 },
+  segmented: { flexGrow: 1, flexShrink: 0, minWidth: 200 },
+  genre: { flexShrink: 1 },
   row: { flexDirection: "row", alignItems: "center", gap: spacing.sm, padding: spacing.md },
-  pill: { flexDirection: "row", alignItems: "center", gap: spacing.xs, maxWidth: 160, height: minimumTouchTarget, paddingHorizontal: spacing.md, borderWidth: 1, borderRadius: radii.full },
+  pill: { flexDirection: "row", alignItems: "center", gap: spacing.xs, maxWidth: 140, height: minimumTouchTarget, paddingHorizontal: spacing.md, borderWidth: 1, borderRadius: radii.full },
   chevron: { transform: [{ rotate: "90deg" }] },
   pillLabel: { flexShrink: 1 },
 });

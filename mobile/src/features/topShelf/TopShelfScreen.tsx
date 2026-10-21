@@ -4,7 +4,7 @@ import { Stack, router, useSegments } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import type { TopShelfBook, TopShelfPeriod, TopShelfView } from "@scripta/shared";
 import { Text } from "../../ui/Text";
-import { EmptyState, ErrorState, Icon, Screen, ScrollDock, Skeleton, captionHitSlop, dynamicType, minimumTouchTarget, radii, searchDockClearance, spacing, typography, useTheme } from "../../ui";
+import { EmptyState, ErrorState, Icon, Screen, ScrollDock, Skeleton, dynamicType, minimumTouchTarget, radii, searchDockClearance, spacing, typography, useTheme } from "../../ui";
 import { BookCover } from "../arena/BookCover";
 import { DiscoverRow } from "../community/DiscoverRow";
 import { workPath } from "../works/workPath";
@@ -12,7 +12,7 @@ import { fetchTopShelf } from "./api";
 import { TopShelfBar } from "./TopShelfBar";
 import { boardTitle, emptySections, valueLabel, visibleBoards } from "./topShelfModel";
 
-export function topShelfHref(view: TopShelfView, period: TopShelfPeriod, genre: string | null) {
+function topShelfHref(view: TopShelfView, period: TopShelfPeriod, genre: string | null) {
   return { pathname: "/top-shelf/[view]", params: { view, period, ...(genre ? { genre } : {}) } } as never;
 }
 
@@ -31,13 +31,13 @@ export function TopShelfScreen() {
     <Stack.Screen options={{ headerShown: true, title: "Top Shelf", headerLargeTitleEnabled: false }} />
     <ScrollDock bar={bar}>
       {(scrollProps) => {
-        if (!data) {
+        if (query.isError || !data) {
           return query.isError
             ? <View style={styles.page}><ErrorState body={query.error instanceof Error ? query.error.message : "Couldn't load Top Shelf."} actionLabel="Retry" onAction={() => void query.refetch()} /></View>
             : <View style={styles.page}><Skeleton height={200} /></View>;
         }
         const empty = emptySections(data);
-        if (empty.podium && empty.records && empty.genres && empty.games) {
+        if (empty.podium && empty.records && (empty.genres || genre !== null) && empty.games) {
           return <View style={styles.page}><EmptyState title={`Nothing here yet${data.period === "month" ? " this month" : ""} — games count once 5 people vote.`} /></View>;
         }
         return (
@@ -93,7 +93,7 @@ function Section({ title, onMore, children }: { title: string; onMore?: () => vo
       <View style={styles.sectionHeader}>
         <Text {...dynamicType} accessibilityRole="header" style={[typography.title, styles.strong, { color: colors.text }]}>{title}</Text>
         {onMore ? (
-          <Pressable accessibilityRole="button" accessibilityLabel={`See all ${title.toLowerCase()}`} hitSlop={captionHitSlop} onPress={onMore}>
+          <Pressable accessibilityRole="button" accessibilityLabel={`See all ${title.toLowerCase()}`} onPress={onMore} style={styles.more}>
             <Icon name="chevronRight" size={20} color={colors.textDim} />
           </Pressable>
         ) : null}
@@ -132,6 +132,7 @@ const styles = StyleSheet.create({
   list: { paddingTop: spacing.md, paddingBottom: searchDockClearance },
   section: { marginBottom: spacing.xl },
   sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: spacing.lg, marginBottom: spacing.sm },
+  more: { width: minimumTouchTarget, height: minimumTouchTarget, marginVertical: -spacing.sm, alignItems: "center", justifyContent: "center" },
   strip: { gap: spacing.sm, paddingHorizontal: spacing.lg },
   card: { width: 160, gap: spacing.xs, padding: spacing.md, borderWidth: 1, borderRadius: radii.lg },
   podiumTitle: { paddingHorizontal: spacing.lg, marginBottom: spacing.md },
