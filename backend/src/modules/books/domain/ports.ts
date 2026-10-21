@@ -101,6 +101,9 @@ export interface BooksRepository {
   portugueseWorksNeedingMatch(workIds: string[] | null, limit: number, rejectionLimit: number, recheckBefore: string | null): string[];
   translationEvidence(workId: string): { workId: string; workAuthor: string; editions: Array<{ title: string; author: string; publisher: string | null; summary: string | null; originalTitle: string | null }> } | undefined;
   originalTitleClaims(): OriginalClaim[];
+  originalClaimsOf(key: string): OriginalClaim[];
+  originalArrivals(limit: number): string[];
+  dropOriginalArrival(titleKey: string): void;
   activeMerges(source: MergeSource): Array<{ id: number; fromWork: string; intoWork: string; movedBookIds: string[]; mergedAt: string }>;
   editionsOf(workIds: string[]): Array<{ id: string; workId: string; title: string; author: string; language: string | null; isbn: string | null; originalTitle: string | null }>;
   titleCandidates(pattern: string): string[];

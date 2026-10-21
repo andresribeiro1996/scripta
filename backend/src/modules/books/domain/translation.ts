@@ -120,3 +120,10 @@ export function evidenceOf(rows: { workId: string; workAuthor: string; editions:
     summaries: editions.flatMap((edition) => (edition.summary?.trim() ? [edition.summary] : []))
   };
 }
+
+export const ORIGINAL_KEY_VERSION = 1;
+
+export function arrivalKey(titleKey: string): string | null {
+  const parts = titleKey.split("|");
+  return parts.length === 3 && parts[0]!.startsWith("ta:") ? `${parts[0]!.slice(3)}|${parts[2]}` : null;
+}

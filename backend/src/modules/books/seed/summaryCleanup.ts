@@ -1,7 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import { cleanSummary } from "@scripta/shared";
 import { isFragment, summaryHashOf, SYNOPSIS_HIDE_BELOW, type SynopsisJudgment } from "../domain/synopsis.js";
-import { originalTitleIn } from "../domain/translation.js";
+import { originalKey, originalTitleIn } from "../domain/translation.js";
 
 export interface SummaryChange {
   table: "books" | "works";
@@ -135,7 +135,7 @@ export function applySummaryCleanup(db: DatabaseSync, plan: SummaryCleanupPlan):
   const applied: SummaryCleanupApplied = { books: 0, works: 0, emptied: 0, skipped: 0, originalTitles: 0, judgmentsWritten: 0 };
   const saveJudgment = db.prepare("INSERT OR IGNORE INTO synopsis_judgments (text_hash, model, usable, kind, asked_at) VALUES (?, ?, ?, ?, ?)");
   const replaceJudgment = db.prepare("INSERT INTO synopsis_judgments (text_hash, model, usable, kind, asked_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(text_hash) DO UPDATE SET model = excluded.model, usable = excluded.usable, kind = excluded.kind, asked_at = excluded.asked_at WHERE synopsis_judgments.model <> 'manual'");
-  const updateBook = db.prepare("UPDATE books SET summary = ?, summary_hash = ?, summary_source = CASE WHEN ? IS NULL THEN NULL ELSE summary_source END, original_title = COALESCE(original_title, ?) WHERE id = ? AND summary = ?");
+  const updateBook = db.prepare("UPDATE books SET summary = ?, summary_hash = ?, summary_source = CASE WHEN ? IS NULL THEN NULL ELSE summary_source END, original_title = COALESCE(original_title, ?), original_key = CASE WHEN original_title IS NULL THEN ? ELSE original_key END WHERE id = ? AND summary = ?");
   const updateWork = db.prepare("UPDATE works SET summary = ?, summary_hash = ? WHERE id = ? AND summary = ?");
 
   const inTransaction = (work: () => void) => {
@@ -164,7 +164,7 @@ export function applySummaryCleanup(db: DatabaseSync, plan: SummaryCleanupPlan):
       for (const change of batch) {
         const changed =
           change.table === "books"
-            ? updateBook.run(change.to, change.newHash, change.to, change.originalTitle, change.id, change.from).changes
+            ? updateBook.run(change.to, change.newHash, change.to, change.originalTitle, change.originalTitle === null ? null : originalKey(change.originalTitle), change.id, change.from).changes
             : updateWork.run(change.to, change.newHash, change.id, change.from).changes;
         if (changed === 0) {
           counts.skipped++;

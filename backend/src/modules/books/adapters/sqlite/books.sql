@@ -45,9 +45,14 @@ CREATE TABLE IF NOT EXISTS books (
   genres_confidence REAL,
   summary_hash        TEXT,
   original_title      TEXT,
+  original_key        TEXT,
   retitle_wanted_at   TEXT,
   created_at          TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS original_arrivals (title_key TEXT PRIMARY KEY);
+
+CREATE TABLE IF NOT EXISTS original_key_version (version INTEGER NOT NULL);
 
 CREATE TABLE IF NOT EXISTS genre_judgments (
   work_id    TEXT PRIMARY KEY,

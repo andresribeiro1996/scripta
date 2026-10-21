@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
+import { DatabaseSync } from "node:sqlite";
 import { test } from "node:test";
-import { authorPattern, evidenceOf, hasVolumeMarker, isOriginalTitle, isPortuguese, mainTitle, mentionsSurname, originalKey, originalTitleIn, sameMainTitle, seriesLikeGroups, seriesLikeOriginals, surnameOf, titlePattern } from "./translation.js";
+import { catalogTitleKey } from "./normalize.js";
+import { ORIGINAL_KEY_VERSION, arrivalKey, authorPattern, evidenceOf, hasVolumeMarker, isOriginalTitle, isPortuguese, mainTitle, mentionsSurname, originalKey, originalTitleIn, sameMainTitle, seriesLikeGroups, seriesLikeOriginals, surnameOf, titlePattern } from "./translation.js";
 
 test("originalTitleIn reads the labelled value to the end of its line", () => {
   assert.equal(originalTitleIn("Uma sinopse.\n\nTítulo original: Les Misérables"), "Les Misérables");
@@ -174,4 +176,41 @@ test("the groups are the originals the series-like predicate answers true for", 
   const isSeriesLike = seriesLikeOriginals(claims);
   assert.equal(isSeriesLike("Chronicles", "Ann Jones"), true);
   assert.equal(isSeriesLike("Chronicles", "Bob Smith"), false);
+});
+
+test("arrivalKey turns a title key into an original key and rejects malformed keys", () => {
+  assert.equal(arrivalKey("ta:to the lighthouse|virginia woolf|"), "to the lighthouse|");
+  assert.equal(arrivalKey("ta:harry potter 2|j k rowling|2"), "harry potter 2|2");
+  for (const key of ["", "isbn:9780000000000", "ta:dune|frank herbert", "ta:dune|frank herbert|1|x"]) assert.equal(arrivalKey(key), null, key);
+});
+
+test("a title key matches an original's title pattern exactly when its arrival key is the original's key", () => {
+  const db = new DatabaseSync(":memory:");
+  const glob = db.prepare("SELECT ? GLOB ? AS hit");
+  const cases: Array<[string, string, string, boolean]> = [
+    ["To the Lighthouse", "Virginia Woolf", "To the Lighthouse", true],
+    ["Dune: Messiah", "Frank Herbert", "Dune", true],
+    ["Dune", "Frank Herbert", "Dune: Messiah", true],
+    ["1984", "George Orwell", "1984", true],
+    ["1984", "George Orwell", "1985", false],
+    ["To the Lighthouse. A Novel", "Virginia Woolf", "To the Lighthouse", false],
+    ["Le Petit Prince (illustré)", "Antoine de Saint-Exupéry", "Le Petit Prince", true],
+    ["Harry Potter 2", "J. K. Rowling", "Harry Potter", false],
+    ["L’Étranger", "Albert Camus", "L'Étranger", true]
+  ];
+  for (const [title, author, original, expected] of cases) {
+    const titleKey = catalogTitleKey(title, author)!;
+    const hit = (glob.get(titleKey, titlePattern(original)!) as { hit: number }).hit === 1;
+    assert.equal(hit, expected, `${title} / ${original}`);
+    assert.equal(arrivalKey(titleKey) === originalKey(original), hit, `${title} / ${original}`);
+  }
+});
+
+test("originalKey is pinned: a change must bump ORIGINAL_KEY_VERSION so stored keys are recomputed", () => {
+  assert.deepEqual(
+    ["To the Lighthouse", "Dune: Messiah", "Les rois maudits. Le roi de fer", "Harry Potter 2", "Le Petit Prince (illustré)"].map(originalKey),
+    ["to the lighthouse|", "dune|", "les rois maudits|", "harry potter 2|2", "le petit prince|"],
+    "originalKey changed: bump ORIGINAL_KEY_VERSION so stored original_key values are recomputed"
+  );
+  assert.equal(ORIGINAL_KEY_VERSION, 1);
 });

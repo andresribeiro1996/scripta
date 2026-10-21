@@ -16,6 +16,7 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 const { applyBooksMigrations } = await import("../adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("../adapters/sqlite/sqliteBooksRepository.js");
 const { summaryHashOf } = await import("../domain/synopsis.js");
+const { originalKey } = await import("../domain/translation.js");
 const { reportJson } = await import("./mojibakeRepair.js");
 const { applySummaryCleanup, planSummaryCleanup, summaryCleanupReport } = await import("./summaryCleanup.js");
 
@@ -61,6 +62,7 @@ test("cleans changed books, skips clean ones and empties chrome-only ones", () =
   const applied = applySummaryCleanup(h.db, plan);
   assert.deepEqual(applied, { books: 2, works: 0, emptied: 1, skipped: 0, originalTitles: 1, judgmentsWritten: 0 });
   assert.deepEqual(h.stored(dirty.id), { summary: LONG, summary_hash: summaryHashOf(LONG), summary_source: "publisher", original_title: "The Island" });
+  assert.equal((h.db.prepare("SELECT original_key FROM books WHERE id = ?").get(dirty.id) as { original_key: string | null }).original_key, originalKey("The Island"));
   assert.equal(h.stored(clean.id).summary, LONG_B);
   assert.deepEqual(h.stored(chrome.id), { summary: null, summary_hash: null, summary_source: null, original_title: null });
 });
