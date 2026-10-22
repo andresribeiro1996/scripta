@@ -50,11 +50,11 @@ test("a work whose original title is its own title is a Portuguese original", ()
 test("one title match whose author's surname the work names is settled by code", () => {
   const repo = freshRepo();
   const en = edition(repo, "9780156907401", { title: "To the Lighthouse", author: "Virginia Woolf", workKey: "OL930W" });
-  const pt = edition(repo, "9789720000402", { title: "Passeio ao Farol", author: "V. Woolf", language: "pt-PT", originalTitle: "To the Lighthouse — A Novel" });
+  const pt = edition(repo, "9789720000402", { title: "Passeio ao Farol", author: "V. Woolf", language: "pt-PT", originalTitle: "To the Lighthouse" });
   assert.deepEqual(planMatch(repo, pt.work_id!, notSeries), { kind: "code", intoWorkId: en.work_id });
 });
 
-test("a title match the work can't vouch for, or two of them, goes to Jev", () => {
+test("a title match the work can't vouch for goes to Jev, another author's same-titled book doesn't stop code, and two works of the author with that title go to Jev", () => {
   const repo = freshRepo();
   const en = edition(repo, "9780156907402", { title: "To the Lighthouse", author: "Virginia Woolf", workKey: "OL931W", year: 1927 });
   const pt = edition(repo, "9789720000403", { title: "Passeio ao Farol", author: "", language: "pt-PT", originalTitle: "To the Lighthouse", summary: "Uma família, uma casa, um farol ao longe e dez anos de distância." });
@@ -63,11 +63,107 @@ test("a title match the work can't vouch for, or two of them, goes to Jev", () =
   assert.deepEqual(plan?.kind === "ask" ? plan.candidates : null, [{ id: en.work_id, title: "To the Lighthouse", author: "Virginia Woolf", year: 1927 }]);
 
   edition(repo, "9780000000404", { title: "Poems", author: "Emily Dickinson", workKey: "OL932W" });
-  edition(repo, "9780000000405", { title: "Poems", author: "John Keats", workKey: "OL933W" });
+  const keats = edition(repo, "9780000000405", { title: "Poems", author: "John Keats", workKey: "OL933W" });
   const poems = edition(repo, "9789720000406", { title: "Poemas", author: "John Keats", language: "pt-PT", originalTitle: "Poems" });
-  const both = planMatch(repo, poems.work_id!, notSeries);
+  assert.deepEqual(planMatch(repo, poems.work_id!, notSeries), { kind: "code", intoWorkId: keats.work_id });
+
+  const other = freshRepo();
+  const first = edition(other, "9780000000410", { title: "Poems", author: "John Keats", workKey: "OL933W" });
+  const second = edition(other, "9780000000411", { title: "Poems", author: "John Keats", workKey: "OL934W" });
+  const translated = edition(other, "9789720000412", { title: "Poemas", author: "John Keats", language: "pt-PT", originalTitle: "Poems" });
+  const both = planMatch(other, translated.work_id!, notSeries);
   assert.equal(both?.kind, "ask");
-  assert.deepEqual(both?.kind === "ask" ? both.candidates.map((candidate) => candidate.author).sort() : null, ["Emily Dickinson", "John Keats"]);
+  assert.deepEqual(both?.kind === "ask" ? both.candidates.map((candidate) => candidate.id).sort() : null, [first.work_id, second.work_id].sort());
+});
+
+test("a subtitle on either side leaves the match to Jev", () => {
+  const cases = [
+    { english: "Dune", author: "Frank Herbert", portuguese: "O Messias de Duna", original: "Dune: Messiah", language: undefined },
+    { english: "The Road", author: "Cormac McCarthy", portuguese: "A Estrada", original: "The Road — A Novel", language: undefined },
+    { english: "Fairy Oak: Il segreto delle gemelle", author: "Elisabetta Gnone", portuguese: "Capitão Grisam", original: "Fairy Oak", language: "it" }
+  ];
+  for (const [index, { english, author, portuguese, original, language }] of cases.entries()) {
+    const repo = freshRepo();
+    const en = edition(repo, `97800000005${index}0`, { title: english, author, workKey: `OL94${index}W`, language });
+    const pt = edition(repo, `97897200005${index}1`, { title: portuguese, author, language: "pt-PT", originalTitle: original });
+    const plan = planMatch(repo, pt.work_id!, notSeries);
+    assert.equal(plan?.kind, "ask");
+    assert.ok(plan?.kind === "ask" && plan.candidates.some((candidate) => candidate.id === en.work_id), english);
+  }
+});
+
+test("two works carrying the whole title in different punctuation leave the match to Jev", () => {
+  const repo = freshRepo();
+  const colon = edition(repo, "9780000000620", { title: "Dune: Messiah", author: "Frank Herbert", workKey: "OL951W" });
+  const dash = edition(repo, "9780000000621", { title: "Dune — Messiah", author: "Frank Herbert", workKey: "OL952W" });
+  const pt = edition(repo, "9789720000622", { title: "O Messias de Duna", author: "Frank Herbert", language: "pt-PT", originalTitle: "Dune: Messiah" });
+  const plan = planMatch(repo, pt.work_id!, notSeries);
+  assert.equal(plan?.kind, "ask");
+  const ids = plan?.kind === "ask" ? plan.candidates.map((candidate) => candidate.id) : [];
+  assert.ok(ids.includes(colon.work_id!) && ids.includes(dash.work_id!));
+});
+
+test("an original found under its words alone settles in code", () => {
+  const repo = freshRepo();
+  const words = edition(repo, "9780000000623", { title: "Dune Messiah", author: "Frank Herbert", workKey: "OL953W" });
+  const pt = edition(repo, "9789720000624", { title: "O Messias de Duna", author: "Frank Herbert", language: "pt-PT", originalTitle: "Dune: Messiah" });
+  assert.deepEqual(planMatch(repo, pt.work_id!, notSeries), { kind: "code", intoWorkId: words.work_id });
+});
+
+test("a Portuguese title its original repeats up to a full stop is its own original", () => {
+  const repo = freshRepo();
+  const maias = edition(repo, "9789720000625", { title: "Os Maias", author: "Eça de Queirós", language: "pt-PT", originalTitle: "Os Maias. Episódios da Vida Romântica" });
+  edition(repo, "9789720000626", { title: "Os Maias", author: "Eça de Queirós", language: "pt-PT", workKey: "OL954W" });
+  assert.deepEqual(planMatch(repo, maias.work_id!, notSeries), { kind: "original" });
+});
+
+test("a work holding two editions that match the original's patterns is one candidate", () => {
+  const repo = freshRepo();
+  edition(repo, "9788804000011", { title: "Fairy Oak", author: "Elisabetta Gnone", workKey: "OL950W", language: "it" });
+  const en = edition(repo, "9788804000012", { title: "Fairy Oak: Il segreto delle gemelle", author: "Elisabetta Gnone", workKey: "OL950W", language: "it" });
+  const pt = edition(repo, "9789720000013", { title: "Capitão Grisam", author: "", language: "pt-PT", originalTitle: "Fairy Oak" });
+  const plan = planMatch(repo, pt.work_id!, notSeries);
+  assert.equal(plan?.kind, "ask");
+  assert.deepEqual(plan?.kind === "ask" ? plan.candidates.map((candidate) => candidate.id) : null, [en.work_id]);
+});
+
+test("an original with a full stop is found under its whole title", () => {
+  const repo = freshRepo();
+  const en = edition(repo, "9781501125607", { title: "Mr. Mercedes", author: "Stephen King", workKey: "OL950W" });
+  const pt = edition(repo, "9789720000607", { title: "O Senhor Mercedes", author: "Stephen King", language: "pt-PT", originalTitle: "Mr. Mercedes" });
+  assert.deepEqual(planMatch(repo, pt.work_id!, notSeries), { kind: "code", intoWorkId: en.work_id });
+});
+
+test("bracketed notes don't stop a code join, but a bracketed volume does", () => {
+  const repo = freshRepo();
+  const en = edition(repo, "9780553103540", { title: "A Game of Thrones (A Song of Ice and Fire, #1)", author: "George R. R. Martin", workKey: "OL960W" });
+  const pt = edition(repo, "9789720000608", { title: "A Guerra dos Tronos", author: "George R. R. Martin", language: "pt-PT", originalTitle: "A Game of Thrones" });
+  assert.deepEqual(planMatch(repo, pt.work_id!, notSeries), { kind: "code", intoWorkId: en.work_id });
+
+  const other = freshRepo();
+  const lighthouse = edition(other, "9780156907609", { title: "To the Lighthouse", author: "Virginia Woolf", workKey: "OL961W" });
+  const volume = edition(other, "9789720000609", { title: "Um Farol", author: "Virginia Woolf", language: "pt-PT", originalTitle: "To the Lighthouse (Book 1)" });
+  const plan = planMatch(other, volume.work_id!, notSeries);
+  assert.equal(plan?.kind, "ask");
+  assert.ok(plan?.kind === "ask" && plan.candidates.some((candidate) => candidate.id === lighthouse.work_id));
+});
+
+test("the edition's whole title decides, wherever the edition was merged", () => {
+  const repo = freshRepo();
+  const first = edition(repo, "9789720000610", { title: "Passeio ao Farol", author: "Virginia Woolf", language: "pt-PT", originalTitle: "To the Lighthouse", workKey: "OL940W" });
+  const original = edition(repo, "9780156907610", { title: "To the Lighthouse", author: "Virginia Woolf", workKey: "OL940W" });
+  assert.equal(original.work_id, first.work_id);
+  const second = edition(repo, "9789720000611", { title: "Rumo ao Farol", author: "Virginia Woolf", language: "pt-PT", originalTitle: "To the Lighthouse" });
+  assert.deepEqual(planMatch(repo, second.work_id!, notSeries), { kind: "code", intoWorkId: first.work_id });
+});
+
+test("a candidate whose author has no usable surname is not vouched for", () => {
+  const repo = freshRepo();
+  const en = edition(repo, "9780000000612", { title: "Orlando", author: "Li Bo", workKey: "OL970W" });
+  const pt = edition(repo, "9789720000613", { title: "Orlando, Uma Biografia", author: "Li Bo", language: "pt-PT", originalTitle: "Orlando" });
+  const plan = planMatch(repo, pt.work_id!, notSeries);
+  assert.equal(plan?.kind, "ask");
+  assert.ok(plan?.kind === "ask" && plan.candidates.some((candidate) => candidate.id === en.work_id));
 });
 
 test("with no original title, the author's works with a non-Portuguese edition are the candidates, most editions first", () => {

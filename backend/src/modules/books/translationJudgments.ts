@@ -2,7 +2,7 @@ import { createJevMatchClassifier, type ClassifyMatch } from "./adapters/typesaf
 import { startDetailsBackfill } from "./backfill.js";
 import { WorkMergeError } from "./domain/errors.js";
 import type { BooksRepository } from "./domain/ports.js";
-import { authorPattern, evidenceOf, hasVolumeMarker, MATCH_MERGE_AT, MAX_CANDIDATES, mentionsSurname, sameMainTitle, seriesLikeOriginals, surnameOf, titlePattern, type SeriesLike, type TranslationEvidence } from "./domain/translation.js";
+import { authorPattern, evidenceOf, hasVolumeMarker, MATCH_MERGE_AT, MAX_CANDIDATES, mentionsSurname, sameMainTitle, sameWholeTitle, seriesLikeOriginals, surnameOf, titlePatterns, type SeriesLike, type TranslationEvidence } from "./domain/translation.js";
 import { JEV_REJECTION_LIMIT } from "./synopsisJudgments.js";
 import { dailySpend, failureKind, nextUtcMidnight, strikeReason } from "./typesafe.js";
 import { createWorkQueue } from "./workQueue.js";
@@ -12,21 +12,29 @@ export type MatchPlan = { kind: "original" } | { kind: "none" } | { kind: "code"
 
 type PlanRepo = Pick<BooksRepository, "translationEvidence" | "titleCandidates" | "authorCandidates" | "matchCandidates">;
 
+export function titleCandidateRows(repo: Pick<BooksRepository, "titleCandidates">, original: string, workId: string): Array<{ id: string; title: string }> {
+  return titlePatterns(original).flatMap((pattern) => repo.titleCandidates(pattern)).filter((row) => row.id !== workId);
+}
+
 export function planMatch(repo: PlanRepo, workId: string, isSeriesLike: SeriesLike): MatchPlan | null {
   const rows = repo.translationEvidence(workId);
   if (!rows || rows.editions.length === 0) return null;
   const evidence = evidenceOf(rows);
   if (evidence.originalTitle && sameMainTitle(evidence.originalTitle, evidence.title)) return { kind: "original" };
   if (evidence.originalTitle && isSeriesLike(evidence.originalTitle, evidence.workAuthor || evidence.author)) return { kind: "none" };
-  const byTitlePattern = evidence.originalTitle ? titlePattern(evidence.originalTitle) : null;
-  const byTitle = byTitlePattern ? repo.titleCandidates(byTitlePattern).filter((id) => id !== workId) : [];
+  const original = evidence.originalTitle;
+  const titleRows = original ? titleCandidateRows(repo, original, workId) : [];
+  const byTitle = [...new Set(titleRows.map((row) => row.id))];
   const byAuthorPattern = authorPattern(evidence.workAuthor || evidence.author);
   const byAuthor = byAuthorPattern ? repo.authorCandidates(byAuthorPattern).filter((id) => id !== workId && !byTitle.includes(id)) : [];
   if (byTitle.length === 0 && byAuthor.length === 0) return { kind: "none" };
-  if (byTitle.length === 1 && !hasVolumeMarker(evidence.originalTitle ?? "") && !hasVolumeMarker(evidence.title)) {
-    const [only] = repo.matchCandidates(byTitle);
-    const surname = only ? surnameOf(only.author) : null;
-    if (only && surname && mentionsSurname([evidence.workAuthor, evidence.author, ...evidence.summaries], surname)) return { kind: "code", intoWorkId: only.id };
+  if (original && !hasVolumeMarker(original) && !hasVolumeMarker(evidence.title)) {
+    const whole = titleRows.filter((row) => sameWholeTitle(row.title, original)).map((row) => row.id);
+    const vouched = repo.matchCandidates(whole).filter((candidate) => {
+      const surname = surnameOf(candidate.author);
+      return surname !== null && mentionsSurname([evidence.workAuthor, evidence.author, ...evidence.summaries], surname);
+    });
+    if (vouched.length === 1) return { kind: "code", intoWorkId: vouched[0]!.id };
   }
   const ids = [...byTitle, ...byAuthor].slice(0, MAX_CANDIDATES);
   const details = new Map(repo.matchCandidates(ids).map((candidate) => [candidate.id, candidate]));

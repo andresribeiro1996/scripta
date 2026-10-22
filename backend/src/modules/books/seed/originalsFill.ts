@@ -1,19 +1,14 @@
-import { firstAuthor, normalizeTitle, normalizeWords, titleNumbers } from "@scripta/shared";
+import { firstAuthor, normalizeTitle, normalizeWords } from "@scripta/shared";
 import type { OpenLibraryWork } from "../adapters/openlibrary/openLibraryCatalog.js";
 import { SourceUnavailableError } from "../domain/errors.js";
 import { lookupIdentity } from "../domain/normalize.js";
-import { evidenceOf, hasVolumeMarker, isPortuguese, mainTitle, mentionsSurname, originalKey, sameMainTitle, seriesLikeOriginals, surnameOf, titlePattern } from "../domain/translation.js";
+import { evidenceOf, hasVolumeMarker, mainTitle, mentionsSurname, originalKey, sameMainTitle, sameWholeTitle, seriesLikeOriginals, sharedOriginals, surnameOf } from "../domain/translation.js";
 import { JEV_REJECTION_LIMIT } from "../synopsisJudgments.js";
 import { runCodeSteps } from "../translationBacklog.js";
-import type { TranslationDeps } from "../translationJudgments.js";
+import { titleCandidateRows, type TranslationDeps } from "../translationJudgments.js";
 import { seedBook } from "./seedCatalog.js";
 
 export type FoundOriginal = { key: string; title: string; author: string };
-
-export function sameWholeTitle(title: string, originalTitle: string): boolean {
-  const main = mainTitle(originalTitle);
-  return normalizeWords(title) === normalizeWords(main) && normalizeTitle(title) === normalizeTitle(main) && titleNumbers(title) === titleNumbers(main);
-}
 
 export function pickOriginal(works: OpenLibraryWork[], originalTitle: string, authorTexts: string[]): FoundOriginal | null {
   for (const work of works) {
@@ -66,17 +61,7 @@ export async function fillOriginals(
   const report: OriginalsReport = { held: held.size, selected: works.length, noOriginal: 0, seriesLike: 0, volume: 0, subtitle: 0, present: 0, noAuthor: 0, sharedOriginal: 0, lookups: 0, found: 0, notFound: 0, added: 0, existing: 0, codeMerges: 0, codeBlocked: 0, noCandidates: 0, presentWorks: [], failed: [], ask: [], originals: [] };
   const claims = repo.originalTitleClaims();
   const isSeriesLike = seriesLikeOriginals(claims);
-  const buckets = new Map<string, { titles: Set<string>; originals: Set<string> }>();
-  for (const claim of claims) {
-    const original = originalKey(claim.originalTitle);
-    const title = normalizeWords(claim.title);
-    if (!isPortuguese(claim.language) || original === null || title === "" || sameMainTitle(claim.title, claim.originalTitle)) continue;
-    const key = `${original}#${surnameOf(claim.author) ?? ""}`;
-    const bucket = buckets.get(key) ?? { titles: new Set(), originals: new Set() };
-    bucket.titles.add(title);
-    bucket.originals.add(normalizeWords(claim.originalTitle));
-    buckets.set(key, bucket);
-  }
+  const shared = sharedOriginals(claims);
   const groups = new Map<string, Group>();
   for (const workId of works) {
     const rows = repo.translationEvidence(workId);
@@ -88,25 +73,21 @@ export async function fillOriginals(
     else if (isSeriesLike(original, author)) report.seriesLike++;
     else if (hasVolumeMarker(evidence.title) || hasVolumeMarker(original)) report.volume++;
     else if (normalizeWords(original) !== normalizeTitle(mainTitle(original))) report.subtitle++;
+    else if (titleCandidateRows(repo, original, workId).some((row) => sameWholeTitle(row.title, original))) {
+      report.present++;
+      report.presentWorks.push({ workId, title: evidence.title, originalTitle: original });
+    } else if (surnameOf(author) === null) report.noAuthor++;
     else {
-      const candidates = repo.titleCandidates(titlePattern(original)!).filter((id) => id !== workId);
-      if (candidates.length > 0) {
-        report.present++;
-        if (repo.matchCandidates(candidates).some((candidate) => sameWholeTitle(candidate.title, original))) report.presentWorks.push({ workId, title: evidence.title, originalTitle: original });
-      } else if (surnameOf(author) === null) report.noAuthor++;
-      else {
-        const key = `${originalKey(original)}#${surnameOf(author)}`;
-        const group = groups.get(key) ?? { originalTitle: mainTitle(original), author: firstAuthor(author), works: [], authorTexts: [] };
-        group.works.push({ workId, title: evidence.title });
-        group.authorTexts.push(evidence.workAuthor, evidence.author);
-        groups.set(key, group);
-      }
+      const key = `${originalKey(original)}#${surnameOf(author)}`;
+      const group = groups.get(key) ?? { originalTitle: mainTitle(original), author: firstAuthor(author), works: [], authorTexts: [] };
+      group.works.push({ workId, title: evidence.title });
+      group.authorTexts.push(evidence.workAuthor, evidence.author);
+      groups.set(key, group);
     }
   }
   const looked: Group[] = [];
-  for (const [key, group] of groups) {
-    const bucket = buckets.get(key);
-    if (bucket && (bucket.titles.size >= 2 || bucket.originals.size >= 2)) report.sharedOriginal += group.works.length;
+  for (const group of groups.values()) {
+    if (shared(group.originalTitle, group.author)) report.sharedOriginal += group.works.length;
     else looked.push(group);
   }
   report.lookups = looked.length;

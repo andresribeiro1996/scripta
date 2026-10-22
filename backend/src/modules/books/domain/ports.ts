@@ -112,7 +112,7 @@ export interface BooksRepository {
   dropOriginalArrival(titleKey: string): void;
   activeMerges(source: MergeSource): Array<{ id: number; fromWork: string; intoWork: string; movedBookIds: string[]; mergedAt: string }>;
   editionsOf(workIds: string[]): Array<{ id: string; workId: string; title: string; author: string; language: string | null; isbn: string | null; originalTitle: string | null }>;
-  titleCandidates(pattern: string): string[];
+  titleCandidates(pattern: string): Array<{ id: string; title: string }>;
   authorCandidates(pattern: string): string[];
   matchCandidates(workIds: string[]): Array<{ id: string; title: string; author: string; year: number | null; editions: number; languages: string[] }>;
   translationReviewRows(mergeAt: number, reviewAt: number): Array<{ workId: string; intoWorkId: string; model: string; confidence: number | null; mergedAt: string | null; group: "possible" | "blocked" | "merged" }>;

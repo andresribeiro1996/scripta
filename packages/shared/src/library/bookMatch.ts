@@ -18,7 +18,7 @@ export function normalizeWords(value: string): string {
     .trim();
 }
 
-function withoutBrackets(value: string): string {
+export function withoutBrackets(value: string): string {
   let result = "";
   let copied = 0;
   let noParen = false;

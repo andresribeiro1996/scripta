@@ -199,7 +199,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const originalTitleClaimsStmt = db.prepare(`SELECT work_id, title, author, language, original_title, summary FROM books WHERE (original_title IS NOT NULL AND original_title <> '') OR summary LIKE '%tulo original%'`);
   const activeMergesStmt = db.prepare(`SELECT id, from_work, into_work, moved_book_ids, merged_at FROM work_merges WHERE source = ? AND undone_at IS NULL ORDER BY id DESC`);
   const editionsOfStmt = db.prepare(`SELECT id, work_id, title, author, language, isbn, original_title, summary FROM books WHERE work_id IN (SELECT value FROM json_each(?)) ORDER BY created_at, rowid`);
-  const titleCandidatesStmt = db.prepare(`SELECT DISTINCT COALESCE(w.merged_into, w.id) AS id FROM books b JOIN works w ON w.id = b.work_id WHERE b.title_key GLOB ?`);
+  const titleCandidatesStmt = db.prepare(`SELECT DISTINCT COALESCE(w.merged_into, w.id) AS id, b.title FROM books b JOIN works w ON w.id = b.work_id WHERE b.title_key GLOB ?`);
   const authorCandidatesStmt = db.prepare(`
     SELECT COALESCE(w.merged_into, w.id) AS id, COUNT(*) AS editions
     FROM books b JOIN works w ON w.id = b.work_id
@@ -1006,7 +1006,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       return (editionsOfStmt.all(JSON.stringify(workIds)) as Array<{ id: string; work_id: string; title: string; author: string; language: string | null; isbn: string | null; original_title: string | null; summary: string | null }>).map((row) => ({ id: row.id, workId: row.work_id, title: row.title, author: row.author, language: row.language, isbn: row.isbn, originalTitle: row.original_title || originalTitleIn(row.summary) }));
     },
     titleCandidates(pattern) {
-      return (titleCandidatesStmt.all(pattern) as Array<{ id: string }>).map((row) => row.id);
+      return titleCandidatesStmt.all(pattern) as Array<{ id: string; title: string }>;
     },
     authorCandidates(pattern) {
       return (authorCandidatesStmt.all(pattern) as Array<{ id: string }>).map((row) => row.id);

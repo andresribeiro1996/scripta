@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import { test } from "node:test";
 import { catalogTitleKey } from "./normalize.js";
-import { ORIGINAL_KEY_VERSION, arrivalKey, authorPattern, evidenceOf, hasVolumeMarker, isOriginalTitle, isPortuguese, mainTitle, mentionsSurname, originalKey, originalTitleIn, sameMainTitle, seriesLikeGroups, seriesLikeOriginals, surnameOf, titlePattern } from "./translation.js";
+import { ORIGINAL_KEY_VERSION, arrivalKey, authorPattern, evidenceOf, hasVolumeMarker, isOriginalTitle, isPortuguese, mainTitle, mentionsSurname, originalKey, originalTitleIn, sameMainTitle, sameWholeTitle, seriesLikeGroups, seriesLikeOriginals, sharedOriginals, surnameOf, titlePattern, titlePatterns, wholeTitle } from "./translation.js";
 
 test("originalTitleIn reads the labelled value to the end of its line", () => {
   assert.equal(originalTitleIn("Uma sinopse.\n\nTítulo original: Les Misérables"), "Les Misérables");
@@ -34,10 +34,12 @@ test("isOriginalTitle needs a letter or digit and rejects another metadata label
   for (const value of ["Solaris", "1984", "Солярис", "Sapiens: A Brief History of Humankind", "Data-Driven Science", "Série noire: Les Rues", "ISBNdb Guide"]) assert.equal(isOriginalTitle(value), true, value);
 });
 
-test("the main title stops at the first dash or full-stop separator", () => {
+test("the main title stops at the first dash, and a full stop is part of the title", () => {
   assert.equal(mainTitle("Lipstick Traces — A Secret History of the Twentieth Century"), "Lipstick Traces");
   assert.equal(mainTitle("Autobiographie d'un poulpe - et autres récits"), "Autobiographie d'un poulpe");
   assert.equal(mainTitle("Brave New World"), "Brave New World");
+  assert.equal(mainTitle("Mr. Mercedes"), "Mr. Mercedes");
+  assert.equal(mainTitle("Les rois maudits. Le roi de fer"), "Les rois maudits. Le roi de fer");
 });
 
 test("sameMainTitle compares main titles the catalog's way, numbers included", () => {
@@ -45,6 +47,20 @@ test("sameMainTitle compares main titles the catalog's way, numbers included", (
   assert.equal(sameMainTitle("Memorial do Convento", "Memorial do convento"), true);
   assert.equal(sameMainTitle("1984", "1985"), false);
   assert.equal(sameMainTitle("", ""), false);
+  assert.equal(sameMainTitle("Os Maias. Episódios da Vida Romântica", "Os Maias"), true);
+});
+
+test("the whole title keeps every word but bracketed ones", () => {
+  assert.equal(sameWholeTitle("A Game of Thrones (A Song of Ice and Fire, #1)", "A Game of Thrones"), true);
+  assert.equal(sameWholeTitle("Dune: Messiah", "Dune"), false);
+  assert.equal(sameWholeTitle("Dune", "Dune: Messiah"), false);
+  assert.equal(sameWholeTitle("The Road — A Novel", "The Road"), false);
+  assert.equal(sameWholeTitle("To the Lighthouse — A Novel", "To the Lighthouse: A Novel"), true);
+  assert.equal(sameWholeTitle("Mr. Mercedes", "Mr Mercedes"), true);
+  assert.equal(sameWholeTitle("L’Étranger", "L'Étranger"), true);
+  assert.equal(sameWholeTitle("", ""), false);
+  assert.equal(sameWholeTitle("()", ""), false);
+  assert.equal(wholeTitle("[EBOOK] O Principezinho"), "o principezinho");
 });
 
 test("Portuguese means a pt language tag", () => {
@@ -57,6 +73,16 @@ test("title and author patterns match the catalog's title keys", () => {
   assert.equal(titlePattern("   "), null);
   assert.equal(authorPattern("Virginia Woolf, Ana Lima"), "virginia woolf|*");
   assert.equal(authorPattern(""), null);
+});
+
+test("title patterns are the stem pattern, then the original's own key, then its words, when they differ", () => {
+  assert.deepEqual(titlePatterns("To the Lighthouse"), ["ta:to the lighthouse|*|"]);
+  assert.deepEqual(titlePatterns("Dune: Messiah"), ["ta:dune|*|", "ta:dune messiah|*|"]);
+  assert.deepEqual(titlePatterns("A Game of Thrones (A Song of Ice and Fire, #1)"), ["ta:a game of thrones|*|"]);
+  assert.deepEqual(titlePatterns("Mr. Mercedes"), ["ta:mr|*|", "ta:mr mercedes|*|"]);
+  assert.deepEqual(titlePatterns("To the Lighthouse — A Novel"), ["ta:to the lighthouse|*|", "ta:to the lighthouse a novel|*|"]);
+  assert.deepEqual(titlePatterns("Harry Potter 2"), ["ta:harry potter 2|*|2"]);
+  assert.deepEqual(titlePatterns("   "), []);
 });
 
 test("the surname is the last word of three or more letters, matched whole", () => {
@@ -144,6 +170,70 @@ test("a claim with a blank title or original cannot make a series", () => {
   const isSeriesLike = seriesLikeOriginals([claim("", "Princess Poppy"), claim("  ", "Princess Poppy"), claim("Poppy no Baile", "Princess Poppy"), claim("A Festa", "Princess Poppy"), ...["Um", "Dois", "Três"].map((title) => claim(title, "   "))]);
   assert.equal(isSeriesLike("Princess Poppy", "Janey Louise Jones"), false);
   assert.equal(isSeriesLike("   ", "Janey Louise Jones"), false);
+});
+
+test("Portuguese titles that differ after a colon count apart, so their series-name original is series-like", () => {
+  const isSeriesLike = seriesLikeOriginals([claim("Crónicas: Aurora", "Chronicles", "Ana Silva"), claim("Crónicas: Crepúsculo", "Chronicles", "Ana Silva"), claim("Crónicas: Noite", "Chronicles", "Ana Silva")]);
+  assert.equal(isSeriesLike("Chronicles", "Ana Silva"), true);
+});
+
+test("edition notes in brackets or after a dash or full stop are not another title", () => {
+  const exupery = "Antoine de Saint-Exupéry";
+  const titles = ["O Principezinho", "[EBOOK] O Principezinho", "O Principezinho (edição de bolso)", "O Principezinho - Edição Interativa", "O Principezinho. Edição especial", "O Principezinho. Edição de luxo", "O Principezinho - Edição Especial 25 Anos"];
+  const isSeriesLike = seriesLikeOriginals(titles.map((title) => claim(title, "Le petit prince", exupery)));
+  assert.equal(isSeriesLike("Le petit prince", exupery), false);
+});
+
+test("a title counts apart wherever today's key tells it apart", () => {
+  const apart = seriesLikeOriginals(["Um: Dois Três", "Um Dois: Três", "Quatro"].map((title) => claim(title, "Chronicles", "Ana Silva")));
+  assert.equal(apart("Chronicles", "Ana Silva"), true);
+  const named = seriesLikeOriginals(["Os Maias: Episódios", "Os Maias: Outra", "Os Maias: Terceira"].map((title) => claim(title, "Os Maias", "Eça de Queirós")));
+  assert.equal(named("Os Maias", "Eça de Queirós"), false);
+});
+
+test("two Portuguese titles for one original make it shared", () => {
+  const shared = sharedOriginals([claim("Passeio ao Farol", "To the Lighthouse", "Virginia Woolf"), claim("Rumo ao Farol", "To the Lighthouse", "Virginia Woolf")]);
+  assert.equal(shared("To the Lighthouse", "Virginia Woolf"), true);
+});
+
+test("one Portuguese title claimed twice is not shared", () => {
+  const shared = sharedOriginals([claim("Passeio ao Farol", "To the Lighthouse", "Virginia Woolf"), claim("Passeio ao Farol", "To the Lighthouse", "Virginia Woolf")]);
+  assert.equal(shared("To the Lighthouse", "Virginia Woolf"), false);
+});
+
+test("two whole originals behind one original key make it shared", () => {
+  const shared = sharedOriginals([claim("Crónicas", "Chronicles", "Ana Silva"), claim("Crónicas", "Chronicles: Dusk", "Ana Silva")]);
+  assert.equal(shared("Chronicles", "Ana Silva"), true);
+});
+
+test("English claims and claims naming themselves do not count", () => {
+  const english = sharedOriginals([claim("Passeio ao Farol", "To the Lighthouse", "Virginia Woolf"), claim("Rumo ao Farol", "To the Lighthouse", "Virginia Woolf", "en")]);
+  assert.equal(english("To the Lighthouse", "Virginia Woolf"), false);
+  const named = sharedOriginals([claim("Orlando", "Orlando", "Virginia Woolf"), claim("Orlando, Uma Vida", "Orlando", "Virginia Woolf")]);
+  assert.equal(named("Orlando", "Virginia Woolf"), false);
+});
+
+test("another surname has its own bucket", () => {
+  const shared = sharedOriginals([claim("Passeio ao Farol", "To the Lighthouse", "Virginia Woolf"), claim("Rumo ao Farol", "To the Lighthouse", "Rui Costa")]);
+  assert.equal(shared("To the Lighthouse", "Virginia Woolf"), false);
+  assert.equal(shared("To the Lighthouse", "Rui Costa"), false);
+  assert.equal(shared("To the Lighthouse", "Ana Silva"), false);
+});
+
+test("a bracket note on a Portuguese title still makes another title for a shared original", () => {
+  const shared = sharedOriginals([claim("Passeio ao Farol", "To the Lighthouse", "Virginia Woolf"), claim("[EBOOK] Passeio ao Farol", "To the Lighthouse", "Virginia Woolf")]);
+  assert.equal(shared("To the Lighthouse", "Virginia Woolf"), true);
+});
+
+test("a Portuguese title with words but no title key still counts for a shared original", () => {
+  const claims = [claim("Passeio ao Farol", "To the Lighthouse", "Virginia Woolf"), claim(": Rumo ao Farol", "To the Lighthouse", "Virginia Woolf")];
+  assert.equal(sharedOriginals(claims)("To the Lighthouse", "Virginia Woolf"), true);
+  assert.equal(seriesLikeOriginals([...claims, claim("Um Farol", "To the Lighthouse", "Virginia Woolf")])("To the Lighthouse", "Virginia Woolf"), false);
+});
+
+test("a full stop after the original's own title still names it", () => {
+  const claims = [claim("Rumo a Orlando", "Orlando", "Virginia Woolf"), claim("Orlando. Uma biografia", "Orlando", "Virginia Woolf")];
+  assert.equal(sharedOriginals(claims)("Orlando", "Virginia Woolf"), false);
 });
 
 test("series-like groups name the original and list the distinct titles and the works that claim it", () => {
