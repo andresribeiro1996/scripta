@@ -373,6 +373,19 @@ test("a present original under its whole title is listed in presentWorks, in a d
   assert.equal(repo.canonicalWorkIds([pt.work_id!]).get(pt.work_id!), en.work_id);
 });
 
+test("a book matching only the stem of an original with a full stop does not make it present", async () => {
+  const repo = freshRepo();
+  edition(repo, isbn(), { title: "Les Rois maudits", author: "Maurice Druon", language: "fr" });
+  const king = portuguese(repo, "O Rei de Ferro", "Maurice Druon", "Les rois maudits. Le roi de fer");
+  const whole = "Les rois maudits. Le roi de fer";
+  const { deps } = setup(repo, { [whole]: [workOf(whole, "Maurice Druon", "OL18W")] });
+  const report = await fillOriginals(deps, [king.work_id!], LIVE);
+  assert.deepEqual([report.present, report.lookups, report.found, report.added, report.codeMerges], [0, 1, 1, 1, 1]);
+  assert.deepEqual(report.presentWorks, []);
+  const added = repo.findBookByKey(catalogTitleKey(whole, "Maurice Druon")!)!;
+  assert.equal(repo.canonicalWorkIds([king.work_id!]).get(king.work_id!), added.work_id);
+});
+
 test("a second shelved copy joins the original that a killed run left inside the first copy's work", async () => {
   const repo = freshRepo();
   const first = portuguese(repo, "Passeio ao Farol", "Virginia Woolf", "To the Lighthouse", "OL930W");

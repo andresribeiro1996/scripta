@@ -30,8 +30,8 @@ export function sameWholeTitle(a: string, b: string): boolean {
 }
 
 export function sameMainTitle(a: string, b: string): boolean {
-  const left = normalizeTitle(mainTitle(a));
-  return left !== "" && left === normalizeTitle(mainTitle(b)) && titleNumbers(mainTitle(a)) === titleNumbers(mainTitle(b));
+  const left = originalKey(a);
+  return left !== null && left === originalKey(b);
 }
 
 export const MATCH_MERGE_AT = 0.9;
@@ -55,8 +55,13 @@ export function titlePattern(title: string): string | null {
   return keyPattern(stem(title));
 }
 
+function wordsPattern(title: string): string | null {
+  const words = wholeTitle(title);
+  return words ? `ta:${globLiteral(words)}|*|${globLiteral(titleNumbers(title))}` : null;
+}
+
 export function titlePatterns(title: string): string[] {
-  return [...new Set([titlePattern(title), keyPattern(title)].filter((pattern) => pattern !== null))];
+  return [...new Set([titlePattern(title), keyPattern(title), wordsPattern(title)].filter((pattern) => pattern !== null))];
 }
 
 export function authorPattern(author: string): string | null {

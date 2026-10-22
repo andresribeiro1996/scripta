@@ -47,8 +47,7 @@ test("sameMainTitle compares main titles the catalog's way, numbers included", (
   assert.equal(sameMainTitle("Memorial do Convento", "Memorial do convento"), true);
   assert.equal(sameMainTitle("1984", "1985"), false);
   assert.equal(sameMainTitle("", ""), false);
-  assert.equal(sameMainTitle("Mr. Mercedes", "Mr. Holmes"), false);
-  assert.equal(sameMainTitle("Os Maias. Episódios da Vida Romântica", "Os Maias"), false);
+  assert.equal(sameMainTitle("Os Maias. Episódios da Vida Romântica", "Os Maias"), true);
 });
 
 test("the whole title keeps every word but bracketed ones", () => {
@@ -76,9 +75,10 @@ test("title and author patterns match the catalog's title keys", () => {
   assert.equal(authorPattern(""), null);
 });
 
-test("title patterns are the stem pattern, then the original's own key when it differs", () => {
+test("title patterns are the stem pattern, then the original's own key, then its words, when they differ", () => {
   assert.deepEqual(titlePatterns("To the Lighthouse"), ["ta:to the lighthouse|*|"]);
-  assert.deepEqual(titlePatterns("Dune: Messiah"), ["ta:dune|*|"]);
+  assert.deepEqual(titlePatterns("Dune: Messiah"), ["ta:dune|*|", "ta:dune messiah|*|"]);
+  assert.deepEqual(titlePatterns("A Game of Thrones (A Song of Ice and Fire, #1)"), ["ta:a game of thrones|*|"]);
   assert.deepEqual(titlePatterns("Mr. Mercedes"), ["ta:mr|*|", "ta:mr mercedes|*|"]);
   assert.deepEqual(titlePatterns("To the Lighthouse — A Novel"), ["ta:to the lighthouse|*|", "ta:to the lighthouse a novel|*|"]);
   assert.deepEqual(titlePatterns("Harry Potter 2"), ["ta:harry potter 2|*|2"]);

@@ -92,6 +92,31 @@ test("a subtitle on either side leaves the match to Jev", () => {
   }
 });
 
+test("two works carrying the whole title in different punctuation leave the match to Jev", () => {
+  const repo = freshRepo();
+  const colon = edition(repo, "9780000000620", { title: "Dune: Messiah", author: "Frank Herbert", workKey: "OL951W" });
+  const dash = edition(repo, "9780000000621", { title: "Dune — Messiah", author: "Frank Herbert", workKey: "OL952W" });
+  const pt = edition(repo, "9789720000622", { title: "O Messias de Duna", author: "Frank Herbert", language: "pt-PT", originalTitle: "Dune: Messiah" });
+  const plan = planMatch(repo, pt.work_id!, notSeries);
+  assert.equal(plan?.kind, "ask");
+  const ids = plan?.kind === "ask" ? plan.candidates.map((candidate) => candidate.id) : [];
+  assert.ok(ids.includes(colon.work_id!) && ids.includes(dash.work_id!));
+});
+
+test("an original found under its words alone settles in code", () => {
+  const repo = freshRepo();
+  const words = edition(repo, "9780000000623", { title: "Dune Messiah", author: "Frank Herbert", workKey: "OL953W" });
+  const pt = edition(repo, "9789720000624", { title: "O Messias de Duna", author: "Frank Herbert", language: "pt-PT", originalTitle: "Dune: Messiah" });
+  assert.deepEqual(planMatch(repo, pt.work_id!, notSeries), { kind: "code", intoWorkId: words.work_id });
+});
+
+test("a Portuguese title its original repeats up to a full stop is its own original", () => {
+  const repo = freshRepo();
+  const maias = edition(repo, "9789720000625", { title: "Os Maias", author: "Eça de Queirós", language: "pt-PT", originalTitle: "Os Maias. Episódios da Vida Romântica" });
+  edition(repo, "9789720000626", { title: "Os Maias", author: "Eça de Queirós", language: "pt-PT", workKey: "OL954W" });
+  assert.deepEqual(planMatch(repo, maias.work_id!, notSeries), { kind: "original" });
+});
+
 test("a work holding two editions that match the original's patterns is one candidate", () => {
   const repo = freshRepo();
   edition(repo, "9788804000011", { title: "Fairy Oak", author: "Elisabetta Gnone", workKey: "OL950W", language: "it" });

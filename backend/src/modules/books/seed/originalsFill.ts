@@ -73,19 +73,16 @@ export async function fillOriginals(
     else if (isSeriesLike(original, author)) report.seriesLike++;
     else if (hasVolumeMarker(evidence.title) || hasVolumeMarker(original)) report.volume++;
     else if (normalizeWords(original) !== normalizeTitle(mainTitle(original))) report.subtitle++;
+    else if (titleCandidateRows(repo, original, workId).some((row) => sameWholeTitle(row.title, original))) {
+      report.present++;
+      report.presentWorks.push({ workId, title: evidence.title, originalTitle: original });
+    } else if (surnameOf(author) === null) report.noAuthor++;
     else {
-      const titleRows = titleCandidateRows(repo, original, workId);
-      if (titleRows.length > 0) {
-        report.present++;
-        if (titleRows.some((row) => sameWholeTitle(row.title, original))) report.presentWorks.push({ workId, title: evidence.title, originalTitle: original });
-      } else if (surnameOf(author) === null) report.noAuthor++;
-      else {
-        const key = `${originalKey(original)}#${surnameOf(author)}`;
-        const group = groups.get(key) ?? { originalTitle: mainTitle(original), author: firstAuthor(author), works: [], authorTexts: [] };
-        group.works.push({ workId, title: evidence.title });
-        group.authorTexts.push(evidence.workAuthor, evidence.author);
-        groups.set(key, group);
-      }
+      const key = `${originalKey(original)}#${surnameOf(author)}`;
+      const group = groups.get(key) ?? { originalTitle: mainTitle(original), author: firstAuthor(author), works: [], authorTexts: [] };
+      group.works.push({ workId, title: evidence.title });
+      group.authorTexts.push(evidence.workAuthor, evidence.author);
+      groups.set(key, group);
     }
   }
   const looked: Group[] = [];
