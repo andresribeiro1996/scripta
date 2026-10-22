@@ -6,7 +6,7 @@ import { readerGlyphLabel, type QuizPreview } from "@scripta/shared";
 import { Icon, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import type { ContentTone, DiscoverItem, PublishedContent } from "@scripta/shared/community";
 import { TIER_LADDER, contentStats, contentStatus, contentTarget, gameActionLabel } from "./communityHome";
-import { openProfile } from "./AuthorAvatar";
+import { AuthorAvatar, openProfile } from "./AuthorAvatar";
 import { ReaderGlyph } from "./ReaderGlyph";
 import { GameTicketArt } from "./GameTicketArt";
 
@@ -15,6 +15,11 @@ export function DiscoverRow({ item, linkAuthor, stats, onPreviewBooks, onOpen }:
   const { content, author } = item;
   const status = contentStatus(content);
   const glyphLabel = readerGlyphLabel(author.readerGlyph);
+  const creator = <>
+    <AuthorAvatar username={author.username} avatarUrl={author.avatarUrl} size={24} />
+    <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, styles.metaName, { color: colors.text }]}>{author.username}</Text>
+    <ReaderGlyph identity={author.readerGlyph} size={20} />
+  </>;
   return (
     <GameRow
       kind={content.kind}
@@ -27,27 +32,18 @@ export function DiscoverRow({ item, linkAuthor, stats, onPreviewBooks, onOpen }:
       ladder={content.kind === "tierlist" ? TIER_LADDER : undefined}
       meta={
         <View style={styles.metaRow}>
-          <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
-            by{" "}
-          </Text>
           {author.unavailable || !linkAuthor ? (
             <View style={[styles.nameRow, styles.shrink]}>
-              <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.metaName, { color: colors.textDim }]}>
-                {author.username}
-              </Text>
-              <ReaderGlyph identity={author.readerGlyph} />
+              {creator}
             </View>
           ) : (
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={glyphLabel ? `Open ${author.username}'s profile, ${glyphLabel}` : `Open ${author.username}'s profile`}
               onPress={() => openProfile(author.username)}
-              style={[styles.nameRow, styles.shrink]}
+              style={({ pressed }) => [styles.nameRow, styles.shrink, { backgroundColor: pressed ? colors.surfacePressed : colors.surface }]}
             >
-              <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.metaName, { color: colors.textDim }]}>
-                {author.username}
-              </Text>
-              <ReaderGlyph identity={author.readerGlyph} />
+              {creator}
             </Pressable>
           )}
         </View>
@@ -117,7 +113,7 @@ export function GameRow({ kind, name, meta, badges, caption, stats = [], covers,
                 <View style={styles.statsRow}>
                   {stats.map((stat) => (
                     <Text key={stat.label} numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
-                      <Text style={[styles.strong, { color: colors.text }]}>{stat.value}</Text> {stat.label}
+                      {stat.value} {stat.label}
                     </Text>
                   ))}
                 </View>
@@ -164,13 +160,13 @@ const styles = StyleSheet.create({
   ticket: { marginHorizontal: spacing.lg, marginVertical: spacing.sm, borderRadius: radii.xl, overflow: "hidden" },
   row: { flexDirection: "row", alignItems: "stretch", minHeight: 152 },
   art: { width: 88, alignItems: "center", justifyContent: "center", borderRightWidth: 1 },
-  details: { flex: 1, padding: spacing.lg, gap: spacing.sm, justifyContent: "center" },
+  details: { flex: 1, padding: spacing.lg, gap: spacing.xs, justifyContent: "center" },
   shrink: { flexShrink: 1 },
   strong: { fontWeight: "600" },
   metaRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap" },
-  nameRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs, minHeight: minimumTouchTarget },
+  nameRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, minHeight: minimumTouchTarget, borderRadius: radii.sm },
   metaName: { flexShrink: 1 },
-  statusRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: spacing.sm },
+  statusRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.xs },
   statsRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   clue: { marginHorizontal: spacing.lg, marginVertical: spacing.lg, padding: spacing.lg, borderLeftWidth: 2, borderRadius: radii.md, gap: spacing.sm },
   clueHeading: { flexDirection: "row", alignItems: "center", gap: spacing.sm, flexWrap: "wrap" },
