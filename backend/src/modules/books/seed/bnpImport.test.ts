@@ -19,12 +19,12 @@ process.env.COVERS_DB_PATH = join(scratch, "covers.sqlite");
 process.env.JWT_ACCESS_SECRET = "a".repeat(64);
 process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
-const { applyBooksMigrations } = await import("../adapters/sqlite/connection.js");
+const { applyBooksMigrations, openBooksDb } = await import("../adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("../adapters/sqlite/sqliteBooksRepository.js");
 const { SourceUnavailableError } = await import("../domain/errors.js");
 const { ObjectStoreUnavailableError } = await import("../../../storage/objectStore.js");
 const { catalogTitleKey } = await import("../domain/normalize.js");
-const { applyBnpRecord, BNP_BUSY_TIMEOUT_MS, BNP_ISBN_URL, fetchBnpScan, importBnp, logBnpSync, lookupBnpIsbn, monthWindows, planBnpRecord, syncBnp, utcDate, waitForBnpLock } = await import("./bnpImport.js");
+const { applyBnpRecord, BNP_BUSY_TIMEOUT_MS, BNP_ISBN_URL, createBnpPacer, fetchBnpScan, importBnp, logBnpSync, lookupBnpIsbn, monthWindows, planBnpRecord, syncBnp, utcDate, waitForBnpLock } = await import("./bnpImport.js");
 const { mapBnpRecord, readMarcRecords } = await import("./bnpRecord.js");
 
 process.env.TZ = "America/Sao_Paulo";
@@ -1220,5 +1220,176 @@ test("the import's connection waits out a write lock that a connection without a
     await exited;
     impatient.close();
     patient.close();
+  }
+});
+
+function fakePacer() {
+  let time = 0;
+  const waits: number[] = [];
+  const pace = createBnpPacer(
+    () => time,
+    async (ms) => {
+      waits.push(ms);
+      time += ms;
+    }
+  );
+  return { pace, waits, tick: (ms: number) => void (time += ms), now: () => time };
+}
+
+test("writes 150 ms apart are never paused", async () => {
+  const { pace, waits, tick } = fakePacer();
+
+  for (let index = 0; index < 50; index++) {
+    await pace(() => {});
+    tick(150);
+  }
+
+  assert.deepEqual(waits, []);
+});
+
+test("writes 149 ms apart are paused once the run passes a second", async () => {
+  const { pace, waits, tick, now } = fakePacer();
+  const pausedAt: number[] = [];
+
+  while (now() < 1500) {
+    const startedAt = now();
+    const before = waits.length;
+    await pace(() => {});
+    if (waits.length > before) pausedAt.push(startedAt);
+    tick(149);
+  }
+
+  assert.deepEqual(pausedAt, [1043]);
+});
+
+test("writes without a gap pause for 200 ms just after a second, and the run restarts after the pause", async () => {
+  const { pace, waits, tick, now } = fakePacer();
+  const pausedAt: number[] = [];
+
+  while (now() < 4000) {
+    const startedAt = now();
+    const before = waits.length;
+    await pace(() => {});
+    if (waits.length > before) pausedAt.push(startedAt);
+    tick(1);
+  }
+
+  assert.deepEqual(pausedAt, [1001, 2202, 3403]);
+  assert.deepEqual(waits, [200, 200, 200]);
+});
+
+test("records that arrive during a pause share it", async () => {
+  let time = 0;
+  const waits: number[] = [];
+  let release!: () => void;
+  const pace = createBnpPacer(
+    () => time,
+    (ms) => {
+      waits.push(ms);
+      return new Promise<void>((resolve) => {
+        release = resolve;
+      });
+    }
+  );
+  for (time = 0; time <= 1000; time += 100) await pace(() => {});
+  const order: string[] = [];
+
+  time = 1100;
+  const first = pace(() => order.push("first"));
+  const second = pace(() => order.push("second"));
+  await new Promise(setImmediate);
+  assert.deepEqual({ waits, order }, { waits: [200], order: [] });
+
+  time = 1300;
+  release();
+  await Promise.all([first, second]);
+
+  assert.deepEqual({ waits, order }, { waits: [200], order: ["first", "second"] });
+});
+
+test("a write that throws still counts as the run's last write", async () => {
+  const { pace, waits, tick } = fakePacer();
+
+  await assert.rejects(
+    pace(() => {
+      tick(1100);
+      throw new Error("boom");
+    }),
+    /boom/
+  );
+  await pace(() => {});
+
+  assert.deepEqual(waits, [200]);
+});
+
+const SERVER_WRITER = `
+const db = new (require("node:sqlite").DatabaseSync)(process.argv[1], { timeout: 5000 });
+process.stdin.once("data", () => {
+  const start = performance.now();
+  let answer;
+  try {
+    db.exec("BEGIN IMMEDIATE");
+    db.exec("COMMIT");
+    answer = {};
+  } catch (error) {
+    answer = { error: error.message };
+  }
+  process.stdout.write(JSON.stringify({ ...answer, waited: performance.now() - start }) + "\\n");
+});
+process.stdout.write("ready\\n");
+`;
+
+const WRITE_HELD_MS = 1_100;
+
+test("a server writer with a 5 s timeout gets the lock while the import writes back to back under a pinned WAL", async () => {
+  const path = process.env.COVERS_DB_PATH!;
+  const importDb = waitForBnpLock(openBooksDb());
+  const pin = new DatabaseSync(path);
+  pin.exec("BEGIN");
+  pin.prepare("SELECT COUNT(*) FROM books").get();
+  const writer = spawn(process.execPath, ["-e", SERVER_WRITER, path], { stdio: ["pipe", "pipe", "inherit"] });
+  const exited = new Promise((resolve) => writer.once("exit", resolve));
+  const dead = new Promise<never>((_, reject) => {
+    writer.once("error", reject);
+    writer.stdin.once("error", reject);
+    writer.once("exit", (code) => reject(new Error(`the writer exited with ${code}`)));
+  });
+  const ready = new Promise<void>((resolve) => writer.stdout.once("data", () => resolve()));
+  let reply = "";
+  const fileRepo = createSqliteBooksRepository(importDb);
+  let asked = false;
+  const repo: BooksRepository = {
+    ...fileRepo,
+    transaction: (write) =>
+      fileRepo.transaction(() => {
+        if (reply.endsWith("\n")) throw new Error("the writer answered");
+        if (!asked) {
+          asked = true;
+          writer.stdin.write("go\n");
+        }
+        const until = performance.now() + WRITE_HELD_MS;
+        while (performance.now() < until);
+        return write();
+      })
+  };
+  const scanless = (isbn: string) => recordOf(isbn).replace(/<datafield [^>]*tag="856">.*?<\/datafield>/, "");
+  const { deps } = harvestSetup({ [windowUrl("2026-10-16", "2026-10-16")]: oaiPage(Array.from({ length: 10 }, (_, index) => scanless(isbnN(index + 1)))) });
+
+  try {
+    await Promise.race([ready, dead]);
+    writer.stdout.on("data", (chunk) => {
+      reply += chunk;
+    });
+    await Promise.race([assert.rejects(importBnp({ ...deps, repo }, run("2026-10-16", "2026-10-16")), /the writer answered/), dead]);
+
+    const answer = JSON.parse(reply) as { waited: number; error?: string };
+    assert.equal(answer.error, undefined);
+    assert.ok(answer.waited > 500 && answer.waited < 5000, `the writer waited ${answer.waited} ms`);
+  } finally {
+    writer.kill();
+    await exited;
+    pin.exec("ROLLBACK");
+    pin.close();
+    importDb.close();
   }
 });

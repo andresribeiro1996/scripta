@@ -1,4 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
+import { setTimeout as sleep } from "node:timers/promises";
 import { ObjectStoreUnavailableError } from "../../../storage/objectStore.js";
 import { storeCoverImage } from "../booksService.js";
 import { MIN_GOOD_WIDTH } from "../domain/constants.js";
@@ -53,7 +54,33 @@ export function planBnpRecord(repo: ReplaceRepo & Pick<BooksRepository, "findBoo
   return { book, isbn, existing, replace: replaceReasonOf(repo, existing, book.scanUrl) };
 }
 
-export async function applyBnpRecord(deps: BnpDeps, plan: BnpPlan): Promise<{ book: BookRow; created: boolean; cover: BnpCoverAction }> {
+type BnpPace = <T>(write: () => T) => Promise<T>;
+
+export function createBnpPacer(clock: () => number = () => performance.now(), wait: (ms: number) => Promise<unknown> = sleep): BnpPace {
+  let runStart = 0;
+  let lastEnd = -Infinity;
+  let pause: Promise<void> | null = null;
+  return async (write) => {
+    while (pause !== null) await pause;
+    const at = clock();
+    if (at - lastEnd >= BNP_PACE_GAP_MS) {
+      runStart = at;
+    } else if (at - runStart > BNP_PACE_RUN_MS) {
+      pause = wait(BNP_PACE_PAUSE_MS).then(() => {
+        pause = null;
+      });
+      await pause;
+      runStart = clock();
+    }
+    try {
+      return write();
+    } finally {
+      lastEnd = clock();
+    }
+  };
+}
+
+export async function applyBnpRecord(deps: BnpDeps, plan: BnpPlan, pace: BnpPace = async (write) => write()): Promise<{ book: BookRow; created: boolean; cover: BnpCoverAction }> {
   const { book, isbn } = plan;
   const identity = lookupIdentity({ isbn, title: book.title, author: book.author });
   if (!identity?.isbn) throw new Error(`Not a valid ISBN: ${isbn}`);
@@ -73,7 +100,7 @@ export async function applyBnpRecord(deps: BnpDeps, plan: BnpPlan): Promise<{ bo
     else scan = { url: book.scanUrl, image };
   }
 
-  const written = deps.repo.transaction(() => {
+  const written = await pace(() => deps.repo.transaction(() => {
     const held = deps.repo.findBookByKey(`isbn:${isbn}`);
     const row = held ?? deps.repo.createBook({ title: identity.title, author: identity.author, isbn: identity.isbn, year: book.year, publisher: book.publisher, genres: udcGenres(book.udc), createdBy: "bnp" }, keysOf(deps.repo, identity), at);
     if (held) {
@@ -88,7 +115,7 @@ export async function applyBnpRecord(deps: BnpDeps, plan: BnpPlan): Promise<{ bo
     deps.repo.setLanguage(row.id, editionLanguage(book.languages, isbn));
     if (book.collection) deps.repo.addBookCollection(row.id, book.collection, "bnp", at);
     return { id: row.id, created: held === undefined, replaceable: replaceReasonOf(deps.repo, row, book.scanUrl) !== null, expected: row.cover_image_id };
-  });
+  }));
 
   if (scan !== null) {
     if (written.replaceable) {
@@ -156,6 +183,9 @@ export const BNP_SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const BNP_PAGE_TIMEOUT_MS = 120_000;
 export const BNP_BUSY_TIMEOUT_MS = 120_000;
 
+const BNP_PACE_GAP_MS = 150;
+const BNP_PACE_RUN_MS = 1_000;
+const BNP_PACE_PAUSE_MS = 200;
 const SCAN_POOL = 2;
 const TOP_PUBLISHERS = 50;
 const SAMPLES = 20;
@@ -296,10 +326,11 @@ export async function importBnp(deps: BnpHarvestDeps, options: BnpImportOptions)
     report.covers[cover]++;
     if (replace !== null) report.replace[replace]++;
   };
+  const pace = createBnpPacer();
   const applyOne = async (book: BnpBook) => {
     await new Promise(setImmediate);
     const plan = planBnpRecord(deps.repo, book)!;
-    const result = await applyBnpRecord(deps, plan);
+    const result = await applyBnpRecord(deps, plan, pace);
     tally({ created: result.created, replace: plan.replace, cover: result.cover });
   };
 
