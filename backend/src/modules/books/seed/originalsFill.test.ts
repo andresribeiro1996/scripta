@@ -467,6 +467,7 @@ test("pickOriginal needs a surname the translation mentions and the whole title"
   assert.equal(pickOriginal([workOf("To the Lighthouse. A Novel", "Virginia Woolf", "OL9W")], "To the Lighthouse", ["Virginia Woolf"]), null);
   assert.equal(pickOriginal([{ key: "/works/OL1W", title: "Dune", authors: ["Frank Herbert"] }], "Dune: Messiah", ["Frank Herbert"]), null);
   assert.equal(pickOriginal([workOf("Fairy Oak: Il segreto delle gemelle", "Elisabetta Gnone", "OL12W")], "Fairy Oak", ["Elisabetta Gnone"]), null);
+  assert.deepEqual(pickOriginal([workOf("Orlando (Penguin Classics)", "Virginia Woolf", "OL17W")], "Orlando", ["Virginia Woolf"]), { key: "/works/OL17W", title: "Orlando (Penguin Classics)", author: "Virginia Woolf" });
   assert.deepEqual(pickOriginal([workOf("Dune: Messiah", "Frank Herbert", "OL13W")], "Dune: Messiah", ["Frank Herbert"]), { key: "/works/OL13W", title: "Dune: Messiah", author: "Frank Herbert" });
   assert.deepEqual(pickOriginal([{ key: "/works/OL10W", title: "Orlando", authors: [] }, workOf("Orlando", "V. Woolf", "OL11W")], "Orlando", ["Virginia Woolf"]), { key: "/works/OL11W", title: "Orlando", author: "V. Woolf" });
 });

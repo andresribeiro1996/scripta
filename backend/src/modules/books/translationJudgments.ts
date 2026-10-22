@@ -12,6 +12,10 @@ export type MatchPlan = { kind: "original" } | { kind: "none" } | { kind: "code"
 
 type PlanRepo = Pick<BooksRepository, "translationEvidence" | "titleCandidates" | "authorCandidates" | "matchCandidates">;
 
+export function titleCandidateRows(repo: Pick<BooksRepository, "titleCandidates">, original: string, workId: string): Array<{ id: string; title: string }> {
+  return titlePatterns(original).flatMap((pattern) => repo.titleCandidates(pattern)).filter((row) => row.id !== workId);
+}
+
 export function planMatch(repo: PlanRepo, workId: string, isSeriesLike: SeriesLike): MatchPlan | null {
   const rows = repo.translationEvidence(workId);
   if (!rows || rows.editions.length === 0) return null;
@@ -19,13 +23,13 @@ export function planMatch(repo: PlanRepo, workId: string, isSeriesLike: SeriesLi
   if (evidence.originalTitle && sameMainTitle(evidence.originalTitle, evidence.title)) return { kind: "original" };
   if (evidence.originalTitle && isSeriesLike(evidence.originalTitle, evidence.workAuthor || evidence.author)) return { kind: "none" };
   const original = evidence.originalTitle;
-  const titleRows = original ? titlePatterns(original).flatMap((pattern) => repo.titleCandidates(pattern)).filter((row) => row.id !== workId) : [];
+  const titleRows = original ? titleCandidateRows(repo, original, workId) : [];
   const byTitle = [...new Set(titleRows.map((row) => row.id))];
   const byAuthorPattern = authorPattern(evidence.workAuthor || evidence.author);
   const byAuthor = byAuthorPattern ? repo.authorCandidates(byAuthorPattern).filter((id) => id !== workId && !byTitle.includes(id)) : [];
   if (byTitle.length === 0 && byAuthor.length === 0) return { kind: "none" };
   if (original && !hasVolumeMarker(original) && !hasVolumeMarker(evidence.title)) {
-    const whole = [...new Set(titleRows.filter((row) => sameWholeTitle(row.title, original)).map((row) => row.id))];
+    const whole = titleRows.filter((row) => sameWholeTitle(row.title, original)).map((row) => row.id);
     const vouched = repo.matchCandidates(whole).filter((candidate) => {
       const surname = surnameOf(candidate.author);
       return surname !== null && mentionsSurname([evidence.workAuthor, evidence.author, ...evidence.summaries], surname);

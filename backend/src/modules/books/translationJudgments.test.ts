@@ -54,7 +54,7 @@ test("one title match whose author's surname the work names is settled by code",
   assert.deepEqual(planMatch(repo, pt.work_id!, notSeries), { kind: "code", intoWorkId: en.work_id });
 });
 
-test("a title match the work can't vouch for goes to Jev, and another author's book of that title doesn't", () => {
+test("a title match the work can't vouch for goes to Jev, another author's same-titled book doesn't stop code, and two works of the author with that title go to Jev", () => {
   const repo = freshRepo();
   const en = edition(repo, "9780156907402", { title: "To the Lighthouse", author: "Virginia Woolf", workKey: "OL931W", year: 1927 });
   const pt = edition(repo, "9789720000403", { title: "Passeio ao Farol", author: "", language: "pt-PT", originalTitle: "To the Lighthouse", summary: "Uma família, uma casa, um farol ao longe e dez anos de distância." });
@@ -90,6 +90,16 @@ test("a subtitle on either side leaves the match to Jev", () => {
     assert.equal(plan?.kind, "ask");
     assert.ok(plan?.kind === "ask" && plan.candidates.some((candidate) => candidate.id === en.work_id), english);
   }
+});
+
+test("a work holding two editions that match the original's patterns is one candidate", () => {
+  const repo = freshRepo();
+  edition(repo, "9788804000011", { title: "Fairy Oak", author: "Elisabetta Gnone", workKey: "OL950W", language: "it" });
+  const en = edition(repo, "9788804000012", { title: "Fairy Oak: Il segreto delle gemelle", author: "Elisabetta Gnone", workKey: "OL950W", language: "it" });
+  const pt = edition(repo, "9789720000013", { title: "Capitão Grisam", author: "", language: "pt-PT", originalTitle: "Fairy Oak" });
+  const plan = planMatch(repo, pt.work_id!, notSeries);
+  assert.equal(plan?.kind, "ask");
+  assert.deepEqual(plan?.kind === "ask" ? plan.candidates.map((candidate) => candidate.id) : null, [en.work_id]);
 });
 
 test("an original with a full stop is found under its whole title", () => {

@@ -2,10 +2,10 @@ import { firstAuthor, normalizeTitle, normalizeWords } from "@scripta/shared";
 import type { OpenLibraryWork } from "../adapters/openlibrary/openLibraryCatalog.js";
 import { SourceUnavailableError } from "../domain/errors.js";
 import { lookupIdentity } from "../domain/normalize.js";
-import { evidenceOf, hasVolumeMarker, mainTitle, mentionsSurname, originalKey, sameMainTitle, sameWholeTitle, seriesLikeOriginals, sharedOriginals, surnameOf, titlePatterns } from "../domain/translation.js";
+import { evidenceOf, hasVolumeMarker, mainTitle, mentionsSurname, originalKey, sameMainTitle, sameWholeTitle, seriesLikeOriginals, sharedOriginals, surnameOf } from "../domain/translation.js";
 import { JEV_REJECTION_LIMIT } from "../synopsisJudgments.js";
 import { runCodeSteps } from "../translationBacklog.js";
-import type { TranslationDeps } from "../translationJudgments.js";
+import { titleCandidateRows, type TranslationDeps } from "../translationJudgments.js";
 import { seedBook } from "./seedCatalog.js";
 
 export type FoundOriginal = { key: string; title: string; author: string };
@@ -74,10 +74,10 @@ export async function fillOriginals(
     else if (hasVolumeMarker(evidence.title) || hasVolumeMarker(original)) report.volume++;
     else if (normalizeWords(original) !== normalizeTitle(mainTitle(original))) report.subtitle++;
     else {
-      const rows = titlePatterns(original).flatMap((pattern) => repo.titleCandidates(pattern)).filter((row) => row.id !== workId);
-      if (rows.length > 0) {
+      const titleRows = titleCandidateRows(repo, original, workId);
+      if (titleRows.length > 0) {
         report.present++;
-        if (rows.some((row) => sameWholeTitle(row.title, original))) report.presentWorks.push({ workId, title: evidence.title, originalTitle: original });
+        if (titleRows.some((row) => sameWholeTitle(row.title, original))) report.presentWorks.push({ workId, title: evidence.title, originalTitle: original });
       } else if (surnameOf(author) === null) report.noAuthor++;
       else {
         const key = `${originalKey(original)}#${surnameOf(author)}`;
