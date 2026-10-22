@@ -28,6 +28,14 @@
 - **A Portuguese title that matched its original only through the `". "` cut** ("Os Maias. Episódios" / "Os Maias") is no longer `original`. It is planned like any other work, and Guard 1 still skips it as a self-claim. Task 1 tests both.
 - **Bracketed volume notes** ("To the Lighthouse (Book 1)") still never settle in code or pass `pickOriginal`: the volume marker is checked on the raw title. Task 2 tests the code step.
 
+
+## Amendments after the branch reviews (commit 4c0b65a8; the spec is current)
+
+These supersede the task text below where they differ:
+- `titlePatterns` returns three patterns, not two. The third is the words pattern `ta:<wholeTitle(t)>|*|<titleNumbers(t)>`, so `titlePatterns("Dune: Messiah")` is `["ta:dune|*|", "ta:dune messiah|*|"]`. A second work that carries the whole title in other punctuation then forces `ask`.
+- `sameMainTitle` keeps today's stem cut (`originalKey` equality). The Task 1 asserts `sameMainTitle("Mr. Mercedes", "Mr. Holmes") === false` and the strict Os Maias assert are replaced by `sameMainTitle("Os Maias. Episódios da Vida Romântica", "Os Maias") === true`. The fill's and the drain's buckets were replaced for the reason given in Task 1, not because `sameMainTitle` changed.
+- The fill's `present` counts only a whole-title edition. A stem-only match no longer stops the lookup.
+
 ---
 
 ### Task 1: Whole titles, `mainTitle`, Guard 1's count and the shared grouping
