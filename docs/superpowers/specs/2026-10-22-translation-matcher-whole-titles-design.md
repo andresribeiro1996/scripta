@@ -28,26 +28,31 @@ The translation code step (`planMatch` → `code`) joins a Portuguese work to it
 
 ### Code step (`planMatch`)
 
-- **Candidates by title.** Canonical works with an edition whose `title_key` matches either of two patterns:
+- **Candidates by title.** Canonical works with an edition whose `title_key` matches any of three patterns:
   - `titlePattern(original)`, unchanged: the stem pattern, cut at a colon, a dash or `". "`;
-  - the original's own key pattern, `ta:<normalizeTitle(original)>|*|<titleNumbers(original)>`.
-- `titlePatterns(original)` returns both, deduplicated, stem first. The stem pattern keeps Jev's candidate list a superset of today's. The whole-key pattern finds "Mr. Mercedes" under its own key.
+  - the original's own key pattern, `ta:<normalizeTitle(original)>|*|<titleNumbers(original)>`;
+  - the words pattern, `ta:<wholeTitle(original)>|*|<titleNumbers(original)>`.
+- `titlePatterns(original)` returns them deduplicated, in that order.
+  - The stem pattern keeps Jev's candidate list a superset of today's.
+  - The own-key pattern finds "Mr. Mercedes" under its own key.
+  - The words pattern finds editions that carry the whole title without a colon, such as "Dune — Messiah" or "Dune Messiah" for "Dune: Messiah". Without it, a second work carrying the whole title would go unseen, and code would pick one of the two without asking.
 - **Code joins only when all of these hold:**
   - exactly one candidate work holds an edition with `sameWholeTitle(edition.title, original)`;
   - the surname of that work's author is named in the work's evidence (author, work author, summaries);
   - neither the original nor the Portuguese work's own title (`evidence.title`) has a volume marker, as today. A candidate's bracketed series note ("#1") does not count.
 - The surname filter applies before counting. Another author's book with the same title no longer forces `ask`.
 - **The `ask` candidate list** is the title candidates from both patterns, then the author candidates, capped at `MAX_CANDIDATES`, as today.
-- **`original` and `none` are unchanged.** `original` is decided by `sameMainTitle`. `none` comes from Guard 1 or from having no candidates.
+- **`original` and `none` are unchanged.** `original` is decided by `sameMainTitle`, which keeps today's stem cut: the two titles' `originalKey`s are equal and not null. `none` comes from Guard 1 or from having no candidates.
+- **Why `original` stays lenient:** that check never makes a join. A Portuguese "Os Maias" whose stored original is "Os Maias. Episódios da Vida Romântica" is the original. With a stricter check, `--recheck-none` would send such works to Jev, and the drain would plan them again.
 
 ### `mainTitle`
 
 - `mainTitle` cuts only at `" — "`, `" – "` and `" - "`.
 - `". "` is ISBD's title/part separator and also ends abbreviations, so it is not a subtitle mark.
 - Its users:
-  - `sameMainTitle`: the `original` check, and the fill's `noOriginal`;
   - the fill's `subtitle` skip and its lookup title;
   - the drain's subtitle rule.
+- `sameMainTitle` does not use it (see the code step).
 - "Mr. Mercedes" is no longer skipped as a subtitle, and it is looked up under its whole title.
 
 ### Guard 1 (non-negotiable: never loosened)
@@ -76,6 +81,7 @@ The translation code step (`planMatch` → `code`) joins a Portuguese work to it
 
 - `titleCandidates(pattern)` returns `Array<{ id: string; title: string }>`: the distinct pairs of canonical work id and edition title whose `title_key` matches.
 - `planMatch` and the fill's present check read edition titles from it. That fixes #323 known issue 1: the fetched original's own edition carries the whole title wherever it landed.
+- **The fill's `present`** now needs an edition of another work that carries the whole original title. An edition that matches only the stem ("Les rois maudits" for "Les rois maudits. Le roi de fer") no longer stops the lookup.
 - It uses the same `idx_books_title_work` range as before. Pulling `b.title` costs one row read per matching edition.
 
 ## Measured before changing join behaviour
@@ -84,7 +90,8 @@ All rules were replayed read-only on production against every active code join, 
 
 - **No existing join changes.** Merged works are never re-selected, so the rules only decide future plans: new works, `--recheck-none`, the fill and the drain.
 - **The whole-title rule** is the only rule that would have blocked past code joins. Those are joins whose original carries a colon, dash or `". "` subtitle the catalog title lacks, or the reverse. Most are correct; some join a sequel or a volume into a series work. From now on such works go to Jev.
-- **Unchanged `titlePattern`, the surname filter, `sameMainTitle` without the `". "` cut, and the new Guard 1 count** blocked none of them. Guard 1 lost no group and gained only real series.
+- **Blocked none of them:** the extra title patterns, the surname filter and the new Guard 1 count.
+  - The words pattern moves one past join to the other work carrying the whole title. Guard 1 lost no group and gained only real series.
 - **Jev joins:** the new code step picks the same target as Jev on nearly every one it can settle.
 
 ## Not in scope
