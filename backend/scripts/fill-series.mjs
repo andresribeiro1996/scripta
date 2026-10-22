@@ -16,6 +16,7 @@ const WIKIDATA_ATTEMPTS = 3;
 const WIKIDATA_RETRY_MS = 60_000;
 const WIKIDATA_GAP_MS = 5_000;
 const OPEN_LIBRARY_GAP_MS = 1000;
+const OPEN_LIBRARY_PROGRESS_EVERY = 100;
 const EDITION_CLASS = "wd:Q3331189";
 const PUBLISHER_SERIES_CLASSES = "wd:Q20655472 wd:Q15695196 wd:Q1700470 wd:Q27785883";
 const SERIES = `?work p:P179 ?statement . ?statement ps:P179 ?series . OPTIONAL { ?statement pq:P1545 ?position . } FILTER NOT EXISTS { ?series wdt:P31 ?seriesClass . VALUES ?seriesClass { ${PUBLISHER_SERIES_CLASSES} } }`;
@@ -50,7 +51,7 @@ for (const name of mode === "held" ? ["COVERS_DB_PATH", "LIBRARY_DB_PATH"] : ["C
   if (!process.env[name]) fail(`Missing environment variable: ${name}`);
 }
 
-const { USER_AGENT, createThrottle } = await import("../dist/modules/books/adapters/http/http.js");
+const { USER_AGENT, createThrottle, fetchJson } = await import("../dist/modules/books/adapters/http/http.js");
 const { createOpenLibraryCatalog } = await import("../dist/modules/books/adapters/openlibrary/openLibraryCatalog.js");
 const { openBooksDb } = await import("../dist/modules/books/adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("../dist/modules/books/adapters/sqlite/sqliteBooksRepository.js");
@@ -121,23 +122,29 @@ SELECT ?position ?${ids} (SAMPLE(?enLabel) AS ?en) (SAMPLE(?ptLabel) AS ?pt) (SA
 GROUP BY ?work ?series ?position ?${ids}`;
 
 async function runWikidata(repo) {
-  const report = { pages: 0, rows: 0, matched: 0, added: 0 };
-  const tally = wikidataTally();
+  const rows = [];
+  let pages = 0;
   for (const [kind, spec] of WIKIDATA_KINDS.entries()) {
     for (let offset = 0, last = false; !last; offset += WIKIDATA_PAGE_ROWS) {
-      if (report.pages > 0) await sleep(WIKIDATA_GAP_MS);
+      if (pages > 0) await sleep(WIKIDATA_GAP_MS);
       const bindings = await queryWikidata(wikidataPage(spec, offset));
-      const rows = bindings.flatMap((binding) => wikidataRowOf(binding) ?? []);
-      const { matched, added } = await fillFromWikidata(repo, rows, at, { dryRun, skip, tally });
-      report.pages++;
-      report.rows += rows.length;
-      report.matched += matched;
-      report.added += added;
-      log(JSON.stringify({ kind, offset, bindings: bindings.length, rows: rows.length, matched, added }));
+      const pageRows = bindings.flatMap((binding) => wikidataRowOf(binding) ?? []);
+      rows.push(...pageRows);
+      pages++;
+      log(JSON.stringify({ kind, offset, bindings: bindings.length, rows: pageRows.length }));
       last = bindings.length < WIKIDATA_PAGE_ROWS;
     }
   }
-  return { ...report, unmatchedSkips: skipNames.filter((name) => !tally.skipped.has(seriesNameKey(name))), series: seriesCounts(tally) };
+  const throttle = createThrottle(OPEN_LIBRARY_GAP_MS);
+  let openLibraryRequests = 0;
+  const fetchWork = (key) =>
+    throttle(() => {
+      if (++openLibraryRequests % OPEN_LIBRARY_PROGRESS_EVERY === 0) log(JSON.stringify({ openLibraryRequests }));
+      return fetchJson("openlibrary", `https://openlibrary.org/works/${key}.json`);
+    });
+  const tally = wikidataTally();
+  const { matched, added, redirected, failedKeys } = await fillFromWikidata(repo, fetchWork, rows, at, { dryRun, skip, tally });
+  return { pages, rows: rows.length, matched, added, redirected, failedKeys, unmatchedSkips: skipNames.filter((name) => !tally.skipped.has(seriesNameKey(name))), series: seriesCounts(tally) };
 }
 
 async function run(repo) {
