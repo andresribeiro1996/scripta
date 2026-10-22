@@ -373,6 +373,26 @@ test("a present original under its whole title is listed in presentWorks, in a d
   assert.equal(repo.canonicalWorkIds([pt.work_id!]).get(pt.work_id!), en.work_id);
 });
 
+test("a second shelved copy joins the original that a killed run left inside the first copy's work", async () => {
+  const repo = freshRepo();
+  const first = portuguese(repo, "Passeio ao Farol", "Virginia Woolf", "To the Lighthouse", "OL930W");
+  edition(repo, isbn(), { title: "To the Lighthouse", author: "Virginia Woolf", workKey: "OL930W" });
+  const second = portuguese(repo, "Passeio ao Farol", "Virginia Woolf", "To the Lighthouse");
+  const { deps } = setup(repo, {});
+  const report = await fillOriginals(deps, [second.work_id!], LIVE);
+  assert.deepEqual(report.presentWorks, [{ workId: second.work_id, title: "Passeio ao Farol", originalTitle: "To the Lighthouse" }]);
+  assert.deepEqual([report.lookups, report.codeMerges], [0, 1]);
+  assert.equal(repo.canonicalWorkIds([second.work_id!]).get(second.work_id!), first.work_id);
+});
+
+test("an original with a full stop is fetched and joined under its whole title", async () => {
+  const repo = freshRepo();
+  const pt = portuguese(repo, "O Senhor Mercedes", "Stephen King", "Mr. Mercedes");
+  const { deps } = setup(repo, { "Mr. Mercedes": [workOf("Mr. Mercedes", "Stephen King", "OL41W")] });
+  const report = await fillOriginals(deps, [pt.work_id!], LIVE);
+  assert.deepEqual([report.lookups, report.found, report.added, report.codeMerges], [1, 1, 1, 1]);
+});
+
 test("two Portuguese titles that differ only after a colon count as two titles naming one original", async () => {
   const repo = freshRepo();
   const held = portuguese(repo, "Crónicas: Aurora", "Ana Silva", "Chronicles");

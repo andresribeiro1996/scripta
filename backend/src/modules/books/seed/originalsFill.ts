@@ -1,19 +1,14 @@
-import { firstAuthor, normalizeTitle, normalizeWords, titleNumbers } from "@scripta/shared";
+import { firstAuthor, normalizeTitle, normalizeWords } from "@scripta/shared";
 import type { OpenLibraryWork } from "../adapters/openlibrary/openLibraryCatalog.js";
 import { SourceUnavailableError } from "../domain/errors.js";
 import { lookupIdentity } from "../domain/normalize.js";
-import { evidenceOf, hasVolumeMarker, mainTitle, mentionsSurname, originalKey, sameMainTitle, seriesLikeOriginals, sharedOriginals, surnameOf, titlePattern } from "../domain/translation.js";
+import { evidenceOf, hasVolumeMarker, mainTitle, mentionsSurname, originalKey, sameMainTitle, sameWholeTitle, seriesLikeOriginals, sharedOriginals, surnameOf, titlePatterns } from "../domain/translation.js";
 import { JEV_REJECTION_LIMIT } from "../synopsisJudgments.js";
 import { runCodeSteps } from "../translationBacklog.js";
 import type { TranslationDeps } from "../translationJudgments.js";
 import { seedBook } from "./seedCatalog.js";
 
 export type FoundOriginal = { key: string; title: string; author: string };
-
-export function sameWholeTitle(title: string, originalTitle: string): boolean {
-  const main = mainTitle(originalTitle);
-  return normalizeWords(title) === normalizeWords(main) && normalizeTitle(title) === normalizeTitle(main) && titleNumbers(title) === titleNumbers(main);
-}
 
 export function pickOriginal(works: OpenLibraryWork[], originalTitle: string, authorTexts: string[]): FoundOriginal | null {
   for (const work of works) {
@@ -79,10 +74,10 @@ export async function fillOriginals(
     else if (hasVolumeMarker(evidence.title) || hasVolumeMarker(original)) report.volume++;
     else if (normalizeWords(original) !== normalizeTitle(mainTitle(original))) report.subtitle++;
     else {
-      const candidates = repo.titleCandidates(titlePattern(original)!).filter((id) => id !== workId);
-      if (candidates.length > 0) {
+      const rows = titlePatterns(original).flatMap((pattern) => repo.titleCandidates(pattern)).filter((row) => row.id !== workId);
+      if (rows.length > 0) {
         report.present++;
-        if (repo.matchCandidates(candidates).some((candidate) => sameWholeTitle(candidate.title, original))) report.presentWorks.push({ workId, title: evidence.title, originalTitle: original });
+        if (rows.some((row) => sameWholeTitle(row.title, original))) report.presentWorks.push({ workId, title: evidence.title, originalTitle: original });
       } else if (surnameOf(author) === null) report.noAuthor++;
       else {
         const key = `${originalKey(original)}#${surnameOf(author)}`;
