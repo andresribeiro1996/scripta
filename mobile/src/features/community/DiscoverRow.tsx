@@ -16,7 +16,7 @@ export function DiscoverRow({ item, linkAuthor, stats, onPreviewBooks, onOpen }:
   const status = contentStatus(content);
   const glyphLabel = readerGlyphLabel(author.readerGlyph);
   const creator = <>
-    <AuthorAvatar username={author.username} avatarUrl={author.avatarUrl} size={24} />
+    <AuthorAvatar username={author.username} avatarUrl={author.avatarUrl} size={28} />
     <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, styles.metaName, { color: colors.text }]}>{author.username}</Text>
     <ReaderGlyph identity={author.readerGlyph} size={20} />
   </>;
@@ -110,13 +110,14 @@ export function GameRow({ kind, name, meta, badges, caption, stats = [], covers,
                     <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{caption}</Text>
                   ) : null}
                 </View>
-                <View style={styles.statsRow}>
+                {stats.length > 0 ? <View style={[styles.statsRow, { borderColor: colors.border }]}>
                   {stats.map((stat) => (
-                    <Text key={stat.label} numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
-                      {stat.value} {stat.label}
-                    </Text>
+                    <View key={stat.label} style={styles.stat}>
+                      <Text {...dynamicType} style={[typography.input, styles.strong, { color: colors.text }]}>{stat.value}</Text>
+                      <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{stat.label}</Text>
+                    </View>
                   ))}
-                </View>
+                </View> : null}
               </View>
             </View>
             {clue ? <View style={[styles.clue, { backgroundColor: colors.background, borderColor: colors.border }]}>
@@ -158,7 +159,7 @@ export function StatusBadge({ label, tone }: { label: string; tone: ContentTone 
 
 const styles = StyleSheet.create({
   ticket: { marginHorizontal: spacing.lg, marginVertical: spacing.sm, borderRadius: radii.xl, overflow: "hidden" },
-  row: { flexDirection: "row", alignItems: "stretch", minHeight: 152 },
+  row: { flexDirection: "row", alignItems: "stretch", minHeight: 216 },
   art: { width: 88, alignItems: "center", justifyContent: "center", borderRightWidth: 1 },
   details: { flex: 1, padding: spacing.lg, gap: spacing.xs, justifyContent: "center" },
   shrink: { flexShrink: 1 },
@@ -167,7 +168,8 @@ const styles = StyleSheet.create({
   nameRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, minHeight: minimumTouchTarget, borderRadius: radii.sm },
   metaName: { flexShrink: 1 },
   statusRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.xs },
-  statsRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  statsRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.lg, borderTopWidth: 1, paddingTop: spacing.md, marginTop: spacing.sm },
+  stat: { gap: spacing.xs, maxWidth: "100%" },
   clue: { marginHorizontal: spacing.lg, marginVertical: spacing.lg, padding: spacing.lg, borderLeftWidth: 2, borderRadius: radii.md, gap: spacing.sm },
   clueHeading: { flexDirection: "row", alignItems: "center", gap: spacing.sm, flexWrap: "wrap" },
   badge: { borderWidth: 1, borderRadius: radii.full, paddingHorizontal: spacing.sm },
