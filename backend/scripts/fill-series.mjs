@@ -17,6 +17,8 @@ const WIKIDATA_RETRY_MS = 60_000;
 const WIKIDATA_GAP_MS = 5_000;
 const OPEN_LIBRARY_GAP_MS = 1000;
 const OPEN_LIBRARY_PROGRESS_EVERY = 100;
+const OPEN_LIBRARY_ATTEMPTS = 3;
+const OPEN_LIBRARY_RETRY_MS = 60_000;
 const EDITION_CLASS = "wd:Q3331189";
 const PUBLISHER_SERIES_CLASSES = "wd:Q20655472 wd:Q15695196 wd:Q1700470 wd:Q27785883";
 const SERIES = `?work p:P179 ?statement . ?statement ps:P179 ?series . OPTIONAL { ?statement pq:P1545 ?position . } FILTER NOT EXISTS { ?series wdt:P31 ?seriesClass . VALUES ?seriesClass { ${PUBLISHER_SERIES_CLASSES} } }`;
@@ -107,6 +109,19 @@ async function queryWikidata(query) {
   }
 }
 
+async function fetchOpenLibraryWork(key) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await fetchJson("openlibrary", `https://openlibrary.org/works/${key}.json`);
+    } catch (error) {
+      if (error.status !== 429 || attempt === OPEN_LIBRARY_ATTEMPTS) throw error;
+      const waitMs = Math.max((error.retryAt ?? 0) - Date.now(), OPEN_LIBRARY_RETRY_MS);
+      log(`openlibrary attempt ${attempt} failed (${reasonOf(error)}), retrying in ${Math.round(waitMs / 1000)}s`);
+      await sleep(waitMs);
+    }
+  }
+}
+
 const wikidataPage = ({ ids, where }, offset) => `
 SELECT ?position ?${ids} (SAMPLE(?enLabel) AS ?en) (SAMPLE(?ptLabel) AS ?pt) (SAMPLE(?anyLabel) AS ?any) WHERE {
   {
@@ -140,7 +155,7 @@ async function runWikidata(repo) {
   const fetchWork = (key) =>
     throttle(() => {
       if (++openLibraryRequests % OPEN_LIBRARY_PROGRESS_EVERY === 0) log(JSON.stringify({ openLibraryRequests }));
-      return fetchJson("openlibrary", `https://openlibrary.org/works/${key}.json`);
+      return fetchOpenLibraryWork(key);
     });
   const tally = wikidataTally();
   const { matched, added, redirected, failedKeys } = await fillFromWikidata(repo, fetchWork, rows, at, { dryRun, skip, tally });
