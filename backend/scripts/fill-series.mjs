@@ -109,17 +109,32 @@ async function queryWikidata(query) {
   }
 }
 
-async function fetchOpenLibraryWork(key) {
-  for (let attempt = 1; ; attempt++) {
+function createWorkFetcher() {
+  const throttle = createThrottle(OPEN_LIBRARY_GAP_MS);
+  let openLibraryRequests = 0;
+  let failed = 0;
+  const request = async (key) => {
     try {
-      return await fetchJson("openlibrary", `https://openlibrary.org/works/${key}.json`);
+      return await throttle(() => fetchJson("openlibrary", `https://openlibrary.org/works/${key}.json`));
     } catch (error) {
-      if (error.status !== 429 || attempt === OPEN_LIBRARY_ATTEMPTS) throw error;
-      const waitMs = Math.max((error.retryAt ?? 0) - Date.now(), OPEN_LIBRARY_RETRY_MS);
-      log(`openlibrary attempt ${attempt} failed (${reasonOf(error)}), retrying in ${Math.round(waitMs / 1000)}s`);
-      await sleep(waitMs);
+      failed++;
+      throw error;
+    } finally {
+      if (++openLibraryRequests % OPEN_LIBRARY_PROGRESS_EVERY === 0) log(JSON.stringify({ openLibraryRequests, failed }));
     }
-  }
+  };
+  return async (key) => {
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await request(key);
+      } catch (error) {
+        if (error.status !== 429 || attempt === OPEN_LIBRARY_ATTEMPTS) throw error;
+        const waitMs = Math.max((error.retryAt ?? 0) - Date.now(), OPEN_LIBRARY_RETRY_MS);
+        log(`openlibrary attempt ${attempt} failed (${reasonOf(error)}), retrying in ${Math.round(waitMs / 1000)}s`);
+        await sleep(waitMs);
+      }
+    }
+  };
 }
 
 const wikidataPage = ({ ids, where }, offset) => `
@@ -150,16 +165,9 @@ async function runWikidata(repo) {
       last = bindings.length < WIKIDATA_PAGE_ROWS;
     }
   }
-  const throttle = createThrottle(OPEN_LIBRARY_GAP_MS);
-  let openLibraryRequests = 0;
-  const fetchWork = (key) =>
-    throttle(() => {
-      if (++openLibraryRequests % OPEN_LIBRARY_PROGRESS_EVERY === 0) log(JSON.stringify({ openLibraryRequests }));
-      return fetchOpenLibraryWork(key);
-    });
   const tally = wikidataTally();
-  const { matched, added, redirected, failedKeys } = await fillFromWikidata(repo, fetchWork, rows, at, { dryRun, skip, tally });
-  return { pages, rows: rows.length, matched, added, redirected, failedKeys, unmatchedSkips: skipNames.filter((name) => !tally.skipped.has(seriesNameKey(name))), series: seriesCounts(tally) };
+  const { matched, added, redirected, failedKeys, failedSeries } = await fillFromWikidata(repo, createWorkFetcher(), rows, at, { dryRun, skip, tally });
+  return { pages, rows: rows.length, matched, added, redirected, failedKeys, failedSeries, unmatchedSkips: skipNames.filter((name) => !tally.skipped.has(seriesNameKey(name))), series: seriesCounts(tally) };
 }
 
 async function run(repo) {

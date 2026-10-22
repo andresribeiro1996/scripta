@@ -102,18 +102,24 @@ export async function fillFromWikidata(
   rows: WikidataRow[],
   at: string,
   { dryRun, skip = new Set(), tally = wikidataTally() }: WikidataOptions
-): Promise<{ matched: number; added: number; redirected: number; failedKeys: string[] }> {
+): Promise<{ matched: number; added: number; redirected: number; failedKeys: string[]; failedSeries: string[] }> {
   const byOpenLibraryKey = repo.workIdsByWorkKeys([...new Set(rows.flatMap((row) => row.olWorkIds))]);
-  const unmatchedKeys = new Set<string>();
-  for (const row of rows) {
+  const kept = rows.flatMap((row) => {
     const nameKey = seriesNameKey(row.series);
-    if (nameKey === null || skip.has(nameKey)) continue;
-    for (const olKey of row.olWorkIds) if (!byOpenLibraryKey.has(olKey)) unmatchedKeys.add(olKey);
-  }
+    return nameKey === null || skip.has(nameKey) ? [] : [{ row, nameKey }];
+  });
+  const unmatchedKeys = new Set<string>();
+  for (const { row } of kept) for (const olKey of row.olWorkIds) if (!byOpenLibraryKey.has(olKey)) unmatchedKeys.add(olKey);
+  const fetched = new Map<string, Promise<unknown>>();
+  const fetchOnce = (olKey: string) => {
+    const answer = fetched.get(olKey) ?? fetchWork(olKey);
+    fetched.set(olKey, answer);
+    return answer;
+  };
   const report = { redirected: 0, failedKeys: [] as string[] };
   for (const olKey of unmatchedKeys) {
     try {
-      const workId = await followRedirects(repo, fetchWork, olKey);
+      const workId = await followRedirects(repo, fetchOnce, olKey);
       if (workId === undefined) continue;
       byOpenLibraryKey.set(olKey, workId);
       report.redirected++;
@@ -121,6 +127,11 @@ export async function fillFromWikidata(
       if (!(error instanceof SourceUnavailableError) || error.status === 429) throw error;
       report.failedKeys.push(olKey);
     }
+  }
+  const failed = new Set(report.failedKeys);
+  const failedSeries = new Map<string, string>();
+  for (const { row, nameKey } of kept) {
+    if (!failedSeries.has(nameKey) && row.olWorkIds.some((olKey) => failed.has(olKey))) failedSeries.set(nameKey, row.series);
   }
   const writes: Array<{ workId: string; entry: SeriesEntry }> = [];
   for (const row of rows) {
@@ -148,7 +159,7 @@ export async function fillFromWikidata(
     }
   }
   const added = dryRun ? 0 : await inBatches(repo, writes, ({ workId, entry }) => repo.addWorkSeries(workId, [entry], "wikidata", at));
-  return { matched: writes.length, added, ...report };
+  return { matched: writes.length, added, ...report, failedSeries: [...failedSeries.values()].sort((left, right) => left.localeCompare(right)) };
 }
 
 export function listOriginalTitleSeries(repo: Pick<BooksRepository, "originalTitleClaims">): OriginalTitleCandidate[] {

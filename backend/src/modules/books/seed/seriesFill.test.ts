@@ -59,7 +59,7 @@ test("Wikidata rows match a work by any ISBN form or by Open Library ID, and a t
     wikidata("Title only", "1", {}),
     wikidata("Nobody has these", null, { isbns: ["9780000000002"], olWorkIds: ["OL2W", "OL3M"] })
   ], AT, LIVE);
-  assert.deepEqual(report, { matched: 3, added: 3, redirected: 0, failedKeys: [] });
+  assert.deepEqual(report, { matched: 3, added: 3, redirected: 0, failedKeys: [], failedSeries: [] });
   assert.deepEqual(repo.bestSeriesOf([dune.work_id!, emma.work_id!, other.work_id!]), new Map([
     [dune.work_id!, { name: "Dune Chronicles", position: "1" }],
     [emma.work_id!, { name: "Highbury", position: null }],
@@ -77,7 +77,7 @@ test("a row naming one work by ISBN and by Open Library ID counts it once, and o
     wikidata("Dune Chronicles", "1", { isbns: ["9780441013593"], olWorkIds: ["OL893415W"] }),
     wikidata("Shared", null, { isbns: ["9780441013593", "9780575081406"] })
   ], AT, LIVE);
-  assert.deepEqual(report, { matched: 3, added: 3, redirected: 0, failedKeys: [] });
+  assert.deepEqual(report, { matched: 3, added: 3, redirected: 0, failedKeys: [], failedSeries: [] });
   const namesOf = (workId: string) => (db.prepare("SELECT name FROM work_series WHERE work_id = ? ORDER BY name").all(workId) as Array<{ name: string }>).map((row) => row.name);
   assert.deepEqual(namesOf(first.work_id!), ["Dune Chronicles", "Shared"]);
   assert.deepEqual(namesOf(second.work_id!), ["Shared"]);
@@ -88,7 +88,7 @@ test("a Wikidata fill can run again: it adds nothing the second time and fills a
   const dune = book(repo, "9780441013593", "Dune", "Frank Herbert");
   await fillFromWikidata(repo, noWork, [wikidata("Dune Chronicles", null, { isbns: ["9780441013593"] })], AT, LIVE);
   const again = await fillFromWikidata(repo, noWork, [wikidata("Dune Chronicles", "1", { isbns: ["9780441013593"] })], AT, LIVE);
-  assert.deepEqual(again, { matched: 1, added: 0, redirected: 0, failedKeys: [] });
+  assert.deepEqual(again, { matched: 1, added: 0, redirected: 0, failedKeys: [], failedSeries: [] });
   assert.equal(rowsOf(db, "work_series").length, 1);
   assert.deepEqual(repo.bestSeriesOf([dune.work_id!]).get(dune.work_id!), { name: "Dune Chronicles", position: "1" });
 });
@@ -98,7 +98,7 @@ test("a Wikidata dry run counts the matches and writes nothing", async () => {
   book(repo, "9780441013593", "Dune", "Frank Herbert");
   const events: string[] = [];
   const report = await fillFromWikidata(countingTransactions(repo, events), noWork, [wikidata("Dune Chronicles", "1", { isbns: ["9780441013593"] }), wikidata("Title only", null, {})], AT, DRY);
-  assert.deepEqual(report, { matched: 1, added: 0, redirected: 0, failedKeys: [] });
+  assert.deepEqual(report, { matched: 1, added: 0, redirected: 0, failedKeys: [], failedSeries: [] });
   assert.equal(rowsOf(db, "work_series").length, 0);
   assert.deepEqual(events, []);
 });
@@ -131,7 +131,7 @@ test("series with equally many works are listed by name, and a fill without a ta
   const tally = wikidataTally();
   await fillFromWikidata(repo, noWork, [wikidata("Zeta", null, { isbns: ["9780441013593"] }), wikidata("Alpha", null, { isbns: ["9780441013593"] })], AT, { ...DRY, tally });
   assert.deepEqual(seriesCounts(tally), [{ name: "Alpha", works: 1 }, { name: "Zeta", works: 1 }]);
-  assert.deepEqual(await fillFromWikidata(repo, noWork, [wikidata("Zeta", null, { isbns: ["9780441013593"] })], AT, DRY), { matched: 1, added: 0, redirected: 0, failedKeys: [] });
+  assert.deepEqual(await fillFromWikidata(repo, noWork, [wikidata("Zeta", null, { isbns: ["9780441013593"] })], AT, DRY), { matched: 1, added: 0, redirected: 0, failedKeys: [], failedSeries: [] });
 });
 
 test("skipped series are neither written nor counted, matched by name key, in a dry run as well", async () => {
@@ -147,7 +147,7 @@ test("skipped series are neither written nor counted, matched by name key, in a 
       wikidata("Dune Chronicles", "1", { isbns: ["9780441013593"] }),
       wikidata("Piccola Biblioteca Adelphi", null, { olWorkIds: ["OL1W"] })
     ], AT, { ...options, skip, tally });
-    assert.deepEqual(report, { matched: 1, added: options.dryRun ? 0 : 1, redirected: 0, failedKeys: [] });
+    assert.deepEqual(report, { matched: 1, added: options.dryRun ? 0 : 1, redirected: 0, failedKeys: [], failedSeries: [] });
     assert.deepEqual(seriesCounts(tally), [{ name: "Dune Chronicles", works: 1 }]);
     assert.deepEqual([...tally.skipped].sort(), [...skip].sort());
     assert.deepEqual(rowsOf(db, "work_series").map((row) => row.name), options.dryRun ? [] : ["Dune Chronicles"]);
@@ -171,7 +171,7 @@ test("Wikidata writes go in batches of a few hundred rows, with the event loop f
   const events: string[] = [];
   setTimeout(() => events.push("tick"), 20);
   const report = await fillFromWikidata(countingTransactions(repo, events), noWork, rows, AT, LIVE);
-  assert.deepEqual(report, { matched: 650, added: 650, redirected: 0, failedKeys: [] });
+  assert.deepEqual(report, { matched: 650, added: 650, redirected: 0, failedKeys: [], failedSeries: [] });
   assert.equal(rowsOf(db, "work_series").length, 650);
   assert.deepEqual(events, ["tx", "tick", "tx", "tx"]);
 });
@@ -196,7 +196,7 @@ test("an Open Library ID that Open Library merged into another work matches the 
   const memories = book(repo, null, "Memories of Ice", "Steven Erikson", { workKey: "OL5734773W" });
   const { asked, fetchWork } = openLibraryWorks({ OL17731722W: redirect("OL17731722W", "OL5734773W") });
   const report = await fillFromWikidata(repo, fetchWork, [wikidata("Malazan Book of the Fallen", "3", { olWorkIds: ["OL17731722W"] })], AT, LIVE);
-  assert.deepEqual(report, { matched: 1, added: 1, redirected: 1, failedKeys: [] });
+  assert.deepEqual(report, { matched: 1, added: 1, redirected: 1, failedKeys: [], failedSeries: [] });
   assert.deepEqual(asked, ["OL17731722W"]);
   assert.deepEqual(repo.bestSeriesOf([memories.work_id!]).get(memories.work_id!), { name: "Malazan Book of the Fallen", position: "3" });
 });
@@ -206,10 +206,10 @@ test("a redirect is followed for at most two requests: two hops reach the catalo
   const reached = book(repo, null, "Two hops", "Author", { workKey: "OL3W" });
   book(repo, null, "Three hops", "Author", { workKey: "OL7W" });
   const near = openLibraryWorks({ OL1W: redirect("OL1W", "OL2W"), OL2W: redirect("OL2W", "OL3W") });
-  assert.deepEqual(await fillFromWikidata(repo, near.fetchWork, [wikidata("Near", "1", { olWorkIds: ["OL1W"] })], AT, LIVE), { matched: 1, added: 1, redirected: 1, failedKeys: [] });
+  assert.deepEqual(await fillFromWikidata(repo, near.fetchWork, [wikidata("Near", "1", { olWorkIds: ["OL1W"] })], AT, LIVE), { matched: 1, added: 1, redirected: 1, failedKeys: [], failedSeries: [] });
   assert.deepEqual(near.asked, ["OL1W", "OL2W"]);
   const far = openLibraryWorks({ OL4W: redirect("OL4W", "OL5W"), OL5W: redirect("OL5W", "OL6W"), OL6W: redirect("OL6W", "OL7W") });
-  assert.deepEqual(await fillFromWikidata(repo, far.fetchWork, [wikidata("Far", "1", { olWorkIds: ["OL4W"] })], AT, LIVE), { matched: 0, added: 0, redirected: 0, failedKeys: [] });
+  assert.deepEqual(await fillFromWikidata(repo, far.fetchWork, [wikidata("Far", "1", { olWorkIds: ["OL4W"] })], AT, LIVE), { matched: 0, added: 0, redirected: 0, failedKeys: [], failedSeries: [] });
   assert.deepEqual(far.asked, ["OL4W", "OL5W"]);
   assert.deepEqual(rowsOf(db, "work_series").map((row) => [row.name, row.work_id]), [["Near", reached.work_id]]);
 });
@@ -225,7 +225,7 @@ test("an Open Library answer that is not a redirect to a work leaves the row unm
     OL6W: { key: "/works/OL6W", type: { key: "/type/work" }, location: "/works/OL9W" }
   });
   const report = await fillFromWikidata(repo, fetchWork, [wikidata("Nothing", "1", { olWorkIds: ["OL1W", "OL2W", "OL3W", "OL4W", "OL5W", "OL6W"] })], AT, LIVE);
-  assert.deepEqual(report, { matched: 0, added: 0, redirected: 0, failedKeys: [] });
+  assert.deepEqual(report, { matched: 0, added: 0, redirected: 0, failedKeys: [], failedSeries: [] });
   assert.deepEqual(asked, ["OL1W", "OL2W", "OL3W", "OL4W", "OL5W", "OL6W"]);
   assert.equal(rowsOf(db, "work_series").length, 0);
 });
@@ -244,7 +244,7 @@ test("Open Library is asked only for IDs no catalog work has, in rows that could
       wikidata("Series C", "2", { olWorkIds: ["OL21W"] })
     ], AT, { ...options, skip: new Set([seriesNameKey("Piccola Biblioteca Adelphi")!]) });
     assert.deepEqual(asked, ["OL11W", "OL21W"]);
-    assert.deepEqual(report, { matched: 3, added: options.dryRun ? 0 : 3, redirected: 1, failedKeys: [] });
+    assert.deepEqual(report, { matched: 3, added: options.dryRun ? 0 : 3, redirected: 1, failedKeys: [], failedSeries: [] });
     assert.deepEqual(
       rowsOf(db, "work_series").map((row) => [row.name, row.work_id]),
       options.dryRun ? [] : [["Series A", held.work_id], ["Series B", merged.work_id], ["Series C", merged.work_id]]
@@ -252,7 +252,21 @@ test("Open Library is asked only for IDs no catalog work has, in rows that could
   }
 });
 
-test("an Open Library outage for one ID is reported and the other rows are still written, but a rate limit or any other error stops the fill", async () => {
+test("an ID that is both a row's ID and another ID's redirect hop is fetched once, and so is its failure", async () => {
+  const { db, repo } = setup();
+  const target = book(repo, null, "Target", "Author", { workKey: "OL3W" });
+  const chain = openLibraryWorks({ OL1W: redirect("OL1W", "OL2W"), OL2W: redirect("OL2W", "OL3W") });
+  const report = await fillFromWikidata(repo, chain.fetchWork, [wikidata("Series One", "1", { olWorkIds: ["OL1W"] }), wikidata("Series Two", "2", { olWorkIds: ["OL2W"] })], AT, LIVE);
+  assert.deepEqual(chain.asked, ["OL1W", "OL2W"]);
+  assert.deepEqual(report, { matched: 2, added: 2, redirected: 2, failedKeys: [], failedSeries: [] });
+  assert.deepEqual(rowsOf(db, "work_series").map((row) => [row.name, row.work_id]), [["Series One", target.work_id], ["Series Two", target.work_id]]);
+  const failing = openLibraryWorks({ OL11W: redirect("OL11W", "OL12W"), OL12W: new SourceUnavailableError("openlibrary", "HTTP 503", { status: 503 }) });
+  const failed = await fillFromWikidata(repo, failing.fetchWork, [wikidata("Series Three", "3", { olWorkIds: ["OL11W"] }), wikidata("Series Four", "4", { olWorkIds: ["OL12W"] })], AT, LIVE);
+  assert.deepEqual(failing.asked, ["OL11W", "OL12W"]);
+  assert.deepEqual(failed, { matched: 0, added: 0, redirected: 0, failedKeys: ["OL11W", "OL12W"], failedSeries: ["Series Four", "Series Three"] });
+});
+
+test("an Open Library outage for one ID is reported with the series it touches and the other rows are still written, but a rate limit or any other error stops the fill", async () => {
   const { db, repo } = setup();
   const target = book(repo, null, "Target", "Author", { workKey: "OL30W" });
   const { fetchWork } = openLibraryWorks({
@@ -262,14 +276,22 @@ test("an Open Library outage for one ID is reported and the other rows are still
     OL41W: redirect("OL41W", "OL42W"),
     OL42W: new SourceUnavailableError("openlibrary", "HTTP 502", { status: 502 })
   });
-  const rows = ["OL31W", "OL32W", "OL33W", "OL41W"].map((key, index) => wikidata(`Series ${index}`, "1", { olWorkIds: [key] }));
-  const report = await fillFromWikidata(repo, fetchWork, rows, AT, LIVE);
-  assert.deepEqual(report, { matched: 1, added: 1, redirected: 1, failedKeys: ["OL31W", "OL32W", "OL41W"] });
+  const rows = [
+    wikidata("Zeta", "1", { olWorkIds: ["OL31W"] }),
+    wikidata("Alpha", "1", { olWorkIds: ["OL32W"] }),
+    wikidata("ALPHA", "2", { olWorkIds: ["OL32W"] }),
+    wikidata("Piccola Biblioteca Adelphi", null, { olWorkIds: ["OL31W"] }),
+    wikidata("Series 2", "1", { olWorkIds: ["OL33W"] }),
+    wikidata("Series 3", "1", { olWorkIds: ["OL41W"] })
+  ];
+  const options = { ...LIVE, skip: new Set([seriesNameKey("Piccola Biblioteca Adelphi")!]) };
+  const report = await fillFromWikidata(repo, fetchWork, rows, AT, options);
+  assert.deepEqual(report, { matched: 1, added: 1, redirected: 1, failedKeys: ["OL31W", "OL32W", "OL41W"], failedSeries: ["Alpha", "Series 3", "Zeta"] });
   assert.deepEqual(rowsOf(db, "work_series").map((row) => [row.name, row.work_id]), [["Series 2", target.work_id]]);
   const limited = openLibraryWorks({ OL31W: new SourceUnavailableError("openlibrary", "HTTP 429", { status: 429 }) });
-  await assert.rejects(fillFromWikidata(repo, limited.fetchWork, rows, AT, LIVE), (error: unknown) => error instanceof SourceUnavailableError && error.status === 429);
+  await assert.rejects(fillFromWikidata(repo, limited.fetchWork, rows, AT, options), (error: unknown) => error instanceof SourceUnavailableError && error.status === 429);
   const broken = openLibraryWorks({ OL31W: new TypeError("boom") });
-  await assert.rejects(fillFromWikidata(repo, broken.fetchWork, rows, AT, LIVE), TypeError);
+  await assert.rejects(fillFromWikidata(repo, broken.fetchWork, rows, AT, options), TypeError);
   assert.equal(rowsOf(db, "work_series").length, 1);
 });
 
