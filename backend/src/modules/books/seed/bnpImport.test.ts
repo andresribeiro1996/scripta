@@ -1236,15 +1236,30 @@ function fakePacer() {
   return { pace, waits, tick: (ms: number) => void (time += ms), now: () => time };
 }
 
-test("writes with a 150 ms gap between them are never paused", async () => {
+test("writes 150 ms apart are never paused", async () => {
   const { pace, waits, tick } = fakePacer();
 
   for (let index = 0; index < 50; index++) {
     await pace(() => {});
-    tick(160);
+    tick(150);
   }
 
   assert.deepEqual(waits, []);
+});
+
+test("writes 149 ms apart are paused once the run passes a second", async () => {
+  const { pace, waits, tick, now } = fakePacer();
+  const pausedAt: number[] = [];
+
+  while (now() < 1500) {
+    const startedAt = now();
+    const before = waits.length;
+    await pace(() => {});
+    if (waits.length > before) pausedAt.push(startedAt);
+    tick(149);
+  }
+
+  assert.deepEqual(pausedAt, [1043]);
 });
 
 test("writes without a gap pause for 200 ms just after a second, and the run restarts after the pause", async () => {
@@ -1321,6 +1336,7 @@ process.stdin.once("data", () => {
   }
   process.stdout.write(JSON.stringify({ ...answer, waited: performance.now() - start }) + "\\n");
 });
+process.stdout.write("ready\\n");
 `;
 
 const WRITE_HELD_MS = 1_100;
@@ -1333,10 +1349,13 @@ test("a server writer with a 5 s timeout gets the lock while the import writes b
   pin.prepare("SELECT COUNT(*) FROM books").get();
   const writer = spawn(process.execPath, ["-e", SERVER_WRITER, path], { stdio: ["pipe", "pipe", "inherit"] });
   const exited = new Promise((resolve) => writer.once("exit", resolve));
-  let reply = "";
-  writer.stdout.on("data", (chunk) => {
-    reply += chunk;
+  const dead = new Promise<never>((_, reject) => {
+    writer.once("error", reject);
+    writer.stdin.once("error", reject);
+    writer.once("exit", (code) => reject(new Error(`the writer exited with ${code}`)));
   });
+  const ready = new Promise<void>((resolve) => writer.stdout.once("data", () => resolve()));
+  let reply = "";
   const fileRepo = createSqliteBooksRepository(importDb);
   let asked = false;
   const repo: BooksRepository = {
@@ -1357,7 +1376,11 @@ test("a server writer with a 5 s timeout gets the lock while the import writes b
   const { deps } = harvestSetup({ [windowUrl("2026-10-16", "2026-10-16")]: oaiPage(Array.from({ length: 10 }, (_, index) => scanless(isbnN(index + 1)))) });
 
   try {
-    await assert.rejects(importBnp({ ...deps, repo }, run("2026-10-16", "2026-10-16")), /the writer answered/);
+    await Promise.race([ready, dead]);
+    writer.stdout.on("data", (chunk) => {
+      reply += chunk;
+    });
+    await Promise.race([assert.rejects(importBnp({ ...deps, repo }, run("2026-10-16", "2026-10-16")), /the writer answered/), dead]);
 
     const answer = JSON.parse(reply) as { waited: number; error?: string };
     assert.equal(answer.error, undefined);

@@ -54,7 +54,7 @@ export function planBnpRecord(repo: ReplaceRepo & Pick<BooksRepository, "findBoo
   return { book, isbn, existing, replace: replaceReasonOf(repo, existing, book.scanUrl) };
 }
 
-export type BnpPace = <T>(write: () => T) => Promise<T>;
+type BnpPace = <T>(write: () => T) => Promise<T>;
 
 export function createBnpPacer(clock: () => number = () => performance.now(), wait: (ms: number) => Promise<unknown> = sleep): BnpPace {
   let runStart = 0;
