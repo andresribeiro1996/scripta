@@ -2,7 +2,7 @@ import { firstAuthor, normalizeTitle, normalizeWords, titleNumbers } from "@scri
 import type { OpenLibraryWork } from "../adapters/openlibrary/openLibraryCatalog.js";
 import { SourceUnavailableError } from "../domain/errors.js";
 import { lookupIdentity } from "../domain/normalize.js";
-import { evidenceOf, hasVolumeMarker, isPortuguese, mainTitle, mentionsSurname, originalKey, sameMainTitle, seriesLikeOriginals, surnameOf, titlePattern } from "../domain/translation.js";
+import { evidenceOf, hasVolumeMarker, mainTitle, mentionsSurname, originalKey, sameMainTitle, seriesLikeOriginals, sharedOriginals, surnameOf, titlePattern } from "../domain/translation.js";
 import { JEV_REJECTION_LIMIT } from "../synopsisJudgments.js";
 import { runCodeSteps } from "../translationBacklog.js";
 import type { TranslationDeps } from "../translationJudgments.js";
@@ -66,17 +66,7 @@ export async function fillOriginals(
   const report: OriginalsReport = { held: held.size, selected: works.length, noOriginal: 0, seriesLike: 0, volume: 0, subtitle: 0, present: 0, noAuthor: 0, sharedOriginal: 0, lookups: 0, found: 0, notFound: 0, added: 0, existing: 0, codeMerges: 0, codeBlocked: 0, noCandidates: 0, presentWorks: [], failed: [], ask: [], originals: [] };
   const claims = repo.originalTitleClaims();
   const isSeriesLike = seriesLikeOriginals(claims);
-  const buckets = new Map<string, { titles: Set<string>; originals: Set<string> }>();
-  for (const claim of claims) {
-    const original = originalKey(claim.originalTitle);
-    const title = normalizeWords(claim.title);
-    if (!isPortuguese(claim.language) || original === null || title === "" || sameMainTitle(claim.title, claim.originalTitle)) continue;
-    const key = `${original}#${surnameOf(claim.author) ?? ""}`;
-    const bucket = buckets.get(key) ?? { titles: new Set(), originals: new Set() };
-    bucket.titles.add(title);
-    bucket.originals.add(normalizeWords(claim.originalTitle));
-    buckets.set(key, bucket);
-  }
+  const shared = sharedOriginals(claims);
   const groups = new Map<string, Group>();
   for (const workId of works) {
     const rows = repo.translationEvidence(workId);
@@ -104,9 +94,8 @@ export async function fillOriginals(
     }
   }
   const looked: Group[] = [];
-  for (const [key, group] of groups) {
-    const bucket = buckets.get(key);
-    if (bucket && (bucket.titles.size >= 2 || bucket.originals.size >= 2)) report.sharedOriginal += group.works.length;
+  for (const group of groups.values()) {
+    if (shared(group.originalTitle, group.author)) report.sharedOriginal += group.works.length;
     else looked.push(group);
   }
   report.lookups = looked.length;

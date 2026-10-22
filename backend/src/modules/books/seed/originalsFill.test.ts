@@ -341,16 +341,23 @@ test("an original with a colon or bracket part is skipped before any lookup", as
   assert.equal(calls.length, 0);
 });
 
-test("an original with a part after a full stop or a dash is skipped, and its volume joins nothing", async () => {
+test("an original with a part after a dash is skipped before any lookup", async () => {
+  const repo = freshRepo();
+  const book = portuguese(repo, "Um Livro", "Ana Silva", "Some Book - A Novel");
+  const { deps, calls } = setup(repo, { "Some Book": [workOf("Some Book", "Ana Silva", "OL16W")] });
+  const report = await fillOriginals(deps, [book.work_id!], LIVE);
+  assert.deepEqual([report.subtitle, report.lookups], [1, 0]);
+  assert.equal(calls.length, 0);
+});
+
+test("an original with a full stop is looked up under its whole title, and a series work is not its original", async () => {
   const repo = freshRepo();
   const king = portuguese(repo, "O Rei de Ferro", "Maurice Druon", "Les rois maudits. Le roi de fer");
-  const book = portuguese(repo, "Um Livro", "Ana Silva", "Some Book - A Novel");
-  const answers = { "Les rois maudits": [workOf("Les Rois maudits", "Maurice Druon", "OL15W")], "Some Book": [workOf("Some Book", "Ana Silva", "OL16W")] };
-  const { deps, calls } = setup(repo, answers);
-  const report = await fillOriginals(deps, [king.work_id!, book.work_id!], LIVE);
-  assert.deepEqual([report.subtitle, report.lookups, report.added, report.codeMerges], [2, 0, 0, 0]);
-  assert.equal(calls.length, 0);
-  for (const pt of [king, book]) assert.equal(repo.canonicalWorkIds([pt.work_id!]).get(pt.work_id!), pt.work_id);
+  const { deps, calls } = setup(repo, { "Les rois maudits. Le roi de fer": [workOf("Les Rois maudits", "Maurice Druon", "OL15W")] });
+  const report = await fillOriginals(deps, [king.work_id!], LIVE);
+  assert.deepEqual(calls, [["Les rois maudits. Le roi de fer", "maurice druon"]]);
+  assert.deepEqual([report.subtitle, report.lookups, report.found, report.added, report.codeMerges], [0, 1, 0, 0, 0]);
+  assert.equal(repo.canonicalWorkIds([king.work_id!]).get(king.work_id!), king.work_id);
 });
 
 test("a present original under its whole title is listed in presentWorks, in a dry run too, and joined in a real run", async () => {

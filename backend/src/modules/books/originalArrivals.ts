@@ -1,6 +1,6 @@
 import { normalizeTitle, normalizeWords } from "@scripta/shared";
 import { startDetailsBackfill } from "./backfill.js";
-import { arrivalKey, evidenceOf, isPortuguese, mainTitle, mentionsSurname, originalKey, sameMainTitle, seriesLikeOriginals, surnameOf, type OriginalClaim, type SeriesLike } from "./domain/translation.js";
+import { arrivalKey, evidenceOf, mainTitle, mentionsSurname, originalKey, seriesLikeOriginals, sharedOriginals, surnameOf, type OriginalClaim } from "./domain/translation.js";
 import { sameWholeTitle } from "./seed/originalsFill.js";
 import { JEV_REJECTION_LIMIT } from "./synopsisJudgments.js";
 import { joinByCode } from "./translationBacklog.js";
@@ -12,27 +12,6 @@ const ORIGINAL_ARRIVALS_TICK_MS = 200;
 
 type ArrivalSteps = { arrivals: number; claimants: number; codeMerges: number; codeBlocked: number };
 type ArrivalDeps = Pick<TranslationDeps, "repo" | "sharesArena" | "now">;
-
-const bucketOf = (original: string, author: string) => `${original}#${surnameOf(author) ?? ""}`;
-
-export function sharedOriginals(claims: OriginalClaim[]): SeriesLike {
-  const buckets = new Map<string, { titles: Set<string>; originals: Set<string> }>();
-  for (const claim of claims) {
-    const original = originalKey(claim.originalTitle);
-    const title = normalizeWords(claim.title);
-    if (!isPortuguese(claim.language) || original === null || title === "" || sameMainTitle(claim.title, claim.originalTitle)) continue;
-    const key = bucketOf(original, claim.author);
-    const bucket = buckets.get(key) ?? { titles: new Set(), originals: new Set() };
-    bucket.titles.add(title);
-    bucket.originals.add(normalizeWords(claim.originalTitle));
-    buckets.set(key, bucket);
-  }
-  return (originalTitle, author) => {
-    const original = originalKey(originalTitle);
-    const bucket = original === null ? undefined : buckets.get(bucketOf(original, author));
-    return bucket !== undefined && (bucket.titles.size >= 2 || bucket.originals.size >= 2);
-  };
-}
 
 function joinClaimants(deps: ArrivalDeps, key: string, surname: string, claims: OriginalClaim[], steps: ArrivalSteps) {
   const seriesLike = seriesLikeOriginals(claims);

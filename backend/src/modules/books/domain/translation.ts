@@ -1,4 +1,4 @@
-import { LOOSE_METADATA_LABEL, STRICT_METADATA_LABEL, firstAuthor, normalizeTitle, normalizeWords, titleNumbers } from "@scripta/shared";
+import { LOOSE_METADATA_LABEL, STRICT_METADATA_LABEL, firstAuthor, normalizeTitle, normalizeWords, titleNumbers, withoutBrackets } from "@scripta/shared";
 
 const ORIGINAL_TITLE = /T[íi]tulo original\s*[:\-–—]?\s*([^\n]+)/i;
 const MAX_ORIGINAL_TITLE = 200;
@@ -14,8 +14,17 @@ export function originalTitleIn(text: string | null): string | null {
   return isOriginalTitle(value) && value.length <= MAX_ORIGINAL_TITLE ? value : null;
 }
 
+const stem = (title: string) => title.split(/ — | – | - |\. /)[0]!.trim();
+
 export function mainTitle(title: string): string {
-  return title.split(/ — | – | - |\. /)[0]!.trim();
+  return title.split(/ — | – | - /)[0]!.trim();
+}
+
+export const wholeTitle = (title: string) => normalizeWords(withoutBrackets(title));
+
+export function sameWholeTitle(a: string, b: string): boolean {
+  const left = wholeTitle(a);
+  return left !== "" && left === wholeTitle(b);
 }
 
 export function sameMainTitle(a: string, b: string): boolean {
@@ -35,10 +44,17 @@ export function isPortuguese(language: string | null): boolean {
   return language === "pt" || (language?.startsWith("pt-") ?? false);
 }
 
+function keyPattern(title: string): string | null {
+  const normalized = normalizeTitle(title);
+  return normalized ? `ta:${globLiteral(normalized)}|*|${globLiteral(titleNumbers(title))}` : null;
+}
+
 export function titlePattern(title: string): string | null {
-  const main = mainTitle(title);
-  const normalized = normalizeTitle(main);
-  return normalized ? `ta:${globLiteral(normalized)}|*|${globLiteral(titleNumbers(main))}` : null;
+  return keyPattern(stem(title));
+}
+
+export function titlePatterns(title: string): string[] {
+  return [...new Set([titlePattern(title), keyPattern(title)].filter((pattern) => pattern !== null))];
 }
 
 export function authorPattern(author: string): string | null {
@@ -59,7 +75,7 @@ export function hasVolumeMarker(title: string): boolean {
 export const SERIES_LIKE_TITLES = 3;
 
 export function originalKey(title: string): string | null {
-  const main = mainTitle(title);
+  const main = stem(title);
   const normalized = normalizeTitle(main);
   return normalized === "" ? null : `${normalized}|${titleNumbers(main)}`;
 }
@@ -70,19 +86,25 @@ export type SeriesLikeGroup = { originalTitle: string; titles: string[]; workIds
 
 const groupOf = (original: string, author: string) => `${original}#${surnameOf(author) ?? ""}`;
 
-type ClaimGroup = { originalTitle: string; titles: Map<string, string>; workIds: Set<string> };
+type ClaimGroup = { originalTitle: string; titles: Map<string, string>; workIds: Set<string>; wholeTitles: Set<string>; originals: Set<string> };
 
 function claimGroups(claims: OriginalClaim[]): Map<string, ClaimGroup> {
   const groups = new Map<string, ClaimGroup>();
   for (const claim of claims) {
-    if (!isPortuguese(claim.language) || sameMainTitle(claim.title, claim.originalTitle)) continue;
     const original = originalKey(claim.originalTitle);
     const title = originalKey(claim.title);
-    if (original === null || title === null) continue;
+    const words = normalizeWords(claim.title);
+    if (!isPortuguese(claim.language) || original === null || words === "" || original === title) continue;
     const key = groupOf(original, claim.author);
-    const group = groups.get(key) ?? { originalTitle: mainTitle(claim.originalTitle), titles: new Map<string, string>(), workIds: new Set<string>() };
-    if (!group.titles.has(title)) group.titles.set(title, claim.title);
-    if (claim.workId !== null) group.workIds.add(claim.workId);
+    const group = groups.get(key) ?? { originalTitle: "", titles: new Map<string, string>(), workIds: new Set<string>(), wholeTitles: new Set<string>(), originals: new Set<string>() };
+    group.wholeTitles.add(words);
+    group.originals.add(normalizeWords(claim.originalTitle));
+    if (title !== null) {
+      if (group.titles.size === 0) group.originalTitle = stem(claim.originalTitle);
+      const counted = `${title}#${wholeTitle(stem(claim.title))}`;
+      if (!group.titles.has(counted)) group.titles.set(counted, claim.title);
+      if (claim.workId !== null) group.workIds.add(claim.workId);
+    }
     groups.set(key, group);
   }
   return groups;
@@ -93,6 +115,15 @@ export function seriesLikeOriginals(claims: OriginalClaim[]): SeriesLike {
   return (originalTitle, author) => {
     const original = originalKey(originalTitle);
     return original !== null && qualifying.has(groupOf(original, author));
+  };
+}
+
+export function sharedOriginals(claims: OriginalClaim[]): SeriesLike {
+  const groups = claimGroups(claims);
+  return (originalTitle, author) => {
+    const original = originalKey(originalTitle);
+    const group = original === null ? undefined : groups.get(groupOf(original, author));
+    return group !== undefined && (group.wholeTitles.size >= 2 || group.originals.size >= 2);
   };
 }
 

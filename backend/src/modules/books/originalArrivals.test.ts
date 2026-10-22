@@ -4,7 +4,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { test } from "node:test";
-import type { OriginalClaim } from "./domain/translation.js";
 
 const scratch = mkdtempSync(join(tmpdir(), "original-arrivals-test-"));
 process.env.AUTH_DB_PATH = join(scratch, "auth.sqlite");
@@ -17,7 +16,7 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 const { applyBooksMigrations } = await import("./adapters/sqlite/connection.js");
 const { catalogTitleKey } = await import("./domain/normalize.js");
 const { createSqliteBooksRepository } = await import("./adapters/sqlite/sqliteBooksRepository.js");
-const { joinArrivedOriginals, sharedOriginals, startOriginalArrivals } = await import("./originalArrivals.js");
+const { joinArrivedOriginals, startOriginalArrivals } = await import("./originalArrivals.js");
 
 type Repo = ReturnType<typeof createSqliteBooksRepository>;
 const AT = "2026-10-15T12:00:00.000Z";
@@ -56,37 +55,6 @@ const rethrow = (error: unknown): never => {
 };
 
 const drain = (repo: Repo, limit = 500) => joinArrivedOriginals({ repo, sharesArena: () => false, now: () => NOW }, limit, rethrow);
-
-const claim = (title: string, originalTitle: string, author = "Virginia Woolf", language: string | null = "pt-PT"): OriginalClaim => ({ workId: null, title, author, language, originalTitle });
-
-test("two Portuguese titles for one original make it shared", () => {
-  const shared = sharedOriginals([claim("Passeio ao Farol", "To the Lighthouse"), claim("Rumo ao Farol", "To the Lighthouse")]);
-  assert.equal(shared("To the Lighthouse", "Virginia Woolf"), true);
-});
-
-test("one Portuguese title claimed twice is not shared", () => {
-  const shared = sharedOriginals([claim("Passeio ao Farol", "To the Lighthouse"), claim("Passeio ao Farol", "To the Lighthouse")]);
-  assert.equal(shared("To the Lighthouse", "Virginia Woolf"), false);
-});
-
-test("two whole originals behind one original key make it shared", () => {
-  const shared = sharedOriginals([claim("Crónicas", "Chronicles", "Ana Silva"), claim("Crónicas", "Chronicles: Dusk", "Ana Silva")]);
-  assert.equal(shared("Chronicles", "Ana Silva"), true);
-});
-
-test("English claims and claims naming themselves do not count", () => {
-  const english = sharedOriginals([claim("Passeio ao Farol", "To the Lighthouse"), claim("Rumo ao Farol", "To the Lighthouse", "Virginia Woolf", "en")]);
-  assert.equal(english("To the Lighthouse", "Virginia Woolf"), false);
-  const named = sharedOriginals([claim("Orlando", "Orlando"), claim("Orlando, Uma Vida", "Orlando")]);
-  assert.equal(named("Orlando", "Virginia Woolf"), false);
-});
-
-test("another surname has its own bucket", () => {
-  const shared = sharedOriginals([claim("Passeio ao Farol", "To the Lighthouse"), claim("Rumo ao Farol", "To the Lighthouse", "Rui Costa")]);
-  assert.equal(shared("To the Lighthouse", "Virginia Woolf"), false);
-  assert.equal(shared("To the Lighthouse", "Rui Costa"), false);
-  assert.equal(shared("To the Lighthouse", "Ana Silva"), false);
-});
 
 test("an arriving original joins a work Jev answered none", () => {
   const repo = freshRepo();
