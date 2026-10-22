@@ -20,7 +20,9 @@ export function mainTitle(title: string): string {
   return title.split(/ — | – | - /)[0]!.trim();
 }
 
-export const wholeTitle = (title: string) => normalizeWords(withoutBrackets(title));
+export function wholeTitle(title: string): string {
+  return normalizeWords(withoutBrackets(title));
+}
 
 export function sameWholeTitle(a: string, b: string): boolean {
   const left = wholeTitle(a);
@@ -91,10 +93,11 @@ type ClaimGroup = { originalTitle: string; titles: Map<string, string>; workIds:
 function claimGroups(claims: OriginalClaim[]): Map<string, ClaimGroup> {
   const groups = new Map<string, ClaimGroup>();
   for (const claim of claims) {
+    if (!isPortuguese(claim.language)) continue;
     const original = originalKey(claim.originalTitle);
     const title = originalKey(claim.title);
     const words = normalizeWords(claim.title);
-    if (!isPortuguese(claim.language) || original === null || words === "" || original === title) continue;
+    if (original === null || words === "" || original === title) continue;
     const key = groupOf(original, claim.author);
     const group = groups.get(key) ?? { originalTitle: "", titles: new Map<string, string>(), workIds: new Set<string>(), wholeTitles: new Set<string>(), originals: new Set<string>() };
     group.wholeTitles.add(words);

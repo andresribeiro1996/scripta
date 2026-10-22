@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import { test } from "node:test";
 import { catalogTitleKey } from "./normalize.js";
-import { ORIGINAL_KEY_VERSION, arrivalKey, authorPattern, evidenceOf, hasVolumeMarker, isOriginalTitle, isPortuguese, mainTitle, mentionsSurname, originalKey, originalTitleIn, sameMainTitle, sameWholeTitle, seriesLikeGroups, seriesLikeOriginals, sharedOriginals, surnameOf, titlePattern, titlePatterns, wholeTitle, type OriginalClaim } from "./translation.js";
+import { ORIGINAL_KEY_VERSION, arrivalKey, authorPattern, evidenceOf, hasVolumeMarker, isOriginalTitle, isPortuguese, mainTitle, mentionsSurname, originalKey, originalTitleIn, sameMainTitle, sameWholeTitle, seriesLikeGroups, seriesLikeOriginals, sharedOriginals, surnameOf, titlePattern, titlePatterns, wholeTitle } from "./translation.js";
 
 test("originalTitleIn reads the labelled value to the end of its line", () => {
   assert.equal(originalTitleIn("Uma sinopse.\n\nTítulo original: Les Misérables"), "Les Misérables");
@@ -179,7 +179,7 @@ test("Portuguese titles that differ after a colon count apart, so their series-n
 
 test("edition notes in brackets or after a dash or full stop are not another title", () => {
   const exupery = "Antoine de Saint-Exupéry";
-  const titles = ["O Principezinho", "[EBOOK] O Principezinho", "O Principezinho (edição de bolso)", "O Principezinho - Edição Interativa", "O Principezinho. Edição especial"];
+  const titles = ["O Principezinho", "[EBOOK] O Principezinho", "O Principezinho (edição de bolso)", "O Principezinho - Edição Interativa", "O Principezinho. Edição especial", "O Principezinho. Edição de luxo", "O Principezinho - Edição Especial 25 Anos"];
   const isSeriesLike = seriesLikeOriginals(titles.map((title) => claim(title, "Le petit prince", exupery)));
   assert.equal(isSeriesLike("Le petit prince", exupery), false);
 });
@@ -187,54 +187,52 @@ test("edition notes in brackets or after a dash or full stop are not another tit
 test("a title counts apart wherever today's key tells it apart", () => {
   const apart = seriesLikeOriginals(["Um: Dois Três", "Um Dois: Três", "Quatro"].map((title) => claim(title, "Chronicles", "Ana Silva")));
   assert.equal(apart("Chronicles", "Ana Silva"), true);
-  const named = seriesLikeOriginals(["Os Maias. Episódios", "Os Maias", "Os Maias. Outra"].map((title) => claim(title, "Os Maias", "Eça de Queirós")));
+  const named = seriesLikeOriginals(["Os Maias: Episódios", "Os Maias: Outra", "Os Maias: Terceira"].map((title) => claim(title, "Os Maias", "Eça de Queirós")));
   assert.equal(named("Os Maias", "Eça de Queirós"), false);
 });
 
-const shareClaim = (title: string, originalTitle: string, author = "Virginia Woolf", language: string | null = "pt-PT"): OriginalClaim => ({ workId: null, title, author, language, originalTitle });
-
 test("two Portuguese titles for one original make it shared", () => {
-  const shared = sharedOriginals([shareClaim("Passeio ao Farol", "To the Lighthouse"), shareClaim("Rumo ao Farol", "To the Lighthouse")]);
+  const shared = sharedOriginals([claim("Passeio ao Farol", "To the Lighthouse", "Virginia Woolf"), claim("Rumo ao Farol", "To the Lighthouse", "Virginia Woolf")]);
   assert.equal(shared("To the Lighthouse", "Virginia Woolf"), true);
 });
 
 test("one Portuguese title claimed twice is not shared", () => {
-  const shared = sharedOriginals([shareClaim("Passeio ao Farol", "To the Lighthouse"), shareClaim("Passeio ao Farol", "To the Lighthouse")]);
+  const shared = sharedOriginals([claim("Passeio ao Farol", "To the Lighthouse", "Virginia Woolf"), claim("Passeio ao Farol", "To the Lighthouse", "Virginia Woolf")]);
   assert.equal(shared("To the Lighthouse", "Virginia Woolf"), false);
 });
 
 test("two whole originals behind one original key make it shared", () => {
-  const shared = sharedOriginals([shareClaim("Crónicas", "Chronicles", "Ana Silva"), shareClaim("Crónicas", "Chronicles: Dusk", "Ana Silva")]);
+  const shared = sharedOriginals([claim("Crónicas", "Chronicles", "Ana Silva"), claim("Crónicas", "Chronicles: Dusk", "Ana Silva")]);
   assert.equal(shared("Chronicles", "Ana Silva"), true);
 });
 
 test("English claims and claims naming themselves do not count", () => {
-  const english = sharedOriginals([shareClaim("Passeio ao Farol", "To the Lighthouse"), shareClaim("Rumo ao Farol", "To the Lighthouse", "Virginia Woolf", "en")]);
+  const english = sharedOriginals([claim("Passeio ao Farol", "To the Lighthouse", "Virginia Woolf"), claim("Rumo ao Farol", "To the Lighthouse", "Virginia Woolf", "en")]);
   assert.equal(english("To the Lighthouse", "Virginia Woolf"), false);
-  const named = sharedOriginals([shareClaim("Orlando", "Orlando"), shareClaim("Orlando, Uma Vida", "Orlando")]);
+  const named = sharedOriginals([claim("Orlando", "Orlando", "Virginia Woolf"), claim("Orlando, Uma Vida", "Orlando", "Virginia Woolf")]);
   assert.equal(named("Orlando", "Virginia Woolf"), false);
 });
 
 test("another surname has its own bucket", () => {
-  const shared = sharedOriginals([shareClaim("Passeio ao Farol", "To the Lighthouse"), shareClaim("Rumo ao Farol", "To the Lighthouse", "Rui Costa")]);
+  const shared = sharedOriginals([claim("Passeio ao Farol", "To the Lighthouse", "Virginia Woolf"), claim("Rumo ao Farol", "To the Lighthouse", "Rui Costa")]);
   assert.equal(shared("To the Lighthouse", "Virginia Woolf"), false);
   assert.equal(shared("To the Lighthouse", "Rui Costa"), false);
   assert.equal(shared("To the Lighthouse", "Ana Silva"), false);
 });
 
 test("a bracket note on a Portuguese title still makes another title for a shared original", () => {
-  const shared = sharedOriginals([shareClaim("Passeio ao Farol", "To the Lighthouse"), shareClaim("[EBOOK] Passeio ao Farol", "To the Lighthouse")]);
+  const shared = sharedOriginals([claim("Passeio ao Farol", "To the Lighthouse", "Virginia Woolf"), claim("[EBOOK] Passeio ao Farol", "To the Lighthouse", "Virginia Woolf")]);
   assert.equal(shared("To the Lighthouse", "Virginia Woolf"), true);
 });
 
 test("a Portuguese title with words but no title key still counts for a shared original", () => {
-  const claims = [shareClaim("Passeio ao Farol", "To the Lighthouse"), shareClaim(": Rumo ao Farol", "To the Lighthouse")];
+  const claims = [claim("Passeio ao Farol", "To the Lighthouse", "Virginia Woolf"), claim(": Rumo ao Farol", "To the Lighthouse", "Virginia Woolf")];
   assert.equal(sharedOriginals(claims)("To the Lighthouse", "Virginia Woolf"), true);
-  assert.equal(seriesLikeOriginals([...claims, shareClaim("Um Farol", "To the Lighthouse")])("To the Lighthouse", "Virginia Woolf"), false);
+  assert.equal(seriesLikeOriginals([...claims, claim("Um Farol", "To the Lighthouse", "Virginia Woolf")])("To the Lighthouse", "Virginia Woolf"), false);
 });
 
-test("a full stop after the original's own title still names it, for both rules", () => {
-  const claims = [shareClaim("Rumo a Orlando", "Orlando"), shareClaim("Orlando. Uma biografia", "Orlando")];
+test("a full stop after the original's own title still names it", () => {
+  const claims = [claim("Rumo a Orlando", "Orlando", "Virginia Woolf"), claim("Orlando. Uma biografia", "Orlando", "Virginia Woolf")];
   assert.equal(sharedOriginals(claims)("Orlando", "Virginia Woolf"), false);
 });
 

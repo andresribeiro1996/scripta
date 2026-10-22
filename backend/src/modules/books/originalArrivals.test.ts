@@ -151,6 +151,15 @@ test("an original with a subtitle part is not joined by its main title", () => {
   assert.equal(repo.workMatchJudgments([pt.work_id!]).size, 0);
 });
 
+test("an original with a part after a full stop is not joined by the title before it", () => {
+  const repo = freshRepo();
+  const pt = claimant(repo, "9789720000803", "O Rei de Ferro", "Maurice Druon", "Les rois maudits. Le roi de fer");
+  emptyQueue(repo);
+  book(repo, "9782253000803", "Les rois maudits", "Maurice Druon", { workKey: "OL964W" });
+  assert.deepEqual(drain(repo), { arrivals: 1, claimants: 1, codeMerges: 0, codeBlocked: 0 });
+  assert.equal(repo.workMatchJudgments([pt.work_id!]).size, 0);
+});
+
 test("a work whose whole title differs from the original is not joined", () => {
   const repo = freshRepo();
   const pt = claimant(repo, "9789720000802", "Duna", "Frank Herbert", "Dune");
