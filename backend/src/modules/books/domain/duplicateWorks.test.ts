@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { planCrowdedFolds, planDuplicateSets } from "./duplicateWorks.js";
+import { planCrowdedFolds, planDuplicateSets, planTitleFolds } from "./duplicateWorks.js";
 import { workTitleKey } from "./normalize.js";
 
 const KEY = workTitleKey("Fourth Wing", "Rebecca Yarros");
@@ -154,4 +154,132 @@ test("never folds works whose title key is empty", () => {
     { titleKey: "", workId: "w-a", title: "!!!", keyed: true },
     { titleKey: "", workId: "k-1", title: "!!!", keyed: false }
   ]), []);
+});
+
+const titled = (titleKey: string, workId: string, title: string, keyed: boolean, createdAt: string) => ({ titleKey, workId, title, keyed, createdAt });
+const LUPIN = workTitleKey("Arsène Lupin", "Maurice Leblanc");
+
+test("planTitleFolds folds a keyless work into the one keyed work with its full title", () => {
+  assert.deepEqual(planTitleFolds([
+    titled(KEY, "w-novel", "Fourth Wing", true, "2026-09-01"),
+    titled(KEY, "w-gn", "Fourth Wing: The Graphic Novel", true, "2026-09-02"),
+    titled(KEY, "k-1", "Fourth wing", false, "2026-09-03"),
+    titled(KEY, "k-2", "Fourth Wing: The Graphic Novel", false, "2026-09-04")
+  ]), [
+    { source: "k-1", target: "w-novel" },
+    { source: "k-2", target: "w-gn" }
+  ]);
+});
+
+test("planTitleFolds leaves a keyless work alone when no keyed work, or several, have its full title", () => {
+  assert.deepEqual(planTitleFolds([
+    titled(KEY, "w-novel", "Fourth Wing", true, "2026-09-01"),
+    titled(KEY, "k-1", "Fourth Wing: The Graphic Novel", false, "2026-09-02")
+  ]), []);
+  assert.deepEqual(planTitleFolds([
+    titled(KEY, "w-a", "Fourth Wing", true, "2026-09-01"),
+    titled(KEY, "w-b", "Fourth WIng", true, "2026-09-02"),
+    titled(KEY, "k-1", "Fourth Wing", false, "2026-09-03")
+  ]), []);
+});
+
+test("planTitleFolds folds only within the keyless work's own title key", () => {
+  const other = workTitleKey("Iron Flame", "Rebecca Yarros");
+  assert.deepEqual(planTitleFolds([
+    titled(other, "w-flame", "Iron Flame", true, "2026-09-01"),
+    titled(KEY, "k-1", "Iron Flame", false, "2026-09-02")
+  ]), []);
+});
+
+test("planTitleFolds never folds works whose title key is empty", () => {
+  assert.deepEqual(planTitleFolds([
+    titled("", "w-a", "!!!", true, "2026-09-01"),
+    titled("", "k-1", "!!!", false, "2026-09-02")
+  ]), []);
+  assert.deepEqual(planTitleFolds([
+    titled(KEY, "k-1", "!!!", false, "2026-09-01"),
+    titled(KEY, "k-2", "???", false, "2026-09-02")
+  ]), []);
+});
+
+test("planTitleFolds keeps a keyless volume apart from the one keyed work whose whole title differs", () => {
+  assert.deepEqual(planTitleFolds([
+    titled(LUPIN, "w-lupin", "Arsène Lupin: Gentleman Ladrão", true, "2026-09-01"),
+    titled(LUPIN, "k-1", "Arsène Lupin: A Agulha Oca", false, "2026-09-02")
+  ]), []);
+});
+
+test("planTitleFolds folds keyless works with one whole title into the oldest of them, and keeps other whole titles apart", () => {
+  assert.deepEqual(planTitleFolds([
+    titled(LUPIN, "k-copy", "Arsène Lupin: A Agulha Oca", false, "2026-09-04"),
+    titled(LUPIN, "k-crystal", "Arsène Lupin: O Tampão de Cristal", false, "2026-09-03"),
+    titled(LUPIN, "k-needle", "Arsène Lupin: A Agulha Oca", false, "2026-09-02"),
+    titled(LUPIN, "k-gentleman", "Arsène Lupin: Gentleman Ladrão", false, "2026-09-01")
+  ]), [{ source: "k-copy", target: "k-needle" }]);
+});
+
+test("planTitleFolds breaks a createdAt tie between keyless works by the lowest work id", () => {
+  assert.deepEqual(planTitleFolds([
+    titled(KEY, "k-b", "Fourth Wing", false, "2026-09-01"),
+    titled(KEY, "k-a", "Fourth Wing", false, "2026-09-01")
+  ]), [{ source: "k-b", target: "k-a" }]);
+});
+
+test("planTitleFolds matches a keyed work through any of its edition titles", () => {
+  const orwell = workTitleKey("1984", "George Orwell");
+  assert.deepEqual(planTitleFolds([
+    titled(orwell, "w-1984", "1984", true, "2026-09-01"),
+    titled(orwell, "w-1984", "Mil Novecentos e Oitenta e Quatro", true, "2026-09-01"),
+    titled(orwell, "k-1", "Mil Novecentos e Oitenta e Quatro", false, "2026-09-02")
+  ]), [{ source: "k-1", target: "w-1984" }]);
+});
+
+test("planTitleFolds ignores bracketed notes", () => {
+  const maias = workTitleKey("Os Maias", "Eça de Queirós");
+  assert.deepEqual(planTitleFolds([
+    titled(maias, "w-maias", "Os Maias", true, "2026-09-01"),
+    titled(maias, "k-1", "[EBOOK] Os Maias", false, "2026-09-02")
+  ]), [{ source: "k-1", target: "w-maias" }]);
+});
+
+test("planTitleFolds folds the keyless works of a crowded key together when no keyed work has their whole title", () => {
+  assert.deepEqual(planTitleFolds([
+    titled(KEY, "w-novel", "Fourth Wing", true, "2026-09-01"),
+    titled(KEY, "k-2", "Fourth Wing: The Graphic Novel", false, "2026-09-03"),
+    titled(KEY, "k-1", "Fourth Wing: The Graphic Novel", false, "2026-09-02")
+  ]), [{ source: "k-2", target: "k-1" }]);
+});
+
+test("planTitleFolds counts a keyless work listed twice once", () => {
+  assert.deepEqual(planTitleFolds([
+    titled(KEY, "k-1", "Fourth Wing", false, "2026-09-01"),
+    titled(KEY, "k-1", "Fourth Wing", false, "2026-09-01")
+  ]), []);
+  assert.deepEqual(planTitleFolds([
+    titled(KEY, "k-1", "Fourth Wing", false, "2026-09-01"),
+    titled(KEY, "k-1", "Fourth Wing", false, "2026-09-01"),
+    titled(KEY, "k-2", "Fourth Wing", false, "2026-09-02"),
+    titled(KEY, "k-2", "Fourth Wing", false, "2026-09-02")
+  ]), [{ source: "k-2", target: "k-1" }]);
+});
+
+test("planTitleFolds orders folds by title key, then the source's createdAt, then its work id", () => {
+  assert.deepEqual(planTitleFolds([
+    titled("key-c", "w-c", "Title C", true, "2026-09-01"),
+    titled("key-c", "c-1", "Title C", false, "2026-09-02"),
+    titled("key-b", "w-b", "Title B", true, "2026-09-01"),
+    titled("key-b", "b-late", "Title B", false, "2026-09-05"),
+    titled("key-b", "b-y", "Title B", false, "2026-09-03"),
+    titled("key-b", "b-x", "Title B", false, "2026-09-03"),
+    titled("key-b", "b-early", "Title B", false, "2026-09-01"),
+    titled("key-a", "w-a", "Title A", true, "2026-09-09"),
+    titled("key-a", "a-1", "Title A", false, "2026-09-10")
+  ]), [
+    { source: "a-1", target: "w-a" },
+    { source: "b-early", target: "w-b" },
+    { source: "b-x", target: "w-b" },
+    { source: "b-y", target: "w-b" },
+    { source: "b-late", target: "w-b" },
+    { source: "c-1", target: "w-c" }
+  ]);
 });

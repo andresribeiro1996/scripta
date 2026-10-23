@@ -1,5 +1,6 @@
 import { firstAuthor, normalizeWords } from "@scripta/shared";
 import { workTitleKey } from "./normalize.js";
+import { wholeTitle } from "./translation.js";
 
 const PLACEHOLDER_AUTHORS = new Set([
   "anonymous",
@@ -51,6 +52,14 @@ export interface KeyWork {
   workId: string;
   title: string;
   keyed: boolean;
+}
+
+export interface TitleWork {
+  titleKey: string;
+  workId: string;
+  title: string;
+  keyed: boolean;
+  createdAt: string;
 }
 
 function compare(a: string, b: string): number {
@@ -107,4 +116,30 @@ export function planCrowdedFolds(works: KeyWork[]): Array<{ source: string; targ
     }
   }
   return folds;
+}
+
+function oldestFirst(a: TitleWork, b: TitleWork): number {
+  return compare(a.createdAt, b.createdAt) || compare(a.workId, b.workId);
+}
+
+export function planTitleFolds(works: TitleWork[]): Array<{ source: string; target: string }> {
+  const groups = new Map<string, TitleWork[]>();
+  for (const work of works) {
+    const whole = wholeTitle(work.title);
+    if (work.titleKey === "" || whole === "") continue;
+    const groupKey = `${work.titleKey}\n${whole}`;
+    groups.set(groupKey, [...(groups.get(groupKey) ?? []), work]);
+  }
+  const folds: Array<{ work: TitleWork; target: string }> = [];
+  for (const group of groups.values()) {
+    const keyedIds = new Set(group.filter((work) => work.keyed).map((work) => work.workId));
+    if (keyedIds.size > 1) continue;
+    const keyless = [...new Map(group.filter((work) => !work.keyed).sort(oldestFirst).map((work) => [work.workId, work])).values()];
+    const target = [...keyedIds][0] ?? keyless.shift()?.workId;
+    if (target === undefined) continue;
+    for (const work of keyless) folds.push({ work, target });
+  }
+  return folds
+    .sort((a, b) => compare(a.work.titleKey, b.work.titleKey) || oldestFirst(a.work, b.work))
+    .map(({ work, target }) => ({ source: work.workId, target }));
 }
