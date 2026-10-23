@@ -955,6 +955,14 @@ test("works sharing an arena stay apart when a search saves an edition", async (
   assert.deepEqual(h.repo.activeMerges("ol-duplicate"), []);
 });
 
+test("a search keeps two keyed works apart when its own hits name their title as a series", async () => {
+  const bigNate = (isbn: string, workKey: string) => ({ result: { title: "Big Nate", authors: ["Lincoln Peirce"], year: 2010, isbn, publisher: null, coverUrl: null, genres: [] }, olCoverId: null, workKey, subjectSeries: [{ name: "Big Nate", position: null }], source: "openlibrary" as const });
+  const h = harness({ catalog: recordingCatalog({ search: async () => [bigNate("9780000000141", "OL1W"), bigNate("9780000000142", "OL2W")] }).catalog });
+  const results = await h.service.searchExternal("big nate");
+  assert.equal(new Set(results.map((result) => result.workId)).size, 2);
+  assert.deepEqual(h.repo.activeMerges("ol-duplicate"), []);
+});
+
 function crowdedFourthWing(overrides: Partial<Deps> = {}) {
   const h = searchingFor([fourthWingHit("9780000000081", "isbndb")], overrides);
   const novel = savedEdition(h, "9780000000082", "Fourth Wing", YARROS, "OL1W");
