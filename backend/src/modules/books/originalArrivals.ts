@@ -1,6 +1,6 @@
 import { normalizeTitle, normalizeWords } from "@scripta/shared";
 import { startDetailsBackfill } from "./backfill.js";
-import { arrivalKey, evidenceOf, mainTitle, mentionsSurname, originalKey, sameWholeTitle, seriesLikeOriginals, sharedOriginals, surnameOf, type OriginalClaim } from "./domain/translation.js";
+import { arrivalKey, evidenceOf, mainTitle, mentionsSurname, originalKey, originalWholeKey, sameWholeTitle, seriesLikeOriginals, sharedOriginals, surnameOf, type OriginalClaim } from "./domain/translation.js";
 import { JEV_REJECTION_LIMIT } from "./synopsisJudgments.js";
 import { joinByCode } from "./translationBacklog.js";
 import { planMatch, type TranslationDeps } from "./translationJudgments.js";
@@ -12,11 +12,12 @@ const ORIGINAL_ARRIVALS_TICK_MS = 200;
 type ArrivalSteps = { arrivals: number; claimants: number; codeMerges: number; codeBlocked: number };
 type ArrivalDeps = Pick<TranslationDeps, "repo" | "sharesArena" | "now">;
 
-function joinClaimants(deps: ArrivalDeps, key: string, surname: string, claims: OriginalClaim[], steps: ArrivalSteps) {
+function joinClaimants(deps: ArrivalDeps, key: string, stem: string, surname: string, claims: OriginalClaim[], steps: ArrivalSteps) {
+  const arrived = (original: string) => originalKey(original) === key || originalWholeKey(original) === key;
   const seriesLike = seriesLikeOriginals(claims);
   const shared = sharedOriginals(claims);
   const at = new Date(deps.now()).toISOString();
-  const named = claims.flatMap((claim) => (claim.workId && mentionsSurname([claim.author], surname) ? [claim.workId] : []));
+  const named = claims.flatMap((claim) => (claim.workId && arrived(claim.originalTitle) && mentionsSurname([claim.author], surname) ? [claim.workId] : []));
   const ids = [...new Set(deps.repo.canonicalWorkIds(named).values())];
   for (const workId of deps.repo.portugueseWorksNeedingMatch(ids, Number.MAX_SAFE_INTEGER, JEV_REJECTION_LIMIT, at)) {
     const rows = deps.repo.translationEvidence(workId);
@@ -24,7 +25,7 @@ function joinClaimants(deps: ArrivalDeps, key: string, surname: string, claims: 
     const evidence = evidenceOf(rows);
     const original = evidence.originalTitle;
     const author = evidence.workAuthor || evidence.author;
-    if (!original || originalKey(original) !== key || normalizeWords(original) !== normalizeTitle(mainTitle(original)) || shared(original, author)) continue;
+    if (!original || originalKey(original) !== stem || !arrived(original) || normalizeWords(original) !== normalizeTitle(mainTitle(original)) || shared(original, author)) continue;
     steps.claimants += 1;
     const plan = planMatch(deps.repo, workId, seriesLike);
     if (plan?.kind !== "code") continue;
@@ -41,8 +42,10 @@ function drainKey(deps: ArrivalDeps, titleKey: string): ArrivalSteps {
   const surname = surnameOf(titleKey.split("|")[1] ?? "");
   deps.repo.transaction(() => {
     if (key !== null && surname !== null) {
-      const claims = deps.repo.originalClaimsOf(key);
-      if (claims.length > 0) joinClaimants(deps, key, surname, claims, drained);
+      for (const stem of new Set([key, ...deps.repo.originalKeysOf(key)])) {
+        const claims = deps.repo.originalClaimsOf(stem);
+        if (claims.length > 0) joinClaimants(deps, key, stem, surname, claims, drained);
+      }
     }
     deps.repo.dropOriginalArrival(titleKey);
   });
