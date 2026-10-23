@@ -148,13 +148,23 @@ test("a series name recorded as the original joins no volume", () => {
   assert.equal(repo.canonicalWorkIds([first.work_id!]).get(first.work_id!), first.work_id);
 });
 
-test("an original with a subtitle part is not joined by its main title", () => {
+test("an original with a colon subtitle joins when it arrives under its whole title", () => {
   const repo = freshRepo();
   const pt = claimant(repo, "9789720000801", "O Messias de Dune", "Frank Herbert", "Dune: Messiah");
   emptyQueue(repo);
-  book(repo, "9780441172696", "Dune: Messiah", "Frank Herbert", { workKey: "OL893415W" });
-  assert.deepEqual(drain(repo), { arrivals: 1, claimants: 0, codeMerges: 0, codeBlocked: 0 });
+  const en = book(repo, "9780441172696", "Dune: Messiah", "Frank Herbert", { workKey: "OL893415W" });
+  assert.deepEqual(drain(repo), { arrivals: 1, claimants: 1, codeMerges: 1, codeBlocked: 0 });
+  assert.equal(repo.canonicalWorkIds([pt.work_id!]).get(pt.work_id!), en.work_id);
+});
+
+test("an original with a colon subtitle is not joined by its main title", () => {
+  const repo = freshRepo();
+  const pt = claimant(repo, "9789720000801", "O Messias de Dune", "Frank Herbert", "Dune: Messiah");
+  emptyQueue(repo);
+  book(repo, "9780441172691", "Dune", "Frank Herbert", { workKey: "OL893416W" });
+  assert.deepEqual(drain(repo), { arrivals: 1, claimants: 1, codeMerges: 0, codeBlocked: 0 });
   assert.equal(repo.workMatchJudgments([pt.work_id!]).size, 0);
+  assert.equal(repo.canonicalWorkIds([pt.work_id!]).get(pt.work_id!), pt.work_id);
 });
 
 test("an original with a part after a full stop is not joined by the title before it", () => {
@@ -200,15 +210,41 @@ test("a work is planned only under the stem key of its own evidence original", (
   assert.equal(repo.canonicalWorkIds([first.work_id!]).get(first.work_id!), first.work_id);
 });
 
-test("an original with a dash part is found when it arrives whole but stays skipped as a subtitle original", () => {
+test("an original with a dash part joins when it arrives under its whole title", () => {
   const repo = freshRepo();
   const pt = claimant(repo, "9789720000814", "A Profecia Sombria", "Rick Riordan", "The Trials of Apollo - The Dark Prophecy");
   emptyQueue(repo);
+  const en = book(repo, "9781484746424", "The Trials of Apollo - The Dark Prophecy", "Rick Riordan", { workKey: "OL19345722W" });
+  assert.deepEqual(drain(repo), { arrivals: 1, claimants: 1, codeMerges: 1, codeBlocked: 0 });
+  assert.equal(repo.canonicalWorkIds([pt.work_id!]).get(pt.work_id!), en.work_id);
+});
+
+test("two volumes under one dash series stem are not joined when one arrives whole", () => {
+  const repo = freshRepo();
+  const prophecy = claimant(repo, "9789720000814", "A Profecia Sombria", "Rick Riordan", "The Trials of Apollo - The Dark Prophecy");
+  const oracle = claimant(repo, "9789720000818", "O Oráculo Oculto", "Rick Riordan", "The Trials of Apollo - The Hidden Oracle");
+  emptyQueue(repo);
   book(repo, "9781484746424", "The Trials of Apollo - The Dark Prophecy", "Rick Riordan", { workKey: "OL19345722W" });
-  const { steps, read } = drainReading(repo);
-  assert.deepEqual(steps, { arrivals: 1, claimants: 0, codeMerges: 0, codeBlocked: 0 });
-  assert.deepEqual(read, [pt.work_id]);
+  assert.deepEqual(drain(repo), { arrivals: 1, claimants: 0, codeMerges: 0, codeBlocked: 0 });
+  assert.equal(repo.workMatchJudgments([prophecy.work_id!, oracle.work_id!]).size, 0);
+});
+
+test("an original with an edition note after a dash is not joined by the plain title", () => {
+  const repo = freshRepo();
+  const pt = claimant(repo, "9789720000819", "O Hobbit", "J. R. R. Tolkien", "The Hobbit - Illustrated Edition");
+  emptyQueue(repo);
+  book(repo, "9780261102217", "The Hobbit", "J. R. R. Tolkien", { workKey: "OL262758W" });
+  assert.deepEqual(drain(repo), { arrivals: 1, claimants: 1, codeMerges: 0, codeBlocked: 0 });
   assert.equal(repo.workMatchJudgments([pt.work_id!]).size, 0);
+});
+
+test("an original with a bracketed note joins when the title without it arrives", () => {
+  const repo = freshRepo();
+  const pt = claimant(repo, "9789720000820", "O Principezinho", "Antoine de Saint-Exupéry", "Le Petit Prince (Édition illustrée)");
+  emptyQueue(repo);
+  const fr = book(repo, "9782070612758", "Le Petit Prince", "Antoine de Saint-Exupéry", { workKey: "OL24379W" });
+  assert.deepEqual(drain(repo), { arrivals: 1, claimants: 1, codeMerges: 1, codeBlocked: 0 });
+  assert.equal(repo.canonicalWorkIds([pt.work_id!]).get(pt.work_id!), fr.work_id);
 });
 
 test("a work whose whole title differs from the original is not joined", () => {

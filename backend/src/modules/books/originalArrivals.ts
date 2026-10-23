@@ -1,6 +1,5 @@
-import { normalizeTitle, normalizeWords } from "@scripta/shared";
 import { startDetailsBackfill } from "./backfill.js";
-import { arrivalKey, evidenceOf, mainTitle, mentionsSurname, originalKey, originalWholeKey, sameWholeTitle, seriesLikeOriginals, sharedOriginals, surnameOf, type OriginalClaim } from "./domain/translation.js";
+import { arrivalKey, evidenceOf, mentionsSurname, originalKey, originalWholeKey, sameWholeTitle, seriesLikeOriginals, sharedOriginals, surnameOf, type OriginalClaim } from "./domain/translation.js";
 import { JEV_REJECTION_LIMIT } from "./synopsisJudgments.js";
 import { joinByCode } from "./translationBacklog.js";
 import { planMatch, type TranslationDeps } from "./translationJudgments.js";
@@ -25,7 +24,7 @@ function joinClaimants(deps: ArrivalDeps, key: string, stem: string, surname: st
     const evidence = evidenceOf(rows);
     const original = evidence.originalTitle;
     const author = evidence.workAuthor || evidence.author;
-    if (!original || originalKey(original) !== stem || !arrived(original) || normalizeWords(original) !== normalizeTitle(mainTitle(original)) || shared(original, author)) continue;
+    if (!original || originalKey(original) !== stem || !arrived(original) || shared(original, author)) continue;
     steps.claimants += 1;
     const plan = planMatch(deps.repo, workId, seriesLike);
     if (plan?.kind !== "code") continue;
