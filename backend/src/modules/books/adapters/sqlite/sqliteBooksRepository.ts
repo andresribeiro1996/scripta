@@ -96,7 +96,10 @@ export const KEYLESS_CANDIDATES_SQL = `
 `;
 export const KEYED_WORKS_SQL = `
   SELECT hits.title_key AS title_key, works.id AS id, works.title AS title, works.author AS author,
-    (SELECT COUNT(*) FROM books WHERE work_id = works.id) AS editions, works.created_at AS created_at
+    (SELECT COUNT(*) FROM books WHERE work_id = works.id) AS editions,
+    (SELECT COUNT(*) FROM works AS alias JOIN work_merges ON work_merges.from_work = alias.id
+      WHERE alias.merged_into = works.id AND work_merges.source = 'ol-duplicate' AND work_merges.undone_at IS NULL) AS absorbed,
+    works.created_at AS created_at
   FROM (SELECT DISTINCT title_key, work_id FROM books WHERE title_key IN (SELECT value FROM json_each(?)) AND title_group_blocked_at IS NULL) AS hits
   CROSS JOIN works ON works.id = hits.work_id
   WHERE works.ol_work_key IS NOT NULL AND works.merged_into IS NULL
@@ -625,8 +628,8 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   }
 
   function keyedWorksWithTitleKeys(keys: string[]): KeyedWork[] {
-    const rows = keyedWorksStmt.all(JSON.stringify(keys)) as Array<{ title_key: string; id: string; title: string; author: string; editions: number; created_at: string }>;
-    return rows.map((row) => ({ titleKey: row.title_key, id: row.id, title: row.title, author: row.author, editions: row.editions, createdAt: row.created_at }));
+    const rows = keyedWorksStmt.all(JSON.stringify(keys)) as Array<{ title_key: string; id: string; title: string; author: string; editions: number; absorbed: number; created_at: string }>;
+    return rows.map((row) => ({ titleKey: row.title_key, id: row.id, title: row.title, author: row.author, editions: row.editions, absorbed: row.absorbed, createdAt: row.created_at }));
   }
 
   function crowdedFolds(keys: string[]): Array<{ source: string; target: string }> {
