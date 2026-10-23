@@ -3129,7 +3129,7 @@ test("the series rule built from one key's claims answers like the one built fro
 
 test("the original keys are stored once, recomputed when the version changes, and cleared with their title", () => {
   const { db, repo } = freshRepo();
-  rawBook(db, "keyed", "Passeio ao Farol", "To the Lighthouse", null);
+  rawBook(db, "keyed", "O Senhor Mercedes", "Mr. Mercedes", null);
   rawBook(db, "labelled", "Orlando em Português", null, "Uma vida.\n\nTítulo original: Orlando");
   db.exec("DROP INDEX idx_books_original_key");
   db.exec("DROP INDEX idx_books_original_whole_key");
@@ -3138,7 +3138,7 @@ test("the original keys are stored once, recomputed when the version changes, an
   db.exec("ALTER TABLE books DROP COLUMN original_whole_key");
   db.exec("DELETE FROM original_key_version");
   applyBooksMigrations(db);
-  assert.equal(keyOf(db, "keyed"), originalKey("To the Lighthouse"));
+  assert.deepEqual(originalsOf(db, "keyed"), { original_title: "Mr. Mercedes", original_key: "mr|", original_whole_key: "mr mercedes|" });
   assert.deepEqual(originalsOf(db, "labelled"), { original_title: "Orlando", original_key: "orlando|", original_whole_key: "orlando|" });
   assert.ok(db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'idx_books_original_key'").get());
   assert.ok(db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'idx_books_original_whole_key'").get());
@@ -3153,8 +3153,7 @@ test("the original keys are stored once, recomputed when the version changes, an
   db.exec("UPDATE original_key_version SET version = 0");
   db.prepare("UPDATE books SET original_title = NULL, summary = NULL WHERE id = 'labelled'").run();
   applyBooksMigrations(db);
-  assert.equal(keyOf(db, "keyed"), originalKey("To the Lighthouse"));
-  assert.equal(originalsOf(db, "keyed").original_whole_key, originalWholeKey("To the Lighthouse"));
+  assert.deepEqual(originalsOf(db, "keyed"), { original_title: "Mr. Mercedes", original_key: "mr|", original_whole_key: "mr mercedes|" });
   assert.equal(keyOf(db, "labelled"), null);
   assert.equal(originalsOf(db, "labelled").original_whole_key, null);
   assert.deepEqual(versions(db), [1]);

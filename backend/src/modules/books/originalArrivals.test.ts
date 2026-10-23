@@ -188,6 +188,18 @@ test("another original under the same full-stop stem is never read, and the two 
   assert.equal(repo.workMatchJudgments([mercedes.work_id!, harrigan.work_id!]).size, 0);
 });
 
+test("a work is planned only under the stem key of its own evidence original", () => {
+  const repo = freshRepo();
+  const first = claimant(repo, "9789720000815", "Senhor Mercedes", "Stephen King", "Mr Mercedes", "OL77W");
+  const second = claimant(repo, "9789720000816", "O Senhor Mercedes", "Stephen King", "Mr. Mercedes", "OL77W");
+  claimant(repo, "9789720000817", "Mercedes, o Início", "Stephen King", "Mr Mercedes");
+  emptyQueue(repo);
+  book(repo, "9781501125607", "Mr. Mercedes", "Stephen King", { workKey: "OL17073965W" });
+  assert.equal(second.work_id, first.work_id);
+  assert.deepEqual(drain(repo), { arrivals: 1, claimants: 0, codeMerges: 0, codeBlocked: 0 });
+  assert.equal(repo.canonicalWorkIds([first.work_id!]).get(first.work_id!), first.work_id);
+});
+
 test("an original with a dash part is found when it arrives whole but stays skipped as a subtitle original", () => {
   const repo = freshRepo();
   const pt = claimant(repo, "9789720000814", "A Profecia Sombria", "Rick Riordan", "The Trials of Apollo - The Dark Prophecy");
