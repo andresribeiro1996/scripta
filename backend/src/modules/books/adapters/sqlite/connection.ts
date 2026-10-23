@@ -66,6 +66,8 @@ export function applyBooksMigrations(db: DatabaseSync): void {
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_summary_hash ON books(summary_hash)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_works_summary_hash ON works(summary_hash)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_work_merges_from ON work_merges(from_work)");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_work_series_name_key ON work_series(name_key)");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_book_collections_name_key ON book_collections(name_key)");
   const imageColumns = db.prepare("PRAGMA table_info(cover_images)").all() as Array<{ name: string }>;
   if (!imageColumns.some((column) => column.name === "origin")) db.exec("ALTER TABLE cover_images ADD COLUMN origin TEXT");
   if (!imageColumns.some((column) => column.name === "color")) db.exec("ALTER TABLE cover_images ADD COLUMN color TEXT");
