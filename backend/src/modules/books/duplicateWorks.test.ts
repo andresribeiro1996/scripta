@@ -107,6 +107,21 @@ test("keeps a survivor and two others apart as crowded, at save and in the walk"
   assert.deepEqual(repo.activeMerges("ol-duplicate"), []);
 });
 
+test("a series' volumes do not collapse one pair at a time, at save and in the walk", async () => {
+  const repo = freshRepo();
+  const first = edition(repo, "Bone", "OL1W", 1, "Jeff Smith");
+  const second = edition(repo, "Bone", "OL2W", 1, "Jeff Smith");
+  edition(repo, "Bone", "OL2W", 1, "Jeff Smith");
+  const key = repo.getBook(first.id)!.title_key!;
+  assert.deepEqual(mergeDuplicateWorks(deps(repo), [key]), { merges: [{ titleKey: key, from: first.work_id, into: second.work_id }], ...counts });
+  const third = edition(repo, "Bone", "OL3W", 3, "Jeff Smith");
+
+  assert.deepEqual(mergeDuplicateWorks(deps(repo), [key]), { merges: [], ...counts, crowded: 1 });
+  assert.deepEqual(await walkDuplicateWorks(deps(repo), { dryRun: false }), { merges: [], ...counts, crowded: 1 });
+  assert.equal(work(repo, third), third.work_id);
+  assert.deepEqual(repo.activeMerges("ol-duplicate").map((merge) => [merge.fromWork, merge.intoWork]), [[first.work_id, second.work_id]]);
+});
+
 test("dry run reports the merge and changes nothing", () => {
   const repo = freshRepo();
   const { small, large, key } = twoDuplicates(repo, "Fourth Wing", "OL1W", "OL2W");
@@ -169,10 +184,10 @@ test("a work that shares an arena with one already merged into the survivor is s
   const repo = freshRepo();
   const survivor = edition(repo, "Fourth Wing", "OL1W", 1);
   edition(repo, "Fourth Wing", "OL1W", 1);
-  const a = edition(repo, "Fourth Wing", "OL2W", 2);
-  const key = repo.getBook(survivor.id)!.title_key!;
-  assert.deepEqual(mergeDuplicateWorks(deps(repo), [key]), { merges: [{ titleKey: key, from: a.work_id, into: survivor.work_id }], ...counts });
+  const a = edition(repo, "Quarta Asa", "OL2W", 2);
+  repo.mergeTranslation(a.work_id!, survivor.work_id!, "code", null, at(3));
   const b = edition(repo, "Fourth Wing", "OL3W", 3);
+  const key = repo.getBook(survivor.id)!.title_key!;
   const tournament = new Set([a.work_id, b.work_id]);
   const worksShareAnArena = (left: string[], right: string[]) => left.some((id) => tournament.has(id)) && right.some((id) => tournament.has(id));
 
@@ -181,7 +196,7 @@ test("a work that shares an arena with one already merged into the survivor is s
   assert.deepEqual(report, { merges: [], ...counts, arena: 1 });
   assert.equal(work(repo, a), survivor.work_id);
   assert.equal(work(repo, b), b.work_id);
-  assert.deepEqual(repo.activeMerges("ol-duplicate").map((merge) => merge.fromWork), [a.work_id]);
+  assert.deepEqual(repo.activeMerges("ol-duplicate"), []);
 });
 
 test("walk covers keys across pages", async () => {
