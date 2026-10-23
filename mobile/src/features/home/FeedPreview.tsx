@@ -52,7 +52,7 @@ function MuralPreview({ item }: { item: Extract<DigestItem, { kind: "mural" }> }
 const styles = StyleSheet.create({
   winner: { transform: [{ rotate: "5deg" }], marginHorizontal: spacing.xs },
   iconTile: { width: 48, height: 72, borderRadius: radii.sm, alignItems: "center", justifyContent: "center" },
-  covers: { padding: spacing.md, borderRadius: radii.md, flexDirection: "row", gap: spacing.sm, alignItems: "center", justifyContent: "center", flexWrap: "wrap", position: "relative", minHeight: 96 },
+  covers: { flexDirection: "row", gap: spacing.sm, alignItems: "center", justifyContent: "flex-start", flexWrap: "wrap", position: "relative", minHeight: 96 },
   quizBadge: { position: "absolute", left: 30, top: 20, width: 32, height: 32, borderRadius: radii.full, alignItems: "center", justifyContent: "center" },
   mural: { width: "100%", aspectRatio: 1, overflow: "hidden", alignItems: "center", justifyContent: "center" },
   ranking: { width: 120, padding: spacing.sm, gap: spacing.xs, borderRadius: radii.md },
