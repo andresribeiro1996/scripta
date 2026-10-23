@@ -83,7 +83,9 @@ export const KEYED_EDITIONS_SQL = `
 `;
 export const KEYED_WORKS_SQL = `
   SELECT hits.title_key AS title_key, works.id AS id, works.title AS title, works.author AS author,
-    (SELECT COUNT(*) FROM books WHERE work_id = works.id) AS editions, works.created_at AS created_at
+    (SELECT COUNT(*) FROM books WHERE work_id = works.id) AS editions,
+    (SELECT COUNT(*) FROM work_merges WHERE into_work = works.id AND source = 'ol-duplicate' AND undone_at IS NULL) AS absorbed,
+    works.created_at AS created_at
   FROM (SELECT DISTINCT title_key, work_id FROM books WHERE title_key IN (SELECT value FROM json_each(?)) AND title_group_blocked_at IS NULL) AS hits
   CROSS JOIN works ON works.id = hits.work_id
   WHERE works.ol_work_key IS NOT NULL AND works.merged_into IS NULL
@@ -630,8 +632,8 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   }
 
   function keyedWorksWithTitleKeys(keys: string[]): KeyedWork[] {
-    const rows = keyedWorksStmt.all(JSON.stringify(keys)) as Array<{ title_key: string; id: string; title: string; author: string; editions: number; created_at: string }>;
-    return rows.map((row) => ({ titleKey: row.title_key, id: row.id, title: row.title, author: row.author, editions: row.editions, createdAt: row.created_at }));
+    const rows = keyedWorksStmt.all(JSON.stringify(keys)) as Array<{ title_key: string; id: string; title: string; author: string; editions: number; absorbed: number; created_at: string }>;
+    return rows.map((row) => ({ titleKey: row.title_key, id: row.id, title: row.title, author: row.author, editions: row.editions, absorbed: row.absorbed, createdAt: row.created_at }));
   }
 
   function titleWorks(stmt: StatementSync, keys: string[], keyed: boolean): TitleWork[] {

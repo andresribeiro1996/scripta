@@ -32,6 +32,7 @@ export interface KeyedWork {
   title: string;
   author: string;
   editions: number;
+  absorbed: number;
   createdAt: string;
 }
 
@@ -84,7 +85,7 @@ export function planDuplicateSets(works: KeyedWork[], isSeriesName: (fullTitle: 
       plan.seriesName += group.length - 1;
       continue;
     }
-    if (group.length > 2) {
+    if (group.length + group.reduce((total, work) => total + work.absorbed, 0) > 2) {
       plan.crowded += group.length - 1;
       continue;
     }
