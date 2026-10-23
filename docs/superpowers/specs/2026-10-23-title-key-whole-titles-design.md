@@ -28,7 +28,7 @@ For a keyless candidate `c` (today's candidate rules: live, keyless, every editi
 2. **No such keyed work:** `c` joins the oldest keyless candidate (`created_at`, then id) with key `k` and whole title `t`. If that is `c` itself, nothing happens.
 3. The undone-pair skip and the arena skip apply to every planned pair, as today.
 
-Keyed works are matched through their **edition** titles, not `works.title`. A keyed work's title is its first edition's, which is often in another language. A translation join leaves Portuguese editions inside an English keyed work ("1984" holding "Mil Novecentos e Oitenta e Quatro"), and a later keyless copy of that Portuguese edition must still find it. This replaces both today's single-keyed rule and the crowded fold. The crowded fold's comparison changes from `normalizeWords(works.title)` to edition whole titles.
+Keyed works are matched through their **edition** titles, not `works.title`. A keyed work's title is its first edition's, which is often in another language. A translation join leaves Portuguese editions inside an English keyed work ("1984" holding "Mil Novecentos e Oitenta e Quatro"), and a later keyless copy of that Portuguese edition must still find it. An edition that an active `title-key` merge moved into the keyed work doesn't count, since a wrongly folded edition would otherwise attract new copies of its title before the undo restores it; editions moved in by any other source (a translation join, `ol-duplicate`, admin) count. This replaces both today's single-keyed rule and the crowded fold. The crowded fold's comparison changes from `normalizeWords(works.title)` to edition whole titles.
 
 **What it costs:** correct folds of a tagline, an edition note or a short title stay separate works, now and in future. A book then shows once per title variant in search, unless the work-key lookup later gives the keyless edition the keyed work's Open Library key, which moves it by key. An edition-note exception ("Edição Limitada", "Ed. Colecionador", "Ebook") would recover some of them, but in the review it also let wrong ones through. It is not part of this change.
 
@@ -57,6 +57,6 @@ Keyed works are matched through their **edition** titles, not `works.title`. A k
 
 1. **Deploy this with the undoable-title-key branch, or after it,** and run the reviewed undos right after that deploy (owner's OK).
    - Not the other way round: under today's rules, the translation step can join a restored Portuguese volume to its keyed original. That original is then the only keyed work under the series key, and every other keyless volume of the series folds into it.
-   - The reverse gap is a few minutes, between this deploy and the undo run. In it, a keyed work that still holds a wrongly folded edition can attract a new copy of that same title.
+   - A title-key fold made before this change no longer attracts copies of its title, so the window between the deploy and the undo run makes no new folds through it.
 2. **Run `POST /books/works/group`, or wait for the daily run,** to fold the restored copies of one volume into one work per whole title. They stay apart from the target they were undone from.
 3. **Re-run the read-only listing** for merges made after the deploy. It should list none with a differing colon part. Merges made between the review and this deploy are reviewed the same way.

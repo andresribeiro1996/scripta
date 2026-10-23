@@ -77,7 +77,15 @@ export const KEYLESS_CANDIDATES_SQL = `
 `;
 export const KEYED_EDITIONS_SQL = `
   SELECT hits.title_key AS title_key, works.id AS id, hits.title AS title, works.created_at AS created_at
-  FROM (SELECT DISTINCT title_key, work_id, title FROM books WHERE title_key IN (SELECT value FROM json_each(?)) AND title_group_blocked_at IS NULL) AS hits
+  FROM (
+    SELECT DISTINCT title_key, work_id, title FROM books
+    WHERE title_key IN (SELECT value FROM json_each(?)) AND title_group_blocked_at IS NULL
+      AND NOT EXISTS (
+        SELECT 1 FROM works AS merged JOIN work_merges AS m ON m.from_work = merged.id
+        WHERE merged.merged_into = books.work_id AND m.source = 'title-key' AND m.undone_at IS NULL
+          AND EXISTS (SELECT 1 FROM json_each(m.moved_book_ids) WHERE value = books.id)
+      )
+  ) AS hits
   CROSS JOIN works ON works.id = hits.work_id
   WHERE works.ol_work_key IS NOT NULL AND works.merged_into IS NULL
 `;

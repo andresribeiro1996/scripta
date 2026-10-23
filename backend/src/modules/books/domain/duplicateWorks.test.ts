@@ -215,6 +215,7 @@ test("planTitleFolds ignores bracketed notes", () => {
 test("planTitleFolds folds the keyless works of a crowded key together when no keyed work has their whole title", () => {
   assert.deepEqual(planTitleFolds([
     titled(KEY, "w-novel", "Fourth Wing", true, "2026-09-01"),
+    titled(KEY, "w-coloring", "Fourth Wing: The Coloring Book", true, "2026-09-01"),
     titled(KEY, "k-2", "Fourth Wing: The Graphic Novel", false, "2026-09-03"),
     titled(KEY, "k-1", "Fourth Wing: The Graphic Novel", false, "2026-09-02")
   ]), [{ source: "k-2", target: "k-1" }]);
