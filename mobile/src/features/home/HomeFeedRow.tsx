@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
   textAction: { alignSelf: "flex-start", justifyContent: "center" },
   shelfGap: { marginTop: spacing.xl },
   iconAction: { width: 32, height: 32, alignItems: "center", justifyContent: "center", borderRadius: radii.md },
-  winnerLabel: { flexDirection: "row", gap: spacing.sm, alignItems: "center", borderTopLeftRadius: radii.xl - 1, borderTopRightRadius: radii.xl - 1, paddingTop: spacing.md, paddingLeft: spacing.md, paddingRight: spacing.xs },
+  winnerLabel: { flexDirection: "row", gap: spacing.sm, alignItems: "center", borderTopLeftRadius: radii.xl - 1, borderTopRightRadius: radii.xl - 1, paddingTop: spacing.md, paddingLeft: spacing.md, paddingRight: spacing.sm },
   winnerBody: { flexDirection: "row-reverse", alignItems: "center" },
   reactions: { paddingBottom: spacing.md, flexDirection: "row", gap: spacing.sm, alignItems: "center" },
   reaction: { minHeight: 32, minWidth: 64, flexDirection: "row", alignItems: "center", gap: spacing.xs, paddingHorizontal: spacing.sm, borderRadius: radii.sm },

@@ -21,7 +21,7 @@ export function FeedPreview({ item }: { item: DigestItem }) {
     const width = item.kind === "completion" ? 80 : 60;
     return <View style={item.kind === "completion" ? styles.winner : undefined}><BookCover cover={book.coverUrl} title={book.title} width={width} height={width * 1.5} /></View>;
   }
-  if (item.kind === "vote" && item.ranking?.length) return <View style={[styles.ranking, { backgroundColor: colors.surface }]} accessibilityLabel={`Ranking preview by ${item.actor.username}`}>
+  if (item.kind === "vote" && item.ranking?.length) return <View style={styles.ranking} accessibilityLabel={`Ranking preview by ${item.actor.username}`}>
     {item.ranking.map((tier, index) => <View key={index} style={styles.tier}>
       <View style={[styles.tierLabel, { backgroundColor: tier.color }]}><Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: (contrastRatio("#000000", tier.color) ?? 0) > (contrastRatio("#ffffff", tier.color) ?? 0) ? "#000000" : "#ffffff" }]}>{tier.label}</Text></View>
       {tier.books.map((book, index) => <BookCover key={index} cover={book.coverUrl} title={book.title} width={28} height={42} />)}
@@ -30,7 +30,7 @@ export function FeedPreview({ item }: { item: DigestItem }) {
   const covers = item.kind === "vote" ? item.content.covers : feedRowModel(item).covers;
   const quiz = item.kind === "publication" && item.content.kind === "quiz";
   if (!(item.kind === "publication" && item.content.kind === "tierlist")) return <View style={{ width: SLOT_WIDTH, height: SLOT_HEIGHT }}>
-    {covers.length ? <CoverFan covers={quiz ? covers.slice(0, 2) : covers} /> : <View style={[styles.iconTile, { backgroundColor: colors.surface }]}><Icon name={feedRowModel(item).icon} size={24} color={colors.accent} /></View>}
+    {covers.length ? <CoverFan covers={quiz ? covers.slice(0, 2) : covers} /> : <View style={[styles.iconTile, { backgroundColor: colors.accentSoft }]}><Icon name={feedRowModel(item).icon} size={24} color={colors.accent} /></View>}
     {quiz ? <View style={[styles.quizBadge, { backgroundColor: colors.surface }]}><Text display {...dynamicType} style={[typography.title, { color: colors.text }]}>?</Text></View> : null}
   </View>;
   return <View style={[styles.covers, { backgroundColor: colors.surface }]}>
@@ -55,7 +55,7 @@ const styles = StyleSheet.create({
   covers: { flexDirection: "row", gap: spacing.sm, alignItems: "center", justifyContent: "flex-start", flexWrap: "wrap", position: "relative", minHeight: 96 },
   quizBadge: { position: "absolute", left: 30, top: 20, width: 32, height: 32, borderRadius: radii.full, alignItems: "center", justifyContent: "center" },
   mural: { width: "100%", aspectRatio: 1, overflow: "hidden", alignItems: "center", justifyContent: "center" },
-  ranking: { width: 120, padding: spacing.sm, gap: spacing.xs, borderRadius: radii.md },
+  ranking: { width: 120, gap: spacing.xs },
   tier: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   tierLabel: { width: 24, height: 42, borderRadius: radii.sm, alignItems: "center", justifyContent: "center" }
 });
