@@ -108,6 +108,7 @@ export interface BooksRepository {
   translationEvidence(workId: string): { workId: string; workAuthor: string; editions: Array<{ title: string; author: string; publisher: string | null; summary: string | null; originalTitle: string | null }> } | undefined;
   originalTitleClaims(): OriginalClaim[];
   originalClaimsOf(key: string): OriginalClaim[];
+  originalKeysOf(wholeKey: string): string[];
   originalArrivals(limit: number): string[];
   dropOriginalArrival(titleKey: string): void;
   activeMerges(source: MergeSource): Array<{ id: number; fromWork: string; intoWork: string; movedBookIds: string[]; mergedAt: string }>;

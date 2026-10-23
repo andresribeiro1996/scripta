@@ -16,14 +16,13 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 const { applyBooksMigrations } = await import("../adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("../adapters/sqlite/sqliteBooksRepository.js");
 const { summaryHashOf } = await import("../domain/synopsis.js");
-const { originalKey } = await import("../domain/translation.js");
 const { reportJson } = await import("./mojibakeRepair.js");
 const { applySummaryCleanup, planSummaryCleanup, summaryCleanupReport } = await import("./summaryCleanup.js");
 
 const NOW = "2026-10-01T00:00:00.000Z";
 const LONG = "Uma história comprida sobre uma ilha esquecida e as pessoas que nela vivem, com segredos antigos e uma viagem inesperada.";
 const LONG_B = "Outra história comprida sobre um farol distante e os marinheiros que o procuram, entre tempestades e velhas promessas.";
-const TAIL = "\n\nDetalhes\n\nTítulo Original The Island\n\nCategoria Ficção\n\nSub-categoria Romance\n\nNº de Páginas 320\n\nCitações";
+const TAIL = "\n\nDetalhes\n\nTítulo Original Mr. Mercedes\n\nCategoria Ficção\n\nSub-categoria Romance\n\nNº de Páginas 320\n\nCitações";
 const SHORT = "Um livro curto.";
 const SHORT_TAIL = `${SHORT}\n\nDetalhes\n\nCitações`;
 
@@ -61,8 +60,9 @@ test("cleans changed books, skips clean ones and empties chrome-only ones", () =
   assert.deepEqual(plan.changes.map((change) => change.id).sort(), [dirty.id, chrome.id].sort());
   const applied = applySummaryCleanup(h.db, plan);
   assert.deepEqual(applied, { books: 2, works: 0, emptied: 1, skipped: 0, originalTitles: 1, judgmentsWritten: 0 });
-  assert.deepEqual(h.stored(dirty.id), { summary: LONG, summary_hash: summaryHashOf(LONG), summary_source: "publisher", original_title: "The Island" });
-  assert.equal((h.db.prepare("SELECT original_key FROM books WHERE id = ?").get(dirty.id) as { original_key: string | null }).original_key, originalKey("The Island"));
+  assert.deepEqual(h.stored(dirty.id), { summary: LONG, summary_hash: summaryHashOf(LONG), summary_source: "publisher", original_title: "Mr. Mercedes" });
+  assert.equal((h.db.prepare("SELECT original_key FROM books WHERE id = ?").get(dirty.id) as { original_key: string | null }).original_key, "mr|");
+  assert.equal((h.db.prepare("SELECT original_whole_key FROM books WHERE id = ?").get(dirty.id) as { original_whole_key: string | null }).original_whole_key, "mr mercedes|");
   assert.equal(h.stored(clean.id).summary, LONG_B);
   assert.deepEqual(h.stored(chrome.id), { summary: null, summary_hash: null, summary_source: null, original_title: null });
 });

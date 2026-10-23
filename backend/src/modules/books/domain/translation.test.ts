@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import { test } from "node:test";
 import { catalogTitleKey } from "./normalize.js";
-import { ORIGINAL_KEY_VERSION, arrivalKey, authorPattern, evidenceOf, hasVolumeMarker, isOriginalTitle, isPortuguese, mainTitle, mentionsSurname, originalKey, originalTitleIn, sameMainTitle, sameWholeTitle, seriesLikeGroups, seriesLikeOriginals, sharedOriginals, surnameOf, titlePattern, titlePatterns, wholeTitle } from "./translation.js";
+import { ORIGINAL_KEY_VERSION, arrivalKey, authorPattern, evidenceOf, hasVolumeMarker, isOriginalTitle, isPortuguese, mainTitle, mentionsSurname, originalKey, originalTitleIn, originalWholeKey, sameMainTitle, sameWholeTitle, seriesLikeGroups, seriesLikeOriginals, sharedOriginals, surnameOf, titlePattern, titlePatterns, wholeTitle } from "./translation.js";
 
 test("originalTitleIn reads the labelled value to the end of its line", () => {
   assert.equal(originalTitleIn("Uma sinopse.\n\nTítulo original: Les Misérables"), "Les Misérables");
@@ -296,11 +296,29 @@ test("a title key matches an original's title pattern exactly when its arrival k
   }
 });
 
-test("originalKey is pinned: a change must bump ORIGINAL_KEY_VERSION so stored keys are recomputed", () => {
+test("the whole original key keeps the parts after a full stop or a dash, and drops a colon part and brackets", () => {
+  assert.deepEqual(
+    ["Mr. Mercedes", "Les rois maudits. Le roi de fer", "The Trials of Apollo - The Dark Prophecy", "Dune: Messiah", "Le Petit Prince (illustré)", "Harry Potter 2", "()"].map(originalWholeKey),
+    ["mr mercedes|", "les rois maudits le roi de fer|", "the trials of apollo the dark prophecy|", "dune|", "le petit prince|", "harry potter 2|2", null]
+  );
+});
+
+test("an arriving title's arrival key is the whole key of the same title as an original", () => {
+  for (const title of ["To the Lighthouse", "Mr. Mercedes", "Les rois maudits. Le roi de fer", "The Trials of Apollo - The Dark Prophecy", "Dune: Messiah", "Le Petit Prince (illustré)", "Harry Potter 2", "Catch-22"]) {
+    assert.equal(arrivalKey(catalogTitleKey(title, "Some Author")!), originalWholeKey(title), title);
+  }
+});
+
+test("the original keys are pinned: a change must bump ORIGINAL_KEY_VERSION so stored keys are recomputed", () => {
   assert.deepEqual(
     ["To the Lighthouse", "Dune: Messiah", "Les rois maudits. Le roi de fer", "Harry Potter 2", "Le Petit Prince (illustré)"].map(originalKey),
     ["to the lighthouse|", "dune|", "les rois maudits|", "harry potter 2|2", "le petit prince|"],
     "originalKey changed: bump ORIGINAL_KEY_VERSION so stored original_key values are recomputed"
+  );
+  assert.deepEqual(
+    ["To the Lighthouse", "Dune: Messiah", "Les rois maudits. Le roi de fer", "Harry Potter 2", "Le Petit Prince (illustré)"].map(originalWholeKey),
+    ["to the lighthouse|", "dune|", "les rois maudits le roi de fer|", "harry potter 2|2", "le petit prince|"],
+    "originalWholeKey changed: bump ORIGINAL_KEY_VERSION so stored original_whole_key values are recomputed"
   );
   assert.equal(ORIGINAL_KEY_VERSION, 1);
 });
