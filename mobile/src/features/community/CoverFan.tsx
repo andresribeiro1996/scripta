@@ -13,13 +13,17 @@ const COVER_INSET = 14;
 export const SLOT_WIDTH = COVER_INSET + COVER_WIDTH + COVER_STEP * 2;
 export const SLOT_HEIGHT = COVER_HEIGHT + COVER_RISE * 2;
 
-export function CoverFan({ covers }: { covers: string[] }) {
+export function fanWidth(count: number) {
+  return COVER_WIDTH + COVER_STEP * Math.max(count - 1, 0);
+}
+
+export function CoverFan({ covers, inset = COVER_INSET }: { covers: string[]; inset?: number }) {
   return covers.map((cover, index) => (
     <Image
       key={`${index}:${cover}`}
       source={{ uri: cover }}
       contentFit="cover"
-      style={[styles.cover, { left: COVER_INSET + index * COVER_STEP, top: (covers.length - 1 - index) * COVER_RISE, zIndex: index }]}
+      style={[styles.cover, { left: inset + index * COVER_STEP, top: (covers.length - 1 - index) * COVER_RISE, zIndex: index }]}
     />
   ));
 }
