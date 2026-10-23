@@ -47,13 +47,6 @@ export interface DuplicatePlan {
   crowded: number;
 }
 
-export interface KeyWork {
-  titleKey: string;
-  workId: string;
-  title: string;
-  keyed: boolean;
-}
-
 export interface TitleWork {
   titleKey: string;
   workId: string;
@@ -101,23 +94,6 @@ export function planDuplicateSets(works: KeyedWork[], isSeriesName: (fullTitle: 
   return plan;
 }
 
-export function planCrowdedFolds(works: KeyWork[]): Array<{ source: string; target: string }> {
-  const byKey = new Map<string, KeyWork[]>();
-  for (const work of works) {
-    if (work.titleKey !== "") byKey.set(work.titleKey, [...(byKey.get(work.titleKey) ?? []), work]);
-  }
-  const folds: Array<{ source: string; target: string }> = [];
-  for (const group of byKey.values()) {
-    const keyed = group.filter((work) => work.keyed);
-    for (const keyless of group.filter((work) => !work.keyed)) {
-      const fullTitle = normalizeWords(keyless.title);
-      const matches = keyed.filter((work) => normalizeWords(work.title) === fullTitle);
-      if (matches.length === 1) folds.push({ source: keyless.workId, target: matches[0]!.workId });
-    }
-  }
-  return folds;
-}
-
 function oldestFirst(a: TitleWork, b: TitleWork): number {
   return compare(a.createdAt, b.createdAt) || compare(a.workId, b.workId);
 }
@@ -134,7 +110,7 @@ export function planTitleFolds(works: TitleWork[]): Array<{ source: string; targ
   for (const group of groups.values()) {
     const keyedIds = new Set(group.filter((work) => work.keyed).map((work) => work.workId));
     if (keyedIds.size > 1) continue;
-    const keyless = [...new Map(group.filter((work) => !work.keyed).sort(oldestFirst).map((work) => [work.workId, work])).values()];
+    const keyless = group.filter((work) => !work.keyed).sort(oldestFirst);
     const target = [...keyedIds][0] ?? keyless.shift()?.workId;
     if (target === undefined) continue;
     for (const work of keyless) folds.push({ work, target });

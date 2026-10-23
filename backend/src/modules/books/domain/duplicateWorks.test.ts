@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { planCrowdedFolds, planDuplicateSets, planTitleFolds } from "./duplicateWorks.js";
+import { planDuplicateSets, planTitleFolds } from "./duplicateWorks.js";
 import { workTitleKey } from "./normalize.js";
 
 const KEY = workTitleKey("Fourth Wing", "Rebecca Yarros");
@@ -115,47 +115,6 @@ test("skipping one set leaves the pairs around it planned", () => {
   );
 });
 
-const crowded = [
-  { titleKey: KEY, workId: "w-novel", title: "Fourth Wing", keyed: true },
-  { titleKey: KEY, workId: "w-gn", title: "Fourth Wing: The Graphic Novel", keyed: true },
-  { titleKey: KEY, workId: "k-1", title: "Fourth wing", keyed: false },
-  { titleKey: KEY, workId: "k-2", title: "Fourth Wing: The Graphic Novel", keyed: false }
-];
-
-test("folds a keyless work into the one keyed work with its full title", () => {
-  assert.deepEqual(planCrowdedFolds(crowded), [
-    { source: "k-1", target: "w-novel" },
-    { source: "k-2", target: "w-gn" }
-  ]);
-});
-
-test("leaves a keyless work alone when no keyed work, or several, have its full title", () => {
-  assert.deepEqual(planCrowdedFolds([
-    { titleKey: KEY, workId: "w-novel", title: "Fourth Wing", keyed: true },
-    { titleKey: KEY, workId: "k-1", title: "Fourth Wing: The Graphic Novel", keyed: false }
-  ]), []);
-  assert.deepEqual(planCrowdedFolds([
-    { titleKey: KEY, workId: "w-a", title: "Fourth Wing", keyed: true },
-    { titleKey: KEY, workId: "w-b", title: "Fourth WIng", keyed: true },
-    { titleKey: KEY, workId: "k-1", title: "Fourth Wing", keyed: false }
-  ]), []);
-});
-
-test("folds only within the keyless work's own title key", () => {
-  const other = workTitleKey("Iron Flame", "Rebecca Yarros");
-  assert.deepEqual(planCrowdedFolds([
-    { titleKey: other, workId: "w-flame", title: "Iron Flame", keyed: true },
-    { titleKey: KEY, workId: "k-1", title: "Iron Flame", keyed: false }
-  ]), []);
-});
-
-test("never folds works whose title key is empty", () => {
-  assert.deepEqual(planCrowdedFolds([
-    { titleKey: "", workId: "w-a", title: "!!!", keyed: true },
-    { titleKey: "", workId: "k-1", title: "!!!", keyed: false }
-  ]), []);
-});
-
 const titled = (titleKey: string, workId: string, title: string, keyed: boolean, createdAt: string) => ({ titleKey, workId, title, keyed, createdAt });
 const LUPIN = workTitleKey("Arsène Lupin", "Maurice Leblanc");
 
@@ -179,7 +138,8 @@ test("planTitleFolds leaves a keyless work alone when no keyed work, or several,
   assert.deepEqual(planTitleFolds([
     titled(KEY, "w-a", "Fourth Wing", true, "2026-09-01"),
     titled(KEY, "w-b", "Fourth WIng", true, "2026-09-02"),
-    titled(KEY, "k-1", "Fourth Wing", false, "2026-09-03")
+    titled(KEY, "k-1", "Fourth Wing", false, "2026-09-03"),
+    titled(KEY, "k-2", "Fourth Wing", false, "2026-09-04")
   ]), []);
 });
 
@@ -247,19 +207,6 @@ test("planTitleFolds folds the keyless works of a crowded key together when no k
     titled(KEY, "w-novel", "Fourth Wing", true, "2026-09-01"),
     titled(KEY, "k-2", "Fourth Wing: The Graphic Novel", false, "2026-09-03"),
     titled(KEY, "k-1", "Fourth Wing: The Graphic Novel", false, "2026-09-02")
-  ]), [{ source: "k-2", target: "k-1" }]);
-});
-
-test("planTitleFolds counts a keyless work listed twice once", () => {
-  assert.deepEqual(planTitleFolds([
-    titled(KEY, "k-1", "Fourth Wing", false, "2026-09-01"),
-    titled(KEY, "k-1", "Fourth Wing", false, "2026-09-01")
-  ]), []);
-  assert.deepEqual(planTitleFolds([
-    titled(KEY, "k-1", "Fourth Wing", false, "2026-09-01"),
-    titled(KEY, "k-1", "Fourth Wing", false, "2026-09-01"),
-    titled(KEY, "k-2", "Fourth Wing", false, "2026-09-02"),
-    titled(KEY, "k-2", "Fourth Wing", false, "2026-09-02")
   ]), [{ source: "k-2", target: "k-1" }]);
 });
 
