@@ -47,5 +47,5 @@ const report = await walkDuplicateWorks(
   dryRun ? { dryRun } : { dryRun, pageSize: 100, pauseMs: 250 }
 );
 
-console.log(JSON.stringify({ mode: dryRun ? "dry-run" : "apply", merges: report.merges.length, undone: report.undone, arena: report.arena, gone: report.gone }));
+console.log(JSON.stringify({ mode: dryRun ? "dry-run" : "apply", merges: report.merges.length, seriesName: report.seriesName, crowded: report.crowded, undone: report.undone, arena: report.arena, gone: report.gone }));
 console.log(JSON.stringify(report.merges.map(({ titleKey, from, into }) => ({ titleKey, ...(before.get(from) ?? describe(from, into)) })), null, 2));

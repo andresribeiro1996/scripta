@@ -40,6 +40,12 @@ export interface DuplicateSet {
   from: string[];
 }
 
+export interface DuplicatePlan {
+  sets: DuplicateSet[];
+  seriesName: number;
+  crowded: number;
+}
+
 export interface KeyWork {
   titleKey: string;
   workId: string;
@@ -60,7 +66,7 @@ function mergeable(work: KeyedWork): boolean {
   return work.titleKey !== "" && author !== "" && !PLACEHOLDER_AUTHORS.has(author) && workTitleKey(work.title, work.author) === work.titleKey;
 }
 
-export function planDuplicateSets(works: KeyedWork[]): DuplicateSet[] {
+export function planDuplicateSets(works: KeyedWork[], isSeriesName: (fullTitle: string) => boolean): DuplicatePlan {
   const seen = new Set<string>();
   const groups = new Map<string, KeyedWork[]>();
   for (const work of works) {
@@ -69,13 +75,21 @@ export function planDuplicateSets(works: KeyedWork[]): DuplicateSet[] {
     const groupKey = `${work.titleKey}\n${normalizeWords(work.title)}`;
     groups.set(groupKey, [...(groups.get(groupKey) ?? []), work]);
   }
-  const sets: DuplicateSet[] = [];
+  const plan: DuplicatePlan = { sets: [], seriesName: 0, crowded: 0 };
   for (const group of groups.values()) {
     if (group.length < 2) continue;
+    if (isSeriesName(normalizeWords(group[0]!.title))) {
+      plan.seriesName += group.length - 1;
+      continue;
+    }
+    if (group.length > 2) {
+      plan.crowded += group.length - 1;
+      continue;
+    }
     const [survivor, ...rest] = [...group].sort(survivorFirst);
-    sets.push({ titleKey: survivor!.titleKey, into: survivor!.id, from: rest.map((work) => work.id) });
+    plan.sets.push({ titleKey: survivor!.titleKey, into: survivor!.id, from: rest.map((work) => work.id) });
   }
-  return sets;
+  return plan;
 }
 
 export function planCrowdedFolds(works: KeyWork[]): Array<{ source: string; target: string }> {

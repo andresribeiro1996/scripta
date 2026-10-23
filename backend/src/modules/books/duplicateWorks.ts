@@ -5,7 +5,7 @@ import type { BooksRepository } from "./domain/ports.js";
 const DEFAULT_PAGE_SIZE = 500;
 
 export interface DuplicateDeps {
-  repo: Pick<BooksRepository, "keyedWorksWithTitleKeys" | "groupableTitleKeys" | "undoneMergeAmong" | "mergeDuplicateWork">;
+  repo: Pick<BooksRepository, "keyedWorksWithTitleKeys" | "groupableTitleKeys" | "isSeriesName" | "undoneMergeAmong" | "mergeDuplicateWork">;
   sharesArena: (from: string, into: string) => boolean;
   now: () => number;
 }
@@ -18,14 +18,17 @@ export interface DuplicateMerge {
 
 export interface DuplicateReport {
   merges: DuplicateMerge[];
+  seriesName: number;
+  crowded: number;
   undone: number;
   arena: number;
   gone: number;
 }
 
 export function mergeDuplicateWorks(deps: DuplicateDeps, titleKeys: string[], dryRun = false): DuplicateReport {
-  const report: DuplicateReport = { merges: [], undone: 0, arena: 0, gone: 0 };
-  for (const set of planDuplicateSets(deps.repo.keyedWorksWithTitleKeys(titleKeys))) {
+  const plan = planDuplicateSets(deps.repo.keyedWorksWithTitleKeys(titleKeys), (title) => deps.repo.isSeriesName(title));
+  const report: DuplicateReport = { merges: [], seriesName: plan.seriesName, crowded: plan.crowded, undone: 0, arena: 0, gone: 0 };
+  for (const set of plan.sets) {
     if (deps.repo.undoneMergeAmong([set.into, ...set.from])) {
       report.undone += 1;
       continue;
@@ -52,13 +55,15 @@ export function mergeDuplicateWorks(deps: DuplicateDeps, titleKeys: string[], dr
 
 export async function walkDuplicateWorks(deps: DuplicateDeps, options: { dryRun: boolean; signal?: AbortSignal; pageSize?: number; pauseMs?: number }): Promise<DuplicateReport> {
   const { dryRun, signal, pageSize = DEFAULT_PAGE_SIZE, pauseMs = 0 } = options;
-  const total: DuplicateReport = { merges: [], undone: 0, arena: 0, gone: 0 };
+  const total: DuplicateReport = { merges: [], seriesName: 0, crowded: 0, undone: 0, arena: 0, gone: 0 };
   let after = "";
   while (!signal?.aborted) {
     const keys = deps.repo.groupableTitleKeys(after, pageSize);
     if (keys.length === 0) break;
     const page = mergeDuplicateWorks(deps, keys, dryRun);
     total.merges.push(...page.merges);
+    total.seriesName += page.seriesName;
+    total.crowded += page.crowded;
     total.undone += page.undone;
     total.arena += page.arena;
     total.gone += page.gone;

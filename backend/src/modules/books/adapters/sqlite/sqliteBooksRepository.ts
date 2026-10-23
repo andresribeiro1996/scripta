@@ -276,6 +276,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const groupablePairsStmt = db.prepare(GROUPABLE_PAIRS_SQL);
   const keylessCandidatesStmt = db.prepare(KEYLESS_CANDIDATES_SQL);
   const keyedWorksStmt = db.prepare(KEYED_WORKS_SQL);
+  const isSeriesNameStmt = db.prepare(`SELECT EXISTS (SELECT 1 FROM work_series WHERE name_key = ?) OR EXISTS (SELECT 1 FROM book_collections WHERE name_key = ?) AS found`);
   const undoneMergeAmongStmt = db.prepare(`SELECT 1 AS found FROM work_merges WHERE undone_at IS NOT NULL AND from_work IN (SELECT value FROM json_each($ids)) AND into_work IN (SELECT value FROM json_each($ids)) LIMIT 1`);
   const workLookupStmt = db.prepare(WORK_LOOKUP_SQL);
   const workCheckedStmt = db.prepare(`UPDATE books SET work_checked_at = ? WHERE id = ?`);
@@ -960,6 +961,9 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
         markUndoneStmt.run(at, merge.id);
         return { into: merge.into_work, editions };
       });
+    },
+    isSeriesName(nameKey) {
+      return (isSeriesNameStmt.get(nameKey, nameKey) as { found: number }).found === 1;
     },
     undoneMergeAmong(workIds) {
       return undoneMergeAmongStmt.get({ $ids: JSON.stringify(workIds) }) !== undefined;

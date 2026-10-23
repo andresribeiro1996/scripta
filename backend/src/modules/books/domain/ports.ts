@@ -58,6 +58,7 @@ export interface BooksRepository {
   groupTitleKeys(keys: string[], limit: number, at?: string, skip?: (from: string, into: string) => boolean): number;
   groupableTitleKeys(after: string, limit: number): string[];
   keyedWorksWithTitleKeys(keys: string[]): KeyedWork[];
+  isSeriesName(nameKey: string): boolean;
   undoneMergeAmong(workIds: string[]): boolean;
   listWorkLookupIds(limit: number, recheckBefore: string): string[];
   markWorkChecked(id: string, at: string): void;

@@ -42,6 +42,8 @@ function deps(repo: Repo, sharesArena: (from: string, into: string) => boolean =
   return { repo, sharesArena, now: () => NOW };
 }
 
+const counts = { seriesName: 0, crowded: 0, undone: 0, arena: 0, gone: 0 };
+
 function twoDuplicates(repo: Repo, title: string, firstKey: string, secondKey: string) {
   const small = edition(repo, title, firstKey, 2);
   const large = edition(repo, title, secondKey, 1);
@@ -51,30 +53,58 @@ function twoDuplicates(repo: Repo, title: string, firstKey: string, secondKey: s
 
 const work = (repo: Repo, book: { id: string }) => repo.getBook(book.id)!.work_id;
 
-test("merges duplicate keyed works for the given keys", () => {
+test("merges a duplicate keyed pair for the given keys and leaves the other key's pair", () => {
   const repo = freshRepo();
   const survivor = edition(repo, "Fourth Wing", "OL2W", 1);
   edition(repo, "Fourth Wing", "OL2W", 1);
   const first = edition(repo, "Fourth Wing", "OL1W", 2);
-  const second = edition(repo, "Fourth Wing", "OL3W", 3);
   const other = twoDuplicates(repo, "Iron Flame", "OL4W", "OL5W");
   const key = repo.getBook(survivor.id)!.title_key!;
 
   const report = mergeDuplicateWorks(deps(repo), [key]);
 
-  assert.deepEqual(report, {
-    merges: [
-      { titleKey: key, from: first.work_id, into: survivor.work_id },
-      { titleKey: key, from: second.work_id, into: survivor.work_id }
-    ],
-    undone: 0,
-    arena: 0,
-    gone: 0
-  });
-  for (const book of [first, second]) assert.equal(work(repo, book), survivor.work_id);
+  assert.deepEqual(report, { merges: [{ titleKey: key, from: first.work_id, into: survivor.work_id }], ...counts });
+  assert.equal(work(repo, first), survivor.work_id);
   assert.notEqual(work(repo, other.small), work(repo, other.large));
-  assert.deepEqual(repo.activeMerges("ol-duplicate").map((merge) => merge.fromWork).sort(), [first.work_id, second.work_id].sort());
-  assert.ok(repo.activeMerges("ol-duplicate").every((merge) => merge.intoWork === survivor.work_id));
+  assert.deepEqual(repo.activeMerges("ol-duplicate").map((merge) => [merge.fromWork, merge.intoWork]), [[first.work_id, survivor.work_id]]);
+});
+
+test("keeps a pair apart when its full title is a series name, from work_series or book_collections", async () => {
+  const repo = freshRepo();
+  const nate = twoDuplicates(repo, "Big Nate", "OL1W", "OL2W");
+  const diaries = twoDuplicates(repo, "Dork Diaries", "OL3W", "OL4W");
+  const flame = twoDuplicates(repo, "Iron Flame", "OL5W", "OL6W");
+  repo.addWorkSeries(nate.small.work_id!, [{ name: "Big Nate", position: null }], "ol-subject", at(3));
+  repo.addBookCollection(diaries.large.id, { name: "Dork Diaries", position: null }, "bnp", at(3));
+  const keys = [nate.key, diaries.key, flame.key];
+
+  assert.deepEqual(mergeDuplicateWorks(deps(repo), keys, true), {
+    merges: [{ titleKey: flame.key, from: flame.small.work_id, into: flame.large.work_id }],
+    ...counts,
+    seriesName: 2
+  });
+  assert.deepEqual(await walkDuplicateWorks(deps(repo), { dryRun: false, pageSize: 1 }), {
+    merges: [{ titleKey: flame.key, from: flame.small.work_id, into: flame.large.work_id }],
+    ...counts,
+    seriesName: 2
+  });
+  assert.notEqual(work(repo, nate.small), work(repo, nate.large));
+  assert.notEqual(work(repo, diaries.small), work(repo, diaries.large));
+  assert.equal(work(repo, flame.small), flame.large.work_id);
+  assert.deepEqual(repo.activeMerges("ol-duplicate").map((merge) => merge.fromWork), [flame.small.work_id]);
+});
+
+test("keeps a survivor and two others apart as crowded, at save and in the walk", async () => {
+  const repo = freshRepo();
+  const a = edition(repo, "Fourth Wing", "OL1W", 1);
+  const b = edition(repo, "Fourth Wing", "OL2W", 2);
+  const c = edition(repo, "Fourth Wing", "OL3W", 3);
+  const key = repo.getBook(a.id)!.title_key!;
+
+  assert.deepEqual(mergeDuplicateWorks(deps(repo), [key]), { merges: [], ...counts, crowded: 2 });
+  assert.deepEqual(await walkDuplicateWorks(deps(repo), { dryRun: false }), { merges: [], ...counts, crowded: 2 });
+  assert.deepEqual([a, b, c].map((book) => work(repo, book)), [a.work_id, b.work_id, c.work_id]);
+  assert.deepEqual(repo.activeMerges("ol-duplicate"), []);
 });
 
 test("dry run reports the merge and changes nothing", () => {
@@ -83,7 +113,7 @@ test("dry run reports the merge and changes nothing", () => {
 
   const report = mergeDuplicateWorks(deps(repo), [key], true);
 
-  assert.deepEqual(report, { merges: [{ titleKey: key, from: small.work_id, into: large.work_id }], undone: 0, arena: 0, gone: 0 });
+  assert.deepEqual(report, { merges: [{ titleKey: key, from: small.work_id, into: large.work_id }], ...counts });
   assert.equal(work(repo, small), small.work_id);
   assert.deepEqual(repo.activeMerges("ol-duplicate"), []);
 });
@@ -92,7 +122,7 @@ test("a work that vanished between planning and merging counts as gone, and othe
   const repo = freshRepo();
   const { small, large, key } = twoDuplicates(repo, "Fourth Wing", "OL1W", "OL2W");
   const refusing = { ...repo, mergeDuplicateWork: () => { throw new WorkMergeError("That work was already merged."); } };
-  assert.deepEqual(mergeDuplicateWorks(deps(refusing), [key]), { merges: [], undone: 0, arena: 0, gone: 1 });
+  assert.deepEqual(mergeDuplicateWorks(deps(refusing), [key]), { merges: [], ...counts, gone: 1 });
   assert.equal(work(repo, small), small.work_id);
   const broken = { ...repo, mergeDuplicateWork: () => { throw new Error("disk full"); } };
   assert.throws(() => mergeDuplicateWorks(deps(broken), [key]), /disk full/);
@@ -110,12 +140,15 @@ test("an undone duplicate merge stays undone", async () => {
   assert.equal(work(repo, a), a.work_id);
   assert.equal(work(repo, b), b.work_id);
 
-  const c = edition(repo, "Fourth Wing", "OL3W", 4);
-  edition(repo, "Fourth Wing", "OL3W", 4);
-  edition(repo, "Fourth Wing", "OL3W", 4);
+  assert.deepEqual(mergeDuplicateWorks(deps(repo), [key]), { merges: [], ...counts, undone: 1 });
+  assert.deepEqual(await walkDuplicateWorks(deps(repo), { dryRun: false }), { merges: [], ...counts, undone: 1 });
+  assert.deepEqual([a, b].map((book) => work(repo, book)), [a.work_id, b.work_id]);
+  assert.deepEqual(repo.activeMerges("ol-duplicate"), []);
 
-  assert.deepEqual(mergeDuplicateWorks(deps(repo), [key]), { merges: [], undone: 1, arena: 0, gone: 0 });
-  assert.deepEqual(await walkDuplicateWorks(deps(repo), { dryRun: false }), { merges: [], undone: 1, arena: 0, gone: 0 });
+  const c = edition(repo, "Fourth Wing", "OL3W", 4);
+
+  assert.deepEqual(mergeDuplicateWorks(deps(repo), [key]), { merges: [], ...counts, crowded: 2 });
+  assert.deepEqual(await walkDuplicateWorks(deps(repo), { dryRun: false }), { merges: [], ...counts, crowded: 2 });
   assert.deepEqual([a, b, c].map((book) => work(repo, book)), [a.work_id, b.work_id, c.work_id]);
   assert.deepEqual(repo.activeMerges("ol-duplicate"), []);
 });
@@ -125,8 +158,8 @@ test("skips works sharing an arena, at save and in the walk", async () => {
   const { small, large, key } = twoDuplicates(repo, "Fourth Wing", "OL1W", "OL2W");
   const sharing = deps(repo, () => true);
 
-  assert.deepEqual(mergeDuplicateWorks(sharing, [key]), { merges: [], undone: 0, arena: 1, gone: 0 });
-  assert.deepEqual(await walkDuplicateWorks(sharing, { dryRun: false }), { merges: [], undone: 0, arena: 1, gone: 0 });
+  assert.deepEqual(mergeDuplicateWorks(sharing, [key]), { merges: [], ...counts, arena: 1 });
+  assert.deepEqual(await walkDuplicateWorks(sharing, { dryRun: false }), { merges: [], ...counts, arena: 1 });
   assert.equal(work(repo, small), small.work_id);
   assert.equal(work(repo, large), large.work_id);
   assert.deepEqual(repo.activeMerges("ol-duplicate"), []);
@@ -137,14 +170,15 @@ test("a work that shares an arena with one already merged into the survivor is s
   const survivor = edition(repo, "Fourth Wing", "OL1W", 1);
   edition(repo, "Fourth Wing", "OL1W", 1);
   const a = edition(repo, "Fourth Wing", "OL2W", 2);
-  const b = edition(repo, "Fourth Wing", "OL3W", 3);
   const key = repo.getBook(survivor.id)!.title_key!;
+  assert.deepEqual(mergeDuplicateWorks(deps(repo), [key]), { merges: [{ titleKey: key, from: a.work_id, into: survivor.work_id }], ...counts });
+  const b = edition(repo, "Fourth Wing", "OL3W", 3);
   const tournament = new Set([a.work_id, b.work_id]);
   const worksShareAnArena = (left: string[], right: string[]) => left.some((id) => tournament.has(id)) && right.some((id) => tournament.has(id));
 
   const report = mergeDuplicateWorks(deps(repo, arenaCheck(repo, worksShareAnArena)), [key]);
 
-  assert.deepEqual(report, { merges: [{ titleKey: key, from: a.work_id, into: survivor.work_id }], undone: 0, arena: 1, gone: 0 });
+  assert.deepEqual(report, { merges: [], ...counts, arena: 1 });
   assert.equal(work(repo, a), survivor.work_id);
   assert.equal(work(repo, b), b.work_id);
   assert.deepEqual(repo.activeMerges("ol-duplicate").map((merge) => merge.fromWork), [a.work_id]);
@@ -164,7 +198,7 @@ test("walk covers keys across pages", async () => {
     [wing.key, wing.small.work_id, wing.large.work_id],
     [flame.key, flame.small.work_id, flame.large.work_id]
   ].sort());
-  assert.deepEqual([report.undone, report.arena, report.gone], [0, 0, 0]);
+  assert.deepEqual([report.seriesName, report.crowded, report.undone, report.arena, report.gone], [0, 0, 0, 0, 0]);
   assert.equal(work(repo, wing.small), wing.large.work_id);
   assert.equal(work(repo, flame.small), flame.large.work_id);
   assert.deepEqual(pages.map((keys) => keys.length), [1, 1, 0]);
@@ -177,7 +211,7 @@ test("walk stops when the signal is aborted", async () => {
 
   const aborted = new AbortController();
   aborted.abort();
-  assert.deepEqual(await walkDuplicateWorks(deps(repo), { dryRun: false, signal: aborted.signal }), { merges: [], undone: 0, arena: 0, gone: 0 });
+  assert.deepEqual(await walkDuplicateWorks(deps(repo), { dryRun: false, signal: aborted.signal }), { merges: [], ...counts });
   assert.deepEqual(repo.activeMerges("ol-duplicate"), []);
 
   const controller = new AbortController();
