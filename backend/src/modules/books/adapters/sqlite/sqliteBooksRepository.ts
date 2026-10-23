@@ -9,7 +9,7 @@ import { WorkMergeError } from "../../domain/errors.js";
 import { wantsRetitle } from "../../domain/lossy.js";
 import { SERIES_SOURCE_RANK, seriesNameKey, type SeriesEntry, type SeriesSource } from "../../domain/series.js";
 import { summaryHashOf, type SynopsisKind } from "../../domain/synopsis.js";
-import { isOriginalTitle, originalKey, originalTitleIn } from "../../domain/translation.js";
+import { isOriginalTitle, originalKey, originalTitleIn, originalWholeKey } from "../../domain/translation.js";
 import type { BookRow, CoverImageRow, DataSource, GenreEvidence, LossyBook, MergeSource, SummarySource, WorkPageRows, WorkView } from "../../domain/types.js";
 
 export const UNCHECKED_COVERS_SQL = `
@@ -25,6 +25,10 @@ export const UPGRADE_WANTED_SQL = `
 
 export const ORIGINAL_CLAIMS_SQL = `
   SELECT work_id, title, author, language, original_title FROM books WHERE original_key = ?
+`;
+
+export const ORIGINAL_KEYS_OF_WHOLE_SQL = `
+  SELECT DISTINCT original_key FROM books WHERE original_whole_key = ? AND original_key IS NOT NULL
 `;
 
 export const UNCHECKED_DETAILS_SQL = `
@@ -173,6 +177,10 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const unmergeStmt = db.prepare(`UPDATE works SET merged_into = NULL WHERE id = ?`);
   const repointBackStmt = db.prepare(`UPDATE works SET merged_into = ? WHERE merged_into = ? AND id IN (SELECT value FROM json_each(?))`);
   const markUndoneStmt = db.prepare(`UPDATE work_merges SET undone_at = ? WHERE id = ?`);
+  const clearCarriedSummaryStmt = db.prepare(`
+    UPDATE works SET summary = NULL, summary_hash = NULL
+    WHERE id = $into AND summary_hash IS NOT NULL AND summary_hash = (SELECT summary_hash FROM works WHERE id = $from)
+  `);
   const moveGroupedBackStmt = db.prepare(`
     UPDATE books SET work_id = $from
     WHERE work_id = $into AND ol_work_key IS NULL AND title_key IN (SELECT title_key FROM books WHERE work_id = $from AND title_key <> '')
@@ -279,7 +287,18 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const keylessCandidatesStmt = db.prepare(KEYLESS_CANDIDATES_SQL);
   const keyedWorksStmt = db.prepare(KEYED_WORKS_SQL);
   const isSeriesNameStmt = db.prepare(`SELECT EXISTS (SELECT 1 FROM work_series WHERE name_key = ?) OR EXISTS (SELECT 1 FROM book_collections WHERE name_key = ?) AS found`);
-  const undoneMergeAmongStmt = db.prepare(`SELECT 1 AS found FROM work_merges WHERE undone_at IS NOT NULL AND from_work IN (SELECT value FROM json_each($ids)) AND into_work IN (SELECT value FROM json_each($ids)) LIMIT 1`);
+  const undoneMergeAmongStmt = db.prepare(`
+    WITH side(id) AS (
+      SELECT value FROM json_each($ids)
+      UNION SELECT id FROM works WHERE merged_into IN (SELECT value FROM json_each($ids))
+    )
+    SELECT 1 AS found FROM work_merges m
+    JOIN works f ON f.id = m.from_work
+    JOIN works i ON i.id = m.into_work
+    WHERE m.undone_at IS NOT NULL AND m.from_work IN side AND m.into_work IN side
+      AND COALESCE(f.merged_into, f.id) <> COALESCE(i.merged_into, i.id)
+    LIMIT 1
+  `);
   const workLookupStmt = db.prepare(WORK_LOOKUP_SQL);
   const workCheckedStmt = db.prepare(`UPDATE books SET work_checked_at = ? WHERE id = ?`);
   const replaceLanguageStmt = db.prepare(`UPDATE books SET language = ? WHERE id = ?`);
@@ -319,6 +338,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
         summary_hash = CASE WHEN ${takesSummary} THEN $summary_hash ELSE summary_hash END,
         original_title = CASE WHEN ${takesSummary} THEN COALESCE(original_title, $original_title) ELSE original_title END,
         original_key = CASE WHEN ${takesSummary} AND original_title IS NULL THEN $original_key ELSE original_key END,
+        original_whole_key = CASE WHEN ${takesSummary} AND original_title IS NULL THEN $original_whole_key ELSE original_whole_key END,
         pages = COALESCE(pages, $pages),
         year = COALESCE(year, $year),
         publisher = COALESCE(publisher, $publisher),
@@ -435,8 +455,9 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     SELECT summary_hash, 'openlibrary', title, author, summary, created_at, rowid FROM works WHERE summary_hash IS NOT NULL AND summary IS NOT NULL
     ORDER BY created_at, ord
   `);
-  const fillOriginalTitleStmt = db.prepare(`UPDATE books SET original_title = ?, original_key = ? WHERE id = ? AND original_title IS NULL`);
+  const fillOriginalTitleStmt = db.prepare(`UPDATE books SET original_title = ?, original_key = ?, original_whole_key = ? WHERE id = ? AND original_title IS NULL`);
   const originalClaimsOfStmt = db.prepare(ORIGINAL_CLAIMS_SQL);
+  const originalKeysOfStmt = db.prepare(ORIGINAL_KEYS_OF_WHOLE_SQL);
   const originalArrivalsStmt = db.prepare(`SELECT title_key FROM original_arrivals LIMIT ?`);
   const dropOriginalArrivalStmt = db.prepare(`DELETE FROM original_arrivals WHERE title_key = ?`);
   const labelledSummariesStmt = db.prepare(`SELECT id, summary FROM books WHERE original_title IS NULL AND summary LIKE '%tulo original%'`);
@@ -529,6 +550,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       $summary_hash: summaryHashOf(summary),
       $original_title: originalTitle,
       $original_key: originalTitle === null ? null : originalKey(originalTitle),
+      $original_whole_key: originalTitle === null ? null : originalWholeKey(originalTitle),
       $pages: details.pages,
       $year: details.year,
       $publisher: details.publisher,
@@ -644,14 +666,18 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     ]);
   }
 
+  function undoneMergeAmong(workIds: string[]): boolean {
+    return undoneMergeAmongStmt.get({ $ids: JSON.stringify(workIds) }) !== undefined;
+  }
+
   function groupTitleKeys(keys: string[], limit: number, at = new Date().toISOString(), skip?: (from: string, into: string) => boolean): number {
     return inTransaction(() => {
-      const pairs = groupablePairsStmt.all(JSON.stringify(keys), skip ? -1 : limit) as Array<{ source: string; target: string }>;
-      if (skip || pairs.length < limit) pairs.push(...crowdedFolds(keys));
+      const pairs = groupablePairsStmt.all(JSON.stringify(keys), -1) as Array<{ source: string; target: string }>;
+      pairs.push(...crowdedFolds(keys));
       let merged = 0;
       for (const pair of pairs) {
         if (merged === limit) break;
-        if (skip?.(pair.source, pair.target)) continue;
+        if (undoneMergeAmong([pair.source, pair.target]) || skip?.(pair.source, pair.target)) continue;
         mergeInto(pair.source, pair.target, { source: "title-key", confidence: null, at, carrySummary: true });
         merged++;
       }
@@ -954,12 +980,13 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
         const merge = latestMergeStmt.get(fromId) as { id: number; into_work: string; source: MergeSource; moved_book_ids: string; repointed_work_ids: string } | undefined;
         const from = workLinkStmt.get(fromId) as WorkLink | undefined;
         if (!merge || !from || from.merged_into !== merge.into_work) throw new WorkMergeError("That merge can no longer be undone.");
-        const grouped = merge.source !== "ol-duplicate";
+        const grouped = merge.source !== "ol-duplicate" && merge.source !== "title-key";
         const moved = Number(moveBackStmt.run(from.id, merge.into_work, merge.moved_book_ids, from.ol_work_key, from.ol_work_key).changes);
         const editions = moved + (grouped ? Number(moveGroupedBackStmt.run({ $from: from.id, $into: merge.into_work }).changes) : 0);
         unmergeStmt.run(from.id);
         repointBackStmt.run(from.id, merge.into_work, merge.repointed_work_ids);
         if (grouped) repointGroupedBackStmt.run({ $from: from.id, $into: merge.into_work });
+        if (merge.source === "title-key") clearCarriedSummaryStmt.run({ $from: from.id, $into: merge.into_work });
         markUndoneStmt.run(at, merge.id);
         return { into: merge.into_work, editions };
       });
@@ -967,9 +994,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     isSeriesName(nameKey) {
       return (isSeriesNameStmt.get(nameKey, nameKey) as { found: number }).found === 1;
     },
-    undoneMergeAmong(workIds) {
-      return undoneMergeAmongStmt.get({ $ids: JSON.stringify(workIds) }) !== undefined;
-    },
+    undoneMergeAmong,
     workMatchJudgments(workIds) {
       const rows = workMatchJudgmentsStmt.all(JSON.stringify(workIds)) as Array<{ work_id: string; model: string; into_work_id: string | null; confidence: number | null; asked_at: string }>;
       return new Map(rows.map((row) => [row.work_id, { model: row.model, intoWorkId: row.into_work_id, confidence: row.confidence, askedAt: row.asked_at }]));
@@ -998,6 +1023,9 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     },
     originalClaimsOf(key) {
       return (originalClaimsOfStmt.all(key) as Array<{ work_id: string | null; title: string; author: string; language: string | null; original_title: string }>).map((row) => ({ workId: row.work_id, title: row.title, author: row.author, language: row.language, originalTitle: row.original_title }));
+    },
+    originalKeysOf(wholeKey) {
+      return (originalKeysOfStmt.all(wholeKey) as Array<{ original_key: string }>).map((row) => row.original_key);
     },
     originalArrivals(limit) {
       return (originalArrivalsStmt.all(limit) as Array<{ title_key: string }>).map((row) => row.title_key);
@@ -1155,7 +1183,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       return [...seen.values()];
     },
     fillOriginalTitle(bookId, title) {
-      if (isOriginalTitle(title)) fillOriginalTitleStmt.run(title, originalKey(title), bookId);
+      if (isOriginalTitle(title)) fillOriginalTitleStmt.run(title, originalKey(title), originalWholeKey(title), bookId);
     },
     fillOriginalTitlesFromSummaries(workId) {
       return inTransaction(() => {
@@ -1163,7 +1191,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
         let filled = 0;
         for (const row of rows) {
           const title = originalTitleIn(row.summary);
-          if (title && fillOriginalTitleStmt.run(title, originalKey(title), row.id).changes > 0) filled += 1;
+          if (title && fillOriginalTitleStmt.run(title, originalKey(title), originalWholeKey(title), row.id).changes > 0) filled += 1;
         }
         return filled;
       });

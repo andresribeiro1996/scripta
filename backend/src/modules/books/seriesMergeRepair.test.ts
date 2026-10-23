@@ -156,6 +156,21 @@ test("undoing two of three volumes restores exactly those two, newest first, wit
   assert.equal(repo.workMatchJudgments([second.work_id!]).size, 0);
 });
 
+test("a title-key join is undone without a manual answer of none, while a code join undone with it still gets one", () => {
+  const { repo } = freshRepo();
+  const lupin = ["Arsène Lupin: A Agulha Oca", "Arsène Lupin: Gentleman Ladrão"].map((title, n) => edition(repo, `978972000075${n}`, title, "Maurice Leblanc"));
+  assert.equal(repo.groupKeylessWorks(10, AT), 1);
+  const [grouped] = repo.activeMerges("title-key");
+  const restored = lupin.find((book) => book.work_id === grouped!.fromWork)!;
+  const { series, volumes } = poppy(repo);
+  joinInto(repo, volumes[0]!, series);
+
+  assert.deepEqual(undoReviewedMerges(repo, [restored.work_id!, volumes[0]!.work_id!], () => NOW, quietly), { undone: [volumes[0]!.work_id, restored.work_id], failures: [] });
+  assert.equal(repo.getBook(restored.id)!.work_id, restored.work_id);
+  assert.equal(repo.workMatchJudgments([restored.work_id!]).size, 0);
+  assert.deepEqual(repo.workMatchJudgments([volumes[0]!.work_id!]).get(volumes[0]!.work_id!), none);
+});
+
 test("a jev join is undone too, and a manual join is reported and left alone", () => {
   const { repo } = freshRepo();
   const { series, volumes } = poppy(repo);
@@ -163,7 +178,7 @@ test("a jev join is undone too, and a manual join is reported and left alone", (
   joinInto(repo, coded, series);
   joinInto(repo, judged, series, "jev");
   joinInto(repo, manual, series, "manual");
-  assert.deepEqual(undoReviewedMerges(repo, volumes.map((volume) => volume.work_id!), () => NOW, quietly), { undone: [judged.work_id, coded.work_id], failures: [{ fromWork: manual.work_id, reason: "no active code, jev or ol-duplicate merge" }] });
+  assert.deepEqual(undoReviewedMerges(repo, volumes.map((volume) => volume.work_id!), () => NOW, quietly), { undone: [judged.work_id, coded.work_id], failures: [{ fromWork: manual.work_id, reason: "no active code, jev, ol-duplicate or title-key merge" }] });
   assert.equal(repo.getBook(coded.id)!.work_id, coded.work_id);
   assert.equal(repo.getBook(judged.id)!.work_id, judged.work_id);
   assert.equal(repo.getBook(manual.id)!.work_id, series.work_id);
@@ -178,7 +193,7 @@ test("every requested id is reported: a typo, a manual join and a join already u
   joinInto(repo, manual, series, "manual");
   joinInto(repo, gone, series);
   repo.undoMerge(gone.work_id!, AT);
-  const reason = "no active code, jev or ol-duplicate merge";
+  const reason = "no active code, jev, ol-duplicate or title-key merge";
   assert.deepEqual(undoReviewedMerges(repo, [coded.work_id!, manual.work_id!, gone.work_id!, "no-such-work"], () => NOW, quietly), {
     undone: [coded.work_id],
     failures: [{ fromWork: manual.work_id, reason }, { fromWork: gone.work_id, reason }, { fromWork: "no-such-work", reason }]

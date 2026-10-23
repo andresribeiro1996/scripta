@@ -52,7 +52,7 @@ export function HomeScreen() {
         <RecapHomeCard />
         {noLibrary ? <View style={styles.onboarding}><EmptyState title="Start your library" body="Bring your books into your reading world." actionLabel="Import library" onAction={() => router.push("/import" as never)} secondaryActionLabel="Add a book" onSecondaryAction={() => router.push("/add-book" as never)} /></View> : null}
       </>}
-      renderSectionHeader={({ section }) => <View style={[styles.sectionHeader, { borderBottomColor: colors.border }]}>
+      renderSectionHeader={({ section }) => <View style={styles.sectionHeader}>
         <Text accessibilityRole="header" {...dynamicType} style={[typography.body, styles.strong, styles.grow, { color: colors.text }]}>{section.title}</Text>
         <Pressable accessibilityRole="link" onPress={findReaders} style={styles.sectionAction}><Text {...dynamicType} style={[typography.caption, styles.strong, { color: colors.accent }]}>Find readers →</Text></Pressable>
       </View>}
@@ -68,8 +68,8 @@ export function HomeScreen() {
 const styles = StyleSheet.create({
   mark: { marginRight: spacing.sm },
   list: { paddingBottom: spacing.huge },
-  onboarding: { paddingHorizontal: spacing.lg, paddingVertical: spacing.lg },
-  sectionHeader: { marginHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.sm, flexDirection: "row", alignItems: "center", gap: spacing.sm, borderBottomWidth: 1 },
+  onboarding: { paddingHorizontal: spacing.md, paddingVertical: spacing.lg },
+  sectionHeader: { marginHorizontal: spacing.md, paddingTop: spacing.xl, paddingBottom: spacing.sm, flexDirection: "row", alignItems: "center", gap: spacing.sm },
   sectionAction: { minHeight: minimumTouchTarget, justifyContent: "center" },
   strong: { fontWeight: "700" },
   grow: { flex: 1, minWidth: 0 }

@@ -56,6 +56,12 @@ const rethrow = (error: unknown): never => {
 
 const drain = (repo: Repo, limit = 500) => joinArrivedOriginals({ repo, sharesArena: () => false, now: () => NOW }, limit, rethrow);
 
+function drainReading(repo: Repo) {
+  const read: string[] = [];
+  const reading = { ...repo, translationEvidence: (workId: string) => (read.push(workId), repo.translationEvidence(workId)) };
+  return { steps: joinArrivedOriginals({ repo: reading, sharesArena: () => false, now: () => NOW }, 500, rethrow), read };
+}
+
 test("an arriving original joins a work Jev answered none", () => {
   const repo = freshRepo();
   const pt = claimant(repo, "9789720000501", "Passeio ao Farol", "Virginia Woolf", "To the Lighthouse");
@@ -157,6 +163,51 @@ test("an original with a part after a full stop is not joined by the title befor
   emptyQueue(repo);
   book(repo, "9782253000803", "Les rois maudits", "Maurice Druon", { workKey: "OL964W" });
   assert.deepEqual(drain(repo), { arrivals: 1, claimants: 1, codeMerges: 0, codeBlocked: 0 });
+  assert.equal(repo.workMatchJudgments([pt.work_id!]).size, 0);
+});
+
+test("an original with a full stop joins when it arrives under its whole title", () => {
+  const repo = freshRepo();
+  const pt = claimant(repo, "9789720000811", "O Senhor Mercedes", "Stephen King", "Mr. Mercedes");
+  emptyQueue(repo);
+  const en = book(repo, "9781501125607", "Mr. Mercedes", "Stephen King", { workKey: "OL17073965W" });
+  assert.deepEqual(drain(repo), { arrivals: 1, claimants: 1, codeMerges: 1, codeBlocked: 0 });
+  assert.equal(repo.canonicalWorkIds([pt.work_id!]).get(pt.work_id!), en.work_id);
+  assert.deepEqual(repo.workMatchJudgments([pt.work_id!]).get(pt.work_id!), { model: "code", intoWorkId: en.work_id, confidence: null, askedAt: AT });
+});
+
+test("another original under the same full-stop stem is never read, and the two count as one shared original", () => {
+  const repo = freshRepo();
+  const mercedes = claimant(repo, "9789720000812", "O Senhor Mercedes", "Stephen King", "Mr. Mercedes");
+  const harrigan = claimant(repo, "9789720000813", "O Telefone do Sr. Harrigan", "Stephen King", "Mr. Harrigan's Phone");
+  emptyQueue(repo);
+  book(repo, "9781501125607", "Mr. Mercedes", "Stephen King", { workKey: "OL17073965W" });
+  const { steps, read } = drainReading(repo);
+  assert.deepEqual(steps, { arrivals: 1, claimants: 0, codeMerges: 0, codeBlocked: 0 });
+  assert.deepEqual(read, [mercedes.work_id]);
+  assert.equal(repo.workMatchJudgments([mercedes.work_id!, harrigan.work_id!]).size, 0);
+});
+
+test("a work is planned only under the stem key of its own evidence original", () => {
+  const repo = freshRepo();
+  const first = claimant(repo, "9789720000815", "Senhor Mercedes", "Stephen King", "Mr Mercedes", "OL77W");
+  const second = claimant(repo, "9789720000816", "O Senhor Mercedes", "Stephen King", "Mr. Mercedes", "OL77W");
+  claimant(repo, "9789720000817", "Mercedes, o Início", "Stephen King", "Mr Mercedes");
+  emptyQueue(repo);
+  book(repo, "9781501125607", "Mr. Mercedes", "Stephen King", { workKey: "OL17073965W" });
+  assert.equal(second.work_id, first.work_id);
+  assert.deepEqual(drain(repo), { arrivals: 1, claimants: 0, codeMerges: 0, codeBlocked: 0 });
+  assert.equal(repo.canonicalWorkIds([first.work_id!]).get(first.work_id!), first.work_id);
+});
+
+test("an original with a dash part is found when it arrives whole but stays skipped as a subtitle original", () => {
+  const repo = freshRepo();
+  const pt = claimant(repo, "9789720000814", "A Profecia Sombria", "Rick Riordan", "The Trials of Apollo - The Dark Prophecy");
+  emptyQueue(repo);
+  book(repo, "9781484746424", "The Trials of Apollo - The Dark Prophecy", "Rick Riordan", { workKey: "OL19345722W" });
+  const { steps, read } = drainReading(repo);
+  assert.deepEqual(steps, { arrivals: 1, claimants: 0, codeMerges: 0, codeBlocked: 0 });
+  assert.deepEqual(read, [pt.work_id]);
   assert.equal(repo.workMatchJudgments([pt.work_id!]).size, 0);
 });
 

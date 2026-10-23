@@ -81,10 +81,13 @@ export function hasVolumeMarker(title: string): boolean {
 
 export const SERIES_LIKE_TITLES = 3;
 
+export function originalWholeKey(title: string): string | null {
+  const normalized = normalizeTitle(title);
+  return normalized === "" ? null : `${normalized}|${titleNumbers(title)}`;
+}
+
 export function originalKey(title: string): string | null {
-  const main = stem(title);
-  const normalized = normalizeTitle(main);
-  return normalized === "" ? null : `${normalized}|${titleNumbers(main)}`;
+  return originalWholeKey(stem(title));
 }
 
 export type OriginalClaim = { workId: string | null; title: string; author: string; language: string | null; originalTitle: string };

@@ -45,7 +45,7 @@ export function RecapHomeCard() {
 }
 
 const styles = StyleSheet.create({
-  card: { flexDirection: "row", alignItems: "center", marginHorizontal: spacing.lg, marginTop: spacing.lg, paddingLeft: spacing.md, paddingRight: spacing.xs, borderWidth: 1, borderRadius: radii.lg },
+  card: { flexDirection: "row", alignItems: "center", marginHorizontal: spacing.md, marginTop: spacing.lg, paddingLeft: spacing.md, paddingRight: spacing.xs, borderWidth: 1, borderRadius: radii.xl },
   body: { flex: 1, minWidth: 0, minHeight: minimumTouchTarget, justifyContent: "center", gap: spacing.xs },
   strong: { fontWeight: "700" },
 });

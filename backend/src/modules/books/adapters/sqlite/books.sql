@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS books (
   summary_hash        TEXT,
   original_title      TEXT,
   original_key        TEXT,
+  original_whole_key  TEXT,
   retitle_wanted_at   TEXT,
   created_at          TEXT NOT NULL
 );
