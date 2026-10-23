@@ -1,5 +1,6 @@
 import { firstAuthor, normalizeWords } from "@scripta/shared";
 import { workTitleKey } from "./normalize.js";
+import { wholeTitle } from "./translation.js";
 
 const PLACEHOLDER_AUTHORS = new Set([
   "anonymous",
@@ -47,11 +48,12 @@ export interface DuplicatePlan {
   crowded: number;
 }
 
-export interface KeyWork {
+export interface TitleWork {
   titleKey: string;
   workId: string;
   title: string;
   keyed: boolean;
+  createdAt: string;
 }
 
 function compare(a: string, b: string): number {
@@ -93,19 +95,28 @@ export function planDuplicateSets(works: KeyedWork[], isSeriesName: (fullTitle: 
   return plan;
 }
 
-export function planCrowdedFolds(works: KeyWork[]): Array<{ source: string; target: string }> {
-  const byKey = new Map<string, KeyWork[]>();
+function oldestFirst(a: TitleWork, b: TitleWork): number {
+  return compare(a.createdAt, b.createdAt) || compare(a.workId, b.workId);
+}
+
+export function planTitleFolds(works: TitleWork[]): Array<{ source: string; target: string }> {
+  const groups = new Map<string, TitleWork[]>();
   for (const work of works) {
-    if (work.titleKey !== "") byKey.set(work.titleKey, [...(byKey.get(work.titleKey) ?? []), work]);
+    const whole = wholeTitle(work.title);
+    if (work.titleKey === "" || whole === "") continue;
+    const groupKey = `${work.titleKey}\n${whole}`;
+    groups.set(groupKey, [...(groups.get(groupKey) ?? []), work]);
   }
-  const folds: Array<{ source: string; target: string }> = [];
-  for (const group of byKey.values()) {
-    const keyed = group.filter((work) => work.keyed);
-    for (const keyless of group.filter((work) => !work.keyed)) {
-      const fullTitle = normalizeWords(keyless.title);
-      const matches = keyed.filter((work) => normalizeWords(work.title) === fullTitle);
-      if (matches.length === 1) folds.push({ source: keyless.workId, target: matches[0]!.workId });
-    }
+  const folds: Array<{ work: TitleWork; target: string }> = [];
+  for (const group of groups.values()) {
+    const keyedIds = new Set(group.filter((work) => work.keyed).map((work) => work.workId));
+    if (keyedIds.size > 1) continue;
+    const keyless = group.filter((work) => !work.keyed).sort(oldestFirst);
+    const target = [...keyedIds][0] ?? keyless.shift()?.workId;
+    if (target === undefined) continue;
+    for (const work of keyless) folds.push({ work, target });
   }
-  return folds;
+  return folds
+    .sort((a, b) => compare(a.work.titleKey, b.work.titleKey) || oldestFirst(a.work, b.work))
+    .map(({ work, target }) => ({ source: work.workId, target }));
 }

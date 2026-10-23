@@ -157,9 +157,10 @@ test("undoing two of three volumes restores exactly those two, newest first, wit
 });
 
 test("a title-key join is undone without a manual answer of none, while a code join undone with it still gets one", () => {
-  const { repo } = freshRepo();
+  const { db, repo } = freshRepo();
   const lupin = ["Arsène Lupin: A Agulha Oca", "Arsène Lupin: Gentleman Ladrão"].map((title, n) => edition(repo, `978972000075${n}`, title, "Maurice Leblanc"));
-  assert.equal(repo.groupKeylessWorks(10, AT), 1);
+  repo.mergeWorks(lupin[1]!.work_id!, lupin[0]!.work_id!, AT);
+  db.prepare("UPDATE work_merges SET source = 'title-key' WHERE from_work = ?").run(lupin[1]!.work_id);
   const [grouped] = repo.activeMerges("title-key");
   const restored = lupin.find((book) => book.work_id === grouped!.fromWork)!;
   const { series, volumes } = poppy(repo);

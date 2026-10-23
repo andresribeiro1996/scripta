@@ -4,7 +4,7 @@ import type { DatabaseSync, StatementSync } from "node:sqlite";
 import { MIN_PREFIX_LENGTH, normalizeWorkKey, WORK_SCAN_LIMIT, workTitleKey } from "../../domain/normalize.js";
 import type { BooksRepository, IdPage, MergeableDetails, PageCursor } from "../../domain/ports.js";
 import { GENRE_SAVE_LINE } from "../../domain/constants.js";
-import { planCrowdedFolds, type KeyedWork } from "../../domain/duplicateWorks.js";
+import { planTitleFolds, type KeyedWork, type TitleWork } from "../../domain/duplicateWorks.js";
 import { WorkMergeError } from "../../domain/errors.js";
 import { wantsRetitle } from "../../domain/lossy.js";
 import { SERIES_SOURCE_RANK, seriesNameKey, type SeriesEntry, type SeriesSource } from "../../domain/series.js";
@@ -69,34 +69,25 @@ const GROUPABLE_CANDIDATES_CTE = `candidates AS (
       AND MIN(books.title_key) <> ''
       AND COUNT(books.title_group_blocked_at) = 0
   )`;
-export const GROUPABLE_PAIRS_SQL = `
-  WITH ${GROUPABLE_CANDIDATES_CTE},
-  keyed AS (
-    SELECT books.title_key AS title_key, MIN(works.id) AS target, COUNT(DISTINCT works.id) AS works
-    FROM books JOIN works ON works.id = books.work_id
-    WHERE works.ol_work_key IS NOT NULL AND works.merged_into IS NULL
-      AND books.title_group_blocked_at IS NULL
-      AND books.title_key IN (SELECT title_key FROM candidates)
-    GROUP BY books.title_key
-  ),
-  oldest AS (
-    SELECT title_key, work_id AS target
-    FROM (SELECT title_key, work_id, ROW_NUMBER() OVER (PARTITION BY title_key ORDER BY created_at, work_id) AS rank FROM candidates)
-    WHERE rank = 1
-  )
-  SELECT candidates.work_id AS source, COALESCE(keyed.target, oldest.target) AS target
-  FROM candidates
-  JOIN oldest ON oldest.title_key = candidates.title_key
-  LEFT JOIN keyed ON keyed.title_key = candidates.title_key
-  WHERE keyed.works = 1 OR (keyed.title_key IS NULL AND candidates.work_id <> oldest.target)
-  ORDER BY candidates.title_key, candidates.created_at, candidates.work_id
-  LIMIT ?
-`;
 export const KEYLESS_CANDIDATES_SQL = `
   WITH ${GROUPABLE_CANDIDATES_CTE}
-  SELECT candidates.title_key AS title_key, candidates.work_id AS id, works.title AS title
+  SELECT candidates.title_key AS title_key, candidates.work_id AS id, works.title AS title, candidates.created_at AS created_at
   FROM candidates JOIN works ON works.id = candidates.work_id
   ORDER BY candidates.title_key, candidates.created_at, candidates.work_id
+`;
+export const KEYED_EDITIONS_SQL = `
+  SELECT hits.title_key AS title_key, works.id AS id, hits.title AS title, works.created_at AS created_at
+  FROM (
+    SELECT DISTINCT title_key, work_id, title FROM books
+    WHERE title_key IN (SELECT value FROM json_each(?)) AND title_group_blocked_at IS NULL
+      AND NOT EXISTS (
+        SELECT 1 FROM works AS merged JOIN work_merges AS m ON m.from_work = merged.id
+        WHERE merged.merged_into = books.work_id AND m.source = 'title-key' AND m.undone_at IS NULL
+          AND EXISTS (SELECT 1 FROM json_each(m.moved_book_ids) WHERE value = books.id)
+      )
+  ) AS hits
+  CROSS JOIN works ON works.id = hits.work_id
+  WHERE works.ol_work_key IS NOT NULL AND works.merged_into IS NULL
 `;
 export const KEYED_WORKS_SQL = `
   SELECT hits.title_key AS title_key, works.id AS id, works.title AS title, works.author AS author,
@@ -283,8 +274,8 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const pageEditionsStmt = db.prepare(`SELECT books.id, books.title, books.language, books.year, books.isbn, books.summary, books.summary_hash, books.cover_image_id, ci.color AS cover_color, books.genres, books.rating, books.rating_count, books.pages, books.genres_source, books.genres_confidence FROM books LEFT JOIN cover_images ci ON ci.id = books.cover_image_id WHERE books.work_id = ? ORDER BY books.created_at, books.rowid`);
   const workEditionsStmt = db.prepare(`SELECT id, isbn, title, author, ol_work_key FROM books WHERE work_id = ? ORDER BY created_at, rowid`);
   const groupableKeysStmt = db.prepare(GROUPABLE_KEYS_SQL);
-  const groupablePairsStmt = db.prepare(GROUPABLE_PAIRS_SQL);
   const keylessCandidatesStmt = db.prepare(KEYLESS_CANDIDATES_SQL);
+  const keyedEditionsStmt = db.prepare(KEYED_EDITIONS_SQL);
   const keyedWorksStmt = db.prepare(KEYED_WORKS_SQL);
   const isSeriesNameStmt = db.prepare(`SELECT EXISTS (SELECT 1 FROM work_series WHERE name_key = ?) OR EXISTS (SELECT 1 FROM book_collections WHERE name_key = ?) AS found`);
   const undoneMergeAmongStmt = db.prepare(`
@@ -653,17 +644,9 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     return rows.map((row) => ({ titleKey: row.title_key, id: row.id, title: row.title, author: row.author, editions: row.editions, absorbed: row.absorbed, createdAt: row.created_at }));
   }
 
-  function crowdedFolds(keys: string[]): Array<{ source: string; target: string }> {
-    const keyed = keyedWorksWithTitleKeys(keys);
-    const worksPerKey = new Map<string, number>();
-    for (const work of keyed) worksPerKey.set(work.titleKey, (worksPerKey.get(work.titleKey) ?? 0) + 1);
-    const crowded = [...worksPerKey].filter(([, works]) => works >= 2).map(([key]) => key);
-    if (crowded.length === 0) return [];
-    const keyless = keylessCandidatesStmt.all(JSON.stringify(crowded)) as Array<{ title_key: string; id: string; title: string }>;
-    return planCrowdedFolds([
-      ...keyed.map((work) => ({ titleKey: work.titleKey, workId: work.id, title: work.title, keyed: true })),
-      ...keyless.map((work) => ({ titleKey: work.title_key, workId: work.id, title: work.title, keyed: false }))
-    ]);
+  function titleWorks(stmt: StatementSync, keys: string[], keyed: boolean): TitleWork[] {
+    const rows = stmt.all(JSON.stringify(keys)) as Array<{ title_key: string; id: string; title: string; created_at: string }>;
+    return rows.map((row) => ({ titleKey: row.title_key, workId: row.id, title: row.title, keyed, createdAt: row.created_at }));
   }
 
   function undoneMergeAmong(workIds: string[]): boolean {
@@ -672,8 +655,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
 
   function groupTitleKeys(keys: string[], limit: number, at = new Date().toISOString(), skip?: (from: string, into: string) => boolean): number {
     return inTransaction(() => {
-      const pairs = groupablePairsStmt.all(JSON.stringify(keys), -1) as Array<{ source: string; target: string }>;
-      pairs.push(...crowdedFolds(keys));
+      const pairs = planTitleFolds([...titleWorks(keyedEditionsStmt, keys, true), ...titleWorks(keylessCandidatesStmt, keys, false)]);
       let merged = 0;
       for (const pair of pairs) {
         if (merged === limit) break;
