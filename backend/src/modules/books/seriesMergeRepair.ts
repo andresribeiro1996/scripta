@@ -4,7 +4,7 @@ import { hasVolumeMarker, seriesLikeOriginals } from "./domain/translation.js";
 import type { MergeSource } from "./domain/types.js";
 
 const SOURCES: MergeSource[] = ["title-key", "admin", "code", "jev", "manual", "ol-duplicate"];
-const UNDOABLE: MergeSource[] = ["code", "jev", "ol-duplicate"];
+const UNDOABLE: MergeSource[] = ["code", "jev", "ol-duplicate", "title-key"];
 
 type Why = "series-like" | "volume";
 type Edition = ReturnType<BooksRepository["editionsOf"]>[number];
@@ -82,9 +82,9 @@ export function undoReviewedMerges(repo: UndoRepo, fromWorks: string[], now: () 
   const requested = merges.filter((merge) => UNDOABLE.includes(merge.source) && reviewed.has(merge.fromWork));
   const queued = new Set(requested.map((merge) => merge.id));
   const found = new Set(requested.map((merge) => merge.fromWork));
-  const failures: Failure[] = [...reviewed].filter((fromWork) => !found.has(fromWork)).map((fromWork) => ({ fromWork, reason: "no active code, jev or ol-duplicate merge" }));
+  const failures: Failure[] = [...reviewed].filter((fromWork) => !found.has(fromWork)).map((fromWork) => ({ fromWork, reason: "no active code, jev, ol-duplicate or title-key merge" }));
   const undone: string[] = [];
-  for (const { fromWork, intoWork } of requested.sort((a, b) => b.id - a.id)) {
+  for (const { fromWork, intoWork, source } of requested.sort((a, b) => b.id - a.id)) {
     const blocker = onwardFrom(byFrom, intoWork).find((step) => !queued.has(step.id));
     if (blocker) {
       failures.push({ fromWork, reason: `its target ${intoWork} was joined onward by a ${blocker.source} join (${blocker.fromWork} to ${blocker.intoWork}) that is not being undone` });
@@ -94,7 +94,7 @@ export function undoReviewedMerges(repo: UndoRepo, fromWorks: string[], now: () 
     try {
       repo.transaction(() => {
         repo.undoMerge(fromWork, at);
-        repo.saveWorkMatchJudgment(fromWork, { model: "manual", intoWorkId: null, confidence: null, askedAt: at });
+        if (source !== "title-key") repo.saveWorkMatchJudgment(fromWork, { model: "manual", intoWorkId: null, confidence: null, askedAt: at });
       });
     } catch (error) {
       if (!(error instanceof WorkMergeError)) throw error;
