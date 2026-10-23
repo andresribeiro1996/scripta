@@ -21,6 +21,7 @@ import { startGenreJobsIfConfigured } from "./genreJudgments.js";
 import { genreReviewWith, reviewGenreWith } from "./genreReview.js";
 import { startSynopsisJobsIfConfigured } from "./synopsisJudgments.js";
 import { reviewSynopsisWith, synopsisReviewWith } from "./synopsisReview.js";
+import { walkDuplicateWorks } from "./duplicateWorks.js";
 import { startOriginalArrivals } from "./originalArrivals.js";
 import { arenaCheck, startTranslationJobsIfConfigured } from "./translationJudgments.js";
 import { reviewTranslationWith, translationReviewWith } from "./translationReview.js";
@@ -188,7 +189,11 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
     (error) => app.log.error({ err: error }, "details backfill failed")
   );
   const stopWorksBackfill = startWorksBackfill(repo, app.log);
-  const grouping = startWorksGrouping((limit) => repo.groupKeylessWorks(limit, undefined, sharesArena), app.log);
+  const grouping = startWorksGrouping(
+    (signal) => walkDuplicateWorks({ repo, sharesArena, now: Date.now }, { dryRun: false, signal, pageSize: 100, pauseMs: 250 }).then((report) => report.merges.length),
+    (limit) => repo.groupKeylessWorks(limit, undefined, sharesArena),
+    app.log
+  );
   const stopWorkKeyBackfill = startDetailsBackfill(
     (signal) => service.backfillWorkKeys(DETAILS_BATCH_SIZE, signal),
     (error) => app.log.error({ err: error }, "work key backfill failed")
