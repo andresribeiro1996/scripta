@@ -97,8 +97,7 @@ export const KEYLESS_CANDIDATES_SQL = `
 export const KEYED_WORKS_SQL = `
   SELECT hits.title_key AS title_key, works.id AS id, works.title AS title, works.author AS author,
     (SELECT COUNT(*) FROM books WHERE work_id = works.id) AS editions,
-    (SELECT COUNT(*) FROM works AS alias JOIN work_merges ON work_merges.from_work = alias.id
-      WHERE alias.merged_into = works.id AND work_merges.source = 'ol-duplicate' AND work_merges.undone_at IS NULL) AS absorbed,
+    (SELECT COUNT(*) FROM work_merges WHERE into_work = works.id AND source = 'ol-duplicate' AND undone_at IS NULL) AS absorbed,
     works.created_at AS created_at
   FROM (SELECT DISTINCT title_key, work_id FROM books WHERE title_key IN (SELECT value FROM json_each(?)) AND title_group_blocked_at IS NULL) AS hits
   CROSS JOIN works ON works.id = hits.work_id

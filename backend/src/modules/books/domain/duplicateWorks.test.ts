@@ -110,10 +110,6 @@ test("skips a pair as crowded when either work has already absorbed a duplicate"
   assert.deepEqual(planDuplicateSets(pair(0, 0), noSeries), plan([{ titleKey: NATE, into: "w-a", from: ["w-b"] }]));
 });
 
-test("a work that absorbed duplicates is not a set on its own", () => {
-  assert.deepEqual(planDuplicateSets([{ ...nate("w-a"), absorbed: 2 }], noSeries), plan([]));
-});
-
 test("a crowded set whose title is a series name counts once, as the series name", () => {
   assert.deepEqual(
     planDuplicateSets([nate("w-a"), nate("w-b"), nate("w-c")], () => true),

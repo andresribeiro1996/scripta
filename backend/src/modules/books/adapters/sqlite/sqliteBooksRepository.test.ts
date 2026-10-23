@@ -1508,9 +1508,8 @@ test("looking up keyed works and keyless candidates for a title key reads throug
     assert.doesNotMatch(plan, /SCAN books/, plan);
   }
   const keyed = (db.prepare(`EXPLAIN QUERY PLAN ${KEYED_WORKS_SQL}`).all("[]") as Array<{ detail: string }>).map((row) => row.detail).join(" | ");
-  assert.match(keyed, /SEARCH alias USING INDEX idx_works_merged_into \(merged_into=\?\)/, keyed);
-  assert.match(keyed, /SEARCH work_merges USING INDEX idx_work_merges_from \(from_work=\?\)/, keyed);
-  assert.doesNotMatch(keyed, /SCAN (works|alias|work_merges)\b/, keyed);
+  assert.match(keyed, /SEARCH work_merges USING COVERING INDEX idx_work_merges_into \(into_work=\? AND source=\? AND undone_at=\?\)/, keyed);
+  assert.doesNotMatch(keyed, /SCAN work_merges/, keyed);
 });
 
 test("fillSubjectGenres fills empty or Jev genres and keeps source genres", () => {
@@ -2481,11 +2480,11 @@ test("keyedWorksWithTitleKeys counts only a work's live ol-duplicate merges as a
   assert.deepEqual(repo.keyedWorksWithTitleKeys([key]).map((work) => [work.id, work.absorbed]), [[target.work_id, 2]]);
 });
 
-test("a survivor's absorbed duplicates move with it into a translation join, and back on undo", () => {
+test("a joined survivor's duplicates stay with it", () => {
   const { repo } = freshRepo();
-  const survivor = edition(repo, "9780000000531", "Fourth Wing", "Rebecca Yarros", "OL1W", at(0));
-  const duplicate = edition(repo, "9780000000532", "Fourth Wing", "Rebecca Yarros", "OL2W", at(1));
-  const other = edition(repo, "9780000000533", "Quarta Asa", "Rebecca Yarros", "OL3W", at(2));
+  const survivor = edition(repo, "9780000000531", "Quarta Asa", "Rebecca Yarros", "OL1W", at(0));
+  const duplicate = edition(repo, "9780000000532", "Quarta Asa", "Rebecca Yarros", "OL2W", at(1));
+  const other = edition(repo, "9780000000533", "Fourth Wing", "Rebecca Yarros", "OL3W", at(2));
   const keys = [survivor, other].map((book) => repo.getBook(book.id)!.title_key!);
   const absorbed = () => Object.fromEntries(repo.keyedWorksWithTitleKeys(keys).map((work) => [work.id, work.absorbed]));
 
@@ -2493,7 +2492,7 @@ test("a survivor's absorbed duplicates move with it into a translation join, and
   assert.deepEqual(absorbed(), { [survivor.work_id!]: 1, [other.work_id!]: 0 });
 
   repo.mergeTranslation(survivor.work_id!, other.work_id!, "code", null, AT);
-  assert.deepEqual(absorbed(), { [other.work_id!]: 1 });
+  assert.deepEqual(absorbed(), { [other.work_id!]: 0 });
 
   repo.undoMerge(survivor.work_id!, "2026-10-16T00:00:00.000Z");
   assert.deepEqual(absorbed(), { [survivor.work_id!]: 1, [other.work_id!]: 0 });
