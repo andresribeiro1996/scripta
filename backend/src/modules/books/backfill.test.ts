@@ -237,7 +237,7 @@ test("works grouping drains at start on a daily unref'd timer, and logs what it 
   const { log, info } = fakeLog();
   const sizes = [250, 7];
   const limits: number[] = [];
-  startWorksGrouping((limit) => { limits.push(limit); return sizes.shift() ?? 0; }, log, undefined, timers);
+  startWorksGrouping(async () => 0, (limit) => { limits.push(limit); return sizes.shift() ?? 0; }, log, undefined, timers);
   assert.equal(state.delay, GROUPING_INTERVAL_MS);
   assert.equal(state.unrefs, 1);
   await until(() => info.length > 0);
@@ -249,11 +249,33 @@ test("works grouping drains at start on a daily unref'd timer, and logs what it 
   assert.deepEqual(info[1], { details: { grouped: 1 }, message: "grouped keyless works by title" });
 });
 
+test("works grouping merges duplicate works before grouping keyless ones", async () => {
+  const { timers } = fakeTimers();
+  const { log, info } = fakeLog();
+  const calls: string[] = [];
+  const signals: unknown[] = [];
+  const sizes = [250, 4];
+  startWorksGrouping(
+    async (signal) => { calls.push("merge"); signals.push(signal); return 3; },
+    () => { calls.push("group"); return sizes.shift() ?? 0; },
+    log,
+    undefined,
+    timers
+  );
+  await until(() => info.length === 2);
+  assert.deepEqual(calls, ["merge", "group", "group"]);
+  assert.ok(signals[0] instanceof AbortSignal);
+  assert.deepEqual(info, [
+    { details: { merged: 3 }, message: "merged duplicate Open Library works" },
+    { details: { grouped: 254 }, message: "grouped keyless works by title" }
+  ]);
+});
+
 test("runNow while a grouping run is going returns null and starts nothing", async () => {
   const { timers } = fakeTimers();
   const { log } = fakeLog();
   let calls = 0;
-  const grouping = startWorksGrouping(() => { calls++; return calls < 3 ? 250 : 0; }, log, undefined, timers);
+  const grouping = startWorksGrouping(async () => 0, () => { calls++; return calls < 3 ? 250 : 0; }, log, undefined, timers);
   assert.equal(await grouping.runNow(), null);
   await until(() => calls === 3);
   assert.equal(await grouping.runNow(), 0);
@@ -264,7 +286,7 @@ test("a failed grouping run is logged and the next run still works", async () =>
   const { state, timers } = fakeTimers();
   const { log, info, error } = fakeLog();
   const outcomes: Array<Error | number> = [new Error("database is locked"), 2];
-  startWorksGrouping(() => {
+  startWorksGrouping(async () => 0, () => {
     const outcome = outcomes.shift() ?? 0;
     if (outcome instanceof Error) throw outcome;
     return outcome;
@@ -281,7 +303,7 @@ test("stopping works grouping ends a run at the next batch boundary and clears t
   const { log } = fakeLog();
   let batches = 0;
   let grouping: { stop(): void } | null = null;
-  grouping = startWorksGrouping(() => { batches++; grouping?.stop(); return 250; }, log, undefined, timers);
+  grouping = startWorksGrouping(async () => 0, () => { batches++; grouping?.stop(); return 250; }, log, undefined, timers);
   await until(() => batches > 1);
   assert.equal(batches, 1);
   assert.deepEqual(state.cleared, [handle]);

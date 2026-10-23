@@ -107,6 +107,7 @@ export interface WorksGrouping {
 }
 
 export function startWorksGrouping(
+  mergeDuplicates: (signal: AbortSignal) => Promise<number>,
   groupKeylessWorks: (limit: number) => number,
   log: WorksLog,
   intervalMs: number = GROUPING_INTERVAL_MS,
@@ -118,6 +119,8 @@ export function startWorksGrouping(
     if (running) return null;
     running = true;
     try {
+      const merged = await mergeDuplicates(controller.signal);
+      if (merged > 0) log.info({ merged }, "merged duplicate Open Library works");
       const grouped = await drainBatches(groupKeylessWorks, controller.signal);
       if (grouped > 0) log.info({ grouped }, "grouped keyless works by title");
       return grouped;
