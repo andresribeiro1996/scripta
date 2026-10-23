@@ -104,6 +104,7 @@ For each queued title key, with `K = arrivalKey(titleKey)` and the surname as to
   - a "Mr. Mercedes" claimant joins when "Mr. Mercedes" by Stephen King arrives;
   - the Druon claimant still isn't joined when "Les rois maudits" arrives (existing test, unchanged);
   - with a second King "Mr." claimant, nothing joins, and that claimant's evidence is never read;
+  - a two-edition work whose first edition names "Mr Mercedes" and whose second names "Mr. Mercedes" is judged only under its evidence original's stem, where the shared rule skips it;
   - a dash original arriving whole is found but not planned.
 
 ## Out of scope
