@@ -18,7 +18,7 @@ export function FeedPreview({ item }: { item: DigestItem }) {
   if (item.kind === "mural") return <MuralPreview item={item} />;
   if (item.kind === "reading" || item.kind === "completion") {
     const book = item.kind === "reading" ? item.book : item.winner;
-    const width = item.kind === "completion" ? 80 : 48;
+    const width = item.kind === "completion" ? 80 : 60;
     return <View style={item.kind === "completion" ? styles.winner : undefined}><BookCover cover={book.coverUrl} title={book.title} width={width} height={width * 1.5} /></View>;
   }
   if (item.kind === "vote" && item.ranking?.length) return <View style={[styles.ranking, { backgroundColor: colors.surface }]} accessibilityLabel={`Ranking preview by ${item.actor.username}`}>
@@ -41,11 +41,10 @@ export function FeedPreview({ item }: { item: DigestItem }) {
 function MuralPreview({ item }: { item: Extract<DigestItem, { kind: "mural" }> }) {
   const palette = themes[item.mural.theme].colors;
   const { width } = useWindowDimensions();
-  const size = Math.min(240, width - spacing.lg * 2);
   const profile = useQuery({ queryKey: ["community", "profile", item.actor.username], queryFn: () => fetchProfile(item.actor.username), enabled: !item.mural.coverImageUrl, retry: false });
   const payload = profile.data?.mural?.mural.id === item.mural.id ? profile.data.mural : null;
   const preview = useMemo(() => (payload?.mural.blocks.length ? muralPreviewOf(payload) : null), [payload]);
-  return <View style={[styles.mural, { width: size, height: size, backgroundColor: palette.background }]}>
+  return <View style={[styles.mural, { backgroundColor: palette.background }]}>
     {item.mural.coverImageUrl ? <Image source={item.mural.coverImageUrl} style={StyleSheet.absoluteFill} contentFit="cover" /> : preview && payload ? <MuralThumbnail mural={preview.mural} canvasWidth={width - spacing.sm * 2} books={preview.books} images={preview.images} tierlists={preview.tierlists} profile={profile.data?.profile.user} shelfThemeOverride={payload.library.shelfTheme} readerCardOverride={payload.library.readerCard} statsOverride={payload.library.stats} /> : <Icon name="murals" size={48} color={palette.accent} />}
   </View>;
 }
@@ -55,7 +54,7 @@ const styles = StyleSheet.create({
   iconTile: { width: 48, height: 72, borderRadius: radii.sm, alignItems: "center", justifyContent: "center" },
   covers: { padding: spacing.md, borderRadius: radii.md, flexDirection: "row", gap: spacing.sm, alignItems: "center", justifyContent: "center", flexWrap: "wrap", position: "relative", minHeight: 96 },
   quizBadge: { position: "absolute", left: 30, top: 20, width: 32, height: 32, borderRadius: radii.full, alignItems: "center", justifyContent: "center" },
-  mural: { alignSelf: "center", borderRadius: radii.md, overflow: "hidden", alignItems: "center", justifyContent: "center" },
+  mural: { width: "100%", aspectRatio: 1, overflow: "hidden", alignItems: "center", justifyContent: "center" },
   ranking: { width: 120, padding: spacing.sm, gap: spacing.xs, borderRadius: radii.md },
   tier: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   tierLabel: { width: 24, height: 42, borderRadius: radii.sm, alignItems: "center", justifyContent: "center" }

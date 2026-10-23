@@ -5,7 +5,6 @@ import { contentDetail } from "@scripta/shared/community";
 import { Text } from "../../ui/Text";
 import { Button, Icon, captionHitSlop, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { AuthorAvatar, openProfile } from "../community/AuthorAvatar";
-import { SLOT_WIDTH } from "../community/CoverFan";
 import { ReaderGlyph } from "../community/ReaderGlyph";
 import { FeedPreview } from "./FeedPreview";
 import { feedEventLabel, feedPrimaryLabel, feedRowAccessibilityLabel, feedRowModel, feedShareTarget, hasActivityThread, reactionCount, readingShelfBook, relativeTime } from "./feedRowModel";
@@ -34,10 +33,11 @@ export function FeedRow({ item, onOpen, actions, onComments, isSaved, onOpenProf
   const bookmark = ref ? <Pressable accessibilityRole="button" accessibilityLabel={saved ? `Remove ${title} from saved` : `Save ${title} for later`} accessibilityState={{ selected: saved, disabled: actions.saving || (isSaved === undefined && !actions.savedReady) }} disabled={actions.saving || (isSaved === undefined && !actions.savedReady)} hitSlop={bookmarkHitSlop} onPress={() => actions.toggleSaved(item, saved)} style={({ pressed }) => [styles.iconAction, { backgroundColor: pressed ? colors.surfacePressed : "transparent" }]}><Icon name="bookmark" filled={saved} size={18} color={saved ? colors.accent : colors.textDim} /></Pressable> : null;
   const action = primary ? filled ? <View style={styles.primary}><Button label={primary} onPress={onOpen} /></View> : <Pressable accessibilityRole="link" hitSlop={linkHitSlop} onPress={onOpen} style={({ pressed }) => [styles.textAction, { opacity: pressed ? 0.6 : 1 }]}><Text {...dynamicType} style={[typography.caption, styles.strong, { color: colors.accent }]}>{primary} →</Text></Pressable> : null;
   const heading = title ? <Pressable accessibilityRole="link" accessibilityLabel={feedRowAccessibilityLabel(item)} hitSlop={headingHitSlop} onPress={onOpen} style={({ pressed }) => [styles.heading, { opacity: pressed ? 0.6 : 1 }]}><Text display {...dynamicType} style={[typography.title, styles.strong, { color: colors.text }]}>{title}</Text></Pressable> : null;
+  const mural = item.kind === "mural";
   const likes = reactionCount(engagement?.likes);
   const comments = reactionCount(engagement?.comments);
-  return <View style={[styles.post, { borderBottomColor: colors.border }]}>
-    {item.kind === "completion" ? <View style={[styles.winnerLabel, { backgroundColor: colors.accentSoft }]}><Icon name="champion" size={16} color={colors.accent} /><Text {...dynamicType} style={[typography.caption, styles.grow, { color: colors.accent }]}>{feedEventLabel(item)}</Text>{bookmark}</View> : <View style={styles.actor}>
+  return <View style={[styles.post, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+    {item.kind === "completion" ? <View style={[styles.winnerLabel, { backgroundColor: colors.accentSoft }]}><Icon name="champion" size={16} color={colors.accent} /><Text {...dynamicType} style={[typography.caption, styles.grow, { color: colors.accent }]}>{feedEventLabel(item)}</Text>{bookmark}</View> : <View style={[styles.actor, styles.inset]}>
       <Pressable accessibilityRole="link" accessibilityLabel={actor && !actor.unavailable ? `Open ${actor.username}'s profile` : undefined} disabled={!actor || actor.unavailable} hitSlop={readerHitSlop} onPress={() => actor && onOpenProfile(actor.username)} style={({ pressed }) => [styles.reader, { backgroundColor: pressed ? colors.surfacePressed : "transparent" }]}>
         {actor ? <AuthorAvatar username={actor.username} avatarUrl={actor.avatarUrl} /> : <Icon name="community" size={28} color={colors.textDim} />}
         <View style={[styles.grow, styles.readerText]}>
@@ -48,10 +48,10 @@ export function FeedRow({ item, onOpen, actions, onComments, isSaved, onOpenProf
       <View style={styles.stamp}><Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{relativeTime(item.createdAt)}</Text></View>
       {bookmark}
     </View>}
-    {item.kind === "follow" ? null : <View style={[styles.body, dense ? styles.bodyRow : styles.bodyColumn, item.kind === "completion" && styles.winnerBody]}>
+    {item.kind === "follow" ? null : <View style={[styles.body, !mural && styles.inset, dense ? styles.bodyRow : styles.bodyColumn, item.kind === "completion" && styles.winnerBody]}>
       {item.kind === "publication" && item.content.kind === "tierlist" ? heading : null}
       <Pressable accessibilityRole="link" accessibilityLabel={`Open ${title}`} onPress={onOpen} style={({ pressed }) => [dense && styles.compactPreview, { opacity: pressed ? 0.75 : 1 }]}><FeedPreview item={item} /></Pressable>
-      <View style={[styles.copy, (dense || item.kind === "completion") && styles.grow]}>
+      <View style={[styles.copy, mural && styles.inset, (dense || item.kind === "completion") && styles.grow]}>
         {item.kind === "publication" && item.content.kind === "tierlist" ? null : heading}
         {detail ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{detail}</Text> : null}
         {item.kind === "completion" ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>You took part · {relativeTime(item.createdAt)}</Text> : null}
@@ -62,7 +62,7 @@ export function FeedRow({ item, onOpen, actions, onComments, isSaved, onOpenProf
         : null}
       </View>
     </View>}
-    <View style={styles.reactions}>
+    <View style={[styles.reactions, styles.inset]}>
       {hasActivityThread(item) ? <>
         <Pressable accessibilityRole="button" accessibilityLabel={engagement?.liked ? "Unlike this post" : "Like this post"} accessibilityState={{ selected: engagement?.liked, disabled: !engagement || actions.liking }} disabled={!engagement || actions.liking} hitSlop={reactionHitSlop} onPress={() => actions.toggleLike(item)} style={({ pressed }) => [styles.reaction, { backgroundColor: pressed ? colors.surfacePressed : "transparent" }]}><Icon name="like" filled={engagement?.liked} size={18} color={engagement?.liked ? colors.accent : colors.textDim} />{likes ? <Text {...dynamicType} style={[typography.caption, styles.count, { color: colors.textDim }]}>{likes}</Text> : null}</Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel={engagement ? `Comments, ${engagement.comments}` : "Comments"} hitSlop={reactionHitSlop} onPress={onComments} style={({ pressed }) => [styles.reaction, { backgroundColor: pressed ? colors.surfacePressed : "transparent" }]}><Icon name="comment" size={18} color={colors.textDim} />{comments ? <Text {...dynamicType} style={[typography.caption, styles.count, { color: colors.textDim }]}>{comments}</Text> : null}</Pressable>
@@ -73,8 +73,9 @@ export function FeedRow({ item, onOpen, actions, onComments, isSaved, onOpenProf
 }
 
 const styles = StyleSheet.create({
-  post: { marginHorizontal: spacing.lg, paddingVertical: spacing.md, borderBottomWidth: 1, gap: spacing.sm },
-  actor: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
+  post: { marginHorizontal: spacing.md, marginBottom: spacing.md, borderWidth: 1, borderRadius: radii.xl, gap: spacing.sm },
+  inset: { paddingHorizontal: spacing.md },
+  actor: { paddingTop: spacing.md, flexDirection: "row", alignItems: "center", gap: spacing.xs },
   reader: { flex: 1, flexDirection: "row", alignItems: "center", gap: spacing.sm, borderRadius: radii.sm },
   readerText: { gap: spacing.xs },
   readerName: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
@@ -85,16 +86,16 @@ const styles = StyleSheet.create({
   body: { gap: spacing.md },
   bodyRow: { flexDirection: "row", alignItems: "center" },
   bodyColumn: { flexDirection: "column" },
-  compactPreview: { minWidth: SLOT_WIDTH, alignItems: "flex-start" },
+  compactPreview: { alignItems: "flex-start" },
   copy: { gap: spacing.xs },
   heading: { minHeight: 32, justifyContent: "center" },
   primary: { alignSelf: "flex-start", paddingTop: spacing.xs },
   textAction: { alignSelf: "flex-start", justifyContent: "center" },
   shelfGap: { marginTop: spacing.xl },
   iconAction: { width: 32, height: 32, alignItems: "center", justifyContent: "center", borderRadius: radii.md },
-  winnerLabel: { flexDirection: "row", gap: spacing.sm, alignItems: "center", borderRadius: radii.md, paddingLeft: spacing.md },
+  winnerLabel: { flexDirection: "row", gap: spacing.sm, alignItems: "center", borderTopLeftRadius: radii.xl - 1, borderTopRightRadius: radii.xl - 1, paddingTop: spacing.md, paddingLeft: spacing.md, paddingRight: spacing.xs },
   winnerBody: { flexDirection: "row-reverse", alignItems: "center" },
-  reactions: { flexDirection: "row", gap: spacing.sm, alignItems: "center" },
+  reactions: { paddingBottom: spacing.md, flexDirection: "row", gap: spacing.sm, alignItems: "center" },
   reaction: { minHeight: 32, minWidth: 64, flexDirection: "row", alignItems: "center", gap: spacing.xs, paddingHorizontal: spacing.sm, borderRadius: radii.sm },
   count: { minWidth: 20, fontVariant: ["tabular-nums"] },
   share: { marginLeft: "auto", minHeight: 32, flexDirection: "row", alignItems: "center", gap: spacing.xs, paddingHorizontal: spacing.sm, borderRadius: radii.sm }
