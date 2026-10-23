@@ -56,7 +56,7 @@ const styles = StyleSheet.create({
   covers: { flexDirection: "row", gap: spacing.sm, alignItems: "center", justifyContent: "flex-start", flexWrap: "wrap", position: "relative", minHeight: 96 },
   quizBadge: { position: "absolute", left: 16, top: 20, width: 32, height: 32, borderRadius: radii.full, alignItems: "center", justifyContent: "center" },
   mural: { width: "100%", aspectRatio: 1, overflow: "hidden", alignItems: "center", justifyContent: "center" },
-  ranking: { width: 120, gap: spacing.xs },
+  ranking: { maxWidth: 120, gap: spacing.xs },
   tier: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   tierLabel: { width: 24, height: 42, borderRadius: radii.sm, alignItems: "center", justifyContent: "center" }
 });
