@@ -298,6 +298,33 @@ test("a failed grouping run is logged and the next run still works", async () =>
   assert.deepEqual(info[0]!.details, { grouped: 2 });
 });
 
+test("a failed duplicate pass is logged, skips that run's grouping, and the next run still works", async () => {
+  const { state, timers } = fakeTimers();
+  const { log, info, error } = fakeLog();
+  const outcomes: Array<Error | number> = [new Error("database is locked"), 0];
+  const groups: number[] = [];
+  startWorksGrouping(
+    async () => {
+      const outcome = outcomes.shift() ?? 0;
+      if (outcome instanceof Error) throw outcome;
+      return outcome;
+    },
+    (limit) => { groups.push(limit); return 2; },
+    log,
+    undefined,
+    timers
+  );
+  await until(() => error.length === 1);
+  assert.equal(error[0]!.message, "works grouping failed");
+  assert.match((error[0]!.details as { err: Error }).err.message, /database is locked/);
+  assert.deepEqual(groups, []);
+  assert.deepEqual(info, []);
+  state.callback!();
+  await until(() => info.length === 1);
+  assert.deepEqual(groups, [250]);
+  assert.deepEqual(info, [{ details: { grouped: 2 }, message: "grouped keyless works by title" }]);
+});
+
 test("stopping works grouping ends a run at the next batch boundary and clears the timer", async () => {
   const { state, handle, timers } = fakeTimers();
   const { log } = fakeLog();

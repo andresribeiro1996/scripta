@@ -119,6 +119,7 @@ export function startWorksGrouping(
     if (running) return null;
     running = true;
     try {
+      await new Promise(setImmediate);
       const merged = await mergeDuplicates(controller.signal);
       if (merged > 0) log.info({ merged }, "merged duplicate Open Library works");
       const grouped = await drainBatches(groupKeylessWorks, controller.signal);
