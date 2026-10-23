@@ -9,7 +9,7 @@ import { openSqlite } from "../../../../db/openSqlite.js";
 import { MIN_GOOD_WIDTH } from "../../domain/constants.js";
 import { catalogTitleKey, givenNameFirst } from "../../domain/normalize.js";
 import { summaryHashOf } from "../../domain/synopsis.js";
-import { ORIGINAL_KEY_VERSION, isOriginalTitle, originalKey, originalTitleIn } from "../../domain/translation.js";
+import { ORIGINAL_KEY_VERSION, isOriginalTitle, originalKey, originalTitleIn, originalWholeKey } from "../../domain/translation.js";
 import { applyMojibakeRepairs, type RowRepair } from "../../seed/mojibakeRepair.js";
 import { CONFIRMED_SQL } from "./sqliteBooksRepository.js";
 
@@ -48,6 +48,7 @@ export function applyBooksMigrations(db: DatabaseSync): void {
   if (!columns.some((column) => column.name === "genres_confidence")) db.exec("ALTER TABLE books ADD COLUMN genres_confidence REAL");
   if (!columns.some((column) => column.name === "original_title")) db.exec("ALTER TABLE books ADD COLUMN original_title TEXT");
   if (!columns.some((column) => column.name === "retitle_wanted_at")) db.exec("ALTER TABLE books ADD COLUMN retitle_wanted_at TEXT");
+  if (!columns.some((column) => column.name === "original_whole_key")) db.exec("ALTER TABLE books ADD COLUMN original_whole_key TEXT");
   moveOpenLibrarySummariesToWorks(db);
   addSummaryHashes(db);
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_work ON books(work_id)");
@@ -291,7 +292,7 @@ function clearNonTitleOriginals(db: DatabaseSync): void {
   if (cleared > 0) console.log(`books: cleared ${cleared} original titles that were not titles`);
 }
 
-export const UNKEYED_ORIGINALS_SQL = "SELECT id, original_title FROM books WHERE original_title IS NOT NULL AND original_key IS NULL";
+export const UNKEYED_ORIGINALS_SQL = "SELECT id, original_title, original_key, original_whole_key FROM books WHERE original_title IS NOT NULL AND (original_key IS NULL OR original_whole_key IS NULL)";
 
 const storedOriginalKeyVersion = (db: DatabaseSync) => (db.prepare("SELECT version FROM original_key_version").get() as { version: number } | undefined)?.version;
 
@@ -303,14 +304,15 @@ function keyOriginalTitles(db: DatabaseSync): void {
       if (storedOriginalKeyVersion(db) !== ORIGINAL_KEY_VERSION) {
         const columns = db.prepare("PRAGMA table_info(books)").all() as Array<{ name: string }>;
         if (!columns.some((column) => column.name === "original_key")) db.exec("ALTER TABLE books ADD COLUMN original_key TEXT");
-        const rows = db.prepare("SELECT id, original_title, original_key, summary FROM books WHERE original_title IS NOT NULL OR original_key IS NOT NULL OR summary LIKE '%tulo original%'").all() as Array<{ id: string; original_title: string | null; original_key: string | null; summary: string | null }>;
-        const update = db.prepare("UPDATE books SET original_title = ?, original_key = ? WHERE id = ?");
+        const rows = db.prepare("SELECT id, original_title, original_key, original_whole_key, summary FROM books WHERE original_title IS NOT NULL OR original_key IS NOT NULL OR original_whole_key IS NOT NULL OR summary LIKE '%tulo original%'").all() as Array<{ id: string; original_title: string | null; original_key: string | null; original_whole_key: string | null; summary: string | null }>;
+        const update = db.prepare("UPDATE books SET original_title = ?, original_key = ?, original_whole_key = ? WHERE id = ?");
         for (const row of rows) {
           const title = row.original_title ?? originalTitleIn(row.summary);
           const key = title === null ? null : originalKey(title);
-          if (title === row.original_title && key === row.original_key) continue;
-          update.run(title, key, row.id);
-          if (key !== null) keyed += 1;
+          const whole = title === null ? null : originalWholeKey(title);
+          if (title === row.original_title && key === row.original_key && whole === row.original_whole_key) continue;
+          update.run(title, key, whole, row.id);
+          if (key !== null || whole !== null) keyed += 1;
         }
         db.exec("DELETE FROM original_key_version");
         db.prepare("INSERT INTO original_key_version (version) VALUES (?)").run(ORIGINAL_KEY_VERSION);
@@ -322,16 +324,19 @@ function keyOriginalTitles(db: DatabaseSync): void {
     }
   }
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_original_key ON books(original_key) WHERE original_key IS NOT NULL");
-  db.exec("CREATE INDEX IF NOT EXISTS idx_books_original_key_missing ON books(id) WHERE original_title IS NOT NULL AND original_key IS NULL");
-  const unkeyed = (db.prepare(UNKEYED_ORIGINALS_SQL).all() as Array<{ id: string; original_title: string }>).flatMap((row) => {
+  db.exec("CREATE INDEX IF NOT EXISTS idx_books_original_whole_key ON books(original_whole_key, original_key) WHERE original_whole_key IS NOT NULL");
+  db.exec("DROP INDEX IF EXISTS idx_books_original_key_missing");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_books_original_keys_missing ON books(id) WHERE original_title IS NOT NULL AND (original_key IS NULL OR original_whole_key IS NULL)");
+  const unkeyed = (db.prepare(UNKEYED_ORIGINALS_SQL).all() as Array<{ id: string; original_title: string; original_key: string | null; original_whole_key: string | null }>).flatMap((row) => {
     const key = originalKey(row.original_title);
-    return key === null ? [] : [{ id: row.id, key }];
+    const whole = originalWholeKey(row.original_title);
+    return key === row.original_key && whole === row.original_whole_key ? [] : [{ id: row.id, key, whole }];
   });
   if (unkeyed.length > 0) {
-    const setKey = db.prepare("UPDATE books SET original_key = ? WHERE id = ?");
+    const setKey = db.prepare("UPDATE books SET original_key = ?, original_whole_key = ? WHERE id = ?");
     db.exec("BEGIN IMMEDIATE");
     try {
-      for (const { id, key } of unkeyed) setKey.run(key, id);
+      for (const { id, key, whole } of unkeyed) setKey.run(key, whole, id);
       db.exec("COMMIT");
     } catch (error) {
       if (db.isTransaction) db.exec("ROLLBACK");
