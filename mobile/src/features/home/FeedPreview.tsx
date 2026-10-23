@@ -6,7 +6,7 @@ import { contrastRatio, type DigestItem } from "@scripta/shared";
 import { Text } from "../../ui/Text";
 import { Icon, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { BookCover } from "../arena/BookCover";
-import { CoverFan, SLOT_HEIGHT, SLOT_WIDTH } from "../community/CoverFan";
+import { CoverFan, SLOT_HEIGHT, fanWidth } from "../community/CoverFan";
 import { fetchProfile } from "../community/api";
 import { MuralThumbnail } from "../murals/MuralCanvas";
 import { muralPreviewOf } from "../public/adapters";
@@ -29,8 +29,9 @@ export function FeedPreview({ item }: { item: DigestItem }) {
   </View>;
   const covers = item.kind === "vote" ? item.content.covers : feedRowModel(item).covers;
   const quiz = item.kind === "publication" && item.content.kind === "quiz";
-  if (!(item.kind === "publication" && item.content.kind === "tierlist")) return <View style={{ width: SLOT_WIDTH, height: SLOT_HEIGHT }}>
-    {covers.length ? <CoverFan covers={quiz ? covers.slice(0, 2) : covers} /> : <View style={[styles.iconTile, { backgroundColor: colors.accentSoft }]}><Icon name={feedRowModel(item).icon} size={24} color={colors.accent} /></View>}
+  const fan = quiz ? covers.slice(0, 2) : covers;
+  if (!(item.kind === "publication" && item.content.kind === "tierlist")) return <View style={{ width: fan.length ? fanWidth(fan.length) : styles.iconTile.width, height: SLOT_HEIGHT }}>
+    {fan.length ? <CoverFan covers={fan} inset={0} /> : <View style={[styles.iconTile, { backgroundColor: colors.accentSoft }]}><Icon name={feedRowModel(item).icon} size={24} color={colors.accent} /></View>}
     {quiz ? <View style={[styles.quizBadge, { backgroundColor: colors.surface }]}><Text display {...dynamicType} style={[typography.title, { color: colors.text }]}>?</Text></View> : null}
   </View>;
   return <View style={[styles.covers, { backgroundColor: colors.surface }]}>
@@ -53,7 +54,7 @@ const styles = StyleSheet.create({
   winner: { transform: [{ rotate: "5deg" }], marginHorizontal: spacing.xs },
   iconTile: { width: 48, height: 72, borderRadius: radii.sm, alignItems: "center", justifyContent: "center" },
   covers: { flexDirection: "row", gap: spacing.sm, alignItems: "center", justifyContent: "flex-start", flexWrap: "wrap", position: "relative", minHeight: 96 },
-  quizBadge: { position: "absolute", left: 30, top: 20, width: 32, height: 32, borderRadius: radii.full, alignItems: "center", justifyContent: "center" },
+  quizBadge: { position: "absolute", left: 16, top: 20, width: 32, height: 32, borderRadius: radii.full, alignItems: "center", justifyContent: "center" },
   mural: { width: "100%", aspectRatio: 1, overflow: "hidden", alignItems: "center", justifyContent: "center" },
   ranking: { width: 120, gap: spacing.xs },
   tier: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
