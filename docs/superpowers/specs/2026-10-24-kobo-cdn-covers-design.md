@@ -56,7 +56,7 @@ curl -sS -o none.jpg -w '%{http_code} %{content_type}\n' https://cdn.kobo.com/bo
 - **The real id** should answer 200 with a JPEG near 1200 wide or 1800 tall. A small original that comes back upscaled to fill the box is acceptable but worth knowing.
 - **The unknown id** must answer 404. A 200 placeholder would be stored as a cover; a 5xx would leave every such book's lookup incomplete and retried every 10 minutes. Either result blocks the merge until the design handles it.
 
-If bad covers are stored anyway, the repair is to point each affected book back at its newest non-`kobo` `cover_images` row (images are never deleted) and set `kobo_image_id` to NULL.
+If bad covers are stored anyway, the repair is to point each affected book back at its newest non-`kobo` `cover_images` row (images are never deleted) and add its Kobo URL to `cover_rejections`, leaving `kobo_image_id` set. The resolver skips a rejected URL, and a set id is never rewritten. Clearing the id instead would undo itself: the next `kobo covers` run reads the same `library_books.image_id` and records it again.
 
 ## Not in scope
 

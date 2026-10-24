@@ -161,3 +161,27 @@ test("without a Kobo image id no Kobo candidate is tried", async () => {
   await findBestCover({ ...orlando, koboImageId: null }, new Set(), sources({ isbndb: source({ isbn: [{ source: "isbndb", url: "https://i/1" }] }) }), fetchImage);
   assert.deepEqual(fetched, ["https://i/1", "https://i/1"]);
 });
+
+test("an ISBN-only lookup asks no source by title and keeps its exact hit", async () => {
+  const titled = [{ source: "apple" as const, url: "https://a/guess", title: "Orlando", authors: ["Virginia Woolf"] }];
+  const isbndb = source({ isbn: [{ source: "isbndb", url: "https://i/small" }], titled });
+  const apple = source({ titled });
+  const openlibrary = source({ titled });
+  const outcome = await findBestCover({ ...orlando, isbnOnly: true }, new Set(), sources({ isbndb, apple, openlibrary }), images({ "https://i/small": [300, 450], "https://a/guess": [900, 1400] }));
+  assert.equal(outcome.found?.candidate.url, "https://i/small");
+  assert.equal(outcome.complete, true);
+  assert.deepEqual([...apple.calls, ...isbndb.calls, ...openlibrary.calls].filter((call) => call.startsWith("title:")), []);
+});
+
+test("an ISBN-only lookup with a Kobo image id asks Kobo first and no source by title", async () => {
+  const titled = [{ source: "apple" as const, url: "https://a/guess", title: "Orlando", authors: ["Virginia Woolf"] }];
+  const isbndb = source({ isbn: [{ source: "isbndb", url: "https://i/small" }], titled });
+  const apple = source({ titled });
+  const fetched: string[] = [];
+  const sizes = images({ [KOBO_URL]: [300, 460], "https://i/small": [250, 380], "https://a/guess": [900, 1400] });
+  const fetchImage: FetchCoverImage = (candidate) => { fetched.push(candidate.url); return sizes(candidate); };
+  const outcome = await findBestCover({ ...orlando, koboImageId: KOBO_ID, isbnOnly: true }, new Set(), sources({ isbndb, apple }), fetchImage);
+  assert.equal(fetched[0], KOBO_URL);
+  assert.deepEqual(outcome.found?.candidate, { source: "kobo", url: KOBO_URL });
+  assert.deepEqual([...apple.calls, ...isbndb.calls].filter((call) => call.startsWith("title:")), []);
+});

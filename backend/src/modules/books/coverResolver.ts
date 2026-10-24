@@ -36,7 +36,7 @@ async function attempt<T>(step: () => Promise<T>): Promise<T | SourceUnavailable
 }
 
 export async function findBestCover(
-  book: { isbn: string | null; title: string; author: string; koboImageId?: string | null },
+  book: { isbn: string | null; title: string; author: string; koboImageId?: string | null; isbnOnly?: boolean },
   rejected: Set<string>,
   sources: CoverSources,
   fetchImage: FetchCoverImage
@@ -49,7 +49,7 @@ export async function findBestCover(
   if (koboImageId) steps.push(async () => [{ source: "kobo", url: koboCoverUrl(koboImageId) }]);
   const isbn = book.isbn;
   if (isbn) steps.push(...exactOrder.map((source) => () => source.byIsbn(isbn)));
-  if (normalizeTitle(book.title)) steps.push(...titleOrder.map((source) => () => source.byTitle(book.title, book.author, accept, isbn)));
+  if (!book.isbnOnly && normalizeTitle(book.title)) steps.push(...titleOrder.map((source) => () => source.byTitle(book.title, book.author, accept, isbn)));
 
   let best: FoundCover | null = null;
   let complete = true;

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
+import { lookupIdentity } from "../domain/normalize.js";
 import { mapBnpRecord, readMarcRecords, readOaiError, readResumptionToken } from "./bnpRecord.js";
 import type { MarcField, MarcRecord } from "./bnpRecord.js";
 
@@ -237,4 +238,21 @@ test("a collection keeps its first volume designation as written, and skips a 22
   assert.deepEqual(collection(field("225", ["a", "Clássicos"], ["v", " "])), { name: "Clássicos", position: null });
   assert.deepEqual(collection(field("225", ["v", "3"]), field("225", ["a", " "]), field("225", ["a", "Clássicos"], ["v", "4"])), { name: "Clássicos", position: "4" });
   assert.equal(collection(field("225", ["v", "3"])), null);
+});
+
+test("pre-2002 records lose their display markers", () => {
+  const [poeta, macau] = readMarcRecords(fixture("oai-pre2002.xml")).map(mapBnpRecord);
+  assert.equal(poeta!.title, "O poeta e a pedra");
+  assert.deepEqual(poeta!.isbns, ["9789728334543"]);
+  assert.equal(macau!.title, "The economy of Macau in 1986 and in early 1987");
+  assert.equal(lookupIdentity({ isbn: null, title: poeta!.title, author: poeta!.author })!.titleKey, lookupIdentity({ isbn: null, title: "O poeta e a pedra", author: "Serafim Ferreira" })!.titleKey);
+});
+
+test("a display marker keeps its display text and a plain bracket stays", () => {
+  const titleOf = (text: string) => mapBnpRecord(readMarcRecords(`<collection><record><controlfield tag="001">1</controlfield><datafield tag="200" ind1="1" ind2=" "><subfield code="a">${text}</subfield></datafield></record></collection>`)[0]!).title;
+  assert.equal(titleOf("&lt;III= 3&gt; Congresso"), "III Congresso");
+  assert.equal(titleOf("Textos &lt;&amp;=e&gt; pretextos"), "Textos & pretextos");
+  assert.equal(titleOf("&lt;As 100= 100&gt; mais lindas cartas"), "As 100 mais lindas cartas");
+  assert.equal(titleOf("&lt;Os &gt;ardis da imagem"), "Os ardis da imagem");
+  assert.equal(titleOf("o &lt;jardim&gt; novo"), "o <jardim> novo");
 });
