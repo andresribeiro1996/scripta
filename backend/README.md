@@ -530,7 +530,7 @@ npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --
 npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'for f in /proc/[0-9]*/cmdline; do tr "\0" " " < $f; echo; done 2>/dev/null | grep "nod[e] scripts/import-bnp"'
 ```
 
-The pre-2002 run goes after the 2002+ one, with the same steps: a dry run of about 3.5 hours whose first window line must read `2013-06-01..2013-06-30` with about 344k records and `failed: null` (that line is the go/no-go for the real run), then the import itself, about 6 hours, with production deploys held while it runs and the volume checked for room for about 80 MB plus the WAL first. Rerun any failed window with `--pre-2002 --from <from> --until <until>`.
+The pre-2002 run goes after the 2002+ one, with the same steps: a dry run of about 3.5 hours whose first window line must read `2013-06-01..2013-06-30` with about 344k records and `failed: null` (that line is the go/no-go for the real run), then the import itself, about 6 hours, with production deploys held while it runs and the volume checked for room for about 80 MB plus the WAL first.
 
 ```bash
 npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && setsid node scripts/import-bnp.mjs --pre-2002 --dry-run > /data/import-bnp-2001-dry.log 2>&1 < /dev/null & sleep 3; ls -l /data/import-bnp-2001*.log'
@@ -538,10 +538,10 @@ npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --
 npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'tail -n 3 /data/import-bnp-2001-dry.log /data/import-bnp-2001.log'
 ```
 
-The container has no `nohup`, so the jobs start with `setsid`; the `ls` after the `sleep 3` shows the log file appeared. The last command prints the job's command line while it is running and nothing once it has ended; the bracket in `nod[e]` stops the check from matching itself.
+The container has no `nohup`, so the jobs start with `setsid`; the `ls` after the `sleep 3` shows the log file appeared. The `/proc` command prints the job's command line while it is running and nothing once it has ended; the bracket in `nod[e]` stops the check from matching itself.
 
-- **Resuming.** If the job dies, rerun with `--from <through>` from its last window line and no `--until`. The run then ends today and writes the cursor. Re-reading a day is harmless, since every record is applied by ISBN.
-- **Failed windows.** If the report lists any, rerun from the first failed window's `from` with no `--until`.
+- **Resuming.** If the job dies, rerun with `--from <through>` from its last window line and no `--until`. The run then ends today and writes the cursor. A `--pre-2002` run resumes with `--pre-2002 --from <through>` and writes no cursor. Re-reading a day is harmless, since every record is applied by ISBN.
+- **Failed windows.** If the report lists any, rerun from the first failed window's `from` with no `--until`. A `--pre-2002` run reruns each failed window with `--pre-2002 --from <from> --until <until>`.
 - **The cursor.** A run with no `--until` that ends with no failed window writes the sync cursor. A run given `--until`, a `--pre-2002` run, and every dry run, writes none. The in-server sync starts only once the cursor exists, so a deploy can never start the full harvest inside the server.
 
 #### Series and collection fills
