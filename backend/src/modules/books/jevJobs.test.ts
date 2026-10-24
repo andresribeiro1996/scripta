@@ -251,21 +251,20 @@ test("the backlog asks every item until the first pause and names its kind", asy
 });
 
 test("a backlog stop is attributed to the item whose call failed, not to a concurrent one", async () => {
-  const releases: Array<() => void> = [];
-  const gate = (index: number) => new Promise<void>((resolve) => { releases[index] = resolve; });
-  const result = await Promise.all([
-    runJevBacklog(["slow", "failing"], async (item, onPause) => {
-      if (item === "slow") {
-        onPause("budget", NOW);
-        await gate(0);
-        return null;
-      }
+  let release = () => {};
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const result = await runJevBacklog(["failing", "concurrent"], async (item, onPause) => {
+    if (item === "failing") {
       onPause("key", NOW);
-      setImmediate(() => releases[0]!());
+      await gate;
       return NOW;
-    })
-  ]);
-  assert.equal(result[0].stoppedBy, "key");
+    }
+    onPause("budget", NOW);
+    release();
+    return null;
+  });
+  assert.equal(result.stoppedBy, "key");
+  assert.deepEqual(result.asked, ["concurrent"]);
 });
 
 test("jevCostUsd rounds to cents", () => {
