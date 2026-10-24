@@ -49,6 +49,7 @@ const KOBO_COVER_GAP_MS = 1000;
 const BACKGROUND_ISBNDB_DAILY_CAP = 500;
 const BNP_LOOKUP_TIMEOUT_MS = 5_000;
 const GROUPING_PAGE_SIZE = 50;
+const KOBO_COVERS_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const FIRST_RUN_DELAY_MS = {
   detailsBackfill: 30_000,
   workKeyBackfill: 40_000,
@@ -59,7 +60,8 @@ const FIRST_RUN_DELAY_MS = {
   synopsisSweep: 75_000,
   translationSweep: 90_000,
   worksGrouping: 120_000,
-  bnpSync: 150_000
+  bnpSync: 150_000,
+  koboCovers: 165_000
 };
 
 let activeService: BooksService | null = null;
@@ -72,6 +74,7 @@ export function enqueueBookCovers(lookups: BookLookup[]) {
 export interface BooksPluginOptions {
   alert?: (subject: string, text: string) => Promise<void>;
   heldWorks?: () => HeldWork[];
+  koboCoverLookups?: () => BookLookup[];
   worksShareAnArena?: (aIds: string[], bIds: string[]) => boolean;
 }
 
@@ -90,6 +93,7 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
   useBooksRepository(repo);
   const isbndbSpend = createIsbndbBudget(repo, ISBNDB_DAILY_QUOTA - ISBNDB_SEARCH_RESERVE, (message) => app.log.warn(message));
   const heldWorks = options.heldWorks;
+  const koboCoverLookups = options.koboCoverLookups;
   const alertTypesafe = (subject: string, text: string) => {
     app.log.warn({ subject }, text);
     options.alert?.(subject, text).catch((error: unknown) => app.log.error({ err: error }, "TypeSafe key alert failed"));
@@ -231,6 +235,9 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
     const report = await syncBnp(bnpDeps);
     if (report) logBnpSync(app.log, report);
   }, FIRST_RUN_DELAY_MS.bnpSync);
+  if (koboCoverLookups) {
+    jobs.every("kobo covers", KOBO_COVERS_INTERVAL_MS, () => timeSync(app.log, "kobo-covers", () => service.recordKoboImageIds(koboCoverLookups())), FIRST_RUN_DELAY_MS.koboCovers);
+  }
   if (genreJobs) jobs.own(genreJobs.stop);
   if (synopsisJobs) jobs.own(synopsisJobs.stop);
   if (translationJobs) jobs.own(translationJobs.stop);
