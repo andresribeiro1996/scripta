@@ -27,7 +27,7 @@ import { arenaCheck, startTranslationJobsIfConfigured } from "./translationJudgm
 import { reviewTranslationWith, translationReviewWith } from "./translationReview.js";
 import { isPortuguese } from "./domain/translation.js";
 import type { HeldWork } from "./genrePass.js";
-import { BACKFILL_INTERVAL_MS, startJob, startTimer } from "../../jobs.js";
+import { BACKFILL_INTERVAL_MS, createJobs } from "../../jobs.js";
 import { DETAILS_BATCH_SIZE, startCoverColorBackfill, startWorksBackfill, startWorksGrouping } from "./backfill.js";
 import { createBooksService, MAX_UPLOAD_BYTES, type BooksService } from "./booksService.js";
 import type { FetchCoverImage } from "./coverResolver.js";
@@ -74,6 +74,7 @@ export interface BooksPluginOptions {
 }
 
 export async function booksPlugin(app: FastifyInstance, options: BooksPluginOptions = {}) {
+  const jobs = createJobs(app.log);
   const isbndbGate = createIsbndbGate({
     onPause: ({ reason, until }) => {
       app.log.warn({ reason, until }, "ISBNdb paused");
@@ -197,16 +198,9 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
     (bookId, lane) => service.processBook(bookId, lane),
     (error, bookId) => app.log.error({ err: error, bookId }, "cover lookup failed")
   );
-  timeStep(app.log, "startup:cover-enqueue", () => service.enqueueUnchecked());
-  const stopBackfill = startTimer(() => timeSync(app.log, "cover-enqueue", () => service.enqueueUnchecked()), BACKFILL_INTERVAL_MS);
-  const stopDetailsBackfill = startJob(
-    (signal) => service.backfillDetails(DETAILS_BATCH_SIZE, signal),
-    (error) => app.log.error({ err: error }, "details backfill failed"),
-    undefined,
-    undefined,
-    FIRST_RUN_DELAY_MS.detailsBackfill
-  );
-  const stopWorksBackfill = startWorksBackfill(repo, app.log, undefined, undefined, FIRST_RUN_DELAY_MS.worksBackfill);
+  jobs.every("cover-enqueue", BACKFILL_INTERVAL_MS, () => timeSync(app.log, "cover-enqueue", () => service.enqueueUnchecked()));
+  jobs.every("details backfill", BACKFILL_INTERVAL_MS, (signal) => service.backfillDetails(DETAILS_BATCH_SIZE, signal), FIRST_RUN_DELAY_MS.detailsBackfill);
+  jobs.own(startWorksBackfill(repo, app.log, undefined, undefined, FIRST_RUN_DELAY_MS.worksBackfill));
   const grouping = startWorksGrouping(
     (signal) => walkDuplicateWorks({ repo, sharesArena, now: Date.now }, { dryRun: false, signal, pageSize: 100, pauseMs: 250 }).then((report) => report.merges.length),
     (limit) => repo.groupKeylessWorks(limit, undefined, sharesArena),
@@ -215,56 +209,32 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
     undefined,
     FIRST_RUN_DELAY_MS.worksGrouping
   );
-  const stopWorkKeyBackfill = startJob(
-    (signal) => service.backfillWorkKeys(DETAILS_BATCH_SIZE, signal),
-    (error) => app.log.error({ err: error }, "work key backfill failed"),
-    undefined,
-    undefined,
-    FIRST_RUN_DELAY_MS.workKeyBackfill
-  );
-  const stopColorBackfill = startCoverColorBackfill((limit) => service.fillCoverColors(limit), app.log, undefined, undefined, FIRST_RUN_DELAY_MS.colorBackfill);
-  const retitleIsbndb = isbndbConfigured ? createIsbndbCatalog(env.ISBNDB_API_KEY, isbndbThrottle, isbndbGate, false, { details: isbndbSpend, search: isbndbSpend }) : null;
-  const stopRetitleJob = retitleIsbndb
-    ? startJob(
-        (signal) => retitleWanted({
-          repo,
-          isbndb: retitleIsbndb,
-          write: (plan) => repo.applyTitleRepairs(plan),
-          info: (details, message) => app.log.info(details, message),
-          warn: (details, message) => app.log.warn(details, message)
-        }, RETITLE_BATCH_SIZE, signal),
-        (error) => app.log.error({ err: error }, "lossy retitle failed"),
-        undefined,
-        undefined,
-        FIRST_RUN_DELAY_MS.retitleJob
-      )
-    : null;
-  const stopBnpSync = startJob(
-    async () => {
-      const report = await syncBnp(bnpDeps);
-      if (report) logBnpSync(app.log, report);
-    },
-    (error) => app.log.error({ err: error }, "bnp sync failed"),
-    BNP_SYNC_INTERVAL_MS,
-    undefined,
-    FIRST_RUN_DELAY_MS.bnpSync
-  );
+  jobs.own(grouping.stop);
+  jobs.every("work key backfill", BACKFILL_INTERVAL_MS, (signal) => service.backfillWorkKeys(DETAILS_BATCH_SIZE, signal), FIRST_RUN_DELAY_MS.workKeyBackfill);
+  jobs.own(startCoverColorBackfill((limit) => service.fillCoverColors(limit), app.log, undefined, undefined, FIRST_RUN_DELAY_MS.colorBackfill));
+  if (isbndbConfigured) {
+    const retitleIsbndb = createIsbndbCatalog(env.ISBNDB_API_KEY, isbndbThrottle, isbndbGate, false, { details: isbndbSpend, search: isbndbSpend });
+    jobs.every("lossy retitle", BACKFILL_INTERVAL_MS, (signal) => retitleWanted({
+      repo,
+      isbndb: retitleIsbndb,
+      write: (plan) => repo.applyTitleRepairs(plan),
+      info: (details, message) => app.log.info(details, message),
+      warn: (details, message) => app.log.warn(details, message)
+    }, RETITLE_BATCH_SIZE, signal), FIRST_RUN_DELAY_MS.retitleJob);
+  }
+  jobs.every("bnp sync", BNP_SYNC_INTERVAL_MS, async () => {
+    const report = await syncBnp(bnpDeps);
+    if (report) logBnpSync(app.log, report);
+  }, FIRST_RUN_DELAY_MS.bnpSync);
+  if (genreJobs) jobs.own(genreJobs.stop);
+  if (synopsisJobs) jobs.own(synopsisJobs.stop);
+  if (translationJobs) jobs.own(translationJobs.stop);
+  jobs.own(stopOriginalArrivals);
+  jobs.own(worker.stop);
   activeService = service;
   app.addHook("onClose", async () => {
     activeService = null;
-    stopBackfill();
-    stopDetailsBackfill();
-    stopWorksBackfill();
-    grouping.stop();
-    stopWorkKeyBackfill();
-    stopColorBackfill();
-    stopRetitleJob?.();
-    stopBnpSync();
-    genreJobs?.stop();
-    synopsisJobs?.stop();
-    translationJobs?.stop();
-    stopOriginalArrivals();
-    worker.stop();
+    jobs.stopAll();
   });
 
   await app.register(async (scoped) => {
