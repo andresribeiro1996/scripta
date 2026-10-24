@@ -2,7 +2,7 @@ import { cleanSummary, validBookRating, workGenres, type IdentityKey, type Reade
 import { summaryMatchesLanguage, type CatalogWorkPage } from "../books/index.js";
 import type { ViewerCopy } from "../library/index.js";
 
-type GameByWork = { id: string; name: string; path: string; ownerUserId: string | null };
+export type GameByWork = { id: string; name: string; path: string; ownerUserId: string | null };
 type Visibility = { followed: boolean; published: boolean; showGlyph: boolean };
 
 export type WorksDeps = {

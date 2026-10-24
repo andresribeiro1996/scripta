@@ -2,7 +2,9 @@
 // TierlistsRepository port, not on SQLite — same reasoning as every other
 // module's service.ts.
 
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
+import { generateVoteCode } from "../../voteCode.js";
+import type { GameByWork } from "../works/index.js";
 import { DEFAULT_TIER_PRESET, type PublicBookData, type ResolvedTierlist, type TierlistData, type VotedTierlist } from "@scripta/shared";
 import type { GameParticipation, RankingTierPreview } from "@scripta/shared/community";
 import { boardWorks } from "./domain/boardKeys.js";
@@ -83,13 +85,6 @@ export interface TierlistDiscoverRef {
   promotedAt: string | null;
 }
 
-export interface GameByWork {
-  id: string;
-  name: string;
-  path: string;
-  ownerUserId: string | null;
-}
-
 function knownFor(works: TierlistWorks, data: unknown): Map<string, string> {
   return works.canonicalByKey(new Map(storedIds(data).map((id) => [id, id])));
 }
@@ -145,18 +140,6 @@ export interface TierlistsService {
  *  delete every one of these and add more — this is just the starting
  *  point, so "New tier list" opens on a recognizable board instead of
  *  an empty one. */
-// Unambiguous alphabet: no 0/O/1/I/L, because these codes get read aloud
-// and typed by hand. 8 chars over 32 symbols is ~10^12 combinations —
-// enough that a poll isn't stumbled upon, though it is an identifier and
-// not a secret (community tier lists are publicly listed; vote_access is
-// what actually authorizes a ballot).
-const CODE_ALPHABET = "23456789abcdefghjkmnpqrstuvwxyz";
-
-export function generateVoteCode(): string {
-  const bytes = randomBytes(8);
-  return [...bytes].map((b) => CODE_ALPHABET[b % CODE_ALPHABET.length]).join("");
-}
-
 /** The two places this module looks inside the opaque `data` document —
  *  see the spec's "Why duplication simplifies everything downstream". */
 interface TierlistDocument {

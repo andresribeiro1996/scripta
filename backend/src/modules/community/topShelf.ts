@@ -1,7 +1,5 @@
 import { tierPosition, type TopShelfBoard } from "@scripta/shared";
-import type { TournamentShelfFacts } from "../arena/service.js";
-import type { QuizShelfFacts } from "../quizzes/service.js";
-import type { TierlistShelfFacts } from "../tierlists/service.js";
+import type { GameShelfFact } from "./domain/games.js";
 import type { GameRef } from "./domain/ports.js";
 
 export const TOP_SHELF_MIN_VOTERS = 5;
@@ -43,9 +41,7 @@ export function topShelfMonthStart(now: Date): string {
 }
 
 export type ShelfInput = {
-  tierlists: TierlistShelfFacts[];
-  tournaments: TournamentShelfFacts[];
-  quizzes: QuizShelfFacts[];
+  games: GameShelfFact[];
   engagement: Map<string, { publishedAt: string; likes: number; comments: number }>;
   visibleOwners: Set<string>;
   canonical: Map<string, string>;
@@ -74,20 +70,18 @@ export function rankTopShelf(input: ShelfInput, opts: { since: string | null; un
   const canon = (id: string) => input.canonical.get(id) ?? id;
   const genresOf = (workId: string) => input.genres.get(workId)?.genres ?? [];
 
-  const build = (kind: GameRef["kind"], f: { id: string; ownerUserId: string; createdAt: string; voters: number; votesSince: number; workIds: string[] }, promoted: boolean): Game => ({
-    ref: { kind, id: f.id },
+  const build = (f: GameShelfFact): Game => ({
+    ref: { kind: f.kind, id: f.id },
     ownerUserId: f.ownerUserId,
-    promoted,
+    promoted: f.promoted,
     createdAt: f.createdAt,
     voters: f.voters,
     votesSince: f.votesSince,
     works: new Set(f.workIds.map(canon)),
-    publishedAt: Date.parse(input.engagement.get(`${kind}:${f.id}`)?.publishedAt ?? f.createdAt),
+    publishedAt: Date.parse(input.engagement.get(`${f.kind}:${f.id}`)?.publishedAt ?? f.createdAt),
   });
 
-  const tierlistGames = input.tierlists.map((t) => ({ facts: t, game: build("tierlist", t, t.promoted) }));
-  const tournamentGames = input.tournaments.map((t) => ({ facts: t, game: build("tournament", t, false) }));
-  const quizGames = input.quizzes.map((q) => ({ facts: q, game: build("quiz", q, false) }));
+  const allGames = input.games.map((f) => ({ facts: f, game: build(f) }));
   const visible = (g: Game) => g.promoted || input.visibleOwners.has(g.ownerUserId);
   const qualifies = (g: Game) => visible(g) && g.voters >= TOP_SHELF_MIN_VOTERS;
 
@@ -107,7 +101,7 @@ export function rankTopShelf(input: ShelfInput, opts: { since: string | null; un
   };
 
   const firstSeen = new Map<string, number>();
-  for (const { game } of [...tierlistGames, ...tournamentGames, ...quizGames]) {
+  for (const { game } of allGames) {
     if (!visible(game)) continue;
     for (const w of game.works) firstSeen.set(w, Math.min(firstSeen.get(w) ?? Infinity, game.publishedAt));
   }
@@ -121,12 +115,10 @@ export function rankTopShelf(input: ShelfInput, opts: { since: string | null; un
       if (map) bump(map, w, game.publishedAt);
     }
   };
-  for (const { game } of tierlistGames) appear(game, tiered);
-  for (const { game } of quizGames) appear(game, quizzed);
-  for (const { game } of tournamentGames) appear(game);
+  for (const { game } of allGames) appear(game, game.ref.kind === "tierlist" ? tiered : game.ref.kind === "quiz" ? quizzed : undefined);
 
   const crowned = new Map<string, Tally>();
-  for (const { facts, game } of tournamentGames) {
+  for (const { facts, game } of allGames) {
     if (!qualifies(game) || !facts.champion) continue;
     const settledAt = Date.parse(facts.champion.settledAt);
     if (!inPeriod(settledAt)) continue;
@@ -155,7 +147,7 @@ export function rankTopShelf(input: ShelfInput, opts: { since: string | null; un
   };
 
   const perList = new Map<string, number[]>();
-  for (const { facts, game } of tierlistGames) {
+  for (const { facts, game } of allGames) {
     if (!qualifies(game)) continue;
     const positions = new Map<string, number[]>();
     for (const p of facts.placements) {
@@ -201,7 +193,7 @@ export function rankTopShelf(input: ShelfInput, opts: { since: string | null; un
   const boards: Partial<Record<TopShelfBoard, Ranked[]>> = {};
   for (const [name, list] of Object.entries(allBoards) as Array<[TopShelfBoard, Ranked[]]>) boards[name] = opts.genre === null ? list : list.filter(inGenre(opts.genre));
 
-  const visibleGames = [...tierlistGames, ...tournamentGames, ...quizGames]
+  const visibleGames = allGames
     .map(({ game }) => game)
     .filter(visible)
     .map((g) => {

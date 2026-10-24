@@ -1,4 +1,5 @@
 import type { ActivityEventType } from "@scripta/shared/community";
+import type { GameKind } from "./games.js";
 
 export interface FollowRow {
   follower_id: string;
@@ -15,7 +16,7 @@ export interface ProfileRow {
   feed_settings: string | null;
 }
 
-export type CommunityRefType = "tierlist" | "tournament" | "quiz" | "book" | "user" | "mural";
+export type CommunityRefType = GameKind | "book" | "user" | "mural";
 
 export interface EventRow {
   id: string;

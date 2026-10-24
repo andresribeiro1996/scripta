@@ -6,9 +6,9 @@ import { mock, test } from "node:test";
 import Fastify from "fastify";
 import { categoryFor, DEFAULT_FEED_SETTINGS, type ActivityEventType, type FeedCategory, type FeedSettings } from "@scripta/shared/community";
 import { registerTrace } from "../../../../trace.js";
+import type { GameCard } from "../../domain/games.js";
 import { ACTIVITY_EVENT_TYPES, FEED_EVENT_TYPES } from "../../domain/feed.js";
 import type { EventRow } from "../../domain/types.js";
-import type { PublishedTierlistRef } from "../../../tierlists/service.js";
 
 const tempRoot = mkdtempSync(join(tmpdir(), "community-repo-"));
 process.env.JWT_ACCESS_SECRET = "a".repeat(64);
@@ -764,9 +764,10 @@ test("the dashboard service pages through a real inbox newest first, narrowed to
   const unused = () => {
     throw new Error("the dashboard does not read this");
   };
-  const refs = new Map<string, PublishedTierlistRef>();
+  const unusedGame = { get: unused, getMany: unused, listByOwner: unused, discoverWindow: unused, discoverByWorks: unused, participation: () => [], shelfFacts: unused };
+  const cards = new Map<string, GameCard<"tierlist">>();
   for (const [id, owner] of [["dash-t-a1", "dash-a"], ["dash-t-b1", "dash-b"], ["dash-t-b2", "dash-b"]]) {
-    refs.set(id!, { id: id!, ownerUserId: owner!, createdAt: "2026-09-01T00:00:00.000Z", voteCode: `code-${id}`, name: id!, poolSize: 3, ballotCount: 0, eligibleVoteCount: 0, promotedAt: null, votingOpen: true, covers: [] });
+    cards.set(id!, { id: id!, ownerUserId: owner!, createdAt: "2026-09-01T00:00:00.000Z", promoted: false, content: { kind: "tierlist", id: id!, voteCode: `code-${id}`, name: id!, poolSize: 3, ballotCount: 0, votingOpen: true, promotedAt: null, covers: [] } });
   }
   const seen: { at: string | null } = { at: null };
   const service = createCommunityService({
@@ -787,10 +788,13 @@ test("the dashboard service pages through a real inbox newest first, narrowed to
     searchUsernameOwners: unused,
     matchWorks: unused,
     murals: { ownsMural: unused, getMuralPublicPayload: unused, getMuralSummary: unused },
-    tierlists: { discoverWindow: unused, getPublishedMany: unused, votedAmong: unused, get: (id) => refs.get(id), listByOwner: unused, discoverByWorks: unused, fillRankingCovers: unused },
-    tournaments: { completedForParticipant: () => [], discoverWindow: unused, getPublishedMany: unused, votedAmong: unused, get: () => undefined, listByOwner: unused, discoverByWorks: unused },
-    quizzes: { discoverWindow: unused, getPublishedMany: unused, votedAmong: unused, get: () => undefined, listByOwner: unused, discoverByWorks: unused },
-    participation: { tierlists: () => [], tournaments: () => [], quizzes: () => [] }
+    games: {
+      tierlist: { ...unusedGame, get: (id) => cards.get(id) },
+      tournament: { ...unusedGame, get: () => undefined },
+      quiz: { ...unusedGame, get: () => undefined }
+    },
+    rankingCovers: unused,
+    completedTournaments: () => []
   });
   const at = (day: number) => `2026-09-0${day}T00:00:00.000Z`;
   const event = (id: string, user: string, type: "tierlist_published" | "voted_on" | "book_added", refId: string, day: number) =>

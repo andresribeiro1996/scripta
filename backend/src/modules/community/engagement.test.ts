@@ -92,15 +92,15 @@ test("engagement counts only the events whose author's switch shows them, in one
   const communityRepo = createSqliteCommunityRepository(db);
   const repo = createSqliteEngagementRepository(db);
   const unused = () => { throw new Error("engagement does not read this"); };
+  const unusedGame = { get: unused, getMany: unused, listByOwner: unused, discoverWindow: unused, discoverByWorks: unused, participation: unused, shelfFacts: unused };
   const community = createCommunityService({
     repo: communityRepo, background: unused, getDashboardSeenAt: unused, setDashboardSeenAt: unused, resolveProfile: unused,
     resolveProfiles: ids => new Map(ids.map(id => [id, { username: id, avatarUrl: null }])),
     resolveLibrary: unused, readerGlyphFor: () => null, sharedBookCounts: unused, sharedBooks: unused, userHasUsername: unused, findUserIdByUsername: unused, searchUsernameOwners: unused, matchWorks: unused,
     murals: { ownsMural: unused, getMuralPublicPayload: unused, getMuralSummary: unused },
-    tierlists: { discoverWindow: unused, getPublishedMany: unused, votedAmong: unused, get: unused, listByOwner: unused, discoverByWorks: unused, fillRankingCovers: unused },
-    tournaments: { completedForParticipant: unused, discoverWindow: unused, getPublishedMany: unused, votedAmong: unused, get: unused, listByOwner: unused, discoverByWorks: unused },
-    quizzes: { discoverWindow: unused, getPublishedMany: unused, votedAmong: unused, get: unused, listByOwner: unused, discoverByWorks: unused },
-    participation: { tierlists: unused, tournaments: unused, quizzes: unused }
+    games: { tierlist: unusedGame, tournament: unusedGame, quiz: unusedGame },
+    rankingCovers: unused,
+    completedTournaments: unused
   });
   const service = createEngagementService({ repo, community, resolveProfiles: ids => new Map(ids.map(id => [id, { username: id, avatarUrl: null }])) });
   const at = "2026-10-14T10:00:00.000Z";

@@ -5,10 +5,8 @@ import { normalizeWords, type IdentityKey, type ReaderProfile } from "@scripta/s
 import type { ActivityEventType, DiscoverItem, FeedSettings, GameParticipation, SharedBook, SuggestedReader } from "@scripta/shared/community";
 import { categoryFor, DEFAULT_FEED_SETTINGS, encodeCursor, normalizeFeedSettings } from "@scripta/shared/community";
 import type { ParticipationItem } from "@scripta/shared/dashboard";
-import type { PublishedTierlistRef } from "../tierlists/service.js";
-import type { PublishedTournamentRef } from "../arena/service.js";
-import type { PublishedQuizRef } from "../quizzes/service.js";
 import type { MuralPublicPayload } from "../murals/index.js";
+import { GAME_KINDS, type GameCard, type GameContent, type GameKind, type GameSource } from "./domain/games.js";
 import type { CommunityRepository, CursorKeyset } from "./domain/ports.js";
 import type { EventRow, FollowRow, ProfileRow } from "./domain/types.js";
 import { FollowLimitError, InvalidCursorError, MuralNotOwnedError, NotFollowingError, ProfileNotFoundError, SelfFollowError, UsernameRequiredError } from "./domain/errors.js";
@@ -137,6 +135,38 @@ function createRepoFake() {
   return { repo, follows, profiles, events, history, backfills };
 }
 
+function fakeGameSource<K extends GameKind>(
+  kind: K,
+  cards: Map<string, GameCard<K>>,
+  voted: Set<string>,
+  participation: Array<GameParticipation & { voteCode?: string }>,
+  gameWorks: Map<string, string[]>,
+  windowCalls: Array<{ kind: GameKind; needle: string; limit: number }>,
+  manyCalls: Array<{ kind: GameKind; ids: string[]; viewerId: string | undefined }>
+): GameSource<K> {
+  const listing = (card: GameCard<K>) => ({ id: card.id, ownerUserId: card.ownerUserId, createdAt: card.createdAt, promoted: card.promoted });
+  const newest = (a: GameCard<K>, b: GameCard<K>) => b.createdAt.localeCompare(a.createdAt);
+  return {
+    get: (id) => cards.get(id),
+    getMany: (ids, viewerId) => {
+      manyCalls.push({ kind, ids: [...ids], viewerId });
+      return ids.flatMap((id) => {
+        const card = cards.get(id);
+        if (!card) return [];
+        return [viewerId === undefined ? card : { ...card, content: { ...card.content, viewerVoted: voted.has(`${viewerId}:${id}`) } }];
+      });
+    },
+    listByOwner: (owner) => [...cards.values()].filter((card) => card.ownerUserId === owner).sort(newest),
+    discoverWindow: (needle, limit) => {
+      windowCalls.push({ kind, needle, limit });
+      return [...cards.values()].filter((card) => normalizeWords(card.content.name).includes(needle)).sort(newest).slice(0, limit).map(listing);
+    },
+    discoverByWorks: (workIds) => [...cards.values()].filter((card) => (gameWorks.get(`${kind}:${card.id}`) ?? []).some((work) => workIds.includes(work))).map(listing),
+    participation: () => participation,
+    shelfFacts: () => []
+  };
+}
+
 function createDeps(repo: CommunityRepository) {
   const readerProfiles = new Map<string, ReaderProfile>();
   const usernames = new Map<string, string>();
@@ -148,26 +178,22 @@ function createDeps(repo: CommunityRepository) {
   const sharedShelves = new Map<string, SharedBook[]>();
   const sharedBookCountsCalls: Array<{ viewerId: string; candidateIds: string[] }> = [];
   const sharedBooksCalls: Array<{ viewerId: string; candidateId: string; limit: number }> = [];
-  const tierlistRefs = new Map<string, PublishedTierlistRef>();
-  const tournamentRefs = new Map<string, PublishedTournamentRef>();
-  const quizRefs = new Map<string, PublishedQuizRef>();
+  const tierlistRefs = new Map<string, GameCard<"tierlist">>();
+  const tournamentRefs = new Map<string, GameCard<"tournament">>();
+  const quizRefs = new Map<string, GameCard<"quiz">>();
   const workMatches = new Map<string, string[]>();
   const gameWorks = new Map<string, string[]>();
-  const byWorks = <R extends { id: string }, D>(kind: string, refs: Map<string, R>, toRef: (ref: R) => D) => (workIds: string[]) =>
-    [...refs.keys()].filter((id) => (gameWorks.get(`${kind}:${id}`) ?? []).some((work) => workIds.includes(work))).map((id) => toRef(refs.get(id)!));
-  const byNewest = <T extends { createdAt: string }>(a: T, b: T) => b.createdAt.localeCompare(a.createdAt);
   const seenAt = { value: null as string | null };
   const votes = new Set<string>();
   const tournamentVotes = new Set<string>();
   const quizPlays = new Set<string>();
   const readerGlyphs = new Map<string, IdentityKey | null>();
   const readerGlyphCalls: string[] = [];
-  const tierlistParticipation: GameParticipation[] = [];
+  const tierlistParticipation: Array<GameParticipation & { voteCode?: string }> = [];
   const tournamentParticipation: GameParticipation[] = [];
   const quizParticipation: GameParticipation[] = [];
-  const windowCalls: Array<{ kind: "tierlist" | "tournament" | "quiz"; needle: string; limit: number }> = [];
-  const publishedManyCalls: Array<{ kind: "tierlist" | "tournament" | "quiz"; ids: string[] }> = [];
-  const votedAmongCalls: Array<{ kind: "tierlist" | "tournament" | "quiz"; viewerId: string; ids: string[] }> = [];
+  const windowCalls: Array<{ kind: GameKind; needle: string; limit: number }> = [];
+  const manyCalls: Array<{ kind: GameKind; ids: string[]; viewerId: string | undefined }> = [];
   const deps: CommunityDeps = {
     repo,
     now: () => NOW,
@@ -216,77 +242,15 @@ function createDeps(repo: CommunityRepository) {
       getMuralPublicPayload: (userId, muralId) => muralPayloads.get(`${userId}:${muralId}`) ?? null,
       getMuralSummary: (userId, muralId) => muralPayloads.get(`${userId}:${muralId}`)?.mural ?? null
     },
-    tierlists: {
-      discoverWindow: (needle, limit) => {
-        windowCalls.push({ kind: "tierlist", needle, limit });
-        return [...tierlistRefs.values()]
-          .filter((r) => normalizeWords(r.name).includes(needle))
-          .sort(byNewest)
-          .slice(0, limit)
-          .map((r) => ({ id: r.id, createdAt: r.createdAt, ownerUserId: r.ownerUserId, promotedAt: r.promotedAt }));
-      },
-      getPublishedMany: (ids) => {
-        publishedManyCalls.push({ kind: "tierlist", ids: [...ids] });
-        return ids.flatMap((id) => tierlistRefs.get(id) ?? []);
-      },
-      votedAmong: (viewerId, ids) => {
-        votedAmongCalls.push({ kind: "tierlist", viewerId, ids: [...ids] });
-        return ids.filter((id) => votes.has(`${viewerId}:${id}`));
-      },
-      get: (id) => tierlistRefs.get(id),
-      listByOwner: (owner) => [...tierlistRefs.values()].filter((r) => r.ownerUserId === owner).sort(byNewest),
-      discoverByWorks: byWorks("tierlist", tierlistRefs, (r) => ({ id: r.id, createdAt: r.createdAt, ownerUserId: r.ownerUserId, promotedAt: r.promotedAt })),
-      fillRankingCovers: (_id, ranking) => ranking.map((tier) => ({ ...tier, books: tier.books.map((book) => ({ ...book, coverUrl: book.coverUrl ?? `https://covers.test/${book.title}.jpg` })) }))
+    games: {
+      tierlist: fakeGameSource("tierlist", tierlistRefs, votes, tierlistParticipation, gameWorks, windowCalls, manyCalls),
+      tournament: fakeGameSource("tournament", tournamentRefs, tournamentVotes, tournamentParticipation, gameWorks, windowCalls, manyCalls),
+      quiz: fakeGameSource("quiz", quizRefs, quizPlays, quizParticipation, gameWorks, windowCalls, manyCalls)
     },
-    tournaments: { completedForParticipant: () => [],
-      discoverWindow: (needle, limit) => {
-        windowCalls.push({ kind: "tournament", needle, limit });
-        return [...tournamentRefs.values()]
-          .filter((r) => normalizeWords(r.name).includes(needle))
-          .sort(byNewest)
-          .slice(0, limit)
-          .map((r) => ({ id: r.id, createdAt: r.createdAt, ownerUserId: r.ownerUserId }));
-      },
-      getPublishedMany: (ids) => {
-        publishedManyCalls.push({ kind: "tournament", ids: [...ids] });
-        return ids.flatMap((id) => tournamentRefs.get(id) ?? []);
-      },
-      votedAmong: (viewerId, ids) => {
-        votedAmongCalls.push({ kind: "tournament", viewerId, ids: [...ids] });
-        return ids.filter((id) => tournamentVotes.has(`${viewerId}:${id}`));
-      },
-      get: (id) => tournamentRefs.get(id),
-      listByOwner: (owner) => [...tournamentRefs.values()].filter((r) => r.ownerUserId === owner).sort(byNewest),
-      discoverByWorks: byWorks("tournament", tournamentRefs, (r) => ({ id: r.id, createdAt: r.createdAt, ownerUserId: r.ownerUserId }))
-    },
-    quizzes: {
-      discoverWindow: (needle, limit) => {
-        windowCalls.push({ kind: "quiz", needle, limit });
-        return [...quizRefs.values()]
-          .filter((r) => normalizeWords(r.name).includes(needle))
-          .sort(byNewest)
-          .slice(0, limit)
-          .map((r) => ({ id: r.id, createdAt: r.createdAt, ownerUserId: r.ownerUserId }));
-      },
-      getPublishedMany: (ids) => {
-        publishedManyCalls.push({ kind: "quiz", ids: [...ids] });
-        return ids.flatMap((id) => quizRefs.get(id) ?? []);
-      },
-      votedAmong: (viewerId, ids) => {
-        votedAmongCalls.push({ kind: "quiz", viewerId, ids: [...ids] });
-        return ids.filter((id) => quizPlays.has(`${viewerId}:${id}`));
-      },
-      get: (id) => quizRefs.get(id),
-      listByOwner: (owner) => [...quizRefs.values()].filter((r) => r.ownerUserId === owner).sort(byNewest),
-      discoverByWorks: byWorks("quiz", quizRefs, (r) => ({ id: r.id, createdAt: r.createdAt, ownerUserId: r.ownerUserId }))
-    },
-    participation: {
-      tierlists: () => tierlistParticipation,
-      tournaments: () => tournamentParticipation,
-      quizzes: () => quizParticipation
-    }
+    rankingCovers: (_id, ranking) => ranking.map((tier) => ({ ...tier, books: tier.books.map((book) => ({ ...book, coverUrl: book.coverUrl ?? `https://covers.test/${book.title}.jpg` })) })),
+    completedTournaments: () => []
   };
-  return { deps, readerProfiles, usernames, ownedMurals, muralPayloads, libraries, libraryCalls, sharedCounts, sharedShelves, sharedBookCountsCalls, sharedBooksCalls, tierlistRefs, tournamentRefs, quizRefs, seenAt, votes, tournamentVotes, quizPlays, readerGlyphs, readerGlyphCalls, tierlistParticipation, tournamentParticipation, quizParticipation, windowCalls, publishedManyCalls, votedAmongCalls, workMatches, gameWorks };
+  return { deps, readerProfiles, usernames, ownedMurals, muralPayloads, libraries, libraryCalls, sharedCounts, sharedShelves, sharedBookCountsCalls, sharedBooksCalls, tierlistRefs, tournamentRefs, quizRefs, seenAt, votes, tournamentVotes, quizPlays, readerGlyphs, readerGlyphCalls, tierlistParticipation, tournamentParticipation, quizParticipation, windowCalls, manyCalls, workMatches, gameWorks };
 }
 
 function profileRow(userId: string, overrides: Partial<ProfileRow> = {}): ProfileRow {
@@ -364,7 +328,7 @@ test("completed joined tournaments page with other events and count as personal 
   const { deps, readerProfiles, seenAt } = createDeps(repo);
   readerProfiles.set("alice", reader("alice"));
   repo.upsertProfile(profileRow("alice"));
-  deps.tournaments.completedForParticipant = () => [1, 2].map(n => ({ ...tournRef(`cup-${n}`, "alice"), status: "completed", completedAt: at(10 + n), winner: { workId: "w1", title: "Dune", author: "Frank Herbert", cover: null } }));
+  deps.completedTournaments = () => [1, 2].map(n => ({ card: tournRef(`cup-${n}`, "alice", { status: "completed" }), completedAt: at(10 + n), winner: { workId: "w1", title: "Dune", author: "Frank Herbert", cover: null } }));
   const service = createCommunityService(deps);
   const kinds = new Set(["completion"]);
   const first = service.getDashboard("viewer", undefined, 1, kinds);
@@ -390,49 +354,22 @@ const pageThrough = (service: CommunityService, limit: number, kinds?: ReadonlyS
   return ids;
 };
 
-export function tierRef(id: string, owner: string, overrides: Partial<PublishedTierlistRef> = {}): PublishedTierlistRef {
-  return {
-    id,
-    ownerUserId: owner,
-    createdAt: "2026-09-02T00:00:00.000Z",
-    voteCode: `code-${id}`,
-    name: `List ${id}`,
-    poolSize: 5,
-    ballotCount: 2,
-    eligibleVoteCount: 1,
-    promotedAt: null,
-    votingOpen: true,
-    covers: [],
-    ...overrides
-  };
+type CardOverrides<K extends GameKind> = Partial<Omit<GameContent<K>, "kind" | "id">> & { ownerUserId?: string; createdAt?: string };
+
+export function tierRef(id: string, owner: string, overrides: CardOverrides<"tierlist"> = {}): GameCard<"tierlist"> {
+  const { ownerUserId = owner, createdAt = "2026-09-02T00:00:00.000Z", ...content } = overrides;
+  const promotedAt = content.promotedAt ?? null;
+  return { id, ownerUserId, createdAt, promoted: promotedAt !== null, content: { kind: "tierlist", id, voteCode: `code-${id}`, name: `List ${id}`, poolSize: 5, ballotCount: 2, votingOpen: true, covers: [], ...content, promotedAt } };
 }
 
-export function tournRef(id: string, owner: string, overrides: Partial<PublishedTournamentRef> = {}): PublishedTournamentRef {
-  return {
-    id,
-    ownerUserId: owner,
-    createdAt: "2026-09-03T00:00:00.000Z",
-    name: `Cup ${id}`,
-    bracketSize: 8,
-    status: "active",
-    covers: [],
-    ...overrides
-  };
+export function tournRef(id: string, owner: string, overrides: CardOverrides<"tournament"> = {}): GameCard<"tournament"> {
+  const { ownerUserId = owner, createdAt = "2026-09-03T00:00:00.000Z", ...content } = overrides;
+  return { id, ownerUserId, createdAt, promoted: false, content: { kind: "tournament", id, name: `Cup ${id}`, bracketSize: 8, status: "active", bookCount: 8, covers: [], ...content } };
 }
 
-export function quizRef(id: string, owner: string, overrides: Partial<PublishedQuizRef> = {}): PublishedQuizRef {
-  return {
-    id,
-    ownerUserId: owner,
-    createdAt: "2026-09-04T00:00:00.000Z",
-    voteCode: `play-${id}`,
-    name: `Quiz ${id}`,
-    questionCount: 6,
-    playCount: 3,
-    playOpen: true,
-    covers: [],
-    ...overrides
-  };
+export function quizRef(id: string, owner: string, overrides: CardOverrides<"quiz"> = {}): GameCard<"quiz"> {
+  const { ownerUserId = owner, createdAt = "2026-09-04T00:00:00.000Z", ...content } = overrides;
+  return { id, ownerUserId, createdAt, promoted: false, content: { kind: "quiz", id, voteCode: `play-${id}`, name: `Quiz ${id}`, questionCount: 6, playCount: 3, playOpen: true, covers: [], ...content } };
 }
 
 test("follow needs an existing user who isn't you", () => {
@@ -1130,13 +1067,14 @@ test("your games' participation shows as one row per game", () => {
   const service = createCommunityService(deps);
   readerProfiles.set("ana", reader("ana"));
   repo.upsertProfile(profileRow("ana"));
-  tierlistParticipation.push({ id: "t1", name: "Sci-fi", covers: ["a", "b", "c", "d"], participantCount: 4, latestAt: at(2), recent: [{ userId: "ana", at: at(2) }, { userId: "ghost", at: at(1) }] });
+  tierlistParticipation.push({ id: "t1", name: "Sci-fi", covers: ["a", "b", "c", "d"], voteCode: "v1", participantCount: 4, latestAt: at(2), recent: [{ userId: "ana", at: at(2) }, { userId: "ghost", at: at(1) }] });
   const { items } = service.getDashboard("viewer", undefined, 20, ALL_KINDS);
   assert.equal(items.length, 1);
   const row = items[0] as ParticipationItem;
   assert.equal(row.kind, "participation");
   assert.equal(row.id, "tierlist:t1");
   assert.equal(row.game.covers.length, 3);
+  assert.equal(row.game.voteCode, "v1");
   assert.equal(row.count, 4);
   assert.equal(row.createdAt, at(2));
   assert.deepEqual(row.actors.map((actor) => actor.username), ["user-ana"]);
@@ -1565,17 +1503,17 @@ test("participation is asked for only the last 30 days, and only when the client
   const { repo } = createRepoFake();
   const { deps } = createDeps(repo);
   const asked: string[][] = [];
-  for (const source of ["tierlists", "tournaments", "quizzes"] as const) {
-    const original = deps.participation[source];
-    deps.participation[source] = (userId, since) => {
-      asked.push([source, userId, since]);
+  for (const kind of GAME_KINDS) {
+    const original = deps.games[kind].participation;
+    deps.games[kind].participation = (userId, since) => {
+      asked.push([kind, userId, since]);
       return original(userId, since);
     };
   }
   const service = createCommunityService(deps);
 
   service.getDashboard("viewer", undefined, 20, ALL_KINDS);
-  assert.deepEqual(asked, ["tierlists", "tournaments", "quizzes"].map((source) => [source, "viewer", "2026-08-31T00:00:00.000Z"]));
+  assert.deepEqual(asked, GAME_KINDS.map((kind) => [kind, "viewer", "2026-08-31T00:00:00.000Z"]));
 
   asked.length = 0;
   service.getDashboard("viewer", undefined, 20);
@@ -1858,7 +1796,7 @@ test("a discover search of punctuation alone lists everything, as an empty searc
 
 test("discover builds summaries and voted flags only for the page it returns", () => {
   const { repo } = createRepoFake();
-  const { deps, readerProfiles, tierlistRefs, tournamentRefs, votes, publishedManyCalls, votedAmongCalls } = createDeps(repo);
+  const { deps, readerProfiles, tierlistRefs, tournamentRefs, votes, manyCalls } = createDeps(repo);
   const service = createCommunityService(deps);
   readerProfiles.set("alice", reader("alice"));
   for (let day = 1; day <= 4; day++) tierlistRefs.set(`t${day}`, tierRef(`t${day}`, "alice", { createdAt: at(day) }));
@@ -1869,12 +1807,11 @@ test("discover builds summaries and voted flags only for the page it returns", (
   const page = service.getDiscover("all", "", 3, 1, "viewer");
 
   assert.deepEqual(page.items.map((item) => [item.content.id, item.content.viewerVoted]), [["g1", false], ["t4", true], ["t3", false]]);
-  assert.deepEqual(publishedManyCalls, [{ kind: "tierlist", ids: ["t4", "t3"] }, { kind: "tournament", ids: ["g1"] }, { kind: "quiz", ids: [] }]);
-  assert.deepEqual(votedAmongCalls, [{ kind: "tierlist", viewerId: "viewer", ids: ["t4", "t3"] }, { kind: "tournament", viewerId: "viewer", ids: ["g1"] }, { kind: "quiz", viewerId: "viewer", ids: [] }]);
+  assert.deepEqual(manyCalls, [{ kind: "tierlist", ids: ["t4", "t3"], viewerId: "viewer" }, { kind: "tournament", ids: ["g1"], viewerId: "viewer" }]);
 
-  votedAmongCalls.length = 0;
+  manyCalls.length = 0;
   service.getDiscover("all", "", 3, 1);
-  assert.deepEqual(votedAmongCalls, []);
+  assert.deepEqual(manyCalls.map((call) => call.viewerId), [undefined, undefined]);
 });
 
 test("discover reads each window only as far as the page needs, up to the cap, and the cap for a search", () => {
@@ -2507,6 +2444,37 @@ test("getActivity links votes to what was voted on, and leaves vanished ones pla
   assert.deepEqual(payloads.gone, { game: "tournament", id: "gone", name: "Old cup" });
 });
 
+test("getActivity enriches a vote by its ref_type even when the payload names no game", () => {
+  const { repo } = createRepoFake();
+  const { deps, usernames, tournamentRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  repo.upsertProfile(profileRow("alice"));
+  tournamentRefs.set("g1", tournRef("g1", "bob", { covers: ["a", "b", "c", "d"] }));
+  repo.insertEvent({ id: "e-known", user_id: "alice", type: "voted_on", ref_type: "tournament", ref_id: "g1", payload: JSON.stringify({ id: "g1", name: "Cup g1" }), created_at: at(3) });
+  repo.insertEvent({ id: "e-unknown", user_id: "alice", type: "voted_on", ref_type: "book", ref_id: "g1", payload: JSON.stringify({ game: "tournament", id: "g1", name: "Cup g1" }), created_at: at(2) });
+  const payloads = Object.fromEntries(service.getActivity("alice", "alice", undefined, 20).items.map((item) => [item.id, item.payload]));
+  assert.deepEqual(payloads["e-known"], { id: "g1", name: "Cup g1", covers: ["a", "b", "c"], href: "/arena/g1" });
+  assert.deepEqual(payloads["e-unknown"], { game: "tournament", id: "g1", name: "Cup g1" });
+});
+
+test("a feed vote with an unknown ref_type is dropped without any game lookup", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tournamentRefs } = createDeps(repo);
+  const lookups: string[] = [];
+  const tournament = deps.games.tournament;
+  deps.games.tournament = { ...tournament, get: (id) => { lookups.push(id); return tournament.get(id); } };
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  repo.upsertProfile(profileRow("alice"));
+  repo.insertFollow({ follower_id: "viewer", followee_id: "alice", created_at: at(1) });
+  tournamentRefs.set("g1", tournRef("g1", "carol"));
+  repo.insertEvent({ id: "e-odd", user_id: "alice", type: "voted_on", ref_type: "book", ref_id: "g1", payload: null, created_at: at(4) });
+  const { items } = service.getDashboard("viewer", undefined, 20, ALL_KINDS);
+  assert.deepEqual(items.filter((item) => item.kind === "vote"), []);
+  assert.deepEqual(lookups, []);
+});
+
 function suggestionFixture() {
   const { repo } = createRepoFake();
   const { deps, readerProfiles, readerGlyphs, libraryCalls, sharedCounts, sharedShelves, sharedBookCountsCalls, sharedBooksCalls } = createDeps(repo);
@@ -2809,7 +2777,7 @@ test("a follower's vote on the viewer's own tournament or unpromoted tier list i
   assert.deepEqual(ids(), ["rank-mine", "rank-theirs", "vote-mine", "vote-theirs"]);
 });
 
-test("getActivity enriches quiz publications and plays with a play link, and drops them once the quiz is deleted", () => {
+test("getActivity enriches quiz publications and plays with a play link, and drops the publication once the quiz is deleted", () => {
   const { repo } = createRepoFake();
   const { deps, usernames, quizRefs } = createDeps(repo);
   const service = createCommunityService(deps);
@@ -2827,7 +2795,37 @@ test("getActivity enriches quiz publications and plays with a play link, and dro
   ]);
 
   quizRefs.clear();
-  assert.deepEqual(service.getActivity("alice", "alice", undefined, 20).items, []);
+  assert.deepEqual(service.getActivity("alice", "alice", undefined, 20).items.map((item) => item.id), ["e-play"]);
+});
+
+test("an activity vote on a deleted quiz is kept, without cover or link", () => {
+  const { repo } = createRepoFake();
+  const { deps, usernames } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  repo.upsertProfile(profileRow("alice"));
+  repo.insertEvent({ id: "e-play", user_id: "alice", type: "voted_on", ref_type: "quiz", ref_id: "gone", payload: JSON.stringify({ game: "quiz", id: "gone", name: "Old quiz" }), created_at: at(2) });
+
+  assert.deepEqual(service.getActivity("alice", "alice", undefined, 20).items.map((item) => [item.id, item.type, item.payload]), [["e-play", "voted_on", { game: "quiz", id: "gone", name: "Old quiz" }]]);
+});
+
+test("profile published lists and completions send at most three covers per game", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, usernames, tierlistRefs, tournamentRefs, quizRefs } = createDeps(repo);
+  readerProfiles.set("alice", reader("alice"));
+  usernames.set("alice", "alice");
+  repo.upsertProfile(profileRow("alice"));
+  const covers = ["a", "b", "c", "d", "e", "f", "g", "h"];
+  tierlistRefs.set("t1", tierRef("t1", "alice", { covers }));
+  tournamentRefs.set("g1", tournRef("g1", "alice", { covers }));
+  quizRefs.set("q1", quizRef("q1", "alice", { covers: covers.slice(0, 3) }));
+  deps.completedTournaments = () => [{ card: tournRef("cup", "alice", { status: "completed", covers }), completedAt: at(10), winner: { workId: "w1", title: "Dune", author: "Frank Herbert", cover: null } }];
+  const service = createCommunityService(deps);
+
+  const { published } = service.getProfileByUsername("alice");
+  assert.deepEqual([published.tierlists[0]?.covers, published.tournaments[0]?.covers, published.quizzes[0]?.covers], [["a", "b", "c"], ["a", "b", "c"], ["a", "b", "c"]]);
+  const completion = service.getDashboard("viewer", undefined, 20, new Set(["completion"])).items[0];
+  assert.equal(completion?.kind === "completion" ? completion.tournament.covers.length : null, 3);
 });
 
 test("getActivity drops a quiz publication whose quiz is owned by someone else", () => {
@@ -2859,7 +2857,7 @@ test("a profile's Published list includes its quizzes, and nothing while unpubli
 
 test("discover's quiz filter returns only quizzes, all includes them, and the viewer's played flag is set", () => {
   const { repo } = createRepoFake();
-  const { deps, readerProfiles, tierlistRefs, tournamentRefs, quizRefs, quizPlays, windowCalls, votedAmongCalls } = createDeps(repo);
+  const { deps, readerProfiles, tierlistRefs, tournamentRefs, quizRefs, quizPlays, windowCalls, manyCalls } = createDeps(repo);
   const service = createCommunityService(deps);
   readerProfiles.set("alice", reader("alice"));
   tierlistRefs.set("t1", tierRef("t1", "alice", { createdAt: at(1) }));
@@ -2872,7 +2870,7 @@ test("discover's quiz filter returns only quizzes, all includes them, and the vi
   const onlyQuizzes = service.getDiscover("quiz", "", 10, 0, "viewer");
   assert.deepEqual(onlyQuizzes.items.map((item) => [item.content.kind, item.content.id, item.content.viewerVoted]), [["quiz", "q2", false], ["quiz", "q1", true]]);
   assert.deepEqual(windowCalls.map((call) => call.kind), ["quiz"]);
-  assert.deepEqual(votedAmongCalls.filter((call) => call.kind === "quiz"), [{ kind: "quiz", viewerId: "viewer", ids: ["q2", "q1"] }]);
+  assert.deepEqual(manyCalls.filter((call) => call.kind === "quiz"), [{ kind: "quiz", ids: ["q2", "q1"], viewerId: "viewer" }]);
 
   assert.deepEqual(service.getDiscover("all", "", 10, 0).items.map((item) => item.content.kind), ["quiz", "quiz", "tournament", "tierlist"]);
   assert.deepEqual(service.getDiscover("tierlist", "", 10, 0).items.map((item) => item.content.kind), ["tierlist"]);
@@ -2885,10 +2883,10 @@ test("discover leaves out a quiz that was deleted between the window and the pag
   const service = createCommunityService(deps);
   readerProfiles.set("alice", reader("alice"));
   quizRefs.set("q1", quizRef("q1", "alice"));
-  const original = deps.quizzes.getPublishedMany;
-  deps.quizzes.getPublishedMany = (ids) => {
+  const original = deps.games.quiz.getMany;
+  deps.games.quiz.getMany = (ids, viewerId) => {
     quizRefs.clear();
-    return original(ids);
+    return original(ids, viewerId);
   };
 
   assert.deepEqual(service.getDiscover("quiz", "", 10, 0).items, []);
@@ -2919,7 +2917,7 @@ test("a discover search also finds games that contain a matching book, once each
 
 test("a book match keeps the game's origin owner and promoted flag, and only the returned page is hydrated", () => {
   const { repo } = createRepoFake();
-  const { deps, readerProfiles, tierlistRefs, workMatches, gameWorks, publishedManyCalls } = createDeps(repo);
+  const { deps, readerProfiles, tierlistRefs, workMatches, gameWorks, manyCalls } = createDeps(repo);
   const service = createCommunityService(deps);
   readerProfiles.set("alice", reader("alice"));
   tierlistRefs.set("t1", tierRef("t1", "alice", { name: "Gothic", createdAt: at(3), promotedAt: at(4) }));
@@ -2930,7 +2928,7 @@ test("a book match keeps the game's origin owner and promoted flag, and only the
   for (const id of ["t1", "t2", "t3", "t4"]) gameWorks.set(`tierlist:${id}`, ["w-frankenstein"]);
   const page = service.getDiscover("tierlist", "frank", 2, 0);
   assert.deepEqual(page.items.map((item) => [item.content.id, item.author.username]), [["t1", "user-alice"], ["t2", "Original creator unavailable"]]);
-  assert.deepEqual(publishedManyCalls, [{ kind: "tierlist", ids: ["t1", "t2"] }, { kind: "tournament", ids: [] }, { kind: "quiz", ids: [] }]);
+  assert.deepEqual(manyCalls, [{ kind: "tierlist", ids: ["t1", "t2"], viewerId: undefined }]);
 });
 
 test("a voted_on ranking with a null cover is filled through the tierlists API", () => {

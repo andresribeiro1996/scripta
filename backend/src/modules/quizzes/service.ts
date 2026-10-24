@@ -2,7 +2,9 @@
 // QuizzesRepository port, not on SQLite — same reasoning as every other
 // module's service.ts.
 
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
+import { generateVoteCode } from "../../voteCode.js";
+import type { GameByWork } from "../works/index.js";
 import { QUIZ_QUESTION_TYPES, generateQuizQuestions, gradeAnswers, quizPreview, type PlayBoard, type PublicBookData, type PublicQuizQuestion, type QuestionStat, type QuizBook, type QuizPreview, type QuizQuestion, type QuizQuestionType, type ResultPlay, type SubmittedAnswer } from "@scripta/shared";
 import type { GameParticipation } from "@scripta/shared/community";
 import type { QuizWorks, QuizzesRepository } from "./domain/ports.js";
@@ -41,15 +43,6 @@ function readDocument(quiz: Quiz): QuizDocument {
     books: Array.isArray(data.books) ? data.books : [],
     questions: Array.isArray(data.questions) ? data.questions : null
   };
-}
-
-// Same unambiguous alphabet as tierlists' vote codes — these get read
-// aloud and typed by hand. An identifier, not a secret.
-const CODE_ALPHABET = "23456789abcdefghjkmnpqrstuvwxyz";
-
-export function generateVoteCode(): string {
-  const bytes = randomBytes(8);
-  return [...bytes].map((b) => CODE_ALPHABET[b % CODE_ALPHABET.length]).join("");
 }
 
 export type Player = { kind: "user"; userId: string } | { kind: "anonymous"; playId: string | null };
@@ -115,13 +108,17 @@ export interface QuizDiscoverRef {
 
 const COVER_PREVIEW_LIMIT = 3;
 
-function toPublishedRef(row: QuizRow, playCount: number): PublishedQuizRef {
-  const doc = readDocument(toQuiz(row));
+function previewCovers(row: QuizRow): string[] {
   const covers: string[] = [];
-  for (const book of doc.books) {
+  for (const book of readDocument(toQuiz(row)).books) {
     if (covers.length >= COVER_PREVIEW_LIMIT) break;
     if (typeof book?.coverUrl === "string" && book.coverUrl) covers.push(book.coverUrl);
   }
+  return covers;
+}
+
+function toPublishedRef(row: QuizRow, playCount: number): PublishedQuizRef {
+  const doc = readDocument(toQuiz(row));
   return {
     id: row.id,
     ownerUserId: row.owner_user_id,
@@ -131,7 +128,7 @@ function toPublishedRef(row: QuizRow, playCount: number): PublishedQuizRef {
     questionCount: doc.questionCount,
     playCount,
     playOpen: row.play_open === 1,
-    covers,
+    covers: previewCovers(row),
     preview: quizPreview(doc)
   };
 }
@@ -399,23 +396,18 @@ export function createQuizzesService(repo: QuizzesRepository, works: QuizWorks, 
     votedAmong: (viewerUserId, ids) => repo.votedAmong(viewerUserId, ids),
 
     participationByOwner(ownerUserId, since) {
-      return repo.listParticipation(ownerUserId, since).map((row) => ({
+      const rows = repo.listParticipation(ownerUserId, since);
+      const quizzes = new Map(repo.listPublicByIds(rows.map((row) => row.id)).map((quiz) => [quiz.id, quiz]));
+      return rows.map((row) => ({
         id: row.id,
         name: row.name,
-        covers: [],
+        covers: quizzes.has(row.id) ? previewCovers(quizzes.get(row.id)!) : [],
         participantCount: row.participants,
         latestAt: row.latest_at,
         recent: repo.listRecentPlayers(row.id, ownerUserId, RECENT_PARTICIPANT_LIMIT).map((r) => ({ userId: r.user_id, at: r.at }))
       }));
     }
   };
-}
-
-export interface GameByWork {
-  id: string;
-  name: string;
-  path: string;
-  ownerUserId: string | null;
 }
 
 export interface QuizzesPublicApi {

@@ -11,6 +11,7 @@
 // whether closes_at must already have passed.
 
 import { randomUUID } from "node:crypto";
+import type { GameByWork } from "../works/index.js";
 import type { Duel, DuelSide, SeedBook, Tournament, TournamentRecord, TournamentView } from "@scripta/shared";
 import type { GameParticipation } from "@scripta/shared/community";
 import {
@@ -499,13 +500,6 @@ export interface PublishedTournamentRef {
 export interface CompletedTournamentRef extends PublishedTournamentRef {
   completedAt: string;
   winner: NonNullable<Tournament["winner"]>;
-}
-
-export interface GameByWork {
-  id: string;
-  name: string;
-  path: string;
-  ownerUserId: string | null;
 }
 
 export interface ArenaPublicApi {

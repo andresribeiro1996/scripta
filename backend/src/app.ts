@@ -38,16 +38,16 @@ import {
   setDashboardSeenAt,
   userHasUsername
 } from "./modules/auth/index.js";
-import { deleteArenaUserData, getArenaPublicApi, registerArenaModule } from "./modules/arena/index.js";
+import { deleteArenaUserData, getArenaPublicApi, getCompletedTournaments, getTournamentGameSource, registerArenaModule } from "./modules/arena/index.js";
 import { createBestEffortRecorder, deleteCommunityUserData, getCommunityPublicApi, registerCommunityModule } from "./modules/community/index.js";
 import type { RankingTierPreview } from "@scripta/shared/community";
 import { canonicalWorks, catalogGenres, enqueueBookCovers, getWorkPage, matchWorks, registerBooksModule } from "./modules/books/index.js";
 import { deleteGalleryUserData, registerGalleryModule } from "./modules/gallery/index.js";
 import { communityRatings, copyOfWork, deleteLibraryUserData, heldWorks, holdersOfWorks, registerLibraryModule, resolvePublicLibrary, readerGlyphFor, resolveEntryWorks, WorkResolutionError, sharedBookCounts, sharedBooks, sweepLibraryWorks, sweepWorks, WORKS_SWEEP_INTERVAL_MS, type BookEvent } from "./modules/library/index.js";
 import { deleteMuralsUserData, getMuralsPublicApi, registerMuralsModule, rekeyMuralsBooks, sweepMuralsWorks } from "./modules/murals/index.js";
-import { deleteQuizzesUserData, getQuizzesPublicApi, registerQuizzesModule } from "./modules/quizzes/index.js";
+import { deleteQuizzesUserData, getQuizGameSource, getQuizzesPublicApi, registerQuizzesModule } from "./modules/quizzes/index.js";
 import { deleteSocialsUserData, registerSocialsModule } from "./modules/socials/index.js";
-import { deleteTierlistsUserData, registerTierlistsModule, getTierlistsPublicApi } from "./modules/tierlists/index.js";
+import { deleteTierlistsUserData, getTierlistGameSource, registerTierlistsModule, getTierlistsPublicApi } from "./modules/tierlists/index.js";
 import { registerWaitlistModule } from "./modules/waitlist/index.js";
 import { registerWorksModule } from "./modules/works/index.js";
 
@@ -200,43 +200,12 @@ export function buildApp() {
     canonicalWorks,
     catalogGenres,
     getWorkPage,
-    tierlistFacts: getTierlistsPublicApi().topShelfFacts,
-    tournamentFacts: getArenaPublicApi().topShelfFacts,
-    quizFacts: getQuizzesPublicApi().topShelfFacts,
     getDashboardSeenAt,
     setDashboardSeenAt,
     murals: getMuralsPublicApi(getTierlistsPublicApi().getTierlistData),
-    tierlists: {
-      discoverWindow: getTierlistsPublicApi().discoverWindow,
-      getPublishedMany: getTierlistsPublicApi().getPublishedMany,
-      votedAmong: getTierlistsPublicApi().votedAmong,
-      get: getTierlistsPublicApi().getPublished,
-      listByOwner: getTierlistsPublicApi().listPublishedByOwner,
-      discoverByWorks: getTierlistsPublicApi().discoverByWorks,
-      fillRankingCovers: getTierlistsPublicApi().fillRankingCovers
-    },
-    tournaments: {
-      completedForParticipant: getArenaPublicApi().completedForParticipant,
-      discoverWindow: getArenaPublicApi().discoverWindow,
-      getPublishedMany: getArenaPublicApi().getPublishedMany,
-      votedAmong: getArenaPublicApi().votedAmong,
-      get: getArenaPublicApi().getPublished,
-      listByOwner: getArenaPublicApi().listPublishedByOwner,
-      discoverByWorks: getArenaPublicApi().discoverByWorks
-    },
-    quizzes: {
-      discoverWindow: getQuizzesPublicApi().discoverWindow,
-      getPublishedMany: getQuizzesPublicApi().getPublishedMany,
-      votedAmong: getQuizzesPublicApi().votedAmong,
-      get: getQuizzesPublicApi().getPublished,
-      listByOwner: getQuizzesPublicApi().listPublishedByOwner,
-      discoverByWorks: getQuizzesPublicApi().discoverByWorks
-    },
-    participation: {
-      tierlists: getTierlistsPublicApi().participationByOwner,
-      tournaments: getArenaPublicApi().participationByOwner,
-      quizzes: getQuizzesPublicApi().participationByOwner
-    }
+    games: { tierlist: getTierlistGameSource(), tournament: getTournamentGameSource(), quiz: getQuizGameSource() },
+    rankingCovers: getTierlistsPublicApi().fillRankingCovers,
+    completedTournaments: getCompletedTournaments()
   });
   app.register(registerTierlistsModule, {
     emitPublished: (copyId: string, ownerUserId: string) => recordActivity(ownerUserId, "tierlist_published", "tierlist", copyId),

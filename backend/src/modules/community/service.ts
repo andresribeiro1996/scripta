@@ -1,17 +1,15 @@
 import { randomUUID } from "node:crypto";
 import { normalizeWords, type IdentityKey, type ReaderProfile } from "@scripta/shared";
-import { categoryFor, contentDetail, decodeCursor, encodeCursor, parseRankingPreview, DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
-import type { ActivityEventType, ActivityItem, CommunityAuthor, CommunityProfileView, CommunityEventType, DiscoverItem, DiscoverType, FeedSettings, FollowState, GameParticipation, OwnProfile, Page, ParticipationGameKind, PersonResult, PublishProfileInput, PublishedContent, QuizSummary, RankingTierPreview, SavedContentRef, SharedBook, SuggestedReader, TierlistSummary, TournamentSummary } from "@scripta/shared/community";
+import { categoryFor, contentDetail, contentTarget, decodeCursor, encodeCursor, parseRankingPreview, DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
+import type { ActivityEventType, ActivityItem, CommunityAuthor, CommunityProfileView, CommunityEventType, DiscoverItem, DiscoverType, FeedSettings, FollowState, OwnProfile, Page, PersonResult, PublishProfileInput, PublishedContent, RankingTierPreview, SavedContentRef, SharedBook, SuggestedReader } from "@scripta/shared/community";
 import type { CompletionItem, DashboardFeedPage, DigestItem, ParticipationItem } from "@scripta/shared/dashboard";
-import type { CompletedTournamentRef, PublishedTournamentRef, TournamentDiscoverRef } from "../arena/service.js";
 import type { MuralsPublicApi } from "../murals/publicApi.js";
-import type { PublishedQuizRef, QuizDiscoverRef } from "../quizzes/service.js";
-import type { PublishedTierlistRef, TierlistDiscoverRef } from "../tierlists/service.js";
 import { currentTrace } from "../../trace.js";
 import { FollowLimitError, InvalidCursorError, MuralNotOwnedError, NotFollowingError, ProfileNotFoundError, SelfFollowError, UsernameRequiredError } from "./domain/errors.js";
 import { ACTIVITY_EVENT_TYPES, ARCHIVE_BATCH, BACKFILL_BATCH, BOOK_EVENTS_PER_DAY, BOOK_EVENTS_WINDOW_MS, DIGEST_EVENT_TYPES, FEED_EVENT_TYPES, FEED_WINDOW_MS, FOLLOW_LIMIT, READING_EVENT_TYPES } from "./domain/feed.js";
+import { GAME_KINDS, asGameKind, type GameCard, type GameKind, type GameSources } from "./domain/games.js";
 import type { CommunityRepository, CursorKeyset } from "./domain/ports.js";
-import type { EventRow, FollowRow } from "./domain/types.js";
+import type { CommunityRefType, EventRow, FollowRow } from "./domain/types.js";
 import { createVisibility, readerListing, type ReaderListing } from "./domain/visibility.js";
 
 const DISCOVER_SCAN_CAP = 500;
@@ -23,8 +21,6 @@ const DASHBOARD_COUNT_CAP = 100;
 const DASHBOARD_REFILL_ROUNDS = 3;
 const NAMED_PARTICIPANTS = 3;
 const LEGACY_DIGEST_KINDS: ReadonlySet<string> = new Set(["publication", "vote", "reading", "follow"]);
-
-export type CommunityRefType = "tierlist" | "tournament" | "quiz" | "book" | "user" | "mural";
 
 function parseEventPayload(raw: string | null): Record<string, unknown> | undefined {
   if (raw === null) return {};
@@ -78,20 +74,8 @@ export function createBestEffortRecorder(emit: CommunityPublicApi["emitEvent"], 
  *  a page the reader taps through to, not a thumbnail. */
 const FEED_COVER_LIMIT = 3;
 
-function toTierlistSummary(ref: PublishedTierlistRef): TierlistSummary {
-  return { kind: "tierlist", id: ref.id, voteCode: ref.voteCode, name: ref.name, poolSize: ref.poolSize, ballotCount: ref.ballotCount, votingOpen: ref.votingOpen, promotedAt: ref.promotedAt, covers: ref.covers.slice(0, FEED_COVER_LIMIT) };
-}
-
-function toTournamentSummary(ref: PublishedTournamentRef): TournamentSummary {
-  return { kind: "tournament", id: ref.id, name: ref.name, bracketSize: ref.bracketSize, status: ref.status, bookCount: ref.bracketSize, covers: ref.covers.slice(0, FEED_COVER_LIMIT) };
-}
-
-function toQuizSummary(ref: PublishedQuizRef): QuizSummary {
-  return { kind: "quiz", id: ref.id, voteCode: ref.voteCode, name: ref.name, questionCount: ref.questionCount, playCount: ref.playCount, playOpen: ref.playOpen, covers: ref.covers.slice(0, FEED_COVER_LIMIT), ...(ref.preview ? { preview: ref.preview } : {}) };
-}
-
-function withVoted(content: PublishedContent, voted: Set<string> | null): PublishedContent {
-  return voted ? { ...content, viewerVoted: voted.has(content.id) } : content;
+function feedContent<C extends PublishedContent>(content: C): C {
+  return { ...content, covers: content.covers.slice(0, FEED_COVER_LIMIT) };
 }
 
 export interface CommunityDeps {
@@ -111,37 +95,9 @@ export interface CommunityDeps {
   searchUsernameOwners(query: string, limit: number): string[];
   matchWorks(query: string, limit: number): string[];
   murals: Pick<MuralsPublicApi, "ownsMural" | "getMuralPublicPayload" | "getMuralSummary">;
-  tierlists: {
-    discoverWindow(needle: string, limit: number): TierlistDiscoverRef[];
-    getPublishedMany(ids: string[]): PublishedTierlistRef[];
-    votedAmong(viewerId: string, ids: string[]): string[];
-    get(id: string): PublishedTierlistRef | undefined;
-    listByOwner(ownerUserId: string): PublishedTierlistRef[];
-    discoverByWorks(workIds: string[], limit: number): TierlistDiscoverRef[];
-    fillRankingCovers(tierlistId: string, ranking: RankingTierPreview[]): RankingTierPreview[];
-  };
-  tournaments: {
-    completedForParticipant(viewerId: string, since: string): CompletedTournamentRef[];
-    discoverWindow(needle: string, limit: number): TournamentDiscoverRef[];
-    getPublishedMany(ids: string[]): PublishedTournamentRef[];
-    votedAmong(viewerId: string, ids: string[]): string[];
-    get(id: string): PublishedTournamentRef | undefined;
-    listByOwner(ownerUserId: string): PublishedTournamentRef[];
-    discoverByWorks(workIds: string[], limit: number): TournamentDiscoverRef[];
-  };
-  quizzes: {
-    discoverWindow(needle: string, limit: number): QuizDiscoverRef[];
-    getPublishedMany(ids: string[]): PublishedQuizRef[];
-    votedAmong(viewerId: string, ids: string[]): string[];
-    get(id: string): PublishedQuizRef | undefined;
-    listByOwner(ownerUserId: string): PublishedQuizRef[];
-    discoverByWorks(workIds: string[], limit: number): QuizDiscoverRef[];
-  };
-  participation: {
-    tierlists(userId: string, since: string): GameParticipation[];
-    tournaments(userId: string, since: string): GameParticipation[];
-    quizzes(userId: string, since: string): GameParticipation[];
-  };
+  games: GameSources;
+  rankingCovers(tierlistId: string, ranking: RankingTierPreview[]): RankingTierPreview[];
+  completedTournaments(viewerId: string, since: string): Array<{ card: GameCard<"tournament">; completedAt: string; winner: { title: string; author: string; cover: string | null; workId: string | null } }>;
 }
 
 export interface CommunityService {
@@ -169,7 +125,7 @@ export interface CommunityService {
   archiveOldEvents(): Promise<{ moved: number; purged: number }>;
 }
 
-export type DiscoverEntry = { kind: "tierlist" | "tournament" | "quiz"; id: string; userId: string; promoted: boolean; createdAt: string };
+export type DiscoverEntry = { kind: GameKind; id: string; userId: string; promoted: boolean; createdAt: string };
 
 function createGlyphLookup(deps: Pick<CommunityDeps, "repo" | "readerGlyphFor">): (userId: string) => IdentityKey | null {
   const visibility = createVisibility(deps.repo, null);
@@ -188,20 +144,14 @@ function withGlyph(author: ReaderProfile & { unavailable?: boolean }, userId: st
   return glyph ? { ...author, userId, readerGlyph: glyph } : { ...author, userId };
 }
 
-export function buildDiscoverItems(deps: Pick<CommunityDeps, "repo" | "tierlists" | "tournaments" | "quizzes" | "resolveProfiles" | "readerGlyphFor">, entries: DiscoverEntry[], viewerId?: string): DiscoverItem[] {
+export function buildDiscoverItems(deps: Pick<CommunityDeps, "repo" | "games" | "resolveProfiles" | "readerGlyphFor">, entries: DiscoverEntry[], viewerId?: string): DiscoverItem[] {
   const authors = deps.resolveProfiles([...new Set(entries.map((entry) => entry.userId))]);
-  const idsOf = (kind: DiscoverEntry["kind"]) => entries.filter((entry) => entry.kind === kind).map((entry) => entry.id);
-  const tierlistIds = idsOf("tierlist");
-  const tournamentIds = idsOf("tournament");
-  const quizIds = idsOf("quiz");
-  const votedTierlists = viewerId ? new Set(deps.tierlists.votedAmong(viewerId, tierlistIds)) : null;
-  const votedTournaments = viewerId ? new Set(deps.tournaments.votedAmong(viewerId, tournamentIds)) : null;
-  const votedQuizzes = viewerId ? new Set(deps.quizzes.votedAmong(viewerId, quizIds)) : null;
-  const contents = new Map<string, PublishedContent>([
-    ...deps.tierlists.getPublishedMany(tierlistIds).map((ref) => [`tierlist:${ref.id}`, withVoted(toTierlistSummary(ref), votedTierlists)] as const),
-    ...deps.tournaments.getPublishedMany(tournamentIds).map((ref) => [`tournament:${ref.id}`, withVoted(toTournamentSummary(ref), votedTournaments)] as const),
-    ...deps.quizzes.getPublishedMany(quizIds).map((ref) => [`quiz:${ref.id}`, withVoted(toQuizSummary(ref), votedQuizzes)] as const)
-  ]);
+  const contents = new Map<string, PublishedContent>();
+  for (const kind of GAME_KINDS) {
+    const ids = entries.filter((entry) => entry.kind === kind).map((entry) => entry.id);
+    if (ids.length === 0) continue;
+    for (const card of deps.games[kind].getMany(ids, viewerId)) contents.set(`${kind}:${card.id}`, feedContent(card.content));
+  }
   const glyphOf = createGlyphLookup(deps);
   return entries.flatMap((entry) => {
     const author = authors.get(entry.userId) ?? (entry.promoted ? { username: "Original creator unavailable", avatarUrl: null, unavailable: true } : undefined);
@@ -250,21 +200,15 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
   const participationItems = (viewerId: string, since: string): ParticipationItem[] => {
     const glyphOf = glyphLookup();
     const visibility = createVisibility(repo, viewerId);
-    const games: Array<[ParticipationGameKind, GameParticipation[]]> = [
-      ["tierlist", deps.participation.tierlists(viewerId, since)],
-      ["tournament", deps.participation.tournaments(viewerId, since)],
-      ["quiz", deps.participation.quizzes(viewerId, since)]
-    ];
-    return games.flatMap(([kind, list]) =>
-      list.map((game) => {
+    return GAME_KINDS.flatMap((kind) =>
+      deps.games[kind].participation(viewerId, since).map((game) => {
         const nameable = game.recent.map((entry) => entry.userId).filter((userId) => visibility.canNameAsParticipant(userId));
         const profiles = deps.resolveProfiles(nameable);
         const actors = nameable
           .filter((userId) => profiles.has(userId))
           .slice(0, NAMED_PARTICIPANTS)
           .map((userId) => withGlyph(profiles.get(userId)!, userId, glyphOf));
-        const voteCode = kind === "tierlist" ? deps.tierlists.get(game.id)?.voteCode : kind === "quiz" ? deps.quizzes.get(game.id)?.voteCode : undefined;
-        return { kind: "participation" as const, id: `${kind}:${game.id}`, game: { kind, id: game.id, name: game.name, covers: game.covers.slice(0, FEED_COVER_LIMIT), ...(voteCode ? { voteCode } : {}) }, actors, count: game.participantCount, createdAt: game.latestAt };
+        return { kind: "participation" as const, id: `${kind}:${game.id}`, game: { kind, id: game.id, name: game.name, covers: game.covers.slice(0, FEED_COVER_LIMIT), ...(game.voteCode ? { voteCode: game.voteCode } : {}) }, actors, count: game.participantCount, createdAt: game.latestAt };
       })
     );
   };
@@ -281,10 +225,10 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
     participation.filter((item) => withinBound(bound, item.createdAt, item.id)).map((item) => ({ id: item.id, createdAt: item.createdAt, participation: item }));
 
   const completionItems = (viewerId: string, since: string): CompletionItem[] => {
-    const refs = deps.tournaments.completedForParticipant(viewerId, since);
-    const profiles = deps.resolveProfiles(refs.map((ref) => ref.ownerUserId));
+    const completed = deps.completedTournaments(viewerId, since);
+    const profiles = deps.resolveProfiles(completed.map(({ card }) => card.ownerUserId));
     const glyphOf = glyphLookup();
-    return refs.map((ref) => ({ kind: "completion", id: `completed:${ref.id}`, actor: withGlyph(profiles.get(ref.ownerUserId) ?? { username: "Creator unavailable", avatarUrl: null, unavailable: true }, ref.ownerUserId, glyphOf), tournament: toTournamentSummary(ref), winner: { title: ref.winner.title, author: ref.winner.author, coverUrl: ref.winner.cover, workId: ref.winner.workId }, createdAt: ref.completedAt }));
+    return completed.map(({ card, completedAt, winner }) => ({ kind: "completion", id: `completed:${card.id}`, actor: withGlyph(profiles.get(card.ownerUserId) ?? { username: "Creator unavailable", avatarUrl: null, unavailable: true }, card.ownerUserId, glyphOf), tournament: feedContent(card.content), winner: { title: winner.title, author: winner.author, coverUrl: winner.cover, workId: winner.workId }, createdAt: completedAt }));
   };
 
   const completionRows = (items: CompletionItem[], bound: Bound): DigestRow[] => items.filter((item) => withinBound(bound, item.createdAt, item.id)).map((item) => ({ id: item.id, createdAt: item.createdAt, completion: item }));
@@ -294,28 +238,18 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
       const event = row.event;
       const actor = profiles.get(event.user_id);
       if (event.type === "tierlist_published" || event.type === "tournament_published" || event.type === "quiz_published") {
-        if (event.ref_type === "quiz") {
-          const ref = deps.quizzes.get(event.ref_id);
-          if (ref && ref.ownerUserId === event.user_id && actor) return { kind: "publication", id: event.id, actor: withGlyph(actor, event.user_id, glyphOf), type: event.type as CommunityEventType, content: toQuizSummary(ref), createdAt: event.created_at };
-        } else if (event.ref_type === "tierlist") {
-          const ref = deps.tierlists.get(event.ref_id);
-          // A promoted tier list outlives its creator's profile, so it keeps
-          // a placeholder author rather than dropping out of the feed.
-          const author = ref && ref.ownerUserId === event.user_id ? actor ?? (ref.promotedAt ? { username: "Original creator unavailable", avatarUrl: null, unavailable: true } : undefined) : undefined;
-          if (ref && author) return { kind: "publication", id: event.id, actor: withGlyph(author, event.user_id, glyphOf), type: event.type as CommunityEventType, content: toTierlistSummary(ref), createdAt: event.created_at };
-        } else {
-          const ref = deps.tournaments.get(event.ref_id);
-          if (ref && ref.ownerUserId === event.user_id && actor) return { kind: "publication", id: event.id, actor: withGlyph(actor, event.user_id, glyphOf), type: event.type as CommunityEventType, content: toTournamentSummary(ref), createdAt: event.created_at };
-        }
+        const kind = asGameKind(event.ref_type);
+        const card = kind ? deps.games[kind].get(event.ref_id) : undefined;
+        const author = card && card.ownerUserId === event.user_id ? actor ?? (card.promoted ? { username: "Original creator unavailable", avatarUrl: null, unavailable: true } : undefined) : undefined;
+        if (card && author) return { kind: "publication", id: event.id, actor: withGlyph(author, event.user_id, glyphOf), type: event.type as CommunityEventType, content: feedContent(card.content), createdAt: event.created_at };
       } else if (event.type === "voted_on") {
-        const quiz = event.ref_type === "quiz" ? deps.quizzes.get(event.ref_id) : undefined;
-        const tierlist = event.ref_type === "tierlist" ? deps.tierlists.get(event.ref_id) : undefined;
-        const tournament = event.ref_type !== "quiz" && event.ref_type !== "tierlist" ? deps.tournaments.get(event.ref_id) : undefined;
-        const ownerId = quiz?.ownerUserId ?? tournament?.ownerUserId ?? (tierlist && !tierlist.promotedAt ? tierlist.ownerUserId : undefined);
+        const kind = asGameKind(event.ref_type);
+        const card = kind ? deps.games[kind].get(event.ref_id) : undefined;
+        const ownerId = card && !card.promoted ? card.ownerUserId : undefined;
         if (hideOwnGameVotes && ownerId === viewerId) return undefined;
-        const content = quiz ? toQuizSummary(quiz) : tierlist ? toTierlistSummary(tierlist) : tournament ? toTournamentSummary(tournament) : undefined;
+        const content = card ? feedContent(card.content) : undefined;
         const parsedRanking = event.ref_type === "tierlist" ? parseRankingPreview(parseEventPayload(event.payload)?.ranking) : [];
-        const ranking = parsedRanking.some((tier) => tier.books.some((book) => !book.coverUrl)) ? deps.tierlists.fillRankingCovers(event.ref_id, parsedRanking) : parsedRanking;
+        const ranking = parsedRanking.some((tier) => tier.books.some((book) => !book.coverUrl)) ? deps.rankingCovers(event.ref_id, parsedRanking) : parsedRanking;
         if (content && actor) return { kind: "vote", id: event.id, actor: withGlyph(actor, event.user_id, glyphOf), content, ...(ranking.length ? { ranking } : {}), createdAt: event.created_at };
       } else if (event.type === "mural_published" && actor) {
         const profile = repo.getProfileRow(event.user_id);
@@ -389,12 +323,11 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
         const event: EventRow = { id: `saved:mural:${ref.id}`, user_id: ref.ownerId, type: "mural_published", ref_type: "mural", ref_id: ref.id, payload: null, created_at: savedAt };
         return this.resolveEvent(viewerId, event);
       }
-      const content = ref.kind === "tierlist" ? deps.tierlists.get(ref.id) : ref.kind === "tournament" ? deps.tournaments.get(ref.id) : deps.quizzes.get(ref.id);
-      if (!content) throw new ProfileNotFoundError();
-      const author = deps.resolveProfiles([content.ownerUserId]).get(content.ownerUserId) ?? ("promotedAt" in content && content.promotedAt ? { username: "Original creator unavailable", avatarUrl: null, unavailable: true } : undefined);
+      const card = deps.games[ref.kind].get(ref.id);
+      if (!card) throw new ProfileNotFoundError();
+      const author = deps.resolveProfiles([card.ownerUserId]).get(card.ownerUserId) ?? (card.promoted ? { username: "Original creator unavailable", avatarUrl: null, unavailable: true } : undefined);
       if (!author) throw new ProfileNotFoundError();
-      const summary = ref.kind === "tierlist" ? toTierlistSummary(content as PublishedTierlistRef) : ref.kind === "tournament" ? toTournamentSummary(content as PublishedTournamentRef) : toQuizSummary(content as PublishedQuizRef);
-      return { kind: "publication", id: `saved:${ref.kind}:${ref.id}`, actor: withGlyph(author, content.ownerUserId, glyphLookup()), type: ref.kind === "tierlist" ? "tierlist_published" : ref.kind === "tournament" ? "tournament_published" : "quiz_published", content: summary, createdAt: savedAt };
+      return { kind: "publication", id: `saved:${ref.kind}:${ref.id}`, actor: withGlyph(author, card.ownerUserId, glyphLookup()), type: `${ref.kind}_published` as const, content: feedContent(card.content), createdAt: savedAt };
     },
     follow(followerId, followeeId) {
       if (followerId === followeeId) throw new SelfFollowError();
@@ -487,9 +420,9 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
         },
         mural,
         published: {
-          tierlists: shown ? deps.tierlists.listByOwner(userId).map(toTierlistSummary) : [],
-          tournaments: shown ? deps.tournaments.listByOwner(userId).map(toTournamentSummary) : [],
-          quizzes: shown ? deps.quizzes.listByOwner(userId).map(toQuizSummary) : []
+          tierlists: shown ? deps.games.tierlist.listByOwner(userId).map((card) => feedContent(card.content)) : [],
+          tournaments: shown ? deps.games.tournament.listByOwner(userId).map((card) => feedContent(card.content)) : [],
+          quizzes: shown ? deps.games.quiz.listByOwner(userId).map((card) => feedContent(card.content)) : []
         }
       };
       if (viewerId === userId) view.feedSettings = settingsFor(userId);
@@ -533,19 +466,12 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
       const needle = normalizeWords(q);
       const window = needle ? DISCOVER_SCAN_CAP : Math.min(offset + limit + 1, DISCOVER_SCAN_CAP);
       const workIds = needle ? deps.matchWorks(q, DISCOVER_BOOK_WORKS) : [];
-      const byBook = <T>(kind: { discoverByWorks(workIds: string[], limit: number): T[] }): T[] => (workIds.length === 0 ? [] : kind.discoverByWorks(workIds, DISCOVER_SCAN_CAP));
-      const entries = new Map<string, { kind: "tierlist" | "tournament" | "quiz"; id: string; userId: string; createdAt: string; promoted: boolean }>();
-      const add = (kind: "tierlist" | "tournament" | "quiz", ref: { id: string; ownerUserId: string; createdAt: string }, promoted: boolean) => {
-        entries.set(`${kind}:${ref.id}`, { kind, id: ref.id, userId: ref.ownerUserId, createdAt: ref.createdAt, promoted });
-      };
-      if (type === "all" || type === "tierlist") {
-        for (const ref of [...deps.tierlists.discoverWindow(needle, window), ...byBook(deps.tierlists)]) add("tierlist", ref, ref.promotedAt !== null);
-      }
-      if (type === "all" || type === "tournament") {
-        for (const ref of [...deps.tournaments.discoverWindow(needle, window), ...byBook(deps.tournaments)]) add("tournament", ref, false);
-      }
-      if (type === "all" || type === "quiz") {
-        for (const ref of [...deps.quizzes.discoverWindow(needle, window), ...byBook(deps.quizzes)]) add("quiz", ref, false);
+      const entries = new Map<string, DiscoverEntry>();
+      for (const kind of GAME_KINDS) {
+        if (type !== "all" && type !== kind) continue;
+        const source = deps.games[kind];
+        const byBook = workIds.length === 0 ? [] : source.discoverByWorks(workIds, DISCOVER_SCAN_CAP);
+        for (const listing of [...source.discoverWindow(needle, window), ...byBook]) entries.set(`${kind}:${listing.id}`, { kind, id: listing.id, userId: listing.ownerUserId, createdAt: listing.createdAt, promoted: listing.promoted });
       }
       const authors = deps.resolveProfiles([...new Set([...entries.values()].map((e) => e.userId))]);
       const visible = [...entries.values()]
@@ -617,38 +543,20 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
       const hiddenTypes = owner ? [] : ACTIVITY_EVENT_TYPES.filter((type) => !settings[categoryFor(type)]);
       const toActivityItem = (event: EventRow): ActivityItem | undefined => {
         if (!owner && !settings[categoryFor(event.type)]) return undefined;
-        if (event.type === "tierlist_published") {
-          const ref = deps.tierlists.get(event.ref_id);
-          if (!ref || ref.ownerUserId !== event.user_id) return undefined;
-          const summary = toTierlistSummary(ref);
-          const payload: Record<string, unknown> = { ...parseEventPayload(event.payload), name: ref.name, detail: contentDetail(summary), covers: summary.covers };
-          if (ref.voteCode) payload.href = `/vote/${ref.voteCode}`;
-          return { id: event.id, type: event.type, payload, createdAt: event.created_at };
-        }
-        if (event.type === "quiz_published") {
-          const ref = deps.quizzes.get(event.ref_id);
-          if (!ref || ref.ownerUserId !== event.user_id) return undefined;
-          const summary = toQuizSummary(ref);
-          return { id: event.id, type: event.type, payload: { ...parseEventPayload(event.payload), name: ref.name, href: `/play/${ref.voteCode}`, detail: contentDetail(summary), covers: summary.covers }, createdAt: event.created_at };
-        }
-        if (event.type === "tournament_published") {
-          const ref = deps.tournaments.get(event.ref_id);
-          if (!ref || ref.ownerUserId !== event.user_id) return undefined;
-          const summary = toTournamentSummary(ref);
-          return { id: event.id, type: event.type, payload: { ...parseEventPayload(event.payload), name: ref.name, href: `/arena/${ref.id}`, detail: contentDetail(summary), covers: summary.covers }, createdAt: event.created_at };
+        if (event.type === "tierlist_published" || event.type === "tournament_published" || event.type === "quiz_published") {
+          const kind = event.type === "tierlist_published" ? "tierlist" : event.type === "tournament_published" ? "tournament" : "quiz";
+          const card = deps.games[kind].get(event.ref_id);
+          if (!card || card.ownerUserId !== event.user_id) return undefined;
+          const content = feedContent(card.content);
+          return { id: event.id, type: event.type, payload: { ...parseEventPayload(event.payload), name: content.name, href: contentTarget(content), detail: contentDetail(content), covers: content.covers }, createdAt: event.created_at };
         }
         const payload = parseEventPayload(event.payload);
         if (payload !== undefined && event.type === "voted_on") {
-          if (payload.game === "quiz") {
-            const ref = deps.quizzes.get(event.ref_id);
-            if (!ref) return undefined;
-            Object.assign(payload, { covers: ref.covers.slice(0, FEED_COVER_LIMIT), href: `/play/${ref.voteCode}` });
-          } else if (payload.game === "tierlist") {
-            const ref = deps.tierlists.get(event.ref_id);
-            if (ref) Object.assign(payload, { covers: ref.covers.slice(0, FEED_COVER_LIMIT), ...(ref.voteCode ? { href: `/vote/${ref.voteCode}` } : {}) });
-          } else {
-            const ref = deps.tournaments.get(event.ref_id);
-            if (ref) Object.assign(payload, { covers: ref.covers.slice(0, FEED_COVER_LIMIT), href: `/arena/${ref.id}` });
+          const kind = asGameKind(event.ref_type);
+          const card = kind ? deps.games[kind].get(event.ref_id) : undefined;
+          if (card) {
+            const content = feedContent(card.content);
+            Object.assign(payload, { covers: content.covers, href: contentTarget(content) });
           }
         }
         if (event.type === "book_started" && payload) return { id: event.id, type: "book_added", payload: { ...payload, started: true }, createdAt: event.created_at };

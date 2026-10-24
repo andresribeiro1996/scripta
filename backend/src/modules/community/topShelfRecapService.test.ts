@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { test } from "node:test";
-import type { TierlistShelfFacts } from "../tierlists/service.js";
 import { createRecapRepository } from "./adapters/sqlite/sqliteRecapRepository.js";
+import type { GameShelfFact } from "./domain/games.js";
 import type { RecapData } from "./topShelfRecap.js";
 import type { ShelfInput } from "./topShelf.js";
 import { createTopShelfRecapService } from "./topShelfRecapService.js";
@@ -11,14 +11,14 @@ import type { ShelfGatherer, TopShelfDeps } from "./topShelfService.js";
 
 process.env.TZ = "America/Sao_Paulo";
 
-const tierlist = (id: string, over: Partial<TierlistShelfFacts> = {}): TierlistShelfFacts => ({ id, ownerUserId: "u1", open: true, promoted: false, createdAt: "2026-10-05T00:00:00.000Z", voters: 5, votesSince: 3, workIds: ["w1"], placements: [], ...over });
-const input = (over: Partial<ShelfInput> = {}): ShelfInput => ({ tierlists: [], tournaments: [], quizzes: [], engagement: new Map(), visibleOwners: new Set(["u1"]), canonical: new Map(), genres: new Map(), ...over });
+const tierlist = (id: string, over: Partial<GameShelfFact> = {}): GameShelfFact => ({ kind: "tierlist", id, ownerUserId: "u1", open: true, promoted: false, createdAt: "2026-10-05T00:00:00.000Z", voters: 5, votesSince: 3, workIds: ["w1"], placements: [], champion: null, ...over });
+const input = (over: Partial<ShelfInput> = {}): ShelfInput => ({ games: [], engagement: new Map(), visibleOwners: new Set(["u1"]), canonical: new Map(), genres: new Map(), ...over });
 
 function setup(now = "2026-10-21T10:00:00Z") {
   const db = new DatabaseSync(":memory:");
   db.exec(readFileSync(new URL("./adapters/sqlite/schema.sql", import.meta.url), "utf8"));
   const repo = createRecapRepository(db);
-  const state = { live: input(), gathered: [] as Array<[string | null, string | null]>, gatherInput: input({ quizzes: [{ id: "q", ownerUserId: "u1", open: true, createdAt: "2026-09-10T00:00:00.000Z", voters: 5, votesSince: 2, workIds: ["w1"] }] }), now: Date.parse(now) };
+  const state = { live: input(), gathered: [] as Array<[string | null, string | null]>, gatherInput: input({ games: [{ kind: "quiz", id: "q", ownerUserId: "u1", open: true, promoted: false, createdAt: "2026-09-10T00:00:00.000Z", voters: 5, votesSince: 2, workIds: ["w1"], placements: [], champion: null }] }), now: Date.parse(now) };
   const gatherer: ShelfGatherer = {
     gather: (since, until) => { state.gathered.push([since, until]); return state.gatherInput; },
     cached: () => state.live,
@@ -26,9 +26,7 @@ function setup(now = "2026-10-21T10:00:00Z") {
   const shelf = { getWorkPage: (id: string) => (id === "gone" || id === "w-old" ? undefined : { id, title: `Title ${id}`, author: "A", editions: [{ coverUrl: `https://cdn.test/${id}.jpg` }] }) } as unknown as TopShelfDeps;
   const community = {
     repo: { getProfileRow: () => undefined, getFeedSettings: () => undefined },
-    tierlists: { getPublishedMany: (ids: string[]) => ids.map((id) => ({ id, ownerUserId: "u1", createdAt: "2026-10-05T00:00:00.000Z", voteCode: `c-${id}`, name: `List ${id}`, poolSize: 4, ballotCount: 5, eligibleVoteCount: 5, promotedAt: null, votingOpen: true, covers: [] })), votedAmong: () => [] },
-    tournaments: { getPublishedMany: () => [], votedAmong: () => [] },
-    quizzes: { getPublishedMany: () => [], votedAmong: () => [] },
+    games: { tierlist: { getMany: (ids: string[]) => ids.map((id) => ({ id, ownerUserId: "u1", createdAt: "2026-10-05T00:00:00.000Z", promoted: false, content: { kind: "tierlist", id, voteCode: `c-${id}`, name: `List ${id}`, poolSize: 4, ballotCount: 5, promotedAt: null, votingOpen: true, covers: [] } })) }, tournament: { getMany: () => [] }, quiz: { getMany: () => [] } },
     resolveProfiles: (ids: string[]) => new Map(ids.map((id) => [id, { username: `user-${id}`, avatarUrl: null }])),
     readerGlyphFor: () => null,
   } as never;
@@ -72,7 +70,7 @@ test("freezeMonth never overwrites a frozen month", () => {
 test("getRecap resolves links live and drops a hidden hottest game", () => {
   const { service, repo, state } = setup();
   repo.put("2026-09", data(), "x");
-  state.live = input({ tierlists: [tierlist("a", { open: false }), tierlist("b")] });
+  state.live = input({ games: [tierlist("a", { open: false }), tierlist("b")] });
   const open = service.getRecap("2026-09");
   assert.deepEqual(open?.cards.map((c) => c.kind), ["summary", "book", "hottestGame"]);
   const book = open?.cards[1];
@@ -81,11 +79,11 @@ test("getRecap resolves links live and drops a hidden hottest game", () => {
   const hot = open?.cards[2];
   assert.equal(hot?.kind === "hottestGame" && hot.open, false);
 
-  state.live = input({ tierlists: [tierlist("a", { open: false }), tierlist("b", { open: false })] });
+  state.live = input({ games: [tierlist("a", { open: false }), tierlist("b", { open: false })] });
   const closed = service.getRecap("2026-09")?.cards[1];
   assert.equal(closed?.kind === "book" && closed.game, null);
 
-  state.live = input({ tierlists: [tierlist("a", { ownerUserId: "x" }), tierlist("b", { workIds: ["other"] })], visibleOwners: new Set(["u1"]) });
+  state.live = input({ games: [tierlist("a", { ownerUserId: "x" }), tierlist("b", { workIds: ["other"] })], visibleOwners: new Set(["u1"]) });
   const hidden = service.getRecap("2026-09");
   assert.deepEqual(hidden?.cards.map((c) => c.kind), ["summary", "book"]);
   const noLink = hidden?.cards[1];
@@ -95,7 +93,7 @@ test("getRecap resolves links live and drops a hidden hottest game", () => {
 test("getRecap links a card whose frozen work was merged into another", () => {
   const { service, repo, state } = setup();
   repo.put("2026-09", data({ books: [{ board: "champions", workId: "w-old", value: 4, candidates: [{ kind: "tierlist", id: "a" }] }] }), "x");
-  state.live = input({ tierlists: [tierlist("a", { workIds: ["w-new"] })], canonical: new Map([["w-old", "w-new"]]) });
+  state.live = input({ games: [tierlist("a", { workIds: ["w-new"] })], canonical: new Map([["w-old", "w-new"]]) });
   const book = service.getRecap("2026-09")?.cards[1];
   assert.equal(book?.kind === "book" && book.game?.content.id, "a");
   assert.equal(book?.kind === "book" && book.book.workId, "w-new");
