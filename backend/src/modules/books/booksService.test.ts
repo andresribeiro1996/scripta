@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { mock, test } from "node:test";
+import type { CoverPriority } from "./worker.js";
 
 const scratch = mkdtempSync(join(tmpdir(), "books-service-test-"));
 process.env.AUTH_DB_PATH = join(scratch, "auth.sqlite");
@@ -2727,4 +2728,20 @@ test("subject series are written in the same transaction as the edition's", asyn
   h.repo.addWorkSeries = (...args) => { inside.push(h.db.isTransaction); return addWork(...args); };
   await h.service.getDetails(dune);
   assert.deepEqual(inside, [true]);
+});
+
+test("a BNP book from before 2002 is looked up by ISBN only, in every lane", async () => {
+  const lookups = async (book: { year: number | null; createdBy: "bnp" | "seed" }, lane: CoverPriority) => {
+    const calls: string[] = [];
+    const h = harness({ sources: { isbndb: recordingSource(calls, "isbndb"), apple: recordingSource(calls, "apple"), openlibrary: recordingSource(calls, "openlibrary") } });
+    const row = h.repo.createBook({ title: "Hannibal", author: "Thomas Harris", isbn: "9789724610788", year: book.year, createdBy: book.createdBy }, ["isbn:9789724610788"], "2026-10-01T00:00:00.000Z");
+    await h.service.processBook(row.id, lane);
+    return calls.some((call) => call.endsWith(":title"));
+  };
+  assert.equal(await lookups({ year: 1999, createdBy: "bnp" }, "background"), false);
+  assert.equal(await lookups({ year: 1999, createdBy: "bnp" }, "upgrade"), false);
+  assert.equal(await lookups({ year: 1999, createdBy: "bnp" }, "normal"), false);
+  assert.equal(await lookups({ year: 2005, createdBy: "bnp" }, "background"), true);
+  assert.equal(await lookups({ year: null, createdBy: "bnp" }, "background"), true);
+  assert.equal(await lookups({ year: 1999, createdBy: "seed" }, "background"), true);
 });

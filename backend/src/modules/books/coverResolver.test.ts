@@ -119,3 +119,14 @@ test("without an ISBN only title steps run; an empty title runs nothing", async 
   assert.deepEqual(await findBestCover({ isbn: null, title: "?!", author: "" }, new Set(), sources({ apple: idle }), images({})), { found: null, complete: true, failures: [] });
   assert.deepEqual(idle.calls, []);
 });
+
+test("an ISBN-only lookup asks no source by title and keeps its exact hit", async () => {
+  const titled = [{ source: "apple" as const, url: "https://a/guess", title: "Orlando", authors: ["Virginia Woolf"] }];
+  const isbndb = source({ isbn: [{ source: "isbndb", url: "https://i/small" }], titled });
+  const apple = source({ titled });
+  const openlibrary = source({ titled });
+  const outcome = await findBestCover({ ...orlando, isbnOnly: true }, new Set(), sources({ isbndb, apple, openlibrary }), images({ "https://i/small": [300, 450], "https://a/guess": [900, 1400] }));
+  assert.equal(outcome.found?.candidate.url, "https://i/small");
+  assert.equal(outcome.complete, true);
+  assert.deepEqual([...apple.calls, ...isbndb.calls, ...openlibrary.calls].filter((call) => call.startsWith("title:")), []);
+});

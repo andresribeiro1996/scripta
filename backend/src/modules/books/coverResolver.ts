@@ -35,7 +35,7 @@ async function attempt<T>(step: () => Promise<T>): Promise<T | SourceUnavailable
 }
 
 export async function findBestCover(
-  book: { isbn: string | null; title: string; author: string },
+  book: { isbn: string | null; title: string; author: string; isbnOnly?: boolean },
   rejected: Set<string>,
   sources: CoverSources,
   fetchImage: FetchCoverImage
@@ -46,7 +46,7 @@ export async function findBestCover(
   const steps: Array<() => Promise<CoverCandidate[]>> = [];
   const isbn = book.isbn;
   if (isbn) steps.push(...exactOrder.map((source) => () => source.byIsbn(isbn)));
-  if (normalizeTitle(book.title)) steps.push(...titleOrder.map((source) => () => source.byTitle(book.title, book.author, accept, isbn)));
+  if (!book.isbnOnly && normalizeTitle(book.title)) steps.push(...titleOrder.map((source) => () => source.byTitle(book.title, book.author, accept, isbn)));
 
   let best: FoundCover | null = null;
   let complete = true;

@@ -22,6 +22,7 @@ const WORK_RECHECK_MS = 30 * 24 * 60 * 60 * 1000;
 const UNAVAILABLE_BACKOFF_MS = 10 * 60 * 1000;
 const COVER_EXTENSION = "webp";
 const SAVE_GROUP_LIMIT = 50;
+const ISBN_ONLY_BEFORE_YEAR = 2002;
 const NO_SOURCE: CoverSource = { byIsbn: async () => [], byTitle: async () => [] };
 const NO_COVER: ResolvedCover = { url: null, fullUrl: null, pending: false, upgrading: false };
 const PENDING: ResolvedCover = { url: null, fullUrl: null, pending: true, upgrading: false };
@@ -362,7 +363,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       if (!book || book.cover_status === "manual") return;
       try {
         const sources = sourcesFor(lane, book);
-        const outcome = await findBestCover({ isbn: book.isbn, title: book.title, author: book.author }, deps.repo.listRejectedUrls(bookId), sources, deps.fetchImage);
+        const outcome = await findBestCover({ isbn: book.isbn, title: book.title, author: book.author, isbnOnly: book.created_by === "bnp" && book.year !== null && book.year < ISBN_ONLY_BEFORE_YEAR }, deps.repo.listRejectedUrls(bookId), sources, deps.fetchImage);
         if (sources.apple !== NO_SOURCE && !outcome.failures.some((failure) => failure.source === "apple")) deps.repo.setAppleChecked(bookId, now().toISOString());
         for (const failure of outcome.failures.filter((failure) => !(failure instanceof SourcePausedError))) deps.warn({ bookId, source: failure.source, error: failure.message }, "cover source unavailable");
 
