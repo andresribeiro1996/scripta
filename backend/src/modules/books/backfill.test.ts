@@ -108,7 +108,7 @@ test("a batch that reports a pause makes the details backfill skip ticks until t
   let clock = 1_000;
   const results: Array<number | null> = [5_000, null];
   let batches = 0;
-  startDetailsBackfill(async () => { batches++; return results.shift() ?? null; }, () => {}, 1000, timers, () => clock);
+  startDetailsBackfill(async () => { batches++; return results.shift() ?? null; }, () => {}, 1000, timers, 0, () => clock);
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(batches, 1);
   clock = 4_999;
@@ -125,7 +125,7 @@ test("a batch that reports a pause makes the details backfill skip ticks until t
 test("a details backfill given an initial delay runs nothing until it passes, then once, then every interval", async () => {
   const { state, timers } = fakeTimers();
   let batches = 0;
-  startDetailsBackfill(async () => { batches++; }, () => {}, 600_000, timers, undefined, 30_000);
+  startDetailsBackfill(async () => { batches++; }, () => {}, 600_000, timers, 30_000);
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(batches, 0);
   assert.equal(state.firstRun?.delay, 30_000);
@@ -140,7 +140,7 @@ test("a details backfill given an initial delay runs nothing until it passes, th
 
 test("stopping a details backfill before its initial delay passes cancels the first run", () => {
   const { state, timers } = fakeTimers();
-  const stop = startDetailsBackfill(async () => {}, () => {}, 600_000, timers, undefined, 30_000);
+  const stop = startDetailsBackfill(async () => {}, () => {}, 600_000, timers, 30_000);
   assert.notEqual(state.firstRun, null);
   stop();
   assert.equal(state.firstRun, null);
@@ -264,6 +264,21 @@ test("a works tick that changes nothing logs nothing", async () => {
   startWorksBackfill({ assignMissingWorks: () => { calls++; return 0; }, fillTitleKeys: () => { calls++; return 0; } }, log, undefined, timers);
   await until(() => calls === 2);
   await new Promise(setImmediate);
+  assert.deepEqual(info, []);
+});
+
+test("a works backfill given an initial delay assigns nothing until it passes, then drains once", async () => {
+  const { state, timers } = fakeTimers();
+  const { log, info } = fakeLog();
+  const limits: number[] = [];
+  startWorksBackfill({ assignMissingWorks: (limit) => { limits.push(limit); return 0; }, fillTitleKeys: () => 0 }, log, undefined, timers, 45_000);
+  await until(() => limits.length > 0);
+  assert.deepEqual(limits, []);
+  assert.equal(state.firstRun?.delay, 45_000);
+  assert.equal(state.delay, 600_000);
+  state.firstRun!.callback();
+  await until(() => limits.length > 0);
+  assert.deepEqual(limits, [250]);
   assert.deepEqual(info, []);
 });
 
@@ -416,6 +431,20 @@ test("the cover colour backfill drains in batches of 50 until one comes back sho
   assert.deepEqual(limits, [50, 50, 50, 50]);
   assert.equal(info.length, 1);
   assert.deepEqual(error, []);
+});
+
+test("a cover colour backfill given an initial delay colours nothing until it passes, then drains once", async () => {
+  const { state, timers } = fakeTimers();
+  const { log } = fakeLog();
+  const limits: number[] = [];
+  startCoverColorBackfill(async (limit) => { limits.push(limit); return 0; }, log, undefined, timers, 50_000);
+  await until(() => limits.length > 0);
+  assert.deepEqual(limits, []);
+  assert.equal(state.firstRun?.delay, 50_000);
+  assert.equal(state.delay, 600_000);
+  state.firstRun!.callback();
+  await until(() => limits.length > 0);
+  assert.deepEqual(limits, [50]);
 });
 
 test("the cover colour backfill stops draining when stopped and logs a failed batch as an error", async () => {

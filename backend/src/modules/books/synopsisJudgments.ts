@@ -109,7 +109,6 @@ export function startSynopsisJobs(deps: HeldDeps & { info: (details: Record<stri
     (error) => deps.onError(error),
     SWEEP_INTERVAL_MS,
     undefined,
-    undefined,
     deps.initialDelayMs
   );
   return {

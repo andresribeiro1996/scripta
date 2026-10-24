@@ -173,7 +173,6 @@ export function startTranslationJobs(deps: HeldDeps & { info: (details: Record<s
     (error) => deps.onError(error),
     SWEEP_INTERVAL_MS,
     undefined,
-    undefined,
     deps.initialDelayMs
   );
   return {

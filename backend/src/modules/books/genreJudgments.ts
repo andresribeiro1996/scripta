@@ -119,7 +119,6 @@ export function startGenreJobs(
     (error) => deps.onError(error),
     GENRE_SWEEP_INTERVAL_MS,
     deps.timers,
-    undefined,
     deps.initialDelayMs
   );
   return {

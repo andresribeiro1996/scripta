@@ -14,9 +14,9 @@
 
 ## Global Constraints
 
-- `startJob(run: (signal: AbortSignal) => Promise<number | null | void>, onError: (error: unknown) => void, intervalMs?: number, timers?: JobTimers, now?: () => number): () => void` keeps today's `startDetailsBackfill` behaviour exactly.
+- `startJob(run: (signal: AbortSignal) => Promise<number | null | void>, onError: (error: unknown) => void, intervalMs?: number, timers?: JobTimers, initialDelayMs?: number, now?: () => number): () => void` keeps today's `startDetailsBackfill` behaviour exactly, including the delayed first run.
 - `startTimer(callback: () => void, intervalMs: number, timers?: JobTimers): () => void` keeps today's `startBackfill` behaviour.
-- `createJobs(log: { error(details: object, message: string): void }, timers?: JobTimers): Jobs` where `Jobs = { every(name: string, intervalMs: number, run: (signal: AbortSignal) => Promise<number | null | void> | number | null | void): void; own(stop: () => void): void; stopAll(): void }`.
+- `createJobs(log: { error(details: object, message: string): void }, timers?: JobTimers): Jobs` where `Jobs = { every(name: string, intervalMs: number, run: (signal: AbortSignal) => Promise<number | null | void> | number | null | void, initialDelayMs?: number): void; own(stop: () => void): void; stopAll(): void }`.
 - Error lines are `log.error({ err: error }, \`${name} failed\`)`, with the names listed in the spec so today's messages are unchanged.
 - No interval or batch size changes. No comments in code.
 - `src/jobs.test.ts` goes into the explicit list in `backend/package.json`'s `test` script. Verify each task with `node scripts/gate.mjs` before committing.
@@ -45,13 +45,13 @@
 **Interfaces:**
 - Produces: `JobTimers` (today's `Timers` interface in `backfill.ts`), `startTimer`, `startJob`, `createJobs`, `Jobs`, all exported from `backend/src/jobs.ts`. `drainBatches` and its batch-size constants stay in `backfill.ts`.
 
-- [ ] **Step 1: Move the tests.** Move the `startBackfill` tests ("the backfill fires every interval on an unref'd timer", "stop clears the interval") and the five `startDetailsBackfill` tests from `backfill.test.ts` into `src/jobs.test.ts`, renamed to `startTimer` / `startJob`, with the `fakeTimers` helper. Drop "error from the backfill is not swallowed": `createJobs` replaces that behaviour. Add:
+- [ ] **Step 1: Move the tests.** Move the `startBackfill` tests ("the backfill fires every interval on an unref'd timer", "stop clears the interval") and the eight `startDetailsBackfill` tests (the three initial-delay ones included) from `backfill.test.ts` into `src/jobs.test.ts`, renamed to `startTimer` / `startJob`, with the `fakeTimers` helper. Drop "error from the backfill is not swallowed": `createJobs` replaces that behaviour. Add:
   - "every runs a job at once and again every interval"
   - "a job that throws or rejects is logged with its name, and the next tick still runs" — one sync throw, one rejection; `log.error` called with `{ err }` and `"cover-enqueue failed"`
   - "a job that returns a resume time skips ticks until then"
   - "stopAll aborts running jobs, clears their timers and calls every owned stop once, last registered first"
 - [ ] **Step 2:** `npx tsx --test src/jobs.test.ts` in `backend/` fails on the missing module.
-- [ ] **Step 3: Implement** `jobs.ts`: `startTimer` and `startJob` are cut from `backfill.ts` verbatim, renamed; `createJobs.every` wraps `run` so a sync throw becomes a rejection, and passes `(error) => log.error({ err: error }, \`${name} failed\`)` as `onError`.
+- [ ] **Step 3: Implement** `jobs.ts`: `startTimer` and `startJob` are cut from `backfill.ts` verbatim, renamed, with the `startFirstRun` and `systemTimers` helpers that `startJob` and `startWorksGrouping` share (exported); `createJobs.every` wraps `run` so a sync throw becomes a rejection, and passes `(error) => log.error({ err: error }, \`${name} failed\`)` as `onError` and `initialDelayMs` through to `startJob`.
 - [ ] **Step 4:** `backfill.ts` imports `startJob`, `startTimer`, `JobTimers` from `../../jobs.js` and no longer exports `startBackfill` / `startDetailsBackfill`. `jevJobs.ts` and `originalArrivals.ts` import `startJob` from `../../jobs.js`; `JevJobsDeps.timers` becomes `JobTimers`. `plugin.ts` imports `startJob` and `startTimer` from `../../jobs.js` and calls them where it called `startDetailsBackfill` and `startBackfill`; Task 2 replaces those calls. Add `src/jobs.test.ts` to the `test` list.
 - [ ] **Step 5:** `npm test --workspace backend` passes; `node scripts/gate.mjs`; commit.
 
@@ -64,7 +64,7 @@
 **Interfaces:**
 - Consumes: `createJobs`, `startJob` from Task 1.
 
-- [ ] **Step 1:** In `booksPlugin`, `const jobs = createJobs(app.log)`. Register: `jobs.every("cover-enqueue", BACKFILL_INTERVAL_MS, () => timeSync(app.log, "cover-enqueue", () => service.enqueueUnchecked()))` (and delete the `timeStep("startup:cover-enqueue", …)` call before it), `"details backfill"`, `"work key backfill"`, `"lossy retitle"` (only when ISBNdb is configured), `"bnp sync"` (with `BNP_SYNC_INTERVAL_MS`) — each with today's `run` body and `DETAILS_BATCH_SIZE`/`BACKFILL_INTERVAL_MS`. `jobs.own(...)` the works backfill, cover colour backfill, works grouping, original arrivals, the three Jev jobs (when started) and the cover worker.
+- [ ] **Step 1:** In `booksPlugin`, `const jobs = createJobs(app.log)`. Register: `jobs.every("cover-enqueue", BACKFILL_INTERVAL_MS, () => timeSync(app.log, "cover-enqueue", () => service.enqueueUnchecked()))` (and delete the `timeStep("startup:cover-enqueue", …)` call before it), `"details backfill"`, `"work key backfill"`, `"lossy retitle"` (only when ISBNdb is configured), `"bnp sync"` (with `BNP_SYNC_INTERVAL_MS`) — each with today's `run` body, `DETAILS_BATCH_SIZE`/`BACKFILL_INTERVAL_MS` and, except the cover enqueue, its `FIRST_RUN_DELAY_MS` entry as `initialDelayMs` (`detailsBackfill`, `workKeyBackfill`, `retitleJob`, `bnpSync`). `jobs.own(...)` the works backfill, cover colour backfill and works grouping (their starters keep taking their `FIRST_RUN_DELAY_MS` entries), original arrivals, the three Jev jobs (when started) and the cover worker.
 - [ ] **Step 2:** The `onClose` hook becomes `activeService = null; jobs.stopAll();`. Delete the `stop*` locals.
 - [ ] **Step 3:** Update `backend/README.md`'s books section (around lines 164 and 175) where it names `startBackfill`/`startDetailsBackfill`, to `createJobs`/`startJob` in `src/jobs.ts`. Run `npm test --workspace backend`. `backend/src/booksWiring.test.ts` builds and closes the whole app, which proves the plugin boots and closes with its unconditional jobs; its env sets no TypeSafe or ISBNdb key, so the Jev `own` calls and the lossy-retitle job are not exercised there. What `stopAll` stops is tested in Task 1.
 - [ ] **Step 4:** `node scripts/gate.mjs`, commit.

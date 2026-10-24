@@ -35,8 +35,8 @@ export function startDetailsBackfill(
   onError: (error: unknown) => void,
   intervalMs: number = BACKFILL_INTERVAL_MS,
   timers: Timers = systemTimers(),
-  now: () => number = Date.now,
-  initialDelayMs: number = 0
+  initialDelayMs: number = 0,
+  now: () => number = Date.now
 ): () => void {
   const controller = new AbortController();
   let running = false;
@@ -97,7 +97,6 @@ export function startWorksBackfill(
     (error) => log.error({ err: error }, "works backfill failed"),
     intervalMs,
     timers,
-    undefined,
     initialDelayMs
   );
 }
@@ -117,7 +116,6 @@ export function startCoverColorBackfill(
     (error) => log.error({ err: error }, "cover colour backfill failed"),
     intervalMs,
     timers,
-    undefined,
     initialDelayMs
   );
 }

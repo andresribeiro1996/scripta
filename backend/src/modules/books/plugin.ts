@@ -204,7 +204,6 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
     (error) => app.log.error({ err: error }, "details backfill failed"),
     undefined,
     undefined,
-    undefined,
     FIRST_RUN_DELAY_MS.detailsBackfill
   );
   const stopWorksBackfill = startWorksBackfill(repo, app.log, undefined, undefined, FIRST_RUN_DELAY_MS.worksBackfill);
@@ -219,7 +218,6 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
   const stopWorkKeyBackfill = startDetailsBackfill(
     (signal) => service.backfillWorkKeys(DETAILS_BATCH_SIZE, signal),
     (error) => app.log.error({ err: error }, "work key backfill failed"),
-    undefined,
     undefined,
     undefined,
     FIRST_RUN_DELAY_MS.workKeyBackfill
@@ -238,7 +236,6 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
         (error) => app.log.error({ err: error }, "lossy retitle failed"),
         undefined,
         undefined,
-        undefined,
         FIRST_RUN_DELAY_MS.retitleJob
       )
     : null;
@@ -249,7 +246,6 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
     },
     (error) => app.log.error({ err: error }, "bnp sync failed"),
     BNP_SYNC_INTERVAL_MS,
-    undefined,
     undefined,
     FIRST_RUN_DELAY_MS.bnpSync
   );
