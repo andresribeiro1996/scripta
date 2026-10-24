@@ -436,3 +436,18 @@ test("the series rule is built only for a work that is judged, and reused for te
   assert.equal(await judge(works[2]!, 10 * 60 * 1000), 2);
   jobs.stop();
 });
+
+test("four works hitting a rejected key at once send one alert", async () => {
+  const repo = freshRepo();
+  const titles = ["Alpha", "Bravo", "Charlie", "Delta"];
+  const works = titles.map((title, n) => {
+    edition(repo, `97801569077${n}0`, { title, author: `Author ${title}`, workKey: `OL97${n}W` });
+    return edition(repo, `97897200009${n}0`, { title: `Pt ${title}`, author: "", language: "pt-PT", originalTitle: title, workKey: `OL98${n}W` }).work_id!;
+  });
+  const key = matching(repo, async () => { throw new SourceUnavailableError("typesafe", "HTTP 401", { status: 401 }); });
+  const jobs = startTranslationJobs({ ...key.deps, heldWorkIds: () => works, info: () => {}, onError: (error) => { throw error; } });
+  for (const workId of works) jobs.add(workId);
+  await flush();
+  jobs.stop();
+  assert.deepEqual(key.alerts, ["TypeSafe rejected the translation requests"]);
+});

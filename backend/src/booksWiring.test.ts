@@ -21,7 +21,9 @@ Object.assign(process.env, {
   COMMUNITY_DB_PATH: join(dir, "community.sqlite"),
   WAITLIST_DB_PATH: join(dir, "waitlist.sqlite"),
   FILES_STORAGE_PATH: join(dir, "files"),
-  R2_IMAGES_BUCKET: ""
+  R2_IMAGES_BUCKET: "",
+  TYPESAFE_API_KEY: "test-typesafe-key",
+  ISBNDB_API_KEY: "test-isbndb-key"
 });
 
 const { buildApp } = await import("./app.js");
@@ -55,4 +57,40 @@ test("the app joins a work to its original that was already queued when it start
   t.after(() => app.close());
   await app.ready();
   assert.equal(booksRepository().canonicalWorkIds([ptWorkId]).get(ptWorkId), enWorkId);
+});
+
+test("every books job arms its first run with its own delay and calls nothing before it fires", async (t) => {
+  const delays: number[] = [];
+  const requests: unknown[] = [];
+  const realSetTimeout = globalThis.setTimeout;
+  const realFetch = globalThis.fetch;
+  globalThis.setTimeout = ((callback: () => void, delay?: number, ...args: unknown[]) => {
+    delays.push(delay ?? 0);
+    return realSetTimeout(callback, delay, ...args);
+  }) as typeof setTimeout;
+  globalThis.fetch = ((input: unknown) => {
+    requests.push(input);
+    return Promise.reject(new Error("no network before a first run fires"));
+  }) as typeof fetch;
+  t.after(() => {
+    globalThis.setTimeout = realSetTimeout;
+    globalThis.fetch = realFetch;
+  });
+  const app = buildApp();
+  await app.ready();
+  await app.close();
+  const expected = {
+    detailsBackfill: 30_000,
+    workKeyBackfill: 40_000,
+    worksBackfill: 45_000,
+    colorBackfill: 50_000,
+    retitleJob: 55_000,
+    genreSweep: 60_000,
+    synopsisSweep: 75_000,
+    translationSweep: 90_000,
+    worksGrouping: 120_000,
+    bnpSync: 150_000
+  };
+  for (const [job, delay] of Object.entries(expected)) assert.ok(delays.includes(delay), `${job} did not arm a ${delay} ms first run`);
+  assert.deepEqual(requests.map(String).filter((url) => /typesafe|isbndb|bnportugal|porbase/.test(url)), []);
 });

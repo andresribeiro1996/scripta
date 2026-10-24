@@ -164,3 +164,14 @@ test("synopsis requests are counted under the synopses source, not genres", asyn
   assert.equal(repo.typesafeUsage(utcDay(NOW), "genres"), 0);
   assert.equal(startSynopsisJobsIfConfigured("", { repo, heldWorkIds: () => [], now: () => NOW, alert: () => {}, info: () => {}, onError: () => {} }), null);
 });
+
+test("four works hitting a rejected key at once send one alert", async () => {
+  const repo = freshRepo();
+  const books = ["9789720000061", "9789720000062", "9789720000063", "9789720000064"].map((isbn, n) => seed(repo, isbn, `${SYNOPSIS} Volume ${n}.`));
+  const key = judging(repo, async () => { throw new SourceUnavailableError("typesafe", "HTTP 401", { status: 401 }); }, books.map((book) => book.work_id!));
+  const jobs = startSynopsisJobs({ ...key.deps, info: () => {}, onError: (error) => { throw error; } });
+  for (const book of books) jobs.add(book.work_id!);
+  await flush();
+  jobs.stop();
+  assert.deepEqual(key.alerts, ["TypeSafe rejected the synopsis requests"]);
+});
