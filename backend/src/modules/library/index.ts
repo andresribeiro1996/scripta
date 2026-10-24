@@ -16,6 +16,6 @@ export { resolvePublicLibrary, resolvePublicLibraryData, resolvePublicBooksByWor
 export type { PublicBookData, PublicHighlight, PublicDataRequest } from "./publicResolver.js";
 export { UnknownWorkError, WorkResolutionError, canonicalByKey, canonicalWorkIds, copyKeysForWorks, duplicateWorkMessage, firstKeyPerWork, knownWorkIds, resolveEntryWorks, resolveTitleWorks, workIdsByKey } from "./works.js";
 export type { WorkEntry, WorkRef } from "./works.js";
-export { startWorksSweep, sweepLibraryWorks } from "./worksSweep.js";
+export { sweepLibraryWorks, sweepWorks, WORKS_SWEEP_INTERVAL_MS } from "./worksSweep.js";
 export type { SweepBatch, WorksSweepStep } from "./worksSweep.js";
 export { communityRatings, copyOfWork, heldWorks, holdersOfWorks, type HeldWork, type ViewerCopy } from "./workHolders.js";

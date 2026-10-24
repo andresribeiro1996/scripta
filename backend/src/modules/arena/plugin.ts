@@ -1,13 +1,9 @@
-// Composition root — mirrors modules/books/plugin.ts's shape, plus this
-// module's own addition: a background interval that settles duels whose
-// timer has expired and advances the bracket. The FIRST background timer
-// in this codebase (no job queue/cron exists elsewhere) — a plain
-// setInterval is the simplest thing that could work at this app's scale,
-// same "no new dependency for something this small" instinct as
-// node:sqlite over better-sqlite3.
+// Composition root — mirrors modules/books/plugin.ts's shape, plus a job
+// that settles duels whose timer has expired and advances the bracket.
 
 import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
+import { createJobs } from "../../jobs.js";
 import { timeSync } from "../../stallLog.js";
 import { openArenaDb } from "./adapters/sqlite/connection.js";
 import { createSqliteArenaRepository } from "./adapters/sqlite/sqliteArenaRepository.js";
@@ -27,18 +23,9 @@ export async function arenaPlugin(app: FastifyInstance, opts: ArenaPluginOptions
   const repo = createSqliteArenaRepository(db);
   const service = createArenaService(repo, opts.emitPublished, opts.emitVotedOn);
 
-  const sweep = setInterval(() => {
-    try {
-      timeSync(app.log, "arena-sweep", () => service.runScheduledSweep());
-    } catch (err) {
-      app.log.error(err, "arena round-settlement sweep failed");
-    }
-  }, SWEEP_INTERVAL_MS);
-  sweep.unref(); // don't keep the process alive just for this timer
-  app.addHook("onClose", (_instance, done) => {
-    clearInterval(sweep);
-    done();
-  });
+  const jobs = createJobs(app.log);
+  jobs.every("arena round-settlement sweep", SWEEP_INTERVAL_MS, () => timeSync(app.log, "arena-sweep", () => service.runScheduledSweep()), SWEEP_INTERVAL_MS);
+  app.addHook("onClose", async () => jobs.stopAll());
 
   // Own scope, own (tighter) rate limit — see buildVoteRoute's own
   // comment for why this route needs to be separate from the rest.

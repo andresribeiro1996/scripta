@@ -616,7 +616,7 @@ Measured on production on 2026-09-30, after a tester imported a 167-book library
 
 - **BookArena**: an owner-created, single-elimination book bracket tournament that anyone with the link can vote on, no account required — the account's library seeds the bracket (random-fill or manual per-slot assignment), and once started, duels settle on a timer (a background sweep, checked every 30s) or via the owner's early-settle action; a tied duel (equal votes) waits for the owner to break it by hand rather than auto-deciding.
 - **Its own SQLite file** (`ARENA_DB_PATH`), same one-module-one-database isolation as every other module — `tournaments`/`tournament_slots`/`duels`/`votes`, with seeded books denormalized as a snapshot (title/author/cover) rather than referencing a shared Book table, since none exists anywhere in this app (see `library`'s own section above).
-- **The first background timer in this codebase** — a plain `setInterval` sweep, no job queue: the simplest thing that could work at this app's scale, same "no new dependency for something this small" instinct as `node:sqlite` itself.
+- **Background sweep** — runs through `createJobs` (`src/jobs.ts`) every 30s, first run 30s after boot, no job queue: the simplest thing that could work at this app's scale, same "no new dependency for something this small" instinct as `node:sqlite` itself.
 - **This repository's first automated test suite** (`backend/src/modules/arena/service.test.ts`, via Node's built-in `node:test` — zero new dependencies) exercises the bracket/duel/round state machine against a hand-written in-memory fake of `ArenaRepository`, finally using the "seam is there" testability this hexagonal split has always had (see "Not built," below).
 
 ### `murals`
