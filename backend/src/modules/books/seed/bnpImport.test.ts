@@ -9,7 +9,7 @@ import { afterEach, test } from "node:test";
 import sharp from "sharp";
 import type { BooksRepository } from "../domain/ports.js";
 import type { BnpBook } from "./bnpRecord.js";
-import type { BnpCoverAction, BnpDeps, BnpHarvestDeps, BnpReplace } from "./bnpImport.js";
+import type { BnpCoverAction, BnpDeps, BnpHarvestDeps, BnpImportOptions, BnpReplace } from "./bnpImport.js";
 
 const scratch = mkdtempSync(join(tmpdir(), "bnp-import-test-"));
 process.env.AUTH_DB_PATH = join(scratch, "auth.sqlite");
@@ -572,7 +572,7 @@ function isbnN(n: number): string {
 }
 
 const recordOf = (isbn: string) => ALLENDE_RECORD.replace("978-972-0-04445-7", isbn).replace("doc=1858036", `doc=${isbn}`);
-const run = (from: string, until: string, extra: Partial<{ dryRun: boolean; cursorOnSuccess: boolean }> = {}) => ({ from, until, dryRun: false, cursorOnSuccess: false, ...extra });
+const run = (from: string, until: string, extra: Partial<BnpImportOptions> = {}): BnpImportOptions => ({ from, until, set: "bibliografianacional", dryRun: false, cursorOnSuccess: false, ...extra });
 const bookCount = (db: DatabaseSync) => (db.prepare("SELECT COUNT(*) AS n FROM books").get() as { n: number }).n;
 const unavailable = () => new SourceUnavailableError("oai.bnportugal.gov.pt", "HTTP 503");
 const UNAVAILABLE = "oai.bnportugal.gov.pt unavailable: HTTP 503";
@@ -1017,6 +1017,18 @@ test("an error while applying stops further records and propagates", async () =>
   await assert.rejects(importBnp(deps, run("2026-10-16", "2026-10-16")), /boom/);
 
   assert.equal(scans.length, 2);
+});
+
+test("a pre-2002 run harvests the 1935-2001 set and never writes the sync cursor", async () => {
+  const url = `${OAI}?verb=ListRecords&metadataPrefix=marcxchange&set=bibliografianacional2001&from=2026-10-18&until=2026-10-18`;
+  const { repo, deps } = harvestSetup({ [url]: EMPTY_PAGE });
+  repo.setHarvestCursor("bnp", "2026-10-01");
+
+  const report = await importBnp(deps, run("2026-10-18", "2026-10-18", { set: "bibliografianacional2001", cursorOnSuccess: true }));
+
+  assert.equal(report.through, "2026-10-18");
+  assert.deepEqual(report.failedWindows, []);
+  assert.equal(repo.getHarvestCursor("bnp"), "2026-10-01");
 });
 
 test("a finished run writes the cursor only when asked, never on a dry run or after a failed window", async () => {

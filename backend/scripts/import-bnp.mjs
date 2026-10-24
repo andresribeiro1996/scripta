@@ -5,7 +5,7 @@ import sharp from "sharp";
 sharp.cache(false);
 sharp.concurrency(1);
 
-const { values } = parseArgs({ options: { "dry-run": { type: "boolean", default: false }, from: { type: "string", default: "2000-01-01" }, until: { type: "string" } } });
+const { values } = parseArgs({ options: { "dry-run": { type: "boolean", default: false }, "pre-2002": { type: "boolean", default: false }, from: { type: "string" }, until: { type: "string" } } });
 
 const { env } = await import("../dist/config/env.js");
 const { openBooksDb } = await import("../dist/modules/books/adapters/sqlite/connection.js");
@@ -14,7 +14,8 @@ const { fetchBnpPage, fetchBnpScan, importBnp, utcDate, waitForBnpLock } = await
 const { createObjectStore } = await import("../dist/storage/createObjectStore.js");
 
 const dryRun = values["dry-run"];
-const from = values.from;
+const pre2002 = values["pre-2002"];
+const from = values.from ?? (pre2002 ? "2013-06-01" : "2000-01-01");
 const until = values.until ?? utcDate(new Date());
 
 for (const [name, value] of [["--from", from], ["--until", until]]) {
@@ -45,6 +46,6 @@ const report = await importBnp(
     now: () => new Date(),
     log: (line) => console.log(line, `rss=${Math.round(process.memoryUsage().rss / 1e6)}MB`)
   },
-  { from, until, dryRun, cursorOnSuccess: values.until === undefined }
+  { from, until, set: pre2002 ? "bibliografianacional2001" : "bibliografianacional", dryRun, cursorOnSuccess: values.until === undefined }
 );
 console.log(JSON.stringify(report));

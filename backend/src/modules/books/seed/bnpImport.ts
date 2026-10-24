@@ -151,9 +151,12 @@ export interface BnpHarvestDeps extends BnpDeps {
   log: (line: string) => void;
 }
 
+export type BnpSet = "bibliografianacional" | "bibliografianacional2001";
+
 export interface BnpImportOptions {
   from: string;
   until: string;
+  set: BnpSet;
   dryRun: boolean;
   cursorOnSuccess: boolean;
 }
@@ -212,7 +215,7 @@ export function monthWindows(from: string, until: string): DateWindow[] {
   return windows;
 }
 
-const firstUrl = (window: DateWindow) => `${BNP_OAI}?verb=ListRecords&metadataPrefix=marcxchange&set=bibliografianacional&from=${window.from}&until=${window.until}`;
+const firstUrl = (set: BnpSet, window: DateWindow) => `${BNP_OAI}?verb=ListRecords&metadataPrefix=marcxchange&set=${set}&from=${window.from}&until=${window.until}`;
 const nextUrl = (token: string) => `${BNP_OAI}?verb=ListRecords&resumptionToken=${encodeURIComponent(token)}`;
 
 async function tryPage(fetchText: BnpHarvestDeps["fetchText"], url: string): Promise<Page> {
@@ -233,9 +236,9 @@ async function fetchPage(fetchText: BnpHarvestDeps["fetchText"], url: string, re
   return retry && "failure" in page && page.transient ? tryPage(fetchText, url) : page;
 }
 
-async function harvestOnce(fetchText: BnpHarvestDeps["fetchText"], window: DateWindow): Promise<Harvested | string> {
+async function harvestOnce(fetchText: BnpHarvestDeps["fetchText"], set: BnpSet, window: DateWindow): Promise<Harvested | string> {
   const harvested: Harvested = { records: 0, deleted: 0, kept: [], skipped: [] };
-  let url: string | null = firstUrl(window);
+  let url: string | null = firstUrl(set, window);
   let number = 0;
   while (url !== null) {
     number++;
@@ -258,10 +261,10 @@ async function harvestOnce(fetchText: BnpHarvestDeps["fetchText"], window: DateW
   return harvested;
 }
 
-export async function harvestWindow(fetchText: BnpHarvestDeps["fetchText"], window: DateWindow): Promise<Harvested | string> {
-  const first = await harvestOnce(fetchText, window);
+export async function harvestWindow(fetchText: BnpHarvestDeps["fetchText"], set: BnpSet, window: DateWindow): Promise<Harvested | string> {
+  const first = await harvestOnce(fetchText, set, window);
   if (typeof first !== "string") return first;
-  const second = await harvestOnce(fetchText, window);
+  const second = await harvestOnce(fetchText, set, window);
   return typeof second === "string" ? `${first}; ${second}` : second;
 }
 
@@ -338,7 +341,7 @@ export async function importBnp(deps: BnpHarvestDeps, options: BnpImportOptions)
   for (const window of monthWindows(options.from, options.until)) {
     const label = `${window.from}..${window.until}`;
     const coversFailedBefore = report.covers.failed;
-    const result = await harvestWindow(deps.fetchText, window);
+    const result = await harvestWindow(deps.fetchText, options.set, window);
     const harvested = typeof result === "string" ? null : result;
     const failure = typeof result === "string" ? result : null;
     if (harvested === null) {
@@ -373,7 +376,7 @@ export async function importBnp(deps: BnpHarvestDeps, options: BnpImportOptions)
   }
 
   report.publishers = { kept: top(keptPublishers), dropped: perSkip((reason) => top(droppedPublishers[reason])) };
-  if (options.cursorOnSuccess && !options.dryRun && report.failedWindows.length === 0) deps.repo.setHarvestCursor("bnp", options.until);
+  if (options.cursorOnSuccess && options.set === "bibliografianacional" && !options.dryRun && report.failedWindows.length === 0) deps.repo.setHarvestCursor("bnp", options.until);
   return report;
 }
 
@@ -401,5 +404,5 @@ export async function lookupBnpIsbn(deps: BnpHarvestDeps, isbn: string): Promise
 export async function syncBnp(deps: BnpHarvestDeps): Promise<BnpImportReport | null> {
   const cursor = deps.repo.getHarvestCursor("bnp");
   if (cursor === null) return null;
-  return importBnp(deps, { from: cursor, until: utcDate(deps.now()), dryRun: false, cursorOnSuccess: true });
+  return importBnp(deps, { from: cursor, until: utcDate(deps.now()), set: "bibliografianacional", dryRun: false, cursorOnSuccess: true });
 }
