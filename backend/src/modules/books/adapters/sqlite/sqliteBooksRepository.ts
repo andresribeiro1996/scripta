@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { cleanSummary } from "@scripta/shared";
+import { cleanSummary, type WorkAward } from "@scripta/shared";
 import type { DatabaseSync, StatementSync } from "node:sqlite";
 import { MIN_PREFIX_LENGTH, normalizeWorkKey, WORK_SCAN_LIMIT, workTitleKey } from "../../domain/normalize.js";
-import type { BooksRepository, IdPage, MergeableDetails, PageCursor } from "../../domain/ports.js";
+import type { BooksRepository, IdPage, MergeableDetails, PageCursor, RecentAward } from "../../domain/ports.js";
 import { GENRE_SAVE_LINE } from "../../domain/constants.js";
 import { planTitleFolds, type KeyedWork, type TitleWork } from "../../domain/duplicateWorks.js";
 import { WorkMergeError } from "../../domain/errors.js";
@@ -514,6 +514,17 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     FROM books JOIN book_collections ON book_collections.book_id = books.id
     WHERE books.work_id IN (SELECT value FROM json_each(?)) AND book_collections.source = 'ol-edition'
     ORDER BY book_collections.rowid
+  `);
+  const upsertWorkAwardStmt = db.prepare(`
+    INSERT INTO work_awards (work_id, prize, year, won, honoree, created_at) VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT (work_id, prize, year) DO UPDATE SET won = 1, created_at = excluded.created_at WHERE won = 0 AND excluded.won = 1
+  `);
+  const workAwardsStmt = db.prepare(`SELECT work_id, prize, year, won FROM work_awards WHERE work_id IN (SELECT value FROM json_each(?)) ORDER BY won DESC, year DESC, prize`);
+  const yearAwardsStmt = db.prepare(`
+    SELECT work_awards.prize AS prize, work_awards.won AS won, work_awards.honoree AS honoree, work_awards.created_at AS created_at, COALESCE(works.merged_into, work_awards.work_id) AS work_id
+    FROM work_awards LEFT JOIN works ON works.id = work_awards.work_id
+    WHERE work_awards.year = ?
+    ORDER BY work_awards.prize, work_awards.created_at, work_awards.rowid
   `);
   const collectionsOfStmt = db.prepare(`SELECT book_id, name, position FROM book_collections WHERE book_id IN (SELECT value FROM json_each(?)) ORDER BY created_at, rowid`);
   const searchSeriesStmt = db.prepare(`SELECT work_id FROM series_fts WHERE series_fts MATCH ? ORDER BY bm25(series_fts), rowid LIMIT ?`);
@@ -1344,6 +1355,53 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
         if (!best.has(row.book_id)) best.set(row.book_id, { bookId: row.book_id, name: row.name, position: row.position });
       }
       return [...best.values()];
+    },
+
+    addWorkAward(row, at) {
+      return upsertWorkAwardStmt.run(row.workId, row.prize, row.year, row.won ? 1 : 0, row.honoree, at).changes > 0;
+    },
+
+    awardsOf(workIds) {
+      if (workIds.length === 0) return new Map();
+      const awards = new Map<string, Map<string, WorkAward>>();
+      const rootOf = new Map(workIds.map((id) => [id, id]));
+      for (const [alias, canonical] of canonicalWorkIds(aliasesOf(workIds))) rootOf.set(alias, canonical);
+      for (const row of workAwardsStmt.all(JSON.stringify([...rootOf.keys()])) as Array<{ work_id: string; prize: string; year: number; won: number }>) {
+        const root = rootOf.get(row.work_id)!;
+        const key = `${row.prize}:${row.year}`;
+        const own = awards.get(root) ?? new Map<string, WorkAward>();
+        if (!own.has(key)) own.set(key, { prize: row.prize, year: row.year, won: row.won === 1 });
+        awards.set(root, own);
+      }
+      return new Map([...awards].map(([root, own]) => [root, [...own.values()]]));
+    },
+
+    recentAwards(year, since) {
+      const byPrize = new Map<string, { winners: Set<string>; nominees: Set<string>; announcedAt: string | null; honoree: string | null }>();
+      for (const row of yearAwardsStmt.all(year) as Array<{ prize: string; won: number; honoree: string | null; created_at: string; work_id: string }>) {
+        const entry = byPrize.get(row.prize) ?? { winners: new Set<string>(), nominees: new Set<string>(), announcedAt: null, honoree: null };
+        if (row.won === 1) {
+          entry.winners.add(row.work_id);
+          entry.announcedAt ??= row.created_at;
+          entry.honoree ??= row.honoree;
+        } else {
+          entry.nominees.add(row.work_id);
+        }
+        byPrize.set(row.prize, entry);
+      }
+      const recent: RecentAward[] = [];
+      for (const [prize, entry] of byPrize) {
+        if (entry.announcedAt === null || entry.announcedAt < since) continue;
+        recent.push({
+          prize,
+          year,
+          announcedAt: entry.announcedAt,
+          winnerWorkIds: [...entry.winners],
+          nomineeWorkIds: [...entry.nominees].filter((id) => !entry.winners.has(id)),
+          honoree: entry.honoree
+        });
+      }
+      return recent.sort((left, right) => (left.announcedAt < right.announcedAt ? 1 : left.announcedAt > right.announcedAt ? -1 : 0));
     }
   };
 }

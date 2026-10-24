@@ -188,3 +188,14 @@ CREATE VIRTUAL TABLE IF NOT EXISTS collections_fts USING fts5(
   name,
   tokenize = 'unicode61 remove_diacritics 2'
 );
+
+CREATE TABLE IF NOT EXISTS work_awards (
+  work_id    TEXT NOT NULL,
+  prize      TEXT NOT NULL,
+  year       INTEGER NOT NULL,
+  won        INTEGER NOT NULL,
+  honoree    TEXT,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (work_id, prize, year)
+);
+CREATE INDEX IF NOT EXISTS idx_work_awards_recent ON work_awards(year, prize);

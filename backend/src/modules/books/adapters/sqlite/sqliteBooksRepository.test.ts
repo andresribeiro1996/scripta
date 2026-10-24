@@ -3544,3 +3544,137 @@ test("a title stored without its key is keyed at the next boot, found through it
   const plan = (db.prepare(`EXPLAIN QUERY PLAN ${UNKEYED_ORIGINALS_SQL}`).all() as Array<{ detail: string }>).map((row) => row.detail).join(" ");
   assert.match(plan, /idx_books_original_keys_missing/);
 });
+
+const awardBook = (repo: ReturnType<typeof freshRepo>["repo"], title: string, isbn: string) => edition(repo, isbn, title, "Some Author").work_id!;
+const award = (workId: string, prize: string, year: number, won: boolean, honoree: string | null = null) => ({ workId, prize, year, won, honoree });
+const storedAward = (db: DatabaseSync, workId: string, prize: string, year: number) =>
+  ({ ...(db.prepare("SELECT won, honoree, created_at FROM work_awards WHERE work_id = ? AND prize = ? AND year = ?").get(workId, prize, year) as { won: number; honoree: string | null; created_at: string }) });
+
+test("addWorkAward inserts once and reports nothing new on a repeat", () => {
+  const { db, repo } = freshRepo();
+  const work = awardBook(repo, "Dune", "9780441013593");
+  assert.equal(repo.addWorkAward(award(work, "hugo-novel", 1966, true), AT), true);
+  assert.equal(repo.addWorkAward(award(work, "hugo-novel", 1966, true), at(1)), false);
+  assert.equal(repo.addWorkAward(award(work, "nebula-novel", 1966, false), AT), true);
+  assert.equal(countOf(db, "work_awards"), 2);
+  assert.deepEqual(storedAward(db, work, "hugo-novel", 1966), { won: 1, honoree: null, created_at: AT });
+  assert.deepEqual(storedAward(db, work, "nebula-novel", 1966), { won: 0, honoree: null, created_at: AT });
+});
+
+test("addWorkAward upgrades a nomination to a win, and a later nomination never downgrades it", () => {
+  const { db, repo } = freshRepo();
+  const work = awardBook(repo, "Dune", "9780441013593");
+  assert.equal(repo.addWorkAward(award(work, "hugo-novel", 1966, false), AT), true);
+  assert.equal(repo.addWorkAward(award(work, "hugo-novel", 1966, false), at(1)), false);
+  assert.equal(repo.addWorkAward(award(work, "hugo-novel", 1966, true), at(2)), true);
+  assert.equal(storedAward(db, work, "hugo-novel", 1966).won, 1);
+  assert.equal(repo.addWorkAward(award(work, "hugo-novel", 1966, false), at(3)), false);
+  assert.equal(repo.addWorkAward(award(work, "hugo-novel", 1966, true), at(4)), false);
+  assert.equal(storedAward(db, work, "hugo-novel", 1966).won, 1);
+  assert.equal(countOf(db, "work_awards"), 1);
+});
+
+test("addWorkAward keeps created_at on a repeat and moves it on an upgrade", () => {
+  const { db, repo } = freshRepo();
+  const work = awardBook(repo, "Dune", "9780441013593");
+  repo.addWorkAward(award(work, "hugo-novel", 1966, false), AT);
+  repo.addWorkAward(award(work, "hugo-novel", 1966, false), at(1));
+  assert.equal(storedAward(db, work, "hugo-novel", 1966).created_at, AT);
+  repo.addWorkAward(award(work, "hugo-novel", 1966, true), at(2));
+  assert.equal(storedAward(db, work, "hugo-novel", 1966).created_at, at(2));
+  repo.addWorkAward(award(work, "hugo-novel", 1966, true), at(3));
+  repo.addWorkAward(award(work, "hugo-novel", 1966, false), at(4));
+  assert.equal(storedAward(db, work, "hugo-novel", 1966).created_at, at(2));
+});
+
+test("awardsOf rolls an alias work's awards up to its canonical work and collapses duplicates", () => {
+  const { repo } = freshRepo();
+  const original = awardBook(repo, "Blindness", "9780156007757");
+  const translation = awardBook(repo, "Ensaio sobre a Cegueira", "9789720000002");
+  const plain = awardBook(repo, "Plain", "9789720000003");
+  repo.addWorkAward(award(original, "booker", 2019, false), AT);
+  repo.addWorkAward(award(original, "nebula-novel", 2020, false), AT);
+  repo.addWorkAward(award(translation, "booker", 2019, true), AT);
+  repo.addWorkAward(award(translation, "hugo-novel", 2020, false), AT);
+  repo.addWorkAward(award(translation, "pulitzer-fiction", 1999, true), AT);
+  assert.equal(repo.mergeWorks(translation, original), original);
+  const awards = repo.awardsOf([original, plain]);
+  assert.deepEqual(awards.get(original), [
+    { prize: "booker", year: 2019, won: true },
+    { prize: "pulitzer-fiction", year: 1999, won: true },
+    { prize: "hugo-novel", year: 2020, won: false },
+    { prize: "nebula-novel", year: 2020, won: false }
+  ]);
+  assert.equal(awards.has(plain), false);
+  assert.equal(awards.size, 1);
+  assert.equal(repo.awardsOf([]).size, 0);
+});
+
+test("recentAwards keeps prizes of the given year whose first win is on or after since", () => {
+  const { repo } = freshRepo();
+  const first = awardBook(repo, "First", "9789720000001");
+  const second = awardBook(repo, "Second", "9789720000002");
+  const third = awardBook(repo, "Third", "9789720000003");
+  repo.addWorkAward(award(first, "booker", 2026, true), at(0));
+  repo.addWorkAward(award(second, "hugo-novel", 2026, true), at(10));
+  repo.addWorkAward(award(first, "nebula-novel", 2026, true), at(-5));
+  repo.addWorkAward(award(second, "pulitzer-fiction", 2026, true), at(3));
+  repo.addWorkAward(award(first, "pulitzer-fiction", 2026, true), at(-1));
+  repo.addWorkAward(award(third, "leya", 2025, true), at(20));
+  assert.deepEqual(
+    repo.recentAwards(2026, at(0)).map((announcement) => [announcement.prize, announcement.year, announcement.announcedAt]),
+    [["hugo-novel", 2026, at(10)], ["booker", 2026, at(0)]]
+  );
+  assert.deepEqual(repo.recentAwards(2025, at(0)).map((announcement) => announcement.prize), ["leya"]);
+  assert.deepEqual(repo.recentAwards(2024, at(0)), []);
+});
+
+test("recentAwards dates an upgraded nomination from its upgrade", () => {
+  const { repo } = freshRepo();
+  const work = awardBook(repo, "Project Hail Mary", "9780593135204");
+  repo.addWorkAward(award(work, "hugo-novel", 2026, false), at(-120));
+  assert.deepEqual(repo.recentAwards(2026, at(-30)), []);
+  repo.addWorkAward(award(work, "hugo-novel", 2026, true), at(2));
+  assert.deepEqual(repo.recentAwards(2026, at(-30)), [
+    { prize: "hugo-novel", year: 2026, announcedAt: at(2), winnerWorkIds: [work], nomineeWorkIds: [], honoree: null }
+  ]);
+  assert.deepEqual(repo.recentAwards(2026, at(3)), []);
+});
+
+test("recentAwards ignores prize years with nominations only, and lists nominees beside winners", () => {
+  const { repo } = freshRepo();
+  const winner = awardBook(repo, "Winner", "9789720000001");
+  const nominee = awardBook(repo, "Nominee", "9789720000002");
+  const other = awardBook(repo, "Other", "9789720000003");
+  repo.addWorkAward(award(nominee, "nebula-novel", 2026, false), AT);
+  repo.addWorkAward(award(other, "nebula-novel", 2026, false), AT);
+  repo.addWorkAward(award(winner, "booker", 2026, true), AT);
+  repo.addWorkAward(award(nominee, "booker", 2026, false), AT);
+  repo.addWorkAward(award(other, "booker", 2026, false), AT);
+  repo.addWorkAward(award(winner, "nobel-literature", 2026, true, "Toni Morrison"), AT);
+  assert.deepEqual(repo.recentAwards(2026, AT), [
+    { prize: "booker", year: 2026, announcedAt: AT, winnerWorkIds: [winner], nomineeWorkIds: [nominee, other], honoree: null },
+    { prize: "nobel-literature", year: 2026, announcedAt: AT, winnerWorkIds: [winner], nomineeWorkIds: [], honoree: "Toni Morrison" }
+  ]);
+});
+
+test("recentAwards reports canonical work ids", () => {
+  const { repo } = freshRepo();
+  const original = awardBook(repo, "Blindness", "9780156007757");
+  const translation = awardBook(repo, "Ensaio sobre a Cegueira", "9789720000002");
+  const sibling = awardBook(repo, "Ensaio", "9789720000003");
+  const nominee = awardBook(repo, "Nominee", "9789720000004");
+  repo.addWorkAward(award(translation, "booker", 2026, true), AT);
+  repo.addWorkAward(award(sibling, "booker", 2026, true), AT);
+  repo.addWorkAward(award(original, "booker", 2026, false), AT);
+  repo.addWorkAward(award(nominee, "booker", 2026, false), AT);
+  repo.addWorkAward(award(translation, "hugo-novel", 2026, false), AT);
+  repo.addWorkAward(award(original, "hugo-novel", 2026, false), AT);
+  repo.addWorkAward(award(sibling, "hugo-novel", 2026, true), AT);
+  repo.mergeWorks(translation, original);
+  repo.mergeWorks(sibling, original);
+  assert.deepEqual(repo.recentAwards(2026, AT), [
+    { prize: "booker", year: 2026, announcedAt: AT, winnerWorkIds: [original], nomineeWorkIds: [nominee], honoree: null },
+    { prize: "hugo-novel", year: 2026, announcedAt: AT, winnerWorkIds: [original], nomineeWorkIds: [], honoree: null }
+  ]);
+});
