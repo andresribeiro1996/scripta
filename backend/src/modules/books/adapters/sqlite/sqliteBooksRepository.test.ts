@@ -1361,6 +1361,7 @@ test("keyless grouping one title key a page, each page its own transaction, merg
     groupTitleKeys: (...args: Parameters<typeof paged.repo.groupTitleKeys>) => {
       open.push(paged.db.isTransaction);
       events.push("group");
+      setImmediate(() => events.push("tick"));
       return paged.repo.groupTitleKeys(...args);
     }
   };
@@ -1373,6 +1374,7 @@ test("keyless grouping one title key a page, each page its own transaction, merg
   assert.ok(events.includes("group"));
   events.forEach((event, i) => {
     if (event === "group") assert.deepEqual(events.slice(i - 2, i), ["keys", "tick"]);
+    if (event === "keys" && i > 0) assert.equal(events[i - 1], "tick");
   });
 });
 
