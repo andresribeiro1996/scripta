@@ -4,8 +4,10 @@
 
 import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
+import { canonicalByKey, knownWorkIds, resolvePublicBooksByWork, resolveTitleWorks } from "../library/index.js";
 import { openQuizzesDb } from "./adapters/sqlite/connection.js";
 import { createSqliteQuizzesRepository } from "./adapters/sqlite/sqliteQuizzesRepository.js";
+import type { QuizWorks } from "./domain/ports.js";
 import { buildPublicQuizRoutes, buildQuizRoutes } from "./routes.js";
 import type { EmitPlayed, EmitPublished, QuizzesPublicApi } from "./service.js";
 import { createQuizzesPublicApi, createQuizzesService } from "./service.js";
@@ -15,10 +17,12 @@ export interface QuizzesPluginOptions {
   emitPlayed?: EmitPlayed;
 }
 
+export const quizWorks: QuizWorks = { knownWorkIds, resolveTitleWorks, canonicalByKey, publicBooksByWork: resolvePublicBooksByWork };
+
 export async function quizzesPlugin(app: FastifyInstance, opts: QuizzesPluginOptions = {}) {
   // --- composition: swap this one block to change storage technology ---
   const db = openQuizzesDb();
-  const quizzesService = createQuizzesService(createSqliteQuizzesRepository(db), opts.emitPublished, opts.emitPlayed);
+  const quizzesService = createQuizzesService(createSqliteQuizzesRepository(db), quizWorks, opts.emitPublished, opts.emitPlayed);
   // -----------------------------------------------------------------------
 
   await app.register(buildQuizRoutes(quizzesService));
@@ -34,7 +38,7 @@ export async function quizzesPlugin(app: FastifyInstance, opts: QuizzesPluginOpt
 let cachedApi: QuizzesPublicApi | null = null;
 
 export function getQuizzesPublicApi(): QuizzesPublicApi {
-  if (!cachedApi) cachedApi = createQuizzesPublicApi(createQuizzesService(createSqliteQuizzesRepository(openQuizzesDb())));
+  if (!cachedApi) cachedApi = createQuizzesPublicApi(createQuizzesService(createSqliteQuizzesRepository(openQuizzesDb()), quizWorks));
   return cachedApi;
 }
 

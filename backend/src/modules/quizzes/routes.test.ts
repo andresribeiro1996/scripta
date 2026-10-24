@@ -22,33 +22,41 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 const { applyQuizzesMigrations } = await import("./adapters/sqlite/connection.js");
 const { createSqliteQuizzesRepository } = await import("./adapters/sqlite/sqliteQuizzesRepository.js");
 const { createQuizzesService } = await import("./service.js");
+const { quizWorks } = await import("./plugin.js");
 const { buildPublicQuizRoutes, buildQuizRoutes } = await import("./routes.js");
 const { openLibraryDb } = await import("../library/adapters/sqlite/connection.js");
 const { applyBooksMigrations, openBooksDb } = await import("../books/adapters/sqlite/connection.js");
 const { resolveWorks } = await import("../books/index.js");
 
 type Service = ReturnType<typeof createQuizzesService>;
+type QuizInput = Parameters<Service["createQuiz"]>[2];
+type QuizWriteOutcome = ReturnType<Service["createQuiz"]>;
 
 const named = (title: string) => resolveWorks([{ isbn: null, title, author: "Someone" }])[0]!;
 const book = (workId: string, title = `Title ${workId}`, author = "A") => ({ workId, title, author, coverUrl: `https://covers.test/${workId}.jpg`, quote: `Quote ${workId}`, blurb: null });
 const worksBook = (title: string, workId?: string, coverUrl: string | null = `https://covers.test/${encodeURIComponent(title)}.jpg`) => ({ ...(workId ? { workId } : {}), title, author: "Someone", coverUrl, quote: null, blurb: null });
 
+const quizInput = (patch: Partial<QuizInput>): QuizInput => ({ sourceLabel: "", questionCount: 10, allowedTypes: ["cover_title", "title_cover", "quote_title", "blurb_title"], books: [], ...patch });
+
+function created(outcome: QuizWriteOutcome) {
+  assert.equal(outcome.ok, true);
+  return outcome.ok ? outcome.quiz : (undefined as never);
+}
+
 /** A published 3-question quiz with its code and the owner-held answer key. */
 function publishedQuiz() {
   const db = new DatabaseSync(":memory:");
   applyQuizzesMigrations(db);
-  const service = createQuizzesService(createSqliteQuizzesRepository(db));
-  const created = service.createQuiz("u1", "Trivia", {
+  const service = createQuizzesService(createSqliteQuizzesRepository(db), quizWorks);
+  const draft = created(service.createQuiz("u1", "Trivia", quizInput({
     sourceLabel: "Shelf",
     questionCount: 3,
-    allowedTypes: ["cover_title", "title_cover", "quote_title", "blurb_title"],
-    books: Array.from({ length: 6 }, (_, i) => book(`b${i}`)),
-    questions: null
-  });
-  const outcome = service.publishQuiz("u1", created.id, []);
+    books: Array.from({ length: 6 }, (_, i) => book(named(`Trivia ${i}`), `Trivia ${i}`))
+  })));
+  const outcome = service.publishQuiz("u1", draft.id);
   assert.ok(outcome.ok);
   const code = outcome.ok ? outcome.quiz.voteCode! : "";
-  const answerKey = (service.getQuiz("u1", created.id)!.data as { questions: Array<{ id: string; answerIndex: number }> }).questions;
+  const answerKey = (service.getQuiz("u1", draft.id)!.data as { questions: Array<{ id: string; answerIndex: number }> }).questions;
   return { service, code, answerKey };
 }
 
@@ -140,7 +148,7 @@ test("an unknown code is a 404 everywhere", async () => {
 async function quizApp(wrap: (service: ReturnType<typeof createQuizzesService>) => ReturnType<typeof createQuizzesService> = (service) => service) {
   const db = new DatabaseSync(":memory:");
   applyQuizzesMigrations(db);
-  const service = wrap(createQuizzesService(createSqliteQuizzesRepository(db)));
+  const service = wrap(createQuizzesService(createSqliteQuizzesRepository(db), quizWorks));
   const app = Fastify();
   app.decorate("authenticateAccessToken", (token: string) => ({ id: token, email: `${token}@example.test`, username: token, avatarId: null }));
   await app.register(buildQuizRoutes(service));
@@ -194,8 +202,8 @@ test("creating a quiz refuses a title the catalog can't resolve and an unknown w
 test("PUT validates the document and replaces it whole", async () => {
   const ids = ["Put V1", "Put V2", "Put V3", "Put V4"].map(named);
   const { app, service, send } = await quizApp();
-  const created = service.createQuiz("q7", "Draft", { sourceLabel: "Shelf", questionCount: 3, allowedTypes: ["cover_title"], books: [], questions: null });
-  const url = `/quizzes/${created.id}`;
+  const draft = created(service.createQuiz("q7", "Draft", quizInput({ sourceLabel: "Shelf", questionCount: 3, allowedTypes: ["cover_title"] })));
+  const url = `/quizzes/${draft.id}`;
 
   assert.equal((await send("PUT", url, "q7", { data: { books: [null, null, null, null] } })).statusCode, 400);
   assert.equal((await send("PUT", url, "q7", { data: { questionCount: 99, books: [] } })).statusCode, 400);
@@ -205,7 +213,7 @@ test("PUT validates the document and replaces it whole", async () => {
   assert.equal(valid.statusCode, 200);
   assert.equal(valid.json().data.questionCount, 2);
   assert.deepEqual(valid.json().data.books.map((entry: { workId: string }) => entry.workId), ids);
-  assert.equal((service.getQuiz("q7", created.id)!.data as { sourceLabel: string }).sourceLabel, "");
+  assert.equal((service.getQuiz("q7", draft.id)!.data as { sourceLabel: string }).sourceLabel, "");
   await app.close();
 });
 
@@ -231,10 +239,10 @@ test("PUT rejects an unknown work and a second edition of one work", async () =>
 test("an unreachable catalog is a 503 and stores nothing", async () => {
   const [a, b] = [named("Catalog Down"), named("Catalog Down Two")];
   const { app, db, service, send } = await quizApp();
-  const existing = service.createQuiz("q8", "Existing", { books: [{ ...book(a, "Catalog Down") }] });
+  const existing = created(service.createQuiz("q8", "Existing", quizInput({ books: [{ ...book(a, "Catalog Down") }] })));
   const coverless = ["Down C1", "Down C2", "Down C3", "Down C4"].map((title) => ({ ...book(named(title), title), coverUrl: null }));
-  const pending = service.createQuiz("q8", "Pending", { questionCount: 2, allowedTypes: ["title_cover", "blurb_title"], books: coverless });
-  const covered = service.createQuiz("q8", "Covered", { questionCount: 2, allowedTypes: ["cover_title"], books: ["Down K1", "Down K2", "Down K3", "Down K4"].map((title) => book(named(title), title)) });
+  const pending = created(service.createQuiz("q8", "Pending", quizInput({ questionCount: 2, allowedTypes: ["title_cover", "blurb_title"], books: coverless })));
+  const covered = created(service.createQuiz("q8", "Covered", quizInput({ questionCount: 2, allowedTypes: ["cover_title"], books: ["Down K1", "Down K2", "Down K3", "Down K4"].map((title) => book(named(title), title)) })));
   const catalog = openBooksDb();
   catalog.exec("ALTER TABLE works RENAME TO works_away");
   try {
@@ -257,9 +265,9 @@ test("an unreachable catalog is a 503 and stores nothing", async () => {
 
 test("a rejected quiz update resolves nothing and keeps its status", async () => {
   const { app, service, send } = await quizApp();
-  const mine = service.createQuiz("q9", "Mine", { books: [] });
-  const published = service.createQuiz("q9", "Published", { questionCount: 2, allowedTypes: ["cover_title"], books: Array.from({ length: 4 }, (_, i) => book(`p${i}`)) });
-  assert.ok(service.publishQuiz("q9", published.id, []).ok);
+  const mine = created(service.createQuiz("q9", "Mine", quizInput({})));
+  const published = created(service.createQuiz("q9", "Published", quizInput({ questionCount: 2, allowedTypes: ["cover_title"], books: Array.from({ length: 4 }, (_, i) => book(named(`Reject P${i}`), `Reject P${i}`)) })));
+  assert.ok(service.publishQuiz("q9", published.id).ok);
   const data = { books: [worksBook("Reject Probe Title")] };
 
   const before = catalogBookCount();
@@ -329,7 +337,7 @@ test("the public board shows each question's prompt from its own book after two 
 test("publish counts one book per work after two editions merge", async () => {
   const ids = ["Dup Pub A", "Dup Pub B", "Dup Pub C", "Dup Pub D"].map(named);
   const { app, service, send } = await quizApp();
-  const draft = service.createQuiz("q13", "Merged", { questionCount: 2, allowedTypes: ["cover_title"], books: ids.map((id, index) => book(id, `Dup Pub ${"ABCD"[index]}`)) });
+  const draft = created(service.createQuiz("q13", "Merged", quizInput({ questionCount: 2, allowedTypes: ["cover_title"], books: ids.map((id, index) => book(id, `Dup Pub ${"ABCD"[index]}`)) })));
   openBooksDb().prepare("UPDATE works SET merged_into = ? WHERE id = ?").run(ids[0]!, ids[1]!);
   const published = await send("POST", `/quizzes/${draft.id}/publish`, "q13", {});
   assert.equal(published.statusCode, 400);
@@ -445,6 +453,19 @@ test("a play toggle by someone who does not own the quiz is a 404, and a publish
   const restore = breakCatalog();
   try {
     assert.equal((await send("PUT", `/quizzes/${quizId}`, "q17", { name: "Renamed" })).statusCode, 404);
+  } finally {
+    restore();
+  }
+  await app.close();
+});
+
+test("publishing an already-published quiz with the catalog down is a 409", async () => {
+  const { app, send, quizId } = await publishedWorksQuiz("q19", ["Twice A", "Twice B", "Twice C", "Twice D"], 3, ["cover_title"]);
+  const restore = breakCatalog();
+  try {
+    const again = await send("POST", `/quizzes/${quizId}/publish`, "q19", {});
+    assert.equal(again.statusCode, 409);
+    assert.equal(again.json().error, "This quiz is already published.");
   } finally {
     restore();
   }

@@ -249,6 +249,7 @@ test("a trigger that rolls the transaction back surfaces its own error and keeps
 
 test("published quizzes about any of the given works, newest first; drafts never", async () => {
   const { createQuizzesService, createQuizzesPublicApi } = await import("../../service.js");
+  const { quizWorks } = await import("../../plugin.js");
   const repo = makeRepo();
   const books = (...workIds: string[]) => JSON.stringify({ books: workIds.map((workId) => ({ workId })) });
   repo.insert(quizRow({ id: "old", name: "Old", data: books("w-old", "w-x"), vote_code: "code-old", created_at: "2026-01-01T00:00:00Z" }));
@@ -260,7 +261,7 @@ test("published quizzes about any of the given works, newest first; drafts never
   assert.deepEqual(repo.listPublishedByWorks(["w-new", "w-old"], 1).map((r) => r.id), ["both"]);
   assert.equal(repo.listPublishedByWorks([], 20).length, 0);
 
-  const api = createQuizzesPublicApi(createQuizzesService(repo));
+  const api = createQuizzesPublicApi(createQuizzesService(repo, quizWorks));
   assert.deepEqual(api.publishedByWorks(["w-new", "w-old"], 20), [
     { id: "both", name: "Both", path: "/play/code-both", ownerUserId: "u2" },
     { id: "old", name: "Old", path: "/play/code-old", ownerUserId: "u1" }
