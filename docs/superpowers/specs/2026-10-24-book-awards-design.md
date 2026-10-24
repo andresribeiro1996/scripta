@@ -55,7 +55,7 @@ The fill uses the same three identifier kinds as the series fill (`fill-series.m
 - **Book prizes:** `?work` has a P166 or P1411 statement whose value is a listed book prize, with a P585 qualifier.
 - **Author prizes:** a `?person` has a P166 statement whose value is a listed author prize, with P585, and `?work wdt:P50 ?person`. The row also carries the person's English label, else their Portuguese one, else any label, as `honoree`.
 
-That is six queries, paged 3000 rows at a time as the series queries are. Each row is `{ isbns, olWorkIds, prize, year, won, honoree }`. The query builder takes an optional `minYear`, filtering on `YEAR(?when) >= minYear`. The script passes none; the daily job passes the current UTC year minus 1.
+That is six queries, plus three for each extra shape the Wikidata check finds (see Unverified at spec time). They are paged 3000 rows at a time, as the series queries are. Each row is `{ isbns, olWorkIds, prize, year, won, honoree }`. The query builder takes an optional `minYear`, filtering on `YEAR(?when) >= minYear`. The script passes none; the daily job passes the current UTC year minus 1.
 
 ### Reuse from the series fill
 
@@ -198,7 +198,12 @@ In `HomeScreen.tsx`'s list header, after `RecapHomeCard`. It shows whether or no
 
 `query.wikidata.org` was blocked for the session that wrote this, so these are checked in the plan's first task, by a dry run on Railway:
 - the prize item IDs, and the four unknown ones;
-- that nominations are P1411 statements on the work, not on the prize item with P1686 ("for work"). If they are on the prize item, the book-prize query gains that shape too;
+- where a book prize is recorded. There are three possible shapes:
+  - (a) P166/P1411 on the work;
+  - (b) P166/P1411 on the author, with a "for work" (P1686) qualifier naming the book;
+  - (c) "winner" (P1346) on the prize item, with P1686.
+
+  The fill queries every shape that adds works beyond (a). An author prize has the matching person-level shapes;
 - per-prize coverage. A prize with near-zero matched works goes back to the user: keep it (costs nothing, rarely shows) or drop it.
 
 ## Later
