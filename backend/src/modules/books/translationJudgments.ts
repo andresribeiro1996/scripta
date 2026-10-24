@@ -133,7 +133,7 @@ export async function judgeWorkMatch(deps: HeldDeps, workId: string, held: () =>
   return matchWork(deps, canonical, seriesLike());
 }
 
-export function startTranslationJobs(deps: HeldDeps & { info: (details: Record<string, unknown>, message: string) => void; onError: (error: unknown, workId?: string) => void }): TranslationJobs {
+export function startTranslationJobs(deps: HeldDeps & { info: (details: Record<string, unknown>, message: string) => void; onError: (error: unknown, workId?: string) => void; initialDelayMs?: number }): TranslationJobs {
   let quietUntil = 0;
   let budgetLoggedUntil = 0;
   let heldCache: { at: number; works: Set<string> } | null = null;
@@ -171,7 +171,9 @@ export function startTranslationJobs(deps: HeldDeps & { info: (details: Record<s
       return null;
     },
     (error) => deps.onError(error),
-    SWEEP_INTERVAL_MS
+    SWEEP_INTERVAL_MS,
+    undefined,
+    deps.initialDelayMs
   );
   return {
     add: (workId) => queue.add(workId),

@@ -52,13 +52,13 @@
   export function jevPause(error: unknown, deps: JevPauseDeps, keyAlert: JevKeyAlert, strike: (strike: JevStrike) => void): number | null;
   export function runJevBacklog(items: string[], judgeOne: (item: string, onPause: (kind: JevPauseKind, until: number) => void) => Promise<number | null>): Promise<{ asked: string[]; stoppedBy: JevStop }>;
   export type JevJobs = { add(workId: string): void; stop(): void };
-  export type JevJobsDeps = { repo: Pick<BooksRepository, "canonicalWorkIds">; heldWorkIds: () => string[]; now: () => number; alert: (subject: string, text: string) => void; info: (details: Record<string, unknown>, message: string) => void; onError: (error: unknown, workId?: string) => void; timers?: Parameters<typeof startDetailsBackfill>[3] };
+  export type JevJobsDeps = { repo: Pick<BooksRepository, "canonicalWorkIds">; heldWorkIds: () => string[]; now: () => number; alert: (subject: string, text: string) => void; info: (details: Record<string, unknown>, message: string) => void; onError: (error: unknown, workId?: string) => void; timers?: Parameters<typeof startDetailsBackfill>[3]; initialDelayMs?: number };
   export type JevJob = { source: string; budgetMessage: string; sweep: (heldWorkIds: string[]) => string[]; judge: (workId: string, held: () => Set<string>, pause: JevPauseDeps) => Promise<number | null> };
   export function startJevJobs(deps: JevJobsDeps, job: JevJob): JevJobs;
   ```
 - Rules:
   - `jevPause`: `failureKind(error)` — `"book"` calls `strike(strikeReason(error))` and returns `null`; `"budget"`, `"outage"`, `"key"` compute `until` as in Global Constraints, call `deps.onPause?.(kind, until)`, and return `until`; `"key"` also calls `deps.alert(keyAlert.subject, keyAlert.text)` first; `null` rethrows `error`.
-  - `startJevJobs`: a `createWorkQueue` of `JEV_IN_FLIGHT` whose `run` is `job.judge(workId, held, pause)`; `held()` returns `heldCanonical(repo, heldWorkIds())` cached for 60 s; `pause.alert` drops any alert within 24 h of the last one sent; `pause.onPause` on `"budget"` logs `deps.info({ source: job.source, until: <ISO> }, job.budgetMessage)` once until `until` passes; a `startDetailsBackfill(run, (error) => deps.onError(error), 24 * 60 * 60 * 1000, deps.timers)` sweep refreshes `held` and queues `job.sweep([...held])`, returning `null`; `stop()` stops the sweep and the queue.
+  - `startJevJobs`: a `createWorkQueue` of `JEV_IN_FLIGHT` whose `run` is `job.judge(workId, held, pause)`; `held()` returns `heldCanonical(repo, heldWorkIds())` cached for 60 s; `pause.alert` drops any alert within 24 h of the last one sent; `pause.onPause` on `"budget"` logs `deps.info({ source: job.source, until: <ISO> }, job.budgetMessage)` once until `until` passes; a `startDetailsBackfill(run, (error) => deps.onError(error), 24 * 60 * 60 * 1000, deps.timers, deps.initialDelayMs)` sweep refreshes `held` and queues `job.sweep([...held])`, returning `null`; `stop()` stops the sweep and the queue.
   - `runJevBacklog`: `JEV_IN_FLIGHT` workers share a cursor while `stoppedBy === "done"`; each item gets its own `onPause` that records the kind; an item returning `null` is pushed onto `asked`; an item returning a time sets `stoppedBy` to that item's recorded kind (`"outage"` if none was recorded) unless already set.
   - `jevCostUsd(requests)` is `Number((requests * 0.00012).toFixed(2))`.
 
@@ -72,6 +72,7 @@
   - "a spent budget is logged once at info level with its source, and alerts nobody, however many workers hit it"
   - "the held set is read once a minute, however many works are judged, and a newly held work is judged after it refreshes"
   - "the sweep runs at boot and again after 24 hours, queueing what it returns" (fake `timers`)
+  - "the sweep waits for initialDelayMs before its first pass" (fake `timers`)
   - "stop ends the sweep and drops queued works"
   - "the backlog asks every item until the first pause and names its kind"
   - "a backlog stop is attributed to the item whose call failed, not to a concurrent one"
