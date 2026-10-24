@@ -48,7 +48,7 @@ export function seriesLabel(series: BookSeries): string {
 }
 
 export function searchResultByline(result: Pick<BookSearchResult, "authors" | "publisher" | "year">): string {
-  return [result.authors.join(", "), result.publisher, result.year].filter(Boolean).join(" · ");
+  return [result.authors.join(", "), result.year, result.publisher].filter(Boolean).join(" · ");
 }
 
 /** True when the query is nothing but an ISBN (10 or 13, dashes/spaces

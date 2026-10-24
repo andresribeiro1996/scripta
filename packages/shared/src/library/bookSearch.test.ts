@@ -119,9 +119,9 @@ test("mapOpenLibraryDoc drops non-sorting markers before repairing mojibake", ()
   assert.equal(mapOpenLibraryDoc({ title: "\u0098A \u009cfÃ© e a crenÃ§a" })?.title, "A fé e a crença");
 });
 
-test("a search result byline reads author · publisher · year and skips what is missing", () => {
+test("a search result byline reads author · year · publisher and skips what is missing", () => {
   const base = { authors: ["Isabel Allende"], publisher: "Porto Editora", year: 2013 };
-  assert.equal(searchResultByline(base), "Isabel Allende · Porto Editora · 2013");
+  assert.equal(searchResultByline(base), "Isabel Allende · 2013 · Porto Editora");
   assert.equal(searchResultByline({ ...base, publisher: null }), "Isabel Allende · 2013");
   assert.equal(searchResultByline({ authors: [], publisher: "Porto Editora", year: null }), "Porto Editora");
 });
