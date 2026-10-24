@@ -27,7 +27,8 @@ import { arenaCheck, startTranslationJobsIfConfigured } from "./translationJudgm
 import { reviewTranslationWith, translationReviewWith } from "./translationReview.js";
 import { isPortuguese } from "./domain/translation.js";
 import type { HeldWork } from "./genrePass.js";
-import { DETAILS_BATCH_SIZE, startBackfill, startCoverColorBackfill, startDetailsBackfill, startWorksBackfill, startWorksGrouping } from "./backfill.js";
+import { BACKFILL_INTERVAL_MS, startJob, startTimer } from "../../jobs.js";
+import { DETAILS_BATCH_SIZE, startCoverColorBackfill, startWorksBackfill, startWorksGrouping } from "./backfill.js";
 import { createBooksService, MAX_UPLOAD_BYTES, type BooksService } from "./booksService.js";
 import type { FetchCoverImage } from "./coverResolver.js";
 import { encodeCover } from "./domain/images.js";
@@ -197,8 +198,8 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
     (error, bookId) => app.log.error({ err: error, bookId }, "cover lookup failed")
   );
   timeStep(app.log, "startup:cover-enqueue", () => service.enqueueUnchecked());
-  const stopBackfill = startBackfill(() => timeSync(app.log, "cover-enqueue", () => service.enqueueUnchecked()));
-  const stopDetailsBackfill = startDetailsBackfill(
+  const stopBackfill = startTimer(() => timeSync(app.log, "cover-enqueue", () => service.enqueueUnchecked()), BACKFILL_INTERVAL_MS);
+  const stopDetailsBackfill = startJob(
     (signal) => service.backfillDetails(DETAILS_BATCH_SIZE, signal),
     (error) => app.log.error({ err: error }, "details backfill failed"),
     undefined,
@@ -214,7 +215,7 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
     undefined,
     FIRST_RUN_DELAY_MS.worksGrouping
   );
-  const stopWorkKeyBackfill = startDetailsBackfill(
+  const stopWorkKeyBackfill = startJob(
     (signal) => service.backfillWorkKeys(DETAILS_BATCH_SIZE, signal),
     (error) => app.log.error({ err: error }, "work key backfill failed"),
     undefined,
@@ -224,7 +225,7 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
   const stopColorBackfill = startCoverColorBackfill((limit) => service.fillCoverColors(limit), app.log, undefined, undefined, FIRST_RUN_DELAY_MS.colorBackfill);
   const retitleIsbndb = isbndbConfigured ? createIsbndbCatalog(env.ISBNDB_API_KEY, isbndbThrottle, isbndbGate, false, { details: isbndbSpend, search: isbndbSpend }) : null;
   const stopRetitleJob = retitleIsbndb
-    ? startDetailsBackfill(
+    ? startJob(
         (signal) => retitleWanted({
           repo,
           isbndb: retitleIsbndb,
@@ -238,7 +239,7 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
         FIRST_RUN_DELAY_MS.retitleJob
       )
     : null;
-  const stopBnpSync = startDetailsBackfill(
+  const stopBnpSync = startJob(
     async () => {
       const report = await syncBnp(bnpDeps);
       if (report) logBnpSync(app.log, report);
