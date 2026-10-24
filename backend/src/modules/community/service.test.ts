@@ -139,7 +139,7 @@ function fakeGameSource<K extends GameKind>(
   kind: K,
   cards: Map<string, GameCard<K>>,
   voted: Set<string>,
-  participation: GameParticipation[],
+  participation: Array<GameParticipation & { voteCode?: string }>,
   gameWorks: Map<string, string[]>,
   windowCalls: Array<{ kind: GameKind; needle: string; limit: number }>,
   manyCalls: Array<{ kind: GameKind; ids: string[]; viewerId: string | undefined }>
@@ -189,7 +189,7 @@ function createDeps(repo: CommunityRepository) {
   const quizPlays = new Set<string>();
   const readerGlyphs = new Map<string, IdentityKey | null>();
   const readerGlyphCalls: string[] = [];
-  const tierlistParticipation: GameParticipation[] = [];
+  const tierlistParticipation: Array<GameParticipation & { voteCode?: string }> = [];
   const tournamentParticipation: GameParticipation[] = [];
   const quizParticipation: GameParticipation[] = [];
   const windowCalls: Array<{ kind: GameKind; needle: string; limit: number }> = [];
@@ -1067,13 +1067,14 @@ test("your games' participation shows as one row per game", () => {
   const service = createCommunityService(deps);
   readerProfiles.set("ana", reader("ana"));
   repo.upsertProfile(profileRow("ana"));
-  tierlistParticipation.push({ id: "t1", name: "Sci-fi", covers: ["a", "b", "c", "d"], participantCount: 4, latestAt: at(2), recent: [{ userId: "ana", at: at(2) }, { userId: "ghost", at: at(1) }] });
+  tierlistParticipation.push({ id: "t1", name: "Sci-fi", covers: ["a", "b", "c", "d"], voteCode: "v1", participantCount: 4, latestAt: at(2), recent: [{ userId: "ana", at: at(2) }, { userId: "ghost", at: at(1) }] });
   const { items } = service.getDashboard("viewer", undefined, 20, ALL_KINDS);
   assert.equal(items.length, 1);
   const row = items[0] as ParticipationItem;
   assert.equal(row.kind, "participation");
   assert.equal(row.id, "tierlist:t1");
   assert.equal(row.game.covers.length, 3);
+  assert.equal(row.game.voteCode, "v1");
   assert.equal(row.count, 4);
   assert.equal(row.createdAt, at(2));
   assert.deepEqual(row.actors.map((actor) => actor.username), ["user-ana"]);
@@ -2441,6 +2442,37 @@ test("getActivity links votes to what was voted on, and leaves vanished ones pla
   assert.deepEqual(payloads.t1, { game: "tierlist", id: "t1", name: "List t1", covers: ["a", "b", "c"], href: "/vote/code-t1" });
   assert.deepEqual(payloads.g1, { game: "tournament", id: "g1", name: "Cup g1", covers: ["x"], href: "/arena/g1" });
   assert.deepEqual(payloads.gone, { game: "tournament", id: "gone", name: "Old cup" });
+});
+
+test("getActivity enriches a vote by its ref_type even when the payload names no game", () => {
+  const { repo } = createRepoFake();
+  const { deps, usernames, tournamentRefs } = createDeps(repo);
+  const service = createCommunityService(deps);
+  usernames.set("alice", "alice");
+  repo.upsertProfile(profileRow("alice"));
+  tournamentRefs.set("g1", tournRef("g1", "bob", { covers: ["a", "b", "c", "d"] }));
+  repo.insertEvent({ id: "e-known", user_id: "alice", type: "voted_on", ref_type: "tournament", ref_id: "g1", payload: JSON.stringify({ id: "g1", name: "Cup g1" }), created_at: at(3) });
+  repo.insertEvent({ id: "e-unknown", user_id: "alice", type: "voted_on", ref_type: "book", ref_id: "g1", payload: JSON.stringify({ game: "tournament", id: "g1", name: "Cup g1" }), created_at: at(2) });
+  const payloads = Object.fromEntries(service.getActivity("alice", "alice", undefined, 20).items.map((item) => [item.id, item.payload]));
+  assert.deepEqual(payloads["e-known"], { id: "g1", name: "Cup g1", covers: ["a", "b", "c"], href: "/arena/g1" });
+  assert.deepEqual(payloads["e-unknown"], { game: "tournament", id: "g1", name: "Cup g1" });
+});
+
+test("a feed vote with an unknown ref_type is dropped without any game lookup", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, tournamentRefs } = createDeps(repo);
+  const lookups: string[] = [];
+  const tournament = deps.games.tournament;
+  deps.games.tournament = { ...tournament, get: (id) => { lookups.push(id); return tournament.get(id); } };
+  const service = createCommunityService(deps);
+  readerProfiles.set("alice", reader("alice"));
+  repo.upsertProfile(profileRow("alice"));
+  repo.insertFollow({ follower_id: "viewer", followee_id: "alice", created_at: at(1) });
+  tournamentRefs.set("g1", tournRef("g1", "carol"));
+  repo.insertEvent({ id: "e-odd", user_id: "alice", type: "voted_on", ref_type: "book", ref_id: "g1", payload: null, created_at: at(4) });
+  const { items } = service.getDashboard("viewer", undefined, 20, ALL_KINDS);
+  assert.deepEqual(items.filter((item) => item.kind === "vote"), []);
+  assert.deepEqual(lookups, []);
 });
 
 function suggestionFixture() {

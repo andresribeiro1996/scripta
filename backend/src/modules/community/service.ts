@@ -552,7 +552,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
         }
         const payload = parseEventPayload(event.payload);
         if (payload !== undefined && event.type === "voted_on") {
-          const kind = typeof payload.game === "string" ? asGameKind(payload.game) : null;
+          const kind = asGameKind(event.ref_type);
           const card = kind ? deps.games[kind].get(event.ref_id) : undefined;
           if (card) {
             const content = feedContent(card.content);
