@@ -70,12 +70,12 @@ export interface WorksSteps {
   fillTitleKeys: (limit: number) => number;
 }
 
-async function drainBatches(step: (limit: number) => number | Promise<number>, signal: AbortSignal, size: number = WORKS_BATCH_SIZE): Promise<number> {
+async function drainBatches(step: (limit: number, signal: AbortSignal) => number | Promise<number>, signal: AbortSignal, size: number = WORKS_BATCH_SIZE): Promise<number> {
   let total = 0;
   for (;;) {
     await new Promise(setImmediate);
     if (signal.aborted) return total;
-    const batch = await step(size);
+    const batch = await step(size, signal);
     total += batch;
     if (batch < size) return total;
   }
@@ -127,7 +127,7 @@ export interface WorksGrouping {
 
 export function startWorksGrouping(
   mergeDuplicates: (signal: AbortSignal) => Promise<number>,
-  groupKeylessWorks: (limit: number) => number,
+  groupKeylessWorks: (limit: number, signal: AbortSignal) => number | Promise<number>,
   log: WorksLog,
   intervalMs: number = GROUPING_INTERVAL_MS,
   timers: Timers = systemTimers(),

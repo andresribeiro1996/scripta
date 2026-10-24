@@ -76,3 +76,24 @@ export async function walkDuplicateWorks(deps: DuplicateDeps, options: { dryRun:
   }
   return total;
 }
+
+export async function groupKeylessWorks(
+  repo: Pick<BooksRepository, "groupableTitleKeys" | "groupTitleKeys">,
+  limit: number,
+  options: { at?: string; skip?: (from: string, into: string) => boolean; signal?: AbortSignal; pageSize?: number } = {}
+): Promise<number> {
+  const { at = new Date().toISOString(), skip, signal, pageSize = limit } = options;
+  let merged = 0;
+  let after = "";
+  while (merged < limit && !signal?.aborted) {
+    const keys = repo.groupableTitleKeys(after, pageSize);
+    if (keys.length === 0) break;
+    await new Promise(setImmediate);
+    if (signal?.aborted) break;
+    merged += repo.groupTitleKeys(keys, limit - merged, at, skip);
+    if (keys.length < pageSize) break;
+    after = keys[keys.length - 1]!;
+    await new Promise(setImmediate);
+  }
+  return merged;
+}

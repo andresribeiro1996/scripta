@@ -21,7 +21,7 @@ import { startGenreJobsIfConfigured } from "./genreJudgments.js";
 import { genreReviewWith, reviewGenreWith } from "./genreReview.js";
 import { startSynopsisJobsIfConfigured } from "./synopsisJudgments.js";
 import { reviewSynopsisWith, synopsisReviewWith } from "./synopsisReview.js";
-import { walkDuplicateWorks } from "./duplicateWorks.js";
+import { groupKeylessWorks, walkDuplicateWorks } from "./duplicateWorks.js";
 import { startOriginalArrivals } from "./originalArrivals.js";
 import { arenaCheck, startTranslationJobsIfConfigured } from "./translationJudgments.js";
 import { reviewTranslationWith, translationReviewWith } from "./translationReview.js";
@@ -47,6 +47,7 @@ const OPEN_LIBRARY_GAP_MS = 1000;
 const OPEN_LIBRARY_COVER_GAP_MS = 3100;
 const BACKGROUND_ISBNDB_DAILY_CAP = 500;
 const BNP_LOOKUP_TIMEOUT_MS = 5_000;
+const GROUPING_PAGE_SIZE = 50;
 const FIRST_RUN_DELAY_MS = {
   detailsBackfill: 30_000,
   workKeyBackfill: 40_000,
@@ -208,8 +209,8 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
   );
   const stopWorksBackfill = startWorksBackfill(repo, app.log, undefined, undefined, FIRST_RUN_DELAY_MS.worksBackfill);
   const grouping = startWorksGrouping(
-    (signal) => walkDuplicateWorks({ repo, sharesArena, now: Date.now }, { dryRun: false, signal, pageSize: 100, pauseMs: 250 }).then((report) => report.merges.length),
-    (limit) => repo.groupKeylessWorks(limit, undefined, sharesArena),
+    (signal) => walkDuplicateWorks({ repo, sharesArena, now: Date.now }, { dryRun: false, signal, pageSize: GROUPING_PAGE_SIZE, pauseMs: 250 }).then((report) => report.merges.length),
+    (limit, signal) => groupKeylessWorks(repo, limit, { skip: sharesArena, signal, pageSize: GROUPING_PAGE_SIZE }),
     app.log,
     undefined,
     undefined,

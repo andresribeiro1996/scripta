@@ -331,10 +331,11 @@ test("works grouping merges duplicate works before grouping keyless ones", async
   const { log, info } = fakeLog();
   const calls: string[] = [];
   const signals: unknown[] = [];
+  const groupSignals: unknown[] = [];
   const sizes = [250, 4];
   startWorksGrouping(
     async (signal) => { calls.push("merge"); signals.push(signal); return 3; },
-    () => { calls.push("group"); return sizes.shift() ?? 0; },
+    (_limit, signal) => { calls.push("group"); groupSignals.push(signal); return sizes.shift() ?? 0; },
     log,
     undefined,
     timers
@@ -342,6 +343,8 @@ test("works grouping merges duplicate works before grouping keyless ones", async
   await until(() => info.length === 2);
   assert.deepEqual(calls, ["merge", "group", "group"]);
   assert.ok(signals[0] instanceof AbortSignal);
+  assert.equal(groupSignals.length, 2);
+  assert.ok(groupSignals.every((signal) => signal === signals[0]));
   assert.deepEqual(info, [
     { details: { merged: 3 }, message: "merged duplicate Open Library works" },
     { details: { grouped: 254 }, message: "grouped keyless works by title" }

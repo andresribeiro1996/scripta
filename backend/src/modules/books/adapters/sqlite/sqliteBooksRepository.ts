@@ -1202,20 +1202,6 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       };
     },
 
-    groupKeylessWorks(limit, at = new Date().toISOString(), skip) {
-      return inTransaction(() => {
-        let merged = 0;
-        let after = "";
-        while (merged < limit) {
-          const keys = groupableTitleKeys(after, limit);
-          if (keys.length === 0) break;
-          merged += groupTitleKeys(keys, limit - merged, at, skip);
-          after = keys[keys.length - 1]!;
-        }
-        return merged;
-      });
-    },
-
     listWorkLookupIds(limit, recheckBefore) {
       return (workLookupStmt.all(recheckBefore, limit) as Array<{ id: string }>).map((row) => row.id);
     },
