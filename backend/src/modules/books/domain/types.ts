@@ -109,3 +109,17 @@ export type JevRejection = { status: number | null; reason: string; attempts: nu
 export type MergeSource = "title-key" | "admin" | "code" | "jev" | "manual" | "ol-duplicate";
 
 export type WorkMatchJudgment = { model: string; intoWorkId: string | null; confidence: number | null; askedAt: string };
+
+export interface RowRepair {
+  id: string;
+  title: string;
+  author: string;
+  repairedTitle: string;
+  repairedAuthor: string;
+}
+
+export interface MojibakeApplied {
+  books: number;
+  works: number;
+  skipped: number;
+}

@@ -2,8 +2,8 @@ import { canonicalIsbn } from "@scripta/shared";
 import { SourcePausedError, SourceUnavailableError } from "./domain/errors.js";
 import { hasCopyrightSign, retitle, retitleRepairs, textOf, type BookText } from "./domain/lossy.js";
 import type { BookCatalog, BooksRepository } from "./domain/ports.js";
-import type { LossyBook } from "./domain/types.js";
-import type { MojibakeApplied, MojibakePlan } from "./seed/mojibakeRepair.js";
+import type { LossyBook, MojibakeApplied } from "./domain/types.js";
+import type { MojibakePlan } from "./seed/mojibakeRepair.js";
 
 export const RETITLE_BATCH_SIZE = 25;
 

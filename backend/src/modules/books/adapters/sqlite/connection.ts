@@ -10,7 +10,8 @@ import { MIN_GOOD_WIDTH } from "../../domain/constants.js";
 import { catalogTitleKey, givenNameFirst } from "../../domain/normalize.js";
 import { summaryHashOf } from "../../domain/synopsis.js";
 import { ORIGINAL_KEY_VERSION, isOriginalTitle, originalKey, originalTitleIn, originalWholeKey } from "../../domain/translation.js";
-import { applyMojibakeRepairs, type RowRepair } from "../../seed/mojibakeRepair.js";
+import type { RowRepair } from "../../domain/types.js";
+import { applyMojibakeRepairs } from "./titleRepairs.js";
 import { CONFIRMED_SQL } from "./sqliteBooksRepository.js";
 
 const adapterDir = dirname(fileURLToPath(import.meta.url));

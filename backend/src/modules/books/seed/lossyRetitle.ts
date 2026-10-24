@@ -3,9 +3,9 @@ import { canonicalIsbn } from "@scripta/shared";
 import { SourcePausedError, SourceUnavailableError } from "../domain/errors.js";
 import { hasCopyrightSign, isLossy, retitle, retitleRepairs, textOf, type BookText, type RetitleCandidates } from "../domain/lossy.js";
 import type { BookCatalog } from "../domain/ports.js";
-import type { LossyBook } from "../domain/types.js";
+import type { LossyBook, MojibakeApplied, RowRepair } from "../domain/types.js";
 import { createThrottle, readSiteFeed, SiteSkipped, type ImportDeps } from "./importPublisherCovers.js";
-import type { BookRepair, MojibakeApplied, RowRepair } from "./mojibakeRepair.js";
+import type { BookRepair } from "./mojibakeRepair.js";
 import type { PublisherSite } from "./publishers.js";
 
 type LossyTarget = LossyBook & { publisher_url: string | null };

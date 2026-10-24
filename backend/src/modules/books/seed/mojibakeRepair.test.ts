@@ -17,7 +17,8 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 const { applyBooksMigrations } = await import("../adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("../adapters/sqlite/sqliteBooksRepository.js");
 const { catalogTitleKey, workTitleKey } = await import("../domain/normalize.js");
-const { applyMojibakeRepairs, mojibakeReport, planMojibakeRepairs, reportJson } = await import("./mojibakeRepair.js");
+const { mojibakeReport, planMojibakeRepairs, reportJson } = await import("./mojibakeRepair.js");
+const { applyMojibakeRepairs } = await import("../adapters/sqlite/titleRepairs.js");
 
 const NOW = "2026-10-01T00:00:00.000Z";
 const BROKEN_TITLE = "Entre a fÃ© e a crenÃ§a";

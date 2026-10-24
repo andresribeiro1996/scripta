@@ -10,6 +10,7 @@ import { wantsRetitle } from "../../domain/lossy.js";
 import { SERIES_SOURCE_RANK, seriesNameKey, type SeriesEntry, type SeriesSource } from "../../domain/series.js";
 import { summaryHashOf, type SynopsisKind } from "../../domain/synopsis.js";
 import { isOriginalTitle, originalKey, originalTitleIn, originalWholeKey } from "../../domain/translation.js";
+import { applyMojibakeRepairs } from "./titleRepairs.js";
 import type { BookRow, CoverImageRow, DataSource, GenreEvidence, LossyBook, MergeSource, SummarySource, WorkPageRows, WorkView } from "../../domain/types.js";
 
 export const UNCHECKED_COVERS_SQL = `
@@ -1266,6 +1267,9 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
 
     clearRetitleWanted(id) {
       clearRetitleWantedStmt.run(id);
+    },
+    applyTitleRepairs(plan) {
+      return applyMojibakeRepairs(db, plan);
     },
 
     addWorkSeries(workId, entries, source, at) {

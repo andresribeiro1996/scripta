@@ -37,7 +37,6 @@ import { coverUrlFor, useBooksRepository } from "./publicCoverLookup.js";
 import { buildAdminRoutes, buildCatalogRoutes, buildCoverFileRoutes, buildGenreReviewRoutes, buildResolveRoutes, buildSynopsisReviewRoutes, buildTranslationReviewRoutes } from "./routes.js";
 import { RETITLE_BATCH_SIZE, retitleWanted } from "./retitleJob.js";
 import { BNP_SYNC_INTERVAL_MS, fetchBnpPage, fetchBnpScan, logBnpSync, lookupBnpIsbn, syncBnp, type BnpHarvestDeps } from "./seed/bnpImport.js";
-import { applyMojibakeRepairs } from "./seed/mojibakeRepair.js";
 import { fetchText } from "./seed/siteFetch.js";
 import { createCoverWorker } from "./worker.js";
 
@@ -229,7 +228,7 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
         (signal) => retitleWanted({
           repo,
           isbndb: retitleIsbndb,
-          write: (plan) => applyMojibakeRepairs(booksDb, plan),
+          write: (plan) => repo.applyTitleRepairs(plan),
           info: (details, message) => app.log.info(details, message),
           warn: (details, message) => app.log.warn(details, message)
         }, RETITLE_BATCH_SIZE, signal),

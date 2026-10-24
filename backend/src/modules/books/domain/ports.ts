@@ -3,7 +3,7 @@ import type { KeyedWork } from "./duplicateWorks.js";
 import type { SynopsisJudgment, SynopsisKind } from "./synopsis.js";
 import type { CollectionSource, SeriesEntry, SeriesSource } from "./series.js";
 import type { OriginalClaim } from "./translation.js";
-import type { BookRow, CoverImageRow, CoverSourceName, CoverStatus, DataSource, GenreEvidence, GenresSource, JevRejection, JevTask, LossyBook, MergeSource, NewBook, SummarySource, WorkMatchJudgment, WorkPageRows, WorkView } from "./types.js";
+import type { BookRow, CoverImageRow, CoverSourceName, CoverStatus, DataSource, GenreEvidence, GenresSource, JevRejection, JevTask, LossyBook, MergeSource, MojibakeApplied, NewBook, RowRepair, SummarySource, WorkMatchJudgment, WorkPageRows, WorkView } from "./types.js";
 
 export type MergeableDetails = Pick<BookMetadata, "summary" | "pages" | "year" | "publisher" | "translator">;
 
@@ -131,6 +131,7 @@ export interface BooksRepository {
   listUpgradeWantedIds(after: PageCursor | null, limit: number): IdPage;
   listRetitleWanted(limit: number): LossyBook[];
   clearRetitleWanted(id: string): void;
+  applyTitleRepairs(plan: { books: RowRepair[]; works: RowRepair[] }): MojibakeApplied;
   addWorkSeries(workId: string, entries: SeriesEntry[], source: SeriesSource, at: string): number;
   addBookCollection(bookId: string, entry: SeriesEntry, source: CollectionSource, at: string): boolean;
   bestSeriesOf(workIds: string[]): Map<string, SeriesEntry>;
