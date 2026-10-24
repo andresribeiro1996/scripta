@@ -60,6 +60,8 @@ export async function walkDuplicateWorks(deps: DuplicateDeps, options: { dryRun:
   while (!signal?.aborted) {
     const keys = deps.repo.groupableTitleKeys(after, pageSize);
     if (keys.length === 0) break;
+    await new Promise(setImmediate);
+    if (signal?.aborted) break;
     const page = mergeDuplicateWorks(deps, keys, dryRun);
     total.merges.push(...page.merges);
     total.seriesName += page.seriesName;

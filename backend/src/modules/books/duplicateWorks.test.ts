@@ -219,6 +219,56 @@ test("walk covers keys across pages", async () => {
   assert.deepEqual(pages.map((keys) => keys.length), [1, 1, 0]);
 });
 
+test("walk yields to the event loop between a page's key read and its merges", async () => {
+  const repo = freshRepo();
+  const wing = twoDuplicates(repo, "Fourth Wing", "OL1W", "OL2W");
+  const flame = twoDuplicates(repo, "Iron Flame", "OL3W", "OL4W");
+  const events: string[] = [];
+  const spying = {
+    ...repo,
+    groupableTitleKeys: (after: string, limit: number) => {
+      events.push("keys");
+      setImmediate(() => events.push("tick"));
+      return repo.groupableTitleKeys(after, limit);
+    },
+    keyedWorksWithTitleKeys: (keys: string[]) => {
+      events.push("plan");
+      return repo.keyedWorksWithTitleKeys(keys);
+    }
+  };
+
+  await walkDuplicateWorks(deps(spying), { dryRun: false, pageSize: 1 });
+
+  const plans = events.flatMap((event, index) => (event === "plan" ? [index] : []));
+  assert.equal(plans.length, 2);
+  for (const index of plans) assert.deepEqual(events.slice(index - 2, index), ["keys", "tick"]);
+  assert.equal(work(repo, wing.small), wing.large.work_id);
+  assert.equal(work(repo, flame.small), flame.large.work_id);
+});
+
+test("walk aborted while yielding after a key read merges nothing from that page", async () => {
+  const repo = freshRepo();
+  twoDuplicates(repo, "Fourth Wing", "OL1W", "OL2W");
+  const controller = new AbortController();
+  let planReads = 0;
+  const spying = {
+    ...repo,
+    groupableTitleKeys: (after: string, limit: number) => {
+      const keys = repo.groupableTitleKeys(after, limit);
+      controller.abort();
+      return keys;
+    },
+    keyedWorksWithTitleKeys: (keys: string[]) => {
+      planReads += 1;
+      return repo.keyedWorksWithTitleKeys(keys);
+    }
+  };
+
+  assert.deepEqual(await walkDuplicateWorks(deps(spying), { dryRun: false, signal: controller.signal }), { merges: [], ...counts });
+  assert.equal(planReads, 0);
+  assert.deepEqual(repo.activeMerges("ol-duplicate"), []);
+});
+
 test("walk stops when the signal is aborted", async () => {
   const repo = freshRepo();
   const wing = twoDuplicates(repo, "Fourth Wing", "OL1W", "OL2W");
