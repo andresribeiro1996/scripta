@@ -33,10 +33,9 @@ const unused = () => {
   throw new Error("the archive does not read this");
 };
 const unusedGame = { get: unused, getMany: unused, listByOwner: unused, discoverWindow: unused, discoverByWorks: unused, participation: unused, shelfFacts: unused };
+const emptyShelfGame = { ...unusedGame, shelfFacts: () => [] };
 const topShelfDeps = {
-  tierlistFacts: () => [],
-  tournamentFacts: () => [],
-  quizFacts: () => [],
+  games: { tierlist: emptyShelfGame, tournament: emptyShelfGame, quiz: emptyShelfGame },
   canonicalWorks: () => new Map<string, string>(),
   catalogGenres: () => new Map<string, { genres: string[] }>(),
   getWorkPage: () => undefined
@@ -166,7 +165,8 @@ test("the plugin runs again every 24 hours, and stops when the app closes", asyn
 
 test("a recap freeze that throws is logged and does not fail registration", async (t) => {
   const { app, logged } = build(t);
-  const failing = { ...topShelfDeps, tierlistFacts: () => { throw new Error("freeze refuses"); } };
+  const refusing = { ...emptyShelfGame, shelfFacts: () => { throw new Error("freeze refuses"); } };
+  const failing = { ...topShelfDeps, games: { tierlist: refusing, tournament: emptyShelfGame, quiz: emptyShelfGame } };
   await app.register(communityPlugin, { ...inertDeps, ...failing });
   await app.ready();
   assert.equal(logged("top shelf recap freeze failed").length, 1);

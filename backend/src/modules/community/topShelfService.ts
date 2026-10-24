@@ -1,16 +1,12 @@
 import type { TopShelf, TopShelfBook, TopShelfBoard, TopShelfGame, TopShelfPeriod, TopShelfView } from "@scripta/shared";
-import type { TournamentShelfFacts } from "../arena/service.js";
 import type { CatalogWorkPage } from "../books/index.js";
-import type { QuizShelfFacts } from "../quizzes/service.js";
-import type { TierlistShelfFacts } from "../tierlists/service.js";
+import { GAME_KINDS, type GameSources } from "./domain/games.js";
 import type { EngagementRepository, GameRef } from "./domain/ports.js";
 import { buildDiscoverItems, type CommunityDeps, type DiscoverEntry } from "./service.js";
 import { rankTopShelf, topShelfMonthStart, type Ranked, type ShelfInput } from "./topShelf.js";
 
 export interface TopShelfDeps {
-  tierlistFacts(since: string | null, until: string | null): TierlistShelfFacts[];
-  tournamentFacts(since: string | null, until: string | null): TournamentShelfFacts[];
-  quizFacts(since: string | null, until: string | null): QuizShelfFacts[];
+  games: GameSources;
   canonicalWorks(ids: string[]): Map<string, string>;
   catalogGenres(workIds: string[]): Map<string, { genres: string[] }>;
   getWorkPage(id: string): CatalogWorkPage | undefined;
@@ -44,24 +40,18 @@ export function createShelfGatherer(deps: { engagementRepo: Pick<EngagementRepos
   const cache = new Map<string, { at: number; value: ShelfInput }>();
 
   const gather = (since: string | null, until: string | null): ShelfInput => {
-    const tierlists = shelf.tierlistFacts(since, until);
-    const tournaments = shelf.tournamentFacts(since, until);
-    const quizzes = shelf.quizFacts(since, until);
-    const refs: GameRef[] = [
-      ...tierlists.map((f) => ({ kind: "tierlist" as const, id: f.id })),
-      ...tournaments.map((f) => ({ kind: "tournament" as const, id: f.id })),
-      ...quizzes.map((f) => ({ kind: "quiz" as const, id: f.id })),
-    ];
-    const ownerIds = [...new Set([...tierlists, ...tournaments, ...quizzes].map((f) => f.ownerUserId))];
+    const games = GAME_KINDS.flatMap((kind) => shelf.games[kind].shelfFacts(since, until));
+    const refs: GameRef[] = games.map((f) => ({ kind: f.kind, id: f.id }));
+    const ownerIds = [...new Set(games.map((f) => f.ownerUserId))];
     const workIds = new Set<string>();
-    for (const f of [...tierlists, ...tournaments, ...quizzes]) for (const id of f.workIds) workIds.add(id);
-    for (const f of tierlists) for (const p of f.placements) workIds.add(p.workId);
-    for (const f of tournaments) if (f.champion) workIds.add(f.champion.workId);
+    for (const f of games) {
+      for (const id of f.workIds) workIds.add(id);
+      for (const p of f.placements) workIds.add(p.workId);
+      if (f.champion) workIds.add(f.champion.workId);
+    }
     const canonical = shelf.canonicalWorks([...workIds]);
     return {
-      tierlists,
-      tournaments,
-      quizzes,
+      games,
       engagement: engagementRepo.gameEngagement(refs, since, until),
       visibleOwners: new Set(community.resolveProfiles(ownerIds).keys()),
       canonical,

@@ -20,9 +20,7 @@ type LiveGame = { ref: GameRef; ownerUserId: string; promoted: boolean; createdA
 
 function liveGames(live: ShelfInput): Map<string, LiveGame> {
   const games = new Map<string, LiveGame>();
-  for (const f of live.tierlists) games.set(`tierlist:${f.id}`, { ref: { kind: "tierlist", id: f.id }, ownerUserId: f.ownerUserId, promoted: f.promoted, createdAt: f.createdAt, open: f.open, workIds: f.workIds });
-  for (const f of live.tournaments) games.set(`tournament:${f.id}`, { ref: { kind: "tournament", id: f.id }, ownerUserId: f.ownerUserId, promoted: false, createdAt: f.createdAt, open: f.open, workIds: f.workIds });
-  for (const f of live.quizzes) games.set(`quiz:${f.id}`, { ref: { kind: "quiz", id: f.id }, ownerUserId: f.ownerUserId, promoted: false, createdAt: f.createdAt, open: f.open, workIds: f.workIds });
+  for (const f of live.games) games.set(`${f.kind}:${f.id}`, { ref: { kind: f.kind, id: f.id }, ownerUserId: f.ownerUserId, promoted: f.promoted, createdAt: f.createdAt, open: f.open, workIds: f.workIds });
   return games;
 }
 

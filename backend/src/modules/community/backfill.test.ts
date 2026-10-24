@@ -32,10 +32,9 @@ const unused = () => {
   throw new Error("the backfill does not read this");
 };
 const unusedGame = { get: unused, getMany: unused, listByOwner: unused, discoverWindow: unused, discoverByWorks: unused, participation: unused, shelfFacts: unused };
+const emptyShelfGame = { ...unusedGame, shelfFacts: () => [] };
 const topShelfDeps = {
-  tierlistFacts: () => [],
-  tournamentFacts: () => [],
-  quizFacts: () => [],
+  games: { tierlist: emptyShelfGame, tournament: emptyShelfGame, quiz: emptyShelfGame },
   canonicalWorks: () => new Map<string, string>(),
   catalogGenres: () => new Map<string, { genres: string[] }>(),
   getWorkPage: () => undefined

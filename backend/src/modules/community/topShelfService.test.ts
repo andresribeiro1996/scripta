@@ -1,18 +1,19 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { TierlistShelfFacts } from "../tierlists/service.js";
-import type { GameCard } from "./domain/games.js";
+import type { GameCard, GameShelfFact } from "./domain/games.js";
 import { createShelfGatherer, createTopShelfService, type TopShelfDeps } from "./topShelfService.js";
 
-const facts = (id: string, workIds: string[], votesSince = 3): TierlistShelfFacts => ({ id, ownerUserId: "u1", open: true, promoted: false, createdAt: "2026-10-05T00:00:00.000Z", voters: 5, votesSince, workIds, placements: [] });
+const facts = (id: string, workIds: string[], votesSince = 3): GameShelfFact => ({ kind: "tierlist", id, ownerUserId: "u1", open: true, promoted: false, createdAt: "2026-10-05T00:00:00.000Z", voters: 5, votesSince, workIds, placements: [], champion: null });
 
 function setup(clock = { at: Date.parse("2026-10-21T10:00:00Z") }) {
   const calls = { facts: [] as Array<string | null>, pages: [] as string[] };
   const tierlists = [facts("t1", ["w1", "w2", "w3", "w4"]), facts("t2", ["w1", "w2", "w3"]), facts("t3", ["w1", "w2"])];
   const shelf: TopShelfDeps = {
-    tierlistFacts: (since) => { calls.facts.push(since); return tierlists; },
-    tournamentFacts: () => [],
-    quizFacts: () => [],
+    games: {
+      tierlist: { shelfFacts: (since: string | null) => { calls.facts.push(since); return tierlists; } },
+      tournament: { shelfFacts: () => [] },
+      quiz: { shelfFacts: () => [] },
+    } as never,
     canonicalWorks: (ids) => new Map(ids.map((id) => [id, id])),
     catalogGenres: () => new Map(),
     getWorkPage: (id) => {
