@@ -22,6 +22,8 @@ Home shows what the people you follow did. When the circle is quiet, or empty fo
    - `scripts/fill-awards.mjs` backfills every year once, with `--dry-run` first.
    - A daily server job re-reads the current and previous year, so a new winner reaches Home within a day of appearing on Wikidata. The previous year catches late Wikidata edits, and prizes whose year label and ceremony fall in different years.
    - There is no `--skip` review. The series fill needed one because Wikidata series names include publisher collections. Here the prize list is a fixed allow-list, and matching is by exact identifier.
+   - The daily job writes on its first run after deploy, before the backfill's dry-run review. Checking the prize item labels (the plan's first task) is the only gate before those writes.
+   - A work added to the catalog after the backfill gets older prizes only when the script is run again. For example, *Wolf Hall* imported later shows its 2009 Booker only after a re-run. The README says to re-run it after large imports.
 8. **The Home card is mobile-only.** The web Home has no card slot today (`RecapHomeCard` is mobile-only too). The web work page does get the badges, since it renders the same `BookScreenModel` as mobile.
 9. **The card covers wins only.** Nominations reach Wikidata late or not at all, so a "shortlist announced" card would usually be weeks stale. Nominees still count toward the card's "N nominees in your library" line.
 
@@ -52,8 +54,10 @@ Before 2016 the International Booker was an author prize. Those statements sit o
 
 The fill uses the same three identifier kinds as the series fill (`fill-series.mjs:25-29`): works with an Open Library work ID (P648), works with an ISBN that aren't edition items, and works whose edition items (P629) carry an ISBN. It runs them for two statement shapes:
 
-- **Book prizes:** `?work` has a P166 or P1411 statement whose value is a listed book prize, with a P585 qualifier.
-- **Author prizes:** a `?person` has a P166 statement whose value is a listed author prize, with P585, and `?work wdt:P50 ?person`. The row also carries the person's English label, else their Portuguese one, else any label, as `honoree`.
+- **Book prizes:** `?work` has a P166 or P1411 statement whose value is a listed book prize.
+- **Author prizes:** a `?person` has a P166 statement whose value is a listed author prize, and `?work wdt:P50 ?person`.
+
+P585 is `OPTIONAL` when there is no `minYear`, so the backfill sees statements that lack it and counts them as `noYear`. With a `minYear`, the year filter needs P585. The row also carries the person's English label, else their Portuguese one, else any label, as `honoree`.
 
 That is six queries, plus three for each extra shape the Wikidata check finds (see Unverified at spec time). They are paged 3000 rows at a time, as the series queries are. Each row is `{ isbns, olWorkIds, prize, year, won, honoree }`. The query builder takes an optional `minYear`, filtering on `YEAR(?when) >= minYear`. The script passes none; the daily job passes the current UTC year minus 1.
 
@@ -61,8 +65,8 @@ That is six queries, plus three for each extra shape the Wikidata check finds (s
 
 Nothing here should be written twice:
 
-- **The query client.** `queryWikidata` (its retry, timeout and User-Agent) and the page loop move from `fill-series.mjs` into `backend/src/modules/books/adapters/wikidata/sparql.ts`, with timers and an abort signal that can be injected. `fill-series.mjs` imports it from `dist`, with no change in behaviour.
-- **The matching.** `inBatches`, `followRedirects`, `listOf` and the ISBN/Open Library matching block inside `fillFromWikidata` (`seriesFill.ts:99-163`) move to `backend/src/modules/books/seed/wikidataMatch.ts`. The block becomes `matchWorkIds(repo, fetchWork, rows)`, which returns each row's work ids plus `{ redirected, failedKeys }`. `fillFromWikidata` calls it; its report and its tests don't change. Tests of the moved code move with it.
+- **The query client.** `queryWikidata` (its retry, timeout and User-Agent), the page loop and the `listOf` binding helper move from `fill-series.mjs` and `seriesFill.ts` into `backend/src/modules/books/adapters/wikidata/sparql.ts`, with timers and an abort signal that can be injected. `fill-series.mjs` imports it from `dist`, with no change in behaviour.
+- **The matching.** `inBatches`, `followRedirects` and the ISBN/Open Library matching block inside `fillFromWikidata` (`seriesFill.ts:99-163`) move to `backend/src/modules/books/seed/wikidataMatch.ts`, along with the script's `createWorkFetcher` (`fill-series.mjs:112-138`). The block becomes `matchWorkIds(repo, fetchWork, rows)`, which returns each row's work ids plus `{ redirected, failedKeys }`. `fillFromWikidata` calls it, and its report doesn't change. `seriesFill.test.ts` is left exactly as it is, as the proof that the series fill hasn't changed; `matchWorkIds` gets tests of its own.
 
 ### Storage
 
@@ -81,7 +85,7 @@ CREATE TABLE IF NOT EXISTS work_awards (
 CREATE INDEX IF NOT EXISTS idx_work_awards_recent ON work_awards(year, prize);
 ```
 
-- **Writes:** `addWorkAwards(rows, at)` inserts, or on conflict sets `won = MAX(won, excluded.won)` and fills `honoree` when it was NULL. It keeps `created_at`. Writes go in transactions of 300 rows with 100 ms pauses (`inBatches`).
+- **Writes:** `addWorkAward(row, at)` inserts. On conflict it only upgrades a nomination to a win, and then moves `created_at` to the upgrade time. That way a winner whose nomination was stored months earlier (Hugo finalists in April, the win in August) still counts as just announced. Writes go in transactions of 300 rows with 100 ms pauses (`inBatches`).
 - **Reads:** `awardsOf(workIds)` rolls merged works up to their canonical work, as `bestSeriesOf` does (`sqliteBooksRepository.ts:1295-1299`). A translation joined to its original therefore shows the original's prizes.
 - **Recent reads:** `recentAwards(year, since)` returns each `(prize, year)` with at least one win, with `announcedAt` = the earliest `created_at` among its wins, when that falls on or after `since`. It also returns the winner work ids, the nominee work ids and the honoree.
 
@@ -115,7 +119,7 @@ The dry run's `prizes` list is reviewed with the user before the real run: a wro
 - A Wikidata failure, after the client's retries, or an Open Library 429 throws. `jobs.every` logs "awards refresh failed", and the next day's run tries again.
 - A deploy restart runs it again after its first-run delay (`startJob` keeps no last-run time). That costs a few queries.
 
-This makes Wikidata a runtime dependency of production for the first time. Until now it was script-only (`docs/services.md`).
+This makes Wikidata a runtime dependency of production for the first time. Until now only the series script called it, and `docs/services.md` doesn't list it yet.
 
 ## API
 
@@ -196,8 +200,8 @@ In `HomeScreen.tsx`'s list header, after `RecapHomeCard`. It shows whether or no
 
 ## Unverified at spec time
 
-`query.wikidata.org` was blocked for the session that wrote this, so these are checked in the plan's first task, by a dry run on Railway:
-- the prize item IDs, and the four unknown ones;
+`query.wikidata.org` was blocked for the session that wrote this. The plan's first task checks the items below with queries run wherever Wikidata is reachable. Per-prize catalog coverage comes later, from the dry run on Railway after merge.
+- the prize item IDs, and the four unknown ones. A prize with no Wikidata item is dropped from the list;
 - where a book prize is recorded. There are three possible shapes:
   - (a) P166/P1411 on the work;
   - (b) P166/P1411 on the author, with a "for work" (P1686) qualifier naming the book;
