@@ -41,7 +41,7 @@ test("a slot whose pid is dead but whose ports are bound is live, not stale", ()
 });
 
 test("a slot with a dead pid and no listeners is stale", () => {
-  assert.equal(slotState({ entry: { pid: 999_999 }, ports: PORTS, listeners: {} }), "stale");
+  assert.equal(slotState({ entry: { pid: 2_147_483_646 }, ports: PORTS, listeners: {} }), "stale");
 });
 
 test("a slot whose recorded pid is alive is live", () => {
@@ -119,7 +119,7 @@ test("a stack labels each listening pid with the role its port implies", () => {
 });
 
 test("a stack with a dead pid and free ports is reported, marked stale, not dropped", () => {
-  const registry = { ...REGISTRY, slots: { 7: { ...REGISTRY.slots[2], pid: 999_999 } } };
+  const registry = { ...REGISTRY, slots: { 7: { ...REGISTRY.slots[2], pid: 2_147_483_646 } } };
   const [stack] = buildStacks({ registry, rows: [], listeners: {}, lanAddress: undefined, cwdForPid: () => undefined });
   assert.equal(stack.state, "stale");
   assert.equal(stack.rssTotalMB, 0);
