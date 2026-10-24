@@ -61,9 +61,9 @@ The fill uses the same three identifier kinds as the series fill (`fill-series.m
 
 In every shape the year is the P585 qualifier of that same statement. The same work, prize and year found by more than one shape is one row: the table's key collapses it, and a win beats a nomination.
 
-P585 is `OPTIONAL` when there is no `minYear`, so the backfill sees statements that lack it and counts them as `noYear`. With a `minYear`, the year filter needs P585. The row also carries the person's English label, else their Portuguese one, else any label, as `honoree`.
+P585 is `OPTIONAL` when there is no `minYear`, so the backfill sees statements that lack it and counts them as `noYear`. With a `minYear`, the year filter needs P585. The row also carries the person's English label, else their Portuguese one, else any label, as `honoree`. The author pages select only the person's item. One more query, run after the pages, fetches the labels of the distinct honorees by `VALUES`. Measured on 2026-10-25, label OPTIONALs on the paged author queries took 7–65 s and sometimes timed out. The same pages took 0.5–2 s without them, and a labels query over 106 laureates took 1.3 s.
 
-That is twelve queries: four shapes, each run for the three identifier kinds. They are paged 3000 rows at a time, as the series queries are. Each row is `{ isbns, olWorkIds, prize, year, won, honoree }`. The query builder takes an optional `minYear`, filtering on `YEAR(?when) >= minYear`. The script passes none; the daily job passes the current UTC year minus 1.
+That is twelve paged queries, four shapes each run for the three identifier kinds, plus the honoree labels query. They are paged 3000 rows at a time, as the series queries are. Each row is `{ isbns, olWorkIds, prize, year, won, honoree }`. The query builder takes an optional `minYear`, filtering on `YEAR(?when) >= minYear`. The script passes none; the daily job passes the current UTC year minus 1.
 
 ### Reuse from the series fill
 
@@ -116,7 +116,7 @@ The dry run's `prizes` list is reviewed with the user before the real run: a wro
 
 `jobs.every("awards refresh", DAY_MS, …, FIRST_RUN_DELAY_MS.awardsRefresh)` in `books/plugin.ts`, with `awardsRefresh: 165_000` added to the table (the first-run delay test counts its entries).
 
-- It runs the twelve queries with `minYear` = current UTC year − 1. These are small, unpaged in practice, so at most a few hundred rows.
+- It runs the twelve queries with `minYear` = current UTC year − 1, then the honoree labels query. These are small, unpaged in practice, so at most a few hundred rows.
 - It follows redirects with the server's shared `openLibraryThrottle` and `fetchJson`, so it never adds load beyond the server's Open Library gap.
 - It writes through the server's repository.
 - It logs one info line: `{ rows, matched, added, redirected, failedKeys: <count> }`.
