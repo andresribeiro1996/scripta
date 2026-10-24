@@ -45,6 +45,7 @@ const ISBNDB_GAP_MS = 1100;
 const APPLE_GAP_MS = 3200;
 const OPEN_LIBRARY_GAP_MS = 1000;
 const OPEN_LIBRARY_COVER_GAP_MS = 3100;
+const KOBO_COVER_GAP_MS = 1000;
 const BACKGROUND_ISBNDB_DAILY_CAP = 500;
 const BNP_LOOKUP_TIMEOUT_MS = 5_000;
 const GROUPING_PAGE_SIZE = 50;
@@ -138,10 +139,13 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
   const isbndbThrottle = createThrottle(ISBNDB_GAP_MS);
   const openLibraryThrottle = createThrottle(OPEN_LIBRARY_GAP_MS);
   const openLibraryCoverThrottle = createThrottle(OPEN_LIBRARY_COVER_GAP_MS);
+  const koboCoverThrottle = createThrottle(KOBO_COVER_GAP_MS);
   const fetchImage: FetchCoverImage = async (candidate) => {
     const bytes = candidate.source === "openlibrary"
       ? await openLibraryCoverThrottle(() => fetchBytes(candidate.source, candidate.url))
-      : await fetchBytes(candidate.source, candidate.url);
+      : candidate.source === "kobo"
+        ? await koboCoverThrottle(() => fetchBytes(candidate.source, candidate.url))
+        : await fetchBytes(candidate.source, candidate.url);
     return bytes ? encodeCover(bytes) : null;
   };
   const backgroundOpenLibrary = createOpenLibraryCatalog(openLibraryThrottle, false);

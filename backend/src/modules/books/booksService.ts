@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { isObjectKey } from "../../storage/objectStore.js";
-import { canonicalIsbn, looksLikeIsbnQuery, type BookGenre, type BookMetadata, type BookSearchResult, type BookSeries } from "@scripta/shared";
+import { canonicalIsbn, looksLikeIsbnQuery, normalizeImageId, type BookGenre, type BookMetadata, type BookSearchResult, type BookSeries } from "@scripta/shared";
 import { findBestCover, type CoverSources, type FetchCoverImage } from "./coverResolver.js";
 import { MIN_GOOD_WIDTH } from "./domain/constants.js";
 import { BookNotFoundError, FileTooLargeError, InvalidImageError, SourcePausedError, SourceUnavailableError, WorkMergeError } from "./domain/errors.js";
@@ -63,6 +63,7 @@ export interface BooksServiceDeps {
 export interface BooksService {
   resolveCover(lookup: BookLookup, front?: boolean): ResolvedCover;
   enqueueCovers(lookups: BookLookup[]): void;
+  recordKoboImageIds(lookups: BookLookup[]): void;
   enqueueUnchecked(): void;
   processBook(bookId: string, lane: CoverPriority): Promise<void>;
   getDetails(lookup: BookLookup): Promise<BookMetadata | null>;
@@ -109,6 +110,22 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
   function lookupDue(book: BookRow): boolean {
     if (book.cover_image_id) return book.cover_status === "low_res" && olderThan(book.cover_checked_at, RETRY_AFTER_MS);
     return book.cover_status !== "missing" || olderThan(book.cover_checked_at, RETRY_AFTER_MS);
+  }
+
+  function koboUpgradeWanted(book: BookRow): boolean {
+    if (book.cover_status === "missing" || book.cover_status === "low_res") return true;
+    if (book.cover_status !== "good" || !book.cover_image_id) return false;
+    return deps.repo.getImage(book.cover_image_id)?.source === "isbndb" && isPortugueseIsbn(book.isbn);
+  }
+
+  function recordKoboId(book: BookRow, lookup: BookLookup): boolean {
+    const imageId = normalizeImageId(lookup.imageId);
+    return imageId !== "" && deps.repo.setKoboImageId(book.id, imageId);
+  }
+
+  function markKoboUpgrade(book: BookRow) {
+    deps.repo.setUpgradeWanted(book.id, now().toISOString());
+    schedule(book.id, "upgrade");
   }
 
   function sourcesFor(lane: CoverPriority, book: BookRow): CoverSources {
@@ -344,8 +361,21 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
     enqueueCovers(lookups) {
       for (const lookup of lookups) {
         const book = findOrCreateBook(deps.repo, lookup, now().toISOString());
-        if (book && lookupDue(book)) schedule(book.id);
+        if (!book) continue;
+        const recorded = recordKoboId(book, lookup);
+        if (lookupDue(book)) schedule(book.id);
+        else if (recorded && koboUpgradeWanted(book)) markKoboUpgrade(book);
       }
+    },
+
+    recordKoboImageIds(lookups) {
+      deps.repo.transaction(() => {
+        for (const lookup of lookups) {
+          const identity = lookupIdentity(lookup);
+          const book = identity ? findExisting(deps.repo, identity) : undefined;
+          if (book && recordKoboId(book, lookup) && koboUpgradeWanted(book)) markKoboUpgrade(book);
+        }
+      });
     },
 
     enqueueUnchecked() {
@@ -362,8 +392,9 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       if (!book || book.cover_status === "manual") return;
       try {
         const sources = sourcesFor(lane, book);
-        const outcome = await findBestCover({ isbn: book.isbn, title: book.title, author: book.author }, deps.repo.listRejectedUrls(bookId), sources, deps.fetchImage);
-        if (sources.apple !== NO_SOURCE && !outcome.failures.some((failure) => failure.source === "apple")) deps.repo.setAppleChecked(bookId, now().toISOString());
+        const outcome = await findBestCover({ isbn: book.isbn, title: book.title, author: book.author, koboImageId: book.kobo_image_id }, deps.repo.listRejectedUrls(bookId), sources, deps.fetchImage);
+        const endedAtKobo = outcome.found?.candidate.source === "kobo" && outcome.found.image.width >= MIN_GOOD_WIDTH;
+        if (sources.apple !== NO_SOURCE && !endedAtKobo && !outcome.failures.some((failure) => failure.source === "apple")) deps.repo.setAppleChecked(bookId, now().toISOString());
         for (const failure of outcome.failures.filter((failure) => !(failure instanceof SourcePausedError))) deps.warn({ bookId, source: failure.source, error: failure.message }, "cover source unavailable");
 
         const latest = deps.repo.getBook(bookId);

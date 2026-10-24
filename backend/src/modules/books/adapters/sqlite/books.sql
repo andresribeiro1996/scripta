@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS books (
   cover_checked_at    TEXT,
   cover_upgrade_wanted_at TEXT,
   apple_checked_at    TEXT,
+  kobo_image_id       TEXT,
   ol_work_key         TEXT,
   publisher_url       TEXT,
   created_by          TEXT,

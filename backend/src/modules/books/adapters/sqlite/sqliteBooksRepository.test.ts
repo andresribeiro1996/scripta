@@ -3544,3 +3544,22 @@ test("a title stored without its key is keyed at the next boot, found through it
   const plan = (db.prepare(`EXPLAIN QUERY PLAN ${UNKEYED_ORIGINALS_SQL}`).all() as Array<{ detail: string }>).map((row) => row.detail).join(" ");
   assert.match(plan, /idx_books_original_keys_missing/);
 });
+
+test("the Kobo image id column is added to an existing database", () => {
+  const db = new DatabaseSync(":memory:");
+  applyBooksMigrations(db);
+  db.exec("ALTER TABLE books DROP COLUMN kobo_image_id");
+  applyBooksMigrations(db);
+  applyBooksMigrations(db);
+  const columns = (db.prepare("PRAGMA table_info(books)").all() as Array<{ name: string }>).map((column) => column.name);
+  assert.ok(columns.includes("kobo_image_id"));
+});
+
+test("setKoboImageId fills a NULL column once and never overwrites it", () => {
+  const { repo } = freshRepo();
+  const book = repo.createBook({ title: "A", author: "A", isbn: null }, ["ta:a|a|"], NOW);
+  assert.equal(book.kobo_image_id, null);
+  assert.equal(repo.setKoboImageId(book.id, "0b8a2a3c-6f1e-4c54-9d0e-1a2b3c4d5e6f"), true);
+  assert.equal(repo.setKoboImageId(book.id, "11111111-2222-4333-8444-555555555555"), false);
+  assert.equal(repo.getBook(book.id)!.kobo_image_id, "0b8a2a3c-6f1e-4c54-9d0e-1a2b3c4d5e6f");
+});

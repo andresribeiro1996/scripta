@@ -475,6 +475,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const setHarvestCursorStmt = db.prepare(`INSERT INTO harvest_cursors (feed, through) VALUES (?, ?) ON CONFLICT (feed) DO UPDATE SET through = excluded.through`);
   const setUpgradeWantedStmt = db.prepare(`UPDATE books SET cover_upgrade_wanted_at = ? WHERE id = ?`);
   const setAppleCheckedStmt = db.prepare(`UPDATE books SET apple_checked_at = ? WHERE id = ?`);
+  const setKoboImageIdStmt = db.prepare(`UPDATE books SET kobo_image_id = ? WHERE id = ? AND kobo_image_id IS NULL`);
   const setWorkKeyStmt = db.prepare(`UPDATE books SET ol_work_key = ? WHERE id = ? AND ol_work_key IS NULL`);
   const setLanguageStmt = db.prepare(`UPDATE books SET language = ? WHERE id = ? AND language IS NULL`);
   const blankTitledStmt = db.prepare(`SELECT id, publisher_url FROM books WHERE title = '' AND publisher_url IS NOT NULL`);
@@ -884,6 +885,10 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
 
     setAppleChecked(bookId, at) {
       setAppleCheckedStmt.run(at, bookId);
+    },
+
+    setKoboImageId(bookId, imageId) {
+      return setKoboImageIdStmt.run(imageId, bookId).changes > 0;
     },
 
     setWorkKey(id, key) {
