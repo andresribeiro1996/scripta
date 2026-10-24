@@ -3,11 +3,27 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { QuizzesRepository } from "./domain/ports.js";
-import type { QuizBook } from "@scripta/shared";
+import type { QuizWorks, QuizzesRepository } from "./domain/ports.js";
+import type { PublicBookData, QuizBook } from "@scripta/shared";
 import type { AnswerRow, PlayRow, QuizRow } from "./domain/types.js";
 import { normalizeWords } from "@scripta/shared";
-import { createQuizzesPublicApi, createQuizzesService } from "./service.js";
+import { createQuizzesPublicApi, createQuizzesService, type QuizWriteOutcome } from "./service.js";
+
+function fakeWorks(options: { aliases?: Record<string, string>; titles?: Record<string, string>; covers?: Record<string, string> } = {}): QuizWorks {
+  const alias = (id: string) => options.aliases?.[id] ?? id;
+  return {
+    knownWorkIds: (ids) => ids.map(alias),
+    resolveTitleWorks: (books) => books.map((entry) => options.titles?.[entry.title] ?? null),
+    canonicalByKey: (ids) => new Map([...ids].map(([key, id]) => [key, alias(id)])),
+    publicBooksByWork: (_ownerUserId, workIds) =>
+      new Map(workIds.flatMap((id) => (options.covers?.[id] ? [[id, { key: id, workId: id, title: id, author: "A", isbn: null, imageId: null, coverUrl: options.covers[id]!, readStatus: null } satisfies PublicBookData] as const] : [])))
+  };
+}
+
+function created(outcome: QuizWriteOutcome) {
+  assert.equal(outcome.ok, true);
+  return outcome.ok ? outcome.quiz : (undefined as never);
+}
 
 function createInMemoryRepo(): QuizzesRepository {
   const quizzes = new Map<string, QuizRow>();
@@ -120,20 +136,19 @@ const book = (workId: string, extra: Partial<QuizBook> = {}): QuizBook => ({
 
 function makeService() {
   const repo = createInMemoryRepo();
-  const service = createQuizzesService(repo);
-  const created = service.createQuiz("u1", "My quiz", {
+  const service = createQuizzesService(repo, fakeWorks());
+  const made = created(service.createQuiz("u1", "My quiz", {
     sourceLabel: "Shelf",
     questionCount: 3,
     allowedTypes: ["cover_title", "title_cover", "quote_title", "blurb_title"],
-    books: [book("b0", { coverUrl: null }), ...Array.from({ length: 5 }, (_, i) => book(`b${i + 1}`))],
-    questions: null
-  });
-  return { repo, service, quizId: created.id };
+    books: [book("b0", { coverUrl: null }), ...Array.from({ length: 5 }, (_, i) => book(`b${i + 1}`))]
+  }));
+  return { repo, service, quizId: made.id };
 }
 
 test("publish generates the full seeded set, mints a code, and opens play", () => {
   const { service, quizId } = makeService();
-  const outcome = service.publishQuiz("u1", quizId, []);
+  const outcome = service.publishQuiz("u1", quizId);
   assert.ok(outcome.ok);
   if (!outcome.ok) return;
   assert.ok(outcome.quiz.voteCode);
@@ -143,35 +158,98 @@ test("publish generates the full seeded set, mints a code, and opens play", () =
   assert.equal(outcome.quiz.playOpen, true);
 });
 
-test("publish resolves covers for shelf books that lack one", () => {
-  const { service, quizId } = makeService();
-  const outcome = service.publishQuiz("u1", quizId, [{ workId: "b0", coverUrl: "https://resolved.test/b0.jpg" }]);
+test("publish fills a missing cover from the owner's library copy of that work and keeps a cover the book already has", () => {
+  const repo = createInMemoryRepo();
+  const draft = created(createQuizzesService(repo, fakeWorks()).createQuiz("u1", "My quiz", {
+    sourceLabel: "",
+    questionCount: 3,
+    allowedTypes: ["cover_title"],
+    books: [book("b0", { coverUrl: null }), ...Array.from({ length: 5 }, (_, i) => book(`b${i + 1}`))]
+  }));
+  const service = createQuizzesService(repo, fakeWorks({ covers: { b0: "https://library.test/b0.jpg", b1: "https://library.test/b1.jpg" } }));
+  const outcome = service.publishQuiz("u1", draft.id);
   assert.ok(outcome.ok);
-  const data = outcome.ok ? (outcome.quiz.data as { books: Array<{ workId: string; coverUrl: string | null }> }) : null;
-  assert.equal(data!.books.find((b) => b.workId === "b0")!.coverUrl, "https://resolved.test/b0.jpg");
+  const books = outcome.ok ? (outcome.quiz.data as { books: Array<{ workId: string; coverUrl: string | null }> }).books : [];
+  assert.equal(books.find((b) => b.workId === "b0")!.coverUrl, "https://library.test/b0.jpg");
+  assert.equal(books.find((b) => b.workId === "b1")!.coverUrl, "https://covers.test/b1.jpg");
+});
+
+test("publish counts one book per work after two editions merge", () => {
+  const { repo, quizId } = makeService();
+  const merged = createQuizzesService(repo, fakeWorks({ aliases: { b1: "b0", b2: "b0", b3: "b0" } }));
+  const outcome = merged.publishQuiz("u1", quizId);
+  assert.equal(outcome.ok, false);
+  if (!outcome.ok) {
+    assert.equal(outcome.reason, "invalid");
+    assert.match((outcome as { error: string }).error, /at least 4 books/i);
+  }
+});
+
+const input = (books: Array<{ workId?: string; title: string; author: string }>) => ({ sourceLabel: "", questionCount: 3, allowedTypes: ["cover_title" as const], books });
+
+test("a create resolves books by work id or by title and keeps the first book per work", () => {
+  const service = createQuizzesService(createInMemoryRepo(), fakeWorks({ aliases: { old: "w1" }, titles: { Pool: "w2" } }));
+  const outcome = service.createQuiz("u1", "Mixed", input([{ workId: "w1", title: "One", author: "A" }, { title: "Pool", author: "A" }, { workId: "old", title: "One again", author: "A" }, { workId: "w2", title: "Pool again", author: "A" }]));
+  assert.ok(outcome.ok);
+  if (!outcome.ok) return;
+  assert.deepEqual((outcome.quiz.data as { books: Array<{ workId: string; title: string }> }).books.map((b) => [b.workId, b.title]), [["w1", "One"], ["w2", "Pool"]]);
+  assert.deepEqual([...outcome.canonical], [["w1", "w1"], ["w2", "w2"]]);
+});
+
+test("a create with a book the catalog can't place is invalid: That book isn't in the catalog.", () => {
+  const repo = createInMemoryRepo();
+  const outcome = createQuizzesService(repo, fakeWorks()).createQuiz("u1", "Bad", input([{ title: "???", author: "A" }]));
+  assert.deepEqual(outcome, { ok: false, reason: "invalid", error: "That book isn't in the catalog." });
+  assert.deepEqual(repo.listByUser("u1"), []);
+});
+
+test("an update with two editions of one work is a duplicate-work outcome carrying the second book's title", () => {
+  const repo = createInMemoryRepo();
+  const draft = created(createQuizzesService(repo, fakeWorks()).createQuiz("u1", "Draft", input([])));
+  const service = createQuizzesService(repo, fakeWorks({ aliases: { w2: "w1" } }));
+  const outcome = service.updateQuiz("u1", draft.id, { data: input([{ workId: "w1", title: "First", author: "A" }, { workId: "w2", title: "Second", author: "A" }]) });
+  assert.deepEqual(outcome, { ok: false, reason: "duplicate-work", title: "Second" });
+  assert.deepEqual((service.getQuiz("u1", draft.id)!.data as { books: unknown[] }).books, []);
+});
+
+test("an update of a published quiz is not-found", () => {
+  const { service, quizId } = makeService();
+  assert.ok(service.publishQuiz("u1", quizId).ok);
+  assert.deepEqual(service.updateQuiz("u1", quizId, { name: "Renamed" }), { ok: false, reason: "not-found", error: "No quiz with that id." });
+  assert.equal(service.getQuiz("u1", quizId)!.name, "My quiz");
+});
+
+test("a name-only update returns the canonical map of the stored books", () => {
+  const { repo, quizId } = makeService();
+  const service = createQuizzesService(repo, fakeWorks({ aliases: { b1: "b0" } }));
+  const outcome = service.updateQuiz("u1", quizId, { name: "Renamed" });
+  assert.ok(outcome.ok);
+  if (!outcome.ok) return;
+  assert.equal(outcome.quiz.name, "Renamed");
+  assert.equal(outcome.canonical.get("b1"), "b0");
+  assert.equal(outcome.canonical.get("b2"), "b2");
 });
 
 test("publish refuses another user's quiz and a second publish", () => {
   const { service, quizId } = makeService();
-  const byOther = service.publishQuiz("u2", quizId, []);
+  const byOther = service.publishQuiz("u2", quizId);
   assert.equal(byOther.ok, false);
   if (!byOther.ok) assert.equal(byOther.reason, "not-found");
-  assert.ok(service.publishQuiz("u1", quizId, []).ok);
-  const again = service.publishQuiz("u1", quizId, []);
+  assert.ok(service.publishQuiz("u1", quizId).ok);
+  const again = service.publishQuiz("u1", quizId);
   assert.equal(again.ok, false);
   if (!again.ok) assert.equal(again.reason, "already-published");
 });
 
 test("publish rejects too few books", () => {
   const { service } = makeService();
-  const few = service.createQuiz("u1", "Few", {
+  const few = created(service.createQuiz("u1", "Few", {
     sourceLabel: "",
     questionCount: 10,
     allowedTypes: ["cover_title"],
-    books: Array.from({ length: 3 }, (_, i) => book(`f${i}`)),
-    questions: null
-  });
-  const outcome = service.publishQuiz("u1", few.id, []);
+    books: Array.from({ length: 3 }, (_, i) => book(`f${i}`))
+  }));
+  const outcome = service.publishQuiz("u1", few.id);
   assert.equal(outcome.ok, false);
   if (!outcome.ok) {
     assert.equal(outcome.reason, "invalid");
@@ -181,7 +259,7 @@ test("publish rejects too few books", () => {
 
 test("getPlayBoard strips the answer key and carries the prompt", () => {
   const { service, quizId } = makeService();
-  const published = service.publishQuiz("u1", quizId, []);
+  const published = service.publishQuiz("u1", quizId);
   assert.ok(published.ok);
   const board = service.getPlayBoard(published.ok ? published.quiz.voteCode! : "");
   assert.ok(board);
@@ -195,7 +273,7 @@ test("getPlayBoard strips the answer key and carries the prompt", () => {
 
 test("submitPlay grades server-side and locks one play per player", () => {
   const { service, quizId } = makeService();
-  const published = service.publishQuiz("u1", quizId, []);
+  const published = service.publishQuiz("u1", quizId);
   assert.ok(published.ok);
   const code = published.ok ? published.quiz.voteCode! : "";
   const board = service.getPlayBoard(code)!;
@@ -211,7 +289,7 @@ test("submitPlay grades server-side and locks one play per player", () => {
 
 test("submitPlay rejects wrong-shaped answers and closed quizzes", () => {
   const { service, quizId } = makeService();
-  const published = service.publishQuiz("u1", quizId, []);
+  const published = service.publishQuiz("u1", quizId);
   assert.ok(published.ok);
   const code = published.ok ? published.quiz.voteCode! : "";
   const short = service.submitPlay(code, [{ questionId: "q0", choiceIndex: 0 }], 1, null, { kind: "anonymous", playId: null });
@@ -228,7 +306,7 @@ test("submitPlay rejects wrong-shaped answers and closed quizzes", () => {
 
 test("anonymous players recover their play by the id handle", () => {
   const { service, quizId } = makeService();
-  const published = service.publishQuiz("u1", quizId, []);
+  const published = service.publishQuiz("u1", quizId);
   assert.ok(published.ok);
   const code = published.ok ? published.quiz.voteCode! : "";
   const board = service.getPlayBoard(code)!;
@@ -242,7 +320,7 @@ test("anonymous players recover their play by the id handle", () => {
 
 test("results order plays score-then-speed and include per-question stats", () => {
   const { service, quizId } = makeService();
-  const published = service.publishQuiz("u1", quizId, []);
+  const published = service.publishQuiz("u1", quizId);
   assert.ok(published.ok);
   const code = published.ok ? published.quiz.voteCode! : "";
   const board = service.getPlayBoard(code)!;
@@ -258,7 +336,7 @@ test("results order plays score-then-speed and include per-question stats", () =
 
 test("the play board looks each question's book up by its stored work", () => {
   const { service, quizId } = makeService();
-  const published = service.publishQuiz("u1", quizId, [{ workId: "b0", coverUrl: "https://resolved.test/b0.jpg" }]);
+  const published = service.publishQuiz("u1", quizId);
   assert.ok(published.ok);
   const code = published.ok ? published.quiz.voteCode! : "";
   const stored = service.getQuiz("u1", quizId)!.data as { books: QuizBook[]; questions: Array<{ id: string; type: string; workId: string }> };
@@ -277,17 +355,17 @@ function makeEmittingService() {
   const repo = createInMemoryRepo();
   const service = createQuizzesService(
     repo,
+    fakeWorks(),
     (quizId, ownerUserId) => published.push([quizId, ownerUserId]),
     (playerUserId, quizId, quizName) => played.push([playerUserId, quizId, quizName])
   );
-  const created = service.createQuiz("u1", "My quiz", {
+  const made = created(service.createQuiz("u1", "My quiz", {
     sourceLabel: "Shelf",
     questionCount: 3,
     allowedTypes: ["cover_title", "title_cover", "quote_title", "blurb_title"],
-    books: Array.from({ length: 6 }, (_, i) => book(`b${i}`)),
-    questions: null
-  });
-  return { service, published, played, quizId: created.id };
+    books: Array.from({ length: 6 }, (_, i) => book(`b${i}`))
+  }));
+  return { service, published, played, quizId: made.id };
 }
 
 function answerFirst(service: ReturnType<typeof createQuizzesService>, code: string) {
@@ -296,23 +374,23 @@ function answerFirst(service: ReturnType<typeof createQuizzesService>, code: str
 
 test("publish emits exactly once with the quiz and its owner, and a second publish emits nothing", () => {
   const { service, published, quizId } = makeEmittingService();
-  assert.ok(service.publishQuiz("u1", quizId, []).ok);
+  assert.ok(service.publishQuiz("u1", quizId).ok);
   assert.deepEqual(published, [[quizId, "u1"]]);
-  assert.equal(service.publishQuiz("u1", quizId, []).ok, false);
+  assert.equal(service.publishQuiz("u1", quizId).ok, false);
   assert.deepEqual(published, [[quizId, "u1"]]);
 });
 
 test("a refused publish emits nothing", () => {
   const { service, published, quizId } = makeEmittingService();
-  assert.equal(service.publishQuiz("u2", quizId, []).ok, false);
-  const few = service.createQuiz("u1", "Few", { sourceLabel: "", questionCount: 10, allowedTypes: ["cover_title"], books: [book("f0")], questions: null });
-  assert.equal(service.publishQuiz("u1", few.id, []).ok, false);
+  assert.equal(service.publishQuiz("u2", quizId).ok, false);
+  const few = created(service.createQuiz("u1", "Few", { sourceLabel: "", questionCount: 10, allowedTypes: ["cover_title"], books: [book("f0")] }));
+  assert.equal(service.publishQuiz("u1", few.id).ok, false);
   assert.deepEqual(published, []);
 });
 
 test("a signed-in play emits once with the player, quiz and name, and the owner's own play emits too", () => {
   const { service, played, quizId } = makeEmittingService();
-  const outcome = service.publishQuiz("u1", quizId, []);
+  const outcome = service.publishQuiz("u1", quizId);
   assert.ok(outcome.ok);
   const code = outcome.ok ? outcome.quiz.voteCode! : "";
   const answers = answerFirst(service, code);
@@ -326,7 +404,7 @@ test("a signed-in play emits once with the player, quiz and name, and the owner'
 
 test("an anonymous play and a play on a closed quiz emit nothing", () => {
   const { service, played, quizId } = makeEmittingService();
-  const outcome = service.publishQuiz("u1", quizId, []);
+  const outcome = service.publishQuiz("u1", quizId);
   assert.ok(outcome.ok);
   const code = outcome.ok ? outcome.quiz.voteCode! : "";
   const answers = answerFirst(service, code);
@@ -338,12 +416,12 @@ test("an anonymous play and a play on a closed quiz emit nothing", () => {
 
 function publishedFixture() {
   const repo = createInMemoryRepo();
-  const service = createQuizzesService(repo);
+  const service = createQuizzesService(repo, fakeWorks());
   const make = (owner: string, name: string, books: QuizBook[], questionCount = 3) => {
-    const created = service.createQuiz(owner, name, { sourceLabel: "", questionCount, allowedTypes: ["title_cover"], books, questions: null });
-    const outcome = service.publishQuiz(owner, created.id, []);
+    const made = created(service.createQuiz(owner, name, { sourceLabel: "", questionCount, allowedTypes: ["title_cover"], books }));
+    const outcome = service.publishQuiz(owner, made.id);
     assert.ok(outcome.ok);
-    return created.id;
+    return made.id;
   };
   return { repo, service, make };
 }
@@ -378,7 +456,7 @@ test("the public reads return only published quizzes", () => {
   const first = make("u1", "First", six);
   const second = make("u1", "Second", six);
   const other = make("u2", "Other", six);
-  const draft = service.createQuiz("u1", "Draft", { sourceLabel: "", questionCount: 3, allowedTypes: ["title_cover"], books: six, questions: null });
+  const draft = created(service.createQuiz("u1", "Draft", { sourceLabel: "", questionCount: 3, allowedTypes: ["title_cover"], books: six }));
   const api = createQuizzesPublicApi(service);
 
   assert.equal(api.getPublished(draft.id), undefined);

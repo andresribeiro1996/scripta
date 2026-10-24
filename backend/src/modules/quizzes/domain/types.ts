@@ -1,5 +1,7 @@
 // Domain types for the quizzes module.
 
+import type { QuizQuestionType } from "@scripta/shared";
+
 /** Row shape as stored — `data` is the quiz document (QuizData in
  *  @scripta/shared) as raw JSON text, kept opaque all the way down and
  *  parsed only at the service edges, same treatment as tierlists' `data`. */
@@ -63,4 +65,20 @@ export interface QuizShelfFacts {
   voters: number;
   votesSince: number;
   workIds: string[];
+}
+
+export interface QuizInputBook {
+  workId?: string;
+  title: string;
+  author: string;
+  coverUrl?: string | null;
+  quote?: string | null;
+  blurb?: string | null;
+}
+
+export interface QuizInput {
+  sourceLabel: string;
+  questionCount: number;
+  allowedTypes: QuizQuestionType[];
+  books: QuizInputBook[];
 }

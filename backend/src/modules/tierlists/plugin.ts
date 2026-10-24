@@ -6,8 +6,10 @@ import fastifyMultipart from "@fastify/multipart";
 import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
 import { peekCachedCoverUrls } from "../books/index.js";
+import { canonicalByKey, knownWorkIds, resolvePublicBooksByWork } from "../library/index.js";
 import { openTierlistsDb } from "./adapters/sqlite/connection.js";
 import { createSqliteTierlistsRepository } from "./adapters/sqlite/sqliteTierlistsRepository.js";
+import type { TierlistWorks } from "./domain/ports.js";
 import { buildPublicTierlistRoutes, buildTierlistRoutes, buildTierlistShareVideoRoutes } from "./routes.js";
 import type { EmitPublished, EmitVotedOn, TierlistsPublicApi } from "./service.js";
 import { createTierlistsPublicApi, createTierlistsService } from "./service.js";
@@ -18,11 +20,13 @@ export interface TierlistsPluginOptions {
   emitVotedOn?: EmitVotedOn;
 }
 
+export const tierlistWorks: TierlistWorks = { knownWorkIds, canonicalByKey, publicBooksByWork: resolvePublicBooksByWork };
+
 export async function tierlistsPlugin(app: FastifyInstance, opts: TierlistsPluginOptions = {}) {
   // --- composition: swap this one block to change storage technology ---
   const db = openTierlistsDb();
   const tierlistsRepository = createSqliteTierlistsRepository(db);
-  const tierlistsService = createTierlistsService(tierlistsRepository, opts.emitPublished, opts.emitVotedOn, peekCachedCoverUrls);
+  const tierlistsService = createTierlistsService(tierlistsRepository, tierlistWorks, opts.emitPublished, opts.emitVotedOn, peekCachedCoverUrls);
   // -----------------------------------------------------------------------
 
   // No rate limit on the authenticated CRUD surface — ordinary tier-list
@@ -61,8 +65,8 @@ let cachedApi: TierlistsPublicApi | null = null;
  *  one file just fine, and getTierlistData only ever reads. */
 export function getTierlistsPublicApi(): TierlistsPublicApi {
   if (!cachedApi) {
-    const service = createTierlistsService(createSqliteTierlistsRepository(openTierlistsDb()), undefined, undefined, peekCachedCoverUrls);
-    cachedApi = createTierlistsPublicApi(service);
+    const service = createTierlistsService(createSqliteTierlistsRepository(openTierlistsDb()), tierlistWorks, undefined, undefined, peekCachedCoverUrls);
+    cachedApi = createTierlistsPublicApi(service, tierlistWorks);
   }
   return cachedApi;
 }

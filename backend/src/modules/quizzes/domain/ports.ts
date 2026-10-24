@@ -2,7 +2,7 @@
 // persistence. Same contract shape as modules/tierlists/domain/ports.ts —
 // service.ts is written against this interface only.
 
-import type { QuestionStat } from "@scripta/shared";
+import type { PublicBookData, QuestionStat } from "@scripta/shared";
 import type { AnswerRow, PlayRow, QuizDiscoverRow, QuizGameRow, QuizRow, QuizShelfFacts } from "./types.js";
 
 export interface QuizzesRepository {
@@ -49,4 +49,11 @@ export interface QuizzesRepository {
   questionStats(quizId: string): QuestionStat[];
   listParticipation(ownerUserId: string, since: string): Array<{ id: string; name: string; participants: number; latest_at: string }>;
   listRecentPlayers(quizId: string, ownerUserId: string, limit: number): Array<{ user_id: string; at: string }>;
+}
+
+export interface QuizWorks {
+  knownWorkIds(ids: string[]): string[];
+  resolveTitleWorks(books: Array<{ title: string; author: string }>): Array<string | null>;
+  canonicalByKey(ids: Map<string, string>): Map<string, string>;
+  publicBooksByWork(ownerUserId: string, workIds: string[]): Map<string, PublicBookData>;
 }

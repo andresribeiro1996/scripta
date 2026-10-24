@@ -521,6 +521,7 @@ test("an E1-shaped tier-list database is migrated on open", () => {
 
 test("published tier lists holding any of the given works, newest first; drafts never", async () => {
   const { createTierlistsService, createTierlistsPublicApi } = await import("../../service.js");
+  const { tierlistWorks } = await import("../../plugin.js");
   const repo = createSqliteTierlistsRepository(freshDb());
   const board = (...workIds: string[]) => JSON.stringify({ tiers: [{ id: "s", label: "S", color: "#fff", workIds: [] }], pool: workIds });
   publishedList(repo, "old", "Old", "2026-01-01T00:00:00.000Z", { data: board("w-old", "w-x") });
@@ -534,7 +535,7 @@ test("published tier lists holding any of the given works, newest first; drafts 
   assert.deepEqual(repo.listPublishedByWorks(["w-new", "w-old"], 2).map((r) => r.id), ["promoted", "both"]);
   assert.equal(repo.listPublishedByWorks([], 20).length, 0);
 
-  const api = createTierlistsPublicApi(createTierlistsService(repo));
+  const api = createTierlistsPublicApi(createTierlistsService(repo, tierlistWorks), tierlistWorks);
   assert.deepEqual(api.publishedByWorks(["w-new", "w-old"], 20), [
     { id: "promoted", name: "Promoted", path: "/vote/code-promoted", ownerUserId: null },
     { id: "both", name: "Both", path: "/vote/code-both", ownerUserId: "u1" },

@@ -10,15 +10,15 @@
 // comment for why a module like this doesn't use one for that case).
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import type { BallotResponse, PublicBookData, Tierlist as WireTierlist, TierlistData, VotingBoard } from "@scripta/shared";
+import type { BallotResponse, Tierlist as WireTierlist, VotingBoard } from "@scripta/shared";
 import { z } from "zod";
 import { sendWorksError } from "../../worksErrors.js";
 import { authGuard, getOptionalAuthenticatedUser } from "../auth/index.js";
-import { duplicateWorkMessage, firstKeyPerWork, knownWorkIds, resolvePublicBooksByWork, UnknownWorkError } from "../library/index.js";
+import { duplicateWorkMessage, firstKeyPerWork, knownWorkIds, UnknownWorkError } from "../library/index.js";
 import { boardWorks } from "./domain/boardKeys.js";
 import type { Tierlist } from "./domain/types.js";
-import type { BallotOutcome, TierlistsService, Voter } from "./service.js";
-import { boardBooks, boardCanonical, canonicalBoard, canonicalFirst, histogramToWorks, placementsFromWorks, placementsToWorks } from "./wire.js";
+import type { BallotOutcome, TierlistsService, TierlistWriteOutcome, Voter } from "./service.js";
+import { boardBooks, canonicalBoard, canonicalFirst, histogramToWorks, placementsFromWorks, placementsToWorks } from "./wire.js";
 import { InvalidShareImageError, MAX_SHARE_IMAGE_BYTES, renderShareVideo, ShareVideoRenderError } from "./shareVideo.js";
 
 const idParamSchema = z.object({ id: z.string().uuid() });
@@ -63,19 +63,9 @@ function answer(tierlist: Tierlist): WireTierlist {
   return { ...tierlist, data: canonicalBoard(tierlist.data) };
 }
 
-function storedBoard(board: TierlistData): { data: TierlistData } | { status: 400 | 409; error: string } {
-  const all = [...board.tiers.flatMap((tier) => tier.workIds), ...board.pool];
-  if (new Set(all).size !== all.length) return { status: 400, error: "Duplicate tier or book." };
-  const ids = knownWorkIds(all);
-  if (new Set(ids).size !== ids.length) return { status: 409, error: duplicateWorkMessage({ workId: null, title: null }) };
-  const canonical = new Map(all.map((id, index) => [id, ids[index]!]));
-  const swap = (workIds: string[]) => workIds.map((id) => canonical.get(id)!);
-  return { data: { tiers: board.tiers.map((tier) => ({ ...tier, workIds: swap(tier.workIds) })), pool: swap(board.pool) } };
-}
-
-function booksInOrder(ownerUserId: string, workIds: string[]): PublicBookData[] {
-  const found = resolvePublicBooksByWork(ownerUserId, workIds);
-  return workIds.flatMap((id) => found.get(id) ?? []);
+function sendWriteFailure(reply: FastifyReply, outcome: Exclude<TierlistWriteOutcome, { ok: true }>) {
+  if (outcome.reason === "duplicate-work") return reply.code(409).send({ error: duplicateWorkMessage({ workId: null, title: outcome.title }) });
+  return reply.code(outcome.reason === "not-found" ? 404 : 400).send({ error: outcome.error });
 }
 
 export function buildTierlistRoutes(service: TierlistsService) {
@@ -91,20 +81,10 @@ export function buildTierlistRoutes(service: TierlistsService) {
     app.post("/tierlists", { preHandler: authGuard }, async (request, reply) => {
       const parsed = createTierlistSchema.safeParse(request.body);
       if (!parsed.success) return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? "Invalid request." });
-      const { name, data, access, ranksWorstFirst } = parsed.data;
-      if (access && !data) return reply.code(400).send({ error: "Choose books and tiers before publishing." });
-      if (data) {
-        const ids = data.tiers.map((tier) => tier.id);
-        if (new Set(ids).size !== ids.length) return reply.code(400).send({ error: "Duplicate tier or book." });
-        if (access && (!data.pool.length || data.tiers.some((tier) => tier.workIds.length))) return reply.code(400).send({ error: "Public tier lists need an unranked book pool." });
-      }
       try {
-        const board = data ? storedBoard(data) : undefined;
-        if (board && "error" in board) return reply.code(board.status).send({ error: board.error });
-        const publicBooks = access && board ? booksInOrder(request.user.id, board.data.pool) : [];
-        if (access && board && publicBooks.length !== board.data.pool.length) return reply.code(400).send({ error: "A selected book is no longer in your library." });
-        const tierlist = service.createTierlist(request.user.id, name, board?.data, access, publicBooks, ranksWorstFirst);
-        return reply.code(201).send(board ? ({ ...tierlist, data: board.data } satisfies WireTierlist) : tierlist);
+        const outcome = service.createTierlist(request.user.id, parsed.data);
+        if (!outcome.ok) return sendWriteFailure(reply, outcome);
+        return reply.code(201).send({ ...outcome.tierlist, data: outcome.data } satisfies WireTierlist);
       } catch (err) {
         return sendWorksError(reply, err);
       }
@@ -130,18 +110,9 @@ export function buildTierlistRoutes(service: TierlistsService) {
       const body = updateTierlistSchema.safeParse(request.body);
       if (!body.success) return reply.code(400).send({ error: body.error.issues[0]?.message ?? "Invalid request." });
       try {
-        let board: { data: TierlistData } | undefined;
-        const owned = service.getTierlist(request.user.id, params.data.id);
-        if (body.data.data !== undefined) {
-          if (!owned || owned.voteCode !== null) return reply.code(404).send({ error: "No tier list with that id." });
-          const result = storedBoard(body.data.data);
-          if ("error" in result) return reply.code(result.status).send({ error: result.error });
-          board = result;
-        }
-        const data = board?.data ?? (owned ? canonicalBoard(owned.data) : undefined);
-        const tierlist = service.updateTierlist(request.user.id, params.data.id, { ...(body.data.name !== undefined ? { name: body.data.name } : {}), ...(board ? { data: board.data } : {}) });
-        if (!tierlist || !data) return reply.code(404).send({ error: "No tier list with that id." });
-        return reply.send({ ...tierlist, data } satisfies WireTierlist);
+        const outcome = service.updateTierlist(request.user.id, params.data.id, { ...(body.data.name !== undefined ? { name: body.data.name } : {}), ...(body.data.data !== undefined ? { data: body.data.data } : {}) });
+        if (!outcome.ok) return sendWriteFailure(reply, outcome);
+        return reply.send({ ...outcome.tierlist, data: outcome.data } satisfies WireTierlist);
       } catch (err) {
         return sendWorksError(reply, err);
       }
@@ -168,14 +139,10 @@ export function buildTierlistRoutes(service: TierlistsService) {
       if (!body.success) {
         return reply.code(400).send({ error: body.error.issues[0]?.message ?? "Invalid request." });
       }
-      const owned = service.getTierlist(request.user.id, params.data.id);
-      if (!owned) return reply.code(404).send({ error: "No tier list with that id." });
       try {
-        const known = boardCanonical(owned.data);
-        const tierlist = service.openVoting(request.user.id, params.data.id, body.data.access, booksInOrder(request.user.id, boardWorks(owned.data)));
-        if (!tierlist) {
-          return reply.code(404).send({ error: "No tier list with that id." });
-        }
+        const opened = service.openVoting(request.user.id, params.data.id, body.data.access);
+        if (!opened) return reply.code(404).send({ error: "No tier list with that id." });
+        const { tierlist, known } = opened;
         return reply.code(201).send({ tierlist: { ...tierlist, data: canonicalBoard(tierlist.data, known) } satisfies WireTierlist, voteCode: tierlist.voteCode });
       } catch (err) {
         return sendWorksError(reply, err);
@@ -309,7 +276,7 @@ export function buildPublicTierlistRoutes(service: TierlistsService) {
           ranksWorstFirst: board.ranksWorstFirst,
           ...(board.votingOpen ? {} : { histogram: histogramToWorks(board.histogram, canonical, first) })
         } satisfies VotingBoard,
-        books: boardBooks(pool, board.publicBooks, () => booksInOrder(board.ownerUserId, pool))
+        books: boardBooks(pool, board.publicBooks, () => service.booksInOrder(board.ownerUserId, pool))
       });
     });
 

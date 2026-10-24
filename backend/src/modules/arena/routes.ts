@@ -13,7 +13,7 @@ import {
   TournamentAlreadyStartedError,
   TournamentNotFoundError
 } from "./domain/errors.js";
-import { knownWorkIds, UnknownWorkError, WorkResolutionError } from "../library/index.js";
+import { UnknownWorkError, WorkResolutionError } from "../library/index.js";
 import type { ArenaService, Tournament } from "./service.js";
 import { summariesForWire, tournamentForWire } from "./wire.js";
 
@@ -120,11 +120,7 @@ export function buildArenaRoutes(service: ArenaService) {
       const body = setWorkSlotsSchema.safeParse(request.body);
       if (!body.success) return reply.code(400).send({ error: "Expected {slots: [{slotIndex, book}, ...]}." });
       try {
-        service.seedingSlots(params.data.id, request.user.id);
-        const ids = knownWorkIds(body.data.slots.map((slot) => slot.book.workId));
-        const duplicate = ids.findIndex((id, index) => ids.indexOf(id) !== index);
-        if (duplicate !== -1) throw new DuplicateBookError(body.data.slots[duplicate]!.book.title);
-        service.setSlotsManual(params.data.id, request.user.id, body.data.slots.map((slot, index) => ({ slotIndex: slot.slotIndex, book: { ...slot.book, workId: ids[index]! } })));
+        service.setSlotsManual(params.data.id, request.user.id, body.data.slots);
         return reply.code(204).send();
       } catch (err) {
         if (err instanceof UnknownWorkError) return reply.code(400).send({ error: err.message });
@@ -140,9 +136,7 @@ export function buildArenaRoutes(service: ArenaService) {
       const body = randomFillWorksSchema.safeParse(request.body);
       if (!body.success) return reply.code(400).send({ error: "Expected {pool: [book, ...]}." });
       try {
-        service.seedingSlots(params.data.id, request.user.id);
-        const ids = knownWorkIds(body.data.pool.map((book) => book.workId));
-        service.randomFill(params.data.id, request.user.id, body.data.pool.map((book, index) => ({ ...book, workId: ids[index]! })));
+        service.randomFill(params.data.id, request.user.id, body.data.pool);
         return reply.code(204).send();
       } catch (err) {
         if (err instanceof UnknownWorkError) return reply.code(400).send({ error: err.message });

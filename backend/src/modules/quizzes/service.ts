@@ -3,10 +3,11 @@
 // module's service.ts.
 
 import { randomBytes, randomUUID } from "node:crypto";
-import { QUIZ_QUESTION_TYPES, generateQuizQuestions, gradeAnswers, quizPreview, type PlayBoard, type PublicQuizQuestion, type QuestionStat, type QuizBook, type QuizPreview, type QuizQuestion, type QuizQuestionType, type ResultPlay, type SubmittedAnswer } from "@scripta/shared";
+import { QUIZ_QUESTION_TYPES, generateQuizQuestions, gradeAnswers, quizPreview, type PlayBoard, type PublicBookData, type PublicQuizQuestion, type QuestionStat, type QuizBook, type QuizPreview, type QuizQuestion, type QuizQuestionType, type ResultPlay, type SubmittedAnswer } from "@scripta/shared";
 import type { GameParticipation } from "@scripta/shared/community";
-import type { QuizzesRepository } from "./domain/ports.js";
-import type { AnswerRow, PlayRow, Quiz, QuizGameRow, QuizRow, QuizShelfFacts } from "./domain/types.js";
+import type { QuizWorks, QuizzesRepository } from "./domain/ports.js";
+import { storedIds } from "./domain/quizWorks.js";
+import type { AnswerRow, PlayRow, Quiz, QuizGameRow, QuizInput, QuizInputBook, QuizRow, QuizShelfFacts } from "./domain/types.js";
 
 function toQuiz(row: QuizRow): Quiz {
   const parsed = JSON.parse(row.data) as unknown;
@@ -57,8 +58,13 @@ export type PlayOutcome =
   | { ok: true; playId: string; score: number; correct: Record<string, boolean> }
   | { ok: false; reason: "not-found" | "closed" | "invalid" | "already-played" };
 
+export type QuizWriteOutcome =
+  | { ok: true; quiz: Quiz; canonical: Map<string, string> }
+  | { ok: false; reason: "not-found" | "invalid"; error: string }
+  | { ok: false; reason: "duplicate-work"; title: string | null };
+
 export type PublishOutcome =
-  | { ok: true; quiz: Quiz }
+  | { ok: true; quiz: Quiz; canonical: Map<string, string> }
   | { ok: false; reason: "not-found" }
   | { ok: false; reason: "already-published"; error: string }
   | { ok: false; reason: "invalid"; error: string };
@@ -136,14 +142,11 @@ export type EmitPlayed = (playerUserId: string, quizId: string, quizName: string
 
 export interface QuizzesService {
   listQuizzes(userId: string): Quiz[];
-  createQuiz(userId: string, name: string, data: unknown): Quiz;
+  createQuiz(userId: string, name: string, data: QuizInput): QuizWriteOutcome;
   getQuiz(userId: string, id: string): Quiz | undefined;
-  updateQuiz(userId: string, id: string, patch: { name?: string; data?: unknown }): Quiz | undefined;
+  updateQuiz(userId: string, id: string, patch: { name?: string; data?: QuizInput }): QuizWriteOutcome;
   deleteQuiz(userId: string, id: string): boolean;
-  /** `resolvedBooks` carries the public cover URLs the route resolved from
-   *  the owner's library (the same resolver tierlists' open-voting uses);
-   *  books that already carry one (pool picks) keep theirs. */
-  publishQuiz(userId: string, id: string, resolvedBooks: Array<{ workId: string; coverUrl: string | null }>, canonical?: Map<string, string>): PublishOutcome;
+  publishQuiz(userId: string, id: string): PublishOutcome;
   setPlayState(userId: string, id: string, open: boolean): Quiz | undefined;
   getPlayBoard(code: string): PlayBoard | undefined;
   submitPlay(code: string, answers: SubmittedAnswer[], durationMs: number, playerName: string | null, player: Player): PlayOutcome;
@@ -162,26 +165,45 @@ export interface QuizzesService {
 
 const RECENT_PARTICIPANT_LIMIT = 10;
 
-export function createQuizzesService(repo: QuizzesRepository, emitPublished?: EmitPublished, emitPlayed?: EmitPlayed): QuizzesService {
+function quizBookWorks(works: QuizWorks, books: QuizInputBook[]): Array<string | null> {
+  const given = [...new Set(books.flatMap((book) => (book.workId ? [book.workId] : [])))];
+  const canonical = works.knownWorkIds(given);
+  const known = new Map(given.map((id, index) => [id, canonical[index]!]));
+  const titled = books.filter((book) => !book.workId);
+  const resolved = works.resolveTitleWorks(titled);
+  const byBook = new Map(titled.map((book, index) => [book, resolved[index] ?? null]));
+  return books.map((book) => (book.workId ? known.get(book.workId)! : byBook.get(book) ?? null));
+}
+
+export function createQuizzesService(repo: QuizzesRepository, works: QuizWorks, emitPublished?: EmitPublished, emitPlayed?: EmitPlayed): QuizzesService {
   return {
     listQuizzes(userId) {
       return repo.listByUser(userId).map(toQuiz);
     },
 
     createQuiz(userId, name, data) {
+      const ids = quizBookWorks(works, data.books);
+      if (ids.some((id) => id === null)) return { ok: false, reason: "invalid", error: "That book isn't in the catalog." };
+      const seen = new Set<string>();
+      const books = data.books.flatMap((book, index) => {
+        const workId = ids[index]!;
+        if (seen.has(workId)) return [];
+        seen.add(workId);
+        return [{ ...book, workId }];
+      });
       const now = new Date().toISOString();
       const row: QuizRow = {
         id: randomUUID(),
         owner_user_id: userId,
         name,
-        data: JSON.stringify(data ?? {}),
+        data: JSON.stringify({ ...data, books }),
         vote_code: null,
         play_open: 0,
         created_at: now,
         updated_at: now
       };
       repo.insert(row);
-      return toQuiz(row);
+      return { ok: true, quiz: toQuiz(row), canonical: new Map(books.map((book) => [book.workId, book.workId])) };
     },
 
     getQuiz(userId, id) {
@@ -190,29 +212,38 @@ export function createQuizzesService(repo: QuizzesRepository, emitPublished?: Em
     },
 
     updateQuiz(userId, id, patch) {
-      if (patch.data !== undefined || patch.name !== undefined) {
-        const existing = repo.getOwned(id, userId);
-        // undefined covers BOTH "not yours" and "already published" — a
-        // published quiz's seeded set must never drift (same 404 convention
-        // as tierlists' updateTierlist).
-        if (!existing || existing.vote_code !== null) return undefined;
+      const existing = repo.getOwned(id, userId);
+      if (!existing || existing.vote_code !== null) return { ok: false, reason: "not-found", error: "No quiz with that id." };
+      let data: string | undefined;
+      let canonical: Map<string, string>;
+      if (patch.data) {
+        const inputBooks = patch.data.books;
+        const ids = quizBookWorks(works, inputBooks);
+        if (ids.some((workId) => workId === null)) return { ok: false, reason: "invalid", error: "That book isn't in the catalog." };
+        const duplicate = ids.findIndex((workId, index) => ids.indexOf(workId) !== index);
+        if (duplicate !== -1) return { ok: false, reason: "duplicate-work", title: inputBooks[duplicate]!.title };
+        data = JSON.stringify({ ...patch.data, books: inputBooks.map((book, index) => ({ ...book, workId: ids[index]! })) });
+        canonical = new Map(ids.map((workId) => [workId!, workId!]));
+      } else {
+        canonical = works.canonicalByKey(new Map(storedIds(toQuiz(existing)).map((workId) => [workId, workId])));
       }
-      const row = repo.update(id, userId, {
-        ...(patch.name !== undefined ? { name: patch.name } : {}),
-        ...(patch.data !== undefined ? { data: JSON.stringify(patch.data) } : {})
-      });
-      return row ? toQuiz(row) : undefined;
+      const row = repo.update(id, userId, { ...(patch.name !== undefined ? { name: patch.name } : {}), ...(data !== undefined ? { data } : {}) });
+      if (!row) return { ok: false, reason: "not-found", error: "No quiz with that id." };
+      return { ok: true, quiz: toQuiz(row), canonical };
     },
 
     deleteQuiz(userId, id) {
       return repo.delete(id, userId);
     },
 
-    publishQuiz(userId, id, resolvedBooks, canonical = new Map()) {
+    publishQuiz(userId, id) {
       const row = repo.getOwned(id, userId);
       if (!row) return { ok: false, reason: "not-found" };
       if (row.vote_code !== null) return { ok: false, reason: "already-published", error: "This quiz is already published." };
       const doc = readDocument(toQuiz(row));
+      const needCover = doc.books.filter((b) => !b.coverUrl);
+      const canonical = works.canonicalByKey(new Map(doc.books.map((b) => [b.workId, b.workId])));
+      const found = needCover.length ? works.publicBooksByWork(userId, needCover.map((b) => b.workId)) : new Map<string, PublicBookData>();
       const seenWorks = new Set<string>();
       doc.books = doc.books.filter((b) => {
         const work = canonical.get(b.workId) ?? b.workId;
@@ -221,8 +252,7 @@ export function createQuizzesService(repo: QuizzesRepository, emitPublished?: Em
         return true;
       });
       if (doc.books.length < 4) return { ok: false, reason: "invalid", error: "A quiz needs at least 4 books." };
-      const coverByWork = new Map(resolvedBooks.map((b) => [b.workId, b.coverUrl]));
-      const books = doc.books.map((b) => ({ ...b, coverUrl: b.coverUrl ?? coverByWork.get(b.workId) ?? null }));
+      const books = doc.books.map((b) => ({ ...b, coverUrl: b.coverUrl ?? found.get(b.workId)?.coverUrl ?? null }));
       const code = generateVoteCode();
       const questions = generateQuizQuestions(books, { questionCount: doc.questionCount, allowedTypes: doc.allowedTypes }, code).map((question) => ({ id: question.id, type: question.type, workId: question.book.workId, options: question.options, answerIndex: question.answerIndex }));
       if (questions.length !== doc.questionCount) {
@@ -231,7 +261,7 @@ export function createQuizzesService(repo: QuizzesRepository, emitPublished?: Em
       const published = repo.publish(id, userId, JSON.stringify({ ...doc, books, questions }), code);
       if (!published) return { ok: false, reason: "not-found" };
       emitPublished?.(id, userId);
-      return { ok: true, quiz: toQuiz(published) };
+      return { ok: true, quiz: toQuiz(published), canonical };
     },
 
     setPlayState(userId, id, open) {

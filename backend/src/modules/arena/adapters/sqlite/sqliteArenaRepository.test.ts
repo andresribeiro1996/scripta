@@ -449,6 +449,7 @@ test("a trigger that rolls the transaction back surfaces its own error and keeps
 
 test("started tournaments seeding any of the given works, newest first; seeding brackets never", async () => {
   const { createArenaService, createArenaPublicApi } = await import("../../service.js");
+  const { arenaWorks } = await import("../../plugin.js");
   const repo = createSqliteArenaRepository(freshDb());
   const slot = (tournamentId: string, index: number, workId: string): TournamentSlotRow => ({ tournament_id: tournamentId, slot_index: index, work_id: workId, title: "T", author: "A", cover_url: null });
   repo.insertTournament(tournament({ id: "old", name: "Old", status: "completed", created_at: "2026-01-01T00:00:00.000Z" }));
@@ -464,7 +465,7 @@ test("started tournaments seeding any of the given works, newest first; seeding 
   assert.deepEqual(repo.listPublishedByWorks(["w-new", "w-old"], 1).map((r) => r.id), ["both"]);
   assert.equal(repo.listPublishedByWorks([], 20).length, 0);
 
-  const api = createArenaPublicApi(createArenaService(repo));
+  const api = createArenaPublicApi(createArenaService(repo, arenaWorks));
   assert.deepEqual(api.publishedByWorks(["w-new", "w-old"], 20), [
     { id: "both", name: "Both", path: "/arena/both", ownerUserId: "u2" },
     { id: "old", name: "Old", path: "/arena/old", ownerUserId: "u1" }
