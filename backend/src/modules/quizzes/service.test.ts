@@ -119,7 +119,7 @@ function createInMemoryRepo(): QuizzesRepository {
       return counts;
     },
     votedAmong: (viewerUserId, ids) => ids.filter((id) => [...plays.values()].some((p) => p.quiz_id === id && p.voter_user_id === viewerUserId)),
-    listParticipation: () => [],
+    listParticipation: (ownerUserId) => [...quizzes.values()].filter((q) => q.owner_user_id === ownerUserId && q.vote_code !== null).map((q) => ({ id: q.id, name: q.name, participants: 1, latest_at: q.created_at })),
     listRecentPlayers: () => []
   };
 }
@@ -490,4 +490,13 @@ test("votedAmong lists the published quizzes the viewer has played", () => {
 
   assert.deepEqual(api.votedAmong("u9", [played, unplayed]), [played]);
   assert.deepEqual(api.votedAmong("u8", [played, unplayed]), []);
+});
+
+test("participation shows up to three of the quiz's book covers", () => {
+  const { service, make } = publishedFixture();
+  const id = make("u1", "Covers", [book("c0", { coverUrl: null }), book("c1"), book("c2"), book("c3"), book("c4"), book("c5")]);
+
+  const rows = createQuizzesPublicApi(service).participationByOwner("u1", "2000-01-01T00:00:00.000Z");
+
+  assert.deepEqual(rows.map((row) => [row.id, row.covers]), [[id, ["https://covers.test/c1.jpg", "https://covers.test/c2.jpg", "https://covers.test/c3.jpg"]]]);
 });

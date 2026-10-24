@@ -1,5 +1,7 @@
 // Domain types for the tierlists module.
 
+import type { TierPlacementFact } from "../../community/index.js";
+
 /** Who may cast a ballot on a community tier list. */
 export type VoteAccess = "anonymous" | "members";
 
@@ -86,5 +88,5 @@ export interface TierlistShelfFacts {
   voters: number;
   votesSince: number;
   workIds: string[];
-  placements: Array<{ workId: string; tierIndex: number; tierCount: number; ranksWorstFirst: boolean; castAt: string }>;
+  placements: TierPlacementFact[];
 }

@@ -8,3 +8,12 @@ export { tierlistsPlugin as registerTierlistsModule, deleteTierlistsUserData } f
 // riding on the plugin's own composition.
 export { getTierlistsPublicApi } from "./plugin.js";
 export type { TierlistsPublicApi } from "./service.js";
+import { createTierlistGameSource } from "./adapters/communityGameSource.js";
+import { getTierlistsPublicApi } from "./plugin.js";
+import type { GameSource } from "../community/index.js";
+
+let cachedGameSource: GameSource<"tierlist"> | null = null;
+
+export function getTierlistGameSource(): GameSource<"tierlist"> {
+  return (cachedGameSource ??= createTierlistGameSource(getTierlistsPublicApi()));
+}

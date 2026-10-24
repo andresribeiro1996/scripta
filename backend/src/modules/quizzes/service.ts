@@ -108,13 +108,17 @@ export interface QuizDiscoverRef {
 
 const COVER_PREVIEW_LIMIT = 3;
 
-function toPublishedRef(row: QuizRow, playCount: number): PublishedQuizRef {
-  const doc = readDocument(toQuiz(row));
+function previewCovers(row: QuizRow): string[] {
   const covers: string[] = [];
-  for (const book of doc.books) {
+  for (const book of readDocument(toQuiz(row)).books) {
     if (covers.length >= COVER_PREVIEW_LIMIT) break;
     if (typeof book?.coverUrl === "string" && book.coverUrl) covers.push(book.coverUrl);
   }
+  return covers;
+}
+
+function toPublishedRef(row: QuizRow, playCount: number): PublishedQuizRef {
+  const doc = readDocument(toQuiz(row));
   return {
     id: row.id,
     ownerUserId: row.owner_user_id,
@@ -124,7 +128,7 @@ function toPublishedRef(row: QuizRow, playCount: number): PublishedQuizRef {
     questionCount: doc.questionCount,
     playCount,
     playOpen: row.play_open === 1,
-    covers,
+    covers: previewCovers(row),
     preview: quizPreview(doc)
   };
 }
@@ -392,10 +396,12 @@ export function createQuizzesService(repo: QuizzesRepository, works: QuizWorks, 
     votedAmong: (viewerUserId, ids) => repo.votedAmong(viewerUserId, ids),
 
     participationByOwner(ownerUserId, since) {
-      return repo.listParticipation(ownerUserId, since).map((row) => ({
+      const rows = repo.listParticipation(ownerUserId, since);
+      const quizzes = new Map(repo.listPublicByIds(rows.map((row) => row.id)).map((quiz) => [quiz.id, quiz]));
+      return rows.map((row) => ({
         id: row.id,
         name: row.name,
-        covers: [],
+        covers: quizzes.has(row.id) ? previewCovers(quizzes.get(row.id)!) : [],
         participantCount: row.participants,
         latestAt: row.latest_at,
         recent: repo.listRecentPlayers(row.id, ownerUserId, RECENT_PARTICIPANT_LIMIT).map((r) => ({ userId: r.user_id, at: r.at }))
