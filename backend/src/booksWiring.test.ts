@@ -79,6 +79,7 @@ test("every books job arms its first run with its own delay and calls nothing be
   const app = buildApp();
   await app.ready();
   await app.close();
+  const arenaSweep = 30_000;
   const expected = {
     detailsBackfill: 30_000,
     workKeyBackfill: 40_000,
@@ -91,6 +92,10 @@ test("every books job arms its first run with its own delay and calls nothing be
     worksGrouping: 120_000,
     bnpSync: 150_000
   };
-  for (const [job, delay] of Object.entries(expected)) assert.ok(delays.includes(delay), `${job} did not arm a ${delay} ms first run`);
+  const wanted = new Map<number, number>([[arenaSweep, 1]]);
+  for (const delay of Object.values(expected)) wanted.set(delay, (wanted.get(delay) ?? 0) + 1);
+  for (const [delay, count] of wanted) {
+    assert.ok(delays.filter((armed) => armed === delay).length >= count, `expected ${count} first runs armed at ${delay} ms`);
+  }
   assert.deepEqual(requests.map(String).filter((url) => /typesafe|isbndb|bnportugal|porbase/.test(url)), []);
 });
