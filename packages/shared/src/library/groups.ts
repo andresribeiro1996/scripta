@@ -103,8 +103,7 @@ export function setGroupStyle(groups: Group[], id: string, style: PerCardStyle |
 
 /** Scrubs one or more books' keys out of every group's `bookKeys` in one
  *  pass — call this alongside actually removing the book(s) from `books`
- *  (see merge.ts's bookKey and the delete handlers in frontend's
- *  LibraryPage.tsx/GroupsPage.tsx, including bulk delete via select mode)
+ *  (see merge.ts's bookKey and `deleteBooks` in bookDeletion.ts)
  *  so a deleted book doesn't linger as a dangling reference forever. Not
  *  strictly required for correctness on its own — `booksInGroup()`
  *  already silently drops a key with no matching book — but leaving it in

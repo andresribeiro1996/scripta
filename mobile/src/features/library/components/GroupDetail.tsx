@@ -11,10 +11,10 @@ import { Text } from "../../../ui/Text";
 import { router, Stack } from "expo-router";
 import {
   bookKey,
+  deleteBooks,
   deleteGroup,
   effectiveCardStyle,
   orderedGroupBooks,
-  removeBooksFromAllGroups,
   renameGroup,
   resolveLibraryStyle,
   saveFailureMessage,
@@ -108,11 +108,7 @@ export function GroupDetail({ groupId }: { groupId: string }) {
         style: "destructive",
         onPress: () => {
           void runUpdate(
-            (data) => ({
-              ...data,
-              books: data.books.filter((b) => !keys.has(bookKey(b))),
-              groups: removeBooksFromAllGroups(data.groups ?? [], keys),
-            }),
+            (data) => deleteBooks(data, keys),
             () => {
               void murals.scrubBooks(keys).catch(() => Alert.alert("The books were deleted, but some mural references couldn't be updated."));
               setSelectedKeys(new Set());

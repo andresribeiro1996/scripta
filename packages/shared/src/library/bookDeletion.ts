@@ -1,5 +1,13 @@
-import type { LibraryData } from "../api/library";
-import { bookKey } from "./merge";
+import { removeBooksFromAllGroups } from "./groups.js";
+import { bookKey } from "./merge.js";
+import type { LibraryData } from "./types.js";
+
+export function deleteBooks(data: LibraryData, keys: ReadonlySet<string>): LibraryData {
+  if (keys.size === 0) return data;
+  const books = data.books.filter((book) => !keys.has(bookKey(book)));
+  const groups = data.groups ? removeBooksFromAllGroups(data.groups, keys) : undefined;
+  return { ...data, books, book_count: books.length, ...(groups ? { groups } : {}) };
+}
 
 function restoreKeys(current: string[], snapshot: string[], keys: ReadonlySet<string>): string[] {
   const restored = [...current];

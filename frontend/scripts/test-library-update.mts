@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { LibraryData } from "../src/api/library";
-import { restoreDeletedBooks } from "../src/lib/restoreDeletedBooks";
+import { restoreDeletedBooks } from "@scripta/shared";
 
 test("undo restores deleted books without replacing concurrent changes", () => {
   const snapshot: LibraryData = {

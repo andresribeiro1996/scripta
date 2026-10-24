@@ -128,7 +128,7 @@ function blockTextStyles(style: BlockStyle, color: string) {
   return {
     name: step(1.25, "700"),
     hero: step(2.8, "700"),
-    stat: step(1.45, "700"),
+    stat: step(1.6, "700"),
     title: step(1.1, "700"),
     body: step(1),
     bio: step(0.9),

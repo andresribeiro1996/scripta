@@ -10,9 +10,9 @@ import {
   addReaderNote,
   bookKey,
   clearBookCover,
+  deleteBooks,
   localDay,
   newId,
-  removeBooksFromAllGroups,
   removeReaderNote,
   reorderOnDrop,
   restoreReadState,
@@ -100,11 +100,7 @@ export function useLibraryActions() {
 
     deleteBooks: (keys: Set<string>, onSuccess: () => void) =>
       run(
-        (data) => ({
-          ...data,
-          books: data.books.filter((book) => !keys.has(bookKey(book))),
-          groups: removeBooksFromAllGroups(data.groups ?? [], keys),
-        }),
+        (data) => deleteBooks(data, keys),
         "Couldn't delete — nothing was changed.",
         onSuccess,
       ),

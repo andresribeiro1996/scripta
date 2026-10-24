@@ -13,6 +13,7 @@ export * from "./bookMatch.js";
 export * from "./dedupe.js";
 export * from "./libraryView.js";
 export * from "./groups.js";
+export * from "./bookDeletion.js";
 export * from "./libraryOrder.js";
 export * from "./addPipeline.js";
 export * from "./libraryChange.js";

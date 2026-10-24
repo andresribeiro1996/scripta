@@ -4,8 +4,10 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useNavigationType, useSearchParams } from "react-router-dom";
 import {
   buildMergedLibrary,
+  deleteBooks,
   findDuplicates,
   LIBRARY_CSV_TEMPLATE,
+  restoreDeletedBooks,
   saveFailureMessage
 } from "@scripta/shared";
 import type { LibraryData, LibraryDocument } from "../api/library";
@@ -32,13 +34,11 @@ import { useLibrary } from "../hooks/useLibrary";
 import { useLibrarySaver } from "../hooks/useLibrarySaver";
 import { useMurals } from "../hooks/useMurals";
 import { parseImportedFile } from "../lib/fileImport";
-import { removeBooksFromAllGroups } from "../lib/groups";
 import { orderLibraryBooks, reorderOnDrop, seriesGroupByBookKey } from "../lib/libraryOrder";
 import { effectiveCardStyle, resolveLibraryStyle, type PerCardStyle } from "../lib/libraryStyle";
 import { bookHref, filterBooks, SORT_OPTIONS, sortBooks, STATUS_FILTER_OPTIONS, type SortKey, type StatusFilter } from "../lib/libraryView";
 import { bookKey } from "../lib/merge";
 import { saveWithViewTransition } from "../lib/viewTransition";
-import { restoreDeletedBooks } from "../lib/restoreDeletedBooks";
 
 const scrollPositions = new Map<string, number>();
 
@@ -218,10 +218,6 @@ export function LibraryPage() {
     setSelectedKeys(new Set()); // always start a fresh selection, whichever direction
   }
 
-  // Scrubs every selected book's key out of every group's bookKeys too
-  // (lib/groups.ts's removeBooksFromAllGroups) in the same save, so a
-  // deleted book doesn't linger as a dangling reference in any series or
-  // collection it was in.
   async function handleDeleteSelected() {
     if (selectedKeys.size === 0) return;
     const current = queryClient.getQueryData<LibraryDocument>(["library"]);
@@ -231,11 +227,7 @@ export function LibraryPage() {
     try {
       await updateLibrary((data) => {
         snapshot = data;
-        return {
-          ...data,
-          books: data.books.filter((b) => !keys.has(bookKey(b))),
-          groups: removeBooksFromAllGroups(data.groups ?? [], keys)
-        };
+        return deleteBooks(data, keys);
       });
     } catch (error) {
       toast({ message: saveFailureMessage(error, "Couldn't delete — nothing was changed."), kind: "error" });
