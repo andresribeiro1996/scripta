@@ -540,7 +540,7 @@ npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --
 
 The container has no `nohup`, so the jobs start with `setsid`; the `ls` after the `sleep 3` shows the log file appeared. The `/proc` command prints the job's command line while it is running and nothing once it has ended; the bracket in `nod[e]` stops the check from matching itself.
 
-- **Resuming.** If the job dies, rerun with `--from <through>` from its last window line and no `--until`. The run then ends today and writes the cursor. A `--pre-2002` run resumes with `--pre-2002 --from <through>` and writes no cursor. Re-reading a day is harmless, since every record is applied by ISBN.
+- **Resuming.** If the job dies, rerun with `--from <through>` from its last window line and no `--until`. The run then ends today and writes the cursor. A `--pre-2002` run resumes with `--pre-2002 --from <through>` and writes no cursor; one that died before its first window line has no `through` and reruns as plain `--pre-2002`. Re-reading a day is harmless, since every record is applied by ISBN.
 - **Failed windows.** If the report lists any, rerun from the first failed window's `from` with no `--until`. A `--pre-2002` run reruns each failed window with `--pre-2002 --from <from> --until <until>`.
 - **The cursor.** A run with no `--until` that ends with no failed window writes the sync cursor. A run given `--until`, a `--pre-2002` run, and every dry run, writes none. The in-server sync starts only once the cursor exists, so a deploy can never start the full harvest inside the server.
 
