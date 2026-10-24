@@ -28,8 +28,7 @@ import {
   TournamentAlreadyStartedError,
   TournamentNotFoundError
 } from "./domain/errors.js";
-import { canonicalWorkIds } from "../library/index.js";
-import type { ArenaRepository } from "./domain/ports.js";
+import type { ArenaRepository, ArenaWorks } from "./domain/ports.js";
 import type { DuelRow, FinalWinnerFields, SeedBookInput, SeedPreview, TournamentGameRow, TournamentRow, TournamentShelfFacts, TournamentSlotRow } from "./domain/types.js";
 
 export interface TournamentDiscoverRef {
@@ -54,7 +53,6 @@ export interface ArenaService {
   votedAmong(voterUserId: string, ids: string[]): string[];
   getTournamentView(id: string, voterToken?: string, viewerUserId?: string | null): TournamentView | null;
   setSlotsManual(tournamentId: string, ownerUserId: string, entries: Array<{ slotIndex: number; book: SeedBookInput }>): void;
-  seedingSlots(tournamentId: string, ownerUserId: string): TournamentSlotRow[];
   randomFill(tournamentId: string, ownerUserId: string, pool: SeedBookInput[]): void;
   getPublicSummary(tournamentId: string): Tournament | undefined;
   start(tournamentId: string, ownerUserId: string): void;
@@ -183,12 +181,12 @@ export type EmitVotedOn = (voterUserId: string, tournamentId: string, tournament
 
 export function createArenaService(
   repo: ArenaRepository,
+  works: ArenaWorks,
   emitPublished?: EmitPublished,
-  emitVotedOn?: EmitVotedOn,
-  canonicalWorks: (ids: string[]) => Map<string, string> = canonicalWorkIds
+  emitVotedOn?: EmitVotedOn
 ): ArenaService {
   function sideOf(duel: DuelRow, workId: string): "a" | "b" {
-    const found = canonicalWorks([workId, ...[duel.book_a_work_id, duel.book_b_work_id].filter((id): id is string => id !== null)]);
+    const found = works.canonicalWorkIds([workId, ...[duel.book_a_work_id, duel.book_b_work_id].filter((id): id is string => id !== null)]);
     const canonical = (id: string | null) => (id === null ? null : found.get(id) ?? id);
     const wanted = canonical(workId);
     if (canonical(duel.book_a_work_id) === wanted) return "a";
@@ -352,20 +350,23 @@ export function createArenaService(
       if (!tournament) throw new TournamentNotFoundError();
       if (tournament.status !== "seeding") throw new TournamentAlreadyStartedError();
 
-      const indices = new Set(requested.map((e) => e.slotIndex));
-      if (indices.size !== requested.length) throw new DuplicateSlotError();
-      if (requested.some((e) => e.slotIndex < 0 || e.slotIndex >= tournament.bracket_size)) {
+      const ids = works.knownWorkIds(requested.map((e) => e.book.workId));
+      const entries = requested.map((e, index) => ({ slotIndex: e.slotIndex, book: { ...e.book, workId: ids[index]! } }));
+
+      const indices = new Set(entries.map((e) => e.slotIndex));
+      if (indices.size !== entries.length) throw new DuplicateSlotError();
+      if (entries.some((e) => e.slotIndex < 0 || e.slotIndex >= tournament.bracket_size)) {
         throw new InvalidSlotIndexError(tournament.bracket_size);
       }
-      const works = new Set<string>();
-      for (const { book } of requested) {
-        if (works.has(book.workId)) throw new DuplicateBookError(book.title);
-        works.add(book.workId);
+      const seenWorks = new Set<string>();
+      for (const { book } of entries) {
+        if (seenWorks.has(book.workId)) throw new DuplicateBookError(book.title);
+        seenWorks.add(book.workId);
       }
 
       // Full-replace, same semantics as PUT /library — see this module's
       // own domain/ports.ts comment on replaceSlots.
-      const rows: TournamentSlotRow[] = requested.map((e) => ({
+      const rows: TournamentSlotRow[] = entries.map((e) => ({
         tournament_id: tournamentId,
         slot_index: e.slotIndex,
         work_id: e.book.workId,
@@ -376,19 +377,14 @@ export function createArenaService(
       repo.replaceSlots(tournamentId, rows);
     },
 
-    seedingSlots(tournamentId, ownerUserId) {
-      const tournament = repo.getOwnedTournament(tournamentId, ownerUserId);
-      if (!tournament) throw new TournamentNotFoundError();
-      if (tournament.status !== "seeding") throw new TournamentAlreadyStartedError();
-      return repo.getSlots(tournamentId);
-    },
-
     randomFill(tournamentId, ownerUserId, requested) {
       const tournament = repo.getOwnedTournament(tournamentId, ownerUserId);
       if (!tournament) throw new TournamentNotFoundError();
       if (tournament.status !== "seeding") throw new TournamentAlreadyStartedError();
+      const ids = works.knownWorkIds(requested.map((book) => book.workId));
+      const resolved = requested.map((book, index) => ({ ...book, workId: ids[index]! }));
       const seen = new Set<string>();
-      const unique = requested.filter((book) => !seen.has(book.workId) && (seen.add(book.workId), true));
+      const unique = resolved.filter((book) => !seen.has(book.workId) && (seen.add(book.workId), true));
       if (unique.length < tournament.bracket_size) throw new NotEnoughBooksError(tournament.bracket_size, unique.length);
 
       // Fisher-Yates.

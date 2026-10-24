@@ -9,13 +9,17 @@
 import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
 import { timeSync } from "../../stallLog.js";
+import { canonicalWorkIds, knownWorkIds } from "../library/index.js";
 import { openArenaDb } from "./adapters/sqlite/connection.js";
 import { createSqliteArenaRepository } from "./adapters/sqlite/sqliteArenaRepository.js";
+import type { ArenaWorks } from "./domain/ports.js";
 import { buildArenaRoutes, buildVoteRoute } from "./routes.js";
 import type { ArenaPublicApi, EmitPublished, EmitVotedOn } from "./service.js";
 import { createArenaPublicApi, createArenaService } from "./service.js";
 
 const SWEEP_INTERVAL_MS = 30_000;
+
+export const arenaWorks: ArenaWorks = { knownWorkIds, canonicalWorkIds };
 
 export interface ArenaPluginOptions {
   emitPublished?: EmitPublished;
@@ -25,7 +29,7 @@ export interface ArenaPluginOptions {
 export async function arenaPlugin(app: FastifyInstance, opts: ArenaPluginOptions = {}) {
   const db = openArenaDb();
   const repo = createSqliteArenaRepository(db);
-  const service = createArenaService(repo, opts.emitPublished, opts.emitVotedOn);
+  const service = createArenaService(repo, arenaWorks, opts.emitPublished, opts.emitVotedOn);
 
   const sweep = setInterval(() => {
     try {
@@ -54,7 +58,7 @@ let cachedApi: ArenaPublicApi | null = null;
 
 export function getArenaPublicApi(): ArenaPublicApi {
   if (!cachedApi) {
-    const service = createArenaService(createSqliteArenaRepository(openArenaDb()));
+    const service = createArenaService(createSqliteArenaRepository(openArenaDb()), arenaWorks);
     cachedApi = createArenaPublicApi(service);
   }
   return cachedApi;

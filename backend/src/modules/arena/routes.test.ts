@@ -17,6 +17,7 @@ process.env.JWT_REFRESH_SECRET ??= "b".repeat(64);
 const { applyArenaMigrations } = await import("./adapters/sqlite/connection.js");
 const { createSqliteArenaRepository } = await import("./adapters/sqlite/sqliteArenaRepository.js");
 const { createArenaService } = await import("./service.js");
+const { arenaWorks } = await import("./plugin.js");
 const { buildArenaRoutes, buildVoteRoute } = await import("./routes.js");
 const { resolveWorks } = await import("../books/index.js");
 const { openBooksDb } = await import("../books/adapters/sqlite/connection.js");
@@ -26,7 +27,7 @@ test("GET /arenas/public allows 30 requests a minute per caller", async () => {
   applyArenaMigrations(db);
   const app = Fastify();
   app.decorate("authenticateAccessToken", (token: string) => ({ id: token, email: `${token}@example.test`, username: token, avatarId: null }));
-  await app.register(buildArenaRoutes(createArenaService(createSqliteArenaRepository(db))));
+  await app.register(buildArenaRoutes(createArenaService(createSqliteArenaRepository(db), arenaWorks)));
   const list = (headers: Record<string, string> = {}, remoteAddress = "203.0.113.7") =>
     app.inject({ method: "GET", url: "/arenas/public", headers, remoteAddress });
   for (let request = 1; request <= 30; request++) assert.equal((await list()).statusCode, 200);
@@ -39,7 +40,7 @@ test("GET /arenas/public allows 30 requests a minute per caller", async () => {
 async function worksArena(owner: string) {
   const db = new DatabaseSync(":memory:");
   applyArenaMigrations(db);
-  const service = createArenaService(createSqliteArenaRepository(db));
+  const service = createArenaService(createSqliteArenaRepository(db), arenaWorks);
   const app = Fastify();
   app.decorate("authenticateAccessToken", (token: string) => ({ id: token, email: `${token}@example.test`, username: token, avatarId: null }));
   await app.register(buildArenaRoutes(service));

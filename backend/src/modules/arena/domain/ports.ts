@@ -89,3 +89,8 @@ export interface ArenaRepository {
   listParticipation(ownerUserId: string, since: string): Array<{ id: string; name: string; participants: number; latest_at: string }>;
   listRecentVoters(tournamentId: string, ownerUserId: string, limit: number): Array<{ user_id: string; at: string }>;
 }
+
+export interface ArenaWorks {
+  knownWorkIds(ids: string[]): string[];
+  canonicalWorkIds(ids: string[]): Map<string, string>;
+}
