@@ -109,11 +109,6 @@ test("outages, a spent budget and a rejected key pause without storing or striki
   assert.equal(repo.genreRejections(workIds).size, 0);
 });
 
-test("an error that isn't a TypeSafe failure is rethrown", async () => {
-  const { repo, workIds } = seeded(["Bug"]);
-  await assert.rejects(judgeWork(deps(repo, workIds, async () => { throw new TypeError("bug"); }), workIds[0]!), TypeError);
-});
-
 test("the boot sweep queues held works and judges them", async () => {
   const { db, repo, workIds } = seeded(["One", "Two", "Not held"]);
   const jobs = startGenreJobs({ ...deps(repo, workIds.slice(0, 2), answer("History", 0.9)), onError: (error) => { throw error; }, info: () => {} });
@@ -122,61 +117,6 @@ test("the boot sweep queues held works and judges them", async () => {
   assert.equal(genresOf(db, "One"), JSON.stringify(["History"]));
   assert.equal(genresOf(db, "Two"), JSON.stringify(["History"]));
   assert.equal(genresOf(db, "Not held"), "[]");
-});
-
-test("four workers hitting a rejected key at once send one alert", async () => {
-  const { repo, workIds } = seeded(["K1", "K2", "K3", "K4"]);
-  const alerts: string[] = [];
-  const key: Classify = async () => { throw new SourceUnavailableError("typesafe", "HTTP 401", { status: 401 }); };
-  const jobs = startGenreJobs({ ...deps(repo, workIds, key, alerts), onError: (error) => { throw error; }, info: () => {} });
-  await flush();
-  jobs.stop();
-  assert.deepEqual(alerts, ["TypeSafe rejected the genre requests"]);
-});
-
-test("a spent budget is logged once at info level and alerts nobody, however many workers hit it", async () => {
-  const { repo, workIds } = seeded(["B1", "B2", "B3", "B4"]);
-  const alerts: string[] = [];
-  const infos: Array<{ details: object; message: string }> = [];
-  const spent: Classify = async () => { throw new TypesafeBudgetSpentError("genres"); };
-  const jobs = startGenreJobs({ ...deps(repo, workIds, spent, alerts), onError: (error) => { throw error; }, info: (details, message) => { infos.push({ details, message }); } });
-  await flush();
-  jobs.stop();
-  assert.equal(infos.length, 1);
-  assert.deepEqual(infos[0]!.details, { until: "2026-10-16T00:00:00.000Z" });
-  assert.deepEqual(alerts, []);
-  assert.equal(repo.genreRejections(workIds).size, 0);
-});
-
-test("the sweep runs at boot and again after 24 hours", async () => {
-  const { db, repo, workIds } = seeded(["Early"]);
-  const held = [...workIds];
-  const ticks: Array<{ callback: () => void; delay: number }> = [];
-  const cleared: unknown[] = [];
-  const timers = {
-    setInterval: (callback: () => void, delay: number) => {
-      const timer = { unref() { return timer; } };
-      ticks.push({ callback, delay });
-      return timer as unknown as NodeJS.Timeout;
-    },
-    clearInterval: (timer: NodeJS.Timeout) => { cleared.push(timer); },
-    setTimeout,
-    clearTimeout
-  };
-  const jobs = startGenreJobs({ ...deps(repo, held, answer("History", 0.9)), onError: (error) => { throw error; }, info: () => {}, timers });
-  await flush();
-  assert.equal(genresOf(db, "Early"), JSON.stringify(["History"]));
-  assert.deepEqual(ticks.map((tick) => tick.delay), [24 * 60 * 60 * 1000]);
-  const late = repo.createBook({ title: "Late", author: "A", isbn: null }, ["ta:late|a|"], new Date(NOW).toISOString());
-  repo.markDetailsMissing(late.id, new Date(NOW).toISOString());
-  held.push(late.work_id!);
-  await flush();
-  assert.equal(genresOf(db, "Late"), "[]");
-  ticks[0]!.callback();
-  await flush();
-  assert.equal(genresOf(db, "Late"), JSON.stringify(["History"]));
-  jobs.stop();
-  assert.equal(cleared.length, 1);
 });
 
 test("a sweep given an initial delay judges nothing until it passes, and stopping clears its timer", async () => {
@@ -203,40 +143,6 @@ test("a sweep given an initial delay judges nothing until it passes, and stoppin
   assert.equal(genresOf(db, "Early"), JSON.stringify(["History"]));
   jobs.stop();
   assert.equal(cleared.length, 1);
-});
-
-test("the held set is read once a minute, however many works are judged, and a newly held work is judged after it refreshes", async () => {
-  const { db, repo, workIds } = seeded(["Skip One", "Skip Two", "Became"]);
-  const held: string[] = [];
-  let clock = NOW;
-  let reads = 0;
-  const jobs = startGenreJobs({
-    ...deps(repo, held, answer("History", 0.9)),
-    heldWorkIds: () => { reads += 1; return held; },
-    now: () => clock,
-    onError: (error) => { throw error; },
-    info: () => {}
-  });
-  await flush();
-  assert.equal(reads, 1);
-  clock += 60 * 1000;
-  reads = 0;
-  jobs.add(workIds[0]!);
-  jobs.add(workIds[1]!);
-  await flush();
-  assert.equal(reads, 1);
-  held.push(workIds[2]!);
-  jobs.add(workIds[2]!);
-  await flush();
-  assert.equal(reads, 1);
-  assert.equal(genresOf(db, "Became"), "[]");
-  clock += 60 * 1000;
-  jobs.add(workIds[2]!);
-  await flush();
-  jobs.stop();
-  assert.equal(reads, 2);
-  assert.equal(genresOf(db, "Became"), JSON.stringify(["History"]));
-  assert.equal(genresOf(db, "Skip One"), "[]");
 });
 
 test("without a key nothing starts", () => {

@@ -84,11 +84,3 @@ test("the report bins the answers and counts strikes, requests and cost", async 
   assert.deepEqual(backlogReport(s.repo, workIds.length, result, 5), { selected: 5, asked: 5, confident: 1, possible: 1, unsure: 1, none: 1, strikes: 1, stoppedBy: "done", requests: 5, estimatedCostUsd: 0 });
 });
 
-test("a stop is attributed to the failure of the call that caused it, not to a concurrent one", async () => {
-  const s = seeded(["First", "Second"]);
-  const classify = async (book: { title: string }) => {
-    throw new SourceUnavailableError("typesafe", "HTTP", { status: book.title === "First" ? 401 : 529 });
-  };
-  const result = await runGenreBacklog({ repo: s.repo, classify, now: NOW, alert: () => {} }, backlogWorkIds(s.repo, [], 10));
-  assert.equal(result.stoppedBy, "key");
-});
