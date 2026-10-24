@@ -6,7 +6,7 @@ export type HolderStatus = 0 | 1 | 2;
 export type ViewerCopy = { bookKey: string; readStatus: HolderStatus; rating: number | null; highlightCount: number; isbn: string | null; coverUrl: string | null };
 
 export type HeldWork = { workId: string; holders: number; finished: boolean };
-export type KoboCoverLookup = { isbn: string | null; title: string | null; author: string | null; imageId: string };
+type KoboCoverLookup = { isbn: string | null; title: string | null; author: string | null; imageId: string };
 
 const statusOf = (value: unknown): HolderStatus => (value === 2 ? 2 : value === 1 ? 1 : 0);
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
