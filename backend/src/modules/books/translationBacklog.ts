@@ -1,16 +1,12 @@
-import type { ClassifyMatch } from "./adapters/typesafe/jevWorkMatch.js";
 import type { BooksRepository } from "./domain/ports.js";
 import { MATCH_MERGE_AT, MATCH_REVIEW_AT, seriesLikeOriginals } from "./domain/translation.js";
-import { JEV_REJECTION_LIMIT } from "./jevJobs.js";
+import { jevCostUsd, JEV_REJECTION_LIMIT, runJevBacklog, type JevStop } from "./jevJobs.js";
 import { matchWork, planMatch, type TranslationDeps } from "./translationJudgments.js";
-import { failureKind, type FailureKind } from "./typesafe.js";
 
 export const TRANSLATION_BACKLOG_SOURCE = "works-backlog";
 export const RECHECK_AFTER_MS = 30 * 24 * 60 * 60 * 1000;
-const IN_FLIGHT = 4;
-const COST_PER_REQUEST_USD = 0.00012;
 
-export type TranslationBacklogStop = "done" | "budget" | "outage" | "key";
+export type TranslationBacklogStop = JevStop;
 export type CodeSteps = { originals: number; noCandidates: number; codeMerges: number; codeBlocked: number; ask: string[] };
 
 export function translationBacklogWorks(repo: Pick<BooksRepository, "canonicalWorkIds" | "portugueseWorksNeedingMatch">, heldWorkIds: string[], recheckBefore: string | null): string[] {
@@ -73,30 +69,9 @@ export function runCodeSteps(deps: TranslationDeps, workIds: string[]): CodeStep
   return steps;
 }
 
-export async function runTranslationBacklog(deps: TranslationDeps, workIds: string[]): Promise<{ asked: string[]; stoppedBy: TranslationBacklogStop }> {
-  const asked: string[] = [];
+export function runTranslationBacklog(deps: TranslationDeps, workIds: string[]): Promise<{ asked: string[]; stoppedBy: TranslationBacklogStop }> {
   const seriesLike = seriesLikeOriginals(deps.repo.originalTitleClaims());
-  let stoppedBy: TranslationBacklogStop = "done";
-  let next = 0;
-  const worker = async () => {
-    while (stoppedBy === "done" && next < workIds.length) {
-      const workId = workIds[next++]!;
-      const call: { failure: FailureKind | null } = { failure: null };
-      const classify: ClassifyMatch = async (input) => {
-        try {
-          return await deps.classify(input);
-        } catch (error) {
-          call.failure = failureKind(error);
-          throw error;
-        }
-      };
-      const pause = await matchWork({ ...deps, classify }, workId, seriesLike);
-      if (pause === null) asked.push(workId);
-      else if (stoppedBy === "done") stoppedBy = call.failure === "budget" || call.failure === "key" ? call.failure : "outage";
-    }
-  };
-  await Promise.all(Array.from({ length: IN_FLIGHT }, worker));
-  return { asked, stoppedBy };
+  return runJevBacklog(workIds, (workId, onPause) => matchWork({ ...deps, onPause }, workId, seriesLike));
 }
 
 export function translationBacklogReport(
@@ -124,6 +99,6 @@ export function translationBacklogReport(
     strikes: repo.jevRejections("works", input.asked).size,
     stoppedBy: input.stoppedBy,
     requests: input.requests,
-    estimatedCostUsd: Number((input.requests * COST_PER_REQUEST_USD).toFixed(2))
+    estimatedCostUsd: jevCostUsd(input.requests)
   };
 }
