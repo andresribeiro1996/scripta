@@ -3,7 +3,7 @@
 // module's service.ts.
 
 import { randomBytes, randomUUID } from "node:crypto";
-import { QUIZ_QUESTION_TYPES, generateQuizQuestions, gradeAnswers, type PlayBoard, type PublicQuizQuestion, type QuestionStat, type QuizBook, type QuizQuestion, type QuizQuestionType, type ResultPlay, type SubmittedAnswer } from "@scripta/shared";
+import { QUIZ_QUESTION_TYPES, generateQuizQuestions, gradeAnswers, quizPreview, type PlayBoard, type PublicQuizQuestion, type QuestionStat, type QuizBook, type QuizPreview, type QuizQuestion, type QuizQuestionType, type ResultPlay, type SubmittedAnswer } from "@scripta/shared";
 import type { GameParticipation } from "@scripta/shared/community";
 import type { QuizzesRepository } from "./domain/ports.js";
 import type { AnswerRow, PlayRow, Quiz, QuizGameRow, QuizRow, QuizShelfFacts } from "./domain/types.js";
@@ -98,6 +98,7 @@ export interface PublishedQuizRef {
   playCount: number;
   playOpen: boolean;
   covers: string[];
+  preview?: QuizPreview;
 }
 
 export interface QuizDiscoverRef {
@@ -124,7 +125,8 @@ function toPublishedRef(row: QuizRow, playCount: number): PublishedQuizRef {
     questionCount: doc.questionCount,
     playCount,
     playOpen: row.play_open === 1,
-    covers
+    covers,
+    preview: quizPreview(doc)
   };
 }
 

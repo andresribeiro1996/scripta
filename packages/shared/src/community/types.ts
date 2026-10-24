@@ -1,6 +1,7 @@
 import type { IdentityKey } from "../readerCards/index.js";
 import type { ReaderProfile } from "../murals/murals.js";
 import type { MuralPublicPayload } from "../public/types.js";
+import type { QuizPreview } from "../quizzes/types.js";
 
 export type CommunityAuthor = ReaderProfile & { userId: string; unavailable?: boolean; readerGlyph?: IdentityKey };
 
@@ -48,6 +49,7 @@ export interface QuizSummary {
   playCount: number;
   playOpen: boolean;
   covers: string[];
+  preview?: QuizPreview;
   viewerVoted?: boolean;
 }
 

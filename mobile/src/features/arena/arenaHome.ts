@@ -1,4 +1,5 @@
 import { FAN_SIZE, TIER_LADDER } from "../community/communityHome";
+import { quizPreview, type QuizPreview } from "@scripta/shared";
 import { CONTENT_STATUS, type ContentTone } from "@scripta/shared/community";
 import type { Quiz } from "../quizzes/api";
 import type { Tierlist, VotedTierlist } from "../tierlists/api";
@@ -203,6 +204,7 @@ export type GameRowModel = {
   caption?: string;
   covers: string[];
   ladder?: string[];
+  preview?: QuizPreview;
 };
 
 function tournamentRow(tournament: Tournament): GameRowModel {
@@ -241,6 +243,7 @@ export function gameRow(row: Exclude<SectionedItem, { kind: "header" }>): GameRo
       meta: item.detail,
       badges: [QUIZ_BADGE[stage(item.source.voteCode, item.source.playOpen)]],
       covers: item.source.data.books.flatMap((book) => (book.coverUrl ? [book.coverUrl] : [])),
+      preview: quizPreview(item.source.data),
     };
   }
   return {

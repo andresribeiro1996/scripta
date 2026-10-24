@@ -1,21 +1,25 @@
 import type { ReactNode } from "react";
 import { router } from "expo-router";
-import { Image } from "expo-image";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
 import { Text } from "../../ui/Text";
-import { readerGlyphLabel } from "@scripta/shared";
-import { captionHitSlop, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
+import { readerGlyphLabel, type QuizPreview } from "@scripta/shared";
+import { Icon, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import type { ContentTone, DiscoverItem, PublishedContent } from "@scripta/shared/community";
-import { FAN_SIZE, TIER_LADDER, contentKindLabel, contentStats, contentStatus, contentTarget } from "./communityHome";
-import { openProfile } from "./AuthorAvatar";
+import { TIER_LADDER, contentStats, contentStatus, contentTarget, gameActionLabel } from "./communityHome";
+import { AuthorAvatar, openProfile } from "./AuthorAvatar";
 import { ReaderGlyph } from "./ReaderGlyph";
-import { CoverImage } from "../library/components/CoverImage";
+import { GameTicketArt } from "./GameTicketArt";
 
 export function DiscoverRow({ item, linkAuthor, stats, onPreviewBooks, onOpen }: { item: DiscoverItem; linkAuthor: boolean; stats?: Array<{ value: number; label: string }>; onPreviewBooks?: (tournament: { id: string; name: string }) => void; onOpen?: () => void }) {
   const { colors } = useTheme();
   const { content, author } = item;
   const status = contentStatus(content);
   const glyphLabel = readerGlyphLabel(author.readerGlyph);
+  const creator = <>
+    <AuthorAvatar username={author.username} avatarUrl={author.avatarUrl} size={28} />
+    <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, styles.metaName, { color: colors.text }]}>{author.username}</Text>
+    <ReaderGlyph identity={author.readerGlyph} size={20} />
+  </>;
   return (
     <GameRow
       kind={content.kind}
@@ -23,31 +27,23 @@ export function DiscoverRow({ item, linkAuthor, stats, onPreviewBooks, onOpen }:
       accessibilityRole="link"
       onPress={() => { onOpen?.(); router.push(contentTarget(content) as never); }}
       covers={content.covers}
+      preview={content.kind === "quiz" ? content.preview : undefined}
+      actionLabel={gameActionLabel(content)}
       ladder={content.kind === "tierlist" ? TIER_LADDER : undefined}
       meta={
         <View style={styles.metaRow}>
-          <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
-            {contentKindLabel(content)} ·{" "}
-          </Text>
           {author.unavailable || !linkAuthor ? (
             <View style={[styles.nameRow, styles.shrink]}>
-              <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.metaName, { color: colors.textDim }]}>
-                {author.username}
-              </Text>
-              <ReaderGlyph identity={author.readerGlyph} />
+              {creator}
             </View>
           ) : (
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={glyphLabel ? `Open ${author.username}'s profile, ${glyphLabel}` : `Open ${author.username}'s profile`}
-              hitSlop={captionHitSlop}
               onPress={() => openProfile(author.username)}
-              style={[styles.nameRow, styles.shrink]}
+              style={({ pressed }) => [styles.nameRow, styles.shrink, { backgroundColor: pressed ? colors.surfacePressed : colors.surface }]}
             >
-              <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.metaName, { color: colors.textDim }]}>
-                {author.username}
-              </Text>
-              <ReaderGlyph identity={author.readerGlyph} />
+              {creator}
             </Pressable>
           )}
         </View>
@@ -70,62 +66,76 @@ export type GameRowProps = {
   stats?: Array<{ value: number; label: string }>;
   covers: RowCover[];
   ladder?: string[];
+  preview?: QuizPreview;
+  actionLabel?: string;
   seeBooks?: { label: string; onPress: () => void };
   accessibilityRole?: "link" | "button";
   onPress: () => void;
   onDelete?: () => void;
 };
 
-export function GameRow({ kind, name, meta, badges, caption, stats = [], covers, ladder, seeBooks, accessibilityRole = "button", onPress, onDelete }: GameRowProps) {
+export function GameRow({ kind, name, meta, badges, caption, stats = [], covers, ladder, preview, actionLabel = "Open game", seeBooks, accessibilityRole = "button", onPress, onDelete }: GameRowProps) {
   const { colors } = useTheme();
+  const { fontScale } = useWindowDimensions();
+  const color = kind === "quiz" ? colors.reference : kind === "tierlist" ? colors.success : colors.accent;
+  const soft = kind === "quiz" ? colors.referenceSoft : kind === "tierlist" ? colors.successSoft : colors.accentSoft;
+  const clue = kind === "quiz" && preview && preview.type !== "cover_title" ? preview : undefined;
   return (
-    <Pressable
-      accessibilityRole={accessibilityRole}
-      accessibilityLabel={`Open ${name}`}
-      onPress={onPress}
-      onLongPress={onDelete}
-      accessibilityHint={onDelete ? "Long-press to delete" : undefined}
-      accessibilityActions={onDelete ? [{ name: "delete", label: "Delete" }] : undefined}
-      onAccessibilityAction={onDelete ? (event) => { if (event.nativeEvent.actionName === "delete") onDelete(); } : undefined}
-    >
-      {({ pressed }) => (
-        <View style={[styles.row, { backgroundColor: pressed ? colors.surfacePressed : "transparent", borderBottomColor: colors.border }]}>
-          {kind === "tournament" ? <TournamentThumb covers={covers} /> : <FanThumb covers={covers} ladder={ladder} />}
-          <View style={styles.grow}>
-            <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>
-              {name}
-            </Text>
-            {typeof meta === "string" ? (
-              <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
-                {meta}
-              </Text>
-            ) : meta}
-            <View style={styles.statusRow}>
-              {badges.map((badge) => <StatusBadge key={badge.label} label={badge.label} tone={badge.tone} />)}
-              {caption ? (
-                <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{caption}</Text>
-              ) : null}
-              {stats.map((stat) => (
-                <Text key={stat.label} numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
-                  <Text style={[styles.strong, { color: colors.text }]}>{stat.value}</Text> {stat.label}
+    <View style={[styles.ticket, { backgroundColor: colors.surface }]}>
+      <Pressable
+        accessibilityRole={accessibilityRole}
+        accessibilityLabel={`${kind === "tierlist" ? "Tier list" : kind === "tournament" ? "Tournament" : "Quiz"}: ${name}`}
+        onPress={onPress}
+        onLongPress={onDelete}
+        accessibilityHint={onDelete ? "Long-press to delete" : preview?.type !== "cover_title" ? preview?.prompt : undefined}
+        accessibilityActions={onDelete ? [{ name: "delete", label: "Delete" }] : undefined}
+        onAccessibilityAction={onDelete ? (event) => { if (event.nativeEvent.actionName === "delete") onDelete(); } : undefined}
+      >
+        {({ pressed }) => (
+          <View style={{ backgroundColor: pressed ? colors.surfacePressed : colors.surface }}>
+            <View style={styles.row}>
+              <View style={[styles.art, { backgroundColor: soft, borderColor: colors.border }]}><GameTicketArt kind={kind} covers={covers} ladder={ladder} preview={preview} color={color} /></View>
+              <View style={styles.details}>
+                <Text numberOfLines={fontScale > 1.3 ? undefined : 2} {...dynamicType} style={[typography.title, styles.strong, { color: colors.text }]}>
+                  {name}
                 </Text>
-              ))}
-              {seeBooks ? (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={seeBooks.label}
-                  hitSlop={captionHitSlop}
-                  onPress={seeBooks.onPress}
-                  style={styles.rowAction}
-                >
-                  <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.strong, { color: colors.accent }]}>See books</Text>
-                </Pressable>
-              ) : null}
+                {typeof meta === "string" ? (
+                  <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>
+                    {meta}
+                  </Text>
+                ) : meta}
+                <View style={styles.statusRow}>
+                  {badges.map((badge) => <StatusBadge key={badge.label} label={badge.label} tone={badge.tone} />)}
+                  {caption ? (
+                    <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{caption}</Text>
+                  ) : null}
+                </View>
+                {stats.length > 0 ? <View style={[styles.statsRow, { borderColor: colors.border }]}>
+                  {stats.map((stat) => (
+                    <View key={stat.label} style={styles.stat}>
+                      <Text {...dynamicType} style={[typography.input, styles.strong, { color: colors.text }]}>{stat.value}</Text>
+                      <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{stat.label}</Text>
+                    </View>
+                  ))}
+                </View> : null}
+              </View>
             </View>
+            {clue ? <View style={[styles.clue, { backgroundColor: colors.background, borderColor: colors.border }]}>
+              <View style={styles.clueHeading}><Icon name={clue.type === "title_cover" ? "book" : "quote"} size={18} color={colors.textDim} /><Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{clue.type === "title_cover" ? "Which cover belongs to this title?" : "Which book is this from?"}</Text></View>
+              <Text numberOfLines={fontScale > 1.3 ? undefined : 3} {...dynamicType} style={[typography.body, { color: colors.text }]}>{clue.prompt}</Text>
+            </View> : null}
           </View>
-        </View>
-      )}
-    </Pressable>
+        )}
+      </Pressable>
+      <View style={[styles.footer, { borderColor: colors.border }]}>
+        <View style={[styles.notch, styles.leftNotch, { backgroundColor: colors.background }]} />
+        <View style={[styles.notch, styles.rightNotch, { backgroundColor: colors.background }]} />
+        <Pressable accessibilityRole={accessibilityRole} accessibilityLabel={`${actionLabel}: ${name}`} onPress={onPress} style={({ pressed }) => [styles.primaryAction, { backgroundColor: pressed ? colors.accentFill : soft }]}>
+          {({ pressed }) => <><Text {...dynamicType} style={[typography.body, styles.strong, styles.shrink, { color: pressed ? colors.text : color }]}>{actionLabel}</Text><Icon name="chevronRight" size={16} color={pressed ? colors.text : color} /></>}
+        </Pressable>
+        {seeBooks ? <Pressable accessibilityRole="button" accessibilityLabel={seeBooks.label} onPress={seeBooks.onPress} style={({ pressed }) => [styles.secondaryAction, { borderColor: colors.border, backgroundColor: pressed ? colors.surfacePressed : colors.surface }]}><Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.textDim }]}>See books</Text></Pressable> : null}
+      </View>
+    </View>
   );
 }
 
@@ -147,94 +157,26 @@ export function StatusBadge({ label, tone }: { label: string; tone: ContentTone 
   );
 }
 
-function FanThumb({ covers, ladder }: { covers: RowCover[]; ladder?: string[] }) {
-  const { colors } = useTheme();
-  const fan: Array<RowCover | null> = covers.length ? covers.slice(0, FAN_SIZE) : [null];
-  const middle = (fan.length - 1) / 2;
-  return (
-    <View style={styles.thumb} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
-      {ladder?.length ? (
-        <View style={styles.ladder}>
-          {ladder.map((color, index) => (
-            <View key={index} style={[styles.grow, { backgroundColor: color }]} />
-          ))}
-        </View>
-      ) : null}
-      {fan.map((cover, index) => (
-        <Cover
-          key={index}
-          cover={cover}
-          style={{
-            left: FAN_INSET + index * FAN_STEP + (FAN_SIZE - fan.length) * (FAN_STEP / 2),
-            top: (THUMB_HEIGHT - FAN_HEIGHT) / 2,
-            width: FAN_WIDTH,
-            height: FAN_HEIGHT,
-            zIndex: index,
-            borderColor: colors.background,
-            transform: [{ rotate: `${(index - middle) * FAN_TILT}deg` }],
-          }}
-        />
-      ))}
-    </View>
-  );
-}
-
-function TournamentThumb({ covers }: { covers: RowCover[] }) {
-  const { colors } = useTheme();
-  return (
-    <View style={styles.thumb} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
-      {[covers[0] ?? null, covers[1] ?? null].map((cover, index) => (
-        <Cover
-          key={index}
-          cover={cover}
-          style={{ left: index * (PAIR_WIDTH + PAIR_GAP), top: (THUMB_HEIGHT - PAIR_HEIGHT) / 2, width: PAIR_WIDTH, height: PAIR_HEIGHT, borderColor: colors.background }}
-        />
-      ))}
-      <View style={[styles.versus, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <Text allowFontScaling={false} style={[styles.versusText, { color: colors.text }]}>VS</Text>
-      </View>
-    </View>
-  );
-}
-
-function Cover({ cover, style }: { cover: RowCover | null; style: object }) {
-  const { colors } = useTheme();
-  if (typeof cover === "string") return <Image source={{ uri: cover }} contentFit="cover" style={[styles.cover, style]} />;
-  return (
-    <View style={[styles.cover, style, { backgroundColor: colors.border }, cover && styles.clip]}>
-      {cover ? <CoverImage book={cover} /> : null}
-    </View>
-  );
-}
-
-const THUMB_WIDTH = 64;
-const THUMB_HEIGHT = 58;
-const LADDER_WIDTH = 4;
-const FAN_INSET = LADDER_WIDTH + 6;
-const FAN_WIDTH = 34;
-const FAN_HEIGHT = 51;
-const FAN_STEP = (THUMB_WIDTH - FAN_INSET - FAN_WIDTH) / 2;
-const FAN_TILT = 6;
-const PAIR_GAP = 4;
-const PAIR_WIDTH = (THUMB_WIDTH - PAIR_GAP) / 2;
-const PAIR_HEIGHT = 45;
-const VERSUS_WIDTH = 26;
-
 const styles = StyleSheet.create({
-  grow: { flex: 1 },
+  ticket: { marginHorizontal: spacing.lg, marginVertical: spacing.sm, borderRadius: radii.xl, overflow: "hidden" },
+  row: { flexDirection: "row", alignItems: "stretch", minHeight: 216 },
+  art: { width: 88, alignItems: "center", justifyContent: "center", borderRightWidth: 1 },
+  details: { flex: 1, padding: spacing.lg, gap: spacing.xs, justifyContent: "center" },
   shrink: { flexShrink: 1 },
   strong: { fontWeight: "600" },
-  row: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderBottomWidth: 1 },
-  metaRow: { flexDirection: "row", alignItems: "center" },
-  nameRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
+  metaRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap" },
+  nameRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, minHeight: minimumTouchTarget, borderRadius: radii.sm },
   metaName: { flexShrink: 1 },
   statusRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.xs },
-  rowAction: { minHeight: minimumTouchTarget - spacing.lg, justifyContent: "center", paddingVertical: spacing.xs },
+  statsRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.lg, borderTopWidth: 1, paddingTop: spacing.md, marginTop: spacing.sm },
+  stat: { gap: spacing.xs, maxWidth: "100%" },
+  clue: { marginHorizontal: spacing.lg, marginVertical: spacing.lg, padding: spacing.lg, borderLeftWidth: 2, borderRadius: radii.md, gap: spacing.sm },
+  clueHeading: { flexDirection: "row", alignItems: "center", gap: spacing.sm, flexWrap: "wrap" },
   badge: { borderWidth: 1, borderRadius: radii.full, paddingHorizontal: spacing.sm },
-  thumb: { width: THUMB_WIDTH, height: THUMB_HEIGHT },
-  ladder: { position: "absolute", left: 0, top: (THUMB_HEIGHT - FAN_HEIGHT) / 2, width: LADDER_WIDTH, height: FAN_HEIGHT, borderRadius: 2, overflow: "hidden" },
-  cover: { position: "absolute", borderRadius: 3, borderWidth: 1 },
-  clip: { overflow: "hidden" },
-  versus: { position: "absolute", left: (THUMB_WIDTH - VERSUS_WIDTH) / 2, top: THUMB_HEIGHT / 2 - 9, width: VERSUS_WIDTH, height: 18, borderRadius: radii.full, borderWidth: 1, alignItems: "center", justifyContent: "center", zIndex: 10 },
-  versusText: { fontSize: 10, fontWeight: "700", letterSpacing: 1 },
+  footer: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, padding: spacing.lg, borderTopWidth: 1, borderStyle: "dashed" },
+  primaryAction: { flex: 1, minWidth: 120, minHeight: spacing.huge, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderRadius: radii.lg },
+  secondaryAction: { minHeight: spacing.huge, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.md, paddingVertical: spacing.md, borderWidth: 1, borderRadius: radii.lg },
+  notch: { position: "absolute", width: 14, height: 14, borderRadius: radii.full, top: -7 },
+  leftNotch: { left: -7 },
+  rightNotch: { right: -7 },
 });

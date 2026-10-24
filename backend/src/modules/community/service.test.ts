@@ -1631,6 +1631,17 @@ test("buildDiscoverItems builds items for given entries in order", () => {
   assert.deepEqual(items.map((item) => [item.content.kind, item.content.id, item.author.username]), [["tournament", "g1", "user-bob"], ["tierlist", "t1", "user-alice"]]);
 });
 
+test("discover preserves a quiz question teaser without answer metadata", () => {
+  const { repo } = createRepoFake();
+  const { deps, readerProfiles, quizRefs } = createDeps(repo);
+  readerProfiles.set("alice", reader("alice"));
+  const preview = { type: "quote_title" as const, prompt: "A beginning is the time for taking the most delicate care." };
+  quizRefs.set("q1", quizRef("q1", "alice", { preview }));
+  const [item] = buildDiscoverItems(deps, [{ kind: "quiz", id: "q1", userId: "alice", promoted: false, createdAt: "2026-09-02T00:00:00.000Z" }]);
+  assert.equal(item?.content.kind, "quiz");
+  if (item?.content.kind === "quiz") assert.deepEqual(item.content.preview, preview);
+});
+
 test("discover filters by type and by name substring, and paginates by offset", () => {
   const { repo } = createRepoFake();
   const { deps, readerProfiles, tierlistRefs, tournamentRefs } = createDeps(repo);
