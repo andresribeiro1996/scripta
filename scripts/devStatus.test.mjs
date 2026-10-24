@@ -174,7 +174,7 @@ test("collectStatus joins every injected source with no default evaluated", () =
       3: {
         worktree: "/wt/x",
         branch: "test/branch",
-        pid: 12_345,
+        pid: 2_147_483_646,
         session: "sess",
         claimedAt: "2026-01-01T00:00:00.000Z",
       },
