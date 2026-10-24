@@ -1,21 +1,6 @@
 import { canonicalByKey, canonicalWorkIds, firstKeyPerWork } from "../library/index.js";
-import type { HistogramCell, Placement, PublicBookData, TierDefinition, TierlistData } from "@scripta/shared";
-
-function list(value: unknown): unknown[] {
-  return Array.isArray(value) ? value : [];
-}
-
-function tiersOf(data: unknown): Array<Record<string, unknown>> {
-  return list((data as { tiers?: unknown } | null)?.tiers).filter((tier): tier is Record<string, unknown> => typeof tier === "object" && tier !== null);
-}
-
-function poolOf(data: unknown): unknown[] {
-  return list((data as { pool?: unknown } | null)?.pool);
-}
-
-function storedIds(data: unknown): string[] {
-  return [...tiersOf(data).flatMap((tier) => list(tier.workIds)), ...poolOf(data)].filter((id): id is string => typeof id === "string" && id !== "");
-}
+import { canonicalBoard as boardOf, storedIds } from "./domain/board.js";
+import type { HistogramCell, Placement, PublicBookData, TierlistData } from "@scripta/shared";
 
 function selfMap(ids: string[]) {
   return canonicalByKey(new Map(ids.map((id) => [id, id])));
@@ -26,17 +11,7 @@ export function boardCanonical(data: unknown): Map<string, string> {
 }
 
 export function canonicalBoard(data: unknown, known?: Map<string, string>): TierlistData {
-  const canonical = known ?? boardCanonical(data);
-  const seen = new Set<string>();
-  const take = (ids: unknown) =>
-    list(ids).flatMap((id) => {
-      const work = typeof id === "string" ? canonical.get(id) : undefined;
-      if (!work || seen.has(work)) return [];
-      seen.add(work);
-      return [work];
-    });
-  const tiers = tiersOf(data).map((tier) => ({ ...tier, workIds: take(tier.workIds) })) as unknown as TierDefinition[];
-  return { tiers, pool: take(poolOf(data)) };
+  return boardOf(data, known ?? boardCanonical(data));
 }
 
 export function canonicalFirst(ids: string[]): { canonical: Map<string, string>; first: Set<string> } {

@@ -3,11 +3,12 @@
 // module's service.ts.
 
 import { randomBytes, randomUUID } from "node:crypto";
-import { DEFAULT_TIER_PRESET, type ResolvedTierlist, type VotedTierlist } from "@scripta/shared";
+import { DEFAULT_TIER_PRESET, type PublicBookData, type ResolvedTierlist, type TierlistData, type VotedTierlist } from "@scripta/shared";
 import type { GameParticipation, RankingTierPreview } from "@scripta/shared/community";
-import type { TierlistsRepository } from "./domain/ports.js";
+import { boardWorks } from "./domain/boardKeys.js";
+import { canonicalBoard, storedIds } from "./domain/board.js";
+import type { TierlistsRepository, TierlistWorks } from "./domain/ports.js";
 import type { BallotRow, HistogramCell, Placement, Tierlist, TierlistGameRow, TierlistRow, TierlistShelfFacts, TierPlacement, VoteAccess } from "./domain/types.js";
-import { canonicalBoard } from "./wire.js";
 
 function toTierlist(row: TierlistRow): Tierlist {
   const parsed = JSON.parse(row.data) as { tiers?: unknown; pool?: unknown };
@@ -89,21 +90,33 @@ export interface GameByWork {
   ownerUserId: string | null;
 }
 
+function knownFor(works: TierlistWorks, data: unknown): Map<string, string> {
+  return works.canonicalByKey(new Map(storedIds(data).map((id) => [id, id])));
+}
+
+export type TierlistWriteOutcome =
+  | { ok: true; tierlist: Tierlist; data: TierlistData }
+  | { ok: false; reason: "not-found" | "invalid"; error: string }
+  | { ok: false; reason: "duplicate-work"; title: string | null };
+
+type StoredBoard = { ok: true; data: TierlistData } | Exclude<TierlistWriteOutcome, { ok: true }>;
+
 export interface TierlistsService {
   listTierlists(userId: string): Tierlist[];
-  createTierlist(userId: string, name: string, data?: TierlistDocument, access?: VoteAccess, publicBooks?: unknown[], ranksWorstFirst?: boolean): Tierlist;
+  createTierlist(userId: string, input: { name: string; data?: TierlistData; access?: VoteAccess; ranksWorstFirst?: boolean }): TierlistWriteOutcome;
   /** undefined if no tier list with that id is owned by userId — a
    *  caller-facing 404, not a server error. Same convention as
    *  modules/murals/service.ts's getMural. */
   getTierlist(userId: string, id: string): Tierlist | undefined;
   /** Partial merge onto the existing row — only the keys present in
-   *  `patch` change. undefined if not owned. */
-  updateTierlist(userId: string, id: string, patch: { name?: string; data?: unknown }): Tierlist | undefined;
+   *  `patch` change. not-found if not owned or already public. */
+  updateTierlist(userId: string, id: string, patch: { name?: string; data?: TierlistData }): TierlistWriteOutcome;
   /** Returns false if no tier list with that id was owned by userId —
    *  same convention as modules/murals/service.ts's deleteMural. */
   deleteTierlist(userId: string, id: string): boolean;
   /** Publishes the existing tier list and seeds the owner's ranking. */
-  openVoting(userId: string, id: string, access: VoteAccess, publicBooks?: unknown[]): Tierlist | undefined;
+  openVoting(userId: string, id: string, access: VoteAccess): { tierlist: Tierlist; known: Map<string, string> } | undefined;
+  booksInOrder(ownerUserId: string, workIds: string[]): PublicBookData[];
   setVotingState(userId: string, id: string, patch: { access?: VoteAccess; open?: boolean }): Tierlist | undefined;
   submitBallot(code: string, placements: Placement[], voter: Voter): BallotOutcome;
   getBallot(code: string, voter: Voter): BallotOutcome;
@@ -243,36 +256,67 @@ export type EmitPublished = (tierlistId: string, ownerUserId: string) => void;
 
 export type EmitVotedOn = (voterUserId: string, tierlistId: string, tierlistName: string, ranking: RankingTierPreview[]) => void;
 
-export function createTierlistsService(repo: TierlistsRepository, emitPublished?: EmitPublished, emitVotedOn?: EmitVotedOn, peekCovers?: CoverPeek): TierlistsService {
+export function createTierlistsService(repo: TierlistsRepository, works: TierlistWorks, emitPublished?: EmitPublished, emitVotedOn?: EmitVotedOn, peekCovers?: CoverPeek): TierlistsService {
+  function storedBoard(board: TierlistData): StoredBoard {
+    const all = [...board.tiers.flatMap((tier) => tier.workIds), ...board.pool];
+    if (new Set(all).size !== all.length) return { ok: false, reason: "invalid", error: "Duplicate tier or book." };
+    const ids = works.knownWorkIds(all);
+    if (new Set(ids).size !== ids.length) return { ok: false, reason: "duplicate-work", title: null };
+    const canonical = new Map(all.map((id, index) => [id, ids[index]!]));
+    const swap = (workIds: string[]) => workIds.map((id) => canonical.get(id)!);
+    return { ok: true, data: { tiers: board.tiers.map((tier) => ({ ...tier, workIds: swap(tier.workIds) })), pool: swap(board.pool) } };
+  }
+
+  function booksInOrder(ownerUserId: string, workIds: string[]): PublicBookData[] {
+    const found = works.publicBooksByWork(ownerUserId, workIds);
+    return workIds.flatMap((id) => found.get(id) ?? []);
+  }
+
   return {
     listTierlists(userId) {
       return repo.listByUser(userId).map(toTierlist);
     },
 
-    createTierlist(userId, name, data, access, publicBooks, ranksWorstFirst = false) {
+    createTierlist(userId, { name, data, access, ranksWorstFirst = false }) {
+      if (access && !data) return { ok: false, reason: "invalid", error: "Choose books and tiers before publishing." };
+      if (data) {
+        const tierIds = data.tiers.map((tier) => tier.id);
+        if (new Set(tierIds).size !== tierIds.length) return { ok: false, reason: "invalid", error: "Duplicate tier or book." };
+        if (access && (!data.pool.length || data.tiers.some((tier) => tier.workIds.length))) return { ok: false, reason: "invalid", error: "Public tier lists need an unranked book pool." };
+      }
+      let board: TierlistData;
+      let publicBooks: PublicBookData[] = [];
+      if (data) {
+        const stored = storedBoard(data);
+        if (!stored.ok) return stored;
+        board = stored.data;
+        if (access) {
+          publicBooks = booksInOrder(userId, board.pool);
+          if (publicBooks.length !== board.pool.length) return { ok: false, reason: "invalid", error: "A selected book is no longer in your library." };
+        }
+      } else {
+        board = { tiers: DEFAULT_TIER_PRESET.map((t) => ({ id: randomUUID(), label: t.label, color: t.color, workIds: [] })), pool: [] };
+      }
       const now = new Date().toISOString();
       const row: TierlistRow = {
         id: randomUUID(),
         owner_user_id: userId,
         origin_user_id: userId,
         name,
-        data: JSON.stringify(data ?? {
-          tiers: DEFAULT_TIER_PRESET.map((t) => ({ id: randomUUID(), label: t.label, color: t.color, workIds: [] })),
-          pool: []
-        }),
+        data: JSON.stringify(board),
         vote_code: access ? generateVoteCode() : null,
         vote_access: access ?? "anonymous",
         voting_open: access ? 1 : 0,
         source_tierlist_id: null,
         promoted_at: null,
-        public_books: access ? JSON.stringify(publicBooks ?? []) : null,
+        public_books: access ? JSON.stringify(publicBooks) : null,
         ranks_worst_first: ranksWorstFirst ? 1 : 0,
         created_at: now,
         updated_at: now
       };
       repo.insert(row);
       if (access) emitPublished?.(row.id, userId);
-      return toTierlist(row);
+      return { ok: true, tierlist: toTierlist(row), data: board };
     },
 
     getTierlist(userId, id) {
@@ -281,26 +325,37 @@ export function createTierlistsService(repo: TierlistsRepository, emitPublished?
     },
 
     updateTierlist(userId, id, patch) {
-      if (patch.data !== undefined || patch.name !== undefined) {
-        const existing = repo.getOwned(id, userId);
-        if (!existing) return undefined;
-        if (existing.vote_code !== null) return undefined;
+      const existing = repo.getOwned(id, userId);
+      if (!existing || existing.vote_code !== null) return { ok: false, reason: "not-found", error: "No tier list with that id." };
+      let board: TierlistData;
+      if (patch.data !== undefined) {
+        const stored = storedBoard(patch.data);
+        if (!stored.ok) return stored;
+        board = stored.data;
+      } else {
+        const current = toTierlist(existing);
+        board = canonicalBoard(current.data, knownFor(works, current.data));
       }
       const row = repo.update(id, userId, {
         ...(patch.name !== undefined ? { name: patch.name } : {}),
-        ...(patch.data !== undefined ? { data: JSON.stringify(patch.data) } : {})
+        ...(patch.data !== undefined ? { data: JSON.stringify(board) } : {})
       });
-      return row ? toTierlist(row) : undefined;
+      if (!row) return { ok: false, reason: "not-found", error: "No tier list with that id." };
+      return { ok: true, tierlist: toTierlist(row), data: board };
     },
 
     deleteTierlist(userId, id) {
       return repo.delete(id, userId);
     },
 
-    openVoting(userId, id, access, publicBooks = []) {
+    booksInOrder,
+
+    openVoting(userId, id, access) {
       const row = repo.getOwned(id, userId);
       if (!row || row.vote_code !== null) return undefined;
       const original = toTierlist(row);
+      const known = knownFor(works, original.data);
+      const publicBooks = booksInOrder(userId, boardWorks(original.data));
 
       const { tiers, pool } = readDocument(original);
       const placements: Placement[] = [];
@@ -324,7 +379,7 @@ export function createTierlistsService(repo: TierlistsRepository, emitPublished?
       const published = repo.publish(original.id, userId, JSON.stringify({ tiers: tiers.map((t) => ({ ...t, workIds: [] })), pool: [...poolWorks] }), access, generateVoteCode(), JSON.stringify(publicBooks), ballot, placements);
       if (!published) return undefined;
       emitPublished?.(original.id, userId);
-      return toTierlist(published);
+      return { tierlist: toTierlist(published), known };
     },
 
     setVotingState(userId, id, patch) {
@@ -541,12 +596,12 @@ export interface TierlistsPublicApi {
 /** Factory over the service. app.ts can't call this directly — it has no
  *  way (and no business) constructing a TierlistsService itself — so
  *  plugin.ts wraps it in the lazily-composed getTierlistsPublicApi(). */
-export function createTierlistsPublicApi(service: TierlistsService): TierlistsPublicApi {
+export function createTierlistsPublicApi(service: TierlistsService, works: TierlistWorks): TierlistsPublicApi {
   return {
     getTierlistData(ownerUserId, tierlistId) {
       const tierlist = service.getTierlist(ownerUserId, tierlistId);
       if (!tierlist) return undefined;
-      return { name: tierlist.name, ...canonicalBoard(tierlist.data) };
+      return { name: tierlist.name, ...canonicalBoard(tierlist.data, knownFor(works, tierlist.data)) };
     },
     discoverWindow: (needle, limit) => service.discoverWindow(needle, limit),
     getPublishedMany: (ids) => service.getPublishedRefs(ids),

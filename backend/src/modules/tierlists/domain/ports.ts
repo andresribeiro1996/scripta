@@ -3,6 +3,7 @@
 // service.ts is written against this interface only, with no idea whether
 // SQLite, Postgres, or an in-memory fake is on the other side.
 
+import type { PublicBookData } from "@scripta/shared";
 import type { TierlistRow, BallotRow, BallotTotals, HistogramCell, Placement, TierlistDiscoverRow, TierlistGameRow, TierPlacement, TierlistShelfFacts, VoteAccess } from "./types.js";
 
 export interface TierlistsRepository {
@@ -59,4 +60,10 @@ export interface TierlistsRepository {
   ballotCountsByTierlist(): Map<string, number>;
   listParticipation(ownerUserId: string, since: string): Array<{ id: string; name: string; public_books: string | null; participants: number; latest_at: string }>;
   listRecentVoters(tierlistId: string, ownerUserId: string, limit: number): Array<{ user_id: string; at: string }>;
+}
+
+export interface TierlistWorks {
+  knownWorkIds(ids: string[]): string[];
+  canonicalByKey(ids: Map<string, string>): Map<string, string>;
+  publicBooksByWork(ownerUserId: string, workIds: string[]): Map<string, PublicBookData>;
 }

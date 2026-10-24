@@ -5,24 +5,30 @@
 // backend/README.md describes for every other module's service layer.
 
 import assert from "node:assert/strict";
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { test } from "node:test";
-import { normalizeWords } from "@scripta/shared";
-import type { TierlistsRepository } from "./domain/ports.js";
+import { normalizeWords, type PublicBookData, type TierDefinition } from "@scripta/shared";
+import type { TierlistsRepository, TierlistWorks } from "./domain/ports.js";
+import { createTierlistsPublicApi, createTierlistsService, type TierlistWriteOutcome } from "./service.js";
 import type { TierlistRow, BallotRow, BallotTotals, HistogramCell, Placement } from "./domain/types.js";
 
-const scratch = mkdtempSync(join(tmpdir(), "tierlists-service-test-"));
-process.env.AUTH_DB_PATH = join(scratch, "auth.sqlite");
-process.env.LIBRARY_DB_PATH = join(scratch, "library.sqlite");
-process.env.GALLERY_DB_PATH = join(scratch, "gallery.sqlite");
-process.env.COVERS_DB_PATH = join(scratch, "covers.sqlite");
-process.env.TIERLISTS_DB_PATH = join(scratch, "tierlists.sqlite");
-process.env.JWT_ACCESS_SECRET = "a".repeat(64);
-process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
-const { createTierlistsPublicApi, createTierlistsService } = await import("./service.js");
+function book(workId: string, patch: Partial<PublicBookData> = {}): PublicBookData {
+  return { key: workId, workId, title: workId, author: "A", isbn: null, imageId: null, coverUrl: null, readStatus: null, ...patch };
+}
+
+function fakeWorks(options: { books?: PublicBookData[]; aliases?: Record<string, string> } = {}): TierlistWorks {
+  const alias = (id: string) => options.aliases?.[id] ?? id;
+  return {
+    knownWorkIds: (ids) => ids.map(alias),
+    canonicalByKey: (ids) => new Map([...ids].map(([key, id]) => [key, alias(id)])),
+    publicBooksByWork: (_ownerUserId, workIds) => new Map(workIds.flatMap((id) => (options.books ? options.books.filter((entry) => entry.workId === id) : [book(id)]).map((entry) => [id, entry] as const)))
+  };
+}
+
+function created(outcome: TierlistWriteOutcome) {
+  assert.equal(outcome.ok, true);
+  return outcome.ok ? outcome.tierlist : (undefined as never);
+}
 
 function createInMemoryRepo(): TierlistsRepository {
   const tierlists = new Map<string, TierlistRow>();
@@ -215,48 +221,150 @@ function createInMemoryRepo(): TierlistsRepository {
 }
 
 function makeService() {
-  return createTierlistsService(createInMemoryRepo());
+  return createTierlistsService(createInMemoryRepo(), fakeWorks());
 }
 
 test("a published ballot event captures actual ranked books from its frozen snapshot", () => {
   const ranking: unknown[] = [];
-  const service = createTierlistsService(createInMemoryRepo(), undefined, (_user, _id, _name, preview) => { ranking.push(preview); });
-  const board = service.createTierlist("owner", "Pool", { tiers: [{ id: "s", label: "S", color: "#c9482f", workIds: [] }, { id: "a", label: "A", color: "#f2aa20", workIds: [] }], pool: ["w1", "w2"] }, "members", [{ workId: "w1", title: "Dune", author: "Frank Herbert", coverUrl: "https://covers.test/dune.jpg" }, { workId: "w2", title: "Emma", author: "Jane Austen", coverUrl: null }]);
+  const works = fakeWorks({ books: [book("w1", { title: "Dune", author: "Frank Herbert", coverUrl: "https://covers.test/dune.jpg" }), book("w2", { title: "Emma", author: "Jane Austen" })] });
+  const service = createTierlistsService(createInMemoryRepo(), works, undefined, (_user, _id, _name, preview) => { ranking.push(preview); });
+  const board = created(service.createTierlist("owner", { name: "Pool", data: { tiers: [{ id: "s", label: "S", color: "#c9482f", workIds: [] }, { id: "a", label: "A", color: "#f2aa20", workIds: [] }], pool: ["w1", "w2"] }, access: "members" }));
   assert.equal(service.submitBallot(board.voteCode!, [{ workId: "w2", tierId: "a" }], { kind: "user", userId: "reader" }).ok, true);
   assert.deepEqual(ranking, [[{ label: "A", color: "#f2aa20", books: [{ title: "Emma", coverUrl: null }] }]]);
 });
 
 test("createTierlist stores a tier list and getTierlist round-trips it", () => {
   const service = makeService();
-  const created = service.createTierlist("u1", "Favorites");
-  assert.equal(created.name, "Favorites");
-  const preset = (created.data as { tiers: Array<{ label: string; color: string }>; pool: string[] }).tiers;
+  const made = created(service.createTierlist("u1", { name: "Favorites" }));
+  assert.equal(made.name, "Favorites");
+  const preset = (made.data as { tiers: Array<{ label: string; color: string }>; pool: string[] }).tiers;
   assert.deepEqual(
     preset.map((t) => t.label),
     ["S", "A", "B", "C", "D"]
   );
   assert.equal(preset[0]?.color, "#c9482f");
-  assert.deepEqual((created.data as { pool: string[] }).pool, []);
-  const fetched = service.getTierlist("u1", created.id);
-  assert.deepEqual(fetched, created);
+  assert.deepEqual((made.data as { pool: string[] }).pool, []);
+  const fetched = service.getTierlist("u1", made.id);
+  assert.deepEqual(fetched, made);
 });
 
 test("public creation uses one immutable resource and a book snapshot", () => {
   const service = makeService();
   const data = { tiers: [{ id: "s", label: "S", color: "#c9482f", workIds: [] }], pool: ["b1"] };
-  const created = service.createTierlist("u1", "Books", data, "anonymous", [{ key: "b1", title: "Book one" }]);
-  assert.ok(created.voteCode);
+  const board = created(service.createTierlist("u1", { name: "Books", data, access: "anonymous" }));
+  assert.ok(board.voteCode);
   assert.equal(service.listTierlists("u1").length, 1);
-  assert.equal(service.getVotingBoard(created.voteCode!)?.publicBooks?.length, 1);
-  assert.equal(service.getResults(created.id).ballotCount, 0);
-  assert.equal(service.updateTierlist("u1", created.id, { name: "Changed" }), undefined);
+  assert.equal(service.getVotingBoard(board.voteCode!)?.publicBooks?.length, 1);
+  assert.equal(service.getResults(board.id).ballotCount, 0);
+  assert.equal(service.updateTierlist("u1", board.id, { name: "Changed" }).ok, false);
+});
+
+const oneTier = [{ id: "s", label: "S", color: "#c9482f", workIds: [] as string[] }];
+
+test("a create with access but no board is invalid", () => {
+  const service = makeService();
+  assert.deepEqual(service.createTierlist("u1", { name: "X", access: "anonymous" }), { ok: false, reason: "invalid", error: "Choose books and tiers before publishing." });
+  assert.equal(service.listTierlists("u1").length, 0);
+});
+
+test("a create with two tiers sharing an id is invalid", () => {
+  const service = makeService();
+  const tiers = [oneTier[0]!, { ...oneTier[0]!, label: "Again" }];
+  assert.deepEqual(service.createTierlist("u1", { name: "X", data: { tiers, pool: [] } }), { ok: false, reason: "invalid", error: "Duplicate tier or book." });
+});
+
+test("a create with a book listed twice is invalid", () => {
+  const service = makeService();
+  assert.deepEqual(service.createTierlist("u1", { name: "X", data: { tiers: oneTier, pool: ["b1", "b1"] } }), { ok: false, reason: "invalid", error: "Duplicate tier or book." });
+});
+
+test("a public create needs every book in the pool and no tier filled", () => {
+  const service = makeService();
+  const error = "Public tier lists need an unranked book pool.";
+  assert.deepEqual(service.createTierlist("u1", { name: "X", data: { tiers: oneTier, pool: [] }, access: "anonymous" }), { ok: false, reason: "invalid", error });
+  assert.deepEqual(service.createTierlist("u1", { name: "X", data: { tiers: [{ ...oneTier[0]!, workIds: ["b1"] }], pool: ["b2"] }, access: "anonymous" }), { ok: false, reason: "invalid", error });
+  assert.equal(service.listTierlists("u1").length, 0);
+});
+
+test("a public create whose book the library no longer holds is invalid", () => {
+  const service = createTierlistsService(createInMemoryRepo(), fakeWorks({ books: [book("b1")] }));
+  assert.deepEqual(service.createTierlist("u1", { name: "X", data: { tiers: oneTier, pool: ["b1", "b2"] }, access: "members" }), { ok: false, reason: "invalid", error: "A selected book is no longer in your library." });
+  assert.equal(service.listTierlists("u1").length, 0);
+});
+
+test("a create with two editions of one work is a duplicate-work outcome with no title", () => {
+  const service = createTierlistsService(createInMemoryRepo(), fakeWorks({ aliases: { e1: "w1", e2: "w1" } }));
+  assert.deepEqual(service.createTierlist("u1", { name: "X", data: { tiers: oneTier, pool: ["e1", "e2"] } }), { ok: false, reason: "duplicate-work", title: null });
+  assert.equal(service.listTierlists("u1").length, 0);
+});
+
+test("a create stores canonical work ids and snapshots the pool's public books in order", () => {
+  const works = fakeWorks({ aliases: { e1: "w1", e2: "w2" }, books: [book("w2", { title: "Emma" }), book("w1", { title: "Dune" })] });
+  const service = createTierlistsService(createInMemoryRepo(), works);
+  const outcome = service.createTierlist("u1", { name: "X", data: { tiers: oneTier, pool: ["e2", "e1"] }, access: "anonymous" });
+  assert.ok(outcome.ok);
+  assert.deepEqual(outcome.data, { tiers: oneTier, pool: ["w2", "w1"] });
+  assert.deepEqual(outcome.tierlist.data, outcome.data);
+  const books = service.getVotingBoard(outcome.tierlist.voteCode!)?.publicBooks as Array<{ title: string }>;
+  assert.deepEqual(books.map((entry) => entry.title), ["Emma", "Dune"]);
+});
+
+test("an update of a public or someone else's list is not-found, and a bad board is invalid", () => {
+  const service = makeService();
+  const mine = created(service.createTierlist("u1", { name: "Mine" }));
+  const published = created(service.createTierlist("u1", { name: "Public", data: { tiers: oneTier, pool: ["b1"] }, access: "anonymous" }));
+  const notFound = { ok: false, reason: "not-found", error: "No tier list with that id." };
+  assert.deepEqual(service.updateTierlist("u2", mine.id, { data: { tiers: oneTier, pool: [] } }), notFound);
+  assert.deepEqual(service.updateTierlist("u1", published.id, { data: { tiers: oneTier, pool: [] } }), notFound);
+  assert.deepEqual(service.updateTierlist("u1", mine.id, { data: { tiers: oneTier, pool: ["b1", "b1"] } }), { ok: false, reason: "invalid", error: "Duplicate tier or book." });
+  assert.deepEqual(service.getTierlist("u1", mine.id)?.data, mine.data);
+});
+
+test("an update with two editions of one work is a duplicate-work outcome and writes nothing", () => {
+  const service = createTierlistsService(createInMemoryRepo(), fakeWorks({ aliases: { e1: "w1", e2: "w1" } }));
+  const mine = created(service.createTierlist("u1", { name: "Mine" }));
+  assert.deepEqual(service.updateTierlist("u1", mine.id, { name: "Renamed", data: { tiers: oneTier, pool: ["e1", "e2"] } }), { ok: false, reason: "duplicate-work", title: null });
+  assert.equal(service.getTierlist("u1", mine.id)?.name, "Mine");
+});
+
+test("a name-only update returns the stored board in canonical ids", () => {
+  const repo = createInMemoryRepo();
+  const service = createTierlistsService(repo, fakeWorks({ aliases: { e1: "w1" } }));
+  const mine = created(service.createTierlist("u1", { name: "Mine" }));
+  repo.update(mine.id, "u1", { data: JSON.stringify({ tiers: oneTier, pool: ["e1"] }) });
+  const updated = service.updateTierlist("u1", mine.id, { name: "Renamed" });
+  assert.ok(updated.ok);
+  assert.deepEqual(updated.data, { tiers: oneTier, pool: ["w1"] });
+  assert.equal(updated.tierlist.name, "Renamed");
+});
+
+test("a name-only update writes nothing when the port throws", () => {
+  const failing: TierlistWorks = { ...fakeWorks(), canonicalByKey: () => { throw new Error("catalog down"); } };
+  const repo = createInMemoryRepo();
+  const mine = created(createTierlistsService(repo, fakeWorks()).createTierlist("u1", { name: "Mine" }));
+  const service = createTierlistsService(repo, failing);
+  assert.throws(() => service.updateTierlist("u1", mine.id, { name: "Renamed" }), /catalog down/);
+  assert.equal(service.getTierlist("u1", mine.id)?.name, "Mine");
+});
+
+test("open voting snapshots the board's books from the owner's library", () => {
+  const works = fakeWorks({ books: [book("w2", { title: "Emma" }), book("w1", { title: "Dune" })] });
+  const repo = createInMemoryRepo();
+  const service = createTierlistsService(repo, works);
+  const mine = created(service.createTierlist("u1", { name: "Mine" }));
+  repo.update(mine.id, "u1", { data: JSON.stringify({ tiers: [{ ...oneTier[0]!, workIds: ["w1"] }], pool: ["w2"] }) });
+  const opened = service.openVoting("u1", mine.id, "anonymous");
+  assert.ok(opened);
+  assert.deepEqual([...opened.known], [["w1", "w1"], ["w2", "w2"]]);
+  const books = service.getVotingBoard(opened.tierlist.voteCode!)?.publicBooks as Array<{ title: string }>;
+  assert.deepEqual(books.map((entry) => entry.title), ["Emma", "Dune"]);
 });
 
 test("listTierlists is scoped per user", () => {
   const service = makeService();
-  const a = service.createTierlist("u1", "A");
-  const b = service.createTierlist("u1", "B");
-  service.createTierlist("u2", "Theirs");
+  const a = created(service.createTierlist("u1", { name: "A" }));
+  const b = created(service.createTierlist("u1", { name: "B" }));
+  created(service.createTierlist("u2", { name: "Theirs" }));
   const listed = service.listTierlists("u1");
   assert.equal(listed.length, 2);
   assert.ok(listed.some((t) => t.id === a.id));
@@ -265,37 +373,39 @@ test("listTierlists is scoped per user", () => {
 
 test("updateTierlist renames without touching data", () => {
   const service = makeService();
-  const t = service.createTierlist("u1", "Old");
+  const t = created(service.createTierlist("u1", { name: "Old" }));
   const updated = service.updateTierlist("u1", t.id, { name: "New" });
-  assert.equal(updated?.name, "New");
-  assert.equal(((updated?.data as { tiers: unknown[] })?.tiers ?? []).length, 5);
+  assert.ok(updated.ok);
+  assert.equal(updated.tierlist.name, "New");
+  assert.equal(updated.data.tiers.length, 5);
 });
 
 test("updateTierlist replaces data without touching name", () => {
   const service = makeService();
-  const t = service.createTierlist("u1", "Keep");
+  const t = created(service.createTierlist("u1", { name: "Keep" }));
   const next = { tiers: [{ id: "s", label: "S", color: "#ff7f7f", workIds: ["b1"] }], pool: ["b2"] };
   const updated = service.updateTierlist("u1", t.id, { data: next });
-  assert.equal(updated?.name, "Keep");
-  assert.deepEqual(updated?.data, next);
+  assert.ok(updated.ok);
+  assert.equal(updated.tierlist.name, "Keep");
+  assert.deepEqual(updated.data, next);
   assert.deepEqual(service.getTierlist("u1", t.id)?.data, next);
 });
 
-test("updateTierlist returns undefined for an unowned tier list", () => {
+test("updateTierlist is not-found for an unowned tier list", () => {
   const service = makeService();
-  const theirs = service.createTierlist("u2", "Theirs");
-  assert.equal(service.updateTierlist("u1", theirs.id, { name: "Mine" }), undefined);
+  const theirs = created(service.createTierlist("u2", { name: "Theirs" }));
+  assert.deepEqual(service.updateTierlist("u1", theirs.id, { name: "Mine" }), { ok: false, reason: "not-found", error: "No tier list with that id." });
 });
 
 test("deleteTierlist returns false for an unowned tier list", () => {
   const service = makeService();
-  const theirs = service.createTierlist("u2", "Theirs");
+  const theirs = created(service.createTierlist("u2", { name: "Theirs" }));
   assert.equal(service.deleteTierlist("u1", theirs.id), false);
 });
 
 test("a deleted tier list is no longer returned by getTierlist", () => {
   const service = makeService();
-  const t = service.createTierlist("u1", "Doomed");
+  const t = created(service.createTierlist("u1", { name: "Doomed" }));
   assert.equal(service.deleteTierlist("u1", t.id), true);
   assert.equal(service.getTierlist("u1", t.id), undefined);
 });
@@ -311,22 +421,22 @@ test("a tier list stored before the tiers/pool shape existed normalizes to empty
     updated_at: new Date().toISOString()
   } as TierlistRow;
   repo.insert(legacy);
-  const service = createTierlistsService(repo);
+  const service = createTierlistsService(repo, fakeWorks());
   assert.deepEqual(service.getTierlist("u1", legacy.id)?.data, { tiers: [], pool: [] });
 });
 
 test("createTierlistsPublicApi resolves the raw document and defaults missing arrays", () => {
   const service = makeService();
-  const api = createTierlistsPublicApi(service);
+  const api = createTierlistsPublicApi(service, fakeWorks());
 
-  const fresh = service.createTierlist("u1", "Fresh");
+  const fresh = created(service.createTierlist("u1", { name: "Fresh" }));
   const freshData = api.getTierlistData("u1", fresh.id);
   assert.equal(freshData?.name, "Fresh");
   assert.equal(freshData?.tiers.length, 5);
   assert.deepEqual(freshData?.pool, []);
 
   const doc = { tiers: [{ id: "s", label: "S", color: "#ff7f7f", workIds: ["b1"] }], pool: ["b2"] };
-  const ranked = service.createTierlist("u1", "Ranked");
+  const ranked = created(service.createTierlist("u1", { name: "Ranked" }));
   service.updateTierlist("u1", ranked.id, { data: doc });
   assert.deepEqual(api.getTierlistData("u1", ranked.id), { name: "Ranked", tiers: doc.tiers, pool: doc.pool });
 
@@ -336,13 +446,13 @@ test("createTierlistsPublicApi resolves the raw document and defaults missing ar
 
 test("openVoting publishes the same tier list and freezes it", () => {
   const service = makeService();
-  const original = service.createTierlist("u1", "Fantasy");
-  const tiers = (original.data as { tiers: Array<{ id: string }> }).tiers;
+  const original = created(service.createTierlist("u1", { name: "Fantasy" }));
+  const tiers = (original.data as { tiers: TierDefinition[] }).tiers;
   service.updateTierlist("u1", original.id, {
     data: { tiers: tiers.map((t, i) => ({ ...t, workIds: i === 0 ? ["b1"] : [] })), pool: ["b2"] }
   });
 
-  const copy = service.openVoting("u1", original.id, "anonymous");
+  const copy = service.openVoting("u1", original.id, "anonymous")?.tierlist;
 
   assert.ok(copy);
   assert.equal(copy.id, original.id);
@@ -357,13 +467,13 @@ test("openVoting publishes the same tier list and freezes it", () => {
 
 test("publishing freezes the structure and keeps the whole pool", () => {
   const service = makeService();
-  const original = service.createTierlist("u1", "Fantasy");
-  const tiers = (original.data as { tiers: Array<{ id: string }> }).tiers;
+  const original = created(service.createTierlist("u1", { name: "Fantasy" }));
+  const tiers = (original.data as { tiers: TierDefinition[] }).tiers;
   service.updateTierlist("u1", original.id, {
     data: { tiers: tiers.map((t, i) => ({ ...t, workIds: i === 0 ? ["b1"] : [] })), pool: ["b2"] }
   });
 
-  const copy = service.openVoting("u1", original.id, "anonymous");
+  const copy = service.openVoting("u1", original.id, "anonymous")?.tierlist;
   const data = copy?.data as { tiers: Array<{ id: string; workIds: string[] }>; pool: string[] };
 
   assert.deepEqual(data.tiers.map((t) => t.workIds), [[], [], [], [], []]);
@@ -373,14 +483,14 @@ test("publishing freezes the structure and keeps the whole pool", () => {
 
 test("openVoting seeds the owner's ranking as the first ballot", () => {
   const service = makeService();
-  const original = service.createTierlist("u1", "Fantasy");
-  const tiers = (original.data as { tiers: Array<{ id: string }> }).tiers;
+  const original = created(service.createTierlist("u1", { name: "Fantasy" }));
+  const tiers = (original.data as { tiers: TierDefinition[] }).tiers;
   const topTierId = tiers[0]!.id;
   service.updateTierlist("u1", original.id, {
     data: { tiers: tiers.map((t, i) => ({ ...t, workIds: i === 0 ? ["b1"] : [] })), pool: ["b2"] }
   });
 
-  const copy = service.openVoting("u1", original.id, "anonymous")!;
+  const copy = service.openVoting("u1", original.id, "anonymous")!.tierlist;
   const results = service.getResults(copy.id);
 
   assert.equal(results.ballotCount, 1);
@@ -390,42 +500,42 @@ test("openVoting seeds the owner's ranking as the first ballot", () => {
 
 test("openVoting returns undefined for an unowned tier list", () => {
   const service = makeService();
-  const theirs = service.createTierlist("u2", "Theirs");
+  const theirs = created(service.createTierlist("u2", { name: "Theirs" }));
   assert.equal(service.openVoting("u1", theirs.id, "anonymous"), undefined);
 });
 
 test("opening voting twice does not create another resource", () => {
   const service = makeService();
-  const original = service.createTierlist("u1", "Fantasy");
-  const first = service.openVoting("u1", original.id, "anonymous")!;
+  const original = created(service.createTierlist("u1", { name: "Fantasy" }));
+  const first = service.openVoting("u1", original.id, "anonymous")!.tierlist;
   assert.equal(service.openVoting("u1", original.id, "members"), undefined);
   assert.equal(service.getTierlist("u1", original.id)?.voteCode, first.voteCode);
 });
 
 test("a public tier list refuses data and name changes", () => {
   const service = makeService();
-  const original = service.createTierlist("u1", "Fantasy");
-  const copy = service.openVoting("u1", original.id, "anonymous")!;
+  const original = created(service.createTierlist("u1", { name: "Fantasy" }));
+  const copy = service.openVoting("u1", original.id, "anonymous")!.tierlist;
   const frozen = copy.data;
 
-  assert.equal(service.updateTierlist("u1", copy.id, { data: { tiers: [], pool: ["sneaky"] } }), undefined);
+  assert.equal(service.updateTierlist("u1", copy.id, { data: { tiers: [], pool: ["sneaky"] } }).ok, false);
   assert.deepEqual(service.getTierlist("u1", copy.id)?.data, frozen);
 
-  assert.equal(service.updateTierlist("u1", copy.id, { name: "Renamed" }), undefined);
+  assert.equal(service.updateTierlist("u1", copy.id, { name: "Renamed" }).ok, false);
 });
 
 test("published structure is immutable", () => {
   const service = makeService();
-  const original = service.createTierlist("u1", "Fantasy");
+  const original = created(service.createTierlist("u1", { name: "Fantasy" }));
   service.openVoting("u1", original.id, "anonymous");
   const edited = service.updateTierlist("u1", original.id, { data: { tiers: [], pool: ["b9"] } });
-  assert.equal(edited, undefined);
+  assert.equal(edited.ok, false);
 });
 
 test("setVotingState switches access and closes without losing ballots", () => {
   const service = makeService();
-  const original = service.createTierlist("u1", "Fantasy");
-  const copy = service.openVoting("u1", original.id, "anonymous")!;
+  const original = created(service.createTierlist("u1", { name: "Fantasy" }));
+  const copy = service.openVoting("u1", original.id, "anonymous")!.tierlist;
 
   const tightened = service.setVotingState("u1", copy.id, { access: "members" });
   assert.equal(tightened?.voteAccess, "members");
@@ -439,12 +549,12 @@ test("setVotingState switches access and closes without losing ballots", () => {
 });
 
 function openPoll(service: ReturnType<typeof makeService>, access: "anonymous" | "members" = "anonymous") {
-  const original = service.createTierlist("u1", "Fantasy");
-  const tiers = (original.data as { tiers: Array<{ id: string }> }).tiers;
+  const original = created(service.createTierlist("u1", { name: "Fantasy" }));
+  const tiers = (original.data as { tiers: TierDefinition[] }).tiers;
   service.updateTierlist("u1", original.id, {
     data: { tiers: tiers.map((t) => ({ ...t, workIds: [] })), pool: ["b1", "b2"] }
   });
-  const copy = service.openVoting("u1", original.id, access)!;
+  const copy = service.openVoting("u1", original.id, access)!.tierlist;
   return { copy, code: copy.voteCode!, tierIds: tiers.map((t) => t.id) };
 }
 
@@ -488,7 +598,7 @@ test("a signed-in voter's ballot is stored against their account id", () => {
   // Authorization header silently loses (every such voter resolves to
   // {kind: "anonymous"} in routes.ts's voterFor).
   const repo = createInMemoryRepo();
-  const service = createTierlistsService(repo);
+  const service = createTierlistsService(repo, fakeWorks());
   const { code, tierIds } = openPoll(service);
   const tierlistId = service.getVotingBoard(code)!.id;
 
@@ -593,7 +703,7 @@ test("getVotingBoard is undefined for an unknown code", () => {
 
 test("listPublicTierlists returns community copies only, newest first", () => {
   const service = makeService();
-  service.createTierlist("u1", "Private");
+  created(service.createTierlist("u1", { name: "Private" }));
   const { code } = openPoll(service);
 
   const listed = service.listPublicTierlists(10, 0);
@@ -606,12 +716,12 @@ test("listPublicTierlists returns community copies only, newest first", () => {
 
 test("openVoting emits exactly one publish event for the same tier list", () => {
   const emitted: Array<[string, string]> = [];
-  const service = createTierlistsService(createInMemoryRepo(), (copyId, ownerUserId) => {
+  const service = createTierlistsService(createInMemoryRepo(), fakeWorks(), (copyId, ownerUserId) => {
     emitted.push([copyId, ownerUserId]);
   });
-  const original = service.createTierlist("u1", "Fantasy");
+  const original = created(service.createTierlist("u1", { name: "Fantasy" }));
 
-  const copy = service.openVoting("u1", original.id, "anonymous");
+  const copy = service.openVoting("u1", original.id, "anonymous")?.tierlist;
 
   assert.ok(copy);
   assert.deepEqual(emitted, [[copy.id, "u1"]]);
@@ -619,7 +729,7 @@ test("openVoting emits exactly one publish event for the same tier list", () => 
 
 test("a first signed-in ballot emits voted_on once", () => {
   const emitted: Array<[string, string, string]> = [];
-  const service = createTierlistsService(createInMemoryRepo(), undefined, (voterUserId, tierlistId, tierlistName) => {
+  const service = createTierlistsService(createInMemoryRepo(), fakeWorks(), undefined, (voterUserId, tierlistId, tierlistName) => {
     emitted.push([voterUserId, tierlistId, tierlistName]);
   });
   const { code, tierIds } = openPoll(service);
@@ -640,12 +750,11 @@ test("a first signed-in ballot emits voted_on once", () => {
 
 test("voted_on ranking skips empty top tiers and keeps the first three populated ones", () => {
   const rankings: Array<Array<{ label: string }>> = [];
-  const service = createTierlistsService(createInMemoryRepo(), undefined, (_voterUserId, _tierlistId, _tierlistName, ranking) => {
+  const service = createTierlistsService(createInMemoryRepo(), fakeWorks({ books: ["w1", "w2", "w3"].map((workId) => book(workId, { title: `Book ${workId}` })) }), undefined, (_voterUserId, _tierlistId, _tierlistName, ranking) => {
     rankings.push(ranking);
   });
   const tiers = ["S", "A", "B", "C", "D"].map((label) => ({ id: label.toLowerCase(), label, color: "#c9482f", workIds: [] }));
-  const snapshot = ["w1", "w2", "w3"].map((workId) => ({ workId, title: `Book ${workId}`, author: "A", coverUrl: null }));
-  const board = service.createTierlist("owner", "Pool", { tiers, pool: ["w1", "w2", "w3"] }, "members", snapshot);
+  const board = created(service.createTierlist("owner", { name: "Pool", data: { tiers, pool: ["w1", "w2", "w3"] }, access: "members" }));
 
   service.submitBallot(board.voteCode!, [{ workId: "w1", tierId: "b" }, { workId: "w2", tierId: "c" }, { workId: "w3", tierId: "d" }], { kind: "user", userId: "reader" });
 
@@ -654,7 +763,7 @@ test("voted_on ranking skips empty top tiers and keeps the first three populated
 
 test("editing a signed-in ballot emits no second voted_on", () => {
   const emitted: Array<[string, string, string]> = [];
-  const service = createTierlistsService(createInMemoryRepo(), undefined, (voterUserId, tierlistId, tierlistName) => {
+  const service = createTierlistsService(createInMemoryRepo(), fakeWorks(), undefined, (voterUserId, tierlistId, tierlistName) => {
     emitted.push([voterUserId, tierlistId, tierlistName]);
   });
   const { code, tierIds } = openPoll(service);
@@ -667,7 +776,7 @@ test("editing a signed-in ballot emits no second voted_on", () => {
 
 test("an anonymous first ballot emits no voted_on", () => {
   const emitted: Array<[string, string, string]> = [];
-  const service = createTierlistsService(createInMemoryRepo(), undefined, (voterUserId, tierlistId, tierlistName) => {
+  const service = createTierlistsService(createInMemoryRepo(), fakeWorks(), undefined, (voterUserId, tierlistId, tierlistName) => {
     emitted.push([voterUserId, tierlistId, tierlistName]);
   });
   const { code, tierIds } = openPoll(service);
@@ -680,8 +789,8 @@ test("an anonymous first ballot emits no voted_on", () => {
 
 test("published refs carry origin creator and timestamps", () => {
   const service = makeService();
-  const ordinary = service.createTierlist("u1", "Private list");
-  const copy = service.openVoting("u1", ordinary.id, "anonymous")!;
+  const ordinary = created(service.createTierlist("u1", { name: "Private list" }));
+  const copy = service.openVoting("u1", ordinary.id, "anonymous")!.tierlist;
 
   const ref = service.getPublishedRef(copy.id);
 
@@ -694,10 +803,10 @@ test("published refs carry origin creator and timestamps", () => {
 
 test("100 distinct member voters promote the same list and revoke creator control", () => {
   const service = makeService();
-  const list = service.createTierlist("creator", "Reference");
+  const list = created(service.createTierlist("creator", { name: "Reference" }));
   const tiers = (list.data as { tiers: Array<{ id: string; label: string; color: string; workIds: string[] }> }).tiers;
   service.updateTierlist("creator", list.id, { data: { tiers, pool: ["b1"] } });
-  const published = service.openVoting("creator", list.id, "anonymous")!;
+  const published = service.openVoting("creator", list.id, "anonymous")!.tierlist;
   const vote = [{ workId: "b1", tierId: tiers[0]!.id }];
   service.submitBallot(published.voteCode!, [], { kind: "user", userId: "abstainer" });
   for (let n = 0; n < 99; n++) {
@@ -753,10 +862,10 @@ const publishedPool = { tiers: [{ id: "s", label: "S", color: "#c9482f", workIds
 
 test("discoverWindow lists only published tier lists, matching the normalized needle, with their origin creator", () => {
   const repo = createInMemoryRepo();
-  const service = createTierlistsService(repo);
-  service.createTierlist("u1", "Hábitos privados");
-  const habits = service.createTierlist("u1", "Hábitos Atómicos", publishedPool, "anonymous", []);
-  const fantasy = service.createTierlist("u2", "Fantasy", publishedPool, "members", []);
+  const service = createTierlistsService(repo, fakeWorks());
+  created(service.createTierlist("u1", { name: "Hábitos privados" }));
+  const habits = created(service.createTierlist("u1", { name: "Hábitos Atómicos", data: publishedPool, access: "anonymous" }));
+  const fantasy = created(service.createTierlist("u2", { name: "Fantasy", data: publishedPool, access: "members" }));
 
   assert.deepEqual(service.discoverWindow("habitos", 10).map((ref) => ref.id), [habits.id]);
   assert.deepEqual(service.discoverWindow("", 10).map((ref) => ref.id).sort(), [habits.id, fantasy.id].sort());
@@ -791,7 +900,7 @@ test("getPublishedRefs builds the refs getPublishedRef does, for the requested i
 
 test("getPublishedRefs leaves out an unpublished tier list", () => {
   const service = makeService();
-  const draft = service.createTierlist("u1", "Draft");
+  const draft = created(service.createTierlist("u1", { name: "Draft" }));
   assert.deepEqual(service.getPublishedRefs([draft.id]), []);
 });
 
@@ -815,13 +924,10 @@ function coverFixture(peeked: Array<Array<{ isbn: string | null; title: string |
     peeked.push(params);
     return params.map((param) => `https://covers.test/${param.title}.jpg`);
   };
-  const service = createTierlistsService(createInMemoryRepo(), undefined, (_user, _id, _name, preview) => { ranking.push(preview); }, peek);
+  const works = fakeWorks({ books: [book("w1", { title: "Dune", author: "Frank Herbert", isbn: "123" }), book("w2", { title: "Emma", author: "Jane Austen", coverUrl: "https://stored.test/emma.jpg" })] });
+  const service = createTierlistsService(createInMemoryRepo(), works, undefined, (_user, _id, _name, preview) => { ranking.push(preview); }, peek);
   const tiers = [{ id: "s", label: "S", color: "#c9482f", workIds: [] }];
-  const snapshot = [
-    { workId: "w1", title: "Dune", author: "Frank Herbert", isbn: "123", coverUrl: null },
-    { workId: "w2", title: "Emma", author: "Jane Austen", coverUrl: "https://stored.test/emma.jpg" }
-  ];
-  const board = service.createTierlist("owner", "Pool", { tiers, pool: ["w1", "w2"] }, "members", snapshot);
+  const board = created(service.createTierlist("owner", { name: "Pool", data: { tiers, pool: ["w1", "w2"] }, access: "members" }));
   return { service, board, ranking };
 }
 
@@ -840,8 +946,9 @@ test("a null snapshot coverUrl is filled from the cover peek in refs, the voting
 
 test("stored cover URLs are not peeked again", () => {
   const peeked: Array<Array<{ isbn: string | null; title: string | null; author: string | null }>> = [];
-  const service = createTierlistsService(createInMemoryRepo(), undefined, undefined, (params) => { peeked.push(params); return params.map(() => null); });
-  const board = service.createTierlist("owner", "Pool", { tiers: [], pool: [] }, "members", [{ workId: "w2", title: "Emma", author: "Jane Austen", coverUrl: "https://stored.test/emma.jpg" }]);
+  const works = fakeWorks({ books: [book("w2", { title: "Emma", author: "Jane Austen", coverUrl: "https://stored.test/emma.jpg" })] });
+  const service = createTierlistsService(createInMemoryRepo(), works, undefined, undefined, (params) => { peeked.push(params); return params.map(() => null); });
+  const board = created(service.createTierlist("owner", { name: "Pool", data: { tiers: [], pool: ["w2"] }, access: "members" }));
 
   assert.deepEqual(service.getPublishedRef(board.id)?.covers, ["https://stored.test/emma.jpg"]);
   assert.equal(peeked.length, 0);
@@ -849,7 +956,7 @@ test("stored cover URLs are not peeked again", () => {
 
 test("without a cover peek a null snapshot coverUrl stays missing", () => {
   const service = makeService();
-  const board = service.createTierlist("owner", "Pool", { tiers: [], pool: [] }, "members", [{ workId: "w1", title: "Dune", author: "Frank Herbert", coverUrl: null }]);
+  const board = created(service.createTierlist("owner", { name: "Pool", data: { tiers: [], pool: ["w1"] }, access: "members" }));
 
   assert.deepEqual(service.getPublishedRef(board.id)?.covers, []);
 });
@@ -864,20 +971,21 @@ test("fillRankingCovers fills null covers by title from the snapshot and leaves 
 test("getPublishedRefs and participationByOwner fill snapshot covers", () => {
   const peek = (params: Array<{ title: string | null }>) => params.map((param) => `https://covers.test/${param.title}.jpg`);
   const repo = createInMemoryRepo();
-  const service = createTierlistsService(repo, undefined, undefined, peek);
-  const board = service.createTierlist("owner", "Pool", { tiers: [], pool: [] }, "members", [{ workId: "w1", title: "Dune", author: "Frank Herbert", coverUrl: null }]);
+  const works = fakeWorks({ books: [book("w1", { title: "Dune", author: "Frank Herbert" })] });
+  const service = createTierlistsService(repo, works, undefined, undefined, peek);
+  const board = created(service.createTierlist("owner", { name: "Pool", data: { tiers: [], pool: ["w1"] }, access: "members" }));
 
   assert.deepEqual(service.getPublishedRefs([board.id])[0]?.covers, ["https://covers.test/Dune.jpg"]);
   assert.deepEqual(service.listPublishedRefsByOwner("owner")[0]?.covers, ["https://covers.test/Dune.jpg"]);
 
-  const participating = createTierlistsService({ ...repo, listParticipation: () => [{ id: board.id, name: "Pool", public_books: JSON.stringify([{ title: "Dune", coverUrl: null }]), participants: 1, latest_at: "2026-10-01T00:00:00.000Z" }] }, undefined, undefined, peek);
+  const participating = createTierlistsService({ ...repo, listParticipation: () => [{ id: board.id, name: "Pool", public_books: JSON.stringify([{ title: "Dune", coverUrl: null }]), participants: 1, latest_at: "2026-10-01T00:00:00.000Z" }] }, works, undefined, undefined, peek);
   assert.deepEqual(participating.participationByOwner("owner", "2026-09-01T00:00:00.000Z")[0]?.covers, ["https://covers.test/Dune.jpg"]);
 });
 
 test("a throwing cover peek leaves the ballot unsaved and emits nothing", () => {
   const emitted: unknown[] = [];
-  const service = createTierlistsService(createInMemoryRepo(), undefined, (...args) => { emitted.push(args); }, () => { throw new Error("books db down"); });
-  const board = service.createTierlist("owner", "Pool", { tiers: [{ id: "s", label: "S", color: "#c9482f", workIds: [] }], pool: ["w1"] }, "members", [{ workId: "w1", title: "Dune", author: "A", coverUrl: null }]);
+  const service = createTierlistsService(createInMemoryRepo(), fakeWorks({ books: [book("w1", { title: "Dune" })] }), undefined, (...args) => { emitted.push(args); }, () => { throw new Error("books db down"); });
+  const board = created(service.createTierlist("owner", { name: "Pool", data: { tiers: [{ id: "s", label: "S", color: "#c9482f", workIds: [] }], pool: ["w1"] }, access: "members" }));
 
   assert.throws(() => service.submitBallot(board.voteCode!, [{ workId: "w1", tierId: "s" }], { kind: "user", userId: "reader" }), /books db down/);
   assert.equal(service.getResults(board.id).ballotCount, 0);

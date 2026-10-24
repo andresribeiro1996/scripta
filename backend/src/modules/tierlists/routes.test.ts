@@ -36,6 +36,7 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 const { applyTierlistsMigrations } = await import("./adapters/sqlite/connection.js");
 const { createSqliteTierlistsRepository } = await import("./adapters/sqlite/sqliteTierlistsRepository.js");
 const { createTierlistsService } = await import("./service.js");
+const { tierlistWorks } = await import("./plugin.js");
 const { buildPublicTierlistRoutes, buildTierlistRoutes, buildTierlistShareVideoRoutes } = await import("./routes.js");
 const { openLibraryDb } = await import("../library/adapters/sqlite/connection.js");
 const { applyBooksMigrations, openBooksDb } = await import("../books/adapters/sqlite/connection.js");
@@ -46,19 +47,24 @@ const [b1, b2] = [titleWork("Poll Book One"), titleWork("Poll Book Two")] as [st
 
 type Service = ReturnType<typeof createTierlistsService>;
 
+function created(outcome: ReturnType<Service["createTierlist"]>) {
+  assert.equal(outcome.ok, true);
+  return outcome.ok ? outcome.tierlist : (undefined as never);
+}
+
 /** An open poll whose owner has already ranked b1 into the top tier, so
  *  its histogram is non-empty from ballot #1 onwards. */
 function openPoll(access: "anonymous" | "members" = "anonymous") {
   const db = new DatabaseSync(":memory:");
   applyTierlistsMigrations(db);
-  const service = createTierlistsService(createSqliteTierlistsRepository(db));
+  const service = createTierlistsService(createSqliteTierlistsRepository(db), tierlistWorks);
 
-  const original = service.createTierlist("u1", "Fantasy");
+  const original = created(service.createTierlist("u1", { name: "Fantasy" }));
   const tiers = (original.data as { tiers: Array<{ id: string; label: string; color: string }> }).tiers;
   service.updateTierlist("u1", original.id, {
     data: { tiers: tiers.map((t, i) => ({ ...t, workIds: i === 0 ? [b1] : [] })), pool: [b2] }
   });
-  const copy = service.openVoting("u1", original.id, access)!;
+  const copy = service.openVoting("u1", original.id, access)!.tierlist;
 
   return { service, copy, code: copy.voteCode!, topTierId: tiers[0]!.id };
 }
@@ -196,7 +202,7 @@ test("a members-only poll refuses an anonymous ballot with 401 {error}", async (
 async function ownerApp() {
   const db = new DatabaseSync(":memory:");
   applyTierlistsMigrations(db);
-  const service = createTierlistsService(createSqliteTierlistsRepository(db));
+  const service = createTierlistsService(createSqliteTierlistsRepository(db), tierlistWorks);
   const app = Fastify();
   app.decorate("authenticateAccessToken", (token: string) => ({ id: token, email: `${token}@example.test`, username: token, avatarId: null }));
   await app.register(buildTierlistRoutes(service));
@@ -258,8 +264,8 @@ test("a PUT stores canonical ids and rejects two editions, keeping the stored li
 test("a PUT on a list that is not the caller's, or already public, is a 404 and bad data a 400", async () => {
   const a = titleWork("Guard A");
   const { app, service } = await ownerApp();
-  const mine = service.createTierlist("t8", "Mine", { tiers: [tier([])], pool: [] });
-  const promoted = service.createTierlist("t8", "Promoted", { tiers: [tier([])], pool: [] });
+  const mine = created(service.createTierlist("t8", { name: "Mine", data: { tiers: [tier([])], pool: [] } }));
+  const promoted = created(service.createTierlist("t8", { name: "Promoted", data: { tiers: [tier([])], pool: [] } }));
   service.openVoting("t8", promoted.id, "anonymous");
   const data = { tiers: [tier([])], pool: [a] };
   const put = (id: string, user: string, payload: unknown) => app.inject({ method: "PUT", url: `/tierlists/${id}`, headers: headers(user), payload: payload as Record<string, unknown> });
@@ -273,7 +279,7 @@ test("a PUT on a list that is not the caller's, or already public, is a 404 and 
 test("an unreachable catalog is a 503 and stores nothing", async () => {
   const a = titleWork("Catalog Down");
   const { app, db, service } = await ownerApp();
-  const existing = service.createTierlist("t9", "Existing", { tiers: [tier([])], pool: [a] });
+  const existing = created(service.createTierlist("t9", { name: "Existing", data: { tiers: [tier([])], pool: [a] } }));
   const catalog = openBooksDb();
   catalog.exec("ALTER TABLE works RENAME TO works_away");
   try {
@@ -453,14 +459,14 @@ test("a create answers from the works it keyed, even if the catalog dies right a
   copy("d2", 0, "ta:gone ranked a|someone", a);
   const db = new DatabaseSync(":memory:");
   applyTierlistsMigrations(db);
-  const real = createTierlistsService(createSqliteTierlistsRepository(db));
+  const real = createTierlistsService(createSqliteTierlistsRepository(db), tierlistWorks);
   let restore = () => {};
   const service: Service = {
     ...real,
     createTierlist: (...args) => {
-      const tierlist = real.createTierlist(...args);
+      const outcome = real.createTierlist(...args);
       restore = breakCatalog();
-      return tierlist;
+      return outcome;
     }
   };
   const app = Fastify();
