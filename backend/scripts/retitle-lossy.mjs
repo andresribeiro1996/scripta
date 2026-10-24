@@ -24,7 +24,8 @@ const { openSqlite } = await import("../dist/db/openSqlite.js");
 const { openBooksDb } = await import("../dist/modules/books/adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("../dist/modules/books/adapters/sqlite/sqliteBooksRepository.js");
 const { lossyRetitleReport, planLossyRetitles } = await import("../dist/modules/books/seed/lossyRetitle.js");
-const { applyMojibakeRepairs, reportJson } = await import("../dist/modules/books/seed/mojibakeRepair.js");
+const { reportJson } = await import("../dist/modules/books/seed/mojibakeRepair.js");
+const { applyMojibakeRepairs } = await import("../dist/modules/books/adapters/sqlite/titleRepairs.js");
 const { PUBLISHERS } = await import("../dist/modules/books/seed/publishers.js");
 const { fetchText } = await import("../dist/modules/books/seed/siteFetch.js");
 

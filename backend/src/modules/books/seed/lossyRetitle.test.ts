@@ -19,7 +19,7 @@ const { createSqliteBooksRepository } = await import("../adapters/sqlite/sqliteB
 const { SourcePausedError, SourceUnavailableError } = await import("../domain/errors.js");
 const { catalogTitleKey, workTitleKey } = await import("../domain/normalize.js");
 const { lossyRetitleReport, planLossyRetitles } = await import("./lossyRetitle.js");
-const { applyMojibakeRepairs } = await import("./mojibakeRepair.js");
+const { applyMojibakeRepairs } = await import("../adapters/sqlite/titleRepairs.js");
 
 type Site = Parameters<typeof planLossyRetitles>[2][number];
 

@@ -18,7 +18,6 @@ const { applyBooksMigrations } = await import("./adapters/sqlite/connection.js")
 const { createSqliteBooksRepository } = await import("./adapters/sqlite/sqliteBooksRepository.js");
 const { SourcePausedError, SourceUnavailableError } = await import("./domain/errors.js");
 const { catalogTitleKey } = await import("./domain/normalize.js");
-const { applyMojibakeRepairs } = await import("./seed/mojibakeRepair.js");
 const { RETITLE_BATCH_SIZE, retitleWanted } = await import("./retitleJob.js");
 
 const NOW = "2026-10-01T00:00:00.000Z";
@@ -46,7 +45,7 @@ function setup(answer: (isbn: string) => Promise<CatalogSearchHit[]> = async () 
         return answer(isbn);
       }
     },
-    write: (plan: Parameters<typeof applyMojibakeRepairs>[1]) => applyMojibakeRepairs(db, plan),
+    write: (plan: Parameters<typeof repo.applyTitleRepairs>[0]) => repo.applyTitleRepairs(plan),
     info: (details: object, message: string) => {
       infos.push([details, message]);
     },
