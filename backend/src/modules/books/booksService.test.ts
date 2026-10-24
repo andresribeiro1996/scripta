@@ -2870,3 +2870,45 @@ test("the first Kobo id wins and a second, different one stores and queues nothi
   assert.equal(h.repo.getBook(id)!.kobo_image_id, KOBO_ID);
   assert.deepEqual(h.enqueued, []);
 });
+
+test("recordKoboImageIds queues nothing and keeps no id or mark when a later write fails and the pass rolls back", () => {
+  const dune = { isbn: "9780441013593", title: "Dune", author: "Frank Herbert" };
+  const { h, id } = prepare(orlando, noSources);
+  h.service.resolveCover(dune);
+  const duneId = h.bookId("isbn:9780441013593");
+  h.enqueued.length = 0;
+  checkedAs(h, id, "missing", "2026-08-22T00:00:00.000Z");
+  checkedAs(h, duneId, "missing", "2026-08-22T00:00:00.000Z");
+  const setKoboImageId = h.repo.setKoboImageId.bind(h.repo);
+  let calls = 0;
+  h.repo.setKoboImageId = (bookId, imageId) => {
+    calls += 1;
+    if (calls === 2) throw new Error("disk full");
+    return setKoboImageId(bookId, imageId);
+  };
+  assert.throws(() => h.service.recordKoboImageIds([withId(orlando), withId(dune)]), /disk full/);
+  assert.equal(h.repo.getBook(id)!.kobo_image_id, null);
+  assert.equal(h.repo.getBook(id)!.cover_upgrade_wanted_at, null);
+  assert.deepEqual(h.enqueued, []);
+});
+
+test("recordKoboImageIds queues its upgrades only after the pass has committed", () => {
+  const inside: boolean[] = [];
+  const h: ReturnType<typeof harness> = harness({ sources: noSources, enqueue: () => { inside.push(h.db.isTransaction); } });
+  h.service.resolveCover(orlando);
+  checkedAs(h, h.bookId("isbn:9780141184272"), "missing", "2026-08-22T00:00:00.000Z");
+  inside.length = 0;
+  h.service.recordKoboImageIds([withId(orlando)]);
+  assert.deepEqual(inside, [false]);
+});
+
+test("recordKoboImageIds ignores a junk id before touching the catalog's keys", () => {
+  const h = harness({ sources: noSources });
+  h.service.resolveCover({ title: "Orlando", author: "Virginia Woolf" });
+  const keys = () => h.db.prepare("SELECT key, book_id FROM book_keys ORDER BY key").all();
+  const before = keys();
+  h.service.recordKoboImageIds([withId(orlando, "file____mnt_onboard_x.epub"), withId(orlando, "")]);
+  assert.deepEqual(keys(), before);
+  h.service.recordKoboImageIds([withId(orlando)]);
+  assert.ok(keys().some((row) => (row as { key: string }).key === "isbn:9780141184272"));
+});

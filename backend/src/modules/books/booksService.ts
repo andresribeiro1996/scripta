@@ -112,20 +112,16 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
     return book.cover_status !== "missing" || olderThan(book.cover_checked_at, RETRY_AFTER_MS);
   }
 
+  const watermarked = (source: CoverSourceName | undefined, isbn: string | null) => source === "isbndb" && isPortugueseIsbn(isbn);
+
   function koboUpgradeWanted(book: BookRow): boolean {
     if (book.cover_status === "missing" || book.cover_status === "low_res") return true;
     if (book.cover_status !== "good" || !book.cover_image_id) return false;
-    return deps.repo.getImage(book.cover_image_id)?.source === "isbndb" && isPortugueseIsbn(book.isbn);
+    return watermarked(deps.repo.getImage(book.cover_image_id)?.source, book.isbn);
   }
 
-  function recordKoboId(book: BookRow, lookup: BookLookup): boolean {
-    const imageId = normalizeImageId(lookup.imageId);
+  function recordKoboId(book: BookRow, imageId: string): boolean {
     return imageId !== "" && deps.repo.setKoboImageId(book.id, imageId);
-  }
-
-  function markKoboUpgrade(book: BookRow) {
-    deps.repo.setUpgradeWanted(book.id, now().toISOString());
-    schedule(book.id, "upgrade");
   }
 
   function sourcesFor(lane: CoverPriority, book: BookRow): CoverSources {
@@ -362,20 +358,31 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       for (const lookup of lookups) {
         const book = findOrCreateBook(deps.repo, lookup, now().toISOString());
         if (!book) continue;
-        const recorded = recordKoboId(book, lookup);
-        if (lookupDue(book)) schedule(book.id);
-        else if (recorded && koboUpgradeWanted(book)) markKoboUpgrade(book);
+        const recorded = recordKoboId(book, normalizeImageId(lookup.imageId));
+        if (lookupDue(book)) {
+          schedule(book.id);
+        } else if (recorded && koboUpgradeWanted(book)) {
+          deps.repo.setUpgradeWanted(book.id, now().toISOString());
+          schedule(book.id, "upgrade");
+        }
       }
     },
 
     recordKoboImageIds(lookups) {
-      deps.repo.transaction(() => {
+      const marked = deps.repo.transaction(() => {
+        const ids: string[] = [];
         for (const lookup of lookups) {
+          const imageId = normalizeImageId(lookup.imageId);
+          if (imageId === "") continue;
           const identity = lookupIdentity(lookup);
           const book = identity ? findExisting(deps.repo, identity) : undefined;
-          if (book && recordKoboId(book, lookup) && koboUpgradeWanted(book)) markKoboUpgrade(book);
+          if (!book || !recordKoboId(book, imageId) || !koboUpgradeWanted(book)) continue;
+          deps.repo.setUpgradeWanted(book.id, now().toISOString());
+          ids.push(book.id);
         }
+        return ids;
       });
+      for (const id of marked) schedule(id, "upgrade");
     },
 
     enqueueUnchecked() {
@@ -404,9 +411,8 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
         let imageId = latest.cover_image_id;
         let width = current?.width ?? 0;
         let source = current?.source;
-        const portuguese = isPortugueseIsbn(book.isbn);
         const found = outcome.found;
-        const replacesWatermark = lane === "upgrade" && found !== null && found.image.width >= MIN_GOOD_WIDTH && source === "isbndb" && portuguese;
+        const replacesWatermark = lane === "upgrade" && found !== null && found.image.width >= MIN_GOOD_WIDTH && watermarked(source, book.isbn);
         if (found && (found.image.width > width || replacesWatermark)) {
           imageId = await storeCoverImage(deps, bookId, found.candidate.source, found.candidate.url, found.image, at);
           width = found.image.width;
@@ -420,7 +426,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
           if (lane === "upgrade") {
             deps.repo.setUpgradeWanted(bookId, null);
           } else if (lane !== "background") {
-            const wanted = status !== "good" || (source === "isbndb" && portuguese);
+            const wanted = status !== "good" || watermarked(source, book.isbn);
             deps.repo.setUpgradeWanted(bookId, wanted ? at : null);
             if (wanted) schedule(bookId, "upgrade");
           }
