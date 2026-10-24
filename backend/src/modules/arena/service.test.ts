@@ -842,6 +842,15 @@ test("two wire ids that resolve to one work can't fill two slots", () => {
   );
 });
 
+test("a repeated work is a duplicate book even when the slot index repeats too", () => {
+  const service = newService(createInMemoryArenaRepository(), { ...identityWorks, knownWorkIds: (ids) => ids.map(() => "same") });
+  const tournament = service.createTournament("owner-1", { name: "Test", bracketSize: 2, roundDurationMinutes: 60 });
+  assert.throws(
+    () => service.setSlotsManual(tournament.id, "owner-1", [{ slotIndex: 0, book: makeBook(1) }, { slotIndex: 0, book: makeBook(2) }]),
+    DuplicateBookError
+  );
+});
+
 test("a non-owner's slots are refused before any work is looked up", () => {
   const throwing: ArenaWorks = { ...identityWorks, knownWorkIds: () => { throw new Error("looked up"); } };
   const service = newService(createInMemoryArenaRepository(), throwing);

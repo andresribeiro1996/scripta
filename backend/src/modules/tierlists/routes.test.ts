@@ -454,6 +454,28 @@ test("an open-voting with the catalog down is a 503 and writes nothing", async (
   await app.close();
 });
 
+test("an open-voting on an already-public list with the catalog down is a 404 and writes nothing", async () => {
+  const [a, b] = [titleWork("Public Down A"), titleWork("Public Down B")];
+  copy("d3", 0, "ta:public down a|someone", a);
+  copy("d3", 1, "ta:public down b|someone", b);
+  const { app, service } = await ownerApp();
+  const created = await app.inject({ method: "POST", url: "/tierlists", headers: headers("d3"), payload: { name: "Poll", data: { tiers: [tier([a])], pool: [b] } } });
+  const id = created.json().id as string;
+  const first = await app.inject({ method: "POST", url: `/tierlists/${id}/open-voting`, headers: headers("d3"), payload: { access: "anonymous" } });
+  assert.equal(first.statusCode, 201);
+  const voteCode = service.getTierlist("d3", id)!.voteCode;
+  const restore = breakCatalog();
+  try {
+    const again = await app.inject({ method: "POST", url: `/tierlists/${id}/open-voting`, headers: headers("d3"), payload: { access: "anonymous" } });
+    assert.equal(again.statusCode, 404);
+    assert.equal(again.json().error, "No tier list with that id.");
+  } finally {
+    restore();
+  }
+  assert.equal(service.getTierlist("d3", id)!.voteCode, voteCode);
+  await app.close();
+});
+
 test("a create answers from the works it keyed, even if the catalog dies right after the write", async () => {
   const [a, b] = [titleWork("Gone Ranked A"), titleWork("Gone Ranked B")];
   copy("d2", 0, "ta:gone ranked a|someone", a);

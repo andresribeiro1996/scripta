@@ -353,15 +353,16 @@ export function createArenaService(
       const ids = works.knownWorkIds(requested.map((e) => e.book.workId));
       const entries = requested.map((e, index) => ({ slotIndex: e.slotIndex, book: { ...e.book, workId: ids[index]! } }));
 
-      const indices = new Set(entries.map((e) => e.slotIndex));
-      if (indices.size !== entries.length) throw new DuplicateSlotError();
-      if (entries.some((e) => e.slotIndex < 0 || e.slotIndex >= tournament.bracket_size)) {
-        throw new InvalidSlotIndexError(tournament.bracket_size);
-      }
       const seenWorks = new Set<string>();
       for (const { book } of entries) {
         if (seenWorks.has(book.workId)) throw new DuplicateBookError(book.title);
         seenWorks.add(book.workId);
+      }
+
+      const indices = new Set(entries.map((e) => e.slotIndex));
+      if (indices.size !== entries.length) throw new DuplicateSlotError();
+      if (entries.some((e) => e.slotIndex < 0 || e.slotIndex >= tournament.bracket_size)) {
+        throw new InvalidSlotIndexError(tournament.bracket_size);
       }
 
       // Full-replace, same semantics as PUT /library — see this module's

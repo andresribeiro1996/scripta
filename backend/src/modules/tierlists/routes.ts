@@ -10,7 +10,7 @@
 // comment for why a module like this doesn't use one for that case).
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import type { BallotResponse, PublicBookData, Tierlist as WireTierlist, TierlistData, VotingBoard } from "@scripta/shared";
+import type { BallotResponse, Tierlist as WireTierlist, VotingBoard } from "@scripta/shared";
 import { z } from "zod";
 import { sendWorksError } from "../../worksErrors.js";
 import { authGuard, getOptionalAuthenticatedUser } from "../auth/index.js";

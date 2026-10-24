@@ -59,6 +59,7 @@ Checks keep today's order: ownership and state first, then the request's own che
 ## Behaviour changes
 
 - Publishing an already-published quiz while the catalog is down answers 409 "This quiz is already published." instead of 503, since the published check now runs before the cover lookup.
+- Opening voting on, or a name-only edit of, an already-public tier list while the catalog is down answers 404 "No tier list with that id." instead of 503, since the public check now runs before the catalog lookups.
 
 ## Tests
 
