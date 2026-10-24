@@ -74,7 +74,7 @@ export async function judgeWorkSynopses(deps: HeldDeps, workId: string, held: ()
   return null;
 }
 
-export function startSynopsisJobs(deps: HeldDeps & { info: (details: Record<string, unknown>, message: string) => void; onError: (error: unknown, workId?: string) => void }): SynopsisJobs {
+export function startSynopsisJobs(deps: HeldDeps & { info: (details: Record<string, unknown>, message: string) => void; onError: (error: unknown, workId?: string) => void; initialDelayMs?: number }): SynopsisJobs {
   let quietUntil = 0;
   let budgetLoggedUntil = 0;
   let heldCache: { at: number; works: Set<string> } | null = null;
@@ -107,7 +107,10 @@ export function startSynopsisJobs(deps: HeldDeps & { info: (details: Record<stri
       return null;
     },
     (error) => deps.onError(error),
-    SWEEP_INTERVAL_MS
+    SWEEP_INTERVAL_MS,
+    undefined,
+    undefined,
+    deps.initialDelayMs
   );
   return {
     add: (workId) => queue.add(workId),

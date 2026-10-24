@@ -297,6 +297,22 @@ test("adding a work only queues it; matching happens after the caller returns", 
   jobs.stop();
 });
 
+test("the sweep waits for its initial delay before its first pass", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout", "setInterval"] });
+  const repo = freshRepo();
+  const { deps } = matching(repo, async () => ({ choice: null, confidence: 0.9, model: "jev-1.13.0" }));
+  let reads = 0;
+  const jobs = startTranslationJobs({ ...deps, heldWorkIds: () => { reads += 1; return []; }, info: () => {}, onError: (error) => { throw error; }, initialDelayMs: 90_000 });
+  await flush();
+  t.mock.timers.tick(89_999);
+  await flush();
+  assert.equal(reads, 0);
+  t.mock.timers.tick(1);
+  await flush();
+  assert.equal(reads, 1);
+  jobs.stop();
+});
+
 test("the arena check looks at each work's live id and all its aliases, however stale the ids it is given", () => {
   const repo = freshRepo();
   const pt = edition(repo, "9789720000460", { title: "O Passeio", author: "Robert Walser", language: "pt-PT" });

@@ -80,7 +80,7 @@ export async function judgeWork(deps: HeldDeps, workId: string, held: () => Set<
 type Timers = Parameters<typeof startDetailsBackfill>[3];
 
 export function startGenreJobs(
-  deps: HeldDeps & { onError: (error: unknown, workId?: string) => void; info: (details: object, message: string) => void; timers?: Timers }
+  deps: HeldDeps & { onError: (error: unknown, workId?: string) => void; info: (details: object, message: string) => void; timers?: Timers; initialDelayMs?: number }
 ): GenreJobs {
   let alertQuietUntil = 0;
   let budgetLoggedUntil = 0;
@@ -118,7 +118,9 @@ export function startGenreJobs(
     },
     (error) => deps.onError(error),
     GENRE_SWEEP_INTERVAL_MS,
-    deps.timers
+    deps.timers,
+    undefined,
+    deps.initialDelayMs
   );
   return {
     add: (workId) => queue.add(workId),

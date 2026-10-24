@@ -135,6 +135,22 @@ test("adding a work only queues it; judging happens after the caller returns", a
   jobs.stop();
 });
 
+test("the sweep waits for its initial delay before its first pass", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout", "setInterval"] });
+  const repo = freshRepo();
+  const { deps } = judging(repo, keep, []);
+  let reads = 0;
+  const jobs = startSynopsisJobs({ ...deps, heldWorkIds: () => { reads += 1; return []; }, info: () => {}, onError: (error) => { throw error; }, initialDelayMs: 75_000 });
+  await flush();
+  t.mock.timers.tick(74_999);
+  await flush();
+  assert.equal(reads, 0);
+  t.mock.timers.tick(1);
+  await flush();
+  assert.equal(reads, 1);
+  jobs.stop();
+});
+
 test("a spent budget is logged once per pause, at info level, without an alert", async () => {
   const repo = freshRepo();
   const books = [seed(repo, "9789720000081", SYNOPSIS), seed(repo, "9789720000082", `${SYNOPSIS} Two.`)];

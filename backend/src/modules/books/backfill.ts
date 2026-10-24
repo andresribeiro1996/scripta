@@ -6,23 +6,37 @@ const COLOR_BATCH_SIZE = 50;
 interface Timers {
   setInterval: (callback: () => void, delay: number) => NodeJS.Timeout;
   clearInterval: (timer: NodeJS.Timeout) => void;
+  setTimeout: (callback: () => void, delay: number) => NodeJS.Timeout;
+  clearTimeout: (timer: NodeJS.Timeout) => void;
 }
+
+const systemTimers = (): Timers => ({ setInterval, clearInterval, setTimeout, clearTimeout });
 
 export function startBackfill(
   enqueueUnchecked: () => void,
   intervalMs: number = BACKFILL_INTERVAL_MS,
-  timers: Timers = { setInterval, clearInterval }
+  timers: Timers = systemTimers()
 ): () => void {
   const timer = timers.setInterval(enqueueUnchecked, intervalMs).unref();
   return () => timers.clearInterval(timer);
+}
+
+function startFirstRun(tick: () => void, initialDelayMs: number, timers: Timers): () => void {
+  if (initialDelayMs <= 0) {
+    tick();
+    return () => {};
+  }
+  const timer = timers.setTimeout(tick, initialDelayMs).unref();
+  return () => timers.clearTimeout(timer);
 }
 
 export function startDetailsBackfill(
   runBatch: (signal: AbortSignal) => Promise<number | null | void>,
   onError: (error: unknown) => void,
   intervalMs: number = BACKFILL_INTERVAL_MS,
-  timers?: Timers,
-  now: () => number = Date.now
+  timers: Timers = systemTimers(),
+  now: () => number = Date.now,
+  initialDelayMs: number = 0
 ): () => void {
   const controller = new AbortController();
   let running = false;
@@ -35,10 +49,11 @@ export function startDetailsBackfill(
       .catch(onError)
       .finally(() => { running = false; });
   };
-  tick();
+  const stopFirstRun = startFirstRun(tick, initialDelayMs, timers);
   const stopTimer = startBackfill(tick, intervalMs, timers);
   return () => {
     controller.abort();
+    stopFirstRun();
     stopTimer();
   };
 }
@@ -70,7 +85,8 @@ export function startWorksBackfill(
   steps: WorksSteps,
   log: WorksLog,
   intervalMs?: number,
-  timers?: Timers
+  timers?: Timers,
+  initialDelayMs?: number
 ): () => void {
   return startDetailsBackfill(
     async (signal) => {
@@ -80,7 +96,9 @@ export function startWorksBackfill(
     },
     (error) => log.error({ err: error }, "works backfill failed"),
     intervalMs,
-    timers
+    timers,
+    undefined,
+    initialDelayMs
   );
 }
 
@@ -88,7 +106,8 @@ export function startCoverColorBackfill(
   step: (limit: number) => Promise<number>,
   log: WorksLog,
   intervalMs?: number,
-  timers?: Timers
+  timers?: Timers,
+  initialDelayMs?: number
 ): () => void {
   return startDetailsBackfill(
     async (signal) => {
@@ -97,7 +116,9 @@ export function startCoverColorBackfill(
     },
     (error) => log.error({ err: error }, "cover colour backfill failed"),
     intervalMs,
-    timers
+    timers,
+    undefined,
+    initialDelayMs
   );
 }
 
@@ -111,7 +132,8 @@ export function startWorksGrouping(
   groupKeylessWorks: (limit: number) => number,
   log: WorksLog,
   intervalMs: number = GROUPING_INTERVAL_MS,
-  timers?: Timers
+  timers: Timers = systemTimers(),
+  initialDelayMs: number = 0
 ): WorksGrouping {
   const controller = new AbortController();
   let running = false;
@@ -132,12 +154,13 @@ export function startWorksGrouping(
   const tick = () => {
     runNow().catch((error: unknown) => log.error({ err: error }, "works grouping failed"));
   };
-  tick();
+  const stopFirstRun = startFirstRun(tick, initialDelayMs, timers);
   const stopTimer = startBackfill(tick, intervalMs, timers);
   return {
     runNow,
     stop: () => {
       controller.abort();
+      stopFirstRun();
       stopTimer();
     }
   };

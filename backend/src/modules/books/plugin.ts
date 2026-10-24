@@ -47,6 +47,18 @@ const OPEN_LIBRARY_GAP_MS = 1000;
 const OPEN_LIBRARY_COVER_GAP_MS = 3100;
 const BACKGROUND_ISBNDB_DAILY_CAP = 500;
 const BNP_LOOKUP_TIMEOUT_MS = 5_000;
+const FIRST_RUN_DELAY_MS = {
+  detailsBackfill: 30_000,
+  workKeyBackfill: 40_000,
+  worksBackfill: 45_000,
+  colorBackfill: 50_000,
+  retitleJob: 55_000,
+  genreSweep: 60_000,
+  synopsisSweep: 75_000,
+  translationSweep: 90_000,
+  worksGrouping: 120_000,
+  bnpSync: 150_000
+};
 
 let activeService: BooksService | null = null;
 
@@ -86,7 +98,8 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
         now: Date.now,
         alert: alertTypesafe,
         onError: (error, workId) => app.log.error({ err: error, workId }, "genre judgment failed"),
-        info: (details, message) => app.log.info(details, message)
+        info: (details, message) => app.log.info(details, message),
+        initialDelayMs: FIRST_RUN_DELAY_MS.genreSweep
       })
     : null;
   const synopsisJobs = heldWorks
@@ -96,7 +109,8 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
         now: Date.now,
         alert: alertTypesafe,
         info: (details, message) => app.log.info(details, message),
-        onError: (error, workId) => app.log.error({ err: error, workId }, "synopsis judgment failed")
+        onError: (error, workId) => app.log.error({ err: error, workId }, "synopsis judgment failed"),
+        initialDelayMs: FIRST_RUN_DELAY_MS.synopsisSweep
       })
     : null;
   const sharesArena = options.worksShareAnArena ? arenaCheck(repo, options.worksShareAnArena) : () => false;
@@ -115,7 +129,8 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
         now: Date.now,
         alert: alertTypesafe,
         info: (details, message) => app.log.info(details, message),
-        onError: (error, workId) => app.log.error({ err: error, workId }, "translation matching failed")
+        onError: (error, workId) => app.log.error({ err: error, workId }, "translation matching failed"),
+        initialDelayMs: FIRST_RUN_DELAY_MS.translationSweep
       })
     : null;
   const isbndbThrottle = createThrottle(ISBNDB_GAP_MS);
@@ -186,19 +201,30 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
   const stopBackfill = startBackfill(() => timeSync(app.log, "cover-enqueue", () => service.enqueueUnchecked()));
   const stopDetailsBackfill = startDetailsBackfill(
     (signal) => service.backfillDetails(DETAILS_BATCH_SIZE, signal),
-    (error) => app.log.error({ err: error }, "details backfill failed")
+    (error) => app.log.error({ err: error }, "details backfill failed"),
+    undefined,
+    undefined,
+    undefined,
+    FIRST_RUN_DELAY_MS.detailsBackfill
   );
-  const stopWorksBackfill = startWorksBackfill(repo, app.log);
+  const stopWorksBackfill = startWorksBackfill(repo, app.log, undefined, undefined, FIRST_RUN_DELAY_MS.worksBackfill);
   const grouping = startWorksGrouping(
     (signal) => walkDuplicateWorks({ repo, sharesArena, now: Date.now }, { dryRun: false, signal, pageSize: 100, pauseMs: 250 }).then((report) => report.merges.length),
     (limit) => repo.groupKeylessWorks(limit, undefined, sharesArena),
-    app.log
+    app.log,
+    undefined,
+    undefined,
+    FIRST_RUN_DELAY_MS.worksGrouping
   );
   const stopWorkKeyBackfill = startDetailsBackfill(
     (signal) => service.backfillWorkKeys(DETAILS_BATCH_SIZE, signal),
-    (error) => app.log.error({ err: error }, "work key backfill failed")
+    (error) => app.log.error({ err: error }, "work key backfill failed"),
+    undefined,
+    undefined,
+    undefined,
+    FIRST_RUN_DELAY_MS.workKeyBackfill
   );
-  const stopColorBackfill = startCoverColorBackfill((limit) => service.fillCoverColors(limit), app.log);
+  const stopColorBackfill = startCoverColorBackfill((limit) => service.fillCoverColors(limit), app.log, undefined, undefined, FIRST_RUN_DELAY_MS.colorBackfill);
   const retitleIsbndb = isbndbConfigured ? createIsbndbCatalog(env.ISBNDB_API_KEY, isbndbThrottle, isbndbGate, false, { details: isbndbSpend, search: isbndbSpend }) : null;
   const stopRetitleJob = retitleIsbndb
     ? startDetailsBackfill(
@@ -209,7 +235,11 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
           info: (details, message) => app.log.info(details, message),
           warn: (details, message) => app.log.warn(details, message)
         }, RETITLE_BATCH_SIZE, signal),
-        (error) => app.log.error({ err: error }, "lossy retitle failed")
+        (error) => app.log.error({ err: error }, "lossy retitle failed"),
+        undefined,
+        undefined,
+        undefined,
+        FIRST_RUN_DELAY_MS.retitleJob
       )
     : null;
   const stopBnpSync = startDetailsBackfill(
@@ -218,7 +248,10 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
       if (report) logBnpSync(app.log, report);
     },
     (error) => app.log.error({ err: error }, "bnp sync failed"),
-    BNP_SYNC_INTERVAL_MS
+    BNP_SYNC_INTERVAL_MS,
+    undefined,
+    undefined,
+    FIRST_RUN_DELAY_MS.bnpSync
   );
   activeService = service;
   app.addHook("onClose", async () => {

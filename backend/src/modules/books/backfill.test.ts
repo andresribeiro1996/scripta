@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { GROUPING_INTERVAL_MS, startBackfill, startCoverColorBackfill, startDetailsBackfill, startWorksBackfill, startWorksGrouping } from "./backfill.js";
 
 function fakeTimers() {
-  const state = { callback: null as (() => void) | null, delay: 0, unrefs: 0, cleared: [] as object[] };
+  const state = { callback: null as (() => void) | null, delay: 0, firstRun: null as { callback: () => void; delay: number } | null, unrefs: 0, cleared: [] as object[] };
   const handle = { unref() { state.unrefs++; return handle; } };
   return {
     state,
@@ -14,7 +14,12 @@ function fakeTimers() {
         state.delay = delay;
         return handle as unknown as NodeJS.Timeout;
       },
-      clearInterval: (value: NodeJS.Timeout) => { state.cleared.push(value); }
+      clearInterval: (value: NodeJS.Timeout) => { state.cleared.push(value); },
+      setTimeout: (callback: () => void, delay: number) => {
+        state.firstRun = { callback, delay };
+        return handle as unknown as NodeJS.Timeout;
+      },
+      clearTimeout: () => { state.firstRun = null; }
     }
   };
 }
@@ -115,6 +120,36 @@ test("a batch that reports a pause makes the details backfill skip ticks until t
   await new Promise((resolve) => setImmediate(resolve));
   state.callback!();
   assert.equal(batches, 3);
+});
+
+test("a details backfill given an initial delay runs nothing until it passes, then once, then every interval", async () => {
+  const { state, timers } = fakeTimers();
+  let batches = 0;
+  startDetailsBackfill(async () => { batches++; }, () => {}, 600_000, timers, undefined, 30_000);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(batches, 0);
+  assert.equal(state.firstRun?.delay, 30_000);
+  assert.equal(state.delay, 600_000);
+  assert.equal(state.unrefs, 2);
+  state.firstRun!.callback();
+  assert.equal(batches, 1);
+  await new Promise((resolve) => setImmediate(resolve));
+  state.callback!();
+  assert.equal(batches, 2);
+});
+
+test("stopping a details backfill before its initial delay passes cancels the first run", () => {
+  const { state, timers } = fakeTimers();
+  const stop = startDetailsBackfill(async () => {}, () => {}, 600_000, timers, undefined, 30_000);
+  assert.notEqual(state.firstRun, null);
+  stop();
+  assert.equal(state.firstRun, null);
+});
+
+test("a details backfill without an initial delay never sets a first-run timer", () => {
+  const { state, timers } = fakeTimers();
+  startDetailsBackfill(async () => {}, () => {}, 600_000, timers);
+  assert.equal(state.firstRun, null);
 });
 
 function fakeLog() {
@@ -247,6 +282,33 @@ test("works grouping drains at start on a daily unref'd timer, and logs what it 
   state.callback!();
   await until(() => info.length > 1);
   assert.deepEqual(info[1], { details: { grouped: 1 }, message: "grouped keyless works by title" });
+});
+
+test("works grouping given an initial delay runs nothing until it passes, then once, then on its daily timer", async () => {
+  const { state, timers } = fakeTimers();
+  const { log, info } = fakeLog();
+  const sizes = [5, 3];
+  const limits: number[] = [];
+  startWorksGrouping(async () => 0, (limit) => { limits.push(limit); return sizes.shift() ?? 0; }, log, undefined, timers, 120_000);
+  await until(() => limits.length > 0);
+  assert.deepEqual(limits, []);
+  assert.equal(state.firstRun?.delay, 120_000);
+  assert.equal(state.delay, GROUPING_INTERVAL_MS);
+  state.firstRun!.callback();
+  await until(() => info.length === 1);
+  assert.deepEqual(info[0]!.details, { grouped: 5 });
+  state.callback!();
+  await until(() => info.length === 2);
+  assert.deepEqual(info[1]!.details, { grouped: 3 });
+});
+
+test("stopping works grouping before its initial delay passes cancels the first run", () => {
+  const { state, timers } = fakeTimers();
+  const { log } = fakeLog();
+  const grouping = startWorksGrouping(async () => 0, () => 0, log, undefined, timers, 120_000);
+  assert.notEqual(state.firstRun, null);
+  grouping.stop();
+  assert.equal(state.firstRun, null);
 });
 
 test("works grouping merges duplicate works before grouping keyless ones", async () => {

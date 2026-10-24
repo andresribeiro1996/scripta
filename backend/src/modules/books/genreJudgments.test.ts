@@ -159,7 +159,9 @@ test("the sweep runs at boot and again after 24 hours", async () => {
       ticks.push({ callback, delay });
       return timer as unknown as NodeJS.Timeout;
     },
-    clearInterval: (timer: NodeJS.Timeout) => { cleared.push(timer); }
+    clearInterval: (timer: NodeJS.Timeout) => { cleared.push(timer); },
+    setTimeout,
+    clearTimeout
   };
   const jobs = startGenreJobs({ ...deps(repo, held, answer("History", 0.9)), onError: (error) => { throw error; }, info: () => {}, timers });
   await flush();
@@ -173,6 +175,32 @@ test("the sweep runs at boot and again after 24 hours", async () => {
   ticks[0]!.callback();
   await flush();
   assert.equal(genresOf(db, "Late"), JSON.stringify(["History"]));
+  jobs.stop();
+  assert.equal(cleared.length, 1);
+});
+
+test("a sweep given an initial delay judges nothing until it passes, and stopping clears its timer", async () => {
+  const { db, repo, workIds } = seeded(["Early"]);
+  const scheduled: Array<{ callback: () => void; delay: number }> = [];
+  const cleared: unknown[] = [];
+  const timers = {
+    setInterval: () => ({ unref() { return this; } }) as unknown as NodeJS.Timeout,
+    clearInterval: () => {},
+    setTimeout: (callback: () => void, delay: number) => {
+      const timer = { unref() { return timer; } };
+      scheduled.push({ callback, delay });
+      return timer as unknown as NodeJS.Timeout;
+    },
+    clearTimeout: (timer: NodeJS.Timeout) => { cleared.push(timer); }
+  };
+  const options = { ...deps(repo, workIds, answer("History", 0.9)), onError: (error: unknown) => { throw error; }, info: () => {}, timers, initialDelayMs: 60_000 };
+  const jobs = startGenreJobs(options);
+  await flush();
+  assert.equal(genresOf(db, "Early"), "[]");
+  assert.deepEqual(scheduled.map((tick) => tick.delay), [60_000]);
+  scheduled[0]!.callback();
+  await flush();
+  assert.equal(genresOf(db, "Early"), JSON.stringify(["History"]));
   jobs.stop();
   assert.equal(cleared.length, 1);
 });
