@@ -26,9 +26,7 @@ function setup(now = "2026-10-21T10:00:00Z") {
   const shelf = { getWorkPage: (id: string) => (id === "gone" || id === "w-old" ? undefined : { id, title: `Title ${id}`, author: "A", editions: [{ coverUrl: `https://cdn.test/${id}.jpg` }] }) } as unknown as TopShelfDeps;
   const community = {
     repo: { getProfileRow: () => undefined, getFeedSettings: () => undefined },
-    tierlists: { getPublishedMany: (ids: string[]) => ids.map((id) => ({ id, ownerUserId: "u1", createdAt: "2026-10-05T00:00:00.000Z", voteCode: `c-${id}`, name: `List ${id}`, poolSize: 4, ballotCount: 5, eligibleVoteCount: 5, promotedAt: null, votingOpen: true, covers: [] })), votedAmong: () => [] },
-    tournaments: { getPublishedMany: () => [], votedAmong: () => [] },
-    quizzes: { getPublishedMany: () => [], votedAmong: () => [] },
+    games: { tierlist: { getMany: (ids: string[]) => ids.map((id) => ({ id, ownerUserId: "u1", createdAt: "2026-10-05T00:00:00.000Z", promoted: false, content: { kind: "tierlist", id, voteCode: `c-${id}`, name: `List ${id}`, poolSize: 4, ballotCount: 5, promotedAt: null, votingOpen: true, covers: [] } })) }, tournament: { getMany: () => [] }, quiz: { getMany: () => [] } },
     resolveProfiles: (ids: string[]) => new Map(ids.map((id) => [id, { username: `user-${id}`, avatarUrl: null }])),
     readerGlyphFor: () => null,
   } as never;

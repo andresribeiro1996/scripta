@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { TierlistShelfFacts } from "../tierlists/service.js";
+import type { GameCard } from "./domain/games.js";
 import { createShelfGatherer, createTopShelfService, type TopShelfDeps } from "./topShelfService.js";
 
 const facts = (id: string, workIds: string[], votesSince = 3): TierlistShelfFacts => ({ id, ownerUserId: "u1", open: true, promoted: false, createdAt: "2026-10-05T00:00:00.000Z", voters: 5, votesSince, workIds, placements: [] });
@@ -19,12 +20,10 @@ function setup(clock = { at: Date.parse("2026-10-21T10:00:00Z") }) {
       return { id, title: `Title ${id}`, author: `Author ${id}`, summary: null, aliasIds: [], editions: [{ coverUrl: null }, { coverUrl: `https://cdn.test/${id}.jpg` }] } as never;
     },
   };
-  const ref = (id: string) => ({ id, ownerUserId: "u1", createdAt: "2026-10-05T00:00:00.000Z", voteCode: `c-${id}`, name: `List ${id}`, poolSize: 4, ballotCount: 5, eligibleVoteCount: 5, promotedAt: null, votingOpen: true, covers: [] });
+  const card = (id: string): GameCard<"tierlist"> => ({ id, ownerUserId: "u1", createdAt: "2026-10-05T00:00:00.000Z", promoted: false, content: { kind: "tierlist", id, voteCode: `c-${id}`, name: `List ${id}`, poolSize: 4, ballotCount: 5, promotedAt: null, votingOpen: true, covers: [] } });
   const community = {
     repo: { getProfileRow: () => undefined, getFeedSettings: () => undefined },
-    tierlists: { getPublishedMany: (ids: string[]) => ids.map(ref), votedAmong: () => [] },
-    tournaments: { getPublishedMany: () => [], votedAmong: () => [] },
-    quizzes: { getPublishedMany: () => [], votedAmong: () => [] },
+    games: { tierlist: { getMany: (ids: string[]) => ids.map(card) }, tournament: { getMany: () => [] }, quiz: { getMany: () => [] } },
     resolveProfiles: (ids: string[]) => new Map(ids.map((id) => [id, { username: `user-${id}`, avatarUrl: null }])),
     readerGlyphFor: () => null,
   } as never;

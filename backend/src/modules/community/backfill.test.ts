@@ -31,6 +31,7 @@ const FAILED = "community feed backfill failed";
 const unused = () => {
   throw new Error("the backfill does not read this");
 };
+const unusedGame = { get: unused, getMany: unused, listByOwner: unused, discoverWindow: unused, discoverByWorks: unused, participation: unused, shelfFacts: unused };
 const topShelfDeps = {
   tierlistFacts: () => [],
   tournamentFacts: () => [],
@@ -55,10 +56,9 @@ const baseDeps: Omit<CommunityDeps, "repo" | "background"> = {
   searchUsernameOwners: unused,
   matchWorks: unused,
   murals: { ownsMural: unused, getMuralPublicPayload: unused, getMuralSummary: unused },
-  tierlists: { discoverWindow: unused, getPublishedMany: unused, votedAmong: unused, get: unused, listByOwner: unused, discoverByWorks: unused, fillRankingCovers: unused },
-  tournaments: { completedForParticipant: () => [], discoverWindow: unused, getPublishedMany: unused, votedAmong: unused, get: unused, listByOwner: unused, discoverByWorks: unused },
-  quizzes: { discoverWindow: unused, getPublishedMany: unused, votedAmong: unused, get: unused, listByOwner: unused, discoverByWorks: unused },
-  participation: { tierlists: unused, tournaments: unused, quizzes: unused }
+  games: { tierlist: unusedGame, tournament: unusedGame, quiz: unusedGame },
+  rankingCovers: unused,
+  completedTournaments: () => []
 };
 
 type Db = ReturnType<typeof openCommunityDb>;

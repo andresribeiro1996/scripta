@@ -32,6 +32,7 @@ const SHOWS_READING = { ...DEFAULT_FEED_SETTINGS, reading: true };
 const unused = () => {
   throw new Error("the archive does not read this");
 };
+const unusedGame = { get: unused, getMany: unused, listByOwner: unused, discoverWindow: unused, discoverByWorks: unused, participation: unused, shelfFacts: unused };
 const topShelfDeps = {
   tierlistFacts: () => [],
   tournamentFacts: () => [],
@@ -59,10 +60,9 @@ const inertDeps: Omit<CommunityDeps, "repo"> = {
   searchUsernameOwners: unused,
   matchWorks: unused,
   murals: { ownsMural: unused, getMuralPublicPayload: unused, getMuralSummary: unused },
-  tierlists: { discoverWindow: unused, getPublishedMany: unused, votedAmong: unused, get: unused, listByOwner: unused, discoverByWorks: unused, fillRankingCovers: unused },
-  tournaments: { completedForParticipant: () => [], discoverWindow: unused, getPublishedMany: unused, votedAmong: unused, get: unused, listByOwner: unused, discoverByWorks: unused },
-  quizzes: { discoverWindow: unused, getPublishedMany: unused, votedAmong: unused, get: unused, listByOwner: unused, discoverByWorks: unused },
-  participation: { tierlists: unused, tournaments: unused, quizzes: unused }
+  games: { tierlist: unusedGame, tournament: unusedGame, quiz: unusedGame },
+  rankingCovers: unused,
+  completedTournaments: () => []
 };
 
 type LogLine = { level: number; msg: string; moved?: number; purged?: number; err?: { message: string } };

@@ -22,7 +22,7 @@ export interface TopShelfService {
   getTopShelf(query: TopShelfQuery): TopShelf;
 }
 
-export type DiscoverDeps = Pick<CommunityDeps, "repo" | "tierlists" | "tournaments" | "quizzes" | "resolveProfiles" | "readerGlyphFor">;
+export type DiscoverDeps = Pick<CommunityDeps, "repo" | "games" | "resolveProfiles" | "readerGlyphFor">;
 
 const CACHE_MS = 60_000;
 const PODIUM = 3;
