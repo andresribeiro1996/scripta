@@ -9,7 +9,6 @@ export function deleteBooks(data: LibraryData, keys: ReadonlySet<string>): Libra
   return { ...data, books, book_count: books.length, ...(groups ? { groups } : {}) };
 }
 
-
 function restoreKeys(current: string[], snapshot: string[], keys: ReadonlySet<string>): string[] {
   const restored = [...current];
   for (const key of snapshot) {

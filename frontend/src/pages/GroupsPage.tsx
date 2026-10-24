@@ -1,6 +1,6 @@
 import { useSearchParams } from "react-router-dom";
 import { useMemo, useState, type ComponentType } from "react";
-import { saveFailureMessage } from "@scripta/shared";
+import { deleteBooks, restoreDeletedBooks, saveFailureMessage } from "@scripta/shared";
 import type { GalleryImage } from "../api/gallery";
 import { BookCard } from "../components/BookCard";
 import { BookGrid } from "../components/BookGrid";
@@ -26,7 +26,6 @@ import {
   makeGroup,
   normalizeGroupName,
   orderedGroupBooks,
-  removeBooksFromAllGroups,
   renameGroup,
   setGroupStyle,
   type Group,
@@ -35,7 +34,6 @@ import {
 import { seriesGroupByBookKey } from "../lib/libraryOrder";
 import { effectiveCardStyle, resolveLibraryStyle, type PerCardStyle } from "../lib/libraryStyle";
 import { bookKey } from "../lib/merge";
-import { restoreDeletedBooks } from "../lib/restoreDeletedBooks";
 
 const COPY: Record<GroupType, { title: string; noun: string; emptyTitle: string; emptyBody: string; untitled: string; icon: ComponentType<{ size?: number }> }> = {
   series: {
@@ -258,10 +256,6 @@ export function GroupsPage({ type }: { type: GroupType }) {
     setSelectedKeys(new Set());
   }
 
-  // Scrubs every selected book's key out of every group's bookKeys too
-  // (lib/groups.ts's removeBooksFromAllGroups) in the same save, so a
-  // deleted book doesn't linger as a dangling reference in any series or
-  // collection it was in.
   async function handleDeleteSelected() {
     if (selectedKeys.size === 0) return;
     const initialSnapshot = library?.data;
@@ -271,11 +265,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
     try {
       await updateLibrary((data) => {
         snapshot = data;
-        return {
-          ...data,
-          books: data.books.filter((b) => !keys.has(bookKey(b))),
-          groups: removeBooksFromAllGroups(data.groups ?? [], keys)
-        };
+        return deleteBooks(data, keys);
       });
     } catch (error) {
       toast({ message: saveFailureMessage(error, "Couldn't delete — nothing was changed."), kind: "error" });
@@ -283,9 +273,6 @@ export function GroupsPage({ type }: { type: GroupType }) {
     }
     setSelectedKeys(new Set());
     setSelectionMode(false);
-    // Independent of the library save above — see LibraryPage.tsx's own
-    // handleDeleteSelected for why murals are scrubbed via a separate
-    // call rather than a field on that save.
     const scrubTimer = setTimeout(() => void scrubBooks(keys), 6500);
     toast({
       message: `Deleted ${keys.size} book${keys.size === 1 ? "" : "s"}.`,
