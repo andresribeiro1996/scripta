@@ -157,3 +157,14 @@ test("Jev reads the work's title, author, edition languages, publishers and long
     { title: "Os Anões", language: "pt-PT", isbn: null, publisher: "Relógio", year: null, summary: null }
   ] }), { title: "Os Anões", author: "Harold Pinter", editionLanguages: ["pt-PT", "en"], publishers: ["Relógio"], synopsis: "x".repeat(1200) });
 });
+
+test("four works hitting a rejected key at once send one alert", async () => {
+  const { repo, workIds } = seeded(["K1", "K2", "K3", "K4"]);
+  const alerts: string[] = [];
+  const key: Classify = async () => { throw new SourceUnavailableError("typesafe", "HTTP 401", { status: 401 }); };
+  const jobs = startGenreJobs({ ...deps(repo, workIds, key, alerts), onError: (error) => { throw error; }, info: () => {} });
+  for (const workId of workIds) jobs.add(workId);
+  await flush();
+  jobs.stop();
+  assert.deepEqual(alerts, ["TypeSafe rejected the genre requests"]);
+});
