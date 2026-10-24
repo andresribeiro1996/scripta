@@ -1,11 +1,9 @@
 import { createJevMatchClassifier, type ClassifyMatch } from "./adapters/typesafe/jevWorkMatch.js";
-import { startDetailsBackfill } from "./backfill.js";
 import { WorkMergeError } from "./domain/errors.js";
 import type { BooksRepository } from "./domain/ports.js";
 import { authorPattern, evidenceOf, hasVolumeMarker, MATCH_MERGE_AT, MAX_CANDIDATES, mentionsSurname, sameMainTitle, sameWholeTitle, seriesLikeOriginals, surnameOf, titlePatterns, type SeriesLike, type TranslationEvidence } from "./domain/translation.js";
-import { JEV_REJECTION_LIMIT } from "./synopsisJudgments.js";
-import { dailySpend, failureKind, nextUtcMidnight, strikeReason } from "./typesafe.js";
-import { createWorkQueue } from "./workQueue.js";
+import { heldCanonical, JEV_REJECTION_LIMIT, JEV_SWEEP_LIMIT, jevPause, startJevJobs, type JevJobs, type JevJobsDeps, type JevPauseDeps } from "./jevJobs.js";
+import { dailySpend } from "./typesafe.js";
 
 export type MatchCandidate = { id: string; title: string; author: string; year: number | null };
 export type MatchPlan = { kind: "original" } | { kind: "none" } | { kind: "code"; intoWorkId: string } | { kind: "ask"; evidence: TranslationEvidence; candidates: MatchCandidate[] };
@@ -45,8 +43,7 @@ export function planMatch(repo: PlanRepo, workId: string, isSeriesLike: SeriesLi
   return { kind: "ask", evidence, candidates };
 }
 
-const OUTAGE_PAUSE_MS = 10 * 60 * 1000;
-const KEY_PAUSE_MS = 24 * 60 * 60 * 1000;
+const TRANSLATION_KEY_ALERT = { subject: "TypeSafe rejected the translation requests", text: "TypeSafe answered 401, so translation matching is paused for a day. Check TYPESAFE_API_KEY." };
 
 export function arenaCheck(repo: Pick<BooksRepository, "canonicalWorkIds" | "aliasesOf">, worksShareAnArena: (aIds: string[], bIds: string[]) => boolean): (fromWorkId: string, intoWorkId: string) => boolean {
   const ids = (id: string) => {
@@ -56,12 +53,10 @@ export function arenaCheck(repo: Pick<BooksRepository, "canonicalWorkIds" | "ali
   return (fromWorkId, intoWorkId) => worksShareAnArena(ids(fromWorkId), ids(intoWorkId));
 }
 
-export type TranslationDeps = {
+export type TranslationDeps = JevPauseDeps & {
   repo: BooksRepository;
   classify: ClassifyMatch;
   sharesArena: (fromWorkId: string, intoWorkId: string) => boolean;
-  now: () => number;
-  alert: (subject: string, text: string) => void;
 };
 
 function decide(deps: TranslationDeps, workId: string, model: string, intoWorkId: string | null, confidence: number | null, merge: boolean, at: string) {
@@ -95,37 +90,18 @@ export async function matchWork(deps: TranslationDeps, workId: string, isSeriesL
     decide(deps, workId, answer.model, into, answer.confidence, answer.confidence >= MATCH_MERGE_AT, at());
     return null;
   } catch (error) {
-    const kind = failureKind(error);
-    if (kind === "book") {
-      deps.repo.recordJevRejection({ task: "works", subject: workId, ...strikeReason(error), at: at() });
-      return null;
-    }
-    if (kind === "budget") return nextUtcMidnight(deps.now());
-    if (kind === "outage") return deps.now() + OUTAGE_PAUSE_MS;
-    if (kind === "key") {
-      deps.alert("TypeSafe rejected the translation requests", "TypeSafe answered 401, so translation matching is paused for a day. Check TYPESAFE_API_KEY.");
-      return deps.now() + KEY_PAUSE_MS;
-    }
-    throw error;
+    return jevPause(error, deps, TRANSLATION_KEY_ALERT, (strike) => deps.repo.recordJevRejection({ task: "works", subject: workId, ...strike, at: at() }));
   }
 }
 
 export const WORK_MATCH_SOURCE = "works";
 export const WORK_MATCH_DAILY_BUDGET = 1000;
-const IN_FLIGHT = 4;
-const SWEEP_LIMIT = 1000;
-const SWEEP_INTERVAL_MS = 24 * 60 * 60 * 1000;
-const HELD_CACHE_MS = 60 * 1000;
 const SERIES_LIKE_CACHE_MS = 10 * 60 * 1000;
 
 type HeldDeps = TranslationDeps & { heldWorkIds: () => string[] };
-export type TranslationJobs = { add(workId: string): void; stop(): void };
+export type TranslationJobs = JevJobs;
 
-function heldCanonical(deps: HeldDeps): Set<string> {
-  return new Set(deps.repo.canonicalWorkIds(deps.heldWorkIds()).values());
-}
-
-export async function judgeWorkMatch(deps: HeldDeps, workId: string, held: () => Set<string> = () => heldCanonical(deps), seriesLike: () => SeriesLike = () => seriesLikeOriginals(deps.repo.originalTitleClaims())): Promise<number | null> {
+export async function judgeWorkMatch(deps: HeldDeps, workId: string, held: () => Set<string> = () => heldCanonical(deps.repo, deps.heldWorkIds()), seriesLike: () => SeriesLike = () => seriesLikeOriginals(deps.repo.originalTitleClaims())): Promise<number | null> {
   const canonical = deps.repo.canonicalWorkIds([workId]).get(workId);
   if (!canonical || !held().has(canonical)) return null;
   if (deps.repo.portugueseWorksNeedingMatch([canonical], 1, JEV_REJECTION_LIMIT, null).length === 0) return null;
@@ -133,55 +109,18 @@ export async function judgeWorkMatch(deps: HeldDeps, workId: string, held: () =>
   return matchWork(deps, canonical, seriesLike());
 }
 
-export function startTranslationJobs(deps: HeldDeps & { info: (details: Record<string, unknown>, message: string) => void; onError: (error: unknown, workId?: string) => void; initialDelayMs?: number }): TranslationJobs {
-  let quietUntil = 0;
-  let budgetLoggedUntil = 0;
-  let heldCache: { at: number; works: Set<string> } | null = null;
+export function startTranslationJobs(deps: JevJobsDeps & { repo: BooksRepository; classify: ClassifyMatch; sharesArena: TranslationDeps["sharesArena"] }): TranslationJobs {
   let seriesLikeCache: { at: number; rule: SeriesLike } | null = null;
-  const alert = (subject: string, text: string) => {
-    if (deps.now() < quietUntil) return;
-    quietUntil = deps.now() + KEY_PAUSE_MS;
-    deps.alert(subject, text);
-  };
-  const held = () => {
-    if (!heldCache || deps.now() - heldCache.at >= HELD_CACHE_MS) heldCache = { at: deps.now(), works: heldCanonical(deps) };
-    return heldCache.works;
-  };
   const seriesLike = () => {
     if (!seriesLikeCache || deps.now() - seriesLikeCache.at >= SERIES_LIKE_CACHE_MS) seriesLikeCache = { at: deps.now(), rule: seriesLikeOriginals(deps.repo.originalTitleClaims()) };
     return seriesLikeCache.rule;
   };
-  const classify: ClassifyMatch = async (input) => {
-    try {
-      return await deps.classify(input);
-    } catch (error) {
-      if (failureKind(error) === "budget" && deps.now() >= budgetLoggedUntil) {
-        budgetLoggedUntil = nextUtcMidnight(deps.now());
-        deps.info({ source: WORK_MATCH_SOURCE, until: new Date(budgetLoggedUntil).toISOString() }, "TypeSafe budget spent; translation matching waits for the next UTC day");
-      }
-      throw error;
-    }
-  };
-  const judged = { ...deps, alert, classify };
-  const queue = createWorkQueue({ concurrency: IN_FLIGHT, now: deps.now, run: (workId) => judgeWorkMatch(judged, workId, held, seriesLike), onError: deps.onError });
-  const stopSweep = startDetailsBackfill(
-    async () => {
-      heldCache = { at: deps.now(), works: heldCanonical(deps) };
-      for (const workId of deps.repo.portugueseWorksNeedingMatch([...heldCache.works], SWEEP_LIMIT, JEV_REJECTION_LIMIT, null)) queue.add(workId);
-      return null;
-    },
-    (error) => deps.onError(error),
-    SWEEP_INTERVAL_MS,
-    undefined,
-    deps.initialDelayMs
-  );
-  return {
-    add: (workId) => queue.add(workId),
-    stop: () => {
-      stopSweep();
-      queue.stop();
-    }
-  };
+  return startJevJobs(deps, {
+    source: WORK_MATCH_SOURCE,
+    budgetMessage: "TypeSafe budget spent; translation matching waits for the next UTC day",
+    sweep: (held) => deps.repo.portugueseWorksNeedingMatch(held, JEV_SWEEP_LIMIT, JEV_REJECTION_LIMIT, null),
+    judge: (workId, held, pause) => judgeWorkMatch({ ...deps, ...pause }, workId, held, seriesLike)
+  });
 }
 
 export function startTranslationJobsIfConfigured(apiKey: string, deps: Omit<Parameters<typeof startTranslationJobs>[0], "classify">): TranslationJobs | null {

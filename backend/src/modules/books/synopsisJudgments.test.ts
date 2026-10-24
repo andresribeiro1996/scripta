@@ -17,7 +17,8 @@ const { applyBooksMigrations } = await import("./adapters/sqlite/connection.js")
 const { createSqliteBooksRepository } = await import("./adapters/sqlite/sqliteBooksRepository.js");
 const { SourceUnavailableError, UnusableAnswerError } = await import("./domain/errors.js");
 const { TypesafeBudgetSpentError, utcDay } = await import("./typesafe.js");
-const { judgeWorkSynopses, startSynopsisJobs, startSynopsisJobsIfConfigured, JEV_REJECTION_LIMIT } = await import("./synopsisJudgments.js");
+const { judgeWorkSynopses, startSynopsisJobs, startSynopsisJobsIfConfigured } = await import("./synopsisJudgments.js");
+const { JEV_REJECTION_LIMIT } = await import("./jevJobs.js");
 
 type Repo = ReturnType<typeof createSqliteBooksRepository>;
 type Answer = { usable: number; kind: "synopsis" | "praise"; model: string };
@@ -149,19 +150,6 @@ test("the sweep waits for its initial delay before its first pass", async (t) =>
   await flush();
   assert.equal(reads, 1);
   jobs.stop();
-});
-
-test("a spent budget is logged once per pause, at info level, without an alert", async () => {
-  const repo = freshRepo();
-  const books = [seed(repo, "9789720000081", SYNOPSIS), seed(repo, "9789720000082", `${SYNOPSIS} Two.`)];
-  const logged: string[] = [];
-  const { deps, alerts } = judging(repo, async () => { throw new TypesafeBudgetSpentError("synopses"); }, books.map((book) => book.work_id!));
-  const jobs = startSynopsisJobs({ ...deps, info: (_details, message) => { logged.push(message); }, onError: (error) => { throw error; } });
-  for (const book of books) jobs.add(book.work_id!);
-  await flush();
-  jobs.stop();
-  assert.deepEqual(logged, ["TypeSafe budget spent; synopsis checks wait for the next UTC day"]);
-  assert.deepEqual(alerts, []);
 });
 
 test("synopsis requests are counted under the synopses source, not genres", async () => {

@@ -1,6 +1,6 @@
 import { startDetailsBackfill } from "./backfill.js";
 import { arrivalKey, evidenceOf, mentionsSurname, originalKey, originalWholeKey, sameWholeTitle, seriesLikeOriginals, sharedOriginals, surnameOf, type OriginalClaim } from "./domain/translation.js";
-import { JEV_REJECTION_LIMIT } from "./synopsisJudgments.js";
+import { JEV_REJECTION_LIMIT } from "./jevJobs.js";
 import { joinByCode } from "./translationBacklog.js";
 import { planMatch, type TranslationDeps } from "./translationJudgments.js";
 
