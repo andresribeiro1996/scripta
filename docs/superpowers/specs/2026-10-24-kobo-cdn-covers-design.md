@@ -13,15 +13,16 @@ Every Kobo import already carries a cover key that nothing on the server uses:
 
 1. **A catalog column, `books.kobo_image_id TEXT`.** It is in `books.sql` for new databases and added on boot to existing ones, as `apple_checked_at` is (`adapters/sqlite/connection.ts:36`). `BookRow` gets `kobo_image_id: string | null`.
 2. **`BookLookup` gains `imageId?: string | null`.** The books module checks it again with `normalizeImageId` from `@scripta/shared` (`packages/shared/src/library/covers.ts:33-36`); an id that fails is ignored. The HTTP routes are unchanged: `lookupSchema` (`backend/src/modules/books/routes.ts:9-13`) still strips the field, so only server-side callers can pass one.
-3. **Recording an id**, in `booksService.ts`, for each lookup whose book `findOrCreateBook` returns:
+3. **Recording an id**, in `booksService.ts`:
    - If the id is valid and the book has no `kobo_image_id`, store it. The first id wins and is never overwritten.
-   - If the id was just stored, the book's status is `missing` or `low_res`, and the book is not due (`lookupDue`), mark it upgrade-wanted (`setUpgradeWanted(book.id, now)`) and schedule it on the `upgrade` lane. A `good` or `manual` book, and a book with no status yet, is left as it is.
-   - `enqueueCovers(lookups)` records, then schedules due books on the normal lane exactly as today.
-   - A new `recordKoboImageIds(lookups)` only records. It never schedules a book because it is due, so a run over every library spends no ISBNdb or Open Library quota on books that only happened to be due.
+   - A book **wants a Kobo upgrade** when its status is `missing` or `low_res`, or when it matches the existing watermark rule (`booksService.ts:392`): status `good`, current image from `isbndb`, and `isPortugueseIsbn(book.isbn)`. A `manual` book, a `good` cover from any other source, and a book with no status yet never do; a book with no status is already on the unchecked list.
+   - **`enqueueCovers(lookups)`**, the import path, uses `findOrCreateBook` as today and records the id. A due book is scheduled on the normal lane exactly as today, with Kobo tried first. A book that is not due, whose id was just stored and which wants a Kobo upgrade, is marked upgrade-wanted (`setUpgradeWanted(book.id, now)`) and scheduled on the `upgrade` lane.
+   - **A new `recordKoboImageIds(lookups)`**, the backfill, only touches books that already exist (`lookupIdentity` + `findExisting`, `domain/findOrCreate.ts:11-25`), so it never creates a catalog row. It records the id, and marks upgrade-wanted and schedules `upgrade` for a book whose id was just stored and which wants a Kobo upgrade, due or not. It never schedules the normal lane, so it spends no ISBNdb or Open Library quota. The whole pass runs in one `repo.transaction`.
 4. **Lookup.** `findBestCover`'s book gains `koboImageId?: string | null`. When it is set, the first step is one candidate, `{ source: "kobo", url: koboCoverUrl(id) }`, before the ISBN steps, whatever the lane. It is an exact identifier, so there is no title or author check. Rejected URLs, `isAcceptableCover` and the 400 px stop apply as for any source.
-   - `koboCoverUrl(id)` in a new `backend/src/modules/books/adapters/sources/kobo.ts` returns `https://cdn.kobo.com/book-images/${encodeURIComponent(id)}/1200/1800/false/image.jpg`. The path is Kobo's own image template, `{ImageId}/{Width}/{Height}/false/image.jpg`; 1200×1800 asks for more than `encodeCover`'s 1600 px cap needs at a cover's usual 1.5 ratio.
-   - `CoverSourceName` (`domain/types.ts:5`) and `CoverCandidate.source` (`domain/ports.ts`) gain `"kobo"`.
+   - `koboCoverUrl(id)` in a new `backend/src/modules/books/adapters/sources/kobo.ts` returns `https://cdn.kobo.com/book-images/${encodeURIComponent(id)}/1200/1800/False/image.jpg`: the viewer's proven URL, with the size raised past `encodeCover`'s 1600 px cap at a cover's usual 1.5 ratio.
+   - `CoverSourceName` (`domain/types.ts:5`) gains `"kobo"`; `CoverCandidate.source` (`domain/ports.ts:143`) follows it.
    - `processBook` passes `book.kobo_image_id`.
+   - **Apple's 30-day stamp stays honest.** A Kobo cover of 400 px or more ends the lookup before Apple is asked, so `processBook` doesn't stamp `apple_checked_at` when `outcome.found` is a Kobo candidate at least `MIN_GOOD_WIDTH` wide. Kobo is the first step, so that is exactly the case where Apple was skipped.
    - `fetchImage` (`plugin.ts`) throttles Kobo images to one request a second (`KOBO_COVER_GAP_MS = 1000`), as it already throttles Open Library's covers.
 5. **Backfill from libraries already imported.**
    - `koboCoverLookups()` in `backend/src/modules/library/workHolders.ts` reads `SELECT DISTINCT isbn, title, author, image_id FROM library_books WHERE image_id IS NOT NULL`. It keeps the rows whose id passes `normalizeImageId` and returns `{ isbn, title, author, imageId }` lookups. It is exported from the library index like `heldWorks`.
@@ -31,8 +32,9 @@ Every Kobo import already carries a cover key that nothing on the server uses:
 ## Behaviour
 
 - **A new Kobo import:** each store book's catalog row gets its id. Books that are due run on the normal lane with Kobo tried first, so a Kobo cover of 400 px or more costs no ISBNdb call.
-- **A book imported before this change** that has no good cover: the first `kobo covers` run marks it upgrade-wanted, and the upgrade lane fetches Kobo before asking Apple.
-- **`good` and `manual` covers are never touched.** The one exception follows the existing rule (`replacesWatermark`, `booksService.ts:378`): an ISBNdb cover on a Portuguese ISBN that is already wanted for an upgrade is replaced by a Kobo cover of 400 px or more, because those ISBNdb covers carry a watermark.
+- **A book imported before this change** that is `missing` or `low_res`, or has a watermarked Portuguese ISBNdb cover: the first `kobo covers` run marks it upgrade-wanted, and the upgrade lane fetches Kobo before asking Apple. The watermarked cover is replaced by a Kobo cover of 400 px or more through the existing `replacesWatermark` rule (`booksService.ts:378`).
+- **Other `good` covers and `manual` covers are never touched.**
+- **A book with no status yet** keeps its place on the unchecked list; when the background lane reaches it, Kobo is tried first.
 - **An ISBN-less copy of the same work** borrows the Kobo cover through the existing sibling lending (`domain/siblingCover.ts`).
 - **"Wrong cover"** rejects a Kobo URL like any other, and the next best cover is looked up.
 
@@ -42,18 +44,23 @@ The id comes from a user's library file, and the cover it points at is shown to 
 
 Kobo's covers are copied into the object store, as Apple's artwork already is.
 
-## Unverified
+## Verify before merge
 
-The session that wrote this could not reach `cdn.kobo.com`. These are unknown:
+The session that wrote this could not reach `cdn.kobo.com`. A Kobo answer of 400 px or more is stored as `good` and never retried, and the first backfill run sends every eligible book through it, so these are checked before merge, from a machine that can reach the CDN:
 
-- What the CDN answers for an id it doesn't have. A 404 is expected, since the viewer falls through on an image error; a 200 placeholder would be stored as a cover.
-- Whether it upscales a small original to fill 1200×1800.
+```
+curl -sS -o real.jpg -w '%{http_code} %{content_type}\n' https://cdn.kobo.com/book-images/<a real ImageId>/1200/1800/False/image.jpg && file real.jpg
+curl -sS -o none.jpg -w '%{http_code} %{content_type}\n' https://cdn.kobo.com/book-images/00000000-0000-4000-8000-000000000000/1200/1800/False/image.jpg && file none.jpg
+```
 
-Check both after deploy from the first `cover_images` rows with `source = 'kobo'` (width, height, and a look at a few).
+- **The real id** should answer 200 with a JPEG near 1200 wide or 1800 tall. A small original that comes back upscaled to fill the box is acceptable but worth knowing.
+- **The unknown id** must answer 404. A 200 placeholder would be stored as a cover; a 5xx would leave every such book's lookup incomplete and retried every 10 minutes. Either result blocks the merge until the design handles it.
+
+If bad covers are stored anyway, the repair is to point each affected book back at its newest non-`kobo` `cover_images` row (images are never deleted) and set `kobo_image_id` to NULL.
 
 ## Not in scope
 
 - Any client change, or a resolve route that accepts an image id.
 - Kobo's affiliate product feed.
-- Replacing `good` covers with Kobo's.
-- Asking Kobo again after a miss, or letting a later id replace a recorded one.
+- Replacing `good` covers with Kobo's, beyond the watermark rule.
+- Asking Kobo again after a miss sooner than the book's next lookup, or letting a later id replace a recorded one.
