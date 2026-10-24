@@ -20,6 +20,7 @@ const { WorkMergeError } = await import("../../domain/errors.js");
 const { summaryHashOf } = await import("../../domain/synopsis.js");
 const { authorPattern, originalKey, originalWholeKey, seriesLikeOriginals } = await import("../../domain/translation.js");
 const { catalogTitleKey } = await import("../../domain/normalize.js");
+const { groupKeylessWorks } = await import("../../duplicateWorks.js");
 
 const NOW = "2026-10-01T00:00:00.000Z";
 const richDetails = { summary: "Open Library synopsis.", rating: 4, ratingCount: 3, sourceUrl: "https://openlibrary.org/works/OL1W", genres: ["Fantasy" as const], pages: 300, publisher: "Bantam", year: 1975, translator: null };
@@ -1188,29 +1189,29 @@ test("getWorkView lists a work's editions oldest first", () => {
 const edition = (repo: ReturnType<typeof createSqliteBooksRepository>, isbn: string, title: string, author: string, workKey?: string, created = NOW) =>
   repo.createBook({ title, author, isbn, workKey }, [`isbn:${isbn}`], created);
 
-test("a keyless work joins the single keyed work that shares its title key, and keeps no key of its own", () => {
+test("a keyless work joins the single keyed work that shares its title key, and keeps no key of its own", async () => {
   const { db, repo } = freshRepo();
   const keyed = edition(repo, "9780441013593", "Dune", "Frank Herbert", "OL893415W");
   const keyless = edition(repo, "9780593099322", "Dune", "Frank Herbert");
-  assert.equal(repo.groupKeylessWorks(250), 1);
+  assert.equal(await groupKeylessWorks(repo, 250), 1);
   const moved = repo.getBook(keyless.id)!;
   assert.deepEqual([moved.work_id, moved.ol_work_key], [keyed.work_id, null]);
   assert.equal(workById(db, keyless.work_id).merged_into, keyed.work_id);
-  assert.equal(repo.groupKeylessWorks(250), 0);
+  assert.equal(await groupKeylessWorks(repo, 250), 0);
 });
 
-test("keyless works sharing a title key merge into the oldest of them", () => {
+test("keyless works sharing a title key merge into the oldest of them", async () => {
   const { db, repo } = freshRepo();
   const oldest = edition(repo, "9789720000001", "Ensaio sobre a Cegueira", "José Saramago", undefined, at(0));
   const middle = edition(repo, "9789720000002", "Ensaio Sobre a Cegueira", "Saramago, José", undefined, at(1));
   const newest = edition(repo, "9789720000003", "Ensaio sobre a cegueira", "José Saramago", undefined, at(2));
-  assert.equal(repo.groupKeylessWorks(250), 1);
+  assert.equal(await groupKeylessWorks(repo, 250), 1);
   assert.deepEqual([oldest, newest].map((book) => repo.getBook(book.id)!.work_id), [oldest.work_id, oldest.work_id]);
   assert.equal(repo.getBook(middle.id)!.work_id, middle.work_id);
   assert.equal(workById(db, oldest.work_id).merged_into, null);
 });
 
-test("grouping skips ambiguous title keys, authorless and unkeyed editions, mixed works and blocked editions", () => {
+test("grouping skips ambiguous title keys, authorless and unkeyed editions, mixed works and blocked editions", async () => {
   const { db, repo } = freshRepo();
   edition(repo, "9780000000001", "Poems", "Emily Dickinson", "OL1W");
   edition(repo, "9780000000002", "Poems", "Emily Dickinson", "OL2W");
@@ -1227,43 +1228,43 @@ test("grouping skips ambiguous title keys, authorless and unkeyed editions, mixe
   const blocked = edition(repo, "9780000000011", "Dune", "Frank Herbert");
   repo.detachEdition(blocked.id, at(1));
   edition(repo, "9780000000012", "Dune", "Frank Herbert", "OL5W");
-  assert.equal(repo.groupKeylessWorks(250), 0);
+  assert.equal(await groupKeylessWorks(repo, 250), 0);
   assert.equal(repo.getBook(blocked.id)!.work_id, blocked.work_id);
 });
 
-test("a keyed edition arriving later pulls a keyless group into its work, and every old id resolves there", () => {
+test("a keyed edition arriving later pulls a keyless group into its work, and every old id resolves there", async () => {
   const { db, repo } = freshRepo();
   const first = edition(repo, "9789720000001", "Os Maias", "Eça de Queirós", undefined, at(0));
   const second = edition(repo, "9789720000002", "Os Maias", "Eça de Queirós", undefined, at(1));
-  assert.equal(repo.groupKeylessWorks(250), 1);
+  assert.equal(await groupKeylessWorks(repo, 250), 1);
   const keyed = edition(repo, "9789725681367", "Os Maias", "Eça de Queirós", "OL846513W", at(2));
-  assert.equal(repo.groupKeylessWorks(250), 1);
+  assert.equal(await groupKeylessWorks(repo, 250), 1);
   assert.deepEqual([first, second, keyed].map((book) => repo.getBook(book.id)!.work_id), [keyed.work_id, keyed.work_id, keyed.work_id]);
   assert.deepEqual([first.work_id, second.work_id].map((id) => workById(db, id).merged_into), [keyed.work_id, keyed.work_id]);
 });
 
-test("Open Library's key moves a title-grouped edition out to its own work, and grouping leaves it there", () => {
+test("Open Library's key moves a title-grouped edition out to its own work, and grouping leaves it there", async () => {
   const { repo } = freshRepo();
   const keyed = edition(repo, "9780441013593", "Dune", "Frank Herbert", "OL1W");
   const grouped = edition(repo, "9780593099322", "Dune", "Frank Herbert");
-  repo.groupKeylessWorks(250);
+  await groupKeylessWorks(repo, 250);
   repo.setWorkKey(grouped.id, "OL9W");
   const moved = repo.getBook(grouped.id)!;
   assert.notEqual(moved.work_id, keyed.work_id);
   assert.equal(repo.getWorkView(moved.work_id!)!.olWorkKey, "OL9W");
   assert.equal(repo.getBook(keyed.id)!.work_id, keyed.work_id);
-  assert.equal(repo.groupKeylessWorks(250), 0);
+  assert.equal(await groupKeylessWorks(repo, 250), 0);
 });
 
-test("groupKeylessWorks merges at most its limit per batch", () => {
+test("groupKeylessWorks merges at most its limit per batch", async () => {
   const { repo } = freshRepo();
   edition(repo, "9780441013593", "Dune", "Frank Herbert", "OL1W");
   edition(repo, "9780593099322", "Dune", "Frank Herbert");
   edition(repo, "9780141439587", "Emma", "Jane Austen", "OL2W");
   edition(repo, "9780141439588", "Emma", "Jane Austen");
-  assert.equal(repo.groupKeylessWorks(1), 1);
-  assert.equal(repo.groupKeylessWorks(1), 1);
-  assert.equal(repo.groupKeylessWorks(1), 0);
+  assert.equal(await groupKeylessWorks(repo, 1), 1);
+  assert.equal(await groupKeylessWorks(repo, 1), 1);
+  assert.equal(await groupKeylessWorks(repo, 1), 0);
 });
 
 function groupingFixture() {
@@ -1327,25 +1328,82 @@ function mergedPairs(db: DatabaseSync, label: Map<string, string>) {
   return rows.map((row) => `${label.get(row.from_work) ?? row.from_work}>${label.get(row.into_work) ?? row.into_work}`);
 }
 
-test("grouping picks the same source and target for every rule case", () => {
+test("grouping picks the same source and target for every rule case", async () => {
   const { db, repo, label } = groupingFixture();
-  assert.equal(repo.groupKeylessWorks(250, NOW), 7);
+  assert.equal(await groupKeylessWorks(repo, 250, { at: NOW }), 7);
   assert.deepEqual(mergedPairs(db, label).sort(), ["b1>b0", "k1>keyed", "k2>keyed", "m1>m0", "m2>m0", "m3>m0", "tie-hi>tie-lo"]);
-  assert.equal(repo.groupKeylessWorks(250, NOW), 0);
+  assert.equal(await groupKeylessWorks(repo, 250, { at: NOW }), 0);
 });
 
-test("batches of one merge the same pairs as one call, oldest first within a title key", () => {
+test("batches of one merge the same pairs as one call, oldest first within a title key", async () => {
   const one = groupingFixture();
   let merged = 0;
-  while (merged < 20 && one.repo.groupKeylessWorks(1, NOW) === 1) merged++;
+  while (merged < 20 && await groupKeylessWorks(one.repo, 1, { at: NOW }) === 1) merged++;
   assert.equal(merged, 7);
   const all = groupingFixture();
-  all.repo.groupKeylessWorks(250, NOW);
+  await groupKeylessWorks(all.repo, 250, { at: NOW });
   assert.deepEqual(mergedPairs(one.db, one.label).sort(), mergedPairs(all.db, all.label).sort());
   assert.deepEqual(mergedPairs(one.db, one.label).filter((pair) => pair.endsWith(">m0")), ["m1>m0", "m2>m0", "m3>m0"]);
 });
 
-test("shared title keys that never pair don't end a batch early", () => {
+test("keyless grouping one title key a page, each page its own transaction, merges the same pairs in the same order as one page", async () => {
+  const paged = groupingFixture();
+  const events: string[] = [];
+  const open: boolean[] = [];
+  const spy = {
+    ...paged.repo,
+    groupableTitleKeys: (...args: Parameters<typeof paged.repo.groupableTitleKeys>) => {
+      open.push(paged.db.isTransaction);
+      events.push("keys");
+      setImmediate(() => events.push("tick"));
+      return paged.repo.groupableTitleKeys(...args);
+    },
+    groupTitleKeys: (...args: Parameters<typeof paged.repo.groupTitleKeys>) => {
+      open.push(paged.db.isTransaction);
+      events.push("group");
+      setImmediate(() => events.push("tick"));
+      return paged.repo.groupTitleKeys(...args);
+    }
+  };
+  assert.equal(await groupKeylessWorks(spy, 250, { at: NOW, pageSize: 1 }), 7);
+  const all = groupingFixture();
+  assert.equal(await groupKeylessWorks(all.repo, 250, { at: NOW }), 7);
+  assert.deepEqual(mergedPairs(paged.db, paged.label), mergedPairs(all.db, all.label));
+  assert.ok(open.length > 0 && open.every((inTransaction) => !inTransaction));
+  assert.ok(events.filter((event) => event === "keys").length > 1);
+  assert.ok(events.includes("group"));
+  events.forEach((event, i) => {
+    if (event === "group") assert.deepEqual(events.slice(i - 2, i), ["keys", "tick"]);
+    if (event === "keys" && i > 0) assert.equal(events[i - 1], "tick");
+  });
+});
+
+test("keyless grouping stops on an aborted signal", async () => {
+  const { db, repo } = groupingFixture();
+  const aborted = new AbortController();
+  aborted.abort();
+  assert.equal(await groupKeylessWorks(repo, 250, { at: NOW, signal: aborted.signal }), 0);
+  assert.equal(countOf(db, "work_merges", "source = 'title-key'"), 0);
+
+  const reading = new AbortController();
+  let grouped = 0;
+  const spy = {
+    ...repo,
+    groupableTitleKeys: (...args: Parameters<typeof repo.groupableTitleKeys>) => {
+      setImmediate(() => reading.abort());
+      return repo.groupableTitleKeys(...args);
+    },
+    groupTitleKeys: (...args: Parameters<typeof repo.groupTitleKeys>) => {
+      grouped++;
+      return repo.groupTitleKeys(...args);
+    }
+  };
+  assert.equal(await groupKeylessWorks(spy, 250, { at: NOW, signal: reading.signal }), 0);
+  assert.equal(grouped, 0);
+  assert.equal(countOf(db, "work_merges", "source = 'title-key'"), 0);
+});
+
+test("shared title keys that never pair don't end a batch early", async () => {
   const { db, repo } = freshRepo();
   edition(repo, "9780000000001", "Alpha Tale", "Ann Author", "OL1W");
   edition(repo, "9780000000002", "Alpha Tale", "Ann Author", "OL2W");
@@ -1362,12 +1420,12 @@ test("shared title keys that never pair don't end a batch early", () => {
   edition(repo, "9780000000011", "Echo Tale", "Ann Author", undefined, at(2));
   const oldest = edition(repo, "9780000000012", "Zulu Tale", "Ann Author", undefined, at(0));
   const newest = edition(repo, "9780000000013", "Zulu Tale", "Ann Author", undefined, at(1));
-  assert.equal(repo.groupKeylessWorks(1, NOW), 1);
+  assert.equal(await groupKeylessWorks(repo, 1, { at: NOW }), 1);
   assert.equal(workById(db, newest.work_id).merged_into, oldest.work_id);
-  assert.equal(repo.groupKeylessWorks(1, NOW), 0);
+  assert.equal(await groupKeylessWorks(repo, 1, { at: NOW }), 0);
 });
 
-test("a batch never merges more than its limit when shared keys yield uneven pairs", () => {
+test("a batch never merges more than its limit when shared keys yield uneven pairs", async () => {
   const { db, repo } = freshRepo();
   edition(repo, "9780000000001", "Alpha Tale", "Ann Author", undefined, at(0));
   edition(repo, "9780000000002", "Alpha Tale", "Ann Author", undefined, at(1));
@@ -1376,7 +1434,7 @@ test("a batch never merges more than its limit when shared keys yield uneven pai
   edition(repo, "9780000000005", "Charlie Tale", "Ann Author", undefined, at(0));
   edition(repo, "9780000000006", "Charlie Tale", "Ann Author", undefined, at(1));
   edition(repo, "9780000000007", "Charlie Tale", "Ann Author", undefined, at(2));
-  assert.deepEqual([repo.groupKeylessWorks(2, NOW), repo.groupKeylessWorks(2, NOW), repo.groupKeylessWorks(2, NOW)], [2, 1, 0]);
+  assert.deepEqual([await groupKeylessWorks(repo, 2, { at: NOW }), await groupKeylessWorks(repo, 2, { at: NOW }), await groupKeylessWorks(repo, 2, { at: NOW })], [2, 1, 0]);
   assert.equal(countOf(db, "work_merges", "source = 'title-key'"), 3);
 });
 
@@ -2274,7 +2332,7 @@ test("a translation merge keeps the original's own summary empty; title-key and 
   assert.equal(workById(db, b.work_id).summary, "Carried.");
 });
 
-test("every merge is recorded with the editions it moved and the works it repointed", () => {
+test("every merge is recorded with the editions it moved and the works it repointed", async () => {
   const { db, repo } = freshRepo();
   const alias = repo.createBook({ title: "Alias", author: "X", isbn: "9789720000207" }, ["isbn:9789720000207"], NOW);
   const pt = repo.createBook({ title: "Passeio", author: "X", isbn: "9789720000208" }, ["isbn:9789720000208"], NOW);
@@ -2283,7 +2341,7 @@ test("every merge is recorded with the editions it moved and the works it repoin
   repo.mergeTranslation(pt.work_id!, en.work_id!, "jev", 0.93, AT);
   const twin1 = repo.createBook({ title: "Twin", author: "Y", isbn: "9789720000219" }, ["isbn:9789720000219"], NOW);
   const twin2 = repo.createBook({ title: "Twin", author: "Y", isbn: "9789720000210" }, ["isbn:9789720000210"], NOW);
-  assert.equal(repo.groupKeylessWorks(10, AT), 1);
+  assert.equal(await groupKeylessWorks(repo, 10, { at: AT }), 1);
   const rows = mergeRows(db);
   assert.deepEqual(rows.map((row) => row.source), ["admin", "jev", "title-key"]);
   assert.deepEqual(rows[0], { from_work: alias.work_id, into_work: pt.work_id, source: "admin", confidence: null, moved_book_ids: JSON.stringify([alias.id]), repointed_work_ids: "[]", merged_at: AT, undone_at: null });
@@ -2395,19 +2453,19 @@ test("editions of works carry the original title from the column or the summary 
   ]);
 });
 
-test("an undone translation merge stays undone through the next title-key grouping, and takes back a later keyless copy", () => {
+test("an undone translation merge stays undone through the next title-key grouping, and takes back a later keyless copy", async () => {
   const { db, repo } = freshRepo();
   const pt = repo.createBook({ title: "Poemas", author: "John Keats", isbn: "9789720000351" }, ["isbn:9789720000351"], NOW);
   const en = repo.createBook({ title: "Poems", author: "Emily Dickinson", isbn: "9780000000352", workKey: "OL930W" }, ["isbn:9780000000352"], NOW);
   repo.mergeTranslation(pt.work_id!, en.work_id!, "jev", 0.92, AT);
   const copy = repo.createBook({ title: "Poemas", author: "John Keats", isbn: "9789720000353" }, ["isbn:9789720000353"], NOW);
-  assert.equal(repo.groupKeylessWorks(10, AT), 1);
+  assert.equal(await groupKeylessWorks(repo, 10, { at: AT }), 1);
   assert.equal(repo.getBook(copy.id)!.work_id, en.work_id);
 
   repo.undoMerge(pt.work_id!, "2026-10-16T00:00:00.000Z");
   assert.equal(repo.getBook(copy.id)!.work_id, pt.work_id);
   assert.equal(workById(db, copy.work_id).merged_into, pt.work_id);
-  assert.equal(repo.groupKeylessWorks(10, "2026-10-17T00:00:00.000Z"), 0);
+  assert.equal(await groupKeylessWorks(repo, 10, { at: "2026-10-17T00:00:00.000Z" }), 0);
   assert.equal(workById(db, pt.work_id).merged_into, null);
   assert.equal(repo.getBook(pt.id)!.work_id, pt.work_id);
 });
@@ -2554,16 +2612,16 @@ test("undoneMergeAmong is true after undoMerge, whichever way the ids are listed
   for (const ids of [[wa, wc], [wb, wc], [wa], []]) assert.equal(repo.undoneMergeAmong(ids), false, ids.join());
 });
 
-test("undoing an ol-duplicate merge keeps the survivor's own keyless editions", () => {
+test("undoing an ol-duplicate merge keeps the survivor's own keyless editions", async () => {
   const { db, repo } = freshRepo();
   const survivor = edition(repo, "9780000000901", "Fourth Wing", "Rebecca Yarros", "OL2W", at(0));
   const before = edition(repo, "9780000000902", "Fourth Wing", "Rebecca Yarros", undefined, at(1));
-  assert.equal(repo.groupKeylessWorks(10, at(2)), 1);
+  assert.equal(await groupKeylessWorks(repo, 10, { at: at(2) }), 1);
   const duplicate = edition(repo, "9780000000903", "Fourth Wing", "Rebecca Yarros", "OL1W", at(3));
   const duplicateOther = edition(repo, "9780000000904", "Quarta Asa", "Rebecca Yarros", "OL1W", at(3));
   repo.mergeDuplicateWork(duplicate.work_id!, survivor.work_id!, at(4));
   const after = edition(repo, "9780000000905", "Fourth Wing", "Rebecca Yarros", undefined, at(5));
-  assert.equal(repo.groupKeylessWorks(10, at(6)), 1);
+  assert.equal(await groupKeylessWorks(repo, 10, { at: at(6) }), 1);
   assert.deepEqual([survivor, before, after, duplicate].map((book) => repo.getBook(book.id)!.work_id), Array(4).fill(survivor.work_id));
 
   assert.deepEqual(repo.undoMerge(duplicate.work_id!, at(7)), { into: survivor.work_id, editions: 2 });
@@ -2595,7 +2653,7 @@ const foldAsTitleKey = (db: DatabaseSync, repo: ReturnType<typeof createSqliteBo
 };
 
 for (const [name, workKey] of [["keyless", undefined], ["keyed", "OL1W"]] as const) {
-  test(`undoing a title-key merge in a ${name} target restores only that merge's edition and blocks no book`, () => {
+  test(`undoing a title-key merge in a ${name} target restores only that merge's edition and blocks no book`, async () => {
     const { db, repo, first, second, third } = lupin(workKey);
     foldAsTitleKey(db, repo, first, second, third);
     for (const book of [first, second, third]) assert.equal(repo.getBook(book.id)!.work_id, first.work_id);
@@ -2610,14 +2668,14 @@ for (const [name, workKey] of [["keyless", undefined], ["keyed", "OL1W"]] as con
       [{ from_work: second.work_id, undone_at: at(7) }, { from_work: third.work_id, undone_at: null }]
     );
 
-    assert.equal(repo.groupKeylessWorks(10, at(8)), 0);
+    assert.equal(await groupKeylessWorks(repo, 10, { at: at(8) }), 0);
     assert.equal(repo.getBook(second.id)!.work_id, second.work_id);
     assert.equal(workById(db, second.work_id).merged_into, null);
     assert.deepEqual(blockedBooks(db), []);
   });
 }
 
-test("two copies of one volume folded into the same target and both undone stay apart from it, unblocked", () => {
+test("two copies of one volume folded into the same target and both undone stay apart from it, unblocked", async () => {
   const { db, repo } = freshRepo();
   const target = edition(repo, "9789720001101", "Arsène Lupin: Gentleman Ladrão", "Maurice Leblanc", undefined, at(0));
   const [copy, other] = ["9789720001102", "9789720001103"].map((isbn, n) => edition(repo, isbn, "Arsène Lupin: A Agulha Oca", "Maurice Leblanc", undefined, at(n + 1)));
@@ -2625,7 +2683,7 @@ test("two copies of one volume folded into the same target and both undone stay 
   for (const book of [copy!, other!]) assert.equal(repo.getBook(book.id)!.work_id, target.work_id);
   for (const book of [copy!, other!]) repo.undoMerge(book.work_id!, at(7));
 
-  assert.equal(repo.groupKeylessWorks(10, at(8)), 1);
+  assert.equal(await groupKeylessWorks(repo, 10, { at: at(8) }), 1);
   assert.equal(repo.getBook(other!.id)!.work_id, copy!.work_id);
   assert.equal(repo.getBook(copy!.id)!.work_id, copy!.work_id);
   assert.equal(repo.getBook(target.id)!.work_id, target.work_id);
@@ -2643,14 +2701,14 @@ const heldNeedle = (otherKeyed: boolean) => {
 };
 
 for (const [name, otherKeyed] of [["beside another keyed volume", true], ["alone", false]] as const) {
-  test(`an edition a title-key merge moved into a keyed work ${name} attracts no keyless copy, and the copy folds with it once the merge is undone`, () => {
+  test(`an edition a title-key merge moved into a keyed work ${name} attracts no keyless copy, and the copy folds with it once the merge is undone`, async () => {
     const { db, repo, keyed, held, copy } = heldNeedle(otherKeyed);
-    assert.equal(repo.groupKeylessWorks(250, at(4)), 0);
+    assert.equal(await groupKeylessWorks(repo, 250, { at: at(4) }), 0);
     assert.equal(repo.getBook(copy.id)!.work_id, copy.work_id);
     assert.equal(repo.getBook(held.id)!.work_id, keyed.work_id);
 
     repo.undoMerge(held.work_id!, at(7));
-    assert.equal(repo.groupKeylessWorks(250, at(8)), 1);
+    assert.equal(await groupKeylessWorks(repo, 250, { at: at(8) }), 1);
     assert.equal(repo.getBook(copy.id)!.work_id, held.work_id);
     assert.equal(repo.getBook(held.id)!.work_id, held.work_id);
     assert.equal(repo.getBook(keyed.id)!.work_id, keyed.work_id);
@@ -2658,36 +2716,36 @@ for (const [name, otherKeyed] of [["beside another keyed volume", true], ["alone
   });
 }
 
-test("an edition an undone title-key merge once moved in attracts keyless copies again when an admin merge moves it back in", () => {
+test("an edition an undone title-key merge once moved in attracts keyless copies again when an admin merge moves it back in", async () => {
   const { db, repo, keyed, held, copy } = heldNeedle(false);
   repo.undoMerge(held.work_id!, at(7));
   repo.mergeWorks(held.work_id!, keyed.work_id!, at(8));
   assert.equal(countOf(db, "work_merges", "source = 'title-key' AND undone_at IS NOT NULL"), 1);
 
-  assert.equal(repo.groupKeylessWorks(250, at(9)), 1);
+  assert.equal(await groupKeylessWorks(repo, 250, { at: at(9) }), 1);
   assert.equal(repo.getBook(copy.id)!.work_id, keyed.work_id);
 });
 
-test("a pair skipped for an undone merge does not use up the batch limit", () => {
+test("a pair skipped for an undone merge does not use up the batch limit", async () => {
   const { repo } = freshRepo();
   const [target, ...copies] = ["9789720001101", "9789720001102", "9789720001103"].map((isbn, n) => edition(repo, isbn, "O Profeta", "Kahlil Gibran", undefined, at(n)));
-  assert.equal(repo.groupKeylessWorks(10, AT), 2);
+  assert.equal(await groupKeylessWorks(repo, 10, { at: AT }), 2);
   for (const copy of copies) repo.undoMerge(copy.work_id!, at(7));
   const later = edition(repo, "9789720001104", "O Profeta", "Kahlil Gibran", undefined, at(9));
 
-  assert.equal(repo.groupKeylessWorks(1, at(10)), 1);
+  assert.equal(await groupKeylessWorks(repo, 1, { at: at(10) }), 1);
   assert.equal(repo.getBook(later.id)!.work_id, target!.work_id);
   for (const copy of copies) assert.notEqual(repo.getBook(copy.id)!.work_id, target!.work_id);
 });
 
-test("grouping does not redo an undone translation join between works that share a title key", () => {
+test("grouping does not redo an undone translation join between works that share a title key", async () => {
   const { db, repo } = freshRepo();
   const keyed = edition(repo, "9780000001201", "Fourth Wing", "Rebecca Yarros", "OL1W", at(0));
   const keyless = edition(repo, "9780000001202", "Fourth Wing", "Rebecca Yarros", undefined, at(1));
   repo.mergeTranslation(keyless.work_id!, keyed.work_id!, "jev", 0.9, AT);
   repo.undoMerge(keyless.work_id!, at(7));
 
-  assert.equal(repo.groupKeylessWorks(10, at(8)), 0);
+  assert.equal(await groupKeylessWorks(repo, 10, { at: at(8) }), 0);
   assert.equal(repo.getBook(keyless.id)!.work_id, keyless.work_id);
   assert.equal(workById(db, keyless.work_id).merged_into, null);
 });
@@ -2702,40 +2760,40 @@ test("groupTitleKeys does not redo an undone merge when a key has several keyed 
   assert.equal(repo.getBook(graphicKeyless.id)!.work_id, graphic.work_id);
 });
 
-test("grouping does not redo an undone merge into a work that has since been joined onward", () => {
+test("grouping does not redo an undone merge into a work that has since been joined onward", async () => {
   const { repo } = freshRepo();
   const a = edition(repo, "9780000001301", "Fourth Wing", "Rebecca Yarros", undefined, at(0));
   const b = edition(repo, "9780000001302", "Fourth Wing", "Rebecca Yarros", undefined, at(1));
-  assert.equal(repo.groupKeylessWorks(10, AT), 1);
+  assert.equal(await groupKeylessWorks(repo, 10, { at: AT }), 1);
   repo.undoMerge(b.work_id!, at(7));
   const keyed = edition(repo, "9780000001303", "Fourth Wing", "Rebecca Yarros", "OL1W", at(8));
   repo.mergeTranslation(a.work_id!, keyed.work_id!, "code", null, at(8));
 
-  assert.equal(repo.groupKeylessWorks(10, at(9)), 0);
+  assert.equal(await groupKeylessWorks(repo, 10, { at: at(9) }), 0);
   assert.equal(repo.getBook(b.id)!.work_id, b.work_id);
   assert.equal(repo.getBook(a.id)!.work_id, keyed.work_id);
 });
 
-test("grouping does not redo an undone merge whose restored work has since been joined into the keyed original", () => {
+test("grouping does not redo an undone merge whose restored work has since been joined into the keyed original", async () => {
   const { repo } = freshRepo();
   const a = edition(repo, "9780000001601", "Fourth Wing", "Rebecca Yarros", undefined, at(0));
   const b = edition(repo, "9780000001602", "Fourth Wing", "Rebecca Yarros", undefined, at(1));
-  assert.equal(repo.groupKeylessWorks(10, AT), 1);
+  assert.equal(await groupKeylessWorks(repo, 10, { at: AT }), 1);
   repo.undoMerge(b.work_id!, at(7));
   const original = edition(repo, "9780000001603", "Fourth Wing", "Rebecca Yarros", "OL1W", at(8));
   repo.mergeTranslation(b.work_id!, original.work_id!, "code", null, at(8));
   assert.equal(repo.undoneMergeAmong([a.work_id!, original.work_id!]), true);
 
-  assert.equal(repo.groupKeylessWorks(10, at(9)), 0);
+  assert.equal(await groupKeylessWorks(repo, 10, { at: at(9) }), 0);
   assert.equal(repo.getBook(a.id)!.work_id, a.work_id);
   assert.equal(repo.getBook(b.id)!.work_id, original.work_id);
 });
 
-test("an undone merge whose two ends were later merged into the same work blocks no pair", () => {
+test("an undone merge whose two ends were later merged into the same work blocks no pair", async () => {
   const { repo } = freshRepo();
   const x = edition(repo, "9780000001701", "Duna", "Frank Herbert", undefined, at(0));
   const y = edition(repo, "9780000001702", "Duna", "Frank Herbert", undefined, at(1));
-  assert.equal(repo.groupKeylessWorks(10, AT), 1);
+  assert.equal(await groupKeylessWorks(repo, 10, { at: AT }), 1);
   repo.undoMerge(y.work_id!, at(7));
   const original = edition(repo, "9780000001703", "Dune", "Frank Herbert", "OL1W", at(8));
   const other = edition(repo, "9780000001704", "Dune Messiah", "Frank Herbert", "OL2W", at(8));
@@ -2743,7 +2801,7 @@ test("an undone merge whose two ends were later merged into the same work blocks
   assert.equal(repo.undoneMergeAmong([original.work_id!, other.work_id!]), false);
   const unrelated = edition(repo, "9780000001705", "Dune", "Frank Herbert", undefined, at(9));
 
-  assert.equal(repo.groupKeylessWorks(10, at(10)), 1);
+  assert.equal(await groupKeylessWorks(repo, 10, { at: at(10) }), 1);
   assert.equal(repo.getBook(unrelated.id)!.work_id, original.work_id);
 });
 
@@ -2806,11 +2864,11 @@ test("groupTitleKeys folds a keyless edition into the keyed work with its full t
   assert.equal(repo.groupTitleKeys([key], 10, AT), 0);
 });
 
-test("groupKeylessWorks folds each keyless edition into the keyed work with its full title when a key has several keyed works", () => {
+test("groupKeylessWorks folds each keyless edition into the keyed work with its full title when a key has several keyed works", async () => {
   const { repo, novel, graphic, piatkus, graphicKeyless, coloring } = fourthWing();
-  assert.equal(repo.groupKeylessWorks(250, AT), 2);
+  assert.equal(await groupKeylessWorks(repo, 250, { at: AT }), 2);
   assert.deepEqual([piatkus, graphicKeyless, coloring].map((book) => repo.getBook(book.id)!.work_id), [novel.work_id, graphic.work_id, coloring.work_id]);
-  assert.equal(repo.groupKeylessWorks(250, AT), 0);
+  assert.equal(await groupKeylessWorks(repo, 250, { at: AT }), 0);
 });
 
 test("groupTitleKeys leaves a keyless edition alone when two keyed works have its full title", () => {
@@ -2823,38 +2881,38 @@ test("groupTitleKeys leaves a keyless edition alone when two keyed works have it
 });
 
 for (const [name, workKey] of [["three keyless volumes of one series stay three works", undefined], ["two keyless volumes beside the keyed first volume of a series stay apart from it and from each other", "OL1W"]] as const) {
-  test(name, () => {
+  test(name, async () => {
     const { db, repo, first, second, third } = lupin(workKey);
-    assert.equal(repo.groupKeylessWorks(250, AT), 0);
+    assert.equal(await groupKeylessWorks(repo, 250, { at: AT }), 0);
     for (const book of [first, second, third]) assert.equal(repo.getBook(book.id)!.work_id, book.work_id);
     assert.equal(countOf(db, "works", "merged_into IS NOT NULL"), 0);
     assert.equal(countOf(db, "work_merges"), 0);
   });
 }
 
-test("two keyless copies of one volume fold together and not into the keyed volume beside them", () => {
+test("two keyless copies of one volume fold together and not into the keyed volume beside them", async () => {
   const { repo, first, second, third } = lupin("OL1W");
   const copy = edition(repo, "9789720001004", "Arsène Lupin: A Agulha Oca", "Maurice Leblanc", undefined, at(3));
-  assert.equal(repo.groupKeylessWorks(250, AT), 1);
+  assert.equal(await groupKeylessWorks(repo, 250, { at: AT }), 1);
   assert.equal(repo.getBook(copy.id)!.work_id, second.work_id);
   for (const book of [first, second, third]) assert.equal(repo.getBook(book.id)!.work_id, book.work_id);
 });
 
-test("a keyless copy of a Portuguese edition folds into the English keyed work that holds it through a translation join", () => {
+test("a keyless copy of a Portuguese edition folds into the English keyed work that holds it through a translation join", async () => {
   const { repo } = freshRepo();
   const english = edition(repo, "9780000002001", "1984", "George Orwell", "OL1W", at(0));
   const portuguese = edition(repo, "9780000002002", "Mil Novecentos e Oitenta e Quatro", "George Orwell", undefined, at(1));
   repo.mergeTranslation(portuguese.work_id!, english.work_id!, "jev", 0.9, AT);
   const copy = edition(repo, "9780000002003", "Mil Novecentos e Oitenta e Quatro", "George Orwell", undefined, at(2));
-  assert.equal(repo.groupKeylessWorks(250, AT), 1);
+  assert.equal(await groupKeylessWorks(repo, 250, { at: AT }), 1);
   assert.equal(repo.getBook(copy.id)!.work_id, english.work_id);
 });
 
-test("the plain book and its graphic novel stay apart", () => {
+test("the plain book and its graphic novel stay apart", async () => {
   const { repo } = freshRepo();
   const graphic = edition(repo, "9789720001101", "O Profeta: Novela Gráfica", "Kahlil Gibran", undefined, at(0));
   const [plain, copy] = ["9789720001102", "9789720001103"].map((isbn, n) => edition(repo, isbn, "O Profeta", "Kahlil Gibran", undefined, at(n + 1)));
-  assert.equal(repo.groupKeylessWorks(250, AT), 1);
+  assert.equal(await groupKeylessWorks(repo, 250, { at: AT }), 1);
   assert.equal(repo.getBook(copy!.id)!.work_id, plain!.work_id);
   assert.equal(repo.getBook(plain!.id)!.work_id, plain!.work_id);
   assert.equal(repo.getBook(graphic.id)!.work_id, graphic.work_id);
@@ -2908,13 +2966,13 @@ test("groupTitleKeys counts only the merges it makes against its limit when skip
   assert.equal(repo.getBook(second.id)!.work_id, dune.work_id);
 });
 
-test("groupKeylessWorks leaves a pair apart when skip rejects it, and makes it once skip stops rejecting", () => {
+test("groupKeylessWorks leaves a pair apart when skip rejects it, and makes it once skip stops rejecting", async () => {
   const { repo, novel, graphic, piatkus, graphicKeyless } = fourthWing();
   const skip = (from: string) => from === piatkus.work_id;
-  assert.equal(repo.groupKeylessWorks(250, AT, skip), 1);
+  assert.equal(await groupKeylessWorks(repo, 250, { at: AT, skip }), 1);
   assert.deepEqual([piatkus, graphicKeyless].map((book) => repo.getBook(book.id)!.work_id), [piatkus.work_id, graphic.work_id]);
-  assert.equal(repo.groupKeylessWorks(250, AT, skip), 0);
-  assert.equal(repo.groupKeylessWorks(250, AT), 1);
+  assert.equal(await groupKeylessWorks(repo, 250, { at: AT, skip }), 0);
+  assert.equal(await groupKeylessWorks(repo, 250, { at: AT }), 1);
   assert.equal(repo.getBook(piatkus.id)!.work_id, novel.work_id);
 });
 

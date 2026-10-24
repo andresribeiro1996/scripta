@@ -54,7 +54,6 @@ export interface BooksRepository {
   setWorkKey(id: string, key: string | null | undefined): void;
   assignMissingWorks(limit: number): number;
   fillTitleKeys(limit: number): number;
-  groupKeylessWorks(limit: number, at?: string, skip?: (from: string, into: string) => boolean): number;
   groupTitleKeys(keys: string[], limit: number, at?: string, skip?: (from: string, into: string) => boolean): number;
   groupableTitleKeys(after: string, limit: number): string[];
   keyedWorksWithTitleKeys(keys: string[]): KeyedWork[];
