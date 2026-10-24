@@ -97,5 +97,5 @@ test("every books job arms its first run with its own delay and calls nothing be
   for (const [delay, count] of wanted) {
     assert.ok(delays.filter((armed) => armed === delay).length >= count, `expected ${count} first runs armed at ${delay} ms`);
   }
-  assert.deepEqual(requests.map(String).filter((url) => /typesafe|isbndb|bnportugal|porbase/.test(url)), []);
+  assert.deepEqual(requests.map(String).filter((url) => /typesafe|isbndb|bnportugal|porbase|openlibrary/.test(url)), []);
 });
