@@ -1,4 +1,4 @@
-import { startDetailsBackfill } from "./backfill.js";
+import { startJob, type JobTimers } from "../../jobs.js";
 import type { BooksRepository } from "./domain/ports.js";
 import { failureKind, nextUtcMidnight, strikeReason } from "./typesafe.js";
 import { createWorkQueue } from "./workQueue.js";
@@ -63,7 +63,7 @@ export type JevJobsDeps = {
   alert: (subject: string, text: string) => void;
   info: (details: Record<string, unknown>, message: string) => void;
   onError: (error: unknown, workId?: string) => void;
-  timers?: Parameters<typeof startDetailsBackfill>[3];
+  timers?: JobTimers;
   initialDelayMs?: number;
 };
 export type JevJob = {
@@ -98,7 +98,7 @@ export function startJevJobs(deps: JevJobsDeps, job: JevJob): JevJobs {
   };
   const held = () => (!heldSet || deps.now() - heldSince >= HELD_CACHE_MS ? refreshHeld() : heldSet);
   const queue = createWorkQueue({ concurrency: JEV_IN_FLIGHT, now: deps.now, run: (workId) => job.judge(workId, held, pause), onError: deps.onError });
-  const stopSweep = startDetailsBackfill(
+  const stopSweep = startJob(
     async () => {
       for (const workId of job.sweep([...refreshHeld()])) queue.add(workId);
       return null;
