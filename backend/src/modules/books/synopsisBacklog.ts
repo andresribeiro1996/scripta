@@ -1,15 +1,12 @@
-import type { ClassifySynopsis } from "./adapters/typesafe/jevSynopsis.js";
 import type { BooksRepository } from "./domain/ports.js";
 import { isFragment, isHiddenSynopsis, SYNOPSIS_REVIEW_BELOW } from "./domain/synopsis.js";
-import { applySynopsisRule, classifyText, JEV_REJECTION_LIMIT, type SynopsisJudgmentDeps } from "./synopsisJudgments.js";
-import { failureKind, type FailureKind } from "./typesafe.js";
+import { jevCostUsd, JEV_REJECTION_LIMIT, runJevBacklog, type JevStop } from "./jevJobs.js";
+import { applySynopsisRule, classifyText, type SynopsisJudgmentDeps } from "./synopsisJudgments.js";
 
 export const SYNOPSIS_BACKLOG_SOURCE = "synopses-backlog";
-const IN_FLIGHT = 4;
-const COST_PER_REQUEST_USD = 0.00012;
 
 export type BacklogText = { hash: string; source: string };
-export type SynopsisBacklogStop = "done" | "budget" | "outage" | "key";
+export type SynopsisBacklogStop = JevStop;
 export type SourceCounts = { texts: number; rule: number; hidden: number; doubtful: number; shown: number };
 export type SynopsisBacklogReport = { selected: number; bySource: Record<string, SourceCounts>; strikes: number; stoppedBy: SynopsisBacklogStop | "no-key"; requests: number; estimatedCostUsd: number };
 
@@ -45,29 +42,8 @@ export function applyRulePass(repo: Pick<BooksRepository, "synopsisText" | "save
   return texts.filter((text) => !applySynopsisRule(repo, text.hash, at));
 }
 
-export async function runSynopsisBacklog(deps: SynopsisJudgmentDeps, hashes: string[]): Promise<{ asked: string[]; stoppedBy: SynopsisBacklogStop }> {
-  const asked: string[] = [];
-  let stoppedBy: SynopsisBacklogStop = "done";
-  let next = 0;
-  const worker = async () => {
-    while (stoppedBy === "done" && next < hashes.length) {
-      const hash = hashes[next++]!;
-      const call: { failure: FailureKind | null } = { failure: null };
-      const classify: ClassifySynopsis = async (input) => {
-        try {
-          return await deps.classify(input);
-        } catch (error) {
-          call.failure = failureKind(error);
-          throw error;
-        }
-      };
-      const pause = await classifyText({ ...deps, classify }, hash);
-      if (pause === null) asked.push(hash);
-      else if (stoppedBy === "done") stoppedBy = call.failure === "budget" || call.failure === "key" ? call.failure : "outage";
-    }
-  };
-  await Promise.all(Array.from({ length: IN_FLIGHT }, worker));
-  return { asked, stoppedBy };
+export function runSynopsisBacklog(deps: SynopsisJudgmentDeps, hashes: string[]): Promise<{ asked: string[]; stoppedBy: SynopsisBacklogStop }> {
+  return runJevBacklog(hashes, (hash, onPause) => classifyText({ ...deps, onPause }, hash));
 }
 
 export function synopsisBacklogReport(repo: Pick<BooksRepository, "synopsisJudgments" | "jevRejections">, texts: BacklogText[], stoppedBy: SynopsisBacklogStop | "no-key", requests: number): SynopsisBacklogReport {
@@ -84,5 +60,5 @@ export function synopsisBacklogReport(repo: Pick<BooksRepository, "synopsisJudgm
     else if (judgment.usable < SYNOPSIS_REVIEW_BELOW) counts.doubtful += 1;
     else counts.shown += 1;
   }
-  return { selected: texts.length, bySource, strikes: repo.jevRejections("synopses", hashes).size, stoppedBy, requests, estimatedCostUsd: Number((requests * COST_PER_REQUEST_USD).toFixed(2)) };
+  return { selected: texts.length, bySource, strikes: repo.jevRejections("synopses", hashes).size, stoppedBy, requests, estimatedCostUsd: jevCostUsd(requests) };
 }

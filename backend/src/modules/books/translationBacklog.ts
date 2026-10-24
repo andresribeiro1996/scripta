@@ -1,7 +1,7 @@
 import type { ClassifyMatch } from "./adapters/typesafe/jevWorkMatch.js";
 import type { BooksRepository } from "./domain/ports.js";
 import { MATCH_MERGE_AT, MATCH_REVIEW_AT, seriesLikeOriginals } from "./domain/translation.js";
-import { JEV_REJECTION_LIMIT } from "./synopsisJudgments.js";
+import { JEV_REJECTION_LIMIT } from "./jevJobs.js";
 import { matchWork, planMatch, type TranslationDeps } from "./translationJudgments.js";
 import { failureKind, type FailureKind } from "./typesafe.js";
 

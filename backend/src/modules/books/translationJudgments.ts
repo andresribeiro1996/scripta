@@ -3,7 +3,7 @@ import { startDetailsBackfill } from "./backfill.js";
 import { WorkMergeError } from "./domain/errors.js";
 import type { BooksRepository } from "./domain/ports.js";
 import { authorPattern, evidenceOf, hasVolumeMarker, MATCH_MERGE_AT, MAX_CANDIDATES, mentionsSurname, sameMainTitle, sameWholeTitle, seriesLikeOriginals, surnameOf, titlePatterns, type SeriesLike, type TranslationEvidence } from "./domain/translation.js";
-import { JEV_REJECTION_LIMIT } from "./synopsisJudgments.js";
+import { JEV_REJECTION_LIMIT } from "./jevJobs.js";
 import { dailySpend, failureKind, nextUtcMidnight, strikeReason } from "./typesafe.js";
 import { createWorkQueue } from "./workQueue.js";
 

@@ -3,7 +3,7 @@ import type { OpenLibraryWork } from "../adapters/openlibrary/openLibraryCatalog
 import { SourceUnavailableError } from "../domain/errors.js";
 import { lookupIdentity } from "../domain/normalize.js";
 import { evidenceOf, hasVolumeMarker, mainTitle, mentionsSurname, originalKey, sameMainTitle, sameWholeTitle, seriesLikeOriginals, sharedOriginals, surnameOf } from "../domain/translation.js";
-import { JEV_REJECTION_LIMIT } from "../synopsisJudgments.js";
+import { JEV_REJECTION_LIMIT } from "../jevJobs.js";
 import { runCodeSteps } from "../translationBacklog.js";
 import { titleCandidateRows, type TranslationDeps } from "../translationJudgments.js";
 import { seedBook } from "./seedCatalog.js";
