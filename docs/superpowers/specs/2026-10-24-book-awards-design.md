@@ -39,12 +39,12 @@ The labels live in `@scripta/shared`, because web and mobile both render them. T
 | `nebula-novel` | Nebula Award | work | Q266012 (Best Novel) |
 | `pulitzer-fiction` | Pulitzer Prize for Fiction | work | Q833633 |
 | `nobel-literature` | Nobel Prize in Literature | author | Q37922 |
-| `camoes` | Prémio Camões | author | ? |
-| `leya` | Prémio LeYa | work | ? |
-| `saramago` | Prémio José Saramago | work | ? |
-| `ape-novel` | Grande Prémio de Romance e Novela APE | work | ? |
+| `camoes` | Prémio Camões | author | Q752134 |
+| `leya` | Prémio LeYa | work | Q6335592 |
+| `saramago` | Prémio José Saramago | work | Q2115410 |
+| `ape-novel` | Grande Prémio de Romance e Novela APE | work | Q10291073 |
 
-**None of these item IDs was checked against Wikidata**, because `query.wikidata.org` couldn't be reached from the session that wrote this spec. The IDs shown are from memory. The `?` IDs are resolved in the plan's first task. The dry run prints each item's English label next to its key, so a wrong ID shows up before anything is written.
+**All ten item IDs were checked against Wikidata on 2026-10-24.** The six known items' English labels read Booker Prize, International Booker Prize, Hugo Award for Best Novel, Nebula Award for Best Novel, Pulitzer Prize for Fiction and Nobel Prize in Literature. The four Portuguese items were found by name and confirmed by their labels and descriptions, all "literary award". Their English labels are Camões Prize, Prémio Leya, José Saramago Prize and Grande Prémio de Romance e Novela, so those are what the dry run prints next to their keys. The dry run still prints each label, so an item ID edited later shows up before anything is written.
 
 Before 2016 the International Booker was an author prize. Those statements sit on people, not works, so the work-level query skips them, which is correct.
 
@@ -52,14 +52,18 @@ Before 2016 the International Booker was an author prize. Those statements sit o
 
 ### Wikidata queries
 
-The fill uses the same three identifier kinds as the series fill (`fill-series.mjs:25-29`): works with an Open Library work ID (P648), works with an ISBN that aren't edition items, and works whose edition items (P629) carry an ISBN. It runs them for two statement shapes:
+The fill uses the same three identifier kinds as the series fill (`fill-series.mjs:25-29`): works with an Open Library work ID (P648), works with an ISBN that aren't edition items, and works whose edition items (P629) carry an ISBN. It runs them for four statement shapes, measured on 2026-10-24 (see Measured on Wikidata):
 
-- **Book prizes:** `?work` has a P166 or P1411 statement whose value is a listed book prize.
+- **Book prizes, on the work (a):** `?work` has a P166 or P1411 statement whose value is a listed book prize.
+- **Book prizes, on the author (b):** a `?person` has a P166 or P1411 statement whose value is a listed book prize, with a "for work" (P1686) qualifier naming `?work`. P166 means won and P1411 nominated, as in (a).
+- **Book prizes, on the prize (c):** the prize item has a "winner" (P1346) statement with a P1686 qualifier naming `?work`. It always means won.
 - **Author prizes:** a `?person` has a P166 statement whose value is a listed author prize, and `?work wdt:P50 ?person`.
+
+In every shape the year is the P585 qualifier of that same statement. The same work, prize and year found by more than one shape is one row: the table's key collapses it, and a win beats a nomination.
 
 P585 is `OPTIONAL` when there is no `minYear`, so the backfill sees statements that lack it and counts them as `noYear`. With a `minYear`, the year filter needs P585. The row also carries the person's English label, else their Portuguese one, else any label, as `honoree`.
 
-That is six queries, plus three for each extra shape the Wikidata check finds (see Unverified at spec time). They are paged 3000 rows at a time, as the series queries are. Each row is `{ isbns, olWorkIds, prize, year, won, honoree }`. The query builder takes an optional `minYear`, filtering on `YEAR(?when) >= minYear`. The script passes none; the daily job passes the current UTC year minus 1.
+That is twelve queries: four shapes, each run for the three identifier kinds. They are paged 3000 rows at a time, as the series queries are. Each row is `{ isbns, olWorkIds, prize, year, won, honoree }`. The query builder takes an optional `minYear`, filtering on `YEAR(?when) >= minYear`. The script passes none; the daily job passes the current UTC year minus 1.
 
 ### Reuse from the series fill
 
@@ -112,7 +116,7 @@ The dry run's `prizes` list is reviewed with the user before the real run: a wro
 
 `jobs.every("awards refresh", DAY_MS, …, FIRST_RUN_DELAY_MS.awardsRefresh)` in `books/plugin.ts`, with `awardsRefresh: 165_000` added to the table (the first-run delay test counts its entries).
 
-- It runs the six queries with `minYear` = current UTC year − 1. These are small, unpaged in practice, so at most a few hundred rows.
+- It runs the twelve queries with `minYear` = current UTC year − 1. These are small, unpaged in practice, so at most a few hundred rows.
 - It follows redirects with the server's shared `openLibraryThrottle` and `fetchJson`, so it never adds load beyond the server's Open Library gap.
 - It writes through the server's repository.
 - It logs one info line: `{ rows, matched, added, redirected, failedKeys: <count> }`.
@@ -198,17 +202,38 @@ In `HomeScreen.tsx`'s list header, after `RecapHomeCard`. It shows whether or no
 - `DESIGN.md`: the award pill, in the component list.
 - `mobile/README.md`: the Home card.
 
-## Unverified at spec time
+## Measured on Wikidata
 
-`query.wikidata.org` was blocked for the session that wrote this. The plan's first task checks the items below with queries run wherever Wikidata is reachable. Per-prize catalog coverage comes later, from the dry run on Railway after merge.
-- the prize item IDs, and the four unknown ones. A prize with no Wikidata item is dropped from the list;
-- where a book prize is recorded. There are three possible shapes:
-  - (a) P166/P1411 on the work;
-  - (b) P166/P1411 on the author, with a "for work" (P1686) qualifier naming the book;
-  - (c) "winner" (P1346) on the prize item, with P1686.
+`query.wikidata.org` was blocked for the session that wrote this spec. The plan's first task ran these checks from the user's Mac on 2026-10-24. Per-prize catalog coverage still comes later, from the dry run on Railway after merge.
 
-  The fill queries every shape that adds works beyond (a). An author prize has the matching person-level shapes;
-- per-prize coverage. A prize with near-zero matched works goes back to the user: keep it (costs nothing, rarely shows) or drop it.
+**Item IDs:** all ten exist and are listed in the Prizes table. No prize was dropped.
+
+**Where book prizes are recorded.** Three shapes were possible: (a) P166/P1411 on the work; (b) P166/P1411 on the author with a P1686 qualifier naming the book; (c) P1346 on the prize item with P1686. Distinct works per shape:
+
+| Prize | (a) won | (a) nominated | (b) works not in (a) | (c) works not in (a) |
+|---|---|---|---|---|
+| Booker | 60 | 479 | 3, incl. *Flesh* (2025 winner) | 1, *Flesh* |
+| International Booker | 12 | 85 | 3, incl. *Time Shelter* (2023) and *Kairos* (2024) | 0 |
+| Hugo, Best Novel | 77 | 288 | 2 (2026 finalists) | 0 |
+| Nebula, Best Novel | 63 | 315 | 1 | 1, *Flowers for Algernon* (1967) |
+| Pulitzer for Fiction | 71 | 7 | 11, incl. *James* (2025) and *Angel Down* (2026) | 0 |
+| Prémio José Saramago | 11 | 0 | 2 | 0 |
+| Prémio LeYa | 0 | 0 | 0 | 0 |
+| Grande Prémio APE | 0 | 0 | 0 | 0 |
+
+So the fill queries (a), (b) and (c) (Wikidata queries, above). (b) carries several of the most recent winners, which the Home card needs. (c) adds only *Flowers for Algernon* beyond (a) and (b), and costs three small queries. A P1346 value that is itself a work, with no P1686, adds nothing, so (c) reads the qualifier only.
+
+**Author prizes.** P166 on the person reaches 123 Nobel laureates and 37 Camões laureates. P1346 on the prize item names no laureate that P166 misses, so the person shape is P166 only. Their works with an identifier: Nobel 1,652 with an Open Library ID out of 18,063 works; Camões 106 out of 344.
+
+**Years.** Every work-level statement in (a) carries P585. In (b), one International Booker "win" (*Not a River*, in fact a 2024 shortlisting) has none, so it is dropped and counted as `noYear`.
+
+**Near-zero, for the user's keep-or-drop call at the post-merge dry-run review.** Keeping any of these costs nothing; they just rarely or never show.
+- **Prémio LeYa:** 0 works in every shape. Its four winners on Wikidata (2009, 2013, 2018, 2025) are recorded on the people, with no "for work". The fill finds nothing.
+- **Grande Prémio APE:** 0 works in every shape. Three statements on two people (2000, 2013, 2016), with no "for work". The fill finds nothing.
+- **Prémio José Saramago:** 13 works, all from 2019 or earlier except a 2024 winner that has no ISBN or Open Library ID. Its card can't fire on today's data.
+- **Prémio Camões:** none of the 2022–2025 laureates has a work with an identifier, so no recent Camões win can be stored, and no card fires.
+
+**Recent wins the Home card can show** (2024–2026, a winning work with an Open Library ID or an ISBN): Booker 2024 and 2025; International Booker 2024 and 2026; Hugo 2024, 2025 and 2026; Nebula 2024 and 2025; Pulitzer 2025; Nobel 2022–2026. Not showable: International Booker 2025 (*Heart Lamp*, no identifiers), Pulitzer 2024 (recorded on the author, with no "for work") and Pulitzer 2026 (*Angel Down*, no identifiers yet).
 
 ## Later
 
