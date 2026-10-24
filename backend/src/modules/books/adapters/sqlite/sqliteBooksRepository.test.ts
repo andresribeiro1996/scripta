@@ -1390,7 +1390,7 @@ test("keyless grouping stops on an aborted signal", async () => {
   const spy = {
     ...repo,
     groupableTitleKeys: (...args: Parameters<typeof repo.groupableTitleKeys>) => {
-      reading.abort();
+      setImmediate(() => reading.abort());
       return repo.groupableTitleKeys(...args);
     },
     groupTitleKeys: (...args: Parameters<typeof repo.groupTitleKeys>) => {

@@ -254,9 +254,8 @@ test("walk aborted while yielding after a key read merges nothing from that page
   const spying = {
     ...repo,
     groupableTitleKeys: (after: string, limit: number) => {
-      const keys = repo.groupableTitleKeys(after, limit);
-      controller.abort();
-      return keys;
+      setImmediate(() => controller.abort());
+      return repo.groupableTitleKeys(after, limit);
     },
     keyedWorksWithTitleKeys: (keys: string[]) => {
       planReads += 1;
