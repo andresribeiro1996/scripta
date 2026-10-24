@@ -7,4 +7,4 @@ export { tierlistsPlugin as registerTierlistsModule, deleteTierlistsUserData } f
 // getTierlistsPublicApi for why this opens its own connection instead of
 // riding on the plugin's own composition.
 export { getTierlistsPublicApi } from "./plugin.js";
-export type { GameByWork, TierlistsPublicApi } from "./service.js";
+export type { TierlistsPublicApi } from "./service.js";

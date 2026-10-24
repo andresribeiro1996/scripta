@@ -2,7 +2,9 @@
 // QuizzesRepository port, not on SQLite — same reasoning as every other
 // module's service.ts.
 
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
+import { generateVoteCode } from "../../voteCode.js";
+import type { GameByWork } from "../works/index.js";
 import { QUIZ_QUESTION_TYPES, generateQuizQuestions, gradeAnswers, quizPreview, type PlayBoard, type PublicBookData, type PublicQuizQuestion, type QuestionStat, type QuizBook, type QuizPreview, type QuizQuestion, type QuizQuestionType, type ResultPlay, type SubmittedAnswer } from "@scripta/shared";
 import type { GameParticipation } from "@scripta/shared/community";
 import type { QuizWorks, QuizzesRepository } from "./domain/ports.js";
@@ -41,15 +43,6 @@ function readDocument(quiz: Quiz): QuizDocument {
     books: Array.isArray(data.books) ? data.books : [],
     questions: Array.isArray(data.questions) ? data.questions : null
   };
-}
-
-// Same unambiguous alphabet as tierlists' vote codes — these get read
-// aloud and typed by hand. An identifier, not a secret.
-const CODE_ALPHABET = "23456789abcdefghjkmnpqrstuvwxyz";
-
-export function generateVoteCode(): string {
-  const bytes = randomBytes(8);
-  return [...bytes].map((b) => CODE_ALPHABET[b % CODE_ALPHABET.length]).join("");
 }
 
 export type Player = { kind: "user"; userId: string } | { kind: "anonymous"; playId: string | null };
@@ -409,13 +402,6 @@ export function createQuizzesService(repo: QuizzesRepository, works: QuizWorks, 
       }));
     }
   };
-}
-
-export interface GameByWork {
-  id: string;
-  name: string;
-  path: string;
-  ownerUserId: string | null;
 }
 
 export interface QuizzesPublicApi {

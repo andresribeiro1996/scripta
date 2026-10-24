@@ -4,4 +4,3 @@
 
 export { arenaPlugin as registerArenaModule, deleteArenaUserData } from "./plugin.js";
 export { getArenaPublicApi } from "./plugin.js";
-export type { GameByWork } from "./service.js";
