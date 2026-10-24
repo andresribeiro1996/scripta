@@ -21,6 +21,7 @@ import { assertObjectKey } from "./storage/objectStore.js";
 import { createObjectStore } from "./storage/createObjectStore.js";
 import { IMMUTABLE_CACHE_CONTROL } from "./storage/r2ObjectStore.js";
 import { runStartupMigrations } from "./migrations/runStartupMigrations.js";
+import { createJobs, type Jobs } from "./jobs.js";
 import { registerStallLog, timeSync } from "./stallLog.js";
 import { registerTrace } from "./trace.js";
 import {
@@ -42,7 +43,7 @@ import { createBestEffortRecorder, deleteCommunityUserData, getCommunityPublicAp
 import type { RankingTierPreview } from "@scripta/shared/community";
 import { canonicalWorks, catalogGenres, enqueueBookCovers, getWorkPage, matchWorks, registerBooksModule } from "./modules/books/index.js";
 import { deleteGalleryUserData, registerGalleryModule } from "./modules/gallery/index.js";
-import { communityRatings, copyOfWork, deleteLibraryUserData, heldWorks, holdersOfWorks, registerLibraryModule, resolvePublicLibrary, readerGlyphFor, resolveEntryWorks, WorkResolutionError, sharedBookCounts, sharedBooks, startWorksSweep, sweepLibraryWorks, type BookEvent } from "./modules/library/index.js";
+import { communityRatings, copyOfWork, deleteLibraryUserData, heldWorks, holdersOfWorks, registerLibraryModule, resolvePublicLibrary, readerGlyphFor, resolveEntryWorks, WorkResolutionError, sharedBookCounts, sharedBooks, sweepLibraryWorks, sweepWorks, WORKS_SWEEP_INTERVAL_MS, type BookEvent } from "./modules/library/index.js";
 import { deleteMuralsUserData, getMuralsPublicApi, registerMuralsModule, rekeyMuralsBooks, sweepMuralsWorks } from "./modules/murals/index.js";
 import { deleteQuizzesUserData, getQuizGameSource, getQuizzesPublicApi, registerQuizzesModule } from "./modules/quizzes/index.js";
 import { deleteSocialsUserData, registerSocialsModule } from "./modules/socials/index.js";
@@ -232,15 +233,20 @@ export function buildApp() {
   });
 
   const sweepSteps = { library: sweepLibraryWorks, murals: sweepMuralsWorks };
-  let stopWorksSweep: (() => void) | null = null;
+  let sweepJobs: Jobs | null = null;
   app.addHook("onReady", async () => {
-    stopWorksSweep = startWorksSweep(
-      Object.entries(sweepSteps).map(([name, step]) => (after: number, limit: number) => timeSync(app.log, `works-sweep:${name}`, () => step(after, limit))),
-      app.log
+    sweepJobs = createJobs(app.log);
+    sweepJobs.every(
+      "works sweep",
+      WORKS_SWEEP_INTERVAL_MS,
+      sweepWorks(
+        Object.entries(sweepSteps).map(([name, step]) => (after: number, limit: number) => timeSync(app.log, `works-sweep:${name}`, () => step(after, limit))),
+        app.log
+      )
     );
   });
   app.addHook("onClose", async () => {
-    stopWorksSweep?.();
+    sweepJobs?.stopAll();
   });
 
   app.addHook("onReady", async () => {

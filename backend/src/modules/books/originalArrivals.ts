@@ -1,4 +1,4 @@
-import { startDetailsBackfill } from "./backfill.js";
+import { startJob } from "../../jobs.js";
 import { arrivalKey, evidenceOf, mentionsSurname, originalKey, originalWholeKey, sameWholeTitle, seriesLikeOriginals, sharedOriginals, surnameOf, type OriginalClaim } from "./domain/translation.js";
 import { JEV_REJECTION_LIMIT } from "./jevJobs.js";
 import { joinByCode } from "./translationBacklog.js";
@@ -67,7 +67,7 @@ export function joinArrivedOriginals(deps: ArrivalDeps, limit: number, onKeyErro
 }
 
 export function startOriginalArrivals(deps: ArrivalDeps & { info: (details: Record<string, unknown>, message: string) => void; onError: (error: unknown, titleKey?: string) => void }): () => void {
-  return startDetailsBackfill(async () => {
+  return startJob(async () => {
     const steps = joinArrivedOriginals(deps, ORIGINAL_ARRIVALS_BATCH, deps.onError);
     if (steps.codeMerges + steps.codeBlocked > 0) deps.info({ ...steps }, "original arrivals joined");
     return null;
