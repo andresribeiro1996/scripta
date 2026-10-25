@@ -142,6 +142,20 @@ test("leaves an edition whose work shows an Open Library summary", async () => {
   assert.equal(report.descriptions.added, 0);
 });
 
+test("re-reads the page after the lookup and leaves an edition whose work gained a summary meanwhile", async () => {
+  const { db, repo } = setup();
+  const a = edition(repo, "9780000000001", "A");
+  const inner = fake({ "9780000000001": hcBook(1, { description: ENGLISH }) });
+  const lookup: HardcoverLookup = async (isbns) => {
+    db.prepare("UPDATE works SET summary = 'Open Library synopsis', ol_work_key = 'OL9W' WHERE id = ?").run(a.work_id);
+    return inner(isbns);
+  };
+  const report = await run(repo, lookup);
+  assert.equal(summaryOf(db, a.id).summary, null);
+  assert.equal(report.descriptions.alreadyHadSummary, 1);
+  assert.equal(report.descriptions.added, 0);
+});
+
 test("fills genres only on empty editions", async () => {
   const { db, repo } = setup();
   const a = edition(repo, "9780000000001", "A", "OL1W");
@@ -172,6 +186,16 @@ test("takes the series from the first matched edition of a work", async () => {
   edition(repo, "9780000000002", "B", "OL1W");
   await run(repo, fake({ "9780000000001": hcBook(1, { featured: series("First") }), "9780000000002": hcBook(2, { featured: series("Second") }) }));
   assert.deepEqual(seriesOf(db, a.work_id!).map((row) => row.name), ["First"]);
+});
+
+test("takes the series from a sibling edition when the first matched edition has none", async () => {
+  const { db, repo } = setup();
+  const a = edition(repo, "9780000000001", "A", "OL1W");
+  edition(repo, "9780000000002", "B", "OL1W");
+  edition(repo, "9780000000003", "C", "OL1W");
+  const report = await run(repo, fake({ "9780000000001": hcBook(1), "9780000000002": hcBook(2, { featured: series("Second") }), "9780000000003": hcBook(3, { featured: series("Third") }) }));
+  assert.deepEqual(seriesOf(db, a.work_id!).map((row) => row.name), ["Second"]);
+  assert.equal(report.series.added, 1);
 });
 
 test("a resumed run adds no second hardcover series", async () => {
@@ -251,6 +275,18 @@ test("dry run writes nothing and reports the same counts as a real run", async (
   assert.equal(dryReport.genreSamples?.length, 1);
 });
 
+test("dry run samples matched books whose genre tags map to no genre", async () => {
+  const { repo } = setup();
+  edition(repo, "9780000000001", "A", "OL1W");
+  edition(repo, "9780000000002", "B", "OL2W");
+  edition(repo, "9780000000003", "C", "OL3W");
+  const report = await run(repo, fake({ "9780000000001": hcBook(1, { genreTags: [{ tag: "Nonsense", count: 9 }] }), "9780000000002": hcBook(2, { genreTags: FANTASY }), "9780000000003": hcBook(3) }), { dryRun: true });
+  assert.deepEqual(report.genreSamples, [
+    { tags: ["Nonsense"], genres: [] },
+    { tags: ["Fantasy"], genres: ["Fantasy"] }
+  ]);
+});
+
 test("resumes after a rowid and stops at maxRequests", async () => {
   const { repo } = setup();
   const ids = Array.from({ length: 120 }, (_, index) => edition(repo, `97800000${String(index).padStart(5, "0")}`, `B${index}`));
@@ -309,4 +345,31 @@ test("a page with no match still advances the cursor", async () => {
   assert.equal(report.matched, 0);
   assert.equal(report.editions, 1);
   assert.ok(report.lastRowid > 0);
+});
+
+test("drops editions without a usable ISBN and makes no request for a page that has none", async () => {
+  const { db, repo } = setup();
+  const bad = edition(repo, "9780000000001", "Bad", "OL1W");
+  db.prepare("UPDATE books SET isbn = 'n/a' WHERE id = ?").run(bad.id);
+  const good = edition(repo, "9780000000002", "Good", "OL2W");
+  const lookup = fake({ "9780000000002": hcBook(2, { description: ENGLISH }) });
+  const report = await run(repo, lookup);
+  assert.deepEqual(lookup.asked, [["9780000000002"]]);
+  assert.equal(report.requests, 1);
+  assert.equal(report.editions, 2);
+  assert.equal(summaryOf(db, good.id).summary, ENGLISH);
+
+  const second = setup();
+  for (let index = 0; index < 50; index += 1) {
+    const unusable = edition(second.repo, `97800001${String(index).padStart(5, "0")}`, `Bad${index}`);
+    second.db.prepare("UPDATE books SET isbn = 'n/a' WHERE id = ?").run(unusable.id);
+  }
+  const last = edition(second.repo, "9780000000002", "Good", "OL2W");
+  const next = fake({});
+  const skipped = await run(second.repo, next, { maxRequests: 1 });
+  assert.deepEqual(next.asked, [["9780000000002"]]);
+  assert.equal(skipped.requests, 1);
+  assert.equal(skipped.editions, 51);
+  assert.equal(skipped.stoppedBy, "done");
+  assert.equal(skipped.lastRowid, (second.db.prepare("SELECT rowid FROM books WHERE id = ?").get(last.id) as { rowid: number }).rowid);
 });

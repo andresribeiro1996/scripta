@@ -63,13 +63,19 @@ export async function fillFromHardcover(
   const atomically = <T>(write: () => T): T => (options.dryRun ? write() : repo.transaction(write));
 
   for (;;) {
-    const page = repo.isbnPage(report.lastRowid, HARDCOVER_PAGE_SIZE);
+    const start = report.lastRowid;
+    const page = repo.isbnPage(start, HARDCOVER_PAGE_SIZE);
     if (page.length === 0) break;
     if (options.maxRequests !== null && report.requests >= options.maxRequests) {
       report.stoppedBy = "max-requests";
       break;
     }
-    const keyed = page.map((edition) => ({ edition, isbn: canonicalIsbn(edition.isbn) }));
+    const keyed = page.map((edition) => ({ edition, isbn: canonicalIsbn(edition.isbn) })).filter(({ isbn }) => isbn !== "");
+    if (keyed.length === 0) {
+      report.editions += page.length;
+      report.lastRowid = page[page.length - 1]!.rowid;
+      continue;
+    }
     let returned;
     try {
       returned = await lookup([...new Set(keyed.map(({ isbn }) => isbn))]);
@@ -90,16 +96,18 @@ export async function fillFromHardcover(
     }
 
     atomically(() => {
+      const hasSummary = new Map(repo.isbnPage(start, HARDCOVER_PAGE_SIZE).map((current) => [current.id, current.hasSummary]));
       const canonical = repo.canonicalWorkIds([...new Set(page.flatMap(({ workId }) => (workId === null ? [] : [workId])))]);
       for (const { edition, isbn } of keyed) {
         const book = books.get(isbn);
-        if (!book) continue;
+        const summarized = hasSummary.get(edition.id);
+        if (!book || summarized === undefined) continue;
         report.matched += 1;
 
         const text = descriptionText(book.description);
         if (text !== null) {
           const detected = detectedLanguage(text);
-          if (edition.hasSummary) report.descriptions.alreadyHadSummary += 1;
+          if (summarized) report.descriptions.alreadyHadSummary += 1;
           else if (detected === null || detected !== editionLanguageOf(edition)) report.descriptions.descriptionWrongLanguage += 1;
           else {
             if (!options.dryRun) repo.mergeDetails(edition.id, { summary: text, pages: null, year: null, publisher: null, translator: null }, "hardcover");
@@ -110,10 +118,10 @@ export async function fillFromHardcover(
         if (edition.workId === null) continue;
         const workId = canonical.get(edition.workId) ?? edition.workId;
 
-        if (!seriesSeen.has(workId)) {
+        const featured = featuredSeriesOf(book);
+        if (featured !== null && !seriesSeen.has(workId)) {
           seriesSeen.add(workId);
-          const featured = featuredSeriesOf(book);
-          if (featured !== null && !repo.hasWorkSeries(workId, "hardcover")) {
+          if (!repo.hasWorkSeries(workId, "hardcover")) {
             const key = seriesNameKey(featured.name);
             if (key === null || options.skipNameKeys.has(key)) report.series.skipped += 1;
             else {
@@ -128,6 +136,7 @@ export async function fillFromHardcover(
 
         if (!genresDone.has(workId)) {
           const genres = genresFromTags(book.genreTags);
+          if (options.dryRun && book.genreTags.length > 0 && genreSamples.length < GENRE_SAMPLES) genreSamples.push({ tags: book.genreTags.map(({ tag }) => tag), genres });
           if (genres.length === 0) report.genres.noMappedGenre += 1;
           else {
             const filled = options.dryRun ? repo.countEmptyGenreEditions(workId) : repo.fillSourceGenres(workId, genres);
@@ -136,7 +145,6 @@ export async function fillFromHardcover(
               report.genres.editions += filled;
             }
             genresDone.add(workId);
-            if (options.dryRun && genreSamples.length < GENRE_SAMPLES) genreSamples.push({ tags: book.genreTags.map(({ tag }) => tag), genres });
           }
         }
       }

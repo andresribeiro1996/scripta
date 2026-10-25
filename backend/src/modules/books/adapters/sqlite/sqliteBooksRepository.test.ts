@@ -3306,6 +3306,16 @@ test("hasWorkSeries is per source", () => {
   assert.equal(repo.hasWorkSeries(book.work_id!, "hardcover"), false);
 });
 
+test("hasWorkSeries counts a row stored on a work merged into it", () => {
+  const { repo } = freshRepo();
+  const target = seriesBook(repo, "Memories of Ice", "9780765348807");
+  const alias = seriesBook(repo, "Memórias de Gelo", "9789720000401");
+  repo.addWorkSeries(alias.work_id!, [{ name: MALAZAN, position: "3" }], "hardcover", AT);
+  repo.mergeTranslation(alias.work_id!, target.work_id!, "manual", null, AT);
+  assert.equal(repo.hasWorkSeries(target.work_id!, "hardcover"), true);
+  assert.equal(repo.hasWorkSeries(target.work_id!, "wikidata"), false);
+});
+
 test("removeSeriesNames drops hardcover rows and their search entry", () => {
   const { db, repo } = freshRepo();
   const book = seriesBook(repo, "Memories of Ice", "9780765348807");

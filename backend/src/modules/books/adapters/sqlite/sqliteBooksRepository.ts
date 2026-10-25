@@ -511,7 +511,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const seriesIndexNamesStmt = db.prepare(`SELECT name FROM series_fts WHERE work_id = ?`);
   const deleteSeriesIndexStmt = db.prepare(`DELETE FROM series_fts WHERE work_id = ? AND name = ?`);
   const hasWorkSeriesStmt = db.prepare(`SELECT 1 FROM work_series WHERE work_id = ? LIMIT 1`);
-  const hasWorkSeriesSourceStmt = db.prepare(`SELECT 1 FROM work_series WHERE work_id = ? AND source = ? LIMIT 1`);
+  const hasWorkSeriesSourceStmt = db.prepare(`SELECT 1 FROM work_series WHERE source = ?2 AND (work_id = ?1 OR work_id IN (SELECT id FROM works WHERE merged_into = ?1)) LIMIT 1`);
   const seriesToRemoveStmt = db.prepare(`
     SELECT work_id, name_key FROM work_series
     WHERE source = ? AND name_key IN (SELECT value FROM json_each(?))
