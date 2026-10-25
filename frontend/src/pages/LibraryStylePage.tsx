@@ -1,10 +1,10 @@
 import { CHECKBOX_CLASS } from "../components/Toolbar";
-import { useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { saveFailureMessage } from "@scripta/shared";
 import { BookCard } from "../components/BookCard";
 import { BookGrid } from "../components/BookGrid";
 import { LibraryCanvas } from "../components/LibraryCanvas";
-import { Page } from "../components/page/Page";
+import { Page, PageWidthContext } from "../components/page/Page";
 import { area } from "../lib/areas";
 import { CardAppearanceSection, CardBorderSection, CardContentSection, CardTextSection, Section, SliderRow } from "../components/StyleControls";
 import { useToast } from "../components/Toaster";
@@ -44,6 +44,7 @@ export function LibraryStylePage() {
   const { data: library, updateLibrary } = useLibrary();
   const toast = useToast();
 
+  const [pageWidth] = useState(useContext(PageWidthContext));
   const [draft, setDraft] = useState<LibraryStyleSettings>(DEFAULT_LIBRARY_STYLE);
   const syncedRef = useRef(false);
 
@@ -96,7 +97,7 @@ export function LibraryStylePage() {
   const usingCustomBackground = draft.backgroundColor !== null;
 
   return (
-    <Page title="Settings" maxWidth={DEFAULT_LIBRARY_STYLE.contentMaxWidth} subtitle="Everything about how your cards and the canvas behind them look — applied across Library, Series, and Collections." tabs={area("settings").tabs}>
+    <Page title="Settings" maxWidth={pageWidth} subtitle="Everything about how your cards and the canvas behind them look — applied across Library, Series, and Collections." tabs={area("settings").tabs}>
       <p className="mb-6 text-sm text-(--color-text-dim)">
         These settings stay inside your books: they never restyle the app's own menus, page headers, or search and filter bar. A series can override its own card appearance from its own style panel (Series page) — those settings take priority over these for that series' cards.
       </p>

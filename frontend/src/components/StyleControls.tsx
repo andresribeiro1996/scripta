@@ -91,7 +91,7 @@ function ColorValueInput({ value, fallback, onChange, label = "Custom color" }: 
     return (
       <span className="flex items-center gap-2 text-sm text-(--color-text-dim)">
         Theme color: {BLOCK_THEME_COLOR_LABELS[themeKey]}
-        <button type="button" onClick={() => onChange(fallback)} className="font-semibold text-(--color-text) underline decoration-(--color-accent)">
+        <button type="button" onClick={() => onChange(fallback)} className="min-h-11 font-semibold text-(--color-text) underline decoration-(--color-accent)">
           Use a custom color
         </button>
       </span>

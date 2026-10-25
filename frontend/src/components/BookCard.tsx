@@ -334,7 +334,7 @@ export function BookCard({
       )}
 
       {((onOpenStyle || onOpenCoverPicker) && !selectable) && (
-        <div className="absolute top-0 left-1 flex flex-col items-start opacity-0 transition-opacity group-hover:opacity-100 [@media(pointer:coarse)]:hidden">
+        <div className="absolute top-0 left-1 flex flex-col items-start [&>button+button]:-mt-5 opacity-0 transition-opacity group-hover:opacity-100 [@media(pointer:coarse)]:hidden">
           {onOpenStyle && (
             <button
               onClick={(e) => {

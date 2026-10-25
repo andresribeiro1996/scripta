@@ -95,7 +95,7 @@ Three layouts, all providing `PageWidthContext`: `DashboardLayout` (signed in; s
 
 Page rules:
 - Tabs sit in the band and name sibling pages of one area (Library: Books, Series, Collections, Gallery); a detail page uses a back link, not tabs.
-- The shared library page uses the owner's width. The Style tab is fixed at 1152px, because its own width slider would resize it mid-drag. Profiles and the Reader card keep narrower content columns inside the full-width body. The mural canvas stays 1152px inside the full-width body.
+- The shared library page uses the owner's width. The Style tab keeps the width the user had when the page mounted for the whole visit, so its title lines up with the other Settings tabs and dragging "Content width" does not resize the page under the pointer. Profiles and the Reader card keep narrower content columns inside the full-width body. The mural canvas stays 1152px inside the full-width body.
 - One accent button per view: `BUTTON_PRIMARY` for it, `BUTTON_SECONDARY` for the rest.
 - Every control is at least 44px. Checkboxes, radios and ranges use `CHECKBOX_CLASS`, `RADIO_CLASS` and `RANGE_CLASS`; `OptionsMenu`'s default trigger is 44px, and a row with several actions folds them into one menu.
 

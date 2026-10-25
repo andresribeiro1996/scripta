@@ -128,7 +128,7 @@ export function SettingsPage() {
                 </button>
               </div>
             ) : (
-              <form onSubmit={handleSubmit} className="flex items-center gap-2">
+              <form onSubmit={handleSubmit} className="flex flex-wrap items-center gap-2">
                 <input
                   id="settings-username"
                   autoFocus
@@ -138,7 +138,7 @@ export function SettingsPage() {
                   maxLength={30}
                   pattern="[a-zA-Z0-9_.]+"
                   title="Letters, numbers, underscores, and periods only."
-                  className="min-h-11 w-48 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm"
+                  className="min-h-11 w-full min-w-0 rounded-lg border border-(--color-border) bg-(--color-surface) sm:w-48 px-3 text-sm"
                 />
                 <button
                   type="submit"
