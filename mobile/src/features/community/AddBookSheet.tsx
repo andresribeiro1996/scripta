@@ -34,7 +34,7 @@ export function AddBookSheet({
   const params = useGlobalSearchParams();
   const segments = useSegments();
   const queryClient = useQueryClient();
-  const library = useLibrary({ enabled: false });
+  const library = useLibrary({ enabled: !!user });
   const existing = ownedEntry({ Title: book.title, Attribution: book.author, ISBN: book.isbn }, library.data?.data.books ?? []);
   const currentStatus = existing ? Number(existing.ReadStatus ?? 0) : null;
   const [busyStatus, setBusyStatus] = useState<0 | 1 | 2 | null>(null);

@@ -93,6 +93,12 @@ test("a work you own keeps its catalog row when the library section doesn't list
   assert.deepEqual(mergeBookResults(catalog, [], owned, new Set(["w-owned"])).map((book) => book.title), ["Other"]);
 });
 
+test("a catalog result with a work id is hidden when a library book matches by ISBN but has no work mapping", () => {
+  const owned = [{ Title: "Dune", Attribution: "Author", ISBN: "9780441013593" }];
+  const catalog = [result("Dune", "w-dune", "9780441013593"), result("Other", "w-other")];
+  assert.deepEqual(mergeBookResults(catalog, [], owned, new Set()).map((book) => book.title), ["Other"]);
+});
+
 test("a search param reads as its trimmed text, or its first item, or nothing", () => {
   assert.equal(searchQueryFromParam("  Malazan Book of the Fallen "), "Malazan Book of the Fallen");
   assert.equal(searchQueryFromParam(["Dune", "Other"]), "Dune");

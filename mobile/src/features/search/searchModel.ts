@@ -126,7 +126,7 @@ export function mergeBookResults(catalog: BookSearchResult[], outside: BookSearc
   const isbns = new Set<string>();
   return [...catalog, ...outside].filter((result) => {
     const isbn = canonicalIsbn(result.isbn);
-    const isOwned = result.workId ? listed.has(result.workId) : ownedEntry({ Title: result.title, Attribution: result.authors.join(", "), ISBN: result.isbn }, owned) !== undefined;
+    const isOwned = (result.workId !== undefined && listed.has(result.workId)) || ownedEntry({ Title: result.title, Attribution: result.authors.join(", "), ISBN: result.isbn }, owned) !== undefined;
     if (isOwned) return false;
     if ((result.workId && works.has(result.workId)) || (isbn && isbns.has(isbn))) return false;
     if (result.workId) works.add(result.workId);
