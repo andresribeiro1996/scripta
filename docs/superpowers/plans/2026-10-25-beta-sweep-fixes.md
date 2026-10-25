@@ -328,6 +328,7 @@ Use the `diagnosing-bugs` skill: build a red repro before any theory.
 - Modify: `mobile/src/features/library/components/AddBookForm.tsx`
 - Modify: `mobile/src/features/community/AddBookSheet.tsx`
 - Modify: `mobile/src/features/search/searchModel.ts`
+- Modify: `mobile/src/features/search/SearchScreen.tsx`
 - Test: `mobile/src/features/search/searchModel.test.ts`
 
 **Interfaces:**

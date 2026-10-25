@@ -11,6 +11,7 @@ import { AuthProvider, useAuth } from "../core/auth";
 import { createAccountLibrarySaver, LibrarySaverContext } from "../features/library/hooks/useLibrary";
 import { FONT_ASSETS } from "../ui/fontAssets";
 import { ThemeProvider, useTheme } from "../ui/theme";
+import { ToastProvider } from "../ui/ToastHost";
 import { useScreenOptions, useSheetOptions } from "../ui/navigation";
 
 void SplashScreen.preventAutoHideAsync();
@@ -75,9 +76,11 @@ export default function RootLayout() {
       <SafeAreaProvider>
           <ThemeProvider bundledFonts={fontsLoaded}>
             <HideSplash />
-            <AuthProvider>
-              <AccountRoutes />
-            </AuthProvider>
+            <ToastProvider>
+              <AuthProvider>
+                <AccountRoutes />
+              </AuthProvider>
+            </ToastProvider>
           </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

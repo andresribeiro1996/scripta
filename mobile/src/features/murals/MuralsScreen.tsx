@@ -122,7 +122,7 @@ export function MuralsScreen() {
   }
 
   function confirmDelete(mural: Mural) {
-    Alert.alert(`Delete “${mural.name}”?`, "This can't be undone.", [{ text: "Cancel", style: "cancel" }, { text: "Delete", style: "destructive", onPress: () => void murals.remove(mural.id) }]);
+    Alert.alert(`Delete “${mural.name}”?`, mural.shareToken ? "This can't be undone. Its public link will stop working." : "This can't be undone.", [{ text: "Cancel", style: "cancel" }, { text: "Delete", style: "destructive", onPress: () => void murals.remove(mural.id) }]);
   }
 
   function editFolder(id: string) {
