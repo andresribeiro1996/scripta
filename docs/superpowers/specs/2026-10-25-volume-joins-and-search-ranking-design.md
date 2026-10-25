@@ -47,6 +47,10 @@ Ranking can't put the volumes first while two of them are hidden inside the omni
 - **Unsure joins go to review, and Claude decides them.** When the guard can't tell whether a translation is a volume or the whole thing, the join goes to the existing translations review queue, and Claude decides it there.
 - **Ranking is in scope.** Search ranking is fixed in this same effort, after the grouping.
 - **Jev builds the scorecard; it doesn't rank live.** Jev grades a fixed set of queries once, and code ranking is measured against those grades.
+- **The scorecard is sized and run this way:**
+  - about 150 queries from outside sources, with 50 held back so the ranking isn't fitted to the tuning books;
+  - grading runs on the production server over `railway ssh`;
+  - scoring runs locally on a snapshot.
 - **Popularity signals:** start with the free ones (editions, languages, Scripta readers, has-a-cover) plus the Wikidata Wikipedia count. The scorecard decides which stay. Open Library reader counts and Hardcover come later, and only if the scorecard shows famous books still ranking too low.
 
 ## Goals
@@ -161,8 +165,17 @@ The review queue doesn't store or show the guard's reason; no schema or response
 
 ## Part 2: scorecard
 
-- **Query set.** About 50 queries, chosen by Claude and committed to the repo. They mix series names, author names and single titles, in Portuguese and English. They include "harry potter", "lord of the rings", "senhor dos anéis", "saramago" and "dune". The user may add queries later.
-- **Candidates per query.** About 30 works, chosen independently of any ranking version: the union of
+- **Query set.** About 150 queries, committed to the repo. None comes from Scripta's own data: users' libraries are too few to be useful, and taking queries from our catalog's most-edition works would bias the test toward the edition-count signal.
+  - **50 hand-picked by Claude:** series names, famous authors and titles, short or ambiguous queries ("dune", "it", "1984"), in Portuguese and English. They include "harry potter", "lord of the rings", "senhor dos anéis" and "saramago".
+  - **50 from public lists:** Wikipedia's best-selling books and best-selling book series.
+  - **50 Portuguese:** recent bestsellers from Portuguese charts (Bertrand, Wook, Fnac) and well-known Portuguese authors.
+  - The user may add queries later.
+- **Hidden set.** The queries are split once, at random, into 100 for tuning and 50 held back. Each source keeps its share in both parts. The split is committed with the queries.
+  - Ranking work looks only at the tuning scores.
+  - Before a ranking PR merges, the held-back 50 are scored too.
+  - A change that raises the tuning score but not the held-back score has been fitted to those books. It doesn't ship.
+- **No per-query rules.** The ranking never names a book or a query; there is no "if the query is X, show Y".
+- **Candidates per query.** About 40 works, chosen independently of any ranking version: the union of
   - the top FTS hits deduplicated by work;
   - the members of any series whose name matches the query;
   - the works with the most editions among the FTS hits.
@@ -172,10 +185,14 @@ The review queue doesn't store or show the guard's reason; no schema or response
   - "unrelated" (gain 0).
 
   Each gain is weighted by Jev's confidence. Grades are saved by work id and committed as the answer key.
-- **Score.** NDCG@10 per query and the mean overall, computed by running the branch's ranking code against a local snapshot of the production catalog, read-only.
+- **Where grading runs.** On the production server, through a script piped over `railway ssh` as in today's read-only checks. The user chose this because no local TypeSafe key exists.
+  - The script reads candidates read-only, calls Jev with the server's key and prints the grades. Claude commits them.
+  - Nothing is written to production or deployed, and the key never leaves the server.
+  - Grading pulls candidates from the live catalog, so it has to wait for the pre-2002 BNP import to finish. It may run during the deploy hold, which only stops deploys.
+- **Score.** NDCG@10 per query, the mean for the tuning set and the mean for the hidden set. It is computed by running the branch's ranking code against a local snapshot of the production catalog, read-only. Production can only run deployed code, which is why scoring is local.
 - **Unlabelled works.** The score treats unlabelled works in a top 10 as unrelated, and lists them so they can be graded and added.
 - **The first run is the baseline** and goes in the PR description.
-- **Cost.** About 1,500 Jev calls once, plus top-ups. Record the actual spend.
+- **Cost.** About 6,000 Jev calls once (about $6 at earlier rates), plus top-ups. Record the actual spend.
 
 ## Part 3: ranking
 
@@ -223,4 +240,4 @@ The current spec `2026-10-20-series-in-search-design.md` lists "sorting results 
   - `covers.sqlite` is about 500 MB, plus a 100 MB WAL.
   - Take the snapshot only after the pre-2002 BNP import has finished. A large read during the import risks the cross-process starvation in `sqlite-cross-process-starvation`.
 - PR shape. Claude's call: three PRs in order, one per part, each to `main`.
-- If the snapshot or the Jev key is not yet available, Part 3 can still be built against the fixture and the hard-example tests. Its PR waits for the scorecard numbers before merging.
+- If the snapshot or the grades are not yet available, Part 3 can still be built against the fixture and the hard-example tests. Its PR waits for the scorecard numbers before merging.
