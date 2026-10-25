@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Group } from "./groups.js";
+import { buildMergedLibrary } from "./addPipeline.js";
 import { moveUnit, orderLibraryBooks, unitMoves } from "./libraryOrder.js";
 
 type Book = Record<string, unknown>;
@@ -37,4 +38,12 @@ test("unitMoves reports the arrows each unit may use", () => {
 test("unitMoves disables every arrow for one series and one standalone book", () => {
   const moves = unitMoves([book("S1", 0), book("A", 1)], [series("S", ["S1"])]);
   for (const move of moves.values()) assert.equal(move.up || move.down, false);
+});
+
+test("adding a book keeps the order of books that had no _order yet", () => {
+  const unordered = [{ _key: "T1", Title: "T1" }, { _key: "S1", Title: "S1" }, { _key: "A", Title: "A" }];
+  const seriesGroups = [series("Zeta", ["T1"]), series("Alpha", ["S1"])];
+  const before = orderLibraryBooks(unordered, seriesGroups).map((b) => b._key);
+  const added = buildMergedLibrary({ books: unordered, groups: seriesGroups }, { books: [{ _key: "N", Title: "N" }] });
+  assert.deepEqual(orderLibraryBooks(added.books, added.groups ?? []).map((b) => b._key), [...before, "N"]);
 });

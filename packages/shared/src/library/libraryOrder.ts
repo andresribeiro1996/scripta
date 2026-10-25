@@ -52,16 +52,18 @@ interface Unit {
 
 function buildUnits(books: Array<Record<string, unknown>>, groups: Group[]): Unit[] {
   const seriesGroups = groups.filter((g) => g.type === "series");
+  const indexOf = new Map(books.map((b, i) => [bookKey(b), i] as const));
 
   const clusters = seriesGroups
     .map((group) => {
       const members = orderedGroupBooks(group, books);
       if (members.length === 0) return null;
       const minOrder = Math.min(...members.map(orderOf));
-      return { group, members, minOrder };
+      const minIndex = Math.min(...members.map((b) => indexOf.get(bookKey(b)) ?? Number.POSITIVE_INFINITY));
+      return { group, members, minOrder, minIndex };
     })
-    .filter((c): c is { group: Group; members: Array<Record<string, unknown>>; minOrder: number } => c !== null)
-    .sort((a, b) => a.minOrder - b.minOrder || a.group.name.localeCompare(b.group.name));
+    .filter((c): c is { group: Group; members: Array<Record<string, unknown>>; minOrder: number; minIndex: number } => c !== null)
+    .sort((a, b) => a.minOrder - b.minOrder || a.minIndex - b.minIndex || a.group.name.localeCompare(b.group.name));
 
   const placed = new Set<string>();
   const units: Unit[] = [];
