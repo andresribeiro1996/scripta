@@ -20,6 +20,7 @@ const TYPE_LABELS: Record<QuizQuestionType, string> = {
   title_cover: "Title → cover",
   quote_title: "Quote → title",
   blurb_title: "Blurb → title",
+  characters_title: "Characters → title",
 };
 
 const uriFor = (url: string): string => coverUrlForApi(url, API_URL);

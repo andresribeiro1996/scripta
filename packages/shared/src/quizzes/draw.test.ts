@@ -85,3 +85,37 @@ test("a distractor is any other book object, so two books sharing a title still 
   const questions = generateQuizQuestions(books, { questionCount: 5, allowedTypes: ["title_cover"] }, "seed");
   for (const question of questions) assert.ok(books.includes(question.book));
 });
+
+const potter = ["Harry Potter", "Ron Weasley", "Hermione Granger"];
+const characterBooks = [
+  book("p1", { characters: potter }),
+  book("p2", { characters: [" harry potter ", "X", "Y"] }),
+  ...["a", "b", "c", "d"].map((k) => book(k, { characters: [`${k}1`, `${k}2`, `${k}3`] }))
+];
+
+test("a book with three characters is eligible for characters_title", () => {
+  assert.ok(eligibleTypes(book("x", { characters: ["a", "b", "c"] })).includes("characters_title"));
+});
+
+test("two names are not enough", () => {
+  assert.ok(!eligibleTypes(book("x", { characters: ["a", "b"] })).includes("characters_title"));
+});
+
+test("characters_title never offers a book that shares a prompt name", () => {
+  let potterQuestions = 0;
+  for (const seed of ["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8"]) {
+    const questions = generateQuizQuestions(characterBooks, { questionCount: 2, allowedTypes: ["characters_title"] }, seed);
+    for (const q of questions) {
+      const other = q.book.workId === "p1" ? "Title p2" : q.book.workId === "p2" ? "Title p1" : null;
+      if (!other) continue;
+      potterQuestions++;
+      assert.ok(!q.options.includes(other));
+    }
+  }
+  assert.ok(potterQuestions > 0);
+});
+
+test("characters_title is skipped when fewer than three clean distractors remain", () => {
+  const shared = ["a", "b", "c", "d"].map((k) => book(k, { characters: ["Same", `${k}2`, `${k}3`] }));
+  assert.equal(generateQuizQuestions(shared, { questionCount: 4, allowedTypes: ["characters_title"] }, "s").length, 0);
+});
