@@ -10,15 +10,18 @@ import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { playerLabel, scoreRows, type PublicQuizQuestion } from "@scripta/shared";
 import { CoverImage } from "../components/BookCard";
+import { Page } from "../components/page/Page";
 import { fetchPublicResultsApi, submitPlayApi, type PlayResponse } from "../api/quizzes";
 import { quizPlayStage } from "../lib/quizPlayStage";
 import { storePlayId, useQuizPlay } from "../hooks/useQuizPlay";
 
+const QUIZ_WIDTH = 576;
+
 function InfoScreen({ message }: { message: string }) {
   return (
-    <div className="flex min-h-screen items-center justify-center px-5 text-center">
-      <p className="text-(--color-text-dim)">{message}</p>
-    </div>
+    <Page title="Quiz">
+      <p className="text-sm text-(--color-text-dim)">{message}</p>
+    </Page>
   );
 }
 
@@ -107,15 +110,17 @@ export function PlayQuizPage() {
   if (stage === "loading") return <InfoScreen message="Loading…" />;
   if (stage === "leaderboard") {
     return (
-      <div className="mx-auto flex min-h-screen max-w-xl flex-col gap-6 px-5 py-8">
-        <p className="text-center text-(--color-text-dim)">This quiz is closed.</p>
-        <Leaderboard code={code ?? ""} />
-      </div>
+      <Page title={playBoard.name} maxWidth={QUIZ_WIDTH}>
+        <div className="flex flex-col gap-6">
+          <p className="text-center text-(--color-text-dim)">This quiz is closed.</p>
+          <Leaderboard code={code ?? ""} />
+        </div>
+      </Page>
     );
   }
 
   if (result) {
-    return <ResultsView code={code ?? ""} result={result} questions={questions} copied={copied} setCopied={setCopied} alreadyPlayed={submitted === null} />;
+    return <ResultsView code={code ?? ""} name={playBoard.name} result={result} questions={questions} copied={copied} setCopied={setCopied} alreadyPlayed={submitted === null} />;
   }
 
   const question = questions[index];
@@ -152,44 +157,40 @@ export function PlayQuizPage() {
   const answeredCount = Object.keys(answers).length;
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-xl flex-col gap-5 px-5 py-8">
-      <div className="flex items-center justify-between text-sm text-(--color-text-dim)">
-        <span>{playBoard.name}</span>
-        <span>
-          {index + 1}/{questions.length} · {Math.floor(elapsed / 1000)}s
-        </span>
-      </div>
-      <div className="h-1 rounded bg-(--color-border)">
-        <div className="h-1 rounded bg-(--color-accent) transition-all" style={{ width: `${Math.round((answeredCount / questions.length) * 100)}%` }} />
-      </div>
-
-      <Prompt question={question} />
-      <Options question={question} picked={picked} onPick={pick} />
-
-      {index === questions.length - 1 && answeredCount === questions.length && (
-        <div className="flex flex-col gap-3">
-          <label className="flex flex-col gap-1 text-sm font-semibold">
-            Name for the leaderboard (optional)
-            <input
-              value={playerName}
-              onChange={(event) => setPlayerName(event.target.value)}
-              maxLength={40}
-              placeholder="Guest"
-              className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2"
-            />
-          </label>
-          {submitError && <p role="alert" className="text-sm text-(--color-danger)">{submitError}</p>}
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void submit()}
-            className="min-h-11 rounded-lg bg-(--color-accent) px-4 font-semibold text-(--color-on-accent) disabled:opacity-50"
-          >
-            {busy ? "Scoring…" : "See my score"}
-          </button>
+    <Page title={playBoard.name} subtitle={`${index + 1}/${questions.length} · ${Math.floor(elapsed / 1000)}s`} maxWidth={QUIZ_WIDTH}>
+      <div className="flex flex-col gap-5">
+        <div className="h-1 rounded bg-(--color-border)">
+          <div className="h-1 rounded bg-(--color-accent) transition-all" style={{ width: `${Math.round((answeredCount / questions.length) * 100)}%` }} />
         </div>
-      )}
-    </div>
+
+        <Prompt question={question} />
+        <Options question={question} picked={picked} onPick={pick} />
+
+        {index === questions.length - 1 && answeredCount === questions.length && (
+          <div className="flex flex-col gap-3">
+            <label className="flex flex-col gap-1 text-sm font-semibold">
+              Name for the leaderboard (optional)
+              <input
+                value={playerName}
+                onChange={(event) => setPlayerName(event.target.value)}
+                maxLength={40}
+                placeholder="Guest"
+                className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2"
+              />
+            </label>
+            {submitError && <p role="alert" className="text-sm text-(--color-danger)">{submitError}</p>}
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void submit()}
+              className="min-h-11 rounded-lg bg-(--color-accent) px-4 font-semibold text-(--color-on-accent) disabled:opacity-50"
+            >
+              {busy ? "Scoring…" : "See my score"}
+            </button>
+          </div>
+        )}
+      </div>
+    </Page>
   );
 }
 
@@ -208,6 +209,7 @@ function ScoreValue({ value, title, dim }: { value: { kind: "text" | "cover"; va
 
 function ResultsView({
   code,
+  name,
   result,
   questions,
   copied,
@@ -215,6 +217,7 @@ function ResultsView({
   alreadyPlayed
 }: {
   code: string;
+  name: string;
   result: PlayResponse;
   questions: PublicQuizQuestion[];
   copied: boolean;
@@ -225,46 +228,48 @@ function ResultsView({
   const score = result.score;
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-xl flex-col gap-6 px-5 py-8">
-      <div className="text-center">
-        <p className="text-sm text-(--color-text-dim)">{alreadyPlayed ? "You already played this quiz." : "Your score"}</p>
-        <p className="text-5xl font-bold text-(--color-accent)">
-          {score}/{questions.length}
-        </p>
+    <Page title={name} maxWidth={QUIZ_WIDTH}>
+      <div className="flex flex-col gap-6">
+        <div className="text-center">
+          <p className="text-sm text-(--color-text-dim)">{alreadyPlayed ? "You already played this quiz." : "Your score"}</p>
+          <p className="text-5xl font-bold text-(--color-accent)">
+            {score}/{questions.length}
+          </p>
+        </div>
+
+        <ol className="flex flex-col gap-1.5 text-sm">
+          {scoreRows(questions, result.correct, result.answers).map((row) => (
+            <li key={row.id} className="flex items-center gap-3 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2">
+              <span className="text-(--color-text-dim)">{row.number}</span>
+              <span aria-hidden="true" className={row.correct ? "text-(--color-success)" : "text-(--color-danger)"}>
+                {row.correct ? "✓" : "✗"}
+              </span>
+              <div className="flex min-w-0 flex-1 flex-col gap-1">
+                {row.answer && <ScoreValue value={row.answer} title={row.answer.title} />}
+                {row.pick && <ScoreValue value={row.pick} dim />}
+              </div>
+            </li>
+          ))}
+        </ol>
+
+        <div className="flex items-center gap-3 rounded-xl border border-(--color-border) bg-(--color-surface) p-4">
+          <code className="min-w-0 flex-1 truncate rounded-lg bg-(--color-surface-hover) px-3 py-2 text-sm">{shareLink}</code>
+          <button
+            type="button"
+            onClick={() => {
+              void navigator.clipboard.writeText(shareLink);
+              setCopied(true);
+              window.setTimeout(() => setCopied(false), 1500);
+            }}
+            className="min-h-10 shrink-0 rounded-lg bg-(--color-accent) px-3 text-sm font-semibold text-(--color-on-accent)"
+          >
+            {copied ? "Copied!" : "Challenge someone"}
+          </button>
+        </div>
+
+        <Leaderboard code={code} />
       </div>
-
-      <ol className="flex flex-col gap-1.5 text-sm">
-        {scoreRows(questions, result.correct, result.answers).map((row) => (
-          <li key={row.id} className="flex items-center gap-3 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2">
-            <span className="text-(--color-text-dim)">{row.number}</span>
-            <span aria-hidden="true" className={row.correct ? "text-(--color-success)" : "text-(--color-danger)"}>
-              {row.correct ? "✓" : "✗"}
-            </span>
-            <div className="flex min-w-0 flex-1 flex-col gap-1">
-              {row.answer && <ScoreValue value={row.answer} title={row.answer.title} />}
-              {row.pick && <ScoreValue value={row.pick} dim />}
-            </div>
-          </li>
-        ))}
-      </ol>
-
-      <div className="flex items-center gap-3 rounded-xl border border-(--color-border) bg-(--color-surface) p-4">
-        <code className="min-w-0 flex-1 truncate rounded-lg bg-(--color-surface-hover) px-3 py-2 text-sm">{shareLink}</code>
-        <button
-          type="button"
-          onClick={() => {
-            void navigator.clipboard.writeText(shareLink);
-            setCopied(true);
-            window.setTimeout(() => setCopied(false), 1500);
-          }}
-          className="min-h-10 shrink-0 rounded-lg bg-(--color-accent) px-3 text-sm font-semibold text-(--color-on-accent)"
-        >
-          {copied ? "Copied!" : "Challenge someone"}
-        </button>
-      </div>
-
-      <Leaderboard code={code} />
-    </div>
+    </Page>
   );
 }
 

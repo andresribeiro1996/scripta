@@ -1,15 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
 import { fetchSharedLibrary } from "../api/sharedLibrary";
-import { PageContainer } from "../components/PageContainer";
+import { Page } from "../components/page/Page";
 import { PublicLibraryGrid } from "../components/PublicLibraryGrid";
 import { resolveLibraryStyle } from "../lib/libraryStyle";
 
 function InfoScreen({ message }: { message: string }) {
   return (
-    <div className="flex min-h-screen items-center justify-center px-5 text-center">
-      <p className="text-(--color-text-dim)">{message}</p>
-    </div>
+    <Page title="Library">
+      <p className="text-sm text-(--color-text-dim)">{message}</p>
+    </Page>
   );
 }
 
@@ -35,11 +35,8 @@ export function SharedLibraryPage() {
   }
 
   return (
-    <PageContainer maxWidth={style.contentMaxWidth}>
-      <header className="mb-6">
-        <h1 className="text-lg font-bold">{data.data.name || "Library"}</h1>
-      </header>
+    <Page title={data.data.name || "Library"} maxWidth={style.contentMaxWidth}>
       <PublicLibraryGrid library={data.data} />
-    </PageContainer>
+    </Page>
   );
 }

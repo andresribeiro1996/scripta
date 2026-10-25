@@ -1,5 +1,5 @@
 import { useState, type CSSProperties } from "react";
-import { Link, Navigate, useLocation } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { DEFAULT_TIER_PRESET } from "@scripta/shared";
 import type { ContentTone, DiscoverItem, DiscoverType } from "@scripta/shared/community";
 import { contentKindLabel, contentStats, contentStatus, contentTarget } from "@scripta/shared/community";
@@ -67,21 +67,12 @@ export function DiscoverPage() {
 
 export function PublicDiscoverPage() {
   const { session } = useAuth();
-  const location = useLocation();
   const destination = discoverDestination(session);
   if (destination) return <Navigate to={destination} replace />;
   return (
-    <div className="min-h-screen bg-(--color-bg) text-(--color-text)">
-      <div className="mx-auto max-w-3xl p-6">
-        <header className="mb-6 flex items-center justify-between gap-3">
-          <h1 className="text-lg font-bold">Discover</h1>
-          <Link to="/login" state={{ from: location }} className="text-sm text-(--color-accent) hover:underline">
-            Sign in
-          </Link>
-        </header>
-        <DiscoverPane />
-      </div>
-    </div>
+    <Page title="Games">
+      <DiscoverPane />
+    </Page>
   );
 }
 

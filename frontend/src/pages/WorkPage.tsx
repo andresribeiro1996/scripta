@@ -6,10 +6,11 @@ import { useAuth } from "../auth/AuthContext";
 import { AddBookSheet } from "../components/AddBookSheet";
 import { EmptyState } from "../components/EmptyState";
 import { useToast } from "../components/Toaster";
-import { BackLink } from "../components/work/BackLink";
+import { Page } from "../components/page/Page";
 import { BookScreen } from "../components/book/BookScreen";
 import { useLibrary } from "../hooks/useLibrary";
 import { useWork } from "../hooks/useWork";
+import { backTo } from "../lib/areas";
 
 export function WorkPage() {
   const { id } = useParams<{ id: string }>();
@@ -26,36 +27,31 @@ export function WorkPage() {
     if (page && id && page.work.id !== id) navigate(`/work/${page.work.id}`, { replace: true });
   }, [page, id, navigate]);
 
-  const backTo = session ? "/dashboard" : "/";
-  const hasHistory = (window.history.state?.idx ?? 0) > 0;
-  const onBack = hasHistory ? () => navigate(-1) : null;
-  const back = <BackLink backTo={backTo} onBack={onBack} />;
+  const back = session ? backTo("book") : undefined;
   const mineKey = page?.mine?.bookKey;
   const book = mineKey ? libraryQuery.data?.data.books.find((b) => bookKey(b) === mineKey) ?? null : null;
 
-  if (isLoading || (mineKey && !book && libraryQuery.isFetching)) return <main className="mx-auto max-w-5xl px-5 py-8">{back}<p className="text-sm text-(--color-text-dim)">Loading…</p></main>;
-  if (!page && isNotFound) return <main className="mx-auto max-w-5xl px-5 py-8">{back}<p className="text-sm text-(--color-text-dim)">No book with that id.</p></main>;
+  if (isLoading || (mineKey && !book && libraryQuery.isFetching)) return <Page title="Book" back={back}><p className="text-sm text-(--color-text-dim)">Loading…</p></Page>;
+  if (!page && isNotFound) return <Page title="Book" back={back}><p className="text-sm text-(--color-text-dim)">No book with that id.</p></Page>;
   if (!page) {
     return (
-      <main className="mx-auto max-w-5xl px-5 py-8">
-        {back}
+      <Page title="Book" back={back}>
         <EmptyState
           title="Couldn't load this book."
           action={<button type="button" onClick={() => void refetch()} className="rounded-lg border border-(--color-border) px-3 py-1.5 text-sm hover:border-(--color-accent)">Retry</button>}
         />
-      </main>
+      </Page>
     );
   }
 
   if (mineKey && !book && libraryQuery.isError) {
     return (
-      <main className="mx-auto max-w-5xl px-5 py-8">
-        {back}
+      <Page title={page.work.title} back={back}>
         <EmptyState
           title="Couldn't load your library."
           action={<button type="button" onClick={() => void libraryQuery.refetch()} className="rounded-lg border border-(--color-border) px-3 py-1.5 text-sm hover:border-(--color-accent)">Retry</button>}
         />
-      </main>
+      </Page>
     );
   }
 
@@ -83,8 +79,7 @@ export function WorkPage() {
         onSelectEdition={setEditionId}
         onAdd={setAdding}
         onShare={() => void share()}
-        onBack={onBack}
-        backTo={backTo}
+        frame={(title, actions, body) => <Page title={title} back={back} actions={actions}>{body}</Page>}
       />
       {adding ? <AddBookSheet book={adding} onClose={() => {
         setAdding(null);

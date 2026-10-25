@@ -5,6 +5,9 @@ import { RequireAuth } from "./auth/RequireAuth";
 import { RequireUsername } from "./auth/RequireUsername";
 import { EdgeSwipeBack } from "./components/EdgeSwipeBack";
 import { DashboardLayout } from "./layouts/DashboardLayout";
+import { PublicLayout } from "./layouts/PublicLayout";
+import { SessionLayout } from "./layouts/SessionLayout";
+import { useAuth } from "./auth/AuthContext";
 import { ArenaListPage } from "./pages/ArenaListPage";
 import { TierListCreatePage } from "./pages/TierListCreatePage";
 import { ArenaSeedPage } from "./pages/ArenaSeedPage";
@@ -43,6 +46,11 @@ import { TierListEditorPage } from "./pages/TierListEditorPage";
 import { WelcomeAvatarPage } from "./pages/WelcomeAvatarPage";
 import { VoteTierlistPage } from "./pages/VoteTierlistPage";
 
+function PublicRoutesLayout() {
+  const { session } = useAuth();
+  return <PublicLayout signedIn={Boolean(session)} />;
+}
+
 export function App() {
   return (
     <>
@@ -55,19 +63,23 @@ export function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/oauth-success" element={<OAuthSuccessPage />} />
-        <Route path="/arena" element={<PublicDiscoverPage />} />
-        <Route path="/arena/:id" element={<ArenaViewPage />} />
-        <Route path="/work/:id" element={<WorkPage />} />
-        <Route path="/work/:id/stats" element={<WorkStatsPage />} />
+        <Route element={<SessionLayout />}>
+          <Route path="/arena/:id" element={<ArenaViewPage />} />
+          <Route path="/work/:id" element={<WorkPage />} />
+          <Route path="/work/:id/stats" element={<WorkStatsPage />} />
+        </Route>
         {/* Public share-viewer pages — no session at all, so these must sit
             outside every RequireAuth/RequireUsername wrapper below, same as
             /login. The token itself is the access control (see each public
             backend route's own comment); a stranger with the link never
             needs — and never gets asked for — an account. */}
-        <Route path="/shared/murals/:token" element={<SharedMuralPage />} />
-        <Route path="/shared/library/:token" element={<SharedLibraryPage />} />
-        <Route path="/vote/:code" element={<VoteTierlistPage />} />
-        <Route path="/play/:code" element={<PlayQuizPage />} />
+        <Route element={<PublicRoutesLayout />}>
+          <Route path="/arena" element={<PublicDiscoverPage />} />
+          <Route path="/shared/murals/:token" element={<SharedMuralPage />} />
+          <Route path="/shared/library/:token" element={<SharedLibraryPage />} />
+          <Route path="/vote/:code" element={<VoteTierlistPage />} />
+          <Route path="/play/:code" element={<PlayQuizPage />} />
+        </Route>
 
         {/* RequireAuth: must be signed in at all. RequireUsername, nested
             inside it: must also have finished setup (a username) — a
@@ -83,8 +95,8 @@ export function App() {
           <Route path="/welcome-avatar" element={<WelcomeAvatarPage />} />
 
           <Route element={<RequireUsername />}>
-            <Route path="/book/:key" element={<BookKeyPage />} />
             <Route element={<DashboardLayout />}>
+              <Route path="/book/:key" element={<BookKeyPage />} />
               <Route path="/dashboard" element={<HomePage />} />
               <Route path="/dashboard/library" element={<LibraryPage />} />
               <Route path="/dashboard/series" element={<SeriesPage />} />

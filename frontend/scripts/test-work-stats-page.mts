@@ -12,7 +12,7 @@ const stats: BookStats = { community: null, tiers: null, tournaments: null };
 const failed = { status: "error", error: new Error("x"), fetchStatus: "idle" } as const;
 
 function render(client: QueryClient) {
-  return renderToString(createElement(QueryClientProvider, { client }, createElement(MemoryRouter, null, createElement(WorkStatsView, { id: "w", back: null }))));
+  return renderToString(createElement(QueryClientProvider, { client }, createElement(MemoryRouter, null, createElement(WorkStatsView, { id: "w" }))));
 }
 
 function seeded() {
