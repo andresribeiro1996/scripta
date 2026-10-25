@@ -12,13 +12,13 @@ const ToastContext = createContext<{ show(message: string, tone?: ToastTone): vo
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const insets = useSafeAreaInsets();
-  const [toast, setToast] = useState<{ message: string; tone: ToastTone } | null>(null);
+  const [toast, setToast] = useState<{ message: string; tone: ToastTone; visible: boolean }>({ message: "", tone: "default", visible: false });
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const show = useCallback((message: string, tone: ToastTone = "default") => {
     if (timer.current) clearTimeout(timer.current);
-    setToast({ message, tone });
-    timer.current = setTimeout(() => setToast(null), TOAST_MS);
+    setToast({ message, tone, visible: true });
+    timer.current = setTimeout(() => setToast((current) => ({ ...current, visible: false })), TOAST_MS);
   }, []);
 
   useEffect(() => () => {
@@ -29,11 +29,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      {toast ? (
-        <View pointerEvents="none" style={[styles.host, { top: insets.top + spacing.md }]}>
-          <Toast visible message={toast.message} tone={toast.tone} />
-        </View>
-      ) : null}
+      <View pointerEvents="none" style={[styles.host, { top: insets.top + spacing.md }]}>
+        <Toast message={toast.message} tone={toast.tone} visible={toast.visible} />
+      </View>
     </ToastContext.Provider>
   );
 }
