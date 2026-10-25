@@ -46,24 +46,24 @@ Run this after the deploy that carries PR #365 and this PR, once the pre-2002 BN
 1. **Dry run (read-only):**
 
    ```bash
-   railway ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c "cd backend && node scripts/undo-series-merges.mjs --guarded > /dev/null"
+   railway ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c "cd /app/backend && node scripts/undo-series-merges.mjs --guarded > /dev/null"
    ```
 
    Expected: `checked 5522, skipped 20, flagged 95`, give or take a few joins made since 2026-10-25.
 2. **Undo:**
 
    ```bash
-   railway ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c "cd backend && node scripts/undo-series-merges.mjs --undo ../docs/repairs/2026-10-25-volume-joins-undo.json"
+   railway ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c "cd /app/backend && node scripts/undo-series-merges.mjs --undo ../docs/repairs/2026-10-25-volume-joins-undo.json"
    ```
 
-   Expected: 61 undone (60 + 1 manual), `failures: []`, `dropped: 1`, `added: 2`. The run is all-or-nothing: if any id is no longer an active merge, nothing is undone and the script exits 1 naming it. Bring that output back for review.
+   Expected: 61 undone (60 + 1 manual), `failures: []`, `dropped: 1`, `added: 2`. If any id is no longer an active merge, nothing is undone and the script exits 1 naming it. Bring that output back for review.
 3. **Detaches and manual merges:**
 
    ```bash
-   railway ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c "cd backend && node ../docs/repairs/2026-10-25-volume-joins-finish.mjs"
+   railway ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c "cd /app/backend && node ../docs/repairs/2026-10-25-volume-joins-finish.mjs"
    ```
 
-   Expected: three `detached` and two `merged` entries.
+   Expected: three `detached` and two `merged` entries, written in one transaction. The two merges are admin merges (source `admin`).
 4. **Check (read-only, Claude runs it):**
    - OL27513W and OL27479W are unmerged works holding the editions listed above.
    - The omnibus holds only its English one-volume, illustrated, deluxe and box-set editions.

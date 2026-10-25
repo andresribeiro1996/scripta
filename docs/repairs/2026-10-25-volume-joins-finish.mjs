@@ -14,6 +14,8 @@ const editions = DETACH.map((isbn) => {
   if (!book) throw new Error(`no edition ${isbn}`);
   return book;
 });
-const detached = editions.map((book) => ({ isbn: book.isbn, work: repo.detachEdition(book.id, at) }));
-const merged = MERGE.map(([from, into]) => ({ from, into: repo.mergeWorks(from, into, at) }));
-console.log(JSON.stringify({ detached, merged }, null, 2));
+const result = repo.transaction(() => ({
+  detached: editions.map((book) => ({ isbn: book.isbn, work: repo.detachEdition(book.id, at) })),
+  merged: MERGE.map(([from, into]) => ({ from, into: repo.mergeWorks(from, into, at) }))
+}));
+console.log(JSON.stringify(result, null, 2));
