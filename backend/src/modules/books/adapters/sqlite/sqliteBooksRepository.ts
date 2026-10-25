@@ -6,6 +6,7 @@ import type { BooksRepository, IdPage, MergeableDetails, PageCursor, RecentAward
 import { GENRE_SAVE_LINE } from "../../domain/constants.js";
 import { planTitleFolds, type KeyedWork, type TitleWork } from "../../domain/duplicateWorks.js";
 import { WorkMergeError } from "../../domain/errors.js";
+import { withoutArticle } from "../../domain/searchRank.js";
 import { wantsRetitle } from "../../domain/lossy.js";
 import { SERIES_SOURCE_RANK, seriesNameKey, type SeriesEntry, type SeriesSource } from "../../domain/series.js";
 import { summaryHashOf, type SynopsisKind } from "../../domain/synopsis.js";
@@ -550,6 +551,8 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   `);
   const collectionsOfStmt = db.prepare(`SELECT book_id, name, position FROM book_collections WHERE book_id IN (SELECT value FROM json_each(?)) ORDER BY created_at, rowid`);
   const searchSeriesStmt = db.prepare(`SELECT work_id FROM series_fts WHERE series_fts MATCH ? ORDER BY bm25(series_fts), rowid LIMIT ?`);
+  const searchSeriesNamesStmt = db.prepare(`SELECT name FROM series_fts WHERE series_fts MATCH ? ORDER BY bm25(series_fts), rowid LIMIT ?`);
+  const seriesMembersStmt = db.prepare(`SELECT work_id, name_key, position, source FROM work_series WHERE name_key IN (SELECT value FROM json_each(?)) ORDER BY rowid`);
   const searchCollectionsStmt = db.prepare(`
     SELECT hits.book_id AS book_id, hits.name AS name, (
       SELECT book_collections.position FROM book_collections
@@ -1392,6 +1395,37 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       const hits = (searchSeriesStmt.all(matchExpression(tokens), WORK_SCAN_LIMIT) as Array<{ work_id: string }>).map((row) => row.work_id);
       const canonical = canonicalWorkIds([...new Set(hits)]);
       return [...new Set(hits.map((id) => canonical.get(id) ?? id))].slice(0, limit);
+    },
+
+    matchingSeries(tokens) {
+      if (tokens.length === 0) return [];
+      const query = withoutArticle(tokens.join(" "));
+      const names = new Map<string, { name: string; exact: boolean }>();
+      for (const { name } of searchSeriesNamesStmt.all(matchExpression(tokens), WORK_SCAN_LIMIT) as Array<{ name: string }>) {
+        const nameKey = seriesNameKey(name);
+        if (!nameKey || names.has(nameKey)) continue;
+        const key = withoutArticle(nameKey);
+        if (key === query) names.set(nameKey, { name, exact: true });
+        else if (query.length >= 3 && key.startsWith(`${query} `)) names.set(nameKey, { name, exact: false });
+      }
+      if (names.size === 0) return [];
+      const rows = seriesMembersStmt.all(JSON.stringify([...names.keys()])) as Array<{ work_id: string; name_key: string; position: string | null; source: SeriesSource }>;
+      const canonical = canonicalWorkIds([...new Set(rows.map((row) => row.work_id))]);
+      const members = new Map<string, Map<string, { position: string | null; rank: number }>>();
+      for (const row of rows) {
+        const workId = canonical.get(row.work_id) ?? row.work_id;
+        const own = members.get(row.name_key) ?? new Map<string, { position: string | null; rank: number }>();
+        const rank = SERIES_SOURCE_RANK[row.source];
+        const seen = own.get(workId);
+        if (!seen || rank < seen.rank) own.set(workId, { position: row.position, rank });
+        members.set(row.name_key, own);
+      }
+      return [...names].map(([nameKey, { name, exact }]) => ({
+        nameKey,
+        name,
+        exact,
+        members: [...(members.get(nameKey) ?? [])].map(([workId, { position }]) => ({ workId, position }))
+      })).sort((a, b) => Number(b.exact) - Number(a.exact) || b.members.length - a.members.length);
     },
 
     searchCollectionBooks(tokens, limit) {
