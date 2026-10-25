@@ -24,3 +24,10 @@ test("rankWorks adds a bonus for a title that equals the query and keeps ties in
   assert.deepEqual(rankWorks([{ workId: "near", textScore: 10.5, exactTitle: false, signals }, { workId: "exact", textScore: 10, exactTitle: true, signals }]), ["exact", "near"]);
   assert.deepEqual(rankWorks([{ workId: "first", textScore: 10, exactTitle: false, signals }, { workId: "second", textScore: 10, exactTitle: false, signals }]), ["first", "second"]);
 });
+
+test("rankWorks puts a work with Wikipedia articles above an otherwise equal work without", () => {
+  const base = { editions: 3, languages: 2, hasCover: true };
+  const plain = { workId: "plain", textScore: 10, exactTitle: false, signals: { ...base, wikipediaSites: null } };
+  const known = { workId: "known", textScore: 10, exactTitle: false, signals: { ...base, wikipediaSites: 80 } };
+  assert.deepEqual(rankWorks([plain, known]), ["known", "plain"]);
+});

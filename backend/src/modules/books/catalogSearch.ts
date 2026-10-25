@@ -45,7 +45,8 @@ function rankedWorkKeys(repo: BooksRepository, tokens: string[], rows: Array<Boo
 }
 
 function representativeEdition(repo: BooksRepository, workId: string): BookRow | undefined {
-  const edition = repo.editionsOf([workId]).find(({ id }) => repo.isSearchable(id));
+  const searchable = repo.editionsOf([workId]).filter(({ id }) => repo.isSearchable(id));
+  const edition = searchable.find(({ hasCover }) => hasCover) ?? searchable[0];
   return edition ? repo.getBook(edition.id) : undefined;
 }
 
@@ -95,6 +96,15 @@ export function catalogHits(repo: BooksRepository, tokens: string[], byWork: boo
   }
   hits.splice(cap);
   if (hits.length < cap) hits.push(...seriesHits(repo, workIds, tried, cap - hits.length));
-  if (hits.length < cap) hits.push(...collectionHits(repo, tokens, hits, byWork, byWork ? WORK_SCAN_LIMIT : cap).slice(0, cap - hits.length));
-  return hits;
+  if (hits.length >= cap) return hits;
+  const collected = collectionHits(repo, tokens, hits, byWork, byWork ? WORK_SCAN_LIMIT : cap).slice(0, cap - hits.length);
+  if (byWork) return [...hits, ...collected];
+  const grouped = [...hits];
+  const tail: Hit[] = [];
+  for (const hit of collected) {
+    const last = hit.workId === null ? -1 : grouped.map(({ workId }) => workId).lastIndexOf(hit.workId);
+    if (last === -1) tail.push(hit);
+    else grouped.splice(last + 1, 0, hit);
+  }
+  return [...grouped, ...tail];
 }

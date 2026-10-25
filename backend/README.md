@@ -582,6 +582,21 @@ npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --
 
 The container has no `nohup`, so the jobs start with `setsid`; the `ls` after the `sleep 3` shows the output files appeared. `original-series.json` is read locally and `original-series-approved.json` is the reviewer's array of names; likewise `wikidata-series.json` (the dry run's report, whose `series` the reviewers read) and `wikidata-skip.json` (their array of rejected names). The report is the last thing on stdout, so `cat` of the `.json` file is empty until the fill ends; the `.log` shows its progress.
 
+#### Wikipedia counts
+
+`scripts/fill-wikipedia-counts.mjs` stores, on each catalog work with an Open Library key, how many Wikipedia language editions have an article on it, which search ranking reads as a popularity signal (`works.wikipedia_sites`). It pages through Wikidata for every item with an Open Library work id and its sitelink count (Wikidata is queried unauthenticated, in pages), then writes the counts to the works whose `ol_work_key` matches. The write is idempotent: a work whose count is already stored is not touched, and it goes in chunks of 500 rows, each in its own transaction, so no single write holds the lock past the server's busy timeout. The report is JSON on stdout and progress lines on stderr.
+
+Options: `--dry-run` (opens the database read-only, still queries Wikidata, writes nothing, and reports `fetched` and `matched`, the number of fetched keys the catalog holds) and `--out <file>` (writes the fetched `{ olWorkKey: sites }` map to a file and touches no database, so it needs no `COVERS_DB_PATH`).
+
+The real run needs `/data` free space of at least the size of the works table, because the WAL grows while it writes.
+
+```
+npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && setsid node scripts/fill-wikipedia-counts.mjs --dry-run > /data/wikipedia-counts-dry.json 2> /data/wikipedia-counts-dry.log < /dev/null & sleep 3; ls -l /data/wikipedia-counts-dry.*'
+npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cat /data/wikipedia-counts-dry.json; tail -n 3 /data/wikipedia-counts-dry.log'
+npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && setsid node scripts/fill-wikipedia-counts.mjs > /data/wikipedia-counts.json 2> /data/wikipedia-counts.log < /dev/null & sleep 3; ls -l /data/wikipedia-counts.*'
+npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cat /data/wikipedia-counts.json; tail -n 3 /data/wikipedia-counts.log'
+```
+
 #### Hardcover enrichment
 
 `scripts/fill-hardcover.mjs` looks the catalog's editions up on Hardcover (https://hardcover.app, GraphQL API) by ISBN, 50 per request, and fills what they lack: a `hardcover` story series with its position (it ranks below `wikidata` and above `ol-edition`), a synopsis where the edition shows none and the text's language matches the edition's, and genres on editions whose genres are still empty (a tag that at least 2 users applied, mapped to our own vocabulary, at most 2 genres; the combined tag "Science Fiction & Fantasy" is ignored). Writes are add-only or fill-empty: an existing synopsis, from any source, is never replaced or hidden. The report goes to stdout and a progress line to stderr every 20 requests; an unmatched, deleted or deduplicated Hardcover book is skipped and counted.

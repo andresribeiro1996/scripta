@@ -2396,6 +2396,23 @@ test("a series search leads with the series in reading order, and every result c
   assert.equal(new Set(results.map((result) => result.isbn)).size, 3);
 });
 
+test("a series member the search did not find leads with its covered edition", () => {
+  const h = harness();
+  const old = seeded(h, "Livro Antigo", isbnOf(1), { author: "Ana Lima", workKey: "OL1W", at: SERIES_AT });
+  const covered = h.repo.createBook({ title: "Livro Novo", author: "Ana Lima", isbn: isbnOf(2), workKey: "OL1W", olCoverId: 9, createdBy: "seed" }, [`isbn:${isbnOf(2)}`], "2026-10-16T12:00:00.000Z");
+  h.repo.addWorkSeries(old.work_id!, [{ name: MALAZAN, position: "1" }], "wikidata", SERIES_AT);
+  assert.deepEqual(h.service.search("malazan", { byWork: true }).map((result) => result.title), [covered.title]);
+});
+
+test("a collection edition of a work already listed stays right after that work's editions", () => {
+  const h = harness();
+  const first = seeded(h, "Lobos", isbnOf(1), { author: "Ana Lima", workKey: "OL1W" });
+  const second = seeded(h, "Outra Edição", isbnOf(2), { author: "Ana Lima", workKey: "OL1W" });
+  seeded(h, "Lobos Beta", isbnOf(3), { author: "Rui Costa", workKey: "OL2W" });
+  h.repo.addBookCollection(second.id, { name: "Lobos", position: null }, "bnp", SERIES_AT);
+  assert.deepEqual(h.service.search("lobos").map((result) => result.title), [first.title, second.title, "Lobos Beta"]);
+});
+
 test("a series name is searched together with its author", () => {
   const h = harness();
   const { deadhouse } = malazanCatalog(h);

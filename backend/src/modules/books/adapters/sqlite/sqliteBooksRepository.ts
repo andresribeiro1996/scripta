@@ -115,6 +115,8 @@ function matchExpression(tokens: string[]): string {
 
 type SeriesCandidate = SeriesEntry & { nameKey: string; source: SeriesSource; rank: number; createdAt: string };
 
+const WIKIPEDIA_WRITE_CHUNK = 500;
+
 export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const byKeyStmt = db.prepare(`SELECT books.* FROM book_keys JOIN books ON books.id = book_keys.book_id WHERE book_keys.key = ?`);
   const byKeysStmt = db.prepare(`SELECT book_keys.key AS key, books.* FROM book_keys JOIN books ON books.id = book_keys.book_id WHERE book_keys.key IN (SELECT value FROM json_each(?))`);
@@ -201,7 +203,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const translationEditionsStmt = db.prepare(`SELECT title, author, publisher, summary, original_title FROM books WHERE work_id = ? ORDER BY created_at, rowid`);
   const originalTitleClaimsStmt = db.prepare(`SELECT work_id, title, author, language, original_title, summary FROM books WHERE (original_title IS NOT NULL AND original_title <> '') OR summary LIKE '%tulo original%'`);
   const activeMergesStmt = db.prepare(`SELECT id, from_work, into_work, moved_book_ids, merged_at, confidence FROM work_merges WHERE source = ? AND undone_at IS NULL ORDER BY id DESC`);
-  const editionsOfStmt = db.prepare(`SELECT id, work_id, title, author, language, isbn, original_title, summary FROM books WHERE work_id IN (SELECT value FROM json_each(?)) ORDER BY created_at, rowid`);
+  const editionsOfStmt = db.prepare(`SELECT id, work_id, title, author, language, isbn, original_title, summary, (cover_image_id IS NOT NULL OR ol_cover_id IS NOT NULL) AS has_cover FROM books WHERE work_id IN (SELECT value FROM json_each(?)) ORDER BY created_at, rowid`);
   const titleCandidatesStmt = db.prepare(`SELECT DISTINCT COALESCE(w.merged_into, w.id) AS id, b.title FROM books b JOIN works w ON w.id = b.work_id WHERE b.title_key GLOB ?`);
   const authorCandidatesStmt = db.prepare(`
     SELECT COALESCE(w.merged_into, w.id) AS id, COUNT(*) AS editions
@@ -1090,7 +1092,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       return (activeMergesStmt.all(source) as Array<{ id: number; from_work: string; into_work: string; moved_book_ids: string; merged_at: string; confidence: number | null }>).map((row) => ({ id: row.id, fromWork: row.from_work, intoWork: row.into_work, movedBookIds: JSON.parse(row.moved_book_ids) as string[], mergedAt: row.merged_at, confidence: row.confidence }));
     },
     editionsOf(workIds) {
-      return (editionsOfStmt.all(JSON.stringify(workIds)) as Array<{ id: string; work_id: string; title: string; author: string; language: string | null; isbn: string | null; original_title: string | null; summary: string | null }>).map((row) => ({ id: row.id, workId: row.work_id, title: row.title, author: row.author, language: row.language, isbn: row.isbn, originalTitle: row.original_title || originalTitleIn(row.summary) }));
+      return (editionsOfStmt.all(JSON.stringify(workIds)) as Array<{ id: string; work_id: string; title: string; author: string; language: string | null; isbn: string | null; original_title: string | null; summary: string | null; has_cover: number }>).map((row) => ({ id: row.id, workId: row.work_id, title: row.title, author: row.author, language: row.language, isbn: row.isbn, originalTitle: row.original_title || originalTitleIn(row.summary), hasCover: row.has_cover === 1 }));
     },
     titleCandidates(pattern) {
       return titleCandidatesStmt.all(pattern) as Array<{ id: string; title: string }>;
@@ -1462,11 +1464,13 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       if (names.size === 0) return { workIds, matches: [] };
       const rows = seriesMembersStmt.all(JSON.stringify([...names.keys()])) as Array<{ work_id: string; name_key: string; position: string | null; source: SeriesSource }>;
       const canonical = canonicalWorkIds([...new Set(rows.map((row) => row.work_id))]);
+      const bestRank = new Map<string, number>();
       const members = new Map<string, Map<string, { position: string | null; rank: number }>>();
       for (const row of rows) {
         const workId = canonical.get(row.work_id) ?? row.work_id;
         const own = members.get(row.name_key) ?? new Map<string, { position: string | null; rank: number }>();
         const rank = SERIES_SOURCE_RANK[row.source];
+        bestRank.set(row.name_key, Math.min(bestRank.get(row.name_key) ?? rank, rank));
         const seen = own.get(workId);
         if (!seen || rank < seen.rank) own.set(workId, { position: row.position, rank });
         members.set(row.name_key, own);
@@ -1476,7 +1480,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
         name,
         exact,
         members: [...(members.get(nameKey) ?? [])].map(([workId, { position }]) => ({ workId, position }))
-      })).sort((a, b) => Number(b.exact) - Number(a.exact) || b.members.length - a.members.length);
+      })).sort((a, b) => Number(b.exact) - Number(a.exact) || b.members.length - a.members.length || (bestRank.get(a.nameKey) ?? Infinity) - (bestRank.get(b.nameKey) ?? Infinity));
       return { workIds, matches };
     },
 
@@ -1487,13 +1491,12 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
 
     setWikipediaSites(rows) {
       let updated = 0;
-      db.exec("BEGIN IMMEDIATE");
-      try {
-        for (const { olWorkKey, sites } of rows) updated += Number(setWikipediaSitesStmt.run(sites, olWorkKey, sites).changes);
-        db.exec("COMMIT");
-      } catch (error) {
-        db.exec("ROLLBACK");
-        throw error;
+      for (let start = 0; start < rows.length; start += WIKIPEDIA_WRITE_CHUNK) {
+        updated += inTransaction(() => {
+          let changed = 0;
+          for (const { olWorkKey, sites } of rows.slice(start, start + WIKIPEDIA_WRITE_CHUNK)) changed += Number(setWikipediaSitesStmt.run(sites, olWorkKey, sites).changes);
+          return changed;
+        });
       }
       return updated;
     },

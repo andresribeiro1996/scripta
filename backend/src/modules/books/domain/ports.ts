@@ -125,7 +125,7 @@ export interface BooksRepository {
   originalArrivals(limit: number): string[];
   dropOriginalArrival(titleKey: string): void;
   activeMerges(source: MergeSource): Array<{ id: number; fromWork: string; intoWork: string; movedBookIds: string[]; mergedAt: string; confidence: number | null }>;
-  editionsOf(workIds: string[]): Array<{ id: string; workId: string; title: string; author: string; language: string | null; isbn: string | null; originalTitle: string | null }>;
+  editionsOf(workIds: string[]): Array<{ id: string; workId: string; title: string; author: string; language: string | null; isbn: string | null; originalTitle: string | null; hasCover: boolean }>;
   titleCandidates(pattern: string): Array<{ id: string; title: string }>;
   authorCandidates(pattern: string): string[];
   matchCandidates(workIds: string[]): Array<{ id: string; title: string; author: string; year: number | null; editions: number; languages: string[] }>;

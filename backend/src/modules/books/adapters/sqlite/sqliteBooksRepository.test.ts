@@ -2533,9 +2533,9 @@ test("editions of works carry the original title from the column or the summary 
   const bare = repo.createBook({ title: "Sem nada", author: "Y", isbn: "9789720000413" }, ["isbn:9789720000413"], NOW);
   repo.createBook({ title: "Outro", author: "Z", isbn: "9789720000414" }, ["isbn:9789720000414"], NOW);
   assert.deepEqual(repo.editionsOf([column.work_id!, bare.work_id!]), [
-    { id: column.id, workId: column.work_id, title: "Passeio ao Farol", author: "Virginia Woolf", language: "pt-PT", isbn: "9789720000411", originalTitle: "To the Lighthouse" },
-    { id: labelled.id, workId: column.work_id, title: "O Passeio", author: "Robert Walser", language: null, isbn: "9789720000412", originalTitle: "Der Spaziergang" },
-    { id: bare.id, workId: bare.work_id, title: "Sem nada", author: "Y", language: null, isbn: "9789720000413", originalTitle: null }
+    { id: column.id, workId: column.work_id, title: "Passeio ao Farol", author: "Virginia Woolf", language: "pt-PT", isbn: "9789720000411", originalTitle: "To the Lighthouse", hasCover: false },
+    { id: labelled.id, workId: column.work_id, title: "O Passeio", author: "Robert Walser", language: null, isbn: "9789720000412", originalTitle: "Der Spaziergang", hasCover: false },
+    { id: bare.id, workId: bare.work_id, title: "Sem nada", author: "Y", language: null, isbn: "9789720000413", originalTitle: null, hasCover: false }
   ]);
 });
 
@@ -3482,6 +3482,16 @@ test("setWikipediaSites writes to the keyed work, and workSignals takes the high
   assert.equal(signals.get(bare.work_id!)!.wikipediaSites, 5);
 });
 
+test("setWikipediaSites applies more rows than one write chunk, and a second call changes nothing", () => {
+  const { db, repo } = freshRepo();
+  const rows = Array.from({ length: 1203 }, (_, n) => ({ olWorkKey: `OL${n + 1}W`, sites: n + 1 }));
+  const insert = db.prepare("INSERT INTO works (id, ol_work_key, title, author, created_at) VALUES (?, ?, 'T', 'A', ?)");
+  for (const { olWorkKey } of rows) insert.run(`w-${olWorkKey}`, olWorkKey, NOW);
+  assert.equal(repo.setWikipediaSites(rows), 1203);
+  assert.equal((db.prepare("SELECT COUNT(*) AS n FROM works WHERE wikipedia_sites IS NOT NULL").get() as { n: number }).n, 1203);
+  assert.equal(repo.setWikipediaSites(rows), 0);
+});
+
 test("searchBooks returns each row's bm25 score", () => {
   const { repo } = freshRepo();
   repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593", createdBy: "seed" }, ["isbn:9780441013593"], NOW);
@@ -3980,6 +3990,15 @@ test("searchSeries matches whole words, ranks exact before prefix and ignores a 
   ]);
   assert.deepEqual(repo.searchSeries(["war"]).matches, []);
   assert.deepEqual(repo.searchSeries(["warriors"]).matches.map(({ name }) => name), ["Warriors"]);
+});
+
+test("searchSeries breaks a tie in size and exactness by the better source", () => {
+  const { repo } = freshRepo();
+  const subject = seriesBook(repo, "Primeiro", "9780261102354");
+  const listed = seriesBook(repo, "Segundo", "9780261102736");
+  repo.addWorkSeries(subject.work_id!, [{ name: "Sombra Antiga", position: "1" }], "ol-subject", AT);
+  repo.addWorkSeries(listed.work_id!, [{ name: "Sombra Nova", position: "1" }], "wikidata", AT);
+  assert.deepEqual(repo.searchSeries(["sombra"]).matches.map(({ name }) => name), ["Sombra Nova", "Sombra Antiga"]);
 });
 
 test("searchSeries gives a two-character query no prefix matches", () => {
