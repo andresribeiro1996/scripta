@@ -1,10 +1,10 @@
 import { CHECKBOX_CLASS } from "../components/Toolbar";
-import { useContext, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { saveFailureMessage } from "@scripta/shared";
 import { BookCard } from "../components/BookCard";
 import { BookGrid } from "../components/BookGrid";
 import { LibraryCanvas } from "../components/LibraryCanvas";
-import { Page, PageWidthContext } from "../components/page/Page";
+import { Page } from "../components/page/Page";
 import { area } from "../lib/areas";
 import { CardAppearanceSection, CardBorderSection, CardContentSection, CardTextSection, Section, SliderRow } from "../components/StyleControls";
 import { useToast } from "../components/Toaster";
@@ -44,7 +44,7 @@ export function LibraryStylePage() {
   const { data: library, updateLibrary } = useLibrary();
   const toast = useToast();
 
-  const [pageWidth] = useState(useContext(PageWidthContext));
+  const [pageWidth, setPageWidth] = useState<number>();
   const [draft, setDraft] = useState<LibraryStyleSettings>(DEFAULT_LIBRARY_STYLE);
   const syncedRef = useRef(false);
 
@@ -55,7 +55,9 @@ export function LibraryStylePage() {
   // at mount time.
   useEffect(() => {
     if (!syncedRef.current && library !== undefined) {
-      setDraft(resolveLibraryStyle(library?.data.style));
+      const saved = resolveLibraryStyle(library?.data.style);
+      setDraft(saved);
+      setPageWidth(saved.contentMaxWidth);
       syncedRef.current = true;
     }
   }, [library]);
