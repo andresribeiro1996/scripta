@@ -51,6 +51,11 @@ test("scoreQueries averages the tuning and hidden sets separately and lists ungr
 test("withoutArticle drops a leading article word only", () => {
   assert.equal(withoutArticle("the lord of the rings"), "lord of the rings");
   assert.equal(withoutArticle("theory"), "theory");
+  assert.equal(withoutArticle("o senhor dos aneis"), "senhor dos aneis");
+  assert.equal(withoutArticle("os maias"), "maias");
+  assert.equal(withoutArticle("uma familia inglesa"), "familia inglesa");
+  assert.equal(withoutArticle("osso"), "osso");
+  assert.equal(withoutArticle("o"), "o");
 });
 
 test("scorecardCandidates puts series members first and still finds the title matches", () => {
@@ -71,6 +76,8 @@ test("scorecardCandidates puts series members first and still finds the title ma
   const others = [add("Harry Potter Page to Screen", "Bob McCabe", "9781608870448"), add("Harry Potter Cookbook", "Dinah Bucholz", "9780345511379")];
   const found = scorecardCandidates(repo, "harry potter");
   assert.deepEqual(found.slice(0, 3).map(({ workId }) => workId), members.map((book) => book.work_id));
+  assert.ok(!repo.searchBooks(["harry", "potter"], 500).some((row) => row.work_id === members[1]!.work_id));
+  assert.ok(found.some(({ workId, title }) => workId === members[1]!.work_id && title === "The Chamber of Secrets"));
   assert.equal(found.length, 5);
   assert.ok(others.every((book) => found.some(({ workId }) => workId === book.work_id)));
   assert.deepEqual(found[1], { workId: members[1]!.work_id, title: "The Chamber of Secrets", author: "J. K. Rowling", year: null });

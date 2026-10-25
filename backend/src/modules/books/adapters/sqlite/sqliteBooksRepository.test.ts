@@ -3877,3 +3877,9 @@ test("matchingSeries lists a merged work once under its canonical id with its be
   const [entry] = repo.matchingSeries(["malazan", "book", "of", "the", "fallen"]);
   assert.deepEqual(entry!.members, [{ workId: keep.work_id, position: "1" }]);
 });
+
+test("matchingSeries matches a Portuguese series exactly without its leading article", () => {
+  const { repo } = freshRepo();
+  matchBook(repo, "A Sociedade do Anel", "9789722317665", ["O Senhor dos Anéis"]);
+  assert.deepEqual(repo.matchingSeries(["senhor", "dos", "aneis"]).map(({ name, exact }) => [name, exact]), [["O Senhor dos Anéis", true]]);
+});
