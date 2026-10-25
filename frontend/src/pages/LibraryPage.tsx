@@ -344,7 +344,7 @@ export function LibraryPage() {
                 setEditingName(true);
               }}
               title="Rename your library"
-              className="inline-flex min-h-11 items-center rounded-lg hover:text-(--color-accent)"
+              className="inline-flex min-h-11 max-w-full min-w-0 items-center rounded-lg text-left break-all hover:text-(--color-accent)"
             >
               {library?.data.name || "Name your library"}
             </button>
@@ -402,7 +402,7 @@ export function LibraryPage() {
         </>
       }
     >
-      {searchParams.get("action") === "import" ? <div className="mb-4 rounded-lg border border-(--color-border) p-4"><h2 className="font-semibold">Import your library</h2><button className="mt-2 min-h-11 rounded-lg bg-(--color-accent) px-4 py-2 text-(--color-on-accent)" onClick={() => fileInputRef.current?.click()}>Choose import file</button></div> : null}
+      {searchParams.get("action") === "import" ? <div className="mb-4 rounded-lg border border-(--color-border) p-4"><h2 className="font-semibold">Import your library</h2><button className={`mt-2 ${BUTTON_SECONDARY}`} onClick={() => fileInputRef.current?.click()}>Choose import file</button></div> : null}
 
       {importStatus && (
         <div className="mb-5 rounded-lg bg-(--color-accent-soft) px-3 py-2 text-sm text-(--color-accent)">{importStatus}</div>
@@ -419,7 +419,6 @@ export function LibraryPage() {
           onStatusChange={(status) => updateView({ status })}
           sort={sortKey}
           onSortChange={(sort) => updateView({ sort })}
-          // Phone-only; see the `actionItems` definition above.
           actions={selectionMode ? undefined : actionItems}
         />
       )}
@@ -454,7 +453,7 @@ export function LibraryPage() {
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={importing}
-                className="rounded-lg bg-(--color-accent) px-4 py-2.5 font-semibold text-(--color-on-accent) disabled:opacity-60"
+                className={BUTTON_SECONDARY}
               >
                 {importing ? "Importing…" : "Choose a file"}
               </button>

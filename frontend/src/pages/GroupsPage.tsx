@@ -91,8 +91,8 @@ export function GroupsPage({ type }: { type: GroupType }) {
   // Matches a group's own name OR any book title inside it — "which
   // collection did I put Dune in?" is at least as common a question here
   // as "where's my sci-fi collection", and the second is unanswerable if
-  // only names are searched. Kept out of `allGroups` so the "+" tile and
-  // the empty-state copy can still reason about how many groups exist at
+  // only names are searched. Kept out of `allGroups` so the
+  // empty-state copy can still reason about how many groups exist at
   // all, rather than how many currently match.
   const groups = useMemo(() => {
     const needle = search.trim().toLowerCase();
@@ -111,9 +111,9 @@ export function GroupsPage({ type }: { type: GroupType }) {
   // FULL group list, same as LibraryPage.tsx's identical lookup.
   const bookSeriesGroup = useMemo(() => seriesGroupByBookKey(library?.data.books ?? [], library?.data.groups ?? []), [library]);
 
-  // Clicking "+" does NOT create anything: it opens an unsaved draft row
+  // Starting a draft does NOT create anything: it opens an unsaved draft row
   // with its name field focused. The group is only persisted once a
-  // non-empty name is committed — so backing out, or tapping "+" out of
+  // non-empty name is committed — so backing out, or starting one out of
   // curiosity, leaves nothing behind. Creating on click had been
   // littering the list with "Untitled series" every time someone
   // changed their mind.

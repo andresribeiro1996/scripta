@@ -90,7 +90,12 @@ const PREFIXES: ReadonlyArray<[string, AreaId]> = [
   ["/admin", "admin"]
 ];
 
-export function areaIdForPath(pathname: string): AreaId | null {
+function trimSlash(pathname: string): string {
+  return pathname.length > 1 && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
+}
+
+export function areaIdForPath(rawPath: string): AreaId | null {
+  const pathname = trimSlash(rawPath);
   if (pathname === "/dashboard") return "home";
   for (const [prefix, id] of PREFIXES) {
     if (pathname === prefix || pathname.startsWith(`${prefix}/`)) return id;
@@ -99,11 +104,12 @@ export function areaIdForPath(pathname: string): AreaId | null {
 }
 
 export function activeTabTo(tabs: readonly AreaTab[], location: { pathname: string; search: string }): string | null {
+  const pathname = trimSlash(location.pathname);
   const wanted = new URLSearchParams(location.search).get("tab");
   let plain: string | null = null;
   for (const tab of tabs) {
     const [path, query] = tab.to.split("?");
-    if (path !== location.pathname) continue;
+    if (path !== pathname) continue;
     const tabParam = query ? new URLSearchParams(query).get("tab") : null;
     if (tabParam === null) plain ??= tab.to;
     else if (tabParam === wanted) return tab.to;

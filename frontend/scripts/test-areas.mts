@@ -22,6 +22,7 @@ test("the active tab follows path and ?tab=, unknown tabs fall back to the plain
   const games = area("games").tabs;
   assert.equal(activeTabTo(games, { pathname: "/dashboard/arena", search: "" }), "/dashboard/arena");
   assert.equal(activeTabTo(games, { pathname: "/dashboard/arena", search: "?tab=quizzes" }), "/dashboard/arena?tab=quizzes");
+  assert.equal(activeTabTo(games, { pathname: "/dashboard/arena/", search: "?tab=quizzes" }), "/dashboard/arena?tab=quizzes");
   assert.equal(activeTabTo(games, { pathname: "/dashboard/arena", search: "?tab=bogus" }), "/dashboard/arena");
   assert.equal(activeTabTo(area("settings").tabs, { pathname: "/dashboard/style", search: "" }), "/dashboard/style");
   assert.equal(activeTabTo(area("library").tabs, { pathname: "/dashboard/murals", search: "" }), null);
@@ -29,7 +30,7 @@ test("the active tab follows path and ?tab=, unknown tabs fall back to the plain
 
 test("every route maps to the area that owns it", () => {
   const cases: Array<[string, AreaId | null]> = [
-    ["/dashboard", "home"], ["/dashboard/library", "library"], ["/dashboard/gallery", "library"], ["/work/w1", "library"], ["/work/w1/stats", "library"], ["/book/isbn:1", "library"], ["/dashboard/libraryx", null],
+    ["/dashboard", "home"], ["/dashboard/arena/", "games"], ["/dashboard/", "home"], ["/dashboard/library", "library"], ["/dashboard/gallery", "library"], ["/work/w1", "library"], ["/work/w1/stats", "library"], ["/book/isbn:1", "library"], ["/dashboard/libraryx", null],
     ["/dashboard/murals", "murals"], ["/dashboard/murals/m1", "murals"],
     ["/dashboard/arena", "games"], ["/dashboard/arena/quiz/q1", "games"], ["/dashboard/arena/t1/seed", "games"], ["/arena/t1", "games"],
     ["/dashboard/reader-card", "readerCard"], ["/community/people", "community"], ["/community/u/alice", "community"],

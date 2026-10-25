@@ -30,7 +30,7 @@ export function Page({ title, subtitle, back, actions, tabs, maxWidth, children 
           ) : null}
           <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 pb-3">
             <div className="min-w-0 flex-1 basis-60">
-              <h1 className="font-display min-w-0 break-words text-2xl sm:text-3xl">{title}</h1>
+              <h1 className="font-display min-w-0 font-bold break-words text-2xl sm:text-3xl">{title}</h1>
               {subtitle ? <p className="mt-1 text-sm text-(--color-text-dim)">{subtitle}</p> : null}
             </div>
             {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}

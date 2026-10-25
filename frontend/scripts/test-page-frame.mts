@@ -15,7 +15,7 @@ const render = (el: ReactElement, path = "/dashboard/arena?tab=quizzes", width?:
 test("one display-font h1 in a surface band", () => {
   const html = render(createElement(Page, { title: "Games", children: "x" }));
   assert.equal(html.match(/<h1/g)?.length, 1);
-  assert.match(html, /<h1 class="[^"]*font-display[^"]*text-2xl[^"]*sm:text-3xl/);
+  assert.match(html, /<h1 class="[^"]*font-display[^"]*font-bold[^"]*text-2xl[^"]*sm:text-3xl/);
   assert.match(html, /bg-\(--color-surface\)[^"]*border-b border-\(--color-border\)|border-b border-\(--color-border\)[^"]*bg-\(--color-surface\)/);
 });
 

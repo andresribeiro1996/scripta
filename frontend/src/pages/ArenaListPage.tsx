@@ -1,4 +1,4 @@
-// "My tournaments" — list + a "+" tile. Same list/detail split as
+// "My tournaments" — list with a create button. Same list/detail split as
 // MuralsListPage.tsx → MuralEditorPage.tsx: this page only creates and
 // lists; seeding happens on ArenaSeedPage.tsx once a tournament exists.
 // Tier lists and quizzes live here too, behind the Games tabs in the

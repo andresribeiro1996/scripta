@@ -19,8 +19,7 @@ import { useScrollLock } from "../hooks/useScrollLock";
 import { area, areaIdForPath, BOTTOM_BAR_AREAS, footerAreas, NAV_AREAS } from "../lib/areas";
 import { resolveLibraryStyle } from "../lib/libraryStyle";
 
-/** Persistent left-hand nav wrapping every signed-in page (Library, Series,
- *  Collections, Settings) — one shared shell instead of each page
+/** Persistent left-hand nav wrapping every signed-in page (every area in lib/areas.ts) — one shared shell instead of each page
  *  reimplementing its own header/logout, which is how it worked before
  *  this existed (see git history on DashboardPage.tsx). */
 export function DashboardLayout() {
@@ -61,7 +60,7 @@ export function DashboardLayout() {
             )}
             <p className="truncate text-xs text-(--color-text-dim)">@{session?.user.username ?? session?.user.email}</p>
           </div>
-          <SidebarNav areas={footerAreas(isAdmin)} activeId={activeId} />
+          <div className={isAdmin ? "mb-2" : undefined}><SidebarNav areas={footerAreas(isAdmin)} activeId={activeId} /></div>
           <button
             onClick={() => void logout()}
             className="w-full rounded-lg border border-(--color-danger-soft) min-h-11 px-3 py-2.5 text-left text-sm text-(--color-danger) hover:bg-(--color-danger-soft)"
@@ -149,7 +148,7 @@ export function DashboardLayout() {
                 )}
                 <p className="truncate text-xs text-(--color-text-dim)">@{session?.user.username ?? session?.user.email}</p>
               </div>
-              <SidebarNav areas={footerAreas(isAdmin)} activeId={activeId} onNavigate={() => setDrawerOpen(false)} />
+              <div className={isAdmin ? "mb-2" : undefined}><SidebarNav areas={footerAreas(isAdmin)} activeId={activeId} onNavigate={() => setDrawerOpen(false)} /></div>
               <button
                 onClick={() => void logout()}
                 className="w-full rounded-lg border border-(--color-danger-soft) min-h-11 px-3 py-2.5 text-left text-sm text-(--color-danger) hover:bg-(--color-danger-soft)"
