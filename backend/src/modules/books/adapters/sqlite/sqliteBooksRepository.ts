@@ -506,7 +506,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   `);
   const removeWorkSeriesStmt = db.prepare(`DELETE FROM work_series WHERE source = ? AND name_key IN (SELECT value FROM json_each(?))`);
   const workSeriesKeyStmt = db.prepare(`SELECT 1 FROM work_series WHERE work_id = ? AND name_key = ? LIMIT 1`);
-  const seriesIndexOfWorkStmt = db.prepare(`SELECT rowid, name FROM series_fts WHERE work_id = ?`);
+  const allSeriesIndexStmt = db.prepare(`SELECT rowid, work_id, name FROM series_fts`);
   const deleteSeriesIndexStmt = db.prepare(`DELETE FROM series_fts WHERE rowid = ?`);
   const refreshSeriesAuthorStmt = db.prepare(`UPDATE series_fts SET author = ? WHERE work_id = ?`);
   const insertCollectionStmt = db.prepare(`
@@ -1312,12 +1312,11 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       return inTransaction(() => {
         const affected = seriesToRemoveStmt.all(source, keys) as Array<{ work_id: string; name_key: string }>;
         const rows = Number(removeWorkSeriesStmt.run(source, keys).changes);
+        const orphaned = new Set(affected.filter((pair) => !workSeriesKeyStmt.get(pair.work_id, pair.name_key)).map((pair) => `${pair.work_id}\n${pair.name_key}`));
         let searchRows = 0;
-        for (const { work_id, name_key } of affected) {
-          if (workSeriesKeyStmt.get(work_id, name_key)) continue;
-          for (const entry of seriesIndexOfWorkStmt.all(work_id) as Array<{ rowid: number; name: string }>) {
-            if (seriesNameKey(entry.name) !== name_key) continue;
-            searchRows += Number(deleteSeriesIndexStmt.run(entry.rowid).changes);
+        if (orphaned.size > 0) {
+          for (const entry of allSeriesIndexStmt.all() as Array<{ rowid: number; work_id: string; name: string }>) {
+            if (orphaned.has(`${entry.work_id}\n${seriesNameKey(entry.name)}`)) searchRows += Number(deleteSeriesIndexStmt.run(entry.rowid).changes);
           }
         }
         return { rows, searchRows };

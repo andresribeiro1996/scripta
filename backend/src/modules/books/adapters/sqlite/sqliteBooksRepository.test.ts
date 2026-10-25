@@ -3219,6 +3219,16 @@ test("removeWorkSeries keeps the search entry when a wikidata row shares the nam
   assert.deepEqual(repo.searchSeriesWorks(["malazan"], 12), [book.work_id]);
 });
 
+test("removeWorkSeries leaves another work's search entry alone", () => {
+  const { repo } = freshRepo();
+  const first = seriesBook(repo, "Memories of Ice", "9780765348807");
+  const other = seriesBook(repo, "Return of the Crimson Guard", "9780765348821", "Ian Esslemont");
+  repo.addWorkSeries(first.work_id!, [{ name: MALAZAN, position: "3" }], "hardcover", AT);
+  repo.addWorkSeries(other.work_id!, [{ name: MALAZAN, position: "1" }], "wikidata", AT);
+  assert.deepEqual(repo.removeWorkSeries(["malazan book of the fallen"], "hardcover"), { rows: 1, searchRows: 1 });
+  assert.deepEqual(repo.searchSeriesWorks(["malazan"], 12), [other.work_id]);
+});
+
 test("an Open Library edition collection becomes the work's series only when Wikidata or a subject names it too", () => {
   const { repo } = freshRepo();
   const book = seriesBook(repo, "Memories of Ice", "9780765348807");
