@@ -57,9 +57,10 @@ export function parseWebSnapshotArgs(argv) {
   return args;
 }
 
-function elementRow({ role, name, x, y, w, h, href, disabled, coveredBy }) {
+function elementRow({ role, name, x, y, w, h, value, href, disabled, coveredBy }) {
   const label = name ? `"${clip(name)}"` : "(no label)";
   const parts = [`  ${role} ${label}`, `@${x},${y}  ${w}×${h}px`];
+  if (value) parts.push(`= "${value}"`);
   if (href) parts.push(`→ ${href}`);
   if (Math.floor(Math.min(w, h)) < MIN_TARGET_PX) parts.push("⚠ <44px");
   if (disabled) parts.push("(disabled)");

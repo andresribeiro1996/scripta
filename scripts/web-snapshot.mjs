@@ -55,6 +55,7 @@ function collectPage() {
     const x = Math.round(rect.left + rect.width / 2);
     const y = Math.round(rect.top + rect.height / 2);
     const row = { role: roleOf(el), name: nameOf(el), x, y, w: Math.round(rect.width), h: Math.round(rect.height) };
+    if ((el.tagName === "INPUT" || el.tagName === "TEXTAREA") && el.readOnly && el.type !== "password" && el.value) row.value = el.value;
     if (el.tagName === "A" && el.getAttribute("href")) row.href = el.getAttribute("href");
     if (el.disabled === true || el.getAttribute("aria-disabled") === "true") row.disabled = true;
     if (x >= 0 && y >= 0 && x < innerWidth && y < innerHeight) {

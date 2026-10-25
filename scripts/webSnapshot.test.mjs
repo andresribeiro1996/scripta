@@ -23,6 +23,7 @@ test("listing flags small, unlabelled, disabled and covered controls", () => {
     elements: [
       { role: "button", name: "", x: 340, y: 24, w: 32, h: 32 },
       { role: "link", name: "Summer reads", x: 180, y: 200, w: 300, h: 96, href: "/murals/1" },
+      { role: "textbox", name: "", x: 180, y: 400, w: 300, h: 40, value: "https://x.test/shared/library/tok" },
       { role: "button", name: "Save", x: 180, y: 860, w: 300, h: 52, disabled: true, coveredBy: "Close" },
     ],
     consoleErrors: ["TypeError: x is undefined"], failedRequests: ["GET 500 /murals"], note: "page was still changing — snapshot again",
@@ -31,6 +32,7 @@ test("listing flags small, unlabelled, disabled and covered controls", () => {
   assert.match(text, /h1 "Murals"/);
   assert.match(text, /button \(no label\)  @340,24  32×32px  ⚠ <44px/);
   assert.match(text, /link "Summer reads"  @180,200  300×96px  → \/murals\/1/);
+  assert.match(text, /textbox \(no label\)  @180,400  300×40px  = "https:\/\/x\.test\/shared\/library\/tok"/);
   assert.match(text, /button "Save"  @180,860  300×52px  \(disabled\)  ⚠ under "Close"/);
   assert.match(text, /console errors \(1\):\n  TypeError/);
   assert.match(text, /failed requests \(1\):\n  GET 500 \/murals/);
