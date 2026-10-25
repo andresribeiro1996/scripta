@@ -516,6 +516,14 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     WHERE books.work_id IN (SELECT value FROM json_each(?)) AND book_collections.source = 'ol-edition'
     ORDER BY book_collections.rowid
   `);
+  const seriesHasOtherMembersStmt = db.prepare(`
+    SELECT 1 FROM work_series JOIN works ON works.id = work_series.work_id
+    WHERE work_series.name_key = ?1 AND COALESCE(works.merged_into, works.id) <> ?2
+    UNION ALL
+    SELECT 1 FROM book_collections JOIN books ON books.id = book_collections.book_id JOIN works ON works.id = books.work_id
+    WHERE book_collections.name_key = ?1 AND COALESCE(works.merged_into, works.id) <> ?2
+    LIMIT 1
+  `);
   const upsertWorkAwardStmt = db.prepare(`
     INSERT INTO work_awards (work_id, prize, year, won, honoree, created_at) VALUES (?, ?, ?, ?, ?, ?)
     ON CONFLICT (work_id, prize, year) DO UPDATE SET won = 1, created_at = excluded.created_at WHERE won = 0 AND excluded.won = 1
@@ -1306,6 +1314,10 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
         indexCollectionStmt.run({ $book_id: bookId, $name: name, $name_key: nameKey });
         return true;
       });
+    },
+
+    seriesHasOtherMembers(nameKey, workId) {
+      return seriesHasOtherMembersStmt.get(nameKey, workId) !== undefined;
     },
 
     bestSeriesOf(workIds) {

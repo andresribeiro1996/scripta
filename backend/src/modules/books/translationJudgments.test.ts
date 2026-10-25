@@ -451,3 +451,48 @@ test("four works hitting a rejected key at once send one alert", async () => {
   jobs.stop();
   assert.deepEqual(key.alerts, ["TypeSafe rejected the translation requests"]);
 });
+
+function lordOfTheRings(repo: Repo) {
+  const lotr = edition(repo, "9780261103252", { title: "The Lord of the Rings", author: "J. R. R. Tolkien", workKey: "OL27448W" });
+  const king = edition(repo, "9780261102378", { title: "The Return of the King", author: "J. R. R. Tolkien", workKey: "OL27455W" });
+  for (const row of [lotr, king]) repo.addWorkSeries(row.work_id!, [{ name: "The Lord of the Rings", position: null }], "wikidata", AT);
+  const pt = edition(repo, "9789720000701", { title: "A Irmandade do Anel", author: "", language: "pt-PT", originalTitle: "The lord of the rings" });
+  return { lotr, king, pt };
+}
+
+test("Jev answering a series head is stored for review and never merges", async () => {
+  const repo = freshRepo();
+  const { lotr, pt } = lordOfTheRings(repo);
+  const plan = planMatch(repo, pt.work_id!, notSeries);
+  const index = plan?.kind === "ask" ? plan.candidates.findIndex((candidate) => candidate.id === lotr.work_id) : -1;
+  assert.notEqual(index, -1);
+  const { deps } = matching(repo, async () => ({ choice: index, confidence: 0.99, model: "jev-1.13.0" }));
+  await matchWork(deps, pt.work_id!, notSeries);
+  assert.equal(repo.workMatchJudgments([pt.work_id!]).get(pt.work_id!)?.intoWorkId, lotr.work_id);
+  assert.equal(repo.getBook(pt.id)!.work_id, pt.work_id);
+  assert.equal(repo.canonicalWorkIds([pt.work_id!]).get(pt.work_id!), pt.work_id);
+  assert.deepEqual(repo.portugueseWorksNeedingMatch(null, 10, 3, "2026-11-30T00:00:00.000Z"), []);
+});
+
+test("Jev answering the whole of a split volume is stored as no work, and the work is rechecked", async () => {
+  const repo = freshRepo();
+  const en = edition(repo, "9780140444308", { title: "Les Misérables", author: "Victor Hugo", workKey: "OL5710W" });
+  const pt = edition(repo, "9789720000702", { title: "Os Miseráveis I", author: "", language: "pt-PT", originalTitle: "Les Misérables" });
+  const { deps } = matching(repo, async () => ({ choice: 0, confidence: 0.99, model: "jev-1.13.0" }));
+  await matchWork(deps, pt.work_id!, notSeries);
+  assert.equal(repo.getBook(pt.id)!.work_id, pt.work_id);
+  assert.equal(repo.workMatchJudgments([pt.work_id!]).get(pt.work_id!)?.intoWorkId, null);
+  assert.deepEqual(repo.portugueseWorksNeedingMatch(null, 10, 3, "2026-11-30T00:00:00.000Z"), [pt.work_id]);
+  await matchWork(deps, pt.work_id!, notSeries);
+  assert.equal(repo.getBook(pt.id)!.work_id, pt.work_id);
+  assert.equal(repo.workMatchJudgments([pt.work_id!]).get(pt.work_id!)?.intoWorkId, null);
+  assert.notEqual(en.work_id, pt.work_id);
+});
+
+test("a plain translation still merges at 0.99", async () => {
+  const repo = freshRepo();
+  const { en, pt } = lighthouse(repo, "");
+  const { deps } = matching(repo, async () => ({ choice: 0, confidence: 0.99, model: "jev-1.13.0" }));
+  await matchWork(deps, pt.work_id!, notSeries);
+  assert.equal(repo.getBook(pt.id)!.work_id, en.work_id);
+});

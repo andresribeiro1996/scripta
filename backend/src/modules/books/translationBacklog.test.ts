@@ -130,3 +130,15 @@ test("the Jev step stops at --max under its own source, and the report counts ou
   assert.equal(report.requests, 1);
   assert.ok([c.ask.work_id, second.work_id].includes(result.asked[0]!));
 });
+
+test("the code steps keep a join whose target heads a series for review", () => {
+  const repo = freshRepo();
+  const c = seedCatalog(repo);
+  const sequel = book(repo, "9780156907599", "Mrs Dalloway", "Virginia Woolf", { workKey: "OL963W" });
+  for (const row of [c.en, sequel]) repo.addWorkSeries(row.work_id!, [{ name: "To the Lighthouse", position: null }], "wikidata", AT);
+  const steps = runCodeSteps(deps(repo, async () => ({ choice: null, confidence: 0, model: "x" })), translationBacklogWorks(repo, [], null));
+  assert.equal(steps.codeBlocked, 1);
+  assert.equal(steps.codeMerges, 0);
+  assert.equal(repo.getBook(c.codePt.id)!.work_id, c.codePt.work_id);
+  assert.deepEqual(repo.workMatchJudgments([c.codePt.work_id!]).get(c.codePt.work_id!), { model: "code", intoWorkId: c.en.work_id, confidence: null, askedAt: AT });
+});

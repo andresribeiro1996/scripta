@@ -143,6 +143,7 @@ export interface BooksRepository {
   applyTitleRepairs(plan: { books: RowRepair[]; works: RowRepair[] }): MojibakeApplied;
   addWorkSeries(workId: string, entries: SeriesEntry[], source: SeriesSource, at: string): number;
   addBookCollection(bookId: string, entry: SeriesEntry, source: CollectionSource, at: string): boolean;
+  seriesHasOtherMembers(nameKey: string, workId: string): boolean;
   bestSeriesOf(workIds: string[]): Map<string, SeriesEntry>;
   collectionsOf(bookIds: string[]): Map<string, SeriesEntry>;
   searchSeriesWorks(tokens: string[], limit: number): string[];

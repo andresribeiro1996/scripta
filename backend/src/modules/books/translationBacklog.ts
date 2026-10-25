@@ -1,7 +1,7 @@
 import type { BooksRepository } from "./domain/ports.js";
 import { MATCH_MERGE_AT, MATCH_REVIEW_AT, seriesLikeOriginals } from "./domain/translation.js";
 import { jevCostUsd, JEV_REJECTION_LIMIT, runJevBacklog, type JevStop } from "./jevJobs.js";
-import { matchWork, planMatch, type TranslationDeps } from "./translationJudgments.js";
+import { guardJoin, matchWork, planMatch, type TranslationDeps } from "./translationJudgments.js";
 
 export const TRANSLATION_BACKLOG_SOURCE = "works-backlog";
 export const RECHECK_AFTER_MS = 30 * 24 * 60 * 60 * 1000;
@@ -37,9 +37,10 @@ export function translationDryRun(repo: Pick<BooksRepository, "translationEviden
 }
 
 export function joinByCode(deps: Pick<TranslationDeps, "repo" | "sharesArena">, workId: string, intoWorkId: string, at: string): boolean {
-  const blocked = deps.sharesArena(workId, intoWorkId);
+  const verdict = guardJoin(deps.repo, workId, intoWorkId);
+  const blocked = verdict !== "join" || deps.sharesArena(workId, intoWorkId);
   deps.repo.transaction(() => {
-    deps.repo.saveWorkMatchJudgment(workId, { model: "code", intoWorkId, confidence: null, askedAt: at });
+    deps.repo.saveWorkMatchJudgment(workId, { model: "code", intoWorkId: verdict === "never" ? null : intoWorkId, confidence: null, askedAt: at });
     if (!blocked) deps.repo.mergeTranslation(workId, intoWorkId, "code", null, at);
   });
   return !blocked;
