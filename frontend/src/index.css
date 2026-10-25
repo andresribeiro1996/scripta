@@ -165,20 +165,10 @@ option {
   }
 }
 
-/* Themed checkboxes and range sliders — the last two native controls
-   still rendering in the browser's own stock blue regardless of theme
-   (every style panel's toggles and "px"/"%" sliders — Card layout, Card
-   border, a mural block's own style, all of it). `accent-color` alone is
-   enough for checkboxes: native checkbox rendering is already about as
-   minimal as it gets, it only needed the right color, not a rebuild.
-   Range sliders get a fuller treatment — the native thumb+track combo
-   (a thick track, a large beveled thumb) reads noticeably heavier than
-   the rest of this app's thin-bordered, flat aesthetic, so it's
-   `appearance: none` and hand-drawn from here: a slim 4px track and a
-   small flat 14px thumb with no border/shadow, not just the existing OS
-   shape recolored. Both `::-webkit-*` (Chrome/Safari/Edge) and
-   `::-moz-*` (Firefox) pseudo-elements are needed — there's no
-   standard, engine-agnostic way to restyle a native range thumb/track. */
+/* Range sliders are hand-drawn: a slim 4px track and a flat 14px thumb, with
+   both ::-webkit-* and ::-moz-* pseudo-elements because there is no
+   engine-agnostic way to restyle them. Components that need a 44px hit area
+   override the 4px height with RANGE_CLASS. */
 :root {
   accent-color: var(--color-accent);
 }

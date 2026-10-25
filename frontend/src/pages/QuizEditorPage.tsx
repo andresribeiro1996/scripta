@@ -13,6 +13,7 @@ import { backTo } from "../lib/areas";
 import { useConfirm } from "../components/ConfirmDialog";
 import { deleteQuizApi, fetchQuizResultsApi, publishQuizApi, setPlayStateApi, updateQuizApi, type Quiz } from "../api/quizzes";
 import { useQuizzes } from "../hooks/useQuizzes";
+import { CHECKBOX_CLASS } from "../components/Toolbar";
 
 const TYPE_LABELS: Record<QuizQuestionType, string> = {
   cover_title: "Blurred cover → title",
@@ -150,6 +151,7 @@ export function QuizEditorPage() {
                     <label key={type} className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm ${offered ? "border-(--color-border)" : "border-(--color-border) opacity-50"}`}>
                       <input
                         type="checkbox"
+                        className={CHECKBOX_CLASS}
                         disabled={!offered}
                         checked={checked}
                         onChange={() =>

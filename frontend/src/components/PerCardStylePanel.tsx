@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { extractPerCardStyle, resolvePerCardStyle, type LibraryStyleSettings, type PerCardStyle } from "../lib/libraryStyle";
 import { CardAppearanceSection, CardBorderSection, CardContentSection, CardTextSection } from "./StyleControls";
 import { Sheet } from "./Sheet";
+import { CHECKBOX_CLASS } from "./Toolbar";
 
 /** Generic "override the per-card style for one thing" modal — used both
  *  for a series (GroupsPage.tsx's "Style" button, series only) and a
@@ -90,6 +91,7 @@ export function PerCardStylePanel({
           <input
             id={`${idPrefix}-style-customized`}
             type="checkbox"
+            className={CHECKBOX_CLASS}
             checked={customized}
             onChange={(e) => handleToggleCustomized(e.target.checked)}
           />

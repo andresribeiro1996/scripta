@@ -328,7 +328,7 @@ export function BookCard({
             onChange={() => onToggleSelect?.(book)}
             onClick={(e) => e.stopPropagation()}
             aria-label={`Select ${String(book.Title ?? "this book")}`}
-            className="absolute top-2.5 left-2.5 h-6 w-6 cursor-pointer appearance-none bg-transparent"
+            className="absolute top-0 left-0 h-11 w-11 cursor-pointer appearance-none bg-transparent"
           />
         </>
       )}

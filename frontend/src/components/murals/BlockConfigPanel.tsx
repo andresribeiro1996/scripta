@@ -21,7 +21,7 @@ import { BookSearchList, GalleryImageGrid } from "./pickers";
 import { Sheet } from "../Sheet";
 import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../page/buttonClasses";
 import { useTierlists } from "../../hooks/useTierlists";
-import { ChevronLeftIcon, ChevronRightIcon } from "../Toolbar";
+import { ChevronLeftIcon, ChevronRightIcon, CHECKBOX_CLASS } from "../Toolbar";
 
 function bookHighlights(book: Record<string, unknown> | undefined): Array<Record<string, unknown>> {
   if (!book || !Array.isArray(book.highlights)) return [];
@@ -85,7 +85,7 @@ export function BlockConfigPanel({
                 value={draft.heading ?? ""}
                 onChange={(e) => setDraft({ ...draft, heading: e.target.value })}
                 placeholder="e.g. My 2026 in books"
-                className="w-full rounded-lg border border-(--color-border) bg-transparent px-3 py-2 text-sm"
+                className="min-h-11 w-full rounded-lg border border-(--color-border) bg-transparent px-3 py-2 text-sm"
               />
             </div>
             <div>
@@ -96,7 +96,7 @@ export function BlockConfigPanel({
                 onChange={(e) => setDraft({ ...draft, body: e.target.value })}
                 rows={4}
                 placeholder="A note, a reflection, whatever you want to say here…"
-                className="w-full rounded-lg border border-(--color-border) bg-transparent px-3 py-2 text-sm"
+                className="min-h-11 w-full rounded-lg border border-(--color-border) bg-transparent px-3 py-2 text-sm"
               />
             </div>
           </div>
@@ -117,6 +117,7 @@ export function BlockConfigPanel({
               <label key={metric} className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-(--color-surface-hover)">
                 <input
                   type="checkbox"
+                  className={CHECKBOX_CLASS}
                   checked={draft.metrics.includes(metric)}
                   onChange={(e) =>
                     setDraft({
@@ -171,7 +172,7 @@ export function BlockConfigPanel({
                 id="image-block-caption"
                 value={draft.caption ?? ""}
                 onChange={(e) => setDraft({ ...draft, caption: e.target.value })}
-                className="w-full rounded-lg border border-(--color-border) bg-transparent px-3 py-2 text-sm"
+                className="min-h-11 w-full rounded-lg border border-(--color-border) bg-transparent px-3 py-2 text-sm"
               />
             </div>
           </div>
@@ -191,7 +192,7 @@ export function BlockConfigPanel({
                 id="spotlight-block-caption"
                 value={draft.caption ?? ""}
                 onChange={(e) => setDraft({ ...draft, caption: e.target.value })}
-                className="w-full rounded-lg border border-(--color-border) bg-transparent px-3 py-2 text-sm"
+                className="min-h-11 w-full rounded-lg border border-(--color-border) bg-transparent px-3 py-2 text-sm"
               />
             </div>
           </div>
@@ -199,7 +200,7 @@ export function BlockConfigPanel({
 
         {draft.type === "shelf" && <div className="space-y-2">
           <label className="block text-sm">Shelf source
-            <select className="ml-2 rounded border p-2" value={draft.collectionId ?? ""} onChange={(event) => {
+            <select className="ml-2 min-h-11 rounded border p-2" value={draft.collectionId ?? ""} onChange={(event) => {
               const collectionId = event.target.value || undefined;
               const resolved = resolveHomeBlock(draft, books, groups, "");
               setDraft({ ...draft, collectionId, bookKeys: collectionId ? [] : resolved.type === "shelf" ? resolved.bookKeys : [] });
@@ -209,9 +210,9 @@ export function BlockConfigPanel({
               {groups.filter((group) => group.type === "collection").map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
             </select>
           </label>
-          {draft.collectionId ? <label className="block text-sm">Title (blank follows collection name)<input className="mt-1 w-full rounded border p-2" value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></label> : null}
+          {draft.collectionId ? <label className="block text-sm">Title (blank follows collection name)<input className="mt-1 min-h-11 w-full rounded border p-2" value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></label> : null}
         </div>}
-        {draft.type === "quote" && <label className="block text-sm">Passage source <select className="rounded border p-2" value={draft.mode ?? "pinned"} onChange={(event) => setDraft({ ...draft, mode: event.target.value === "rediscover" ? "rediscover" : undefined, bookKey: "", highlightId: "" })}><option value="pinned">Choose a passage</option><option value="rediscover">Rediscover a passage</option></select></label>}
+        {draft.type === "quote" && <label className="block text-sm">Passage source <select className="min-h-11 rounded border p-2" value={draft.mode ?? "pinned"} onChange={(event) => setDraft({ ...draft, mode: event.target.value === "rediscover" ? "rediscover" : undefined, bookKey: "", highlightId: "" })}><option value="pinned">Choose a passage</option><option value="rediscover">Rediscover a passage</option></select></label>}
         {draft.type === "shelf" && !draft.collectionId && (
           <div className="flex flex-col gap-3">
             <div>
@@ -221,7 +222,7 @@ export function BlockConfigPanel({
                 value={draft.title}
                 onChange={(e) => setDraft({ ...draft, title: e.target.value })}
                 placeholder="e.g. Top 5 Books This Year"
-                className="w-full rounded-lg border border-(--color-border) bg-transparent px-3 py-2 text-sm"
+                className="min-h-11 w-full rounded-lg border border-(--color-border) bg-transparent px-3 py-2 text-sm"
               />
             </div>
 
@@ -321,7 +322,7 @@ export function BlockConfigPanel({
                 value={draft.title}
                 onChange={(e) => setDraft({ ...draft, title: e.target.value })}
                 placeholder="e.g. My favorite lines"
-                className="w-full rounded-lg border border-(--color-border) bg-transparent px-3 py-2 text-sm"
+                className="min-h-11 w-full rounded-lg border border-(--color-border) bg-transparent px-3 py-2 text-sm"
               />
             </div>
 

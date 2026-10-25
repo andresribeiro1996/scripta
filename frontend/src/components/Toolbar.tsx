@@ -38,13 +38,10 @@ export const TOOLBAR_CONTROL_CLASS =
 const BOX_INPUT =
   "relative h-11 w-11 shrink-0 cursor-pointer appearance-none disabled:cursor-not-allowed disabled:opacity-50 before:absolute before:top-1/2 before:left-1/2 before:flex before:size-5 before:-translate-x-1/2 before:-translate-y-1/2 before:items-center before:justify-center before:border before:border-(--color-border) before:bg-(--color-surface) before:text-xs before:leading-none before:text-(--color-on-accent) checked:before:border-(--color-accent) checked:before:bg-(--color-accent)";
 
-/** A checkbox whose input is itself the 44px target, with a 20px drawn box. */
 export const CHECKBOX_CLASS = `${BOX_INPUT} before:rounded checked:before:content-['✓']`;
 
-/** A radio whose input is itself the 44px target, with a 20px drawn dot. */
 export const RADIO_CLASS = `${BOX_INPUT} before:rounded-full checked:before:content-['●']`;
 
-/** A range input with a 44px-tall hit area around the 4px track. */
 export const RANGE_CLASS = "h-11! w-full bg-transparent!";
 
 /** Icon buttons in a ToolbarRow — geometry and chrome only, NO text

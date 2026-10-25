@@ -39,7 +39,7 @@ const MENU_WIDTH = 132;
 export function OptionsMenu({
   items,
   title = "Settings",
-  triggerClassName = "flex h-6 w-6 items-center justify-center rounded-full bg-[rgba(10,8,6,0.72)] text-white backdrop-blur-xs",
+  triggerClassName,
   trigger
 }: {
   items: OptionsMenuItem[];
@@ -76,8 +76,15 @@ export function OptionsMenu({
 
   return (
     <>
-      <button onClick={toggle} title={title} className={triggerClassName}>
-        {trigger ?? <MoreIcon size={16} />}
+      <button onClick={toggle} title={title} className={triggerClassName ?? "flex h-11 w-11 items-center justify-center"}>
+        {trigger ??
+          (triggerClassName ? (
+            <MoreIcon size={16} />
+          ) : (
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[rgba(10,8,6,0.72)] text-white backdrop-blur-xs">
+              <MoreIcon size={16} />
+            </span>
+          ))}
       </button>
       {open &&
         position &&

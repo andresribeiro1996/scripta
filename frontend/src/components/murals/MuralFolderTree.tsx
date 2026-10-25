@@ -106,19 +106,11 @@ export function MuralFolderTree({
                 </button>
               )}
               <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-                <button
-                  onClick={() => onCreateFolder(folder.id)}
-                  title="New subfolder"
-                  className="flex h-11 w-11 items-center justify-center rounded text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)"
-                >
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                    <path d="M12 5v14M5 12h14" />
-                  </svg>
-                </button>
                 <OptionsMenu
                   title="Folder settings"
                   triggerClassName="flex h-11 w-11 items-center justify-center rounded text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)"
                   items={[
+                    { label: "New subfolder", onClick: () => onCreateFolder(folder.id) },
                     {
                       label: "Rename",
                       onClick: () => {

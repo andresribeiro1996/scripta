@@ -15,7 +15,7 @@ import { PerCardStylePanel } from "../components/PerCardStylePanel";
 import { Sheet } from "../components/Sheet";
 import { SkeletonGroups } from "../components/Skeleton";
 import { useToast } from "../components/Toaster";
-import { TOOLBAR_CONTROL_CLASS, ToolbarRow } from "../components/Toolbar";
+import { TOOLBAR_CONTROL_CLASS, ToolbarRow, CHECKBOX_CLASS } from "../components/Toolbar";
 import { useDelayedShow } from "../hooks/useDelayedShow";
 import { useLibrary } from "../hooks/useLibrary";
 import { useLibrarySaver } from "../hooks/useLibrarySaver";
@@ -574,9 +574,9 @@ function BookPickerModal({
           return (
             <label
               key={String(book.ContentID ?? i)}
-              className="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2 text-sm hover:bg-(--color-surface-hover)"
+              className="flex cursor-pointer items-center gap-1 rounded-lg px-2 text-sm hover:bg-(--color-surface-hover)"
             >
-              <input type="checkbox" checked={inGroup} onChange={() => onToggle(book, inGroup)} />
+              <input type="checkbox" className={CHECKBOX_CLASS} checked={inGroup} onChange={() => onToggle(book, inGroup)} />
               <span className="min-w-0 flex-1 truncate">
                 {String(book.Title ?? "Untitled")}
                 <span className="text-(--color-text-dim)"> — {String(book.Attribution ?? "Unknown author")}</span>
