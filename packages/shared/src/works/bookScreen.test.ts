@@ -253,3 +253,38 @@ test("no series, no collection and no page all read as null", () => {
   assert.equal(bookScreenModel(page({ editions: [] }), null, viewer).series, null);
   assert.equal(bookScreenModel(null, owned(), viewer).series, null);
 });
+
+const hugo = { prize: "hugo-novel", year: 1993, won: true };
+const bookerNominee = { prize: "booker", year: 2019, won: false };
+const nobel = { prize: "nobel-literature", year: 1998, won: true };
+const camoes = { prize: "camoes", year: 1995, won: true };
+
+test("awards lists book prizes as labelled pills, wins first", () => {
+  const nebula = { prize: "nebula-novel", year: 1994, won: true };
+  const model = bookScreenModel(page({ awards: [bookerNominee, hugo, nebula] }), null, viewer);
+  assert.deepEqual(model.awards, [
+    { label: "Nebula Award 1994", won: true },
+    { label: "Hugo Award 1993", won: true },
+    { label: "Booker Prize 2019 · nominee", won: false }
+  ]);
+});
+
+test("authorAwards joins author prizes and leaves them out of awards", () => {
+  const model = bookScreenModel(page({ awards: [camoes, hugo, nobel] }), null, viewer);
+  assert.equal(model.authorAwards, "Nobel Prize in Literature 1998 · Prémio Camões 1995");
+  assert.deepEqual(model.awards, [{ label: "Hugo Award 1993", won: true }]);
+  assert.equal(bookScreenModel(page({ awards: [hugo] }), null, viewer).authorAwards, null);
+});
+
+test("unknown prizes are dropped", () => {
+  const model = bookScreenModel(page({ awards: [{ prize: "goodreads-choice", year: 2020, won: true }, hugo] }), null, viewer);
+  assert.deepEqual(model.awards, [{ label: "Hugo Award 1993", won: true }]);
+  assert.equal(model.authorAwards, null);
+});
+
+test("a page without awards has none", () => {
+  for (const model of [bookScreenModel(page(), null, viewer), bookScreenModel(page({ awards: [] }), null, viewer), bookScreenModel(null, owned(), viewer)]) {
+    assert.deepEqual(model.awards, []);
+    assert.equal(model.authorAwards, null);
+  }
+});
