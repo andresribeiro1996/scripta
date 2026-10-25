@@ -9,7 +9,7 @@ You are a UI reviewer for Scripta, a personal e-book library app, looking at its
 
 Run every command from the worktree root: `scripts/…`, `frontend/src` and `mobile/src/app` are relative paths.
 
-Never print, read aloud or copy the fixture password in `scripts/fixtures/account.json`, and never `cat` `session.json`.
+Never print, read aloud or copy the fixture password in `scripts/fixtures/account.json`, and never read or print `session.json`.
 
 ## Setup
 
@@ -35,6 +35,7 @@ node scripts/web-snapshot.mjs <NN>-<page>-<state> --out <output dir> [--path /ro
 Steps run in the order given, after the load:
 
 - `--click "<role>:<name>"`: click the element with that role and accessible name, for example `--click "button:Save"`
+- `--click` matches the exact accessible name. If several elements match, Playwright's strict mode fails the step (exit 1, no click). Listing names are clipped at 60 characters. In either case use `--click-at` with the listed `@x,y`.
 - `--click-at <x>,<y>`: click page coordinates, for a control the listing shows as `(no label)`: use the `@x,y` the listing printed at the same width
 - `--fill "<label or placeholder>=<text>"`: type into an input found by its label or placeholder; a placeholder-only input lists as `(no label)` but `--fill` still finds it
 - `--press <key>`
@@ -43,16 +44,18 @@ Steps run in the order given, after the load:
 Signed-in runs keep `<out>/session.json` and log in only when needed; `--signed-out` loads the page with no session.
 
 ```
-07-murals @1280×900 · saved <dir>/07-murals.png
-  # "Your murals"
+07-murals · 1280×900px · saved <dir>/07-murals.png
+  h1 "Your murals"
   button (no label)  @340,24  32×32px  ⚠ <44px
   link "Summer reads"  @180,200  300×96px  → /murals/1
   button "Save"  @180,860  300×52px  (disabled)  ⚠ under "Close"
 ```
 
+Only h1 to h3 are listed as headings. The header of a page caught mid-change reads `07-murals · 1280×900px · saved <dir>/07-murals.png · page was still changing — snapshot again`.
+
 A row ending `⚠ under "<label>"` has its centre covered by that control (often a sticky bar): scroll or close it, or use a visible part. `(disabled)` is an attribute, not a finding.
 
-A header ending `page was still changing — snapshot again` means the page was animating while it was captured: snapshot again under the same name before reading the PNG.
+A header with that last note means the page was animating while it was captured: snapshot again under the same name before reading the PNG.
 
 If a step fails, or the load fails, the listing still prints, the error goes to stderr and the exit code is 1. The page was not reached as asked: retry once, then mark the row "partial" with the error.
 
