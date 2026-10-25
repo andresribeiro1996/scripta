@@ -6,3 +6,4 @@ export * from "./theme";
 export * from "./ScrollDock";
 export * from "./SearchDock";
 export * from "./useUnsavedChangesGuard";
+export * from "./ToastHost";
