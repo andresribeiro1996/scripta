@@ -23,7 +23,7 @@ const { createSqliteBooksRepository } = await import("../adapters/sqlite/sqliteB
 const { WIKIDATA_PAGE_ROWS } = await import("../adapters/wikidata/sparql.js");
 const { SourceUnavailableError } = await import("../domain/errors.js");
 const { PRIZE_ITEMS } = await import("../domain/awards.js");
-const { awardQueries, awardRowsOf, fillAwards, refreshAwards } = await import("./awardsFill.js");
+const { awardQueries, awardRowsOf, fillAwards, honoreeLabels, itemOf, refreshAwards } = await import("./awardsFill.js");
 
 const AT = "2026-10-24T12:00:00.000Z";
 const LIVE = { dryRun: false };
@@ -109,15 +109,52 @@ test("awardRowsOf ignores an unlisted item", () => {
   assert.deepEqual(noYear, {});
 });
 
-test("awardRowsOf takes the honoree's English label, else Portuguese, else any", () => {
-  const { rows } = awardRowsOf([
-    binding({ prize: item("Q37922"), won: "true", year: "1998", olIds: "OL1W", en: "José Saramago", pt: "José de Sousa Saramago", any: "Saramago" }),
-    binding({ prize: item("Q37922"), won: "true", year: "1998", olIds: "OL2W", pt: "José de Sousa Saramago", any: "Saramago" }),
-    binding({ prize: item("Q37922"), won: "true", year: "1998", olIds: "OL3W", en: "  ", pt: "José de Sousa Saramago" }),
-    binding({ prize: item("Q37922"), won: "true", year: "1998", olIds: "OL4W", any: "Saramago" }),
-    binding({ prize: item("Q37922"), won: "true", year: "1998", olIds: "OL5W" })
-  ]);
-  assert.deepEqual(rows.map((kept) => kept.honoree), ["José Saramago", "José de Sousa Saramago", "José de Sousa Saramago", "Saramago", null]);
+test("honoreeLabels takes the honoree's English label, else Portuguese, else any", async () => {
+  const asked: string[] = [];
+  const person = (id: string) => item(id);
+  const labels = await honoreeLabels(
+    async (text) => {
+      asked.push(text);
+      return [
+        binding({ person: person("Q1"), en: "José Saramago", pt: "José de Sousa Saramago", any: "Saramago" }),
+        binding({ person: person("Q2"), pt: "Camilo Castelo Branco", any: "Castelo Branco" }),
+        binding({ person: person("Q3"), en: "  ", pt: "Vergílio Ferreira" }),
+        binding({ person: person("Q4"), any: "Gao Xingjian" }),
+        binding({ person: person("Q5") })
+      ];
+    },
+    [
+      binding({ person: person("Q1"), prize: item("Q37922") }),
+      binding({ person: person("Q2"), prize: item("Q752134") }),
+      binding({ person: person("Q1"), prize: item("Q37922") }),
+      binding({ person: person("Q3") }),
+      binding({ person: person("Q4") }),
+      binding({ person: person("Q5") }),
+      binding({ prize: item("Q160082") })
+    ]
+  );
+  assert.deepEqual([...labels], [["Q1", "José Saramago"], ["Q2", "Camilo Castelo Branco"], ["Q3", "Vergílio Ferreira"], ["Q4", "Gao Xingjian"]]);
+  assert.equal(asked.length, 1);
+  assert.ok(asked[0]!.includes("VALUES ?person { wd:Q1 wd:Q2 wd:Q3 wd:Q4 wd:Q5 }"));
+  assert.ok(asked[0]!.includes("rdfs:label"));
+
+  const { rows } = awardRowsOf(
+    [
+      binding({ person: person("Q1"), prize: item("Q37922"), won: "true", year: "1998", olIds: "OL1W" }),
+      binding({ person: person("Q5"), prize: item("Q37922"), won: "true", year: "1998", olIds: "OL2W" }),
+      binding({ prize: item("Q160082"), won: "true", year: "2019", olIds: "OL3W" })
+    ],
+    labels
+  );
+  assert.deepEqual(rows.map((kept) => kept.honoree), ["José Saramago", null, null]);
+});
+
+test("honoreeLabels does not ask Wikidata when no binding names a person", async () => {
+  const asked: string[] = [];
+  const labels = await honoreeLabels(async (text) => (asked.push(text), []), [binding({ prize: item("Q160082"), won: "true", year: "2019", olIds: "OL3W" })]);
+  assert.equal(labels.size, 0);
+  assert.deepEqual(asked, []);
+  assert.equal(itemOf(item("Q42")), "Q42");
 });
 
 test("awardQueries makes P585 optional without minYear and filters on it with one", () => {
@@ -148,11 +185,11 @@ test("awardQueries covers each identifier kind for every shape Task 1 recorded",
   const authorPrizes = "VALUES ?prize { wd:Q37922 wd:Q752134 }";
   const pairs = "VALUES (?p ?ps ?won) { (p:P166 ps:P166 true) (p:P1411 ps:P1411 false) }";
   const shapes: Record<string, { present: string[]; absent: string[] }> = {
-    "on-work": { present: [pairs, "?work ?p ?statement . ?statement ?ps ?prize .", bookPrizes], absent: ["P1686", "P1346", "P50", authorPrizes] },
-    "on-author": { present: [pairs, "?person ?p ?statement . ?statement ?ps ?prize ; pq:P1686 ?work .", bookPrizes], absent: ["P1346", "P50", authorPrizes] },
-    "on-prize": { present: ["?prize p:P1346 ?statement . ?statement pq:P1686 ?work . BIND(true AS ?won)", bookPrizes], absent: [pairs, "P50", authorPrizes] },
+    "on-work": { present: ["SELECT ?work ?prize ?won ?year (GROUP_CONCAT", pairs, "?work ?p ?statement . ?statement ?ps ?prize .", bookPrizes], absent: ["P1686", "P1346", "P50", authorPrizes] },
+    "on-author": { present: ["SELECT ?work ?prize ?won ?year (GROUP_CONCAT", pairs, "?person ?p ?statement . ?statement ?ps ?prize ; pq:P1686 ?work .", bookPrizes], absent: ["P1346", "P50", authorPrizes] },
+    "on-prize": { present: ["SELECT ?work ?prize ?won ?year (GROUP_CONCAT", "?prize p:P1346 ?statement . ?statement pq:P1686 ?work . BIND(true AS ?won)", bookPrizes], absent: [pairs, "P50", authorPrizes] },
     "author-prize": {
-      present: ["?person p:P166 ?statement . ?statement ps:P166 ?prize . ?work wdt:P50 ?person . BIND(true AS ?won)", authorPrizes, "(SAMPLE(?enLabel) AS ?en)", "(SAMPLE(?ptLabel) AS ?pt)", "(SAMPLE(?anyLabel) AS ?any)"],
+      present: ["SELECT ?work ?person ?prize ?won ?year (GROUP_CONCAT", "?person p:P166 ?statement . ?statement ps:P166 ?prize . ?work wdt:P50 ?person . BIND(true AS ?won)", authorPrizes],
       absent: [pairs, "P1346", "P1686", bookPrizes]
     }
   };
@@ -165,7 +202,7 @@ test("awardQueries covers each identifier kind for every shape Task 1 recorded",
     for (const [kind, expectedKind] of Object.entries(identifiers)) {
       const text = queryOf(`${shape}/${kind}`);
       for (const needle of [...expectedShape.present, ...expectedKind.present]) assert.ok(text.includes(needle), `${shape}/${kind} lacks ${needle}`);
-      for (const needle of [...expectedShape.absent, ...expectedKind.absent]) assert.ok(!text.includes(needle), `${shape}/${kind} has ${needle}`);
+      for (const needle of [...expectedShape.absent, ...expectedKind.absent, "rdfs:label", "SAMPLE("]) assert.ok(!text.includes(needle), `${shape}/${kind} has ${needle}`);
     }
   }
 });
@@ -274,26 +311,33 @@ function refreshDeps(overrides: Record<string, unknown> = {}) {
   return { db, repo, lines, asked, deps };
 }
 
-test("refreshAwards queries from last year, pages until a short page and logs one summary line", async () => {
+test("refreshAwards queries from last year, pages until a short page, asks for the honorees' labels once and logs one summary line", async () => {
   const { db, repo, lines, asked, deps } = refreshDeps();
   book(repo, "9780441013593", "Dune", "Frank Herbert");
+  book(repo, "9780156007757", "Blindness", "José Saramago");
   const full = Array.from({ length: WIKIDATA_PAGE_ROWS }, (_, index) => binding({ prize: item("Q160082"), won: "false", year: "2026", isbns: `97810000${String(index).padStart(5, "0")}` }));
   const matching = binding({ prize: item("Q255032"), won: "true", year: "2026", isbns: "9780441013593" });
+  const laureate = binding({ person: item("Q1"), prize: item("Q37922"), won: "true", year: "2026", isbns: "9780156007757" });
   await refreshAwards({ ...deps, query: async (text: string) => {
     asked.push(text);
-    return [full, [matching]][asked.length - 1] ?? [];
+    if (text.includes("rdfs:label")) return [binding({ person: item("Q1"), en: "José Saramago" })];
+    return [full, [matching, laureate]][asked.length - 1] ?? [];
   } }, new AbortController().signal);
-  assert.equal(asked.length, 13);
+  assert.equal(asked.length, 14);
   assert.ok(asked[0]!.includes("OFFSET 0"));
   assert.ok(asked[1]!.includes("OFFSET 3000"));
   assert.equal(asked[1]!.replace("OFFSET 3000", "OFFSET 0"), asked[0]);
   assert.ok(asked[2]!.includes("OFFSET 0") && asked[2] !== asked[0]);
-  for (const text of asked) assert.ok(text.includes("FILTER(?year >= 2026)"), text);
-  assert.deepEqual(lines, [[{ rows: 3001, matched: 1, added: 1, redirected: 0, failedKeys: 0 }, "awards refresh"]]);
-  assert.deepEqual(storedAwards(db).map((stored) => [stored.prize, stored.year, stored.created_at]), [["hugo-novel", 2026, "2027-01-01T01:00:00.000Z"]]);
+  for (const text of asked.slice(0, 13)) assert.ok(text.includes("FILTER(?year >= 2026)") && !text.includes("rdfs:label"), text);
+  assert.ok(asked[13]!.includes("VALUES ?person { wd:Q1 }"));
+  assert.deepEqual(lines, [[{ rows: 3002, matched: 2, added: 2, redirected: 0, failedKeys: 0 }, "awards refresh"]]);
+  assert.deepEqual(
+    storedAwards(db).map((stored) => [stored.prize, stored.year, stored.honoree, stored.created_at]),
+    [["hugo-novel", 2026, null, "2027-01-01T01:00:00.000Z"], ["nobel-literature", 2026, "José Saramago", "2027-01-01T01:00:00.000Z"]]
+  );
 });
 
-test("refreshAwards lets a Wikidata failure, an Open Library 429 and an abort propagate, and logs nothing", async () => {
+test("refreshAwards lets a Wikidata failure, a failing labels query, an Open Library 429 and an abort propagate, and logs nothing", async () => {
   const failing = refreshDeps({ query: async () => { throw new Error("Wikidata query failed after 3 attempts: HTTP 503"); } });
   await assert.rejects(refreshAwards(failing.deps, new AbortController().signal), /Wikidata query failed after 3 attempts/);
 
@@ -309,11 +353,21 @@ test("refreshAwards lets a Wikidata failure, an Open Library 429 and an abort pr
   await assert.rejects(refreshAwards(throttled.deps, new AbortController().signal), (error: unknown) => error instanceof SourceUnavailableError && error.status === 429);
   assert.equal(asked.length, 12);
 
+  const labelled = refreshDeps({
+    query: async (text: string) => {
+      if (text.includes("rdfs:label")) throw new Error("Wikidata query failed after 3 attempts: HTTP 504");
+      return [binding({ person: item("Q1"), prize: item("Q37922"), won: "true", year: "2026", isbns: "9780441013593" })];
+    }
+  });
+  book(labelled.repo, "9780441013593", "Dune", "Frank Herbert");
+  await assert.rejects(refreshAwards(labelled.deps, new AbortController().signal), /HTTP 504/);
+  assert.equal(storedAwards(labelled.db).length, 0);
+
   const aborted = new AbortController();
   aborted.abort();
   const stopped = refreshDeps();
   await assert.rejects(refreshAwards(stopped.deps, aborted.signal), { name: "AbortError" });
   assert.deepEqual(stopped.asked, []);
 
-  assert.deepEqual([failing.lines, throttled.lines, stopped.lines], [[], [], []]);
+  assert.deepEqual([failing.lines, throttled.lines, labelled.lines, stopped.lines], [[], [], [], []]);
 });

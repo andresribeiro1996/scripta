@@ -21,14 +21,13 @@ const { openBooksDb } = await import("../dist/modules/books/adapters/sqlite/conn
 const { createSqliteBooksRepository } = await import("../dist/modules/books/adapters/sqlite/sqliteBooksRepository.js");
 const { queryAllPages, queryWikidata } = await import("../dist/modules/books/adapters/wikidata/sparql.js");
 const { PRIZE_ITEMS } = await import("../dist/modules/books/domain/awards.js");
-const { awardQueries, awardRowsOf, fillAwards } = await import("../dist/modules/books/seed/awardsFill.js");
+const { awardQueries, awardRowsOf, fillAwards, honoreeLabels, itemOf } = await import("../dist/modules/books/seed/awardsFill.js");
 const { waitForBnpLock } = await import("../dist/modules/books/seed/bnpImport.js");
 const { createWorkFetcher } = await import("../dist/modules/books/seed/wikidataMatch.js");
 
 const dryRun = values["dry-run"];
 const at = new Date().toISOString();
 const log = (line) => console.error(line);
-const itemOf = (uri) => uri.slice(uri.lastIndexOf("/") + 1);
 
 async function prizeLabels() {
   const items = Object.values(PRIZE_ITEMS).map((id) => `wd:${id}`).join(" ");
@@ -53,7 +52,7 @@ for (const { kind, page } of awardQueries()) {
     }))
   );
 }
-const { rows, noYear } = awardRowsOf(bindings);
+const { rows, noYear } = awardRowsOf(bindings, await honoreeLabels((text) => queryWikidata(text, { log }), bindings));
 const { matched, added, redirected, failedKeys, prizes } = await fillAwards(repo, createWorkFetcher({ log }), rows, at, { dryRun });
 console.log(
   JSON.stringify(

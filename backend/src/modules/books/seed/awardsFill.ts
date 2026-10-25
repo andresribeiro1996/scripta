@@ -48,7 +48,7 @@ const SHAPES = [
   { name: "author-prize", honours: "author", where: "?person p:P166 ?statement . ?statement ps:P166 ?prize . ?work wdt:P50 ?person . BIND(true AS ?won)" }
 ] as const;
 
-const itemOf = (uri: string) => uri.slice(uri.lastIndexOf("/") + 1);
+export const itemOf = (uri: string) => uri.slice(uri.lastIndexOf("/") + 1);
 
 const yearClause = (minYear: number | undefined) =>
   minYear === undefined
@@ -58,29 +58,40 @@ const yearClause = (minYear: number | undefined) =>
 function pageOf(shape: (typeof SHAPES)[number], kind: (typeof KINDS)[number], minYear: number | undefined, offset: number): string {
   const prizes = PRIZE_KEYS.filter((key) => PRIZES[key].honours === shape.honours).map((key) => `wd:${PRIZE_ITEMS[key]}`);
   const group = shape.honours === "author" ? "?work ?person ?prize ?won ?year" : "?work ?prize ?won ?year";
-  const inner = `
+  return `
 SELECT ${group} (GROUP_CONCAT(DISTINCT ?id; separator="|") AS ?${kind.ids}) WHERE {
   ${shape.where} VALUES ?prize { ${prizes.join(" ")} } ${kind.where} ${yearClause(minYear)}
 }
 GROUP BY ${group}
 ORDER BY ${group}
 LIMIT ${WIKIDATA_PAGE_ROWS} OFFSET ${offset}`;
-  if (shape.honours === "work") return inner;
-  return `
-SELECT ?prize ?won ?year ?${kind.ids} (SAMPLE(?enLabel) AS ?en) (SAMPLE(?ptLabel) AS ?pt) (SAMPLE(?anyLabel) AS ?any) WHERE {
-  { ${inner} }
-  OPTIONAL { ?person rdfs:label ?enLabel . FILTER(LANG(?enLabel) = "en") }
-  OPTIONAL { ?person rdfs:label ?ptLabel . FILTER(LANGMATCHES(LANG(?ptLabel), "pt")) }
-  OPTIONAL { ?person rdfs:label ?anyLabel . }
-}
-GROUP BY ${group} ?${kind.ids}`;
 }
 
 export function awardQueries(minYear?: number): Array<{ kind: string; page: (offset: number) => string }> {
   return SHAPES.flatMap((shape) => KINDS.map((kind) => ({ kind: `${shape.name}/${kind.name}`, page: (offset: number) => pageOf(shape, kind, minYear, offset) })));
 }
 
-export function awardRowsOf(bindings: Binding[]): { rows: AwardRow[]; noYear: Partial<Record<PrizeKey, number>> } {
+const honoreeLabelsQuery = (people: string[]) => `
+SELECT ?person (SAMPLE(?enLabel) AS ?en) (SAMPLE(?ptLabel) AS ?pt) (SAMPLE(?anyLabel) AS ?any) WHERE {
+  VALUES ?person { ${people.map((id) => `wd:${id}`).join(" ")} }
+  OPTIONAL { ?person rdfs:label ?enLabel . FILTER(LANG(?enLabel) = "en") }
+  OPTIONAL { ?person rdfs:label ?ptLabel . FILTER(LANGMATCHES(LANG(?ptLabel), "pt")) }
+  OPTIONAL { ?person rdfs:label ?anyLabel . }
+}
+GROUP BY ?person`;
+
+export async function honoreeLabels(query: (query: string) => Promise<Binding[]>, bindings: Binding[]): Promise<Map<string, string>> {
+  const people = [...new Set(bindings.flatMap((binding) => (binding.person ? [itemOf(binding.person.value)] : [])))];
+  if (people.length === 0) return new Map();
+  const labels = new Map<string, string>();
+  for (const binding of await query(honoreeLabelsQuery(people))) {
+    const label = [binding.en, binding.pt, binding.any].map((found) => found?.value.trim() ?? "").find(Boolean);
+    if (binding.person && label) labels.set(itemOf(binding.person.value), label);
+  }
+  return labels;
+}
+
+export function awardRowsOf(bindings: Binding[], honorees: ReadonlyMap<string, string> = new Map()): { rows: AwardRow[]; noYear: Partial<Record<PrizeKey, number>> } {
   const rows: AwardRow[] = [];
   const noYear: Partial<Record<PrizeKey, number>> = {};
   for (const binding of bindings) {
@@ -97,7 +108,7 @@ export function awardRowsOf(bindings: Binding[]): { rows: AwardRow[]; noYear: Pa
       prize,
       year,
       won: binding.won?.value === "true",
-      honoree: [binding.en, binding.pt, binding.any].map((label) => label?.value.trim() ?? "").find(Boolean) ?? null
+      honoree: (binding.person && honorees.get(itemOf(binding.person.value))) || null
     });
   }
   return { rows, noYear };
@@ -141,12 +152,12 @@ export async function fillAwards(
 
 export async function refreshAwards({ repo, query, fetchWork, now, info, sleep }: AwardsRefreshDeps, signal: AbortSignal): Promise<void> {
   const at = new Date(now());
-  const rows: AwardRow[] = [];
+  const bindings: Binding[] = [];
   for (const { page } of awardQueries(at.getUTCFullYear() - 1)) {
     signal.throwIfAborted();
-    const bindings = await queryAllPages(page, { log: (line) => info({}, line), sleep, query });
-    rows.push(...awardRowsOf(bindings).rows);
+    bindings.push(...(await queryAllPages(page, { log: (line) => info({}, line), sleep, query })));
   }
+  const { rows } = awardRowsOf(bindings, await honoreeLabels(query, bindings));
   const { matched, added, redirected, failedKeys } = await fillAwards(repo, fetchWork, rows, at.toISOString(), { dryRun: false });
   info({ rows: rows.length, matched, added, redirected, failedKeys: failedKeys.length }, "awards refresh");
 }
