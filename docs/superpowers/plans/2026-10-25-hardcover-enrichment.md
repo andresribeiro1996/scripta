@@ -112,7 +112,26 @@ Typical errors:
 
 Scratch data is in the session scratchpad (`hc/calib*.json`, `labels*.txt`).
 
-**Open (user's call):** drop the genre part, or keep it with `GENRE_LIMIT = 1` (precision ~0.55)? The Jev genre pass is probably more accurate. **Step 5 (descriptions), 633 sample descriptions:**
+**Follow-up check on Hardcover's 80 most-read books.** These map well. For example *Dune* → Science Fiction, *Pride and Prejudice* → Romance, Classics, and *Sapiens* → History, Science.
+
+Two problems remain:
+- **The combined tag "Science Fiction & Fantasy" maps to Science Fiction**, the first rule that matches. That gave *A Game of Thrones*, *The Way of Kings* and *The Eye of the World* Science Fiction. **Fix:** ignore that tag.
+- **A minor second tag with a count of 3–5** still adds Fantasy to *Hyperion* and *Children of Time*, and "Young Adult" to *Mistborn*.
+
+**What a count gate does.** Ignoring the combined tag and keeping at most 2 genres:
+
+| Sample | Rule | Precision | Books covered |
+|---|---|---|---|
+| ≥10 readers | count ≥ 1 | 0.51 | 109/197 |
+| ≥10 readers | count ≥ 2 | 0.72 | 23/197 |
+| random | count ≥ 2 | 0.58 | 14/175 |
+
+So the gate trades coverage for precision.
+
+**Revised candidate:** `GENRE_MIN_COUNT = 2`, `GENRE_LIMIT = 2`, and the combined tag dropped.
+
+**Open (user's call), superseding the line below:** keep that candidate, or drop genres.
+ drop the genre part, or keep it with `GENRE_LIMIT = 1` (precision ~0.55)? The Jev genre pass is probably more accurate. **Step 5 (descriptions), 633 sample descriptions:**
 - HTML tags in 2; `htmlToText` covers them.
 - Markdown `**bold**` in 8 (about 2.5 per 200), `](` links in 1, entities in 0.
 - Marketing lines: "New York Times bestselling…" in 36, "Provided by publisher" in 3, "This edition / print on demand" in 3.
