@@ -13,7 +13,7 @@ import { useDebouncedValue } from "../library/lib/debounce";
 import { receiveScans } from "./scanBridge";
 import { SearchIdle } from "./SearchIdle";
 import { SearchResultRow, type ResultActions } from "./SearchResultRow";
-import { SEARCH_SCOPES, isNetworkQuery, mergeBookResults, ownedBooks, searchQueryFromParam, searchRows, type ResultSection, type SearchScope } from "./searchModel";
+import { SEARCH_SCOPES, isNetworkQuery, mergeBookResults, searchQueryFromParam, searchRows, type ResultSection, type SearchScope } from "./searchModel";
 import { useRecentSearches } from "./useRecentSearches";
 
 type TabsNavigation = { addListener: (type: "tabPress", listener: () => void) => () => void };
@@ -55,7 +55,7 @@ export function SearchScreen({ q, t }: { q?: string | string[]; t?: string | str
   const books = library.data?.data.books ?? [];
   const libraryRows = books.filter((book) => matchesSearch(book, trimmed));
   const listedWorks = new Set(withWorkIds(libraryRows, library.data?.works).flatMap((book) => workIdOf(book) ?? []));
-  const bookRows = mergeBookResults(catalog.data ?? [], external.data ?? [], ownedBooks(books), listedWorks);
+  const bookRows = mergeBookResults(catalog.data ?? [], external.data ?? [], books, listedWorks);
   const gameRows = games.data?.pages.flatMap((page) => page.items) ?? [];
   const rowsFor = (scope: SearchScope) => searchRows({
     scope,

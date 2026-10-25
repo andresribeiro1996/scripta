@@ -5,6 +5,7 @@ import { Text } from "../../../ui/Text";
 import { Image } from "expo-image";
 import { buildManualBook, normalizeIsbn, searchInsideOutside, searchResultByline, seriesLabel } from "@scripta/shared";
 import { Button, Input } from "../../../ui/components";
+import { useToast } from "../../../ui/ToastHost";
 import { spacing, typography, useTheme } from "../../../ui/theme";
 import { bookSearchApi, type BookSearchResult } from "../api/search";
 import { IsbnScanner } from "./IsbnScanner";
@@ -28,6 +29,7 @@ export function AddBookForm({
   initialScanning?: boolean;
 }) {
   const { colors } = useTheme();
+  const toast = useToast();
   const [query, setQuery] = useState(initialQuery);
   const [results, setResults] = useState<BookSearchResult[] | null>(null);
   const [searching, setSearching] = useState(false);
@@ -133,6 +135,7 @@ export function AddBookForm({
       setPublisher("");
       setGenres([]);
       setQuery("");
+      toast.show("Added to your library", "success");
       onClose();
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : "Couldn't add that book.");

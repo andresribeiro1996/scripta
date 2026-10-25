@@ -11,6 +11,7 @@ import { FinishedScreen } from "../library/FinishedScreen";
 import { addBookToLibrary } from "../library/api/client";
 import { LIBRARY_QUERY_KEY, useLibrary } from "../library/hooks/useLibrary";
 import { toRecommendation } from "../library/lib/recommendation";
+import { ownedEntry } from "../search/searchModel";
 import { pathWithQuery } from "../auth/navigation";
 import { workPath } from "../works/workPath";
 
@@ -34,6 +35,8 @@ export function AddBookSheet({
   const segments = useSegments();
   const queryClient = useQueryClient();
   const library = useLibrary({ enabled: false });
+  const existing = ownedEntry({ Title: book.title, Attribution: book.author, ISBN: book.isbn }, library.data?.data.books ?? []);
+  const currentStatus = existing ? Number(existing.ReadStatus ?? 0) : null;
   const [busyStatus, setBusyStatus] = useState<0 | 1 | 2 | null>(null);
   const [toast, setToast] = useState<{ message: string; tone: "success" | "error" } | null>(null);
   const [finished, setFinished] = useState<Record<string, unknown> | null>(null);
@@ -54,7 +57,7 @@ export function AddBookSheet({
     setToast(null);
     try {
       const { key, updated } = await addBookToLibrary({ ...toRecommendation(book, readStatus), day: localDay() });
-      if (readStatus !== 2) void queryClient.invalidateQueries({ queryKey: LIBRARY_QUERY_KEY });
+      void queryClient.invalidateQueries({ queryKey: LIBRARY_QUERY_KEY });
       if (readStatus === 2) {
         const { data, error: reloadError } = await library.refetch();
         if (reloadError) {
@@ -87,7 +90,7 @@ export function AddBookSheet({
 
   const workId = book.workId;
   return (
-    <Sheet visible title="Add to library" onClose={onClose}>
+    <Sheet visible title={existing ? "Update status" : "Add to library"} onClose={onClose}>
       <View style={styles.book}>
         <BookCover cover={book.coverUrl ?? null} title={book.title} width={96} height={138} />
         <View style={styles.text}>
@@ -95,13 +98,13 @@ export function AddBookSheet({
           <Text numberOfLines={2} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{searchResultByline({ authors: [book.author], publisher: book.publisher ?? null, year: book.year ?? null })}</Text>
         </View>
       </View>
-      <Text {...dynamicType} style={[typography.caption, styles.strong, { color: colors.textDim }]}>Add to your library as</Text>
+      <Text {...dynamicType} style={[typography.caption, styles.strong, { color: colors.textDim }]}>{existing ? "Move it to" : "Add to your library as"}</Text>
       <View style={styles.actions}>
         {STATUS_OPTIONS.map((option) => (
           <Button
             key={option.value}
             label={option.label}
-            variant="secondary"
+            variant={option.value === currentStatus ? "primary" : "secondary"}
             loading={busyStatus === option.value}
             disabled={busyStatus !== null}
             onPress={() => void handleAdd(option.value)}

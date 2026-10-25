@@ -1,4 +1,4 @@
-import { bookKey, canonicalIsbn, statusLabel, type BookSearchResult, type LibraryBook } from "@scripta/shared";
+import { bookKey, canonicalIsbn, isCertainMatch, statusLabel, type BookSearchResult, type LibraryBook } from "@scripta/shared";
 import type { DiscoverItem, PersonResult } from "@scripta/shared/community";
 
 export const SEARCH_SCOPES = [
@@ -115,25 +115,19 @@ export function libraryStatus(book: LibraryBook): { label: string; tone: "accent
   return { label, tone: "neutral" };
 }
 
-export interface OwnedBooks {
-  isbns: Set<string>;
+type LibraryEntry = Record<string, unknown>;
+
+export function ownedEntry(candidate: LibraryEntry, books: LibraryEntry[]): LibraryEntry | undefined {
+  return books.find((book) => isCertainMatch(candidate, book));
 }
 
-export function ownedBooks(books: LibraryBook[]): OwnedBooks {
-  return {
-    isbns: new Set(books.flatMap((book) => {
-      const isbn = canonicalIsbn(book.ISBN);
-      return isbn ? [isbn] : [];
-    })),
-  };
-}
-
-export function mergeBookResults(catalog: BookSearchResult[], outside: BookSearchResult[], owned: OwnedBooks, listed: ReadonlySet<string>): BookSearchResult[] {
+export function mergeBookResults(catalog: BookSearchResult[], outside: BookSearchResult[], owned: LibraryEntry[], listed: ReadonlySet<string>): BookSearchResult[] {
   const works = new Set<string>();
   const isbns = new Set<string>();
   return [...catalog, ...outside].filter((result) => {
     const isbn = canonicalIsbn(result.isbn);
-    if (result.workId ? listed.has(result.workId) : isbn !== "" && owned.isbns.has(isbn)) return false;
+    const isOwned = result.workId ? listed.has(result.workId) : ownedEntry({ Title: result.title, Attribution: result.authors.join(", "), ISBN: result.isbn }, owned) !== undefined;
+    if (isOwned) return false;
     if ((result.workId && works.has(result.workId)) || (isbn && isbns.has(isbn))) return false;
     if (result.workId) works.add(result.workId);
     if (isbn) isbns.add(isbn);

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { BookSearchResult } from "@scripta/shared";
 import type { DiscoverItem, PersonResult } from "@scripta/shared/community";
-import { idleSections, libraryStatus, mergeBookResults, ownedBooks, readRecentSearches, recentSearchesKey, recordRecentSearch, searchQueryFromParam, searchRows, type ResultsInput, type SearchRow } from "./searchModel.js";
+import { idleSections, libraryStatus, mergeBookResults, ownedEntry, readRecentSearches, recentSearchesKey, recordRecentSearch, searchQueryFromParam, searchRows, type ResultsInput, type SearchRow } from "./searchModel.js";
 
 const result = (title: string, workId?: string, isbn: string | null = null): BookSearchResult => ({ title, authors: ["Author"], year: 2001, isbn, publisher: null, coverUrl: null, genres: [], ...(workId ? { workId } : {}) });
 const person = (userId: string) => ({ user: { userId, username: userId, avatarUrl: null }, followerCount: 0, private: false }) as unknown as PersonResult;
@@ -80,14 +80,14 @@ test("a library row's chip reads its shelf", () => {
 });
 
 test("Open Library results merge into Books by work, and works you own are left out", () => {
-  const owned = ownedBooks([{ Title: "Mine", ISBN: "0441013597" }]);
+  const owned = [{ Title: "Mine", ISBN: "0441013597" }];
   const catalog = [result("Dune", "w-dune"), result("Owned", "w-owned")];
   const outside = [result("Dune again", "w-dune"), result("New", "w-new"), result("Owned by ISBN", undefined, "9780441013593"), result("Loose", undefined, "9781234567897")];
   assert.deepEqual(mergeBookResults(catalog, outside, owned, new Set(["w-owned"])).map((book) => book.title), ["Dune", "New", "Loose"]);
 });
 
 test("a work you own keeps its catalog row when the library section doesn't list it", () => {
-  const owned = ownedBooks([{ Title: "Mine", ISBN: "0441013597" }]);
+  const owned = [{ Title: "Mine", ISBN: "0441013597" }];
   const catalog = [result("Owned", "w-owned"), result("Other", "w-other")];
   assert.deepEqual(mergeBookResults(catalog, [], owned, new Set()).map((book) => book.title), ["Owned", "Other"]);
   assert.deepEqual(mergeBookResults(catalog, [], owned, new Set(["w-owned"])).map((book) => book.title), ["Other"]);
@@ -117,4 +117,19 @@ test("stored recent searches are read back safely", () => {
   assert.deepEqual(readRecentSearches("not json"), []);
   assert.deepEqual(readRecentSearches('["dune", 3, "frank"]'), ["dune", "frank"]);
   assert.deepEqual(readRecentSearches('{"a":1}'), []);
+});
+
+test("ownedEntry finds a library book by ISBN, in either ISBN form", () => {
+  const mine = { Title: "Mine", ISBN: "0441013597", ReadStatus: 1 };
+  assert.equal(ownedEntry({ Title: "Dune", Attribution: "Frank Herbert", ISBN: "9780441013593" }, [{ Title: "Other", ISBN: "9781234567897" }, mine]), mine);
+});
+
+test("ownedEntry matches a hand-added book with no ISBN by title and author", () => {
+  const mine = { Title: "The Hobbit", Attribution: "J.R.R. Tolkien", ReadStatus: 2 };
+  assert.equal(ownedEntry({ Title: "The hobbit", Attribution: "J.R.R. Tolkien", ISBN: "9780261102217" }, [mine]), mine);
+});
+
+test("ownedEntry returns nothing for another edition the server's rule rejects", () => {
+  const mine = { Title: "Dune", Attribution: "Frank Herbert", ISBN: "9780441013593" };
+  assert.equal(ownedEntry({ Title: "Dune", Attribution: "Frank Herbert", ISBN: "9780593099322" }, [mine]), undefined);
 });
