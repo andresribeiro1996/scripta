@@ -44,6 +44,30 @@ export function LibraryIcon({ size = 22 }: IconProps) {
   );
 }
 
+/** A house — the home dashboard. */
+export function HomeIcon({ size = 22 }: IconProps) {
+  return (
+    <svg {...svgProps(size)}>
+      <path d="M4 11 12 4.5 20 11" />
+      <path d="M6 9.8V19.5h12V9.8" />
+      <path d="M10 19.5v-5h4v5" />
+    </svg>
+  );
+}
+
+/** A card with a portrait and text lines — the shareable reader card. */
+export function ReaderCardIcon({ size = 22 }: IconProps) {
+  return (
+    <svg {...svgProps(size)}>
+      <rect x="3.5" y="5" width="17" height="14" rx="2" />
+      <circle cx="9" cy="10.5" r="2" />
+      <path d="M5.8 16.2c.5-1.4 1.7-2.1 3.2-2.1s2.7.7 3.2 2.1" />
+      <path d="M15 9.5h3" />
+      <path d="M15 13h3" />
+    </svg>
+  );
+}
+
 /** Spines on a shelf — books that run in sequence. */
 export function SeriesIcon({ size = 22 }: IconProps) {
   return (

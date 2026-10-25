@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createElement } from "react";
+import { createElement, Fragment, type ReactNode } from "react";
 import { renderToString } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -8,7 +8,6 @@ import type { WorkPage } from "@scripta/shared";
 import { BookScreen, ReaderList } from "../src/components/book/BookScreen";
 import { ConfirmProvider } from "../src/components/ConfirmDialog";
 import { ToastProvider } from "../src/components/Toaster";
-import { BackLink } from "../src/components/work/BackLink";
 import { createWebLibrarySaver, LibrarySaverContext } from "../src/hooks/useLibrarySaver";
 
 const edition = (n: number, mine = false) => ({ bookId: `e${n}`, title: `Dune ${n}`, language: "en", year: 1965 + n, isbn: n === 1 ? "9780441013593" : null, coverUrl: null, coverColor: null, pages: 400 + n, mine });
@@ -28,7 +27,7 @@ const owned = { Title: "Dune", Attribution: "Frank Herbert", ISBN: "978044101359
 Object.defineProperty(globalThis, "matchMedia", { value: () => ({ matches: false }), configurable: true });
 
 type Props = Parameters<typeof BookScreen>[0];
-const base: Props = { page, book: null, signedIn: true, backTo: "/", onBack: null, editionId: null, onSelectEdition: () => undefined, onAdd: () => undefined, onShare: () => undefined };
+const base: Props = { page, book: null, signedIn: true, frame: (_title: string, actions: ReactNode, body: ReactNode) => createElement(Fragment, null, actions, body), editionId: null, onSelectEdition: () => undefined, onAdd: () => undefined, onShare: () => undefined };
 function render(props: Partial<Props>) {
   const client = new QueryClient();
   return renderToString(
@@ -132,11 +131,11 @@ test("a library-only book opens on Highlights with no About or Community", () =>
   assert.ok(!html.includes("Rated"));
 });
 
-test("Back links to the given fallback without history, and is a button with it", () => {
-  assert.ok(render({ backTo: "/dashboard" }).includes('href="/dashboard"'));
-  const button = render({ backTo: "/dashboard", onBack: () => undefined });
-  assert.ok(!button.includes('href="/dashboard"'));
-  assert.ok(button.includes("Back"));
+test("the title and back link belong to the band: the screen renders no h1 of its own", () => {
+  assert.ok(!render({}).includes("<h1"));
+  const titles: string[] = [];
+  render({ frame: (title, _actions, body) => (titles.push(title), body) });
+  assert.deepEqual(titles, ["Dune"]);
 });
 
 const rows = [
@@ -158,12 +157,6 @@ test("signed out: no reader links to a profile", () => {
   assert.ok(!html.includes("/community/u/"));
   assert.ok(html.includes("bo"));
   assert.ok(!html.includes("<h3"));
-});
-
-test("BackLink renders on its own, as used by the loading and not-found states", () => {
-  const html = renderToString(createElement(MemoryRouter, null, createElement(BackLink, { backTo: "/", onBack: null })));
-  assert.ok(html.includes("Back"));
-  assert.ok(html.includes('href="/"'));
 });
 
 test("the hero carries the Open Library rating as stars with a count caption", () => {

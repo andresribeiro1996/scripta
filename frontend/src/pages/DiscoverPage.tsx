@@ -1,5 +1,5 @@
 import { useState, type CSSProperties } from "react";
-import { Link, Navigate, useLocation } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { DEFAULT_TIER_PRESET } from "@scripta/shared";
 import type { ContentTone, DiscoverItem, DiscoverType } from "@scripta/shared/community";
 import { contentKindLabel, contentStats, contentStatus, contentTarget } from "@scripta/shared/community";
@@ -7,9 +7,11 @@ import { useAuth } from "../auth/AuthContext";
 import { EmptyState } from "../components/EmptyState";
 import { CommunityIcon } from "../components/NavIcons";
 import { ReaderGlyph } from "../components/ReaderGlyph";
+import { Page } from "../components/page/Page";
 import { SkeletonCardGrid } from "../components/Skeleton";
 import { useCommunityDiscover } from "../hooks/useCommunity";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
+import { area } from "../lib/areas";
 import { discoverDestination } from "../lib/landing";
 
 const DISCOVER_FILTERS: Array<{ value: DiscoverType; label: string }> = [
@@ -57,30 +59,20 @@ function retryButton(refetch: () => void) {
 
 export function DiscoverPage() {
   return (
-    <div className="mx-auto max-w-3xl p-6">
-      <h2 className="mb-6 text-lg font-bold">Discover</h2>
+    <Page title="Community" tabs={area("community").tabs}>
       <DiscoverPane />
-    </div>
+    </Page>
   );
 }
 
 export function PublicDiscoverPage() {
   const { session } = useAuth();
-  const location = useLocation();
   const destination = discoverDestination(session);
   if (destination) return <Navigate to={destination} replace />;
   return (
-    <div className="min-h-screen bg-(--color-bg) text-(--color-text)">
-      <div className="mx-auto max-w-3xl p-6">
-        <header className="mb-6 flex items-center justify-between gap-3">
-          <h1 className="text-lg font-bold">Discover</h1>
-          <Link to="/login" state={{ from: location }} className="text-sm text-(--color-accent) hover:underline">
-            Sign in
-          </Link>
-        </header>
-        <DiscoverPane />
-      </div>
-    </div>
+    <Page title="Games">
+      <DiscoverPane />
+    </Page>
   );
 }
 

@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createElement, isValidElement, type ReactElement, type ReactNode } from "react";
 import { renderToString } from "react-dom/server";
-import { MemoryRouter } from "react-router-dom";
 import { QueryClient } from "@tanstack/react-query";
 import type { GenreReview, GenreReviewAction } from "@scripta/shared";
 
@@ -11,7 +10,7 @@ const storage = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: str
 Object.defineProperty(globalThis, "localStorage", { value: storage, configurable: true });
 Object.defineProperty(globalThis, "sessionStorage", { value: storage, configurable: true });
 
-const { AdminLinks } = await import("../src/components/AdminLinks");
+const { area, footerAreas } = await import("../src/lib/areas");
 const { GenreReviewList, GenreReviewRowView, submitDecision } = await import("../src/components/GenreReviewList");
 const { decideGenre } = await import("../src/pages/AdminGenresPage");
 
@@ -40,9 +39,9 @@ test("Retry is offered on rejected rows only, and Jev's guess is preselected", (
 });
 
 test("the genre review link shows only for the admin", () => {
-  const link = (isAdmin: boolean) => renderToString(createElement(MemoryRouter, null, createElement(AdminLinks, { isAdmin })));
-  assert.ok(link(true).includes('href="/admin/genres"'));
-  assert.equal(link(false), "");
+  assert.ok(footerAreas(true).some((a) => a.id === "admin" && a.to === "/admin/genres"));
+  assert.ok(area("admin").tabs.some((t) => t.to === "/admin/genres"));
+  assert.deepEqual(footerAreas(false), []);
 });
 
 function textOf(node: ReactNode): string {

@@ -107,7 +107,7 @@ export function ProfileActivity({ activity }: { activity: ReturnType<typeof useC
         const showDay = i === 0 || activityDay(entries[i - 1]!.item.createdAt) !== day;
         return (
           <div key={item.id}>
-            {showDay && <h3 className={`pb-1 text-[11px] font-semibold tracking-wider text-(--color-text-dim) uppercase ${i === 0 ? "" : "pt-5"}`}>{day}</h3>}
+            {showDay && <h3 className={`pb-1 text-[11px] font-semibold text-(--color-text-dim) ${i === 0 ? "" : "pt-5"}`}>{day}</h3>}
             <ActivityEntry item={item} row={row} />
           </div>
         );

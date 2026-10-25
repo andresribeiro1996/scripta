@@ -25,6 +25,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
 import { fetchSharedMural } from "../api/sharedMurals";
 import type { GalleryImage } from "../api/gallery";
+import { Page } from "../components/page/Page";
 import { MuralCanvas } from "../components/murals/MuralCanvas";
 import { FullscreenIcon, toolbarIconClass } from "../components/Toolbar";
 import { useMuralFullscreen } from "../hooks/useMuralFullscreen";
@@ -34,9 +35,9 @@ import { muralThemeStyle } from "../lib/theme";
 
 function InfoScreen({ message }: { message: string }) {
   return (
-    <div className="flex min-h-screen items-center justify-center px-5 text-center">
-      <p className="text-(--color-text-dim)">{message}</p>
-    </div>
+    <Page title="Mural">
+      <p className="text-sm text-(--color-text-dim)">{message}</p>
+    </Page>
   );
 }
 
@@ -88,15 +89,16 @@ export function SharedMuralPage() {
   };
 
   return (
-    <div className="mx-auto max-w-6xl px-5 py-8">
-      <header className="mb-6 flex items-center justify-between gap-4">
-        <h1 className="text-lg font-bold">{mural.name}</h1>
-        {mural.blocks.length > 0 && (
+    <Page
+      title={mural.name}
+      actions={
+        mural.blocks.length > 0 && (
           <button onClick={() => void enterFullscreen()} aria-label="View mural fullscreen" title="View mural fullscreen" className={toolbarIconClass()}>
             <FullscreenIcon />
           </button>
-        )}
-      </header>
+        )
+      }
+    >
       {mural.blocks.length === 0 ? (
         <p className="text-sm text-(--color-text-dim)">This mural is empty.</p>
       ) : (
@@ -126,6 +128,6 @@ export function SharedMuralPage() {
           />
         </div>
       )}
-    </div>
+    </Page>
   );
 }

@@ -67,7 +67,7 @@ export function MiniBookTile({
 export function BlockEyebrow({ children, count }: { children: ReactNode; count?: number }) {
   return (
     <div className="mb-1.5 flex shrink-0 items-baseline justify-between gap-2">
-      <span className="min-w-0 truncate text-[0.7em] font-bold tracking-wide text-(--color-text-dim) uppercase">{children}</span>
+      <span className="min-w-0 truncate text-[0.7em] font-bold text-(--color-text-dim)">{children}</span>
       {count !== undefined && <span className="shrink-0 text-[0.7em] text-(--color-text-dim)">{count === 1 ? "1 book" : `${count} books`}</span>}
     </div>
   );

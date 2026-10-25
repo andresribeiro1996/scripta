@@ -171,7 +171,7 @@ test("non-SQLite rows and results are capped", async () => {
   await writeFile(tooLarge, `Book Id,Title,Author,Exclusive Shelf\n1,${"x".repeat(1024 * 1024)},Author,read\n`);
   await assert.rejects(parseImport(tooLarge, PARSE_TIMEOUT_MS, 1024 * 1024), (error: Error) => {
     assert.ok(error instanceof InvalidImportError);
-    assert.equal(error.message, "This import is over 1 MB, the most Scripta can store. Import fewer books or highlights.");
+    assert.equal(error.message, "This import is over 1 MB, the most Atmyshelf can store. Import fewer books or highlights.");
     return true;
   });
 });
@@ -211,7 +211,7 @@ test("a Kobo SQLite whose rows exceed the cap names the limit in whole MB", asyn
   db.close();
   await assert.rejects(parseImport(path, PARSE_TIMEOUT_MS, 1024 * 1024), (error: Error) => {
     assert.ok(error instanceof InvalidImportError);
-    assert.equal(error.message, "This import is over 1 MB, the most Scripta can store. Import fewer books or highlights.");
+    assert.equal(error.message, "This import is over 1 MB, the most Atmyshelf can store. Import fewer books or highlights.");
     return true;
   });
 });
@@ -222,7 +222,7 @@ test("an import over the cap answers 422 INVALID_IMPORT with the plain-words mes
   const response = await app.inject({ method: "POST", url: "/library/import/preview", headers: { ...upload.headers, authorization }, payload: upload.payload });
   assert.equal(response.statusCode, 422);
   assert.equal(response.json().code, "INVALID_IMPORT");
-  assert.match(response.json().error, /^This import is over \d+ MB, the most Scripta can store\. Import fewer books or highlights\.$/);
+  assert.match(response.json().error, /^This import is over \d+ MB, the most Atmyshelf can store\. Import fewer books or highlights\.$/);
   await app.close();
 });
 
@@ -357,7 +357,7 @@ test("PUT library returns a distinct oversized-body error", async () => {
   });
   assert.equal(response.statusCode, 413);
   assert.equal(response.json().code, "LIBRARY_BODY_TOO_LARGE");
-  assert.match(response.json().error, /^Your library is over \d+ MB, the most Scripta can store\. Remove some books or highlights and try again\.$/);
+  assert.match(response.json().error, /^Your library is over \d+ MB, the most Atmyshelf can store\. Remove some books or highlights and try again\.$/);
   await app.close();
 });
 
@@ -370,7 +370,7 @@ test("import error sanitization: only allowlisted messages pass through", async 
   assert.equal(sanitizeImportError("The import contains too many rows.", limit), "The import contains too many rows.");
   assert.equal(sanitizeImportError("`Bookmark` must be a real SQLite table.", limit), "`Bookmark` must be a real SQLite table.");
   assert.equal(sanitizeImportError("`content` must be a real SQLite table.", limit), "`content` must be a real SQLite table.");
-  const tooLarge = "This import is over 10 MB, the most Scripta can store. Import fewer books or highlights.";
+  const tooLarge = "This import is over 10 MB, the most Atmyshelf can store. Import fewer books or highlights.";
   assert.equal(sanitizeImportError(tooLarge, limit), tooLarge);
   assert.equal(sanitizeImportError(tooLarge, 5 * 1024 * 1024), "Couldn't parse that import file.");
   assert.equal(sanitizeImportError(tooLarge.replace("10", "/var/private/secret-path"), limit), "Couldn't parse that import file.");

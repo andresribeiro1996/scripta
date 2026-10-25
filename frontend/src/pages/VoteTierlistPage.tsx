@@ -30,6 +30,8 @@ import type { TierlistData } from "../api/tierlists";
 import { useAuth } from "../auth/AuthContext";
 import { AddBookSheet } from "../components/AddBookSheet";
 import { CoverImage } from "../components/BookCard";
+import { Page } from "../components/page/Page";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../components/page/buttonClasses";
 import { Sheet } from "../components/Sheet";
 import { TierBoard } from "../components/tierlist/TierBoard";
 import { TierlistResultsView } from "../components/tierlist/TierlistResultsView";
@@ -39,9 +41,9 @@ import { toPlacements } from "../lib/tierlistResults";
 
 function InfoScreen({ message }: { message: string }) {
   return (
-    <div className="flex min-h-screen items-center justify-center px-5 text-center">
-      <p className="text-(--color-text-dim)">{message}</p>
-    </div>
+    <Page title="Tier list">
+      <p className="text-sm text-(--color-text-dim)">{message}</p>
+    </Page>
   );
 }
 
@@ -118,29 +120,27 @@ export function VoteTierlistPage() {
     const histogram = ballot?.results.histogram ?? board.histogram ?? [];
     const ballotCount = ballot?.results.ballotCount ?? board.ballotCount;
     return (
-      <div className="mx-auto max-w-5xl px-5 py-8">
-        <header className="mb-1 flex items-center justify-between gap-3">
-          <h1 className="min-w-0 flex-1 truncate text-lg font-bold">{board.name}</h1>
-          <div className="flex shrink-0 items-center gap-2">
+      <Page
+        title={board.name}
+        actions={
+          <>
             {ballot && board.votingOpen && (
               <button
                 onClick={() => {
                   setWorking(ballotBoard(board, ballot.placements));
                   setEditing(true);
                 }}
-                className="min-h-9 shrink-0 rounded-lg border border-(--color-border) px-3 text-sm font-semibold"
+                className={BUTTON_SECONDARY}
               >
                 Edit ballot
               </button>
             )}
-            <button
-              onClick={() => setBooksOpen(true)}
-              className="min-h-9 shrink-0 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm hover:bg-(--color-surface-hover)"
-            >
+            <button onClick={() => setBooksOpen(true)} className={BUTTON_SECONDARY}>
               Books
             </button>
-          </div>
-        </header>
+          </>
+        }
+      >
         {board.ranksWorstFirst ? <p className="mb-2 text-xs text-(--color-text-dim)">Top tier = worst</p> : null}
         <p className="mb-4 text-sm text-(--color-text-dim)">
           {justSubmitted ? "Your ballot is in. " : alreadySubmitted ? "You've already ranked this one. " : ""}
@@ -156,7 +156,7 @@ export function VoteTierlistPage() {
         />
         {booksSheet}
         {pickedSheet}
-      </div>
+      </Page>
     );
   }
 
@@ -177,16 +177,12 @@ export function VoteTierlistPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-5 py-8">
-      <header className="mb-4 flex items-center justify-between gap-3">
-        <h1 className="min-w-0 flex-1 truncate text-lg font-bold">{board.name}</h1>
-        <div className="flex shrink-0 items-center gap-2">
+    <Page
+      title={board.name}
+      actions={
+        <>
           {membersOnlyBlocked ? (
-            <Link
-              to="/login"
-              state={{ from: location }}
-              className="min-h-9 shrink-0 rounded-lg bg-(--color-accent) px-3 text-sm font-semibold text-(--color-on-accent) flex items-center"
-            >
+            <Link to="/login" state={{ from: location }} className={BUTTON_PRIMARY}>
               Sign in to vote
             </Link>
           ) : (
@@ -197,28 +193,22 @@ export function VoteTierlistPage() {
                     setWorking(null);
                     setEditing(false);
                   }}
-                  className="min-h-9 rounded-lg border border-(--color-border) px-3 text-sm font-semibold"
+                  className={BUTTON_SECONDARY}
                 >
                   Cancel
                 </button>
               )}
-              <button
-                onClick={() => void handleSubmit()}
-                disabled={submitting || toPlacements(data).length === 0}
-                className="min-h-9 rounded-lg bg-(--color-accent) px-3 text-sm font-semibold text-(--color-on-accent) disabled:opacity-60"
-              >
+              <button onClick={() => void handleSubmit()} disabled={submitting || toPlacements(data).length === 0} className={BUTTON_PRIMARY}>
                 {submitting ? "Submitting…" : editing ? "Update ballot" : "Submit ballot"}
               </button>
             </>
           )}
-          <button
-            onClick={() => setBooksOpen(true)}
-            className="min-h-9 shrink-0 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm hover:bg-(--color-surface-hover)"
-          >
+          <button onClick={() => setBooksOpen(true)} className={BUTTON_SECONDARY}>
             Books
           </button>
-        </div>
-      </header>
+        </>
+      }
+    >
       {board.ranksWorstFirst ? <p className="mb-2 text-xs text-(--color-text-dim)">Top tier = worst</p> : null}
       <p className="mb-4 text-sm text-(--color-text-dim)">
         {membersOnlyBlocked
@@ -229,6 +219,6 @@ export function VoteTierlistPage() {
       <TierBoard data={data} books={books} onChange={setWorking} structureEditable={false} />
       {booksSheet}
       {pickedSheet}
-    </div>
+    </Page>
   );
 }

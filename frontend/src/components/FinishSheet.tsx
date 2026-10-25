@@ -161,7 +161,7 @@ export function FinishSheet({
           {shelfError && <p className="rounded-lg bg-(--color-danger-soft) px-3 py-2 text-sm text-(--color-danger)">{shelfError}</p>}
 
           <div className="flex items-center justify-between gap-3">
-            <p className="text-xs font-semibold tracking-wide text-(--color-text-dim) uppercase">{`Finished · ${day}`}</p>
+            <p className="text-xs font-semibold text-(--color-text-dim)">{`Finished · ${day}`}</p>
             <button
               type="button"
               onClick={close}

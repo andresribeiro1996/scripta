@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { hasChosen, readerCardInputOf, saveFailureMessage, visitorView, type ReaderCardStylePatch } from "@scripta/shared";
 import { themes } from "@scripta/shared/themes";
+import { Page } from "../components/page/Page";
 import { useAuth } from "../auth/AuthContext";
 import { HighlightChoice, SignatureChoice } from "../components/readerCard/ReaderCardChoices";
 import { ReaderCardOptions, Segmented } from "../components/readerCard/ReaderCardOptions";
@@ -42,34 +43,37 @@ export function ReaderCardPage() {
   };
 
   if (!style) {
-    if (isPending) return <p className="px-5 py-8 text-sm text-(--color-text-dim)">Loading your reader card…</p>;
+    if (isPending) return <Page title="Reader card"><p className="text-sm text-(--color-text-dim)">Loading your reader card…</p></Page>;
     return (
-      <div className="px-5 py-8">
-        <button type="button" onClick={() => void refetch()} className="text-sm font-semibold text-(--color-accent)">Couldn't load your reader card. Try again</button>
-      </div>
+      <Page title="Reader card">
+        <div className="max-w-5xl mx-auto">
+          <button type="button" onClick={() => void refetch()} className="text-sm font-semibold text-(--color-accent)">Couldn't load your reader card. Try again</button>
+        </div>
+      </Page>
     );
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-5 sm:px-5 sm:py-8">
-      <h2 className="mb-6 text-lg font-bold">Reader card</h2>
-      <div className="lg:grid lg:grid-cols-[minmax(0,22rem)_1fr] lg:gap-8">
-        <div className="mb-6 flex flex-col items-center gap-3 lg:sticky lg:top-6 lg:mb-0 lg:self-start">
-          <div className="w-full max-w-[18rem]">
-            <Segmented label="Preview as" options={AUDIENCES} labels={AUDIENCE_LABELS} value={audience} onChange={setAudience} />
+    <Page title="Reader card">
+      <div className="max-w-5xl mx-auto">
+        <div className="lg:grid lg:grid-cols-[minmax(0,22rem)_1fr] lg:gap-8">
+          <div className="mb-6 flex flex-col items-center gap-3 lg:sticky lg:top-6 lg:mb-0 lg:self-start">
+            <div className="w-full max-w-[18rem]">
+              <Segmented label="Preview as" options={AUDIENCES} labels={AUDIENCE_LABELS} value={audience} onChange={setAudience} />
+            </div>
+            <div className="w-full">
+              <ReaderCardTurner key={`${preview.view}-${preview.style.layout}-${hasChosen(preview.card.chosen)}`} input={preview} cardWidth="w-[min(100%,18rem)]" spreadWidth="w-full" />
+            </div>
+            {input.card.state === "unwritten" && input.missing ? <p className="text-sm text-(--color-text-dim)">{input.missing}</p> : null}
           </div>
-          <div className="w-full">
-            <ReaderCardTurner key={`${preview.view}-${preview.style.layout}-${hasChosen(preview.card.chosen)}`} input={preview} cardWidth="w-[min(100%,18rem)]" spreadWidth="w-full" />
+          <div className="space-y-6">
+            <ReaderCardOptions input={input} scheme={scheme} onChange={change} />
+            <SignatureChoice books={books} signature={style.signature} chosen={input.card.chosen?.signature} onChange={change} />
+            <HighlightChoice books={books} highlight={style.highlight} chosen={input.card.chosen?.highlight} onChange={change} />
+            <ReaderGlyphSetting username={readerName} books={books} groups={groups} />
           </div>
-          {input.card.state === "unwritten" && input.missing ? <p className="text-sm text-(--color-text-dim)">{input.missing}</p> : null}
-        </div>
-        <div className="space-y-6">
-          <ReaderCardOptions input={input} scheme={scheme} onChange={change} />
-          <SignatureChoice books={books} signature={style.signature} chosen={input.card.chosen?.signature} onChange={change} />
-          <HighlightChoice books={books} highlight={style.highlight} chosen={input.card.chosen?.highlight} onChange={change} />
-          <ReaderGlyphSetting username={readerName} books={books} groups={groups} />
         </div>
       </div>
-    </div>
+    </Page>
   );
 }

@@ -1,22 +1,14 @@
-import { Fragment, useState, type ComponentType } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link, NavLink, Outlet } from "react-router-dom";
+import { Link, Outlet, useLocation } from "react-router-dom";
 import { newCountLabel } from "@scripta/shared";
 import { fetchIsAdmin } from "../api/books";
 import { useAuth } from "../auth/AuthContext";
-import { AdminLinks } from "../components/AdminLinks";
 import { Avatar } from "../components/Avatar";
 import { BrandLockup } from "../components/BrandLockup";
-import {
-  ArenaIcon,
-  CollectionsIcon,
-  GalleryIcon,
-  LibraryIcon,
-  MoreIcon,
-  MuralsIcon,
-  SeriesIcon,
-  SettingsIcon
-} from "../components/NavIcons";
+import { MoreIcon } from "../components/NavIcons";
+import { PageWidthContext } from "../components/page/Page";
+import { AREA_ICONS, SidebarNav } from "../components/page/SidebarNav";
 import { OfflineBanner } from "../components/OfflineBanner";
 import { useAccountAppearanceSync } from "../hooks/useAccountAppearanceSync";
 import { useDashboard } from "../hooks/useDashboard";
@@ -24,50 +16,10 @@ import { useDismissible } from "../hooks/useDismissible";
 import { useGenreEnrichment } from "../hooks/useGenreEnrichment";
 import { useLibrary } from "../hooks/useLibrary";
 import { useScrollLock } from "../hooks/useScrollLock";
+import { area, areaIdForPath, BOTTOM_BAR_AREAS, footerAreas, NAV_AREAS } from "../lib/areas";
+import { resolveLibraryStyle } from "../lib/libraryStyle";
 
-interface NavItem {
-  to: string;
-  label: string;
-  end: boolean;
-  description?: string;
-  // Every destination carries one. The bottom tab bar is the app's most
-  // looked-at surface and it was five words in a row, which is what a
-  // site's nav looks like — an app's tab bar is icon over label, and the
-  // shape is what you actually navigate by once you know the app.
-  icon: ComponentType<{ size?: number }>;
-}
-
-const NAV_GROUPS: Array<{ items: NavItem[] }> = [
-  {
-    items: [
-      { to: "/dashboard", label: "Home", end: true, icon: MuralsIcon },
-      { to: "/dashboard/library", label: "Library", end: true, icon: LibraryIcon },
-      { to: "/dashboard/series", label: "Series", end: false, icon: SeriesIcon },
-      { to: "/dashboard/collections", label: "Collections", end: false, icon: CollectionsIcon }
-    ]
-  },
-  {
-    items: [
-      { to: "/dashboard/gallery", label: "Gallery", end: false, icon: GalleryIcon },
-      { to: "/dashboard/murals", label: "Murals", end: false, description: "Freeform dashboard pages", icon: MuralsIcon },
-      { to: "/dashboard/arena", label: "Games", end: false, description: "Book-bracket tournaments", icon: ArenaIcon }
-    ]
-  },
-  {
-    // "Library style" deliberately isn't here. It styles ONE page's
-    // cards and canvas, so it belongs to the Library rather than to the
-    // app — it now lives behind that page's own gear, next to the other
-    // things you do to your library. The route still exists and is
-    // reachable directly; it's only the nav entry that moved, so an old
-    // bookmark keeps working.
-    items: [{ to: "/dashboard/settings", label: "Settings", end: false, icon: SettingsIcon }]
-  }
-];
-
-const TAB_ITEMS = NAV_GROUPS[0].items;
-
-/** Persistent left-hand nav wrapping every signed-in page (Library, Series,
- *  Collections, Settings) — one shared shell instead of each page
+/** Persistent left-hand nav wrapping every signed-in page (every area in lib/areas.ts) — one shared shell instead of each page
  *  reimplementing its own header/logout, which is how it worked before
  *  this existed (see git history on DashboardPage.tsx). */
 export function DashboardLayout() {
@@ -89,43 +41,15 @@ export function DashboardLayout() {
 
   useDismissible(() => setDrawerOpen(false), drawerOpen);
 
-  const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-    `flex items-start gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-      isActive
-        ? "bg-(--color-accent-soft) text-(--color-accent)"
-        : "text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)"
-    }`;
-
+  const activeId = areaIdForPath(useLocation().pathname);
   const homeBadge = newCountLabel(personalNewCount);
-  const homeLabel = (item: NavItem) => (item.to === "/dashboard" && homeBadge ? `Home, ${homeBadge} new` : undefined);
-  const badge = (item: NavItem, position: string) =>
-    item.to === "/dashboard" && homeBadge ? (
-      <span className={`${position} rounded-full bg-(--color-accent) px-1.5 text-[10px] font-bold text-(--color-on-accent)`}>{homeBadge}</span>
-    ) : null;
 
   return (
     <div className="flex min-h-screen">
       <aside className="hidden w-56 shrink-0 flex-col border-r border-(--color-border) bg-(--color-surface) px-3 py-5 lg:flex">
         <BrandLockup className="mb-6 px-2" />
         <nav className="flex flex-1 flex-col gap-1">
-          {NAV_GROUPS.map((group, groupIndex) => (
-            <Fragment key={groupIndex}>
-              {groupIndex > 0 && <div className="my-3 border-t border-(--color-border)" />}
-              {group.items.map((item) => (
-                <NavLink key={item.to} to={item.to} end={item.end} title={item.description} aria-label={homeLabel(item)} className={navLinkClass}>
-                  {/* mt-px optically centres an 18px glyph on a 20px
-                      first line; the row is items-start so the drawer's
-                      two-line entries keep the icon beside the label
-                      rather than floating between the two lines. */}
-                  <span className="mt-px shrink-0">
-                    <item.icon size={18} />
-                  </span>
-                  <span>{item.label}</span>
-                  {badge(item, "ml-auto self-center")}
-                </NavLink>
-              ))}
-            </Fragment>
-          ))}
+          <SidebarNav areas={NAV_AREAS} activeId={activeId} homeBadge={homeBadge} />
         </nav>
         <div className="mt-auto border-t border-(--color-border) pt-3">
           <div className="mb-2 flex items-center gap-2 px-2">
@@ -136,10 +60,10 @@ export function DashboardLayout() {
             )}
             <p className="truncate text-xs text-(--color-text-dim)">@{session?.user.username ?? session?.user.email}</p>
           </div>
-          <AdminLinks isAdmin={isAdmin} />
+          <div className={isAdmin ? "mb-2" : undefined}><SidebarNav areas={footerAreas(isAdmin)} activeId={activeId} /></div>
           <button
             onClick={() => void logout()}
-            className="w-full rounded-lg border border-(--color-danger-soft) px-3 py-2.5 text-left text-sm text-(--color-danger) hover:bg-(--color-danger-soft)"
+            className="w-full rounded-lg border border-(--color-danger-soft) min-h-11 px-3 py-2.5 text-left text-sm text-(--color-danger) hover:bg-(--color-danger-soft)"
           >
             Log out
           </button>
@@ -156,30 +80,36 @@ export function DashboardLayout() {
           its comment for the whole boundary. */}
       <main className={`min-w-0 flex-1 ${navHidden ? "lg:pb-0" : "pb-[calc(3.5rem+env(safe-area-inset-bottom,0px))] lg:pb-0"}`}>
         <OfflineBanner />
-        <Outlet context={{ setNavHidden }} />
+        <PageWidthContext.Provider value={resolveLibraryStyle(library?.data.style).contentMaxWidth}>
+          <Outlet context={{ setNavHidden }} />
+        </PageWidthContext.Provider>
       </main>
 
       {!navHidden && (
         <nav className="fixed inset-x-0 bottom-0 z-40 flex border-t border-(--color-border) bg-(--color-surface) pb-[env(safe-area-inset-bottom,0px)] lg:hidden">
-          {TAB_ITEMS.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.end}
-              aria-label={homeLabel(item)}
-              className={({ isActive }) =>
-                `flex h-14 flex-1 flex-col items-center justify-center gap-0.5 text-[10px] font-medium ${
-                  isActive ? "text-(--color-accent)" : "text-(--color-text-dim)"
-                }`
-              }
-            >
-              <span className="relative">
-                <item.icon size={22} />
-                {badge(item, "absolute -top-1 left-1/2")}
-              </span>
-              {item.label}
-            </NavLink>
-          ))}
+          {BOTTOM_BAR_AREAS.map((id) => {
+            const item = area(id);
+            const Icon = AREA_ICONS[id];
+            return (
+              <Link
+                key={id}
+                to={item.to}
+                aria-current={id === activeId ? "page" : undefined}
+                aria-label={id === "home" && homeBadge ? `Home, ${homeBadge} new` : undefined}
+                className={`flex h-14 flex-1 flex-col items-center justify-center gap-0.5 text-[10px] font-medium ${
+                  id === activeId ? "text-(--color-accent)" : "text-(--color-text-dim)"
+                }`}
+              >
+                <span className="relative">
+                  <Icon size={22} />
+                  {id === "home" && homeBadge && (
+                    <span className="absolute -top-1 left-1/2 rounded-full bg-(--color-accent) px-1.5 text-[10px] font-bold text-(--color-on-accent)">{homeBadge}</span>
+                  )}
+                </span>
+                {item.label}
+              </Link>
+            );
+          })}
           <button
             onClick={() => setDrawerOpen(true)}
             aria-expanded={drawerOpen}
@@ -201,32 +131,7 @@ export function DashboardLayout() {
           >
             <BrandLockup className="mb-6 px-2" />
             <nav className="flex flex-1 flex-col gap-1">
-              {NAV_GROUPS.map((group, groupIndex) => (
-                <Fragment key={groupIndex}>
-                  {groupIndex > 0 && <div className="my-3 border-t border-(--color-border)" />}
-                  {group.items.map((item) => (
-                    <NavLink
-                      key={item.to}
-                      to={item.to}
-                      end={item.end}
-                      aria-label={homeLabel(item)}
-                      className={navLinkClass}
-                      onClick={() => setDrawerOpen(false)}
-                    >
-                      <span className="mt-px shrink-0">
-                        <item.icon size={18} />
-                      </span>
-                      <span>
-                        {item.label}
-                        {item.description && (
-                          <span className="block text-xs font-normal text-(--color-text-dim)">{item.description}</span>
-                        )}
-                      </span>
-                      {badge(item, "ml-auto self-center")}
-                    </NavLink>
-                  ))}
-                </Fragment>
-              ))}
+              <SidebarNav areas={NAV_AREAS} activeId={activeId} homeBadge={homeBadge} onNavigate={() => setDrawerOpen(false)} withDescriptions />
             </nav>
             <div className="mt-6 border-t border-(--color-border) pt-3">
               <div className="mb-2 flex items-center gap-2 px-2">
@@ -243,10 +148,10 @@ export function DashboardLayout() {
                 )}
                 <p className="truncate text-xs text-(--color-text-dim)">@{session?.user.username ?? session?.user.email}</p>
               </div>
-              <AdminLinks isAdmin={isAdmin} onNavigate={() => setDrawerOpen(false)} />
+              <div className={isAdmin ? "mb-2" : undefined}><SidebarNav areas={footerAreas(isAdmin)} activeId={activeId} onNavigate={() => setDrawerOpen(false)} /></div>
               <button
                 onClick={() => void logout()}
-                className="w-full rounded-lg border border-(--color-danger-soft) px-3 py-2.5 text-left text-sm text-(--color-danger) hover:bg-(--color-danger-soft)"
+                className="w-full rounded-lg border border-(--color-danger-soft) min-h-11 px-3 py-2.5 text-left text-sm text-(--color-danger) hover:bg-(--color-danger-soft)"
               >
                 Log out
               </button>

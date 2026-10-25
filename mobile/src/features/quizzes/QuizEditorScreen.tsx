@@ -6,7 +6,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pressable, ScrollView, Share, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { API_URL } from "../../core/config";
-import { Button, Dialog, EditorHeading, ErrorState, FormScroll, HeaderActions, IconButton, Input, Menu, type MenuItem, SaveStateButton, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, radii, spacing, typography, useTheme, useUnsavedChangesGuard } from "../../ui";
+import { Button, Dialog, EditorHeading, ErrorState, FormScroll, HeaderActions, IconButton, Input, Menu, type MenuItem, SaveStateButton, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme, useUnsavedChangesGuard } from "../../ui";
 import { coverUrlForApi } from "../library/lib/coverUrl";
 import { publicContentUrl } from "../sharing/links";
 import { fetchQuizResults, publishQuiz, setPlayState, updateQuiz, type Quiz } from "./api";
@@ -181,7 +181,7 @@ export function QuizEditorScreen({ quiz, onUpdated, initialView }: { quiz: Quiz;
 const styles = StyleSheet.create({
   screen: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xl },
   lengths: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
-  length: { minWidth: 56, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderWidth: 1, borderRadius: radii.md, alignItems: "center" },
+  length: { minWidth: 56, minHeight: minimumTouchTarget, justifyContent: "center", paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderWidth: 1, borderRadius: radii.md, alignItems: "center" },
   row: { minHeight: 52, borderWidth: 1, borderRadius: radii.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, flexDirection: "row", alignItems: "center", gap: spacing.sm },
   offered: { opacity: 0.5 },
   grow: { flex: 1 },

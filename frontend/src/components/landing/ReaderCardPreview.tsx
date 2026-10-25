@@ -79,7 +79,7 @@ export function ReaderCardPreview() {
                   </span>
                 </span>
                 {look.name !== "Nocturne" && <span style={{ ...surface({ gradientColor: "theme:accentSoft", gradientStrength: 40, gradientAngle: 180 }), gridArea: "favourites" }} className="p-1.5">
-                  <span className="mb-1.5 block text-[7px] tracking-[0.12em] uppercase">All-time favourites</span>
+                  <span className="mb-1.5 block text-[7px]">All-time favourites</span>
                   <span className="grid grid-cols-6 gap-1.5">
                     {favourites.map((slug) => (
                       <img key={slug} src={coverSrc(slug)} alt={`${BOOKS[slug].title} by ${BOOKS[slug].author}`} width="100" height="150" className="block aspect-2/3 w-full rounded-sm object-cover shadow-sm" />
@@ -97,7 +97,7 @@ export function ReaderCardPreview() {
                   <img src={scheme === "dark" ? cardSources.reversed : cardSources.paper} width="250" height="350" alt={`The ${plate.name} reader card`} className={`block h-auto w-9 ${nocturne ? "" : "-rotate-3 shadow-sm"}`} />
                 </span>}
                 {look.name === "Linen" && <span style={{ ...surface({ cardBorderStyle: "dashed", cardBorderColor: "theme:accent", cardBorderOpacity: 25, cardRadius: 3, cardShadow: false }), gridArea: "reading" }} className="p-1.5">
-                  <span className="mb-1.5 block text-[7px] tracking-[0.1em] uppercase">Currently reading</span>
+                  <span className="mb-1.5 block text-[7px]">Currently reading</span>
                   <span className="flex gap-2">
                     {(["klara", "left-hand", "pachinko"] as const).map((slug) => (
                       <span key={slug} className="block w-6">
@@ -114,7 +114,7 @@ export function ReaderCardPreview() {
                   <TextBlockView block={{ id: "preview-note", type: "text", body: "Books that feel like places. Worlds I’m not quite ready to leave.", layout: { x: 6, y: 0, w: 6, h: 3 } }} />
                 </div>}
                 {look.name === "Nocturne" && <div style={{ ...surface({ cardBorderWidth: 0 }), gridArea: "tierlist" }} className="p-1.5 [&_div]:rounded-none [&_div]:border-0 [&_div]:[text-shadow:none]">
-                  <span className="mb-1 block text-[7px] tracking-[0.1em] text-(--color-text-dim) uppercase">My personal canon</span>
+                  <span className="mb-1 block text-[7px] text-(--color-text-dim)">My personal canon</span>
                   <div className="flex flex-col gap-1">
                     {previewTiers.map((tier) => <TierRowShell key={tier.label} tier={{ id: tier.label, label: tier.label, color: "transparent", workIds: [...tier.books] }}>
                       <div className="flex gap-1 p-1">

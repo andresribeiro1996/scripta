@@ -14,6 +14,7 @@ type PerCardStyleProps = {
   currentOverride: PerCardStyle | undefined;
   seedStyle: LibraryStyleSettings;
   previewBook?: Record<string, unknown>;
+  error?: string | null;
   onSave: (style: PerCardStyle | undefined) => void;
   onClose: () => void;
 };
@@ -34,6 +35,7 @@ export function PerCardStyleForm({
   seedStyle,
   onSave,
   previewBook,
+  error,
 }: PerCardStyleProps) {
   const { colors } = useTheme();
   const [customized, setCustomized] = useState(currentOverride !== undefined);
@@ -62,6 +64,7 @@ export function PerCardStyleForm({
   return (
     <View style={{ flex: 1, gap: spacing.md }}>
       <CardStylePreview books={previewBook ? [previewBook] : []} style={customized ? { ...seedStyle, ...draft } : seedStyle} />
+      {error ? <Text accessibilityRole="alert" style={[typography.caption, { color: colors.danger }]}>{error}</Text> : null}
       <FormScroll contentContainerStyle={{ gap: spacing.lg, paddingBottom: spacing.xl }}>
         <View style={{ gap: spacing.sm }}>
           <Segmented accessibilityLabel="Style source" value={customized ? "custom" : "inherited"} options={[{ value: "inherited", label: "Inherited" }, { value: "custom", label: "Custom" }]} onChange={(value) => toggleCustomized(value === "custom")} />

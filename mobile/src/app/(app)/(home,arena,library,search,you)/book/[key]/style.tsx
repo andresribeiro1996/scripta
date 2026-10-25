@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import type { PerCardStyle } from "@scripta/shared";
 import { PerCardStyleForm } from "@/features/library/components/PerCardStyleForm";
@@ -10,7 +11,8 @@ export default function BookStyleRoute() {
   const { colors } = useTheme();
   const { key } = useLocalSearchParams<{ key: string }>();
   const { book, seedStyle, inheritedFrom, loading } = useBook(key);
-  const { saveBookStyle } = useLibraryActions();
+  const [error, setError] = useState<string | null>(null);
+  const { saveBookStyle } = useLibraryActions(setError);
   const name = String(book?.Title ?? "");
   const title = "Card style";
 
@@ -30,7 +32,11 @@ export default function BookStyleRoute() {
           currentOverride={book._style as PerCardStyle | undefined}
           seedStyle={seedStyle}
           previewBook={book}
-          onSave={(style) => void saveBookStyle(book, style)}
+          error={error}
+          onSave={(style) => {
+            setError(null);
+            void saveBookStyle(book, style);
+          }}
           onClose={() => router.back()}
         />
       )}
