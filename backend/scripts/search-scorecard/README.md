@@ -3,7 +3,7 @@
 Measures catalog search against a Jev-graded answer key. Spec: `docs/superpowers/specs/2026-10-25-volume-joins-and-search-ranking-design.md` (Parts 2–3).
 
 - `queries.json`: 150 queries (50 hand-picked, 50 from Wikipedia's best-seller lists, 50 Portuguese). `hidden` marks the held-back third of each source, chosen by `sha1(q)` order.
-- `grades.json`: `{ [q]: Grade[] }`. Jev's grade for each (query, work) pair: `named` = 2, `related` = 1, `unrelated` = 0, times its confidence.
+- `grades.json`: `{ [q]: Grade[] }`. It stays empty (`{}`) until the first grading run, which lands with the ranking PR. Jev's grade for each (query, work) pair: `named` = 2, `related` = 1, `unrelated` = 0, times its confidence.
 
 Everything runs read-only on the production container; there is no local snapshot. Branch code that isn't deployed is bundled with esbuild. `readonlyRepo.ts` opens `COVERS_DB_PATH` read-only and makes up for any schema the deploy doesn't have yet:
 - a missing table becomes a TEMP table;

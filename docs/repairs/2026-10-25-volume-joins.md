@@ -20,9 +20,12 @@ The result is 57 undone and 38 kept.
 
 - **Undo 423 and 424** ("Os Pilares da Terra – Volume I", code joins). The guard let them through because Volume I matched *The Pillars of the Earth*'s own series position 1. They are split volumes like 422 and 650.
 - **Undo 23431,** the title-key fold of the Galician "A irmandade do anel" (9788483026823) into the omnibus. It belongs with Fellowship. Once undone, the daily title-key fold moves it there.
-- **Undo 671,** a **manual** merge of "O Conde de Monte Cristo II" (9789896417499, OL24667894W) into the whole novel. It is a split volume. The undo tool gains `manual` as an undoable source in the same PR.
+- **Undo 671,** a **manual** merge of "O Conde de Monte Cristo II" (9789896417499, OL24667894W) into the whole novel. It is a split volume. Manual merges stay protected from an ordinary `undo` list, so this one is named in the file's explicit `undoManual` list.
 - **Detach 9789896417338,** "Os Miseráveis (volume 2 de 2)". It reached the whole novel through a title-key fold. Its title key equals the whole novel's, so an undo would be folded straight back. A detach also blocks title grouping.
-- **Manual merge** of `e2ae6929…` "A Irmandade do Anel - O Senhor dos Anéis - Parte I" (Planeta, 9789897774355) into the restored Fellowship (OL27513W). It is the same book as the Planeta "A irmandade do anel" (9789897773921).
+- **Detach 9789896410353 and 9789897849831,** part 2 of "O Romance do Genji" and of "Lore Olympus: Volume 1". Brackets drop out of title keys, so each part 1 and part 2 share one key. Without the detach, the daily title-key fold would merge each restored pair back into one work.
+- **Manual merge** of `e2ae6929…` "A Irmandade do Anel - O Senhor dos Anéis - Parte I" (Planeta, 9789897774355) into the restored Fellowship (`a5bf1a13…`, OL27513W). It is the same book as the Planeta "A irmandade do anel" (9789897773921).
+- **Manual merge** of the restored "Mundos paralelos" (`469f87b2…`) into *Northern Lights* (`5aff62cf…`, OL111464W). Undone works carry a `manual` null judgment, so no job would join it on its own.
+- **No home work in the catalog** for the other single novels taken out of omnibuses: "Meio sol amarelo", "A cor do hibisco", "Álbum de família", the Grumpy Monkey sequels and the graphic novels. They stay as Portuguese works of their own. "Anúncio de um crime" carries its own key (OL471771W), so it comes back as *A Murder is Announced* itself.
 
 ## The Lord of the Rings
 
@@ -35,6 +38,37 @@ After the undo:
   - drop the omnibus's Wikidata row "The Lord of the Rings" at position 2;
   - add Fellowship at position 1 and Two Towers at position 2;
   - Return of the King (`adc3706d…`) keeps its position 3.
+
+## Runbook
+
+Run this after the deploy that carries PR #365 and this PR, once the pre-2002 BNP import has finished. Run each command from the Mac.
+
+1. **Dry run (read-only):**
+
+   ```bash
+   railway ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c "cd backend && node scripts/undo-series-merges.mjs --guarded > /dev/null"
+   ```
+
+   Expected: `checked 5522, skipped 20, flagged 95`, give or take a few joins made since 2026-10-25.
+2. **Undo:**
+
+   ```bash
+   railway ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c "cd backend && node scripts/undo-series-merges.mjs --undo ../docs/repairs/2026-10-25-volume-joins-undo.json"
+   ```
+
+   Expected: 61 undone (60 + 1 manual), `failures: []`, `dropped: 1`, `added: 2`. The run is all-or-nothing: if any id is no longer an active merge, nothing is undone and the script exits 1 naming it. Bring that output back for review.
+3. **Detaches and manual merges:**
+
+   ```bash
+   railway ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c "cd backend && node ../docs/repairs/2026-10-25-volume-joins-finish.mjs"
+   ```
+
+   Expected: three `detached` and two `merged` entries.
+4. **Check (read-only, Claude runs it):**
+   - OL27513W and OL27479W are unmerged works holding the editions listed above.
+   - The omnibus holds only its English one-volume, illustrated, deluxe and box-set editions.
+   - The series rows read: Fellowship 1, Two Towers 2, Return of the King 3.
+   - `--guarded` flags only the 38 kept joins.
 
 ## Flagged joins
 

@@ -41,3 +41,4 @@ await Promise.all(Array.from({ length: 6 }, async () => {
   for (let pair = queue.shift(); pair; pair = queue.shift()) await grade(pair);
 }));
 console.error(`pairs ${pairs.length}, calls ${calls}, failed ${failed}`);
+if (failed > 0) process.exitCode = 1;
