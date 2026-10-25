@@ -426,7 +426,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
           if (!deps.repo.setCoverIf(bookId, latest.cover_image_id, { imageId, status, checkedAt: at })) return;
           if (lane === "upgrade") {
             deps.repo.setUpgradeWanted(bookId, null);
-          } else if (lane !== "background") {
+          } else if (lane !== "background" || latest.kobo_image_id !== book.kobo_image_id) {
             const wanted = status !== "good" || watermarked(source, book.isbn);
             deps.repo.setUpgradeWanted(bookId, wanted ? at : null);
             if (wanted) schedule(bookId, "upgrade");

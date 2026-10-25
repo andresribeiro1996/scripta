@@ -2803,6 +2803,19 @@ test("recordKoboImageIds marks a due missing book for upgrade and queues the upg
   assert.deepEqual(h.enqueued, [{ bookId: id, priority: "upgrade" }]);
 });
 
+test("a background lookup that misses while the daily job records a Kobo id marks the book for upgrade", async () => {
+  let recordId = () => {};
+  const apple: CoverSource = { byIsbn: async () => { recordId(); return []; }, byTitle: async () => [] };
+  const { h, id } = prepare(orlando, { isbndb: null, apple, openlibrary: emptySource });
+  recordId = () => h.service.recordKoboImageIds([withId(orlando)]);
+  await h.service.processBook(id, "background");
+  const book = h.repo.getBook(id)!;
+  assert.equal(book.kobo_image_id, KOBO_ID);
+  assert.equal(book.cover_status, "missing");
+  assert.equal(book.cover_upgrade_wanted_at, "2026-10-01T00:00:00.000Z");
+  assert.deepEqual(h.enqueued, [{ bookId: id, priority: "upgrade" }]);
+});
+
 test("recordKoboImageIds stores the id of a book with no cover status and queues nothing", () => {
   const { h, id } = prepare(orlando, noSources);
   h.service.recordKoboImageIds([withId(orlando)]);
