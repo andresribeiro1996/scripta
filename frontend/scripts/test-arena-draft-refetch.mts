@@ -25,28 +25,55 @@ test("refetching an unsaved draft tournament requests nothing", async () => {
   }
 });
 
-test("refreshing a saved draft's new id refetches that tournament, and an empty id requests nothing", async () => {
+async function withHook<T>(fetchImpl: typeof fetch, run: (hook: ReturnType<typeof useArena>, client: QueryClient) => Promise<T>) {
   const originalFetch = globalThis.fetch;
-  const requested: string[] = [];
-  globalThis.fetch = async (url) => {
-    requested.push(new URL(String(url)).pathname);
-    return Response.json({ error: "Unavailable" }, { status: 500 });
-  };
+  globalThis.fetch = fetchImpl;
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
   let hook!: ReturnType<typeof useArena>;
   function Probe() { hook = useArena(""); return null; }
   renderToString(createElement(QueryClientProvider, { client }, createElement(Probe)));
-  const observer = new QueryObserver(client, { queryKey: ["arena", "t1", "tok"], queryFn: async () => { await fetch("http://x/arenas/t1"); return 1; }, staleTime: Infinity });
-  client.setQueryData(["arena", "t1", "tok"], 0);
-  const unsubscribe = observer.subscribe(() => {});
   try {
-    await hook.refresh("");
-    assert.deepEqual(requested, []);
-    await hook.refresh("t1");
-    assert.deepEqual(requested, ["/arenas/t1"]);
+    return await run(hook, client);
   } finally {
     globalThis.fetch = originalFetch;
-    unsubscribe();
     client.clear();
   }
+}
+
+const key = ["arena", "t1", "tok"];
+const options = { queryKey: key, queryFn: async () => (await fetch("http://x/arenas/t1")).json() as Promise<{ slots: number[] }> };
+
+test("refresh requests nothing for an empty id", async () => {
+  const requested: string[] = [];
+  await withHook(async (url) => { requested.push(String(url)); return Response.json({}); }, async (hook) => {
+    await hook.refresh("");
+    assert.deepEqual(requested, []);
+  });
+});
+
+test("refresh discards a still-pending pre-write fetch and keeps the post-write data", async () => {
+  let calls = 0;
+  let resolveFirst!: (response: Response) => void;
+  await withHook(async () => {
+    calls++;
+    if (calls === 1) return new Promise<Response>((resolve) => { resolveFirst = resolve; });
+    return Response.json({ slots: [1] });
+  }, async (hook, client) => {
+    const unsubscribe = new QueryObserver(client, options).subscribe(() => {});
+    assert.equal(calls, 1);
+    const refreshing = hook.refresh("t1");
+    resolveFirst(Response.json({ slots: [] }));
+    await refreshing;
+    assert.deepEqual(client.getQueryData(key), { slots: [1] });
+    unsubscribe();
+  });
+});
+
+test("refresh rejects when the refetch fails", async () => {
+  await withHook(async () => Response.json({ slots: [] }), async (hook, client) => {
+    const unsubscribe = new QueryObserver(client, { ...options, queryFn: async () => { throw new Error("Unavailable"); }, staleTime: Infinity }).subscribe(() => {});
+    client.setQueryData(key, { slots: [] });
+    await assert.rejects(hook.refresh("t1"), /Unavailable/);
+    unsubscribe();
+  });
 });

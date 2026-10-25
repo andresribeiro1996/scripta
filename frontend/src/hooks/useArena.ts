@@ -39,7 +39,9 @@ export function useArena(id: string) {
   }
 
   async function refresh(targetId: string) {
-    if (targetId !== "") await queryClient.invalidateQueries({ queryKey: ["arena", targetId] });
+    if (targetId === "") return;
+    await queryClient.cancelQueries({ queryKey: ["arena", targetId] });
+    await queryClient.invalidateQueries({ queryKey: ["arena", targetId] }, { throwOnError: true });
   }
 
   return { tournament: query.data, isLoading: query.isLoading, error: query.error, voterToken, vote, refetch, refresh };
