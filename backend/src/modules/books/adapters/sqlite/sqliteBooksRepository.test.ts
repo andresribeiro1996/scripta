@@ -557,7 +557,7 @@ const WORK_COLUMNS = ["work_id", "language", "work_checked_at"];
 
 function assertWorkSchema(db: DatabaseSync) {
   const names = (sql: string) => (db.prepare(sql).all() as Array<{ name: string }>).map((row) => row.name);
-  assert.deepEqual(names("PRAGMA table_info(works)"), ["id", "ol_work_key", "title", "author", "merged_into", "created_at", "summary", "summary_hash"]);
+  assert.deepEqual(names("PRAGMA table_info(works)"), ["id", "ol_work_key", "title", "author", "merged_into", "created_at", "summary", "summary_hash", "wikipedia_sites"]);
   assert.deepEqual(names("PRAGMA table_info(books)").filter((name) => WORK_COLUMNS.includes(name)), WORK_COLUMNS);
   assert.deepEqual(names("PRAGMA index_info(idx_books_work_editions)"), ["work_id", "year", "language"]);
   assert.equal(db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'idx_books_work'").get(), undefined);
@@ -3452,6 +3452,33 @@ test("workSignals counts editions, languages and covers across a work and the wo
   assert.deepEqual(signals.get(target.work_id!), { editions: 3, languages: 2, hasCover: true, wikipediaSites: null });
   assert.deepEqual(signals.get(bare.work_id!), { editions: 1, languages: 0, hasCover: false, wikipediaSites: null });
   assert.equal(signals.has("missing"), false);
+});
+
+test("applyBooksMigrations adds works.wikipedia_sites to an older works table", () => {
+  const db = new DatabaseSync(":memory:");
+  db.exec("CREATE TABLE works (id TEXT PRIMARY KEY, ol_work_key TEXT UNIQUE, title TEXT NOT NULL, author TEXT NOT NULL, merged_into TEXT REFERENCES works(id), created_at TEXT NOT NULL, summary TEXT, summary_hash TEXT)");
+  db.prepare("INSERT INTO works (id, ol_work_key, title, author, created_at) VALUES ('w1', 'OL1W', 'Dune', 'Frank Herbert', ?)").run(NOW);
+  applyBooksMigrations(db);
+  applyBooksMigrations(db);
+  assert.equal((db.prepare("SELECT wikipedia_sites FROM works WHERE id = 'w1'").get() as { wikipedia_sites: number | null }).wikipedia_sites, null);
+});
+
+test("setWikipediaSites writes to the canonical work of each key, and workSignals takes the highest count across the work and its aliases", () => {
+  const { db, repo } = freshRepo();
+  const target = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593", workKey: "OL1W" }, ["isbn:9780441013593"], NOW);
+  const alias = repo.createBook({ title: "Duna", author: "Frank Herbert", isbn: "9789722345678", workKey: "OL2W" }, ["isbn:9789722345678"], NOW);
+  const bare = repo.createBook({ title: "Other", author: "Ana Lima", isbn: "9780000000011", workKey: "OL3W" }, ["isbn:9780000000011"], NOW);
+  db.prepare("UPDATE works SET merged_into = ? WHERE id = ?").run(target.work_id, alias.work_id);
+  const sites = (id: string | null) => (db.prepare("SELECT wikipedia_sites AS n FROM works WHERE id = ?").get(id) as { n: number | null }).n;
+  assert.equal(repo.setWikipediaSites([{ olWorkKey: "OL2W", sites: 40 }, { olWorkKey: "OL3W", sites: 5 }, { olWorkKey: "OL9W", sites: 9 }]), 2);
+  assert.equal(sites(target.work_id), 40);
+  assert.equal(sites(alias.work_id), null);
+  assert.equal(sites(bare.work_id), 5);
+  assert.equal(repo.setWikipediaSites([{ olWorkKey: "OL3W", sites: 5 }]), 0);
+  db.prepare("UPDATE works SET wikipedia_sites = 70 WHERE id = ?").run(alias.work_id);
+  const signals = repo.workSignals([target.work_id!, bare.work_id!]);
+  assert.equal(signals.get(target.work_id!)!.wikipediaSites, 70);
+  assert.equal(signals.get(bare.work_id!)!.wikipediaSites, 5);
 });
 
 test("searchBooks returns each row's bm25 score", () => {

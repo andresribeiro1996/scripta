@@ -576,10 +576,12 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       EXISTS (
         SELECT 1 FROM members AS covered JOIN books AS cover ON cover.work_id = covered.work_id
         WHERE covered.root = members.root AND (cover.cover_image_id IS NOT NULL OR cover.ol_cover_id IS NOT NULL)
-      ) AS has_cover
+      ) AS has_cover,
+      (SELECT MAX(sited.wikipedia_sites) FROM members AS aliased JOIN works AS sited ON sited.id = aliased.work_id WHERE aliased.root = members.root) AS wikipedia_sites
     FROM members JOIN books ON books.work_id = members.work_id
     GROUP BY members.root
   `);
+  const setWikipediaSitesStmt = db.prepare(`UPDATE works SET wikipedia_sites = ? WHERE id = (SELECT COALESCE(merged_into, id) FROM works WHERE ol_work_key = ?) AND wikipedia_sites IS NOT ?`);
   const seriesMembersStmt = db.prepare(`SELECT work_id, name_key, position, source FROM work_series WHERE name_key IN (SELECT value FROM json_each(?)) ORDER BY rowid`);
   const searchCollectionsStmt = db.prepare(`
     SELECT hits.book_id AS book_id, hits.name AS name, (
@@ -1479,8 +1481,21 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     },
 
     workSignals(workIds) {
-      const rows = workSignalsStmt.all(JSON.stringify(workIds)) as Array<{ work_id: string; editions: number; languages: number; has_cover: number }>;
-      return new Map(rows.map((row) => [row.work_id, { editions: row.editions, languages: row.languages, hasCover: row.has_cover === 1, wikipediaSites: null }]));
+      const rows = workSignalsStmt.all(JSON.stringify(workIds)) as Array<{ work_id: string; editions: number; languages: number; has_cover: number; wikipedia_sites: number | null }>;
+      return new Map(rows.map((row) => [row.work_id, { editions: row.editions, languages: row.languages, hasCover: row.has_cover === 1, wikipediaSites: row.wikipedia_sites }]));
+    },
+
+    setWikipediaSites(rows) {
+      let updated = 0;
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        for (const { olWorkKey, sites } of rows) updated += Number(setWikipediaSitesStmt.run(sites, olWorkKey, sites).changes);
+        db.exec("COMMIT");
+      } catch (error) {
+        db.exec("ROLLBACK");
+        throw error;
+      }
+      return updated;
     },
 
     searchCollectionBooks(tokens, limit) {

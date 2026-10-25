@@ -112,12 +112,18 @@ export function applyBooksMigrations(db: DatabaseSync): void {
       throw error;
     }
   }
+  addWikipediaSites(db);
   backfillTitleKeys(db);
   joinIsbn10Editions(db);
   indexConfirmedBooks(db);
   turnIsbndbFirstAuthors(db);
   clearNonTitleOriginals(db);
   keyOriginalTitles(db);
+}
+
+function addWikipediaSites(db: DatabaseSync): void {
+  const columns = db.prepare("PRAGMA table_info(works)").all() as Array<{ name: string }>;
+  if (!columns.some((column) => column.name === "wikipedia_sites")) db.exec("ALTER TABLE works ADD COLUMN wikipedia_sites INTEGER");
 }
 
 function moveOpenLibrarySummariesToWorks(db: DatabaseSync): void {

@@ -156,6 +156,7 @@ export interface BooksRepository {
   collectionsOf(bookIds: string[]): Map<string, SeriesEntry>;
   searchSeries(tokens: string[]): { workIds: string[]; matches: SeriesMatch[] };
   workSignals(workIds: string[]): Map<string, WorkSignals>;
+  setWikipediaSites(rows: Array<{ olWorkKey: string; sites: number }>): number;
   searchCollectionBooks(tokens: string[], limit: number): Array<{ bookId: string } & SeriesEntry>;
   addWorkAward(row: { workId: string; prize: string; year: number; won: boolean; honoree: string | null }, at: string): boolean;
   awardsOf(workIds: string[]): Map<string, WorkAward[]>;

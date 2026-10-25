@@ -6,7 +6,8 @@ CREATE TABLE IF NOT EXISTS works (
   merged_into  TEXT REFERENCES works(id),
   created_at   TEXT NOT NULL,
   summary      TEXT,
-  summary_hash TEXT
+  summary_hash TEXT,
+  wikipedia_sites INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS books (
