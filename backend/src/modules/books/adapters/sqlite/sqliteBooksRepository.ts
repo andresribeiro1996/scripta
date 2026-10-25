@@ -498,6 +498,12 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     INSERT INTO series_fts (work_id, name, author)
     SELECT $work_id, $name, $author WHERE (SELECT COUNT(*) FROM work_series WHERE work_id = $work_id AND name_key = $name_key) = 1
   `);
+  const isbnPageStmt = db.prepare(`
+    SELECT b.rowid AS rowid, b.id AS id, b.isbn AS isbn, b.work_id AS work_id, b.language AS language,
+           (COALESCE(b.summary, '') <> '' OR (COALESCE(w.summary, '') <> '' AND w.ol_work_key IS NOT NULL)) AS has_summary
+    FROM books b LEFT JOIN works w ON w.id = b.work_id
+    WHERE b.rowid > ? AND COALESCE(b.isbn, '') <> '' ORDER BY b.rowid LIMIT ?
+  `);
   const hasWorkSeriesStmt = db.prepare(`SELECT 1 FROM work_series WHERE work_id = ? LIMIT 1`);
   const hasWorkSeriesSourceStmt = db.prepare(`SELECT 1 FROM work_series WHERE work_id = ? AND source = ? LIMIT 1`);
   const seriesToRemoveStmt = db.prepare(`
@@ -1305,6 +1311,11 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
 
     hasWorkSeries(workId, source) {
       return hasWorkSeriesSourceStmt.get(workId, source) !== undefined;
+    },
+
+    isbnPage(afterRowid, limit) {
+      const rows = isbnPageStmt.all(afterRowid, limit) as Array<{ rowid: number; id: string; isbn: string; work_id: string | null; language: string | null; has_summary: number }>;
+      return rows.map((row) => ({ rowid: Number(row.rowid), id: row.id, isbn: row.isbn, workId: row.work_id, language: row.language, hasSummary: row.has_summary === 1 }));
     },
 
     removeWorkSeries(nameKeys, source) {
