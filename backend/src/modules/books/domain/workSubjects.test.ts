@@ -78,6 +78,10 @@ test("a single word merges only into one candidate", () => {
   assert.deepEqual(clean(["Harry", "Harry Potter"], ["Fiction"]).subjects.person, ["Harry Potter"]);
 });
 
+test("a single-word alias keeps the group's earliest position", () => {
+  assert.deepEqual(clean(["Harry", "Ron Weasley", "Harry Potter"], ["Fiction"]).subjects.person, ["Harry Potter", "Ron Weasley"]);
+});
+
 test("places and times are trimmed and de-duplicated, ungated", () => {
   const result = cleanWorkSubjects({ people: [], places: ["England", " England ", "London"], times: [], subjects: ["History"], authors: [] });
   assert.deepEqual(result.subjects.place, ["England", "London"]);

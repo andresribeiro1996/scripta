@@ -63,9 +63,10 @@ function mergeAliases(names: string[]): string[] {
   const groups = new Map<number, string>();
   entries.forEach((entry, index) => {
     const root = rootOf(index);
+    if (!groups.has(root)) groups.set(root, "");
     if (singleAliases.has(index)) return;
     const current = groups.get(root);
-    if (current === undefined || wordCount(entry.name) < wordCount(current)) groups.set(root, entry.name);
+    if (!current || wordCount(entry.name) < wordCount(current)) groups.set(root, entry.name);
   });
   return [...groups.values()];
 }
