@@ -10,6 +10,7 @@ import { digestRoute, feedRowModel } from "./feedRowModel";
 import { CommentsSheet } from "./CommentsSheet";
 import { SavedContentSheet } from "./SavedContentSheet";
 import { RecapHomeCard } from "../topShelf/RecapHomeCard";
+import { AwardHomeCard } from "../awards/AwardHomeCard";
 import { ENGAGEMENT_QUERY_KEY, SAVED_STATE_QUERY_KEY, useHomeActions } from "./useHomeActions";
 
 export function HomeScreen() {
@@ -50,6 +51,7 @@ export function HomeScreen() {
     <SectionList sections={sections} keyExtractor={(item) => `${item.kind}:${item.id}`} stickySectionHeadersEnabled={false} maintainVisibleContentPosition={{ minIndexForVisible: 0 }} contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.list}
       ListHeaderComponent={<>
         <RecapHomeCard />
+        <AwardHomeCard />
         {noLibrary ? <View style={styles.onboarding}><EmptyState title="Start your library" body="Bring your books into your reading world." actionLabel="Import library" onAction={() => router.push("/import" as never)} secondaryActionLabel="Add a book" onSecondaryAction={() => router.push("/add-book" as never)} /></View> : null}
       </>}
       renderSectionHeader={({ section }) => <View style={styles.sectionHeader}>
