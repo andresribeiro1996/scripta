@@ -6,10 +6,12 @@ import { AuthorAvatar } from "../components/CommunityAuthorAvatar";
 import { EmptyState } from "../components/EmptyState";
 import { CommunityIcon } from "../components/NavIcons";
 import { ReaderGlyph } from "../components/ReaderGlyph";
+import { Page } from "../components/page/Page";
 import { SkeletonCardGrid } from "../components/Skeleton";
 import { followUser, unfollowUser } from "../api/community";
 import { useCommunityPeople, useSuggestedPeople } from "../hooks/useCommunity";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
+import { area } from "../lib/areas";
 
 const searchInput =
   "mb-3 w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm outline-none focus:border-(--color-accent)";
@@ -24,10 +26,9 @@ function retryButton(refetch: () => void) {
 
 export function PeoplePage() {
   return (
-    <div className="mx-auto max-w-3xl p-6">
-      <h2 className="mb-6 text-lg font-bold">People</h2>
+    <Page title="Community" tabs={area("community").tabs}>
       <PeoplePane />
-    </div>
+    </Page>
   );
 }
 

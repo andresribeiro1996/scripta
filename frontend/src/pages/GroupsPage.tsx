@@ -9,12 +9,12 @@ import { EmptyState } from "../components/EmptyState";
 import { LibraryCanvas } from "../components/LibraryCanvas";
 import { CollectionsIcon, SeriesIcon } from "../components/NavIcons";
 import { OptionsMenu } from "../components/OptionsMenu";
-import { PageContainer } from "../components/PageContainer";
+import { Page } from "../components/page/Page";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../components/page/buttonClasses";
 import { PerCardStylePanel } from "../components/PerCardStylePanel";
-import { ActionSheet } from "../components/Sheet";
 import { SkeletonGroups } from "../components/Skeleton";
 import { useToast } from "../components/Toaster";
-import { GearIcon, PlusIcon, TOOLBAR_CONTROL_CLASS, ToolbarRow, toolbarIconClass } from "../components/Toolbar";
+import { TOOLBAR_CONTROL_CLASS, ToolbarRow } from "../components/Toolbar";
 import { useDelayedShow } from "../hooks/useDelayedShow";
 import { useDismissible } from "../hooks/useDismissible";
 import { useLibrary } from "../hooks/useLibrary";
@@ -31,23 +31,26 @@ import {
   type Group,
   type GroupType
 } from "../lib/groups";
+import { area } from "../lib/areas";
 import { seriesGroupByBookKey } from "../lib/libraryOrder";
 import { effectiveCardStyle, resolveLibraryStyle, type PerCardStyle } from "../lib/libraryStyle";
 import { bookKey } from "../lib/merge";
 
-const COPY: Record<GroupType, { title: string; noun: string; emptyTitle: string; emptyBody: string; untitled: string; icon: ComponentType<{ size?: number }> }> = {
+const COPY: Record<GroupType, { title: string; noun: string; plural: string; emptyTitle: string; emptyBody: string; untitled: string; icon: ComponentType<{ size?: number }> }> = {
   series: {
     title: "Series",
     noun: "series",
+    plural: "series",
     emptyTitle: "No series yet.",
     emptyBody:
-      "Series are picked up automatically from your books' Series field on import — or add one by hand below.",
+      "Series are picked up automatically from your books' Series field on import — or add one by hand with the button above.",
     untitled: "Untitled series",
     icon: SeriesIcon
   },
   collection: {
     title: "Collections",
     noun: "collection",
+    plural: "collections",
     emptyTitle: "No collections yet.",
     emptyBody: "Create one to start organizing your books your own way.",
     untitled: "Untitled collection",
@@ -63,7 +66,6 @@ export function GroupsPage({ type }: { type: GroupType }) {
   const { data: library, isLoading, updateLibrary } = useLibrary();
   const { scrubBooks } = useMurals();
   const copy = COPY[type];
-  const [actionsOpen, setActionsOpen] = useState(false);
   const [params] = useSearchParams();
   const selectedGroupId = params.get("group");
   const [search, setSearch] = useState("");
@@ -89,8 +91,8 @@ export function GroupsPage({ type }: { type: GroupType }) {
   // Matches a group's own name OR any book title inside it — "which
   // collection did I put Dune in?" is at least as common a question here
   // as "where's my sci-fi collection", and the second is unanswerable if
-  // only names are searched. Kept out of `allGroups` so the "+" tile and
-  // the empty-state copy can still reason about how many groups exist at
+  // only names are searched. Kept out of `allGroups` so the
+  // empty-state copy can still reason about how many groups exist at
   // all, rather than how many currently match.
   const groups = useMemo(() => {
     const needle = search.trim().toLowerCase();
@@ -109,9 +111,9 @@ export function GroupsPage({ type }: { type: GroupType }) {
   // FULL group list, same as LibraryPage.tsx's identical lookup.
   const bookSeriesGroup = useMemo(() => seriesGroupByBookKey(library?.data.books ?? [], library?.data.groups ?? []), [library]);
 
-  // Clicking "+" does NOT create anything: it opens an unsaved draft row
+  // Starting a draft does NOT create anything: it opens an unsaved draft row
   // with its name field focused. The group is only persisted once a
-  // non-empty name is committed — so backing out, or tapping "+" out of
+  // non-empty name is committed — so backing out, or starting one out of
   // curiosity, leaves nothing behind. Creating on click had been
   // littering the list with "Untitled series" every time someone
   // changed their mind.
@@ -302,44 +304,34 @@ export function GroupsPage({ type }: { type: GroupType }) {
   const coverBook = coverBookKey ? books.find((b) => bookKey(b) === coverBookKey) : null;
 
   return (
-    <PageContainer maxWidth={style.contentMaxWidth}>
-      {/* Desktop-only, except in selection mode: the search row below
-          carries the phone gear, and the bottom tab bar already says
-          which page this is. Selection mode is the exception — it holds
-          "Delete selected" with a live count, which is destructive and
-          count-dependent, so it stays visible with explicit buttons. */}
-      <header
-        className={`mb-6 items-center justify-between gap-4 sm:flex ${selectionMode ? "flex" : "hidden"}`}
-      >
-        <h2 className="text-lg font-bold">{copy.title}</h2>
-        {books.length > 0 &&
-          (selectionMode ? (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-(--color-text-dim)">{selectedKeys.size} selected</span>
-              <button
-                onClick={() => void handleDeleteSelected()}
-                disabled={selectedKeys.size === 0}
-                className="rounded-lg bg-(--color-danger) px-3.5 py-2.5 text-sm font-semibold text-(--color-on-danger) hover:opacity-90 disabled:opacity-50"
-              >
-                Delete selected
-              </button>
-              <button
-                onClick={handleToggleSelectionMode}
-                className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3.5 py-2.5 text-sm hover:bg-(--color-surface-hover)"
-              >
-                Cancel
-              </button>
-            </div>
-          ) : (
+    <Page
+      title="Library"
+      subtitle={isLoading ? undefined : `${allGroups.length} ${allGroups.length === 1 ? copy.noun : copy.plural}`}
+      tabs={area("library").tabs}
+      maxWidth={style.contentMaxWidth}
+      actions={
+        books.length > 0 && selectionMode ? (
+          <>
+            <span className="text-sm text-(--color-text-dim)">{selectedKeys.size} selected</span>
             <button
-              onClick={handleToggleSelectionMode}
-              className="hidden rounded-lg border border-(--color-border) bg-(--color-surface) px-3.5 py-2.5 text-sm hover:bg-(--color-surface-hover) sm:block"
+              onClick={() => void handleDeleteSelected()}
+              disabled={selectedKeys.size === 0}
+              className="inline-flex min-h-11 items-center justify-center rounded-lg bg-(--color-danger) px-4 text-sm font-semibold text-(--color-on-danger) hover:opacity-90 disabled:opacity-50"
             >
-              Select…
+              Delete selected
             </button>
-          ))}
-      </header>
-
+            <button onClick={handleToggleSelectionMode} className={BUTTON_SECONDARY}>Cancel</button>
+          </>
+        ) : (
+          <>
+            <button onClick={handleStartDraft} disabled={creating || drafting} className={BUTTON_PRIMARY}>
+              {creating ? "Adding…" : `New ${copy.noun}`}
+            </button>
+            {books.length > 0 && <button onClick={handleToggleSelectionMode} className={BUTTON_SECONDARY}>Select…</button>}
+          </>
+        )
+      }
+    >
       {books.length > 0 && (
         <ToolbarRow>
           <div className="flex items-center gap-2">
@@ -350,27 +342,9 @@ export function GroupsPage({ type }: { type: GroupType }) {
               aria-label={`Search ${copy.title.toLowerCase()} by name`}
               className={`${TOOLBAR_CONTROL_CLASS} min-w-0 flex-1 sm:max-w-xs`}
             />
-            {!selectionMode && (
-              <button
-                onClick={() => setActionsOpen(true)}
-                aria-label={`${copy.title} actions`}
-                className={`${toolbarIconClass()} sm:hidden`}
-              >
-                <GearIcon />
-              </button>
-            )}
           </div>
         </ToolbarRow>
       )}
-
-      {actionsOpen && (
-        <ActionSheet
-          title={copy.title}
-          items={[{ label: "Select…", onClick: handleToggleSelectionMode }]}
-          onClose={() => setActionsOpen(false)}
-        />
-      )}
-
 
       {!isLoading && allGroups.length === 0 && <EmptyState icon={copy.icon} title={copy.emptyTitle} body={copy.emptyBody} />}
       {!isLoading && allGroups.length > 0 && groups.length === 0 && (
@@ -378,14 +352,6 @@ export function GroupsPage({ type }: { type: GroupType }) {
       )}
 
       <div className="flex flex-col gap-6">
-        {/* Always first, and always present — deliberately outside the
-            `groups.map` below so the ability to add one never disappears
-            just because the list is empty, exactly like the mural grid's
-            "+" tile. Shaped as a full-width dashed bar rather than a
-            square card because this page stacks its groups vertically
-            instead of laying them out in a grid; the dashed border and
-            the "+" are what carry the "this makes a new one" meaning
-            across both. */}
         {drafting ? (
           <div className="flex min-h-14 items-center gap-2 rounded-xl border-2 border-dashed border-(--color-accent) p-3">
             <input
@@ -408,26 +374,8 @@ export function GroupsPage({ type }: { type: GroupType }) {
               className="min-h-11 w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm"
             />
           </div>
-        ) : (
-          <button
-            onClick={handleStartDraft}
-            disabled={creating}
-            className="flex min-h-14 items-center justify-center gap-2 rounded-xl border-2 border-dashed border-(--color-border) p-4 text-(--color-text-dim) transition-colors hover:border-(--color-accent) hover:text-(--color-accent) disabled:opacity-60"
-          >
-            {creating ? (
-              <span className="text-sm font-semibold">Adding…</span>
-            ) : (
-              <>
-                <PlusIcon />
-                <span className="text-sm font-semibold">New {copy.noun}</span>
-              </>
-            )}
-          </button>
-        )}
+        ) : null}
 
-        {/* After the "New …" tile, which is where the real panels
-            start — a skeleton above it would put the placeholder
-            somewhere the content never appears. */}
         {showSkeleton && <SkeletonGroups style={style} />}
 
         {groups.map((group) => {
@@ -562,7 +510,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
           onClose={() => setCoverBookKey(null)}
         />
       )}
-    </PageContainer>
+    </Page>
   );
 }
 

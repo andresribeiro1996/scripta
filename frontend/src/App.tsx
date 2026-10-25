@@ -21,6 +21,7 @@ import { GalleryPage } from "./pages/GalleryPage";
 import { LandingPage } from "./pages/LandingPage";
 import { BookKeyPage } from "./pages/BookKeyPage";
 import { LibraryPage } from "./pages/LibraryPage";
+import { SettingsAppearancePage } from "./pages/SettingsAppearancePage";
 import { LibraryStylePage } from "./pages/LibraryStylePage";
 import { LoginPage } from "./pages/LoginPage";
 import { MuralEditorPage } from "./pages/MuralEditorPage";
@@ -99,6 +100,7 @@ export function App() {
               <Route path="/dashboard/arena/:id/seed" element={<ArenaSeedPage />} />
               <Route path="/dashboard/style" element={<LibraryStylePage />} />
               <Route path="/dashboard/settings" element={<SettingsPage />} />
+              <Route path="/dashboard/settings/appearance" element={<SettingsAppearancePage />} />
               <Route path="/dashboard/reader-card" element={<ReaderCardPage />} />
               <Route path="/admin/genres" element={<AdminGenresPage />} />
               <Route path="/admin/synopses" element={<AdminSynopsesPage />} />
