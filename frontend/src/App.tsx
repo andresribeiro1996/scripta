@@ -4,7 +4,6 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { RequireAuth } from "./auth/RequireAuth";
 import { RequireUsername } from "./auth/RequireUsername";
 import { EdgeSwipeBack } from "./components/EdgeSwipeBack";
-import { DashboardLayout } from "./layouts/DashboardLayout";
 import { PublicLayout } from "./layouts/PublicLayout";
 import { SessionLayout } from "./layouts/SessionLayout";
 import { useAuth } from "./auth/AuthContext";
@@ -63,16 +62,52 @@ export function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/oauth-success" element={<OAuthSuccessPage />} />
+        {/* One layout route for everything that wears the sidebar when
+            there is a session and the public frame when there is not, so
+            crossing between the library and a work never remounts it. The
+            guards nest inside: RequireAuth means signed in at all,
+            RequireUsername means the account also finished setup (a
+            Google sign-in without a username yet is routed to
+            /choose-username). */}
         <Route element={<SessionLayout />}>
           <Route path="/arena/:id" element={<ArenaViewPage />} />
           <Route path="/work/:id" element={<WorkPage />} />
           <Route path="/work/:id/stats" element={<WorkStatsPage />} />
+          <Route element={<RequireAuth />}>
+            <Route element={<RequireUsername />}>
+          <Route path="/book/:key" element={<BookKeyPage />} />
+          <Route path="/dashboard" element={<HomePage />} />
+          <Route path="/dashboard/library" element={<LibraryPage />} />
+          <Route path="/dashboard/series" element={<SeriesPage />} />
+          <Route path="/dashboard/collections" element={<CollectionsPage />} />
+          <Route path="/dashboard/gallery" element={<GalleryPage />} />
+          <Route path="/dashboard/murals" element={<MuralsListPage />} />
+          <Route path="/dashboard/murals/:muralId" element={<MuralEditorPage />} />
+          <Route path="/dashboard/arena" element={<ArenaListPage />} />
+          <Route path="/dashboard/arena/tierlist/new" element={<TierListCreatePage />} />
+          <Route path="/dashboard/arena/tierlist/:id" element={<TierListEditorPage />} />
+          <Route path="/dashboard/arena/quiz/new" element={<QuizCreatePage />} />
+          <Route path="/dashboard/arena/quiz/:id" element={<QuizEditorPage />} />
+          <Route path="/dashboard/arena/:id/seed" element={<ArenaSeedPage />} />
+          <Route path="/dashboard/style" element={<LibraryStylePage />} />
+          <Route path="/dashboard/settings" element={<SettingsPage />} />
+          <Route path="/dashboard/settings/appearance" element={<SettingsAppearancePage />} />
+          <Route path="/dashboard/reader-card" element={<ReaderCardPage />} />
+          <Route path="/admin/genres" element={<AdminGenresPage />} />
+          <Route path="/admin/synopses" element={<AdminSynopsesPage />} />
+          <Route path="/admin/translations" element={<AdminTranslationsPage />} />
+          <Route path="/community" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/community/discover" element={<DiscoverPage />} />
+          <Route path="/community/people" element={<PeoplePage />} />
+          <Route path="/community/u/:username" element={<CommunityProfilePage />} />
+            </Route>
+          </Route>
         </Route>
-        {/* Public share-viewer pages — no session at all, so these must sit
-            outside every RequireAuth/RequireUsername wrapper below, same as
-            /login. The token itself is the access control (see each public
-            backend route's own comment); a stranger with the link never
-            needs — and never gets asked for — an account. */}
+
+        {/* Pages a stranger with the link can open. The token or code is the
+            access control (see each public backend route's own comment);
+            nobody is asked for an account, and a signed-in visitor just
+            sees "Open my library" instead of "Log in". */}
         <Route element={<PublicRoutesLayout />}>
           <Route path="/arena" element={<PublicDiscoverPage />} />
           <Route path="/shared/murals/:token" element={<SharedMuralPage />} />
@@ -81,48 +116,13 @@ export function App() {
           <Route path="/play/:code" element={<PlayQuizPage />} />
         </Route>
 
-        {/* RequireAuth: must be signed in at all. RequireUsername, nested
-            inside it: must also have finished setup (a username) — a
-            Google sign-in without one yet is routed to /choose-username,
-            which itself only needs RequireAuth (not RequireUsername, or
-            it'd redirect to itself). /welcome-avatar is the skippable
-            avatar step of the signup journey — same placement: it needs a
-            session, but NOT a username yet (a password signup goes
-            straight here after registering; a Google signup passes
-            through choose-username first). */}
+        {/* /choose-username and /welcome-avatar need a session but NOT a
+            username yet (a password signup goes straight to the avatar
+            step; a Google signup passes through choose-username first),
+            so they sit under RequireAuth alone. */}
         <Route element={<RequireAuth />}>
           <Route path="/choose-username" element={<ChooseUsernamePage />} />
           <Route path="/welcome-avatar" element={<WelcomeAvatarPage />} />
-
-          <Route element={<RequireUsername />}>
-            <Route element={<DashboardLayout />}>
-              <Route path="/book/:key" element={<BookKeyPage />} />
-              <Route path="/dashboard" element={<HomePage />} />
-              <Route path="/dashboard/library" element={<LibraryPage />} />
-              <Route path="/dashboard/series" element={<SeriesPage />} />
-              <Route path="/dashboard/collections" element={<CollectionsPage />} />
-              <Route path="/dashboard/gallery" element={<GalleryPage />} />
-              <Route path="/dashboard/murals" element={<MuralsListPage />} />
-              <Route path="/dashboard/murals/:muralId" element={<MuralEditorPage />} />
-              <Route path="/dashboard/arena" element={<ArenaListPage />} />
-              <Route path="/dashboard/arena/tierlist/new" element={<TierListCreatePage />} />
-              <Route path="/dashboard/arena/tierlist/:id" element={<TierListEditorPage />} />
-              <Route path="/dashboard/arena/quiz/new" element={<QuizCreatePage />} />
-              <Route path="/dashboard/arena/quiz/:id" element={<QuizEditorPage />} />
-              <Route path="/dashboard/arena/:id/seed" element={<ArenaSeedPage />} />
-              <Route path="/dashboard/style" element={<LibraryStylePage />} />
-              <Route path="/dashboard/settings" element={<SettingsPage />} />
-              <Route path="/dashboard/settings/appearance" element={<SettingsAppearancePage />} />
-              <Route path="/dashboard/reader-card" element={<ReaderCardPage />} />
-              <Route path="/admin/genres" element={<AdminGenresPage />} />
-              <Route path="/admin/synopses" element={<AdminSynopsesPage />} />
-              <Route path="/admin/translations" element={<AdminTranslationsPage />} />
-              <Route path="/community" element={<Navigate to="/dashboard" replace />} />
-              <Route path="/community/discover" element={<DiscoverPage />} />
-              <Route path="/community/people" element={<PeoplePage />} />
-              <Route path="/community/u/:username" element={<CommunityProfilePage />} />
-            </Route>
-          </Route>
         </Route>
 
         <Route path="*" element={<NotFoundPage />} />

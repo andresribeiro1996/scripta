@@ -335,10 +335,10 @@ export function MuralsListPage() {
                 // BookCard.tsx already uses for opening a book. role="button"/
                 // tabIndex/onKeyDown mirror CoverPickerModal.tsx's gallery
                 // tiles, so opening a mural this way stays keyboard-reachable
-                // too, not just clickable. A fixed min-h-40 — same as the "+"
-                // tile above — so every card in the grid lines up whether or
-                // not it has a cover image, instead of content-driven cards
-                // of differing heights sitting next to a full-bleed image one.
+                // too, not just clickable. A fixed min-h-40 so every card in the grid
+                // lines up whether or not it has a cover image, instead of
+                // content-driven cards of differing heights sitting next to a
+                // full-bleed image one.
                 <div
                   key={mural.id}
                   role="button"

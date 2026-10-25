@@ -4,5 +4,5 @@ import { PublicLayout } from "./PublicLayout";
 
 export function SessionLayout() {
   const { session } = useAuth();
-  return session ? <DashboardLayout /> : <PublicLayout signedIn={false} />;
+  return session?.user.username ? <DashboardLayout /> : <PublicLayout signedIn={Boolean(session)} />;
 }

@@ -15,8 +15,6 @@ import { fetchPublicResultsApi, submitPlayApi, type PlayResponse } from "../api/
 import { quizPlayStage } from "../lib/quizPlayStage";
 import { storePlayId, useQuizPlay } from "../hooks/useQuizPlay";
 
-const QUIZ_WIDTH = 576;
-
 function InfoScreen({ message }: { message: string }) {
   return (
     <Page title="Quiz">
@@ -110,8 +108,8 @@ export function PlayQuizPage() {
   if (stage === "loading") return <InfoScreen message="Loading…" />;
   if (stage === "leaderboard") {
     return (
-      <Page title={playBoard.name} maxWidth={QUIZ_WIDTH}>
-        <div className="flex flex-col gap-6">
+      <Page title={playBoard.name}>
+        <div className="mx-auto flex max-w-xl flex-col gap-6">
           <p className="text-center text-(--color-text-dim)">This quiz is closed.</p>
           <Leaderboard code={code ?? ""} />
         </div>
@@ -157,8 +155,8 @@ export function PlayQuizPage() {
   const answeredCount = Object.keys(answers).length;
 
   return (
-    <Page title={playBoard.name} subtitle={`${index + 1}/${questions.length} · ${Math.floor(elapsed / 1000)}s`} maxWidth={QUIZ_WIDTH}>
-      <div className="flex flex-col gap-5">
+    <Page title={playBoard.name} subtitle={`${index + 1}/${questions.length} · ${Math.floor(elapsed / 1000)}s`}>
+      <div className="mx-auto flex max-w-xl flex-col gap-5">
         <div className="h-1 rounded bg-(--color-border)">
           <div className="h-1 rounded bg-(--color-accent) transition-all" style={{ width: `${Math.round((answeredCount / questions.length) * 100)}%` }} />
         </div>
@@ -228,8 +226,8 @@ function ResultsView({
   const score = result.score;
 
   return (
-    <Page title={name} maxWidth={QUIZ_WIDTH}>
-      <div className="flex flex-col gap-6">
+    <Page title={name}>
+      <div className="mx-auto flex max-w-xl flex-col gap-6">
         <div className="text-center">
           <p className="text-sm text-(--color-text-dim)">{alreadyPlayed ? "You already played this quiz." : "Your score"}</p>
           <p className="text-5xl font-bold text-(--color-accent)">
