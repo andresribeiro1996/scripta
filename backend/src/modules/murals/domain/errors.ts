@@ -18,3 +18,10 @@ export class MuralConflictError extends Error {
     this.name = "MuralConflictError";
   }
 }
+
+export class MuralNameTooLongError extends Error {
+  constructor() {
+    super("Names can be at most 200 characters.");
+    this.name = "MuralNameTooLongError";
+  }
+}

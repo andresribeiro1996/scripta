@@ -78,8 +78,9 @@ export function BlockConfigPanel({
           {draft.type === "text" && (
             <div className="flex flex-col gap-3">
               <div>
-                <label className="mb-1 block text-xs font-medium text-(--color-text-dim)">Heading</label>
+                <label htmlFor="text-block-heading" className="mb-1 block text-xs font-medium text-(--color-text-dim)">Heading</label>
                 <input
+                  id="text-block-heading"
                   value={draft.heading ?? ""}
                   onChange={(e) => setDraft({ ...draft, heading: e.target.value })}
                   placeholder="e.g. My 2026 in books"
@@ -87,8 +88,9 @@ export function BlockConfigPanel({
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-(--color-text-dim)">Text</label>
+                <label htmlFor="text-block-body" className="mb-1 block text-xs font-medium text-(--color-text-dim)">Text</label>
                 <textarea
+                  id="text-block-body"
                   value={draft.body ?? ""}
                   onChange={(e) => setDraft({ ...draft, body: e.target.value })}
                   rows={4}
@@ -163,8 +165,9 @@ export function BlockConfigPanel({
                 }}
               />
               <div>
-                <label className="mb-1 block text-xs font-medium text-(--color-text-dim)">Caption (optional)</label>
+                <label htmlFor="image-block-caption" className="mb-1 block text-xs font-medium text-(--color-text-dim)">Caption (optional)</label>
                 <input
+                  id="image-block-caption"
                   value={draft.caption ?? ""}
                   onChange={(e) => setDraft({ ...draft, caption: e.target.value })}
                   className="w-full rounded-lg border border-(--color-border) bg-transparent px-3 py-2 text-sm"
@@ -182,8 +185,9 @@ export function BlockConfigPanel({
               )}
               <BookSearchList books={books} isSelected={(b) => bookKey(b) === draft.bookKey} onSelect={(b) => setDraft({ ...draft, bookKey: bookKey(b) })} />
               <div>
-                <label className="mb-1 block text-xs font-medium text-(--color-text-dim)">Caption (optional)</label>
+                <label htmlFor="spotlight-block-caption" className="mb-1 block text-xs font-medium text-(--color-text-dim)">Caption (optional)</label>
                 <input
+                  id="spotlight-block-caption"
                   value={draft.caption ?? ""}
                   onChange={(e) => setDraft({ ...draft, caption: e.target.value })}
                   className="w-full rounded-lg border border-(--color-border) bg-transparent px-3 py-2 text-sm"
@@ -210,8 +214,9 @@ export function BlockConfigPanel({
           {draft.type === "shelf" && !draft.collectionId && (
             <div className="flex flex-col gap-3">
               <div>
-                <label className="mb-1 block text-xs font-medium text-(--color-text-dim)">Title</label>
+                <label htmlFor="shelf-block-title" className="mb-1 block text-xs font-medium text-(--color-text-dim)">Title</label>
                 <input
+                  id="shelf-block-title"
                   value={draft.title}
                   onChange={(e) => setDraft({ ...draft, title: e.target.value })}
                   placeholder="e.g. Top 5 Books This Year"
@@ -309,8 +314,9 @@ export function BlockConfigPanel({
           {draft.type === "quoteCollection" && (
             <div className="flex flex-col gap-3">
               <div>
-                <label className="mb-1 block text-xs font-medium text-(--color-text-dim)">Title</label>
+                <label htmlFor="quotes-block-title" className="mb-1 block text-xs font-medium text-(--color-text-dim)">Title</label>
                 <input
+                  id="quotes-block-title"
                   value={draft.title}
                   onChange={(e) => setDraft({ ...draft, title: e.target.value })}
                   placeholder="e.g. My favorite lines"

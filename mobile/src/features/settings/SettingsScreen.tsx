@@ -71,7 +71,7 @@ export function SettingsScreen() {
         <Text style={[typography.body, { color: colors.text }]}>{user?.email}</Text>
         {editing ? <>
           <Input label="Username" value={draft} onChangeText={setDraft} autoCapitalize="none" autoCorrect={false} />
-          <View style={styles.actions}><Button label="Cancel" variant="secondary" onPress={() => setEditing(false)} /><Button label="Save" loading={busy} disabled={draft.trim().length < 3} onPress={() => void run(() => setUsername(draft.trim())).then((saved) => { if (saved) setEditing(false); })} /></View>
+          <View style={styles.actions}><Button label="Cancel" variant="secondary" onPress={() => { setError(null); setDraft(user?.username ?? ""); setEditing(false); }} /><Button label="Save" loading={busy} disabled={draft.trim().length < 3} onPress={() => void run(() => setUsername(draft.trim())).then((saved) => { if (saved) setEditing(false); })} /></View>
         </> : <><Text style={[typography.body, { color: colors.text }]}>@{user?.username}</Text><Button label="Change username" variant="secondary" onPress={() => setEditing(true)} /></>}
         {error ? <Text accessibilityRole="alert" style={[typography.caption, { color: colors.danger }]}>{error}</Text> : null}
       </View>

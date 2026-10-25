@@ -14,7 +14,7 @@ import {
   localDay,
   newId,
   removeReaderNote,
-  reorderOnDrop,
+  moveUnit,
   restoreReadState,
   saveFailureMessage,
   setBookCover,
@@ -63,9 +63,9 @@ export function useLibraryActions() {
       assertSaved(await submit({ kind: "add", book }));
     },
 
-    reorder: (draggedKey: string, targetKey: string) =>
+    reorder: (key: string, direction: "up" | "down") =>
       run((data) => {
-        const books = reorderOnDrop(data.books, data.groups ?? [], draggedKey, targetKey);
+        const books = moveUnit(data.books, data.groups ?? [], key, direction);
         return books === data.books ? data : { ...data, books };
       }, "Couldn't save the new order."),
 

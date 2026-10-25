@@ -52,3 +52,12 @@ test("an unreadable process reads as unknown rather than as a mismatch", () => {
   });
   assert.equal(env, null);
 });
+
+test("an admin id the running backend lacks is a mismatch, named in the message", () => {
+  const rows = mismatchedEnv({ AUTH_DB_PATH: "/dev/auth.sqlite" }, { AUTH_DB_PATH: "/dev/auth.sqlite", ADMIN_USER_ID: "u-1" });
+  assert.deepEqual(rows, [{ name: "ADMIN_USER_ID", expected: "u-1", actual: null }]);
+  const message = describeMismatch(3000, rows);
+  assert.match(message, /ADMIN_USER_ID/);
+  assert.doesNotMatch(message, /different data directory/);
+  assert.match(message, /npm run dev:release/);
+});

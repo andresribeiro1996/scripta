@@ -83,6 +83,7 @@ export function MuralFolderTree({
               {renamingId === folder.id ? (
                 <input
                   autoFocus
+                  maxLength={200}
                   value={renameDraft}
                   onChange={(e) => setRenameDraft(e.target.value)}
                   onBlur={() => commitRename(folder)}

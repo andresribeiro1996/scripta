@@ -194,6 +194,7 @@ export function ShareModal({
             <div className="flex items-center gap-2">
               <input
                 readOnly
+                aria-label="Share link"
                 value={current.shareUrl}
                 onFocus={(e) => e.currentTarget.select()}
                 className="w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm"

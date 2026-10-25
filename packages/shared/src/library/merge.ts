@@ -1,7 +1,7 @@
 import type { LibraryData } from "./types.js";
 import { certainFacts, matchFacts } from "./bookMatch.js";
 import { normalizeIsbn } from "./covers.js";
-import { GENRES_FROM_CATALOG } from "./catalogGenres.js";
+import { GENRES_FROM_CATALOG } from "./bookGenres.js";
 
 /** Identifies "the same book" across sources whose native IDs aren't
  *  comparable at all (Kobo's ContentID vs Goodreads' synthetic

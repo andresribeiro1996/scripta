@@ -8,7 +8,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import type { PublicQuizQuestion } from "@scripta/shared";
+import { playerLabel, scoreRows, type PublicQuizQuestion } from "@scripta/shared";
 import { CoverImage } from "../components/BookCard";
 import { fetchPublicResultsApi, submitPlayApi, type PlayResponse } from "../api/quizzes";
 import { quizPlayStage } from "../lib/quizPlayStage";
@@ -193,6 +193,19 @@ export function PlayQuizPage() {
   );
 }
 
+function ScoreValue({ value, title, dim }: { value: { kind: "text" | "cover"; value: string }; title?: string; dim?: boolean }) {
+  if (value.kind === "text") return <span className={`truncate ${dim ? "text-(--color-text-dim)" : ""}`}>{dim ? "Your pick: " : ""}{value.value}</span>;
+  return (
+    <span className="flex items-center gap-2">
+      <span className="relative block h-10 w-7 shrink-0 overflow-hidden rounded bg-(--color-border)">
+        <CoverImage book={{ Title: title ?? "Picked cover", _coverUrl: value.value }} fit="contain" alt={title ?? "Picked cover"} />
+      </span>
+      {title && <span className="truncate">{title}</span>}
+      {dim && <span className="text-(--color-text-dim)">Your pick</span>}
+    </span>
+  );
+}
+
 function ResultsView({
   code,
   result,
@@ -221,12 +234,16 @@ function ResultsView({
       </div>
 
       <ol className="flex flex-col gap-1.5 text-sm">
-        {questions.map((question, i) => (
-          <li key={question.id} className="flex items-center justify-between rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2">
-            <span className="text-(--color-text-dim)">{i + 1}</span>
-            <span aria-hidden="true" className={result.correct[question.id] ? "text-(--color-success)" : "text-(--color-danger)"}>
-              {result.correct[question.id] ? "✓" : "✗"}
+        {scoreRows(questions, result.correct, result.answers).map((row) => (
+          <li key={row.id} className="flex items-center gap-3 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2">
+            <span className="text-(--color-text-dim)">{row.number}</span>
+            <span aria-hidden="true" className={row.correct ? "text-(--color-success)" : "text-(--color-danger)"}>
+              {row.correct ? "✓" : "✗"}
             </span>
+            <div className="flex min-w-0 flex-1 flex-col gap-1">
+              {row.answer && <ScoreValue value={row.answer} title={row.answer.title} />}
+              {row.pick && <ScoreValue value={row.pick} dim />}
+            </div>
           </li>
         ))}
       </ol>
@@ -266,7 +283,10 @@ function Leaderboard({ code }: { code: string }) {
             {leaderboard.data.plays.map((play, i) => (
               <tr key={i} className="border-t border-(--color-border)">
                 <td className="py-1.5 pr-3">{i + 1}</td>
-                <td className="py-1.5 pr-3">{play.playerName ?? "Guest"}</td>
+                <td className="py-1.5 pr-3">
+                  {playerLabel(play).name}
+                  {playerLabel(play).guest && <span className="ml-2 text-xs text-(--color-text-dim)">guest</span>}
+                </td>
                 <td className="py-1.5 pr-3">{play.score}/{leaderboard.data.questionCount}</td>
                 <td className="py-1.5">{(play.durationMs / 1000).toFixed(1)}s</td>
               </tr>

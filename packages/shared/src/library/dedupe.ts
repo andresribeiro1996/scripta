@@ -1,5 +1,4 @@
-import { genresForBook, normalizeBookGenres } from "./bookGenres.js";
-import { GENRES_FROM_CATALOG } from "./catalogGenres.js";
+import { GENRES_FROM_CATALOG, genresForBook, normalizeBookGenres } from "./bookGenres.js";
 import { certainFacts, likelyFacts, matchFacts, type MatchFacts } from "./bookMatch.js";
 import { bookKey, unionHighlights, withIdentityOf } from "./merge.js";
 import type { LibraryData } from "./types.js";

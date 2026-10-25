@@ -477,6 +477,7 @@ export function MuralEditorPage() {
             <input
               autoFocus
               value={nameDraft}
+              maxLength={200}
               onChange={(e) => setNameDraft(e.target.value)}
               onBlur={() => void guard(handleRename(), "Couldn't save that name.")}
               onKeyDown={(e) => {

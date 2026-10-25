@@ -6,7 +6,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { QUIZ_QUESTION_TYPES, eligibleTypes, type QuizData, type QuizQuestionType } from "@scripta/shared";
+import { QUIZ_QUESTION_TYPES, eligibleTypes, playerLabel, quizOptionLabel, quizQuestionLabel, type QuizData, type QuizQuestionType } from "@scripta/shared";
 import { PageContainer } from "../components/PageContainer";
 import { useConfirm } from "../components/ConfirmDialog";
 import { deleteQuizApi, fetchQuizResultsApi, publishQuizApi, setPlayStateApi, updateQuizApi, type Quiz } from "../api/quizzes";
@@ -293,7 +293,10 @@ function PublishedSection({ quiz, shareLink, copied, setCopied }: { quiz: Quiz; 
             {results.data.plays.map((play, index) => (
               <tr key={play.playId} className="border-t border-(--color-border)">
                 <td className="py-1.5 pr-3">{index + 1}</td>
-                <td className="py-1.5 pr-3">{play.playerName ?? "Guest"}</td>
+                <td className="py-1.5 pr-3">
+                  {playerLabel(play).name}
+                  {playerLabel(play).guest && <span className="ml-2 text-xs text-(--color-text-dim)">guest</span>}
+                </td>
                 <td className="py-1.5 pr-3">{play.score}/{results.data!.questionCount}</td>
                 <td className="py-1.5">{(play.durationMs / 1000).toFixed(1)}s</td>
               </tr>
@@ -305,15 +308,18 @@ function PublishedSection({ quiz, shareLink, copied, setCopied }: { quiz: Quiz; 
       {results.data && results.data.stats.length > 0 && (
         <div className="flex flex-col gap-3">
           <h2 className="text-lg font-bold">Per-question stats</h2>
-          {results.data.stats.map((stat) => (
+          {results.data.stats.map((stat) => {
+            const index = ownerQuestions.findIndex((item) => item.id === stat.questionId);
+            const asked = ownerQuestions[index];
+            return (
             <div key={stat.questionId} className="rounded-xl border border-(--color-border) bg-(--color-surface) p-3">
               <p className="text-sm font-semibold">
-                {stat.questionId} · {stat.correctCount}/{stat.answerCount} correct
+                {asked ? quizQuestionLabel(asked, index, quiz.data.books) : stat.questionId} · {stat.correctCount}/{stat.answerCount} correct
               </p>
               <div className="mt-2 flex flex-col gap-1">
                 {stat.picks.map((pick) => (
                   <div key={pick.choiceIndex} className="flex items-center gap-2 text-xs text-(--color-text-dim)">
-                    <span className="w-6">#{pick.choiceIndex + 1}</span>
+                    <span className="w-40 truncate">{asked ? quizOptionLabel(asked.type, asked.options[pick.choiceIndex], quiz.data.books) : `#${pick.choiceIndex + 1}`}</span>
                     {/* Same tally-bar treatment as DuelCard: accent fill on a border track. */}
                     <span className="h-2 flex-1 rounded bg-(--color-border)">
                       <span className="block h-2 rounded bg-(--color-accent)" style={{ width: `${Math.round((pick.count / stat.answerCount) * 100)}%` }} />
@@ -323,7 +329,8 @@ function PublishedSection({ quiz, shareLink, copied, setCopied }: { quiz: Quiz; 
                 ))}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </section>

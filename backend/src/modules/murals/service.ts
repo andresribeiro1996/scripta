@@ -5,10 +5,12 @@
 import { randomUUID } from "node:crypto";
 import { muralThemeId } from "@scripta/shared";
 import type { Mural as WireMural, MuralBlock } from "@scripta/shared";
-import { FolderCycleError, InvalidFolderReferenceError, MuralConflictError } from "./domain/errors.js";
+import { FolderCycleError, InvalidFolderReferenceError, MuralConflictError, MuralNameTooLongError } from "./domain/errors.js";
 import type { ThemeId } from "@scripta/shared/themes";
 import type { MuralsRepository } from "./domain/ports.js";
 import type { MuralFolder, MuralFolderRow, MuralRow } from "./domain/types.js";
+
+const MAX_NAME_LENGTH = 200;
 
 function toMural(row: MuralRow, publicUrlFor: (token: string) => string): WireMural {
   return {
@@ -113,7 +115,9 @@ export function createMuralsService(
       if (patch.folderId !== undefined && patch.folderId !== null && !repo.getOwnedFolder(patch.folderId, userId)) {
         throw new InvalidFolderReferenceError();
       }
-      if (!repo.getOwned(id, userId)) return undefined;
+      const existing = repo.getOwned(id, userId);
+      if (!existing) return undefined;
+      if (patch.name !== undefined && patch.name.length > MAX_NAME_LENGTH && patch.name !== existing.name) throw new MuralNameTooLongError();
       const works = patch.blocks !== undefined && resolveWorks ? resolveWorks(patch.blocks) : undefined;
       const row = repo.update(id, userId, {
         ...(patch.name !== undefined ? { name: patch.name } : {}),
@@ -178,6 +182,9 @@ export function createMuralsService(
     },
 
     renameFolder(userId, id, name) {
+      const existing = repo.getOwnedFolder(id, userId);
+      if (!existing) return undefined;
+      if (name.length > MAX_NAME_LENGTH && name !== existing.name) throw new MuralNameTooLongError();
       const row = repo.updateFolder(id, userId, { name });
       return row ? toFolder(row) : undefined;
     },

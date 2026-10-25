@@ -187,6 +187,10 @@ export function AddBookModal({
     }
   }
 
+  const missingTitle = title.trim() === "";
+  const missingAuthor = author.trim() === "";
+  const missing = missingTitle && missingAuthor ? "Title and author are required." : missingTitle ? "Title is required." : missingAuthor ? "Author is required." : null;
+
   return (
     <div className="overlay-in fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div
@@ -288,6 +292,7 @@ export function AddBookModal({
           <label className="block">
             <span className="mb-1 block text-xs font-semibold">Title</span>
             <input
+              required
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               className="w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm"
@@ -296,6 +301,7 @@ export function AddBookModal({
           <label className="block">
             <span className="mb-1 block text-xs font-semibold">Author</span>
             <input
+              required
               value={author}
               onChange={(e) => setAuthor(e.target.value)}
               className="w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm"
@@ -355,11 +361,13 @@ export function AddBookModal({
           </div>
           <button
             onClick={() => void handleSave()}
-            disabled={saving || title.trim() === "" || author.trim() === ""}
+            disabled={saving || missing !== null}
+            aria-describedby={missing ? "add-book-missing" : undefined}
             className="w-full rounded-lg bg-(--color-accent) px-4 py-2.5 text-sm font-semibold text-(--color-on-accent) disabled:opacity-60"
           >
             {saving ? "Adding…" : "Add book"}
           </button>
+          {missing && <p id="add-book-missing" className="text-xs text-(--color-text-dim)">{missing}</p>}
           {saveError && <p className="text-xs text-(--color-danger)">{saveError}</p>}
         </div>
       </div>

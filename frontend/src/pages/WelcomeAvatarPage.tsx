@@ -63,7 +63,7 @@ export function WelcomeAvatarPage() {
           type="button"
           disabled={uploading}
           onClick={() => fileInputRef.current?.click()}
-          className={authSecondaryClass}
+          className={hasAvatar ? authSecondaryClass : authSubmitClass}
         >
           {uploading ? "Uploading…" : hasAvatar ? "Choose a different photo" : "Choose a photo"}
         </button>
@@ -74,7 +74,7 @@ export function WelcomeAvatarPage() {
           type="button"
           disabled={uploading}
           onClick={() => navigate(takeAuthReturnTo(), { replace: true })}
-          className={`${authSubmitClass} mt-3`}
+          className={`${hasAvatar ? authSubmitClass : authSecondaryClass} mt-3`}
         >
           {hasAvatar ? "Continue" : "Skip for now"}
         </button>

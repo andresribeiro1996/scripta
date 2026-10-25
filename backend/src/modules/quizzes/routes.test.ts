@@ -471,3 +471,17 @@ test("publishing an already-published quiz with the catalog down is a 409", asyn
   }
   await app.close();
 });
+
+test("the play response carries the correct answers, the board and a missing play do not", async () => {
+  const { service, code, answerKey } = publishedQuiz();
+  const board = await call(service, { method: "GET", url: `/quizzes/voting/${code}` });
+  assert.equal(JSON.stringify(board.body).includes("answerIndex"), false);
+  assert.equal(JSON.stringify(board.body).includes("\"answers\""), false);
+  const answers = answerKey.map((q) => ({ questionId: q.id, choiceIndex: 0 }));
+  const played = await call(service, { method: "POST", url: `/quizzes/voting/${code}/play`, body: { answers, durationMs: 1 } }, "u9");
+  assert.equal(played.status, 200);
+  assert.deepEqual((played.body as unknown as { answers: unknown }).answers, Object.fromEntries(answerKey.map((q) => [q.id, { choiceIndex: 0, answerIndex: q.answerIndex }])));
+  const missing = await call(service, { method: "GET", url: `/quizzes/voting/${code}/play` }, "u8");
+  assert.equal(missing.status, 404);
+  assert.equal("answers" in missing.body, false);
+});

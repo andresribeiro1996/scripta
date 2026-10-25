@@ -77,3 +77,13 @@ test("the parsed body is returned", async () => {
   const { result } = await capture(() => request<{ ok: boolean }>("/a", { auth: "none" }));
   assert.deepEqual(result, { ok: true });
 });
+
+test("a rate limit says how long to wait", async () => {
+  const limited = () => Response.json({ statusCode: 429, error: "Too Many Requests", message: "Rate limit exceeded, retry in 45 seconds" }, { status: 429, statusText: "Too Many Requests" });
+  await assert.rejects(capture(() => request("/auth/login", { method: "POST", auth: "none" }), limited), { status: 429, message: "Too many tries. Wait 45 seconds and try again." });
+});
+
+test("a rate limit without a retry time still reads as a sentence", async () => {
+  const limited = () => new Response(null, { status: 429, statusText: "Too Many Requests" });
+  await assert.rejects(capture(() => request("/auth/login", { method: "POST", auth: "none" }), limited), { message: "Too many tries. Wait a minute and try again." });
+});
