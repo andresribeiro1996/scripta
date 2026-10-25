@@ -4,7 +4,7 @@ import { Stack, router, useLocalSearchParams, useSegments } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { recapMonthName, type TopShelfBook, type TopShelfPeriod, type TopShelfView } from "@scripta/shared";
 import { Text } from "../../ui/Text";
-import { Button, EmptyState, ErrorState, Icon, Screen, ScrollDock, Skeleton, dynamicType, minimumTouchTarget, radii, searchDockClearance, spacing, typography, useTheme } from "../../ui";
+import { Button, EmptyState, ErrorState, Icon, Screen, Skeleton, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import { BookCover } from "../arena/BookCover";
 import { DiscoverRow } from "../community/DiscoverRow";
 import { workPath } from "../works/workPath";
@@ -30,84 +30,86 @@ export function TopShelfScreen() {
   const openRecap = (month: string) => router.push(`/recap/${month}` as never);
   const openBook = (book: TopShelfBook) => router.push(workPath(book.workId, segments) as never);
 
-  const [barHeight, setBarHeight] = useState(searchDockClearance);
-  const bar = <TopShelfBar period={period} onPeriod={setPeriod} genre={genre} onGenre={setGenre} genres={data?.genres ?? []} genreDisabled={false} onHeight={setBarHeight} />;
+  const bar = <View style={{ backgroundColor: colors.background }}><TopShelfBar period={period} onPeriod={setPeriod} genre={genre} onGenre={setGenre} genres={data?.genres ?? []} genreDisabled={false} /></View>;
+
+  function body() {
+    if (query.isError || !data) {
+      return query.isError
+        ? <View style={styles.page}><ErrorState body={query.error instanceof Error ? query.error.message : "Couldn't load Top Shelf."} actionLabel="Retry" onAction={() => void query.refetch()} /></View>
+        : <View style={styles.page}><Skeleton height={200} /></View>;
+    }
+    const empty = emptySections(data);
+    const playButton = play ? <View style={styles.recapButton}><Button label={`▶ Play ${recapMonthName(play)} recap`} numberOfLines={1} onPress={() => openRecap(play)} /></View> : null;
+    const pastRecaps = past.length ? (
+      <Section title="Past recaps">
+        {past.map((month) => (
+          <Pressable key={month} accessibilityRole="button" accessibilityLabel={`${recapMonthName(month)} recap`} onPress={() => openRecap(month)} style={[styles.recapRow, { borderColor: colors.border }]}>
+            <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.grow, { color: colors.text }]}>{`${recapMonthName(month)} recap`}</Text>
+            <Icon name="chevronRight" size={20} color={colors.textDim} />
+          </Pressable>
+        ))}
+      </Section>
+    ) : null;
+    if (empty.podium && empty.records && (empty.genres || genre !== null) && empty.games) {
+      return (
+        <>
+          {playButton}
+          <View style={styles.page}><EmptyState title={`Nothing here yet${data.period === "month" ? " this month" : ""} — games count once 5 people vote.`} /></View>
+          {pastRecaps}
+        </>
+      );
+    }
+    return (
+      <>
+        {playButton}
+        {empty.podium ? null : <Podium books={data.boards.champions ?? []} title={data.period === "month" ? "Book of the month" : "All-time champions"} onOpen={openBook} />}
+        {empty.records ? null : (
+          <Section title="Records">
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.strip}>
+              {visibleBoards(data.period).flatMap((board) => {
+                const leader = data.boards[board]?.[0];
+                if (!leader) return [];
+                return [
+                  <Pressable key={board} accessibilityRole="button" accessibilityLabel={`${boardTitle(board, null)}, ${leader.title}, ${valueLabel(board, leader.value)}`} onPress={() => router.push(topShelfHref(board, period, genre))} style={[styles.card, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+                    <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{boardTitle(board, null)}</Text>
+                    <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>{leader.title}</Text>
+                    <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.accent }]}>{valueLabel(board, leader.value)}</Text>
+                  </Pressable>,
+                ];
+              })}
+            </ScrollView>
+          </Section>
+        )}
+        {empty.genres || genre ? null : (
+          <Section title="Champions by genre" onMore={() => router.push(topShelfHref("champions", period, null))}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.strip}>
+              {data.genreChampions.map((entry) => (
+                <Pressable key={entry.genre} accessibilityRole="button" accessibilityLabel={`${entry.genre} champions, ${entry.book.title}`} onPress={() => router.push(topShelfHref("champions", period, entry.genre))} style={[styles.card, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+                  <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{entry.genre}</Text>
+                  <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>{entry.book.title}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </Section>
+        )}
+        {empty.games ? null : (
+          <Section title="Hottest games" onMore={() => router.push(topShelfHref("games", period, genre))}>
+            {data.games.map((game) => (
+              <DiscoverRow key={game.item.content.id} item={game.item} linkAuthor stats={[{ value: game.likes, label: "likes" }, { value: game.votes, label: "votes" }, { value: game.comments, label: "comments" }]} />
+            ))}
+          </Section>
+        )}
+        {pastRecaps}
+      </>
+    );
+  }
 
   return <Screen top={false}>
     <Stack.Screen options={{ headerShown: true, title: "Top Shelf", headerLargeTitleEnabled: false }} />
-    <ScrollDock bar={bar}>
-      {(scrollProps) => {
-        if (query.isError || !data) {
-          return query.isError
-            ? <View style={styles.page}><ErrorState body={query.error instanceof Error ? query.error.message : "Couldn't load Top Shelf."} actionLabel="Retry" onAction={() => void query.refetch()} /></View>
-            : <View style={styles.page}><Skeleton height={200} /></View>;
-        }
-        const empty = emptySections(data);
-        const playButton = play ? <View style={styles.recapButton}><Button label={`▶ Play ${recapMonthName(play)} recap`} numberOfLines={1} onPress={() => openRecap(play)} /></View> : null;
-        const pastRecaps = past.length ? (
-          <Section title="Past recaps">
-            {past.map((month) => (
-              <Pressable key={month} accessibilityRole="button" accessibilityLabel={`${recapMonthName(month)} recap`} onPress={() => openRecap(month)} style={[styles.recapRow, { borderColor: colors.border }]}>
-                <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.grow, { color: colors.text }]}>{`${recapMonthName(month)} recap`}</Text>
-                <Icon name="chevronRight" size={20} color={colors.textDim} />
-              </Pressable>
-            ))}
-          </Section>
-        ) : null;
-        if (empty.podium && empty.records && (empty.genres || genre !== null) && empty.games) {
-          return (
-            <ScrollView {...scrollProps} contentContainerStyle={[styles.list, { paddingBottom: barHeight }]}>
-              {playButton}
-              <View style={styles.page}><EmptyState title={`Nothing here yet${data.period === "month" ? " this month" : ""} — games count once 5 people vote.`} /></View>
-              {pastRecaps}
-            </ScrollView>
-          );
-        }
-        return (
-        <ScrollView {...scrollProps} contentContainerStyle={[styles.list, { paddingBottom: barHeight }]}>
-          {playButton}
-          {empty.podium ? null : <Podium books={data.boards.champions ?? []} title={data.period === "month" ? "Book of the month" : "All-time champions"} onOpen={openBook} />}
-          {empty.records ? null : (
-            <Section title="Records">
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.strip}>
-                {visibleBoards(data.period).flatMap((board) => {
-                  const leader = data.boards[board]?.[0];
-                  if (!leader) return [];
-                  return [
-                    <Pressable key={board} accessibilityRole="button" accessibilityLabel={`${boardTitle(board, null)}, ${leader.title}, ${valueLabel(board, leader.value)}`} onPress={() => router.push(topShelfHref(board, period, genre))} style={[styles.card, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-                      <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{boardTitle(board, null)}</Text>
-                      <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>{leader.title}</Text>
-                      <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.accent }]}>{valueLabel(board, leader.value)}</Text>
-                    </Pressable>,
-                  ];
-                })}
-              </ScrollView>
-            </Section>
-          )}
-          {empty.genres || genre ? null : (
-            <Section title="Champions by genre" onMore={() => router.push(topShelfHref("champions", period, null))}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.strip}>
-                {data.genreChampions.map((entry) => (
-                  <Pressable key={entry.genre} accessibilityRole="button" accessibilityLabel={`${entry.genre} champions, ${entry.book.title}`} onPress={() => router.push(topShelfHref("champions", period, entry.genre))} style={[styles.card, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-                    <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{entry.genre}</Text>
-                    <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>{entry.book.title}</Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
-            </Section>
-          )}
-          {empty.games ? null : (
-            <Section title="Hottest games" onMore={() => router.push(topShelfHref("games", period, genre))}>
-              {data.games.map((game) => (
-                <DiscoverRow key={game.item.content.id} item={game.item} linkAuthor stats={[{ value: game.likes, label: "likes" }, { value: game.votes, label: "votes" }, { value: game.comments, label: "comments" }]} />
-              ))}
-            </Section>
-          )}
-          {pastRecaps}
-        </ScrollView>
-        );
-      }}
-    </ScrollDock>
+    <ScrollView stickyHeaderIndices={[0]} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.list}>
+      {bar}
+      {body()}
+    </ScrollView>
   </Screen>;
 }
 
@@ -153,7 +155,7 @@ const styles = StyleSheet.create({
   strong: { fontWeight: "700" },
   center: { textAlign: "center" },
   page: { flex: 1, padding: spacing.lg },
-  list: { paddingTop: spacing.md },
+  list: { paddingBottom: spacing.xl },
   section: { marginBottom: spacing.xl },
   sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: spacing.lg, marginBottom: spacing.sm },
   more: { width: minimumTouchTarget, height: minimumTouchTarget, marginVertical: -spacing.sm, alignItems: "center", justifyContent: "center" },
