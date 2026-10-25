@@ -55,7 +55,7 @@ function collectPage() {
     const x = Math.round(rect.left + rect.width / 2);
     const y = Math.round(rect.top + rect.height / 2);
     const row = { role: roleOf(el), name: nameOf(el), x, y, w: Math.round(rect.width), h: Math.round(rect.height) };
-    if ((el.tagName === "INPUT" || el.tagName === "TEXTAREA") && el.readOnly && el.type !== "password" && el.value) row.value = el.value;
+    if (row.role === "textbox" && el.readOnly && el.type !== "password" && el.value) row.value = el.value;
     if (el.tagName === "A" && el.getAttribute("href")) row.href = el.getAttribute("href");
     if (el.disabled === true || el.getAttribute("aria-disabled") === "true") row.disabled = true;
     if (x >= 0 && y >= 0 && x < innerWidth && y < innerHeight) {
@@ -90,6 +90,7 @@ async function settleIdle(page) {
 
 async function runStep(page, step) {
   if (step.kind === "click") await page.getByRole(step.role, { name: step.name, exact: true }).click({ timeout: 10000 });
+  else if (step.kind === "upload") page.once("filechooser", (chooser) => chooser.setFiles(step.path));
   else if (step.kind === "clickAt") await page.mouse.click(step.x, step.y);
   else if (step.kind === "fill") {
     const byLabel = page.getByLabel(step.label, { exact: true });
@@ -102,6 +103,7 @@ async function runStep(page, step) {
 
 function describeStep(step) {
   if (step.kind === "click") return `--click "${step.role}:${step.name}"`;
+  if (step.kind === "upload") return `--upload ${step.path}`;
   if (step.kind === "clickAt") return `--click-at ${step.x},${step.y}`;
   if (step.kind === "fill") return `--fill "${step.label}=…"`;
   if (step.kind === "press") return `--press ${step.key}`;
@@ -145,6 +147,7 @@ async function main() {
   page.on("console", (message) => {
     if (message.type() === "error") consoleErrors.push(message.text());
   });
+  page.on("pageerror", (error) => consoleErrors.push(error.message));
   page.on("response", (response) => {
     if (response.status() >= 400) failedRequests.push(`${response.request().method()} ${response.status()} ${new URL(response.url()).pathname}`);
   });

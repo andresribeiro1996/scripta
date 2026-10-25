@@ -50,7 +50,7 @@ async function main() {
     log(`Vite already listening on ${ports.vite}.`);
   } else {
     log("Starting Vite...");
-    spawnDetached("npm", ["run", "dev"], { cwd: frontendDir, env: process.env, logName: "vite.log", runtimeDir });
+    spawnDetached("npm", ["run", "dev"], { cwd: frontendDir, env: { ...process.env, VITE_API_URL: webUrls({ vitePort: ports.vite, apiPort: ports.backend, https }).api }, logName: "vite.log", runtimeDir });
     await waitFor(() => isPortOpen(ports.vite), { timeoutMs: 60_000, label: `Vite on port ${ports.vite}` });
   }
 

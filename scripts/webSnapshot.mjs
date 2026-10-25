@@ -1,7 +1,7 @@
 const LABEL_LIMIT = 60;
 const MIN_TARGET_PX = 44;
 const HEIGHT = 900;
-const STEP_FLAGS = new Set(["--click", "--click-at", "--fill", "--press", "--wait"]);
+const STEP_FLAGS = new Set(["--click", "--click-at", "--fill", "--press", "--wait", "--upload"]);
 
 function clip(value) {
   const flat = value.replace(/\s+/g, " ").trim();
@@ -24,6 +24,7 @@ function parseStep(flag, value) {
     if (split === -1) throw new Error(`--fill needs "<label>=<text>", got "${value}"`);
     return { kind: "fill", label: value.slice(0, split), text: value.slice(split + 1) };
   }
+  if (flag === "--upload") return { kind: "upload", path: value };
   if (flag === "--press") return { kind: "press", key: value };
   return { kind: "wait", text: value };
 }
@@ -52,7 +53,7 @@ export function parseWebSnapshotArgs(argv) {
       if (!Number.isInteger(args.width) || args.width <= 0) throw new Error(`--width needs a positive integer, got "${value}"`);
     } else args.steps.push(parseStep(arg, value));
   }
-  if (!args.name) throw new Error("usage: node scripts/web-snapshot.mjs <name> --out <dir> [--path /route] [--width N] [--signed-out] [steps]");
+  if (!args.name) throw new Error("usage: node scripts/web-snapshot.mjs <name> --out <dir> [--path /route] [--width N] [--signed-out] [steps: --click --click-at --fill --press --wait --upload]");
   if (!args.out) throw new Error("--out <dir> is required");
   return args;
 }

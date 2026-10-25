@@ -42,6 +42,7 @@ Steps run in the order given, after the load:
 - If several elements match a `--click`, Playwright's strict mode fails the step (exit 1, no click). Listing names are clipped at 60 characters. When a name does not match or is ambiguous, use `--click-at` with the listed `@x,y`.
 - `--click-at <x>,<y>`: click page coordinates, for a control the listing shows as `(no label)`: use the `@x,y` the listing printed at the same width
 - `--fill "<label or placeholder>=<text>"`: type into an input found by its label or placeholder; a placeholder-only input lists as `(no label)` but `--fill` still finds it
+- `--upload <png>`: the next click that opens a file chooser gets that file. Put it right before the `--click` that opens the chooser, using one of your own PNGs from the out dir. Never use files from the repo or the home directory.
 - `--press <key>`
 - `--wait "<text>"`: wait until the text is visible
 
@@ -57,10 +58,9 @@ Signed-in runs keep `<out>/session.json` and log in only when needed; `--signed-
 
 Only h1 to h3 are listed as headings. A read-only text field shows its value (`textbox (no label)  @180,400  300×40px  = "https://…"`), which is how you read share links; the values of other inputs are not listed. Link URLs come from `→ href`. A vote or play code shown as plain text is read from the PNG.
 
-A header ending `· page was still changing — snapshot again` (for example `07-murals · 1280×900px · saved <dir>/07-murals.png · page was still changing — snapshot again`) means the page was animating while it was captured: snapshot again under the same name before reading the PNG.
+A header ending `· page was still changing — snapshot again` (for example `07-murals · 1280×900px · saved <dir>/07-murals.png · page was still changing — snapshot again`) means the page was animating while it was captured. Retry once under the same name. If the note repeats, the page has a looping animation (for example the reader card's shine, frontend/src/index.css:394): read the PNG anyway and note it in the coverage row. Don't loop.
 
 A row ending `⚠ under "<label>"` has its centre covered by that control (often a sticky bar): scroll or close it, or use a visible part. `(disabled)` is an attribute, not a finding.
-
 
 If a step fails, or the load fails, the listing still prints, the error goes to stderr and the exit code is 1. The page was not reached as asked: retry once, then mark the row "partial" with the error.
 
@@ -74,7 +74,7 @@ When you read a PNG, look for: text or a control cut off at an edge, the same te
 
 You may create, edit and delete anything through the site; the run started from `--reset`, and it does not reset at the end. Never write `backend/data/`, a `.sqlite` file or the fixtures directly.
 
-Never change the password or email of the fixture account, and never delete it: that breaks the next `dev-web.mjs` run without `--reset`. On the fixture account, only look at the change-password, change-email and delete-account controls. You may sign up one throwaway account on the local stack (`/login?mode=signup`, email `ui-<unix time>@local.test`, username `ui_<unix time>`, a password of 8 or more characters) and use those three controls on that account only, as `beta-tester` does; delete it last.
+Never change the password or email of the fixture account, and never delete it: that breaks the next `dev-web.mjs` run without `--reset`. On the fixture account, only look at the change-password, change-email and delete-account controls. You may sign up one throwaway account on the local stack (`/login?mode=signup`, email `ui-<unix time>@local.test`, username `ui_<unix time>`, a password of 8 or more characters) and use those three controls on that account only, as `beta-tester` does; delete it last. A run without `--signed-out` is always the fixture account, so the throwaway account's whole flow (signup, change email, change password, delete) runs as one `--signed-out` step chain in a single command. Never open /settings without `--signed-out` intending to act on the throwaway account.
 
 In this order:
 
