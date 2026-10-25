@@ -887,6 +887,8 @@ git add frontend/src/components/Toolbar.tsx frontend/src/components/OptionsMenu.
 - Modify: `frontend/src/pages/LibraryStylePage.tsx`
 - Modify: `DESIGN.md`
 - Modify: `frontend/README.md`
+- Modify: `frontend/scripts/test-page-frame.mts`
+- Modify: `frontend/scripts/test-library-style.mts`
 
 - [ ] **Step 1: Confirm nothing imports `PageContainer`**
 
