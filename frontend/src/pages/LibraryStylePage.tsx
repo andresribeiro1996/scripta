@@ -95,7 +95,11 @@ export function LibraryStylePage() {
   const usingCustomBackground = draft.backgroundColor !== null;
 
   return (
-    <Page title="Settings" subtitle="Everything about how your cards and the canvas behind them look — applied across Library, Series, and Collections. These settings stay inside your books: they never restyle the app's own menus, page headers, or search and filter bar. A series can override its own card appearance from its own style panel (Series page) — those settings take priority over these for that series' cards." tabs={area("settings").tabs}>
+    <Page title="Settings" subtitle="Everything about how your cards and the canvas behind them look — applied across Library, Series, and Collections." tabs={area("settings").tabs}>
+      <p className="mb-6 text-sm text-(--color-text-dim)">
+        These settings stay inside your books: they never restyle the app's own menus, page headers, or search and filter bar. A series can override its own card appearance from its own style panel (Series page) — those settings take priority over these for that series' cards.
+      </p>
+
       <div className="mb-6 grid gap-6 sm:grid-cols-2">
         <Section title="Card layout">
           <SliderRow id="card-size" label="Card size" value={draft.cardMinWidth} range={CARD_MIN_WIDTH_RANGE} onChange={(v) => applyDraft({ ...draft, cardMinWidth: v })} />
