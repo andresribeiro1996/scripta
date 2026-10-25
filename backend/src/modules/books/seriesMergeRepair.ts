@@ -7,7 +7,7 @@ import { joinVerdict } from "./domain/volumeGuard.js";
 import { guardTarget } from "./translationJudgments.js";
 
 const SOURCES: MergeSource[] = ["title-key", "admin", "code", "jev", "manual", "ol-duplicate"];
-const UNDOABLE: MergeSource[] = ["code", "jev", "ol-duplicate", "title-key"];
+const UNDOABLE: MergeSource[] = ["code", "jev", "manual", "ol-duplicate", "title-key"];
 
 type Why = "series-like" | "volume";
 type Edition = ReturnType<BooksRepository["editionsOf"]>[number];
@@ -156,7 +156,7 @@ export function undoReviewedMerges(repo: UndoRepo, fromWorks: string[], now: () 
   const requested = merges.filter((merge) => UNDOABLE.includes(merge.source) && reviewed.has(merge.fromWork));
   const queued = new Set(requested.map((merge) => merge.id));
   const found = new Set(requested.map((merge) => merge.fromWork));
-  const failures: Failure[] = [...reviewed].filter((fromWork) => !found.has(fromWork)).map((fromWork) => ({ fromWork, reason: "no active code, jev, ol-duplicate or title-key merge" }));
+  const failures: Failure[] = [...reviewed].filter((fromWork) => !found.has(fromWork)).map((fromWork) => ({ fromWork, reason: "no active code, jev, manual, ol-duplicate or title-key merge" }));
   const undone: string[] = [];
   for (const { fromWork, intoWork, source } of requested.sort((a, b) => b.id - a.id)) {
     const blocker = onwardFrom(byFrom, intoWork).find((step) => !queued.has(step.id));
