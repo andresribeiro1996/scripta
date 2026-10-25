@@ -19,8 +19,8 @@ import { DuplicatesSheet } from "../components/DuplicatesSheet";
 import { EmptyState } from "../components/EmptyState";
 import { LibraryCanvas } from "../components/LibraryCanvas";
 import { LibraryToolbar } from "../components/LibraryToolbar";
-import { LibraryIcon } from "../components/NavIcons";
-import type { OptionsMenuItem } from "../components/OptionsMenu";
+import { LibraryIcon, MoreIcon } from "../components/NavIcons";
+import { OptionsMenu, type OptionsMenuItem } from "../components/OptionsMenu";
 import { Page } from "../components/page/Page";
 import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../components/page/buttonClasses";
 import { PerCardStylePanel } from "../components/PerCardStylePanel";
@@ -344,7 +344,7 @@ export function LibraryPage() {
                 setEditingName(true);
               }}
               title="Rename your library"
-              className="inline-flex min-h-11 max-w-full min-w-0 items-center rounded-lg text-left break-all hover:text-(--color-accent)"
+              className="inline-flex min-h-11 max-w-full min-w-0 items-center rounded-lg text-left break-all min-w-11 hover:text-(--color-accent)"
             >
               {library?.data.name || "Name your library"}
             </button>
@@ -371,6 +371,14 @@ export function LibraryPage() {
           ) : (
             <>
               <button onClick={() => setAddingBook(true)} className={BUTTON_PRIMARY}>Add book</button>
+              <div className="sm:hidden">
+                <OptionsMenu
+                  items={actionItems}
+                  title="More actions"
+                  trigger={<MoreIcon size={22} />}
+                  triggerClassName="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-(--color-border) bg-(--color-surface) text-(--color-text) hover:bg-(--color-surface-hover)"
+                />
+              </div>
               <div className="hidden flex-wrap items-center gap-2 sm:flex">
                 <button onClick={() => setSyncingGoodreads(true)} className={BUTTON_SECONDARY}>Sync Goodreads…</button>
                 {books.length > 0 && <button onClick={handleToggleSelectionMode} className={BUTTON_SECONDARY}>Select…</button>}
@@ -419,7 +427,6 @@ export function LibraryPage() {
           onStatusChange={(status) => updateView({ status })}
           sort={sortKey}
           onSortChange={(sort) => updateView({ sort })}
-          actions={selectionMode ? undefined : actionItems}
         />
       )}
 

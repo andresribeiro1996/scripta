@@ -32,7 +32,8 @@ import type { Tournament } from "../api/arena";
 export function ArenaListPage() {
   const { tournaments, isLoading, error: tournamentsError, refetch: refetchTournaments } = useMyTournaments();
   const showSkeleton = useDelayedShow(isLoading);
-  const { tournaments: votedTournaments } = useVotedTournaments();
+  const { tournaments: votedTournaments, isLoading: votedLoading, error: votedError, refetch: refetchVoted } = useVotedTournaments();
+  const loadError = tournamentsError || votedError;
   const { data: quizzesData, isLoading: quizzesLoading, remove: removeQuiz } = useQuizzes();
   const quizzes = quizzesData ?? [];
   const showQuizSkeleton = useDelayedShow(quizzesLoading);
@@ -129,18 +130,18 @@ export function ArenaListPage() {
 
           {showSkeleton && <SkeletonCardGrid count={3} label="Loading tournaments" tileClassName="min-h-[86px]" />}
 
-          {!isLoading && tournamentsError && (
+          {!isLoading && !votedLoading && loadError && (
             <EmptyState
               title="Couldn't load your tournaments."
               action={
-                <button onClick={() => void refetchTournaments()} className="rounded-lg border border-(--color-border) px-3 py-1.5 text-sm hover:border-(--color-accent)">
+                <button onClick={() => void Promise.all([refetchTournaments(), refetchVoted()])} className="rounded-lg border border-(--color-border) px-3 py-1.5 text-sm hover:border-(--color-accent)">
                   Retry
                 </button>
               }
             />
           )}
 
-          {!isLoading && !tournamentsError && tournaments.length === 0 && votedTournaments.length === 0 && (
+          {!isLoading && !votedLoading && !loadError && tournaments.length === 0 && votedTournaments.length === 0 && (
             <EmptyState icon={ArenaIcon} title="No tournaments yet." body="Pit your books against each other in a bracket." />
           )}
 
