@@ -1,12 +1,11 @@
 import { AccountSecuritySection } from "../auth/AccountSecuritySection";
 import { DeleteAccountSection } from "../auth/DeleteAccountSection";
 import { useRef, useState } from "react";
-import { Link } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { Avatar } from "../components/Avatar";
-import { FontPicker } from "../components/FontPicker";
+import { Page } from "../components/page/Page";
 import { SocialsSection } from "../components/SocialsSection";
-import { ThemePicker } from "../components/ThemePicker";
+import { area } from "../lib/areas";
 
 export function SettingsPage() {
   const { session, setUsername, uploadAvatar, removeAvatar } = useAuth();
@@ -64,19 +63,9 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-xl px-5 py-8">
-      <h2 className="mb-6 text-lg font-bold">Settings</h2>
-
+    <Page title="Settings" tabs={area("settings").tabs}>
+      <div className="max-w-xl">
       <section className="rounded-xl border border-(--color-border) bg-(--color-surface) p-5">
-        <h3 className="mb-4 text-sm font-semibold">Appearance</h3>
-        <ThemePicker />
-        <div className="mt-5 space-y-4">
-          <FontPicker slot="display" />
-          <FontPicker slot="text" />
-        </div>
-      </section>
-
-      <section className="mt-5 rounded-xl border border-(--color-border) bg-(--color-surface) p-5">
         <h3 className="mb-4 text-sm font-semibold">Account</h3>
 
         {session && (
@@ -170,15 +159,10 @@ export function SettingsPage() {
         </div>
       </section>
 
-      <section className="mt-5 rounded-xl border border-(--color-border) bg-(--color-surface) p-5">
-        <h3 className="mb-1 text-sm font-semibold">Reader card</h3>
-        <p className="mb-3 text-xs text-(--color-text-dim)">Choose your card's counter, layout, signature book and highlight.</p>
-        <Link to="/dashboard/reader-card" className="text-xs font-semibold text-(--color-accent)">Edit card</Link>
-      </section>
-
       <AccountSecuritySection />
       <SocialsSection />
       <DeleteAccountSection />
-    </div>
+      </div>
+    </Page>
   );
 }

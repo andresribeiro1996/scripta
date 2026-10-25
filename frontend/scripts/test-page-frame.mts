@@ -79,3 +79,14 @@ test("Games, Community and Admin pages use Page with their area's tabs", () => {
   const arena = readFileSync(new URL("../src/pages/ArenaListPage.tsx", import.meta.url), "utf8");
   assert.doesNotMatch(arena, /aria-pressed/);
 });
+
+test("Settings tabs all use Page with the Settings tabs and no retired sections", () => {
+  for (const file of ["SettingsPage", "SettingsAppearancePage", "LibraryStylePage"]) {
+    const src = readFileSync(new URL(`../src/pages/${file}.tsx`, import.meta.url), "utf8");
+    assert.match(src, /<Page[\s\S]*?tabs=\{area\("settings"\)\.tabs\}/, file);
+  }
+  const settings = readFileSync(new URL("../src/pages/SettingsPage.tsx", import.meta.url), "utf8");
+  assert.doesNotMatch(settings, />Appearance</);
+  assert.doesNotMatch(settings, />Reader card</);
+  assert.match(readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8"), /path="\/dashboard\/settings\/appearance"/);
+});
