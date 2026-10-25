@@ -4,7 +4,7 @@ import { Stack, router, useLocalSearchParams, useSegments } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { recapMonthName, type TopShelfBook, type TopShelfPeriod, type TopShelfView } from "@scripta/shared";
 import { Text } from "../../ui/Text";
-import { Button, EmptyState, ErrorState, Icon, Screen, ScrollDock, Skeleton, dynamicType, minimumTouchTarget, radii, searchDockClearance, spacing, typography, useTheme } from "../../ui";
+import { Button, EmptyState, ErrorState, Icon, Screen, Skeleton, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import { BookCover } from "../arena/BookCover";
 import { DiscoverRow } from "../community/DiscoverRow";
 import { workPath } from "../works/workPath";
@@ -30,17 +30,20 @@ export function TopShelfScreen() {
   const openRecap = (month: string) => router.push(`/recap/${month}` as never);
   const openBook = (book: TopShelfBook) => router.push(workPath(book.workId, segments) as never);
 
-  const [barHeight, setBarHeight] = useState(searchDockClearance);
-  const bar = <TopShelfBar period={period} onPeriod={setPeriod} genre={genre} onGenre={setGenre} genres={data?.genres ?? []} genreDisabled={false} onHeight={setBarHeight} />;
+  const bar = <View style={{ backgroundColor: colors.background }}><TopShelfBar period={period} onPeriod={setPeriod} genre={genre} onGenre={setGenre} genres={data?.genres ?? []} genreDisabled={false} /></View>;
 
   return <Screen top={false}>
     <Stack.Screen options={{ headerShown: true, title: "Top Shelf", headerLargeTitleEnabled: false }} />
-    <ScrollDock bar={bar}>
-      {(scrollProps) => {
+    {(() => {
         if (query.isError || !data) {
-          return query.isError
-            ? <View style={styles.page}><ErrorState body={query.error instanceof Error ? query.error.message : "Couldn't load Top Shelf."} actionLabel="Retry" onAction={() => void query.refetch()} /></View>
-            : <View style={styles.page}><Skeleton height={200} /></View>;
+          return (
+            <ScrollView stickyHeaderIndices={[0]} keyboardShouldPersistTaps="handled">
+              {bar}
+              {query.isError
+                ? <View style={styles.page}><ErrorState body={query.error instanceof Error ? query.error.message : "Couldn't load Top Shelf."} actionLabel="Retry" onAction={() => void query.refetch()} /></View>
+                : <View style={styles.page}><Skeleton height={200} /></View>}
+            </ScrollView>
+          );
         }
         const empty = emptySections(data);
         const playButton = play ? <View style={styles.recapButton}><Button label={`▶ Play ${recapMonthName(play)} recap`} numberOfLines={1} onPress={() => openRecap(play)} /></View> : null;
@@ -56,7 +59,8 @@ export function TopShelfScreen() {
         ) : null;
         if (empty.podium && empty.records && (empty.genres || genre !== null) && empty.games) {
           return (
-            <ScrollView {...scrollProps} contentContainerStyle={[styles.list, { paddingBottom: barHeight }]}>
+            <ScrollView stickyHeaderIndices={[0]} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.list}>
+              {bar}
               {playButton}
               <View style={styles.page}><EmptyState title={`Nothing here yet${data.period === "month" ? " this month" : ""} — games count once 5 people vote.`} /></View>
               {pastRecaps}
@@ -64,7 +68,8 @@ export function TopShelfScreen() {
           );
         }
         return (
-        <ScrollView {...scrollProps} contentContainerStyle={[styles.list, { paddingBottom: barHeight }]}>
+        <ScrollView stickyHeaderIndices={[0]} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.list}>
+          {bar}
           {playButton}
           {empty.podium ? null : <Podium books={data.boards.champions ?? []} title={data.period === "month" ? "Book of the month" : "All-time champions"} onOpen={openBook} />}
           {empty.records ? null : (
@@ -106,8 +111,7 @@ export function TopShelfScreen() {
           {pastRecaps}
         </ScrollView>
         );
-      }}
-    </ScrollDock>
+    })()}
   </Screen>;
 }
 
@@ -153,7 +157,7 @@ const styles = StyleSheet.create({
   strong: { fontWeight: "700" },
   center: { textAlign: "center" },
   page: { flex: 1, padding: spacing.lg },
-  list: { paddingTop: spacing.md },
+  list: { paddingBottom: spacing.xl },
   section: { marginBottom: spacing.xl },
   sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: spacing.lg, marginBottom: spacing.sm },
   more: { width: minimumTouchTarget, height: minimumTouchTarget, marginVertical: -spacing.sm, alignItems: "center", justifyContent: "center" },
