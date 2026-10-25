@@ -303,40 +303,10 @@ export function LibraryPage() {
   const styleBook = styleBookKey ? books.find((b) => bookKey(b) === styleBookKey) : null;
   const coverBook = coverBookKey ? books.find((b) => bookKey(b) === coverBookKey) : null;
 
-  // The phone's only route to these actions — there is no header on a
-  // phone to hold them. Passed to LibraryToolbar as ITEMS rather than a
-  // rendered menu: the toolbar shows them behind a gear in its own row
-  // and opens them in a bottom sheet, matching the filter and sort
-  // controls sitting right beside it.
-  //
-  // Suppressed during selection mode, where the header reappears
-  // carrying "Delete selected" and its live count: that action is
-  // destructive and count-dependent, so it stays visible with explicit
-  // buttons rather than hiding behind a gear.
-  //
-  // Nothing renders these when the library is empty, since the toolbar
-  // itself doesn't render then. That's deliberate rather than a gap: the
-  // empty state shows the header (so the library name is there and
-  // tappable to rename) plus its own prominent "Choose a file" button,
-  // which covers importing. Sharing an empty library is the only thing
-  // out of reach, and it has nothing to share.
   const actionItems: OptionsMenuItem[] = [
-    // First, because it's the one thing that lost its own visible
-    // affordance when the library-name row went away on phones.
-    {
-      label: "Rename library…",
-      onClick: () => {
-        setNameDraft(library?.data.name ?? "");
-        setEditingName(true);
-      }
-    },
-    { label: "Add book…", onClick: () => setAddingBook(true) },
     { label: "Sync Goodreads…", onClick: () => setSyncingGoodreads(true) },
     { label: "Download CSV template", onClick: downloadCsvTemplate },
     ...(books.length > 0 ? [{ label: "Select…", onClick: handleToggleSelectionMode }] : []),
-    // Moved out of the app nav: it styles this page's cards and canvas,
-    // not the app, so it belongs with the other things you do to your
-    // library rather than sitting beside Settings.
     { label: "Library style…", onClick: () => navigate("/dashboard/style") },
     { label: "Share", onClick: () => setSharing(true) },
     {

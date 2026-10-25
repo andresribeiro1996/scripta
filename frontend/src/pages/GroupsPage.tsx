@@ -43,7 +43,7 @@ const COPY: Record<GroupType, { title: string; noun: string; plural: string; emp
     plural: "series",
     emptyTitle: "No series yet.",
     emptyBody:
-      "Series are picked up automatically from your books' Series field on import — or add one by hand below.",
+      "Series are picked up automatically from your books' Series field on import — or add one by hand with the button above.",
     untitled: "Untitled series",
     icon: SeriesIcon
   },
@@ -352,14 +352,6 @@ export function GroupsPage({ type }: { type: GroupType }) {
       )}
 
       <div className="flex flex-col gap-6">
-        {/* Always first, and always present — deliberately outside the
-            `groups.map` below so the ability to add one never disappears
-            just because the list is empty, exactly like the mural grid's
-            "+" tile. Shaped as a full-width dashed bar rather than a
-            square card because this page stacks its groups vertically
-            instead of laying them out in a grid; the dashed border and
-            the "+" are what carry the "this makes a new one" meaning
-            across both. */}
         {drafting ? (
           <div className="flex min-h-14 items-center gap-2 rounded-xl border-2 border-dashed border-(--color-accent) p-3">
             <input
@@ -384,9 +376,6 @@ export function GroupsPage({ type }: { type: GroupType }) {
           </div>
         ) : null}
 
-        {/* After the "New …" tile, which is where the real panels
-            start — a skeleton above it would put the placeholder
-            somewhere the content never appears. */}
         {showSkeleton && <SkeletonGroups style={style} />}
 
         {groups.map((group) => {
