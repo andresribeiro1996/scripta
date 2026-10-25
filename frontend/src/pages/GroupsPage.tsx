@@ -457,7 +457,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
                   >
                     {group.name}
                     {group.style && (
-                      <span className="ml-1.5 rounded-full bg-(--color-accent-soft) px-1.5 py-0.5 align-middle text-[10px] font-semibold text-(--color-accent)">
+                      <span className="ml-1.5 inline-block rounded-full bg-(--color-accent-soft) px-1.5 py-0.5 align-middle whitespace-nowrap text-[10px] font-semibold text-(--color-accent)">
                         custom style
                       </span>
                     )}

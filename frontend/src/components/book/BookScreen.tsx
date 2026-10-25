@@ -189,7 +189,7 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
         ) : null}
 
         <div className="grid gap-6 sm:grid-cols-[220px_1fr]">
-          <div className="self-start text-center sm:sticky sm:top-6 sm:text-left">
+          <div className="min-w-0 self-start text-center sm:sticky sm:top-6 sm:text-left">
             {model.edition && work ? (
               <EditionStrip key={coverVersion} editions={work.editions} author={work.author} edition={model.edition} mineBook={book} onSelect={onSelectEdition} />
             ) : (
