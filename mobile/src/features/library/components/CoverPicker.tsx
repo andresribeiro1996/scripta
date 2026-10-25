@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../../ui/Text";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
-import { Button, ErrorState } from "../../../ui/components";
+import { Button, ConfirmDialog, ErrorState } from "../../../ui/components";
 import { minimumTouchTarget, radii, spacing, typography, useTheme } from "../../../ui/theme";
 import { deleteGalleryImage, fetchGalleryImages, uploadGalleryImage, type GalleryImage } from "../../gallery/api";
 
@@ -26,6 +26,7 @@ export function CoverPicker({
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState<GalleryImage | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -68,21 +69,14 @@ export function CoverPicker({
     }
   }
 
-  function confirmDelete(image: GalleryImage) {
-    Alert.alert("Delete this image from your gallery?", "Any book using it as a cover will fall back to its normal cover.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: () => {
-          setDeletingId(image.id);
-          deleteGalleryImage(image.id)
-            .then(() => setImages((prev) => prev?.filter((i) => i.id !== image.id) ?? prev))
-            .catch(() => Alert.alert("Couldn't delete that image — try again."))
-            .finally(() => setDeletingId(null));
-        },
-      },
-    ]);
+  function deleteImage(image: GalleryImage) {
+    setConfirmingDelete(null);
+    setUploadError(null);
+    setDeletingId(image.id);
+    deleteGalleryImage(image.id)
+      .then(() => setImages((prev) => prev?.filter((i) => i.id !== image.id) ?? prev))
+      .catch(() => setUploadError("Couldn't delete that image — try again."))
+      .finally(() => setDeletingId(null));
   }
 
   return (
@@ -121,7 +115,7 @@ export function CoverPicker({
                   onSelect(item);
                   onClose();
                 }}
-                onLongPress={() => confirmDelete(item)}
+                onLongPress={() => setConfirmingDelete(item)}
                 style={[
                   styles.thumb,
                   { borderColor: item.id === currentImageId ? colors.accent : "transparent", backgroundColor: colors.border },
@@ -141,6 +135,15 @@ export function CoverPicker({
           <Text style={[typography.caption, { color: colors.textDim }]}>Tap to use as cover. Long-press to delete from your gallery.</Text>
         )}
       </ScrollView>
+      <ConfirmDialog
+        visible={confirmingDelete !== null}
+        title="Delete this image from your gallery?"
+        body="Any book using it as a cover will fall back to its normal cover."
+        confirmLabel="Delete"
+        destructive
+        onConfirm={() => confirmingDelete && deleteImage(confirmingDelete)}
+        onCancel={() => setConfirmingDelete(null)}
+      />
     </>
   );
 }

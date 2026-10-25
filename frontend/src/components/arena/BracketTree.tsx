@@ -150,7 +150,7 @@ export function BracketTree({ tournament, renderDuel }: { tournament: Tournament
       <div className="hidden gap-8 overflow-x-auto pb-4 sm:flex">
         {roundNumbers.map((roundNumber) => (
           <div key={roundNumber} className="grid min-w-72 flex-1 grid-cols-[repeat(auto-fit,minmax(18rem,1fr))] content-around gap-6">
-            <h3 className="col-span-full text-center text-xs font-semibold tracking-wide text-(--color-text-dim) uppercase">
+            <h3 className="col-span-full text-center text-xs font-semibold text-(--color-text-dim)">
               {labelFor(roundNumber)}
             </h3>
             {duelsIn(roundNumber).map((duel) => (

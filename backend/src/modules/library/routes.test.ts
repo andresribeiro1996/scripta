@@ -28,7 +28,7 @@ const kobo = { ContentID: "k1", Title: "Dune", Attribution: "Frank Herbert", Rea
 const goodreads = { ContentID: "g1", Title: "Dune", Attribution: "Frank Herbert", ISBN: "9780441013593", ReadStatus: 2 };
 
 const tooLargeBody = {
-  error: "Your library is over 10 MB, the most Scripta can store. Remove some books or highlights and try again.",
+  error: "Your library is over 10 MB, the most Atmyshelf can store. Remove some books or highlights and try again.",
   code: "LIBRARY_BODY_TOO_LARGE",
   maxBytes: 10485760
 };

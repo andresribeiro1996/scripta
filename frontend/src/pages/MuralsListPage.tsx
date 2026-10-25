@@ -246,7 +246,7 @@ export function MuralsListPage() {
                   regardless of its label's height. */}
               <div className="hidden flex-wrap items-end gap-3 sm:flex">
                 <label className="flex flex-col gap-1">
-                  <span className="text-[10.5px] font-semibold tracking-wide text-(--color-text-dim) uppercase">Search</span>
+                  <span className="text-[10.5px] font-semibold text-(--color-text-dim)">Search</span>
                   <input
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
@@ -255,7 +255,7 @@ export function MuralsListPage() {
                   />
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-[10.5px] font-semibold tracking-wide text-(--color-text-dim) uppercase">Sort</span>
+                  <span className="text-[10.5px] font-semibold text-(--color-text-dim)">Sort</span>
                   {/* appearance-none + a hand-drawn chevron, not the browser's
                       own <select> arrow — the native one rendered flush
                       against the box's right edge with no real breathing room

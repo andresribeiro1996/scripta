@@ -93,7 +93,7 @@ export function RecapCard({ card, month, currentMonth, url, sharing = false, onO
         {url ? <View style={styles.qr}><QRCode value={url} size={72} quietZone={4} backgroundColor="white" color="black" /></View> : null}
         <View style={styles.stripText}>
           <Text numberOfLines={3} {...dynamicType} style={[typography.body, { color: RECAP_COLORS.text, fontWeight: "600" }]}>{recapCta(card, currentMonth)}</Text>
-          <Svg accessibilityLabel="Scripta" width={20} height={20} viewBox={MARK_VIEWBOX}><MarkRects fill={RECAP_COLORS.gold} /></Svg>
+          <Svg accessibilityLabel="Atmyshelf" width={20} height={20} viewBox={MARK_VIEWBOX}><MarkRects fill={RECAP_COLORS.gold} /></Svg>
         </View>
       </View> : <Text numberOfLines={2} {...dynamicType} style={[typography.caption, styles.hint]}>{recapCta(card, currentMonth)}</Text>}
     </View>

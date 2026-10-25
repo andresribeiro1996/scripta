@@ -310,7 +310,7 @@ export function LibraryPage() {
     { label: "Library style…", onClick: () => navigate("/dashboard/style") },
     { label: "Share", onClick: () => setSharing(true) },
     {
-      label: importing ? "Importing…" : books.length > 0 ? "Import more…" : "Import library…",
+      label: importing ? "Importing…" : "Import library…",
       onClick: () => {
         if (!importing) fileInputRef.current?.click();
       }
@@ -370,7 +370,7 @@ export function LibraryPage() {
             </>
           ) : (
             <>
-              <button onClick={() => setAddingBook(true)} className={BUTTON_PRIMARY}>Add book</button>
+              <button onClick={() => setAddingBook(true)} className={BUTTON_PRIMARY}>Add a book</button>
               <div className="sm:hidden">
                 <OptionsMenu
                   items={actionItems}
@@ -390,7 +390,7 @@ export function LibraryPage() {
                   title={books.length > 0 ? "Matching books are merged with what's already here, not duplicated." : undefined}
                   className={BUTTON_SECONDARY}
                 >
-                  {importing ? "Importing…" : books.length > 0 ? "Import more…" : "Import library…"}
+                  {importing ? "Importing…" : "Import library"}
                 </button>
                 <a href={csvTemplateUrl} download="atmyshelf-library.csv" className={BUTTON_SECONDARY}>CSV template</a>
               </div>
@@ -410,7 +410,7 @@ export function LibraryPage() {
         </>
       }
     >
-      {searchParams.get("action") === "import" ? <div className="mb-4 rounded-lg border border-(--color-border) p-4"><h2 className="font-semibold">Import your library</h2><button className={`mt-2 ${BUTTON_SECONDARY}`} onClick={() => fileInputRef.current?.click()}>Choose import file</button></div> : null}
+      {searchParams.get("action") === "import" ? <div className="mb-4 rounded-lg border border-(--color-border) p-4"><h2 className="font-semibold">Import library</h2><button className={`mt-2 ${BUTTON_SECONDARY}`} onClick={() => fileInputRef.current?.click()}>Choose import file</button></div> : null}
 
       {importStatus && (
         <div className="mb-5 rounded-lg bg-(--color-accent-soft) px-3 py-2 text-sm text-(--color-accent)">{importStatus}</div>

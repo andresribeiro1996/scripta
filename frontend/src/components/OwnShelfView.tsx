@@ -213,7 +213,7 @@ export function OwnShelfView({ username }: { username: string }) {
                         Import library
                       </Link>
                       <Link to="/dashboard/library?action=add" className="rounded-lg border border-(--color-border) px-3 py-2 text-sm">
-                        Add a book manually
+                        Add a book
                       </Link>
                     </div>
                   }
@@ -315,7 +315,7 @@ function OwnerControls({
   const [confirming, setConfirming] = useState(false);
   const [muralId, setMuralId] = useState<string>(currentMuralId ?? "");
   const [next, setNext] = useState<FeedSettings>(feedSettings ?? DEFAULT_FEED_SETTINGS);
-  const sectionLabel = "px-3 pt-4 pb-2 text-[11px] font-semibold tracking-wider text-(--color-text-dim) uppercase";
+  const sectionLabel = "px-3 pt-4 pb-2 text-[11px] font-semibold text-(--color-text-dim)";
   return (
     <>
       <button
