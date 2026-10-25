@@ -43,14 +43,8 @@ export function SettingsScreen() {
   }
 
   async function confirmSignOut() {
-    setBusy(true);
-    try {
-      await signOut();
-      setSignOutOpen(false);
-      router.replace("/(public)/login");
-    } finally {
-      setBusy(false);
-    }
+    setSignOutOpen(false);
+    if (await run(signOut)) router.replace("/(public)/login");
   }
 
   return (
@@ -83,7 +77,7 @@ export function SettingsScreen() {
       <Button label="Account" variant="secondary" onPress={() => router.push("/account-security")} />
       <SocialsSection />
       <Button label="Sign out" variant="destructive" onPress={() => setSignOutOpen(true)} />
-      <ConfirmDialog visible={signOutOpen} title="Sign out" body="Sign out of Atmyshelf on this device?" confirmLabel="Sign out" destructive loading={busy} onConfirm={() => void confirmSignOut()} onCancel={() => setSignOutOpen(false)} />
+      <ConfirmDialog visible={signOutOpen} title="Sign out" body="Sign out of Atmyshelf on this device?" confirmLabel="Sign out" destructive onConfirm={() => void confirmSignOut()} onCancel={() => setSignOutOpen(false)} />
     </ScrollView>
     </Screen>
   );
