@@ -188,3 +188,32 @@ test("possible genres read as possible", () => {
   assert.ok(html.includes("Possibly History"));
   assert.ok(html.includes("Science Fiction"));
 });
+
+test("the work page shows a win pill, a nominee pill and the author prize line", () => {
+  const awards = [
+    { prize: "booker", year: 2019, won: false },
+    { prize: "hugo-novel", year: 1993, won: true },
+    { prize: "nobel-literature", year: 1998, won: true },
+    { prize: "camoes", year: 1995, won: true }
+  ];
+  const html = render({ page: { ...page, work: { ...page.work, awards } } });
+  const pill = (label: string) => html.match(new RegExp(`<li(?=[^>]*title="${label}")([^>]*)>(.*?)</li>`));
+  const win = pill("Hugo Award 1993");
+  const nominee = pill("Booker Prize 2019 · nominee");
+  assert.ok(win && nominee);
+  assert.match(win[1]!, /class="[^"]*bg-\(--color-accent-soft\)[^"]*text-\(--color-accent\)[^"]*"/);
+  assert.match(win[2]!, /^<span class="flex shrink-0"><svg[^>]*width="12"[^>]*>.*<\/svg><\/span><span class="truncate">Hugo Award 1993<\/span>$/);
+  assert.match(nominee[1]!, /class="[^"]*border-\(--color-border\)[^"]*text-\(--color-text-dim\)[^"]*"/);
+  assert.equal(nominee[2], '<span class="truncate">Booker Prize 2019 · nominee</span>');
+  for (const { 1: attributes } of [win, nominee]) assert.match(attributes!, /class="[^"]*\bmax-w-full\b[^"]*"/);
+  assert.match(html, /<p class="mt-1 text-xs text-\(--color-text-dim\)">Nobel Prize in Literature 1998 · Prémio Camões 1995<\/p>/);
+  assert.ok(html.indexOf("Hugo Award 1993") < html.indexOf("Booker Prize 2019 · nominee"));
+  assert.ok(html.indexOf("Booker Prize 2019 · nominee") < html.indexOf("Science Fiction"));
+  assert.ok(!html.includes("Nobel Prize in Literature 1998</span>"));
+});
+
+test("a work page with no awards has no pills and no author prize line", () => {
+  const html = render({});
+  assert.ok(!html.includes("nominee"));
+  assert.ok(!html.includes("Prize"));
+});

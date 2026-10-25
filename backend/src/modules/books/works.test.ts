@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { test } from "node:test";
+import type { BooksRepository } from "./domain/ports.js";
 
 const scratch = mkdtempSync(join(tmpdir(), "books-works-test-"));
 process.env.AUTH_DB_PATH = join(scratch, "auth.sqlite");
@@ -15,7 +16,7 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
 const { applyBooksMigrations } = await import("./adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("./adapters/sqlite/sqliteBooksRepository.js");
-const { resolveWorksWith, canonicalWorksWith, getWorkPageWith, matchWorksWith, catalogGenresWith } = await import("./works.js");
+const { resolveWorksWith, canonicalWorksWith, getWorkPageWith, getRecentAwardsWith, ANNOUNCE_DAYS, matchWorksWith, catalogGenresWith } = await import("./works.js");
 const { summaryHashOf } = await import("./domain/synopsis.js");
 
 function freshRepo() {
@@ -221,4 +222,96 @@ test("a work page without a series or a collection answers null for both", () =>
   const page = getWorkPageWith(repo, () => "x", id!)!;
   assert.equal(page.series, null);
   assert.deepEqual(page.editions.map((e) => e.collection), [null]);
+});
+
+const AWARDS_NOW = new Date("2026-10-25T12:00:00.000Z");
+const daysAgo = (days: number) => new Date(AWARDS_NOW.getTime() - days * 86_400_000).toISOString();
+const awardOf = (workId: string, prize: string, year: number, won: boolean, honoree: string | null = null) => ({ workId, prize, year, won, honoree });
+
+function awardedBook(repo: ReturnType<typeof freshRepo>["repo"], title: string, author: string, isbn: string, workKey?: string) {
+  return repo.createBook({ title, author, isbn, workKey }, [`isbn:${isbn}`], "2026-10-01T00:00:00.000Z");
+}
+
+test("getWorkPageWith includes the work's awards, wins first, newest first", () => {
+  const { repo } = freshRepo();
+  const dune = awardedBook(repo, "Dune", "Frank Herbert", "9780441013593");
+  const quiet = awardedBook(repo, "Quiet Book", "Nobody", "9780441172719");
+  repo.addWorkAward(awardOf(dune.work_id!, "booker", 2019, false), daysAgo(40));
+  repo.addWorkAward(awardOf(dune.work_id!, "hugo-novel", 1966, true), daysAgo(40));
+  repo.addWorkAward(awardOf(dune.work_id!, "pulitzer-fiction", 1999, true), daysAgo(40));
+  repo.addWorkAward(awardOf(dune.work_id!, "goodreads-choice", 2020, true), daysAgo(40));
+  assert.deepEqual(getWorkPageWith(repo, () => "x", dune.work_id!)!.awards, [
+    { prize: "pulitzer-fiction", year: 1999, won: true },
+    { prize: "hugo-novel", year: 1966, won: true },
+    { prize: "booker", year: 2019, won: false }
+  ]);
+  assert.deepEqual(getWorkPageWith(repo, () => "x", quiet.work_id!)!.awards, []);
+});
+
+test("getRecentAwardsWith builds book-prize winners with title, author and the first edition cover", () => {
+  const { repo } = freshRepo();
+  const bare = awardedBook(repo, "Shuggie Bain", "Douglas Stuart", "9780802129703", "OL1W");
+  const covered = awardedBook(repo, "Shuggie Bain", "Douglas Stuart", "9781529068801", "OL1W");
+  const second = awardedBook(repo, "Girl, Woman, Other", "Bernardine Evaristo", "9780241984949", "OL2W");
+  const nominee = awardedBook(repo, "Nominee", "Someone", "9780441172719", "OL3W");
+  assert.equal(bare.work_id, covered.work_id);
+  repo.insertImage({ id: "shuggie", book_id: covered.id, source: "apple", source_url: null, width: 900, height: 1400, byte_size: 10, color: "#aa0000", created_at: daysAgo(10) });
+  repo.setCover(covered.id, { imageId: "shuggie", status: "good", checkedAt: daysAgo(10) });
+  repo.addWorkAward(awardOf(bare.work_id!, "booker", 2026, true), daysAgo(3));
+  repo.addWorkAward(awardOf(second.work_id!, "booker", 2026, true), daysAgo(3));
+  repo.addWorkAward(awardOf(nominee.work_id!, "booker", 2026, false), daysAgo(40));
+  assert.deepEqual(getRecentAwardsWith(repo, (imageId) => `cover:${imageId}`, AWARDS_NOW), [{
+    prize: "booker",
+    year: 2026,
+    announcedAt: daysAgo(3),
+    winners: [
+      { workId: bare.work_id, title: "Shuggie Bain", author: "Douglas Stuart", coverUrl: "cover:shuggie" },
+      { workId: second.work_id, title: "Girl, Woman, Other", author: "Bernardine Evaristo", coverUrl: null }
+    ],
+    nomineeWorkIds: [nominee.work_id],
+    honoree: null
+  }]);
+});
+
+test("getRecentAwardsWith gives an author prize its honoree and work ids and no winners", () => {
+  const { repo } = freshRepo();
+  const first = awardedBook(repo, "The Vegetarian", "Han Kang", "9780553448184");
+  const second = awardedBook(repo, "Human Acts", "Han Kang", "9781101906118");
+  const camoes = awardedBook(repo, "Sonetos", "Luís Vaz", "9789720000001");
+  repo.addWorkAward(awardOf(first.work_id!, "nobel-literature", 2026, true, "Kang Han-gang"), daysAgo(1));
+  repo.addWorkAward(awardOf(second.work_id!, "nobel-literature", 2026, true, "Kang Han-gang"), daysAgo(1));
+  repo.addWorkAward(awardOf(camoes.work_id!, "camoes", 2026, true), daysAgo(2));
+  assert.deepEqual(getRecentAwardsWith(repo, () => "x", AWARDS_NOW), [
+    { prize: "nobel-literature", year: 2026, announcedAt: daysAgo(1), winners: [], nomineeWorkIds: [], honoree: { name: "Kang Han-gang", workIds: [first.work_id, second.work_id] } },
+    { prize: "camoes", year: 2026, announcedAt: daysAgo(2), winners: [], nomineeWorkIds: [], honoree: { name: "Luís Vaz", workIds: [camoes.work_id] } }
+  ]);
+});
+
+test("getRecentAwardsWith asks for the current UTC year and ANNOUNCE_DAYS back", () => {
+  const calls: Array<[number, string]> = [];
+  const books = { recentAwards: (year: number, since: string) => { calls.push([year, since]); return []; } } as unknown as BooksRepository;
+  assert.deepEqual(getRecentAwardsWith(books, () => "x", new Date("2027-01-01T00:30:00+02:00")), []);
+  assert.deepEqual(calls, [[2026, "2026-12-17T22:30:00.000Z"]]);
+  assert.equal(ANNOUNCE_DAYS, 14);
+});
+
+test("getRecentAwardsWith breaks announcedAt ties in prize-list order", () => {
+  const { repo } = freshRepo();
+  const winner = awardedBook(repo, "Winner", "Someone", "9780441172719");
+  for (const prize of ["ape-novel", "saramago", "booker"]) repo.addWorkAward(awardOf(winner.work_id!, prize, 2026, true), daysAgo(5));
+  repo.addWorkAward(awardOf(winner.work_id!, "nebula-novel", 2026, true), daysAgo(1));
+  assert.deepEqual(getRecentAwardsWith(repo, () => "x", AWARDS_NOW).map((announcement) => announcement.prize), ["nebula-novel", "booker", "saramago", "ape-novel"]);
+});
+
+test("getRecentAwardsWith skips unknown prizes, gone winners, and announcements left with nobody to show", () => {
+  const { repo } = freshRepo();
+  const winner = awardedBook(repo, "Winner", "Someone", "9780441172719");
+  repo.addWorkAward(awardOf(winner.work_id!, "goodreads-choice", 2026, true), daysAgo(1));
+  repo.addWorkAward(awardOf("gone-work", "hugo-novel", 2026, true), daysAgo(2));
+  repo.addWorkAward(awardOf(winner.work_id!, "hugo-novel", 2026, true), daysAgo(2));
+  repo.addWorkAward(awardOf("gone-work", "nebula-novel", 2026, true), daysAgo(3));
+  repo.addWorkAward(awardOf("gone-work", "camoes", 2026, true), daysAgo(4));
+  const announcements = getRecentAwardsWith(repo, () => "x", AWARDS_NOW);
+  assert.deepEqual(announcements.map((announcement) => announcement.prize), ["hugo-novel"]);
+  assert.deepEqual(announcements[0]!.winners.map((entry) => entry.workId), [winner.work_id]);
 });

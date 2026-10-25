@@ -175,6 +175,17 @@ export function BookScreen({ page, book, model, signedIn, onAdd, onSelectEdition
         <Text {...dynamicType} style={[typography.heading, styles.centeredText, { color: colors.text }]}>{model.title}</Text>
         {model.series ? <SeriesLine series={model.series} signedIn={signedIn} segments={segments} /> : null}
         <Text {...dynamicType} style={[typography.body, styles.centeredText, { color: colors.textDim }]}>{model.author}</Text>
+        {model.authorAwards ? <Text {...dynamicType} style={[typography.caption, styles.centeredText, { color: colors.textDim }]}>{model.authorAwards}</Text> : null}
+        {model.awards.length > 0 ? (
+          <View style={styles.chips}>
+            {model.awards.map((award) => (
+              <View key={award.label} style={[styles.chip, styles.pill, award.won ? { borderColor: colors.accentSoft, backgroundColor: colors.accentSoft } : { borderColor: colors.border }]}>
+                {award.won ? <Icon name="champion" size={12} color={colors.accent} /> : null}
+                <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.shrink, { color: award.won ? colors.accent : colors.textDim }]}>{award.label}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
         {model.genres.length + model.possibleGenres.length > 0 ? (
           <View style={styles.chips}>
             {model.genres.map((genre) => (
@@ -320,6 +331,8 @@ const styles = StyleSheet.create({
   chips: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs, justifyContent: "center" },
   chip: { borderWidth: 1, borderRadius: radii.full, paddingHorizontal: spacing.sm },
   possibleChip: { borderStyle: "dashed" },
+  pill: { flexDirection: "row", alignItems: "center", gap: spacing.xs, maxWidth: "100%" },
+  shrink: { flexShrink: 1 },
   section: { gap: spacing.sm },
   group: { gap: spacing.sm },
   primaryRow: { flexDirection: "row", gap: spacing.sm, minHeight: 44 },

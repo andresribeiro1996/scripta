@@ -6,7 +6,7 @@ import { timeStep, timeSync, timedMethods } from "../../stallLog.js";
 import { createObjectStore } from "../../storage/createObjectStore.js";
 import { createCompositeCatalog } from "./adapters/catalog/compositeCatalog.js";
 import { onlyMatchingLanguage } from "./adapters/catalog/languageFilter.js";
-import { createThrottle, fetchBytes } from "./adapters/http/http.js";
+import { createThrottle, fetchBytes, fetchJson } from "./adapters/http/http.js";
 import { createIsbndbBudget, ISBNDB_DAILY_QUOTA, ISBNDB_SEARCH_RESERVE } from "./adapters/isbndb/isbndbBudget.js";
 import { createIsbndbCatalog } from "./adapters/isbndb/isbndbCatalog.js";
 import { capDailyCalls } from "./adapters/isbndb/isbndbDailyCap.js";
@@ -17,6 +17,7 @@ import { createIsbndbSource } from "./adapters/sources/isbndb.js";
 import { createOpenLibraryCoverSource } from "./adapters/sources/openLibrary.js";
 import { openBooksDb } from "./adapters/sqlite/connection.js";
 import { createSqliteBooksRepository } from "./adapters/sqlite/sqliteBooksRepository.js";
+import { queryWikidata } from "./adapters/wikidata/sparql.js";
 import { startGenreJobsIfConfigured } from "./genreJudgments.js";
 import { genreReviewWith, reviewGenreWith } from "./genreReview.js";
 import { startSynopsisJobsIfConfigured } from "./synopsisJudgments.js";
@@ -37,6 +38,7 @@ import type { CoverBlobReader, CoverBlobStore } from "./domain/ports.js";
 import { coverUrlFor, useBooksRepository } from "./publicCoverLookup.js";
 import { buildAdminRoutes, buildCatalogRoutes, buildCoverFileRoutes, buildGenreReviewRoutes, buildResolveRoutes, buildSynopsisReviewRoutes, buildTranslationReviewRoutes } from "./routes.js";
 import { RETITLE_BATCH_SIZE, retitleWanted } from "./retitleJob.js";
+import { refreshAwards } from "./seed/awardsFill.js";
 import { BNP_SYNC_INTERVAL_MS, fetchBnpPage, fetchBnpScan, logBnpSync, lookupBnpIsbn, syncBnp, type BnpHarvestDeps } from "./seed/bnpImport.js";
 import { fetchText } from "./seed/siteFetch.js";
 import { createCoverWorker } from "./worker.js";
@@ -61,7 +63,8 @@ const FIRST_RUN_DELAY_MS = {
   translationSweep: 90_000,
   worksGrouping: 120_000,
   bnpSync: 150_000,
-  koboCovers: 165_000
+  koboCovers: 165_000,
+  awardsRefresh: 180_000
 };
 
 let activeService: BooksService | null = null;
@@ -238,6 +241,13 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
   if (koboCoverLookups) {
     jobs.every("kobo covers", KOBO_COVERS_INTERVAL_MS, () => timeSync(app.log, "kobo-covers", () => service.recordKoboImageIds(koboCoverLookups())), FIRST_RUN_DELAY_MS.koboCovers);
   }
+  jobs.every("awards refresh", 24 * 60 * 60 * 1000, (signal) => refreshAwards({
+    repo,
+    query: (q) => queryWikidata(q, { log: (line) => app.log.warn(line), signal }),
+    fetchWork: (key) => openLibraryThrottle(() => fetchJson("openlibrary", `https://openlibrary.org/works/${key}.json`)),
+    now: Date.now,
+    info: (details, message) => app.log.info(details, message)
+  }, signal), FIRST_RUN_DELAY_MS.awardsRefresh);
   if (genreJobs) jobs.own(genreJobs.stop);
   if (synopsisJobs) jobs.own(synopsisJobs.stop);
   if (translationJobs) jobs.own(translationJobs.stop);

@@ -1,4 +1,4 @@
-import type { BookMetadata, BookSearchResult, CatalogBookMetadata } from "@scripta/shared";
+import type { BookMetadata, BookSearchResult, CatalogBookMetadata, WorkAward } from "@scripta/shared";
 import type { KeyedWork } from "./duplicateWorks.js";
 import type { SynopsisJudgment, SynopsisKind } from "./synopsis.js";
 import type { CollectionSource, SeriesEntry, SeriesSource } from "./series.js";
@@ -17,6 +17,15 @@ export interface CoverBlobReader {
 
 export interface PageCursor { at: string; row: number }
 export interface IdPage { ids: string[]; next: PageCursor | null }
+
+export interface RecentAward {
+  prize: string;
+  year: number;
+  announcedAt: string;
+  winnerWorkIds: string[];
+  nomineeWorkIds: string[];
+  honoree: string | null;
+}
 
 export interface BooksRepository {
   transaction<T>(write: () => T): T;
@@ -138,6 +147,9 @@ export interface BooksRepository {
   collectionsOf(bookIds: string[]): Map<string, SeriesEntry>;
   searchSeriesWorks(tokens: string[], limit: number): string[];
   searchCollectionBooks(tokens: string[], limit: number): Array<{ bookId: string } & SeriesEntry>;
+  addWorkAward(row: { workId: string; prize: string; year: number; won: boolean; honoree: string | null }, at: string): boolean;
+  awardsOf(workIds: string[]): Map<string, WorkAward[]>;
+  recentAwards(year: number, since: string): RecentAward[];
 }
 
 export interface CoverCandidate {

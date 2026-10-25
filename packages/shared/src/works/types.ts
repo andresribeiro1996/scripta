@@ -14,8 +14,16 @@ export type WorkGameRef = { id: string; name: string; owner: ReaderProfile | "ap
 
 export type WorkRating = { value: number; count: number };
 
+export type WorkAward = { prize: string; year: number; won: boolean };
+
+export type AwardWinner = { workId: string; title: string; author: string; coverUrl: string | null };
+
+export type AwardAnnouncement = { prize: string; year: number; announcedAt: string; winners: AwardWinner[]; nomineeWorkIds: string[]; honoree: { name: string; workIds: string[] } | null };
+
+export type RecentAwards = { announcements: AwardAnnouncement[] };
+
 export type WorkPage = {
-  work: { id: string; title: string; author: string; summary: string | null; coverUrl: string | null; coverColor: string | null; editions: WorkEdition[]; genres: string[]; possibleGenres?: string[]; rating: WorkRating | null; year: number | null; pages: number | null; series?: BookSeries | null };
+  work: { id: string; title: string; author: string; summary: string | null; coverUrl: string | null; coverColor: string | null; editions: WorkEdition[]; genres: string[]; possibleGenres?: string[]; rating: WorkRating | null; year: number | null; pages: number | null; series?: BookSeries | null; awards?: WorkAward[] };
   mine: WorkMine | null;
   readers: { followed: WorkReader[]; others: WorkReader[]; counts: { readers: number; finished: number } };
   games: { tierlists: WorkGameRef[]; arenas: WorkGameRef[]; quizzes: WorkGameRef[] };

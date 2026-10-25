@@ -3,6 +3,7 @@ import type { BookSeries } from "../library/bookSearch.js";
 import { statusLabel } from "../library/covers.js";
 import { FINISH_FEELINGS, type FinishRating } from "../library/finish.js";
 import type { IdentityKey } from "../readerCards/index.js";
+import { PRIZES, awardLabel, knownAwards } from "./awards.js";
 import { ratingCountLabel } from "./bookStats.js";
 import { gameOwnerLabel, readerCountsLabel, readerStatusLabel, summaryPreview } from "./labels.js";
 import type { WorkEdition, WorkGameRef, WorkPage, WorkReader } from "./types.js";
@@ -15,6 +16,8 @@ export type BookScreenReaderRow = { username: string; avatarUrl: string | null; 
 export type BookScreenModel = {
   title: string;
   author: string;
+  authorAwards: string | null;
+  awards: Array<{ label: string; won: boolean }>;
   genres: string[];
   possibleGenres: string[];
   series: BookSeries | null;
@@ -62,6 +65,15 @@ function gameRows(games: WorkPage["games"]) {
   return kinds.flatMap(([key, label, list]) => list.map((game) => ({ key: `${key}-${game.id}`, title: game.name, detail: `${label} · ${gameOwnerLabel(game.owner)}`, path: game.path })));
 }
 
+function awardLines(awards: WorkPage["work"]["awards"]) {
+  const known = knownAwards(awards);
+  const authorParts = known.filter((award) => PRIZES[award.prize].honours === "author").map((award) => `${PRIZES[award.prize].label} ${award.year}`);
+  return {
+    awards: known.filter((award) => PRIZES[award.prize].honours === "work").map((award) => ({ label: awardLabel(award), won: award.won })),
+    authorAwards: authorParts.length > 0 ? authorParts.join(" · ") : null
+  };
+}
+
 const withCount = (label: string, count: number) => (count > 0 ? `${label} (${count})` : label);
 
 function defaultEditionIndex(work: WorkPage["work"]) {
@@ -97,10 +109,13 @@ export function bookScreenModel(page: WorkPage | null, book: Book | null, viewer
     ...(book ? [{ key: "highlights" as const, label: withCount("Highlights", highlights.length) }] : []),
     ...(page ? [{ key: "community" as const, label: withCount("Community", page.readers.counts.readers) }] : [])
   ];
+  const { awards, authorAwards } = awardLines(work?.awards);
   const menu: BookScreenMenuKey[] = [...(book ? (["style", "cover"] as const) : []), ...(viewer.isAdmin && !selected ? (["rejectCover", "replaceCover"] as const) : [])];
   return {
     title: selected?.title ?? work?.title ?? String(book?.Title ?? "Untitled"),
     author: work?.author ?? String(book?.Attribution ?? "Unknown author"),
+    authorAwards,
+    awards,
     genres: work ? work.genres ?? [] : book ? genresForBook(book).slice(0, GENRE_CAP) : [],
     possibleGenres: work?.possibleGenres ?? [],
     series: work ? work.series ?? (selected ?? work.editions[defaultEditionIndex(work)])?.collection ?? null : null,

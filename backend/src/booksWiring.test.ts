@@ -91,12 +91,13 @@ test("every books job arms its first run with its own delay and calls nothing be
     translationSweep: 90_000,
     worksGrouping: 120_000,
     bnpSync: 150_000,
-    koboCovers: 165_000
+    koboCovers: 165_000,
+    awardsRefresh: 180_000
   };
   const wanted = new Map<number, number>([[arenaSweep, 1]]);
   for (const delay of Object.values(expected)) wanted.set(delay, (wanted.get(delay) ?? 0) + 1);
   for (const [delay, count] of wanted) {
     assert.ok(delays.filter((armed) => armed === delay).length >= count, `expected ${count} first runs armed at ${delay} ms`);
   }
-  assert.deepEqual(requests.map(String).filter((url) => /typesafe|isbndb|bnportugal|porbase|openlibrary|cdn\.kobo\.com/.test(url)), []);
+  assert.deepEqual(requests.map(String).filter((url) => /typesafe|isbndb|bnportugal|porbase|openlibrary|cdn\.kobo\.com|wikidata/.test(url)), []);
 });

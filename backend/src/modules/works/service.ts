@@ -1,4 +1,4 @@
-import { cleanSummary, validBookRating, workGenres, type IdentityKey, type ReaderProfile, type WorkGameRef, type WorkPage, type WorkReader } from "@scripta/shared";
+import { cleanSummary, validBookRating, workGenres, type AwardAnnouncement, type IdentityKey, type ReaderProfile, type RecentAwards, type WorkGameRef, type WorkPage, type WorkReader } from "@scripta/shared";
 import { summaryMatchesLanguage, type CatalogWorkPage } from "../books/index.js";
 import type { ViewerCopy } from "../library/index.js";
 
@@ -15,6 +15,7 @@ export type WorksDeps = {
   tierlists(workIds: string[], limit: number): GameByWork[];
   arenas(workIds: string[], limit: number): GameByWork[];
   quizzes(workIds: string[], limit: number): GameByWork[];
+  getRecentAwards(): AwardAnnouncement[];
 };
 
 const READER_CAP = 50;
@@ -75,6 +76,10 @@ export function createWorksService(deps: WorksDeps) {
   }
 
   return {
+    recentAwards(): RecentAwards {
+      return { announcements: deps.getRecentAwards() };
+    },
+
     getPage(id: string, viewerId: string | null): WorkPage | undefined {
       const work = deps.getWorkPage(id);
       if (!work) return undefined;
@@ -94,6 +99,7 @@ export function createWorksService(deps: WorksDeps) {
           coverUrl,
           coverColor,
           series: work.series ? { ...work.series, kind: "series" } : null,
+          awards: work.awards,
           editions: work.editions.map((edition) => ({ bookId: edition.bookId, title: edition.title, language: edition.language, year: edition.year, isbn: edition.isbn, coverUrl: edition.coverUrl, coverColor: edition.coverColor, pages: edition.pages, mine: edition === mineEdition, collection: edition.collection ? { ...edition.collection, kind: "collection" } : null })),
           ...workGenres(work.editions),
           rating: bestRating(work.editions),
