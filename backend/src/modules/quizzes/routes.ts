@@ -6,7 +6,7 @@
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
-import type { PlayResponse } from "@scripta/shared";
+import { QUIZ_QUESTION_TYPES, type PlayResponse } from "@scripta/shared";
 import { authGuard, getOptionalAuthenticatedUser } from "../auth/index.js";
 import { duplicateWorkMessage } from "../library/index.js";
 import { sendWorksError } from "../../worksErrors.js";
@@ -29,7 +29,7 @@ const quizBookSchema = z.object({
 const quizDataSchema = z.object({
   sourceLabel: z.string().trim().max(200).default(""),
   questionCount: z.number().int().min(1).max(20).default(10),
-  allowedTypes: z.array(z.enum(["cover_title", "title_cover", "quote_title", "blurb_title"])).min(1).default(["cover_title", "title_cover", "quote_title", "blurb_title"]),
+  allowedTypes: z.array(z.enum(QUIZ_QUESTION_TYPES)).min(1).default(["cover_title", "title_cover", "quote_title", "blurb_title"]),
   books: z.array(quizBookSchema).max(500).default([])
 });
 

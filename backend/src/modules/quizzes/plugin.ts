@@ -4,6 +4,7 @@
 
 import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
+import { getWorkCharacters } from "../books/index.js";
 import { canonicalByKey, knownWorkIds, resolvePublicBooksByWork, resolveTitleWorks } from "../library/index.js";
 import { openQuizzesDb } from "./adapters/sqlite/connection.js";
 import { createSqliteQuizzesRepository } from "./adapters/sqlite/sqliteQuizzesRepository.js";
@@ -18,7 +19,7 @@ export interface QuizzesPluginOptions {
   resolveUsernames?: ResolveUsernames;
 }
 
-export const quizWorks: QuizWorks = { knownWorkIds, resolveTitleWorks, canonicalByKey, publicBooksByWork: resolvePublicBooksByWork };
+export const quizWorks: QuizWorks = { knownWorkIds, resolveTitleWorks, canonicalByKey, publicBooksByWork: resolvePublicBooksByWork, charactersOf: getWorkCharacters };
 
 export async function quizzesPlugin(app: FastifyInstance, opts: QuizzesPluginOptions = {}) {
   // --- composition: swap this one block to change storage technology ---
