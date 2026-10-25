@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Stack, router } from "expo-router";
 import { FlatList, Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
@@ -268,11 +268,17 @@ export function MuralPicker({
   const murals = useMurals();
   const [selected, setSelected] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const working = useRef(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!visible) setCreateError(null);
+  }, [visible]);
   const items = murals.data ?? [];
   const noMurals = murals.isSuccess && items.length === 0;
 
   async function createMural() {
+    if (working.current) return;
+    working.current = true;
     setCreating(true);
     setCreateError(null);
     try {
@@ -282,6 +288,7 @@ export function MuralPicker({
     } catch (reason) {
       setCreateError(reason instanceof Error ? reason.message : "Couldn't create the mural. Try again.");
     } finally {
+      working.current = false;
       setCreating(false);
     }
   }
@@ -295,7 +302,7 @@ export function MuralPicker({
         {murals.isPending ? (
           <Skeleton height={120} />
         ) : noMurals ? (
-          <EmptyState title="No murals yet" actionLabel={creating ? "Creating…" : "Create a mural"} onAction={() => { if (!creating) void createMural(); }} />
+          <EmptyState title="No murals yet" actionLabel={creating ? "Creating…" : "Create a mural"} onAction={() => void createMural()} />
         ) : (
           <FlatList
             data={items}
