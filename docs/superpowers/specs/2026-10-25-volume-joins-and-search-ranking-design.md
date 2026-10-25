@@ -51,7 +51,7 @@ Ranking can't put the volumes first while two of them are hidden inside the omni
   - about 150 queries from outside sources, with 50 held back so the ranking isn't fitted to the tuning books;
   - grading runs on the production server over `railway ssh`;
   - scoring runs locally on a snapshot.
-- **Popularity signals:** start with the free ones (editions, languages, Scripta readers, has-a-cover) plus the Wikidata Wikipedia count. The scorecard decides which stay. Open Library reader counts and Hardcover come later, and only if the scorecard shows famous books still ranking too low.
+- **Popularity signals:** start with the free ones (editions, languages, has-a-cover) plus the Wikidata Wikipedia count. Scripta readers were dropped: the user pointed out Scripta has almost no users, so the count can't move a score and would add library-module plumbing. The scorecard decides which stay. Open Library reader counts and Hardcover come later, and only if the scorecard shows famous books still ranking too low.
 
 ## Goals
 
@@ -213,7 +213,6 @@ Changes, each measured against the scorecard:
 3. **Then text match combined with how well known the work is.** Candidate signals, each kept only if it raises the overall score without making any of the hard examples wrong:
    - number of editions;
    - number of distinct edition languages;
-   - Scripta readers holding it;
    - has a cover;
    - the Wikidata Wikipedia (sitelink) count.
 
