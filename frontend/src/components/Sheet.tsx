@@ -19,12 +19,14 @@ export function Sheet({
   children,
   onClose,
   onBack,
+  footer,
   style
 }: {
   title: string;
   children: ReactNode;
   onClose: () => void;
   onBack?: () => void;
+  footer?: ReactNode;
   style?: CSSProperties;
 }) {
   useScrollLock();
@@ -44,7 +46,7 @@ export function Sheet({
         // The bottom padding carries the safe-area inset: a sheet's rows
         // run to the very bottom edge, so without it the last row sits
         // under a gesture bar.
-        className="flex max-h-[90dvh] w-full flex-col overflow-hidden rounded-t-3xl bg-(--color-surface) pb-[env(safe-area-inset-bottom,0px)] shadow-xl sm:max-w-md sm:rounded-2xl sm:pb-0"
+        className="flex max-h-[90dvh] w-full flex-col overflow-hidden rounded-t-3xl bg-(--color-surface) pb-[env(safe-area-inset-bottom,0px)] shadow-xl sm:max-w-md sm:rounded-xl sm:pb-0"
         style={style}
         onClick={(e) => e.stopPropagation()}
         onKeyDown={keepTabInside}
@@ -73,7 +75,7 @@ export function Sheet({
               </svg>
             </button>
           )}
-          <h2 className="min-w-0 flex-1 truncate pl-1 text-base font-semibold">{title}</h2>
+          <h2 className="min-w-0 flex-1 truncate pl-1 text-lg font-bold">{title}</h2>
           <button
             ref={closeRef}
             onClick={onClose}
@@ -86,6 +88,7 @@ export function Sheet({
           </button>
         </div>
         <div className="min-h-0 overflow-y-auto overscroll-contain p-2 pt-0">{children}</div>
+        {footer && <div className="flex shrink-0 justify-end gap-2 px-4 pt-2 pb-3">{footer}</div>}
       </div>
     </div>
   );

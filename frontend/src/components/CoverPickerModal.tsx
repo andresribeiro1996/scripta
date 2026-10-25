@@ -1,10 +1,10 @@
 import { useRef, useState } from "react";
 import type { GalleryImage } from "../api/gallery";
 import { useDeleteGalleryImage } from "../hooks/useDeleteGalleryImage";
-import { useDismissible } from "../hooks/useDismissible";
 import { useGalleryImages } from "../hooks/useGalleryImages";
 import { useConfirm } from "./ConfirmDialog";
-import { useScrollLock } from "../hooks/useScrollLock";
+import { BUTTON_SECONDARY } from "./page/buttonClasses";
+import { Sheet } from "./Sheet";
 import { CloseIcon } from "./Toolbar";
 
 /** "Cover" button's modal (BookCard.tsx, everywhere a card renders;
@@ -39,8 +39,6 @@ export function CoverPickerModal({
   onRemoveCover: () => void;
   onClose: () => void;
 }) {
-  useScrollLock();
-  useDismissible(onClose);
   const { images, isLoading, upload } = useGalleryImages();
   const deleteImage = useDeleteGalleryImage();
   const confirm = useConfirm();
@@ -85,120 +83,103 @@ export function CoverPickerModal({
   }
 
   return (
-    <div className="overlay-in fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+    <Sheet title={`Cover for "${title}"`} onClose={onClose} style={{ maxWidth: "42rem" }}>
+      <p className="mx-2 text-xs text-(--color-text-dim)">Pick one of your uploaded images, or upload a new one.</p>
+
       <div
-        className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-(--color-border) bg-(--color-surface) shadow-lg"
-        onClick={(e) => e.stopPropagation()}
+        className={`m-2 mb-0 flex items-center justify-between gap-3 rounded-lg border-2 border-dashed px-4 py-3 text-sm transition-colors ${
+          dragOver ? "border-(--color-accent) bg-(--color-accent-soft)" : "border-(--color-border)"
+        }`}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragOver(true);
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragOver(false);
+          const file = e.dataTransfer.files?.[0];
+          if (file) void handleUpload(file);
+        }}
       >
-        <div className="flex items-center justify-between border-b border-(--color-border) p-4">
-          <div>
-            <h3 className="text-sm font-semibold">Cover for "{title}"</h3>
-            <p className="text-xs text-(--color-text-dim)">Pick one of your uploaded images, or upload a new one.</p>
-          </div>
-          <button onClick={onClose} className="text-sm text-(--color-text-dim) hover:text-(--color-text)">
-            Close
-          </button>
-        </div>
-
-        <div
-          className={`m-4 mb-0 flex items-center justify-between gap-3 rounded-lg border-2 border-dashed px-4 py-3 text-sm transition-colors ${
-            dragOver ? "border-(--color-accent) bg-(--color-accent-soft)" : "border-(--color-border)"
-          }`}
-          onDragOver={(e) => {
-            e.preventDefault();
-            setDragOver(true);
-          }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setDragOver(false);
-            const file = e.dataTransfer.files?.[0];
+        <span className="text-(--color-text-dim)">Drag an image here, or</span>
+        <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className={BUTTON_SECONDARY}>
+          {uploading ? "Uploading…" : "Upload new image…"}
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/heic"
+          hidden
+          onChange={(e) => {
+            const file = e.target.files?.[0];
             if (file) void handleUpload(file);
+            e.target.value = "";
           }}
-        >
-          <span className="text-(--color-text-dim)">Drag an image here, or</span>
+        />
+      </div>
+      {uploadError && <p className="mx-2 mt-2 text-xs text-(--color-danger)">{uploadError}</p>}
+
+      {currentImageId && (
+        <div className="mx-2 mt-3">
           <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-            className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-1.5 text-sm font-semibold hover:bg-(--color-surface-hover) disabled:opacity-60"
-          >
-            {uploading ? "Uploading…" : "Upload new image…"}
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp,image/heic"
-            hidden
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) void handleUpload(file);
-              e.target.value = "";
+            onClick={() => {
+              onRemoveCover();
+              onClose();
             }}
-          />
+            className="text-xs text-(--color-danger) transition-opacity hover:opacity-80"
+          >
+            {removeCoverLabel}
+          </button>
         </div>
-        {uploadError && <p className="mx-4 mt-2 text-xs text-(--color-danger)">{uploadError}</p>}
+      )}
 
-        {currentImageId && (
-          <div className="mx-4 mt-3">
-            <button
-              onClick={() => {
-                onRemoveCover();
-                onClose();
-              }}
-              className="text-xs text-(--color-danger) transition-opacity hover:opacity-80"
-            >
-              {removeCoverLabel}
-            </button>
-          </div>
+      <div className="p-2">
+        {isLoading && <p className="text-sm text-(--color-text-dim)">Loading your gallery…</p>}
+        {!isLoading && images.length === 0 && (
+          <p className="text-sm text-(--color-text-dim)">No images in your gallery yet — upload one above.</p>
         )}
-
-        <div className="flex-1 overflow-y-auto overscroll-contain p-4">
-          {isLoading && <p className="text-sm text-(--color-text-dim)">Loading your gallery…</p>}
-          {!isLoading && images.length === 0 && (
-            <p className="text-sm text-(--color-text-dim)">No images in your gallery yet — upload one above.</p>
-          )}
-          {images.length > 0 && (
-            <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
-              {images.map((image) => (
-                // A plain div, not a <button> — it hosts the delete
-                // button as a real child, and a <button> can't validly
-                // contain another interactive element.
-                <div
-                  key={image.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => {
+        {images.length > 0 && (
+          <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
+            {images.map((image) => (
+              // A plain div, not a <button> — it hosts the delete
+              // button as a real child, and a <button> can't validly
+              // contain another interactive element.
+              <div
+                key={image.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => {
+                  onSelect(image);
+                  onClose();
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
                     onSelect(image);
                     onClose();
+                  }
+                }}
+                className={`group relative aspect-square cursor-pointer overflow-hidden rounded-lg border-2 bg-(--color-border) ${
+                  image.id === currentImageId ? "border-(--color-accent)" : "border-transparent"
+                }`}
+              >
+                <img src={image.url} alt="" className="h-full w-full object-cover" />
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void handleDeleteImage(image.id);
                   }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      onSelect(image);
-                      onClose();
-                    }
-                  }}
-                  className={`group relative aspect-square cursor-pointer overflow-hidden rounded-lg border-2 bg-(--color-border) ${
-                    image.id === currentImageId ? "border-(--color-accent)" : "border-transparent"
-                  }`}
+                  title="Delete from gallery"
+                  className="absolute top-1 right-1 flex h-6 w-6 items-center justify-center rounded-full bg-[rgba(10,8,6,0.72)] text-xs font-bold text-white opacity-0 backdrop-blur-xs transition-opacity group-hover:opacity-100 pointer-coarse:h-9 pointer-coarse:w-9 pointer-coarse:opacity-100"
                 >
-                  <img src={image.url} alt="" className="h-full w-full object-cover" />
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      void handleDeleteImage(image.id);
-                    }}
-                    title="Delete from gallery"
-                    className="absolute top-1 right-1 flex h-6 w-6 items-center justify-center rounded-full bg-[rgba(10,8,6,0.72)] text-xs font-bold text-white opacity-0 backdrop-blur-xs transition-opacity group-hover:opacity-100 pointer-coarse:h-9 pointer-coarse:w-9 pointer-coarse:opacity-100"
-                  >
-                    {deletingId === image.id ? "…" : <CloseIcon size={13} />}
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+                  {deletingId === image.id ? "…" : <CloseIcon size={13} />}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
-    </div>
+    </Sheet>
   );
 }
