@@ -790,7 +790,28 @@ git add frontend/src/components/murals/MoveToFolderModal.tsx frontend/src/compon
 - Modify: `frontend/src/pages/HomePage.tsx`
 - Modify: `frontend/src/pages/MuralEditorPage.tsx`
 - Modify: `frontend/src/pages/ArenaSeedPage.tsx`
+- Modify: `frontend/src/layouts/DashboardLayout.tsx`
+- Modify: `frontend/src/components/NavIcons.tsx`
+- Modify: `frontend/src/pages/ArenaListPage.tsx`
+- Modify: `frontend/src/pages/MuralsListPage.tsx`
+- Modify: `frontend/src/components/murals/MuralFolderTree.tsx`
+- Modify: `frontend/src/pages/QuizCreatePage.tsx`
+- Modify: `frontend/src/pages/TierListCreatePage.tsx`
+- Modify: `frontend/src/pages/LibraryStylePage.tsx`
+- Modify: `frontend/src/components/StyleControls.tsx`
+- Modify: `frontend/src/components/readerCard/ReaderCardChoices.tsx`
+- Modify: `frontend/src/components/readerCard/ReaderCardOptions.tsx`
+- Modify: `frontend/src/components/readerCard/ReaderGlyphSetting.tsx`
+- Modify: `frontend/src/auth/AccountSecuritySection.tsx`
+- Modify: `frontend/src/components/SocialsSection.tsx`
+- Modify: `frontend/src/pages/DiscoverPage.tsx`
+- Modify: `frontend/src/pages/PeoplePage.tsx`
+- Modify: `frontend/src/pages/CommunityProfilePage.tsx`
+- Modify: `frontend/src/components/OwnShelfView.tsx`
+- Modify: `frontend/src/components/ProfileActivity.tsx`
 - Test: `frontend/scripts/test-controls.mts`
+
+Ruling (controller, during execution): the first sweep pass flagged controls under 44px in the files from `DashboardLayout.tsx` down, which the original list missed. They join the task. `SettingsAppearancePage`'s 1×1 radios are visually hidden inputs inside 44px label tiles, so they are false positives and stay out.
 
 **Interfaces:**
 - Consumes: `BUTTON_PRIMARY` and `BUTTON_SECONDARY` (Task 2), and `SettingsIcon` from `components/NavIcons.tsx`.
