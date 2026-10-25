@@ -11,7 +11,7 @@ import { coverUrlForApi } from "../library/lib/coverUrl";
 import { publicContentUrl } from "../sharing/links";
 import { fetchQuizResults, publishQuiz, setPlayState, updateQuiz, type Quiz } from "./api";
 
-export type EditorView = "setup" | "results";
+type EditorView = "setup" | "results";
 
 const PUBLISHED_VIEWS = [{ value: "setup", label: "Questions" }, { value: "results", label: "Results" }] as const;
 

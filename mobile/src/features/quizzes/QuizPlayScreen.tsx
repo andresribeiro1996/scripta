@@ -183,10 +183,11 @@ function EndScreen({ code, board, result, returning, tab, setTab }: {
 
 function ScoreValue({ value, title, dim }: { value: { kind: "text" | "cover"; value: string }; title?: string; dim?: boolean }) {
   const { colors } = useTheme();
-  if (value.kind === "text") return <Text numberOfLines={1} {...dynamicType} style={[typography.body, { color: dim ? colors.textDim : colors.text }]}>{value.value}</Text>;
+  if (value.kind === "text") return <Text numberOfLines={1} {...dynamicType} style={[typography.body, { color: dim ? colors.textDim : colors.text }]}>{dim ? "Your pick: " : ""}{value.value}</Text>;
   return <View style={styles.scoreCover}>
     <Image source={{ uri: uriFor(value.value) }} contentFit="cover" style={styles.scoreThumb} alt={title ?? "Picked cover"} />
     {title ? <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.grow, { color: colors.text }]}>{title}</Text> : null}
+    {dim ? <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>Your pick</Text> : null}
   </View>;
 }
 

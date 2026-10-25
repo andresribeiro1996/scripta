@@ -194,13 +194,14 @@ export function PlayQuizPage() {
 }
 
 function ScoreValue({ value, title, dim }: { value: { kind: "text" | "cover"; value: string }; title?: string; dim?: boolean }) {
-  if (value.kind === "text") return <span className={`truncate ${dim ? "text-(--color-text-dim)" : ""}`}>{value.value}</span>;
+  if (value.kind === "text") return <span className={`truncate ${dim ? "text-(--color-text-dim)" : ""}`}>{dim ? "Your pick: " : ""}{value.value}</span>;
   return (
     <span className="flex items-center gap-2">
       <span className="relative block h-10 w-7 shrink-0 overflow-hidden rounded bg-(--color-border)">
         <CoverImage book={{ Title: title ?? "Picked cover", _coverUrl: value.value }} fit="contain" alt={title ?? "Picked cover"} />
       </span>
       {title && <span className="truncate">{title}</span>}
+      {dim && <span className="text-(--color-text-dim)">Your pick</span>}
     </span>
   );
 }

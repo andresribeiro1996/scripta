@@ -1,19 +1,3 @@
-// Accessible, non-gesture reorder controls — this task's brief asks for
-// "accessible non-gesture controls plus drag if practical"; a full drag
-// gesture (Gesture Handler/Reanimated, already installed) over the
-// virtualized grid is real future work this task didn't reach (see this
-// task's handoff notes for the gap) — VoiceOver/TalkBack can already
-// operate this list's Up/Down buttons today, which a drag gesture alone
-// never gives you for free.
-//
-// Renders as a plain vertical list (not the grid) — reordering by
-// scanning up/down through a list of titles is a more legible mental
-// model than picking out cover art in a grid, and it's the same list
-// shape @scripta/shared's own `orderLibraryBooks` already produces
-// (series clustered together, ahead of standalone books). Arrows move a
-// series past the next series, or a standalone book past the next
-// standalone book — see libraryOrder.ts's moveUnit.
-
 import { useMemo } from "react";
 import { FlatList, Pressable, StyleSheet, View } from "react-native";
 import { Text } from "../../../ui/Text";
@@ -26,9 +10,6 @@ export function ReorderList({
   onMove,
   onClose,
 }: {
-  /** Same display order LibraryScreen's grid renders (before search/
-   *  filter/sort narrows it further — reordering only makes sense
-   *  against the library's OWN order, not a filtered view of it). */
   orderedBooks: Array<Record<string, unknown>>;
   groups: Group[];
   onMove: (key: string, direction: "up" | "down") => void;
@@ -43,18 +24,20 @@ export function ReorderList({
         data={orderedBooks}
         keyExtractor={(book, i) => String(book.ContentID ?? i)}
         contentContainerStyle={{ paddingBottom: spacing.xl }}
-        renderItem={({ item }) => {
+        renderItem={({ item, index }) => {
           const key = bookKey(item);
           const move = moves.get(key);
           const canMoveUp = move?.up ?? false;
           const canMoveDown = move?.down ?? false;
+          const previous = index > 0 ? moves.get(bookKey(orderedBooks[index - 1])) : undefined;
+          const firstInSeries = move?.inSeries && (index === 0 || moves.get(bookKey(orderedBooks[index - 1])) !== move);
           return (
             <View style={[styles.row, { borderColor: colors.border }]}>
               <View style={styles.title}>
                 <Text style={[typography.body, { color: colors.text }]} numberOfLines={1}>
                   {String(item.Title ?? "Untitled")}
                 </Text>
-                {move?.inSeries ? (
+                {firstInSeries ? (
                   <Text style={[typography.caption, { color: colors.textDim }]}>Series stay at the top and move together.</Text>
                 ) : null}
               </View>
