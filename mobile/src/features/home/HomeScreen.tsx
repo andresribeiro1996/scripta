@@ -10,6 +10,7 @@ import { digestRoute, feedRowModel } from "./feedRowModel";
 import { CommentsSheet } from "./CommentsSheet";
 import { SavedContentSheet } from "./SavedContentSheet";
 import { RecapHomeCard } from "../topShelf/RecapHomeCard";
+import { AwardHomeCard, RECENT_AWARDS_QUERY_KEY } from "../awards/AwardHomeCard";
 import { ENGAGEMENT_QUERY_KEY, SAVED_STATE_QUERY_KEY, useHomeActions } from "./useHomeActions";
 
 export function HomeScreen() {
@@ -33,11 +34,12 @@ export function HomeScreen() {
     void activity.refetch();
     void queryClient.invalidateQueries({ queryKey: ENGAGEMENT_QUERY_KEY });
     void queryClient.invalidateQueries({ queryKey: SAVED_STATE_QUERY_KEY });
+    void queryClient.invalidateQueries({ queryKey: RECENT_AWARDS_QUERY_KEY });
   }, [actions.library.refetch, dashboard.refetch, activity.refetch, queryClient]));
 
   async function onRefresh() {
     setPulling(true);
-    try { await Promise.all([actions.library.refetch(), dashboard.refetch(), activity.refetch(), queryClient.invalidateQueries({ queryKey: ENGAGEMENT_QUERY_KEY }), queryClient.invalidateQueries({ queryKey: SAVED_STATE_QUERY_KEY })]); }
+    try { await Promise.all([actions.library.refetch(), dashboard.refetch(), activity.refetch(), queryClient.invalidateQueries({ queryKey: ENGAGEMENT_QUERY_KEY }), queryClient.invalidateQueries({ queryKey: SAVED_STATE_QUERY_KEY }), queryClient.invalidateQueries({ queryKey: RECENT_AWARDS_QUERY_KEY })]); }
     finally { setPulling(false); }
   }
   const findReaders = () => router.push("/people" as never);
@@ -47,9 +49,10 @@ export function HomeScreen() {
   return <Screen top={false}>
     <Stack.Screen options={{ title: "Home", headerShown: true, headerLeft: () => <View style={styles.mark}><BrandMark size={24} /></View>, headerRight: () => <HeaderActions><IconButton name="bell" accessibilityLabel="Open activity" badge={activityBadge} onPress={() => router.push("/activity" as never)} /><IconButton name="bookmark" accessibilityLabel="Open saved games and murals" onPress={() => setSavedOpen(true)} /></HeaderActions> }} />
     {error ? <Toast visible message={error} tone="error" /> : null}
-    <SectionList sections={sections} keyExtractor={(item) => `${item.kind}:${item.id}`} stickySectionHeadersEnabled={false} maintainVisibleContentPosition={{ minIndexForVisible: 0 }} contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.list}
+    <SectionList sections={sections} keyExtractor={(item) => `${item.kind}:${item.id}`} stickySectionHeadersEnabled={false} maintainVisibleContentPosition={{ minIndexForVisible: 0, autoscrollToTopThreshold: 10 }} contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.list}
       ListHeaderComponent={<>
         <RecapHomeCard />
+        <AwardHomeCard />
         {noLibrary ? <View style={styles.onboarding}><EmptyState title="Start your library" body="Bring your books into your reading world." actionLabel="Import library" onAction={() => router.push("/import" as never)} secondaryActionLabel="Add a book" onSecondaryAction={() => router.push("/add-book" as never)} /></View> : null}
       </>}
       renderSectionHeader={({ section }) => <View style={styles.sectionHeader}>

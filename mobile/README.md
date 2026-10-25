@@ -168,6 +168,8 @@ Long-press a block to drag it. Reanimated keeps drag positioning and collision p
 
 Home shows “Your reading circle”: followed readers’ publications, reading activity and murals. The bell in the header carries an unread badge. It opens the Activity screen: new followers (with Follow back), plays of your games, and winners from tournaments you joined. Seeing that screen marks them seen, which also clears the Home tab badge. Own reading/progress and next-book widgets no longer occupy Home. Posts use theme tokens, inset separators and aligned actions.
 
+Above the feed, a card announces a prize win from the last 14 days (`GET /awards/recent`, no sign-in needed). A book prize shows the winner's cover, "Title · Author" and, for a book you hold, whether you've read it, are reading it or have it on your to-read shelf, else how many nominees you hold. An author prize (Nobel, Camões) shows the honoree and how many of their books you hold, and opens Search. Tapping a book prize opens the winner's page. Dismissing a card is stored per device as `awardDismissed:<prize>:<year>` and reveals the next announcement. A failed request hides the card.
+
 Real activity posts support likes, comments and native sharing. Tier-list publications show their book pool; new ranking events show the reader’s actual mini tiers. Quizzes, tournaments and murals have content previews and direct actions. Tap a reader to open their profile, use Want to read without changing an existing book’s reading status, and bookmark games or murals into Home’s Saved sheet. Comments and saved content use Expo UI sheets with pagination and retry states.
 
 ### Reader suggestions

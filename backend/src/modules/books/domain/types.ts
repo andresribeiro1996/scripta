@@ -2,7 +2,7 @@ export type CoverStatus = "good" | "low_res" | "missing" | "manual";
 export type DetailsStatus = "found" | "missing";
 export type DataSource = "openlibrary" | "isbndb" | "bnp";
 export type SummarySource = DataSource | "publisher";
-export type CoverSourceName = "isbndb" | "apple" | "openlibrary" | "upload" | "publisher" | "bnp";
+export type CoverSourceName = "isbndb" | "apple" | "kobo" | "openlibrary" | "upload" | "publisher" | "bnp";
 
 export type BookCreator = "seed" | "publisher" | "bnp";
 
@@ -32,6 +32,7 @@ export interface BookRow {
   cover_checked_at: string | null;
   cover_upgrade_wanted_at: string | null;
   apple_checked_at: string | null;
+  kobo_image_id: string | null;
   ol_work_key: string | null;
   publisher_url: string | null;
   created_by: BookCreator | null;

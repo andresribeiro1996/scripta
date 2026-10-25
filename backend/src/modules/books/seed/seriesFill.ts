@@ -1,10 +1,10 @@
-import { canonicalIsbn } from "@scripta/shared";
+import { listOf, type Binding } from "../adapters/wikidata/sparql.js";
 import { SourceUnavailableError } from "../domain/errors.js";
-import { normalizeWorkKey } from "../domain/normalize.js";
 import type { BooksRepository, EditionRecordSource } from "../domain/ports.js";
 import { seriesNameKey, type SeriesEntry } from "../domain/series.js";
 import { seriesLikeGroups } from "../domain/translation.js";
 import { harvestWindow, type BnpHarvestDeps, type DateWindow } from "./bnpImport.js";
+import { inBatches, matchWorkIds } from "./wikidataMatch.js";
 
 export interface FillOptions {
   dryRun: boolean;
@@ -37,24 +37,8 @@ export interface OriginalTitleCandidate {
   titles: string[];
 }
 
-const BATCH_SIZE = 300;
 const HELD_PROGRESS_EVERY = 25;
-const BATCH_PAUSE_MS = 100;
-const REDIRECT_HOPS = 2;
 const OPEN_LIBRARY_WORK = /^OL\d+W$/;
-
-async function inBatches<T>(repo: Pick<BooksRepository, "transaction">, items: T[], write: (item: T) => boolean | number): Promise<number> {
-  let added = 0;
-  for (let start = 0; start < items.length; start += BATCH_SIZE) {
-    if (start > 0) await new Promise((resolve) => setTimeout(resolve, BATCH_PAUSE_MS));
-    added += repo.transaction(() => items.slice(start, start + BATCH_SIZE).reduce((total, item) => total + Number(write(item)), 0));
-  }
-  return added;
-}
-
-type Binding = Record<string, { value: string } | undefined>;
-
-const listOf = (binding: Binding, name: string) => (binding[name]?.value ?? "").split("|").map((item) => item.trim()).filter(Boolean);
 
 export function wikidataRowOf(binding: Binding): WikidataRow | null {
   const series = [binding.en, binding.pt, binding.any].map((label) => label?.value.trim() ?? "").find(Boolean);
@@ -75,27 +59,6 @@ export function seriesCounts(tally: WikidataTally): Array<{ name: string; works:
     .sort((left, right) => right.works - left.works || left.name.localeCompare(right.name));
 }
 
-function redirectTarget(record: unknown): string | null {
-  const { type, location } = (record ?? {}) as { type?: { key?: unknown } | null; location?: unknown };
-  return type?.key === "/type/redirect" && typeof location === "string" ? normalizeWorkKey(location) : null;
-}
-
-async function followRedirects(
-  repo: Pick<BooksRepository, "workIdsByWorkKeys">,
-  fetchWork: (olWorkKey: string) => Promise<unknown>,
-  olWorkKey: string
-): Promise<string | undefined> {
-  let current = olWorkKey;
-  for (let hop = 0; hop < REDIRECT_HOPS; hop++) {
-    const target = redirectTarget(await fetchWork(current));
-    if (target === null) return undefined;
-    const workId = repo.workIdsByWorkKeys([target]).get(target);
-    if (workId) return workId;
-    current = target;
-  }
-  return undefined;
-}
-
 export async function fillFromWikidata(
   repo: Pick<BooksRepository, "transaction" | "findBookByKey" | "workIdsByWorkKeys" | "addWorkSeries">,
   fetchWork: (olWorkKey: string) => Promise<unknown>,
@@ -103,55 +66,24 @@ export async function fillFromWikidata(
   at: string,
   { dryRun, skip = new Set(), tally = wikidataTally() }: WikidataOptions
 ): Promise<{ matched: number; added: number; redirected: number; failedKeys: string[]; failedSeries: string[] }> {
-  const byOpenLibraryKey = repo.workIdsByWorkKeys([...new Set(rows.flatMap((row) => row.olWorkIds))]);
-  const kept = rows.flatMap((row) => {
+  const kept: Array<{ row: WikidataRow; nameKey: string }> = [];
+  const skipped = new Set<string>();
+  for (const row of rows) {
     const nameKey = seriesNameKey(row.series);
-    return nameKey === null || skip.has(nameKey) ? [] : [{ row, nameKey }];
-  });
-  const unmatchedKeys = new Set<string>();
-  for (const { row } of kept) for (const olKey of row.olWorkIds) if (!byOpenLibraryKey.has(olKey)) unmatchedKeys.add(olKey);
-  const fetched = new Map<string, Promise<unknown>>();
-  const fetchOnce = (olKey: string) => {
-    const answer = fetched.get(olKey) ?? fetchWork(olKey);
-    fetched.set(olKey, answer);
-    return answer;
-  };
-  const report = { redirected: 0, failedKeys: [] as string[] };
-  for (const olKey of unmatchedKeys) {
-    try {
-      const workId = await followRedirects(repo, fetchOnce, olKey);
-      if (workId === undefined) continue;
-      byOpenLibraryKey.set(olKey, workId);
-      report.redirected++;
-    } catch (error) {
-      if (!(error instanceof SourceUnavailableError) || error.status === 429) throw error;
-      report.failedKeys.push(olKey);
-    }
+    if (nameKey === null) continue;
+    if (skip.has(nameKey)) skipped.add(nameKey);
+    else kept.push({ row, nameKey });
   }
-  const failed = new Set(report.failedKeys);
+  const { workIds, redirected, failedKeys } = await matchWorkIds(repo, fetchWork, kept.map(({ row }) => row));
+  for (const nameKey of skipped) tally.skipped.add(nameKey);
+  const failed = new Set(failedKeys);
   const failedSeries = new Map<string, string>();
   for (const { row, nameKey } of kept) {
     if (!failedSeries.has(nameKey) && row.olWorkIds.some((olKey) => failed.has(olKey))) failedSeries.set(nameKey, row.series);
   }
   const writes: Array<{ workId: string; entry: SeriesEntry }> = [];
-  for (const row of rows) {
-    const nameKey = seriesNameKey(row.series);
-    if (nameKey === null) continue;
-    if (skip.has(nameKey)) {
-      tally.skipped.add(nameKey);
-      continue;
-    }
-    const workIds = new Set<string>();
-    for (const isbn of row.isbns) {
-      const canonical = canonicalIsbn(isbn);
-      const workId = canonical ? repo.findBookByKey(`isbn:${canonical}`)?.work_id : null;
-      if (workId) workIds.add(workId);
-    }
-    for (const olKey of row.olWorkIds) {
-      const workId = byOpenLibraryKey.get(olKey);
-      if (workId) workIds.add(workId);
-    }
-    for (const workId of workIds) {
+  for (const [index, { row, nameKey }] of kept.entries()) {
+    for (const workId of workIds[index]!) {
       writes.push({ workId, entry: { name: row.series, position: row.position } });
       const counted = tally.series.get(nameKey) ?? { name: row.series, workIds: new Set<string>() };
       counted.workIds.add(workId);
@@ -159,7 +91,7 @@ export async function fillFromWikidata(
     }
   }
   const added = dryRun ? 0 : await inBatches(repo, writes, ({ workId, entry }) => repo.addWorkSeries(workId, [entry], "wikidata", at));
-  return { matched: writes.length, added, ...report, failedSeries: [...failedSeries.values()].sort((left, right) => left.localeCompare(right)) };
+  return { matched: writes.length, added, redirected, failedKeys, failedSeries: [...failedSeries.values()].sort((left, right) => left.localeCompare(right)) };
 }
 
 export function listOriginalTitleSeries(repo: Pick<BooksRepository, "originalTitleClaims">): OriginalTitleCandidate[] {

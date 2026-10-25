@@ -2730,6 +2730,203 @@ test("subject series are written in the same transaction as the edition's", asyn
   assert.deepEqual(inside, [true]);
 });
 
+const KOBO_ID = "0b8a2a3c-6f1e-4c54-9d0e-1a2b3c4d5e6f";
+const KOBO_URL = `https://cdn.kobo.com/book-images/${KOBO_ID}/1200/1800/False/image.jpg`;
+const YESTERDAY = "2026-09-30T00:00:00.000Z";
+const withId = (lookup: typeof orlando, imageId: string = KOBO_ID) => ({ ...lookup, imageId });
+const noSources: Deps["sources"] = { isbndb: null, apple: emptySource, openlibrary: emptySource };
+
+function checkedAs(h: ReturnType<typeof harness>, id: string, status: "missing" | "low_res" | "manual", checkedAt: string) {
+  const imageId = status === "missing" ? null : withCover(h, id, "openlibrary", status === "low_res" ? 300 : 900, "low_res");
+  h.repo.setCover(id, { imageId, status, checkedAt });
+}
+
+test("an upgrade lookup that Kobo answers at 400px or more asks Apple nothing and leaves the Apple stamp unset", async () => {
+  const calls: string[] = [];
+  const { h, id } = prepare(orlando, { isbndb: null, apple: recordingSource(calls, "apple"), openlibrary: emptySource }, [[KOBO_URL, 900]]);
+  h.repo.setKoboImageId(id, KOBO_ID);
+  h.repo.setUpgradeWanted(id, YESTERDAY);
+  await h.service.processBook(id, "upgrade");
+  const book = h.repo.getBook(id)!;
+  assert.equal(book.cover_status, "good");
+  assert.equal(h.repo.getImage(book.cover_image_id!)!.source, "kobo");
+  assert.equal(h.repo.getImage(book.cover_image_id!)!.source_url, KOBO_URL);
+  assert.deepEqual(calls, []);
+  assert.equal(book.apple_checked_at, null);
+  assert.equal(book.cover_upgrade_wanted_at, null);
+});
+
+test("an upgrade lookup whose Kobo image is under 400px still asks Apple and stamps it", async () => {
+  const calls: string[] = [];
+  const { h, id } = prepare(orlando, { isbndb: null, apple: recordingSource(calls, "apple"), openlibrary: emptySource }, [[KOBO_URL, 300]]);
+  h.repo.setKoboImageId(id, KOBO_ID);
+  await h.service.processBook(id, "upgrade");
+  assert.deepEqual(calls, ["apple:isbn", "apple:title"]);
+  assert.equal(h.repo.getBook(id)!.apple_checked_at, "2026-10-01T00:00:00.000Z");
+  assert.equal(h.repo.getBook(id)!.cover_status, "low_res");
+});
+
+test("enqueueCovers records a new book's Kobo id and queues it once on the normal lane", () => {
+  const h = harness({ sources: noSources });
+  h.service.enqueueCovers([withId(orlando)]);
+  const book = h.repo.findBookByKey("isbn:9780141184272")!;
+  assert.equal(book.kobo_image_id, KOBO_ID);
+  assert.deepEqual(h.enqueued, [{ bookId: book.id, priority: "normal" }]);
+});
+
+test("enqueueCovers sends a not-due missing or low_res book with a new id to the upgrade lane only", () => {
+  for (const status of ["missing", "low_res"] as const) {
+    const { h, id } = prepare(orlando, noSources);
+    checkedAs(h, id, status, YESTERDAY);
+    h.service.enqueueCovers([withId(orlando)]);
+    assert.equal(h.repo.getBook(id)!.kobo_image_id, KOBO_ID);
+    assert.equal(h.repo.getBook(id)!.cover_upgrade_wanted_at, "2026-10-01T00:00:00.000Z");
+    assert.deepEqual(h.enqueued, [{ bookId: id, priority: "upgrade" }]);
+  }
+});
+
+test("enqueueCovers does not queue a not-due book again for an id it already holds", () => {
+  const { h, id } = prepare(orlando, noSources);
+  checkedAs(h, id, "missing", YESTERDAY);
+  h.repo.setKoboImageId(id, KOBO_ID);
+  h.service.enqueueCovers([withId(orlando)]);
+  assert.deepEqual(h.enqueued, []);
+  assert.equal(h.repo.getBook(id)!.cover_upgrade_wanted_at, null);
+});
+
+test("recordKoboImageIds marks a due missing book for upgrade and queues the upgrade lane only", () => {
+  const { h, id } = prepare(orlando, noSources);
+  checkedAs(h, id, "missing", "2026-08-22T00:00:00.000Z");
+  h.service.recordKoboImageIds([withId(orlando)]);
+  assert.equal(h.repo.getBook(id)!.kobo_image_id, KOBO_ID);
+  assert.equal(h.repo.getBook(id)!.cover_upgrade_wanted_at, "2026-10-01T00:00:00.000Z");
+  assert.deepEqual(h.enqueued, [{ bookId: id, priority: "upgrade" }]);
+});
+
+test("a background lookup that misses while the daily job records a Kobo id marks the book for upgrade", async () => {
+  let recordId = () => {};
+  const apple: CoverSource = { byIsbn: async () => { recordId(); return []; }, byTitle: async () => [] };
+  const { h, id } = prepare(orlando, { isbndb: null, apple, openlibrary: emptySource });
+  recordId = () => h.service.recordKoboImageIds([withId(orlando)]);
+  await h.service.processBook(id, "background");
+  const book = h.repo.getBook(id)!;
+  assert.equal(book.kobo_image_id, KOBO_ID);
+  assert.equal(book.cover_status, "missing");
+  assert.equal(book.cover_upgrade_wanted_at, "2026-10-01T00:00:00.000Z");
+  assert.deepEqual(h.enqueued, [{ bookId: id, priority: "upgrade" }]);
+});
+
+test("recordKoboImageIds stores the id of a book with no cover status and queues nothing", () => {
+  const { h, id } = prepare(orlando, noSources);
+  h.service.recordKoboImageIds([withId(orlando)]);
+  assert.equal(h.repo.getBook(id)!.kobo_image_id, KOBO_ID);
+  assert.equal(h.repo.getBook(id)!.cover_upgrade_wanted_at, null);
+  assert.deepEqual(h.enqueued, []);
+});
+
+test("recordKoboImageIds stores the id of a good Apple cover and a manual cover without marking or queuing them", () => {
+  const dune = { isbn: "9780441013593", title: "Dune", author: "Frank Herbert" };
+  const { h, id } = prepare(orlando, noSources);
+  h.service.resolveCover(dune);
+  const duneId = h.bookId("isbn:9780441013593");
+  h.enqueued.length = 0;
+  withCover(h, id, "apple", 900);
+  checkedAs(h, duneId, "manual", YESTERDAY);
+  h.service.recordKoboImageIds([withId(orlando), withId(dune, "11111111-2222-4333-8444-555555555555")]);
+  assert.equal(h.repo.getBook(id)!.kobo_image_id, KOBO_ID);
+  assert.equal(h.repo.getBook(duneId)!.kobo_image_id, "11111111-2222-4333-8444-555555555555");
+  assert.equal(h.repo.getBook(id)!.cover_upgrade_wanted_at, null);
+  assert.equal(h.repo.getBook(duneId)!.cover_upgrade_wanted_at, null);
+  assert.equal(h.repo.getBook(duneId)!.cover_status, "manual");
+  assert.deepEqual(h.enqueued, []);
+});
+
+test("recordKoboImageIds marks a good ISBNdb cover on a Portuguese ISBN for upgrade and leaves an English one", () => {
+  const { h, id } = prepare(PORTUGUESE, noSources);
+  withCover(h, id, "isbndb", 900);
+  const english = prepare(orlando, noSources);
+  withCover(english.h, english.id, "isbndb", 900);
+  h.service.recordKoboImageIds([withId(PORTUGUESE)]);
+  english.h.service.recordKoboImageIds([withId(orlando)]);
+  assert.equal(h.repo.getBook(id)!.cover_upgrade_wanted_at, "2026-10-01T00:00:00.000Z");
+  assert.deepEqual(h.enqueued, [{ bookId: id, priority: "upgrade" }]);
+  assert.equal(english.h.repo.getBook(english.id)!.cover_upgrade_wanted_at, null);
+  assert.deepEqual(english.h.enqueued, []);
+});
+
+test("recordKoboImageIds never creates a catalog row", () => {
+  const h = harness({ sources: noSources });
+  h.service.recordKoboImageIds([withId(orlando), withId({ isbn: "", title: "Dune", author: "Frank Herbert" })]);
+  assert.equal(h.repo.findBookByKey("isbn:9780141184272"), undefined);
+  assert.equal((h.db.prepare("SELECT COUNT(*) AS n FROM books").get() as { n: number }).n, 0);
+  assert.deepEqual(h.enqueued, []);
+});
+
+test("an id that is not a UUID is not stored", () => {
+  const { h, id } = prepare(orlando, noSources);
+  checkedAs(h, id, "missing", YESTERDAY);
+  h.service.recordKoboImageIds([withId(orlando, "file____mnt_onboard_x.epub")]);
+  h.service.enqueueCovers([withId(orlando, "file____mnt_onboard_x.epub")]);
+  assert.equal(h.repo.getBook(id)!.kobo_image_id, null);
+  assert.equal(h.repo.getBook(id)!.cover_upgrade_wanted_at, null);
+  assert.deepEqual(h.enqueued, []);
+});
+
+test("the first Kobo id wins and a second, different one stores and queues nothing", () => {
+  const other = "11111111-2222-4333-8444-555555555555";
+  const { h, id } = prepare(orlando, noSources);
+  checkedAs(h, id, "missing", YESTERDAY);
+  h.service.enqueueCovers([withId(orlando)]);
+  assert.deepEqual(h.enqueued, [{ bookId: id, priority: "upgrade" }]);
+  h.enqueued.length = 0;
+  h.service.enqueueCovers([withId(orlando, other)]);
+  h.service.recordKoboImageIds([withId(orlando, other)]);
+  assert.equal(h.repo.getBook(id)!.kobo_image_id, KOBO_ID);
+  assert.deepEqual(h.enqueued, []);
+});
+
+test("recordKoboImageIds queues nothing and keeps no id or mark when a later write fails and the pass rolls back", () => {
+  const dune = { isbn: "9780441013593", title: "Dune", author: "Frank Herbert" };
+  const { h, id } = prepare(orlando, noSources);
+  h.service.resolveCover(dune);
+  const duneId = h.bookId("isbn:9780441013593");
+  h.enqueued.length = 0;
+  checkedAs(h, id, "missing", "2026-08-22T00:00:00.000Z");
+  checkedAs(h, duneId, "missing", "2026-08-22T00:00:00.000Z");
+  const setKoboImageId = h.repo.setKoboImageId.bind(h.repo);
+  let calls = 0;
+  h.repo.setKoboImageId = (bookId, imageId) => {
+    calls += 1;
+    if (calls === 2) throw new Error("disk full");
+    return setKoboImageId(bookId, imageId);
+  };
+  assert.throws(() => h.service.recordKoboImageIds([withId(orlando), withId(dune)]), /disk full/);
+  assert.equal(h.repo.getBook(id)!.kobo_image_id, null);
+  assert.equal(h.repo.getBook(id)!.cover_upgrade_wanted_at, null);
+  assert.deepEqual(h.enqueued, []);
+});
+
+test("recordKoboImageIds queues its upgrades only after the pass has committed", () => {
+  const inside: boolean[] = [];
+  const h: ReturnType<typeof harness> = harness({ sources: noSources, enqueue: () => { inside.push(h.db.isTransaction); } });
+  h.service.resolveCover(orlando);
+  checkedAs(h, h.bookId("isbn:9780141184272"), "missing", "2026-08-22T00:00:00.000Z");
+  inside.length = 0;
+  h.service.recordKoboImageIds([withId(orlando)]);
+  assert.deepEqual(inside, [false]);
+});
+
+test("recordKoboImageIds ignores a junk id before touching the catalog's keys", () => {
+  const h = harness({ sources: noSources });
+  h.service.resolveCover({ title: "Orlando", author: "Virginia Woolf" });
+  const keys = () => h.db.prepare("SELECT key, book_id FROM book_keys ORDER BY key").all();
+  const before = keys();
+  h.service.recordKoboImageIds([withId(orlando, "file____mnt_onboard_x.epub"), withId(orlando, "")]);
+  assert.deepEqual(keys(), before);
+  h.service.recordKoboImageIds([withId(orlando)]);
+  assert.ok(keys().some((row) => (row as { key: string }).key === "isbn:9780141184272"));
+});
+
 test("a BNP book from before 2002 is looked up by ISBN only, in every lane", async () => {
   const lookups = async (book: { year: number | null; createdBy: "bnp" | "seed" }, lane: CoverPriority) => {
     const calls: string[] = [];

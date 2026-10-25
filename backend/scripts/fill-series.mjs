@@ -9,16 +9,7 @@ const USAGE = [
   "       node scripts/fill-series.mjs originals --list | --apply <approved.json>",
   "       node scripts/fill-series.mjs bnp [--from YYYY-MM-DD] [--until YYYY-MM-DD]"
 ].join("\n");
-const WIKIDATA_URL = "https://query.wikidata.org/sparql";
-const WIKIDATA_PAGE_ROWS = 3000;
-const WIKIDATA_TIMEOUT_MS = 90_000;
-const WIKIDATA_ATTEMPTS = 3;
-const WIKIDATA_RETRY_MS = 60_000;
-const WIKIDATA_GAP_MS = 5_000;
 const OPEN_LIBRARY_GAP_MS = 1000;
-const OPEN_LIBRARY_PROGRESS_EVERY = 100;
-const OPEN_LIBRARY_ATTEMPTS = 3;
-const OPEN_LIBRARY_RETRY_MS = 60_000;
 const EDITION_CLASS = "wd:Q3331189";
 const PUBLISHER_SERIES_CLASSES = "wd:Q20655472 wd:Q15695196 wd:Q1700470 wd:Q27785883";
 const SERIES = `?work p:P179 ?statement . ?statement ps:P179 ?series . OPTIONAL { ?statement pq:P1545 ?position . } FILTER NOT EXISTS { ?series wdt:P31 ?seriesClass . VALUES ?seriesClass { ${PUBLISHER_SERIES_CLASSES} } }`;
@@ -53,18 +44,19 @@ for (const name of mode === "held" ? ["COVERS_DB_PATH", "LIBRARY_DB_PATH"] : ["C
   if (!process.env[name]) fail(`Missing environment variable: ${name}`);
 }
 
-const { USER_AGENT, createThrottle, fetchJson } = await import("../dist/modules/books/adapters/http/http.js");
+const { createThrottle } = await import("../dist/modules/books/adapters/http/http.js");
 const { createOpenLibraryCatalog } = await import("../dist/modules/books/adapters/openlibrary/openLibraryCatalog.js");
+const { WIKIDATA_PAGE_ROWS, queryAllPages } = await import("../dist/modules/books/adapters/wikidata/sparql.js");
 const { openBooksDb } = await import("../dist/modules/books/adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("../dist/modules/books/adapters/sqlite/sqliteBooksRepository.js");
 const { fetchBnpPage, monthWindows, utcDate, waitForBnpLock } = await import("../dist/modules/books/seed/bnpImport.js");
 const { seriesNameKey } = await import("../dist/modules/books/domain/series.js");
 const { fillBnpCollections, fillFromOriginalTitles, fillFromWikidata, fillHeldEditions, listOriginalTitleSeries, seriesCounts, wikidataRowOf, wikidataTally } = await import("../dist/modules/books/seed/seriesFill.js");
+const { createWorkFetcher } = await import("../dist/modules/books/seed/wikidataMatch.js");
 const { createWorkHolders } = await import("../dist/modules/library/workHolders.js");
 
 const dryRun = values["dry-run"];
 const at = new Date().toISOString();
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const log = (line) => console.error(line);
 
 function namesIn(path, what) {
@@ -81,60 +73,6 @@ function bnpWindows() {
   }
   if (values.from > until) fail(`--from ${values.from} is after --until ${until}`);
   return monthWindows(values.from, until);
-}
-
-const isRetryable = (error) => error instanceof TypeError || error instanceof SyntaxError || error.name === "TimeoutError";
-const reasonOf = (error) => (error.cause ? `${error.message} (${error.cause.code ?? error.cause.message})` : error.message);
-
-async function queryWikidata(query) {
-  for (let attempt = 1; ; attempt++) {
-    let failure;
-    try {
-      const response = await fetch(WIKIDATA_URL, {
-        method: "POST",
-        headers: { "User-Agent": USER_AGENT, Accept: "application/sparql-results+json", "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ query }),
-        signal: AbortSignal.timeout(WIKIDATA_TIMEOUT_MS)
-      });
-      if (response.ok) return (await response.json()).results.bindings;
-      if (response.status !== 429 && response.status < 500) throw new Error(`Wikidata query failed: HTTP ${response.status}`);
-      failure = new Error(`HTTP ${response.status}`);
-    } catch (error) {
-      if (!isRetryable(error)) throw error;
-      failure = error;
-    }
-    if (attempt === WIKIDATA_ATTEMPTS) throw new Error(`Wikidata query failed after ${attempt} attempts: ${reasonOf(failure)}`, { cause: failure });
-    log(`wikidata attempt ${attempt} failed (${reasonOf(failure)}), retrying`);
-    await sleep(WIKIDATA_RETRY_MS);
-  }
-}
-
-function createWorkFetcher() {
-  const throttle = createThrottle(OPEN_LIBRARY_GAP_MS);
-  let openLibraryRequests = 0;
-  let failed = 0;
-  const request = async (key) => {
-    try {
-      return await throttle(() => fetchJson("openlibrary", `https://openlibrary.org/works/${key}.json`));
-    } catch (error) {
-      failed++;
-      throw error;
-    } finally {
-      if (++openLibraryRequests % OPEN_LIBRARY_PROGRESS_EVERY === 0) log(JSON.stringify({ openLibraryRequests, failed }));
-    }
-  };
-  return async (key) => {
-    for (let attempt = 1; ; attempt++) {
-      try {
-        return await request(key);
-      } catch (error) {
-        if (error.status !== 429 || attempt === OPEN_LIBRARY_ATTEMPTS) throw error;
-        const waitMs = Math.max((error.retryAt ?? 0) - Date.now(), OPEN_LIBRARY_RETRY_MS);
-        log(`openlibrary attempt ${attempt} failed (${reasonOf(error)}), retrying in ${Math.round(waitMs / 1000)}s`);
-        await sleep(waitMs);
-      }
-    }
-  };
 }
 
 const wikidataPage = ({ ids, where }, offset) => `
@@ -155,18 +93,18 @@ async function runWikidata(repo) {
   const rows = [];
   let pages = 0;
   for (const [kind, spec] of WIKIDATA_KINDS.entries()) {
-    for (let offset = 0, last = false; !last; offset += WIKIDATA_PAGE_ROWS) {
-      if (pages > 0) await sleep(WIKIDATA_GAP_MS);
-      const bindings = await queryWikidata(wikidataPage(spec, offset));
-      const pageRows = bindings.flatMap((binding) => wikidataRowOf(binding) ?? []);
-      rows.push(...pageRows);
-      pages++;
-      log(JSON.stringify({ kind, offset, bindings: bindings.length, rows: pageRows.length }));
-      last = bindings.length < WIKIDATA_PAGE_ROWS;
-    }
+    await queryAllPages((offset) => wikidataPage(spec, offset), {
+      log,
+      onPage: (offset, bindings) => {
+        const pageRows = bindings.flatMap((binding) => wikidataRowOf(binding) ?? []);
+        rows.push(...pageRows);
+        pages++;
+        log(JSON.stringify({ kind, offset, bindings: bindings.length, rows: pageRows.length }));
+      }
+    });
   }
   const tally = wikidataTally();
-  const { matched, added, redirected, failedKeys, failedSeries } = await fillFromWikidata(repo, createWorkFetcher(), rows, at, { dryRun, skip, tally });
+  const { matched, added, redirected, failedKeys, failedSeries } = await fillFromWikidata(repo, createWorkFetcher({ log }), rows, at, { dryRun, skip, tally });
   return { pages, rows: rows.length, matched, added, redirected, failedKeys, failedSeries, unmatchedSkips: skipNames.filter((name) => !tally.skipped.has(seriesNameKey(name))), series: seriesCounts(tally) };
 }
 

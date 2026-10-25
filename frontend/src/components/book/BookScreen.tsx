@@ -33,7 +33,7 @@ import { OptionsMenu } from "../OptionsMenu";
 import { PerCardStylePanel } from "../PerCardStylePanel";
 import { ReaderGlyph } from "../ReaderGlyph";
 import { BackLink } from "../work/BackLink";
-import { CommunityIcon, InfoIcon, QuoteIcon } from "../NavIcons";
+import { ArenaIcon, CommunityIcon, InfoIcon, QuoteIcon } from "../NavIcons";
 import { MoreIcon, ShareIcon } from "../Toolbar";
 import { StatsTiles } from "./BookStats";
 import { EditionStrip } from "./EditionStrip";
@@ -54,6 +54,9 @@ type Props = {
 const TAB_ICONS: Record<BookScreenTabKey, typeof InfoIcon> = { about: InfoIcon, highlights: QuoteIcon, community: CommunityIcon };
 
 const rowClass = "flex items-center gap-3 rounded-xl border border-(--color-border) bg-(--color-surface) p-4";
+const pillClass = "inline-flex max-w-full items-center gap-1 rounded-full border px-2 text-xs";
+const winPillClass = `${pillClass} border-(--color-accent-soft) bg-(--color-accent-soft) text-(--color-accent)`;
+const nomineePillClass = `${pillClass} border-(--color-border) text-(--color-text-dim)`;
 const sectionHeading = "mb-3 text-lg font-bold";
 const roundButtonClass = "flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-(--color-border) bg-(--color-surface) text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)";
 const controlClass = "inline-flex min-h-11 items-center justify-center rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm font-semibold hover:bg-(--color-surface-hover)";
@@ -197,6 +200,17 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
             <h1 className="mt-4 text-2xl font-bold">{model.title}</h1>
             {model.series ? <p className="mt-1 text-xs text-(--color-text-dim)">{seriesLabel(model.series)}</p> : null}
             <p className="mt-1 text-sm text-(--color-text-dim)">{model.author}</p>
+            {model.authorAwards ? <p className="mt-1 text-xs text-(--color-text-dim)">{model.authorAwards}</p> : null}
+            {model.awards.length > 0 ? (
+              <ul className="mt-3 flex flex-wrap justify-center gap-1.5 sm:justify-start">
+                {model.awards.map((award) => (
+                  <li key={award.label} title={award.label} className={award.won ? winPillClass : nomineePillClass}>
+                    {award.won ? <span className="flex shrink-0"><ArenaIcon size={12} /></span> : null}
+                    <span className="truncate">{award.label}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
             {model.genres.length + model.possibleGenres.length > 0 ? (
               <ul className="mt-3 flex flex-wrap justify-center gap-1.5 sm:justify-start">
                 {model.genres.map((genre) => (

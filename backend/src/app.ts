@@ -41,9 +41,9 @@ import {
 import { deleteArenaUserData, getArenaPublicApi, getCompletedTournaments, getTournamentGameSource, registerArenaModule } from "./modules/arena/index.js";
 import { createBestEffortRecorder, deleteCommunityUserData, getCommunityPublicApi, registerCommunityModule } from "./modules/community/index.js";
 import type { RankingTierPreview } from "@scripta/shared/community";
-import { canonicalWorks, catalogGenres, enqueueBookCovers, getWorkPage, matchWorks, registerBooksModule } from "./modules/books/index.js";
+import { canonicalWorks, catalogGenres, enqueueBookCovers, getRecentAwards, getWorkPage, matchWorks, registerBooksModule } from "./modules/books/index.js";
 import { deleteGalleryUserData, registerGalleryModule } from "./modules/gallery/index.js";
-import { communityRatings, copyOfWork, deleteLibraryUserData, heldWorks, holdersOfWorks, registerLibraryModule, resolvePublicLibrary, readerGlyphFor, resolveEntryWorks, WorkResolutionError, sharedBookCounts, sharedBooks, sweepLibraryWorks, sweepWorks, WORKS_SWEEP_INTERVAL_MS, type BookEvent } from "./modules/library/index.js";
+import { communityRatings, copyOfWork, deleteLibraryUserData, heldWorks, holdersOfWorks, koboCoverLookups, registerLibraryModule, resolvePublicLibrary, readerGlyphFor, resolveEntryWorks, WorkResolutionError, sharedBookCounts, sharedBooks, sweepLibraryWorks, sweepWorks, WORKS_SWEEP_INTERVAL_MS, type BookEvent } from "./modules/library/index.js";
 import { deleteMuralsUserData, getMuralsPublicApi, registerMuralsModule, rekeyMuralsBooks, sweepMuralsWorks } from "./modules/murals/index.js";
 import { deleteQuizzesUserData, getQuizGameSource, getQuizzesPublicApi, registerQuizzesModule } from "./modules/quizzes/index.js";
 import { deleteSocialsUserData, registerSocialsModule } from "./modules/socials/index.js";
@@ -168,6 +168,7 @@ export function buildApp() {
   app.register(registerGalleryModule);
   app.register(registerBooksModule, {
     heldWorks,
+    koboCoverLookups,
     worksShareAnArena: (aIds: string[], bIds: string[]) => getArenaPublicApi().worksShareATournament(aIds, bIds),
     alert: emailEnabled && env.ALERT_EMAIL
       ? (subject: string, text: string) => {
@@ -219,6 +220,7 @@ export function buildApp() {
   });
   app.register(registerWorksModule, {
     getWorkPage,
+    getRecentAwards,
     holdersOfWorks,
     copyOfWork,
     readerVisibility: (viewerId: string | null, userIds: string[]) => getCommunityPublicApi().readerVisibility(viewerId, userIds),

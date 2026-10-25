@@ -22,3 +22,14 @@ test("fetchWorkStats is optional-auth and encodes the id", async () => {
   assert.deepEqual(await createWorksApi(request).fetchWorkStats("a/b"), { community: null, tiers: null, tournaments: null });
   assert.deepEqual(calls, [{ path: "/works/a%2Fb/stats", init: { auth: "optional" } }]);
 });
+
+test("fetchRecentAwards requests /awards/recent without auth", async () => {
+  const calls: Array<{ path: string; init: ApiRequestInit }> = [];
+  const recent = { announcements: [] };
+  const request = (async (path: string, init: ApiRequestInit) => {
+    calls.push({ path, init });
+    return recent;
+  }) as ApiRequest;
+  assert.deepEqual(await createWorksApi(request).fetchRecentAwards(), recent);
+  assert.deepEqual(calls, [{ path: "/awards/recent", init: { auth: "none" } }]);
+});

@@ -13,6 +13,11 @@ export function buildWorkRoutes(service: WorksService) {
       if (!page) return reply.code(404).send({ error: "No book with that id." });
       return reply.send(page);
     });
+
+    app.get("/awards/recent", async (_request, reply) => {
+      reply.header("Cache-Control", "no-store");
+      return reply.send(service.recentAwards());
+    });
   };
 }
 

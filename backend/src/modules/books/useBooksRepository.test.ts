@@ -53,7 +53,7 @@ test("the public reads go through the repository registered with useBooksReposit
 
   calls.length = 0;
   assert.equal(getWorkPage(workId)?.id, workId);
-  assert.deepEqual(calls, ["workPageRows", "bestSeriesOf", "collectionsOf"]);
+  assert.deepEqual(calls, ["workPageRows", "bestSeriesOf", "collectionsOf", "awardsOf"]);
 
   calls.length = 0;
   assert.deepEqual(catalogGenres([workId]), new Map());
