@@ -62,3 +62,20 @@ test("Library area pages use Page with the Library tabs", () => {
     assert.doesNotMatch(src, /<h2 className="[^"]*text-lg font-bold/, file);
   }
 });
+
+test("Games, Community and Admin pages use Page with their area's tabs", () => {
+  const pages: Array<[string, string]> = [
+    ["ArenaListPage", "games"],
+    ["DiscoverPage", "community"],
+    ["PeoplePage", "community"],
+    ["AdminGenresPage", "admin"],
+    ["AdminSynopsesPage", "admin"],
+    ["AdminTranslationsPage", "admin"]
+  ];
+  for (const [file, id] of pages) {
+    const src = readFileSync(new URL(`../src/pages/${file}.tsx`, import.meta.url), "utf8");
+    assert.match(src, new RegExp(`<Page[\\s\\S]*?tabs=\\{area\\("${id}"\\)\\.tabs\\}`), file);
+  }
+  const arena = readFileSync(new URL("../src/pages/ArenaListPage.tsx", import.meta.url), "utf8");
+  assert.doesNotMatch(arena, /aria-pressed/);
+});

@@ -1,8 +1,8 @@
 // "My tournaments" — list + a "+" tile. Same list/detail split as
 // MuralsListPage.tsx → MuralEditorPage.tsx: this page only creates and
 // lists; seeding happens on ArenaSeedPage.tsx once a tournament exists.
-// Tier lists live here too, behind the segmented tab control below —
-// they're Arena-shaped content (pick books, rank them) even though a
+// Tier lists and quizzes live here too, behind the Games tabs in the
+// band — they're Arena-shaped content (pick books, rank them) even though a
 // tier list itself renders inside a mural.
 
 import { useMemo, useState } from "react";
@@ -16,14 +16,17 @@ import { useConfirm } from "../components/ConfirmDialog";
 import { EmptyState } from "../components/EmptyState";
 import { ArenaIcon } from "../components/NavIcons";
 import { OptionsMenu } from "../components/OptionsMenu";
+import { Page } from "../components/page/Page";
+import { BUTTON_PRIMARY } from "../components/page/buttonClasses";
 import { SkeletonCardGrid } from "../components/Skeleton";
-import { PlusIcon, TOOLBAR_CONTROL_CLASS, ToolbarRow } from "../components/Toolbar";
+import { TOOLBAR_CONTROL_CLASS, ToolbarRow } from "../components/Toolbar";
 import { useDelayedShow } from "../hooks/useDelayedShow";
 import { useMyTournaments } from "../hooks/useMyTournaments";
 import { useQuizzes } from "../hooks/useQuizzes";
 import { useTierlists } from "../hooks/useTierlists";
 import { useVotedTierlists } from "../hooks/useVotedTierlists";
 import { useVotedTournaments } from "../hooks/useVotedTournaments";
+import { area } from "../lib/areas";
 import type { Tournament } from "../api/arena";
 
 export function ArenaListPage() {
@@ -39,19 +42,12 @@ export function ArenaListPage() {
   const tierlists = tierlistsData ?? [];
   const navigate = useNavigate();
   const confirm = useConfirm();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const tab = searchParams.get("tab") === "tierlists" ? "tierlists" : searchParams.get("tab") === "quizzes" ? "quizzes" : "tournaments";
   const [createError, setCreateError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [renamingTierlistId, setRenamingTierlistId] = useState<string | null>(null);
   const [tierlistNameDraft, setTierlistNameDraft] = useState("");
-
-  function handleTabSwitch(next: "tournaments" | "tierlists" | "quizzes") {
-    const params = new URLSearchParams(searchParams);
-    if (next === "tournaments") params.delete("tab");
-    else params.set("tab", next);
-    setSearchParams(params);
-  }
 
   const bySearch = useMemo(() => {
     const needle = search.trim().toLowerCase();
@@ -92,32 +88,23 @@ export function ArenaListPage() {
     await removeQuiz(quiz.id);
   }
 
+  const create =
+    tab === "tierlists"
+      ? { label: "New tier list", onClick: () => navigate("/dashboard/arena/tierlist/new") }
+      : tab === "quizzes"
+        ? { label: "New quiz", onClick: () => navigate("/dashboard/arena/quiz/new") }
+        : { label: "New tournament", onClick: handleCreate };
+
   return (
-    <div className="mx-auto max-w-5xl px-5 py-8">
-      {/* Desktop-only title, like the other list pages — the bottom tab
-          bar already says where you are, and the search row below is
-          what a phone actually needs at the top. */}
-      <h2 className="mb-6 hidden text-lg font-bold sm:block">Games</h2>
-
-      {/* The three Arena contents, one segmented control — same component
-          shape ArenaViewPage's round control uses, so switching between
-          tournaments and tier lists reads as the same gesture as
-          switching rounds. */}
-      <div className="mb-4 flex items-stretch overflow-hidden rounded-lg border border-(--color-border) bg-(--color-surface) min-w-72 sm:w-fit">
-        {(["tournaments", "tierlists", "quizzes"] as const).map((t, i) => (
-          <button
-            key={t}
-            onClick={() => handleTabSwitch(t)}
-            aria-pressed={tab === t}
-            className={`flex min-h-11 flex-1 items-center justify-center gap-1.5 px-3 text-sm font-semibold ${
-              i > 0 ? "border-l border-(--color-border)" : ""
-            } ${tab === t ? "bg-(--color-accent-soft) text-(--color-accent)" : "text-(--color-text-dim) hover:bg-(--color-surface-hover)"}`}
-          >
-            {t === "tournaments" ? "Tournaments" : t === "tierlists" ? "Tier lists" : "Quizzes"}
-          </button>
-        ))}
-      </div>
-
+    <Page
+      title="Games"
+      tabs={area("games").tabs}
+      actions={
+        <button onClick={create.onClick} className={BUTTON_PRIMARY}>
+          {create.label}
+        </button>
+      }
+    >
       {tab === "tournaments" && (
         <>
           <p className="mb-4 text-sm text-(--color-text-dim)">
@@ -142,25 +129,13 @@ export function ArenaListPage() {
 
           {showSkeleton && <SkeletonCardGrid count={3} label="Loading tournaments" tileClassName="min-h-[86px]" />}
 
-          {/* Section headers appear only once there's something in the
-              second section — until then the tab is the plain create list
-              it always was. */}
+          {!isLoading && tournaments.length === 0 && votedTournaments.length === 0 && (
+            <EmptyState icon={ArenaIcon} title="No tournaments yet." body="Pit your books against each other in a bracket." />
+          )}
+
           {votedTournaments.length > 0 && <h3 className="mb-3 text-sm font-semibold">Created by you</h3>}
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {/* Always first, always present — deliberately outside the map
-                so creating never disappears when the list is empty, the same
-                way the mural grid's "+" tile works. Opens an unsaved
-                tournament on the seed page, where the name and bracket size
-                are editable until the first real change saves it. */}
-            <button
-              onClick={handleCreate}
-              className="flex min-h-14 items-center justify-center gap-2 rounded-xl border-2 border-dashed border-(--color-border) p-4 text-(--color-text-dim) transition-colors hover:border-(--color-accent) hover:text-(--color-accent) disabled:opacity-60"
-            >
-              <PlusIcon />
-              <span className="text-sm font-semibold">New tournament</span>
-            </button>
-
             {bySearch.created.map((t) => (
               <TournamentCard key={t.id} t={t} />
             ))}
@@ -200,14 +175,6 @@ export function ArenaListPage() {
           {votedTierlists.length > 0 && <h3 className="mb-3 text-sm font-semibold">Created by you</h3>}
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <button
-              onClick={() => navigate("/dashboard/arena/tierlist/new")}
-              className="flex min-h-14 items-center justify-center gap-2 rounded-xl border-2 border-dashed border-(--color-border) p-4 text-(--color-text-dim) transition-colors hover:border-(--color-accent) hover:text-(--color-accent) disabled:opacity-60"
-            >
-              <PlusIcon />
-              <span className="text-sm font-semibold">New tier list</span>
-            </button>
-
             {tierlists.map((tl) =>
               renamingTierlistId === tl.id ? (
                 <div key={tl.id} className="rounded-xl border border-(--color-accent) bg-(--color-surface) p-4">
@@ -295,14 +262,6 @@ export function ArenaListPage() {
           )}
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <button
-              onClick={() => navigate("/dashboard/arena/quiz/new")}
-              className="flex min-h-14 items-center justify-center gap-2 rounded-xl border-2 border-dashed border-(--color-border) p-4 text-(--color-text-dim) transition-colors hover:border-(--color-accent) hover:text-(--color-accent) disabled:opacity-60"
-            >
-              <PlusIcon />
-              <span className="text-sm font-semibold">New quiz</span>
-            </button>
-
             {quizzes.map((quiz) => (
               <div
                 key={quiz.id}
@@ -334,7 +293,7 @@ export function ArenaListPage() {
           </div>
         </>
       )}
-    </div>
+    </Page>
   );
 }
 

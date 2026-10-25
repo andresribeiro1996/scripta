@@ -2,6 +2,9 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { withoutSynopsis, type SynopsisDecision, type SynopsisReview } from "@scripta/shared";
 import { fetchIsAdmin, fetchSynopsisReview, reviewSynopsis } from "../api/books";
 import { SynopsisReviewList } from "../components/SynopsisReviewList";
+import { EmptyState } from "../components/EmptyState";
+import { Page } from "../components/page/Page";
+import { area } from "../lib/areas";
 import { NotFoundPage } from "./NotFoundPage";
 
 export function AdminSynopsesPage() {
@@ -15,9 +18,8 @@ export function AdminSynopsesPage() {
     client.setQueryData<SynopsisReview>(["synopsis-review"], (current) => (current ? withoutSynopsis(current, hash) : current));
   };
   return (
-    <div className="mx-auto max-w-3xl px-5 py-6">
-      <h1 className="text-xl font-bold">Synopsis review</h1>
-      {review.data ? <SynopsisReviewList review={review.data} onDecide={decide} /> : review.isError ? <p role="alert" className="mt-4 text-sm text-(--color-danger)">The review list didn't load.</p> : null}
-    </div>
+    <Page title="Admin" subtitle="Synopsis review" tabs={area("admin").tabs}>
+      {review.data ? review.data.items.length === 0 ? <EmptyState title="Nothing to review." /> : <SynopsisReviewList review={review.data} onDecide={decide} /> : review.isError ? <p role="alert" className="mt-4 text-sm text-(--color-danger)">The review list didn't load.</p> : null}
+    </Page>
   );
 }
