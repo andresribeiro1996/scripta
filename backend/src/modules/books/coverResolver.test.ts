@@ -4,6 +4,8 @@ import { findBestCover, type CoverSources, type FetchCoverImage } from "./coverR
 import { SourceUnavailableError } from "./domain/errors.js";
 import type { CoverCandidate, CoverSource, TitledCandidate } from "./domain/ports.js";
 
+const KOBO_ID = "0b8a2a3c-6f1e-4c54-9d0e-1a2b3c4d5e6f";
+const KOBO_URL = `https://cdn.kobo.com/book-images/${KOBO_ID}/1200/1800/False/image.jpg`;
 const orlando = { isbn: "9780141184272", title: "Orlando (Penguin Modern Classics)", author: "Virginia Woolf" };
 
 function source(options: { isbn?: CoverCandidate[] | Error; titled?: TitledCandidate[] | Error } = {}): CoverSource & { calls: string[] } {
@@ -120,6 +122,46 @@ test("without an ISBN only title steps run; an empty title runs nothing", async 
   assert.deepEqual(idle.calls, []);
 });
 
+test("a Kobo image of 400px or more ends the lookup before any other source is asked", async () => {
+  const apple = source({ isbn: [{ source: "apple", url: "https://a/1" }] });
+  const isbndb = source({ isbn: [{ source: "isbndb", url: "https://i/1" }] });
+  const outcome = await findBestCover({ ...orlando, koboImageId: KOBO_ID }, new Set(), sources({ apple, isbndb }), images({ [KOBO_URL]: [900, 1400], "https://a/1": [900, 1400] }));
+  assert.deepEqual(outcome.found?.candidate, { source: "kobo", url: KOBO_URL });
+  assert.equal(outcome.complete, true);
+  assert.deepEqual(apple.calls, []);
+  assert.deepEqual(isbndb.calls, []);
+});
+
+test("a Kobo image is taken even when the book's title matches nothing the other sources would accept", async () => {
+  const apple = source({ titled: [{ source: "apple", url: "https://a/1", title: "Something Else", authors: ["Someone Else"] }] });
+  const outcome = await findBestCover({ isbn: null, title: "Orlando", author: "Virginia Woolf", koboImageId: KOBO_ID }, new Set(), sources({ apple }), images({ [KOBO_URL]: [900, 1400] }));
+  assert.equal(outcome.found?.candidate.source, "kobo");
+  assert.deepEqual(apple.calls, []);
+});
+
+test("a Kobo image under 400px is kept as best while the other sources are still asked, and a wider one wins", async () => {
+  const isbndb = source({ isbn: [{ source: "isbndb", url: "https://i/1" }] });
+  const narrow = await findBestCover({ ...orlando, koboImageId: KOBO_ID }, new Set(), sources({ isbndb }), images({ [KOBO_URL]: [300, 460] }));
+  assert.deepEqual(narrow.found?.candidate, { source: "kobo", url: KOBO_URL });
+  assert.deepEqual(isbndb.calls, ["isbn:9780141184272", "title:Orlando (Penguin Modern Classics)"]);
+  const wider = await findBestCover({ ...orlando, koboImageId: KOBO_ID }, new Set(), sources({ isbndb: source({ isbn: [{ source: "isbndb", url: "https://i/1" }] }) }), images({ [KOBO_URL]: [300, 460], "https://i/1": [900, 1400] }));
+  assert.equal(wider.found?.candidate.url, "https://i/1");
+});
+
+test("a rejected Kobo URL is skipped", async () => {
+  const isbndb = source({ isbn: [{ source: "isbndb", url: "https://i/1" }] });
+  const outcome = await findBestCover({ ...orlando, koboImageId: KOBO_ID }, new Set([KOBO_URL]), sources({ isbndb }), images({ [KOBO_URL]: [900, 1400], "https://i/1": [900, 1400] }));
+  assert.equal(outcome.found?.candidate.url, "https://i/1");
+});
+
+test("without a Kobo image id no Kobo candidate is tried", async () => {
+  const fetched: string[] = [];
+  const fetchImage: FetchCoverImage = async (candidate) => { fetched.push(candidate.url); return null; };
+  await findBestCover(orlando, new Set(), sources({ isbndb: source({ isbn: [{ source: "isbndb", url: "https://i/1" }] }) }), fetchImage);
+  await findBestCover({ ...orlando, koboImageId: null }, new Set(), sources({ isbndb: source({ isbn: [{ source: "isbndb", url: "https://i/1" }] }) }), fetchImage);
+  assert.deepEqual(fetched, ["https://i/1", "https://i/1"]);
+});
+
 test("an ISBN-only lookup asks no source by title and keeps its exact hit", async () => {
   const titled = [{ source: "apple" as const, url: "https://a/guess", title: "Orlando", authors: ["Virginia Woolf"] }];
   const isbndb = source({ isbn: [{ source: "isbndb", url: "https://i/small" }], titled });
@@ -129,4 +171,17 @@ test("an ISBN-only lookup asks no source by title and keeps its exact hit", asyn
   assert.equal(outcome.found?.candidate.url, "https://i/small");
   assert.equal(outcome.complete, true);
   assert.deepEqual([...apple.calls, ...isbndb.calls, ...openlibrary.calls].filter((call) => call.startsWith("title:")), []);
+});
+
+test("an ISBN-only lookup with a Kobo image id asks Kobo first and no source by title", async () => {
+  const titled = [{ source: "apple" as const, url: "https://a/guess", title: "Orlando", authors: ["Virginia Woolf"] }];
+  const isbndb = source({ isbn: [{ source: "isbndb", url: "https://i/small" }], titled });
+  const apple = source({ titled });
+  const fetched: string[] = [];
+  const sizes = images({ [KOBO_URL]: [300, 460], "https://i/small": [250, 380], "https://a/guess": [900, 1400] });
+  const fetchImage: FetchCoverImage = (candidate) => { fetched.push(candidate.url); return sizes(candidate); };
+  const outcome = await findBestCover({ ...orlando, koboImageId: KOBO_ID, isbnOnly: true }, new Set(), sources({ isbndb, apple }), fetchImage);
+  assert.equal(fetched[0], KOBO_URL);
+  assert.deepEqual(outcome.found?.candidate, { source: "kobo", url: KOBO_URL });
+  assert.deepEqual([...apple.calls, ...isbndb.calls].filter((call) => call.startsWith("title:")), []);
 });

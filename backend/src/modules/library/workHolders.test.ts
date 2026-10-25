@@ -67,3 +67,21 @@ test("held works count each work's holders and whether anyone finished it", () =
     { workId: "w-other", holders: 1, finished: false }
   ]);
 });
+
+test("Kobo cover lookups are one per distinct book, with real image ids only", () => {
+  const db = new DatabaseSync(":memory:");
+  applyLibrarySchema(db);
+  const row = db.prepare("INSERT INTO library_books (user_id, position, book_key, title, author, isbn, image_id, row_hash) VALUES (?, ?, ?, ?, ?, ?, ?, 'h')");
+  const id = "0f2b6c3e-5d1a-4b7e-9c40-1a2b3c4d5e6f";
+  const other = "1a2b6c3e-5d1a-4b7e-9c40-1a2b3c4d5e6f";
+  row.run("ana", 0, "isbn:111", "Stoner", "John Williams", "111", id);
+  row.run("bo", 3, "isbn:111", "Stoner", "John Williams", "111", id);
+  row.run("ana", 1, "ta:side|a", "Side", "A", null, "file____mnt_onboard_side.epub");
+  row.run("ana", 2, "ta:none|a", "None", "A", null, null);
+  row.run("cy", 0, "ta:other|b", "Other", "B", null, ` ${other} `);
+  const { koboCoverLookups } = createWorkHolders(db);
+  assert.deepEqual(koboCoverLookups().sort((a, b) => a.imageId.localeCompare(b.imageId)), [
+    { isbn: "111", title: "Stoner", author: "John Williams", imageId: id },
+    { isbn: null, title: "Other", author: "B", imageId: other }
+  ]);
+});

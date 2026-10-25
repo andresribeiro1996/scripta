@@ -5,6 +5,7 @@ import { createThrottle, type Throttle } from "../http/http.js";
 import { appleArtworkUrl, createAppleSource, parseAppleResults, storefrontsFor } from "./apple.js";
 import { createIsbndbGate } from "../isbndb/isbndbGate.js";
 import { createIsbndbGet, createIsbndbSource, parseIsbndbBooks } from "./isbndb.js";
+import { koboCoverUrl } from "./kobo.js";
 import { createOpenLibraryCoverSource } from "./openLibrary.js";
 
 const direct: Throttle = (task) => task();
@@ -234,4 +235,9 @@ test("a 429 that lifts in a second is retried per book, one that lifts in an hou
   stub(() => new Response("", { status: 429, headers: { "retry-after": "3600" } }));
   await assert.rejects(get("https://api2.isbndb.com/book/1"), SourcePausedError);
   assert.equal(pauses.length, 1);
+});
+
+test("a Kobo cover URL asks the CDN for the 1200 by 1800 image and escapes the id", () => {
+  assert.equal(koboCoverUrl("0b8a2a3c-6f1e-4c54-9d0e-1a2b3c4d5e6f"), "https://cdn.kobo.com/book-images/0b8a2a3c-6f1e-4c54-9d0e-1a2b3c4d5e6f/1200/1800/False/image.jpg");
+  assert.equal(koboCoverUrl("a/b c"), "https://cdn.kobo.com/book-images/a%2Fb%20c/1200/1800/False/image.jpg");
 });
