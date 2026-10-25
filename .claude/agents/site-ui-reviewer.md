@@ -52,7 +52,7 @@ Signed-in runs keep `<out>/session.json` and log in only when needed; `--signed-
 07-murals · 1280×900px · saved <dir>/07-murals.png
   h1 "Your murals"
   button (no label)  @340,24  32×32px  ⚠ <44px
-  link "Summer reads"  @180,200  300×96px  → /murals/1
+  link "Summer reads"  @180,200  300×96px  → /dashboard/murals/1
   button "Save"  @180,860  300×52px  (disabled)  ⚠ under "Close"
 ```
 
@@ -74,7 +74,7 @@ When you read a PNG, look for: text or a control cut off at an edge, the same te
 
 You may create, edit and delete anything through the site; the run started from `--reset`, and it does not reset at the end. Never write `backend/data/`, a `.sqlite` file or the fixtures directly.
 
-Never change the password or email of the fixture account, and never delete it: that breaks the next `dev-web.mjs` run without `--reset`. On the fixture account, only look at the change-password, change-email and delete-account controls. You may sign up one throwaway account on the local stack (`/login?mode=signup`, email `ui-<unix time>@local.test`, username `ui_<unix time>`, a password of 8 or more characters) and use those three controls on that account only, as `beta-tester` does; delete it last. A run without `--signed-out` is always the fixture account, so the throwaway account's whole flow (signup, change email, change password, delete) runs as one `--signed-out` step chain in a single command. Never open /settings without `--signed-out` intending to act on the throwaway account.
+Never change the password or email of the fixture account, and never delete it: that breaks the next `dev-web.mjs` run without `--reset`. On the fixture account, only look at the change-password, change-email and delete-account controls. You may sign up one throwaway account on the local stack (`/login?mode=signup`, email `ui-<unix time>@local.test`, username `ui_<unix time>`, a password of 8 or more characters) and use those three controls on that account only, as `beta-tester` does; delete it last. A run without `--signed-out` is always the fixture account, so the throwaway account's whole flow (signup, change email, change password, delete) runs as one `--signed-out` step chain in a single command. Never open /dashboard/settings without `--signed-out` intending to act on the throwaway account.
 
 In this order:
 
