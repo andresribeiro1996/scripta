@@ -133,3 +133,39 @@ Steps:
   - no variables or `*_DB_PATH` changes;
   - the first boot drops `idx_books_work` and builds three indexes, about 0.3 s, once;
   - after the deploy, opening the translation review should log no `books:translationReviewRows` or `books:matchCandidates` stall above the 200 ms threshold outside an import. During an import, expect roughly a third of today's 7.2 s.
+
+## Task 2: keep the old row order for full ties (review round 2)
+
+The Codex branch review (r1) found the problem. `translationReviewWith` sorts with a stable sort whose last key is the title. Rows that tie on finished, holders, group, `mergedAt` and title therefore keep the order the SQL returned them in. The old statement had no `ORDER BY`. Its plans returned:
+- arm 1 in works rowid order, through `idx_works_merged_into`;
+- arm 2 in merge `id` order (`SCAN m`).
+
+The new plans return arm 1 in `work_id` order and arm 2 by source. Two live works both titled "Poemas" in the possible group would swap places.
+
+Making the old order explicit fixes it:
+- the plans stay the same, each arm adding a small `USE TEMP B-TREE FOR ORDER BY` under `MERGE (UNION ALL)`;
+- the copy still reads 7,052 cold pages;
+- all 5,180 rows come back in exactly the old statement's order.
+
+- Modify: `backend/src/modules/books/adapters/sqlite/sqliteBooksRepository.ts`
+- Test: `backend/src/modules/books/adapters/sqlite/sqliteBooksRepository.test.ts`
+
+Steps:
+1. `translationReviewRowsStmt`:
+   - arm 1 selects two more columns, `0 AS arm, w.rowid AS seq`;
+   - arm 2 selects `1, m.id` in the same positions;
+   - the statement ends with `ORDER BY arm, seq`;
+   - the mapper stays as it is (it ignores the extra columns).
+2. Tests in `sqliteBooksRepository.test.ts`:
+   - **Plan test for the review rows:** keep every assertion, adding `MERGE (UNION ALL)` if useful, and still no `idx_works_merged_into` and no `SCAN m\b`.
+   - **New repository test for `translationReviewRows` order:**
+     - two live works with the same title, inserted so that their ids sort opposite to their insertion order (for example insert `works` rows `w-b` then `w-a` with SQL), each with an open Jev judgment (confidence between `MATCH_REVIEW_AT` and `MATCH_MERGE_AT`) proposing a live original;
+     - they come back in insertion order;
+     - two translation merges whose `from_work` ids sort opposite to their merge order come back in merge order.
+     - The test must be deterministic, so no random ids decide the outcome. It must fail if `ORDER BY arm, seq` is removed.
+3. Verify:
+   - `npm run build --workspace @scripta/shared`;
+   - `npm run typecheck --workspace backend`;
+   - `npm test --workspace backend`;
+   - the books repository test file under `npx -y node@24.21.0`.
+   - Commit.
