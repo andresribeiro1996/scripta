@@ -19,8 +19,8 @@
 - `POST /works/characters` accepts at most **500** ids.
 - The book screen shows the first **8** names, then "+N more".
 - Copy, verbatim:
-  - create screens: "Guess the book from its characters"
-  - editors: "Characters → title"
+  - web create screen: "Guess the book from its characters"
+  - mobile create screen and both editors: "Characters → title" (mobile create already uses the arrow style)
   - play caption: "Who's in this book?"
   - mobile discover clue: "Which book has these characters?"
   - availability failure: "Characters couldn't be checked"
@@ -54,8 +54,8 @@
   - `personNameKey(name: string): string | null`
 
 - [ ] **Step 1: Write the failing tests** in `workSubjects.test.ts`, using the 2026-10-25 probe data from the spec:
-  - `pride and prejudice keeps all 14 in order`: `subject_people` from `/works/OL66554W.json` (14 names, Elizabeth Bennet first), subjects include `"Fiction, Romance, Historical, Regency"`. Assert `person.length === 14`, `person[0] === "Elizabeth Bennet"`, `gatedOut === false`.
-  - `1984 drops the dated author heading`: the 20 names from the spec probe, authors `["George Orwell"]`. Assert `person.slice(0,3)` deep-equals `["Big Brother","Emmanuel Goldstein","Thought Police"]`, and that no name contains `"Orwell"`.
+  - `pride and prejudice keeps all 14 in order`: people `["Elizabeth Bennet","Fitzwilliam Darcy","Charlotte Lucas","George Wickham","Mr. Bennet","Mrs. Bennet","Jane Bennet","Mary Bennet","Catherine Bennet","Lydia Bennet","Charles Bingley","Caroline Bingley","William Collins","Catherine de Bourgh"]`, subjects include `"Fiction, Romance, Historical, Regency"`. Assert `person.length === 14`, `person[0] === "Elizabeth Bennet"`, `gatedOut === false`.
+  - `1984 drops the dated author heading`: people `["Big Brother","Emmanuel Goldstein","Thought Police","Winston Smith","Julia","O'Brien","Aaronson","Jones","Rutherford","Ampleforth","God","Rudyard Kipling","Charrington","Katharine Smith","Tom Parsons","Mrs. Parsons","Syme","Leonard Moore","René-Noël Raimbault","George Orwell (1862-1931)"]`, subjects `["Fiction","censorship"]`, authors `["George Orwell"]`. Assert `person.slice(0,3)` deep-equals `["Big Brother","Emmanuel Goldstein","Thought Police"]`, and that no name contains `"Orwell"`.
   - `qualifier and honorific variants merge`: `["Mr. Sherlock Holmes (Fictional character)","Dr. Watson (Fictional character)","Sherlock Holmes","John H. Watson (Fictitious character)","Inspector Lestrade"]`, subjects `[]`. The gate passes via the qualifier. Assert `person` deep-equals `["Sherlock Holmes","Dr. Watson","John H. Watson","Inspector Lestrade"]`.
   - `non-fiction is gated out`: people `["Adolf Hitler (1889-1945)","Neville Chamberlain (1869-1940)"]`, subjects `["History","Third Reich"]`. Assert `person` is `[]` and `gatedOut === true`. Repeat with people `["Abraham Lincoln","William H. Seward"]` and subjects `["Nonfiction","American Civil War","Non-fiction"]`, expecting the same.
   - `gate words`: each of `"Juvenile fiction"`, `"Ficção portuguesa"`, `"Ficción"`, `"Graphic novels"`, `"Romance"`, `"Romans"` alone passes the gate for people `["A B","C D","E F"]`.
@@ -115,7 +115,12 @@
 
 - [ ] **Step 3: Add the DDL and implement the methods.**
   - DDL: the spec's `work_subjects` table, verbatim, after the `work_awards` index in `books.sql`.
-  - Reads: resolve aliases exactly as `bestSeriesOf` does (`rootOf` + `canonicalWorkIds(aliasesOf(...))`, around `sqliteBooksRepository.ts:1394`). Select with `json_each`, ordered by `work_id, position`.
+  - Reads, in order:
+    - map each given id to its canonical work with `canonicalWorkIds` over the given ids, so a merged-away id maps to its root (`bestSeriesOf` alone never does this)
+    - gather each canonical's aliases with `aliasesOf`, as `bestSeriesOf` does at `sqliteBooksRepository.ts:1394-1400`
+    - select all their rows with `json_each`, ordered by `work_id, position`
+    - pick per canonical (own list, else the longest alias list)
+    - key the result back under each given id
 
 - [ ] **Step 4: Run to verify pass.** Same command. Expected: PASS.
 
@@ -138,19 +143,21 @@
 
 **Interfaces:**
 - Consumes: `cleanWorkSubjects` (Task 1) and `replaceWorkSubjects` (Task 2).
-- Produces: `CatalogDetails.subjects?: WorkSubjects`. Open Library's `fetchDetails` always sets it when it returns details, even when every list is empty. Other catalogs never set it.
+- Produces: `CatalogDetails.subjects?: WorkSubjects`. Open Library's `fetchDetails` sets it only when the work record is a real work (`work?.type?.key === "/type/work"`), even when every list is empty. A `null` record (404) or a redirect record leaves it unset, so stored rows survive (spec call 2). Other catalogs never set it.
 
 - [ ] **Step 1: Write failing tests**
   - In `openLibraryCatalog.test.ts`, add `details carry cleaned subjects from the work record`:
     - The work JSON has `subject_people: ["Mr. Sherlock Holmes (Fictional character)","Sherlock Holmes","Dr. Watson"]`, `subject_places: ["London"]`, `subject_times: ["19th century"]` and `subjects: ["Fiction"]`.
     - The search doc has `author_name: ["Arthur Conan Doyle"]`.
     - Assert `details.subjects` deep-equals `{person:["Sherlock Holmes","Dr. Watson"],place:["London"],time:["19th century"]}`.
-    - Update the existing whole-object `deepEqual`s (test at line 26 and others) to include `subjects: {person:[],place:[],time:[]}`.
+    - Work fixtures that should carry subjects get `type: { key: "/type/work" }`. Update the existing whole-object `deepEqual`s (test at line 26 and others) to match.
+  - `a redirect or missing work record sets no subjects`: the work JSON `{type:{key:"/type/redirect"},location:"/works/OL2W"}` and a `null` work each give `details.subjects === undefined`.
   - In `booksService.test.ts`:
     - `details with subjects replace the work's subjects`: a `recordingCatalog` returns `subjects: {person:["A B","C D","E F"],place:[],time:[]}`. Assert via `rowsOf(h, "work_subjects", workId)`. Then return `{person:[],place:[],time:[]}` and assert zero rows.
     - `details without subjects leave stored subjects alone`: pre-write rows, return details with no `subjects` key, and assert the rows are unchanged.
     - `a null details result touches nothing`.
     - Cover both the found branch and the details-missing branch (details with only `workKey`).
+    - `subjects are not written to a work keyed to a different Open Library work`: the book's work already has `ol_work_key` `OL9W`, and the details carry `workKey: "/works/OL1W"`. Assert no rows are written.
 
 - [ ] **Step 2: Run to verify failure**
   Run: `cd backend && npx tsx --test src/modules/books/adapters/openlibrary/openLibraryCatalog.test.ts src/modules/books/booksService.test.ts`
@@ -160,7 +167,11 @@
   - In `fetchDetails`, build `subjects` with `cleanWorkSubjects`:
     - `people`, `places`, `times` and `subjects` come from the work record. Fall back to `match.subject` for `subjects`, as `subjectsOf` does.
     - `authors` comes from `match.author_name`.
-  - In `lookupDetails`, next to each `storeSeries` call: when `details.subjects` is present and the book has a `work_id`, call `replaceWorkSubjects` inside the same `deps.repo.transaction` as `storeSeries`.
+  - In `lookupDetails`, after `setWorkKey` on each branch, call a new local `storeSubjects(bookId, details, at)`. When `details.subjects` is present it:
+    - re-reads the book with `deps.repo.getBook`, because `setWorkKey` can move it to another work
+    - reads that work with `getWorkView`
+    - calls `replaceWorkSubjects` only when the work's `olWorkKey` equals `normalizeWorkKey(details.workKey)`
+  - Leave `storeSeries` unchanged. It returns early when there's no series, so it can't host this write.
 
 - [ ] **Step 4: Run to verify pass.** Same command. Expected: PASS.
 
@@ -257,7 +268,7 @@
 **Interfaces:**
 - Consumes: `charactersOf` (Task 2).
 - Produces:
-  - `CatalogWorkPage.characters: string[]`, and `WorkPage.work.characters?: string[]` (shared).
+  - `CatalogWorkPage.characters?: string[]` (optional, like `awards`, so existing page fixtures still typecheck), and `WorkPage.work.characters?: string[]` (shared).
   - `WorksDeps.charactersOf(workIds: string[]): Map<string, string[]>`.
   - `WorksService.characters(workIds: string[]): Record<string, string[]>` returns the first 3 names, only for lists of length ≥ 3, keyed by the ids given.
   - Route: `POST /works/characters`, body `{ workIds: string[] }` (zod: non-empty strings, `.max(500)`). It responds `200 { characters }`, or `400` over the cap or on a malformed body. Auth is optional, and the `Cache-Control: no-store` header matches `GET /works/:id`.
@@ -298,6 +309,10 @@
 - Modify: `packages/shared/src/quizzes/types.ts`
 - Modify: `packages/shared/src/quizzes/draw.ts`
 - Modify: `packages/shared/src/quizzes/preview.ts`
+- Modify: `frontend/src/pages/QuizCreatePage.tsx`
+- Modify: `frontend/src/pages/QuizEditorPage.tsx`
+- Modify: `mobile/src/features/quizzes/QuizCreateScreen.tsx`
+- Modify: `mobile/src/features/quizzes/QuizEditorScreen.tsx`
 - Test: `packages/shared/src/quizzes/draw.test.ts`
 - Test: `packages/shared/src/quizzes/preview.test.ts`
 
@@ -327,13 +342,17 @@
 
 - [ ] **Step 3: Implement.** In `generateQuizQuestions`, when `type === "characters_title"`, the candidate loop also skips any candidate whose `characters` include one of the prompt's three names (lowercase-trimmed set). The existing `distractors.length < 3` → `continue` handles the rest.
 
-- [ ] **Step 4: Run to verify pass, build, commit**
-  Run: `npm test --workspace @scripta/shared && npm run build --workspace @scripta/shared`
+- [ ] **Step 4: Add the four `TYPE_LABELS` entries.** They are `Record<QuizQuestionType, string>` and stop typechecking without them:
+  - web create (`QuizCreatePage.tsx:29`): "Guess the book from its characters"
+  - web editor (`QuizEditorPage.tsx:15`), mobile create (`QuizCreateScreen.tsx:15`) and mobile editor (`QuizEditorScreen.tsx:18`): "Characters → title"
+
+- [ ] **Step 5: Run to verify pass, build, typecheck, commit**
+  Run: `npm test --workspace @scripta/shared && npm run build --workspace @scripta/shared && npm run typecheck --workspace frontend && npm run typecheck --workspace mobile`
   ```bash
-  git add packages/shared/src/quizzes/types.ts packages/shared/src/quizzes/draw.ts packages/shared/src/quizzes/preview.ts packages/shared/src/quizzes/draw.test.ts packages/shared/src/quizzes/preview.test.ts
+  git add packages/shared/src/quizzes/types.ts packages/shared/src/quizzes/draw.ts packages/shared/src/quizzes/preview.ts packages/shared/src/quizzes/draw.test.ts packages/shared/src/quizzes/preview.test.ts frontend/src/pages/QuizCreatePage.tsx frontend/src/pages/QuizEditorPage.tsx mobile/src/features/quizzes/QuizCreateScreen.tsx mobile/src/features/quizzes/QuizEditorScreen.tsx
   git commit -m "Add the characters quiz question type to the shared draw"
   ```
-  Add `characterPrompt` and `QUIZ_MIN_CHARACTERS` to `packages/shared/src/quizzes/index.ts` exports, and stage that file in the same commit.
+  `packages/shared/src/quizzes/index.ts` already re-exports with `export *`, so it needs no change.
 
 ### Task 7: Backend quiz publish fills and freezes characters
 
@@ -342,6 +361,7 @@
 - Modify: `backend/src/modules/quizzes/plugin.ts`
 - Modify: `backend/src/modules/quizzes/service.ts`
 - Modify: `backend/src/modules/quizzes/routes.ts`
+- Modify: `backend/src/modules/quizzes/adapters/communityGameSource.test.ts`
 - Test: `backend/src/modules/quizzes/service.test.ts`
 - Test: `backend/src/modules/quizzes/routes.test.ts`
 
@@ -357,6 +377,7 @@
       - Changing the fake afterwards does not change `getPlay`/public question prompts.
     - `public characters question prompt is the joined first three` asserts `prompt === "Elizabeth Bennet · Fitzwilliam Darcy · Charlotte Lucas"`.
     - `publish error names characters` asserts the exact new error string for `allowedTypes: ["characters_title"]` with too few ready books.
+    - `a stored draft without allowedTypes reads as the four original types`. The `readDocument` fallback at `service.ts:42` uses `[...QUIZ_QUESTION_TYPES]` today, so old drafts would silently gain `characters_title`.
   - `routes.test.ts`:
     - `allowedTypes accepts characters_title`
     - `omitted allowedTypes still defaults to the four original types`
@@ -371,12 +392,14 @@
   - `toPublicQuestion`: `characters_title` → `characterPrompt(book?.characters ?? [])`.
   - Route zod: add the enum value, keeping the omitted default at the four original types. Make sure `quizBookSchema` doesn't carry `characters`.
   - Replace the error string with the new one.
+  - `readDocument`'s fallback (`service.ts:42`) becomes the same explicit four types.
+  - Add `charactersOf` to the hand-built `QuizWorks` in `communityGameSource.test.ts:21-25`.
 
 - [ ] **Step 4: Run to verify pass.** Same command. Expected: PASS.
 
 - [ ] **Step 5: Typecheck and commit**
   ```bash
-  git add backend/src/modules/quizzes/domain/ports.ts backend/src/modules/quizzes/plugin.ts backend/src/modules/quizzes/service.ts backend/src/modules/quizzes/routes.ts backend/src/modules/quizzes/service.test.ts backend/src/modules/quizzes/routes.test.ts
+  git add backend/src/modules/quizzes/domain/ports.ts backend/src/modules/quizzes/plugin.ts backend/src/modules/quizzes/service.ts backend/src/modules/quizzes/routes.ts backend/src/modules/quizzes/service.test.ts backend/src/modules/quizzes/routes.test.ts backend/src/modules/quizzes/adapters/communityGameSource.test.ts
   git commit -m "Fill quiz characters from the catalog at publish"
   ```
 
@@ -428,23 +451,28 @@
 - Modify: `frontend/src/pages/QuizCreatePage.tsx`
 - Modify: `frontend/src/pages/QuizEditorPage.tsx`
 - Modify: `frontend/src/pages/PlayQuizPage.tsx`
-- Test: `frontend/scripts/test-quiz-play-stage.mts`
+- Modify: `frontend/src/api/works.ts`
+- Create: `frontend/src/components/quiz/QuizPrompt.tsx`
+- Test: `frontend/scripts/test-quiz-prompt.mts`
 
 **Interfaces:**
 - Consumes: `fetchWorkCharacters` (Task 5), and `"characters_title"` and `eligibleTypes` (Task 6).
 
-- [ ] **Step 1: Write failing test** in `test-quiz-play-stage.mts`: a `characters_title` question renders the caption "Who's in this book?" and the prompt text `A · B · C` without the quotation-mark wrapper used for quotes.
+- [ ] **Step 1: Write failing test** in a new `frontend/scripts/test-quiz-prompt.mts`, using the same `render` helper style as `test-work-page.mts`:
+  - `QuizPrompt` for a `characters_title` question renders "Who's in this book?" and `A · B · C`, with no `“`.
+  - For `quote_title` it still renders `“…”`.
 
 - [ ] **Step 2: Run to verify failure**
   Run: `npm test --workspace frontend`
   Expected: FAIL.
 
 - [ ] **Step 3: Implement.**
-  - `TYPE_LABELS` get the two exact labels (create: "Guess the book from its characters"; editor: "Characters → title").
-  - Create page:
-    - An effect keyed on the chosen books' work ids calls `fetchWorkCharacters`, and sets `characters` on matching books before `availableTypes` is computed.
+  - Move `Prompt` out of `PlayQuizPage.tsx:25-40` into an exported `QuizPrompt` in `frontend/src/components/quiz/QuizPrompt.tsx`, and add the `characters_title` branch.
+  - Add `fetchWorkCharacters` to the method list in `frontend/src/api/works.ts`.
+  - Create page and editor page. The editor (`QuizEditorPage.tsx:149-150`) decides the offered types from draft books, which never carry characters, so both pages need this:
+    - An effect keyed on the books' work ids calls `fetchWorkCharacters`.
+    - It overlays `characters` onto the books used for `eligibleTypes` and the offered types only. They are never sent back in the saved document.
     - On failure, show the note "Characters couldn't be checked" and leave `characters` unset.
-  - Play page: a `characters_title` branch in the prompt renderer (`PlayQuizPage.tsx:33-40`).
 
 - [ ] **Step 4: Run to verify pass, typecheck and lint**
   Run: `npm test --workspace frontend && npm run typecheck --workspace frontend && npm run lint --workspace frontend`
@@ -452,7 +480,7 @@
 
 - [ ] **Step 5: Commit**
   ```bash
-  git add frontend/src/pages/QuizCreatePage.tsx frontend/src/pages/QuizEditorPage.tsx frontend/src/pages/PlayQuizPage.tsx frontend/scripts/test-quiz-play-stage.mts
+  git add frontend/src/pages/QuizCreatePage.tsx frontend/src/pages/QuizEditorPage.tsx frontend/src/pages/PlayQuizPage.tsx frontend/src/api/works.ts frontend/src/components/quiz/QuizPrompt.tsx frontend/scripts/test-quiz-prompt.mts
   git commit -m "Offer and play character questions on the web"
   ```
 
@@ -463,6 +491,7 @@
 - Modify: `mobile/src/features/quizzes/QuizEditorScreen.tsx`
 - Modify: `mobile/src/features/quizzes/QuizPlayScreen.tsx`
 - Modify: `mobile/src/features/community/DiscoverRow.tsx`
+- Modify: `mobile/src/features/works/api.ts`
 - Modify: `packages/shared/src/quizzes/labels.ts`
 - Test: `packages/shared/src/quizzes/labels.test.ts`
 
@@ -478,8 +507,8 @@
 
 - [ ] **Step 3: Implement.**
   - `quizClueHeading`, used by `DiscoverRow`. The icon for `characters_title` is `"quote"`, unchanged.
-  - Mobile `TYPE_LABELS` (create and editor) get the exact labels.
-  - The create screen fetches characters on chosen-book change, as on the web, with the failure note beside the existing cover note (`QuizCreateScreen.tsx:161`).
+  - Add `fetchWorkCharacters` to `mobile/src/features/works/api.ts`'s method list.
+  - The create screen and the editor screen (`QuizEditorScreen.tsx:131-132`) fetch characters for their books, as on the web, and overlay them for the offered types only. The create screen's failure note sits beside the existing cover note (`QuizCreateScreen.tsx:161`). The editor's sits beside its type checkboxes.
   - `Prompt` (`QuizPlayScreen.tsx:144-153`) gets a `characters_title` branch: the "Who's in this book?" caption above the plain prompt text, with no quotation marks.
 
 - [ ] **Step 4: Run to verify pass and typecheck**
@@ -488,7 +517,7 @@
 
 - [ ] **Step 5: Commit**
   ```bash
-  git add mobile/src/features/quizzes/QuizCreateScreen.tsx mobile/src/features/quizzes/QuizEditorScreen.tsx mobile/src/features/quizzes/QuizPlayScreen.tsx mobile/src/features/community/DiscoverRow.tsx packages/shared/src/quizzes/labels.ts packages/shared/src/quizzes/labels.test.ts
+  git add mobile/src/features/quizzes/QuizCreateScreen.tsx mobile/src/features/quizzes/QuizEditorScreen.tsx mobile/src/features/quizzes/QuizPlayScreen.tsx mobile/src/features/community/DiscoverRow.tsx mobile/src/features/works/api.ts packages/shared/src/quizzes/labels.ts packages/shared/src/quizzes/labels.test.ts
   git commit -m "Offer and play character questions on mobile"
   ```
 

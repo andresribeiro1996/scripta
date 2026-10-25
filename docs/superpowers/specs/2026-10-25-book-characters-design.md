@@ -100,7 +100,7 @@ Repository additions:
 
 ## Getting characters
 
-- **New works (the hook).** `fetchDetails` returns the cleaned subjects beside `subjectSeries`. `lookupDetails` (`booksService.ts:284`) calls `replaceWorkSubjects` for the book's work wherever it already calls `storeSeries`, on both the found and the details-missing branches. This covers every book that goes through the details lookup from now on.
+- **New works (the hook).** `fetchDetails` returns the cleaned subjects beside `subjectSeries`, but only when the work record is a real work (`type.key === "/type/work"`). A missing or redirect record returns none, so stored rows survive (call 2). `lookupDetails` (`booksService.ts:284`) calls `replaceWorkSubjects` after `setWorkKey` on both the found and the details-missing branches. It writes only when the book's work, re-read after `setWorkKey` (which can move the book), has the same Open Library key as the details. This covers every book that goes through the details lookup from now on.
 - **Existing works (the backfill).** `backend/scripts/fill-characters.mjs [--dry-run]`, built like the other fills: it imports from `../dist`, needs `COVERS_DB_PATH`, and writes a JSON report to stdout.
   - It reads `SELECT id, ol_work_key FROM works WHERE merged_into IS NULL AND ol_work_key IS NOT NULL`.
   - It queries search in batches of 100 keys through the Open Library throttle (`createThrottle(1000)`).
@@ -118,7 +118,7 @@ Repository additions:
 
 ## Book screen
 
-- `getWorkPageWith` (`books/works.ts:59`) adds `characters: string[]` (all cleaned people, in order). The shared `WorkPage.work` type gets an optional `characters?: string[]`, which is additive, so old clients ignore it.
+- `getWorkPageWith` (`books/works.ts:59`) adds an optional `characters?: string[]` (all cleaned people, in order). The shared `WorkPage.work` type gets an optional `characters?: string[]`, which is additive, so old clients ignore it.
 - `bookScreenModel` exposes it.
 - Web (`frontend/src/components/book/BookScreen.tsx`, after the awards list) and mobile (`mobile/src/features/works/BookScreen.tsx`, the same place) show a "Characters" line:
   - the first eight names joined with ", "
@@ -134,18 +134,20 @@ Shared (`packages/shared/src/quizzes/`):
 - `eligibleTypes` adds `characters_title` when `characters` has three or more names.
 - `generateQuizQuestions` applies call 8 to `characters_title` distractors.
 - `preview.ts` builds the prompt as the first three names joined with " · ".
-- Labels: "Guess the book from its characters" (create) and "Characters → title" (editor), on web and mobile.
+- Labels: "Guess the book from its characters" on the web create screen. "Characters → title" on the mobile create screen and both editors, matching each screen's existing style.
 
 Backend (`backend/src/modules/quizzes/`):
-- The route's `allowedTypes` enum gains `characters_title`. Its default when omitted stays the current four, so an old client that omits it is unaffected.
+- The route's `allowedTypes` enum gains `characters_title`. Its default when omitted stays the current four, and so does `readDocument`'s fallback for stored drafts without `allowedTypes` (`service.ts:42`). Neither old clients nor old drafts silently gain the type.
 - Any `characters` a client sends on a book is ignored, because characters are catalog only.
 - `publishQuiz` fills each book's `characters` from the catalog with `charactersOf`, through a new works-port read, next to where it fills covers (`service.ts:257-262`). The full list is stored. The values are frozen into the published document, so a later re-fetch never changes a published quiz.
 - `toPublicQuestion` returns the joined names as the prompt for `characters_title`.
 - The not-enough-books error becomes "Not enough books have the covers, quotes, blurbs, or characters those question types need."
 
-Create-time availability. The create screens only offer a type that at least one chosen book supports (`QuizCreatePage.tsx:109`, `QuizCreateScreen.tsx:102`), and the client has no character data. So:
+Create- and edit-time availability. The create screens and the quiz editors only offer a type that at least one book supports (`QuizCreatePage.tsx:109`, `QuizCreateScreen.tsx:102`, `QuizEditorPage.tsx:149`, `QuizEditorScreen.tsx:131`), and the client has no character data. So:
 - **New route** `POST /works/characters` with body `{ workIds: string[] }`, capped at 500 ids (builder's choice of cap). It returns `{ characters: Record<string, string[]> }` with the first three names, only for works with three or more. Optional auth, like `GET /works/:id`.
-- Both create screens call it whenever the chosen book set changes, and set `characters` on those books before computing availability. The values are only used for availability; publish refills them from the catalog.
+- The create screens and the editors call it whenever their book set changes, and overlay `characters` on those books for availability only. The values are never saved into the draft; publish refills them from the catalog.
+- The starter pool's books carry no work ids on the client, so the characters type isn't offered for a pool-only quiz. Accepted for this release.
+- The route shares the works scope's rate limit of 30 requests a minute (`works/plugin.ts:25-27`). That's enough, since calls happen on discrete book picks.
 - If the call fails, the type is not offered. A one-line note says "Characters couldn't be checked", like mobile's existing cover note (`QuizCreateScreen.tsx:161`).
 - No debounce or client cache: the set changes on discrete picks.
 - Results are keyed by the id the client sent (call 7).
