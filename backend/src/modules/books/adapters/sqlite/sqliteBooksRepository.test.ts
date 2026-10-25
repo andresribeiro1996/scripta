@@ -1709,7 +1709,26 @@ test("the translation review rows start from each table's own index and look the
   assert.match(plan, /SCAN j USING COVERING INDEX idx_work_match_judgments_proposed/, plan);
   assert.match(plan, /SEARCH m USING INDEX idx_work_merges_translations \(source=\?\)/, plan);
   assert.match(plan, /SEARCH w USING INDEX sqlite_autoindex_works_1 \(id=\?\)/, plan);
+  assert.match(plan, /MERGE \(UNION ALL\)/, plan);
   assert.doesNotMatch(plan, /idx_works_merged_into|SCAN m\b/, plan);
+});
+
+test("the translation review rows list doubts in the order their works were added, then merges in merge order, whatever the ids and sources sort to", () => {
+  const { db, repo } = freshRepo();
+  const work = db.prepare("INSERT INTO works (id, title, author, merged_into, created_at) VALUES (?, 'Poemas', 'Autor', ?, ?)");
+  work.run("original", null, NOW);
+  work.run("doubt-b", null, NOW);
+  work.run("doubt-a", null, NOW);
+  work.run("merged-b", "original", NOW);
+  work.run("merged-a", "original", NOW);
+  const judge = db.prepare("INSERT INTO work_match_judgments (work_id, model, into_work_id, confidence, asked_at) VALUES (?, 'jev-1', 'original', 0.7, ?)");
+  judge.run("doubt-b", NOW);
+  judge.run("doubt-a", NOW);
+  const merge = db.prepare("INSERT INTO work_merges (from_work, into_work, source, confidence, moved_book_ids, repointed_work_ids, merged_at) VALUES (?, 'original', ?, NULL, '[]', '[]', ?)");
+  merge.run("merged-b", "manual", NOW);
+  merge.run("merged-a", "code", NOW);
+
+  assert.deepEqual(repo.translationReviewRows(0.9, 0.5).map((row) => [row.workId, row.group]), [["doubt-b", "possible"], ["doubt-a", "possible"], ["merged-b", "merged"], ["merged-a", "merged"]]);
 });
 
 test("the match candidates read counts editions from the covering work editions index, with no distinct", () => {
