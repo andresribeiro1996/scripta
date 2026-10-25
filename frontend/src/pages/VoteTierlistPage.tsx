@@ -51,7 +51,7 @@ export function VoteTierlistPage() {
   const { code } = useParams<{ code: string }>();
   const location = useLocation();
   const { session } = useAuth();
-  const { board, books: publicBooks, isLoading, error, ballot, justSubmitted, submit } = useTierlistVoting(code ?? "");
+  const { board, books: publicBooks, isLoading, error, ballotError, ballot, justSubmitted, submit } = useTierlistVoting(code ?? "");
   const [working, setWorking] = useState<TierlistData | null>(null);
   const [editing, setEditing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -64,6 +64,9 @@ export function VoteTierlistPage() {
   }
   if (isLoading || !board) {
     return <InfoScreen message="Loading…" />;
+  }
+  if (ballotError) {
+    return <InfoScreen message="Couldn't load your ballot. Reload to try again." />;
   }
 
   const books = publicBooks.map((b) => toPrivateBook(b as unknown as PublicBookData));

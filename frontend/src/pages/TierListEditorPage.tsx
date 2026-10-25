@@ -26,6 +26,7 @@ export function TierListEditorPage() {
   const [nameDraft, setNameDraft] = useState("");
   const [addingBooks, setAddingBooks] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   // The voting board (ballot count, frozen tiers/pool) behind this tier
   // list's OWN vote code, read through the same public route voters hit
@@ -106,8 +107,21 @@ export function TierListEditorPage() {
   const tierlistId = tierlist.id;
   const tierlistName = tierlist.name;
   const voteCode = tierlist.voteCode;
+  const voteLink = `${window.location.origin}/vote/${voteCode}`;
   const voteAccess = tierlist.voteAccess;
   const votingOpen = tierlist.votingOpen;
+
+  async function copyVoteLink() {
+    try {
+      await navigator.clipboard.writeText(voteLink);
+    } catch {
+      setVotingActionError("Couldn't copy the link.");
+      return;
+    }
+    setVotingActionError(null);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1500);
+  }
 
   async function commit(next: TierlistData) {
     setVotingActionError(null);
@@ -275,9 +289,14 @@ export function TierListEditorPage() {
         <div className="mb-6 flex flex-col gap-3 rounded-xl border border-(--color-border) bg-(--color-surface) p-3">
           <p className="text-sm text-(--color-text-dim)">This public tier list is locked. At 100 distinct signed-in voters, it becomes an app-owned reference.</p>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <a href={`/vote/${voteCode}`} className="text-sm font-semibold text-(--color-accent) hover:opacity-80">
-              /vote/{voteCode}
-            </a>
+            <div className="flex min-w-0 flex-1 basis-60 items-center gap-2">
+              <a href={voteLink} className="inline-flex min-h-11 min-w-0 flex-1 items-center text-sm font-semibold text-(--color-accent) hover:opacity-80">
+                <span className="truncate">{voteLink}</span>
+              </a>
+              <button type="button" onClick={() => void copyVoteLink()} className={`${BUTTON_SECONDARY} shrink-0`}>
+                {copied ? "Copied!" : "Copy"}
+              </button>
+            </div>
             <span className="text-xs text-(--color-text-dim)">
               {votingBoard?.ballotCount ?? 0} {(votingBoard?.ballotCount ?? 0) === 1 ? "ballot" : "ballots"} · {votingBoard?.eligibleVoteCount ?? 0}/100 eligible voters
             </span>

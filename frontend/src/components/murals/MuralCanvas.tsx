@@ -30,6 +30,7 @@ export function MuralCanvas({
   books,
   images,
   profile,
+  hideProfileName,
   shelfThemeOverride,
   readerCardOverride,
   onLayoutChange,
@@ -58,6 +59,7 @@ export function MuralCanvas({
   books: Array<Record<string, unknown>>;
   images: GalleryImage[];
   profile?: ReaderProfile;
+  hideProfileName?: boolean;
   shelfThemeOverride?: ShelfTheme;
   readerCardOverride?: PublicReaderCard;
   onDragChange?: (dragging: boolean) => void;
@@ -196,7 +198,7 @@ export function MuralCanvas({
             } as CSSProperties}
           >
             {!editMode ? <button className="absolute inset-0 z-10 rounded-[inherit] focus-visible:outline-2 focus-visible:outline-[var(--block-accent,var(--color-accent))]" aria-label={`Open ${block.type} block`} onClick={() => onOpenBlock ? onOpenBlock(block) : setFocusedId(block.id)} /> : null}
-            <BlockRenderer block={block} books={books} images={images} profile={profile} groups={groups} shelfThemeOverride={shelfThemeOverride} readerCardOverride={readerCardOverride} statsOverride={statsOverride} tierlistData={tierlistData} />
+            <BlockRenderer block={block} books={books} images={images} profile={profile} hideProfileName={hideProfileName} groups={groups} shelfThemeOverride={shelfThemeOverride} readerCardOverride={readerCardOverride} statsOverride={statsOverride} tierlistData={tierlistData} />
             {effects.fadeColor && effects.fadeOpacity > 0 ? <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-[1] rounded-[inherit]" style={{ backgroundColor: effects.fadeColor, opacity: effects.fadeOpacity }} /> : null}
             {editMode && !drag.drop && (
               <div className="mural-block-controls absolute top-0 right-0 z-20 opacity-0 transition-opacity group-hover:opacity-100">

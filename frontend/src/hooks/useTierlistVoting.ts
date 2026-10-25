@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { fetchBallot, fetchMyBallot, fetchTierlistResultsApi, fetchVotingBoard, submitBallotApi, type BallotResponse, type HistogramCell } from "../api/tierlistVoting";
+import { ballotOrNull, fetchBallot, fetchMyBallot, fetchTierlistResultsApi, fetchVotingBoard, submitBallotApi, type BallotResponse, type HistogramCell } from "../api/tierlistVoting";
 import { getSession } from "../auth/tokenStore";
 
 // The anonymous voter's ONLY handle on their ballot. A signed-in voter
@@ -9,6 +9,15 @@ import { getSession } from "../auth/tokenStore";
 // never generated here, or two browsers would collide on one id.
 function ballotStorageKey(code: string) {
   return `tierlist-ballot:${code}`;
+}
+
+export function ballotQueryOptions(code: string, storedBallotId: string | null, enabled: boolean) {
+  return {
+    queryKey: ["tierlists", "ballot", code, storedBallotId],
+    queryFn: () => ballotOrNull(() => (storedBallotId === null ? fetchMyBallot(code) : fetchBallot(code, storedBallotId))),
+    enabled,
+    retry: false
+  };
 }
 
 export function useTierlistVoting(code: string) {
@@ -33,12 +42,7 @@ export function useTierlistVoting(code: string) {
   // openVoting moves their ranking out of the tier list document and seeds
   // it as their ballot, so this is the only route back to it. `retry: false`
   // because "you have no ballot here" comes back as a 404, not a blip.
-  const existing = useQuery({
-    queryKey: ["tierlists", "ballot", code, storedBallotId],
-    queryFn: () => (storedBallotId === null ? fetchMyBallot(code) : fetchBallot(code, storedBallotId)),
-    enabled: code.length > 0 && (storedBallotId !== null || Boolean(getSession())),
-    retry: false
-  });
+  const existing = useQuery(ballotQueryOptions(code, storedBallotId, code.length > 0 && (storedBallotId !== null || Boolean(getSession()))));
 
   async function submit(placements: Array<{ workId: string; tierId: string }>): Promise<BallotResponse> {
     const response = await submitBallotApi(code, placements, storedBallotId);
@@ -58,6 +62,7 @@ export function useTierlistVoting(code: string) {
     // very "my ranking is gone" bug this fetch exists to fix.
     isLoading: query.isLoading || existing.isLoading,
     error: query.error,
+    ballotError: existing.error,
     /** This session's submission if there was one, else whatever ballot the
      *  caller already held. */
     ballot: submitted ?? existing.data ?? null,

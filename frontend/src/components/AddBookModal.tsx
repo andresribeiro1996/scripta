@@ -260,7 +260,7 @@ export function AddBookModal({
             setScanError(null);
             setScanning((prev) => !prev);
           }}
-          className="mt-2 text-xs text-(--color-text-dim) underline transition-colors hover:text-(--color-text)"
+          className="mt-1 inline-flex min-h-11 items-center text-xs text-(--color-text-dim) underline transition-colors hover:text-(--color-text)"
         >
           {scanning ? "Stop scanning" : "Or scan the ISBN barcode with your camera"}
         </button>

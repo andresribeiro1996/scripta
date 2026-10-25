@@ -236,7 +236,7 @@ export function OwnShelfView({ username }: { username: string }) {
                         Start blank
                       </button>
                     </div>
-                    <MuralCanvas mural={previewMural} editMode={false} groups={groups} books={books} images={images} profile={profile} />
+                    <MuralCanvas mural={previewMural} editMode={false} groups={groups} books={books} images={images} profile={profile} hideProfileName />
                   </div>
                 )}
               </div>
