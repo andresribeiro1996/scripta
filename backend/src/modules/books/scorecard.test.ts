@@ -82,3 +82,20 @@ test("scorecardCandidates puts series members first and still finds the title ma
   assert.ok(others.every((book) => found.some(({ workId }) => workId === book.work_id)));
   assert.deepEqual(found[1], { workId: members[1]!.work_id, title: "The Chamber of Secrets", author: "J. K. Rowling", year: null });
 });
+
+test("scorecardCandidates keeps the works with the most editions even when they rank past the limit", () => {
+  const db = new DatabaseSync(":memory:");
+  applyBooksMigrations(db);
+  const repo = createSqliteBooksRepository(db);
+  const add = (title: string, isbn: string, workKey?: string) => {
+    const book = repo.createBook({ title, author: "Some Author", isbn, workKey }, [`isbn:${isbn}`], NOW);
+    repo.makeSearchable(book.id);
+    return book;
+  };
+  for (let n = 0; n < 8; n++) add(`Dune ${n}`, `97800000000${n}0`);
+  const popular = add("Dune with many extra words in the long title", "9780000009990", "OL1W");
+  for (let n = 0; n < 3; n++) add("Dune with many extra words in the long title", `97800000008${n}0`, "OL1W");
+  const found = scorecardCandidates(repo, "dune", 5);
+  assert.equal(found.length, 5);
+  assert.ok(found.some(({ workId }) => workId === popular.work_id));
+});

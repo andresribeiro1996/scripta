@@ -7,6 +7,7 @@ export type QueryScore = { q: string; hidden: boolean; ndcg: number; unlabelled:
 
 const GRADE_GAIN = { named: 2, related: 1, unrelated: 0 };
 const TOP = 10;
+const POPULAR = 10;
 
 export function gainOf(grade: Grade): number {
   return GRADE_GAIN[grade.grade] * grade.confidence;
@@ -45,8 +46,12 @@ export function scorecardCandidates(repo: CandidateRepo, query: string, limit = 
   const canonical = repo.canonicalWorkIds(workIdsOf(rows));
   const fts = [...new Set(rows.flatMap((row) => (row.work_id ? [canonical.get(row.work_id) ?? row.work_id] : [])))];
   const details = new Map(repo.matchCandidates([...new Set([...series, ...fts])]).map((candidate) => [candidate.id, candidate]));
-  const popular = fts.flatMap((id) => (details.has(id) ? [details.get(id)!] : [])).sort((a, b) => b.editions - a.editions).slice(0, 10).map(({ id }) => id);
-  return [...new Set([...series, ...fts, ...popular])].slice(0, limit).flatMap((id) => {
+  const head = [...new Set(series)].slice(0, limit);
+  const taken = new Set(head);
+  const popular = fts.filter((id) => !taken.has(id) && details.has(id)).sort((a, b) => details.get(b)!.editions - details.get(a)!.editions).slice(0, POPULAR);
+  const kept = new Set([...taken, ...popular]);
+  const middle = fts.filter((id) => !kept.has(id)).slice(0, Math.max(0, limit - kept.size));
+  return [...head, ...middle, ...popular].slice(0, limit).flatMap((id) => {
     const found = details.get(id);
     return found ? [{ workId: id, title: found.title, author: found.author, year: found.year }] : [];
   });

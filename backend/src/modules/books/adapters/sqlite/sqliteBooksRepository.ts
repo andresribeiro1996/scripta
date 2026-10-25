@@ -1400,8 +1400,9 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     matchingSeries(tokens) {
       if (tokens.length === 0) return [];
       const query = withoutArticle(tokens.join(" "));
+      const matchTokens = query.split(" ");
       const names = new Map<string, { name: string; exact: boolean }>();
-      for (const { name } of searchSeriesNamesStmt.all(matchExpression(tokens), WORK_SCAN_LIMIT) as Array<{ name: string }>) {
+      for (const { name } of searchSeriesNamesStmt.all(matchExpression(matchTokens), WORK_SCAN_LIMIT) as Array<{ name: string }>) {
         const nameKey = seriesNameKey(name);
         if (!nameKey || names.has(nameKey)) continue;
         const key = withoutArticle(nameKey);

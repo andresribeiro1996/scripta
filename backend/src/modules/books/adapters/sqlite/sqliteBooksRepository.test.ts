@@ -3883,3 +3883,12 @@ test("matchingSeries matches a Portuguese series exactly without its leading art
   matchBook(repo, "A Sociedade do Anel", "9789722317665", ["O Senhor dos Anéis"]);
   assert.deepEqual(repo.matchingSeries(["senhor", "dos", "aneis"]).map(({ name, exact }) => [name, exact]), [["O Senhor dos Anéis", true]]);
 });
+
+test("matchingSeries ignores a leading article in the query as well as in the name", () => {
+  const { repo } = freshRepo();
+  matchBook(repo, "The Eye of the World", "9780812511819", ["Wheel of Time"]);
+  matchBook(repo, "A Sociedade do Anel", "9789722317665", ["Senhor dos Anéis"]);
+  assert.deepEqual(repo.matchingSeries(["the", "wheel", "of", "time"]).map(({ name, exact }) => [name, exact]), [["Wheel of Time", true]]);
+  assert.deepEqual(repo.matchingSeries(["o", "senhor", "dos", "aneis"]).map(({ name, exact }) => [name, exact]), [["Senhor dos Anéis", true]]);
+  assert.deepEqual(repo.matchingSeries(["the"]), []);
+});
