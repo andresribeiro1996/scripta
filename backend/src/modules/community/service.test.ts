@@ -7,7 +7,7 @@ import { categoryFor, DEFAULT_FEED_SETTINGS, encodeCursor, normalizeFeedSettings
 import type { ParticipationItem } from "@scripta/shared/dashboard";
 import type { MuralPublicPayload } from "../murals/index.js";
 import { GAME_KINDS, type GameCard, type GameContent, type GameKind, type GameSource } from "./domain/games.js";
-import type { CommunityRepository, CursorKeyset } from "./domain/ports.js";
+import type { CommunityRepository, CursorKeyset, VisibilityRow } from "./domain/ports.js";
 import type { EventRow, FollowRow, ProfileRow } from "./domain/types.js";
 import { FollowLimitError, InvalidCursorError, MuralNotOwnedError, NotFollowingError, ProfileNotFoundError, SelfFollowError, UsernameRequiredError } from "./domain/errors.js";
 import { ACTIVITY_EVENT_TYPES, FEED_EVENT_TYPES } from "./domain/feed.js";
@@ -2945,4 +2945,16 @@ test("a voted_on ranking with a null cover is filled through the tierlists API",
   const item = service.getDashboard("viewer", undefined, 20).items.find((entry) => entry.id === "e-vote") as { ranking?: typeof ranking } | undefined;
 
   assert.deepEqual(item?.ranking?.[0]?.books, [{ title: "Dune", coverUrl: "https://covers.test/Dune.jpg" }, { title: "Emma", coverUrl: "https://stored.test/emma.jpg" }]);
+});
+
+test("nameableUsernames names published users with votes shown and omits unpublished or vote-hiding ones", () => {
+  const { repo } = createRepoFake();
+  const rows: VisibilityRow[] = [
+    { user_id: "a", published: 1, show_publications: 1, show_reading: 0, show_votes: 1, show_follows: 1, show_reader_glyph: 0 },
+    { user_id: "b", published: 0, show_publications: 1, show_reading: 0, show_votes: 1, show_follows: 1, show_reader_glyph: 0 },
+    { user_id: "c", published: 1, show_publications: 1, show_reading: 0, show_votes: 0, show_follows: 1, show_reader_glyph: 0 }
+  ];
+  repo.visibilityRows = (userIds) => rows.filter((row) => userIds.includes(row.user_id));
+  const api = createCommunityPublicApi(repo, () => NOW, (userIds) => new Map(userIds.map((id) => [id, reader(id)])));
+  assert.deepEqual([...api.nameableUsernames(["a", "b", "c", "d"])], [["a", reader("a").username]]);
 });

@@ -363,6 +363,7 @@ export function LibraryPage() {
           <input
             autoFocus
             value={nameDraft}
+            maxLength={200}
             onChange={(e) => setNameDraft(e.target.value)}
             onBlur={() => void handleRenameLibrary()}
             onKeyDown={(e) => {

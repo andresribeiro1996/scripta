@@ -80,6 +80,7 @@ export interface QuestionStat {
 export interface ResultPlay {
   playId: string;
   playerName: string | null;
+  anonymous: boolean;
   score: number;
   durationMs: number;
   createdAt: string;
@@ -108,6 +109,7 @@ export interface PlayResponse {
   playId: string;
   score: number;
   correct: Record<string, boolean>;
+  answers?: Record<string, { choiceIndex: number; answerIndex: number }>;
 }
 
 export type PublicResultPlay = Omit<ResultPlay, "playId">;

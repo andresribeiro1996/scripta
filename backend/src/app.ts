@@ -216,7 +216,8 @@ export function buildApp() {
   app.register(registerQuizzesModule, {
     emitPublished: (quizId: string, ownerUserId: string) => recordActivity(ownerUserId, "quiz_published", "quiz", quizId),
     emitPlayed: (playerUserId: string, quizId: string, quizName: string) =>
-      recordActivity(playerUserId, "voted_on", "quiz", quizId, { game: "quiz", id: quizId, name: quizName })
+      recordActivity(playerUserId, "voted_on", "quiz", quizId, { game: "quiz", id: quizId, name: quizName }),
+    resolveUsernames: (userIds: string[]) => getCommunityPublicApi().nameableUsernames(userIds)
   });
   app.register(registerWorksModule, {
     getWorkPage,

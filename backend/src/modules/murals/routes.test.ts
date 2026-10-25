@@ -151,3 +151,42 @@ test("a save without blocks leaves the stored works alone", async () => {
   assert.deepEqual(workRows(db, mural.id), stored);
   await app.close();
 });
+
+test("mural and folder create reject names over 200 characters and accept 200", async () => {
+  const { app } = await muralApp();
+  const headers = { authorization: "Bearer u7" };
+  for (const url of ["/murals", "/murals/folders"]) {
+    const tooLong = await app.inject({ method: "POST", url, headers, payload: { name: "a".repeat(201) } });
+    assert.equal(tooLong.statusCode, 400);
+    const ok = await app.inject({ method: "POST", url, headers, payload: { name: "a".repeat(200) } });
+    assert.equal(ok.statusCode, 201);
+  }
+  await app.close();
+});
+
+test("update and folder rename reject a new name over 200 characters", async () => {
+  const { app, service } = await muralApp();
+  const headers = { authorization: "Bearer u8" };
+  const mural = service.createMural("u8", "Short");
+  const folder = service.createFolder("u8", "Short");
+  const res = await app.inject({ method: "PUT", url: `/murals/${mural.id}`, headers, payload: { name: "a".repeat(201) } });
+  assert.equal(res.statusCode, 400);
+  const resFolder = await app.inject({ method: "PUT", url: `/murals/folders/${folder.id}`, headers, payload: { name: "a".repeat(201) } });
+  assert.equal(resFolder.statusCode, 400);
+  await app.close();
+});
+
+test("a mural with an old 300-character name keeps saving when the name is resent unchanged", async () => {
+  const { app, db, service, putBlocks } = await muralApp();
+  const headers = { authorization: "Bearer u9" };
+  const mural = service.createMural("u9", "Short");
+  const longName = "b".repeat(300);
+  db.prepare("UPDATE murals SET name = ? WHERE id = ?").run(longName, mural.id);
+  const blocks = [{ id: "b1", type: "spotlight", layout, bookKey: DUNE_KEY }];
+  const resent = await app.inject({ method: "PUT", url: `/murals/${mural.id}`, headers, payload: { name: longName, blocks } });
+  assert.equal(resent.statusCode, 200);
+  assert.equal((await putBlocks(mural.id, "u9", [])).statusCode, 200);
+  const changed = await app.inject({ method: "PUT", url: `/murals/${mural.id}`, headers, payload: { name: "c".repeat(301) } });
+  assert.equal(changed.statusCode, 400);
+  await app.close();
+});

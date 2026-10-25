@@ -500,3 +500,67 @@ test("participation shows up to three of the quiz's book covers", () => {
 
   assert.deepEqual(rows.map((row) => [row.id, row.covers]), [[id, ["https://covers.test/c1.jpg", "https://covers.test/c2.jpg", "https://covers.test/c3.jpg"]]]);
 });
+
+function namedPlaysFixture(names: Map<string, string>) {
+  const repo = createInMemoryRepo();
+  const service = createQuizzesService(repo, fakeWorks(), undefined, undefined, (userIds) => new Map(userIds.flatMap((id) => (names.has(id) ? [[id, names.get(id)!] as [string, string]] : []))));
+  const made = created(service.createQuiz("u1", "My quiz", {
+    sourceLabel: "Shelf",
+    questionCount: 3,
+    allowedTypes: ["cover_title", "title_cover", "quote_title", "blurb_title"],
+    books: Array.from({ length: 6 }, (_, i) => book(`b${i}`))
+  }));
+  const published = service.publishQuiz("u1", made.id);
+  assert.ok(published.ok);
+  const code = published.ok ? published.quiz.voteCode! : "";
+  return { service, code, quizId: made.id, answers: answerFirst(service, code) };
+}
+
+test("results name a nameable player by their current username, call other signed-in players Reader, and tag guests as anonymous", () => {
+  const names = new Map([["alice-id", "alice"]]);
+  const { service, code, quizId, answers } = namedPlaysFixture(names);
+  service.submitPlay(code, answers, 1000, null, { kind: "user", userId: "alice-id" });
+  service.submitPlay(code, answers, 2000, null, { kind: "user", userId: "hidden-id" });
+  service.submitPlay(code, answers, 3000, "Typed", { kind: "user", userId: "typed-id" });
+  service.submitPlay(code, answers, 4000, "Gus", { kind: "anonymous", playId: null });
+  service.submitPlay(code, answers, 5000, null, { kind: "anonymous", playId: null });
+  const shown = (plays: Array<{ playerName: string | null; anonymous: boolean }>) => plays.map((p) => ({ playerName: p.playerName, anonymous: p.anonymous }));
+  const expected = [
+    { playerName: "alice", anonymous: false },
+    { playerName: "Reader", anonymous: false },
+    { playerName: "Typed", anonymous: false },
+    { playerName: "Gus", anonymous: true },
+    { playerName: null, anonymous: true }
+  ];
+  assert.deepEqual(shown(service.getResults("u1", quizId)!.plays), expected);
+  const publicPlays = service.getPublicResults(code)!.plays;
+  assert.deepEqual(shown(publicPlays), expected);
+  for (const play of publicPlays) assert.equal("playId" in play, false);
+  names.set("alice-id", "alice2");
+  assert.equal(service.getResults("u1", quizId)!.plays[0]!.playerName, "alice2");
+});
+
+test("a signed-in player's typed name is not shown when they are nameable, and a non-nameable one never leaks a username", () => {
+  const { service, code, quizId, answers } = namedPlaysFixture(new Map([["alice-id", "alice"]]));
+  service.submitPlay(code, answers, 1000, "Typed", { kind: "user", userId: "alice-id" });
+  assert.equal(service.getResults("u1", quizId)!.plays[0]!.playerName, "alice");
+  const other = namedPlaysFixture(new Map());
+  other.service.submitPlay(other.code, other.answers, 1000, null, { kind: "user", userId: "alice-id" });
+  assert.equal(other.service.getResults("u1", other.quizId)!.plays[0]!.playerName, "Reader");
+});
+
+test("submitPlay and getPlay return the player's pick and the correct index per question, for users and guests", () => {
+  const { service, code, quizId, answers } = namedPlaysFixture(new Map());
+  const stored = (service.getQuiz("u1", quizId)!.data as { questions: Array<{ id: string; answerIndex: number }> }).questions;
+  const expected = Object.fromEntries(stored.map((q) => [q.id, { choiceIndex: 0, answerIndex: q.answerIndex }]));
+  const user = service.submitPlay(code, answers, 1000, null, { kind: "user", userId: "u9" });
+  assert.ok(user.ok);
+  assert.deepEqual(user.ok && user.answers, expected);
+  const again = service.getPlay(code, { kind: "user", userId: "u9" });
+  assert.deepEqual(again.ok && again.answers, expected);
+  const guest = service.submitPlay(code, answers, 1000, null, { kind: "anonymous", playId: null });
+  assert.ok(guest.ok);
+  const reread = service.getPlay(code, { kind: "anonymous", playId: guest.ok ? guest.playId : null });
+  assert.deepEqual(reread.ok && reread.answers, expected);
+  assert.equal(service.getPlay(code, { kind: "anonymous", playId: null }).ok, false);
+});

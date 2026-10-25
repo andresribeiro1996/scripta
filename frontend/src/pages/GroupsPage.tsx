@@ -391,6 +391,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
             <input
               autoFocus
               value={draftName}
+              maxLength={200}
               onChange={(e) => setDraftName(e.target.value)}
               onBlur={() => void handleCommitDraft()}
               onKeyDown={(e) => {
@@ -438,6 +439,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
                   <input
                     autoFocus
                     value={editingName}
+                    maxLength={200}
                     onChange={(e) => setEditingName(e.target.value)}
                     onBlur={() => handleRename(group.id)}
                     onKeyDown={(e) => {

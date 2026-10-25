@@ -1,17 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import type { PublicQuizQuestion } from "@scripta/shared";
+import { playerLabel, scoreRows, type PublicQuizQuestion } from "@scripta/shared";
 import { useQuery } from "@tanstack/react-query";
-import { router, Stack, useNavigation } from "expo-router";
-import { usePreventRemove } from "expo-router/react-navigation";
+import { router, Stack } from "expo-router";
 import { isPermanentError } from "../../core/apiClient";
 import { Image } from "expo-image";
-import { Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { useAuth } from "../../core/auth";
 import { ApiError } from "../../core/api";
 import { API_URL } from "../../core/config";
-import { Button, ErrorState, FormScroll, Input, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { Button, ErrorState, FormScroll, Input, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, radii, spacing, typography, useTheme, useUnsavedChangesGuard } from "../../ui";
 import { coverUrlForApi } from "../library/lib/coverUrl";
 import { fetchPlay, fetchPlayBoard, fetchPublicResults, submitPlay, type PlayBoard, type PlayResponse } from "./api";
 import { buildSubmission, isComplete, nextIndex, playStage, playStorageKey } from "./quizPlay";
@@ -63,13 +62,7 @@ export function QuizPlayScreen({ code }: { code: string }) {
   }
 
   const result = submitted ?? ownPlay;
-  const navigation = useNavigation();
-  usePreventRemove(Object.keys(answers).length > 0 && !submitted, ({ data }) => {
-    Alert.alert("Leave this quiz?", "Your answers so far won't be saved.", [
-      { text: "Keep playing", style: "cancel" },
-      { text: "Leave", style: "destructive", onPress: () => navigation.dispatch(data.action) },
-    ]);
-  });
+  const leaveDialog = useUnsavedChangesGuard(Object.keys(answers).length > 0 && !submitted, { title: "Leave this quiz?", body: "Your answers so far won't be saved.", confirmLabel: "Leave", cancelLabel: "Keep playing" });
   const stage = playStage({
     boardReady: board.isSuccess,
     boardMissing: board.isError,
@@ -95,6 +88,7 @@ export function QuizPlayScreen({ code }: { code: string }) {
   }
 
   return <Screen bottom top={false} style={styles.screen}>
+    {leaveDialog}
     <Stack.Screen options={{ headerShown: true, title: board.data?.name ?? "Quiz" }} />
     {error ? <Toast visible message={error} tone="error" /> : null}
     {stage === "loading" || board.isPending ? <Screen bottom style={styles.screen}><Skeleton height={180} /></Screen>
@@ -173,14 +167,28 @@ function EndScreen({ code, board, result, returning, tab, setTab }: {
     <ScrollView contentContainerStyle={styles.section}>
       <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{returning ? "You already played this quiz." : "Your score"}</Text>
       <Text {...dynamicType} display={false} style={[typography.heading, styles.score, { color: colors.accent }]}>{result.score}/{board.questionCount}</Text>
-      {board.questions.map((question, i) => (
-        <View key={question.id} style={[styles.verdict, { borderColor: colors.border }]}>
-          <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{i + 1}</Text>
-          <Text {...dynamicType} style={[typography.title, { color: result.correct[question.id] ? colors.success : colors.danger }]}>{result.correct[question.id] ? "✓" : "✗"}</Text>
+      {scoreRows(board.questions, result.correct, result.answers).map((row) => (
+        <View key={row.id} style={[styles.verdict, { borderColor: colors.border }]}>
+          <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{row.number}</Text>
+          <Text {...dynamicType} style={[typography.title, { color: row.correct ? colors.success : colors.danger }]}>{row.correct ? "✓" : "✗"}</Text>
+          <View style={styles.grow}>
+            {row.answer ? <ScoreValue value={row.answer} title={row.answer.title} /> : null}
+            {row.pick ? <ScoreValue value={row.pick} dim /> : null}
+          </View>
         </View>
       ))}
     </ScrollView>
   )} />;
+}
+
+function ScoreValue({ value, title, dim }: { value: { kind: "text" | "cover"; value: string }; title?: string; dim?: boolean }) {
+  const { colors } = useTheme();
+  if (value.kind === "text") return <Text numberOfLines={1} {...dynamicType} style={[typography.body, { color: dim ? colors.textDim : colors.text }]}>{dim ? "Your pick: " : ""}{value.value}</Text>;
+  return <View style={styles.scoreCover}>
+    <Image source={{ uri: uriFor(value.value) }} contentFit="cover" style={styles.scoreThumb} alt={title ?? "Picked cover"} />
+    {title ? <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.grow, { color: colors.text }]}>{title}</Text> : null}
+    {dim ? <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>Your pick</Text> : null}
+  </View>;
 }
 
 function Leaderboard({ code }: { code: string }) {
@@ -193,7 +201,8 @@ function Leaderboard({ code }: { code: string }) {
     {leaderboard.data.plays.map((play, i) => (
       <View key={`${play.playerName ?? "Guest"}-${i}`} style={[styles.leaderRow, { borderColor: colors.border }]}>
         <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{i + 1}</Text>
-        <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, styles.grow, { color: colors.text }]}>{play.playerName ?? "Guest"}</Text>
+        <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, styles.grow, { color: colors.text }]}>{playerLabel(play).name}</Text>
+        {playerLabel(play).guest ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>guest</Text> : null}
         <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{play.score}/{leaderboard.data.questionCount}</Text>
         <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{(play.durationMs / 1000).toFixed(1)}s</Text>
       </View>
@@ -219,7 +228,9 @@ const styles = StyleSheet.create({
   complete: { gap: spacing.sm, paddingBottom: spacing.xl },
   section: { gap: spacing.sm, paddingTop: spacing.lg },
   leaderRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.xs, borderBottomWidth: StyleSheet.hairlineWidth },
-  verdict: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderWidth: 1, borderRadius: radii.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  verdict: { flexDirection: "row", alignItems: "center", gap: spacing.md, borderWidth: 1, borderRadius: radii.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  scoreCover: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  scoreThumb: { width: 32, height: 48, borderRadius: radii.sm },
   score: { textAlign: "center", fontWeight: "700" },
   strong: { fontWeight: "700" },
   grow: { flex: 1 },

@@ -1,8 +1,6 @@
-import { genresForBook, normalizeBookGenres } from "./bookGenres.js";
+import { GENRES_FROM_CATALOG, genresForBook, normalizeBookGenres } from "./bookGenres.js";
 import { bookKey } from "./merge.js";
 import type { LibraryData } from "./types.js";
-
-export const GENRES_FROM_CATALOG = "catalog";
 
 export function withCatalogGenres(data: LibraryData, catalog: Record<string, string[]>): LibraryData {
   let changed = false;

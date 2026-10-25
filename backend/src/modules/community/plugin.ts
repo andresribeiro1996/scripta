@@ -1,5 +1,6 @@
 import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
+import { resolvePublicReaderProfiles } from "../auth/index.js";
 import { openCommunityDb } from "./adapters/sqlite/connection.js";
 import { createSqliteCommunityRepository } from "./adapters/sqlite/sqliteCommunityRepository.js";
 import { createRecapRepository } from "./adapters/sqlite/sqliteRecapRepository.js";
@@ -79,7 +80,7 @@ let cachedPublicApi: CommunityPublicApi | null = null;
 
 export function getCommunityPublicApi(): CommunityPublicApi {
   if (!cachedPublicApi) {
-    cachedPublicApi = createCommunityPublicApi(createSqliteCommunityRepository(openCommunityDb()));
+    cachedPublicApi = createCommunityPublicApi(createSqliteCommunityRepository(openCommunityDb()), Date.now, resolvePublicReaderProfiles);
   }
   return cachedPublicApi;
 }
