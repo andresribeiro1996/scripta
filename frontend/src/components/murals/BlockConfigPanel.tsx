@@ -79,7 +79,7 @@ export function BlockConfigPanel({
         {draft.type === "text" && (
           <div className="flex flex-col gap-3">
             <div>
-              <label htmlFor="text-block-heading" className="mb-1 block text-xs font-medium text-(--color-text-dim)">Heading</label>
+              <label htmlFor="text-block-heading" className="mb-1 block text-sm font-semibold">Heading</label>
               <input
                 id="text-block-heading"
                 value={draft.heading ?? ""}
@@ -89,7 +89,7 @@ export function BlockConfigPanel({
               />
             </div>
             <div>
-              <label htmlFor="text-block-body" className="mb-1 block text-xs font-medium text-(--color-text-dim)">Text</label>
+              <label htmlFor="text-block-body" className="mb-1 block text-sm font-semibold">Text</label>
               <textarea
                 id="text-block-body"
                 value={draft.body ?? ""}
@@ -104,8 +104,8 @@ export function BlockConfigPanel({
 
         {draft.type === "profile" && (
           <div className="flex flex-col gap-4">
-            <label className="text-sm">Biography<textarea value={draft.bio} onChange={(event) => setDraft({ ...draft, bio: event.target.value })} rows={4} className="mt-1 w-full rounded-lg border border-(--color-border) bg-transparent px-3 py-2" /></label>
-            <fieldset><legend className="mb-2 text-sm font-medium">What I like</legend><div className="flex flex-wrap gap-2">{BOOK_GENRES.map((genre) => { const checked = draft.favoriteGenres.includes(genre); return <label key={genre} className={`cursor-pointer rounded-full border px-3 py-1.5 text-sm ${checked ? "border-(--color-accent) bg-(--color-accent-soft) text-(--color-accent)" : "border-(--color-border)"}`}><input type="checkbox" className="sr-only" checked={checked} onChange={() => setDraft({ ...draft, favoriteGenres: checked ? draft.favoriteGenres.filter((item) => item !== genre) : [...draft.favoriteGenres, genre] })} />{genre}</label>; })}</div></fieldset>
+            <label className="text-sm"><span className="font-semibold">Biography</span><textarea value={draft.bio} onChange={(event) => setDraft({ ...draft, bio: event.target.value })} rows={4} className="mt-1 w-full rounded-lg border border-(--color-border) bg-transparent px-3 py-2" /></label>
+            <fieldset><legend className="mb-2 text-sm font-semibold">What I like</legend><div className="flex flex-wrap gap-2">{BOOK_GENRES.map((genre) => { const checked = draft.favoriteGenres.includes(genre); return <label key={genre} className={`cursor-pointer rounded-full border px-3 py-1.5 text-sm ${checked ? "border-(--color-accent) bg-(--color-accent-soft) text-(--color-accent)" : "border-(--color-border)"}`}><input type="checkbox" className="sr-only" checked={checked} onChange={() => setDraft({ ...draft, favoriteGenres: checked ? draft.favoriteGenres.filter((item) => item !== genre) : [...draft.favoriteGenres, genre] })} />{genre}</label>; })}</div></fieldset>
             <p className="text-xs text-(--color-text-dim)">My shelf theme is calculated automatically from your books.</p>
           </div>
         )}
@@ -167,7 +167,7 @@ export function BlockConfigPanel({
               }}
             />
             <div>
-              <label htmlFor="image-block-caption" className="mb-1 block text-xs font-medium text-(--color-text-dim)">Caption (optional)</label>
+              <label htmlFor="image-block-caption" className="mb-1 block text-sm font-semibold">Caption (optional)</label>
               <input
                 id="image-block-caption"
                 value={draft.caption ?? ""}
@@ -187,7 +187,7 @@ export function BlockConfigPanel({
             )}
             <BookSearchList books={books} isSelected={(b) => bookKey(b) === draft.bookKey} onSelect={(b) => setDraft({ ...draft, bookKey: bookKey(b) })} />
             <div>
-              <label htmlFor="spotlight-block-caption" className="mb-1 block text-xs font-medium text-(--color-text-dim)">Caption (optional)</label>
+              <label htmlFor="spotlight-block-caption" className="mb-1 block text-sm font-semibold">Caption (optional)</label>
               <input
                 id="spotlight-block-caption"
                 value={draft.caption ?? ""}
@@ -199,7 +199,7 @@ export function BlockConfigPanel({
         )}
 
         {draft.type === "shelf" && <div className="space-y-2">
-          <label className="block text-sm">Shelf source
+          <label className="block text-sm"><span className="font-semibold">Shelf source</span>
             <select className="ml-2 min-h-11 rounded border p-2" value={draft.collectionId ?? ""} onChange={(event) => {
               const collectionId = event.target.value || undefined;
               const resolved = resolveHomeBlock(draft, books, groups, "");
@@ -210,13 +210,13 @@ export function BlockConfigPanel({
               {groups.filter((group) => group.type === "collection").map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
             </select>
           </label>
-          {draft.collectionId ? <label className="block text-sm">Title (blank follows collection name)<input className="mt-1 min-h-11 w-full rounded border p-2" value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></label> : null}
+          {draft.collectionId ? <label className="block text-sm"><span className="font-semibold">Title (blank follows collection name)</span><input className="mt-1 min-h-11 w-full rounded border p-2" value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></label> : null}
         </div>}
-        {draft.type === "quote" && <label className="block text-sm">Passage source <select className="min-h-11 rounded border p-2" value={draft.mode ?? "pinned"} onChange={(event) => setDraft({ ...draft, mode: event.target.value === "rediscover" ? "rediscover" : undefined, bookKey: "", highlightId: "" })}><option value="pinned">Choose a passage</option><option value="rediscover">Rediscover a passage</option></select></label>}
+        {draft.type === "quote" && <label className="block text-sm"><span className="font-semibold">Passage source</span> <select className="min-h-11 rounded border p-2" value={draft.mode ?? "pinned"} onChange={(event) => setDraft({ ...draft, mode: event.target.value === "rediscover" ? "rediscover" : undefined, bookKey: "", highlightId: "" })}><option value="pinned">Choose a passage</option><option value="rediscover">Rediscover a passage</option></select></label>}
         {draft.type === "shelf" && !draft.collectionId && (
           <div className="flex flex-col gap-3">
             <div>
-              <label htmlFor="shelf-block-title" className="mb-1 block text-xs font-medium text-(--color-text-dim)">Title</label>
+              <label htmlFor="shelf-block-title" className="mb-1 block text-sm font-semibold">Title</label>
               <input
                 id="shelf-block-title"
                 value={draft.title}
@@ -316,7 +316,7 @@ export function BlockConfigPanel({
         {draft.type === "quoteCollection" && (
           <div className="flex flex-col gap-3">
             <div>
-              <label htmlFor="quotes-block-title" className="mb-1 block text-xs font-medium text-(--color-text-dim)">Title</label>
+              <label htmlFor="quotes-block-title" className="mb-1 block text-sm font-semibold">Title</label>
               <input
                 id="quotes-block-title"
                 value={draft.title}
@@ -389,7 +389,7 @@ export function BlockConfigPanel({
 
             return (
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium text-(--color-text-dim)">Which tier list</label>
+                <label className="text-sm font-semibold">Which tier list</label>
                 {tierlists === undefined ? (
                   <p className="text-xs text-(--color-text-dim)">Loading tier lists…</p>
                 ) : tierlists.length === 0 ? (
