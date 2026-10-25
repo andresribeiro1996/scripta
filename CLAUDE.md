@@ -15,6 +15,7 @@ The main session plans, designs and reviews; routine work goes to the saved agen
 | Rendered mobile change needs a device pass | `device-checker` |
 | User wants emulator screenshots | `device-checker`, capture-only, `model: "haiku"`; send the PNGs with SendUserFile without reading them |
 | User explicitly asks for a beta test or UX sweep of the app — never otherwise, and never to verify a change | `beta-tester`; the main session evaluates `$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")/beta-tests/<YYYY-MM-DD-HHMM>/` and passes its own worktree path and the absolute output dir; send its `report.md` with SendUserFile, then triage it with the user |
+| User explicitly asks for a site UI review, a web UX sweep, or site-vs-app gaps — never otherwise, and never to verify a change | `site-ui-reviewer`; the main session passes its own worktree path and the absolute output dir `$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")/ui-reviews/<YYYY-MM-DD-HHMM>/`; send its `report.md` with SendUserFile, then triage it with the user |
 | Failing CI on a PR, or a `<ci-monitor-event>` | `ci-fixer` |
 | Production, Railway, Cloudflare, Litestream, EAS | `deploy-ops` |
 | Branch touches auth, tokens, OAuth, share links or who can see what | run the `security-review` skill before merge |

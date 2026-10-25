@@ -27,19 +27,19 @@ const backendDir = join(repoRoot, "backend");
  *  to resolve @scripta/shared", or the backend crashing on an import it
  *  expects to exist) doesn't say so — so this checks for it rather than
  *  letting that confusing error be the first thing a caller produces. */
-/** Refuses a backend on this slot's port that was started against a
- *  different data directory. Silent about the normal case, and silent when
+/** Refuses a backend on this slot's port whose environment differs from the
+ *  expected one (the dev data directory by default). Silent about the normal case, and silent when
  *  the running environment can't be read at all — see devBackendEnv.mjs. */
-export function assertAdoptedBackendMatches(port, log) {
+export function assertAdoptedBackendMatches(port, log, expected = devDataDirEnv()) {
   const listeners = readListeners();
   const pid = listeners[port]?.[0];
   if (pid === undefined) return;
   const running = readProcessEnv(pid);
   if (!running) {
-    log(`Adopting the backend on ${port} without checking its data directory — couldn't read the environment of pid ${pid}.`);
+    log(`Adopting the backend on ${port} without checking its environment — couldn't read the environment of pid ${pid}.`);
     return;
   }
-  const rows = mismatchedEnv(running, devDataDirEnv());
+  const rows = mismatchedEnv(running, expected);
   if (rows.length) throw new Error(describeMismatch(port, rows));
 }
 

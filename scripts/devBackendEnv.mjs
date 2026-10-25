@@ -78,8 +78,8 @@ export function mismatchedEnv(actual, expected) {
 export function describeMismatch(port, rows) {
   const lines = rows.map((row) => `  ${row.name}\n    running: ${row.actual ?? "(not set)"}\n    wanted:  ${row.expected}`);
   return [
-    `The backend already listening on ${port} was started with a different data directory,`,
-    "so adopting it would serve some modules out of the wrong database.",
+    `The backend already listening on ${port} was started with different settings than this script needs,`,
+    "so adopting it would serve the wrong data or behave differently.",
     ...lines,
     "Free the slot and let this script start it again: npm run dev:release",
   ].join("\n");
