@@ -7,7 +7,7 @@ export function MoveToFolderModal({
   folders,
   disabledIds,
   onSelect,
-  onClose,
+  onClose
 }: {
   title: string;
   folders: MuralFolder[];

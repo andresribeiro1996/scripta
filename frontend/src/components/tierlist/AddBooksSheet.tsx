@@ -69,7 +69,7 @@ export function AddBooksSheet({
             disabled={selected.size === 0}
             className={BUTTON_PRIMARY}
           >
-            Add {selected.size > 0 ? selected.size : ""} {selected.size === 1 ? "book" : "books"}
+            {selected.size === 0 ? "Pick books to add" : `Add ${selected.size} ${selected.size === 1 ? "book" : "books"}`}
           </button>
         </>
       }
@@ -85,42 +85,42 @@ export function AddBooksSheet({
         />
       </div>
       <div className="p-2">
-          {filtered.length === 0 ? (
-            <p className="p-3 text-sm text-(--color-text-dim)">No books match.</p>
-          ) : (
-            <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
-              {filtered.map((book, i) => {
-                const key = workIdOf(book)!;
-                const isSelected = selected.has(key);
-                return (
-                  <button
-                    key={String(book.ContentID ?? i)}
-                    onClick={() => toggle(key)}
-                    aria-pressed={isSelected}
-                    // MiniBookTile's only content here is a cover image
-                    // (`showTitle={false} showAuthor={false}`), whose
-                    // `CoverImage` renders `alt=""` — without this, every
-                    // button in the grid reads identically to a screen
-                    // reader ("button, not pressed" x N). The book's own
-                    // title gives each one a distinct accessible name.
-                    aria-label={String(book.Title ?? "Untitled")}
-                    className={`relative h-[6.5em] overflow-hidden rounded-lg ring-2 transition-shadow ${
-                      isSelected ? "ring-(--color-accent)" : "ring-transparent"
-                    }`}
-                  >
-                    <MiniBookTile book={book} showTitle={false} showAuthor={false} />
-                    {isSelected && (
-                      <span className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-(--color-accent) text-(--color-on-accent)">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M20 6 9 17l-5-5" />
-                        </svg>
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          )}
+        {filtered.length === 0 ? (
+          <p className="p-3 text-sm text-(--color-text-dim)">No books match.</p>
+        ) : (
+          <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
+            {filtered.map((book, i) => {
+              const key = workIdOf(book)!;
+              const isSelected = selected.has(key);
+              return (
+                <button
+                  key={String(book.ContentID ?? i)}
+                  onClick={() => toggle(key)}
+                  aria-pressed={isSelected}
+                  // MiniBookTile's only content here is a cover image
+                  // (`showTitle={false} showAuthor={false}`), whose
+                  // `CoverImage` renders `alt=""` — without this, every
+                  // button in the grid reads identically to a screen
+                  // reader ("button, not pressed" x N). The book's own
+                  // title gives each one a distinct accessible name.
+                  aria-label={String(book.Title ?? "Untitled")}
+                  className={`relative h-[6.5em] overflow-hidden rounded-lg ring-2 transition-shadow ${
+                    isSelected ? "ring-(--color-accent)" : "ring-transparent"
+                  }`}
+                >
+                  <MiniBookTile book={book} showTitle={false} showAuthor={false} />
+                  {isSelected && (
+                    <span className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-(--color-accent) text-(--color-on-accent)">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20 6 9 17l-5-5" />
+                      </svg>
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
     </Sheet>
   );
