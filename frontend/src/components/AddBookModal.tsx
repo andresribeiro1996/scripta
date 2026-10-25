@@ -201,6 +201,17 @@ export function AddBookModal({
       onClose={onClose}
       footer={
         <>
+          {saveError ? (
+            <p role="alert" className="mr-auto min-w-0 self-center text-xs text-(--color-danger)">
+              {saveError}
+            </p>
+          ) : (
+            missing && (
+              <p id="add-book-missing" className="mr-auto min-w-0 self-center text-xs text-(--color-text-dim)">
+                {missing}
+              </p>
+            )
+          )}
           <button onClick={onClose} className={BUTTON_SECONDARY}>
             Cancel
           </button>
@@ -365,12 +376,6 @@ export function AddBookModal({
               />
             </label>
           </div>
-          {missing && (
-            <p id="add-book-missing" className="text-xs text-(--color-text-dim)">
-              {missing}
-            </p>
-          )}
-          {saveError && <p className="text-xs text-(--color-danger)">{saveError}</p>}
         </div>
       </div>
     </Sheet>

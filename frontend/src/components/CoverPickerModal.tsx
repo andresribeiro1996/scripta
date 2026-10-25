@@ -84,55 +84,57 @@ export function CoverPickerModal({
 
   return (
     <Sheet title={`Cover for "${title}"`} onClose={onClose} style={{ maxWidth: "42rem" }}>
-      <p className="mx-2 text-xs text-(--color-text-dim)">Pick one of your uploaded images, or upload a new one.</p>
+      <div className="sticky top-0 z-10 bg-(--color-surface) pb-2">
+        <p className="mx-2 text-xs text-(--color-text-dim)">Pick one of your uploaded images, or upload a new one.</p>
 
-      <div
-        className={`m-2 mb-0 flex items-center justify-between gap-3 rounded-lg border-2 border-dashed px-4 py-3 text-sm transition-colors ${
-          dragOver ? "border-(--color-accent) bg-(--color-accent-soft)" : "border-(--color-border)"
-        }`}
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDragOver(true);
-        }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDragOver(false);
-          const file = e.dataTransfer.files?.[0];
-          if (file) void handleUpload(file);
-        }}
-      >
-        <span className="text-(--color-text-dim)">Drag an image here, or</span>
-        <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className={BUTTON_SECONDARY}>
-          {uploading ? "Uploading…" : "Upload new image…"}
-        </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp,image/heic"
-          hidden
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) void handleUpload(file);
-            e.target.value = "";
+        <div
+          className={`m-2 mb-0 flex items-center justify-between gap-3 rounded-lg border-2 border-dashed px-4 py-3 text-sm transition-colors ${
+            dragOver ? "border-(--color-accent) bg-(--color-accent-soft)" : "border-(--color-border)"
+          }`}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragOver(true);
           }}
-        />
-      </div>
-      {uploadError && <p className="mx-2 mt-2 text-xs text-(--color-danger)">{uploadError}</p>}
-
-      {currentImageId && (
-        <div className="mx-2 mt-3">
-          <button
-            onClick={() => {
-              onRemoveCover();
-              onClose();
-            }}
-            className="text-xs text-(--color-danger) transition-opacity hover:opacity-80"
-          >
-            {removeCoverLabel}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragOver(false);
+            const file = e.dataTransfer.files?.[0];
+            if (file) void handleUpload(file);
+          }}
+        >
+          <span className="text-(--color-text-dim)">Drag an image here, or</span>
+          <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className={BUTTON_SECONDARY}>
+            {uploading ? "Uploading…" : "Upload new image…"}
           </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/heic"
+            hidden
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void handleUpload(file);
+              e.target.value = "";
+            }}
+          />
         </div>
-      )}
+        {uploadError && <p className="mx-2 mt-2 text-xs text-(--color-danger)">{uploadError}</p>}
+
+        {currentImageId && (
+          <div className="mx-2 mt-3">
+            <button
+              onClick={() => {
+                onRemoveCover();
+                onClose();
+              }}
+              className="text-xs text-(--color-danger) transition-opacity hover:opacity-80"
+            >
+              {removeCoverLabel}
+            </button>
+          </div>
+        )}
+      </div>
 
       <div className="p-2">
         {isLoading && <p className="text-sm text-(--color-text-dim)">Loading your gallery…</p>}

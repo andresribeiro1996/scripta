@@ -386,7 +386,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
               placeholder={`Name this ${copy.noun}…`}
               className={`min-h-11 w-full rounded-lg border bg-(--color-surface) px-3 text-sm ${draftError ? "border-(--color-danger)" : "border-(--color-border)"}`}
             />
-            <p id="new-group-name-hint" className={`mt-1 text-xs ${draftError ? "text-(--color-danger)" : "text-(--color-text-dim)"}`}>
+            <p id="new-group-name-hint" role={draftError ? "alert" : undefined} className={`mt-1 text-xs ${draftError ? "text-(--color-danger)" : "text-(--color-text-dim)"}`}>
               {draftError ?? "Press Enter to add it."}
             </p>
           </div>
@@ -556,7 +556,7 @@ function BookPickerModal({
 
   return (
     <Sheet title={`Books in "${group.name}"`} onClose={onClose}>
-      <div className="p-2 pt-0">
+      <div className="sticky top-0 z-10 bg-(--color-surface) p-2 pt-0">
         <input
           ref={searchRef}
           value={search}
@@ -566,25 +566,25 @@ function BookPickerModal({
           className="min-h-11 w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm"
         />
       </div>
-        <div className="p-2">
-          {filtered.length === 0 && <p className="p-3 text-sm text-(--color-text-dim)">No books match.</p>}
-          {filtered.map((book, i) => {
-            const key = bookKey(book);
-            const inGroup = memberKeys.has(key);
-            return (
-              <label
-                key={String(book.ContentID ?? i)}
-                className="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2 text-sm hover:bg-(--color-surface-hover)"
-              >
-                <input type="checkbox" checked={inGroup} onChange={() => onToggle(book, inGroup)} />
-                <span className="min-w-0 flex-1 truncate">
-                  {String(book.Title ?? "Untitled")}
-                  <span className="text-(--color-text-dim)"> — {String(book.Attribution ?? "Unknown author")}</span>
-                </span>
-              </label>
-            );
-          })}
-        </div>
+      <div className="p-2">
+        {filtered.length === 0 && <p className="p-3 text-sm text-(--color-text-dim)">No books match.</p>}
+        {filtered.map((book, i) => {
+          const key = bookKey(book);
+          const inGroup = memberKeys.has(key);
+          return (
+            <label
+              key={String(book.ContentID ?? i)}
+              className="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2 text-sm hover:bg-(--color-surface-hover)"
+            >
+              <input type="checkbox" checked={inGroup} onChange={() => onToggle(book, inGroup)} />
+              <span className="min-w-0 flex-1 truncate">
+                {String(book.Title ?? "Untitled")}
+                <span className="text-(--color-text-dim)"> — {String(book.Attribution ?? "Unknown author")}</span>
+              </span>
+            </label>
+          );
+        })}
+      </div>
     </Sheet>
   );
 }
