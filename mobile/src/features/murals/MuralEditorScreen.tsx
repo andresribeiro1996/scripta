@@ -60,6 +60,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
   const [history, setHistory] = useState<MuralBlock[][]>([]);
   const scrollRef = useAnimatedRef<ScrollView>();
   const pendingScroll = useRef<number | null>(null);
+  const unsavedRef = useRef(false);
   const scrollOffset = useSharedValue(0);
   const contentHeight = useSharedValue(0);
   const bottomInset = useSharedValue(88);
@@ -110,7 +111,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
 
   useFocusEffect(useCallback(() => {
     void muralQuery.refetch().then(({ data }) => {
-      if (!data) return;
+      if (!data || unsavedRef.current) return;
       setName(data.name);
       setTheme(data.theme);
       setBlocks(data.blocks);
@@ -120,6 +121,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
 
   const draftMural = useMemo(() => mural ? { ...mural, name: currentName, theme: currentTheme, blocks: currentBlocks } : null, [mural, currentName, currentTheme, currentBlocks]);
   const unsaved = useMemo(() => !!mural && ((currentName.trim() || mural.name) !== mural.name || currentTheme !== muralThemeId(mural.theme) || JSON.stringify(currentBlocks) !== JSON.stringify(mural.blocks)), [mural, currentName, currentTheme, currentBlocks]);
+  unsavedRef.current = unsaved;
   const discardDialog = useUnsavedChangesGuard(unsaved);
 
   function updateSelected(transform: (block: MuralBlock) => MuralBlock) {
