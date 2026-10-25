@@ -20,7 +20,7 @@
 - Endpoint `https://api.hardcover.app/v1/graphql`
 - `HARDCOVER_PAGE_SIZE = 50`
 - request gap `1100` ms
-- `GENRE_MIN_COUNT = 2`, `GENRE_MIN_SHARE = 0.2`, `GENRE_LIMIT = 3`, unless Task 1 records other values
+- `GENRE_MIN_COUNT = 2` and `GENRE_LIMIT = 2`; the combined tag "Science Fiction & Fantasy" (`/science fiction (&|and) fantasy/i`) is ignored. Calibrated in Task 1, and the user chose this rule on 2026-10-25.
 - progress line every `20` requests
 
 **Retries:**
@@ -58,7 +58,7 @@
 
 ---
 
-### Task 1: Probe and calibrate against the live API (a controller step, needs the user's token)
+### Task 1: Probe and calibrate against the live API (a controller step, needs the user's token) — DONE 2026-10-25
 
 This is not an implementer task. It needs `HARDCOVER_API_TOKEN` in `backend/.env`, which the user supplies. It costs about 10 requests out of the token's 5,000 a day. Scratch files go in the session scratchpad, never in the repo.
 
@@ -128,10 +128,9 @@ Two problems remain:
 
 So the gate trades coverage for precision.
 
-**Revised candidate:** `GENRE_MIN_COUNT = 2`, `GENRE_LIMIT = 2`, and the combined tag dropped.
+**Decision (user, 2026-10-25):** keep genres with `GENRE_MIN_COUNT = 2` and `GENRE_LIMIT = 2`, and ignore the combined tag. There is no share threshold.
 
-**Open (user's call), superseding the line below:** keep that candidate, or drop genres.
- drop the genre part, or keep it with `GENRE_LIMIT = 1` (precision ~0.55)? The Jev genre pass is probably more accurate. **Step 5 (descriptions), 633 sample descriptions:**
+**Step 5 (descriptions), 633 sample descriptions:**
 - HTML tags in 2; `htmlToText` covers them.
 - Markdown `**bold**` in 8 (about 2.5 per 200), `](` links in 1, entities in 0.
 - Marketing lines: "New York Times bestselling…" in 36, "Provided by publisher" in 3, "This edition / print on demand" in 3.
@@ -232,7 +231,7 @@ So the gate trades coverage for precision.
   ```ts
   export const HARDCOVER_ENDPOINT = "https://api.hardcover.app/v1/graphql";
   export const HARDCOVER_PAGE_SIZE = 50;
-  export const GENRE_MIN_COUNT, GENRE_MIN_SHARE, GENRE_LIMIT;
+  export const GENRE_MIN_COUNT = 2, GENRE_LIMIT = 2;
   export type HardcoverSeries = { name: string; position: number | null; compilation: boolean };
   export type HardcoverBook = { id: number; usable: boolean; description: string | null; genreTags: Array<{ tag: string; count: number }>; featured: HardcoverSeries | null; series: HardcoverSeries[] };
   // `series` stays [] when Task 1 settles on cached_featured_series alone
@@ -268,9 +267,10 @@ So the gate trades coverage for precision.
   - `featuredSeriesOf`: featured wins; a sole unfeatured row is used; two unfeatured rows give null; no rows give null.
   - `seriesPosition`: 1 → "1", 1.5 → "1.5", null → null.
   - `genresFromTags`, with the calibrated constants:
-    - a tag below `GENRE_MIN_COUNT` is dropped;
-    - a tag below `GENRE_MIN_SHARE` of the top tag is dropped;
-    - more than `GENRE_LIMIT` mapped genres are cut to the highest-count ones;
+    - a tag with count 1 is dropped;
+    - `"Science Fiction & Fantasy":5` alongside `"Fantasy":20` gives `["Fantasy"]` only (A Game of Thrones);
+    - `Fantasy:61, Adventure:27, Young Adult:25` gives `["Fantasy", "Young Adult"]`;
+    - more than 2 mapped genres are cut to the 2 with the highest counts;
     - an unmappable tag ("Adult") is dropped;
     - the result comes back in `BOOK_GENRES` order.
   - `descriptionText`:
@@ -287,7 +287,7 @@ So the gate trades coverage for precision.
 - [ ] **Step 2: Add the file to `backend/package.json`'s `test` list, run it and see it fail:** `npm exec --workspace backend -- tsx --test src/modules/books/adapters/hardcover/hardcover.test.ts`.
 - [ ] **Step 3: Implement `hardcover.ts`.**
   - The query text is the spec's (Data → The query), as amended by Task 1.
-  - `genresFromTags` sorts by count, descending, and keeps tags with `count >= GENRE_MIN_COUNT && count >= GENRE_MIN_SHARE * top`.
+  - `genresFromTags` drops tags matching the combined-tag pattern, sorts the rest by count (descending), and keeps tags with `count >= GENRE_MIN_COUNT`.
   - It maps each kept tag with `normalizeBookGenres([tag])`, collects distinct genres in that order until it has `GENRE_LIMIT`, and returns `normalizeBookGenres(chosen)`.
 - [ ] **Step 4: Run the tests and see them pass.** Typecheck is clean.
 - [ ] **Step 5: Commit:** `git commit -m "Add the Hardcover adapter"`.

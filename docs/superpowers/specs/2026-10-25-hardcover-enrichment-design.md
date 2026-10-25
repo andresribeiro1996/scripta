@@ -84,15 +84,16 @@ Scripta is a personal project: not charged for, not incorporated, no ads. It sti
    - The result goes through `fillSourceGenres(workId, genres)` (`backend/src/modules/books/adapters/sqlite/sqliteBooksRepository.ts:262`), exactly as `seedGenres.ts` and `feedGenres.ts` do.
    - It fills only editions whose `genres` is `'[]'`, with `genres_source = NULL`, so the jev, manual and NULL guards are unchanged.
    - A work's genres are taken from the first matched edition whose tags map to at least one genre. A run-wide set marks a work only once that non-empty result has been written, so an edition whose tags map to nothing doesn't block a sibling that has some.
-8. **Only well-supported tags count.**
-   - A Genre tag is used when its `count` is at least `GENRE_MIN_COUNT` and at least `GENRE_MIN_SHARE` of the top tag's count.
-   - At most `GENRE_LIMIT` genres per work are kept, after mapping.
-   - **Calibration happens before any code, locally, with the user's token.**
-     - The plan's first task fetches about 200 Hardcover books by random `id` (`books(where: {id: {_in: [...]}})`), skipping missing ids, along with their `cached_tags` and descriptions.
-     - Claude labels each book's correct genres from our vocabulary, then picks the three constants that best match the labels, and records the numbers and the agreement in the plan.
-     - Until then the defaults are 2, 0.2 and 3.
-     - The same sample answers the description question in Decision 13.
-     - The dry run's `genreSamples` (runbook step 3) is a second look on catalog books. A threshold change after that goes through a normal PR and deploy before the real run.
+8. **Only tags with real votes count (calibrated 2026-10-25, chosen by the user).**
+   - **The rule:**
+     - a Genre tag is used only when its `count` is at least `GENRE_MIN_COUNT = 2`;
+     - the combined tag "Science Fiction & Fantasy" (`/science fiction (&|and) fantasy/i`) is ignored, because our mapping reads it as Science Fiction;
+     - at most `GENRE_LIMIT = 2` genres per work are kept, taken in descending tag count.
+   - **Why:** most Hardcover tags on less-read books are single imported subjects. With them included, precision was about 0.5 on two blind-labelled samples of about 200 books each, one random and one with ≥10 readers.
+   - **The trade-off** (≥10-reader sample): with the gate, precision is 0.72 but only about 12% of books get genres; without it, about 55% do. On Hardcover's 80 most-read books the rule is almost always right.
+   - The rest stay empty for the Jev genre pass.
+   - The plan's Task 1 notes have the samples and the numbers.
+   - The dry run's `genreSamples` (runbook step 3) is a second look on catalog books. A rule change after that goes through a normal PR and deploy before the real run.
 9. **The summary source is `hardcover`, and nothing in the UI credits it.**
    - `SummarySource` (`backend/src/modules/books/domain/types.ts:3-4`) gains `"hardcover"`, and so does the shared `BookMetadata.summarySource` union (`bookMetadata.ts:23`).
    - `summaryLink` (`backend/src/modules/books/booksService.ts:144`) returns `""` for it, as for `bnp`, since the Hardcover slug isn't stored. The web summary therefore shows no "Source:" link. That is what BNP summaries show today.
