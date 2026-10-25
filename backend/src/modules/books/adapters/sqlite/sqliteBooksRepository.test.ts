@@ -3274,6 +3274,78 @@ test("bestSeriesOf takes the position from the best-ranked row of the same name 
   assert.deepEqual(repo.bestSeriesOf([book.work_id!]).get(book.work_id!), { name: MALAZAN, position: "3" });
 });
 
+test("wikidata series beats hardcover", () => {
+  const { repo } = freshRepo();
+  const book = seriesBook(repo, "Dune", "9780441013593", "Frank Herbert");
+  repo.addWorkSeries(book.work_id!, [{ name: "Dune", position: "1" }], "hardcover", at(-1));
+  repo.addWorkSeries(book.work_id!, [{ name: "Dune Chronicles", position: "1" }], "wikidata", at(1));
+  assert.deepEqual(repo.bestSeriesOf([book.work_id!]).get(book.work_id!), { name: "Dune Chronicles", position: "1" });
+});
+
+test("hardcover beats ol-subject", () => {
+  const { repo } = freshRepo();
+  const book = seriesBook(repo, "Dune", "9780441013593", "Frank Herbert");
+  repo.addWorkSeries(book.work_id!, [{ name: "Dune Saga", position: "1" }], "ol-subject", at(-1));
+  repo.addWorkSeries(book.work_id!, [{ name: "Dune", position: "1" }], "hardcover", at(1));
+  assert.deepEqual(repo.bestSeriesOf([book.work_id!]).get(book.work_id!), { name: "Dune", position: "1" });
+});
+
+test("edition collection gives a hardcover series its position", () => {
+  const { repo } = freshRepo();
+  const book = seriesBook(repo, "Memories of Ice", "9780765348807");
+  repo.addWorkSeries(book.work_id!, [{ name: MALAZAN, position: null }], "hardcover", AT);
+  repo.addBookCollection(book.id, { name: MALAZAN, position: "3" }, "ol-edition", AT);
+  assert.deepEqual(repo.bestSeriesOf([book.work_id!]).get(book.work_id!), { name: MALAZAN, position: "3" });
+});
+
+test("hasWorkSeries is per source", () => {
+  const { repo } = freshRepo();
+  const book = seriesBook(repo, "Memories of Ice", "9780765348807");
+  repo.addWorkSeries(book.work_id!, [{ name: MALAZAN, position: "3" }], "wikidata", AT);
+  assert.equal(repo.hasWorkSeries(book.work_id!, "wikidata"), true);
+  assert.equal(repo.hasWorkSeries(book.work_id!, "hardcover"), false);
+});
+
+test("hasWorkSeries counts a row stored on a work merged into it", () => {
+  const { repo } = freshRepo();
+  const target = seriesBook(repo, "Memories of Ice", "9780765348807");
+  const alias = seriesBook(repo, "Memórias de Gelo", "9789720000401");
+  repo.addWorkSeries(alias.work_id!, [{ name: MALAZAN, position: "3" }], "hardcover", AT);
+  repo.mergeTranslation(alias.work_id!, target.work_id!, "manual", null, AT);
+  assert.equal(repo.hasWorkSeries(target.work_id!, "hardcover"), true);
+  assert.equal(repo.hasWorkSeries(target.work_id!, "wikidata"), false);
+});
+
+test("removeSeriesNames drops hardcover rows and their search entry", () => {
+  const { db, repo } = freshRepo();
+  const book = seriesBook(repo, "Memories of Ice", "9780765348807");
+  repo.addWorkSeries(book.work_id!, [{ name: MALAZAN, position: "3" }], "hardcover", AT);
+  assert.deepEqual(repo.searchSeriesWorks(["malazan"], 12), [book.work_id]);
+  assert.deepEqual(repo.removeSeriesNames(["malazan book of the fallen"], "hardcover"), { rows: 1, searchRows: 1 });
+  assert.equal(countOf(db, "work_series"), 0);
+  assert.deepEqual(repo.searchSeriesWorks(["malazan"], 12), []);
+});
+
+test("removeSeriesNames keeps the search entry when a wikidata row shares the name key", () => {
+  const { db, repo } = freshRepo();
+  const book = seriesBook(repo, "Memories of Ice", "9780765348807");
+  repo.addWorkSeries(book.work_id!, [{ name: MALAZAN, position: "3" }], "wikidata", AT);
+  repo.addWorkSeries(book.work_id!, [{ name: "Malazan: Book of the Fallen", position: "3" }], "hardcover", AT);
+  assert.deepEqual(repo.removeSeriesNames(["malazan book of the fallen"], "hardcover"), { rows: 1, searchRows: 0 });
+  assert.equal(countOf(db, "work_series"), 1);
+  assert.deepEqual(repo.searchSeriesWorks(["malazan"], 12), [book.work_id]);
+});
+
+test("removeSeriesNames leaves another work's search entry alone", () => {
+  const { repo } = freshRepo();
+  const first = seriesBook(repo, "Memories of Ice", "9780765348807");
+  const other = seriesBook(repo, "Return of the Crimson Guard", "9780765348821", "Ian Esslemont");
+  repo.addWorkSeries(first.work_id!, [{ name: MALAZAN, position: "3" }], "hardcover", AT);
+  repo.addWorkSeries(other.work_id!, [{ name: MALAZAN, position: "1" }], "wikidata", AT);
+  assert.deepEqual(repo.removeSeriesNames(["malazan book of the fallen"], "hardcover"), { rows: 1, searchRows: 1 });
+  assert.deepEqual(repo.searchSeriesWorks(["malazan"], 12), [other.work_id]);
+});
+
 test("an Open Library edition collection becomes the work's series only when Wikidata or a subject names it too", () => {
   const { repo } = freshRepo();
   const book = seriesBook(repo, "Memories of Ice", "9780765348807");

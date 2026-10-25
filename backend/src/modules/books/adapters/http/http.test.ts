@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
-import { afterEach, test } from "node:test";
+import { afterEach, mock, test } from "node:test";
 import { SourceUnavailableError } from "../../domain/errors.js";
-import { createThrottle, fetchBytes, fetchJson, USER_AGENT } from "./http.js";
+import { createThrottle, fetchBytes, fetchJson, postJson, USER_AGENT } from "./http.js";
 
 const originalFetch = globalThis.fetch;
 afterEach(() => {
@@ -124,4 +124,63 @@ test("an urgent task runs before queued normal tasks, the gap holds, and each la
     throttle(mark("u2"), { urgent: true })
   ]);
   assert.deepEqual(order, [["n1", 0], ["u1", 1000], ["u2", 2000], ["n2", 3000], ["n3", 4000]]);
+});
+
+test("postJson sends method, JSON body and headers", async () => {
+  let seen: RequestInit | undefined;
+  stub((_url, init) => {
+    seen = init;
+    return Response.json({ data: 1 });
+  });
+  assert.deepEqual(await postJson("hardcover", "https://api.test/g", { query: "q" }, { Authorization: "Bearer t" }), { data: 1 });
+  const headers = new Headers(seen?.headers);
+  assert.equal(seen?.method, "POST");
+  assert.deepEqual(JSON.parse(String(seen?.body)), { query: "q" });
+  assert.equal(headers.get("Authorization"), "Bearer t");
+  assert.equal(headers.get("Content-Type"), "application/json");
+  assert.equal(headers.get("User-Agent"), USER_AGENT);
+});
+
+test("postJson 429 carries retryAt", async () => {
+  const before = Date.now();
+  stub(() => new Response("slow", { status: 429, headers: { "retry-after": "30" } }));
+  await assert.rejects(postJson("hardcover", "https://api.test/g", {}), (error: unknown) => {
+    assert.ok(error instanceof SourceUnavailableError);
+    assert.equal(error.status, 429);
+    assert.ok(error.retryAt! >= before + 30_000 && error.retryAt! <= Date.now() + 30_000);
+    return true;
+  });
+});
+
+test("postJson passes its timeout", async () => {
+  const timeout = mock.method(AbortSignal, "timeout");
+  try {
+    let signal: unknown;
+    stub((_url, init) => {
+      signal = init?.signal;
+      return Response.json({});
+    });
+    await postJson("hardcover", "https://api.test/g", {}, {}, 30_000);
+    assert.ok(signal instanceof AbortSignal);
+    assert.deepEqual(timeout.mock.calls.at(-1)?.arguments, [30_000]);
+    await postJson("hardcover", "https://api.test/g", {});
+    assert.deepEqual(timeout.mock.calls.at(-1)?.arguments, [10_000]);
+  } finally {
+    timeout.mock.restore();
+  }
+});
+
+test("postJson 403 includes the body", async () => {
+  stub(() => new Response('{"error":"insufficient_scope"}', { status: 403 }));
+  await assert.rejects(postJson("hardcover", "https://api.test/g", {}), (error: unknown) => {
+    assert.ok(error instanceof SourceUnavailableError);
+    assert.equal(error.status, 403);
+    assert.match(error.message, /insufficient_scope/);
+    return true;
+  });
+});
+
+test("postJson reports invalid JSON", async () => {
+  stub(() => new Response("not json"));
+  await assert.rejects(postJson("hardcover", "https://api.test/g", {}), /invalid JSON/);
 });
