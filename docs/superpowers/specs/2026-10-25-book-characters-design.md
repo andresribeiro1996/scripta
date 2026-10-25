@@ -71,10 +71,10 @@ People, in order:
 8. **Merge aliases**, over the kept list in order:
    - A name with two or more key words whose key-word set is a subset of another kept name's set merges into that name ("Rodion Raskolnikov" into "Rodion Romanovich Raskolnikov").
    - A single-word name merges into the other kept name whose first key word it is, only when exactly one such name exists. "George" stays when "George Weasley" and "George Wickham" are both there.
-   - The merged entry keeps the earliest position of the group and displays the variant with the fewest words.
+   - The merged entry keeps the earliest position of the group and displays the variant with the fewest words, except that a single-word alias never wins the display ("Harry" and "Harry Potter" show "Harry Potter"; "Odysseus" and "Odysseus King of Ithaca" show the latter).
 9. Drop empty names after trimming.
 
-Accepted gaps: real people without dates on fiction ("Napoléon I"), and no deny list.
+Accepted gaps: real people without dates on fiction ("Napoléon I"), and no deny list. The subset merge also folds namesakes with a middle name (James Potter into James Sirius Potter); a lost minor namesake costs little, while a duplicate in a quiz prompt looks broken.
 
 Expected results from the 2026-10-25 probes. These become test fixtures:
 

@@ -65,7 +65,7 @@ test("crime and punishment merges name variants", () => {
 
 test("odyssey strips parentheticals and drops other-language duplicates", () => {
   const result = clean(["Homer", "Odysseus (Greek mythology)", "Odysseus King of Ithaca (Mythological character)", "Achilles (Greek mythology)", "Calypso (Greek mythology)", "Achille (Mythologie grecque)", "Ulysse (Mythologie grecque)", "Penelope (Greek mythology)"], ["Fiction"], ["Ὅμηρος", "Homer"]);
-  assert.deepEqual(result.subjects.person, ["Odysseus", "Achilles", "Calypso", "Penelope"]);
+  assert.deepEqual(result.subjects.person, ["Odysseus King of Ithaca", "Achilles", "Calypso", "Penelope"]);
 });
 
 test("name keys ignore word order", () => {
@@ -75,7 +75,7 @@ test("name keys ignore word order", () => {
 
 test("a single word merges only into one candidate", () => {
   assert.deepEqual(clean(["George Weasley", "George Wickham", "George"], ["Fiction"]).subjects.person, ["George Weasley", "George Wickham", "George"]);
-  assert.deepEqual(clean(["Harry", "Harry Potter"], ["Fiction"]).subjects.person, ["Harry"]);
+  assert.deepEqual(clean(["Harry", "Harry Potter"], ["Fiction"]).subjects.person, ["Harry Potter"]);
 });
 
 test("places and times are trimmed and de-duplicated, ungated", () => {

@@ -42,6 +42,7 @@ function mergeAliases(names: string[]): string[] {
   const entries = names.map((name) => ({ name, words: personWords(name) ?? [] }));
   const sets = entries.map((entry) => new Set(entry.words));
   const parent = entries.map((_, index) => index);
+  const singleAliases = new Set<number>();
   const rootOf = (index: number): number => (parent[index] === index ? index : rootOf(parent[index]!));
   entries.forEach((entry, index) => {
     if (entry.words.length < 2) return;
@@ -54,11 +55,15 @@ function mergeAliases(names: string[]): string[] {
     entries.forEach((other, otherIndex) => {
       if (otherIndex !== index && other.words[0] === entry.words[0]) roots.add(rootOf(otherIndex));
     });
-    if (roots.size === 1) parent[index] = [...roots][0]!;
+    if (roots.size === 1) {
+      parent[index] = [...roots][0]!;
+      singleAliases.add(index);
+    }
   });
   const groups = new Map<number, string>();
   entries.forEach((entry, index) => {
     const root = rootOf(index);
+    if (singleAliases.has(index)) return;
     const current = groups.get(root);
     if (current === undefined || wordCount(entry.name) < wordCount(current)) groups.set(root, entry.name);
   });
