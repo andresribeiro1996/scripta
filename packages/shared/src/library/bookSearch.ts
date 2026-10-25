@@ -18,9 +18,8 @@
 // GET /books/search/external (Open Library). This module holds only the
 // pure query-shape, merge and result-mapping logic.
 
-import { normalizeBookGenres, type BookGenre } from "./bookGenres.js";
+import { GENRES_FROM_CATALOG, normalizeBookGenres, type BookGenre } from "./bookGenres.js";
 import { normalizeWords } from "./bookMatch.js";
-import { GENRES_FROM_CATALOG } from "./catalogGenres.js";
 import { normalizeIsbn } from "./covers.js";
 import { bookKey } from "./merge.js";
 import { cleanCatalogText } from "./mojibake.js";
