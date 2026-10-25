@@ -123,6 +123,23 @@ The check takes the Portuguese work (its title and original title) and the targe
 
 **Join.** Everything else, as today.
 
+**Revised after the production listing (2026-10-25).** Read-only against production, the rules above flagged 295 of 5,522 active code/Jev joins. Most of the 86 "never" answers were correct joins:
+- BNP's "Série.. Vol. N,. Título" form;
+- `#N` series positions;
+- "Uma rapariga dos anos 20".
+
+The reviews were dominated by three patterns: series numbers in subtitles, series named after their first book, and publisher collections named like generic titles ("Poesia" has 716 members). The guard now uses these rules, simulated on all 5,522 joins at 95 flags (12 "never", all real split volumes), with the three Tolkien merges still flagged:
+- **Volume markers.** Only a marker at the end of the title counts.
+  - `#N` and `Nº N` are series positions and never count.
+  - A bare single Arabic digit is weak: it gives review, never "never".
+  - A volume word or a Roman numeral I–IX in the main title gives "never". It gives review instead when the title has BNP's ".." form, or when the stem without the number names a series.
+  - In a subtitle, only a volume word counts, and it gives review.
+- **The target's numbers include its series positions.** "A Seleção 1" joins *The Selection* when that is position 1 of its series.
+- **Series head.**
+  - A `work_series` series gives review, unless the target is position 1 of it (Dune, Outlander).
+  - A publisher collection gives review only when the Portuguese title carries a volume marker.
+- **The original-title rule is dropped.** BNP gives books 2–4 of a series the series name as their original title ("L'amica geniale"), and Jev's target was right in those cases.
+
 Facts the builder must verify before relying on them:
 - **What happens to a high-confidence judgment that wasn't merged.** It shows in the review queue's "blocked" group (`translationReviewRowsStmt`). Confirm nothing else merges such judgments later, such as a backlog recheck or a sweep. If something does, the guard must also stop that path.
 - **Re-asking cost.** The 30-day backlog recheck re-selects only judgments with no target.
