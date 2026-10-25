@@ -222,3 +222,16 @@ test("the cover column can shrink below the edition strip's width, so a phone pa
   const html = render({});
   assert.match(html, /<div class="min-w-0 self-start[^"]*"><div><div[^>]*aria-roledescription="carousel"/);
 });
+
+test("a work page lists the first eight characters and counts the rest", () => {
+  const characters = Array.from({ length: 10 }, (_, i) => `Person ${i + 1}`);
+  const html = render({ page: { ...page, work: { ...page.work, characters } } });
+  assert.ok(html.includes("Characters: Person 1, Person 2"));
+  assert.ok(html.includes("Person 8"));
+  assert.ok(!html.includes("Person 9"));
+  assert.ok(html.includes("+2 more"));
+});
+
+test("a work page without characters has no characters line", () => {
+  assert.ok(!render({}).includes("Characters"));
+});

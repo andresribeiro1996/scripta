@@ -288,3 +288,17 @@ test("a page without awards has none", () => {
     assert.equal(model.authorAwards, null);
   }
 });
+
+test("characters split after eight", () => {
+  const characters = Array.from({ length: 11 }, (_, i) => `Person ${i + 1}`);
+  const model = bookScreenModel(page({ characters }), null, viewer);
+  assert.equal(model.characters.shown.length, 8);
+  assert.equal(model.characters.more.length, 3);
+  assert.equal(model.characters.more[0], "Person 9");
+});
+
+test("a page without characters has none", () => {
+  for (const model of [bookScreenModel(page(), null, viewer), bookScreenModel(null, owned(), viewer)]) {
+    assert.deepEqual(model.characters, { shown: [], more: [] });
+  }
+});
