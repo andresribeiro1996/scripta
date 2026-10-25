@@ -74,3 +74,4 @@ node_modules
 packages/*/dist/
 
 /beta-tests/
+/ui-reviews/

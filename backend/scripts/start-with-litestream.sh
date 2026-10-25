@@ -51,4 +51,6 @@ for path in $databases; do
   litestream restore -config litestream.yml -if-db-not-exists -if-replica-exists "$path"
 done
 
+node scripts/truncate-wals.mjs $databases
+
 exec litestream replicate -config litestream.yml -exec "node dist/server.js"
