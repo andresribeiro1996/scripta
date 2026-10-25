@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { bracketShape, type Duel } from "@scripta/shared";
-import { arenaViewTabs, bracketSlots, matchEmptyCopy, matchNote, roundHeadline, tournamentChampion, votableDuels } from "./arenaView.js";
+import { arenaViewTabs, BRACKET_MATCH_WIDTH, bracketMapLayout, bracketSlots, matchEmptyCopy, matchNote, roundHeadline, tournamentChampion, votableDuels } from "./arenaView.js";
 
 const duel = (over: Partial<Duel> = {}): Duel => ({
   id: "d1",
@@ -65,6 +65,29 @@ test("there's no champion until the final itself is decided", () => {
 
   const wonFinal = duel({ id: "f", roundNumber: 2, duelIndex: 0, winnerWorkId: "b", status: "settled" });
   assert.equal(tournamentChampion(4, [semiA, semiB, wonFinal])?.title, "B");
+});
+
+test("large bracket maps preserve cover sizes and leave room between matches", () => {
+  for (const size of [2, 4, 8, 16, 32, 64]) {
+    const rounds = bracketShape(size, []);
+    for (const viewport of [288, 360, 768, 1440]) {
+      const layout = bracketMapLayout(rounds, viewport);
+      assert.ok(layout.width >= viewport);
+      for (let round = 0; round < rounds.length; round++) {
+        const cellWidth = layout.width / Math.max(1, Math.ceil(rounds[round]!.length / 2));
+        const coverWidth = layout.coverWidths[round]!;
+        assert.ok(coverWidth >= 48 && coverWidth <= 80);
+        assert.ok(cellWidth >= coverWidth * 2 + 40);
+        assert.ok(cellWidth >= BRACKET_MATCH_WIDTH + 16);
+        if (round > 0) assert.ok(coverWidth >= layout.coverWidths[round - 1]!);
+      }
+    }
+  }
+  assert.deepEqual(bracketMapLayout(bracketShape(32, []), 288), {
+    width: 1856,
+    coverWidths: [48, 56, 64, 72, 80],
+  });
+  assert.equal(bracketMapLayout(bracketShape(4, []), 360).width, 360);
 });
 
 test("the match pane explains an empty deck by what the tournament is doing", () => {

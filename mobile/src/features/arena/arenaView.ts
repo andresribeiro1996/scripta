@@ -29,6 +29,16 @@ export function bracketSlots(bracketSize: number, duels: Duel[]): Array<{ key: s
     round.map((duel, duelIndex) => ({ duel, key: `${roundIndex}:${duelIndex}` })));
 }
 
+export const BRACKET_MATCH_WIDTH = 216;
+
+export function bracketMapLayout(rounds: BracketSlot[][], viewportWidth: number): { width: number; coverWidths: number[] } {
+  const slotsPerSide = Math.max(1, ...rounds.slice(0, -1).map((slots) => Math.ceil(slots.length / 2)));
+  return {
+    width: Math.max(viewportWidth, slotsPerSide * (BRACKET_MATCH_WIDTH + 16)),
+    coverWidths: rounds.map((_, index) => Math.min(48 + index * 8, 80)),
+  };
+}
+
 /** The book that won the final, read off that duel rather than the
  *  summary's own `winner` field — that one has been seen already set while
  *  earlier rounds were still open. */
