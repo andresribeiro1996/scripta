@@ -14,7 +14,7 @@ Home shows what the people you follow did. When the circle is quiet, or empty fo
 **Builder's calls (Claude's, each open to the user's override):**
 1. **Book prizes and author prizes.** The Nobel and the Camões honour an author, not a book. They reach a work through Wikidata's author property (P50) on works that match the catalog by ISBN or Open Library ID, the same way series do. They are never matched by name. They are shown under the author's name, not as a book badge, so a reader doesn't read "Nobel Prize 1998" as the book's own prize.
 2. **Won and nominated.** "Award received" (P166) means won. "Nominated for" (P1411) means nominated. Wikidata doesn't reliably tell a longlist from a shortlist, so the app says "nominee" and claims nothing more. For a given work, prize and year, a win beats a nomination.
-3. **The year is the statement's "point in time" (P585), as Wikidata records it.** A statement without one is dropped and counted in the report. A badge with no year can't be placed in a season, and the report shows how much that loses.
+3. **The year is the statement's "point in time" (P585), as Wikidata records it.** A statement without one is dropped, and its result rows are counted in the report as `noYear`. A badge with no year can't be placed in a season, and the report shows how much that loses.
 4. **Hugo and Nebula: Best Novel only.** Novellas are books too. Adding Best Novella is one more entry in the prize list, if the user wants it.
 5. **Exact prize items only.** A statement counts only when its value is one of the listed Wikidata items. Subclasses are not followed. The generic "Hugo Award" item is not "Hugo Award for Best Novel", for example.
 6. **Add-only, like the series fill.** Rows are added or upgraded from nominated to won, and never deleted by a fill. A wrong row is deleted by hand (README).
@@ -107,7 +107,7 @@ CREATE INDEX IF NOT EXISTS idx_work_awards_recent ON work_awards(year, prize);
 
 The report:
 - `prizes`: for each key, `{ key, item, label, rows, works, won, nominated }`. `label` is the item's English label, which is how a wrong item ID is caught.
-- `noYear`: statements dropped for lacking P585, per key.
+- `noYear`: result rows dropped for lacking P585, per key. It is an upper bound on statements: a statement is one row for each identifier kind and query shape that finds it, and an author-prize statement is one row for each work of the laureate, so one undated laureate statement can count once per work.
 - `pages`, `rows`, `matched`, `added`, `redirected`, `failedKeys`.
 
 The dry run's `prizes` list is reviewed with the user before the real run: a wrong label, or a prize with 0 works, is raised then.
@@ -172,7 +172,7 @@ In `HomeScreen.tsx`'s list header, after `RecapHomeCard`. It shows whether or no
   - Tapping it opens Search with the honoree's name (`seriesSearchHref`, as the series line does).
 - **The library intersection** is a pure function, `awardCardModel(announcement, library)`, in `mobile/src/features/awards/`. It reads `library.data.books`, `library.works[bookKey(book)]` and `book.ReadStatus` (0 to-read, 1 reading, 2 finished). A book with no resolved work isn't counted.
 
-**Known consequence:** the first backfill stores every current-year win at once, so for 14 days Home offers this year's earlier prizes one after another. That happens once, and reads as a catch-up.
+**Known consequence:** the daily job's first run after deploy stores every current-year win at once, stamped with the deploy time, so for 14 days Home offers this year's earlier prizes one after another. That happens once, and reads as a catch-up.
 
 ## Error handling
 

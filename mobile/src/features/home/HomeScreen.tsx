@@ -10,7 +10,7 @@ import { digestRoute, feedRowModel } from "./feedRowModel";
 import { CommentsSheet } from "./CommentsSheet";
 import { SavedContentSheet } from "./SavedContentSheet";
 import { RecapHomeCard } from "../topShelf/RecapHomeCard";
-import { AwardHomeCard } from "../awards/AwardHomeCard";
+import { AwardHomeCard, RECENT_AWARDS_QUERY_KEY } from "../awards/AwardHomeCard";
 import { ENGAGEMENT_QUERY_KEY, SAVED_STATE_QUERY_KEY, useHomeActions } from "./useHomeActions";
 
 export function HomeScreen() {
@@ -34,11 +34,12 @@ export function HomeScreen() {
     void activity.refetch();
     void queryClient.invalidateQueries({ queryKey: ENGAGEMENT_QUERY_KEY });
     void queryClient.invalidateQueries({ queryKey: SAVED_STATE_QUERY_KEY });
+    void queryClient.invalidateQueries({ queryKey: RECENT_AWARDS_QUERY_KEY });
   }, [actions.library.refetch, dashboard.refetch, activity.refetch, queryClient]));
 
   async function onRefresh() {
     setPulling(true);
-    try { await Promise.all([actions.library.refetch(), dashboard.refetch(), activity.refetch(), queryClient.invalidateQueries({ queryKey: ENGAGEMENT_QUERY_KEY }), queryClient.invalidateQueries({ queryKey: SAVED_STATE_QUERY_KEY })]); }
+    try { await Promise.all([actions.library.refetch(), dashboard.refetch(), activity.refetch(), queryClient.invalidateQueries({ queryKey: ENGAGEMENT_QUERY_KEY }), queryClient.invalidateQueries({ queryKey: SAVED_STATE_QUERY_KEY }), queryClient.invalidateQueries({ queryKey: RECENT_AWARDS_QUERY_KEY })]); }
     finally { setPulling(false); }
   }
   const findReaders = () => router.push("/people" as never);

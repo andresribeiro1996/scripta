@@ -11,11 +11,13 @@ import { fetchRecentAwards } from "../works/api";
 import { seriesSearchHref, workPath } from "../works/workPath";
 import { awardCardModel, awardKey, firstUndismissed } from "./awardCardModel";
 
+export const RECENT_AWARDS_QUERY_KEY = ["recentAwards"] as const;
+
 export function AwardHomeCard() {
   const { colors } = useTheme();
   const segments = useSegments();
   const library = useLibrary();
-  const recent = useQuery({ queryKey: ["recentAwards"], queryFn: fetchRecentAwards, retry: false });
+  const recent = useQuery({ queryKey: RECENT_AWARDS_QUERY_KEY, queryFn: fetchRecentAwards, retry: false });
   const announcements = recent.data?.announcements;
   const [dismissed, setDismissed] = useState<ReadonlySet<string> | null>(null);
 
