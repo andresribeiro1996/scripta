@@ -1,4 +1,5 @@
 import { searchTokens } from "./domain/normalize.js";
+import { seriesOrder } from "./domain/searchRank.js";
 import { workIdsOf } from "./domain/workSearch.js";
 import type { BooksRepository } from "./domain/ports.js";
 
@@ -41,8 +42,7 @@ type CandidateRepo = Pick<BooksRepository, "searchBooks" | "canonicalWorkIds" | 
 
 export function scorecardCandidates(repo: CandidateRepo, query: string, limit = 40): Array<{ workId: string; title: string; author: string; year: number | null }> {
   const tokens = searchTokens(query);
-  const position = (value: string | null) => (value !== null && Number.isFinite(Number(value)) ? Number(value) : Infinity);
-  const series = [...(repo.searchSeries(tokens).matches[0]?.members ?? [])].sort((a, b) => position(a.position) - position(b.position)).map(({ workId }) => workId);
+  const series = seriesOrder(repo.searchSeries(tokens).matches[0]?.members ?? []);
   const rows = repo.searchBooks(tokens, 500);
   const canonical = repo.canonicalWorkIds(workIdsOf(rows));
   const fts = [...new Set(rows.flatMap((row) => (row.work_id ? [canonical.get(row.work_id) ?? row.work_id] : [])))];

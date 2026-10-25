@@ -49,8 +49,7 @@ function representativeEdition(repo: BooksRepository, workId: string): BookRow |
   return edition ? repo.getBook(edition.id) : undefined;
 }
 
-function seriesHits(repo: BooksRepository, workIds: string[], present: Hit[], room: number): Hit[] {
-  const known = new Set(present.flatMap(({ workId }) => (workId ? [workId] : [])));
+function seriesHits(repo: BooksRepository, workIds: string[], known: Set<string>, room: number): Hit[] {
   const hits: Hit[] = [];
   for (const workId of workIds) {
     if (hits.length === room) break;
@@ -86,14 +85,16 @@ export function catalogHits(repo: BooksRepository, tokens: string[], byWork: boo
   const shown = byWork ? byWorkKey(firstEditionPerWork(rows, canonical)) : editions;
   const { workIds, matches } = repo.searchSeries(tokens);
   const hits: Hit[] = [];
+  const tried = new Set<string>();
   for (const key of rankedWorkKeys(repo, tokens, rows, editions, matches)) {
     if (hits.length >= cap) break;
+    tried.add(key);
     const found = shown.get(key);
     const row = found ? undefined : representativeEdition(repo, key);
     hits.push(...(found ?? (row ? [{ row, workId: key }] : [])));
   }
   hits.splice(cap);
-  if (hits.length < cap) hits.push(...seriesHits(repo, workIds, hits, cap - hits.length));
+  if (hits.length < cap) hits.push(...seriesHits(repo, workIds, tried, cap - hits.length));
   if (hits.length < cap) hits.push(...collectionHits(repo, tokens, hits, byWork, byWork ? WORK_SCAN_LIMIT : cap).slice(0, cap - hits.length));
   return hits;
 }

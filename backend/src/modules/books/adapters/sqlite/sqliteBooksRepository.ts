@@ -573,7 +573,10 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       SELECT works.merged_into, works.id FROM works WHERE works.merged_into IN (SELECT id FROM roots)
     )
     SELECT members.root AS work_id, COUNT(*) AS editions, COUNT(DISTINCT books.language) AS languages,
-      MAX(books.cover_image_id IS NOT NULL OR books.ol_cover_id IS NOT NULL) AS has_cover
+      EXISTS (
+        SELECT 1 FROM members AS covered JOIN books AS cover ON cover.work_id = covered.work_id
+        WHERE covered.root = members.root AND (cover.cover_image_id IS NOT NULL OR cover.ol_cover_id IS NOT NULL)
+      ) AS has_cover
     FROM members JOIN books ON books.work_id = members.work_id
     GROUP BY members.root
   `);

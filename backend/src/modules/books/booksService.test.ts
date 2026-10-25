@@ -2699,6 +2699,15 @@ test("a search by edition keeps each work's editions together and returns at mos
   assert.equal(new Set(runs).size, runs.length);
 });
 
+test("a leading series member without a searchable edition is looked up once", () => {
+  const h = harness();
+  const hidden = seeded(h, "Livro escondido", isbnOf(1), { author: "Ana Lima", searchable: false });
+  h.repo.addWorkSeries(hidden.work_id!, [{ name: "Wayfarers", position: "1" }], "wikidata", SERIES_AT);
+  const editions = mock.method(h.repo, "editionsOf");
+  assert.deepEqual(h.service.search("wayfarers", { byWork: true }), []);
+  assert.deepEqual(editions.mock.calls.map((call) => call.arguments[0]), [[hidden.work_id]]);
+});
+
 test("a series member merged into another work appears once, as its canonical work", () => {
   const h = harness();
   const target = workWith(h, "Wayfarers: The Long Way", "Becky Chambers", 1, 100);
