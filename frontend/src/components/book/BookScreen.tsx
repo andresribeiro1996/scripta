@@ -167,7 +167,7 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
       {wash ? (
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[520px]"
+          className="pointer-events-none absolute -inset-x-4 -top-5 -z-10 h-[520px] sm:-inset-x-5 sm:-top-8"
           style={{ background: `linear-gradient(to bottom, ${wash.top}, ${wash.mid} 45%, transparent)` }}
         />
       ) : null}
