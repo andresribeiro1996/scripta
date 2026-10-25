@@ -144,9 +144,50 @@ export function reorderOnDrop(
   const insertAt = remaining.indexOf(targetUnit);
   remaining.splice(insertAt, 0, draggedUnit);
 
-  const orderIndex = new Map(remaining.flatMap((u) => u.books).map((b, i) => [bookKey(b), i] as const));
+  return writeOrder(books, remaining);
+}
+
+function writeOrder(books: Array<Record<string, unknown>>, units: Unit[]): Array<Record<string, unknown>> {
+  const orderIndex = new Map(units.flatMap((u) => u.books).map((b, i) => [bookKey(b), i] as const));
   return books.map((b) => {
     const idx = orderIndex.get(bookKey(b));
     return idx === undefined ? b : { ...b, _order: idx };
   });
+}
+
+function neighbourIndex(units: Unit[], idx: number, direction: "up" | "down"): number {
+  const next = direction === "up" ? idx - 1 : idx + 1;
+  return next >= 0 && next < units.length && !units[next].group === !units[idx].group ? next : -1;
+}
+
+export function moveUnit(
+  books: Array<Record<string, unknown>>,
+  groups: Group[],
+  key: string,
+  direction: "up" | "down"
+): Array<Record<string, unknown>> {
+  const units = buildUnits(books, groups);
+  const idx = units.findIndex((u) => u.books.some((b) => bookKey(b) === key));
+  if (idx === -1) return books;
+  const next = neighbourIndex(units, idx, direction);
+  if (next === -1) return books;
+  [units[idx], units[next]] = [units[next], units[idx]];
+  return writeOrder(books, units);
+}
+
+export function unitMoves(
+  books: Array<Record<string, unknown>>,
+  groups: Group[]
+): Map<string, { up: boolean; down: boolean; inSeries: boolean }> {
+  const units = buildUnits(books, groups);
+  const moves = new Map<string, { up: boolean; down: boolean; inSeries: boolean }>();
+  units.forEach((unit, idx) => {
+    const entry = {
+      up: neighbourIndex(units, idx, "up") !== -1,
+      down: neighbourIndex(units, idx, "down") !== -1,
+      inSeries: unit.group !== undefined,
+    };
+    for (const b of unit.books) moves.set(bookKey(b), entry);
+  });
+  return moves;
 }
