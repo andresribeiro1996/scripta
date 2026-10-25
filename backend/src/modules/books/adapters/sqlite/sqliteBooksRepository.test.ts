@@ -3274,6 +3274,78 @@ test("bestSeriesOf takes the position from the best-ranked row of the same name 
   assert.deepEqual(repo.bestSeriesOf([book.work_id!]).get(book.work_id!), { name: MALAZAN, position: "3" });
 });
 
+test("wikidata series beats hardcover", () => {
+  const { repo } = freshRepo();
+  const book = seriesBook(repo, "Dune", "9780441013593", "Frank Herbert");
+  repo.addWorkSeries(book.work_id!, [{ name: "Dune", position: "1" }], "hardcover", at(-1));
+  repo.addWorkSeries(book.work_id!, [{ name: "Dune Chronicles", position: "1" }], "wikidata", at(1));
+  assert.deepEqual(repo.bestSeriesOf([book.work_id!]).get(book.work_id!), { name: "Dune Chronicles", position: "1" });
+});
+
+test("hardcover beats ol-subject", () => {
+  const { repo } = freshRepo();
+  const book = seriesBook(repo, "Dune", "9780441013593", "Frank Herbert");
+  repo.addWorkSeries(book.work_id!, [{ name: "Dune Saga", position: "1" }], "ol-subject", at(-1));
+  repo.addWorkSeries(book.work_id!, [{ name: "Dune", position: "1" }], "hardcover", at(1));
+  assert.deepEqual(repo.bestSeriesOf([book.work_id!]).get(book.work_id!), { name: "Dune", position: "1" });
+});
+
+test("edition collection gives a hardcover series its position", () => {
+  const { repo } = freshRepo();
+  const book = seriesBook(repo, "Memories of Ice", "9780765348807");
+  repo.addWorkSeries(book.work_id!, [{ name: MALAZAN, position: null }], "hardcover", AT);
+  repo.addBookCollection(book.id, { name: MALAZAN, position: "3" }, "ol-edition", AT);
+  assert.deepEqual(repo.bestSeriesOf([book.work_id!]).get(book.work_id!), { name: MALAZAN, position: "3" });
+});
+
+test("hasWorkSeries is per source", () => {
+  const { repo } = freshRepo();
+  const book = seriesBook(repo, "Memories of Ice", "9780765348807");
+  repo.addWorkSeries(book.work_id!, [{ name: MALAZAN, position: "3" }], "wikidata", AT);
+  assert.equal(repo.hasWorkSeries(book.work_id!, "wikidata"), true);
+  assert.equal(repo.hasWorkSeries(book.work_id!, "hardcover"), false);
+});
+
+test("hasWorkSeries counts a row stored on a work merged into it", () => {
+  const { repo } = freshRepo();
+  const target = seriesBook(repo, "Memories of Ice", "9780765348807");
+  const alias = seriesBook(repo, "Memórias de Gelo", "9789720000401");
+  repo.addWorkSeries(alias.work_id!, [{ name: MALAZAN, position: "3" }], "hardcover", AT);
+  repo.mergeTranslation(alias.work_id!, target.work_id!, "manual", null, AT);
+  assert.equal(repo.hasWorkSeries(target.work_id!, "hardcover"), true);
+  assert.equal(repo.hasWorkSeries(target.work_id!, "wikidata"), false);
+});
+
+test("removeSeriesNames drops hardcover rows and their search entry", () => {
+  const { db, repo } = freshRepo();
+  const book = seriesBook(repo, "Memories of Ice", "9780765348807");
+  repo.addWorkSeries(book.work_id!, [{ name: MALAZAN, position: "3" }], "hardcover", AT);
+  assert.deepEqual(repo.searchSeriesWorks(["malazan"], 12), [book.work_id]);
+  assert.deepEqual(repo.removeSeriesNames(["malazan book of the fallen"], "hardcover"), { rows: 1, searchRows: 1 });
+  assert.equal(countOf(db, "work_series"), 0);
+  assert.deepEqual(repo.searchSeriesWorks(["malazan"], 12), []);
+});
+
+test("removeSeriesNames keeps the search entry when a wikidata row shares the name key", () => {
+  const { db, repo } = freshRepo();
+  const book = seriesBook(repo, "Memories of Ice", "9780765348807");
+  repo.addWorkSeries(book.work_id!, [{ name: MALAZAN, position: "3" }], "wikidata", AT);
+  repo.addWorkSeries(book.work_id!, [{ name: "Malazan: Book of the Fallen", position: "3" }], "hardcover", AT);
+  assert.deepEqual(repo.removeSeriesNames(["malazan book of the fallen"], "hardcover"), { rows: 1, searchRows: 0 });
+  assert.equal(countOf(db, "work_series"), 1);
+  assert.deepEqual(repo.searchSeriesWorks(["malazan"], 12), [book.work_id]);
+});
+
+test("removeSeriesNames leaves another work's search entry alone", () => {
+  const { repo } = freshRepo();
+  const first = seriesBook(repo, "Memories of Ice", "9780765348807");
+  const other = seriesBook(repo, "Return of the Crimson Guard", "9780765348821", "Ian Esslemont");
+  repo.addWorkSeries(first.work_id!, [{ name: MALAZAN, position: "3" }], "hardcover", AT);
+  repo.addWorkSeries(other.work_id!, [{ name: MALAZAN, position: "1" }], "wikidata", AT);
+  assert.deepEqual(repo.removeSeriesNames(["malazan book of the fallen"], "hardcover"), { rows: 1, searchRows: 1 });
+  assert.deepEqual(repo.searchSeriesWorks(["malazan"], 12), [other.work_id]);
+});
+
 test("an Open Library edition collection becomes the work's series only when Wikidata or a subject names it too", () => {
   const { repo } = freshRepo();
   const book = seriesBook(repo, "Memories of Ice", "9780765348807");
@@ -3839,4 +3911,56 @@ test("seriesPositionsOf lists series rows on the work and on works merged into i
   repo.mergeWorks(b.work_id!, a.work_id!);
   assert.deepEqual(repo.seriesPositionsOf(a.work_id!), [{ nameKey: "the lord of the rings", position: "1" }, { nameKey: "middle earth cycle", position: null }]);
   assert.deepEqual(repo.seriesPositionsOf(c.work_id!), [{ nameKey: "other", position: "9" }]);
+});
+
+const matchBook = (repo: ReturnType<typeof freshRepo>["repo"], title: string, isbn: string, series: string[]) => {
+  const book = seriesBook(repo, title, isbn);
+  for (const name of series) repo.addWorkSeries(book.work_id!, [{ name, position: "1" }], "wikidata", AT);
+  return book;
+};
+
+test("matchingSeries matches whole words, ranks exact before prefix and ignores a leading article", () => {
+  const { repo } = freshRepo();
+  matchBook(repo, "Fellowship", "9780261102354", ["The Lord of the Rings"]);
+  matchBook(repo, "Silmarillion", "9780261102736", ["Lord of the Rings Companions", "Warriors"]);
+  matchBook(repo, "Hobbit", "9780261102217", ["Lord of the Rings Companions"]);
+  assert.deepEqual(repo.matchingSeries(["lord", "of", "the", "rings"]).map(({ name, exact, members }) => [name, exact, members.length]), [
+    ["The Lord of the Rings", true, 1],
+    ["Lord of the Rings Companions", false, 2]
+  ]);
+  assert.deepEqual(repo.matchingSeries(["war"]), []);
+  assert.deepEqual(repo.matchingSeries(["warriors"]).map(({ name }) => name), ["Warriors"]);
+});
+
+test("matchingSeries gives a two-character query no prefix matches", () => {
+  const { repo } = freshRepo();
+  matchBook(repo, "Fellowship", "9780261102354", ["Lo Series"]);
+  matchBook(repo, "Silmarillion", "9780261102736", ["Lo"]);
+  assert.deepEqual(repo.matchingSeries(["lo"]).map(({ name, exact }) => [name, exact]), [["Lo", true]]);
+});
+
+test("matchingSeries lists a merged work once under its canonical id with its best source's position", () => {
+  const { repo } = freshRepo();
+  const keep = seriesBook(repo, "Gardens of the Moon", "9780765348807");
+  const lose = seriesBook(repo, "Gardens of the Moon (Portuguese)", "9789897770012");
+  repo.addWorkSeries(keep.work_id!, [{ name: MALAZAN, position: "9" }], "ol-subject", AT);
+  repo.addWorkSeries(lose.work_id!, [{ name: MALAZAN, position: "1" }], "wikidata", AT);
+  repo.mergeWorks(lose.work_id!, keep.work_id!, AT);
+  const [entry] = repo.matchingSeries(["malazan", "book", "of", "the", "fallen"]);
+  assert.deepEqual(entry!.members, [{ workId: keep.work_id, position: "1" }]);
+});
+
+test("matchingSeries matches a Portuguese series exactly without its leading article", () => {
+  const { repo } = freshRepo();
+  matchBook(repo, "A Sociedade do Anel", "9789722317665", ["O Senhor dos Anéis"]);
+  assert.deepEqual(repo.matchingSeries(["senhor", "dos", "aneis"]).map(({ name, exact }) => [name, exact]), [["O Senhor dos Anéis", true]]);
+});
+
+test("matchingSeries ignores a leading article in the query as well as in the name", () => {
+  const { repo } = freshRepo();
+  matchBook(repo, "The Eye of the World", "9780812511819", ["Wheel of Time"]);
+  matchBook(repo, "A Sociedade do Anel", "9789722317665", ["Senhor dos Anéis"]);
+  assert.deepEqual(repo.matchingSeries(["the", "wheel", "of", "time"]).map(({ name, exact }) => [name, exact]), [["Wheel of Time", true]]);
+  assert.deepEqual(repo.matchingSeries(["o", "senhor", "dos", "aneis"]).map(({ name, exact }) => [name, exact]), [["Senhor dos Anéis", true]]);
+  assert.deepEqual(repo.matchingSeries(["the"]), []);
 });

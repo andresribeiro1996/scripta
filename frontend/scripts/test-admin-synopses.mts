@@ -2,9 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createElement } from "react";
 import { renderToString } from "react-dom/server";
-import { MemoryRouter } from "react-router-dom";
 import type { SynopsisReview } from "@scripta/shared";
-import { AdminLinks } from "../src/components/AdminLinks";
+import { area, footerAreas } from "../src/lib/areas";
 import { SynopsisReviewList } from "../src/components/SynopsisReviewList";
 
 const item = (hash: string, group: "hidden" | "doubtful", model: string, kind: string, usable: number) => ({ hash, title: `Title ${hash}`, author: "Author", coverUrl: null, editions: 2, works: 1, source: "publisher", text: "Praise for the author.", holders: 1, finished: true, group, model, kind, usable });
@@ -29,8 +28,8 @@ test("every row offers Keep and Hide", () => {
 });
 
 test("the admin sees both review links, and nobody else sees any", () => {
-  const links = (isAdmin: boolean) => renderToString(createElement(MemoryRouter, null, createElement(AdminLinks, { isAdmin })));
-  assert.ok(links(true).includes('href="/admin/genres"'));
-  assert.ok(links(true).includes('href="/admin/synopses"'));
-  assert.equal(links(false), "");
+  assert.equal(footerAreas(true)[0]?.id, "admin");
+  assert.ok(area("admin").tabs.some((t) => t.to === "/admin/genres"));
+  assert.ok(area("admin").tabs.some((t) => t.to === "/admin/synopses"));
+  assert.deepEqual(footerAreas(false), []);
 });

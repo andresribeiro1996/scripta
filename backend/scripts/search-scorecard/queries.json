@@ -1,0 +1,752 @@
+[
+  {
+    "q": "harry potter",
+    "source": "hand",
+    "hidden": true
+  },
+  {
+    "q": "lord of the rings",
+    "source": "hand",
+    "hidden": false
+  },
+  {
+    "q": "senhor dos anéis",
+    "source": "hand",
+    "hidden": true
+  },
+  {
+    "q": "saramago",
+    "source": "hand",
+    "hidden": false
+  },
+  {
+    "q": "dune",
+    "source": "hand",
+    "hidden": false
+  },
+  {
+    "q": "it",
+    "source": "hand",
+    "hidden": false
+  },
+  {
+    "q": "1984",
+    "source": "hand",
+    "hidden": true
+  },
+  {
+    "q": "game of thrones",
+    "source": "hand",
+    "hidden": true
+  },
+  {
+    "q": "guerra dos tronos",
+    "source": "hand",
+    "hidden": true
+  },
+  {
+    "q": "narnia",
+    "source": "hand",
+    "hidden": true
+  },
+  {
+    "q": "hunger games",
+    "source": "hand",
+    "hidden": false
+  },
+  {
+    "q": "jogos da fome",
+    "source": "hand",
+    "hidden": false
+  },
+  {
+    "q": "stephen king",
+    "source": "hand",
+    "hidden": false
+  },
+  {
+    "q": "agatha christie",
+    "source": "hand",
+    "hidden": false
+  },
+  {
+    "q": "tolkien",
+    "source": "hand",
+    "hidden": false
+  },
+  {
+    "q": "jane austen",
+    "source": "hand",
+    "hidden": false
+  },
+  {
+    "q": "orgulho e preconceito",
+    "source": "hand",
+    "hidden": false
+  },
+  {
+    "q": "pride and prejudice",
+    "source": "hand",
+    "hidden": false
+  },
+  {
+    "q": "dostoievski",
+    "source": "hand",
+    "hidden": true
+  },
+  {
+    "q": "crime e castigo",
+    "source": "hand",
+    "hidden": false
+  },
+  {
+    "q": "war and peace",
+    "source": "hand",
+    "hidden": false
+  },
+  {
+    "q": "guerra e paz",
+    "source": "hand",
+    "hidden": false
+  },
+  {
+    "q": "les misérables",
+    "source": "hand",
+    "hidden": false
+  },
+  {
+    "q": "os miseráveis",
+    "source": "hand",
+    "hidden": false
+  },
+  {
+    "q": "conde de monte cristo",
+    "source": "hand",
+    "hidden": false
+  },
+  {
+    "q": "o principezinho",
+    "source": "hand",
+    "hidden": false
+  },
+  {
+    "q": "dom quixote",
+    "source": "hand",
+    "hidden": true
+  },
+  {
+    "q": "ulysses",
+    "source": "hand",
+    "hidden": true
+  },
+  {
+    "q": "moby dick",
+    "source": "hand",
+    "hidden": false
+  },
+  {
+    "q": "the shining",
+    "source": "hand",
+    "hidden": false
+  },
+  {
+    "q": "o nome do vento",
+    "source": "hand",
+    "hidden": true
+  },
+  {
+    "q": "the witcher",
+    "source": "hand",
+    "hidden": false
+  },
+  {
+    "q": "discworld",
+    "source": "hand",
+    "hidden": false
+  },
+  {
+    "q": "sherlock holmes",
+    "source": "hand",
+    "hidden": false
+  },
+  {
+    "q": "poirot",
+    "source": "hand",
+    "hidden": false
+  },
+  {
+    "q": "murakami",
+    "source": "hand",
+    "hidden": false
+  },
+  {
+    "q": "kafka",
+    "source": "hand",
+    "hidden": false
+  },
+  {
+    "q": "a metamorfose",
+    "source": "hand",
+    "hidden": false
+  },
+  {
+    "q": "frankenstein",
+    "source": "hand",
+    "hidden": true
+  },
+  {
+    "q": "dracula",
+    "source": "hand",
+    "hidden": true
+  },
+  {
+    "q": "brave new world",
+    "source": "hand",
+    "hidden": false
+  },
+  {
+    "q": "admirável mundo novo",
+    "source": "hand",
+    "hidden": true
+  },
+  {
+    "q": "o triunfo dos porcos",
+    "source": "hand",
+    "hidden": false
+  },
+  {
+    "q": "foundation",
+    "source": "hand",
+    "hidden": true
+  },
+  {
+    "q": "fundação",
+    "source": "hand",
+    "hidden": false
+  },
+  {
+    "q": "war",
+    "source": "hand",
+    "hidden": false
+  },
+  {
+    "q": "emma",
+    "source": "hand",
+    "hidden": true
+  },
+  {
+    "q": "rebecca",
+    "source": "hand",
+    "hidden": false
+  },
+  {
+    "q": "the stand",
+    "source": "hand",
+    "hidden": true
+  },
+  {
+    "q": "cem anos de solidão",
+    "source": "hand",
+    "hidden": true
+  },
+  {
+    "q": "A Tale of Two Cities",
+    "source": "bestsellers",
+    "hidden": false
+  },
+  {
+    "q": "The Little Prince",
+    "source": "bestsellers",
+    "hidden": false
+  },
+  {
+    "q": "The Alchemist",
+    "source": "bestsellers",
+    "hidden": false
+  },
+  {
+    "q": "Harry Potter and the Philosopher's Stone",
+    "source": "bestsellers",
+    "hidden": true
+  },
+  {
+    "q": "And Then There Were None",
+    "source": "bestsellers",
+    "hidden": true
+  },
+  {
+    "q": "Dream of the Red Chamber",
+    "source": "bestsellers",
+    "hidden": false
+  },
+  {
+    "q": "The Hobbit",
+    "source": "bestsellers",
+    "hidden": true
+  },
+  {
+    "q": "Alice's Adventures in Wonderland",
+    "source": "bestsellers",
+    "hidden": false
+  },
+  {
+    "q": "She",
+    "source": "bestsellers",
+    "hidden": true
+  },
+  {
+    "q": "The Da Vinci Code",
+    "source": "bestsellers",
+    "hidden": true
+  },
+  {
+    "q": "Harry Potter and the Chamber of Secrets",
+    "source": "bestsellers",
+    "hidden": false
+  },
+  {
+    "q": "The Catcher in the Rye",
+    "source": "bestsellers",
+    "hidden": true
+  },
+  {
+    "q": "Sophie's World",
+    "source": "bestsellers",
+    "hidden": false
+  },
+  {
+    "q": "The Bridges of Madison County",
+    "source": "bestsellers",
+    "hidden": false
+  },
+  {
+    "q": "One Hundred Years of Solitude",
+    "source": "bestsellers",
+    "hidden": false
+  },
+  {
+    "q": "Lolita",
+    "source": "bestsellers",
+    "hidden": false
+  },
+  {
+    "q": "Heidi",
+    "source": "bestsellers",
+    "hidden": false
+  },
+  {
+    "q": "Anne of Green Gables",
+    "source": "bestsellers",
+    "hidden": false
+  },
+  {
+    "q": "Black Beauty",
+    "source": "bestsellers",
+    "hidden": false
+  },
+  {
+    "q": "The Name of the Rose",
+    "source": "bestsellers",
+    "hidden": false
+  },
+  {
+    "q": "The Eagle Has Landed",
+    "source": "bestsellers",
+    "hidden": true
+  },
+  {
+    "q": "Watership Down",
+    "source": "bestsellers",
+    "hidden": false
+  },
+  {
+    "q": "Charlotte's Web",
+    "source": "bestsellers",
+    "hidden": false
+  },
+  {
+    "q": "The Ginger Man",
+    "source": "bestsellers",
+    "hidden": false
+  },
+  {
+    "q": "The Purpose Driven Life",
+    "source": "bestsellers",
+    "hidden": true
+  },
+  {
+    "q": "Goosebumps",
+    "source": "bestsellers",
+    "hidden": false
+  },
+  {
+    "q": "Perry Mason",
+    "source": "bestsellers",
+    "hidden": true
+  },
+  {
+    "q": "Diary of a Wimpy Kid",
+    "source": "bestsellers",
+    "hidden": false
+  },
+  {
+    "q": "Choose Your Own Adventure",
+    "source": "bestsellers",
+    "hidden": true
+  },
+  {
+    "q": "Berenstain Bears",
+    "source": "bestsellers",
+    "hidden": true
+  },
+  {
+    "q": "Mr. Men",
+    "source": "bestsellers",
+    "hidden": false
+  },
+  {
+    "q": "Sweet Valley High",
+    "source": "bestsellers",
+    "hidden": true
+  },
+  {
+    "q": "Noddy",
+    "source": "bestsellers",
+    "hidden": false
+  },
+  {
+    "q": "Jack Reacher",
+    "source": "bestsellers",
+    "hidden": true
+  },
+  {
+    "q": "Thomas & Friends",
+    "source": "bestsellers",
+    "hidden": false
+  },
+  {
+    "q": "Nancy Drew",
+    "source": "bestsellers",
+    "hidden": false
+  },
+  {
+    "q": "San-Antonio",
+    "source": "bestsellers",
+    "hidden": false
+  },
+  {
+    "q": "Robert Langdon",
+    "source": "bestsellers",
+    "hidden": false
+  },
+  {
+    "q": "Geronimo Stilton",
+    "source": "bestsellers",
+    "hidden": false
+  },
+  {
+    "q": "Percy Jackson",
+    "source": "bestsellers",
+    "hidden": false
+  },
+  {
+    "q": "The Baby-sitters Club",
+    "source": "bestsellers",
+    "hidden": false
+  },
+  {
+    "q": "American Girl",
+    "source": "bestsellers",
+    "hidden": false
+  },
+  {
+    "q": "Twilight",
+    "source": "bestsellers",
+    "hidden": false
+  },
+  {
+    "q": "Star Wars",
+    "source": "bestsellers",
+    "hidden": false
+  },
+  {
+    "q": "Little Critter",
+    "source": "bestsellers",
+    "hidden": true
+  },
+  {
+    "q": "Peter Rabbit",
+    "source": "bestsellers",
+    "hidden": true
+  },
+  {
+    "q": "Fifty Shades",
+    "source": "bestsellers",
+    "hidden": false
+  },
+  {
+    "q": "Chicken Soup for the Soul",
+    "source": "bestsellers",
+    "hidden": true
+  },
+  {
+    "q": "Clifford the Big Red Dog",
+    "source": "bestsellers",
+    "hidden": true
+  },
+  {
+    "q": "Frank Merriwell",
+    "source": "bestsellers",
+    "hidden": false
+  },
+  {
+    "q": "Ala D",
+    "source": "portuguese",
+    "hidden": false
+  },
+  {
+    "q": "Esperança",
+    "source": "portuguese",
+    "hidden": false
+  },
+  {
+    "q": "O que é o amor?",
+    "source": "portuguese",
+    "hidden": false
+  },
+  {
+    "q": "Raparigas no Inferno",
+    "source": "portuguese",
+    "hidden": true
+  },
+  {
+    "q": "A Criada",
+    "source": "portuguese",
+    "hidden": true
+  },
+  {
+    "q": "Nem Todas as Árvores Morrem de Pé",
+    "source": "portuguese",
+    "hidden": true
+  },
+  {
+    "q": "A Paixão segundo G.H.",
+    "source": "portuguese",
+    "hidden": true
+  },
+  {
+    "q": "A Duquesa",
+    "source": "portuguese",
+    "hidden": false
+  },
+  {
+    "q": "Conta-me Tudo",
+    "source": "portuguese",
+    "hidden": false
+  },
+  {
+    "q": "Querida Tia",
+    "source": "portuguese",
+    "hidden": false
+  },
+  {
+    "q": "Astérix na Lusitânia",
+    "source": "portuguese",
+    "hidden": false
+  },
+  {
+    "q": "A Cicatriz",
+    "source": "portuguese",
+    "hidden": false
+  },
+  {
+    "q": "Como fazer tudo na Air Fryer",
+    "source": "portuguese",
+    "hidden": false
+  },
+  {
+    "q": "O Hospital das Alfaces",
+    "source": "portuguese",
+    "hidden": true
+  },
+  {
+    "q": "Sexto Sentido",
+    "source": "portuguese",
+    "hidden": false
+  },
+  {
+    "q": "O Protocolo Caos",
+    "source": "portuguese",
+    "hidden": false
+  },
+  {
+    "q": "Freida McFadden",
+    "source": "portuguese",
+    "hidden": false
+  },
+  {
+    "q": "Colleen Hoover",
+    "source": "portuguese",
+    "hidden": false
+  },
+  {
+    "q": "Raul Minh'alma",
+    "source": "portuguese",
+    "hidden": false
+  },
+  {
+    "q": "Pedro Chagas Freitas",
+    "source": "portuguese",
+    "hidden": false
+  },
+  {
+    "q": "José Rodrigues dos Santos",
+    "source": "portuguese",
+    "hidden": true
+  },
+  {
+    "q": "Valérie Perrin",
+    "source": "portuguese",
+    "hidden": false
+  },
+  {
+    "q": "Eça de Queirós",
+    "source": "portuguese",
+    "hidden": false
+  },
+  {
+    "q": "Fernando Pessoa",
+    "source": "portuguese",
+    "hidden": false
+  },
+  {
+    "q": "Camões",
+    "source": "portuguese",
+    "hidden": true
+  },
+  {
+    "q": "Lobo Antunes",
+    "source": "portuguese",
+    "hidden": false
+  },
+  {
+    "q": "Sophia de Mello Breyner",
+    "source": "portuguese",
+    "hidden": false
+  },
+  {
+    "q": "Miguel Torga",
+    "source": "portuguese",
+    "hidden": true
+  },
+  {
+    "q": "José Luís Peixoto",
+    "source": "portuguese",
+    "hidden": true
+  },
+  {
+    "q": "Valter Hugo Mãe",
+    "source": "portuguese",
+    "hidden": false
+  },
+  {
+    "q": "Gonçalo M. Tavares",
+    "source": "portuguese",
+    "hidden": false
+  },
+  {
+    "q": "Afonso Cruz",
+    "source": "portuguese",
+    "hidden": true
+  },
+  {
+    "q": "Lídia Jorge",
+    "source": "portuguese",
+    "hidden": true
+  },
+  {
+    "q": "Agustina Bessa-Luís",
+    "source": "portuguese",
+    "hidden": false
+  },
+  {
+    "q": "Mia Couto",
+    "source": "portuguese",
+    "hidden": false
+  },
+  {
+    "q": "Miguel Sousa Tavares",
+    "source": "portuguese",
+    "hidden": false
+  },
+  {
+    "q": "Camilo Castelo Branco",
+    "source": "portuguese",
+    "hidden": false
+  },
+  {
+    "q": "Florbela Espanca",
+    "source": "portuguese",
+    "hidden": false
+  },
+  {
+    "q": "Os Maias",
+    "source": "portuguese",
+    "hidden": true
+  },
+  {
+    "q": "Mensagem",
+    "source": "portuguese",
+    "hidden": true
+  },
+  {
+    "q": "Os Lusíadas",
+    "source": "portuguese",
+    "hidden": false
+  },
+  {
+    "q": "Livro do Desassossego",
+    "source": "portuguese",
+    "hidden": false
+  },
+  {
+    "q": "Memorial do Convento",
+    "source": "portuguese",
+    "hidden": true
+  },
+  {
+    "q": "Ensaio sobre a Cegueira",
+    "source": "portuguese",
+    "hidden": false
+  },
+  {
+    "q": "Amor de Perdição",
+    "source": "portuguese",
+    "hidden": true
+  },
+  {
+    "q": "O Primo Basílio",
+    "source": "portuguese",
+    "hidden": false
+  },
+  {
+    "q": "Equador",
+    "source": "portuguese",
+    "hidden": false
+  },
+  {
+    "q": "Uma Família Inglesa",
+    "source": "portuguese",
+    "hidden": true
+  },
+  {
+    "q": "Esteiros",
+    "source": "portuguese",
+    "hidden": false
+  },
+  {
+    "q": "A Cidade e as Serras",
+    "source": "portuguese",
+    "hidden": true
+  }
+]

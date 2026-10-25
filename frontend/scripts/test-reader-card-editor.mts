@@ -11,6 +11,7 @@ import { HighlightChoice, SignatureChoice } from "../src/components/readerCard/R
 import { ReaderCardOptions } from "../src/components/readerCard/ReaderCardOptions";
 import { ReaderGlyphSetting } from "../src/components/readerCard/ReaderGlyphSetting";
 import { ToastProvider } from "../src/components/Toaster";
+import { area } from "../src/lib/areas";
 
 const books = Array.from({ length: 6 }, (_, i) => ({ Title: `Book ${i}`, Attribution: `Author ${i}`, ReadStatus: 2, _genres: ["Fantasy"] }));
 const group = (html: string, label: string) => {
@@ -113,9 +114,9 @@ test("the glyph switch is gone from the shelf's profile sheet", () => {
   assert.doesNotMatch(readFileSync("src/components/OwnShelfView.tsx", "utf8"), /readerGlyph/);
 });
 
-test("the editor has its route and a way in from Settings", () => {
+test("the editor has its route and a way in from the area map", () => {
   assert.match(readFileSync("src/App.tsx", "utf8"), /path="\/dashboard\/reader-card" element={<ReaderCardPage \/>}/);
-  assert.match(readFileSync("src/pages/SettingsPage.tsx", "utf8"), /to="\/dashboard\/reader-card"/);
+  assert.equal(area("readerCard").to, "/dashboard/reader-card");
 });
 
 test("the toggle only animates when motion is allowed", () => {

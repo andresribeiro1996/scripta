@@ -7,9 +7,11 @@ import { useAuth } from "../auth/AuthContext";
 import { EmptyState } from "../components/EmptyState";
 import { CommunityIcon } from "../components/NavIcons";
 import { ReaderGlyph } from "../components/ReaderGlyph";
+import { Page } from "../components/page/Page";
 import { SkeletonCardGrid } from "../components/Skeleton";
 import { useCommunityDiscover } from "../hooks/useCommunity";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
+import { area } from "../lib/areas";
 import { discoverDestination } from "../lib/landing";
 
 const DISCOVER_FILTERS: Array<{ value: DiscoverType; label: string }> = [
@@ -57,10 +59,9 @@ function retryButton(refetch: () => void) {
 
 export function DiscoverPage() {
   return (
-    <div className="mx-auto max-w-3xl p-6">
-      <h2 className="mb-6 text-lg font-bold">Discover</h2>
+    <Page title="Community" tabs={area("community").tabs}>
       <DiscoverPane />
-    </div>
+    </Page>
   );
 }
 

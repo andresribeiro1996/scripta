@@ -16,8 +16,20 @@ export async function readBody<T>(source: string, read: () => Promise<T>): Promi
   }
 }
 
-async function request(source: string, url: string, headers: Record<string, string> = {}): Promise<Response> {
-  return readBody(source, () => fetch(url, { headers: { "User-Agent": USER_AGENT, ...headers }, signal: AbortSignal.timeout(TIMEOUT_MS) }));
+async function request(
+  source: string,
+  url: string,
+  headers: Record<string, string> = {},
+  init: { method?: string; body?: string; timeoutMs?: number } = {}
+): Promise<Response> {
+  return readBody(source, () =>
+    fetch(url, {
+      method: init.method,
+      body: init.body,
+      headers: { "User-Agent": USER_AGENT, ...headers },
+      signal: AbortSignal.timeout(init.timeoutMs ?? TIMEOUT_MS)
+    })
+  );
 }
 
 function rateLimitField(header: string | null, field: string): number | undefined {
@@ -47,6 +59,27 @@ export async function fetchJson(source: string, url: string, headers?: Record<st
   const res = await request(source, url, headers);
   if (res.status === 404) return null;
   if (!res.ok) throw await failure(source, res);
+  try {
+    return await readBody(source, () => res.json());
+  } catch (error) {
+    if (error instanceof SyntaxError) throw new SourceUnavailableError(source, "invalid JSON");
+    throw error;
+  }
+}
+
+export async function postJson(
+  source: string,
+  url: string,
+  body: unknown,
+  headers?: Record<string, string>,
+  timeoutMs?: number
+): Promise<unknown> {
+  const res = await request(source, url, { "Content-Type": "application/json", ...headers }, { method: "POST", body: JSON.stringify(body), timeoutMs });
+  if (res.status === 429) throw await failure(source, res);
+  if (!res.ok) {
+    const text = await readBody(source, () => res.text());
+    throw new SourceUnavailableError(source, `HTTP ${res.status} ${text.slice(0, 200)}`.trim(), { status: res.status });
+  }
   try {
     return await readBody(source, () => res.json());
   } catch (error) {

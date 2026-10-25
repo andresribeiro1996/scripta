@@ -1,21 +1,16 @@
 import { useState } from "react";
-import { ActionSheet, OptionSheet } from "./Sheet";
-import { FilterIcon, GearIcon, SortIcon, TOOLBAR_CONTROL_CLASS, ToolbarRow, toolbarIconClass } from "./Toolbar";
-import type { OptionsMenuItem } from "./OptionsMenu";
+import { OptionSheet } from "./Sheet";
+import { FilterIcon, SortIcon, TOOLBAR_CONTROL_CLASS, ToolbarRow, toolbarIconClass } from "./Toolbar";
 import { STATUS_FILTER_OPTIONS, SORT_OPTIONS, type SortKey, type StatusFilter } from "../lib/libraryView";
 
-/** Search, filter, sort — and on a phone, the page's actions too.
+/** Search, filter, sort.
  *
  *  ONE row below `sm`. This was three stacked rows (library name, search,
  *  then two full-width selects), which on a 375px phone spent roughly a
- *  sixth of the viewport before a single cover appeared. The selects and
- *  the page's actions all become icon buttons in this row, each opening
- *  a bottom sheet — the library name moves into the actions sheet (as
- *  "Rename library…"), since a truncated name plus a search field plus
- *  three icons cannot share 375px without the search field becoming
- *  useless.
+ *  sixth of the viewport before a single cover appeared. The selects
+ *  become icon buttons in this row, each opening a bottom sheet.
  *
- *  Sheets, not dropdowns, for all three. These icons sit at the top of
+ *  Sheets, not dropdowns, for both. These icons sit at the top of
  *  the screen and get used one-handed; a dropdown hanging off the
  *  top-right corner opens at the furthest point from a thumb. Anchoring
  *  the choices at the bottom puts them in reach, and using one
@@ -23,9 +18,7 @@ import { STATUS_FILTER_OPTIONS, SORT_OPTIONS, type SortKey, type StatusFilter } 
  *  differently from each other. OptionsMenu's dropdown is still right
  *  where it's used on pointer-sized targets (mural blocks, series rows).
  *
- *  At `sm` and up the labelled native selects come back and `actions` is
- *  not rendered here at all — the page shows its own header with the
- *  library name and full-text buttons. Desktop has the room, and
+ *  At `sm` and up the labelled native selects come back Desktop has the room, and
  *  "All statuses"/"My order" read better as words than as an icon whose
  *  current value you have to open a sheet to discover. The two layouts
  *  are separate markup rather than one adaptive row: they differ in
@@ -39,8 +32,7 @@ export function LibraryToolbar({
   status,
   onStatusChange,
   sort,
-  onSortChange,
-  actions
+  onSortChange
 }: {
   query: string;
   onQueryChange: (q: string) => void;
@@ -48,13 +40,8 @@ export function LibraryToolbar({
   onStatusChange: (s: StatusFilter) => void;
   sort: SortKey;
   onSortChange: (k: SortKey) => void;
-  /** The page's own actions, shown as a gear in this row on phones only.
-   *  Items, not rendered markup: the toolbar opens them in a sheet
-   *  matching the filter and sort controls beside them, so it needs the
-   *  list rather than someone else's dropdown. */
-  actions?: OptionsMenuItem[];
 }) {
-  const [sheet, setSheet] = useState<"status" | "sort" | "actions" | null>(null);
+  const [sheet, setSheet] = useState<"status" | "sort" | null>(null);
 
   // A filter/sort that is doing something is worth showing without
   // opening the sheet: the icon goes accent-colored when the control is
@@ -89,15 +76,6 @@ export function LibraryToolbar({
           >
             <SortIcon />
           </button>
-          {actions && actions.length > 0 && (
-            <button
-              onClick={() => setSheet("actions")}
-              aria-label="Library actions"
-              className={toolbarIconClass()}
-            >
-              <GearIcon />
-            </button>
-          )}
         </div>
 
         {/* Desktop: labelled selects, page keeps its own header. */}
@@ -151,7 +129,6 @@ export function LibraryToolbar({
       {sheet === "sort" && (
         <OptionSheet title="Sort books" options={SORT_OPTIONS} value={sort} onSelect={onSortChange} onClose={() => setSheet(null)} />
       )}
-      {sheet === "actions" && actions && <ActionSheet title="Library" items={actions} onClose={() => setSheet(null)} />}
     </>
   );
 }

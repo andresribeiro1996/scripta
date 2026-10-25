@@ -2,9 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createElement } from "react";
 import { renderToString } from "react-dom/server";
-import { MemoryRouter } from "react-router-dom";
 import type { TranslationReview } from "@scripta/shared";
-import { AdminLinks } from "../src/components/AdminLinks";
+import { area, footerAreas } from "../src/lib/areas";
 import { TranslationReviewList } from "../src/components/TranslationReviewList";
 
 const item = (workId: string, group: "possible" | "blocked" | "merged", model: string, confidence: number | null) => ({
@@ -30,5 +29,7 @@ test("possible rows offer Merge and Not a translation, blocked rows only the sec
 });
 
 test("the admin sees the translation review link", () => {
-  assert.ok(renderToString(createElement(MemoryRouter, null, createElement(AdminLinks, { isAdmin: true }))).includes('href="/admin/translations"'));
+  assert.equal(footerAreas(true)[0]?.id, "admin");
+  assert.ok(area("admin").tabs.some((t) => t.to === "/admin/translations"));
+  assert.deepEqual(footerAreas(false), []);
 });

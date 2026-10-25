@@ -8,9 +8,10 @@ import { coverColor, encodeCover, type EncodedCover } from "./domain/images.js";
 import { hiddenSynopsisHashes } from "./domain/synopsis.js";
 import { fillMissingIdentity, findExisting, findOrCreateBook, keysOf } from "./domain/findOrCreate.js";
 import { siblingCoverImageIds } from "./domain/siblingCover.js";
-import { coveredFirst, firstEditionPerWork, workIdsOf } from "./domain/workSearch.js";
-import { editionLanguage, findByIdentity, isPortugalIsbn, isPortugueseIsbn, isValidIsbn, lookupIdentity, SEARCH_LIMIT, searchTokens, WORK_SCAN_LIMIT, WORK_SEARCH_LIMIT, type BookIdentity, type BookLookup } from "./domain/normalize.js";
+import { coveredFirst, workIdsOf } from "./domain/workSearch.js";
+import { editionLanguage, findByIdentity, isPortugalIsbn, isPortugueseIsbn, isValidIsbn, lookupIdentity, searchTokens, type BookIdentity, type BookLookup } from "./domain/normalize.js";
 import { summaryMatchesLanguage } from "./adapters/catalog/languageFilter.js";
+import { canonicalHits, catalogHits, type Hit } from "./catalogSearch.js";
 import { mergeDuplicateWorks } from "./duplicateWorks.js";
 import type { BookCatalog, BooksRepository, CatalogSearchHit, CoverBlobReader, CoverBlobStore, CoverSource, EditionRecordSource, PageCursor } from "./domain/ports.js";
 import type { SeriesEntry } from "./domain/series.js";
@@ -32,7 +33,6 @@ export const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
 
 export type CoverFileSize = "file" | "thumb";
 
-type Hit = { row: BookRow; workId: string | null; matched?: SeriesEntry };
 type Found = { result: BookSearchResult; bookId: string | null; matched?: SeriesEntry };
 
 export interface ResolvedCover {
@@ -143,7 +143,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
 
   function summaryLink(book: BookRow): string {
     if (book.summary_source === "publisher") return book.publisher_url ?? "";
-    if (book.summary_source === "bnp") return "";
+    if (book.summary_source === "bnp" || book.summary_source === "hardcover") return "";
     if (book.summary_source === "isbndb") return book.isbn ? `https://isbndb.com/book/${book.isbn}` : "";
     return book.source_url ?? "";
   }
@@ -200,60 +200,16 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
     });
   }
 
-  function canonicalHits(rows: BookRow[]): Hit[] {
-    const canonical = deps.repo.canonicalWorkIds(workIdsOf(rows));
-    return rows.map((row) => ({ row, workId: row.work_id ? canonical.get(row.work_id) ?? row.work_id : null }));
-  }
-
   function resultsOf(hits: Hit[]): BookSearchResult[] {
     return withSeries(hits.map(({ row, workId, matched }) => ({ result: toSearchResult(row, workId), bookId: row.id, matched })));
   }
 
   function withWorkIds(rows: BookRow[]): BookSearchResult[] {
-    return resultsOf(canonicalHits(rows));
-  }
-
-  function representativeEdition(workId: string): BookRow | undefined {
-    const edition = deps.repo.editionsOf([workId]).find(({ id }) => deps.repo.isSearchable(id));
-    return edition ? deps.repo.getBook(edition.id) : undefined;
-  }
-
-  function seriesHits(tokens: string[], present: Hit[], room: number): Hit[] {
-    const known = new Set(present.flatMap(({ workId }) => (workId ? [workId] : [])));
-    const hits: Hit[] = [];
-    for (const workId of deps.repo.searchSeriesWorks(tokens, WORK_SCAN_LIMIT)) {
-      if (hits.length === room) break;
-      const row = known.has(workId) ? undefined : representativeEdition(workId);
-      if (row) hits.push({ row, workId });
-    }
-    return hits;
-  }
-
-  function collectionHits(tokens: string[], present: Hit[], byWork: boolean, limit: number): Hit[] {
-    const books = new Set(present.map(({ row }) => row.id));
-    const works = new Set(present.flatMap(({ workId }) => (workId ? [workId] : [])));
-    const matches = deps.repo.searchCollectionBooks(tokens, limit).filter(({ bookId }) => !books.has(bookId));
-    const rows = matches.flatMap(({ bookId }) => {
-      const row = deps.repo.getBook(bookId);
-      return row ? [row] : [];
-    });
-    const entries = new Map(matches.map(({ bookId, name, position }) => [bookId, { name, position }]));
-    return canonicalHits(rows).flatMap((hit) => {
-      if (byWork && hit.workId !== null) {
-        if (works.has(hit.workId)) return [];
-        works.add(hit.workId);
-      }
-      return [{ ...hit, matched: entries.get(hit.row.id) }];
-    });
+    return resultsOf(canonicalHits(deps.repo, rows));
   }
 
   function searchCatalog(tokens: string[], byWork: boolean): BookSearchResult[] {
-    const cap = byWork ? WORK_SEARCH_LIMIT : SEARCH_LIMIT;
-    const rows = deps.repo.searchBooks(tokens, byWork ? WORK_SCAN_LIMIT : SEARCH_LIMIT);
-    const hits = byWork ? firstEditionPerWork(rows, deps.repo.canonicalWorkIds(workIdsOf(rows))).slice(0, cap) : canonicalHits(rows);
-    if (hits.length < cap) hits.push(...seriesHits(tokens, hits, cap - hits.length));
-    if (hits.length < cap) hits.push(...collectionHits(tokens, hits, byWork, byWork ? WORK_SCAN_LIMIT : cap).slice(0, cap - hits.length));
-    return resultsOf(hits);
+    return resultsOf(catalogHits(deps.repo, tokens, byWork));
   }
 
   async function nationalBibliographyBook(query: string, isbn: string): Promise<BookRow | null> {

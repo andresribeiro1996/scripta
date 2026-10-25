@@ -3,7 +3,8 @@ import { saveFailureMessage } from "@scripta/shared";
 import { BookCard } from "../components/BookCard";
 import { BookGrid } from "../components/BookGrid";
 import { LibraryCanvas } from "../components/LibraryCanvas";
-import { PageContainer } from "../components/PageContainer";
+import { Page } from "../components/page/Page";
+import { area } from "../lib/areas";
 import { CardAppearanceSection, CardBorderSection, CardContentSection, CardTextSection, Section, SliderRow } from "../components/StyleControls";
 import { useToast } from "../components/Toaster";
 import { useLibrary } from "../hooks/useLibrary";
@@ -94,16 +95,10 @@ export function LibraryStylePage() {
   const usingCustomBackground = draft.backgroundColor !== null;
 
   return (
-    <PageContainer>
-      <header className="mb-6">
-        <h2 className="text-lg font-bold">Library style</h2>
-        <p className="text-sm text-(--color-text-dim)">
-          Everything about how your cards and the canvas behind them look — applied across Library, Series, and
-          Collections. These settings stay inside your books: they never restyle the app's own menus, page headers, or
-          search and filter bar. A series can override its own card appearance from its own style panel (Series page) —
-          those settings take priority over these for that series' cards.
-        </p>
-      </header>
+    <Page title="Settings" maxWidth={DEFAULT_LIBRARY_STYLE.contentMaxWidth} subtitle="Everything about how your cards and the canvas behind them look — applied across Library, Series, and Collections." tabs={area("settings").tabs}>
+      <p className="mb-6 text-sm text-(--color-text-dim)">
+        These settings stay inside your books: they never restyle the app's own menus, page headers, or search and filter bar. A series can override its own card appearance from its own style panel (Series page) — those settings take priority over these for that series' cards.
+      </p>
 
       <div className="mb-6 grid gap-6 sm:grid-cols-2">
         <Section title="Card layout">
@@ -216,6 +211,6 @@ export function LibraryStylePage() {
         keep the app's theme no matter what you set here. Content width isn't previewed: this panel is narrower than
         every value that slider offers. Hover a card above to see the shadow and hover animation settings.
       </p>
-    </PageContainer>
+    </Page>
   );
 }

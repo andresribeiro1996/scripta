@@ -7,7 +7,7 @@ const WORDS: Record<"pt" | "en", Set<string>> = {
 const MIN_HITS = 3;
 const DOMINANCE = 2;
 
-function detectedLanguage(text: string): "pt" | "en" | null {
+export function detectedLanguage(text: string): "pt" | "en" | null {
   const score = { pt: 0, en: 0 };
   for (const [word] of text.toLowerCase().matchAll(/\p{L}+/gu)) {
     if (WORDS.pt.has(word)) score.pt++;
