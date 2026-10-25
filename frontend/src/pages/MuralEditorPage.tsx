@@ -440,7 +440,7 @@ export function MuralEditorPage() {
 
   if (isLoading) {
     return (
-      <Page title="Mural" back={backTo("mural")} maxWidth={DEFAULT_LIBRARY_STYLE.contentMaxWidth}>
+      <Page title="Mural" back={backTo("mural")}>
         <p className="text-sm text-(--color-text-dim)">Loading…</p>
       </Page>
     );
@@ -448,7 +448,7 @@ export function MuralEditorPage() {
 
   if (!mural && !isDraft) {
     return (
-      <Page title="Mural" back={backTo("mural")} maxWidth={DEFAULT_LIBRARY_STYLE.contentMaxWidth}>
+      <Page title="Mural" back={backTo("mural")}>
         <p className="text-sm text-(--color-text-dim)">No mural with that id.</p>
       </Page>
     );
@@ -468,7 +468,6 @@ export function MuralEditorPage() {
 
   return (
     <Page
-      maxWidth={DEFAULT_LIBRARY_STYLE.contentMaxWidth}
       back={backToMurals}
       title={editingName ? (
         <input
@@ -595,36 +594,38 @@ export function MuralEditorPage() {
             <button disabled={savingLayout || savingDraft || !layoutHistory.length || layoutHistory.at(-1)?.id !== view.id || JSON.stringify(layoutHistory.at(-1)?.after) !== JSON.stringify(view.blocks)} onClick={() => void guard(undoLayout(), "Couldn't undo that move.")} className="min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm font-semibold disabled:opacity-40">Undo</button>
           </div> : null}
           </div>
-          <MuralCanvas
-            mural={view}
-            editMode={editMode}
-            onDragChange={setDragging}
-            groups={library?.data.groups ?? NO_GROUPS}
-            books={books}
-            images={images}
-            profile={session?.user.username ? { username: session.user.username, avatarUrl: session.user.avatarId ? avatarUrlFor(session.user.avatarId) : null } : undefined}
-            revertNonce={revertNonce}
-            onLayoutChange={(blockId, layout) => void guard(changeLayout((blocks) => moveMuralBlock(blocks, blockId, layout)), "Couldn't save that move.")}
-            onToggleExpansion={(blockId, axis, bottom, top) => void guard(changeLayout((blocks) => toggleMuralBlockExpansion(blocks, blockId, axis, bottom, top)), "Couldn't resize that block.")}
-            onConfigureBlock={(block) => setConfiguringBlockId(block.id)}
-            onStyleBlock={(block) => setStylingBlockId(block.id)}
-            onDuplicateBlock={(blockId) => void guard(handleDuplicateBlock(blockId), "Couldn't duplicate that block.")}
-            onDeleteBlock={(blockId) => void guard(handleDeleteBlock(blockId), "Couldn't delete that block.")}
-            selectedBlockId={selectedBlockId}
-            mobileDraft={mobileDraft}
-            busy={savingDraft || savingLayout}
-            onSelectBlock={setSelectedBlockId}
-            onStartResize={(block) => startMobileDraft("resize", block)}
-            onMobileDraftChange={changeMobileDraft}
-            onApplyMobileDraft={() => void guard(applyMobileDraft(), "Couldn't save that change.")}
-            onCancelMobileDraft={() => {
-              const keepSelected = mobileDraft?.kind === "move" || mobileDraft?.kind === "resize";
-              const blockId = mobileDraft?.block.id ?? null;
-              setMobileDraft(null);
-              setSelectedBlockId(keepSelected ? blockId : null);
-            }}
-            tierlistData={tierlistData}
-          />
+          <div className="mx-auto" style={{ maxWidth: `${DEFAULT_LIBRARY_STYLE.contentMaxWidth}px` }}>
+            <MuralCanvas
+              mural={view}
+              editMode={editMode}
+              onDragChange={setDragging}
+              groups={library?.data.groups ?? NO_GROUPS}
+              books={books}
+              images={images}
+              profile={session?.user.username ? { username: session.user.username, avatarUrl: session.user.avatarId ? avatarUrlFor(session.user.avatarId) : null } : undefined}
+              revertNonce={revertNonce}
+              onLayoutChange={(blockId, layout) => void guard(changeLayout((blocks) => moveMuralBlock(blocks, blockId, layout)), "Couldn't save that move.")}
+              onToggleExpansion={(blockId, axis, bottom, top) => void guard(changeLayout((blocks) => toggleMuralBlockExpansion(blocks, blockId, axis, bottom, top)), "Couldn't resize that block.")}
+              onConfigureBlock={(block) => setConfiguringBlockId(block.id)}
+              onStyleBlock={(block) => setStylingBlockId(block.id)}
+              onDuplicateBlock={(blockId) => void guard(handleDuplicateBlock(blockId), "Couldn't duplicate that block.")}
+              onDeleteBlock={(blockId) => void guard(handleDeleteBlock(blockId), "Couldn't delete that block.")}
+              selectedBlockId={selectedBlockId}
+              mobileDraft={mobileDraft}
+              busy={savingDraft || savingLayout}
+              onSelectBlock={setSelectedBlockId}
+              onStartResize={(block) => startMobileDraft("resize", block)}
+              onMobileDraftChange={changeMobileDraft}
+              onApplyMobileDraft={() => void guard(applyMobileDraft(), "Couldn't save that change.")}
+              onCancelMobileDraft={() => {
+                const keepSelected = mobileDraft?.kind === "move" || mobileDraft?.kind === "resize";
+                const blockId = mobileDraft?.block.id ?? null;
+                setMobileDraft(null);
+                setSelectedBlockId(keepSelected ? blockId : null);
+              }}
+              tierlistData={tierlistData}
+            />
+          </div>
         </div>
       )}
 

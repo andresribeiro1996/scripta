@@ -163,6 +163,7 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
   );
 
   return frame(model.title, headerActions, (
+    <>
     <div className="relative isolate">
       {wash ? (
         <div
@@ -373,44 +374,45 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
             </div>
           </div>
         </div>
-
-        {book && styling ? (
-          <PerCardStylePanel
-            idPrefix="book"
-            name={String(book.Title ?? "Untitled")}
-            priorityText="the series and library-wide"
-            currentOverride={book._style as PerCardStyle | undefined}
-            seedStyle={effectiveCardStyle(
-              resolveLibraryStyle(library?.data.style),
-              seriesGroupByBookKey(books, library?.data.groups ?? []).get(bookKey(book))?.style
-            )}
-            onSave={(style) => actions.saveStyle(book, style)}
-            onClose={() => setStyling(false)}
-          />
-        ) : null}
-        {book && pickingCover ? (
-          <CoverPickerModal
-            title={String(book.Title ?? "Untitled")}
-            currentImageId={typeof book._coverImageId === "string" ? book._coverImageId : null}
-            removeCoverLabel="Remove custom cover — go back to the normal auto-detected one"
-            onSelect={(image) => void actions.saveCover(book, image)}
-            onRemoveCover={() => void actions.removeCover(book)}
-            onClose={() => setPickingCover(false)}
-          />
-        ) : null}
-        {book && finishing ? (
-          <FinishSheet
-            book={book}
-            books={books}
-            before={finishing}
-            onSetRating={actions.setRating}
-            onAddNote={actions.addNote}
-            onRestoreRead={actions.restoreRead}
-            onClose={() => setFinishing(null)}
-          />
-        ) : null}
       </div>
     </div>
+
+    {book && styling ? (
+        <PerCardStylePanel
+          idPrefix="book"
+          name={String(book.Title ?? "Untitled")}
+          priorityText="the series and library-wide"
+          currentOverride={book._style as PerCardStyle | undefined}
+          seedStyle={effectiveCardStyle(
+            resolveLibraryStyle(library?.data.style),
+            seriesGroupByBookKey(books, library?.data.groups ?? []).get(bookKey(book))?.style
+          )}
+          onSave={(style) => actions.saveStyle(book, style)}
+          onClose={() => setStyling(false)}
+        />
+      ) : null}
+      {book && pickingCover ? (
+        <CoverPickerModal
+          title={String(book.Title ?? "Untitled")}
+          currentImageId={typeof book._coverImageId === "string" ? book._coverImageId : null}
+          removeCoverLabel="Remove custom cover — go back to the normal auto-detected one"
+          onSelect={(image) => void actions.saveCover(book, image)}
+          onRemoveCover={() => void actions.removeCover(book)}
+          onClose={() => setPickingCover(false)}
+        />
+      ) : null}
+      {book && finishing ? (
+        <FinishSheet
+          book={book}
+          books={books}
+          before={finishing}
+          onSetRating={actions.setRating}
+          onAddNote={actions.addNote}
+          onRestoreRead={actions.restoreRead}
+          onClose={() => setFinishing(null)}
+        />
+      ) : null}
+    </>
   ));
 }
 
