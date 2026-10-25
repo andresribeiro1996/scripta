@@ -21,7 +21,8 @@ import { LibraryCanvas } from "../components/LibraryCanvas";
 import { LibraryToolbar } from "../components/LibraryToolbar";
 import { LibraryIcon } from "../components/NavIcons";
 import type { OptionsMenuItem } from "../components/OptionsMenu";
-import { PageContainer } from "../components/PageContainer";
+import { Page } from "../components/page/Page";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../components/page/buttonClasses";
 import { PerCardStylePanel } from "../components/PerCardStylePanel";
 import { ShareModal } from "../components/ShareModal";
 import { SyncGoodreadsModal } from "../components/SyncGoodreadsModal";
@@ -35,6 +36,7 @@ import { useLibrarySaver } from "../hooks/useLibrarySaver";
 import { useMurals } from "../hooks/useMurals";
 import { parseImportedFile } from "../lib/fileImport";
 import { orderLibraryBooks, reorderOnDrop, seriesGroupByBookKey } from "../lib/libraryOrder";
+import { area } from "../lib/areas";
 import { effectiveCardStyle, resolveLibraryStyle, type PerCardStyle } from "../lib/libraryStyle";
 import { bookHref, filterBooks, SORT_OPTIONS, sortBooks, STATUS_FILTER_OPTIONS, type SortKey, type StatusFilter } from "../lib/libraryView";
 import { bookKey } from "../lib/merge";
@@ -346,118 +348,76 @@ export function LibraryPage() {
   ];
 
   return (
-    <PageContainer maxWidth={style.contentMaxWidth}>
-      {searchParams.get("action") === "import" ? <div className="mb-4 rounded-lg border border-(--color-border) p-4"><h2 className="font-semibold">Import your library</h2><button className="mt-2 min-h-11 rounded-lg bg-(--color-accent) px-4 py-2 text-(--color-on-accent)" onClick={() => fileInputRef.current?.click()}>Choose import file</button></div> : null}
-      {/* Desktop-only, with one exception: renaming. On a phone the whole
-          header is gone — its actions moved into the toolbar row and the
-          library name into that row's menu — but "Rename library…" in
-          that menu still needs somewhere to put its text input, so the
-          header comes back for exactly as long as `editingName` is on.
-          Without that the menu item would appear to do nothing. */}
-      <header
-        className={`mb-4 items-center justify-between gap-3 sm:mb-6 sm:flex sm:gap-4 ${
-          editingName || books.length === 0 ? "flex" : "hidden"
-        }`}
-      >
-        {editingName ? (
-          <input
-            autoFocus
-            value={nameDraft}
-            maxLength={200}
-            onChange={(e) => setNameDraft(e.target.value)}
-            onBlur={() => void handleRenameLibrary()}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") void handleRenameLibrary();
-              if (e.key === "Escape") setEditingName(false);
-            }}
-            placeholder="Name your library…"
-            className="rounded-lg border border-(--color-border) bg-(--color-surface) px-2 py-1 text-lg font-bold"
-          />
-        ) : (
-          <button
-            onClick={() => {
-              setNameDraft(library?.data.name ?? "");
-              setEditingName(true);
-            }}
-            title="Rename your library"
-            className="min-w-0 truncate text-left text-lg font-bold transition-colors hover:text-(--color-accent)"
-          >
-            {library?.data.name || "Library"}
-          </button>
-        )}
-        {/* Selection mode is deliberately NOT collapsed into the menu on
-            mobile — "Delete selected" is destructive and count-dependent,
-            so it stays visible with its live count next to it. Everything
-            else folds behind one gear below `sm`; see the menu below. */}
-        <div className="flex items-center gap-2">
-          {books.length > 0 && selectionMode && (
+    <Page
+      title="Library"
+      subtitle={
+        <>
+          {editingName ? (
+            <input
+              autoFocus
+              value={nameDraft}
+              maxLength={200}
+              aria-label="Library name"
+              onChange={(e) => setNameDraft(e.target.value)}
+              onBlur={() => void handleRenameLibrary()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void handleRenameLibrary();
+                if (e.key === "Escape") setEditingName(false);
+              }}
+              placeholder="Name your library…"
+              className="min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-2 text-sm"
+            />
+          ) : (
+            <button
+              onClick={() => {
+                setNameDraft(library?.data.name ?? "");
+                setEditingName(true);
+              }}
+              title="Rename your library"
+              className="inline-flex min-h-11 items-center rounded-lg hover:text-(--color-accent)"
+            >
+              {library?.data.name || "Name your library"}
+            </button>
+          )}
+          {isLoading ? null : ` · ${books.length} book${books.length === 1 ? "" : "s"}`}
+        </>
+      }
+      tabs={area("library").tabs}
+      maxWidth={style.contentMaxWidth}
+      actions={
+        <>
+          {books.length > 0 && selectionMode ? (
             <>
               <span className="text-sm text-(--color-text-dim)">{selectedKeys.size} selected</span>
               <button
                 onClick={() => void handleDeleteSelected()}
                 disabled={selectedKeys.size === 0}
-                className="min-h-11 rounded-lg bg-(--color-danger) px-3.5 py-2.5 text-sm font-semibold text-(--color-on-danger) hover:opacity-90 disabled:opacity-50"
+                className="inline-flex min-h-11 items-center justify-center rounded-lg bg-(--color-danger) px-4 text-sm font-semibold text-(--color-on-danger) hover:opacity-90 disabled:opacity-50"
               >
                 Delete selected
               </button>
-              <button
-                onClick={handleToggleSelectionMode}
-                className="min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3.5 py-2.5 text-sm hover:bg-(--color-surface-hover)"
-              >
-                Cancel
-              </button>
+              <button onClick={handleToggleSelectionMode} className={BUTTON_SECONDARY}>Cancel</button>
+            </>
+          ) : (
+            <>
+              <button onClick={() => setAddingBook(true)} className={BUTTON_PRIMARY}>Add book</button>
+              <div className="hidden flex-wrap items-center gap-2 sm:flex">
+                <button onClick={() => setSyncingGoodreads(true)} className={BUTTON_SECONDARY}>Sync Goodreads…</button>
+                {books.length > 0 && <button onClick={handleToggleSelectionMode} className={BUTTON_SECONDARY}>Select…</button>}
+                <button onClick={() => navigate("/dashboard/style")} className={BUTTON_SECONDARY}>Style…</button>
+                <button onClick={() => setSharing(true)} className={BUTTON_SECONDARY}>Share</button>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={importing}
+                  title={books.length > 0 ? "Matching books are merged with what's already here, not duplicated." : undefined}
+                  className={BUTTON_SECONDARY}
+                >
+                  {importing ? "Importing…" : books.length > 0 ? "Import more…" : "Import library…"}
+                </button>
+                <a href={csvTemplateUrl} download="atmyshelf-library.csv" className={BUTTON_SECONDARY}>CSV template</a>
+              </div>
             </>
           )}
-
-          <div className={`hidden items-center gap-2 sm:flex ${selectionMode ? "sm:hidden" : ""}`}>
-            <button
-              onClick={() => setAddingBook(true)}
-              className="min-h-11 rounded-lg bg-(--color-accent) px-3.5 py-2.5 text-sm font-semibold text-(--color-on-accent) hover:opacity-90"
-            >
-              Add book
-            </button>
-            <button
-              onClick={() => setSyncingGoodreads(true)}
-              className="min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3.5 py-2.5 text-sm hover:bg-(--color-surface-hover)"
-            >
-              Sync Goodreads…
-            </button>
-            {books.length > 0 && (
-              <button
-                onClick={handleToggleSelectionMode}
-                className="min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3.5 py-2.5 text-sm hover:bg-(--color-surface-hover)"
-              >
-                Select…
-              </button>
-            )}
-            {/* The phone reaches this through the toolbar gear; the
-                desktop header has no gear, so without an explicit button
-                here Library style would be unreachable from the UI
-                entirely once it left the nav. */}
-            <button
-              onClick={() => navigate("/dashboard/style")}
-              className="min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3.5 py-2.5 text-sm hover:bg-(--color-surface-hover)"
-            >
-              Style…
-            </button>
-            <button
-              onClick={() => setSharing(true)}
-              className="min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3.5 py-2.5 text-sm hover:bg-(--color-surface-hover)"
-            >
-              Share
-            </button>
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={importing}
-              title={books.length > 0 ? "Matching books are merged with what's already here, not duplicated." : undefined}
-              className="min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3.5 py-2.5 text-sm hover:bg-(--color-surface-hover) disabled:opacity-60"
-            >
-              {importing ? "Importing…" : books.length > 0 ? "Import more…" : "Import library…"}
-            </button>
-            <a href={csvTemplateUrl} download="atmyshelf-library.csv" className="min-h-11 rounded-lg border border-(--color-border) px-3.5 py-2.5 text-sm hover:bg-(--color-surface-hover)">
-              CSV template
-            </a>
-          </div>
           <input
             ref={fileInputRef}
             type="file"
@@ -469,8 +429,10 @@ export function LibraryPage() {
               e.target.value = "";
             }}
           />
-        </div>
-      </header>
+        </>
+      }
+    >
+      {searchParams.get("action") === "import" ? <div className="mb-4 rounded-lg border border-(--color-border) p-4"><h2 className="font-semibold">Import your library</h2><button className="mt-2 min-h-11 rounded-lg bg-(--color-accent) px-4 py-2 text-(--color-on-accent)" onClick={() => fileInputRef.current?.click()}>Choose import file</button></div> : null}
 
       {importStatus && (
         <div className="mb-5 rounded-lg bg-(--color-accent-soft) px-3 py-2 text-sm text-(--color-accent)">{importStatus}</div>
@@ -664,6 +626,6 @@ export function LibraryPage() {
           onClose={() => setSharing(false)}
         />
       )}
-    </PageContainer>
+    </Page>
   );
 }

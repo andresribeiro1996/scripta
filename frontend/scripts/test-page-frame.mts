@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createElement, type ReactElement } from "react";
@@ -52,4 +53,12 @@ test("body width comes from context, a prop overrides it", () => {
 test("button classes meet the 44px floor", () => {
   for (const cls of [BUTTON_PRIMARY, BUTTON_SECONDARY]) assert.match(cls, /min-h-11/);
   assert.match(BUTTON_PRIMARY, /bg-\(--color-accent\)/);
+});
+
+test("Library area pages use Page with the Library tabs", () => {
+  for (const file of ["LibraryPage", "GroupsPage", "GalleryPage"]) {
+    const src = readFileSync(new URL(`../src/pages/${file}.tsx`, import.meta.url), "utf8");
+    assert.match(src, /<Page[\s\S]*?tabs=\{area\("library"\)\.tabs\}/, file);
+    assert.doesNotMatch(src, /<h2 className="[^"]*text-lg font-bold/, file);
+  }
 });
