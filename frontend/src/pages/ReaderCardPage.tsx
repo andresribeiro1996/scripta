@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { hasChosen, readerCardInputOf, saveFailureMessage, visitorView, type ReaderCardStylePatch } from "@scripta/shared";
 import { themes } from "@scripta/shared/themes";
+import { Page } from "../components/page/Page";
 import { useAuth } from "../auth/AuthContext";
 import { HighlightChoice, SignatureChoice } from "../components/readerCard/ReaderCardChoices";
 import { ReaderCardOptions, Segmented } from "../components/readerCard/ReaderCardOptions";
@@ -51,8 +52,7 @@ export function ReaderCardPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-5 sm:px-5 sm:py-8">
-      <h2 className="mb-6 text-lg font-bold">Reader card</h2>
+    <Page title="Reader card" maxWidth={1024}>
       <div className="lg:grid lg:grid-cols-[minmax(0,22rem)_1fr] lg:gap-8">
         <div className="mb-6 flex flex-col items-center gap-3 lg:sticky lg:top-6 lg:mb-0 lg:self-start">
           <div className="w-full max-w-[18rem]">
@@ -70,6 +70,6 @@ export function ReaderCardPage() {
           <ReaderGlyphSetting username={readerName} books={books} groups={groups} />
         </div>
       </div>
-    </div>
+    </Page>
   );
 }

@@ -6,7 +6,8 @@ import { markDashboardSeen } from "../api/community";
 import { DASHBOARD_QUERY_KEY, useDashboard } from "../hooks/useDashboard";
 import { useLibrary } from "../hooks/useLibrary";
 import { useAuth } from "../auth/AuthContext";
-import { PageContainer } from "../components/PageContainer";
+import { Page } from "../components/page/Page";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../components/page/buttonClasses";
 import { BookGrid } from "../components/BookGrid";
 import { BookCard } from "../components/BookCard";
 import { AuthorAvatar } from "../components/CommunityAuthorAvatar";
@@ -14,8 +15,6 @@ import { PickNextSheet } from "../components/PickNextSheet";
 import { ReaderGlyph } from "../components/ReaderGlyph";
 import { resolveLibraryStyle } from "../lib/libraryStyle";
 import { bookHref } from "../lib/libraryView";
-
-const button = "inline-flex min-h-11 items-center justify-center rounded-lg border border-(--color-border) px-4 py-2 text-sm hover:bg-(--color-surface-hover) disabled:opacity-50";
 
 export function HomePage() {
   const navigate = useNavigate();
@@ -60,17 +59,13 @@ export function HomePage() {
   const cards = session ? buildDashboardCards(books, day, session.user.id) : [];
   const upNextKeys = cards.find((c) => c.kind === "upNext")?.bookKeys ?? [];
 
-  return <PageContainer>
+  return <Page title="Home" actions={<>
+      <Link className={BUTTON_SECONDARY} to="/community/people">Find people</Link>
+      <Link className={BUTTON_SECONDARY} to="/community/discover">Discover</Link>
+    </>}>
     <div className="space-y-5">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold">Home</h1>
-        <div className="flex flex-wrap gap-2">
-          <Link className={button} to="/community/people">Find people</Link>
-          <Link className={button} to="/community/discover">Discover</Link>
-        </div>
-      </header>
-      {library.isPending ? <p role="status">Loading home…</p> : library.isError ? <div role="alert"><p>Couldn't load your home.</p><button className={button} onClick={() => { void dashboard.refetch(); void library.refetch(); }}>Retry</button></div> : <>
-        {!books.length ? <div className="space-y-3 rounded-xl border border-(--color-border) p-6"><h2 className="text-xl">Start your library</h2><p>Import your existing collection, or add your first book manually.</p><div className="flex flex-wrap gap-2"><Link className={`${button} bg-(--color-accent) text-(--color-on-accent)`} to="/dashboard/library?action=import">Import library</Link><Link className={button} to="/dashboard/library?action=add">Add a book manually</Link></div></div>
+      {library.isPending ? <p role="status">Loading home…</p> : library.isError ? <div role="alert"><p>Couldn't load your home.</p><button className={BUTTON_SECONDARY} onClick={() => { void dashboard.refetch(); void library.refetch(); }}>Retry</button></div> : <>
+        {!books.length ? <div className="space-y-3 rounded-xl border border-(--color-border) p-6"><h2 className="text-xl">Start your library</h2><p>Import your existing collection, or add your first book manually.</p><div className="flex flex-wrap gap-2"><Link className={BUTTON_PRIMARY} to="/dashboard/library?action=import">Import library</Link><Link className={BUTTON_SECONDARY} to="/dashboard/library?action=add">Add a book manually</Link></div></div>
           : cards.map((card) => {
             if (card.kind === "currentlyReading" || card.kind === "upNext") {
               const section = card.kind === "currentlyReading" ? card.bookKeys : card.bookKeys.slice(0, 6);
@@ -102,7 +97,7 @@ export function HomePage() {
           <h2 className="text-xl">Activity</h2>
           {newLabel ? <p className="text-sm font-semibold text-(--color-accent)">{newLabel} new for you</p> : null}
           {loadingActivity ? <p role="status">Loading activity…</p> : dashboard.error && dashboard.items.length === 0 ? (
-            <div role="alert"><p>Couldn't load activity.</p><button className={button} onClick={() => void dashboard.refetch()}>Retry</button></div>
+            <div role="alert"><p>Couldn't load activity.</p><button className={BUTTON_SECONDARY} onClick={() => void dashboard.refetch()}>Retry</button></div>
           ) : dashboard.items.length === 0 ? <p className="text-sm text-(--color-text-dim)">Nothing here yet. Follow people to see what they publish.</p> : (
             <>
               {dashboard.isRefetchError && !dashboard.isRefetching ? <p role="alert" className="text-sm text-(--color-danger)">Couldn't refresh activity.</p> : null}
@@ -164,5 +159,5 @@ export function HomePage() {
       </>}
       {picking && upNextKeys.length >= 2 ? <PickNextSheet keys={upNextKeys} books={books} onClose={() => setPicking(false)} /> : null}
     </div>
-  </PageContainer>;
+  </Page>;
 }

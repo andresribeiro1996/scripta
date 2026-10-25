@@ -11,11 +11,12 @@ import { MuralFolderTree } from "../components/murals/MuralFolderTree";
 import { MuralPresetPicker } from "../components/murals/MuralPresetPicker";
 import { MuralsIcon } from "../components/NavIcons";
 import { OptionsMenu } from "../components/OptionsMenu";
-import { PageContainer } from "../components/PageContainer";
+import { Page } from "../components/page/Page";
+import { BUTTON_PRIMARY } from "../components/page/buttonClasses";
 import { ShareModal } from "../components/ShareModal";
 import { OptionSheet } from "../components/Sheet";
 import { SkeletonCardGrid } from "../components/Skeleton";
-import { FolderIcon, PlusIcon, SortIcon, TOOLBAR_CONTROL_CLASS, ToolbarRow, toolbarIconClass } from "../components/Toolbar";
+import { FolderIcon, SortIcon, TOOLBAR_CONTROL_CLASS, ToolbarRow, toolbarIconClass } from "../components/Toolbar";
 import { useDelayedShow } from "../hooks/useDelayedShow";
 import { useMuralFolders } from "../hooks/useMuralFolders";
 import { useMurals } from "../hooks/useMurals";
@@ -146,17 +147,11 @@ export function MuralsListPage() {
   const movingFolder = movingFolderId ? folders.find((f) => f.id === movingFolderId) : null;
 
   return (
-    <PageContainer>
+    <Page title="Murals" actions={<button onClick={handleCreate} className={BUTTON_PRIMARY}>New mural</button>}>
       <button onClick={() => setPresetsOpen(true)} className="mb-4 flex min-h-11 w-full items-center justify-between rounded-xl border border-(--color-border) bg-(--color-surface) px-4 text-left text-sm font-semibold hover:bg-(--color-surface-hover)">
         <span>Start from a preset</span><span aria-hidden="true">→</span>
       </button>
       {presetsOpen && <MuralPresetPicker folderId={selectedFolderId} onClose={() => setPresetsOpen(false)} />}
-      {/* Desktop-only. On a phone this row held nothing but the word
-          "Murals", which the bottom tab bar already says. */}
-      <header className="mb-6 hidden items-center justify-between gap-4 sm:flex">
-        <h2 className="text-lg font-bold">Murals</h2>
-      </header>
-
       <div className="flex items-start gap-6">
         <div className="hidden w-56 shrink-0 md:block">
           <MuralFolderTree
@@ -246,7 +241,7 @@ export function MuralsListPage() {
                   regardless of its label's height. */}
               <div className="hidden flex-wrap items-end gap-3 sm:flex">
                 <label className="flex flex-col gap-1">
-                  <span className="text-[10.5px] font-semibold tracking-wide text-(--color-text-dim) uppercase">Search</span>
+                  <span className="text-[10.5px] font-semibold tracking-wide text-(--color-text-dim)">Search</span>
                   <input
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
@@ -255,7 +250,7 @@ export function MuralsListPage() {
                   />
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-[10.5px] font-semibold tracking-wide text-(--color-text-dim) uppercase">Sort</span>
+                  <span className="text-[10.5px] font-semibold tracking-wide text-(--color-text-dim)">Sort</span>
                   {/* appearance-none + a hand-drawn chevron, not the browser's
                       own <select> arrow — the native one rendered flush
                       against the box's right edge with no real breathing room
@@ -332,35 +327,6 @@ export function MuralsListPage() {
           )}
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {/* Replaces the old "New mural name…" input + "Create mural"
-                button, always the first thing in the grid rather than a
-                separate form row above it. Creates immediately on click
-                with a placeholder name ("Untitled mural," see
-                handleCreate) instead of asking for a name up front —
-                there's no text field left to type one into before
-                creating. Stays visible regardless of the search/filter
-                controls above (it's not part of `filteredMurals`), since
-                the ability to create a new mural shouldn't disappear just
-                because a filter currently matches nothing.
-
-                Deliberately SHORTER than a real mural card (min-h-14, not
-                the cards' min-h-40). It matched their full height at
-                first, on the theory that it should sit among them as a
-                peer — but a full-size dashed rectangle is the largest
-                thing on an empty page and reads as more important than
-                the murals themselves, and on a phone, where the grid is
-                one column, it filled a third of the viewport before any
-                real content. A single compact row still reads as "add
-                one" from the dashed border and the "+". */}
-            <button
-              onClick={handleCreate}
-              title="Create a new mural"
-              className="flex min-h-14 items-center justify-center gap-2 rounded-xl border-2 border-dashed border-(--color-border) p-4 text-(--color-text-dim) transition-colors hover:border-(--color-accent) hover:text-(--color-accent) disabled:opacity-60"
-            >
-              <PlusIcon />
-              <span className="text-sm font-semibold">New mural</span>
-            </button>
-
             {filteredMurals.map((mural) => {
               const hasCover = Boolean(mural.coverImageUrl);
               return (
@@ -533,6 +499,6 @@ export function MuralsListPage() {
           onClose={() => setSharingMuralId(null)}
         />
       )}
-    </PageContainer>
+    </Page>
   );
 }

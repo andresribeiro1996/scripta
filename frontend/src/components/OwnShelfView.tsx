@@ -7,6 +7,8 @@ import { fetchOwnProfile, publishProfile, setShelfMural, unpublishProfile, updat
 import { useAuth } from "../auth/AuthContext";
 import { avatarUrlFor } from "./Avatar";
 import { EmptyState } from "./EmptyState";
+import { Page } from "./page/Page";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "./page/buttonClasses";
 import { MuralsIcon } from "./NavIcons";
 import { MuralCanvas } from "./murals/MuralCanvas";
 import { ProfileActivity } from "./ProfileActivity";
@@ -19,6 +21,7 @@ import { useGalleryImages } from "../hooks/useGalleryImages";
 import { useLibrary } from "../hooks/useLibrary";
 import { useMurals } from "../hooks/useMurals";
 import { useScrollLock } from "../hooks/useScrollLock";
+import { backTo } from "../lib/areas";
 import { keepTabInside } from "../lib/keepTabInside";
 import { orderLibraryBooks } from "../lib/libraryOrder";
 import { buildMuralPreset, shelfPresetSummary } from "../lib/muralPresets";
@@ -150,12 +153,14 @@ export function OwnShelfView({ username }: { username: string }) {
     : undefined;
 
   return (
-    <div className="mx-auto max-w-4xl px-4 pt-3 pb-10 sm:px-6 sm:pt-6">
-      <header className="flex items-center justify-between gap-4 pb-3">
-        <h1 className="min-w-0 truncate text-xl font-bold tracking-tight sm:text-2xl">{username}</h1>
-        <div className="flex shrink-0 items-center gap-2">
+    <Page
+      title={`@${username}`}
+      back={backTo("profile")}
+      maxWidth={896}
+      actions={
+        <>
           <span
-            className={`rounded-full border px-3 py-1.5 text-sm font-semibold ${
+            className={`inline-flex min-h-11 items-center rounded-full border px-3 text-sm font-semibold ${
               ownData.published ? "border-(--color-accent) bg-(--color-accent-soft) text-(--color-accent)" : "border-(--color-border) text-(--color-text-dim)"
             }`}
           >
@@ -165,7 +170,7 @@ export function OwnShelfView({ username }: { username: string }) {
             <button
               onClick={() => setPublishing(true)}
               disabled={busy}
-              className="rounded-full bg-(--color-accent) px-4 py-1.5 text-sm font-semibold text-(--color-on-accent) disabled:opacity-50"
+              className={BUTTON_PRIMARY}
             >
               Publish…
             </button>
@@ -180,8 +185,9 @@ export function OwnShelfView({ username }: { username: string }) {
             onUnpublish={() => void run(() => unpublishProfile())}
             onSaveSettings={(settings) => void run(() => updateFeedSettings(settings))}
           />
-        </div>
-      </header>
+        </>
+      }
+    >
       {error && <p className="mb-4 text-sm text-(--color-danger)">{error}</p>}
       <SwipeTabs tabs={OWN_SHELF_TABS} value={tab} onChange={setTab} label="Shelf sections">
         {(panel) => {
@@ -236,7 +242,7 @@ export function OwnShelfView({ username }: { username: string }) {
           );
         }}
       </SwipeTabs>
-    </div>
+    </Page>
   );
 }
 
@@ -315,7 +321,7 @@ function OwnerControls({
   const [confirming, setConfirming] = useState(false);
   const [muralId, setMuralId] = useState<string>(currentMuralId ?? "");
   const [next, setNext] = useState<FeedSettings>(feedSettings ?? DEFAULT_FEED_SETTINGS);
-  const sectionLabel = "px-3 pt-4 pb-2 text-[11px] font-semibold tracking-wider text-(--color-text-dim) uppercase";
+  const sectionLabel = "px-3 pt-4 pb-2 text-sm font-semibold text-(--color-text-dim)";
   return (
     <>
       <button
@@ -325,7 +331,7 @@ function OwnerControls({
           setConfirming(false);
           setOpen(true);
         }}
-        className="shrink-0 rounded-full border border-(--color-border) bg-(--color-surface) px-4 py-1.5 text-sm font-semibold hover:border-(--color-accent)"
+        className={BUTTON_SECONDARY}
       >
         Manage profile
       </button>

@@ -111,3 +111,18 @@ test("Games and Murals single-item pages use Page with a back link built from ba
     assert.doesNotMatch(src, /All tournaments|← Tier lists|← Quizzes/, file);
   }
 });
+
+test("Home, Murals, Reader card and profiles use Page", () => {
+  const read = (path: string) => readFileSync(new URL(`../src/${path}`, import.meta.url), "utf8");
+  for (const file of ["pages/HomePage", "pages/MuralsListPage", "pages/ReaderCardPage", "pages/CommunityProfilePage", "components/OwnShelfView"]) {
+    const src = read(`${file}.tsx`);
+    assert.match(src, /<Page[\s>]/, file);
+    assert.doesNotMatch(src, /PageContainer/, file);
+  }
+  for (const file of ["pages/CommunityProfilePage", "components/OwnShelfView"]) {
+    assert.match(read(`${file}.tsx`), /back=\{backTo\("profile"\)\}/, file);
+  }
+  assert.doesNotMatch(read("components/OwnShelfView.tsx"), /<h1/);
+  assert.doesNotMatch(read("pages/MuralsListPage.tsx"), /uppercase/);
+  assert.doesNotMatch(read("pages/HomePage.tsx"), /const button\b/);
+});
