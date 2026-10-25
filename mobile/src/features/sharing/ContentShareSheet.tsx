@@ -61,11 +61,11 @@ export function ContentShareSheet({ visible, onClose, title, description, url, c
   async function exportImage(mode: "save" | "send" | "video") {
     if (!imageReady || !capture.current) throw new Error("Wait for the image preview to finish loading.");
     if (mode === "save") {
-      const denied = new Error("Allow saving photos in your device settings, or use Send image.");
+      const deniedMessage = "Allow saving photos in your device settings, or use Send image.";
       let permission;
       try { permission = await requestPermissionsAsync(true, ["photo"]); }
-      catch { throw denied; }
-      if (!permission.granted) throw denied;
+      catch (reason) { throw new Error(deniedMessage, { cause: reason }); }
+      if (!permission.granted) throw new Error(deniedMessage);
     } else if (!await Sharing.isAvailableAsync()) {
       throw new Error("Sharing is unavailable on this device. You can save the image instead.");
     }
