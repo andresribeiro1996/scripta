@@ -50,7 +50,7 @@ Ranking can't put the volumes first while two of them are hidden inside the omni
 - **The scorecard is sized and run this way:**
   - about 150 queries from outside sources, with 50 held back so the ranking isn't fitted to the tuning books;
   - grading runs on the production server over `railway ssh`;
-  - scoring runs locally on a snapshot.
+  - scoring runs in production too, read-only, by bundled branch code (2026-10-25 change: the user dropped the local snapshot, "just do it in prod").
 - **Popularity signals:** start with the free ones (editions, languages, has-a-cover) plus the Wikidata Wikipedia count. Scripta readers were dropped: the user pointed out Scripta has almost no users, so the count can't move a score and would add library-module plumbing. The scorecard decides which stay. Open Library reader counts and Hardcover come later, and only if the scorecard shows famous books still ranking too low.
 
 ## Goals
@@ -191,7 +191,7 @@ The review queue doesn't store or show the guard's reason; no schema or response
   - The script reads candidates read-only, calls Jev with the server's key and prints the grades. Claude commits them.
   - Nothing is written to production or deployed, and the key never leaves the server.
   - Grading pulls candidates from the live catalog, so it has to wait for the pre-2002 BNP import to finish. It may run during the deploy hold, which only stops deploys.
-- **Score.** NDCG@10 per query, the mean for the tuning set and the mean for the hidden set. It is computed by running the branch's ranking code against a local snapshot of the production catalog, read-only. Production can only run deployed code, which is why scoring is local.
+- **Score.** NDCG@10 per query, the mean for the tuning set and the mean for the hidden set. It is computed by running the branch's ranking code on the production container, read-only: production only has deployed code, so the script is bundled with esbuild, uploaded to `/tmp` in base64 chunks, run and deleted. It prints to stdout only. Scores are taken on repaired data, after PR 1 is deployed and the user has run the repair runbook.
 - **Unlabelled works.** The score treats unlabelled works in a top 10 as unrelated, and lists them so they can be graded and added.
 - **The first run is the baseline** and goes in the PR description.
 - **Cost.** About 6,000 Jev calls once (about $6 at earlier rates), plus top-ups. Record the actual spend.
@@ -239,8 +239,7 @@ The current spec `2026-10-20-series-in-search-design.md` lists "sorting results 
 
 - The exact numeral and omnibus-word lists, within the rules above.
 - The ranking formula and weights, as long as the scorecard and the hard examples drive them.
-- How to get a local snapshot of the production catalog: a Litestream restore, or a copy over `railway ssh`. Either way it must be read-only.
-  - `covers.sqlite` is about 500 MB, plus a 100 MB WAL.
-  - Take the snapshot only after the pre-2002 BNP import has finished. A large read during the import risks the cross-process starvation in `sqlite-cross-process-starvation`.
+- How to run branch code against production read-only (decided 2026-10-25: esbuild bundle in `/tmp`, no local snapshot).
+  - Keep reads light while the pre-2002 BNP import runs. Heavy reads during the import risk the cross-process starvation in `sqlite-cross-process-starvation`; candidates, grading and scoring wait until it has finished.
 - PR shape. Claude's call: three PRs in order, one per part, each to `main`.
-- If the snapshot or the grades are not yet available, Part 3 can still be built against the fixture and the hard-example tests. Its PR waits for the scorecard numbers before merging.
+- If the repaired production data or the grades are not yet available, Part 3 can still be built against the fixture and the hard-example tests. Its PR waits for the scorecard numbers before merging.

@@ -6,16 +6,16 @@
 
 **Architecture:**
 - **Scorecard (PR 2).** The pure scoring code and candidate pool live in `backend/src/modules/books/scorecard.ts`. Small scripts in `backend/scripts/search-scorecard/` use it.
-  - Candidates are computed locally on a read-only snapshot of the production catalog.
-  - Jev grades them on the production server over `railway ssh`, using the server's key. Nothing is written there.
-  - Scores are computed locally by running the branch's code against the snapshot.
+  - **No local snapshot** (user decision, 2026-10-25: "just do it in prod"). Candidates and scores are computed on the production container over `railway ssh`, read-only, by bundled branch code (see Global Constraints, "Running branch code in production").
+  - Jev grades the candidates on the production server, using the server's key. Grading reads no database. Nothing is written there.
+  - Scores are measured on repaired data: after PR 1 is deployed and the user has run the repair runbook.
 - **Ranking (PR 3).**
   - Moves `searchCatalog`'s hit-building out of `booksService.ts` into `catalogSearch.ts`, so the service and the scorer share it.
   - Adds series-first and a work-level ranking (`domain/searchRank.ts`) driven by edition count, language count, cover and a new Wikipedia count.
 
 **Tech Stack:** TypeScript, `node:sqlite` (FTS5), `node:test` via `tsx`, TypeSafe Jev (`askJev`), Wikidata SPARQL.
 
-**Spec:** `docs/superpowers/specs/2026-10-25-volume-joins-and-search-ranking-design.md` (Parts 2 and 3). Part 1 is `docs/superpowers/plans/2026-10-25-volume-safe-translation-joins.md`. Its Task 4 (the review) uses this plan's Task 1 snapshot, and this plan's Task 3 uses that review's undo file.
+**Spec:** `docs/superpowers/specs/2026-10-25-volume-joins-and-search-ranking-design.md` (Parts 2 and 3). Part 1 is `docs/superpowers/plans/2026-10-25-volume-safe-translation-joins.md`. Its Task 4 (the review) runs the guarded listing in production, and this plan's baseline waits until the user has applied that review's undo file in production.
 
 ## Global Constraints
 
@@ -34,10 +34,13 @@
   - The script reads no database and writes nothing on the server.
   - The key is never printed or copied.
   - It uses `askJev` from the deployed `dist` with a no-op `spend`.
-- **Snapshot.**
-  - Read-only, kept outside the repo at `$HOME/.cache/scripta/covers-snapshot.sqlite`.
-  - Taken only after the pre-2002 BNP import session announces it has finished.
-  - Repaired copy: `$HOME/.cache/scripta/covers-repaired.sqlite`.
+- **Running branch code in production** (replaces the snapshot). Production only has deployed code, so for code that isn't deployed:
+  - bundle the script into one file with esbuild (it ships with tsx);
+  - upload it in base64 chunks under 100 KB to `/tmp` on the container (never `/data`), run it, then delete it;
+  - open the catalog with `new DatabaseSync(process.env.COVERS_DB_PATH, { readOnly: true })`;
+  - print results to stdout only. No writes, and never print secrets.
+- **Order.** (a) PR 1 merges. (b) The guarded listing runs in production and Claude writes the undo file (Plan 1 Task 4). (c) After the BNP import finishes and the user deploys, the user runs the repair runbook. (d) Then candidates, grading and the baseline run in production on repaired data. (e) Then ranking iterations are scored the same way.
+- **Timing.** Keep production reads light while the pre-2002 BNP import runs; (d) and (e) wait until it has finished.
 - **No deploy** while the deploy hold is in force. Merging to `main` is fine.
 - **API stays additive.**
   - Result caps stay `SEARCH_LIMIT` 12 and `WORK_SEARCH_LIMIT` 20.
@@ -47,7 +50,7 @@
   - the tuning mean is above the baseline's;
   - the hidden mean is above the baseline's;
   - the three hard examples pass;
-  - search p95 on the snapshot is no more than 50 ms above the baseline's p95.
+  - search p95 in production is no more than 50 ms above the baseline's p95, with the baseline and branch runs made back to back in one session (live load makes runs hours apart incomparable).
 - **Code style:**
   - No comments in code.
   - New `*.test.ts` files go into `backend/package.json`'s `test` script.
@@ -66,17 +69,9 @@
 
 ---
 
-### Task 1 (main session or `deploy-ops`): production snapshot
+### Task 1: dropped
 
-- [ ] **Wait** until the pre-2002 BNP import session has announced it has finished. Don't start earlier.
-- [ ] **Check free space** on the volume first: `df -h /data` over ssh. `VACUUM INTO` holds a read transaction for the length of the copy, so the WAL can grow meanwhile (the 2026-10-04 outage was a full volume). Stop if less than 1 GB is free.
-- [ ] **Make the copy on the server.** Over `railway ssh` (the command in the Global Constraints), run `node --input-type=module` with `new DatabaseSync(process.env.COVERS_DB_PATH, { readOnly: true })` and `VACUUM INTO '/tmp/covers-snapshot.sqlite'`.
-- [ ] **Copy it down.** Stream `/tmp/covers-snapshot.sqlite` to `$HOME/.cache/scripta/covers-snapshot.sqlite`, through `gzip | base64` and back out, or `split` into chunks if one stream fails.
-- [ ] **Check and clean up.**
-  - Remove the server's `/tmp` copy.
-  - Locally, `PRAGMA integrity_check` should print `ok`.
-  - The count of `books` should be within 1% of the live count read in the same session.
-- [ ] Nothing to commit.
+The local snapshot is dropped (user decision, 2026-10-25). Reads run in production; see the Global Constraints.
 
 ### Task 2 (main session): query set
 
@@ -130,8 +125,8 @@
 
     It deduplicates and cuts to `limit`.
 - Script:
-  - `node backend/scripts/search-scorecard/candidates.mjs --db <path>` reads `queries.json` and prints `{ [q]: candidates[] }` JSON, read-only.
-  - It imports `dist`, so build first.
+  - `backend/scripts/search-scorecard/candidates.mjs` reads `queries.json` and prints `{ [q]: candidates[] }` JSON, opening `COVERS_DB_PATH` read-only.
+  - It is bundled with esbuild and run on the production container, per the Global Constraints. Its queries are embedded in the bundle.
 
 - [ ] **Tests in `scorecard.test.ts`:**
   - `ndcgAt(["a","b"], new Map([["a",2],["b",1]]), 10)` → `1`.
@@ -169,21 +164,18 @@
 
   - It prints `Grade` JSON lines.
   - Batches stay under 100 KB of base64, so the `node -e` argument fits.
-- `score.mjs --db <path> [--set tune|hidden|all]`:
-  - It defaults to `tune`, and builds `dist`.
+- `score.mjs [--set tune|hidden|all]`:
+  - It defaults to `tune`. It is bundled with esbuild together with `queries.json` and `grades.json`, and run on the production container, read-only, per the Global Constraints.
   - For each query it runs `catalogHits(repo, searchTokens(q), true)` (Task 3) and takes the canonical `workId`s in order.
   - It prints a table of `q`, NDCG@10 and unlabelled count, then `tune` and `hidden` means, then search p50 and p95 in ms.
 
 Steps:
-- [ ] **Build the repaired copy.**
-  - Copy the snapshot to `covers-repaired.sqlite`.
-  - Apply Part 1's `docs/repairs/2026-10-25-volume-joins-undo.json` with `node backend/scripts/undo-series-merges.mjs --undo …`, run with the Global Constraints' environment and `COVERS_DB_PATH=$HOME/.cache/scripta/covers-repaired.sqlite`. The file carries its own `dropSeries` and `addSeries`, so no Wikidata refill is needed.
-  - If Part 1's review isn't done yet, stop here and do that first.
-- [ ] **Candidates.** Run `candidates.mjs --db covers-repaired.sqlite > $HOME/.cache/scripta/candidates.json`. Expected: about 150 keys, most with 40 candidates.
+- [ ] **Wait for repaired data.** Production must carry PR 1's deploy and the user's run of the repair runbook (Plan 1 Task 4). Until then, write and test the scripts but don't grade.
+- [ ] **Candidates.** Run the bundled `candidates.mjs` in production and save stdout to `$HOME/.cache/scripta/candidates.json`. Expected: about 150 keys, most with 40 candidates.
 - [ ] **Grade on the server,** in batches, as in the spec's production-read command.
   - Collect the output into `grades.json` as `{ [q]: Grade[] }`.
   - Record the number of calls and the TypeSafe spend reported for the day.
-- [ ] **Baseline.** Run `score.mjs --db covers-repaired.sqlite --set all` on today's ranking.
+- [ ] **Baseline.** Run the bundled `score.mjs --set all` in production on today's ranking.
   - Grade any `unlabelled` ids with one more server batch, then rerun.
   - Save the printed output for the PR description.
 - [ ] **README.** Write `README.md` with the four commands (candidates, grade batch, score, top-up) and the ship rule.
@@ -213,7 +205,7 @@ Steps:
     - `export function seriesOrder(members: Array<{ workId: string; position: string | null }>): string[]`. It sorts by a numeric position: a decimal, or a Roman numeral converted to a number. Unpositioned members go last, in their stored order.
   - `catalogHits` (Task 3) keeps its signature and gains the ranking below.
   - On `BooksRepository`: `searchBooks(tokens, limit)` returns `Array<BookRow & { search_score: number }>`. `searchStmt` also selects `hits.score AS search_score`. It stays the single `books_fts MATCH` statement, which the pinned repository test checks. Existing callers keep working, since the type is a superset.
-  - In `normalize.ts`: a new `CATALOG_SCAN_LIMIT` for the catalog FTS scan in both modes. Use the smallest value that puts "Harry Potter e a Pedra Filosofal" inside the scan on the snapshot, capped at 500. `WORK_SCAN_LIMIT` stays 100, because the games search, `searchSeriesWorks` and `collectionHits` also use it.
+  - In `normalize.ts`: a new `CATALOG_SCAN_LIMIT` for the catalog FTS scan in both modes. Use the smallest value that puts "Harry Potter e a Pedra Filosofal" inside the scan in production (read-only), capped at 500. `WORK_SCAN_LIMIT` stays 100, because the games search, `searchSeriesWorks` and `collectionHits` also use it.
 
 **Ranking (the shape is fixed, the weights are tuned):**
 1. **Series first.** The first `matchingSeries(tokens)` entry's `seriesOrder` members lead when either:
@@ -241,7 +233,7 @@ Steps:
   - `seriesOrder` with positions `["2","1","III",null,"1.5"]` → order 1, 1.5, 2, III, null.
   - `rankWorks` puts a 30-edition, 8-language work above a 1-edition work with a slightly better `textScore`.
 - [ ] **Implement.** Then add `searchRank.test.ts` to `test`.
-- [ ] **Run `node scripts/gate.mjs`,** then `score.mjs --db covers-repaired.sqlite --set tune`.
+- [ ] **Run `node scripts/gate.mjs`,** then the bundled `score.mjs --set tune` in production.
   - Tune the weights until the tuning mean is above the baseline's.
   - Then run `--set hidden` once. If the hidden mean isn't above the baseline's, step back toward simpler weights. Don't tune on the hidden set.
 - [ ] **Commit** with message `Rank catalog search by work, series first`. Record the before and after means and p95 in the commit message.
@@ -276,7 +268,8 @@ Steps:
   - `workSignals` returns the value.
 - [ ] **Implement,** then run `node scripts/gate.mjs`.
 - [ ] **Measure.**
-  - Run `fill-wikipedia-counts.mjs` with `COVERS_DB_PATH` pointing at `covers-repaired.sqlite`.
+  - Production can't be written for a measurement, so run `fill-wikipedia-counts.mjs --dry-run` locally (Wikidata is public) with an option that writes the `{ olWorkKey: sites }` map to a file instead of the database.
+  - Bundle that map with `score.mjs`, which overlays it on `workSignals`' `wikipediaSites` in memory (keys resolved to canonical works read-only). Nothing is written.
   - Add a `log1p(wikipediaSites)` term to `rankWorks`, with `null` treated as 0, and rerun `score.mjs --set tune`.
   - Keep the term only if the tuning mean rises. Then run `--set hidden` once.
   - If the term is dropped, revert the whole task with `git reset --hard` to the Task 5 commit, since YAGNI. Record the measured numbers in the PR description instead.
@@ -286,8 +279,8 @@ Steps:
 
 - [ ] **Final scorecard.** Run `score.mjs --set all`.
   - Grade any unlabelled ids first.
-  - Paste the tuning mean, the hidden mean and p95 against the baseline into the PR description. Also paste the hard-example orders, as run on the snapshot.
+  - Paste the tuning mean, the hidden mean and p95 against the baseline into the PR description. Also paste the hard-example orders, as run in production.
 - [ ] **Check the ship rule** in the Global Constraints. If it fails, don't merge; bring the numbers to the user.
 - [ ] **Runbook entry** for the user, after the deploy:
-  1. if Task 6 kept the signal, `fill-wikipedia-counts.mjs --dry-run`, then the real run on production, with the expected matched count from the snapshot run;
+  1. if Task 6 kept the signal, `fill-wikipedia-counts.mjs --dry-run`, then the real run on production, with the expected matched count from the local dry run;
   2. a read-only check of the "harry potter" and "lord of the rings" orders.

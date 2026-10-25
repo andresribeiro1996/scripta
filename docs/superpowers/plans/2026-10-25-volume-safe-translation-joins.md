@@ -25,7 +25,7 @@
   - A new `*.test.ts` file goes into `backend/package.json`'s `test` script, or CI won't run it.
   - Prefer the existing test files listed per task.
 - **Verify each task** with `node scripts/gate.mjs` before committing.
-- **Running a backend script locally** (against a scratch database or the snapshot) needs the same environment preamble the tests set, because `config/env.ts` exits at import time: `AUTH_DB_PATH`, `LIBRARY_DB_PATH` and `GALLERY_DB_PATH` pointing at scratch files, `JWT_ACCESS_SECRET` set to 64 `a`s and `JWT_REFRESH_SECRET` set to 64 `b`s, plus `COVERS_DB_PATH`.
+- **Running a backend script locally** (against a scratch database) needs the same environment preamble the tests set, because `config/env.ts` exits at import time: `AUTH_DB_PATH`, `LIBRARY_DB_PATH` and `GALLERY_DB_PATH` pointing at scratch files, `JWT_ACCESS_SECRET` set to 64 `a`s and `JWT_REFRESH_SECRET` set to 64 `b`s, plus `COVERS_DB_PATH`.
 
 ## Review Focus
 
@@ -216,9 +216,16 @@
 - Create: `docs/repairs/2026-10-25-volume-joins.md`
 - Create: `docs/repairs/2026-10-25-volume-joins-undo.json`
 
-This needs Claude's judgment and production data. It is committed on Plan 2's branch (PR 2), because Plan 2's Task 4 reads the undo file. It runs after Plan 2's Task 1 has produced the local production snapshot, and after Tasks 1–3 are merged. The listing needs the new code, and the snapshot lets it run before any deploy.
+This needs Claude's judgment and production data. It is committed on Plan 2's branch (PR 2), because the repair runbook and Plan 2's baseline both depend on it. It runs after Tasks 1–3 are merged.
 
-- [ ] **List.** Run `--guarded` against the local snapshot.
+**No local snapshot (user decision, 2026-10-25: "just do it in prod").** Every read in this task runs on the production container over `railway ssh` (command in Plan 2's Global Constraints), with `new DatabaseSync(process.env.COVERS_DB_PATH, { readOnly: true })`. The listing needs code that isn't deployed yet, so:
+- bundle a small entry that opens the database read-only and prints `listGuardedMerges` into one file with esbuild (it ships with tsx);
+- upload it in base64 chunks under 100 KB to `/tmp` on the container (never `/data`), run it, then delete it;
+- print results to stdout only. No writes, and never print secrets.
+
+Keep these reads light while the pre-2002 BNP import runs (`sqlite-cross-process-starvation`).
+
+- [ ] **List.** Run the bundled `--guarded` listing in production.
   - If `flagged` is in the hundreds, the rules are too broad (spec anti-goal). Stop, and bring the counts to the user.
 - [ ] **Decide each flagged merge.** Rules:
   - split volumes stay apart;
@@ -232,7 +239,7 @@ This needs Claude's judgment and production data. It is committed on Plan 2's br
   - the three "O senhor dos anéis" Contemporânea editions (#52/#54/#56), judged on pages, collection and BNP data;
   - `e2ae6929…` "A Irmandade do Anel - … Parte I": a manual merge into the restored Fellowship if it is the same book.
 - [ ] **Series rows.**
-  - First query `work_series` on the snapshot for `name_key = 'the lord of the rings'`, to see which work holds the position-2 row. The fill writes to the current `work_id` of the edition holding the ISBN (`seed/seriesFill.ts:144-148`), so the row may sit on the omnibus or on the merged Two Towers work (`1e34a680…`).
+  - First query `work_series` read-only in production for `name_key = 'the lord of the rings'`, to see which work holds the position-2 row. The fill writes to the current `work_id` of the edition holding the ISBN (`seed/seriesFill.ts:144-148`), so the row may sit on the omnibus or on the merged Two Towers work (`1e34a680…`).
   - Put any row on the omnibus in `dropSeries`.
   - Put Fellowship position 1 and Two Towers position 2 (source `wikidata`) in `addSeries`, unless their own rows already exist.
 - [ ] **Editions with no merge row to undo.** Some editions sit in the omnibus without a `work_merges` row that moved them, possibly the Contemporânea volumes. These need the admin `POST /books/works/detach` route (`routes.ts:163`), with each edition's ISBN. Afterwards a manual review merge moves them into the right volume work. List them in the review file.
