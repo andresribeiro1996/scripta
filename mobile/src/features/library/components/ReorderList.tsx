@@ -30,7 +30,7 @@ export function ReorderList({
           const canMoveUp = move?.up ?? false;
           const canMoveDown = move?.down ?? false;
           const previous = index > 0 ? moves.get(bookKey(orderedBooks[index - 1])) : undefined;
-          const firstInSeries = move?.inSeries && (index === 0 || moves.get(bookKey(orderedBooks[index - 1])) !== move);
+          const firstInSeries = move?.inSeries && (index === 0 || previous !== move);
           return (
             <View style={[styles.row, { borderColor: colors.border }]}>
               <View style={styles.title}>
