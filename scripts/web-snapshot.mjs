@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { chromium, errors } from "playwright";
 import { portsFromEnvLocal, webUrls } from "./devWeb.mjs";
 import { mobileCertsExist } from "./mobileCertPaths.mjs";
-import { formatWebListing, parseWebSnapshotArgs, sessionState } from "./webSnapshot.mjs";
+import { formatWebListing, parseWebSnapshotArgs } from "./webSnapshot.mjs";
 
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const HEIGHT = 900;
@@ -72,13 +72,9 @@ function collectPage() {
   return { headings, elements };
 }
 
-async function login(api, account) {
-  const response = await fetch(`${api}/auth/login`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ identifier: account.username, password: account.password }),
-  });
-  if (!response.ok) throw new Error(`POST ${api}/auth/login answered ${response.status}`);
+async function login(request, api, account) {
+  const response = await request.post(`${api}/auth/login`, { data: { identifier: account.username, password: account.password } });
+  if (!response.ok()) throw new Error(`POST ${api}/auth/login answered ${response.status()}`);
   const { user, accessToken, refreshToken } = await response.json();
   return { user, accessToken, refreshToken };
 }
@@ -138,11 +134,7 @@ async function main() {
   const account = JSON.parse(readFileSync(join(repoRoot, "scripts", "fixtures", "account.json"), "utf8"));
   const saveSession = (state) => writeFileSync(sessionPath, JSON.stringify(state), { mode: 0o600 });
 
-  let storageState;
-  if (!args.signedOut) {
-    if (!existsSync(sessionPath)) saveSession(sessionState(web, await login(api, account)));
-    storageState = sessionPath;
-  }
+  const storageState = !args.signedOut && existsSync(sessionPath) ? sessionPath : undefined;
 
   const browser = await chromium.launch({ channel: "chrome", headless: true });
   const context = await browser.newContext({ viewport: { width: args.width, height: HEIGHT }, ignoreHTTPSErrors: web.startsWith("https:"), serviceWorkers: "block", storageState });
@@ -166,9 +158,9 @@ async function main() {
     try {
       await page.goto(web + args.path, { waitUntil: "networkidle" });
       if (!args.signedOut && !(await page.evaluate(() => localStorage.getItem("kobo_session") !== null))) {
-        const body = await login(api, account);
+        const body = await login(context.request, api, account);
         await page.evaluate((value) => localStorage.setItem("kobo_session", value), JSON.stringify(body));
-        await page.reload({ waitUntil: "networkidle" });
+        await page.goto(web + args.path, { waitUntil: "networkidle" });
       }
     } catch (error) {
       failure = `loading ${args.path} failed: ${error.message}`;
@@ -185,8 +177,11 @@ async function main() {
     collected = await page.evaluate(collectPage);
     await page.screenshot({ path: pngPath, fullPage: true });
   } finally {
-    if (!args.signedOut) saveSession(await context.storageState());
-    await browser.close();
+    try {
+      if (!args.signedOut) saveSession(await context.storageState());
+    } finally {
+      await browser.close();
+    }
   }
   console.log(formatWebListing({ name: args.name, pngPath, width: args.width, height: HEIGHT, ...collected, consoleErrors, failedRequests, note }));
   if (failure) {
