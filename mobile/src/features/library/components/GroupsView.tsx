@@ -114,6 +114,7 @@ export const GroupsView = forwardRef<GroupsViewHandle, GroupsViewProps>(function
             autoFocus
             label={`Name this ${copy.noun}`}
             value={draftName}
+            maxLength={200}
             onChangeText={setDraftName}
             onBlur={() => void handleCommitDraft()}
             onSubmitEditing={() => void handleCommitDraft()}

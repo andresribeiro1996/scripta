@@ -180,7 +180,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
   }
 
   async function persist() {
-    const updated = await updateMural(id, { name: currentName.trim() || mural!.name, theme: currentTheme, blocks: currentBlocks, updatedAt: mural!.updatedAt });
+    const updated = await updateMural(id, { ...(currentName.trim() && currentName.trim() !== mural!.name ? { name: currentName.trim() } : {}), theme: currentTheme, blocks: currentBlocks, updatedAt: mural!.updatedAt });
     cacheMural(updated);
     setName(updated.name);
     setTheme(updated.theme);
@@ -257,7 +257,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
       {selected ? <View pointerEvents={blockToolsHidden ? "none" : "auto"} accessibilityElementsHidden={blockToolsHidden} importantForAccessibility={blockToolsHidden ? "no-hide-descendants" : "auto"} onLayout={(event) => { const height = event.nativeEvent.layout.height; setDockHeight(height); if (!dragging) bottomInset.set(height + spacing.md); }} style={[styles.dock, { opacity: blockToolsHidden ? 0 : 1, backgroundColor: colors.surface, borderColor: colors.border }]}><BlockActionBar actions={blockActions} disabled={busy} /></View> : !dragging ? <Fab label="Add" accessibilityLabel="Add block" onPress={() => setAdding(true)} /> : null}
       {history.length && !blockToolsHidden ? <View style={[styles.undo, { bottom: selected ? dockHeight + spacing.md : spacing.md }]}><Button label="Undo" variant="secondary" disabled={busy} onPress={undo} /></View> : null}
       <Dialog visible={renaming} title="Rename mural" onClose={() => setRenaming(false)}>
-        <View style={styles.dialog}><Input label="Mural name" value={draftName} error={nameError} onChangeText={(text) => { setDraftName(text); setNameError(undefined); }} /><Button label="Done" onPress={() => { const trimmed = draftName.trim(); if (!trimmed) { setNameError("Name can't be empty"); return; } setName(trimmed); setRenaming(false); }} /></View>
+        <View style={styles.dialog}><Input label="Mural name" value={draftName} maxLength={200} error={nameError} onChangeText={(text) => { setDraftName(text); setNameError(undefined); }} /><Button label="Done" onPress={() => { const trimmed = draftName.trim(); if (!trimmed) { setNameError("Name can't be empty"); return; } setName(trimmed); setRenaming(false); }} /></View>
       </Dialog>
       <MuralShareSheet mural={shareFor} books={books} groups={groups} images={gallery.data ?? []} tierlists={tierlists.data ?? []} profile={profile} draft={unsaved} contentReady={!libraryQuery.isPending && !gallery.isPending && !tierlists.isPending} contentError={libraryQuery.error?.message ?? gallery.error?.message ?? tierlists.error?.message ?? undefined} onRetryContent={() => { void libraryQuery.refetch(); void gallery.refetch(); void tierlists.refetch(); }} onClose={() => setShareFor(null)} onEnableLink={async () => {
         if (shareFor === null) return;
