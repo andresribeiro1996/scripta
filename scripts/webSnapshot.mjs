@@ -76,7 +76,3 @@ export function formatWebListing({ name, pngPath, width, height = HEIGHT, headin
   if (failedRequests.length) lines.push(`failed requests (${failedRequests.length}):`, ...failedRequests.map((r) => `  ${r}`));
   return lines.join("\n");
 }
-
-export function sessionState(origin, loginBody) {
-  return { cookies: [], origins: [{ origin, localStorage: [{ name: "kobo_session", value: JSON.stringify(loginBody) }] }] };
-}

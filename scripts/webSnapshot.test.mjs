@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { formatWebListing, parseWebSnapshotArgs, sessionState } from "./webSnapshot.mjs";
+import { formatWebListing, parseWebSnapshotArgs } from "./webSnapshot.mjs";
 
 test("args keep steps in order and apply defaults", () => {
   const args = parseWebSnapshotArgs(["03-murals", "--out", "/o", "--path", "/murals", "--click", "button:New mural", "--fill", "Title=Summer", "--click-at", "340,24", "--press", "Enter", "--wait", "Summer"]);
@@ -34,11 +34,4 @@ test("listing flags small, unlabelled, disabled and covered controls", () => {
   assert.match(text, /button "Save"  @180,860  300×52px  \(disabled\)  ⚠ under "Close"/);
   assert.match(text, /console errors \(1\):\n  TypeError/);
   assert.match(text, /failed requests \(1\):\n  GET 500 \/murals/);
-});
-
-test("session state seeds kobo_session for the web origin", () => {
-  const body = { user: { id: "u-1" }, accessToken: "a", refreshToken: "r" };
-  assert.deepEqual(sessionState("http://localhost:5174", body), {
-    cookies: [], origins: [{ origin: "http://localhost:5174", localStorage: [{ name: "kobo_session", value: JSON.stringify(body) }] }],
-  });
 });
