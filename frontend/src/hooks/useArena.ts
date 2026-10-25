@@ -38,5 +38,9 @@ export function useArena(id: string) {
     if (id !== "") await query.refetch();
   }
 
-  return { tournament: query.data, isLoading: query.isLoading, error: query.error, voterToken, vote, refetch };
+  async function refresh(targetId: string) {
+    if (targetId !== "") await queryClient.invalidateQueries({ queryKey: ["arena", targetId] });
+  }
+
+  return { tournament: query.data, isLoading: query.isLoading, error: query.error, voterToken, vote, refetch, refresh };
 }
