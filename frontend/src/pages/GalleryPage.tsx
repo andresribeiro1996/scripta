@@ -2,13 +2,15 @@ import { useMemo, useRef, useState } from "react";
 import { useConfirm } from "../components/ConfirmDialog";
 import { EmptyState } from "../components/EmptyState";
 import { GalleryIcon } from "../components/NavIcons";
-import { PageContainer } from "../components/PageContainer";
+import { Page } from "../components/page/Page";
+import { BUTTON_PRIMARY } from "../components/page/buttonClasses";
 import { SkeletonCardGrid } from "../components/Skeleton";
-import { CloseIcon, ToolbarRow } from "../components/Toolbar";
+import { CloseIcon } from "../components/Toolbar";
 import { useDelayedShow } from "../hooks/useDelayedShow";
 import { useDeleteGalleryImage } from "../hooks/useDeleteGalleryImage";
 import { useGalleryImages } from "../hooks/useGalleryImages";
 import { useLibrary } from "../hooks/useLibrary";
+import { area } from "../lib/areas";
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -76,35 +78,29 @@ export function GalleryPage() {
   }
 
   return (
-    <PageContainer>
-      {/* One row on a phone: the title goes (the bottom tab bar already
-          says which page this is) and Upload becomes the row, full width
-          — it's the page's only action, so a gear hiding a single item
-          would be a tap for nothing. The title comes back at `sm`. */}
-      <ToolbarRow>
-        <div className="flex items-center justify-between gap-4">
-          <h2 className="hidden text-lg font-bold sm:block">Gallery</h2>
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-            className="min-h-11 w-full rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-semibold text-(--color-on-accent) disabled:opacity-60 sm:w-auto"
-          >
+    <Page
+      title="Library"
+      subtitle={isLoading ? undefined : `${images.length} image${images.length === 1 ? "" : "s"}`}
+      tabs={area("library").tabs}
+      actions={
+        <>
+          <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className={BUTTON_PRIMARY}>
             {uploading ? "Uploading…" : "Upload image…"}
           </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp,image/heic"
-          hidden
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) void handleUpload(file);
-            e.target.value = "";
-          }}
-        />
-        </div>
-      </ToolbarRow>
-
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/heic"
+            hidden
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void handleUpload(file);
+              e.target.value = "";
+            }}
+          />
+        </>
+      }
+    >
       {uploadError && (
         <div className="mb-5 rounded-lg bg-(--color-danger-soft) px-3 py-2 text-sm text-(--color-danger)">{uploadError}</div>
       )}
@@ -181,6 +177,6 @@ export function GalleryPage() {
           })}
         </div>
       )}
-    </PageContainer>
+    </Page>
   );
 }

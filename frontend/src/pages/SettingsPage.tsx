@@ -1,12 +1,11 @@
 import { AccountSecuritySection } from "../auth/AccountSecuritySection";
 import { DeleteAccountSection } from "../auth/DeleteAccountSection";
 import { useRef, useState } from "react";
-import { Link } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { Avatar } from "../components/Avatar";
-import { FontPicker } from "../components/FontPicker";
+import { Page } from "../components/page/Page";
 import { SocialsSection } from "../components/SocialsSection";
-import { ThemePicker } from "../components/ThemePicker";
+import { area } from "../lib/areas";
 
 export function SettingsPage() {
   const { session, setUsername, uploadAvatar, removeAvatar } = useAuth();
@@ -64,121 +63,106 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-xl px-5 py-8">
-      <h2 className="mb-6 text-lg font-bold">Settings</h2>
+    <Page title="Settings" tabs={area("settings").tabs}>
+      <div className="max-w-xl">
+        <section className="rounded-xl border border-(--color-border) bg-(--color-surface) p-5">
+          <h3 className="mb-4 text-sm font-semibold">Account</h3>
 
-      <section className="rounded-xl border border-(--color-border) bg-(--color-surface) p-5">
-        <h3 className="mb-4 text-sm font-semibold">Appearance</h3>
-        <ThemePicker />
-        <div className="mt-5 space-y-4">
-          <FontPicker slot="display" />
-          <FontPicker slot="text" />
-        </div>
-      </section>
-
-      <section className="mt-5 rounded-xl border border-(--color-border) bg-(--color-surface) p-5">
-        <h3 className="mb-4 text-sm font-semibold">Account</h3>
-
-        {session && (
-          <div className="mb-4 flex items-center gap-3">
-            <Avatar user={session.user} size={48} className={avatarBusy ? "animate-pulse" : ""} />
-            <div>
-              <div className="mb-0.5 text-xs text-(--color-text-dim)">Profile picture</div>
-              <div className="flex items-center gap-3">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,image/heic"
-                  onChange={handleAvatarChange}
-                  className="hidden"
-                />
-                <button
-                  disabled={avatarBusy}
-                  onClick={() => fileInputRef.current?.click()}
-                  aria-label={avatarBusy ? undefined : "Change profile picture"}
-                  className="text-xs text-(--color-accent) transition-opacity hover:opacity-80 disabled:opacity-50"
-                >
-                  {avatarBusy ? "Working…" : "Change"}
-                </button>
-                {session.user.avatarId && (
+          {session && (
+            <div className="mb-4 flex items-center gap-3">
+              <Avatar user={session.user} size={48} className={avatarBusy ? "animate-pulse" : ""} />
+              <div>
+                <div className="mb-0.5 text-xs text-(--color-text-dim)">Profile picture</div>
+                <div className="flex items-center gap-3">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/heic"
+                    onChange={handleAvatarChange}
+                    className="hidden"
+                  />
                   <button
                     disabled={avatarBusy}
-                    onClick={() => void handleAvatarRemove()}
-                    className="text-xs text-(--color-text-dim) transition-opacity hover:opacity-80 disabled:opacity-50"
+                    onClick={() => fileInputRef.current?.click()}
+                    aria-label={avatarBusy ? undefined : "Change profile picture"}
+                    className="text-xs text-(--color-accent) transition-opacity hover:opacity-80 disabled:opacity-50"
                   >
-                    Remove
+                    {avatarBusy ? "Working…" : "Change"}
                   </button>
-                )}
+                  {session.user.avatarId && (
+                    <button
+                      disabled={avatarBusy}
+                      onClick={() => void handleAvatarRemove()}
+                      className="text-xs text-(--color-text-dim) transition-opacity hover:opacity-80 disabled:opacity-50"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        )}
-
-        <div className="mb-4">
-          <div className="mb-1 text-xs text-(--color-text-dim)">Email</div>
-          <div className="text-sm">{session?.user.email}</div>
-        </div>
-
-        <div>
-          <div className="mb-1 text-xs text-(--color-text-dim)">Username</div>
-          {!editing ? (
-            <div className="flex items-center gap-3">
-              <span className="text-sm">@{session?.user.username ?? "—"}</span>
-              <button
-                onClick={() => {
-                  setEditing(true);
-                  setDraft(session?.user.username ?? "");
-                  setError(null);
-                  setSuccess(false);
-                }}
-                aria-label="Change username"
-                className="text-xs text-(--color-accent) transition-opacity hover:opacity-80"
-              >
-                Change
-              </button>
-            </div>
-          ) : (
-            <form onSubmit={handleSubmit} className="flex items-center gap-2">
-              <input
-                autoFocus
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                minLength={3}
-                maxLength={30}
-                pattern="[a-zA-Z0-9_.]+"
-                title="Letters, numbers, underscores, and periods only."
-                className="w-48 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-1.5 text-sm"
-              />
-              <button
-                type="submit"
-                disabled={submitting}
-                className="rounded-lg bg-(--color-accent) px-3 py-1.5 text-sm font-semibold text-(--color-on-accent) disabled:opacity-60"
-              >
-                Save
-              </button>
-              <button
-                type="button"
-                onClick={() => setEditing(false)}
-                className="text-sm text-(--color-text-dim) hover:text-(--color-text)"
-              >
-                Cancel
-              </button>
-            </form>
           )}
-          {error && <p className="mt-2 text-xs text-(--color-danger)">{error}</p>}
-          {success && <p className="mt-2 text-xs text-(--color-accent)">Username updated.</p>}
-        </div>
-      </section>
 
-      <section className="mt-5 rounded-xl border border-(--color-border) bg-(--color-surface) p-5">
-        <h3 className="mb-1 text-sm font-semibold">Reader card</h3>
-        <p className="mb-3 text-xs text-(--color-text-dim)">Choose your card's counter, layout, signature book and highlight.</p>
-        <Link to="/dashboard/reader-card" className="text-xs font-semibold text-(--color-accent)">Edit card</Link>
-      </section>
+          <div className="mb-4">
+            <div className="mb-1 text-xs text-(--color-text-dim)">Email</div>
+            <div className="text-sm">{session?.user.email}</div>
+          </div>
 
-      <AccountSecuritySection />
-      <SocialsSection />
-      <DeleteAccountSection />
-    </div>
+          <div>
+            <div className="mb-1 text-xs text-(--color-text-dim)">Username</div>
+            {!editing ? (
+              <div className="flex items-center gap-3">
+                <span className="text-sm">@{session?.user.username ?? "—"}</span>
+                <button
+                  onClick={() => {
+                    setEditing(true);
+                    setDraft(session?.user.username ?? "");
+                    setError(null);
+                    setSuccess(false);
+                  }}
+                  aria-label="Change username"
+                  className="text-xs text-(--color-accent) transition-opacity hover:opacity-80"
+                >
+                  Change
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmit} className="flex items-center gap-2">
+                <input
+                  autoFocus
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  minLength={3}
+                  maxLength={30}
+                  pattern="[a-zA-Z0-9_.]+"
+                  title="Letters, numbers, underscores, and periods only."
+                  className="w-48 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-1.5 text-sm"
+                />
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="rounded-lg bg-(--color-accent) px-3 py-1.5 text-sm font-semibold text-(--color-on-accent) disabled:opacity-60"
+                >
+                  Save
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditing(false)}
+                  className="text-sm text-(--color-text-dim) hover:text-(--color-text)"
+                >
+                  Cancel
+                </button>
+              </form>
+            )}
+            {error && <p className="mt-2 text-xs text-(--color-danger)">{error}</p>}
+            {success && <p className="mt-2 text-xs text-(--color-accent)">Username updated.</p>}
+          </div>
+        </section>
+
+        <AccountSecuritySection />
+        <SocialsSection />
+        <DeleteAccountSection />
+      </div>
+    </Page>
   );
 }
