@@ -499,6 +499,15 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     SELECT $work_id, $name, $author WHERE (SELECT COUNT(*) FROM work_series WHERE work_id = $work_id AND name_key = $name_key) = 1
   `);
   const hasWorkSeriesStmt = db.prepare(`SELECT 1 FROM work_series WHERE work_id = ? LIMIT 1`);
+  const hasWorkSeriesSourceStmt = db.prepare(`SELECT 1 FROM work_series WHERE work_id = ? AND source = ? LIMIT 1`);
+  const seriesToRemoveStmt = db.prepare(`
+    SELECT work_id, name_key FROM work_series
+    WHERE source = ? AND name_key IN (SELECT value FROM json_each(?))
+  `);
+  const removeWorkSeriesStmt = db.prepare(`DELETE FROM work_series WHERE source = ? AND name_key IN (SELECT value FROM json_each(?))`);
+  const workSeriesKeyStmt = db.prepare(`SELECT 1 FROM work_series WHERE work_id = ? AND name_key = ? LIMIT 1`);
+  const seriesIndexOfWorkStmt = db.prepare(`SELECT rowid, name FROM series_fts WHERE work_id = ?`);
+  const deleteSeriesIndexStmt = db.prepare(`DELETE FROM series_fts WHERE rowid = ?`);
   const refreshSeriesAuthorStmt = db.prepare(`UPDATE series_fts SET author = ? WHERE work_id = ?`);
   const insertCollectionStmt = db.prepare(`
     INSERT INTO book_collections (book_id, name, name_key, position, source, created_at) VALUES (?, ?, ?, ?, ?, ?)
@@ -1294,6 +1303,27 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       });
     },
 
+    hasWorkSeries(workId, source) {
+      return hasWorkSeriesSourceStmt.get(workId, source) !== undefined;
+    },
+
+    removeWorkSeries(nameKeys, source) {
+      const keys = JSON.stringify(nameKeys);
+      return inTransaction(() => {
+        const affected = seriesToRemoveStmt.all(source, keys) as Array<{ work_id: string; name_key: string }>;
+        const rows = Number(removeWorkSeriesStmt.run(source, keys).changes);
+        let searchRows = 0;
+        for (const { work_id, name_key } of affected) {
+          if (workSeriesKeyStmt.get(work_id, name_key)) continue;
+          for (const entry of seriesIndexOfWorkStmt.all(work_id) as Array<{ rowid: number; name: string }>) {
+            if (seriesNameKey(entry.name) !== name_key) continue;
+            searchRows += Number(deleteSeriesIndexStmt.run(entry.rowid).changes);
+          }
+        }
+        return { rows, searchRows };
+      });
+    },
+
     addBookCollection(bookId, entry, source, at) {
       const nameKey = seriesNameKey(entry.name);
       if (!nameKey) return false;
@@ -1326,7 +1356,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       }
       for (const row of editionCollectionsStmt.all(members) as Array<{ work_id: string; name: string; name_key: string; position: string | null; created_at: string }>) {
         const named = candidates.get(rootOf.get(row.work_id)!);
-        if (named?.some((candidate) => candidate.nameKey === row.name_key && (candidate.source === "wikidata" || candidate.source === "ol-subject"))) {
+        if (named?.some((candidate) => candidate.nameKey === row.name_key && (candidate.source === "wikidata" || candidate.source === "hardcover" || candidate.source === "ol-subject"))) {
           named.push({ name: row.name, position: row.position, nameKey: row.name_key, source: "ol-edition", rank: SERIES_SOURCE_RANK["ol-edition"], createdAt: row.created_at });
         }
       }

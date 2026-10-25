@@ -142,6 +142,8 @@ export interface BooksRepository {
   clearRetitleWanted(id: string): void;
   applyTitleRepairs(plan: { books: RowRepair[]; works: RowRepair[] }): MojibakeApplied;
   addWorkSeries(workId: string, entries: SeriesEntry[], source: SeriesSource, at: string): number;
+  hasWorkSeries(workId: string, source: SeriesSource): boolean;
+  removeWorkSeries(nameKeys: string[], source: SeriesSource): { rows: number; searchRows: number };
   addBookCollection(bookId: string, entry: SeriesEntry, source: CollectionSource, at: string): boolean;
   bestSeriesOf(workIds: string[]): Map<string, SeriesEntry>;
   collectionsOf(bookIds: string[]): Map<string, SeriesEntry>;
