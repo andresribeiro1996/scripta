@@ -6,7 +6,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pressable, ScrollView, Share, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { API_URL } from "../../core/config";
-import { Button, Dialog, EditorHeading, ErrorState, FormScroll, HeaderActions, IconButton, Input, Menu, type MenuItem, SaveStateButton, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { Button, Dialog, EditorHeading, ErrorState, FormScroll, HeaderActions, IconButton, Input, Menu, type MenuItem, SaveStateButton, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, radii, spacing, typography, useTheme, useUnsavedChangesGuard } from "../../ui";
 import { coverUrlForApi } from "../library/lib/coverUrl";
 import { publicContentUrl } from "../sharing/links";
 import { fetchQuizResults, publishQuiz, setPlayState, updateQuiz, type Quiz } from "./api";
@@ -95,6 +95,7 @@ export function QuizEditorScreen({ quiz, onUpdated, initialView }: { quiz: Quiz;
 
   const frozen = current.voteCode !== null;
   const dirty = !frozen && JSON.stringify(data) !== JSON.stringify(current.data);
+  const discardDialog = useUnsavedChangesGuard(dirty);
   const lockEdits = publishing;
   const actionItems: MenuItem[] = frozen
     ? [
@@ -104,6 +105,7 @@ export function QuizEditorScreen({ quiz, onUpdated, initialView }: { quiz: Quiz;
     : [{ label: "Publish…", onPress: () => setConfirmingPublish(true) }];
 
   return <Screen top={false}>
+    {discardDialog}
     <Stack.Screen options={{
       headerShown: true,
       title: "",

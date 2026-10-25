@@ -7,7 +7,7 @@ import { FlatList, Pressable, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { apiClient, ApiError } from "../../core/api";
 import { useLibrary, useWorkBooks } from "../library";
-import { Button, Dialog, EditorHeading, EmptyState, ErrorState, Fab, HeaderActions, IconButton, Input, Menu, type MenuItem, SaveStateButton, Screen, Sheet, Skeleton, SwipeableTabs, Toast, dynamicType, spacing, typography, useTheme } from "../../ui";
+import { Button, Dialog, EditorHeading, EmptyState, ErrorState, Fab, HeaderActions, IconButton, Input, Menu, type MenuItem, SaveStateButton, Screen, Sheet, Skeleton, SwipeableTabs, Toast, dynamicType, spacing, typography, useTheme, useUnsavedChangesGuard } from "../../ui";
 import { fetchMyBallot, fetchTierlistResults, fetchVotingBoard, openVoting, renderTierlistShareVideo, setVotingState, updateTierlist, type Tierlist } from "./api";
 import { moveBookTo, votingBooks } from "./tierBoardData";
 import { TierBoard, TierHead } from "./TierBoard";
@@ -117,6 +117,7 @@ export function TierlistEditorScreen({ tierlist, onUpdated, startInRank = false 
   const myPlacements = myBallot.data?.placements ?? null;
   const boardData = frozen && board.data ? ballotBoard(board.data.board, myPlacements ?? []) : data;
   const dirty = !frozen && JSON.stringify(data) !== JSON.stringify(current.data);
+  const discardDialog = useUnsavedChangesGuard(dirty);
   const placed = data.tiers.reduce((sum, tier) => sum + tier.workIds.length, 0);
   const changeData = setData;
   const save = () => run(() => updateTierlist(current.id, { data }));
@@ -136,6 +137,7 @@ export function TierlistEditorScreen({ tierlist, onUpdated, startInRank = false 
     ];
 
   return <Screen top={false} style={styles.screen}>
+    {discardDialog}
     <Stack.Screen options={{
       headerShown: true,
       title: "",

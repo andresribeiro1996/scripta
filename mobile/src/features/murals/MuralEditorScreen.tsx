@@ -23,7 +23,7 @@ import { AccessibilityInfo, Pressable, ScrollView, StyleSheet, useWindowDimensio
 import Animated, { useAnimatedReaction, useAnimatedRef, useAnimatedScrollHandler, useSharedValue } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 import { Text } from "../../ui/Text";
-import { Button, Dialog, EditorHeading, EmptyState, ErrorState, Fab, HeaderActions, Icon, IconButton, Input, SaveStateButton, Sheet, Toast } from "../../ui";
+import { Button, Dialog, EditorHeading, EmptyState, ErrorState, Fab, HeaderActions, Icon, IconButton, Input, SaveStateButton, Sheet, Toast, useUnsavedChangesGuard } from "../../ui";
 import { BookPickerList } from "../library/components/BookPickerList";
 import { ThemeGrid } from "../../ui/ThemeGrid";
 import { MuralThemeScope, radii, spacing, typography } from "../../ui/theme";
@@ -120,6 +120,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
 
   const draftMural = useMemo(() => mural ? { ...mural, name: currentName, theme: currentTheme, blocks: currentBlocks } : null, [mural, currentName, currentTheme, currentBlocks]);
   const unsaved = useMemo(() => !!mural && ((currentName.trim() || mural.name) !== mural.name || currentTheme !== muralThemeId(mural.theme) || JSON.stringify(currentBlocks) !== JSON.stringify(mural.blocks)), [mural, currentName, currentTheme, currentBlocks]);
+  const discardDialog = useUnsavedChangesGuard(unsaved);
 
   function updateSelected(transform: (block: MuralBlock) => MuralBlock) {
     if (!selected) return;
@@ -226,6 +227,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
 
   return (
     <MuralScreen theme={currentTheme}>
+      {discardDialog}
       <Stack.Screen
         options={{
           headerShown: true,

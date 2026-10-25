@@ -403,6 +403,19 @@ export function Dialog(props: OverlayProps) {
   return <Overlay {...props} sheet={false} />;
 }
 
+export function ConfirmDialog({ visible, title, body, confirmLabel, cancelLabel = "Cancel", destructive = false, loading = false, onConfirm, onCancel }: { visible: boolean; title: string; body?: string; confirmLabel: string; cancelLabel?: string; destructive?: boolean; loading?: boolean; onConfirm: () => void; onCancel: () => void }) {
+  const { colors } = useTheme();
+  return (
+    <Dialog visible={visible} title={title} onClose={onCancel}>
+      <View style={styles.confirm}>
+        {body ? <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{body}</Text> : null}
+        <Button label={confirmLabel} variant={destructive ? "destructive" : "primary"} loading={loading} onPress={onConfirm} />
+        <Button label={cancelLabel} variant="secondary" disabled={loading} onPress={onCancel} />
+      </View>
+    </Dialog>
+  );
+}
+
 export function ToggleSwitch({ value, onValueChange, accessibilityLabel, disabled = false }: { value: boolean; onValueChange: () => void; accessibilityLabel: string; disabled?: boolean }) {
   const { colors } = useTheme();
   return (
@@ -860,6 +873,7 @@ const styles = StyleSheet.create({
   dialogOverlay: { justifyContent: "center", padding: spacing.lg },
   sheet: { maxHeight: "90%", padding: spacing.xl, borderWidth: 1, borderBottomWidth: 0, borderTopLeftRadius: radii.xl, borderTopRightRadius: radii.xl },
   dialog: { maxHeight: "90%", padding: spacing.xl, borderWidth: 1, borderRadius: radii.lg },
+  confirm: { gap: spacing.md },
   overlayHeader: { minHeight: minimumTouchTarget, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md },
   overlayTitle: { ...typography.title, fontWeight: "700", flex: 1 },
   closeButton: { minHeight: minimumTouchTarget, minWidth: minimumTouchTarget, alignItems: "center", justifyContent: "center" },
