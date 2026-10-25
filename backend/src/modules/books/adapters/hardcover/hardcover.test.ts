@@ -96,6 +96,16 @@ test("parseEditions throws on GraphQL errors", () => {
   assert.throws(() => parseEditions({ errors: [{ message: "bad field" }] }), /GraphQL: bad field/);
 });
 
+test("parseEditions skips an edition whose book is null", () => {
+  assert.deepEqual(parseEditions(body({ isbn_13: "9780441172719", book: null })), []);
+});
+
+test("parseEditions throws on a malformed edition or book id", () => {
+  assert.throws(() => parseEditions(body("nope")), /unexpected response/);
+  assert.throws(() => parseEditions(body({ isbn_13: "9780441172719", book: bookRow({ id: "7" }) })), /unexpected response/);
+  assert.throws(() => parseEditions(body({ isbn_13: "9780441172719" })), /unexpected response/);
+});
+
 test("featuredSeriesOf prefers featured, then a sole row", () => {
   assert.equal(featuredSeriesOf(book({ featured: series("A"), series: [series("B")] }))?.name, "A");
   assert.equal(featuredSeriesOf(book({ series: [series("B")] }))?.name, "B");

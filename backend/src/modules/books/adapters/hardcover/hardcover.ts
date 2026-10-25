@@ -92,13 +92,15 @@ export function parseEditions(data: unknown): HardcoverEdition[] {
   if (!Array.isArray(editions)) throw new SourceUnavailableError(SOURCE, "unexpected response");
   const parsed: HardcoverEdition[] = [];
   for (const edition of editions) {
-    if (!isRow(edition) || !isRow(edition.book) || typeof edition.book.id !== "number") continue;
+    if (!isRow(edition)) throw new SourceUnavailableError(SOURCE, "unexpected response");
+    if (edition.book === null) continue;
     const book = edition.book;
+    if (!isRow(book) || typeof book.id !== "number") throw new SourceUnavailableError(SOURCE, "unexpected response");
     const isbn13 = (typeof edition.isbn_13 === "string" ? canonicalIsbn(edition.isbn_13) : "") || canonicalIsbn(edition.isbn_10) || null;
     parsed.push({
       isbn13,
       book: {
-        id: book.id as number,
+        id: book.id,
         usable: book.book_status_id === 1 && book.canonical_id == null,
         description: typeof book.description === "string" ? book.description : null,
         genreTags: genreTagsOf(book.cached_tags),
