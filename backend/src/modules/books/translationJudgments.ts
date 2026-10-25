@@ -61,20 +61,23 @@ export type TranslationDeps = JevPauseDeps & {
   sharesArena: (fromWorkId: string, intoWorkId: string) => boolean;
 };
 
-export function headsSeriesOf(repo: Pick<BooksRepository, "seriesHasOtherMembers">, intoWorkId: string) {
-  return (title: string) => {
-    const key = seriesNameKey(title);
-    return key !== null && repo.seriesHasOtherMembers(key, intoWorkId);
+export function guardTarget(repo: Pick<BooksRepository, "seriesMemberKind" | "seriesPositionsOf">, targetTitle: string, canonicalId: string) {
+  return {
+    target: { title: targetTitle, series: repo.seriesPositionsOf(canonicalId) },
+    memberKind: (title: string) => {
+      const key = seriesNameKey(title);
+      return key === null ? null : repo.seriesMemberKind(key, canonicalId);
+    }
   };
 }
 
-export function guardJoin(repo: Pick<BooksRepository, "translationEvidence" | "matchCandidates" | "seriesHasOtherMembers" | "canonicalWorkIds">, workId: string, intoWorkId: string): JoinVerdict {
+export function guardJoin(repo: Pick<BooksRepository, "translationEvidence" | "matchCandidates" | "seriesMemberKind" | "seriesPositionsOf" | "canonicalWorkIds">, workId: string, intoWorkId: string): JoinVerdict {
   const rows = repo.translationEvidence(workId);
   const canonicalId = repo.canonicalWorkIds([intoWorkId]).get(intoWorkId) ?? intoWorkId;
   const target = repo.matchCandidates([canonicalId])[0];
   if (!rows || rows.editions.length === 0 || !target) return "join";
-  const evidence = evidenceOf(rows);
-  return joinVerdict({ title: evidence.title, originalTitle: evidence.originalTitle }, { title: target.title }, headsSeriesOf(repo, canonicalId));
+  const guard = guardTarget(repo, target.title, canonicalId);
+  return joinVerdict({ title: evidenceOf(rows).title }, guard.target, guard.memberKind);
 }
 
 function decide(deps: TranslationDeps, workId: string, model: string, intoWorkId: string | null, confidence: number | null, merge: boolean, at: string) {

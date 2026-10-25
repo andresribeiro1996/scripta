@@ -3719,7 +3719,7 @@ test("setKoboImageId fills a NULL column once and never overwrites it", () => {
   assert.equal(repo.getBook(book.id)!.kobo_image_id, "0b8a2a3c-6f1e-4c54-9d0e-1a2b3c4d5e6f");
 });
 
-test("seriesHasOtherMembers counts series rows and edition collections on other canonical works, merged or not", () => {
+test("seriesMemberKind counts series rows and edition collections on other canonical works, merged or not", () => {
   const { repo } = freshRepo();
   const key = "the lord of the rings";
   const entry = { name: "The Lord of the Rings", position: null };
@@ -3727,17 +3727,30 @@ test("seriesHasOtherMembers counts series rows and edition collections on other 
   const b = seriesBook(repo, "The Two Towers", "9780261102361", "J. R. R. Tolkien");
   repo.addWorkSeries(a.work_id!, [entry], "wikidata", AT);
   repo.addWorkSeries(b.work_id!, [entry], "wikidata", AT);
-  assert.equal(repo.seriesHasOtherMembers(key, a.work_id!), true);
+  assert.equal(repo.seriesMemberKind(key, a.work_id!), "series");
   repo.mergeWorks(b.work_id!, a.work_id!);
-  assert.equal(repo.seriesHasOtherMembers(key, a.work_id!), false);
+  assert.equal(repo.seriesMemberKind(key, a.work_id!), null);
   const c = seriesBook(repo, "The Return of the King", "9780261102378", "J. R. R. Tolkien");
   const d = seriesBook(repo, "The Hobbit", "9780261102217", "J. R. R. Tolkien");
   repo.addWorkSeries(c.work_id!, [entry], "wikidata", AT);
   repo.mergeWorks(c.work_id!, d.work_id!);
-  assert.equal(repo.seriesHasOtherMembers(key, a.work_id!), true);
+  assert.equal(repo.seriesMemberKind(key, a.work_id!), "series");
   const e = seriesBook(repo, "Unfinished Tales", "9780261102385", "J. R. R. Tolkien");
   const f = seriesBook(repo, "Silmarillion Extra", "9780261102392", "J. R. R. Tolkien");
   repo.addBookCollection(f.id, { name: "Middle-earth Cycle", position: null }, "ol-edition", AT);
-  assert.equal(repo.seriesHasOtherMembers("middle earth cycle", e.work_id!), true);
-  assert.equal(repo.seriesHasOtherMembers("middle earth cycle", f.work_id!), false);
+  assert.equal(repo.seriesMemberKind("middle earth cycle", e.work_id!), "collection");
+  assert.equal(repo.seriesMemberKind("middle earth cycle", f.work_id!), null);
+});
+
+test("seriesPositionsOf lists series rows on the work and on works merged into it", () => {
+  const { repo } = freshRepo();
+  const a = seriesBook(repo, "The Fellowship of the Ring", "9780261102354", "J. R. R. Tolkien");
+  const b = seriesBook(repo, "The Two Towers", "9780261102361", "J. R. R. Tolkien");
+  const c = seriesBook(repo, "Unfinished Tales", "9780261102385", "J. R. R. Tolkien");
+  repo.addWorkSeries(a.work_id!, [{ name: "The Lord of the Rings", position: "1" }], "wikidata", AT);
+  repo.addWorkSeries(b.work_id!, [{ name: "Middle-earth Cycle", position: null }], "wikidata", AT);
+  repo.addWorkSeries(c.work_id!, [{ name: "Other", position: "9" }], "wikidata", AT);
+  repo.mergeWorks(b.work_id!, a.work_id!);
+  assert.deepEqual(repo.seriesPositionsOf(a.work_id!), [{ nameKey: "the lord of the rings", position: "1" }, { nameKey: "middle earth cycle", position: null }]);
+  assert.deepEqual(repo.seriesPositionsOf(c.work_id!), [{ nameKey: "other", position: "9" }]);
 });

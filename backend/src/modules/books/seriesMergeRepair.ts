@@ -4,7 +4,7 @@ import { seriesNameKey, type SeriesSource } from "./domain/series.js";
 import { hasVolumeMarker, seriesLikeOriginals } from "./domain/translation.js";
 import type { MergeSource } from "./domain/types.js";
 import { joinVerdict } from "./domain/volumeGuard.js";
-import { headsSeriesOf } from "./translationJudgments.js";
+import { guardTarget } from "./translationJudgments.js";
 
 const SOURCES: MergeSource[] = ["title-key", "admin", "code", "jev", "manual", "ol-duplicate"];
 const UNDOABLE: MergeSource[] = ["code", "jev", "ol-duplicate", "title-key"];
@@ -14,7 +14,7 @@ type Edition = ReturnType<BooksRepository["editionsOf"]>[number];
 type Merge = ReturnType<BooksRepository["activeMerges"]>[number] & { source: MergeSource };
 type ListRepo = Pick<BooksRepository, "activeMerges" | "editionsOf" | "originalTitleClaims" | "canonicalWorkIds" | "getWorkView">;
 type UndoRepo = Pick<BooksRepository, "activeMerges" | "transaction" | "undoMerge" | "saveWorkMatchJudgment">;
-type GuardRepo = Pick<BooksRepository, "activeMerges" | "editionsOf" | "canonicalWorkIds" | "getWorkView" | "collectionsOf" | "seriesHasOtherMembers">;
+type GuardRepo = Pick<BooksRepository, "activeMerges" | "editionsOf" | "canonicalWorkIds" | "getWorkView" | "collectionsOf" | "seriesMemberKind" | "seriesPositionsOf">;
 type Failure = { fromWork: string; reason: string };
 
 export type SeriesCollapse = {
@@ -112,7 +112,8 @@ export function listGuardedMerges(repo: GuardRepo): { checked: number; skipped: 
       skipped.push(merge.id);
       continue;
     }
-    const verdict = joinVerdict({ title: filled(editions.map((edition) => edition.title)) ?? "", originalTitle: filled(editions.map((edition) => edition.originalTitle)) }, { title: target.title }, headsSeriesOf(repo, current));
+    const guard = guardTarget(repo, target.title, current);
+    const verdict = joinVerdict({ title: filled(editions.map((edition) => edition.title)) ?? "" }, guard.target, guard.memberKind);
     if (verdict === "join") continue;
     const collections = repo.collectionsOf(editions.map((edition) => edition.id));
     flagged.push({

@@ -521,13 +521,20 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     WHERE books.work_id IN (SELECT value FROM json_each(?)) AND book_collections.source = 'ol-edition'
     ORDER BY book_collections.rowid
   `);
-  const seriesHasOtherMembersStmt = db.prepare(`
+  const otherSeriesStmt = db.prepare(`
     SELECT 1 FROM work_series JOIN works ON works.id = work_series.work_id
     WHERE work_series.name_key = ?1 AND COALESCE(works.merged_into, works.id) <> ?2
-    UNION ALL
+    LIMIT 1
+  `);
+  const otherCollectionStmt = db.prepare(`
     SELECT 1 FROM book_collections JOIN books ON books.id = book_collections.book_id JOIN works ON works.id = books.work_id
     WHERE book_collections.name_key = ?1 AND COALESCE(works.merged_into, works.id) <> ?2
     LIMIT 1
+  `);
+  const seriesPositionsStmt = db.prepare(`
+    SELECT name_key, position FROM work_series
+    WHERE work_id = ?1 OR work_id IN (SELECT id FROM works WHERE merged_into = ?1)
+    ORDER BY rowid
   `);
   const upsertWorkAwardStmt = db.prepare(`
     INSERT INTO work_awards (work_id, prize, year, won, honoree, created_at) VALUES (?, ?, ?, ?, ?, ?)
@@ -1332,8 +1339,13 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       });
     },
 
-    seriesHasOtherMembers(nameKey, workId) {
-      return seriesHasOtherMembersStmt.get(nameKey, workId) !== undefined;
+    seriesMemberKind(nameKey, workId) {
+      if (otherSeriesStmt.get(nameKey, workId) !== undefined) return "series";
+      return otherCollectionStmt.get(nameKey, workId) !== undefined ? "collection" : null;
+    },
+
+    seriesPositionsOf(workId) {
+      return (seriesPositionsStmt.all(workId) as Array<{ name_key: string; position: string | null }>).map((row) => ({ nameKey: row.name_key, position: row.position }));
     },
 
     bestSeriesOf(workIds) {

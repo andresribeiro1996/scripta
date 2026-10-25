@@ -144,7 +144,8 @@ export interface BooksRepository {
   addWorkSeries(workId: string, entries: SeriesEntry[], source: SeriesSource, at: string): number;
   removeWorkSeries(workId: string, nameKey: string, source: SeriesSource): number;
   addBookCollection(bookId: string, entry: SeriesEntry, source: CollectionSource, at: string): boolean;
-  seriesHasOtherMembers(nameKey: string, workId: string): boolean;
+  seriesMemberKind(nameKey: string, workId: string): "series" | "collection" | null;
+  seriesPositionsOf(workId: string): Array<{ nameKey: string; position: string | null }>;
   bestSeriesOf(workIds: string[]): Map<string, SeriesEntry>;
   collectionsOf(bookIds: string[]): Map<string, SeriesEntry>;
   searchSeriesWorks(tokens: string[], limit: number): string[];
