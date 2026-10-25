@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { playerLabel, quizOptionLabel, quizQuestionLabel, scoreRows } from "./labels.js";
+import { playerLabel, quizClueHeading, quizOptionLabel, quizQuestionLabel, scoreRows } from "./labels.js";
 import type { PublicQuizQuestion, QuizBook, QuizQuestion } from "./types.js";
 
 const books: QuizBook[] = [{ workId: "w1", title: "Dune", author: "Frank Herbert", coverUrl: "/c/dune.jpg", quote: null, blurb: null }];
@@ -33,4 +33,10 @@ test("score rows carry the right answer, and the pick when wrong", () => {
   assert.deepEqual(rows[0], { id: "q0", number: 1, correct: false, answer: { kind: "cover", value: "/c/b.jpg", title: "Dune" }, pick: { kind: "cover", value: "/c/a.jpg" } });
   assert.deepEqual(rows[1], { id: "q1", number: 2, correct: true, answer: { kind: "text", value: "Dune" } });
   assert.deepEqual(scoreRows(questions, correct, undefined), [{ id: "q0", number: 1, correct: false }, { id: "q1", number: 2, correct: true }]);
+});
+
+test("the discover clue heading follows the question type", () => {
+  assert.equal(quizClueHeading("characters_title"), "Which book has these characters?");
+  assert.equal(quizClueHeading("title_cover"), "Which cover belongs to this title?");
+  assert.equal(quizClueHeading("quote_title"), "Which book is this from?");
 });

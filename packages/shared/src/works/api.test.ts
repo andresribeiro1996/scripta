@@ -43,3 +43,15 @@ test("fetchWorkCharacters posts the ids", async () => {
   assert.deepEqual(await createWorksApi(request).fetchWorkCharacters(["a", "b"]), { characters: {} });
   assert.deepEqual(calls, [{ path: "/works/characters", init: { method: "POST", body: { workIds: ["a", "b"] }, auth: "optional" } }]);
 });
+
+test("fetchWorkCharacters splits more than 500 ids into two posts and merges them", async () => {
+  const sizes: number[] = [];
+  const request = (async (_path: string, init: ApiRequestInit) => {
+    const ids = (init.body as { workIds: string[] }).workIds;
+    sizes.push(ids.length);
+    return { characters: { [ids[0]]: ["x"] } };
+  }) as ApiRequest;
+  const ids = Array.from({ length: 501 }, (_, i) => `w${i}`);
+  assert.deepEqual(await createWorksApi(request).fetchWorkCharacters(ids), { characters: { w0: ["x"], w500: ["x"] } });
+  assert.deepEqual(sizes, [500, 1]);
+});

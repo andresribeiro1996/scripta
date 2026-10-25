@@ -8,6 +8,7 @@ import { useLibrary, useWorkBooks } from "../library";
 import { Button, Input, Screen, Segmented, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { resolveCover } from "../library/api/covers";
 import { createQuiz, type Quiz } from "./api";
+import { useWorkCharacters } from "./useWorkCharacters";
 
 const SOURCES = [{ value: "shelf", label: "Shelf" }, { value: "collection", label: "Collection" }, { value: "pool", label: "Famous" }] as const;
 type Source = (typeof SOURCES)[number]["value"];
@@ -100,7 +101,12 @@ export function QuizCreateScreen() {
     ? QUIZ_POOL.filter((book) => poolIds.includes(book.id)).map(({ id: _id, ...book }) => book)
     : shelfRawBooks.map((raw) => toQuizBook(raw, resolvedCovers[bookKey(raw)]));
 
-  const availableTypes = QUIZ_QUESTION_TYPES.filter((type) => books.some((book) => eligibleTypes(book).includes(type)));
+  const { characters, failed: charactersFailed } = useWorkCharacters(books.flatMap((book) => (book.workId ? [book.workId] : [])));
+  const offeredBooks = books.map((book) => {
+    const found = book.workId ? characters[book.workId] : undefined;
+    return found ? { ...book, characters: found } : book;
+  });
+  const availableTypes = QUIZ_QUESTION_TYPES.filter((type) => offeredBooks.some((book) => eligibleTypes(book).includes(type)));
   const effectiveTypes = allowedTypes.filter((type) => availableTypes.includes(type));
   const lengthOptions = LENGTHS.filter((count) => count <= books.length);
   const effectiveCount = lengthOptions.includes(questionCount) ? questionCount : (lengthOptions[lengthOptions.length - 1] ?? 0);
@@ -162,6 +168,7 @@ export function QuizCreateScreen() {
         <Text {...dynamicType} style={[typography.caption, styles.grow, { color: colors.textDim }]}>Some covers couldn't be checked, so cover questions may be unavailable.</Text>
         <Button label="Retry" variant="secondary" onPress={() => { setResolveFailed(false); setResolveAttempt((value) => value + 1); }} />
       </View> : null}
+      {charactersFailed ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Characters couldn't be checked</Text> : null}
       <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{books.length} {books.length === 1 ? "book" : "books"} selected</Text>
     </> : <ScrollView contentContainerStyle={styles.stepScroll} keyboardShouldPersistTaps="handled">
       <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>Questions</Text>
