@@ -190,10 +190,12 @@ export function BookScreen({ page, book, model, signedIn, onAdd, onSelectEdition
         {model.characters.shown.length > 0 ? (
           <Text {...dynamicType} style={[typography.caption, styles.centeredText, { color: colors.textDim }]}>
             {`Characters: ${(charactersOpen ? [...model.characters.shown, ...model.characters.more] : model.characters.shown).join(", ")}`}
-            {model.characters.more.length > 0 && !charactersOpen ? (
-              <Text accessibilityRole="button" onPress={() => setCharactersOpen(true)} style={{ color: colors.accent }}>{` +${model.characters.more.length} more`}</Text>
-            ) : null}
           </Text>
+        ) : null}
+        {model.characters.shown.length > 0 && model.characters.more.length > 0 && !charactersOpen ? (
+          <Pressable accessibilityRole="button" accessibilityLabel="Show all characters" onPress={() => setCharactersOpen(true)} style={{ minHeight: minimumTouchTarget, justifyContent: "center" }}>
+            <Text {...dynamicType} style={[typography.caption, { color: colors.accent }]}>{`+${model.characters.more.length} more`}</Text>
+          </Pressable>
         ) : null}
         {model.genres.length + model.possibleGenres.length > 0 ? (
           <View style={styles.chips}>

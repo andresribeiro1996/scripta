@@ -218,7 +218,7 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
                 {model.characters.more.length > 0 && !allCharacters ? (
                   <>
                     {" "}
-                    <button type="button" onClick={() => setAllCharacters(true)} className="font-semibold text-(--color-accent)">{`+${model.characters.more.length} more`}</button>
+                    <button type="button" aria-label="Show all characters" onClick={() => setAllCharacters(true)} className="inline-flex min-h-11 items-center font-semibold text-(--color-accent)">{`+${model.characters.more.length} more`}</button>
                   </>
                 ) : null}
               </p>

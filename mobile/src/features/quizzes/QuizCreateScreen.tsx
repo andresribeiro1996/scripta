@@ -168,7 +168,6 @@ export function QuizCreateScreen() {
         <Text {...dynamicType} style={[typography.caption, styles.grow, { color: colors.textDim }]}>Some covers couldn't be checked, so cover questions may be unavailable.</Text>
         <Button label="Retry" variant="secondary" onPress={() => { setResolveFailed(false); setResolveAttempt((value) => value + 1); }} />
       </View> : null}
-      {charactersFailed ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Characters couldn't be checked</Text> : null}
       <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{books.length} {books.length === 1 ? "book" : "books"} selected</Text>
     </> : <ScrollView contentContainerStyle={styles.stepScroll} keyboardShouldPersistTaps="handled">
       <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>Questions</Text>
@@ -180,6 +179,7 @@ export function QuizCreateScreen() {
         ))}
       </View>
       <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>Question types</Text>
+      {charactersFailed ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Characters couldn't be checked</Text> : null}
       {QUIZ_QUESTION_TYPES.map((type) => {
         const offered = availableTypes.includes(type);
         const checked = offered && effectiveTypes.includes(type);

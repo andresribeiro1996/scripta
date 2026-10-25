@@ -119,3 +119,16 @@ test("characters_title is skipped when fewer than three clean distractors remain
   const shared = ["a", "b", "c", "d"].map((k) => book(k, { characters: ["Same", `${k}2`, `${k}3`] }));
   assert.equal(generateQuizQuestions(shared, { questionCount: 4, allowedTypes: ["characters_title"] }, "s").length, 0);
 });
+
+test("a book whose characters_title draw falls short keeps its other types", () => {
+  const cast = ["Frodo Baggins", "Samwise Gamgee", "Gandalf"];
+  const lotr = ["fellowship", "towers", "king"].map((k) => book(k, { characters: cast }));
+  const hobbit = book("hobbit", { characters: ["Bilbo Baggins", "Gandalf", "Thorin"] });
+  const all: QuizConfig = {
+    questionCount: 4,
+    allowedTypes: ["cover_title", "title_cover", "quote_title", "blurb_title", "characters_title"]
+  };
+  for (let i = 0; i < 200; i++) {
+    assert.equal(generateQuizQuestions([...lotr, hobbit], all, `seed${i}`).length, 4);
+  }
+});

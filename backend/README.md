@@ -665,7 +665,9 @@ Read `quizReady` from the dry run. Re-run after large imports.
 
 ```bash
 npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && setsid node scripts/fill-characters.mjs --dry-run > /data/fill-characters-dry.json 2> /data/fill-characters-dry.log < /dev/null & sleep 3; ls -l /data/fill-characters-dry.*'
+npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cat /data/fill-characters-dry.json; tail -n 3 /data/fill-characters-dry.log'
 npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && setsid node scripts/fill-characters.mjs > /data/fill-characters.json 2> /data/fill-characters.log < /dev/null & sleep 3; ls -l /data/fill-characters.*'
+npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cat /data/fill-characters.json; tail -n 3 /data/fill-characters.log'
 ```
 
 #### Known limitations of covers, details and search, and the options for each
