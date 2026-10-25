@@ -27,7 +27,7 @@ test("Settings' Change buttons and fields meet the 44px floor and carry labels",
 
 test("Style and Cover chips and Home activity rows are 44px targets", () => {
   const card = src("components/BookCard");
-  assert.equal(card.match(/flex min-h-11 min-w-11 items-center justify-center/g)?.length, 2);
+  assert.equal(card.match(/flex min-h-11 min-w-11 items-start justify-center/g)?.length, 2);
   assert.match(src("pages/HomePage"), /<Link to=\{digestTarget\(item\)\} className="flex min-h-11/);
 });
 
