@@ -37,12 +37,12 @@ export function scoreQueries(queries: Array<{ q: string; hidden: boolean }>, ran
   };
 }
 
-type CandidateRepo = Pick<BooksRepository, "searchBooks" | "canonicalWorkIds" | "matchingSeries" | "matchCandidates">;
+type CandidateRepo = Pick<BooksRepository, "searchBooks" | "canonicalWorkIds" | "searchSeries" | "matchCandidates">;
 
 export function scorecardCandidates(repo: CandidateRepo, query: string, limit = 40): Array<{ workId: string; title: string; author: string; year: number | null }> {
   const tokens = searchTokens(query);
   const position = (value: string | null) => (value !== null && Number.isFinite(Number(value)) ? Number(value) : Infinity);
-  const series = [...(repo.matchingSeries(tokens)[0]?.members ?? [])].sort((a, b) => position(a.position) - position(b.position)).map(({ workId }) => workId);
+  const series = [...(repo.searchSeries(tokens).matches[0]?.members ?? [])].sort((a, b) => position(a.position) - position(b.position)).map(({ workId }) => workId);
   const rows = repo.searchBooks(tokens, 500);
   const canonical = repo.canonicalWorkIds(workIdsOf(rows));
   const fts = [...new Set(rows.flatMap((row) => (row.work_id ? [canonical.get(row.work_id) ?? row.work_id] : [])))];

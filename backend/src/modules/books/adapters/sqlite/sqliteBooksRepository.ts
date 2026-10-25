@@ -459,7 +459,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const detailsMissingStmt = db.prepare(`UPDATE books SET details_status = 'missing', details_checked_at = ? WHERE id = ?`);
   const detailsAttemptedStmt = db.prepare(`UPDATE books SET details_checked_at = ? WHERE id = ?`);
   const searchStmt = db.prepare(`
-    SELECT books.* FROM (
+    SELECT books.*, hits.score AS search_score FROM (
       SELECT rowid AS fts_row, bm25(books_fts) AS score FROM books_fts
       WHERE books_fts MATCH ? ORDER BY score, fts_row LIMIT ?
     ) AS hits
@@ -564,8 +564,19 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     ORDER BY work_awards.prize, work_awards.created_at, work_awards.rowid
   `);
   const collectionsOfStmt = db.prepare(`SELECT book_id, name, position FROM book_collections WHERE book_id IN (SELECT value FROM json_each(?)) ORDER BY created_at, rowid`);
-  const searchSeriesStmt = db.prepare(`SELECT work_id FROM series_fts WHERE series_fts MATCH ? ORDER BY bm25(series_fts), rowid LIMIT ?`);
-  const searchSeriesNamesStmt = db.prepare(`SELECT name FROM series_fts WHERE series_fts MATCH ? ORDER BY bm25(series_fts), rowid LIMIT ?`);
+  const searchSeriesStmt = db.prepare(`SELECT work_id, name FROM series_fts WHERE series_fts MATCH ? ORDER BY bm25(series_fts), rowid LIMIT ?`);
+  const workSignalsStmt = db.prepare(`
+    WITH roots(id) AS (SELECT DISTINCT value FROM json_each(?)),
+    members(root, work_id) AS (
+      SELECT id, id FROM roots
+      UNION ALL
+      SELECT works.merged_into, works.id FROM works WHERE works.merged_into IN (SELECT id FROM roots)
+    )
+    SELECT members.root AS work_id, COUNT(*) AS editions, COUNT(DISTINCT books.language) AS languages,
+      MAX(books.cover_image_id IS NOT NULL OR books.ol_cover_id IS NOT NULL) AS has_cover
+    FROM members JOIN books ON books.work_id = members.work_id
+    GROUP BY members.root
+  `);
   const seriesMembersStmt = db.prepare(`SELECT work_id, name_key, position, source FROM work_series WHERE name_key IN (SELECT value FROM json_each(?)) ORDER BY rowid`);
   const searchCollectionsStmt = db.prepare(`
     SELECT hits.book_id AS book_id, hits.name AS name, (
@@ -893,7 +904,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
 
     searchBooks(tokens, limit) {
       if (tokens.length === 0) return [];
-      return searchStmt.all(matchExpression(tokens), limit) as unknown as BookRow[];
+      return searchStmt.all(matchExpression(tokens), limit) as unknown as Array<BookRow & { search_score: number }>;
     },
 
     listUncheckedCoverIds(after, limit) {
@@ -1429,26 +1440,21 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       return earliest;
     },
 
-    searchSeriesWorks(tokens, limit) {
-      if (tokens.length === 0) return [];
-      const hits = (searchSeriesStmt.all(matchExpression(tokens), WORK_SCAN_LIMIT) as Array<{ work_id: string }>).map((row) => row.work_id);
-      const canonical = canonicalWorkIds([...new Set(hits)]);
-      return [...new Set(hits.map((id) => canonical.get(id) ?? id))].slice(0, limit);
-    },
-
-    matchingSeries(tokens) {
-      if (tokens.length === 0) return [];
+    searchSeries(tokens) {
+      if (tokens.length === 0) return { workIds: [], matches: [] };
       const query = withoutArticle(tokens.join(" "));
-      const matchTokens = query.split(" ");
+      const hits = searchSeriesStmt.all(matchExpression(query.split(" ")), WORK_SCAN_LIMIT) as Array<{ work_id: string; name: string }>;
+      const found = canonicalWorkIds([...new Set(hits.map((row) => row.work_id))]);
+      const workIds = [...new Set(hits.map((row) => found.get(row.work_id) ?? row.work_id))];
       const names = new Map<string, { name: string; exact: boolean }>();
-      for (const { name } of searchSeriesNamesStmt.all(matchExpression(matchTokens), WORK_SCAN_LIMIT) as Array<{ name: string }>) {
+      for (const { name } of hits) {
         const nameKey = seriesNameKey(name);
         if (!nameKey || names.has(nameKey)) continue;
         const key = withoutArticle(nameKey);
         if (key === query) names.set(nameKey, { name, exact: true });
         else if (query.length >= 3 && key.startsWith(`${query} `)) names.set(nameKey, { name, exact: false });
       }
-      if (names.size === 0) return [];
+      if (names.size === 0) return { workIds, matches: [] };
       const rows = seriesMembersStmt.all(JSON.stringify([...names.keys()])) as Array<{ work_id: string; name_key: string; position: string | null; source: SeriesSource }>;
       const canonical = canonicalWorkIds([...new Set(rows.map((row) => row.work_id))]);
       const members = new Map<string, Map<string, { position: string | null; rank: number }>>();
@@ -1460,12 +1466,18 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
         if (!seen || rank < seen.rank) own.set(workId, { position: row.position, rank });
         members.set(row.name_key, own);
       }
-      return [...names].map(([nameKey, { name, exact }]) => ({
+      const matches = [...names].map(([nameKey, { name, exact }]) => ({
         nameKey,
         name,
         exact,
         members: [...(members.get(nameKey) ?? [])].map(([workId, { position }]) => ({ workId, position }))
       })).sort((a, b) => Number(b.exact) - Number(a.exact) || b.members.length - a.members.length);
+      return { workIds, matches };
+    },
+
+    workSignals(workIds) {
+      const rows = workSignalsStmt.all(JSON.stringify(workIds)) as Array<{ work_id: string; editions: number; languages: number; has_cover: number }>;
+      return new Map(rows.map((row) => [row.work_id, { editions: row.editions, languages: row.languages, hasCover: row.has_cover === 1, wikipediaSites: null }]));
     },
 
     searchCollectionBooks(tokens, limit) {

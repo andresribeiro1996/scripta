@@ -2,6 +2,7 @@ import type { BookMetadata, BookSearchResult, CatalogBookMetadata, WorkAward } f
 import type { KeyedWork } from "./duplicateWorks.js";
 import type { SynopsisJudgment, SynopsisKind } from "./synopsis.js";
 import type { CollectionSource, SeriesEntry, SeriesSource } from "./series.js";
+import type { WorkSignals } from "./searchRank.js";
 import type { OriginalClaim } from "./translation.js";
 import type { BookRow, CoverImageRow, CoverSourceName, CoverStatus, DataSource, GenreEvidence, GenresSource, JevRejection, JevTask, LossyBook, MergeSource, MojibakeApplied, NewBook, RowRepair, SummarySource, WorkMatchJudgment, WorkPageRows, WorkView } from "./types.js";
 
@@ -52,7 +53,7 @@ export interface BooksRepository {
   mergeDetails(bookId: string, details: MergeableDetails, summarySource: SummarySource | null): void;
   markDetailsMissing(bookId: string, checkedAt: string): void;
   markDetailsAttempted(bookId: string, checkedAt: string): void;
-  searchBooks(tokens: string[], limit: number): BookRow[];
+  searchBooks(tokens: string[], limit: number): Array<BookRow & { search_score: number }>;
   listUncheckedCoverIds(after: PageCursor | null, limit: number): IdPage;
   listUncheckedDetailIds(limit: number): string[];
   listHeldBnpDetailIds(workIds: string[], limit: number): string[];
@@ -153,8 +154,8 @@ export interface BooksRepository {
   seriesPositionsOf(workId: string): Array<{ nameKey: string; position: string | null }>;
   bestSeriesOf(workIds: string[]): Map<string, SeriesEntry>;
   collectionsOf(bookIds: string[]): Map<string, SeriesEntry>;
-  searchSeriesWorks(tokens: string[], limit: number): string[];
-  matchingSeries(tokens: string[]): SeriesMatch[];
+  searchSeries(tokens: string[]): { workIds: string[]; matches: SeriesMatch[] };
+  workSignals(workIds: string[]): Map<string, WorkSignals>;
   searchCollectionBooks(tokens: string[], limit: number): Array<{ bookId: string } & SeriesEntry>;
   addWorkAward(row: { workId: string; prize: string; year: number; won: boolean; honoree: string | null }, at: string): boolean;
   awardsOf(workIds: string[]): Map<string, WorkAward[]>;

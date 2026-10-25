@@ -3185,11 +3185,11 @@ test("filling a work's blank author with fillIdentity makes its series findable 
   const other = seriesBook(repo, "Return of the Crimson Guard", "9780765348821", "Ian Esslemont");
   repo.addWorkSeries(blank.work_id!, [{ name: MALAZAN, position: "3" }], "wikidata", AT);
   repo.addWorkSeries(other.work_id!, [{ name: MALAZAN, position: "1" }], "wikidata", AT);
-  assert.deepEqual(repo.searchSeriesWorks(["malazan", "erikson"], 12), []);
+  assert.deepEqual(repo.searchSeries(["malazan", "erikson"]).workIds, []);
   repo.fillIdentity(blank.id, "Memories of Ice", "Steven Erikson");
-  assert.deepEqual(repo.searchSeriesWorks(["malazan", "erikson"], 12), [blank.work_id]);
-  assert.deepEqual(repo.searchSeriesWorks(["malazan", "esslemont"], 12), [other.work_id]);
-  assert.deepEqual(new Set(repo.searchSeriesWorks(["malazan"], 12)), new Set([blank.work_id, other.work_id]));
+  assert.deepEqual(repo.searchSeries(["malazan", "erikson"]).workIds, [blank.work_id]);
+  assert.deepEqual(repo.searchSeries(["malazan", "esslemont"]).workIds, [other.work_id]);
+  assert.deepEqual(new Set(repo.searchSeries(["malazan"]).workIds), new Set([blank.work_id, other.work_id]));
 });
 
 test("a second edition that fills a held work's blank author makes every series on that work findable by author", () => {
@@ -3197,10 +3197,10 @@ test("a second edition that fills a held work's blank author makes every series 
   const first = repo.createBook({ title: "Memories of Ice", author: "", isbn: "9780765348807", workKey: "OL1W" }, ["isbn:9780765348807"], NOW);
   repo.addWorkSeries(first.work_id!, [{ name: MALAZAN, position: "3" }], "wikidata", AT);
   repo.addWorkSeries(first.work_id!, [{ name: "Malazan Empire", position: null }], "ol-subject", AT);
-  assert.deepEqual(repo.searchSeriesWorks(["empire", "erikson"], 12), []);
+  assert.deepEqual(repo.searchSeries(["empire", "erikson"]).workIds, []);
   repo.createBook({ title: "Memories of Ice", author: "Steven Erikson", isbn: "9780765316974", workKey: "OL1W" }, ["isbn:9780765316974"], NOW);
-  assert.deepEqual(repo.searchSeriesWorks(["malazan", "erikson"], 12), [first.work_id]);
-  assert.deepEqual(repo.searchSeriesWorks(["empire", "erikson"], 12), [first.work_id]);
+  assert.deepEqual(repo.searchSeries(["malazan", "erikson"]).workIds, [first.work_id]);
+  assert.deepEqual(repo.searchSeries(["empire", "erikson"]).workIds, [first.work_id]);
 });
 
 test("assigning a legacy edition to a held work with a blank author makes the work's series findable by author", () => {
@@ -3210,9 +3210,9 @@ test("assigning a legacy edition to a held work with a blank author makes the wo
   db.prepare("UPDATE books SET work_id = NULL WHERE id = ?").run(legacy.id);
   db.prepare("UPDATE works SET author = '' WHERE id = ?").run(held.work_id);
   repo.addWorkSeries(held.work_id!, [{ name: MALAZAN, position: "3" }], "wikidata", AT);
-  assert.deepEqual(repo.searchSeriesWorks(["malazan", "erikson"], 12), []);
+  assert.deepEqual(repo.searchSeries(["malazan", "erikson"]).workIds, []);
   assert.equal(repo.assignMissingWorks(250), 1);
-  assert.deepEqual(repo.searchSeriesWorks(["malazan", "erikson"], 12), [held.work_id]);
+  assert.deepEqual(repo.searchSeries(["malazan", "erikson"]).workIds, [held.work_id]);
 });
 
 test("keying an edition into a held work with a blank author makes the work's series findable by author", () => {
@@ -3220,10 +3220,10 @@ test("keying an edition into a held work with a blank author makes the work's se
   const held = repo.createBook({ title: "Memories of Ice", author: "", isbn: "9780765348807", workKey: "OL1W" }, ["isbn:9780765348807"], NOW);
   const edition = repo.createBook({ title: "Memories of Ice", author: "Steven Erikson", isbn: "9780765316974" }, ["isbn:9780765316974"], NOW);
   repo.addWorkSeries(held.work_id!, [{ name: MALAZAN, position: "3" }], "wikidata", AT);
-  assert.deepEqual(repo.searchSeriesWorks(["malazan", "erikson"], 12), []);
+  assert.deepEqual(repo.searchSeries(["malazan", "erikson"]).workIds, []);
   repo.setWorkKey(edition.id, "OL1W");
   assert.equal(repo.getBook(edition.id)!.work_id, held.work_id);
-  assert.deepEqual(repo.searchSeriesWorks(["malazan", "erikson"], 12), [held.work_id]);
+  assert.deepEqual(repo.searchSeries(["malazan", "erikson"]).workIds, [held.work_id]);
 });
 
 test("merging an edition with an author into a blank-authored work makes the target's series findable by author", () => {
@@ -3231,9 +3231,9 @@ test("merging an edition with an author into a blank-authored work makes the tar
   const target = repo.createBook({ title: "Memories of Ice", author: "", isbn: "9780765348807" }, ["isbn:9780765348807"], NOW);
   const source = repo.createBook({ title: "Memórias de Gelo", author: "Steven Erikson", isbn: "9789896414672" }, ["isbn:9789896414672"], NOW);
   repo.addWorkSeries(target.work_id!, [{ name: MALAZAN, position: "3" }], "wikidata", AT);
-  assert.deepEqual(repo.searchSeriesWorks(["malazan", "erikson"], 12), []);
+  assert.deepEqual(repo.searchSeries(["malazan", "erikson"]).workIds, []);
   assert.equal(repo.mergeWorks(source.work_id!, target.work_id!), target.work_id);
-  assert.deepEqual(repo.searchSeriesWorks(["malazan", "erikson"], 12), [target.work_id]);
+  assert.deepEqual(repo.searchSeries(["malazan", "erikson"]).workIds, [target.work_id]);
 });
 
 test("a work whose author is already set keeps its indexed author when a later edition has a different one", () => {
@@ -3241,8 +3241,8 @@ test("a work whose author is already set keeps its indexed author when a later e
   const first = repo.createBook({ title: "Memories of Ice", author: "Steven Erikson", isbn: "9780765348807", workKey: "OL1W" }, ["isbn:9780765348807"], NOW);
   repo.addWorkSeries(first.work_id!, [{ name: MALAZAN, position: "3" }], "wikidata", AT);
   repo.createBook({ title: "Memories of Ice", author: "S. Erikson", isbn: "9780765316974", workKey: "OL1W" }, ["isbn:9780765316974"], NOW);
-  assert.deepEqual(repo.searchSeriesWorks(["malazan", "erikson"], 12), [first.work_id]);
-  assert.deepEqual(repo.searchSeriesWorks(["malazan", "steven"], 12), [first.work_id]);
+  assert.deepEqual(repo.searchSeries(["malazan", "erikson"]).workIds, [first.work_id]);
+  assert.deepEqual(repo.searchSeries(["malazan", "steven"]).workIds, [first.work_id]);
 });
 
 test("bestSeriesOf prefers Wikidata to an Open Library subject, whichever arrived first", () => {
@@ -3320,10 +3320,10 @@ test("removeSeriesNames drops hardcover rows and their search entry", () => {
   const { db, repo } = freshRepo();
   const book = seriesBook(repo, "Memories of Ice", "9780765348807");
   repo.addWorkSeries(book.work_id!, [{ name: MALAZAN, position: "3" }], "hardcover", AT);
-  assert.deepEqual(repo.searchSeriesWorks(["malazan"], 12), [book.work_id]);
+  assert.deepEqual(repo.searchSeries(["malazan"]).workIds, [book.work_id]);
   assert.deepEqual(repo.removeSeriesNames(["malazan book of the fallen"], "hardcover"), { rows: 1, searchRows: 1 });
   assert.equal(countOf(db, "work_series"), 0);
-  assert.deepEqual(repo.searchSeriesWorks(["malazan"], 12), []);
+  assert.deepEqual(repo.searchSeries(["malazan"]).workIds, []);
 });
 
 test("removeSeriesNames keeps the search entry when a wikidata row shares the name key", () => {
@@ -3333,7 +3333,7 @@ test("removeSeriesNames keeps the search entry when a wikidata row shares the na
   repo.addWorkSeries(book.work_id!, [{ name: "Malazan: Book of the Fallen", position: "3" }], "hardcover", AT);
   assert.deepEqual(repo.removeSeriesNames(["malazan book of the fallen"], "hardcover"), { rows: 1, searchRows: 0 });
   assert.equal(countOf(db, "work_series"), 1);
-  assert.deepEqual(repo.searchSeriesWorks(["malazan"], 12), [book.work_id]);
+  assert.deepEqual(repo.searchSeries(["malazan"]).workIds, [book.work_id]);
 });
 
 test("removeSeriesNames leaves another work's search entry alone", () => {
@@ -3343,7 +3343,7 @@ test("removeSeriesNames leaves another work's search entry alone", () => {
   repo.addWorkSeries(first.work_id!, [{ name: MALAZAN, position: "3" }], "hardcover", AT);
   repo.addWorkSeries(other.work_id!, [{ name: MALAZAN, position: "1" }], "wikidata", AT);
   assert.deepEqual(repo.removeSeriesNames(["malazan book of the fallen"], "hardcover"), { rows: 1, searchRows: 1 });
-  assert.deepEqual(repo.searchSeriesWorks(["malazan"], 12), [other.work_id]);
+  assert.deepEqual(repo.searchSeries(["malazan"]).workIds, [other.work_id]);
 });
 
 test("an Open Library edition collection becomes the work's series only when Wikidata or a subject names it too", () => {
@@ -3393,41 +3393,41 @@ test("a series follows its work through a merge and comes back with an undo", ()
   assert.equal(repo.bestSeriesOf([b.work_id!]).has(b.work_id!), false);
 });
 
-test("searchSeriesWorks finds a work by its series name, with or without its author", () => {
+test("searchSeries finds a work by its series name, with or without its author", () => {
   const { repo } = freshRepo();
   const book = seriesBook(repo, "Memories of Ice", "9780765348807");
   const other = seriesBook(repo, "Dune", "9780441013593", "Frank Herbert");
   repo.addWorkSeries(book.work_id!, [{ name: MALAZAN, position: "3" }], "wikidata", AT);
   repo.addWorkSeries(other.work_id!, [{ name: "Dune Chronicles", position: "1" }], "wikidata", AT);
 
-  assert.deepEqual(repo.searchSeriesWorks(["malazan"], 10), [book.work_id]);
-  assert.deepEqual(repo.searchSeriesWorks(["malazan", "erikson"], 10), [book.work_id]);
-  assert.deepEqual(repo.searchSeriesWorks(["malaz"], 10), [book.work_id]);
-  assert.deepEqual(repo.searchSeriesWorks(["malazan", "herbert"], 10), []);
-  assert.deepEqual(repo.searchSeriesWorks(["fallen", "book"], 10), [book.work_id]);
-  assert.deepEqual(repo.searchSeriesWorks([], 10), []);
+  assert.deepEqual(repo.searchSeries(["malazan"]).workIds, [book.work_id]);
+  assert.deepEqual(repo.searchSeries(["malazan", "erikson"]).workIds, [book.work_id]);
+  assert.deepEqual(repo.searchSeries(["malaz"]).workIds, [book.work_id]);
+  assert.deepEqual(repo.searchSeries(["malazan", "herbert"]).workIds, []);
+  assert.deepEqual(repo.searchSeries(["fallen", "book"]).workIds, [book.work_id]);
+  assert.deepEqual(repo.searchSeries([]).workIds, []);
 });
 
-test("searchSeriesWorks ignores diacritics in the series name", () => {
+test("searchSeries ignores diacritics in the series name", () => {
   const { repo } = freshRepo();
   const book = seriesBook(repo, "O Hobbit", "9789720000403", "J. R. R. Tolkien");
   repo.addWorkSeries(book.work_id!, [{ name: "Sénior Coleção", position: null }], "wikidata", AT);
-  assert.deepEqual(repo.searchSeriesWorks(["senior", "colecao"], 10), [book.work_id]);
+  assert.deepEqual(repo.searchSeries(["senior", "colecao"]).workIds, [book.work_id]);
 });
 
-test("searchSeriesWorks returns a merged-away work as its canonical work, once", () => {
+test("searchSeries returns a merged-away work as its canonical work, once", () => {
   const { repo } = freshRepo();
   const a = seriesBook(repo, "Passeio", "9789720000404", "Steven Erikson", "OL932W");
   const b = seriesBook(repo, "Walk", "9780156907395", "Steven Erikson", "OL933W");
   repo.addWorkSeries(a.work_id!, [{ name: MALAZAN, position: "3" }], "wikidata", AT);
-  assert.deepEqual(repo.searchSeriesWorks(["malazan"], 10), [a.work_id]);
+  assert.deepEqual(repo.searchSeries(["malazan"]).workIds, [a.work_id]);
   repo.mergeTranslation(a.work_id!, b.work_id!, "manual", null, AT);
-  assert.deepEqual(repo.searchSeriesWorks(["malazan"], 10), [b.work_id]);
+  assert.deepEqual(repo.searchSeries(["malazan"]).workIds, [b.work_id]);
   repo.addWorkSeries(b.work_id!, [{ name: MALAZAN, position: "3" }], "ol-subject", AT);
-  assert.deepEqual(repo.searchSeriesWorks(["malazan"], 10), [b.work_id]);
+  assert.deepEqual(repo.searchSeries(["malazan"]).workIds, [b.work_id]);
 });
 
-test("searchSeriesWorks dedupes merged works before it applies the limit", () => {
+test("searchSeries lists merged works once, under their canonical id", () => {
   const { repo } = freshRepo();
   const target = seriesBook(repo, "Target", "9780000000011", "Steven Erikson", "OL934W");
   const aliases = [1, 2, 3].map((n) => seriesBook(repo, `Alias ${n}`, `978000000002${n}`, "Steven Erikson"));
@@ -3436,8 +3436,30 @@ test("searchSeriesWorks dedupes merged works before it applies the limit", () =>
   repo.addWorkSeries(other.work_id!, [{ name: "Saga", position: null }], "wikidata", AT);
   for (const alias of aliases) repo.mergeTranslation(alias.work_id!, target.work_id!, "manual", null, AT);
 
-  assert.deepEqual(repo.searchSeriesWorks(["saga"], 2), [target.work_id, other.work_id]);
-  assert.deepEqual(repo.searchSeriesWorks(["saga"], 1), [target.work_id]);
+  assert.deepEqual(repo.searchSeries(["saga"]).workIds, [target.work_id, other.work_id]);
+});
+
+test("workSignals counts editions, languages and covers across a work and the works merged into it", () => {
+  const { db, repo } = freshRepo();
+  const target = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593", workKey: "OL1W" }, ["isbn:9780441013593"], NOW);
+  repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780593099322", workKey: "OL1W" }, ["isbn:9780593099322"], NOW);
+  const alias = repo.createBook({ title: "Duna", author: "Frank Herbert", isbn: "9789722345678", workKey: "OL2W", olCoverId: 7 }, ["isbn:9789722345678"], NOW);
+  const bare = repo.createBook({ title: "Other", author: "Ana Lima", isbn: "9780000000011", workKey: "OL3W" }, ["isbn:9780000000011"], NOW);
+  repo.setLanguage(target.id, "en");
+  repo.setLanguage(alias.id, "pt");
+  db.prepare("UPDATE works SET merged_into = ? WHERE id = ?").run(target.work_id, alias.work_id);
+  const signals = repo.workSignals([target.work_id!, bare.work_id!, "missing"]);
+  assert.deepEqual(signals.get(target.work_id!), { editions: 3, languages: 2, hasCover: true, wikipediaSites: null });
+  assert.deepEqual(signals.get(bare.work_id!), { editions: 1, languages: 0, hasCover: false, wikipediaSites: null });
+  assert.equal(signals.has("missing"), false);
+});
+
+test("searchBooks returns each row's bm25 score", () => {
+  const { repo } = freshRepo();
+  repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593", createdBy: "seed" }, ["isbn:9780441013593"], NOW);
+  const [row] = repo.searchBooks(["dune"], 10);
+  assert.equal(typeof row!.search_score, "number");
+  assert.ok(row!.search_score < 0);
 });
 
 test("addBookCollection stores a collection on an edition, and collectionsOf and searchCollectionBooks find it", () => {
@@ -3919,48 +3941,48 @@ const matchBook = (repo: ReturnType<typeof freshRepo>["repo"], title: string, is
   return book;
 };
 
-test("matchingSeries matches whole words, ranks exact before prefix and ignores a leading article", () => {
+test("searchSeries matches whole words, ranks exact before prefix and ignores a leading article", () => {
   const { repo } = freshRepo();
   matchBook(repo, "Fellowship", "9780261102354", ["The Lord of the Rings"]);
   matchBook(repo, "Silmarillion", "9780261102736", ["Lord of the Rings Companions", "Warriors"]);
   matchBook(repo, "Hobbit", "9780261102217", ["Lord of the Rings Companions"]);
-  assert.deepEqual(repo.matchingSeries(["lord", "of", "the", "rings"]).map(({ name, exact, members }) => [name, exact, members.length]), [
+  assert.deepEqual(repo.searchSeries(["lord", "of", "the", "rings"]).matches.map(({ name, exact, members }) => [name, exact, members.length]), [
     ["The Lord of the Rings", true, 1],
     ["Lord of the Rings Companions", false, 2]
   ]);
-  assert.deepEqual(repo.matchingSeries(["war"]), []);
-  assert.deepEqual(repo.matchingSeries(["warriors"]).map(({ name }) => name), ["Warriors"]);
+  assert.deepEqual(repo.searchSeries(["war"]).matches, []);
+  assert.deepEqual(repo.searchSeries(["warriors"]).matches.map(({ name }) => name), ["Warriors"]);
 });
 
-test("matchingSeries gives a two-character query no prefix matches", () => {
+test("searchSeries gives a two-character query no prefix matches", () => {
   const { repo } = freshRepo();
   matchBook(repo, "Fellowship", "9780261102354", ["Lo Series"]);
   matchBook(repo, "Silmarillion", "9780261102736", ["Lo"]);
-  assert.deepEqual(repo.matchingSeries(["lo"]).map(({ name, exact }) => [name, exact]), [["Lo", true]]);
+  assert.deepEqual(repo.searchSeries(["lo"]).matches.map(({ name, exact }) => [name, exact]), [["Lo", true]]);
 });
 
-test("matchingSeries lists a merged work once under its canonical id with its best source's position", () => {
+test("searchSeries lists a merged work once under its canonical id with its best source's position", () => {
   const { repo } = freshRepo();
   const keep = seriesBook(repo, "Gardens of the Moon", "9780765348807");
   const lose = seriesBook(repo, "Gardens of the Moon (Portuguese)", "9789897770012");
   repo.addWorkSeries(keep.work_id!, [{ name: MALAZAN, position: "9" }], "ol-subject", AT);
   repo.addWorkSeries(lose.work_id!, [{ name: MALAZAN, position: "1" }], "wikidata", AT);
   repo.mergeWorks(lose.work_id!, keep.work_id!, AT);
-  const [entry] = repo.matchingSeries(["malazan", "book", "of", "the", "fallen"]);
+  const [entry] = repo.searchSeries(["malazan", "book", "of", "the", "fallen"]).matches;
   assert.deepEqual(entry!.members, [{ workId: keep.work_id, position: "1" }]);
 });
 
-test("matchingSeries matches a Portuguese series exactly without its leading article", () => {
+test("searchSeries matches a Portuguese series exactly without its leading article", () => {
   const { repo } = freshRepo();
   matchBook(repo, "A Sociedade do Anel", "9789722317665", ["O Senhor dos Anéis"]);
-  assert.deepEqual(repo.matchingSeries(["senhor", "dos", "aneis"]).map(({ name, exact }) => [name, exact]), [["O Senhor dos Anéis", true]]);
+  assert.deepEqual(repo.searchSeries(["senhor", "dos", "aneis"]).matches.map(({ name, exact }) => [name, exact]), [["O Senhor dos Anéis", true]]);
 });
 
-test("matchingSeries ignores a leading article in the query as well as in the name", () => {
+test("searchSeries ignores a leading article in the query as well as in the name", () => {
   const { repo } = freshRepo();
   matchBook(repo, "The Eye of the World", "9780812511819", ["Wheel of Time"]);
   matchBook(repo, "A Sociedade do Anel", "9789722317665", ["Senhor dos Anéis"]);
-  assert.deepEqual(repo.matchingSeries(["the", "wheel", "of", "time"]).map(({ name, exact }) => [name, exact]), [["Wheel of Time", true]]);
-  assert.deepEqual(repo.matchingSeries(["o", "senhor", "dos", "aneis"]).map(({ name, exact }) => [name, exact]), [["Senhor dos Anéis", true]]);
-  assert.deepEqual(repo.matchingSeries(["the"]), []);
+  assert.deepEqual(repo.searchSeries(["the", "wheel", "of", "time"]).matches.map(({ name, exact }) => [name, exact]), [["Wheel of Time", true]]);
+  assert.deepEqual(repo.searchSeries(["o", "senhor", "dos", "aneis"]).matches.map(({ name, exact }) => [name, exact]), [["Senhor dos Anéis", true]]);
+  assert.deepEqual(repo.searchSeries(["the"]).matches, []);
 });
