@@ -1719,11 +1719,11 @@ test("the translation review rows list doubts in the order their works were adde
   work.run("original", null, NOW);
   work.run("doubt-b", null, NOW);
   work.run("doubt-a", null, NOW);
-  work.run("merged-b", "original", NOW);
   work.run("merged-a", "original", NOW);
+  work.run("merged-b", "original", NOW);
   const judge = db.prepare("INSERT INTO work_match_judgments (work_id, model, into_work_id, confidence, asked_at) VALUES (?, 'jev-1', 'original', 0.7, ?)");
-  judge.run("doubt-b", NOW);
   judge.run("doubt-a", NOW);
+  judge.run("doubt-b", NOW);
   const merge = db.prepare("INSERT INTO work_merges (from_work, into_work, source, confidence, moved_book_ids, repointed_work_ids, merged_at) VALUES (?, 'original', ?, NULL, '[]', '[]', ?)");
   merge.run("merged-b", "manual", NOW);
   merge.run("merged-a", "code", NOW);
