@@ -332,7 +332,7 @@ export function Input({
         <Icon name="close" size={20} color={colors.textDim} />
       </Pressable> : null}
       </View>
-      {hint ? <Text {...dynamicType} style={[styles.help, { color: colors.textDim }]}>{hint}</Text> : null}
+      {hint && !error ? <Text {...dynamicType} style={[styles.help, { color: colors.textDim }]}>{hint}</Text> : null}
       {error ? <Text accessibilityLiveRegion="polite" {...dynamicType} style={[styles.help, { color: colors.danger }]}>{error}</Text> : null}
     </View>
   );

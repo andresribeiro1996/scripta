@@ -201,8 +201,23 @@ export function MuralEditorScreen({ id }: { id: string }) {
     }
   }
 
-  if (muralQuery.isPending) return <View style={styles.center}><Text>Loading mural…</Text></View>;
-  if (muralQuery.isError || !mural || !draftMural) return <ErrorState title="Mural unavailable" body="It may have been deleted." actionLabel="Back" onAction={() => router.back()} />;
+  const header = (
+    <Stack.Screen
+      options={{
+        headerShown: true,
+        title: "",
+        headerLargeTitleEnabled: false,
+        headerRight: () => dragging || !draftMural ? null : <MuralThemeScope theme={currentTheme}><HeaderActions>
+          <SaveStateButton busy={busy} unsaved={unsaved} onPress={() => void save()} />
+          <IconButton accessibilityLabel="Mural theme" name="theme" onPress={() => setThemeOpen(true)} />
+          <IconButton accessibilityLabel="Share mural" name="share" onPress={() => setShareFor(draftMural)} />
+        </HeaderActions></MuralThemeScope>,
+      }}
+    />
+  );
+
+  if (muralQuery.isPending) return <View style={styles.center}>{header}<Text>Loading mural…</Text></View>;
+  if (muralQuery.isError || !mural || !draftMural) return <>{header}<ErrorState title="Mural unavailable" body="It may have been deleted." actionLabel="Back" onAction={() => router.back()} /></>;
 
   const blockActions: BlockAction[] = selected ? [
     { key: "edit", label: "Edit", accessibilityLabel: "Edit block content, style and size", icon: "edit", tone: "accent", onPress: () => setSheetTab(isConfigurable(selected.type) ? "content" : "style") },
@@ -228,18 +243,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
   return (
     <MuralScreen theme={currentTheme}>
       {discardDialog}
-      <Stack.Screen
-        options={{
-          headerShown: true,
-          title: "",
-          headerLargeTitleEnabled: false,
-          headerRight: () => dragging ? null : <MuralThemeScope theme={currentTheme}><HeaderActions>
-            <SaveStateButton busy={busy} unsaved={unsaved} onPress={() => void save()} />
-            <IconButton accessibilityLabel="Mural theme" name="theme" onPress={() => setThemeOpen(true)} />
-            <IconButton accessibilityLabel="Share mural" name="share" onPress={() => setShareFor(draftMural)} />
-          </HeaderActions></MuralThemeScope>,
-        }}
-      />
+      {header}
       {error ? <Toast visible message={error} tone="error" /> : null}
       <Animated.ScrollView ref={scrollRef} onLayout={(event) => setViewportHeight(event.nativeEvent.layout.height)} onScroll={onScroll} scrollEventThrottle={16} onContentSizeChange={(_width, height) => { contentHeight.set(height); flushScroll(height); }} keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.canvasScroll, { paddingBottom: Math.max(120, dockHeight + spacing.md) }]}>
         <EditorHeading name={currentName} accessibilityLabel={`Rename mural, ${currentName}`} onRename={() => { setDraftName(currentName); setNameError(undefined); setRenaming(true); }} />
