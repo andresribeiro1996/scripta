@@ -24,7 +24,7 @@ import { MuralConflictError, useMurals } from "../hooks/useMurals";
 import { useTierlists } from "../hooks/useTierlists";
 import { useWorkBooks } from "../hooks/useWorkBooks";
 import { muralThemeStyle, useResolvedTheme } from "../lib/theme";
-import { type BlockStyle } from "../lib/libraryStyle";
+import { DEFAULT_LIBRARY_STYLE, type BlockStyle } from "../lib/libraryStyle";
 import { useAuth } from "../auth/AuthContext";
 import { avatarUrlFor } from "../components/Avatar";
 import {
@@ -440,7 +440,7 @@ export function MuralEditorPage() {
 
   if (isLoading) {
     return (
-      <Page title="Mural" back={backTo("mural")}>
+      <Page title="Mural" back={backTo("mural")} maxWidth={DEFAULT_LIBRARY_STYLE.contentMaxWidth}>
         <p className="text-sm text-(--color-text-dim)">Loading…</p>
       </Page>
     );
@@ -448,7 +448,7 @@ export function MuralEditorPage() {
 
   if (!mural && !isDraft) {
     return (
-      <Page title="Mural" back={backTo("mural")}>
+      <Page title="Mural" back={backTo("mural")} maxWidth={DEFAULT_LIBRARY_STYLE.contentMaxWidth}>
         <p className="text-sm text-(--color-text-dim)">No mural with that id.</p>
       </Page>
     );
@@ -468,6 +468,7 @@ export function MuralEditorPage() {
 
   return (
     <Page
+      maxWidth={DEFAULT_LIBRARY_STYLE.contentMaxWidth}
       back={backToMurals}
       title={editingName ? (
         <input

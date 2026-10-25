@@ -211,7 +211,7 @@ export function ArenaSeedPage() {
   return (
     <Page
       back={backTo("tournament")}
-      subtitle={`${filledCount} / ${bracketSize} slots filled`}
+      subtitle={`${bracketSize}-book bracket`}
       title={editingName ? (
         <input
           autoFocus
