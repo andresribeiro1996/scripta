@@ -27,6 +27,8 @@ export interface RecentAward {
   honoree: string | null;
 }
 
+export type SeriesMatch = { nameKey: string; name: string; exact: boolean; members: Array<{ workId: string; position: string | null }> };
+
 export interface BooksRepository {
   transaction<T>(write: () => T): T;
   findBookByKey(key: string): BookRow | undefined;
@@ -152,6 +154,7 @@ export interface BooksRepository {
   bestSeriesOf(workIds: string[]): Map<string, SeriesEntry>;
   collectionsOf(bookIds: string[]): Map<string, SeriesEntry>;
   searchSeriesWorks(tokens: string[], limit: number): string[];
+  matchingSeries(tokens: string[]): SeriesMatch[];
   searchCollectionBooks(tokens: string[], limit: number): Array<{ bookId: string } & SeriesEntry>;
   addWorkAward(row: { workId: string; prize: string; year: number; won: boolean; honoree: string | null }, at: string): boolean;
   awardsOf(workIds: string[]): Map<string, WorkAward[]>;

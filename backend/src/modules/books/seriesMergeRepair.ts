@@ -149,14 +149,16 @@ export function addSeriesRows(repo: Pick<BooksRepository, "addWorkSeries">, rows
   return rows.reduce((added, row) => added + repo.addWorkSeries(row.workId, [{ name: row.name, position: row.position }], row.source, at), 0);
 }
 
-export function undoReviewedMerges(repo: UndoRepo, fromWorks: string[], now: () => number, progress: (fromWork: string) => void): { undone: string[]; failures: Failure[] } {
-  const reviewed = new Set(fromWorks);
+export function undoReviewedMerges(repo: UndoRepo, fromWorks: string[], now: () => number, progress: (fromWork: string) => void, manualFromWorks: string[] = []): { undone: string[]; failures: Failure[] } {
+  const reviewed = new Set([...fromWorks, ...manualFromWorks]);
+  const manualOk = new Set(manualFromWorks);
   const merges = allActiveMerges(repo);
   const byFrom = new Map(merges.map((merge) => [merge.fromWork, merge]));
-  const requested = merges.filter((merge) => UNDOABLE.includes(merge.source) && reviewed.has(merge.fromWork));
+  const requested = merges.filter((merge) => (UNDOABLE.includes(merge.source) || (merge.source === "manual" && manualOk.has(merge.fromWork))) && reviewed.has(merge.fromWork));
   const queued = new Set(requested.map((merge) => merge.id));
   const found = new Set(requested.map((merge) => merge.fromWork));
   const failures: Failure[] = [...reviewed].filter((fromWork) => !found.has(fromWork)).map((fromWork) => ({ fromWork, reason: "no active code, jev, ol-duplicate or title-key merge" }));
+  if (failures.length > 0) return { undone: [], failures };
   const undone: string[] = [];
   for (const { fromWork, intoWork, source } of requested.sort((a, b) => b.id - a.id)) {
     const blocker = onwardFrom(byFrom, intoWork).find((step) => !queued.has(step.id));
