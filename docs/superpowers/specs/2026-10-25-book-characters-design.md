@@ -60,13 +60,21 @@ People, in order:
    - Fiction subjects match `fiction`, `ficción`, `ficção`, `novel`, `romance` or `romans` as words, case-insensitive. That covers "Fiction", "Fantasy fiction", "Juvenile fiction" and "Fiction, Romance, Historical, Regency".
    - Any subject matching `non-?fiction` never counts as fiction.
    - A work that fails the gate stores no people.
-2. **Strip qualifiers.** Remove a trailing `(Fictional character)`, `(Fictitious character)`, `(Legendary character)` or `(Mythical character)`, case-insensitive.
-3. **Drop life dates.** Drop any name containing a run of three or more digits, which catches "William Shakespeare (1564-1616)" and "Hermann Goering (1893-1946)". HAL 9000 is lost too; that's accepted.
-4. **Drop the author.** Drop names whose key equals the key of one of the work's authors.
-5. **Merge duplicates by `name_key`.**
-   - `name_key` is `seriesNameKey` (`domain/series.ts:10`), with a leading honorific (mr, mrs, ms, miss, dr, sir, lady) removed when two or more words remain. So "Mr. Sherlock Holmes" and "Sherlock Holmes" merge, but "Mr. Bennet" stays "mr bennet".
-   - The merged entry keeps the first occurrence's position and displays the variant with the fewest words.
-6. Drop empty names after trimming.
+2. **Drop translated headings.** Drop a name whose parenthetical starts with `personaje`, `personnage`, `personagem`, `personaggio`, `mythologie` or `mitolog` (case-insensitive), such as "Dracula, Conde (Personaje literario)" or "Achille (Mythologie grecque)". They duplicate an English heading.
+3. **Strip qualifiers.** Remove a trailing `(Fictional character)`, `(Fictitious character)`, `(Legendary character)` or `(Mythical character)`, case-insensitive.
+4. **Drop life dates.** Drop any name containing a run of three or more digits, which catches "William Shakespeare (1564-1616)" and "Hermann Goering (1893-1946)". HAL 9000 is lost too; that's accepted.
+5. **Strip any other trailing parenthetical**, such as "(Greek mythology)", then invert a name with exactly one comma ("Dracula, Count" becomes "Count Dracula").
+6. **Drop the author.** Drop names whose key equals the key of one of the work's authors. The authors are Open Library's `author_name` plus Scripta's own work author, so "Homer" is dropped even when Open Library spells the author "Ὅμηρος". The hook passes the author from the lookup, and the backfill passes `works.author` (`worksWithOpenLibraryKey` returns it; `fetchOpenLibrarySubjects` takes `{ key, author }` pairs).
+7. **Merge duplicates by `name_key`.**
+   - `name_key` is `seriesNameKey` (`domain/series.ts:10`), with a leading honorific (mr, mrs, ms, miss, dr, sir, lady) removed when two or more words remain, and its words sorted. So "Mr. Sherlock Holmes" and "Sherlock Holmes" merge, "Count Dracula" and "Dracula Count" merge, but "Mr. Bennet" and "Bennet" stay distinct.
+   - The merged entry keeps the first occurrence's position and displays the variant with the fewest words (ties: first seen).
+8. **Merge aliases**, over the kept list in order:
+   - A name with two or more key words whose key-word set is a subset of another kept name's set merges into that name ("Rodion Raskolnikov" into "Rodion Romanovich Raskolnikov").
+   - A single-word name merges into the other kept name whose first key word it is, only when exactly one such name exists. "George" stays when "George Weasley" and "George Wickham" are both there.
+   - The merged entry keeps the earliest position of the group and displays the variant with the fewest words.
+9. Drop empty names after trimming.
+
+Accepted gaps: real people without dates on fiction ("Napoléon I"), and no deny list.
 
 Expected results from the 2026-10-25 probes. These become test fixtures:
 

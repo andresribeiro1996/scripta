@@ -67,11 +67,19 @@ test("apply replaces returned works and keeps missing ones", async () => {
   assert.deepEqual(names(missing), ["Kept"]);
 });
 
+test("each fetched work carries its Scripta author", async () => {
+  const { repo } = setup();
+  book(repo, "One", "OL1W");
+  let seen: Array<{ key: string; author: string }> = [];
+  await fillCharacters(repo, async (works) => ((seen = works), new Map()), AT, { dryRun: true, log: quiet });
+  assert.deepEqual(seen, [{ key: "OL1W", author: "Author" }]);
+});
+
 test("batches are 100 keys", async () => {
   const { repo } = setup();
   for (let i = 1; i <= 250; i++) book(repo, `Book ${i}`, `OL${i}W`);
   const sizes: number[] = [];
-  await fillCharacters(repo, async (keys) => (sizes.push(keys.length), new Map()), AT, { dryRun: true, log: quiet });
+  await fillCharacters(repo, async (works) => (sizes.push(works.length), new Map()), AT, { dryRun: true, log: quiet });
   assert.deepEqual(sizes, [100, 100, 50]);
 });
 
@@ -82,9 +90,9 @@ test("a failing batch rejects after earlier batches are written", async () => {
   await assert.rejects(
     fillCharacters(
       repo,
-      async (keys) => {
+      async (works) => {
         if (++calls === 2) throw new Error("boom");
-        return new Map(keys.map((key) => [key, cleaned(["Someone"])]));
+        return new Map(works.map(({ key }) => [key, cleaned(["Someone"])]));
       },
       AT,
       { dryRun: false, log: quiet }

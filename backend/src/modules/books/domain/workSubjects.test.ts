@@ -49,8 +49,33 @@ test("three digits drop a name", () => {
 });
 
 test("one-word honorific stays distinct", () => {
-  assert.equal(personNameKey("Mr. Bennet"), "mr bennet");
+  assert.notEqual(personNameKey("Mr. Bennet"), personNameKey("Bennet"));
   assert.equal(personNameKey("Mr. Sherlock Holmes"), personNameKey("Sherlock Holmes"));
+});
+
+test("dracula drops translated headings, inverts and merges", () => {
+  const result = clean(["Count Dracula (fictitious character)", "Bram Stoker (1847-1912)", "Dracula Count (Fictitious character)", "Dracula, Conde (Personaje literario)", "Dracula, Count (Fictitious character)", "Van Helsing"], ["Fiction"], ["Bram Stoker"]);
+  assert.deepEqual(result.subjects.person, ["Count Dracula", "Van Helsing"]);
+});
+
+test("crime and punishment merges name variants", () => {
+  const result = clean(["Fyodor Dostoyevsky (1821-1881)", "Rodion Raskolnikov", "Rodion Romanovich Raskolnikov", "Porfiry Petrovich", "Sofia Semyonovna Marmeladova", "Avdotya Romanovna Raskolnikova", "Arkady Ivanovich Svidrigailov", "Dmitri Prokofich Razumikhin"], ["Fiction"], ["Fiódor Dostoievski", "Fyodor Dostoevsky"]);
+  assert.deepEqual(result.subjects.person.slice(0, 3), ["Rodion Raskolnikov", "Porfiry Petrovich", "Sofia Semyonovna Marmeladova"]);
+});
+
+test("odyssey strips parentheticals and drops other-language duplicates", () => {
+  const result = clean(["Homer", "Odysseus (Greek mythology)", "Odysseus King of Ithaca (Mythological character)", "Achilles (Greek mythology)", "Calypso (Greek mythology)", "Achille (Mythologie grecque)", "Ulysse (Mythologie grecque)", "Penelope (Greek mythology)"], ["Fiction"], ["Ὅμηρος", "Homer"]);
+  assert.deepEqual(result.subjects.person, ["Odysseus", "Achilles", "Calypso", "Penelope"]);
+});
+
+test("name keys ignore word order", () => {
+  assert.equal(personNameKey("Count Dracula"), personNameKey("Dracula Count"));
+  assert.deepEqual(clean(["Jane Austen", "Emma Woodhouse"], ["Fiction"], ["Austen, Jane"]).subjects.person, ["Emma Woodhouse"]);
+});
+
+test("a single word merges only into one candidate", () => {
+  assert.deepEqual(clean(["George Weasley", "George Wickham", "George"], ["Fiction"]).subjects.person, ["George Weasley", "George Wickham", "George"]);
+  assert.deepEqual(clean(["Harry", "Harry Potter"], ["Fiction"]).subjects.person, ["Harry"]);
 });
 
 test("places and times are trimmed and de-duplicated, ungated", () => {

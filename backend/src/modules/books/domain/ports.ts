@@ -163,7 +163,7 @@ export interface BooksRepository {
   recentAwards(year: number, since: string): RecentAward[];
   replaceWorkSubjects(workId: string, subjects: WorkSubjects, at: string): void;
   charactersOf(workIds: string[]): Map<string, string[]>;
-  worksWithOpenLibraryKey(): Array<{ id: string; olWorkKey: string }>;
+  worksWithOpenLibraryKey(): Array<{ id: string; olWorkKey: string; author: string }>;
 }
 
 export interface CoverCandidate {
