@@ -16,7 +16,9 @@
 
 ## Global Constraints
 
-- **Sidebar areas, in order:** Home, Library, Murals, Games, Reader card, Community, Settings. Admin (admins only) comes last.
+- **Sidebar areas, in order:** Home, Library, Murals, Games, Reader card, Community, Settings.
+- **Admin** (admins only) is not in that list. It is one "Admin" link to `/admin/genres` in the sidebar and drawer footer, above Log out, where `AdminLinks` sits today (spec).
+- **Phone bottom bar:** Home, Library, Murals, Games, then More. The drawer lists every area plus the footer.
 - **Tabs:**
   - Library: Books · Series · Collections · Gallery
   - Games: Tier lists · Quizzes · Tournaments
@@ -27,7 +29,9 @@
 - **Single items** (tier list, quiz, tournament, seed page, mural, Work/book page, community profile) get a back link named after the area ("‹ Games"), and never get tabs.
 - **"Games"** in every visible string. Routes keep `/arena`.
 - **No existing route, query parameter (`?tab=`, `?action=`) or share-link format changes.** The one new address is `/dashboard/settings/appearance` (Ruling: route-based, so the Settings tab is an ordinary link).
-- **Title:** the page's only `h1`, using the `font-display` utility, `text-2xl` (24/30), `sm:text-3xl`. Subtitle `text-sm text-(--color-text-dim)`.
+- **Title:** the page's only `h1`, using the `font-display` utility (`--font-display` in `src/themes.css`), `text-2xl` (24/30), `sm:text-3xl`. Subtitle `text-sm text-(--color-text-dim)`.
+- **Rename-in-place titles** (mural, tier list, seed page, tournament) keep working: `Page`'s `title` is a `ReactNode`, and those pages pass their existing rename button or input as the title, inside the `h1`.
+- **Body padding** is `px-4 py-5 sm:px-5 sm:py-8`, the same as `PageContainer` today, because `ToolbarRow`'s sticky phone offsets (`components/Toolbar.tsx:27`) depend on it.
 - **Band:** `bg-(--color-surface)` with `border-b border-(--color-border)`. Tokens only, no hex values. Every theme must still work.
 - **Active tab:** `text-(--color-text)` plus `border-b-2 border-(--color-accent)`, and `aria-current="page"`. Other tabs: `text-(--color-text-dim)`.
 - **Body width:** the user's `contentMaxWidth` (default `DEFAULT_LIBRARY_STYLE.contentMaxWidth`, 1152) on every signed-in page. Public pages use the default, and the shared library uses the owner's value. Mural canvases keep their own saved width, centred.
@@ -43,8 +47,8 @@
 ## Review Focus
 
 1. **A deep link with an unknown `?tab=`** (`/dashboard/arena?tab=bogus`) should highlight Tournaments, as the page itself treats it. Pinned in Task 1's `activeTabTo` test.
-2. **A non-admin** should see no Admin entry in the sidebar, drawer or bottom bar. Pinned in Task 1's `navAreas(false)` test and Task 3's `SidebarNav` test.
-3. **A signed-out visitor to `/work/:id`** should get no sidebar and a "Log in" link. A signed-in one should get the sidebar with Library highlighted. Pinned in Task 9's `PublicLayout` test and `areaIdForPath("/work/x")` in Task 1.
+2. **A non-admin** should see no Admin entry in the sidebar, drawer or bottom bar. Pinned in Task 1's `footerAreas(false)` test and Task 3's `SidebarNav` test.
+3. **A signed-out visitor to `/work/:id`** should get no sidebar, a "Log in" link, and no back link into the signed-in library. A signed-in one should get the sidebar with Library highlighted. Pinned in Task 9's `PublicLayout` test and `areaIdForPath("/work/x")` in Task 1.
 4. **A 60-character title at 360px** (a long mural or tournament name) should wrap inside the band and never widen the page. Pinned in Task 2's test (`min-w-0 break-words` on the title column) and Task 7's 360px check.
 5. **Old bookmarks** should keep working:
    - `/dashboard/settings` opens Account.
@@ -67,11 +71,12 @@
   ```ts
   export type AreaId = "home" | "library" | "murals" | "games" | "readerCard" | "community" | "settings" | "admin";
   export interface AreaTab { label: string; to: string }
-  export interface Area { id: AreaId; label: string; to: string; tabs: readonly AreaTab[]; adminOnly: boolean }
+  export interface Area { id: AreaId; label: string; to: string; tabs: readonly AreaTab[]; description?: string }
   export const AREAS: readonly Area[];
   export function area(id: AreaId): Area;
-  export function navAreas(isAdmin: boolean): Area[];
-  export const BOTTOM_BAR_AREAS: readonly AreaId[]; // ["home", "library", "games", "murals"]; the More drawer lists every area
+  export const NAV_AREAS: readonly Area[];      // the seven sidebar areas, Admin excluded
+  export function footerAreas(isAdmin: boolean): Area[]; // [area("admin")] or []
+  export const BOTTOM_BAR_AREAS: readonly AreaId[]; // ["home", "library", "murals", "games"]
   export function areaIdForPath(pathname: string): AreaId | null;
   export function activeTabTo(tabs: readonly AreaTab[], location: { pathname: string; search: string }): string | null;
   export type BackKind = "tierlist" | "quiz" | "tournament" | "mural" | "book" | "profile";
@@ -81,9 +86,11 @@
 - [ ] **Step 1: Write the failing tests** in `frontend/scripts/test-areas.mts`.
 
 ```ts
-test("areas come in sidebar order, Admin last and only for admins", () => {
-  assert.deepEqual(navAreas(false).map((a) => a.label), ["Home", "Library", "Murals", "Games", "Reader card", "Community", "Settings"]);
-  assert.deepEqual(navAreas(true).map((a) => a.label).at(-1), "Admin");
+test("areas come in sidebar order; Admin sits in the footer, for admins only", () => {
+  assert.deepEqual(NAV_AREAS.map((a) => a.label), ["Home", "Library", "Murals", "Games", "Reader card", "Community", "Settings"]);
+  assert.deepEqual(footerAreas(false), []);
+  assert.deepEqual(footerAreas(true).map((a) => [a.label, a.to]), [["Admin", "/admin/genres"]]);
+  assert.deepEqual(BOTTOM_BAR_AREAS, ["home", "library", "murals", "games"]);
 });
 
 test("tabs carry today's routes", () => {
@@ -106,7 +113,7 @@ test("the active tab follows path and ?tab=, unknown tabs fall back to the plain
 
 test("every route maps to the area that owns it", () => {
   const cases: Array<[string, AreaId | null]> = [
-    ["/dashboard", "home"], ["/dashboard/library", "library"], ["/dashboard/gallery", "library"], ["/work/w1", "library"], ["/work/w1/stats", "library"], ["/book/isbn:1", "library"],
+    ["/dashboard", "home"], ["/dashboard/library", "library"], ["/dashboard/gallery", "library"], ["/work/w1", "library"], ["/work/w1/stats", "library"], ["/book/isbn:1", "library"], ["/dashboard/libraryx", null],
     ["/dashboard/murals", "murals"], ["/dashboard/murals/m1", "murals"],
     ["/dashboard/arena", "games"], ["/dashboard/arena/quiz/q1", "games"], ["/dashboard/arena/t1/seed", "games"], ["/arena/t1", "games"],
     ["/dashboard/reader-card", "readerCard"], ["/community/people", "community"], ["/community/u/alice", "community"],
@@ -130,7 +137,7 @@ test("back links go to the tab the item belongs to", () => {
 Run: `cd frontend && npx tsx --tsconfig tsconfig.app.json --test scripts/test-areas.mts`
 Expected: FAIL, the module is not found.
 
-- [ ] **Step 3: Implement `frontend/src/lib/areas.ts`** with the interfaces above. `activeTabTo` matches the tab whose path equals `pathname` and whose `tab` query equals the location's. If none matches, it falls back to the tab with that path and no query. `areaIdForPath` is a prefix table.
+- [ ] **Step 3: Implement `frontend/src/lib/areas.ts`** with the interfaces above. `activeTabTo` matches the tab whose path equals `pathname` and whose `tab` query equals the location's. If none matches, it falls back to the tab with that path and no query. `areaIdForPath` is a table of path prefixes matched on whole segments, so `/dashboard/libraryx` matches nothing. `description` carries today's drawer descriptions (Murals "Freeform dashboard pages", Games "Book-bracket tournaments").
 
 - [ ] **Step 4: Run the tests and see them pass**
 
@@ -156,7 +163,7 @@ git add frontend/src/lib/areas.ts frontend/scripts/test-areas.mts && git commit 
   ```ts
   export const PageWidthContext: React.Context<number>; // default DEFAULT_LIBRARY_STYLE.contentMaxWidth
   export function Page(props: {
-    title: string;
+    title: ReactNode; // a string, or a page's rename button/input
     subtitle?: ReactNode;
     back?: { to: string; label: string };
     actions?: ReactNode;
@@ -184,14 +191,23 @@ test("one display-font h1 in a surface band", () => {
 
 test("the current tab is marked and every tab is a 44px target", () => {
   const html = render(createElement(Page, { title: "Games", tabs: area("games").tabs, children: "x" }));
-  assert.match(html, /aria-current="page"[^>]*>Quizzes<|>Quizzes</);
+  assert.match(html, /<a(?=[^>]*aria-current="page")[^>]*>Quizzes<\/a>/);
   assert.equal(html.match(/aria-current="page"/g)?.length, 1);
-  assert.equal(html.match(/<a [^>]*min-h-11/g)?.length, 3);
+  assert.equal(html.match(/<a(?=[^>]*min-h-11)[^>]*>/g)?.length, 3);
 });
 
 test("back link names the area and is a 44px target", () => {
   const html = render(createElement(Page, { title: "Summer showdown", back: backTo("tournament"), children: "x" }));
-  assert.match(html, /<a [^>]*href="\/dashboard\/arena"[^>]*min-h-11[^>]*>.*Games/);
+  assert.match(html, /<a(?=[^>]*href="\/dashboard\/arena")(?=[^>]*min-h-11)[^>]*>[\s\S]*?Games<\/a>/);
+});
+
+test("a rename control can be the title", () => {
+  const html = render(createElement(Page, { title: createElement("button", null, "Summer showdown"), children: "x" }));
+  assert.match(html, /<h1[^>]*><button>Summer showdown<\/button><\/h1>/);
+});
+
+test("the body keeps PageContainer's padding", () => {
+  assert.match(render(createElement(Page, { title: "T", children: "x" })), /px-4 py-5 sm:px-5 sm:py-8/);
 });
 
 test("a long title can wrap inside the band", () => {
@@ -217,7 +233,7 @@ Expected: FAIL, the module is not found.
 
 - [ ] **Step 3: Implement `Page.tsx` and `buttonClasses.ts`.**
   - The band's inner row uses the same max-width as the body, so the title lines up with the content.
-  - Tabs are `Link`s inside `<nav aria-label="<title> sections">`, with `overflow-x-auto` below `sm`.
+  - Tabs are `Link`s inside `<nav aria-label="Sections">`, with `overflow-x-auto` below `sm`.
   - The back link reuses `ChevronLeftIcon` from `components/Toolbar.tsx`.
 
 - [ ] **Step 4: Run the tests and see them pass**
@@ -238,12 +254,16 @@ git add frontend/src/components/page/Page.tsx frontend/src/components/page/butto
 - Modify: `frontend/src/layouts/DashboardLayout.tsx`
 - Modify: `frontend/src/components/NavIcons.tsx`
 - Delete: `frontend/src/components/AdminLinks.tsx`
+- Modify: `frontend/scripts/test-admin-genres.mts`
+- Modify: `frontend/scripts/test-admin-synopses.mts`
+- Modify: `frontend/scripts/test-admin-translations.mts`
 - Test: `frontend/scripts/test-sidebar-nav.mts`
 
 **Interfaces:**
-- Consumes: `navAreas`, `BOTTOM_BAR_AREAS`, `areaIdForPath` (Task 1), and `PageWidthContext` (Task 2).
-- Produces: `SidebarNav({ areas, activeId, onNavigate, withDescriptions }: { areas: readonly Area[]; activeId: AreaId | null; onNavigate?: () => void; withDescriptions?: boolean }): JSX.Element`, used by the sidebar and the drawer. Also `ReaderCardIcon` in `NavIcons.tsx`, a hand-authored 24-viewBox stroke SVG per DESIGN.md Iconography. Area icons:
-  - Home: `MuralsIcon`, as today
+- Consumes: `NAV_AREAS`, `footerAreas`, `BOTTOM_BAR_AREAS`, `areaIdForPath` (Task 1), and `PageWidthContext` (Task 2).
+- Produces: `SidebarNav({ areas, activeId, homeBadge, onNavigate, withDescriptions }: { areas: readonly Area[]; activeId: AreaId | null; homeBadge?: string | null; onNavigate?: () => void; withDescriptions?: boolean }): JSX.Element`, used for the sidebar, the drawer and the footer Admin link. `homeBadge` renders today's badge and the "Home, N new" `aria-label` on Home.
+- Also produces two icons in `NavIcons.tsx`, both hand-authored 24-viewBox stroke SVGs per DESIGN.md Iconography: `HomeIcon` and `ReaderCardIcon`. Area icons:
+  - Home: `HomeIcon` (new, so Home and Murals no longer share a glyph in the bottom bar)
   - Library: `LibraryIcon`
   - Murals: `MuralsIcon`
   - Games: `ArenaIcon`
@@ -255,16 +275,24 @@ git add frontend/src/components/page/Page.tsx frontend/src/components/page/butto
 - [ ] **Step 1: Write the failing tests** in `frontend/scripts/test-sidebar-nav.mts`.
 
 ```ts
-test("lists the given areas as 44px links and marks the active one", () => {
-  const html = renderToString(createElement(MemoryRouter, null, createElement(SidebarNav, { areas: navAreas(false), activeId: "library" })));
-  assert.equal(html.match(/<a [^>]*min-h-11/g)?.length, 7);
-  assert.match(html, /aria-current="page"[^>]*>[\s\S]*?Library/);
+const nav = (props: Parameters<typeof SidebarNav>[0]) => renderToString(createElement(MemoryRouter, null, createElement(SidebarNav, props)));
+
+test("lists the areas as 44px links and marks the active one", () => {
+  const html = nav({ areas: NAV_AREAS, activeId: "library" });
+  assert.equal(html.match(/<a(?=[^>]*min-h-11)[^>]*>/g)?.length, 7);
+  assert.match(html, /<a(?=[^>]*aria-current="page")(?=[^>]*href="\/dashboard\/library")[^>]*>/);
+  assert.equal(html.match(/aria-current="page"/g)?.length, 1);
   assert.doesNotMatch(html, /Admin/);
 });
 
-test("admins get the Admin area", () => {
-  const html = renderToString(createElement(MemoryRouter, null, createElement(SidebarNav, { areas: navAreas(true), activeId: null })));
-  assert.match(html, /href="\/admin\/genres"/);
+test("the Home badge and its label survive", () => {
+  const html = nav({ areas: NAV_AREAS, activeId: null, homeBadge: "3" });
+  assert.match(html, /aria-label="Home, 3 new"/);
+});
+
+test("the footer Admin link is a 44px link to the review queues", () => {
+  assert.match(nav({ areas: footerAreas(true), activeId: null }), /<a(?=[^>]*href="\/admin\/genres")(?=[^>]*min-h-11)[^>]*>[\s\S]*?Admin/);
+  assert.equal(nav({ areas: footerAreas(false), activeId: null }).includes("/admin/"), false);
 });
 ```
 
@@ -274,12 +302,13 @@ Run: `cd frontend && npx tsx --tsconfig tsconfig.app.json --test scripts/test-si
 Expected: FAIL, the module is not found.
 
 - [ ] **Step 3: Implement `SidebarNav`, then rewire `DashboardLayout`.**
-  - `NAV_GROUPS` and `TAB_ITEMS` give way to `navAreas(isAdmin)`.
+  - `NAV_GROUPS` and `TAB_ITEMS` give way to `NAV_AREAS`.
+  - The footer renders `SidebarNav` with `footerAreas(isAdmin)` above Log out, in the sidebar and in the drawer.
   - The active area comes from `areaIdForPath(useLocation().pathname)`, not `NavLink`'s own matching.
   - The bottom bar shows `BOTTOM_BAR_AREAS` plus More, at `h-14`.
-  - Keep the Home badge, the avatar/username row, Log out (raise it to `min-h-11`) and `setNavHidden`.
+  - Keep the Home badge (pass `newCountLabel(personalNewCount)` as `homeBadge`), the avatar/username row, Log out (raise it to `min-h-11`) and `setNavHidden`.
   - Wrap `<Outlet>` in `PageWidthContext.Provider value={resolveLibraryStyle(library?.data.style).contentMaxWidth}`.
-  - Delete `AdminLinks.tsx`, since the Admin area replaces it.
+  - Delete `AdminLinks.tsx`, since the footer Admin link replaces it. The three admin tests that rendered `AdminLinks` now assert `footerAreas(true)` (and `area("admin").tabs`) holds their page's route, and that `footerAreas(false)` is empty.
 
 - [ ] **Step 4: Run the tests and see them pass, then run the frontend checks**
 
@@ -289,7 +318,7 @@ Expected: PASS, with no type or lint errors.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add frontend/src/components/page/SidebarNav.tsx frontend/src/layouts/DashboardLayout.tsx frontend/src/components/NavIcons.tsx frontend/src/components/AdminLinks.tsx frontend/scripts/test-sidebar-nav.mts && git commit -m "Build the sidebar, drawer and bottom bar from the area map"
+git add frontend/src/components/page/SidebarNav.tsx frontend/src/layouts/DashboardLayout.tsx frontend/src/components/NavIcons.tsx frontend/src/components/AdminLinks.tsx frontend/scripts/test-admin-genres.mts frontend/scripts/test-admin-synopses.mts frontend/scripts/test-admin-translations.mts frontend/scripts/test-sidebar-nav.mts && git commit -m "Build the sidebar, drawer and bottom bar from the area map"
 ```
 
 ### Task 4: Library area on `Page`
@@ -393,6 +422,7 @@ Manual check: snapshot `/dashboard/arena`, `/dashboard/arena?tab=quizzes`, `/com
 git add frontend/src/pages/ArenaListPage.tsx frontend/src/pages/DiscoverPage.tsx frontend/src/pages/PeoplePage.tsx frontend/src/pages/AdminGenresPage.tsx frontend/src/pages/AdminSynopsesPage.tsx frontend/src/pages/AdminTranslationsPage.tsx frontend/scripts/test-page-frame.mts && git commit -m "Games, Community and Admin use the band and its tabs"
 ```
 
+
 ### Task 6: Settings becomes Account · Appearance · Style
 
 **Files:**
@@ -400,13 +430,18 @@ git add frontend/src/pages/ArenaListPage.tsx frontend/src/pages/DiscoverPage.tsx
 - Create: `frontend/src/pages/SettingsAppearancePage.tsx`
 - Modify: `frontend/src/pages/LibraryStylePage.tsx`
 - Modify: `frontend/src/App.tsx`
+- Modify: `frontend/scripts/test-reader-card-editor.mts`
 - Test: `frontend/scripts/test-page-frame.mts`
 
 **Interfaces:**
 - Consumes: `Page` (Task 2) and `area("settings").tabs` (Task 1).
 - Produces: route `/dashboard/settings/appearance` → `SettingsAppearancePage`.
 
-- [ ] **Step 1: Extend the source guard.** All three files use `<Page` with `area("settings").tabs`. `App.tsx` declares `path="/dashboard/settings/appearance"`. `SettingsPage` no longer contains the strings "Appearance" or "Reader card" as section headings.
+- [ ] **Step 1: Extend the source guard.**
+  - All three page files use `<Page` with `area("settings").tabs`.
+  - `App.tsx` declares `path="/dashboard/settings/appearance"`.
+  - `SettingsPage` no longer has an "Appearance" or "Reader card" section heading.
+  - In `test-reader-card-editor.mts`, the "way in from Settings" assertion (`:118`) becomes a way in from the area map: `area("readerCard").to === "/dashboard/reader-card"`.
 
 - [ ] **Step 2: Run it and see it fail**
 
@@ -415,22 +450,25 @@ Expected: FAIL.
 
 - [ ] **Step 3: Split the page.**
   - Move today's Appearance section (`SettingsPage.tsx:71`, theme and fonts) into `SettingsAppearancePage`.
-  - Remove the Reader card section (`SettingsPage.tsx:172`).
+  - Remove the Reader card section (`SettingsPage.tsx:172`), since the sidebar now reaches it.
   - Account keeps the rest, each group in a card inside the body.
-  - `LibraryStylePage` gets the Settings band (title "Settings", tab Style) and keeps its own subtitle line as `subtitle`.
-  - The two "Change" buttons keep the distinct names lane C gave them.
+  - `LibraryStylePage` gets the Settings band (title "Settings", tab Style) and moves its own subtitle line into `subtitle`.
+  - The two "Change" buttons keep the distinct names lane C gave them. Their 44px size is Task 12's job.
 
 - [ ] **Step 4: Run the suite, then do the manual check**
 
 Run: `cd frontend && npm test && npm run typecheck && npm run lint`
 Expected: PASS.
 
-Manual check: snapshot `/dashboard/settings`, `/dashboard/settings/appearance` and `/dashboard/style` at 1280 and 360. All three should show `h1 "Settings"` with the right tab current. Change the theme on Appearance, reload, and confirm it persisted. Then run `npm run dev:release`.
+Manual check:
+1. Snapshot `/dashboard/settings`, `/dashboard/settings/appearance` and `/dashboard/style` at 1280 and 360. All three should show `h1 "Settings"` with the right tab current.
+2. On Appearance, change the theme, reload, and confirm it persisted.
+3. Run `npm run dev:release`.
 
 - [ ] **Step 5: Commit, then ship Phase 1**
 
 ```bash
-git add frontend/src/pages/SettingsPage.tsx frontend/src/pages/SettingsAppearancePage.tsx frontend/src/pages/LibraryStylePage.tsx frontend/src/App.tsx frontend/scripts/test-page-frame.mts && git commit -m "Split Settings into Account, Appearance and Style tabs"
+git add frontend/src/pages/SettingsPage.tsx frontend/src/pages/SettingsAppearancePage.tsx frontend/src/pages/LibraryStylePage.tsx frontend/src/App.tsx frontend/scripts/test-reader-card-editor.mts frontend/scripts/test-page-frame.mts && git commit -m "Split Settings into Account, Appearance and Style tabs"
 ```
 
 Then use the ship skill to push and open PR 1 with auto-merge.
@@ -449,12 +487,11 @@ Then use the ship skill to push and open PR 1 with auto-merge.
 - Test: `frontend/scripts/test-page-frame.mts`
 
 **Interfaces:**
-- Consumes: `Page` (Task 2) and `backTo("tierlist" | "quiz" | "tournament" | "mural")` (Task 1).
+- Consumes: `Page` with `title: ReactNode` (Task 2), and `backTo("tierlist" | "quiz" | "tournament" | "mural")` (Task 1).
 
 - [ ] **Step 1: Extend the source guard.**
-  - Each file uses `<Page` with `back={backTo("…")}` and no `tabs=`.
-  - No file contains the visible strings "‹ Arena", "Arena" (as copy), "All tournaments" or "← Tier lists"/"← Quizzes".
-  - Write the copy check as `assert.doesNotMatch(src, />[^<{]*\bArena\b[^<]*</)`.
+  - Each file uses `<Page` with a `back=` built from `backTo(…)`, and no `tabs=`.
+  - No file contains a visible "Arena" (`assert.doesNotMatch(src, />[^<{]*\bArena\b[^<]*</)`), nor "All tournaments", "← Tier lists" or "← Quizzes".
 
 - [ ] **Step 2: Run it and see it fail**
 
@@ -462,11 +499,16 @@ Run: `cd frontend && npx tsx --tsconfig tsconfig.app.json --test scripts/test-pa
 Expected: FAIL.
 
 - [ ] **Step 3: Migrate.**
-  - The title is the item's name, and the subtitle is its one key fact (wizard step "Step n of m", seed slot count, "Round n of m").
-  - The band holds the primary action: "Done editing" in mural edit mode, "Start tournament" on the seed page, "Publish quiz" on the quiz editor. All other buttons are secondary.
-  - In mural edit mode, the band may compress to a single row. The builder may hide its subtitle; it must not hide the title.
-  - The mural canvas keeps its saved width, centred in the body.
-  - Copy "Arena" → "Games" anywhere it shows.
+  - **Title:** the item's name.
+    - The mural, tier list editor and seed page pass their existing click-to-rename button or input as `title` (`MuralEditorPage.tsx:476-499`, `TierListEditorPage.tsx:197-217`, `ArenaSeedPage.tsx:216-236`).
+    - Renaming keeps working.
+  - **Subtitle:** one key fact, such as "Step n of m" in the wizards or the seed slot count.
+  - **Band primary:** "Done editing" in mural edit mode and "Start tournament" on the seed page. Every other button is secondary.
+  - **Quiz editor's "Publish quiz":** stays where it is (spec non-goal #8). It stays the view's one accent.
+  - **Mural editor back link:** keeps today's `?folder=` (`MuralEditorPage.tsx:94`). It uses `{ ...backTo("mural"), to: folder ? `${backTo("mural").to}?folder=${folder}` : backTo("mural").to }`.
+  - **Mural edit mode:** the band may compress to a single row and drop its subtitle. It must keep the title.
+  - **Mural canvas:** keeps its saved width, centred in the body.
+  - **Copy:** "Arena" → "Games" wherever it shows.
 
 - [ ] **Step 4: Run the suite, then do the manual check**
 
@@ -474,13 +516,14 @@ Run: `cd frontend && npm test && npm run typecheck && npm run lint`
 Expected: PASS.
 
 Manual check:
-- Create a tier list, a quiz, a tournament (to its seed page) and a mural with a 60-character name.
-- Snapshot each at 1280 and 360. Each should show:
-  - one `h1`;
-  - a back link "Games"/"Murals" whose `→ href` matches `backTo`;
-  - exactly one accent button;
-  - at 360, the title wrapping inside the band with the page no wider than 360px.
-- Then run `npm run dev:release`.
+1. Create a tier list, a quiz, a tournament (go as far as its seed page) and a mural, each with a 60-character name. Put the mural in a folder.
+2. Snapshot each at 1280 and 360. Each should show:
+   - one `h1`;
+   - a back link "Games"/"Murals" whose `→ href` matches the rule above, with the folder kept for the mural;
+   - exactly one accent button;
+   - at 360, the title wrapping inside the band, and the page no wider than 360px.
+3. Rename the mural from its title, and confirm the new name sticks after a reload.
+4. Run `npm run dev:release`.
 
 - [ ] **Step 5: Commit**
 
@@ -488,22 +531,24 @@ Manual check:
 git add frontend/src/pages/TierListCreatePage.tsx frontend/src/pages/TierListEditorPage.tsx frontend/src/pages/QuizCreatePage.tsx frontend/src/pages/QuizEditorPage.tsx frontend/src/pages/ArenaSeedPage.tsx frontend/src/pages/MuralEditorPage.tsx frontend/scripts/test-page-frame.mts && git commit -m "Games and Murals items get the band with a back link"
 ```
 
-### Task 8: Home, Murals list, Reader card and community profile
+### Task 8: Home, Murals list, Reader card and profiles
 
 **Files:**
 - Modify: `frontend/src/pages/HomePage.tsx`
 - Modify: `frontend/src/pages/MuralsListPage.tsx`
 - Modify: `frontend/src/pages/ReaderCardPage.tsx`
 - Modify: `frontend/src/pages/CommunityProfilePage.tsx`
+- Modify: `frontend/src/components/OwnShelfView.tsx`
 - Test: `frontend/scripts/test-page-frame.mts`
 
 **Interfaces:**
 - Consumes: `Page` and `BUTTON_*` (Task 2), and `backTo("profile")` (Task 1).
 
 - [ ] **Step 1: Extend the source guard.**
-  - All four use `<Page`.
-  - `CommunityProfilePage` passes `back={backTo("profile")}`.
-  - `MuralsListPage` contains no uppercase-eyebrow class (`uppercase`) on its filter labels.
+  - The four pages and `OwnShelfView` use `<Page`.
+  - `CommunityProfilePage` and `OwnShelfView` pass `back={backTo("profile")}`.
+  - `OwnShelfView` has no `<h1` of its own.
+  - `MuralsListPage` has no `uppercase` class on its filter labels.
   - `HomePage`'s local `const button` is gone.
 
 - [ ] **Step 2: Run it and see it fail**
@@ -512,12 +557,12 @@ Run: `cd frontend && npx tsx --tsconfig tsconfig.app.json --test scripts/test-pa
 Expected: FAIL.
 
 - [ ] **Step 3: Migrate.**
-  - **Home:** title "Home". The Find people and Discover link-buttons become secondary actions.
-  - **Murals:** title "Murals". The preset banner moves below the band. "New mural" is the primary. The filter labels are sentence case.
+  - **Home:** title "Home". Find people and Discover become secondary actions.
+  - **Murals:** title "Murals". The preset banner moves below the band, "New mural" is the primary, and the filter labels are sentence case.
   - **Reader card:** title "Reader card".
-  - **Profile:**
-    - Title is the display name or `@username`.
-    - The profile's type tags and section labels are sentence case.
+  - **Profiles:** both another reader's profile and your own shelf (`OwnShelfView`, reached from the sidebar avatar) get the band.
+    - Title: the display name or `@username`.
+    - Type tags and section labels are sentence case.
     - Mural block headings stay as they are.
 
 - [ ] **Step 4: Run the suite, then do the manual check**
@@ -525,12 +570,14 @@ Expected: FAIL.
 Run: `cd frontend && npm test && npm run typecheck && npm run lint`
 Expected: PASS.
 
-Manual check: snapshot `/dashboard`, `/dashboard/murals`, `/dashboard/reader-card` and `/community/u/fixture_alice` at 1280 and 360. Each should show one `h1` and fit the page at 360. Then run `npm run dev:release`.
+Manual check:
+1. Snapshot `/dashboard`, `/dashboard/murals`, `/dashboard/reader-card`, `/community/u/fixture_alice` and your own `/community/u/<fixture username>` at 1280 and 360. Each should show one `h1` and fit at 360.
+2. Run `npm run dev:release`.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add frontend/src/pages/HomePage.tsx frontend/src/pages/MuralsListPage.tsx frontend/src/pages/ReaderCardPage.tsx frontend/src/pages/CommunityProfilePage.tsx frontend/scripts/test-page-frame.mts && git commit -m "Home, Murals, Reader card and profiles use the band"
+git add frontend/src/pages/HomePage.tsx frontend/src/pages/MuralsListPage.tsx frontend/src/pages/ReaderCardPage.tsx frontend/src/pages/CommunityProfilePage.tsx frontend/src/components/OwnShelfView.tsx frontend/scripts/test-page-frame.mts && git commit -m "Home, Murals, Reader card and profiles use the band"
 ```
 
 ### Task 9: Public frame, and the pages that serve both
@@ -539,6 +586,8 @@ git add frontend/src/pages/HomePage.tsx frontend/src/pages/MuralsListPage.tsx fr
 - Create: `frontend/src/layouts/PublicLayout.tsx`
 - Create: `frontend/src/layouts/SessionLayout.tsx`
 - Modify: `frontend/src/App.tsx`
+- Modify: `frontend/src/components/book/BookScreen.tsx`
+- Delete: `frontend/src/components/work/BackLink.tsx`
 - Modify: `frontend/src/pages/WorkPage.tsx`
 - Modify: `frontend/src/pages/WorkStatsPage.tsx`
 - Modify: `frontend/src/pages/BookKeyPage.tsx`
@@ -547,26 +596,32 @@ git add frontend/src/pages/HomePage.tsx frontend/src/pages/MuralsListPage.tsx fr
 - Modify: `frontend/src/pages/SharedMuralPage.tsx`
 - Modify: `frontend/src/pages/VoteTierlistPage.tsx`
 - Modify: `frontend/src/pages/PlayQuizPage.tsx`
+- Modify: `frontend/src/pages/DiscoverPage.tsx`
+- Modify: `frontend/scripts/test-work-page.mts`
 - Test: `frontend/scripts/test-public-layout.mts`
 
 **Interfaces:**
 - Consumes: `Page`, `PageWidthContext` (Task 2), and `backTo("book" | "tournament")` (Task 1).
 - Produces:
-  - `PublicLayout(): JSX.Element` renders a top row with `BrandLockup` linking to `/`. On the right it shows "Log in" (`/login`) when signed out, or "Open my library" (`/dashboard`) when signed in. Then `<Outlet>` with `PageWidthContext` at the default width. There is no sidebar.
-  - `SessionLayout(): JSX.Element` renders `session ? <DashboardLayout/> : <PublicLayout/>`.
+  - `PublicLayout({ signedIn }: { signedIn: boolean }): JSX.Element`. A top row with `BrandLockup` linking to `/`, then on the right either "Log in" (`/login`) or, when signed in, "Open my library" (`/dashboard`). Then `<Outlet>` inside `PageWidthContext` at the default width. No sidebar.
+  - `SessionLayout(): JSX.Element` returns `session ? <DashboardLayout/> : <PublicLayout signedIn={false}/>`, using `useAuth()`.
+  - The routes that always use `PublicLayout` get `signedIn={Boolean(session)}` through a one-line wrapper in `App.tsx`.
+  - `PublicLayout` takes a prop, not the auth context, because `AuthProvider` can't render under `renderToString` (no `getServerSnapshot`).
 
-- [ ] **Step 1: Write the failing tests** in `frontend/scripts/test-public-layout.mts`. Render with a stubbed signed-out auth context, the way other tests stub providers.
+- [ ] **Step 1: Write the failing tests** in `frontend/scripts/test-public-layout.mts`.
 
 ```ts
+const render = (signedIn: boolean) => renderToString(createElement(MemoryRouter, null, createElement(PublicLayout, { signedIn })));
+
 test("signed out: brand, a Log in link, no sidebar", () => {
-  const html = renderSignedOut(createElement(PublicLayout));
-  assert.match(html, /href="\/login"[^>]*>Log in</);
+  const html = render(false);
+  assert.match(html, /<a(?=[^>]*href="\/login")[^>]*>Log in<\/a>/);
   assert.match(html, /href="\/"/);
   assert.doesNotMatch(html, /<aside/);
 });
 
 test("signed in: the right link opens the library", () => {
-  assert.match(renderSignedIn(createElement(PublicLayout)), /href="\/dashboard"[^>]*>Open my library</);
+  assert.match(render(true), /<a(?=[^>]*href="\/dashboard")[^>]*>Open my library<\/a>/);
 });
 ```
 
@@ -578,11 +633,18 @@ Expected: FAIL, the module is not found.
 - [ ] **Step 3: Implement the layouts and rewire `App.tsx`.**
   - **Routes:**
     - `/work/:id`, `/work/:id/stats` and `/arena/:id` go under `SessionLayout`.
-    - `/book/:key` moves inside the `DashboardLayout` route (it is already signed-in only).
+    - `/book/:key` moves inside the `DashboardLayout` route. It is behind `RequireAuth` and `RequireUsername` today and stays signed-in only.
     - `/shared/murals/:token`, `/shared/library/:token`, `/vote/:code`, `/play/:code` and `/arena` go under `PublicLayout`.
     - The signed-in `/arena` redirect (`discoverDestination`) stays.
-  - **Pages:** move each onto `Page`. Work and book pages take `back={backTo("book")}`, replacing `components/work/BackLink.tsx`; delete that file if nothing imports it.
-  - **`ArenaViewPage`:** `back={backTo("tournament")}` when signed in, and `{ to: "/arena", label: "Games" }` when signed out. Owner actions appear in the band for the owner only.
+  - **Work and book pages:** `BookScreen` gives up the parts the band now owns:
+    - its `<main>` wrapper (`BookScreen.tsx:163`);
+    - the back link (`:165`);
+    - Share and More (`:166-175`), which become band `actions`;
+    - the hero `h1` (`:200`). The title moves to the band; the hero keeps cover, series, author and awards.
+
+    `WorkPage` and `BookKeyPage` render `Page` with `title`, `back` and those actions. Delete `BackLink.tsx`, and in `test-work-page.mts` replace the `BackLink` test (`:163`) with one asserting that `BookScreen`'s output contains no `<h1`.
+  - **Signed-out back links:** a signed-out Work or stats page shows no back link, because there is no library to go back to. `ArenaViewPage` uses `backTo("tournament")` when signed in and `{ to: "/arena", label: "Games" }` when signed out. Its owner actions appear in the band for the owner only.
+  - **`PublicDiscoverPage`** (in `DiscoverPage.tsx`): drop its own `min-h-screen` wrapper, `h1` and "Sign in" link (`DiscoverPage.tsx:72-82`), because `PublicLayout` supplies the Log in link. Render `Page` with title "Games".
   - **`SharedLibraryPage`:** passes the owner's `contentMaxWidth` as `maxWidth`.
   - **`SharedMuralPage`:** keeps its fullscreen button as an action.
 
@@ -591,54 +653,58 @@ Expected: FAIL, the module is not found.
 Run: `cd frontend && npm test && npm run typecheck && npm run lint`
 Expected: PASS.
 
-Manual checks:
-- Signed in, snapshot `/work/<id>`, `/arena/<id>` and `/book/<key>`. Each should show the sidebar with Library or Games highlighted, plus one `h1`.
-- Signed out (`--signed-out`), snapshot the same pages plus a shared library, a shared mural, `/vote/<code>`, `/play/<code>` and `/arena`, all at 1280 and 360. Each should show a "Log in" link, no sidebar links, one `h1`, and fit at 360.
-- Take share links, codes and ids from the site's own pages.
-
-Then run `npm run dev:release`.
+Manual check:
+1. Signed in, snapshot `/work/<id>`, `/arena/<id>` and `/book/<key>`. Each should show the sidebar with Library or Games highlighted and one `h1`.
+2. Signed out (`--signed-out`), snapshot `/work/<id>`, `/arena/<id>`, a shared library, a shared mural, `/vote/<code>`, `/play/<code>` and `/arena`, at 1280 and 360. Each should show one "Log in" link, no sidebar, one `h1`, no back link into `/dashboard`, and fit at 360. Take the share links, codes and ids from the site's own pages.
+3. Run `npm run dev:release`.
 
 - [ ] **Step 5: Commit, then ship Phase 2**
 
 ```bash
-git add frontend/src/layouts/PublicLayout.tsx frontend/src/layouts/SessionLayout.tsx frontend/src/App.tsx frontend/src/pages/WorkPage.tsx frontend/src/pages/WorkStatsPage.tsx frontend/src/pages/BookKeyPage.tsx frontend/src/pages/ArenaViewPage.tsx frontend/src/pages/SharedLibraryPage.tsx frontend/src/pages/SharedMuralPage.tsx frontend/src/pages/VoteTierlistPage.tsx frontend/src/pages/PlayQuizPage.tsx frontend/scripts/test-public-layout.mts && git commit -m "Public pages get the band without the sidebar; work, book and tournament pages follow the session"
+git add frontend/src/layouts/PublicLayout.tsx frontend/src/layouts/SessionLayout.tsx frontend/src/App.tsx frontend/src/components/book/BookScreen.tsx frontend/src/components/work/BackLink.tsx frontend/src/pages/WorkPage.tsx frontend/src/pages/WorkStatsPage.tsx frontend/src/pages/BookKeyPage.tsx frontend/src/pages/ArenaViewPage.tsx frontend/src/pages/SharedLibraryPage.tsx frontend/src/pages/SharedMuralPage.tsx frontend/src/pages/VoteTierlistPage.tsx frontend/src/pages/PlayQuizPage.tsx frontend/src/pages/DiscoverPage.tsx frontend/scripts/test-work-page.mts frontend/scripts/test-public-layout.mts && git commit -m "Public pages get the band without the sidebar; work and tournament pages follow the session"
 ```
 
-Then use the ship skill to push and open PR 2 with auto-merge (base `main` once PR 1 has merged).
+Then use the ship skill to push and open PR 2 with auto-merge, based on `main` once PR 1 has merged.
 
 ## Phase 3: dialogs, controls, docs (PR 3)
 
-### Task 10: One dialog shape
+### Task 10: One dialog shape — Sheet, Confirm and the library dialogs
 
 **Files:**
 - Modify: `frontend/src/components/Sheet.tsx`
+- Modify: `frontend/src/components/ConfirmDialog.tsx`
 - Modify: `frontend/src/components/ShareModal.tsx`
 - Modify: `frontend/src/components/CoverPickerModal.tsx`
 - Modify: `frontend/src/components/AddBookModal.tsx`
 - Modify: `frontend/src/components/SyncGoodreadsModal.tsx`
-- Modify: `frontend/src/components/murals/MoveToFolderModal.tsx`
-- Modify: `frontend/src/components/tierlist/AddBooksSheet.tsx`
-- Modify: `frontend/src/components/OwnShelfView.tsx`
+- Modify: `frontend/src/components/PerCardStylePanel.tsx`
+- Modify: `frontend/src/components/SocialsSection.tsx`
 - Modify: `frontend/src/pages/GroupsPage.tsx`
-- Modify: `frontend/src/components/murals/BlockConfigPanel.tsx`
 - Test: `frontend/scripts/test-sheet.mts`
 
 **Interfaces:**
-- Produces: `Sheet` gains `footer?: ReactNode`, rendered in a bottom row aligned to the end, with gap 8. Its title becomes `text-lg font-bold`. The rest of the existing props are unchanged.
+- Produces:
+  - `Sheet` gains `footer?: ReactNode`, rendered in a bottom row aligned to the end with an 8px gap.
+  - Its title becomes `text-lg font-bold`.
+  - Its other props are unchanged.
+  - `ConfirmDialog` renders through `Sheet`, with its buttons in the footer.
 
-- [ ] **Step 1: Write the failing tests** in `frontend/scripts/test-sheet.mts`. Stub `document`/`matchMedia` the way `scripts/test-work-page.mts` does, if `Sheet`'s effects need it.
+- [ ] **Step 1: Write the failing tests** in `frontend/scripts/test-sheet.mts`. Stub `matchMedia` the way `scripts/test-work-page.mts` does, if `Sheet`'s effects need it.
 
 ```ts
+const DIALOG_FILES = ["components/ShareModal", "components/CoverPickerModal", "components/AddBookModal", "components/SyncGoodreadsModal", "components/PerCardStylePanel", "components/SocialsSection", "pages/GroupsPage", "components/ConfirmDialog"];
+
 test("title left at text-lg, 44px Close on the right, optional footer", () => {
   const html = renderToString(createElement(Sheet, { title: "Change username", onClose: () => undefined, footer: createElement("button", null, "Save"), children: "body" }));
   assert.match(html, /<h2 class="[^"]*text-lg font-bold/);
-  assert.match(html, /aria-label="Close"[^>]*class="[^"]*h-11 w-11/);
+  assert.match(html, /<button(?=[^>]*aria-label="Close")(?=[^>]*h-11 w-11)[^>]*>/);
   assert.match(html, />Save<\/button>/);
 });
 
-test("no hand-rolled overlays remain in the migrated files", () => {
-  for (const file of ["components/ShareModal", "components/CoverPickerModal", "components/AddBookModal", "components/SyncGoodreadsModal", "components/murals/MoveToFolderModal", "components/tierlist/AddBooksSheet", "components/OwnShelfView", "pages/GroupsPage", "components/murals/BlockConfigPanel"]) {
+test("these dialogs are built on Sheet, with no hand-rolled overlay or Close text button", () => {
+  for (const file of DIALOG_FILES) {
     const src = readFileSync(new URL(`../src/${file}.tsx`, import.meta.url), "utf8");
+    assert.match(src, /<Sheet\b/, file);
     assert.doesNotMatch(src, /fixed inset-0/, file);
     assert.doesNotMatch(src, />\s*Close\s*</, file);
   }
@@ -650,75 +716,158 @@ test("no hand-rolled overlays remain in the migrated files", () => {
 Run: `cd frontend && npx tsx --tsconfig tsconfig.app.json --test scripts/test-sheet.mts`
 Expected: FAIL.
 
-- [ ] **Step 3: Add `footer` to `Sheet`, then move each listed overlay onto `Sheet`.**
-  - Fields follow the DESIGN.md Input pattern: `body-strong` label linked by `htmlFor`/`id`, a hint or error line under it, and the border turning `danger` on error.
+- [ ] **Step 3: Add `footer` to `Sheet`, then move each listed dialog onto it.**
+  - Fields follow the DESIGN.md Input pattern: a `body-strong` label linked by `htmlFor`/`id`, a hint or error line under it, and a `danger` border on error.
   - A disabled submit names what's missing in the hint line.
-  - The "New collection" name field shows an error instead of closing silently on an empty name.
-  - Full-screen viewers (`ReaderCardViewer`) are not dialogs and stay as they are. Ruling: they have no title or commit action. If the grep finds another overlay that is a titled dialog, it joins this task.
+  - The "New collection" name field (in `GroupsPage`) shows an error on an empty name instead of closing silently.
 
 - [ ] **Step 4: Run the suite, then do the manual check**
 
 Run: `cd frontend && npm test && npm run typecheck && npm run lint`
 Expected: PASS.
 
-Manual check: open each dialog with `web-snapshot` steps at 1280 and 360. Each listing should show one `button "Close"` at 44×44, labelled fields, and at most one accent button. Then run `npm run dev:release`.
+Manual check:
+1. Open each dialog with `web-snapshot` steps at 1280 and 360: Add book, Share, Sync Goodreads, cover picker, card style, socials, New collection, and a delete confirm. Each listing should show one `button "Close"` at 44×44, labelled fields, and at most one accent button.
+2. Run `npm run dev:release`.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add frontend/src/components/Sheet.tsx frontend/src/components/ShareModal.tsx frontend/src/components/CoverPickerModal.tsx frontend/src/components/AddBookModal.tsx frontend/src/components/SyncGoodreadsModal.tsx frontend/src/components/murals/MoveToFolderModal.tsx frontend/src/components/tierlist/AddBooksSheet.tsx frontend/src/components/OwnShelfView.tsx frontend/src/pages/GroupsPage.tsx frontend/src/components/murals/BlockConfigPanel.tsx frontend/scripts/test-sheet.mts && git commit -m "Every dialog uses Sheet: title, Close, labelled fields, one primary"
+git add frontend/src/components/Sheet.tsx frontend/src/components/ConfirmDialog.tsx frontend/src/components/ShareModal.tsx frontend/src/components/CoverPickerModal.tsx frontend/src/components/AddBookModal.tsx frontend/src/components/SyncGoodreadsModal.tsx frontend/src/components/PerCardStylePanel.tsx frontend/src/components/SocialsSection.tsx frontend/src/pages/GroupsPage.tsx frontend/scripts/test-sheet.mts && git commit -m "Sheet gets a footer; Confirm and the library dialogs use it"
 ```
 
-### Task 11: Controls sweep, 44px and one accent
+### Task 11: One dialog shape — murals, games and shelf dialogs
 
 **Files:**
-- Modify: `frontend/src/components/Toolbar.tsx`
-- Modify: `frontend/src/components/BookCard.tsx`
-- Test: `frontend/scripts/test-page-frame.mts`
+- Modify: `frontend/src/components/murals/MoveToFolderModal.tsx`
+- Modify: `frontend/src/components/murals/BlockConfigPanel.tsx`
+- Modify: `frontend/src/components/murals/BlockStylePanel.tsx`
+- Modify: `frontend/src/components/tierlist/AddBooksSheet.tsx`
+- Modify: `frontend/src/components/arena/SeedSlotGrid.tsx`
+- Modify: `frontend/src/components/OwnShelfView.tsx`
+- Test: `frontend/scripts/test-sheet.mts`
 
 **Interfaces:**
-- Consumes: `BUTTON_PRIMARY` and `BUTTON_SECONDARY` (Task 2).
+- Consumes: `Sheet` with `footer` (Task 10).
 
-- [ ] **Step 1: Write the failing test.** Assert that `TOOLBAR_CONTROL_CLASS` and `TOOLBAR_ICON_BUTTON_CLASS` (`components/Toolbar.tsx:35, 53`) contain `min-h-11`, or `h-11` with `w-11` for the icon button. Also assert that the overflow icon `Toolbar` exports for menus is the three-dot glyph (`MoreIcon`), not the ring.
+- [ ] **Step 1: Extend `DIALOG_FILES`** in `test-sheet.mts` with the six files. Also assert that `BlockConfigPanel.tsx` has no visible "Arena" (`/>[^<{]*\bArena\b[^<]*</`, today at `:394,416,422`).
 
 - [ ] **Step 2: Run it and see it fail**
 
-Run: `cd frontend && npx tsx --tsconfig tsconfig.app.json --test scripts/test-page-frame.mts`
+Run: `cd frontend && npx tsx --tsconfig tsconfig.app.json --test scripts/test-sheet.mts`
 Expected: FAIL.
 
-- [ ] **Step 3: Raise the shared classes to 44px, then sweep the remaining sub-44 controls.** The sweep is driven by the listing, not by guessing:
-  1. Run `node scripts/dev-web.mjs --reset`.
-  2. Snapshot every signed-in route in `App.tsx` at 1280 and 360.
-  3. Collect every `⚠ <44px` row, and fix each at its component: card Style/Cover chips, settings gear icons, Settings "Change" buttons, Home activity rows, the mural and tournament toolbars.
+- [ ] **Step 3: Move each onto `Sheet`, with the same field rules as Task 10.**
+  - The mural block dialog loses its duplicate Close/Cancel.
+  - Its Heading and Text fields keep the `htmlFor` links lane C added.
+  - "Arena" → "Games" in `BlockConfigPanel`.
+  - `ReaderCardViewer` is a full-screen viewer, not a titled dialog, and stays as it is. Ruling: no title and no commit action, so the dialog rule doesn't apply.
 
-  Where a design wants a small glyph, give it a 44px hit area. Settings actions use `SettingsIcon`. Any view still showing two accent buttons gets one demoted to `BUTTON_SECONDARY`. Add any further component files the sweep touches to this task's commit.
+- [ ] **Step 4: Run the suite, then do the manual check**
+
+Run: `cd frontend && npm test && npm run typecheck && npm run lint`
+Expected: PASS.
+
+Manual check:
+1. Open each dialog at 1280 and 360: move to folder, block config, block style, add books to a tier list, a seed slot picker, and the own-shelf profile sheet. Expect the same pass marks as Task 10.
+2. Run `npm run dev:release`.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add frontend/src/components/murals/MoveToFolderModal.tsx frontend/src/components/murals/BlockConfigPanel.tsx frontend/src/components/murals/BlockStylePanel.tsx frontend/src/components/tierlist/AddBooksSheet.tsx frontend/src/components/arena/SeedSlotGrid.tsx frontend/src/components/OwnShelfView.tsx frontend/scripts/test-sheet.mts && git commit -m "Mural, game and shelf dialogs use Sheet"
+```
+
+### Task 12: Controls and fields sweep — 44px, one accent, icons, labels
+
+**Files:**
+- Modify: `frontend/src/components/Toolbar.tsx`
+- Modify: `frontend/src/components/OptionsMenu.tsx`
+- Modify: `frontend/src/components/LibraryToolbar.tsx`
+- Modify: `frontend/src/pages/GroupsPage.tsx`
+- Modify: `frontend/src/pages/SettingsPage.tsx`
+- Modify: `frontend/src/components/BookCard.tsx`
+- Modify: `frontend/src/pages/HomePage.tsx`
+- Modify: `frontend/src/pages/MuralEditorPage.tsx`
+- Modify: `frontend/src/pages/ArenaSeedPage.tsx`
+- Test: `frontend/scripts/test-controls.mts`
+
+**Interfaces:**
+- Consumes: `BUTTON_PRIMARY` and `BUTTON_SECONDARY` (Task 2), and `SettingsIcon` from `components/NavIcons.tsx`.
+
+- [ ] **Step 1: Write the failing tests** in `frontend/scripts/test-controls.mts`.
+
+```ts
+const src = (f: string) => readFileSync(new URL(`../src/${f}.tsx`, import.meta.url), "utf8");
+
+test("menus open on three dots, not the sun glyph", () => {
+  assert.match(src("components/OptionsMenu"), /MoreIcon/);
+  assert.doesNotMatch(src("components/OptionsMenu"), /<circle cx="12" cy="12" r="3"/);
+});
+
+test("settings actions use the sidebar's gear, and the bare-ring GearIcon is gone", () => {
+  assert.doesNotMatch(src("components/Toolbar"), /export function GearIcon/);
+  for (const f of ["pages/GroupsPage", "components/LibraryToolbar"]) assert.doesNotMatch(src(f), /GearIcon/, f);
+});
+
+test("Settings' Change buttons and fields meet the 44px floor and carry labels", () => {
+  const s = src("pages/SettingsPage");
+  assert.doesNotMatch(s, /text-xs[^"]*"[^>]*>\s*Change/);
+  assert.match(s, /<label[^>]*htmlFor=/);
+});
+```
+
+Before relying on the sun-glyph assertion, check `OptionsMenu.tsx:24-31` for the actual `circle` it draws, and adjust the regex to match it.
+
+- [ ] **Step 2: Run them and see them fail**
+
+Run: `cd frontend && npx tsx --tsconfig tsconfig.app.json --test scripts/test-controls.mts`
+Expected: FAIL.
+
+- [ ] **Step 3: Fix the named controls, then sweep with the listing.**
+  - **Named fixes:**
+    - `OptionsMenu`'s default trigger uses `MoreIcon`.
+    - Remove `Toolbar`'s `GearIcon`. `GroupsPage:359` and `LibraryToolbar:98` use `SettingsIcon`.
+    - Settings "Change" buttons and fields get 44px targets and labelled inputs (`SettingsPage.tsx:95-101,127-142`).
+    - Card Style/Cover chips (`BookCard`) and Home activity rows (`HomePage`) get 44px hit areas.
+    - The mural editor and seed page toolbars reach 44px, with one accent each.
+  - **Sweep:**
+    1. Run `node scripts/dev-web.mjs --reset`.
+    2. Snapshot every signed-in route in `App.tsx` at 1280 and 360.
+    3. Check every `⚠ <44px` row, every `(no label)` field, and any view with two accent buttons.
+    4. Fix the ones in this task's files.
+    5. If one remains in a file this task doesn't list, stop and report it as NEEDS_CONTEXT with the file and the listing row. The controller adds it to the plan, because the scope gate rejects unlisted files.
 
 - [ ] **Step 4: Run the suite and re-run the sweep**
 
 Run: `cd frontend && npm test && npm run typecheck && npm run lint`
-Expected: PASS. A second snapshot pass over every signed-in route shows no `⚠ <44px` row. Then run `npm run dev:release`.
+Expected: PASS. A second snapshot pass over every signed-in route shows no `⚠ <44px` row and no `(no label)` field. Then run `npm run dev:release`.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add frontend/src/components/Toolbar.tsx frontend/src/components/BookCard.tsx frontend/scripts/test-page-frame.mts && git commit -m "Raise every control to 44px and keep one accent button per view"
+git add frontend/src/components/Toolbar.tsx frontend/src/components/OptionsMenu.tsx frontend/src/components/LibraryToolbar.tsx frontend/src/pages/GroupsPage.tsx frontend/src/pages/SettingsPage.tsx frontend/src/components/BookCard.tsx frontend/src/pages/HomePage.tsx frontend/src/pages/MuralEditorPage.tsx frontend/src/pages/ArenaSeedPage.tsx frontend/scripts/test-controls.mts && git commit -m "Raise every control to 44px, one accent per view, three-dot menus and labelled fields"
 ```
 
-### Task 12: Document the frame, retire `PageContainer`
+### Task 13: Document the frame, retire `PageContainer`
 
 **Files:**
-- Modify: `DESIGN.md`
 - Delete: `frontend/src/components/PageContainer.tsx`
+- Modify: `frontend/src/components/LibraryCanvas.tsx`
+- Modify: `frontend/src/components/Toolbar.tsx`
+- Modify: `frontend/src/pages/LibraryStylePage.tsx`
+- Modify: `DESIGN.md`
 - Modify: `frontend/README.md`
 
 - [ ] **Step 1: Confirm nothing imports `PageContainer`**
 
-Run: `rg -n "PageContainer" frontend/src`
+Run: `rg -n "import.*PageContainer" frontend/src frontend/scripts`
 Expected: no matches. Move any page still on it to `Page` first.
 
-- [ ] **Step 2: Update the docs.**
+- [ ] **Step 2: Update the comments and docs that name it.**
+  - Point the existing comments that mention `PageContainer` at `Page` (`LibraryCanvas.tsx:9,21,23`, `Toolbar.tsx:21`, `LibraryStylePage.tsx:201`).
   - **`DESIGN.md`:**
-    - Add a "Page frame" section to Layout: areas, the band, tabs, back links, the public band and widths.
+    - Add a "Page frame" section to Layout covering areas, the band, tabs, back links, the public band and widths.
     - Add `Page` and `SidebarNav` to Components.
     - Note `Sheet`'s footer.
     - Replace "web composes the same tokens ad hoc per call site, no shared primitives" with the primitives that now exist.
@@ -727,15 +876,17 @@ Expected: no matches. Move any page still on it to `Page` first.
 
 - [ ] **Step 3: Run the checks**
 
-Run: `cd frontend && npm test && npm run typecheck && npm run lint`
-Expected: PASS.
+Run: `rg -n "PageContainer" frontend/src && cd frontend && npm test && npm run typecheck && npm run lint`
+Expected: `rg` prints nothing, and the suite passes.
 
 - [ ] **Step 4: Commit, then ship Phase 3**
 
 ```bash
-git add DESIGN.md frontend/README.md frontend/src/components/PageContainer.tsx && git commit -m "Document the page frame and retire PageContainer"
+git add frontend/src/components/PageContainer.tsx frontend/src/components/LibraryCanvas.tsx frontend/src/components/Toolbar.tsx frontend/src/pages/LibraryStylePage.tsx DESIGN.md frontend/README.md && git commit -m "Document the page frame and retire PageContainer"
 ```
 
-Use the ship skill to push and open PR 3 with auto-merge. Then ask the user to run a full `site-ui-reviewer` pass, which the spec requires and only the user dispatches. Pass criteria:
-- no harmony finding on H1–H5, H7 or H8;
+Use the ship skill to push and open PR 3 with auto-merge.
+
+Then ask the user to run a full `site-ui-reviewer` pass. The spec requires it, and only the user dispatches that agent. The pass succeeds when it shows:
+- no harmony finding on H1–H8;
 - no `⚠ <44px` row on a signed-in page.

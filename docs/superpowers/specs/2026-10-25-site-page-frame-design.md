@@ -32,7 +32,7 @@ The site does not need to look like the mobile app. Coherence *within* the site 
 
 ### Areas: the sidebar
 
-The sidebar lists areas only, in this order: **Home, Library, Murals, Games, Reader card, Community, Settings**. Admin is an area for admins only, shown where `AdminLinks` appears today. The lockup, avatar, admin links and Log out stay where they are.
+The sidebar lists areas only, in this order: **Home, Library, Murals, Games, Reader card, Community, Settings**. Admin is an area for admins only, reached by one "Admin" link where `AdminLinks` appears today (the sidebar and drawer footer, above Log out). The lockup, avatar, admin links and Log out stay where they are.
 
 | Area | Tabs in its band | Routes behind the tabs |
 |---|---|---|
@@ -69,7 +69,7 @@ Below the band, content sits in one centred container whose width is the user's 
 
 ### Public pages: band without sidebar
 
-`/shared/library/:token`, `/shared/murals/:token`, `/vote/:code`, `/play/:code`, `/arena` and `/arena/:id` when signed out, and `/work/:id`, `/work/:id/stats` and `/book/:key` when signed out, all get the same band with no sidebar. Above the band they get the brand lockup linking to `/` and a "Log in" link on the right. A signed-in viewer of `/work/:id`, `/work/:id/stats`, `/book/:key` and `/arena/:id` gets the full frame with the sidebar, so the sidebar no longer disappears on those pages (H2). A signed-in visitor to `/arena` keeps today's redirect to `/community/discover` (`discoverDestination`, `frontend/src/pages/DiscoverPage.tsx:76`). The user decided "band without sidebar for public pages". The lockup and Log in link are my call. They cost the landing-page decision nothing, because that page stays as it is.
+`/shared/library/:token`, `/shared/murals/:token`, `/vote/:code`, `/play/:code`, `/arena` and `/arena/:id` when signed out, and `/work/:id` and `/work/:id/stats` when signed out, all get the same band with no sidebar. Above the band they get the brand lockup linking to `/` and a "Log in" link on the right. A signed-in viewer of `/work/:id`, `/work/:id/stats` and `/arena/:id` gets the full frame with the sidebar, and so does `/book/:key`, which is signed-in only. The sidebar no longer disappears on those pages (H2). A signed-out Work page has no back link, because there is no library to go back to. *My call.* On a Work or book page the band takes the title, the back link, Share and More. The hero below keeps the cover, series, author and awards, but no longer repeats the title. *My call:* two `h1`s would break the one-title rule. A signed-in visitor to `/arena` keeps today's redirect to `/community/discover` (`discoverDestination`, `frontend/src/pages/DiscoverPage.tsx:76`). The user decided "band without sidebar for public pages". The lockup and Log in link are my call. They cost the landing-page decision nothing, because that page stays as it is.
 
 ## Rules under the frame (from the review and DESIGN.md)
 
