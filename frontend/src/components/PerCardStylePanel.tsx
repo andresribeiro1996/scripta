@@ -1,8 +1,8 @@
 import { useRef, useState } from "react";
 import { extractPerCardStyle, resolvePerCardStyle, type LibraryStyleSettings, type PerCardStyle } from "../lib/libraryStyle";
 import { CardAppearanceSection, CardBorderSection, CardContentSection, CardTextSection } from "./StyleControls";
-import { useDismissible } from "../hooks/useDismissible";
-import { useScrollLock } from "../hooks/useScrollLock";
+import { Sheet } from "./Sheet";
+import { CHECKBOX_CLASS } from "./Toolbar";
 
 /** Generic "override the per-card style for one thing" modal — used both
  *  for a series (GroupsPage.tsx's "Style" button, series only) and a
@@ -44,8 +44,6 @@ export function PerCardStylePanel({
   onSave: (style: PerCardStyle | undefined) => void;
   onClose: () => void;
 }) {
-  useScrollLock();
-  useDismissible(onClose);
   const [customized, setCustomized] = useState(currentOverride !== undefined);
   // Seeded from the current saved override if there is one (resolved
   // against defaults — see resolvePerCardStyle's own comment for why a
@@ -86,44 +84,31 @@ export function PerCardStylePanel({
   }
 
   return (
-    <div className="overlay-in fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div
-        className="max-h-[85vh] w-full max-w-2xl overflow-y-auto overscroll-contain rounded-xl border border-(--color-border) bg-(--color-surface) shadow-lg"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between border-b border-(--color-border) p-4">
-          <div>
-            <h3 className="text-sm font-semibold">Style for "{name}"</h3>
-            <p className="text-xs text-(--color-text-dim)">Takes priority over {priorityText} style.</p>
+    <Sheet title={`Style for "${name}"`} onClose={onClose} style={{ maxWidth: "42rem" }}>
+      <div className="px-2 pb-2">
+        <p className="mb-3 text-xs text-(--color-text-dim)">Takes priority over {priorityText} style.</p>
+        <label className="mb-4 flex items-center gap-2 text-sm font-semibold" htmlFor={`${idPrefix}-style-customized`}>
+          <input
+            id={`${idPrefix}-style-customized`}
+            type="checkbox"
+            className={CHECKBOX_CLASS}
+            checked={customized}
+            onChange={(e) => handleToggleCustomized(e.target.checked)}
+          />
+          Custom style
+        </label>
+
+        {!customized ? (
+          <p className="text-sm text-(--color-text-dim)">Currently uses {priorityText} style. Turn this on to override it.</p>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <CardAppearanceSection idPrefix={idPrefix} draft={draft} onApply={applyPatch} onSaveNow={savePatchNow} />
+            <CardBorderSection idPrefix={idPrefix} draft={draft} onApply={applyPatch} onSaveNow={savePatchNow} />
+            <CardContentSection idPrefix={idPrefix} draft={draft} onApply={applyPatch} onSaveNow={savePatchNow} />
+            <CardTextSection idPrefix={idPrefix} draft={draft} onApply={applyPatch} onSaveNow={savePatchNow} />
           </div>
-          <button onClick={onClose} className="text-sm text-(--color-text-dim) hover:text-(--color-text)">
-            Close
-          </button>
-        </div>
-
-        <div className="p-4">
-          <label className="mb-4 flex items-center gap-2 text-sm font-semibold" htmlFor={`${idPrefix}-style-customized`}>
-            <input
-              id={`${idPrefix}-style-customized`}
-              type="checkbox"
-              checked={customized}
-              onChange={(e) => handleToggleCustomized(e.target.checked)}
-            />
-            Custom style
-          </label>
-
-          {!customized ? (
-            <p className="text-sm text-(--color-text-dim)">Currently uses {priorityText} style. Turn this on to override it.</p>
-          ) : (
-            <div className="grid gap-4 sm:grid-cols-2">
-              <CardAppearanceSection idPrefix={idPrefix} draft={draft} onApply={applyPatch} onSaveNow={savePatchNow} />
-              <CardBorderSection idPrefix={idPrefix} draft={draft} onApply={applyPatch} onSaveNow={savePatchNow} />
-              <CardContentSection idPrefix={idPrefix} draft={draft} onApply={applyPatch} onSaveNow={savePatchNow} />
-              <CardTextSection idPrefix={idPrefix} draft={draft} onApply={applyPatch} onSaveNow={savePatchNow} />
-            </div>
-          )}
-        </div>
+        )}
       </div>
-    </div>
+    </Sheet>
   );
 }

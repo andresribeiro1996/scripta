@@ -73,9 +73,9 @@ function DuelSideCard({
         <Link
           to={`/work/${side.workId}`}
           aria-label="About this book"
-          className="absolute left-1.5 top-1.5 z-10 rounded-full bg-black/50 px-2 py-0.5 text-sm font-bold text-white"
+          className="absolute left-0 top-0 z-10 flex h-11 w-11 items-center justify-center text-sm font-bold text-white"
         >
-          i
+          <span className="rounded-full bg-black/50 px-2 py-0.5">i</span>
         </Link>
       )}
       {onAddBook && (
@@ -86,9 +86,9 @@ function DuelSideCard({
             event.stopPropagation();
             onAddBook(side);
           }}
-          className="absolute right-1.5 top-1.5 z-10 rounded-full bg-black/50 px-2 py-0.5 text-sm font-bold text-white"
+          className="absolute right-0 top-0 z-10 flex h-11 w-11 items-center justify-center text-sm font-bold text-white"
         >
-          +
+          <span className="rounded-full bg-black/50 px-2 py-0.5">+</span>
         </button>
       )}
     </div>

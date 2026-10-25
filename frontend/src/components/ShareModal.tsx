@@ -1,16 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 import { ApiError, postToSocial, type SocialProvider } from "../api/socials";
-import { useDismissible } from "../hooks/useDismissible";
 import { useSocials } from "../hooks/useSocials";
 import { useConfirm } from "./ConfirmDialog";
 import { SocialIcon } from "./icons/SocialIcons";
-import { useScrollLock } from "../hooks/useScrollLock";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "./page/buttonClasses";
+import { Sheet } from "./Sheet";
 
 type Platform = Extract<SocialProvider, "x" | "threads">;
 
-const PLATFORM_LABELS: Record<Platform, string> = { x: "X", threads: "Threads" };
+const PLATFORM_LABELS: Record<Platform, string> = {
+  x: "X",
+  threads: "Threads"
+};
 
-/** The one modal every "Share" entry point in the app opens — a mural
+/** The one dialog every "Share" entry point in the app opens — a mural
  *  card's OptionsMenu, MuralEditorPage's header, and LibraryPage's
  *  page-level Share button (see each page's own wiring). Deliberately
  *  generic over WHAT is being shared (a `title` string plus a share-
@@ -21,9 +24,7 @@ const PLATFORM_LABELS: Record<Platform, string> = { x: "X", threads: "Threads" }
  *  shareToken/shareUrl shape (lib/murals.ts's Mural, api/library.ts's
  *  LibraryDocument).
  *
- *  Same fixed-overlay modal shell as ConfirmDialog.tsx/CoverPickerModal.tsx
- *  (bg-black/40 backdrop, click-outside-to-close via the inner panel's own
- *  stopPropagation, Escape-to-close).
+ *  Built on Sheet.
  *
  *  Local state carries the shared/not-shared view instead of waiting for
  *  the parent's own re-render — onShare/onUnshare already hand back
@@ -47,13 +48,13 @@ export function ShareModal({
   onUnshare: () => Promise<void>;
   onClose: () => void;
 }) {
-  useScrollLock();
   const { data: socials } = useSocials();
   const confirm = useConfirm();
 
-  const [current, setCurrent] = useState<{ shareToken: string; shareUrl: string } | null>(
-    shareToken && shareUrl ? { shareToken, shareUrl } : null
-  );
+  const [current, setCurrent] = useState<{
+    shareToken: string;
+    shareUrl: string;
+  } | null>(shareToken && shareUrl ? { shareToken, shareUrl } : null);
   const [sharing, setSharing] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
   const [unsharing, setUnsharing] = useState(false);
@@ -73,8 +74,6 @@ export function ShareModal({
       if (copiedTimeoutRef.current) clearTimeout(copiedTimeoutRef.current);
     };
   }, []);
-
-  useDismissible(onClose);
 
   async function handleShare() {
     setShareError(null);
@@ -161,30 +160,35 @@ export function ShareModal({
   const canNativeShare = typeof navigator.share === "function";
 
   return (
-    <div className="overlay-in fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div
-        className="w-full max-w-md rounded-xl border border-(--color-border) bg-(--color-surface) p-5 shadow-lg"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-sm font-semibold">Share "{title}"</h3>
-          <button onClick={onClose} className="text-sm text-(--color-text-dim) hover:text-(--color-text)">
-            Close
-          </button>
-        </div>
-
-        {!current && (
-          <div>
-            <p className="mb-4 text-sm text-(--color-text-dim)">
-              Create a public link anyone can view — no account needed on their end.
-            </p>
-            <button
-              onClick={() => void handleShare()}
-              disabled={sharing}
-              className="rounded-lg bg-(--color-accent) px-4 py-2 text-sm font-semibold text-(--color-on-accent) disabled:opacity-60"
-            >
+    <Sheet
+      title={`Share "${title}"`}
+      onClose={onClose}
+      footer={
+        !current ? (
+          <>
+            <button onClick={onClose} className={BUTTON_SECONDARY}>
+              Cancel
+            </button>
+            <button onClick={() => void handleShare()} disabled={sharing} className={BUTTON_PRIMARY}>
               {sharing ? "Creating…" : "Create share link"}
             </button>
+          </>
+        ) : composing ? (
+          <>
+            <button onClick={closeCompose} disabled={posting} className={BUTTON_SECONDARY}>
+              Cancel
+            </button>
+            <button onClick={() => void handlePost()} disabled={posting || composeText.trim().length === 0} className={BUTTON_PRIMARY}>
+              {posting ? "Posting…" : `Post to ${PLATFORM_LABELS[composing]}`}
+            </button>
+          </>
+        ) : undefined
+      }
+    >
+      <div className="px-2 pb-2">
+        {!current && (
+          <div>
+            <p className="mb-4 text-sm text-(--color-text-dim)">Create a public link anyone can view — no account needed on their end.</p>
             {shareError && <p className="mt-2 text-xs text-(--color-danger)">{shareError}</p>}
           </div>
         )}
@@ -197,12 +201,9 @@ export function ShareModal({
                 aria-label="Share link"
                 value={current.shareUrl}
                 onFocus={(e) => e.currentTarget.select()}
-                className="w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm"
+                className="min-h-11 w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm"
               />
-              <button
-                onClick={() => void handleCopy()}
-                className="shrink-0 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm font-semibold hover:bg-(--color-surface-hover)"
-              >
+              <button onClick={() => void handleCopy()} className={`${BUTTON_SECONDARY} shrink-0`}>
                 Copy link
               </button>
             </div>
@@ -210,10 +211,7 @@ export function ShareModal({
             {copyError && <p className="mt-1.5 text-xs text-(--color-danger)">{copyError}</p>}
 
             {canNativeShare && (
-              <button
-                onClick={handleNativeShare}
-                className="mt-3 w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm font-semibold hover:bg-(--color-surface-hover)"
-              >
+              <button onClick={handleNativeShare} className={`${BUTTON_SECONDARY} mt-3 w-full`}>
                 Share…
               </button>
             )}
@@ -229,7 +227,7 @@ export function ShareModal({
                       onClick={() => openCompose(platform)}
                       disabled={!connected}
                       title={connected ? undefined : `Connect ${PLATFORM_LABELS[platform]} in Settings to share directly.`}
-                      className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm font-semibold hover:bg-(--color-surface-hover) disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-(--color-surface)"
+                      className={`${BUTTON_SECONDARY} flex-1 gap-2 disabled:cursor-not-allowed`}
                     >
                       <SocialIcon provider={platform} className="h-4 w-4" />
                       {PLATFORM_LABELS[platform]}
@@ -243,27 +241,12 @@ export function ShareModal({
               <div className="mt-3">
                 <textarea
                   autoFocus
+                  aria-label="Post text"
                   value={composeText}
                   onChange={(e) => setComposeText(e.target.value)}
                   rows={5}
                   className="w-full resize-none rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm"
                 />
-                <div className="mt-2 flex justify-end gap-2">
-                  <button
-                    onClick={closeCompose}
-                    disabled={posting}
-                    className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-1.5 text-sm font-semibold hover:bg-(--color-surface-hover) disabled:opacity-60"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={() => void handlePost()}
-                    disabled={posting || composeText.trim().length === 0}
-                    className="rounded-lg bg-(--color-accent) px-3 py-1.5 text-sm font-semibold text-(--color-on-accent) disabled:opacity-60"
-                  >
-                    {posting ? "Posting…" : `Post to ${PLATFORM_LABELS[composing]}`}
-                  </button>
-                </div>
                 {postError && <p className="mt-2 text-xs text-(--color-danger)">{postError}</p>}
                 {postSuccess && (
                   <p className="mt-2 text-xs text-(--color-accent)">
@@ -282,7 +265,7 @@ export function ShareModal({
               <button
                 onClick={() => void handleStopSharing()}
                 disabled={unsharing}
-                className="text-xs text-(--color-danger) transition-opacity hover:opacity-80 disabled:opacity-60"
+                className="min-h-11 text-xs text-(--color-danger) transition-opacity hover:opacity-80 disabled:opacity-60"
               >
                 {unsharing ? "Stopping…" : "Stop sharing"}
               </button>
@@ -291,6 +274,6 @@ export function ShareModal({
           </div>
         )}
       </div>
-    </div>
+    </Sheet>
   );
 }

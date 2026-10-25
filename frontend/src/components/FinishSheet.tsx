@@ -16,6 +16,7 @@ import {
 import { fetchOwnProfile } from "../api/community";
 import { fetchMural, updateMuralApi } from "../api/murals";
 import { CoverImage } from "./BookCard";
+import { BUTTON_PRIMARY } from "./page/buttonClasses";
 import { DuelButton } from "./DuelButton";
 import { FeelingChips } from "./FeelingChips";
 import { Sheet } from "./Sheet";
@@ -165,7 +166,7 @@ export function FinishSheet({
             <button
               type="button"
               onClick={close}
-              className="min-h-9 rounded-lg bg-(--color-accent) px-3 py-1.5 text-sm font-semibold text-(--color-on-accent) hover:opacity-90"
+              className={BUTTON_PRIMARY}
             >
               Done
             </button>

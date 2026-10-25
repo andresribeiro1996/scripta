@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { MiniBookTile } from "../murals/blocks/BookBlocks";
-import { useScrollLock } from "../../hooks/useScrollLock";
-import { useDismissible } from "../../hooks/useDismissible";
+import { Sheet } from "../Sheet";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../page/buttonClasses";
 import { workIdOf, booksByWork } from "@scripta/shared";
 
 /** Picks several books into a tier list's pool in one trip.
@@ -26,8 +26,10 @@ export function AddBooksSheet({
   onAdd: (workIds: string[]) => void;
   onClose: () => void;
 }) {
-  useScrollLock();
-  useDismissible(onClose);
+  const searchRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    searchRef.current?.focus();
+  }, []);
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
@@ -50,66 +52,13 @@ export function AddBooksSheet({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center sm:p-4" onClick={onClose}>
-      <div
-        className="flex max-h-[85vh] w-full flex-col rounded-t-2xl border border-(--color-border) bg-(--color-surface) shadow-lg sm:max-w-2xl sm:rounded-2xl"
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Add books to the pool"
-      >
-        <div className="shrink-0 border-b border-(--color-border) p-3">
-          <input
-            autoFocus
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search your library…"
-            aria-label="Search your library"
-            className="w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm"
-          />
-        </div>
-
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3">
-          {filtered.length === 0 ? (
-            <p className="p-3 text-sm text-(--color-text-dim)">No books match.</p>
-          ) : (
-            <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
-              {filtered.map((book, i) => {
-                const key = workIdOf(book)!;
-                const isSelected = selected.has(key);
-                return (
-                  <button
-                    key={String(book.ContentID ?? i)}
-                    onClick={() => toggle(key)}
-                    aria-pressed={isSelected}
-                    // MiniBookTile's only content here is a cover image
-                    // (`showTitle={false} showAuthor={false}`), whose
-                    // `CoverImage` renders `alt=""` — without this, every
-                    // button in the grid reads identically to a screen
-                    // reader ("button, not pressed" x N). The book's own
-                    // title gives each one a distinct accessible name.
-                    aria-label={String(book.Title ?? "Untitled")}
-                    className={`relative h-[6.5em] overflow-hidden rounded-lg ring-2 transition-shadow ${
-                      isSelected ? "ring-(--color-accent)" : "ring-transparent"
-                    }`}
-                  >
-                    <MiniBookTile book={book} showTitle={false} showAuthor={false} />
-                    {isSelected && (
-                      <span className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-(--color-accent) text-(--color-on-accent)">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M20 6 9 17l-5-5" />
-                        </svg>
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        <div className="flex shrink-0 items-center justify-between gap-3 border-t border-(--color-border) p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]">
-          <button onClick={onClose} className="min-h-11 rounded-lg px-3 text-sm text-(--color-text-dim) hover:text-(--color-text)">
+    <Sheet
+      title="Add books to the pool"
+      onClose={onClose}
+      style={{ maxWidth: "42rem" }}
+      footer={
+        <>
+          <button onClick={onClose} className={BUTTON_SECONDARY}>
             Cancel
           </button>
           <button
@@ -118,12 +67,61 @@ export function AddBooksSheet({
               onClose();
             }}
             disabled={selected.size === 0}
-            className="min-h-11 rounded-lg bg-(--color-accent) px-4 text-sm font-semibold text-(--color-on-accent) disabled:opacity-50"
+            className={BUTTON_PRIMARY}
           >
-            Add {selected.size > 0 ? selected.size : ""} {selected.size === 1 ? "book" : "books"}
+            {selected.size === 0 ? "Pick books to add" : `Add ${selected.size} ${selected.size === 1 ? "book" : "books"}`}
           </button>
-        </div>
+        </>
+      }
+    >
+      <div className="sticky top-0 z-10 bg-(--color-surface) p-2 pt-0">
+        <input
+          ref={searchRef}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search your library…"
+          aria-label="Search your library"
+          className="min-h-11 w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm"
+        />
       </div>
-    </div>
+      <div className="p-2">
+        {filtered.length === 0 ? (
+          <p className="p-3 text-sm text-(--color-text-dim)">No books match.</p>
+        ) : (
+          <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
+            {filtered.map((book, i) => {
+              const key = workIdOf(book)!;
+              const isSelected = selected.has(key);
+              return (
+                <button
+                  key={String(book.ContentID ?? i)}
+                  onClick={() => toggle(key)}
+                  aria-pressed={isSelected}
+                  // MiniBookTile's only content here is a cover image
+                  // (`showTitle={false} showAuthor={false}`), whose
+                  // `CoverImage` renders `alt=""` — without this, every
+                  // button in the grid reads identically to a screen
+                  // reader ("button, not pressed" x N). The book's own
+                  // title gives each one a distinct accessible name.
+                  aria-label={String(book.Title ?? "Untitled")}
+                  className={`relative h-[6.5em] overflow-hidden rounded-lg ring-2 transition-shadow ${
+                    isSelected ? "ring-(--color-accent)" : "ring-transparent"
+                  }`}
+                >
+                  <MiniBookTile book={book} showTitle={false} showAuthor={false} />
+                  {isSelected && (
+                    <span className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-(--color-accent) text-(--color-on-accent)">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20 6 9 17l-5-5" />
+                      </svg>
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </Sheet>
   );
 }

@@ -15,6 +15,7 @@ import { BracketTree } from "../components/arena/BracketTree";
 import { DuelCard } from "../components/arena/DuelCard";
 import { useArena } from "../hooks/useArena";
 import { Page } from "../components/page/Page";
+import { BUTTON_SECONDARY } from "../components/page/buttonClasses";
 import { backTo } from "../lib/areas";
 
 export function ArenaViewPage() {
@@ -122,7 +123,7 @@ export function ArenaViewPage() {
               if (e.key === "Escape") setEditingName(false);
             }}
             aria-label="Tournament name"
-            className="w-full rounded-lg border border-(--color-border) bg-(--color-bg) px-2 py-1 text-2xl font-bold"
+            className="min-h-11 w-full rounded-lg border border-(--color-border) bg-(--color-bg) px-2 py-1 text-2xl font-bold"
           />
         ) : isOwner ? (
           <button
@@ -131,9 +132,9 @@ export function ArenaViewPage() {
               setEditingName(true);
             }}
             title="Rename this tournament"
-            className="block w-full text-left font-bold transition-colors hover:text-(--color-accent)"
+            className="flex min-h-11 w-full items-center text-left font-bold transition-colors hover:text-(--color-accent)"
           >
-            {tournament.name}
+            <span className="min-w-0 break-words">{tournament.name}</span>
           </button>
         ) : (
           tournament.name
@@ -214,7 +215,7 @@ export function ArenaViewPage() {
                 <button
                   onClick={() => void handleSettle(duel.id)}
                   disabled={busyDuelId === duel.id}
-                  className="mt-2 w-full rounded-lg border border-(--color-border) py-2 text-xs text-(--color-text-dim) hover:bg-(--color-surface-hover)"
+                  className={`${BUTTON_SECONDARY} mt-2 w-full`}
                 >
                   Settle now
                 </button>
@@ -224,14 +225,14 @@ export function ArenaViewPage() {
                   <button
                     onClick={() => void handleTiebreak(duel.id, duel.bookA.workId!)}
                     disabled={busyDuelId === duel.id || duel.bookA.workId === null}
-                    className="flex-1 rounded-lg bg-(--color-accent) py-2 text-xs font-medium text-(--color-on-accent)"
+                    className={`${BUTTON_SECONDARY} flex-1`}
                   >
                     {duel.bookA.title} wins
                   </button>
                   <button
                     onClick={() => void handleTiebreak(duel.id, duel.bookB.workId!)}
                     disabled={busyDuelId === duel.id || duel.bookB.workId === null}
-                    className="flex-1 rounded-lg bg-(--color-accent) py-2 text-xs font-medium text-(--color-on-accent)"
+                    className={`${BUTTON_SECONDARY} flex-1`}
                   >
                     {duel.bookB.title} wins
                   </button>

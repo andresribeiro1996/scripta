@@ -43,7 +43,7 @@ export function MuralFolderTree({
     <nav className="flex flex-col gap-0.5">
       <button
         onClick={() => onSelect(null)}
-        className={`rounded-lg px-2 py-1.5 text-left text-sm font-semibold ${
+        className={`min-h-11 rounded-lg px-2 text-left text-sm font-semibold ${
           selectedFolderId === null
             ? "bg-(--color-accent-soft) text-(--color-accent)"
             : "text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)"
@@ -62,7 +62,7 @@ export function MuralFolderTree({
               <button
                 onClick={() => toggle(folder.id)}
                 title={isCollapsed ? "Expand" : "Collapse"}
-                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded text-(--color-text-dim) hover:bg-(--color-surface-hover) ${
+                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded text-(--color-text-dim) hover:bg-(--color-surface-hover) ${
                   hasChildren ? "" : "invisible"
                 }`}
               >
@@ -91,12 +91,12 @@ export function MuralFolderTree({
                     if (e.key === "Enter") commitRename(folder);
                     if (e.key === "Escape") setRenamingId(null);
                   }}
-                  className="w-full min-w-0 rounded border border-(--color-border) bg-(--color-surface) px-1.5 py-0.5 text-sm"
+                  className="min-h-11 w-full min-w-0 rounded border border-(--color-border) bg-(--color-surface) px-1.5 text-sm"
                 />
               ) : (
                 <button
                   onClick={() => onSelect(folder.id)}
-                  className={`flex-1 truncate rounded px-1.5 py-1 text-left text-sm ${
+                  className={`min-h-11 flex-1 truncate rounded px-1.5 text-left text-sm ${
                     selectedFolderId === folder.id
                       ? "bg-(--color-accent-soft) font-semibold text-(--color-accent)"
                       : "text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)"
@@ -106,19 +106,11 @@ export function MuralFolderTree({
                 </button>
               )}
               <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-                <button
-                  onClick={() => onCreateFolder(folder.id)}
-                  title="New subfolder"
-                  className="flex h-5 w-5 items-center justify-center rounded text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)"
-                >
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                    <path d="M12 5v14M5 12h14" />
-                  </svg>
-                </button>
                 <OptionsMenu
                   title="Folder settings"
-                  triggerClassName="flex h-5 w-5 items-center justify-center rounded text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)"
+                  triggerClassName="flex h-11 w-11 items-center justify-center rounded text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)"
                   items={[
+                    { label: "New subfolder", onClick: () => onCreateFolder(folder.id) },
                     {
                       label: "Rename",
                       onClick: () => {
@@ -138,7 +130,7 @@ export function MuralFolderTree({
       <button
         onClick={() => onCreateFolder(selectedFolderId === null ? null : (folders.find((f) => f.id === selectedFolderId)?.parentId ?? null))}
         title="Create a folder next to the current selection"
-        className="mt-2 rounded-lg border border-dashed border-(--color-border) px-2 py-1.5 text-left text-xs text-(--color-text-dim) transition-colors hover:border-(--color-accent) hover:text-(--color-accent)"
+        className="mt-2 min-h-11 rounded-lg border border-dashed border-(--color-border) px-2 text-left text-xs text-(--color-text-dim) transition-colors hover:border-(--color-accent) hover:text-(--color-accent)"
       >
         + New folder
       </button>

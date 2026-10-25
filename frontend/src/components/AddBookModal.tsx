@@ -11,15 +11,12 @@
 // The barcode scanner (@zxing/browser) is dynamically imported inside
 // the scan effect so its ~300KB stays out of the main bundle for the
 // 99% of sessions that never open a camera.
-//
-// Same fixed-overlay modal shell as ShareModal.tsx (bg-black/40 backdrop,
-// click-outside-to-close, Escape-to-close, scroll-locked page behind).
 
 import { useEffect, useRef, useState } from "react";
 import type { IScannerControls } from "@zxing/browser";
 import { seriesLabel } from "@scripta/shared";
-import { useDismissible } from "../hooks/useDismissible";
-import { useScrollLock } from "../hooks/useScrollLock";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "./page/buttonClasses";
+import { Sheet } from "./Sheet";
 import { normalizeIsbn } from "../lib/covers";
 import { bookSearchApi, buildManualBook, searchInsideOutside, searchResultByline, type BookSearchResult } from "../lib/bookSearch";
 
@@ -38,9 +35,6 @@ export function AddBookModal({
   onAdd: (book: Record<string, unknown>) => Promise<void>;
   onClose: () => void;
 }) {
-  useScrollLock();
-  useDismissible(onClose);
-
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<BookSearchResult[] | null>(null);
   const [searching, setSearching] = useState(false);
@@ -189,21 +183,47 @@ export function AddBookModal({
 
   const missingTitle = title.trim() === "";
   const missingAuthor = author.trim() === "";
-  const missing = missingTitle && missingAuthor ? "Title and author are required." : missingTitle ? "Title is required." : missingAuthor ? "Author is required." : null;
+  const missing =
+    missingTitle && missingAuthor
+      ? "Title and author are required."
+      : missingTitle
+        ? "Title is required."
+        : missingAuthor
+          ? "Author is required."
+          : null;
 
   return (
-    <div className="overlay-in fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div
-        className="max-h-[90vh] w-full max-w-md overflow-y-auto overscroll-contain rounded-xl border border-(--color-border) bg-(--color-surface) p-5 shadow-lg"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-sm font-semibold">Add a book</h3>
-          <button onClick={onClose} className="text-sm text-(--color-text-dim) hover:text-(--color-text)">
-            Close
+    <Sheet
+      title="Add a book"
+      onClose={onClose}
+      footer={
+        <>
+          {saveError ? (
+            <p role="alert" className="mr-auto min-w-0 self-center text-xs text-(--color-danger)">
+              {saveError}
+            </p>
+          ) : (
+            missing && (
+              <p id="add-book-missing" className="mr-auto min-w-0 self-center text-xs text-(--color-text-dim)">
+                {missing}
+              </p>
+            )
+          )}
+          <button onClick={onClose} className={BUTTON_SECONDARY}>
+            Cancel
           </button>
-        </div>
-
+          <button
+            onClick={() => void handleSave()}
+            disabled={saving || missing !== null}
+            aria-describedby={missing ? "add-book-missing" : undefined}
+            className={BUTTON_PRIMARY}
+          >
+            {saving ? "Adding…" : "Add book"}
+          </button>
+        </>
+      }
+    >
+      <div className="px-2 pb-2">
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -217,13 +237,9 @@ export function AddBookModal({
             onChange={(e) => setQuery(e.target.value)}
             placeholder="ISBN, title, or author"
             aria-label="Search for a book"
-            className="min-w-0 flex-1 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm"
+            className="min-h-11 min-w-0 flex-1 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm"
           />
-          <button
-            type="submit"
-            disabled={searching || query.trim() === ""}
-            className="shrink-0 rounded-lg bg-(--color-accent) px-3.5 py-2 text-sm font-semibold text-(--color-on-accent) disabled:opacity-60"
-          >
+          <button type="submit" disabled={searching || query.trim() === ""} className={`${BUTTON_SECONDARY} shrink-0`}>
             {searching ? "Searching…" : "Search"}
           </button>
         </form>
@@ -236,7 +252,9 @@ export function AddBookModal({
             // actual reason beats zxing's opaque TypeError and the
             // generic "couldn't start" guess below.
             if (!navigator.mediaDevices?.getUserMedia) {
-              setScanError("The camera needs a secure connection — open the app over https:// (or localhost), not a plain http:// address.");
+              setScanError(
+                "The camera needs a secure connection — open the app over https:// (or localhost), not a plain http:// address."
+              );
               return;
             }
             setScanError(null);
@@ -259,9 +277,7 @@ export function AddBookModal({
         {results !== null && !scanning && (
           <div className="mt-3 max-h-64 overflow-y-auto overscroll-contain rounded-lg border border-(--color-border)">
             {results.length === 0 && !outsidePending && (
-              <p className="p-3 text-xs text-(--color-text-dim)">
-                No matches — fill the form in below by hand instead.
-              </p>
+              <p className="p-3 text-xs text-(--color-text-dim)">No matches — fill the form in below by hand instead.</p>
             )}
             {results.map((r, i) => (
               <button
@@ -277,9 +293,7 @@ export function AddBookModal({
                 <span className="min-w-0">
                   <span className="block truncate text-sm font-semibold">{r.title}</span>
                   {r.series && <span className="block truncate text-xs text-(--color-text-dim)">{seriesLabel(r.series)}</span>}
-                  <span className="block truncate text-xs text-(--color-text-dim)">
-                    {searchResultByline(r)}
-                  </span>
+                  <span className="block truncate text-xs text-(--color-text-dim)">{searchResultByline(r)}</span>
                 </span>
               </button>
             ))}
@@ -290,39 +304,39 @@ export function AddBookModal({
 
         <div className="mt-4 space-y-3 border-t border-(--color-border) pt-4">
           <label className="block">
-            <span className="mb-1 block text-xs font-semibold">Title</span>
+            <span className="mb-1 block text-sm font-semibold">Title</span>
             <input
               required
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm"
+              className="min-h-11 w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm"
             />
           </label>
           <label className="block">
-            <span className="mb-1 block text-xs font-semibold">Author</span>
+            <span className="mb-1 block text-sm font-semibold">Author</span>
             <input
               required
               value={author}
               onChange={(e) => setAuthor(e.target.value)}
-              className="w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm"
+              className="min-h-11 w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm"
             />
           </label>
           <div className="flex gap-3">
             <label className="min-w-0 flex-1">
-              <span className="mb-1 block text-xs font-semibold">ISBN</span>
+              <span className="mb-1 block text-sm font-semibold">ISBN</span>
               <input
                 value={isbn}
                 onChange={(e) => setIsbn(e.target.value)}
                 inputMode="numeric"
-                className="w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm"
+                className="min-h-11 w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm"
               />
             </label>
             <label className="w-32">
-              <span className="mb-1 block text-xs font-semibold">Rating</span>
+              <span className="mb-1 block text-sm font-semibold">Rating</span>
               <select
                 value={rating ?? ""}
                 onChange={(e) => setRating(e.target.value === "" ? null : Number(e.target.value))}
-                className="w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm"
+                className="min-h-11 w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm"
               >
                 <option value="">—</option>
                 {[1, 2, 3, 4, 5].map((n) => (
@@ -335,11 +349,11 @@ export function AddBookModal({
           </div>
           <div className="flex gap-3">
             <label className="w-32">
-              <span className="mb-1 block text-xs font-semibold">Status</span>
+              <span className="mb-1 block text-sm font-semibold">Status</span>
               <select
                 value={readStatus}
                 onChange={(e) => setReadStatus(Number(e.target.value))}
-                className="w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm"
+                className="min-h-11 w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm"
               >
                 {STATUS_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>
@@ -349,28 +363,18 @@ export function AddBookModal({
               </select>
             </label>
             <label className="min-w-0 flex-1">
-              <span className="mb-1 block text-xs font-semibold">Date read</span>
+              <span className="mb-1 block text-sm font-semibold">Date read</span>
               <input
                 type="date"
                 value={dateRead}
                 onChange={(e) => setDateRead(e.target.value)}
                 disabled={readStatus !== 2}
-                className="w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm disabled:opacity-50"
+                className="min-h-11 w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm disabled:opacity-50"
               />
             </label>
           </div>
-          <button
-            onClick={() => void handleSave()}
-            disabled={saving || missing !== null}
-            aria-describedby={missing ? "add-book-missing" : undefined}
-            className="w-full rounded-lg bg-(--color-accent) px-4 py-2.5 text-sm font-semibold text-(--color-on-accent) disabled:opacity-60"
-          >
-            {saving ? "Adding…" : "Add book"}
-          </button>
-          {missing && <p id="add-book-missing" className="text-xs text-(--color-text-dim)">{missing}</p>}
-          {saveError && <p className="text-xs text-(--color-danger)">{saveError}</p>}
         </div>
       </div>
-    </div>
+    </Sheet>
   );
 }

@@ -199,7 +199,7 @@ export function MuralCanvas({
             <BlockRenderer block={block} books={books} images={images} profile={profile} groups={groups} shelfThemeOverride={shelfThemeOverride} readerCardOverride={readerCardOverride} statsOverride={statsOverride} tierlistData={tierlistData} />
             {effects.fadeColor && effects.fadeOpacity > 0 ? <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-[1] rounded-[inherit]" style={{ backgroundColor: effects.fadeColor, opacity: effects.fadeOpacity }} /> : null}
             {editMode && !drag.drop && (
-              <div className="mural-block-controls absolute top-1.5 right-1.5 z-20 opacity-0 transition-opacity group-hover:opacity-100">
+              <div className="mural-block-controls absolute top-0 right-0 z-20 opacity-0 transition-opacity group-hover:opacity-100">
                 <OptionsMenu
                   title="Block settings"
                   items={[

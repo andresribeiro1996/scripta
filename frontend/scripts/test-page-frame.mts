@@ -36,7 +36,7 @@ test("a rename control can be the title", () => {
   assert.match(html, /<h1[^>]*><button>Summer showdown<\/button><\/h1>/);
 });
 
-test("the body keeps PageContainer's padding", () => {
+test("the body keeps the page padding", () => {
   assert.match(render(createElement(Page, { title: "T", children: "x" })), /px-4 py-5 sm:px-5 sm:py-8/);
 });
 

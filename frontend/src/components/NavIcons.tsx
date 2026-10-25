@@ -137,11 +137,8 @@ export function CommunityIcon({ size = 22 }: IconProps) {
   );
 }
 
-/** A cog — settings. Toolbar.tsx's GearIcon carries the same mark (they
- *  must: it is the one settings glyph in the app), redrawn there from
- *  hub-and-spokes for the same reason. Radial ticks around a circle read
- *  as a brightness/sun mark at any size — teeth have to sit ON the
- *  silhouette for the eye to call it a gear. */
+/** A cog — settings. Teeth sit on the silhouette; radial ticks around a
+ *  circle would read as a brightness mark. */
 export function SettingsIcon({ size = 22 }: IconProps) {
   return (
     <svg {...svgProps(size)}>

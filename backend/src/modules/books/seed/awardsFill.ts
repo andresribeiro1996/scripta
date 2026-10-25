@@ -50,6 +50,8 @@ const SHAPES = [
 
 export const itemOf = (uri: string) => uri.slice(uri.lastIndexOf("/") + 1);
 
+export const prizeOf = (binding: Binding): PrizeKey | null => (binding.prize && PRIZE_OF_ITEM.get(itemOf(binding.prize.value))) || null;
+
 const yearClause = (minYear: number | undefined) =>
   minYear === undefined
     ? "OPTIONAL { ?statement pq:P585 ?when . } BIND(YEAR(?when) AS ?year)"
@@ -95,7 +97,7 @@ export function awardRowsOf(bindings: Binding[], honorees: ReadonlyMap<string, s
   const rows: AwardRow[] = [];
   const noYear: Partial<Record<PrizeKey, number>> = {};
   for (const binding of bindings) {
-    const prize = binding.prize && PRIZE_OF_ITEM.get(itemOf(binding.prize.value));
+    const prize = prizeOf(binding);
     if (!prize) continue;
     const year = Number.parseInt(binding.year?.value ?? "", 10);
     if (!Number.isInteger(year)) {

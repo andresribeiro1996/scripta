@@ -3,6 +3,7 @@ import { DeleteAccountSection } from "../auth/DeleteAccountSection";
 import { useRef, useState } from "react";
 import { useAuth } from "../auth/AuthContext";
 import { Avatar } from "../components/Avatar";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../components/page/buttonClasses";
 import { Page } from "../components/page/Page";
 import { SocialsSection } from "../components/SocialsSection";
 import { area } from "../lib/areas";
@@ -85,7 +86,7 @@ export function SettingsPage() {
                     disabled={avatarBusy}
                     onClick={() => fileInputRef.current?.click()}
                     aria-label={avatarBusy ? undefined : "Change profile picture"}
-                    className="text-xs text-(--color-accent) transition-opacity hover:opacity-80 disabled:opacity-50"
+                    className="inline-flex min-h-11 items-center px-2 text-sm text-(--color-accent) transition-opacity hover:opacity-80 disabled:opacity-50"
                   >
                     {avatarBusy ? "Working…" : "Change"}
                   </button>
@@ -93,7 +94,7 @@ export function SettingsPage() {
                     <button
                       disabled={avatarBusy}
                       onClick={() => void handleAvatarRemove()}
-                      className="text-xs text-(--color-text-dim) transition-opacity hover:opacity-80 disabled:opacity-50"
+                      className="inline-flex min-h-11 items-center px-2 text-sm text-(--color-text-dim) transition-opacity hover:opacity-80 disabled:opacity-50"
                     >
                       Remove
                     </button>
@@ -109,7 +110,7 @@ export function SettingsPage() {
           </div>
 
           <div>
-            <div className="mb-1 text-xs text-(--color-text-dim)">Username</div>
+            <label htmlFor="settings-username" className="mb-1 block text-xs text-(--color-text-dim)">Username</label>
             {!editing ? (
               <div className="flex items-center gap-3">
                 <span className="text-sm">@{session?.user.username ?? "—"}</span>
@@ -121,14 +122,15 @@ export function SettingsPage() {
                     setSuccess(false);
                   }}
                   aria-label="Change username"
-                  className="text-xs text-(--color-accent) transition-opacity hover:opacity-80"
+                  className="inline-flex min-h-11 items-center px-2 text-sm text-(--color-accent) transition-opacity hover:opacity-80"
                 >
                   Change
                 </button>
               </div>
             ) : (
-              <form onSubmit={handleSubmit} className="flex items-center gap-2">
+              <form onSubmit={handleSubmit} className="flex flex-wrap items-center gap-2">
                 <input
+                  id="settings-username"
                   autoFocus
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
@@ -136,19 +138,19 @@ export function SettingsPage() {
                   maxLength={30}
                   pattern="[a-zA-Z0-9_.]+"
                   title="Letters, numbers, underscores, and periods only."
-                  className="w-48 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-1.5 text-sm"
+                  className="min-h-11 w-full min-w-0 rounded-lg border border-(--color-border) bg-(--color-surface) sm:w-48 px-3 text-sm"
                 />
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="rounded-lg bg-(--color-accent) px-3 py-1.5 text-sm font-semibold text-(--color-on-accent) disabled:opacity-60"
+                  className={BUTTON_PRIMARY}
                 >
                   Save
                 </button>
                 <button
                   type="button"
                   onClick={() => setEditing(false)}
-                  className="text-sm text-(--color-text-dim) hover:text-(--color-text)"
+                  className={BUTTON_SECONDARY}
                 >
                   Cancel
                 </button>

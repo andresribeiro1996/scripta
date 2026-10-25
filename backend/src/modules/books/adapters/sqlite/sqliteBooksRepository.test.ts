@@ -2685,6 +2685,38 @@ test("mergeDuplicateWork refuses a keyless or already merged work", () => {
   assert.equal(repo.getBook(c.id)!.work_id, c.work_id);
 });
 
+test("addWorkAlias leaves a merged work holding the key, so the key maps to the target and a later edition lands there", () => {
+  const { db, repo } = freshRepo();
+  const target = edition(repo, "9780000000901", "Fourth Wing", "Rebecca Yarros", "OL1W");
+  repo.setWorkSummary(target.id, "Kept.");
+  repo.addWorkAlias("OL2W", target.work_id!, AT);
+
+  const alias = db.prepare("SELECT * FROM works WHERE ol_work_key = 'OL2W'").get() as unknown as WorkRow;
+  assert.deepEqual([alias.merged_into, alias.title, alias.author, alias.created_at], [target.work_id, "Fourth Wing", "Rebecca Yarros", AT]);
+  assert.deepEqual(repo.workIdsByWorkKeys(["OL1W", "OL2W"]), new Map([["OL1W", target.work_id!], ["OL2W", target.work_id!]]));
+  assert.deepEqual(mergeRows(db), [{ from_work: alias.id, into_work: target.work_id, source: "ol-duplicate", confidence: null, moved_book_ids: "[]", repointed_work_ids: "[]", merged_at: AT, undone_at: null }]);
+  assert.equal(countOf(db, "books"), 1);
+  assert.equal(workById(db, target.work_id).summary, "Kept.");
+
+  const later = repo.createBook({ title: "Fourth Wing", author: "Rebecca Yarros", isbn: "9780000000902", workKey: "OL2W" }, ["isbn:9780000000902"], NOW);
+  assert.equal(repo.getBook(later.id)!.work_id, target.work_id);
+});
+
+test("addWorkAlias onto a merged work aliases its target, and refuses a missing work", () => {
+  const { db, repo } = freshRepo();
+  const from = edition(repo, "9780000000911", "Fourth WIng", "Rebecca Yarros", "OL1W", at(1));
+  const into = edition(repo, "9780000000912", "Fourth Wing", "Rebecca Yarros", "OL2W", at(0));
+  repo.mergeDuplicateWork(from.work_id!, into.work_id!, AT);
+  repo.addWorkAlias("OL3W", from.work_id!, AT);
+  assert.equal(repo.workIdsByWorkKeys(["OL3W"]).get("OL3W"), into.work_id);
+  const alias = db.prepare("SELECT * FROM works WHERE ol_work_key = 'OL3W'").get() as unknown as WorkRow;
+  assert.equal(alias.merged_into, into.work_id);
+
+  assert.throws(() => repo.addWorkAlias("OL4W", "no-such-work", AT), WorkMergeError);
+  assert.equal(repo.workIdsByWorkKeys(["OL4W"]).size, 0);
+  assert.equal(countOf(db, "works"), 3);
+});
+
 test("undoneMergeAmong is true after undoMerge, whichever way the ids are listed", () => {
   const { repo } = freshRepo();
   const a = edition(repo, "9780000000801", "Fourth Wing", "Rebecca Yarros", "OL1W");

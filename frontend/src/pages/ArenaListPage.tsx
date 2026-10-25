@@ -17,7 +17,7 @@ import { EmptyState } from "../components/EmptyState";
 import { ArenaIcon } from "../components/NavIcons";
 import { OptionsMenu } from "../components/OptionsMenu";
 import { Page } from "../components/page/Page";
-import { BUTTON_PRIMARY } from "../components/page/buttonClasses";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../components/page/buttonClasses";
 import { SkeletonCardGrid } from "../components/Skeleton";
 import { TOOLBAR_CONTROL_CLASS, ToolbarRow } from "../components/Toolbar";
 import { useDelayedShow } from "../hooks/useDelayedShow";
@@ -110,7 +110,7 @@ export function ArenaListPage() {
         <>
           <p className="mb-4 text-sm text-(--color-text-dim)">
             Bracket tournaments from your library —{" "}
-            <a href="/arena" className="text-(--color-accent) underline">
+            <a href="/arena" className="inline-flex min-h-11 items-center text-(--color-accent) underline">
               browse public tournaments
             </a>
             .
@@ -134,7 +134,7 @@ export function ArenaListPage() {
             <EmptyState
               title="Couldn't load your tournaments."
               action={
-                <button onClick={() => void Promise.all([refetchTournaments(), refetchVoted()])} className="rounded-lg border border-(--color-border) px-3 py-1.5 text-sm hover:border-(--color-accent)">
+                <button onClick={() => void Promise.all([refetchTournaments(), refetchVoted()])} className={BUTTON_SECONDARY}>
                   Retry
                 </button>
               }
@@ -224,7 +224,7 @@ export function ArenaListPage() {
                   </div>
                   <OptionsMenu
                     title="Tier list settings"
-                    triggerClassName="absolute top-3 right-3 flex h-9 w-9 items-center justify-center rounded-lg text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)"
+                    triggerClassName="absolute top-1.5 right-1.5 flex h-11 w-11 items-center justify-center rounded-lg text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)"
                     items={[
                       ...(tl.voteCode === null ? [{
                         label: "Rename",
@@ -297,7 +297,7 @@ export function ArenaListPage() {
                 </div>
                 <OptionsMenu
                   title="Quiz settings"
-                  triggerClassName="absolute top-3 right-3 flex h-9 w-9 items-center justify-center rounded-lg text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)"
+                  triggerClassName="absolute top-1.5 right-1.5 flex h-11 w-11 items-center justify-center rounded-lg text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)"
                   items={[{ label: "Delete", onClick: () => void handleDeleteQuiz(quiz), danger: true }]}
                 />
               </div>

@@ -77,6 +77,7 @@ export interface BooksRepository {
   replaceLanguage(id: string, tag: string): void;
   mergeWorks(fromId: string, intoId: string, at?: string): string;
   mergeDuplicateWork(fromId: string, intoId: string, at: string): string;
+  addWorkAlias(key: string, intoId: string, at: string): void;
   detachEdition(bookId: string, at: string): string;
   getWorkView(id: string): WorkView | undefined;
   workPageRows(id: string): WorkPageRows | undefined;

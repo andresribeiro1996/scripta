@@ -1007,6 +1007,16 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       });
     },
 
+    addWorkAlias(key, intoId, at) {
+      inTransaction(() => {
+        const into = liveWorkId(intoId);
+        if (!into) throw new WorkMergeError("No such work.");
+        const { title, author } = workStmt.get(into) as { title: string; author: string };
+        const alias = insertWork(key, title, author, at);
+        mergeInto(alias, into, { source: "ol-duplicate", confidence: null, at, carrySummary: false });
+      });
+    },
+
     mergeTranslation(fromId, intoId, source, confidence, at) {
       return inTransaction(() => {
         const from = workLinkStmt.get(fromId) as WorkLink | undefined;

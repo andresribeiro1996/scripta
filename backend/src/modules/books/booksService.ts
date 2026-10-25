@@ -6,13 +6,13 @@ import { MIN_GOOD_WIDTH } from "./domain/constants.js";
 import { BookNotFoundError, FileTooLargeError, InvalidImageError, SourcePausedError, SourceUnavailableError, WorkMergeError } from "./domain/errors.js";
 import { coverColor, encodeCover, type EncodedCover } from "./domain/images.js";
 import { hiddenSynopsisHashes } from "./domain/synopsis.js";
-import { fillMissingIdentity, findExisting, findOrCreateBook, keysOf } from "./domain/findOrCreate.js";
+import { findExisting, findOrCreateBook } from "./domain/findOrCreate.js";
 import { siblingCoverImageIds } from "./domain/siblingCover.js";
 import { coveredFirst, workIdsOf } from "./domain/workSearch.js";
 import { editionLanguage, findByIdentity, normalizeWorkKey, isPortugalIsbn, isPortugueseIsbn, isValidIsbn, lookupIdentity, searchTokens, type BookIdentity, type BookLookup } from "./domain/normalize.js";
 import { summaryMatchesLanguage } from "./adapters/catalog/languageFilter.js";
 import { canonicalHits, catalogHits, type Hit } from "./catalogSearch.js";
-import { mergeDuplicateWorks } from "./duplicateWorks.js";
+import { saveCatalogHits, storeSeries } from "./saveHits.js";
 import type { BookCatalog, BooksRepository, CatalogDetails, CatalogSearchHit, CoverBlobReader, CoverBlobStore, CoverSource, EditionRecordSource, PageCursor } from "./domain/ports.js";
 import type { SeriesEntry } from "./domain/series.js";
 import type { BookRow, CoverSourceName, CoverStatus, WorkView } from "./domain/types.js";
@@ -22,7 +22,6 @@ const RETRY_AFTER_MS = 30 * 24 * 60 * 60 * 1000;
 const WORK_RECHECK_MS = 30 * 24 * 60 * 60 * 1000;
 const UNAVAILABLE_BACKOFF_MS = 10 * 60 * 1000;
 const COVER_EXTENSION = "webp";
-const SAVE_GROUP_LIMIT = 50;
 const ISBN_ONLY_BEFORE_YEAR = 2002;
 const NO_SOURCE: CoverSource = { byIsbn: async () => [], byTitle: async () => [] };
 const NO_COVER: ResolvedCover = { url: null, fullUrl: null, pending: false, upgrading: false };
@@ -226,27 +225,12 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
   }
 
   function saveHits(hits: CatalogSearchHit[]): BookSearchResult[] {
-    const saved = hits.map(({ result, olCoverId, workKey, subjectSeries, source }) => {
-      const author = result.authors.join(", ");
-      const identity = lookupIdentity({ isbn: result.isbn, title: result.title, author });
-      if (!identity) return { result, book: null };
-      const book = findExisting(deps.repo, identity) ?? deps.repo.createBook(
-        { title: identity.title, author: identity.author, isbn: identity.isbn, year: result.year, publisher: result.publisher, olCoverId, workKey, genres: result.genres, sources: [source] },
-        keysOf(deps.repo, identity),
-        now().toISOString()
-      );
-      fillMissingIdentity(deps.repo, book, identity.title, identity.author);
-      deps.repo.setWorkKey(book.id, workKey);
-      deps.repo.makeSearchable(book.id);
-      storeSeries(book.id, { subjectSeries }, now().toISOString());
-      return { result: book.cover_image_id ? { ...result, coverUrl: deps.publicUrlFor(book.cover_image_id, "thumb") } : result, book: deps.repo.getBook(book.id) ?? book };
+    const rows = saveCatalogHits({ repo: deps.repo, sharesArena: deps.sharesArena }, hits, now().toISOString());
+    const saved = hits.map(({ result }, index) => {
+      const book = rows[index] ?? null;
+      return { result: book?.cover_image_id ? { ...result, coverUrl: deps.publicUrlFor(book.cover_image_id, "thumb") } : result, book };
     });
     const books = saved.flatMap(({ book }) => (book ? [book] : []));
-    const titleKeys = [...new Set(books.flatMap(({ title_key }) => (title_key ? [title_key] : [])))];
-    if (titleKeys.length > 0) {
-      mergeDuplicateWorks({ repo: deps.repo, sharesArena: deps.sharesArena, now: () => now().getTime() }, titleKeys);
-      deps.repo.groupTitleKeys(titleKeys, SAVE_GROUP_LIMIT, now().toISOString(), deps.sharesArena);
-    }
     for (const book of books) if (!book.cover_image_id && lookupDue(book)) schedule(book.id);
     const canonical = deps.repo.canonicalWorkIds(workIdsOf(books));
     const found = withSeries(saved.map(({ result, book }) => ({
@@ -270,17 +254,6 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
     return view;
   }
 
-  function storeSeries(bookId: string, found: { editionSeries?: SeriesEntry[]; subjectSeries?: SeriesEntry[] }, at: string) {
-    const editions = found.editionSeries ?? [];
-    const subjects = found.subjectSeries ?? [];
-    if (editions.length === 0 && subjects.length === 0) return;
-    deps.repo.transaction(() => {
-      for (const entry of editions) deps.repo.addBookCollection(bookId, entry, "ol-edition", at);
-      const workId = subjects.length > 0 ? deps.repo.getBook(bookId)?.work_id : null;
-      if (workId) deps.repo.addWorkSeries(workId, subjects, "ol-subject", at);
-    });
-  }
-
   function storeSubjects(bookId: string, details: CatalogDetails, at: string) {
     if (!details.subjects) return;
     const workId = deps.repo.getBook(bookId)?.work_id;
@@ -296,14 +269,14 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       deps.repo.saveDetails(book.id, details.metadata, details.sources, details.summarySource, at);
       deps.repo.setWorkKey(book.id, details.workKey);
       if (details.workSummary) deps.repo.setWorkSummary(book.id, details.workSummary);
-      storeSeries(book.id, details, at);
+      storeSeries(deps.repo, book.id, details, at);
       storeSubjects(book.id, details, at);
       return;
     }
     if (details) {
       deps.repo.mergeDetails(book.id, { ...details.metadata, summary: null }, null);
       deps.repo.setWorkKey(book.id, details.workKey);
-      storeSeries(book.id, details, at);
+      storeSeries(deps.repo, book.id, details, at);
       storeSubjects(book.id, details, at);
     }
     deps.repo.markDetailsMissing(book.id, at);
@@ -459,7 +432,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
             const language = editionLanguage(record.languages, book.isbn);
             if (language) deps.repo.replaceLanguage(id, language);
           }
-          if (record) storeSeries(id, { editionSeries: record.series }, now().toISOString());
+          if (record) storeSeries(deps.repo, id, { editionSeries: record.series }, now().toISOString());
         } catch (error) {
           if (!(error instanceof SourceUnavailableError)) throw error;
           if (error.retryAt !== undefined) return error.retryAt;

@@ -349,7 +349,7 @@ console.log("\n14. The phone grid: default size gives PHONE_COLUMNS_AT_DEFAULT_S
     return { columns, cardWidth: (canvasWidth - gap * (columns - 1)) / columns };
   }
 
-  // A 360px phone, less PageContainer's 16px of padding a side.
+  // A 360px phone, less Page's 16px of padding a side.
   const canvas = 328;
   const gap = DEFAULT_LIBRARY_STYLE.cardGap;
 

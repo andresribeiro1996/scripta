@@ -205,15 +205,15 @@ export function TierListEditorPage() {
             setEditingName(true);
           }}
           title="Rename this tier list"
-          className="block min-w-0 max-w-full text-left break-words transition-colors hover:text-(--color-accent)"
+          className="flex min-h-11 min-w-0 max-w-full items-center text-left transition-colors hover:text-(--color-accent)"
         >
-          {tierlist.name}
+          <span className="min-w-0 break-words">{tierlist.name}</span>
         </button>
       )}
       actions={voteCode === null ? (
         <button
           onClick={() => (editing ? exitEditing() : setEditing(true))}
-          className={editing ? BUTTON_PRIMARY : BUTTON_SECONDARY}
+          className={editing && !openPanelOpen ? BUTTON_PRIMARY : BUTTON_SECONDARY}
         >
           {editing ? "Done" : "Edit"}
         </button>
@@ -233,7 +233,7 @@ export function TierListEditorPage() {
                     key={access}
                     onClick={() => setVoteAccessDraft(access)}
                     aria-pressed={voteAccessDraft === access}
-                    className={`flex min-h-9 flex-1 items-center justify-center px-3 text-sm font-semibold ${
+                    className={`flex min-h-11 flex-1 items-center justify-center px-3 text-sm font-semibold ${
                       i > 0 ? "border-l border-(--color-border)" : ""
                     } ${
                       voteAccessDraft === access
@@ -249,14 +249,14 @@ export function TierListEditorPage() {
                 <button
                   onClick={() => void handleOpenVoting()}
                   disabled={openingVoting}
-                  className="min-h-9 flex-1 rounded-lg bg-(--color-accent) px-3 text-sm font-semibold text-(--color-on-accent) disabled:opacity-60"
+                  className={`${BUTTON_PRIMARY} flex-1`}
                 >
                   {openingVoting ? "Opening…" : "Confirm and open"}
                 </button>
                 <button
                   onClick={() => setOpenPanelOpen(false)}
                   disabled={openingVoting}
-                  className="min-h-9 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm font-semibold hover:bg-(--color-surface-hover) disabled:opacity-60"
+                  className={BUTTON_SECONDARY}
                 >
                   Cancel
                 </button>
@@ -265,7 +265,7 @@ export function TierListEditorPage() {
           ) : (
             <button
               onClick={() => setOpenPanelOpen(true)}
-              className="min-h-9 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm font-semibold hover:bg-(--color-surface-hover)"
+              className={BUTTON_SECONDARY}
             >
               Open for voting
             </button>
@@ -284,7 +284,7 @@ export function TierListEditorPage() {
           </div>
           <a
             href={`/vote/${voteCode}`}
-            className="min-h-9 self-start rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm font-semibold hover:bg-(--color-surface-hover) flex items-center"
+            className={`${BUTTON_SECONDARY} self-start`}
           >
             {ownBallot?.placements.length ? "Edit your ballot" : "Rank your ballot"}
           </a>
@@ -296,7 +296,7 @@ export function TierListEditorPage() {
                   onClick={() => void handleAccessChange(access)}
                   disabled={savingAccess}
                   aria-pressed={voteAccess === access}
-                  className={`flex min-h-9 items-center justify-center px-3 text-sm font-semibold disabled:opacity-60 ${
+                  className={`flex min-h-11 items-center justify-center px-3 text-sm font-semibold disabled:opacity-60 ${
                     i > 0 ? "border-l border-(--color-border)" : ""
                   } ${
                     voteAccess === access
@@ -311,7 +311,7 @@ export function TierListEditorPage() {
             <button
               onClick={() => void handleToggleVotingOpen()}
               disabled={savingOpenState}
-              className="min-h-9 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm font-semibold hover:bg-(--color-surface-hover) disabled:opacity-60"
+              className={BUTTON_SECONDARY}
             >
               {votingOpen ? (savingOpenState ? "Closing…" : "Close voting") : savingOpenState ? "Reopening…" : "Reopen voting"}
             </button>

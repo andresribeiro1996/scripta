@@ -55,7 +55,7 @@ export function TierRowShell({
   return (
     <div className="flex shrink-0 items-stretch gap-2 overflow-hidden rounded-lg border border-(--color-border)">
       <div
-        className="flex w-[3em] shrink-0 flex-col items-center justify-center gap-1 overflow-hidden p-1 text-center text-[0.9em] leading-tight font-bold break-words text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.35)]"
+        className={`flex w-[3em] shrink-0 flex-col items-center justify-center gap-1 overflow-hidden p-1 text-center text-[0.9em] leading-tight font-bold break-words text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.35)] ${colorControl ? "min-w-11" : ""}`}
         style={{ backgroundColor: tier.color }}
       >
         <span className="line-clamp-3">{tier.label || "—"}</span>

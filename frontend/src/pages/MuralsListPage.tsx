@@ -12,7 +12,7 @@ import { MuralPresetPicker } from "../components/murals/MuralPresetPicker";
 import { MuralsIcon } from "../components/NavIcons";
 import { OptionsMenu } from "../components/OptionsMenu";
 import { Page } from "../components/page/Page";
-import { BUTTON_PRIMARY } from "../components/page/buttonClasses";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../components/page/buttonClasses";
 import { ShareModal } from "../components/ShareModal";
 import { OptionSheet } from "../components/Sheet";
 import { SkeletonCardGrid } from "../components/Skeleton";
@@ -167,7 +167,7 @@ export function MuralsListPage() {
 
         <div className="min-w-0 flex-1">
           <nav className="mb-3 hidden items-center gap-1 text-xs text-(--color-text-dim) md:flex">
-            <button onClick={() => setSelectedFolderId(null)} className="hover:text-(--color-text)">
+            <button onClick={() => setSelectedFolderId(null)} className="inline-flex min-h-11 items-center hover:text-(--color-text)">
               All murals
             </button>
             {folderPath(folders, selectedFolderId).map((f, i, path) => (
@@ -176,7 +176,7 @@ export function MuralsListPage() {
                 {i === path.length - 1 ? (
                   <span className="font-semibold text-(--color-text)">{f.name}</span>
                 ) : (
-                  <button onClick={() => setSelectedFolderId(f.id)} className="hover:text-(--color-text)">
+                  <button onClick={() => setSelectedFolderId(f.id)} className="inline-flex min-h-11 items-center hover:text-(--color-text)">
                     {f.name}
                   </button>
                 )}
@@ -192,7 +192,7 @@ export function MuralsListPage() {
               title="No murals yet."
               body={'A mural is a freeform dashboard you build yourself \u2014 a "Top 5 Books This Year" shelf, a favorite quote, a photo, whatever you want on the wall. Use the + below to start.'}
               action={
-                <button onClick={() => setPresetsOpen(true)} className="rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-semibold text-(--color-on-accent)">
+                <button onClick={() => setPresetsOpen(true)} className={BUTTON_SECONDARY}>
                   Start from a preset
                 </button>
               }
@@ -246,7 +246,7 @@ export function MuralsListPage() {
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Search"
-                    className="w-56 max-w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm"
+                    className="min-h-11 w-56 max-w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm"
                   />
                 </label>
                 <label className="flex flex-col gap-1">
@@ -262,7 +262,7 @@ export function MuralsListPage() {
                     <select
                       value={sortBy}
                       onChange={(e) => setSortBy(e.target.value as SortBy)}
-                      className="w-full appearance-none rounded-lg border border-(--color-border) bg-(--color-surface) py-2 pr-8 pl-3 text-sm"
+                      className="min-h-11 w-full appearance-none rounded-lg border border-(--color-border) bg-(--color-surface) py-2 pr-8 pl-3 text-sm"
                     >
                       {SORT_OPTIONS.map((opt) => (
                         <option key={opt.value} value={opt.value}>
@@ -348,7 +348,7 @@ export function MuralsListPage() {
                     // e.target === e.currentTarget: only react when the key
                     // event originated on the card itself, not bubbled up
                     // from a real focusable control nested inside it (the
-                    // settings ⚙, or the rename input while editing) — those
+                    // options menu, or the rename input while editing) — those
                     // need Enter/Space for their own purposes (activating the
                     // button, typing a literal space into the name), not
                     // "open this mural."
@@ -417,8 +417,8 @@ export function MuralsListPage() {
                         title="Mural settings"
                         triggerClassName={
                           hasCover
-                            ? "flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[rgba(10,8,6,0.72)] text-white backdrop-blur-xs"
-                            : "flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)"
+                            ? "-m-2.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[rgba(10,8,6,0.72)] text-white backdrop-blur-xs"
+                            : "-m-2.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)"
                         }
                         items={[
                           {
