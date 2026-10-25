@@ -30,8 +30,11 @@ type Shelf = { blocks: MuralBlock[]; landed: Landing[] };
 
 export function FinishedScreen({ book, before, onClose }: { book: Record<string, unknown>; before: ReadSnapshot | null; onClose: () => void }) {
   const { colors } = useTheme();
-  const { setRating, addNote, restoreRead } = useLibraryActions();
   const { show } = useToast();
+  const { setRating, addNote, restoreRead } = useLibraryActions((message) => {
+    if (mounted.current) setShelfError(message);
+    else show(message, "error");
+  });
   const libraryQuery = useLibrary();
   const queryClient = useQueryClient();
   const own = useQuery({ queryKey: ["community", "own-profile"], queryFn: fetchOwnProfile });

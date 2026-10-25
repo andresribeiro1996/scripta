@@ -32,16 +32,17 @@ import { buildMergedLibrary } from "../lib/mergeAndSave";
 import { useToast } from "../../../ui/ToastHost";
 import { useLibrary } from "./useLibrary";
 
-export function useLibraryActions() {
+export function useLibraryActions(onError?: (message: string) => void) {
   const { updateLibrary, submit } = useLibrary();
   const { show } = useToast();
+  const report = onError ?? ((message: string) => show(message, "error"));
 
   function run(mutate: (data: LibraryData) => LibraryData, failureMessage: string, onSuccess?: () => void) {
-    return attemptUpdate(() => updateLibrary(mutate), (error) => show(saveFailureMessage(error, failureMessage), "error"), onSuccess);
+    return attemptUpdate(() => updateLibrary(mutate), (error) => report(saveFailureMessage(error, failureMessage)), onSuccess);
   }
 
   function runChange(change: LibraryChange, failureMessage: string) {
-    return attemptUpdate(async () => assertSaved(await submit(change)), (error) => show(saveFailureMessage(error, failureMessage), "error"));
+    return attemptUpdate(async () => assertSaved(await submit(change)), (error) => report(saveFailureMessage(error, failureMessage)));
   }
 
   function mapBook(key: string, change: (book: Record<string, unknown>) => Record<string, unknown>) {
