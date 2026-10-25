@@ -30,7 +30,7 @@ import { area } from "../lib/areas";
 import type { Tournament } from "../api/arena";
 
 export function ArenaListPage() {
-  const { tournaments, isLoading } = useMyTournaments();
+  const { tournaments, isLoading, error: tournamentsError, refetch: refetchTournaments } = useMyTournaments();
   const showSkeleton = useDelayedShow(isLoading);
   const { tournaments: votedTournaments } = useVotedTournaments();
   const { data: quizzesData, isLoading: quizzesLoading, remove: removeQuiz } = useQuizzes();
@@ -129,7 +129,18 @@ export function ArenaListPage() {
 
           {showSkeleton && <SkeletonCardGrid count={3} label="Loading tournaments" tileClassName="min-h-[86px]" />}
 
-          {!isLoading && tournaments.length === 0 && votedTournaments.length === 0 && (
+          {!isLoading && tournamentsError && (
+            <EmptyState
+              title="Couldn't load your tournaments."
+              action={
+                <button onClick={() => void refetchTournaments()} className="rounded-lg border border-(--color-border) px-3 py-1.5 text-sm hover:border-(--color-accent)">
+                  Retry
+                </button>
+              }
+            />
+          )}
+
+          {!isLoading && !tournamentsError && tournaments.length === 0 && votedTournaments.length === 0 && (
             <EmptyState icon={ArenaIcon} title="No tournaments yet." body="Pit your books against each other in a bracket." />
           )}
 
