@@ -342,6 +342,7 @@ export function BracketRounds({
       </ScrollView>
 
       <View style={[styles.bar, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.railScroll} contentContainerStyle={styles.railContent}>
         {byRound.map((roundSlots, i) => {
           const on = i === roundIdx;
           const done = roundSlots.every((duel) => duel?.status === "settled");
@@ -367,6 +368,7 @@ export function BracketRounds({
             </Fragment>
           );
         })}
+        </ScrollView>
         <View style={[styles.barRule, { backgroundColor: colors.border }]} />
         <BracketViewToggle to="classic" onPress={onShowClassic} />
       </View>
@@ -393,12 +395,13 @@ const styles = StyleSheet.create({
   pane: { flex: 1 },
   list: { paddingBottom: BAR_RESERVE, flexGrow: 1 },
   bar: { position: "absolute", left: 0, right: 0, bottom: 0, minHeight: BAR_HEIGHT, flexDirection: "row", alignItems: "center", paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.sm, borderTopWidth: 1 },
-  barRule: { width: 1, height: 24, marginLeft: spacing.md, marginRight: spacing.sm, marginBottom: 8 },
-  node: { alignItems: "center", justifyContent: "center", gap: 3, flexShrink: 0, minWidth: minimumTouchTarget, minHeight: minimumTouchTarget },
+  barRule: { width: 1, height: 24, marginLeft: spacing.md, marginRight: spacing.sm },
+  railScroll: { flex: 1 },
+  railContent: { flexGrow: 1, alignItems: "center" },
+  node: { alignItems: "center", justifyContent: "center", flexShrink: 0, minWidth: minimumTouchTarget, minHeight: minimumTouchTarget },
   nodeDot: { width: 14, height: 14, borderRadius: radii.full },
-  nodeLabel: { fontSize: 10 },
-  // Sits on the dots' centre line, not the labels'.
-  rail: { flex: 1, height: 2, marginBottom: 14, marginHorizontal: 2 },
+  nodeLabel: { fontSize: 10, position: "absolute", top: "50%", marginTop: 10 },
+  rail: { flex: 1, minWidth: 12, height: 2, marginHorizontal: 2 },
   // The home feed's row recipe: a hairline under each block and nothing
   // else, so a round reads as one list of results.
   block: { paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderBottomWidth: 1 },
