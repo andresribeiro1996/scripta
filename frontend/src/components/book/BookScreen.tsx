@@ -54,8 +54,9 @@ type Props = {
 const TAB_ICONS: Record<BookScreenTabKey, typeof InfoIcon> = { about: InfoIcon, highlights: QuoteIcon, community: CommunityIcon };
 
 const rowClass = "flex items-center gap-3 rounded-xl border border-(--color-border) bg-(--color-surface) p-4";
-const winPillClass = "inline-flex items-center gap-1 rounded-full border border-(--color-accent-soft) bg-(--color-accent-soft) px-2 text-xs text-(--color-accent)";
-const nomineePillClass = "rounded-full border border-(--color-border) px-2 text-xs text-(--color-text-dim)";
+const pillClass = "inline-flex max-w-full items-center gap-1 rounded-full border px-2 text-xs";
+const winPillClass = `${pillClass} border-(--color-accent-soft) bg-(--color-accent-soft) text-(--color-accent)`;
+const nomineePillClass = `${pillClass} border-(--color-border) text-(--color-text-dim)`;
 const sectionHeading = "mb-3 text-lg font-bold";
 const roundButtonClass = "flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-(--color-border) bg-(--color-surface) text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)";
 const controlClass = "inline-flex min-h-11 items-center justify-center rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm font-semibold hover:bg-(--color-surface-hover)";
@@ -203,9 +204,9 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
             {model.awards.length > 0 ? (
               <ul className="mt-3 flex flex-wrap justify-center gap-1.5 sm:justify-start">
                 {model.awards.map((award) => (
-                  <li key={award.label} className={award.won ? winPillClass : nomineePillClass}>
-                    {award.won ? <ArenaIcon size={12} /> : null}
-                    {award.label}
+                  <li key={award.label} title={award.label} className={award.won ? winPillClass : nomineePillClass}>
+                    {award.won ? <span className="flex shrink-0"><ArenaIcon size={12} /></span> : null}
+                    <span className="truncate">{award.label}</span>
                   </li>
                 ))}
               </ul>
