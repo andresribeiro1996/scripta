@@ -34,5 +34,9 @@ export function useArena(id: string) {
     await queryClient.invalidateQueries({ queryKey });
   }
 
-  return { tournament: query.data, isLoading: query.isLoading, error: query.error, voterToken, vote, refetch: query.refetch };
+  async function refetch() {
+    if (id !== "") await query.refetch();
+  }
+
+  return { tournament: query.data, isLoading: query.isLoading, error: query.error, voterToken, vote, refetch };
 }
