@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useDismissible } from "../hooks/useDismissible";
+import { MoreIcon } from "./NavIcons";
 
 export interface OptionsMenuItem {
   label: string;
@@ -14,23 +15,7 @@ export interface OptionsMenuItem {
 
 const MENU_WIDTH = 132;
 
-// A plain hub-and-spokes gear, not a Unicode "⚙" glyph — the glyph was the
-// actual bug report this exists to fix: "⚙" doesn't sit centered within
-// its own character cell in most fonts (font-dependent side bearing, not
-// a CSS bug), so even a correctly flex-centered button visibly looked
-// off-center. An SVG drawn on a 24×24 viewBox centered at (12,12) is
-// centered by construction — same reasoning BookCard.tsx's own inline
-// BookIcon/checkmark SVGs already follow for exactly this reason.
-function GearIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="3.2" />
-      <path d="M12 2.5v3M12 18.5v3M21.5 12h-3M5.5 12h-3M18.5 5.5l-2.1 2.1M7.6 16.4l-2.1 2.1M18.5 18.5l-2.1-2.1M7.6 7.6 5.5 5.5" />
-    </svg>
-  );
-}
-
-/** A single ⚙ trigger that opens a small dropdown of actions — the one
+/** A single three-dot trigger that opens a small dropdown of actions — the one
  *  consolidated entry point for "this item's controls," replacing what
  *  used to be several separate always-visible buttons wherever it's used
  *  (mural blocks' old 🎨/⚙/× row in MuralCanvas.tsx; a mural list card's
@@ -63,7 +48,7 @@ export function OptionsMenu({
    *  treatment — a dark translucent circle for a trigger sitting on
    *  arbitrary block content/imagery (needs contrast regardless of
    *  what's underneath), a plain ghost icon for one sitting on a flat
-   *  card background — only the gear glyph inside is fixed. */
+   *  card background — only the three-dot glyph inside is fixed. */
   triggerClassName?: string;
   trigger?: ReactNode;
 }) {
@@ -92,7 +77,7 @@ export function OptionsMenu({
   return (
     <>
       <button onClick={toggle} title={title} className={triggerClassName}>
-        {trigger ?? <GearIcon />}
+        {trigger ?? <MoreIcon size={16} />}
       </button>
       {open &&
         position &&
@@ -112,7 +97,7 @@ export function OptionsMenu({
                   if (!item.checked) item.onClick();
                   setOpen(false);
                 }}
-                className={`flex w-full items-center justify-between gap-3 px-3 py-1.5 text-left ${
+                className={`flex w-full items-center justify-between gap-3 min-h-11 px-3 text-left ${
                   item.danger ? "text-(--color-danger) hover:bg-(--color-danger-soft)" : "hover:bg-(--color-surface-hover)"
                 }`}
               >

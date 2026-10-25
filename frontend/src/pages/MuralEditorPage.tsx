@@ -481,7 +481,7 @@ export function MuralEditorPage() {
             if (e.key === "Escape") setEditingName(false);
           }}
           aria-label="Mural name"
-          className="font-display block w-full min-w-0 rounded-lg border border-(--color-border) bg-(--color-surface) px-2 py-1 font-bold"
+          className="font-display block min-h-11 w-full min-w-0 rounded-lg border border-(--color-border) bg-(--color-surface) px-2 py-1 font-bold"
         />
       ) : (
         <button
@@ -490,7 +490,7 @@ export function MuralEditorPage() {
             setEditingName(true);
           }}
           title="Rename this mural"
-          className="block min-w-0 max-w-full text-left break-words transition-colors hover:text-(--color-accent)"
+          className="flex min-h-11 min-w-0 max-w-full items-center text-left break-words transition-colors hover:text-(--color-accent)"
         >
           {view.name}
         </button>
@@ -566,7 +566,7 @@ export function MuralEditorPage() {
           body={editMode ? "Add your first block with the + button above." : "Turn on editing and add your first block."}
           action={
             !editMode && (
-              <button onClick={() => setEditMode(true)} className="rounded-lg bg-(--color-accent) px-4 py-2 font-semibold text-(--color-on-accent)">
+              <button onClick={() => setEditMode(true)} className={BUTTON_PRIMARY}>
                 Start building
               </button>
             )

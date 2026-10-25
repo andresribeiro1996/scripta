@@ -224,7 +224,7 @@ export function ArenaSeedPage() {
           }}
           placeholder="Name this tournament…"
           aria-label="Tournament name"
-          className="font-display block w-full min-w-0 rounded-lg border border-(--color-border) bg-(--color-surface) px-2 py-1 font-bold"
+          className="font-display block min-h-11 w-full min-w-0 rounded-lg border border-(--color-border) bg-(--color-surface) px-2 py-1 font-bold"
         />
       ) : (
         <button
@@ -233,7 +233,7 @@ export function ArenaSeedPage() {
             setEditingName(true);
           }}
           title="Rename this tournament"
-          className="block min-w-0 max-w-full text-left break-words transition-colors hover:text-(--color-accent)"
+          className="flex min-h-11 min-w-0 max-w-full items-center text-left break-words transition-colors hover:text-(--color-accent)"
         >
           {name}
         </button>
@@ -277,7 +277,7 @@ export function ArenaSeedPage() {
             <button
               onClick={() => setPickingSize(true)}
               aria-label={`Bracket size, ${draftBracketSize} books — fixed once the tournament starts`}
-              className="flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg border border-(--color-border) bg-(--color-surface) px-2.5 text-xs hover:bg-(--color-surface-hover)"
+              className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg border border-(--color-border) bg-(--color-surface) px-2.5 text-xs hover:bg-(--color-surface-hover)"
             >
               {draftBracketSize} books
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-(--color-text-dim)">

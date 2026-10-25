@@ -410,7 +410,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
                       if (e.key === "Enter") handleRename(group.id);
                       if (e.key === "Escape") setEditingId(null);
                     }}
-                    className="rounded-lg border border-(--color-border) bg-(--color-surface) px-2 py-1 text-sm font-semibold"
+                    className="min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-2 text-sm font-semibold"
                   />
                 ) : (
                   <button
@@ -418,7 +418,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
                       setEditingId(group.id);
                       setEditingName(group.name);
                     }}
-                    className="text-left text-sm font-semibold transition-colors hover:text-(--color-accent)"
+                    className="min-h-11 text-left text-sm font-semibold transition-colors hover:text-(--color-accent)"
                     title="Rename"
                   >
                     {group.name}
@@ -435,7 +435,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
                   </span>
                   <OptionsMenu
                     title={`${copy.noun[0].toUpperCase()}${copy.noun.slice(1)} settings`}
-                    triggerClassName="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)"
+                    triggerClassName="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)"
                     items={[
                       // Collections don't get their own style override —
                       // same reason there's no "Style" button on a

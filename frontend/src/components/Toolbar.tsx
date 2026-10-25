@@ -64,23 +64,8 @@ export function toolbarIconClass(active = false): string {
 }
 
 // Icons are drawn SVGs on a 24×24 viewBox centred on (12,12), never
-// Unicode glyphs — a character like "⚙" sits off-centre in its own cell
-// in most fonts, so even a correctly centred button looks wrong. Same
-// reasoning OptionsMenu.tsx's own gear already follows.
-
-/** A cog — a page's actions. Was hub-and-spokes: a small circle with
- *  eight long radial ticks, which is the geometry of a SUN, and read as
- *  a brightness control rather than settings. Teeth on the silhouette
- *  are what make the eye call it a gear. Shares its shape with
- *  NavIcons.tsx's SettingsIcon — one settings mark in the app. */
-export function GearIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="" />
-      <circle cx="12" cy="12" r="3.1" />
-    </svg>
-  );
-}
+// Unicode glyphs — a character sits off-centre in its own cell in most
+// fonts, so even a correctly centred button looks wrong.
 
 /** Funnel — a filter. */
 export function FilterIcon() {

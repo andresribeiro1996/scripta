@@ -104,7 +104,7 @@ export function HomePage() {
               <div className="space-y-3">
                 {dashboard.items.map((item) => (
                   <div key={`${item.kind}:${item.id}`} className="rounded-xl border border-(--color-border) bg-(--color-surface) p-4">
-                    <Link to={digestTarget(item)} className="flex items-center gap-2">
+                    <Link to={digestTarget(item)} className="flex min-h-11 items-center gap-2">
                       {item.kind === "participation" ? (
                         <>
                           {item.actors.length > 0 && (
