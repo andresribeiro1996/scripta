@@ -5,7 +5,7 @@ import { QUIZ_POOL, QUIZ_QUESTION_TYPES, bookKey, booksByWork, booksInGroup, eli
 import { FlatList, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { useLibrary, useWorkBooks } from "../library";
-import { Button, Input, Screen, Segmented, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { Button, Input, Screen, Segmented, Toast, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import { resolveCover } from "../library/api/covers";
 import { createQuiz, type Quiz } from "./api";
 
@@ -155,7 +155,7 @@ export function QuizCreateScreen() {
         }}
       /> : null}
       {source === "shelf" ? <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>
-        {library.isPending ? "Loading books…" : library.isError ? "Your library couldn't be loaded." : `${shelfRawBooks.length} books on your shelf.`}
+        {library.isPending ? "Loading books…" : library.isError ? "Your library couldn't be loaded." : `${shelfRawBooks.length} books in your library.`}
       </Text> : null}
       {resolveFailed && source !== "pool" ? <View style={styles.resolveRetry}>
         <Text {...dynamicType} style={[typography.caption, styles.grow, { color: colors.textDim }]}>Some covers couldn't be checked, so cover questions may be unavailable.</Text>
@@ -196,7 +196,7 @@ const styles = StyleSheet.create({
   row: { minHeight: 52, borderWidth: 1, borderRadius: radii.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, flexDirection: "row", alignItems: "center", gap: spacing.sm },
   offered: { opacity: 0.5 },
   lengths: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
-  length: { minWidth: 56, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderWidth: 1, borderRadius: radii.md, alignItems: "center" },
+  length: { minWidth: 56, minHeight: minimumTouchTarget, justifyContent: "center", paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderWidth: 1, borderRadius: radii.md, alignItems: "center" },
   stepScroll: { gap: spacing.md, paddingBottom: spacing.lg },
   resolveRetry: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   actions: { flexDirection: "row", justifyContent: "flex-end", gap: spacing.sm },

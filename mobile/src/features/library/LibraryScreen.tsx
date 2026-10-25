@@ -16,7 +16,7 @@
 // re-pointed at groups instead of books while this tab is active.
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Pressable, RefreshControl, StyleSheet, View } from "react-native";
+import { Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import {
@@ -35,8 +35,9 @@ import {
   type SortKey,
 } from "@scripta/shared";
 import { Button, EmptyState, ErrorState, Fab, IconButton, Input, Menu, Screen, Sheet, Skeleton, SwipeableTabs, type MenuItem } from "../../ui/components";
-import { SearchDock, dynamicType, searchDockClearance, searchDockFabClearance, useTheme } from "../../ui";
+import { ConfirmDialog, SearchDock, dynamicType, searchDockClearance, searchDockFabClearance, useTheme } from "../../ui";
 import { radii, spacing, typography } from "../../ui/theme";
+import { useToast } from "../../ui/ToastHost";
 import { useMurals } from "../murals/useMurals";
 import { useLibrary } from "./hooks/useLibrary";
 import { useLibraryActions } from "./hooks/useLibraryActions";
@@ -54,6 +55,7 @@ export function LibraryScreen() {
   const { colors } = useTheme();
   const { data: library, isPending, isError, error, refetch, isRefetching } = useLibrary();
   const actions = useLibraryActions();
+  const { show } = useToast();
   const murals = useMurals();
 
   const { q } = useLocalSearchParams<{ q?: string }>();
@@ -78,6 +80,7 @@ export function LibraryScreen() {
   const [reviewingDuplicates, setReviewingDuplicates] = useState(false);
   const [addingBook, setAddingBook] = useState(false);
   const [selectionMode, setSelectionMode] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
 
   const books = library?.data.books ?? [];
@@ -115,21 +118,17 @@ export function LibraryScreen() {
 
   function handleDeleteSelected() {
     if (selectedKeys.size === 0) return;
+    setConfirmingDelete(true);
+  }
+
+  function confirmDeleteSelected() {
     const keys = selectedKeys;
-    Alert.alert(`Delete ${keys.size} book${keys.size === 1 ? "" : "s"}?`, "This can't be undone.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: () => {
-          void actions.deleteBooks(keys, () => {
-            void murals.scrubBooks(keys).catch(() => Alert.alert("The books were deleted, but some mural references couldn't be updated."));
-            setSelectedKeys(new Set());
-            setSelectionMode(false);
-          });
-        },
-      },
-    ]);
+    setConfirmingDelete(false);
+    void actions.deleteBooks(keys, () => {
+      void murals.scrubBooks(keys).catch(() => show("The books were deleted, but some mural references couldn't be updated.", "error"));
+      setSelectedKeys(new Set());
+      setSelectionMode(false);
+    });
   }
 
   function startRenamingLibrary() {
@@ -139,7 +138,7 @@ export function LibraryScreen() {
 
   const actionItems: MenuItem[] = [
     { label: "Rename library…", onPress: startRenamingLibrary },
-    { label: "Import / sync…", onPress: () => router.push("/import" as never) },
+    { label: "Import library…", onPress: () => router.push("/import" as never) },
     ...(books.length > 1 ? [{ label: "Reorder…", onPress: () => router.push("/reorder" as never) }] : []),
     ...(!onCollectionsTab && books.length > 0 ? [{ label: "Select…", onPress: () => setSelectionMode(true) }] : []),
     { label: "Library style…", onPress: () => router.push("/style" as never) },
@@ -221,7 +220,7 @@ export function LibraryScreen() {
         <EmptyState
           title="Start your library"
           body="Import your existing collection, or find a book by title or barcode."
-          actionLabel="Import library…"
+          actionLabel="Import library"
           onAction={() => router.push("/import" as never)}
           secondaryActionLabel="Add a book"
           onSecondaryAction={() => setAddingBook(true)}
@@ -334,6 +333,16 @@ export function LibraryScreen() {
       <Sheet visible={reviewingDuplicates && possibleDuplicates.length > 0} title="Possible duplicates" onClose={() => setReviewingDuplicates(false)}>
         {library ? <DuplicatesSheetBody groups={possibleDuplicates} library={library} /> : null}
       </Sheet>
+
+      <ConfirmDialog
+        visible={confirmingDelete}
+        title={`Delete ${selectedKeys.size} book${selectedKeys.size === 1 ? "" : "s"}?`}
+        body="This can't be undone."
+        confirmLabel="Delete"
+        destructive
+        onConfirm={confirmDeleteSelected}
+        onCancel={() => setConfirmingDelete(false)}
+      />
     </Screen>
   );
 }

@@ -1,8 +1,8 @@
 import { useCallback, useState } from "react";
-import { Alert, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { useFocusEffect } from "expo-router";
-import { Button, Input, Sheet, ToggleSwitch } from "../../ui";
+import { Button, ConfirmDialog, Input, Sheet, ToggleSwitch } from "../../ui";
 import { minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui/theme";
 import { startSocialConnect, type SocialProvider, type SocialStatus } from "./api";
 import { useSocials } from "./useSocials";
@@ -14,6 +14,7 @@ export function SocialsSection() {
   const { data = [], isPending, refetch, connectBluesky, disconnect } = useSocials();
   const [busy, setBusy] = useState<SocialProvider | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [disconnecting, setDisconnecting] = useState<SocialStatus | null>(null);
   const [blueskyOpen, setBlueskyOpen] = useState(false);
   const [handle, setHandle] = useState("");
   const [appPassword, setAppPassword] = useState("");
@@ -37,13 +38,9 @@ export function SocialsSection() {
   }
 
   function confirmDisconnect(status: SocialStatus) {
-    Alert.alert(`Disconnect ${LABELS[status.provider]}?`, "Atmyshelf will delete the stored access token.", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Disconnect", style: "destructive", onPress: () => {
-        setBusy(status.provider);
-        disconnect(status.provider).catch((reason) => setError(reason instanceof Error ? reason.message : "Couldn't disconnect that account.")).finally(() => setBusy(null));
-      } },
-    ]);
+    setDisconnecting(null);
+    setBusy(status.provider);
+    disconnect(status.provider).catch((reason) => setError(reason instanceof Error ? reason.message : "Couldn't disconnect that account.")).finally(() => setBusy(null));
   }
 
   async function submitBluesky() {
@@ -74,11 +71,12 @@ export function SocialsSection() {
             accessibilityLabel={LABELS[status.provider]}
             value={status.connected}
             disabled={!status.enabled || busy === status.provider}
-            onValueChange={() => status.connected ? confirmDisconnect(status) : void enable(status.provider)}
+            onValueChange={() => status.connected ? setDisconnecting(status) : void enable(status.provider)}
           />
         </View>
       ))}
       {error ? <Text accessibilityRole="alert" style={[typography.caption, { color: colors.danger }]}>{error}</Text> : null}
+      <ConfirmDialog visible={disconnecting !== null} title={`Disconnect ${disconnecting ? LABELS[disconnecting.provider] : ""}?`} body="Atmyshelf will delete the stored access token." confirmLabel="Disconnect" destructive onConfirm={() => disconnecting && confirmDisconnect(disconnecting)} onCancel={() => setDisconnecting(null)} />
       <Sheet visible={blueskyOpen} title="Connect Bluesky" onClose={() => setBlueskyOpen(false)}>
         <View style={styles.form}>
           <Text style={[typography.caption, { color: colors.textDim }]}>Use an app password from Bluesky Settings, not your account password.</Text>

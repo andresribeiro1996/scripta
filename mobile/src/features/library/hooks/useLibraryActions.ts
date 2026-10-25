@@ -5,7 +5,6 @@
 //
 // Every one goes through attemptUpdate, which is what keeps a failed save from
 // being reported as a success.
-import { Alert } from "react-native";
 import {
   addReaderNote,
   bookKey,
@@ -30,17 +29,20 @@ import {
 import type { GalleryImage } from "../../gallery/api";
 import { assertSaved, attemptUpdate } from "../lib/attemptUpdate";
 import { buildMergedLibrary } from "../lib/mergeAndSave";
+import { useToast } from "../../../ui/ToastHost";
 import { useLibrary } from "./useLibrary";
 
-export function useLibraryActions() {
+export function useLibraryActions(onError?: (message: string) => void) {
   const { updateLibrary, submit } = useLibrary();
+  const { show } = useToast();
+  const report = onError ?? ((message: string) => show(message, "error"));
 
   function run(mutate: (data: LibraryData) => LibraryData, failureMessage: string, onSuccess?: () => void) {
-    return attemptUpdate(() => updateLibrary(mutate), (error) => Alert.alert(saveFailureMessage(error, failureMessage)), onSuccess);
+    return attemptUpdate(() => updateLibrary(mutate), (error) => report(saveFailureMessage(error, failureMessage)), onSuccess);
   }
 
   function runChange(change: LibraryChange, failureMessage: string) {
-    return attemptUpdate(async () => assertSaved(await submit(change)), (error) => Alert.alert(saveFailureMessage(error, failureMessage)));
+    return attemptUpdate(async () => assertSaved(await submit(change)), (error) => report(saveFailureMessage(error, failureMessage)));
   }
 
   function mapBook(key: string, change: (book: Record<string, unknown>) => Record<string, unknown>) {
