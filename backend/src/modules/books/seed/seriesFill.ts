@@ -125,7 +125,7 @@ export async function fillBnpCollections(
   for (const window of windows) {
     const label = `${window.from}..${window.until}`;
     report.windows++;
-    const harvested = await harvestWindow(deps.fetchText, window);
+    const harvested = await harvestWindow(deps.fetchText, "bibliografianacional", window);
     if (typeof harvested === "string") {
       report.failedWindows.push(label);
       deps.log(JSON.stringify({ window: label, failed: harvested }));

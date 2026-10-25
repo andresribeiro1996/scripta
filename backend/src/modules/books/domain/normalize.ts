@@ -41,6 +41,7 @@ export interface BookLookup {
   isbn?: string | null;
   title?: string | null;
   author?: string | null;
+  imageId?: string | null;
 }
 
 export interface BookIdentity {

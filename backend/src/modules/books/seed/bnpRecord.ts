@@ -47,6 +47,8 @@ const ERROR_CODE = /<error\b[^>]*\bcode="([^"]*)"/;
 const RESUMPTION_TOKEN = /<resumptionToken\b[^>]*>([^<]*)<\/resumptionToken>/;
 const NO_RECORDS = "noRecordsMatch";
 const LEADING_MARKERS = /^\?(\S+) \?/;
+const DISPLAY_MARKER = /<([^<>=]*)=[^<>]*>/g;
+const ARTICLE_MARKER = /<([^<>=]*\s)>/g;
 const ORIGINAL_TITLE = /^T[íi]t\. orig\.:\s*/;
 const NO_PUBLISHER = /^(?:s\.\s*n\.)?$/i;
 const YEAR_IN_TEXT = /(?:1[5-9]|20)\d{2}/;
@@ -92,7 +94,7 @@ export function readOaiError(xml: string): string | null {
   return code === undefined || code === NO_RECORDS ? null : structuredClone(code);
 }
 
-const clean = (value: string) => cleanCatalogText(value).replace(/\s+/g, " ").trim();
+const clean = (value: string) => cleanCatalogText(value.replace(DISPLAY_MARKER, "$1").replace(ARTICLE_MARKER, "$1")).replace(/\s+/g, " ").trim();
 
 function raw(record: MarcRecord, tag: string, code: string): string[] {
   return record.fields.filter((f) => f.tag === tag).flatMap((f) => f.subfields.filter(([c]) => c === code).map(([, value]) => value));

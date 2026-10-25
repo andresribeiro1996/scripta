@@ -114,7 +114,7 @@ The dry run's `prizes` list is reviewed with the user before the real run: a wro
 
 ### Daily job
 
-`jobs.every("awards refresh", DAY_MS, …, FIRST_RUN_DELAY_MS.awardsRefresh)` in `books/plugin.ts`, with `awardsRefresh: 165_000` added to the table (the first-run delay test counts its entries).
+`jobs.every("awards refresh", DAY_MS, …, FIRST_RUN_DELAY_MS.awardsRefresh)` in `books/plugin.ts`, with `awardsRefresh: 180_000` added to the table (the first-run delay test counts its entries; 165 s went to the `kobo covers` job, which merged first).
 
 - It runs the twelve queries with `minYear` = current UTC year − 1, then the honoree labels query. These are small, unpaged in practice, so at most a few hundred rows.
 - It follows redirects with the server's shared `openLibraryThrottle` and `fetchJson`, so it never adds load beyond the server's Open Library gap.

@@ -60,6 +60,7 @@ export interface BooksRepository {
   setHarvestCursor(feed: string, through: string): void;
   setUpgradeWanted(bookId: string, at: string | null): void;
   setAppleChecked(bookId: string, at: string): void;
+  setKoboImageId(bookId: string, imageId: string): boolean;
   setWorkKey(id: string, key: string | null | undefined): void;
   assignMissingWorks(limit: number): number;
   fillTitleKeys(limit: number): number;

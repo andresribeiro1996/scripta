@@ -1,3 +1,4 @@
+import { koboCoverUrl } from "./adapters/sources/kobo.js";
 import { MIN_GOOD_WIDTH } from "./domain/constants.js";
 import { SourceUnavailableError } from "./domain/errors.js";
 import { isAcceptableCover, type EncodedCover } from "./domain/images.js";
@@ -35,7 +36,7 @@ async function attempt<T>(step: () => Promise<T>): Promise<T | SourceUnavailable
 }
 
 export async function findBestCover(
-  book: { isbn: string | null; title: string; author: string },
+  book: { isbn: string | null; title: string; author: string; koboImageId?: string | null; isbnOnly?: boolean },
   rejected: Set<string>,
   sources: CoverSources,
   fetchImage: FetchCoverImage
@@ -44,9 +45,11 @@ export async function findBestCover(
   const exactOrder = [sources.apple, sources.isbndb, sources.openlibrary].filter((source): source is CoverSource => source !== null);
   const titleOrder = [sources.apple, sources.isbndb, sources.openlibrary].filter((source): source is CoverSource => source !== null);
   const steps: Array<() => Promise<CoverCandidate[]>> = [];
+  const koboImageId = book.koboImageId;
+  if (koboImageId) steps.push(async () => [{ source: "kobo", url: koboCoverUrl(koboImageId) }]);
   const isbn = book.isbn;
   if (isbn) steps.push(...exactOrder.map((source) => () => source.byIsbn(isbn)));
-  if (normalizeTitle(book.title)) steps.push(...titleOrder.map((source) => () => source.byTitle(book.title, book.author, accept, isbn)));
+  if (!book.isbnOnly && normalizeTitle(book.title)) steps.push(...titleOrder.map((source) => () => source.byTitle(book.title, book.author, accept, isbn)));
 
   let best: FoundCover | null = null;
   let complete = true;
