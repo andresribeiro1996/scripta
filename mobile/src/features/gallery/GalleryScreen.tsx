@@ -98,7 +98,7 @@ export function GalleryScreen() {
         options={{
           headerShown: true,
           title: "Gallery",
-          headerRight: () => <IconButton accessibilityLabel="Upload image" name="add" onPress={() => void pickImage()} />,
+          headerRight: () => <IconButton framed label="Upload" accessibilityLabel="Upload image" name="add" onPress={() => void pickImage()} />,
         }}
       />
       {upload.isPending ? <Text style={[typography.caption, styles.uploading, { color: colors.textDim }]}>Uploading…</Text> : null}
@@ -109,7 +109,7 @@ export function GalleryScreen() {
         keyExtractor={(item) => item.id}
         numColumns={2}
         refreshControl={<RefreshControl refreshing={gallery.isRefetching} onRefresh={() => void gallery.refetch()} />}
-        ListEmptyComponent={!gallery.isPending ? <EmptyState title="No images yet" body="Upload an image to use it in your library or murals." /> : null}
+        ListEmptyComponent={!gallery.isPending ? <EmptyState title="No images yet" body="Upload an image to use it in your library or murals." actionLabel="Upload image" onAction={() => void pickImage()} /> : null}
         renderItem={({ item }) => (
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Image source={{ uri: item.url }} style={styles.image} contentFit="cover" />

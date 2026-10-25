@@ -227,9 +227,13 @@ export function IconButton({
   tone = "default",
   badge,
   disabled = false,
+  label,
+  framed = false,
 }: {
   name: IconName;
   accessibilityLabel: string;
+  label?: string;
+  framed?: boolean;
   onPress?: () => void;
   tone?: "default" | "danger" | "accent";
   badge?: string | null;
@@ -249,11 +253,13 @@ export function IconButton({
         const background = tone === "accent" ? (pressed ? colors.accentSoft : colors.accent) : pressed ? colors.surfacePressed : "transparent";
         return [
           styles.iconButton,
+          framed && [styles.iconButtonFramed, { borderColor: tone === "accent" ? colors.accent : colors.border }],
           { backgroundColor: background, opacity: disabled ? 0.55 : 1 },
         ];
       }}
     >
       <Icon color={color} name={name} size={22} />
+      {label ? <Text style={[typography.body, styles.iconButtonLabel, { color }]}>{label}</Text> : null}
       {badge ? <View style={[styles.tabBadge, styles.iconBadge, { backgroundColor: colors.accent }]}><Text style={[styles.tabBadgeText, { color: colors.onAccent }]}>{badge}</Text></View> : null}
     </Pressable>
   );
@@ -264,7 +270,7 @@ export function HeaderActions({ children }: { children: ReactNode }) {
 }
 
 export function SaveStateButton({ busy, unsaved, onPress }: { busy: boolean; unsaved: boolean; onPress: () => void }) {
-  return <IconButton disabled={busy || !unsaved} tone={unsaved ? "accent" : "default"} accessibilityLabel={busy ? "Saving changes" : unsaved ? "Save changes" : "All changes saved"} name={!busy && !unsaved ? "confirm" : "save"} onPress={onPress} />;
+  return <IconButton framed disabled={busy || !unsaved} tone={unsaved ? "accent" : "default"} label={busy ? "Saving…" : unsaved ? "Save" : "Saved"} accessibilityLabel={busy ? "Saving changes" : unsaved ? "Save changes" : "All changes saved"} name={!busy && !unsaved ? "confirm" : "save"} onPress={onPress} />;
 }
 
 export function Input({
@@ -860,6 +866,8 @@ const styles = StyleSheet.create({
   fab: { position: "absolute", right: spacing.lg, bottom: spacing.lg, minHeight: 56, flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingHorizontal: spacing.lg, borderRadius: radii.full, elevation: 6, shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } },
   fabLabel: { fontWeight: "700" },
   headerActions: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  iconButtonFramed: { flexDirection: "row", gap: spacing.xs, paddingHorizontal: spacing.md, borderWidth: 1 },
+  iconButtonLabel: { fontWeight: "600" },
   iconButton: { minHeight: minimumTouchTarget, minWidth: minimumTouchTarget, alignItems: "center", justifyContent: "center", borderRadius: radii.full },
   field: { gap: spacing.xs },
   label: { ...typography.body, fontWeight: "600" },
