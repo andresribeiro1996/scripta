@@ -6,7 +6,7 @@
 // collection" button).
 
 import { useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../../ui/Text";
 import { router, Stack } from "expo-router";
 import {
@@ -24,7 +24,7 @@ import {
   type LibraryData,
   type PerCardStyle,
 } from "@scripta/shared";
-import { Button, ConfirmDialog, EmptyState, ErrorState, IconButton, Input, Menu, Screen, Sheet, Skeleton, type MenuItem } from "../../../ui/components";
+import { Button, ConfirmDialog, EmptyState, ErrorState, IconButton, Input, Menu, Screen, Sheet, Skeleton, Toast, type MenuItem } from "../../../ui/components";
 import { spacing, typography, useTheme } from "../../../ui/theme";
 import { useMurals } from "../../murals/useMurals";
 import { useLibrary } from "../hooks/useLibrary";
@@ -52,9 +52,12 @@ export function GroupDetail({ groupId }: { groupId: string }) {
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [confirming, setConfirming] = useState<"group" | "books" | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [pickerError, setPickerError] = useState<string | null>(null);
 
   async function runUpdate(mutate: (data: LibraryData) => LibraryData, onSuccess?: () => void) {
-    return attemptUpdate(() => updateLibrary(mutate), (error) => Alert.alert(saveFailureMessage(error, "Couldn't save — check your connection.")), onSuccess);
+    setNotice(null);
+    return attemptUpdate(() => updateLibrary(mutate), (error) => setNotice(saveFailureMessage(error, "Couldn't save — check your connection.")), onSuccess);
   }
 
   function handleCommitRename() {
@@ -72,9 +75,10 @@ export function GroupDetail({ groupId }: { groupId: string }) {
 
   function handleToggleBook(book: Record<string, unknown>, inGroup: boolean) {
     if (!group) return;
+    setPickerError(null);
     void attemptUpdate(
       async () => assertSaved(await submit({ kind: "membership", groupId: group.id, bookKey: bookKey(book), member: !inGroup })),
-      (error) => Alert.alert(saveFailureMessage(error, "Couldn't save — check your connection.")),
+      (error) => setPickerError(saveFailureMessage(error, "Couldn't save — check your connection.")),
     );
   }
 
@@ -104,7 +108,7 @@ export function GroupDetail({ groupId }: { groupId: string }) {
     void runUpdate(
       (data) => deleteBooks(data, keys),
       () => {
-        void murals.scrubBooks(keys).catch(() => Alert.alert("The books were deleted, but some mural references couldn't be updated."));
+        void murals.scrubBooks(keys).catch(() => setNotice("The books were deleted, but some mural references couldn't be updated."));
         setSelectedKeys(new Set());
         setSelectionMode(false);
       },
@@ -138,6 +142,8 @@ export function GroupDetail({ groupId }: { groupId: string }) {
           unreachable on that platform. Title stays for whatever chrome
           iOS does draw; it's otherwise inert. */}
       <Stack.Screen options={{ title: group?.name ?? "Collection" }} />
+
+      {notice ? <Toast visible message={notice} tone="error" /> : null}
 
       {isPending ? (
         <Skeleton height={180} />
@@ -208,7 +214,7 @@ export function GroupDetail({ groupId }: { groupId: string }) {
         </ScrollView>
       )}
 
-      {group && pickerOpen && <BookPickerSheet group={group} allBooks={books} onToggle={handleToggleBook} onClose={() => setPickerOpen(false)} />}
+      {group && pickerOpen && <BookPickerSheet group={group} allBooks={books} error={pickerError} onToggle={handleToggleBook} onClose={() => setPickerOpen(false)} />}
 
       <PerCardStyleSheet
         key={`${groupId}-${styleOpen}`}
@@ -238,11 +244,13 @@ export function GroupDetail({ groupId }: { groupId: string }) {
 function BookPickerSheet({
   group,
   allBooks,
+  error,
   onToggle,
   onClose,
 }: {
   group: Group;
   allBooks: Array<Record<string, unknown>>;
+  error: string | null;
   onToggle: (book: Record<string, unknown>, inGroup: boolean) => void;
   onClose: () => void;
 }) {
@@ -250,6 +258,7 @@ function BookPickerSheet({
 
   return (
     <Sheet visible title={`Books in "${group.name}"`} onClose={onClose}>
+      {error ? <Toast visible message={error} tone="error" /> : null}
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: spacing.xs, paddingBottom: spacing.xl }}>
         <BookPickerList books={allBooks} isSelected={(book) => memberKeys.has(bookKey(book))} onSelect={(book) => onToggle(book, memberKeys.has(bookKey(book)))} />
       </ScrollView>

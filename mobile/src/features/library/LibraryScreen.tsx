@@ -16,7 +16,7 @@
 // re-pointed at groups instead of books while this tab is active.
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Pressable, RefreshControl, StyleSheet, View } from "react-native";
+import { Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import {
@@ -37,6 +37,7 @@ import {
 import { Button, EmptyState, ErrorState, Fab, IconButton, Input, Menu, Screen, Sheet, Skeleton, SwipeableTabs, type MenuItem } from "../../ui/components";
 import { ConfirmDialog, SearchDock, dynamicType, searchDockClearance, searchDockFabClearance, useTheme } from "../../ui";
 import { radii, spacing, typography } from "../../ui/theme";
+import { useToast } from "../../ui/ToastHost";
 import { useMurals } from "../murals/useMurals";
 import { useLibrary } from "./hooks/useLibrary";
 import { useLibraryActions } from "./hooks/useLibraryActions";
@@ -54,6 +55,7 @@ export function LibraryScreen() {
   const { colors } = useTheme();
   const { data: library, isPending, isError, error, refetch, isRefetching } = useLibrary();
   const actions = useLibraryActions();
+  const { show } = useToast();
   const murals = useMurals();
 
   const { q } = useLocalSearchParams<{ q?: string }>();
@@ -123,7 +125,7 @@ export function LibraryScreen() {
     const keys = selectedKeys;
     setConfirmingDelete(false);
     void actions.deleteBooks(keys, () => {
-      void murals.scrubBooks(keys).catch(() => Alert.alert("The books were deleted, but some mural references couldn't be updated."));
+      void murals.scrubBooks(keys).catch(() => show("The books were deleted, but some mural references couldn't be updated.", "error"));
       setSelectedKeys(new Set());
       setSelectionMode(false);
     });

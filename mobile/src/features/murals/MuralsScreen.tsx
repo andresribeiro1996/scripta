@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Dimensions, FlatList, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
+import { Dimensions, FlatList, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { Image } from "expo-image";
 import { RNHostView } from "@expo/ui";
@@ -53,6 +53,7 @@ export function MuralsScreen() {
   const [deletingMuralBusy, setDeletingMuralBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deletingFolder, setDeletingFolder] = useState<MuralFolder | null>(null);
+  const [folderError, setFolderError] = useState<string | null>(null);
   const [savingFolder, setSavingFolder] = useState(false);
   const [folderName, setFolderName] = useState("");
   const flatFolders = [...(folders.data ?? [])].sort((a, b) => a.name.localeCompare(b.name));
@@ -141,26 +142,30 @@ export function MuralsScreen() {
     const folder = flatFolders.find((item) => item.id === id);
     if (!folder) return;
     setFolderPicker(false);
+    setFolderError(null);
     setEditingFolderId(id);
     setFolderName(folder.name);
   }
 
   function newFolder() {
     setFolderPicker(false);
+    setFolderError(null);
     setEditingFolderId(null);
     setFolderName("");
   }
 
   function deleteFolder(folder: MuralFolder) {
     setDeletingFolder(null);
+    setFolderError(null);
     void folders.remove(folder.id).then(() => {
       if (folderId === folder.id) setFolderId(undefined);
-    }).catch((reason: unknown) => Alert.alert(reason instanceof Error ? reason.message : "Couldn't delete that folder."));
+    }).catch((reason: unknown) => setFolderError(reason instanceof Error ? reason.message : "Couldn't delete that folder."));
   }
 
   async function saveFolder() {
     const name = folderName.trim();
     if (!name || savingFolder) return;
+    setFolderError(null);
     setSavingFolder(true);
     try {
       if (editingFolderId === null) await folders.create(name, null);
@@ -169,7 +174,7 @@ export function MuralsScreen() {
       setEditingFolderId(undefined);
       setFolderPicker(true);
     } catch (reason) {
-      Alert.alert(reason instanceof Error ? reason.message : "Couldn't save that folder.");
+      setFolderError(reason instanceof Error ? reason.message : "Couldn't save that folder.");
     } finally {
       setSavingFolder(false);
     }
@@ -307,12 +312,13 @@ export function MuralsScreen() {
                 );
               })}
             </ScrollView>
+            {folderError ? <Text accessibilityRole="alert" {...dynamicType} style={[typography.caption, { color: colors.danger }]}>{folderError}</Text> : null}
             <Button label="New folder" variant="secondary" onPress={newFolder} />
           </View>
         </RNHostView>
       </FolderSheet>
       <Sheet visible={moveFor !== null} title="Move mural" onClose={() => setMoveFor(null)}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheet}><Button label="Unfiled" variant={moveFor?.folderId === null ? "primary" : "secondary"} onPress={() => void murals.update(moveFor!.id, { folderId: null }).then(() => setMoveFor(null))} />{flatFolders.map((folder) => <Button key={folder.id} label={folder.name} variant={moveFor?.folderId === folder.id ? "primary" : "secondary"} onPress={() => void murals.update(moveFor!.id, { folderId: folder.id }).then(() => setMoveFor(null))} />)}</ScrollView></Sheet>
-      <Sheet visible={editingFolderId !== undefined} title={editingFolder ? "Rename folder" : "New folder"} onClose={() => setEditingFolderId(undefined)}><ModalBody><Input label="Folder name" value={folderName} onChangeText={setFolderName} placeholder="e.g. Reading lists" autoCapitalize="sentences" returnKeyType="done" /><Button label={editingFolder ? "Save name" : "Create folder"} disabled={!folderName.trim()} loading={savingFolder} onPress={() => void saveFolder()} /></ModalBody></Sheet>
+      <Sheet visible={editingFolderId !== undefined} title={editingFolder ? "Rename folder" : "New folder"} onClose={() => setEditingFolderId(undefined)}><ModalBody><Input label="Folder name" value={folderName} onChangeText={setFolderName} placeholder="e.g. Reading lists" autoCapitalize="sentences" returnKeyType="done" />{folderError ? <Text accessibilityRole="alert" {...dynamicType} style={[typography.caption, { color: colors.danger }]}>{folderError}</Text> : null}<Button label={editingFolder ? "Save name" : "Create folder"} disabled={!folderName.trim()} loading={savingFolder} onPress={() => void saveFolder()} /></ModalBody></Sheet>
       <ConfirmDialog
         visible={deletingMural !== null}
         title={`Delete “${deletingMural?.name ?? ""}”?`}

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../../ui/Text";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
@@ -71,10 +71,11 @@ export function CoverPicker({
 
   function deleteImage(image: GalleryImage) {
     setConfirmingDelete(null);
+    setUploadError(null);
     setDeletingId(image.id);
     deleteGalleryImage(image.id)
       .then(() => setImages((prev) => prev?.filter((i) => i.id !== image.id) ?? prev))
-      .catch(() => Alert.alert("Couldn't delete that image — try again."))
+      .catch(() => setUploadError("Couldn't delete that image — try again."))
       .finally(() => setDeletingId(null));
   }
 

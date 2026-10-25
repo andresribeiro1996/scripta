@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Alert, ScrollView, StyleSheet, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import {
   bookKey,
@@ -18,6 +18,7 @@ import {
 import { fetchOwnProfile } from "../community/api";
 import { fetchMural, updateMural } from "../murals/api";
 import { Button, Input, Toast } from "../../ui/components";
+import { useToast } from "../../ui/ToastHost";
 import { dynamicType, spacing, typography, useTheme } from "../../ui/theme";
 import { CoverImage } from "./components/CoverImage";
 import { DuelButton } from "./components/DuelButton";
@@ -30,6 +31,7 @@ type Shelf = { blocks: MuralBlock[]; landed: Landing[] };
 export function FinishedScreen({ book, before, onClose }: { book: Record<string, unknown>; before: ReadSnapshot | null; onClose: () => void }) {
   const { colors } = useTheme();
   const { setRating, addNote, restoreRead } = useLibraryActions();
+  const { show } = useToast();
   const libraryQuery = useLibrary();
   const queryClient = useQueryClient();
   const own = useQuery({ queryKey: ["community", "own-profile"], queryFn: fetchOwnProfile });
@@ -53,10 +55,10 @@ export function FinishedScreen({ book, before, onClose }: { book: Record<string,
 
   // While the sheet is still open the in-sheet banner is enough; a save that
   // fails after Done/Undo already closed it (a queued finish/promote settling
-  // late) has no banner left to show it, so that case also gets an Alert.
+  // late) has no banner left to show it, so that case also gets a toast.
   function reportShelfError() {
     if (mounted.current) setShelfError("Couldn't update your shelf.");
-    else Alert.alert("Couldn't update your shelf.");
+    else show("Couldn't update your shelf.", "error");
   }
 
   useEffect(() => {

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Alert, View } from "react-native";
+import { View } from "react-native";
 import { useQueryClient } from "@tanstack/react-query";
 import { bookKey, markDistinct, saveFailureMessage, statusLabel } from "@scripta/shared";
 import { Text } from "../../../ui/Text";
@@ -15,17 +15,19 @@ export function DuplicatesSheetBody({ groups, library }: { groups: string[][]; l
   const { updateLibrary, saver } = useLibrary();
   const queryClient = useQueryClient();
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const byKey = new Map(library.data.books.map((book) => [bookKey(book), book] as const));
 
   async function run(action: () => Promise<unknown>, failure: string) {
     if (busy) return;
+    setError(null);
     setBusy(true);
     try {
       await action();
-    } catch (error) {
-      console.error(error);
+    } catch (reason) {
+      console.error(reason);
       void queryClient.invalidateQueries({ queryKey: LIBRARY_QUERY_KEY });
-      Alert.alert(saveFailureMessage(error, failure));
+      setError(saveFailureMessage(reason, failure));
     } finally {
       setBusy(false);
     }
@@ -41,6 +43,7 @@ export function DuplicatesSheetBody({ groups, library }: { groups: string[][]; l
   return (
     <ModalBody>
       <View style={{ gap: spacing.lg }}>
+        {error ? <Text accessibilityRole="alert" style={[typography.caption, { color: colors.danger }]}>{error}</Text> : null}
         {groups.map((group) => (
           <View key={group.join("|")} style={{ gap: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radii.lg, padding: spacing.md }}>
             {group.map((key) => {

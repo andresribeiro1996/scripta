@@ -1,13 +1,13 @@
-import { Alert } from "react-native";
 import { Stack } from "expo-router";
 import { saveFailureMessage } from "@scripta/shared";
 import { LibraryStyleView } from "@/features/library/components/LibraryStyleView";
 import { useLibrary } from "@/features/library/hooks/useLibrary";
 import { attemptUpdate } from "@/features/library/lib/attemptUpdate";
-import { Screen } from "@/ui";
+import { Screen, useToast } from "@/ui";
 
 export default function LibraryStyleRoute() {
   const { data: library, updateLibrary } = useLibrary();
+  const { show } = useToast();
 
   return (
     <Screen top={false}>
@@ -18,7 +18,7 @@ export default function LibraryStyleRoute() {
         onSave={(next) =>
           void attemptUpdate(
             () => updateLibrary((data) => ({ ...data, style: next })),
-            (error) => Alert.alert(saveFailureMessage(error, "Couldn't save the style change.")),
+            (error) => show(saveFailureMessage(error, "Couldn't save the style change."), "error"),
           )
         }
       />

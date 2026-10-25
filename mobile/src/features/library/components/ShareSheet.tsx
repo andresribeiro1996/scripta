@@ -4,7 +4,7 @@
 // without needing one at all.
 
 import { useState } from "react";
-import { Alert, View } from "react-native";
+import { View } from "react-native";
 import { Text } from "../../../ui/Text";
 import { Button, ConfirmDialog, Input } from "../../../ui/components";
 import { spacing, typography, useTheme } from "../../../ui/theme";
@@ -44,10 +44,11 @@ export function ShareSheetBody({
 
   function handleStopSharing() {
     setConfirmingStop(false);
+    setShareError(null);
     setUnsharing(true);
     onUnshare()
       .then(() => setCurrent(null))
-      .catch(() => Alert.alert("Couldn't stop sharing — try again."))
+      .catch(() => setShareError("Couldn't stop sharing — try again."))
       .finally(() => setUnsharing(false));
   }
 
@@ -66,6 +67,7 @@ export function ShareSheetBody({
       <Input label="Share link" value={current.shareUrl} editable={false} selectTextOnFocus />
       <ShareActions message={current.shareUrl} title={title} />
       <Button label={unsharing ? "Stopping…" : "Stop sharing"} variant="destructive" loading={unsharing} onPress={() => setConfirmingStop(true)} />
+      {shareError && <Text style={[typography.caption, { color: colors.danger }]}>{shareError}</Text>}
       <ConfirmDialog visible={confirmingStop} title="Stop sharing this link?" body="Anyone who already has the link will lose access to it." confirmLabel="Stop sharing" destructive onConfirm={handleStopSharing} onCancel={() => setConfirmingStop(false)} />
     </View>
   );
