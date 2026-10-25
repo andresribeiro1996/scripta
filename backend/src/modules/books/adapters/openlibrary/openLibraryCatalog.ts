@@ -37,21 +37,22 @@ export async function searchOpenLibraryWorks(throttle: Throttle, title: string, 
   });
 }
 
-export async function fetchOpenLibrarySubjects(throttle: Throttle, keys: string[]): Promise<Map<string, CleanedSubjects>> {
+export async function fetchOpenLibrarySubjects(throttle: Throttle, works: Array<{ key: string; author: string }>): Promise<Map<string, CleanedSubjects>> {
   const params = new URLSearchParams({
-    q: `key:(${keys.map((key) => `/works/${key}`).join(" OR ")})`,
+    q: `key:(${works.map(({ key }) => `/works/${key}`).join(" OR ")})`,
     fields: "key,author_name,person,place,time,subject",
     limit: "100"
   });
   const data = await throttle(() => fetchJson("openlibrary", `https://openlibrary.org/search.json?${params}`));
   const docs = data && typeof data === "object" ? (data as { docs?: unknown }).docs : undefined;
   if (!Array.isArray(docs)) throw new SourceUnavailableError("openlibrary", "unreadable subjects batch");
+  const authorOf = new Map(works.map(({ key, author }) => [key, author]));
   const found = new Map<string, CleanedSubjects>();
   for (const item of docs) {
     if (!item || typeof item !== "object") continue;
     const doc = item as Record<string, unknown>;
     const key = typeof doc.key === "string" ? normalizeWorkKey(doc.key) : null;
-    if (key) found.set(key, cleanWorkSubjects({ people: doc.person, places: doc.place, times: doc.time, subjects: doc.subject, authors: doc.author_name }));
+    if (key && authorOf.has(key)) found.set(key, cleanWorkSubjects({ people: doc.person, places: doc.place, times: doc.time, subjects: doc.subject, authors: [doc.author_name, authorOf.get(key)].flat() }));
   }
   return found;
 }
@@ -78,7 +79,7 @@ export function createOpenLibraryCatalog(throttle: Throttle, urgent = true): Boo
       const subjectSeries = seriesFromSubjects(subjectsOf(work, match));
       const fields = work && typeof work === "object" ? (work as Record<string, unknown>) : null;
       const subjects = keyOf(fields?.type) === "/type/work"
-        ? cleanWorkSubjects({ people: fields?.subject_people, places: fields?.subject_places, times: fields?.subject_times, subjects: subjectsOf(work, match), authors: match.author_name }).subjects
+        ? { people: fields?.subject_people, places: fields?.subject_places, times: fields?.subject_times, subjects: subjectsOf(work, match), authors: [match.author_name, author].flat() }
         : undefined;
       return {
         metadata,

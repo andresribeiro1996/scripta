@@ -2953,24 +2953,24 @@ test("a BNP book from before 2002 is looked up by ISBN only, in every lane", asy
   assert.equal(await lookups({ year: 1999, createdBy: "seed" }, "background"), true);
 });
 
-const SUBJECT_KINDS = { person: [] as string[], place: [] as string[], time: [] as string[] };
+const rawSubjects = (people: string[], places: string[] = [], authors: string[] = []) => ({ people, places, times: [] as string[], subjects: ["Fiction"], authors });
 const subjectRows = (h: Harness, workId: string) =>
   h.db.prepare(`SELECT kind, name FROM work_subjects WHERE work_id = ? ORDER BY kind, position`).all(workId).map((row) => ({ ...row }));
 
-function subjectDetails(overrides: { subjects?: typeof SUBJECT_KINDS; workKey?: string; thin?: boolean }) {
+function subjectDetails(overrides: { subjects?: ReturnType<typeof rawSubjects>; workKey?: string; thin?: boolean }) {
   const metadata = { summary: overrides.thin ? null : "Spice.", rating: null, ratingCount: 0, sourceUrl: "https://openlibrary.org/works/OL1W", genres: [], pages: overrides.thin ? 300 : null, publisher: null, year: null, translator: null };
   return { metadata, sources: ["openlibrary" as const], summarySource: null, workKey: overrides.workKey ?? "/works/OL1W", ...(overrides.subjects ? { subjects: overrides.subjects } : {}) };
 }
 
 test("details with subjects replace the work's subjects", async () => {
   for (const thin of [false, true]) {
-    let answer: ReturnType<typeof subjectDetails> | null = subjectDetails({ thin, subjects: { person: ["A B", "C D", "E F"], place: [], time: [] } });
+    let answer: ReturnType<typeof subjectDetails> | null = subjectDetails({ thin, subjects: rawSubjects(["A B", "C D", "E F"]) });
     const h = harness({ catalog: recordingCatalog({ fetchDetails: async () => answer }).catalog });
     h.service.resolveCover(dune);
     await h.service.getDetails(dune);
     const workId = h.repo.findBookByKey("isbn:9780441013593")!.work_id!;
     assert.deepEqual(subjectRows(h, workId), [{ kind: "person", name: "A B" }, { kind: "person", name: "C D" }, { kind: "person", name: "E F" }]);
-    answer = subjectDetails({ thin, subjects: { ...SUBJECT_KINDS } });
+    answer = subjectDetails({ thin, subjects: rawSubjects([]) });
     h.db.prepare(`UPDATE books SET details_checked_at = NULL, details_status = NULL`).run();
     await h.service.getDetails(dune);
     assert.deepEqual(subjectRows(h, workId), []);
@@ -3000,11 +3000,22 @@ test("a null details result touches nothing", async () => {
 });
 
 test("subjects are not written to a work keyed to a different Open Library work", async () => {
-  const h = harness({ catalog: recordingCatalog({ fetchDetails: async () => subjectDetails({ subjects: { person: ["A B"], place: [], time: [] } }) }).catalog });
+  const h = harness({ catalog: recordingCatalog({ fetchDetails: async () => subjectDetails({ subjects: rawSubjects(["A B"]) }) }).catalog });
   h.service.resolveCover(dune);
   h.repo.setWorkKey(h.bookId("isbn:9780441013593"), "OL9W");
   await h.service.getDetails(dune);
   const workId = h.repo.findBookByKey("isbn:9780441013593")!.work_id!;
   assert.equal(h.repo.getWorkView(workId)!.olWorkKey, "OL9W");
   assert.deepEqual(subjectRows(h, workId), []);
+});
+
+test("the stored people exclude the work's author even when the edition's author is spelled differently", async () => {
+  const homer = { isbn: "9780441013593", title: "Odyssey", author: "Homero" };
+  const h = harness({ catalog: recordingCatalog({ fetchDetails: async () => subjectDetails({ subjects: rawSubjects(["Homer", "Odysseus (Greek mythology)"], [], ["Ὅμηρος", "Homero"]) }) }).catalog });
+  h.service.resolveCover(homer);
+  const bookId = h.bookId("isbn:9780441013593");
+  h.db.prepare(`UPDATE works SET author = ? WHERE id = (SELECT work_id FROM books WHERE id = ?)`).run("Homer", bookId);
+  await h.service.getDetails(homer);
+  const workId = h.repo.findBookByKey("isbn:9780441013593")!.work_id!;
+  assert.deepEqual(subjectRows(h, workId), [{ kind: "person", name: "Odysseus" }]);
 });

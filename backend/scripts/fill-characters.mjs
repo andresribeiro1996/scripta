@@ -32,7 +32,7 @@ const db = dryRun ? new DatabaseSync(process.env.COVERS_DB_PATH, { readOnly: tru
 const repo = createSqliteBooksRepository(waitForBnpLock(db));
 
 try {
-  const report = await fillCharacters(repo, (keys) => fetchOpenLibrarySubjects(throttle, keys), new Date().toISOString(), { dryRun, log });
+  const report = await fillCharacters(repo, (works) => fetchOpenLibrarySubjects(throttle, works), new Date().toISOString(), { dryRun, log });
   console.log(JSON.stringify({ dryRun, ...report }, null, 2));
 } catch (error) {
   fail(error.message);

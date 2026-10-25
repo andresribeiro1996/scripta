@@ -15,7 +15,7 @@ export interface CharactersReport {
 
 export async function fillCharacters(
   repo: Pick<BooksRepository, "transaction" | "worksWithOpenLibraryKey" | "replaceWorkSubjects">,
-  fetchBatch: (keys: string[]) => Promise<Map<string, CleanedSubjects>>,
+  fetchBatch: (works: Array<{ key: string; author: string }>) => Promise<Map<string, CleanedSubjects>>,
   at: string,
   { dryRun, log }: { dryRun: boolean; log: (line: string) => void }
 ): Promise<CharactersReport> {
@@ -23,7 +23,7 @@ export async function fillCharacters(
   const report: CharactersReport = { works: works.length, returned: 0, withPeople: 0, quizReady: 0, gatedOut: 0, rows: { person: 0, place: 0, time: 0 }, sample: [] };
   for (let start = 0; start < works.length; start += CHARACTER_BATCH) {
     const batch = works.slice(start, start + CHARACTER_BATCH);
-    const found = await fetchBatch(batch.map((work) => work.olWorkKey));
+    const found = await fetchBatch(batch.map(({ olWorkKey, author }) => ({ key: olWorkKey, author })));
     const writes: Array<{ id: string; subjects: CleanedSubjects["subjects"] }> = [];
     for (const { id, olWorkKey } of batch) {
       const cleaned = found.get(olWorkKey);
