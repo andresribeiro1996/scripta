@@ -57,26 +57,33 @@ Scripta is a personal project: not charged for, not incorporated, no ads. It sti
 3. **Hardcover ranks second for series, after Wikidata.** The ranks become `wikidata` 0, `hardcover` 1, `ol-edition` 2, `ol-subject` 3, `original-title` 4.
    - A work that already shows a Wikidata series keeps it. Hardcover fills the gaps and outranks Open Library's messier edition and subject strings.
    - In `bestSeriesOf`, an edition collection whose name matches a `hardcover` series supplies its position, as it already does for `wikidata` and `ol-subject` (`sqliteBooksRepository.ts:1327-1330`).
-4. **One series per Hardcover book: its featured series.** The SeriesSource type and the rank table live in `backend/src/modules/books/domain/series.ts:3,7`. That is `featured_book_series`, else the only `book_series` row if there is exactly one, else none.
+4. **One series per Hardcover book: its featured series.** The SeriesSource type and the rank table live in `backend/src/modules/books/domain/series.ts:3,7`. The featured series comes from `cached_featured_series` (jsonb) if Task 1 finds it carries the name and position. Otherwise it is `featured_book_series`, and then the sole `book_series` row when there is exactly one. Hardcover's roadmap caps query depth at 3, and `editions → book → featured_book_series → series` is depth 4, so the jsonb form comes first.
    - This stops a Stormlight book from showing "The Cosmere" when both are stored under the same source.
    - The umbrella series is lost from search for now.
    - Rows with `compilation = true` are kept, since their position is the first book's, and our work may be the omnibus.
-   - Only the first matched edition of a work in a run supplies its series. A per-run `seen` set does this, the same one genres use. Two editions of one work can match different Hardcover books, for example an omnibus and a single volume. Without the set, both series would be stored under `hardcover`, and `bestSeriesOf` would pick between them by `created_at`, which is arbitrary.
+   - Only one Hardcover series is ever stored per work. The series step is skipped when the work already has a `hardcover` row (`hasWorkSeries(workId, "hardcover")`, a new repository read), so a resumed or repeated run never adds a second one. Two editions of one work can match different Hardcover books, for example an omnibus and a single volume. Without the set, both series would be stored under `hardcover`, and `bestSeriesOf` would pick between them by `created_at`, which is arbitrary.
    - A position Hardcover changes later isn't updated. `addWorkSeries` only fills a NULL position, as for Wikidata.
-5. **Series names go through a review list, as in the Wikidata fill.**
-   - The dry run lists series names with work counts.
-   - The user reviews them. A real run refuses to start without `--skip <names.json>`, which may hold `[]`. This mirrors `fill-series.mjs:41`, because a community database also holds publisher collections ("Penguin Classics").
-6. **Descriptions are written per edition, only into an empty summary, only when the language matches.**
+5. **Series names go through a review list, before and after the run.**
+   - The dry run on a sample lists series names with work counts. A real run refuses to start without `--skip <names.json>`, which may hold `[]`. This mirrors `fill-series.mjs:41`, because a community database also holds publisher collections ("Penguin Classics").
+   - The sample covers only the first ~25k editions in rowid order, so the real run's report also lists `seriesNames`, for every name it added. The user and Claude review that full list.
+   - Names rejected after the run are removed with `--remove <names.json>`. It costs no requests, and it deletes the `hardcover` rows with those name keys (`removeWorkSeries(nameKeys, "hardcover")`, a new repository write). It also deletes their `series_fts` rows when no other source keeps that name on the work, since `series_fts` is only written for a work's first row of a name key (`sqliteBooksRepository.ts:497-500`). Hand SQL would leave search finding the work under the deleted name.
+6. **Descriptions are written per edition, only when the edition shows no synopsis today, and only when the language is known to match.**
    - They are written through the existing `mergeDetails(bookId, { summary, pages: null, year: null, publisher: null, translator: null }, "hardcover")`. Its first-write-wins rule keeps any existing synopsis.
+   - **"Shows no synopsis today"** means `books.summary` is empty and the work has no `works.summary` with an `ol_work_key`. The details read prefers the edition's own summary over the Open Library work summary (`booksService.ts:150-161`), and a boot migration cleared edition summaries where the work holds one (`connection.ts:130-136`). Writing into those empty edition rows would hide a synopsis readers already see, so they count as `alreadyHadSummary`. When the work summary is in the other language and hidden by the language check, this skips an edition that shows nothing. The rule accepts that loss, because it is simpler than re-running the read path's check.
    - Hardcover keeps a description on the book, which matches our work, and usually in English.
-   - The language rule is the one the details lookup already applies (`onlyMatchingLanguage`, `backend/src/modules/books/adapters/catalog/languageFilter.ts:27-35`): `summaryMatchesLanguage(description, book.language ?? (isPortugueseIsbn(book.isbn) ? "pt" : null))`. A Portuguese edition therefore does not get an English blurb.
+   - **The language rule is stricter than `summaryMatchesLanguage`**, which passes any language other than pt or en (`languageFilter.ts:21-25`). The edition's language is:
+     - `book.language`;
+     - else `pt` for a Portuguese ISBN;
+     - else `en` for an English-area ISBN group (978-0, 978-1, 979-8);
+     - else unknown.
+     The description is written only when `detectedLanguage(text)` (made exported from `languageFilter.ts`) equals that language. An unknown or undetectable language writes nothing. So a French edition, or a 978-3 edition with no language, never gets an English blurb.
    - **This cuts the 29k estimate.** Most of the 8% Portugal-ISBN matches will be dropped. The dry run reports the drop as `descriptionWrongLanguage`.
    - Only the matched edition is written. Its sibling editions keep reading their own summary, or the Open Library work summary, as today.
 7. **Genres reuse the source-genre fill.**
    - Hardcover Genre tags go through `normalizeBookGenres` (`packages/shared/src/library/bookGenres.ts:77`), which already maps English genre labels to the 26-genre vocabulary.
    - The result goes through `fillSourceGenres(workId, genres)` (`backend/src/modules/books/adapters/sqlite/sqliteBooksRepository.ts:262`), exactly as `seedGenres.ts` and `feedGenres.ts` do.
    - It fills only editions whose `genres` is `'[]'`, with `genres_source = NULL`, so the jev, manual and NULL guards are unchanged.
-   - A work's genres are taken from the first matched edition that yields any. The `seen` set is the same as in `seedGenres.ts`.
+   - A work's genres are taken from the first matched edition whose tags map to at least one genre. A run-wide set marks a work only once that non-empty result has been written, so an edition whose tags map to nothing doesn't block a sibling that has some.
 8. **Only well-supported tags count.**
    - A Genre tag is used when its `count` is at least `GENRE_MIN_COUNT` and at least `GENRE_MIN_SHARE` of the top tag's count.
    - At most `GENRE_LIMIT` genres per work are kept, after mapping.
@@ -86,11 +93,12 @@ Scripta is a personal project: not charged for, not incorporated, no ads. It sti
      - Until then the defaults are 2, 0.2 and 3.
      - The same sample answers the description question in Decision 13.
      - The dry run's `genreSamples` (runbook step 3) is a second look on catalog books. A threshold change after that goes through a normal PR and deploy before the real run.
-9. **The summary source is `hardcover`, credited without a link.**
+9. **The summary source is `hardcover`, and nothing in the UI credits it.**
    - `SummarySource` (`backend/src/modules/books/domain/types.ts:3-4`) gains `"hardcover"`, and so does the shared `BookMetadata.summarySource` union (`bookMetadata.ts:23`).
    - `summaryLink` (`backend/src/modules/books/booksService.ts:144`) returns `""` for it, as for `bnp`, since the Hardcover slug isn't stored. The web summary therefore shows no "Source:" link. That is what BNP summaries show today.
-   - Web `summarySourceName` gains a `"Hardcover"` branch for when a link exists later.
-   - The change is additive. An older web tab would label it "Open Library", but web deploys with the backend, and mobile doesn't render the source.
+   - The web summary renders its "Source:" line only when `sourceUrl` is non-empty (`frontend/src/components/BookSummary.tsx:55`), so `summarySourceName` doesn't change.
+   - **The terms need no credit here.** Descriptions are facts about books, which the terms allow even for professional projects. The credit rule covers aggregate figures shown as such ("average Hardcover rating", "number of Hardcover readers"). Our genres are our own 26-genre classification, chosen with tag counts as one input, and no Hardcover figure is displayed. A later feature that shows a Hardcover number (a rating, a reader count, mood percentages) must credit it.
+   - The change is additive. Mobile doesn't render the source.
 10. **One pass over every edition with an ISBN, in rowid order, resumable.**
     - Pages are 50 editions with a non-null `isbn`. The cursor is the last rowid.
     - There is no gap filter: the run is about 4,700 requests, inside one day's quota, and most editions lack something.
@@ -126,8 +134,7 @@ query Editions($i13: [String!]!, $i10: [String!]!) {
       canonical_id
       description
       cached_tags
-      featured_book_series { position compilation series { name } }
-      book_series { position compilation series { name } }
+      cached_featured_series
     }
   }
 }
@@ -136,9 +143,10 @@ query Editions($i13: [String!]!, $i10: [String!]!) {
 - **The ISBN lists.** `$i13` holds the page's ISBN-13s (`books.isbn` is always canonical ISBN-13, `bookMatch.ts:55-61`). `$i10` holds the ISBN-10 of each 978- ISBN, because some Hardcover editions carry only one of the two.
 - **Headers:** `Authorization: Bearer <token>`, `Content-Type: application/json`, and the backend's `USER_AGENT` (`http.ts:4`), which is what Hardcover asks for.
 - **Unverified shapes.** The plan's first task checks these against the live API with the user's token before any code is written:
-  - whether `featured_book_series` is selectable under `book` (docs list it as a `book_series` relation);
+  - what `cached_featured_series` holds. If it lacks the name or position, use `featured_book_series { position compilation series { name } }` and `book_series { … }`, provided the depth isn't rejected;
+  - the real 401/403 body (from a bad token) and the `RateLimit` header format;
   - the `cached_tags` shape: expected `{ "Genre": [{ "tag": "Fantasy", "count": 41, ... }], "Mood": [...], ... }`;
-  - whether the response stays well under the 30 s query timeout at 50 ISBNs.
+  - the response time at 50 ISBNs. The client's default timeout is 10 s (`http.ts:3`), so `postJson` takes a `timeoutMs` and the Hardcover lookup passes 30 000, which is Hardcover's own query limit.
 
 ### Matching
 
@@ -163,20 +171,20 @@ In a dry run the database is opened read-only, as `fill-series.mjs:124` does. Th
 
 ## The script
 
-`node scripts/fill-hardcover.mjs [--dry-run] [--skip <names.json>] [--after <rowid>] [--max-requests <n>]`
+`node scripts/fill-hardcover.mjs [--dry-run] [--skip <names.json>] [--after <rowid>] [--max-requests <n>]`, or `node scripts/fill-hardcover.mjs --remove <names.json>` (no requests, no token needed)
 
 - **Output:** the JSON report goes to stdout, and progress goes to stderr as JSON lines every 20 requests. This is the same split as `fill-series.mjs`.
 - **Refusals:** a real run without `--skip` refuses, as Decision 5 says.
 - **Errors:**
   - **401 or 403** ends the run at once with the API's `error` field, for example `invalid_token`, `insufficient_scope` or `request_exceeds_capacity`.
-  - **429:** a short `Retry-After` (≤ 120 s) is waited out, up to 3 attempts. A longer one, or a `RateLimit` header showing 0 daily requests left, ends the run cleanly with `stoppedBy: "daily-quota"` and `lastRowid`.
-  - **5xx, 408 and network errors** retry 3 times with 30 s between tries. After that the run ends with `stoppedBy: "error"` and `lastRowid`. Nothing is swallowed.
-  - **GraphQL `errors` in a 200 response** end the run with the message.
+  - **429:** a short `Retry-After` (≤ 120 s) is waited out, up to 3 attempts. A 429 with no `Retry-After` waits 60 s, one per-minute window, and counts as an attempt. A longer `Retry-After` ends the run cleanly with `stoppedBy: "daily-quota"` and `lastRowid`. Hardcover sends `Retry-After` on every 429, and a spent daily quota points it at midnight UTC.
+  - **5xx, 408 and network errors** (status ≥ 500, 408, or no status) retry 3 times with 30 s between tries. Any other 4xx ends the run at once. After that the run ends with `stoppedBy: "error"` and `lastRowid`. Nothing is swallowed.
+  - **GraphQL `errors` in a 200 response** end the run at once, never retried, with the message.
 - **Re-runs are safe.** Every write is add-only or fill-empty.
 
 ### The client
 
-A new `postJson(source, url, body, headers)` in `backend/src/modules/books/adapters/http/http.ts` reuses the private `request`, `failure` and `readBody` helpers, so 429 parsing (`Retry-After`, `ratelimit` remaining → `quota`) isn't written twice. `request` gains an optional method and body, and the existing `fetchJson` callers don't change.
+A new `postJson(source, url, body, headers, timeoutMs)` in `backend/src/modules/books/adapters/http/http.ts` reuses the private `request`, `failure` and `readBody` helpers, so 429 `Retry-After` parsing isn't written twice. Hardcover's daily stop is decided from `retryAt`, not from `failure()`'s ISBNdb-style `remaining=` quota flag. `request` gains an optional method and body, and the existing `fetchJson` callers don't change.
 
 The Hardcover pieces live in `backend/src/modules/books/adapters/hardcover/hardcover.ts`:
 - the query text;
@@ -186,7 +194,12 @@ The Hardcover pieces live in `backend/src/modules/books/adapters/hardcover/hardc
 
 The fill loop lives in `backend/src/modules/books/seed/hardcoverFill.ts`. It is `fillFromHardcover(deps, options)`, with the repository, the lookup function, `now` and `log` injected, so tests need no network.
 
-The repository gains one read: `isbnPage(afterRowid, limit)`. It returns `{ rowid, id, isbn, workId, language, hasSummary }` for editions with a non-null `isbn`, ordered by rowid. Everything else reuses existing methods.
+The repository gains:
+- `isbnPage(afterRowid, limit)`, which returns `{ rowid, id, isbn, workId, language, hasSummary }` for editions with a non-empty `isbn`, ordered by rowid. `hasSummary` follows Decision 6.
+- `hasWorkSeries(workId, source)`.
+- `removeWorkSeries(nameKeys, source)`.
+
+Everything else reuses existing methods. An edition with no `work_id` gets only the description step.
 
 ### The report
 
@@ -196,7 +209,7 @@ The repository gains one read: `isbnPage(afterRowid, limit)`. It returns `{ rowi
   descriptions: { added, descriptionWrongLanguage, alreadyHadSummary },
   genres:   { works, editions, noMappedGenre },
   skippedBooks, duplicateIsbns,
-  seriesNames: [{ name, works }]  // dry run only, most works first
+  seriesNames: [{ name, works }]  // most works first; in a real run, the names added
   genreSamples: [{ tags, genres }] // dry run only, the first 50 matched books with Genre tags
 }
 ```
@@ -210,23 +223,24 @@ The deploy hold for the pre-2002 BNP import stays in force (until about 21:00Z o
    ```
    node scripts/fill-hardcover.mjs --dry-run --max-requests 500 > /data/hardcover-dry.json 2> /data/hardcover-dry.log
    ```
-3. The user and Claude review `seriesNames`, `genreSamples` and the language drop. The rejected names go into `/data/hardcover-skip.json`.
+3. The user and Claude review `seriesNames`, `genreSamples` and the language drop. The rejected names go into `/data/hardcover-skip.json`. If the drop shows that Decision 6 would write too few descriptions to be worth it, raise that before step 4.
 4. The real run, on a UTC day with the full quota left:
    ```
    node scripts/fill-hardcover.mjs --skip /data/hardcover-skip.json > /data/hardcover.json 2> /data/hardcover.log
    ```
    If it stops with `daily-quota` or is killed by a deploy, re-run it the next day with `--after <lastRowid>`. A deploy kills `railway ssh` jobs, so hold merges during the roughly 90-minute run.
-5. Run the synopsis backlog's free rule pass (`synopsis-backlog.mjs` without `--max`) over the new descriptions. The Jev pass is the user's call, as before. The daily synopsis sweep already judges new texts on held works.
+   Then the user and Claude review the run's full `seriesNames`, and run `--remove /data/hardcover-remove.json` for anything rejected.
+5. Run the synopsis backlog's free rule pass over the new descriptions, with the Jev key blanked so no paid calls happen: `TYPESAFE_API_KEY= node scripts/synopsis-backlog.mjs --max 1` (`--max` is required, `synopsis-backlog.mjs:4-8`). The Jev pass is the user's call, as before. The daily synopsis sweep already judges new texts on held works.
 
 ## Error handling
 
 Covered under The script. Two more rules:
-- Writes never delete anything. A wrong series row is deleted by hand, as for the Wikidata fill, and the README says how.
+- The fill never deletes anything. Only `--remove` deletes, and only `hardcover` series rows and their search entries.
 - A failed page is never marked as done. The cursor only moves past pages whose writes committed, and the report's counters cover committed pages only.
 
 ## Testing
 
-Backend, `node:test` via `tsx --test`. New files go into `backend/package.json`'s explicit test list, and they use the env preamble from `awardsFill.test.ts:12-18`.
+Backend, `node:test` via `tsx --test`. New files go into `backend/package.json`'s explicit test list, and they use the env preamble from `awardsFill.test.ts:12-19`.
 
 - **`hardcover.test.ts`:**
   - `featuredSeriesOf`: featured, sole, several unfeatured, none;
@@ -244,16 +258,21 @@ Backend, `node:test` via `tsx --test`. New files go into `backend/package.json`'
   - a dry run writes nothing and reports the same counts;
   - `--after` and `--max-requests` cursor behaviour;
   - a daily-quota stop that reports `lastRowid`.
-- **`http.test.ts`:** `postJson` sends method, body and headers, and its 429 carries `retryAt` and `quota`.
+  - an edition whose work has an Open Library work summary is left alone;
+  - a French or 978-3 null-language edition gets no English description;
+  - a resumed run doesn't add a second `hardcover` series to a work that has one;
+  - `--remove` deletes the `hardcover` rows and their `series_fts` entries, but keeps the entry when a `wikidata` row has the same name key;
+  - an edition with no `work_id` gets only its description.
+- **`http.test.ts`:** `postJson` sends method, body and headers, its 429 carries `retryAt` from `Retry-After`, and it passes its `timeoutMs`.
 - **Series rank:** `bestSeriesOf` with a `wikidata` row beating a `hardcover` row, a `hardcover` row beating an `ol-subject` row, and an edition collection supplying a position to a `hardcover` series.
-- **Shared:** `summarySource` typing compiles. Web: `summarySourceName` returns "Hardcover".
+- **Shared:** `summarySource` typing compiles.
 - **Checks:** typecheck and lint in backend, shared and frontend, then `node scripts/gate.mjs`.
 
 No device pass: nothing rendered changes, apart from the web summary source label.
 
 ## Docs
 
-- `backend/README.md`: a "Hardcover enrichment" section covering the token, the dry run, the review, the real run, resuming, and deleting a wrong series row by hand. It also gives the terms summary, so a later reader knows why ratings and moods aren't stored.
+- `backend/README.md`: a "Hardcover enrichment" section covering the token, the dry run, the review, the real run, resuming, and deleting a wrong series row by hand. It also gives the terms summary, so a later reader knows why ratings and moods aren't stored. The series-order sentence at `backend/README.md:176` gains Hardcover.
 - `docs/services.md`: list Hardcover as a source used by an owner-run script.
 
 ## Later (not in this design)
