@@ -397,7 +397,7 @@ const styles = StyleSheet.create({
   bar: { position: "absolute", left: 0, right: 0, bottom: 0, minHeight: BAR_HEIGHT, flexDirection: "row", alignItems: "center", paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.sm, borderTopWidth: 1 },
   barRule: { width: 1, height: 24, marginLeft: spacing.md, marginRight: spacing.sm },
   railScroll: { flex: 1 },
-  railContent: { flexGrow: 1, alignItems: "center" },
+  railContent: { flexGrow: 1, alignItems: "center", paddingVertical: spacing.xs },
   node: { alignItems: "center", justifyContent: "center", flexShrink: 0, minWidth: minimumTouchTarget, minHeight: minimumTouchTarget },
   nodeDot: { width: 14, height: 14, borderRadius: radii.full },
   nodeLabel: { fontSize: 10, position: "absolute", top: "50%", marginTop: 10 },
