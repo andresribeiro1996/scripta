@@ -149,6 +149,12 @@ function Prompt({ question }: { question: PublicQuizQuestion }) {
   if (question.type === "title_cover") {
     return <Text {...dynamicType} style={[typography.heading, styles.promptText, { color: colors.text }]}>{question.prompt}</Text>;
   }
+  if (question.type === "characters_title") {
+    return <View style={styles.promptCharacters}>
+      <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Who's in this book?</Text>
+      <Text {...dynamicType} style={[typography.heading, styles.promptText, { color: colors.text }]}>{question.prompt}</Text>
+    </View>;
+  }
   return <Text {...dynamicType} display={false} style={[typography.title, styles.promptQuote, { color: colors.text }]}>“{question.prompt}”</Text>;
 }
 
@@ -219,6 +225,7 @@ const styles = StyleSheet.create({
   fill: { height: 4, borderRadius: radii.full },
   promptTile: { alignSelf: "center", width: 180, height: 252, borderRadius: radii.lg, overflow: "hidden" },
   promptText: { textAlign: "center" },
+  promptCharacters: { alignItems: "center", gap: spacing.xs },
   promptQuote: { textAlign: "center", fontStyle: "italic" },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md },
   tile: { flexGrow: 1, flexBasis: "46%", aspectRatio: 2 / 3, borderRadius: radii.lg, borderWidth: 2, overflow: "hidden" },

@@ -18,6 +18,7 @@ export type BookScreenModel = {
   author: string;
   authorAwards: string | null;
   awards: Array<{ label: string; won: boolean }>;
+  characters: { shown: string[]; more: string[] };
   genres: string[];
   possibleGenres: string[];
   series: BookSeries | null;
@@ -36,6 +37,7 @@ export type BookScreenModel = {
   community: { countsLabel: string; groups: Array<{ key: string; title: string | null; rows: BookScreenReaderRow[] }>; games: Array<{ key: string; title: string; detail: string; path: string }> } | null;
 };
 
+export const CHARACTERS_SHOWN = 8;
 const GENRE_CAP = 3;
 const EDITIONS_PREVIEW = 3;
 const STATUSES = [0, 1, 2] as const;
@@ -116,6 +118,7 @@ export function bookScreenModel(page: WorkPage | null, book: Book | null, viewer
     author: work?.author ?? String(book?.Attribution ?? "Unknown author"),
     authorAwards,
     awards,
+    characters: { shown: (work?.characters ?? []).slice(0, CHARACTERS_SHOWN), more: (work?.characters ?? []).slice(CHARACTERS_SHOWN) },
     genres: work ? work.genres ?? [] : book ? genresForBook(book).slice(0, GENRE_CAP) : [],
     possibleGenres: work?.possibleGenres ?? [],
     series: work ? work.series ?? (selected ?? work.editions[defaultEditionIndex(work)])?.collection ?? null : null,

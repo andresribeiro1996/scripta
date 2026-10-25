@@ -56,4 +56,5 @@ export interface QuizWorks {
   resolveTitleWorks(books: Array<{ title: string; author: string }>): Array<string | null>;
   canonicalByKey(ids: Map<string, string>): Map<string, string>;
   publicBooksByWork(ownerUserId: string, workIds: string[]): Map<string, PublicBookData>;
+  charactersOf(workIds: string[]): Map<string, string[]>;
 }

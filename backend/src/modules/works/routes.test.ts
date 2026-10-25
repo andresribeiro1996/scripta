@@ -17,7 +17,7 @@ const { buildWorkRoutes, buildWorkStatsRoutes } = await import("./routes.js");
 const { worksPlugin } = await import("./plugin.js");
 const { WorkResolutionError } = await import("../library/index.js");
 
-function appWith(getPage: (id: string, viewerId: string | null) => unknown, getStats: (id: string) => unknown = () => undefined, recentAwards: () => unknown = () => ({ announcements: [] })) {
+function appWith(getPage: (id: string, viewerId: string | null) => unknown, getStats: (id: string) => unknown = () => undefined, recentAwards: () => unknown = () => ({ announcements: [] }), characters: (ids: string[]) => unknown = () => ({})) {
   const app = Fastify();
   app.decorate("authenticateAccessToken", (token: string) => (token === "good" ? { id: "viewer", email: "v@example.test", username: "viewer", avatarId: null } : null));
   app.setErrorHandler((error: FastifyError, _request, reply) => {
@@ -25,7 +25,7 @@ function appWith(getPage: (id: string, viewerId: string | null) => unknown, getS
     const statusCode = typeof error.statusCode === "number" && error.statusCode >= 400 && error.statusCode < 500 ? error.statusCode : 500;
     return statusCode === 500 ? reply.code(500).send({ error: "Internal server error" }) : reply.code(statusCode).send({ error: error.message });
   });
-  void app.register(buildWorkRoutes({ getPage, recentAwards } as never));
+  void app.register(buildWorkRoutes({ getPage, recentAwards, characters } as never));
   void app.register(buildWorkStatsRoutes({ getStats } as never));
   return app;
 }
@@ -100,5 +100,29 @@ test("GET /awards/recent returns the announcements with no-store and needs no si
   assert.equal(res.statusCode, 200);
   assert.deepEqual(res.json(), { announcements });
   assert.equal(res.headers["cache-control"], "no-store");
+  await app.close();
+});
+
+test("characters route answers by given id", async () => {
+  const app = appWith(() => undefined, () => undefined, undefined, (ids) => Object.fromEntries(ids.map((id) => [id, ["A", "B", "C"]])));
+  const res = await app.inject({ method: "POST", url: "/works/characters", payload: { workIds: ["merged-away", "w"] } });
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.json(), { characters: { "merged-away": ["A", "B", "C"], w: ["A", "B", "C"] } });
+  assert.equal(res.headers["cache-control"], "no-store");
+  await app.close();
+});
+
+test("characters route rejects 501 ids with 400", async () => {
+  const app = appWith(() => undefined);
+  const ids = Array.from({ length: 501 }, (_, i) => `w${i}`);
+  assert.equal((await app.inject({ method: "POST", url: "/works/characters", payload: { workIds: ids } })).statusCode, 400);
+  assert.equal((await app.inject({ method: "POST", url: "/works/characters", payload: { workIds: [""] } })).statusCode, 400);
+  assert.equal((await app.inject({ method: "POST", url: "/works/characters", payload: {} })).statusCode, 400);
+  await app.close();
+});
+
+test("characters route needs no token", async () => {
+  const app = appWith(() => undefined);
+  assert.equal((await app.inject({ method: "POST", url: "/works/characters", payload: { workIds: ["w"] } })).statusCode, 200);
   await app.close();
 });

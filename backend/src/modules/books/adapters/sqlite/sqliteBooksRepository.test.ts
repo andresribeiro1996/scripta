@@ -3996,3 +3996,56 @@ test("matchingSeries ignores a leading article in the query as well as in the na
   assert.deepEqual(repo.matchingSeries(["o", "senhor", "dos", "aneis"]).map(({ name, exact }) => [name, exact]), [["Senhor dos Anéis", true]]);
   assert.deepEqual(repo.matchingSeries(["the"]), []);
 });
+
+const subjectsOf = (person: string[], place: string[] = [], time: string[] = []) => ({ person, place, time });
+const keyedBook = (repo: ReturnType<typeof freshRepo>["repo"], title: string, workKey: string | null) =>
+  repo.createBook({ title, author: "Some Author", isbn: null, workKey }, [`ta:${title.toLowerCase()}|some author|`], NOW).work_id!;
+
+test("replaceWorkSubjects replaces every kind", () => {
+  const { db, repo } = freshRepo();
+  const work = keyedBook(repo, "Emma", "OL1W");
+  repo.replaceWorkSubjects(work, subjectsOf(["A B", "C D"], ["X"], ["T"]), NOW);
+  repo.replaceWorkSubjects(work, subjectsOf(["E F"]), NOW);
+  assert.deepEqual(repo.charactersOf([work]).get(work), ["E F"]);
+  assert.equal((db.prepare("SELECT COUNT(*) AS n FROM work_subjects WHERE work_id = ?").get(work) as { n: number }).n, 1);
+});
+
+test("charactersOf keeps order", () => {
+  const { repo } = freshRepo();
+  const work = keyedBook(repo, "Pride", "OL2W");
+  const names = ["Elizabeth Bennet", "Fitzwilliam Darcy", "Charlotte Lucas"];
+  repo.replaceWorkSubjects(work, subjectsOf(names), NOW);
+  assert.deepEqual(repo.charactersOf([work]).get(work), names);
+});
+
+test("charactersOf answers a merged-away id with the canonical list", () => {
+  const { repo } = freshRepo();
+  const canonical = keyedBook(repo, "Canon", "OL3W");
+  const alias = keyedBook(repo, "Alias", null);
+  repo.replaceWorkSubjects(canonical, subjectsOf(["Ann Lee", "Bob Ray"]), NOW);
+  assert.equal(repo.mergeWorks(alias, canonical), canonical);
+  assert.deepEqual(repo.charactersOf([alias]).get(alias), ["Ann Lee", "Bob Ray"]);
+  assert.deepEqual(repo.charactersOf([canonical, alias]).get(canonical), ["Ann Lee", "Bob Ray"]);
+});
+
+test("charactersOf falls back to the longest alias list", () => {
+  const { repo } = freshRepo();
+  const canonical = keyedBook(repo, "Root", null);
+  const short = keyedBook(repo, "Short", null);
+  const long = keyedBook(repo, "Long", null);
+  repo.replaceWorkSubjects(short, subjectsOf(["Ann Lee", "Bob Ray"]), NOW);
+  repo.replaceWorkSubjects(long, subjectsOf(["Cy One", "Di Two", "Ed Three", "Fy Four"]), NOW);
+  repo.mergeWorks(short, canonical);
+  repo.mergeWorks(long, canonical);
+  assert.deepEqual(repo.charactersOf([canonical]).get(canonical), ["Cy One", "Di Two", "Ed Three", "Fy Four"]);
+  assert.equal(repo.charactersOf([keyedBook(repo, "Empty", "OL8W")]).size, 0);
+});
+
+test("worksWithOpenLibraryKey skips merged and keyless works", () => {
+  const { db, repo } = freshRepo();
+  const kept = keyedBook(repo, "Kept", "OL9W");
+  const merged = keyedBook(repo, "Merged", "OL10W");
+  keyedBook(repo, "Keyless", null);
+  db.prepare("UPDATE works SET merged_into = ? WHERE id = ?").run(kept, merged);
+  assert.deepEqual(repo.worksWithOpenLibraryKey(), [{ id: kept, olWorkKey: "OL9W" }]);
+});

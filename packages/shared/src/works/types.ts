@@ -23,7 +23,7 @@ export type AwardAnnouncement = { prize: string; year: number; announcedAt: stri
 export type RecentAwards = { announcements: AwardAnnouncement[] };
 
 export type WorkPage = {
-  work: { id: string; title: string; author: string; summary: string | null; coverUrl: string | null; coverColor: string | null; editions: WorkEdition[]; genres: string[]; possibleGenres?: string[]; rating: WorkRating | null; year: number | null; pages: number | null; series?: BookSeries | null; awards?: WorkAward[] };
+  work: { id: string; title: string; author: string; summary: string | null; coverUrl: string | null; coverColor: string | null; editions: WorkEdition[]; genres: string[]; possibleGenres?: string[]; rating: WorkRating | null; year: number | null; pages: number | null; series?: BookSeries | null; awards?: WorkAward[]; characters?: string[] };
   mine: WorkMine | null;
   readers: { followed: WorkReader[]; others: WorkReader[]; counts: { readers: number; finished: number } };
   games: { tierlists: WorkGameRef[]; arenas: WorkGameRef[]; quizzes: WorkGameRef[] };

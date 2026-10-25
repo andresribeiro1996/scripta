@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { router } from "expo-router";
 import { Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
 import { Text } from "../../ui/Text";
-import { readerGlyphLabel, type QuizPreview } from "@scripta/shared";
+import { quizClueHeading, readerGlyphLabel, type QuizPreview } from "@scripta/shared";
 import { Icon, IconButton, Menu, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import type { ContentTone, DiscoverItem, PublishedContent } from "@scripta/shared/community";
 import { TIER_LADDER, contentStats, contentStatus, contentTarget, gameActionLabel } from "./communityHome";
@@ -121,7 +121,7 @@ export function GameRow({ kind, name, meta, badges, caption, stats = [], covers,
               </View>
             </View>
             {clue ? <View style={[styles.clue, { backgroundColor: colors.background, borderColor: colors.border }]}>
-              <View style={styles.clueHeading}><Icon name={clue.type === "title_cover" ? "book" : "quote"} size={18} color={colors.textDim} /><Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{clue.type === "title_cover" ? "Which cover belongs to this title?" : "Which book is this from?"}</Text></View>
+              <View style={styles.clueHeading}><Icon name={clue.type === "title_cover" ? "book" : "quote"} size={18} color={colors.textDim} /><Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{quizClueHeading(clue.type)}</Text></View>
               <Text numberOfLines={fontScale > 1.3 ? undefined : 3} {...dynamicType} style={[typography.body, { color: colors.text }]}>{clue.prompt}</Text>
             </View> : null}
           </View>

@@ -10,6 +10,7 @@ import { Button, Dialog, EditorHeading, ErrorState, FormScroll, HeaderActions, I
 import { coverUrlForApi } from "../library/lib/coverUrl";
 import { publicContentUrl } from "../sharing/links";
 import { fetchQuizResults, publishQuiz, setPlayState, updateQuiz, type Quiz } from "./api";
+import { useWorkCharacters } from "./useWorkCharacters";
 
 type EditorView = "setup" | "results";
 
@@ -20,6 +21,7 @@ const TYPE_LABELS: Record<QuizQuestionType, string> = {
   title_cover: "Title → cover",
   quote_title: "Quote → title",
   blurb_title: "Blurb → title",
+  characters_title: "Characters → title",
 };
 
 const uriFor = (url: string): string => coverUrlForApi(url, API_URL);
@@ -31,6 +33,7 @@ export function QuizEditorScreen({ quiz, onUpdated, initialView }: { quiz: Quiz;
   const [data, setData] = useState<QuizData>(quiz.data);
   const dataRef = useRef(data);
   dataRef.current = data;
+  const { characters, failed: charactersFailed } = useWorkCharacters(data.books.map((book) => book.workId));
   const [view, setView] = useState<EditorView>(initialView ?? "setup");
   const [busy, setBusy] = useState(false);
   const [publishing, setPublishing] = useState(false);
@@ -128,13 +131,14 @@ export function QuizEditorScreen({ quiz, onUpdated, initialView }: { quiz: Quiz;
         ))}
       </View>
       {QUIZ_QUESTION_TYPES.map((type) => {
-        const offered = data.books.some((book) => eligibleTypes(book).includes(type));
+        const offered = data.books.some((book) => eligibleTypes({ ...book, characters: characters[book.workId] ?? book.characters }).includes(type));
         const checked = offered && data.allowedTypes.includes(type);
         return <Pressable key={type} accessibilityRole="checkbox" accessibilityState={{ checked, disabled: !offered || lockEdits }} disabled={!offered || lockEdits} onPress={() => setData((value) => ({ ...value, allowedTypes: checked ? value.allowedTypes.filter((entry) => entry !== type) : [...value.allowedTypes, type] }))} style={[styles.row, offered ? null : styles.offered, { borderColor: colors.border }]}>
           <Text {...dynamicType} style={[typography.body, styles.grow, { color: colors.text }]}>{TYPE_LABELS[type]}</Text>
           {!offered ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>no book has this data</Text> : <Text {...dynamicType} style={[typography.body, { color: colors.accent }]}>{checked ? "✓" : ""}</Text>}
         </Pressable>;
       })}
+      {charactersFailed ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Characters couldn't be checked</Text> : null}
       {data.books.map((book) => <View key={book.workId} style={[styles.book, { borderColor: colors.border, backgroundColor: colors.surface }]}>
         <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>{book.title}</Text>
         <Input label="Quote (optional)" value={book.quote ?? ""} editable={!lockEdits} onChangeText={(quote) => setData((value) => ({ ...value, books: value.books.map((entry) => entry.workId === book.workId ? { ...entry, quote } : entry) }))} placeholder="Paste a line from this book…" multiline />

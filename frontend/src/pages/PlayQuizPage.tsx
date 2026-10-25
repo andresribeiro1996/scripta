@@ -11,6 +11,7 @@ import { useParams } from "react-router-dom";
 import { playerLabel, scoreRows, type PublicQuizQuestion } from "@scripta/shared";
 import { CoverImage } from "../components/BookCard";
 import { Page } from "../components/page/Page";
+import { QuizPrompt } from "../components/quiz/QuizPrompt";
 import { fetchPublicResultsApi, submitPlayApi, type PlayResponse } from "../api/quizzes";
 import { quizPlayStage } from "../lib/quizPlayStage";
 import { storePlayId, useQuizPlay } from "../hooks/useQuizPlay";
@@ -21,24 +22,6 @@ function InfoScreen({ message }: { message: string }) {
       <p className="text-sm text-(--color-text-dim)">{message}</p>
     </Page>
   );
-}
-
-function Prompt({ question }: { question: PublicQuizQuestion }) {
-  if (question.type === "cover_title") {
-    // Same cover chain as every other game (CoverImage: confirmed URL,
-    // backend resolve, fallback tile) — the blur is the whole question, so
-    // it wraps the fallback too. The fallback Title is deliberately NOT
-    // the answer: a dead cover must not give the question away.
-    return (
-      <div className="relative mx-auto h-56 w-40 overflow-hidden rounded-lg bg-(--color-border) blur-md">
-        <CoverImage book={{ Title: "Cover unavailable", _coverUrl: question.prompt }} alt="Which book is this?" />
-      </div>
-    );
-  }
-  if (question.type === "title_cover") {
-    return <p className="text-center text-2xl font-bold">{question.prompt}</p>;
-  }
-  return <p className="text-center font-serif text-lg italic leading-relaxed">“{question.prompt}”</p>;
 }
 
 function Options({ question, onPick, picked }: { question: PublicQuizQuestion; onPick: (index: number) => void; picked: number | null }) {
@@ -161,7 +144,7 @@ export function PlayQuizPage() {
           <div className="h-1 rounded bg-(--color-accent) transition-all" style={{ width: `${Math.round((answeredCount / questions.length) * 100)}%` }} />
         </div>
 
-        <Prompt question={question} />
+        <QuizPrompt question={question} />
         <Options question={question} picked={picked} onPick={pick} />
 
         {index === questions.length - 1 && answeredCount === questions.length && (

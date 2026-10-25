@@ -22,7 +22,8 @@ const works = {
   knownWorkIds: (ids: string[]) => ids,
   resolveTitleWorks: (books: Array<{ title: string; author: string }>) => books.map(() => null),
   canonicalByKey: (ids: Map<string, string>) => new Map(ids),
-  publicBooksByWork: (_ownerUserId: string, _workIds: string[]) => new Map<string, PublicBookData>()
+  publicBooksByWork: (_ownerUserId: string, _workIds: string[]) => new Map<string, PublicBookData>(),
+  charactersOf: (_workIds: string[]) => new Map<string, string[]>()
 };
 
 const book = (workId: string): QuizBook => ({ workId, title: `Title ${workId}`, author: "A", coverUrl: `https://covers.test/${workId}.jpg`, quote: `Quote ${workId}`, blurb: `Blurb ${workId}` });

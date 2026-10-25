@@ -14,12 +14,14 @@ import { useConfirm } from "../components/ConfirmDialog";
 import { deleteQuizApi, fetchQuizResultsApi, publishQuizApi, setPlayStateApi, updateQuizApi, type Quiz } from "../api/quizzes";
 import { useQuizzes } from "../hooks/useQuizzes";
 import { CHECKBOX_CLASS } from "../components/Toolbar";
+import { useWorkCharacters } from "../hooks/useWorkCharacters";
 
 const TYPE_LABELS: Record<QuizQuestionType, string> = {
   cover_title: "Blurred cover → title",
   title_cover: "Title → cover",
   quote_title: "Quote → title",
-  blurb_title: "Blurb → title"
+  blurb_title: "Blurb → title",
+  characters_title: "Characters → title"
 };
 
 export function QuizEditorPage() {
@@ -51,6 +53,8 @@ export function QuizEditorPage() {
       setDraftQuizId(quiz.id);
     }
   }, [quiz, draftQuizId]);
+
+  const { characters, failed: charactersFailed } = useWorkCharacters((draft?.books ?? []).map((book) => book.workId));
 
   function updateDraft(mutate: (current: QuizData) => QuizData): void {
     if (!quiz) return;
@@ -145,7 +149,7 @@ export function QuizEditorPage() {
               </label>
               <div className="flex flex-wrap gap-2">
                 {QUIZ_QUESTION_TYPES.map((type) => {
-                  const offered = data.books.some((book) => eligibleTypes(book).includes(type));
+                  const offered = data.books.some((book) => eligibleTypes({ ...book, characters: characters[book.workId] ?? book.characters }).includes(type));
                   const checked = offered && data.allowedTypes.includes(type);
                   return (
                     <label key={type} className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm ${offered ? "border-(--color-border)" : "border-(--color-border) opacity-50"}`}>
@@ -166,6 +170,7 @@ export function QuizEditorPage() {
                   );
                 })}
               </div>
+              {charactersFailed && <p className="text-sm text-(--color-text-dim)">Characters couldn't be checked</p>}
             </div>
 
             {data.books.map((book) => (

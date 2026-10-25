@@ -1,4 +1,7 @@
-export const QUIZ_QUESTION_TYPES = ["cover_title", "title_cover", "quote_title", "blurb_title"] as const;
+export const QUIZ_QUESTION_TYPES = ["cover_title", "title_cover", "quote_title", "blurb_title", "characters_title"] as const;
+
+export const QUIZ_MIN_CHARACTERS = 3;
+export const QUIZ_PROMPT_CHARACTERS = 3;
 
 export type QuizQuestionType = (typeof QUIZ_QUESTION_TYPES)[number];
 
@@ -15,6 +18,7 @@ export interface QuizBookContent {
   coverUrl: string | null;
   quote: string | null;
   blurb: string | null;
+  characters?: string[] | null;
 }
 
 export interface QuizBook extends QuizBookContent {

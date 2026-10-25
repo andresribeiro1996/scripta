@@ -9,6 +9,7 @@ import { WorkMergeError } from "../../domain/errors.js";
 import { withoutArticle } from "../../domain/searchRank.js";
 import { wantsRetitle } from "../../domain/lossy.js";
 import { SERIES_SOURCE_RANK, seriesNameKey, type SeriesEntry, type SeriesSource } from "../../domain/series.js";
+import { personNameKey, type WorkSubjects } from "../../domain/workSubjects.js";
 import { summaryHashOf, type SynopsisKind } from "../../domain/synopsis.js";
 import { isOriginalTitle, originalKey, originalTitleIn, originalWholeKey } from "../../domain/translation.js";
 import { applyMojibakeRepairs } from "./titleRepairs.js";
@@ -557,6 +558,10 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     ON CONFLICT (work_id, prize, year) DO UPDATE SET won = 1, created_at = excluded.created_at WHERE won = 0 AND excluded.won = 1
   `);
   const workAwardsStmt = db.prepare(`SELECT work_id, prize, year, won FROM work_awards WHERE work_id IN (SELECT value FROM json_each(?)) ORDER BY won DESC, year DESC, prize`);
+  const deleteWorkSubjectsStmt = db.prepare(`DELETE FROM work_subjects WHERE work_id = ?`);
+  const insertWorkSubjectStmt = db.prepare(`INSERT OR IGNORE INTO work_subjects (work_id, kind, position, name, name_key, created_at) VALUES (?, ?, ?, ?, ?, ?)`);
+  const workPeopleStmt = db.prepare(`SELECT work_id, name FROM work_subjects WHERE kind = 'person' AND work_id IN (SELECT value FROM json_each(?)) ORDER BY work_id, position`);
+  const worksWithKeyStmt = db.prepare(`SELECT id, ol_work_key AS olWorkKey FROM works WHERE merged_into IS NULL AND ol_work_key IS NOT NULL ORDER BY rowid`);
   const yearAwardsStmt = db.prepare(`
     SELECT work_awards.prize AS prize, work_awards.won AS won, work_awards.honoree AS honoree, work_awards.created_at AS created_at, COALESCE(works.merged_into, work_awards.work_id) AS work_id
     FROM work_awards LEFT JOIN works ON works.id = work_awards.work_id
@@ -1504,6 +1509,47 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
         awards.set(root, own);
       }
       return new Map([...awards].map(([root, own]) => [root, [...own.values()]]));
+    },
+
+    replaceWorkSubjects(workId, subjects, at) {
+      inTransaction(() => {
+        deleteWorkSubjectsStmt.run(workId);
+        for (const kind of ["person", "place", "time"] as const) {
+          let position = 0;
+          for (const name of subjects[kind]) {
+            const key = kind === "person" ? personNameKey(name) : seriesNameKey(name);
+            if (key && insertWorkSubjectStmt.run(workId, kind, position, name, key, at).changes > 0) position += 1;
+          }
+        }
+      });
+    },
+
+    charactersOf(workIds) {
+      const characters = new Map<string, string[]>();
+      if (workIds.length === 0) return characters;
+      const canonicalOf = canonicalWorkIds(workIds);
+      const roots = [...new Set(canonicalOf.values())];
+      const rootOf = new Map(roots.map((id) => [id, id]));
+      for (const [alias, canonical] of canonicalWorkIds(aliasesOf(roots))) rootOf.set(alias, canonical);
+      const lists = new Map<string, Map<string, string[]>>();
+      for (const row of workPeopleStmt.all(JSON.stringify([...rootOf.keys()])) as Array<{ work_id: string; name: string }>) {
+        const root = rootOf.get(row.work_id)!;
+        const perWork = lists.get(root) ?? new Map<string, string[]>();
+        const names = perWork.get(row.work_id) ?? [];
+        names.push(row.name);
+        perWork.set(row.work_id, names);
+        lists.set(root, perWork);
+      }
+      for (const [root, perWork] of lists) {
+        const own = perWork.get(root);
+        const best = own ?? [...perWork.values()].reduce((longest, names) => (names.length > longest.length ? names : longest));
+        for (const [id, canonical] of canonicalOf) if (canonical === root) characters.set(id, best);
+      }
+      return characters;
+    },
+
+    worksWithOpenLibraryKey() {
+      return (worksWithKeyStmt.all() as Array<{ id: string; olWorkKey: string }>).map((row) => ({ id: row.id, olWorkKey: row.olWorkKey }));
     },
 
     recentAwards(year, since) {

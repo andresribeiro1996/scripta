@@ -153,6 +153,7 @@ export function BookScreen({ page, book, model, signedIn, onAdd, onSelectEdition
   const statsTiles = bookStatsModel(statsQuery.data ?? null, page?.work.rating ?? null).tiles;
   const [selected, setSelected] = useState<BookScreenTabKey | null>(null);
   const [aboutOpen, setAboutOpen] = useState(false);
+  const [charactersOpen, setCharactersOpen] = useState(false);
   const [editionsOpen, setEditionsOpen] = useState(false);
   const tab = model.tabs.some((t) => t.key === selected) ? selected : model.tabs[0]?.key;
   const card = [styles.card, { backgroundColor: colors.surface, borderColor: colors.border }];
@@ -193,6 +194,16 @@ export function BookScreen({ page, book, model, signedIn, onAdd, onSelectEdition
               </View>
             ))}
           </View>
+        ) : null}
+        {model.characters.shown.length > 0 ? (
+          <Text {...dynamicType} style={[typography.caption, styles.centeredText, { color: colors.textDim }]}>
+            {`Characters: ${(charactersOpen ? [...model.characters.shown, ...model.characters.more] : model.characters.shown).join(", ")}`}
+          </Text>
+        ) : null}
+        {model.characters.shown.length > 0 && model.characters.more.length > 0 && !charactersOpen ? (
+          <Pressable accessibilityRole="button" accessibilityLabel="Show all characters" onPress={() => setCharactersOpen(true)} style={{ minHeight: minimumTouchTarget, justifyContent: "center" }}>
+            <Text {...dynamicType} style={[typography.caption, { color: colors.accent }]}>{`+${model.characters.more.length} more`}</Text>
+          </Pressable>
         ) : null}
         {model.genres.length + model.possibleGenres.length > 0 ? (
           <View style={styles.chips}>

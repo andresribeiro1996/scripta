@@ -2952,3 +2952,59 @@ test("a BNP book from before 2002 is looked up by ISBN only, in every lane", asy
   assert.equal(await lookups({ year: null, createdBy: "bnp" }, "background"), true);
   assert.equal(await lookups({ year: 1999, createdBy: "seed" }, "background"), true);
 });
+
+const SUBJECT_KINDS = { person: [] as string[], place: [] as string[], time: [] as string[] };
+const subjectRows = (h: Harness, workId: string) =>
+  h.db.prepare(`SELECT kind, name FROM work_subjects WHERE work_id = ? ORDER BY kind, position`).all(workId).map((row) => ({ ...row }));
+
+function subjectDetails(overrides: { subjects?: typeof SUBJECT_KINDS; workKey?: string; thin?: boolean }) {
+  const metadata = { summary: overrides.thin ? null : "Spice.", rating: null, ratingCount: 0, sourceUrl: "https://openlibrary.org/works/OL1W", genres: [], pages: overrides.thin ? 300 : null, publisher: null, year: null, translator: null };
+  return { metadata, sources: ["openlibrary" as const], summarySource: null, workKey: overrides.workKey ?? "/works/OL1W", ...(overrides.subjects ? { subjects: overrides.subjects } : {}) };
+}
+
+test("details with subjects replace the work's subjects", async () => {
+  for (const thin of [false, true]) {
+    let answer: ReturnType<typeof subjectDetails> | null = subjectDetails({ thin, subjects: { person: ["A B", "C D", "E F"], place: [], time: [] } });
+    const h = harness({ catalog: recordingCatalog({ fetchDetails: async () => answer }).catalog });
+    h.service.resolveCover(dune);
+    await h.service.getDetails(dune);
+    const workId = h.repo.findBookByKey("isbn:9780441013593")!.work_id!;
+    assert.deepEqual(subjectRows(h, workId), [{ kind: "person", name: "A B" }, { kind: "person", name: "C D" }, { kind: "person", name: "E F" }]);
+    answer = subjectDetails({ thin, subjects: { ...SUBJECT_KINDS } });
+    h.db.prepare(`UPDATE books SET details_checked_at = NULL, details_status = NULL`).run();
+    await h.service.getDetails(dune);
+    assert.deepEqual(subjectRows(h, workId), []);
+  }
+});
+
+test("details without subjects leave stored subjects alone", async () => {
+  for (const thin of [false, true]) {
+    const h = harness({ catalog: recordingCatalog({ fetchDetails: async () => subjectDetails({ thin }) }).catalog });
+    h.service.resolveCover(dune);
+    await h.service.getDetails(dune);
+    const workId = h.repo.findBookByKey("isbn:9780441013593")!.work_id!;
+    h.repo.replaceWorkSubjects(workId, { person: ["A B"], place: ["Rome"], time: [] }, SERIES_AT);
+    h.db.prepare(`UPDATE books SET details_checked_at = NULL, details_status = NULL`).run();
+    await h.service.getDetails(dune);
+    assert.deepEqual(subjectRows(h, workId), [{ kind: "person", name: "A B" }, { kind: "place", name: "Rome" }]);
+  }
+});
+
+test("a null details result touches nothing", async () => {
+  const h = harness({ catalog: recordingCatalog({ fetchDetails: async () => null }).catalog });
+  h.service.resolveCover(dune);
+  const workId = h.repo.findBookByKey("isbn:9780441013593")!.work_id!;
+  h.repo.replaceWorkSubjects(workId, { person: ["A B"], place: [], time: [] }, SERIES_AT);
+  await h.service.getDetails(dune);
+  assert.deepEqual(subjectRows(h, workId), [{ kind: "person", name: "A B" }]);
+});
+
+test("subjects are not written to a work keyed to a different Open Library work", async () => {
+  const h = harness({ catalog: recordingCatalog({ fetchDetails: async () => subjectDetails({ subjects: { person: ["A B"], place: [], time: [] } }) }).catalog });
+  h.service.resolveCover(dune);
+  h.repo.setWorkKey(h.bookId("isbn:9780441013593"), "OL9W");
+  await h.service.getDetails(dune);
+  const workId = h.repo.findBookByKey("isbn:9780441013593")!.work_id!;
+  assert.equal(h.repo.getWorkView(workId)!.olWorkKey, "OL9W");
+  assert.deepEqual(subjectRows(h, workId), []);
+});

@@ -13,6 +13,7 @@ import { normalizeImageId, normalizeIsbn } from "../lib/covers";
 import { useLibrary } from "../hooks/useLibrary";
 import { useWorkBooks } from "../hooks/useWorkBooks";
 import { CHECKBOX_CLASS, RADIO_CLASS } from "../components/Toolbar";
+import { useWorkCharacters } from "../hooks/useWorkCharacters";
 
 function toQuizBook(book: Record<string, unknown>, resolvedCover: string | null | undefined): QuizBookInput {
   return {
@@ -32,7 +33,8 @@ const TYPE_LABELS: Record<QuizQuestionType, string> = {
   cover_title: "Guess the title from a blurred cover",
   title_cover: "Guess the cover from the title",
   quote_title: "Guess the book from a quote",
-  blurb_title: "Guess the book from its blurb"
+  blurb_title: "Guess the book from its blurb",
+  characters_title: "Guess the book from its characters"
 };
 
 const BOOK_COUNT = 4;
@@ -106,9 +108,15 @@ export function QuizCreatePage() {
       ? QUIZ_POOL.filter((book) => poolIds.includes(book.id)).map(({ id: _id, ...book }) => book)
       : shelfRawBooks.map((raw) => toQuizBook(raw, resolvedCovers[bookKey(raw)]));
 
+  const { characters, failed: charactersFailed } = useWorkCharacters(books.flatMap((book) => (book.workId ? [book.workId] : [])));
+  const offeredBooks = books.map((book) => {
+    const found = book.workId ? characters[book.workId] : undefined;
+    return found ? { ...book, characters: found } : book;
+  });
+
   // A type is offerable only if at least one chosen book has the data it
   // needs — same eligibility rule the backend's publish enforces.
-  const availableTypes = QUIZ_QUESTION_TYPES.filter((type) => books.some((book) => eligibleTypes(book).includes(type)));
+  const availableTypes = QUIZ_QUESTION_TYPES.filter((type) => offeredBooks.some((book) => eligibleTypes(book).includes(type)));
   const effectiveTypes = allowedTypes.filter((type) => availableTypes.includes(type));
 
   // Question count can never exceed the pool the draw picks from.
@@ -224,6 +232,7 @@ export function QuizCreatePage() {
                 );
               })}
             </fieldset>
+            {charactersFailed && <p className="text-sm text-(--color-text-dim)">Characters couldn't be checked</p>}
           </>
         )}
         <div className="flex justify-end gap-3 pt-2">

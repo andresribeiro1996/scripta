@@ -43,6 +43,7 @@ function deps(overrides: Partial<WorksDeps> = {}): WorksDeps {
     arenas: () => [{ id: "a1", name: "SF bracket", path: "/arena/a1", ownerUserId: "bo" }],
     quizzes: () => [],
     getRecentAwards: () => [],
+    charactersOf: () => new Map([["w", ["Paul Atreides", "Jessica", "Leto"]]]),
     ...overrides
   };
 }
@@ -246,4 +247,15 @@ test("getPage passes awards through", () => {
 test("recentAwards wraps the announcements", () => {
   const announcements = [{ prize: "booker", year: 2026, announcedAt: "2026-10-20T00:00:00.000Z", winners: [], nomineeWorkIds: [], honoree: null }];
   assert.deepEqual(createWorksService(deps({ getRecentAwards: () => announcements })).recentAwards(), { announcements });
+});
+
+test("characters keeps only quiz-ready works, first three names", () => {
+  const charactersOf = () => new Map([["a", ["1 1", "2 2", "3 3", "4 4"]], ["b", ["1 1", "2 2"]]]);
+  assert.deepEqual(createWorksService(deps({ charactersOf })).characters(["a", "b"]), { a: ["1 1", "2 2", "3 3"] });
+});
+
+test("getPage passes the characters through", () => {
+  const base = deps();
+  const getWorkPage: WorksDeps["getWorkPage"] = (id) => ({ ...base.getWorkPage(id)!, characters: ["Paul", "Jessica"] });
+  assert.deepEqual(createWorksService(deps({ getWorkPage })).getPage("w", null)!.work.characters, ["Paul", "Jessica"]);
 });

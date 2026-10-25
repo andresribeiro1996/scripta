@@ -20,7 +20,14 @@ export async function worksPlugin(app: FastifyInstance, deps: WorksDeps & Omit<B
       throw new WorkResolutionError(error);
     }
   };
-  const service = createWorksService({ ...deps, getWorkPage, getRecentAwards });
+  const charactersOf: WorksDeps["charactersOf"] = (workIds) => {
+    try {
+      return deps.charactersOf(workIds);
+    } catch (error) {
+      throw new WorkResolutionError(error);
+    }
+  };
+  const service = createWorksService({ ...deps, getWorkPage, getRecentAwards, charactersOf });
   const stats = createBookStatsService({ getWorkPage, communityRatings: deps.communityRatings, tierPlacements: deps.tierPlacements, tournamentRecord: deps.tournamentRecord });
   await app.register(async (scoped) => {
     await scoped.register(fastifyRateLimit, { max: 30, timeWindow: "1 minute" });

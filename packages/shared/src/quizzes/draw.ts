@@ -1,4 +1,4 @@
-import type { QuizBookContent, QuizConfig, QuizQuestionType } from "./types.js";
+import { QUIZ_MIN_CHARACTERS, QUIZ_PROMPT_CHARACTERS, type QuizBookContent, type QuizConfig, type QuizQuestionType } from "./types.js";
 
 /** FNV-1a — stable string hash, so the seed derives from the vote code
  *  identically everywhere the draw might ever be re-run. */
@@ -32,6 +32,12 @@ function shuffle<T>(items: T[], rand: () => number): T[] {
   return copy;
 }
 
+export function characterPrompt(characters: readonly string[]): string {
+  return characters.slice(0, QUIZ_PROMPT_CHARACTERS).join(" · ");
+}
+
+const characterKey = (name: string): string => name.trim().toLowerCase();
+
 /** What a book can actually support — cover questions need a cover (and
  *  title_cover's OPTIONS are covers, so it needs one too), quote/blurb
  *  need their text. */
@@ -40,6 +46,7 @@ export function eligibleTypes(book: QuizBookContent): QuizQuestionType[] {
   if (book.coverUrl) types.push("cover_title", "title_cover");
   if (book.quote) types.push("quote_title");
   if (book.blurb) types.push("blurb_title");
+  if ((book.characters?.length ?? 0) >= QUIZ_MIN_CHARACTERS) types.push("characters_title");
   return types;
 }
 
@@ -58,28 +65,38 @@ export function generateQuizQuestions<B extends QuizBookContent>(
   const questions: Array<{ id: string; type: QuizQuestionType; book: B; options: string[]; answerIndex: number }> = [];
   for (const book of shuffle(books, rand)) {
     if (questions.length >= config.questionCount) break;
-    const available = eligibleTypes(book).filter((t) => config.allowedTypes.includes(t));
-    if (available.length === 0) continue;
-    const type = available[Math.floor(rand() * available.length)]!;
-    const coverOptions = type === "title_cover";
-    const valueOf = (b: B): string => (coverOptions ? b.coverUrl ?? "" : b.title);
-    const distractorPool = coverOptions ? withCover : books;
-    const answerValue = valueOf(book);
-    // Dedupe by displayed value, not just by book: two books may share a
-    // title or cover URL, and options A,B,B,B make the answer index pick
-    // an arbitrary one of the duplicates.
-    const seenValues = new Set<string>([answerValue]);
-    const distractors: B[] = [];
-    for (const candidate of shuffle(distractorPool.filter((b) => b !== book), rand)) {
-      if (distractors.length === 3) break;
-      const value = valueOf(candidate);
-      if (seenValues.has(value)) continue;
-      seenValues.add(value);
-      distractors.push(candidate);
+    let available = eligibleTypes(book).filter((t) => config.allowedTypes.includes(t));
+    while (available.length > 0) {
+      const type = available[Math.floor(rand() * available.length)]!;
+      const coverOptions = type === "title_cover";
+      const valueOf = (b: B): string => (coverOptions ? b.coverUrl ?? "" : b.title);
+      const distractorPool = coverOptions ? withCover : books;
+      const answerValue = valueOf(book);
+      // Dedupe by displayed value, not just by book: two books may share a
+      // title or cover URL, and options A,B,B,B make the answer index pick
+      // an arbitrary one of the duplicates.
+      const seenValues = new Set<string>([answerValue]);
+      const promptNames = type === "characters_title" ? new Set((book.characters ?? []).slice(0, QUIZ_PROMPT_CHARACTERS).map(characterKey)) : null;
+      const distractors: B[] = [];
+      for (const candidate of shuffle(distractorPool.filter((b) => b !== book), rand)) {
+        if (distractors.length === 3) break;
+        if (promptNames && (candidate.characters ?? []).some((name) => promptNames.has(characterKey(name)))) continue;
+        const value = valueOf(candidate);
+        if (seenValues.has(value)) continue;
+        seenValues.add(value);
+        distractors.push(candidate);
+      }
+      if (distractors.length < 3) {
+        if (type === "characters_title") {
+          available = available.filter((t) => t !== type);
+          continue;
+        }
+        break;
+      }
+      const ordered = shuffle([...distractors.map(valueOf), answerValue], rand);
+      questions.push({ id: `q${questions.length}`, type, book, options: ordered, answerIndex: ordered.indexOf(answerValue) });
+      break;
     }
-    if (distractors.length < 3) continue;
-    const ordered = shuffle([...distractors.map(valueOf), answerValue], rand);
-    questions.push({ id: `q${questions.length}`, type, book, options: ordered, answerIndex: ordered.indexOf(answerValue) });
   }
   return questions;
 }

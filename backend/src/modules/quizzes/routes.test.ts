@@ -485,3 +485,28 @@ test("the play response carries the correct answers, the board and a missing pla
   assert.equal(missing.status, 404);
   assert.equal("answers" in missing.body, false);
 });
+
+test("allowedTypes accepts characters_title", async () => {
+  const { app, send } = await quizApp();
+  const res = await send("POST", "/quizzes", "q20", { name: "Cast", data: { questionCount: 3, allowedTypes: ["characters_title"], books: [worksBook("Cast A", named("Cast A"))] } });
+  assert.equal(res.statusCode, 201);
+  assert.deepEqual(res.json().data.allowedTypes, ["characters_title"]);
+  await app.close();
+});
+
+test("omitted allowedTypes still defaults to the four original types", async () => {
+  const { app, send } = await quizApp();
+  const res = await send("POST", "/quizzes", "q21", { name: "Default", data: { books: [worksBook("Default A", named("Default A"))] } });
+  assert.equal(res.statusCode, 201);
+  assert.deepEqual(res.json().data.allowedTypes, ["cover_title", "title_cover", "quote_title", "blurb_title"]);
+  await app.close();
+});
+
+test("a client-sent characters field is stripped", async () => {
+  const { app, send } = await quizApp();
+  const res = await send("POST", "/quizzes", "q22", { name: "Strip", data: { allowedTypes: ["cover_title"], books: [{ ...worksBook("Strip A", named("Strip A")), characters: ["Fake A", "Fake B", "Fake C"] }] } });
+  assert.equal(res.statusCode, 201);
+  const books = res.json().data.books as Array<Record<string, unknown>>;
+  assert.equal("characters" in books[0]!, false);
+  await app.close();
+});

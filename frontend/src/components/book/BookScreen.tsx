@@ -76,6 +76,7 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
   const statsTiles = bookStatsModel(statsQuery.data ?? null, page?.work.rating ?? null).tiles;
   const [tab, setTab] = useState<BookScreenTabKey>(model.tabs[0]!.key);
   const [aboutOpen, setAboutOpen] = useState(false);
+  const [allCharacters, setAllCharacters] = useState(false);
   const [allEditions, setAllEditions] = useState(false);
   const [styling, setStyling] = useState(false);
   const [pickingCover, setPickingCover] = useState(false);
@@ -208,6 +209,17 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
                   </li>
                 ))}
               </ul>
+            ) : null}
+            {model.characters.shown.length > 0 ? (
+              <p className="mt-3 text-xs text-(--color-text-dim)">
+                {`Characters: ${(allCharacters ? [...model.characters.shown, ...model.characters.more] : model.characters.shown).join(", ")}`}
+                {model.characters.more.length > 0 && !allCharacters ? (
+                  <>
+                    {" "}
+                    <button type="button" aria-label="Show all characters" onClick={() => setAllCharacters(true)} className="inline-flex min-h-11 items-center font-semibold text-(--color-accent)">{`+${model.characters.more.length} more`}</button>
+                  </>
+                ) : null}
+              </p>
             ) : null}
             {model.genres.length + model.possibleGenres.length > 0 ? (
               <ul className="mt-3 flex flex-wrap justify-center gap-1.5 sm:justify-start">
