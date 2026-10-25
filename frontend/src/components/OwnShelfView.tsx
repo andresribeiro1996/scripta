@@ -117,30 +117,34 @@ export function OwnShelfView({ username }: { username: string }) {
 
   if (own.isPending || murals.isLoading) {
     return (
-      <Page title={`@${username}`} back={backTo("profile")} maxWidth={768}>
-        <SkeletonCardGrid count={2} label="Loading your shelf" tileClassName="min-h-[120px]" />
+      <Page title={`@${username}`} back={backTo("profile")}>
+        <div className="max-w-3xl mx-auto">
+          <SkeletonCardGrid count={2} label="Loading your shelf" tileClassName="min-h-[120px]" />
+        </div>
       </Page>
     );
   }
 
   if (own.isError || murals.isError) {
     return (
-      <Page title={`@${username}`} back={backTo("profile")} maxWidth={768}>
-        <EmptyState
-          title="Shelf unavailable."
-          body="Couldn't load your shelf."
-          action={
-            <button
-              onClick={() => {
-                void own.refetch();
-                void murals.refetch();
-              }}
-              className="rounded-lg border border-(--color-border) px-3 py-1.5 text-sm hover:border-(--color-accent)"
-            >
-              Retry
-            </button>
-          }
-        />
+      <Page title={`@${username}`} back={backTo("profile")}>
+        <div className="max-w-3xl mx-auto">
+          <EmptyState
+            title="Shelf unavailable."
+            body="Couldn't load your shelf."
+            action={
+              <button
+                onClick={() => {
+                  void own.refetch();
+                  void murals.refetch();
+                }}
+                className="rounded-lg border border-(--color-border) px-3 py-1.5 text-sm hover:border-(--color-accent)"
+              >
+                Retry
+              </button>
+            }
+          />
+        </div>
       </Page>
     );
   }
@@ -156,7 +160,6 @@ export function OwnShelfView({ username }: { username: string }) {
     <Page
       title={`@${username}`}
       back={backTo("profile")}
-      maxWidth={896}
       actions={
         <>
           <span
@@ -188,60 +191,62 @@ export function OwnShelfView({ username }: { username: string }) {
         </>
       }
     >
-      {error && <p className="mb-4 text-sm text-(--color-danger)">{error}</p>}
-      <SwipeTabs tabs={OWN_SHELF_TABS} value={tab} onChange={setTab} label="Shelf sections">
-        {(panel) => {
-          if (panel === "activity") return <ProfileActivity activity={activity} />;
-          return (
-            <div className="mb-8">
-              {shelfMural && muralHasBlocks ? (
-                <MuralCanvas mural={shelfMural} editMode={false} groups={groups} books={books} images={images} profile={profile} />
-              ) : libraryQuery.isPending ? (
-                <SkeletonCardGrid count={2} label="Loading your library" tileClassName="min-h-[120px]" />
-              ) : libraryQuery.isError ? (
-                <EmptyState
-                  title="Library unavailable."
-                  body="Couldn't load your library."
-                  action={
-                    <button onClick={() => void libraryQuery.refetch()} className="rounded-lg border border-(--color-border) px-3 py-1.5 text-sm hover:border-(--color-accent)">
-                      Retry
-                    </button>
-                  }
-                />
-              ) : books.length === 0 ? (
-                <EmptyState
-                  icon={MuralsIcon}
-                  title="Start your library"
-                  body="Import your existing collection, or add your first book manually."
-                  action={
-                    <div className="flex flex-wrap justify-center gap-2">
-                      <Link to="/dashboard/library?action=import" className="rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-semibold text-(--color-on-accent)">
-                        Import library
-                      </Link>
-                      <Link to="/dashboard/library?action=add" className="rounded-lg border border-(--color-border) px-3 py-2 text-sm">
-                        Add a book
-                      </Link>
+      <div className="max-w-4xl mx-auto">
+        {error && <p className="mb-4 text-sm text-(--color-danger)">{error}</p>}
+        <SwipeTabs tabs={OWN_SHELF_TABS} value={tab} onChange={setTab} label="Shelf sections">
+          {(panel) => {
+            if (panel === "activity") return <ProfileActivity activity={activity} />;
+            return (
+              <div className="mb-8">
+                {shelfMural && muralHasBlocks ? (
+                  <MuralCanvas mural={shelfMural} editMode={false} groups={groups} books={books} images={images} profile={profile} />
+                ) : libraryQuery.isPending ? (
+                  <SkeletonCardGrid count={2} label="Loading your library" tileClassName="min-h-[120px]" />
+                ) : libraryQuery.isError ? (
+                  <EmptyState
+                    title="Library unavailable."
+                    body="Couldn't load your library."
+                    action={
+                      <button onClick={() => void libraryQuery.refetch()} className="rounded-lg border border-(--color-border) px-3 py-1.5 text-sm hover:border-(--color-accent)">
+                        Retry
+                      </button>
+                    }
+                  />
+                ) : books.length === 0 ? (
+                  <EmptyState
+                    icon={MuralsIcon}
+                    title="Start your library"
+                    body="Import your existing collection, or add your first book manually."
+                    action={
+                      <div className="flex flex-wrap justify-center gap-2">
+                        <Link to="/dashboard/library?action=import" className="rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-semibold text-(--color-on-accent)">
+                          Import library
+                        </Link>
+                        <Link to="/dashboard/library?action=add" className="rounded-lg border border-(--color-border) px-3 py-2 text-sm">
+                          Add a book
+                        </Link>
+                      </div>
+                    }
+                  />
+                ) : (
+                  <div className="space-y-4">
+                    <p className="text-sm text-(--color-text-dim)">{shelfPresetSummary(books, ownData.published)}</p>
+                    <div className="flex flex-wrap gap-2">
+                      <button onClick={() => void keepShelf()} disabled={busy} className="rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-semibold text-(--color-on-accent) disabled:opacity-50">
+                        Keep this shelf
+                      </button>
+                      <button onClick={() => void startBlank()} disabled={busy} className="rounded-lg border border-(--color-border) px-3 py-2 text-sm disabled:opacity-50">
+                        Start blank
+                      </button>
                     </div>
-                  }
-                />
-              ) : (
-                <div className="space-y-4">
-                  <p className="text-sm text-(--color-text-dim)">{shelfPresetSummary(books, ownData.published)}</p>
-                  <div className="flex flex-wrap gap-2">
-                    <button onClick={() => void keepShelf()} disabled={busy} className="rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-semibold text-(--color-on-accent) disabled:opacity-50">
-                      Keep this shelf
-                    </button>
-                    <button onClick={() => void startBlank()} disabled={busy} className="rounded-lg border border-(--color-border) px-3 py-2 text-sm disabled:opacity-50">
-                      Start blank
-                    </button>
+                    <MuralCanvas mural={previewMural} editMode={false} groups={groups} books={books} images={images} profile={profile} />
                   </div>
-                  <MuralCanvas mural={previewMural} editMode={false} groups={groups} books={books} images={images} profile={profile} />
-                </div>
-              )}
-            </div>
-          );
-        }}
-      </SwipeTabs>
+                )}
+              </div>
+            );
+          }}
+        </SwipeTabs>
+      </div>
     </Page>
   );
 }

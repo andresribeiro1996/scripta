@@ -65,16 +65,20 @@ export function CommunityProfilePage() {
 
   if (!session || isLoading || (!view && !isNotFound && !error)) {
     return (
-      <Page title={`@${username ?? ""}`} back={backTo("profile")} maxWidth={768}>
-        <SkeletonCardGrid count={2} label="Loading profile" tileClassName="min-h-[120px]" />
+      <Page title={`@${username ?? ""}`} back={backTo("profile")}>
+        <div className="max-w-3xl mx-auto">
+          <SkeletonCardGrid count={2} label="Loading profile" tileClassName="min-h-[120px]" />
+        </div>
       </Page>
     );
   }
 
   if (isNotFound || !view) {
     return (
-      <Page title={`@${username ?? ""}`} back={backTo("profile")} maxWidth={768}>
-        <PrivateProfileState />
+      <Page title={`@${username ?? ""}`} back={backTo("profile")}>
+        <div className="max-w-3xl mx-auto">
+          <PrivateProfileState />
+        </div>
       </Page>
     );
   }
@@ -84,9 +88,10 @@ export function CommunityProfilePage() {
       <Page
         title={<span className="flex items-center gap-3"><AuthorAvatar author={view.profile.user} size={40} /><span className="min-w-0">@{view.profile.user.username}</span></span>}
         back={backTo("profile")}
-        maxWidth={768}
       >
-        <PrivateProfileState />
+        <div className="max-w-3xl mx-auto">
+          <PrivateProfileState />
+        </div>
       </Page>
     );
   }
@@ -124,7 +129,6 @@ export function CommunityProfilePage() {
     <Page
       title={<span className="flex items-center gap-1.5"><span className="min-w-0">@{user.username}</span><ReaderGlyph identity={user.readerGlyph} /></span>}
       back={backTo("profile")}
-      maxWidth={896}
       actions={
         <FollowControls
           busy={busy}
@@ -138,63 +142,65 @@ export function CommunityProfilePage() {
         />
       }
     >
-      {error && <p className="mb-4 text-sm text-(--color-danger)">{error}</p>}
-      <SwipeTabs tabs={PROFILE_TABS} value={tab} onChange={setTab} label="Profile sections">
-        {(panel) => {
-          if (panel === "activity") return <ProfileActivity activity={activity} />;
-          if (panel === "library") {
-            if (library.isLoading) return <SkeletonCardGrid count={6} label="Loading library" tileClassName="aspect-[2/3]" />;
-            if (library.error || !library.library) {
-              return library.error ? <EmptyState title="Couldn't load this library." action={retryButton(library.refetch)} /> : <p className="text-sm text-(--color-text-dim)">This library is empty.</p>;
+      <div className="max-w-4xl mx-auto">
+        {error && <p className="mb-4 text-sm text-(--color-danger)">{error}</p>}
+        <SwipeTabs tabs={PROFILE_TABS} value={tab} onChange={setTab} label="Profile sections">
+          {(panel) => {
+            if (panel === "activity") return <ProfileActivity activity={activity} />;
+            if (panel === "library") {
+              if (library.isLoading) return <SkeletonCardGrid count={6} label="Loading library" tileClassName="aspect-[2/3]" />;
+              if (library.error || !library.library) {
+                return library.error ? <EmptyState title="Couldn't load this library." action={retryButton(library.refetch)} /> : <p className="text-sm text-(--color-text-dim)">This library is empty.</p>;
+              }
+              return <PublicLibraryGrid library={library.library} />;
             }
-            return <PublicLibraryGrid library={library.library} />;
-          }
-          return (
-            <>
-              <div className="mb-8">
-                {mural && mural.blocks.length > 0 && muralData ? (
-                  <MuralCanvas
-                    mural={mural}
-                    editMode={false}
-                    books={books}
-                    images={images}
-                    profile={user}
-                    shelfThemeOverride={muralData.library.shelfTheme}
-                    readerCardOverride={muralData.library.readerCard}
-                    statsOverride={muralData.library.stats}
-                    tierlistData={(tierlistId) => muralData.tierlists[tierlistId]}
-                  />
-                ) : (
-                  <MuralCanvas mural={profileOnlyMural(viewerTheme)} editMode={false} books={[]} images={[]} profile={user} />
-                )}
-              </div>
-              <h2 className="mb-3 text-sm font-semibold text-(--color-text-dim)">Published</h2>
-              {publishedRows.length === 0 ? (
-                <EmptyState title="Nothing published yet." body="Tier lists, tournaments and quizzes show up here." />
-              ) : (
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  {publishedRows.map((row) => (
-                    <Link
-                      key={`${row.kind}:${row.target}`}
-                      to={row.target}
-                      className="group flex items-center gap-3 rounded-xl border border-(--color-border) bg-(--color-surface) px-4 py-3.5 transition-colors hover:border-(--color-accent)"
-                    >
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-xs font-semibold text-(--color-accent)">{row.kind}</span>
-                        <span className="block truncate font-semibold">{row.name}</span>
-                        <span className="block text-sm text-(--color-text-dim)">{row.detail}</span>
-                      </span>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-(--color-text-dim) transition-transform group-hover:translate-x-0.5" aria-hidden>
-                        <path d="m9 18 6-6-6-6" />
-                      </svg>
-                    </Link>
-                  ))}
+            return (
+              <>
+                <div className="mb-8">
+                  {mural && mural.blocks.length > 0 && muralData ? (
+                    <MuralCanvas
+                      mural={mural}
+                      editMode={false}
+                      books={books}
+                      images={images}
+                      profile={user}
+                      shelfThemeOverride={muralData.library.shelfTheme}
+                      readerCardOverride={muralData.library.readerCard}
+                      statsOverride={muralData.library.stats}
+                      tierlistData={(tierlistId) => muralData.tierlists[tierlistId]}
+                    />
+                  ) : (
+                    <MuralCanvas mural={profileOnlyMural(viewerTheme)} editMode={false} books={[]} images={[]} profile={user} />
+                  )}
                 </div>
-              )}
-            </>
-          );
-        }}
-      </SwipeTabs>
+                <h2 className="mb-3 text-sm font-semibold text-(--color-text-dim)">Published</h2>
+                {publishedRows.length === 0 ? (
+                  <EmptyState title="Nothing published yet." body="Tier lists, tournaments and quizzes show up here." />
+                ) : (
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    {publishedRows.map((row) => (
+                      <Link
+                        key={`${row.kind}:${row.target}`}
+                        to={row.target}
+                        className="group flex items-center gap-3 rounded-xl border border-(--color-border) bg-(--color-surface) px-4 py-3.5 transition-colors hover:border-(--color-accent)"
+                      >
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-xs font-semibold text-(--color-accent)">{row.kind}</span>
+                          <span className="block truncate font-semibold">{row.name}</span>
+                          <span className="block text-sm text-(--color-text-dim)">{row.detail}</span>
+                        </span>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-(--color-text-dim) transition-transform group-hover:translate-x-0.5" aria-hidden>
+                          <path d="m9 18 6-6-6-6" />
+                        </svg>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </>
+            );
+          }}
+        </SwipeTabs>
+      </div>
     </Page>
   );
 }

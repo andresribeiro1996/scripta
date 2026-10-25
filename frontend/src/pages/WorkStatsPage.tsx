@@ -3,13 +3,16 @@ import { useNavigate, useParams } from "react-router-dom";
 import { bookStatsModel } from "@scripta/shared";
 import { EmptyState } from "../components/EmptyState";
 import { StatsSections } from "../components/book/BookStats";
+import { useAuth } from "../auth/AuthContext";
+import { backTo } from "../lib/areas";
 import { Page } from "../components/page/Page";
 import { useWork } from "../hooks/useWork";
 import { useWorkStats } from "../hooks/useWorkStats";
 
 export function WorkStatsView({ id }: { id: string | undefined }) {
   const navigate = useNavigate();
-  const back = id ? { to: `/work/${id}`, label: "Book" } : undefined;
+  const { session } = useAuth();
+  const back = session ? backTo("book") : undefined;
   const work = useWork(id);
   const stats = useWorkStats(work.page?.work.id === id ? id : undefined);
 
