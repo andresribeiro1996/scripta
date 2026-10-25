@@ -125,7 +125,9 @@ The check takes the Portuguese work (its title and original title) and the targe
 
 Facts the builder must verify before relying on them:
 - **What happens to a high-confidence judgment that wasn't merged.** It shows in the review queue's "blocked" group (`translationReviewRowsStmt`). Confirm nothing else merges such judgments later, such as a backlog recheck or a sweep. If something does, the guard must also stop that path.
-- **Re-asking cost.** The 30-day backlog recheck re-asks Jev for guarded works. Re-asking is acceptable only if the same guard stops it again. If the cost per month matters, record it.
+- **Re-asking cost.** The 30-day backlog recheck re-selects only judgments with no target.
+  - A `never` work is re-asked monthly, and the guard must stop it again. Record that cost.
+  - A `review` work keeps its target and waits in the queue.
 
 The review queue doesn't store or show the guard's reason; no schema or response change. Guard reviews sit in the existing "blocked" group, and the reviewer sees titles, original titles and the proposed target (Claude's call).
 
@@ -143,9 +145,9 @@ The review queue doesn't store or show the guard's reason; no schema or response
 
   The builder works out how to identify these from `work_merges.moved_book_ids` and title keys, and shows the list for review before writing an undo file.
 - **Series rows.**
-  - Remove the omnibus's wrong series row (position 2).
-  - Rerun the existing series fill (`backend/scripts/fill-series.mjs`) for the restored works so Fellowship gets position 1 and Two Towers position 2.
-  - The builder confirms where the wrong row came from, so the fill doesn't recreate it.
+  - Find which work holds the position-2 row. Rows stay on the work they were written to, and the fill writes to the current work of the ISBN's edition.
+  - Remove any wrong row from the omnibus.
+  - Add Fellowship position 1 and Two Towers position 2 directly in the undo file. Rerunning the Wikidata fill is not an option: a real run needs a reviewed skip list.
 - **The Portuguese Fellowship work.** Decide in review whether "A Irmandade do Anel - … Parte I" (`e2ae6929…`) and the restored Fellowship belong together. They probably do, since the Fellowship itself is "Part I". If so, use a manual merge.
 - **"O senhor dos anéis" editions.** Decide them in review, using page count, collection numbering and BNP data, as either one-volume or volume. Move the volumes to their volume works.
 - **Commit the review artifact.** Claude's decisions are committed in the repo, reviewable like earlier repairs:
@@ -206,7 +208,9 @@ Changes, each measured against the scorecard:
    - Pull enough FTS hits to see the real candidates. Today's 100-row scan can miss "Harry Potter e a Pedra Filosofal" behind dozens of short "Harry Potter" titles.
    - Score each canonical work once.
 2. **Series first.** When the query matches a series name, that series' member works lead, ordered by position (Claude's call on the details):
-   - **What counts as a match.** The query's normalised words equal the series `name_key`, or the query is a prefix of it. A query of at least 3 characters can match as a prefix.
+   - **What counts as a match.** The comparison ignores one leading article (the/a/an/o/os/as/um/uma) on both sides.
+     - An exact match (the query equals the series name) always leads.
+     - A whole-word prefix match (a query of at least 3 characters) leads only when no work's title exactly matches the query.
    - **Several series match.** Pick the one whose key equals the query exactly. Then prefer the one with the most canonical member works, then the higher-ranked source (`domain/series.ts`).
    - **Members are fetched from the series tables,** whether or not FTS found them. Members without a position come after the numbered ones.
    - **Non-member works with matching titles** (the other "Harry Potter" books) come after all members.
@@ -226,7 +230,7 @@ Changes, each measured against the scorecard:
    Edition-mode details (Claude's call):
    - Each work's editions stay together, in today's within-work order.
    - Series-first applies here too.
-   - Result caps stay as they are (`SEARCH_LIMIT` 12, `WORK_SEARCH_LIMIT` 20). Only the scan size before ranking grows.
+   - Result caps stay as they are (`SEARCH_LIMIT` 12, `WORK_SEARCH_LIMIT` 20). Only the catalog's own scan size before ranking grows. It gets its own constant, because `WORK_SCAN_LIMIT` also drives the games search.
 4. **The hard examples** ("harry potter", "lord of the rings", and "dune", where an exact famous title comes first) are unit tests on a fixture, as well as scorecard queries.
 
 The current spec `2026-10-20-series-in-search-design.md` lists "sorting results by series position" as a non-goal. This design supersedes that line.

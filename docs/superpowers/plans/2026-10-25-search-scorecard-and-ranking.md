@@ -52,11 +52,14 @@
   - No comments in code.
   - New `*.test.ts` files go into `backend/package.json`'s `test` script.
 - **Verify** with `node scripts/gate.mjs` before each commit.
+- **Running a backend script locally** needs the test environment preamble, because `config/env.ts` exits at import time: `AUTH_DB_PATH`, `LIBRARY_DB_PATH` and `GALLERY_DB_PATH` pointing at scratch files, `JWT_ACCESS_SECRET` set to 64 `a`s and `JWT_REFRESH_SECRET` set to 64 `b`s, plus `COVERS_DB_PATH`.
+- **Matching titles and series names ignores a leading article.** One leading article (`the`, `a`, `an`, `o`, `os`, `as`, `um`, `uma`) is dropped from both sides after `normalizeWords`, so "lord of the rings" equals "The Lord of the Rings". Put this helper in `domain/searchRank.ts` as `export function withoutArticle(words: string): string` (it is created in Task 3).
+- **Production access.** Use `railway ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c "node --input-type=module -e \"\$(echo <base64> | base64 -d)\""`. If the permission classifier blocks Claude's call, hand the exact command to the user.
 
 ## Review Focus
 
-1. **Short or one-word queries** ("it", "dune", "1984"). Series-first needs at least 3 characters, and an exact title still beats a prefix match. Pinned in Task 5.
-2. **A query that matches several series** ("harry potter" matches the Wikidata "Harry Potter" and an `ol-subject` variant). Only one series leads, with no duplicated works. Pinned in Task 5.
+1. **Short or one-word queries** ("it", "dune", "1984", "war"). A prefix match counts only by whole words, needs at least 3 characters, and leads only when no FTS work's title exactly matches the query. An exact series match always leads. Pinned in Task 5.
+2. **A query that matches several series** ("harry potter" matches the Wikidata "Harry Potter" and an `ol-subject` variant). Entries are grouped by `name_key`, so one series leads with no duplicated works, and each work's position comes from its best source. Pinned in Task 5.
 3. **Series members without a position, or with positions like "1.5" or "III".** They sort numerically where they can, unpositioned members go last, and nothing throws. Pinned in Task 5.
 4. **Edition mode** (no `by=work`). A work's editions stay together, and the 12-result cap holds. Pinned in Task 5.
 5. **A merged work in the series tables.** Series members resolve to canonical works, so a merged-away volume doesn't appear twice. Pinned in Task 5.
@@ -66,7 +69,8 @@
 ### Task 1 (main session or `deploy-ops`): production snapshot
 
 - [ ] **Wait** until the pre-2002 BNP import session has announced it has finished. Don't start earlier.
-- [ ] **Make the copy on the server.** Over `railway ssh` (the project, environment and service ids are the ones in the spec's production reads), run `node --input-type=module` with `new DatabaseSync(process.env.COVERS_DB_PATH, { readOnly: true })` and `VACUUM INTO '/tmp/covers-snapshot.sqlite'`.
+- [ ] **Check free space** on the volume first: `df -h /data` over ssh. `VACUUM INTO` holds a read transaction for the length of the copy, so the WAL can grow meanwhile (the 2026-10-04 outage was a full volume). Stop if less than 1 GB is free.
+- [ ] **Make the copy on the server.** Over `railway ssh` (the command in the Global Constraints), run `node --input-type=module` with `new DatabaseSync(process.env.COVERS_DB_PATH, { readOnly: true })` and `VACUUM INTO '/tmp/covers-snapshot.sqlite'`.
 - [ ] **Copy it down.** Stream `/tmp/covers-snapshot.sqlite` to `$HOME/.cache/scripta/covers-snapshot.sqlite`, through `gzip | base64` and back out, or `split` into chunks if one stream fails.
 - [ ] **Check and clean up.**
   - Remove the server's `/tmp` copy.
@@ -97,6 +101,7 @@
 - Create: `backend/scripts/search-scorecard/candidates.mjs`
 - Create: `backend/src/modules/books/catalogSearch.ts`
 - Modify: `backend/src/modules/books/booksService.ts`
+- Create: `backend/src/modules/books/domain/searchRank.ts`
 - Modify: `backend/package.json`
 
 **Interfaces:**
@@ -104,11 +109,13 @@
   - It is moved verbatim from `booksService.ts` (`searchCatalog`'s hit building, `seriesHits`, `collectionHits`, `canonicalHits`, `representativeEdition`), with `Hit` moved too.
   - `searchCatalog` becomes `resultsOf(catalogHits(deps.repo, tokens, byWork))`.
   - This is a refactor with no behaviour change: the existing `booksService.test.ts` search tests pass untouched. It is what `score.mjs` calls, so the baseline measures today's ranking.
+- Produces, in `domain/searchRank.ts`: `withoutArticle(words: string): string` (see Global Constraints).
 - Produces, on `BooksRepository`:
-  - `matchingSeries(tokens: string[]): Array<{ nameKey: string; name: string; source: SeriesSource; members: Array<{ workId: string; position: string | null }> }>`.
-  - It returns series whose `name_key` equals `tokens.join(" ")`, or starts with it when that string is at least 3 characters.
-  - Members are canonical work ids, with each work listed once per series.
-  - Order: exact match first, then more members, then `SERIES_SOURCE_RANK`.
+  - `matchingSeries(tokens: string[]): Array<{ nameKey: string; name: string; exact: boolean; members: Array<{ workId: string; position: string | null }> }>`.
+  - Candidates come from `series_fts` with the same MATCH expression as `searchSeriesWorks`. This adds no `books_fts` statement.
+  - Let `q = withoutArticle(tokens.join(" "))` and `k = withoutArticle(name_key)`. An entry is `exact` when `k === q`. It is a prefix entry when `q` is at least 3 characters and `k` starts with `q + " "`, so the match is by whole words.
+  - Entries are grouped by `name_key` across sources. Members are canonical work ids, each listed once, and a work's position comes from its best source by `SERIES_SOURCE_RANK`.
+  - Order: exact entries first, then more members.
   - `work_series` only. Publisher collections don't make a series.
 - Produces, in `scorecard.ts`:
   - `export type Grade = { workId: string; grade: "named" | "related" | "unrelated"; confidence: number };`
@@ -131,9 +138,12 @@
   - `ndcgAt(["b","a"], …same…, 10)` is strictly between 0 and 1.
   - `ndcgAt(["x"], new Map(), 10)` → `0`.
   - `scoreQueries` averages the tuning and hidden sets separately and lists ungraded ids found in the top 10 as `unlabelled`.
+  - `withoutArticle("the lord of the rings")` → `"lord of the rings"`; `withoutArticle("theory")` → `"theory"`.
   - `scorecardCandidates` on a fixture with a "Harry Potter" series of 3 Rowling works (positions 1–3) whose titles don't all contain the query, plus 2 other "Harry Potter" titles: all 5 appear, series members first.
 - [ ] **Repository test** for `matchingSeries`:
   - exact beats prefix;
+  - `["lord","of","the","rings"]` matches "The Lord of the Rings" as `exact`;
+  - `["war"]` doesn't match "Warriors" (whole words only);
   - a 2-character query gets no prefix matches;
   - a member merged into another work comes back as the canonical id, once.
 - [ ] **Implement,** and add `scorecard.test.ts` to the `test` script. Run `node scripts/gate.mjs`.
@@ -167,8 +177,7 @@
 Steps:
 - [ ] **Build the repaired copy.**
   - Copy the snapshot to `covers-repaired.sqlite`.
-  - Apply Part 1's `docs/repairs/2026-10-25-volume-joins-undo.json` with `COVERS_DB_PATH=$HOME/.cache/scripta/covers-repaired.sqlite node backend/scripts/undo-series-merges.mjs --undo …`.
-  - Run `fill-series.mjs wikidata` against it.
+  - Apply Part 1's `docs/repairs/2026-10-25-volume-joins-undo.json` with `node backend/scripts/undo-series-merges.mjs --undo …`, run with the Global Constraints' environment and `COVERS_DB_PATH=$HOME/.cache/scripta/covers-repaired.sqlite`. The file carries its own `dropSeries` and `addSeries`, so no Wikidata refill is needed.
   - If Part 1's review isn't done yet, stop here and do that first.
 - [ ] **Candidates.** Run `candidates.mjs --db covers-repaired.sqlite > $HOME/.cache/scripta/candidates.json`. Expected: about 150 keys, most with 40 candidates.
 - [ ] **Grade on the server,** in batches, as in the spec's production-read command.
@@ -185,7 +194,7 @@ Steps:
 
 **Files:**
 - Modify: `backend/src/modules/books/catalogSearch.ts`
-- Create: `backend/src/modules/books/domain/searchRank.ts`
+- Modify: `backend/src/modules/books/domain/searchRank.ts`
 - Test: `backend/src/modules/books/domain/searchRank.test.ts`
 - Modify: `backend/src/modules/books/booksService.ts`
 - Modify: `backend/src/modules/books/domain/ports.ts`
@@ -203,17 +212,20 @@ Steps:
     - `export function rankWorks(candidates: RankCandidate[]): string[]`
     - `export function seriesOrder(members: Array<{ workId: string; position: string | null }>): string[]`. It sorts by a numeric position: a decimal, or a Roman numeral converted to a number. Unpositioned members go last, in their stored order.
   - `catalogHits` (Task 3) keeps its signature and gains the ranking below.
-  - In `normalize.ts`: `WORK_SCAN_LIMIT` rises from 100 to the smallest value that puts "Harry Potter e a Pedra Filosofal" inside the scan on the snapshot. Measure it, capped at 500.
+  - On `BooksRepository`: `searchBooks(tokens, limit)` returns `Array<BookRow & { search_score: number }>`. `searchStmt` also selects `hits.score AS search_score`. It stays the single `books_fts MATCH` statement, which the pinned repository test checks. Existing callers keep working, since the type is a superset.
+  - In `normalize.ts`: a new `CATALOG_SCAN_LIMIT` for the catalog FTS scan in both modes. Use the smallest value that puts "Harry Potter e a Pedra Filosofal" inside the scan on the snapshot, capped at 500. `WORK_SCAN_LIMIT` stays 100, because the games search, `searchSeriesWorks` and `collectionHits` also use it.
 
 **Ranking (the shape is fixed, the weights are tuned):**
-1. **Series first.** If `matchingSeries(tokens)` is non-empty, the first series' `seriesOrder` members lead.
+1. **Series first.** The first `matchingSeries(tokens)` entry's `seriesOrder` members lead when either:
+   - it is `exact`; or
+   - it is a prefix entry and no FTS work's `withoutArticle(normalizeWords(title))` equals `withoutArticle(tokens.join(" "))`.
 2. **Remaining FTS works** follow, ordered by `rankWorks`.
    - `textScore` is that work's best bm25, negated, so higher is better.
-   - `exactTitle` means the work's normalised title equals the normalised query.
+   - `exactTitle` means `withoutArticle(normalizeWords(title)) === withoutArticle(tokens.join(" "))`.
    - Combine them: `exactTitle` adds a fixed bonus, and the signals are added as weighted `log1p` terms.
    - Start with every weight at 1 and the bonus at 1. Adjust only by running `score.mjs --set tune`.
 3. **Collection hits** come last, as today.
-4. **Edition mode.** Each work's editions are grouped in that work order, keeping their bm25 order within the work, and cut to the cap.
+4. **Edition mode.** It scans `CATALOG_SCAN_LIMIT` rows too, not 12. Each work's editions are grouped in that work order, keeping their bm25 order within the work, and cut to the cap.
 
 - [ ] **Tests in `booksService.test.ts` (hard examples)**, using the existing search-test harness:
   - **harry potter.** Seven Rowling works with Wikidata series "Harry Potter" at positions 1–7 and 3 editions each, plus four one-edition works titled "Harry Potter" by other authors. `search("harry potter", { byWork: true })` lists the seven Rowling works first, in positions 1–7.
@@ -241,6 +253,7 @@ Steps:
 - Modify: `backend/src/modules/books/adapters/sqlite/connection.ts`
 - Modify: `backend/src/modules/books/adapters/sqlite/sqliteBooksRepository.ts`
 - Modify: `backend/src/modules/books/domain/ports.ts`
+- Modify: `backend/src/modules/books/domain/searchRank.ts`
 - Test: `backend/src/modules/books/adapters/sqlite/sqliteBooksRepository.test.ts`
 - Create: `backend/scripts/wikidata.mjs`
 - Modify: `backend/scripts/fill-series.mjs`
@@ -251,7 +264,7 @@ Steps:
 - **Repository.**
   - `setWikipediaSites(rows: Array<{ olWorkKey: string; sites: number }>): number` updates the canonical work holding each key and returns the count updated.
   - `workSignals` reads the column.
-- **`backend/scripts/wikidata.mjs`** exports `wikidataPages(where: string, select: string)`. It is moved out of `fill-series.mjs`'s paging and retry loop (`fill-series.mjs:146-165`), and `fill-series.mjs` imports it with no behaviour change.
+- **`backend/scripts/wikidata.mjs`** exports `wikidataQuery(sparql: string): Promise<unknown[]>`, the fetch-with-retry function moved out of `fill-series.mjs` (`fill-series.mjs:87-109`, with its constants). `fill-series.mjs` imports it with no behaviour change. Each script keeps its own paging loop.
 - **`fill-wikipedia-counts.mjs [--dry-run]`.**
   - It pages `?work wdt:P648 ?id . ?work wikibase:sitelinks ?n . FILTER(REGEX(?id, "^OL[0-9]+W$"))`, with no label OPTIONALs.
   - It writes via `setWikipediaSites`.
