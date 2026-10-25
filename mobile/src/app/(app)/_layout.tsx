@@ -1,5 +1,6 @@
 import { pathWithQuery } from "../../features/auth/navigation";
 import { usePathname, useGlobalSearchParams } from "expo-router";
+import { useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 import { Redirect, Tabs } from "expo-router";
 import { newCountLabel } from "@scripta/shared";
@@ -11,7 +12,8 @@ import { useLibrary } from "../../features/library/hooks/useLibrary";
 import { ErrorState } from "../../ui/components";
 import { fontStyleFor } from "../../ui/fontStyle";
 import { Icon } from "../../ui/icon";
-import { useTheme } from "../../ui/theme";
+import { TabThemeContext } from "../../ui/tabTheme";
+import { useTheme, type Theme } from "../../ui/theme";
 
 function GenreEnrichment() {
   const { data: library, updateLibrary } = useLibrary();
@@ -25,7 +27,10 @@ function AppearanceSync() {
 }
 
 function AppTabs() {
-  const { colors, fonts } = useTheme();
+  const appTheme = useTheme();
+  const { colors } = appTheme;
+  const [tabTheme, setTabTheme] = useState<Theme | null>(null);
+  const bar = tabTheme ?? appTheme;
   const { data } = useActivityFeed();
   const newCount = data?.pages[0]?.personalNewCount ?? 0;
 
@@ -34,16 +39,16 @@ function AppTabs() {
   // another tab screen hidden with href: null. The group segments don't appear
   // in the URL, so every path is unchanged.
   return (
-    <>
+    <TabThemeContext.Provider value={setTabTheme}>
       <GenreEnrichment />
       <AppearanceSync />
       <Tabs
         screenOptions={{
           headerShown: false,
-          tabBarActiveTintColor: colors.accent,
-          tabBarInactiveTintColor: colors.textDim,
-          tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
-          tabBarLabelStyle: fontStyleFor(fonts.text, "text", { fontSize: 10 }) ?? undefined,
+          tabBarActiveTintColor: bar.colors.accent,
+          tabBarInactiveTintColor: bar.colors.textDim,
+          tabBarStyle: { backgroundColor: bar.colors.surface, borderTopColor: bar.colors.border },
+          tabBarLabelStyle: fontStyleFor(bar.fonts.text, "text", { fontSize: 10 }) ?? undefined,
         }}
       >
         <Tabs.Screen
@@ -60,7 +65,7 @@ function AppTabs() {
         <Tabs.Screen name="(arena)" options={{ title: "Games", tabBarIcon: ({ color, focused, size }) => <Icon name="arena" filled={focused} color={color} size={size} /> }} />
         <Tabs.Screen name="(you)" options={{ title: "You", tabBarIcon: ({ color, focused, size }) => <Icon name="profile" filled={focused} color={color} size={size} /> }} />
       </Tabs>
-    </>
+    </TabThemeContext.Provider>
   );
 }
 
