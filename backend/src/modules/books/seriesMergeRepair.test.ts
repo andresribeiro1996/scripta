@@ -309,7 +309,7 @@ test("listGuardedMerges flags a join the guard would now stop and lists what joi
 
 test("listGuardedMerges reports nothing when no join is flagged", () => {
   const { repo } = freshRepo();
-  assert.deepEqual(listGuardedMerges(repo), { checked: 0, flagged: [] });
+  assert.deepEqual(listGuardedMerges(repo), { checked: 0, skipped: [], flagged: [] });
 });
 
 test("dropSeriesRows removes only the named row", () => {
@@ -328,4 +328,25 @@ test("addSeriesRows adds a row bestSeriesOf returns with its position", () => {
   dropSeriesRows(repo, [{ workId: omnibus.work_id!, name: LOTR, source: "wikidata" }]);
   assert.equal(addSeriesRows(repo, [{ workId: omnibus.work_id!, name: LOTR, position: "1-3", source: "wikidata" }], AT), 1);
   assert.deepEqual(repo.bestSeriesOf([omnibus.work_id!]).get(omnibus.work_id!), { name: LOTR, position: "1-3" });
+});
+
+test("listGuardedMerges flags a volume number the target lacks as never", () => {
+  const { repo } = freshRepo();
+  const hugo = edition(repo, "9780140444308", "Les Misérables", "Victor Hugo", { workKey: "OL1W" });
+  const roman = edition(repo, "9789722000010", "Os Miseráveis I", "Victor Hugo", { language: "pt-PT", originalTitle: "Les Misérables" });
+  repo.mergeTranslation(roman.work_id!, hugo.work_id!, "jev", 0.97, AT);
+  const result = listGuardedMerges(repo);
+  assert.equal(result.checked, 1);
+  assert.deepEqual(result.flagged.map((row) => [row.fromWork, row.verdict]), [[roman.work_id, "never"]]);
+});
+
+test("listGuardedMerges reports a merge it could not evaluate as skipped", () => {
+  const { repo } = freshRepo();
+  const { fellowship } = tolkien(repo);
+  const book = repo.getBook(fellowship.id)!;
+  repo.detachEdition(book.id, AT);
+  const result = listGuardedMerges(repo);
+  assert.equal(result.checked, 0);
+  assert.equal(result.skipped.length, 1);
+  assert.deepEqual(result.flagged, []);
 });

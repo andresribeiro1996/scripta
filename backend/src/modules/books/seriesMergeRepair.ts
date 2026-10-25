@@ -91,7 +91,7 @@ export type GuardedMerge = {
   later: Array<{ mergeId: number; fromWork: string; source: MergeSource; editions: Array<{ title: string; isbn: string | null; originalTitle: string | null }> }>;
 };
 
-export function listGuardedMerges(repo: GuardRepo): { checked: number; flagged: GuardedMerge[] } {
+export function listGuardedMerges(repo: GuardRepo): { checked: number; skipped: number[]; flagged: GuardedMerge[] } {
   const merges = allActiveMerges(repo);
   const live = repo.canonicalWorkIds(merges.map((merge) => merge.intoWork));
   const editionsByWork = new Map<string, Edition[]>();
@@ -102,12 +102,17 @@ export function listGuardedMerges(repo: GuardRepo): { checked: number; flagged: 
   };
   const candidates = merges.filter((merge): merge is Merge & { source: "code" | "jev" } => merge.source === "code" || merge.source === "jev");
   const flagged: GuardedMerge[] = [];
+  const skipped: number[] = [];
+  const filled = (values: Array<string | null>) => values.find((value): value is string => Boolean(value?.trim())) ?? null;
   for (const merge of candidates) {
     const current = live.get(merge.intoWork) ?? merge.intoWork;
     const editions = movedEditions(merge);
     const target = repo.getWorkView(current);
-    if (editions.length === 0 || !target) continue;
-    const verdict = joinVerdict({ title: editions[0]!.title, originalTitle: editions.find((edition) => edition.originalTitle !== null)?.originalTitle ?? null }, { title: target.title }, headsSeriesOf(repo, current));
+    if (editions.length === 0 || !target) {
+      skipped.push(merge.id);
+      continue;
+    }
+    const verdict = joinVerdict({ title: filled(editions.map((edition) => edition.title)) ?? "", originalTitle: filled(editions.map((edition) => edition.originalTitle)) }, { title: target.title }, headsSeriesOf(repo, current));
     if (verdict === "join") continue;
     const collections = repo.collectionsOf(editions.map((edition) => edition.id));
     flagged.push({
@@ -127,7 +132,7 @@ export function listGuardedMerges(repo: GuardRepo): { checked: number; flagged: 
         .map((other) => ({ mergeId: other.id, fromWork: other.fromWork, source: other.source, editions: movedEditions(other).map((edition) => ({ title: edition.title, isbn: edition.isbn, originalTitle: edition.originalTitle })) }))
     });
   }
-  return { checked: candidates.length, flagged };
+  return { checked: candidates.length - skipped.length, skipped, flagged };
 }
 
 export function dropSeriesRows(repo: Pick<BooksRepository, "removeWorkSeries">, rows: Array<{ workId: string; name: string; source: SeriesSource }>): number {

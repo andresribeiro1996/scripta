@@ -22,12 +22,13 @@ if (values.list) {
   const { listGuardedMerges } = await import("../dist/modules/books/seriesMergeRepair.js");
   const repo = createSqliteBooksRepository(new DatabaseSync(process.env.COVERS_DB_PATH, { readOnly: true }));
   const result = listGuardedMerges(repo);
-  console.error(`checked ${result.checked}, flagged ${result.flagged.length}`);
+  console.error(`checked ${result.checked}, skipped ${result.skipped.length}, flagged ${result.flagged.length}`);
   console.log(JSON.stringify(result));
 } else {
   const file = JSON.parse(readFileSync(values.undo, "utf8"));
   const { undo, dropSeries = [], addSeries = [] } = file ?? {};
-  const rowOf = (row, fields) => row !== null && typeof row === "object" && typeof row.workId === "string" && typeof row.name === "string" && typeof row.source === "string" && fields.every((field) => row[field] === null || typeof row[field] === "string");
+  const { SERIES_SOURCES } = await import("../dist/modules/books/domain/series.js");
+  const rowOf = (row, fields) => row !== null && typeof row === "object" && typeof row.workId === "string" && typeof row.name === "string" && SERIES_SOURCES.includes(row.source) && fields.every((field) => row[field] === null || typeof row[field] === "string");
   if (!Array.isArray(undo) || !undo.every((fromWork) => typeof fromWork === "string") || !Array.isArray(dropSeries) || !dropSeries.every((row) => rowOf(row, [])) || !Array.isArray(addSeries) || !addSeries.every((row) => rowOf(row, ["position"]) && "position" in row)) {
     console.error('The file must be {"undo": ["<fromWork>", ...], "dropSeries": [{"workId", "name", "source"}], "addSeries": [{"workId", "name", "position", "source"}]}.');
     process.exit(1);
