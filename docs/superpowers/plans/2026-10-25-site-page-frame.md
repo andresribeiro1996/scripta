@@ -809,6 +809,8 @@ git add frontend/src/components/murals/MoveToFolderModal.tsx frontend/src/compon
 - Modify: `frontend/src/pages/CommunityProfilePage.tsx`
 - Modify: `frontend/src/components/OwnShelfView.tsx`
 - Modify: `frontend/src/components/ProfileActivity.tsx`
+- Modify: `frontend/src/components/ToggleSwitch.tsx`
+- Modify: `frontend/src/components/readerCard/DraftField.tsx`
 - Test: `frontend/scripts/test-controls.mts`
 
 Ruling (controller, during execution): the first sweep pass flagged controls under 44px in the files from `DashboardLayout.tsx` down, which the original list missed. They join the task. `SettingsAppearancePage`'s 1×1 radios are visually hidden inputs inside 44px label tiles, so they are false positives and stay out.
