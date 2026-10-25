@@ -15,6 +15,7 @@ import { canonicalHits, catalogHits, type Hit } from "./catalogSearch.js";
 import { saveCatalogHits, storeSeries } from "./saveHits.js";
 import type { BookCatalog, BooksRepository, CatalogDetails, CatalogSearchHit, CoverBlobReader, CoverBlobStore, CoverSource, EditionRecordSource, PageCursor } from "./domain/ports.js";
 import type { SeriesEntry } from "./domain/series.js";
+import { cleanWorkSubjects } from "./domain/workSubjects.js";
 import type { BookRow, CoverSourceName, CoverStatus, WorkView } from "./domain/types.js";
 import type { CoverPriority } from "./worker.js";
 
@@ -259,7 +260,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
     const workId = deps.repo.getBook(bookId)?.work_id;
     const work = workId ? deps.repo.getWorkView(workId) : undefined;
     const key = normalizeWorkKey(details.workKey);
-    if (work && key !== null && work.olWorkKey === key) deps.repo.replaceWorkSubjects(work.id, details.subjects, at);
+    if (work && key !== null && work.olWorkKey === key) deps.repo.replaceWorkSubjects(work.id, cleanWorkSubjects({ ...details.subjects, authors: [details.subjects.authors, work.author].flat() }).subjects, at);
   }
 
   async function lookupDetails(book: BookRow, catalog: BookCatalog) {

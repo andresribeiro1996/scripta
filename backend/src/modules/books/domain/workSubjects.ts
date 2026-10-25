@@ -1,6 +1,7 @@
 import { seriesNameKey } from "./series.js";
 
 export type WorkSubjects = { person: string[]; place: string[]; time: string[] };
+export type RawWorkSubjects = { people: unknown; places: unknown; times: unknown; subjects: unknown; authors: unknown };
 export type CleanedSubjects = { subjects: WorkSubjects; gatedOut: boolean };
 
 const FICTION = /(?<![\p{L}\p{N}])(?:fiction|ficción|ficção|novels?|romance|romans)(?![\p{L}\p{N}])/iu;
@@ -82,7 +83,7 @@ function uniqueByKey(names: string[], keyOf: (name: string) => string | null, pr
   return [...entries.values()];
 }
 
-export function cleanWorkSubjects(raw: { people: unknown; places: unknown; times: unknown; subjects: unknown; authors: unknown }): CleanedSubjects {
+export function cleanWorkSubjects(raw: RawWorkSubjects): CleanedSubjects {
   const people = strings(raw.people);
   const isFiction = strings(raw.subjects).some((subject) => FICTION.test(subject) && !NON_FICTION.test(subject)) || people.some((name) => FICTIONAL_QUALIFIER.test(name.trim()));
   const place = uniqueByKey(strings(raw.places).map((name) => name.trim()), seriesNameKey, false);

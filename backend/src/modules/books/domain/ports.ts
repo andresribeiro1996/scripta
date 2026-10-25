@@ -3,7 +3,7 @@ import type { KeyedWork } from "./duplicateWorks.js";
 import type { SynopsisJudgment, SynopsisKind } from "./synopsis.js";
 import type { CollectionSource, SeriesEntry, SeriesSource } from "./series.js";
 import type { OriginalClaim } from "./translation.js";
-import type { WorkSubjects } from "./workSubjects.js";
+import type { RawWorkSubjects, WorkSubjects } from "./workSubjects.js";
 import type { BookRow, CoverImageRow, CoverSourceName, CoverStatus, DataSource, GenreEvidence, GenresSource, JevRejection, JevTask, LossyBook, MergeSource, MojibakeApplied, NewBook, RowRepair, SummarySource, WorkMatchJudgment, WorkPageRows, WorkView } from "./types.js";
 
 export type MergeableDetails = Pick<BookMetadata, "summary" | "pages" | "year" | "publisher" | "translator">;
@@ -197,7 +197,7 @@ export interface CatalogDetails {
   workSummary?: string | null;
   editionSeries?: SeriesEntry[];
   subjectSeries?: SeriesEntry[];
-  subjects?: WorkSubjects;
+  subjects?: RawWorkSubjects;
 }
 
 export interface BookCatalog {

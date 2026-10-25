@@ -79,7 +79,7 @@ export function createOpenLibraryCatalog(throttle: Throttle, urgent = true): Boo
       const subjectSeries = seriesFromSubjects(subjectsOf(work, match));
       const fields = work && typeof work === "object" ? (work as Record<string, unknown>) : null;
       const subjects = keyOf(fields?.type) === "/type/work"
-        ? cleanWorkSubjects({ people: fields?.subject_people, places: fields?.subject_places, times: fields?.subject_times, subjects: subjectsOf(work, match), authors: [match.author_name, author].flat() }).subjects
+        ? { people: fields?.subject_people, places: fields?.subject_places, times: fields?.subject_times, subjects: subjectsOf(work, match), authors: [match.author_name, author].flat() }
         : undefined;
       return {
         metadata,

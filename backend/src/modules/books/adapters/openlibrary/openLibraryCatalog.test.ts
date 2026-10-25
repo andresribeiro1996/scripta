@@ -58,18 +58,14 @@ test("details carry cleaned subjects from the work record", async () => {
     {}
   ]);
   const details = await catalog.fetchDetails({ isbn: "9780553348477", title: "", author: "" });
-  assert.deepEqual(details?.subjects, { person: ["Sherlock Holmes", "Dr. Watson"], place: ["London"], time: ["19th century"] });
+  assert.deepEqual(details?.subjects, { people: ["Mr. Sherlock Holmes (Fictional character)", "Sherlock Holmes", "Dr. Watson"], places: ["London"], times: ["19th century"], subjects: ["Fiction"], authors: ["Arthur Conan Doyle", ""] });
 });
 
-test("details drop the Scripta author even when Open Library spells it differently", async () => {
+test("details carry the edition's author with Open Library's", async () => {
   const catalog = createOpenLibraryCatalog(direct);
-  respond([
-    { docs: [{ ...doc, author_name: ["Ὅμηρος"] }] },
-    { type: { key: "/type/work" }, subject_people: ["Homer", "Odysseus (Greek mythology)"], subjects: ["Fiction"] },
-    {}
-  ]);
-  const details = await catalog.fetchDetails({ isbn: "9780553348477", title: "", author: "Homer" });
-  assert.deepEqual(details?.subjects?.person, ["Odysseus"]);
+  respond([{ docs: [{ ...doc, author_name: ["Ὅμηρος"] }] }, { type: { key: "/type/work" }, subject_people: ["Homer"], subjects: ["Fiction"] }, {}]);
+  const details = await catalog.fetchDetails({ isbn: "9780553348477", title: "", author: "Homero" });
+  assert.deepEqual(details?.subjects?.authors, ["Ὅμηρος", "Homero"]);
 });
 
 test("a redirect or missing work record sets no subjects", async () => {
