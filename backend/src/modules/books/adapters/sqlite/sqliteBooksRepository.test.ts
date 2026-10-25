@@ -3463,21 +3463,22 @@ test("applyBooksMigrations adds works.wikipedia_sites to an older works table", 
   assert.equal((db.prepare("SELECT wikipedia_sites FROM works WHERE id = 'w1'").get() as { wikipedia_sites: number | null }).wikipedia_sites, null);
 });
 
-test("setWikipediaSites writes to the canonical work of each key, and workSignals takes the highest count across the work and its aliases", () => {
+test("setWikipediaSites writes to the keyed work, and workSignals takes the highest count across a work and its aliases", () => {
   const { db, repo } = freshRepo();
   const target = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593", workKey: "OL1W" }, ["isbn:9780441013593"], NOW);
   const alias = repo.createBook({ title: "Duna", author: "Frank Herbert", isbn: "9789722345678", workKey: "OL2W" }, ["isbn:9789722345678"], NOW);
+  const other = repo.createBook({ title: "Dune PT", author: "Frank Herbert", isbn: "9789722345679", workKey: "OL4W" }, ["isbn:9789722345679"], NOW);
   const bare = repo.createBook({ title: "Other", author: "Ana Lima", isbn: "9780000000011", workKey: "OL3W" }, ["isbn:9780000000011"], NOW);
-  db.prepare("UPDATE works SET merged_into = ? WHERE id = ?").run(target.work_id, alias.work_id);
+  db.prepare("UPDATE works SET merged_into = ? WHERE id IN (?, ?)").run(target.work_id, alias.work_id, other.work_id);
   const sites = (id: string | null) => (db.prepare("SELECT wikipedia_sites AS n FROM works WHERE id = ?").get(id) as { n: number | null }).n;
-  assert.equal(repo.setWikipediaSites([{ olWorkKey: "OL2W", sites: 40 }, { olWorkKey: "OL3W", sites: 5 }, { olWorkKey: "OL9W", sites: 9 }]), 2);
-  assert.equal(sites(target.work_id), 40);
-  assert.equal(sites(alias.work_id), null);
-  assert.equal(sites(bare.work_id), 5);
-  assert.equal(repo.setWikipediaSites([{ olWorkKey: "OL3W", sites: 5 }]), 0);
-  db.prepare("UPDATE works SET wikipedia_sites = 70 WHERE id = ?").run(alias.work_id);
+  const rows = [{ olWorkKey: "OL2W", sites: 55 }, { olWorkKey: "OL4W", sites: 3 }, { olWorkKey: "OL3W", sites: 5 }, { olWorkKey: "OL9W", sites: 9 }];
+  assert.equal(repo.setWikipediaSites(rows), 3);
+  assert.equal(repo.setWikipediaSites(rows), 0);
+  assert.equal(sites(target.work_id), null);
+  assert.equal(sites(alias.work_id), 55);
+  assert.equal(sites(other.work_id), 3);
   const signals = repo.workSignals([target.work_id!, bare.work_id!]);
-  assert.equal(signals.get(target.work_id!)!.wikipediaSites, 70);
+  assert.equal(signals.get(target.work_id!)!.wikipediaSites, 55);
   assert.equal(signals.get(bare.work_id!)!.wikipediaSites, 5);
 });
 

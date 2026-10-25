@@ -581,7 +581,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     FROM members JOIN books ON books.work_id = members.work_id
     GROUP BY members.root
   `);
-  const setWikipediaSitesStmt = db.prepare(`UPDATE works SET wikipedia_sites = ? WHERE id = (SELECT COALESCE(merged_into, id) FROM works WHERE ol_work_key = ?) AND wikipedia_sites IS NOT ?`);
+  const setWikipediaSitesStmt = db.prepare(`UPDATE works SET wikipedia_sites = ? WHERE ol_work_key = ? AND wikipedia_sites IS NOT ?`);
   const seriesMembersStmt = db.prepare(`SELECT work_id, name_key, position, source FROM work_series WHERE name_key IN (SELECT value FROM json_each(?)) ORDER BY rowid`);
   const searchCollectionsStmt = db.prepare(`
     SELECT hits.book_id AS book_id, hits.name AS name, (

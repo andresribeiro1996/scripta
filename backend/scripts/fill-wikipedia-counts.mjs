@@ -40,14 +40,14 @@ if (values.out !== undefined) {
   writeFileSync(values.out, JSON.stringify(Object.fromEntries(rows.map((row) => [row.olWorkKey, row.sites]))));
   console.log(JSON.stringify({ matched: rows.length, out: values.out }, null, 2));
 } else {
-  const { openBooksDb } = await import("../dist/modules/books/adapters/sqlite/connection.js");
-  const { createSqliteBooksRepository } = await import("../dist/modules/books/adapters/sqlite/sqliteBooksRepository.js");
-  const { waitForBnpLock } = await import("../dist/modules/books/seed/bnpImport.js");
   if (values["dry-run"]) {
     const db = new DatabaseSync(process.env.COVERS_DB_PATH, { readOnly: true });
     const held = db.prepare("SELECT COUNT(*) AS n FROM works WHERE ol_work_key IN (SELECT value FROM json_each(?))").get(JSON.stringify(rows.map((row) => row.olWorkKey)));
     console.log(JSON.stringify({ dryRun: true, fetched: rows.length, matched: held.n }, null, 2));
   } else {
+    const { openBooksDb } = await import("../dist/modules/books/adapters/sqlite/connection.js");
+    const { createSqliteBooksRepository } = await import("../dist/modules/books/adapters/sqlite/sqliteBooksRepository.js");
+    const { waitForBnpLock } = await import("../dist/modules/books/seed/bnpImport.js");
     const repo = createSqliteBooksRepository(waitForBnpLock(openBooksDb()));
     console.log(JSON.stringify({ dryRun: false, fetched: rows.length, updated: repo.setWikipediaSites(rows) }, null, 2));
   }
