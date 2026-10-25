@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import { SourceUnavailableError } from "../../domain/errors.js";
 import type { Throttle } from "../http/http.js";
-import { createOpenLibraryCatalog, parseEditionRecord, searchOpenLibraryWorks } from "./openLibraryCatalog.js";
+import { createOpenLibraryCatalog, fetchOpenLibrarySubjects, parseEditionRecord, searchOpenLibraryWorks } from "./openLibraryCatalog.js";
 
 const direct: Throttle = (task) => task();
 const originalFetch = globalThis.fetch;
@@ -250,4 +250,26 @@ test("a work search without author names gives an empty author list, and a rate 
   await assert.rejects(searchOpenLibraryWorks(direct, "x", "y"), (error: unknown) => error instanceof SourceUnavailableError && error.status === 429);
   globalThis.fetch = (async () => new Response("", { status: 404 })) as typeof fetch;
   assert.deepEqual(await searchOpenLibraryWorks(direct, "x", "y"), []);
+});
+
+test("subjects batch maps docs back to bare keys", async () => {
+  const requests = respond([
+    {
+      docs: [
+        { key: "/works/OL66554W", author_name: ["Jane Austen"], person: ["Elizabeth Bennet", "Fitzwilliam Darcy", "Jane Bennet"], subject: ["Fiction"] },
+        { key: "/works/OL47181W", author_name: ["A. Historian"], person: ["Napoleon (1769-1821)"], subject: ["History"] }
+      ]
+    }
+  ]);
+  const found = await fetchOpenLibrarySubjects(direct, ["OL66554W", "OL47181W", "OL1W"]);
+  assert.equal(new URL(requests[0]!).searchParams.get("q"), "key:(/works/OL66554W OR /works/OL47181W OR /works/OL1W)");
+  assert.equal(found.size, 2);
+  assert.equal(found.has("OL1W"), false);
+  assert.equal(found.get("OL66554W")?.gatedOut, false);
+  assert.equal(found.get("OL47181W")?.gatedOut, true);
+});
+
+test("a subjects batch with no readable answer rejects", async () => {
+  respond([null]);
+  await assert.rejects(fetchOpenLibrarySubjects(direct, ["OL1W"]), SourceUnavailableError);
 });

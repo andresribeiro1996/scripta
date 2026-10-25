@@ -652,6 +652,22 @@ The container has no `nohup`, so the jobs start with `setsid`; the `ls` after th
 
 A wrong row is deleted by hand in the `COVERS_DB_PATH` database: `DELETE FROM work_awards WHERE work_id = ? AND prize = ? AND year = ?`, or `DELETE FROM work_awards WHERE prize = ?` for a whole prize. A fill adds a deleted row back while Wikidata still states it and it still matches the work, which for the current and previous year is the next daily run, so delete only once the cause is gone (a corrected item ID in `PRIZE_ITEMS`, a corrected statement on Wikidata).
 
+#### Book characters
+
+`scripts/fill-characters.mjs` reads the subjects of every catalog work that has an Open Library key, 100 works to a `search.json` request at the 1 second gap, and stores the cleaned people, places and times in `work_subjects` (rules and examples in `docs/superpowers/specs/2026-10-25-book-characters-design.md`).
+
+- **Cleanup.** Names are deduplicated by name key; "(Fictional character)" qualifiers, names with life dates and the author's own name are dropped. A work whose subjects do not mark it as fiction keeps its places and times but gets no people (`gatedOut`).
+- **Replace semantics.** A work Open Library returns has its rows replaced, in one transaction a batch. A work it does not return (an unknown or merged key) keeps the rows it has, so a rerun never erases data on a partial answer. An unreadable answer ends the run with exit code 1; earlier batches stay written, and a rerun is safe.
+- **`--dry-run`** opens the database read-only, makes the same requests and writes nothing.
+- **The report** has `dryRun`, `works` (with a key), `returned`, `withPeople`, `quizReady` (three or more people), `gatedOut`, `rows` (`person`, `place`, `time` totals) and a `sample` of the first 20 works with people. Progress on stderr is one line a batch.
+
+Read `quizReady` from the dry run. Re-run after large imports.
+
+```bash
+npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && setsid node scripts/fill-characters.mjs --dry-run > /data/fill-characters-dry.json 2> /data/fill-characters-dry.log < /dev/null & sleep 3; ls -l /data/fill-characters-dry.*'
+npx -y @railway/cli@latest ssh --project 404b0e4a-701b-47ea-83fc-a82a80ae5094 --environment 39833834-0e18-4dde-a57f-3bf0bf0bab51 --service scripta -- sh -c 'cd /app/backend && setsid node scripts/fill-characters.mjs > /data/fill-characters.json 2> /data/fill-characters.log < /dev/null & sleep 3; ls -l /data/fill-characters.*'
+```
+
 #### Known limitations of covers, details and search, and the options for each
 
 Measured on production on 2026-09-30, after a tester imported a 167-book library and waited about 20 minutes for covers. The server itself was never slow: `/covers/resolve` p50 was 1 ms and `PUT /library` about 5 ms. The time goes into the pipeline around it. Recheck the numbers below before relying on them.
