@@ -89,7 +89,30 @@ This is not an implementer task. It needs `HARDCOVER_API_TOKEN` in `backend/.env
 
 #### Calibration results
 
-_Filled by Task 1._
+**Partial run, 2026-10-25.** Token works (Free plan: 60/min, burst 10, 5,000/day). About 25 requests were used.
+
+**Shapes:**
+- `RateLimit` header: `"Free";r=9;t=0, "daily";r=4935;t=35639`.
+- Bad token: `401 {"error":"invalid_token","error_description":"Invalid or expired token"}`.
+- `cached_tags` keys are `Tag, Mood, Genre, Group, Content Warning`. Entries look like `{tag, count, tagSlug, category, categorySlug, spoilerRatio}`.
+- `cached_featured_series` is `{id, series:{id,name,slug,books_count,primary_books_count}, details, featured, position, collection, unreleased}`, or `{}` when a book has no featured series. **Use it alone.**
+- The depth-4 relation query is still accepted today.
+- 29 editions came back for 31 dev ISBNs. That response took 533 ms; the next one, the same request minus the series relations, took 316 ms.
+- About 3 of the 29 descriptions contained `<i>` tags, and none contained markdown.
+
+**Genre calibration: Hardcover Genre tags are weak.** Two blind-labelled samples were scored:
+- 175 random books: best precision 0.56 at recall 0.39, with mostly count-1 imported subjects;
+- 197 books with ≥10 readers: best precision 0.52 at recall 0.38 (`c=1, s≥0, l=2`).
+- Count thresholds don't help, because most counts are 1. Some counts are corrupted, for example `Young Adult:20448` on an obscure book.
+
+Typical errors:
+- "Young Adult" on children's books;
+- a default "Fantasy, Adventure, Science Fiction" bundle on unrelated books;
+- "Classics" applied loosely.
+
+Scratch data is in the session scratchpad (`hc/calib*.json`, `labels*.txt`).
+
+**Open (user's call):** drop the genre part, or keep it with `GENRE_LIMIT = 1` (precision ~0.55)? The Jev genre pass is probably more accurate. Step 5's boilerplate review was not done.
 
 ---
 
