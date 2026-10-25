@@ -1,6 +1,8 @@
 import { createJevMatchClassifier, type ClassifyMatch } from "./adapters/typesafe/jevWorkMatch.js";
 import { WorkMergeError } from "./domain/errors.js";
 import type { BooksRepository } from "./domain/ports.js";
+import { seriesNameKey } from "./domain/series.js";
+import { joinVerdict, type JoinVerdict } from "./domain/volumeGuard.js";
 import { authorPattern, evidenceOf, hasVolumeMarker, MATCH_MERGE_AT, MAX_CANDIDATES, mentionsSurname, sameMainTitle, sameWholeTitle, seriesLikeOriginals, surnameOf, titlePatterns, type SeriesLike, type TranslationEvidence } from "./domain/translation.js";
 import { heldCanonical, JEV_REJECTION_LIMIT, JEV_SWEEP_LIMIT, jevPause, startJevJobs, type JevJobs, type JevJobsDeps, type JevPauseDeps } from "./jevJobs.js";
 import { dailySpend } from "./typesafe.js";
@@ -59,12 +61,33 @@ export type TranslationDeps = JevPauseDeps & {
   sharesArena: (fromWorkId: string, intoWorkId: string) => boolean;
 };
 
+export function guardTarget(repo: Pick<BooksRepository, "seriesMemberKind" | "seriesPositionsOf">, targetTitle: string, canonicalId: string) {
+  return {
+    target: { title: targetTitle, series: repo.seriesPositionsOf(canonicalId) },
+    memberKind: (title: string) => {
+      const key = seriesNameKey(title);
+      return key === null ? null : repo.seriesMemberKind(key, canonicalId);
+    }
+  };
+}
+
+export function guardJoin(repo: Pick<BooksRepository, "translationEvidence" | "matchCandidates" | "seriesMemberKind" | "seriesPositionsOf" | "canonicalWorkIds">, workId: string, intoWorkId: string): JoinVerdict {
+  const rows = repo.translationEvidence(workId);
+  const canonicalId = repo.canonicalWorkIds([intoWorkId]).get(intoWorkId) ?? intoWorkId;
+  const target = repo.matchCandidates([canonicalId])[0];
+  if (!rows || rows.editions.length === 0 || !target) return "join";
+  const guard = guardTarget(repo, target.title, canonicalId);
+  return joinVerdict({ title: evidenceOf(rows).title }, guard.target, guard.memberKind);
+}
+
 function decide(deps: TranslationDeps, workId: string, model: string, intoWorkId: string | null, confidence: number | null, merge: boolean, at: string) {
+  const verdict = intoWorkId ? guardJoin(deps.repo, workId, intoWorkId) : "join";
+  const saved = verdict === "never" ? null : intoWorkId;
   try {
     deps.repo.transaction(() => {
-      deps.repo.saveWorkMatchJudgment(workId, { model, intoWorkId, confidence, askedAt: at });
+      deps.repo.saveWorkMatchJudgment(workId, { model, intoWorkId: saved, confidence, askedAt: at });
       deps.repo.clearJevRejection("works", workId);
-      if (merge && intoWorkId && !deps.sharesArena(workId, intoWorkId)) deps.repo.mergeTranslation(workId, intoWorkId, model === "code" ? "code" : "jev", confidence, at);
+      if (merge && intoWorkId && verdict === "join" && !deps.sharesArena(workId, intoWorkId)) deps.repo.mergeTranslation(workId, intoWorkId, model === "code" ? "code" : "jev", confidence, at);
     });
   } catch (error) {
     if (!(error instanceof WorkMergeError)) throw error;

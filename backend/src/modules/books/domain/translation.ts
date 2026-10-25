@@ -73,7 +73,9 @@ export function surnameOf(author: string): string | null {
   return firstAuthor(author).split(" ").filter((word) => word.length >= 3).at(-1) ?? null;
 }
 
-const VOLUME_WORD = /\b(?:book|bk|vol|volume|livro|tomo|tome|part|parte)\s?(?:\d+|[ivx]{1,4}|one|two|three|four|five|six|seven|eight|nine|ten|um|dois|tres|quatro|cinco|seis|sete|oito|nove|dez)\b/;
+export const VOLUME_WORDS = ["book", "bk", "vol", "volume", "livro", "tomo", "tome", "part", "parte"];
+
+export const VOLUME_WORD = new RegExp(String.raw`\b(?:${VOLUME_WORDS.join("|")})\s?(\d+|[ivx]{1,4}|one|two|three|four|five|six|seven|eight|nine|ten|um|dois|tres|quatro|cinco|seis|sete|oito|nove|dez)\b`);
 
 export function hasVolumeMarker(title: string): boolean {
   return /#\s*\d/.test(title) || VOLUME_WORD.test(normalizeWords(title));

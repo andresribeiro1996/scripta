@@ -16,7 +16,8 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 const { applyBooksMigrations } = await import("./adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("./adapters/sqlite/sqliteBooksRepository.js");
 const { WorkMergeError } = await import("./domain/errors.js");
-const { listSeriesCollapses, undoReviewedMerges } = await import("./seriesMergeRepair.js");
+const { listSeriesCollapses, undoReviewedMerges, listGuardedMerges, dropSeriesRows, addSeriesRows } = await import("./seriesMergeRepair.js");
+const { groupKeylessWorks } = await import("./duplicateWorks.js");
 
 type Repo = ReturnType<typeof createSqliteBooksRepository>;
 type Edition = ReturnType<Repo["getBook"]> & object;
@@ -268,4 +269,84 @@ test("an error other than a refused undo propagates and rolls the undo back", ()
   assert.throws(() => undoReviewedMerges(broken, [volumes[0]!.work_id!], () => NOW, quietly), /disk full/);
   assert.equal(repo.getBook(volumes[0]!.id)!.work_id, series.work_id);
   assert.deepEqual(repo.activeMerges("code").map((merge) => merge.fromWork), [volumes[0]!.work_id]);
+});
+
+const LOTR = "The Lord of the Rings";
+const TOLKIEN = "J. R. R. Tolkien";
+
+function tolkien(repo: Repo) {
+  const omnibus = edition(repo, "9780261103252", LOTR, TOLKIEN, { workKey: "OL27448W" });
+  const king = edition(repo, "9780261102378", "The Return of the King", TOLKIEN, { workKey: "OL27479W" });
+  repo.addWorkSeries(omnibus.work_id!, [{ name: LOTR, position: null }], "wikidata", AT);
+  repo.addWorkSeries(king.work_id!, [{ name: LOTR, position: "3" }], "wikidata", AT);
+  const fellowship = edition(repo, "9789722000001", "A Irmandade do Anel", TOLKIEN, { language: "pt-PT", originalTitle: "The lord of the rings" });
+  repo.mergeTranslation(fellowship.work_id!, omnibus.work_id!, "jev", 0.99, AT);
+  return { omnibus, king, fellowship };
+}
+
+test("listGuardedMerges flags a join the guard would now stop and lists what joined the target later", async () => {
+  const { repo } = freshRepo();
+  const { omnibus, fellowship } = tolkien(repo);
+  const keyless = edition(repo, "9789722000002", "A irmandade do anel", TOLKIEN);
+  repo.setLanguage(keyless.id, "pt-PT");
+  await groupKeylessWorks(repo, 250, { at: AT });
+  const lighthouse = edition(repo, "9780156907392", "To the Lighthouse", "Virginia Woolf", { workKey: "OL468431W" });
+  const farol = edition(repo, "9789722000003", "Passeio ao Farol", "Virginia Woolf", { language: "pt-PT", originalTitle: "To the Lighthouse" });
+  repo.mergeTranslation(farol.work_id!, lighthouse.work_id!, "code", null, AT);
+  const result = listGuardedMerges(repo);
+  assert.equal(result.checked, 2);
+  assert.equal(result.flagged.length, 1);
+  const [flag] = result.flagged;
+  assert.equal(flag!.fromWork, fellowship.work_id);
+  assert.equal(flag!.intoWork, omnibus.work_id);
+  assert.equal(flag!.source, "jev");
+  assert.equal(flag!.confidence, 0.99);
+  assert.equal(flag!.verdict, "review");
+  assert.equal(flag!.intoTitle, LOTR);
+  assert.deepEqual(flag!.editions.map((row) => [row.title, row.isbn, row.originalTitle]), [["A Irmandade do Anel", "9789722000001", "The lord of the rings"]]);
+  assert.deepEqual(flag!.later.map((row) => [row.source, row.editions.map((item) => item.title)]), [["title-key", ["A irmandade do anel"]]]);
+});
+
+test("listGuardedMerges reports nothing when no join is flagged", () => {
+  const { repo } = freshRepo();
+  assert.deepEqual(listGuardedMerges(repo), { checked: 0, skipped: [], flagged: [] });
+});
+
+test("dropSeriesRows removes only the named row", () => {
+  const { repo } = freshRepo();
+  const { omnibus, king } = tolkien(repo);
+  assert.equal(repo.bestSeriesOf([omnibus.work_id!]).get(omnibus.work_id!)?.name, LOTR);
+  assert.equal(dropSeriesRows(repo, [{ workId: omnibus.work_id!, name: LOTR, source: "wikidata" }]), 1);
+  assert.equal(repo.bestSeriesOf([omnibus.work_id!]).has(omnibus.work_id!), false);
+  assert.equal(repo.bestSeriesOf([king.work_id!]).get(king.work_id!)?.name, LOTR);
+  assert.equal(dropSeriesRows(repo, [{ workId: omnibus.work_id!, name: LOTR, source: "wikidata" }]), 0);
+});
+
+test("addSeriesRows adds a row bestSeriesOf returns with its position", () => {
+  const { repo } = freshRepo();
+  const { omnibus } = tolkien(repo);
+  dropSeriesRows(repo, [{ workId: omnibus.work_id!, name: LOTR, source: "wikidata" }]);
+  assert.equal(addSeriesRows(repo, [{ workId: omnibus.work_id!, name: LOTR, position: "1-3", source: "wikidata" }], AT), 1);
+  assert.deepEqual(repo.bestSeriesOf([omnibus.work_id!]).get(omnibus.work_id!), { name: LOTR, position: "1-3" });
+});
+
+test("listGuardedMerges flags a volume number the target lacks as never", () => {
+  const { repo } = freshRepo();
+  const hugo = edition(repo, "9780140444308", "Les Misérables", "Victor Hugo", { workKey: "OL1W" });
+  const roman = edition(repo, "9789722000010", "Os Miseráveis I", "Victor Hugo", { language: "pt-PT", originalTitle: "Les Misérables" });
+  repo.mergeTranslation(roman.work_id!, hugo.work_id!, "jev", 0.97, AT);
+  const result = listGuardedMerges(repo);
+  assert.equal(result.checked, 1);
+  assert.deepEqual(result.flagged.map((row) => [row.fromWork, row.verdict]), [[roman.work_id, "never"]]);
+});
+
+test("listGuardedMerges reports a merge it could not evaluate as skipped", () => {
+  const { repo } = freshRepo();
+  const { fellowship } = tolkien(repo);
+  const book = repo.getBook(fellowship.id)!;
+  repo.detachEdition(book.id, AT);
+  const result = listGuardedMerges(repo);
+  assert.equal(result.checked, 0);
+  assert.equal(result.skipped.length, 1);
+  assert.deepEqual(result.flagged, []);
 });
