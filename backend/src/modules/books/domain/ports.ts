@@ -196,6 +196,7 @@ export interface CatalogDetails {
   workSummary?: string | null;
   editionSeries?: SeriesEntry[];
   subjectSeries?: SeriesEntry[];
+  subjects?: WorkSubjects;
 }
 
 export interface BookCatalog {

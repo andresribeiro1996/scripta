@@ -1,6 +1,7 @@
 import { buildBookMetadata, findOpenLibraryMatch, mapOpenLibraryDoc, openLibraryDescription } from "@scripta/shared";
 import { normalizeWorkKey } from "../../domain/normalize.js";
 import type { BookCatalog, EditionRecord, EditionRecordSource } from "../../domain/ports.js";
+import { cleanWorkSubjects } from "../../domain/workSubjects.js";
 import { parseSeriesString, seriesFromSubjects } from "../../domain/series.js";
 import { fetchJson, type Throttle } from "../http/http.js";
 
@@ -55,6 +56,10 @@ export function createOpenLibraryCatalog(throttle: Throttle, urgent = true): Boo
       metadata.summary = openLibraryDescription(edition);
       const editionSeries = parseEditionRecord(edition).series;
       const subjectSeries = seriesFromSubjects(subjectsOf(work, match));
+      const fields = work && typeof work === "object" ? (work as Record<string, unknown>) : null;
+      const subjects = keyOf(fields?.type) === "/type/work"
+        ? cleanWorkSubjects({ people: fields?.subject_people, places: fields?.subject_places, times: fields?.subject_times, subjects: subjectsOf(work, match), authors: match.author_name }).subjects
+        : undefined;
       return {
         metadata,
         sources: ["openlibrary"],
@@ -62,7 +67,8 @@ export function createOpenLibraryCatalog(throttle: Throttle, urgent = true): Boo
         workKey: String(match.key),
         workSummary,
         ...(editionSeries ? { editionSeries } : {}),
-        ...(subjectSeries.length > 0 ? { subjectSeries } : {})
+        ...(subjectSeries.length > 0 ? { subjectSeries } : {}),
+        ...(subjects ? { subjects } : {})
       };
     },
 

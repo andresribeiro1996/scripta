@@ -9,11 +9,11 @@ import { hiddenSynopsisHashes } from "./domain/synopsis.js";
 import { fillMissingIdentity, findExisting, findOrCreateBook, keysOf } from "./domain/findOrCreate.js";
 import { siblingCoverImageIds } from "./domain/siblingCover.js";
 import { coveredFirst, workIdsOf } from "./domain/workSearch.js";
-import { editionLanguage, findByIdentity, isPortugalIsbn, isPortugueseIsbn, isValidIsbn, lookupIdentity, searchTokens, type BookIdentity, type BookLookup } from "./domain/normalize.js";
+import { editionLanguage, findByIdentity, normalizeWorkKey, isPortugalIsbn, isPortugueseIsbn, isValidIsbn, lookupIdentity, searchTokens, type BookIdentity, type BookLookup } from "./domain/normalize.js";
 import { summaryMatchesLanguage } from "./adapters/catalog/languageFilter.js";
 import { canonicalHits, catalogHits, type Hit } from "./catalogSearch.js";
 import { mergeDuplicateWorks } from "./duplicateWorks.js";
-import type { BookCatalog, BooksRepository, CatalogSearchHit, CoverBlobReader, CoverBlobStore, CoverSource, EditionRecordSource, PageCursor } from "./domain/ports.js";
+import type { BookCatalog, BooksRepository, CatalogDetails, CatalogSearchHit, CoverBlobReader, CoverBlobStore, CoverSource, EditionRecordSource, PageCursor } from "./domain/ports.js";
 import type { SeriesEntry } from "./domain/series.js";
 import type { BookRow, CoverSourceName, CoverStatus, WorkView } from "./domain/types.js";
 import type { CoverPriority } from "./worker.js";
@@ -281,6 +281,14 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
     });
   }
 
+  function storeSubjects(bookId: string, details: CatalogDetails, at: string) {
+    if (!details.subjects) return;
+    const workId = deps.repo.getBook(bookId)?.work_id;
+    const work = workId ? deps.repo.getWorkView(workId) : undefined;
+    const key = normalizeWorkKey(details.workKey);
+    if (work && key !== null && work.olWorkKey === key) deps.repo.replaceWorkSubjects(work.id, details.subjects, at);
+  }
+
   async function lookupDetails(book: BookRow, catalog: BookCatalog) {
     const details = await catalog.fetchDetails({ isbn: book.isbn, title: book.title, author: book.author, language: book.language ?? (isPortugueseIsbn(book.isbn) ? "pt" : null) });
     const at = now().toISOString();
@@ -289,12 +297,14 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       deps.repo.setWorkKey(book.id, details.workKey);
       if (details.workSummary) deps.repo.setWorkSummary(book.id, details.workSummary);
       storeSeries(book.id, details, at);
+      storeSubjects(book.id, details, at);
       return;
     }
     if (details) {
       deps.repo.mergeDetails(book.id, { ...details.metadata, summary: null }, null);
       deps.repo.setWorkKey(book.id, details.workKey);
       storeSeries(book.id, details, at);
+      storeSubjects(book.id, details, at);
     }
     deps.repo.markDetailsMissing(book.id, at);
   }

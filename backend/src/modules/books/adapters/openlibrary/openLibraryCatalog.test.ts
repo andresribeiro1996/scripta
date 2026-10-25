@@ -50,6 +50,26 @@ test("details come from the matching work", async () => {
   assert.equal((await catalog.fetchDetails({ isbn: null, title: "ECOTOPIA", author: "Ernest Callenbach" }))?.workSummary, "Plain summary. Source: Wikipedia");
 });
 
+test("details carry cleaned subjects from the work record", async () => {
+  const catalog = createOpenLibraryCatalog(direct);
+  respond([
+    { docs: [{ ...doc, author_name: ["Arthur Conan Doyle"] }] },
+    { type: { key: "/type/work" }, subject_people: ["Mr. Sherlock Holmes (Fictional character)", "Sherlock Holmes", "Dr. Watson"], subject_places: ["London"], subject_times: ["19th century"], subjects: ["Fiction"] },
+    {}
+  ]);
+  const details = await catalog.fetchDetails({ isbn: "9780553348477", title: "", author: "" });
+  assert.deepEqual(details?.subjects, { person: ["Sherlock Holmes", "Dr. Watson"], place: ["London"], time: ["19th century"] });
+});
+
+test("a redirect or missing work record sets no subjects", async () => {
+  const catalog = createOpenLibraryCatalog(direct);
+  for (const work of [{ type: { key: "/type/redirect" }, location: "/works/OL2W" }, null]) {
+    respond([{ docs: [doc] }, work, {}]);
+    const details = await catalog.fetchDetails({ isbn: "9780553348477", title: "", author: "" });
+    assert.equal(details?.subjects, undefined);
+  }
+});
+
 test("an edition's own description wins over the work's", async () => {
   const catalog = createOpenLibraryCatalog(direct);
   const requests = respond([{ docs: [doc] }, { description: "Work text." }, { description: { value: "Edition text." } }]);
