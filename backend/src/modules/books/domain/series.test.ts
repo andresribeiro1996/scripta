@@ -15,8 +15,8 @@ test("a name with no letters or digits has no key", () => {
   assert.equal(seriesNameKey(""), null);
 });
 
-test("sources rank Wikidata, then Open Library editions, then subjects, then original titles", () => {
-  assert.deepEqual(SERIES_SOURCE_RANK, { wikidata: 0, "ol-edition": 1, "ol-subject": 2, "original-title": 3 });
+test("sources rank Wikidata, then Hardcover, then Open Library editions, then subjects, then original titles", () => {
+  assert.deepEqual(SERIES_SOURCE_RANK, { wikidata: 0, hardcover: 1, "ol-edition": 2, "ol-subject": 3, "original-title": 4 });
 });
 
 test("a series string gives its name and the position written in any of Open Library's forms", () => {

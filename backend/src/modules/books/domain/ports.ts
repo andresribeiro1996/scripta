@@ -144,6 +144,9 @@ export interface BooksRepository {
   clearRetitleWanted(id: string): void;
   applyTitleRepairs(plan: { books: RowRepair[]; works: RowRepair[] }): MojibakeApplied;
   addWorkSeries(workId: string, entries: SeriesEntry[], source: SeriesSource, at: string): number;
+  hasWorkSeries(workId: string, source: SeriesSource): boolean;
+  isbnPage(afterRowid: number, limit: number): Array<{ rowid: number; id: string; isbn: string; workId: string | null; language: string | null; hasSummary: boolean }>;
+  removeSeriesNames(nameKeys: string[], source: SeriesSource): { rows: number; searchRows: number };
   removeWorkSeries(workId: string, nameKey: string, source: SeriesSource): number;
   addBookCollection(bookId: string, entry: SeriesEntry, source: CollectionSource, at: string): boolean;
   seriesMemberKind(nameKey: string, workId: string): "series" | "collection" | null;

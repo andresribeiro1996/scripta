@@ -143,7 +143,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
 
   function summaryLink(book: BookRow): string {
     if (book.summary_source === "publisher") return book.publisher_url ?? "";
-    if (book.summary_source === "bnp") return "";
+    if (book.summary_source === "bnp" || book.summary_source === "hardcover") return "";
     if (book.summary_source === "isbndb") return book.isbn ? `https://isbndb.com/book/${book.isbn}` : "";
     return book.source_url ?? "";
   }

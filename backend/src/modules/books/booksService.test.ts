@@ -599,6 +599,16 @@ test("a bnp summary has no source link", async () => {
   assert.deepEqual([details?.summarySource, details?.sourceUrl], ["bnp", ""]);
 });
 
+test("details of a hardcover summary", async () => {
+  const h = harness({ catalog: recordingCatalog().catalog });
+  h.service.resolveCover(dune);
+  const id = h.bookId("isbn:9780441013593");
+  h.repo.mergeDetails(id, { summary: "A long enough synopsis about sandworms and spice.", pages: null, year: null, publisher: null, translator: null }, "hardcover");
+  const details = await h.service.getDetails(dune);
+  assert.equal(h.repo.getBook(id)!.source_url, "https://openlibrary.org/works/OL1W");
+  assert.deepEqual([details?.summarySource, details?.sourceUrl], ["hardcover", ""]);
+});
+
 test("an ISBNdb synopsis links to ISBNdb even when Open Library supplied the rating", async () => {
   const olRating = { metadata: { summary: null, rating: 3.8, ratingCount: 42, sourceUrl: "https://openlibrary.org/works/OL5W", genres: ["Science Fiction" as const], pages: null, publisher: null, year: null, translator: null }, sources: ["openlibrary" as const], summarySource: null };
   const primary: Catalog = { fetchDetails: async () => olRating, search: async () => [] };

@@ -37,6 +37,7 @@ export default defineRailway(() => {
       GOOGLE_CALLBACK_URL: preserve(),
       GOOGLE_CLIENT_ID: preserve(),
       GOOGLE_CLIENT_SECRET: preserve(),
+      HARDCOVER_API_TOKEN: preserve(),
       ISBNDB_API_KEY: preserve(),
       JWT_ACCESS_SECRET: preserve(),
       JWT_REFRESH_SECRET: preserve(),

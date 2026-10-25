@@ -1,7 +1,7 @@
 export type CoverStatus = "good" | "low_res" | "missing" | "manual";
 export type DetailsStatus = "found" | "missing";
 export type DataSource = "openlibrary" | "isbndb" | "bnp";
-export type SummarySource = DataSource | "publisher";
+export type SummarySource = DataSource | "publisher" | "hardcover";
 export type CoverSourceName = "isbndb" | "apple" | "kobo" | "openlibrary" | "upload" | "publisher" | "bnp";
 
 export type BookCreator = "seed" | "publisher" | "bnp";
