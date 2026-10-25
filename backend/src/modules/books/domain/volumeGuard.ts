@@ -34,7 +34,7 @@ export function volumeNumber(text: string): string | null {
   if (marked !== null) return marked;
   const parts = words.split(" ");
   const last = parts.at(-1)!;
-  if (parts.length >= 2 && (/^\d{1,2}$/.test(last) || ROMAN.includes(last))) return toArabic(last);
+  if (parts.length >= 2 && (/^\d{1,2}$/.test(last) || last !== "x" && ROMAN.includes(last))) return toArabic(last);
   return null;
 }
 

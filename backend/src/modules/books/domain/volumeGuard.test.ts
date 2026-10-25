@@ -12,6 +12,7 @@ const cases: Array<[string, { title: string; originalTitle: string | null }, { t
   ["roman in name", { title: "Henrique V", originalTitle: "Henry V" }, { title: "Henry V" }, none, "join"],
   ["number in name", { title: "Catch-22", originalTitle: "Catch-22" }, { title: "Catch-22" }, none, "join"],
   ["X in name", { title: "Malcolm X", originalTitle: null }, { title: "The Autobiography of Malcolm X" }, none, "join"],
+  ["trailing X is a letter", { title: "Raio-X", originalTitle: "X-Ray" }, { title: "X-Ray" }, none, "join"],
   ["three digits", { title: "Fahrenheit 451", originalTitle: null }, { title: "Fahrenheit 451" }, none, "join"],
   ["subtitle volume", { title: "A Coisa - Livro 1", originalTitle: "It" }, { title: "It" }, none, "review"],
   ["series subtitle volume", { title: "A Irmandade do Anel - O Senhor dos Anéis - Parte I", originalTitle: null }, { title: "The Fellowship of the Ring" }, none, "review"],
@@ -33,6 +34,7 @@ test("volumeNumber", () => {
   assert.equal(volumeNumber("tomo dois"), "2");
   assert.equal(volumeNumber("1984"), null);
   assert.equal(volumeNumber("Henry"), null);
+  assert.equal(volumeNumber("Geração X"), null);
 });
 
 test("isOmnibusTitle", () => {
