@@ -211,20 +211,21 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     ORDER BY editions DESC, id
   `);
   const matchCandidatesStmt = db.prepare(`
-    SELECT w.id, w.title, w.author, MIN(b.year) AS year, COUNT(b.id) AS editions, json_group_array(DISTINCT COALESCE(b.language, '')) AS languages
+    SELECT w.id, w.title, w.author, MIN(b.year) AS year, COUNT(*) AS editions, json_group_array(COALESCE(b.language, '') ORDER BY b.rowid) AS languages
     FROM works w JOIN books b ON b.work_id = w.id
     WHERE w.id IN (SELECT value FROM json_each(?))
     GROUP BY w.id
   `);
   const translationReviewRowsStmt = db.prepare(`
     SELECT j.work_id AS work_id, j.into_work_id AS into_id, j.model AS model, j.confidence AS confidence, NULL AS merged_at,
-      CASE WHEN j.model = 'code' OR j.confidence >= $merge THEN 'blocked' ELSE 'possible' END AS grp
-    FROM work_match_judgments j JOIN works w ON w.id = j.work_id
+      CASE WHEN j.model = 'code' OR j.confidence >= $merge THEN 'blocked' ELSE 'possible' END AS grp, 0 AS arm, w.rowid AS seq
+    FROM work_match_judgments j CROSS JOIN works w ON w.id = j.work_id
     WHERE w.merged_into IS NULL AND j.into_work_id IS NOT NULL AND j.model <> 'manual' AND (j.model = 'code' OR j.confidence >= $review)
     UNION ALL
-    SELECT m.from_work, m.into_work, m.source, m.confidence, m.merged_at, 'merged'
-    FROM work_merges m JOIN works w ON w.id = m.from_work
+    SELECT m.from_work, m.into_work, m.source, m.confidence, m.merged_at, 'merged', 1, m.id
+    FROM work_merges m CROSS JOIN works w ON w.id = m.from_work
     WHERE m.source IN ('code', 'jev', 'manual') AND m.undone_at IS NULL AND w.merged_into = m.into_work
+    ORDER BY arm, seq
   `);
   const translationReviewWorksStmt = db.prepare(`
     SELECT w.id, w.title, w.author,
@@ -1045,7 +1046,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       return (authorCandidatesStmt.all(pattern) as Array<{ id: string }>).map((row) => row.id);
     },
     matchCandidates(workIds) {
-      return (matchCandidatesStmt.all(JSON.stringify(workIds)) as Array<{ id: string; title: string; author: string; year: number | null; editions: number; languages: string }>).map((row) => ({ id: row.id, title: row.title, author: row.author, year: row.year, editions: row.editions, languages: (JSON.parse(row.languages) as string[]).filter(Boolean) }));
+      return (matchCandidatesStmt.all(JSON.stringify(workIds)) as Array<{ id: string; title: string; author: string; year: number | null; editions: number; languages: string }>).map((row) => ({ id: row.id, title: row.title, author: row.author, year: row.year, editions: row.editions, languages: [...new Set(JSON.parse(row.languages) as string[])].filter(Boolean) }));
     },
     translationReviewRows(mergeAt, reviewAt) {
       return (translationReviewRowsStmt.all({ $merge: mergeAt, $review: reviewAt }) as Array<{ work_id: string; into_id: string; model: string; confidence: number | null; merged_at: string | null; grp: "possible" | "blocked" | "merged" }>).map((row) => ({ workId: row.work_id, intoWorkId: row.into_id, model: row.model, confidence: row.confidence, mergedAt: row.merged_at, group: row.grp }));

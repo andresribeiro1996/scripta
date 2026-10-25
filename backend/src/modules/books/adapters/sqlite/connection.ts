@@ -53,7 +53,8 @@ export function applyBooksMigrations(db: DatabaseSync): void {
   if (!columns.some((column) => column.name === "original_whole_key")) db.exec("ALTER TABLE books ADD COLUMN original_whole_key TEXT");
   moveOpenLibrarySummariesToWorks(db);
   addSummaryHashes(db);
-  db.exec("CREATE INDEX IF NOT EXISTS idx_books_work ON books(work_id)");
+  db.exec("DROP INDEX IF EXISTS idx_books_work");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_books_work_editions ON books(work_id, year, language)");
   db.exec("DROP INDEX IF EXISTS idx_books_title_key");
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_title_work ON books(title_key, work_id)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_author_key ON books(substr(title_key, instr(title_key, '|') + 1))");
@@ -70,6 +71,8 @@ export function applyBooksMigrations(db: DatabaseSync): void {
   db.exec("CREATE INDEX IF NOT EXISTS idx_works_summary_hash ON works(summary_hash)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_work_merges_from ON work_merges(from_work)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_work_merges_into ON work_merges(into_work, source, undone_at)");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_work_merges_translations ON work_merges(source) WHERE source IN ('code', 'jev', 'manual') AND undone_at IS NULL");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_work_match_judgments_proposed ON work_match_judgments(work_id, into_work_id, model, confidence) WHERE into_work_id IS NOT NULL");
   db.exec("CREATE INDEX IF NOT EXISTS idx_work_series_name_key ON work_series(name_key)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_book_collections_name_key ON book_collections(name_key)");
   const imageColumns = db.prepare("PRAGMA table_info(cover_images)").all() as Array<{ name: string }>;
