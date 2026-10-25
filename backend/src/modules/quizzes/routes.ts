@@ -214,5 +214,5 @@ function sendPlayOutcome(reply: FastifyReply, outcome: PlayOutcome) {
     if (outcome.reason === "already-played") return reply.code(409).send({ error: "You've already played this quiz." });
     return reply.code(400).send({ error: "Those answers don't match this quiz." });
   }
-  return reply.send({ playId: outcome.playId, score: outcome.score, correct: outcome.correct } satisfies PlayResponse);
+  return reply.send({ playId: outcome.playId, score: outcome.score, correct: outcome.correct, answers: outcome.answers } satisfies PlayResponse);
 }

@@ -10,7 +10,7 @@ import { ACTIVITY_EVENT_TYPES, ARCHIVE_BATCH, BACKFILL_BATCH, BOOK_EVENTS_PER_DA
 import { GAME_KINDS, asGameKind, type GameCard, type GameKind, type GameSources } from "./domain/games.js";
 import type { CommunityRepository, CursorKeyset } from "./domain/ports.js";
 import type { CommunityRefType, EventRow, FollowRow } from "./domain/types.js";
-import { createVisibility, readerListing, type ReaderListing } from "./domain/visibility.js";
+import { canNameAsParticipant, createVisibility, readerListing, type ReaderListing } from "./domain/visibility.js";
 
 const DISCOVER_SCAN_CAP = 500;
 const DISCOVER_BOOK_WORKS = 20;
@@ -611,9 +611,10 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
 export interface CommunityPublicApi {
   emitEvent(userId: string, type: ActivityEventType, refType: CommunityRefType, refId: string, payload?: Record<string, unknown>): void;
   readerVisibility(viewerId: string | null, userIds: string[]): Map<string, ReaderListing>;
+  nameableUsernames(userIds: string[]): Map<string, string>;
 }
 
-export function createCommunityPublicApi(repo: CommunityRepository, now: () => number = Date.now): CommunityPublicApi {
+export function createCommunityPublicApi(repo: CommunityRepository, now: () => number = Date.now, resolveProfiles: CommunityDeps["resolveProfiles"] = () => new Map()): CommunityPublicApi {
   return {
     emitEvent: createActivityRecorder(repo, now),
     readerVisibility(viewerId, userIds) {
@@ -623,6 +624,12 @@ export function createCommunityPublicApi(repo: CommunityRepository, now: () => n
         if (listing) visible.set(userId, listing);
       }
       return visible;
+    },
+    nameableUsernames(userIds) {
+      const nameable = [...createVisibility(repo, null).standings(userIds)].filter(([, standing]) => canNameAsParticipant(standing)).map(([userId]) => userId);
+      const names = new Map<string, string>();
+      for (const [userId, profile] of resolveProfiles(nameable)) names.set(userId, profile.username);
+      return names;
     }
   };
 }

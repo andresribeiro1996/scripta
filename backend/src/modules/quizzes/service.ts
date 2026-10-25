@@ -48,7 +48,7 @@ function readDocument(quiz: Quiz): QuizDocument {
 export type Player = { kind: "user"; userId: string } | { kind: "anonymous"; playId: string | null };
 
 export type PlayOutcome =
-  | { ok: true; playId: string; score: number; correct: Record<string, boolean> }
+  | { ok: true; playId: string; score: number; correct: Record<string, boolean>; answers: Record<string, { choiceIndex: number; answerIndex: number }> }
   | { ok: false; reason: "not-found" | "closed" | "invalid" | "already-played" };
 
 export type QuizWriteOutcome =
@@ -70,8 +70,21 @@ export interface QuizResults {
   questionCount: number;
 }
 
-function toResultPlay(row: PlayRow): ResultPlay {
-  return { playId: row.id, playerName: row.player_name, score: row.score, durationMs: row.duration_ms, createdAt: row.created_at };
+export type ResolveUsernames = (userIds: string[]) => Map<string, string>;
+
+function toResultPlay(row: PlayRow, usernames: Map<string, string>): ResultPlay {
+  const username = row.voter_user_id === null ? undefined : usernames.get(row.voter_user_id);
+  const playerName = username ?? row.player_name ?? (row.voter_user_id === null ? null : "Reader");
+  return { playId: row.id, playerName, anonymous: row.voter_user_id === null, score: row.score, durationMs: row.duration_ms, createdAt: row.created_at };
+}
+
+function answersFor(questions: QuizQuestion[], given: Map<string, number>): Record<string, { choiceIndex: number; answerIndex: number }> {
+  const answers: Record<string, { choiceIndex: number; answerIndex: number }> = {};
+  for (const question of questions) {
+    const choiceIndex = given.get(question.id);
+    if (choiceIndex !== undefined) answers[question.id] = { choiceIndex, answerIndex: question.answerIndex };
+  }
+  return answers;
 }
 
 function toPublicQuestion(question: QuizQuestion, bookByWork: Map<string, QuizBook>): PublicQuizQuestion {
@@ -172,7 +185,8 @@ function quizBookWorks(works: QuizWorks, books: QuizInputBook[]): Array<string |
   return books.map((book) => (book.workId ? known.get(book.workId)! : byBook.get(book) ?? null));
 }
 
-export function createQuizzesService(repo: QuizzesRepository, works: QuizWorks, emitPublished?: EmitPublished, emitPlayed?: EmitPlayed): QuizzesService {
+export function createQuizzesService(repo: QuizzesRepository, works: QuizWorks, emitPublished?: EmitPublished, emitPlayed?: EmitPlayed, resolveUsernames?: ResolveUsernames): QuizzesService {
+  const namesFor = (rows: PlayRow[]) => resolveUsernames?.([...new Set(rows.flatMap((row) => (row.voter_user_id === null ? [] : [row.voter_user_id])))]) ?? new Map<string, string>();
   return {
     listQuizzes(userId) {
       return repo.listByUser(userId).map(toQuiz);
@@ -327,7 +341,8 @@ export function createQuizzesService(repo: QuizzesRepository, works: QuizWorks, 
       }));
       repo.savePlay(play, answerRows);
       if (player.kind === "user") emitPlayed?.(player.userId, row.id, row.name);
-      return { ok: true, playId: play.id, score, correct };
+      const given = new Map(answers.map((answer) => [answer.questionId, answer.choiceIndex]));
+      return { ok: true, playId: play.id, score, correct, answers: answersFor(questions, given) };
     },
 
     getPlay(code, player) {
@@ -341,15 +356,21 @@ export function createQuizzesService(repo: QuizzesRepository, works: QuizWorks, 
             : undefined;
       if (!existing) return { ok: false, reason: "not-found" };
       const correct: Record<string, boolean> = {};
-      for (const answer of repo.getAnswers(existing.id)) correct[answer.question_id] = answer.correct === 1;
-      return { ok: true, playId: existing.id, score: existing.score, correct };
+      const given = new Map<string, number>();
+      for (const answer of repo.getAnswers(existing.id)) {
+        correct[answer.question_id] = answer.correct === 1;
+        given.set(answer.question_id, answer.choice_index);
+      }
+      return { ok: true, playId: existing.id, score: existing.score, correct, answers: answersFor(readDocument(toQuiz(row)).questions ?? [], given) };
     },
 
     getResults(userId, id) {
       if (!repo.getOwned(id, userId)) return undefined;
       const row = repo.getById(id)!;
+      const plays = repo.listPlays(id);
+      const names = namesFor(plays);
       return {
-        plays: repo.listPlays(id).map(toResultPlay),
+        plays: plays.map((play) => toResultPlay(play, names)),
         stats: repo.questionStats(id),
         questionCount: readDocument(toQuiz(row)).questionCount
       };
@@ -360,9 +381,11 @@ export function createQuizzesService(repo: QuizzesRepository, works: QuizWorks, 
       if (!row) return undefined;
       // playId stays owner-side: it's an anonymous player's only play
       // handle, and the public leaderboard must not hand out everyone's.
+      const plays = repo.listPlays(row.id);
+      const names = namesFor(plays);
       return {
-        plays: repo.listPlays(row.id).map((playRow) => {
-          const { playId: _playId, ...rest } = toResultPlay(playRow);
+        plays: plays.map((playRow) => {
+          const { playId: _playId, ...rest } = toResultPlay(playRow, names);
           return rest;
         }),
         questionCount: readDocument(toQuiz(row)).questionCount

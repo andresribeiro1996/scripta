@@ -77,6 +77,7 @@
 - Modify: `backend/src/modules/quizzes/routes.ts`
 - Modify: `backend/src/modules/quizzes/plugin.ts`
 - Modify: `backend/src/modules/community/service.ts`
+- Modify: `backend/src/modules/community/plugin.ts`
 - Modify: `backend/src/app.ts`
 - Test: `backend/src/modules/quizzes/service.test.ts`
 - Test: `backend/src/modules/quizzes/routes.test.ts`
