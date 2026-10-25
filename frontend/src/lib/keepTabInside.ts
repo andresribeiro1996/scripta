@@ -7,7 +7,7 @@ export function keepTabInside(event: KeyboardEvent<HTMLElement>) {
   if (event.key !== "Tab") return;
   const controls = Array.from(
     event.currentTarget.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)
-  ).filter((element) => element.getClientRects().length > 0);
+  ).filter((element) => element.checkVisibility());
   const first = controls[0];
   const last = controls[controls.length - 1];
   if (event.shiftKey && document.activeElement === first) {

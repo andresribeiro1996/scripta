@@ -365,7 +365,7 @@ export function TierBoard({ data, books, onChange, structureEditable, poolLabel,
         {structureEditable && (
           <button
             onClick={addTier}
-            className="self-start rounded-lg border border-dashed border-(--color-border) px-3 py-1.5 text-sm text-(--color-text-dim) hover:border-(--color-accent) hover:text-(--color-accent)"
+            className="min-h-11 self-start rounded-lg border border-dashed border-(--color-border) px-3 text-sm text-(--color-text-dim) hover:border-(--color-accent) hover:text-(--color-accent)"
           >
             + Add tier
           </button>

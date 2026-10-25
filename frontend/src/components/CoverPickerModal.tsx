@@ -150,6 +150,7 @@ export function CoverPickerModal({
                 key={image.id}
                 role="button"
                 tabIndex={0}
+                aria-label="Use this image"
                 onClick={() => {
                   onSelect(image);
                   onClose();

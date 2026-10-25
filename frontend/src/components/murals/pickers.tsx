@@ -123,6 +123,7 @@ export function GalleryImageGrid({
         <div
           key={image.id}
           role="button"
+          aria-label="Use this image"
           tabIndex={0}
           onClick={() => onSelect(image)}
           onKeyDown={(e) => {

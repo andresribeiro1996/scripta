@@ -7,7 +7,7 @@ const dim = "text-sm text-(--color-text-dim)";
 export function StatsTiles({ tiles, to }: { tiles: BookStatsModel["tiles"]; to: string }) {
   if (tiles.length === 0) return null;
   return (
-    <Link to={to} className="mt-1 flex flex-wrap items-center justify-center gap-x-1.5 text-xs text-(--color-text-dim) hover:opacity-90 sm:justify-start">
+    <Link to={to} className="flex min-h-11 flex-wrap content-center items-center justify-center gap-x-1.5 text-xs text-(--color-text-dim) hover:opacity-90 sm:justify-start">
       <span className="sr-only">Book stats: </span>
       {tiles.map((tile, index) => (
         <span key={tile.key} className="whitespace-nowrap">

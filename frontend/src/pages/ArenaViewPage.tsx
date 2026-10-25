@@ -123,7 +123,7 @@ export function ArenaViewPage() {
               if (e.key === "Escape") setEditingName(false);
             }}
             aria-label="Tournament name"
-            className="w-full rounded-lg border border-(--color-border) bg-(--color-bg) px-2 py-1 text-2xl font-bold"
+            className="min-h-11 w-full rounded-lg border border-(--color-border) bg-(--color-bg) px-2 py-1 text-2xl font-bold"
           />
         ) : isOwner ? (
           <button
@@ -132,9 +132,9 @@ export function ArenaViewPage() {
               setEditingName(true);
             }}
             title="Rename this tournament"
-            className="block w-full text-left font-bold transition-colors hover:text-(--color-accent)"
+            className="flex min-h-11 w-full items-center text-left font-bold transition-colors hover:text-(--color-accent)"
           >
-            {tournament.name}
+            <span className="min-w-0 break-words">{tournament.name}</span>
           </button>
         ) : (
           tournament.name

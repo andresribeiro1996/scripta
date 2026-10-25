@@ -136,7 +136,7 @@ export function QuizEditorPage() {
                 <select
                   value={data.questionCount}
                   onChange={(event) => updateDraft((current) => ({ ...current, questionCount: Number(event.target.value) }))}
-                  className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2"
+                  className="min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2"
                 >
                   {[4, 5, 10, 15, 20].map((count) => (
                     <option key={count} value={count}>{count}</option>

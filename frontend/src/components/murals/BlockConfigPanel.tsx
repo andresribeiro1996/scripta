@@ -241,7 +241,7 @@ export function BlockConfigPanel({
                           [keys[i - 1], keys[i]] = [keys[i], keys[i - 1]];
                           setDraft({ ...draft, bookKeys: keys });
                         }}
-                        className="text-(--color-text-dim) hover:text-(--color-text) disabled:opacity-30"
+                        className="flex h-11 w-11 shrink-0 items-center justify-center text-(--color-text-dim) hover:text-(--color-text) disabled:opacity-30"
                         title="Move up"
                       >
                         ▲
@@ -253,14 +253,14 @@ export function BlockConfigPanel({
                           [keys[i], keys[i + 1]] = [keys[i + 1], keys[i]];
                           setDraft({ ...draft, bookKeys: keys });
                         }}
-                        className="text-(--color-text-dim) hover:text-(--color-text) disabled:opacity-30"
+                        className="flex h-11 w-11 shrink-0 items-center justify-center text-(--color-text-dim) hover:text-(--color-text) disabled:opacity-30"
                         title="Move down"
                       >
                         ▼
                       </button>
                       <button
                         onClick={() => setDraft({ ...draft, bookKeys: draft.bookKeys.filter((k) => k !== key) })}
-                        className="text-(--color-danger) transition-opacity hover:opacity-80"
+                        className="min-h-11 px-2 text-(--color-danger) transition-opacity hover:opacity-80"
                       >
                         Remove
                       </button>
@@ -280,7 +280,7 @@ export function BlockConfigPanel({
         {draft.type === "quote" && draft.mode !== "rediscover" &&
           (browsingBookKey ? (
             <div className="flex flex-col gap-2">
-              <button onClick={() => setBrowsingBookKey(null)} className="inline-flex items-center gap-1 self-start text-xs text-(--color-text-dim) hover:text-(--color-text)">
+              <button onClick={() => setBrowsingBookKey(null)} className="inline-flex min-h-11 items-center gap-1 self-start text-xs text-(--color-text-dim) hover:text-(--color-text)">
                 <ChevronLeftIcon size={13} />
                 Back to books
               </button>
@@ -294,7 +294,7 @@ export function BlockConfigPanel({
                       setDraft({ ...draft, bookKey: browsingBookKey, highlightId: String(h.BookmarkID) });
                       setBrowsingBookKey(null);
                     }}
-                    className="rounded-lg border border-(--color-border) px-3 py-2 text-left text-sm italic hover:bg-(--color-surface-hover)"
+                    className="min-h-11 rounded-lg border border-(--color-border) px-3 py-2 text-left text-sm italic hover:bg-(--color-surface-hover)"
                   >
                     "{String(h.Text ?? "")}"
                   </button>
@@ -336,7 +336,7 @@ export function BlockConfigPanel({
                       <span className="min-w-0 flex-1 truncate italic">"{String(highlight?.Text ?? "")}"</span>
                       <button
                         onClick={() => setDraft({ ...draft, quotes: draft.quotes.filter((_, j) => j !== i) })}
-                        className="shrink-0 text-(--color-danger) transition-opacity hover:opacity-80"
+                        className="min-h-11 shrink-0 px-2 text-(--color-danger) transition-opacity hover:opacity-80"
                       >
                         Remove
                       </button>
@@ -348,7 +348,7 @@ export function BlockConfigPanel({
 
             {browsingBookKey ? (
               <div className="flex flex-col gap-2">
-                <button onClick={() => setBrowsingBookKey(null)} className="inline-flex items-center gap-1 self-start text-xs text-(--color-text-dim) hover:text-(--color-text)">
+                <button onClick={() => setBrowsingBookKey(null)} className="inline-flex min-h-11 items-center gap-1 self-start text-xs text-(--color-text-dim) hover:text-(--color-text)">
                   <ChevronLeftIcon size={13} />
                   Back to books
                 </button>
@@ -361,7 +361,7 @@ export function BlockConfigPanel({
                       if (!already) setDraft({ ...draft, quotes: [...draft.quotes, ref] });
                       setBrowsingBookKey(null);
                     }}
-                    className="rounded-lg border border-(--color-border) px-3 py-2 text-left text-sm italic hover:bg-(--color-surface-hover)"
+                    className="min-h-11 rounded-lg border border-(--color-border) px-3 py-2 text-left text-sm italic hover:bg-(--color-surface-hover)"
                   >
                     "{String(h.Text ?? "")}"
                   </button>
@@ -419,7 +419,7 @@ export function BlockConfigPanel({
                 <Link
                   to="/dashboard/arena?tab=tierlists"
                   onClick={onClose}
-                  className="inline-flex items-center gap-1 self-start text-xs font-medium text-(--color-accent) transition-opacity hover:opacity-80"
+                  className="inline-flex min-h-11 items-center gap-1 self-start text-xs font-medium text-(--color-accent) transition-opacity hover:opacity-80"
                 >
                   Create in Games
                   <ChevronRightIcon size={13} />

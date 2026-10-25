@@ -77,7 +77,7 @@ export function AddBookSheet({
   }
 
   const actionClass =
-    "rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2.5 text-sm font-medium hover:bg-(--color-surface-hover) disabled:opacity-60";
+    "min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm font-medium hover:bg-(--color-surface-hover) disabled:opacity-60";
 
   return (
     <Sheet title="Add to your library" onClose={onClose}>
