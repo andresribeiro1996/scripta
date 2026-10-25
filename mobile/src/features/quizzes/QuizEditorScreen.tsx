@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Stack } from "expo-router";
 import { Image } from "expo-image";
-import { QUIZ_QUESTION_TYPES, eligibleTypes, type QuizData, type QuizQuestionType } from "@scripta/shared";
+import { QUIZ_QUESTION_TYPES, eligibleTypes, playerLabel, quizOptionLabel, quizQuestionLabel, type QuizData, type QuizQuestionType } from "@scripta/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pressable, ScrollView, Share, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
@@ -11,7 +11,7 @@ import { coverUrlForApi } from "../library/lib/coverUrl";
 import { publicContentUrl } from "../sharing/links";
 import { fetchQuizResults, publishQuiz, setPlayState, updateQuiz, type Quiz } from "./api";
 
-type EditorView = "setup" | "results";
+export type EditorView = "setup" | "results";
 
 const PUBLISHED_VIEWS = [{ value: "setup", label: "Questions" }, { value: "results", label: "Results" }] as const;
 
@@ -24,14 +24,14 @@ const TYPE_LABELS: Record<QuizQuestionType, string> = {
 
 const uriFor = (url: string): string => coverUrlForApi(url, API_URL);
 
-export function QuizEditorScreen({ quiz, onUpdated }: { quiz: Quiz; onUpdated: (quiz: Quiz) => void }) {
+export function QuizEditorScreen({ quiz, onUpdated, initialView }: { quiz: Quiz; onUpdated: (quiz: Quiz) => void; initialView?: EditorView }) {
   const { colors } = useTheme();
   const queryClient = useQueryClient();
   const [current, setCurrent] = useState(quiz);
   const [data, setData] = useState<QuizData>(quiz.data);
   const dataRef = useRef(data);
   dataRef.current = data;
-  const [view, setView] = useState<EditorView>("setup");
+  const [view, setView] = useState<EditorView>(initialView ?? "setup");
   const [busy, setBusy] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -143,17 +143,18 @@ export function QuizEditorScreen({ quiz, onUpdated }: { quiz: Quiz; onUpdated: (
     </FormScroll> : frozen ? results.isPending ? <Skeleton height={180} /> : <View style={styles.grow}><View style={styles.frozenHeading}><EditorHeading name={current.name} /></View><SwipeableTabs accessibilityLabel="Quiz editor view" options={PUBLISHED_VIEWS} value={view} onChange={setView} renderPage={(page) => page === "results" ? results.isError ? <ErrorState body="Couldn't load results." actionLabel="Retry" onAction={() => void results.refetch()} /> : <ScrollView contentContainerStyle={styles.screen}>
       {(results.data?.plays ?? []).map((play, i) => <View key={`${play.playerName ?? "Guest"}-${i}`} style={[styles.leaderRow, { borderColor: colors.border }]}>
         <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{i + 1}</Text>
-        <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, styles.grow, { color: colors.text }]}>{play.playerName ?? "Guest"}</Text>
+        <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, styles.grow, { color: colors.text }]}>{playerLabel(play).name}</Text>
+        {playerLabel(play).guest ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>guest</Text> : null}
         <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{play.score}/{results.data!.questionCount}</Text>
       </View>)}
-      {(results.data?.stats ?? []).map((stat) => <View key={stat.questionId} style={styles.stat}>
-        <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{stat.questionId} · {stat.correctCount}/{stat.answerCount} correct</Text>
+      {(results.data?.stats ?? []).map((stat) => { const index = (current.data.questions ?? []).findIndex((item) => item.id === stat.questionId); const asked = current.data.questions?.[index]; return <View key={stat.questionId} style={styles.stat}>
+        <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{asked ? quizQuestionLabel(asked, index, current.data.books) : stat.questionId} · {stat.correctCount}/{stat.answerCount} correct</Text>
         {stat.picks.map((pick) => <View key={pick.choiceIndex} style={styles.pick}>
-          <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>#{pick.choiceIndex + 1}</Text>
+          <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.pickLabel, { color: colors.textDim }]}>{asked ? quizOptionLabel(asked.type, asked.options[pick.choiceIndex], current.data.books) : `#${pick.choiceIndex + 1}`}</Text>
           <View style={[styles.pickTrack, { backgroundColor: colors.border }]}><View style={[styles.pickFill, { backgroundColor: colors.accent, width: `${Math.round((pick.count / stat.answerCount) * 100)}%` }]} /></View>
           <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{pick.count}</Text>
         </View>)}
-      </View>)}
+      </View>; })}
     </ScrollView> : <ScrollView contentContainerStyle={styles.screen}>
       {(current.data.questions ?? []).map((question, index) => <View key={question.id} style={[styles.row, { borderColor: colors.border }]}>
         <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{index + 1}. {TYPE_LABELS[question.type]}</Text>
@@ -184,6 +185,7 @@ const styles = StyleSheet.create({
   leaderRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.xs, borderBottomWidth: StyleSheet.hairlineWidth },
   stat: { gap: spacing.xs },
   pick: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  pickLabel: { width: 120 },
   pickTrack: { flex: 1, height: 4, borderRadius: radii.full },
   pickFill: { height: 4, borderRadius: radii.full },
   answerThumb: { width: 44, height: 66, borderRadius: radii.sm },

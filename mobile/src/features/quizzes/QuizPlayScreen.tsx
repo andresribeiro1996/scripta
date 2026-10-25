@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import type { PublicQuizQuestion } from "@scripta/shared";
+import { playerLabel, scoreRows, type PublicQuizQuestion } from "@scripta/shared";
 import { useQuery } from "@tanstack/react-query";
 import { router, Stack, useNavigation } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
@@ -173,14 +173,27 @@ function EndScreen({ code, board, result, returning, tab, setTab }: {
     <ScrollView contentContainerStyle={styles.section}>
       <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{returning ? "You already played this quiz." : "Your score"}</Text>
       <Text {...dynamicType} display={false} style={[typography.heading, styles.score, { color: colors.accent }]}>{result.score}/{board.questionCount}</Text>
-      {board.questions.map((question, i) => (
-        <View key={question.id} style={[styles.verdict, { borderColor: colors.border }]}>
-          <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{i + 1}</Text>
-          <Text {...dynamicType} style={[typography.title, { color: result.correct[question.id] ? colors.success : colors.danger }]}>{result.correct[question.id] ? "✓" : "✗"}</Text>
+      {scoreRows(board.questions, result.correct, result.answers).map((row) => (
+        <View key={row.id} style={[styles.verdict, { borderColor: colors.border }]}>
+          <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{row.number}</Text>
+          <Text {...dynamicType} style={[typography.title, { color: row.correct ? colors.success : colors.danger }]}>{row.correct ? "✓" : "✗"}</Text>
+          <View style={styles.grow}>
+            {row.answer ? <ScoreValue value={row.answer} title={row.answer.title} /> : null}
+            {row.pick ? <ScoreValue value={row.pick} dim /> : null}
+          </View>
         </View>
       ))}
     </ScrollView>
   )} />;
+}
+
+function ScoreValue({ value, title, dim }: { value: { kind: "text" | "cover"; value: string }; title?: string; dim?: boolean }) {
+  const { colors } = useTheme();
+  if (value.kind === "text") return <Text numberOfLines={1} {...dynamicType} style={[typography.body, { color: dim ? colors.textDim : colors.text }]}>{value.value}</Text>;
+  return <View style={styles.scoreCover}>
+    <Image source={{ uri: uriFor(value.value) }} contentFit="cover" style={styles.scoreThumb} alt={title ?? "Picked cover"} />
+    {title ? <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.grow, { color: colors.text }]}>{title}</Text> : null}
+  </View>;
 }
 
 function Leaderboard({ code }: { code: string }) {
@@ -193,7 +206,8 @@ function Leaderboard({ code }: { code: string }) {
     {leaderboard.data.plays.map((play, i) => (
       <View key={`${play.playerName ?? "Guest"}-${i}`} style={[styles.leaderRow, { borderColor: colors.border }]}>
         <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{i + 1}</Text>
-        <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, styles.grow, { color: colors.text }]}>{play.playerName ?? "Guest"}</Text>
+        <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, styles.grow, { color: colors.text }]}>{playerLabel(play).name}</Text>
+        {playerLabel(play).guest ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>guest</Text> : null}
         <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{play.score}/{leaderboard.data.questionCount}</Text>
         <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{(play.durationMs / 1000).toFixed(1)}s</Text>
       </View>
@@ -219,7 +233,9 @@ const styles = StyleSheet.create({
   complete: { gap: spacing.sm, paddingBottom: spacing.xl },
   section: { gap: spacing.sm, paddingTop: spacing.lg },
   leaderRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.xs, borderBottomWidth: StyleSheet.hairlineWidth },
-  verdict: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderWidth: 1, borderRadius: radii.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  verdict: { flexDirection: "row", alignItems: "center", gap: spacing.md, borderWidth: 1, borderRadius: radii.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  scoreCover: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  scoreThumb: { width: 32, height: 48, borderRadius: radii.sm },
   score: { textAlign: "center", fontWeight: "700" },
   strong: { fontWeight: "700" },
   grow: { flex: 1 },
