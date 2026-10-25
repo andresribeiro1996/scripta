@@ -115,9 +115,10 @@ export function TierListEditorPage() {
     try {
       await navigator.clipboard.writeText(voteLink);
     } catch {
-      setVotingActionError("Couldn't copy the link — select it and copy it by hand.");
+      setVotingActionError("Couldn't copy the link.");
       return;
     }
+    setVotingActionError(null);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1500);
   }

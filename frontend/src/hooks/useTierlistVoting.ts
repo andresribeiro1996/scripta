@@ -32,9 +32,7 @@ export function useTierlistVoting(code: string) {
   // of a poll always holds one without ever having voted through this page:
   // openVoting moves their ranking out of the tier list document and seeds
   // it as their ballot, so this is the only route back to it. `retry: false`
-  // because "you have no ballot here" comes back as a 404, not a blip, and
-  // ballotOrNull reads that one status as "no ballot": a list published at
-  // creation never seeded the owner a ballot (only openVoting does).
+  // because "you have no ballot here" comes back as a 404, not a blip.
   const existing = useQuery({
     queryKey: ["tierlists", "ballot", code, storedBallotId],
     queryFn: () => ballotOrNull(() => (storedBallotId === null ? fetchMyBallot(code) : fetchBallot(code, storedBallotId))),

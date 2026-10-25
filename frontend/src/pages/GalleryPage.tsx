@@ -123,7 +123,7 @@ export function GalleryPage() {
           a phone this was ~100px of viewport explaining a gesture that
           cannot be performed. Uploading there goes through the button
           above, which opens the OS file/photo picker. */}
-      {!isLoading && images.length === 0 ? null : (
+      {isLoading || images.length === 0 ? null : (
         <div className={`mb-6 hidden items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-8 text-sm transition-colors sm:flex ${dragOver ? "border-(--color-accent) bg-(--color-accent-soft)" : "border-(--color-border)"}`} {...dropHandlers}>
           <span className="text-(--color-text-dim)">Drag an image here to upload it — JPEG, PNG, or WebP, up to 20 MB.</span>
         </div>
