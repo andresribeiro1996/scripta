@@ -42,6 +42,7 @@ function deps(overrides: Partial<WorksDeps> = {}): WorksDeps {
     tierlists: () => [{ id: "t1", name: "Best SF", path: "/vote/abc", ownerUserId: null }, { id: "t2", name: "Gone", path: "/vote/def", ownerUserId: "deleted" }],
     arenas: () => [{ id: "a1", name: "SF bracket", path: "/arena/a1", ownerUserId: "bo" }],
     quizzes: () => [],
+    getRecentAwards: () => [],
     ...overrides
   };
 }
@@ -232,4 +233,17 @@ test("the work page carries the series as a series and each edition's collection
   const plain = createWorksService(deps({ getWorkPage: pageOf([edition("e1", null, {})]) })).getPage("w", null)!.work;
   assert.equal(plain.series, null);
   assert.deepEqual(plain.editions.map((e) => e.collection), [null]);
+});
+
+test("getPage passes awards through", () => {
+  const awards = [{ prize: "booker", year: 2019, won: true }, { prize: "hugo-novel", year: 1966, won: false }];
+  const base = deps();
+  const withAwards = createWorksService({ ...base, getWorkPage: (id) => { const page = base.getWorkPage(id); return page && { ...page, awards }; } });
+  assert.deepEqual(withAwards.getPage("w", null)!.work.awards, awards);
+  assert.equal(createWorksService(base).getPage("w", null)!.work.awards, undefined);
+});
+
+test("recentAwards wraps the announcements", () => {
+  const announcements = [{ prize: "booker", year: 2026, announcedAt: "2026-10-20T00:00:00.000Z", winners: [], nomineeWorkIds: [], honoree: null }];
+  assert.deepEqual(createWorksService(deps({ getRecentAwards: () => announcements })).recentAwards(), { announcements });
 });

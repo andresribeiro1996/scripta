@@ -17,7 +17,7 @@ const { buildWorkRoutes, buildWorkStatsRoutes } = await import("./routes.js");
 const { worksPlugin } = await import("./plugin.js");
 const { WorkResolutionError } = await import("../library/index.js");
 
-function appWith(getPage: (id: string, viewerId: string | null) => unknown, getStats: (id: string) => unknown = () => undefined) {
+function appWith(getPage: (id: string, viewerId: string | null) => unknown, getStats: (id: string) => unknown = () => undefined, recentAwards: () => unknown = () => ({ announcements: [] })) {
   const app = Fastify();
   app.decorate("authenticateAccessToken", (token: string) => (token === "good" ? { id: "viewer", email: "v@example.test", username: "viewer", avatarId: null } : null));
   app.setErrorHandler((error: FastifyError, _request, reply) => {
@@ -25,7 +25,7 @@ function appWith(getPage: (id: string, viewerId: string | null) => unknown, getS
     const statusCode = typeof error.statusCode === "number" && error.statusCode >= 400 && error.statusCode < 500 ? error.statusCode : 500;
     return statusCode === 500 ? reply.code(500).send({ error: "Internal server error" }) : reply.code(statusCode).send({ error: error.message });
   });
-  void app.register(buildWorkRoutes({ getPage } as never));
+  void app.register(buildWorkRoutes({ getPage, recentAwards } as never));
   void app.register(buildWorkStatsRoutes({ getStats } as never));
   return app;
 }
@@ -90,5 +90,15 @@ test("the page and stats routes have separate rate-limit budgets", async () => {
   for (let i = 0; i < 30; i += 1) assert.equal((await app.inject({ url: "/works/w" })).statusCode, 404);
   assert.equal((await app.inject({ url: "/works/w" })).statusCode, 429);
   assert.equal((await app.inject({ url: "/works/w/stats" })).statusCode, 404);
+  await app.close();
+});
+
+test("GET /awards/recent returns the announcements with no-store and needs no sign-in", async () => {
+  const announcements = [{ prize: "booker", year: 2026, announcedAt: "2026-10-20T00:00:00.000Z", winners: [], nomineeWorkIds: [], honoree: null }];
+  const app = appWith(() => undefined, () => undefined, () => ({ announcements }));
+  const res = await app.inject({ url: "/awards/recent" });
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.json(), { announcements });
+  assert.equal(res.headers["cache-control"], "no-store");
   await app.close();
 });

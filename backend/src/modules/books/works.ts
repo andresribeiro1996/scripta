@@ -1,4 +1,4 @@
-import { normalizeBookGenres, workGenres, type WorkGenres } from "@scripta/shared";
+import { PRIZES, isPrizeKey, knownAwards, normalizeBookGenres, workGenres, type AwardAnnouncement, type AwardWinner, type WorkAward, type WorkGenres } from "@scripta/shared";
 import { findOrCreateBook } from "./domain/findOrCreate.js";
 import { searchTokens, WORK_SCAN_LIMIT, type BookLookup } from "./domain/normalize.js";
 import type { SeriesEntry } from "./domain/series.js";
@@ -52,6 +52,7 @@ export type CatalogWorkPage = {
   summary: string | null;
   aliasIds: string[];
   series?: SeriesEntry | null;
+  awards?: WorkAward[];
   editions: Array<{ bookId: string; title: string; language: string | null; year: number | null; isbn: string | null; summary: string | null; coverUrl: string | null; coverColor: string | null; genres: string[]; rating: number | null; ratingCount: number; pages: number | null; possible?: boolean; collection?: SeriesEntry | null }>;
 };
 
@@ -69,6 +70,7 @@ export function getWorkPageWith(books: BooksRepository, coverUrl: (imageId: stri
     summary: shown(rows.work.summary, rows.work.summary_hash),
     aliasIds: rows.aliasIds,
     series,
+    awards: knownAwards(books.awardsOf([rows.work.id]).get(rows.work.id)),
     editions: rows.editions.map((edition) => ({
       bookId: edition.id,
       title: edition.title,
@@ -90,6 +92,46 @@ export function getWorkPageWith(books: BooksRepository, coverUrl: (imageId: stri
 
 export function getWorkPage(id: string): CatalogWorkPage | undefined {
   return getWorkPageWith(booksRepository(), (imageId) => coverUrlFor(imageId, "file"), id);
+}
+
+export const ANNOUNCE_DAYS = 14;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const PRIZE_ORDER = Object.keys(PRIZES);
+
+export function getRecentAwardsWith(books: BooksRepository, coverUrl: (imageId: string) => string, now: Date): AwardAnnouncement[] {
+  const since = new Date(now.getTime() - ANNOUNCE_DAYS * DAY_MS).toISOString();
+  const winnerOf = (workId: string): AwardWinner | undefined => {
+    const rows = books.workPageRows(workId);
+    if (!rows) return undefined;
+    const imageId = rows.editions.find((edition) => edition.cover_image_id)?.cover_image_id;
+    return { workId: rows.work.id, title: rows.work.title, author: rows.work.author, coverUrl: imageId ? coverUrl(imageId) : null };
+  };
+  const firstAuthor = (workIds: string[]) => {
+    for (const workId of workIds) {
+      const winner = winnerOf(workId);
+      if (winner) return winner.author;
+    }
+    return undefined;
+  };
+  const announcements: AwardAnnouncement[] = [];
+  const recent = books.recentAwards(now.getUTCFullYear(), since).sort((left, right) =>
+    (left.announcedAt < right.announcedAt ? 1 : left.announcedAt > right.announcedAt ? -1 : 0) || PRIZE_ORDER.indexOf(left.prize) - PRIZE_ORDER.indexOf(right.prize));
+  for (const row of recent) {
+    if (!isPrizeKey(row.prize)) continue;
+    const { prize, year, announcedAt, nomineeWorkIds } = row;
+    if (PRIZES[row.prize].honours === "author") {
+      const name = row.honoree ?? firstAuthor(row.winnerWorkIds);
+      if (name) announcements.push({ prize, year, announcedAt, winners: [], nomineeWorkIds, honoree: { name, workIds: row.winnerWorkIds } });
+      continue;
+    }
+    const winners = row.winnerWorkIds.flatMap((id) => winnerOf(id) ?? []);
+    if (winners.length > 0) announcements.push({ prize, year, announcedAt, winners, nomineeWorkIds, honoree: null });
+  }
+  return announcements;
+}
+
+export function getRecentAwards(): AwardAnnouncement[] {
+  return getRecentAwardsWith(booksRepository(), (imageId) => coverUrlFor(imageId, "file"), new Date());
 }
 
 export const CONFIDENT_GENRE_LINE = 0.8;
