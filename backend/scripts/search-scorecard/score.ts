@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { catalogHits } from "../../src/modules/books/catalogSearch.js";
 import { searchTokens } from "../../src/modules/books/domain/normalize.js";
@@ -6,13 +7,30 @@ import grades from "./grades.json" with { type: "json" };
 import queries from "./queries.json" with { type: "json" };
 import { readonlyRepo } from "./readonlyRepo.js";
 
-const { values } = parseArgs({ options: { set: { type: "string", default: "tune" } } });
+const { values } = parseArgs({ options: { set: { type: "string", default: "tune" }, wikipedia: { type: "string" } } });
 if (!["tune", "hidden", "all"].includes(values.set!)) {
-  console.error("Usage: score.mjs [--set tune|hidden|all]");
+  console.error("Usage: score.mjs [--set tune|hidden|all] [--wikipedia <sites.json>]");
   process.exit(1);
 }
 const chosen = queries.filter(({ hidden }) => values.set === "all" || hidden === (values.set === "hidden"));
-const { repo } = readonlyRepo();
+const { db, repo: live } = readonlyRepo();
+const sites: Record<string, number> = values.wikipedia ? JSON.parse(readFileSync(values.wikipedia, "utf8")) : {};
+const keysOf = db.prepare("SELECT id AS root, ol_work_key AS key FROM works WHERE id IN (SELECT value FROM json_each(?1)) AND ol_work_key IS NOT NULL UNION ALL SELECT merged_into AS root, ol_work_key AS key FROM works WHERE merged_into IN (SELECT value FROM json_each(?1)) AND ol_work_key IS NOT NULL");
+const repo = values.wikipedia
+  ? {
+      ...live,
+      workSignals(workIds: string[]) {
+        const signals = live.workSignals(workIds);
+        for (const { root, key } of keysOf.all(JSON.stringify(workIds)) as Array<{ root: string; key: string }>) {
+          const count = sites[key];
+          const entry = signals.get(root);
+          if (count === undefined || !entry) continue;
+          entry.wikipediaSites = Math.max(entry.wikipediaSites ?? 0, count);
+        }
+        return signals;
+      }
+    }
+  : live;
 const ranked = new Map<string, string[]>();
 const timings: number[] = [];
 for (const { q } of chosen) {
