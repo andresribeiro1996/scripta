@@ -18,7 +18,6 @@ export function TopShelfBar({
   onGenre,
   genres,
   genreDisabled,
-  onHeight,
 }: {
   period: TopShelfPeriod;
   onPeriod: (period: TopShelfPeriod) => void;
@@ -26,7 +25,6 @@ export function TopShelfBar({
   onGenre: (genre: string | null) => void;
   genres: string[];
   genreDisabled: boolean;
-  onHeight?: (height: number) => void;
 }) {
   const { colors } = useTheme();
   const label = genre ?? ALL_GENRES;
@@ -43,7 +41,7 @@ export function TopShelfBar({
   ];
 
   return (
-    <View style={styles.row} onLayout={(event) => onHeight?.(event.nativeEvent.layout.height)}>
+    <View style={styles.row}>
       <View style={styles.segmented}>
         <Segmented options={PERIODS} value={period} onChange={onPeriod} accessibilityLabel="Period" />
       </View>

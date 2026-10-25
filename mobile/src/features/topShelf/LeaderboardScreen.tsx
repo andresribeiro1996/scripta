@@ -4,7 +4,7 @@ import { Redirect, Stack, router, useSegments } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import type { TopShelfBoard, TopShelfPeriod, TopShelfView } from "@scripta/shared";
 import { Text } from "../../ui/Text";
-import { EmptyState, ErrorState, Screen, ScrollDock, Skeleton, dynamicType, radii, searchDockClearance, spacing, typography, useTheme } from "../../ui";
+import { EmptyState, ErrorState, Screen, Skeleton, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { BookCover } from "../arena/BookCover";
 import { contentTarget } from "../community/communityHome";
 import { workPath } from "../works/workPath";
@@ -36,8 +36,7 @@ function Leaderboard({ view, initialPeriod, initialGenre }: { view: TopShelfView
     else setPeriod(next);
   };
 
-  const [barHeight, setBarHeight] = useState(searchDockClearance);
-  const bar = <TopShelfBar period={period} onPeriod={choosePeriod} genre={genre} onGenre={setGenre} genres={data?.genres ?? []} genreDisabled={isGames} onHeight={setBarHeight} />;
+  const bar = <View style={{ backgroundColor: colors.background }}><TopShelfBar period={period} onPeriod={choosePeriod} genre={genre} onGenre={setGenre} genres={data?.genres ?? []} genreDisabled={isGames} /></View>;
 
   function rows(): Row[] {
     if (!data) return [];
@@ -66,47 +65,47 @@ function Leaderboard({ view, initialPeriod, initialGenre }: { view: TopShelfView
     }));
   }
 
+  function body() {
+    if (query.isError || !data) {
+      return query.isError
+        ? <View style={styles.page}><ErrorState body={query.error instanceof Error ? query.error.message : "Couldn't load this leaderboard."} actionLabel="Retry" onAction={() => void query.refetch()} /></View>
+        : <View style={styles.page}><Skeleton height={200} /></View>;
+    }
+    const list = rows();
+    if (list.length === 0) {
+      return <View style={styles.page}><EmptyState title={`Nothing here yet${data.period === "month" ? " this month" : ""}${isGames ? "." : " — games count once 5 people vote."}`} /></View>;
+    }
+    return list.map((row, index) => (
+      <Pressable key={row.key} accessibilityRole="button" accessibilityLabel={`${index + 1}. ${row.title}, ${row.label}`} onPress={row.onPress}>
+        {({ pressed }) => (
+          <View style={[styles.row, { backgroundColor: pressed ? colors.surfacePressed : "transparent", borderBottomColor: colors.border }]}>
+            <Text {...dynamicType} style={[typography.title, styles.rank, { color: index === 0 ? colors.accent : colors.textDim }]}>{index + 1}</Text>
+            <BookCover cover={row.cover} title={row.title} {...COVER} />
+            <View style={styles.grow}>
+              <Text numberOfLines={2} {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>{row.title}</Text>
+              <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{row.subtitle}</Text>
+              <View style={[styles.track, { backgroundColor: colors.surface }]}>
+                <View style={[styles.fill, { width: `${row.fraction * 100}%`, backgroundColor: colors.accent }]} />
+              </View>
+            </View>
+            <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.strong, styles.value, { color: colors.text }]}>{row.label}</Text>
+          </View>
+        )}
+      </Pressable>
+    ));
+  }
+
   return <Screen top={false}>
     <Stack.Screen options={{ headerShown: true, title: boardTitle(view, genre), headerLargeTitleEnabled: false }} />
-    <ScrollDock bar={bar}>
-      {(scrollProps) => {
-        if (query.isError || !data) {
-          return query.isError
-            ? <View style={styles.page}><ErrorState body={query.error instanceof Error ? query.error.message : "Couldn't load this leaderboard."} actionLabel="Retry" onAction={() => void query.refetch()} /></View>
-            : <View style={styles.page}><Skeleton height={200} /></View>;
-        }
-        const list = rows();
-        if (list.length === 0) {
-          return <View style={styles.page}><EmptyState title={`Nothing here yet${data.period === "month" ? " this month" : ""}${isGames ? "." : " — games count once 5 people vote."}`} /></View>;
-        }
-        return (
-          <ScrollView {...scrollProps} contentContainerStyle={{ paddingBottom: barHeight }}>
-            {list.map((row, index) => (
-              <Pressable key={row.key} accessibilityRole="button" accessibilityLabel={`${index + 1}. ${row.title}, ${row.label}`} onPress={row.onPress}>
-                {({ pressed }) => (
-                  <View style={[styles.row, { backgroundColor: pressed ? colors.surfacePressed : "transparent", borderBottomColor: colors.border }]}>
-                    <Text {...dynamicType} style={[typography.title, styles.rank, { color: index === 0 ? colors.accent : colors.textDim }]}>{index + 1}</Text>
-                    <BookCover cover={row.cover} title={row.title} {...COVER} />
-                    <View style={styles.grow}>
-                      <Text numberOfLines={2} {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>{row.title}</Text>
-                      <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{row.subtitle}</Text>
-                      <View style={[styles.track, { backgroundColor: colors.surface }]}>
-                        <View style={[styles.fill, { width: `${row.fraction * 100}%`, backgroundColor: colors.accent }]} />
-                      </View>
-                    </View>
-                    <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.strong, styles.value, { color: colors.text }]}>{row.label}</Text>
-                  </View>
-                )}
-              </Pressable>
-            ))}
-          </ScrollView>
-        );
-      }}
-    </ScrollDock>
+    <ScrollView stickyHeaderIndices={[0]} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.list}>
+      {bar}
+      {body()}
+    </ScrollView>
   </Screen>;
 }
 
 const styles = StyleSheet.create({
+  list: { paddingBottom: spacing.xl },
   grow: { flex: 1, gap: spacing.xs },
   strong: { fontWeight: "600" },
   page: { flex: 1, padding: spacing.lg },
