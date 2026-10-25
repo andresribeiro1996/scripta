@@ -115,8 +115,6 @@ function matchExpression(tokens: string[]): string {
 
 type SeriesCandidate = SeriesEntry & { nameKey: string; source: SeriesSource; rank: number; createdAt: string };
 
-const WIKIPEDIA_WRITE_CHUNK = 500;
-
 export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const byKeyStmt = db.prepare(`SELECT books.* FROM book_keys JOIN books ON books.id = book_keys.book_id WHERE book_keys.key = ?`);
   const byKeysStmt = db.prepare(`SELECT book_keys.key AS key, books.* FROM book_keys JOIN books ON books.id = book_keys.book_id WHERE book_keys.key IN (SELECT value FROM json_each(?))`);
@@ -1490,15 +1488,11 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     },
 
     setWikipediaSites(rows) {
-      let updated = 0;
-      for (let start = 0; start < rows.length; start += WIKIPEDIA_WRITE_CHUNK) {
-        updated += inTransaction(() => {
-          let changed = 0;
-          for (const { olWorkKey, sites } of rows.slice(start, start + WIKIPEDIA_WRITE_CHUNK)) changed += Number(setWikipediaSitesStmt.run(sites, olWorkKey, sites).changes);
-          return changed;
-        });
-      }
-      return updated;
+      return inTransaction(() => {
+        let changed = 0;
+        for (const { olWorkKey, sites } of rows) changed += Number(setWikipediaSitesStmt.run(sites, olWorkKey, sites).changes);
+        return changed;
+      });
     },
 
     searchCollectionBooks(tokens, limit) {

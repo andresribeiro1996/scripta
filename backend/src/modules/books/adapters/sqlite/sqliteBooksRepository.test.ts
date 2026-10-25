@@ -3482,14 +3482,23 @@ test("setWikipediaSites writes to the keyed work, and workSignals takes the high
   assert.equal(signals.get(bare.work_id!)!.wikipediaSites, 5);
 });
 
-test("setWikipediaSites applies more rows than one write chunk, and a second call changes nothing", () => {
+test("setWikipediaSites writes its rows in one transaction and a second call changes nothing", () => {
   const { db, repo } = freshRepo();
-  const rows = Array.from({ length: 1203 }, (_, n) => ({ olWorkKey: `OL${n + 1}W`, sites: n + 1 }));
+  const rows = Array.from({ length: 500 }, (_, n) => ({ olWorkKey: `OL${n + 1}W`, sites: n + 1 }));
   const insert = db.prepare("INSERT INTO works (id, ol_work_key, title, author, created_at) VALUES (?, ?, 'T', 'A', ?)");
   for (const { olWorkKey } of rows) insert.run(`w-${olWorkKey}`, olWorkKey, NOW);
-  assert.equal(repo.setWikipediaSites(rows), 1203);
-  assert.equal((db.prepare("SELECT COUNT(*) AS n FROM works WHERE wikipedia_sites IS NOT NULL").get() as { n: number }).n, 1203);
+  assert.equal(repo.setWikipediaSites(rows), 500);
+  assert.equal((db.prepare("SELECT COUNT(*) AS n FROM works WHERE wikipedia_sites IS NOT NULL").get() as { n: number }).n, 500);
   assert.equal(repo.setWikipediaSites(rows), 0);
+});
+
+test("editionsOf flags editions with a cover_image_id or an ol_cover_id", () => {
+  const { db, repo } = freshRepo();
+  const covered = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593", workKey: "OL1W" }, ["isbn:9780441013593"], NOW);
+  const bare = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780593099322", workKey: "OL1W" }, ["isbn:9780593099322"], NOW);
+  const olCover = repo.createBook({ title: "Duna", author: "Frank Herbert", isbn: "9789722345678", workKey: "OL1W", olCoverId: 7 }, ["isbn:9789722345678"], NOW);
+  db.prepare("UPDATE books SET cover_image_id = 'img' WHERE id = ?").run(covered.id);
+  assert.deepEqual(repo.editionsOf([covered.work_id!]).map(({ id, hasCover }) => [id, hasCover]), [[covered.id, true], [bare.id, false], [olCover.id, true]]);
 });
 
 test("searchBooks returns each row's bm25 score", () => {

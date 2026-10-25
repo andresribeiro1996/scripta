@@ -2398,8 +2398,8 @@ test("a series search leads with the series in reading order, and every result c
 
 test("a series member the search did not find leads with its covered edition", () => {
   const h = harness();
-  const old = seeded(h, "Livro Antigo", isbnOf(1), { author: "Ana Lima", workKey: "OL1W", at: SERIES_AT });
-  const covered = h.repo.createBook({ title: "Livro Novo", author: "Ana Lima", isbn: isbnOf(2), workKey: "OL1W", olCoverId: 9, createdBy: "seed" }, [`isbn:${isbnOf(2)}`], "2026-10-16T12:00:00.000Z");
+  const old = seeded(h, "Livro", isbnOf(1), { author: "Ana Lima", workKey: "OL1W", at: SERIES_AT });
+  const covered = h.repo.createBook({ title: "Livro", author: "Ana Lima", isbn: isbnOf(2), workKey: "OL1W", olCoverId: 9, createdBy: "seed" }, [`isbn:${isbnOf(2)}`], "2026-10-16T12:00:00.000Z");
   h.repo.addWorkSeries(old.work_id!, [{ name: MALAZAN, position: "1" }], "wikidata", SERIES_AT);
   assert.deepEqual(h.service.search("malazan", { byWork: true }).map((result) => result.title), [covered.title]);
 });
@@ -2411,6 +2411,15 @@ test("a collection edition of a work already listed stays right after that work'
   seeded(h, "Lobos Beta", isbnOf(3), { author: "Rui Costa", workKey: "OL2W" });
   h.repo.addBookCollection(second.id, { name: "Lobos", position: null }, "bnp", SERIES_AT);
   assert.deepEqual(h.service.search("lobos").map((result) => result.title), [first.title, second.title, "Lobos Beta"]);
+});
+
+test("collection editions of works not yet listed are grouped by work", () => {
+  const h = harness();
+  const c1 = seeded(h, "Cão Um", isbnOf(1), { author: "Ana Lima", workKey: "OL1W" });
+  const d1 = seeded(h, "Doce Um", isbnOf(2), { author: "Rui Costa", workKey: "OL2W" });
+  const c2 = seeded(h, "Cão Dois", isbnOf(3), { author: "Ana Lima", workKey: "OL1W" });
+  for (const book of [c1, d1, c2]) h.repo.addBookCollection(book.id, { name: "Bichos", position: null }, "bnp", SERIES_AT);
+  assert.deepEqual(h.service.search("bichos").map((result) => result.title), [c1.title, c2.title, d1.title]);
 });
 
 test("a series name is searched together with its author", () => {

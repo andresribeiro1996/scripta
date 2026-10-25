@@ -1,6 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import { writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
+import { setTimeout as sleep } from "node:timers/promises";
 
 const USAGE = "Usage: node scripts/fill-wikipedia-counts.mjs [--dry-run] [--out <file>]";
 
@@ -18,6 +19,9 @@ if (values.out === undefined && !process.env.COVERS_DB_PATH) fail("Missing envir
 
 const { wikipediaSitesFrom } = await import("../dist/modules/books/seed/wikipediaCounts.js");
 const { WIKIDATA_PAGE_ROWS, queryAllPages } = await import("../dist/modules/books/adapters/wikidata/sparql.js");
+
+const CHUNK_ROWS = 500;
+const CHUNK_PAUSE_MS = 250;
 
 const log = (line) => console.error(line);
 
@@ -49,6 +53,11 @@ if (values.out !== undefined) {
     const { createSqliteBooksRepository } = await import("../dist/modules/books/adapters/sqlite/sqliteBooksRepository.js");
     const { waitForBnpLock } = await import("../dist/modules/books/seed/bnpImport.js");
     const repo = createSqliteBooksRepository(waitForBnpLock(openBooksDb()));
-    console.log(JSON.stringify({ dryRun: false, fetched: rows.length, updated: repo.setWikipediaSites(rows) }, null, 2));
+    let updated = 0;
+    for (let start = 0; start < rows.length; start += CHUNK_ROWS) {
+      if (start > 0) await sleep(CHUNK_PAUSE_MS);
+      updated += repo.setWikipediaSites(rows.slice(start, start + CHUNK_ROWS));
+    }
+    console.log(JSON.stringify({ dryRun: false, fetched: rows.length, updated }, null, 2));
   }
 }

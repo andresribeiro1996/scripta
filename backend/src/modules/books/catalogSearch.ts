@@ -3,7 +3,7 @@ import type { BooksRepository, SeriesMatch } from "./domain/ports.js";
 import { rankWorks, seriesOrder, withoutArticle, type RankCandidate } from "./domain/searchRank.js";
 import type { SeriesEntry } from "./domain/series.js";
 import type { BookRow } from "./domain/types.js";
-import { firstEditionPerWork, workIdsOf } from "./domain/workSearch.js";
+import { coveredFirst, firstEditionPerWork, workIdsOf } from "./domain/workSearch.js";
 
 export type Hit = { row: BookRow; workId: string | null; matched?: SeriesEntry };
 
@@ -45,8 +45,8 @@ function rankedWorkKeys(repo: BooksRepository, tokens: string[], rows: Array<Boo
 }
 
 function representativeEdition(repo: BooksRepository, workId: string): BookRow | undefined {
-  const searchable = repo.editionsOf([workId]).filter(({ id }) => repo.isSearchable(id));
-  const edition = searchable.find(({ hasCover }) => hasCover) ?? searchable[0];
+  const ordered = coveredFirst(repo.editionsOf([workId]), ({ workId: id }) => id, ({ hasCover }) => hasCover, ({ title }) => title);
+  const edition = ordered.find(({ id }) => repo.isSearchable(id));
   return edition ? repo.getBook(edition.id) : undefined;
 }
 
@@ -103,8 +103,11 @@ export function catalogHits(repo: BooksRepository, tokens: string[], byWork: boo
   const tail: Hit[] = [];
   for (const hit of collected) {
     const last = hit.workId === null ? -1 : grouped.map(({ workId }) => workId).lastIndexOf(hit.workId);
-    if (last === -1) tail.push(hit);
-    else grouped.splice(last + 1, 0, hit);
+    if (last !== -1) grouped.splice(last + 1, 0, hit);
+    else {
+      const inTail = hit.workId === null ? -1 : tail.map(({ workId }) => workId).lastIndexOf(hit.workId);
+      tail.splice(inTail === -1 ? tail.length : inTail + 1, 0, hit);
+    }
   }
   return [...grouped, ...tail];
 }
