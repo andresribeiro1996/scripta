@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdtempSync, statSync } from "node:fs";
+import { execFileSync, spawnSync } from "node:child_process";
+import { copyFileSync, existsSync, mkdtempSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -60,4 +60,14 @@ test("a busy checkpoint is reported, not thrown", () => {
   assert.equal(run(c), `truncate-wals: ${c} wal_bytes=${walBytes} busy, WAL left in place\n`);
   assert.ok(statSync(`${c}-wal`).size > 0);
   holder.close();
+});
+
+test("a file that is not a database fails and names the path", () => {
+  const path = join(mkdtempSync(join(tmpdir(), "truncate-wals-")), "bad.sqlite");
+  writeFileSync(path, "not a database".repeat(400));
+
+  const result = spawnSync(process.execPath, [script, path], { encoding: "utf8" });
+
+  assert.notEqual(result.status, 0);
+  assert.ok(result.stderr.includes(`truncate-wals: ${path}`));
 });
