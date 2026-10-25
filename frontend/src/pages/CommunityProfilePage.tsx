@@ -65,17 +65,17 @@ export function CommunityProfilePage() {
 
   if (!session || isLoading || (!view && !isNotFound && !error)) {
     return (
-      <div className="mx-auto max-w-3xl p-6">
+      <Page title={`@${username ?? ""}`} back={backTo("profile")} maxWidth={768}>
         <SkeletonCardGrid count={2} label="Loading profile" tileClassName="min-h-[120px]" />
-      </div>
+      </Page>
     );
   }
 
   if (isNotFound || !view) {
     return (
-      <div className="mx-auto max-w-3xl p-6">
+      <Page title={`@${username ?? ""}`} back={backTo("profile")} maxWidth={768}>
         <PrivateProfileState />
-      </div>
+      </Page>
     );
   }
 

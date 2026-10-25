@@ -117,15 +117,15 @@ export function OwnShelfView({ username }: { username: string }) {
 
   if (own.isPending || murals.isLoading) {
     return (
-      <div className="mx-auto max-w-3xl p-6">
+      <Page title={`@${username}`} back={backTo("profile")} maxWidth={768}>
         <SkeletonCardGrid count={2} label="Loading your shelf" tileClassName="min-h-[120px]" />
-      </div>
+      </Page>
     );
   }
 
   if (own.isError || murals.isError) {
     return (
-      <div className="mx-auto max-w-3xl p-6">
+      <Page title={`@${username}`} back={backTo("profile")} maxWidth={768}>
         <EmptyState
           title="Shelf unavailable."
           body="Couldn't load your shelf."
@@ -141,7 +141,7 @@ export function OwnShelfView({ username }: { username: string }) {
             </button>
           }
         />
-      </div>
+      </Page>
     );
   }
 

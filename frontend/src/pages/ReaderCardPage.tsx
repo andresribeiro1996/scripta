@@ -43,11 +43,11 @@ export function ReaderCardPage() {
   };
 
   if (!style) {
-    if (isPending) return <p className="px-5 py-8 text-sm text-(--color-text-dim)">Loading your reader card…</p>;
+    if (isPending) return <Page title="Reader card" maxWidth={1024}><p className="text-sm text-(--color-text-dim)">Loading your reader card…</p></Page>;
     return (
-      <div className="px-5 py-8">
+      <Page title="Reader card" maxWidth={1024}>
         <button type="button" onClick={() => void refetch()} className="text-sm font-semibold text-(--color-accent)">Couldn't load your reader card. Try again</button>
-      </div>
+      </Page>
     );
   }
 
