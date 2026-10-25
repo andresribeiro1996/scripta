@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdtempSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -62,12 +62,16 @@ test("a busy checkpoint is reported, not thrown", () => {
   holder.close();
 });
 
-test("a file that is not a database fails and names the path", () => {
-  const path = join(mkdtempSync(join(tmpdir(), "truncate-wals-")), "bad.sqlite");
-  writeFileSync(path, "not a database".repeat(400));
+test("a path that is not a database fails and names the path", () => {
+  const dir = mkdtempSync(join(tmpdir(), "truncate-wals-"));
+  const file = join(dir, "bad.sqlite");
+  writeFileSync(file, "not a database".repeat(400));
+  const folder = join(dir, "folder.sqlite");
+  mkdirSync(folder);
 
-  const result = spawnSync(process.execPath, [script, path], { encoding: "utf8" });
-
-  assert.notEqual(result.status, 0);
-  assert.ok(result.stderr.includes(`truncate-wals: ${path}`));
+  for (const path of [file, folder]) {
+    const result = spawnSync(process.execPath, [script, path], { encoding: "utf8" });
+    assert.notEqual(result.status, 0);
+    assert.ok(result.stderr.includes(`truncate-wals: ${path}`), result.stderr);
+  }
 });
