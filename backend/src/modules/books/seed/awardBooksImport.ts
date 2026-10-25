@@ -2,7 +2,7 @@ import { PRIZES, canonicalIsbn, type PrizeKey } from "@scripta/shared";
 import { realSleep, type Sleep } from "../adapters/typesafe/jevRequest.js";
 import { listOf, type Binding } from "../adapters/wikidata/sparql.js";
 import { SourceUnavailableError } from "../domain/errors.js";
-import { normalizeWorkKey } from "../domain/normalize.js";
+import { lookupIdentity, normalizeWorkKey, workTitleKey } from "../domain/normalize.js";
 import type { BookCatalog, BooksRepository, CatalogSearchHit } from "../domain/ports.js";
 import { saveCatalogHits } from "../saveHits.js";
 import { itemOf, prizeOf } from "./awardsFill.js";
@@ -51,7 +51,10 @@ export function missingAwardWorks(repo: Pick<BooksRepository, "findBookByKey" | 
   return works.filter((work) => !work.olWorkIds.some((id) => known.has(id)) && !work.isbns.some((isbn) => repo.findBookByKey(`isbn:${isbn}`)));
 }
 
-const usable = ({ result }: CatalogSearchHit) => result.title.trim() !== "" && result.authors.some((name) => name.trim() !== "");
+function usable({ result }: CatalogSearchHit): boolean {
+  const identity = lookupIdentity({ title: result.title, author: result.authors.join(", ") });
+  return identity !== null && workTitleKey(identity.title, identity.author) !== "";
+}
 
 export async function resolveAwardWork(search: BookCatalog["search"], work: AwardWork): Promise<CatalogSearchHit | null> {
   for (const id of work.olWorkIds) {

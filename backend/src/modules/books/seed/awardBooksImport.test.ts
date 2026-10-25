@@ -160,14 +160,19 @@ test("resolveAwardWork falls back to the ISBNs and saves the searched ISBN", asy
   assert.equal(resolved?.workKey, "/works/OL2W");
 });
 
-test("resolveAwardWork skips a hit with no title or no author, and returns null when nothing fits", async () => {
+test("resolveAwardWork skips a hit with no title, no author, a punctuation-only title or a blank first author, and returns null when nothing fits", async () => {
   const good = hit("Wolf Hall", ["Hilary Mantel"], "OL2W");
-  const found = searching(() => [hit("", ["Hilary Mantel"], "OL2W"), hit("Wolf Hall", [], "OL2W"), good]);
+  const found = searching(() => [hit("", ["Hilary Mantel"], "OL2W"), hit("Wolf Hall", [], "OL2W"), hit("!!!", ["Hilary Mantel"], "OL2W"), hit("Wolf Hall", ["", "Hilary Mantel"], "OL2W"), good]);
   const resolved = await resolveAwardWork(found.search, work("Q1", ["booker"], { olWorkIds: ["OL2W"] }));
   assert.equal(resolved?.result.title, "Wolf Hall");
   assert.deepEqual(resolved?.result.authors, ["Hilary Mantel"]);
 
-  const unusable = searching(() => [hit("", ["Hilary Mantel"], "OL2W", "9782222222222"), hit("Wolf Hall", [], "OL2W", "9782222222222")]);
+  const unusable = searching(() => [
+    hit("", ["Hilary Mantel"], "OL2W", "9782222222222"),
+    hit("Wolf Hall", [], "OL2W", "9782222222222"),
+    hit("!!!", ["Hilary Mantel"], "OL2W", "9782222222222"),
+    hit("Wolf Hall", ["", "Hilary Mantel"], "OL2W", "9782222222222")
+  ]);
   assert.equal(await resolveAwardWork(unusable.search, work("Q1", ["booker"], { olWorkIds: ["OL2W"], isbns: ["9780000000002"] })), null);
   assert.equal(await resolveAwardWork(unusable.search, work("Q2", ["booker"])), null);
 });
@@ -180,6 +185,7 @@ test("resolveAwardWork saves a work-ID hit without an ISBN", async () => {
   assert.equal(bookCount(db), 1);
   assert.equal(saved?.isbn, null);
   assert.equal(saved?.ol_work_key, "OL2W");
+  assert.equal(saved?.title_key, "ta:wolf hall|hilary mantel|");
   assert.equal(repo.findBookByKey("isbn:9782222222222"), undefined);
 });
 
