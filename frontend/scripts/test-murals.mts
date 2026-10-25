@@ -111,7 +111,7 @@ console.log("\n3. addBlock — first free slot, never overlapping");
   const muralId = murals[0].id;
   const first = addBlock(murals, muralId, "text");
   murals = first.murals;
-  check("first block at the origin", JSON.stringify(murals[0].blocks[0].layout) === JSON.stringify({ x: 0, y: 0, w: 4, h: 2 }));
+  check("first block at the origin", JSON.stringify(murals[0].blocks[0].layout) === JSON.stringify({ x: 0, y: 0, w: 4, h: 3 }));
   const second = addBlock(murals, muralId, "stats");
   murals = second.murals;
   const [b1, b2] = murals[0].blocks;
@@ -120,12 +120,12 @@ console.log("\n3. addBlock — first free slot, never overlapping");
   check("addBlock returns the new block's id", second.blockId === b2.id);
 
   const withGap = muralWithBlocks([
-    { id: "a", type: "text", layout: { x: 4, y: 0, w: 8, h: 2 }, heading: "A" },
-    { id: "b", type: "text", layout: { x: 0, y: 2, w: 12, h: 2 }, heading: "B" }
+    { id: "a", type: "text", layout: { x: 4, y: 0, w: 8, h: 3 }, heading: "A" },
+    { id: "b", type: "text", layout: { x: 0, y: 3, w: 12, h: 2 }, heading: "B" }
   ]);
   const inGap = addBlock(withGap, "m1", "text");
   const gapBlock = inGap.murals[0].blocks.find((b) => b.id === inGap.blockId)!;
-  check("a gap at the top-left takes the new block", JSON.stringify(gapBlock.layout) === JSON.stringify({ x: 0, y: 0, w: 4, h: 2 }));
+  check("a gap at the top-left takes the new block", JSON.stringify(gapBlock.layout) === JSON.stringify({ x: 0, y: 0, w: 4, h: 3 }));
 
   const full = muralWithBlocks([
     { id: "a", type: "text", layout: { x: 0, y: 0, w: 12, h: 2 }, heading: "A" },

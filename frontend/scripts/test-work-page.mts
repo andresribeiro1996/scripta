@@ -217,3 +217,8 @@ test("a work page with no awards has no pills and no author prize line", () => {
   assert.ok(!html.includes("nominee"));
   assert.ok(!html.includes("Prize"));
 });
+
+test("the cover column can shrink below the edition strip's width, so a phone page never widens to fit the strip", () => {
+  const html = render({});
+  assert.match(html, /<div class="min-w-0 self-start[^"]*"><div><div[^>]*aria-roledescription="carousel"/);
+});
