@@ -18,8 +18,8 @@ import type { GalleryImage } from "../../api/gallery";
 import { ALL_STAT_METRICS, BOOK_GENRES, STAT_METRIC_LABELS, blockLabel, type MuralBlock } from "../../lib/murals";
 import { bookKey } from "../../lib/merge";
 import { BookSearchList, GalleryImageGrid } from "./pickers";
-import { useDismissible } from "../../hooks/useDismissible";
-import { useScrollLock } from "../../hooks/useScrollLock";
+import { Sheet } from "../Sheet";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../page/buttonClasses";
 import { useTierlists } from "../../hooks/useTierlists";
 import { ChevronLeftIcon, ChevronRightIcon } from "../Toolbar";
 
@@ -43,12 +43,10 @@ export function BlockConfigPanel({
   onSave: (block: MuralBlock) => void;
   onClose: () => void;
 }) {
-  useScrollLock();
-  useDismissible(onClose);
   const [draft, setDraft] = useState<MuralBlock>(block);
   // tierlist only: the saved tier lists to pick from. Everything else
   // about a tier list — structure, pool, ranking — is edited over in
-  // Arena (TierListEditorPage); this modal's whole tierlist job is
+  // the Games area (TierListEditorPage); this modal's whole tierlist job is
   // choosing WHICH one the block displays.
   const { data: tierlists } = useTierlists();
   // Only meaningful for quote/quoteCollection's two-step "pick a book,
@@ -62,19 +60,22 @@ export function BlockConfigPanel({
   }
 
   return (
-    <div className="overlay-in fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div
-        className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-(--color-border) bg-(--color-surface) shadow-lg"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between border-b border-(--color-border) p-4">
-          <h3 className="text-sm font-semibold">{blockLabel(draft.type)}</h3>
-          <button onClick={onClose} className="text-sm text-(--color-text-dim) hover:text-(--color-text)">
-            Close
+    <Sheet
+      title={blockLabel(draft.type)}
+      onClose={onClose}
+      style={{ maxWidth: "32rem" }}
+      footer={
+        <>
+          <button onClick={onClose} className={BUTTON_SECONDARY}>
+            Cancel
           </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto overscroll-contain p-4">
+          <button onClick={handleSave} className={BUTTON_PRIMARY}>
+            Save
+          </button>
+        </>
+      }
+    >
+      <div className="p-2">
           {draft.type === "text" && (
             <div className="flex flex-col gap-3">
               <div>
@@ -391,7 +392,7 @@ export function BlockConfigPanel({
                   {tierlists === undefined ? (
                     <p className="text-xs text-(--color-text-dim)">Loading tier lists…</p>
                   ) : tierlists.length === 0 ? (
-                    <p className="text-xs text-(--color-text-dim)">No tier lists yet — create one in Arena and it will show up here.</p>
+                    <p className="text-xs text-(--color-text-dim)">No tier lists yet — create one in Games and it will show up here.</p>
                   ) : (
                     tierlists.map((t) => (
                       <button
@@ -413,29 +414,19 @@ export function BlockConfigPanel({
                       </button>
                     ))
                   )}
-                  <p className="mt-1 text-xs text-(--color-text-dim)">Ranking and tiers are edited over in Arena.</p>
+                  <p className="mt-1 text-xs text-(--color-text-dim)">Ranking and tiers are edited over in Games.</p>
                   <Link
                     to="/dashboard/arena?tab=tierlists"
                     onClick={onClose}
                     className="inline-flex items-center gap-1 self-start text-xs font-medium text-(--color-accent) transition-opacity hover:opacity-80"
                   >
-                    Create in Arena
+                    Create in Games
                     <ChevronRightIcon size={13} />
                   </Link>
                 </div>
               );
             })()}
-        </div>
-
-        <div className="flex justify-end gap-2 border-t border-(--color-border) p-4">
-          <button onClick={onClose} className="rounded-lg border border-(--color-border) px-3 py-2 text-sm hover:bg-(--color-surface-hover)">
-            Cancel
-          </button>
-          <button onClick={handleSave} className="rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-semibold text-(--color-on-accent)">
-            Save
-          </button>
-        </div>
       </div>
-    </div>
+    </Sheet>
   );
 }

@@ -20,8 +20,8 @@ import { workIdOf, booksByWork } from "@scripta/shared";
 import { useWorkBooks } from "../../hooks/useWorkBooks";
 import { CoverImage } from "../BookCard";
 import { BookSearchList } from "../murals/pickers";
-import { useDismissible } from "../../hooks/useDismissible";
-import { useScrollLock } from "../../hooks/useScrollLock";
+import { Sheet } from "../Sheet";
+import { BUTTON_SECONDARY } from "../page/buttonClasses";
 
 export function SeedSlotGrid({
   bracketSize,
@@ -49,9 +49,6 @@ export function SeedSlotGrid({
   const workBooks = useWorkBooks(library);
   const books = useMemo(() => [...booksByWork(workBooks).values()], [workBooks]);
   const [pickingSlot, setPickingSlot] = useState<number | null>(null);
-  // Always-mounted grid — lock only while the picker modal is up.
-  useScrollLock(pickingSlot !== null);
-  useDismissible(() => setPickingSlot(null), pickingSlot !== null);
   const usedWorkIds = new Set(slots.filter((s): s is SeedBook => s !== null).map((s) => s.workId));
   const filledCount = slots.filter(Boolean).length;
 
@@ -79,7 +76,7 @@ export function SeedSlotGrid({
           onClick={onRandomFill}
           disabled={books.length < bracketSize}
           title={books.length < bracketSize ? `Your library needs at least ${bracketSize} books to random-fill.` : undefined}
-          className="rounded-lg bg-(--color-accent) px-3 py-1.5 text-sm font-medium text-(--color-on-accent) disabled:opacity-50"
+          className={BUTTON_SECONDARY}
         >
           Random fill
         </button>
@@ -105,18 +102,14 @@ export function SeedSlotGrid({
       </div>
 
       {pickingSlot !== null && (
-        <div className="overlay-in fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setPickingSlot(null)}>
-          <div
-            className="w-full max-w-md rounded-xl border border-(--color-border) bg-(--color-surface) p-4 shadow-lg"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="mb-3 text-sm font-semibold">Pick a book for slot {pickingSlot + 1}</h3>
+        <Sheet title={`Pick a book for slot ${pickingSlot + 1}`} onClose={() => setPickingSlot(null)}>
+          <div className="p-2">
             <BookSearchList
               books={books.filter((b) => !usedWorkIds.has(workIdOf(b) ?? null))}
               onSelect={(book) => void assignSlot(pickingSlot, book)}
             />
           </div>
-        </div>
+        </Sheet>
       )}
     </div>
   );

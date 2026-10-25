@@ -15,7 +15,13 @@ const DIALOG_FILES = [
   "components/PerCardStylePanel",
   "components/SocialsSection",
   "pages/GroupsPage",
-  "components/ConfirmDialog"
+  "components/ConfirmDialog",
+  "components/murals/MoveToFolderModal",
+  "components/murals/BlockConfigPanel",
+  "components/murals/BlockStylePanel",
+  "components/tierlist/AddBooksSheet",
+  "components/arena/SeedSlotGrid",
+  "components/OwnShelfView"
 ];
 
 test("title left at text-lg, 44px Close on the right, optional footer", () => {
@@ -34,4 +40,9 @@ test("these dialogs are built on Sheet, with no hand-rolled overlay or Close tex
     assert.doesNotMatch(src, /fixed inset-0/, file);
     assert.doesNotMatch(src, />\s*Close\s*</, file);
   }
+});
+
+test("the block config dialog says Games, not Arena", () => {
+  const src = readFileSync(new URL("../src/components/murals/BlockConfigPanel.tsx", import.meta.url), "utf8");
+  assert.doesNotMatch(src, />[^<{]*\bArena\b[^<]*</);
 });
