@@ -173,32 +173,45 @@ test("a title-key join is undone without a manual answer of none, while a code j
   assert.deepEqual(repo.workMatchJudgments([volumes[0]!.work_id!]).get(volumes[0]!.work_id!), none);
 });
 
-test("jev and manual joins are undone too, each leaving a manual answer of none", () => {
+test("a jev join is undone too, and a manual join is reported and left alone", () => {
   const { repo } = freshRepo();
   const { series, volumes } = poppy(repo);
   const [coded, judged, manual] = volumes as [Edition, Edition, Edition];
   joinInto(repo, coded, series);
   joinInto(repo, judged, series, "jev");
   joinInto(repo, manual, series, "manual");
-  assert.deepEqual(undoReviewedMerges(repo, volumes.map((volume) => volume.work_id!), () => NOW, quietly), { undone: [manual.work_id, judged.work_id, coded.work_id], failures: [] });
+  assert.deepEqual(undoReviewedMerges(repo, volumes.map((volume) => volume.work_id!), () => NOW, quietly), { undone: [judged.work_id, coded.work_id], failures: [{ fromWork: manual.work_id, reason: "no active code, jev, ol-duplicate or title-key merge" }] });
   assert.equal(repo.getBook(coded.id)!.work_id, coded.work_id);
   assert.equal(repo.getBook(judged.id)!.work_id, judged.work_id);
-  assert.equal(repo.getBook(manual.id)!.work_id, manual.work_id);
-  assert.equal(repo.workMatchJudgments([manual.work_id!]).get(manual.work_id!)?.intoWorkId, null);
-  assert.equal(repo.workMatchJudgments([manual.work_id!]).get(manual.work_id!)?.model, "manual");
+  assert.equal(repo.getBook(manual.id)!.work_id, series.work_id);
+  assert.equal(repo.workMatchJudgments([manual.work_id!]).size, 0);
 });
 
-test("every requested id is reported: a typo and a join already undone are failures", () => {
+test("a manual join is undone only when named in the explicit manual list", () => {
   const { repo } = freshRepo();
   const { series, volumes } = poppy(repo);
-  const [coded, , gone] = volumes as [Edition, Edition, Edition];
+  const manual = volumes[0]!;
+  joinInto(repo, manual, series, "manual");
+  const reason = "no active code, jev, ol-duplicate or title-key merge";
+  assert.deepEqual(undoReviewedMerges(repo, [manual.work_id!], () => NOW, quietly), { undone: [], failures: [{ fromWork: manual.work_id, reason }] });
+  assert.equal(repo.getBook(manual.id)!.work_id, series.work_id);
+  assert.deepEqual(undoReviewedMerges(repo, [], () => NOW, quietly, [manual.work_id!]), { undone: [manual.work_id], failures: [] });
+  assert.equal(repo.getBook(manual.id)!.work_id, manual.work_id);
+  assert.deepEqual(repo.workMatchJudgments([manual.work_id!]).get(manual.work_id!), { model: "manual", intoWorkId: null, confidence: null, askedAt: UNDONE_AT });
+});
+
+test("every requested id is reported: a typo, a manual join and a join already undone are failures", () => {
+  const { repo } = freshRepo();
+  const { series, volumes } = poppy(repo);
+  const [coded, manual, gone] = volumes as [Edition, Edition, Edition];
   joinInto(repo, coded, series);
+  joinInto(repo, manual, series, "manual");
   joinInto(repo, gone, series);
   repo.undoMerge(gone.work_id!, AT);
-  const reason = "no active code, jev, manual, ol-duplicate or title-key merge";
-  assert.deepEqual(undoReviewedMerges(repo, [coded.work_id!, gone.work_id!, "no-such-work"], () => NOW, quietly), {
+  const reason = "no active code, jev, ol-duplicate or title-key merge";
+  assert.deepEqual(undoReviewedMerges(repo, [coded.work_id!, manual.work_id!, gone.work_id!, "no-such-work"], () => NOW, quietly), {
     undone: [coded.work_id],
-    failures: [{ fromWork: gone.work_id, reason }, { fromWork: "no-such-work", reason }]
+    failures: [{ fromWork: manual.work_id, reason }, { fromWork: gone.work_id, reason }, { fromWork: "no-such-work", reason }]
   });
 });
 

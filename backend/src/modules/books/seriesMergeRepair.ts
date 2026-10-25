@@ -7,7 +7,7 @@ import { joinVerdict } from "./domain/volumeGuard.js";
 import { guardTarget } from "./translationJudgments.js";
 
 const SOURCES: MergeSource[] = ["title-key", "admin", "code", "jev", "manual", "ol-duplicate"];
-const UNDOABLE: MergeSource[] = ["code", "jev", "manual", "ol-duplicate", "title-key"];
+const UNDOABLE: MergeSource[] = ["code", "jev", "ol-duplicate", "title-key"];
 
 type Why = "series-like" | "volume";
 type Edition = ReturnType<BooksRepository["editionsOf"]>[number];
@@ -149,14 +149,15 @@ export function addSeriesRows(repo: Pick<BooksRepository, "addWorkSeries">, rows
   return rows.reduce((added, row) => added + repo.addWorkSeries(row.workId, [{ name: row.name, position: row.position }], row.source, at), 0);
 }
 
-export function undoReviewedMerges(repo: UndoRepo, fromWorks: string[], now: () => number, progress: (fromWork: string) => void): { undone: string[]; failures: Failure[] } {
-  const reviewed = new Set(fromWorks);
+export function undoReviewedMerges(repo: UndoRepo, fromWorks: string[], now: () => number, progress: (fromWork: string) => void, manualFromWorks: string[] = []): { undone: string[]; failures: Failure[] } {
+  const reviewed = new Set([...fromWorks, ...manualFromWorks]);
+  const manualOk = new Set(manualFromWorks);
   const merges = allActiveMerges(repo);
   const byFrom = new Map(merges.map((merge) => [merge.fromWork, merge]));
-  const requested = merges.filter((merge) => UNDOABLE.includes(merge.source) && reviewed.has(merge.fromWork));
+  const requested = merges.filter((merge) => (UNDOABLE.includes(merge.source) || (merge.source === "manual" && manualOk.has(merge.fromWork))) && reviewed.has(merge.fromWork));
   const queued = new Set(requested.map((merge) => merge.id));
   const found = new Set(requested.map((merge) => merge.fromWork));
-  const failures: Failure[] = [...reviewed].filter((fromWork) => !found.has(fromWork)).map((fromWork) => ({ fromWork, reason: "no active code, jev, manual, ol-duplicate or title-key merge" }));
+  const failures: Failure[] = [...reviewed].filter((fromWork) => !found.has(fromWork)).map((fromWork) => ({ fromWork, reason: "no active code, jev, ol-duplicate or title-key merge" }));
   const undone: string[] = [];
   for (const { fromWork, intoWork, source } of requested.sort((a, b) => b.id - a.id)) {
     const blocker = onwardFrom(byFrom, intoWork).find((step) => !queued.has(step.id));
