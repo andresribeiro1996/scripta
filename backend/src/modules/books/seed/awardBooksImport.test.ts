@@ -40,8 +40,8 @@ const work = (itemId: string, prizes: PrizeKey[], ids: { isbns?: string[]; olWor
   isbns: ids.isbns ?? [],
   olWorkIds: ids.olWorkIds ?? []
 });
-const hit = (title: string, authors: string[], workKey: string | null, isbn: string | null = null): CatalogSearchHit => ({
-  result: { title, authors, year: null, isbn, publisher: null, coverUrl: null, genres: [] },
+const hit = (title: string, authors: string[], workKey: string | null, isbn: string | null = null, publisher: string | null = null): CatalogSearchHit => ({
+  result: { title, authors, year: null, isbn, publisher, coverUrl: null, genres: [] },
   olCoverId: null,
   workKey: workKey && `/works/${workKey}`,
   source: "openlibrary"
@@ -142,30 +142,33 @@ test("missingAwardWorks keeps only works the catalog has by neither ISBN nor Ope
 
 test("resolveAwardWork takes the Open Library hit whose work key matches and rejects another work", async () => {
   const other = hit("Wolf Hall", ["Hilary Mantel"], "OL9W", "9781111111111");
-  const wanted = hit("Wolf Hall", ["Hilary Mantel"], "OL2W", "9782222222222");
+  const wanted = hit("Wolf Hall", ["Hilary Mantel"], "OL2W", "9782222222222", "Audible Studios");
   const found = searching(() => [other, wanted]);
   const resolved = await resolveAwardWork(found.search, work("Q1", ["booker"], { olWorkIds: ["OL2W"] }));
   assert.deepEqual(found.asked, [{ text: "key:/works/OL2W" }]);
-  assert.deepEqual(resolved, { ...wanted, result: { ...wanted.result, isbn: null } });
+  assert.deepEqual(resolved, { hit: { ...wanted, result: { ...wanted.result, isbn: null, publisher: null } }, olWorkId: "OL2W", isbn: null });
 
   const wrong = searching(() => [other]);
   assert.equal(await resolveAwardWork(wrong.search, work("Q1", ["booker"], { olWorkIds: ["OL2W"] })), null);
 });
 
-test("resolveAwardWork falls back to the ISBNs and saves the searched ISBN", async () => {
-  const found = searching((query) => ("isbn" in query && query.isbn === "9780000000019" ? [hit("Wolf Hall", ["Hilary Mantel"], "OL2W", "9782222222222")] : []));
+test("resolveAwardWork falls back to the ISBNs and saves the searched ISBN without the hit's publisher", async () => {
+  const found = searching((query) => ("isbn" in query && query.isbn === "9780000000019" ? [hit("Wolf Hall", ["Hilary Mantel"], "OL2W", "9782222222222", "Audible Studios")] : []));
   const resolved = await resolveAwardWork(found.search, work("Q1", ["booker"], { olWorkIds: ["OL2W"], isbns: ["9780000000002", "9780000000019"] }));
   assert.deepEqual(found.asked, [{ text: "key:/works/OL2W" }, { isbn: "9780000000002" }, { isbn: "9780000000019" }]);
-  assert.equal(resolved?.result.isbn, "9780000000019");
-  assert.equal(resolved?.workKey, "/works/OL2W");
+  assert.equal(resolved?.hit.result.isbn, "9780000000019");
+  assert.equal(resolved?.hit.result.publisher, null);
+  assert.equal(resolved?.hit.workKey, "/works/OL2W");
+  assert.equal(resolved?.isbn, "9780000000019");
+  assert.equal(resolved?.olWorkId, null);
 });
 
 test("resolveAwardWork skips a hit with no title, no author, a punctuation-only title or a blank first author, and returns null when nothing fits", async () => {
   const good = hit("Wolf Hall", ["Hilary Mantel"], "OL2W");
   const found = searching(() => [hit("", ["Hilary Mantel"], "OL2W"), hit("Wolf Hall", [], "OL2W"), hit("!!!", ["Hilary Mantel"], "OL2W"), hit("Wolf Hall", ["", "Hilary Mantel"], "OL2W"), good]);
   const resolved = await resolveAwardWork(found.search, work("Q1", ["booker"], { olWorkIds: ["OL2W"] }));
-  assert.equal(resolved?.result.title, "Wolf Hall");
-  assert.deepEqual(resolved?.result.authors, ["Hilary Mantel"]);
+  assert.equal(resolved?.hit.result.title, "Wolf Hall");
+  assert.deepEqual(resolved?.hit.result.authors, ["Hilary Mantel"]);
 
   const unusable = searching(() => [
     hit("", ["Hilary Mantel"], "OL2W", "9782222222222"),
@@ -179,11 +182,12 @@ test("resolveAwardWork skips a hit with no title, no author, a punctuation-only 
 
 test("resolveAwardWork saves a work-ID hit without an ISBN", async () => {
   const { db, repo, deps } = setup();
-  const resolved = await resolveAwardWork(searching(() => [hit("Wolf Hall", ["Hilary Mantel"], "OL2W", "9782222222222")]).search, work("Q1", ["booker"], { olWorkIds: ["OL2W"] }));
+  const resolved = await resolveAwardWork(searching(() => [hit("Wolf Hall", ["Hilary Mantel"], "OL2W", "9782222222222", "Audible Studios")]).search, work("Q1", ["booker"], { olWorkIds: ["OL2W"] }));
   assert.ok(resolved);
-  const [saved] = saveCatalogHits(deps, [resolved], AT);
+  const [saved] = saveCatalogHits(deps, [resolved.hit], AT);
   assert.equal(bookCount(db), 1);
   assert.equal(saved?.isbn, null);
+  assert.equal(saved?.publisher, null);
   assert.equal(saved?.ol_work_key, "OL2W");
   assert.equal(saved?.title_key, "ta:wolf hall|hilary mantel|");
   assert.equal(repo.findBookByKey("isbn:9782222222222"), undefined);
@@ -224,6 +228,8 @@ test("importAwardBooks creates the resolved books, counts each under every prize
   assert.equal(found.asked.length, 4);
   assert.deepEqual(report.unresolved, ["Q3"]);
   assert.deepEqual(report.failedKeys, []);
+  assert.equal(report.aliases, 0);
+  assert.deepEqual(report.isbnResolutions, [{ item: "Q2", isbn: "9780000000019", title: "Dune" }]);
   assert.deepEqual(logs, []);
 });
 
@@ -268,7 +274,51 @@ test("a work-ID hit whose title and author the catalog already has is found, not
   assert.equal(bookCount(db), 1);
   assert.equal(repo.getBook(existing.id)?.ol_work_key, "OL2W");
   assert.deepEqual(report.createdBookIds, []);
+  assert.equal(report.aliases, 0);
   assert.deepEqual(report.prizes.booker, { candidates: 1, resolved: 1, created: 0, unresolved: 0 });
+});
+
+const aliasCase = () => {
+  const setupCase = setup();
+  const existing = plainBook(setupCase.repo, null, "Wolf Hall", "Hilary Mantel", "OL1W");
+  const found = searching(() => [hit("Wolf Hall", ["Hilary Mantel"], "OL2W", "9782222222222")]);
+  return { ...setupCase, existing, found, works: [work("Q1", ["booker"], { olWorkIds: ["OL2W"] })] };
+};
+
+test("a work-ID hit adopted by a book keyed to another Open Library work leaves Wikidata's ID as an alias of that work", async () => {
+  const { db, repo, deps, existing, found, works } = aliasCase();
+  const report = await importAwardBooks({ ...deps, search: found.search }, works, AT, LIVE);
+  assert.equal(bookCount(db), 1);
+  assert.deepEqual(report.createdBookIds, []);
+  assert.equal(report.aliases, 1);
+  assert.equal(repo.getBook(existing.id)?.ol_work_key, "OL1W");
+  const canonical = repo.workIdsByWorkKeys(["OL1W"]).get("OL1W");
+  assert.equal(canonical, repo.getBook(existing.id)?.work_id);
+  assert.deepEqual(repo.workIdsByWorkKeys(["OL2W"]), new Map([["OL2W", canonical!]]));
+  assert.deepEqual(missingAwardWorks(repo, works), []);
+
+  const again = await importAwardBooks({ ...deps, search: found.search }, works, AT, LIVE);
+  assert.equal(again.aliases, 0);
+  assert.equal((db.prepare("SELECT COUNT(*) AS n FROM works").get() as { n: number }).n, 2);
+});
+
+test("no alias is made when a work already holds the Open Library ID", async () => {
+  const { db, repo, deps, found, works } = aliasCase();
+  const holder = plainBook(repo, null, "Another Book", "Someone Else", "OL2W");
+  const worksBefore = (db.prepare("SELECT COUNT(*) AS n FROM works").get() as { n: number }).n;
+  const report = await importAwardBooks({ ...deps, search: found.search }, works, AT, LIVE);
+  assert.equal(report.aliases, 0);
+  assert.equal(repo.workIdsByWorkKeys(["OL2W"]).get("OL2W"), repo.getBook(holder.id)?.work_id);
+  assert.equal((db.prepare("SELECT COUNT(*) AS n FROM works").get() as { n: number }).n, worksBefore);
+  assert.equal((db.prepare("SELECT COUNT(*) AS n FROM work_merges").get() as { n: number }).n, 0);
+});
+
+test("a dry run makes no alias", async () => {
+  const { db, repo, deps, found, works } = aliasCase();
+  const report = await importAwardBooks({ ...deps, search: found.search }, works, AT, { dryRun: true, max: null });
+  assert.equal(report.aliases, 0);
+  assert.equal(repo.workIdsByWorkKeys(["OL2W"]).size, 0);
+  assert.equal((db.prepare("SELECT COUNT(*) AS n FROM works").get() as { n: number }).n, 1);
 });
 
 test("a dry run makes the same searches and writes nothing", async () => {
@@ -295,6 +345,28 @@ test("a dry run makes the same searches and writes nothing", async () => {
   assert.deepEqual(dryReport.prizes.booker, { candidates: 1, resolved: 1, created: 0, unresolved: 0 });
   assert.deepEqual(dryReport.prizes["hugo-novel"], { candidates: 1, resolved: 1, created: 0, unresolved: 0 });
   assert.equal(liveReport.createdBookIds.length, 2);
+});
+
+test("the report lists every work resolved through an ISBN with the ISBN searched and the hit's title, in a dry run and a real one", async () => {
+  const works = [
+    work("Q1", ["booker"], { olWorkIds: ["OL1W"] }),
+    work("Q2", ["hugo-novel"], { olWorkIds: ["OL4W"], isbns: ["9780000000019", "9780000000026"] }),
+    work("Q3", ["leya"], { isbns: ["9780000000033"] })
+  ];
+  const answer = (query: Query) => {
+    if ("text" in query && query.text === "key:/works/OL1W") return [hit("Wolf Hall", ["Hilary Mantel"], "OL1W")];
+    if ("isbn" in query && query.isbn === "9780000000026") return [hit("Dune", ["Frank Herbert"], "OL3W", "9783333333333")];
+    if ("isbn" in query && query.isbn === "9780000000033") return [hit("Blindness", ["José Saramago"], "OL5W")];
+    return [];
+  };
+  const expected = [
+    { item: "Q2", isbn: "9780000000026", title: "Dune" },
+    { item: "Q3", isbn: "9780000000033", title: "Blindness" }
+  ];
+  const dry = await importAwardBooks({ ...setup().deps, search: searching(answer).search }, works, AT, { dryRun: true, max: null });
+  assert.deepEqual(dry.isbnResolutions, expected);
+  const live = await importAwardBooks({ ...setup().deps, search: searching(answer).search }, works, AT, LIVE);
+  assert.deepEqual(live.isbnResolutions, expected);
 });
 
 test("max stops saving after that many works", async () => {

@@ -5,7 +5,7 @@ import type { BooksRepository, CatalogSearchHit } from "./domain/ports.js";
 import type { SeriesEntry } from "./domain/series.js";
 import type { BookRow } from "./domain/types.js";
 
-export const SAVE_GROUP_LIMIT = 50;
+const SAVE_GROUP_LIMIT = 50;
 
 export function storeSeries(repo: BooksRepository, bookId: string, found: { editionSeries?: SeriesEntry[]; subjectSeries?: SeriesEntry[] }, at: string): void {
   const editions = found.editionSeries ?? [];

@@ -22,7 +22,11 @@ export type AwardBooksReport = {
   failedKeys: string[];
   unresolved: string[];
   createdBookIds: string[];
+  aliases: number;
+  isbnResolutions: Array<{ item: string; isbn: string; title: string }>;
 };
+
+export type AwardResolution = { hit: CatalogSearchHit; olWorkId: string | null; isbn: string | null };
 
 export function awardWorksOf(pages: Array<{ kind: string; bindings: Binding[] }>): AwardWork[] {
   const found = new Map<string, { prizes: Set<PrizeKey>; ownIsbns: string[]; editionIsbns: string[]; olWorkIds: string[] }>();
@@ -56,16 +60,24 @@ function usable({ result }: CatalogSearchHit): boolean {
   return identity !== null && workTitleKey(identity.title, identity.author) !== "";
 }
 
-export async function resolveAwardWork(search: BookCatalog["search"], work: AwardWork): Promise<CatalogSearchHit | null> {
+export async function resolveAwardWork(search: BookCatalog["search"], work: AwardWork): Promise<AwardResolution | null> {
   for (const id of work.olWorkIds) {
     const found = (await search({ text: `key:/works/${id}` })).find((hit) => normalizeWorkKey(hit.workKey) === id && usable(hit));
-    if (found) return { ...found, result: { ...found.result, isbn: null } };
+    if (found) return { hit: { ...found, result: { ...found.result, isbn: null, publisher: null } }, olWorkId: id, isbn: null };
   }
   for (const isbn of work.isbns) {
     const found = (await search({ isbn })).find(usable);
-    if (found) return { ...found, result: { ...found.result, isbn } };
+    if (found) return { hit: { ...found, result: { ...found.result, isbn, publisher: null } }, olWorkId: null, isbn };
   }
   return null;
+}
+
+function aliasWorkKey(repo: Pick<BooksRepository, "getBook" | "workIdsByWorkKeys" | "addWorkAlias">, bookId: string, olWorkId: string, at: string): boolean {
+  if (repo.workIdsByWorkKeys([olWorkId]).has(olWorkId)) return false;
+  const workId = repo.getBook(bookId)?.work_id;
+  if (!workId) return false;
+  repo.addWorkAlias(olWorkId, workId, at);
+  return true;
 }
 
 export async function importAwardBooks(
@@ -81,18 +93,20 @@ export async function importAwardBooks(
     requests: 0,
     failedKeys: [],
     unresolved: [],
-    createdBookIds: []
+    createdBookIds: [],
+    aliases: 0,
+    isbnResolutions: []
   };
   const countedSearch: BookCatalog["search"] = (query) => {
     report.requests++;
     return search(query);
   };
-  const resolved: Array<{ work: AwardWork; hit: CatalogSearchHit }> = [];
+  const resolved: Array<{ work: AwardWork; hit: CatalogSearchHit; olWorkId: string | null }> = [];
   let unresolved = 0;
   for (const [index, work] of works.entries()) {
-    let hit: CatalogSearchHit | null | undefined;
+    let resolution: AwardResolution | null | undefined;
     try {
-      hit = await resolveAwardWork(countedSearch, work);
+      resolution = await resolveAwardWork(countedSearch, work);
     } catch (error) {
       if (!(error instanceof SourceUnavailableError) || error.status === 429) throw error;
       report.failedKeys.push(work.item);
@@ -100,11 +114,14 @@ export async function importAwardBooks(
     for (const prize of work.prizes) {
       const tally = report.prizes[prize]!;
       tally.candidates++;
-      if (hit) tally.resolved++;
-      if (hit === null) tally.unresolved++;
+      if (resolution) tally.resolved++;
+      if (resolution === null) tally.unresolved++;
     }
-    if (hit) resolved.push({ work, hit });
-    if (hit === null) {
+    if (resolution) {
+      resolved.push({ work, hit: resolution.hit, olWorkId: resolution.olWorkId });
+      if (resolution.isbn) report.isbnResolutions.push({ item: work.item, isbn: resolution.isbn, title: resolution.hit.result.title });
+    }
+    if (resolution === null) {
       unresolved++;
       if (report.unresolved.length < UNRESOLVED_LISTED) report.unresolved.push(work.item);
     }
@@ -120,9 +137,12 @@ export async function importAwardBooks(
     const chunk = toSave.slice(start, start + SAVE_CHUNK);
     const saved = saveCatalogHits({ repo, sharesArena }, chunk.map(({ hit }) => hit), at);
     for (const [index, row] of saved.entries()) {
-      if (row?.created_at !== at) continue;
+      if (!row) continue;
+      const { work, olWorkId } = chunk[index]!;
+      if (olWorkId && aliasWorkKey(repo, row.id, olWorkId, at)) report.aliases++;
+      if (row.created_at !== at) continue;
       created.add(row.id);
-      for (const prize of chunk[index]!.work.prizes) createdByPrize.set(prize, (createdByPrize.get(prize) ?? new Set<string>()).add(row.id));
+      for (const prize of work.prizes) createdByPrize.set(prize, (createdByPrize.get(prize) ?? new Set<string>()).add(row.id));
     }
   }
   for (const [prize, ids] of createdByPrize) report.prizes[prize]!.created = ids.size;

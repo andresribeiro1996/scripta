@@ -26,7 +26,7 @@ The user asked Claude to proceed without questions ("go on", 2026-10-25). Every 
 
 1. **Scope: the eight book prizes, winners and nominees.** That is about 600 works. Laureates' other works for the Nobel and Camões (about 1,000) are left out. Many are single poems, essays or letters, and an author prize already shows on whichever of their books the catalog has.
 2. **Open Library only, no ISBNdb.** ISBNdb's daily quota is shared with search and other jobs, and an ISBNdb search spends it unmetered. Open Library is free and already throttled at 1 request a second. There is no BNP step, because the BNP lookup needs the cover store and image fetches set up in the script. Only 3 Saramago winners have Portugal ISBNs, and the BNP harvest brings Portuguese editions in anyway.
-3. **The edition comes from Wikidata's identifiers.** A book found by Wikidata's Open Library work ID is saved without an ISBN, by title, author, work key and cover. Open Library lists a work's ISBNs in no particular order, and the first is often a translation: for Wolf Hall it is a Turkish edition. A book found by ISBN is saved under that ISBN, with ISBNs on the work item tried before its edition items' ISBNs. Either way, the awards fill matches it afterwards by the same identifier. Language is whatever that edition is, mostly English. Translations join through the catalog's existing grouping and translation matching.
+3. **The edition comes from Wikidata's identifiers.** A book found by Wikidata's Open Library work ID is saved without an ISBN, by title, author, work key and cover. Open Library lists a work's ISBNs in no particular order, and the first is often a translation: for Wolf Hall it is a Turkish edition. A book found by ISBN is saved under that ISBN, with ISBNs on the work item tried before its edition items' ISBNs. Neither route saves the hit's publisher, which Open Library lists in no useful order either. Either way, the awards fill matches it afterwards by the same identifier. When a work-ID hit is adopted by an existing book whose work holds a different Open Library key, the Wikidata ID would be held by no work and the awards fill could not match it, so it is recorded as an alias: a work row with that key, merged into the book's work as an `ol-duplicate` merge. Language is whatever that edition is, mostly English. Translations join through the catalog's existing grouping and translation matching.
 4. **The same save path as user search, shared, not copied.** That path finds an existing book by identity, else creates it, sets the work key, makes it searchable, groups title keys and merges duplicate works. Its core moves out of the books service closure into a function both the service and the script call. The service's behaviour doesn't change.
 5. **A script, run like the awards fill.**
    - Usage: `node scripts/import-award-books.mjs [--dry-run] [--max N]`, run over `railway ssh` with deploys held.
@@ -53,7 +53,9 @@ The script prints a JSON report on stdout and progress on stderr, like `fill-awa
 - `prizes`: per key, `{ candidates, resolved, created, unresolved }`. `candidates` are works no catalog book matches. A work listed for two prizes counts under both;
 - `requests`, `failedKeys`;
 - `unresolved`: the Wikidata item IDs, capped at 50, for a spot check;
-- `at` and `createdBookIds`, so a bad run's books can be found.
+- `at` and `createdBookIds`, so a bad run's books can be found;
+- `aliases`, the work IDs recorded as aliases;
+- `isbnResolutions`: every work resolved through the ISBN route, as `{ item, isbn, title }`, in dry and real runs, so the dry run shows any work that would be saved under a translation's ISBN.
 
 A dry run reports `resolved` (books it would create or find) and no `created`, because finding an existing book can write a key.
 
