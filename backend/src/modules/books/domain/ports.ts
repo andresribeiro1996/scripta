@@ -3,6 +3,7 @@ import type { KeyedWork } from "./duplicateWorks.js";
 import type { SynopsisJudgment, SynopsisKind } from "./synopsis.js";
 import type { CollectionSource, SeriesEntry, SeriesSource } from "./series.js";
 import type { OriginalClaim } from "./translation.js";
+import type { WorkSubjects } from "./workSubjects.js";
 import type { BookRow, CoverImageRow, CoverSourceName, CoverStatus, DataSource, GenreEvidence, GenresSource, JevRejection, JevTask, LossyBook, MergeSource, MojibakeApplied, NewBook, RowRepair, SummarySource, WorkMatchJudgment, WorkPageRows, WorkView } from "./types.js";
 
 export type MergeableDetails = Pick<BookMetadata, "summary" | "pages" | "year" | "publisher" | "translator">;
@@ -159,6 +160,9 @@ export interface BooksRepository {
   addWorkAward(row: { workId: string; prize: string; year: number; won: boolean; honoree: string | null }, at: string): boolean;
   awardsOf(workIds: string[]): Map<string, WorkAward[]>;
   recentAwards(year: number, since: string): RecentAward[];
+  replaceWorkSubjects(workId: string, subjects: WorkSubjects, at: string): void;
+  charactersOf(workIds: string[]): Map<string, string[]>;
+  worksWithOpenLibraryKey(): Array<{ id: string; olWorkKey: string }>;
 }
 
 export interface CoverCandidate {
