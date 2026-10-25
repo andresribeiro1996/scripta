@@ -5,7 +5,7 @@
 // tapping a row there, or by deep link (e.g. the Home mural's "Open
 // collection" button).
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../../ui/Text";
 import { router, Stack } from "expo-router";
@@ -54,6 +54,13 @@ export function GroupDetail({ groupId }: { groupId: string }) {
   const [confirming, setConfirming] = useState<"group" | "books" | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [pickerError, setPickerError] = useState<string | null>(null);
+  const [styleError, setStyleError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(null), 5000);
+    return () => clearTimeout(timer);
+  }, [notice]);
 
   async function runUpdate(mutate: (data: LibraryData) => LibraryData, onSuccess?: () => void) {
     setNotice(null);
@@ -84,7 +91,11 @@ export function GroupDetail({ groupId }: { groupId: string }) {
 
   function handleSaveGroupStyle(groupStyle: PerCardStyle | undefined) {
     if (!group) return;
-    void runUpdate((data) => ({ ...data, groups: setGroupStyle(data.groups ?? [], group.id, groupStyle) }));
+    setStyleError(null);
+    void attemptUpdate(
+      () => updateLibrary((data) => ({ ...data, groups: setGroupStyle(data.groups ?? [], group.id, groupStyle) })),
+      (error) => setStyleError(saveFailureMessage(error, "Couldn't save the style change.")),
+    );
   }
 
   function handleToggleSelect(book: Record<string, unknown>) {
@@ -224,8 +235,12 @@ export function GroupDetail({ groupId }: { groupId: string }) {
         currentOverride={group?.style}
         seedStyle={style}
         previewBook={members[0]}
+        error={styleError}
         onSave={handleSaveGroupStyle}
-        onClose={() => setStyleOpen(false)}
+        onClose={() => {
+          setStyleOpen(false);
+          setStyleError(null);
+        }}
       />
 
       <ConfirmDialog
