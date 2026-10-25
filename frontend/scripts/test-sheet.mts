@@ -46,3 +46,8 @@ test("the block config dialog says Games, not Arena", () => {
   const src = readFileSync(new URL("../src/components/murals/BlockConfigPanel.tsx", import.meta.url), "utf8");
   assert.doesNotMatch(src, />[^<{]*\bArena\b[^<]*</);
 });
+
+test("the focus trap counts <summary> toggles as focusable", async () => {
+  const { FOCUSABLE_SELECTOR } = await import("../src/lib/keepTabInside");
+  assert.match(FOCUSABLE_SELECTOR, /(^|, )summary(,|$)/);
+});

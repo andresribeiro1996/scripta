@@ -348,7 +348,7 @@ export function MuralsListPage() {
                     // e.target === e.currentTarget: only react when the key
                     // event originated on the card itself, not bubbled up
                     // from a real focusable control nested inside it (the
-                    // settings ⚙, or the rename input while editing) — those
+                    // options menu, or the rename input while editing) — those
                     // need Enter/Space for their own purposes (activating the
                     // button, typing a literal space into the name), not
                     // "open this mural."

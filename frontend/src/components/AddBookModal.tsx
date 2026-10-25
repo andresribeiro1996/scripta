@@ -11,9 +11,6 @@
 // The barcode scanner (@zxing/browser) is dynamically imported inside
 // the scan effect so its ~300KB stays out of the main bundle for the
 // 99% of sessions that never open a camera.
-//
-// Same fixed-overlay modal shell as ShareModal.tsx (bg-black/40 backdrop,
-// click-outside-to-close, Escape-to-close, scroll-locked page behind).
 
 import { useEffect, useRef, useState } from "react";
 import type { IScannerControls } from "@zxing/browser";

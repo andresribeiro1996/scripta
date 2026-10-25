@@ -4,6 +4,7 @@ import { saveFailureMessage } from "@scripta/shared";
 import { addBookToLibrary } from "../api/library";
 import { useAuth } from "../auth/AuthContext";
 import { CoverImage } from "./BookCard";
+import { BUTTON_PRIMARY } from "./page/buttonClasses";
 import { Sheet } from "./Sheet";
 import { useToast } from "./Toaster";
 import { statusLabel } from "../lib/covers";
@@ -46,7 +47,7 @@ export function AddBookSheet({
           <Link
             to="/login"
             state={{ from: location }}
-            className="min-h-9 rounded-lg bg-(--color-accent) px-4 py-2 text-sm font-semibold text-(--color-on-accent) hover:opacity-90"
+            className={BUTTON_PRIMARY}
           >
             Sign in
           </Link>

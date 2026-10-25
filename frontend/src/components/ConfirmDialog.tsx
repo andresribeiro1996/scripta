@@ -1,13 +1,12 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "./page/buttonClasses";
 import { Sheet } from "./Sheet";
 
 interface ConfirmOptions {
-  /** Short question, e.g. `Delete "My Series"?` — rendered like
-   *  CoverPickerModal's own modal heading. */
+  /** Short question, e.g. `Delete "My Series"?` — the dialog's title. */
   title: string;
   /** Optional supporting detail below the title, e.g. "This can't be
-   *  undone." — rendered like CoverPickerModal's own modal subtitle. */
+   *  undone." */
   body?: string;
   /** Defaults to "Delete" — every call site this replaced was a delete
    *  confirmation, so that's the sensible default rather than something
@@ -37,6 +36,7 @@ const ConfirmContext = createContext<ConfirmContextValue | null>(null);
 export function ConfirmProvider({ children }: { children: ReactNode }) {
   const [pending, setPending] = useState<PendingConfirm | null>(null);
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
+  const bodyId = useId();
 
   const confirm = useCallback((options: ConfirmOptions) => {
     return new Promise<boolean>((resolve) => {
@@ -63,6 +63,8 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
       {pending && (
         <Sheet
           title={pending.title}
+          role="alertdialog"
+          aria-describedby={pending.body ? bodyId : undefined}
           onClose={() => settle(false)}
           footer={
             <>
@@ -82,7 +84,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
             </>
           }
         >
-          {pending.body && <p className="px-2 pb-2 text-sm text-(--color-text-dim)">{pending.body}</p>}
+          {pending.body && <p id={bodyId} className="px-2 pb-2 text-sm text-(--color-text-dim)">{pending.body}</p>}
         </Sheet>
       )}
     </ConfirmContext.Provider>

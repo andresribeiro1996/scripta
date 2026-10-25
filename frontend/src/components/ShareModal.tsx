@@ -13,7 +13,7 @@ const PLATFORM_LABELS: Record<Platform, string> = {
   threads: "Threads"
 };
 
-/** The one modal every "Share" entry point in the app opens — a mural
+/** The one dialog every "Share" entry point in the app opens — a mural
  *  card's OptionsMenu, MuralEditorPage's header, and LibraryPage's
  *  page-level Share button (see each page's own wiring). Deliberately
  *  generic over WHAT is being shared (a `title` string plus a share-
@@ -24,9 +24,7 @@ const PLATFORM_LABELS: Record<Platform, string> = {
  *  shareToken/shareUrl shape (lib/murals.ts's Mural, api/library.ts's
  *  LibraryDocument).
  *
- *  Same fixed-overlay modal shell as ConfirmDialog.tsx/CoverPickerModal.tsx
- *  (bg-black/40 backdrop, click-outside-to-close via the inner panel's own
- *  stopPropagation, Escape-to-close).
+ *  Built on Sheet.
  *
  *  Local state carries the shared/not-shared view instead of waiting for
  *  the parent's own re-render — onShare/onUnshare already hand back
@@ -267,7 +265,7 @@ export function ShareModal({
               <button
                 onClick={() => void handleStopSharing()}
                 disabled={unsharing}
-                className="text-xs text-(--color-danger) transition-opacity hover:opacity-80 disabled:opacity-60"
+                className="min-h-11 text-xs text-(--color-danger) transition-opacity hover:opacity-80 disabled:opacity-60"
               >
                 {unsharing ? "Stopping…" : "Stop sharing"}
               </button>

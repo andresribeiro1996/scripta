@@ -112,7 +112,7 @@ function TierEditorRow({
             }}
             placeholder="Label"
             aria-label="Tier label"
-            className="min-h-9 min-w-0 flex-1 rounded-lg border border-(--color-border) bg-(--color-surface) px-2.5 text-sm font-semibold"
+            className="min-h-11 min-w-0 flex-1 rounded-lg border border-(--color-border) bg-(--color-surface) px-2.5 text-sm font-semibold"
           />
           {/* Up/down stay as direct buttons — reordering tiers is the
               frequent action. Delete goes behind the ⋮ menu: rare, and
@@ -384,7 +384,7 @@ export function TierBoard({ data, books, onChange, structureEditable, poolLabel,
           <button
             onClick={() => setPoolCollapsed((c) => !c)}
             aria-expanded={!poolCollapsed}
-            className="flex min-h-9 items-center gap-1.5 text-xs font-semibold text-(--color-text-dim) hover:text-(--color-text)"
+            className="flex min-h-11 items-center gap-1.5 text-xs font-semibold text-(--color-text-dim) hover:text-(--color-text)"
           >
             {poolCollapsed ? <ChevronUpIcon /> : <ChevronDownIcon />}
             {poolHeading} — {resolvedPool.length} {resolvedPool.length === 1 ? "book" : "books"}
@@ -395,7 +395,7 @@ export function TierBoard({ data, books, onChange, structureEditable, poolLabel,
           {structureEditable && onAddBooks && (
             <button
               onClick={onAddBooks}
-              className="min-h-9 shrink-0 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm font-semibold hover:bg-(--color-surface-hover)"
+              className="min-h-11 shrink-0 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm font-semibold hover:bg-(--color-surface-hover)"
             >
               Add books
             </button>

@@ -14,6 +14,8 @@ export interface OptionsMenuItem {
 }
 
 const MENU_WIDTH = 132;
+const ROW_HEIGHT = 44;
+const EDGE_GAP = 8;
 
 /** A single three-dot trigger that opens a small dropdown of actions — the one
  *  consolidated entry point for "this item's controls," replacing what
@@ -53,7 +55,7 @@ export function OptionsMenu({
   trigger?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
-  const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
+  const [position, setPosition] = useState<{ top?: number; bottom?: number; left: number; maxHeight: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -70,7 +72,12 @@ export function OptionsMenu({
   function toggle(e: React.MouseEvent<HTMLButtonElement>) {
     e.stopPropagation();
     const rect = e.currentTarget.getBoundingClientRect();
-    setPosition({ top: rect.bottom + 4, left: Math.max(8, rect.width > MENU_WIDTH ? rect.left : rect.right - MENU_WIDTH) });
+    const left = Math.max(8, rect.width > MENU_WIDTH ? rect.left : rect.right - MENU_WIDTH);
+    const wanted = items.length * ROW_HEIGHT + 10;
+    const below = window.innerHeight - rect.bottom - EDGE_GAP - 4;
+    const above = rect.top - EDGE_GAP - 4;
+    if (wanted <= below || below >= above) setPosition({ top: rect.bottom + 4, left, maxHeight: below });
+    else setPosition({ bottom: window.innerHeight - rect.top + 4, left, maxHeight: above });
     setOpen((o) => !o);
   }
 
@@ -91,8 +98,8 @@ export function OptionsMenu({
         createPortal(
           <div
             ref={menuRef}
-            style={{ top: position.top, left: position.left, minWidth: MENU_WIDTH }}
-            className="menu-in fixed z-50 overflow-hidden rounded-lg border border-(--color-border) bg-(--color-surface) py-1 text-sm shadow-lg"
+            style={{ top: position.top, bottom: position.bottom, left: position.left, minWidth: MENU_WIDTH, maxHeight: position.maxHeight }}
+            className="menu-in fixed z-50 overflow-y-auto rounded-lg border border-(--color-border) bg-(--color-surface) py-1 text-sm shadow-lg"
           >
             {items.map((item) => (
               <button

@@ -20,7 +20,9 @@ export function Sheet({
   onClose,
   onBack,
   footer,
-  style
+  style,
+  role = "dialog",
+  "aria-describedby": describedBy
 }: {
   title: string;
   children: ReactNode;
@@ -28,6 +30,8 @@ export function Sheet({
   onBack?: () => void;
   footer?: ReactNode;
   style?: CSSProperties;
+  role?: "dialog" | "alertdialog";
+  "aria-describedby"?: string;
 }) {
   useScrollLock();
   useDismissible(onClose);
@@ -50,9 +54,10 @@ export function Sheet({
         style={style}
         onClick={(e) => e.stopPropagation()}
         onKeyDown={keepTabInside}
-        role="dialog"
+        role={role}
         aria-modal="true"
         aria-label={title}
+        aria-describedby={describedBy}
       >
         <div className="flex shrink-0 items-center gap-2 px-4 pt-3 pb-2">
           {onBack && (

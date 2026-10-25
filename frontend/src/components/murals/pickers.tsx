@@ -40,7 +40,8 @@ export function BookSearchList({
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         placeholder={placeholder}
-        className="w-full border-b border-(--color-border) bg-transparent px-3 py-2 text-sm"
+        aria-label={placeholder}
+        className="min-h-11 w-full border-b border-(--color-border) bg-transparent px-3 py-2 text-sm"
       />
       <div className="max-h-48 overflow-y-auto">
         {filtered.length === 0 && <p className="p-3 text-sm text-(--color-text-dim)">No books match.</p>}
@@ -48,7 +49,7 @@ export function BookSearchList({
           <button
             key={String(book.ContentID ?? i)}
             onClick={() => onSelect(book)}
-            className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-(--color-surface-hover) ${
+            className={`flex min-h-11 w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-(--color-surface-hover) ${
               isSelected?.(book) ? "bg-(--color-accent-soft)" : ""
             }`}
           >
@@ -141,9 +142,11 @@ export function GalleryImageGrid({
               void handleDelete(image.id);
             }}
             title="Delete from gallery"
-            className="absolute top-1 right-1 flex h-6 w-6 items-center justify-center rounded-full bg-[rgba(10,8,6,0.72)] text-xs font-bold text-white opacity-0 backdrop-blur-xs transition-opacity group-hover:opacity-100 pointer-coarse:h-9 pointer-coarse:w-9 pointer-coarse:opacity-100"
+            className="absolute top-0 right-0 flex h-11 w-11 items-center justify-center text-xs font-bold text-white opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100"
           >
-            {deletingId === image.id ? "…" : <CloseIcon size={13} />}
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[rgba(10,8,6,0.72)] backdrop-blur-xs">
+              {deletingId === image.id ? "…" : <CloseIcon size={13} />}
+            </span>
           </button>
         </div>
       ))}

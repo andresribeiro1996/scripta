@@ -1,5 +1,5 @@
 import { resolveHomeBlock, type Group } from "@scripta/shared";
-// "Configure this block" modal, opened from a block's gear icon
+// "Configure this block" modal, opened from a block's options menu
 // (MuralCanvas.tsx) in edit mode. One modal handles every block type —
 // its body switches on `draft.type` — rather than eight separate modals,
 // since they all share the same "edit a local draft, Save commits it"

@@ -13,8 +13,7 @@ import { CloseIcon } from "./Toolbar";
  *  specific thing's cover, upload a new one on the spot, or clear it
  *  back off. Picking or clearing closes the modal — this is a one-shot
  *  action, not a live-editing panel like PerCardStylePanel.tsx, so
- *  there's nothing to keep it open for. Same fixed-overlay modal shell as
- *  GroupsPage.tsx's BookPickerModal / PerCardStylePanel.tsx.
+ *  there's nothing to keep it open for. Built on Sheet.
  *
  *  Deliberately generic (a `title`/`currentImageId` pair, not a whole
  *  `book`-shaped object) — a mural has no Title/`_coverImageId` fields of
@@ -128,7 +127,7 @@ export function CoverPickerModal({
                 onRemoveCover();
                 onClose();
               }}
-              className="text-xs text-(--color-danger) transition-opacity hover:opacity-80"
+              className="min-h-11 text-xs text-(--color-danger) transition-opacity hover:opacity-80"
             >
               {removeCoverLabel}
             </button>
@@ -173,9 +172,11 @@ export function CoverPickerModal({
                     void handleDeleteImage(image.id);
                   }}
                   title="Delete from gallery"
-                  className="absolute top-1 right-1 flex h-6 w-6 items-center justify-center rounded-full bg-[rgba(10,8,6,0.72)] text-xs font-bold text-white opacity-0 backdrop-blur-xs transition-opacity group-hover:opacity-100 pointer-coarse:h-9 pointer-coarse:w-9 pointer-coarse:opacity-100"
+                  className="absolute top-0 right-0 flex h-11 w-11 items-center justify-center text-xs font-bold text-white opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100"
                 >
-                  {deletingId === image.id ? "…" : <CloseIcon size={13} />}
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[rgba(10,8,6,0.72)] backdrop-blur-xs">
+                    {deletingId === image.id ? "…" : <CloseIcon size={13} />}
+                  </span>
                 </button>
               </div>
             ))}

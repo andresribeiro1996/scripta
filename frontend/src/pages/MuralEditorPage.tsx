@@ -490,9 +490,9 @@ export function MuralEditorPage() {
             setEditingName(true);
           }}
           title="Rename this mural"
-          className="flex min-h-11 min-w-0 max-w-full items-center text-left break-words transition-colors hover:text-(--color-accent)"
+          className="flex min-h-11 min-w-0 max-w-full items-center text-left transition-colors hover:text-(--color-accent)"
         >
-          {view.name}
+          <span className="min-w-0 break-words">{view.name}</span>
         </button>
       )}
       actions={<>

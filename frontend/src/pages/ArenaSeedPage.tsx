@@ -233,9 +233,9 @@ export function ArenaSeedPage() {
             setEditingName(true);
           }}
           title="Rename this tournament"
-          className="flex min-h-11 min-w-0 max-w-full items-center text-left break-words transition-colors hover:text-(--color-accent)"
+          className="flex min-h-11 min-w-0 max-w-full items-center text-left transition-colors hover:text-(--color-accent)"
         >
-          {name}
+          <span className="min-w-0 break-words">{name}</span>
         </button>
       )}
       actions={<>

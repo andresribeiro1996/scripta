@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { QUIZ_QUESTION_TYPES, eligibleTypes, playerLabel, quizOptionLabel, quizQuestionLabel, type QuizData, type QuizQuestionType } from "@scripta/shared";
 import { Page } from "../components/page/Page";
-import { BUTTON_SECONDARY } from "../components/page/buttonClasses";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../components/page/buttonClasses";
 import { backTo } from "../lib/areas";
 import { useConfirm } from "../components/ConfirmDialog";
 import { deleteQuizApi, fetchQuizResultsApi, publishQuizApi, setPlayStateApi, updateQuizApi, type Quiz } from "../api/quizzes";
@@ -178,7 +178,7 @@ export function QuizEditorPage() {
                   <button
                     type="button"
                     onClick={() => updateDraft((current) => ({ ...current, books: current.books.filter((entry) => entry.workId !== book.workId) }))}
-                    className="min-h-9 rounded-lg border border-(--color-border) px-3 text-sm"
+                    className={BUTTON_SECONDARY}
                   >
                     Remove
                   </button>
@@ -250,14 +250,14 @@ function PublishedSection({ quiz, shareLink, copied, setCopied }: { quiz: Quiz; 
             setCopied(true);
             window.setTimeout(() => setCopied(false), 1500);
           }}
-          className="min-h-10 rounded-lg bg-(--color-accent) px-3 text-sm font-semibold text-(--color-on-accent)"
+          className={BUTTON_PRIMARY}
         >
           {copied ? "Copied!" : "Copy challenge link"}
         </button>
         <button
           type="button"
           onClick={() => void toggleOpen(!quiz.playOpen)}
-          className="min-h-10 rounded-lg border border-(--color-border) px-3 text-sm"
+          className={BUTTON_SECONDARY}
         >
           {quiz.playOpen ? "Close for play" : "Open for play"}
         </button>

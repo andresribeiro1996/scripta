@@ -20,7 +20,7 @@ export function FeelingChips({
             role="radio"
             aria-checked={selected}
             onClick={() => onChange(rating)}
-            className={`min-h-9 rounded-full border px-3 text-sm font-semibold ${selected ? "border-(--color-accent) bg-(--color-accent-soft) text-(--color-accent)" : "border-(--color-border) bg-(--color-surface) hover:bg-(--color-surface-hover)"}`}
+            className={`min-h-11 rounded-full border px-3 text-sm font-semibold ${selected ? "border-(--color-accent) bg-(--color-accent-soft) text-(--color-accent)" : "border-(--color-border) bg-(--color-surface) hover:bg-(--color-surface-hover)"}`}
           >
             {feelingLabel}
           </button>
