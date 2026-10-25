@@ -6,7 +6,7 @@ import type { LibraryStyleSettings } from "../lib/libraryStyle";
  *  This is the "page" half of the Library style settings
  *  (backgroundColor + contentPaddingX/contentPaddingY, see
  *  lib/libraryStyle.ts) given a box of its own. Those used to be applied
- *  by Page and by DashboardLayout's `<main>`, which meant a
+ *  by the old page wrapper and by DashboardLayout's `<main>`, which meant a
  *  *library* setting styled the whole application shell: a custom
  *  background painted behind the page header, the search/filter toolbar,
  *  and every unrelated route (Settings, Library style, Gallery, Murals)
