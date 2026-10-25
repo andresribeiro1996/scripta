@@ -45,6 +45,10 @@ const cases: Array<[string, string, string, Kind, string, Array<{ nameKey: strin
   ["roman volume of a lone work", "Memória do Fogo I", "Memory of fire", none, "never"],
   ["collection of the same name", "Poesia", "Poesia", kinds({ Poesia: "collection" }), "join"],
   ["volume of a collection", "Blacksad.. Vol. 1,. Algures entre as sombras", "Blacksad", kinds({ Blacksad: "collection" }), "review"],
+  ["spelled ordinal on both sides", "Memorial Livro Segundo", "Memorial Livro Segundo", none, "join"],
+  ["spelled ordinal volume word on both sides", "Memórias Tomo Primeiro", "Memórias Tomo Primeiro", none, "join"],
+  ["series stem of a roman volume", "Geronimo Stilton V", "Four Mice Deep in the Jungle", none, "never"],
+  ["series stem downgrades a roman volume", "Geronimo Stilton V", "Four Mice Deep in the Jungle", kinds({ "Geronimo Stilton": "series" }), "review", noSeries],
   ["original title no longer counts", "História do Novo Nome", "The Story of a New Name", kinds({ "L'amica geniale": "series" }), "join"]
 ];
 

@@ -1,6 +1,6 @@
 import { normalizeWords, titleNumbers, withoutBrackets } from "@scripta/shared";
 import { seriesNameKey } from "./series.js";
-import { VOLUME_WORD, mainTitle } from "./translation.js";
+import { VOLUME_WORD, VOLUME_WORDS, mainTitle } from "./translation.js";
 
 export type JoinVerdict = "join" | "review" | "never";
 
@@ -43,12 +43,14 @@ export function volumeNumber(text: string): string | null {
   return trailingNumber(words);
 }
 
+const SPELLED_VOLUME = new RegExp(String.raw`\b(?:${VOLUME_WORDS.join("|")})\s?(\d+|[ivx]{1,4}|${NUMBER_WORDS.flat().join("|")})\b`, "g");
+
 function volumeNumbers(text: string): string[] {
   const numbers: Array<string | null> = [];
   const hash = /#\s*(\d+)/.exec(text);
   if (hash) numbers.push(String(Number(hash[1])));
   const words = normalizeWords(text);
-  for (const marker of words.matchAll(new RegExp(VOLUME_WORD.source, "g"))) numbers.push(toArabic(marker[1]!));
+  for (const marker of words.matchAll(SPELLED_VOLUME)) numbers.push(toArabic(marker[1]!));
   for (const segment of text.split(/[,;:]| [-–—] /)) numbers.push(trailingNumber(normalizeWords(segment)));
   return numbers.filter((value) => value !== null);
 }
@@ -72,11 +74,12 @@ export function isOmnibusTitle(title: string): boolean {
   return OMNIBUS_PHRASES.some((phrase) => words.includes(` ${phrase} `)) || /\b(?:books|livros) \d+ \d+\b/.test(words);
 }
 
+const STEM_END = new RegExp(String.raw`\s+(?:(?:${VOLUME_WORDS.join("|")})\.?\s+)?#?\s*\S+$`, "i");
+
 function seriesStem(main: string): string {
-  return main.replace(/\s+(?:(?:book|bk|vol|volume|livro|tomo|tome|part|parte)\.?\s+)?#?\s*\S+$/i, "");
+  return main.replace(STEM_END, "");
 }
 
-const VOLUME_WORDS = new Set(["book", "bk", "vol", "volume", "livro", "tomo", "tome", "part", "parte"]);
 const NUMBERED_END = /(?:#|\bn\.?\s*[º°]|\bno\.)\s*\d+\s*$/i;
 
 type EndMarker = { n: string; strong: boolean; word: boolean };
@@ -87,9 +90,9 @@ function endMarker(title: string): EndMarker | null {
   const last = words.at(-1)!;
   const n = last === "x" ? null : toArabic(last);
   if (n === null || words.length < 2) return null;
-  if (VOLUME_WORDS.has(words.at(-2)!)) return { n, strong: true, word: true };
+  if (VOLUME_WORDS.includes(words.at(-2)!)) return { n, strong: true, word: true };
   if (/^\d+$/.test(last)) return last.length === 1 ? { n, strong: false, word: false } : null;
-  return ROMAN.indexOf(last) >= 0 && last !== "x" ? { n, strong: true, word: false } : null;
+  return ROMAN.includes(last) ? { n, strong: true, word: false } : null;
 }
 
 export type JoinTarget = { title: string; series: Array<{ nameKey: string; position: string | null }> };
@@ -100,6 +103,7 @@ export function joinVerdict(work: { title: string }, target: JoinTarget, memberK
   const targetNumbers = new Set([
     ...titleNumbers(targetTitle).split(" ").filter((digits) => digits !== "").map((digits) => String(Number(digits))),
     ...volumeNumbers(targetTitle),
+    ...[endMarker(targetTitle)?.n ?? []].flat(),
     ...target.series.flatMap((entry) => [...(entry.position ?? "").matchAll(/\d+/g)].map((digits) => String(Number(digits[0]))))
   ]);
   const marker = endMarker(workTitle);
