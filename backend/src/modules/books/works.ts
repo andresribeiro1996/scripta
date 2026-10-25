@@ -53,6 +53,7 @@ export type CatalogWorkPage = {
   aliasIds: string[];
   series?: SeriesEntry | null;
   awards?: WorkAward[];
+  characters?: string[];
   editions: Array<{ bookId: string; title: string; language: string | null; year: number | null; isbn: string | null; summary: string | null; coverUrl: string | null; coverColor: string | null; genres: string[]; rating: number | null; ratingCount: number; pages: number | null; possible?: boolean; collection?: SeriesEntry | null }>;
 };
 
@@ -71,6 +72,7 @@ export function getWorkPageWith(books: BooksRepository, coverUrl: (imageId: stri
     aliasIds: rows.aliasIds,
     series,
     awards: knownAwards(books.awardsOf([rows.work.id]).get(rows.work.id)),
+    characters: books.charactersOf([rows.work.id]).get(rows.work.id) ?? [],
     editions: rows.editions.map((edition) => ({
       bookId: edition.id,
       title: edition.title,
@@ -92,6 +94,10 @@ export function getWorkPageWith(books: BooksRepository, coverUrl: (imageId: stri
 
 export function getWorkPage(id: string): CatalogWorkPage | undefined {
   return getWorkPageWith(booksRepository(), (imageId) => coverUrlFor(imageId, "file"), id);
+}
+
+export function getWorkCharacters(workIds: string[]): Map<string, string[]> {
+  return booksRepository().charactersOf(workIds);
 }
 
 export const ANNOUNCE_DAYS = 14;

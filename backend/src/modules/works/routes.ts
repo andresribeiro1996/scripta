@@ -1,10 +1,21 @@
 import type { FastifyInstance } from "fastify";
+import { z } from "zod";
 import { getOptionalAuthenticatedUser } from "../auth/index.js";
 import type { WorksService } from "./service.js";
 import type { BookStatsService } from "./stats.js";
 
+const charactersSchema = z.object({ workIds: z.array(z.string().min(1)).max(500) });
+
 export function buildWorkRoutes(service: WorksService) {
   return async function workRoutes(app: FastifyInstance) {
+    app.post("/works/characters", async (request, reply) => {
+      getOptionalAuthenticatedUser(request);
+      reply.header("Cache-Control", "no-store");
+      const parsed = charactersSchema.safeParse(request.body);
+      if (!parsed.success) return reply.code(400).send({ error: "Expected {workIds} with at most 500 ids." });
+      return reply.send({ characters: service.characters(parsed.data.workIds) });
+    });
+
     app.get("/works/:id", async (request, reply) => {
       const { id } = request.params as { id: string };
       const viewer = getOptionalAuthenticatedUser(request);

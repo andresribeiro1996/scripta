@@ -16,10 +16,12 @@ export type WorksDeps = {
   arenas(workIds: string[], limit: number): GameByWork[];
   quizzes(workIds: string[], limit: number): GameByWork[];
   getRecentAwards(): AwardAnnouncement[];
+  charactersOf(workIds: string[]): Map<string, string[]>;
 };
 
 const READER_CAP = 50;
 const GAME_CAP = 20;
+const QUIZ_CHARACTERS = 3;
 const isbnKey = (isbn: string | null) => (isbn ? isbn.replace(/[\s-]/g, "") : null);
 const byUsername = (a: WorkReader, b: WorkReader) => a.username.toLowerCase().localeCompare(b.username.toLowerCase());
 
@@ -80,6 +82,12 @@ export function createWorksService(deps: WorksDeps) {
       return { announcements: deps.getRecentAwards() };
     },
 
+    characters(workIds: string[]): Record<string, string[]> {
+      const result: Record<string, string[]> = {};
+      for (const [id, names] of deps.charactersOf(workIds)) if (names.length >= QUIZ_CHARACTERS) result[id] = names.slice(0, QUIZ_CHARACTERS);
+      return result;
+    },
+
     getPage(id: string, viewerId: string | null): WorkPage | undefined {
       const work = deps.getWorkPage(id);
       if (!work) return undefined;
@@ -100,6 +108,7 @@ export function createWorksService(deps: WorksDeps) {
           coverColor,
           series: work.series ? { ...work.series, kind: "series" } : null,
           awards: work.awards,
+          characters: work.characters,
           editions: work.editions.map((edition) => ({ bookId: edition.bookId, title: edition.title, language: edition.language, year: edition.year, isbn: edition.isbn, coverUrl: edition.coverUrl, coverColor: edition.coverColor, pages: edition.pages, mine: edition === mineEdition, collection: edition.collection ? { ...edition.collection, kind: "collection" } : null })),
           ...workGenres(work.editions),
           rating: bestRating(work.editions),

@@ -33,3 +33,13 @@ test("fetchRecentAwards requests /awards/recent without auth", async () => {
   assert.deepEqual(await createWorksApi(request).fetchRecentAwards(), recent);
   assert.deepEqual(calls, [{ path: "/awards/recent", init: { auth: "none" } }]);
 });
+
+test("fetchWorkCharacters posts the ids", async () => {
+  const calls: Array<{ path: string; init: ApiRequestInit }> = [];
+  const request = (async (path: string, init: ApiRequestInit) => {
+    calls.push({ path, init });
+    return { characters: {} };
+  }) as ApiRequest;
+  assert.deepEqual(await createWorksApi(request).fetchWorkCharacters(["a", "b"]), { characters: {} });
+  assert.deepEqual(calls, [{ path: "/works/characters", init: { method: "POST", body: { workIds: ["a", "b"] }, auth: "optional" } }]);
+});

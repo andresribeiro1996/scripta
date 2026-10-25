@@ -11,6 +11,9 @@ export function createWorksApi(request: ApiRequest) {
     fetchWorkStats(id: string): Promise<BookStats> {
       return request<BookStats>(apiPath`/works/${id}/stats`, { auth: "optional" });
     },
+    fetchWorkCharacters(workIds: string[]): Promise<{ characters: Record<string, string[]> }> {
+      return request<{ characters: Record<string, string[]> }>("/works/characters", { method: "POST", body: { workIds }, auth: "optional" });
+    },
     fetchRecentAwards(): Promise<RecentAwards> {
       return request<RecentAwards>("/awards/recent", { auth: "none" });
     },
