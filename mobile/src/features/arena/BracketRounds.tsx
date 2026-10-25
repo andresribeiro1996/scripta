@@ -40,7 +40,7 @@ import { Fragment, useRef, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { bracketShape, countdownLabel, duelWinner, needsVote, roundLabel, sharePercent, type BracketSlot, type Duel, type DuelSide } from "@scripta/shared";
-import { Icon, Sheet, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { Icon, Sheet, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import { BookCover } from "./BookCover";
 import { DuelSideRow } from "./DuelSideRow";
 import { BracketViewToggle } from "./BracketViewToggle";
@@ -194,7 +194,7 @@ function MatchCard({
             accessibilityRole="button"
             accessibilityLabel="Settle this match now"
             disabled={busy}
-            hitSlop={10}
+            hitSlop={12}
             onPress={() => onSettle(duel.id)}
             style={[styles.settle, { borderColor: colors.border, opacity: busy ? 0.5 : 1 }]}
           >
@@ -394,7 +394,7 @@ const styles = StyleSheet.create({
   list: { paddingBottom: BAR_RESERVE, flexGrow: 1 },
   bar: { position: "absolute", left: 0, right: 0, bottom: 0, minHeight: BAR_HEIGHT, flexDirection: "row", alignItems: "center", paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.sm, borderTopWidth: 1 },
   barRule: { width: 1, height: 24, marginLeft: spacing.md, marginRight: spacing.sm, marginBottom: 8 },
-  node: { alignItems: "center", gap: 3, flexShrink: 0 },
+  node: { alignItems: "center", justifyContent: "center", gap: 3, flexShrink: 0, minWidth: minimumTouchTarget, minHeight: minimumTouchTarget },
   nodeDot: { width: 14, height: 14, borderRadius: radii.full },
   nodeLabel: { fontSize: 10 },
   // Sits on the dots' centre line, not the labels'.
