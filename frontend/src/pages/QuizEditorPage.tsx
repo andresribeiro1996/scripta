@@ -5,9 +5,11 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { QUIZ_QUESTION_TYPES, eligibleTypes, playerLabel, quizOptionLabel, quizQuestionLabel, type QuizData, type QuizQuestionType } from "@scripta/shared";
-import { PageContainer } from "../components/PageContainer";
+import { Page } from "../components/page/Page";
+import { BUTTON_SECONDARY } from "../components/page/buttonClasses";
+import { backTo } from "../lib/areas";
 import { useConfirm } from "../components/ConfirmDialog";
 import { deleteQuizApi, fetchQuizResultsApi, publishQuizApi, setPlayStateApi, updateQuizApi, type Quiz } from "../api/quizzes";
 import { useQuizzes } from "../hooks/useQuizzes";
@@ -89,15 +91,12 @@ export function QuizEditorPage() {
     }
   }
 
-  if (isLoading) return <PageContainer><p className="px-5 py-8 text-(--color-text-dim)">Loading…</p></PageContainer>;
+  if (isLoading) return <Page title="Quiz" back={backTo("quiz")}><p className="text-(--color-text-dim)">Loading…</p></Page>;
   if (!quiz) {
     return (
-      <PageContainer>
-        <div className="mx-auto max-w-2xl px-5 py-8">
-          <Link to="/dashboard/arena?tab=quizzes" className="text-sm text-(--color-text-dim) hover:text-(--color-text)">← Quizzes</Link>
-          <p className="mt-4 text-(--color-text-dim)">No quiz with that id.</p>
-        </div>
-      </PageContainer>
+      <Page title="Quiz" back={backTo("quiz")}>
+        <p className="text-(--color-text-dim)">No quiz with that id.</p>
+      </Page>
     );
   }
 
@@ -105,28 +104,27 @@ export function QuizEditorPage() {
   const shareLink = quiz.voteCode ? `${window.location.origin}/play/${quiz.voteCode}` : null;
   if (!data) {
     return (
-      <PageContainer>
-        <p className="px-5 py-8 text-(--color-text-dim)">Loading…</p>
-      </PageContainer>
+      <Page title={quiz.name} back={backTo("quiz")}>
+        <p className="text-(--color-text-dim)">Loading…</p>
+      </Page>
     );
   }
 
   return (
-    <PageContainer>
+    <Page
+      title={quiz.name}
+      back={backTo("quiz")}
+      actions={quiz.voteCode === null ? (
+        <button
+          type="button"
+          onClick={() => { void confirm({ title: `Delete "${quiz.name}"?`, body: "This can't be undone." }).then(async (yes) => { if (yes) { await deleteQuizApi(quiz.id); await queryClient.invalidateQueries({ queryKey: ["quizzes"] }); navigate("/dashboard/arena?tab=quizzes"); } }); }}
+          className={`${BUTTON_SECONDARY} text-(--color-danger)`}
+        >
+          Delete
+        </button>
+      ) : undefined}
+    >
       <div className="mx-auto flex max-w-3xl flex-col gap-5 pb-10">
-        <Link to="/dashboard/arena?tab=quizzes" className="text-sm text-(--color-text-dim) hover:text-(--color-text)">← Quizzes</Link>
-        <div className="flex items-start justify-between gap-4">
-          <h1 className="text-2xl font-bold">{quiz.name}</h1>
-          {quiz.voteCode === null && (
-            <button
-              type="button"
-              onClick={() => { void confirm({ title: `Delete "${quiz.name}"?`, body: "This can't be undone." }).then(async (yes) => { if (yes) { await deleteQuizApi(quiz.id); await queryClient.invalidateQueries({ queryKey: ["quizzes"] }); navigate("/dashboard/arena?tab=quizzes"); } }); }}
-              className="min-h-10 rounded-lg border border-(--color-border) px-3 text-sm text-(--color-danger)"
-            >
-              Delete
-            </button>
-          )}
-        </div>
         {error && <p role="alert" className="text-sm text-(--color-danger)">{error}</p>}
 
         {quiz.voteCode === null && (
@@ -225,7 +223,7 @@ export function QuizEditorPage() {
 
         {quiz.voteCode !== null && <PublishedSection quiz={quiz} shareLink={shareLink!} copied={copied} setCopied={setCopied} />}
       </div>
-    </PageContainer>
+    </Page>
   );
 }
 

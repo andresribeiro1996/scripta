@@ -32,7 +32,6 @@ import { FinishSheet } from "../FinishSheet";
 import { OptionsMenu } from "../OptionsMenu";
 import { PerCardStylePanel } from "../PerCardStylePanel";
 import { ReaderGlyph } from "../ReaderGlyph";
-import { BackLink } from "../work/BackLink";
 import { ArenaIcon, CommunityIcon, InfoIcon, QuoteIcon } from "../NavIcons";
 import { MoreIcon, ShareIcon } from "../Toolbar";
 import { StatsTiles } from "./BookStats";
@@ -47,8 +46,7 @@ type Props = {
   onSelectEdition: (bookId: string) => void;
   onAdd: (addBook: NonNullable<BookScreenModel["addBook"]>) => void;
   onShare: (() => void) | null;
-  onBack: (() => void) | null;
-  backTo: string;
+  frame: (title: string, actions: ReactNode, body: ReactNode) => ReactNode;
 };
 
 const TAB_ICONS: Record<BookScreenTabKey, typeof InfoIcon> = { about: InfoIcon, highlights: QuoteIcon, community: CommunityIcon };
@@ -70,7 +68,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, onAdd, onShare, onBack, backTo }: Props) {
+export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, onAdd, onShare, frame }: Props) {
   const { data: isAdmin = false } = useQuery({ queryKey: ["books-admin"], queryFn: fetchIsAdmin, staleTime: Infinity, enabled: signedIn });
   const { data: library } = useLibrary({ enabled: Boolean(book) });
   const model = bookScreenModel(page, book, { isAdmin }, editionId);
@@ -151,29 +149,30 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
   const aboutSummary = model.about?.summary ?? null;
   const editions = model.about ? (allEditions ? model.about.editions : model.about.editionsPreview) : [];
 
-  return (
+  const headerActions = (
+    <>
+      {onShare ? (
+        <button type="button" onClick={onShare} aria-label="Share" title="Share" className={roundButtonClass}>
+          <ShareIcon />
+        </button>
+      ) : null}
+      {menuItems.length > 0 ? (
+        <OptionsMenu items={menuItems} title="More" trigger={<><MoreIcon /><span className="sr-only">More</span></>} triggerClassName={roundButtonClass} />
+      ) : null}
+    </>
+  );
+
+  return frame(model.title, headerActions, (
+    <>
     <div className="relative isolate">
       {wash ? (
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[520px]"
+          className="pointer-events-none absolute -inset-x-4 -top-5 -z-10 h-[520px] sm:-inset-x-5 sm:-top-8"
           style={{ background: `linear-gradient(to bottom, ${wash.top}, ${wash.mid} 45%, transparent)` }}
         />
       ) : null}
-      <main className="mx-auto max-w-5xl px-5 py-8">
-        <div className="mb-2 flex items-center justify-between gap-3">
-          <BackLink backTo={backTo} onBack={onBack} className="" />
-          <div className="flex items-center gap-2">
-            {onShare ? (
-              <button type="button" onClick={onShare} aria-label="Share" title="Share" className={roundButtonClass}>
-                <ShareIcon />
-              </button>
-            ) : null}
-            {menuItems.length > 0 ? (
-              <OptionsMenu items={menuItems} title="More" trigger={<><MoreIcon /><span className="sr-only">More</span></>} triggerClassName={roundButtonClass} />
-            ) : null}
-          </div>
-        </div>
+      <div>
         {model.menu.includes("replaceCover") ? (
           <input
             ref={coverFile}
@@ -197,9 +196,8 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
                 <CoverImage key={coverVersion} book={heroBook} size="full" />
               </div>
             )}
-            <h1 className="mt-4 text-2xl font-bold">{model.title}</h1>
-            {model.series ? <p className="mt-1 text-xs text-(--color-text-dim)">{seriesLabel(model.series)}</p> : null}
-            <p className="mt-1 text-sm text-(--color-text-dim)">{model.author}</p>
+            {model.series ? <p className="mt-4 text-xs text-(--color-text-dim)">{seriesLabel(model.series)}</p> : null}
+            <p className={`${model.series ? "mt-1" : "mt-4"} text-sm text-(--color-text-dim)`}>{model.author}</p>
             {model.authorAwards ? <p className="mt-1 text-xs text-(--color-text-dim)">{model.authorAwards}</p> : null}
             {model.awards.length > 0 ? (
               <ul className="mt-3 flex flex-wrap justify-center gap-1.5 sm:justify-start">
@@ -376,45 +374,46 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
             </div>
           </div>
         </div>
-
-        {book && styling ? (
-          <PerCardStylePanel
-            idPrefix="book"
-            name={String(book.Title ?? "Untitled")}
-            priorityText="the series and library-wide"
-            currentOverride={book._style as PerCardStyle | undefined}
-            seedStyle={effectiveCardStyle(
-              resolveLibraryStyle(library?.data.style),
-              seriesGroupByBookKey(books, library?.data.groups ?? []).get(bookKey(book))?.style
-            )}
-            onSave={(style) => actions.saveStyle(book, style)}
-            onClose={() => setStyling(false)}
-          />
-        ) : null}
-        {book && pickingCover ? (
-          <CoverPickerModal
-            title={String(book.Title ?? "Untitled")}
-            currentImageId={typeof book._coverImageId === "string" ? book._coverImageId : null}
-            removeCoverLabel="Remove custom cover — go back to the normal auto-detected one"
-            onSelect={(image) => void actions.saveCover(book, image)}
-            onRemoveCover={() => void actions.removeCover(book)}
-            onClose={() => setPickingCover(false)}
-          />
-        ) : null}
-        {book && finishing ? (
-          <FinishSheet
-            book={book}
-            books={books}
-            before={finishing}
-            onSetRating={actions.setRating}
-            onAddNote={actions.addNote}
-            onRestoreRead={actions.restoreRead}
-            onClose={() => setFinishing(null)}
-          />
-        ) : null}
-      </main>
+      </div>
     </div>
-  );
+
+    {book && styling ? (
+        <PerCardStylePanel
+          idPrefix="book"
+          name={String(book.Title ?? "Untitled")}
+          priorityText="the series and library-wide"
+          currentOverride={book._style as PerCardStyle | undefined}
+          seedStyle={effectiveCardStyle(
+            resolveLibraryStyle(library?.data.style),
+            seriesGroupByBookKey(books, library?.data.groups ?? []).get(bookKey(book))?.style
+          )}
+          onSave={(style) => actions.saveStyle(book, style)}
+          onClose={() => setStyling(false)}
+        />
+      ) : null}
+      {book && pickingCover ? (
+        <CoverPickerModal
+          title={String(book.Title ?? "Untitled")}
+          currentImageId={typeof book._coverImageId === "string" ? book._coverImageId : null}
+          removeCoverLabel="Remove custom cover — go back to the normal auto-detected one"
+          onSelect={(image) => void actions.saveCover(book, image)}
+          onRemoveCover={() => void actions.removeCover(book)}
+          onClose={() => setPickingCover(false)}
+        />
+      ) : null}
+      {book && finishing ? (
+        <FinishSheet
+          book={book}
+          books={books}
+          before={finishing}
+          onSetRating={actions.setRating}
+          onAddNote={actions.addNote}
+          onRestoreRead={actions.restoreRead}
+          onClose={() => setFinishing(null)}
+        />
+      ) : null}
+    </>
+  ));
 }
 
 export function ReaderList({ title, rows, signedIn }: { title: string | null; rows: BookScreenReaderRow[]; signedIn: boolean }) {

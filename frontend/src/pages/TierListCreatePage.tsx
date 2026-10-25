@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { createTier, DEFAULT_TIER_PRESET, workIdOf, type TierlistData, booksByWork } from "@scripta/shared";
-import { PageContainer } from "../components/PageContainer";
+import { Page } from "../components/page/Page";
+import { backTo } from "../lib/areas";
 import { useLibrary } from "../hooks/useLibrary";
 import { useTierlists } from "../hooks/useTierlists";
 import { useWorkBooks } from "../hooks/useWorkBooks";
@@ -38,13 +39,8 @@ export function TierListCreatePage() {
     }
   }
 
-  return <PageContainer>
+  return <Page title={["Choose books", "Set up tiers", "Publish settings"][step]} subtitle={`Step ${step + 1} of 3`} back={backTo("tierlist")}>
     <div className="mx-auto flex max-w-2xl flex-col gap-5 pb-10">
-      <Link to="/dashboard/arena?tab=tierlists" className="text-sm text-(--color-text-dim) hover:text-(--color-text)">← Tier lists</Link>
-      <div>
-        <p className="text-sm text-(--color-text-dim)">Step {step + 1} of 3</p>
-        <h1 className="text-2xl font-bold">{["Choose books", "Set up tiers", "Publish settings"][step]}</h1>
-      </div>
       {error && <p role="alert" className="text-sm text-(--color-danger)">{error}</p>}
       {step === 0 && <>
         <label className="flex flex-col gap-1 text-sm font-semibold">Tier list name
@@ -96,5 +92,5 @@ export function TierListCreatePage() {
         {step < 2 ? <button type="button" disabled={step === 0 ? !pool.length || isError : tiers.some((tier) => !tier.label.trim())} onClick={() => setStep((value) => value + 1)} className="min-h-11 rounded-lg bg-(--color-accent) px-4 font-semibold text-(--color-on-accent) disabled:opacity-50">Next</button> : <button type="button" disabled={busy} onClick={() => void submit()} className="min-h-11 rounded-lg bg-(--color-accent) px-4 font-semibold text-(--color-on-accent) disabled:opacity-50">{busy ? "Creating…" : "Create tier list"}</button>}
       </div>
     </div>
-  </PageContainer>;
+  </Page>;
 }

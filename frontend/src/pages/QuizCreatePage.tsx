@@ -3,9 +3,10 @@
 // the editor; the pool ships with famous first lines already attached.
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { QUIZ_POOL, QUIZ_QUESTION_TYPES, bookKey, booksInGroup, eligibleTypes, workIdOf, type QuizBookInput, type QuizDataInput, type QuizQuestionType, booksByWork } from "@scripta/shared";
-import { PageContainer } from "../components/PageContainer";
+import { Page } from "../components/page/Page";
+import { backTo } from "../lib/areas";
 import { createQuizApi } from "../api/quizzes";
 import { resolveCover } from "../api/covers";
 import { normalizeImageId, normalizeIsbn } from "../lib/covers";
@@ -133,13 +134,8 @@ export function QuizCreatePage() {
   }
 
   return (
-    <PageContainer>
+    <Page title={["Choose books", "Set up questions"][step]} subtitle={`Step ${step + 1} of 2`} back={backTo("quiz")}>
       <div className="mx-auto flex max-w-2xl flex-col gap-5 pb-10">
-        <Link to="/dashboard/arena?tab=quizzes" className="text-sm text-(--color-text-dim) hover:text-(--color-text)">← Quizzes</Link>
-        <div>
-          <p className="text-sm text-(--color-text-dim)">Step {step + 1} of 2</p>
-          <h1 className="text-2xl font-bold">{["Choose books", "Set up questions"][step]}</h1>
-        </div>
         {error && <p role="alert" className="text-sm text-(--color-danger)">{error}</p>}
         {step === 0 && (
           <>
@@ -251,6 +247,6 @@ export function QuizCreatePage() {
           )}
         </div>
       </div>
-    </PageContainer>
+    </Page>
   );
 }

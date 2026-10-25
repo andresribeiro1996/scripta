@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useDismissible } from "../../hooks/useDismissible";
 import { Sheet } from "../Sheet";
+import { BUTTON_SECONDARY } from "../page/buttonClasses";
 import { PlusIcon, toolbarIconClass } from "../Toolbar";
 import { blockLabel, type BlockType } from "../../lib/murals";
 
@@ -60,7 +61,7 @@ export function AddBlockMenu({ onAdd }: { onAdd: (type: BlockType) => void }) {
       <div className="relative hidden sm:block">
         <button
           onClick={() => setOpen((o) => !o)}
-          className="rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-semibold text-(--color-on-accent)"
+          className={BUTTON_SECONDARY}
         >
           + Add block
         </button>

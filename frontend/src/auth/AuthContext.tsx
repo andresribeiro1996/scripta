@@ -30,7 +30,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // useSyncExternalStore is the correct hook for exactly this shape: state
   // that lives outside React (tokenStore.ts) but needs to trigger
   // re-renders here when it changes.
-  const session = useSyncExternalStore(subscribeToSession, getSession);
+  const session = useSyncExternalStore(subscribeToSession, getSession, getSession);
 
   async function signup(email: string, username: string, password: string, remember = false) {
     const body = (await publicFetch("/auth/signup", {
