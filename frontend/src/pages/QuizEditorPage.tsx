@@ -8,11 +8,12 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { QUIZ_QUESTION_TYPES, eligibleTypes, playerLabel, quizOptionLabel, quizQuestionLabel, type QuizData, type QuizQuestionType } from "@scripta/shared";
 import { Page } from "../components/page/Page";
-import { BUTTON_SECONDARY } from "../components/page/buttonClasses";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../components/page/buttonClasses";
 import { backTo } from "../lib/areas";
 import { useConfirm } from "../components/ConfirmDialog";
 import { deleteQuizApi, fetchQuizResultsApi, publishQuizApi, setPlayStateApi, updateQuizApi, type Quiz } from "../api/quizzes";
 import { useQuizzes } from "../hooks/useQuizzes";
+import { CHECKBOX_CLASS } from "../components/Toolbar";
 
 const TYPE_LABELS: Record<QuizQuestionType, string> = {
   cover_title: "Blurred cover → title",
@@ -135,7 +136,7 @@ export function QuizEditorPage() {
                 <select
                   value={data.questionCount}
                   onChange={(event) => updateDraft((current) => ({ ...current, questionCount: Number(event.target.value) }))}
-                  className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2"
+                  className="min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2"
                 >
                   {[4, 5, 10, 15, 20].map((count) => (
                     <option key={count} value={count}>{count}</option>
@@ -150,6 +151,7 @@ export function QuizEditorPage() {
                     <label key={type} className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm ${offered ? "border-(--color-border)" : "border-(--color-border) opacity-50"}`}>
                       <input
                         type="checkbox"
+                        className={CHECKBOX_CLASS}
                         disabled={!offered}
                         checked={checked}
                         onChange={() =>
@@ -176,7 +178,7 @@ export function QuizEditorPage() {
                   <button
                     type="button"
                     onClick={() => updateDraft((current) => ({ ...current, books: current.books.filter((entry) => entry.workId !== book.workId) }))}
-                    className="min-h-9 rounded-lg border border-(--color-border) px-3 text-sm"
+                    className={BUTTON_SECONDARY}
                   >
                     Remove
                   </button>
@@ -248,14 +250,14 @@ function PublishedSection({ quiz, shareLink, copied, setCopied }: { quiz: Quiz; 
             setCopied(true);
             window.setTimeout(() => setCopied(false), 1500);
           }}
-          className="min-h-10 rounded-lg bg-(--color-accent) px-3 text-sm font-semibold text-(--color-on-accent)"
+          className={BUTTON_PRIMARY}
         >
           {copied ? "Copied!" : "Copy challenge link"}
         </button>
         <button
           type="button"
           onClick={() => void toggleOpen(!quiz.playOpen)}
-          className="min-h-10 rounded-lg border border-(--color-border) px-3 text-sm"
+          className={BUTTON_SECONDARY}
         >
           {quiz.playOpen ? "Close for play" : "Open for play"}
         </button>

@@ -1,5 +1,5 @@
 import { useSearchParams } from "react-router-dom";
-import { useMemo, useState, type ComponentType } from "react";
+import { useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import { deleteBooks, restoreDeletedBooks, saveFailureMessage } from "@scripta/shared";
 import type { GalleryImage } from "../api/gallery";
 import { BookCard } from "../components/BookCard";
@@ -12,11 +12,11 @@ import { OptionsMenu } from "../components/OptionsMenu";
 import { Page } from "../components/page/Page";
 import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../components/page/buttonClasses";
 import { PerCardStylePanel } from "../components/PerCardStylePanel";
+import { Sheet } from "../components/Sheet";
 import { SkeletonGroups } from "../components/Skeleton";
 import { useToast } from "../components/Toaster";
-import { TOOLBAR_CONTROL_CLASS, ToolbarRow } from "../components/Toolbar";
+import { TOOLBAR_CONTROL_CLASS, ToolbarRow, CHECKBOX_CLASS } from "../components/Toolbar";
 import { useDelayedShow } from "../hooks/useDelayedShow";
-import { useDismissible } from "../hooks/useDismissible";
 import { useLibrary } from "../hooks/useLibrary";
 import { useLibrarySaver } from "../hooks/useLibrarySaver";
 import { useMurals } from "../hooks/useMurals";
@@ -71,6 +71,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
   const [search, setSearch] = useState("");
   const [drafting, setDrafting] = useState(false);
   const [draftName, setDraftName] = useState("");
+  const [draftError, setDraftError] = useState<string | null>(null);
   const toast = useToast();
 
   const [creating, setCreating] = useState(false);
@@ -119,15 +120,19 @@ export function GroupsPage({ type }: { type: GroupType }) {
   // changed their mind.
   function handleStartDraft() {
     setDraftName("");
+    setDraftError(null);
     setDrafting(true);
   }
 
-  async function handleCommitDraft() {
+  async function handleCommitDraft(fromEnter = false) {
     const name = draftName.trim();
+    if (fromEnter && !name) {
+      setDraftError(`Give this ${copy.noun} a name.`);
+      return;
+    }
     setDrafting(false);
     setDraftName("");
-    // An empty name is an abandoned draft, not an error to report: it's
-    // the ordinary way of backing out, by tapping away.
+    // Tapping away from an empty draft is the ordinary way of backing out.
     if (!name || creating) return;
     setCreating(true);
     try {
@@ -353,15 +358,24 @@ export function GroupsPage({ type }: { type: GroupType }) {
 
       <div className="flex flex-col gap-6">
         {drafting ? (
-          <div className="flex min-h-14 items-center gap-2 rounded-xl border-2 border-dashed border-(--color-accent) p-3">
+          <div className="rounded-xl border-2 border-dashed border-(--color-accent) p-3">
+            <label htmlFor="new-group-name" className="mb-1 block text-sm font-semibold">
+              Name
+            </label>
             <input
+              id="new-group-name"
               autoFocus
               value={draftName}
               maxLength={200}
-              onChange={(e) => setDraftName(e.target.value)}
+              aria-invalid={draftError ? true : undefined}
+              aria-describedby="new-group-name-hint"
+              onChange={(e) => {
+                setDraftName(e.target.value);
+                setDraftError(null);
+              }}
               onBlur={() => void handleCommitDraft()}
               onKeyDown={(e) => {
-                if (e.key === "Enter") void handleCommitDraft();
+                if (e.key === "Enter") void handleCommitDraft(true);
                 if (e.key === "Escape") {
                   // Discard outright — don't let the blur that follows
                   // commit what Escape just cancelled.
@@ -370,9 +384,11 @@ export function GroupsPage({ type }: { type: GroupType }) {
                 }
               }}
               placeholder={`Name this ${copy.noun}…`}
-              aria-label={`Name the new ${copy.noun}`}
-              className="min-h-11 w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm"
+              className={`min-h-11 w-full rounded-lg border bg-(--color-surface) px-3 text-sm ${draftError ? "border-(--color-danger)" : "border-(--color-border)"}`}
             />
+            <p id="new-group-name-hint" role={draftError ? "alert" : undefined} className={`mt-1 text-xs ${draftError ? "text-(--color-danger)" : "text-(--color-text-dim)"}`}>
+              {draftError ?? "Press Enter to add it."}
+            </p>
           </div>
         ) : null}
 
@@ -394,7 +410,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
                       if (e.key === "Enter") handleRename(group.id);
                       if (e.key === "Escape") setEditingId(null);
                     }}
-                    className="rounded-lg border border-(--color-border) bg-(--color-surface) px-2 py-1 text-sm font-semibold"
+                    className="min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-2 text-sm font-semibold"
                   />
                 ) : (
                   <button
@@ -402,7 +418,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
                       setEditingId(group.id);
                       setEditingName(group.name);
                     }}
-                    className="text-left text-sm font-semibold transition-colors hover:text-(--color-accent)"
+                    className="min-h-11 text-left text-sm font-semibold transition-colors hover:text-(--color-accent)"
                     title="Rename"
                   >
                     {group.name}
@@ -419,7 +435,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
                   </span>
                   <OptionsMenu
                     title={`${copy.noun[0].toUpperCase()}${copy.noun.slice(1)} settings`}
-                    triggerClassName="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)"
+                    triggerClassName="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)"
                     items={[
                       // Collections don't get their own style override —
                       // same reason there's no "Style" button on a
@@ -525,7 +541,10 @@ function BookPickerModal({
   onToggle: (book: Record<string, unknown>, inGroup: boolean) => void;
   onClose: () => void;
 }) {
-  useDismissible(onClose);
+  const searchRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    searchRef.current?.focus();
+  }, []);
   const [search, setSearch] = useState("");
   const memberKeys = useMemo(() => new Set(group.bookKeys), [group]);
 
@@ -536,46 +555,36 @@ function BookPickerModal({
   }, [allBooks, search]);
 
   return (
-    <div className="overlay-in fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div
-        className="flex max-h-[80vh] w-full max-w-md flex-col rounded-xl border border-(--color-border) bg-(--color-surface) shadow-lg"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between border-b border-(--color-border) p-4">
-          <h3 className="text-sm font-semibold">Books in "{group.name}"</h3>
-          <button onClick={onClose} className="text-sm text-(--color-text-dim) hover:text-(--color-text)">
-            Close
-          </button>
-        </div>
-        <div className="border-b border-(--color-border) p-3">
-          <input
-            autoFocus
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search your library…"
-            className="w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-1.5 text-sm"
-          />
-        </div>
-        <div className="flex-1 overflow-y-auto p-2">
-          {filtered.length === 0 && <p className="p-3 text-sm text-(--color-text-dim)">No books match.</p>}
-          {filtered.map((book, i) => {
-            const key = bookKey(book);
-            const inGroup = memberKeys.has(key);
-            return (
-              <label
-                key={String(book.ContentID ?? i)}
-                className="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2 text-sm hover:bg-(--color-surface-hover)"
-              >
-                <input type="checkbox" checked={inGroup} onChange={() => onToggle(book, inGroup)} />
-                <span className="min-w-0 flex-1 truncate">
-                  {String(book.Title ?? "Untitled")}
-                  <span className="text-(--color-text-dim)"> — {String(book.Attribution ?? "Unknown author")}</span>
-                </span>
-              </label>
-            );
-          })}
-        </div>
+    <Sheet title={`Books in "${group.name}"`} onClose={onClose}>
+      <div className="sticky top-0 z-10 bg-(--color-surface) p-2 pt-0">
+        <input
+          ref={searchRef}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search your library…"
+          aria-label="Search your library"
+          className="min-h-11 w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm"
+        />
       </div>
-    </div>
+      <div className="p-2">
+        {filtered.length === 0 && <p className="p-3 text-sm text-(--color-text-dim)">No books match.</p>}
+        {filtered.map((book, i) => {
+          const key = bookKey(book);
+          const inGroup = memberKeys.has(key);
+          return (
+            <label
+              key={String(book.ContentID ?? i)}
+              className="flex cursor-pointer items-center gap-1 rounded-lg px-2 text-sm hover:bg-(--color-surface-hover)"
+            >
+              <input type="checkbox" className={CHECKBOX_CLASS} checked={inGroup} onChange={() => onToggle(book, inGroup)} />
+              <span className="min-w-0 flex-1 truncate">
+                {String(book.Title ?? "Untitled")}
+                <span className="text-(--color-text-dim)"> — {String(book.Attribution ?? "Unknown author")}</span>
+              </span>
+            </label>
+          );
+        })}
+      </div>
+    </Sheet>
   );
 }

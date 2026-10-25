@@ -1,18 +1,21 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ApiError, startSocialConnect, type SocialProvider, type SocialStatus } from "../api/socials";
 import { useSocials } from "../hooks/useSocials";
 import { useConfirm } from "./ConfirmDialog";
 import { ToggleSwitch } from "./ToggleSwitch";
 import { SocialIcon } from "./icons/SocialIcons";
-import { useDismissible } from "../hooks/useDismissible";
-import { useScrollLock } from "../hooks/useScrollLock";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "./page/buttonClasses";
+import { Sheet } from "./Sheet";
 
 const PROVIDER_META: Record<SocialProvider, { label: string; hint: string }> = {
   x: { label: "X", hint: "Post and read on your behalf." },
   instagram: { label: "Instagram", hint: "Post and read on your behalf." },
   threads: { label: "Threads", hint: "Post and read on your behalf." },
   tiktok: { label: "TikTok", hint: "Post and read on your behalf." },
-  bluesky: { label: "Bluesky", hint: "Sign in with an app password (Bluesky Settings → App Passwords), not your real password." }
+  bluesky: {
+    label: "Bluesky",
+    hint: "Sign in with an app password (Bluesky Settings → App Passwords), not your real password."
+  }
 };
 
 /** Settings → Socials — one row per platform, identified by its icon
@@ -137,12 +140,7 @@ export function SocialsSection() {
 
       {error && <p className="mt-3 text-xs text-(--color-danger)">{error}</p>}
 
-      {blueskyOpen && (
-        <BlueskyConnectModal
-          onConnect={connectBlueskyAccount}
-          onClose={() => setBlueskyOpen(false)}
-        />
-      )}
+      {blueskyOpen && <BlueskyConnectModal onConnect={connectBlueskyAccount} onClose={() => setBlueskyOpen(false)} />}
     </section>
   );
 }
@@ -154,8 +152,10 @@ function BlueskyConnectModal({
   onConnect: (handle: string, appPassword: string) => Promise<void>;
   onClose: () => void;
 }) {
-  useScrollLock();
-  useDismissible(onClose);
+  const handleRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    handleRef.current?.focus();
+  }, []);
   const [handle, setHandle] = useState("");
   const [appPassword, setAppPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -175,36 +175,53 @@ function BlueskyConnectModal({
     }
   }
 
+  const missing =
+    handle.trim() === "" && appPassword === ""
+      ? "Enter your handle and an app password."
+      : handle.trim() === ""
+        ? "Enter your handle."
+        : appPassword === ""
+          ? "Enter an app password."
+          : null;
+
   return (
-    <div className="overlay-in fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <form
-        onSubmit={(e) => void handleSubmit(e)}
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-sm rounded-xl border border-(--color-border) bg-(--color-surface) p-5 shadow-lg"
-      >
-        <h3 className="mb-1 text-sm font-semibold">Connect Bluesky</h3>
+    <Sheet
+      title="Connect Bluesky"
+      onClose={onClose}
+      footer={
+        <>
+          <button type="button" onClick={onClose} className={BUTTON_SECONDARY}>
+            Cancel
+          </button>
+          <button type="submit" form="bluesky-connect-form" disabled={submitting || missing !== null} className={BUTTON_PRIMARY}>
+            {submitting ? "Connecting…" : "Connect"}
+          </button>
+        </>
+      }
+    >
+      <form id="bluesky-connect-form" onSubmit={(e) => void handleSubmit(e)} className="px-2 pb-2">
         <p className="mb-4 text-xs text-(--color-text-dim)">
-          Use an app password, not your real one — generate one from Bluesky at Settings → App Passwords. Atmyshelf never sees your
-          actual account password.
+          Use an app password, not your real one — generate one from Bluesky at Settings → App Passwords. Atmyshelf never sees your actual
+          account password.
         </p>
 
         <div className="mb-3">
-          <label className="mb-1 block text-xs text-(--color-text-dim)" htmlFor="bluesky-handle">
+          <label className="mb-1 block text-sm font-semibold" htmlFor="bluesky-handle">
             Handle
           </label>
           <input
             id="bluesky-handle"
-            autoFocus
+            ref={handleRef}
             required
             value={handle}
             onChange={(e) => setHandle(e.target.value)}
             placeholder="you.bsky.social"
-            className="w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-1.5 text-sm"
+            className="min-h-11 w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-1.5 text-sm"
           />
         </div>
 
-        <div className="mb-4">
-          <label className="mb-1 block text-xs text-(--color-text-dim)" htmlFor="bluesky-app-password">
+        <div className="mb-3">
+          <label className="mb-1 block text-sm font-semibold" htmlFor="bluesky-app-password">
             App password
           </label>
           <input
@@ -214,29 +231,13 @@ function BlueskyConnectModal({
             value={appPassword}
             onChange={(e) => setAppPassword(e.target.value)}
             placeholder="xxxx-xxxx-xxxx-xxxx"
-            className="w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-1.5 text-sm"
+            className="min-h-11 w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-1.5 text-sm"
           />
         </div>
 
-        {error && <p className="mb-3 text-xs text-(--color-danger)">{error}</p>}
-
-        <div className="flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-1.5 text-sm font-semibold hover:bg-(--color-surface-hover)"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={submitting}
-            className="rounded-lg bg-(--color-accent) px-3 py-1.5 text-sm font-semibold text-(--color-on-accent) disabled:opacity-60"
-          >
-            {submitting ? "Connecting…" : "Connect"}
-          </button>
-        </div>
+        {missing && <p className="text-xs text-(--color-text-dim)">{missing}</p>}
+        {error && <p className="text-xs text-(--color-danger)">{error}</p>}
       </form>
-    </div>
+    </Sheet>
   );
 }

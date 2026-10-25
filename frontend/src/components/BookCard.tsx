@@ -328,13 +328,13 @@ export function BookCard({
             onChange={() => onToggleSelect?.(book)}
             onClick={(e) => e.stopPropagation()}
             aria-label={`Select ${String(book.Title ?? "this book")}`}
-            className="absolute top-2.5 left-2.5 h-6 w-6 cursor-pointer appearance-none bg-transparent"
+            className="absolute top-0 left-0 h-11 w-11 cursor-pointer appearance-none bg-transparent"
           />
         </>
       )}
 
       {((onOpenStyle || onOpenCoverPicker) && !selectable) && (
-        <div className="absolute top-2.5 left-2.5 flex flex-col items-start gap-1.5 opacity-0 transition-opacity group-hover:opacity-100 [@media(pointer:coarse)]:hidden">
+        <div className="absolute top-0 left-1 flex flex-col items-start [&>button+button]:-mt-4 opacity-0 transition-opacity group-hover:opacity-100 [@media(pointer:coarse)]:hidden">
           {onOpenStyle && (
             <button
               onClick={(e) => {
@@ -342,9 +342,9 @@ export function BookCard({
                 onOpenStyle(book);
               }}
               title={book._style ? "Edit this book's custom style" : "Give this book its own style"}
-              className={`rounded-full px-2.5 py-1 text-[10.5px] font-semibold backdrop-blur-xs ${book._style ? "bg-(--color-accent) text-(--color-on-accent)" : "bg-[rgba(10,8,6,0.72)] text-white"}`}
+              className="flex min-h-11 min-w-11 items-start justify-center px-1.5"
             >
-              Style
+              <span className={`rounded-full px-2.5 py-1 text-[10.5px] font-semibold backdrop-blur-xs ${book._style ? "bg-(--color-accent) text-(--color-on-accent)" : "bg-[rgba(10,8,6,0.72)] text-white"}`}>Style</span>
             </button>
           )}
           {onOpenCoverPicker && (
@@ -354,9 +354,9 @@ export function BookCard({
                 onOpenCoverPicker(book);
               }}
               title={book._coverImageId ? "Change this book's custom cover" : "Set a custom cover from your gallery"}
-              className={`rounded-full px-2.5 py-1 text-[10.5px] font-semibold backdrop-blur-xs ${book._coverImageId ? "bg-(--color-accent) text-(--color-on-accent)" : "bg-[rgba(10,8,6,0.72)] text-white"}`}
+              className="flex min-h-11 min-w-11 items-start justify-center px-1.5"
             >
-              Cover
+              <span className={`rounded-full px-2.5 py-1 text-[10.5px] font-semibold backdrop-blur-xs ${book._coverImageId ? "bg-(--color-accent) text-(--color-on-accent)" : "bg-[rgba(10,8,6,0.72)] text-white"}`}>Cover</span>
             </button>
           )}
         </div>

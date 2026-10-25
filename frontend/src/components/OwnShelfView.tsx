@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { FeedCategory, FeedSettings } from "@scripta/shared/community";
@@ -16,13 +16,10 @@ import { Sheet } from "./Sheet";
 import { SkeletonCardGrid } from "./Skeleton";
 import { SwipeTabs } from "./SwipeTabs";
 import { useCommunityActivity } from "../hooks/useCommunity";
-import { useDismissible } from "../hooks/useDismissible";
 import { useGalleryImages } from "../hooks/useGalleryImages";
 import { useLibrary } from "../hooks/useLibrary";
 import { useMurals } from "../hooks/useMurals";
-import { useScrollLock } from "../hooks/useScrollLock";
 import { backTo } from "../lib/areas";
-import { keepTabInside } from "../lib/keepTabInside";
 import { orderLibraryBooks } from "../lib/libraryOrder";
 import { buildMuralPreset, shelfPresetSummary } from "../lib/muralPresets";
 import type { Mural } from "../lib/murals";
@@ -138,7 +135,7 @@ export function OwnShelfView({ username }: { username: string }) {
                   void own.refetch();
                   void murals.refetch();
                 }}
-                className="rounded-lg border border-(--color-border) px-3 py-1.5 text-sm hover:border-(--color-accent)"
+                className={BUTTON_SECONDARY}
               >
                 Retry
               </button>
@@ -207,7 +204,7 @@ export function OwnShelfView({ username }: { username: string }) {
                     title="Library unavailable."
                     body="Couldn't load your library."
                     action={
-                      <button onClick={() => void libraryQuery.refetch()} className="rounded-lg border border-(--color-border) px-3 py-1.5 text-sm hover:border-(--color-accent)">
+                      <button onClick={() => void libraryQuery.refetch()} className={BUTTON_SECONDARY}>
                         Retry
                       </button>
                     }
@@ -219,10 +216,10 @@ export function OwnShelfView({ username }: { username: string }) {
                     body="Import your existing collection, or add your first book manually."
                     action={
                       <div className="flex flex-wrap justify-center gap-2">
-                        <Link to="/dashboard/library?action=import" className="rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-semibold text-(--color-on-accent)">
+                        <Link to="/dashboard/library?action=import" className={BUTTON_SECONDARY}>
                           Import library
                         </Link>
-                        <Link to="/dashboard/library?action=add" className="rounded-lg border border-(--color-border) px-3 py-2 text-sm">
+                        <Link to="/dashboard/library?action=add" className={BUTTON_SECONDARY}>
                           Add a book
                         </Link>
                       </div>
@@ -232,10 +229,10 @@ export function OwnShelfView({ username }: { username: string }) {
                   <div className="space-y-4">
                     <p className="text-sm text-(--color-text-dim)">{shelfPresetSummary(books, ownData.published)}</p>
                     <div className="flex flex-wrap gap-2">
-                      <button onClick={() => void keepShelf()} disabled={busy} className="rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-semibold text-(--color-on-accent) disabled:opacity-50">
+                      <button onClick={() => void keepShelf()} disabled={busy} className={BUTTON_SECONDARY}>
                         Keep this shelf
                       </button>
-                      <button onClick={() => void startBlank()} disabled={busy} className="rounded-lg border border-(--color-border) px-3 py-2 text-sm disabled:opacity-50">
+                      <button onClick={() => void startBlank()} disabled={busy} className={BUTTON_SECONDARY}>
                         Start blank
                       </button>
                     </div>
@@ -251,49 +248,30 @@ export function OwnShelfView({ username }: { username: string }) {
   );
 }
 
-const answerButton = "rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2.5 text-sm font-semibold hover:bg-(--color-surface-hover)";
-
 function PublishDialog({ username, onAnswer, onCancel }: { username: string; onAnswer: (shareReading: boolean) => void; onCancel: () => void }) {
-  const cancelButtonRef = useRef<HTMLButtonElement>(null);
-  useScrollLock();
-  useDismissible(onCancel);
-  useEffect(() => {
-    const previous = document.activeElement;
-    cancelButtonRef.current?.focus({ preventScroll: true });
-    return () => {
-      if (previous instanceof HTMLElement && previous.isConnected) previous.focus({ preventScroll: true });
-    };
-  }, []);
-
   return (
-    <div className="overlay-in fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onCancel}>
-      <div
-        className="w-full max-w-sm rounded-xl border border-(--color-border) bg-(--color-surface) p-5 shadow-lg"
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={keepTabInside}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="publish-dialog-title"
-        aria-describedby="publish-dialog-body publish-dialog-question"
-      >
-        <h3 id="publish-dialog-title" className="text-sm font-semibold">
-          Publish your shelf?
-        </h3>
-        <p id="publish-dialog-body" className="mt-1.5 text-xs text-(--color-text-dim)">{`It becomes a public page at /u/${username} with your library, and readers can find and follow you.`}</p>
-        <p id="publish-dialog-question" className="mt-3 text-sm">Share what you add and finish on your page and with followers?</p>
-        <div className="mt-5 flex flex-col gap-2">
-          <button onClick={() => onAnswer(true)} className={answerButton}>
-            Share my reading
-          </button>
-          <button onClick={() => onAnswer(false)} className={answerButton}>
-            Don't share my reading
-          </button>
-          <button ref={cancelButtonRef} onClick={onCancel} className="rounded-lg px-3 py-2.5 text-sm font-semibold text-(--color-text-dim) hover:text-(--color-text)">
+    <Sheet
+      title="Publish your shelf?"
+      onClose={onCancel}
+      footer={
+        <div className="flex flex-wrap justify-end gap-2">
+          <button onClick={onCancel} className={BUTTON_SECONDARY}>
             Cancel
           </button>
+          <button onClick={() => onAnswer(false)} className={BUTTON_SECONDARY}>
+            Don't share my reading
+          </button>
+          <button onClick={() => onAnswer(true)} className={BUTTON_PRIMARY}>
+            Share my reading
+          </button>
         </div>
+      }
+    >
+      <div className="px-3 pb-2">
+        <p className="text-xs text-(--color-text-dim)">{`It becomes a public page at /u/${username} with your library, and readers can find and follow you.`}</p>
+        <p className="mt-3 text-sm">Share what you add and finish on your page and with followers?</p>
       </div>
-    </div>
+    </Sheet>
   );
 }
 
@@ -341,14 +319,27 @@ function OwnerControls({
         Manage profile
       </button>
       {open && (
-        <Sheet title="Manage profile" onClose={() => setOpen(false)}>
+        <Sheet
+          title="Manage profile"
+          onClose={() => setOpen(false)}
+          footer={
+            <>
+              <button onClick={() => setOpen(false)} className={BUTTON_SECONDARY}>
+                Cancel
+              </button>
+              <button onClick={() => onSaveSettings(next)} disabled={busy} className={BUTTON_PRIMARY}>
+                {busy ? "Saving…" : "Save feed settings"}
+              </button>
+            </>
+          }
+        >
           <p className={sectionLabel}>Shelf mural</p>
           <div className="flex items-center gap-2 px-3">
             <select
               value={muralId}
               onChange={(e) => setMuralId(e.target.value)}
               aria-label="Shelf mural"
-              className="min-w-0 flex-1 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm"
+              className="min-h-11 min-w-0 flex-1 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm"
             >
               {(murals ?? []).map((mural) => (
                 <option key={mural.id} value={mural.id}>
@@ -359,7 +350,7 @@ function OwnerControls({
             <button
               onClick={() => muralId && muralId !== currentMuralId && onSwitch(muralId)}
               disabled={busy || !muralId || muralId === currentMuralId}
-              className="rounded-lg border border-(--color-border) px-3 py-2 text-sm font-semibold hover:border-(--color-accent) disabled:opacity-50"
+              className={BUTTON_SECONDARY}
             >
               {busy ? "Working…" : "Switch"}
             </button>
@@ -382,31 +373,22 @@ function OwnerControls({
               )}
             </button>
           ))}
-          <div className="px-3 pt-2">
-            <button
-              onClick={() => onSaveSettings(next)}
-              disabled={busy}
-              className="w-full rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-semibold text-(--color-on-accent) disabled:opacity-50"
-            >
-              {busy ? "Saving…" : "Save feed settings"}
-            </button>
-          </div>
           {published && (
             <div className="mt-4 border-t border-(--color-border) p-3">
               {confirming ? (
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-sm text-(--color-text-dim)">Hide your profile from the community?</span>
                   <span className="flex shrink-0 items-center gap-2">
-                    <button onClick={() => setConfirming(false)} className="px-2 py-1.5 text-sm text-(--color-text-dim) hover:text-(--color-text)">
+                    <button onClick={() => setConfirming(false)} className="min-h-11 px-2 text-sm text-(--color-text-dim) hover:text-(--color-text)">
                       Cancel
                     </button>
-                    <button onClick={onUnpublish} disabled={busy} className="rounded-lg bg-(--color-danger) px-3 py-1.5 text-sm font-semibold text-(--color-on-danger) disabled:opacity-50">
+                    <button onClick={onUnpublish} disabled={busy} className="min-h-11 rounded-lg bg-(--color-danger) px-3 text-sm font-semibold text-(--color-on-danger) disabled:opacity-50">
                       Unpublish
                     </button>
                   </span>
                 </div>
               ) : (
-                <button onClick={() => setConfirming(true)} className="text-sm font-semibold text-(--color-danger)">
+                <button onClick={() => setConfirming(true)} className="min-h-11 text-sm font-semibold text-(--color-danger)">
                   Unpublish profile
                 </button>
               )}

@@ -24,24 +24,14 @@ export function TierColorPicker({ color, onChange }: { color: string; onChange: 
   const [open, setOpen] = useState(false);
   return (
     <>
-      {/* `h-8 w-8` (32px) rather than the old `h-3 w-6` (12x24px) raw-input
-          dimensions — this is the only entry point to a tier's colour, and
-          every OTHER control this branch touched (the up/down chevrons,
-          the ⋮ menu) already moved to a 44px `toolbarIconClass()` target.
-          It can't quite reach 44px itself: it sits inside the tier chip's
-          fixed `w-[3em]` column alongside the label text and, in the read-
-          only mural block, no button at all (`colorControl` is undefined
-          there — see TierRowShell), so growing it further would start
-          crowding the label or forcing the chip wider for every viewer,
-          not just the editor. 32px is still a large improvement over 12px
-          tall and comfortably inside the chip. */}
       <button
         onClick={() => setOpen(true)}
         title="Tier color"
         aria-label="Tier color"
-        className="h-8 w-8 shrink-0 rounded-sm ring-1 ring-white/70"
-        style={{ backgroundColor: color }}
-      />
+        className="-mx-1 -my-1.5 flex h-11 w-11 shrink-0 items-center justify-center"
+      >
+        <span className="h-8 w-8 rounded-sm ring-1 ring-white/70" style={{ backgroundColor: color }} />
+      </button>
       {open && (
         <Sheet title="Tier color" onClose={() => setOpen(false)}>
           <div className="flex flex-wrap gap-2 p-2">
