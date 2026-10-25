@@ -40,7 +40,7 @@ import {
 export function Section({ title, children, wide }: { title?: string; children: ReactNode; wide?: boolean }) {
   return (
     <section className={`rounded-xl border border-(--color-border) bg-(--color-surface) p-4 ${wide ? "sm:col-span-2" : ""}`}>
-      {title && <h4 className="mb-3 text-xs font-semibold tracking-wide text-(--color-text-dim) uppercase">{title}</h4>}
+      {title && <h4 className="mb-3 text-xs font-semibold text-(--color-text-dim)">{title}</h4>}
       {children}
     </section>
   );

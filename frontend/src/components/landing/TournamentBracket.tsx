@@ -175,7 +175,7 @@ function BracketView({ geo, rows, className }: { geo: Geo; rows: Row[]; classNam
       {rows.map((row, i) => (
         <div key={i} className="absolute left-0 right-0" style={{ top: geo.rowTops[i], height: geo.rowH }}>
           <span
-            className="absolute left-0 font-bold uppercase leading-[14px] tracking-[0.3px]"
+            className="absolute left-0 font-bold leading-[14px]"
             style={{ top: geo.labelTop, fontSize: geo.labelFontSize, color: row.label === "Final" ? "var(--color-accent)" : "var(--color-text-dim)" }}
           >
             {row.label}
@@ -201,7 +201,7 @@ function BracketView({ geo, rows, className }: { geo: Geo; rows: Row[]; classNam
                 )}
                 <SideView view={tile.a} geo={geo} />
                 <span
-                  className="flex items-center justify-center font-bold uppercase tracking-[0.3px]"
+                  className="flex items-center justify-center font-bold"
                   style={{ width: geo.vsW, fontSize: geo.vsFontSize, opacity: tile.vsOp, color: tile.active ? "var(--color-accent)" : "var(--color-text-dim)" }}
                 >
                   vs

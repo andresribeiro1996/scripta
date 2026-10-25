@@ -165,7 +165,7 @@ export function CommunityProfilePage() {
                   <MuralCanvas mural={profileOnlyMural(viewerTheme)} editMode={false} books={[]} images={[]} profile={user} />
                 )}
               </div>
-              <h2 className="mb-3 text-[11px] font-semibold tracking-wider text-(--color-text-dim) uppercase">Published</h2>
+              <h2 className="mb-3 text-[11px] font-semibold text-(--color-text-dim)">Published</h2>
               {publishedRows.length === 0 ? (
                 <EmptyState title="Nothing published yet." body="Tier lists, tournaments and quizzes show up here." />
               ) : (
@@ -177,7 +177,7 @@ export function CommunityProfilePage() {
                       className="group flex items-center gap-3 rounded-xl border border-(--color-border) bg-(--color-surface) px-4 py-3.5 transition-colors hover:border-(--color-accent)"
                     >
                       <span className="min-w-0 flex-1">
-                        <span className="block text-[11px] font-semibold tracking-wider text-(--color-accent) uppercase">{row.kind}</span>
+                        <span className="block text-[11px] font-semibold text-(--color-accent)">{row.kind}</span>
                         <span className="block truncate font-semibold">{row.name}</span>
                         <span className="block text-sm text-(--color-text-dim)">{row.detail}</span>
                       </span>

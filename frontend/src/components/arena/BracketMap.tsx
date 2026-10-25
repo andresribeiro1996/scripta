@@ -221,7 +221,7 @@ function MatchSheet({
     <Sheet title="Match" onClose={onClose}>
       <div className="flex items-start gap-2 px-2 pt-1">
         <SheetSide side={duel.bookA} duel={duel} />
-        <span className="self-center text-[11px] font-semibold text-(--color-text-dim) uppercase">vs</span>
+        <span className="self-center text-[11px] font-semibold text-(--color-text-dim)">vs</span>
         <SheetSide side={duel.bookB} duel={duel} />
       </div>
 
@@ -289,7 +289,7 @@ function RoundRow({
   return (
     <div className="flex flex-col">
       <p
-        className={`text-center text-[8.5px] font-semibold tracking-wide text-(--color-text-dim) uppercase sm:text-[10px] ${
+        className={`text-center text-[8.5px] font-semibold text-(--color-text-dim) sm:text-[10px] ${
           mirrored ? "order-last mt-1" : "mb-1"
         }`}
       >
@@ -415,7 +415,7 @@ export function BracketMap({
 
       {finalDuel && (
         <div className="flex flex-col">
-          <p className="text-center text-[8.5px] font-semibold tracking-wide text-(--color-accent) uppercase sm:text-[10px]">Final</p>
+          <p className="text-center text-[8.5px] font-semibold text-(--color-accent) sm:text-[10px]">Final</p>
           <div className="relative flex w-full flex-col justify-center">
             {/* Receives from BOTH halves, so it takes a stub on each edge
                 — the only cell in the bracket that does. */}

@@ -32,8 +32,8 @@ export function ProfileBlockView({ block, books, profile, shelfThemeOverride }: 
       {profile?.avatarUrl ? <img src={profile.avatarUrl} alt="" className="h-14 w-14 shrink-0 rounded-full object-cover" /> : <div aria-hidden="true" className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-(--color-accent-soft) text-xl font-bold text-(--color-accent)">{initial}</div>}
       <div className="min-w-0"><h3 className="truncate text-[1.25em] font-bold">@{profile?.username || "reader"}</h3>{block.bio && <p className="line-clamp-3 text-[0.9em] text-(--color-text-dim)">{block.bio}</p>}</div>
     </div>
-    {block.favoriteGenres.length > 0 && <section><p className="mb-1 text-[0.7em] font-bold tracking-wide text-(--color-text-dim) uppercase">What I like</p><div className="flex flex-wrap gap-1.5">{block.favoriteGenres.map((genre) => <span key={genre} className="rounded-full bg-(--color-accent-soft) px-2.5 py-1 text-[0.8em] text-(--color-accent)">{genre}</span>)}</div></section>}
-    {theme.genres.length > 0 && <section><p className="mb-1 text-[0.7em] font-bold tracking-wide text-(--color-text-dim) uppercase">My shelf theme</p><p>{theme.genres.join(" · ")}</p><p className="text-[0.75em] text-(--color-text-dim)">Based on {theme.matchedBooks} of {theme.totalBooks} books</p></section>}
+    {block.favoriteGenres.length > 0 && <section><p className="mb-1 text-[0.7em] font-bold text-(--color-text-dim)">What I like</p><div className="flex flex-wrap gap-1.5">{block.favoriteGenres.map((genre) => <span key={genre} className="rounded-full bg-(--color-accent-soft) px-2.5 py-1 text-[0.8em] text-(--color-accent)">{genre}</span>)}</div></section>}
+    {theme.genres.length > 0 && <section><p className="mb-1 text-[0.7em] font-bold text-(--color-text-dim)">My shelf theme</p><p>{theme.genres.join(" · ")}</p><p className="text-[0.75em] text-(--color-text-dim)">Based on {theme.matchedBooks} of {theme.totalBooks} books</p></section>}
   </div>;
 }
 
