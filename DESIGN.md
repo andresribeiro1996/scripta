@@ -85,7 +85,19 @@ No bundled icon library, by design:
 
 ## Layout
 
-Content max-width is a per-library user preference (`contentMaxWidth`, 800–1800px, default **1152px**). Book grid: CSS Grid `repeat(auto-fill, minmax(cardFloor,1fr))`, `space-lg` gap, phone-width override guarantees 3 columns. No custom breakpoints — stock Tailwind v4 defaults (`sm` = 640px).
+Content max-width is a per-library user preference (`contentMaxWidth`, 800–1800px, default **1152px**); the page frame below applies it. Book grid: CSS Grid `repeat(auto-fill, minmax(cardFloor,1fr))`, `space-lg` gap, phone-width override guarantees 3 columns. No custom breakpoints — stock Tailwind v4 defaults (`sm` = 640px).
+
+### The frame
+
+Navigation comes from one map, `frontend/src/lib/areas.ts`. `AREAS` lists Home, Library, Murals, Games, Reader card, Community, Settings and Admin, each with its `to` and its tabs. `NAV_AREAS` is the sidebar (all but Admin), `footerAreas(isAdmin)` adds Admin for admins, and `BOTTOM_BAR_AREAS` (Home, Library, Murals, Games) is the phone bottom bar, with the rest behind "More". `areaIdForPath` finds the active area, `activeTabTo` the active tab, and `backTo(kind)` the back link for a detail page (tierlist, quiz, tournament, mural, book, profile).
+
+Three layouts, all providing `PageWidthContext`: `DashboardLayout` (signed in; sidebar and bottom bar, width = the user's `contentMaxWidth`, outlet context `setNavHidden` for full-screen editors), `PublicLayout` (brand lockup left, Log in or Open my library right, width 1152px) and `SessionLayout`, which picks Dashboard when the session has a username and Public otherwise.
+
+Page rules:
+- Tabs sit in the band and name sibling pages of one area (Library: Books, Series, Collections, Gallery); a detail page uses a back link, not tabs.
+- The shared library page uses the owner's width. The Style tab is fixed at 1152px, because its own width slider would resize it mid-drag. Profiles and the Reader card keep narrower content columns inside the full-width body. The mural canvas stays 1152px inside the full-width body.
+- One accent button per view: `BUTTON_PRIMARY` for it, `BUTTON_SECONDARY` for the rest.
+- Every control is at least 44px. Checkboxes, radios and ranges use `CHECKBOX_CLASS`, `RADIO_CLASS` and `RANGE_CLASS`; `OptionsMenu`'s default trigger is 44px, and a row with several actions folds them into one menu.
 
 ## Motion
 
@@ -119,7 +131,7 @@ In the app the mark follows the theme (`markTreatment` in `packages/shared/src/t
 
 Full guidelines, states and prop shapes live in the artifact's per-component READMEs — this is the condensed version. Source files are cited so you can go straight to the real implementation.
 
-### Core controls (`mobile/src/ui/components.tsx`; web composes the same tokens ad hoc per call site, no shared primitives)
+### Core controls (`mobile/src/ui/components.tsx`; web shares `BUTTON_PRIMARY` / `BUTTON_SECONDARY` (`components/page/buttonClasses.ts`), `Sheet`, `OptionsMenu` and the `Toolbar.tsx` control classes)
 
 - **Button** — variants `primary` (filled `accent`/`on-accent`) / `secondary` (`surface` + `border`, hover → `surface-hover`) / `destructive` (filled `danger`/`on-danger`). 44px min-height, `radius-md`, `body-strong` label. `disabled` → 0.55 opacity; `loading` → spinner replaces label. One primary button per screen.
 - **IconButton** — glyph-only (44×44, `radius-full`) or glyph+label (pill). `tone: default | danger | accent` (accent = filled `accent`/`on-accent`, pressed `accent-soft`). Always set `accessibilityLabel`.
@@ -137,6 +149,12 @@ Full guidelines, states and prop shapes live in the artifact's per-component REA
 - **MuralBlock** (`components/murals/blocks/*.tsx`) — 8 variants: `shelf`/`currentlyReading` (horizontal scroll, hand-curated order; `currentlyReading` covers carry an `accent`-on-`border` progress bar + percent, no captions), `spotlight` (full-bleed single cover), `quote` (vertically centered pull-quote), `quoteCollection` (left-ruled citations, `accent` as a structural rule), `text` (no color muting — user's own words), `profile` (avatar + eyebrow-label sections, reuses `accent-soft`/`accent` as chip), `image` (zero inner padding, `image-caption-scrim`), `stats` (numbers hardcoded to `accent`, a badge not body text; when total, finished and in-progress are all selected, a library breakdown bar — `accent` / `accent-fill` / `border` — with legend replaces the number strip). `shelf`/`currentlyReading`/`quoteCollection`/`tierlist` titles are eyebrow headings (`text-dim`, sentence case), with a book count on the two book rows. All blocks size text in `em` not `rem` so per-block `fontSize` cascades. Block chrome (`radius-lg`/`border`/`surface`) applied uniformly by `MuralCanvas.tsx`.
 - **DuelCard** (`components/arena/DuelCard.tsx`) — two book sides with **2px** border (the one 2px control in the system — the border carries the primary signal here), live tally bar (`accent` fill on `border` track). Winner side border → `accent`; no separate loser-red treatment.
 - **BracketMap** (`components/arena/BracketMap.tsx`) — tournament bracket, pure-CSS connectors: equal `flex-1` cells per round so a parent match centers exactly on its two child matches, connected by small absolutely-positioned 1px-`border` stub elements (no SVG, no JS measuring). Winner: 2px `accent` ring on cover. Loser: 0.45 opacity. Empty slot: dashed `border`.
+
+### Page frame (web)
+
+- **Page** (`components/page/Page.tsx`) — every page renders inside it: a header band (`surface`, bottom `border`) holding an optional back link, the `font-display` title (`text-2xl sm:text-3xl`, wraps), a `text-dim` subtitle, right-aligned `actions`, and an optional tab row; then the body (`px-4 py-5 sm:px-5 sm:py-8`). Width is `maxWidth` or `PageWidthContext`. Back links and tab links are 44px high.
+- **SidebarNav** (`components/page/SidebarNav.tsx`) — the area list shared by the sidebar and the mobile drawer: 44px rows, icon + label, `accent-soft` / `accent` when active, optional description and Home badge.
+- **Sheet** (`components/Sheet.tsx`) — the shared dialog; takes a `footer` pinned under the scrolling body, right-aligned, for the dialog's actions.
 
 ### Forms (web)
 

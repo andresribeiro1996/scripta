@@ -6,7 +6,7 @@ import type { LibraryStyleSettings } from "../lib/libraryStyle";
  *  This is the "page" half of the Library style settings
  *  (backgroundColor + contentPaddingX/contentPaddingY, see
  *  lib/libraryStyle.ts) given a box of its own. Those used to be applied
- *  by PageContainer and by DashboardLayout's `<main>`, which meant a
+ *  by Page and by DashboardLayout's `<main>`, which meant a
  *  *library* setting styled the whole application shell: a custom
  *  background painted behind the page header, the search/filter toolbar,
  *  and every unrelated route (Settings, Library style, Gallery, Murals)
@@ -18,9 +18,9 @@ import type { LibraryStyleSettings } from "../lib/libraryStyle";
  *  So the boundary is drawn here instead: the app shell (sidebar, tab
  *  bar, page headers, toolbars, a series' name heading) is always
  *  theme-colored and always legible, and these settings govern the canvas
- *  the grid sits on. PageContainer keeps its own fixed, responsive
+ *  the grid sits on. Page keeps its own fixed, responsive
  *  padding — it is chrome, not canvas. Content WIDTH deliberately stayed
- *  on PageContainer rather than moving here; see its comment for why.
+ *  on Page rather than moving here.
  *
  *  Rounded and clipped so a custom color reads as a deliberate panel
  *  rather than a leak. With no custom color set (`backgroundColor: null`)

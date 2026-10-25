@@ -195,7 +195,7 @@ export function LibraryStylePage() {
           to see at all.
 
           `contentMaxWidth` is deliberately NOT applied here: it belongs
-          to PageContainer (the page's own width, header included), not
+          to Page (the page's own width, header included), not
           to the canvas, and this preview panel is far narrower than any
           value the slider offers — showing it here could only ever
           mislead. */}

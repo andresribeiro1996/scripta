@@ -18,7 +18,7 @@ import type { ReactNode } from "react";
  *  so finding something meant scrolling back to the top to type, then
  *  back down. Pinning costs no extra vertical space — the row is already
  *  there. It needs its own opaque background and a negative inset to
- *  cover PageContainer's padding, or content scrolls visibly through the
+ *  cover Page's body padding, or content scrolls visibly through the
  *  gap behind it. Not sticky at `sm`+, where the toolbar is usually on
  *  screen anyway and a pinned bar would just spend space that isn't
  *  scarce. */
