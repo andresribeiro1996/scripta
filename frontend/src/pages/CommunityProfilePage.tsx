@@ -170,7 +170,7 @@ export function CommunityProfilePage() {
                       tierlistData={(tierlistId) => muralData.tierlists[tierlistId]}
                     />
                   ) : (
-                    <MuralCanvas mural={profileOnlyMural(viewerTheme)} editMode={false} books={[]} images={[]} profile={user} />
+                    <MuralCanvas mural={profileOnlyMural(viewerTheme)} editMode={false} books={[]} images={[]} profile={user} hideProfileName />
                   )}
                 </div>
                 <h2 className="mb-3 text-sm font-semibold text-(--color-text-dim)">Published</h2>

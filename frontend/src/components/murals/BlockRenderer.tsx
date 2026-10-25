@@ -30,12 +30,14 @@ export function BlockRenderer({
   shelfThemeOverride,
   readerCardOverride,
   statsOverride,
-  tierlistData
+  tierlistData,
+  hideProfileName
 }: {
   block: MuralBlock;
   books: Array<Record<string, unknown>>;
   images: GalleryImage[];
   profile?: ReaderProfile;
+  hideProfileName?: boolean;
   groups?: Group[];
   shelfThemeOverride?: ShelfTheme;
   readerCardOverride?: PublicReaderCard;
@@ -61,7 +63,7 @@ export function BlockRenderer({
     case "text":
       return <TextBlockView block={block} />;
     case "profile":
-      return <ProfileBlockView block={block} books={books} profile={profile} shelfThemeOverride={shelfThemeOverride} />;
+      return <ProfileBlockView block={block} books={books} profile={profile} shelfThemeOverride={shelfThemeOverride} hideName={hideProfileName} />;
     case "currentlyReading":
       return <CurrentlyReadingBlockView block={block} books={books} />;
     case "stats":
