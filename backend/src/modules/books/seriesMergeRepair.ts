@@ -158,6 +158,7 @@ export function undoReviewedMerges(repo: UndoRepo, fromWorks: string[], now: () 
   const queued = new Set(requested.map((merge) => merge.id));
   const found = new Set(requested.map((merge) => merge.fromWork));
   const failures: Failure[] = [...reviewed].filter((fromWork) => !found.has(fromWork)).map((fromWork) => ({ fromWork, reason: "no active code, jev, ol-duplicate or title-key merge" }));
+  if (failures.length > 0) return { undone: [], failures };
   const undone: string[] = [];
   for (const { fromWork, intoWork, source } of requested.sort((a, b) => b.id - a.id)) {
     const blocker = onwardFrom(byFrom, intoWork).find((step) => !queued.has(step.id));

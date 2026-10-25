@@ -99,3 +99,23 @@ test("scorecardCandidates keeps the works with the most editions even when they 
   assert.equal(found.length, 5);
   assert.ok(found.some(({ workId }) => workId === popular.work_id));
 });
+
+test("scorecardCandidates caps a long series at the first books by position and keeps the popular title matches", () => {
+  const db = new DatabaseSync(":memory:");
+  applyBooksMigrations(db);
+  const repo = createSqliteBooksRepository(db);
+  const add = (title: string, isbn: string, workKey?: string) => {
+    const book = repo.createBook({ title, author: "Some Author", isbn, workKey }, [`isbn:${isbn}`], NOW);
+    repo.makeSearchable(book.id);
+    return book;
+  };
+  const members = Array.from({ length: 45 }, (_, n) => add(`Chronicle ${n + 1}`, `9781000000${String(n).padStart(3, "0")}`));
+  [...members].reverse().forEach((book) => repo.addWorkSeries(book.work_id!, [{ name: "Saga", position: String(members.indexOf(book) + 1) }], "wikidata", NOW));
+  const popular = add("Saga with many extra words in the long title", "9782000000001", "OL9W");
+  for (let n = 0; n < 3; n++) add("Saga with many extra words in the long title", `978200000010${n}`, "OL9W");
+  const found = scorecardCandidates(repo, "saga").map(({ workId }) => workId);
+  const memberIds = new Set(members.map((book) => book.work_id));
+  assert.ok(found.filter((id) => memberIds.has(id)).length <= 30);
+  assert.deepEqual(found.slice(0, 30), members.slice(0, 30).map((book) => book.work_id));
+  assert.ok(found.includes(popular.work_id!));
+});

@@ -41,12 +41,13 @@ type CandidateRepo = Pick<BooksRepository, "searchBooks" | "canonicalWorkIds" | 
 
 export function scorecardCandidates(repo: CandidateRepo, query: string, limit = 40): Array<{ workId: string; title: string; author: string; year: number | null }> {
   const tokens = searchTokens(query);
-  const series = repo.matchingSeries(tokens)[0]?.members.map(({ workId }) => workId) ?? [];
+  const position = (value: string | null) => (value !== null && Number.isFinite(Number(value)) ? Number(value) : Infinity);
+  const series = [...(repo.matchingSeries(tokens)[0]?.members ?? [])].sort((a, b) => position(a.position) - position(b.position)).map(({ workId }) => workId);
   const rows = repo.searchBooks(tokens, 500);
   const canonical = repo.canonicalWorkIds(workIdsOf(rows));
   const fts = [...new Set(rows.flatMap((row) => (row.work_id ? [canonical.get(row.work_id) ?? row.work_id] : [])))];
   const details = new Map(repo.matchCandidates([...new Set([...series, ...fts])]).map((candidate) => [candidate.id, candidate]));
-  const head = [...new Set(series)].slice(0, limit);
+  const head = [...new Set(series)].slice(0, Math.max(0, limit - POPULAR));
   const taken = new Set(head);
   const popular = fts.filter((id) => !taken.has(id) && details.has(id)).sort((a, b) => details.get(b)!.editions - details.get(a)!.editions).slice(0, POPULAR);
   const kept = new Set([...taken, ...popular]);
