@@ -1,6 +1,5 @@
 import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
-import { resolvePublicReaderProfiles } from "../auth/index.js";
 import { openCommunityDb } from "./adapters/sqlite/connection.js";
 import { createSqliteCommunityRepository } from "./adapters/sqlite/sqliteCommunityRepository.js";
 import { createRecapRepository } from "./adapters/sqlite/sqliteRecapRepository.js";
