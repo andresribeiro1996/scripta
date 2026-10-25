@@ -6,7 +6,7 @@ import { DraftField } from "./DraftField";
 export type SaveStyle = (patch: ReaderCardStylePatch) => Promise<boolean>;
 type Book = Record<string, unknown>;
 
-const LINK = "text-xs font-semibold text-(--color-accent)";
+const LINK = "inline-flex min-h-11 items-center text-xs font-semibold text-(--color-accent)";
 const DIM = "text-sm text-(--color-text-dim)";
 
 function NoteField({ signature, onChange }: { signature: ChosenSignature; onChange: SaveStyle }) {
@@ -55,7 +55,7 @@ export function HighlightChoice({ books, highlight, chosen, onChange }: { books:
   const list = (passages: Passage[]) => (
     <div className="max-h-64 overflow-y-auto rounded-lg border border-(--color-border)">
       {passages.map((passage) => (
-        <button key={`${passage.bookKey}:${passage.highlightId}`} type="button" onClick={() => choose(passage)} className="block w-full px-3 py-2 text-left text-sm hover:bg-(--color-surface-hover)">
+        <button key={`${passage.bookKey}:${passage.highlightId}`} type="button" onClick={() => choose(passage)} className="block min-h-11 w-full px-3 py-2 text-left text-sm hover:bg-(--color-surface-hover)">
           “{passage.text}” <span className="text-(--color-text-dim)">— {passage.title}</span>
         </button>
       ))}
@@ -73,7 +73,7 @@ export function HighlightChoice({ books, highlight, chosen, onChange }: { books:
       </div>
       {picking ? (
         <div className="mt-2 space-y-2">
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search your highlights…" aria-label="Search your highlights" className="w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm" />
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search your highlights…" aria-label="Search your highlights" className="min-h-11 w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm" />
           {query.trim() ? (matches.length ? list(matches) : <p className={DIM}>No highlights match.</p>) : browsing ? (
             <>
               <button type="button" className={LINK} onClick={() => setBrowsing(null)}>Back to books</button>

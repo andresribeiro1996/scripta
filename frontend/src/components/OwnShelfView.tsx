@@ -135,7 +135,7 @@ export function OwnShelfView({ username }: { username: string }) {
                   void own.refetch();
                   void murals.refetch();
                 }}
-                className="rounded-lg border border-(--color-border) px-3 py-1.5 text-sm hover:border-(--color-accent)"
+                className={BUTTON_SECONDARY}
               >
                 Retry
               </button>
@@ -204,7 +204,7 @@ export function OwnShelfView({ username }: { username: string }) {
                     title="Library unavailable."
                     body="Couldn't load your library."
                     action={
-                      <button onClick={() => void libraryQuery.refetch()} className="rounded-lg border border-(--color-border) px-3 py-1.5 text-sm hover:border-(--color-accent)">
+                      <button onClick={() => void libraryQuery.refetch()} className={BUTTON_SECONDARY}>
                         Retry
                       </button>
                     }
@@ -216,10 +216,10 @@ export function OwnShelfView({ username }: { username: string }) {
                     body="Import your existing collection, or add your first book manually."
                     action={
                       <div className="flex flex-wrap justify-center gap-2">
-                        <Link to="/dashboard/library?action=import" className="rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-semibold text-(--color-on-accent)">
+                        <Link to="/dashboard/library?action=import" className={BUTTON_SECONDARY}>
                           Import library
                         </Link>
-                        <Link to="/dashboard/library?action=add" className="rounded-lg border border-(--color-border) px-3 py-2 text-sm">
+                        <Link to="/dashboard/library?action=add" className={BUTTON_SECONDARY}>
                           Add a book
                         </Link>
                       </div>
@@ -229,10 +229,10 @@ export function OwnShelfView({ username }: { username: string }) {
                   <div className="space-y-4">
                     <p className="text-sm text-(--color-text-dim)">{shelfPresetSummary(books, ownData.published)}</p>
                     <div className="flex flex-wrap gap-2">
-                      <button onClick={() => void keepShelf()} disabled={busy} className="rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-semibold text-(--color-on-accent) disabled:opacity-50">
+                      <button onClick={() => void keepShelf()} disabled={busy} className={BUTTON_SECONDARY}>
                         Keep this shelf
                       </button>
-                      <button onClick={() => void startBlank()} disabled={busy} className="rounded-lg border border-(--color-border) px-3 py-2 text-sm disabled:opacity-50">
+                      <button onClick={() => void startBlank()} disabled={busy} className={BUTTON_SECONDARY}>
                         Start blank
                       </button>
                     </div>
@@ -339,7 +339,7 @@ function OwnerControls({
               value={muralId}
               onChange={(e) => setMuralId(e.target.value)}
               aria-label="Shelf mural"
-              className="min-w-0 flex-1 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm"
+              className="min-h-11 min-w-0 flex-1 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm"
             >
               {(murals ?? []).map((mural) => (
                 <option key={mural.id} value={mural.id}>
@@ -350,7 +350,7 @@ function OwnerControls({
             <button
               onClick={() => muralId && muralId !== currentMuralId && onSwitch(muralId)}
               disabled={busy || !muralId || muralId === currentMuralId}
-              className="rounded-lg border border-(--color-border) px-3 py-2 text-sm font-semibold hover:border-(--color-accent) disabled:opacity-50"
+              className={BUTTON_SECONDARY}
             >
               {busy ? "Working…" : "Switch"}
             </button>
@@ -379,16 +379,16 @@ function OwnerControls({
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-sm text-(--color-text-dim)">Hide your profile from the community?</span>
                   <span className="flex shrink-0 items-center gap-2">
-                    <button onClick={() => setConfirming(false)} className="px-2 py-1.5 text-sm text-(--color-text-dim) hover:text-(--color-text)">
+                    <button onClick={() => setConfirming(false)} className="min-h-11 px-2 text-sm text-(--color-text-dim) hover:text-(--color-text)">
                       Cancel
                     </button>
-                    <button onClick={onUnpublish} disabled={busy} className="rounded-lg bg-(--color-danger) px-3 py-1.5 text-sm font-semibold text-(--color-on-danger) disabled:opacity-50">
+                    <button onClick={onUnpublish} disabled={busy} className="min-h-11 rounded-lg bg-(--color-danger) px-3 text-sm font-semibold text-(--color-on-danger) disabled:opacity-50">
                       Unpublish
                     </button>
                   </span>
                 </div>
               ) : (
-                <button onClick={() => setConfirming(true)} className="text-sm font-semibold text-(--color-danger)">
+                <button onClick={() => setConfirming(true)} className="min-h-11 text-sm font-semibold text-(--color-danger)">
                   Unpublish profile
                 </button>
               )}

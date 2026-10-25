@@ -5,6 +5,7 @@ import type { useCommunityActivity } from "../hooks/useCommunity";
 import { EmptyState } from "./EmptyState";
 import { ArenaIcon, CommunityIcon, LibraryIcon, MuralsIcon } from "./NavIcons";
 import { SkeletonCardGrid } from "./Skeleton";
+import { BUTTON_SECONDARY } from "./page/buttonClasses";
 
 const TONE = {
   accent: { text: "text-(--color-accent)", fill: "bg-(--color-accent-soft)" },
@@ -71,7 +72,7 @@ function ActivityEntry({ item, row }: { item: ActivityItem; row: ActivityRow }) 
       </span>
     </>
   );
-  const className = "flex items-center gap-3 border-b border-(--color-border) px-1 py-3";
+  const className = "flex min-h-11 items-center gap-3 border-b border-(--color-border) px-1 py-3";
   return target ? (
     <Link to={target} className={`${className} -mx-2 rounded-lg px-3 transition-colors hover:bg-(--color-surface-hover)`}>
       {body}
@@ -88,7 +89,7 @@ export function ProfileActivity({ activity }: { activity: ReturnType<typeof useC
       <EmptyState
         title="Couldn't load activity."
         action={
-          <button onClick={() => void activity.refetch()} className="rounded-lg border border-(--color-border) px-3 py-1.5 text-sm hover:border-(--color-accent)">
+          <button onClick={() => void activity.refetch()} className={BUTTON_SECONDARY}>
             Retry
           </button>
         }
@@ -116,7 +117,7 @@ export function ProfileActivity({ activity }: { activity: ReturnType<typeof useC
         <button
           onClick={() => void activity.fetchNextPage()}
           disabled={activity.isFetchingNextPage}
-          className="mt-4 w-full rounded-lg border border-(--color-border) px-3 py-2 text-sm text-(--color-text-dim) hover:border-(--color-accent) disabled:opacity-50"
+          className="mt-4 min-h-11 w-full rounded-lg border border-(--color-border) px-3 py-2 text-sm text-(--color-text-dim) hover:border-(--color-accent) disabled:opacity-50"
         >
           {activity.isFetchingNextPage ? "Loading…" : "Load more"}
         </button>

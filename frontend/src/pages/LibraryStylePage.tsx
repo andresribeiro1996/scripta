@@ -1,3 +1,4 @@
+import { CHECKBOX_CLASS } from "../components/Toolbar";
 import { useEffect, useRef, useState } from "react";
 import { saveFailureMessage } from "@scripta/shared";
 import { BookCard } from "../components/BookCard";
@@ -120,6 +121,7 @@ export function LibraryStylePage() {
                   <input
                     id="custom-bg-toggle"
                     type="checkbox"
+                    className={CHECKBOX_CLASS}
                     checked={usingCustomBackground}
                     onChange={(e) => {
                       if (e.target.checked) {
@@ -141,7 +143,7 @@ export function LibraryStylePage() {
                   type="color"
                   value={draft.backgroundColor ?? "#141210"}
                   onChange={(e) => applyDraft({ ...draft, backgroundColor: e.target.value })}
-                  className="mt-1 h-9 w-20 rounded border border-(--color-border) bg-transparent"
+                  className="mt-1 h-11 w-20 rounded border border-(--color-border) bg-transparent"
                 />
               )}
             </div>
@@ -174,7 +176,7 @@ export function LibraryStylePage() {
 
       <button
         onClick={() => saveNow(DEFAULT_LIBRARY_STYLE)}
-        className="mb-8 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm hover:bg-(--color-surface-hover)"
+        className="mb-8 min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm hover:bg-(--color-surface-hover)"
       >
         Reset all to defaults
       </button>

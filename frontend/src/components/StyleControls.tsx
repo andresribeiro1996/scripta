@@ -1,3 +1,4 @@
+import { CHECKBOX_CLASS, RANGE_CLASS } from "./Toolbar";
 import type { ReactNode } from "react";
 import { BLOCK_GRADIENT_ANGLE_RANGE, BLOCK_GRADIENT_STRENGTH_RANGE, BLOCK_SHADOW_BLUR_RANGE, BLOCK_SHADOW_OFFSET_RANGE, BLOCK_SHADOW_OPACITY_RANGE, BLOCK_THEME_COLOR_LABELS, parseThemeColorRef } from "@scripta/shared";
 import {
@@ -78,7 +79,7 @@ export function SliderRow({
         step={range.step}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full"
+        className={RANGE_CLASS}
       />
     </div>
   );
@@ -96,7 +97,7 @@ function ColorValueInput({ value, fallback, onChange, label = "Custom color" }: 
       </span>
     );
   }
-  return <input type="color" aria-label={label} value={value} onChange={(e) => onChange(e.target.value)} className="h-8 w-16 rounded border border-(--color-border) bg-transparent" />;
+  return <input type="color" aria-label={label} value={value} onChange={(e) => onChange(e.target.value)} className="h-11 w-16 rounded border border-(--color-border) bg-transparent" />;
 }
 
 export function ToggleRow({
@@ -115,7 +116,7 @@ export function ToggleRow({
   return (
     <div className="mb-4 last:mb-0">
       <label className="flex items-center gap-2 text-sm font-semibold" htmlFor={id}>
-        <input id={id} type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+        <input id={id} type="checkbox" className={CHECKBOX_CLASS} checked={checked} onChange={(e) => onChange(e.target.checked)} />
         {label}
       </label>
       {hint && <p className="mt-1 text-xs text-(--color-text-dim)">{hint}</p>}
@@ -155,7 +156,7 @@ export function CardAppearanceSection({ idPrefix, draft, onApply, onSaveNow }: C
           id={`${idPrefix}-card-aspect`}
           value={draft.cardAspectRatio}
           onChange={(e) => onSaveNow({ cardAspectRatio: e.target.value as CardAspectRatio })}
-          className="w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm"
+          className="w-full rounded-lg border border-(--color-border) bg-(--color-surface) min-h-11 px-3 py-2 text-sm"
         >
           {CARD_ASPECT_RATIO_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -227,6 +228,7 @@ export function CardBorderSection({ idPrefix, draft, onApply, onSaveNow }: CardB
               <input
                 id={`${idPrefix}-border-side-${side}`}
                 type="checkbox"
+                className={CHECKBOX_CLASS}
                 disabled={draft.cardBorderWidth === 0}
                 checked={draft.cardBorderSides[side]}
                 onChange={(e) => onSaveNow({ cardBorderSides: { ...draft.cardBorderSides, [side]: e.target.checked } })}
@@ -246,7 +248,7 @@ export function CardBorderSection({ idPrefix, draft, onApply, onSaveNow }: CardB
           value={draft.cardBorderStyle}
           disabled={draft.cardBorderWidth === 0}
           onChange={(e) => onSaveNow({ cardBorderStyle: e.target.value as CardBorderStyle })}
-          className="w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm disabled:opacity-60"
+          className="w-full rounded-lg border border-(--color-border) bg-(--color-surface) min-h-11 px-3 py-2 text-sm disabled:opacity-60"
         >
           {CARD_BORDER_STYLE_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -270,6 +272,7 @@ export function CardBorderSection({ idPrefix, draft, onApply, onSaveNow }: CardB
           <input
             id={`${idPrefix}-custom-border-color-toggle`}
             type="checkbox"
+            className={CHECKBOX_CLASS}
             checked={usingCustomBorderColor}
             disabled={draft.cardBorderWidth === 0}
             onChange={(e) => {
@@ -327,7 +330,7 @@ export function CardTextSection({ idPrefix, draft, onApply, onSaveNow }: { idPre
           id={`${idPrefix}-card-font-family`}
           value={draft.cardFontFamily}
           onChange={(e) => onSaveNow({ cardFontFamily: e.target.value as CardFontFamily })}
-          className="w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm"
+          className="w-full rounded-lg border border-(--color-border) bg-(--color-surface) min-h-11 px-3 py-2 text-sm"
         >
           {CARD_FONT_FAMILY_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -355,6 +358,7 @@ export function CardTextSection({ idPrefix, draft, onApply, onSaveNow }: { idPre
           <input
             id={`${idPrefix}-custom-card-text-color-toggle`}
             type="checkbox"
+            className={CHECKBOX_CLASS}
             checked={usingCustomTextColor}
             onChange={(e) => onSaveNow({ cardTextColor: e.target.checked ? "#ffffff" : null })}
           />
@@ -365,7 +369,7 @@ export function CardTextSection({ idPrefix, draft, onApply, onSaveNow }: { idPre
             type="color"
             value={draft.cardTextColor ?? "#ffffff"}
             onChange={(e) => onApply({ cardTextColor: e.target.value })}
-            className="h-8 w-16 rounded border border-(--color-border) bg-transparent"
+            className="h-11 w-16 rounded border border-(--color-border) bg-transparent"
           />
         )}
       </div>
@@ -400,6 +404,7 @@ export function BlockBackgroundSection({
         <input
           id={`${idPrefix}-no-bg-toggle`}
           type="checkbox"
+          className={CHECKBOX_CLASS}
           checked={transparent}
           onChange={(e) => onSaveNow(e.target.checked ? { backgroundColor: "transparent", cardShadow: false } : { backgroundColor: null })}
         />
@@ -410,6 +415,7 @@ export function BlockBackgroundSection({
           <input
             id={`${idPrefix}-custom-bg-toggle`}
             type="checkbox"
+            className={CHECKBOX_CLASS}
             checked={usingCustomBackground}
             disabled={transparent}
             onChange={(e) => {
@@ -443,7 +449,7 @@ export function BlockBackgroundSection({
           id={`${idPrefix}-background-finish`}
           value={draft.backgroundFinish}
           onChange={(e) => onSaveNow({ backgroundFinish: e.target.value as BlockBackgroundFinish })}
-          className="w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm"
+          className="w-full rounded-lg border border-(--color-border) bg-(--color-surface) min-h-11 px-3 py-2 text-sm"
         >
           {BLOCK_BACKGROUND_FINISH_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -462,7 +468,7 @@ export function BlockBackgroundSection({
           id={`${idPrefix}-inner-spacing`}
           value={draft.innerSpacing}
           onChange={(e) => onSaveNow({ innerSpacing: e.target.value as BlockInnerSpacing })}
-          className="w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm"
+          className="w-full rounded-lg border border-(--color-border) bg-(--color-surface) min-h-11 px-3 py-2 text-sm"
         >
           {BLOCK_INNER_SPACING_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -541,7 +547,7 @@ export function BlockTextSection({
           id={`${idPrefix}-font-family`}
           value={draft.fontFamily}
           onChange={(e) => onSaveNow({ fontFamily: e.target.value as BlockFontFamily })}
-          className="w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm"
+          className="w-full rounded-lg border border-(--color-border) bg-(--color-surface) min-h-11 px-3 py-2 text-sm"
         >
           {BLOCK_FONT_FAMILY_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -567,7 +573,7 @@ export function BlockTextSection({
           id={`${idPrefix}-text-align`}
           value={draft.textAlign}
           onChange={(e) => onSaveNow({ textAlign: e.target.value as BlockTextAlign })}
-          className="w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm"
+          className="w-full rounded-lg border border-(--color-border) bg-(--color-surface) min-h-11 px-3 py-2 text-sm"
         >
           {BLOCK_TEXT_ALIGN_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -594,6 +600,7 @@ export function BlockTextSection({
           <input
             id={`${idPrefix}-custom-text-color-toggle`}
             type="checkbox"
+            className={CHECKBOX_CLASS}
             checked={usingCustomTextColor}
             onChange={(e) => {
               if (e.target.checked) {

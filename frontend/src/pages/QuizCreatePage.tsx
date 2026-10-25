@@ -12,6 +12,7 @@ import { resolveCover } from "../api/covers";
 import { normalizeImageId, normalizeIsbn } from "../lib/covers";
 import { useLibrary } from "../hooks/useLibrary";
 import { useWorkBooks } from "../hooks/useWorkBooks";
+import { CHECKBOX_CLASS, RADIO_CLASS } from "../components/Toolbar";
 
 function toQuizBook(book: Record<string, unknown>, resolvedCover: string | null | undefined): QuizBookInput {
   return {
@@ -140,7 +141,7 @@ export function QuizCreatePage() {
         {step === 0 && (
           <>
             <label className="flex flex-col gap-1 text-sm font-semibold">Quiz name
-              <input value={name} onChange={(event) => setName(event.target.value)} maxLength={200} placeholder="Untitled quiz" className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2" />
+              <input value={name} onChange={(event) => setName(event.target.value)} maxLength={200} placeholder="Untitled quiz" className="min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2" />
             </label>
             <fieldset className="flex flex-col gap-2">
               <legend className="mb-1 text-sm font-semibold">Question source</legend>
@@ -149,15 +150,15 @@ export function QuizCreatePage() {
                 ["collection", "One of my collections"],
                 ["pool", "Famous books (anyone can play)"]
               ] as const).map(([value, label]) => (
-                <label key={value} className="flex items-center gap-2 rounded-lg border border-(--color-border) p-3">
-                  <input type="radio" checked={source === value} onChange={() => setSource(value)} />
+                <label key={value} className="flex items-center gap-1 rounded-lg border border-(--color-border) pr-3">
+                  <input type="radio" className={RADIO_CLASS} checked={source === value} onChange={() => setSource(value)} />
                   {label}
                 </label>
               ))}
             </fieldset>
             {source === "collection" && (
               <label className="flex flex-col gap-1 text-sm font-semibold">Collection
-                <select value={collectionId} onChange={(event) => setCollectionId(event.target.value)} className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2">
+                <select value={collectionId} onChange={(event) => setCollectionId(event.target.value)} className="min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2">
                   <option value="">Choose a collection…</option>
                   {collections.map((group) => (
                     <option key={group.id} value={group.id}>{group.name}</option>
@@ -186,7 +187,7 @@ export function QuizCreatePage() {
             )}
             {source === "shelf" && (
               <p className="text-sm text-(--color-text-dim)">
-                {isLoading ? "Loading books…" : isError ? <button onClick={() => void refetch()} className="text-left text-(--color-accent)">Couldn't load your library. Retry</button> : `${shelfRawBooks.length} books on your shelf.`}
+                {isLoading ? "Loading books…" : isError ? <button onClick={() => void refetch()} className="min-h-11 text-left text-(--color-accent)">Couldn't load your library. Retry</button> : `${shelfRawBooks.length} books on your shelf.`}
               </p>
             )}
             <p className="text-sm text-(--color-text-dim)">{books.length} {books.length === 1 ? "book" : "books"} selected</p>
@@ -197,7 +198,7 @@ export function QuizCreatePage() {
             <label className="flex flex-col gap-1 text-sm font-semibold">Questions
               {/* Only lengths the selected pool can actually fill — with 4–9
                   books the old fixed 5/10/15/20 list left nothing selectable. */}
-              <select value={effectiveQuestionCount} onChange={(event) => setQuestionCount(Number(event.target.value))} className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2">
+              <select value={effectiveQuestionCount} onChange={(event) => setQuestionCount(Number(event.target.value))} className="min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2">
                 {lengthOptions.map((count) => (
                   <option key={count} value={count}>{count} questions</option>
                 ))}
@@ -209,9 +210,10 @@ export function QuizCreatePage() {
                 const offered = availableTypes.includes(type);
                 const checked = offered && effectiveTypes.includes(type);
                 return (
-                  <label key={type} className={`flex items-center gap-2 rounded-lg border p-3 ${offered ? "border-(--color-border)" : "border-(--color-border) opacity-50"}`}>
+                  <label key={type} className={`flex items-center gap-1 rounded-lg border pr-3 ${offered ? "border-(--color-border)" : "border-(--color-border) opacity-50"}`}>
                     <input
                       type="checkbox"
+                      className={CHECKBOX_CLASS}
                       disabled={!offered}
                       checked={checked}
                       onChange={() => setAllowedTypes((value) => (value.includes(type) ? value.filter((entry) => entry !== type) : [...value, type]))}

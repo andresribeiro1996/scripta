@@ -6,6 +6,7 @@ import { backTo } from "../lib/areas";
 import { useLibrary } from "../hooks/useLibrary";
 import { useTierlists } from "../hooks/useTierlists";
 import { useWorkBooks } from "../hooks/useWorkBooks";
+import { RADIO_CLASS } from "../components/Toolbar";
 
 export function TierListCreatePage() {
   const navigate = useNavigate();
@@ -44,12 +45,12 @@ export function TierListCreatePage() {
       {error && <p role="alert" className="text-sm text-(--color-danger)">{error}</p>}
       {step === 0 && <>
         <label className="flex flex-col gap-1 text-sm font-semibold">Tier list name
-          <input value={name} onChange={(event) => setName(event.target.value)} maxLength={200} placeholder="Untitled tier list" className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2" />
+          <input value={name} onChange={(event) => setName(event.target.value)} maxLength={200} placeholder="Untitled tier list" className="min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2" />
         </label>
         <label className="flex flex-col gap-1 text-sm font-semibold">Books in pool · {pool.length}
-          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search your library" className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2" />
+          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search your library" className="min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2" />
         </label>
-        {isLoading ? <p>Loading books…</p> : isError ? <button onClick={() => void refetch()} className="text-left text-(--color-accent)">Couldn't load your library. Retry</button> : <div className="max-h-[50vh] space-y-2 overflow-y-auto">
+        {isLoading ? <p>Loading books…</p> : isError ? <button onClick={() => void refetch()} className="min-h-11 text-left text-(--color-accent)">Couldn't load your library. Retry</button> : <div className="max-h-[50vh] space-y-2 overflow-y-auto">
           {filtered.map((book) => {
             const key = workIdOf(book)!;
             const checked = pool.includes(key);
@@ -65,23 +66,23 @@ export function TierListCreatePage() {
         {tiers.map((tier, index) => <div key={tier.id} className="flex items-end gap-3">
           <span className="mb-1 h-10 w-3 shrink-0 rounded" style={{ backgroundColor: tier.color }} />
           <label className="flex flex-1 flex-col gap-1 text-sm">Tier {index + 1}
-            <input value={tier.label} maxLength={30} onChange={(event) => setTiers((value) => value.map((entry) => entry.id === tier.id ? { ...entry, label: event.target.value } : entry))} className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2" />
+            <input value={tier.label} maxLength={30} onChange={(event) => setTiers((value) => value.map((entry) => entry.id === tier.id ? { ...entry, label: event.target.value } : entry))} className="min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2" />
           </label>
-          <button type="button" disabled={tiers.length === 1} onClick={() => setTiers((value) => value.filter((entry) => entry.id !== tier.id))} className="min-h-10 rounded-lg border border-(--color-border) px-3 disabled:opacity-50">Remove</button>
+          <button type="button" disabled={tiers.length === 1} onClick={() => setTiers((value) => value.filter((entry) => entry.id !== tier.id))} className="min-h-11 rounded-lg border border-(--color-border) px-3 disabled:opacity-50">Remove</button>
         </div>)}
-        <button type="button" onClick={() => setTiers((value) => [...value, createTier("New tier", "#8a8580")])} className="min-h-10 rounded-lg border border-(--color-border) px-3">Add tier</button>
+        <button type="button" onClick={() => setTiers((value) => [...value, createTier("New tier", "#8a8580")])} className="min-h-11 rounded-lg border border-(--color-border) px-3">Add tier</button>
       </>}
       {step === 2 && <>
         <fieldset className="flex flex-col gap-3"><legend className="mb-2 font-semibold">Top tier means</legend>
-          {([false, true] as const).map((value) => <label key={String(value)} className="flex items-center gap-2 rounded-lg border border-(--color-border) p-3"><input type="radio" name="direction" checked={worstFirst === value} onChange={() => setWorstFirst(value)} />{value ? "Worst" : "Best"}</label>)}
+          {([false, true] as const).map((value) => <label key={String(value)} className="flex items-center gap-1 rounded-lg border border-(--color-border) pr-3"><input type="radio" className={RADIO_CLASS} name="direction" checked={worstFirst === value} onChange={() => setWorstFirst(value)} />{value ? "Worst" : "Best"}</label>)}
           <p className="text-sm text-(--color-text-dim)">Can't be changed later.</p>
         </fieldset>
         <fieldset className="flex flex-col gap-3"><legend className="mb-2 font-semibold">Visibility</legend>
-          {(["private", "public"] as const).map((value) => <label key={value} className="flex items-center gap-2 rounded-lg border border-(--color-border) p-3"><input type="radio" checked={visibility === value} onChange={() => setVisibility(value)} />{value === "private" ? "Private" : "Public · open for voting"}</label>)}
+          {(["private", "public"] as const).map((value) => <label key={value} className="flex items-center gap-1 rounded-lg border border-(--color-border) pr-3"><input type="radio" className={RADIO_CLASS} checked={visibility === value} onChange={() => setVisibility(value)} />{value === "private" ? "Private" : "Public · open for voting"}</label>)}
         </fieldset>
         {visibility === "public" ? <>
           <fieldset className="flex flex-col gap-3"><legend className="mb-2 font-semibold">Who can vote?</legend>
-            {(["anonymous", "members"] as const).map((value) => <label key={value} className="flex items-center gap-2 rounded-lg border border-(--color-border) p-3"><input type="radio" checked={access === value} onChange={() => setAccess(value)} />{value === "anonymous" ? "Anyone" : "Members only"}</label>)}
+            {(["anonymous", "members"] as const).map((value) => <label key={value} className="flex items-center gap-1 rounded-lg border border-(--color-border) pr-3"><input type="radio" className={RADIO_CLASS} checked={access === value} onChange={() => setAccess(value)} />{value === "anonymous" ? "Anyone" : "Members only"}</label>)}
           </fieldset>
           <p className="text-sm text-(--color-text-dim)">Public lists lock their name, books, and tiers. At 100 distinct signed-in voters, this becomes an app-owned reference.</p>
         </> : <p className="text-sm text-(--color-text-dim)">Only you can see and edit this list. You can open voting later.</p>}

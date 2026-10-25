@@ -25,7 +25,7 @@ import { buildReconstructedBooks } from "../lib/sharedMural";
 
 function retryButton(refetch: () => void) {
   return (
-    <button onClick={() => void refetch()} className="rounded-lg border border-(--color-border) px-3 py-1.5 text-sm hover:border-(--color-accent)">
+    <button onClick={() => void refetch()} className={BUTTON_SECONDARY}>
       Retry
     </button>
   );
