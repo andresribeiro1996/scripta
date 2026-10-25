@@ -56,6 +56,12 @@ curl -sS -o none.jpg -w '%{http_code} %{content_type}\n' https://cdn.kobo.com/bo
 - **The real id** should answer 200 with a JPEG near 1200 wide or 1800 tall. A small original that comes back upscaled to fill the box is acceptable but worth knowing.
 - **The unknown id** must answer 404. A 200 placeholder would be stored as a cover; a 5xx would leave every such book's lookup incomplete and retried every 10 minutes. Either result blocks the merge until the design handles it.
 
+Checked 2026-10-25 from a Mac:
+
+- **Real id** (`445d6933-ac83-46c6-bb76-30802ceee152`): 200 `image/jpeg`, 1200×1799, the book's cover.
+- **Unknown id** (`00000000-0000-4000-8000-000000000000`): 404 `image/jpeg`. The body is an 82,558-byte 1200×1716 blank-book placeholder, but `fetchBytes` returns `null` on any non-2xx before reading it, so it is a miss.
+- **Upscaling:** yes. The same id's original is 1667×2500 (EXIF), and asking for `3000/4500` returns 3000×4499. A small original therefore arrives at 1200 wide and is stored as `good`; width says nothing about a Kobo cover's real resolution.
+
 If bad covers are stored anyway, the repair is to point each affected book back at its newest non-`kobo` `cover_images` row (images are never deleted) and add its Kobo URL to `cover_rejections`, leaving `kobo_image_id` set. The resolver skips a rejected URL, and a set id is never rewritten. Clearing the id instead would undo itself: the next `kobo covers` run reads the same `library_books.image_id` and records it again.
 
 ## Not in scope
