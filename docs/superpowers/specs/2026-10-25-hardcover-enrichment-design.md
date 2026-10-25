@@ -159,7 +159,7 @@ query Editions($i13: [String!]!, $i10: [String!]!) {
 In a dry run the database is opened read-only, as `fill-series.mjs:124` does. The counts come from the same checks without writing:
 - the summary is empty and the language matches;
 - `countEmptyGenreEditions(workId) > 0`;
-- the work has no stored row for that series name key under `hardcover`.
+- a series entry not on the skip list counts as added. Before the first real run no `hardcover` rows exist, so the count is exact then.
 
 ## The script
 
@@ -197,7 +197,7 @@ The repository gains one read: `isbnPage(afterRowid, limit)`. It returns `{ rowi
   genres:   { works, editions, noMappedGenre },
   skippedBooks, duplicateIsbns,
   seriesNames: [{ name, works }]  // dry run only, most works first
-  genreSamples: [{ tags, genres }] // dry run only, 50 random, for calibration review
+  genreSamples: [{ tags, genres }] // dry run only, the first 50 matched books with Genre tags
 }
 ```
 
