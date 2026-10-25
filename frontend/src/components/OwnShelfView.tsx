@@ -213,7 +213,7 @@ export function OwnShelfView({ username }: { username: string }) {
                         Import library
                       </Link>
                       <Link to="/dashboard/library?action=add" className="rounded-lg border border-(--color-border) px-3 py-2 text-sm">
-                        Add a book manually
+                        Add a book
                       </Link>
                     </div>
                   }

@@ -138,7 +138,7 @@ export function LibraryScreen() {
 
   const actionItems: MenuItem[] = [
     { label: "Rename library…", onPress: startRenamingLibrary },
-    { label: "Import / sync…", onPress: () => router.push("/import" as never) },
+    { label: "Import library…", onPress: () => router.push("/import" as never) },
     ...(books.length > 1 ? [{ label: "Reorder…", onPress: () => router.push("/reorder" as never) }] : []),
     ...(!onCollectionsTab && books.length > 0 ? [{ label: "Select…", onPress: () => setSelectionMode(true) }] : []),
     { label: "Library style…", onPress: () => router.push("/style" as never) },
@@ -220,7 +220,7 @@ export function LibraryScreen() {
         <EmptyState
           title="Start your library"
           body="Import your existing collection, or find a book by title or barcode."
-          actionLabel="Import library…"
+          actionLabel="Import library"
           onAction={() => router.push("/import" as never)}
           secondaryActionLabel="Add a book"
           onSecondaryAction={() => setAddingBook(true)}

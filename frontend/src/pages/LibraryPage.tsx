@@ -328,7 +328,7 @@ export function LibraryPage() {
         setEditingName(true);
       }
     },
-    { label: "Add book…", onClick: () => setAddingBook(true) },
+    { label: "Add a book…", onClick: () => setAddingBook(true) },
     { label: "Sync Goodreads…", onClick: () => setSyncingGoodreads(true) },
     { label: "Download CSV template", onClick: downloadCsvTemplate },
     ...(books.length > 0 ? [{ label: "Select…", onClick: handleToggleSelectionMode }] : []),
@@ -338,7 +338,7 @@ export function LibraryPage() {
     { label: "Library style…", onClick: () => navigate("/dashboard/style") },
     { label: "Share", onClick: () => setSharing(true) },
     {
-      label: importing ? "Importing…" : books.length > 0 ? "Import more…" : "Import library…",
+      label: importing ? "Importing…" : "Import library…",
       onClick: () => {
         if (!importing) fileInputRef.current?.click();
       }
@@ -347,7 +347,7 @@ export function LibraryPage() {
 
   return (
     <PageContainer maxWidth={style.contentMaxWidth}>
-      {searchParams.get("action") === "import" ? <div className="mb-4 rounded-lg border border-(--color-border) p-4"><h2 className="font-semibold">Import your library</h2><button className="mt-2 min-h-11 rounded-lg bg-(--color-accent) px-4 py-2 text-(--color-on-accent)" onClick={() => fileInputRef.current?.click()}>Choose import file</button></div> : null}
+      {searchParams.get("action") === "import" ? <div className="mb-4 rounded-lg border border-(--color-border) p-4"><h2 className="font-semibold">Import library</h2><button className="mt-2 min-h-11 rounded-lg bg-(--color-accent) px-4 py-2 text-(--color-on-accent)" onClick={() => fileInputRef.current?.click()}>Choose import file</button></div> : null}
       {/* Desktop-only, with one exception: renaming. On a phone the whole
           header is gone — its actions moved into the toolbar row and the
           library name into that row's menu — but "Rename library…" in
@@ -414,7 +414,7 @@ export function LibraryPage() {
               onClick={() => setAddingBook(true)}
               className="min-h-11 rounded-lg bg-(--color-accent) px-3.5 py-2.5 text-sm font-semibold text-(--color-on-accent) hover:opacity-90"
             >
-              Add book
+              Add a book
             </button>
             <button
               onClick={() => setSyncingGoodreads(true)}
@@ -452,7 +452,7 @@ export function LibraryPage() {
               title={books.length > 0 ? "Matching books are merged with what's already here, not duplicated." : undefined}
               className="min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3.5 py-2.5 text-sm hover:bg-(--color-surface-hover) disabled:opacity-60"
             >
-              {importing ? "Importing…" : books.length > 0 ? "Import more…" : "Import library…"}
+              {importing ? "Importing…" : "Import library"}
             </button>
             <a href={csvTemplateUrl} download="atmyshelf-library.csv" className="min-h-11 rounded-lg border border-(--color-border) px-3.5 py-2.5 text-sm hover:bg-(--color-surface-hover)">
               CSV template

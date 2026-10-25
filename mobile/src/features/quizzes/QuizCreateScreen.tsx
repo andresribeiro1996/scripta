@@ -155,7 +155,7 @@ export function QuizCreateScreen() {
         }}
       /> : null}
       {source === "shelf" ? <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>
-        {library.isPending ? "Loading books…" : library.isError ? "Your library couldn't be loaded." : `${shelfRawBooks.length} books on your shelf.`}
+        {library.isPending ? "Loading books…" : library.isError ? "Your library couldn't be loaded." : `${shelfRawBooks.length} books in your library.`}
       </Text> : null}
       {resolveFailed && source !== "pool" ? <View style={styles.resolveRetry}>
         <Text {...dynamicType} style={[typography.caption, styles.grow, { color: colors.textDim }]}>Some covers couldn't be checked, so cover questions may be unavailable.</Text>
