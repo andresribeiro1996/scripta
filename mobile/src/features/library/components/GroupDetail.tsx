@@ -170,7 +170,7 @@ export function GroupDetail({ groupId }: { groupId: string }) {
           ) : (
             <View style={styles.topRow}>
               {editingName ? (
-                <Input autoFocus label="Name" value={nameDraft} onChangeText={setNameDraft} onBlur={handleCommitRename} onSubmitEditing={handleCommitRename} />
+                <Input autoFocus label="Name" value={nameDraft} maxLength={200} onChangeText={setNameDraft} onBlur={handleCommitRename} onSubmitEditing={handleCommitRename} />
               ) : (
                 <Pressable
                   accessibilityLabel={`Rename ${group.name}`}

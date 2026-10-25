@@ -16,6 +16,7 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 const { applyBooksMigrations } = await import("./adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("./adapters/sqlite/sqliteBooksRepository.js");
 const { BookNotFoundError, WorkMergeError } = await import("./domain/errors.js");
+const { matchWork } = await import("./translationJudgments.js");
 const { reviewTranslationWith, translationReviewWith } = await import("./translationReview.js");
 
 type Repo = ReturnType<typeof createSqliteBooksRepository>;
@@ -92,4 +93,29 @@ test("a doubt whose proposed original has since been folded into another work is
   repo.mergeWorks(loose.work_id!, keyed.work_id!, AT);
   const review = translationReviewWith(repo, [], (id) => id);
   assert.deepEqual(review.items.map((item) => [item.title, item.group, item.proposed.workId]), [["O Passeio", "possible", keyed.work_id]]);
+});
+
+test("a guarded Jev answer is listed as blocked with its proposed target", async () => {
+  const repo = freshRepo();
+  const lotr = repo.createBook({ title: "The Lord of the Rings", author: "J. R. R. Tolkien", isbn: "9780261103252", workKey: "OL27448W" }, ["isbn:9780261103252"], AT);
+  const king = repo.createBook({ title: "The Return of the King", author: "J. R. R. Tolkien", isbn: "9780261102378", workKey: "OL27455W" }, ["isbn:9780261102378"], AT);
+  for (const row of [lotr, king]) repo.addWorkSeries(row.work_id!, [{ name: "The Lord of the Rings", position: null }], "wikidata", AT);
+  const pt = repo.createBook({ title: "A Irmandade do Anel", author: "", isbn: "9789720000701" }, ["isbn:9789720000701"], AT);
+  repo.setLanguage(pt.id, "pt-PT");
+  repo.fillOriginalTitle(pt.id, "The lord of the rings");
+  const answer = async (input: { candidates: Array<{ title: string }> }) => ({ choice: input.candidates.findIndex((candidate) => candidate.title === "The Lord of the Rings"), confidence: 0.99, model: "jev-1.13.0" });
+  await matchWork({ repo, classify: answer, sharesArena: () => false, now, alert: () => {} }, pt.work_id!, () => false);
+  const review = translationReviewWith(repo, [], (id) => id);
+  assert.deepEqual(review.items.map((item) => [item.title, item.group, item.proposed.title]), [["A Irmandade do Anel", "blocked", "The Lord of the Rings"]]);
+});
+
+test("a merge whose original was later folded into another work is no longer listed as merged", () => {
+  const repo = freshRepo();
+  const { pt, en } = pair(repo, 9);
+  const later = repo.createBook({ title: "Book 9", author: "Author", isbn: "9780000006092", workKey: "OL9792W" }, ["isbn:9780000006092"], AT);
+  repo.mergeTranslation(pt.work_id!, en.work_id!, "jev", 0.95, AT);
+  assert.deepEqual(translationReviewWith(repo, [], (id) => id).items.map((item) => [item.title, item.group, item.proposed.workId]), [["Livro 9", "merged", en.work_id]]);
+
+  repo.mergeDuplicateWork(en.work_id!, later.work_id!, AT);
+  assert.deepEqual(translationReviewWith(repo, [], (id) => id), { items: [], total: 0 });
 });

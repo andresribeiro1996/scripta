@@ -122,7 +122,7 @@ const KINDS: { [T in BlockType]: Kind<T> } = {
     valid: (b) => typeof b.imageId === "string",
     references: (b, refs) => { if (nonEmpty(b.imageId)) refs.imageIds.add(b.imageId); },
     rekey: same, scrub: same, draws: noBooks },
-  text: { label: "Text", size: { w: 4, h: 2 }, minHeight: 0, configurable: true, content: () => ({ heading: "", body: "" }),
+  text: { label: "Text", size: { w: 4, h: 3 }, minHeight: 0, configurable: true, content: () => ({ heading: "", body: "" }),
     valid: always, references: nothing, rekey: same, scrub: same, draws: noBooks },
   profile: { label: "Reader profile", size: { w: 6, h: 5 }, minHeight: 0, configurable: true, content: () => ({ bio: "", favoriteGenres: [] }),
     valid: always, references: (_b, refs) => { refs.needsShelfTheme = true; }, rekey: same, scrub: same, draws: noBooks },

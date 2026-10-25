@@ -1,3 +1,5 @@
+export const GENRES_FROM_CATALOG = "catalog";
+
 export const BOOK_GENRES = [
   "Fantasy",
   "Science Fiction",

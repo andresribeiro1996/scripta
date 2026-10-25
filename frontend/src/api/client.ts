@@ -35,6 +35,10 @@ async function parseOrThrow(res: Response): Promise<unknown> {
   } catch {
     // no body (e.g. a 204), that's fine
   }
+  if (res.status === 429) {
+    const wait = body && typeof body === "object" && "message" in body && typeof body.message === "string" ? /retry in (.+)$/.exec(body.message)?.[1] : undefined;
+    throw new ApiError(429, `Too many tries. Wait ${wait ?? "a minute"} and try again.`);
+  }
   if (!res.ok) {
     const message =
       body && typeof body === "object" && "error" in body && typeof (body as { error?: unknown }).error === "string"

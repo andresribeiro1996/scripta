@@ -403,3 +403,14 @@ test("the job joins on its first tick and logs what it did", async () => {
   assert.equal(logged[0]!.message, "original arrivals joined");
   assert.equal(logged[0]!.details.codeMerges, 1);
 });
+
+test("an arriving original whose target heads a series is counted blocked and not merged", () => {
+  const repo = freshRepo();
+  const pt = claimant(repo, "9789720000501", "Passeio ao Farol", "Virginia Woolf", "To the Lighthouse");
+  const sequel = book(repo, "9780156907599", "Mrs Dalloway", "Virginia Woolf", { workKey: "OL961W" });
+  const en = arriveLighthouse(repo);
+  for (const row of [en, sequel]) repo.addWorkSeries(row.work_id!, [{ name: "To the Lighthouse", position: null }], "wikidata", AT);
+  assert.deepEqual(drain(repo), { arrivals: 1, claimants: 1, codeMerges: 0, codeBlocked: 1 });
+  assert.equal(repo.canonicalWorkIds([pt.work_id!]).get(pt.work_id!), pt.work_id);
+  assert.equal(repo.workMatchJudgments([pt.work_id!]).get(pt.work_id!)?.intoWorkId, en.work_id);
+});

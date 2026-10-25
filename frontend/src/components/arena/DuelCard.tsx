@@ -40,7 +40,7 @@ function DuelSideCard({
   // can't nest another button — so the wrapper carries the flex sizing
   // the button used to hold and the "+" sits as an absolute sibling.
   return (
-    <div className="relative flex flex-1 flex-col">
+    <div className="relative flex min-w-0 flex-1 flex-col">
       <button
         onClick={onVote}
         disabled={!canVote}

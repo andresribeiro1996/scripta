@@ -3,7 +3,7 @@ import { router } from "expo-router";
 import { Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
 import { Text } from "../../ui/Text";
 import { readerGlyphLabel, type QuizPreview } from "@scripta/shared";
-import { Icon, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
+import { Icon, IconButton, Menu, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import type { ContentTone, DiscoverItem, PublishedContent } from "@scripta/shared/community";
 import { TIER_LADDER, contentStats, contentStatus, contentTarget, gameActionLabel } from "./communityHome";
 import { AuthorAvatar, openProfile } from "./AuthorAvatar";
@@ -134,6 +134,7 @@ export function GameRow({ kind, name, meta, badges, caption, stats = [], covers,
           {({ pressed }) => <><Text {...dynamicType} style={[typography.body, styles.strong, styles.shrink, { color: pressed ? colors.text : color }]}>{actionLabel}</Text><Icon name="chevronRight" size={16} color={pressed ? colors.text : color} /></>}
         </Pressable>
         {seeBooks ? <Pressable accessibilityRole="button" accessibilityLabel={seeBooks.label} onPress={seeBooks.onPress} style={({ pressed }) => [styles.secondaryAction, { borderColor: colors.border, backgroundColor: pressed ? colors.surfacePressed : colors.surface }]}><Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.textDim }]}>See books</Text></Pressable> : null}
+        {onDelete ? <Menu items={[{ label: "Delete…", destructive: true, onPress: onDelete }]}><IconButton accessibilityLabel={`More actions for ${name}`} name="more" /></Menu> : null}
       </View>
     </View>
   );

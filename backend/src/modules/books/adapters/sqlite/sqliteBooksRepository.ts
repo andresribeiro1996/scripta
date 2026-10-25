@@ -199,7 +199,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const somePortugueseNeedingMatchStmt = db.prepare(`SELECT w.id FROM (SELECT DISTINCT value FROM json_each($ids)) AS ids CROSS JOIN works w ON w.id = ids.value WHERE ${portugueseWorkFilter} ORDER BY w.created_at, w.rowid LIMIT $limit`);
   const translationEditionsStmt = db.prepare(`SELECT title, author, publisher, summary, original_title FROM books WHERE work_id = ? ORDER BY created_at, rowid`);
   const originalTitleClaimsStmt = db.prepare(`SELECT work_id, title, author, language, original_title, summary FROM books WHERE (original_title IS NOT NULL AND original_title <> '') OR summary LIKE '%tulo original%'`);
-  const activeMergesStmt = db.prepare(`SELECT id, from_work, into_work, moved_book_ids, merged_at FROM work_merges WHERE source = ? AND undone_at IS NULL ORDER BY id DESC`);
+  const activeMergesStmt = db.prepare(`SELECT id, from_work, into_work, moved_book_ids, merged_at, confidence FROM work_merges WHERE source = ? AND undone_at IS NULL ORDER BY id DESC`);
   const editionsOfStmt = db.prepare(`SELECT id, work_id, title, author, language, isbn, original_title, summary FROM books WHERE work_id IN (SELECT value FROM json_each(?)) ORDER BY created_at, rowid`);
   const titleCandidatesStmt = db.prepare(`SELECT DISTINCT COALESCE(w.merged_into, w.id) AS id, b.title FROM books b JOIN works w ON w.id = b.work_id WHERE b.title_key GLOB ?`);
   const authorCandidatesStmt = db.prepare(`
@@ -211,20 +211,21 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     ORDER BY editions DESC, id
   `);
   const matchCandidatesStmt = db.prepare(`
-    SELECT w.id, w.title, w.author, MIN(b.year) AS year, COUNT(b.id) AS editions, json_group_array(DISTINCT COALESCE(b.language, '')) AS languages
+    SELECT w.id, w.title, w.author, MIN(b.year) AS year, COUNT(*) AS editions, json_group_array(COALESCE(b.language, '') ORDER BY b.rowid) AS languages
     FROM works w JOIN books b ON b.work_id = w.id
     WHERE w.id IN (SELECT value FROM json_each(?))
     GROUP BY w.id
   `);
   const translationReviewRowsStmt = db.prepare(`
     SELECT j.work_id AS work_id, j.into_work_id AS into_id, j.model AS model, j.confidence AS confidence, NULL AS merged_at,
-      CASE WHEN j.model = 'code' OR j.confidence >= $merge THEN 'blocked' ELSE 'possible' END AS grp
-    FROM work_match_judgments j JOIN works w ON w.id = j.work_id
+      CASE WHEN j.model = 'code' OR j.confidence >= $merge THEN 'blocked' ELSE 'possible' END AS grp, 0 AS arm, w.rowid AS seq
+    FROM work_match_judgments j CROSS JOIN works w ON w.id = j.work_id
     WHERE w.merged_into IS NULL AND j.into_work_id IS NOT NULL AND j.model <> 'manual' AND (j.model = 'code' OR j.confidence >= $review)
     UNION ALL
-    SELECT m.from_work, m.into_work, m.source, m.confidence, m.merged_at, 'merged'
-    FROM work_merges m JOIN works w ON w.id = m.from_work
+    SELECT m.from_work, m.into_work, m.source, m.confidence, m.merged_at, 'merged', 1, m.id
+    FROM work_merges m CROSS JOIN works w ON w.id = m.from_work
     WHERE m.source IN ('code', 'jev', 'manual') AND m.undone_at IS NULL AND w.merged_into = m.into_work
+    ORDER BY arm, seq
   `);
   const translationReviewWorksStmt = db.prepare(`
     SELECT w.id, w.title, w.author,
@@ -504,16 +505,20 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     FROM books b LEFT JOIN works w ON w.id = b.work_id
     WHERE b.rowid > ? AND COALESCE(b.isbn, '') <> '' ORDER BY b.rowid LIMIT ?
   `);
+  const workSeriesNameStmt = db.prepare(`SELECT name FROM work_series WHERE work_id = ? AND name_key = ? AND source = ?`);
+  const deleteWorkSeriesStmt = db.prepare(`DELETE FROM work_series WHERE work_id = ? AND name_key = ? AND source = ?`);
+  const workSeriesKeyCountStmt = db.prepare(`SELECT COUNT(*) AS n FROM work_series WHERE work_id = ? AND name_key = ?`);
+  const seriesIndexNamesStmt = db.prepare(`SELECT name FROM series_fts WHERE work_id = ?`);
+  const deleteSeriesIndexStmt = db.prepare(`DELETE FROM series_fts WHERE work_id = ? AND name = ?`);
   const hasWorkSeriesStmt = db.prepare(`SELECT 1 FROM work_series WHERE work_id = ? LIMIT 1`);
   const hasWorkSeriesSourceStmt = db.prepare(`SELECT 1 FROM work_series WHERE work_id = ? AND source = ? LIMIT 1`);
   const seriesToRemoveStmt = db.prepare(`
     SELECT work_id, name_key FROM work_series
     WHERE source = ? AND name_key IN (SELECT value FROM json_each(?))
   `);
-  const removeWorkSeriesStmt = db.prepare(`DELETE FROM work_series WHERE source = ? AND name_key IN (SELECT value FROM json_each(?))`);
-  const workSeriesKeyStmt = db.prepare(`SELECT 1 FROM work_series WHERE work_id = ? AND name_key = ? LIMIT 1`);
+  const removeSeriesNamesStmt = db.prepare(`DELETE FROM work_series WHERE source = ? AND name_key IN (SELECT value FROM json_each(?))`);
   const allSeriesIndexStmt = db.prepare(`SELECT rowid, work_id, name FROM series_fts`);
-  const deleteSeriesIndexStmt = db.prepare(`DELETE FROM series_fts WHERE rowid = ?`);
+  const deleteSeriesIndexRowStmt = db.prepare(`DELETE FROM series_fts WHERE rowid = ?`);
   const refreshSeriesAuthorStmt = db.prepare(`UPDATE series_fts SET author = ? WHERE work_id = ?`);
   const insertCollectionStmt = db.prepare(`
     INSERT INTO book_collections (book_id, name, name_key, position, source, created_at) VALUES (?, ?, ?, ?, ?, ?)
@@ -530,6 +535,21 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     FROM books JOIN book_collections ON book_collections.book_id = books.id
     WHERE books.work_id IN (SELECT value FROM json_each(?)) AND book_collections.source = 'ol-edition'
     ORDER BY book_collections.rowid
+  `);
+  const otherSeriesStmt = db.prepare(`
+    SELECT 1 FROM work_series JOIN works ON works.id = work_series.work_id
+    WHERE work_series.name_key = ?1 AND COALESCE(works.merged_into, works.id) <> ?2
+    LIMIT 1
+  `);
+  const otherCollectionStmt = db.prepare(`
+    SELECT 1 FROM book_collections JOIN books ON books.id = book_collections.book_id JOIN works ON works.id = books.work_id
+    WHERE book_collections.name_key = ?1 AND COALESCE(works.merged_into, works.id) <> ?2
+    LIMIT 1
+  `);
+  const seriesPositionsStmt = db.prepare(`
+    SELECT name_key, position FROM work_series
+    WHERE work_id = ?1 OR work_id IN (SELECT id FROM works WHERE merged_into = ?1)
+    ORDER BY rowid
   `);
   const upsertWorkAwardStmt = db.prepare(`
     INSERT INTO work_awards (work_id, prize, year, won, honoree, created_at) VALUES (?, ?, ?, ?, ?, ?)
@@ -1048,7 +1068,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       dropOriginalArrivalStmt.run(titleKey);
     },
     activeMerges(source) {
-      return (activeMergesStmt.all(source) as Array<{ id: number; from_work: string; into_work: string; moved_book_ids: string; merged_at: string }>).map((row) => ({ id: row.id, fromWork: row.from_work, intoWork: row.into_work, movedBookIds: JSON.parse(row.moved_book_ids) as string[], mergedAt: row.merged_at }));
+      return (activeMergesStmt.all(source) as Array<{ id: number; from_work: string; into_work: string; moved_book_ids: string; merged_at: string; confidence: number | null }>).map((row) => ({ id: row.id, fromWork: row.from_work, intoWork: row.into_work, movedBookIds: JSON.parse(row.moved_book_ids) as string[], mergedAt: row.merged_at, confidence: row.confidence }));
     },
     editionsOf(workIds) {
       return (editionsOfStmt.all(JSON.stringify(workIds)) as Array<{ id: string; work_id: string; title: string; author: string; language: string | null; isbn: string | null; original_title: string | null; summary: string | null }>).map((row) => ({ id: row.id, workId: row.work_id, title: row.title, author: row.author, language: row.language, isbn: row.isbn, originalTitle: row.original_title || originalTitleIn(row.summary) }));
@@ -1060,7 +1080,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       return (authorCandidatesStmt.all(pattern) as Array<{ id: string }>).map((row) => row.id);
     },
     matchCandidates(workIds) {
-      return (matchCandidatesStmt.all(JSON.stringify(workIds)) as Array<{ id: string; title: string; author: string; year: number | null; editions: number; languages: string }>).map((row) => ({ id: row.id, title: row.title, author: row.author, year: row.year, editions: row.editions, languages: (JSON.parse(row.languages) as string[]).filter(Boolean) }));
+      return (matchCandidatesStmt.all(JSON.stringify(workIds)) as Array<{ id: string; title: string; author: string; year: number | null; editions: number; languages: string }>).map((row) => ({ id: row.id, title: row.title, author: row.author, year: row.year, editions: row.editions, languages: [...new Set(JSON.parse(row.languages) as string[])].filter(Boolean) }));
     },
     translationReviewRows(mergeAt, reviewAt) {
       return (translationReviewRowsStmt.all({ $merge: mergeAt, $review: reviewAt }) as Array<{ work_id: string; into_id: string; model: string; confidence: number | null; merged_at: string | null; grp: "possible" | "blocked" | "merged" }>).map((row) => ({ workId: row.work_id, intoWorkId: row.into_id, model: row.model, confidence: row.confidence, mergedAt: row.merged_at, group: row.grp }));
@@ -1318,19 +1338,30 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       return rows.map((row) => ({ rowid: Number(row.rowid), id: row.id, isbn: row.isbn, workId: row.work_id, language: row.language, hasSummary: row.has_summary === 1 }));
     },
 
-    removeWorkSeries(nameKeys, source) {
+    removeSeriesNames(nameKeys, source) {
       const keys = JSON.stringify(nameKeys);
       return inTransaction(() => {
         const affected = seriesToRemoveStmt.all(source, keys) as Array<{ work_id: string; name_key: string }>;
-        const rows = Number(removeWorkSeriesStmt.run(source, keys).changes);
-        const orphaned = new Set(affected.filter((pair) => !workSeriesKeyStmt.get(pair.work_id, pair.name_key)).map((pair) => `${pair.work_id}\n${pair.name_key}`));
+        const rows = Number(removeSeriesNamesStmt.run(source, keys).changes);
+        const orphaned = new Set(affected.filter((pair) => (workSeriesKeyCountStmt.get(pair.work_id, pair.name_key) as { n: number }).n === 0).map((pair) => `${pair.work_id}\n${pair.name_key}`));
         let searchRows = 0;
         if (orphaned.size > 0) {
           for (const entry of allSeriesIndexStmt.all() as Array<{ rowid: number; work_id: string; name: string }>) {
-            if (orphaned.has(`${entry.work_id}\n${seriesNameKey(entry.name)}`)) searchRows += Number(deleteSeriesIndexStmt.run(entry.rowid).changes);
+            if (orphaned.has(`${entry.work_id}\n${seriesNameKey(entry.name)}`)) searchRows += Number(deleteSeriesIndexRowStmt.run(entry.rowid).changes);
           }
         }
         return { rows, searchRows };
+      });
+    },
+
+    removeWorkSeries(workId, nameKey, source) {
+      return inTransaction(() => {
+        if (!workSeriesNameStmt.get(workId, nameKey, source)) return 0;
+        const removed = Number(deleteWorkSeriesStmt.run(workId, nameKey, source).changes);
+        if ((workSeriesKeyCountStmt.get(workId, nameKey) as { n: number }).n === 0) {
+          for (const { name } of seriesIndexNamesStmt.all(workId) as Array<{ name: string }>) if (seriesNameKey(name) === nameKey) deleteSeriesIndexStmt.run(workId, name);
+        }
+        return removed;
       });
     },
 
@@ -1346,6 +1377,15 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
         indexCollectionStmt.run({ $book_id: bookId, $name: name, $name_key: nameKey });
         return true;
       });
+    },
+
+    seriesMemberKind(nameKey, workId) {
+      if (otherSeriesStmt.get(nameKey, workId) !== undefined) return "series";
+      return otherCollectionStmt.get(nameKey, workId) !== undefined ? "collection" : null;
+    },
+
+    seriesPositionsOf(workId) {
+      return (seriesPositionsStmt.all(workId) as Array<{ name_key: string; position: string | null }>).map((row) => ({ nameKey: row.name_key, position: row.position }));
     },
 
     bestSeriesOf(workIds) {

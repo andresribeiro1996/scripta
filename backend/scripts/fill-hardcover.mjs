@@ -62,7 +62,7 @@ function namesIn(path) {
 if (remove) {
   const keys = namesIn(values.remove).flatMap((name) => seriesNameKey(name) ?? []);
   const repo = createSqliteBooksRepository(waitForBnpLock(openBooksDb()));
-  console.log(JSON.stringify({ removed: repo.removeWorkSeries(keys, "hardcover") }, null, 2));
+  console.log(JSON.stringify({ removed: repo.removeSeriesNames(keys, "hardcover") }, null, 2));
   process.exit(0);
 }
 

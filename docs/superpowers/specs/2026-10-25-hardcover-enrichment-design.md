@@ -66,7 +66,7 @@ Scripta is a personal project: not charged for, not incorporated, no ads. It sti
 5. **Series names go through a review list, before and after the run.**
    - The dry run on a sample lists series names with work counts. A real run refuses to start without `--skip <names.json>`, which may hold `[]`. This mirrors `fill-series.mjs:41`, because a community database also holds publisher collections ("Penguin Classics").
    - The sample covers only the first ~25k editions in rowid order, so the real run's report also lists `seriesNames`, for every name it added. The user and Claude review that full list.
-   - Names rejected after the run are removed with `--remove <names.json>`. It costs no requests, and it deletes the `hardcover` rows with those name keys (`removeWorkSeries(nameKeys, "hardcover")`, a new repository write). It also deletes their `series_fts` rows when no other source keeps that name on the work, since `series_fts` is only written for a work's first row of a name key (`sqliteBooksRepository.ts:497-500`). Hand SQL would leave search finding the work under the deleted name.
+   - Names rejected after the run are removed with `--remove <names.json>`. It costs no requests, and it deletes the `hardcover` rows with those name keys (`removeSeriesNames(nameKeys, "hardcover")`, a new repository write). It also deletes their `series_fts` rows when no other source keeps that name on the work, since `series_fts` is only written for a work's first row of a name key (`sqliteBooksRepository.ts:497-500`). Hand SQL would leave search finding the work under the deleted name.
 6. **Descriptions are written per edition, only when the edition shows no synopsis today, and only when the language is known to match.**
    - They are written through the existing `mergeDetails(bookId, { summary, pages: null, year: null, publisher: null, translator: null }, "hardcover")`. Its first-write-wins rule keeps any existing synopsis.
    - **"Shows no synopsis today"** means `books.summary` is empty and the work has no `works.summary` with an `ol_work_key`. The details read prefers the edition's own summary over the Open Library work summary (`booksService.ts:150-161`), and a boot migration cleared edition summaries where the work holds one (`connection.ts:130-136`). Writing into those empty edition rows would hide a synopsis readers already see, so they count as `alreadyHadSummary`. When the work summary is in the other language and hidden by the language check, this skips an edition that shows nothing. The rule accepts that loss, because it is simpler than re-running the read path's check.
@@ -198,7 +198,7 @@ The fill loop lives in `backend/src/modules/books/seed/hardcoverFill.ts`. It is 
 The repository gains:
 - `isbnPage(afterRowid, limit)`, which returns `{ rowid, id, isbn, workId, language, hasSummary }` for editions with a non-empty `isbn`, ordered by rowid. `hasSummary` follows Decision 6.
 - `hasWorkSeries(workId, source)`.
-- `removeWorkSeries(nameKeys, source)`.
+- `removeSeriesNames(nameKeys, source)`.
 
 Everything else reuses existing methods. An edition with no `work_id` gets only the description step.
 

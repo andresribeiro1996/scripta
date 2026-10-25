@@ -95,6 +95,7 @@ export function SettingsPage() {
                 <button
                   disabled={avatarBusy}
                   onClick={() => fileInputRef.current?.click()}
+                  aria-label={avatarBusy ? undefined : "Change profile picture"}
                   className="text-xs text-(--color-accent) transition-opacity hover:opacity-80 disabled:opacity-50"
                 >
                   {avatarBusy ? "Working…" : "Change"}
@@ -130,6 +131,7 @@ export function SettingsPage() {
                   setError(null);
                   setSuccess(false);
                 }}
+                aria-label="Change username"
                 className="text-xs text-(--color-accent) transition-opacity hover:opacity-80"
               >
                 Change

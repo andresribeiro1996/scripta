@@ -5,6 +5,7 @@ import { Text } from "../../../ui/Text";
 import { Image } from "expo-image";
 import { buildManualBook, normalizeIsbn, searchInsideOutside, searchResultByline, seriesLabel } from "@scripta/shared";
 import { Button, Input } from "../../../ui/components";
+import { useToast } from "../../../ui/ToastHost";
 import { spacing, typography, useTheme } from "../../../ui/theme";
 import { bookSearchApi, type BookSearchResult } from "../api/search";
 import { IsbnScanner } from "./IsbnScanner";
@@ -28,6 +29,7 @@ export function AddBookForm({
   initialScanning?: boolean;
 }) {
   const { colors } = useTheme();
+  const toast = useToast();
   const [query, setQuery] = useState(initialQuery);
   const [results, setResults] = useState<BookSearchResult[] | null>(null);
   const [searching, setSearching] = useState(false);
@@ -133,6 +135,7 @@ export function AddBookForm({
       setPublisher("");
       setGenres([]);
       setQuery("");
+      toast.show("Added to your library", "success");
       onClose();
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : "Couldn't add that book.");
@@ -206,12 +209,13 @@ export function AddBookForm({
         )}
 
         <View style={{ gap: spacing.md, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.md }}>
-          <Input label="Title" value={title} onChangeText={setTitle} />
-          <Input label="Author" value={author} onChangeText={setAuthor} />
+          <Input label="Title (required)" value={title} onChangeText={setTitle} />
+          <Input label="Author (required)" value={author} onChangeText={setAuthor} />
           <Input label="ISBN" value={isbn} onChangeText={setIsbn} keyboardType="numeric" />
           <Input label="Publisher" value={publisher} onChangeText={setPublisher} />
           <SelectRow label="Status" value={readStatus} options={STATUS_OPTIONS} onChange={setReadStatus} />
           <Button label={saving ? "Adding…" : "Add book"} loading={saving} disabled={title.trim() === "" || author.trim() === ""} onPress={() => void handleSave()} />
+          {title.trim() === "" || author.trim() === "" ? <Text style={[typography.caption, { color: colors.textDim }]}>Add a title and an author to continue.</Text> : null}
           {saveError && <Text style={[typography.caption, { color: colors.danger }]}>{saveError}</Text>}
         </View>
       </ScrollView>

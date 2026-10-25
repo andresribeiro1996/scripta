@@ -23,7 +23,7 @@ import { AccessibilityInfo, Pressable, ScrollView, StyleSheet, useWindowDimensio
 import Animated, { useAnimatedReaction, useAnimatedRef, useAnimatedScrollHandler, useSharedValue } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 import { Text } from "../../ui/Text";
-import { Button, Dialog, EditorHeading, EmptyState, ErrorState, Fab, HeaderActions, Icon, IconButton, Input, SaveStateButton, Sheet, Toast } from "../../ui";
+import { Button, Dialog, EditorHeading, EmptyState, ErrorState, Fab, HeaderActions, Icon, IconButton, Input, SaveStateButton, Sheet, Toast, useUnsavedChangesGuard } from "../../ui";
 import { BookPickerList } from "../library/components/BookPickerList";
 import { ThemeGrid } from "../../ui/ThemeGrid";
 import { MuralThemeScope, radii, spacing, typography } from "../../ui/theme";
@@ -60,6 +60,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
   const [history, setHistory] = useState<MuralBlock[][]>([]);
   const scrollRef = useAnimatedRef<ScrollView>();
   const pendingScroll = useRef<number | null>(null);
+  const unsavedRef = useRef(false);
   const scrollOffset = useSharedValue(0);
   const contentHeight = useSharedValue(0);
   const bottomInset = useSharedValue(88);
@@ -110,7 +111,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
 
   useFocusEffect(useCallback(() => {
     void muralQuery.refetch().then(({ data }) => {
-      if (!data) return;
+      if (!data || unsavedRef.current) return;
       setName(data.name);
       setTheme(data.theme);
       setBlocks(data.blocks);
@@ -120,6 +121,8 @@ export function MuralEditorScreen({ id }: { id: string }) {
 
   const draftMural = useMemo(() => mural ? { ...mural, name: currentName, theme: currentTheme, blocks: currentBlocks } : null, [mural, currentName, currentTheme, currentBlocks]);
   const unsaved = useMemo(() => !!mural && ((currentName.trim() || mural.name) !== mural.name || currentTheme !== muralThemeId(mural.theme) || JSON.stringify(currentBlocks) !== JSON.stringify(mural.blocks)), [mural, currentName, currentTheme, currentBlocks]);
+  unsavedRef.current = unsaved;
+  const discardDialog = useUnsavedChangesGuard(unsaved);
 
   function updateSelected(transform: (block: MuralBlock) => MuralBlock) {
     if (!selected) return;
@@ -179,7 +182,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
   }
 
   async function persist() {
-    const updated = await updateMural(id, { name: currentName.trim() || mural!.name, theme: currentTheme, blocks: currentBlocks, updatedAt: mural!.updatedAt });
+    const updated = await updateMural(id, { ...(currentName.trim() && currentName.trim() !== mural!.name ? { name: currentName.trim() } : {}), theme: currentTheme, blocks: currentBlocks, updatedAt: mural!.updatedAt });
     cacheMural(updated);
     setName(updated.name);
     setTheme(updated.theme);
@@ -200,8 +203,23 @@ export function MuralEditorScreen({ id }: { id: string }) {
     }
   }
 
-  if (muralQuery.isPending) return <View style={styles.center}><Text>Loading mural…</Text></View>;
-  if (muralQuery.isError || !mural || !draftMural) return <ErrorState title="Mural unavailable" body="It may have been deleted." actionLabel="Back" onAction={() => router.back()} />;
+  const header = (
+    <Stack.Screen
+      options={{
+        headerShown: true,
+        title: "",
+        headerLargeTitleEnabled: false,
+        headerRight: () => dragging || !draftMural ? null : <MuralThemeScope theme={currentTheme}><HeaderActions>
+          <SaveStateButton busy={busy} unsaved={unsaved} onPress={() => void save()} />
+          <IconButton accessibilityLabel="Mural theme" name="theme" onPress={() => setThemeOpen(true)} />
+          <IconButton accessibilityLabel="Share mural" name="share" onPress={() => setShareFor(draftMural)} />
+        </HeaderActions></MuralThemeScope>,
+      }}
+    />
+  );
+
+  if (muralQuery.isPending) return <View style={styles.center}>{header}<Text>Loading mural…</Text></View>;
+  if (muralQuery.isError || !mural || !draftMural) return <>{header}<ErrorState title="Mural unavailable" body="It may have been deleted." actionLabel="Back" onAction={() => router.back()} /></>;
 
   const blockActions: BlockAction[] = selected ? [
     { key: "edit", label: "Edit", accessibilityLabel: "Edit block content, style and size", icon: "edit", tone: "accent", onPress: () => setSheetTab(isConfigurable(selected.type) ? "content" : "style") },
@@ -226,18 +244,8 @@ export function MuralEditorScreen({ id }: { id: string }) {
 
   return (
     <MuralScreen theme={currentTheme}>
-      <Stack.Screen
-        options={{
-          headerShown: true,
-          title: "",
-          headerLargeTitleEnabled: false,
-          headerRight: () => dragging ? null : <MuralThemeScope theme={currentTheme}><HeaderActions>
-            <SaveStateButton busy={busy} unsaved={unsaved} onPress={() => void save()} />
-            <IconButton accessibilityLabel="Mural theme" name="theme" onPress={() => setThemeOpen(true)} />
-            <IconButton accessibilityLabel="Share mural" name="share" onPress={() => setShareFor(draftMural)} />
-          </HeaderActions></MuralThemeScope>,
-        }}
-      />
+      {discardDialog}
+      {header}
       {error ? <Toast visible message={error} tone="error" /> : null}
       <Animated.ScrollView ref={scrollRef} onLayout={(event) => setViewportHeight(event.nativeEvent.layout.height)} onScroll={onScroll} scrollEventThrottle={16} onContentSizeChange={(_width, height) => { contentHeight.set(height); flushScroll(height); }} keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.canvasScroll, { paddingBottom: Math.max(120, dockHeight + spacing.md) }]}>
         <EditorHeading name={currentName} accessibilityLabel={`Rename mural, ${currentName}`} onRename={() => { setDraftName(currentName); setNameError(undefined); setRenaming(true); }} />
@@ -251,7 +259,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
       {selected ? <View pointerEvents={blockToolsHidden ? "none" : "auto"} accessibilityElementsHidden={blockToolsHidden} importantForAccessibility={blockToolsHidden ? "no-hide-descendants" : "auto"} onLayout={(event) => { const height = event.nativeEvent.layout.height; setDockHeight(height); if (!dragging) bottomInset.set(height + spacing.md); }} style={[styles.dock, { opacity: blockToolsHidden ? 0 : 1, backgroundColor: colors.surface, borderColor: colors.border }]}><BlockActionBar actions={blockActions} disabled={busy} /></View> : !dragging ? <Fab label="Add" accessibilityLabel="Add block" onPress={() => setAdding(true)} /> : null}
       {history.length && !blockToolsHidden ? <View style={[styles.undo, { bottom: selected ? dockHeight + spacing.md : spacing.md }]}><Button label="Undo" variant="secondary" disabled={busy} onPress={undo} /></View> : null}
       <Dialog visible={renaming} title="Rename mural" onClose={() => setRenaming(false)}>
-        <View style={styles.dialog}><Input label="Mural name" value={draftName} error={nameError} onChangeText={(text) => { setDraftName(text); setNameError(undefined); }} /><Button label="Done" onPress={() => { const trimmed = draftName.trim(); if (!trimmed) { setNameError("Name can't be empty"); return; } setName(trimmed); setRenaming(false); }} /></View>
+        <View style={styles.dialog}><Input label="Mural name" value={draftName} maxLength={200} error={nameError} onChangeText={(text) => { setDraftName(text); setNameError(undefined); }} /><Button label="Done" onPress={() => { const trimmed = draftName.trim(); if (!trimmed) { setNameError("Name can't be empty"); return; } setName(trimmed); setRenaming(false); }} /></View>
       </Dialog>
       <MuralShareSheet mural={shareFor} books={books} groups={groups} images={gallery.data ?? []} tierlists={tierlists.data ?? []} profile={profile} draft={unsaved} contentReady={!libraryQuery.isPending && !gallery.isPending && !tierlists.isPending} contentError={libraryQuery.error?.message ?? gallery.error?.message ?? tierlists.error?.message ?? undefined} onRetryContent={() => { void libraryQuery.refetch(); void gallery.refetch(); void tierlists.refetch(); }} onClose={() => setShareFor(null)} onEnableLink={async () => {
         if (shareFor === null) return;

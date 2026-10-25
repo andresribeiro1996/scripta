@@ -5,6 +5,7 @@ export type CollectionSource = "bnp" | "ol-edition";
 export type SeriesEntry = { name: string; position: string | null };
 
 export const SERIES_SOURCE_RANK: Record<SeriesSource, number> = { wikidata: 0, hardcover: 1, "ol-edition": 2, "ol-subject": 3, "original-title": 4 };
+export const SERIES_SOURCES = Object.keys(SERIES_SOURCE_RANK) as SeriesSource[];
 
 export function seriesNameKey(name: string): string | null {
   return normalizeWords(name) || null;

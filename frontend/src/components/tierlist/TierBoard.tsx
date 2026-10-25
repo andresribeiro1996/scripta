@@ -95,8 +95,8 @@ function TierEditorRow({
   const resolvedKeys = tier.workIds.filter((k) => byWork.has(k));
   return (
     <div className="flex flex-col gap-1">
-      <div className="flex items-center gap-1.5">
-        {structureEditable ? (
+      {structureEditable && (
+        <div className="flex items-center gap-1.5">
           <input
             defaultValue={tier.label}
             onBlur={(e) => {
@@ -114,42 +114,36 @@ function TierEditorRow({
             aria-label="Tier label"
             className="min-h-9 min-w-0 flex-1 rounded-lg border border-(--color-border) bg-(--color-surface) px-2.5 text-sm font-semibold"
           />
-        ) : (
-          <span className="min-h-9 min-w-0 flex-1 truncate px-2.5 py-1.5 text-sm font-semibold">{tier.label || "Untitled tier"}</span>
-        )}
-        {/* Up/down stay as direct buttons — reordering tiers is the
-            frequent action. Delete goes behind the ⋮ menu: rare, and
-            destructive enough that a mis-tap on a 44px target next to
-            two other 44px targets is a real risk. Same consolidation
-            OptionsMenu already does for mural blocks and list cards. */}
-        {structureEditable && (
-          <>
-            <button
-              disabled={isFirst}
-              onClick={onMoveUp}
-              aria-label="Move tier up"
-              title="Move tier up"
-              className={`${toolbarIconClass()} disabled:opacity-30`}
-            >
-              <ChevronUpIcon />
-            </button>
-            <button
-              disabled={isLast}
-              onClick={onMoveDown}
-              aria-label="Move tier down"
-              title="Move tier down"
-              className={`${toolbarIconClass()} disabled:opacity-30`}
-            >
-              <ChevronDownIcon />
-            </button>
-            <OptionsMenu
-              title="Tier settings"
-              triggerClassName={toolbarIconClass()}
-              items={[{ label: "Delete tier", onClick: onDelete, danger: true }]}
-            />
-          </>
-        )}
-      </div>
+          {/* Up/down stay as direct buttons — reordering tiers is the
+              frequent action. Delete goes behind the ⋮ menu: rare, and
+              destructive enough that a mis-tap on a 44px target next to
+              two other 44px targets is a real risk. Same consolidation
+              OptionsMenu already does for mural blocks and list cards. */}
+          <button
+            disabled={isFirst}
+            onClick={onMoveUp}
+            aria-label="Move tier up"
+            title="Move tier up"
+            className={`${toolbarIconClass()} disabled:opacity-30`}
+          >
+            <ChevronUpIcon />
+          </button>
+          <button
+            disabled={isLast}
+            onClick={onMoveDown}
+            aria-label="Move tier down"
+            title="Move tier down"
+            className={`${toolbarIconClass()} disabled:opacity-30`}
+          >
+            <ChevronDownIcon />
+          </button>
+          <OptionsMenu
+            title="Tier settings"
+            triggerClassName={toolbarIconClass()}
+            items={[{ label: "Delete tier", onClick: onDelete, danger: true }]}
+          />
+        </div>
+      )}
       <DropZone id={tier.id}>
         <TierRowShell tier={tier} colorControl={structureEditable ? <TierColorPicker color={tier.color} onChange={onRecolor} /> : undefined}>
           {resolvedKeys.length === 0 ? (

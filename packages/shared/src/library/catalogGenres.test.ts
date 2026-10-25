@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { GENRES_FROM_CATALOG, withCatalogGenres } from "./catalogGenres.js";
+import { GENRES_FROM_CATALOG } from "./bookGenres.js";
+import { withCatalogGenres } from "./catalogGenres.js";
 
 const dune = { Title: "Dune", Attribution: "Frank Herbert", ISBN: "9780441013593" };
 const key = "isbn:9780441013593";

@@ -152,6 +152,8 @@ export function ArenaSeedScreen({ tournament, onStarted }: { tournament?: Tourna
         <Button label={saving ? "Saving…" : isSaved ? "Saved" : "Save progress"} variant="secondary" disabled={busy || isSaved} onPress={() => void saveProgress()} />
         <Button label="Start" loading={busy} disabled={slots.some((slot) => !slot)} onPress={start} />
       </View>
+      {slots.some((slot) => !slot) ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Fill every slot to start.</Text> : null}
+      {library.isSuccess && !books.length ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Random fill needs books in your library.</Text> : null}
       {library.isPending ? <Skeleton height={120} /> : library.isError ? <ErrorState body="Your library couldn't be loaded." actionLabel="Retry" onAction={() => void library.refetch()} /> : (
         <FlatList
           data={slots}

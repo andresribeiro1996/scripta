@@ -559,7 +559,8 @@ function assertWorkSchema(db: DatabaseSync) {
   const names = (sql: string) => (db.prepare(sql).all() as Array<{ name: string }>).map((row) => row.name);
   assert.deepEqual(names("PRAGMA table_info(works)"), ["id", "ol_work_key", "title", "author", "merged_into", "created_at", "summary", "summary_hash"]);
   assert.deepEqual(names("PRAGMA table_info(books)").filter((name) => WORK_COLUMNS.includes(name)), WORK_COLUMNS);
-  assert.deepEqual(names("PRAGMA index_info(idx_books_work)"), ["work_id"]);
+  assert.deepEqual(names("PRAGMA index_info(idx_books_work_editions)"), ["work_id", "year", "language"]);
+  assert.equal(db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'idx_books_work'").get(), undefined);
   assert.throws(() => db.prepare("INSERT INTO books (id, title, author, work_id, created_at) VALUES ('orphan', 'A', 'A', 'missing', ?)").run(NOW), /FOREIGN KEY constraint failed/);
 }
 
@@ -1063,6 +1064,25 @@ test("the old work lookup index is replaced on an existing database and the othe
   const exists = (name: string) => db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = ?").get(name) !== undefined;
   assert.equal(exists("idx_books_work_lookup"), false);
   assert.deepEqual(["idx_books_work_queue", "idx_books_bnp_details", "idx_books_details_pending"].map(exists), [true, true, true]);
+});
+
+test("the work index becomes the work editions index and the translation review indexes are added to an existing database once", () => {
+  const db = new DatabaseSync(":memory:");
+  applyBooksMigrations(db);
+  db.exec("DROP INDEX idx_books_work_editions");
+  db.exec("DROP INDEX idx_work_merges_translations");
+  db.exec("DROP INDEX idx_work_match_judgments_proposed");
+  db.exec("CREATE INDEX idx_books_work ON books(work_id)");
+  applyBooksMigrations(db);
+  applyBooksMigrations(db);
+  const indexSql = (name: string) => (db.prepare("SELECT sql FROM sqlite_master WHERE type = 'index' AND name = ?").get(name) as { sql: string } | undefined)?.sql;
+  const columns = (name: string) => (db.prepare(`PRAGMA index_info(${name})`).all() as Array<{ name: string }>).map((row) => row.name);
+  assert.equal(indexSql("idx_books_work"), undefined);
+  assert.deepEqual(columns("idx_books_work_editions"), ["work_id", "year", "language"]);
+  assert.deepEqual(columns("idx_work_merges_translations"), ["source"]);
+  assert.match(indexSql("idx_work_merges_translations")!, / WHERE source IN \('code', 'jev', 'manual'\) AND undone_at IS NULL$/);
+  assert.deepEqual(columns("idx_work_match_judgments_proposed"), ["work_id", "into_work_id", "model", "confidence"]);
+  assert.match(indexSql("idx_work_match_judgments_proposed")!, / WHERE into_work_id IS NOT NULL$/);
 });
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -1659,21 +1679,87 @@ test("the held bnp read probes the bnp details index by work and never the work 
   const { db } = freshRepo();
   const plan = (db.prepare(`EXPLAIN QUERY PLAN ${HELD_BNP_DETAILS_SQL}`).all("[]", 50) as Array<{ detail: string }>).map((row) => row.detail).join(" | ");
   assert.match(plan, /SEARCH books USING COVERING INDEX idx_books_bnp_details \(work_id=\?/, plan);
-  assert.doesNotMatch(plan, /idx_books_work\b/, plan);
+  assert.doesNotMatch(plan, /idx_books_work_editions\b/, plan);
 });
 
-test("the Portuguese read for given works starts from the ids", () => {
+function preparedStatements(pattern: RegExp) {
   const db = new DatabaseSync(":memory:");
   applyBooksMigrations(db);
   const prepare = mock.method(db, "prepare");
   createSqliteBooksRepository(db);
-  const statements = prepare.mock.calls.map((call) => String(call.arguments[0])).filter((sql) => /CROSS JOIN works w ON w\.id = ids\.value/.test(sql));
+  const statements = prepare.mock.calls.map((call) => String(call.arguments[0])).filter((sql) => pattern.test(sql));
   prepare.mock.restore();
+  return { db, statements };
+}
+
+test("the Portuguese read for given works starts from the ids", () => {
+  const { db, statements } = preparedStatements(/CROSS JOIN works w ON w\.id = ids\.value/);
 
   assert.equal(statements.length, 1);
   const plan = (db.prepare(`EXPLAIN QUERY PLAN ${statements[0]}`).all({ $ids: "[]", $recheck: null, $rejections: 3, $limit: 50 }) as Array<{ detail: string }>).map((row) => row.detail).join(" | ");
   assert.match(plan, /SEARCH w USING INDEX sqlite_autoindex_works_1 \(id=\?\)/, plan);
   assert.doesNotMatch(plan, /idx_works_merged_into/, plan);
+});
+
+test("the translation review rows start from each table's own index and look the work up by id", () => {
+  const { db, statements } = preparedStatements(/work_match_judgments j CROSS JOIN works w/);
+
+  assert.equal(statements.length, 1);
+  const plan = (db.prepare(`EXPLAIN QUERY PLAN ${statements[0]}`).all({ $merge: 0.9, $review: 0.5 }) as Array<{ detail: string }>).map((row) => row.detail).join(" | ");
+  assert.match(plan, /SCAN j USING COVERING INDEX idx_work_match_judgments_proposed/, plan);
+  assert.match(plan, /SEARCH m USING INDEX idx_work_merges_translations \(source=\?\)/, plan);
+  assert.match(plan, /SEARCH w USING INDEX sqlite_autoindex_works_1 \(id=\?\)/, plan);
+  assert.match(plan, /MERGE \(UNION ALL\)/, plan);
+  assert.doesNotMatch(plan, /idx_works_merged_into|SCAN m\b/, plan);
+});
+
+test("the translation review rows list doubts in the order their works were added, then merges in merge order, whatever the ids and sources sort to", () => {
+  const { db, repo } = freshRepo();
+  const work = db.prepare("INSERT INTO works (id, title, author, merged_into, created_at) VALUES (?, 'Poemas', 'Autor', ?, ?)");
+  work.run("original", null, NOW);
+  work.run("doubt-b", null, NOW);
+  work.run("doubt-a", null, NOW);
+  work.run("merged-a", "original", NOW);
+  work.run("merged-b", "original", NOW);
+  const judge = db.prepare("INSERT INTO work_match_judgments (work_id, model, into_work_id, confidence, asked_at) VALUES (?, 'jev-1', 'original', 0.7, ?)");
+  judge.run("doubt-a", NOW);
+  judge.run("doubt-b", NOW);
+  const merge = db.prepare("INSERT INTO work_merges (from_work, into_work, source, confidence, moved_book_ids, repointed_work_ids, merged_at) VALUES (?, 'original', ?, NULL, '[]', '[]', ?)");
+  merge.run("merged-b", "manual", NOW);
+  merge.run("merged-a", "code", NOW);
+
+  assert.deepEqual(repo.translationReviewRows(0.9, 0.5).map((row) => [row.workId, row.group]), [["doubt-b", "possible"], ["doubt-a", "possible"], ["merged-b", "merged"], ["merged-a", "merged"]]);
+});
+
+test("the match candidates read counts editions from the covering work editions index, with no distinct", () => {
+  const { db, statements } = preparedStatements(/json_group_array\(COALESCE\(b\.language/);
+
+  assert.equal(statements.length, 1);
+  const plan = (db.prepare(`EXPLAIN QUERY PLAN ${statements[0]}`).all("[]") as Array<{ detail: string }>).map((row) => row.detail).join(" | ");
+  assert.match(plan, /SEARCH b USING COVERING INDEX idx_books_work_editions \(work_id=\?\)/, plan);
+  assert.doesNotMatch(plan, /USE TEMP B-TREE FOR json_group_array\(DISTINCT\)/, plan);
+});
+
+test("matchCandidates counts editions, takes the earliest year and lists each language once in the order its first edition was added", () => {
+  const { repo } = freshRepo();
+  const edition = (n: number, year: number | null, language: string | null) => {
+    const book = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: `978000000070${n}`, year, workKey: "OL70W" }, [`isbn:978000000070${n}`], NOW);
+    if (language) repo.setLanguage(book.id, language);
+    return book;
+  };
+  const dune = edition(1, 2001, "en");
+  edition(2, 1999, "pt");
+  edition(3, 2003, "en");
+  edition(4, null, null);
+  edition(5, 1990, "pt-PT");
+  const other = repo.createBook({ title: "Hyperion", author: "Dan Simmons", isbn: null, workKey: "OL71W" }, ["ta:hyperion|dan simmons|"], NOW);
+  const loose = repo.createBook({ title: "Hyperion", author: "Dan Simmons", isbn: null }, ["ta:hyperion|dan simmons|loose"], NOW);
+  repo.mergeWorks(loose.work_id!, other.work_id!);
+
+  assert.deepEqual(repo.matchCandidates([dune.work_id!]), [{ id: dune.work_id, title: "Dune", author: "Frank Herbert", year: 1990, editions: 5, languages: ["en", "pt", "pt-PT"] }]);
+  assert.deepEqual(repo.matchCandidates([dune.work_id!, "missing", dune.work_id!]).map((row) => row.id), [dune.work_id]);
+  assert.deepEqual(repo.matchCandidates([loose.work_id!]), []);
+  assert.deepEqual(repo.matchCandidates([]), []);
 });
 
 test("portugueseWorksNeedingMatch for given works returns each live work once, oldest first, up to the limit", () => {
@@ -1731,7 +1817,7 @@ test("the author read of candidate works searches the author index", () => {
   applyBooksMigrations(db);
   const prepare = mock.method(db, "prepare");
   createSqliteBooksRepository(db);
-  const statements = prepare.mock.calls.map((call) => String(call.arguments[0])).filter((sql) => /COUNT\(\*\) AS editions/.test(sql));
+  const statements = prepare.mock.calls.map((call) => String(call.arguments[0])).filter((sql) => /COUNT\(\*\) AS editions\s+FROM books b/.test(sql));
   prepare.mock.restore();
 
   assert.equal(statements.length, 1);
@@ -2430,8 +2516,8 @@ test("active merges list one source's merges that are not undone, newest first, 
   repo.mergeTranslation(judged!.work_id!, target.work_id!, "jev", 0.95, AT);
   repo.undoMerge(second!.work_id!, "2026-10-16T00:00:00.000Z");
   assert.deepEqual(repo.activeMerges("code"), [
-    { id: 3, fromWork: third!.work_id, intoWork: target.work_id, movedBookIds: [third!.id], mergedAt: AT },
-    { id: 1, fromWork: first!.work_id, intoWork: target.work_id, movedBookIds: [first!.id], mergedAt: AT }
+    { id: 3, fromWork: third!.work_id, intoWork: target.work_id, movedBookIds: [third!.id], mergedAt: AT, confidence: null },
+    { id: 1, fromWork: first!.work_id, intoWork: target.work_id, movedBookIds: [first!.id], mergedAt: AT, confidence: null }
   ]);
   assert.deepEqual(repo.activeMerges("jev").map((merge) => merge.fromWork), [judged!.work_id]);
   assert.deepEqual(repo.activeMerges("manual"), []);
@@ -3031,6 +3117,27 @@ test("addWorkSeries stores the name with its position, a second source adds a ro
   assert.equal(countOf(db, "work_series"), 2);
 });
 
+test("removeWorkSeries deletes one source's row and its search entry, and returns the count", () => {
+  const { db, repo } = freshRepo();
+  const book = seriesBook(repo, "Memories of Ice", "9780765348807");
+  repo.addWorkSeries(book.work_id!, [{ name: MALAZAN, position: "3" }], "ol-subject", AT);
+  assert.equal(repo.removeWorkSeries(book.work_id!, "malazan book of the fallen", "ol-subject"), 1);
+  assert.equal(repo.removeWorkSeries(book.work_id!, "malazan book of the fallen", "ol-subject"), 0);
+  assert.equal(countOf(db, "work_series"), 0);
+  assert.equal(countOf(db, "series_fts"), 0);
+});
+
+test("removeWorkSeries clears the search entry when the sources spelled the name differently", () => {
+  const { db, repo } = freshRepo();
+  const book = seriesBook(repo, "Dune", "9780441013593");
+  repo.addWorkSeries(book.work_id!, [{ name: "Dune", position: "1" }], "wikidata", AT);
+  repo.addWorkSeries(book.work_id!, [{ name: "DUNE", position: "1" }], "ol-subject", AT);
+  assert.equal(repo.removeWorkSeries(book.work_id!, "dune", "wikidata"), 1);
+  assert.equal(countOf(db, "series_fts"), 1);
+  assert.equal(repo.removeWorkSeries(book.work_id!, "dune", "ol-subject"), 1);
+  assert.equal(countOf(db, "series_fts"), 0);
+});
+
 test("addWorkSeries fills a missing position but never overwrites a set one", () => {
   const { db, repo } = freshRepo();
   const book = seriesBook(repo, "Memories of Ice", "9780765348807");
@@ -3199,33 +3306,33 @@ test("hasWorkSeries is per source", () => {
   assert.equal(repo.hasWorkSeries(book.work_id!, "hardcover"), false);
 });
 
-test("removeWorkSeries drops hardcover rows and their search entry", () => {
+test("removeSeriesNames drops hardcover rows and their search entry", () => {
   const { db, repo } = freshRepo();
   const book = seriesBook(repo, "Memories of Ice", "9780765348807");
   repo.addWorkSeries(book.work_id!, [{ name: MALAZAN, position: "3" }], "hardcover", AT);
   assert.deepEqual(repo.searchSeriesWorks(["malazan"], 12), [book.work_id]);
-  assert.deepEqual(repo.removeWorkSeries(["malazan book of the fallen"], "hardcover"), { rows: 1, searchRows: 1 });
+  assert.deepEqual(repo.removeSeriesNames(["malazan book of the fallen"], "hardcover"), { rows: 1, searchRows: 1 });
   assert.equal(countOf(db, "work_series"), 0);
   assert.deepEqual(repo.searchSeriesWorks(["malazan"], 12), []);
 });
 
-test("removeWorkSeries keeps the search entry when a wikidata row shares the name key", () => {
+test("removeSeriesNames keeps the search entry when a wikidata row shares the name key", () => {
   const { db, repo } = freshRepo();
   const book = seriesBook(repo, "Memories of Ice", "9780765348807");
   repo.addWorkSeries(book.work_id!, [{ name: MALAZAN, position: "3" }], "wikidata", AT);
   repo.addWorkSeries(book.work_id!, [{ name: "Malazan: Book of the Fallen", position: "3" }], "hardcover", AT);
-  assert.deepEqual(repo.removeWorkSeries(["malazan book of the fallen"], "hardcover"), { rows: 1, searchRows: 0 });
+  assert.deepEqual(repo.removeSeriesNames(["malazan book of the fallen"], "hardcover"), { rows: 1, searchRows: 0 });
   assert.equal(countOf(db, "work_series"), 1);
   assert.deepEqual(repo.searchSeriesWorks(["malazan"], 12), [book.work_id]);
 });
 
-test("removeWorkSeries leaves another work's search entry alone", () => {
+test("removeSeriesNames leaves another work's search entry alone", () => {
   const { repo } = freshRepo();
   const first = seriesBook(repo, "Memories of Ice", "9780765348807");
   const other = seriesBook(repo, "Return of the Crimson Guard", "9780765348821", "Ian Esslemont");
   repo.addWorkSeries(first.work_id!, [{ name: MALAZAN, position: "3" }], "hardcover", AT);
   repo.addWorkSeries(other.work_id!, [{ name: MALAZAN, position: "1" }], "wikidata", AT);
-  assert.deepEqual(repo.removeWorkSeries(["malazan book of the fallen"], "hardcover"), { rows: 1, searchRows: 1 });
+  assert.deepEqual(repo.removeSeriesNames(["malazan book of the fallen"], "hardcover"), { rows: 1, searchRows: 1 });
   assert.deepEqual(repo.searchSeriesWorks(["malazan"], 12), [other.work_id]);
 });
 
@@ -3758,4 +3865,40 @@ test("setKoboImageId fills a NULL column once and never overwrites it", () => {
   assert.equal(repo.setKoboImageId(book.id, "0b8a2a3c-6f1e-4c54-9d0e-1a2b3c4d5e6f"), true);
   assert.equal(repo.setKoboImageId(book.id, "11111111-2222-4333-8444-555555555555"), false);
   assert.equal(repo.getBook(book.id)!.kobo_image_id, "0b8a2a3c-6f1e-4c54-9d0e-1a2b3c4d5e6f");
+});
+
+test("seriesMemberKind counts series rows and edition collections on other canonical works, merged or not", () => {
+  const { repo } = freshRepo();
+  const key = "the lord of the rings";
+  const entry = { name: "The Lord of the Rings", position: null };
+  const a = seriesBook(repo, "The Fellowship of the Ring", "9780261102354", "J. R. R. Tolkien");
+  const b = seriesBook(repo, "The Two Towers", "9780261102361", "J. R. R. Tolkien");
+  repo.addWorkSeries(a.work_id!, [entry], "wikidata", AT);
+  repo.addWorkSeries(b.work_id!, [entry], "wikidata", AT);
+  assert.equal(repo.seriesMemberKind(key, a.work_id!), "series");
+  repo.mergeWorks(b.work_id!, a.work_id!);
+  assert.equal(repo.seriesMemberKind(key, a.work_id!), null);
+  const c = seriesBook(repo, "The Return of the King", "9780261102378", "J. R. R. Tolkien");
+  const d = seriesBook(repo, "The Hobbit", "9780261102217", "J. R. R. Tolkien");
+  repo.addWorkSeries(c.work_id!, [entry], "wikidata", AT);
+  repo.mergeWorks(c.work_id!, d.work_id!);
+  assert.equal(repo.seriesMemberKind(key, a.work_id!), "series");
+  const e = seriesBook(repo, "Unfinished Tales", "9780261102385", "J. R. R. Tolkien");
+  const f = seriesBook(repo, "Silmarillion Extra", "9780261102392", "J. R. R. Tolkien");
+  repo.addBookCollection(f.id, { name: "Middle-earth Cycle", position: null }, "ol-edition", AT);
+  assert.equal(repo.seriesMemberKind("middle earth cycle", e.work_id!), "collection");
+  assert.equal(repo.seriesMemberKind("middle earth cycle", f.work_id!), null);
+});
+
+test("seriesPositionsOf lists series rows on the work and on works merged into it", () => {
+  const { repo } = freshRepo();
+  const a = seriesBook(repo, "The Fellowship of the Ring", "9780261102354", "J. R. R. Tolkien");
+  const b = seriesBook(repo, "The Two Towers", "9780261102361", "J. R. R. Tolkien");
+  const c = seriesBook(repo, "Unfinished Tales", "9780261102385", "J. R. R. Tolkien");
+  repo.addWorkSeries(a.work_id!, [{ name: "The Lord of the Rings", position: "1" }], "wikidata", AT);
+  repo.addWorkSeries(b.work_id!, [{ name: "Middle-earth Cycle", position: null }], "wikidata", AT);
+  repo.addWorkSeries(c.work_id!, [{ name: "Other", position: "9" }], "wikidata", AT);
+  repo.mergeWorks(b.work_id!, a.work_id!);
+  assert.deepEqual(repo.seriesPositionsOf(a.work_id!), [{ nameKey: "the lord of the rings", position: "1" }, { nameKey: "middle earth cycle", position: null }]);
+  assert.deepEqual(repo.seriesPositionsOf(c.work_id!), [{ nameKey: "other", position: "9" }]);
 });

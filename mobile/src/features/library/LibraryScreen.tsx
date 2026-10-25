@@ -328,7 +328,7 @@ export function LibraryScreen() {
       {addingBook ? <AddBookOptionsSheet onClose={() => setAddingBook(false)} /> : null}
 
       <Sheet visible={editingName} title="Rename library" onClose={() => setEditingName(false)}>
-        <Input label="Library name" autoFocus value={nameDraft} onChangeText={setNameDraft} onSubmitEditing={() => void handleRenameLibrary()} onBlur={() => void handleRenameLibrary()} />
+        <Input label="Library name" autoFocus value={nameDraft} maxLength={200} onChangeText={setNameDraft} onSubmitEditing={() => void handleRenameLibrary()} onBlur={() => void handleRenameLibrary()} />
       </Sheet>
 
       <Sheet visible={reviewingDuplicates && possibleDuplicates.length > 0} title="Possible duplicates" onClose={() => setReviewingDuplicates(false)}>

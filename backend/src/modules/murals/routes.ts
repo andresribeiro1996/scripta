@@ -26,14 +26,14 @@ import { THEME_IDS } from "@scripta/shared/themes";
 import { z } from "zod";
 import { authGuard } from "../auth/index.js";
 import { resolveEntryWorks, workIdsByKey, WorkResolutionError } from "../library/index.js";
-import { FolderCycleError, InvalidFolderReferenceError, MuralConflictError } from "./domain/errors.js";
+import { FolderCycleError, InvalidFolderReferenceError, MuralConflictError, MuralNameTooLongError } from "./domain/errors.js";
 import { resolveMuralPublicPayload } from "./domain/publicPayload.js";
 import type { MuralsService } from "./service.js";
 
 const idParamSchema = z.object({ id: z.string().uuid() });
 
 const createMuralSchema = z.object({
-  name: z.string().min(1, "name is required and must be non-empty."),
+  name: z.string().min(1, "name is required and must be non-empty.").max(200, "Names can be at most 200 characters."),
   folderId: z.string().uuid().nullable().optional(),
   theme: z.enum(THEME_IDS).optional()
 });
@@ -59,7 +59,7 @@ const setCoverSchema = z.object({
 });
 
 const createFolderSchema = z.object({
-  name: z.string().min(1, "name is required and must be non-empty."),
+  name: z.string().min(1, "name is required and must be non-empty.").max(200, "Names can be at most 200 characters."),
   parentId: z.string().uuid().nullable().optional()
 });
 
@@ -131,7 +131,7 @@ export function buildMuralRoutes(service: MuralsService, resolveWorks: typeof re
         if (err instanceof MuralConflictError) {
           return reply.code(409).send({ error: err.message, current: service.getMural(request.user.id, params.data.id) });
         }
-        if (err instanceof InvalidFolderReferenceError) return reply.code(400).send({ error: err.message });
+        if (err instanceof InvalidFolderReferenceError || err instanceof MuralNameTooLongError) return reply.code(400).send({ error: err.message });
         if (err instanceof WorkResolutionError) return reply.code(503).send({ error: err.message });
         throw err;
       }
@@ -237,7 +237,7 @@ export function buildMuralRoutes(service: MuralsService, resolveWorks: typeof re
           folder = service.moveFolder(request.user.id, params.data.id, body.data.parentId);
         }
       } catch (err) {
-        if (err instanceof InvalidFolderReferenceError || err instanceof FolderCycleError) {
+        if (err instanceof InvalidFolderReferenceError || err instanceof FolderCycleError || err instanceof MuralNameTooLongError) {
           return reply.code(400).send({ error: err.message });
         }
         throw err;

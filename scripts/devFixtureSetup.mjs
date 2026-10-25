@@ -9,7 +9,7 @@
 // documented.
 
 import { spawnSync } from "node:child_process";
-import { existsSync, rmSync } from "node:fs";
+import { readdirSync, rmSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { devDataDir, devDataDirEnv } from "./devDataDir.mjs";
@@ -19,6 +19,30 @@ import { readListeners } from "./devListeners.mjs";
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const backendDir = join(repoRoot, "backend");
 
+/** Refuses a backend on this slot's port whose environment differs from the
+ *  expected one (the dev data directory by default). Silent about the normal case, and silent when
+ *  the running environment can't be read at all — see devBackendEnv.mjs. */
+export function assertAdoptedBackendMatches(port, log, expected = devDataDirEnv()) {
+  const listeners = readListeners();
+  const pid = listeners[port]?.[0];
+  if (pid === undefined) return;
+  const running = readProcessEnv(pid);
+  if (!running) {
+    log(`Adopting the backend on ${port} without checking its environment — couldn't read the environment of pid ${pid}.`);
+    return;
+  }
+  const rows = mismatchedEnv(running, expected);
+  if (rows.length) throw new Error(describeMismatch(port, rows));
+}
+
+export function sharedDistIsStale(sharedDir) {
+  const built = statSync(join(sharedDir, "dist/index.js"), { throwIfNoEntry: false });
+  if (!built) return true;
+  return readdirSync(join(sharedDir, "src"), { recursive: true, withFileTypes: true }).some(
+    (entry) => entry.isFile() && !entry.name.endsWith(".test.ts") && statSync(join(entry.parentPath, entry.name)).mtimeMs > built.mtimeMs,
+  );
+}
+
 /** `packages/shared`'s compiled `dist/` is gitignored (it's a build
  *  artifact, not source) and every existing setup story — root README,
  *  mobile/README.md — already says to `npm install` then build it. A
@@ -27,25 +51,9 @@ const backendDir = join(repoRoot, "backend");
  *  to resolve @scripta/shared", or the backend crashing on an import it
  *  expects to exist) doesn't say so — so this checks for it rather than
  *  letting that confusing error be the first thing a caller produces. */
-/** Refuses a backend on this slot's port that was started against a
- *  different data directory. Silent about the normal case, and silent when
- *  the running environment can't be read at all — see devBackendEnv.mjs. */
-export function assertAdoptedBackendMatches(port, log) {
-  const listeners = readListeners();
-  const pid = listeners[port]?.[0];
-  if (pid === undefined) return;
-  const running = readProcessEnv(pid);
-  if (!running) {
-    log(`Adopting the backend on ${port} without checking its data directory — couldn't read the environment of pid ${pid}.`);
-    return;
-  }
-  const rows = mismatchedEnv(running, devDataDirEnv());
-  if (rows.length) throw new Error(describeMismatch(port, rows));
-}
-
 export function ensureSharedBuilt(log) {
-  if (existsSync(join(repoRoot, "packages/shared/dist/index.js"))) return;
-  log("Building @scripta/shared (first run in this worktree)...");
+  if (!sharedDistIsStale(join(repoRoot, "packages/shared"))) return;
+  log("Building @scripta/shared (dist missing or older than src)...");
   const result = spawnSync("npm", ["run", "build", "--workspace", "@scripta/shared"], { cwd: repoRoot, stdio: "inherit" });
   if (result.status !== 0) throw new Error("Building @scripta/shared failed — see output above.");
 }

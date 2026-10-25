@@ -143,7 +143,7 @@ test("a row opens the native route for what it is about: the owner's game, a pro
   const createdAt = "2026-09-30T00:00:00.000Z";
   const game = (kind: ParticipationItem["game"]["kind"]): DigestItem => ({ kind: "participation", id: `${kind}:g1`, game: { kind, id: "g1", name: "G", covers: [] }, actors: [], count: 1, createdAt });
   assert.equal(digestRoute(game("tierlist")), "/tierlist/g1");
-  assert.equal(digestRoute(game("quiz")), "/quiz/g1");
+  assert.equal(digestRoute(game("quiz")), "/quiz/g1?view=results");
   assert.equal(digestRoute(game("tournament")), "/arena/g1");
   assert.equal(digestRoute({ kind: "follow", id: "f1", actor, createdAt, viewerFollows: false }), "/u/alice");
   assert.equal(digestRoute({ kind: "reading", id: "e3", actor, book: { title: "Hyperion", author: "Dan Simmons", coverUrl: null }, finished: true, createdAt }), "/u/alice");

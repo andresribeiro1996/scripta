@@ -177,7 +177,7 @@ So the gate trades coverage for precision.
   - `SeriesSource` includes `"hardcover"`, and `SERIES_SOURCE_RANK` is exactly as in Global Constraints.
   - In `bestSeriesOf`, edition collections are confirmed by a `hardcover` row too (`sqliteBooksRepository.ts:1329`).
   - `BooksRepository.hasWorkSeries(workId: string, source: SeriesSource): boolean`.
-  - `BooksRepository.removeWorkSeries(nameKeys: string[], source: SeriesSource): { rows: number; searchRows: number }`.
+  - `BooksRepository.removeSeriesNames(nameKeys: string[], source: SeriesSource): { rows: number; searchRows: number }`.
     - It deletes `work_series` rows with that source and any of those name keys.
     - For each affected `(work_id, name_key)` with no remaining `work_series` row, it deletes that work's `series_fts` rows whose name has the same `seriesNameKey`.
     - It all happens in one transaction.
@@ -187,11 +187,11 @@ So the gate trades coverage for precision.
   - `hardcover beats ol-subject`: the best name is the hardcover one.
   - `edition collection gives a hardcover series its position`: a `hardcover` row with a null position, and an edition collection with the same name key and position "3". The best position is "3".
   - `hasWorkSeries is per source`.
-  - `removeWorkSeries drops hardcover rows and their search entry`. Afterwards a series search for the name no longer returns the work.
-  - `removeWorkSeries keeps the search entry when a wikidata row shares the name key`.
+  - `removeSeriesNames drops hardcover rows and their search entry`. Afterwards a series search for the name no longer returns the work.
+  - `removeSeriesNames keeps the search entry when a wikidata row shares the name key`.
   - In `series.test.ts:19`, update the asserted rank table to the new one.
 - [ ] **Step 2: Run and see them fail:** `npm exec --workspace backend -- tsx --test src/modules/books/adapters/sqlite/sqliteBooksRepository.test.ts`.
-- [ ] **Step 3: Implement** the type, the ranks, the `|| candidate.source === "hardcover"` condition, `hasWorkSeries` and `removeWorkSeries`.
+- [ ] **Step 3: Implement** the type, the ranks, the `|| candidate.source === "hardcover"` condition, `hasWorkSeries` and `removeSeriesNames`.
 - [ ] **Step 4: Run the tests, plus `series.test.ts`, `seriesFill.test.ts` and `booksService.test.ts`, and see them pass.** `grep -rn SERIES_SOURCE_RANK backend/src` shows no other reader that relies on the old numbers.
 - [ ] **Step 5: Commit:** `git commit -m "Rank Hardcover series after Wikidata"`.
 
@@ -390,13 +390,13 @@ So the gate trades coverage for precision.
 
 **Interfaces:**
 - Consumes: `createHardcoverLookup` (Task 5) and `fillFromHardcover` (Task 6), from `../dist/...`; `openBooksDb` and `createSqliteBooksRepository`; `waitForBnpLock` (`seed/bnpImport.js`); `seriesNameKey`.
-- Consumes also `removeWorkSeries` (Task 3).
+- Consumes also `removeSeriesNames` (Task 3).
 - Produces the CLI `node scripts/fill-hardcover.mjs [--dry-run] [--skip <names.json>] [--after <rowid>] [--max-requests <n>]`, and `node scripts/fill-hardcover.mjs --remove <names.json>`.
 
 - [ ] **Step 1: Write the script**, modelled on `fill-series.mjs:1-60` and `fill-awards.mjs`:
   - **Arguments:** `parseArgs` with the four options. A parse error prints the usage and exits 1.
   - **Required environment:** `COVERS_DB_PATH`, plus `HARDCOVER_API_TOKEN` unless `--remove` is given. A missing one exits 1 with `Missing environment variable: <name>`. The script reads `process.env` only. Locally, run it with `node --env-file=.env`.
-  - **`--remove`:** it can't be combined with the other options. It reads a JSON array of names, maps them through `seriesNameKey`, calls `removeWorkSeries(keys, "hardcover")` on the locked read-write repository, and prints `{ removed: { rows, searchRows } }`.
+  - **`--remove`:** it can't be combined with the other options. It reads a JSON array of names, maps them through `seriesNameKey`, calls `removeSeriesNames(keys, "hardcover")` on the locked read-write repository, and prints `{ removed: { rows, searchRows } }`.
   - **Skip list:** a real run without `--skip` exits 1 with `A real Hardcover fill needs --skip <names.json>: run --dry-run --max-requests 500, review seriesNames, then pass the rejected names (or a file holding []).` The `--skip` file is a JSON array of names, read as `new Set(names.map(seriesNameKey).filter(Boolean))`.
   - **Database:** a dry run opens `new DatabaseSync(COVERS_DB_PATH, { readOnly: true })`, as `fill-series.mjs:124` does. Otherwise it uses `createSqliteBooksRepository(waitForBnpLock(openBooksDb(...)))`, as `fill-awards.mjs:39` does.
   - **Output:** the report goes to stdout as `JSON.stringify(report, null, 2)` and progress to stderr. It exits 1 when `stoppedBy === "error"`, else 0.
