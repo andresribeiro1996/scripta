@@ -3041,6 +3041,17 @@ test("removeWorkSeries deletes one source's row and its search entry, and return
   assert.equal(countOf(db, "series_fts"), 0);
 });
 
+test("removeWorkSeries clears the search entry when the sources spelled the name differently", () => {
+  const { db, repo } = freshRepo();
+  const book = seriesBook(repo, "Dune", "9780441013593");
+  repo.addWorkSeries(book.work_id!, [{ name: "Dune", position: "1" }], "wikidata", AT);
+  repo.addWorkSeries(book.work_id!, [{ name: "DUNE", position: "1" }], "ol-subject", AT);
+  assert.equal(repo.removeWorkSeries(book.work_id!, "dune", "wikidata"), 1);
+  assert.equal(countOf(db, "series_fts"), 1);
+  assert.equal(repo.removeWorkSeries(book.work_id!, "dune", "ol-subject"), 1);
+  assert.equal(countOf(db, "series_fts"), 0);
+});
+
 test("addWorkSeries fills a missing position but never overwrites a set one", () => {
   const { db, repo } = freshRepo();
   const book = seriesBook(repo, "Memories of Ice", "9780765348807");

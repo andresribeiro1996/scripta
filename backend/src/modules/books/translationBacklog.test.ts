@@ -142,3 +142,14 @@ test("the code steps keep a join whose target heads a series for review", () => 
   assert.equal(repo.getBook(c.codePt.id)!.work_id, c.codePt.work_id);
   assert.deepEqual(repo.workMatchJudgments([c.codePt.work_id!]).get(c.codePt.work_id!), { model: "code", intoWorkId: c.en.work_id, confidence: null, askedAt: AT });
 });
+
+test("the code steps save no target for a join onto the whole of a split volume", () => {
+  const repo = freshRepo();
+  book(repo, "9780140444308", "Les Misérables", "Victor Hugo", { workKey: "OL5710W" });
+  const pt = book(repo, "9789720000702", "Os Miseráveis I", "", { language: "pt-PT", summary: "Romance de Victor Hugo.\n\nTítulo original: Les Misérables" });
+  const steps = runCodeSteps(deps(repo, async () => ({ choice: null, confidence: 0, model: "x" })), translationBacklogWorks(repo, [], null));
+  assert.equal(steps.codeMerges, 0);
+  assert.equal(steps.codeBlocked, 1);
+  assert.deepEqual(repo.workMatchJudgments([pt.work_id!]).get(pt.work_id!), { model: "code", intoWorkId: null, confidence: null, askedAt: AT });
+  assert.equal(repo.getBook(pt.id)!.work_id, pt.work_id);
+});

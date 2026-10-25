@@ -15,7 +15,8 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
 const { applyBooksMigrations } = await import("./adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("./adapters/sqlite/sqliteBooksRepository.js");
-const { arenaCheck, judgeWorkMatch, matchWork, planMatch, startTranslationJobs } = await import("./translationJudgments.js");
+const { arenaCheck, guardJoin, judgeWorkMatch, matchWork, planMatch, startTranslationJobs } = await import("./translationJudgments.js");
+const { translationReviewWith } = await import("./translationReview.js");
 const { seriesLikeOriginals } = await import("./domain/translation.js");
 const { SourceUnavailableError, UnusableAnswerError } = await import("./domain/errors.js");
 
@@ -487,6 +488,27 @@ test("Jev answering the whole of a split volume is stored as no work, and the wo
   assert.equal(repo.getBook(pt.id)!.work_id, pt.work_id);
   assert.equal(repo.workMatchJudgments([pt.work_id!]).get(pt.work_id!)?.intoWorkId, null);
   assert.notEqual(en.work_id, pt.work_id);
+});
+
+test("a medium-confidence answer on the whole of a split volume is neither saved nor listed for review", async () => {
+  const repo = freshRepo();
+  edition(repo, "9780140444308", { title: "Les Misérables", author: "Victor Hugo", workKey: "OL5710W" });
+  const pt = edition(repo, "9789720000702", { title: "Os Miseráveis I", author: "", language: "pt-PT", originalTitle: "Les Misérables" });
+  const { deps } = matching(repo, async () => ({ choice: 0, confidence: 0.8, model: "jev-1.13.0" }));
+  await matchWork(deps, pt.work_id!, notSeries);
+  const judgment = repo.workMatchJudgments([pt.work_id!]).get(pt.work_id!);
+  assert.equal(judgment?.intoWorkId, null);
+  assert.equal(judgment?.confidence, 0.8);
+  assert.deepEqual(translationReviewWith(repo, [], (id) => id).items, []);
+});
+
+test("the guard judges the canonical work when the target was merged away", () => {
+  const repo = freshRepo();
+  const volume = edition(repo, "9780140444309", { title: "Les Misérables I", author: "Victor Hugo" });
+  const whole = edition(repo, "9780140444308", { title: "Les Misérables", author: "Victor Hugo", workKey: "OL5710W" });
+  const pt = edition(repo, "9789720000702", { title: "Os Miseráveis I", author: "", language: "pt-PT", originalTitle: "Les Misérables" });
+  repo.mergeWorks(volume.work_id!, whole.work_id!, AT);
+  assert.equal(guardJoin(repo, pt.work_id!, volume.work_id!), "never");
 });
 
 test("a plain translation still merges at 0.99", async () => {

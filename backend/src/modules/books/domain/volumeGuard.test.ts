@@ -22,6 +22,12 @@ const cases: Array<[string, { title: string; originalTitle: string | null }, { t
   ["omnibus target", { title: "Anúncio de um crime", originalTitle: "A Murder is Announced" }, { title: "Murder on the Orient Express / A Murder is Announced" }, none, "review"],
   ["both omnibus", { title: "Trilogia Millennium", originalTitle: null }, { title: "The Millennium Trilogy" }, none, "join"],
   ["plain", { title: "Passeio ao Farol", originalTitle: "To the Lighthouse" }, { title: "To the Lighthouse" }, none, "join"],
+  ["bracketed volume", { title: "Os Miseráveis (Volume I)", originalTitle: "Les Misérables" }, { title: "Les Misérables" }, none, "never"],
+  ["bracketed series with book", { title: "A Guerra dos Tronos (As Crónicas de Gelo e Fogo, Livro 1)", originalTitle: "A Game of Thrones" }, { title: "A Game of Thrones" }, none, "join"],
+  ["target name and part numbers", { title: "Henrique IV - Parte I", originalTitle: "Henry IV, Part 1" }, { title: "Henry IV, Part 1" }, none, "join"],
+  ["target name and part numbers VI", { title: "Henrique VI - Parte 3", originalTitle: "Henry VI, Part 3" }, { title: "Henry VI, Part 3" }, none, "join"],
+  ["numbered series book with subtitle", { title: "Diário de um Banana 2 - A Vingança do Rodrick", originalTitle: "Rodrick Rules" }, { title: "Rodrick Rules" }, none, "review"],
+  ["numbered series book of a series head", { title: "Geronimo Stilton 5", originalTitle: null }, { title: "Four Mice Deep in the Jungle" }, heads(["Geronimo Stilton"]), "review"],
   ["bracketed series", { title: "Harry Potter e a Pedra Filosofal (Harry Potter, #1)", originalTitle: "Harry Potter and the Philosopher's Stone" }, { title: "Harry Potter and the Philosopher's Stone" }, none, "join"]
 ];
 

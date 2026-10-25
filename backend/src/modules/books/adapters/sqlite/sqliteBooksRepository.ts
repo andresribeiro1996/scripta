@@ -501,6 +501,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const workSeriesNameStmt = db.prepare(`SELECT name FROM work_series WHERE work_id = ? AND name_key = ? AND source = ?`);
   const deleteWorkSeriesStmt = db.prepare(`DELETE FROM work_series WHERE work_id = ? AND name_key = ? AND source = ?`);
   const workSeriesKeyCountStmt = db.prepare(`SELECT COUNT(*) AS n FROM work_series WHERE work_id = ? AND name_key = ?`);
+  const seriesIndexNamesStmt = db.prepare(`SELECT name FROM series_fts WHERE work_id = ?`);
   const deleteSeriesIndexStmt = db.prepare(`DELETE FROM series_fts WHERE work_id = ? AND name = ?`);
   const hasWorkSeriesStmt = db.prepare(`SELECT 1 FROM work_series WHERE work_id = ? LIMIT 1`);
   const refreshSeriesAuthorStmt = db.prepare(`UPDATE series_fts SET author = ? WHERE work_id = ?`);
@@ -1308,10 +1309,11 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
 
     removeWorkSeries(workId, nameKey, source) {
       return inTransaction(() => {
-        const row = workSeriesNameStmt.get(workId, nameKey, source) as { name: string } | undefined;
-        if (!row) return 0;
+        if (!workSeriesNameStmt.get(workId, nameKey, source)) return 0;
         const removed = Number(deleteWorkSeriesStmt.run(workId, nameKey, source).changes);
-        if ((workSeriesKeyCountStmt.get(workId, nameKey) as { n: number }).n === 0) deleteSeriesIndexStmt.run(workId, row.name);
+        if ((workSeriesKeyCountStmt.get(workId, nameKey) as { n: number }).n === 0) {
+          for (const { name } of seriesIndexNamesStmt.all(workId) as Array<{ name: string }>) if (seriesNameKey(name) === nameKey) deleteSeriesIndexStmt.run(workId, name);
+        }
         return removed;
       });
     },

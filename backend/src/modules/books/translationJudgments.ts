@@ -68,16 +68,17 @@ export function headsSeriesOf(repo: Pick<BooksRepository, "seriesHasOtherMembers
   };
 }
 
-export function guardJoin(repo: Pick<BooksRepository, "translationEvidence" | "matchCandidates" | "seriesHasOtherMembers">, workId: string, intoWorkId: string): JoinVerdict {
+export function guardJoin(repo: Pick<BooksRepository, "translationEvidence" | "matchCandidates" | "seriesHasOtherMembers" | "canonicalWorkIds">, workId: string, intoWorkId: string): JoinVerdict {
   const rows = repo.translationEvidence(workId);
-  const target = repo.matchCandidates([intoWorkId])[0];
+  const canonicalId = repo.canonicalWorkIds([intoWorkId]).get(intoWorkId) ?? intoWorkId;
+  const target = repo.matchCandidates([canonicalId])[0];
   if (!rows || rows.editions.length === 0 || !target) return "join";
   const evidence = evidenceOf(rows);
-  return joinVerdict({ title: evidence.title, originalTitle: evidence.originalTitle }, { title: target.title }, headsSeriesOf(repo, intoWorkId));
+  return joinVerdict({ title: evidence.title, originalTitle: evidence.originalTitle }, { title: target.title }, headsSeriesOf(repo, canonicalId));
 }
 
 function decide(deps: TranslationDeps, workId: string, model: string, intoWorkId: string | null, confidence: number | null, merge: boolean, at: string) {
-  const verdict = merge && intoWorkId ? guardJoin(deps.repo, workId, intoWorkId) : "join";
+  const verdict = intoWorkId ? guardJoin(deps.repo, workId, intoWorkId) : "join";
   const saved = verdict === "never" ? null : intoWorkId;
   try {
     deps.repo.transaction(() => {

@@ -37,6 +37,11 @@ if (values.list) {
   const { undoReviewedMerges, dropSeriesRows, addSeriesRows } = await import("../dist/modules/books/seriesMergeRepair.js");
   const repo = createSqliteBooksRepository(openBooksDb());
   const result = undoReviewedMerges(repo, undo, Date.now, (fromWork) => console.error(`undone ${fromWork}`));
+  if (result.failures.length > 0) {
+    console.error("Series edits were skipped because some undos failed.");
+    console.log(JSON.stringify({ ...result, dropped: 0, added: 0 }, null, 2));
+    process.exit(1);
+  }
   const dropped = dropSeriesRows(repo, dropSeries);
   const added = addSeriesRows(repo, addSeries, new Date().toISOString());
   console.log(JSON.stringify({ ...result, dropped, added }, null, 2));
