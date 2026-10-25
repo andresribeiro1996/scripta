@@ -1,10 +1,12 @@
 import { ballotBoard, workIdOf, booksByWork } from "@scripta/shared";
 import { useEffect, useState } from "react";
-import { Link, useOutletContext, useParams } from "react-router-dom";
+import { useOutletContext, useParams } from "react-router-dom";
 import type { TierlistData } from "../api/tierlists";
 import { openVotingApi, setVotingStateApi } from "../api/tierlistVoting";
 import { TierRow } from "../components/murals/blocks/BookBlocks";
-import { PageContainer } from "../components/PageContainer";
+import { Page } from "../components/page/Page";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../components/page/buttonClasses";
+import { backTo } from "../lib/areas";
 import { AddBooksSheet } from "../components/tierlist/AddBooksSheet";
 import { TierBoard } from "../components/tierlist/TierBoard";
 import { TierlistResultsView } from "../components/tierlist/TierlistResultsView";
@@ -13,7 +15,6 @@ import { useLibrary } from "../hooks/useLibrary";
 import { useTierlists } from "../hooks/useTierlists";
 import { useTierlistResults, useTierlistVoting } from "../hooks/useTierlistVoting";
 import { useWorkBooks } from "../hooks/useWorkBooks";
-import { ChevronLeftIcon } from "../components/Toolbar";
 
 export function TierListEditorPage() {
   const { id } = useParams<{ id: string }>();
@@ -87,23 +88,17 @@ export function TierListEditorPage() {
 
   if (isLoading) {
     return (
-      <PageContainer>
+      <Page title="Tier list" back={backTo("tierlist")}>
         <p className="text-sm text-(--color-text-dim)">Loading…</p>
-      </PageContainer>
+      </Page>
     );
   }
 
   if (!tierlist) {
     return (
-      <PageContainer>
-        <p className="text-sm text-(--color-text-dim)">
-          No tier list with that id.{" "}
-          <Link to="/dashboard/arena?tab=tierlists" className="text-(--color-accent) transition-opacity hover:opacity-80">
-            Back to Arena
-          </Link>
-          .
-        </p>
-      </PageContainer>
+      <Page title="Tier list" back={backTo("tierlist")}>
+        <p className="text-sm text-(--color-text-dim)">No tier list with that id.</p>
+      </Page>
     );
   }
 
@@ -187,56 +182,43 @@ export function TierListEditorPage() {
   const resolvedPool = data.pool.filter((id) => byWork.has(id));
 
   return (
-    <PageContainer>
-      <header className="mb-6">
-        <Link to="/dashboard/arena?tab=tierlists" className="inline-flex items-center gap-1 text-xs text-(--color-text-dim) hover:text-(--color-text)">
-          <ChevronLeftIcon size={13} />
-          Arena
-        </Link>
-        <div className="flex items-center justify-between gap-3">
-          {editingName && voteCode === null ? (
-            <input
-              autoFocus
-              value={nameDraft}
-              onChange={(e) => setNameDraft(e.target.value)}
-              onBlur={() => void handleRename()}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") void handleRename();
-                if (e.key === "Escape") setEditingName(false);
-              }}
-              aria-label="Tier list name"
-              className="block min-w-0 flex-1 rounded-lg border border-(--color-border) bg-(--color-surface) px-2 py-1 text-lg font-bold"
-            />
-          ) : (
-            <button
-              disabled={voteCode !== null}
-              onClick={() => {
-                setNameDraft(tierlist.name);
-                setEditingName(true);
-              }}
-              title="Rename this tier list"
-              className="block min-w-0 flex-1 truncate text-left text-lg font-bold transition-colors hover:text-(--color-accent)"
-            >
-              {tierlist.name}
-            </button>
-          )}
-          {/* Structure editing is meaningless once this list has a vote
-              code — see the panel below — so the Edit/Done toggle that
-              drives it is dropped entirely rather than shown disabled. */}
-          {voteCode === null && (
-            <button
-              onClick={() => (editing ? exitEditing() : setEditing(true))}
-              className={`min-h-9 shrink-0 rounded-lg px-3 text-sm font-semibold ${
-                editing
-                  ? "bg-(--color-accent) text-(--color-on-accent)"
-                  : "border border-(--color-border) bg-(--color-surface) hover:bg-(--color-surface-hover)"
-              }`}
-            >
-              {editing ? "Done" : "Edit"}
-            </button>
-          )}
-        </div>
-      </header>
+    <Page
+      back={backTo("tierlist")}
+      title={editingName && voteCode === null ? (
+        <input
+          autoFocus
+          value={nameDraft}
+          onChange={(e) => setNameDraft(e.target.value)}
+          onBlur={() => void handleRename()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") void handleRename();
+            if (e.key === "Escape") setEditingName(false);
+          }}
+          aria-label="Tier list name"
+          className="font-display block w-full min-w-0 rounded-lg border border-(--color-border) bg-(--color-surface) px-2 py-1 font-bold"
+        />
+      ) : (
+        <button
+          disabled={voteCode !== null}
+          onClick={() => {
+            setNameDraft(tierlist.name);
+            setEditingName(true);
+          }}
+          title="Rename this tier list"
+          className="block min-w-0 max-w-full text-left break-words transition-colors hover:text-(--color-accent)"
+        >
+          {tierlist.name}
+        </button>
+      )}
+      actions={voteCode === null ? (
+        <button
+          onClick={() => (editing ? exitEditing() : setEditing(true))}
+          className={editing ? BUTTON_PRIMARY : BUTTON_SECONDARY}
+        >
+          {editing ? "Done" : "Edit"}
+        </button>
+      ) : undefined}
+    >
 
       {votingActionError && <p className="mb-4 text-sm text-(--color-danger)">{votingActionError}</p>}
 
@@ -387,6 +369,6 @@ export function TierListEditorPage() {
           onClose={() => setAddingBooks(false)}
         />
       )}
-    </PageContainer>
+    </Page>
   );
 }

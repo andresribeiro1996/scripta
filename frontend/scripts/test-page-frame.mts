@@ -90,3 +90,24 @@ test("Settings tabs all use Page with the Settings tabs and no retired sections"
   assert.doesNotMatch(settings, />Reader card</);
   assert.match(readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8"), /path="\/dashboard\/settings\/appearance"/);
 });
+
+test("Games and Murals single-item pages use Page with a back link built from backTo", () => {
+  const pages: Array<[string, string]> = [
+    ["TierListCreatePage", "tierlist"],
+    ["TierListEditorPage", "tierlist"],
+    ["QuizCreatePage", "quiz"],
+    ["QuizEditorPage", "quiz"],
+    ["ArenaSeedPage", "tournament"],
+    ["MuralEditorPage", "mural"]
+  ];
+  for (const [file, kind] of pages) {
+    const src = readFileSync(new URL(`../src/pages/${file}.tsx`, import.meta.url), "utf8");
+    assert.match(src, /<Page[\s>]/, file);
+    assert.match(src, /back=\{/, file);
+    assert.match(src, new RegExp(`backTo\\("${kind}"\\)`), file);
+    assert.doesNotMatch(src, /tabs=/, file);
+    assert.doesNotMatch(src, /PageContainer/, file);
+    assert.doesNotMatch(src, />[^<{]*\bArena\b[^<]*</, file);
+    assert.doesNotMatch(src, /All tournaments|← Tier lists|← Quizzes/, file);
+  }
+});
