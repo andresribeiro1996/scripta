@@ -46,7 +46,7 @@ function collectPage() {
     }
     const label = el.labels?.length ? [...el.labels].map(text).filter(Boolean).join(" ") : "";
     if (label) return label;
-    return text(el) || el.getAttribute("title")?.trim() || el.getAttribute("placeholder")?.trim() || "";
+    return text(el) || el.getAttribute("title")?.trim() || "";
   };
   const elements = [];
   for (const el of document.querySelectorAll(INTERACTIVE)) {
@@ -144,8 +144,8 @@ async function main() {
     storageState = sessionPath;
   }
 
-  const browser = await chromium.launch({ channel: "chrome" });
-  const context = await browser.newContext({ viewport: { width: args.width, height: HEIGHT }, ignoreHTTPSErrors: true, storageState });
+  const browser = await chromium.launch({ channel: "chrome", headless: true });
+  const context = await browser.newContext({ viewport: { width: args.width, height: HEIGHT }, ignoreHTTPSErrors: web.startsWith("https:"), serviceWorkers: "block", storageState });
   const page = await context.newPage();
   const consoleErrors = [];
   const failedRequests = [];
@@ -163,18 +163,22 @@ async function main() {
   let note = "";
   let collected = { headings: [], elements: [] };
   try {
-    await page.goto(web + args.path, { waitUntil: "networkidle" });
-    if (!args.signedOut && !(await page.evaluate(() => localStorage.getItem("kobo_session") !== null))) {
-      const body = await login(api, account);
-      await page.evaluate((value) => localStorage.setItem("kobo_session", value), JSON.stringify(body));
-      await page.reload({ waitUntil: "networkidle" });
+    try {
+      await page.goto(web + args.path, { waitUntil: "networkidle" });
+      if (!args.signedOut && !(await page.evaluate(() => localStorage.getItem("kobo_session") !== null))) {
+        const body = await login(api, account);
+        await page.evaluate((value) => localStorage.setItem("kobo_session", value), JSON.stringify(body));
+        await page.reload({ waitUntil: "networkidle" });
+      }
+    } catch (error) {
+      failure = `loading ${args.path} failed: ${error.message}`;
     }
     for (const [index, step] of args.steps.entries()) {
+      if (failure) break;
       try {
         await runStep(page, step);
       } catch (error) {
         failure = `step ${index + 1} (${describeStep(step)}) failed: ${error.message}`;
-        break;
       }
     }
     note = await settleScreen(page);
