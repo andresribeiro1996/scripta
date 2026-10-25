@@ -61,16 +61,19 @@ export type TranslationDeps = JevPauseDeps & {
   sharesArena: (fromWorkId: string, intoWorkId: string) => boolean;
 };
 
+export function headsSeriesOf(repo: Pick<BooksRepository, "seriesHasOtherMembers">, intoWorkId: string) {
+  return (title: string) => {
+    const key = seriesNameKey(title);
+    return key !== null && repo.seriesHasOtherMembers(key, intoWorkId);
+  };
+}
+
 export function guardJoin(repo: Pick<BooksRepository, "translationEvidence" | "matchCandidates" | "seriesHasOtherMembers">, workId: string, intoWorkId: string): JoinVerdict {
   const rows = repo.translationEvidence(workId);
   const target = repo.matchCandidates([intoWorkId])[0];
   if (!rows || rows.editions.length === 0 || !target) return "join";
   const evidence = evidenceOf(rows);
-  const headsSeries = (title: string) => {
-    const key = seriesNameKey(title);
-    return key !== null && repo.seriesHasOtherMembers(key, intoWorkId);
-  };
-  return joinVerdict({ title: evidence.title, originalTitle: evidence.originalTitle }, { title: target.title }, headsSeries);
+  return joinVerdict({ title: evidence.title, originalTitle: evidence.originalTitle }, { title: target.title }, headsSeriesOf(repo, intoWorkId));
 }
 
 function decide(deps: TranslationDeps, workId: string, model: string, intoWorkId: string | null, confidence: number | null, merge: boolean, at: string) {

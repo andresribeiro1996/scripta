@@ -121,7 +121,7 @@ export interface BooksRepository {
   originalKeysOf(wholeKey: string): string[];
   originalArrivals(limit: number): string[];
   dropOriginalArrival(titleKey: string): void;
-  activeMerges(source: MergeSource): Array<{ id: number; fromWork: string; intoWork: string; movedBookIds: string[]; mergedAt: string }>;
+  activeMerges(source: MergeSource): Array<{ id: number; fromWork: string; intoWork: string; movedBookIds: string[]; mergedAt: string; confidence: number | null }>;
   editionsOf(workIds: string[]): Array<{ id: string; workId: string; title: string; author: string; language: string | null; isbn: string | null; originalTitle: string | null }>;
   titleCandidates(pattern: string): Array<{ id: string; title: string }>;
   authorCandidates(pattern: string): string[];
@@ -142,6 +142,7 @@ export interface BooksRepository {
   clearRetitleWanted(id: string): void;
   applyTitleRepairs(plan: { books: RowRepair[]; works: RowRepair[] }): MojibakeApplied;
   addWorkSeries(workId: string, entries: SeriesEntry[], source: SeriesSource, at: string): number;
+  removeWorkSeries(workId: string, nameKey: string, source: SeriesSource): number;
   addBookCollection(bookId: string, entry: SeriesEntry, source: CollectionSource, at: string): boolean;
   seriesHasOtherMembers(nameKey: string, workId: string): boolean;
   bestSeriesOf(workIds: string[]): Map<string, SeriesEntry>;

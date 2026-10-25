@@ -2430,8 +2430,8 @@ test("active merges list one source's merges that are not undone, newest first, 
   repo.mergeTranslation(judged!.work_id!, target.work_id!, "jev", 0.95, AT);
   repo.undoMerge(second!.work_id!, "2026-10-16T00:00:00.000Z");
   assert.deepEqual(repo.activeMerges("code"), [
-    { id: 3, fromWork: third!.work_id, intoWork: target.work_id, movedBookIds: [third!.id], mergedAt: AT },
-    { id: 1, fromWork: first!.work_id, intoWork: target.work_id, movedBookIds: [first!.id], mergedAt: AT }
+    { id: 3, fromWork: third!.work_id, intoWork: target.work_id, movedBookIds: [third!.id], mergedAt: AT, confidence: null },
+    { id: 1, fromWork: first!.work_id, intoWork: target.work_id, movedBookIds: [first!.id], mergedAt: AT, confidence: null }
   ]);
   assert.deepEqual(repo.activeMerges("jev").map((merge) => merge.fromWork), [judged!.work_id]);
   assert.deepEqual(repo.activeMerges("manual"), []);
@@ -3029,6 +3029,16 @@ test("addWorkSeries stores the name with its position, a second source adds a ro
   assert.equal(countOf(db, "work_series"), 2);
   assert.equal(repo.addWorkSeries(book.work_id!, [{ name: MALAZAN, position: "3" }], "wikidata", at(1)), 0);
   assert.equal(countOf(db, "work_series"), 2);
+});
+
+test("removeWorkSeries deletes one source's row and its search entry, and returns the count", () => {
+  const { db, repo } = freshRepo();
+  const book = seriesBook(repo, "Memories of Ice", "9780765348807");
+  repo.addWorkSeries(book.work_id!, [{ name: MALAZAN, position: "3" }], "ol-subject", AT);
+  assert.equal(repo.removeWorkSeries(book.work_id!, "malazan book of the fallen", "ol-subject"), 1);
+  assert.equal(repo.removeWorkSeries(book.work_id!, "malazan book of the fallen", "ol-subject"), 0);
+  assert.equal(countOf(db, "work_series"), 0);
+  assert.equal(countOf(db, "series_fts"), 0);
 });
 
 test("addWorkSeries fills a missing position but never overwrites a set one", () => {

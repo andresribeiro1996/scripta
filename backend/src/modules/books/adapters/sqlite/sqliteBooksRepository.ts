@@ -199,7 +199,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const somePortugueseNeedingMatchStmt = db.prepare(`SELECT w.id FROM (SELECT DISTINCT value FROM json_each($ids)) AS ids CROSS JOIN works w ON w.id = ids.value WHERE ${portugueseWorkFilter} ORDER BY w.created_at, w.rowid LIMIT $limit`);
   const translationEditionsStmt = db.prepare(`SELECT title, author, publisher, summary, original_title FROM books WHERE work_id = ? ORDER BY created_at, rowid`);
   const originalTitleClaimsStmt = db.prepare(`SELECT work_id, title, author, language, original_title, summary FROM books WHERE (original_title IS NOT NULL AND original_title <> '') OR summary LIKE '%tulo original%'`);
-  const activeMergesStmt = db.prepare(`SELECT id, from_work, into_work, moved_book_ids, merged_at FROM work_merges WHERE source = ? AND undone_at IS NULL ORDER BY id DESC`);
+  const activeMergesStmt = db.prepare(`SELECT id, from_work, into_work, moved_book_ids, merged_at, confidence FROM work_merges WHERE source = ? AND undone_at IS NULL ORDER BY id DESC`);
   const editionsOfStmt = db.prepare(`SELECT id, work_id, title, author, language, isbn, original_title, summary FROM books WHERE work_id IN (SELECT value FROM json_each(?)) ORDER BY created_at, rowid`);
   const titleCandidatesStmt = db.prepare(`SELECT DISTINCT COALESCE(w.merged_into, w.id) AS id, b.title FROM books b JOIN works w ON w.id = b.work_id WHERE b.title_key GLOB ?`);
   const authorCandidatesStmt = db.prepare(`
@@ -498,6 +498,10 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     INSERT INTO series_fts (work_id, name, author)
     SELECT $work_id, $name, $author WHERE (SELECT COUNT(*) FROM work_series WHERE work_id = $work_id AND name_key = $name_key) = 1
   `);
+  const workSeriesNameStmt = db.prepare(`SELECT name FROM work_series WHERE work_id = ? AND name_key = ? AND source = ?`);
+  const deleteWorkSeriesStmt = db.prepare(`DELETE FROM work_series WHERE work_id = ? AND name_key = ? AND source = ?`);
+  const workSeriesKeyCountStmt = db.prepare(`SELECT COUNT(*) AS n FROM work_series WHERE work_id = ? AND name_key = ?`);
+  const deleteSeriesIndexStmt = db.prepare(`DELETE FROM series_fts WHERE work_id = ? AND name = ?`);
   const hasWorkSeriesStmt = db.prepare(`SELECT 1 FROM work_series WHERE work_id = ? LIMIT 1`);
   const refreshSeriesAuthorStmt = db.prepare(`UPDATE series_fts SET author = ? WHERE work_id = ?`);
   const insertCollectionStmt = db.prepare(`
@@ -1041,7 +1045,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       dropOriginalArrivalStmt.run(titleKey);
     },
     activeMerges(source) {
-      return (activeMergesStmt.all(source) as Array<{ id: number; from_work: string; into_work: string; moved_book_ids: string; merged_at: string }>).map((row) => ({ id: row.id, fromWork: row.from_work, intoWork: row.into_work, movedBookIds: JSON.parse(row.moved_book_ids) as string[], mergedAt: row.merged_at }));
+      return (activeMergesStmt.all(source) as Array<{ id: number; from_work: string; into_work: string; moved_book_ids: string; merged_at: string; confidence: number | null }>).map((row) => ({ id: row.id, fromWork: row.from_work, intoWork: row.into_work, movedBookIds: JSON.parse(row.moved_book_ids) as string[], mergedAt: row.merged_at, confidence: row.confidence }));
     },
     editionsOf(workIds) {
       return (editionsOfStmt.all(JSON.stringify(workIds)) as Array<{ id: string; work_id: string; title: string; author: string; language: string | null; isbn: string | null; original_title: string | null; summary: string | null }>).map((row) => ({ id: row.id, workId: row.work_id, title: row.title, author: row.author, language: row.language, isbn: row.isbn, originalTitle: row.original_title || originalTitleIn(row.summary) }));
@@ -1299,6 +1303,16 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
           }
         }
         return added;
+      });
+    },
+
+    removeWorkSeries(workId, nameKey, source) {
+      return inTransaction(() => {
+        const row = workSeriesNameStmt.get(workId, nameKey, source) as { name: string } | undefined;
+        if (!row) return 0;
+        const removed = Number(deleteWorkSeriesStmt.run(workId, nameKey, source).changes);
+        if ((workSeriesKeyCountStmt.get(workId, nameKey) as { n: number }).n === 0) deleteSeriesIndexStmt.run(workId, row.name);
+        return removed;
       });
     },
 
