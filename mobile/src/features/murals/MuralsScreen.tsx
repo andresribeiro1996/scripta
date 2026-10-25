@@ -8,7 +8,7 @@ import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import { useQuery } from "@tanstack/react-query";
 import { Stack, useRouter } from "expo-router";
 import { buildMuralPreset, muralThemeId, MURAL_PRESETS, presetAvailability, type Mural, type MuralFolder, type MuralPresetId } from "@scripta/shared";
-import { Button, dynamicType, EmptyState, ErrorState, Fab, Icon, IconButton, Input, Menu, minimumTouchTarget, ModalBody, Screen, Sheet, Toast } from "../../ui";
+import { Button, ConfirmDialog, dynamicType, EmptyState, ErrorState, Fab, Icon, IconButton, Input, Menu, minimumTouchTarget, ModalBody, Screen, Sheet, Toast } from "../../ui";
 import { radii, spacing, typography, useTheme } from "../../ui/theme";
 import { themes } from "@scripta/shared/themes";
 import { MuralThumbnail } from "./MuralCanvas";
@@ -49,6 +49,10 @@ export function MuralsScreen() {
   const [moveFor, setMoveFor] = useState<Mural | null>(null);
   const [folderPicker, setFolderPicker] = useState(false);
   const [editingFolderId, setEditingFolderId] = useState<string | null | undefined>(undefined);
+  const [deletingMural, setDeletingMural] = useState<Mural | null>(null);
+  const [deletingMuralBusy, setDeletingMuralBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deletingFolder, setDeletingFolder] = useState<MuralFolder | null>(null);
   const [savingFolder, setSavingFolder] = useState(false);
   const [folderName, setFolderName] = useState("");
   const flatFolders = [...(folders.data ?? [])].sort((a, b) => a.name.localeCompare(b.name));
@@ -121,8 +125,16 @@ export function MuralsScreen() {
     setFolderPicker(false);
   }
 
-  function confirmDelete(mural: Mural) {
-    Alert.alert(`Delete “${mural.name}”?`, mural.shareToken ? "This can't be undone. Its public link will stop working." : "This can't be undone.", [{ text: "Cancel", style: "cancel" }, { text: "Delete", style: "destructive", onPress: () => void murals.remove(mural.id) }]);
+  async function deleteMural(mural: Mural) {
+    setDeletingMuralBusy(true);
+    try {
+      await murals.remove(mural.id);
+      setDeletingMural(null);
+    } catch (reason) {
+      setDeleteError(reason instanceof Error ? reason.message : "Couldn't delete that mural.");
+    } finally {
+      setDeletingMuralBusy(false);
+    }
   }
 
   function editFolder(id: string) {
@@ -139,12 +151,11 @@ export function MuralsScreen() {
     setFolderName("");
   }
 
-  function confirmDeleteFolder(folder: MuralFolder) {
-    Alert.alert(`Delete “${folder.name}”?`, "The murals stay in your library.", [{ text: "Cancel", style: "cancel" }, { text: "Delete", style: "destructive", onPress: () => {
-      void folders.remove(folder.id).then(() => {
-        if (folderId === folder.id) setFolderId(undefined);
-      }).catch((reason: unknown) => Alert.alert(reason instanceof Error ? reason.message : "Couldn't delete that folder."));
-    } }]);
+  function deleteFolder(folder: MuralFolder) {
+    setDeletingFolder(null);
+    void folders.remove(folder.id).then(() => {
+      if (folderId === folder.id) setFolderId(undefined);
+    }).catch((reason: unknown) => Alert.alert(reason instanceof Error ? reason.message : "Couldn't delete that folder."));
   }
 
   async function saveFolder() {
@@ -229,7 +240,7 @@ export function MuralsScreen() {
                         { label: "Move to folder…", onPress: () => setMoveFor(item) },
                         { label: "Change cover…", onPress: () => setCoverFor(item) },
                         { label: "Share…", onPress: () => setShareFor(item) },
-                        { label: "Delete", destructive: true, onPress: () => confirmDelete(item) },
+                        { label: "Delete", destructive: true, onPress: () => { setDeleteError(null); setDeletingMural(item); } },
                       ]}
                     >
                       <View accessible accessibilityRole="button" accessibilityLabel={`Settings for ${item.name}`} style={[styles.menuIcon, { backgroundColor: colors.surface, borderColor: colors.border }]}><Icon name="settings" size={16} color={colors.textDim} /></View>
@@ -291,7 +302,7 @@ export function MuralsScreen() {
                       <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{choice.count}</Text>
                       {selected ? <Icon name="confirm" size={18} color={colors.accent} /> : null}
                     </Pressable>
-                    {folder ? <Menu title={folder.name} items={[{ label: "Rename folder…", onPress: () => editFolder(folder.id) }, { label: "Delete folder", destructive: true, onPress: () => confirmDeleteFolder(folder) }]}><View accessible accessibilityRole="button" accessibilityLabel={`Settings for ${folder.name}`}><Icon name="settings" size={18} color={colors.textDim} /></View></Menu> : null}
+                    {folder ? <Menu title={folder.name} items={[{ label: "Rename folder…", onPress: () => editFolder(folder.id) }, { label: "Delete folder", destructive: true, onPress: () => setDeletingFolder(folder) }]}><View accessible accessibilityRole="button" accessibilityLabel={`Settings for ${folder.name}`}><Icon name="settings" size={18} color={colors.textDim} /></View></Menu> : null}
                   </View>
                 );
               })}
@@ -302,6 +313,25 @@ export function MuralsScreen() {
       </FolderSheet>
       <Sheet visible={moveFor !== null} title="Move mural" onClose={() => setMoveFor(null)}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheet}><Button label="Unfiled" variant={moveFor?.folderId === null ? "primary" : "secondary"} onPress={() => void murals.update(moveFor!.id, { folderId: null }).then(() => setMoveFor(null))} />{flatFolders.map((folder) => <Button key={folder.id} label={folder.name} variant={moveFor?.folderId === folder.id ? "primary" : "secondary"} onPress={() => void murals.update(moveFor!.id, { folderId: folder.id }).then(() => setMoveFor(null))} />)}</ScrollView></Sheet>
       <Sheet visible={editingFolderId !== undefined} title={editingFolder ? "Rename folder" : "New folder"} onClose={() => setEditingFolderId(undefined)}><ModalBody><Input label="Folder name" value={folderName} onChangeText={setFolderName} placeholder="e.g. Reading lists" autoCapitalize="sentences" returnKeyType="done" /><Button label={editingFolder ? "Save name" : "Create folder"} disabled={!folderName.trim()} loading={savingFolder} onPress={() => void saveFolder()} /></ModalBody></Sheet>
+      <ConfirmDialog
+        visible={deletingMural !== null}
+        title={`Delete “${deletingMural?.name ?? ""}”?`}
+        body={[deletingMural?.shareToken ? "This can't be undone. Its public link will stop working." : "This can't be undone.", deleteError].filter(Boolean).join("\n\n")}
+        confirmLabel="Delete"
+        destructive
+        loading={deletingMuralBusy}
+        onConfirm={() => deletingMural && void deleteMural(deletingMural)}
+        onCancel={() => setDeletingMural(null)}
+      />
+      <ConfirmDialog
+        visible={deletingFolder !== null}
+        title={`Delete “${deletingFolder?.name ?? ""}”?`}
+        body="The murals stay in your library."
+        confirmLabel="Delete"
+        destructive
+        onConfirm={() => deletingFolder && deleteFolder(deletingFolder)}
+        onCancel={() => setDeletingFolder(null)}
+      />
     </Screen>
   );
 }

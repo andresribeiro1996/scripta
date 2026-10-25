@@ -35,7 +35,7 @@ import {
   type SortKey,
 } from "@scripta/shared";
 import { Button, EmptyState, ErrorState, Fab, IconButton, Input, Menu, Screen, Sheet, Skeleton, SwipeableTabs, type MenuItem } from "../../ui/components";
-import { SearchDock, dynamicType, searchDockClearance, searchDockFabClearance, useTheme } from "../../ui";
+import { ConfirmDialog, SearchDock, dynamicType, searchDockClearance, searchDockFabClearance, useTheme } from "../../ui";
 import { radii, spacing, typography } from "../../ui/theme";
 import { useMurals } from "../murals/useMurals";
 import { useLibrary } from "./hooks/useLibrary";
@@ -78,6 +78,7 @@ export function LibraryScreen() {
   const [reviewingDuplicates, setReviewingDuplicates] = useState(false);
   const [addingBook, setAddingBook] = useState(false);
   const [selectionMode, setSelectionMode] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
 
   const books = library?.data.books ?? [];
@@ -115,21 +116,17 @@ export function LibraryScreen() {
 
   function handleDeleteSelected() {
     if (selectedKeys.size === 0) return;
+    setConfirmingDelete(true);
+  }
+
+  function confirmDeleteSelected() {
     const keys = selectedKeys;
-    Alert.alert(`Delete ${keys.size} book${keys.size === 1 ? "" : "s"}?`, "This can't be undone.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: () => {
-          void actions.deleteBooks(keys, () => {
-            void murals.scrubBooks(keys).catch(() => Alert.alert("The books were deleted, but some mural references couldn't be updated."));
-            setSelectedKeys(new Set());
-            setSelectionMode(false);
-          });
-        },
-      },
-    ]);
+    setConfirmingDelete(false);
+    void actions.deleteBooks(keys, () => {
+      void murals.scrubBooks(keys).catch(() => Alert.alert("The books were deleted, but some mural references couldn't be updated."));
+      setSelectedKeys(new Set());
+      setSelectionMode(false);
+    });
   }
 
   function startRenamingLibrary() {
@@ -334,6 +331,16 @@ export function LibraryScreen() {
       <Sheet visible={reviewingDuplicates && possibleDuplicates.length > 0} title="Possible duplicates" onClose={() => setReviewingDuplicates(false)}>
         {library ? <DuplicatesSheetBody groups={possibleDuplicates} library={library} /> : null}
       </Sheet>
+
+      <ConfirmDialog
+        visible={confirmingDelete}
+        title={`Delete ${selectedKeys.size} book${selectedKeys.size === 1 ? "" : "s"}?`}
+        body="This can't be undone."
+        confirmLabel="Delete"
+        destructive
+        onConfirm={confirmDeleteSelected}
+        onCancel={() => setConfirmingDelete(false)}
+      />
     </Screen>
   );
 }

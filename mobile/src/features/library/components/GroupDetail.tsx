@@ -24,7 +24,7 @@ import {
   type LibraryData,
   type PerCardStyle,
 } from "@scripta/shared";
-import { Button, EmptyState, ErrorState, IconButton, Input, Menu, Screen, Sheet, Skeleton, type MenuItem } from "../../../ui/components";
+import { Button, ConfirmDialog, EmptyState, ErrorState, IconButton, Input, Menu, Screen, Sheet, Skeleton, type MenuItem } from "../../../ui/components";
 import { spacing, typography, useTheme } from "../../../ui/theme";
 import { useMurals } from "../../murals/useMurals";
 import { useLibrary } from "../hooks/useLibrary";
@@ -51,6 +51,7 @@ export function GroupDetail({ groupId }: { groupId: string }) {
   const [styleOpen, setStyleOpen] = useState(false);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+  const [confirming, setConfirming] = useState<"group" | "books" | null>(null);
 
   async function runUpdate(mutate: (data: LibraryData) => LibraryData, onSuccess?: () => void) {
     return attemptUpdate(() => updateLibrary(mutate), (error) => Alert.alert(saveFailureMessage(error, "Couldn't save — check your connection.")), onSuccess);
@@ -63,16 +64,10 @@ export function GroupDetail({ groupId }: { groupId: string }) {
     void runUpdate((data) => ({ ...data, groups: renameGroup(data.groups ?? [], group.id, name) }));
   }
 
-  function handleDeleteGroup() {
+  function confirmDeleteGroup() {
     if (!group) return;
-    Alert.alert(`Delete "${group.name}"?`, "The books stay in your library — this only removes the grouping.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: () => void runUpdate((data) => ({ ...data, groups: deleteGroup(data.groups ?? [], group.id) }), () => router.back()),
-      },
-    ]);
+    setConfirming(null);
+    void runUpdate((data) => ({ ...data, groups: deleteGroup(data.groups ?? [], group.id) }), () => router.back());
   }
 
   function handleToggleBook(book: Record<string, unknown>, inGroup: boolean) {
@@ -100,24 +95,20 @@ export function GroupDetail({ groupId }: { groupId: string }) {
 
   function handleDeleteSelected() {
     if (selectedKeys.size === 0) return;
+    setConfirming("books");
+  }
+
+  function confirmDeleteSelected() {
     const keys = selectedKeys;
-    Alert.alert(`Delete ${keys.size} book${keys.size === 1 ? "" : "s"}?`, "This removes them from your library entirely, not just this group.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: () => {
-          void runUpdate(
-            (data) => deleteBooks(data, keys),
-            () => {
-              void murals.scrubBooks(keys).catch(() => Alert.alert("The books were deleted, but some mural references couldn't be updated."));
-              setSelectedKeys(new Set());
-              setSelectionMode(false);
-            },
-          );
-        },
+    setConfirming(null);
+    void runUpdate(
+      (data) => deleteBooks(data, keys),
+      () => {
+        void murals.scrubBooks(keys).catch(() => Alert.alert("The books were deleted, but some mural references couldn't be updated."));
+        setSelectedKeys(new Set());
+        setSelectionMode(false);
       },
-    ]);
+    );
   }
 
   const menuItems: MenuItem[] = group
@@ -135,7 +126,7 @@ export function GroupDetail({ groupId }: { groupId: string }) {
               },
             ]
           : []),
-        { label: "Delete", destructive: true, onPress: handleDeleteGroup },
+        { label: "Delete", destructive: true, onPress: () => setConfirming("group") },
       ]
     : [];
 
@@ -229,6 +220,16 @@ export function GroupDetail({ groupId }: { groupId: string }) {
         previewBook={members[0]}
         onSave={handleSaveGroupStyle}
         onClose={() => setStyleOpen(false)}
+      />
+
+      <ConfirmDialog
+        visible={confirming !== null}
+        title={confirming === "group" ? `Delete "${group?.name ?? ""}"?` : `Delete ${selectedKeys.size} book${selectedKeys.size === 1 ? "" : "s"}?`}
+        body={confirming === "group" ? "The books stay in your library — this only removes the grouping." : "This removes them from your library entirely, not just this group."}
+        confirmLabel="Delete"
+        destructive
+        onConfirm={confirming === "group" ? confirmDeleteGroup : confirmDeleteSelected}
+        onCancel={() => setConfirming(null)}
       />
     </Screen>
   );

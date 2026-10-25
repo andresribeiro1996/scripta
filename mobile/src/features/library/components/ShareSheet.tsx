@@ -6,7 +6,7 @@
 import { useState } from "react";
 import { Alert, View } from "react-native";
 import { Text } from "../../../ui/Text";
-import { Button, Input } from "../../../ui/components";
+import { Button, ConfirmDialog, Input } from "../../../ui/components";
 import { spacing, typography, useTheme } from "../../../ui/theme";
 import { ShareActions } from "../../socials";
 
@@ -28,6 +28,7 @@ export function ShareSheetBody({
   const [sharing, setSharing] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
   const [unsharing, setUnsharing] = useState(false);
+  const [confirmingStop, setConfirmingStop] = useState(false);
 
   async function handleShare() {
     setShareError(null);
@@ -42,20 +43,12 @@ export function ShareSheetBody({
   }
 
   function handleStopSharing() {
-    Alert.alert("Stop sharing this link?", "Anyone who already has the link will lose access to it.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Stop sharing",
-        style: "destructive",
-        onPress: () => {
-          setUnsharing(true);
-          onUnshare()
-            .then(() => setCurrent(null))
-            .catch(() => Alert.alert("Couldn't stop sharing — try again."))
-            .finally(() => setUnsharing(false));
-        },
-      },
-    ]);
+    setConfirmingStop(false);
+    setUnsharing(true);
+    onUnshare()
+      .then(() => setCurrent(null))
+      .catch(() => Alert.alert("Couldn't stop sharing — try again."))
+      .finally(() => setUnsharing(false));
   }
 
   if (!current) {
@@ -72,7 +65,8 @@ export function ShareSheetBody({
     <View style={{ gap: spacing.md }}>
       <Input label="Share link" value={current.shareUrl} editable={false} selectTextOnFocus />
       <ShareActions message={current.shareUrl} title={title} />
-      <Button label={unsharing ? "Stopping…" : "Stop sharing"} variant="destructive" loading={unsharing} onPress={handleStopSharing} />
+      <Button label={unsharing ? "Stopping…" : "Stop sharing"} variant="destructive" loading={unsharing} onPress={() => setConfirmingStop(true)} />
+      <ConfirmDialog visible={confirmingStop} title="Stop sharing this link?" body="Anyone who already has the link will lose access to it." confirmLabel="Stop sharing" destructive onConfirm={handleStopSharing} onCancel={() => setConfirmingStop(false)} />
     </View>
   );
 }

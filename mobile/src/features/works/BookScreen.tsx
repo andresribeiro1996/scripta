@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { router, useSegments } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
-import { Alert, Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
+import { Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
 import Animated, { useAnimatedScrollHandler, useAnimatedStyle, type SharedValue } from "react-native-reanimated";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import { bookStatsModel, coverWash, editionLabel, seriesLabel, type BookScreenModel, type BookScreenTabKey, type WorkPage } from "@scripta/shared";
 import { Text } from "../../ui/Text";
-import { Button, Icon, Menu, captionHitSlop, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme, type IconName, type MenuItem } from "../../ui";
+import { Button, ConfirmDialog, Icon, Menu, captionHitSlop, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme, type IconName, type MenuItem } from "../../ui";
 import { useLibraryActions } from "../library/hooks/useLibraryActions";
 import { useChangeStatus } from "../library/hooks/useChangeStatus";
 import { BookCover } from "../arena/BookCover";
@@ -74,13 +74,6 @@ export function bookMenuItems(model: BookScreenModel, key: string, segments: rea
   return model.menu.flatMap((item) => (item === "style" ? [{ label: "Card style", onPress: to("style") }] : item === "cover" ? [{ label: "Change cover", onPress: to("cover") }] : []));
 }
 
-function confirmDeleteNote(onConfirm: () => void) {
-  Alert.alert("Delete this note?", "This can't be undone.", [
-    { text: "Cancel", style: "cancel" },
-    { text: "Delete", style: "destructive", onPress: onConfirm },
-  ]);
-}
-
 function OwnerRow({ book, model }: { book: Record<string, unknown>; model: BookScreenModel }) {
   const { colors } = useTheme();
   const { setRating } = useLibraryActions();
@@ -127,10 +120,25 @@ function SeriesLine({ series, signedIn, segments }: { series: NonNullable<BookSc
 function DeleteNote({ book, bookmarkId }: { book: Record<string, unknown>; bookmarkId: string }) {
   const { colors } = useTheme();
   const { deleteNote } = useLibraryActions();
+  const [confirming, setConfirming] = useState(false);
   return (
-    <Text accessibilityRole="button" {...dynamicType} onPress={() => confirmDeleteNote(() => void deleteNote(book, bookmarkId))} style={[typography.caption, styles.strong, { color: colors.danger }]}>
-      Delete
-    </Text>
+    <>
+      <Text accessibilityRole="button" {...dynamicType} onPress={() => setConfirming(true)} style={[typography.caption, styles.strong, { color: colors.danger }]}>
+        Delete
+      </Text>
+      <ConfirmDialog
+        visible={confirming}
+        title="Delete this note?"
+        body="This can't be undone."
+        confirmLabel="Delete"
+        destructive
+        onConfirm={() => {
+          setConfirming(false);
+          void deleteNote(book, bookmarkId);
+        }}
+        onCancel={() => setConfirming(false)}
+      />
+    </>
   );
 }
 

@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { Alert, ScrollView, StyleSheet, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { Stack, useRouter } from "expo-router";
-import { Button, Input, Screen } from "../../ui";
+import { Button, ConfirmDialog, Input, Screen } from "../../ui";
 import { radii, spacing, typography, useTheme } from "../../ui/theme";
 import { useAuth } from "../../core/auth";
 import { API_URL } from "../../core/config";
@@ -19,6 +19,7 @@ export function SettingsScreen() {
   const [draft, setDraft] = useState(user?.username ?? "");
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [signOutOpen, setSignOutOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function pickAvatar() {
@@ -41,11 +42,15 @@ export function SettingsScreen() {
     finally { setBusy(false); }
   }
 
-  function confirmSignOut() {
-    Alert.alert("Sign out", "Sign out of Atmyshelf on this device?", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Sign out", style: "destructive", onPress: () => void signOut().then(() => router.replace("/(public)/login")) },
-    ]);
+  async function confirmSignOut() {
+    setBusy(true);
+    try {
+      await signOut();
+      setSignOutOpen(false);
+      router.replace("/(public)/login");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -77,7 +82,8 @@ export function SettingsScreen() {
       </View>
       <Button label="Account" variant="secondary" onPress={() => router.push("/account-security")} />
       <SocialsSection />
-      <Button label="Sign out" variant="destructive" onPress={confirmSignOut} />
+      <Button label="Sign out" variant="destructive" onPress={() => setSignOutOpen(true)} />
+      <ConfirmDialog visible={signOutOpen} title="Sign out" body="Sign out of Atmyshelf on this device?" confirmLabel="Sign out" destructive loading={busy} onConfirm={() => void confirmSignOut()} onCancel={() => setSignOutOpen(false)} />
     </ScrollView>
     </Screen>
   );

@@ -1,12 +1,12 @@
 import { useMemo, useState } from "react";
 import { Stack } from "expo-router";
-import { Alert, FlatList, Pressable, RefreshControl, StyleSheet, View } from "react-native";
+import { FlatList, Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { scrubImageFromBooks } from "@scripta/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, EmptyState, ErrorState, IconButton, Screen } from "../../ui";
+import { Button, ConfirmDialog, EmptyState, ErrorState, IconButton, Screen } from "../../ui";
 import { minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui/theme";
 import { useLibrary } from "../library/hooks/useLibrary";
 import { useMurals } from "../murals/useMurals";
@@ -27,6 +27,7 @@ export function GalleryScreen() {
   const { data: library, updateLibrary } = useLibrary();
   const murals = useMurals();
   const [error, setError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<GalleryImage | null>(null);
   const usage = useMemo(() => {
     const counts = new Map<string, number>();
     for (const book of library?.data.books ?? []) {
@@ -78,17 +79,11 @@ export function GalleryScreen() {
     }
   }
 
-  function confirmDelete(image: GalleryImage) {
-    const usedBy = usage.get(image.id) ?? 0;
-    const usedByMurals = muralUsage.get(image.id) ?? 0;
-    const warning = usedBy || usedByMurals
-      ? `Deleting it will remove it from ${usedBy} book${usedBy === 1 ? "" : "s"} and ${usedByMurals} mural reference${usedByMurals === 1 ? "" : "s"}.`
-      : "This can't be undone.";
-    Alert.alert("Delete this image?", warning, [
-      { text: "Cancel", style: "cancel" },
-      { text: "Delete", style: "destructive", onPress: () => remove.mutate(image) },
-    ]);
-  }
+  const usedBy = deleting ? usage.get(deleting.id) ?? 0 : 0;
+  const usedByMurals = deleting ? muralUsage.get(deleting.id) ?? 0 : 0;
+  const deleteWarning = usedBy || usedByMurals
+    ? `Deleting it will remove it from ${usedBy} book${usedBy === 1 ? "" : "s"} and ${usedByMurals} mural reference${usedByMurals === 1 ? "" : "s"}.`
+    : "This can't be undone.";
 
   if (gallery.isError) return <ErrorState body={gallery.error.message} actionLabel="Retry" onAction={() => void gallery.refetch()} />;
 
@@ -116,11 +111,21 @@ export function GalleryScreen() {
             <Text numberOfLines={1} style={[typography.caption, { color: colors.textDim }]}>{item.width}×{item.height} · {formatBytes(item.byteSize)}</Text>
             {(usage.get(item.id) ?? 0) > 0 ? <Text style={[typography.caption, { color: colors.accent }]}>Cover for {usage.get(item.id)} book{usage.get(item.id) === 1 ? "" : "s"}</Text> : null}
             {(muralUsage.get(item.id) ?? 0) > 0 ? <Text style={[typography.caption, { color: colors.accent }]}>Used by {muralUsage.get(item.id)} mural reference{muralUsage.get(item.id) === 1 ? "" : "s"}</Text> : null}
-            <Pressable accessibilityRole="button" accessibilityLabel={`Delete ${item.width}×${item.height} image`} disabled={remove.isPending} onPress={() => confirmDelete(item)} style={styles.deleteButton}>
+            <Pressable accessibilityRole="button" accessibilityLabel={`Delete ${item.width}×${item.height} image`} disabled={remove.isPending} onPress={() => setDeleting(item)} style={styles.deleteButton}>
               <Text style={[typography.body, { color: colors.danger }]}>Delete</Text>
             </Pressable>
           </View>
         )}
+      />
+      <ConfirmDialog
+        visible={deleting !== null}
+        title="Delete this image?"
+        body={deleteWarning}
+        confirmLabel="Delete"
+        destructive
+        loading={remove.isPending}
+        onConfirm={() => deleting && remove.mutate(deleting, { onSettled: () => setDeleting(null) })}
+        onCancel={() => setDeleting(null)}
       />
     </Screen>
   );
