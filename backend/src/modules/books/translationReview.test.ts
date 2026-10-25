@@ -93,3 +93,14 @@ test("a doubt whose proposed original has since been folded into another work is
   const review = translationReviewWith(repo, [], (id) => id);
   assert.deepEqual(review.items.map((item) => [item.title, item.group, item.proposed.workId]), [["O Passeio", "possible", keyed.work_id]]);
 });
+
+test("a merge whose original was later folded into another work is no longer listed as merged", () => {
+  const repo = freshRepo();
+  const { pt, en } = pair(repo, 9);
+  const later = repo.createBook({ title: "Book 9", author: "Author", isbn: "9780000006092", workKey: "OL9792W" }, ["isbn:9780000006092"], AT);
+  repo.mergeTranslation(pt.work_id!, en.work_id!, "jev", 0.95, AT);
+  assert.deepEqual(translationReviewWith(repo, [], (id) => id).items.map((item) => [item.title, item.group, item.proposed.workId]), [["Livro 9", "merged", en.work_id]]);
+
+  repo.mergeDuplicateWork(en.work_id!, later.work_id!, AT);
+  assert.deepEqual(translationReviewWith(repo, [], (id) => id), { items: [], total: 0 });
+});
