@@ -516,7 +516,7 @@ function namedPlaysFixture(names: Map<string, string>) {
   return { service, code, quizId: made.id, answers: answerFirst(service, code) };
 }
 
-test("results name a nameable player by their current username, call other signed-in players Reader, and tag guests as anonymous", () => {
+test("results name a signed-in player by their current username, fall back to the typed name then Reader, and tag guests as anonymous", () => {
   const names = new Map([["alice-id", "alice"]]);
   const { service, code, quizId, answers } = namedPlaysFixture(names);
   service.submitPlay(code, answers, 1000, null, { kind: "user", userId: "alice-id" });
@@ -540,13 +540,14 @@ test("results name a nameable player by their current username, call other signe
   assert.equal(service.getResults("u1", quizId)!.plays[0]!.playerName, "alice2");
 });
 
-test("a signed-in player's typed name is not shown when they are nameable, and a non-nameable one never leaks a username", () => {
+test("a signed-in player's typed name is not shown when the resolver has a username, and one without a username shows the typed name", () => {
   const { service, code, quizId, answers } = namedPlaysFixture(new Map([["alice-id", "alice"]]));
   service.submitPlay(code, answers, 1000, "Typed", { kind: "user", userId: "alice-id" });
   assert.equal(service.getResults("u1", quizId)!.plays[0]!.playerName, "alice");
   const other = namedPlaysFixture(new Map());
-  other.service.submitPlay(other.code, other.answers, 1000, null, { kind: "user", userId: "alice-id" });
-  assert.equal(other.service.getResults("u1", other.quizId)!.plays[0]!.playerName, "Reader");
+  other.service.submitPlay(other.code, other.answers, 1000, "Typed", { kind: "user", userId: "alice-id" });
+  other.service.submitPlay(other.code, other.answers, 2000, null, { kind: "user", userId: "bob-id" });
+  assert.deepEqual(other.service.getResults("u1", other.quizId)!.plays.map((p) => p.playerName), ["Typed", "Reader"]);
 });
 
 test("submitPlay and getPlay return the player's pick and the correct index per question, for users and guests", () => {

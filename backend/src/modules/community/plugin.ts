@@ -80,7 +80,7 @@ let cachedPublicApi: CommunityPublicApi | null = null;
 
 export function getCommunityPublicApi(): CommunityPublicApi {
   if (!cachedPublicApi) {
-    cachedPublicApi = createCommunityPublicApi(createSqliteCommunityRepository(openCommunityDb()), Date.now, resolvePublicReaderProfiles);
+    cachedPublicApi = createCommunityPublicApi(createSqliteCommunityRepository(openCommunityDb()), Date.now);
   }
   return cachedPublicApi;
 }
