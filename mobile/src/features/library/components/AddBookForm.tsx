@@ -209,12 +209,13 @@ export function AddBookForm({
         )}
 
         <View style={{ gap: spacing.md, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.md }}>
-          <Input label="Title" value={title} onChangeText={setTitle} />
-          <Input label="Author" value={author} onChangeText={setAuthor} />
+          <Input label="Title (required)" value={title} onChangeText={setTitle} />
+          <Input label="Author (required)" value={author} onChangeText={setAuthor} />
           <Input label="ISBN" value={isbn} onChangeText={setIsbn} keyboardType="numeric" />
           <Input label="Publisher" value={publisher} onChangeText={setPublisher} />
           <SelectRow label="Status" value={readStatus} options={STATUS_OPTIONS} onChange={setReadStatus} />
           <Button label={saving ? "Adding…" : "Add book"} loading={saving} disabled={title.trim() === "" || author.trim() === ""} onPress={() => void handleSave()} />
+          {title.trim() === "" || author.trim() === "" ? <Text style={[typography.caption, { color: colors.textDim }]}>Add a title and an author to continue.</Text> : null}
           {saveError && <Text style={[typography.caption, { color: colors.danger }]}>{saveError}</Text>}
         </View>
       </ScrollView>

@@ -264,19 +264,38 @@ export function MuralPicker({
   onClose: () => void;
   onPick: (muralId: string) => void;
 }) {
-  const { colors } = useTheme();
+  const { colors, id: theme } = useTheme();
   const murals = useMurals();
   const [selected, setSelected] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
   const items = murals.data ?? [];
+  const noMurals = murals.isSuccess && items.length === 0;
+
+  async function createMural() {
+    setCreating(true);
+    setCreateError(null);
+    try {
+      const mural = await murals.create("Untitled mural", theme);
+      onClose();
+      router.push(`/murals/${mural.id}` as never);
+    } catch (reason) {
+      setCreateError(reason instanceof Error ? reason.message : "Couldn't create the mural. Try again.");
+    } finally {
+      setCreating(false);
+    }
+  }
   return (
     <Dialog visible={visible} title={title} onClose={onClose}>
       <View style={styles.dialogGap}>
         <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>
           {description}
         </Text>
-        {error ? <Toast visible message={error} tone="error" /> : null}
+        {error || createError ? <Toast visible message={(error ?? createError)!} tone="error" /> : null}
         {murals.isPending ? (
           <Skeleton height={120} />
+        ) : noMurals ? (
+          <EmptyState title="No murals yet" actionLabel={creating ? "Creating…" : "Create a mural"} onAction={() => { if (!creating) void createMural(); }} />
         ) : (
           <FlatList
             data={items}
@@ -296,12 +315,14 @@ export function MuralPicker({
             )}
           />
         )}
-        <Button
-          label={actionLabel}
-          disabled={!selected}
-          loading={busy}
-          onPress={() => selected && onPick(selected)}
-        />
+        {noMurals ? null : (
+          <Button
+            label={actionLabel}
+            disabled={!selected}
+            loading={busy}
+            onPress={() => selected && onPick(selected)}
+          />
+        )}
       </View>
     </Dialog>
   );
