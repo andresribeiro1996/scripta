@@ -90,7 +90,7 @@ function DiscoverPane() {
               Couldn't refresh Discover.
             </p>
           )}
-          <ul className="game-ticket-grid">
+          <ul className={`game-ticket-grid ${type === "quiz" ? "auto-rows-fr" : ""}`}>
             {items.map((item) => (
               <DiscoverRow key={`${item.content.kind}:${item.content.id}`} item={item} />
             ))}

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useDismissible } from "../hooks/useDismissible";
 import { MoreIcon } from "./NavIcons";
@@ -56,18 +56,26 @@ export function OptionsMenu({
 }) {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState<{ top?: number; bottom?: number; left: number; maxHeight: number } | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const menuId = useId();
 
   useEffect(() => {
     if (!open) return;
+    menuRef.current?.querySelector("button")?.focus();
     function handlePointerDown(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setOpen(false);
+      if (menuRef.current && !menuRef.current.contains(e.target as Node) && !triggerRef.current?.contains(e.target as Node)) setOpen(false);
     }
     window.addEventListener("mousedown", handlePointerDown);
     return () => window.removeEventListener("mousedown", handlePointerDown);
   }, [open]);
 
-  useDismissible(() => setOpen(false), open);
+  function close() {
+    setOpen(false);
+    triggerRef.current?.focus();
+  }
+
+  useDismissible(close, open);
 
   function toggle(e: React.MouseEvent<HTMLButtonElement>) {
     e.stopPropagation();
@@ -83,7 +91,7 @@ export function OptionsMenu({
 
   return (
     <>
-      <button onClick={toggle} title={title} className={triggerClassName ?? "flex h-11 w-11 items-center justify-center"}>
+      <button ref={triggerRef} type="button" onClick={toggle} title={title} aria-label={title} aria-haspopup="menu" aria-expanded={open} aria-controls={open ? menuId : undefined} className={triggerClassName ?? "flex h-11 w-11 items-center justify-center"}>
         {trigger ??
           (triggerClassName ? (
             <MoreIcon size={16} />
@@ -98,18 +106,38 @@ export function OptionsMenu({
         createPortal(
           <div
             ref={menuRef}
+            id={menuId}
+            role="menu"
+            aria-label={title}
+            onKeyDown={(event) => {
+              if (event.key === "Tab") {
+                close();
+                return;
+              }
+              const buttons = [...event.currentTarget.querySelectorAll<HTMLButtonElement>("button")];
+              const current = buttons.findIndex((button) => button === document.activeElement);
+              let next: number;
+              if (event.key === "ArrowDown") next = (current + 1) % buttons.length;
+              else if (event.key === "ArrowUp") next = (current - 1 + buttons.length) % buttons.length;
+              else if (event.key === "Home") next = 0;
+              else if (event.key === "End") next = buttons.length - 1;
+              else return;
+              event.preventDefault();
+              buttons[next]?.focus();
+            }}
             style={{ top: position.top, bottom: position.bottom, left: position.left, minWidth: MENU_WIDTH, maxHeight: position.maxHeight }}
             className="menu-in fixed z-50 overflow-y-auto rounded-lg border border-(--color-border) bg-(--color-surface) py-1 text-sm shadow-lg"
           >
             {items.map((item) => (
               <button
                 key={item.label}
-                role={item.checked === undefined ? undefined : "menuitemradio"}
+                type="button"
+                role={item.checked === undefined ? "menuitem" : "menuitemradio"}
                 aria-checked={item.checked}
                 onClick={(e) => {
                   e.stopPropagation();
+                  close();
                   if (!item.checked) item.onClick();
-                  setOpen(false);
                 }}
                 className={`flex w-full items-center justify-between gap-3 min-h-11 px-3 text-left ${
                   item.danger ? "text-(--color-danger) hover:bg-(--color-danger-soft)" : "hover:bg-(--color-surface-hover)"
