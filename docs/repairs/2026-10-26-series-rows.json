@@ -1,0 +1,60 @@
+{
+  "undo": [],
+  "dropSeries": [
+    {
+      "workId": "69bd72c5-d0a6-4e89-9c75-992e4be9e05a",
+      "name": "Dune",
+      "source": "wikidata"
+    }
+  ],
+  "addSeries": [
+    {
+      "workId": "f28c096e-21ef-4373-a96e-5a785361f1ee",
+      "name": "Harry Potter",
+      "position": "1",
+      "source": "wikidata"
+    },
+    {
+      "workId": "a728a3ba-482a-4cb6-a639-469c086d887e",
+      "name": "Harry Potter",
+      "position": "2",
+      "source": "wikidata"
+    },
+    {
+      "workId": "6ccad4cf-3bc7-4a24-8332-d524d13a70d5",
+      "name": "Harry Potter",
+      "position": "3",
+      "source": "wikidata"
+    },
+    {
+      "workId": "1939b932-8756-4091-a59a-4bb7150a6ac6",
+      "name": "Harry Potter",
+      "position": "4",
+      "source": "wikidata"
+    },
+    {
+      "workId": "376f354e-39c8-484c-bd9a-f80042a32332",
+      "name": "Harry Potter",
+      "position": "5",
+      "source": "wikidata"
+    },
+    {
+      "workId": "ebd002ce-cfeb-4a13-b46c-562479ccbd05",
+      "name": "Harry Potter",
+      "position": "6",
+      "source": "wikidata"
+    },
+    {
+      "workId": "f3132cf0-8393-48dc-b278-e4fc134eb0b9",
+      "name": "Harry Potter",
+      "position": "7",
+      "source": "wikidata"
+    },
+    {
+      "workId": "69bd72c5-d0a6-4e89-9c75-992e4be9e05a",
+      "name": "Dune",
+      "position": "2",
+      "source": "wikidata"
+    }
+  ]
+}
