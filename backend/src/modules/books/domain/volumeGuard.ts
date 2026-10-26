@@ -1,4 +1,5 @@
 import { normalizeWords, titleNumbers, withoutBrackets } from "@scripta/shared";
+import { withoutArticle } from "./searchRank.js";
 import { seriesNameKey } from "./series.js";
 import { VOLUME_WORD, VOLUME_WORDS, mainTitle } from "./translation.js";
 
@@ -97,16 +98,28 @@ function endMarker(title: string): EndMarker | null {
 
 export type JoinTarget = { title: string; series: Array<{ nameKey: string; position: string | null }> };
 
+const SERIES_WORDS = ["serie", "series", "saga", "ciclo", "cycle", "cronica", "cronicas", "chronicles", "trilogia", "trilogy", "tetralogia", "colecao", "coleccao"];
+
+function showsSeriesContext(workTitle: string, target: JoinTarget): boolean {
+  const padded = ` ${normalizeWords(workTitle)} `;
+  return SERIES_WORDS.some((word) => padded.includes(` ${word} `)) ||
+    target.series.some((entry) => {
+      const key = withoutArticle(entry.nameKey);
+      return key.length >= 3 && padded.includes(` ${key} `);
+    });
+}
+
 export function joinVerdict(work: { title: string }, target: JoinTarget, memberKind: (title: string) => "series" | "collection" | null): JoinVerdict {
   const workTitle = withVolumeBrackets(work.title);
   const targetTitle = withVolumeBrackets(target.title);
+  const marker = endMarker(workTitle);
+  const positionsCount = !marker?.word || showsSeriesContext(work.title, target);
   const targetNumbers = new Set([
     ...titleNumbers(targetTitle).split(" ").filter((digits) => digits !== "").map((digits) => String(Number(digits))),
     ...volumeNumbers(targetTitle),
     ...[endMarker(targetTitle)?.n ?? []].flat(),
-    ...target.series.flatMap((entry) => [...(entry.position ?? "").matchAll(/\d+/g)].map((digits) => String(Number(digits[0]))))
+    ...(positionsCount ? target.series.flatMap((entry) => [...(entry.position ?? "").matchAll(/\d+/g)].map((digits) => String(Number(digits[0])))) : [])
   ]);
-  const marker = endMarker(workTitle);
   if (marker && !targetNumbers.has(marker.n)) {
     const main = mainTitle(workTitle);
     if (main.length === workTitle.length) {
