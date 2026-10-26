@@ -13,9 +13,9 @@ const render = (props: { kind: PublishedContent["kind"]; stats?: Array<{ value: 
   );
 
 test("each kind tints its art panel with its own soft colour", () => {
-  assert.match(render({ kind: "quiz" }), /background-color:var\(--color-reference-soft\)/);
-  assert.match(render({ kind: "tierlist" }), /background-color:var\(--color-success-soft\)/);
-  assert.match(render({ kind: "tournament" }), /background-color:var\(--color-accent-soft\)/);
+  assert.match(render({ kind: "quiz" }), /border-r border-\(--color-border\) bg-\(--color-reference-soft\)/);
+  assert.match(render({ kind: "tierlist" }), /border-r border-\(--color-border\) bg-\(--color-success-soft\)/);
+  assert.match(render({ kind: "tournament" }), /border-r border-\(--color-border\) bg-\(--color-accent-soft\)/);
 });
 
 test("a quote_title preview shows its clue heading and prompt", () => {

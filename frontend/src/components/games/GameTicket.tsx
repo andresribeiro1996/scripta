@@ -15,9 +15,9 @@ const STATUS_TONES: Record<ContentTone, string> = {
 };
 
 const KINDS = {
-  quiz: { prefix: "Quiz: ", color: "var(--color-reference)", soft: "var(--color-reference-soft)" },
-  tierlist: { prefix: "Tier list: ", color: "var(--color-success)", soft: "var(--color-success-soft)" },
-  tournament: { prefix: "Tournament: ", color: "var(--color-accent)", soft: "var(--color-accent-soft)" }
+  quiz: { prefix: "Quiz: ", color: "var(--color-reference)", soft: "bg-(--color-reference-soft)", action: "bg-(--color-reference-soft) text-(--color-reference)" },
+  tierlist: { prefix: "Tier list: ", color: "var(--color-success)", soft: "bg-(--color-success-soft)", action: "bg-(--color-success-soft) text-(--color-success)" },
+  tournament: { prefix: "Tournament: ", color: "var(--color-accent)", soft: "bg-(--color-accent-soft)", action: "bg-(--color-accent-soft) text-(--color-accent)" }
 } as const;
 
 export function StatusBadge({ label, tone }: { label: string; tone: ContentTone }) {
@@ -49,12 +49,12 @@ export function GameTicket({
   actionLabel?: string;
   menu?: ReactNode;
 }) {
-  const { prefix, color, soft } = KINDS[kind];
+  const { prefix, color, soft, action } = KINDS[kind];
   const clue = kind === "quiz" && preview && preview.type !== "cover_title" ? preview : undefined;
   return (
     <div className="relative flex flex-col overflow-hidden rounded-xl border border-(--color-border) bg-(--color-surface) hover:border-(--color-accent)">
       <div className="flex items-stretch">
-        <div className="flex w-22 shrink-0 items-center justify-center border-r border-(--color-border)" style={{ backgroundColor: soft }}>
+        <div className={`flex w-22 shrink-0 items-center justify-center border-r border-(--color-border) ${soft}`}>
           <GameTicketArt kind={kind} covers={covers} ladder={ladder} preview={preview} color={color} />
         </div>
         <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 p-4">
@@ -93,8 +93,7 @@ export function GameTicket({
         <Link
           to={to}
           aria-label={`${actionLabel}: ${name}`}
-          className="flex min-h-11 min-w-0 flex-1 items-center justify-between gap-2 rounded-lg px-4 text-sm font-semibold hover:bg-(--color-accent-fill) hover:text-(--color-text)"
-          style={{ backgroundColor: soft, color }}
+          className={`flex min-h-11 min-w-0 flex-1 items-center justify-between gap-2 rounded-lg px-4 text-sm font-semibold ${action} hover:bg-(--color-accent-fill) hover:text-(--color-text)`}
         >
           <span className="min-w-0 truncate">{actionLabel}</span>
           <ChevronRightIcon size={16} />
