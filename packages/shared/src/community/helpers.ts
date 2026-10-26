@@ -1,5 +1,6 @@
 import { statusLabel } from "../library/covers.js";
 import { plural } from "../plural.js";
+import { DEFAULT_TIER_PRESET } from "../tierlists/tierlist.js";
 import type {
   ActivityEventType,
   ActivityItem,
@@ -13,6 +14,14 @@ import type {
 } from "./types.js";
 
 const CONTENT_KINDS: Record<PublishedContent["kind"], true> = { tierlist: true, tournament: true, quiz: true };
+
+export const TIER_LADDER = DEFAULT_TIER_PRESET.map((tier) => tier.color);
+
+export function gameActionLabel(content: PublishedContent): string {
+  if (content.kind === "quiz") return content.playOpen && !content.viewerVoted ? "Play quiz" : "View quiz";
+  if (content.kind === "tournament") return content.status === "completed" ? "View results" : "Vote in tournament";
+  return content.promotedAt || !content.votingOpen ? "View rankings" : content.viewerVoted ? "Edit ranking" : "Rank books";
+}
 
 export function isKnownContent(content: PublishedContent): boolean {
   return CONTENT_KINDS[content?.kind] === true;
