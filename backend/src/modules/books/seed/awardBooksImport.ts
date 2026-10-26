@@ -23,6 +23,7 @@ export type AwardBooksReport = {
   unresolved: string[];
   createdBookIds: string[];
   aliases: number;
+  skipped: number;
   isbnResolutions: Array<{ item: string; isbn: string; title: string }>;
 };
 
@@ -82,9 +83,9 @@ function aliasWorkKey(repo: Pick<BooksRepository, "getBook" | "workIdsByWorkKeys
 
 export async function importAwardBooks(
   deps: { repo: BooksRepository; sharesArena: (fromWorkId: string, intoWorkId: string) => boolean; search: BookCatalog["search"]; log: (line: string) => void; sleep?: Sleep },
-  works: AwardWork[],
+  allWorks: AwardWork[],
   at: string,
-  { dryRun, max }: { dryRun: boolean; max: number | null }
+  { dryRun, max, skip = new Set<string>() }: { dryRun: boolean; max: number | null; skip?: ReadonlySet<string> }
 ): Promise<AwardBooksReport> {
   const { repo, sharesArena, search, log, sleep = realSleep } = deps;
   const report: AwardBooksReport = {
@@ -95,8 +96,11 @@ export async function importAwardBooks(
     unresolved: [],
     createdBookIds: [],
     aliases: 0,
+    skipped: 0,
     isbnResolutions: []
   };
+  const works = allWorks.filter((work) => !skip.has(work.item));
+  report.skipped = allWorks.length - works.length;
   const countedSearch: BookCatalog["search"] = (query) => {
     report.requests++;
     return search(query);
