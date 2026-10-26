@@ -149,7 +149,7 @@ export function ArenaListPage() {
 
           {votedTournaments.length > 0 && <h3 className="mb-3 text-sm font-semibold">Created by you</h3>}
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {bySearch.created.map((t) => (
               <TournamentCard key={t.id} t={t} />
             ))}
@@ -158,7 +158,7 @@ export function ArenaListPage() {
           {(bySearch.voted.length > 0 || (votedTournaments.length > 0 && !search.trim())) && (
             <>
               <h3 className="mb-3 mt-6 text-sm font-semibold">Voting in</h3>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {bySearch.voted.map((t) => (
                   <TournamentCard key={t.id} t={t} />
                 ))}
@@ -188,7 +188,7 @@ export function ArenaListPage() {
 
           {votedTierlists.length > 0 && <h3 className="mb-3 text-sm font-semibold">Created by you</h3>}
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {tierlists.map((tl) =>
               renamingTierlistId === tl.id ? (
                 <div key={tl.id} className="rounded-xl border border-(--color-accent) bg-(--color-surface) p-4">
@@ -240,7 +240,7 @@ export function ArenaListPage() {
           {votedTierlists.length > 0 && (
             <>
               <h3 className="mb-3 mt-6 text-sm font-semibold">Voted on</h3>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {votedTierlists.map((tl) => (
                   <GameTicket
                     key={tl.id}
@@ -271,7 +271,7 @@ export function ArenaListPage() {
             />
           )}
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {quizzes.map((quiz) => (
               <GameTicket
                 key={quiz.id}

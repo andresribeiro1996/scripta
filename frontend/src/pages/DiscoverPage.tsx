@@ -90,7 +90,7 @@ function DiscoverPane() {
               Couldn't refresh Discover.
             </p>
           )}
-          <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <ul className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {items.map((item) => (
               <DiscoverRow key={`${item.content.kind}:${item.content.id}`} item={item} />
             ))}
