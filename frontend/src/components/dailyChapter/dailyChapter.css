@@ -1,0 +1,57 @@
+.daily-chapter-invitation { display: grid; grid-template-columns: 136px minmax(0,1fr); gap: 24px; align-items: center; padding: 24px; border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-surface); }
+.daily-chapter-art { --dc-accent: var(--color-accent); --dc-tint: var(--color-accent-soft); display: flex; align-items: center; justify-content: center; width: 136px; height: 180px; overflow: hidden; }
+.daily-chapter-art .dc-motif { transform: scale(.8); }
+@media (max-width: 480px) { .daily-chapter-invitation { grid-template-columns: 76px minmax(0,1fr); gap: 12px; padding: 16px; } .daily-chapter-invitation .daily-chapter-art { width: 76px; } .daily-chapter-invitation .dc-motif { transform: scale(.5); } }
+.daily-chapter-art .dc-motif{position:relative;width:150px;height:180px;color:var(--dc-accent);flex-shrink:0}
+.daily-chapter-art .dc-motif span{display:block;position:absolute;background:currentColor}
+.daily-chapter-art .m-door span:nth-child(1){inset:0 18px;border-radius:80px 80px 0 0;box-shadow:12px 0 0 color-mix(in srgb,currentColor 18%,transparent)}
+.daily-chapter-art .m-door span:nth-child(2){width:6px;height:6px;background:var(--dc-tint);right:34px;top:112px;border-radius:50%}
+.daily-chapter-art .m-books span{bottom:10px;width:34px;border-radius:4px 7px 7px 4px;box-shadow:inset 5px 0 0 color-mix(in srgb,var(--dc-tint) 26%,transparent)}
+.daily-chapter-art .m-books span:nth-child(1){height:135px;left:9px;transform:rotate(-8deg)}
+.daily-chapter-art .m-books span:nth-child(2){height:158px;left:53px;opacity:.73}
+.daily-chapter-art .m-books span:nth-child(3){height:120px;left:100px;transform:rotate(9deg)}
+.daily-chapter-art .m-books span:nth-child(4){height:4px;width:148px;left:0;bottom:5px;box-shadow:none}
+.daily-chapter-art .m-film span:nth-child(1){inset:9px 11px;transform:rotate(-7deg);border-radius:5px;background:repeating-linear-gradient(to bottom,currentColor 0 35px,transparent 35px 42px);border:13px solid currentColor;box-shadow:0 0 0 1px color-mix(in srgb,currentColor 50%,transparent)}
+.daily-chapter-art .m-film span:nth-child(2){inset:21px 36px;transform:rotate(-7deg);background:repeating-linear-gradient(to bottom,var(--dc-tint) 0 30px,currentColor 30px 39px)}
+.daily-chapter-art .m-portrait span:nth-child(1){inset:4px 8px;border-radius:70px 70px 8px 8px;background:none;border:2px solid currentColor}
+.daily-chapter-art .m-portrait span:nth-child(2){width:51px;height:57px;border-radius:50%;top:35px;left:48px}
+.daily-chapter-art .m-portrait span:nth-child(3){width:90px;height:58px;border-radius:50px 50px 5px 5px;top:101px;left:28px;opacity:.68}
+.daily-chapter-art .m-island span:nth-child(1){width:37px;height:37px;border-radius:50%;top:15px;right:7px;opacity:.65}
+.daily-chapter-art .m-island span:nth-child(2){width:118px;height:65px;border-radius:100% 100% 0 0;left:6px;bottom:43px;transform:rotate(-7deg)}
+.daily-chapter-art .m-island span:nth-child(3){width:146px;height:5px;bottom:29px;left:2px;border-radius:100%;box-shadow:0 14px 0 color-mix(in srgb,currentColor 60%,transparent),0 28px 0 color-mix(in srgb,currentColor 32%,transparent)}
+.daily-chapter-art .m-heart span:nth-child(1){width:81px;height:81px;top:55px;left:35px;transform:rotate(-45deg);border-radius:5px}
+.daily-chapter-art .m-heart span:nth-child(1):before,.daily-chapter-art .m-heart span:nth-child(1):after{content:"";position:absolute;width:81px;height:81px;border-radius:50%;background:currentColor}
+.daily-chapter-art .m-heart span:nth-child(1):before{left:0;top:-40px}
+.daily-chapter-art .m-heart span:nth-child(1):after{left:40px;top:0}
+.daily-chapter-art .m-leaf span:nth-child(1){width:3px;height:157px;top:11px;left:73px;transform:rotate(13deg);border-radius:3px}
+.daily-chapter-art .m-leaf span:nth-child(2){width:56px;height:36px;border-radius:100% 0 100% 0;left:23px;top:40px;transform:rotate(15deg)}
+.daily-chapter-art .m-leaf span:nth-child(3){width:56px;height:36px;border-radius:0 100% 0 100%;left:77px;top:75px;transform:rotate(-12deg);opacity:.65}
+.daily-chapter-art .m-leaf span:nth-child(4){width:56px;height:36px;border-radius:100% 0 100% 0;left:18px;top:109px;transform:rotate(15deg);opacity:.8}
+.daily-chapter-art .m-column span:nth-child(1){width:89px;height:116px;left:30px;top:39px;background:repeating-linear-gradient(to right,currentColor 0 13px,transparent 13px 19px)}
+.daily-chapter-art .m-column span:nth-child(2){width:121px;height:16px;top:20px;left:14px;border-radius:3px;box-shadow:0 145px 0 currentColor}
+.daily-chapter-art .m-column span:nth-child(3){width:103px;height:10px;top:38px;left:23px;box-shadow:0 116px 0 currentColor;opacity:.55}
+.daily-chapter-art .m-tiles{display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);gap:7px;padding:21px 0}
+.daily-chapter-art .m-tiles span{position:relative;background:none;border:2px solid currentColor;border-radius:8px;transform:rotate(4deg)}
+.daily-chapter-art .m-tiles span:after{content:"";position:absolute;width:12px;height:12px;background:currentColor;top:50%;left:50%;transform:translate(-50%,-50%) rotate(45deg);border-radius:2px}
+.daily-chapter-art .m-tiles span:nth-child(even){opacity:.55;transform:rotate(-4deg)}
+.daily-chapter-art .m-clock span:nth-child(1){width:135px;height:135px;border:4px solid currentColor;border-radius:50%;left:7px;top:25px;background:none}
+.daily-chapter-art .m-clock span:nth-child(2){width:4px;height:48px;left:73px;top:49px;transform-origin:bottom;transform:rotate(15deg);border-radius:4px}
+.daily-chapter-art .m-clock span:nth-child(3){width:43px;height:4px;left:75px;top:94px;transform-origin:left;transform:rotate(25deg);border-radius:4px}
+.daily-chapter-art .m-clock span:nth-child(4){height:8px;width:8px;left:71px;top:91px;border-radius:50%}
+.daily-chapter-art .m-window span:nth-child(1){inset:2px 12px;border:3px solid currentColor;border-radius:80px 80px 0 0;background:none}
+.daily-chapter-art .m-window span:nth-child(2){width:3px;height:172px;left:74px;top:6px}
+.daily-chapter-art .m-window span:nth-child(3){width:122px;height:3px;left:14px;top:99px}
+.daily-chapter-art .m-window span:nth-child(4){width:34px;height:34px;border-radius:50%;right:24px;top:51px;opacity:.65}
+.daily-chapter-art .m-envelope span:nth-child(1){width:146px;height:102px;left:2px;top:48px;border:3px solid currentColor;border-radius:4px;background:none;transform:rotate(-7deg)}
+.daily-chapter-art .m-envelope span:nth-child(2){width:98px;height:65px;left:24px;top:18px;border-radius:4px;transform:rotate(-7deg);opacity:.5}
+.daily-chapter-art .m-envelope span:nth-child(3){width:97px;height:97px;border-bottom:3px solid currentColor;border-right:3px solid currentColor;left:25px;top:15px;transform:rotate(38deg);background:none}
+.daily-chapter-art .m-envelope span:nth-child(4){width:23px;height:23px;border-radius:50%;left:67px;top:106px;background:currentColor;box-shadow:0 0 0 5px var(--dc-tint)}
+.daily-chapter-art .m-planet span:nth-child(1){width:99px;height:99px;border-radius:50%;top:42px;left:26px}
+.daily-chapter-art .m-planet span:nth-child(2){width:158px;height:54px;border:3px solid currentColor;border-radius:50%;background:none;top:65px;left:-4px;transform:rotate(-25deg);box-shadow:0 0 0 5px var(--dc-tint)}
+.daily-chapter-art .m-planet span:nth-child(3){width:7px;height:7px;border-radius:50%;right:12px;top:14px;box-shadow:-107px 17px 0 color-mix(in srgb,currentColor 60%,transparent),-121px 143px 0 color-mix(in srgb,currentColor 80%,transparent)}
+.daily-chapter-art .m-people span:nth-child(1),.daily-chapter-art .m-people span:nth-child(2),.daily-chapter-art .m-people span:nth-child(3){width:34px;height:34px;border-radius:50%;top:44px;left:11px}
+.daily-chapter-art .m-people span:nth-child(2){left:59px;top:25px;opacity:.72}
+.daily-chapter-art .m-people span:nth-child(3){left:106px;top:44px;opacity:.5}
+.daily-chapter-art .m-people span:nth-child(1):after,.daily-chapter-art .m-people span:nth-child(2):after,.daily-chapter-art .m-people span:nth-child(3):after{content:"";position:absolute;top:42px;left:-4px;width:42px;height:70px;background:currentColor;border-radius:23px 23px 6px 6px}
+  .daily-chapter-art .dc-motif{transform:scale(.68);margin:-26px}
+  .daily-chapter-art .dc-motif{transform:scale(.71);margin:-26px}

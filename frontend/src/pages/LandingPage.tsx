@@ -1,3 +1,4 @@
+import { DailyChapterCard } from "../components/dailyChapter/DailyChapterCard";
 import { useEffect } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
@@ -20,6 +21,7 @@ export function LandingPage() {
       <LandingNav />
       <main className="flex flex-1 flex-col">
         <LandingHero />
+        <div className="mx-auto w-full max-w-3xl px-4 py-6"><DailyChapterCard /></div>
       </main>
       <LandingFooter />
     </div>

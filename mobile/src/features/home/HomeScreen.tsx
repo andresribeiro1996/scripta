@@ -1,3 +1,4 @@
+import { DailyChapterCard } from "../dailyChapter/daily-chapter-card";
 import { useCallback, useState } from "react";
 import { Pressable, RefreshControl, SectionList, StyleSheet, View } from "react-native";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
@@ -51,6 +52,7 @@ export function HomeScreen() {
     {error ? <Toast visible message={error} tone="error" /> : null}
     <SectionList sections={sections} keyExtractor={(item) => `${item.kind}:${item.id}`} stickySectionHeadersEnabled={false} maintainVisibleContentPosition={{ minIndexForVisible: 0, autoscrollToTopThreshold: 10 }} contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.list}
       ListHeaderComponent={<>
+        <DailyChapterCard />
         <RecapHomeCard />
         <AwardHomeCard />
         {noLibrary ? <View style={styles.onboarding}><EmptyState title="Start your library" body="Bring your books into your reading world." actionLabel="Import library" onAction={() => router.push("/import" as never)} secondaryActionLabel="Add a book" onSecondaryAction={() => router.push("/add-book" as never)} /></View> : null}

@@ -1,3 +1,4 @@
+import { DailyChapterCard } from "../components/dailyChapter/DailyChapterCard";
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQueryClient, type InfiniteData } from "@tanstack/react-query";
@@ -63,6 +64,7 @@ export function HomePage() {
       <Link className={BUTTON_SECONDARY} to="/community/people">Find people</Link>
       <Link className={BUTTON_SECONDARY} to="/community/discover">Discover</Link>
     </>}>
+    <div className="mb-6"><DailyChapterCard /></div>
     <div className="space-y-5">
       {library.isPending ? <p role="status">Loading home…</p> : library.isError ? <div role="alert"><p>Couldn't load your home.</p><button className={BUTTON_SECONDARY} onClick={() => { void dashboard.refetch(); void library.refetch(); }}>Retry</button></div> : <>
         {!books.length ? <div className="space-y-3 rounded-xl border border-(--color-border) p-6"><h2 className="text-xl">Start your library</h2><p>Import your existing collection, or add your first book manually.</p><div className="flex flex-wrap gap-2"><Link className={BUTTON_PRIMARY} to="/dashboard/library?action=import">Import library</Link><Link className={BUTTON_SECONDARY} to="/dashboard/library?action=add">Add a book</Link></div></div>

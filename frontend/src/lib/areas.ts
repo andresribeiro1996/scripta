@@ -52,7 +52,7 @@ export const AREAS: readonly Area[] = [
     label: "Admin",
     to: "/admin/genres",
     tabs: [
-      { label: "Genres", to: "/admin/genres" },
+      { label: "Daily chapter", to: "/admin/daily-chapter" }, { label: "Genres", to: "/admin/genres" },
       { label: "Synopses", to: "/admin/synopses" },
       { label: "Translations", to: "/admin/translations" }
     ]

@@ -14,7 +14,7 @@ test("tabs carry today's routes", () => {
   assert.deepEqual(area("games").tabs.map((t) => [t.label, t.to]), [["Tier lists", "/dashboard/arena?tab=tierlists"], ["Quizzes", "/dashboard/arena?tab=quizzes"], ["Tournaments", "/dashboard/arena"]]);
   assert.deepEqual(area("settings").tabs.map((t) => t.to), ["/dashboard/settings", "/dashboard/settings/appearance", "/dashboard/style"]);
   assert.deepEqual(area("community").tabs.map((t) => t.to), ["/community/discover", "/community/people"]);
-  assert.deepEqual(area("admin").tabs.map((t) => t.to), ["/admin/genres", "/admin/synopses", "/admin/translations"]);
+  assert.deepEqual(area("admin").tabs.map((t) => t.to), ["/admin/daily-chapter", "/admin/genres", "/admin/synopses", "/admin/translations"]);
   assert.deepEqual([area("home").tabs, area("murals").tabs, area("readerCard").tabs], [[], [], []]);
 });
 
