@@ -492,6 +492,17 @@ test("a work-ID hit whose title is a Wikidata title, with a subtitle or a series
   }
 });
 
+test("a work-ID hit that differs from a Wikidata title only by a leading article is accepted", async () => {
+  for (const [wanted, title] of [["The Terraformers", "Terraformers"], ["A Summons to Memphis", "Summons to Memphis"], ["Spool of Blue Thread", "A Spool of Blue Thread"], ["An Instance of the Fingerpost", "Instance of the Fingerpost"]]) {
+    const found = searching(() => [hit(title!, ["Julian Barnes"], "OL31595819W")]);
+    const resolved = await resolveAwardWork(found.search, work("Q1", ["booker"], { ...FLAUBERT, titles: [wanted!] }));
+    assert.equal(resolved?.hit.result.title, title);
+    assert.equal(resolved?.translatedFrom, undefined);
+  }
+  const theme = searching(() => [hit("Theme Park", ["Julian Barnes"], "OL31595819W")]);
+  assert.equal((await resolveAwardWork(theme.search, work("Q1", ["booker"], { ...FLAUBERT, isbns: [], authors: [], titles: ["Park"] })))?.hit.result.title, undefined);
+});
+
 test("a work with no Wikidata titles accepts the work-ID hit whatever its title", async () => {
   const resolved = await resolveAwardWork(searching(() => [translated]).search, work("Q1", ["booker"], { olWorkIds: ["OL31595819W"] }));
   assert.equal(resolved?.hit.result.title, "Le perroquet de flaubert");

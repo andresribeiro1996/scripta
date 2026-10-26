@@ -94,7 +94,9 @@ function usable({ result }: CatalogSearchHit): boolean {
   return identity !== null && workTitleKey(identity.title, identity.author) !== "";
 }
 
-const titleFits = (work: AwardWork, { result }: CatalogSearchHit) => work.titles.length === 0 || work.titles.some((title) => titleMatches(title, result.title));
+const withoutArticle = (title: string) => title.replace(/^(the|an?)\s+/i, "");
+const titleFits = (work: AwardWork, { result }: CatalogSearchHit) =>
+  work.titles.length === 0 || work.titles.some((title) => titleMatches(withoutArticle(title), withoutArticle(result.title)));
 
 export async function resolveAwardWork(search: BookCatalog["search"], work: AwardWork, onMismatch: (olTitle: string) => void = () => {}): Promise<AwardResolution | null> {
   let translated: { olWorkId: string; title: string } | null = null;
