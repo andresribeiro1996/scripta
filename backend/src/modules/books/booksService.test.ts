@@ -2382,18 +2382,44 @@ function classicsCatalog(h: Harness, members: number, searchable = true) {
   return books;
 }
 
-test("a series search lists the title hits first, then the series works, and every result carries the series", () => {
+test("a series search leads with the series in reading order, and every result carries the series", () => {
   const h = harness();
   const { deadhouse } = malazanCatalog(h);
   const results = h.service.search("malazan");
-  assert.deepEqual(results.map((result) => result.title), [deadhouse.title, "Gardens of the Moon", "Memories of Ice"]);
+  assert.deepEqual(results.map((result) => result.title), ["Gardens of the Moon", deadhouse.title, "Memories of Ice"]);
   assert.deepEqual(results.map((result) => result.series), [
-    { name: MALAZAN, kind: "series", position: "2" },
     { name: MALAZAN, kind: "series", position: "1" },
+    { name: MALAZAN, kind: "series", position: "2" },
     { name: MALAZAN, kind: "series", position: "3" }
   ]);
   assert.ok(results.every((result) => typeof result.workId === "string"));
   assert.equal(new Set(results.map((result) => result.isbn)).size, 3);
+});
+
+test("a series member the search did not find leads with its covered edition", () => {
+  const h = harness();
+  const old = seeded(h, "Livro", isbnOf(1), { author: "Ana Lima", workKey: "OL1W", at: SERIES_AT });
+  const covered = h.repo.createBook({ title: "Livro", author: "Ana Lima", isbn: isbnOf(2), workKey: "OL1W", olCoverId: 9, createdBy: "seed" }, [`isbn:${isbnOf(2)}`], "2026-10-16T12:00:00.000Z");
+  h.repo.addWorkSeries(old.work_id!, [{ name: MALAZAN, position: "1" }], "wikidata", SERIES_AT);
+  assert.deepEqual(h.service.search("malazan", { byWork: true }).map((result) => result.title), [covered.title]);
+});
+
+test("a collection edition of a work already listed stays right after that work's editions", () => {
+  const h = harness();
+  const first = seeded(h, "Lobos", isbnOf(1), { author: "Ana Lima", workKey: "OL1W" });
+  const second = seeded(h, "Outra Edição", isbnOf(2), { author: "Ana Lima", workKey: "OL1W" });
+  seeded(h, "Lobos Beta", isbnOf(3), { author: "Rui Costa", workKey: "OL2W" });
+  h.repo.addBookCollection(second.id, { name: "Lobos", position: null }, "bnp", SERIES_AT);
+  assert.deepEqual(h.service.search("lobos").map((result) => result.title), [first.title, second.title, "Lobos Beta"]);
+});
+
+test("collection editions of works not yet listed are grouped by work", () => {
+  const h = harness();
+  const c1 = seeded(h, "Cão Um", isbnOf(1), { author: "Ana Lima", workKey: "OL1W" });
+  const d1 = seeded(h, "Doce Um", isbnOf(2), { author: "Rui Costa", workKey: "OL2W" });
+  const c2 = seeded(h, "Cão Dois", isbnOf(3), { author: "Ana Lima", workKey: "OL1W" });
+  for (const book of [c1, d1, c2]) h.repo.addBookCollection(book.id, { name: "Bichos", position: null }, "bnp", SERIES_AT);
+  assert.deepEqual(h.service.search("bichos").map((result) => result.title), [c1.title, c2.title, d1.title]);
 });
 
 test("a series name is searched together with its author", () => {
@@ -2408,7 +2434,7 @@ test("a series search by work gives one row per work", () => {
   const { deadhouse } = malazanCatalog(h);
   seeded(h, "Gardens of the Moon (reissue)", "9780765348999", { workKey: "OL1W" });
   const results = h.service.search("malazan", { byWork: true });
-  assert.deepEqual(results.map((result) => result.title), [deadhouse.title, "Gardens of the Moon", "Memories of Ice"]);
+  assert.deepEqual(results.map((result) => result.title), ["Gardens of the Moon", deadhouse.title, "Memories of Ice"]);
   assert.equal(new Set(results.map((result) => result.workId)).size, 3);
   assert.ok(results.every((result) => result.series?.name === MALAZAN));
 });
@@ -2571,7 +2597,7 @@ test("series works without a searchable edition never crowd out one that has it"
 test("series works are read only until the room left is filled", () => {
   const h = harness();
   const titleHits = [1, 2].map((n) => seeded(h, `Malazan ${n}`, isbnOf(n), { author: `Autor ${n}` }));
-  for (let n = 0; n < 30; n += 1) h.repo.addWorkSeries(seeded(h, `Livro ${n}`, isbnOf(100 + n), { author: `Escritor ${n}` }).work_id!, [{ name: MALAZAN, position: null }], "wikidata", SERIES_AT);
+  for (let n = 0; n < 30; n += 1) h.repo.addWorkSeries(seeded(h, `Livro ${n}`, isbnOf(100 + n), { author: `Escritor ${n}` }).work_id!, [{ name: "Contos de Malazan", position: null }], "wikidata", SERIES_AT);
   const editions = mock.method(h.repo, "editionsOf");
   const results = h.service.search("malazan");
   assert.equal(results.length, 12);
@@ -2580,16 +2606,16 @@ test("series works are read only until the room left is filled", () => {
 });
 
 function searchSpies(h: Harness) {
-  return { series: mock.method(h.repo, "searchSeriesWorks"), collections: mock.method(h.repo, "searchCollectionBooks") };
+  return { series: mock.method(h.repo, "searchSeries"), collections: mock.method(h.repo, "searchCollectionBooks") };
 }
 
-test("the series and collection indexes are not searched when title and author hits already fill the cap", () => {
+test("the series index is searched once, and the collection index not at all, when title and author hits already fill the cap", () => {
   for (const [byWork, cap] of [[false, 12], [true, 20]] as const) {
     const h = harness();
     for (let n = 0; n < cap; n += 1) seeded(h, `Malazan ${n}`, isbnOf(n), { author: `Autor ${n}` });
     const spies = searchSpies(h);
     assert.equal(h.service.search("malazan", { byWork }).length, cap);
-    assert.equal(spies.series.mock.callCount(), 0);
+    assert.equal(spies.series.mock.callCount(), 1);
     assert.equal(spies.collections.mock.callCount(), 0);
   }
 });
@@ -2614,6 +2640,108 @@ test("both indexes are searched while the earlier groups leave room", () => {
   h.service.search("malazan");
   assert.equal(spies.series.mock.callCount(), 1);
   assert.equal(spies.collections.mock.callCount(), 1);
+});
+
+function workWith(h: Harness, title: string, author: string, editions: number, first: number, series?: { name: string; position: string | null }) {
+  const [book] = Array.from({ length: editions }, (_, n) => seeded(h, title, isbnOf(first + n), { author, workKey: `OL${first}W` }));
+  if (series) h.repo.addWorkSeries(book!.work_id!, [series], "wikidata", SERIES_AT);
+  return book!.work_id!;
+}
+
+const workIdsFor = (h: Harness, query: string) => h.service.search(query, { byWork: true }).map((result) => result.workId);
+
+test("harry potter lists Rowling's seven novels first, in reading order", () => {
+  const h = harness();
+  const titles = ["Philosopher's Stone", "Chamber of Secrets", "Prisoner of Azkaban", "Goblet of Fire", "Order of the Phoenix", "Half-Blood Prince", "Deathly Hallows"];
+  const novels = titles.map((title, n) => ({ title: `Harry Potter and the ${title}`, n }));
+  const ids = [...novels].reverse().map(({ title, n }) => [n, workWith(h, title, "J. K. Rowling", 3, 100 * (n + 1), { name: "Harry Potter", position: String(n + 1) })] as const);
+  for (let n = 0; n < 4; n += 1) workWith(h, "Harry Potter", `Autor ${n}`, 1, 1000 + n);
+  const results = workIdsFor(h, "harry potter");
+  assert.deepEqual(results.slice(0, 7), [...ids].sort(([a], [b]) => a - b).map(([, id]) => id));
+  assert.equal(results.length, 11);
+});
+
+test("lord of the rings lists the three volumes, then the omnibus, then the calendar", () => {
+  const h = harness();
+  const volumes = ["The Fellowship of the Ring", "The Two Towers", "The Return of the King"].map((title, n) => workWith(h, title, "J. R. R. Tolkien", 1, 100 * (n + 1), { name: "The Lord of the Rings", position: String(n + 1) }));
+  const omnibus = workWith(h, "The Lord of the Rings", "J. R. R. Tolkien", 4, 1000);
+  const calendar = workWith(h, "2024 The Lord of the Rings Wall Calendar", "Tolkien Estate", 1, 2000);
+  assert.deepEqual(workIdsFor(h, "lord of the rings"), [...volumes, omnibus, calendar]);
+});
+
+test("dune lists Frank Herbert's Dune first", () => {
+  const h = harness();
+  const dune = workWith(h, "Dune", "Frank Herbert", 6, 100, { name: "Dune", position: "1" });
+  const messiah = workWith(h, "Dune Messiah", "Frank Herbert", 1, 200, { name: "Dune", position: "2" });
+  const other = workWith(h, "Dune", "Ana Lima", 1, 300);
+  assert.deepEqual(workIdsFor(h, "dune"), [dune, messiah, other]);
+});
+
+test("a series that only starts with the query does not lead when a work's title is the query", () => {
+  const h = harness();
+  const dune = workWith(h, "Dune", "Frank Herbert", 1, 100);
+  workWith(h, "Dune Messiah", "Frank Herbert", 1, 200, { name: "Dune Chronicles", position: "2" });
+  workWith(h, "Children of Dune", "Frank Herbert", 1, 300, { name: "Dune Chronicles", position: "3" });
+  assert.equal(workIdsFor(h, "dune")[0], dune);
+});
+
+test("a two-letter query never lets a series lead on a prefix of its name", () => {
+  const h = harness();
+  workWith(h, "It Ends with Us", "Colleen Hoover", 1, 100, { name: "It Ends with Us", position: "1" });
+  workWith(h, "It Starts with Us", "Colleen Hoover", 1, 200, { name: "It Ends with Us", position: "2" });
+  const night = workWith(h, "It Happened One Night", "Ana Lima", 5, 300);
+  assert.equal(workIdsFor(h, "it")[0], night);
+});
+
+test("when two series match, only the exact one leads, and a work in both appears once", () => {
+  const h = harness();
+  const dune = workWith(h, "Dune", "Frank Herbert", 1, 100, { name: "Dune", position: "1" });
+  const messiah = workWith(h, "Dune Messiah", "Frank Herbert", 1, 200, { name: "Dune", position: "2" });
+  for (const [id, position] of [[dune, "1"], [messiah, "2"]] as const) h.repo.addWorkSeries(id, [{ name: "Dune Chronicles", position }], "wikidata", SERIES_AT);
+  const children = workWith(h, "Children of Dune", "Frank Herbert", 1, 300, { name: "Dune Chronicles", position: "3" });
+  const emperor = workWith(h, "God Emperor of Dune", "Frank Herbert", 1, 400, { name: "Dune Chronicles", position: "4" });
+  const graphic = workWith(h, "Dune: The Graphic Novel", "Brian Herbert", 5, 500);
+  const results = workIdsFor(h, "dune");
+  assert.deepEqual(results.slice(0, 3), [dune, messiah, graphic]);
+  assert.deepEqual(new Set(results), new Set([dune, messiah, graphic, children, emperor]));
+  assert.equal(results.length, 5);
+});
+
+test("a leading series sorts decimal and Roman positions as numbers and puts unpositioned members last", () => {
+  const h = harness();
+  const [none, three, two, one, half] = ([null, "III", "2", "1", "1.5"] as const).map((position, n) => workWith(h, `Livro ${n}`, "Ana Lima", 1, 100 * (n + 1), { name: "Wayfarers", position }));
+  assert.deepEqual(workIdsFor(h, "wayfarers"), [one, half, two, three, none]);
+});
+
+test("a search by edition keeps each work's editions together and returns at most 12", () => {
+  const h = harness();
+  const dune = workWith(h, "Dune", "Frank Herbert", 5, 100, { name: "Dune", position: "1" });
+  const messiah = workWith(h, "Dune Messiah", "Frank Herbert", 5, 200, { name: "Dune", position: "2" });
+  workWith(h, "Dune", "Ana Lima", 5, 300);
+  const ids = h.service.search("dune").map((result) => result.workId);
+  assert.equal(ids.length, 12);
+  assert.deepEqual(ids.slice(0, 10), [...Array(5).fill(dune), ...Array(5).fill(messiah)]);
+  const runs = ids.filter((id, n) => id !== ids[n - 1]);
+  assert.equal(new Set(runs).size, runs.length);
+});
+
+test("a leading series member without a searchable edition is looked up once", () => {
+  const h = harness();
+  const hidden = seeded(h, "Livro escondido", isbnOf(1), { author: "Ana Lima", searchable: false });
+  h.repo.addWorkSeries(hidden.work_id!, [{ name: "Wayfarers", position: "1" }], "wikidata", SERIES_AT);
+  const editions = mock.method(h.repo, "editionsOf");
+  assert.deepEqual(h.service.search("wayfarers", { byWork: true }), []);
+  assert.deepEqual(editions.mock.calls.map((call) => call.arguments[0]), [[hidden.work_id]]);
+});
+
+test("a series member merged into another work appears once, as its canonical work", () => {
+  const h = harness();
+  const target = workWith(h, "Wayfarers: The Long Way", "Becky Chambers", 1, 100);
+  const alias = workWith(h, "Wayfarers: O Longo Caminho", "Becky Chambers", 1, 200, { name: "Wayfarers", position: "1" });
+  h.repo.addWorkSeries(target, [{ name: "Wayfarers", position: "1" }], "hardcover", SERIES_AT);
+  h.repo.mergeTranslation(alias, target, "manual", null, SERIES_AT);
+  assert.deepEqual(workIdsFor(h, "wayfarers"), [target]);
+  assert.deepEqual(h.service.search("wayfarers").map((result) => result.workId), [target, target]);
 });
 
 test("search results saved from outside carry the series once the work has one", async () => {

@@ -30,6 +30,7 @@ const MARC_LANGUAGES = new Map([
 export const SEARCH_LIMIT = 12;
 export const WORK_SEARCH_LIMIT = 20;
 export const WORK_SCAN_LIMIT = 100;
+export const CATALOG_SCAN_LIMIT = 100;
 export const MIN_PREFIX_LENGTH = 3;
 
 export function normalizeWorkKey(raw: string | null | undefined): string | null {
