@@ -47,7 +47,7 @@ export function ArenaSeedPage() {
   // ids are UUIDs (randomUUID in the arena service), so none can be
   // called "new". The existing `:id/seed` route matches it unchanged.
   const isDraft = id === "new";
-  const { tournament, isLoading, refetch } = useArena(isDraft ? "" : id!);
+  const { tournament, isLoading, refetch, refresh } = useArena(isDraft ? "" : id!);
   const { data: library } = useLibrary();
   const workBooks = useWorkBooks(library);
   const [slots, setSlots] = useState<Array<SeedBook | null>>([]);
@@ -186,7 +186,7 @@ export function ArenaSeedPage() {
         target.id,
         slots.filter((s): s is SeedBook => s !== null).map((book, i) => ({ slotIndex: i, book }))
       );
-      await refetch();
+      await refresh(target.id);
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Couldn't save your progress.");
     }
@@ -200,7 +200,7 @@ export function ArenaSeedPage() {
       const target = await materialize();
       if (!target) return;
       await randomFillTournament(target.id, pool);
-      await refetch();
+      await refresh(target.id);
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Couldn't random-fill the bracket.");
     } finally {
