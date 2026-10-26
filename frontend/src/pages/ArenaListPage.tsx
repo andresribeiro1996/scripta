@@ -7,11 +7,13 @@
 
 import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { contentDetail, contentTarget } from "@scripta/shared/community";
+import { quizPreview } from "@scripta/shared";
+import { TIER_LADDER, contentDetail, contentTarget } from "@scripta/shared/community";
 import type { Quiz } from "../api/quizzes";
 import type { Tierlist } from "../api/tierlists";
 import { TournamentStatusBadge } from "../components/arena/TournamentStatusBadge";
 import { QuizStatusBadge, quizStatus } from "../components/quizzes/QuizStatusBadge";
+import { GameTicket } from "../components/games/GameTicket";
 import { useConfirm } from "../components/ConfirmDialog";
 import { EmptyState } from "../components/EmptyState";
 import { ArenaIcon } from "../components/NavIcons";
@@ -128,7 +130,7 @@ export function ArenaListPage() {
             </ToolbarRow>
           )}
 
-          {showSkeleton && <SkeletonCardGrid count={3} label="Loading tournaments" tileClassName="min-h-[86px]" />}
+          {showSkeleton && <SkeletonCardGrid count={3} label="Loading tournaments" tileClassName="min-h-[260px]" gridClassName="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3" />}
 
           {!isLoading && !votedLoading && loadError && (
             <EmptyState
@@ -174,7 +176,7 @@ export function ArenaListPage() {
         <>
           {createError && <p className="mb-4 text-sm text-(--color-danger)">{createError}</p>}
 
-          {showTierlistSkeleton && <SkeletonCardGrid count={3} label="Loading tier lists" tileClassName="min-h-[86px]" />}
+          {showTierlistSkeleton && <SkeletonCardGrid count={3} label="Loading tier lists" tileClassName="min-h-[260px]" gridClassName="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3" />}
 
           {!tierlistsLoading && tierlists.length === 0 && votedTierlists.length === 0 && (
             <EmptyState
@@ -205,38 +207,32 @@ export function ArenaListPage() {
                   <p className="mt-1 text-sm text-(--color-text-dim)">Updated {new Date(tl.updatedAt).toLocaleDateString()}</p>
                 </div>
               ) : (
-                <div
+                <GameTicket
                   key={tl.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => navigate(`/dashboard/arena/tierlist/${tl.id}`)}
-                  onKeyDown={(e) => {
-                    if ((e.key === "Enter" || e.key === " ") && e.target === e.currentTarget) {
-                      e.preventDefault();
-                      navigate(`/dashboard/arena/tierlist/${tl.id}`);
-                    }
-                  }}
-                  className="relative cursor-pointer rounded-xl border border-(--color-border) bg-(--color-surface) hover:border-(--color-accent)"
-                >
-                  <div className="p-4 pr-12">
-                    <h3 className="font-semibold">{tl.name}</h3>
-                    <p className="text-sm text-(--color-text-dim)">Updated {new Date(tl.updatedAt).toLocaleDateString()}</p>
-                  </div>
-                  <OptionsMenu
-                    title="Tier list settings"
-                    triggerClassName="absolute top-1.5 right-1.5 flex h-11 w-11 items-center justify-center rounded-lg text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)"
-                    items={[
-                      ...(tl.voteCode === null ? [{
-                        label: "Rename",
-                        onClick: () => {
-                          setTierlistNameDraft(tl.name);
-                          setRenamingTierlistId(tl.id);
-                        }
-                      }] : []),
-                      { label: "Delete", onClick: () => void handleDeleteTierlist(tl), danger: true }
-                    ]}
-                  />
-                </div>
+                  kind="tierlist"
+                  name={tl.name}
+                  to={`/dashboard/arena/tierlist/${tl.id}`}
+                  meta={`Updated ${new Date(tl.updatedAt).toLocaleDateString()}`}
+                  badges={null}
+                  covers={[]}
+                  ladder={tl.data.tiers.map((tier) => tier.color)}
+                  menu={
+                    <OptionsMenu
+                      title="Tier list settings"
+                      triggerClassName={"flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)"}
+                      items={[
+                        ...(tl.voteCode === null ? [{
+                          label: "Rename",
+                          onClick: () => {
+                            setTierlistNameDraft(tl.name);
+                            setRenamingTierlistId(tl.id);
+                          }
+                        }] : []),
+                        { label: "Delete", onClick: () => void handleDeleteTierlist(tl), danger: true }
+                      ]}
+                    />
+                  }
+                />
               )
             )}
           </div>
@@ -246,14 +242,16 @@ export function ArenaListPage() {
               <h3 className="mb-3 mt-6 text-sm font-semibold">Voted on</h3>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {votedTierlists.map((tl) => (
-                  <a
+                  <GameTicket
                     key={tl.id}
-                    href={contentTarget({ kind: "tierlist", ...tl })}
-                    className="block rounded-xl border border-(--color-border) bg-(--color-surface) p-4 hover:border-(--color-accent)"
-                  >
-                    <h3 className="font-semibold">{tl.name}</h3>
-                    <p className="text-sm text-(--color-text-dim)">{contentDetail({ kind: "tierlist", ...tl })}</p>
-                  </a>
+                    kind="tierlist"
+                    name={tl.name}
+                    to={contentTarget({ kind: "tierlist", ...tl })}
+                    meta={contentDetail({ kind: "tierlist", ...tl })}
+                    badges={null}
+                    covers={tl.covers}
+                    ladder={TIER_LADDER}
+                  />
                 ))}
               </div>
             </>
@@ -263,7 +261,7 @@ export function ArenaListPage() {
 
       {tab === "quizzes" && (
         <>
-          {showQuizSkeleton && <SkeletonCardGrid count={3} label="Loading quizzes" tileClassName="min-h-[86px]" />}
+          {showQuizSkeleton && <SkeletonCardGrid count={3} label="Loading quizzes" tileClassName="min-h-[260px]" gridClassName="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3" />}
 
           {!quizzesLoading && quizzes.length === 0 && (
             <EmptyState
@@ -275,32 +273,23 @@ export function ArenaListPage() {
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {quizzes.map((quiz) => (
-              <div
+              <GameTicket
                 key={quiz.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => navigate(`/dashboard/arena/quiz/${quiz.id}`)}
-                onKeyDown={(e) => {
-                  if ((e.key === "Enter" || e.key === " ") && e.target === e.currentTarget) {
-                    e.preventDefault();
-                    navigate(`/dashboard/arena/quiz/${quiz.id}`);
-                  }
-                }}
-                className="relative cursor-pointer rounded-xl border border-(--color-border) bg-(--color-surface) hover:border-(--color-accent)"
-              >
-                <div className="p-4 pr-12">
-                  <h3 className="font-semibold">{quiz.name}</h3>
-                  <p className="flex flex-wrap items-center gap-1.5 text-sm text-(--color-text-dim)">
-                    {quiz.data.books.length} books
-                    <QuizStatusBadge status={quizStatus(quiz)} />
-                  </p>
-                </div>
-                <OptionsMenu
-                  title="Quiz settings"
-                  triggerClassName="absolute top-1.5 right-1.5 flex h-11 w-11 items-center justify-center rounded-lg text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)"
-                  items={[{ label: "Delete", onClick: () => void handleDeleteQuiz(quiz), danger: true }]}
-                />
-              </div>
+                kind="quiz"
+                name={quiz.name}
+                to={`/dashboard/arena/quiz/${quiz.id}`}
+                meta={`${quiz.data.books.length} books`}
+                badges={<QuizStatusBadge status={quizStatus(quiz)} />}
+                covers={[]}
+                preview={quizPreview(quiz.data)}
+                menu={
+                  <OptionsMenu
+                    title="Quiz settings"
+                    triggerClassName={"flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)"}
+                    items={[{ label: "Delete", onClick: () => void handleDeleteQuiz(quiz), danger: true }]}
+                  />
+                }
+              />
             ))}
           </div>
         </>
@@ -313,15 +302,13 @@ export function ArenaListPage() {
 // seeding, but the card markup is identical either way.
 function TournamentCard({ t }: { t: Tournament }) {
   return (
-    <a
-      href={t.status === "seeding" ? `/dashboard/arena/${t.id}/seed` : `/arena/${t.id}`}
-      className="block rounded-xl border border-(--color-border) bg-(--color-surface) p-4 hover:border-(--color-accent)"
-    >
-      <h3 className="font-semibold">{t.name}</h3>
-      <p className="flex flex-wrap items-center gap-1.5 text-sm text-(--color-text-dim)">
-        {t.bracketSize}-book bracket
-        <TournamentStatusBadge status={t.status} round={t.currentRound} />
-      </p>
-    </a>
+    <GameTicket
+      kind="tournament"
+      name={t.name}
+      to={t.status === "seeding" ? `/dashboard/arena/${t.id}/seed` : `/arena/${t.id}`}
+      meta={`${t.bracketSize}-book bracket`}
+      badges={<TournamentStatusBadge status={t.status} round={t.currentRound} />}
+      covers={t.covers}
+    />
   );
 }

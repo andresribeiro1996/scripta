@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { parseRankingPreview } from "./helpers.js";
 import { test } from "node:test";
+import { DEFAULT_TIER_PRESET } from "../tierlists/tierlist.js";
 
 test("ranking previews keep real book placements and discard malformed or empty tiers", () => {
   const tier = { label: "S", color: "#c9482f", books: [{ title: "Dune", coverUrl: null }] };
@@ -13,7 +14,7 @@ test("ranking previews keep real book placements and discard malformed or empty 
 test("a reading start uses a familiar wire event with an additive flag", () => {
   assert.equal(activityRow({ id: "start", type: "book_added", payload: { title: "Dune", status: 1, started: true }, createdAt: "2026-10-14T10:00:00Z" })?.label, "Started reading");
 });
-import { activityRow, contentDetail, contentKindLabel, contentStats, contentStatus, contentTarget, feedAction, followFailureMessage, isKnownContent, personCaption, suggestionReason } from "./helpers.js";
+import { TIER_LADDER, activityRow, contentDetail, contentKindLabel, contentStats, contentStatus, contentTarget, feedAction, followFailureMessage, gameActionLabel, isKnownContent, personCaption, suggestionReason } from "./helpers.js";
 import type { FeedItem, PersonResult, PublishedContent, QuizSummary, SuggestedReader } from "./types.js";
 
 test("suggestionReason counts the shared books, singular or plural", () => {
@@ -113,4 +114,23 @@ test("isKnownContent accepts the kinds this build renders and rejects others", (
   assert.equal(isKnownContent({ kind: "tierlist" } as PublishedContent), true);
   assert.equal(isKnownContent({ kind: "hologram" } as never), false);
   assert.equal(isKnownContent(undefined as never), false);
+});
+
+const actionTierlist = { kind: "tierlist", id: "t1", voteCode: "code12ab", name: "Top fantasy", poolSize: 12, ballotCount: 4, votingOpen: true, promotedAt: null, covers: [] as string[] } as const;
+const actionTournament = { kind: "tournament", id: "g1", name: "Autumn cup", bracketSize: 8, status: "active", bookCount: 8, covers: [] as string[] } as const;
+
+test("ticket actions reflect closed games and prior participation", () => {
+  assert.equal(gameActionLabel({ ...actionTierlist, votingOpen: true }), "Rank books");
+  assert.equal(gameActionLabel({ ...actionTierlist, viewerVoted: true }), "Edit ranking");
+  assert.equal(gameActionLabel({ ...actionTierlist, votingOpen: false }), "View rankings");
+  assert.equal(gameActionLabel({ ...actionTierlist, promotedAt: "2026-01-01" }), "View rankings");
+  assert.equal(gameActionLabel({ ...actionTournament, status: "completed" }), "View results");
+  assert.equal(gameActionLabel({ ...actionTournament, status: "active" }), "Vote in tournament");
+  assert.equal(gameActionLabel(quiz()), "Play quiz");
+  assert.equal(gameActionLabel(quiz({ viewerVoted: true })), "View quiz");
+  assert.equal(gameActionLabel(quiz({ playOpen: false })), "View quiz");
+});
+
+test("the tier ladder is the default preset colours", () => {
+  assert.deepEqual(TIER_LADDER, DEFAULT_TIER_PRESET.map((tier) => tier.color));
 });

@@ -10,22 +10,8 @@ import {
   contentTarget,
   feedHeading,
   feedTarget,
-  gameActionLabel,
   renderableActivity,
 } from "./communityHome.js";
-
-test("ticket actions reflect closed games and prior participation", () => {
-  assert.equal(gameActionLabel({ ...tierlist, votingOpen: true }), "Rank books");
-  assert.equal(gameActionLabel({ ...tierlist, viewerVoted: true }), "Edit ranking");
-  assert.equal(gameActionLabel({ ...tierlist, votingOpen: false }), "View rankings");
-  assert.equal(gameActionLabel({ ...tierlist, promotedAt: "2026-01-01" }), "View rankings");
-  assert.equal(gameActionLabel({ ...tournament, status: "completed" }), "View results");
-  assert.equal(gameActionLabel({ ...tournament, status: "active" }), "Vote in tournament");
-  const quiz = { kind: "quiz" as const, id: "q", voteCode: "code", name: "Quiz", questionCount: 4, playCount: 0, playOpen: true, covers: [] };
-  assert.equal(gameActionLabel(quiz), "Play quiz");
-  assert.equal(gameActionLabel({ ...quiz, viewerVoted: true }), "View quiz");
-  assert.equal(gameActionLabel({ ...quiz, playOpen: false }), "View quiz");
-});
 
 const tierlist = {
   kind: "tierlist",
