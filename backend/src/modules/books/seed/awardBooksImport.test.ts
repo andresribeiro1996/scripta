@@ -430,3 +430,25 @@ test("importAwardBooks saves in chunks of 25 with a 250 ms pause between them", 
   assert.deepEqual(second.sleeps, [250, 250]);
   assert.equal(bookCount(second.db), 51);
 });
+
+test("skipped works are neither looked up nor saved, and only missing ones count as skipped", async () => {
+  const { db, deps } = setup();
+  const found = searching((query) => ("text" in query && query.text === "key:/works/OL2W" ? [hit("Wolf Hall", ["Hilary Mantel"], "OL2W")] : []));
+  const report = await importAwardBooks(
+    { ...deps, search: found.search },
+    [work("Q1", ["booker"], { olWorkIds: ["OL1W"] }), work("Q2", ["booker"], { olWorkIds: ["OL2W"] })],
+    AT,
+    { dryRun: false, max: null, skip: new Set(["Q1", "Q99"]) }
+  );
+  assert.deepEqual(found.asked, [{ text: "key:/works/OL2W" }]);
+  assert.equal(bookCount(db), 1);
+  assert.equal(report.skipped, 1);
+  assert.equal(report.prizes.booker?.candidates, 1);
+  assert.equal(report.requests, 1);
+});
+
+test("a dry run without a skip set reports none skipped", async () => {
+  const { deps } = setup();
+  const report = await importAwardBooks({ ...deps, search: searching(() => []).search }, [work("Q1", ["booker"], { olWorkIds: ["OL1W"] })], AT, { dryRun: true, max: null });
+  assert.equal(report.skipped, 0);
+});
