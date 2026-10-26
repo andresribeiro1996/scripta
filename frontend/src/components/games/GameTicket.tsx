@@ -52,7 +52,7 @@ export function GameTicket({
   const { prefix, color, soft, action } = KINDS[kind];
   const clue = kind === "quiz" && preview && preview.type !== "cover_title" ? preview : undefined;
   return (
-    <div className="relative flex flex-col overflow-hidden rounded-xl border border-(--color-border) bg-(--color-surface) hover:border-(--color-accent)">
+    <div className="relative flex w-full flex-col overflow-clip rounded-xl border border-(--color-border) bg-(--color-surface) hover:border-(--color-accent)">
       <div className="flex items-stretch">
         <div className={`flex w-22 shrink-0 items-center justify-center border-r border-(--color-border) ${soft}`}>
           <GameTicketArt kind={kind} covers={covers} ladder={ladder} preview={preview} color={color} />
