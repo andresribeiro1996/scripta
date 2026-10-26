@@ -11,11 +11,12 @@ import { MuralFolderTree } from "../components/murals/MuralFolderTree";
 import { MuralPresetPicker } from "../components/murals/MuralPresetPicker";
 import { MuralsIcon } from "../components/NavIcons";
 import { OptionsMenu } from "../components/OptionsMenu";
-import { PageContainer } from "../components/PageContainer";
+import { Page } from "../components/page/Page";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../components/page/buttonClasses";
 import { ShareModal } from "../components/ShareModal";
 import { OptionSheet } from "../components/Sheet";
 import { SkeletonCardGrid } from "../components/Skeleton";
-import { FolderIcon, PlusIcon, SortIcon, TOOLBAR_CONTROL_CLASS, ToolbarRow, toolbarIconClass } from "../components/Toolbar";
+import { FolderIcon, SortIcon, TOOLBAR_CONTROL_CLASS, ToolbarRow, toolbarIconClass } from "../components/Toolbar";
 import { useDelayedShow } from "../hooks/useDelayedShow";
 import { useMuralFolders } from "../hooks/useMuralFolders";
 import { useMurals } from "../hooks/useMurals";
@@ -146,17 +147,11 @@ export function MuralsListPage() {
   const movingFolder = movingFolderId ? folders.find((f) => f.id === movingFolderId) : null;
 
   return (
-    <PageContainer>
+    <Page title="Murals" actions={<button onClick={handleCreate} className={BUTTON_PRIMARY}>New mural</button>}>
       <button onClick={() => setPresetsOpen(true)} className="mb-4 flex min-h-11 w-full items-center justify-between rounded-xl border border-(--color-border) bg-(--color-surface) px-4 text-left text-sm font-semibold hover:bg-(--color-surface-hover)">
         <span>Start from a preset</span><span aria-hidden="true">→</span>
       </button>
       {presetsOpen && <MuralPresetPicker folderId={selectedFolderId} onClose={() => setPresetsOpen(false)} />}
-      {/* Desktop-only. On a phone this row held nothing but the word
-          "Murals", which the bottom tab bar already says. */}
-      <header className="mb-6 hidden items-center justify-between gap-4 sm:flex">
-        <h2 className="text-lg font-bold">Murals</h2>
-      </header>
-
       <div className="flex items-start gap-6">
         <div className="hidden w-56 shrink-0 md:block">
           <MuralFolderTree
@@ -172,7 +167,7 @@ export function MuralsListPage() {
 
         <div className="min-w-0 flex-1">
           <nav className="mb-3 hidden items-center gap-1 text-xs text-(--color-text-dim) md:flex">
-            <button onClick={() => setSelectedFolderId(null)} className="hover:text-(--color-text)">
+            <button onClick={() => setSelectedFolderId(null)} className="inline-flex min-h-11 items-center hover:text-(--color-text)">
               All murals
             </button>
             {folderPath(folders, selectedFolderId).map((f, i, path) => (
@@ -181,7 +176,7 @@ export function MuralsListPage() {
                 {i === path.length - 1 ? (
                   <span className="font-semibold text-(--color-text)">{f.name}</span>
                 ) : (
-                  <button onClick={() => setSelectedFolderId(f.id)} className="hover:text-(--color-text)">
+                  <button onClick={() => setSelectedFolderId(f.id)} className="inline-flex min-h-11 items-center hover:text-(--color-text)">
                     {f.name}
                   </button>
                 )}
@@ -197,7 +192,7 @@ export function MuralsListPage() {
               title="No murals yet."
               body={'A mural is a freeform dashboard you build yourself \u2014 a "Top 5 Books This Year" shelf, a favorite quote, a photo, whatever you want on the wall. Use the + below to start.'}
               action={
-                <button onClick={() => setPresetsOpen(true)} className="rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-semibold text-(--color-on-accent)">
+                <button onClick={() => setPresetsOpen(true)} className={BUTTON_SECONDARY}>
                   Start from a preset
                 </button>
               }
@@ -246,16 +241,16 @@ export function MuralsListPage() {
                   regardless of its label's height. */}
               <div className="hidden flex-wrap items-end gap-3 sm:flex">
                 <label className="flex flex-col gap-1">
-                  <span className="text-[10.5px] font-semibold tracking-wide text-(--color-text-dim) uppercase">Search</span>
+                  <span className="text-[10.5px] font-semibold text-(--color-text-dim)">Search</span>
                   <input
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Search"
-                    className="w-56 max-w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm"
+                    className="min-h-11 w-56 max-w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm"
                   />
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-[10.5px] font-semibold tracking-wide text-(--color-text-dim) uppercase">Sort</span>
+                  <span className="text-[10.5px] font-semibold text-(--color-text-dim)">Sort</span>
                   {/* appearance-none + a hand-drawn chevron, not the browser's
                       own <select> arrow — the native one rendered flush
                       against the box's right edge with no real breathing room
@@ -267,7 +262,7 @@ export function MuralsListPage() {
                     <select
                       value={sortBy}
                       onChange={(e) => setSortBy(e.target.value as SortBy)}
-                      className="w-full appearance-none rounded-lg border border-(--color-border) bg-(--color-surface) py-2 pr-8 pl-3 text-sm"
+                      className="min-h-11 w-full appearance-none rounded-lg border border-(--color-border) bg-(--color-surface) py-2 pr-8 pl-3 text-sm"
                     >
                       {SORT_OPTIONS.map((opt) => (
                         <option key={opt.value} value={opt.value}>
@@ -332,35 +327,6 @@ export function MuralsListPage() {
           )}
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {/* Replaces the old "New mural name…" input + "Create mural"
-                button, always the first thing in the grid rather than a
-                separate form row above it. Creates immediately on click
-                with a placeholder name ("Untitled mural," see
-                handleCreate) instead of asking for a name up front —
-                there's no text field left to type one into before
-                creating. Stays visible regardless of the search/filter
-                controls above (it's not part of `filteredMurals`), since
-                the ability to create a new mural shouldn't disappear just
-                because a filter currently matches nothing.
-
-                Deliberately SHORTER than a real mural card (min-h-14, not
-                the cards' min-h-40). It matched their full height at
-                first, on the theory that it should sit among them as a
-                peer — but a full-size dashed rectangle is the largest
-                thing on an empty page and reads as more important than
-                the murals themselves, and on a phone, where the grid is
-                one column, it filled a third of the viewport before any
-                real content. A single compact row still reads as "add
-                one" from the dashed border and the "+". */}
-            <button
-              onClick={handleCreate}
-              title="Create a new mural"
-              className="flex min-h-14 items-center justify-center gap-2 rounded-xl border-2 border-dashed border-(--color-border) p-4 text-(--color-text-dim) transition-colors hover:border-(--color-accent) hover:text-(--color-accent) disabled:opacity-60"
-            >
-              <PlusIcon />
-              <span className="text-sm font-semibold">New mural</span>
-            </button>
-
             {filteredMurals.map((mural) => {
               const hasCover = Boolean(mural.coverImageUrl);
               return (
@@ -369,10 +335,10 @@ export function MuralsListPage() {
                 // BookCard.tsx already uses for opening a book. role="button"/
                 // tabIndex/onKeyDown mirror CoverPickerModal.tsx's gallery
                 // tiles, so opening a mural this way stays keyboard-reachable
-                // too, not just clickable. A fixed min-h-40 — same as the "+"
-                // tile above — so every card in the grid lines up whether or
-                // not it has a cover image, instead of content-driven cards
-                // of differing heights sitting next to a full-bleed image one.
+                // too, not just clickable. A fixed min-h-40 so every card in the grid
+                // lines up whether or not it has a cover image, instead of
+                // content-driven cards of differing heights sitting next to a
+                // full-bleed image one.
                 <div
                   key={mural.id}
                   role="button"
@@ -382,7 +348,7 @@ export function MuralsListPage() {
                     // e.target === e.currentTarget: only react when the key
                     // event originated on the card itself, not bubbled up
                     // from a real focusable control nested inside it (the
-                    // settings ⚙, or the rename input while editing) — those
+                    // options menu, or the rename input while editing) — those
                     // need Enter/Space for their own purposes (activating the
                     // button, typing a literal space into the name), not
                     // "open this mural."
@@ -451,8 +417,8 @@ export function MuralsListPage() {
                         title="Mural settings"
                         triggerClassName={
                           hasCover
-                            ? "flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[rgba(10,8,6,0.72)] text-white backdrop-blur-xs"
-                            : "flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)"
+                            ? "-m-2.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[rgba(10,8,6,0.72)] text-white backdrop-blur-xs"
+                            : "-m-2.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)"
                         }
                         items={[
                           {
@@ -533,6 +499,6 @@ export function MuralsListPage() {
           onClose={() => setSharingMuralId(null)}
         />
       )}
-    </PageContainer>
+    </Page>
   );
 }

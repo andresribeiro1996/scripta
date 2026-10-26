@@ -15,7 +15,7 @@ const VOTE_VERBS = { tierlist: "Rank it yourself", quiz: "Play it yourself", tou
 export function recapTitle(card: TopShelfRecapCard, month: string): string {
   const name = recapMonthName(month);
   switch (card.kind) {
-    case "summary": return `${name} on Scripta`;
+    case "summary": return `${name} on Atmyshelf`;
     case "hottestGame": return `🔥 ${name}'s hottest game`;
     case "book": {
       if (card.board === "champions") return "Book of the month";
@@ -35,9 +35,9 @@ export function recapNumber(card: TopShelfRecapCard): string {
 
 export function recapCta(card: TopShelfRecapCard, currentMonth: string): string {
   switch (card.kind) {
-    case "summary": return "Join in on Scripta";
+    case "summary": return "Join in on Atmyshelf";
     case "hottestGame": return card.open ? "Play it yourself" : "See how it ended";
-    case "book": return card.game ? `${VOTE_VERBS[card.game.content.kind]} — it counts for ${recapMonthName(currentMonth)}` : `See ${card.book.title} on Scripta`;
+    case "book": return card.game ? `${VOTE_VERBS[card.game.content.kind]} — it counts for ${recapMonthName(currentMonth)}` : `See ${card.book.title} on Atmyshelf`;
   }
 }
 

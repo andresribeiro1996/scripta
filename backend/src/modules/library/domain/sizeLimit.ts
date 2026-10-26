@@ -5,9 +5,9 @@ function wholeMegabytes(bytes: number): number {
 }
 
 export function libraryTooLargeMessage(maxBytes: number): string {
-  return `Your library is over ${wholeMegabytes(maxBytes)} MB, the most Scripta can store. Remove some books or highlights and try again.`;
+  return `Your library is over ${wholeMegabytes(maxBytes)} MB, the most Atmyshelf can store. Remove some books or highlights and try again.`;
 }
 
 export function importTooLargeMessage(maxBytes: number): string {
-  return `This import is over ${wholeMegabytes(maxBytes)} MB, the most Scripta can store. Import fewer books or highlights.`;
+  return `This import is over ${wholeMegabytes(maxBytes)} MB, the most Atmyshelf can store. Import fewer books or highlights.`;
 }

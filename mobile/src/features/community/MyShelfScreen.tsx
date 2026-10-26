@@ -222,7 +222,7 @@ export function MyShelfScreen() {
                 body="Import your existing collection, or add your first book manually."
                 actionLabel="Import library"
                 onAction={() => router.push("/import" as never)}
-                secondaryActionLabel="Add a book manually"
+                secondaryActionLabel="Add a book"
                 onSecondaryAction={() => router.push("/add-book" as never)}
               />
             );

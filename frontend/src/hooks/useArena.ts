@@ -34,5 +34,15 @@ export function useArena(id: string) {
     await queryClient.invalidateQueries({ queryKey });
   }
 
-  return { tournament: query.data, isLoading: query.isLoading, error: query.error, voterToken, vote, refetch: query.refetch };
+  async function refetch() {
+    if (id !== "") await query.refetch();
+  }
+
+  async function refresh(targetId: string) {
+    if (targetId === "") return;
+    await queryClient.cancelQueries({ queryKey: ["arena", targetId] });
+    await queryClient.invalidateQueries({ queryKey: ["arena", targetId] }, { throwOnError: true });
+  }
+
+  return { tournament: query.data, isLoading: query.isLoading, error: query.error, voterToken, vote, refetch, refresh };
 }

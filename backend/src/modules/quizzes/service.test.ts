@@ -9,12 +9,13 @@ import type { AnswerRow, PlayRow, QuizRow } from "./domain/types.js";
 import { normalizeWords } from "@scripta/shared";
 import { createQuizzesPublicApi, createQuizzesService, type QuizWriteOutcome } from "./service.js";
 
-function fakeWorks(options: { aliases?: Record<string, string>; titles?: Record<string, string>; covers?: Record<string, string> } = {}): QuizWorks {
+function fakeWorks(options: { aliases?: Record<string, string>; titles?: Record<string, string>; covers?: Record<string, string>; characters?: Map<string, string[]> } = {}): QuizWorks {
   const alias = (id: string) => options.aliases?.[id] ?? id;
   return {
     knownWorkIds: (ids) => ids.map(alias),
     resolveTitleWorks: (books) => books.map((entry) => options.titles?.[entry.title] ?? null),
     canonicalByKey: (ids) => new Map([...ids].map(([key, id]) => [key, alias(id)])),
+    charactersOf: (workIds) => new Map(workIds.flatMap((id) => (options.characters?.has(id) ? [[id, options.characters.get(id)!] as const] : []))),
     publicBooksByWork: (_ownerUserId, workIds) =>
       new Map(workIds.flatMap((id) => (options.covers?.[id] ? [[id, { key: id, workId: id, title: id, author: "A", isbn: null, imageId: null, coverUrl: options.covers[id]!, readStatus: null } satisfies PublicBookData] as const] : [])))
   };
@@ -516,7 +517,7 @@ function namedPlaysFixture(names: Map<string, string>) {
   return { service, code, quizId: made.id, answers: answerFirst(service, code) };
 }
 
-test("results name a nameable player by their current username, call other signed-in players Reader, and tag guests as anonymous", () => {
+test("results name a signed-in player by their current username, fall back to the typed name then Reader, and tag guests as anonymous", () => {
   const names = new Map([["alice-id", "alice"]]);
   const { service, code, quizId, answers } = namedPlaysFixture(names);
   service.submitPlay(code, answers, 1000, null, { kind: "user", userId: "alice-id" });
@@ -540,13 +541,14 @@ test("results name a nameable player by their current username, call other signe
   assert.equal(service.getResults("u1", quizId)!.plays[0]!.playerName, "alice2");
 });
 
-test("a signed-in player's typed name is not shown when they are nameable, and a non-nameable one never leaks a username", () => {
+test("a signed-in player's typed name is not shown when the resolver has a username, and one without a username shows the typed name", () => {
   const { service, code, quizId, answers } = namedPlaysFixture(new Map([["alice-id", "alice"]]));
   service.submitPlay(code, answers, 1000, "Typed", { kind: "user", userId: "alice-id" });
   assert.equal(service.getResults("u1", quizId)!.plays[0]!.playerName, "alice");
   const other = namedPlaysFixture(new Map());
-  other.service.submitPlay(other.code, other.answers, 1000, null, { kind: "user", userId: "alice-id" });
-  assert.equal(other.service.getResults("u1", other.quizId)!.plays[0]!.playerName, "Reader");
+  other.service.submitPlay(other.code, other.answers, 1000, "Typed", { kind: "user", userId: "alice-id" });
+  other.service.submitPlay(other.code, other.answers, 2000, null, { kind: "user", userId: "bob-id" });
+  assert.deepEqual(other.service.getResults("u1", other.quizId)!.plays.map((p) => p.playerName), ["Typed", "Reader"]);
 });
 
 test("submitPlay and getPlay return the player's pick and the correct index per question, for users and guests", () => {
@@ -563,4 +565,53 @@ test("submitPlay and getPlay return the player's pick and the correct index per 
   const reread = service.getPlay(code, { kind: "anonymous", playId: guest.ok ? guest.playId : null });
   assert.deepEqual(reread.ok && reread.answers, expected);
   assert.equal(service.getPlay(code, { kind: "anonymous", playId: null }).ok, false);
+});
+
+const catalogCharacters = (names: string[][]) => new Map(names.map((list, i) => [`b${i}`, list]));
+const charactersQuiz = (service: ReturnType<typeof createQuizzesService>, books: QuizBook[]) =>
+  created(service.createQuiz("u1", "Cast", { sourceLabel: "", questionCount: 4, allowedTypes: ["characters_title"], books })).id;
+
+test("publish fills characters from the catalog and freezes them", () => {
+  const catalog = catalogCharacters([0, 1, 2, 3].map((i) => [`Cat${i}a`, `Cat${i}b`, `Cat${i}c`, `Cat${i}d`]));
+  const service = createQuizzesService(createInMemoryRepo(), fakeWorks({ characters: catalog }));
+  const id = charactersQuiz(service, [0, 1, 2, 3].map((i) => book(`b${i}`, { characters: ["Fake A", "Fake B", "Fake C"] })));
+  const outcome = service.publishQuiz("u1", id);
+  assert.ok(outcome.ok);
+  const stored = (outcome.ok ? outcome.quiz.data : {}) as { books: Array<{ workId: string; characters: string[] }> };
+  stored.books.forEach((b, i) => assert.deepEqual(b.characters, catalog.get(`b${i}`)));
+  const code = service.getQuiz("u1", id)!.voteCode!;
+  const before = service.getPlayBoard(code)!.questions.map((q) => q.prompt);
+  catalog.set("b0", ["Changed X", "Changed Y", "Changed Z"]);
+  assert.deepEqual(service.getPlayBoard(code)!.questions.map((q) => q.prompt), before);
+  assert.ok(before.every((prompt) => !prompt.includes("Fake") && !prompt.includes("Changed")));
+});
+
+test("public characters question prompt is the joined first three", () => {
+  const names = [["Elizabeth Bennet", "Fitzwilliam Darcy", "Charlotte Lucas", "Jane Bennet"], ["Frodo Baggins", "Samwise Gamgee", "Gandalf"], ["Ahab", "Ishmael", "Queequeg"], ["Winston Smith", "Julia", "O'Brien"]];
+  const service = createQuizzesService(createInMemoryRepo(), fakeWorks({ characters: catalogCharacters(names) }));
+  const id = charactersQuiz(service, [0, 1, 2, 3].map((i) => book(`b${i}`)));
+  assert.ok(service.publishQuiz("u1", id).ok);
+  const prompts = service.getPlayBoard(service.getQuiz("u1", id)!.voteCode!)!.questions.map((q) => q.prompt);
+  assert.ok(prompts.includes("Elizabeth Bennet · Fitzwilliam Darcy · Charlotte Lucas"));
+});
+
+test("publish error names characters", () => {
+  const service = createQuizzesService(createInMemoryRepo(), fakeWorks());
+  const id = charactersQuiz(service, [0, 1, 2, 3].map((i) => book(`b${i}`)));
+  const outcome = service.publishQuiz("u1", id);
+  assert.deepEqual(outcome.ok ? null : outcome, { ok: false, reason: "invalid", error: "Not enough books have the covers, quotes, blurbs, or characters those question types need." });
+});
+
+test("a stored draft without allowedTypes reads as the four original types", () => {
+  const repo = createInMemoryRepo();
+  const service = createQuizzesService(repo, fakeWorks({ characters: catalogCharacters([0, 1, 2, 3].map((i) => [`Cat${i}a`, `Cat${i}b`, `Cat${i}c`])) }));
+  const id = created(service.createQuiz("u1", "Old", { sourceLabel: "", questionCount: 4, allowedTypes: ["cover_title"], books: [0, 1, 2, 3].map((i) => book(`b${i}`)) })).id;
+  const row = repo.getOwned(id, "u1")!;
+  const { allowedTypes: _dropped, ...rest } = JSON.parse(row.data) as Record<string, unknown>;
+  repo.update(id, "u1", { data: JSON.stringify(rest) });
+  const outcome = service.publishQuiz("u1", id);
+  assert.ok(outcome.ok);
+  const types = new Set(((outcome.ok ? outcome.quiz.data : {}) as { questions: Array<{ type: string }> }).questions.map((q) => q.type));
+  assert.equal(types.has("characters_title"), false);
+  assert.deepEqual((outcome.ok ? (outcome.quiz.data as { allowedTypes: string[] }).allowedTypes : []), ["cover_title", "title_cover", "quote_title", "blurb_title"]);
 });

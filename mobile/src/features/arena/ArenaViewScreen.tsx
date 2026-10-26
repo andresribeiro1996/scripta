@@ -2,12 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { router, Stack } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Alert, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { createVoterToken } from "@scripta/shared";
 import { useAuth } from "../../core/auth";
 import { isPermanentError } from "../../core/apiClient";
-import { Button, Dialog, EmptyState, ErrorState, HeaderActions, IconButton, Input, Menu, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, spacing, typography, useTheme } from "../../ui";
+import { Button, ConfirmDialog, Dialog, EmptyState, ErrorState, HeaderActions, IconButton, Input, Menu, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, spacing, typography, useTheme } from "../../ui";
 import { AddBookSheet } from "../community/AddBookSheet";
 import { fetchTournament, renameTournament, resolveTiebreak, settleDuelEarly, voteOnDuel } from "./api";
 import { arenaViewTabs, matchEmptyCopy, tournamentChampion, votableDuels, type ArenaViewTab } from "./arenaView";
@@ -29,6 +29,7 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
   const [token, setToken] = useState<string | null>(null);
   const [tab, setTab] = useState<ArenaViewTab | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [settling, setSettling] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [renaming, setRenaming] = useState(false);
   const [name, setName] = useState("");
@@ -79,11 +80,9 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
     }
   }
 
-  function confirmSettle(duelId: string) {
-    Alert.alert("Settle this match now?", "Voting closes and the current votes decide the winner. A tie comes back to you to break.", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Settle", style: "destructive", onPress: () => void action(duelId, () => settleDuelEarly(id, duelId)) },
-    ]);
+  async function settle(duelId: string) {
+    await action(duelId, () => settleDuelEarly(id, duelId));
+    setSettling(null);
   }
 
   if (!token || tournament.isPending) return <Screen bottom top={false} style={styles.centered}><Skeleton height={160} /></Screen>;
@@ -151,7 +150,7 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
               tournament={data}
               isOwner={isOwner}
               busyDuelId={busy}
-              onSettle={confirmSettle}
+              onSettle={setSettling}
               onTiebreak={(duelId, workId) => void action(duelId, () => resolveTiebreak(id, duelId, workId))}
             />
           </ScrollView>
@@ -171,7 +170,7 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
         refreshing={tournament.isRefetching}
         onRefresh={refresh}
         onShowClassic={() => setBracketView("classic")}
-        onSettle={confirmSettle}
+        onSettle={setSettling}
         onTiebreak={(duelId, workId) => void action(duelId, () => resolveTiebreak(id, duelId, workId))}
       />
     );
@@ -211,6 +210,7 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
       <ArenaBooksSheet id={booksOpen ? id : null} name={data.name} onAddBook={openAddBook} onClose={() => setBooksOpen(false)} />
       {addBook ? <AddBookSheet book={addBook} onClose={() => setAddBook(null)} /> : null}
       <Dialog visible={renaming} title="Rename tournament" onClose={() => setRenaming(false)}><View style={styles.dialog}><Input label="Tournament name" value={name} onChangeText={setName} maxLength={200} /><Button label="Save name" disabled={!name.trim()} loading={busy === "rename"} onPress={() => void action("rename", async () => { await renameTournament(id, name.trim()); setRenaming(false); })} /></View></Dialog>
+      <ConfirmDialog visible={settling !== null} title="Settle this match now?" body="Voting closes and the current votes decide the winner. A tie comes back to you to break." confirmLabel="Settle" destructive loading={settling !== null && busy === settling} onConfirm={() => settling && void settle(settling)} onCancel={() => setSettling(null)} />
     </Screen>
   );
 }

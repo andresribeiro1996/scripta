@@ -3,14 +3,17 @@
 // the editor; the pool ships with famous first lines already attached.
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { QUIZ_POOL, QUIZ_QUESTION_TYPES, bookKey, booksInGroup, eligibleTypes, workIdOf, type QuizBookInput, type QuizDataInput, type QuizQuestionType, booksByWork } from "@scripta/shared";
-import { PageContainer } from "../components/PageContainer";
+import { Page } from "../components/page/Page";
+import { backTo } from "../lib/areas";
 import { createQuizApi } from "../api/quizzes";
 import { resolveCover } from "../api/covers";
 import { normalizeImageId, normalizeIsbn } from "../lib/covers";
 import { useLibrary } from "../hooks/useLibrary";
 import { useWorkBooks } from "../hooks/useWorkBooks";
+import { CHECKBOX_CLASS, RADIO_CLASS } from "../components/Toolbar";
+import { useWorkCharacters } from "../hooks/useWorkCharacters";
 
 function toQuizBook(book: Record<string, unknown>, resolvedCover: string | null | undefined): QuizBookInput {
   return {
@@ -30,7 +33,8 @@ const TYPE_LABELS: Record<QuizQuestionType, string> = {
   cover_title: "Guess the title from a blurred cover",
   title_cover: "Guess the cover from the title",
   quote_title: "Guess the book from a quote",
-  blurb_title: "Guess the book from its blurb"
+  blurb_title: "Guess the book from its blurb",
+  characters_title: "Guess the book from its characters"
 };
 
 const BOOK_COUNT = 4;
@@ -104,9 +108,15 @@ export function QuizCreatePage() {
       ? QUIZ_POOL.filter((book) => poolIds.includes(book.id)).map(({ id: _id, ...book }) => book)
       : shelfRawBooks.map((raw) => toQuizBook(raw, resolvedCovers[bookKey(raw)]));
 
+  const { characters, failed: charactersFailed } = useWorkCharacters(books.flatMap((book) => (book.workId ? [book.workId] : [])));
+  const offeredBooks = books.map((book) => {
+    const found = book.workId ? characters[book.workId] : undefined;
+    return found ? { ...book, characters: found } : book;
+  });
+
   // A type is offerable only if at least one chosen book has the data it
   // needs — same eligibility rule the backend's publish enforces.
-  const availableTypes = QUIZ_QUESTION_TYPES.filter((type) => books.some((book) => eligibleTypes(book).includes(type)));
+  const availableTypes = QUIZ_QUESTION_TYPES.filter((type) => offeredBooks.some((book) => eligibleTypes(book).includes(type)));
   const effectiveTypes = allowedTypes.filter((type) => availableTypes.includes(type));
 
   // Question count can never exceed the pool the draw picks from.
@@ -133,18 +143,13 @@ export function QuizCreatePage() {
   }
 
   return (
-    <PageContainer>
+    <Page title={["Choose books", "Set up questions"][step]} subtitle={`Step ${step + 1} of 2`} back={backTo("quiz")}>
       <div className="mx-auto flex max-w-2xl flex-col gap-5 pb-10">
-        <Link to="/dashboard/arena?tab=quizzes" className="text-sm text-(--color-text-dim) hover:text-(--color-text)">← Quizzes</Link>
-        <div>
-          <p className="text-sm text-(--color-text-dim)">Step {step + 1} of 2</p>
-          <h1 className="text-2xl font-bold">{["Choose books", "Set up questions"][step]}</h1>
-        </div>
         {error && <p role="alert" className="text-sm text-(--color-danger)">{error}</p>}
         {step === 0 && (
           <>
             <label className="flex flex-col gap-1 text-sm font-semibold">Quiz name
-              <input value={name} onChange={(event) => setName(event.target.value)} maxLength={200} placeholder="Untitled quiz" className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2" />
+              <input value={name} onChange={(event) => setName(event.target.value)} maxLength={200} placeholder="Untitled quiz" className="min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2" />
             </label>
             <fieldset className="flex flex-col gap-2">
               <legend className="mb-1 text-sm font-semibold">Question source</legend>
@@ -153,15 +158,15 @@ export function QuizCreatePage() {
                 ["collection", "One of my collections"],
                 ["pool", "Famous books (anyone can play)"]
               ] as const).map(([value, label]) => (
-                <label key={value} className="flex items-center gap-2 rounded-lg border border-(--color-border) p-3">
-                  <input type="radio" checked={source === value} onChange={() => setSource(value)} />
+                <label key={value} className="flex items-center gap-1 rounded-lg border border-(--color-border) pr-3">
+                  <input type="radio" className={RADIO_CLASS} checked={source === value} onChange={() => setSource(value)} />
                   {label}
                 </label>
               ))}
             </fieldset>
             {source === "collection" && (
               <label className="flex flex-col gap-1 text-sm font-semibold">Collection
-                <select value={collectionId} onChange={(event) => setCollectionId(event.target.value)} className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2">
+                <select value={collectionId} onChange={(event) => setCollectionId(event.target.value)} className="min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2">
                   <option value="">Choose a collection…</option>
                   {collections.map((group) => (
                     <option key={group.id} value={group.id}>{group.name}</option>
@@ -190,7 +195,7 @@ export function QuizCreatePage() {
             )}
             {source === "shelf" && (
               <p className="text-sm text-(--color-text-dim)">
-                {isLoading ? "Loading books…" : isError ? <button onClick={() => void refetch()} className="text-left text-(--color-accent)">Couldn't load your library. Retry</button> : `${shelfRawBooks.length} books on your shelf.`}
+                {isLoading ? "Loading books…" : isError ? <button onClick={() => void refetch()} className="min-h-11 text-left text-(--color-accent)">Couldn't load your library. Retry</button> : `${shelfRawBooks.length} books on your shelf.`}
               </p>
             )}
             <p className="text-sm text-(--color-text-dim)">{books.length} {books.length === 1 ? "book" : "books"} selected</p>
@@ -201,7 +206,7 @@ export function QuizCreatePage() {
             <label className="flex flex-col gap-1 text-sm font-semibold">Questions
               {/* Only lengths the selected pool can actually fill — with 4–9
                   books the old fixed 5/10/15/20 list left nothing selectable. */}
-              <select value={effectiveQuestionCount} onChange={(event) => setQuestionCount(Number(event.target.value))} className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2">
+              <select value={effectiveQuestionCount} onChange={(event) => setQuestionCount(Number(event.target.value))} className="min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2">
                 {lengthOptions.map((count) => (
                   <option key={count} value={count}>{count} questions</option>
                 ))}
@@ -213,9 +218,10 @@ export function QuizCreatePage() {
                 const offered = availableTypes.includes(type);
                 const checked = offered && effectiveTypes.includes(type);
                 return (
-                  <label key={type} className={`flex items-center gap-2 rounded-lg border p-3 ${offered ? "border-(--color-border)" : "border-(--color-border) opacity-50"}`}>
+                  <label key={type} className={`flex items-center gap-1 rounded-lg border pr-3 ${offered ? "border-(--color-border)" : "border-(--color-border) opacity-50"}`}>
                     <input
                       type="checkbox"
+                      className={CHECKBOX_CLASS}
                       disabled={!offered}
                       checked={checked}
                       onChange={() => setAllowedTypes((value) => (value.includes(type) ? value.filter((entry) => entry !== type) : [...value, type]))}
@@ -226,6 +232,7 @@ export function QuizCreatePage() {
                 );
               })}
             </fieldset>
+            {charactersFailed && <p className="text-sm text-(--color-text-dim)">Characters couldn't be checked</p>}
           </>
         )}
         <div className="flex justify-end gap-3 pt-2">
@@ -251,6 +258,6 @@ export function QuizCreatePage() {
           )}
         </div>
       </div>
-    </PageContainer>
+    </Page>
   );
 }

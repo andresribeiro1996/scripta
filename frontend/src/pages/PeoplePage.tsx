@@ -12,13 +12,14 @@ import { followUser, unfollowUser } from "../api/community";
 import { useCommunityPeople, useSuggestedPeople } from "../hooks/useCommunity";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { area } from "../lib/areas";
+import { BUTTON_SECONDARY } from "../components/page/buttonClasses";
 
 const searchInput =
-  "mb-3 w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm outline-none focus:border-(--color-accent)";
+  "mb-3 min-h-11 w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm outline-none focus:border-(--color-accent)";
 
 function retryButton(refetch: () => void) {
   return (
-    <button onClick={() => void refetch()} className="rounded-lg border border-(--color-border) px-3 py-1.5 text-sm hover:border-(--color-accent)">
+    <button onClick={() => void refetch()} className={BUTTON_SECONDARY}>
       Retry
     </button>
   );
@@ -102,7 +103,7 @@ function PersonList({
         const suggestion = "sharedCount" in person ? person : null;
         return (
           <div key={person.user.userId} className="flex items-center justify-between gap-3 rounded-xl border border-(--color-border) bg-(--color-surface) p-4">
-            <Link to={`/community/u/${person.user.username}`} className="flex min-w-0 flex-1 items-center gap-2">
+            <Link to={`/community/u/${person.user.username}`} className="flex min-h-11 min-w-0 flex-1 items-center gap-2">
               <AuthorAvatar author={person.user} size={32} />
               <span className="min-w-0">
                 <span className="flex items-center gap-1 text-sm font-semibold">
@@ -123,7 +124,7 @@ function PersonList({
               <button
                 onClick={() => void onToggle(person)}
                 disabled={busyId === person.user.userId}
-                className={`shrink-0 rounded-full border px-3 py-1 text-xs font-semibold disabled:opacity-50 ${
+                className={`min-h-11 shrink-0 rounded-full border px-4 text-xs font-semibold disabled:opacity-50 ${
                   person.viewerFollows ? "border-(--color-border) text-(--color-text-dim)" : "border-(--color-accent) bg-(--color-accent-soft) text-(--color-accent)"
                 }`}
               >

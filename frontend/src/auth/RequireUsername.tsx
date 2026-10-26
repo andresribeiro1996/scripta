@@ -1,5 +1,5 @@
 import { saveAuthReturnTo } from "./returnTo";
-import { Navigate, Outlet, useLocation } from "react-router-dom";
+import { Navigate, Outlet, useLocation, useOutletContext } from "react-router-dom";
 import { useAuth } from "./AuthContext";
 
 /** Nested inside <RequireAuth> (see App.tsx): by the time this runs, a
@@ -10,6 +10,7 @@ import { useAuth } from "./AuthContext";
  *  never hits this, since a username is required at signup time. */
 export function RequireUsername() {
   const location = useLocation();
+  const context = useOutletContext();
   const { session } = useAuth();
 
   if (session && !session.user.username) {
@@ -17,5 +18,5 @@ export function RequireUsername() {
     return <Navigate to="/choose-username" replace />;
   }
 
-  return <Outlet />;
+  return <Outlet context={context} />;
 }

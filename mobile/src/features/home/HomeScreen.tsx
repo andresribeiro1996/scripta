@@ -44,7 +44,7 @@ export function HomeScreen() {
   }
   const findReaders = () => router.push("/people" as never);
   const error = actions.error ?? (dashboard.isRefetchError && !dashboard.isRefetching ? "Couldn't refresh activity." : null);
-  const empty = dashboard.isPending || (dashboard.hasNextPage && !dashboard.isError && !items.length) ? <Skeleton height={80} /> : dashboard.isError && !dashboard.data ? <ErrorState body="Couldn't load activity." actionLabel="Retry" onAction={() => void dashboard.refetch()} /> : dashboard.hasNextPage ? null : <EmptyState title="Your circle starts here" body="Follow readers to see their books, games and murals." actionLabel="Find readers" onAction={findReaders} />;
+  const empty = dashboard.isPending || (dashboard.hasNextPage && !dashboard.isError && !items.length) ? <Skeleton height={80} /> : dashboard.isError && !dashboard.data ? <ErrorState body="Couldn't load activity." actionLabel="Retry" onAction={() => void dashboard.refetch()} /> : dashboard.hasNextPage ? null : <EmptyState title="Your circle starts here" body="Follow readers to see their books, games and murals." secondaryActionLabel="Find people" onSecondaryAction={findReaders} />;
   const noLibrary = actions.library.data === null || actions.library.data?.data.books.length === 0;
   return <Screen top={false}>
     <Stack.Screen options={{ title: "Home", headerShown: true, headerLeft: () => <View style={styles.mark}><BrandMark size={24} /></View>, headerRight: () => <HeaderActions><IconButton name="bell" accessibilityLabel="Open activity" badge={activityBadge} onPress={() => router.push("/activity" as never)} /><IconButton name="bookmark" accessibilityLabel="Open saved games and murals" onPress={() => setSavedOpen(true)} /></HeaderActions> }} />
@@ -57,7 +57,7 @@ export function HomeScreen() {
       </>}
       renderSectionHeader={({ section }) => <View style={styles.sectionHeader}>
         <Text accessibilityRole="header" {...dynamicType} style={[typography.body, styles.strong, styles.grow, { color: colors.text }]}>{section.title}</Text>
-        <Pressable accessibilityRole="link" onPress={findReaders} style={styles.sectionAction}><Text {...dynamicType} style={[typography.caption, styles.strong, { color: colors.accent }]}>Find readers →</Text></Pressable>
+        <Pressable accessibilityRole="link" onPress={findReaders} style={styles.sectionAction}><Text {...dynamicType} style={[typography.caption, styles.strong, { color: colors.accent }]}>Find people →</Text></Pressable>
       </View>}
       renderItem={({ item }) => <FeedRow item={item} actions={actions} onOpen={() => router.push(digestRoute(item) as never)} onComments={() => setComments(item)} />}
       renderSectionFooter={({ section }) => !section.data.length ? <View style={styles.onboarding}>{empty}</View> : null}

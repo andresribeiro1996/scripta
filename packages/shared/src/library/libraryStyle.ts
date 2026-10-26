@@ -155,7 +155,7 @@ export interface LibraryStyleSettings {
    *  without a book grid. */
   backgroundColor: string | null;
   /** Max width of the page content (the grid AND the header above it),
-   *  in px — applied by PageContainer, the one style field that stays
+   *  in px — applied as the web Page body's width (PageWidthContext), the one style field that stays
    *  there, since a grid and its header have to share a width or they
    *  visibly stop lining up. */
   contentMaxWidth: number;
@@ -189,9 +189,9 @@ export const DEFAULT_LIBRARY_STYLE: LibraryStyleSettings = {
   cardBold: false,
   cardItalic: false,
   backgroundColor: null,
-  contentMaxWidth: 1152, // matches PageContainer's own default width (72rem)
+  contentMaxWidth: 1152, // matches the Page default width (72rem)
   // 0, not the 20/32 these were when they applied to the whole PAGE.
-  // They now pad the book canvas INSIDE PageContainer's own padding
+  // They now pad the book canvas INSIDE Page's own body padding
   // (see LibraryCanvas), so any non-zero default would indent the grid
   // from the page header sitting right above it — for every user who
   // never opens these settings. At 0 with no custom background the

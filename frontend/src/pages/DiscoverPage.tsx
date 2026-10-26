@@ -1,5 +1,5 @@
 import { useState, type CSSProperties } from "react";
-import { Link, Navigate, useLocation } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { DEFAULT_TIER_PRESET } from "@scripta/shared";
 import type { ContentTone, DiscoverItem, DiscoverType } from "@scripta/shared/community";
 import { contentKindLabel, contentStats, contentStatus, contentTarget } from "@scripta/shared/community";
@@ -13,6 +13,7 @@ import { useCommunityDiscover } from "../hooks/useCommunity";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { area } from "../lib/areas";
 import { discoverDestination } from "../lib/landing";
+import { BUTTON_SECONDARY } from "../components/page/buttonClasses";
 
 const DISCOVER_FILTERS: Array<{ value: DiscoverType; label: string }> = [
   { value: "all", label: "All" },
@@ -47,11 +48,11 @@ const PAIR_WIDTH = (THUMB_WIDTH - PAIR_GAP) / 2;
 const PAIR_HEIGHT = 45;
 
 const searchInput =
-  "mb-3 w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm outline-none focus:border-(--color-accent)";
+  "mb-3 min-h-11 w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm outline-none focus:border-(--color-accent)";
 
 function retryButton(refetch: () => void) {
   return (
-    <button onClick={() => void refetch()} className="rounded-lg border border-(--color-border) px-3 py-1.5 text-sm hover:border-(--color-accent)">
+    <button onClick={() => void refetch()} className={BUTTON_SECONDARY}>
       Retry
     </button>
   );
@@ -67,21 +68,12 @@ export function DiscoverPage() {
 
 export function PublicDiscoverPage() {
   const { session } = useAuth();
-  const location = useLocation();
   const destination = discoverDestination(session);
   if (destination) return <Navigate to={destination} replace />;
   return (
-    <div className="min-h-screen bg-(--color-bg) text-(--color-text)">
-      <div className="mx-auto max-w-3xl p-6">
-        <header className="mb-6 flex items-center justify-between gap-3">
-          <h1 className="text-lg font-bold">Discover</h1>
-          <Link to="/login" state={{ from: location }} className="text-sm text-(--color-accent) hover:underline">
-            Sign in
-          </Link>
-        </header>
-        <DiscoverPane />
-      </div>
-    </div>
+    <Page title="Games">
+      <DiscoverPane />
+    </Page>
   );
 }
 
@@ -131,7 +123,7 @@ function DiscoverPane() {
             <button
               onClick={() => void fetchNextPage()}
               disabled={isFetchingNextPage}
-              className="mt-3 w-full rounded-lg border border-(--color-border) px-3 py-2 text-sm text-(--color-text-dim) hover:border-(--color-accent) disabled:opacity-50"
+              className="mt-3 min-h-11 w-full rounded-lg border border-(--color-border) px-3 py-2 text-sm text-(--color-text-dim) hover:border-(--color-accent) disabled:opacity-50"
             >
               {isFetchingNextPage ? "Loading…" : "Load more"}
             </button>
@@ -149,8 +141,8 @@ function DiscoverRow({ item }: { item: DiscoverItem }) {
     <li className="relative flex items-center gap-3 border-b border-(--color-border) px-2 py-3 hover:bg-(--color-surface-hover)">
       {content.kind === "tierlist" ? <TierlistThumb covers={content.covers} /> : content.kind === "quiz" ? <QuizThumb covers={content.covers} /> : <TournamentThumb covers={content.covers} />}
       <div className="min-w-0 flex-1">
-        <h3 className="truncate text-sm font-semibold">
-          <Link to={contentTarget(content)} className="after:absolute after:inset-0">
+        <h3 className="-my-1.5 text-sm font-semibold">
+          <Link to={contentTarget(content)} className="block truncate leading-11 after:absolute after:inset-0">
             {content.name}
           </Link>
         </h3>
@@ -160,7 +152,7 @@ function DiscoverRow({ item }: { item: DiscoverItem }) {
             {author.unavailable ? (
               author.username
             ) : (
-              <Link to={`/community/u/${author.username}`} className="relative z-10 hover:text-(--color-accent)">
+              <Link to={`/community/u/${author.username}`} className="relative z-10 -my-3 inline-flex min-h-11 items-center hover:text-(--color-accent)">
                 {author.username}
               </Link>
             )}

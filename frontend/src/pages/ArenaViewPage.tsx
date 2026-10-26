@@ -5,7 +5,7 @@
 // auth primitive needed on the (deliberately unauthenticated) GET route.
 
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { renameTournament, resolveTiebreak, settleDuelEarly, type DuelSide } from "../api/arena";
 import { useAuth } from "../auth/AuthContext";
 import { AddBookSheet } from "../components/AddBookSheet";
@@ -14,7 +14,9 @@ import { TournamentStatusBadge } from "../components/arena/TournamentStatusBadge
 import { BracketTree } from "../components/arena/BracketTree";
 import { DuelCard } from "../components/arena/DuelCard";
 import { useArena } from "../hooks/useArena";
-import { ChevronLeftIcon } from "../components/Toolbar";
+import { Page } from "../components/page/Page";
+import { BUTTON_SECONDARY } from "../components/page/buttonClasses";
+import { backTo } from "../lib/areas";
 
 export function ArenaViewPage() {
   const { id } = useParams<{ id: string }>();
@@ -28,18 +30,20 @@ export function ArenaViewPage() {
   const [nameDraft, setNameDraft] = useState("");
   const [picked, setPicked] = useState<DuelSide | null>(null);
 
+  const back = session ? backTo("tournament") : { to: "/arena", label: "Games" };
+
   if (isLoading) {
     return (
-      <div className="mx-auto max-w-5xl px-5 py-8">
+      <Page title="Tournament" back={back}>
         <p className="text-sm text-(--color-text-dim)">Loading…</p>
-      </div>
+      </Page>
     );
   }
   if (!tournament) {
     return (
-      <div className="mx-auto max-w-5xl px-5 py-8">
+      <Page title="Tournament" back={back}>
         <p className="text-sm text-(--color-text-dim)">No such tournament.</p>
-      </div>
+      </Page>
     );
   }
 
@@ -106,48 +110,44 @@ export function ArenaViewPage() {
     tournament.status === "active" ? tournament.duels.filter((d) => d.status === "active" && !d.hasVoted).length : 0;
 
   return (
-    <div className="mx-auto max-w-5xl px-5 py-8">
-      <Link to="/arena" className="mb-2 inline-flex items-center gap-1 text-xs text-(--color-text-dim) hover:text-(--color-text)">
-        <ChevronLeftIcon size={13} />
-        All tournaments
-      </Link>
-      {/* The heading stays a heading for everyone; for the owner it is
-          also the rename control. */}
-      {isOwner && editingName ? (
-        <input
-          autoFocus
-          value={nameDraft}
-          onChange={(e) => setNameDraft(e.target.value)}
-          onBlur={() => void handleRename()}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") void handleRename();
-            if (e.key === "Escape") setEditingName(false);
-          }}
-          aria-label="Tournament name"
-          className="mb-1 w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-2 py-1 text-lg font-bold"
-        />
-      ) : (
-        <h2 className="mb-1 text-lg font-bold">
-          {isOwner ? (
-            <button
-              onClick={() => {
-                setNameDraft(tournament.name);
-                setEditingName(true);
-              }}
-              title="Rename this tournament"
-              className="block w-full truncate text-left font-bold transition-colors hover:text-(--color-accent)"
-            >
-              {tournament.name}
-            </button>
-          ) : (
-            tournament.name
-          )}
-        </h2>
-      )}
-      <p className="mb-4 flex flex-wrap items-center gap-1.5 text-sm text-(--color-text-dim)">
-        {tournament.bracketSize}-book bracket
-        <TournamentStatusBadge status={tournament.status} round={tournament.currentRound} />
-      </p>
+    <Page
+      title={
+        isOwner && editingName ? (
+          <input
+            autoFocus
+            value={nameDraft}
+            onChange={(e) => setNameDraft(e.target.value)}
+            onBlur={() => void handleRename()}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void handleRename();
+              if (e.key === "Escape") setEditingName(false);
+            }}
+            aria-label="Tournament name"
+            className="min-h-11 w-full rounded-lg border border-(--color-border) bg-(--color-bg) px-2 py-1 text-2xl font-bold"
+          />
+        ) : isOwner ? (
+          <button
+            onClick={() => {
+              setNameDraft(tournament.name);
+              setEditingName(true);
+            }}
+            title="Rename this tournament"
+            className="flex min-h-11 w-full items-center text-left font-bold transition-colors hover:text-(--color-accent)"
+          >
+            <span className="min-w-0 break-words">{tournament.name}</span>
+          </button>
+        ) : (
+          tournament.name
+        )
+      }
+      subtitle={
+        <span className="flex flex-wrap items-center gap-1.5">
+          {tournament.bracketSize}-book bracket
+          <TournamentStatusBadge status={tournament.status} round={tournament.currentRound} />
+        </span>
+      }
+      back={back}
+    >
       {voteError && <p className="mb-4 text-sm text-(--color-danger)">{voteError}</p>}
       {ownerActionError && <p className="mb-4 text-sm text-(--color-danger)">{ownerActionError}</p>}
 
@@ -215,7 +215,7 @@ export function ArenaViewPage() {
                 <button
                   onClick={() => void handleSettle(duel.id)}
                   disabled={busyDuelId === duel.id}
-                  className="mt-2 w-full rounded-lg border border-(--color-border) py-2 text-xs text-(--color-text-dim) hover:bg-(--color-surface-hover)"
+                  className={`${BUTTON_SECONDARY} mt-2 w-full`}
                 >
                   Settle now
                 </button>
@@ -225,14 +225,14 @@ export function ArenaViewPage() {
                   <button
                     onClick={() => void handleTiebreak(duel.id, duel.bookA.workId!)}
                     disabled={busyDuelId === duel.id || duel.bookA.workId === null}
-                    className="flex-1 rounded-lg bg-(--color-accent) py-2 text-xs font-medium text-(--color-on-accent)"
+                    className={`${BUTTON_SECONDARY} flex-1`}
                   >
                     {duel.bookA.title} wins
                   </button>
                   <button
                     onClick={() => void handleTiebreak(duel.id, duel.bookB.workId!)}
                     disabled={busyDuelId === duel.id || duel.bookB.workId === null}
-                    className="flex-1 rounded-lg bg-(--color-accent) py-2 text-xs font-medium text-(--color-on-accent)"
+                    className={`${BUTTON_SECONDARY} flex-1`}
                   >
                     {duel.bookB.title} wins
                   </button>
@@ -249,6 +249,6 @@ export function ArenaViewPage() {
           onClose={() => setPicked(null)}
         />
       )}
-    </div>
+    </Page>
   );
 }

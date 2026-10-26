@@ -5,7 +5,7 @@
 import { randomUUID } from "node:crypto";
 import { generateVoteCode } from "../../voteCode.js";
 import type { GameByWork } from "../works/index.js";
-import { QUIZ_QUESTION_TYPES, generateQuizQuestions, gradeAnswers, quizPreview, type PlayBoard, type PublicBookData, type PublicQuizQuestion, type QuestionStat, type QuizBook, type QuizPreview, type QuizQuestion, type QuizQuestionType, type ResultPlay, type SubmittedAnswer } from "@scripta/shared";
+import { characterPrompt, generateQuizQuestions, gradeAnswers, quizPreview, type PlayBoard, type PublicBookData, type PublicQuizQuestion, type QuestionStat, type QuizBook, type QuizPreview, type QuizQuestion, type QuizQuestionType, type ResultPlay, type SubmittedAnswer } from "@scripta/shared";
 import type { GameParticipation } from "@scripta/shared/community";
 import type { QuizWorks, QuizzesRepository } from "./domain/ports.js";
 import { storedIds } from "./domain/quizWorks.js";
@@ -24,6 +24,8 @@ function toQuiz(row: QuizRow): Quiz {
   };
 }
 
+const ORIGINAL_QUESTION_TYPES: QuizQuestionType[] = ["cover_title", "title_cover", "quote_title", "blurb_title"];
+
 /** The one place this module looks inside the opaque `data` document —
  *  parsed defensively, same stance as tierlists' readDocument. */
 interface QuizDocument {
@@ -39,7 +41,7 @@ function readDocument(quiz: Quiz): QuizDocument {
   return {
     sourceLabel: typeof data.sourceLabel === "string" ? data.sourceLabel : "",
     questionCount: typeof data.questionCount === "number" ? data.questionCount : 10,
-    allowedTypes: Array.isArray(data.allowedTypes) ? data.allowedTypes : [...QUIZ_QUESTION_TYPES],
+    allowedTypes: Array.isArray(data.allowedTypes) ? data.allowedTypes : ORIGINAL_QUESTION_TYPES,
     books: Array.isArray(data.books) ? data.books : [],
     questions: Array.isArray(data.questions) ? data.questions : null
   };
@@ -96,7 +98,9 @@ function toPublicQuestion(question: QuizQuestion, bookByWork: Map<string, QuizBo
         ? book?.title ?? ""
         : question.type === "quote_title"
           ? book?.quote ?? ""
-          : book?.blurb ?? "";
+          : question.type === "blurb_title"
+            ? book?.blurb ?? ""
+            : characterPrompt(book?.characters ?? []);
   return { id: question.id, type: question.type, prompt, options: question.options };
 }
 
@@ -263,11 +267,12 @@ export function createQuizzesService(repo: QuizzesRepository, works: QuizWorks, 
         return true;
       });
       if (doc.books.length < 4) return { ok: false, reason: "invalid", error: "A quiz needs at least 4 books." };
-      const books = doc.books.map((b) => ({ ...b, coverUrl: b.coverUrl ?? found.get(b.workId)?.coverUrl ?? null }));
+      const characters = works.charactersOf(doc.books.map((b) => b.workId));
+      const books = doc.books.map((b) => ({ ...b, coverUrl: b.coverUrl ?? found.get(b.workId)?.coverUrl ?? null, characters: characters.get(b.workId) ?? null }));
       const code = generateVoteCode();
       const questions = generateQuizQuestions(books, { questionCount: doc.questionCount, allowedTypes: doc.allowedTypes }, code).map((question) => ({ id: question.id, type: question.type, workId: question.book.workId, options: question.options, answerIndex: question.answerIndex }));
       if (questions.length !== doc.questionCount) {
-        return { ok: false, reason: "invalid", error: "Not enough books have the covers, quotes, or blurbs those question types need." };
+        return { ok: false, reason: "invalid", error: "Not enough books have the covers, quotes, blurbs, or characters those question types need." };
       }
       const published = repo.publish(id, userId, JSON.stringify({ ...doc, books, questions }), code);
       if (!published) return { ok: false, reason: "not-found" };

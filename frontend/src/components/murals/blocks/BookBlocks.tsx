@@ -7,6 +7,7 @@ import { bookKey } from "../../../lib/merge";
 import { blockBooks, resolveShelfBooks, type MuralBlock, type TierDefinition } from "../../../lib/murals";
 import { OptionsMenu, type OptionsMenuItem } from "../../OptionsMenu";
 import { TierRowEmpty, TierRowShell, TierRowTiles } from "../../tierlist/TierRowShell";
+import { MoreIcon } from "../../NavIcons";
 
 /** A small, read-only cover tile — reuses BookCard's own CoverImage (same
  *  Kobo/Open Library/gallery-assigned resolution chain) but with none of
@@ -67,7 +68,7 @@ export function MiniBookTile({
 export function BlockEyebrow({ children, count }: { children: ReactNode; count?: number }) {
   return (
     <div className="mb-1.5 flex shrink-0 items-baseline justify-between gap-2">
-      <span className="min-w-0 truncate text-[0.7em] font-bold tracking-wide text-(--color-text-dim) uppercase">{children}</span>
+      <span className="min-w-0 truncate text-[0.7em] font-bold text-(--color-text-dim)">{children}</span>
       {count !== undefined && <span className="shrink-0 text-[0.7em] text-(--color-text-dim)">{count === 1 ? "1 book" : `${count} books`}</span>}
     </div>
   );
@@ -332,12 +333,13 @@ export function DraggableTierTile({
           blocks and list cards that have no drag listeners to fight. */}
       <div
         onPointerDown={(e) => e.stopPropagation()}
-        className={`absolute top-0.5 right-0.5 transition-opacity ${coarse ? "opacity-100" : "opacity-0 group-hover/tile:opacity-100"}`}
+        className={`absolute top-0 right-0 transition-opacity ${coarse ? "opacity-100" : "opacity-0 group-hover/tile:opacity-100"}`}
       >
         <OptionsMenu
           items={menuItems}
           title="Move this book"
-          triggerClassName="flex h-5 w-5 items-center justify-center rounded-full bg-[rgba(10,8,6,0.72)] text-white backdrop-blur-xs"
+          triggerClassName="flex h-11 w-11 items-center justify-center"
+          trigger={<span className="flex h-6 w-6 items-center justify-center rounded-full bg-[rgba(10,8,6,0.72)] text-white backdrop-blur-xs"><MoreIcon size={16} /></span>}
         />
       </div>
     </div>

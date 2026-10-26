@@ -4,6 +4,7 @@ import type { SynopsisJudgment, SynopsisKind } from "./synopsis.js";
 import type { CollectionSource, SeriesEntry, SeriesSource } from "./series.js";
 import type { WorkSignals } from "./searchRank.js";
 import type { OriginalClaim } from "./translation.js";
+import type { RawWorkSubjects, WorkSubjects } from "./workSubjects.js";
 import type { BookRow, CoverImageRow, CoverSourceName, CoverStatus, DataSource, GenreEvidence, GenresSource, JevRejection, JevTask, LossyBook, MergeSource, MojibakeApplied, NewBook, RowRepair, SummarySource, WorkMatchJudgment, WorkPageRows, WorkView } from "./types.js";
 
 export type MergeableDetails = Pick<BookMetadata, "summary" | "pages" | "year" | "publisher" | "translator">;
@@ -77,6 +78,7 @@ export interface BooksRepository {
   replaceLanguage(id: string, tag: string): void;
   mergeWorks(fromId: string, intoId: string, at?: string): string;
   mergeDuplicateWork(fromId: string, intoId: string, at: string): string;
+  addWorkAlias(key: string, intoId: string, at: string): void;
   detachEdition(bookId: string, at: string): string;
   getWorkView(id: string): WorkView | undefined;
   workPageRows(id: string): WorkPageRows | undefined;
@@ -161,6 +163,9 @@ export interface BooksRepository {
   addWorkAward(row: { workId: string; prize: string; year: number; won: boolean; honoree: string | null }, at: string): boolean;
   awardsOf(workIds: string[]): Map<string, WorkAward[]>;
   recentAwards(year: number, since: string): RecentAward[];
+  replaceWorkSubjects(workId: string, subjects: WorkSubjects, at: string): void;
+  charactersOf(workIds: string[]): Map<string, string[]>;
+  worksWithOpenLibraryKey(): Array<{ id: string; olWorkKey: string; author: string }>;
 }
 
 export interface CoverCandidate {
@@ -194,6 +199,7 @@ export interface CatalogDetails {
   workSummary?: string | null;
   editionSeries?: SeriesEntry[];
   subjectSeries?: SeriesEntry[];
+  subjects?: RawWorkSubjects;
 }
 
 export interface BookCatalog {

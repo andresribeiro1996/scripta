@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, type DragEvent } from "react";
 import { useConfirm } from "../components/ConfirmDialog";
 import { EmptyState } from "../components/EmptyState";
 import { GalleryIcon } from "../components/NavIcons";
@@ -49,6 +49,20 @@ export function GalleryPage() {
     }
     return counts;
   }, [library]);
+
+  const dropHandlers = {
+    onDragOver: (e: DragEvent) => {
+      e.preventDefault();
+      setDragOver(true);
+    },
+    onDragLeave: () => setDragOver(false),
+    onDrop: (e: DragEvent) => {
+      e.preventDefault();
+      setDragOver(false);
+      const file = e.dataTransfer.files?.[0];
+      if (file) void handleUpload(file);
+    }
+  };
 
   async function handleUpload(file: File) {
     setUploadError(null);
@@ -109,24 +123,11 @@ export function GalleryPage() {
           a phone this was ~100px of viewport explaining a gesture that
           cannot be performed. Uploading there goes through the button
           above, which opens the OS file/photo picker. */}
-      <div
-        className={`mb-6 hidden items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-8 text-sm transition-colors sm:flex ${
-          dragOver ? "border-(--color-accent) bg-(--color-accent-soft)" : "border-(--color-border)"
-        }`}
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDragOver(true);
-        }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDragOver(false);
-          const file = e.dataTransfer.files?.[0];
-          if (file) void handleUpload(file);
-        }}
-      >
-        <span className="text-(--color-text-dim)">Drag an image here to upload it — JPEG, PNG, or WebP, up to 20 MB.</span>
-      </div>
+      {isLoading || images.length === 0 ? null : (
+        <div className={`mb-6 hidden items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-8 text-sm transition-colors sm:flex ${dragOver ? "border-(--color-accent) bg-(--color-accent-soft)" : "border-(--color-border)"}`} {...dropHandlers}>
+          <span className="text-(--color-text-dim)">Drag an image here to upload it — JPEG, PNG, or WebP, up to 20 MB.</span>
+        </div>
+      )}
 
       {showSkeleton && (
         <SkeletonCardGrid
@@ -138,11 +139,13 @@ export function GalleryPage() {
       )}
 
       {!isLoading && images.length === 0 && (
-        <EmptyState
-          icon={GalleryIcon}
-          title="No images yet."
-          body={'Upload one above, or straight from a book\u2019s "Cover" button.'}
-        />
+        <div className={`rounded-xl ${dragOver ? "ring-2 ring-(--color-accent)" : ""}`} {...dropHandlers}>
+          <EmptyState
+            icon={GalleryIcon}
+            title="No images yet."
+            body={<>Upload one with the button above, or add one from a book&rsquo;s &ldquo;Cover&rdquo; button.<span className="hidden sm:inline"> You can also drag an image onto this panel.</span> JPEG, PNG, or WebP, up to 20 MB.</>}
+          />
+        </div>
       )}
 
       {images.length > 0 && (
@@ -168,9 +171,11 @@ export function GalleryPage() {
                   onClick={() => void handleDelete(image.id)}
                   disabled={deletingId === image.id}
                   title="Delete from gallery"
-                  className="absolute top-2 right-2 flex h-7 w-7 items-center justify-center rounded-full bg-[rgba(10,8,6,0.72)] text-sm font-bold text-white opacity-0 backdrop-blur-xs transition-opacity group-hover:opacity-100 disabled:opacity-100 pointer-coarse:h-9 pointer-coarse:w-9 pointer-coarse:opacity-100"
+                  className="absolute top-0 right-0 flex h-11 w-11 items-center justify-center text-sm font-bold text-white opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 disabled:opacity-100 pointer-coarse:opacity-100"
                 >
-                  {deletingId === image.id ? "…" : <CloseIcon size={13} />}
+                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[rgba(10,8,6,0.72)] backdrop-blur-xs">
+                    {deletingId === image.id ? "…" : <CloseIcon size={13} />}
+                  </span>
                 </button>
               </div>
             );

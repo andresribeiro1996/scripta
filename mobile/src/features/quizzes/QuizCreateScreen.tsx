@@ -5,9 +5,10 @@ import { QUIZ_POOL, QUIZ_QUESTION_TYPES, bookKey, booksByWork, booksInGroup, eli
 import { FlatList, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { useLibrary, useWorkBooks } from "../library";
-import { Button, Input, Screen, Segmented, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { Button, Input, Screen, Segmented, Toast, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import { resolveCover } from "../library/api/covers";
 import { createQuiz, type Quiz } from "./api";
+import { useWorkCharacters } from "./useWorkCharacters";
 
 const SOURCES = [{ value: "shelf", label: "Shelf" }, { value: "collection", label: "Collection" }, { value: "pool", label: "Famous" }] as const;
 type Source = (typeof SOURCES)[number]["value"];
@@ -17,6 +18,7 @@ const TYPE_LABELS: Record<QuizQuestionType, string> = {
   title_cover: "Title → cover",
   quote_title: "Quote → title",
   blurb_title: "Blurb → title",
+  characters_title: "Characters → title",
 };
 
 function toQuizBook(book: Record<string, unknown>, resolvedCover: string | null | undefined): QuizBookInput {
@@ -99,7 +101,12 @@ export function QuizCreateScreen() {
     ? QUIZ_POOL.filter((book) => poolIds.includes(book.id)).map(({ id: _id, ...book }) => book)
     : shelfRawBooks.map((raw) => toQuizBook(raw, resolvedCovers[bookKey(raw)]));
 
-  const availableTypes = QUIZ_QUESTION_TYPES.filter((type) => books.some((book) => eligibleTypes(book).includes(type)));
+  const { characters, failed: charactersFailed } = useWorkCharacters(books.flatMap((book) => (book.workId ? [book.workId] : [])));
+  const offeredBooks = books.map((book) => {
+    const found = book.workId ? characters[book.workId] : undefined;
+    return found ? { ...book, characters: found } : book;
+  });
+  const availableTypes = QUIZ_QUESTION_TYPES.filter((type) => offeredBooks.some((book) => eligibleTypes(book).includes(type)));
   const effectiveTypes = allowedTypes.filter((type) => availableTypes.includes(type));
   const lengthOptions = LENGTHS.filter((count) => count <= books.length);
   const effectiveCount = lengthOptions.includes(questionCount) ? questionCount : (lengthOptions[lengthOptions.length - 1] ?? 0);
@@ -155,7 +162,7 @@ export function QuizCreateScreen() {
         }}
       /> : null}
       {source === "shelf" ? <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>
-        {library.isPending ? "Loading books…" : library.isError ? "Your library couldn't be loaded." : `${shelfRawBooks.length} books on your shelf.`}
+        {library.isPending ? "Loading books…" : library.isError ? "Your library couldn't be loaded." : `${shelfRawBooks.length} books in your library.`}
       </Text> : null}
       {resolveFailed && source !== "pool" ? <View style={styles.resolveRetry}>
         <Text {...dynamicType} style={[typography.caption, styles.grow, { color: colors.textDim }]}>Some covers couldn't be checked, so cover questions may be unavailable.</Text>
@@ -172,6 +179,7 @@ export function QuizCreateScreen() {
         ))}
       </View>
       <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>Question types</Text>
+      {charactersFailed ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Characters couldn't be checked</Text> : null}
       {QUIZ_QUESTION_TYPES.map((type) => {
         const offered = availableTypes.includes(type);
         const checked = offered && effectiveTypes.includes(type);
@@ -196,7 +204,7 @@ const styles = StyleSheet.create({
   row: { minHeight: 52, borderWidth: 1, borderRadius: radii.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, flexDirection: "row", alignItems: "center", gap: spacing.sm },
   offered: { opacity: 0.5 },
   lengths: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
-  length: { minWidth: 56, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderWidth: 1, borderRadius: radii.md, alignItems: "center" },
+  length: { minWidth: 56, minHeight: minimumTouchTarget, justifyContent: "center", paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderWidth: 1, borderRadius: radii.md, alignItems: "center" },
   stepScroll: { gap: spacing.md, paddingBottom: spacing.lg },
   resolveRetry: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   actions: { flexDirection: "row", justifyContent: "flex-end", gap: spacing.sm },

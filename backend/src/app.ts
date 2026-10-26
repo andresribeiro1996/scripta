@@ -41,7 +41,7 @@ import {
 import { deleteArenaUserData, getArenaPublicApi, getCompletedTournaments, getTournamentGameSource, registerArenaModule } from "./modules/arena/index.js";
 import { createBestEffortRecorder, deleteCommunityUserData, getCommunityPublicApi, registerCommunityModule } from "./modules/community/index.js";
 import type { RankingTierPreview } from "@scripta/shared/community";
-import { canonicalWorks, catalogGenres, enqueueBookCovers, getRecentAwards, getWorkPage, matchWorks, registerBooksModule } from "./modules/books/index.js";
+import { canonicalWorks, catalogGenres, enqueueBookCovers, getRecentAwards, getWorkCharacters, getWorkPage, matchWorks, registerBooksModule } from "./modules/books/index.js";
 import { deleteGalleryUserData, registerGalleryModule } from "./modules/gallery/index.js";
 import { communityRatings, copyOfWork, deleteLibraryUserData, heldWorks, holdersOfWorks, koboCoverLookups, registerLibraryModule, resolvePublicLibrary, readerGlyphFor, resolveEntryWorks, WorkResolutionError, sharedBookCounts, sharedBooks, sweepLibraryWorks, sweepWorks, WORKS_SWEEP_INTERVAL_MS, type BookEvent } from "./modules/library/index.js";
 import { deleteMuralsUserData, getMuralsPublicApi, registerMuralsModule, rekeyMuralsBooks, sweepMuralsWorks } from "./modules/murals/index.js";
@@ -217,11 +217,12 @@ export function buildApp() {
     emitPublished: (quizId: string, ownerUserId: string) => recordActivity(ownerUserId, "quiz_published", "quiz", quizId),
     emitPlayed: (playerUserId: string, quizId: string, quizName: string) =>
       recordActivity(playerUserId, "voted_on", "quiz", quizId, { game: "quiz", id: quizId, name: quizName }),
-    resolveUsernames: (userIds: string[]) => getCommunityPublicApi().nameableUsernames(userIds)
+    resolveUsernames: (userIds: string[]) => new Map([...resolvePublicReaderProfiles(userIds)].map(([id, profile]) => [id, profile.username]))
   });
   app.register(registerWorksModule, {
     getWorkPage,
     getRecentAwards,
+    charactersOf: getWorkCharacters,
     holdersOfWorks,
     copyOfWork,
     readerVisibility: (viewerId: string | null, userIds: string[]) => getCommunityPublicApi().readerVisibility(viewerId, userIds),

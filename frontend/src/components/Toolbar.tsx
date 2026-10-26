@@ -18,7 +18,7 @@ import type { ReactNode } from "react";
  *  so finding something meant scrolling back to the top to type, then
  *  back down. Pinning costs no extra vertical space — the row is already
  *  there. It needs its own opaque background and a negative inset to
- *  cover PageContainer's padding, or content scrolls visibly through the
+ *  cover Page's body padding, or content scrolls visibly through the
  *  gap behind it. Not sticky at `sm`+, where the toolbar is usually on
  *  screen anyway and a pinned bar would just spend space that isn't
  *  scarce. */
@@ -34,6 +34,15 @@ export function ToolbarRow({ children }: { children: ReactNode }) {
  *  smallest comfortably tappable target. */
 export const TOOLBAR_CONTROL_CLASS =
   "min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-2.5 py-2.5 text-sm";
+
+const BOX_INPUT =
+  "relative h-11 w-11 shrink-0 cursor-pointer appearance-none disabled:cursor-not-allowed disabled:opacity-50 before:absolute before:top-1/2 before:left-1/2 before:flex before:size-5 before:-translate-x-1/2 before:-translate-y-1/2 before:items-center before:justify-center before:border before:border-(--color-border) before:bg-(--color-surface) before:text-xs before:leading-none before:text-(--color-on-accent) checked:before:border-(--color-accent) checked:before:bg-(--color-accent)";
+
+export const CHECKBOX_CLASS = `${BOX_INPUT} before:rounded checked:before:content-['✓']`;
+
+export const RADIO_CLASS = `${BOX_INPUT} before:rounded-full checked:before:content-['●']`;
+
+export const RANGE_CLASS = "h-11! w-full bg-transparent!";
 
 /** Icon buttons in a ToolbarRow — geometry and chrome only, NO text
  *  color. Unlike a labelled control, an icon button has no text to
@@ -64,23 +73,8 @@ export function toolbarIconClass(active = false): string {
 }
 
 // Icons are drawn SVGs on a 24×24 viewBox centred on (12,12), never
-// Unicode glyphs — a character like "⚙" sits off-centre in its own cell
-// in most fonts, so even a correctly centred button looks wrong. Same
-// reasoning OptionsMenu.tsx's own gear already follows.
-
-/** A cog — a page's actions. Was hub-and-spokes: a small circle with
- *  eight long radial ticks, which is the geometry of a SUN, and read as
- *  a brightness control rather than settings. Teeth on the silhouette
- *  are what make the eye call it a gear. Shares its shape with
- *  NavIcons.tsx's SettingsIcon — one settings mark in the app. */
-export function GearIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="" />
-      <circle cx="12" cy="12" r="3.1" />
-    </svg>
-  );
-}
+// Unicode glyphs — a character sits off-centre in its own cell in most
+// fonts, so even a correctly centred button looks wrong.
 
 /** Funnel — a filter. */
 export function FilterIcon() {

@@ -36,7 +36,7 @@ test("a rename control can be the title", () => {
   assert.match(html, /<h1[^>]*><button>Summer showdown<\/button><\/h1>/);
 });
 
-test("the body keeps PageContainer's padding", () => {
+test("the body keeps the page padding", () => {
   assert.match(render(createElement(Page, { title: "T", children: "x" })), /px-4 py-5 sm:px-5 sm:py-8/);
 });
 
@@ -89,4 +89,40 @@ test("Settings tabs all use Page with the Settings tabs and no retired sections"
   assert.doesNotMatch(settings, />Appearance</);
   assert.doesNotMatch(settings, />Reader card</);
   assert.match(readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8"), /path="\/dashboard\/settings\/appearance"/);
+});
+
+test("Games and Murals single-item pages use Page with a back link built from backTo", () => {
+  const pages: Array<[string, string]> = [
+    ["TierListCreatePage", "tierlist"],
+    ["TierListEditorPage", "tierlist"],
+    ["QuizCreatePage", "quiz"],
+    ["QuizEditorPage", "quiz"],
+    ["ArenaSeedPage", "tournament"],
+    ["MuralEditorPage", "mural"]
+  ];
+  for (const [file, kind] of pages) {
+    const src = readFileSync(new URL(`../src/pages/${file}.tsx`, import.meta.url), "utf8");
+    assert.match(src, /<Page[\s>]/, file);
+    assert.match(src, /back=\{/, file);
+    assert.match(src, new RegExp(`backTo\\("${kind}"\\)`), file);
+    assert.doesNotMatch(src, /tabs=/, file);
+    assert.doesNotMatch(src, /PageContainer/, file);
+    assert.doesNotMatch(src, />[^<{]*\bArena\b[^<]*</, file);
+    assert.doesNotMatch(src, /All tournaments|← Tier lists|← Quizzes/, file);
+  }
+});
+
+test("Home, Murals, Reader card and profiles use Page", () => {
+  const read = (path: string) => readFileSync(new URL(`../src/${path}`, import.meta.url), "utf8");
+  for (const file of ["pages/HomePage", "pages/MuralsListPage", "pages/ReaderCardPage", "pages/CommunityProfilePage", "components/OwnShelfView"]) {
+    const src = read(`${file}.tsx`);
+    assert.match(src, /<Page[\s>]/, file);
+    assert.doesNotMatch(src, /PageContainer/, file);
+  }
+  for (const file of ["pages/CommunityProfilePage", "components/OwnShelfView"]) {
+    assert.match(read(`${file}.tsx`), /back=\{backTo\("profile"\)\}/, file);
+  }
+  assert.doesNotMatch(read("components/OwnShelfView.tsx"), /<h1/);
+  assert.doesNotMatch(read("pages/MuralsListPage.tsx"), /uppercase/);
+  assert.doesNotMatch(read("pages/HomePage.tsx"), /const button\b/);
 });

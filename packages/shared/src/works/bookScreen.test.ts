@@ -86,7 +86,7 @@ test("community lists followed then others and the games", () => {
   const { community } = bookScreenModel(page(), null, { isAdmin: false });
   assert.equal(community!.countsLabel, "2 readers · 1 finished");
   assert.deepEqual(community!.groups.map((g) => [g.title, g.rows.map((r) => r.username)]), [["People you follow", ["ana"]], ["Other readers", ["bo"]]]);
-  assert.deepEqual(community!.games.map((g) => [g.title, g.detail, g.path]), [["Best SF", "Tier list · Scripta", "/vote/abc"]]);
+  assert.deepEqual(community!.games.map((g) => [g.title, g.detail, g.path]), [["Best SF", "Tier list · Atmyshelf", "/vote/abc"]]);
 });
 
 test("meta line is year and pages, dropping what is missing", () => {
@@ -117,7 +117,7 @@ test("games list every kind and an empty page has none", () => {
   const games = { tierlists: [], arenas: [{ id: "a1", name: "SF", owner: { username: "bo", avatarUrl: null }, path: "/arena/a1" }], quizzes: [{ id: "q1", name: "Trivia", owner: "app" as const, path: "/quiz/q1" }] };
   assert.deepEqual(bookScreenModel({ ...base, games }, null, { isAdmin: false }).community!.games, [
     { key: "arena-a1", title: "SF", detail: "Tournament · bo", path: "/arena/a1" },
-    { key: "quiz-q1", title: "Trivia", detail: "Quiz · Scripta", path: "/quiz/q1" }
+    { key: "quiz-q1", title: "Trivia", detail: "Quiz · Atmyshelf", path: "/quiz/q1" }
   ]);
   assert.deepEqual(bookScreenModel({ ...base, games: { tierlists: [], arenas: [], quizzes: [] } }, null, { isAdmin: false }).community!.games, []);
 });
@@ -286,5 +286,19 @@ test("a page without awards has none", () => {
   for (const model of [bookScreenModel(page(), null, viewer), bookScreenModel(page({ awards: [] }), null, viewer), bookScreenModel(null, owned(), viewer)]) {
     assert.deepEqual(model.awards, []);
     assert.equal(model.authorAwards, null);
+  }
+});
+
+test("characters split after eight", () => {
+  const characters = Array.from({ length: 11 }, (_, i) => `Person ${i + 1}`);
+  const model = bookScreenModel(page({ characters }), null, viewer);
+  assert.equal(model.characters.shown.length, 8);
+  assert.equal(model.characters.more.length, 3);
+  assert.equal(model.characters.more[0], "Person 9");
+});
+
+test("a page without characters has none", () => {
+  for (const model of [bookScreenModel(page(), null, viewer), bookScreenModel(null, owned(), viewer)]) {
+    assert.deepEqual(model.characters, { shown: [], more: [] });
   }
 });

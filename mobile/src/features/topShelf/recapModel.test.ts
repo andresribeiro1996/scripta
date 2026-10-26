@@ -14,7 +14,7 @@ const hottest = (open: boolean): TopShelfRecapCard => ({ kind: "hottestGame", op
 const summary: TopShelfRecapCard = { kind: "summary", gamesPublished: 12, votesCast: 340, booksInPlay: 58 };
 
 test("recapTitle names the month and the record", () => {
-  assert.equal(recapTitle(summary, "2026-10"), "October on Scripta");
+  assert.equal(recapTitle(summary, "2026-10"), "October on Atmyshelf");
   assert.equal(recapTitle(bookCard(null, "champions"), "2026-10"), "Book of the month");
   assert.equal(recapTitle(bookCard(null), "2026-10"), "👑 October's most crowned");
   assert.equal(recapTitle(hottest(true), "2026-10"), "🔥 October's hottest game");
@@ -30,10 +30,10 @@ test("recapCta frames a vote as counting for the current month", () => {
   assert.equal(recapCta(bookCard(tierlist), "2026-11"), "Rank it yourself — it counts for November");
   assert.equal(recapCta(bookCard(quiz), "2026-11"), "Play it yourself — it counts for November");
   assert.equal(recapCta(bookCard(tournament), "2026-11"), "Vote in the bracket — it counts for November");
-  assert.equal(recapCta(bookCard(null), "2026-11"), "See Dune on Scripta");
+  assert.equal(recapCta(bookCard(null), "2026-11"), "See Dune on Atmyshelf");
   assert.equal(recapCta(hottest(true), "2026-11"), "Play it yourself");
   assert.equal(recapCta(hottest(false), "2026-11"), "See how it ended");
-  assert.equal(recapCta(summary, "2026-11"), "Join in on Scripta");
+  assert.equal(recapCta(summary, "2026-11"), "Join in on Atmyshelf");
 });
 
 test("recapLinkPath falls back to the book page and the landing page", () => {

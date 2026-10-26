@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { THEME_IDS, type ThemeId } from "@scripta/shared/themes";
-import { Link, useNavigate, useOutletContext, useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useOutletContext, useParams, useSearchParams } from "react-router-dom";
 import { EmptyState } from "../components/EmptyState";
 import { AddBlockMenu } from "../components/murals/AddBlockMenu";
 import { BlockConfigPanel } from "../components/murals/BlockConfigPanel";
@@ -8,12 +8,14 @@ import { BlockStylePanel } from "../components/murals/BlockStylePanel";
 import { MuralCanvas } from "../components/murals/MuralCanvas";
 import type { MobileMuralDraft } from "../components/murals/MobileMuralCanvas";
 import { MuralsIcon } from "../components/NavIcons";
-import { PageContainer } from "../components/PageContainer";
+import { Page } from "../components/page/Page";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../components/page/buttonClasses";
+import { backTo } from "../lib/areas";
 import { ShareModal } from "../components/ShareModal";
 import { Sheet } from "../components/Sheet";
 import { ThemeOptionGrid } from "../components/ThemeOptionGrid";
 import { useToast } from "../components/Toaster";
-import { ChevronLeftIcon, FullscreenIcon, PaletteIcon, PencilIcon, ShareIcon, toolbarIconClass } from "../components/Toolbar";
+import { FullscreenIcon, PaletteIcon, PencilIcon, ShareIcon, toolbarIconClass } from "../components/Toolbar";
 import { useGalleryImages } from "../hooks/useGalleryImages";
 import { useLibrary } from "../hooks/useLibrary";
 import { useMuralFullscreen } from "../hooks/useMuralFullscreen";
@@ -22,7 +24,7 @@ import { MuralConflictError, useMurals } from "../hooks/useMurals";
 import { useTierlists } from "../hooks/useTierlists";
 import { useWorkBooks } from "../hooks/useWorkBooks";
 import { muralThemeStyle, useResolvedTheme } from "../lib/theme";
-import { type BlockStyle } from "../lib/libraryStyle";
+import { DEFAULT_LIBRARY_STYLE, type BlockStyle } from "../lib/libraryStyle";
 import { useAuth } from "../auth/AuthContext";
 import { avatarUrlFor } from "../components/Avatar";
 import {
@@ -91,7 +93,8 @@ export function MuralEditorPage() {
   // folder you must have been in to open it. A draft has no folderId of
   // its own yet, so it falls back to the one it was created from.
   const backFolderId = mural?.folderId ?? draftFolderId;
-  const backToMurals = backFolderId ? `/dashboard/murals?folder=${encodeURIComponent(backFolderId)}` : "/dashboard/murals";
+  const muralsBack = backTo("mural");
+  const backToMurals = { ...muralsBack, to: backFolderId ? `${muralsBack.to}?folder=${encodeURIComponent(backFolderId)}` : muralsBack.to };
   const [draftName, setDraftName] = useState("Untitled mural");
   const [draftTheme, setDraftTheme] = useState<ThemeId>(viewerTheme);
   // Guards against a double-create: two quick actions on a draft (add a
@@ -437,19 +440,17 @@ export function MuralEditorPage() {
 
   if (isLoading) {
     return (
-      <PageContainer>
+      <Page title="Mural" back={backTo("mural")}>
         <p className="text-sm text-(--color-text-dim)">Loading…</p>
-      </PageContainer>
+      </Page>
     );
   }
 
   if (!mural && !isDraft) {
     return (
-      <PageContainer>
-        <p className="text-sm text-(--color-text-dim)">
-          No mural with that id. <Link to="/dashboard/murals" className="text-(--color-accent) transition-opacity hover:opacity-80">Back to Murals</Link>.
-        </p>
-      </PageContainer>
+      <Page title="Mural" back={backTo("mural")}>
+        <p className="text-sm text-(--color-text-dim)">No mural with that id.</p>
+      </Page>
     );
   }
 
@@ -466,46 +467,35 @@ export function MuralEditorPage() {
   };
 
   return (
-    <PageContainer>
-      <header className="mb-6 flex items-center justify-between gap-4">
-        <div>
-          <Link to={backToMurals} className="inline-flex items-center gap-1 text-xs text-(--color-text-dim) hover:text-(--color-text)">
-            <ChevronLeftIcon size={13} />
-            Murals
-          </Link>
-          {editingName ? (
-            <input
-              autoFocus
-              value={nameDraft}
-              maxLength={200}
-              onChange={(e) => setNameDraft(e.target.value)}
-              onBlur={() => void guard(handleRename(), "Couldn't save that name.")}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") void guard(handleRename(), "Couldn't save that name.");
-                if (e.key === "Escape") setEditingName(false);
-              }}
-              className="block rounded-lg border border-(--color-border) bg-(--color-surface) px-2 py-1 text-lg font-bold"
-            />
-          ) : (
-            <button
-              onClick={() => {
-                setNameDraft(view.name);
-                setEditingName(true);
-              }}
-              title="Rename this mural"
-              className="block text-left text-lg font-bold transition-colors hover:text-(--color-accent)"
-            >
-              {view.name}
-            </button>
-          )}
-        </div>
-        {/* Phone: the header's actions as the same 44px icon row every
-            list page's toolbar uses — Share opens the same ShareModal,
-            Edit/Done is a pencil that goes accent while editing, and
-            AddBlockMenu renders its own icon-plus-bottom-sheet form.
-            Desktop below keeps the labelled buttons: there's room, and a
-            word beats an icon whose meaning you'd have to long-press to
-            discover. */}
+    <Page
+      back={backToMurals}
+      title={editingName ? (
+        <input
+          autoFocus
+          value={nameDraft}
+          maxLength={200}
+          onChange={(e) => setNameDraft(e.target.value)}
+          onBlur={() => void guard(handleRename(), "Couldn't save that name.")}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") void guard(handleRename(), "Couldn't save that name.");
+            if (e.key === "Escape") setEditingName(false);
+          }}
+          aria-label="Mural name"
+          className="font-display block min-h-11 w-full min-w-0 rounded-lg border border-(--color-border) bg-(--color-surface) px-2 py-1 font-bold"
+        />
+      ) : (
+        <button
+          onClick={() => {
+            setNameDraft(view.name);
+            setEditingName(true);
+          }}
+          title="Rename this mural"
+          className="flex min-h-11 min-w-0 max-w-full items-center text-left transition-colors hover:text-(--color-accent)"
+        >
+          <span className="min-w-0 break-words">{view.name}</span>
+        </button>
+      )}
+      actions={<>
         <div style={{ visibility: dragging ? "hidden" : undefined }} className="flex items-center gap-2 sm:hidden">
           {editMode && !mobileDraft && <AddBlockMenu onAdd={(type) => void guard(handleAddBlock(type), "Couldn't add that block.")} />}
           {view.blocks.length > 0 && (
@@ -533,14 +523,14 @@ export function MuralEditorPage() {
           {view.blocks.length > 0 && (
             <button
               onClick={() => void enterFullscreen()}
-              className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm font-semibold hover:bg-(--color-surface-hover)"
+              className={BUTTON_SECONDARY}
             >
               Fullscreen
             </button>
           )}
           <button
             onClick={() => setPickingTheme(true)}
-            className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm font-semibold hover:bg-(--color-surface-hover)"
+            className={BUTTON_SECONDARY}
           >
             Theme
           </button>
@@ -551,21 +541,20 @@ export function MuralEditorPage() {
           {mural && (
             <button
               onClick={() => setSharing(true)}
-              className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm font-semibold hover:bg-(--color-surface-hover)"
+              className={BUTTON_SECONDARY}
             >
               Share
             </button>
           )}
           <button
             onClick={toggleEditMode}
-            className={`rounded-lg px-3 py-2 text-sm font-semibold ${
-              editMode ? "bg-(--color-accent) text-(--color-on-accent)" : "border border-(--color-border) bg-(--color-surface) hover:bg-(--color-surface-hover)"
-            }`}
+            className={editMode ? BUTTON_PRIMARY : BUTTON_SECONDARY}
           >
             {editMode ? "Done editing" : "Edit"}
           </button>
         </div>
-      </header>
+      </>}
+    >
 
       {view.blocks.length === 0 && !mobileDraft && (
         // Editing is already on in the second case, so telling you to turn
@@ -577,7 +566,7 @@ export function MuralEditorPage() {
           body={editMode ? "Add your first block with the + button above." : "Turn on editing and add your first block."}
           action={
             !editMode && (
-              <button onClick={() => setEditMode(true)} className="rounded-lg bg-(--color-accent) px-4 py-2 font-semibold text-(--color-on-accent)">
+              <button onClick={() => setEditMode(true)} className={BUTTON_PRIMARY}>
                 Start building
               </button>
             )
@@ -605,36 +594,38 @@ export function MuralEditorPage() {
             <button disabled={savingLayout || savingDraft || !layoutHistory.length || layoutHistory.at(-1)?.id !== view.id || JSON.stringify(layoutHistory.at(-1)?.after) !== JSON.stringify(view.blocks)} onClick={() => void guard(undoLayout(), "Couldn't undo that move.")} className="min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm font-semibold disabled:opacity-40">Undo</button>
           </div> : null}
           </div>
-          <MuralCanvas
-            mural={view}
-            editMode={editMode}
-            onDragChange={setDragging}
-            groups={library?.data.groups ?? NO_GROUPS}
-            books={books}
-            images={images}
-            profile={session?.user.username ? { username: session.user.username, avatarUrl: session.user.avatarId ? avatarUrlFor(session.user.avatarId) : null } : undefined}
-            revertNonce={revertNonce}
-            onLayoutChange={(blockId, layout) => void guard(changeLayout((blocks) => moveMuralBlock(blocks, blockId, layout)), "Couldn't save that move.")}
-            onToggleExpansion={(blockId, axis, bottom, top) => void guard(changeLayout((blocks) => toggleMuralBlockExpansion(blocks, blockId, axis, bottom, top)), "Couldn't resize that block.")}
-            onConfigureBlock={(block) => setConfiguringBlockId(block.id)}
-            onStyleBlock={(block) => setStylingBlockId(block.id)}
-            onDuplicateBlock={(blockId) => void guard(handleDuplicateBlock(blockId), "Couldn't duplicate that block.")}
-            onDeleteBlock={(blockId) => void guard(handleDeleteBlock(blockId), "Couldn't delete that block.")}
-            selectedBlockId={selectedBlockId}
-            mobileDraft={mobileDraft}
-            busy={savingDraft || savingLayout}
-            onSelectBlock={setSelectedBlockId}
-            onStartResize={(block) => startMobileDraft("resize", block)}
-            onMobileDraftChange={changeMobileDraft}
-            onApplyMobileDraft={() => void guard(applyMobileDraft(), "Couldn't save that change.")}
-            onCancelMobileDraft={() => {
-              const keepSelected = mobileDraft?.kind === "move" || mobileDraft?.kind === "resize";
-              const blockId = mobileDraft?.block.id ?? null;
-              setMobileDraft(null);
-              setSelectedBlockId(keepSelected ? blockId : null);
-            }}
-            tierlistData={tierlistData}
-          />
+          <div className="mx-auto" style={{ maxWidth: `${DEFAULT_LIBRARY_STYLE.contentMaxWidth}px` }}>
+            <MuralCanvas
+              mural={view}
+              editMode={editMode}
+              onDragChange={setDragging}
+              groups={library?.data.groups ?? NO_GROUPS}
+              books={books}
+              images={images}
+              profile={session?.user.username ? { username: session.user.username, avatarUrl: session.user.avatarId ? avatarUrlFor(session.user.avatarId) : null } : undefined}
+              revertNonce={revertNonce}
+              onLayoutChange={(blockId, layout) => void guard(changeLayout((blocks) => moveMuralBlock(blocks, blockId, layout)), "Couldn't save that move.")}
+              onToggleExpansion={(blockId, axis, bottom, top) => void guard(changeLayout((blocks) => toggleMuralBlockExpansion(blocks, blockId, axis, bottom, top)), "Couldn't resize that block.")}
+              onConfigureBlock={(block) => setConfiguringBlockId(block.id)}
+              onStyleBlock={(block) => setStylingBlockId(block.id)}
+              onDuplicateBlock={(blockId) => void guard(handleDuplicateBlock(blockId), "Couldn't duplicate that block.")}
+              onDeleteBlock={(blockId) => void guard(handleDeleteBlock(blockId), "Couldn't delete that block.")}
+              selectedBlockId={selectedBlockId}
+              mobileDraft={mobileDraft}
+              busy={savingDraft || savingLayout}
+              onSelectBlock={setSelectedBlockId}
+              onStartResize={(block) => startMobileDraft("resize", block)}
+              onMobileDraftChange={changeMobileDraft}
+              onApplyMobileDraft={() => void guard(applyMobileDraft(), "Couldn't save that change.")}
+              onCancelMobileDraft={() => {
+                const keepSelected = mobileDraft?.kind === "move" || mobileDraft?.kind === "resize";
+                const blockId = mobileDraft?.block.id ?? null;
+                setMobileDraft(null);
+                setSelectedBlockId(keepSelected ? blockId : null);
+              }}
+              tierlistData={tierlistData}
+            />
+          </div>
         </div>
       )}
 
@@ -690,6 +681,6 @@ export function MuralEditorPage() {
           onClose={() => setSharing(false)}
         />
       )}
-    </PageContainer>
+    </Page>
   );
 }

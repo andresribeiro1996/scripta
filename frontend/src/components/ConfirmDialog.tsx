@@ -1,13 +1,12 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import { useDismissible } from "../hooks/useDismissible";
-import { useScrollLock } from "../hooks/useScrollLock";
+import { createContext, useCallback, useContext, useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "./page/buttonClasses";
+import { Sheet } from "./Sheet";
 
 interface ConfirmOptions {
-  /** Short question, e.g. `Delete "My Series"?` — rendered like
-   *  CoverPickerModal's own modal heading. */
+  /** Short question, e.g. `Delete "My Series"?` — the dialog's title. */
   title: string;
   /** Optional supporting detail below the title, e.g. "This can't be
-   *  undone." — rendered like CoverPickerModal's own modal subtitle. */
+   *  undone." */
   body?: string;
   /** Defaults to "Delete" — every call site this replaced was a delete
    *  confirmation, so that's the sensible default rather than something
@@ -36,9 +35,8 @@ const ConfirmContext = createContext<ConfirmContextValue | null>(null);
 
 export function ConfirmProvider({ children }: { children: ReactNode }) {
   const [pending, setPending] = useState<PendingConfirm | null>(null);
-  // Always-mounted provider — lock only while a dialog is actually up.
-  useScrollLock(pending !== null);
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
+  const bodyId = useId();
 
   const confirm = useCallback((options: ConfirmOptions) => {
     return new Promise<boolean>((resolve) => {
@@ -59,48 +57,35 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
     if (pending) cancelButtonRef.current?.focus();
   }, [pending]);
 
-  useDismissible(() => settle(false), pending !== null);
-
   return (
     <ConfirmContext.Provider value={{ confirm }}>
       {children}
       {pending && (
-        // Same fixed-overlay modal shell as CoverPickerModal.tsx / the
-        // mural pickers — bg-black/40 backdrop, click-outside-to-close
-        // (here: cancel) via the inner panel's stopPropagation.
-        <div className="overlay-in fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => settle(false)}>
-          <div
-            className="w-full max-w-sm rounded-xl border border-(--color-border) bg-(--color-surface) p-5 shadow-lg"
-            onClick={(e) => e.stopPropagation()}
-            role="alertdialog"
-            aria-modal="true"
-            aria-labelledby="confirm-dialog-title"
-          >
-            <h3 id="confirm-dialog-title" className="text-sm font-semibold">
-              {pending.title}
-            </h3>
-            {pending.body && <p className="mt-1.5 text-xs text-(--color-text-dim)">{pending.body}</p>}
-            <div className="mt-5 flex justify-end gap-2">
-              <button
-                ref={cancelButtonRef}
-                onClick={() => settle(false)}
-                className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2.5 text-sm font-semibold hover:bg-(--color-surface-hover)"
-              >
+        <Sheet
+          title={pending.title}
+          role="alertdialog"
+          aria-describedby={pending.body ? bodyId : undefined}
+          onClose={() => settle(false)}
+          footer={
+            <>
+              <button ref={cancelButtonRef} onClick={() => settle(false)} className={BUTTON_SECONDARY}>
                 Cancel
               </button>
               <button
                 onClick={() => settle(true)}
                 className={
                   pending.danger === false
-                    ? "rounded-lg bg-(--color-accent) px-3 py-2.5 text-sm font-semibold text-(--color-on-accent) hover:opacity-90"
-                    : "rounded-lg bg-(--color-danger) px-3 py-2.5 text-sm font-semibold text-(--color-on-danger) hover:opacity-90"
+                    ? BUTTON_PRIMARY
+                    : "inline-flex min-h-11 items-center justify-center rounded-lg bg-(--color-danger) px-4 text-sm font-semibold text-(--color-on-danger) hover:opacity-90"
                 }
               >
                 {pending.confirmLabel ?? "Delete"}
               </button>
-            </div>
-          </div>
-        </div>
+            </>
+          }
+        >
+          {pending.body && <p id={bodyId} className="px-2 pb-2 text-sm text-(--color-text-dim)">{pending.body}</p>}
+        </Sheet>
       )}
     </ConfirmContext.Provider>
   );

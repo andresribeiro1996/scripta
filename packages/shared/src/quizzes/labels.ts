@@ -35,3 +35,9 @@ export function scoreRows(questions: PublicQuizQuestion[], correct: Record<strin
 export function playerLabel(play: { playerName: string | null; anonymous: boolean }): { name: string; guest: boolean } {
   return { name: play.playerName ?? "Guest", guest: play.anonymous };
 }
+
+export function quizClueHeading(type: QuizQuestionType): string {
+  if (type === "characters_title") return "Which book has these characters?";
+  if (type === "title_cover") return "Which cover belongs to this title?";
+  return "Which book is this from?";
+}

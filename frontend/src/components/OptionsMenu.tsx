@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useDismissible } from "../hooks/useDismissible";
+import { MoreIcon } from "./NavIcons";
 
 export interface OptionsMenuItem {
   label: string;
@@ -13,24 +14,10 @@ export interface OptionsMenuItem {
 }
 
 const MENU_WIDTH = 132;
+const ROW_HEIGHT = 44;
+const EDGE_GAP = 8;
 
-// A plain hub-and-spokes gear, not a Unicode "⚙" glyph — the glyph was the
-// actual bug report this exists to fix: "⚙" doesn't sit centered within
-// its own character cell in most fonts (font-dependent side bearing, not
-// a CSS bug), so even a correctly flex-centered button visibly looked
-// off-center. An SVG drawn on a 24×24 viewBox centered at (12,12) is
-// centered by construction — same reasoning BookCard.tsx's own inline
-// BookIcon/checkmark SVGs already follow for exactly this reason.
-function GearIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="3.2" />
-      <path d="M12 2.5v3M12 18.5v3M21.5 12h-3M5.5 12h-3M18.5 5.5l-2.1 2.1M7.6 16.4l-2.1 2.1M18.5 18.5l-2.1-2.1M7.6 7.6 5.5 5.5" />
-    </svg>
-  );
-}
-
-/** A single ⚙ trigger that opens a small dropdown of actions — the one
+/** A single three-dot trigger that opens a small dropdown of actions — the one
  *  consolidated entry point for "this item's controls," replacing what
  *  used to be several separate always-visible buttons wherever it's used
  *  (mural blocks' old 🎨/⚙/× row in MuralCanvas.tsx; a mural list card's
@@ -54,7 +41,7 @@ function GearIcon() {
 export function OptionsMenu({
   items,
   title = "Settings",
-  triggerClassName = "flex h-6 w-6 items-center justify-center rounded-full bg-[rgba(10,8,6,0.72)] text-white backdrop-blur-xs",
+  triggerClassName,
   trigger
 }: {
   items: OptionsMenuItem[];
@@ -63,12 +50,12 @@ export function OptionsMenu({
    *  treatment — a dark translucent circle for a trigger sitting on
    *  arbitrary block content/imagery (needs contrast regardless of
    *  what's underneath), a plain ghost icon for one sitting on a flat
-   *  card background — only the gear glyph inside is fixed. */
+   *  card background — only the three-dot glyph inside is fixed. */
   triggerClassName?: string;
   trigger?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
-  const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
+  const [position, setPosition] = useState<{ top?: number; bottom?: number; left: number; maxHeight: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -85,22 +72,34 @@ export function OptionsMenu({
   function toggle(e: React.MouseEvent<HTMLButtonElement>) {
     e.stopPropagation();
     const rect = e.currentTarget.getBoundingClientRect();
-    setPosition({ top: rect.bottom + 4, left: Math.max(8, rect.width > MENU_WIDTH ? rect.left : rect.right - MENU_WIDTH) });
+    const left = Math.max(8, rect.width > MENU_WIDTH ? rect.left : rect.right - MENU_WIDTH);
+    const wanted = items.length * ROW_HEIGHT + 10;
+    const below = window.innerHeight - rect.bottom - EDGE_GAP - 4;
+    const above = rect.top - EDGE_GAP - 4;
+    if (wanted <= below || below >= above) setPosition({ top: rect.bottom + 4, left, maxHeight: below });
+    else setPosition({ bottom: window.innerHeight - rect.top + 4, left, maxHeight: above });
     setOpen((o) => !o);
   }
 
   return (
     <>
-      <button onClick={toggle} title={title} className={triggerClassName}>
-        {trigger ?? <GearIcon />}
+      <button onClick={toggle} title={title} className={triggerClassName ?? "flex h-11 w-11 items-center justify-center"}>
+        {trigger ??
+          (triggerClassName ? (
+            <MoreIcon size={16} />
+          ) : (
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[rgba(10,8,6,0.72)] text-white backdrop-blur-xs">
+              <MoreIcon size={16} />
+            </span>
+          ))}
       </button>
       {open &&
         position &&
         createPortal(
           <div
             ref={menuRef}
-            style={{ top: position.top, left: position.left, minWidth: MENU_WIDTH }}
-            className="menu-in fixed z-50 overflow-hidden rounded-lg border border-(--color-border) bg-(--color-surface) py-1 text-sm shadow-lg"
+            style={{ top: position.top, bottom: position.bottom, left: position.left, minWidth: MENU_WIDTH, maxHeight: position.maxHeight }}
+            className="menu-in fixed z-50 overflow-y-auto rounded-lg border border-(--color-border) bg-(--color-surface) py-1 text-sm shadow-lg"
           >
             {items.map((item) => (
               <button
@@ -112,7 +111,7 @@ export function OptionsMenu({
                   if (!item.checked) item.onClick();
                   setOpen(false);
                 }}
-                className={`flex w-full items-center justify-between gap-3 px-3 py-1.5 text-left ${
+                className={`flex w-full items-center justify-between gap-3 min-h-11 px-3 text-left ${
                   item.danger ? "text-(--color-danger) hover:bg-(--color-danger-soft)" : "hover:bg-(--color-surface-hover)"
                 }`}
               >

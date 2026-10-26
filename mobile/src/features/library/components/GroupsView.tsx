@@ -16,7 +16,7 @@
 // can drive this list without it needing its own chrome.
 
 import { forwardRef, useImperativeHandle, useMemo, useRef, useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../../ui/Text";
 import { router } from "expo-router";
 import { bookKey, makeGroup, orderedGroupBooks, saveFailureMessage, type GroupType } from "@scripta/shared";
@@ -24,6 +24,7 @@ import { EmptyState, Input } from "../../../ui/components";
 import { Icon, type IconName } from "../../../ui/icon";
 import type { SearchDockScrollProps } from "../../../ui/SearchDock";
 import { radii, spacing, typography, useTheme } from "../../../ui/theme";
+import { useToast } from "../../../ui/ToastHost";
 import { useLibrary } from "../hooks/useLibrary";
 import { attemptUpdate } from "../lib/attemptUpdate";
 import { CoverImage } from "./CoverImage";
@@ -71,6 +72,7 @@ export const GroupsView = forwardRef<GroupsViewHandle, GroupsViewProps>(function
   const draftType: GroupType = typeFilter === "series" ? "series" : "collection";
   const copy = COPY[typeFilter];
   const { colors } = useTheme();
+  const { show } = useToast();
 
   const [drafting, setDrafting] = useState(false);
   const [draftName, setDraftName] = useState("");
@@ -101,7 +103,7 @@ export const GroupsView = forwardRef<GroupsViewHandle, GroupsViewProps>(function
     const group = makeGroup(draftType, name);
     await attemptUpdate(
       () => updateLibrary((data) => ({ ...data, groups: [...(data.groups ?? []), group] })),
-      (error) => Alert.alert(saveFailureMessage(error, "Couldn't save — check your connection.")),
+      (error) => show(saveFailureMessage(error, "Couldn't save — check your connection."), "error"),
       () => router.push(`/collection/${group.id}` as never),
     );
   }

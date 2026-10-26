@@ -1,3 +1,4 @@
+import { CHECKBOX_CLASS } from "../components/Toolbar";
 import { useEffect, useRef, useState } from "react";
 import { saveFailureMessage } from "@scripta/shared";
 import { BookCard } from "../components/BookCard";
@@ -43,6 +44,7 @@ export function LibraryStylePage() {
   const { data: library, updateLibrary } = useLibrary();
   const toast = useToast();
 
+  const [pageWidth, setPageWidth] = useState<number>();
   const [draft, setDraft] = useState<LibraryStyleSettings>(DEFAULT_LIBRARY_STYLE);
   const syncedRef = useRef(false);
 
@@ -53,7 +55,9 @@ export function LibraryStylePage() {
   // at mount time.
   useEffect(() => {
     if (!syncedRef.current && library !== undefined) {
-      setDraft(resolveLibraryStyle(library?.data.style));
+      const saved = resolveLibraryStyle(library?.data.style);
+      setDraft(saved);
+      setPageWidth(saved.contentMaxWidth);
       syncedRef.current = true;
     }
   }, [library]);
@@ -95,7 +99,7 @@ export function LibraryStylePage() {
   const usingCustomBackground = draft.backgroundColor !== null;
 
   return (
-    <Page title="Settings" maxWidth={DEFAULT_LIBRARY_STYLE.contentMaxWidth} subtitle="Everything about how your cards and the canvas behind them look — applied across Library, Series, and Collections." tabs={area("settings").tabs}>
+    <Page title="Settings" maxWidth={pageWidth} subtitle="Everything about how your cards and the canvas behind them look — applied across Library, Series, and Collections." tabs={area("settings").tabs}>
       <p className="mb-6 text-sm text-(--color-text-dim)">
         These settings stay inside your books: they never restyle the app's own menus, page headers, or search and filter bar. A series can override its own card appearance from its own style panel (Series page) — those settings take priority over these for that series' cards.
       </p>
@@ -120,6 +124,7 @@ export function LibraryStylePage() {
                   <input
                     id="custom-bg-toggle"
                     type="checkbox"
+                    className={CHECKBOX_CLASS}
                     checked={usingCustomBackground}
                     onChange={(e) => {
                       if (e.target.checked) {
@@ -141,7 +146,7 @@ export function LibraryStylePage() {
                   type="color"
                   value={draft.backgroundColor ?? "#141210"}
                   onChange={(e) => applyDraft({ ...draft, backgroundColor: e.target.value })}
-                  className="mt-1 h-9 w-20 rounded border border-(--color-border) bg-transparent"
+                  className="mt-1 h-11 w-20 rounded border border-(--color-border) bg-transparent"
                 />
               )}
             </div>
@@ -174,7 +179,7 @@ export function LibraryStylePage() {
 
       <button
         onClick={() => saveNow(DEFAULT_LIBRARY_STYLE)}
-        className="mb-8 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm hover:bg-(--color-surface-hover)"
+        className="mb-8 min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm hover:bg-(--color-surface-hover)"
       >
         Reset all to defaults
       </button>
@@ -193,7 +198,7 @@ export function LibraryStylePage() {
           to see at all.
 
           `contentMaxWidth` is deliberately NOT applied here: it belongs
-          to PageContainer (the page's own width, header included), not
+          to Page (the page's own width, header included), not
           to the canvas, and this preview panel is far narrower than any
           value the slider offers — showing it here could only ever
           mislead. */}

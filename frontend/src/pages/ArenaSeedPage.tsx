@@ -16,7 +16,10 @@ import {
 } from "../api/arena";
 import { useAuth } from "../auth/AuthContext";
 import { SeedSlotGrid } from "../components/arena/SeedSlotGrid";
+import { Page } from "../components/page/Page";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../components/page/buttonClasses";
 import { OptionSheet } from "../components/Sheet";
+import { backTo } from "../lib/areas";
 import { useArena } from "../hooks/useArena";
 import { useLibrary } from "../hooks/useLibrary";
 import { toSeedBook } from "../lib/arenaSeed";
@@ -44,7 +47,7 @@ export function ArenaSeedPage() {
   // ids are UUIDs (randomUUID in the arena service), so none can be
   // called "new". The existing `:id/seed` route matches it unchanged.
   const isDraft = id === "new";
-  const { tournament, isLoading, refetch } = useArena(isDraft ? "" : id!);
+  const { tournament, isLoading, refetch, refresh } = useArena(isDraft ? "" : id!);
   const { data: library } = useLibrary();
   const workBooks = useWorkBooks(library);
   const [slots, setSlots] = useState<Array<SeedBook | null>>([]);
@@ -138,9 +141,9 @@ export function ArenaSeedPage() {
 
   if (isLoading) {
     return (
-      <div className="mx-auto max-w-5xl px-5 py-8">
+      <Page title="Seed tournament" back={backTo("tournament")}>
         <p className="text-sm text-(--color-text-dim)">Loading…</p>
-      </div>
+      </Page>
     );
   }
   if (!tournament && !isDraft) return <Navigate to="/dashboard/arena" replace />;
@@ -183,7 +186,7 @@ export function ArenaSeedPage() {
         target.id,
         slots.filter((s): s is SeedBook => s !== null).map((book, i) => ({ slotIndex: i, book }))
       );
-      await refetch();
+      await refresh(target.id);
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Couldn't save your progress.");
     }
@@ -197,7 +200,7 @@ export function ArenaSeedPage() {
       const target = await materialize();
       if (!target) return;
       await randomFillTournament(target.id, pool);
-      await refetch();
+      await refresh(target.id);
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Couldn't random-fill the bracket.");
     } finally {
@@ -206,41 +209,48 @@ export function ArenaSeedPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-5 py-8">
-      {/* One row: the name, and nothing else. The bracket size moved
-          down into the grid's own toolbar — it belongs beside the slot
-          count and Random fill, which describe the same thing — and the
-          seeded count that briefly lived here was a second way of saying
-          what that toolbar already said ("0 / 16 slots filled"). */}
-      <div className="mb-4">
-        {editingName ? (
-          <input
-            autoFocus
-            value={nameDraft}
-            onChange={(e) => setNameDraft(e.target.value)}
-            onBlur={() => void handleRename()}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") void handleRename();
-              if (e.key === "Escape") setEditingName(false);
-            }}
-            placeholder="Name this tournament…"
-            aria-label="Tournament name"
-            className="w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-2 py-1 text-lg font-bold"
-          />
-        ) : (
-          <button
-            onClick={() => {
-              setNameDraft(name);
-              setEditingName(true);
-            }}
-            title="Rename this tournament"
-            className="block w-full truncate text-left text-lg font-bold transition-colors hover:text-(--color-accent)"
-          >
-            Seed &quot;{name}&quot;
-          </button>
-        )}
-      </div>
-
+    <Page
+      back={backTo("tournament")}
+      subtitle={`${bracketSize}-book bracket`}
+      title={editingName ? (
+        <input
+          autoFocus
+          value={nameDraft}
+          onChange={(e) => setNameDraft(e.target.value)}
+          onBlur={() => void handleRename()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") void handleRename();
+            if (e.key === "Escape") setEditingName(false);
+          }}
+          placeholder="Name this tournament…"
+          aria-label="Tournament name"
+          className="font-display block min-h-11 w-full min-w-0 rounded-lg border border-(--color-border) bg-(--color-surface) px-2 py-1 font-bold"
+        />
+      ) : (
+        <button
+          onClick={() => {
+            setNameDraft(name);
+            setEditingName(true);
+          }}
+          title="Rename this tournament"
+          className="flex min-h-11 min-w-0 max-w-full items-center text-left transition-colors hover:text-(--color-accent)"
+        >
+          <span className="min-w-0 break-words">{name}</span>
+        </button>
+      )}
+      actions={<>
+        <button onClick={() => void handleSaveProgress()} className={BUTTON_SECONDARY}>
+          Save progress
+        </button>
+        <button
+          onClick={() => void handleStart()}
+          disabled={!canStart || starting}
+          className={BUTTON_PRIMARY}
+        >
+          {starting ? "Starting…" : "Start tournament"}
+        </button>
+      </>}
+    >
       {actionError && <p className="mb-4 text-sm text-(--color-danger)">{actionError}</p>}
 
       <SeedSlotGrid
@@ -267,7 +277,7 @@ export function ArenaSeedPage() {
             <button
               onClick={() => setPickingSize(true)}
               aria-label={`Bracket size, ${draftBracketSize} books — fixed once the tournament starts`}
-              className="flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg border border-(--color-border) bg-(--color-surface) px-2.5 text-xs hover:bg-(--color-surface-hover)"
+              className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg border border-(--color-border) bg-(--color-surface) px-2.5 text-xs hover:bg-(--color-surface-hover)"
             >
               {draftBracketSize} books
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-(--color-text-dim)">
@@ -290,19 +300,6 @@ export function ArenaSeedPage() {
           onClose={() => setPickingSize(false)}
         />
       )}
-
-      <div className="mt-6 flex items-center justify-between">
-        <button onClick={() => void handleSaveProgress()} className="rounded-lg border border-(--color-border) px-3 py-1.5 text-sm">
-          Save progress
-        </button>
-        <button
-          onClick={() => void handleStart()}
-          disabled={!canStart || starting}
-          className="rounded-lg bg-(--color-accent) px-4 py-2 text-sm font-medium text-(--color-on-accent) disabled:opacity-50"
-        >
-          {starting ? "Starting…" : "Start tournament"}
-        </button>
-      </div>
-    </div>
+    </Page>
   );
 }

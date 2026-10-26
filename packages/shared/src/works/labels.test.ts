@@ -14,8 +14,8 @@ test("counts read naturally, including none and one", () => {
   assert.equal(readerCountsLabel({ readers: 12, finished: 8 }), "12 readers · 8 finished");
 });
 
-test("a promoted game is owned by Scripta", () => {
-  assert.equal(gameOwnerLabel("app"), "Scripta");
+test("a promoted game is owned by Atmyshelf", () => {
+  assert.equal(gameOwnerLabel("app"), "Atmyshelf");
   assert.equal(gameOwnerLabel({ username: "ana", avatarUrl: null }), "ana");
 });
 

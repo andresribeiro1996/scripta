@@ -4,7 +4,9 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { RequireAuth } from "./auth/RequireAuth";
 import { RequireUsername } from "./auth/RequireUsername";
 import { EdgeSwipeBack } from "./components/EdgeSwipeBack";
-import { DashboardLayout } from "./layouts/DashboardLayout";
+import { PublicLayout } from "./layouts/PublicLayout";
+import { SessionLayout } from "./layouts/SessionLayout";
+import { useAuth } from "./auth/AuthContext";
 import { ArenaListPage } from "./pages/ArenaListPage";
 import { TierListCreatePage } from "./pages/TierListCreatePage";
 import { ArenaSeedPage } from "./pages/ArenaSeedPage";
@@ -43,6 +45,11 @@ import { TierListEditorPage } from "./pages/TierListEditorPage";
 import { WelcomeAvatarPage } from "./pages/WelcomeAvatarPage";
 import { VoteTierlistPage } from "./pages/VoteTierlistPage";
 
+function PublicRoutesLayout() {
+  const { session } = useAuth();
+  return <PublicLayout signedIn={Boolean(session)} />;
+}
+
 export function App() {
   return (
     <>
@@ -55,36 +62,13 @@ export function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/oauth-success" element={<OAuthSuccessPage />} />
-        <Route path="/arena" element={<PublicDiscoverPage />} />
-        <Route path="/arena/:id" element={<ArenaViewPage />} />
-        <Route path="/work/:id" element={<WorkPage />} />
-        <Route path="/work/:id/stats" element={<WorkStatsPage />} />
-        {/* Public share-viewer pages — no session at all, so these must sit
-            outside every RequireAuth/RequireUsername wrapper below, same as
-            /login. The token itself is the access control (see each public
-            backend route's own comment); a stranger with the link never
-            needs — and never gets asked for — an account. */}
-        <Route path="/shared/murals/:token" element={<SharedMuralPage />} />
-        <Route path="/shared/library/:token" element={<SharedLibraryPage />} />
-        <Route path="/vote/:code" element={<VoteTierlistPage />} />
-        <Route path="/play/:code" element={<PlayQuizPage />} />
-
-        {/* RequireAuth: must be signed in at all. RequireUsername, nested
-            inside it: must also have finished setup (a username) — a
-            Google sign-in without one yet is routed to /choose-username,
-            which itself only needs RequireAuth (not RequireUsername, or
-            it'd redirect to itself). /welcome-avatar is the skippable
-            avatar step of the signup journey — same placement: it needs a
-            session, but NOT a username yet (a password signup goes
-            straight here after registering; a Google signup passes
-            through choose-username first). */}
-        <Route element={<RequireAuth />}>
-          <Route path="/choose-username" element={<ChooseUsernamePage />} />
-          <Route path="/welcome-avatar" element={<WelcomeAvatarPage />} />
-
-          <Route element={<RequireUsername />}>
-            <Route path="/book/:key" element={<BookKeyPage />} />
-            <Route element={<DashboardLayout />}>
+        <Route element={<SessionLayout />}>
+          <Route path="/arena/:id" element={<ArenaViewPage />} />
+          <Route path="/work/:id" element={<WorkPage />} />
+          <Route path="/work/:id/stats" element={<WorkStatsPage />} />
+          <Route element={<RequireAuth />}>
+            <Route element={<RequireUsername />}>
+              <Route path="/book/:key" element={<BookKeyPage />} />
               <Route path="/dashboard" element={<HomePage />} />
               <Route path="/dashboard/library" element={<LibraryPage />} />
               <Route path="/dashboard/series" element={<SeriesPage />} />
@@ -111,6 +95,27 @@ export function App() {
               <Route path="/community/u/:username" element={<CommunityProfilePage />} />
             </Route>
           </Route>
+        </Route>
+
+        {/* Pages a stranger with the link can open. The token or code is the
+            access control (see each public backend route's own comment);
+            nobody is asked for an account, and a signed-in visitor just
+            sees "Open my library" instead of "Log in". */}
+        <Route element={<PublicRoutesLayout />}>
+          <Route path="/arena" element={<PublicDiscoverPage />} />
+          <Route path="/shared/murals/:token" element={<SharedMuralPage />} />
+          <Route path="/shared/library/:token" element={<SharedLibraryPage />} />
+          <Route path="/vote/:code" element={<VoteTierlistPage />} />
+          <Route path="/play/:code" element={<PlayQuizPage />} />
+        </Route>
+
+        {/* /choose-username and /welcome-avatar need a session but NOT a
+            username yet (a password signup goes straight to the avatar
+            step; a Google signup passes through choose-username first),
+            so they sit under RequireAuth alone. */}
+        <Route element={<RequireAuth />}>
+          <Route path="/choose-username" element={<ChooseUsernamePage />} />
+          <Route path="/welcome-avatar" element={<WelcomeAvatarPage />} />
         </Route>
 
         <Route path="*" element={<NotFoundPage />} />

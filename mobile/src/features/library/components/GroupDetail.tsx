@@ -5,8 +5,8 @@
 // tapping a row there, or by deep link (e.g. the Home mural's "Open
 // collection" button).
 
-import { useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { useEffect, useState } from "react";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../../ui/Text";
 import { router, Stack } from "expo-router";
 import {
@@ -24,7 +24,7 @@ import {
   type LibraryData,
   type PerCardStyle,
 } from "@scripta/shared";
-import { Button, EmptyState, ErrorState, IconButton, Input, Menu, Screen, Sheet, Skeleton, type MenuItem } from "../../../ui/components";
+import { Button, ConfirmDialog, EmptyState, ErrorState, IconButton, Input, Menu, Screen, Sheet, Skeleton, Toast, type MenuItem } from "../../../ui/components";
 import { spacing, typography, useTheme } from "../../../ui/theme";
 import { useMurals } from "../../murals/useMurals";
 import { useLibrary } from "../hooks/useLibrary";
@@ -51,9 +51,20 @@ export function GroupDetail({ groupId }: { groupId: string }) {
   const [styleOpen, setStyleOpen] = useState(false);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+  const [confirming, setConfirming] = useState<"group" | "books" | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [pickerError, setPickerError] = useState<string | null>(null);
+  const [styleError, setStyleError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(null), 5000);
+    return () => clearTimeout(timer);
+  }, [notice]);
 
   async function runUpdate(mutate: (data: LibraryData) => LibraryData, onSuccess?: () => void) {
-    return attemptUpdate(() => updateLibrary(mutate), (error) => Alert.alert(saveFailureMessage(error, "Couldn't save — check your connection.")), onSuccess);
+    setNotice(null);
+    return attemptUpdate(() => updateLibrary(mutate), (error) => setNotice(saveFailureMessage(error, "Couldn't save — check your connection.")), onSuccess);
   }
 
   function handleCommitRename() {
@@ -63,29 +74,28 @@ export function GroupDetail({ groupId }: { groupId: string }) {
     void runUpdate((data) => ({ ...data, groups: renameGroup(data.groups ?? [], group.id, name) }));
   }
 
-  function handleDeleteGroup() {
+  function confirmDeleteGroup() {
     if (!group) return;
-    Alert.alert(`Delete "${group.name}"?`, "The books stay in your library — this only removes the grouping.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: () => void runUpdate((data) => ({ ...data, groups: deleteGroup(data.groups ?? [], group.id) }), () => router.back()),
-      },
-    ]);
+    setConfirming(null);
+    void runUpdate((data) => ({ ...data, groups: deleteGroup(data.groups ?? [], group.id) }), () => router.back());
   }
 
   function handleToggleBook(book: Record<string, unknown>, inGroup: boolean) {
     if (!group) return;
+    setPickerError(null);
     void attemptUpdate(
       async () => assertSaved(await submit({ kind: "membership", groupId: group.id, bookKey: bookKey(book), member: !inGroup })),
-      (error) => Alert.alert(saveFailureMessage(error, "Couldn't save — check your connection.")),
+      (error) => setPickerError(saveFailureMessage(error, "Couldn't save — check your connection.")),
     );
   }
 
   function handleSaveGroupStyle(groupStyle: PerCardStyle | undefined) {
     if (!group) return;
-    void runUpdate((data) => ({ ...data, groups: setGroupStyle(data.groups ?? [], group.id, groupStyle) }));
+    setStyleError(null);
+    void attemptUpdate(
+      () => updateLibrary((data) => ({ ...data, groups: setGroupStyle(data.groups ?? [], group.id, groupStyle) })),
+      (error) => setStyleError(saveFailureMessage(error, "Couldn't save the style change.")),
+    );
   }
 
   function handleToggleSelect(book: Record<string, unknown>) {
@@ -100,24 +110,20 @@ export function GroupDetail({ groupId }: { groupId: string }) {
 
   function handleDeleteSelected() {
     if (selectedKeys.size === 0) return;
+    setConfirming("books");
+  }
+
+  function confirmDeleteSelected() {
     const keys = selectedKeys;
-    Alert.alert(`Delete ${keys.size} book${keys.size === 1 ? "" : "s"}?`, "This removes them from your library entirely, not just this group.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: () => {
-          void runUpdate(
-            (data) => deleteBooks(data, keys),
-            () => {
-              void murals.scrubBooks(keys).catch(() => Alert.alert("The books were deleted, but some mural references couldn't be updated."));
-              setSelectedKeys(new Set());
-              setSelectionMode(false);
-            },
-          );
-        },
+    setConfirming(null);
+    void runUpdate(
+      (data) => deleteBooks(data, keys),
+      () => {
+        void murals.scrubBooks(keys).catch(() => setNotice("The books were deleted, but some mural references couldn't be updated."));
+        setSelectedKeys(new Set());
+        setSelectionMode(false);
       },
-    ]);
+    );
   }
 
   const menuItems: MenuItem[] = group
@@ -135,7 +141,7 @@ export function GroupDetail({ groupId }: { groupId: string }) {
               },
             ]
           : []),
-        { label: "Delete", destructive: true, onPress: handleDeleteGroup },
+        { label: "Delete", destructive: true, onPress: () => setConfirming("group") },
       ]
     : [];
 
@@ -147,6 +153,8 @@ export function GroupDetail({ groupId }: { groupId: string }) {
           unreachable on that platform. Title stays for whatever chrome
           iOS does draw; it's otherwise inert. */}
       <Stack.Screen options={{ title: group?.name ?? "Collection" }} />
+
+      {notice ? <Toast visible message={notice} tone="error" /> : null}
 
       {isPending ? (
         <Skeleton height={180} />
@@ -217,7 +225,7 @@ export function GroupDetail({ groupId }: { groupId: string }) {
         </ScrollView>
       )}
 
-      {group && pickerOpen && <BookPickerSheet group={group} allBooks={books} onToggle={handleToggleBook} onClose={() => setPickerOpen(false)} />}
+      {group && pickerOpen && <BookPickerSheet group={group} allBooks={books} error={pickerError} onToggle={handleToggleBook} onClose={() => setPickerOpen(false)} />}
 
       <PerCardStyleSheet
         key={`${groupId}-${styleOpen}`}
@@ -227,8 +235,22 @@ export function GroupDetail({ groupId }: { groupId: string }) {
         currentOverride={group?.style}
         seedStyle={style}
         previewBook={members[0]}
+        error={styleError}
         onSave={handleSaveGroupStyle}
-        onClose={() => setStyleOpen(false)}
+        onClose={() => {
+          setStyleOpen(false);
+          setStyleError(null);
+        }}
+      />
+
+      <ConfirmDialog
+        visible={confirming !== null}
+        title={confirming === "group" ? `Delete "${group?.name ?? ""}"?` : `Delete ${selectedKeys.size} book${selectedKeys.size === 1 ? "" : "s"}?`}
+        body={confirming === "group" ? "The books stay in your library — this only removes the grouping." : "This removes them from your library entirely, not just this group."}
+        confirmLabel="Delete"
+        destructive
+        onConfirm={confirming === "group" ? confirmDeleteGroup : confirmDeleteSelected}
+        onCancel={() => setConfirming(null)}
       />
     </Screen>
   );
@@ -237,11 +259,13 @@ export function GroupDetail({ groupId }: { groupId: string }) {
 function BookPickerSheet({
   group,
   allBooks,
+  error,
   onToggle,
   onClose,
 }: {
   group: Group;
   allBooks: Array<Record<string, unknown>>;
+  error: string | null;
   onToggle: (book: Record<string, unknown>, inGroup: boolean) => void;
   onClose: () => void;
 }) {
@@ -249,6 +273,7 @@ function BookPickerSheet({
 
   return (
     <Sheet visible title={`Books in "${group.name}"`} onClose={onClose}>
+      {error ? <Toast visible message={error} tone="error" /> : null}
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: spacing.xs, paddingBottom: spacing.xl }}>
         <BookPickerList books={allBooks} isSelected={(book) => memberKeys.has(bookKey(book))} onSelect={(book) => onToggle(book, memberKeys.has(bookKey(book)))} />
       </ScrollView>

@@ -201,3 +201,13 @@ CREATE TABLE IF NOT EXISTS work_awards (
   PRIMARY KEY (work_id, prize, year)
 );
 CREATE INDEX IF NOT EXISTS idx_work_awards_recent ON work_awards(year, prize);
+
+CREATE TABLE IF NOT EXISTS work_subjects (
+  work_id TEXT NOT NULL REFERENCES works(id),
+  kind TEXT NOT NULL CHECK (kind IN ('person', 'place', 'time')),
+  position INTEGER NOT NULL,
+  name TEXT NOT NULL,
+  name_key TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (work_id, kind, name_key)
+);

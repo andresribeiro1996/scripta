@@ -5,18 +5,23 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { QUIZ_QUESTION_TYPES, eligibleTypes, playerLabel, quizOptionLabel, quizQuestionLabel, type QuizData, type QuizQuestionType } from "@scripta/shared";
-import { PageContainer } from "../components/PageContainer";
+import { Page } from "../components/page/Page";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../components/page/buttonClasses";
+import { backTo } from "../lib/areas";
 import { useConfirm } from "../components/ConfirmDialog";
 import { deleteQuizApi, fetchQuizResultsApi, publishQuizApi, setPlayStateApi, updateQuizApi, type Quiz } from "../api/quizzes";
 import { useQuizzes } from "../hooks/useQuizzes";
+import { CHECKBOX_CLASS } from "../components/Toolbar";
+import { useWorkCharacters } from "../hooks/useWorkCharacters";
 
 const TYPE_LABELS: Record<QuizQuestionType, string> = {
   cover_title: "Blurred cover → title",
   title_cover: "Title → cover",
   quote_title: "Quote → title",
-  blurb_title: "Blurb → title"
+  blurb_title: "Blurb → title",
+  characters_title: "Characters → title"
 };
 
 export function QuizEditorPage() {
@@ -48,6 +53,8 @@ export function QuizEditorPage() {
       setDraftQuizId(quiz.id);
     }
   }, [quiz, draftQuizId]);
+
+  const { characters, failed: charactersFailed } = useWorkCharacters((draft?.books ?? []).map((book) => book.workId));
 
   function updateDraft(mutate: (current: QuizData) => QuizData): void {
     if (!quiz) return;
@@ -89,15 +96,12 @@ export function QuizEditorPage() {
     }
   }
 
-  if (isLoading) return <PageContainer><p className="px-5 py-8 text-(--color-text-dim)">Loading…</p></PageContainer>;
+  if (isLoading) return <Page title="Quiz" back={backTo("quiz")}><p className="text-(--color-text-dim)">Loading…</p></Page>;
   if (!quiz) {
     return (
-      <PageContainer>
-        <div className="mx-auto max-w-2xl px-5 py-8">
-          <Link to="/dashboard/arena?tab=quizzes" className="text-sm text-(--color-text-dim) hover:text-(--color-text)">← Quizzes</Link>
-          <p className="mt-4 text-(--color-text-dim)">No quiz with that id.</p>
-        </div>
-      </PageContainer>
+      <Page title="Quiz" back={backTo("quiz")}>
+        <p className="text-(--color-text-dim)">No quiz with that id.</p>
+      </Page>
     );
   }
 
@@ -105,28 +109,27 @@ export function QuizEditorPage() {
   const shareLink = quiz.voteCode ? `${window.location.origin}/play/${quiz.voteCode}` : null;
   if (!data) {
     return (
-      <PageContainer>
-        <p className="px-5 py-8 text-(--color-text-dim)">Loading…</p>
-      </PageContainer>
+      <Page title={quiz.name} back={backTo("quiz")}>
+        <p className="text-(--color-text-dim)">Loading…</p>
+      </Page>
     );
   }
 
   return (
-    <PageContainer>
+    <Page
+      title={quiz.name}
+      back={backTo("quiz")}
+      actions={quiz.voteCode === null ? (
+        <button
+          type="button"
+          onClick={() => { void confirm({ title: `Delete "${quiz.name}"?`, body: "This can't be undone." }).then(async (yes) => { if (yes) { await deleteQuizApi(quiz.id); await queryClient.invalidateQueries({ queryKey: ["quizzes"] }); navigate("/dashboard/arena?tab=quizzes"); } }); }}
+          className={`${BUTTON_SECONDARY} text-(--color-danger)`}
+        >
+          Delete
+        </button>
+      ) : undefined}
+    >
       <div className="mx-auto flex max-w-3xl flex-col gap-5 pb-10">
-        <Link to="/dashboard/arena?tab=quizzes" className="text-sm text-(--color-text-dim) hover:text-(--color-text)">← Quizzes</Link>
-        <div className="flex items-start justify-between gap-4">
-          <h1 className="text-2xl font-bold">{quiz.name}</h1>
-          {quiz.voteCode === null && (
-            <button
-              type="button"
-              onClick={() => { void confirm({ title: `Delete "${quiz.name}"?`, body: "This can't be undone." }).then(async (yes) => { if (yes) { await deleteQuizApi(quiz.id); await queryClient.invalidateQueries({ queryKey: ["quizzes"] }); navigate("/dashboard/arena?tab=quizzes"); } }); }}
-              className="min-h-10 rounded-lg border border-(--color-border) px-3 text-sm text-(--color-danger)"
-            >
-              Delete
-            </button>
-          )}
-        </div>
         {error && <p role="alert" className="text-sm text-(--color-danger)">{error}</p>}
 
         {quiz.voteCode === null && (
@@ -137,7 +140,7 @@ export function QuizEditorPage() {
                 <select
                   value={data.questionCount}
                   onChange={(event) => updateDraft((current) => ({ ...current, questionCount: Number(event.target.value) }))}
-                  className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2"
+                  className="min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2"
                 >
                   {[4, 5, 10, 15, 20].map((count) => (
                     <option key={count} value={count}>{count}</option>
@@ -146,12 +149,13 @@ export function QuizEditorPage() {
               </label>
               <div className="flex flex-wrap gap-2">
                 {QUIZ_QUESTION_TYPES.map((type) => {
-                  const offered = data.books.some((book) => eligibleTypes(book).includes(type));
+                  const offered = data.books.some((book) => eligibleTypes({ ...book, characters: characters[book.workId] ?? book.characters }).includes(type));
                   const checked = offered && data.allowedTypes.includes(type);
                   return (
                     <label key={type} className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm ${offered ? "border-(--color-border)" : "border-(--color-border) opacity-50"}`}>
                       <input
                         type="checkbox"
+                        className={CHECKBOX_CLASS}
                         disabled={!offered}
                         checked={checked}
                         onChange={() =>
@@ -166,6 +170,7 @@ export function QuizEditorPage() {
                   );
                 })}
               </div>
+              {charactersFailed && <p className="text-sm text-(--color-text-dim)">Characters couldn't be checked</p>}
             </div>
 
             {data.books.map((book) => (
@@ -178,7 +183,7 @@ export function QuizEditorPage() {
                   <button
                     type="button"
                     onClick={() => updateDraft((current) => ({ ...current, books: current.books.filter((entry) => entry.workId !== book.workId) }))}
-                    className="min-h-9 rounded-lg border border-(--color-border) px-3 text-sm"
+                    className={BUTTON_SECONDARY}
                   >
                     Remove
                   </button>
@@ -225,7 +230,7 @@ export function QuizEditorPage() {
 
         {quiz.voteCode !== null && <PublishedSection quiz={quiz} shareLink={shareLink!} copied={copied} setCopied={setCopied} />}
       </div>
-    </PageContainer>
+    </Page>
   );
 }
 
@@ -250,14 +255,14 @@ function PublishedSection({ quiz, shareLink, copied, setCopied }: { quiz: Quiz; 
             setCopied(true);
             window.setTimeout(() => setCopied(false), 1500);
           }}
-          className="min-h-10 rounded-lg bg-(--color-accent) px-3 text-sm font-semibold text-(--color-on-accent)"
+          className={BUTTON_PRIMARY}
         >
           {copied ? "Copied!" : "Copy challenge link"}
         </button>
         <button
           type="button"
           onClick={() => void toggleOpen(!quiz.playOpen)}
-          className="min-h-10 rounded-lg border border-(--color-border) px-3 text-sm"
+          className={BUTTON_SECONDARY}
         >
           {quiz.playOpen ? "Close for play" : "Open for play"}
         </button>

@@ -1,10 +1,12 @@
 import { ballotBoard, workIdOf, booksByWork } from "@scripta/shared";
 import { useEffect, useState } from "react";
-import { Link, useOutletContext, useParams } from "react-router-dom";
+import { useOutletContext, useParams } from "react-router-dom";
 import type { TierlistData } from "../api/tierlists";
 import { openVotingApi, setVotingStateApi } from "../api/tierlistVoting";
 import { TierRow } from "../components/murals/blocks/BookBlocks";
-import { PageContainer } from "../components/PageContainer";
+import { Page } from "../components/page/Page";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../components/page/buttonClasses";
+import { backTo } from "../lib/areas";
 import { AddBooksSheet } from "../components/tierlist/AddBooksSheet";
 import { TierBoard } from "../components/tierlist/TierBoard";
 import { TierlistResultsView } from "../components/tierlist/TierlistResultsView";
@@ -13,7 +15,6 @@ import { useLibrary } from "../hooks/useLibrary";
 import { useTierlists } from "../hooks/useTierlists";
 import { useTierlistResults, useTierlistVoting } from "../hooks/useTierlistVoting";
 import { useWorkBooks } from "../hooks/useWorkBooks";
-import { ChevronLeftIcon } from "../components/Toolbar";
 
 export function TierListEditorPage() {
   const { id } = useParams<{ id: string }>();
@@ -25,6 +26,7 @@ export function TierListEditorPage() {
   const [nameDraft, setNameDraft] = useState("");
   const [addingBooks, setAddingBooks] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   // The voting board (ballot count, frozen tiers/pool) behind this tier
   // list's OWN vote code, read through the same public route voters hit
@@ -87,23 +89,17 @@ export function TierListEditorPage() {
 
   if (isLoading) {
     return (
-      <PageContainer>
+      <Page title="Tier list" back={backTo("tierlist")}>
         <p className="text-sm text-(--color-text-dim)">Loading…</p>
-      </PageContainer>
+      </Page>
     );
   }
 
   if (!tierlist) {
     return (
-      <PageContainer>
-        <p className="text-sm text-(--color-text-dim)">
-          No tier list with that id.{" "}
-          <Link to="/dashboard/arena?tab=tierlists" className="text-(--color-accent) transition-opacity hover:opacity-80">
-            Back to Arena
-          </Link>
-          .
-        </p>
-      </PageContainer>
+      <Page title="Tier list" back={backTo("tierlist")}>
+        <p className="text-sm text-(--color-text-dim)">No tier list with that id.</p>
+      </Page>
     );
   }
 
@@ -111,8 +107,21 @@ export function TierListEditorPage() {
   const tierlistId = tierlist.id;
   const tierlistName = tierlist.name;
   const voteCode = tierlist.voteCode;
+  const voteLink = `${window.location.origin}/vote/${voteCode}`;
   const voteAccess = tierlist.voteAccess;
   const votingOpen = tierlist.votingOpen;
+
+  async function copyVoteLink() {
+    try {
+      await navigator.clipboard.writeText(voteLink);
+    } catch {
+      setVotingActionError("Couldn't copy the link.");
+      return;
+    }
+    setVotingActionError(null);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1500);
+  }
 
   async function commit(next: TierlistData) {
     setVotingActionError(null);
@@ -187,56 +196,43 @@ export function TierListEditorPage() {
   const resolvedPool = data.pool.filter((id) => byWork.has(id));
 
   return (
-    <PageContainer>
-      <header className="mb-6">
-        <Link to="/dashboard/arena?tab=tierlists" className="inline-flex items-center gap-1 text-xs text-(--color-text-dim) hover:text-(--color-text)">
-          <ChevronLeftIcon size={13} />
-          Arena
-        </Link>
-        <div className="flex items-center justify-between gap-3">
-          {editingName && voteCode === null ? (
-            <input
-              autoFocus
-              value={nameDraft}
-              onChange={(e) => setNameDraft(e.target.value)}
-              onBlur={() => void handleRename()}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") void handleRename();
-                if (e.key === "Escape") setEditingName(false);
-              }}
-              aria-label="Tier list name"
-              className="block min-w-0 flex-1 rounded-lg border border-(--color-border) bg-(--color-surface) px-2 py-1 text-lg font-bold"
-            />
-          ) : (
-            <button
-              disabled={voteCode !== null}
-              onClick={() => {
-                setNameDraft(tierlist.name);
-                setEditingName(true);
-              }}
-              title="Rename this tier list"
-              className="block min-w-0 flex-1 truncate text-left text-lg font-bold transition-colors hover:text-(--color-accent)"
-            >
-              {tierlist.name}
-            </button>
-          )}
-          {/* Structure editing is meaningless once this list has a vote
-              code — see the panel below — so the Edit/Done toggle that
-              drives it is dropped entirely rather than shown disabled. */}
-          {voteCode === null && (
-            <button
-              onClick={() => (editing ? exitEditing() : setEditing(true))}
-              className={`min-h-9 shrink-0 rounded-lg px-3 text-sm font-semibold ${
-                editing
-                  ? "bg-(--color-accent) text-(--color-on-accent)"
-                  : "border border-(--color-border) bg-(--color-surface) hover:bg-(--color-surface-hover)"
-              }`}
-            >
-              {editing ? "Done" : "Edit"}
-            </button>
-          )}
-        </div>
-      </header>
+    <Page
+      back={backTo("tierlist")}
+      title={editingName && voteCode === null ? (
+        <input
+          autoFocus
+          value={nameDraft}
+          onChange={(e) => setNameDraft(e.target.value)}
+          onBlur={() => void handleRename()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") void handleRename();
+            if (e.key === "Escape") setEditingName(false);
+          }}
+          aria-label="Tier list name"
+          className="font-display block w-full min-w-0 rounded-lg border border-(--color-border) bg-(--color-surface) px-2 py-1 font-bold"
+        />
+      ) : (
+        <button
+          disabled={voteCode !== null}
+          onClick={() => {
+            setNameDraft(tierlist.name);
+            setEditingName(true);
+          }}
+          title="Rename this tier list"
+          className="flex min-h-11 min-w-0 max-w-full items-center text-left transition-colors hover:text-(--color-accent)"
+        >
+          <span className="min-w-0 break-words">{tierlist.name}</span>
+        </button>
+      )}
+      actions={voteCode === null ? (
+        <button
+          onClick={() => (editing ? exitEditing() : setEditing(true))}
+          className={editing && !openPanelOpen ? BUTTON_PRIMARY : BUTTON_SECONDARY}
+        >
+          {editing ? "Done" : "Edit"}
+        </button>
+      ) : undefined}
+    >
 
       {votingActionError && <p className="mb-4 text-sm text-(--color-danger)">{votingActionError}</p>}
 
@@ -251,7 +247,7 @@ export function TierListEditorPage() {
                     key={access}
                     onClick={() => setVoteAccessDraft(access)}
                     aria-pressed={voteAccessDraft === access}
-                    className={`flex min-h-9 flex-1 items-center justify-center px-3 text-sm font-semibold ${
+                    className={`flex min-h-11 flex-1 items-center justify-center px-3 text-sm font-semibold ${
                       i > 0 ? "border-l border-(--color-border)" : ""
                     } ${
                       voteAccessDraft === access
@@ -267,14 +263,14 @@ export function TierListEditorPage() {
                 <button
                   onClick={() => void handleOpenVoting()}
                   disabled={openingVoting}
-                  className="min-h-9 flex-1 rounded-lg bg-(--color-accent) px-3 text-sm font-semibold text-(--color-on-accent) disabled:opacity-60"
+                  className={`${BUTTON_PRIMARY} flex-1`}
                 >
                   {openingVoting ? "Opening…" : "Confirm and open"}
                 </button>
                 <button
                   onClick={() => setOpenPanelOpen(false)}
                   disabled={openingVoting}
-                  className="min-h-9 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm font-semibold hover:bg-(--color-surface-hover) disabled:opacity-60"
+                  className={BUTTON_SECONDARY}
                 >
                   Cancel
                 </button>
@@ -283,7 +279,7 @@ export function TierListEditorPage() {
           ) : (
             <button
               onClick={() => setOpenPanelOpen(true)}
-              className="min-h-9 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm font-semibold hover:bg-(--color-surface-hover)"
+              className={BUTTON_SECONDARY}
             >
               Open for voting
             </button>
@@ -293,16 +289,21 @@ export function TierListEditorPage() {
         <div className="mb-6 flex flex-col gap-3 rounded-xl border border-(--color-border) bg-(--color-surface) p-3">
           <p className="text-sm text-(--color-text-dim)">This public tier list is locked. At 100 distinct signed-in voters, it becomes an app-owned reference.</p>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <a href={`/vote/${voteCode}`} className="text-sm font-semibold text-(--color-accent) hover:opacity-80">
-              /vote/{voteCode}
-            </a>
+            <div className="flex min-w-0 flex-1 basis-60 items-center gap-2">
+              <a href={voteLink} className="inline-flex min-h-11 min-w-0 flex-1 items-center text-sm font-semibold text-(--color-accent) hover:opacity-80">
+                <span className="truncate">{voteLink}</span>
+              </a>
+              <button type="button" onClick={() => void copyVoteLink()} className={`${BUTTON_SECONDARY} shrink-0`}>
+                {copied ? "Copied!" : "Copy"}
+              </button>
+            </div>
             <span className="text-xs text-(--color-text-dim)">
               {votingBoard?.ballotCount ?? 0} {(votingBoard?.ballotCount ?? 0) === 1 ? "ballot" : "ballots"} · {votingBoard?.eligibleVoteCount ?? 0}/100 eligible voters
             </span>
           </div>
           <a
             href={`/vote/${voteCode}`}
-            className="min-h-9 self-start rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm font-semibold hover:bg-(--color-surface-hover) flex items-center"
+            className={`${BUTTON_SECONDARY} self-start`}
           >
             {ownBallot?.placements.length ? "Edit your ballot" : "Rank your ballot"}
           </a>
@@ -314,7 +315,7 @@ export function TierListEditorPage() {
                   onClick={() => void handleAccessChange(access)}
                   disabled={savingAccess}
                   aria-pressed={voteAccess === access}
-                  className={`flex min-h-9 items-center justify-center px-3 text-sm font-semibold disabled:opacity-60 ${
+                  className={`flex min-h-11 items-center justify-center px-3 text-sm font-semibold disabled:opacity-60 ${
                     i > 0 ? "border-l border-(--color-border)" : ""
                   } ${
                     voteAccess === access
@@ -329,7 +330,7 @@ export function TierListEditorPage() {
             <button
               onClick={() => void handleToggleVotingOpen()}
               disabled={savingOpenState}
-              className="min-h-9 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm font-semibold hover:bg-(--color-surface-hover) disabled:opacity-60"
+              className={BUTTON_SECONDARY}
             >
               {votingOpen ? (savingOpenState ? "Closing…" : "Close voting") : savingOpenState ? "Reopening…" : "Reopen voting"}
             </button>
@@ -387,6 +388,6 @@ export function TierListEditorPage() {
           onClose={() => setAddingBooks(false)}
         />
       )}
-    </PageContainer>
+    </Page>
   );
 }

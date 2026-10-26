@@ -1,17 +1,18 @@
 import { useState } from "react";
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
+import { KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
 import { Text } from "../ui/Text";
 import { Redirect, router, Stack } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { PASSWORD_HINT, type AccountSecurity } from "@scripta/shared";
 import { apiClient } from "../core/api";
 import { useAuth } from "../core/auth";
-import { Button, Input, Screen } from "../ui";
+import { Button, Input, Screen, useToast } from "../ui";
 import { spacing, typography, useTheme } from "../ui/theme";
 
 export default function AccountSecurityPage() {
   const { user, ready, signOut } = useAuth();
   const { colors } = useTheme();
+  const { show } = useToast();
   const account = useQuery({ queryKey: ["account-security"], queryFn: () => apiClient.request<AccountSecurity>("/auth/account", { auth: true }), enabled: Boolean(user) });
   const [mode, setMode] = useState<"password" | "email" | null>(null);
   const [email, setEmail] = useState("");
@@ -50,7 +51,7 @@ export default function AccountSecurityPage() {
       await apiClient.request("/auth/delete-account", { method: "POST", auth: true, body: account.data?.hasPassword ? { password: confirmation } : { confirmation } });
       await signOut();
       router.replace("/login");
-      Alert.alert("Account deleted", "Your account and everything in it have been deleted.");
+      show("Your account and everything in it have been deleted.", "success");
     } catch (reason) { setDeleteError(reason instanceof Error ? reason.message : "Please try again."); }
     finally { setBusy(false); }
   }

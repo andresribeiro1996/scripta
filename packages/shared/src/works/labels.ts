@@ -14,7 +14,7 @@ export function readerCountsLabel(counts: { readers: number; finished: number })
 }
 
 export function gameOwnerLabel(owner: ReaderProfile | "app"): string {
-  return owner === "app" ? "Scripta" : owner.username;
+  return owner === "app" ? "Atmyshelf" : owner.username;
 }
 
 export function editionLabel(edition: WorkEdition): string {
