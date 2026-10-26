@@ -105,7 +105,7 @@ function showsSeriesContext(workTitle: string, target: JoinTarget): boolean {
   return SERIES_WORDS.some((word) => padded.includes(` ${word} `)) ||
     target.series.some((entry) => {
       const key = withoutArticle(entry.nameKey);
-      return key !== "" && padded.includes(` ${key} `);
+      return key.length >= 3 && padded.includes(` ${key} `);
     });
 }
 
@@ -113,7 +113,7 @@ export function joinVerdict(work: { title: string }, target: JoinTarget, memberK
   const workTitle = withVolumeBrackets(work.title);
   const targetTitle = withVolumeBrackets(target.title);
   const marker = endMarker(workTitle);
-  const positionsCount = !marker?.word || showsSeriesContext(workTitle, target);
+  const positionsCount = !marker?.word || showsSeriesContext(work.title, target);
   const targetNumbers = new Set([
     ...titleNumbers(targetTitle).split(" ").filter((digits) => digits !== "").map((digits) => String(Number(digits))),
     ...volumeNumbers(targetTitle),
