@@ -40,14 +40,36 @@ test("the body keeps the page padding", () => {
   assert.match(render(createElement(Page, { title: "T", children: "x" })), /px-4 py-5 sm:px-5 sm:py-8/);
 });
 
+test("a page with its own heading can omit the title band and keep the body frame", () => {
+  const html = render(createElement(Page, { title: null }, createElement("h1", null, "Quiz results")));
+  assert.doesNotMatch(html, /<header/);
+  assert.match(html, /px-4 py-5 sm:px-5 sm:py-8/);
+  assert.match(html, /<h1>Quiz results<\/h1>/);
+});
+
 test("a long title can wrap inside the band", () => {
   const html = render(createElement(Page, { title: "A".repeat(60), children: "x" }));
   assert.match(html, /min-w-0[^"]*break-words|break-words[^"]*min-w-0/);
 });
 
-test("body width comes from context, a prop overrides it", () => {
+test("body width comes from context, a prop overrides only the body", () => {
   assert.match(render(createElement(Page, { title: "T", children: "x" }), "/", 1400), /max-width:1400px/);
-  assert.match(render(createElement(Page, { title: "T", maxWidth: 900, children: "x" }), "/", 1400), /max-width:900px/);
+  const html = render(createElement(Page, { title: "T", maxWidth: 900, children: "x" }), "/", 1400);
+  assert.match(html, /<header[\s\S]*?max-width:1400px[\s\S]*?<\/header>/);
+  assert.match(html, /<\/header><div[^>]*style="max-width:900px"/);
+});
+
+test("tabs and controls sit below the title band", () => {
+  const html = render(createElement(Page, {
+    title: "Library",
+    subtitle: "84 books",
+    actions: createElement("button", null, "Add a book"),
+    tabs: area("library").tabs,
+    children: "Library content"
+  }));
+  const header = html.slice(0, html.indexOf("</header>"));
+  assert.doesNotMatch(header, /84 books|Add a book|aria-label="Sections"/);
+  assert.match(html, /<\/header>[\s\S]*84 books[\s\S]*Add a book[\s\S]*aria-label="Sections"[\s\S]*Library content/);
 });
 
 test("button classes meet the 44px floor", () => {

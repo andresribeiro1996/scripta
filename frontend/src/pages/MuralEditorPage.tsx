@@ -24,7 +24,7 @@ import { MuralConflictError, useMurals } from "../hooks/useMurals";
 import { useTierlists } from "../hooks/useTierlists";
 import { useWorkBooks } from "../hooks/useWorkBooks";
 import { muralThemeStyle, useResolvedTheme } from "../lib/theme";
-import { DEFAULT_LIBRARY_STYLE, type BlockStyle } from "../lib/libraryStyle";
+import type { BlockStyle } from "../lib/libraryStyle";
 import { useAuth } from "../auth/AuthContext";
 import { avatarUrlFor } from "../components/Avatar";
 import {
@@ -594,7 +594,7 @@ export function MuralEditorPage() {
             <button disabled={savingLayout || savingDraft || !layoutHistory.length || layoutHistory.at(-1)?.id !== view.id || JSON.stringify(layoutHistory.at(-1)?.after) !== JSON.stringify(view.blocks)} onClick={() => void guard(undoLayout(), "Couldn't undo that move.")} className="min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm font-semibold disabled:opacity-40">Undo</button>
           </div> : null}
           </div>
-          <div className="mx-auto" style={{ maxWidth: `${DEFAULT_LIBRARY_STYLE.contentMaxWidth}px` }}>
+          <div className="mx-auto max-w-6xl">
             <MuralCanvas
               mural={view}
               editMode={editMode}

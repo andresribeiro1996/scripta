@@ -21,38 +21,42 @@ export function Page({ title, subtitle, back, actions, tabs, maxWidth, children 
   const activeTo = tabs?.length ? activeTabTo(tabs, location) : null;
   return (
     <>
-      <header className="border-b border-(--color-border) bg-(--color-surface)">
-        <div className="mx-auto px-4 pt-3 sm:px-5" style={style}>
-          {back ? (
-            <Link to={back.to} className="-ml-2 inline-flex min-h-11 items-center gap-1 rounded-lg px-2 text-sm text-(--color-text-dim) hover:text-(--color-text)">
-              <ChevronLeftIcon />{back.label}
-            </Link>
-          ) : null}
-          <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 pb-3">
-            <div className="min-w-0 flex-1 basis-60 sm:basis-40">
-              <h1 className="font-display min-w-0 font-bold break-words text-2xl sm:text-3xl">{title}</h1>
-              {subtitle ? <p className="mt-1 text-sm text-(--color-text-dim)">{subtitle}</p> : null}
-            </div>
-            {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
+      {title != null && (
+        <header className="border-b border-(--color-border) bg-(--color-surface)">
+          <div className="mx-auto flex min-h-20 items-center gap-4 px-4 py-3 sm:px-5 lg:px-8" style={{ maxWidth: `${contextWidth}px` }}>
+            {back ? (
+              <Link to={back.to} className="-ml-2 inline-flex min-h-11 shrink-0 items-center gap-1 rounded-lg px-2 text-sm text-(--color-text-dim) hover:text-(--color-text)">
+                <ChevronLeftIcon />{back.label}
+              </Link>
+            ) : null}
+            <h1 className="font-display min-w-0 flex-1 font-bold break-words text-2xl sm:text-3xl">{title}</h1>
           </div>
-          {tabs?.length ? (
-            <nav aria-label="Sections" className="-mx-4 flex overflow-x-auto px-4 sm:mx-0 sm:px-0">
-              {tabs.map((tab) => {
-                const active = tab.to === activeTo;
-                return (
-                  <Link
-                    key={tab.to}
-                    to={tab.to}
-                    aria-current={active ? "page" : undefined}
-                    className={`inline-flex min-h-11 shrink-0 items-center whitespace-nowrap border-b-2 px-3 text-sm font-semibold ${active ? "border-(--color-accent) text-(--color-text)" : "border-transparent text-(--color-text-dim) hover:text-(--color-text)"}`}
-                  >{tab.label}</Link>
-                );
-              })}
-            </nav>
-          ) : null}
-        </div>
-      </header>
-      <div className="mx-auto px-4 py-5 sm:px-5 sm:py-8" style={style}>{children}</div>
+        </header>
+      )}
+      <div className="mx-auto px-4 py-5 sm:px-5 sm:py-8 lg:px-8" style={style}>
+        {subtitle || actions ? (
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+            {subtitle ? <div className="min-w-0 text-sm text-(--color-text-dim)">{subtitle}</div> : null}
+            {actions ? <div className="ml-auto flex flex-wrap items-center gap-2">{actions}</div> : null}
+          </div>
+        ) : null}
+        {tabs?.length ? (
+          <nav aria-label="Sections" className="-mx-4 mb-6 flex overflow-x-auto border-b border-(--color-border) px-4 sm:mx-0 sm:px-0">
+            {tabs.map((tab) => {
+              const active = tab.to === activeTo;
+              return (
+                <Link
+                  key={tab.to}
+                  to={tab.to}
+                  aria-current={active ? "page" : undefined}
+                  className={`inline-flex min-h-11 shrink-0 items-center whitespace-nowrap border-b-2 px-3 text-sm font-semibold ${active ? "border-(--color-accent) text-(--color-text)" : "border-transparent text-(--color-text-dim) hover:text-(--color-text)"}`}
+                >{tab.label}</Link>
+              );
+            })}
+          </nav>
+        ) : null}
+        {children}
+      </div>
     </>
   );
 }

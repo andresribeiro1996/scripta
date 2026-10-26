@@ -44,7 +44,6 @@ export function LibraryStylePage() {
   const { data: library, updateLibrary } = useLibrary();
   const toast = useToast();
 
-  const [pageWidth, setPageWidth] = useState<number>();
   const [draft, setDraft] = useState<LibraryStyleSettings>(DEFAULT_LIBRARY_STYLE);
   const syncedRef = useRef(false);
 
@@ -57,7 +56,6 @@ export function LibraryStylePage() {
     if (!syncedRef.current && library !== undefined) {
       const saved = resolveLibraryStyle(library?.data.style);
       setDraft(saved);
-      setPageWidth(saved.contentMaxWidth);
       syncedRef.current = true;
     }
   }, [library]);
@@ -99,7 +97,7 @@ export function LibraryStylePage() {
   const usingCustomBackground = draft.backgroundColor !== null;
 
   return (
-    <Page title="Settings" maxWidth={pageWidth} subtitle="Everything about how your cards and the canvas behind them look — applied across Library, Series, and Collections." tabs={area("settings").tabs}>
+    <Page title="Settings" subtitle="Everything about how your cards and the canvas behind them look — applied across Library, Series, and Collections." tabs={area("settings").tabs}>
       <p className="mb-6 text-sm text-(--color-text-dim)">
         These settings stay inside your books: they never restyle the app's own menus, page headers, or search and filter bar. A series can override its own card appearance from its own style panel (Series page) — those settings take priority over these for that series' cards.
       </p>
@@ -195,13 +193,7 @@ export function LibraryStylePage() {
           preview now that these settings stop at the books instead of
           washing over the entire page. With no custom background set the
           canvas is transparent, so without an outline there'd be nothing
-          to see at all.
-
-          `contentMaxWidth` is deliberately NOT applied here: it belongs
-          to Page (the page's own width, header included), not
-          to the canvas, and this preview panel is far narrower than any
-          value the slider offers — showing it here could only ever
-          mislead. */}
+          to see at all. */}
       <div className="overflow-hidden rounded-xl border border-dashed border-(--color-border)">
         <LibraryCanvas style={draft}>
           <BookGrid style={draft}>
@@ -213,8 +205,8 @@ export function LibraryStylePage() {
       </div>
       <p className="mt-2 text-xs text-(--color-text-dim)">
         The dashed edge is where your canvas ends — the app's own menus, page header, and search bar sit outside it and
-        keep the app's theme no matter what you set here. Content width isn't previewed: this panel is narrower than
-        every value that slider offers. Hover a card above to see the shadow and hover animation settings.
+        keep the app's theme no matter what you set here. Content width applies on the Library, Series and Collections
+        pages. Hover a card above to see the shadow and hover animation settings.
       </p>
     </Page>
   );

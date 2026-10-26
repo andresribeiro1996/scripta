@@ -130,7 +130,7 @@ export function ArenaListPage() {
             </ToolbarRow>
           )}
 
-          {showSkeleton && <SkeletonCardGrid count={3} label="Loading tournaments" tileClassName="min-h-[260px]" gridClassName="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3" />}
+          {showSkeleton && <SkeletonCardGrid count={3} label="Loading tournaments" tileClassName="min-h-[260px]" gridClassName="game-ticket-grid" />}
 
           {!isLoading && !votedLoading && loadError && (
             <EmptyState
@@ -149,7 +149,7 @@ export function ArenaListPage() {
 
           {votedTournaments.length > 0 && <h3 className="mb-3 text-sm font-semibold">Created by you</h3>}
 
-          <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="game-ticket-grid">
             {bySearch.created.map((t) => (
               <TournamentCard key={t.id} t={t} />
             ))}
@@ -158,7 +158,7 @@ export function ArenaListPage() {
           {(bySearch.voted.length > 0 || (votedTournaments.length > 0 && !search.trim())) && (
             <>
               <h3 className="mb-3 mt-6 text-sm font-semibold">Voting in</h3>
-              <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="game-ticket-grid">
                 {bySearch.voted.map((t) => (
                   <TournamentCard key={t.id} t={t} />
                 ))}
@@ -176,7 +176,7 @@ export function ArenaListPage() {
         <>
           {createError && <p className="mb-4 text-sm text-(--color-danger)">{createError}</p>}
 
-          {showTierlistSkeleton && <SkeletonCardGrid count={3} label="Loading tier lists" tileClassName="min-h-[260px]" gridClassName="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3" />}
+          {showTierlistSkeleton && <SkeletonCardGrid count={3} label="Loading tier lists" tileClassName="min-h-[260px]" gridClassName="game-ticket-grid" />}
 
           {!tierlistsLoading && tierlists.length === 0 && votedTierlists.length === 0 && (
             <EmptyState
@@ -188,7 +188,7 @@ export function ArenaListPage() {
 
           {votedTierlists.length > 0 && <h3 className="mb-3 text-sm font-semibold">Created by you</h3>}
 
-          <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="game-ticket-grid">
             {tierlists.map((tl) =>
               renamingTierlistId === tl.id ? (
                 <div key={tl.id} className="rounded-xl border border-(--color-accent) bg-(--color-surface) p-4">
@@ -240,7 +240,7 @@ export function ArenaListPage() {
           {votedTierlists.length > 0 && (
             <>
               <h3 className="mb-3 mt-6 text-sm font-semibold">Voted on</h3>
-              <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="game-ticket-grid">
                 {votedTierlists.map((tl) => (
                   <GameTicket
                     key={tl.id}
@@ -261,7 +261,7 @@ export function ArenaListPage() {
 
       {tab === "quizzes" && (
         <>
-          {showQuizSkeleton && <SkeletonCardGrid count={3} label="Loading quizzes" tileClassName="min-h-[260px]" gridClassName="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3" />}
+          {showQuizSkeleton && <SkeletonCardGrid count={3} label="Loading quizzes" tileClassName="min-h-[260px]" gridClassName="game-ticket-grid" />}
 
           {!quizzesLoading && quizzes.length === 0 && (
             <EmptyState
@@ -271,7 +271,7 @@ export function ArenaListPage() {
             />
           )}
 
-          <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="game-ticket-grid auto-rows-fr">
             {quizzes.map((quiz) => (
               <GameTicket
                 key={quiz.id}

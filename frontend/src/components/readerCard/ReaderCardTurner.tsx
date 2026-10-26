@@ -7,10 +7,10 @@ import { ReaderCardImage } from "./ReaderCardImage";
 const TURN = "motion-safe:transition-transform motion-safe:duration-500 motion-safe:ease-[cubic-bezier(0.32,0.72,0,1)]";
 const wideScreen = () => typeof window !== "undefined" && window.innerWidth >= 768 && !window.matchMedia?.("(pointer: coarse)").matches;
 
-export function ReaderCardTurner({ input, cardWidth, spreadWidth, onScrim = false, autoFocus = false }: { input: ReaderCardBase; cardWidth: string; spreadWidth: string; onScrim?: boolean; autoFocus?: boolean }) {
+export function ReaderCardTurner({ input, cardWidth, spreadWidth, onScrim = false, autoFocus = false }: { input: ReaderCardBase; cardWidth: string; spreadWidth?: string; onScrim?: boolean; autoFocus?: boolean }) {
   const [wide] = useState(wideScreen);
   const steps = useMemo(() => readerCardPages(input.style.layout, input.view ?? "visitor", hasChosen(input.card.chosen)), [input]);
-  const spread = wide && steps.some(Array.isArray) ? (steps[1] as [ReaderCardPage, ReaderCardPage]) : null;
+  const spread = spreadWidth && wide && steps.some(Array.isArray) ? (steps[1] as [ReaderCardPage, ReaderCardPage]) : null;
   const pages = useMemo(() => steps.flat(), [steps]);
   const count = spread ? 2 : pages.length;
   const pager = input.style.layout === "book" && !spread;
