@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { parseRankingPreview } from "./helpers.js";
 import { test } from "node:test";
+import { DEFAULT_TIER_PRESET } from "../tierlists/tierlist.js";
 
 test("ranking previews keep real book placements and discard malformed or empty tiers", () => {
   const tier = { label: "S", color: "#c9482f", books: [{ title: "Dune", coverUrl: null }] };
@@ -131,6 +132,5 @@ test("ticket actions reflect closed games and prior participation", () => {
 });
 
 test("the tier ladder is the default preset colours", () => {
-  assert.ok(TIER_LADDER.length > 0);
-  assert.ok(TIER_LADDER.every((color) => typeof color === "string"));
+  assert.deepEqual(TIER_LADDER, DEFAULT_TIER_PRESET.map((tier) => tier.color));
 });

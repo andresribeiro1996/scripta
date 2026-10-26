@@ -135,7 +135,7 @@ function DiscoverRow({ item }: { item: DiscoverItem }) {
             {author.unavailable ? (
               <span className="min-w-0 truncate font-semibold">{author.username}</span>
             ) : (
-              <Link to={`/community/u/${author.username}`} className="min-w-0 truncate font-semibold hover:text-(--color-accent)">
+              <Link to={`/community/u/${author.username}`} className="relative z-10 -my-3 block min-w-0 truncate leading-11 font-semibold hover:text-(--color-accent)">
                 {author.username}
               </Link>
             )}

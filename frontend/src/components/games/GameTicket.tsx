@@ -64,7 +64,7 @@ export function GameTicket({
               {name}
             </Link>
           </h3>
-          <div className="relative z-10 min-w-0 text-xs text-(--color-text-dim)">{meta}</div>
+          <div className="min-w-0 text-xs text-(--color-text-dim)">{meta}</div>
           <div className="mt-1 flex flex-wrap items-center gap-2">{badges}</div>
           {stats.length > 0 && (
             <div data-stats className="mt-2 flex flex-wrap gap-4 border-t border-(--color-border) pt-3">

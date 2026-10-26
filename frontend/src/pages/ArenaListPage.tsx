@@ -130,7 +130,7 @@ export function ArenaListPage() {
             </ToolbarRow>
           )}
 
-          {showSkeleton && <SkeletonCardGrid count={3} label="Loading tournaments" tileClassName="min-h-[260px]" />}
+          {showSkeleton && <SkeletonCardGrid count={3} label="Loading tournaments" tileClassName="min-h-[260px]" gridClassName="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3" />}
 
           {!isLoading && !votedLoading && loadError && (
             <EmptyState
@@ -176,7 +176,7 @@ export function ArenaListPage() {
         <>
           {createError && <p className="mb-4 text-sm text-(--color-danger)">{createError}</p>}
 
-          {showTierlistSkeleton && <SkeletonCardGrid count={3} label="Loading tier lists" tileClassName="min-h-[260px]" />}
+          {showTierlistSkeleton && <SkeletonCardGrid count={3} label="Loading tier lists" tileClassName="min-h-[260px]" gridClassName="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3" />}
 
           {!tierlistsLoading && tierlists.length === 0 && votedTierlists.length === 0 && (
             <EmptyState
@@ -261,7 +261,7 @@ export function ArenaListPage() {
 
       {tab === "quizzes" && (
         <>
-          {showQuizSkeleton && <SkeletonCardGrid count={3} label="Loading quizzes" tileClassName="min-h-[260px]" />}
+          {showQuizSkeleton && <SkeletonCardGrid count={3} label="Loading quizzes" tileClassName="min-h-[260px]" gridClassName="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3" />}
 
           {!quizzesLoading && quizzes.length === 0 && (
             <EmptyState
