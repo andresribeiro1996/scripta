@@ -561,7 +561,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const deleteWorkSubjectsStmt = db.prepare(`DELETE FROM work_subjects WHERE work_id = ?`);
   const insertWorkSubjectStmt = db.prepare(`INSERT OR IGNORE INTO work_subjects (work_id, kind, position, name, name_key, created_at) VALUES (?, ?, ?, ?, ?, ?)`);
   const workPeopleStmt = db.prepare(`SELECT work_id, name FROM work_subjects WHERE kind = 'person' AND work_id IN (SELECT value FROM json_each(?)) ORDER BY work_id, position`);
-  const worksWithKeyStmt = db.prepare(`SELECT id, ol_work_key AS olWorkKey, author FROM works WHERE merged_into IS NULL AND ol_work_key IS NOT NULL ORDER BY rowid`);
+  const worksWithKeyStmt = db.prepare(`SELECT rowid, id, ol_work_key AS olWorkKey, author FROM works WHERE merged_into IS NULL AND ol_work_key IS NOT NULL ORDER BY rowid`);
   const yearAwardsStmt = db.prepare(`
     SELECT work_awards.prize AS prize, work_awards.won AS won, work_awards.honoree AS honoree, work_awards.created_at AS created_at, COALESCE(works.merged_into, work_awards.work_id) AS work_id
     FROM work_awards LEFT JOIN works ON works.id = work_awards.work_id
@@ -1576,7 +1576,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     },
 
     worksWithOpenLibraryKey() {
-      return (worksWithKeyStmt.all() as Array<{ id: string; olWorkKey: string; author: string }>).map((row) => ({ id: row.id, olWorkKey: row.olWorkKey, author: row.author }));
+      return (worksWithKeyStmt.all() as Array<{ rowid: number; id: string; olWorkKey: string; author: string }>).map((row) => ({ rowid: row.rowid, id: row.id, olWorkKey: row.olWorkKey, author: row.author }));
     },
 
     recentAwards(year, since) {
