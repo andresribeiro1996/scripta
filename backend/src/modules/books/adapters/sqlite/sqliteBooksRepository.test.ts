@@ -4125,5 +4125,5 @@ test("worksWithOpenLibraryKey skips merged and keyless works", () => {
   const merged = keyedBook(repo, "Merged", "OL10W");
   keyedBook(repo, "Keyless", null);
   db.prepare("UPDATE works SET merged_into = ? WHERE id = ?").run(kept, merged);
-  assert.deepEqual(repo.worksWithOpenLibraryKey(), [{ id: kept, olWorkKey: "OL9W", author: "Some Author" }]);
+  assert.deepEqual(repo.worksWithOpenLibraryKey().map(({ rowid, ...rest }) => (assert.equal(typeof rowid, "number"), rest)), [{ id: kept, olWorkKey: "OL9W", author: "Some Author" }]);
 });
