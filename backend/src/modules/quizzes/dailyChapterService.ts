@@ -9,6 +9,7 @@ export const dailyGuestKey = (id: string) => "daily-guest:" + id;
 const fail = (status: number, message: string): never => { throw new DailyChapterError(status, message); };
 const normalized = (value: string) => value.normalize("NFKC").toLocaleLowerCase().replace(/\s+/g, " ").trim();
 const bookIdentity = (book: DailyChapterBook) => [normalized(book.title), normalized(book.author), book.language].join("\0");
+const passageKey = (question: Pick<DailyChapterQuestionInput, "bookId" | "type" | "prompt">) => [question.bookId, question.type, normalized(question.prompt)].join("\0");
 
 export function createDailyChapterService(repo: DailyChapterRepository, plays: QuizzesRepository, clock: () => Date = () => new Date()) {
   const today = () => clock().toISOString().slice(0, 10);
@@ -121,7 +122,6 @@ export function createDailyChapterService(repo: DailyChapterRepository, plays: Q
       }
       const existingQuestions = repo.questions();
       const questionIds = new Map(existingQuestions.map((question) => [question.id, question]));
-      const passageKey = (question: Pick<DailyChapterQuestionInput, "bookId" | "type" | "prompt">) => [question.bookId, question.type, normalized(question.prompt)].join("\0");
       const passages = new Map(existingQuestions.map((question) => [passageKey(question), question.id]));
       for (const question of questions) {
         const book = byId.get(question.bookId);
@@ -168,10 +168,12 @@ export function createDailyChapterService(repo: DailyChapterRepository, plays: Q
       }
       if (reviewed) {
         const existingQuestions = repo.questions();
+        const passages = new Map(existingQuestions.map((question) => [passageKey(question), question.id]));
         for (const question of questions) {
           const previous = existingQuestions.find((q) => q.id === question.id);
-          if (previous && (previous.bookId !== question.bookId || previous.type !== question.type || normalized(previous.prompt) !== normalized(question.prompt))) return fail(409, "A reviewed question id belongs to different content. Nothing was imported.");
-          if (existingQuestions.some((q) => q.id !== question.id && q.bookId === question.bookId && q.type === question.type && normalized(q.prompt) === normalized(question.prompt))) return fail(409, "Reuse the existing passage id in the reviewed pack. Nothing was imported.");
+          if (previous && passageKey(previous) !== passageKey(question)) return fail(409, "A reviewed question id belongs to different content. Nothing was imported.");
+          if (passages.has(passageKey(question)) && passages.get(passageKey(question)) !== question.id) return fail(409, "Reuse the existing passage id in the reviewed pack. Nothing was imported.");
+          passages.set(passageKey(question), question.id);
         }
       }
       if (editions.some((edition) => plays.getById(edition.id))) return fail(409, "An edition id belongs to another quiz. Nothing was imported.");

@@ -350,3 +350,13 @@ test("reviewed imports promote matching raw candidates, retain later reviews and
     assert.equal(next.editorial().questions.length, 500);
   }
 });
+
+test("reviewed imports reject repeated passages within the incoming pack atomically", () => {
+  const { service } = setup(); const pack = reviewedLaunchPack();
+  const original = pack.editions[0].questions[0];
+  pack.editions[1].questions[0] = { ...original, id: "repeated-passage", prompt: "  " + original.prompt.replace(/ /g, "\n") + "  " };
+  assert.throws(() => service.importPack({ pack, startDate: "2030-01-01" }, "editor"), /Reuse the existing passage id/);
+  assert.equal(service.editorial().books.length, 0);
+  assert.equal(service.editorial().questions.length, 0);
+  assert.equal(service.editorial().editions.length, 0);
+});
