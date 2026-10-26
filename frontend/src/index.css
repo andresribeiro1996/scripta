@@ -231,6 +231,13 @@ input[type="range"]:focus-visible::-moz-range-thumb {
   outline-offset: 2px;
 }
 
+.game-ticket-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 24rem), 1fr));
+  align-items: start;
+  gap: 1rem;
+}
+
 /* The book-card grid. `auto-fill` + a `minmax` floor turns the single
    "card size" setting into responsive columns without breakpoint tiers;
    BookGrid.tsx feeds the two numbers in as custom properties (it can't

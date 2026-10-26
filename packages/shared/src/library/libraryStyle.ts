@@ -154,10 +154,6 @@ export interface LibraryStyleSettings {
    *  the page header, the search/filter toolbar, the nav, or any route
    *  without a book grid. */
   backgroundColor: string | null;
-  /** Max width of the page content (the grid AND the header above it),
-   *  in px — applied as the web Page body's width (PageWidthContext), the one style field that stays
-   *  there, since a grid and its header have to share a width or they
-   *  visibly stop lining up. */
   contentMaxWidth: number;
   /** Horizontal padding INSIDE the canvas, in px — the gap between a
    *  custom background's edge and the cards. Not page padding: it can't
@@ -189,7 +185,7 @@ export const DEFAULT_LIBRARY_STYLE: LibraryStyleSettings = {
   cardBold: false,
   cardItalic: false,
   backgroundColor: null,
-  contentMaxWidth: 1152, // matches the Page default width (72rem)
+  contentMaxWidth: 1600,
   // 0, not the 20/32 these were when they applied to the whole PAGE.
   // They now pad the book canvas INSIDE Page's own body padding
   // (see LibraryCanvas), so any non-zero default would indent the grid
@@ -228,8 +224,6 @@ export const CARD_BORDER_STYLE_OPTIONS: Array<{ value: CardBorderStyle; label: s
 // range inputs silently snap it to the nearest step (90) the moment
 // they're touched, diverging from what's documented as the default.
 export const OVERLAY_INTENSITY_RANGE = { min: 0, max: 100, step: 2 };
-// step: 16, not 20 — same reasoning as OVERLAY_INTENSITY_RANGE above: the
-// default (1152) has to land exactly on the step grid from `min`.
 export const CONTENT_MAX_WIDTH_RANGE = { min: 800, max: 1800, step: 16 };
 export const CONTENT_PADDING_RANGE = { min: 0, max: 64, step: 4 };
 export const CARD_ASPECT_RATIO_OPTIONS: Array<{ value: CardAspectRatio; label: string }> = [

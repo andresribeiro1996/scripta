@@ -5,14 +5,14 @@
 // score, the per-question verdicts, the leaderboard, and the same link
 // back — that loop is the challenge.
 
-import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import { playerLabel, scoreRows, type PublicQuizQuestion } from "@scripta/shared";
+import type { PublicQuizQuestion } from "@scripta/shared";
 import { CoverImage } from "../components/BookCard";
 import { Page } from "../components/page/Page";
 import { QuizPrompt } from "../components/quiz/QuizPrompt";
-import { fetchPublicResultsApi, submitPlayApi, type PlayResponse } from "../api/quizzes";
+import { submitPlayApi, type PlayResponse } from "../api/quizzes";
+import { QuizLeaderboard, QuizResults } from "../components/quiz/QuizResults";
 import { quizPlayStage } from "../lib/quizPlayStage";
 import { storePlayId, useQuizPlay } from "../hooks/useQuizPlay";
 
@@ -72,7 +72,6 @@ export function PlayQuizPage() {
   const [submitted, setSubmitted] = useState<PlayResponse | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [copied, setCopied] = useState(false);
   const startRef = useRef(Date.now());
   const [elapsed, setElapsed] = useState(0);
 
@@ -94,14 +93,14 @@ export function PlayQuizPage() {
       <Page title={playBoard.name}>
         <div className="mx-auto flex max-w-xl flex-col gap-6">
           <p className="text-center text-(--color-text-dim)">This quiz is closed.</p>
-          <Leaderboard code={code ?? ""} />
+          <QuizLeaderboard code={code ?? ""} />
         </div>
       </Page>
     );
   }
 
   if (result) {
-    return <ResultsView code={code ?? ""} name={playBoard.name} result={result} questions={questions} copied={copied} setCopied={setCopied} alreadyPlayed={submitted === null} />;
+    return <QuizResults code={code ?? ""} name={playBoard.name} result={result} questions={questions} alreadyPlayed={submitted === null} />;
   }
 
   const question = questions[index];
@@ -172,114 +171,5 @@ export function PlayQuizPage() {
         )}
       </div>
     </Page>
-  );
-}
-
-function ScoreValue({ value, title, dim }: { value: { kind: "text" | "cover"; value: string }; title?: string; dim?: boolean }) {
-  if (value.kind === "text") return <span className={`truncate ${dim ? "text-(--color-text-dim)" : ""}`}>{dim ? "Your pick: " : ""}{value.value}</span>;
-  return (
-    <span className="flex items-center gap-2">
-      <span className="relative block h-10 w-7 shrink-0 overflow-hidden rounded bg-(--color-border)">
-        <CoverImage book={{ Title: title ?? "Picked cover", _coverUrl: value.value }} fit="contain" alt={title ?? "Picked cover"} />
-      </span>
-      {title && <span className="truncate">{title}</span>}
-      {dim && <span className="text-(--color-text-dim)">Your pick</span>}
-    </span>
-  );
-}
-
-function ResultsView({
-  code,
-  name,
-  result,
-  questions,
-  copied,
-  setCopied,
-  alreadyPlayed
-}: {
-  code: string;
-  name: string;
-  result: PlayResponse;
-  questions: PublicQuizQuestion[];
-  copied: boolean;
-  setCopied: (value: boolean) => void;
-  alreadyPlayed: boolean;
-}) {
-  const shareLink = `${window.location.origin}/play/${code}`;
-  const score = result.score;
-
-  return (
-    <Page title={name}>
-      <div className="mx-auto flex max-w-xl flex-col gap-6">
-        <div className="text-center">
-          <p className="text-sm text-(--color-text-dim)">{alreadyPlayed ? "You already played this quiz." : "Your score"}</p>
-          <p className="text-5xl font-bold text-(--color-accent)">
-            {score}/{questions.length}
-          </p>
-        </div>
-
-        <ol className="flex flex-col gap-1.5 text-sm">
-          {scoreRows(questions, result.correct, result.answers).map((row) => (
-            <li key={row.id} className="flex items-center gap-3 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2">
-              <span className="text-(--color-text-dim)">{row.number}</span>
-              <span aria-hidden="true" className={row.correct ? "text-(--color-success)" : "text-(--color-danger)"}>
-                {row.correct ? "✓" : "✗"}
-              </span>
-              <div className="flex min-w-0 flex-1 flex-col gap-1">
-                {row.answer && <ScoreValue value={row.answer} title={row.answer.title} />}
-                {row.pick && <ScoreValue value={row.pick} dim />}
-              </div>
-            </li>
-          ))}
-        </ol>
-
-        <div className="flex items-center gap-3 rounded-xl border border-(--color-border) bg-(--color-surface) p-4">
-          <code className="min-w-0 flex-1 truncate rounded-lg bg-(--color-surface-hover) px-3 py-2 text-sm">{shareLink}</code>
-          <button
-            type="button"
-            onClick={() => {
-              void navigator.clipboard.writeText(shareLink);
-              setCopied(true);
-              window.setTimeout(() => setCopied(false), 1500);
-            }}
-            className="min-h-10 shrink-0 rounded-lg bg-(--color-accent) px-3 text-sm font-semibold text-(--color-on-accent)"
-          >
-            {copied ? "Copied!" : "Challenge someone"}
-          </button>
-        </div>
-
-        <Leaderboard code={code} />
-      </div>
-    </Page>
-  );
-}
-
-function Leaderboard({ code }: { code: string }) {
-  const leaderboard = useQuery({ queryKey: ["quizPublicResults", code], queryFn: () => fetchPublicResultsApi(code) });
-  if (leaderboard.isError) return <p className="text-sm text-(--color-text-dim)">Couldn't load the leaderboard.</p>;
-  if (!leaderboard.data) return null;
-  return (
-    <div>
-      <h2 className="mb-2 text-lg font-bold">Leaderboard</h2>
-      {leaderboard.data.plays.length === 0 ? (
-        <p className="text-sm text-(--color-text-dim)">No plays yet.</p>
-      ) : (
-        <table className="w-full text-sm">
-          <tbody>
-            {leaderboard.data.plays.map((play, i) => (
-              <tr key={i} className="border-t border-(--color-border)">
-                <td className="py-1.5 pr-3">{i + 1}</td>
-                <td className="py-1.5 pr-3">
-                  {playerLabel(play).name}
-                  {playerLabel(play).guest && <span className="ml-2 text-xs text-(--color-text-dim)">guest</span>}
-                </td>
-                <td className="py-1.5 pr-3">{play.score}/{leaderboard.data.questionCount}</td>
-                <td className="py-1.5">{(play.durationMs / 1000).toFixed(1)}s</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </div>
   );
 }
