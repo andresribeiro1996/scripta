@@ -22,7 +22,7 @@ const { createSqliteBooksRepository } = await import("../adapters/sqlite/sqliteB
 const { PRIZE_ITEMS } = await import("../domain/awards.js");
 const { SourceUnavailableError } = await import("../domain/errors.js");
 const { saveCatalogHits } = await import("../saveHits.js");
-const { awardWorksOf, importAwardBooks, missingAwardWorks, resolveAwardWork } = await import("./awardBooksImport.js");
+const { awardWorksOf, importAwardBooks, missingAwardWorks, resolveAwardWork, withWikidataNames } = await import("./awardBooksImport.js");
 
 const AT = "2026-10-25T12:00:00.000Z";
 const EARLIER = "2026-01-01T00:00:00.000Z";
@@ -34,11 +34,13 @@ const binding = (fields: Record<string, string>): Binding => Object.fromEntries(
 const item = (id: string) => `http://www.wikidata.org/entity/${id}`;
 const entry = (workId: string, prize: PrizeKey, fields: Record<string, string> = {}): Binding =>
   binding({ work: item(workId), prize: item(PRIZE_ITEMS[prize]), won: "true", year: "2020", ...fields });
-const work = (itemId: string, prizes: PrizeKey[], ids: { isbns?: string[]; olWorkIds?: string[] } = {}): AwardWork => ({
+const work = (itemId: string, prizes: PrizeKey[], ids: { isbns?: string[]; olWorkIds?: string[]; titles?: string[]; authors?: string[] } = {}): AwardWork => ({
   item: itemId,
   prizes,
   isbns: ids.isbns ?? [],
-  olWorkIds: ids.olWorkIds ?? []
+  olWorkIds: ids.olWorkIds ?? [],
+  titles: ids.titles ?? [],
+  authors: ids.authors ?? []
 });
 const hit = (title: string, authors: string[], workKey: string | null, isbn: string | null = null, publisher: string | null = null): CatalogSearchHit => ({
   result: { title, authors, year: null, isbn, publisher, coverUrl: null, genres: [] },
@@ -99,8 +101,8 @@ test("awardWorksOf groups a work's bindings across identifier kinds and prizes",
     { kind: "on-work/openlibrary", bindings: [entry("Q1", "nebula-novel", { olIds: "OL1W|OL2W" })] }
   ]);
   assert.deepEqual(works, [
-    { item: "Q1", prizes: ["booker", "hugo-novel", "nebula-novel"], isbns: ["9780441013593", "9780000000019"], olWorkIds: ["OL1W", "OL2W"] },
-    { item: "Q2", prizes: ["leya"], isbns: ["9780000000002"], olWorkIds: [] }
+    { item: "Q1", prizes: ["booker", "hugo-novel", "nebula-novel"], isbns: ["9780441013593", "9780000000019"], olWorkIds: ["OL1W", "OL2W"], titles: [], authors: [] },
+    { item: "Q2", prizes: ["leya"], isbns: ["9780000000002"], olWorkIds: [], titles: [], authors: [] }
   ]);
 });
 
@@ -118,7 +120,7 @@ test("awardWorksOf drops author prizes, unlisted items and undated statements", 
       ]
     }
   ]);
-  assert.deepEqual(works, [{ item: "Q2", prizes: ["saramago"], isbns: [], olWorkIds: ["OL2W"] }]);
+  assert.deepEqual(works, [{ item: "Q2", prizes: ["saramago"], isbns: [], olWorkIds: ["OL2W"], titles: [], authors: [] }]);
 });
 
 test("awardWorksOf puts a work's own ISBNs before its editions' ISBNs", () => {
@@ -451,4 +453,96 @@ test("a dry run without a skip set reports none skipped", async () => {
   const { deps } = setup();
   const report = await importAwardBooks({ ...deps, search: searching(() => []).search }, [work("Q1", ["booker"], { olWorkIds: ["OL1W"] })], AT, { dryRun: true, max: null });
   assert.equal(report.skipped, 0);
+});
+
+test("withWikidataNames fills titles (P1476 and English label) and authors from a separate query per 200 items", async () => {
+  const queries: string[] = [];
+  const sleeps: number[] = [];
+  const works = Array.from({ length: 201 }, (_, index) => work(`Q${index}`, ["booker"], { olWorkIds: [`OL${index}W`] }));
+  const filled = await withWikidataNames(
+    async (text) => {
+      queries.push(text);
+      return text.includes("wd:Q0 ") ? [binding({ work: item("Q0"), label: "Picoverse", titles: "Picoverse|Pico verse", authors: "Robert A. Metzger" })] : [];
+    },
+    works,
+    async (ms) => {
+      sleeps.push(ms);
+    }
+  );
+  assert.equal(queries.length, 2);
+  assert.deepEqual(sleeps, [5000, 5000]);
+  assert.deepEqual(filled[0]?.titles, ["Picoverse", "Pico verse"]);
+  assert.deepEqual(filled[0]?.authors, ["Robert A. Metzger"]);
+  assert.deepEqual(filled[1]?.titles, []);
+  assert.deepEqual(filled[1]?.authors, []);
+  assert.equal(filled[200]?.item, "Q200");
+});
+
+const FLAUBERT = { olWorkIds: ["OL31595819W"], titles: ["Flaubert's Parrot"], authors: ["Julian Barnes"], isbns: ["9780000000019"] };
+const translated = hit("Le perroquet de flaubert", ["Barnes-J"], "OL31595819W", "9782234000000");
+const original = hit("Flaubert's Parrot", ["Julian Barnes"], "OL1984734W", "9780679731368", "Vintage");
+
+test("a work-ID hit whose title is a Wikidata title, with a subtitle or a series in brackets, is accepted as today", async () => {
+  for (const title of ["Flaubert's Parrot", "Flaubert's parrot: a novel", "Flaubert's Parrot (Picador Classics)"]) {
+    const found = searching(() => [hit(title, ["Julian Barnes"], "OL31595819W")]);
+    const resolved = await resolveAwardWork(found.search, work("Q1", ["booker"], FLAUBERT));
+    assert.equal(resolved?.hit.result.title, title);
+    assert.equal(resolved?.translatedFrom, undefined);
+    assert.equal(found.asked.length, 1);
+  }
+});
+
+test("a work with no Wikidata titles accepts the work-ID hit whatever its title", async () => {
+  const resolved = await resolveAwardWork(searching(() => [translated]).search, work("Q1", ["booker"], { olWorkIds: ["OL31595819W"] }));
+  assert.equal(resolved?.hit.result.title, "Le perroquet de flaubert");
+  assert.equal(resolved?.translatedFrom, undefined);
+});
+
+test("a translated work-ID hit is replaced by the original found by title and author, aliased to Wikidata's ID", async () => {
+  const { db, repo, deps } = setup();
+  const found = searching((query) => ("text" in query && query.text.startsWith("key:") ? [translated] : [hit("Flaubert's Parrot Study Guide", ["Someone Else"], "OL9W"), hit("Flaubert's Parrot", ["Other Person"], "OL8W"), original]));
+  const report = await importAwardBooks({ ...deps, search: found.search }, [work("Q1063693", ["booker"], FLAUBERT)], AT, LIVE);
+  assert.deepEqual(found.asked, [{ text: "key:/works/OL31595819W" }, { text: "Flaubert's Parrot Julian Barnes" }]);
+  assert.deepEqual(report.originalSwaps, [{ item: "Q1063693", from: "Le perroquet de flaubert", to: "Flaubert's Parrot", olWorkId: "OL31595819W", workKey: "OL1984734W" }]);
+  assert.deepEqual(report.workIdMismatches, []);
+  assert.deepEqual(report.isbnResolutions, []);
+  assert.equal(bookCount(db), 1);
+  const [saved] = db.prepare("SELECT id, title, isbn, publisher, ol_work_key FROM books").all() as Array<{ id: string; title: string; isbn: string | null; publisher: string | null; ol_work_key: string }>;
+  assert.equal(saved?.title, "Flaubert's Parrot");
+  assert.equal(saved?.isbn, null);
+  assert.equal(saved?.publisher, null);
+  assert.equal(saved?.ol_work_key, "OL1984734W");
+  assert.equal(report.aliases, 1);
+  assert.equal(repo.workIdsByWorkKeys(["OL31595819W"]).get("OL31595819W"), repo.getBook(saved!.id)?.work_id);
+  assert.deepEqual(missingAwardWorks(repo, [work("Q1063693", ["booker"], FLAUBERT)]), []);
+});
+
+test("a dry run lists the same swaps", async () => {
+  const found = searching((query) => ("text" in query && query.text.startsWith("key:") ? [translated] : [original]));
+  const report = await importAwardBooks({ ...setup().deps, search: found.search }, [work("Q1063693", ["booker"], FLAUBERT)], AT, { dryRun: true, max: null });
+  assert.equal(report.originalSwaps.length, 1);
+  assert.equal(report.aliases, 0);
+});
+
+test("a translated hit with no original found goes to the ISBN route and is listed as a mismatch; unresolved when that fails too", async () => {
+  const answer = (query: Query) => {
+    if ("text" in query && query.text.startsWith("key:")) return [translated];
+    if ("isbn" in query) return [hit("Flaubert's Parrot", ["Julian Barnes"], "OL1984734W")];
+    return [];
+  };
+  const viaIsbn = await importAwardBooks({ ...setup().deps, search: searching(answer).search }, [work("Q1", ["booker"], FLAUBERT)], AT, { dryRun: true, max: null });
+  assert.deepEqual(viaIsbn.workIdMismatches, [{ item: "Q1", olTitle: "Le perroquet de flaubert", wikidataTitles: ["Flaubert's Parrot"] }]);
+  assert.deepEqual(viaIsbn.originalSwaps, []);
+  assert.equal(viaIsbn.isbnResolutions.length, 1);
+
+  const none = await importAwardBooks({ ...setup().deps, search: searching((query) => ("text" in query && query.text.startsWith("key:") ? [translated] : [])).search }, [work("Q1", ["booker"], { ...FLAUBERT, isbns: [] })], AT, { dryRun: true, max: null });
+  assert.deepEqual(none.workIdMismatches.map((row) => row.item), ["Q1"]);
+  assert.deepEqual(none.unresolved, ["Q1"]);
+});
+
+test("the original search needs a Wikidata author, and the hit must share a surname with one", async () => {
+  const asked = searching((query) => ("text" in query && query.text.startsWith("key:") ? [translated] : [original]));
+  assert.equal(await resolveAwardWork(asked.search, work("Q1", ["booker"], { ...FLAUBERT, isbns: [], authors: [] })), null);
+  assert.equal(asked.asked.length, 1);
+  assert.equal(await resolveAwardWork(asked.search, work("Q1", ["booker"], { ...FLAUBERT, isbns: [], authors: ["Ian McEwan"] })), null);
 });

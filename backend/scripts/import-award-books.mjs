@@ -40,10 +40,10 @@ const { createThrottle } = await import("../dist/modules/books/adapters/http/htt
 const { createOpenLibraryCatalog } = await import("../dist/modules/books/adapters/openlibrary/openLibraryCatalog.js");
 const { openBooksDb } = await import("../dist/modules/books/adapters/sqlite/connection.js");
 const { createSqliteBooksRepository } = await import("../dist/modules/books/adapters/sqlite/sqliteBooksRepository.js");
-const { queryAllPages } = await import("../dist/modules/books/adapters/wikidata/sparql.js");
+const { queryAllPages, queryWikidata } = await import("../dist/modules/books/adapters/wikidata/sparql.js");
 const { createSqliteArenaRepository } = await import("../dist/modules/arena/adapters/sqlite/sqliteArenaRepository.js");
 const { awardQueries } = await import("../dist/modules/books/seed/awardsFill.js");
-const { awardWorksOf, importAwardBooks, missingAwardWorks } = await import("../dist/modules/books/seed/awardBooksImport.js");
+const { awardWorksOf, importAwardBooks, missingAwardWorks, withWikidataNames } = await import("../dist/modules/books/seed/awardBooksImport.js");
 const { waitForBnpLock } = await import("../dist/modules/books/seed/bnpImport.js");
 const { arenaCheck } = await import("../dist/modules/books/translationJudgments.js");
 
@@ -67,7 +67,7 @@ for (const { kind, page } of awardQueries()) {
   });
 }
 const works = awardWorksOf(pages);
-const missing = missingAwardWorks(repo, works);
+const missing = await withWikidataNames((text) => queryWikidata(text, { log }), missingAwardWorks(repo, works));
 log(JSON.stringify({ works: works.length, missing: missing.length }));
 
 const report = await importAwardBooks(

@@ -2,7 +2,7 @@ import { PRIZES, canonicalIsbn, type PrizeKey } from "@scripta/shared";
 import { realSleep, type Sleep } from "../adapters/typesafe/jevRequest.js";
 import { listOf, type Binding } from "../adapters/wikidata/sparql.js";
 import { SourceUnavailableError } from "../domain/errors.js";
-import { lookupIdentity, normalizeWorkKey, workTitleKey } from "../domain/normalize.js";
+import { authorMatches, lookupIdentity, normalizeWorkKey, titleMatches, workTitleKey } from "../domain/normalize.js";
 import type { BookCatalog, BooksRepository, CatalogSearchHit } from "../domain/ports.js";
 import { saveCatalogHits } from "../saveHits.js";
 import { itemOf, prizeOf } from "./awardsFill.js";
@@ -10,10 +10,12 @@ import { itemOf, prizeOf } from "./awardsFill.js";
 const SAVE_CHUNK = 25;
 const SAVE_PAUSE_MS = 250;
 const PROGRESS_EVERY = 100;
+const NAMES_CHUNK = 200;
+const NAMES_GAP_MS = 5_000;
 const UNRESOLVED_LISTED = 50;
 const BOOK_PRIZES = (Object.keys(PRIZES) as PrizeKey[]).filter((key) => PRIZES[key].honours === "work");
 
-export type AwardWork = { item: string; prizes: PrizeKey[]; isbns: string[]; olWorkIds: string[] };
+export type AwardWork = { item: string; prizes: PrizeKey[]; isbns: string[]; olWorkIds: string[]; titles: string[]; authors: string[] };
 
 export type AwardBooksReport = {
   at: string;
@@ -25,9 +27,11 @@ export type AwardBooksReport = {
   aliases: number;
   skipped: number;
   isbnResolutions: Array<{ item: string; isbn: string; title: string }>;
+  originalSwaps: Array<{ item: string; from: string; to: string; olWorkId: string; workKey: string }>;
+  workIdMismatches: Array<{ item: string; olTitle: string; wikidataTitles: string[] }>;
 };
 
-export type AwardResolution = { hit: CatalogSearchHit; olWorkId: string | null; isbn: string | null };
+export type AwardResolution = { hit: CatalogSearchHit; olWorkId: string | null; isbn: string | null; translatedFrom?: string };
 
 export function awardWorksOf(pages: Array<{ kind: string; bindings: Binding[] }>): AwardWork[] {
   const found = new Map<string, { prizes: Set<PrizeKey>; ownIsbns: string[]; editionIsbns: string[]; olWorkIds: string[] }>();
@@ -47,7 +51,9 @@ export function awardWorksOf(pages: Array<{ kind: string; bindings: Binding[] }>
     item,
     prizes: BOOK_PRIZES.filter((key) => prizes.has(key)),
     isbns: [...new Set([...ownIsbns, ...editionIsbns].filter(Boolean))],
-    olWorkIds: [...new Set(olWorkIds)]
+    olWorkIds: [...new Set(olWorkIds)],
+    titles: [],
+    authors: []
   }));
 }
 
@@ -56,16 +62,55 @@ export function missingAwardWorks(repo: Pick<BooksRepository, "findBookByKey" | 
   return works.filter((work) => !work.olWorkIds.some((id) => known.has(id)) && !work.isbns.some((isbn) => repo.findBookByKey(`isbn:${isbn}`)));
 }
 
+const namesQuery = (items: string[]) => `
+SELECT ?work (SAMPLE(?enLabel) AS ?label) (GROUP_CONCAT(DISTINCT ?title; SEPARATOR="|") AS ?titles) (GROUP_CONCAT(DISTINCT ?author; SEPARATOR="|") AS ?authors) WHERE {
+  VALUES ?work { ${items.map((id) => `wd:${id}`).join(" ")} }
+  OPTIONAL { ?work wdt:P1476 ?title }
+  OPTIONAL { ?work rdfs:label ?enLabel . FILTER(LANG(?enLabel) = "en") }
+  OPTIONAL {
+    ?work wdt:P50 ?person .
+    OPTIONAL { ?person rdfs:label ?enName . FILTER(LANG(?enName) = "en") }
+    OPTIONAL { ?person rdfs:label ?anyName . FILTER NOT EXISTS { ?person rdfs:label ?en2 . FILTER(LANG(?en2) = "en") } }
+    BIND(COALESCE(?enName, ?anyName) AS ?author)
+  }
+}
+GROUP BY ?work`;
+
+export async function withWikidataNames(query: (query: string) => Promise<Binding[]>, works: AwardWork[], sleep: Sleep = realSleep): Promise<AwardWork[]> {
+  const names = new Map<string, { titles: string[]; authors: string[] }>();
+  for (let start = 0; start < works.length; start += NAMES_CHUNK) {
+    await sleep(NAMES_GAP_MS);
+    for (const binding of await query(namesQuery(works.slice(start, start + NAMES_CHUNK).map((work) => work.item)))) {
+      if (!binding.work) continue;
+      const label = binding.label?.value.trim() ?? "";
+      names.set(itemOf(binding.work.value), { titles: [...new Set([...listOf(binding, "titles"), ...(label ? [label] : [])])], authors: [...new Set(listOf(binding, "authors"))] });
+    }
+  }
+  return works.map((work) => ({ ...work, ...names.get(work.item) }));
+}
+
 function usable({ result }: CatalogSearchHit): boolean {
   const identity = lookupIdentity({ title: result.title, author: result.authors.join(", ") });
   return identity !== null && workTitleKey(identity.title, identity.author) !== "";
 }
 
-export async function resolveAwardWork(search: BookCatalog["search"], work: AwardWork): Promise<AwardResolution | null> {
+const titleFits = (work: AwardWork, { result }: CatalogSearchHit) => work.titles.length === 0 || work.titles.some((title) => titleMatches(title, result.title));
+
+export async function resolveAwardWork(search: BookCatalog["search"], work: AwardWork, onMismatch: (olTitle: string) => void = () => {}): Promise<AwardResolution | null> {
+  let translated: { olWorkId: string; title: string } | null = null;
   for (const id of work.olWorkIds) {
     const found = (await search({ text: `key:/works/${id}` })).find((hit) => normalizeWorkKey(hit.workKey) === id && usable(hit));
-    if (found) return { hit: { ...found, result: { ...found.result, isbn: null, publisher: null } }, olWorkId: id, isbn: null };
+    if (!found) continue;
+    if (titleFits(work, found)) return { hit: { ...found, result: { ...found.result, isbn: null, publisher: null } }, olWorkId: id, isbn: null };
+    translated ??= { olWorkId: id, title: found.result.title };
   }
+  if (translated && work.authors.length > 0) {
+    const original = (await search({ text: `${work.titles[0]} ${work.authors[0]}` })).find(
+      (hit) => normalizeWorkKey(hit.workKey) !== null && usable(hit) && titleFits(work, hit) && authorMatches(work.authors.join(", "), hit.result.authors)
+    );
+    if (original) return { hit: { ...original, result: { ...original.result, isbn: null, publisher: null } }, olWorkId: translated.olWorkId, isbn: null, translatedFrom: translated.title };
+  }
+  if (translated) onMismatch(translated.title);
   for (const isbn of work.isbns) {
     const found = (await search({ isbn })).find(usable);
     if (found) return { hit: { ...found, result: { ...found.result, isbn, publisher: null } }, olWorkId: null, isbn };
@@ -97,7 +142,9 @@ export async function importAwardBooks(
     createdBookIds: [],
     aliases: 0,
     skipped: 0,
-    isbnResolutions: []
+    isbnResolutions: [],
+    originalSwaps: [],
+    workIdMismatches: []
   };
   const works = allWorks.filter((work) => !skip.has(work.item));
   report.skipped = allWorks.length - works.length;
@@ -109,12 +156,14 @@ export async function importAwardBooks(
   let unresolved = 0;
   for (const [index, work] of works.entries()) {
     let resolution: AwardResolution | null | undefined;
+    let mismatch: string | null = null;
     try {
-      resolution = await resolveAwardWork(countedSearch, work);
+      resolution = await resolveAwardWork(countedSearch, work, (olTitle) => (mismatch = olTitle));
     } catch (error) {
       if (!(error instanceof SourceUnavailableError) || error.status === 429) throw error;
       report.failedKeys.push(work.item);
     }
+    if (mismatch !== null && resolution !== undefined) report.workIdMismatches.push({ item: work.item, olTitle: mismatch, wikidataTitles: work.titles });
     for (const prize of work.prizes) {
       const tally = report.prizes[prize]!;
       tally.candidates++;
@@ -123,6 +172,9 @@ export async function importAwardBooks(
     }
     if (resolution) {
       resolved.push({ work, hit: resolution.hit, olWorkId: resolution.olWorkId });
+      if (resolution.translatedFrom) {
+        report.originalSwaps.push({ item: work.item, from: resolution.translatedFrom, to: resolution.hit.result.title, olWorkId: resolution.olWorkId!, workKey: normalizeWorkKey(resolution.hit.workKey)! });
+      }
       if (resolution.isbn) report.isbnResolutions.push({ item: work.item, isbn: resolution.isbn, title: resolution.hit.result.title });
     }
     if (resolution === null) {
