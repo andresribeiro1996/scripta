@@ -28,7 +28,7 @@ All of this lives in `backend/src/modules/books`.
 
 ### `GET /covers/candidates`
 
-The route is authenticated. It is registered with the catalog routes (300 requests a minute).
+The route is authenticated. Both picker routes share their own rate-limit scope of 30 requests a minute, because each listing can spend ISBNdb's shared daily budget.
 
 Its query is the same lookup as `GET /covers/resolve` (`isbn`, `title`, `author`), plus `from`, which is `quick` (the default) or `apple`. A lookup with neither an ISBN nor a title gets a 400. The route finds or creates the catalog book the way `uploadCover` does (`findOrCreateBook`).
 
@@ -45,11 +45,11 @@ Its query is the same lookup as `GET /covers/resolve` (`isbn`, `title`, `author`
 
 `from=apple` returns only Apple's steps: by ISBN, then by title. It drops URLs that match a stored row's `source_url`, just as `quick` does.
 
-The response is `{ candidates: CoverCandidateView[], unavailable: CoverSourceName[] }`. `unavailable` names each source that failed (`SourceUnavailableError`, including a paused or spent ISBNdb). Those failures are not logged as warnings, because a picker is not a lookup the worker owes the book.
+The response is `{ candidates: CoverCandidateView[], unavailable: CoverSourceName[] }`. `unavailable` names each source that failed (`SourceUnavailableError`, including a paused or spent ISBNdb). The service doesn't log those failures as warnings (`deps.warn`), because a picker is not a lookup the worker owes the book. The shared ISBNdb gate and budget still log their own pause lines.
 
 The steps reuse `findBestCover`'s step building. The list of steps (sources by ISBN, then by title, with the accept function, the rejection filter and the per-step cap) moves into one function that both `findBestCover` and the candidate list call.
 
-Each found URL is recorded in the offer map, keyed by account and book id, for 30 minutes. Expired entries are pruned on each write.
+Each found URL is merged into the offer map, keyed by account and book id, for 30 minutes. It merges rather than replaces, because the client's quick and apple listings run in parallel. Expired entries are pruned on each write.
 
 ### `POST /covers/pick`
 
@@ -67,6 +67,7 @@ For a `url`:
   - A download that fails → 502.
   - An image that is missing or fails `isAcceptableCover` → 422, "That image can't be used as a cover."
   - An image that passes is stored with `storeCoverImage(deps, book.id, offer.source, url, image, at)`.
+  - Two picks of the same URL for the same book at once share one download and one row.
 
 With `everyone: true`, the book's cover is set to the image with status `manual`, its upgrade mark is cleared, and its backoff is dropped. That is the same tail `uploadCover` runs (`backend/src/modules/books/booksService.ts:509-522`); both call one helper. Without `everyone`, the catalog cover is untouched.
 
@@ -90,7 +91,9 @@ Both pickers get a **Found covers** section above **Your gallery**:
 - web: `frontend/src/components/CoverPickerModal.tsx`
 - mobile: `mobile/src/features/library/components/CoverPicker.tsx`
 
-The section shows only when the caller passes the book's cover lookup. That is the same `CoverLookupParams` the caller already uses with the cover resolver. Pickers opened for something other than a book are unchanged.
+The section shows only when the caller passes the book's cover lookup. That is the same `CoverLookupParams` the caller already uses with the cover resolver. On web the callers are the library page, the book screen and the groups page; pickers opened for a group or mural cover are unchanged.
+
+**Remove custom cover** shows when the book has a gallery cover **or** any `_coverUrl`. Today it keys only on the gallery id, which would leave a found-cover pick with no way back.
 
 - **Loading.** On open, the picker sends `from=quick` and `from=apple` in parallel. Quick results show first. Until Apple answers, a muted "Checking Apple Books…" tile sits at the end. Each name in `unavailable` adds one muted line, for example "ISBNdb didn't answer."
 - **Tiles.** A found tile loads its remote URL and reads the natural size. It hides itself if the image fails to load or fails `isAcceptableCover`. Each tile shows `width × height` and the source name. Stored tiles show their stored size.
@@ -120,7 +123,7 @@ The picker stays owners-only, as it is today.
   - R2 grows by one image per first pick of a URL.
 - **Web:** ships with the Pages deploy.
 - **Mobile:** JS only, since `expo-image` is already installed, so it ships over the air to builds with a matching native fingerprint.
-- **ISBNdb:** each picker open can spend up to 2 calls from the shared 4,800-a-day budget. When the budget is spent, ISBNdb shows as unavailable and the rest of the list still works.
+- **ISBNdb:** each picker open can spend up to 2 calls from the shared 4,800-a-day budget, and the 30-a-minute scope bounds how fast one account can spend it. When the budget is spent, ISBNdb shows as unavailable and the rest of the list still works.
 
 ## Tests
 

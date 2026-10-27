@@ -17,10 +17,11 @@
 
 - **Names.** The catalog image id is always `coverImageId`, never `imageId`, because `CoverLookupParams.imageId` is the Kobo ImageId.
 - **Limits:**
-  - offers last 30 minutes (`COVER_OFFER_TTL_MS = 30 * 60 * 1000`)
+  - offers last 30 minutes (`COVER_OFFER_TTL_MS = 30 * 60 * 1000`), measured with the service's `now()`
   - a picked `url` is at most 2,000 characters
   - at most 3 candidates per step (the existing `CANDIDATES_PER_STEP`)
-- **Picker lookups never change a book's cover state.** They never call `setCover`, `setAppleChecked`, `setUpgradeWanted` or `deps.warn`, and never touch `backoffUntil`. The one exception is `pickCover` with `everyone: true`.
+  - both picker routes share their own rate-limit scope of 30 requests a minute, because each listing can spend ISBNdb's shared daily budget
+- **Picker lookups never change a book's cover state.** They never call `setCover`, `setAppleChecked`, `setUpgradeWanted` or `deps.warn`, and never touch `backoffUntil`. The shared ISBNdb gate and budget still log their own pause lines, as for any ISBNdb call. The one exception is `pickCover` with `everyone: true`.
 - **HTTP statuses:**
 
   | Status | When |
@@ -65,11 +66,13 @@
 ## Review Focus
 
 1. **Server-side request forgery.** `pickCover` downloads only a URL that `listCoverCandidates` offered to the same account for the same book within 30 minutes. A URL offered to another account, or for another book, gets a 409. Pinned in Task 4.
-2. **No side effects from browsing.** Listing candidates, including a paused or spent ISBNdb, logs no warning, stamps nothing, and leaves `cover_status`, `cover_checked_at`, `apple_checked_at` and the backoff alone. Pinned in Task 4.
+2. **No side effects from browsing.** Listing candidates, including a paused or spent ISBNdb, never calls `deps.warn`, stamps nothing, and leaves `cover_status`, `cover_checked_at`, `apple_checked_at`, `cover_upgrade_wanted_at` and the backoff alone. Pinned in Task 4.
 3. **A personal pick leaves the catalog cover alone.** Only an admin's `everyone: true` sets it, as `manual`. Pinned in Tasks 4 and 5.
 4. **`findBestCover` behaves the same after the step extraction.** The existing `coverResolver.test.ts` cases pass unchanged. Pinned in Task 3.
-5. **One stored row per `(book, source_url)`.** Picking an already-stored URL reuses its row and downloads nothing. Pinned in Task 4.
-6. **Picker lookups use the urgent lane of the shared throttles.** They never get throttles of their own, which would double the request rate a source sees. Pinned in Task 5.
+5. **One stored row per `(book, source_url)`.** Picking an already-stored URL reuses its row and downloads nothing. Two picks of the same URL at once share one download. Pinned in Task 4.
+6. **Picker lookups use the urgent lane of the shared throttles.** They never get throttles of their own, which would double the request rate a source sees. `urgentLane` overrides the explicit `{ urgent: false }` that `createIsbndbGet` passes (`backend/src/modules/books/adapters/sources/isbndb.ts:30`). Pinned in Task 5.
+7. **A found-cover pick can be undone.** Both pickers show Remove custom cover when the book has a gallery cover or any `_coverUrl`. Pinned in Tasks 6 and 7.
+8. **Parallel listings don't cancel each other's offers.** The quick and apple listings merge into one offer set. Pinned in Task 4.
 
 ---
 
@@ -84,6 +87,8 @@
 - Modify: `backend/src/modules/books/domain/images.ts`
 - Modify: `backend/src/modules/books/domain/images.test.ts`
 - Modify: `backend/src/modules/books/coverResolver.ts`
+- Modify: `backend/src/modules/books/seed/bnpImport.ts`
+- Modify: `backend/src/modules/books/seed/importPublisherCovers.ts`
 
 **Interfaces:**
 - Produces, from `@scripta/shared`:
@@ -131,7 +136,7 @@
   - In `backend/src/modules/books/domain/images.ts`:
     - delete the local `MIN_ASPECT_RATIO`, `MAX_ASPECT_RATIO`, `ISBNDB_PLACEHOLDER` and `isAcceptableCover`
     - import `COVER_MIN_ASPECT_RATIO` and `COVER_MAX_ASPECT_RATIO` from `@scripta/shared` for the two remaining uses (`images.ts:235`, `:241`)
-  - Switch `backend/src/modules/books/coverResolver.ts:4` to import `isAcceptableCover` from `@scripta/shared`.
+  - Switch every import of `isAcceptableCover` to `@scripta/shared`: `backend/src/modules/books/coverResolver.ts:4`, `backend/src/modules/books/seed/bnpImport.ts:8` and `backend/src/modules/books/seed/importPublisherCovers.ts:4`.
   - Delete the moved cases from `images.test.ts`, along with its `isAcceptableCover` import.
 
 - [ ] **Step 4: Run to verify pass.**
@@ -140,7 +145,7 @@
 
 - [ ] **Step 5: Commit.**
   ```bash
-  git add packages/shared/src/library/coverCandidates.ts packages/shared/src/library/coverCandidates.test.ts packages/shared/src/library/bookCovers.ts packages/shared/src/library/bookCovers.test.ts packages/shared/src/library/index.ts backend/src/modules/books/domain/images.ts backend/src/modules/books/domain/images.test.ts backend/src/modules/books/coverResolver.ts
+  git add packages/shared/src/library/coverCandidates.ts packages/shared/src/library/coverCandidates.test.ts packages/shared/src/library/bookCovers.ts packages/shared/src/library/bookCovers.test.ts packages/shared/src/library/index.ts backend/src/modules/books/domain/images.ts backend/src/modules/books/domain/images.test.ts backend/src/modules/books/coverResolver.ts backend/src/modules/books/seed/bnpImport.ts backend/src/modules/books/seed/importPublisherCovers.ts
   git commit -m "Add shared cover candidate helpers and move isAcceptableCover into shared"
   ```
 
@@ -253,14 +258,15 @@
     - a step that throws `SourceUnavailableError` (including `SourcePausedError`) adds `error.source` to `unavailable` (de-duplicated) and is skipped
     - any other error propagates
     - from each step's `offerable(result, rejected)`, every URL not in `seen` becomes `{ source, url, fullUrl: url, coverImageId: null, width: null, height: null }` and is added to `seen`
-  - It records every found URL in the offer map, keyed `${userId}\n${book.id}`, mapping url → `{ source, expiresAt: now + COVER_OFFER_TTL_MS }`. On each write, entries whose `expiresAt` has passed are removed, and so are keys left empty.
+  - It merges every found URL into the offer map, keyed `${userId}\n${book.id}`, mapping url → `{ source, expiresAt: now().getTime() + COVER_OFFER_TTL_MS }`. Merging matters: the quick and apple listings run in parallel, and replacing the key's entries would expire the other listing's offers. On each write, entries whose `expiresAt` has passed are removed, and so are keys left empty.
 - **`pickCover`:**
-  - It finds the book with `findByIdentity(lookupIdentity(lookup))` and throws `BookNotFoundError` when there is none.
+  - It finds the book as `rejectCover` does (`booksService.ts:486-488`): `lookupIdentity(lookup)`, then `findByIdentity(deps.repo, identity)`. It throws `BookNotFoundError` when either returns nothing.
   - With `coverImageId`: the row must exist, have `book_id === book.id`, and have a `source_url` that is null or not rejected; otherwise `BookNotFoundError`.
   - With `url`:
     - The URL must be in the offer map for this user and book and not expired, or the method throws `CoverOfferExpiredError`.
     - If `listImages(book.id)` has a row with `source_url === url`, it reuses that row.
     - Otherwise it calls `fetchPickedImage({ source, url })`. A `SourceUnavailableError` propagates. A `null` result, or one failing `isAcceptableCover`, throws `UnusableCoverError`. A usable image is stored with `storeCoverImage(deps, book.id, source, url, image, at)`.
+    - The download and store run once per `${book.id}\n${url}`. An in-flight `Map<string, Promise<string>>` hands a concurrent pick of the same URL the same promise, and its entry is deleted when the promise settles, either way.
   - With `everyone`, it calls `setManualCover(book.id, imageId, at)`.
   - It returns `coverOf(imageId, false)`.
 
@@ -272,10 +278,13 @@
   - `quick candidates never ask Apple; apple candidates ask only Apple and skip Kobo`.
   - `apple candidates drop a URL already stored for the book`.
   - `an unavailable source is reported, not warned, and stamps nothing`:
-    - ISBNdb throws `SourcePausedError`, and the response has `unavailable: ["isbndb"]`
+    - ISBNdb throws `SourcePausedError` and Open Library throws a plain `SourceUnavailableError`; the quick response has `unavailable: ["isbndb", "openlibrary"]`
+    - an apple listing in which Apple returns a URL runs too
     - `warnings` is empty
-    - the book's `cover_status`, `cover_checked_at` and `apple_checked_at` are unchanged
-    - `enqueued` is empty
+    - the book's `cover_status`, `cover_checked_at`, `apple_checked_at` and `cover_upgrade_wanted_at` are unchanged
+    - `enqueued` is empty, and a following `resolveCover(lookup, true)` still enqueues the book, which proves no backoff was set
+  - `quick and apple offers merge`: after a quick listing and an apple listing for the same book, a URL from each is pickable.
+  - `two concurrent picks of one URL download once and return one image`.
   - `pick downloads an offered URL and stores it without touching the catalog cover`.
   - `pick reuses a stored row for the same source URL without downloading`. Assert `fetchPickedImage` is not called.
   - `pick refuses a URL never offered, offered to another user, offered for another book, or older than 30 minutes`. Each throws `CoverOfferExpiredError`; advance the harness clock for the last case.
@@ -305,6 +314,8 @@
 **Files:**
 - Modify: `backend/src/modules/books/routes.ts`
 - Test: `backend/src/modules/books/routes.test.ts`
+- Modify: `backend/src/modules/books/adapters/http/http.ts`
+- Test: `backend/src/modules/books/adapters/http/http.test.ts`
 - Modify: `backend/src/modules/books/plugin.ts`
 - Modify: `backend/README.md`
 
@@ -313,11 +324,15 @@
 - Produces:
   - `GET /covers/candidates`. It takes `lookupSchema` plus `from: z.enum(["quick","apple"]).default("quick")`, and returns `CoverCandidatesResponse`.
   - `POST /covers/pick`. Its body is `lookupSchema` plus `coverImageId: z.string().uuid().optional()`, `url: z.string().url().max(2000).optional()` and `everyone: z.boolean().optional()`. Exactly one of `coverImageId` and `url` is allowed. It returns `ResolvedCover`.
-  - Both routes are added to `buildCatalogRoutes` behind `authGuard`.
+  - Both routes go in a new `buildCoverPickerRoutes(service)` behind `authGuard`. `plugin.ts` registers it in its own scope with `fastifyRateLimit` at 30 a minute.
+  - `urgentLane(throttle: Throttle): Throttle` in `adapters/http/http.ts`, next to `createThrottle`. It returns `(task) => throttle(task, { urgent: true })`, ignoring any options the caller passes.
 
-- [ ] **Step 1: Write failing tests** in `routes.test.ts`, using `makeService` and `call`:
+- [ ] **Step 1: Write failing tests.**
+  In `http.test.ts`, in the style of the urgent-lane test at `:112`: `a task sent through urgentLane with { urgent: false } still runs before queued normal tasks`.
+  In `routes.test.ts`, using `makeService` and `call` (register `buildCoverPickerRoutes(service)` in `call`):
   - `candidates require auth` → 401.
   - `candidates reject a lookup without isbn or title, and a bad from` → 400.
+  - `candidates for a junk ISBN (isbn=abc)` → 404.
   - `candidates return the service response` (a fake source with one URL, plus a stored image).
   - `pick rejects both or neither of coverImageId and url, and a non-URL url` → 400.
   - `pick everyone from a non-admin` → 403, and the service is not called (no image stored).
@@ -330,17 +345,18 @@
   - `pick everyone from the admin sets the catalog cover`. A following `GET /covers/resolve` returns the picked image.
 
 - [ ] **Step 2: Run to verify failure.**
-  Run: `cd backend && npx tsx --test src/modules/books/routes.test.ts`
+  Run: `cd backend && npx tsx --test src/modules/books/routes.test.ts src/modules/books/adapters/http/http.test.ts`
   Expected: FAIL.
 
-- [ ] **Step 3: Implement the routes.**
+- [ ] **Step 3: Implement the routes and `urgentLane`.**
   - Validate `isLookable`.
   - For `everyone` from a non-admin, return 403 before calling the service.
-  - Map the errors as listed. Rethrow anything else.
+  - Map the errors as listed, including `BookNotFoundError` → 404 on the candidates route. Rethrow anything else.
 
 - [ ] **Step 4: Wire the urgent lane in `plugin.ts`.**
   - Hoist the Apple throttle into `const appleThrottle = createThrottle(APPLE_GAP_MS)`, and use it for the worker's Apple source.
-  - Add `const urgentLane = (throttle: Throttle): Throttle => (task) => throttle(task, { urgent: true })`.
+  - Import `urgentLane` from `./adapters/http/http.js`.
+  - Register `buildCoverPickerRoutes(service)` in its own scope with `fastifyRateLimit` at `{ max: 30, timeWindow: "1 minute" }`.
   - Pass `pickerSources` built from the same throttles, the same `isbndbGate` and the same `isbndbSpend`:
     - `isbndb: isbndbConfigured ? createIsbndbSource(env.ISBNDB_API_KEY, urgentLane(isbndbThrottle), isbndbGate, isbndbSpend) : null`
     - `apple: createAppleSource(urgentLane(appleThrottle))`
@@ -348,7 +364,7 @@
   - Turn the `fetchImage` body into `makeFetchImage(openLibraryCover: Throttle, koboCover: Throttle): FetchCoverImage`. `fetchImage` is `makeFetchImage(openLibraryCoverThrottle, koboCoverThrottle)`, and `fetchPickedImage` is `makeFetchImage(urgentLane(openLibraryCoverThrottle), urgentLane(koboCoverThrottle))`.
 
 - [ ] **Step 5: Docs.** In `backend/README.md`, under `books`:
-  - Add both routes to the module table row and the route table.
+  - Add both routes to the module table row, the route table, and the rate-limit line (`backend/README.md:200`), as their own 30/min scope.
   - Add one bullet, "**The cover picker lists and stores candidates on demand**", covering:
     - the order of the stored and found groups
     - the 30-minute offer guard and why (the server only fetches URLs it listed)
@@ -359,9 +375,9 @@
     - ISBNdb's budget cost (up to 2 calls per open)
 
 - [ ] **Step 6: Run, typecheck, commit.**
-  Run: `cd backend && npx tsx --test src/modules/books/routes.test.ts && cd .. && npm run typecheck --workspace backend && node scripts/gate.mjs`
+  Run: `cd backend && npx tsx --test src/modules/books/routes.test.ts src/modules/books/adapters/http/http.test.ts && cd .. && npm run typecheck --workspace backend && node scripts/gate.mjs`
   ```bash
-  git add backend/src/modules/books/routes.ts backend/src/modules/books/routes.test.ts backend/src/modules/books/plugin.ts backend/README.md
+  git add backend/src/modules/books/routes.ts backend/src/modules/books/routes.test.ts backend/src/modules/books/adapters/http/http.ts backend/src/modules/books/adapters/http/http.test.ts backend/src/modules/books/plugin.ts backend/README.md
   git commit -m "Add cover candidate and pick routes on the urgent lane"
   ```
 
@@ -374,6 +390,7 @@
 - Modify: `frontend/src/hooks/useBookActions.ts`
 - Modify: `frontend/src/components/book/BookScreen.tsx`
 - Modify: `frontend/src/pages/LibraryPage.tsx`
+- Modify: `frontend/src/pages/GroupsPage.tsx`
 
 **Interfaces:**
 - Consumes: the shared helpers (Task 1), the routes (Task 5), `apiFetch`, `rememberResolvedCover` and the `["books-admin"]` query (`frontend/src/components/book/BookScreen.tsx:72`).
@@ -381,7 +398,7 @@
   - In `api/covers.ts`:
     - `fetchCoverCandidates(params: ResolveCoverParams, from: CoverPickSource): Promise<CoverCandidatesResponse>`
     - `pickCover(params: ResolveCoverParams, choice: CoverChoice, everyone: boolean): Promise<ResolvedCoverResponse>`
-  - On `useBookActions`: `saveCoverUrl(book, url)` (via `setBookCoverUrl`) and `useCoverForEveryone(book, cover)`:
+  - On `useBookActions`: `saveCoverUrl(book, url)` (via `setBookCoverUrl`, imported from `@scripta/shared`) and `saveCoverForEveryone(book, cover)`:
     - it calls `rememberResolvedCover(coverParamsFor(book), cover)`
     - if the book has `_coverUrl`, it saves `clearBookCover`
   - On `CoverPickerModal`, new optional props:
@@ -390,10 +407,11 @@
     - `isAdmin?: boolean`
     - `onPickFound?: (cover: ResolvedCoverResponse, everyone: boolean) => void`
 
-    `FoundCovers` renders only when `lookup` and `onPickFound` are both set, so the group and mural pickers are unchanged.
+    `FoundCovers` renders only when `lookup` and `onPickFound` are both set, so the group-cover and mural pickers are unchanged.
+  - Remove custom cover shows when `currentImageId` is set **or** `coverUrl` is a non-empty string, so a found-cover pick can be undone (today it shows only for `currentImageId`, `CoverPickerModal.tsx:123`).
 
 - [ ] **Step 1: `FoundCovers.tsx`.**
-  - **Loading:** on mount it fires `fetchCoverCandidates(lookup, "quick")` and `fetchCoverCandidates(lookup, "apple")` in parallel, and appends Apple's candidates when they arrive.
+  - **Loading:** on mount it fires `fetchCoverCandidates(lookup, "quick")` and `fetchCoverCandidates(lookup, "apple")` in parallel, and appends Apple's candidates when they arrive. The fetch effect depends on `coverQueryKey(lookup)`, never the `lookup` object, because callers build a new object each render and every image `onLoad` re-renders.
   - **Tiles:** each tile renders an `<img>`:
     - `onLoad` records `naturalWidth` and `naturalHeight` in a `measured` map
     - `onError` records `null`
@@ -408,23 +426,31 @@
     - clicking a tile calls `pickCover(lookup, choice, false)`, where the choice is `coverImageId` when set, otherwise `url`, then `onPickFound(cover, false)`
     - with `isAdmin`, a second button, "Use for everyone", does the same with `true`
     - errors show on that tile, using the server's message (`ApiError` message)
+    - every tile is disabled while a pick is pending
   - Match the gallery grid's markup, sizes and keyboard handling in `CoverPickerModal.tsx`.
 
 - [ ] **Step 2: Mount it.**
-  - Render `FoundCovers` above the gallery grid in `CoverPickerModal.tsx`, under the heading "Found covers".
-  - In `BookScreen.tsx:407` and `LibraryPage.tsx:549`, pass:
+  - Render `FoundCovers` above the gallery grid in `CoverPickerModal.tsx`, under the heading "Found covers", and widen the Remove custom cover condition as above.
+  - In `BookScreen.tsx:407`, `LibraryPage.tsx:549` and `GroupsPage.tsx:520`, pass:
     - `lookup={coverParamsFor(book)}`
     - `coverUrl={book._coverUrl}`
-    - `isAdmin`, from the `["books-admin"]` query (add the same `useQuery` to `LibraryPage`)
-    - `onPickFound`, which calls `saveCoverUrl(book, cover.fullUrl)` for a personal pick or `useCoverForEveryone(book, cover)` for `everyone`, then closes the modal
+    - `isAdmin`, from the `["books-admin"]` query (add the same `useQuery` where it is missing)
+    - `onPickFound`, which calls `saveCoverUrl(book, cover.fullUrl)` for a personal pick (when `fullUrl` is set) or `saveCoverForEveryone(book, cover)` for `everyone`, then closes the modal. `GroupsPage` saves through its own `updateLibrary` handlers (`GroupsPage.tsx:223-245`), so add a `setBookCoverUrl` handler there beside `handleSaveBookCover`.
 
 - [ ] **Step 3: Verify.**
   Run: `npm run typecheck --workspace frontend && npm run lint --workspace frontend && npm test --workspace frontend && node scripts/gate.mjs`
   Expected: PASS.
+  Then start the backend and web dev servers as `docs/dev-workflow.md` describes, and drive the library page in headless Chromium with Playwright. Check that:
+  - opening a book's cover picker shows Found covers with sizes
+  - picking one closes the modal and the card shows it
+  - reopening marks it current
+  - Remove custom cover is offered and reverts it
+
+  Save screenshots under the scratchpad, not the repo.
 
 - [ ] **Step 4: Commit.**
   ```bash
-  git add frontend/src/api/covers.ts frontend/src/components/FoundCovers.tsx frontend/src/components/CoverPickerModal.tsx frontend/src/hooks/useBookActions.ts frontend/src/components/book/BookScreen.tsx frontend/src/pages/LibraryPage.tsx
+  git add frontend/src/api/covers.ts frontend/src/components/FoundCovers.tsx frontend/src/components/CoverPickerModal.tsx frontend/src/hooks/useBookActions.ts frontend/src/components/book/BookScreen.tsx frontend/src/pages/LibraryPage.tsx frontend/src/pages/GroupsPage.tsx
   git commit -m "Add found covers to the web cover picker"
   ```
 
@@ -440,22 +466,23 @@
 **Interfaces:**
 - Consumes: the shared helpers (Task 1), the routes (Task 5), `apiClient.request(..., { auth: true })` and `coverParamsFor` (`mobile/src/features/library/components/CoverImage.tsx:18`).
 - Produces:
-  - In `api/covers.ts`: `fetchCoverCandidates` and `pickCover`, with the same signatures as on web. `pickCover` always sends `everyone: false`, and mobile has no admin action.
+  - In `api/covers.ts`: `fetchCoverCandidates(params, from)`, as on web, and `pickCover(params: ResolveCoverParams, choice: CoverChoice): Promise<ResolvedCoverResponse>`, which sends `pickCoverBody(params, choice, false)`. Mobile has no admin action.
   - On `useLibraryActions`: `saveBookCoverUrl(book, url)`, via `setBookCoverUrl`, with the message "Couldn't save the cover change."
   - On `CoverPicker`, new optional props `lookup?` and `coverUrl?`, and `onPickFound?: (cover: ResolvedCoverResponse) => void`.
+  - Remove custom cover shows when `currentImageId` is set **or** `coverUrl` is a non-empty string (today only `currentImageId`, `CoverPicker.tsx:88`).
 
 - [ ] **Step 1: `FoundCovers.tsx`.**
-  - It has the same behaviour as web Task 6 Step 1, without the admin button.
+  - It has the same behaviour as web Task 6 Step 1 (including the effect keyed on `coverQueryKey(lookup)` and tiles disabled while a pick is pending), without the admin button.
   - Tiles use `expo-image`'s `Image` with `onLoad={(e) => measure(e.source.width, e.source.height)}` and `onError`.
   - It uses the theme tokens, `minimumTouchTarget` and the gallery tile size from `CoverPicker.tsx`.
   - Every tile has an `accessibilityLabel`, "`<label>` cover, `<w>` by `<h>`", and the current tile has `accessibilityState={{ selected: true }}`.
 
 - [ ] **Step 2: Mount it.**
-  - Render `FoundCovers` above the gallery list in `CoverPicker.tsx`, under "Found covers".
+  - Render `FoundCovers` above the gallery list in `CoverPicker.tsx`, under "Found covers", and widen the Remove custom cover condition as above.
   - In `cover.tsx`, pass:
     - `lookup={coverParamsFor(book)}`
     - `coverUrl={book._coverUrl}`
-    - `onPickFound={(cover) => { void saveBookCoverUrl(book, cover.fullUrl ?? ""); router.back(); }}`, skipping the save when `fullUrl` is null
+    - `onPickFound={(cover) => { if (cover.fullUrl) void saveBookCoverUrl(book, cover.fullUrl); router.back(); }}`
 
 - [ ] **Step 3: Verify.**
   Run: `npm run typecheck --workspace mobile && npm test --workspace mobile && node scripts/gate.mjs`
