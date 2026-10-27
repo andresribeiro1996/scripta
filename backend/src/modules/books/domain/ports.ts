@@ -212,6 +212,7 @@ export interface EditionRecord {
   workKey: string | null;
   languages: string[];
   series?: SeriesEntry[];
+  year?: number;
 }
 
 export interface EditionRecordSource {

@@ -7,6 +7,7 @@ import {
   PORTUGAL_ISBN13_PREFIXES,
   authorMatches,
   catalogTitleKey,
+  dateYear,
   workTitleKey,
   editionLanguage,
   givenNameFirst,
@@ -195,4 +196,10 @@ test("isValidIsbn checks the check digit of both lengths", () => {
   assert.equal(isValidIsbn("972-708-948-2"), false);
   assert.equal(isValidIsbn("097522980X"), true);
   assert.equal(isValidIsbn("12345"), false);
+});
+
+test("a date gives its year from leading digits or the first standalone year in range", () => {
+  for (const date of ["2005", "20050802", "2005-08-02T00:00:00Z", "August 2, 2005", "Aug 02, 2005", "c2005", "[2005]", "0000, reprinted 2005"]) assert.equal(dateYear(date), 2005, date);
+  for (const date of ["1449", String(new Date().getFullYear() + 1), "12345", ""]) assert.equal(dateYear(date), null, date);
+  for (const value of [5, null, undefined]) assert.equal(dateYear(value), null, String(value));
 });
