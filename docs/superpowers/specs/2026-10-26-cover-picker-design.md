@@ -33,7 +33,7 @@ The route is authenticated. It is registered with the catalog routes (300 reques
 Its query is the same lookup as `GET /covers/resolve` (`isbn`, `title`, `author`), plus `from`, which is `quick` (the default) or `apple`. A lookup with neither an ISBN nor a title gets a 400. The route finds or creates the catalog book the way `uploadCover` does (`findOrCreateBook`).
 
 `from=quick` returns these groups, in order:
-1. **Stored:** every `cover_images` row of the book, newest first, except rows whose `source_url` is in `cover_rejections`. Each has `imageId`, the thumbnail and file URLs (`publicUrlFor`), `width` and `height`.
+1. **Stored:** every `cover_images` row of the book, newest first, except rows whose `source_url` is in `cover_rejections`. Each has `coverImageId`, the thumbnail and file URLs (`publicUrlFor`), `width` and `height`. The name is `coverImageId` everywhere, because `imageId` in a cover lookup already means the Kobo ImageId.
 2. **Found:** these steps, in order:
    - Kobo (when `kobo_image_id` is set)
    - ISBNdb by ISBN
@@ -41,9 +41,9 @@ Its query is the same lookup as `GET /covers/resolve` (`isbn`, `title`, `author`
    - ISBNdb by title
    - Open Library by title
 
-   A found candidate has `imageId: null`, `url` and `fullUrl` both set to the source URL, and `width: null`, `height: null`. A URL already listed, as a stored row's `source_url` or by an earlier step, is dropped.
+   A found candidate has `coverImageId: null`, `url` and `fullUrl` both set to the source URL, and `width: null`, `height: null`. A URL already listed, as a stored row's `source_url` or by an earlier step, is dropped.
 
-`from=apple` returns only Apple's steps: by ISBN, then by title.
+`from=apple` returns only Apple's steps: by ISBN, then by title. It drops URLs that match a stored row's `source_url`, just as `quick` does.
 
 The response is `{ candidates: CoverCandidateView[], unavailable: CoverSourceName[] }`. `unavailable` names each source that failed (`SourceUnavailableError`, including a paused or spent ISBNdb). Those failures are not logged as warnings, because a picker is not a lookup the worker owes the book.
 
@@ -53,12 +53,12 @@ Each found URL is recorded in the offer map, keyed by account and book id, for 3
 
 ### `POST /covers/pick`
 
-The body is the lookup plus exactly one of `imageId` (a UUID) or `url` (at most 2,000 characters), and optionally `everyone: boolean`.
+The body is the lookup plus exactly one of `coverImageId` (a UUID) or `url` (at most 2,000 characters), and optionally `everyone: boolean`.
 
 Checks, in order:
 - `everyone` from anyone but the admin → 403.
 - No catalog book for the lookup → 404.
-- `imageId` that isn't a row of this book, or whose `source_url` is rejected → 404.
+- `coverImageId` that isn't a row of this book, or whose `source_url` is rejected → 404.
 - `url` that isn't in this account's offers for this book → 409, "That cover offer expired. Reopen the picker."
 
 For a `url`:
@@ -76,7 +76,7 @@ The response is `coverOf(imageId, false)`: `{ url, fullUrl, pending: false, upgr
 
 There is no new table or column. The changes are:
 - **A new repository query, `listImages(bookId)`.**
-- **A new index, `CREATE INDEX IF NOT EXISTS idx_cover_images_book ON cover_images(book_id)`.** It is created on boot in `connection.ts`. Nothing reads `cover_images` by book today, and the table holds every BNP scan.
+- **A new index, `CREATE INDEX IF NOT EXISTS idx_cover_images_book ON cover_images(book_id)`.** It goes in `books.sql`, which runs on every boot. Nothing reads `cover_images` by book today, and the table holds every BNP scan.
 
 ## Shared (`@scripta/shared`)
 
@@ -142,15 +142,11 @@ The picker stays owners-only, as it is today.
   - A non-admin `everyone` → 403.
   - `everyone` sets a `manual` cover and clears the upgrade mark.
   - A personal pick leaves the catalog cover alone.
-- **Routes:** validation errors (no ISBN or title, both or neither of `imageId` and `url`, a bad `from`) and the auth guard.
+- **Routes:** validation errors (no ISBN or title, both or neither of `coverImageId` and `url`, a bad `from`) and the auth guard.
 - **Shared:**
   - The `isAcceptableCover` cases move with it from `backend/src/modules/books/domain/images.test.ts:54-62`.
   - `setBookCoverUrl` drops `_coverImageId`.
   - The request builders.
-- **Clients:**
-  - Unacceptable or failed tiles hide.
-  - The current pick is marked.
-  - The admin action shows only for the admin, and only on web.
-  - Choosing a tile saves `_coverUrl`.
+- **Clients:** the tile rules (unacceptable or failed tiles hide, the current pick is marked) are shared helpers, tested in `@scripta/shared`. The clients are checked by typecheck, lint, and one device pass on mobile.
 
 Every new `*.test.ts` file goes into `backend/package.json`'s test list.
