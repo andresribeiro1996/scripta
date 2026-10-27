@@ -22,8 +22,8 @@ function deps(overrides: Partial<WorksDeps> = {}): WorksDeps {
     getWorkPage: (id) => (id === "old" || id === "w" ? {
       id: "w", title: "Dune", author: "Frank Herbert", summary: null, aliasIds: ["w", "old"],
       editions: [
-        { bookId: "e1", title: "Dune", language: "en", year: 1965, isbn: "9780441013593", summary: null, coverUrl: null, coverColor: null, genres: [], rating: null, ratingCount: 0, pages: null },
-        { bookId: "e2", title: "Duna", language: "pt-BR", year: 2017, isbn: "9788576573135", summary: "Especiaria.", coverUrl: "cover:e2", coverColor: "#e0a82e", genres: [], rating: null, ratingCount: 0, pages: null }
+        { bookId: "e1", title: "Dune", language: "en", year: 1965, isbn: "9780441013593", summary: null, coverUrl: null, coverColor: null, genres: [], rating: null, ratingCount: 0, pages: null, firstPublishedYear: null },
+        { bookId: "e2", title: "Duna", language: "pt-BR", year: 2017, isbn: "9788576573135", summary: "Especiaria.", coverUrl: "cover:e2", coverColor: "#e0a82e", genres: [], rating: null, ratingCount: 0, pages: null, firstPublishedYear: null }
       ]
     } : undefined),
     holdersOfWorks: () => [
@@ -86,8 +86,8 @@ function pageWith(summary: string | null, editionSummaries: [string | null, stri
   return () => ({
     id: "w", title: "Dune", author: "Frank Herbert", summary, aliasIds: ["w"],
     editions: [
-      { bookId: "e1", title: "Dune", language: "en", year: 1965, isbn: "9780441013593", summary: editionSummaries[0], coverUrl: null, coverColor: null, genres: [], rating: null, ratingCount: 0, pages: null },
-      { bookId: "e2", title: "Duna", language: "pt-BR", year: 2017, isbn: "9788576573135", summary: editionSummaries[1], coverUrl: null, coverColor: null, genres: [], rating: null, ratingCount: 0, pages: null }
+      { bookId: "e1", title: "Dune", language: "en", year: 1965, isbn: "9780441013593", summary: editionSummaries[0], coverUrl: null, coverColor: null, genres: [], rating: null, ratingCount: 0, pages: null, firstPublishedYear: null },
+      { bookId: "e2", title: "Duna", language: "pt-BR", year: 2017, isbn: "9788576573135", summary: editionSummaries[1], coverUrl: null, coverColor: null, genres: [], rating: null, ratingCount: 0, pages: null, firstPublishedYear: null }
     ]
   });
 }
@@ -154,7 +154,7 @@ test("readers are capped at 50, followed first, while counts cover everyone visi
 
 type Edition = NonNullable<ReturnType<WorksDeps["getWorkPage"]>>["editions"][number];
 const edition = (bookId: string, isbn: string | null, extra: Partial<Edition>): Edition => ({
-  bookId, title: "Dune", language: "en", year: null, isbn, summary: null, coverUrl: null, coverColor: null, genres: [], rating: null, ratingCount: 0, pages: null, ...extra
+  bookId, title: "Dune", language: "en", year: null, isbn, summary: null, coverUrl: null, coverColor: null, genres: [], rating: null, ratingCount: 0, pages: null, firstPublishedYear: null, ...extra
 });
 const pageOf = (editions: Edition[]): WorksDeps["getWorkPage"] => () => ({ id: "w", title: "Dune", author: "Frank Herbert", summary: null, aliasIds: ["w"], editions });
 
@@ -194,6 +194,14 @@ test("year is the earliest edition's; pages prefer the viewer's edition", () => 
   assert.equal(signedOut.pages, 680);
 });
 
+test("earliest year counts firstPublishedYear", () => {
+  const getWorkPage = pageOf([
+    edition("e1", null, { year: 2015, firstPublishedYear: 1954 }),
+    edition("e2", null, { year: 2001, firstPublishedYear: null })
+  ]);
+  assert.equal(createWorksService(deps({ getWorkPage })).getPage("w", null)!.work.year, 1954);
+});
+
 test("editions without details give no genres, rating, year or pages", () => {
   const work = createWorksService(deps({ getWorkPage: pageOf([edition("e1", null, {})]) })).getPage("w", null)!.work;
   assert.deepEqual([work.genres, work.rating, work.year, work.pages], [[], null, null, null]);
@@ -202,7 +210,7 @@ test("editions without details give no genres, rating, year or pages", () => {
 test("your own edition's summary comes before the work summary", () => {
   const work = {
     id: "w", title: "Dune", author: "Frank Herbert", summary: "Work text.", aliasIds: ["w"],
-    editions: [{ bookId: "e2", title: "Duna", language: "pt-BR", year: 2017, isbn: "9788576573135", summary: "Especiaria.", coverUrl: null, coverColor: null, genres: [], rating: null, ratingCount: 0, pages: null }]
+    editions: [{ bookId: "e2", title: "Duna", language: "pt-BR", year: 2017, isbn: "9788576573135", summary: "Especiaria.", coverUrl: null, coverColor: null, genres: [], rating: null, ratingCount: 0, pages: null, firstPublishedYear: null }]
   };
   const own = { bookKey: "isbn:9788576573135", readStatus: 2 as const, rating: null, highlightCount: 0, isbn: "9788576573135", coverUrl: null };
   assert.equal(createWorksService(deps({ getWorkPage: () => work, copyOfWork: () => own })).getPage("w", "viewer")!.work.summary, "Especiaria.");
@@ -212,7 +220,7 @@ test("your own edition's summary comes before the work summary", () => {
 test("a reader whose own edition has no synopsis gets one in their edition's language, never the original's English", () => {
   const english = "The story of a family and the house where they spend their summers, told over ten years.";
   const portuguese = "A história de uma família e da casa onde passam os verões, contada ao longo de dez anos.";
-  const edition = (bookId: string, isbn: string, language: string, summary: string | null) => ({ bookId, title: bookId, language, year: 2000, isbn, summary, coverUrl: null, coverColor: null, genres: [], rating: null, ratingCount: 0, pages: null });
+  const edition = (bookId: string, isbn: string, language: string, summary: string | null) => ({ bookId, title: bookId, language, year: 2000, isbn, summary, coverUrl: null, coverColor: null, genres: [], rating: null, ratingCount: 0, pages: null, firstPublishedYear: null });
   const work = (editions: ReturnType<typeof edition>[]) => () => ({ id: "w", title: "To the Lighthouse", author: "Virginia Woolf", summary: english, aliasIds: ["w"], editions });
   const own = { bookKey: "isbn:9789720000701", readStatus: 2 as const, rating: null, highlightCount: 0, isbn: "9789720000701", coverUrl: null };
   const mine = edition("mine", "9789720000701", "pt-PT", null);

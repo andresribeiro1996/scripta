@@ -856,6 +856,12 @@ test("an outside text search saves every result so the inside search finds them 
   assert.equal(book.coverUrl, "https://covers.openlibrary.org/b/id/7-M.jpg");
 });
 
+test("a saved row shows its edition year in search, not the first-publication year", () => {
+  const h = harness();
+  h.repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593", year: 2015, firstPublishedYear: 1954, createdBy: "seed" }, ["isbn:9780441013593"], "2026-10-01T00:00:00.000Z");
+  assert.equal(h.service.search("dune")[0]!.year, 2015);
+});
+
 test("a partial saved match no longer hides the outside search", async () => {
   const messiah = { result: { title: "Dune Messiah", authors: ["Frank Herbert"], year: 1969, isbn: null, publisher: null, coverUrl: null, genres: [] }, olCoverId: null, source: "openlibrary" as const };
   const dune = { result: { title: "Dune", authors: ["Frank Herbert"], year: 1965, isbn: "9780441013593", publisher: null, coverUrl: null, genres: [] }, olCoverId: null, source: "openlibrary" as const };

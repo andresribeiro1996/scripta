@@ -27,8 +27,9 @@ export function saveCatalogHits(
     const author = result.authors.join(", ");
     const identity = lookupIdentity({ isbn: result.isbn, title: result.title, author });
     if (!identity) return null;
+    const years = source === "openlibrary" ? { year: null, firstPublishedYear: result.year } : { year: result.year };
     const book = findExisting(deps.repo, identity) ?? deps.repo.createBook(
-      { title: identity.title, author: identity.author, isbn: identity.isbn, year: result.year, publisher: result.publisher, olCoverId, workKey, genres: result.genres, sources: [source] },
+      { title: identity.title, author: identity.author, isbn: identity.isbn, ...years, publisher: result.publisher, olCoverId, workKey, genres: result.genres, sources: [source] },
       keysOf(deps.repo, identity),
       at
     );

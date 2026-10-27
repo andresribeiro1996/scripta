@@ -177,7 +177,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
     return {
       title: book.title,
       authors: book.author ? book.author.split(", ") : [],
-      year: book.year,
+      year: book.year ?? book.first_published_year,
       isbn: book.isbn,
       publisher: book.publisher,
       coverUrl: book.cover_image_id ? deps.publicUrlFor(book.cover_image_id, "thumb") : openLibraryThumb(book.ol_cover_id),

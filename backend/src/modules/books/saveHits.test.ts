@@ -49,6 +49,20 @@ test("saveCatalogHits creates a book with the hit's work key and makes it search
   assert.deepEqual(repo.searchBooks(["dune"], 10).map(({ id }) => id), [book.id]);
 });
 
+test("an Open Library hit's year is the work's first publication, kept out of the edition year", () => {
+  const { repo, deps } = fresh();
+  saveCatalogHits(deps, [hit({ year: 1954 })], AT);
+  const book = repo.findBookByKey("isbn:9780441013593")!;
+  assert.deepEqual([book.year, book.first_published_year], [null, 1954]);
+});
+
+test("an ISBNdb hit's year is the edition's own", () => {
+  const { repo, deps } = fresh();
+  saveCatalogHits(deps, [{ ...hit({ year: 2015 }), source: "isbndb" }], AT);
+  const book = repo.findBookByKey("isbn:9780441013593")!;
+  assert.deepEqual([book.year, book.first_published_year], [2015, null]);
+});
+
 test("saveCatalogHits finds an existing book by ISBN instead of creating one", () => {
   const { db, deps } = fresh();
   const [first] = saveCatalogHits(deps, [hit({}, "OL893415W")], AT);
