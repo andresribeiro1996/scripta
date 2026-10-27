@@ -180,6 +180,7 @@
 - Modify: `backend/src/modules/books/booksService.ts`
 - Test: `backend/src/modules/books/booksService.test.ts`
 - Modify: `backend/src/modules/books/plugin.ts`
+- Test: `backend/src/booksWiring.test.ts`
 - Modify: `backend/README.md`
 
 **Interfaces:**
@@ -223,6 +224,8 @@
       - keeps a `year` that differs from `first_published_year`
       - stamps in every case, including `null`
     - `the edition year queue uses its partial index`: the EXPLAIN QUERY PLAN of `EDITION_YEAR_SQL` names `idx_books_edition_year_queue`, in the style of the test at `:1681`.
+    - Task 2's version-6 upgrade test drops `edition_year_checked_at`. SQLite refuses `DROP COLUMN` while an index uses the column, so add `DROP INDEX idx_books_edition_year_queue` before that `ALTER`.
+  - `booksWiring.test.ts`: add `editionYearBackfill: 42_000` to the expected first-run delays.
   - `booksService.test.ts`, with the harness's `editionRecords`:
     - `the edition-year backfill replaces a copied year with the record's later year`.
     - `an earlier record year is refused, and the row is stamped`.
@@ -251,6 +254,6 @@
 - [ ] **Step 5: Run, typecheck, gate, commit.**
   Run: `npm run typecheck --workspace backend && npm test --workspace backend && node scripts/gate.mjs`
   ```bash
-  git add backend/src/modules/books/domain/ports.ts backend/src/modules/books/adapters/sqlite/connection.ts backend/src/modules/books/adapters/sqlite/sqliteBooksRepository.ts backend/src/modules/books/adapters/sqlite/sqliteBooksRepository.test.ts backend/src/modules/books/booksService.ts backend/src/modules/books/booksService.test.ts backend/src/modules/books/plugin.ts backend/README.md
+  git add backend/src/modules/books/domain/ports.ts backend/src/modules/books/adapters/sqlite/connection.ts backend/src/modules/books/adapters/sqlite/sqliteBooksRepository.ts backend/src/modules/books/adapters/sqlite/sqliteBooksRepository.test.ts backend/src/modules/books/booksService.ts backend/src/modules/books/booksService.test.ts backend/src/modules/books/plugin.ts backend/src/booksWiring.test.ts backend/README.md
   git commit -m "Backfill edition years from Open Library edition records"
   ```
