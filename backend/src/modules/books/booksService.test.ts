@@ -1929,6 +1929,101 @@ test("an aborted work key lookup starts no further requests", async () => {
   assert.equal(calls.length, 1);
 });
 
+function yearBooks(h: ReturnType<typeof harness>, specs: Array<{ isbn: string; year: number | null }>) {
+  return specs.map(({ isbn, year }) => h.repo.createBook({ title: `Book ${isbn}`, author: "Someone", isbn, year, firstPublishedYear: 1954 }, [`isbn:${isbn}`], "2026-09-01T00:00:00.000Z").id);
+}
+
+const yearAndStamp = (h: ReturnType<typeof harness>, id: string) => {
+  const book = h.repo.getBook(id)!;
+  return [book.year, book.edition_year_checked_at];
+};
+
+test("the edition-year backfill replaces a copied year with the record's later year", async () => {
+  const h = harness({ editionRecords: editionRecords(async () => ({ title: "Dune", workKey: null, languages: [], year: 2015 })) });
+  const [id] = yearBooks(h, [{ isbn: "9789720000001", year: 1954 }]);
+  assert.equal(await h.service.backfillEditionYears(50), null);
+  assert.deepEqual(yearAndStamp(h, id!), [2015, "2026-10-01T00:00:00.000Z"]);
+});
+
+test("an earlier record year is refused, and the row is stamped", async () => {
+  const h = harness({ editionRecords: editionRecords(async () => ({ title: "Dune", workKey: null, languages: [], year: 1900 })) });
+  const [id] = yearBooks(h, [{ isbn: "9789720000001", year: 1954 }]);
+  await h.service.backfillEditionYears(50);
+  assert.deepEqual(yearAndStamp(h, id!), [1954, "2026-10-01T00:00:00.000Z"]);
+});
+
+test("a record without a year, or no record, stamps and leaves the row", async () => {
+  const h = harness({ editionRecords: editionRecords(async (isbn) => isbn === "9789720000001" ? { title: "Dune", workKey: null, languages: [] } : null) });
+  const ids = yearBooks(h, [{ isbn: "9789720000001", year: 1954 }, { isbn: "9789720000002", year: null }]);
+  await h.service.backfillEditionYears(50);
+  assert.deepEqual(ids.map((id) => yearAndStamp(h, id)), [[1954, "2026-10-01T00:00:00.000Z"], [null, "2026-10-01T00:00:00.000Z"]]);
+});
+
+test("a 503 is warned and stamped", async () => {
+  const h = harness({
+    editionRecords: editionRecords(async (isbn) => {
+      if (isbn === "9789720000001") throw new SourceUnavailableError("openlibrary", "HTTP 503", { status: 503 });
+      return { title: "Dune", workKey: null, languages: [], year: 2015 };
+    })
+  });
+  const ids = yearBooks(h, [{ isbn: "9789720000001", year: 1954 }, { isbn: "9789720000002", year: 1954 }]);
+  assert.equal(await h.service.backfillEditionYears(50), null);
+  assert.deepEqual(ids.map((id) => yearAndStamp(h, id)), [[1954, "2026-10-01T00:00:00.000Z"], [2015, "2026-10-01T00:00:00.000Z"]]);
+  assert.deepEqual(h.warnings, [{ details: { bookId: ids[0], source: "openlibrary", error: "openlibrary unavailable: HTTP 503" }, message: "edition year source unavailable" }]);
+});
+
+test("a 429 returns a retry time and stamps nothing", async () => {
+  const calls: string[] = [];
+  let failure = new SourceUnavailableError("openlibrary", "HTTP 429", { status: 429, retryAt: 123_456 });
+  const h = harness({ editionRecords: editionRecords(async () => { throw failure; }, calls) });
+  const ids = yearBooks(h, [{ isbn: "9789720000001", year: 1954 }, { isbn: "9789720000002", year: 1954 }]);
+  assert.equal(await h.service.backfillEditionYears(50), 123_456);
+  failure = new SourceUnavailableError("openlibrary", "HTTP 429", { status: 429 });
+  assert.equal(await h.service.backfillEditionYears(50), Date.parse("2026-10-01T00:00:00.000Z") + 10 * 60 * 1000);
+  assert.equal(calls.length, 2);
+  assert.deepEqual(ids.map((id) => yearAndStamp(h, id)), [[1954, null], [1954, null]]);
+  assert.deepEqual(h.warnings, []);
+});
+
+test("a year changed after the copy is kept", async () => {
+  const h: ReturnType<typeof harness> = harness({
+    editionRecords: editionRecords(async () => {
+      h.repo.mergeDetails(id!, { summary: null, pages: null, year: 2010, publisher: null, translator: null }, null);
+      return { title: "Dune", workKey: null, languages: [], year: 2020 };
+    })
+  });
+  const [id] = yearBooks(h, [{ isbn: "9789720000001", year: null }]);
+  await h.service.backfillEditionYears(50);
+  assert.deepEqual(yearAndStamp(h, id!), [2010, "2026-10-01T00:00:00.000Z"]);
+});
+
+test("a stamped row is asked again after 30 days", async () => {
+  const calls: string[] = [];
+  const h = harness({ editionRecords: editionRecords(async () => null, calls) });
+  yearBooks(h, [{ isbn: "9789722541701", year: 1954 }]);
+  await h.service.backfillEditionYears(50);
+  await h.service.backfillEditionYears(50);
+  assert.deepEqual(calls, ["9789722541701"]);
+  h.advance(31 * DAY);
+  await h.service.backfillEditionYears(50);
+  assert.deepEqual(calls, ["9789722541701", "9789722541701"]);
+});
+
+test("a bug in an edition year lookup propagates", async () => {
+  const h = harness({ editionRecords: editionRecords(async () => { throw new TypeError("boom"); }) });
+  yearBooks(h, [{ isbn: "9789720000001", year: 1954 }]);
+  await assert.rejects(h.service.backfillEditionYears(50), TypeError);
+});
+
+test("the signal stops the edition-year run", async () => {
+  const calls: string[] = [];
+  const controller = new AbortController();
+  const h = harness({ editionRecords: editionRecords(async () => { controller.abort(); return null; }, calls) });
+  yearBooks(h, [{ isbn: "9789720000001", year: 1954 }, { isbn: "9789720000002", year: 1954 }]);
+  await h.service.backfillEditionYears(50, controller.signal);
+  assert.equal(calls.length, 1);
+});
+
 test("enqueueUnchecked queues one batch per call, continues where it stopped, and wraps after a short page", () => {
   const h = harness();
   const at = "2026-09-01T00:00:00.000Z";

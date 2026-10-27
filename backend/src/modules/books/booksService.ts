@@ -70,6 +70,7 @@ export interface BooksService {
   getDetails(lookup: BookLookup): Promise<BookMetadata | null>;
   backfillDetails(limit: number, signal?: AbortSignal): Promise<number | null>;
   backfillWorkKeys(limit: number, signal?: AbortSignal): Promise<number | null>;
+  backfillEditionYears(limit: number, signal?: AbortSignal): Promise<number | null>;
   fillCoverColors(limit: number): Promise<number>;
   search(query: string, options?: { byWork?: boolean }): BookSearchResult[];
   searchExternal(query: string): Promise<BookSearchResult[]>;
@@ -441,6 +442,26 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
           deps.warn({ bookId: id, source: error.source, error: error.message }, "work key source unavailable");
         }
         deps.repo.markWorkChecked(id, now().toISOString());
+      }
+      return null;
+    },
+
+    async backfillEditionYears(limit, signal) {
+      const recheckBefore = new Date(now().getTime() - WORK_RECHECK_MS).toISOString();
+      for (const id of deps.repo.listEditionYearIds(limit, recheckBefore)) {
+        if (signal?.aborted) return null;
+        const book = deps.repo.getBook(id);
+        if (!book?.isbn) continue;
+        try {
+          const record = await deps.editionRecords.fetchEditionRecord(book.isbn);
+          deps.repo.setEditionYear(id, record?.year ?? null, now().toISOString());
+        } catch (error) {
+          if (!(error instanceof SourceUnavailableError)) throw error;
+          if (error.retryAt !== undefined) return error.retryAt;
+          if (error.status === 429) return now().getTime() + UNAVAILABLE_BACKOFF_MS;
+          deps.warn({ bookId: id, source: error.source, error: error.message }, "edition year source unavailable");
+          deps.repo.setEditionYear(id, null, now().toISOString());
+        }
       }
       return null;
     },

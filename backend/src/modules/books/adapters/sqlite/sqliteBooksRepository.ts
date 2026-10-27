@@ -52,6 +52,14 @@ export const WORK_LOOKUP_SQL = `
   ORDER BY work_checked_at IS NOT NULL, created_by IS NOT NULL, coalesce(work_checked_at, ''), created_at, rowid
   LIMIT ?
 `;
+export const EDITION_YEAR_SQL = `
+  SELECT id FROM books
+  WHERE isbn IS NOT NULL AND first_published_year IS NOT NULL AND (year IS NULL OR year = first_published_year)
+    AND (edition_year_checked_at IS NOT NULL) IN (0, 1)
+    AND coalesce(edition_year_checked_at, '') < ?
+  ORDER BY edition_year_checked_at IS NOT NULL, coalesce(edition_year_checked_at, ''), created_at, rowid
+  LIMIT ?
+`;
 export const GROUPABLE_KEYS_SQL = `
   SELECT title_key FROM books
   WHERE title_key > ?
@@ -296,6 +304,13 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   `);
   const workLookupStmt = db.prepare(WORK_LOOKUP_SQL);
   const workCheckedStmt = db.prepare(`UPDATE books SET work_checked_at = ? WHERE id = ?`);
+  const editionYearStmt = db.prepare(EDITION_YEAR_SQL);
+  const setEditionYearStmt = db.prepare(`
+    UPDATE books
+    SET year = CASE WHEN $year IS NOT NULL AND (year IS NULL OR (year = first_published_year AND $year > first_published_year)) THEN $year ELSE year END,
+        edition_year_checked_at = $at
+    WHERE id = $id
+  `);
   const replaceLanguageStmt = db.prepare(`UPDATE books SET language = ? WHERE id = ?`);
   const makeSearchableStmt = db.prepare(`
     INSERT INTO books_fts (book_id, title, author)
@@ -1295,6 +1310,14 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
 
     markWorkChecked(id, at) {
       workCheckedStmt.run(at, id);
+    },
+
+    listEditionYearIds(limit, recheckBefore) {
+      return (editionYearStmt.all(recheckBefore, limit) as Array<{ id: string }>).map((row) => row.id);
+    },
+
+    setEditionYear(id, year, checkedAt) {
+      setEditionYearStmt.run({ $id: id, $year: year, $at: checkedAt });
     },
 
     replaceLanguage(id, tag) {

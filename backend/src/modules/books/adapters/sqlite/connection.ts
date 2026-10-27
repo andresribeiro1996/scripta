@@ -69,6 +69,7 @@ export function applyBooksMigrations(db: DatabaseSync): void {
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_details_pending ON books(details_checked_at IS NOT NULL, created_by IS NOT NULL, details_checked_at, created_at) WHERE details_status IS NULL AND created_by IS NOT 'bnp'");
   db.exec("DROP INDEX IF EXISTS idx_books_work_lookup");
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_work_queue ON books(work_checked_at IS NOT NULL, created_by IS NOT NULL, coalesce(work_checked_at, ''), created_at) WHERE ol_work_key IS NULL AND isbn IS NOT NULL AND details_status IS NOT NULL AND (created_by IS NULL OR created_by <> 'publisher')");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_books_edition_year_queue ON books(edition_year_checked_at IS NOT NULL, coalesce(edition_year_checked_at, ''), created_at) WHERE isbn IS NOT NULL AND first_published_year IS NOT NULL AND (year IS NULL OR year = first_published_year)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_bnp_details ON books(work_id, created_by, details_status, details_checked_at, created_at, id) WHERE created_by = 'bnp' AND details_status IS NULL");
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_summary_hash ON books(summary_hash)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_works_summary_hash ON works(summary_hash)");

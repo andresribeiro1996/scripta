@@ -83,6 +83,7 @@ test("every books job arms its first run with its own delay and calls nothing be
   const expected = {
     detailsBackfill: 30_000,
     workKeyBackfill: 40_000,
+    editionYearBackfill: 42_000,
     worksBackfill: 45_000,
     colorBackfill: 50_000,
     retitleJob: 55_000,

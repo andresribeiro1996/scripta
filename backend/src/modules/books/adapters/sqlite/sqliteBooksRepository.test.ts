@@ -15,7 +15,7 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
 const { applyBooksMigrations, openBooksDb, UNKEYED_ORIGINALS_SQL } = await import("./connection.js");
 const { findOrCreateBook } = await import("../../domain/findOrCreate.js");
-const { createSqliteBooksRepository, ORIGINAL_CLAIMS_SQL, ORIGINAL_KEYS_OF_WHOLE_SQL, UNCHECKED_COVERS_SQL, UPGRADE_WANTED_SQL, UNCHECKED_DETAILS_SQL, HELD_BNP_DETAILS_SQL, WORK_LOOKUP_SQL, GROUPABLE_KEYS_SQL, KEYED_EDITIONS_SQL, KEYED_WORKS_SQL, KEYLESS_CANDIDATES_SQL } = await import("./sqliteBooksRepository.js");
+const { createSqliteBooksRepository, ORIGINAL_CLAIMS_SQL, ORIGINAL_KEYS_OF_WHOLE_SQL, UNCHECKED_COVERS_SQL, UPGRADE_WANTED_SQL, UNCHECKED_DETAILS_SQL, HELD_BNP_DETAILS_SQL, WORK_LOOKUP_SQL, EDITION_YEAR_SQL, GROUPABLE_KEYS_SQL, KEYED_EDITIONS_SQL, KEYED_WORKS_SQL, KEYLESS_CANDIDATES_SQL } = await import("./sqliteBooksRepository.js");
 const { WorkMergeError } = await import("../../domain/errors.js");
 const { summaryHashOf } = await import("../../domain/synopsis.js");
 const { authorPattern, originalKey, originalWholeKey, seriesLikeOriginals } = await import("../../domain/translation.js");
@@ -1568,6 +1568,13 @@ test("the work lookup seeks both flags and the check time in its index", () => {
   assert.match(plan, /SEARCH books USING INDEX idx_books_work_queue \(<expr>=\? AND <expr>=\? AND <expr><\?\)/, plan);
 });
 
+test("the edition year queue uses its partial index", () => {
+  const { db } = freshRepo();
+  const plan = (db.prepare(`EXPLAIN QUERY PLAN ${EDITION_YEAR_SQL}`).all(NOW, 50) as Array<{ detail: string }>).map((row) => row.detail).join(" | ");
+  assert.match(plan, /SEARCH books USING INDEX idx_books_edition_year_queue \(<expr>=\? AND <expr><\?\)/, plan);
+  assert.doesNotMatch(plan, /TEMP B-TREE/, plan);
+});
+
 test("grouping reads shared title keys from the covering index, with no temp sort", () => {
   const { db } = freshRepo();
   const plan = (sql: string, ...params: Array<string | number>) => (db.prepare(`EXPLAIN QUERY PLAN ${sql}`).all(...params) as Array<{ detail: string }>).map((row) => row.detail).join(" | ");
@@ -1875,6 +1882,57 @@ test("listWorkLookupIds returns due editions never-checked first, user editions 
   assert.deepEqual(repo.listWorkLookupIds(5, recheckBefore), due.slice(0, 5));
 });
 
+test("listEditionYearIds returns due copied or empty years, never-checked first, then the oldest check", () => {
+  const { repo } = freshRepo();
+  let next = 0;
+  const edition = (createdAt: string, options: { year?: number | null; firstPublishedYear?: number | null; isbn?: string | null; checkedAt?: string } = {}) => {
+    const isbn = options.isbn === undefined ? `97897200${String(++next).padStart(5, "0")}` : options.isbn;
+    const book = repo.createBook({ title: `Book ${next}`, author: "X", isbn, year: options.year === undefined ? 1954 : options.year, firstPublishedYear: options.firstPublishedYear === undefined ? 1954 : options.firstPublishedYear }, [isbn ? `isbn:${isbn}` : `ta:book ${next}|x|`], createdAt);
+    if (options.checkedAt) repo.setEditionYear(book.id, null, options.checkedAt);
+    return book.id;
+  };
+  const recheckBefore = at(-30);
+
+  const checked35 = edition(at(-90), { checkedAt: at(-35) });
+  const checked40 = edition(at(-90), { year: null, checkedAt: at(-40) });
+  const never = edition(at(-60));
+  const tieA = edition(at(-10), { year: null });
+  const tieB = edition(at(-10));
+  const old = edition(at(-20));
+  edition(at(-90), { checkedAt: at(-5) });
+  edition(at(-90), { year: 2015 });
+  edition(at(-90), { year: null, firstPublishedYear: null });
+  edition(at(-90), { isbn: null });
+
+  const due = [never, old, tieA, tieB, checked40, checked35];
+  assert.deepEqual(repo.listEditionYearIds(50, recheckBefore), due);
+  assert.deepEqual(repo.listEditionYearIds(3, recheckBefore), due.slice(0, 3));
+});
+
+test("setEditionYear replaces a copied year only with a greater one, fills an empty year, and stamps every time", () => {
+  const { repo } = freshRepo();
+  let next = 0;
+  const edition = (year: number | null, firstPublishedYear: number | null) => {
+    const isbn = `97897200${String(++next).padStart(5, "0")}`;
+    return repo.createBook({ title: `Book ${next}`, author: "X", isbn, year, firstPublishedYear }, [`isbn:${isbn}`], NOW).id;
+  };
+  const apply = (year: number | null, firstPublishedYear: number | null, found: number | null) => {
+    const id = edition(year, firstPublishedYear);
+    repo.setEditionYear(id, found, at(1));
+    const book = repo.getBook(id)!;
+    return [book.year, book.first_published_year, book.edition_year_checked_at];
+  };
+
+  assert.deepEqual(apply(1954, 1954, 2015), [2015, 1954, at(1)]);
+  assert.deepEqual(apply(1954, 1954, 1950), [1954, 1954, at(1)]);
+  assert.deepEqual(apply(1954, 1954, 1954), [1954, 1954, at(1)]);
+  assert.deepEqual(apply(1954, 1954, null), [1954, 1954, at(1)]);
+  assert.deepEqual(apply(null, 1954, 1900), [1900, 1954, at(1)]);
+  assert.deepEqual(apply(null, 1954, 2015), [2015, 1954, at(1)]);
+  assert.deepEqual(apply(null, 1954, null), [null, 1954, at(1)]);
+  assert.deepEqual(apply(2015, 1954, 2020), [2015, 1954, at(1)]);
+});
+
 test("setWorkSummary keeps the first summary, assigns a missing work and follows merged_into", () => {
   const { db, repo } = freshRepo();
   const a = repo.createBook({ title: "A", author: "X", isbn: "9789720000001" }, ["isbn:9789720000001"], NOW);
@@ -2084,6 +2142,7 @@ test("version-6 copy fills first_published_year on Open Library rows only", () =
   applyBooksMigrations(db);
   db.exec("DROP INDEX idx_books_work_years");
   db.exec("CREATE INDEX idx_books_work_editions ON books(work_id, year, language)");
+  db.exec("DROP INDEX idx_books_edition_year_queue");
   db.exec("ALTER TABLE books DROP COLUMN first_published_year");
   db.exec("ALTER TABLE books DROP COLUMN edition_year_checked_at");
   db.exec("PRAGMA user_version = 5");
