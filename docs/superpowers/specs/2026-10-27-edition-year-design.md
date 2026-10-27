@@ -89,7 +89,7 @@ The job is registered beside the work-key backfill.
 ## Not in this release
 
 - ISBNdb lookups for rows Open Library doesn't know (mostly Portuguese editions).
-- ISBN-less Open Library rows, including award-import rows. They keep the first-publication year in `year`, because there is no edition to ask about.
+- ISBN-less Open Library rows already stored, including award-import rows. They keep the first-publication year in `year`, because there is no edition to ask about. New ISBN-less Open Library hits store it only in `first_published_year`, so their edition strip shows no year.
 - Changing what external Open Library search results show.
 - A source column for `year`.
 - Renaming "earliest edition" in the Jev work-match prompt.

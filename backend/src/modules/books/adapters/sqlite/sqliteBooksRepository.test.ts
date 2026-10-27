@@ -2093,6 +2093,7 @@ test("version-6 copy fills first_published_year on Open Library rows only", () =
   insert.run("c", "9780000000003", 1954, '["openlibrary"]', "bnp", NOW);
   insert.run("d", null, 1954, '["openlibrary"]', null, NOW);
   insert.run("e", "9780000000005", null, '["openlibrary"]', null, NOW);
+  insert.run("g", "9780000000007", 1954, '["isbndb","openlibrary"]', null, NOW);
   const rows = () => db.prepare("SELECT id, year, first_published_year FROM books ORDER BY id").all().map((row) => ({ ...row }));
   const exists = (name: string) => db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = ?").get(name) !== undefined;
 
@@ -2103,7 +2104,8 @@ test("version-6 copy fills first_published_year on Open Library rows only", () =
     { id: "b", year: 1954, first_published_year: null },
     { id: "c", year: 1954, first_published_year: null },
     { id: "d", year: 1954, first_published_year: null },
-    { id: "e", year: null, first_published_year: null }
+    { id: "e", year: null, first_published_year: null },
+    { id: "g", year: 1954, first_published_year: null }
   ]);
   assert.equal(userVersion(db), 6);
   assert.deepEqual([exists("idx_books_work_years"), exists("idx_books_work_editions")], [true, false]);
