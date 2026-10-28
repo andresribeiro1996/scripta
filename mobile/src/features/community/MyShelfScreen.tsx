@@ -6,7 +6,7 @@ import { Text } from "../../ui/Text";
 import { buildMuralPreset, ensureBookBlockHeights, orderLibraryBooks, shelfPresetSummary, type Mural } from "@scripta/shared";
 import { useAuth } from "../../core/auth";
 import { API_URL } from "../../core/config";
-import { Button, Dialog, dynamicType, EmptyState, ErrorState, HeaderActions, IconButton, Menu, Screen, Skeleton, spacing, SwipeableTabs, Toast, typography, useTheme, type MenuItem } from "../../ui";
+import { ActionSheet, Button, Dialog, dynamicType, EmptyState, ErrorState, HeaderActions, IconButton, Screen, Skeleton, spacing, SwipeableTabs, Toast, typography, useTheme, type ActionItem } from "../../ui";
 import { fetchGalleryImages } from "../gallery/api";
 import { useLibrary } from "../library/hooks/useLibrary";
 import { MuralCanvas } from "../murals";
@@ -167,10 +167,12 @@ export function MyShelfScreen() {
     setAnswer(null);
   }
 
-  const menuItems: MenuItem[] = [
-    ...(hasMural ? [{ label: "Edit shelf", onPress: () => router.push(`/murals/${ownData.muralId}` as never) }] : []),
-    { label: "Switch shelf mural…", onPress: () => setSwitchingMural(true) },
-    { label: "Feed settings…", onPress: () => setSettingsOpen(true) },
+  const menuGroups: ActionItem[][] = [
+    [
+      ...(hasMural ? [{ label: "Edit shelf", icon: "edit" as const, onPress: () => router.push(`/murals/${ownData.muralId}` as never) }] : []),
+      { label: "Switch shelf mural", icon: "murals", onPress: () => setSwitchingMural(true) },
+    ],
+    [{ label: "Feed settings", icon: "settings", onPress: () => setSettingsOpen(true) }],
   ];
 
   const headerRight = () => (
@@ -180,9 +182,9 @@ export function MyShelfScreen() {
         accessibilityLabel={ownData.published ? "Published. Tap to unpublish" : "Private. Tap to publish"}
         onPress={handleChipPress}
       />
-      <Menu title="My shelf" items={menuItems}>
-        <IconButton accessibilityLabel="Shelf options" name="more" />
-      </Menu>
+      <ActionSheet title="My shelf" groups={menuGroups}>
+        {(open) => <IconButton accessibilityLabel="Shelf options" name="more" onPress={open} />}
+      </ActionSheet>
     </HeaderActions>
   );
 

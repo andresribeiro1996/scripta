@@ -2,7 +2,7 @@ import { useState, type ReactNode } from "react";
 import { booksByWork, workIdOf, type TierDefinition, type TierlistData } from "@scripta/shared";
 import { Pressable, ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import { Text } from "../../ui/Text";
-import { Button, Dialog, IconButton, Input, Menu, type MenuItem, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { ActionSheet, Button, Dialog, IconButton, Input, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { CoverImage } from "../library/components/CoverImage";
 
 export type TierBook = Record<string, unknown>;
@@ -69,13 +69,15 @@ export function TierBoard({ data, books, onChange, structureEditable, poolLabel 
         <View style={[styles.tierLabel, { backgroundColor: tier.color }]}><Text numberOfLines={3} {...dynamicType} style={[typography.caption, styles.strong, styles.center, { color: "#fff" }]}>{tier.label || "Untitled"}</Text></View>
         <View style={styles.grow}>{renderBooks(tier.id)}</View>
         {structureEditable ? <View style={styles.tierActions}>
-          <Menu title={tier.label || "Untitled"} items={[
-            { label: "Edit tier", onPress: () => { setEditing(tier); setLabel(tier.label); setColor(tier.color); } },
-            ...(index > 0 ? [{ label: "Move up", onPress: () => moveTier(index, -1) }] : []),
-            ...(index < data.tiers.length - 1 ? [{ label: "Move down", onPress: () => moveTier(index, 1) }] : []),
+          <ActionSheet title={tier.label || "Untitled"} groups={[
+            [{ label: "Edit tier", icon: "edit", onPress: () => { setEditing(tier); setLabel(tier.label); setColor(tier.color); } }],
+            [
+              ...(index > 0 ? [{ label: "Move up", icon: "expandVertical" as const, onPress: () => moveTier(index, -1) }] : []),
+              ...(index < data.tiers.length - 1 ? [{ label: "Move down", icon: "expandVertical" as const, onPress: () => moveTier(index, 1) }] : []),
+            ],
           ]}>
-            <IconButton accessibilityLabel={`Actions for ${tier.label || "Untitled"} tier`} name="more" />
-          </Menu>
+            {(open) => <IconButton accessibilityLabel={`Actions for ${tier.label || "Untitled"} tier`} name="more" onPress={open} />}
+          </ActionSheet>
         </View> : null}
       </View>)}
       {data.pool.length ? <View style={styles.footer}>

@@ -8,7 +8,7 @@ import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import { useQuery } from "@tanstack/react-query";
 import { Stack, useRouter } from "expo-router";
 import { buildMuralPreset, muralThemeId, MURAL_PRESETS, presetAvailability, type Mural, type MuralFolder, type MuralPresetId } from "@scripta/shared";
-import { Button, ConfirmDialog, dynamicType, EmptyState, ErrorState, Fab, Icon, IconButton, Input, Menu, minimumTouchTarget, ModalBody, Screen, Sheet, Toast } from "../../ui";
+import { ActionSheet, Button, ConfirmDialog, dynamicType, EmptyState, ErrorState, Fab, Icon, IconButton, Input, minimumTouchTarget, ModalBody, Screen, Sheet, Toast } from "../../ui";
 import { radii, spacing, typography, useTheme } from "../../ui/theme";
 import { themes } from "@scripta/shared/themes";
 import { MuralThumbnail } from "./MuralCanvas";
@@ -239,17 +239,19 @@ export function MuralsScreen() {
                     </View>
                   </Pressable>
                   <View style={styles.menu}>
-                    <Menu
+                    <ActionSheet
                       title={item.name}
-                      items={[
-                        { label: "Move to folder…", onPress: () => setMoveFor(item) },
-                        { label: "Change cover…", onPress: () => setCoverFor(item) },
-                        { label: "Share…", onPress: () => setShareFor(item) },
-                        { label: "Delete", destructive: true, onPress: () => { setDeleteError(null); setDeletingMural(item); } },
+                      groups={[
+                        [
+                          { label: "Move to folder", icon: "folder", onPress: () => setMoveFor(item) },
+                          { label: "Change cover", icon: "image", onPress: () => setCoverFor(item) },
+                        ],
+                        [{ label: "Share", icon: "share", onPress: () => setShareFor(item) }],
+                        [{ label: "Delete", icon: "delete", destructive: true, onPress: () => { setDeleteError(null); setDeletingMural(item); } }],
                       ]}
                     >
-                      <View accessible accessibilityRole="button" accessibilityLabel={`Settings for ${item.name}`} style={[styles.menuIcon, { backgroundColor: colors.surface, borderColor: colors.border }]}><Icon name="settings" size={16} color={colors.textDim} /></View>
-                    </Menu>
+                      {(open) => <Pressable accessibilityRole="button" accessibilityLabel={`Settings for ${item.name}`} hitSlop={10} onPress={open} style={[styles.menuIcon, { backgroundColor: colors.surface, borderColor: colors.border }]}><Icon name="settings" size={16} color={colors.textDim} /></Pressable>}
+                    </ActionSheet>
                   </View>
                 </View>
               );
@@ -307,7 +309,7 @@ export function MuralsScreen() {
                       <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{choice.count}</Text>
                       {selected ? <Icon name="confirm" size={18} color={colors.accent} /> : null}
                     </Pressable>
-                    {folder ? <Menu title={folder.name} items={[{ label: "Rename folder…", onPress: () => editFolder(folder.id) }, { label: "Delete folder", destructive: true, onPress: () => setDeletingFolder(folder) }]}><View accessible accessibilityRole="button" accessibilityLabel={`Settings for ${folder.name}`}><Icon name="settings" size={18} color={colors.textDim} /></View></Menu> : null}
+                    {folder ? <ActionSheet title={folder.name} groups={[[{ label: "Rename folder", icon: "edit", onPress: () => editFolder(folder.id) }], [{ label: "Delete folder", icon: "delete", destructive: true, onPress: () => setDeletingFolder(folder) }]]}>{(open) => <Pressable accessibilityRole="button" accessibilityLabel={`Settings for ${folder.name}`} hitSlop={15} onPress={open}><Icon name="settings" size={18} color={colors.textDim} /></Pressable>}</ActionSheet> : null}
                   </View>
                 );
               })}
