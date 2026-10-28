@@ -311,6 +311,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
         edition_year_checked_at = $at
     WHERE id = $id
   `);
+  const fillFirstPublishedYearStmt = db.prepare(`UPDATE books SET first_published_year = ? WHERE id = ? AND first_published_year IS NULL`);
   const replaceLanguageStmt = db.prepare(`UPDATE books SET language = ? WHERE id = ?`);
   const makeSearchableStmt = db.prepare(`
     INSERT INTO books_fts (book_id, title, author)
@@ -1318,6 +1319,10 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
 
     setEditionYear(id, year, checkedAt) {
       setEditionYearStmt.run({ $id: id, $year: year, $at: checkedAt });
+    },
+
+    fillFirstPublishedYear(id, year) {
+      fillFirstPublishedYearStmt.run(year, id);
     },
 
     replaceLanguage(id, tag) {

@@ -63,6 +63,33 @@ test("an ISBNdb hit's year is the edition's own", () => {
   assert.deepEqual([book.year, book.first_published_year], [2015, null]);
 });
 
+function existing(repo: ReturnType<typeof fresh>["repo"], years: { year?: number | null; firstPublishedYear?: number | null } = {}) {
+  repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593", ...years }, ["isbn:9780441013593"], AT);
+}
+
+test("an Open Library hit fills the first-publication year of a row it reuses", () => {
+  const { repo, deps } = fresh();
+  existing(repo);
+  saveCatalogHits(deps, [hit({ year: 1954 })], AT);
+  const book = repo.findBookByKey("isbn:9780441013593")!;
+  assert.deepEqual([book.year, book.first_published_year], [null, 1954]);
+});
+
+test("an Open Library hit never overwrites a stored first-publication year", () => {
+  const { repo, deps } = fresh();
+  existing(repo, { firstPublishedYear: 1960 });
+  saveCatalogHits(deps, [hit({ year: 1954 })], AT);
+  assert.equal(repo.findBookByKey("isbn:9780441013593")!.first_published_year, 1960);
+});
+
+test("an ISBNdb hit leaves the first-publication year of a row it reuses empty", () => {
+  const { repo, deps } = fresh();
+  existing(repo);
+  saveCatalogHits(deps, [{ ...hit({ year: 2015 }), source: "isbndb" }], AT);
+  const book = repo.findBookByKey("isbn:9780441013593")!;
+  assert.deepEqual([book.year, book.first_published_year], [null, null]);
+});
+
 test("saveCatalogHits finds an existing book by ISBN instead of creating one", () => {
   const { db, deps } = fresh();
   const [first] = saveCatalogHits(deps, [hit({}, "OL893415W")], AT);
