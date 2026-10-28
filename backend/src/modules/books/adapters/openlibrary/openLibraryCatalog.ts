@@ -1,5 +1,5 @@
 import { buildBookMetadata, findOpenLibraryMatch, mapOpenLibraryDoc, openLibraryDescription } from "@scripta/shared";
-import { normalizeWorkKey } from "../../domain/normalize.js";
+import { dateYear, normalizeWorkKey } from "../../domain/normalize.js";
 import { SourceUnavailableError } from "../../domain/errors.js";
 import type { BookCatalog, EditionRecord, EditionRecordSource } from "../../domain/ports.js";
 import { cleanWorkSubjects, type CleanedSubjects } from "../../domain/workSubjects.js";
@@ -13,11 +13,13 @@ const subjectsOf = (work: unknown, match: Record<string, unknown>): unknown => (
 export function parseEditionRecord(record: unknown): EditionRecord {
   const fields: Record<string, unknown> = record && typeof record === "object" ? (record as Record<string, unknown>) : {};
   const series = (Array.isArray(fields.series) ? fields.series : []).flatMap((value) => (typeof value === "string" ? parseSeriesString(value) ?? [] : []));
+  const year = dateYear(fields.publish_date);
   return {
     title: typeof fields.title === "string" ? fields.title.trim() : "",
     workKey: Array.isArray(fields.works) ? keyOf(fields.works[0]) : null,
     languages: Array.isArray(fields.languages) ? fields.languages.flatMap((language) => keyOf(language) ?? []) : [],
-    ...(series.length > 0 ? { series } : {})
+    ...(series.length > 0 ? { series } : {}),
+    ...(year !== null ? { year } : {})
   };
 }
 
@@ -75,7 +77,9 @@ export function createOpenLibraryCatalog(throttle: Throttle, urgent = true): Boo
       const metadata = buildBookMetadata(match, work);
       const workSummary = metadata.summary;
       metadata.summary = openLibraryDescription(edition);
-      const editionSeries = parseEditionRecord(edition).series;
+      const record = parseEditionRecord(edition);
+      metadata.year = record.year ?? metadata.year;
+      const editionSeries = record.series;
       const subjectSeries = seriesFromSubjects(subjectsOf(work, match));
       const fields = work && typeof work === "object" ? (work as Record<string, unknown>) : null;
       const subjects = keyOf(fields?.type) === "/type/work"

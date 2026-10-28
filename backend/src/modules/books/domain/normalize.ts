@@ -33,6 +33,14 @@ export const WORK_SCAN_LIMIT = 100;
 export const CATALOG_SCAN_LIMIT = 100;
 export const MIN_PREFIX_LENGTH = 3;
 
+export function dateYear(value: unknown): number | null {
+  if (typeof value !== "string") return null;
+  const inRange = (year: number) => year >= 1450 && year <= new Date().getFullYear();
+  if (/^\d{4}/.test(value) && inRange(Number(value.slice(0, 4)))) return Number(value.slice(0, 4));
+  for (const [, digits] of value.matchAll(/(?<!\d)(\d{4})(?!\d)/g)) if (inRange(Number(digits))) return Number(digits);
+  return null;
+}
+
 export function normalizeWorkKey(raw: string | null | undefined): string | null {
   const key = raw?.replace(/^\/works\//, "") ?? "";
   return /^OL\d+W$/.test(key) ? key : null;

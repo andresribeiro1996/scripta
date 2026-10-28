@@ -15,7 +15,7 @@ process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
 const { applyBooksMigrations, openBooksDb, UNKEYED_ORIGINALS_SQL } = await import("./connection.js");
 const { findOrCreateBook } = await import("../../domain/findOrCreate.js");
-const { createSqliteBooksRepository, ORIGINAL_CLAIMS_SQL, ORIGINAL_KEYS_OF_WHOLE_SQL, UNCHECKED_COVERS_SQL, UPGRADE_WANTED_SQL, UNCHECKED_DETAILS_SQL, HELD_BNP_DETAILS_SQL, WORK_LOOKUP_SQL, GROUPABLE_KEYS_SQL, KEYED_EDITIONS_SQL, KEYED_WORKS_SQL, KEYLESS_CANDIDATES_SQL } = await import("./sqliteBooksRepository.js");
+const { createSqliteBooksRepository, ORIGINAL_CLAIMS_SQL, ORIGINAL_KEYS_OF_WHOLE_SQL, UNCHECKED_COVERS_SQL, UPGRADE_WANTED_SQL, UNCHECKED_DETAILS_SQL, HELD_BNP_DETAILS_SQL, WORK_LOOKUP_SQL, EDITION_YEAR_SQL, GROUPABLE_KEYS_SQL, KEYED_EDITIONS_SQL, KEYED_WORKS_SQL, KEYLESS_CANDIDATES_SQL } = await import("./sqliteBooksRepository.js");
 const { WorkMergeError } = await import("../../domain/errors.js");
 const { summaryHashOf } = await import("../../domain/synopsis.js");
 const { authorPattern, originalKey, originalWholeKey, seriesLikeOriginals } = await import("../../domain/translation.js");
@@ -559,7 +559,8 @@ function assertWorkSchema(db: DatabaseSync) {
   const names = (sql: string) => (db.prepare(sql).all() as Array<{ name: string }>).map((row) => row.name);
   assert.deepEqual(names("PRAGMA table_info(works)"), ["id", "ol_work_key", "title", "author", "merged_into", "created_at", "summary", "summary_hash", "wikipedia_sites"]);
   assert.deepEqual(names("PRAGMA table_info(books)").filter((name) => WORK_COLUMNS.includes(name)), WORK_COLUMNS);
-  assert.deepEqual(names("PRAGMA index_info(idx_books_work_editions)"), ["work_id", "year", "language"]);
+  assert.deepEqual(names("PRAGMA index_info(idx_books_work_years)"), ["work_id", "year", "first_published_year", "language"]);
+  assert.equal(db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'idx_books_work_editions'").get(), undefined);
   assert.equal(db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'idx_books_work'").get(), undefined);
   assert.throws(() => db.prepare("INSERT INTO books (id, title, author, work_id, created_at) VALUES ('orphan', 'A', 'A', 'missing', ?)").run(NOW), /FOREIGN KEY constraint failed/);
 }
@@ -1066,10 +1067,10 @@ test("the old work lookup index is replaced on an existing database and the othe
   assert.deepEqual(["idx_books_work_queue", "idx_books_bnp_details", "idx_books_details_pending"].map(exists), [true, true, true]);
 });
 
-test("the work index becomes the work editions index and the translation review indexes are added to an existing database once", () => {
+test("the work index becomes the work years index and the translation review indexes are added to an existing database once", () => {
   const db = new DatabaseSync(":memory:");
   applyBooksMigrations(db);
-  db.exec("DROP INDEX idx_books_work_editions");
+  db.exec("DROP INDEX idx_books_work_years");
   db.exec("DROP INDEX idx_work_merges_translations");
   db.exec("DROP INDEX idx_work_match_judgments_proposed");
   db.exec("CREATE INDEX idx_books_work ON books(work_id)");
@@ -1078,7 +1079,7 @@ test("the work index becomes the work editions index and the translation review 
   const indexSql = (name: string) => (db.prepare("SELECT sql FROM sqlite_master WHERE type = 'index' AND name = ?").get(name) as { sql: string } | undefined)?.sql;
   const columns = (name: string) => (db.prepare(`PRAGMA index_info(${name})`).all() as Array<{ name: string }>).map((row) => row.name);
   assert.equal(indexSql("idx_books_work"), undefined);
-  assert.deepEqual(columns("idx_books_work_editions"), ["work_id", "year", "language"]);
+  assert.deepEqual(columns("idx_books_work_years"), ["work_id", "year", "first_published_year", "language"]);
   assert.deepEqual(columns("idx_work_merges_translations"), ["source"]);
   assert.match(indexSql("idx_work_merges_translations")!, / WHERE source IN \('code', 'jev', 'manual'\) AND undone_at IS NULL$/);
   assert.deepEqual(columns("idx_work_match_judgments_proposed"), ["work_id", "into_work_id", "model", "confidence"]);
@@ -1517,7 +1518,7 @@ test("the ISBN-10 pass leaves two keyed works that disagree alone", () => {
 
 test("the ISBN-10 pass runs once", () => {
   const { db } = freshRepo();
-  assert.equal((db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version, 5);
+  assert.equal((db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version, 6);
 });
 
 test("listUncheckedCoverIds pages by created_at then insert order, and a short page ends the cycle", () => {
@@ -1565,6 +1566,13 @@ test("the work lookup seeks both flags and the check time in its index", () => {
   const { db } = freshRepo();
   const plan = (db.prepare(`EXPLAIN QUERY PLAN ${WORK_LOOKUP_SQL}`).all(NOW, 50) as Array<{ detail: string }>).map((row) => row.detail).join(" | ");
   assert.match(plan, /SEARCH books USING INDEX idx_books_work_queue \(<expr>=\? AND <expr>=\? AND <expr><\?\)/, plan);
+});
+
+test("the edition year queue uses its partial index", () => {
+  const { db } = freshRepo();
+  const plan = (db.prepare(`EXPLAIN QUERY PLAN ${EDITION_YEAR_SQL}`).all(NOW, 50) as Array<{ detail: string }>).map((row) => row.detail).join(" | ");
+  assert.match(plan, /SEARCH books USING INDEX idx_books_edition_year_queue \(<expr>=\? AND <expr><\?\)/, plan);
+  assert.doesNotMatch(plan, /TEMP B-TREE/, plan);
 });
 
 test("grouping reads shared title keys from the covering index, with no temp sort", () => {
@@ -1679,7 +1687,7 @@ test("the held bnp read probes the bnp details index by work and never the work 
   const { db } = freshRepo();
   const plan = (db.prepare(`EXPLAIN QUERY PLAN ${HELD_BNP_DETAILS_SQL}`).all("[]", 50) as Array<{ detail: string }>).map((row) => row.detail).join(" | ");
   assert.match(plan, /SEARCH books USING COVERING INDEX idx_books_bnp_details \(work_id=\?/, plan);
-  assert.doesNotMatch(plan, /idx_books_work_editions\b/, plan);
+  assert.doesNotMatch(plan, /idx_books_work_years\b/, plan);
 });
 
 function preparedStatements(pattern: RegExp) {
@@ -1731,12 +1739,12 @@ test("the translation review rows list doubts in the order their works were adde
   assert.deepEqual(repo.translationReviewRows(0.9, 0.5).map((row) => [row.workId, row.group]), [["doubt-b", "possible"], ["doubt-a", "possible"], ["merged-b", "merged"], ["merged-a", "merged"]]);
 });
 
-test("the match candidates read counts editions from the covering work editions index, with no distinct", () => {
+test("the match candidates read counts editions from the covering work years index, with no distinct", () => {
   const { db, statements } = preparedStatements(/json_group_array\(COALESCE\(b\.language/);
 
   assert.equal(statements.length, 1);
   const plan = (db.prepare(`EXPLAIN QUERY PLAN ${statements[0]}`).all("[]") as Array<{ detail: string }>).map((row) => row.detail).join(" | ");
-  assert.match(plan, /SEARCH b USING COVERING INDEX idx_books_work_editions \(work_id=\?\)/, plan);
+  assert.match(plan, /SEARCH b USING COVERING INDEX idx_books_work_years \(work_id=\?\)/, plan);
   assert.doesNotMatch(plan, /USE TEMP B-TREE FOR json_group_array\(DISTINCT\)/, plan);
 });
 
@@ -1760,6 +1768,24 @@ test("matchCandidates counts editions, takes the earliest year and lists each la
   assert.deepEqual(repo.matchCandidates([dune.work_id!, "missing", dune.work_id!]).map((row) => row.id), [dune.work_id]);
   assert.deepEqual(repo.matchCandidates([loose.work_id!]), []);
   assert.deepEqual(repo.matchCandidates([]), []);
+});
+
+test("translation match year takes first_published_year when it is smaller", () => {
+  const { repo } = freshRepo();
+  let n = 0;
+  const edition = (workKey: string, year: number | null, firstPublishedYear: number | null) => {
+    const isbn = `97800000008${String(n++).padStart(2, "0")}`;
+    return repo.createBook({ title: "Dune", author: "Frank Herbert", isbn, year, firstPublishedYear, workKey }, [`isbn:${isbn}`], NOW);
+  };
+  const firstIsSmaller = edition("OL80W", 2015, 1954);
+  edition("OL80W", 2001, null);
+  edition("OL80W", null, 1960);
+  const editionIsSmaller = edition("OL81W", 1999, 2005);
+  const onlyFirst = edition("OL82W", null, 1960);
+  const neither = edition("OL83W", null, null);
+  const books = [firstIsSmaller, editionIsSmaller, onlyFirst, neither];
+  const years = new Map(repo.matchCandidates(books.map((book) => book.work_id!)).map((row) => [row.id, row.year]));
+  assert.deepEqual(books.map((book) => years.get(book.work_id!)), [1954, 1999, 1960, null]);
 });
 
 test("portugueseWorksNeedingMatch for given works returns each live work once, oldest first, up to the limit", () => {
@@ -1854,6 +1880,57 @@ test("listWorkLookupIds returns due editions never-checked first, user editions 
   const due = [userOld, tieA, tieB, seedNever, userChecked40, userChecked35, bnpChecked45, seedChecked33];
   assert.deepEqual(repo.listWorkLookupIds(50, recheckBefore), due);
   assert.deepEqual(repo.listWorkLookupIds(5, recheckBefore), due.slice(0, 5));
+});
+
+test("listEditionYearIds returns due copied or empty years, never-checked first, then the oldest check", () => {
+  const { repo } = freshRepo();
+  let next = 0;
+  const edition = (createdAt: string, options: { year?: number | null; firstPublishedYear?: number | null; isbn?: string | null; checkedAt?: string } = {}) => {
+    const isbn = options.isbn === undefined ? `97897200${String(++next).padStart(5, "0")}` : options.isbn;
+    const book = repo.createBook({ title: `Book ${next}`, author: "X", isbn, year: options.year === undefined ? 1954 : options.year, firstPublishedYear: options.firstPublishedYear === undefined ? 1954 : options.firstPublishedYear }, [isbn ? `isbn:${isbn}` : `ta:book ${next}|x|`], createdAt);
+    if (options.checkedAt) repo.setEditionYear(book.id, null, options.checkedAt);
+    return book.id;
+  };
+  const recheckBefore = at(-30);
+
+  const checked35 = edition(at(-90), { checkedAt: at(-35) });
+  const checked40 = edition(at(-90), { year: null, checkedAt: at(-40) });
+  const never = edition(at(-60));
+  const tieA = edition(at(-10), { year: null });
+  const tieB = edition(at(-10));
+  const old = edition(at(-20));
+  edition(at(-90), { checkedAt: at(-5) });
+  edition(at(-90), { year: 2015 });
+  edition(at(-90), { year: null, firstPublishedYear: null });
+  edition(at(-90), { isbn: null });
+
+  const due = [never, old, tieA, tieB, checked40, checked35];
+  assert.deepEqual(repo.listEditionYearIds(50, recheckBefore), due);
+  assert.deepEqual(repo.listEditionYearIds(3, recheckBefore), due.slice(0, 3));
+});
+
+test("setEditionYear replaces a copied year only with a greater one, fills an empty year, and stamps every time", () => {
+  const { repo } = freshRepo();
+  let next = 0;
+  const edition = (year: number | null, firstPublishedYear: number | null) => {
+    const isbn = `97897200${String(++next).padStart(5, "0")}`;
+    return repo.createBook({ title: `Book ${next}`, author: "X", isbn, year, firstPublishedYear }, [`isbn:${isbn}`], NOW).id;
+  };
+  const apply = (year: number | null, firstPublishedYear: number | null, found: number | null) => {
+    const id = edition(year, firstPublishedYear);
+    repo.setEditionYear(id, found, at(1));
+    const book = repo.getBook(id)!;
+    return [book.year, book.first_published_year, book.edition_year_checked_at];
+  };
+
+  assert.deepEqual(apply(1954, 1954, 2015), [2015, 1954, at(1)]);
+  assert.deepEqual(apply(1954, 1954, 1950), [1954, 1954, at(1)]);
+  assert.deepEqual(apply(1954, 1954, 1954), [1954, 1954, at(1)]);
+  assert.deepEqual(apply(1954, 1954, null), [1954, 1954, at(1)]);
+  assert.deepEqual(apply(null, 1954, 1900), [1900, 1954, at(1)]);
+  assert.deepEqual(apply(null, 1954, 2015), [2015, 1954, at(1)]);
+  assert.deepEqual(apply(null, 1954, null), [null, 1954, at(1)]);
+  assert.deepEqual(apply(2015, 1954, 2020), [2015, 1954, at(1)]);
 });
 
 test("setWorkSummary keeps the first summary, assigns a missing work and follows merged_into", () => {
@@ -1963,7 +2040,7 @@ test("the ISBNdb-first author pass turns a surname-first name with its title key
   assert.equal(repo.findBookByKey("ta:dune|herbert|")?.id, book.id);
   assert.deepEqual({ ...db.prepare("SELECT author FROM books_fts WHERE book_id = ?").get(book.id) }, { author: "Frank Herbert" });
   assert.equal(workById(db, book.work_id).author, "Frank Herbert");
-  assert.equal(userVersion(db), 5);
+  assert.equal(userVersion(db), 6);
 });
 
 test("the ISBNdb-first author pass changes a work only when its author is the turned book's own text", () => {
@@ -1997,7 +2074,7 @@ test("the ISBNdb-first author pass leaves the same text alone when the row is no
   db.exec("PRAGMA user_version = 3");
   applyBooksMigrations(db);
   assert.deepEqual(rows(), before);
-  assert.equal(userVersion(db), 5);
+  assert.equal(userVersion(db), 6);
 });
 
 test("the ISBNdb-first author pass runs once, so a row saved after it is left as stored", () => {
@@ -2022,7 +2099,7 @@ test("the ISBNdb-first author pass can stop part way and finish on the next boot
   db.exec("DROP TRIGGER stop_second");
   applyBooksMigrations(db);
   for (const book of [first, second]) assert.deepEqual([authorOf(db, book.id), workById(db, book.work_id).author], ["Frank Herbert", "Frank Herbert"]);
-  assert.equal(userVersion(db), 5);
+  assert.equal(userVersion(db), 6);
 });
 
 const originalTitleOf = (db: DatabaseSync, id: string) => (db.prepare("SELECT original_title FROM books WHERE id = ?").get(id) as { original_title: string | null }).original_title;
@@ -2039,7 +2116,7 @@ test("the original-title pass clears stored values that are not titles and keeps
   db.exec("PRAGMA user_version = 4");
   applyBooksMigrations(db);
   assert.deepEqual(books.map((book) => originalTitleOf(db, book.id)), [null, null, null, null, null, null, "Solaris", "1984", "Солярис"]);
-  assert.equal(userVersion(db), 5);
+  assert.equal(userVersion(db), 6);
 });
 
 test("the original-title pass runs once, so a value stored after it is left as stored", () => {
@@ -2050,6 +2127,54 @@ test("the original-title pass runs once, so a value stored after it is left as s
   db.prepare("UPDATE books SET original_title = ':' WHERE id = ?").run(book.id);
   applyBooksMigrations(db);
   assert.equal(originalTitleOf(db, book.id), ":");
+});
+
+test("createBook stores firstPublishedYear", () => {
+  const { repo } = freshRepo();
+  const both = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593", year: 2015, firstPublishedYear: 1954 }, ["isbn:9780441013593"], NOW);
+  const neither = repo.createBook({ title: "Emma", author: "Jane Austen", isbn: "9780141439587" }, ["isbn:9780141439587"], NOW);
+  assert.deepEqual([both.year, both.first_published_year, both.edition_year_checked_at], [2015, 1954, null]);
+  assert.deepEqual([neither.year, neither.first_published_year, neither.edition_year_checked_at], [null, null, null]);
+});
+
+test("version-6 copy fills first_published_year on Open Library rows only", () => {
+  const db = new DatabaseSync(":memory:");
+  applyBooksMigrations(db);
+  db.exec("DROP INDEX idx_books_work_years");
+  db.exec("CREATE INDEX idx_books_work_editions ON books(work_id, year, language)");
+  db.exec("DROP INDEX idx_books_edition_year_queue");
+  db.exec("ALTER TABLE books DROP COLUMN first_published_year");
+  db.exec("ALTER TABLE books DROP COLUMN edition_year_checked_at");
+  db.exec("PRAGMA user_version = 5");
+  const insert = db.prepare("INSERT INTO books (id, title, author, isbn, year, data_sources, created_by, created_at) VALUES (?, 'Dune', 'Frank Herbert', ?, ?, ?, ?, ?)");
+  insert.run("a", "9780000000001", 1954, '["openlibrary","isbndb"]', null, NOW);
+  insert.run("b", "9780000000002", 1954, '["isbndb"]', null, NOW);
+  insert.run("c", "9780000000003", 1954, '["openlibrary"]', "bnp", NOW);
+  insert.run("d", null, 1954, '["openlibrary"]', null, NOW);
+  insert.run("e", "9780000000005", null, '["openlibrary"]', null, NOW);
+  insert.run("g", "9780000000007", 1954, '["isbndb","openlibrary"]', null, NOW);
+  const rows = () => db.prepare("SELECT id, year, first_published_year FROM books ORDER BY id").all().map((row) => ({ ...row }));
+  const exists = (name: string) => db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = ?").get(name) !== undefined;
+
+  applyBooksMigrations(db);
+
+  assert.deepEqual(rows(), [
+    { id: "a", year: 1954, first_published_year: 1954 },
+    { id: "b", year: 1954, first_published_year: null },
+    { id: "c", year: 1954, first_published_year: null },
+    { id: "d", year: 1954, first_published_year: null },
+    { id: "e", year: null, first_published_year: null },
+    { id: "g", year: 1954, first_published_year: null }
+  ]);
+  assert.equal(userVersion(db), 6);
+  assert.deepEqual([exists("idx_books_work_years"), exists("idx_books_work_editions")], [true, false]);
+
+  insert.run("f", "9780000000006", 1999, '["openlibrary"]', null, NOW);
+  const before = rows();
+  applyBooksMigrations(db);
+  assert.deepEqual(rows(), before);
+  assert.deepEqual(rows().find((row) => row.id === "f"), { id: "f", year: 1999, first_published_year: null });
+  assert.equal(userVersion(db), 6);
 });
 
 test("the last word matches as a prefix once it has three letters", () => {

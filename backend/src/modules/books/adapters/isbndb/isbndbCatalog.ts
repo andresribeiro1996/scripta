@@ -1,5 +1,5 @@
 import { htmlToText, normalizeBookGenres, normalizeIsbn, positiveInteger, type BookSearchResult } from "@scripta/shared";
-import { givenNameFirst, isValidIsbn } from "../../domain/normalize.js";
+import { dateYear, givenNameFirst, isValidIsbn } from "../../domain/normalize.js";
 import type { BookCatalog } from "../../domain/ports.js";
 import type { Spend } from "../../typesafe.js";
 import type { Throttle } from "../http/http.js";
@@ -12,11 +12,6 @@ function plainText(value: unknown): string | null {
   return typeof value === "string" ? htmlToText(value) || null : null;
 }
 
-function yearOf(value: unknown): number | null {
-  const year = typeof value === "string" && /^\d{4}/.test(value) ? Number(value.slice(0, 4)) : null;
-  return year !== null && year >= 1450 && year <= new Date().getFullYear() ? year : null;
-}
-
 function isbnOf(record: Record<string, unknown>): string | null {
   return normalizeIsbn(record.isbn13) || normalizeIsbn(record.isbn) || null;
 }
@@ -27,7 +22,7 @@ function toResult(record: Record<string, unknown>): BookSearchResult | null {
   return {
     title,
     authors: Array.isArray(record.authors) ? record.authors.filter((name): name is string => typeof name === "string" && name.trim() !== "").map(givenNameFirst) : [],
-    year: yearOf(record.date_published),
+    year: dateYear(record.date_published),
     isbn: isbnOf(record),
     publisher: plainText(record.publisher),
     coverUrl: null,
@@ -46,7 +41,7 @@ export function createIsbndbCatalog(apiKey: string, throttle: Throttle, gate: Is
       const summary = plainText(record.synopsis) ?? plainText(record.overview);
       const genres = normalizeBookGenres(record.subjects);
       const pages = positiveInteger(record.pages);
-      const year = yearOf(record.date_published);
+      const year = dateYear(record.date_published);
       const publisher = plainText(record.publisher);
       if (!summary && genres.length === 0 && pages === null && year === null && !publisher) return null;
       return {

@@ -27,11 +27,14 @@ export function saveCatalogHits(
     const author = result.authors.join(", ");
     const identity = lookupIdentity({ isbn: result.isbn, title: result.title, author });
     if (!identity) return null;
-    const book = findExisting(deps.repo, identity) ?? deps.repo.createBook(
-      { title: identity.title, author: identity.author, isbn: identity.isbn, year: result.year, publisher: result.publisher, olCoverId, workKey, genres: result.genres, sources: [source] },
+    const years = source === "openlibrary" ? { year: null, firstPublishedYear: result.year } : { year: result.year };
+    const reused = findExisting(deps.repo, identity);
+    const book = reused ?? deps.repo.createBook(
+      { title: identity.title, author: identity.author, isbn: identity.isbn, ...years, publisher: result.publisher, olCoverId, workKey, genres: result.genres, sources: [source] },
       keysOf(deps.repo, identity),
       at
     );
+    if (reused && source === "openlibrary" && result.year) deps.repo.fillFirstPublishedYear(book.id, result.year);
     fillMissingIdentity(deps.repo, book, identity.title, identity.author);
     deps.repo.setWorkKey(book.id, workKey);
     deps.repo.makeSearchable(book.id);

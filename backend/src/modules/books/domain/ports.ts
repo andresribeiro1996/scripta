@@ -75,6 +75,9 @@ export interface BooksRepository {
   undoneMergeAmong(workIds: string[]): boolean;
   listWorkLookupIds(limit: number, recheckBefore: string): string[];
   markWorkChecked(id: string, at: string): void;
+  listEditionYearIds(limit: number, recheckBefore: string): string[];
+  setEditionYear(id: string, year: number | null, checkedAt: string): void;
+  fillFirstPublishedYear(id: string, year: number): void;
   replaceLanguage(id: string, tag: string): void;
   mergeWorks(fromId: string, intoId: string, at?: string): string;
   mergeDuplicateWork(fromId: string, intoId: string, at: string): string;
@@ -212,6 +215,7 @@ export interface EditionRecord {
   workKey: string | null;
   languages: string[];
   series?: SeriesEntry[];
+  year?: number;
 }
 
 export interface EditionRecordSource {

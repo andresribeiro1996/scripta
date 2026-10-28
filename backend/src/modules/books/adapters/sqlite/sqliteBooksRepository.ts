@@ -52,6 +52,14 @@ export const WORK_LOOKUP_SQL = `
   ORDER BY work_checked_at IS NOT NULL, created_by IS NOT NULL, coalesce(work_checked_at, ''), created_at, rowid
   LIMIT ?
 `;
+export const EDITION_YEAR_SQL = `
+  SELECT id FROM books
+  WHERE isbn IS NOT NULL AND first_published_year IS NOT NULL AND (year IS NULL OR year = first_published_year)
+    AND (edition_year_checked_at IS NOT NULL) IN (0, 1)
+    AND coalesce(edition_year_checked_at, '') < ?
+  ORDER BY edition_year_checked_at IS NOT NULL, coalesce(edition_year_checked_at, ''), created_at, rowid
+  LIMIT ?
+`;
 export const GROUPABLE_KEYS_SQL = `
   SELECT title_key FROM books
   WHERE title_key > ?
@@ -121,8 +129,8 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const byKeysStmt = db.prepare(`SELECT book_keys.key AS key, books.* FROM book_keys JOIN books ON books.id = book_keys.book_id WHERE book_keys.key IN (SELECT value FROM json_each(?))`);
   const byIdStmt = db.prepare(`SELECT * FROM books WHERE id = ?`);
   const insertBookStmt = db.prepare(`
-    INSERT INTO books (id, title, author, year, publisher, isbn, ol_cover_id, ol_work_key, work_id, genres, data_sources, created_by, title_key, retitle_wanted_at, created_at)
-    VALUES ($id, $title, $author, $year, $publisher, $isbn, $ol_cover_id, $ol_work_key, $work_id, $genres, $data_sources, $created_by, $title_key, $retitle_wanted_at, $created_at)
+    INSERT INTO books (id, title, author, year, first_published_year, publisher, isbn, ol_cover_id, ol_work_key, work_id, genres, data_sources, created_by, title_key, retitle_wanted_at, created_at)
+    VALUES ($id, $title, $author, $year, $first_published_year, $publisher, $isbn, $ol_cover_id, $ol_work_key, $work_id, $genres, $data_sources, $created_by, $title_key, $retitle_wanted_at, $created_at)
   `);
   const insertKeyIfMissingStmt = db.prepare(`INSERT OR IGNORE INTO book_keys (key, book_id) VALUES (?, ?)`);
   const fillIdentityStmt = db.prepare(`UPDATE books SET title = ?, author = ?, title_key = ? WHERE id = ? AND (title = '' OR author = '')`);
@@ -213,7 +221,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     ORDER BY editions DESC, id
   `);
   const matchCandidatesStmt = db.prepare(`
-    SELECT w.id, w.title, w.author, MIN(b.year) AS year, COUNT(*) AS editions, json_group_array(COALESCE(b.language, '') ORDER BY b.rowid) AS languages
+    SELECT w.id, w.title, w.author, MIN(COALESCE(min(b.year, b.first_published_year), b.year, b.first_published_year)) AS year, COUNT(*) AS editions, json_group_array(COALESCE(b.language, '') ORDER BY b.rowid) AS languages
     FROM works w JOIN books b ON b.work_id = w.id
     WHERE w.id IN (SELECT value FROM json_each(?))
     GROUP BY w.id
@@ -275,7 +283,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   `);
   const jevJudgedStmt = db.prepare(`SELECT work_id FROM genre_judgments WHERE model <> 'manual'`);
   const countEmptyGenreEditionsStmt = db.prepare(`SELECT COUNT(*) AS n FROM books WHERE work_id = ? AND genres = '[]'`);
-  const pageEditionsStmt = db.prepare(`SELECT books.id, books.title, books.language, books.year, books.isbn, books.summary, books.summary_hash, books.cover_image_id, ci.color AS cover_color, books.genres, books.rating, books.rating_count, books.pages, books.genres_source, books.genres_confidence FROM books LEFT JOIN cover_images ci ON ci.id = books.cover_image_id WHERE books.work_id = ? ORDER BY books.created_at, books.rowid`);
+  const pageEditionsStmt = db.prepare(`SELECT books.id, books.title, books.language, books.year, books.first_published_year, books.isbn, books.summary, books.summary_hash, books.cover_image_id, ci.color AS cover_color, books.genres, books.rating, books.rating_count, books.pages, books.genres_source, books.genres_confidence FROM books LEFT JOIN cover_images ci ON ci.id = books.cover_image_id WHERE books.work_id = ? ORDER BY books.created_at, books.rowid`);
   const workEditionsStmt = db.prepare(`SELECT id, isbn, title, author, ol_work_key FROM books WHERE work_id = ? ORDER BY created_at, rowid`);
   const groupableKeysStmt = db.prepare(GROUPABLE_KEYS_SQL);
   const keylessCandidatesStmt = db.prepare(KEYLESS_CANDIDATES_SQL);
@@ -296,6 +304,14 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   `);
   const workLookupStmt = db.prepare(WORK_LOOKUP_SQL);
   const workCheckedStmt = db.prepare(`UPDATE books SET work_checked_at = ? WHERE id = ?`);
+  const editionYearStmt = db.prepare(EDITION_YEAR_SQL);
+  const setEditionYearStmt = db.prepare(`
+    UPDATE books
+    SET year = CASE WHEN $year IS NOT NULL AND (year IS NULL OR (year = first_published_year AND $year > first_published_year)) THEN $year ELSE year END,
+        edition_year_checked_at = $at
+    WHERE id = $id
+  `);
+  const fillFirstPublishedYearStmt = db.prepare(`UPDATE books SET first_published_year = ? WHERE id = ? AND first_published_year IS NULL`);
   const replaceLanguageStmt = db.prepare(`UPDATE books SET language = ? WHERE id = ?`);
   const makeSearchableStmt = db.prepare(`
     INSERT INTO books_fts (book_id, title, author)
@@ -806,6 +822,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
           $title: input.title,
           $author: input.author,
           $year: input.year ?? null,
+          $first_published_year: input.firstPublishedYear ?? null,
           $publisher: input.publisher ?? null,
           $isbn: input.isbn,
           $ol_cover_id: input.olCoverId ?? null,
@@ -1294,6 +1311,18 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
 
     markWorkChecked(id, at) {
       workCheckedStmt.run(at, id);
+    },
+
+    listEditionYearIds(limit, recheckBefore) {
+      return (editionYearStmt.all(recheckBefore, limit) as Array<{ id: string }>).map((row) => row.id);
+    },
+
+    setEditionYear(id, year, checkedAt) {
+      setEditionYearStmt.run({ $id: id, $year: year, $at: checkedAt });
+    },
+
+    fillFirstPublishedYear(id, year) {
+      fillFirstPublishedYearStmt.run(year, id);
     },
 
     replaceLanguage(id, tag) {

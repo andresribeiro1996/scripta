@@ -135,6 +135,14 @@ test("a work page edition carries normalised genres, rating and pages", () => {
   assert.equal(edition!.pages, 412);
 });
 
+test("getWorkPageWith returns firstPublishedYear from sqlite", () => {
+  const { repo } = freshRepo();
+  const first = repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593", year: 2015, firstPublishedYear: 1954, workKey: "OL1W" }, ["isbn:9780441013593"], "2026-10-04T00:00:00.000Z");
+  repo.createBook({ title: "Duna", author: "Frank Herbert", isbn: "9788576573135", year: 2001, workKey: "OL1W" }, ["isbn:9788576573135"], "2026-10-05T00:00:00.000Z");
+  const editions = getWorkPageWith(repo, () => "x", first.work_id!)!.editions;
+  assert.deepEqual(editions.map((edition) => [edition.year, edition.firstPublishedYear]), [[2015, 1954], [2001, null]]);
+});
+
 test("matchWorks returns the best matching works and the works merged into them", () => {
   const { repo, db } = freshRepo();
   const at = "2026-10-04T00:00:00.000Z";

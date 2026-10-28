@@ -36,7 +36,7 @@ function bestRating(editions: CatalogEdition[]): WorkPage["work"]["rating"] {
 }
 
 function earliestYear(editions: CatalogEdition[]): number | null {
-  const years = editions.flatMap((edition) => (edition.year === null ? [] : [edition.year]));
+  const years = editions.flatMap((edition) => [edition.year, edition.firstPublishedYear]).filter((year) => year !== null);
   return years.length > 0 ? Math.min(...years) : null;
 }
 
