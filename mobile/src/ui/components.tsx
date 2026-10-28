@@ -417,9 +417,15 @@ export function ActionSheet({ title, groups, children }: {
   const { colors } = useTheme();
   const [visible, setVisible] = useState(false);
   const pending = useRef<(() => void) | null>(null);
-  const open = useCallback(() => setVisible(true), []);
   const close = useCallback(() => setVisible(false), []);
+  const running = useRef(false);
+  const open = useCallback(() => {
+    running.current = false;
+    setVisible(true);
+  }, []);
   const run = (item: ActionItem) => {
+    if (running.current) return;
+    running.current = true;
     setVisible(false);
     if (Platform.OS === "ios") pending.current = item.onPress;
     else item.onPress();
