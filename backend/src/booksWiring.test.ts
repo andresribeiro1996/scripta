@@ -60,6 +60,41 @@ test("the app joins a work to its original that was already queued when it start
   assert.equal(booksRepository().canonicalWorkIds([ptWorkId]).get(ptWorkId), enWorkId);
 });
 
+test("closing the app waits for the cover lookup it has in flight", async (t) => {
+  const db = new DatabaseSync(process.env.COVERS_DB_PATH!);
+  applyBooksMigrations(db);
+  const seed = createSqliteBooksRepository(db);
+  const at = new Date().toISOString();
+  const book = seed.createBook({ title: "Mrs Dalloway", author: "Virginia Woolf", isbn: null }, ["ta:mrs dalloway|virginia woolf|"], at);
+  seed.setAppleChecked(book.id, at);
+  db.close();
+  const requests: string[] = [];
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: unknown) => {
+    requests.push(String(input));
+    await held;
+    return new Response(null, { status: 404 });
+  }) as typeof fetch;
+  t.after(() => {
+    release();
+    globalThis.fetch = realFetch;
+  });
+  const app = buildApp();
+  await app.ready();
+  assert.equal(requests.length, 1);
+  let closed = false;
+  const closing = app.close().then(() => { closed = true; });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(closed, false, "close resolved while a cover lookup was still in flight");
+  release();
+  await closing;
+  const after = new DatabaseSync(process.env.COVERS_DB_PATH!);
+  t.after(() => after.close());
+  assert.notEqual(after.prepare("SELECT cover_checked_at FROM books WHERE id = ?").get(book.id)?.cover_checked_at, null);
+});
+
 test("every books job arms its first run with its own delay and calls nothing before it fires", async (t) => {
   const delays: number[] = [];
   const requests: unknown[] = [];
