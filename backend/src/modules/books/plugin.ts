@@ -259,6 +259,7 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
   app.addHook("onClose", async () => {
     activeService = null;
     jobs.stopAll();
+    await worker.idle();
   });
 
   await app.register(async (scoped) => {
