@@ -50,6 +50,7 @@ test("the app joins a work to its original that was already queued when it start
   seed.setLanguage(pt.id, "pt-PT");
   seed.fillOriginalTitle(pt.id, "To the Lighthouse");
   const en = seed.createBook({ title: "To the Lighthouse", author: "Virginia Woolf", isbn: "9780156907501", workKey: "OL960W" }, ["isbn:9780156907501"], at);
+  for (const book of [pt, en]) seed.setCover(book.id, { imageId: null, status: "missing", checkedAt: at });
   const ptWorkId = seed.getBook(pt.id)!.work_id!;
   const enWorkId = seed.getBook(en.id)!.work_id!;
   db.close();
@@ -99,5 +100,5 @@ test("every books job arms its first run with its own delay and calls nothing be
   for (const [delay, count] of wanted) {
     assert.ok(delays.filter((armed) => armed === delay).length >= count, `expected ${count} first runs armed at ${delay} ms`);
   }
-  assert.deepEqual(requests.map(String).filter((url) => /typesafe|isbndb|bnportugal|porbase|openlibrary|cdn\.kobo\.com|wikidata/.test(url)), []);
+  assert.deepEqual(requests.map(String).filter((url) => /typesafe|isbndb|itunes\.apple\.com|bnportugal|porbase|openlibrary|cdn\.kobo\.com|wikidata/.test(url)), []);
 });
