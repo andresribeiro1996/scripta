@@ -7,7 +7,7 @@ import { FlatList, Pressable, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { apiClient, ApiError } from "../../core/api";
 import { useLibrary, useWorkBooks } from "../library";
-import { Button, Dialog, EditorHeading, EmptyState, ErrorState, Fab, HeaderActions, IconButton, Input, Menu, type MenuItem, SaveStateButton, Screen, Sheet, Skeleton, SwipeableTabs, Toast, dynamicType, spacing, typography, useTheme, useUnsavedChangesGuard } from "../../ui";
+import { ActionSheet, type ActionItem, Button, Dialog, EditorHeading, EmptyState, ErrorState, Fab, HeaderActions, IconButton, Input, SaveStateButton, Screen, Sheet, Skeleton, SwipeableTabs, Toast, dynamicType, spacing, typography, useTheme, useUnsavedChangesGuard } from "../../ui";
 import { fetchMyBallot, fetchTierlistResults, fetchVotingBoard, openVoting, renderTierlistShareVideo, setVotingState, updateTierlist, type Tierlist } from "./api";
 import { moveBookTo, votingBooks } from "./tierBoardData";
 import { TierBoard, TierHead } from "./TierBoard";
@@ -124,16 +124,18 @@ export function TierlistEditorScreen({ tierlist, onUpdated, startInRank = false 
   const shareDataError = frozen ? board.error ?? (shareView === "results" ? results.error : myBallot.error) : library.error;
   const shareDataReady = frozen ? Boolean(board.data) && (shareView === "results" ? Boolean(results.data) : !myBallot.isPending && !myBallot.isError) : !library.isPending && !library.isError;
   const showShare = () => { setShareUrl(null); setLinkError(null); setImageReady(false); setShareView(view === "results" ? "results" : "board"); setSharing(true); };
-  const actionItems: MenuItem[] = frozen
+  const actionGroups: ActionItem[][] = frozen
     ? [
-      { label: current.votingOpen ? "Close voting" : "Reopen voting", onPress: () => void run(() => setVotingState(current.id, { open: !current.votingOpen })) },
-      { label: current.voteAccess === "anonymous" ? "Require members" : "Allow anyone", onPress: () => void run(() => setVotingState(current.id, { access: current.voteAccess === "anonymous" ? "members" : "anonymous" })) },
+      [{ label: current.votingOpen ? "Close voting" : "Reopen voting", icon: current.votingOpen ? "lock" : "vote", onPress: () => void run(() => setVotingState(current.id, { open: !current.votingOpen })) }],
+      [{ label: current.voteAccess === "anonymous" ? "Require members" : "Allow anyone", icon: current.voteAccess === "anonymous" ? "community" : "public", onPress: () => void run(() => setVotingState(current.id, { access: current.voteAccess === "anonymous" ? "members" : "anonymous" })) }],
     ]
     : [
-      { label: "Rename…", onPress: () => setRenaming(true) },
-      { label: "Add books…", onPress: () => setAdding(true) },
-      { label: "Add tier", onPress: () => setData((value) => ({ ...value, tiers: [...value.tiers, createTier("New tier", "#8a8580")] })) },
-      { label: "Open voting…", onPress: () => setConfirmingVoting(true) },
+      [{ label: "Rename", icon: "edit", onPress: () => setRenaming(true) }],
+      [
+        { label: "Add books", icon: "add", onPress: () => setAdding(true) },
+        { label: "Add tier", icon: "tierlist", onPress: () => setData((value) => ({ ...value, tiers: [...value.tiers, createTier("New tier", "#8a8580")] })) },
+      ],
+      [{ label: "Open voting", icon: "vote", onPress: () => setConfirmingVoting(true) }],
     ];
 
   return <Screen top={false} style={styles.screen}>
@@ -145,7 +147,7 @@ export function TierlistEditorScreen({ tierlist, onUpdated, startInRank = false 
       headerRight: () => <HeaderActions>
         {!frozen ? <SaveStateButton busy={busy} unsaved={dirty} onPress={() => void save()} /> : null}
         <IconButton accessibilityLabel="Share tier list" name="share" onPress={showShare} />
-        <Menu title={current.name} items={actionItems}><IconButton accessibilityLabel="Tier list actions" name="more" /></Menu>
+        <ActionSheet title={current.name} groups={actionGroups}>{(open) => <IconButton accessibilityLabel="Tier list actions" name="more" onPress={open} />}</ActionSheet>
       </HeaderActions>,
     }} />
     {error ? <Toast visible message={error} tone="error" /> : null}

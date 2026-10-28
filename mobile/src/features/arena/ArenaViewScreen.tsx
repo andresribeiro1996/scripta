@@ -7,7 +7,7 @@ import { Text } from "../../ui/Text";
 import { createVoterToken } from "@scripta/shared";
 import { useAuth } from "../../core/auth";
 import { isPermanentError } from "../../core/apiClient";
-import { Button, ConfirmDialog, Dialog, EmptyState, ErrorState, HeaderActions, IconButton, Input, Menu, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, spacing, typography, useTheme } from "../../ui";
+import { ActionSheet, Button, ConfirmDialog, Dialog, EmptyState, ErrorState, HeaderActions, IconButton, Input, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, spacing, typography, useTheme } from "../../ui";
 import { AddBookSheet } from "../community/AddBookSheet";
 import { fetchTournament, renameTournament, resolveTiebreak, settleDuelEarly, voteOnDuel } from "./api";
 import { arenaViewTabs, matchEmptyCopy, tournamentChampion, votableDuels, type ArenaViewTab } from "./arenaView";
@@ -185,15 +185,15 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
           headerRight: () => (
             <HeaderActions>
             <IconButton name="share" accessibilityLabel="Share tournament" onPress={() => void action("share", async () => setShareUrl(await publicContentUrl(`/arena/${encodeURIComponent(id)}`)))} />
-            <Menu
+            <ActionSheet
               title={data.name}
-              items={[
-                { label: data.slots.length ? `See all ${data.slots.length} books` : "View book pool", onPress: () => setBooksOpen(true) },
-                ...(isOwner ? [{ label: "Rename…", onPress: () => { setName(data.name); setRenaming(true); } }] : []),
+              groups={[
+                [{ label: data.slots.length ? `See all ${data.slots.length} books` : "View book pool", icon: "book", onPress: () => setBooksOpen(true) }],
+                ...(isOwner ? [[{ label: "Rename", icon: "edit" as const, onPress: () => { setName(data.name); setRenaming(true); } }]] : []),
               ]}
             >
-              <IconButton accessibilityLabel={`Actions for ${data.name}`} name="more" />
-            </Menu>
+              {(open) => <IconButton accessibilityLabel={`Actions for ${data.name}`} name="more" onPress={open} />}
+            </ActionSheet>
             </HeaderActions>
           ),
         }}

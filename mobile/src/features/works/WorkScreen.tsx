@@ -8,7 +8,7 @@ import { bookKey, bookScreenModel, coverWash } from "@scripta/shared";
 import { isPermanentError } from "../../core/apiClient";
 import { useAuth } from "../../core/auth";
 import { useScreenOptions } from "../../ui/navigation";
-import { ErrorState, HeaderActions, IconButton, Menu, Screen, Skeleton, Toast, spacing, useTheme } from "../../ui";
+import { ActionSheet, ErrorState, HeaderActions, IconButton, Screen, Skeleton, Toast, spacing, useTheme } from "../../ui";
 import { AddBookSheet } from "../community/AddBookSheet";
 import { LIBRARY_QUERY_KEY, useLibrary } from "../library/hooks/useLibrary";
 import { ContentShareSheet } from "../sharing/ContentShareSheet";
@@ -102,7 +102,7 @@ export function WorkScreen({ id, edition = null }: { id: string; edition?: strin
           headerRight: () => (
             <HeaderActions>
               <IconButton name="share" accessibilityLabel="Share book" onPress={() => void share()} />
-              {menuItems.length > 0 ? <Menu title={work.title} items={menuItems}><IconButton accessibilityLabel="Book actions" name="more" /></Menu> : null}
+              {menuItems.length > 0 ? <ActionSheet title={work.title} groups={[menuItems]}>{(open) => <IconButton accessibilityLabel="Book actions" name="more" onPress={open} />}</ActionSheet> : null}
             </HeaderActions>
           ),
         }}
