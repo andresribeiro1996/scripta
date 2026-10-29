@@ -20,11 +20,11 @@ test("each rule skips its record, in order", () => {
 });
 
 test("trade publishers a naive pattern would catch are kept", () => {
-  for (const publisher of ["Clube do Autor", "Fundação Francisco Manuel dos Santos", "Fundação Calouste Gulbenkian", "Instituto Piaget", "Assírio & Alvim", "Edições Afrontamento"]) assert.equal(bnpSkipReason(book({ publisher })), null, publisher);
+  for (const publisher of ["Clube do Autor", "Fundação Francisco Manuel dos Santos", "Fundação Calouste Gulbenkian", "Instituto Piaget", "Inst. Piaget", "Assírio & Alvim", "Edições Afrontamento", "CETOP", "Universitária", "Imprensa Nacional-Casa da Moeda", "Academia do Livro"]) assert.equal(bnpSkipReason(book({ publisher })), null, publisher);
 });
 
 test("institutional publishers are dropped", () => {
-  for (const publisher of ["Imprensa da Universidade de Coimbra", "Município de Oeiras", "União das Freguesias de Carcavelos e Parede", "Direcção-Geral de Inovação e Desenvolvimento Curricular", "Banda Musical das Caldas das Taipas", "Instituto Politécnico de Leiria"]) assert.equal(bnpSkipReason(book({ publisher })), "institutional", publisher);
+  for (const publisher of ["Imprensa da Universidade de Coimbra", "Município de Oeiras", "União das Freguesias de Carcavelos e Parede", "Direcção-Geral de Inovação e Desenvolvimento Curricular", "Banda Musical das Caldas das Taipas", "Instituto Politécnico de Leiria", "LNEC", "Lab. Nac. de Eng. Civil", "Laboratório Nacional de Engenharia Civil", "IEFP", "I.E.F.P.", "APPACDM", "Biblioteca Nacional de Portugal", "UTAD", "Univ. de Trás-os-Montes e Alto Douro", "Universitárias Lusófonas", "Expo'98", "C.M.", "Instituto Cultural de Macau", "Academia de Marinha", "IPPAR", "ISPA", "Citeforma", "Sociedade Martins Sarmento"]) assert.equal(bnpSkipReason(book({ publisher })), "institutional", publisher);
 });
 
 test("udc codes map to genres and a plain novel gets none", () => {
