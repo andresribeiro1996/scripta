@@ -76,8 +76,7 @@ export function createDailyChapterService(repo: DailyChapterRepository, plays: Q
       const book = repo.books().find((item) => item.id === question.bookId);
       if (!book) return fail(400, "Add the target book before its question.");
       if (question.options[question.answerIndex] !== book.title) return fail(400, "The correct answer must be the target book's title.");
-      const normalized = question.prompt.normalize("NFKC").replace(/\s+/g, " ").trim();
-      if (repo.questions().some((q) => q.id !== question.id && q.bookId === question.bookId && q.type === question.type && q.prompt.normalize("NFKC").replace(/\s+/g, " ").trim() === normalized)) return fail(409, "This passage or clue is already in the bank.");
+      if (repo.questions().some((q) => q.id !== question.id && passageKey(q) === passageKey(question))) return fail(409, "This passage or clue is already in the bank.");
       repo.saveQuestion({ ...question, approvedAt: approved ? clock().toISOString() : null, approvedBy: approved ? userId : null });
     },
     saveEdition(input: DailyChapterEditionInput) {
@@ -178,6 +177,8 @@ export function createDailyChapterService(repo: DailyChapterRepository, plays: Q
       }
       if (editions.some((edition) => plays.getById(edition.id))) return fail(409, "An edition id belongs to another quiz. Nothing was imported.");
       const existing = repo.editions();
+      const moved = editions.find((edition) => existing.some((item) => item.id === edition.id && item.date !== edition.date));
+      if (moved) return fail(409, "Edition " + moved.id + " is already on " + existing.find((item) => item.id === moved.id)!.date + ". Remove it or keep its date.");
       if (editions.some((edition) => existing.some((item) => item.date === edition.date && item.id !== edition.id))) return fail(409, "An imported date is already occupied. Nothing was imported.");
       repo.importDrafts([...books.values()], questions, editions);
     }

@@ -63,7 +63,8 @@ CREATE TABLE IF NOT EXISTS daily_chapter_books (
 );
 CREATE TABLE IF NOT EXISTS daily_chapter_questions (
   id TEXT PRIMARY KEY,
-  data TEXT NOT NULL
+  data TEXT NOT NULL,
+  edited_at TEXT
 );
 CREATE TABLE IF NOT EXISTS daily_chapter_editions (
   id TEXT PRIMARY KEY,

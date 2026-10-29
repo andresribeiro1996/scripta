@@ -360,3 +360,30 @@ test("reviewed imports reject repeated passages within the incoming pack atomica
   assert.equal(service.editorial().questions.length, 0);
   assert.equal(service.editorial().editions.length, 0);
 });
+
+test("a reviewed reimport never overwrites a question the editor saved", () => {
+  const { service } = setup(); const pack = reviewedLaunchPack();
+  service.importPack({ pack, startDate: "2030-01-01" }, "editor");
+  const input = pack.editions[0].questions[0];
+  const stored = service.editorial().questions.find((q) => q.id === input.id)!;
+  service.saveQuestion({ ...stored, explanation: "An editor correction.", approved: false }, "later-editor");
+  service.importPack({ pack, startDate: "2030-01-01" }, "editor");
+  const kept = service.editorial().questions.find((q) => q.id === input.id)!;
+  assert.equal(kept.explanation, "An editor correction.");
+  assert.equal(kept.approvedAt, null);
+});
+
+test("importing an existing edition id on a different date is rejected before any write", () => {
+  const { service } = setup(); const pack = reviewedLaunchPack();
+  service.importPack({ pack, startDate: "2030-01-01" }, "editor");
+  const before = JSON.stringify(service.editorial());
+  assert.throws(() => service.importPack({ pack, startDate: "2030-02-01" }, "editor"), /already on 2030-01-01/);
+  assert.equal(JSON.stringify(service.editorial()), before);
+  service.importPack({ pack, startDate: "2030-01-01" }, "editor");
+});
+
+test("saving a question treats prompts that differ only by case as duplicates", () => {
+  const { service } = setup(); seed(service);
+  const first = service.editorial().questions[0]!;
+  assert.throws(() => service.saveQuestion({ ...first, id: first.id + "-copy", prompt: first.prompt.toUpperCase(), approved: false }, "editor"), /already in the bank/);
+});
