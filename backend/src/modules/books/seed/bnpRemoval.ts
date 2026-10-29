@@ -45,8 +45,7 @@ export function readRemovalHolds(library: DatabaseSync, games: GameDatabases): R
   }
   for (const [name, sql] of GAME_WORK_QUERIES) {
     for (const row of games[name].prepare(sql).all() as Array<{ work_id: string | null }>) {
-      const workId = Object.values(row)[0];
-      if (typeof workId === "string") holds.workIds.add(workId);
+      if (typeof row.work_id === "string") holds.workIds.add(row.work_id);
     }
   }
   return holds;
@@ -94,6 +93,7 @@ export async function removeBnpBooks(deps: RemovalDeps, bookIds: string[]) {
     const removed = deps.repo.removeBooks(bookIds.slice(start, start + REMOVAL_CHUNK));
     report.removed += removed.books;
     report.worksRemoved += removed.works;
+    if (removed.coverImageIds.length > 0) deps.log(JSON.stringify({ orphanCoverImageIds: removed.coverImageIds }));
     for (const id of removed.coverImageIds) {
       for (const key of [`covers/${id}.webp`, `covers/${id}-thumb.webp`]) {
         try {

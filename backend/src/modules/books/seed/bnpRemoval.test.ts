@@ -48,8 +48,8 @@ test("only institutional bnp books are selected, and anything a reader or game h
   const repo = setup();
   const free = add(repo, "Livre", "9789720000001", "Câmara Municipal de Tavira");
   const byWork = add(repo, "Por obra", "9789720000002", "Universidade de Coimbra");
-  const byIsbn = add(repo, "Por isbn", "9789720000003", "Museu do Fado");
-  const byKey = add(repo, "Por chave", "9789720000004", "Museu do Fado");
+  add(repo, "Por isbn", "9789720000003", "Museu do Fado");
+  add(repo, "Por chave", "9789720000004", "Museu do Fado");
   const byGame = add(repo, "Por jogo", "9789720000005", "Museu do Fado");
   const byDuel = add(repo, "Por duelo", "9789720000006", "Museu do Fado");
   add(repo, "Editora normal", "9789720000007", "Porto Editora");
@@ -66,8 +66,6 @@ test("only institutional bnp books are selected, and anything a reader or game h
   assert.deepEqual(plan.kept, { workHeld: 3, isbnHeld: 1, keyHeld: 1 });
   assert.deepEqual(plan.byPublisher, [{ publisher: "Câmara Municipal de Tavira", books: 1 }]);
   assert.deepEqual(plan.samples, [{ title: "Livre", publisher: "Câmara Municipal de Tavira", isbn: "9789720000001" }]);
-  void byIsbn;
-  void byKey;
 });
 
 test("a book is kept when a work merged into or from its work is held", () => {
