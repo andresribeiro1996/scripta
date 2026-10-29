@@ -183,7 +183,7 @@ export interface BnpImportReport {
 export const BNP_OAI = "https://oai.bnportugal.gov.pt/servlet/OAIHandler";
 export const BNP_ISBN_URL = "https://urn.porbase.org/isbn/unimarc/marcxchange?id=";
 export const BNP_SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000;
-const BNP_PAGE_TIMEOUT_MS = 120_000;
+const BNP_PAGE_TIMEOUT_MS = 600_000;
 export const BNP_BUSY_TIMEOUT_MS = 120_000;
 
 const BNP_PACE_GAP_MS = 150;
