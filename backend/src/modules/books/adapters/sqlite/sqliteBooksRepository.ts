@@ -535,6 +535,42 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     WHERE source = ? AND name_key IN (SELECT value FROM json_each(?))
   `);
   const removeSeriesNamesStmt = db.prepare(`DELETE FROM work_series WHERE source = ? AND name_key IN (SELECT value FROM json_each(?))`);
+  const bnpPublisherBooksStmt = db.prepare(`SELECT id, title, publisher, isbn FROM books WHERE created_by = 'bnp' AND publisher IS NOT NULL`);
+  const bookWorksStmt = db.prepare(`
+    SELECT b.id AS id, b.work_id AS work_id, (SELECT merged_into FROM works WHERE id = b.work_id) AS parent,
+           (SELECT json_group_array(id) FROM works WHERE merged_into = b.work_id) AS children
+    FROM books b WHERE b.id IN (SELECT value FROM json_each(?))
+  `);
+  const bookKeysStmt = db.prepare(`SELECT book_id, key FROM book_keys WHERE book_id IN (SELECT value FROM json_each(?))`);
+  const removedWorksStmt = db.prepare(`SELECT DISTINCT work_id FROM books WHERE id IN (SELECT value FROM json_each(?)) AND work_id IS NOT NULL`);
+  const removedCoversStmt = db.prepare(`
+    SELECT id FROM cover_images WHERE book_id IN (SELECT value FROM json_each(?1))
+      AND id NOT IN (SELECT cover_image_id FROM books WHERE cover_image_id IS NOT NULL AND id NOT IN (SELECT value FROM json_each(?1)))
+  `);
+  const reownCoversStmt = db.prepare(`
+    UPDATE cover_images SET book_id = (SELECT b.id FROM books b WHERE b.cover_image_id = cover_images.id AND b.id NOT IN (SELECT value FROM json_each(?1)) LIMIT 1)
+    WHERE book_id IN (SELECT value FROM json_each(?1)) AND id IN (SELECT cover_image_id FROM books WHERE cover_image_id IS NOT NULL AND id NOT IN (SELECT value FROM json_each(?1)))
+  `);
+  const deleteCoversStmt = db.prepare(`DELETE FROM cover_images WHERE id IN (SELECT value FROM json_each(?))`);
+  const deleteBookRowsStmts = ["cover_rejections", "book_keys", "books_search", "books_fts", "book_collections", "collections_fts"].map((table) => db.prepare(`DELETE FROM ${table} WHERE book_id IN (SELECT value FROM json_each(?))`));
+  const deleteBooksStmt = db.prepare(`DELETE FROM books WHERE id IN (SELECT value FROM json_each(?))`);
+  const orphanWorksStmt = db.prepare(`
+    SELECT w.value AS id FROM json_each(?) w
+    WHERE NOT EXISTS (SELECT 1 FROM books WHERE work_id = w.value)
+      AND NOT EXISTS (SELECT 1 FROM works WHERE merged_into = w.value)
+      AND NOT EXISTS (SELECT 1 FROM work_merges m WHERE m.from_work = w.value OR m.into_work = w.value OR EXISTS (SELECT 1 FROM json_each(m.repointed_work_ids) r WHERE r.value = w.value))
+  `);
+  const deleteWorkRowsStmts = [
+    "DELETE FROM work_series WHERE work_id IN (SELECT value FROM json_each(?))",
+    "DELETE FROM series_fts WHERE work_id IN (SELECT value FROM json_each(?))",
+    "DELETE FROM work_awards WHERE work_id IN (SELECT value FROM json_each(?))",
+    "DELETE FROM work_subjects WHERE work_id IN (SELECT value FROM json_each(?))",
+    "DELETE FROM genre_judgments WHERE work_id IN (SELECT value FROM json_each(?))",
+    "DELETE FROM genre_rejections WHERE work_id IN (SELECT value FROM json_each(?))",
+    "DELETE FROM work_match_judgments WHERE work_id IN (SELECT value FROM json_each(?1)) OR into_work_id IN (SELECT value FROM json_each(?1))",
+    "DELETE FROM jev_rejections WHERE task = 'works' AND subject IN (SELECT value FROM json_each(?))"
+  ].map((sql) => db.prepare(sql));
+  const deleteWorksStmt = db.prepare(`DELETE FROM works WHERE id IN (SELECT value FROM json_each(?))`);
   const allSeriesIndexStmt = db.prepare(`SELECT rowid, work_id, name FROM series_fts`);
   const deleteSeriesIndexRowStmt = db.prepare(`DELETE FROM series_fts WHERE rowid = ?`);
   const refreshSeriesAuthorStmt = db.prepare(`UPDATE series_fts SET author = ? WHERE work_id = ?`);
@@ -1399,6 +1435,36 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     isbnPage(afterRowid, limit) {
       const rows = isbnPageStmt.all(afterRowid, limit) as Array<{ rowid: number; id: string; isbn: string; work_id: string | null; language: string | null; has_summary: number }>;
       return rows.map((row) => ({ rowid: Number(row.rowid), id: row.id, isbn: row.isbn, workId: row.work_id, language: row.language, hasSummary: row.has_summary === 1 }));
+    },
+
+    bnpPublisherBooks() {
+      return bnpPublisherBooksStmt.all() as Array<{ id: string; title: string; publisher: string; isbn: string | null }>;
+    },
+
+    bookHolds(bookIds) {
+      const ids = JSON.stringify(bookIds);
+      const keys = new Map<string, string[]>();
+      for (const row of bookKeysStmt.all(ids) as Array<{ book_id: string; key: string }>) keys.set(row.book_id, [...(keys.get(row.book_id) ?? []), row.key]);
+      return (bookWorksStmt.all(ids) as Array<{ id: string; work_id: string | null; parent: string | null; children: string }>).map((row) => ({
+        id: row.id,
+        workIds: [row.work_id, row.parent, ...(JSON.parse(row.children) as string[])].filter((id): id is string => id !== null),
+        keys: keys.get(row.id) ?? []
+      }));
+    },
+
+    removeBooks(bookIds) {
+      const ids = JSON.stringify(bookIds);
+      return inTransaction(() => {
+        const workIds = (removedWorksStmt.all(ids) as Array<{ work_id: string }>).map((row) => row.work_id);
+        const coverImageIds = (removedCoversStmt.all(ids) as Array<{ id: string }>).map((row) => row.id);
+        reownCoversStmt.run(ids);
+        deleteCoversStmt.run(JSON.stringify(coverImageIds));
+        for (const stmt of deleteBookRowsStmts) stmt.run(ids);
+        const books = Number(deleteBooksStmt.run(ids).changes);
+        const orphans = JSON.stringify((orphanWorksStmt.all(JSON.stringify(workIds)) as Array<{ id: string }>).map((row) => row.id));
+        for (const stmt of deleteWorkRowsStmts) stmt.run(orphans);
+        return { books, works: Number(deleteWorksStmt.run(orphans).changes), coverImageIds };
+      });
     },
 
     removeSeriesNames(nameKeys, source) {

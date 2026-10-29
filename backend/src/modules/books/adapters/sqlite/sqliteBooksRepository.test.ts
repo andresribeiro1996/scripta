@@ -4252,3 +4252,91 @@ test("worksWithOpenLibraryKey skips merged and keyless works", () => {
   db.prepare("UPDATE works SET merged_into = ? WHERE id = ?").run(kept, merged);
   assert.deepEqual(repo.worksWithOpenLibraryKey().map(({ rowid, ...rest }) => (assert.equal(typeof rowid, "number"), rest)), [{ id: kept, olWorkKey: "OL9W", author: "Some Author" }]);
 });
+
+function bookRows(db: DatabaseSync, bookId: string) {
+  return [
+    countOf(db, "books", `id = '${bookId}'`),
+    countOf(db, "book_keys", `book_id = '${bookId}'`),
+    countOf(db, "cover_images", `book_id = '${bookId}'`),
+    countOf(db, "cover_rejections", `book_id = '${bookId}'`),
+    countOf(db, "books_fts", `book_id = '${bookId}'`),
+    countOf(db, "books_search", `book_id = '${bookId}'`),
+    countOf(db, "book_collections", `book_id = '${bookId}'`),
+    countOf(db, "collections_fts", `book_id = '${bookId}'`)
+  ];
+}
+
+function removableBook(db: DatabaseSync, repo: ReturnType<typeof freshRepo>["repo"], title: string, isbn: string, workKey?: string) {
+  const book = repo.createBook({ title, author: "Autor Teste", isbn, workKey, createdBy: "bnp", publisher: "Camara Municipal" }, [`isbn:${isbn}`], NOW);
+  repo.insertImage({ id: `img-${isbn}`, book_id: book.id, source: "bnp", source_url: null, width: 900, height: 1400, byte_size: 10, color: "", created_at: NOW });
+  repo.setCover(book.id, { imageId: `img-${isbn}`, status: "good", checkedAt: NOW });
+  repo.addRejection(book.id, "https://x/y.jpg", NOW);
+  repo.addBookCollection(book.id, { name: "Colecao Teste", position: "1" }, "bnp", NOW);
+  return book;
+}
+
+function workRows(db: DatabaseSync, workId: string) {
+  return ["works", "work_series", "series_fts", "work_awards", "work_subjects", "genre_judgments", "genre_rejections", "work_match_judgments", "jev_rejections"].map((table) =>
+    countOf(db, table, table === "works" ? `id = '${workId}'` : table === "jev_rejections" ? `subject = '${workId}'` : `work_id = '${workId}'`)
+  );
+}
+
+function workRowsFor(db: DatabaseSync, workId: string) {
+  db.prepare("INSERT INTO work_series (work_id, name, name_key, position, source, created_at) VALUES (?, 'Serie', 'serie', '1', 'wikidata', ?)").run(workId, NOW);
+  db.prepare("INSERT INTO series_fts (work_id, name, author) VALUES (?, 'Serie', 'Autor')").run(workId);
+  db.prepare("INSERT INTO work_awards (work_id, prize, year, won, honoree, created_at) VALUES (?, 'Premio', 2020, 1, NULL, ?)").run(workId, NOW);
+  db.prepare("INSERT INTO work_subjects (work_id, kind, position, name, name_key, created_at) VALUES (?, 'place', 0, 'Lisboa', 'lisboa', ?)").run(workId, NOW);
+  db.prepare("INSERT INTO genre_judgments (work_id, model, genre, confidence, asked_at) VALUES (?, 'm', NULL, 0.5, ?)").run(workId, NOW);
+  db.prepare("INSERT INTO genre_rejections (work_id, status, reason, attempts, last_at) VALUES (?, 500, 'x', 1, ?)").run(workId, NOW);
+  db.prepare("INSERT INTO work_match_judgments (work_id, model, into_work_id, confidence, asked_at) VALUES (?, 'm', NULL, NULL, ?)").run(workId, NOW);
+  db.prepare("INSERT INTO jev_rejections (task, subject, status, reason, attempts, last_at) VALUES ('works', ?, 500, 'x', 1, ?)").run(workId, NOW);
+}
+
+test("removeBooks clears a book from every table, drops a lonely work with its rows, and reports the covers", () => {
+  const { db, repo } = freshRepo();
+  const gone = removableBook(db, repo, "Livro Municipal", "9789720000001");
+  const stays = repo.createBook({ title: "Outro", author: "Outro Autor", isbn: "9789720000002" }, ["isbn:9789720000002"], NOW);
+  workRowsFor(db, gone.work_id!);
+  assert.deepEqual(repo.removeBooks([gone.id]), { books: 1, works: 1, coverImageIds: ["img-9789720000001"] });
+  assert.deepEqual(bookRows(db, gone.id), [0, 0, 0, 0, 0, 0, 0, 0]);
+  assert.deepEqual(workRows(db, gone.work_id!), [0, 0, 0, 0, 0, 0, 0, 0, 0]);
+  assert.equal(countOf(db, "books", `id = '${stays.id}'`), 1);
+  assert.equal(countOf(db, "works", `id = '${stays.work_id}'`), 1);
+});
+
+test("removeBooks keeps a work that has another edition, is merged into, or sits in a merge row", () => {
+  const { db, repo } = freshRepo();
+  const first = removableBook(db, repo, "Edicao A", "9789720000011", "OL11W");
+  const second = repo.createBook({ title: "Edicao B", author: "Autor Teste", isbn: "9789720000012", workKey: "OL11W" }, ["isbn:9789720000012"], NOW);
+  assert.equal(first.work_id, second.work_id);
+  workRowsFor(db, first.work_id!);
+  assert.deepEqual(repo.removeBooks([first.id]), { books: 1, works: 0, coverImageIds: ["img-9789720000011"] });
+  assert.deepEqual(workRows(db, first.work_id!), [1, 1, 1, 1, 1, 1, 1, 1, 1]);
+
+  const alias = removableBook(db, repo, "Alias", "9789720000021", "OL21W");
+  const target = repo.createBook({ title: "Target", author: "Autor Teste", isbn: "9789720000022", workKey: "OL22W" }, ["isbn:9789720000022"], NOW);
+  repo.mergeTranslation(alias.work_id!, target.work_id!, "manual", null, AT);
+  const mergedAway = repo.removeBooks([target.id]);
+  assert.equal(mergedAway.works, 0);
+  assert.equal(countOf(db, "works", `id = '${target.work_id}'`), 1);
+  assert.equal(countOf(db, "works", `id = '${alias.work_id}'`), 1);
+  assert.equal(repo.removeBooks([alias.id]).works, 0);
+  assert.equal(countOf(db, "works", `id = '${alias.work_id}'`), 1);
+});
+
+test("removeBooks keeps a cover image another book still points at, now owned by that book", () => {
+  const { db, repo } = freshRepo();
+  const gone = removableBook(db, repo, "Livro", "9789720000031");
+  const other = repo.createBook({ title: "Outro", author: "Autor", isbn: "9789720000032" }, ["isbn:9789720000032"], NOW);
+  repo.setCover(other.id, { imageId: "img-9789720000031", status: "good", checkedAt: NOW });
+  assert.deepEqual(repo.removeBooks([gone.id]).coverImageIds, []);
+  assert.equal(countOf(db, "cover_images", `id = 'img-9789720000031' AND book_id = '${other.id}'`), 1);
+});
+
+test("bnpPublisherBooks and bookHolds list bnp books with their works and keys", () => {
+  const { db, repo } = freshRepo();
+  const book = removableBook(db, repo, "Livro", "9789720000041");
+  repo.createBook({ title: "Seed", author: "Autor", isbn: "9789720000042", publisher: "Camara Municipal" }, ["isbn:9789720000042"], NOW);
+  assert.deepEqual(repo.bnpPublisherBooks().map((row) => ({ ...row })), [{ id: book.id, title: "Livro", publisher: "Camara Municipal", isbn: "9789720000041" }]);
+  assert.deepEqual(repo.bookHolds([book.id]), [{ id: book.id, workIds: [book.work_id], keys: ["isbn:9789720000041"] }]);
+});

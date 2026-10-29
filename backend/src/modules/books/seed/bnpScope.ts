@@ -49,11 +49,13 @@ const MAIN_PREFIXES: Array<[string, BookGenre | null]> = [
   ["5", "Science"]
 ];
 
+export const isInstitutionalPublisher = (publisher: string): boolean => INSTITUTIONAL.test(normalizeGenreLabel(publisher));
+
 export function bnpSkipReason(book: BnpBook): BnpSkip | null {
   if (book.isbns.length === 0) return "noIsbn";
   if (book.udc.some((code) => code.includes("(075"))) return "textbook";
   if (book.publisher === null) return "noPublisher";
-  if (INSTITUTIONAL.test(normalizeGenreLabel(book.publisher))) return "institutional";
+  if (isInstitutionalPublisher(book.publisher)) return "institutional";
   if (book.author === "") return "noPerson";
   return null;
 }

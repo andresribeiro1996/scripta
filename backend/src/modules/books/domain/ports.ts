@@ -152,6 +152,9 @@ export interface BooksRepository {
   addWorkSeries(workId: string, entries: SeriesEntry[], source: SeriesSource, at: string): number;
   hasWorkSeries(workId: string, source: SeriesSource): boolean;
   isbnPage(afterRowid: number, limit: number): Array<{ rowid: number; id: string; isbn: string; workId: string | null; language: string | null; hasSummary: boolean }>;
+  bnpPublisherBooks(): Array<{ id: string; title: string; publisher: string; isbn: string | null }>;
+  bookHolds(bookIds: string[]): Array<{ id: string; workIds: string[]; keys: string[] }>;
+  removeBooks(bookIds: string[]): { books: number; works: number; coverImageIds: string[] };
   removeSeriesNames(nameKeys: string[], source: SeriesSource): { rows: number; searchRows: number };
   removeWorkSeries(workId: string, nameKey: string, source: SeriesSource): number;
   addBookCollection(bookId: string, entry: SeriesEntry, source: CollectionSource, at: string): boolean;

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { mapBnpRecord, readMarcRecords } from "./bnpRecord.js";
 import type { BnpBook } from "./bnpRecord.js";
-import { bnpSkipReason, udcGenres } from "./bnpScope.js";
+import { bnpSkipReason, isInstitutionalPublisher, udcGenres } from "./bnpScope.js";
 
 const book = (over: Partial<BnpBook>): BnpBook => ({ recordId: "1", isbns: ["9789720044457"], title: "T", author: "A B", translator: null, originalTitle: null, publisher: "Porto Editora", year: 2020, pages: 100, languages: ["por"], udc: [], summary: null, scanUrl: null, collection: null, ...over });
 
@@ -108,4 +108,11 @@ test("the recorded national bibliography records scope and map as expected", () 
   const allende = mapped(urn);
   assert.equal(bnpSkipReason(allende), null);
   assert.deepEqual(udcGenres(allende.udc), []);
+});
+
+test("isInstitutionalPublisher shares the import's rule", () => {
+  assert.equal(isInstitutionalPublisher("Câmara Municipal de Tavira"), true);
+  assert.equal(isInstitutionalPublisher("I.E.F.P."), true);
+  assert.equal(isInstitutionalPublisher("Assírio & Alvim"), false);
+  assert.equal(isInstitutionalPublisher("Universitária"), false);
 });
