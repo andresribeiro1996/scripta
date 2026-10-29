@@ -1,0 +1,2191 @@
+{
+  "version": 1,
+  "name": "The Daily Chapter — launch fortnight",
+  "status": "editorial-reviewed",
+  "language": "en",
+  "review": {
+    "by": "Codex editorial pass",
+    "date": "2026-10-26",
+    "scope": [
+      "primary-source premise checks",
+      "exact quotation wording and locations",
+      "distinct plausible choices and correct answers",
+      "premise-level spoilers",
+      "theme fit and question order"
+    ],
+    "readerPlaytested": false,
+    "note": "Difficulty is an editorial estimate. Rights are assumed cleared on the project owner’s instruction. Editions stay private until scheduled."
+  },
+  "editions": [
+    {
+      "id": "launch-v1-01",
+      "day": 1,
+      "themeId": "impossible-places",
+      "title": "Between worlds",
+      "intro": "Unexpected doors. Impossible places. Five little journeys somewhere new.",
+      "questions": [
+        {
+          "id": "se-ae5311f235c66fdd058c4e55b14bd94e",
+          "type": "quote_title",
+          "prompt": "So she was considering in her own mind (as well as she could, for the hot day made her feel very sleepy and stupid), whether the pleasure of making a daisy-chain would be worth the trouble of getting up and picking the daisies, when suddenly a White Rabbit with pink eyes ran close by her.",
+          "book": {
+            "title": "Alice’s Adventures in Wonderland",
+            "author": "Lewis Carroll",
+            "sourceUrl": "https://github.com/standardebooks/lewis-carroll_alices-adventures-in-wonderland_john-tenniel/blob/9ecdf2ffa23098e7cb3c72157d7c3031b6f59903/src/epub/text/chapter-1.xhtml"
+          },
+          "sourceEdition": "Standard Ebooks: Alice’s Adventures in Wonderland; en-GB; chapter-1, paragraph 3; revision 9ecdf2ffa23098e7cb3c72157d7c3031b6f59903",
+          "rights": {
+            "basis": "permission",
+            "evidence": "Quotation reuse rights are assumed cleared for Atmyshelf app/web quizzes, as instructed by the project owner. Source file SHA-256 a006f6595337f1a3b35e46676352200514f1a50511125edda6bf898f83027486; whitespace-normalized text SHA-256 bcc1283dd130bea7e0770f8d354880f7ee1085748a4c5ee7d75cc59cef3d21fa."
+          },
+          "explanation": "The White Rabbit appears at the start of Lewis Carroll’s story, just before Alice follows him down the rabbit-hole.",
+          "quoteProof": {
+            "questionId": "se-ae5311f235c66fdd058c4e55b14bd94e",
+            "path": "src/epub/text/chapter-1.xhtml",
+            "paragraph": 3,
+            "section": "chapter-1",
+            "fileSha256": "a006f6595337f1a3b35e46676352200514f1a50511125edda6bf898f83027486",
+            "textSha256": "bcc1283dd130bea7e0770f8d354880f7ee1085748a4c5ee7d75cc59cef3d21fa",
+            "repository": "lewis-carroll_alices-adventures-in-wonderland_john-tenniel",
+            "revision": "9ecdf2ffa23098e7cb3c72157d7c3031b6f59903",
+            "translators": []
+          },
+          "options": [
+            "Through the Looking-Glass",
+            "Alice’s Adventures in Wonderland",
+            "The Wonderful Wizard of Oz",
+            "Peter Pan"
+          ],
+          "answerIndex": 1,
+          "difficulty": "easy",
+          "reviewNotes": "Exact contiguous source text; character, setting or recognizable wording provides the identifying clue. Alternatives reviewed for a single supported attribution."
+        },
+        {
+          "id": "se-e9c4498caa225f0a3f8437675682121d",
+          "type": "quote_title",
+          "prompt": "Today, however, they were not playing. Uncle Henry sat upon the doorstep and looked anxiously at the sky, which was even grayer than usual. Dorothy stood in the door with Toto in her arms, and looked at the sky too. Aunt Em was washing the dishes.",
+          "book": {
+            "title": "The Wonderful Wizard of Oz",
+            "author": "L. Frank Baum",
+            "sourceUrl": "https://github.com/standardebooks/l-frank-baum_the-wonderful-wizard-of-oz/blob/36104f0b9ace47debd6ac19cec9dc91b3858e83a/src/epub/text/chapter-1.xhtml"
+          },
+          "sourceEdition": "Standard Ebooks: The Wonderful Wizard of Oz; en-US; chapter-1, paragraph 7; revision 36104f0b9ace47debd6ac19cec9dc91b3858e83a",
+          "rights": {
+            "basis": "permission",
+            "evidence": "Quotation reuse rights are assumed cleared for Atmyshelf app/web quizzes, as instructed by the project owner. Source file SHA-256 f9fdf29b9000a11777afabb8ff3c5ef2819438a3a092976d39620ef4382316c0; whitespace-normalized text SHA-256 3a223eed6de47d273c539b131fdc4b361407188961611d8bfcaf29f8f4775d88."
+          },
+          "explanation": "Dorothy, Toto, Uncle Henry and Aunt Em are still in Kansas as the approaching cyclone sets the journey in motion.",
+          "quoteProof": {
+            "questionId": "se-e9c4498caa225f0a3f8437675682121d",
+            "path": "src/epub/text/chapter-1.xhtml",
+            "paragraph": 7,
+            "section": "chapter-1",
+            "fileSha256": "f9fdf29b9000a11777afabb8ff3c5ef2819438a3a092976d39620ef4382316c0",
+            "textSha256": "3a223eed6de47d273c539b131fdc4b361407188961611d8bfcaf29f8f4775d88",
+            "repository": "l-frank-baum_the-wonderful-wizard-of-oz",
+            "revision": "36104f0b9ace47debd6ac19cec9dc91b3858e83a",
+            "translators": []
+          },
+          "options": [
+            "The Secret Garden",
+            "A Little Princess",
+            "The Wind in the Willows",
+            "The Wonderful Wizard of Oz"
+          ],
+          "answerIndex": 3,
+          "difficulty": "easy",
+          "reviewNotes": "Exact contiguous source text; character, setting or recognizable wording provides the identifying clue. Alternatives reviewed for a single supported attribution."
+        },
+        {
+          "id": "se-0abc2cd45fabf53bddf66f91a1e40eaa",
+          "type": "quote_title",
+          "prompt": "This is an exact inventory of what we found about the body of the man-mountain, who used us with great civility, and due respect to your majesty’s commission. Signed and sealed on the fourth day of the eighty-ninth moon of your majesty’s auspicious reign.",
+          "book": {
+            "title": "Gulliver’s Travels",
+            "author": "Jonathan Swift",
+            "sourceUrl": "https://github.com/standardebooks/jonathan-swift_gullivers-travels/blob/f04d45a853c8d552c6ca7acea7a8f294d7f855b7/src/epub/text/chapter-1-2.xhtml"
+          },
+          "sourceEdition": "Standard Ebooks: Gulliver’s Travels; en-GB; chapter-1-2, paragraph 10; revision f04d45a853c8d552c6ca7acea7a8f294d7f855b7",
+          "rights": {
+            "basis": "permission",
+            "evidence": "Quotation reuse rights are assumed cleared for Atmyshelf app/web quizzes, as instructed by the project owner. Source file SHA-256 b4d327e2c16ae8430bbe11bcaa94a79bbe76b88e4ee42611474d2efc97eb02c6; whitespace-normalized text SHA-256 bb758e1c295349bdbdaf0cd635c73dc979a15289daa14cc015923e8c349555fa."
+          },
+          "explanation": "The tiny inhabitants of Lilliput describe their enormous visitor as the “man-mountain” in Jonathan Swift’s satire.",
+          "quoteProof": {
+            "questionId": "se-0abc2cd45fabf53bddf66f91a1e40eaa",
+            "path": "src/epub/text/chapter-1-2.xhtml",
+            "paragraph": 10,
+            "section": "chapter-1-2",
+            "fileSha256": "b4d327e2c16ae8430bbe11bcaa94a79bbe76b88e4ee42611474d2efc97eb02c6",
+            "textSha256": "bb758e1c295349bdbdaf0cd635c73dc979a15289daa14cc015923e8c349555fa",
+            "repository": "jonathan-swift_gullivers-travels",
+            "revision": "f04d45a853c8d552c6ca7acea7a8f294d7f855b7",
+            "translators": []
+          },
+          "options": [
+            "Robinson Crusoe",
+            "Treasure Island",
+            "Gulliver’s Travels",
+            "The Swiss Family Robinson"
+          ],
+          "answerIndex": 2,
+          "difficulty": "medium",
+          "reviewNotes": "Exact contiguous source text; character, setting or recognizable wording provides the identifying clue. Alternatives reviewed for a single supported attribution."
+        },
+        {
+          "id": "se-5ac4c9c01d614f60f8ad1192329fea5f",
+          "type": "quote_title",
+          "prompt": "On the 24th of May, 1863, my uncle, Professor Liedenbrock, rushed into his little house, No. 19 Königstrasse, one of the oldest streets in the oldest portion of the city of Hamburg.",
+          "book": {
+            "title": "Journey to the Center of the Earth",
+            "author": "Jules Verne",
+            "sourceUrl": "https://github.com/standardebooks/jules-verne_journey-to-the-center-of-the-earth_f-a-malleson/blob/3a69e4ca3a52253ea0ed84557385afd174071219/src/epub/text/chapter-1.xhtml"
+          },
+          "sourceEdition": "Standard Ebooks: Journey to the Center of the Earth; translation by F. A. Malleson; en-GB; chapter-1, paragraph 2; revision 3a69e4ca3a52253ea0ed84557385afd174071219",
+          "rights": {
+            "basis": "permission",
+            "evidence": "Quotation reuse rights are assumed cleared for Atmyshelf app/web quizzes, as instructed by the project owner. Source file SHA-256 8227e5891a1de7674abf7f3b9308e6d4e8e69868837515c12a6589d143d8684a; whitespace-normalized text SHA-256 6e659f39cd9ca49bae5a7a8b36efeda9835191e7a415074266bf00eae14eafb3."
+          },
+          "explanation": "Professor Liedenbrock is the mineralogist whose discovery sends Jules Verne’s explorers beneath the Earth. This quotation uses Frederick Amadeus Malleson’s translation.",
+          "quoteProof": {
+            "questionId": "se-5ac4c9c01d614f60f8ad1192329fea5f",
+            "path": "src/epub/text/chapter-1.xhtml",
+            "paragraph": 2,
+            "section": "chapter-1",
+            "fileSha256": "8227e5891a1de7674abf7f3b9308e6d4e8e69868837515c12a6589d143d8684a",
+            "textSha256": "6e659f39cd9ca49bae5a7a8b36efeda9835191e7a415074266bf00eae14eafb3",
+            "repository": "jules-verne_journey-to-the-center-of-the-earth_f-a-malleson",
+            "revision": "3a69e4ca3a52253ea0ed84557385afd174071219",
+            "translators": [
+              "F. A. Malleson"
+            ]
+          },
+          "options": [
+            "Journey to the Center of the Earth",
+            "Twenty Thousand Leagues Under the Seas",
+            "Around the World in Eighty Days",
+            "The Mysterious Island"
+          ],
+          "answerIndex": 0,
+          "difficulty": "medium",
+          "reviewNotes": "Exact contiguous source text; character, setting or recognizable wording provides the identifying clue. Alternatives reviewed for a single supported attribution."
+        },
+        {
+          "id": "se-b14816220fd276a2b99e07500021e8e0",
+          "type": "quote_title",
+          "prompt": "I have said the Princess Irene was about eight years old when my story begins. And this is how it begins.",
+          "book": {
+            "title": "The Princess and the Goblin",
+            "author": "George MacDonald",
+            "sourceUrl": "https://github.com/standardebooks/george-macdonald_the-princess-and-the-goblin/blob/3157cc12856da62e34975f86a97064a7b74786c3/src/epub/text/chapter-2.xhtml"
+          },
+          "sourceEdition": "Standard Ebooks: The Princess and the Goblin; en-GB; chapter-2, paragraph 2; revision 3157cc12856da62e34975f86a97064a7b74786c3",
+          "rights": {
+            "basis": "permission",
+            "evidence": "Quotation reuse rights are assumed cleared for Atmyshelf app/web quizzes, as instructed by the project owner. Source file SHA-256 2658a400253b21d211d76c809a1c5d303155ea82ba357baed57748d5a2c1eac8; whitespace-normalized text SHA-256 34d16ccbde64f3358ed0574b1656aa92210456ba278c3350eb02193579822c6a."
+          },
+          "explanation": "George MacDonald introduces Princess Irene at the start of this story. The Princess and Curdie follows her later adventures with Curdie.",
+          "quoteProof": {
+            "questionId": "se-b14816220fd276a2b99e07500021e8e0",
+            "path": "src/epub/text/chapter-2.xhtml",
+            "paragraph": 2,
+            "section": "chapter-2",
+            "fileSha256": "2658a400253b21d211d76c809a1c5d303155ea82ba357baed57748d5a2c1eac8",
+            "textSha256": "34d16ccbde64f3358ed0574b1656aa92210456ba278c3350eb02193579822c6a",
+            "repository": "george-macdonald_the-princess-and-the-goblin",
+            "revision": "3157cc12856da62e34975f86a97064a7b74786c3",
+            "translators": []
+          },
+          "options": [
+            "The Princess and the Goblin",
+            "The Princess and Curdie",
+            "The Light Princess",
+            "The Enchanted Castle"
+          ],
+          "answerIndex": 0,
+          "difficulty": "stretch",
+          "reviewNotes": "Exact contiguous source text; character, setting or recognizable wording provides the identifying clue. Alternatives reviewed for a single supported attribution."
+        }
+      ]
+    },
+    {
+      "id": "launch-v1-02",
+      "day": 2,
+      "themeId": "bookshops-libraries",
+      "title": "Among the shelves",
+      "intro": "A place to begin again. A book to get lost in. Five stories for book people.",
+      "questions": [
+        {
+          "id": "chapter-02-q1",
+          "type": "blurb_title",
+          "prompt": "After a breakup, Takako accepts a room above her uncle’s second-hand bookshop in Tokyo and begins discovering the pleasure of reading.",
+          "book": {
+            "title": "Days at the Morisaki Bookshop",
+            "author": "Satoshi Yagisawa",
+            "sourceUrl": "https://www.bonnierbooks.co.uk/books/manilla-press/days-at-the-morisaki-bookshop/"
+          },
+          "explanation": "Takako’s new beginning unfolds around her uncle Satoru’s shop in Jimbocho.",
+          "difficulty": "easy",
+          "seedQuestionId": "chapter-02-q1",
+          "rights": {
+            "basis": "original",
+            "evidence": "Original clue written for The Daily Chapter; premise checked against the linked primary source."
+          },
+          "sourceEdition": "Original premise clue; author, estate or publisher source reviewed 2026-10-26.",
+          "options": [
+            "Days at the Morisaki Bookshop",
+            "The Cat Who Saved Books",
+            "Before the Coffee Gets Cold",
+            "Welcome to the Hyunam-dong Bookshop"
+          ],
+          "answerIndex": 0,
+          "reviewNotes": "Original premise clue checked against the linked author, estate or publisher source. No ending or solution is revealed."
+        },
+        {
+          "id": "chapter-02-q2",
+          "type": "blurb_title",
+          "prompt": "A boy in Barcelona chooses a mysterious novel from the Cemetery of Forgotten Books and becomes fascinated by its author.",
+          "book": {
+            "title": "The Shadow of the Wind",
+            "author": "Carlos Ruiz Zafón",
+            "sourceUrl": "https://www.penguinrandomhouse.com/books/292766/shadow-of-the-wind-by-carlos-ruiz-zafon/9780143126393/readers-guide"
+          },
+          "explanation": "Daniel’s discovery of a novel by Julián Carax begins this Barcelona mystery.",
+          "difficulty": "easy",
+          "seedQuestionId": "chapter-02-q2",
+          "rights": {
+            "basis": "original",
+            "evidence": "Original clue written for The Daily Chapter; premise checked against the linked primary source."
+          },
+          "sourceEdition": "Original premise clue; author, estate or publisher source reviewed 2026-10-26.",
+          "options": [
+            "The Name of the Rose",
+            "The Book Thief",
+            "The Historian",
+            "The Shadow of the Wind"
+          ],
+          "answerIndex": 3,
+          "reviewNotes": "Original premise clue checked against the linked author, estate or publisher source. No ending or solution is revealed."
+        },
+        {
+          "id": "chapter-02-q3",
+          "type": "blurb_title",
+          "prompt": "A historical novel follows Belle da Costa Greene as she builds J. P. Morgan’s collection of rare books and manuscripts while concealing her racial identity.",
+          "book": {
+            "title": "The Personal Librarian",
+            "author": "Marie Benedict and Victoria Christopher Murray",
+            "sourceUrl": "https://www.penguinrandomhouse.com/books/623191/the-personal-librarian-a-gma-book-club-pick-by-marie-benedict-and-victoria-christopher-murray/9780593101544/"
+          },
+          "explanation": "The novel draws on the life of the woman who helped create the Pierpont Morgan Library.",
+          "difficulty": "medium",
+          "seedQuestionId": "chapter-02-q3",
+          "rights": {
+            "basis": "original",
+            "evidence": "Original clue written for The Daily Chapter; premise checked against the linked primary source."
+          },
+          "sourceEdition": "Original premise clue; author, estate or publisher source reviewed 2026-10-26.",
+          "options": [
+            "The Paris Library",
+            "The Lions of Fifth Avenue",
+            "The Personal Librarian",
+            "The Personal Assistant"
+          ],
+          "answerIndex": 2,
+          "reviewNotes": "Original premise clue checked against the linked author, estate or publisher source. No ending or solution is revealed."
+        },
+        {
+          "id": "chapter-02-q4",
+          "type": "blurb_title",
+          "prompt": "Florence Green opens a bookshop in an East Anglian coastal town and encounters polite but determined local opposition.",
+          "book": {
+            "title": "The Bookshop",
+            "author": "Penelope Fitzgerald",
+            "sourceUrl": "https://thebookerprizes.com/the-booker-library/books/the-bookshop"
+          },
+          "explanation": "Florence’s attempt to bring a bookshop to Hardborough disturbs the town’s established order.",
+          "difficulty": "medium",
+          "seedQuestionId": "chapter-02-q4",
+          "rights": {
+            "basis": "original",
+            "evidence": "Original clue written for The Daily Chapter; premise checked against the linked primary source."
+          },
+          "sourceEdition": "Original premise clue; author, estate or publisher source reviewed 2026-10-26.",
+          "options": [
+            "The Little Paris Bookshop",
+            "The Bookshop",
+            "The Bookshop on the Corner",
+            "The Reading List"
+          ],
+          "answerIndex": 1,
+          "reviewNotes": "Original premise clue checked against the linked author, estate or publisher source. No ending or solution is revealed."
+        },
+        {
+          "id": "chapter-02-q5",
+          "type": "blurb_title",
+          "prompt": "A bookseller named Loveday prefers books to people and has the opening lines of favourite novels tattooed on her skin.",
+          "book": {
+            "title": "The Lost for Words Bookshop",
+            "author": "Stephanie Butland",
+            "sourceUrl": "https://us.macmillan.com/books/9781250124548/thelostforwordsbookshop/"
+          },
+          "explanation": "Loveday Cardew’s guarded life and love of books sit at the heart of this novel.",
+          "difficulty": "stretch",
+          "seedQuestionId": "chapter-02-q5",
+          "rights": {
+            "basis": "original",
+            "evidence": "Original clue written for The Daily Chapter; premise checked against the linked primary source."
+          },
+          "sourceEdition": "Original premise clue; author, estate or publisher source reviewed 2026-10-26.",
+          "options": [
+            "The Lost Bookshop",
+            "The Lost for Words Bookshop",
+            "The Storied Life of A. J. Fikry",
+            "The Last Bookshop in London"
+          ],
+          "answerIndex": 1,
+          "reviewNotes": "Original premise clue checked against the linked author, estate or publisher source. No ending or solution is revealed."
+        }
+      ]
+    },
+    {
+      "id": "launch-v1-03",
+      "day": 3,
+      "themeId": "page-to-screen",
+      "title": "From page to screen",
+      "intro": "Five stories that made the leap to the screen. Can you recognize the words behind the images?",
+      "questions": [
+        {
+          "id": "se-6681132c919421d0080ccb1988711207",
+          "type": "quote_title",
+          "prompt": "“Christmas won’t be Christmas without any presents,” grumbled Jo, lying on the rug.",
+          "book": {
+            "title": "Little Women",
+            "author": "Louisa May Alcott",
+            "sourceUrl": "https://github.com/standardebooks/louisa-may-alcott_little-women/blob/38695106591f6060142dd1ad4da1d2aeded8ab8f/src/epub/text/chapter-1.xhtml"
+          },
+          "sourceEdition": "Standard Ebooks: Little Women; en-US; chapter-1, paragraph 2; revision 38695106591f6060142dd1ad4da1d2aeded8ab8f",
+          "rights": {
+            "basis": "permission",
+            "evidence": "Quotation reuse rights are assumed cleared for Atmyshelf app/web quizzes, as instructed by the project owner. Source file SHA-256 f5560a6769bb77cc876e7b5ccc663199ae9eb11d6fb599bf569f3801de107097; whitespace-normalized text SHA-256 93e668a725da8754f1b61eac09c8d09d2be61cbb55900eea6335383f72d5bafe."
+          },
+          "explanation": "Jo March’s complaint opens Little Women, introducing the sisters’ Christmas without presents before their family story unfolds.",
+          "quoteProof": {
+            "questionId": "se-6681132c919421d0080ccb1988711207",
+            "path": "src/epub/text/chapter-1.xhtml",
+            "paragraph": 2,
+            "section": "chapter-1",
+            "fileSha256": "f5560a6769bb77cc876e7b5ccc663199ae9eb11d6fb599bf569f3801de107097",
+            "textSha256": "93e668a725da8754f1b61eac09c8d09d2be61cbb55900eea6335383f72d5bafe",
+            "repository": "louisa-may-alcott_little-women",
+            "revision": "38695106591f6060142dd1ad4da1d2aeded8ab8f",
+            "translators": []
+          },
+          "options": [
+            "Anne of Green Gables",
+            "A Little Princess",
+            "The Railway Children",
+            "Little Women"
+          ],
+          "answerIndex": 3,
+          "difficulty": "easy",
+          "reviewNotes": "Exact contiguous source text; character, setting or recognizable wording provides the identifying clue. Alternatives reviewed for a single supported attribution."
+        },
+        {
+          "id": "se-73c029fe5b66316a29f5806395cf5b82",
+          "type": "quote_title",
+          "prompt": "His mother looked at him from head to foot and laughed too. “You are a deer and I am a deer. We’re both deer,” she said. “Do you understand?”",
+          "book": {
+            "title": "Bambi",
+            "author": "Felix Salten",
+            "sourceUrl": "https://github.com/standardebooks/felix-salten_bambi_whittaker-chambers/blob/3301afe82bfd31b6ade13b054a1e7aa3a1f436a1/src/epub/text/chapter-2.xhtml"
+          },
+          "sourceEdition": "Standard Ebooks: Bambi; translation by Whittaker Chambers; en-US; chapter-2, paragraph 13; revision 3301afe82bfd31b6ade13b054a1e7aa3a1f436a1",
+          "rights": {
+            "basis": "permission",
+            "evidence": "Quotation reuse rights are assumed cleared for Atmyshelf app/web quizzes, as instructed by the project owner. Source file SHA-256 44101d85bc4e80877cc271a26b2039aadb2d7e5d720ae820399de312f789e351; whitespace-normalized text SHA-256 62a48529ebdd8da904811a92f86508b81bd22e0e4f426527fbfeecf82a5de776."
+          },
+          "explanation": "Felix Salten’s young deer learns about the forest from his mother. The quotation comes from Whittaker Chambers’s English translation, rather than a film script.",
+          "quoteProof": {
+            "questionId": "se-73c029fe5b66316a29f5806395cf5b82",
+            "path": "src/epub/text/chapter-2.xhtml",
+            "paragraph": 13,
+            "section": "chapter-2",
+            "fileSha256": "44101d85bc4e80877cc271a26b2039aadb2d7e5d720ae820399de312f789e351",
+            "textSha256": "62a48529ebdd8da904811a92f86508b81bd22e0e4f426527fbfeecf82a5de776",
+            "repository": "felix-salten_bambi_whittaker-chambers",
+            "revision": "3301afe82bfd31b6ade13b054a1e7aa3a1f436a1",
+            "translators": [
+              "Whittaker Chambers"
+            ]
+          },
+          "options": [
+            "Black Beauty",
+            "Bambi",
+            "Watership Down",
+            "The Wind in the Willows"
+          ],
+          "answerIndex": 1,
+          "difficulty": "easy",
+          "reviewNotes": "Exact contiguous source text; character, setting or recognizable wording provides the identifying clue. Alternatives reviewed for a single supported attribution."
+        },
+        {
+          "id": "se-e6bd2d01d2337653b9f16527f169416b",
+          "type": "quote_title",
+          "prompt": "In my younger and more vulnerable years my father gave me some advice that I’ve been turning over in my mind ever since.",
+          "book": {
+            "title": "The Great Gatsby",
+            "author": "F. Scott Fitzgerald",
+            "sourceUrl": "https://github.com/standardebooks/f-scott-fitzgerald_the-great-gatsby/blob/fe47c8c04f5175d45f9410f4e3ca64c257ae0acc/src/epub/text/chapter-1.xhtml"
+          },
+          "sourceEdition": "Standard Ebooks: The Great Gatsby; en-GB; chapter-1, paragraph 1; revision fe47c8c04f5175d45f9410f4e3ca64c257ae0acc",
+          "rights": {
+            "basis": "permission",
+            "evidence": "Quotation reuse rights are assumed cleared for Atmyshelf app/web quizzes, as instructed by the project owner. Source file SHA-256 7e46ac1dcf4d16f62101a0b87de645f86f967d661f5697beec7e77e9713e2fcd; whitespace-normalized text SHA-256 b739f6322b6fe9150ef48cdd3a29c2049913c4e8ce7cc51a8496d97c037c4909."
+          },
+          "explanation": "Nick Carraway begins F. Scott Fitzgerald’s novel by recalling advice from his father before describing the people he meets on Long Island.",
+          "quoteProof": {
+            "questionId": "se-e6bd2d01d2337653b9f16527f169416b",
+            "path": "src/epub/text/chapter-1.xhtml",
+            "paragraph": 1,
+            "section": "chapter-1",
+            "fileSha256": "7e46ac1dcf4d16f62101a0b87de645f86f967d661f5697beec7e77e9713e2fcd",
+            "textSha256": "b739f6322b6fe9150ef48cdd3a29c2049913c4e8ce7cc51a8496d97c037c4909",
+            "repository": "f-scott-fitzgerald_the-great-gatsby",
+            "revision": "fe47c8c04f5175d45f9410f4e3ca64c257ae0acc",
+            "translators": []
+          },
+          "options": [
+            "The Great Gatsby",
+            "The Sun Also Rises",
+            "The Catcher in the Rye",
+            "Tender Is the Night"
+          ],
+          "answerIndex": 0,
+          "difficulty": "medium",
+          "reviewNotes": "Exact contiguous source text; character, setting or recognizable wording provides the identifying clue. Alternatives reviewed for a single supported attribution."
+        },
+        {
+          "id": "se-24d357444ee74ce45b30a9a93e56dc39",
+          "type": "quote_title",
+          "prompt": "“The chances against anything manlike on Mars are a million to one,” he said.",
+          "book": {
+            "title": "The War of the Worlds",
+            "author": "H. G. Wells",
+            "sourceUrl": "https://github.com/standardebooks/h-g-wells_the-war-of-the-worlds/blob/7c2c332ce1ce8025d07ec982b02dad293dc63671/src/epub/text/chapter-1-1.xhtml"
+          },
+          "sourceEdition": "Standard Ebooks: The War of the Worlds; en-GB; chapter-1-1, paragraph 18; revision 7c2c332ce1ce8025d07ec982b02dad293dc63671",
+          "rights": {
+            "basis": "permission",
+            "evidence": "Quotation reuse rights are assumed cleared for Atmyshelf app/web quizzes, as instructed by the project owner. Source file SHA-256 2a3d267e4be1568508d1a1e2613516187807527d4ab4a2b5a4c99c06f0c56df8; whitespace-normalized text SHA-256 244688d0c21ff6ef03a023ffb4e861f5a7d3c2e29d7d3af30a490391ddb41243."
+          },
+          "explanation": "Ogilvy’s confident dismissal of life on Mars appears early in H. G. Wells’s invasion novel. His certainty is part of the opening’s dramatic irony.",
+          "quoteProof": {
+            "questionId": "se-24d357444ee74ce45b30a9a93e56dc39",
+            "path": "src/epub/text/chapter-1-1.xhtml",
+            "paragraph": 18,
+            "section": "chapter-1-1",
+            "fileSha256": "2a3d267e4be1568508d1a1e2613516187807527d4ab4a2b5a4c99c06f0c56df8",
+            "textSha256": "244688d0c21ff6ef03a023ffb4e861f5a7d3c2e29d7d3af30a490391ddb41243",
+            "repository": "h-g-wells_the-war-of-the-worlds",
+            "revision": "7c2c332ce1ce8025d07ec982b02dad293dc63671",
+            "translators": []
+          },
+          "options": [
+            "The First Men in the Moon",
+            "A Princess of Mars",
+            "The War of the Worlds",
+            "Out of the Silent Planet"
+          ],
+          "answerIndex": 2,
+          "difficulty": "medium",
+          "reviewNotes": "Exact contiguous source text; character, setting or recognizable wording provides the identifying clue. Alternatives reviewed for a single supported attribution."
+        },
+        {
+          "id": "se-5345268c5d81c961de7f580cf16b929d",
+          "type": "quote_title",
+          "prompt": "Newland Archer, during this brief episode, had been thrown into a strange state of embarrassment.",
+          "book": {
+            "title": "The Age of Innocence",
+            "author": "Edith Wharton",
+            "sourceUrl": "https://github.com/standardebooks/edith-wharton_the-age-of-innocence/blob/c8acc54bcdaf3a266cf37695c79a9927ccde26ee/src/epub/text/chapter-2.xhtml"
+          },
+          "sourceEdition": "Standard Ebooks: The Age of Innocence; en-GB; chapter-2, paragraph 1; revision c8acc54bcdaf3a266cf37695c79a9927ccde26ee",
+          "rights": {
+            "basis": "permission",
+            "evidence": "Quotation reuse rights are assumed cleared for Atmyshelf app/web quizzes, as instructed by the project owner. Source file SHA-256 3c43ac2cedb87322c5bae3d56deacd96ce7bbeccf611ccad760727a25adecf34; whitespace-normalized text SHA-256 3e352d897eefb42877c95e4dd9dda70052c37e9df97f21314603c80389057fdd."
+          },
+          "explanation": "Newland Archer is the central character in Edith Wharton’s novel of New York society, later adapted for the screen by Martin Scorsese.",
+          "quoteProof": {
+            "questionId": "se-5345268c5d81c961de7f580cf16b929d",
+            "path": "src/epub/text/chapter-2.xhtml",
+            "paragraph": 1,
+            "section": "chapter-2",
+            "fileSha256": "3c43ac2cedb87322c5bae3d56deacd96ce7bbeccf611ccad760727a25adecf34",
+            "textSha256": "3e352d897eefb42877c95e4dd9dda70052c37e9df97f21314603c80389057fdd",
+            "repository": "edith-wharton_the-age-of-innocence",
+            "revision": "c8acc54bcdaf3a266cf37695c79a9927ccde26ee",
+            "translators": []
+          },
+          "options": [
+            "The House of Mirth",
+            "The Custom of the Country",
+            "The Age of Innocence",
+            "Washington Square"
+          ],
+          "answerIndex": 2,
+          "difficulty": "stretch",
+          "reviewNotes": "Exact contiguous source text; character, setting or recognizable wording provides the identifying clue. Alternatives reviewed for a single supported attribution."
+        }
+      ]
+    },
+    {
+      "id": "launch-v1-04",
+      "day": 4,
+      "themeId": "memoirs",
+      "title": "Remarkable lives",
+      "intro": "Five lived experiences, told by the people who lived them.",
+      "questions": [
+        {
+          "id": "chapter-04-q1",
+          "type": "blurb_title",
+          "prompt": "A former US First Lady reflects on her childhood on Chicago’s South Side and the experiences that eventually took her to the White House.",
+          "book": {
+            "title": "Becoming",
+            "author": "Michelle Obama",
+            "sourceUrl": "https://www.penguinrandomhouse.com/books/562881/becoming-by-michelle-obama/9781524763152/"
+          },
+          "explanation": "Michelle Obama traces the personal experiences behind her public life.",
+          "difficulty": "easy",
+          "seedQuestionId": "chapter-04-q1",
+          "rights": {
+            "basis": "original",
+            "evidence": "Original clue written for The Daily Chapter; premise checked against the linked primary source."
+          },
+          "sourceEdition": "Original premise clue; author, estate or publisher source reviewed 2026-10-26.",
+          "options": [
+            "Living History",
+            "My Life",
+            "A Promised Land",
+            "Becoming"
+          ],
+          "answerIndex": 3,
+          "reviewNotes": "Original premise clue checked against the linked author, estate or publisher source. No ending or solution is revealed."
+        },
+        {
+          "id": "chapter-04-q2",
+          "type": "blurb_title",
+          "prompt": "A South African comedian recounts growing up under apartheid as the child of a Black mother and a white father.",
+          "book": {
+            "title": "Born a Crime",
+            "author": "Trevor Noah",
+            "sourceUrl": "https://www.penguinrandomhouse.com/books/537515/born-a-crime-by-trevor-noah/"
+          },
+          "explanation": "Noah’s memoir connects his childhood, his mother and the divisions of apartheid South Africa.",
+          "difficulty": "easy",
+          "seedQuestionId": "chapter-04-q2",
+          "rights": {
+            "basis": "original",
+            "evidence": "Original clue written for The Daily Chapter; premise checked against the linked primary source."
+          },
+          "sourceEdition": "Original premise clue; author, estate or publisher source reviewed 2026-10-26.",
+          "options": [
+            "Long Walk to Freedom",
+            "Dreams from My Father",
+            "Born a Crime",
+            "The Color of Water"
+          ],
+          "answerIndex": 2,
+          "reviewNotes": "Original premise clue checked against the linked author, estate or publisher source. No ending or solution is revealed."
+        },
+        {
+          "id": "chapter-04-q3",
+          "type": "blurb_title",
+          "prompt": "Raised outside formal schooling in an isolated Idaho family, a young woman eventually earns a doctorate at Cambridge.",
+          "book": {
+            "title": "Educated",
+            "author": "Tara Westover",
+            "sourceUrl": "https://www.penguinrandomhouse.com/books/550168/educated-by-tara-westover/"
+          },
+          "explanation": "Westover describes her route into education and its effects on her family relationships.",
+          "difficulty": "medium",
+          "seedQuestionId": "chapter-04-q3",
+          "rights": {
+            "basis": "original",
+            "evidence": "Original clue written for The Daily Chapter; premise checked against the linked primary source."
+          },
+          "sourceEdition": "Original premise clue; author, estate or publisher source reviewed 2026-10-26.",
+          "options": [
+            "Educated",
+            "The Glass Castle",
+            "Unorthodox",
+            "The Liars’ Club"
+          ],
+          "answerIndex": 0,
+          "reviewNotes": "Original premise clue checked against the linked author, estate or publisher source. No ending or solution is revealed."
+        },
+        {
+          "id": "chapter-04-q4",
+          "type": "blurb_title",
+          "prompt": "Grieving her mother and facing upheaval in her life, a novice hiker sets off alone along the Pacific Crest Trail.",
+          "book": {
+            "title": "Wild",
+            "author": "Cheryl Strayed",
+            "sourceUrl": "https://www.penguinrandomhouse.com/books/200313/wild-by-cheryl-strayed/9780307592736/"
+          },
+          "explanation": "Strayed’s solo hike becomes the framework for a memoir of grief and rebuilding.",
+          "difficulty": "medium",
+          "seedQuestionId": "chapter-04-q4",
+          "rights": {
+            "basis": "original",
+            "evidence": "Original clue written for The Daily Chapter; premise checked against the linked primary source."
+          },
+          "sourceEdition": "Original premise clue; author, estate or publisher source reviewed 2026-10-26.",
+          "options": [
+            "A Walk in the Woods",
+            "Tracks",
+            "Into the Wild",
+            "Wild"
+          ],
+          "answerIndex": 3,
+          "reviewNotes": "Original premise clue checked against the linked author, estate or publisher source. No ending or solution is revealed."
+        },
+        {
+          "id": "chapter-04-q5",
+          "type": "blurb_title",
+          "prompt": "Anthony Bourdain takes readers behind restaurant doors into the heat, long shifts and unruly culture of commercial kitchens.",
+          "book": {
+            "title": "Kitchen Confidential",
+            "author": "Anthony Bourdain",
+            "sourceUrl": "https://www.bloomsbury.com/us/kitchen-confidential-9781582340821/"
+          },
+          "explanation": "Bourdain writes about the working life and culture of professional cooks.",
+          "difficulty": "stretch",
+          "seedQuestionId": "chapter-04-q5",
+          "rights": {
+            "basis": "original",
+            "evidence": "Original clue written for The Daily Chapter; premise checked against the linked primary source."
+          },
+          "sourceEdition": "Original premise clue; author, estate or publisher source reviewed 2026-10-26.",
+          "options": [
+            "Heat",
+            "Kitchen Confidential",
+            "Blood, Bones & Butter",
+            "The Apprentice"
+          ],
+          "answerIndex": 1,
+          "reviewNotes": "Original premise clue checked against the linked author, estate or publisher source. No ending or solution is revealed."
+        }
+      ]
+    },
+    {
+      "id": "launch-v1-05",
+      "day": 5,
+      "themeId": "island-stories",
+      "title": "A world apart",
+      "intro": "Remote shores, hidden histories and lives surrounded by water.",
+      "questions": [
+        {
+          "id": "se-5d68a61a42d83ddca81274e25e760811",
+          "type": "quote_title",
+          "prompt": "“Fifteen men on the dead man’s chest, Yo-ho-ho and a bottle of rum!”",
+          "book": {
+            "title": "Treasure Island",
+            "author": "Robert Louis Stevenson",
+            "sourceUrl": "https://github.com/standardebooks/robert-louis-stevenson_treasure-island/blob/c7fd6b42e8e856a49781be45d71a9aa18819f3b8/src/epub/text/chapter-1.xhtml"
+          },
+          "sourceEdition": "Standard Ebooks: Treasure Island; en-US; chapter-1, paragraph 4; revision c7fd6b42e8e856a49781be45d71a9aa18819f3b8",
+          "rights": {
+            "basis": "permission",
+            "evidence": "Quotation reuse rights are assumed cleared for Atmyshelf app/web quizzes, as instructed by the project owner. Source file SHA-256 2ff716ce01bf03aa93480a14cfb13e622bbd603dbd530ad32eb0e96fcf4294fb; whitespace-normalized text SHA-256 fd0242db66da8aac4259a250a474739e63d8d5f0885e6fcd8a8e99c2522bcf7a."
+          },
+          "explanation": "The old sailor’s song is heard at the Admiral Benbow inn near the beginning of Robert Louis Stevenson’s pirate adventure.",
+          "quoteProof": {
+            "questionId": "se-5d68a61a42d83ddca81274e25e760811",
+            "path": "src/epub/text/chapter-1.xhtml",
+            "paragraph": 4,
+            "section": "chapter-1",
+            "fileSha256": "2ff716ce01bf03aa93480a14cfb13e622bbd603dbd530ad32eb0e96fcf4294fb",
+            "textSha256": "fd0242db66da8aac4259a250a474739e63d8d5f0885e6fcd8a8e99c2522bcf7a",
+            "repository": "robert-louis-stevenson_treasure-island",
+            "revision": "c7fd6b42e8e856a49781be45d71a9aa18819f3b8",
+            "translators": []
+          },
+          "options": [
+            "Treasure Island",
+            "Kidnapped",
+            "Captain Blood",
+            "Swallows and Amazons"
+          ],
+          "answerIndex": 0,
+          "difficulty": "easy",
+          "reviewNotes": "Exact contiguous source text; character, setting or recognizable wording provides the identifying clue. Alternatives reviewed for a single supported attribution."
+        },
+        {
+          "id": "chapter-05-q2",
+          "type": "blurb_title",
+          "prompt": "A shipwrecked sailor builds a new life on a remote island, finding ways to feed, shelter and occupy himself over many years.",
+          "book": {
+            "title": "Robinson Crusoe",
+            "author": "Daniel Defoe",
+            "sourceUrl": "https://global.penguinrandomhouse.com/announcements/theres-a-book-for-that-sole-survivor-novels/"
+          },
+          "explanation": "Defoe’s castaway narrates the practical and emotional challenges of island life.",
+          "difficulty": "easy",
+          "seedQuestionId": "chapter-05-q2",
+          "rights": {
+            "basis": "original",
+            "evidence": "Original clue written for The Daily Chapter; premise checked against the linked primary source."
+          },
+          "sourceEdition": "Original premise clue; author, estate or publisher source reviewed 2026-10-26.",
+          "options": [
+            "Robinson Crusoe",
+            "The Swiss Family Robinson",
+            "Gulliver’s Travels",
+            "The Coral Island"
+          ],
+          "answerIndex": 0,
+          "reviewNotes": "Original premise clue checked against the linked author, estate or publisher source. No ending or solution is revealed."
+        },
+        {
+          "id": "chapter-05-q3",
+          "type": "blurb_title",
+          "prompt": "Ten strangers accept invitations to an isolated island, where their absent hosts and a series of deaths turn the visit into a trap.",
+          "book": {
+            "title": "And Then There Were None",
+            "author": "Agatha Christie",
+            "sourceUrl": "https://www.agathachristie.com/stories/and-then-there-were-none"
+          },
+          "explanation": "Soldier Island cuts Christie’s guests off from outside help.",
+          "difficulty": "medium",
+          "seedQuestionId": "chapter-05-q3",
+          "rights": {
+            "basis": "original",
+            "evidence": "Original clue written for The Daily Chapter; premise checked against the linked primary source."
+          },
+          "sourceEdition": "Original premise clue; author, estate or publisher source reviewed 2026-10-26.",
+          "options": [
+            "The Guest List",
+            "The Hunting Party",
+            "And Then There Were None",
+            "The Woman in Cabin 10"
+          ],
+          "answerIndex": 2,
+          "reviewNotes": "Original premise clue checked against the linked author, estate or publisher source. No ending or solution is revealed."
+        },
+        {
+          "id": "chapter-05-q4",
+          "type": "blurb_title",
+          "prompt": "A shipwreck survivor reaches an island where a scientist is experimenting with transforming animals into humanlike beings.",
+          "book": {
+            "title": "The Island of Doctor Moreau",
+            "author": "H. G. Wells",
+            "sourceUrl": "https://www.gutenberg.org/ebooks/159"
+          },
+          "explanation": "Edward Prendick encounters the consequences of Moreau’s experiments.",
+          "difficulty": "medium",
+          "seedQuestionId": "chapter-05-q4",
+          "rights": {
+            "basis": "original",
+            "evidence": "Original clue written for The Daily Chapter; premise checked against the linked primary source."
+          },
+          "sourceEdition": "Original premise clue; author, estate or publisher source reviewed 2026-10-26.",
+          "options": [
+            "The Invisible Man",
+            "The Time Machine",
+            "The Chrysalids",
+            "The Island of Doctor Moreau"
+          ],
+          "answerIndex": 3,
+          "reviewNotes": "Original premise clue checked against the linked author, estate or publisher source. No ending or solution is revealed."
+        },
+        {
+          "id": "chapter-05-q5",
+          "type": "blurb_title",
+          "prompt": "A Greek Cypriot and a Turkish Cypriot fall in love in a taverna whose fig tree bears witness to the island’s divided history.",
+          "book": {
+            "title": "The Island of Missing Trees",
+            "author": "Elif Shafak",
+            "sourceUrl": "https://www.bloomsbury.com/us/island-of-missing-trees-9781635578591/"
+          },
+          "explanation": "Kostas, Defne and the fig tree connect personal memory with the history of Cyprus.",
+          "difficulty": "stretch",
+          "seedQuestionId": "chapter-05-q5",
+          "rights": {
+            "basis": "original",
+            "evidence": "Original clue written for The Daily Chapter; premise checked against the linked primary source."
+          },
+          "sourceEdition": "Original premise clue; author, estate or publisher source reviewed 2026-10-26.",
+          "options": [
+            "The Beekeeper of Aleppo",
+            "The Island of Missing Trees",
+            "Small Island",
+            "The Island"
+          ],
+          "answerIndex": 1,
+          "reviewNotes": "Original premise clue checked against the linked author, estate or publisher source. No ending or solution is revealed."
+        }
+      ]
+    },
+    {
+      "id": "launch-v1-06",
+      "day": 6,
+      "themeId": "romantic-comedies",
+      "title": "A little chemistry",
+      "intro": "From Austen to contemporary romance: awkward arrangements, familiar rivals and unexpected feelings.",
+      "questions": [
+        {
+          "id": "se-20a64418a0ed1544bb77960d7ac5153f",
+          "type": "quote_title",
+          "prompt": "It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.",
+          "book": {
+            "title": "Pride and Prejudice",
+            "author": "Jane Austen",
+            "sourceUrl": "https://github.com/standardebooks/jane-austen_pride-and-prejudice/blob/ed94a32be3e875c0814568050c7544e03aad3ef5/src/epub/text/chapter-1.xhtml"
+          },
+          "sourceEdition": "Standard Ebooks: Pride and Prejudice; en-GB; chapter-1, paragraph 1; revision ed94a32be3e875c0814568050c7544e03aad3ef5",
+          "rights": {
+            "basis": "permission",
+            "evidence": "Quotation reuse rights are assumed cleared for Atmyshelf app/web quizzes, as instructed by the project owner. Source file SHA-256 78e777101e7a3d6dc723dbf6df5d851ae1ba6fd1ebaad29264b14607c9e23214; whitespace-normalized text SHA-256 ff3583336f59ddbfb6b202e15e9ed7fa05f3b6da8e159cd237af89fc02e5932e."
+          },
+          "explanation": "Jane Austen opens with this ironic claim about wealthy single men, setting up the marriage expectations surrounding the Bennet family.",
+          "quoteProof": {
+            "questionId": "se-20a64418a0ed1544bb77960d7ac5153f",
+            "path": "src/epub/text/chapter-1.xhtml",
+            "paragraph": 1,
+            "section": "chapter-1",
+            "fileSha256": "78e777101e7a3d6dc723dbf6df5d851ae1ba6fd1ebaad29264b14607c9e23214",
+            "textSha256": "ff3583336f59ddbfb6b202e15e9ed7fa05f3b6da8e159cd237af89fc02e5932e",
+            "repository": "jane-austen_pride-and-prejudice",
+            "revision": "ed94a32be3e875c0814568050c7544e03aad3ef5",
+            "translators": []
+          },
+          "options": [
+            "Sense and Sensibility",
+            "Emma",
+            "Pride and Prejudice",
+            "Persuasion"
+          ],
+          "answerIndex": 2,
+          "difficulty": "easy",
+          "reviewNotes": "Exact contiguous source text; character, setting or recognizable wording provides the identifying clue. Alternatives reviewed for a single supported attribution."
+        },
+        {
+          "id": "chapter-06-q1",
+          "type": "blurb_title",
+          "prompt": "The son of an American president and a British prince turn a public rivalry into a much more private relationship.",
+          "book": {
+            "title": "Red, White & Royal Blue",
+            "author": "Casey McQuiston",
+            "sourceUrl": "https://www.caseymcquiston.com/red-white-and-royal-blue"
+          },
+          "explanation": "Alex Claremont-Diaz and Prince Henry are the pair at the centre of this romance.",
+          "difficulty": "easy",
+          "seedQuestionId": "chapter-06-q1",
+          "rights": {
+            "basis": "original",
+            "evidence": "Original clue written for The Daily Chapter; premise checked against the linked primary source."
+          },
+          "sourceEdition": "Original premise clue; author, estate or publisher source reviewed 2026-10-26.",
+          "options": [
+            "Boyfriend Material",
+            "Red, White & Royal Blue",
+            "One Last Stop",
+            "Playing the Palace"
+          ],
+          "answerIndex": 1,
+          "reviewNotes": "Original premise clue checked against the linked author, estate or publisher source. No ending or solution is revealed."
+        },
+        {
+          "id": "chapter-06-q2",
+          "type": "blurb_title",
+          "prompt": "Tiffy and Leon share a one-bedroom flat and the same bed at different times, leaving notes before they have ever met.",
+          "book": {
+            "title": "The Flatshare",
+            "author": "Beth O’Leary",
+            "sourceUrl": "https://www.betholearyauthor.com/the-flatshare/"
+          },
+          "explanation": "Their opposite working hours make an unusual flat-sharing arrangement possible.",
+          "difficulty": "medium",
+          "seedQuestionId": "chapter-06-q2",
+          "rights": {
+            "basis": "original",
+            "evidence": "Original clue written for The Daily Chapter; premise checked against the linked primary source."
+          },
+          "sourceEdition": "Original premise clue; author, estate or publisher source reviewed 2026-10-26.",
+          "options": [
+            "The Switch",
+            "The Flatshare",
+            "The Roommate",
+            "The Wake-Up Call"
+          ],
+          "answerIndex": 1,
+          "reviewNotes": "Original premise clue checked against the linked author, estate or publisher source. No ending or solution is revealed."
+        },
+        {
+          "id": "chapter-06-q3",
+          "type": "blurb_title",
+          "prompt": "A biology PhD student starts a fake relationship with a famously difficult professor after an impulsive kiss.",
+          "book": {
+            "title": "The Love Hypothesis",
+            "author": "Ali Hazelwood",
+            "sourceUrl": "https://www.penguinrandomhouse.com/books/673764/the-love-hypothesis-prime-tie-in-by-ali-hazelwood-with-a-foreword-by-lili-reinhart/"
+          },
+          "explanation": "Olive Smith and Adam Carlsen’s pretend relationship complicates their academic lives.",
+          "difficulty": "medium",
+          "seedQuestionId": "chapter-06-q3",
+          "rights": {
+            "basis": "original",
+            "evidence": "Original clue written for The Daily Chapter; premise checked against the linked primary source."
+          },
+          "sourceEdition": "Original premise clue; author, estate or publisher source reviewed 2026-10-26.",
+          "options": [
+            "Love on the Brain",
+            "The Kiss Quotient",
+            "The Rosie Project",
+            "The Love Hypothesis"
+          ],
+          "answerIndex": 3,
+          "reviewNotes": "Original premise clue checked against the linked author, estate or publisher source. No ending or solution is revealed."
+        },
+        {
+          "id": "chapter-06-q4",
+          "type": "blurb_title",
+          "prompt": "Literary agent Nora visits a small North Carolina town with her sister, only to keep encountering editor Charlie Lastra.",
+          "book": {
+            "title": "Book Lovers",
+            "author": "Emily Henry",
+            "sourceUrl": "https://www.penguinrandomhouse.com/books/670293/book-lovers-by-emily-henry/9780593334836/"
+          },
+          "explanation": "Nora’s trip to Sunshine Falls repeatedly brings her together with a familiar editor.",
+          "difficulty": "stretch",
+          "seedQuestionId": "chapter-06-q4",
+          "rights": {
+            "basis": "original",
+            "evidence": "Original clue written for The Daily Chapter; premise checked against the linked primary source."
+          },
+          "sourceEdition": "Original premise clue; author, estate or publisher source reviewed 2026-10-26.",
+          "options": [
+            "Book Lovers",
+            "Beach Read",
+            "The Bookish Life of Nina Hill",
+            "People We Meet on Vacation"
+          ],
+          "answerIndex": 0,
+          "reviewNotes": "Original premise clue checked against the linked author, estate or publisher source. No ending or solution is revealed."
+        }
+      ]
+    },
+    {
+      "id": "launch-v1-07",
+      "day": 7,
+      "themeId": "natural-world",
+      "title": "Wild and wonderful",
+      "intro": "Fungi, forests, feathers and the lives unfolding around us.",
+      "questions": [
+        {
+          "id": "chapter-07-q1",
+          "type": "blurb_title",
+          "prompt": "A botanist brings plant science into conversation with Indigenous knowledge, gratitude and reciprocity with the living world.",
+          "book": {
+            "title": "Braiding Sweetgrass",
+            "author": "Robin Wall Kimmerer",
+            "sourceUrl": "https://milkweed.org/braiding-sweetgrass"
+          },
+          "explanation": "Kimmerer combines her botanical training with knowledge from her Indigenous heritage.",
+          "difficulty": "easy",
+          "seedQuestionId": "chapter-07-q1",
+          "rights": {
+            "basis": "original",
+            "evidence": "Original clue written for The Daily Chapter; premise checked against the linked primary source."
+          },
+          "sourceEdition": "Original premise clue; author, estate or publisher source reviewed 2026-10-26.",
+          "options": [
+            "The Genius of Birds",
+            "The Overstory",
+            "Braiding Sweetgrass",
+            "Pilgrim at Tinker Creek"
+          ],
+          "answerIndex": 2,
+          "reviewNotes": "Original premise clue checked against the linked author, estate or publisher source. No ending or solution is revealed."
+        },
+        {
+          "id": "chapter-07-q2",
+          "type": "blurb_title",
+          "prompt": "A biologist explores fungi, from yeasts and lichens to networks that help shape ecosystems.",
+          "book": {
+            "title": "Entangled Life",
+            "author": "Merlin Sheldrake",
+            "sourceUrl": "https://www.merlinsheldrake.com/entangled-life"
+          },
+          "explanation": "Sheldrake centres fungi and their relationships with other forms of life.",
+          "difficulty": "easy",
+          "seedQuestionId": "chapter-07-q2",
+          "rights": {
+            "basis": "original",
+            "evidence": "Original clue written for The Daily Chapter; premise checked against the linked primary source."
+          },
+          "sourceEdition": "Original premise clue; author, estate or publisher source reviewed 2026-10-26.",
+          "options": [
+            "Other Minds",
+            "The Hidden Life of Trees",
+            "The Tangled Tree",
+            "Entangled Life"
+          ],
+          "answerIndex": 3,
+          "reviewNotes": "Original premise clue checked against the linked author, estate or publisher source. No ending or solution is revealed."
+        },
+        {
+          "id": "chapter-07-q3",
+          "type": "blurb_title",
+          "prompt": "After her father’s death, a writer turns to training a goshawk named Mabel.",
+          "book": {
+            "title": "H Is for Hawk",
+            "author": "Helen Macdonald",
+            "sourceUrl": "https://groveatlantic.com/book/h-is-for-hawk/"
+          },
+          "explanation": "Macdonald intertwines grief, falconry and her relationship with Mabel.",
+          "difficulty": "medium",
+          "seedQuestionId": "chapter-07-q3",
+          "rights": {
+            "basis": "original",
+            "evidence": "Original clue written for The Daily Chapter; premise checked against the linked primary source."
+          },
+          "sourceEdition": "Original premise clue; author, estate or publisher source reviewed 2026-10-26.",
+          "options": [
+            "The Goshawk",
+            "H Is for Hawk",
+            "Vesper Flights",
+            "The Peregrine"
+          ],
+          "answerIndex": 1,
+          "reviewNotes": "Original premise clue checked against the linked author, estate or publisher source. No ending or solution is revealed."
+        },
+        {
+          "id": "clue-612601f0ad45595d50a97ce543eb85ff",
+          "type": "blurb_title",
+          "prompt": "In this work of nonfiction, an author befriends octopuses at an aquarium while exploring their behaviour and animal consciousness.",
+          "book": {
+            "title": "The Soul of an Octopus",
+            "author": "Sy Montgomery",
+            "sourceUrl": "https://www.simonandschuster.com/books/The-Soul-of-an-Octopus/Sy-Montgomery/9781451697711"
+          },
+          "explanation": "Montgomery’s encounters with octopuses guide this work of nonfiction.",
+          "difficulty": "medium",
+          "seedQuestionId": "chapter-07-q4",
+          "rights": {
+            "basis": "original",
+            "evidence": "Original clue written for The Daily Chapter; premise checked against the linked primary source."
+          },
+          "sourceEdition": "Original premise clue; author, estate or publisher source reviewed 2026-10-26.",
+          "options": [
+            "The Soul of an Octopus",
+            "Remarkably Bright Creatures",
+            "The Secret Life of Lobsters",
+            "The Sea Around Us"
+          ],
+          "answerIndex": 0,
+          "reviewNotes": "Original premise clue checked against the linked author, estate or publisher source. No ending or solution is revealed."
+        },
+        {
+          "id": "clue-ca118785885c797b953089dd634c4d56",
+          "type": "blurb_title",
+          "prompt": "Drawing on his years as a forester, Peter Wohlleben explores trees as social beings that communicate with and support one another.",
+          "book": {
+            "title": "The Hidden Life of Trees",
+            "author": "Peter Wohlleben",
+            "sourceUrl": "https://www.foliosociety.com/usa/the-hidden-life-of-trees"
+          },
+          "explanation": "Wohlleben draws on his forestry experience to examine life in the forest.",
+          "difficulty": "stretch",
+          "seedQuestionId": "chapter-07-q5",
+          "rights": {
+            "basis": "original",
+            "evidence": "Original clue written for The Daily Chapter; premise checked against the linked primary source."
+          },
+          "sourceEdition": "Original premise clue; author, estate or publisher source reviewed 2026-10-26.",
+          "options": [
+            "The Forest Unseen",
+            "The Wild Trees",
+            "The Hidden Life of Trees",
+            "The Living Mountain"
+          ],
+          "answerIndex": 2,
+          "reviewNotes": "Original premise clue checked against the linked author, estate or publisher source. No ending or solution is revealed."
+        }
+      ]
+    },
+    {
+      "id": "launch-v1-08",
+      "day": 8,
+      "themeId": "retold-myths",
+      "title": "Old myths, new voices",
+      "intro": "Familiar legends, seen through the people at their edges.",
+      "questions": [
+        {
+          "id": "chapter-08-q1",
+          "type": "blurb_title",
+          "prompt": "A daughter of Helios develops a gift for witchcraft and makes a life on the island of Aeaea.",
+          "book": {
+            "title": "Circe",
+            "author": "Madeline Miller",
+            "sourceUrl": "https://madelinemiller.com/circe/"
+          },
+          "explanation": "Miller gives the witch encountered in the Odyssey a story of her own.",
+          "difficulty": "easy",
+          "seedQuestionId": "chapter-08-q1",
+          "rights": {
+            "basis": "original",
+            "evidence": "Original clue written for The Daily Chapter; premise checked against the linked primary source."
+          },
+          "sourceEdition": "Original premise clue; author, estate or publisher source reviewed 2026-10-26.",
+          "options": [
+            "Circe",
+            "Ariadne",
+            "Atalanta",
+            "Clytemnestra"
+          ],
+          "answerIndex": 0,
+          "reviewNotes": "Original premise clue checked against the linked author, estate or publisher source. No ending or solution is revealed."
+        },
+        {
+          "id": "chapter-08-q2",
+          "type": "blurb_title",
+          "prompt": "Patroclus tells the story of his bond with Achilles as their lives move towards the Trojan War.",
+          "book": {
+            "title": "The Song of Achilles",
+            "author": "Madeline Miller",
+            "sourceUrl": "https://madelinemiller.com/find-out-more/readers-guide/"
+          },
+          "explanation": "Patroclus’s perspective centres the relationship behind Achilles’s legendary reputation.",
+          "difficulty": "easy",
+          "seedQuestionId": "chapter-08-q2",
+          "rights": {
+            "basis": "original",
+            "evidence": "Original clue written for The Daily Chapter; premise checked against the linked primary source."
+          },
+          "sourceEdition": "Original premise clue; author, estate or publisher source reviewed 2026-10-26.",
+          "options": [
+            "The Silence of the Girls",
+            "The Song of Achilles",
+            "The Iliad",
+            "The King Must Die"
+          ],
+          "answerIndex": 1,
+          "reviewNotes": "Original premise clue checked against the linked author, estate or publisher source. No ending or solution is revealed."
+        },
+        {
+          "id": "chapter-08-q3",
+          "type": "blurb_title",
+          "prompt": "A princess of Crete helps Theseus face the Minotaur, setting in motion a life beyond the labyrinth.",
+          "book": {
+            "title": "Ariadne",
+            "author": "Jennifer Saint",
+            "sourceUrl": "https://us.macmillan.com/books/9781250773579/ariadne/"
+          },
+          "explanation": "Saint revisits the myth through Ariadne and the women around her.",
+          "difficulty": "medium",
+          "seedQuestionId": "chapter-08-q3",
+          "rights": {
+            "basis": "original",
+            "evidence": "Original clue written for The Daily Chapter; premise checked against the linked primary source."
+          },
+          "sourceEdition": "Original premise clue; author, estate or publisher source reviewed 2026-10-26.",
+          "options": [
+            "Elektra",
+            "Stone Blind",
+            "Ariadne",
+            "Daughters of Sparta"
+          ],
+          "answerIndex": 2,
+          "reviewNotes": "Original premise clue checked against the linked author, estate or publisher source. No ending or solution is revealed."
+        },
+        {
+          "id": "chapter-08-q4",
+          "type": "blurb_title",
+          "prompt": "Odysseus’s wife and her twelve maids revisit their part in the story usually told about his long journey home.",
+          "book": {
+            "title": "The Penelopiad",
+            "author": "Margaret Atwood",
+            "sourceUrl": "https://canongate.co.uk/books/72-the-penelopiad/"
+          },
+          "explanation": "Atwood gives Penelope and the maids a chance to question the familiar account.",
+          "difficulty": "medium",
+          "seedQuestionId": "chapter-08-q4",
+          "rights": {
+            "basis": "original",
+            "evidence": "Original clue written for The Daily Chapter; premise checked against the linked primary source."
+          },
+          "sourceEdition": "Original premise clue; author, estate or publisher source reviewed 2026-10-26.",
+          "options": [
+            "A Thousand Ships",
+            "The Women of Troy",
+            "The Children of Jocasta",
+            "The Penelopiad"
+          ],
+          "answerIndex": 3,
+          "reviewNotes": "Original premise clue checked against the linked author, estate or publisher source. No ending or solution is revealed."
+        },
+        {
+          "id": "clue-30f1c826fc8ac1bda3fe52ea83f1fd2a",
+          "type": "blurb_title",
+          "prompt": "A woman who never speaks in Virgil’s Aeneid becomes the narrator of her own life and her connection to Aeneas.",
+          "book": {
+            "title": "Lavinia",
+            "author": "Ursula K. Le Guin",
+            "sourceUrl": "https://www.ursulakleguin.com/lavinia"
+          },
+          "explanation": "Le Guin develops the voice of the Latin princess from Virgil’s epic.",
+          "difficulty": "stretch",
+          "seedQuestionId": "chapter-08-q5",
+          "rights": {
+            "basis": "original",
+            "evidence": "Original clue written for The Daily Chapter; premise checked against the linked primary source."
+          },
+          "sourceEdition": "Original premise clue; author, estate or publisher source reviewed 2026-10-26.",
+          "options": [
+            "The Firebrand",
+            "The Red Tent",
+            "The Palace of Illusions",
+            "Lavinia"
+          ],
+          "answerIndex": 3,
+          "reviewNotes": "Original premise clue checked against the linked author, estate or publisher source. No ending or solution is revealed."
+        }
+      ]
+    },
+    {
+      "id": "launch-v1-09",
+      "day": 9,
+      "themeId": "portuguese-literature",
+      "title": "Stories from Portugal",
+      "intro": "Five voices and stories with Portuguese roots.",
+      "questions": [
+        {
+          "id": "chapter-09-q1",
+          "type": "blurb_title",
+          "prompt": "An unexplained epidemic of white blindness spreads through a city, leading the authorities to quarantine the first affected people.",
+          "book": {
+            "title": "Blindness",
+            "author": "José Saramago",
+            "sourceUrl": "https://www.josesaramago.org/en/book/blindness-essay/"
+          },
+          "explanation": "Saramago uses a sudden loss of sight to explore how people behave towards one another.",
+          "difficulty": "easy",
+          "seedQuestionId": "chapter-09-q1",
+          "rights": {
+            "basis": "original",
+            "evidence": "Original clue written for The Daily Chapter; premise checked against the linked primary source."
+          },
+          "sourceEdition": "Original premise clue; author, estate or publisher source reviewed 2026-10-26.",
+          "options": [
+            "Blindness",
+            "Seeing",
+            "The Plague",
+            "The Death of Ivan Ilyich"
+          ],
+          "answerIndex": 0,
+          "reviewNotes": "Original premise clue checked against the linked author, estate or publisher source. No ending or solution is revealed."
+        },
+        {
+          "id": "chapter-09-q2",
+          "type": "blurb_title",
+          "prompt": "Fragments attributed to Lisbon bookkeeper Bernardo Soares turn ordinary working life into reflections on dreams, identity and existence.",
+          "book": {
+            "title": "The Book of Disquiet",
+            "author": "Fernando Pessoa",
+            "sourceUrl": "https://www.ndbooks.com/book/the-book-of-disquiet-the-complete-edition/"
+          },
+          "explanation": "Pessoa’s fragmentary work is closely associated with the voice of Bernardo Soares.",
+          "difficulty": "easy",
+          "seedQuestionId": "chapter-09-q2",
+          "rights": {
+            "basis": "original",
+            "evidence": "Original clue written for The Daily Chapter; premise checked against the linked primary source."
+          },
+          "sourceEdition": "Original premise clue; author, estate or publisher source reviewed 2026-10-26.",
+          "options": [
+            "The Book of Illusions",
+            "The Book of Disquiet",
+            "The Notebooks of Malte Laurids Brigge",
+            "The Year of the Death of Ricardo Reis"
+          ],
+          "answerIndex": 1,
+          "reviewNotes": "Original premise clue checked against the linked author, estate or publisher source. No ending or solution is revealed."
+        },
+        {
+          "id": "chapter-09-q3",
+          "type": "blurb_title",
+          "prompt": "The fortunes of a wealthy Portuguese family, including the young doctor Carlos da Maia, unfold against nineteenth-century Lisbon society.",
+          "book": {
+            "title": "The Maias",
+            "author": "Eça de Queirós",
+            "sourceUrl": "https://www.ndbooks.com/book/the-maias/"
+          },
+          "explanation": "The Maia family gives Queirós a way to examine several generations and their social world.",
+          "difficulty": "medium",
+          "seedQuestionId": "chapter-09-q3",
+          "rights": {
+            "basis": "original",
+            "evidence": "Original clue written for The Daily Chapter; premise checked against the linked primary source."
+          },
+          "sourceEdition": "Original premise clue; author, estate or publisher source reviewed 2026-10-26.",
+          "options": [
+            "The Crime of Father Amaro",
+            "Cousin Bazilio",
+            "The Relic",
+            "The Maias"
+          ],
+          "answerIndex": 3,
+          "reviewNotes": "Original premise clue checked against the linked author, estate or publisher source. No ending or solution is revealed."
+        },
+        {
+          "id": "chapter-09-q4",
+          "type": "blurb_title",
+          "prompt": "Fifteen-year-old Rui leaves Angola with his family in 1975 and starts an uncertain new life in a hotel near Lisbon.",
+          "book": {
+            "title": "The Return",
+            "author": "Dulce Maria Cardoso",
+            "sourceUrl": "https://www.hachette.co.uk/titles/dulce-maria-cardoso/the-return/9780857054357/"
+          },
+          "explanation": "Cardoso follows displacement and family life through Rui’s adolescent perspective.",
+          "difficulty": "medium",
+          "seedQuestionId": "chapter-09-q4",
+          "rights": {
+            "basis": "original",
+            "evidence": "Original clue written for The Daily Chapter; premise checked against the linked primary source."
+          },
+          "sourceEdition": "Original premise clue; author, estate or publisher source reviewed 2026-10-26.",
+          "options": [
+            "Eliete",
+            "The Piano Cemetery",
+            "The Return",
+            "South of Nowhere"
+          ],
+          "answerIndex": 2,
+          "reviewNotes": "Original premise clue checked against the linked author, estate or publisher source. No ending or solution is revealed."
+        },
+        {
+          "id": "chapter-09-q5",
+          "type": "blurb_title",
+          "prompt": "A woman revisits the events surrounding her marriage to a Portuguese military officer in Mozambique, questioning how that past has been told.",
+          "book": {
+            "title": "The Murmuring Coast",
+            "author": "Lídia Jorge",
+            "sourceUrl": "https://books.google.com/books/about/The_Murmuring_Coast.html?id=85YrnoxfgC8C"
+          },
+          "explanation": "Jorge returns to a colonial wartime setting through Eva Lopo’s recollections.",
+          "difficulty": "stretch",
+          "seedQuestionId": "chapter-09-q5",
+          "rights": {
+            "basis": "original",
+            "evidence": "Original clue written for The Daily Chapter; premise checked against the linked primary source."
+          },
+          "sourceEdition": "Original premise clue; author, estate or publisher source reviewed 2026-10-26.",
+          "options": [
+            "The Murmuring Coast",
+            "The Wind Whistling in the Cranes",
+            "The Land at the End of the World",
+            "The Painter of Birds"
+          ],
+          "answerIndex": 0,
+          "reviewNotes": "Original premise clue checked against the linked author, estate or publisher source. No ending or solution is revealed."
+        }
+      ]
+    },
+    {
+      "id": "launch-v1-10",
+      "day": 10,
+      "themeId": "time-travel",
+      "title": "Out of time",
+      "intro": "A café, a doorway, a letter. Five ways to slip out of the present.",
+      "questions": [
+        {
+          "id": "chapter-10-q1",
+          "type": "blurb_title",
+          "prompt": "A small Tokyo café lets its visitors travel into the past, provided they follow strict rules and return before their drink cools.",
+          "book": {
+            "title": "Before the Coffee Gets Cold",
+            "author": "Toshikazu Kawaguchi",
+            "sourceUrl": "https://www.panmacmillan.com/authors/toshikazu-kawaguchi/before-the-coffee-gets-cold/9781529029598"
+          },
+          "explanation": "The café’s time-travel offer is shaped by a very particular deadline.",
+          "difficulty": "easy",
+          "seedQuestionId": "chapter-10-q1",
+          "rights": {
+            "basis": "original",
+            "evidence": "Original clue written for The Daily Chapter; premise checked against the linked primary source."
+          },
+          "sourceEdition": "Original premise clue; author, estate or publisher source reviewed 2026-10-26.",
+          "options": [
+            "Before the Coffee Gets Cold",
+            "The Full Moon Coffee Shop",
+            "The Travelling Cat Chronicles",
+            "The Kamogawa Food Detectives"
+          ],
+          "answerIndex": 0,
+          "reviewNotes": "Original premise clue checked against the linked author, estate or publisher source. No ending or solution is revealed."
+        },
+        {
+          "id": "se-e96b3ec0432ba4d7cdc0fc1d3273b34d",
+          "type": "quote_title",
+          "prompt": "“Upon that machine,” said the Time Traveller, holding the lamp aloft, “I intend to explore time. Is that plain? I was never more serious in my life.”",
+          "book": {
+            "title": "The Time Machine",
+            "author": "H. G. Wells",
+            "sourceUrl": "https://github.com/standardebooks/h-g-wells_the-time-machine/blob/9fd22d612e6ed35cd07a8ed5e3ccdc4856c05088/src/epub/text/chapter-1.xhtml"
+          },
+          "sourceEdition": "Standard Ebooks: The Time Machine; en-GB; chapter-1.xhtml, paragraph 76, characters 1-149; revision 9fd22d612e6ed35cd07a8ed5e3ccdc4856c05088",
+          "rights": {
+            "basis": "permission",
+            "evidence": "Quotation reuse rights are assumed cleared for Atmyshelf app/web quizzes, as instructed by the project owner. Source file SHA-256 271ade0cbef9469a3b6afac85e6b76d49f632398ff35dae08c7cf1f63ee268ee; whitespace-normalized text SHA-256 ee396ff8c9691efd9eca93121bc234accdcffbb5ac942efa9401223b686d6267."
+          },
+          "explanation": "H. G. Wells’s Time Traveller has shown his dinner guests his machine and announces his intention to travel on it.",
+          "quoteProof": {
+            "questionId": "se-e96b3ec0432ba4d7cdc0fc1d3273b34d",
+            "repository": "h-g-wells_the-time-machine",
+            "revision": "9fd22d612e6ed35cd07a8ed5e3ccdc4856c05088",
+            "translators": [],
+            "path": "src/epub/text/chapter-1.xhtml",
+            "paragraph": 76,
+            "paragraphText": "“Upon that machine,” said the Time Traveller, holding the lamp aloft, “I intend to explore time. Is that plain? I was never more serious in my life.”",
+            "start": 0,
+            "length": 149,
+            "fileSha256": "271ade0cbef9469a3b6afac85e6b76d49f632398ff35dae08c7cf1f63ee268ee",
+            "textSha256": "ee396ff8c9691efd9eca93121bc234accdcffbb5ac942efa9401223b686d6267"
+          },
+          "options": [
+            "Time and Again",
+            "Replay",
+            "The Time Machine",
+            "The Time Traveler’s Wife"
+          ],
+          "answerIndex": 2,
+          "difficulty": "easy",
+          "reviewNotes": "Exact contiguous source text; character, setting or recognizable wording provides the identifying clue. Alternatives reviewed for a single supported attribution."
+        },
+        {
+          "id": "chapter-10-q3",
+          "type": "blurb_title",
+          "prompt": "An English teacher discovers a passage into the past and takes on the task of preventing John F. Kennedy’s assassination.",
+          "book": {
+            "title": "11/22/63",
+            "author": "Stephen King",
+            "sourceUrl": "https://stephenking.com/works/novel/11-22-63.html"
+          },
+          "explanation": "Jake Epping’s mission gives King’s time-travel novel its date-shaped title.",
+          "difficulty": "medium",
+          "seedQuestionId": "chapter-10-q3",
+          "rights": {
+            "basis": "original",
+            "evidence": "Original clue written for The Daily Chapter; premise checked against the linked primary source."
+          },
+          "sourceEdition": "Original premise clue; author, estate or publisher source reviewed 2026-10-26.",
+          "options": [
+            "The Dead Zone",
+            "Replay",
+            "Time and Again",
+            "11/22/63"
+          ],
+          "answerIndex": 3,
+          "reviewNotes": "Original premise clue checked against the linked author, estate or publisher source. No ending or solution is revealed."
+        },
+        {
+          "id": "clue-fb3e95ef3e2fc512d87d43c96efddab5",
+          "type": "blurb_title",
+          "prompt": "Dana, a Black writer from 1970s California, is repeatedly transported to a plantation in the pre-Civil War American South.",
+          "book": {
+            "title": "Kindred",
+            "author": "Octavia E. Butler",
+            "sourceUrl": "https://www.octaviabutler.com/kindred"
+          },
+          "explanation": "Butler connects Dana’s present to the lives and power structures of the American past.",
+          "difficulty": "medium",
+          "seedQuestionId": "chapter-10-q4",
+          "rights": {
+            "basis": "original",
+            "evidence": "Original clue written for The Daily Chapter; premise checked against the linked primary source."
+          },
+          "sourceEdition": "Original premise clue; author, estate or publisher source reviewed 2026-10-26.",
+          "options": [
+            "Parable of the Sower",
+            "Kindred",
+            "Beloved",
+            "The Water Dancer"
+          ],
+          "answerIndex": 1,
+          "reviewNotes": "Original premise clue checked against the linked author, estate or publisher source. No ending or solution is revealed."
+        },
+        {
+          "id": "chapter-10-q5",
+          "type": "blurb_title",
+          "prompt": "Two agents on opposing sides of a war across possible futures begin leaving each other letters.",
+          "book": {
+            "title": "This Is How You Lose the Time War",
+            "author": "Amal El-Mohtar and Max Gladstone",
+            "sourceUrl": "https://www.simonandschuster.com/books/This-Is-How-You-Lose-the-Time-War/Amal-El-Mohtar/9781534430990"
+          },
+          "explanation": "The correspondence between Red and Blue becomes the centre of this novella.",
+          "difficulty": "stretch",
+          "seedQuestionId": "chapter-10-q5",
+          "rights": {
+            "basis": "original",
+            "evidence": "Original clue written for The Daily Chapter; premise checked against the linked primary source."
+          },
+          "sourceEdition": "Original premise clue; author, estate or publisher source reviewed 2026-10-26.",
+          "options": [
+            "The Future of Another Timeline",
+            "This Is How You Lose the Time War",
+            "The Psychology of Time Travel",
+            "The Rise and Fall of D.O.D.O."
+          ],
+          "answerIndex": 1,
+          "reviewNotes": "Original premise clue checked against the linked author, estate or publisher source. No ending or solution is revealed."
+        }
+      ]
+    },
+    {
+      "id": "launch-v1-11",
+      "day": 11,
+      "themeId": "gothic-stories",
+      "title": "Behind closed doors",
+      "intro": "Voices from castles, laboratories and shadowed drawing rooms. Name the books behind these words.",
+      "questions": [
+        {
+          "id": "se-b6476f5a62552747c198c7abe4bedae5",
+          "type": "quote_title",
+          "prompt": "“Listen to them⁠—the children of the night. What music they make!”",
+          "book": {
+            "title": "Dracula",
+            "author": "Bram Stoker",
+            "sourceUrl": "https://github.com/standardebooks/bram-stoker_dracula/blob/e9e81aadf8b235fb6498728bce54b0967e224612/src/epub/text/chapter-2.xhtml"
+          },
+          "sourceEdition": "Standard Ebooks: Dracula; en-GB; chapter-2.xhtml, paragraph 23, characters 1-66; revision e9e81aadf8b235fb6498728bce54b0967e224612",
+          "rights": {
+            "basis": "permission",
+            "evidence": "Quotation reuse rights are assumed cleared for Atmyshelf app/web quizzes, as instructed by the project owner. Source file SHA-256 b633e317993385bbe136dc2e3f5376c10c009f5aa66ef6300e15a8e5a45d9bd8; whitespace-normalized text SHA-256 44c97555c5af78621c23721b0c228f3015b849c74b75934cc29803aace4f07ee."
+          },
+          "explanation": "Count Dracula says this about the wolves outside his castle while Jonathan Harker is his guest. The line appears in Harker’s journal.",
+          "quoteProof": {
+            "questionId": "se-b6476f5a62552747c198c7abe4bedae5",
+            "repository": "bram-stoker_dracula",
+            "revision": "e9e81aadf8b235fb6498728bce54b0967e224612",
+            "translators": [],
+            "path": "src/epub/text/chapter-2.xhtml",
+            "paragraph": 23,
+            "paragraphText": "“Listen to them⁠—the children of the night. What music they make!” Seeing, I suppose, some expression in my face strange to him, he added:⁠—",
+            "start": 0,
+            "length": 66,
+            "fileSha256": "b633e317993385bbe136dc2e3f5376c10c009f5aa66ef6300e15a8e5a45d9bd8",
+            "textSha256": "44c97555c5af78621c23721b0c228f3015b849c74b75934cc29803aace4f07ee"
+          },
+          "options": [
+            "Carmilla",
+            "The Vampyre",
+            "The Turn of the Screw",
+            "Dracula"
+          ],
+          "answerIndex": 3,
+          "difficulty": "easy",
+          "reviewNotes": "Exact contiguous source text; character, setting or recognizable wording provides the identifying clue. Alternatives reviewed for a single supported attribution."
+        },
+        {
+          "id": "se-87680081ccb5f51af72ee1fa74972353",
+          "type": "quote_title",
+          "prompt": "As they entered they saw Dorian Gray. He was seated at the piano, with his back to them, turning over the pages of a volume of Schumann’s “Forest Scenes.” “You must lend me these, Basil,” he cried. “I want to learn them. They are perfectly charming.”",
+          "book": {
+            "title": "The Picture of Dorian Gray",
+            "author": "Oscar Wilde",
+            "sourceUrl": "https://github.com/standardebooks/oscar-wilde_the-picture-of-dorian-gray/blob/c6b6877688d7652e74c3db4e21322adcb27cadcd/src/epub/text/chapter-2.xhtml"
+          },
+          "sourceEdition": "Standard Ebooks: The Picture of Dorian Gray; en-GB; chapter-2, paragraph 1; revision c6b6877688d7652e74c3db4e21322adcb27cadcd",
+          "rights": {
+            "basis": "permission",
+            "evidence": "Quotation reuse rights are assumed cleared for Atmyshelf app/web quizzes, as instructed by the project owner. Source file SHA-256 96f099adc6e423121c4c593761dddc1f22db123ae493160d2f301853bf8b8bf5; whitespace-normalized text SHA-256 b8a5517d50b09a4607c03e4145cb71403a8664967f588e20ba5ce40094821f43."
+          },
+          "explanation": "Dorian Gray is visiting the artist Basil Hallward. The piano and the named characters place the scene near the start of Oscar Wilde’s novel.",
+          "quoteProof": {
+            "questionId": "se-87680081ccb5f51af72ee1fa74972353",
+            "path": "src/epub/text/chapter-2.xhtml",
+            "paragraph": 1,
+            "section": "chapter-2",
+            "fileSha256": "96f099adc6e423121c4c593761dddc1f22db123ae493160d2f301853bf8b8bf5",
+            "textSha256": "b8a5517d50b09a4607c03e4145cb71403a8664967f588e20ba5ce40094821f43",
+            "repository": "oscar-wilde_the-picture-of-dorian-gray",
+            "revision": "c6b6877688d7652e74c3db4e21322adcb27cadcd",
+            "translators": []
+          },
+          "options": [
+            "The Picture of Dorian Gray",
+            "The Portrait of a Lady",
+            "The Marble Faun",
+            "The Oval Portrait"
+          ],
+          "answerIndex": 0,
+          "difficulty": "easy",
+          "reviewNotes": "Exact contiguous source text; character, setting or recognizable wording provides the identifying clue. Alternatives reviewed for a single supported attribution."
+        },
+        {
+          "id": "se-af97143ba53ea17aa901c543da3fdb75",
+          "type": "quote_title",
+          "prompt": "Remember, that I am thy creature; I ought to be thy Adam; but I am rather the fallen angel, whom thou drivest from joy for no misdeed.",
+          "book": {
+            "title": "Frankenstein",
+            "author": "Mary Shelley",
+            "sourceUrl": "https://github.com/standardebooks/mary-shelley_frankenstein/blob/3909a2b9d956377e797e235562cd237d3667fa9b/src/epub/text/chapter-10.xhtml"
+          },
+          "sourceEdition": "Standard Ebooks: Frankenstein; en-GB; chapter-10.xhtml, paragraph 12, characters 720-853; revision 3909a2b9d956377e797e235562cd237d3667fa9b",
+          "rights": {
+            "basis": "permission",
+            "evidence": "Quotation reuse rights are assumed cleared for Atmyshelf app/web quizzes, as instructed by the project owner. Source file SHA-256 f0f3e1674cf7a93f28b807947e6bb9abb17cbbd92141e19ec64d523aca4d41c7; whitespace-normalized text SHA-256 2c5522e02e6ffbc2d5ee07d549c16fb655b73e51d94766f2d4f4ef1fe9383830."
+          },
+          "explanation": "The creature appeals to Victor Frankenstein through the imagery of Adam and the fallen angel, asking his creator to hear his story.",
+          "quoteProof": {
+            "questionId": "se-af97143ba53ea17aa901c543da3fdb75",
+            "repository": "mary-shelley_frankenstein",
+            "revision": "3909a2b9d956377e797e235562cd237d3667fa9b",
+            "translators": [],
+            "path": "src/epub/text/chapter-10.xhtml",
+            "paragraph": 12,
+            "paragraphText": "“Be calm! I entreat you to hear me, before you give vent to your hatred on my devoted head. Have I not suffered enough, that you seek to increase my misery? Life, although it may only be an accumulation of anguish, is dear to me, and I will defend it. Remember, thou hast made me more powerful than thyself; my height is superior to thine; my joints more supple. But I will not be tempted to set myself in opposition to thee. I am thy creature, and I will be even mild and docile to my natural lord and king, if thou wilt also perform thy part, the which thou owest me. Oh, Frankenstein, be not equitable to every other, and trample upon me alone, to whom thy justice, and even thy clemency and affection, is most due. Remember, that I am thy creature; I ought to be thy Adam; but I am rather the fallen angel, whom thou drivest from joy for no misdeed. Everywhere I see bliss, from which I alone am irrevocably excluded. I was benevolent and good; misery made me a fiend. Make me happy, and I shall again be virtuous.”",
+            "start": 719,
+            "length": 134,
+            "fileSha256": "f0f3e1674cf7a93f28b807947e6bb9abb17cbbd92141e19ec64d523aca4d41c7",
+            "textSha256": "2c5522e02e6ffbc2d5ee07d549c16fb655b73e51d94766f2d4f4ef1fe9383830"
+          },
+          "options": [
+            "The Island of Doctor Moreau",
+            "The Strange Case of Dr. Jekyll and Mr. Hyde",
+            "Frankenstein",
+            "The Golem"
+          ],
+          "answerIndex": 2,
+          "difficulty": "medium",
+          "reviewNotes": "Exact contiguous source text; character, setting or recognizable wording provides the identifying clue. Alternatives reviewed for a single supported attribution."
+        },
+        {
+          "id": "se-89c9e30bab5818a84525fca6cd719814",
+          "type": "quote_title",
+          "prompt": "“I have been wanting to speak to you, Jekyll,” began the latter. “You know that will of yours?”",
+          "book": {
+            "title": "The Strange Case of Dr. Jekyll and Mr. Hyde",
+            "author": "Robert Louis Stevenson",
+            "sourceUrl": "https://github.com/standardebooks/robert-louis-stevenson_the-strange-case-of-dr-jekyll-and-mr-hyde/blob/bb6ccb4d19e94d71588dbacbd3a48aa6cd1846ed/src/epub/text/chapter-3.xhtml"
+          },
+          "sourceEdition": "Standard Ebooks: The Strange Case of Dr. Jekyll and Mr. Hyde; en-GB; chapter-3, paragraph 2; revision bb6ccb4d19e94d71588dbacbd3a48aa6cd1846ed",
+          "rights": {
+            "basis": "permission",
+            "evidence": "Quotation reuse rights are assumed cleared for Atmyshelf app/web quizzes, as instructed by the project owner. Source file SHA-256 58af8ea3a7a4980b417dc207de6c8745c25f9764291be2576c0f0901fde764ec; whitespace-normalized text SHA-256 abc8e11aed82e55e86a0c13ede49e2551eb5057b6bcaac23a138307f79066b3d."
+          },
+          "explanation": "The lawyer Mr. Utterson questions his friend Dr. Jekyll about a troubling will early in Robert Louis Stevenson’s novella.",
+          "quoteProof": {
+            "questionId": "se-89c9e30bab5818a84525fca6cd719814",
+            "path": "src/epub/text/chapter-3.xhtml",
+            "paragraph": 2,
+            "section": "chapter-3",
+            "fileSha256": "58af8ea3a7a4980b417dc207de6c8745c25f9764291be2576c0f0901fde764ec",
+            "textSha256": "abc8e11aed82e55e86a0c13ede49e2551eb5057b6bcaac23a138307f79066b3d",
+            "repository": "robert-louis-stevenson_the-strange-case-of-dr-jekyll-and-mr-hyde",
+            "revision": "bb6ccb4d19e94d71588dbacbd3a48aa6cd1846ed",
+            "translators": []
+          },
+          "options": [
+            "The Picture of Dorian Gray",
+            "The Strange Case of Dr. Jekyll and Mr. Hyde",
+            "The Island of Doctor Moreau",
+            "The Invisible Man"
+          ],
+          "answerIndex": 1,
+          "difficulty": "medium",
+          "reviewNotes": "Exact contiguous source text; character, setting or recognizable wording provides the identifying clue. Alternatives reviewed for a single supported attribution."
+        },
+        {
+          "id": "se-a20a27f9c50780f5025f96825707afd7",
+          "type": "quote_title",
+          "prompt": "I was glad of it: I never liked long walks, especially on chilly afternoons: dreadful to me was the coming home in the raw twilight, with nipped fingers and toes, and a heart saddened by the chidings of Bessie, the nurse, and humbled by the consciousness of my physical inferiority to Eliza, John, and Georgiana Reed.",
+          "book": {
+            "title": "Jane Eyre",
+            "author": "Charlotte Brontë",
+            "sourceUrl": "https://github.com/standardebooks/charlotte-bronte_jane-eyre/blob/f0b188283cdc96670a2f629e312fffb57440f4e6/src/epub/text/chapter-1.xhtml"
+          },
+          "sourceEdition": "Standard Ebooks: Jane Eyre; en-GB; chapter-1, paragraph 2; revision f0b188283cdc96670a2f629e312fffb57440f4e6",
+          "rights": {
+            "basis": "permission",
+            "evidence": "Quotation reuse rights are assumed cleared for Atmyshelf app/web quizzes, as instructed by the project owner. Source file SHA-256 9085c026986d81a71de7df65452286607a44c533f54202b638c923cb8376b197; whitespace-normalized text SHA-256 5001b1108e5f900d561820565150ffa8e9766deed0dadce248f16a0e63c79618."
+          },
+          "explanation": "The young narrator is living with the Reed family at Gateshead. Bessie and the Reed children identify the opening world of Charlotte Brontë’s novel.",
+          "quoteProof": {
+            "questionId": "se-a20a27f9c50780f5025f96825707afd7",
+            "path": "src/epub/text/chapter-1.xhtml",
+            "paragraph": 2,
+            "section": "chapter-1",
+            "fileSha256": "9085c026986d81a71de7df65452286607a44c533f54202b638c923cb8376b197",
+            "textSha256": "5001b1108e5f900d561820565150ffa8e9766deed0dadce248f16a0e63c79618",
+            "repository": "charlotte-bronte_jane-eyre",
+            "revision": "f0b188283cdc96670a2f629e312fffb57440f4e6",
+            "translators": []
+          },
+          "options": [
+            "Wuthering Heights",
+            "Agnes Grey",
+            "Jane Eyre",
+            "Villette"
+          ],
+          "answerIndex": 2,
+          "difficulty": "stretch",
+          "reviewNotes": "Exact contiguous source text; character, setting or recognizable wording provides the identifying clue. Alternatives reviewed for a single supported attribution."
+        }
+      ]
+    },
+    {
+      "id": "launch-v1-12",
+      "day": 12,
+      "themeId": "letters-diaries",
+      "title": "Dear reader",
+      "intro": "Private pages, distant friends and stories told one entry at a time.",
+      "questions": [
+        {
+          "id": "chapter-12-q1",
+          "type": "blurb_title",
+          "prompt": "A Jewish teenager records daily life while hiding with her family in Amsterdam during the Nazi occupation.",
+          "book": {
+            "title": "The Diary of a Young Girl",
+            "author": "Anne Frank",
+            "sourceUrl": "https://www.annefrank.org/en/anne-frank/who-was-anne-frank/"
+          },
+          "explanation": "Anne Frank’s diary records the experiences of a young person living in hiding.",
+          "difficulty": "easy",
+          "seedQuestionId": "chapter-12-q1",
+          "rights": {
+            "basis": "original",
+            "evidence": "Original clue written for The Daily Chapter; premise checked against the linked primary source."
+          },
+          "sourceEdition": "Original premise clue; author, estate or publisher source reviewed 2026-10-26.",
+          "options": [
+            "I Am Malala",
+            "The Hiding Place",
+            "Zlata’s Diary",
+            "The Diary of a Young Girl"
+          ],
+          "answerIndex": 3,
+          "reviewNotes": "Original premise clue checked against the linked author, estate or publisher source. No ending or solution is revealed."
+        },
+        {
+          "id": "chapter-12-q2",
+          "type": "blurb_title",
+          "prompt": "Charlie tells an unnamed friend about his first year of high school through letters, as new friendships draw him out of the sidelines.",
+          "book": {
+            "title": "The Perks of Being a Wallflower",
+            "author": "Stephen Chbosky",
+            "sourceUrl": "https://www.simonandschuster.com/books/The-Perks-of-Being-a-Wallflower/Stephen-Chbosky/9781451696196"
+          },
+          "explanation": "Charlie’s letters give the novel its intimate account of adolescence and friendship.",
+          "difficulty": "easy",
+          "seedQuestionId": "chapter-12-q2",
+          "rights": {
+            "basis": "original",
+            "evidence": "Original clue written for The Daily Chapter; premise checked against the linked primary source."
+          },
+          "sourceEdition": "Original premise clue; author, estate or publisher source reviewed 2026-10-26.",
+          "options": [
+            "The Catcher in the Rye",
+            "The Perks of Being a Wallflower",
+            "Looking for Alaska",
+            "Aristotle and Dante Discover the Secrets of the Universe"
+          ],
+          "answerIndex": 1,
+          "reviewNotes": "Original premise clue checked against the linked author, estate or publisher source. No ending or solution is revealed."
+        },
+        {
+          "id": "chapter-12-q3",
+          "type": "blurb_title",
+          "prompt": "After the Second World War, writer Juliet Ashton exchanges letters with members of a book club formed on occupied Guernsey.",
+          "book": {
+            "title": "The Guernsey Literary and Potato Peel Pie Society",
+            "author": "Mary Ann Shaffer and Annie Barrows",
+            "sourceUrl": "https://www.penguinrandomhouse.com/books/164594/the-guernsey-literary-and-potato-peel-pie-society-by-mary-ann-shaffer-and-annie-barrows/"
+          },
+          "explanation": "The letters bring Juliet into contact with an island community and its wartime history.",
+          "difficulty": "medium",
+          "seedQuestionId": "chapter-12-q3",
+          "rights": {
+            "basis": "original",
+            "evidence": "Original clue written for The Daily Chapter; premise checked against the linked primary source."
+          },
+          "sourceEdition": "Original premise clue; author, estate or publisher source reviewed 2026-10-26.",
+          "options": [
+            "The Jane Austen Society",
+            "The Reading List",
+            "The Guernsey Literary and Potato Peel Pie Society",
+            "The Chilbury Ladies’ Choir"
+          ],
+          "answerIndex": 2,
+          "reviewNotes": "Original premise clue checked against the linked author, estate or publisher source. No ending or solution is revealed."
+        },
+        {
+          "id": "chapter-12-q4",
+          "type": "blurb_title",
+          "prompt": "Celie’s letters to God and to her sister Nettie trace her life in the American South and her search for independence.",
+          "book": {
+            "title": "The Color Purple",
+            "author": "Alice Walker",
+            "sourceUrl": "https://www.hachette.co.uk/titles/alice-walker/the-color-purple/9781409139263/"
+          },
+          "explanation": "Walker uses Celie’s letters to centre her voice and changing relationships.",
+          "difficulty": "medium",
+          "seedQuestionId": "chapter-12-q4",
+          "rights": {
+            "basis": "original",
+            "evidence": "Original clue written for The Daily Chapter; premise checked against the linked primary source."
+          },
+          "sourceEdition": "Original premise clue; author, estate or publisher source reviewed 2026-10-26.",
+          "options": [
+            "The Color Purple",
+            "Their Eyes Were Watching God",
+            "The Bluest Eye",
+            "I Know Why the Caged Bird Sings"
+          ],
+          "answerIndex": 0,
+          "reviewNotes": "Original premise clue checked against the linked author, estate or publisher source. No ending or solution is revealed."
+        },
+        {
+          "id": "se-a98ef3a2bbaf3d928b3a18c5323b064d",
+          "type": "quote_title",
+          "prompt": "“Well,” resumed Rose; “I was going to tell you an important piece of news I heard there⁠—I have been bursting with it ever since. You know it was reported a month ago, that somebody was going to take Wildfell Hall⁠—and⁠—what do you think? It has actually been inhabited above a week!⁠—and we never knew!”",
+          "book": {
+            "title": "The Tenant of Wildfell Hall",
+            "author": "Anne Brontë",
+            "sourceUrl": "https://github.com/standardebooks/anne-bronte_the-tenant-of-wildfell-hall/blob/a4af7522f68d261e6192c2ea49b0614767be742d/src/epub/text/chapter-1.xhtml"
+          },
+          "sourceEdition": "Standard Ebooks: The Tenant of Wildfell Hall; en-GB; chapter-1.xhtml, paragraph 19, characters 1-304; revision a4af7522f68d261e6192c2ea49b0614767be742d",
+          "rights": {
+            "basis": "permission",
+            "evidence": "Quotation reuse rights are assumed cleared for Atmyshelf app/web quizzes, as instructed by the project owner. Source file SHA-256 c594e071156ddc67c3e6d0fecff4444475b970b25cda6337b0a91a22b4f8677f; whitespace-normalized text SHA-256 66067257fe36f1d98102395fb1d4476913a527601bc12fd49c75ef16a4c3d38c."
+          },
+          "explanation": "Rose announces the arrival of a new resident at Wildfell Hall. Gilbert Markham recounts these events in letters, within a novel that also contains Helen’s diary.",
+          "quoteProof": {
+            "questionId": "se-a98ef3a2bbaf3d928b3a18c5323b064d",
+            "repository": "anne-bronte_the-tenant-of-wildfell-hall",
+            "revision": "a4af7522f68d261e6192c2ea49b0614767be742d",
+            "translators": [],
+            "path": "src/epub/text/chapter-1.xhtml",
+            "paragraph": 19,
+            "paragraphText": "“Well,” resumed Rose; “I was going to tell you an important piece of news I heard there⁠—I have been bursting with it ever since. You know it was reported a month ago, that somebody was going to take Wildfell Hall⁠—and⁠—what do you think? It has actually been inhabited above a week!⁠—and we never knew!”",
+            "start": 0,
+            "length": 304,
+            "fileSha256": "c594e071156ddc67c3e6d0fecff4444475b970b25cda6337b0a91a22b4f8677f",
+            "textSha256": "66067257fe36f1d98102395fb1d4476913a527601bc12fd49c75ef16a4c3d38c"
+          },
+          "options": [
+            "Agnes Grey",
+            "The Woman in White",
+            "The Diary of a Nobody",
+            "The Tenant of Wildfell Hall"
+          ],
+          "answerIndex": 3,
+          "difficulty": "stretch",
+          "reviewNotes": "Exact contiguous source text; character, setting or recognizable wording provides the identifying clue. Alternatives reviewed for a single supported attribution."
+        }
+      ]
+    },
+    {
+      "id": "launch-v1-13",
+      "day": 13,
+      "themeId": "space-adventures",
+      "title": "Beyond the stars",
+      "intro": "Stranded astronauts, unlikely crews and journeys far from home.",
+      "questions": [
+        {
+          "id": "clue-b844a37db7eaa153b0ea5c0858625ae4",
+          "type": "blurb_title",
+          "prompt": "At the start of this comic space adventure, Arthur Dent escapes Earth moments before its demolition with his friend Ford Prefect.",
+          "book": {
+            "title": "The Hitchhiker’s Guide to the Galaxy",
+            "author": "Douglas Adams",
+            "sourceUrl": "https://www.penguinrandomhouse.com/books/671/the-hitchhikers-guide-to-the-galaxy-25th-anniversary-edition-by-douglas-adams/"
+          },
+          "explanation": "Arthur’s rescue begins an absurd journey through the galaxy.",
+          "difficulty": "easy",
+          "seedQuestionId": "chapter-13-q1",
+          "rights": {
+            "basis": "original",
+            "evidence": "Original clue written for The Daily Chapter; premise checked against the linked primary source."
+          },
+          "sourceEdition": "Original premise clue; author, estate or publisher source reviewed 2026-10-26.",
+          "options": [
+            "The Restaurant at the End of the Universe",
+            "The Hitchhiker’s Guide to the Galaxy",
+            "Good Omens",
+            "The Sirens of Titan"
+          ],
+          "answerIndex": 1,
+          "reviewNotes": "Original premise clue checked against the linked author, estate or publisher source. No ending or solution is revealed."
+        },
+        {
+          "id": "chapter-13-q2",
+          "type": "blurb_title",
+          "prompt": "Astronaut Mark Watney is left behind on Mars and relies on his scientific training to stay alive.",
+          "book": {
+            "title": "The Martian",
+            "author": "Andy Weir",
+            "sourceUrl": "https://www.penguinrandomhouse.com/books/234102/the-martian-by-andy-weir/"
+          },
+          "explanation": "Watney’s improvised survival efforts centre the story on Mars.",
+          "difficulty": "easy",
+          "seedQuestionId": "chapter-13-q2",
+          "rights": {
+            "basis": "original",
+            "evidence": "Original clue written for The Daily Chapter; premise checked against the linked primary source."
+          },
+          "sourceEdition": "Original premise clue; author, estate or publisher source reviewed 2026-10-26.",
+          "options": [
+            "The Martian",
+            "Artemis",
+            "Red Mars",
+            "Seveneves"
+          ],
+          "answerIndex": 0,
+          "reviewNotes": "Original premise clue checked against the linked author, estate or publisher source. No ending or solution is revealed."
+        },
+        {
+          "id": "chapter-13-q3",
+          "type": "blurb_title",
+          "prompt": "A man wakes aboard a spacecraft with almost no memory and gradually discovers that his mission could save humanity.",
+          "book": {
+            "title": "Project Hail Mary",
+            "author": "Andy Weir",
+            "sourceUrl": "https://images.penguinrandomhouse.com/promo_image/9780593135204_8306.pdf"
+          },
+          "explanation": "Ryland Grace must recover the purpose of his mission while solving its scientific puzzle.",
+          "difficulty": "medium",
+          "seedQuestionId": "chapter-13-q3",
+          "rights": {
+            "basis": "original",
+            "evidence": "Original clue written for The Daily Chapter; premise checked against the linked primary source."
+          },
+          "sourceEdition": "Original premise clue; author, estate or publisher source reviewed 2026-10-26.",
+          "options": [
+            "Rendezvous with Rama",
+            "Solaris",
+            "Project Hail Mary",
+            "Tau Zero"
+          ],
+          "answerIndex": 2,
+          "reviewNotes": "Original premise clue checked against the linked author, estate or publisher source. No ending or solution is revealed."
+        },
+        {
+          "id": "chapter-13-q4",
+          "type": "blurb_title",
+          "prompt": "Rosemary joins the Wayfarer, a wormhole-building ship whose crew brings together people from several species.",
+          "book": {
+            "title": "The Long Way to a Small, Angry Planet",
+            "author": "Becky Chambers",
+            "sourceUrl": "https://www.hachette.co.uk/titles/becky-chambers/the-long-way-to-a-small-angry-planet/9781473619814/"
+          },
+          "explanation": "The Wayfarer’s working life and its varied crew shape Chambers’s space adventure.",
+          "difficulty": "medium",
+          "seedQuestionId": "chapter-13-q4",
+          "rights": {
+            "basis": "original",
+            "evidence": "Original clue written for The Daily Chapter; premise checked against the linked primary source."
+          },
+          "sourceEdition": "Original premise clue; author, estate or publisher source reviewed 2026-10-26.",
+          "options": [
+            "A Memory Called Empire",
+            "The Galaxy, and the Ground Within",
+            "A Psalm for the Wild-Built",
+            "The Long Way to a Small, Angry Planet"
+          ],
+          "answerIndex": 3,
+          "reviewNotes": "Original premise clue checked against the linked author, estate or publisher source. No ending or solution is revealed."
+        },
+        {
+          "id": "chapter-13-q5",
+          "type": "blurb_title",
+          "prompt": "Breq was once the intelligence of a vast starship. Now confined to one human body, she pursues a mission of revenge.",
+          "book": {
+            "title": "Ancillary Justice",
+            "author": "Ann Leckie",
+            "sourceUrl": "https://www.hachette.co.uk/titles/ann-leckie/ancillary-justice/9780356502403/"
+          },
+          "explanation": "Leckie’s novel follows the surviving fragment of the starship Justice of Toren.",
+          "difficulty": "stretch",
+          "seedQuestionId": "chapter-13-q5",
+          "rights": {
+            "basis": "original",
+            "evidence": "Original clue written for The Daily Chapter; premise checked against the linked primary source."
+          },
+          "sourceEdition": "Original premise clue; author, estate or publisher source reviewed 2026-10-26.",
+          "options": [
+            "Ancillary Justice",
+            "A Memory Called Empire",
+            "All Systems Red",
+            "Translation State"
+          ],
+          "answerIndex": 0,
+          "reviewNotes": "Original premise clue checked against the linked author, estate or publisher source. No ending or solution is revealed."
+        }
+      ]
+    },
+    {
+      "id": "launch-v1-14",
+      "day": 14,
+      "themeId": "found-family",
+      "title": "The people we find",
+      "intro": "Unexpected arrivals, new neighbours and the people who become home.",
+      "questions": [
+        {
+          "id": "chapter-14-q1",
+          "type": "blurb_title",
+          "prompt": "Caseworker Linus Baker is sent to inspect an island home where six unusually magical children live.",
+          "book": {
+            "title": "The House in the Cerulean Sea",
+            "author": "TJ Klune",
+            "sourceUrl": "https://us.macmillan.com/books/9781250217288/thehouseintheceruleansea/"
+          },
+          "explanation": "Linus’s assignment brings him into the household run by Arthur Parnassus.",
+          "difficulty": "easy",
+          "seedQuestionId": "chapter-14-q1",
+          "rights": {
+            "basis": "original",
+            "evidence": "Original clue written for The Daily Chapter; premise checked against the linked primary source."
+          },
+          "sourceEdition": "Original premise clue; author, estate or publisher source reviewed 2026-10-26.",
+          "options": [
+            "Miss Peregrine’s Home for Peculiar Children",
+            "The House in the Cerulean Sea",
+            "The Very Secret Society of Irregular Witches",
+            "The House of the Spirits"
+          ],
+          "answerIndex": 1,
+          "reviewNotes": "Original premise clue checked against the linked author, estate or publisher source. No ending or solution is revealed."
+        },
+        {
+          "id": "se-0ad1426a7f8669f299d819b7ecfbcec6",
+          "type": "quote_title",
+          "prompt": "Marilla came briskly forward as Matthew opened the door. But when her eyes fell on the odd little figure in the stiff, ugly dress, with the long braids of red hair and the eager, luminous eyes, she stopped short in amazement.",
+          "book": {
+            "title": "Anne of Green Gables",
+            "author": "L. M. Montgomery",
+            "sourceUrl": "https://github.com/standardebooks/l-m-montgomery_anne-of-green-gables/blob/fd460b10581dcd38bf3a053e4e006bf5ec140c87/src/epub/text/chapter-3.xhtml"
+          },
+          "sourceEdition": "Standard Ebooks: Anne of Green Gables; en-GB; chapter-3, paragraph 2; revision fd460b10581dcd38bf3a053e4e006bf5ec140c87",
+          "rights": {
+            "basis": "permission",
+            "evidence": "Quotation reuse rights are assumed cleared for Atmyshelf app/web quizzes, as instructed by the project owner. Source file SHA-256 859f841c34da45dd118f4a39cec22286675f187b7bdec2ed6bbd53f99ea07ba0; whitespace-normalized text SHA-256 ba52bfbcaefbb64cb67cdeeec8aeda599fc9e202ebaad7ece3377b04a65b1342."
+          },
+          "explanation": "Marilla and Matthew Cuthbert are meeting Anne, whose red hair and arrival at Green Gables begin an unexpected family story.",
+          "quoteProof": {
+            "questionId": "se-0ad1426a7f8669f299d819b7ecfbcec6",
+            "path": "src/epub/text/chapter-3.xhtml",
+            "paragraph": 2,
+            "section": "chapter-3",
+            "fileSha256": "859f841c34da45dd118f4a39cec22286675f187b7bdec2ed6bbd53f99ea07ba0",
+            "textSha256": "ba52bfbcaefbb64cb67cdeeec8aeda599fc9e202ebaad7ece3377b04a65b1342",
+            "repository": "l-m-montgomery_anne-of-green-gables",
+            "revision": "fd460b10581dcd38bf3a053e4e006bf5ec140c87",
+            "translators": []
+          },
+          "options": [
+            "A Little Princess",
+            "Anne of Green Gables",
+            "Pollyanna",
+            "Heidi"
+          ],
+          "answerIndex": 1,
+          "difficulty": "easy",
+          "reviewNotes": "Exact contiguous source text; character, setting or recognizable wording provides the identifying clue. Alternatives reviewed for a single supported attribution."
+        },
+        {
+          "id": "clue-7b2490f0c7b5760d94107b1169dc4403",
+          "type": "blurb_title",
+          "prompt": "A gruff widower’s rigid routines are interrupted by new neighbours whose first parking attempt destroys his mailbox.",
+          "book": {
+            "title": "A Man Called Ove",
+            "author": "Fredrik Backman",
+            "sourceUrl": "https://www.simonandschuster.com/books/A-Man-Called-Ove/Fredrik-Backman/9781476738024"
+          },
+          "explanation": "Ove’s encounters with his neighbours gradually reveal the person behind his gruff exterior.",
+          "difficulty": "medium",
+          "seedQuestionId": "chapter-14-q3",
+          "rights": {
+            "basis": "original",
+            "evidence": "Original clue written for The Daily Chapter; premise checked against the linked primary source."
+          },
+          "sourceEdition": "Original premise clue; author, estate or publisher source reviewed 2026-10-26.",
+          "options": [
+            "The Unlikely Pilgrimage of Harold Fry",
+            "Eleanor Oliphant Is Completely Fine",
+            "The Authenticity Project",
+            "A Man Called Ove"
+          ],
+          "answerIndex": 3,
+          "reviewNotes": "Original premise clue checked against the linked author, estate or publisher source. No ending or solution is revealed."
+        },
+        {
+          "id": "se-ff4b4def18441796bdaded9e55eabdf7",
+          "type": "quote_title",
+          "prompt": "Sara stood quietly, with her eyes fixed upon Miss Minchin’s face. She was thinking something odd, as usual.",
+          "book": {
+            "title": "A Little Princess",
+            "author": "Frances Hodgson Burnett",
+            "sourceUrl": "https://github.com/standardebooks/frances-hodgson-burnett_a-little-princess/blob/375721cc181b8fdb84996a9abccdc1ec906eec10/src/epub/text/chapter-1.xhtml"
+          },
+          "sourceEdition": "Standard Ebooks: A Little Princess; en-US; chapter-1.xhtml, paragraph 30, characters 1-107; revision 375721cc181b8fdb84996a9abccdc1ec906eec10",
+          "rights": {
+            "basis": "permission",
+            "evidence": "Quotation reuse rights are assumed cleared for Atmyshelf app/web quizzes, as instructed by the project owner. Source file SHA-256 fbd7cf3a6e49a3fce3494d4dc997a5f48a3f53635bbbfd6a2b491947ff7ea77b; whitespace-normalized text SHA-256 70b66e094ef06ae7868203b04dd83625ce7cc01a2a7743480631535591a83e31."
+          },
+          "explanation": "Sara Crewe has just arrived at Miss Minchin’s boarding school in Frances Hodgson Burnett’s novel, where her imagination will become a source of strength.",
+          "quoteProof": {
+            "questionId": "se-ff4b4def18441796bdaded9e55eabdf7",
+            "repository": "frances-hodgson-burnett_a-little-princess",
+            "revision": "375721cc181b8fdb84996a9abccdc1ec906eec10",
+            "translators": [],
+            "path": "src/epub/text/chapter-1.xhtml",
+            "paragraph": 30,
+            "paragraphText": "Sara stood quietly, with her eyes fixed upon Miss Minchin’s face. She was thinking something odd, as usual.",
+            "start": 0,
+            "length": 107,
+            "fileSha256": "fbd7cf3a6e49a3fce3494d4dc997a5f48a3f53635bbbfd6a2b491947ff7ea77b",
+            "textSha256": "70b66e094ef06ae7868203b04dd83625ce7cc01a2a7743480631535591a83e31"
+          },
+          "options": [
+            "The Secret Garden",
+            "Anne of Green Gables",
+            "A Little Princess",
+            "Heidi"
+          ],
+          "answerIndex": 2,
+          "difficulty": "medium",
+          "reviewNotes": "Exact contiguous source text; character, setting or recognizable wording provides the identifying clue. Alternatives reviewed for a single supported attribution."
+        },
+        {
+          "id": "chapter-14-q2",
+          "type": "blurb_title",
+          "prompt": "Mika Moon accepts an invitation to teach three young witches who live together at a place called Nowhere House.",
+          "book": {
+            "title": "The Very Secret Society of Irregular Witches",
+            "author": "Sangu Mandanna",
+            "sourceUrl": "https://www.penguinrandomhouse.com/books/696866/the-very-secret-society-of-irregular-witches-by-sangu-mandanna/"
+          },
+          "explanation": "The invitation challenges Mika’s expectation that witches must live separately.",
+          "difficulty": "stretch",
+          "seedQuestionId": "chapter-14-q2",
+          "rights": {
+            "basis": "original",
+            "evidence": "Original clue written for The Daily Chapter; premise checked against the linked primary source."
+          },
+          "sourceEdition": "Original premise clue; author, estate or publisher source reviewed 2026-10-26.",
+          "options": [
+            "The Very Secret Society of Irregular Witches",
+            "The Ex Hex",
+            "The Witch’s Heart",
+            "Garden Spells"
+          ],
+          "answerIndex": 0,
+          "reviewNotes": "Original premise clue checked against the linked author, estate or publisher source. No ending or solution is revealed."
+        }
+      ]
+    }
+  ]
+}

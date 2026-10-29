@@ -1,0 +1,1747 @@
+{
+  "version": 1,
+  "name": "The Daily Chapter",
+  "status": "editorial-draft",
+  "researchDate": "2026-10-25",
+  "language": "en",
+  "themes": [
+    {
+      "id": "cozy-mysteries",
+      "name": "Cozy mysteries",
+      "family": "Genres",
+      "motif": "window",
+      "tone": "sage"
+    },
+    {
+      "id": "space-adventures",
+      "name": "Space adventures",
+      "family": "Genres",
+      "motif": "planet",
+      "tone": "blue"
+    },
+    {
+      "id": "romantic-comedies",
+      "name": "Romantic comedies",
+      "family": "Genres",
+      "motif": "heart",
+      "tone": "rose"
+    },
+    {
+      "id": "gothic-stories",
+      "name": "Gothic stories",
+      "family": "Genres",
+      "motif": "window",
+      "tone": "plum"
+    },
+    {
+      "id": "historical-fiction",
+      "name": "Historical fiction",
+      "family": "Genres",
+      "motif": "column",
+      "tone": "ochre"
+    },
+    {
+      "id": "bookshops-libraries",
+      "name": "Bookshops & libraries",
+      "family": "Places",
+      "motif": "books",
+      "tone": "sage"
+    },
+    {
+      "id": "island-stories",
+      "name": "Island stories",
+      "family": "Places",
+      "motif": "island",
+      "tone": "blue"
+    },
+    {
+      "id": "boarding-schools",
+      "name": "Boarding schools",
+      "family": "Places",
+      "motif": "window",
+      "tone": "copper"
+    },
+    {
+      "id": "train-journeys",
+      "name": "Train journeys",
+      "family": "Places",
+      "motif": "train",
+      "tone": "blue"
+    },
+    {
+      "id": "small-towns",
+      "name": "Small towns",
+      "family": "Places",
+      "motif": "houses",
+      "tone": "sage"
+    },
+    {
+      "id": "found-family",
+      "name": "Found family",
+      "family": "Relationships",
+      "motif": "people",
+      "tone": "rose"
+    },
+    {
+      "id": "unlikely-friendships",
+      "name": "Unlikely friendships",
+      "family": "Relationships",
+      "motif": "people",
+      "tone": "sage"
+    },
+    {
+      "id": "complicated-siblings",
+      "name": "Complicated siblings",
+      "family": "Relationships",
+      "motif": "people",
+      "tone": "plum"
+    },
+    {
+      "id": "rivals-romance",
+      "name": "Rivals & romance",
+      "family": "Relationships",
+      "motif": "heart",
+      "tone": "rose"
+    },
+    {
+      "id": "across-generations",
+      "name": "Across generations",
+      "family": "Relationships",
+      "motif": "portrait",
+      "tone": "ochre"
+    },
+    {
+      "id": "time-travel",
+      "name": "Time travel",
+      "family": "Story premises",
+      "motif": "clock",
+      "tone": "blue"
+    },
+    {
+      "id": "secret-identities",
+      "name": "Secret identities",
+      "family": "Story premises",
+      "motif": "key",
+      "tone": "copper"
+    },
+    {
+      "id": "disappearances",
+      "name": "Disappearances",
+      "family": "Story premises",
+      "motif": "window",
+      "tone": "plum"
+    },
+    {
+      "id": "strange-invitations",
+      "name": "Strange invitations",
+      "family": "Story premises",
+      "motif": "envelope",
+      "tone": "rose"
+    },
+    {
+      "id": "impossible-places",
+      "name": "Impossible places",
+      "family": "Story premises",
+      "motif": "door",
+      "tone": "sage"
+    },
+    {
+      "id": "opening-lines",
+      "name": "Opening lines",
+      "family": "Storytelling",
+      "motif": "pen",
+      "tone": "copper"
+    },
+    {
+      "id": "letters-diaries",
+      "name": "Letters & diaries",
+      "family": "Storytelling",
+      "motif": "envelope",
+      "tone": "copper"
+    },
+    {
+      "id": "stories-within-stories",
+      "name": "Stories within stories",
+      "family": "Storytelling",
+      "motif": "books",
+      "tone": "plum"
+    },
+    {
+      "id": "unreliable-narrators",
+      "name": "Unreliable narrators",
+      "family": "Storytelling",
+      "motif": "mirror",
+      "tone": "ink"
+    },
+    {
+      "id": "one-extraordinary-day",
+      "name": "One extraordinary day",
+      "family": "Storytelling",
+      "motif": "sun",
+      "tone": "ochre"
+    },
+    {
+      "id": "page-to-screen",
+      "name": "Page to screen",
+      "family": "Book culture",
+      "motif": "film",
+      "tone": "copper"
+    },
+    {
+      "id": "retold-myths",
+      "name": "Retold myths",
+      "family": "Book culture",
+      "motif": "column",
+      "tone": "ochre"
+    },
+    {
+      "id": "pen-names",
+      "name": "Pen names",
+      "family": "Book culture",
+      "motif": "pen",
+      "tone": "ink"
+    },
+    {
+      "id": "debut-novels",
+      "name": "Debut novels",
+      "family": "Book culture",
+      "motif": "books",
+      "tone": "rose"
+    },
+    {
+      "id": "books-about-books",
+      "name": "Books about books",
+      "family": "Book culture",
+      "motif": "books",
+      "tone": "sage"
+    },
+    {
+      "id": "japanese-fiction",
+      "name": "Japanese fiction",
+      "family": "Around the world",
+      "motif": "window",
+      "tone": "blue"
+    },
+    {
+      "id": "portuguese-literature",
+      "name": "Portuguese literature",
+      "family": "Around the world",
+      "motif": "tiles",
+      "tone": "blue"
+    },
+    {
+      "id": "latin-american-voices",
+      "name": "Latin American voices",
+      "family": "Around the world",
+      "motif": "sun",
+      "tone": "rose"
+    },
+    {
+      "id": "african-storytelling",
+      "name": "African storytelling",
+      "family": "Around the world",
+      "motif": "tree",
+      "tone": "ochre"
+    },
+    {
+      "id": "translated-favourites",
+      "name": "Translated favourites",
+      "family": "Around the world",
+      "motif": "books",
+      "tone": "copper"
+    },
+    {
+      "id": "memoirs",
+      "name": "Memoirs",
+      "family": "True stories",
+      "motif": "portrait",
+      "tone": "copper"
+    },
+    {
+      "id": "natural-world",
+      "name": "The natural world",
+      "family": "True stories",
+      "motif": "leaf",
+      "tone": "sage"
+    },
+    {
+      "id": "scientific-discoveries",
+      "name": "Scientific discoveries",
+      "family": "True stories",
+      "motif": "planet",
+      "tone": "blue"
+    },
+    {
+      "id": "remarkable-journeys",
+      "name": "Remarkable journeys",
+      "family": "True stories",
+      "motif": "compass",
+      "tone": "ochre"
+    },
+    {
+      "id": "hidden-histories",
+      "name": "Hidden histories",
+      "family": "True stories",
+      "motif": "column",
+      "tone": "plum"
+    }
+  ],
+  "editions": [
+    {
+      "id": "chapter-01",
+      "day": 1,
+      "themeId": "impossible-places",
+      "title": "Between worlds",
+      "intro": "Unexpected doors. Impossible places. Five little journeys somewhere new.",
+      "questions": [
+        {
+          "id": "chapter-01-q1",
+          "type": "quote_title",
+          "prompt": "In a hole in the ground there lived a hobbit.",
+          "options": [
+            "The Wind in the Willows",
+            "The Hobbit",
+            "The Lion, the Witch and the Wardrobe",
+            "The Neverending Story"
+          ],
+          "answerIndex": 1,
+          "book": {
+            "title": "The Hobbit",
+            "author": "J. R. R. Tolkien",
+            "sourceUrl": "https://www.tolkienestate.com/Writing/"
+          },
+          "explanation": "Tolkien introduces the comfort of a hobbit-hole before Bilbo’s unexpected adventure.",
+          "difficulty": "easy"
+        },
+        {
+          "id": "chapter-01-q2",
+          "type": "blurb_title",
+          "prompt": "A woman enters a library whose books let her experience the lives she might have lived after making different choices.",
+          "options": [
+            "The Starless Sea",
+            "The Invisible Life of Addie LaRue",
+            "The Book Thief",
+            "The Midnight Library"
+          ],
+          "answerIndex": 3,
+          "book": {
+            "title": "The Midnight Library",
+            "author": "Matt Haig",
+            "sourceUrl": "https://www.penguinrandomhouse.com/articles/the-midnight-library-by-matt-haig-excerpt/"
+          },
+          "explanation": "Nora Seed explores possible versions of her life through the books in the library.",
+          "difficulty": "easy"
+        },
+        {
+          "id": "chapter-01-q3",
+          "type": "blurb_title",
+          "prompt": "A twelve-year-old travels with a satyr and a daughter of Athena to recover Zeus’s stolen lightning bolt.",
+          "options": [
+            "The Lightning Thief",
+            "Artemis Fowl",
+            "The Red Pyramid",
+            "Nevermoor"
+          ],
+          "answerIndex": 0,
+          "book": {
+            "title": "The Lightning Thief",
+            "author": "Rick Riordan",
+            "sourceUrl": "https://rickriordan.com/book/the-lightning-thief/"
+          },
+          "explanation": "Percy Jackson’s first quest centres on the theft of Zeus’s master bolt.",
+          "difficulty": "medium"
+        },
+        {
+          "id": "chapter-01-q4",
+          "type": "blurb_title",
+          "prompt": "An orc retires from adventuring and tries to open a coffee shop in a city unfamiliar with coffee.",
+          "options": [
+            "The House in the Cerulean Sea",
+            "Emily Wilde’s Encyclopaedia of Faeries",
+            "Legends & Lattes",
+            "The Very Secret Society of Irregular Witches"
+          ],
+          "answerIndex": 2,
+          "book": {
+            "title": "Legends & Lattes",
+            "author": "Travis Baldree",
+            "sourceUrl": "https://us.macmillan.com/books/9781250889652/legendslattes/"
+          },
+          "explanation": "Viv’s fresh start in Thune exchanges a life of fighting for coffee and community.",
+          "difficulty": "medium"
+        },
+        {
+          "id": "chapter-01-q5",
+          "type": "blurb_title",
+          "prompt": "A solitary man records a vast house of statues and ocean tides. His occasional visitor is known as the Other.",
+          "options": [
+            "The Night Circus",
+            "Piranesi",
+            "The Ocean at the End of the Lane",
+            "The Ten Thousand Doors of January"
+          ],
+          "answerIndex": 1,
+          "book": {
+            "title": "Piranesi",
+            "author": "Susanna Clarke",
+            "sourceUrl": "https://www.bloomsbury.com/uk/piranesi-9781526634108/"
+          },
+          "explanation": "The House and its tides are the world that Piranesi patiently documents.",
+          "difficulty": "stretch"
+        }
+      ]
+    },
+    {
+      "id": "chapter-02",
+      "day": 2,
+      "themeId": "bookshops-libraries",
+      "title": "Among the shelves",
+      "intro": "A place to begin again. A book to get lost in. Five stories for book people.",
+      "questions": [
+        {
+          "id": "chapter-02-q1",
+          "type": "blurb_title",
+          "prompt": "After a breakup, Takako accepts a room above her uncle’s second-hand bookshop in Tokyo and begins discovering the pleasure of reading.",
+          "options": [
+            "The Cat Who Saved Books",
+            "Before the Coffee Gets Cold",
+            "Days at the Morisaki Bookshop",
+            "Welcome to the Hyunam-dong Bookshop"
+          ],
+          "answerIndex": 2,
+          "book": {
+            "title": "Days at the Morisaki Bookshop",
+            "author": "Satoshi Yagisawa",
+            "sourceUrl": "https://www.bonnierbooks.co.uk/books/manilla-press/days-at-the-morisaki-bookshop/"
+          },
+          "explanation": "Takako’s new beginning unfolds around her uncle Satoru’s shop in Jimbocho.",
+          "difficulty": "easy"
+        },
+        {
+          "id": "chapter-02-q2",
+          "type": "blurb_title",
+          "prompt": "A boy in Barcelona chooses a mysterious novel from the Cemetery of Forgotten Books and becomes fascinated by its author.",
+          "options": [
+            "The Shadow of the Wind",
+            "The Name of the Rose",
+            "The Book Thief",
+            "The Historian"
+          ],
+          "answerIndex": 0,
+          "book": {
+            "title": "The Shadow of the Wind",
+            "author": "Carlos Ruiz Zafón",
+            "sourceUrl": "https://www.penguinrandomhouse.com/books/292766/shadow-of-the-wind-by-carlos-ruiz-zafon/9780143126393/readers-guide"
+          },
+          "explanation": "Daniel’s discovery of a novel by Julián Carax begins this Barcelona mystery.",
+          "difficulty": "easy"
+        },
+        {
+          "id": "chapter-02-q3",
+          "type": "blurb_title",
+          "prompt": "A historical novel follows Belle da Costa Greene as she builds J. P. Morgan’s collection of rare books and manuscripts while concealing her racial identity.",
+          "options": [
+            "The Paris Library",
+            "The Lions of Fifth Avenue",
+            "The Personal Assistant",
+            "The Personal Librarian"
+          ],
+          "answerIndex": 3,
+          "book": {
+            "title": "The Personal Librarian",
+            "author": "Marie Benedict and Victoria Christopher Murray",
+            "sourceUrl": "https://www.penguinrandomhouse.com/books/623191/the-personal-librarian-a-gma-book-club-pick-by-marie-benedict-and-victoria-christopher-murray/9780593101544/"
+          },
+          "explanation": "The novel draws on the life of the woman who helped create the Pierpont Morgan Library.",
+          "difficulty": "medium"
+        },
+        {
+          "id": "chapter-02-q4",
+          "type": "blurb_title",
+          "prompt": "Florence Green opens a bookshop in an East Anglian coastal town and encounters polite but determined local opposition.",
+          "options": [
+            "The Little Paris Bookshop",
+            "The Bookshop",
+            "The Bookshop on the Corner",
+            "The Reading List"
+          ],
+          "answerIndex": 1,
+          "book": {
+            "title": "The Bookshop",
+            "author": "Penelope Fitzgerald",
+            "sourceUrl": "https://thebookerprizes.com/the-booker-library/books/the-bookshop"
+          },
+          "explanation": "Florence’s attempt to bring a bookshop to Hardborough disturbs the town’s established order.",
+          "difficulty": "medium"
+        },
+        {
+          "id": "chapter-02-q5",
+          "type": "blurb_title",
+          "prompt": "A bookseller named Loveday prefers books to people and has the opening lines of favourite novels tattooed on her skin.",
+          "options": [
+            "The Lost Bookshop",
+            "The Storied Life of A. J. Fikry",
+            "The Lost for Words Bookshop",
+            "The Last Bookshop in London"
+          ],
+          "answerIndex": 2,
+          "book": {
+            "title": "The Lost for Words Bookshop",
+            "author": "Stephanie Butland",
+            "sourceUrl": "https://us.macmillan.com/books/9781250124548/thelostforwordsbookshop/"
+          },
+          "explanation": "Loveday Cardew’s guarded life and love of books sit at the heart of this novel.",
+          "difficulty": "stretch"
+        }
+      ]
+    },
+    {
+      "id": "chapter-03",
+      "day": 3,
+      "themeId": "page-to-screen",
+      "title": "From page to screen",
+      "intro": "You may know the scene. Do you know the book behind it?",
+      "questions": [
+        {
+          "id": "chapter-03-q1",
+          "type": "blurb_title",
+          "prompt": "A teenage girl volunteers in her younger sister’s place for a televised contest in which the participants fight to the death.",
+          "options": [
+            "Divergent",
+            "The Maze Runner",
+            "Battle Royale",
+            "The Hunger Games"
+          ],
+          "answerIndex": 3,
+          "book": {
+            "title": "The Hunger Games",
+            "author": "Suzanne Collins",
+            "sourceUrl": "https://www.scholastic.com/newsroom/all-news/press-release/the-hunger-games-by-suzanne-collins.html"
+          },
+          "explanation": "Katniss volunteers when Prim is selected at the reaping.",
+          "difficulty": "easy"
+        },
+        {
+          "id": "chapter-03-q2",
+          "type": "blurb_title",
+          "prompt": "Meg, Jo, Beth and Amy March grow up together, balancing family, ambitions and limited means during the American Civil War era.",
+          "options": [
+            "Anne of Green Gables",
+            "Little Women",
+            "A Little Princess",
+            "The Railway Children"
+          ],
+          "answerIndex": 1,
+          "book": {
+            "title": "Little Women",
+            "author": "Louisa May Alcott",
+            "sourceUrl": "https://www.panmacmillan.com/authors/louisa-may-alcott/little-women/9781509827770"
+          },
+          "explanation": "The March sisters’ differing hopes and temperaments shape this family story.",
+          "difficulty": "easy"
+        },
+        {
+          "id": "chapter-03-q3",
+          "type": "blurb_title",
+          "prompt": "An island theme park brings genetically recreated dinosaurs face to face with its first visitors, with disastrous consequences.",
+          "options": [
+            "The Lost World",
+            "The Andromeda Strain",
+            "Jurassic Park",
+            "Congo"
+          ],
+          "answerIndex": 2,
+          "book": {
+            "title": "Jurassic Park",
+            "author": "Michael Crichton",
+            "sourceUrl": "https://www.penguinrandomhouse.com/books/33501/jurassic-park-by-michael-crichton/paperback/"
+          },
+          "explanation": "Crichton turns a dinosaur attraction into a story about technology and control.",
+          "difficulty": "medium"
+        },
+        {
+          "id": "chapter-03-q4",
+          "type": "blurb_title",
+          "prompt": "Paul Atreides arrives on the desert planet Arrakis, where a precious spice makes the planet central to an interstellar struggle.",
+          "options": [
+            "Dune",
+            "Foundation",
+            "Hyperion",
+            "The Left Hand of Darkness"
+          ],
+          "answerIndex": 0,
+          "book": {
+            "title": "Dune",
+            "author": "Frank Herbert",
+            "sourceUrl": "https://us.macmillan.com/books/9781427201447/dune/"
+          },
+          "explanation": "Arrakis, its spice and its people are central to Paul’s story.",
+          "difficulty": "medium"
+        },
+        {
+          "id": "chapter-03-q5",
+          "type": "blurb_title",
+          "prompt": "Connell and Marianne move from the same Irish school into university, repeatedly finding and losing their connection to one another.",
+          "options": [
+            "Conversations with Friends",
+            "One Day",
+            "Never Let Me Go",
+            "Normal People"
+          ],
+          "answerIndex": 3,
+          "book": {
+            "title": "Normal People",
+            "author": "Sally Rooney",
+            "sourceUrl": "https://www.penguinrandomhouse.com/books/592625/normal-people-by-sally-rooney/9781984822185/"
+          },
+          "explanation": "Rooney follows the changing relationship between Marianne and Connell across several years.",
+          "difficulty": "stretch"
+        }
+      ]
+    },
+    {
+      "id": "chapter-04",
+      "day": 4,
+      "themeId": "memoirs",
+      "title": "Remarkable lives",
+      "intro": "Five lived experiences, told by the people who lived them.",
+      "questions": [
+        {
+          "id": "chapter-04-q1",
+          "type": "blurb_title",
+          "prompt": "A former US First Lady reflects on her childhood on Chicago’s South Side and the experiences that eventually took her to the White House.",
+          "options": [
+            "Becoming",
+            "Living History",
+            "My Life",
+            "A Promised Land"
+          ],
+          "answerIndex": 0,
+          "book": {
+            "title": "Becoming",
+            "author": "Michelle Obama",
+            "sourceUrl": "https://www.penguinrandomhouse.com/books/562881/becoming-by-michelle-obama/9781524763152/"
+          },
+          "explanation": "Michelle Obama traces the personal experiences behind her public life.",
+          "difficulty": "easy"
+        },
+        {
+          "id": "chapter-04-q2",
+          "type": "blurb_title",
+          "prompt": "A South African comedian recounts growing up under apartheid as the child of a Black mother and a white father.",
+          "options": [
+            "Long Walk to Freedom",
+            "Dreams from My Father",
+            "Born a Crime",
+            "The Color of Water"
+          ],
+          "answerIndex": 2,
+          "book": {
+            "title": "Born a Crime",
+            "author": "Trevor Noah",
+            "sourceUrl": "https://www.penguinrandomhouse.com/books/537515/born-a-crime-by-trevor-noah/"
+          },
+          "explanation": "Noah’s memoir connects his childhood, his mother and the divisions of apartheid South Africa.",
+          "difficulty": "easy"
+        },
+        {
+          "id": "chapter-04-q3",
+          "type": "blurb_title",
+          "prompt": "Raised outside formal schooling in an isolated Idaho family, a young woman eventually earns a doctorate at Cambridge.",
+          "options": [
+            "The Glass Castle",
+            "Educated",
+            "Unorthodox",
+            "The Liars’ Club"
+          ],
+          "answerIndex": 1,
+          "book": {
+            "title": "Educated",
+            "author": "Tara Westover",
+            "sourceUrl": "https://www.penguinrandomhouse.com/books/550168/educated-by-tara-westover/"
+          },
+          "explanation": "Westover describes her route into education and its effects on her family relationships.",
+          "difficulty": "medium"
+        },
+        {
+          "id": "chapter-04-q4",
+          "type": "blurb_title",
+          "prompt": "Grieving her mother and facing upheaval in her life, a novice hiker sets off alone along the Pacific Crest Trail.",
+          "options": [
+            "A Walk in the Woods",
+            "Tracks",
+            "Into the Wild",
+            "Wild"
+          ],
+          "answerIndex": 3,
+          "book": {
+            "title": "Wild",
+            "author": "Cheryl Strayed",
+            "sourceUrl": "https://www.penguinrandomhouse.com/books/200313/wild-by-cheryl-strayed/9780307592736/"
+          },
+          "explanation": "Strayed’s solo hike becomes the framework for a memoir of grief and rebuilding.",
+          "difficulty": "medium"
+        },
+        {
+          "id": "chapter-04-q5",
+          "type": "blurb_title",
+          "prompt": "Anthony Bourdain takes readers behind restaurant doors into the heat, long shifts and unruly culture of commercial kitchens.",
+          "options": [
+            "Kitchen Confidential",
+            "Heat",
+            "Blood, Bones & Butter",
+            "The Apprentice"
+          ],
+          "answerIndex": 0,
+          "book": {
+            "title": "Kitchen Confidential",
+            "author": "Anthony Bourdain",
+            "sourceUrl": "https://www.bloomsbury.com/us/kitchen-confidential-9781582340821/"
+          },
+          "explanation": "Bourdain writes about the working life and culture of professional cooks.",
+          "difficulty": "stretch"
+        }
+      ]
+    },
+    {
+      "id": "chapter-05",
+      "day": 5,
+      "themeId": "island-stories",
+      "title": "A world apart",
+      "intro": "Remote shores, hidden histories and lives surrounded by water.",
+      "questions": [
+        {
+          "id": "chapter-05-q1",
+          "type": "blurb_title",
+          "prompt": "Jim Hawkins finds a pirate’s map and sails on the Hispaniola, whose crew includes the persuasive Long John Silver.",
+          "options": [
+            "Kidnapped",
+            "Treasure Island",
+            "Captain Blood",
+            "Swallows and Amazons"
+          ],
+          "answerIndex": 1,
+          "book": {
+            "title": "Treasure Island",
+            "author": "Robert Louis Stevenson",
+            "sourceUrl": "https://www.gutenberg.org/ebooks/120"
+          },
+          "explanation": "Jim’s map leads him into an expedition for Captain Flint’s buried treasure.",
+          "difficulty": "easy"
+        },
+        {
+          "id": "chapter-05-q2",
+          "type": "blurb_title",
+          "prompt": "A shipwrecked sailor builds a new life on a remote island, finding ways to feed, shelter and occupy himself over many years.",
+          "options": [
+            "The Swiss Family Robinson",
+            "Gulliver’s Travels",
+            "The Coral Island",
+            "Robinson Crusoe"
+          ],
+          "answerIndex": 3,
+          "book": {
+            "title": "Robinson Crusoe",
+            "author": "Daniel Defoe",
+            "sourceUrl": "https://www.gutenberg.org/ebooks/521"
+          },
+          "explanation": "Defoe’s castaway narrates the practical and emotional challenges of island life.",
+          "difficulty": "easy"
+        },
+        {
+          "id": "chapter-05-q3",
+          "type": "blurb_title",
+          "prompt": "Ten strangers accept invitations to an isolated island, where their absent hosts and a series of deaths turn the visit into a trap.",
+          "options": [
+            "And Then There Were None",
+            "The Guest List",
+            "The Hunting Party",
+            "The Woman in Cabin 10"
+          ],
+          "answerIndex": 0,
+          "book": {
+            "title": "And Then There Were None",
+            "author": "Agatha Christie",
+            "sourceUrl": "https://www.agathachristie.com/stories/and-then-there-were-none"
+          },
+          "explanation": "Soldier Island cuts Christie’s guests off from outside help.",
+          "difficulty": "medium"
+        },
+        {
+          "id": "chapter-05-q4",
+          "type": "blurb_title",
+          "prompt": "A shipwreck survivor reaches an island where a scientist is experimenting with transforming animals into humanlike beings.",
+          "options": [
+            "The Invisible Man",
+            "The Time Machine",
+            "The Island of Doctor Moreau",
+            "The Chrysalids"
+          ],
+          "answerIndex": 2,
+          "book": {
+            "title": "The Island of Doctor Moreau",
+            "author": "H. G. Wells",
+            "sourceUrl": "https://www.gutenberg.org/ebooks/159"
+          },
+          "explanation": "Edward Prendick encounters the consequences of Moreau’s experiments.",
+          "difficulty": "medium"
+        },
+        {
+          "id": "chapter-05-q5",
+          "type": "blurb_title",
+          "prompt": "A Greek Cypriot and a Turkish Cypriot fall in love in a taverna whose fig tree bears witness to the island’s divided history.",
+          "options": [
+            "The Beekeeper of Aleppo",
+            "The Island of Missing Trees",
+            "Small Island",
+            "The Island"
+          ],
+          "answerIndex": 1,
+          "book": {
+            "title": "The Island of Missing Trees",
+            "author": "Elif Shafak",
+            "sourceUrl": "https://www.bloomsbury.com/us/island-of-missing-trees-9781635578591/"
+          },
+          "explanation": "Kostas, Defne and the fig tree connect personal memory with the history of Cyprus.",
+          "difficulty": "stretch"
+        }
+      ]
+    },
+    {
+      "id": "chapter-06",
+      "day": 6,
+      "themeId": "romantic-comedies",
+      "title": "A little chemistry",
+      "intro": "Awkward arrangements, familiar rivals and feelings that complicate everything.",
+      "questions": [
+        {
+          "id": "chapter-06-q1",
+          "type": "blurb_title",
+          "prompt": "The son of an American president and a British prince turn a public rivalry into a much more private relationship.",
+          "options": [
+            "Boyfriend Material",
+            "One Last Stop",
+            "Red, White & Royal Blue",
+            "Playing the Palace"
+          ],
+          "answerIndex": 2,
+          "book": {
+            "title": "Red, White & Royal Blue",
+            "author": "Casey McQuiston",
+            "sourceUrl": "https://www.caseymcquiston.com/red-white-and-royal-blue"
+          },
+          "explanation": "Alex Claremont-Diaz and Prince Henry are the pair at the centre of this romance.",
+          "difficulty": "easy"
+        },
+        {
+          "id": "chapter-06-q2",
+          "type": "blurb_title",
+          "prompt": "Tiffy and Leon share a one-bedroom flat and the same bed at different times, leaving notes before they have ever met.",
+          "options": [
+            "The Flatshare",
+            "The Switch",
+            "The Roommate",
+            "The Wake-Up Call"
+          ],
+          "answerIndex": 0,
+          "book": {
+            "title": "The Flatshare",
+            "author": "Beth O’Leary",
+            "sourceUrl": "https://www.betholearyauthor.com/the-flatshare/"
+          },
+          "explanation": "Their opposite working hours make an unusual flat-sharing arrangement possible.",
+          "difficulty": "easy"
+        },
+        {
+          "id": "chapter-06-q3",
+          "type": "blurb_title",
+          "prompt": "A biology PhD student starts a fake relationship with a famously difficult professor after an impulsive kiss.",
+          "options": [
+            "Love on the Brain",
+            "The Kiss Quotient",
+            "The Rosie Project",
+            "The Love Hypothesis"
+          ],
+          "answerIndex": 3,
+          "book": {
+            "title": "The Love Hypothesis",
+            "author": "Ali Hazelwood",
+            "sourceUrl": "https://www.penguinrandomhouse.com/books/673764/the-love-hypothesis-prime-tie-in-by-ali-hazelwood-with-a-foreword-by-lili-reinhart/"
+          },
+          "explanation": "Olive Smith and Adam Carlsen’s pretend relationship complicates their academic lives.",
+          "difficulty": "medium"
+        },
+        {
+          "id": "chapter-06-q4",
+          "type": "blurb_title",
+          "prompt": "Literary agent Nora visits a small North Carolina town with her sister, only to keep encountering editor Charlie Lastra.",
+          "options": [
+            "Beach Read",
+            "Book Lovers",
+            "The Bookish Life of Nina Hill",
+            "People We Meet on Vacation"
+          ],
+          "answerIndex": 1,
+          "book": {
+            "title": "Book Lovers",
+            "author": "Emily Henry",
+            "sourceUrl": "https://www.penguinrandomhouse.com/books/670293/book-lovers-by-emily-henry/9780593334836/"
+          },
+          "explanation": "Nora’s trip to Sunshine Falls repeatedly brings her together with a familiar editor.",
+          "difficulty": "medium"
+        },
+        {
+          "id": "chapter-06-q5",
+          "type": "blurb_title",
+          "prompt": "Lucy Hutton and Joshua Templeman share an office at a publishing company and compete for the same promotion.",
+          "options": [
+            "The Spanish Love Deception",
+            "The Unhoneymooners",
+            "The Hating Game",
+            "The Ex Talk"
+          ],
+          "answerIndex": 2,
+          "book": {
+            "title": "The Hating Game",
+            "author": "Sally Thorne",
+            "sourceUrl": "https://www.sallythorneauthor.com/the-hating-game"
+          },
+          "explanation": "Lucy and Joshua’s workplace rivalry drives this romantic comedy.",
+          "difficulty": "stretch"
+        }
+      ]
+    },
+    {
+      "id": "chapter-07",
+      "day": 7,
+      "themeId": "natural-world",
+      "title": "Wild and wonderful",
+      "intro": "Fungi, forests, feathers and the lives unfolding around us.",
+      "questions": [
+        {
+          "id": "chapter-07-q1",
+          "type": "blurb_title",
+          "prompt": "A botanist brings plant science into conversation with Indigenous knowledge, gratitude and reciprocity with the living world.",
+          "options": [
+            "The Genius of Birds",
+            "The Overstory",
+            "Pilgrim at Tinker Creek",
+            "Braiding Sweetgrass"
+          ],
+          "answerIndex": 3,
+          "book": {
+            "title": "Braiding Sweetgrass",
+            "author": "Robin Wall Kimmerer",
+            "sourceUrl": "https://milkweed.org/braiding-sweetgrass"
+          },
+          "explanation": "Kimmerer combines her botanical training with knowledge from her Indigenous heritage.",
+          "difficulty": "easy"
+        },
+        {
+          "id": "chapter-07-q2",
+          "type": "blurb_title",
+          "prompt": "A biologist explores fungi, from yeasts and lichens to networks that help shape ecosystems.",
+          "options": [
+            "Other Minds",
+            "Entangled Life",
+            "The Hidden Life of Trees",
+            "The Tangled Tree"
+          ],
+          "answerIndex": 1,
+          "book": {
+            "title": "Entangled Life",
+            "author": "Merlin Sheldrake",
+            "sourceUrl": "https://www.merlinsheldrake.com/entangled-life"
+          },
+          "explanation": "Sheldrake centres fungi and their relationships with other forms of life.",
+          "difficulty": "easy"
+        },
+        {
+          "id": "chapter-07-q3",
+          "type": "blurb_title",
+          "prompt": "After her father’s death, a writer turns to training a goshawk named Mabel.",
+          "options": [
+            "The Goshawk",
+            "Vesper Flights",
+            "H Is for Hawk",
+            "The Peregrine"
+          ],
+          "answerIndex": 2,
+          "book": {
+            "title": "H Is for Hawk",
+            "author": "Helen Macdonald",
+            "sourceUrl": "https://groveatlantic.com/book/h-is-for-hawk/"
+          },
+          "explanation": "Macdonald intertwines grief, falconry and her relationship with Mabel.",
+          "difficulty": "medium"
+        },
+        {
+          "id": "chapter-07-q4",
+          "type": "blurb_title",
+          "prompt": "An author gets to know octopuses at an aquarium while exploring their behaviour and the possibilities of animal consciousness.",
+          "options": [
+            "The Soul of an Octopus",
+            "Remarkably Bright Creatures",
+            "The Secret Life of Lobsters",
+            "The Sea Around Us"
+          ],
+          "answerIndex": 0,
+          "book": {
+            "title": "The Soul of an Octopus",
+            "author": "Sy Montgomery",
+            "sourceUrl": "https://symontgomery.com/soul-of-an-octopus/"
+          },
+          "explanation": "Montgomery’s encounters with octopuses guide this work of nonfiction.",
+          "difficulty": "medium"
+        },
+        {
+          "id": "chapter-07-q5",
+          "type": "blurb_title",
+          "prompt": "A forester invites readers to consider the relationships, survival strategies and social lives of trees.",
+          "options": [
+            "The Forest Unseen",
+            "The Wild Trees",
+            "The Living Mountain",
+            "The Hidden Life of Trees"
+          ],
+          "answerIndex": 3,
+          "book": {
+            "title": "The Hidden Life of Trees",
+            "author": "Peter Wohlleben",
+            "sourceUrl": "https://www.peterwohllebenbooks.com/the-hidden-life-of-trees"
+          },
+          "explanation": "Wohlleben draws on his forestry experience to examine life in the forest.",
+          "difficulty": "stretch"
+        }
+      ]
+    },
+    {
+      "id": "chapter-08",
+      "day": 8,
+      "themeId": "retold-myths",
+      "title": "Old myths, new voices",
+      "intro": "Familiar legends, seen through the people at their edges.",
+      "questions": [
+        {
+          "id": "chapter-08-q1",
+          "type": "blurb_title",
+          "prompt": "A daughter of Helios develops a gift for witchcraft and makes a life on the island of Aeaea.",
+          "options": [
+            "Circe",
+            "Ariadne",
+            "Atalanta",
+            "Clytemnestra"
+          ],
+          "answerIndex": 0,
+          "book": {
+            "title": "Circe",
+            "author": "Madeline Miller",
+            "sourceUrl": "https://madelinemiller.com/circe/"
+          },
+          "explanation": "Miller gives the witch encountered in the Odyssey a story of her own.",
+          "difficulty": "easy"
+        },
+        {
+          "id": "chapter-08-q2",
+          "type": "blurb_title",
+          "prompt": "Patroclus tells the story of his bond with Achilles as their lives move towards the Trojan War.",
+          "options": [
+            "The Silence of the Girls",
+            "The Iliad",
+            "The Song of Achilles",
+            "The King Must Die"
+          ],
+          "answerIndex": 2,
+          "book": {
+            "title": "The Song of Achilles",
+            "author": "Madeline Miller",
+            "sourceUrl": "https://madelinemiller.com/the-song-of-achilles/"
+          },
+          "explanation": "Patroclus’s perspective centres the relationship behind Achilles’s legendary reputation.",
+          "difficulty": "easy"
+        },
+        {
+          "id": "chapter-08-q3",
+          "type": "blurb_title",
+          "prompt": "A princess of Crete helps Theseus face the Minotaur, setting in motion a life beyond the labyrinth.",
+          "options": [
+            "Elektra",
+            "Ariadne",
+            "Stone Blind",
+            "Daughters of Sparta"
+          ],
+          "answerIndex": 1,
+          "book": {
+            "title": "Ariadne",
+            "author": "Jennifer Saint",
+            "sourceUrl": "https://us.macmillan.com/books/9781250773579/ariadne/"
+          },
+          "explanation": "Saint revisits the myth through Ariadne and the women around her.",
+          "difficulty": "medium"
+        },
+        {
+          "id": "chapter-08-q4",
+          "type": "blurb_title",
+          "prompt": "Odysseus’s wife and her twelve maids revisit their part in the story usually told about his long journey home.",
+          "options": [
+            "A Thousand Ships",
+            "The Women of Troy",
+            "The Children of Jocasta",
+            "The Penelopiad"
+          ],
+          "answerIndex": 3,
+          "book": {
+            "title": "The Penelopiad",
+            "author": "Margaret Atwood",
+            "sourceUrl": "https://margaretatwood.ca/books/the-penelopiad/"
+          },
+          "explanation": "Atwood gives Penelope and the maids a chance to question the familiar account.",
+          "difficulty": "medium"
+        },
+        {
+          "id": "chapter-08-q5",
+          "type": "blurb_title",
+          "prompt": "A woman who barely speaks in Virgil’s Aeneid becomes the narrator of her own life and her connection to Aeneas.",
+          "options": [
+            "Lavinia",
+            "The Firebrand",
+            "The Red Tent",
+            "The Palace of Illusions"
+          ],
+          "answerIndex": 0,
+          "book": {
+            "title": "Lavinia",
+            "author": "Ursula K. Le Guin",
+            "sourceUrl": "https://www.ursulakleguin.com/lavinia"
+          },
+          "explanation": "Le Guin develops the voice of the Latin princess from Virgil’s epic.",
+          "difficulty": "stretch"
+        }
+      ]
+    },
+    {
+      "id": "chapter-09",
+      "day": 9,
+      "themeId": "portuguese-literature",
+      "title": "Stories from Portugal",
+      "intro": "Five voices and stories with Portuguese roots.",
+      "questions": [
+        {
+          "id": "chapter-09-q1",
+          "type": "blurb_title",
+          "prompt": "An unexplained epidemic of white blindness spreads through a city, leading the authorities to quarantine the first affected people.",
+          "options": [
+            "Seeing",
+            "Blindness",
+            "The Plague",
+            "The Death of Ivan Ilyich"
+          ],
+          "answerIndex": 1,
+          "book": {
+            "title": "Blindness",
+            "author": "José Saramago",
+            "sourceUrl": "https://www.josesaramago.org/en/book/blindness-essay/"
+          },
+          "explanation": "Saramago uses a sudden loss of sight to explore how people behave towards one another.",
+          "difficulty": "easy"
+        },
+        {
+          "id": "chapter-09-q2",
+          "type": "blurb_title",
+          "prompt": "Fragments attributed to Lisbon bookkeeper Bernardo Soares turn ordinary working life into reflections on dreams, identity and existence.",
+          "options": [
+            "The Book of Illusions",
+            "The Notebooks of Malte Laurids Brigge",
+            "The Year of the Death of Ricardo Reis",
+            "The Book of Disquiet"
+          ],
+          "answerIndex": 3,
+          "book": {
+            "title": "The Book of Disquiet",
+            "author": "Fernando Pessoa",
+            "sourceUrl": "https://wwnorton.co.uk/books/9780811226936-the-book-of-disquiet"
+          },
+          "explanation": "Pessoa’s fragmentary work is closely associated with the voice of Bernardo Soares.",
+          "difficulty": "easy"
+        },
+        {
+          "id": "chapter-09-q3",
+          "type": "blurb_title",
+          "prompt": "The fortunes of a wealthy Portuguese family, including the young doctor Carlos da Maia, unfold against nineteenth-century Lisbon society.",
+          "options": [
+            "The Maias",
+            "The Crime of Father Amaro",
+            "Cousin Bazilio",
+            "The Relic"
+          ],
+          "answerIndex": 0,
+          "book": {
+            "title": "The Maias",
+            "author": "Eça de Queirós",
+            "sourceUrl": "https://www.ndbooks.com/book/the-maias/"
+          },
+          "explanation": "The Maia family gives Queirós a way to examine several generations and their social world.",
+          "difficulty": "medium"
+        },
+        {
+          "id": "chapter-09-q4",
+          "type": "blurb_title",
+          "prompt": "Fifteen-year-old Rui leaves Angola with his family in 1975 and starts an uncertain new life in a hotel near Lisbon.",
+          "options": [
+            "Eliete",
+            "The Piano Cemetery",
+            "The Return",
+            "South of Nowhere"
+          ],
+          "answerIndex": 2,
+          "book": {
+            "title": "The Return",
+            "author": "Dulce Maria Cardoso",
+            "sourceUrl": "https://www.hachette.co.uk/titles/dulce-maria-cardoso/the-return/9780857054357/"
+          },
+          "explanation": "Cardoso follows displacement and family life through Rui’s adolescent perspective.",
+          "difficulty": "medium"
+        },
+        {
+          "id": "chapter-09-q5",
+          "type": "blurb_title",
+          "prompt": "A woman revisits the events surrounding her marriage to a Portuguese military officer in Mozambique, questioning how that past has been told.",
+          "options": [
+            "The Wind Whistling in the Cranes",
+            "The Murmuring Coast",
+            "The Land at the End of the World",
+            "The Painter of Birds"
+          ],
+          "answerIndex": 1,
+          "book": {
+            "title": "The Murmuring Coast",
+            "author": "Lídia Jorge",
+            "sourceUrl": "https://books.google.com/books/about/The_Murmuring_Coast.html?id=85YrnoxfgC8C"
+          },
+          "explanation": "Jorge returns to a colonial wartime setting through Eva Lopo’s recollections.",
+          "difficulty": "stretch"
+        }
+      ]
+    },
+    {
+      "id": "chapter-10",
+      "day": 10,
+      "themeId": "time-travel",
+      "title": "Out of time",
+      "intro": "A café, a doorway, a letter. Five ways to slip out of the present.",
+      "questions": [
+        {
+          "id": "chapter-10-q1",
+          "type": "blurb_title",
+          "prompt": "A small Tokyo café lets its visitors travel into the past, provided they follow strict rules and return before their drink cools.",
+          "options": [
+            "The Full Moon Coffee Shop",
+            "The Travelling Cat Chronicles",
+            "Before the Coffee Gets Cold",
+            "The Kamogawa Food Detectives"
+          ],
+          "answerIndex": 2,
+          "book": {
+            "title": "Before the Coffee Gets Cold",
+            "author": "Toshikazu Kawaguchi",
+            "sourceUrl": "https://www.panmacmillan.com/authors/toshikazu-kawaguchi/before-the-coffee-gets-cold/9781529029598"
+          },
+          "explanation": "The café’s time-travel offer is shaped by a very particular deadline.",
+          "difficulty": "easy"
+        },
+        {
+          "id": "chapter-10-q2",
+          "type": "blurb_title",
+          "prompt": "Henry’s involuntary journeys through time make his relationship with artist Clare unfold in an unusual order.",
+          "options": [
+            "The Time Traveler’s Wife",
+            "The First Fifteen Lives of Harry August",
+            "Life After Life",
+            "How to Stop Time"
+          ],
+          "answerIndex": 0,
+          "book": {
+            "title": "The Time Traveler’s Wife",
+            "author": "Audrey Niffenegger",
+            "sourceUrl": "https://www.penguin.co.uk/books/358096/the-time-travelers-wife-by-niffenegger-audrey/9781529996272"
+          },
+          "explanation": "Henry and Clare experience their shared life from different points in time.",
+          "difficulty": "easy"
+        },
+        {
+          "id": "chapter-10-q3",
+          "type": "blurb_title",
+          "prompt": "An English teacher discovers a passage into the past and takes on the task of preventing John F. Kennedy’s assassination.",
+          "options": [
+            "The Dead Zone",
+            "Replay",
+            "Time and Again",
+            "11/22/63"
+          ],
+          "answerIndex": 3,
+          "book": {
+            "title": "11/22/63",
+            "author": "Stephen King",
+            "sourceUrl": "https://stephenking.com/works/novel/11-22-63.html"
+          },
+          "explanation": "Jake Epping’s mission gives King’s time-travel novel its date-shaped title.",
+          "difficulty": "medium"
+        },
+        {
+          "id": "chapter-10-q4",
+          "type": "blurb_title",
+          "prompt": "Dana, a Black writer living in the 1970s, is repeatedly pulled into the world of a plantation in pre-Civil War Maryland.",
+          "options": [
+            "Parable of the Sower",
+            "Kindred",
+            "Beloved",
+            "The Water Dancer"
+          ],
+          "answerIndex": 1,
+          "book": {
+            "title": "Kindred",
+            "author": "Octavia E. Butler",
+            "sourceUrl": "https://www.octaviabutler.com/kindred"
+          },
+          "explanation": "Butler connects Dana’s present to the lives and power structures of the American past.",
+          "difficulty": "medium"
+        },
+        {
+          "id": "chapter-10-q5",
+          "type": "blurb_title",
+          "prompt": "Two agents on opposing sides of a war across possible futures begin leaving each other letters.",
+          "options": [
+            "The Future of Another Timeline",
+            "The Psychology of Time Travel",
+            "This Is How You Lose the Time War",
+            "The Rise and Fall of D.O.D.O."
+          ],
+          "answerIndex": 2,
+          "book": {
+            "title": "This Is How You Lose the Time War",
+            "author": "Amal El-Mohtar and Max Gladstone",
+            "sourceUrl": "https://www.simonandschuster.com/books/This-Is-How-You-Lose-the-Time-War/Amal-El-Mohtar/9781534430990"
+          },
+          "explanation": "The correspondence between Red and Blue becomes the centre of this novella.",
+          "difficulty": "stretch"
+        }
+      ]
+    },
+    {
+      "id": "chapter-11",
+      "day": 11,
+      "themeId": "gothic-stories",
+      "title": "Behind closed doors",
+      "intro": "Strange houses, uneasy visitors and the things left unspoken.",
+      "questions": [
+        {
+          "id": "chapter-11-q1",
+          "type": "blurb_title",
+          "prompt": "A young English solicitor visits a Transylvanian count whose plans will eventually bring a vampire to England.",
+          "options": [
+            "Carmilla",
+            "The Vampyre",
+            "Interview with the Vampire",
+            "Dracula"
+          ],
+          "answerIndex": 3,
+          "book": {
+            "title": "Dracula",
+            "author": "Bram Stoker",
+            "sourceUrl": "https://www.gutenberg.org/ebooks/345"
+          },
+          "explanation": "Jonathan Harker’s journey to the Count’s castle begins the novel’s gathering of journals and letters.",
+          "difficulty": "easy"
+        },
+        {
+          "id": "chapter-11-q2",
+          "type": "blurb_title",
+          "prompt": "A young scientist creates a living being and recoils from the creature he has brought into the world.",
+          "options": [
+            "The Strange Case of Dr Jekyll and Mr Hyde",
+            "Frankenstein",
+            "The Picture of Dorian Gray",
+            "The Invisible Man"
+          ],
+          "answerIndex": 1,
+          "book": {
+            "title": "Frankenstein",
+            "author": "Mary Shelley",
+            "sourceUrl": "https://www.gutenberg.org/ebooks/84"
+          },
+          "explanation": "Victor Frankenstein’s creation and rejection of the creature drive Shelley’s novel.",
+          "difficulty": "easy"
+        },
+        {
+          "id": "chapter-11-q3",
+          "type": "blurb_title",
+          "prompt": "A new bride arrives at Manderley and finds her married life overshadowed by the memory of her husband’s first wife.",
+          "options": [
+            "My Cousin Rachel",
+            "Jane Eyre",
+            "Rebecca",
+            "The Thirteenth Tale"
+          ],
+          "answerIndex": 2,
+          "book": {
+            "title": "Rebecca",
+            "author": "Daphne du Maurier",
+            "sourceUrl": "https://www.dumaurier.org/menu_page.php?id=102"
+          },
+          "explanation": "The unnamed second Mrs de Winter encounters a household still shaped by Rebecca.",
+          "difficulty": "medium"
+        },
+        {
+          "id": "chapter-11-q4",
+          "type": "blurb_title",
+          "prompt": "Noemí travels to an isolated English-style mansion in Mexico after receiving a disturbing letter from her newly married cousin.",
+          "options": [
+            "Mexican Gothic",
+            "The Hacienda",
+            "The Silent Companions",
+            "The Death of Jane Lawrence"
+          ],
+          "answerIndex": 0,
+          "book": {
+            "title": "Mexican Gothic",
+            "author": "Silvia Moreno-Garcia",
+            "sourceUrl": "https://www.penguinrandomhouse.com/books/577068/mexican-gothic-by-silvia-moreno-garcia/9780525620785/"
+          },
+          "explanation": "Noemí’s visit to High Place begins with concern for her cousin Catalina.",
+          "difficulty": "medium"
+        },
+        {
+          "id": "chapter-11-q5",
+          "type": "blurb_title",
+          "prompt": "Merricat, her sister Constance and their uncle live apart from a hostile village after a tragedy in the Blackwood family.",
+          "options": [
+            "The Haunting of Hill House",
+            "The Little Stranger",
+            "The Woman in Black",
+            "We Have Always Lived in the Castle"
+          ],
+          "answerIndex": 3,
+          "book": {
+            "title": "We Have Always Lived in the Castle",
+            "author": "Shirley Jackson",
+            "sourceUrl": "https://www.penguinrandomhouse.com/books/541341/we-have-always-lived-in-the-castle-by-shirley-jackson/"
+          },
+          "explanation": "The isolated Blackwood household is the setting for Merricat’s unsettling account.",
+          "difficulty": "stretch"
+        }
+      ]
+    },
+    {
+      "id": "chapter-12",
+      "day": 12,
+      "themeId": "letters-diaries",
+      "title": "Dear reader",
+      "intro": "Private pages, distant friends and stories told one entry at a time.",
+      "questions": [
+        {
+          "id": "chapter-12-q1",
+          "type": "blurb_title",
+          "prompt": "A Jewish teenager records daily life while hiding with her family in Amsterdam during the Nazi occupation.",
+          "options": [
+            "The Diary of a Young Girl",
+            "I Am Malala",
+            "The Hiding Place",
+            "Zlata’s Diary"
+          ],
+          "answerIndex": 0,
+          "book": {
+            "title": "The Diary of a Young Girl",
+            "author": "Anne Frank",
+            "sourceUrl": "https://www.randomhousebooks.com/books/55694/"
+          },
+          "explanation": "Anne Frank’s diary records the experiences of a young person living in hiding.",
+          "difficulty": "easy"
+        },
+        {
+          "id": "chapter-12-q2",
+          "type": "blurb_title",
+          "prompt": "Charlie tells an unnamed friend about his first year of high school through letters, as new friendships draw him out of the sidelines.",
+          "options": [
+            "The Catcher in the Rye",
+            "Looking for Alaska",
+            "The Perks of Being a Wallflower",
+            "Aristotle and Dante Discover the Secrets of the Universe"
+          ],
+          "answerIndex": 2,
+          "book": {
+            "title": "The Perks of Being a Wallflower",
+            "author": "Stephen Chbosky",
+            "sourceUrl": "https://www.simonandschuster.com/books/The-Perks-of-Being-a-Wallflower/Stephen-Chbosky/9781451696196"
+          },
+          "explanation": "Charlie’s letters give the novel its intimate account of adolescence and friendship.",
+          "difficulty": "easy"
+        },
+        {
+          "id": "chapter-12-q3",
+          "type": "blurb_title",
+          "prompt": "After the Second World War, writer Juliet Ashton exchanges letters with members of a book club formed on occupied Guernsey.",
+          "options": [
+            "The Jane Austen Society",
+            "The Guernsey Literary and Potato Peel Pie Society",
+            "The Reading List",
+            "The Chilbury Ladies’ Choir"
+          ],
+          "answerIndex": 1,
+          "book": {
+            "title": "The Guernsey Literary and Potato Peel Pie Society",
+            "author": "Mary Ann Shaffer and Annie Barrows",
+            "sourceUrl": "https://www.penguinrandomhouse.com/books/164594/the-guernsey-literary-and-potato-peel-pie-society-by-mary-ann-shaffer-and-annie-barrows/"
+          },
+          "explanation": "The letters bring Juliet into contact with an island community and its wartime history.",
+          "difficulty": "medium"
+        },
+        {
+          "id": "chapter-12-q4",
+          "type": "blurb_title",
+          "prompt": "Celie’s letters to God and to her sister Nettie trace her life in the American South and her search for independence.",
+          "options": [
+            "Their Eyes Were Watching God",
+            "The Bluest Eye",
+            "I Know Why the Caged Bird Sings",
+            "The Color Purple"
+          ],
+          "answerIndex": 3,
+          "book": {
+            "title": "The Color Purple",
+            "author": "Alice Walker",
+            "sourceUrl": "https://www.hachette.co.uk/titles/alice-walker/the-color-purple/9781409139263/"
+          },
+          "explanation": "Walker uses Celie’s letters to centre her voice and changing relationships.",
+          "difficulty": "medium"
+        },
+        {
+          "id": "chapter-12-q5",
+          "type": "blurb_title",
+          "prompt": "London clerk Charles Pooter records domestic mishaps, social embarrassments and his hopes of being taken seriously.",
+          "options": [
+            "The Diary of a Nobody",
+            "Three Men in a Boat",
+            "The Diary of a Provincial Lady",
+            "Cold Comfort Farm"
+          ],
+          "answerIndex": 0,
+          "book": {
+            "title": "The Diary of a Nobody",
+            "author": "George Grossmith and Weedon Grossmith",
+            "sourceUrl": "https://www.gutenberg.org/ebooks/1026"
+          },
+          "explanation": "The Grossmiths turn Pooter’s daily entries into a comedy of ordinary Victorian life.",
+          "difficulty": "stretch"
+        }
+      ]
+    },
+    {
+      "id": "chapter-13",
+      "day": 13,
+      "themeId": "space-adventures",
+      "title": "Beyond the stars",
+      "intro": "Stranded astronauts, unlikely crews and journeys far from home.",
+      "questions": [
+        {
+          "id": "chapter-13-q1",
+          "type": "blurb_title",
+          "prompt": "Arthur Dent escapes Earth moments before its demolition and travels through space with his friend Ford Prefect.",
+          "options": [
+            "The Restaurant at the End of the Universe",
+            "The Hitchhiker’s Guide to the Galaxy",
+            "Good Omens",
+            "The Sirens of Titan"
+          ],
+          "answerIndex": 1,
+          "book": {
+            "title": "The Hitchhiker’s Guide to the Galaxy",
+            "author": "Douglas Adams",
+            "sourceUrl": "https://www.penguinrandomhouse.com/books/671/the-hitchhikers-guide-to-the-galaxy-25th-anniversary-edition-by-douglas-adams/"
+          },
+          "explanation": "Arthur’s rescue begins an absurd journey through the galaxy.",
+          "difficulty": "easy"
+        },
+        {
+          "id": "chapter-13-q2",
+          "type": "blurb_title",
+          "prompt": "Astronaut Mark Watney is left behind on Mars and relies on his scientific training to stay alive.",
+          "options": [
+            "Artemis",
+            "Red Mars",
+            "Seveneves",
+            "The Martian"
+          ],
+          "answerIndex": 3,
+          "book": {
+            "title": "The Martian",
+            "author": "Andy Weir",
+            "sourceUrl": "https://www.penguinrandomhouse.com/books/818980/the-martian-deluxe-edition-by-andy-weir/"
+          },
+          "explanation": "Watney’s improvised survival efforts centre the story on Mars.",
+          "difficulty": "easy"
+        },
+        {
+          "id": "chapter-13-q3",
+          "type": "blurb_title",
+          "prompt": "A man wakes aboard a spacecraft with almost no memory and gradually discovers that his mission could save humanity.",
+          "options": [
+            "Project Hail Mary",
+            "Rendezvous with Rama",
+            "Solaris",
+            "Tau Zero"
+          ],
+          "answerIndex": 0,
+          "book": {
+            "title": "Project Hail Mary",
+            "author": "Andy Weir",
+            "sourceUrl": "https://images.penguinrandomhouse.com/promo_image/9780593135204_8306.pdf"
+          },
+          "explanation": "Ryland Grace must recover the purpose of his mission while solving its scientific puzzle.",
+          "difficulty": "medium"
+        },
+        {
+          "id": "chapter-13-q4",
+          "type": "blurb_title",
+          "prompt": "Rosemary joins the Wayfarer, a wormhole-building ship whose crew brings together people from several species.",
+          "options": [
+            "A Memory Called Empire",
+            "The Galaxy, and the Ground Within",
+            "The Long Way to a Small, Angry Planet",
+            "A Psalm for the Wild-Built"
+          ],
+          "answerIndex": 2,
+          "book": {
+            "title": "The Long Way to a Small, Angry Planet",
+            "author": "Becky Chambers",
+            "sourceUrl": "https://www.hachette.co.uk/titles/becky-chambers/the-long-way-to-a-small-angry-planet/9781473619814/"
+          },
+          "explanation": "The Wayfarer’s working life and its varied crew shape Chambers’s space adventure.",
+          "difficulty": "medium"
+        },
+        {
+          "id": "chapter-13-q5",
+          "type": "blurb_title",
+          "prompt": "Breq was once the intelligence of a vast starship. Now confined to one human body, she pursues a mission of revenge.",
+          "options": [
+            "A Memory Called Empire",
+            "Ancillary Justice",
+            "All Systems Red",
+            "Translation State"
+          ],
+          "answerIndex": 1,
+          "book": {
+            "title": "Ancillary Justice",
+            "author": "Ann Leckie",
+            "sourceUrl": "https://annleckie.com/novel/ancillary-justice/"
+          },
+          "explanation": "Leckie’s novel follows the surviving fragment of the starship Justice of Toren.",
+          "difficulty": "stretch"
+        }
+      ]
+    },
+    {
+      "id": "chapter-14",
+      "day": 14,
+      "themeId": "found-family",
+      "title": "The people we find",
+      "intro": "A household, a neighbourhood, a circle. Five ways to belong.",
+      "questions": [
+        {
+          "id": "chapter-14-q1",
+          "type": "blurb_title",
+          "prompt": "Caseworker Linus Baker is sent to inspect an island home where six unusually magical children live.",
+          "options": [
+            "Miss Peregrine’s Home for Peculiar Children",
+            "The Very Secret Society of Irregular Witches",
+            "The House in the Cerulean Sea",
+            "The House of the Spirits"
+          ],
+          "answerIndex": 2,
+          "book": {
+            "title": "The House in the Cerulean Sea",
+            "author": "TJ Klune",
+            "sourceUrl": "https://us.macmillan.com/books/9781250217288/thehouseintheceruleansea/"
+          },
+          "explanation": "Linus’s assignment brings him into the household run by Arthur Parnassus.",
+          "difficulty": "easy"
+        },
+        {
+          "id": "chapter-14-q2",
+          "type": "blurb_title",
+          "prompt": "Mika Moon accepts an invitation to teach three young witches who live together at a place called Nowhere House.",
+          "options": [
+            "The Very Secret Society of Irregular Witches",
+            "The Ex Hex",
+            "The Witch’s Heart",
+            "Garden Spells"
+          ],
+          "answerIndex": 0,
+          "book": {
+            "title": "The Very Secret Society of Irregular Witches",
+            "author": "Sangu Mandanna",
+            "sourceUrl": "https://www.penguinrandomhouse.com/books/696866/the-very-secret-society-of-irregular-witches-by-sangu-mandanna/"
+          },
+          "explanation": "The invitation challenges Mika’s expectation that witches must live separately.",
+          "difficulty": "easy"
+        },
+        {
+          "id": "chapter-14-q3",
+          "type": "blurb_title",
+          "prompt": "A gruff widower’s strictly ordered days are disrupted when Parvaneh and her family move in next door.",
+          "options": [
+            "The Unlikely Pilgrimage of Harold Fry",
+            "Eleanor Oliphant Is Completely Fine",
+            "The Authenticity Project",
+            "A Man Called Ove"
+          ],
+          "answerIndex": 3,
+          "book": {
+            "title": "A Man Called Ove",
+            "author": "Fredrik Backman",
+            "sourceUrl": "https://www.simonandschuster.com/books/A-Man-Called-Ove/Fredrik-Backman/9781476738024"
+          },
+          "explanation": "Ove’s encounters with his neighbours gradually reveal the person behind his gruff exterior.",
+          "difficulty": "medium"
+        },
+        {
+          "id": "chapter-14-q4",
+          "type": "blurb_title",
+          "prompt": "Four residents of a retirement village meet to discuss unsolved crimes, then find themselves investigating a fresh murder.",
+          "options": [
+            "The Marlow Murder Club",
+            "The Thursday Murder Club",
+            "Vera Wong’s Unsolicited Advice for Murderers",
+            "The No. 1 Ladies’ Detective Agency"
+          ],
+          "answerIndex": 1,
+          "book": {
+            "title": "The Thursday Murder Club",
+            "author": "Richard Osman",
+            "sourceUrl": "https://global.penguinrandomhouse.com/announcements/richard-osman-to-discuss-his-new-mystery-novel-via-facebook-live-9-20/"
+          },
+          "explanation": "The friends’ weekly meetings become unexpectedly practical when a real case arrives.",
+          "difficulty": "medium"
+        },
+        {
+          "id": "chapter-14-q5",
+          "type": "blurb_title",
+          "prompt": "Widowed aquarium cleaner Tova forms an unlikely friendship with Marcellus, a giant Pacific octopus.",
+          "options": [
+            "The Soul of an Octopus",
+            "How the Penguins Saved Veronica",
+            "Remarkably Bright Creatures",
+            "The Travelling Cat Chronicles"
+          ],
+          "answerIndex": 2,
+          "book": {
+            "title": "Remarkably Bright Creatures",
+            "author": "Shelby Van Pelt",
+            "sourceUrl": "https://shelbyvanpelt.com/books/remarkably-bright-creatures/"
+          },
+          "explanation": "Tova and Marcellus’s connection brings companionship and new possibilities into her life.",
+          "difficulty": "stretch"
+        }
+      ]
+    }
+  ]
+}

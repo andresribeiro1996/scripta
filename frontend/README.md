@@ -9,6 +9,8 @@ Skim layer over the detailed sections below. Pages render through one layout rou
 | Route | Page | What |
 |---|---|---|
 | `/` | `LandingPage.tsx` | public landing page; a signed-in visitor goes straight to `/dashboard` |
+| `/daily` | `DailyChapterPage.tsx` | public official daily quiz, result recovery and personal theme history |
+| `/admin/daily-chapter` | `AdminDailyChapterPage.tsx` | editor-only target books, reviewed question bank, quote coverage and edition calendar |
 | `/privacy` | `PrivacyPage.tsx` | privacy notice, public; linked from the landing footer and every auth screen |
 | `/login` | `LoginPage.tsx` | signup (`?mode=signup`) / login (email or username), Google sign-in if configured |
 | `/oauth-success` | `OAuthSuccessPage.tsx` | where Google's login flow lands back |
@@ -24,6 +26,8 @@ Skim layer over the detailed sections below. Pages render through one layout rou
 | `/dashboard/reader-card` | `ReaderCardPage.tsx` | the reader card editor: counter, trait, layout, signature book and note, highlight, glyph; reached from "Edit card" in your own card's viewer and from Settings |
 | `/dashboard/settings` | `SettingsPage.tsx` | account + username + socials connections |
 | `/shared/library/:token`, `/shared/murals/:token` | `SharedLibraryPage.tsx` / `SharedMuralPage.tsx` | public share-link views, no account needed |
+
+The Daily Chapter editor accepts both draft packs and the [reviewed launch fortnight](../docs/daily-chapter/launch-fortnight.md). Reviewed packs retain question approval; publishing each saved edition is a separate action.
 
 ## Running it
 

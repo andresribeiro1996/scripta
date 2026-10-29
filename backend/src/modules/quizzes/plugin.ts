@@ -2,6 +2,10 @@
 // modules/tierlists/plugin.ts: two route builders, each in its OWN
 // encapsulation scope so the public one carries its rate limit.
 
+import { env } from "../../config/env.js";
+import { createSqliteDailyChapterRepository } from "./adapters/sqlite/sqliteDailyChapterRepository.js";
+import { createDailyChapterService } from "./dailyChapterService.js";
+import { buildDailyChapterRoutes } from "./dailyChapterRoutes.js";
 import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
 import { getWorkCharacters } from "../books/index.js";
@@ -28,6 +32,10 @@ export async function quizzesPlugin(app: FastifyInstance, opts: QuizzesPluginOpt
   // -----------------------------------------------------------------------
 
   await app.register(buildQuizRoutes(quizzesService));
+  await app.register(async (scoped) => {
+    await scoped.register(fastifyRateLimit, { max: 120, timeWindow: "1 minute" });
+    await scoped.register(buildDailyChapterRoutes(createDailyChapterService(createSqliteDailyChapterRepository(db), createSqliteQuizzesRepository(db)), (userId) => Boolean(env.ADMIN_USER_ID) && userId === env.ADMIN_USER_ID));
+  });
 
   // Same 30/minute public-write limit as tierlists' ballot routes: this
   // surface is unauthenticated AND writes (a play).

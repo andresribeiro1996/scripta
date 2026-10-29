@@ -149,7 +149,7 @@ The web route tree has a native equivalent. The native tab shell uses shorter in
 | `/welcome-avatar` | Native skippable avatar onboarding |
 | `/oauth-success` | Native OAuth uses the `scripta://oauth-redirect` auth-session callback; the web callback path returns to login |
 
-`/arena`, `/arena/:id`, `/vote/:code`, `/play/:code`, `/shared/library/:token`, and `/shared/murals/:token` remain public and never pass through the app auth guard.
+`/daily`, `/arena`, `/arena/:id`, `/vote/:code`, `/play/:code`, `/shared/library/:token`, and `/shared/murals/:token` remain public and never pass through the app auth guard.
 
 ## Conventions
 
@@ -191,3 +191,7 @@ Search and Add Book results and the book page show a book's series or collection
 The shared Input supports password visibility and field hints. Login/signup validate fields before submission, preserve autofill, scroll above the keyboard, and prevent competing sign-in attempts. Sessions continue to use SecureStore and remain signed in by default.
 
 `/forgot-password` requests a recovery email; the link completes recovery on the HTTPS web client. Settings opens `/account-security` for password changes, email verification, and correction. Existing accounts remain usable while unverified. Sign-in destinations survive username and avatar onboarding.
+
+### The Daily Chapter
+
+`/daily` is public and opens from Home or sign-in. Five questions are shared with the website's official UTC edition. Guest identities and answer drafts use AsyncStorage; scores and theme history are server-graded and stored. Signing in attaches unclaimed guest results without replacing an account result. Editorial review and scheduling live in the web editor at `/admin/daily-chapter`.

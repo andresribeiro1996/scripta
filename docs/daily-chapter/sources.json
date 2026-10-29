@@ -1,0 +1,798 @@
+[
+  {
+    "repository": "jane-austen_pride-and-prejudice",
+    "themeIds": [
+      "romantic-comedies",
+      "complicated-siblings",
+      "rivals-romance"
+    ],
+    "revision": "ed94a32be3e875c0814568050c7544e03aad3ef5"
+  },
+  {
+    "repository": "jane-austen_emma",
+    "themeIds": [
+      "romantic-comedies",
+      "small-towns"
+    ],
+    "revision": "91b9bdb6e67e334c3db0aa16d69ba5d76d70000c"
+  },
+  {
+    "repository": "jane-austen_persuasion",
+    "themeIds": [
+      "across-generations",
+      "opening-lines"
+    ],
+    "revision": "fa8ac94bf0fb6f9f67221c775526b305b8ff42bf"
+  },
+  {
+    "repository": "charles-dickens_a-christmas-carol",
+    "themeIds": [
+      "gothic-stories",
+      "one-extraordinary-day"
+    ],
+    "revision": "dd1fb9f80b0c3fcfa2686449468f094eeadb3ff4"
+  },
+  {
+    "repository": "charles-dickens_a-tale-of-two-cities",
+    "themeIds": [
+      "historical-fiction",
+      "secret-identities"
+    ],
+    "revision": "ce19cd420184874a47b5a798e9e88f7facae9896"
+  },
+  {
+    "repository": "charles-dickens_great-expectations",
+    "themeIds": [
+      "found-family",
+      "across-generations"
+    ],
+    "revision": "81271e3258059ca1f743909edfe6abae6ee2b329"
+  },
+  {
+    "repository": "charles-dickens_oliver-twist",
+    "themeIds": [
+      "found-family",
+      "hidden-histories"
+    ],
+    "revision": "819af2b75e43aef0c5db08f131304a1b9bf4e298"
+  },
+  {
+    "repository": "charlotte-bronte_jane-eyre",
+    "themeIds": [
+      "gothic-stories",
+      "boarding-schools"
+    ],
+    "revision": "f0b188283cdc96670a2f629e312fffb57440f4e6"
+  },
+  {
+    "repository": "charlotte-bronte_villette",
+    "themeIds": [
+      "boarding-schools",
+      "unreliable-narrators"
+    ],
+    "revision": "34c6d08e70109d6ff7662efcb80da779a84d517e"
+  },
+  {
+    "repository": "emily-bronte_wuthering-heights",
+    "themeIds": [
+      "gothic-stories",
+      "complicated-siblings"
+    ],
+    "revision": "eef92e19ac95d89b0e5c845e927d49061fc95092"
+  },
+  {
+    "repository": "anne-bronte_the-tenant-of-wildfell-hall",
+    "themeIds": [
+      "letters-diaries",
+      "secret-identities"
+    ],
+    "revision": "a4af7522f68d261e6192c2ea49b0614767be742d"
+  },
+  {
+    "repository": "george-eliot_middlemarch",
+    "themeIds": [
+      "small-towns",
+      "across-generations"
+    ],
+    "revision": "f3614eb51d2643db32c4e237761e36f0f2c82e79"
+  },
+  {
+    "repository": "george-eliot_silas-marner",
+    "themeIds": [
+      "found-family",
+      "small-towns"
+    ],
+    "revision": "5e4a668b8ccfd6706cc3cfbfbed0a97d5e95fa7d"
+  },
+  {
+    "repository": "thomas-hardy_tess-of-the-durbervilles",
+    "themeIds": [
+      "small-towns",
+      "historical-fiction"
+    ],
+    "revision": "6c362297da2258b871034588505c068b6c10fb3b"
+  },
+  {
+    "repository": "thomas-hardy_far-from-the-madding-crowd",
+    "themeIds": [
+      "small-towns",
+      "rivals-romance"
+    ],
+    "revision": "c96c1ef7cebc252bd254d001ba4d44af698dcd45"
+  },
+  {
+    "repository": "robert-louis-stevenson_treasure-island",
+    "themeIds": [
+      "island-stories",
+      "remarkable-journeys"
+    ],
+    "revision": "c7fd6b42e8e856a49781be45d71a9aa18819f3b8"
+  },
+  {
+    "repository": "robert-louis-stevenson_the-strange-case-of-dr-jekyll-and-mr-hyde",
+    "themeIds": [
+      "gothic-stories",
+      "secret-identities"
+    ],
+    "revision": "bb6ccb4d19e94d71588dbacbd3a48aa6cd1846ed"
+  },
+  {
+    "repository": "mary-shelley_frankenstein",
+    "themeIds": [
+      "gothic-stories",
+      "letters-diaries"
+    ],
+    "revision": "3909a2b9d956377e797e235562cd237d3667fa9b"
+  },
+  {
+    "repository": "mary-shelley_the-last-man",
+    "themeIds": [
+      "gothic-stories",
+      "remarkable-journeys"
+    ],
+    "revision": "09f58f0740479bfee011779d8393495ce03464f6"
+  },
+  {
+    "repository": "bram-stoker_dracula",
+    "themeIds": [
+      "gothic-stories",
+      "letters-diaries"
+    ],
+    "revision": "e9e81aadf8b235fb6498728bce54b0967e224612"
+  },
+  {
+    "repository": "oscar-wilde_the-picture-of-dorian-gray",
+    "themeIds": [
+      "gothic-stories",
+      "secret-identities"
+    ],
+    "revision": "c6b6877688d7652e74c3db4e21322adcb27cadcd"
+  },
+  {
+    "repository": "lewis-carroll_alices-adventures-in-wonderland_john-tenniel",
+    "themeIds": [
+      "impossible-places",
+      "remarkable-journeys"
+    ],
+    "revision": "9ecdf2ffa23098e7cb3c72157d7c3031b6f59903"
+  },
+  {
+    "repository": "lewis-carroll_through-the-looking-glass_john-tenniel",
+    "themeIds": [
+      "impossible-places",
+      "one-extraordinary-day"
+    ],
+    "revision": "56b8c2b2163e7eba0bed778b9c73aa8afbe572b1"
+  },
+  {
+    "repository": "frances-hodgson-burnett_the-secret-garden",
+    "themeIds": [
+      "found-family",
+      "natural-world"
+    ],
+    "revision": "17f754b0b3637bf63c8d13ebb4f0b4f3d19eb2e1"
+  },
+  {
+    "repository": "frances-hodgson-burnett_a-little-princess",
+    "themeIds": [
+      "boarding-schools",
+      "found-family"
+    ],
+    "revision": "375721cc181b8fdb84996a9abccdc1ec906eec10"
+  },
+  {
+    "repository": "louisa-may-alcott_little-women",
+    "themeIds": [
+      "complicated-siblings",
+      "across-generations"
+    ],
+    "revision": "38695106591f6060142dd1ad4da1d2aeded8ab8f"
+  },
+  {
+    "repository": "l-m-montgomery_anne-of-green-gables",
+    "themeIds": [
+      "found-family",
+      "small-towns"
+    ],
+    "revision": "fd460b10581dcd38bf3a053e4e006bf5ec140c87"
+  },
+  {
+    "repository": "mark-twain_the-adventures-of-tom-sawyer",
+    "themeIds": [
+      "small-towns",
+      "unlikely-friendships"
+    ],
+    "revision": "d51493e2ec4894468e8cd3b38f848d4fae4e78b9"
+  },
+  {
+    "repository": "herman-melville_moby-dick",
+    "themeIds": [
+      "remarkable-journeys",
+      "stories-within-stories"
+    ],
+    "revision": "d313179e05e7196feee2ed47a97d43949126f11a"
+  },
+  {
+    "repository": "nathaniel-hawthorne_the-scarlet-letter",
+    "themeIds": [
+      "historical-fiction"
+    ],
+    "revision": "5dd74b7da6590a648ea45488fc370ac809d2ee70"
+  },
+  {
+    "repository": "edith-wharton_the-house-of-mirth",
+    "themeIds": [
+      "historical-fiction",
+      "secret-identities"
+    ],
+    "revision": "cd779f424dd499ca265ffc206c4d16c18a61d8b3"
+  },
+  {
+    "repository": "edith-wharton_the-age-of-innocence",
+    "themeIds": [
+      "historical-fiction",
+      "page-to-screen"
+    ],
+    "revision": "c8acc54bcdaf3a266cf37695c79a9927ccde26ee"
+  },
+  {
+    "repository": "henry-james_the-turn-of-the-screw",
+    "themeIds": [
+      "gothic-stories",
+      "unreliable-narrators"
+    ],
+    "revision": "047e8e9d63e6bdec2315c4a763975b3514580735"
+  },
+  {
+    "repository": "f-scott-fitzgerald_the-great-gatsby",
+    "themeIds": [
+      "unreliable-narrators",
+      "page-to-screen"
+    ],
+    "revision": "fe47c8c04f5175d45f9410f4e3ca64c257ae0acc"
+  },
+  {
+    "repository": "virginia-woolf_mrs-dalloway",
+    "themeIds": [
+      "one-extraordinary-day",
+      "opening-lines"
+    ],
+    "revision": "f28a2f6c96813766bff4aad501bf1967d72b1454"
+  },
+  {
+    "repository": "virginia-woolf_to-the-lighthouse",
+    "themeIds": [
+      "across-generations",
+      "island-stories"
+    ],
+    "revision": "2ba2ffe0d5e8789902cfe86c5cde4753b7b68843"
+  },
+  {
+    "repository": "james-joyce_dubliners",
+    "themeIds": [
+      "opening-lines",
+      "complicated-siblings"
+    ],
+    "revision": "c54fa2759376b23bc4db8994112036eec86eb0bc"
+  },
+  {
+    "repository": "arthur-conan-doyle_the-hound-of-the-baskervilles",
+    "themeIds": [
+      "gothic-stories",
+      "disappearances"
+    ],
+    "revision": "39839ab1766697d6c22905d33a74964329be268c"
+  },
+  {
+    "repository": "h-g-wells_the-time-machine",
+    "themeIds": [
+      "time-travel",
+      "impossible-places"
+    ],
+    "revision": "9fd22d612e6ed35cd07a8ed5e3ccdc4856c05088"
+  },
+  {
+    "repository": "h-g-wells_the-war-of-the-worlds",
+    "themeIds": [
+      "page-to-screen"
+    ],
+    "revision": "7c2c332ce1ce8025d07ec982b02dad293dc63671"
+  },
+  {
+    "repository": "h-g-wells_the-island-of-doctor-moreau",
+    "themeIds": [
+      "island-stories",
+      "gothic-stories"
+    ],
+    "revision": "7ebb34774fbb4637469dd13dee0b7af7e563e248"
+  },
+  {
+    "repository": "jules-verne_around-the-world-in-eighty-days_george-makepeace-towle",
+    "themeIds": [
+      "remarkable-journeys",
+      "train-journeys"
+    ],
+    "revision": "56c82e97ff5d4f8950afca05b71af72688a8da34"
+  },
+  {
+    "repository": "jules-verne_journey-to-the-center-of-the-earth_f-a-malleson",
+    "themeIds": [
+      "impossible-places",
+      "remarkable-journeys"
+    ],
+    "revision": "3a69e4ca3a52253ea0ed84557385afd174071219"
+  },
+  {
+    "repository": "jack-london_the-call-of-the-wild",
+    "themeIds": [
+      "natural-world",
+      "remarkable-journeys"
+    ],
+    "revision": "561cc9334d5d9ea203ce9310b1d27a8b0f12cc3f"
+  },
+  {
+    "repository": "jack-london_white-fang",
+    "themeIds": [
+      "natural-world",
+      "unlikely-friendships"
+    ],
+    "revision": "2d19a7eab9b0a615c12e48d74231de05ffa013e9"
+  },
+  {
+    "repository": "jonathan-swift_gullivers-travels",
+    "themeIds": [
+      "impossible-places",
+      "island-stories"
+    ],
+    "revision": "f04d45a853c8d552c6ca7acea7a8f294d7f855b7"
+  },
+  {
+    "repository": "l-frank-baum_the-wonderful-wizard-of-oz",
+    "themeIds": [
+      "impossible-places",
+      "found-family"
+    ],
+    "revision": "36104f0b9ace47debd6ac19cec9dc91b3858e83a"
+  },
+  {
+    "repository": "rudyard-kipling_the-jungle-book",
+    "themeIds": [
+      "natural-world",
+      "found-family"
+    ],
+    "revision": "ece216cb43b862dad09da186934ef2da81b21831"
+  },
+  {
+    "repository": "kenneth-grahame_the-wind-in-the-willows",
+    "themeIds": [
+      "unlikely-friendships",
+      "natural-world"
+    ],
+    "revision": "d2ab18d63ae1a3bdb691f7fd942982c175c46c26"
+  },
+  {
+    "repository": "e-nesbit_the-railway-children",
+    "themeIds": [
+      "train-journeys",
+      "complicated-siblings"
+    ],
+    "revision": "6afc594101ac2a219f9d6121b43ae200b1263fc2"
+  },
+  {
+    "repository": "e-nesbit_five-children-and-it",
+    "themeIds": [
+      "complicated-siblings",
+      "impossible-places"
+    ],
+    "revision": "ffcae11419b4fe64cec83264188db1e870e67e7c"
+  },
+  {
+    "repository": "anna-sewell_black-beauty",
+    "themeIds": [
+      "natural-world",
+      "unlikely-friendships"
+    ],
+    "revision": "746066cada242978106ac72e077c03384d1e5d3a"
+  },
+  {
+    "repository": "johanna-spyri_heidi_elisabeth-p-stork",
+    "themeIds": [
+      "found-family",
+      "across-generations"
+    ],
+    "revision": "1b0cfa30616729c8dae14146b4b36268ac8b803c"
+  },
+  {
+    "repository": "felix-salten_bambi_whittaker-chambers",
+    "themeIds": [
+      "natural-world",
+      "page-to-screen"
+    ],
+    "revision": "3301afe82bfd31b6ade13b054a1e7aa3a1f436a1"
+  },
+  {
+    "repository": "alexandre-dumas_the-count-of-monte-cristo_chapman-and-hall",
+    "themeIds": [
+      "historical-fiction",
+      "secret-identities"
+    ],
+    "revision": "1af363f17450316f295e7d30d7eb77742906c789"
+  },
+  {
+    "repository": "alexandre-dumas_the-three-musketeers_william-robson",
+    "themeIds": [
+      "historical-fiction",
+      "found-family"
+    ],
+    "revision": "136f0d378e2518fba34e009d4c6180f542ab052f"
+  },
+  {
+    "repository": "victor-hugo_les-miserables_isabel-f-hapgood",
+    "themeIds": [
+      "historical-fiction",
+      "found-family"
+    ],
+    "revision": "dc5e2132bc581bd7d8efc67cd46135d75739c0d6"
+  },
+  {
+    "repository": "gustave-flaubert_madame-bovary_eleanor-marx-aveling",
+    "themeIds": [
+      "small-towns",
+      "translated-favourites"
+    ],
+    "revision": "79778b1fa63c8bfe84b8b8984e8d66205df6c524"
+  },
+  {
+    "repository": "leo-tolstoy_anna-karenina_constance-garnett",
+    "themeIds": [
+      "translated-favourites",
+      "complicated-siblings"
+    ],
+    "revision": "caaa125ab2996eb3ca23e492231689f7bcfdcf33"
+  },
+  {
+    "repository": "fyodor-dostoevsky_crime-and-punishment_constance-garnett",
+    "themeIds": [
+      "translated-favourites",
+      "unreliable-narrators"
+    ],
+    "revision": "95bc05484ef0a6521f982e5848b9c79d2f67f5b5"
+  },
+  {
+    "repository": "fyodor-dostoevsky_the-brothers-karamazov_constance-garnett",
+    "themeIds": [
+      "translated-favourites",
+      "complicated-siblings"
+    ],
+    "revision": "26bd6bf86114dacad5f23f6001d377867db0a68f"
+  },
+  {
+    "repository": "nikolai-gogol_dead-souls_c-j-hogarth",
+    "themeIds": [
+      "translated-favourites",
+      "remarkable-journeys"
+    ],
+    "revision": "f590589310b5a3d4e85c38b5128097a81635966b"
+  },
+  {
+    "repository": "franz-kafka_the-castle_willa-muir_edwin-muir",
+    "themeIds": [
+      "translated-favourites",
+      "impossible-places"
+    ],
+    "revision": "b7e36931cc32388d96b5cc55dc9e7e1aede8c5df"
+  },
+  {
+    "repository": "hermann-hesse_siddhartha_various-translators",
+    "themeIds": [
+      "translated-favourites",
+      "remarkable-journeys"
+    ],
+    "revision": "27572b5441f487cd8d91de8484497117ee645952"
+  },
+  {
+    "repository": "knut-hamsun_hunger_george-egerton",
+    "themeIds": [
+      "translated-favourites",
+      "unreliable-narrators"
+    ],
+    "revision": "11159125811f4fa321a6c40e7af1f211ade429a3"
+  },
+  {
+    "repository": "homer_the-odyssey_william-cullen-bryant",
+    "themeIds": [
+      "remarkable-journeys",
+      "stories-within-stories"
+    ],
+    "revision": "ecf1df3ba258a7012d6e8ad0c191894cd79b2339"
+  },
+  {
+    "repository": "homer_the-iliad_william-cullen-bryant",
+    "themeIds": [
+      "remarkable-journeys",
+      "stories-within-stories"
+    ],
+    "revision": "4c535a06077bc7f13caf654be62428afea945bf1"
+  },
+  {
+    "repository": "virgil_the-aeneid_john-dryden",
+    "themeIds": [
+      "remarkable-journeys",
+      "stories-within-stories"
+    ],
+    "revision": "3bd52cf52fdecdfc8623913045819ce58f5bc322"
+  },
+  {
+    "repository": "thomas-bulfinch_bulfinchs-mythology",
+    "themeIds": [
+      "retold-myths",
+      "stories-within-stories"
+    ],
+    "revision": "3822a83d5c52109515690488e6487f5a5321127a"
+  },
+  {
+    "repository": "henry-david-thoreau_walden",
+    "themeIds": [
+      "natural-world",
+      "memoirs"
+    ],
+    "revision": "af72c4ac0793569939ab3d038cbda440b60da940"
+  },
+  {
+    "repository": "john-muir_my-first-summer-in-the-sierra",
+    "themeIds": [
+      "natural-world",
+      "memoirs"
+    ],
+    "revision": "d031e6da8a72b37bfbcdc2b36f4fb3cb2c036809"
+  },
+  {
+    "repository": "mary-wollstonecraft_a-vindication-of-the-rights-of-woman",
+    "themeIds": [
+      "hidden-histories"
+    ],
+    "revision": "1c51ba43297ea42295d8c8eab5f40d2e45a7d3a3"
+  },
+  {
+    "repository": "solomon-northup_twelve-years-a-slave",
+    "themeIds": [
+      "memoirs",
+      "hidden-histories"
+    ],
+    "revision": "7629fca3f1f6606f01a04694ef1c2a427584533a"
+  },
+  {
+    "repository": "booker-t-washington_up-from-slavery",
+    "themeIds": [
+      "memoirs",
+      "hidden-histories"
+    ],
+    "revision": "e0c669db74c678d5174c1c5e9c847ee7d8196cf0"
+  },
+  {
+    "repository": "harriet-beecher-stowe_uncle-toms-cabin",
+    "themeIds": [
+      "hidden-histories",
+      "historical-fiction"
+    ],
+    "revision": "4b815a19b2e8e7c1e1e58be8ccf1a44713e32be9"
+  },
+  {
+    "repository": "upton-sinclair_the-jungle",
+    "themeIds": [
+      "historical-fiction"
+    ],
+    "revision": "40ad53e4145de7193df08327086569cd2fbe0f5c"
+  },
+  {
+    "repository": "stephen-crane_the-red-badge-of-courage",
+    "themeIds": [
+      "historical-fiction",
+      "hidden-histories"
+    ],
+    "revision": "ebe3876cf6d0d93428c247a67076dc927d03ccb8"
+  },
+  {
+    "repository": "willa-cather_my-antonia",
+    "themeIds": [
+      "historical-fiction",
+      "across-generations"
+    ],
+    "revision": "9e7c26a2f2954ed707528ce427172f970a77e6c9"
+  },
+  {
+    "repository": "kate-chopin_the-awakening",
+    "themeIds": [
+      "historical-fiction",
+      "opening-lines"
+    ],
+    "revision": "49955125aa51c4d268543f96f2a1094058b4574d"
+  },
+  {
+    "repository": "charlotte-perkins-gilman_herland",
+    "themeIds": [
+      "impossible-places",
+      "remarkable-journeys"
+    ],
+    "revision": "39bcd6d8ae3a1c95f1a50a2214abe55a9d3b9642"
+  },
+  {
+    "repository": "paul-laurence-dunbar_the-sport-of-the-gods",
+    "themeIds": [
+      "historical-fiction",
+      "hidden-histories"
+    ],
+    "revision": "01719f6f0a000594a2cf3c77f87d36d5370e19fa"
+  },
+  {
+    "repository": "kahlil-gibran_the-prophet",
+    "themeIds": [
+      "translated-favourites",
+      "stories-within-stories"
+    ],
+    "revision": "fe6a2dd8385b3dcd91414ef82add829d1885e784"
+  },
+  {
+    "repository": "marcus-aurelius_meditations_george-long",
+    "themeIds": [
+      "hidden-histories",
+      "memoirs"
+    ],
+    "revision": "3a47d37d9f1df94de235d53839f4b254ce2953d5"
+  },
+  {
+    "repository": "charles-kingsley_the-water-babies",
+    "themeIds": [
+      "impossible-places",
+      "remarkable-journeys"
+    ],
+    "revision": "3b0a7464a9ff143b277c5e86dac385221ea43007"
+  },
+  {
+    "repository": "mark-twain_the-adventures-of-huckleberry-finn",
+    "themeIds": [
+      "remarkable-journeys",
+      "unlikely-friendships"
+    ],
+    "revision": "7ff397180b5d7d7627be102f7f321924983472ef"
+  },
+  {
+    "repository": "daniel-defoe_the-life-and-adventures-of-robinson-crusoe",
+    "themeIds": [
+      "island-stories",
+      "remarkable-journeys"
+    ],
+    "revision": "f72c024dea5c699015c60bd69841a54b337e9c8d"
+  },
+  {
+    "repository": "victor-hugo_notre-dame-de-paris_isabel-f-hapgood",
+    "themeIds": [
+      "gothic-stories",
+      "historical-fiction"
+    ],
+    "revision": "1223389ad0fd36bf809a945d822785d00889be79"
+  },
+  {
+    "repository": "ivan-turgenev_fathers-and-children_constance-garnett",
+    "themeIds": [
+      "translated-favourites",
+      "across-generations"
+    ],
+    "revision": "332befc2762949c09f99ebc8731a6a22e461bc41"
+  },
+  {
+    "repository": "miguel-de-cervantes-saavedra_don-quixote_john-ormsby",
+    "themeIds": [
+      "translated-favourites",
+      "stories-within-stories"
+    ],
+    "revision": "5646bfbdd843b067d110a4077ccaac2ab768a0d7"
+  },
+  {
+    "repository": "charles-darwin_the-origin-of-species",
+    "themeIds": [
+      "natural-world",
+      "scientific-discoveries"
+    ],
+    "revision": "141aef57be550265a080ec652ba2b7b1cea6bc97"
+  },
+  {
+    "repository": "frederick-douglass_narrative-of-the-life-of-frederick-douglass",
+    "themeIds": [
+      "memoirs",
+      "hidden-histories"
+    ],
+    "revision": "35802c7fbe7baf67a53c29261059dd770833dc8a"
+  },
+  {
+    "repository": "okakura-kakuzo_the-book-of-tea",
+    "themeIds": [
+      "hidden-histories"
+    ],
+    "revision": "dd82a2d034b8c1617fcc14724b404dc466645a85"
+  },
+  {
+    "repository": "olaudah-equiano_the-interesting-narrative-of-the-life-of-olaudah-equiano",
+    "themeIds": [
+      "memoirs",
+      "remarkable-journeys"
+    ],
+    "revision": "c2c0abe691178bc73db01c3a039b108479c748e2"
+  },
+  {
+    "repository": "wilkie-collins_the-woman-in-white",
+    "themeIds": [
+      "gothic-stories",
+      "secret-identities"
+    ],
+    "revision": "9b84f26d02fd3fcbd5c7904fefa1d6b5092e9f14"
+  },
+  {
+    "repository": "wilkie-collins_the-moonstone",
+    "themeIds": [
+      "disappearances",
+      "stories-within-stories"
+    ],
+    "revision": "0d4a853a27cf8f5698151319f81f6a9d88addfd9"
+  },
+  {
+    "repository": "baroness-orczy_the-scarlet-pimpernel",
+    "themeIds": [
+      "historical-fiction",
+      "secret-identities"
+    ],
+    "revision": "a57baae8b9e9ee8f2bc2eb52a353438279e690df"
+  },
+  {
+    "repository": "john-buchan_the-thirty-nine-steps",
+    "themeIds": [
+      "secret-identities",
+      "page-to-screen"
+    ],
+    "revision": "38479284b92d570170f80c6e5e12572d691a5be0"
+  },
+  {
+    "repository": "george-macdonald_the-princess-and-the-goblin",
+    "themeIds": [
+      "impossible-places",
+      "found-family"
+    ],
+    "revision": "3157cc12856da62e34975f86a97064a7b74786c3"
+  },
+  {
+    "repository": "h-rider-haggard_king-solomons-mines",
+    "themeIds": [
+      "remarkable-journeys",
+      "impossible-places"
+    ],
+    "revision": "a75b1b8ffe22376d1c6a64ae808de12555b807c5"
+  },
+  {
+    "repository": "r-d-blackmore_lorna-doone",
+    "themeIds": [
+      "historical-fiction",
+      "rivals-romance"
+    ],
+    "revision": "d78d671e7b909420197086624eb2e33fa416e389"
+  }
+]

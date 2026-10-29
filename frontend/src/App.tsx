@@ -1,4 +1,6 @@
 import { AccountActionPage } from "./pages/AccountActionPage";
+import { DailyChapterPage } from "./pages/DailyChapterPage";
+import { AdminDailyChapterPage } from "./pages/AdminDailyChapterPage";
 import { HomePage } from "./pages/HomePage";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { RequireAuth } from "./auth/RequireAuth";
@@ -86,6 +88,7 @@ export function App() {
               <Route path="/dashboard/settings" element={<SettingsPage />} />
               <Route path="/dashboard/settings/appearance" element={<SettingsAppearancePage />} />
               <Route path="/dashboard/reader-card" element={<ReaderCardPage />} />
+              <Route path="/admin/daily-chapter" element={<AdminDailyChapterPage />} />
               <Route path="/admin/genres" element={<AdminGenresPage />} />
               <Route path="/admin/synopses" element={<AdminSynopsesPage />} />
               <Route path="/admin/translations" element={<AdminTranslationsPage />} />
@@ -106,6 +109,7 @@ export function App() {
           <Route path="/shared/murals/:token" element={<SharedMuralPage />} />
           <Route path="/shared/library/:token" element={<SharedLibraryPage />} />
           <Route path="/vote/:code" element={<VoteTierlistPage />} />
+          <Route path="/daily" element={<DailyChapterPage />} />
           <Route path="/play/:code" element={<PlayQuizPage />} />
         </Route>
 

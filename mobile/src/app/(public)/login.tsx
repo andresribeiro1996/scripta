@@ -201,6 +201,7 @@ export default function LoginPage() {
             <Text accessibilityLiveRegion="polite" accessibilityRole="alert" style={[styles.error, { color: colors.danger }]}>{error}</Text>
           ) : null}
         </View>
+        <Button label="Play today's chapter" variant="secondary" onPress={() => router.push("/daily")} />
       </FormScroll>
     </Screen>
   );
