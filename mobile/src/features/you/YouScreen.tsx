@@ -4,16 +4,10 @@ import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { useAuth } from "../../core/auth";
 import { API_URL } from "../../core/config";
-import { Icon, IconButton, Screen, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { IconButton, Screen, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { AuthorAvatar } from "../community/AuthorAvatar";
 import { fetchOwnProfile } from "../community/api";
-
-const ROWS = [
-  { label: "Your shelf", href: "/me" },
-  { label: "Murals", href: "/murals" },
-  { label: "Reader card", href: "/reader-card" },
-  { label: "Gallery", href: "/gallery" },
-] as const;
+import { CARDS } from "./YouPreviews";
 
 export function YouScreen() {
   const { colors } = useTheme();
@@ -41,20 +35,19 @@ export function YouScreen() {
             ) : null}
           </View>
         </View>
-        <View style={[styles.rows, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          {ROWS.map((row, index) => (
+        <View style={styles.grid}>
+          {CARDS.map((card) => (
             <Pressable
-              key={row.href}
+              key={card.href}
               accessibilityRole="button"
-              onPress={() => router.push(row.href as never)}
-              style={({ pressed }) => [
-                styles.row,
-                index > 0 ? { borderTopWidth: 1, borderTopColor: colors.border } : null,
-                pressed ? { backgroundColor: colors.surfacePressed } : null,
-              ]}
+              accessibilityLabel={card.label}
+              onPress={() => router.push(card.href as never)}
+              style={({ pressed }) => [styles.card, { backgroundColor: pressed ? colors.surfacePressed : colors.surface, borderColor: colors.border }]}
             >
-              <Text {...dynamicType} style={[typography.body, styles.rowLabel, { color: colors.text }]}>{row.label}</Text>
-              <Icon name="chevronRight" size={18} color={colors.textDim} />
+              <View style={[styles.preview, { backgroundColor: colors.accentSoft }]}>
+                <card.Preview />
+              </View>
+              <Text {...dynamicType} style={[typography.body, styles.label, { color: colors.text }]}>{card.label}</Text>
             </Pressable>
           ))}
         </View>
@@ -67,7 +60,8 @@ const styles = StyleSheet.create({
   page: { padding: spacing.lg, gap: spacing.lg },
   profile: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   grow: { flex: 1, gap: spacing.xs },
-  rows: { borderWidth: 1, borderRadius: radii.lg, overflow: "hidden" },
-  row: { minHeight: 52, flexDirection: "row", alignItems: "center", gap: spacing.md, paddingHorizontal: spacing.lg },
-  rowLabel: { flex: 1, fontWeight: "600" },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md },
+  card: { width: "48%", flexGrow: 1, borderWidth: 1, borderRadius: radii.lg, overflow: "hidden" },
+  preview: { height: 132, alignItems: "center", justifyContent: "center", overflow: "hidden" },
+  label: { fontWeight: "600", textAlign: "center", padding: spacing.md },
 });
