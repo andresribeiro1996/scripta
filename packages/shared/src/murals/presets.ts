@@ -25,7 +25,7 @@ const UNAVAILABLE: Record<MuralPresetId, string> = {
   shelf: "Needs books in your library"
 };
 
-function timestamp(value: unknown) {
+export function timestamp(value: unknown) {
   const date = typeof value === "string" ? Date.parse(value) : NaN;
   return Number.isFinite(date) ? date : 0;
 }

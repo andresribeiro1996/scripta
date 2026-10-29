@@ -61,7 +61,7 @@ const styles = StyleSheet.create({
   profile: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   grow: { flex: 1, gap: spacing.xs },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md },
-  card: { width: "48%", flexGrow: 1, borderWidth: 1, borderRadius: radii.lg, overflow: "hidden" },
+  card: { flexGrow: 1, flexBasis: "40%", borderWidth: 1, borderRadius: radii.lg, overflow: "hidden" },
   preview: { height: 132, alignItems: "center", justifyContent: "center", overflow: "hidden" },
   label: { fontWeight: "600", textAlign: "center", padding: spacing.md },
 });

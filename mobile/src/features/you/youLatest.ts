@@ -1,13 +1,11 @@
-import type { Mural } from "@scripta/shared";
+import { timestamp, type Mural } from "@scripta/shared";
 
 type Book = Record<string, unknown>;
-
-const addedOn = (book: Book) => (typeof book.DateCreated === "string" ? book.DateCreated : "");
 
 export function latestBooks(books: readonly Book[], count: number): Book[] {
   return books
     .map((book, index) => ({ book, index }))
-    .sort((a, b) => addedOn(b.book).localeCompare(addedOn(a.book)) || b.index - a.index)
+    .sort((a, b) => timestamp(b.book.DateCreated) - timestamp(a.book.DateCreated) || b.index - a.index)
     .slice(0, count)
     .map((entry) => entry.book);
 }
