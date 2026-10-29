@@ -52,6 +52,14 @@ export const WORK_LOOKUP_SQL = `
   ORDER BY work_checked_at IS NOT NULL, created_by IS NOT NULL, coalesce(work_checked_at, ''), created_at, rowid
   LIMIT ?
 `;
+export const EDITION_YEAR_SQL = `
+  SELECT id FROM books
+  WHERE isbn IS NOT NULL AND first_published_year IS NOT NULL AND (year IS NULL OR year = first_published_year)
+    AND (edition_year_checked_at IS NOT NULL) IN (0, 1)
+    AND coalesce(edition_year_checked_at, '') < ?
+  ORDER BY edition_year_checked_at IS NOT NULL, coalesce(edition_year_checked_at, ''), created_at, rowid
+  LIMIT ?
+`;
 export const GROUPABLE_KEYS_SQL = `
   SELECT title_key FROM books
   WHERE title_key > ?
@@ -121,8 +129,8 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const byKeysStmt = db.prepare(`SELECT book_keys.key AS key, books.* FROM book_keys JOIN books ON books.id = book_keys.book_id WHERE book_keys.key IN (SELECT value FROM json_each(?))`);
   const byIdStmt = db.prepare(`SELECT * FROM books WHERE id = ?`);
   const insertBookStmt = db.prepare(`
-    INSERT INTO books (id, title, author, year, publisher, isbn, ol_cover_id, ol_work_key, work_id, genres, data_sources, created_by, title_key, retitle_wanted_at, created_at)
-    VALUES ($id, $title, $author, $year, $publisher, $isbn, $ol_cover_id, $ol_work_key, $work_id, $genres, $data_sources, $created_by, $title_key, $retitle_wanted_at, $created_at)
+    INSERT INTO books (id, title, author, year, first_published_year, publisher, isbn, ol_cover_id, ol_work_key, work_id, genres, data_sources, created_by, title_key, retitle_wanted_at, created_at)
+    VALUES ($id, $title, $author, $year, $first_published_year, $publisher, $isbn, $ol_cover_id, $ol_work_key, $work_id, $genres, $data_sources, $created_by, $title_key, $retitle_wanted_at, $created_at)
   `);
   const insertKeyIfMissingStmt = db.prepare(`INSERT OR IGNORE INTO book_keys (key, book_id) VALUES (?, ?)`);
   const fillIdentityStmt = db.prepare(`UPDATE books SET title = ?, author = ?, title_key = ? WHERE id = ? AND (title = '' OR author = '')`);
@@ -213,7 +221,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     ORDER BY editions DESC, id
   `);
   const matchCandidatesStmt = db.prepare(`
-    SELECT w.id, w.title, w.author, MIN(b.year) AS year, COUNT(*) AS editions, json_group_array(COALESCE(b.language, '') ORDER BY b.rowid) AS languages
+    SELECT w.id, w.title, w.author, MIN(COALESCE(min(b.year, b.first_published_year), b.year, b.first_published_year)) AS year, COUNT(*) AS editions, json_group_array(COALESCE(b.language, '') ORDER BY b.rowid) AS languages
     FROM works w JOIN books b ON b.work_id = w.id
     WHERE w.id IN (SELECT value FROM json_each(?))
     GROUP BY w.id
@@ -275,7 +283,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   `);
   const jevJudgedStmt = db.prepare(`SELECT work_id FROM genre_judgments WHERE model <> 'manual'`);
   const countEmptyGenreEditionsStmt = db.prepare(`SELECT COUNT(*) AS n FROM books WHERE work_id = ? AND genres = '[]'`);
-  const pageEditionsStmt = db.prepare(`SELECT books.id, books.title, books.language, books.year, books.isbn, books.summary, books.summary_hash, books.cover_image_id, ci.color AS cover_color, books.genres, books.rating, books.rating_count, books.pages, books.genres_source, books.genres_confidence FROM books LEFT JOIN cover_images ci ON ci.id = books.cover_image_id WHERE books.work_id = ? ORDER BY books.created_at, books.rowid`);
+  const pageEditionsStmt = db.prepare(`SELECT books.id, books.title, books.language, books.year, books.first_published_year, books.isbn, books.summary, books.summary_hash, books.cover_image_id, ci.color AS cover_color, books.genres, books.rating, books.rating_count, books.pages, books.genres_source, books.genres_confidence FROM books LEFT JOIN cover_images ci ON ci.id = books.cover_image_id WHERE books.work_id = ? ORDER BY books.created_at, books.rowid`);
   const workEditionsStmt = db.prepare(`SELECT id, isbn, title, author, ol_work_key FROM books WHERE work_id = ? ORDER BY created_at, rowid`);
   const groupableKeysStmt = db.prepare(GROUPABLE_KEYS_SQL);
   const keylessCandidatesStmt = db.prepare(KEYLESS_CANDIDATES_SQL);
@@ -296,6 +304,14 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   `);
   const workLookupStmt = db.prepare(WORK_LOOKUP_SQL);
   const workCheckedStmt = db.prepare(`UPDATE books SET work_checked_at = ? WHERE id = ?`);
+  const editionYearStmt = db.prepare(EDITION_YEAR_SQL);
+  const setEditionYearStmt = db.prepare(`
+    UPDATE books
+    SET year = CASE WHEN $year IS NOT NULL AND (year IS NULL OR (year = first_published_year AND $year > first_published_year)) THEN $year ELSE year END,
+        edition_year_checked_at = $at
+    WHERE id = $id
+  `);
+  const fillFirstPublishedYearStmt = db.prepare(`UPDATE books SET first_published_year = ? WHERE id = ? AND first_published_year IS NULL`);
   const replaceLanguageStmt = db.prepare(`UPDATE books SET language = ? WHERE id = ?`);
   const makeSearchableStmt = db.prepare(`
     INSERT INTO books_fts (book_id, title, author)
@@ -519,6 +535,42 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     WHERE source = ? AND name_key IN (SELECT value FROM json_each(?))
   `);
   const removeSeriesNamesStmt = db.prepare(`DELETE FROM work_series WHERE source = ? AND name_key IN (SELECT value FROM json_each(?))`);
+  const bnpPublisherBooksStmt = db.prepare(`SELECT id, title, publisher, isbn FROM books WHERE created_by = 'bnp' AND publisher IS NOT NULL`);
+  const bookWorksStmt = db.prepare(`
+    SELECT b.id AS id, b.work_id AS work_id, (SELECT merged_into FROM works WHERE id = b.work_id) AS parent,
+           (SELECT json_group_array(id) FROM works WHERE merged_into = b.work_id) AS children
+    FROM books b WHERE b.id IN (SELECT value FROM json_each(?))
+  `);
+  const bookKeysStmt = db.prepare(`SELECT book_id, key FROM book_keys WHERE book_id IN (SELECT value FROM json_each(?))`);
+  const removedWorksStmt = db.prepare(`SELECT DISTINCT work_id FROM books WHERE id IN (SELECT value FROM json_each(?)) AND work_id IS NOT NULL`);
+  const removedCoversStmt = db.prepare(`
+    SELECT id FROM cover_images WHERE book_id IN (SELECT value FROM json_each(?1))
+      AND id NOT IN (SELECT cover_image_id FROM books WHERE cover_image_id IS NOT NULL AND id NOT IN (SELECT value FROM json_each(?1)))
+  `);
+  const reownCoversStmt = db.prepare(`
+    UPDATE cover_images SET book_id = (SELECT b.id FROM books b WHERE b.cover_image_id = cover_images.id AND b.id NOT IN (SELECT value FROM json_each(?1)) LIMIT 1)
+    WHERE book_id IN (SELECT value FROM json_each(?1)) AND id IN (SELECT cover_image_id FROM books WHERE cover_image_id IS NOT NULL AND id NOT IN (SELECT value FROM json_each(?1)))
+  `);
+  const deleteCoversStmt = db.prepare(`DELETE FROM cover_images WHERE id IN (SELECT value FROM json_each(?))`);
+  const deleteBookRowsStmts = ["cover_rejections", "book_keys", "books_search", "books_fts", "book_collections", "collections_fts"].map((table) => db.prepare(`DELETE FROM ${table} WHERE book_id IN (SELECT value FROM json_each(?))`));
+  const deleteBooksStmt = db.prepare(`DELETE FROM books WHERE id IN (SELECT value FROM json_each(?))`);
+  const orphanWorksStmt = db.prepare(`
+    SELECT w.value AS id FROM json_each(?) w
+    WHERE NOT EXISTS (SELECT 1 FROM books WHERE work_id = w.value)
+      AND NOT EXISTS (SELECT 1 FROM works WHERE merged_into = w.value)
+      AND NOT EXISTS (SELECT 1 FROM work_merges m WHERE m.from_work = w.value OR m.into_work = w.value OR EXISTS (SELECT 1 FROM json_each(m.repointed_work_ids) r WHERE r.value = w.value))
+  `);
+  const deleteWorkRowsStmts = [
+    "DELETE FROM work_series WHERE work_id IN (SELECT value FROM json_each(?))",
+    "DELETE FROM series_fts WHERE work_id IN (SELECT value FROM json_each(?))",
+    "DELETE FROM work_awards WHERE work_id IN (SELECT value FROM json_each(?))",
+    "DELETE FROM work_subjects WHERE work_id IN (SELECT value FROM json_each(?))",
+    "DELETE FROM genre_judgments WHERE work_id IN (SELECT value FROM json_each(?))",
+    "DELETE FROM genre_rejections WHERE work_id IN (SELECT value FROM json_each(?))",
+    "DELETE FROM work_match_judgments WHERE work_id IN (SELECT value FROM json_each(?1)) OR into_work_id IN (SELECT value FROM json_each(?1))",
+    "DELETE FROM jev_rejections WHERE task = 'works' AND subject IN (SELECT value FROM json_each(?))"
+  ].map((sql) => db.prepare(sql));
+  const deleteWorksStmt = db.prepare(`DELETE FROM works WHERE id IN (SELECT value FROM json_each(?))`);
   const allSeriesIndexStmt = db.prepare(`SELECT rowid, work_id, name FROM series_fts`);
   const deleteSeriesIndexRowStmt = db.prepare(`DELETE FROM series_fts WHERE rowid = ?`);
   const refreshSeriesAuthorStmt = db.prepare(`UPDATE series_fts SET author = ? WHERE work_id = ?`);
@@ -806,6 +858,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
           $title: input.title,
           $author: input.author,
           $year: input.year ?? null,
+          $first_published_year: input.firstPublishedYear ?? null,
           $publisher: input.publisher ?? null,
           $isbn: input.isbn,
           $ol_cover_id: input.olCoverId ?? null,
@@ -1296,6 +1349,18 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       workCheckedStmt.run(at, id);
     },
 
+    listEditionYearIds(limit, recheckBefore) {
+      return (editionYearStmt.all(recheckBefore, limit) as Array<{ id: string }>).map((row) => row.id);
+    },
+
+    setEditionYear(id, year, checkedAt) {
+      setEditionYearStmt.run({ $id: id, $year: year, $at: checkedAt });
+    },
+
+    fillFirstPublishedYear(id, year) {
+      fillFirstPublishedYearStmt.run(year, id);
+    },
+
     replaceLanguage(id, tag) {
       replaceLanguageStmt.run(tag, id);
     },
@@ -1370,6 +1435,36 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     isbnPage(afterRowid, limit) {
       const rows = isbnPageStmt.all(afterRowid, limit) as Array<{ rowid: number; id: string; isbn: string; work_id: string | null; language: string | null; has_summary: number }>;
       return rows.map((row) => ({ rowid: Number(row.rowid), id: row.id, isbn: row.isbn, workId: row.work_id, language: row.language, hasSummary: row.has_summary === 1 }));
+    },
+
+    bnpPublisherBooks() {
+      return bnpPublisherBooksStmt.all() as Array<{ id: string; title: string; publisher: string; isbn: string | null }>;
+    },
+
+    bookHolds(bookIds) {
+      const ids = JSON.stringify(bookIds);
+      const keys = new Map<string, string[]>();
+      for (const row of bookKeysStmt.all(ids) as Array<{ book_id: string; key: string }>) keys.set(row.book_id, [...(keys.get(row.book_id) ?? []), row.key]);
+      return (bookWorksStmt.all(ids) as Array<{ id: string; work_id: string | null; parent: string | null; children: string }>).map((row) => ({
+        id: row.id,
+        workIds: [row.work_id, row.parent, ...(JSON.parse(row.children) as string[])].filter((id): id is string => id !== null),
+        keys: keys.get(row.id) ?? []
+      }));
+    },
+
+    removeBooks(bookIds) {
+      const ids = JSON.stringify(bookIds);
+      return inTransaction(() => {
+        const workIds = (removedWorksStmt.all(ids) as Array<{ work_id: string }>).map((row) => row.work_id);
+        const coverImageIds = (removedCoversStmt.all(ids) as Array<{ id: string }>).map((row) => row.id);
+        reownCoversStmt.run(ids);
+        deleteCoversStmt.run(JSON.stringify(coverImageIds));
+        for (const stmt of deleteBookRowsStmts) stmt.run(ids);
+        const books = Number(deleteBooksStmt.run(ids).changes);
+        const orphans = JSON.stringify((orphanWorksStmt.all(JSON.stringify(workIds)) as Array<{ id: string }>).map((row) => row.id));
+        for (const stmt of deleteWorkRowsStmts) stmt.run(orphans);
+        return { books, works: Number(deleteWorksStmt.run(orphans).changes), coverImageIds };
+      });
     },
 
     removeSeriesNames(nameKeys, source) {

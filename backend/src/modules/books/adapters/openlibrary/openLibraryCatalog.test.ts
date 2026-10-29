@@ -47,7 +47,9 @@ test("details come from the matching work", async () => {
   assert.doesNotMatch(new URL(requests[0]!).searchParams.get("fields")!, /number_of_pages_median|first_publish_year|publisher/);
 
   respond([{ docs: [doc] }, { description: "**Plain summary.** Source: [Wikipedia](https://en.wikipedia.org/wiki/Ecotopia)" }]);
-  assert.equal((await catalog.fetchDetails({ isbn: null, title: "ECOTOPIA", author: "Ernest Callenbach" }))?.workSummary, "Plain summary. Source: Wikipedia");
+  const byTitle = await catalog.fetchDetails({ isbn: null, title: "ECOTOPIA", author: "Ernest Callenbach" });
+  assert.equal(byTitle?.workSummary, "Plain summary. Source: Wikipedia");
+  assert.equal(byTitle?.metadata.year, null);
 });
 
 test("details carry cleaned subjects from the work record", async () => {
@@ -79,13 +81,15 @@ test("a redirect or missing work record sets no subjects", async () => {
 
 test("an edition's own description wins over the work's", async () => {
   const catalog = createOpenLibraryCatalog(direct);
-  const requests = respond([{ docs: [doc] }, { description: "Work text." }, { description: { value: "Edition text." } }]);
+  const requests = respond([{ docs: [doc] }, { description: "Work text." }, { description: { value: "Edition text." }, publish_date: "2015" }]);
   const withEdition = await catalog.fetchDetails({ isbn: "9780553348477", title: "", author: "" });
-  assert.deepEqual([withEdition?.metadata.summary, withEdition?.summarySource, withEdition?.workSummary], ["Edition text.", "openlibrary", "Work text."]);
+  assert.deepEqual([withEdition?.metadata.summary, withEdition?.summarySource, withEdition?.workSummary, withEdition?.metadata.year], ["Edition text.", "openlibrary", "Work text.", 2015]);
   assert.equal(requests[2], "https://openlibrary.org/isbn/9780553348477.json");
   respond([{ docs: [doc] }, { description: "Work text." }, null]);
   const withoutEdition = await catalog.fetchDetails({ isbn: "9780553348477", title: "", author: "" });
-  assert.deepEqual([withoutEdition?.metadata.summary, withoutEdition?.summarySource, withoutEdition?.workSummary], [null, null, "Work text."]);
+  assert.deepEqual([withoutEdition?.metadata.summary, withoutEdition?.summarySource, withoutEdition?.workSummary, withoutEdition?.metadata.year], [null, null, "Work text.", null]);
+  respond([{ docs: [doc] }, { description: "Work text." }, { description: "Edition text." }]);
+  assert.equal((await catalog.fetchDetails({ isbn: "9780553348477", title: "", author: "" }))?.metadata.year, null);
 });
 
 test("details reject mismatches and untrusted keys", async () => {
@@ -168,6 +172,11 @@ test("an edition record gives its title, its work and its languages as Open Libr
     isbn_13: ["9788550807560"]
   };
   assert.deepEqual(parseEditionRecord(record), { title: "Hábitos Atômicos", workKey: "/works/OL17930368W", languages: ["/languages/por", "/languages/eng"] });
+});
+
+test("an edition record reads the year in its publish date, and omits the field when there is none", () => {
+  assert.equal(parseEditionRecord({ title: "x", publish_date: "March 2015" }).year, 2015);
+  for (const record of [{ title: "x" }, { title: "x", publish_date: "" }, { title: "x", publish_date: "undated" }, { title: "x", publish_date: 2015 }]) assert.equal("year" in parseEditionRecord(record), false, JSON.stringify(record));
 });
 
 test("an edition record with no work or language, or that is not a record at all, parses as empty", () => {

@@ -59,6 +59,23 @@ test("a book on a narrow screen is a pager of every page", () => {
   assert.match(html, /snap-x/);
 });
 
+test("an inline book stays a single-page preview on desktop; the viewer can open a spread", () => {
+  const previous = Object.getOwnPropertyDescriptor(globalThis, "window");
+  Object.defineProperty(globalThis, "window", { configurable: true, value: { innerWidth: 1440, matchMedia: () => ({ matches: false }) } });
+  try {
+    const html = renderToString(createElement(ReaderCardTurner, { input: visitor("book"), cardWidth: "w-72" }));
+    assert.match(html, /role="region" aria-label="Reader card pages"/);
+    assert.match(html, />Page 1 of 3</);
+    assert.doesNotMatch(html, /aria-label="Open the card"/);
+    const full = viewer(visitor("book"));
+    assert.match(full, /aria-label="Open the card"/);
+    assert.match(full, />Page 1 of 2</);
+  } finally {
+    if (previous) Object.defineProperty(globalThis, "window", previous);
+    else Reflect.deleteProperty(globalThis, "window");
+  }
+});
+
 test("the page dots are white on the scrim, whatever the theme's surface is", () => {
   const html = viewer(visitor("faces"));
   const dots = html.slice(html.indexOf('aria-label="Pages"'));

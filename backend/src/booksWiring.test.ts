@@ -50,6 +50,7 @@ test("the app joins a work to its original that was already queued when it start
   seed.setLanguage(pt.id, "pt-PT");
   seed.fillOriginalTitle(pt.id, "To the Lighthouse");
   const en = seed.createBook({ title: "To the Lighthouse", author: "Virginia Woolf", isbn: "9780156907501", workKey: "OL960W" }, ["isbn:9780156907501"], at);
+  for (const book of [pt, en]) seed.setCover(book.id, { imageId: null, status: "missing", checkedAt: at });
   const ptWorkId = seed.getBook(pt.id)!.work_id!;
   const enWorkId = seed.getBook(en.id)!.work_id!;
   db.close();
@@ -57,6 +58,41 @@ test("the app joins a work to its original that was already queued when it start
   t.after(() => app.close());
   await app.ready();
   assert.equal(booksRepository().canonicalWorkIds([ptWorkId]).get(ptWorkId), enWorkId);
+});
+
+test("closing the app waits for the cover lookup it has in flight", async (t) => {
+  const db = new DatabaseSync(process.env.COVERS_DB_PATH!);
+  applyBooksMigrations(db);
+  const seed = createSqliteBooksRepository(db);
+  const at = new Date().toISOString();
+  const book = seed.createBook({ title: "Mrs Dalloway", author: "Virginia Woolf", isbn: null }, ["ta:mrs dalloway|virginia woolf|"], at);
+  seed.setAppleChecked(book.id, at);
+  db.close();
+  const requests: string[] = [];
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: unknown) => {
+    requests.push(String(input));
+    await held;
+    return new Response(null, { status: 404 });
+  }) as typeof fetch;
+  t.after(() => {
+    release();
+    globalThis.fetch = realFetch;
+  });
+  const app = buildApp();
+  await app.ready();
+  assert.equal(requests.length, 1);
+  let closed = false;
+  const closing = app.close().then(() => { closed = true; });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(closed, false, "close resolved while a cover lookup was still in flight");
+  release();
+  await closing;
+  const after = new DatabaseSync(process.env.COVERS_DB_PATH!);
+  t.after(() => after.close());
+  assert.notEqual(after.prepare("SELECT cover_checked_at FROM books WHERE id = ?").get(book.id)?.cover_checked_at, null);
 });
 
 test("every books job arms its first run with its own delay and calls nothing before it fires", async (t) => {
@@ -83,6 +119,7 @@ test("every books job arms its first run with its own delay and calls nothing be
   const expected = {
     detailsBackfill: 30_000,
     workKeyBackfill: 40_000,
+    editionYearBackfill: 42_000,
     worksBackfill: 45_000,
     colorBackfill: 50_000,
     retitleJob: 55_000,
@@ -99,5 +136,5 @@ test("every books job arms its first run with its own delay and calls nothing be
   for (const [delay, count] of wanted) {
     assert.ok(delays.filter((armed) => armed === delay).length >= count, `expected ${count} first runs armed at ${delay} ms`);
   }
-  assert.deepEqual(requests.map(String).filter((url) => /typesafe|isbndb|bnportugal|porbase|openlibrary|cdn\.kobo\.com|wikidata/.test(url)), []);
+  assert.deepEqual(requests.map(String).filter((url) => /typesafe|isbndb|itunes\.apple\.com|bnportugal|porbase|openlibrary|cdn\.kobo\.com|wikidata/.test(url)), []);
 });

@@ -50,6 +50,8 @@ CREATE TABLE IF NOT EXISTS books (
   original_key        TEXT,
   original_whole_key  TEXT,
   retitle_wanted_at   TEXT,
+  first_published_year INTEGER,
+  edition_year_checked_at TEXT,
   created_at          TEXT NOT NULL
 );
 

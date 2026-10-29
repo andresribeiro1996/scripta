@@ -74,7 +74,7 @@ function DiscoverPane() {
           </button>
         ))}
       </div>
-      {isLoading && <SkeletonCardGrid count={4} label="Loading published games" tileClassName="min-h-[260px]" gridClassName="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3" />}
+      {isLoading && <SkeletonCardGrid count={4} label="Loading published games" tileClassName="min-h-[260px]" gridClassName="game-ticket-grid" />}
       {!isLoading && error && items.length === 0 && <EmptyState title="Couldn't load published games." action={retryButton(refetch)} />}
       {!isLoading && !error && items.length === 0 && (
         needle ? (
@@ -90,7 +90,7 @@ function DiscoverPane() {
               Couldn't refresh Discover.
             </p>
           )}
-          <ul className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <ul className={`game-ticket-grid ${type === "quiz" ? "auto-rows-fr" : ""}`}>
             {items.map((item) => (
               <DiscoverRow key={`${item.content.kind}:${item.content.id}`} item={item} />
             ))}
@@ -119,7 +119,7 @@ function DiscoverRow({ item }: { item: DiscoverItem }) {
   const { content, author } = item;
   const status = contentStatus(content);
   return (
-    <li className="flex">
+    <li className={`flex ${content.kind === "quiz" ? "self-stretch" : ""}`}>
       <GameTicket
         kind={content.kind}
         name={content.name}
@@ -131,7 +131,7 @@ function DiscoverRow({ item }: { item: DiscoverItem }) {
         stats={contentStats(content)}
         meta={
           <span className="flex min-w-0 items-center gap-2">
-            <AuthorAvatar author={author} size={28} />
+            <AuthorAvatar author={author} size={32} />
             {author.unavailable ? (
               <span className="min-w-0 truncate font-semibold">{author.username}</span>
             ) : (

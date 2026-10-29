@@ -85,18 +85,21 @@ No bundled icon library, by design:
 
 ## Layout
 
-Content max-width is a per-library user preference (`contentMaxWidth`, 800–1800px, default **1152px**); the page frame below applies it. Book grid: CSS Grid `repeat(auto-fill, minmax(cardFloor,1fr))`, `space-lg` gap, phone-width override guarantees 3 columns. No custom breakpoints — stock Tailwind v4 defaults (`sm` = 640px).
+The shared page frame has a **1600px** max-width and responsive gutters (16px, 20px, then 32px on desktop). Library, Series, Collections and shared libraries keep the owner's content-width preference (`contentMaxWidth`, 800–1800px, default **1600px**) for their bodies. Book grid: CSS Grid `repeat(auto-fill, minmax(cardFloor,1fr))`, `space-lg` gap, phone-width override guarantees 3 columns. No custom breakpoints — stock Tailwind v4 defaults (`sm` = 640px).
 
 ### The frame
 
 Navigation comes from one map, `frontend/src/lib/areas.ts`. `AREAS` lists Home, Library, Murals, Games, Reader card, Community, Settings and Admin, each with its `to` and its tabs. `NAV_AREAS` is the sidebar (all but Admin), `footerAreas(isAdmin)` adds Admin for admins, and `BOTTOM_BAR_AREAS` (Home, Library, Murals, Games) is the phone bottom bar, with the rest behind "More". `areaIdForPath` finds the active area, `activeTabTo` the active tab, and `backTo(kind)` the back link for a detail page (tierlist, quiz, tournament, mural, book, profile).
 
-Three layouts, all providing `PageWidthContext`: `DashboardLayout` (signed in; sidebar and bottom bar, width = the user's `contentMaxWidth`, outlet context `setNavHidden` for full-screen editors), `PublicLayout` (brand lockup left, Log in or Open my library right, width 1152px) and `SessionLayout`, which picks Dashboard when the session has a username and Public otherwise.
+`SessionLayout` picks `DashboardLayout` when the session has a username and `PublicLayout` otherwise. Dashboard provides the sidebar, bottom bar and outlet context `setNavHidden` for full-screen editors. Public provides a brand lockup and Log in or Open my library link. Both use the shared 1600px page frame; a saved Library width never resizes unrelated sections.
 
 Page rules:
-- Tabs sit in the band and name sibling pages of one area (Library: Books, Series, Collections, Gallery); a detail page uses a back link, not tabs.
-- The shared library page uses the owner's width. The Style tab keeps the width the user had when the page mounted for the whole visit, so its title lines up with the other Settings tabs and dragging "Content width" does not resize the page under the pointer. Profiles and the Reader card keep narrower content columns inside the full-width body. The mural canvas stays 1152px inside the full-width body.
+- The title band has an 80px minimum height. Back links sit beside the title; subtitles, actions and sibling-page tabs sit in the body below it. Long titles can wrap without clipping. Quiz results pass `title={null}` and place their own `h1` in the results section instead of a separate band.
+- On phones and tablets, quiz results use Quick look: a compact score beside the cover fan, expandable answer rows, Your answers / Leaderboard tabs, and one challenge action below the selected panel. Desktop keeps full answer comparisons and the sharing/leaderboard column.
+- The shared library body uses the owner's width. The Style tab keeps the shared frame while dragging "Content width". Profiles and the Reader card keep narrower content columns inside the full-width body. The mural canvas stays 1152px inside the full-width body.
+- Reader card editor previews keep the same card width for Flip, Book and One back. Book pages browse individually in the editor; the full viewer can open a two-page spread.
 - One accent button per view: `BUTTON_PRIMARY` for it, `BUTTON_SECONDARY` for the rest.
+- Library keeps Add a book and a More actions menu visible at every width. Sync, import, CSV template, selection, styling and sharing live in that menu.
 - Every control is at least 44px. Checkboxes, radios and ranges use `CHECKBOX_CLASS`, `RADIO_CLASS` and `RANGE_CLASS`; `OptionsMenu`'s default trigger is 44px, and a row with several actions folds them into one menu.
 
 ## Motion
@@ -142,7 +145,7 @@ Full guidelines, states and prop shapes live in the artifact's per-component REA
 ### Content cards
 
 - **BookCard** (`frontend/src/components/BookCard.tsx` + `BookGrid`) — cover fills tile at `cardRadius` (user pref, default `radius-xl`/16px, 0–32 range). Optional title/author overlay in one of 6 `CardFontFamily` choices, over a scrim. No-cover fallback: plain `surface` tile with centered title, never a broken-image icon.
-- **ListCard** (`ArenaListPage.tsx`, repeated classes not a shared component) — tierlist/tournament row: `radius-xl`, `border`, title (`body-strong`) + one meta line (`text-dim`). Hover/selected → border swaps to `accent`.
+- **GameTicket** (`components/games/GameTicket.tsx`) — shared by Games and Discover: type-specific artwork, 18–20px titles, 14px creator/status text, 20px stat values and a footer action. The shared grid fits cards at a 384px minimum width (or the available phone width). Quiz cards align in each row and across the quiz-only grid; tier lists and tournaments keep their natural height. Artwork fills a 96px phone / 128px desktop panel; vertical padding is 12px. Hover keeps the type's border color and darkens the action's existing fill.
 - **TournamentStatusBadge** (`components/arena/TournamentStatusBadge.tsx`) — pill: `seeding` (`border`/`surface`/`text-dim`) / `active` (`accent`/`accent-soft`) / `completed` (`success`/`success-soft`, the only other place `success` appears).
 - **AwardPill** (`mobile/src/features/works/BookScreen.tsx`, `frontend/src/components/book/BookScreen.tsx`) — a book prize in the work page's hero, above the genre chips: `radius-full`, `caption` / `text-xs`, not tappable. A win is `accent-soft` with `accent` text and the trophy icon (mobile `champion`, web `ArenaIcon` at 12px); a nomination is the genre chip (`border`, `text-dim`) with "· nominee" in its label. Author prizes are not pills but a `text-dim` caption line under the author.
 - **TierRow** (`components/tierlist/TierRowShell.tsx`) — colored label chip (raw per-tierlist hex, white text + shadow) + wrapping `6em×4em` book tiles. Empty row still renders at 4em min-height ("Drag books here") — never collapses to zero.
@@ -152,7 +155,7 @@ Full guidelines, states and prop shapes live in the artifact's per-component REA
 
 ### Page frame (web)
 
-- **Page** (`components/page/Page.tsx`) — every page renders inside it: a header band (`surface`, bottom `border`) holding an optional back link, the `font-display` title (`text-2xl sm:text-3xl`, wraps), a `text-dim` subtitle, right-aligned `actions`, and an optional tab row; then the body (`px-4 py-5 sm:px-5 sm:py-8`). Width is `maxWidth` or `PageWidthContext`. Back links and tab links are 44px high.
+- **Page** (`components/page/Page.tsx`) — every page renders inside it: an 80px minimum-height title band (`surface`, bottom `border`) holding an optional back link and the `font-display` title (`text-2xl sm:text-3xl`, wraps). The body (`px-4 py-5 sm:px-5 sm:py-8 lg:px-8`) holds the subtitle, right-aligned actions, optional tab row and content. The title band uses `PageWidthContext`; `maxWidth` overrides only the body's width. Back links and tab links are 44px high.
 - **SidebarNav** (`components/page/SidebarNav.tsx`) — the area list shared by the sidebar and the mobile drawer: 44px rows, icon + label, `accent-soft` / `accent` when active, optional description and Home badge.
 - **Sheet** (`components/Sheet.tsx`) — the shared dialog; takes a `footer` pinned under the scrolling body, right-aligned, for the dialog's actions.
 
@@ -167,7 +170,7 @@ Full guidelines, states and prop shapes live in the artifact's per-component REA
 
 ### Headers (mobile — native stack bar via `useScreenOptions()`)
 
-- A header carries the back chevron, the title, at most **two** labelled actions and the `⋯` overflow menu — everything else belongs in the menu or in screen content.
+- A header carries the back chevron, the title, at most **two** labelled actions and the `⋯` overflow menu — everything else belongs in the menu or in screen content. The `⋯` trigger opens an `ActionSheet` (grouped rows with icon tiles, the destructive group last); the native `Menu` is only for short one-of-N pickers anchored to their control.
 - Every header action is an **`IconButton` with `label` + `framed`** (icon + word in a drawn 44pt target), so the visible target matches the touch target — a bare glyph reads smaller than its hit area and people aim at the ink. The `⋯` menu trigger stays glyph-only (platform convention), and so does Home's framed notification bell. Its frame draws the 44pt target, a bell with a badge is the platform convention for notifications, and its accessibility label names it. A second labelled pill would crowd the title on a 360dp phone.
 - Creation stays on **FABs** (thumb zone), not the header; header buttons navigate (`Browse`, `Library`) or open modals (`Add`, `Upload`, `Save`).
 - The mural, tier list and quiz editors show their name as a page heading (`EditorHeading`, tap to rename where renaming exists) at the top of the content, and the editors carry a labelled Save state button — Save in accent while there are unsaved changes, Saving… while saving, and Saved with a checkmark when saved — because an editor's title can't share a narrow header with its actions.

@@ -7,7 +7,6 @@ import { useAuth } from "../auth/AuthContext";
 import { Avatar } from "../components/Avatar";
 import { BrandLockup } from "../components/BrandLockup";
 import { MoreIcon } from "../components/NavIcons";
-import { PageWidthContext } from "../components/page/Page";
 import { AREA_ICONS, SidebarNav } from "../components/page/SidebarNav";
 import { OfflineBanner } from "../components/OfflineBanner";
 import { useAccountAppearanceSync } from "../hooks/useAccountAppearanceSync";
@@ -17,7 +16,6 @@ import { useGenreEnrichment } from "../hooks/useGenreEnrichment";
 import { useLibrary } from "../hooks/useLibrary";
 import { useScrollLock } from "../hooks/useScrollLock";
 import { area, areaIdForPath, BOTTOM_BAR_AREAS, footerAreas, NAV_AREAS } from "../lib/areas";
-import { resolveLibraryStyle } from "../lib/libraryStyle";
 
 /** Persistent left-hand nav wrapping every signed-in page (every area in lib/areas.ts) — one shared shell instead of each page
  *  reimplementing its own header/logout, which is how it worked before
@@ -80,9 +78,7 @@ export function DashboardLayout() {
           its comment for the whole boundary. */}
       <main className={`min-w-0 flex-1 ${navHidden ? "lg:pb-0" : "pb-[calc(3.5rem+env(safe-area-inset-bottom,0px))] lg:pb-0"}`}>
         <OfflineBanner />
-        <PageWidthContext.Provider value={resolveLibraryStyle(library?.data.style).contentMaxWidth}>
-          <Outlet context={{ setNavHidden }} />
-        </PageWidthContext.Provider>
+        <Outlet context={{ setNavHidden }} />
       </main>
 
       {!navHidden && (

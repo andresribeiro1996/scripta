@@ -44,6 +44,8 @@ export function applyBooksMigrations(db: DatabaseSync): void {
   if (!columns.some((column) => column.name === "work_id")) db.exec("ALTER TABLE books ADD COLUMN work_id TEXT REFERENCES works(id)");
   if (!columns.some((column) => column.name === "language")) db.exec("ALTER TABLE books ADD COLUMN language TEXT");
   if (!columns.some((column) => column.name === "work_checked_at")) db.exec("ALTER TABLE books ADD COLUMN work_checked_at TEXT");
+  if (!columns.some((column) => column.name === "first_published_year")) db.exec("ALTER TABLE books ADD COLUMN first_published_year INTEGER");
+  if (!columns.some((column) => column.name === "edition_year_checked_at")) db.exec("ALTER TABLE books ADD COLUMN edition_year_checked_at TEXT");
   if (!columns.some((column) => column.name === "title_key")) db.exec("ALTER TABLE books ADD COLUMN title_key TEXT");
   if (!columns.some((column) => column.name === "title_group_blocked_at")) db.exec("ALTER TABLE books ADD COLUMN title_group_blocked_at TEXT");
   if (!columns.some((column) => column.name === "genres_source")) db.exec("ALTER TABLE books ADD COLUMN genres_source TEXT");
@@ -54,7 +56,8 @@ export function applyBooksMigrations(db: DatabaseSync): void {
   moveOpenLibrarySummariesToWorks(db);
   addSummaryHashes(db);
   db.exec("DROP INDEX IF EXISTS idx_books_work");
-  db.exec("CREATE INDEX IF NOT EXISTS idx_books_work_editions ON books(work_id, year, language)");
+  db.exec("DROP INDEX IF EXISTS idx_books_work_editions");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_books_work_years ON books(work_id, year, first_published_year, language)");
   db.exec("DROP INDEX IF EXISTS idx_books_title_key");
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_title_work ON books(title_key, work_id)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_author_key ON books(substr(title_key, instr(title_key, '|') + 1))");
@@ -66,6 +69,7 @@ export function applyBooksMigrations(db: DatabaseSync): void {
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_details_pending ON books(details_checked_at IS NOT NULL, created_by IS NOT NULL, details_checked_at, created_at) WHERE details_status IS NULL AND created_by IS NOT 'bnp'");
   db.exec("DROP INDEX IF EXISTS idx_books_work_lookup");
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_work_queue ON books(work_checked_at IS NOT NULL, created_by IS NOT NULL, coalesce(work_checked_at, ''), created_at) WHERE ol_work_key IS NULL AND isbn IS NOT NULL AND details_status IS NOT NULL AND (created_by IS NULL OR created_by <> 'publisher')");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_books_edition_year_queue ON books(edition_year_checked_at IS NOT NULL, coalesce(edition_year_checked_at, ''), created_at) WHERE isbn IS NOT NULL AND first_published_year IS NOT NULL AND (year IS NULL OR year = first_published_year)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_bnp_details ON books(work_id, created_by, details_status, details_checked_at, created_at, id) WHERE created_by = 'bnp' AND details_status IS NULL");
   db.exec("CREATE INDEX IF NOT EXISTS idx_books_summary_hash ON books(summary_hash)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_works_summary_hash ON works(summary_hash)");
@@ -118,6 +122,7 @@ export function applyBooksMigrations(db: DatabaseSync): void {
   indexConfirmedBooks(db);
   turnIsbndbFirstAuthors(db);
   clearNonTitleOriginals(db);
+  copyFirstPublishedYears(db);
   keyOriginalTitles(db);
 }
 
@@ -302,6 +307,24 @@ function clearNonTitleOriginals(db: DatabaseSync): void {
     throw error;
   }
   if (cleared > 0) console.log(`books: cleared ${cleared} original titles that were not titles`);
+}
+
+function copyFirstPublishedYears(db: DatabaseSync): void {
+  const { user_version: version } = db.prepare("PRAGMA user_version").get() as { user_version: number };
+  if (version >= 6) return;
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    db.exec(`
+      UPDATE books SET first_published_year = year
+      WHERE created_by IS NULL AND isbn IS NOT NULL AND year IS NOT NULL
+        AND first_published_year IS NULL AND json_extract(data_sources, '$[0]') = 'openlibrary'
+    `);
+    db.exec("PRAGMA user_version = 6");
+    db.exec("COMMIT");
+  } catch (error) {
+    if (db.isTransaction) db.exec("ROLLBACK");
+    throw error;
+  }
 }
 
 export const UNKEYED_ORIGINALS_SQL = "SELECT id, original_title, original_key, original_whole_key FROM books WHERE original_title IS NOT NULL AND (original_key IS NULL OR original_whole_key IS NULL)";

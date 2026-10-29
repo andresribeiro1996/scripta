@@ -24,7 +24,7 @@ import {
   type LibraryData,
   type PerCardStyle,
 } from "@scripta/shared";
-import { Button, ConfirmDialog, EmptyState, ErrorState, IconButton, Input, Menu, Screen, Sheet, Skeleton, Toast, type MenuItem } from "../../../ui/components";
+import { ActionSheet, Button, ConfirmDialog, EmptyState, ErrorState, IconButton, Input, Screen, Sheet, Skeleton, Toast, type ActionItem } from "../../../ui/components";
 import { spacing, typography, useTheme } from "../../../ui/theme";
 import { useMurals } from "../../murals/useMurals";
 import { useLibrary } from "../hooks/useLibrary";
@@ -126,22 +126,25 @@ export function GroupDetail({ groupId }: { groupId: string }) {
     );
   }
 
-  const menuItems: MenuItem[] = group
+  const menuGroups: ActionItem[][] = group
     ? [
-        ...(group.type === "series" ? [{ label: "Style…", onPress: () => setStyleOpen(true) }] : []),
-        { label: "Manage books…", onPress: () => setPickerOpen(true) },
-        ...(members.length > 0
-          ? [
-              {
-                label: "Select…",
-                onPress: () => {
-                  setSelectionMode(true);
-                  setSelectedKeys(new Set());
+        [
+          ...(group.type === "series" ? [{ label: "Style", icon: "style" as const, onPress: () => setStyleOpen(true) }] : []),
+          { label: "Manage books", icon: "book", onPress: () => setPickerOpen(true) },
+          ...(members.length > 0
+            ? [
+                {
+                  label: "Select",
+                  icon: "select" as const,
+                  onPress: () => {
+                    setSelectionMode(true);
+                    setSelectedKeys(new Set());
+                  },
                 },
-              },
-            ]
-          : []),
-        { label: "Delete", destructive: true, onPress: () => setConfirming("group") },
+              ]
+            : []),
+        ],
+        [{ label: "Delete", icon: "delete", destructive: true, onPress: () => setConfirming("group") }],
       ]
     : [];
 
@@ -194,9 +197,9 @@ export function GroupDetail({ groupId }: { groupId: string }) {
                   </Text>
                 </Pressable>
               )}
-              <Menu items={menuItems}>
-                <IconButton accessibilityLabel="Collection actions" name="more" />
-              </Menu>
+              <ActionSheet title={group?.name ?? "Collection"} groups={menuGroups}>
+                {(open) => <IconButton accessibilityLabel="Collection actions" name="more" onPress={open} />}
+              </ActionSheet>
             </View>
           )}
           <Text style={[typography.caption, { color: colors.textDim }]}>

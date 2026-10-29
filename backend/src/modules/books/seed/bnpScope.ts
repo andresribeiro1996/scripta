@@ -6,7 +6,7 @@ export const BNP_SKIPS = ["noIsbn", "textbook", "noPublisher", "institutional", 
 
 export type BnpSkip = (typeof BNP_SKIPS)[number];
 
-const INSTITUTIONAL = /\b(?:camara municipal|camara municpal|municipio|empresa municipal|junta de freguesia|uniao das? (?:juntas de )?freguesias|comunidade intermunicipal|universidade|faculdade|politecnico|escola superior|agrupamento de escolas|ministerio|direc?cao geral|direc?cao regional|direc?cao de servicos|secretaria regional|governo|regiao autonoma|assembleia da republica|associacao|centro de estudos|centro de investigacao|museu|diocese|paroquia|banda musical|filarmonica|grupo coral|santa casa|conferencia episcopal|instituto (?:politecnico|nacional|superior|portugues|de )|comissao)\b/;
+const INSTITUTIONAL = /\b(?:camara municipal|camara municpal|municipio|empresa municipal|junta de freguesia|uniao das? (?:juntas de )?freguesias|comunidade intermunicipal|universidade|faculdade|politecnico|escola superior|agrupamento de escolas|ministerio|direc?cao geral|direc?cao regional|direc?cao de servicos|secretaria regional|governo|regiao autonoma|assembleia da republica|associacao|centro de estudos|centro de investigacao|museu|diocese|paroquia|banda musical|filarmonica|grupo coral|santa casa|conferencia episcopal|instituto (?:politecnico|nacional|superior|portugues|cultural|de )|comissao|lnec|lab(?:oratorio)? nac(?:ional)?|iefp|i e f p|appacdm|biblioteca nacional|utad|univ|universitarias lusofonas|expo 98|^c m$|academia de marinha|ippar|ispa|citeforma|sociedade martins sarmento)\b/;
 
 const MAIN_NUMBER = /^[\d.]+/;
 const LITERARY_FORM = /-([1-9][\d.]*)/;
@@ -49,11 +49,13 @@ const MAIN_PREFIXES: Array<[string, BookGenre | null]> = [
   ["5", "Science"]
 ];
 
+export const isInstitutionalPublisher = (publisher: string): boolean => INSTITUTIONAL.test(normalizeGenreLabel(publisher));
+
 export function bnpSkipReason(book: BnpBook): BnpSkip | null {
   if (book.isbns.length === 0) return "noIsbn";
   if (book.udc.some((code) => code.includes("(075"))) return "textbook";
   if (book.publisher === null) return "noPublisher";
-  if (INSTITUTIONAL.test(normalizeGenreLabel(book.publisher))) return "institutional";
+  if (isInstitutionalPublisher(book.publisher)) return "institutional";
   if (book.author === "") return "noPerson";
   return null;
 }

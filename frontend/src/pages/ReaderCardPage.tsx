@@ -46,7 +46,7 @@ export function ReaderCardPage() {
     if (isPending) return <Page title="Reader card"><p className="text-sm text-(--color-text-dim)">Loading your reader card…</p></Page>;
     return (
       <Page title="Reader card">
-        <div className="max-w-5xl mx-auto">
+        <div className="max-w-7xl mx-auto">
           <button type="button" onClick={() => void refetch()} className="text-sm font-semibold text-(--color-accent)">Couldn't load your reader card. Try again</button>
         </div>
       </Page>
@@ -55,14 +55,14 @@ export function ReaderCardPage() {
 
   return (
     <Page title="Reader card">
-      <div className="max-w-5xl mx-auto">
-        <div className="lg:grid lg:grid-cols-[minmax(0,22rem)_1fr] lg:gap-8">
+      <div className="max-w-7xl mx-auto">
+        <div className="lg:grid lg:grid-cols-2 lg:gap-8">
           <div className="mb-6 flex flex-col items-center gap-3 lg:sticky lg:top-6 lg:mb-0 lg:self-start">
             <div className="w-full max-w-[18rem]">
               <Segmented label="Preview as" options={AUDIENCES} labels={AUDIENCE_LABELS} value={audience} onChange={setAudience} />
             </div>
             <div className="w-full">
-              <ReaderCardTurner key={`${preview.view}-${preview.style.layout}-${hasChosen(preview.card.chosen)}`} input={preview} cardWidth="w-[min(100%,18rem)]" spreadWidth="w-full" />
+              <ReaderCardTurner key={`${preview.view}-${preview.style.layout}-${hasChosen(preview.card.chosen)}`} input={preview} cardWidth="w-[min(100%,18rem)]" />
             </div>
             {input.card.state === "unwritten" && input.missing ? <p className="text-sm text-(--color-text-dim)">{input.missing}</p> : null}
           </div>

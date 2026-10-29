@@ -371,29 +371,12 @@ export function LibraryPage() {
           ) : (
             <>
               <button onClick={() => setAddingBook(true)} className={BUTTON_PRIMARY}>Add a book</button>
-              <div className="sm:hidden">
-                <OptionsMenu
-                  items={actionItems}
-                  title="More actions"
-                  trigger={<MoreIcon size={22} />}
-                  triggerClassName="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-(--color-border) bg-(--color-surface) text-(--color-text) hover:bg-(--color-surface-hover)"
-                />
-              </div>
-              <div className="hidden flex-wrap items-center gap-2 sm:flex">
-                <button onClick={() => setSyncingGoodreads(true)} className={BUTTON_SECONDARY}>Sync Goodreads…</button>
-                {books.length > 0 && <button onClick={handleToggleSelectionMode} className={BUTTON_SECONDARY}>Select…</button>}
-                <button onClick={() => navigate("/dashboard/style")} className={BUTTON_SECONDARY}>Style…</button>
-                <button onClick={() => setSharing(true)} className={BUTTON_SECONDARY}>Share</button>
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={importing}
-                  title={books.length > 0 ? "Matching books are merged with what's already here, not duplicated." : undefined}
-                  className={BUTTON_SECONDARY}
-                >
-                  {importing ? "Importing…" : "Import library"}
-                </button>
-                <a href={csvTemplateUrl} download="atmyshelf-library.csv" className={BUTTON_SECONDARY}>CSV template</a>
-              </div>
+              <OptionsMenu
+                items={actionItems}
+                title="More actions"
+                trigger={<MoreIcon size={22} />}
+                triggerClassName="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-(--color-border) bg-(--color-surface) text-(--color-text) hover:bg-(--color-surface-hover)"
+              />
             </>
           )}
           <input

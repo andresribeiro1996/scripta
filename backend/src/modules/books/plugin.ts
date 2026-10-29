@@ -55,6 +55,7 @@ const KOBO_COVERS_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const FIRST_RUN_DELAY_MS = {
   detailsBackfill: 30_000,
   workKeyBackfill: 40_000,
+  editionYearBackfill: 42_000,
   worksBackfill: 45_000,
   colorBackfill: 50_000,
   retitleJob: 55_000,
@@ -223,6 +224,7 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
   );
   jobs.own(grouping.stop);
   jobs.every("work key backfill", BACKFILL_INTERVAL_MS, (signal) => service.backfillWorkKeys(DETAILS_BATCH_SIZE, signal), FIRST_RUN_DELAY_MS.workKeyBackfill);
+  jobs.every("edition year backfill", BACKFILL_INTERVAL_MS, (signal) => service.backfillEditionYears(DETAILS_BATCH_SIZE, signal), FIRST_RUN_DELAY_MS.editionYearBackfill);
   jobs.own(startCoverColorBackfill((limit) => service.fillCoverColors(limit), app.log, undefined, undefined, FIRST_RUN_DELAY_MS.colorBackfill));
   if (isbndbConfigured) {
     const retitleIsbndb = createIsbndbCatalog(env.ISBNDB_API_KEY, isbndbThrottle, isbndbGate, false, { details: isbndbSpend, search: isbndbSpend });
@@ -257,6 +259,7 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
   app.addHook("onClose", async () => {
     activeService = null;
     jobs.stopAll();
+    await worker.idle();
   });
 
   await app.register(async (scoped) => {

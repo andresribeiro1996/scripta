@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { mapBnpRecord, readMarcRecords } from "./bnpRecord.js";
 import type { BnpBook } from "./bnpRecord.js";
-import { bnpSkipReason, udcGenres } from "./bnpScope.js";
+import { bnpSkipReason, isInstitutionalPublisher, udcGenres } from "./bnpScope.js";
 
 const book = (over: Partial<BnpBook>): BnpBook => ({ recordId: "1", isbns: ["9789720044457"], title: "T", author: "A B", translator: null, originalTitle: null, publisher: "Porto Editora", year: 2020, pages: 100, languages: ["por"], udc: [], summary: null, scanUrl: null, collection: null, ...over });
 
@@ -20,11 +20,11 @@ test("each rule skips its record, in order", () => {
 });
 
 test("trade publishers a naive pattern would catch are kept", () => {
-  for (const publisher of ["Clube do Autor", "Fundação Francisco Manuel dos Santos", "Fundação Calouste Gulbenkian", "Instituto Piaget", "Assírio & Alvim", "Edições Afrontamento"]) assert.equal(bnpSkipReason(book({ publisher })), null, publisher);
+  for (const publisher of ["Clube do Autor", "Fundação Francisco Manuel dos Santos", "Fundação Calouste Gulbenkian", "Instituto Piaget", "Inst. Piaget", "Assírio & Alvim", "Edições Afrontamento", "CETOP", "Universitária", "Imprensa Nacional-Casa da Moeda", "Academia do Livro"]) assert.equal(bnpSkipReason(book({ publisher })), null, publisher);
 });
 
 test("institutional publishers are dropped", () => {
-  for (const publisher of ["Imprensa da Universidade de Coimbra", "Município de Oeiras", "União das Freguesias de Carcavelos e Parede", "Direcção-Geral de Inovação e Desenvolvimento Curricular", "Banda Musical das Caldas das Taipas", "Instituto Politécnico de Leiria"]) assert.equal(bnpSkipReason(book({ publisher })), "institutional", publisher);
+  for (const publisher of ["Imprensa da Universidade de Coimbra", "Município de Oeiras", "União das Freguesias de Carcavelos e Parede", "Direcção-Geral de Inovação e Desenvolvimento Curricular", "Banda Musical das Caldas das Taipas", "Instituto Politécnico de Leiria", "LNEC", "Lab. Nac. de Eng. Civil", "Laboratório Nacional de Engenharia Civil", "IEFP", "I.E.F.P.", "APPACDM", "Biblioteca Nacional de Portugal", "UTAD", "Univ. de Trás-os-Montes e Alto Douro", "Universitárias Lusófonas", "Expo'98", "C.M.", "Instituto Cultural de Macau", "Academia de Marinha", "IPPAR", "ISPA", "Citeforma", "Sociedade Martins Sarmento"]) assert.equal(bnpSkipReason(book({ publisher })), "institutional", publisher);
 });
 
 test("udc codes map to genres and a plain novel gets none", () => {
@@ -108,4 +108,11 @@ test("the recorded national bibliography records scope and map as expected", () 
   const allende = mapped(urn);
   assert.equal(bnpSkipReason(allende), null);
   assert.deepEqual(udcGenres(allende.udc), []);
+});
+
+test("isInstitutionalPublisher shares the import's rule", () => {
+  assert.equal(isInstitutionalPublisher("Câmara Municipal de Tavira"), true);
+  assert.equal(isInstitutionalPublisher("I.E.F.P."), true);
+  assert.equal(isInstitutionalPublisher("Assírio & Alvim"), false);
+  assert.equal(isInstitutionalPublisher("Universitária"), false);
 });

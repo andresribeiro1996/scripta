@@ -44,6 +44,8 @@ export interface BookRow {
   genres_source: GenresSource | null;
   genres_confidence: number | null;
   retitle_wanted_at: string | null;
+  first_published_year: number | null;
+  edition_year_checked_at: string | null;
   created_at: string;
 }
 
@@ -67,6 +69,7 @@ export interface NewBook {
   author: string;
   isbn: string | null;
   year?: number | null;
+  firstPublishedYear?: number | null;
   publisher?: string | null;
   olCoverId?: number | null;
   workKey?: string | null;
@@ -88,7 +91,7 @@ export interface LossyBook {
 export type WorkPageRows = {
   work: { id: string; title: string; author: string; summary: string | null; summary_hash: string | null };
   aliasIds: string[];
-  editions: Array<{ id: string; title: string; language: string | null; year: number | null; isbn: string | null; summary: string | null; summary_hash: string | null; cover_image_id: string | null; cover_color: string | null; genres: string; rating: number | null; rating_count: number; pages: number | null; genres_source: GenresSource | null; genres_confidence: number | null }>;
+  editions: Array<{ id: string; title: string; language: string | null; year: number | null; first_published_year: number | null; isbn: string | null; summary: string | null; summary_hash: string | null; cover_image_id: string | null; cover_color: string | null; genres: string; rating: number | null; rating_count: number; pages: number | null; genres_source: GenresSource | null; genres_confidence: number | null }>;
 };
 
 export interface WorkView {
