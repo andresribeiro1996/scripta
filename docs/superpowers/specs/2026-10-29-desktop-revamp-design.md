@@ -59,7 +59,7 @@ A full-width bar, `sticky top-0`, 64px high (`h-16`), above every signed-in page
 - **Contents, left to right**, inside `px-8` gutters (not width-capped):
   1. `BrandLockup`, linking to `/dashboard`.
   2. The area links: Home, Library, Murals, Games, Reader card, Community. These are `NAV_AREAS` without Settings, from `frontend/src/lib/areas.ts`. Each link is a 44px pill (`rounded-full px-3.5 text-sm font-semibold`). The current area is `accent-soft` with `accent` text and `aria-current="page"`. The others are `text-dim`, turning `surface-hover` with `text` on hover. Home keeps its new-count badge (`newCountLabel`, as in today's sidebar).
-  3. The account button, pushed to the right: the avatar at 32–34px in a 44px target, with a chevron. It opens a menu with a header (avatar, @username), then My shelf (`/community/u/:username`), Settings, Admin (admins only, as `footerAreas(isAdmin)` decides today) and Log out. Log out is last and set apart; it is not a red-bordered box. While a Settings, Admin or own-profile page is open, the button shows a quiet `surface-hover` state.
+  3. The account button, pushed to the right: the avatar at 32–34px in a 44px target, with a chevron. It opens a menu with a non-interactive header row (@username), then My shelf (`/community/u/:username`), Settings, Admin (admins only, as `footerAreas(isAdmin)` decides today) and Log out. Log out is last and set apart; it is not a red-bordered box. While a Settings, Admin or own-profile page is open, the button shows a quiet `surface-hover` state.
 - **A "Skip to content" link** comes first in the bar. It is visually hidden until focused and jumps to `<main id="content">`.
 - The bar replaces the sidebar entirely at `lg` and up.
 
@@ -69,7 +69,7 @@ These keep today's navigation: the fixed bottom bar (`BOTTOM_BAR_AREAS` plus Mor
 
 ### Signed-out and public pages
 
-`PublicLayout` gets the same bar at every width. It shows the brand and "Log in" (or "Open my library" for a session without a username), and has no area links. This covers `/shared/library/:token`, `/shared/murals/:token`, `/vote/:code`, `/play/:code` and public `/arena`, plus the signed-out `/work/:id`, `/work/:id/stats` and `/arena/:id`.
+`PublicLayout` gets the same bar at every width; like the signed-in bar, it is sticky only from `lg`. It shows the brand and "Log in" (or "Open my library" for a session without a username), and has no area links. This covers `/shared/library/:token`, `/shared/murals/:token`, `/vote/:code`, `/play/:code` and public `/arena`, plus the signed-out `/work/:id`, `/work/:id/stats` and `/arena/:id`.
 
 **Signed-in viewers of share, vote and play pages now get the app frame** (*my call*). `/shared/*`, `/vote/:code` and `/play/:code` move under `SessionLayout`, which already picks the dashboard frame for a session with a username and the public frame otherwise (`frontend/src/layouts/SessionLayout.tsx:7`). A signed-in reader then never loses their navigation by opening a friend's link. Public `/arena` keeps its redirect for signed-in users.
 
@@ -87,12 +87,12 @@ Things that stick today assume nothing else is pinned: `OfflineBanner.tsx:17`, `
   - On the left are the `h1` and the subtitle under it. The `h1` is in the display font, bold, `text-3xl` (30/36) below `lg` and 40/48 at `lg`, and wraps without clipping. The subtitle is `text-sm text-dim`, one fact, with `mt-1.5`.
   - On the right are the actions: secondary buttons, then at most one primary, `flex flex-wrap gap-2`. On a phone they wrap under the title.
 - **Tabs**, optional, `mt-6`: a `nav` of 44px links, `gap-7`, with a `border` hairline under the row and horizontal scrolling when it overflows. The current tab has `text` and a 2px `accent` underline sitting on the hairline (`-mb-px`) and `aria-current="page"`. The others are `text-dim`. The data still comes from each area's `tabs`, and `activeTabTo` still picks the current one.
-- **Content** starts `mt-6` below the tabs (or `mt-2` below a header without tabs) and ends with `pb-16`.
+- **Content** starts `mt-6` below the tabs (or `mt-8` below a header without tabs) and ends with `pb-16`.
 - `title={null}` keeps working for pages that place their own `h1` (quiz results, the book page hero, and the profile header below).
 
 ### Widths
 
-`Page` takes `width: "wide" | "default" | "narrow"` (*my call* on names). The content and header share one centred container with gutters of `px-4 sm:px-6 lg:px-8`.
+`Page` takes `width: "wide" | "default" | "narrow"` (*my call* on names). The content and header share one centred container. The widths below are content widths, and the gutters (`px-4 sm:px-6 lg:px-8`) sit outside them, so the mural canvas keeps its full 1152px inside `default`.
 
 | Width | Max | Pages |
 |---|---|---|
@@ -117,7 +117,7 @@ These come from `DESIGN.md` tokens throughout. Nothing new is added to the palet
   - Labels and buttons are `font-semibold`.
   - Sentence case everywhere.
 - **Rhythm.** Sections in a column are 48px apart (`gap-12`). Panel padding is 16–20px. Grids use 20–32px gaps.
-- **Covers outside the owner's grid** are drawn by one presentational component (*my call*, name left to the builder) used on Home, the book page hero, edition rows and activity thumbnails. It draws book corners (`2px 5px 5px 2px`), the new cover shadow (light and dark versions; a dark-scheme theme uses the dark one), and a faint spine shade on the left edge. With no cover image it shows the existing fallback: a plain `surface` tile with the title centred. It reuses the cover URL and fallback logic `BookCard` already uses rather than copying it. The Library grid, Series, Collections and the shared library keep `BookCard` with the owner's style.
+- **Covers outside the owner's grid** are drawn by one presentational component (*my call*, name left to the builder) used on Home, the book page hero and edition rows. It draws book corners (`2px 5px 5px 2px`), the new cover shadow (light and dark versions; a dark-scheme theme uses the dark one), and a faint spine shade on the left edge. With no cover image it shows the existing fallback: a plain `surface` tile with the title centred. It wraps the existing `CoverImage` (`frontend/src/components/BookCard.tsx:69`), which already resolves covers and falls back on error, rather than copying that logic. The Library grid, Series, Collections and the shared library keep `BookCard` with the owner's style.
 - **Motion.** Cover tiles lift 3px on hover (180ms, `cubic-bezier(0.32, 0.72, 0, 1)`, as in `DESIGN.md` Motion). Under reduced motion they don't move.
 - **Focus.** Every interactive element shows the same visible `accent` focus ring.
 
@@ -134,7 +134,7 @@ These go in the existing shared modules (`components/page/buttonClasses.ts`, `co
 | Text field | **new** one class for `input`/`select`/`textarea`: `surface`, `border`, `rounded-lg`, 44px min height, 16px text, `accent` focus border, `danger` on error, label above, hint or error below | 51 of 119 fields repeating the same inline classes (`AddBookModal.tsx:312-372`, `PeoplePage.tsx:17`, `DiscoverPage.tsx:31`) |
 | Filter chip | **new** 44px pill. Unselected is `surface` + `border`. Selected is inverted ink: `text` background, `bg` label. Uses `aria-pressed`, with an optional count in `text-dim` | the Library status select, the Discover type filter |
 | Menu | `OptionsMenu` | — |
-| Dialog | `Sheet` (`radius-lg`, title left, 44px "×" right, footer with Cancel plus one primary) | the remaining overlays that skip it, except `ReaderCardViewer` (full-screen viewer) and the More drawer |
+| Dialog | `Sheet` (`radius-lg`, title left, 44px "×" right, footer with Cancel plus one primary) | already everywhere except `ReaderCardViewer` (full-screen viewer), the More drawer and `AddBlockMenu`'s desktop dropdown (a menu, not a dialog; its phone branch is a `Sheet`), which all stay as they are |
 | Empty state | `EmptyState`, which already exists | the Arena view bypass (`ArenaViewPage.tsx:189`) and any one-line "nothing here" texts in the pages this work touches |
 
 ## Pages
@@ -176,7 +176,7 @@ Every page below renders through `Page`. Unless it says otherwise, its title, ba
     - One meta line: stars and "4.5 · 109 ratings", first publication year, edition count, in `text-dim`.
     - Genre chips, with possible genres dashed as today, and award pills (`DESIGN.md` AwardPill).
     - The status menu (`accent-soft` with an `accent` border and a check glyph, since it is the page's main control) and the "How it landed" menu (secondary). For a book that isn't in the library, the single primary "Add to library" / "Add this edition" takes their place.
-    - The **section tabs as labelled underline tabs** (About · Highlights N · Readers N, from `model.tabs`), replacing today's icon-only segmented control (`BookScreen.tsx:276-299`).
+    - The **section tabs as labelled underline tabs**, using the shared model's labels as they are (About · Highlights (N) · Community (N), `packages/shared/src/works/bookScreen.ts:79,112`, which the phone app uses too), replacing today's icon-only segmented control (`BookScreen.tsx:276-299`).
     - The section content: About this book (16px reading text, Show more), Characters, and Editions as a list panel whose rows have a small cover, edition facts and a "Yours" chip.
 - **Below `lg`:** stacked. Cover centred at about 200px, then title, meta, controls and tabs, as today.
 - `test-work-page.mts` pins the `Finished ▾` glyph and icon tabs. Its assertions move to the new labels.
@@ -228,7 +228,7 @@ The public bar as above, the same page header, and widths from the table. The sh
 
 ### Not found (`*`)
 
-`EmptyState`-style centred message, with "Go to your library" as `BUTTON_PRIMARY`.
+Keeps its centred message, with "Go to your library" as `BUTTON_PRIMARY`.
 
 ## Tests and docs
 
