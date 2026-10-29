@@ -59,7 +59,8 @@ CREATE INDEX IF NOT EXISTS idx_quiz_works_work ON quiz_works(work_id);
 
 CREATE TABLE IF NOT EXISTS daily_chapter_books (
   id TEXT PRIMARY KEY,
-  data TEXT NOT NULL
+  data TEXT NOT NULL,
+  edited_at TEXT
 );
 CREATE TABLE IF NOT EXISTS daily_chapter_questions (
   id TEXT PRIMARY KEY,

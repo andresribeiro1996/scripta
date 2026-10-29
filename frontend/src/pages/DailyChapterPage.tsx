@@ -21,7 +21,7 @@ export function DailyChapterPage() {
   };
   const [identity, setIdentity] = useState(loadIdentity);
   const daily = useQuery({ queryKey: ["daily-chapter", "today"], queryFn: dailyChapterApi.today, refetchInterval: 60_000 });
-  const history = useQuery({ queryKey: ["daily-chapter", "history", session?.user.id ?? "guest", identity.id, daily.data?.date], queryFn: () => dailyChapterApi.history(identity.id!), enabled: Boolean(identity.id && daily.data?.date) });
+  const history = useQuery({ queryKey: ["daily-chapter", "history", session?.user.id ?? "guest", identity.id, daily.data?.date], queryFn: () => dailyChapterApi.history(identity.id!, Boolean(session)), enabled: Boolean(identity.id && daily.data?.date) });
   const result = history.data?.results.find((item) => item.editionId === daily.data?.board?.id);
   return <Page title="The Daily Chapter" subtitle="One theme. Five questions. A little discovery, every day." maxWidth={760}>
     <div className="space-y-8">
@@ -62,7 +62,7 @@ function DailyGame({ board, guestId, playerId, result: recovered }: { board: Dai
     const body = dailyChapterSubmission(board.questions, answers);
     if (!body) return;
     setBusy(true); setError(undefined);
-    try { const next = await dailyChapterApi.play(board.id, guestId, body); setSubmitted(next); void client.invalidateQueries({ queryKey: ["daily-chapter", "history"] }); }
+    try { const next = await dailyChapterApi.play(board.id, guestId, body, Boolean(session)); setSubmitted(next); void client.invalidateQueries({ queryKey: ["daily-chapter", "history"] }); }
     catch (reason) { setError(reason instanceof Error ? reason.message : "Couldn't score your chapter. Try again."); void client.invalidateQueries({ queryKey: ["daily-chapter", "today"] }); }
     finally { setBusy(false); }
   }

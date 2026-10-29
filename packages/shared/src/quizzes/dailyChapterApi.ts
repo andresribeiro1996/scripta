@@ -6,8 +6,8 @@ import type { DailyChapterBoard, DailyChapterBook, DailyChapterEditionInput, Dai
 export function createDailyChapterApi(request: ApiRequest) {
   return {
     today: () => request<{ board: DailyChapterBoard | null; date: string; nextAt: string }>("/daily-chapter/today", { auth: "none" }),
-    history: (guestId: string) => request<DailyChapterHistory>("/daily-chapter/history", { method: "POST", body: { guestId }, auth: "optional" }),
-    play: (id: string, guestId: string, answers: SubmittedAnswer[]) => request<DailyChapterResult>(apiPath`/daily-chapter/${id}/play`, { method: "POST", body: { guestId, answers }, auth: "optional" }),
+    history: (guestId: string, member: boolean) => request<DailyChapterHistory>("/daily-chapter/history", { method: "POST", body: { guestId }, auth: member ? "required" : "none" }),
+    play: (id: string, guestId: string, answers: SubmittedAnswer[], member: boolean) => request<DailyChapterResult>(apiPath`/daily-chapter/${id}/play`, { method: "POST", body: { guestId, answers }, auth: member ? "required" : "none" }),
     editorial: () => request<DailyChapterEditorial>("/daily-chapter/admin", { auth: "required" }),
     saveBook: (book: DailyChapterBook) => request("/daily-chapter/admin/books", { method: "PUT", body: book, auth: "required" }),
     saveQuestion: (question: DailyChapterQuestionInput) => request("/daily-chapter/admin/questions", { method: "PUT", body: question, auth: "required" }),

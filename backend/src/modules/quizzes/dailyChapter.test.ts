@@ -6,6 +6,7 @@ import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import Fastify, { type InjectOptions } from "fastify";
+import { DAILY_CHAPTER_THEMES } from "@scripta/shared";
 
 const scratch = mkdtempSync(join(tmpdir(), "daily-chapter-"));
 for (const key of ["AUTH_DB_PATH", "LIBRARY_DB_PATH", "GALLERY_DB_PATH", "COVERS_DB_PATH", "TIERLISTS_DB_PATH", "QUIZZES_DB_PATH"]) process.env[key] = join(scratch, key + ".sqlite");
@@ -371,6 +372,16 @@ test("a reviewed reimport never overwrites a question the editor saved", () => {
   const kept = service.editorial().questions.find((q) => q.id === input.id)!;
   assert.equal(kept.explanation, "An editor correction.");
   assert.equal(kept.approvedAt, null);
+});
+
+test("a reimport never restores theme tags an editor removed from a saved book", () => {
+  const { service } = setup(); const pack = reviewedLaunchPack();
+  service.importPack({ pack, startDate: "2030-01-01" }, "editor");
+  const stored = service.editorial().books[0]!;
+  const rest = DAILY_CHAPTER_THEMES.map((theme) => theme.id).filter((id) => !stored.themeIds.includes(id)).slice(0, 1);
+  service.saveBook({ ...stored, themeIds: rest });
+  service.importPack({ pack, startDate: "2030-01-01" }, "editor");
+  assert.deepEqual(service.editorial().books.find((book) => book.id === stored.id)!.themeIds, rest);
 });
 
 test("importing an existing edition id on a different date is rejected before any write", () => {

@@ -26,7 +26,7 @@ export function DailyChapterScreen() {
   const { ready, user, unreachable, retry } = useAuth();
   const identity = useQuery({ queryKey: ["daily-chapter", "identity"], queryFn: deviceIdentity, staleTime: Infinity });
   const daily = useQuery({ queryKey: ["daily-chapter", "today"], queryFn: dailyChapterApi.today, refetchInterval: 60_000 });
-  const history = useQuery({ queryKey: ["daily-chapter", "history", user?.id ?? "guest", identity.data, daily.data?.date], queryFn: () => dailyChapterApi.history(identity.data!), enabled: ready && !unreachable && Boolean(identity.data && daily.data?.date) });
+  const history = useQuery({ queryKey: ["daily-chapter", "history", user?.id ?? "guest", identity.data, daily.data?.date], queryFn: () => dailyChapterApi.history(identity.data!, Boolean(user)), enabled: ready && !unreachable && Boolean(identity.data && daily.data?.date) });
   const result = history.data?.results.find((item) => item.editionId === daily.data?.board?.id);
   return <Screen top={false} bottom><Stack.Screen options={{ title: "The Daily Chapter", headerShown: true }} /><ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={{ padding: spacing.lg, gap: spacing.xl, paddingBottom: spacing.huge }}>
     <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>One theme. Five questions. A new chapter at 00:00 UTC. Everyone welcome.</Text>
@@ -64,7 +64,7 @@ function DailyGame({ board, guestId, playerId, recovered }: { board: DailyChapte
     const body = dailyChapterSubmission(questions, answers);
     if (!body) return;
     setBusy(true); setError("");
-    try { setSubmitted(await dailyChapterApi.play(board.id, guestId, body)); void client.invalidateQueries({ queryKey: ["daily-chapter", "history"] }); }
+    try { setSubmitted(await dailyChapterApi.play(board.id, guestId, body, Boolean(user))); void client.invalidateQueries({ queryKey: ["daily-chapter", "history"] }); }
     catch (reason) { setError(reason instanceof Error ? reason.message : "Couldn't score your chapter. Try again."); void client.invalidateQueries({ queryKey: ["daily-chapter", "today"] }); }
     finally { setBusy(false); }
   }
