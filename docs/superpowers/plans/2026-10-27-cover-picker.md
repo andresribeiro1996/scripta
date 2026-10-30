@@ -465,6 +465,9 @@
 - Modify: `mobile/src/features/library/components/CoverPicker.tsx`
 - Modify: `mobile/src/features/library/hooks/useLibraryActions.ts`
 - Modify: `mobile/src/app/(app)/(home,arena,library,search,you)/book/[key]/cover.tsx`
+- Modify: `packages/shared/src/library/coverCandidates.ts`
+- Test: `packages/shared/src/library/coverCandidates.test.ts`
+- Modify: `frontend/src/components/FoundCovers.tsx`
 
 **Interfaces:**
 - Consumes: the shared helpers (Task 1), the routes (Task 5), `apiClient.request(..., { auth: true })` and `coverParamsFor` (`mobile/src/features/library/components/CoverImage.tsx:18`).
