@@ -4,7 +4,8 @@ import { useRef, useState } from "react";
 import { useAuth } from "../auth/AuthContext";
 import { Avatar } from "../components/Avatar";
 import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../components/page/buttonClasses";
-import { Page } from "../components/page/Page";
+import { Page, SettingGroup, SettingRow } from "../components/page/Page";
+import { LIST_PANEL } from "../components/page/surfaceClasses";
 import { SocialsSection } from "../components/SocialsSection";
 import { area } from "../lib/areas";
 
@@ -13,6 +14,7 @@ export function SettingsPage() {
   const [draft, setDraft] = useState(session?.user.username ?? "");
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [avatarBusy, setAvatarBusy] = useState(false);
@@ -22,26 +24,24 @@ export function SettingsPage() {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
-    setError(null);
-    setSuccess(false);
+    setAvatarError(null);
     setAvatarBusy(true);
     try {
       await uploadAvatar(file);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+      setAvatarError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
       setAvatarBusy(false);
     }
   }
 
   async function handleAvatarRemove() {
-    setError(null);
-    setSuccess(false);
+    setAvatarError(null);
     setAvatarBusy(true);
     try {
       await removeAvatar();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+      setAvatarError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
       setAvatarBusy(false);
     }
@@ -64,56 +64,49 @@ export function SettingsPage() {
   }
 
   return (
-    <Page title="Settings" tabs={area("settings").tabs}>
-      <div className="max-w-xl">
-        <section className="rounded-xl border border-(--color-border) bg-(--color-surface) p-5">
-          <h3 className="mb-4 text-sm font-semibold">Account</h3>
-
-          {session && (
-            <div className="mb-4 flex items-center gap-3">
-              <Avatar user={session.user} size={48} className={avatarBusy ? "animate-pulse" : ""} />
-              <div>
-                <div className="mb-0.5 text-xs text-(--color-text-dim)">Profile picture</div>
-                <div className="flex items-center gap-3">
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp,image/heic"
-                    onChange={handleAvatarChange}
-                    className="hidden"
-                  />
-                  <button
-                    disabled={avatarBusy}
-                    onClick={() => fileInputRef.current?.click()}
-                    aria-label={avatarBusy ? undefined : "Change profile picture"}
-                    className="inline-flex min-h-11 items-center px-2 text-sm text-(--color-accent) transition-opacity hover:opacity-80 disabled:opacity-50"
-                  >
-                    {avatarBusy ? "Working…" : "Change"}
+    <Page title="Settings" tabs={area("settings").tabs} sideTabs>
+      <div className="space-y-8">
+        <SettingGroup title="Profile">
+          <div className={LIST_PANEL}>
+            {session && (
+              <SettingRow
+                leading={<Avatar user={session.user} size={48} className={avatarBusy ? "animate-pulse" : ""} />}
+                label="Profile picture"
+                description={
+                  <>
+                    <span className="block">{avatarBusy ? "Working…" : "Shown on your profile, murals and games"}</span>
+                    {avatarError ? <span role="alert" className="block text-(--color-danger)">{avatarError}</span> : null}
+                  </>
+                }
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/heic"
+                  onChange={handleAvatarChange}
+                  className="hidden"
+                />
+                <button disabled={avatarBusy} onClick={() => fileInputRef.current?.click()} className={BUTTON_SECONDARY}>
+                  Change picture
+                </button>
+                {session.user.avatarId && (
+                  <button disabled={avatarBusy} onClick={() => void handleAvatarRemove()} className={BUTTON_SECONDARY}>
+                    Remove picture
                   </button>
-                  {session.user.avatarId && (
-                    <button
-                      disabled={avatarBusy}
-                      onClick={() => void handleAvatarRemove()}
-                      className="inline-flex min-h-11 items-center px-2 text-sm text-(--color-text-dim) transition-opacity hover:opacity-80 disabled:opacity-50"
-                    >
-                      Remove
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="mb-4">
-            <div className="mb-1 text-xs text-(--color-text-dim)">Email</div>
-            <div className="text-sm">{session?.user.email}</div>
-          </div>
-
-          <div>
-            <label htmlFor="settings-username" className="mb-1 block text-xs text-(--color-text-dim)">Username</label>
-            {!editing ? (
-              <div className="flex items-center gap-3">
-                <span className="text-sm">@{session?.user.username ?? "—"}</span>
+                )}
+              </SettingRow>
+            )}
+            <SettingRow
+              label={<label htmlFor="settings-username">Username</label>}
+              description={
+                <>
+                  <span className="block">@{session?.user.username ?? "—"}</span>
+                  {error ? <span role="alert" className="block text-(--color-danger)">{error}</span> : null}
+                  {success ? <span role="status" className="block text-(--color-accent)">Username updated.</span> : null}
+                </>
+              }
+            >
+              {!editing ? (
                 <button
                   onClick={() => {
                     setEditing(true);
@@ -121,45 +114,34 @@ export function SettingsPage() {
                     setError(null);
                     setSuccess(false);
                   }}
-                  aria-label="Change username"
-                  className="inline-flex min-h-11 items-center px-2 text-sm text-(--color-accent) transition-opacity hover:opacity-80"
-                >
-                  Change
-                </button>
-              </div>
-            ) : (
-              <form onSubmit={handleSubmit} className="flex flex-wrap items-center gap-2">
-                <input
-                  id="settings-username"
-                  autoFocus
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  minLength={3}
-                  maxLength={30}
-                  pattern="[a-zA-Z0-9_.]+"
-                  title="Letters, numbers, underscores, and periods only."
-                  className="min-h-11 w-full min-w-0 rounded-lg border border-(--color-border) bg-(--color-surface) sm:w-48 px-3 text-sm"
-                />
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className={BUTTON_PRIMARY}
-                >
-                  Save
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEditing(false)}
                   className={BUTTON_SECONDARY}
                 >
-                  Cancel
+                  Change username
                 </button>
-              </form>
-            )}
-            {error && <p className="mt-2 text-xs text-(--color-danger)">{error}</p>}
-            {success && <p className="mt-2 text-xs text-(--color-accent)">Username updated.</p>}
+              ) : (
+                <form onSubmit={handleSubmit} className="flex flex-wrap items-center gap-2">
+                  <input
+                    id="settings-username"
+                    autoFocus
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    minLength={3}
+                    maxLength={30}
+                    pattern="[a-zA-Z0-9_.]+"
+                    title="Letters, numbers, underscores, and periods only."
+                    className="min-h-11 w-full min-w-0 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm sm:w-48"
+                  />
+                  <button type="submit" disabled={submitting} className={BUTTON_PRIMARY}>
+                    Save
+                  </button>
+                  <button type="button" onClick={() => setEditing(false)} className={BUTTON_SECONDARY}>
+                    Cancel
+                  </button>
+                </form>
+              )}
+            </SettingRow>
           </div>
-        </section>
+        </SettingGroup>
 
         <AccountSecuritySection />
         <SocialsSection />

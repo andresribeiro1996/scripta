@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { SIGNATURE_NOTE_MAX, bookKey, bookPassages, isFinishedBook, searchPassages, type ChosenHighlight, type ChosenSignature, type Passage, type ReaderCardChosen, type ReaderCardStylePatch } from "@scripta/shared";
 import { BookSearchList } from "../murals/pickers";
+import { PANEL_HEADING } from "../page/surfaceClasses";
 import { DraftField } from "./DraftField";
 
 export type SaveStyle = (patch: ReaderCardStylePatch) => Promise<boolean>;
@@ -18,7 +19,7 @@ export function SignatureChoice({ books, signature, chosen, onChange }: { books:
   const [picking, setPicking] = useState(false);
   return (
     <section>
-      <h3 className="mb-2 text-sm font-semibold">Signature book</h3>
+      <h3 className={`${PANEL_HEADING} mb-2`}>Signature book</h3>
       {signature && chosen ? <p className="text-sm">{chosen.title} <span className="text-(--color-text-dim)">— {chosen.author}</span></p> : null}
       {signature && !chosen ? <p className={DIM}>No longer in your library.</p> : null}
       {!signature && finished.length === 0 ? <p className={DIM}>Finish a book to choose your signature book.</p> : null}
@@ -63,7 +64,7 @@ export function HighlightChoice({ books, highlight, chosen, onChange }: { books:
   );
   return (
     <section>
-      <h3 className="mb-2 text-sm font-semibold">Highlight</h3>
+      <h3 className={`${PANEL_HEADING} mb-2`}>Highlight</h3>
       {highlight && chosen ? <p className="text-sm italic">{`“${chosen.text}”`} <span className="not-italic text-(--color-text-dim)">— {chosen.title}</span></p> : null}
       {highlight && !chosen ? <p className={DIM}>No longer in your library.</p> : null}
       {withPassages.length === 0 ? <p className={DIM}>No Kobo highlights yet.</p> : null}

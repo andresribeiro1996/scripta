@@ -5,6 +5,8 @@ import { useConfirm } from "./ConfirmDialog";
 import { ToggleSwitch } from "./ToggleSwitch";
 import { SocialIcon } from "./icons/SocialIcons";
 import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "./page/buttonClasses";
+import { SettingGroup, SettingRow } from "./page/Page";
+import { LIST_PANEL } from "./page/surfaceClasses";
 import { Sheet } from "./Sheet";
 
 const PROVIDER_META: Record<SocialProvider, { label: string; hint: string }> = {
@@ -90,58 +92,53 @@ export function SocialsSection() {
   }
 
   return (
-    <section className="mt-6 rounded-xl border border-(--color-border) bg-(--color-surface) p-5">
-      <h3 className="mb-1 text-sm font-semibold">Socials</h3>
-      <p className="mb-4 text-xs text-(--color-text-dim)">
-        Connect social platforms so Atmyshelf can act on your behalf. Enabling one requires signing in and authorizing access; the key it
-        gets is stored only to make that possible.
-      </p>
+    <>
+      <SettingGroup
+        title="Socials"
+        description="Connect social platforms so Atmyshelf can act on your behalf. Enabling one requires signing in and authorizing access; the key it gets is stored only to make that possible."
+      >
+        <div className={LIST_PANEL}>
+          {isLoading && <p className="px-4 py-3 text-sm text-(--color-text-dim)">Loading…</p>}
 
-      {isLoading && <p className="text-sm text-(--color-text-dim)">Loading…</p>}
-
-      {socials && (
-        <ul className="space-y-3">
-          {socials.map((status) => {
+          {socials?.map((status) => {
             const meta = PROVIDER_META[status.provider];
             const busy = pendingProvider === status.provider;
             return (
-              <li key={status.provider} className={`flex items-center gap-3 ${status.enabled ? "" : "opacity-50"}`}>
-                <span
-                  title={meta.label}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-(--color-border) bg-(--color-surface) text-(--color-text)"
-                >
-                  <SocialIcon provider={status.provider} className="h-4.5 w-4.5" />
-                </span>
-
-                <div className="min-w-0 flex-1">
-                  <span className="sr-only">{meta.label}</span>
-                  <p className="truncate text-xs text-(--color-text-dim)">
-                    {!status.enabled
-                      ? "Not set up on this server yet."
-                      : status.connected
-                        ? `Connected${status.handle ? ` as ${status.handle}` : ""}.`
-                        : meta.hint}
-                  </p>
-                </div>
-
+              <SettingRow
+                key={status.provider}
+                leading={
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-(--color-border) bg-(--color-surface) text-(--color-text)">
+                    <SocialIcon provider={status.provider} className="h-4.5 w-4.5" />
+                  </span>
+                }
+                label={meta.label}
+                description={
+                  !status.enabled
+                    ? "Not set up on this server yet."
+                    : status.connected
+                      ? `Connected${status.handle ? ` as ${status.handle}` : ""}.`
+                      : meta.hint
+                }
+              >
                 {busy && <span className="text-xs text-(--color-text-dim)">Working…</span>}
-
-                <ToggleSwitch
-                  label={`${status.connected ? "Disconnect" : "Connect"} ${meta.label}`}
-                  checked={status.connected}
-                  disabled={!status.enabled || busy}
-                  onChange={(next) => (next ? void handleEnable(status.provider) : void handleDisable(status))}
-                />
-              </li>
+                <span className={status.enabled ? "" : "opacity-50"}>
+                  <ToggleSwitch
+                    label={`${status.connected ? "Disconnect" : "Connect"} ${meta.label}`}
+                    checked={status.connected}
+                    disabled={!status.enabled || busy}
+                    onChange={(next) => (next ? void handleEnable(status.provider) : void handleDisable(status))}
+                  />
+                </span>
+              </SettingRow>
             );
           })}
-        </ul>
-      )}
 
-      {error && <p className="mt-3 text-xs text-(--color-danger)">{error}</p>}
+          {error && <p className="px-4 py-3 text-sm text-(--color-danger)">{error}</p>}
+        </div>
+      </SettingGroup>
 
       {blueskyOpen && <BlueskyConnectModal onConnect={connectBlueskyAccount} onClose={() => setBlueskyOpen(false)} />}
-    </section>
+    </>
   );
 }
 

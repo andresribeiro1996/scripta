@@ -55,3 +55,7 @@ test("back links go to the tab the item belongs to", () => {
 test("the Saved page belongs to Home", () => {
   assert.equal(areaIdForPath("/dashboard/saved"), "home");
 });
+
+test("the Settings tabs read Account, Appearance, Library style", () => {
+  assert.deepEqual(area("settings").tabs.map((t) => t.label), ["Account", "Appearance", "Library style"]);
+});

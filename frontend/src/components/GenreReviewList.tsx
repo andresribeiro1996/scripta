@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { BOOK_GENRES, GENRE_REVIEW_GROUPS, GENRE_REVIEW_HEADINGS, genreEvidenceLabel, type GenreReview, type GenreReviewAction, type GenreReviewItem } from "@scripta/shared";
+import { BUTTON_SECONDARY, chipClass } from "./page/buttonClasses";
+import { LIST_PANEL, LIST_ROW, PANEL_HEADING } from "./page/surfaceClasses";
 
 const MAX_GENRES = 3;
 
@@ -34,7 +36,7 @@ export function GenreReviewRowView({
   onDecide: (action: GenreReviewAction) => void;
 }) {
   return (
-    <li className="flex gap-3 border-b border-(--color-border) py-4">
+    <li className={`${LIST_ROW} items-start!`}>
       {item.coverUrl ? <img src={item.coverUrl} alt="" className="h-24 w-16 shrink-0 rounded object-cover" /> : <div className="h-24 w-16 shrink-0 rounded bg-(--color-surface-hover)" />}
       <div className="min-w-0 flex-1">
         <p className="font-semibold">{item.title}</p>
@@ -48,7 +50,7 @@ export function GenreReviewRowView({
                 type="button"
                 aria-pressed={picked.includes(genre)}
                 onClick={() => onToggle(genre)}
-                className={`rounded-full border px-2 py-1 text-xs ${picked.includes(genre) ? "border-(--color-accent) bg-(--color-accent-soft) text-(--color-accent)" : "border-(--color-border) text-(--color-text-dim)"}`}
+                className={chipClass(picked.includes(genre))}
               >
                 {genre}
               </button>
@@ -56,14 +58,14 @@ export function GenreReviewRowView({
           ))}
         </ul>
         <div className="mt-2 flex flex-wrap gap-2">
-          <button type="button" disabled={busy || picked.length === 0} onClick={() => onDecide({ genres: picked })} className="rounded-lg bg-(--color-accent) px-3 py-1.5 text-sm font-semibold text-(--color-on-accent) disabled:opacity-50">
+          <button type="button" disabled={busy || picked.length === 0} onClick={() => onDecide({ genres: picked })} className={BUTTON_SECONDARY}>
             Save
           </button>
-          <button type="button" disabled={busy} onClick={() => onDecide({ genres: [] })} className="rounded-lg border border-(--color-border) px-3 py-1.5 text-sm">
+          <button type="button" disabled={busy} onClick={() => onDecide({ genres: [] })} className={BUTTON_SECONDARY}>
             No genre
           </button>
           {item.evidence.group === "rejected" ? (
-            <button type="button" disabled={busy} onClick={() => onDecide({ retry: true })} className="rounded-lg border border-(--color-border) px-3 py-1.5 text-sm">
+            <button type="button" disabled={busy} onClick={() => onDecide({ retry: true })} className={BUTTON_SECONDARY}>
               Retry
             </button>
           ) : null}
@@ -101,8 +103,8 @@ export function GenreReviewList({ review, onDecide }: { review: GenreReview; onD
         if (items.length === 0) return null;
         return (
           <section key={group} className="mt-6">
-            <h2 className="text-lg font-bold">{`${GENRE_REVIEW_HEADINGS[group]} (${items.length})`}</h2>
-            <ul>
+            <h2 className={`${PANEL_HEADING} mb-2`}>{`${GENRE_REVIEW_HEADINGS[group]} (${items.length})`}</h2>
+            <ul className={LIST_PANEL}>
               {items.map((item) => (
                 <GenreReviewRow key={item.workId} item={item} onDecide={onDecide} />
               ))}

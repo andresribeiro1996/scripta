@@ -20,11 +20,18 @@ test("the bare-ring GearIcon is gone", () => {
   for (const f of ["pages/GroupsPage", "components/LibraryToolbar"]) assert.doesNotMatch(src(f), /GearIcon/, f);
 });
 
-test("Settings' Change buttons and fields meet the 44px floor and carry labels", () => {
+test("Settings rows name their object and meet the floor", () => {
   const s = src("pages/SettingsPage");
-  assert.doesNotMatch(s, /text-xs[^"]*"[^>]*>\s*Change/);
-  assert.match(s, /<label[^>]*htmlFor=/);
-  assert.match(s, /min-h-11[^"]*"\s*>\s*Change/);
+  assert.match(s, />\s*Change picture\s*</);
+  assert.match(s, />\s*Change username\s*</);
+  assert.doesNotMatch(s, />\s*Change\s*</);
+  assert.match(s, /LIST_PANEL/);
+  assert.match(s, /setAvatarError\(err/);
+  assert.equal(s.match(/setError\(err/g)?.length, 1);
+  assert.match(s, /role="alert"[^>]*>\{avatarError\}/);
+  assert.match(s, /<span className="block">@\{session\?\.user\.username/);
+  assert.match(s, /role="status"[^>]*>Username updated\./);
+  assert.match(src("auth/DeleteAccountSection"), /BUTTON_DANGER_OUTLINE/);
 });
 
 test("Style and Cover chips are 44px targets", () => {

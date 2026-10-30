@@ -3,6 +3,7 @@
 // Run with:
 //   npx tsx scripts/test-murals.mts
 
+import { readFileSync } from "node:fs";
 import {
   addBlock,
   clearMuralCover,
@@ -368,6 +369,32 @@ console.log("\n17. scrubImageFromMurals — also clears a mural's OWN cover, not
   check("profileOnlyMural holds one profile block", mural.blocks.length === 1 && mural.blocks[0]?.type === "profile");
   check("profileOnlyMural takes the theme it is given", mural.theme === "dark");
   check("spanning the full grid, three rows tall", JSON.stringify(mural.blocks[0]?.layout) === JSON.stringify({ x: 0, y: 0, w: 12, h: 3 }));
+}
+
+console.log("\n18. Murals page — preset and new mural in the header, a folder column, tiles as panels");
+{
+  const read = (name: string) => readFileSync(new URL(`../src/${name}.tsx`, import.meta.url), "utf8");
+  const list = read("pages/MuralsListPage");
+  const tree = read("components/murals/MuralFolderTree");
+  const editor = read("pages/MuralEditorPage");
+  check("the murals search shrinks in the tablet toolbar", /<SearchField className="flex-1 sm:flex-initial"/.test(list));
+  check("preset and New mural sit in the header actions, preset first", /actions=\{[\s\S]*?Start from a preset[\s\S]*?New mural/.test(list));
+  check("the full-width preset bar is gone", !/mb-4 flex min-h-11 w-full/.test(list));
+  check("a 220px folder column at lg", /lg:grid-cols-\[220px_minmax\(0,1fr\)\]/.test(list));
+  check("tiles are panels", /\$\{PANEL\} /.test(list));
+  check("the search is the shared SearchField", /<SearchField/.test(list));
+  check("no uppercase labels", !/uppercase/.test(list));
+  check("the stale Library-toolbar comment is gone", !/Library toolbar's filter and sort/.test(list));
+  check("the current folder row carries aria-current", (tree.match(/aria-current=\{selectedFolderId === (?:null|folder\.id) \? "true" : undefined\}/g) ?? []).length === 2);
+  check("the folder column shows from md and the folder sheet icon hides there", /md:grid-cols-\[200px_minmax\(0,1fr\)\]/.test(list) && /<div className="hidden md:block">\s*<MuralFolderTree/.test(list) && /\$\{toolbarIconClass\(selectedFolderId !== null\)\} md:hidden/.test(list));
+  check("the fullscreen overlay resets the offline banner offset", /\[--app-top:0px\] \[--offline-h:0px\]/.test(editor));
+  check("width stays the first Page prop", /<Page\s+width="wide"/.test(list));
+  check("the editor keeps its back link and a single primary in edit mode", /back=\{backToMurals\}/.test(editor) && /editMode \? BUTTON_PRIMARY : BUTTON_SECONDARY/.test(editor));
+  const expand = read("components/murals/MuralExpandButtons");
+  check("expanding upward starts below the editor's sticky strip", /let top = topEdge\?\.\(\) \?\? 0/.test(expand) && !/--app-top|--offline-h/.test(expand));
+  check("the editor measures its sticky strip for topEdge", /ref=\{stickyRef\}[^>]*sticky top-\(--app-top\)/.test(editor) && /topEdge=\{\(\) => stickyRef\.current\?\.getBoundingClientRect\(\)\.bottom \?\? 0\}/.test(editor));
+  check("topEdge reaches both expand button sets", /<MuralExpandButtons(?:=>|[^>])*topEdge=\{topEdge\}/.test(read("components/murals/MuralCanvas")) && /<MuralExpandButtons(?:=>|[^>])*topEdge=\{topEdge\}/.test(read("components/murals/MobileMuralCanvas")));
+  check("the editor rename field uses the shared title field", /className=\{TITLE_FIELD_CLASS\}/.test(editor));
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

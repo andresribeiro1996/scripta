@@ -151,3 +151,19 @@ test("twelve finish chips between corners and print, with the stored one checked
   assert.match(finishes, /aria-checked="true"[^>]*>(?:(?!<\/button>).)*Gilt edge/s);
   assert.ok(html.indexOf(`aria-label="Corners"`) < html.indexOf(`aria-label="Finish"`) && html.indexOf(`aria-label="Finish"`) < html.indexOf(`aria-label="Print"`));
 });
+
+test("preview sticks under the bar beside the controls at lg; no inner page width", () => {
+  const page = readFileSync(new URL("../src/pages/ReaderCardPage.tsx", import.meta.url), "utf8");
+  assert.match(page, /lg:grid-cols-\[minmax\(0,5fr\)_minmax\(0,7fr\)\]/);
+  assert.match(page, /lg:sticky lg:top-\[calc\(var\(--app-top\)\+1\.5rem\)\]/);
+  assert.doesNotMatch(page, /max-w-7xl/);
+});
+
+test("every control group heading uses the panel heading style", () => {
+  for (const file of ["ReaderCardOptions", "ReaderCardChoices", "ReaderGlyphSetting"]) {
+    const source = readFileSync(`src/components/readerCard/${file}.tsx`, "utf8");
+    assert.match(source, /import \{ PANEL_HEADING \} from "\.\.\/page\/surfaceClasses"/, file);
+    assert.doesNotMatch(source, /<h3 className="[^"]*text-sm/, file);
+    for (const tag of source.match(/<h3\b(?:=>|[^>])*>/g) ?? []) assert.match(tag, /PANEL_HEADING/, `${file}: ${tag}`);
+  }
+});

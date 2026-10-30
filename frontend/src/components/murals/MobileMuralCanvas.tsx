@@ -166,6 +166,7 @@ export function MobileMuralCanvas({
   onLayoutChange,
   onDragChange,
   onToggleExpansion,
+  topEdge,
   onDraftChange,
   onApplyDraft,
   onCancelDraft,
@@ -194,6 +195,7 @@ export function MobileMuralCanvas({
   onDragChange?: (dragging: boolean) => void;
   onLayoutChange?: (blockId: string, layout: BlockLayout) => void;
   onToggleExpansion?: (blockId: string, axis: "w" | "h", bottom: number, top: number) => void;
+  topEdge?: () => number;
   onDraftChange?: (layout: BlockLayout) => void;
   onApplyDraft?: () => void;
   onCancelDraft?: () => void;
@@ -345,7 +347,7 @@ export function MobileMuralCanvas({
           <button onClick={() => setFocusedBlockId(selected.id)} className="min-h-11 rounded-xl px-3 text-sm font-semibold hover:bg-(--color-surface-hover)">Open</button>
           <button onClick={() => onStartResize?.(selected)} className="min-h-11 rounded-xl px-3 text-sm font-semibold hover:bg-(--color-surface-hover)">Resize</button>
           <button onClick={() => setMoreOpen(true)} className="min-h-11 rounded-xl px-3 text-sm font-semibold hover:bg-(--color-surface-hover)">More</button>
-          <div className="col-span-3 flex gap-1"><MuralExpandButtons block={selected} canvas={canvasRef} scale={scale} busy={busy} bottomEdge={() => dockRef.current?.getBoundingClientRect().top ?? window.innerHeight} onToggle={onToggleExpansion} /></div>
+          <div className="col-span-3 flex gap-1"><MuralExpandButtons block={selected} canvas={canvasRef} scale={scale} busy={busy} bottomEdge={() => dockRef.current?.getBoundingClientRect().top ?? window.innerHeight} topEdge={topEdge} onToggle={onToggleExpansion} /></div>
         </div>
       )}
 

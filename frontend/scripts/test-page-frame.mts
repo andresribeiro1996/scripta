@@ -22,6 +22,31 @@ test("no band: one display h1 at 30px, 40px from lg, wrapping", () => {
   assert.doesNotMatch(html.slice(0, html.indexOf("</header>")), /bg-\(--color-surface\)/);
 });
 
+test("side tabs: a row below lg, a vertical nav from lg, current marked in both", () => {
+  const html = render(createElement(Page, { title: "Settings", tabs: area("settings").tabs, sideTabs: true, children: "BODY" }), "/dashboard/settings");
+  assert.match(html, /<nav aria-label="Sections"[^>]*lg:hidden/);
+  assert.match(html, /<nav aria-label="Sections"[^>]*hidden lg:flex/);
+  assert.equal(html.match(/aria-current="page"/g)?.length, 2);
+  assert.match(html, /max-w-3xl[^>]*>BODY/);
+});
+
+test("the row nav and side nav share one tab-link helper", () => {
+  const page = readFileSync(new URL("../src/components/page/Page.tsx", import.meta.url), "utf8");
+  assert.equal(page.match(/tabList\.map|tabs\.map/g)?.length, 1);
+  assert.match(page, /tabLinks\(tabList, activeTo, tabClass\)/);
+  assert.match(page, /tabLinks\(tabList, activeTo, sideTabClass\)/);
+});
+
+test("the Appearance tab uses the Account tab's group heading", () => {
+  const src = readFileSync(new URL("../src/pages/SettingsAppearancePage.tsx", import.meta.url), "utf8");
+  assert.match(src, /<h2 className=\{`\$\{PANEL_HEADING\}[^`]*`\}>Appearance<\/h2>/);
+  assert.doesNotMatch(src, /<h3/);
+});
+
+test("all Settings tabs use side tabs", () => {
+  for (const f of ["SettingsPage", "SettingsAppearancePage", "LibraryStylePage"]) assert.match(readFileSync(new URL(`../src/pages/${f}.tsx`, import.meta.url), "utf8"), /sideTabs/, f);
+});
+
 test("back link above the title, actions on the title row, subtitle under the title, tabs last", () => {
   const html = render(createElement(Page, { title: "Library", back: backTo("tournament"), subtitle: "84 books", actions: createElement("button", null, "Add a book"), tabs: area("library").tabs, children: "BODY" }), "/dashboard/library");
   const header = html.slice(0, html.indexOf("</header>"));

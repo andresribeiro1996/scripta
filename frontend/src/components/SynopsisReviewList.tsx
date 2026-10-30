@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { SYNOPSIS_REVIEW_GROUPS, SYNOPSIS_REVIEW_HEADINGS, synopsisEvidenceLabel, type SynopsisDecision, type SynopsisReview, type SynopsisReviewItem } from "@scripta/shared";
+import { BUTTON_SECONDARY } from "./page/buttonClasses";
+import { LIST_PANEL, LIST_ROW, PANEL_HEADING } from "./page/surfaceClasses";
 
 function SynopsisReviewRow({ item, onDecide }: { item: SynopsisReviewItem; onDecide: (hash: string, decision: SynopsisDecision) => Promise<void> }) {
   const [error, setError] = useState<string | null>(null);
@@ -14,7 +16,7 @@ function SynopsisReviewRow({ item, onDecide }: { item: SynopsisReviewItem; onDec
   };
   const carriers = `${item.editions} ${item.editions === 1 ? "edition" : "editions"}${item.works > 1 ? ` · ${item.works} works` : ""}`;
   return (
-    <li className="flex gap-3 border-b border-(--color-border) py-4">
+    <li className={`${LIST_ROW} items-start!`}>
       {item.coverUrl ? <img src={item.coverUrl} alt="" className="h-24 w-16 shrink-0 rounded object-cover" /> : <div className="h-24 w-16 shrink-0 rounded bg-(--color-surface-hover)" />}
       <div className="min-w-0 flex-1">
         <p className="font-semibold">{item.title}</p>
@@ -22,10 +24,10 @@ function SynopsisReviewRow({ item, onDecide }: { item: SynopsisReviewItem; onDec
         <p className="mt-1 text-xs text-(--color-text-dim)">{`${synopsisEvidenceLabel(item)} · ${item.source ?? "unknown source"} · ${carriers} · ${item.holders} ${item.holders === 1 ? "library" : "libraries"}${item.finished ? " · finished" : ""}`}</p>
         <p className="mt-2 whitespace-pre-line text-sm">{item.text}</p>
         <div className="mt-2 flex flex-wrap gap-2">
-          <button type="button" disabled={busy} onClick={() => decide("keep")} className="rounded-lg bg-(--color-accent) px-3 py-1.5 text-sm font-semibold text-(--color-on-accent) disabled:opacity-50">
+          <button type="button" disabled={busy} onClick={() => decide("keep")} className={BUTTON_SECONDARY}>
             Keep
           </button>
-          <button type="button" disabled={busy} onClick={() => decide("hide")} className="rounded-lg border border-(--color-border) px-3 py-1.5 text-sm">
+          <button type="button" disabled={busy} onClick={() => decide("hide")} className={BUTTON_SECONDARY}>
             Hide
           </button>
         </div>
@@ -44,8 +46,8 @@ export function SynopsisReviewList({ review, onDecide }: { review: SynopsisRevie
         if (items.length === 0) return null;
         return (
           <section key={group} className="mt-6">
-            <h2 className="text-lg font-bold">{`${SYNOPSIS_REVIEW_HEADINGS[group]} (${items.length})`}</h2>
-            <ul>
+            <h2 className={`${PANEL_HEADING} mb-2`}>{`${SYNOPSIS_REVIEW_HEADINGS[group]} (${items.length})`}</h2>
+            <ul className={LIST_PANEL}>
               {items.map((item) => (
                 <SynopsisReviewRow key={item.hash} item={item} onDecide={onDecide} />
               ))}

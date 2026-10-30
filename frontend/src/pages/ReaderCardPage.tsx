@@ -46,32 +46,28 @@ export function ReaderCardPage() {
     if (isPending) return <Page title="Reader card"><p className="text-sm text-(--color-text-dim)">Loading your reader card…</p></Page>;
     return (
       <Page title="Reader card">
-        <div className="max-w-7xl mx-auto">
-          <button type="button" onClick={() => void refetch()} className="text-sm font-semibold text-(--color-accent)">Couldn't load your reader card. Try again</button>
-        </div>
+        <button type="button" onClick={() => void refetch()} className="text-sm font-semibold text-(--color-accent)">Couldn't load your reader card. Try again</button>
       </Page>
     );
   }
 
   return (
     <Page title="Reader card">
-      <div className="max-w-7xl mx-auto">
-        <div className="lg:grid lg:grid-cols-2 lg:gap-8">
-          <div className="mb-6 flex flex-col items-center gap-3 lg:sticky lg:top-[calc(var(--app-top)+1.5rem)] lg:mb-0 lg:self-start">
-            <div className="w-full max-w-[18rem]">
-              <Segmented label="Preview as" options={AUDIENCES} labels={AUDIENCE_LABELS} value={audience} onChange={setAudience} />
-            </div>
-            <div className="w-full">
-              <ReaderCardTurner key={`${preview.view}-${preview.style.layout}-${hasChosen(preview.card.chosen)}`} input={preview} cardWidth="w-[min(100%,18rem)]" />
-            </div>
-            {input.card.state === "unwritten" && input.missing ? <p className="text-sm text-(--color-text-dim)">{input.missing}</p> : null}
+      <div className="lg:grid lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-8">
+        <div className="mb-6 flex flex-col items-center gap-3 lg:sticky lg:top-[calc(var(--app-top)+1.5rem)] lg:mb-0 lg:self-start">
+          <div className="w-full max-w-[18rem]">
+            <Segmented label="Preview as" options={AUDIENCES} labels={AUDIENCE_LABELS} value={audience} onChange={setAudience} />
           </div>
-          <div className="space-y-6">
-            <ReaderCardOptions input={input} scheme={scheme} onChange={change} />
-            <SignatureChoice books={books} signature={style.signature} chosen={input.card.chosen?.signature} onChange={change} />
-            <HighlightChoice books={books} highlight={style.highlight} chosen={input.card.chosen?.highlight} onChange={change} />
-            <ReaderGlyphSetting username={readerName} books={books} groups={groups} />
+          <div className="w-full">
+            <ReaderCardTurner key={`${preview.view}-${preview.style.layout}-${hasChosen(preview.card.chosen)}`} input={preview} cardWidth="w-[min(100%,18rem)]" />
           </div>
+          {input.card.state === "unwritten" && input.missing ? <p className="text-sm text-(--color-text-dim)">{input.missing}</p> : null}
+        </div>
+        <div className="space-y-6">
+          <ReaderCardOptions input={input} scheme={scheme} onChange={change} />
+          <SignatureChoice books={books} signature={style.signature} chosen={input.card.chosen?.signature} onChange={change} />
+          <HighlightChoice books={books} highlight={style.highlight} chosen={input.card.chosen?.highlight} onChange={change} />
+          <ReaderGlyphSetting username={readerName} books={books} groups={groups} />
         </div>
       </div>
     </Page>

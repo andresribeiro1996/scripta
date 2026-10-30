@@ -2,7 +2,9 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { AccountSecurity } from "@scripta/shared";
 import { apiFetch } from "../api/client";
-import { BUTTON_DANGER } from "../components/page/buttonClasses";
+import { BUTTON_DANGER, BUTTON_DANGER_OUTLINE, BUTTON_SECONDARY } from "../components/page/buttonClasses";
+import { SettingGroup, SettingRow } from "../components/page/Page";
+import { LIST_PANEL } from "../components/page/surfaceClasses";
 import { useAuth } from "./AuthContext";
 import { setAuthNotice } from "./returnTo";
 import { setSession } from "./tokenStore";
@@ -30,16 +32,16 @@ export function DeleteAccountSection() {
     finally { setBusy(false); }
   }
 
-  return <section className="mt-5 space-y-3 rounded-xl border border-(--color-border) bg-(--color-surface) p-5">
-    <h3 className="text-sm font-semibold">Delete account</h3>
-    <p className="text-sm text-(--color-text-dim)">Permanently deletes your account and everything in it: your library and highlights, murals, gallery images, tier lists, tournaments, follows and connected accounts. Share links stop working. This can’t be undone.</p>
-    {!open ? <button type="button" disabled={account.isPending} onClick={() => setOpen(true)} className="min-h-11 rounded-lg border border-(--color-danger) px-4 text-sm font-semibold text-(--color-danger) disabled:opacity-55">Delete account…</button>
-      : <form onSubmit={submit}><fieldset disabled={busy} className="space-y-3 text-sm">
-        {hasPassword
-          ? <label className="block">Enter your password to confirm<PasswordInput required autoComplete="current-password" value={value} onChange={(event) => setValue(event.target.value)} /></label>
-          : <label className="block">Type <b>{name}</b> to confirm<input required autoComplete="off" autoCapitalize="none" spellCheck={false} className="mt-1 w-full rounded-lg border border-(--color-border) bg-(--color-bg) p-3" value={value} onChange={(event) => setValue(event.target.value)} /></label>}
-        {error && <p role="alert" className="text-(--color-danger)">{error}</p>}
-        <div className="flex flex-wrap gap-4"><button className={BUTTON_DANGER}>{busy ? "Deleting…" : "Delete my account"}</button><button type="button" onClick={() => { setOpen(false); setValue(""); setError(""); }}>Cancel</button></div>
-      </fieldset></form>}
-  </section>;
+  return <SettingGroup title="Delete account"><div className={LIST_PANEL}>
+    <SettingRow label="Delete your account" description="Permanently deletes your account and everything in it: your library and highlights, murals, gallery images, tier lists, tournaments, follows and connected accounts. Share links stop working. This can’t be undone.">
+      {!open && <button type="button" disabled={account.isPending} onClick={() => setOpen(true)} className={BUTTON_DANGER_OUTLINE}>Delete account…</button>}
+    </SettingRow>
+    {open && <form onSubmit={submit} className="px-4 py-3"><fieldset disabled={busy} className="space-y-3 text-sm">
+      {hasPassword
+        ? <label className="block">Enter your password to confirm<PasswordInput required autoComplete="current-password" value={value} onChange={(event) => setValue(event.target.value)} /></label>
+        : <label className="block">Type <b>{name}</b> to confirm<input required autoComplete="off" autoCapitalize="none" spellCheck={false} className="mt-1 min-h-11 w-full rounded-lg border border-(--color-border) bg-(--color-bg) p-3" value={value} onChange={(event) => setValue(event.target.value)} /></label>}
+      {error && <p role="alert" className="text-(--color-danger)">{error}</p>}
+      <div className="flex flex-wrap gap-4"><button className={BUTTON_DANGER}>{busy ? "Deleting…" : "Delete my account"}</button><button type="button" className={BUTTON_SECONDARY} onClick={() => { setOpen(false); setValue(""); setError(""); }}>Cancel</button></div>
+    </fieldset></form>}
+  </div></SettingGroup>;
 }
