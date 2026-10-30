@@ -123,3 +123,7 @@ export function createThrottle(
       if (!running) void pump();
     });
 }
+
+export function urgentLane(throttle: Throttle): Throttle {
+  return (task) => throttle(task, { urgent: true });
+}

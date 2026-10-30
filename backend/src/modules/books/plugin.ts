@@ -6,7 +6,7 @@ import { timeStep, timeSync, timedMethods } from "../../stallLog.js";
 import { createObjectStore } from "../../storage/createObjectStore.js";
 import { createCompositeCatalog } from "./adapters/catalog/compositeCatalog.js";
 import { onlyMatchingLanguage } from "./adapters/catalog/languageFilter.js";
-import { createThrottle, fetchBytes, fetchJson } from "./adapters/http/http.js";
+import { createThrottle, fetchBytes, fetchJson, urgentLane, type Throttle } from "./adapters/http/http.js";
 import { createIsbndbBudget, ISBNDB_DAILY_QUOTA, ISBNDB_SEARCH_RESERVE } from "./adapters/isbndb/isbndbBudget.js";
 import { createIsbndbCatalog } from "./adapters/isbndb/isbndbCatalog.js";
 import { capDailyCalls } from "./adapters/isbndb/isbndbDailyCap.js";
@@ -36,7 +36,7 @@ import { encodeCover } from "./domain/images.js";
 import type { BookLookup } from "./domain/normalize.js";
 import type { CoverBlobReader, CoverBlobStore } from "./domain/ports.js";
 import { coverUrlFor, useBooksRepository } from "./publicCoverLookup.js";
-import { buildAdminRoutes, buildCatalogRoutes, buildCoverFileRoutes, buildGenreReviewRoutes, buildResolveRoutes, buildSynopsisReviewRoutes, buildTranslationReviewRoutes } from "./routes.js";
+import { buildAdminRoutes, buildCatalogRoutes, buildCoverFileRoutes, buildCoverPickerRoutes, buildGenreReviewRoutes, buildResolveRoutes, buildSynopsisReviewRoutes, buildTranslationReviewRoutes } from "./routes.js";
 import { RETITLE_BATCH_SIZE, retitleWanted } from "./retitleJob.js";
 import { refreshAwards } from "./seed/awardsFill.js";
 import { BNP_SYNC_INTERVAL_MS, fetchBnpPage, fetchBnpScan, logBnpSync, lookupBnpIsbn, syncBnp, type BnpHarvestDeps } from "./seed/bnpImport.js";
@@ -148,14 +148,16 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
   const openLibraryThrottle = createThrottle(OPEN_LIBRARY_GAP_MS);
   const openLibraryCoverThrottle = createThrottle(OPEN_LIBRARY_COVER_GAP_MS);
   const koboCoverThrottle = createThrottle(KOBO_COVER_GAP_MS);
-  const fetchImage: FetchCoverImage = async (candidate) => {
+  const appleThrottle = createThrottle(APPLE_GAP_MS);
+  const makeFetchImage = (openLibraryCover: Throttle, koboCover: Throttle): FetchCoverImage => async (candidate) => {
     const bytes = candidate.source === "openlibrary"
-      ? await openLibraryCoverThrottle(() => fetchBytes(candidate.source, candidate.url))
+      ? await openLibraryCover(() => fetchBytes(candidate.source, candidate.url))
       : candidate.source === "kobo"
-        ? await koboCoverThrottle(() => fetchBytes(candidate.source, candidate.url))
+        ? await koboCover(() => fetchBytes(candidate.source, candidate.url))
         : await fetchBytes(candidate.source, candidate.url);
     return bytes ? encodeCover(bytes) : null;
   };
+  const fetchImage = makeFetchImage(openLibraryCoverThrottle, koboCoverThrottle);
   const backgroundOpenLibrary = createOpenLibraryCatalog(openLibraryThrottle, false);
   const blobs: CoverBlobStore & CoverBlobReader = {
     save: (id, extension, bytes) => createObjectStore().put(`covers/${id}.${extension}`, bytes, "image/webp"),
@@ -179,8 +181,13 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
     blobs,
     sources: {
       isbndb: isbndbConfigured ? createIsbndbSource(env.ISBNDB_API_KEY, isbndbThrottle, isbndbGate, isbndbSpend) : null,
-      apple: createAppleSource(createThrottle(APPLE_GAP_MS)),
+      apple: createAppleSource(appleThrottle),
       openlibrary: createOpenLibraryCoverSource(openLibraryThrottle)
+    },
+    pickerSources: {
+      isbndb: isbndbConfigured ? createIsbndbSource(env.ISBNDB_API_KEY, urgentLane(isbndbThrottle), isbndbGate, isbndbSpend) : null,
+      apple: createAppleSource(urgentLane(appleThrottle)),
+      openlibrary: createOpenLibraryCoverSource(urgentLane(openLibraryThrottle))
     },
     catalog: createCompositeCatalog(
       onlyMatchingLanguage(createOpenLibraryCatalog(openLibraryThrottle)),
@@ -193,6 +200,7 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
     ),
     editionRecords: backgroundOpenLibrary,
     fetchImage,
+    fetchPickedImage: makeFetchImage(urgentLane(openLibraryCoverThrottle), urgentLane(koboCoverThrottle)),
     enqueue: (bookId, priority) => worker.enqueue(bookId, priority),
     publicUrlFor: coverUrlFor,
     adminUserId: env.ADMIN_USER_ID,
@@ -269,6 +277,10 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
   await app.register(async (scoped) => {
     await scoped.register(fastifyRateLimit, { max: 300, timeWindow: "1 minute" });
     await scoped.register(buildCatalogRoutes(service));
+  });
+  await app.register(async (scoped) => {
+    await scoped.register(fastifyRateLimit, { max: 30, timeWindow: "1 minute" });
+    await scoped.register(buildCoverPickerRoutes(service));
   });
   await app.register(async (scoped) => {
     await scoped.register(fastifyRateLimit, { max: 30, timeWindow: "1 minute" });

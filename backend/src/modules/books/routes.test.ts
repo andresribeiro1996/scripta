@@ -20,7 +20,7 @@ const { applyBooksMigrations } = await import("./adapters/sqlite/connection.js")
 const { createSqliteBooksRepository } = await import("./adapters/sqlite/sqliteBooksRepository.js");
 const { createBooksService, MAX_UPLOAD_BYTES } = await import("./booksService.js");
 const { BookNotFoundError, SourceUnavailableError, WorkMergeError } = await import("./domain/errors.js");
-const { buildAdminRoutes, buildCatalogRoutes, buildGenreReviewRoutes, buildSynopsisReviewRoutes, buildTranslationReviewRoutes, buildCoverFileRoutes, buildResolveRoutes } = await import("./routes.js");
+const { buildAdminRoutes, buildCatalogRoutes, buildCoverPickerRoutes, buildGenreReviewRoutes, buildSynopsisReviewRoutes, buildTranslationReviewRoutes, buildCoverFileRoutes, buildResolveRoutes } = await import("./routes.js");
 
 type Deps = Parameters<typeof createBooksService>[0];
 const publicUrlFor = (id: string, size: string) => `https://images.test/covers/${id}${size === "thumb" ? "-thumb" : ""}.webp`;
@@ -56,6 +56,7 @@ async function call(service: ReturnType<typeof createBooksService>, options: Inj
   await app.register(buildCoverFileRoutes(publicUrlFor));
   await app.register(buildCatalogRoutes(service));
   await app.register(buildAdminRoutes(service, groupWorks));
+  await app.register(buildCoverPickerRoutes(service));
   const res = await app.inject(signedInAs ? { ...options, headers: { ...options.headers, authorization: `Bearer ${signedInAs}` } } : options);
   await app.close();
   return res;
@@ -326,4 +327,153 @@ test("the translation review is the admin's only, and maps validation, not found
   assert.equal((await callTranslationReview({ method: "POST", url: "/books/translation-review/w1", payload: { undo: true } }, "admin")).statusCode, 200);
   assert.equal((await callTranslationReview({ method: "POST", url: "/books/translation-review/w1", payload: { reject: true } }, "admin", () => { throw new BookNotFoundError(); })).statusCode, 404);
   assert.equal((await callTranslationReview({ method: "POST", url: "/books/translation-review/w1", payload: { merge: "w2" } }, "admin", () => { throw new WorkMergeError("Both works are in an arena."); })).statusCode, 409);
+});
+
+const PICKER_AT = "2026-10-01T00:00:00.000Z";
+const orlando = { isbn: "9780141184272", title: "Orlando", author: "Virginia Woolf" };
+const orlandoQuery = "isbn=9780141184272&title=Orlando&author=Virginia%20Woolf";
+const storedId = "11111111-1111-4111-8111-111111111111";
+const pickedCover = { full: Buffer.from("full"), thumb: Buffer.from("thumb"), width: 600, height: 900, color: null };
+
+function pickerService(overrides: Partial<Deps> = {}) {
+  return makeService({
+    sources: {
+      isbndb: null,
+      apple: empty,
+      openlibrary: { byIsbn: async () => [{ source: "openlibrary", url: "https://o/a" }, { source: "openlibrary", url: "https://o/missing" }, { source: "openlibrary", url: "https://o/down" }], byTitle: async () => [] }
+    },
+    fetchPickedImage: async ({ url }) => {
+      if (url.endsWith("/down")) throw new SourceUnavailableError("openlibrary", "HTTP 503", { status: 503 });
+      return url.endsWith("/missing") ? null : pickedCover;
+    },
+    ...overrides
+  });
+}
+
+function orlandoBook(repo: ReturnType<typeof makeService>["repo"]) {
+  return repo.createBook({ title: orlando.title, author: orlando.author, isbn: orlando.isbn }, ["isbn:9780141184272"], PICKER_AT);
+}
+
+const listCandidates = (service: ReturnType<typeof makeService>["service"], user: string, query = orlandoQuery) =>
+  call(service, { method: "GET", url: `/covers/candidates?${query}` }, user);
+const pick = (service: ReturnType<typeof makeService>["service"], user: string | undefined, payload: object) =>
+  call(service, { method: "POST", url: "/covers/pick", payload }, user);
+
+test("candidates need auth, an ISBN or a title, and a known source group", async () => {
+  const { service } = pickerService();
+  assert.equal((await call(service, { method: "GET", url: `/covers/candidates?${orlandoQuery}` })).statusCode, 401);
+  assert.equal((await listCandidates(service, "u1", "author=Virginia%20Woolf")).statusCode, 400);
+  assert.equal((await listCandidates(service, "u1", "imageId=abc")).statusCode, 400);
+  assert.equal((await listCandidates(service, "u1", `${orlandoQuery}&from=slow`)).statusCode, 400);
+});
+
+test("candidates for a junk ISBN are a 404", async () => {
+  const { service } = pickerService();
+  const res = await listCandidates(service, "u1", "isbn=abc");
+  assert.equal(res.statusCode, 404);
+  assert.deepEqual(res.json(), { error: "No such book." });
+});
+
+test("candidates return the stored covers and what the sources found, and report an unavailable source with a 200", async () => {
+  const down: Deps["sources"]["apple"] = { byIsbn: async () => { throw new SourceUnavailableError("apple", "HTTP 503", { status: 503 }); }, byTitle: async () => [] };
+  const { service, repo } = pickerService({
+    sources: { isbndb: null, apple: down, openlibrary: { byIsbn: async () => [{ source: "openlibrary", url: "https://o/a" }], byTitle: async () => [] } }
+  });
+  const book = orlandoBook(repo);
+  repo.insertImage({ id: storedId, book_id: book.id, source: "upload", source_url: null, width: 500, height: 800, byte_size: 1, color: "", created_at: PICKER_AT });
+  const quick = await listCandidates(service, "u1");
+  assert.equal(quick.statusCode, 200);
+  assert.deepEqual(quick.json(), {
+    candidates: [
+      { source: "upload", url: publicUrlFor(storedId, "thumb"), fullUrl: publicUrlFor(storedId, "file"), coverImageId: storedId, width: 500, height: 800 },
+      { source: "openlibrary", url: "https://o/a", fullUrl: "https://o/a", coverImageId: null, width: null, height: null }
+    ],
+    unavailable: []
+  });
+  const apple = await listCandidates(service, "u1", `${orlandoQuery}&from=apple`);
+  assert.equal(apple.statusCode, 200);
+  assert.deepEqual(apple.json(), { candidates: [], unavailable: ["apple"] });
+});
+
+test("pick needs auth and exactly one of coverImageId and url, and the url must be a URL", async () => {
+  const { service } = pickerService();
+  assert.equal((await pick(service, undefined, { ...orlando, url: "https://o/a" })).statusCode, 401);
+  const invalid = [
+    { ...orlando },
+    { ...orlando, coverImageId: storedId, url: "https://o/a" },
+    { ...orlando, url: "not a url" },
+    { ...orlando, url: `https://o/${"a".repeat(2000)}` },
+    { ...orlando, coverImageId: "not-a-uuid" },
+    { ...orlando, url: "https://o/a", everyone: "yes" },
+    { url: "https://o/a" }
+  ];
+  for (const payload of invalid) {
+    assert.equal((await pick(service, "u1", payload)).statusCode, 400, JSON.stringify(payload).slice(0, 80));
+  }
+});
+
+test("pick everyone from a non-admin is a 403 and never reaches the service", async () => {
+  let downloads = 0;
+  const { service, repo } = pickerService({ fetchPickedImage: async () => { downloads += 1; return pickedCover; } });
+  const book = orlandoBook(repo);
+  await listCandidates(service, "u1");
+  const res = await pick(service, "u1", { ...orlando, url: "https://o/a", everyone: true });
+  assert.equal(res.statusCode, 403);
+  assert.deepEqual(res.json(), { error: "Only the admin can change shared covers." });
+  assert.equal(downloads, 0);
+  assert.deepEqual(repo.listImages(book.id), []);
+});
+
+test("pick maps a missing book, an expired offer, an unusable image and a failed download", async () => {
+  const { service, repo } = pickerService();
+  orlandoBook(repo);
+  await listCandidates(service, "u1");
+
+  const unknownBook = await pick(service, "u1", { title: "Nothing Here", url: "https://o/a" });
+  assert.equal(unknownBook.statusCode, 404);
+  assert.deepEqual(unknownBook.json(), { error: "No such book." });
+  const unknownImage = await pick(service, "u1", { ...orlando, coverImageId: storedId });
+  assert.equal(unknownImage.statusCode, 404);
+
+  const expired = await pick(service, "u1", { ...orlando, url: "https://o/never" });
+  assert.equal(expired.statusCode, 409);
+  assert.deepEqual(expired.json(), { error: "That cover offer expired. Reopen the picker." });
+
+  const unusable = await pick(service, "u1", { ...orlando, url: "https://o/missing" });
+  assert.equal(unusable.statusCode, 422);
+  assert.deepEqual(unusable.json(), { error: "That image can't be used as a cover." });
+
+  const failed = await pick(service, "u1", { ...orlando, url: "https://o/down" });
+  assert.equal(failed.statusCode, 502);
+  assert.deepEqual(failed.json(), { error: "Couldn't download that cover. Try again." });
+});
+
+test("pick returns the stored cover's URLs for an offered URL and leaves the catalog cover alone", async () => {
+  const { service, repo } = pickerService();
+  const book = orlandoBook(repo);
+  await listCandidates(service, "u1");
+  const res = await pick(service, "u1", { ...orlando, url: "https://o/a" });
+  assert.equal(res.statusCode, 200);
+  const [stored, ...rest] = repo.listImages(book.id);
+  assert.deepEqual(rest, []);
+  assert.equal(stored!.source_url, "https://o/a");
+  assert.deepEqual(res.json(), { url: publicUrlFor(stored!.id, "thumb"), fullUrl: publicUrlFor(stored!.id, "file"), pending: false, upgrading: false });
+  const again = await pick(service, "u1", { ...orlando, coverImageId: stored!.id });
+  assert.deepEqual(again.json(), res.json());
+  const after = repo.getBook(book.id)!;
+  assert.equal(after.cover_image_id, null);
+  assert.equal(after.cover_status, null);
+});
+
+test("pick everyone from the admin sets the catalog cover", async () => {
+  const { service, repo } = pickerService();
+  const book = orlandoBook(repo);
+  await listCandidates(service, "admin");
+  const res = await pick(service, "admin", { ...orlando, url: "https://o/a", everyone: true });
+  assert.equal(res.statusCode, 200);
+  const after = repo.getBook(book.id)!;
+  assert.equal(after.cover_status, "manual");
+  assert.equal(after.cover_image_id, repo.listImages(book.id)[0]!.id);
+  const resolved = await call(service, { method: "GET", url: `/covers/resolve?${orlandoQuery}` }, "u1");
+  assert.deepEqual(resolved.json(), res.json());
 });
