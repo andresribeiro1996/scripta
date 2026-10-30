@@ -75,3 +75,17 @@ test("the circle feed: Retry on a failed load, and onboarding only when there is
   assert.match(home, /!hasNextPage|hasNextPage === false/);
   assert.doesNotMatch(home, /BUTTON_PRIMARY[^\n]*Find people|Find people[^\n]*BUTTON_PRIMARY/);
 });
+
+test("feed covers come from the item's cover URL only, never a title lookup", () => {
+  const src = readFileSync(new URL("../src/components/home/FeedCard.tsx", import.meta.url), "utf8");
+  assert.match(src, /url \? \{ _coverUrl: url \} : \{\}/);
+  assert.doesNotMatch(src, /Title: title|Attribution: author/);
+  assert.match(src, /<BookCover book=\{book\} title=\{title\}/);
+});
+
+test("For you follow back refreshes the circle, and a failed refresh or page with rows shown offers Retry", () => {
+  const src = readFileSync(new URL("../src/components/home/ForYouPanel.tsx", import.meta.url), "utf8");
+  assert.match(src, /queryKey: \["community", "dashboard", "circle"\]/);
+  assert.match(src, /feed\.isError && items\.length > 0/);
+  assert.match(src, /Couldn't refresh activity\./);
+});

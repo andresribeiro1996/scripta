@@ -34,7 +34,7 @@ export function AwardsCard({ announcements, library }: { announcements: readonly
 
   const content = (
     <>
-      {model.coverUrl ? <BookCover book={{ Title: model.subtitle, _coverUrl: model.coverUrl }} width={40} /> : null}
+      {model.coverUrl ? <BookCover book={{ _coverUrl: model.coverUrl }} title={model.subtitle} width={40} /> : null}
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="font-bold break-words">{model.title}</span>
         <span className="line-clamp-2 break-words text-(--color-text-dim)">{model.subtitle}</span>

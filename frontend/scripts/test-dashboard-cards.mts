@@ -70,3 +70,23 @@ test("suggestions: at most three, the shared reason, Follow as a secondary butto
   assert.match(s, /BUTTON_SECONDARY[\s\S]*?Follow|Follow[\s\S]*?BUTTON_SECONDARY/);
   assert.match(s, /\/community\/people/);
 });
+
+test("the awards card looks nothing up by title: only the cover URL, and the title only for the fallback", () => {
+  const card = read("components/home/AwardsCard");
+  assert.match(card, /<BookCover book=\{\{ _coverUrl: model\.coverUrl \}\} title=\{model\.subtitle\}/);
+  assert.doesNotMatch(card, /Title: model\.subtitle/);
+});
+
+test("suggestions: a failed load shows Retry, Follow names the reader, and following refreshes the circle", () => {
+  const s = read("components/home/SuggestedReaders");
+  assert.match(s, /Couldn't load suggestions\./);
+  assert.match(s, /refetch/);
+  assert.match(s, /Retry/);
+  assert.match(s, /<button(?:=>|[^>])*aria-label=\{`Follow \$\{reader\.user\.username\}`\}/);
+  assert.match(s, /queryKey: \["community", "dashboard", "circle"\]/);
+});
+
+test("the reading strip's empty-state link is a 44px target", () => {
+  const strip = read("components/home/ReadingStrip");
+  assert.match(strip, /<Link to="\/dashboard\/library"(?:=>|[^>])*min-h-11(?:=>|[^>])*>Pick something from your library/);
+});

@@ -22,9 +22,9 @@ const ICONS: Record<FeedIconName, ComponentType<{ size?: number }>> = {
 const PREVIEW_LINK = "group shrink-0";
 const TILE = "relative block h-27 w-30 shrink-0 rounded-xl";
 
-function Cover({ url, title, author, width }: { url: string | null | undefined; title?: string; author?: string; width: number }) {
-  const book = useMemo(() => ({ Title: title, Attribution: author, _coverUrl: url ?? undefined }), [title, author, url]);
-  return <BookCover book={book} title="Book" width={width} />;
+function Cover({ url, title, width }: { url: string | null | undefined; title?: string; width: number }) {
+  const book = useMemo(() => (url ? { _coverUrl: url } : {}), [url]);
+  return <BookCover book={book} title={title} width={width} />;
 }
 
 function TournamentTile({ covers }: { covers: string[] }) {
@@ -50,7 +50,7 @@ function QuizTile({ covers }: { covers: string[] }) {
 function Preview({ item, covers }: { item: DigestItem; covers: string[] }) {
   if (item.kind === "reading" || item.kind === "completion") {
     const book = item.kind === "reading" ? item.book : item.winner;
-    return <Cover url={book.coverUrl} title={book.title} author={book.author} width={72} />;
+    return <Cover url={book.coverUrl} title={book.title} width={72} />;
   }
   const game = item.kind === "publication" || item.kind === "vote" ? item.content.kind : item.kind === "participation" ? item.game.kind : null;
   if (game === "tournament") return <TournamentTile covers={covers} />;

@@ -14,7 +14,7 @@ export function ReadingStrip({ books, works }: { books: LibraryBook[]; works: Re
         <Link to="/dashboard/library?status=reading" className={LIBRARY_LINK}>Library →</Link>
       </div>
       {books.length === 0 ? (
-        <p className="text-(--color-text-dim)">Nothing in progress. <Link to="/dashboard/library" className="font-semibold text-(--color-accent)">Pick something from your library</Link></p>
+        <p className="text-(--color-text-dim)">Nothing in progress. <Link to="/dashboard/library" className="inline-flex min-h-11 items-center font-semibold text-(--color-accent)">Pick something from your library</Link></p>
       ) : (
         <div className="grid grid-cols-5 gap-2.5">
           {books.slice(0, 5).map((book) => {

@@ -28,7 +28,7 @@ export function HomePage() {
   const { session } = useAuth();
   const library = useLibrary();
   const circle = useCircleFeed();
-  const shelf = useQuery({ queryKey: ["topShelf", "month", null], queryFn: () => fetchTopShelf({ period: "month", genre: null }), staleTime: 30_000, retry: 1 });
+  const shelf = useQuery({ queryKey: ["topShelf", "month", null, "games"], queryFn: () => fetchTopShelf({ period: "month", genre: null, view: "games" }), staleTime: 30_000, retry: 1 });
   const awards = useQuery({ queryKey: ["recentAwards"], queryFn: fetchRecentAwards, staleTime: 30_000, retry: 1 });
   const viewerId = session?.user.id ?? "";
   const popular = shelf.data?.games ?? [];

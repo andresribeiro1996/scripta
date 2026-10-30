@@ -37,3 +37,9 @@ test("the Home badge counts the personal feed, and the new hooks keep the app's 
   assert.match(hooks, /PERSONAL_DIGEST_KINDS/);
   assert.equal(hooks.match(/staleTime: 30_000/g)?.length, 2);
 });
+
+test("Home asks Top Shelf for the games view, keyed by it, so followed games are not cut to the podium", () => {
+  const home = readFileSync(new URL("../src/pages/HomePage.tsx", import.meta.url), "utf8");
+  assert.match(home, /queryKey: \["topShelf", "month", null, "games"\]/);
+  assert.match(home, /fetchTopShelf\(\{ period: "month", genre: null, view: "games" \}\)/);
+});

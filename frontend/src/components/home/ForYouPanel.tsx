@@ -94,8 +94,11 @@ export function ForYouPanel() {
     setError(null);
     try {
       await followUser(userId);
-      await queryClient.invalidateQueries({ queryKey: ["community", "people"] });
-      if ((await feed.refetch()).isError) setError("Couldn't refresh activity.");
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["community", "people"] }),
+        queryClient.invalidateQueries({ queryKey: ["community", "dashboard", "circle"] })
+      ]);
+      await feed.refetch();
     } catch (failure) {
       setError(followFailureMessage(failure, "Couldn't follow them. Try again."));
     } finally {
@@ -149,6 +152,12 @@ export function ForYouPanel() {
           })}
         </ul>
       )}
+      {feed.isError && items.length > 0 ? (
+        <div role="alert" className="space-y-3 px-4.5 py-3">
+          <p>Couldn't refresh activity.</p>
+          <button type="button" className={BUTTON_SECONDARY} onClick={() => void feed.refetch()}>Retry</button>
+        </div>
+      ) : null}
       {error ? <p role="alert" className="px-4.5 py-3 text-sm text-(--color-danger)">{error}</p> : null}
       {feed.hasNextPage ? <div className="px-4.5 py-3"><button type="button" className={BUTTON_SECONDARY} disabled={feed.isFetching} onClick={() => void feed.fetchNextPage()}>Show more</button></div> : null}
     </section>
