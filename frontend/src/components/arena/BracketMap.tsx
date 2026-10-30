@@ -57,7 +57,7 @@ function CheckBadge() {
 
 /** One book's half of a match tile. A plain div, NOT a button: the whole
  *  tile is the tap target now (see MatchTile). */
-function MatchSide({ side, duel, isWinner, decided }: { side: DuelSide; duel: Duel; isWinner: boolean; decided: boolean }) {
+function MatchSide({ side, duel, character, isWinner, decided }: { side: DuelSide; duel: Duel; character: boolean; isWinner: boolean; decided: boolean }) {
   // Memoized for the same reason DuelCard memoizes its own: CoverImage
   // resets its resolved-cover state whenever it is handed a NEW object
   // reference, so without this every poll tick (useArena refetches every
@@ -76,13 +76,19 @@ function MatchSide({ side, duel, isWinner, decided }: { side: DuelSide; duel: Du
           opacity alone, which a colourblind viewer may not see at all.
           The badge is a shape, so it survives that. */}
       <div
-        className={`relative aspect-2/3 w-full max-w-[42px] rounded-xs bg-(--color-border) sm:max-w-[56px] ${
+        className={`relative aspect-2/3 w-full rounded-xs bg-(--color-border) ${character ? "" : "max-w-[42px] sm:max-w-[56px]"} ${
           isWinner ? "ring-2 ring-(--color-accent)" : ""
         } ${decided && !isWinner ? "opacity-45" : ""}`}
       >
-        <div className="absolute inset-0 overflow-hidden rounded-xs">
-          <CoverImage book={coverBook} />
-        </div>
+        {character ? (
+          <div className="absolute inset-0 flex items-center justify-center overflow-hidden rounded-xs bg-(--color-accent-soft) p-0.5 text-center">
+            <span className="line-clamp-4 break-words text-[8px] font-bold leading-tight text-(--color-accent) sm:text-[10px]">{side.title}</span>
+          </div>
+        ) : (
+          <div className="absolute inset-0 overflow-hidden rounded-xs">
+            <CoverImage book={coverBook} />
+          </div>
+        )}
         {isWinner && <CheckBadge />}
       </div>
       <span
@@ -113,7 +119,7 @@ function EmptyTile() {
   );
 }
 
-function MatchTile({ duel, onOpen }: { duel: BracketSlot; onOpen: () => void }) {
+function MatchTile({ duel, character, onOpen }: { duel: BracketSlot; character: boolean; onOpen: () => void }) {
   if (!duel) return <EmptyTile />;
   const decided = duel.status === "settled";
   const winner = duelWinner(duel);
@@ -152,26 +158,34 @@ function MatchTile({ duel, onOpen }: { duel: BracketSlot; onOpen: () => void }) 
           aria-hidden
         />
       )}
-      <MatchSide side={duel.bookA} duel={duel} isWinner={winner === duel.bookA} decided={decided} />
+      <MatchSide side={duel.bookA} duel={duel} character={character} isWinner={winner === duel.bookA} decided={decided} />
       <div className="w-px shrink-0 bg-(--color-border)" />
-      <MatchSide side={duel.bookB} duel={duel} isWinner={winner === duel.bookB} decided={decided} />
+      <MatchSide side={duel.bookB} duel={duel} character={character} isWinner={winner === duel.bookB} decided={decided} />
     </button>
   );
 }
 
 /** One book inside the match sheet: cover, title, author, tally. */
-function SheetSide({ side, duel }: { side: DuelSide; duel: Duel }) {
+function SheetSide({ side, duel, character }: { side: DuelSide; duel: Duel; character: boolean }) {
   const coverBook = useMemo(() => coverBookFor(side), [side.title, side.author, side.cover]);
   const pct = sharePercent(side.votes, duel);
   const won = duelWinner(duel) === side;
   return (
     <div className="flex min-w-0 flex-1 flex-col items-center text-center">
-      <div className={`relative aspect-2/3 w-16 overflow-hidden rounded-lg bg-(--color-border) ${won ? "ring-2 ring-(--color-accent)" : ""}`}>
-        <CoverImage book={coverBook} />
-      </div>
-      <p className="mt-1.5 line-clamp-2 text-xs font-semibold">{side.title}</p>
-      <p className="mt-0.5 line-clamp-1 text-[11px] text-(--color-text-dim)">{side.author}</p>
-      {side.workId && (
+      {character ? (
+        <div className={`flex aspect-2/3 w-16 items-center justify-center overflow-hidden rounded-lg bg-(--color-accent-soft) p-1 text-center ${won ? "ring-2 ring-(--color-accent)" : ""}`}>
+          <span className="line-clamp-4 break-words text-xs font-bold text-(--color-accent)">{side.title}</span>
+        </div>
+      ) : (
+        <>
+          <div className={`relative aspect-2/3 w-16 overflow-hidden rounded-lg bg-(--color-border) ${won ? "ring-2 ring-(--color-accent)" : ""}`}>
+            <CoverImage book={coverBook} />
+          </div>
+          <p className="mt-1.5 line-clamp-2 text-xs font-semibold">{side.title}</p>
+          <p className="mt-0.5 line-clamp-1 text-[11px] text-(--color-text-dim)">{side.author}</p>
+        </>
+      )}
+      {side.workId && !character && (
         <Link to={`/work/${side.workId}`} className="mt-1 text-[11px] font-semibold text-(--color-accent) hover:underline">
           About this book
         </Link>
@@ -203,12 +217,14 @@ function SheetSide({ side, duel }: { side: DuelSide; duel: Duel }) {
  *  voting is that view's entire purpose. */
 function MatchSheet({
   duel,
+  character,
   canVote,
   voting,
   onVote,
   onClose
 }: {
   duel: Duel;
+  character: boolean;
   canVote: boolean;
   voting: boolean;
   onVote: ((workId: string) => void) | undefined;
@@ -220,9 +236,9 @@ function MatchSheet({
   return (
     <Sheet title="Match" onClose={onClose}>
       <div className="flex items-start gap-2 px-2 pt-1">
-        <SheetSide side={duel.bookA} duel={duel} />
+        <SheetSide side={duel.bookA} duel={duel} character={character} />
         <span className="self-center text-[11px] font-semibold text-(--color-text-dim)">vs</span>
-        <SheetSide side={duel.bookB} duel={duel} />
+        <SheetSide side={duel.bookB} duel={duel} character={character} />
       </div>
 
       <p className="mt-3 text-center text-xs text-(--color-text-dim)">
@@ -267,6 +283,7 @@ function MatchSheet({
 function RoundRow({
   slots,
   label,
+  character,
   mirrored,
   feedsInward,
   receivesFromOutside,
@@ -275,6 +292,7 @@ function RoundRow({
 }: {
   slots: BracketSlot[];
   label: string;
+  character: boolean;
   mirrored: boolean;
   feedsInward: boolean;
   receivesFromOutside: boolean;
@@ -310,7 +328,7 @@ function RoundRow({
                 centring a narrower tile inside its cell keeps every stub
                 meeting the tile's own centre. */}
             <div className="mx-auto px-0.5 py-2 sm:px-1 sm:py-2.5" style={{ width: `${widthRatio * 100}%` }}>
-              <MatchTile duel={duel} onOpen={() => duel && onOpen(duel)} />
+              <MatchTile duel={duel} character={character} onOpen={() => duel && onOpen(duel)} />
             </div>
 
             {feedsInward && (
@@ -360,6 +378,7 @@ export function BracketMap({
 
   // The SHAPE comes from bracketSize, not from the duels that exist —
   // see lib/arenaBracket.ts for why that distinction is the whole point.
+  const character = tournament.subject !== null;
   const byRound = bracketShape(tournament.bracketSize, tournament.duels);
 
   if (byRound.length === 0) return null;
@@ -405,6 +424,7 @@ export function BracketMap({
           key={`t-${roundIdx}`}
           slots={slots}
           label={labelFor(roundIdx)}
+          character={character}
           mirrored={false}
           feedsInward={roundIdx < top.length - 1 || hasCentre}
           receivesFromOutside={roundIdx > 0}
@@ -422,7 +442,7 @@ export function BracketMap({
             <span className="absolute top-0 left-1/2 h-1.5 border-l border-(--color-border) sm:h-2" aria-hidden />
             <span className="absolute bottom-0 left-1/2 h-1.5 border-l border-(--color-border) sm:h-2" aria-hidden />
             <div className="mx-auto px-0.5 py-2 sm:px-1 sm:py-2.5" style={{ width: `${tileRatio(1) * 100}%` }}>
-              <MatchTile duel={finalDuel} onOpen={() => finalDuel && setOpen(finalDuel.id)} />
+              <MatchTile duel={finalDuel} character={character} onOpen={() => finalDuel && setOpen(finalDuel.id)} />
               {champion && (
                 <p className="mt-1 truncate text-center text-[10px] font-semibold text-(--color-accent) sm:text-[11px]">
                   🏆 {champion.title}
@@ -441,6 +461,7 @@ export function BracketMap({
             key={`b-${roundIdx}`}
             slots={slots}
             label={labelFor(roundIdx)}
+            character={character}
             mirrored
             feedsInward={roundIdx < bottom.length - 1 || hasCentre}
             receivesFromOutside={roundIdx > 0}
@@ -457,6 +478,7 @@ export function BracketMap({
       {openDuel && (
         <MatchSheet
           duel={openDuel}
+          character={character}
           canVote={tournament.status === "active" && openDuel.status === "active" && !openDuel.hasVoted && Boolean(onVote)}
           voting={votingDuelId === openDuel.id}
           onVote={onVote ? (workId) => onVote(openDuel.id, workId) : undefined}

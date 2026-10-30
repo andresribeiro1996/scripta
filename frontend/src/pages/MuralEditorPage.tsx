@@ -1,3 +1,4 @@
+import { bookTierlists } from "@scripta/shared";
 import { useEffect, useRef, useState } from "react";
 import { THEME_IDS, type ThemeId } from "@scripta/shared/themes";
 import { useNavigate, useOutletContext, useParams, useSearchParams } from "react-router-dom";
@@ -68,7 +69,7 @@ export function MuralEditorPage() {
   // ceremony).
   const { data: tierlists } = useTierlists();
   const tierlistData = (tierlistId: string) => {
-    const tierlist = tierlists?.find((t) => t.id === tierlistId);
+    const tierlist = tierlists && bookTierlists(tierlists).find((t) => t.id === tierlistId);
     return tierlist ? { name: tierlist.name, tiers: tierlist.data.tiers, pool: tierlist.data.pool } : undefined;
   };
   const books = useWorkBooks(library);

@@ -6,7 +6,7 @@
 // number of ballots — so every mode is recomputed on each render with no
 // memoization and, crucially, no network request between switches.
 
-import { booksByWork } from "@scripta/shared";
+import { booksByWork, isCharacterBook } from "@scripta/shared";
 import { Link } from "react-router-dom";
 import { aggregate, AGGREGATION_MODES, type AggregationMode, type BookResult, type HistogramCell } from "../../lib/tierlistResults";
 import { MiniBookTile } from "../murals/blocks/BookBlocks";
@@ -24,14 +24,20 @@ export interface TierlistResultsViewProps {
 
 function ResultTile({ result, book }: { result: BookResult; book: Record<string, unknown> }) {
   const agreement = Math.round((1 - result.spread) * 100);
-  return (
-    <Link to={`/work/${result.workId}`} aria-label={`About ${String(book.Title ?? "Untitled")}`} className="flex w-[4em] flex-col gap-0.5">
+  const content = (
+    <>
       <div className="h-[6em] w-[4em] overflow-hidden rounded-lg">
         <MiniBookTile book={book} showTitle={false} showAuthor={false} />
       </div>
       <p className="text-center text-[0.65rem] leading-tight text-(--color-text-dim)">
         {result.votes} {result.votes === 1 ? "vote" : "votes"} · {agreement}% agree
       </p>
+    </>
+  );
+  if (isCharacterBook(book)) return <div className="flex w-[4em] flex-col gap-0.5">{content}</div>;
+  return (
+    <Link to={`/work/${result.workId}`} aria-label={`About ${String(book.Title ?? "Untitled")}`} className="flex w-[4em] flex-col gap-0.5">
+      {content}
     </Link>
   );
 }
@@ -40,6 +46,7 @@ export function TierlistResultsView({ histogram, tierIds, tiers, pool, books, ba
   const [mode, setMode] = useState<AggregationMode>("average");
   const results = aggregate(histogram, tierIds, pool, mode);
   const byWork = booksByWork(books);
+  const noun = books.some(isCharacterBook) ? "character" : "book";
 
   const byTier = new Map<string, BookResult[]>(tierIds.map((id) => [id, []]));
   const unranked: BookResult[] = [];
@@ -84,7 +91,7 @@ export function TierlistResultsView({ histogram, tierIds, tiers, pool, books, ba
           return (
             <TierRowShell key={tier.id} tier={{ ...tier, workIds: [] }}>
               {rows.length === 0 ? (
-                <TierRowEmpty message="Nobody ranked a book here." />
+                <TierRowEmpty message={`Nobody ranked a ${noun} here.`} />
               ) : (
                 <TierRowTiles>
                   {rows.map((result) => {
@@ -104,6 +111,13 @@ export function TierlistResultsView({ histogram, tierIds, tiers, pool, books, ba
           <div className="flex flex-wrap gap-1.5 rounded-lg border border-dashed border-(--color-border) p-2">
             {unranked.map((result) => {
               const book = byWork.get(result.workId);
+              if (book && isCharacterBook(book)) {
+                return (
+                  <div key={result.workId} className="block h-[6em] w-[4em] overflow-hidden rounded-lg">
+                    <MiniBookTile book={book} showTitle={false} showAuthor={false} />
+                  </div>
+                );
+              }
               return book ? (
                 <Link
                   key={result.workId}

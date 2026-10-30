@@ -1,5 +1,5 @@
 import { useDraggable, useDroppable } from "@dnd-kit/core";
-import { readingPercent, booksByWork } from "@scripta/shared";
+import { readingPercent, booksByWork, isCharacterBook } from "@scripta/shared";
 import type { ReactNode } from "react";
 import { CoverImage } from "../../BookCard";
 import type { ResolvedTierlist } from "../../../api/tierlists";
@@ -49,6 +49,14 @@ export function MiniBookTile({
   showTitle?: boolean;
   showAuthor?: boolean;
 }) {
+  if (isCharacterBook(book)) {
+    const name = String(book.Title ?? "Untitled");
+    return (
+      <div role="img" aria-label={name} className="flex h-full items-center justify-center overflow-hidden rounded-lg bg-(--color-accent-soft) p-1 text-center">
+        <span className="line-clamp-3 break-words text-[0.7em] font-bold leading-tight text-(--color-accent)">{name}</span>
+      </div>
+    );
+  }
   const showFooter = showTitle || showAuthor;
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-lg">
@@ -201,7 +209,7 @@ export function TierRow({ tier, books }: { tier: TierDefinition; books: Array<Re
   return (
     <TierRowShell tier={tier}>
       {resolvedKeys.length === 0 ? (
-        <TierRowEmpty message="No books on this tier." />
+        <TierRowEmpty message={`No ${books.some(isCharacterBook) ? "characters" : "books"} on this tier.`} />
       ) : (
         <TierRowTiles>
           {resolvedKeys.map((key) => (
@@ -281,6 +289,7 @@ export function DraggableTierTile({
   // one control that could rank a book without dragging was invisible.
   const coarse = typeof window !== "undefined" && Boolean(window.matchMedia?.("(pointer: coarse)").matches);
   const title = String(book.Title ?? "Untitled");
+  const noun = isCharacterBook(book) ? "character" : "book";
   return (
     <div
       ref={setRefs}
@@ -294,7 +303,7 @@ export function DraggableTierTile({
       // ("button, Drag to a tier, or use the ⋮ menu" x N); folding the
       // book's own title in gives each one a distinct accessible name.
       // `title` is kept too, purely for the mouse-hover tooltip.
-      aria-label={`${title} — drag to a tier, or use the ⋮ menu`}
+      aria-label={noun === "character" ? title : `${title} — drag to a tier, or use the ⋮ menu`}
       title="Drag to a tier, or use the ⋮ menu"
       className={`group/tile relative h-[6em] w-[4em] shrink-0 cursor-grab overflow-hidden rounded-lg active:cursor-grabbing ${
         isOver && !isDragging ? "ring-2 ring-(--color-accent)" : ""
@@ -337,7 +346,7 @@ export function DraggableTierTile({
       >
         <OptionsMenu
           items={menuItems}
-          title="Move this book"
+          title={`Move this ${noun}`}
           triggerClassName="flex h-11 w-11 items-center justify-center"
           trigger={<span className="flex h-6 w-6 items-center justify-center rounded-full bg-[rgba(10,8,6,0.72)] text-white backdrop-blur-xs"><MoreIcon size={16} /></span>}
         />

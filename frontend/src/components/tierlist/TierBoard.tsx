@@ -1,4 +1,4 @@
-import { booksByWork } from "@scripta/shared";
+import { booksByWork, isCharacterBook, itemNoun } from "@scripta/shared";
 import {
   closestCenter,
   DndContext,
@@ -147,7 +147,7 @@ function TierEditorRow({
       <DropZone id={tier.id}>
         <TierRowShell tier={tier} colorControl={structureEditable ? <TierColorPicker color={tier.color} onChange={onRecolor} /> : undefined}>
           {resolvedKeys.length === 0 ? (
-            <TierRowEmpty message="Drag a book here from the pool." />
+            <TierRowEmpty message={`Drag a ${books.some(isCharacterBook) ? "character" : "book"} here from the pool.`} />
           ) : (
             <TierRowTiles>
               {resolvedKeys.map((key) => {
@@ -329,6 +329,7 @@ export function TierBoard({ data, books, onChange, structureEditable, poolLabel,
   const byWork = booksByWork(books);
   const resolvedPool = data.pool.filter((k) => byWork.has(k));
   const poolHeading = poolLabel ?? "Pool";
+  const character = books.some(isCharacterBook);
 
   return (
     <DndContext
@@ -387,7 +388,7 @@ export function TierBoard({ data, books, onChange, structureEditable, poolLabel,
             className="flex min-h-11 items-center gap-1.5 text-xs font-semibold text-(--color-text-dim) hover:text-(--color-text)"
           >
             {poolCollapsed ? <ChevronUpIcon /> : <ChevronDownIcon />}
-            {poolHeading} — {resolvedPool.length} {resolvedPool.length === 1 ? "book" : "books"}
+            {poolHeading} — {resolvedPool.length} {itemNoun(character, resolvedPool.length)}
           </button>
           {/* Adding to the pool grows the frozen set voters would be
               ranking, so it's gated the same as the tier controls above —
@@ -406,7 +407,7 @@ export function TierBoard({ data, books, onChange, structureEditable, poolLabel,
             <div className="flex min-h-[7em] items-start gap-1.5 overflow-x-auto overscroll-contain px-3 pb-3">
               {resolvedPool.length === 0 ? (
                 <p className="py-4 text-xs text-(--color-text-dim)">
-                  Pool is empty — every book is ranked. Drag one back here to unrank it.
+                  Pool is empty — every {character ? "character" : "book"} is ranked. Drag one back here to unrank it.
                 </p>
               ) : (
                 resolvedPool.map((key) => (

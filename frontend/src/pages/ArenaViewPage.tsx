@@ -4,11 +4,13 @@
 // (if any) against the tournament's plain ownerUserId field — no new
 // auth primitive needed on the (deliberately unauthenticated) GET route.
 
+import { itemNoun } from "@scripta/shared";
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { renameTournament, resolveTiebreak, settleDuelEarly, type DuelSide } from "../api/arena";
 import { useAuth } from "../auth/AuthContext";
 import { AddBookSheet } from "../components/AddBookSheet";
+import { CharacterHeader } from "../components/CharacterHeader";
 import { BracketMap } from "../components/arena/BracketMap";
 import { TournamentStatusBadge } from "../components/arena/TournamentStatusBadge";
 import { BracketTree } from "../components/arena/BracketTree";
@@ -142,12 +144,13 @@ export function ArenaViewPage() {
       }
       subtitle={
         <span className="flex flex-wrap items-center gap-1.5">
-          {tournament.bracketSize}-book bracket
+          {tournament.bracketSize}-{itemNoun(tournament.subject, 1)} bracket
           <TournamentStatusBadge status={tournament.status} round={tournament.currentRound} />
         </span>
       }
       back={back}
     >
+      {tournament.subject ? <CharacterHeader subject={tournament.subject} /> : null}
       {voteError && <p className="mb-4 text-sm text-(--color-danger)">{voteError}</p>}
       {ownerActionError && <p className="mb-4 text-sm text-(--color-danger)">{ownerActionError}</p>}
 
@@ -207,9 +210,10 @@ export function ArenaViewPage() {
             <div>
               <DuelCard
                 duel={duel}
+                character={tournament.subject !== null}
                 onVote={(workId) => void handleVote(duel.id, workId)}
                 votingDisabledReason={votingDisabledReason}
-                onAddBook={setPicked}
+                onAddBook={tournament.subject ? undefined : setPicked}
               />
               {isOwner && duel.status === "active" && (
                 <button

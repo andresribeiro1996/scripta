@@ -18,6 +18,7 @@ import { useCountdown } from "./useCountdown";
 
 function DuelSideCard({
   side,
+  character,
   totalVotes,
   isWinner,
   canVote,
@@ -25,6 +26,7 @@ function DuelSideCard({
   onAddBook
 }: {
   side: DuelSide;
+  character: boolean;
   totalVotes: number;
   isWinner: boolean;
   canVote: boolean;
@@ -55,12 +57,22 @@ function DuelSideCard({
             enormous scroll. The cap crops rather than letterboxes
             (CoverImage uses object-cover), which loses a little art but
             keeps a whole match on screen. */}
-        <div className="relative aspect-2/3 max-h-36 w-full bg-(--color-border) sm:max-h-56">
-          <CoverImage book={coverImageBook} />
-        </div>
+        {character ? (
+          <div className="flex aspect-2/3 max-h-36 w-full items-center justify-center bg-(--color-accent-soft) p-2 text-center sm:max-h-56">
+            <h4 className="line-clamp-4 break-words text-sm font-bold text-(--color-accent)">{side.title}</h4>
+          </div>
+        ) : (
+          <div className="relative aspect-2/3 max-h-36 w-full bg-(--color-border) sm:max-h-56">
+            <CoverImage book={coverImageBook} />
+          </div>
+        )}
         <div className="p-2.5 sm:p-3">
-          <h4 className="truncate text-sm font-semibold">{side.title}</h4>
-          <p className="truncate text-xs text-(--color-text-dim)">{side.author}</p>
+          {!character && (
+            <>
+              <h4 className="truncate text-sm font-semibold">{side.title}</h4>
+              <p className="truncate text-xs text-(--color-text-dim)">{side.author}</p>
+            </>
+          )}
           <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-(--color-border)">
             <div className="h-full bg-(--color-accent)" style={{ width: `${pct}%` }} />
           </div>
@@ -69,7 +81,7 @@ function DuelSideCard({
           </p>
         </div>
       </button>
-      {side.workId && (
+      {side.workId && !character && (
         <Link
           to={`/work/${side.workId}`}
           aria-label="About this book"
@@ -78,7 +90,7 @@ function DuelSideCard({
           <span className="rounded-full bg-black/50 px-2 py-0.5">i</span>
         </Link>
       )}
-      {onAddBook && (
+      {onAddBook && !character && (
         <button
           type="button"
           aria-label={`Add ${side.title} to your library`}
@@ -97,11 +109,13 @@ function DuelSideCard({
 
 export function DuelCard({
   duel,
+  character = false,
   onVote,
   votingDisabledReason,
   onAddBook
 }: {
   duel: Duel;
+  character?: boolean;
   onVote: (workId: string) => void;
   /** Non-null when voting shouldn't be allowed right now (already voted,
    *  duel settled, tournament not active) — shown instead of the
@@ -133,6 +147,7 @@ export function DuelCard({
       <div className="flex gap-3">
         <DuelSideCard
           side={duel.bookA}
+          character={character}
           totalVotes={totalVotes}
           isWinner={winner === duel.bookA}
           canVote={canVote && duel.bookA.workId !== null}
@@ -142,6 +157,7 @@ export function DuelCard({
         <div className="flex items-center px-1 text-sm font-bold text-(--color-text-dim)">VS</div>
         <DuelSideCard
           side={duel.bookB}
+          character={character}
           totalVotes={totalVotes}
           isWinner={winner === duel.bookB}
           canVote={canVote && duel.bookB.workId !== null}
