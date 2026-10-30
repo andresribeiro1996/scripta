@@ -146,14 +146,14 @@ Every page below renders through `Page`. Unless it says otherwise, its title, ba
 **Decided with the user on 2026-10-30, replacing the personal Home first drafted here.** Home is social-first and mirrors the phone app's Home (`mobile/src/features/home/`) in parts and look. It is built only on endpoints that already exist. The user ruled out a new endpoint, so there is no everyone-feed: activity comes from people you follow, and suggested readers keep Home from feeling empty. The canvas's "Home" artboard is the reference.
 
 - **Header**: title "Home". The only action is **Saved**, an icon button (bookmark) that opens the saved list, as the app's Home header does.
-- **At `lg` and up, two columns**: a main column (`minmax(0,1fr)`) and a 340px side column with a 40px gap. Below `lg` it is one column, with the side panels after the main column.
+- **At `lg` and up, two columns**: a main column (`minmax(0,1fr)`) and a 340px side column with a 40px gap. Below `lg` it is one column: the awards card and Games, then the side panels (For you first), then the reading circle. That way For you, and the badge it clears, isn't buried under the whole feed on a phone (*my call*).
 - **Main column, top to bottom:**
   - **Awards card**, only while `GET /awards/recent` returns something. This is the app's `AwardHomeCard`: a `surface` row with a `border`, 16px radius, a small cover, the prize line, title and author, and an `accent` shelf line ("Not on your shelf yet" / on your shelf). Its copy comes from the app's award card model, which moves to `@scripta/shared`. The app's monthly recap card stays out, because the web has no recap player.
   - **Games.** A section heading with "Browse all →" (to Discover).
     - "From people you follow": games the people you follow published, taken from the existing Home feed's publication items.
     - "Popular this week": the existing Top Shelf games list (`GET /top-shelf?view=games`), without your own games.
     - If both are empty, show the newest from Discover.
-    - Each game is the web `GameTicket` (already a port of the app's ticket): the tinted art column per type, title, author, status chip, numbers, and the dashed footer with its tinted action ("Vote in tournament", "Play quiz", "Rank books"). Show two per group in a `repeat(auto-fill, minmax(340px,1fr))` grid.
+    - Each game is the web `GameTicket` (already a port of the app's ticket): the tinted art column per type, title, author, status chip, numbers, and the dashed footer with its tinted action ("Vote in tournament", "Play quiz", "Rank books"). Show up to two per group in the existing `game-ticket-grid` (`frontend/src/index.css:234`).
   - **Your reading circle.** A section heading with "Find people →". These are the app's feed cards (`HomeFeedRow`) for the circle kinds (`CIRCLE_DIGEST_KINDS`). Each is a `surface` card with a 16px radius:
     - a header with a 36px avatar, the bold name, the event label in `text-dim` under it, the relative time and a Save button;
     - a preview by kind: a book cover with the title in the display font, the author, and **Want to read** (or **Open in your shelf →** when you hold it); a tournament's two tilted covers with "VS"; a quiz's cover fan with the "?" disc; a mural tile;
