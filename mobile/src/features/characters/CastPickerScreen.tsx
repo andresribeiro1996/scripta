@@ -7,7 +7,7 @@ import { Text } from "../../ui/Text";
 import { Button, ErrorState, Input, Screen, Segmented, Skeleton, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { BookCover } from "../arena/BookCover";
 import { createCharacterTournament } from "../arena/api";
-import { createCharacterTierlist } from "../tierlists/api";
+import { createCharacterTierlist, type Tierlist } from "../tierlists/api";
 import { fetchWorkCast } from "../works/api";
 
 const MODES = [{ value: "tierlist", label: "Tier list" }, { value: "tournament", label: "Tournament" }] as const;
@@ -54,12 +54,12 @@ function CastPicker({ workId, cast }: { workId: string; cast: WorkCast }) {
       const title = name.trim() || `${cast.scope.label} characters`;
       if (mode === "tierlist") {
         const created = await createCharacterTierlist(title, characters);
-        await queryClient.invalidateQueries({ queryKey: ["tierlists"] });
-        router.replace(`/tierlist/${created.id}` as never);
+        queryClient.setQueryData<Tierlist[]>(["tierlists"], (items = []) => [created, ...items]);
+        router.replace(`/tierlist/${created.id}?rank=1` as never);
       } else {
         const hours = Number(duration);
         const created = await createCharacterTournament({ name: title, bracketSize: size, roundDurationMinutes: Number.isFinite(hours) && hours > 0 ? hours * 60 : 1440, characters });
-        await queryClient.invalidateQueries({ queryKey: ["arena", "mine"] });
+        void queryClient.invalidateQueries({ queryKey: ["arena", "mine"] });
         router.replace(`/arena/${created.id}` as never);
       }
     } catch (reason) {
@@ -69,9 +69,8 @@ function CastPicker({ workId, cast }: { workId: string; cast: WorkCast }) {
     }
   }
 
-  return (
-    <>
-      {error ? <Toast visible message={error} tone="error" /> : null}
+  const header = (
+    <View style={styles.headerBlock}>
       <View style={styles.header}>
         <BookCover cover={cast.scope.coverUrl} title={cast.scope.label} width={48} height={72} />
         <View style={styles.grow}>
@@ -89,11 +88,19 @@ function CastPicker({ workId, cast }: { workId: string; cast: WorkCast }) {
       ) : null}
       <Input label="Name" value={name} onChangeText={setName} maxLength={200} />
       <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{mode === "tournament" ? `${ticked.length} of ${size} characters` : `${ticked.length} characters`}</Text>
+    </View>
+  );
+
+  return (
+    <>
+      {error ? <Toast visible message={error} tone="error" /> : null}
       <FlatList
         data={cast.characters}
         keyExtractor={(character) => character.id}
         style={styles.grow}
         contentContainerStyle={styles.list}
+        keyboardShouldPersistTaps="handled"
+        ListHeaderComponent={header}
         renderItem={({ item }) => {
           const checked = selected.has(item.id);
           return (
@@ -112,6 +119,7 @@ function CastPicker({ workId, cast }: { workId: string; cast: WorkCast }) {
 const styles = StyleSheet.create({
   screen: { padding: spacing.lg, gap: spacing.md },
   grow: { flex: 1 },
+  headerBlock: { gap: spacing.md, paddingBottom: spacing.sm },
   header: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   row: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   list: { gap: spacing.xs, paddingBottom: spacing.lg },
