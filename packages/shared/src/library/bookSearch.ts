@@ -20,6 +20,7 @@
 
 import { GENRES_FROM_CATALOG, normalizeBookGenres, type BookGenre } from "./bookGenres.js";
 import { normalizeWords } from "./bookMatch.js";
+import { positiveInteger } from "./bookMetadata.js";
 import { normalizeIsbn } from "./covers.js";
 import { bookKey } from "./merge.js";
 import { cleanCatalogText } from "./mojibake.js";
@@ -143,7 +144,7 @@ export function mapOpenLibraryDoc(doc: Record<string, unknown>): BookSearchResul
     publisher: typeof publishers[0] === "string" ? publishers[0] : null,
     coverUrl: typeof doc.cover_i === "number" ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg` : null,
     genres: normalizeBookGenres(doc.subject),
-    pages: typeof doc.number_of_pages_median === "number" && Number.isInteger(doc.number_of_pages_median) && doc.number_of_pages_median > 0 ? doc.number_of_pages_median : null
+    pages: positiveInteger(doc.number_of_pages_median)
   };
 }
 
@@ -192,6 +193,6 @@ export function buildManualBook(fields: ManualBookFields, id: string): Record<st
     highlights: [] as Array<Record<string, unknown>>,
     ...(fields.genres?.length ? { _genres: fields.genres, ...(fields.genresEdited ? {} : { _genresFrom: GENRES_FROM_CATALOG }) } : {}),
     ...(fields.format ? { _format: fields.format } : {}),
-    ...(typeof fields.pages === "number" && Number.isInteger(fields.pages) && fields.pages > 0 ? { _pages: fields.pages } : {})
+    ...(positiveInteger(fields.pages) ? { _pages: fields.pages } : {})
   };
 }
