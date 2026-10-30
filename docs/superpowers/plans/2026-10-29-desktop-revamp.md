@@ -1309,6 +1309,8 @@ git add frontend/src/pages/ArenaListPage.tsx frontend/src/pages/ArenaViewPage.ts
 **Files:**
 - Modify: `frontend/src/pages/MuralsListPage.tsx`
 - Modify: `frontend/src/pages/MuralEditorPage.tsx`
+- Modify: `frontend/src/components/murals/MuralFolderTree.tsx`
+- Modify: `frontend/src/components/murals/MuralExpandButtons.tsx`
 - Test: `frontend/scripts/test-murals.mts`
 
 - [ ] **Step 1: Write the failing test.**
