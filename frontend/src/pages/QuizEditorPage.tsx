@@ -120,6 +120,7 @@ export function QuizEditorPage() {
       width="narrow"
       title={quiz.name}
       back={backTo("quiz")}
+      subtitle={quiz.voteCode === null && data.books.length < 4 ? "A quiz needs at least 4 books." : undefined}
       actions={quiz.voteCode === null ? (
         <>
           <button
@@ -226,8 +227,6 @@ export function QuizEditorPage() {
                 </label>
               </div>
             ))}
-
-            {data.books.length < 4 && <p className="text-sm text-(--color-text-dim)">A quiz needs at least 4 books.</p>}
           </section>
         )}
 

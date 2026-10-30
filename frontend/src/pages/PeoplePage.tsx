@@ -9,7 +9,7 @@ import { ReaderGlyph } from "../components/ReaderGlyph";
 import { Page } from "../components/page/Page";
 import { SkeletonCardGrid } from "../components/Skeleton";
 import { followUser, unfollowUser } from "../api/community";
-import { useCommunityPeople, useSuggestedPeople } from "../hooks/useCommunity";
+import { invalidateAfterFollow, useCommunityPeople, useSuggestedPeople } from "../hooks/useCommunity";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { area } from "../lib/areas";
 import { BUTTON_SECONDARY } from "../components/page/buttonClasses";
@@ -47,10 +47,7 @@ function PeoplePane() {
     try {
       if (person.viewerFollows) await unfollowUser(person.user.userId);
       else await followUser(person.user.userId);
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["community", "people"] }),
-        queryClient.invalidateQueries({ queryKey: ["community", "dashboard", "circle"] })
-      ]);
+      await invalidateAfterFollow(queryClient);
     } catch (error) {
       setFollowError(followFailureMessage(error, "Couldn't update who you follow."));
     } finally {

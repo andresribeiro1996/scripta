@@ -6,8 +6,8 @@ export function AuthorAvatar({ author, size = 20 }: { author: CommunityAuthor; s
   }
   return (
     <span
-      className="flex shrink-0 items-center justify-center rounded-full bg-(--color-accent-soft) text-[10px] font-bold text-(--color-accent)"
-      style={{ width: size, height: size }}
+      className="flex shrink-0 items-center justify-center rounded-full bg-(--color-accent-soft) font-bold text-(--color-accent)"
+      style={{ width: size, height: size, fontSize: Math.round(size * 0.45) }}
     >
       {author.username.slice(0, 1).toUpperCase()}
     </span>

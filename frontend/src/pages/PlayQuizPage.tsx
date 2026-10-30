@@ -8,18 +8,20 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import type { PublicQuizQuestion } from "@scripta/shared";
+import { useAuth } from "../auth/AuthContext";
 import { CoverImage } from "../components/BookCard";
 import { Page } from "../components/page/Page";
 import { BUTTON_PRIMARY, FIELD_CLASS } from "../components/page/buttonClasses";
 import { QuizPrompt } from "../components/quiz/QuizPrompt";
 import { submitPlayApi, type PlayResponse } from "../api/quizzes";
 import { QuizLeaderboard, QuizResults } from "../components/quiz/QuizResults";
+import { backTo } from "../lib/areas";
 import { quizPlayStage } from "../lib/quizPlayStage";
 import { storePlayId, useQuizPlay } from "../hooks/useQuizPlay";
 
-function InfoScreen({ message }: { message: string }) {
+function InfoScreen({ message, back }: { message: string; back?: { to: string; label: string } }) {
   return (
-    <Page width="narrow" title="Quiz">
+    <Page width="narrow" back={back} title="Quiz">
       <p className="text-sm text-(--color-text-dim)">{message}</p>
     </Page>
   );
@@ -65,6 +67,8 @@ function Options({ question, onPick, picked }: { question: PublicQuizQuestion; o
 
 export function PlayQuizPage() {
   const { code } = useParams();
+  const { session } = useAuth();
+  const back = session?.user.username ? backTo("quiz") : undefined;
   const { board, ownPlay } = useQuizPlay(code ?? "");
   const [index, setIndex] = useState(0);
   const [picked, setPicked] = useState<number | null>(null);
@@ -81,17 +85,17 @@ export function PlayQuizPage() {
     return () => window.clearInterval(timer);
   }, []);
 
-  if (board.isPending) return <InfoScreen message="Loading…" />;
-  if (board.isError) return <InfoScreen message={board.error instanceof Error ? board.error.message : "No quiz at that link."} />;
+  if (board.isPending) return <InfoScreen message="Loading…" back={back} />;
+  if (board.isError) return <InfoScreen message={board.error instanceof Error ? board.error.message : "No quiz at that link."} back={back} />;
   const playBoard = board.data;
 
   const result = submitted ?? (ownPlay.data ?? null);
   const questions = playBoard.questions;
   const stage = quizPlayStage({ playOpen: playBoard.playOpen, hasResult: result !== null, ownPlayPending: ownPlay.isPending });
-  if (stage === "loading") return <InfoScreen message="Loading…" />;
+  if (stage === "loading") return <InfoScreen message="Loading…" back={back} />;
   if (stage === "leaderboard") {
     return (
-      <Page width="narrow" title={playBoard.name}>
+      <Page width="narrow" back={back} title={playBoard.name}>
         <div className="flex flex-col gap-6">
           <p className="text-center text-(--color-text-dim)">This quiz is closed.</p>
           <QuizLeaderboard code={code ?? ""} />
@@ -101,7 +105,7 @@ export function PlayQuizPage() {
   }
 
   if (result) {
-    return <QuizResults code={code ?? ""} name={playBoard.name} result={result} questions={questions} alreadyPlayed={submitted === null} />;
+    return <QuizResults code={code ?? ""} name={playBoard.name} result={result} questions={questions} alreadyPlayed={submitted === null} back={back} />;
   }
 
   const question = questions[index];
@@ -138,7 +142,7 @@ export function PlayQuizPage() {
   const answeredCount = Object.keys(answers).length;
 
   return (
-    <Page width="narrow" title={playBoard.name} subtitle={`${index + 1}/${questions.length} · ${Math.floor(elapsed / 1000)}s`}>
+    <Page width="narrow" back={back} title={playBoard.name} subtitle={`${index + 1}/${questions.length} · ${Math.floor(elapsed / 1000)}s`}>
       <div className="flex flex-col gap-5">
         <div className="h-1 rounded bg-(--color-border)">
           <div className="h-1 rounded bg-(--color-accent) transition-all" style={{ width: `${Math.round((answeredCount / questions.length) * 100)}%` }} />

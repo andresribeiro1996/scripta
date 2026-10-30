@@ -9,6 +9,8 @@ export const BUTTON_DANGER_OUTLINE = `${BOX} border border-(--color-danger) bg-t
 export const FIELD_CLASS =
   "min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-base text-(--color-text) placeholder:text-(--color-text-dim) focus:border-(--color-accent) aria-invalid:border-(--color-danger) disabled:opacity-55";
 
+export const TITLE_FIELD_CLASS = `${FIELD_CLASS} font-display block w-full min-w-0 font-bold text-[length:inherit]! leading-[inherit]!`;
+
 export function chipClass(selected: boolean): string {
   const state = selected
     ? "border-(--color-text) bg-(--color-text) text-(--color-bg)"

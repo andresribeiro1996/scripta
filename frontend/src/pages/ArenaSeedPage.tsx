@@ -17,7 +17,7 @@ import {
 import { useAuth } from "../auth/AuthContext";
 import { SeedSlotGrid } from "../components/arena/SeedSlotGrid";
 import { Page } from "../components/page/Page";
-import { BUTTON_PRIMARY, BUTTON_SECONDARY, FIELD_CLASS } from "../components/page/buttonClasses";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY, TITLE_FIELD_CLASS } from "../components/page/buttonClasses";
 import { OptionSheet } from "../components/Sheet";
 import { backTo } from "../lib/areas";
 import { useArena } from "../hooks/useArena";
@@ -224,7 +224,7 @@ export function ArenaSeedPage() {
           }}
           placeholder="Name this tournament…"
           aria-label="Tournament name"
-          className={`${FIELD_CLASS} font-display block w-full min-w-0 font-bold`}
+          className={TITLE_FIELD_CLASS}
         />
       ) : (
         <button

@@ -104,7 +104,7 @@ test("feed covers come from the item's cover URL only, never a title lookup", ()
 
 test("For you follow back refreshes the circle, and a failed refresh or page with rows shown offers Retry", () => {
   const src = readFileSync(new URL("../src/components/home/ForYouPanel.tsx", import.meta.url), "utf8");
-  assert.match(src, /queryKey: \["community", "dashboard", "circle"\]/);
+  assert.match(src, /await invalidateAfterFollow\(queryClient\)/);
   assert.match(src, /feed\.isError && items\.length > 0/);
   assert.match(src, /Couldn't refresh activity\./);
 });

@@ -54,12 +54,13 @@ function QuizAnswer({ row, question, expanded, onToggle }: { row: ScoreRow; ques
   );
 }
 
-export function QuizResults({ code, name, result, questions, alreadyPlayed }: {
+export function QuizResults({ code, name, result, questions, alreadyPlayed, back }: {
   code: string;
   name: string;
   result: PlayResponse;
   questions: PublicQuizQuestion[];
   alreadyPlayed: boolean;
+  back?: { to: string; label: string };
 }) {
   const [tab, setTab] = useState<"answers" | "board">("answers");
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -72,7 +73,7 @@ export function QuizResults({ code, name, result, questions, alreadyPlayed }: {
   })).entries()].slice(0, 3);
 
   return (
-    <Page title={null}>
+    <Page back={back} title={null}>
       <section aria-label="Your result" className={`relative isolate mb-3 grid items-center gap-x-4 gap-y-3 pb-3 lg:mb-8 lg:gap-6 lg:border-b lg:border-(--color-border) lg:pb-10 ${covers.length ? "grid-cols-[minmax(0,1fr)_auto] lg:grid-cols-2" : ""}`}>
         <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10" style={{ background: "radial-gradient(ellipse at 60% 50%, color-mix(in srgb, var(--color-accent) 8%, transparent), transparent 70%)" }} />
         <div className="contents min-w-0 lg:block">

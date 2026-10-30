@@ -18,7 +18,7 @@ import { PublicLibraryGrid } from "../components/PublicLibraryGrid";
 import { ReaderGlyph } from "../components/ReaderGlyph";
 import { SkeletonCardGrid } from "../components/Skeleton";
 import { SwipeTabs } from "../components/SwipeTabs";
-import { useCommunityActivity, useCommunityLibrary, useCommunityProfile } from "../hooks/useCommunity";
+import { invalidateAfterFollow, useCommunityActivity, useCommunityLibrary, useCommunityProfile } from "../hooks/useCommunity";
 import { backTo } from "../lib/areas";
 import { ensureBookBlockHeights, profileOnlyMural, type Mural } from "../lib/murals";
 import { useResolvedTheme } from "../lib/theme";
@@ -52,7 +52,7 @@ export function CommunityProfilePage() {
     try {
       await action();
       await queryClient.invalidateQueries({ queryKey: ["community", "profile", username] });
-      await queryClient.invalidateQueries({ queryKey: ["community", "people"] });
+      await invalidateAfterFollow(queryClient);
     } catch (error) {
       setError(followFailureMessage(error, "Something went wrong. Try again."));
     } finally {
@@ -204,19 +204,10 @@ const PROFILE_TABS = [
 
 type ProfileTab = (typeof PROFILE_TABS)[number]["value"];
 
-function ProfileAvatar({ author }: { author: CommunityAuthor }) {
-  if (author.avatarUrl) return <AuthorAvatar author={author} size={72} />;
-  return (
-    <span aria-hidden="true" className="flex size-[72px] shrink-0 items-center justify-center rounded-full bg-(--color-accent) text-3xl font-semibold text-(--color-on-accent)">
-      {author.username.slice(0, 1).toUpperCase()}
-    </span>
-  );
-}
-
 function ProfileHeader({ user, action }: { user: CommunityAuthor; action?: ReactNode }) {
   return (
     <div className="flex flex-wrap items-center gap-5">
-      <ProfileAvatar author={user} />
+      <AuthorAvatar author={user} size={72} />
       <h1 className="font-display min-w-0 flex-1 basis-48 break-words text-3xl font-bold lg:text-[2.5rem] lg:leading-[3rem]">
         <span className="flex items-center gap-1.5">
           <span className="min-w-0 break-words">@{user.username}</span>

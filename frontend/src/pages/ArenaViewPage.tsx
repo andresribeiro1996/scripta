@@ -18,7 +18,7 @@ import { DuelCard } from "../components/arena/DuelCard";
 import { useArena } from "../hooks/useArena";
 import { EmptyState } from "../components/EmptyState";
 import { Page } from "../components/page/Page";
-import { BUTTON_SECONDARY, FIELD_CLASS } from "../components/page/buttonClasses";
+import { BUTTON_SECONDARY, TITLE_FIELD_CLASS } from "../components/page/buttonClasses";
 import { backTo } from "../lib/areas";
 
 export function ArenaViewPage() {
@@ -126,7 +126,7 @@ export function ArenaViewPage() {
               if (e.key === "Escape") setEditingName(false);
             }}
             aria-label="Tournament name"
-            className={`${FIELD_CLASS} font-display w-full font-bold`}
+            className={TITLE_FIELD_CLASS}
           />
         ) : isOwner ? (
           <button

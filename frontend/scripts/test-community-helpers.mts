@@ -96,7 +96,7 @@ check(
 );
 check("People search uses the shared field", /<SearchField/.test(people));
 check("SearchField carries the field class", /FIELD_CLASS\} w-full pl-10/.test(readFileSync(new URL("../src/components/Toolbar.tsx", import.meta.url), "utf8")));
-check("People follow refreshes the home circle", /"community", "dashboard", "circle"/.test(people));
+check("People follow refreshes the home circle", /await invalidateAfterFollow\(queryClient\)/.test(people));
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);
