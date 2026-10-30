@@ -98,7 +98,7 @@ export function createOpenLibraryCatalog(throttle: Throttle, urgent = true): Boo
     },
 
     async search(query) {
-      const params = new URLSearchParams({ fields: "key,title,author_name,first_publish_year,isbn,publisher,cover_i,subject", limit: "12" });
+      const params = new URLSearchParams({ fields: "key,title,author_name,first_publish_year,isbn,publisher,cover_i,subject,number_of_pages_median", limit: "12" });
       if ("isbn" in query) params.set("isbn", query.isbn);
       else params.set("q", query.text);
       const data = await get(`https://openlibrary.org/search.json?${params}`);

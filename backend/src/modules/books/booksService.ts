@@ -236,6 +236,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       year: book.year ?? book.first_published_year,
       isbn: book.isbn,
       publisher: book.publisher,
+      pages: book.pages,
       coverUrl: book.cover_image_id ? deps.publicUrlFor(book.cover_image_id, "thumb") : openLibraryThumb(book.ol_cover_id),
       genres: JSON.parse(book.genres) as BookGenre[],
       ...(workId ? { workId } : {})

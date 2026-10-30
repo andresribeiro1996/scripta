@@ -138,6 +138,13 @@ test("search maps docs and keeps the Open Library cover id", async () => {
   assert.equal(new URL(isbnRequests[0]!).searchParams.get("isbn"), "9780441013593");
 });
 
+test("a search asks for the median page count and maps it", async () => {
+  const requests = respond([{ docs: [{ key: "/works/OL1W", title: "Dune", number_of_pages_median: 288 }] }]);
+  const hits = await createOpenLibraryCatalog(direct).search({ text: "dune" });
+  assert.match(new URL(requests[0]!).searchParams.get("fields")!, /number_of_pages_median/);
+  assert.equal(hits[0]!.result.pages, 288);
+});
+
 test("catalog calls use the urgent lane", async () => {
   const lanes: Array<boolean | undefined> = [];
   const recording: Throttle = (task, options) => {
