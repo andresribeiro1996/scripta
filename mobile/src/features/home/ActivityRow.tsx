@@ -2,8 +2,7 @@ import { Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
 import { Text } from "../../ui/Text";
 import { Button, Icon, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import { AuthorAvatar } from "../community/AuthorAvatar";
-import { activityRowModel, activitySentence, type PersonalItem } from "./activityModel";
-import { relativeTime } from "./feedRowModel";
+import { activityRowModel, activitySentence, relativeTime, type PersonalItem } from "@scripta/shared/community";
 
 export function ActivityRow({ item, isNew, following, onOpen, onFollowBack }: { item: PersonalItem; isNew: boolean; following: boolean; onOpen: () => void; onFollowBack: () => void }) {
   const { colors } = useTheme();

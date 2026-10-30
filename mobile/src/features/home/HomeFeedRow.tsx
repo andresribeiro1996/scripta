@@ -1,13 +1,12 @@
 import { Pressable, StyleSheet, View } from "react-native";
 import { router } from "expo-router";
 import { bookKey, participationLead, savedContentRef, type DigestItem } from "@scripta/shared";
-import { contentDetail } from "@scripta/shared/community";
+import { contentDetail, feedEventLabel, feedPrimaryLabel, feedRowAccessibilityLabel, feedRowModel, feedShareTarget, hasActivityThread, reactionCount, readingShelfBook, relativeTime } from "@scripta/shared/community";
 import { Text } from "../../ui/Text";
 import { Button, Icon, captionHitSlop, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { AuthorAvatar, openProfile } from "../community/AuthorAvatar";
 import { ReaderGlyph } from "../community/ReaderGlyph";
 import { FeedPreview } from "./FeedPreview";
-import { feedEventLabel, feedPrimaryLabel, feedRowAccessibilityLabel, feedRowModel, feedShareTarget, hasActivityThread, reactionCount, readingShelfBook, relativeTime } from "./feedRowModel";
 import type { HomeActions } from "./useHomeActions";
 
 const readerHitSlop = { top: spacing.sm };

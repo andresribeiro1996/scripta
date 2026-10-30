@@ -12,7 +12,7 @@ import { AREA_ICONS, SidebarNav } from "../components/page/SidebarNav";
 import { TopBar } from "../components/page/TopBar";
 import { OfflineBanner } from "../components/OfflineBanner";
 import { useAccountAppearanceSync } from "../hooks/useAccountAppearanceSync";
-import { useDashboard } from "../hooks/useDashboard";
+import { useActivityFeed } from "../hooks/useDashboard";
 import { useDismissible } from "../hooks/useDismissible";
 import { useGenreEnrichment } from "../hooks/useGenreEnrichment";
 import { useLibrary } from "../hooks/useLibrary";
@@ -25,7 +25,7 @@ import { area, areaIdForPath, BOTTOM_BAR_AREAS, footerAreas, NAV_AREAS, TOP_BAR_
 export function DashboardLayout() {
   const { session, logout } = useAuth();
   const { data: library, updateLibrary } = useLibrary();
-  const { personalNewCount } = useDashboard();
+  const { personalNewCount } = useActivityFeed();
   useGenreEnrichment(library?.data.books ?? [], library?.genres, updateLibrary);
   useAccountAppearanceSync();
   const { data: isAdmin = false } = useQuery({ queryKey: ["books-admin"], queryFn: fetchIsAdmin, staleTime: Infinity, enabled: Boolean(session) });
