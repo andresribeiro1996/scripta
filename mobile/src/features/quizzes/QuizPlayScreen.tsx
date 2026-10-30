@@ -186,8 +186,8 @@ function EndScreen({ code, board, result, returning, tab, setTab, onError }: {
     <View style={styles.hero}>
       <View style={styles.heroText}>
         <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Your results</Text>
-        <Text {...dynamicType} style={[typography.heading, { color: colors.text }]}>{board.name}</Text>
-        <Text {...dynamicType} display={false} accessibilityLabel={`${result.score} of ${board.questionCount} correct`} style={[styles.score, { color: colors.text }]}>
+        <Text {...dynamicType} numberOfLines={2} style={[typography.heading, { color: colors.text }]}>{board.name}</Text>
+        <Text {...dynamicType} display={false} maxFontSizeMultiplier={1.2} accessibilityLabel={`${result.score} of ${board.questionCount} correct`} style={[styles.score, { color: colors.text }]}>
           {result.score}<Text style={[styles.scoreOutOf, { color: colors.textDim }]}> / {board.questionCount}</Text>
         </Text>
         <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{result.score} correct · {board.questionCount - result.score} incorrect</Text>
@@ -262,8 +262,8 @@ function Leaderboard({ code }: { code: string }) {
           {playerLabel(play).guest ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Guest</Text> : null}
         </View>
         <View style={styles.leaderScore}>
-          <Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>{play.score}/{leaderboard.data.questionCount}</Text>
-          <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{(play.durationMs / 1000).toFixed(1)}s</Text>
+          <Text {...dynamicType} numberOfLines={1} style={[typography.body, styles.strong, { color: colors.text }]}>{play.score}/{leaderboard.data.questionCount}</Text>
+          <Text {...dynamicType} numberOfLines={1} style={[typography.caption, { color: colors.textDim }]}>{(play.durationMs / 1000).toFixed(1)}s</Text>
         </View>
       </View>
     ))}
@@ -289,7 +289,7 @@ const styles = StyleSheet.create({
   complete: { gap: spacing.sm, paddingBottom: spacing.xl },
   section: { paddingTop: spacing.sm },
   leaderRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, minHeight: minimumTouchTarget, paddingVertical: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth },
-  rank: { width: spacing.xl },
+  rank: { minWidth: spacing.xl },
   leaderScore: { alignItems: "flex-end" },
   end: { flex: 1, gap: spacing.md },
   hero: { flexDirection: "row", alignItems: "center", gap: spacing.md },
@@ -305,9 +305,9 @@ const styles = StyleSheet.create({
   answerBody: { flexDirection: "row", paddingBottom: spacing.md },
   answerColumn: { flex: 1 },
   pickColumn: { borderLeftWidth: StyleSheet.hairlineWidth, paddingLeft: spacing.md },
-  answerValue: { alignItems: "flex-start", gap: spacing.xs },
-  answerCover: { width: 64, height: 96, borderRadius: radii.sm, overflow: "hidden" },
-  pickCover: { width: 40, height: 60, borderRadius: radii.sm, overflow: "hidden" },
+  answerValue: { gap: spacing.xs },
+  answerCover: { alignSelf: "flex-start", width: 64, height: 96, borderRadius: radii.sm, overflow: "hidden" },
+  pickCover: { alignSelf: "flex-start", width: 40, height: 60, borderRadius: radii.sm, overflow: "hidden" },
   strong: { fontWeight: "700" },
   grow: { flex: 1 },
 });
