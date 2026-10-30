@@ -1,10 +1,14 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Pressable, ScrollView, View } from "react-native";
 import { Stack, useRouter } from "expo-router";
-import { DAILY_CHAPTER_THEMES, dailyChapterSummary, dailyChapterThemeRates, recapMonthName } from "@scripta/shared";
+import { DAILY_CHAPTER_THEMES, dailyChapterMonthShare, dailyChapterSummary, dailyChapterThemeRates, recapMonthName } from "@scripta/shared";
 import { Text } from "../../ui/Text";
-import { EmptyState, ErrorState, Icon, Screen, Skeleton, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
+import { Button, EmptyState, ErrorState, Icon, IconButton, Screen, Skeleton, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
+import { ContentShareSheet } from "../sharing/ContentShareSheet";
+import { publicContentUrl } from "../sharing/links";
 import { DailyChapterCalendar } from "./daily-chapter-calendar";
+import { DailyChapterPoster } from "./daily-chapter-poster";
 import { DailyChapterSquares } from "./daily-chapter-squares";
 import { useDailyHistory, useDeviceIdentity } from "./use-daily-history";
 
@@ -21,6 +25,8 @@ export function YourChaptersScreen() {
   const current = new Date().toISOString().slice(0, 7);
   const [month, setMonth] = useState(current);
   const data = history.data;
+  const [sharing, setSharing] = useState(false);
+  const link = useQuery({ queryKey: ["public-url", "/daily"], queryFn: () => publicContentUrl("/daily"), enabled: sharing });
   const open = (editionId: string) => router.push(`/daily-chapters/${editionId}` as never);
   const retry = () => { void identity.refetch(); void history.refetch(); };
   let body;
@@ -58,7 +64,11 @@ export function YourChaptersScreen() {
           <Icon name="chevronRight" size={16} color={colors.textDim} />
         </Pressable>)}
       </View>
+      <Button label="Share my chapters" onPress={() => setSharing(true)} />
+      <ContentShareSheet visible={sharing} onClose={() => setSharing(false)} title="My Daily Chapter" url={link.data ?? null} linkError={link.error ? link.error.message : null} onRetryLink={() => void link.refetch()} textMessage={link.data ? dailyChapterMonthShare(summary, link.data) : undefined}>
+        <DailyChapterPoster summary={summary} />
+      </ContentShareSheet>
     </>;
   }
-  return <Screen top={false} bottom><Stack.Screen options={{ title: "Your chapters", headerShown: true }} /><ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={{ padding: spacing.lg, gap: spacing.xl, paddingBottom: spacing.huge }}>{body}</ScrollView></Screen>;
+  return <Screen top={false} bottom><Stack.Screen options={{ title: "Your chapters", headerShown: true, headerRight: data?.results.length ? () => <IconButton name="share" accessibilityLabel="Share my chapters" onPress={() => setSharing(true)} /> : undefined }} /><ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={{ padding: spacing.lg, gap: spacing.xl, paddingBottom: spacing.huge }}>{body}</ScrollView></Screen>;
 }

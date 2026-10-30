@@ -25,9 +25,10 @@ type Props = {
   linkError?: string | null;
   onRetryLink?: () => void;
   onExportVideo?: (pngUri: string) => Promise<string>;
+  textMessage?: string;
 };
 
-export function ContentShareSheet({ visible, onClose, title, description, url, children, previewControls, imageReady = true, onEnableLink, enableLinkLabel = "Create share link", onDisableLink, linkError, onRetryLink, onExportVideo }: Props) {
+export function ContentShareSheet({ visible, onClose, title, description, url, children, previewControls, imageReady = true, onEnableLink, enableLinkLabel = "Create share link", onDisableLink, linkError, onRetryLink, onExportVideo, textMessage }: Props) {
   const { colors } = useTheme();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -132,6 +133,7 @@ export function ContentShareSheet({ visible, onClose, title, description, url, c
               <View style={styles.rowItem}><ShareChoice icon="link" label="Send link" detail="Open the live version" disabled={busy} onPress={() => void run(async () => { await Share.share({ message: shareUrl, title }); })} /></View>
               <View style={styles.rowItem}><ShareChoice icon="qr" label="QR code" detail="Share face to face" disabled={busy} onPress={() => setView("qr")} /></View>
             </View> : onEnableLink ? <ShareChoice icon="link" label={enableLinkLabel} detail="Let others open the live version" disabled={busy} onPress={() => void run(async () => { const next = await onEnableLink(); if (next) setCreatedUrl(next); })} /> : null}
+            {textMessage ? <ShareChoice icon="share" label="Send as text" detail="For group chats" disabled={busy} onPress={() => void run(async () => { await Share.share({ message: textMessage, title }); })} /> : null}
             {children ? <Text style={[typography.caption, { color: colors.textDim, textAlign: "center" }]}>Sharing an image keeps your visibility unchanged.</Text> : null}
             {shareUrl && onDisableLink ? <Pressable accessibilityRole="button" accessibilityState={{ disabled: busy }} disabled={busy} onPress={() => void run(async () => { await onDisableLink(); setCreatedUrl(null); })} style={({ pressed }) => [styles.textAction, { opacity: busy || pressed ? 0.5 : 1 }]}><Text {...dynamicType} style={[typography.caption, { color: colors.danger, alignSelf: "stretch", textAlign: "center" }]}>Stop sharing link</Text></Pressable> : null}
           </>}
