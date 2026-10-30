@@ -863,6 +863,16 @@ test("a saved row shows its edition year in search, not the first-publication ye
   assert.equal(h.service.search("dune")[0]!.year, 2015);
 });
 
+test("catalog search results carry the edition's page count", () => {
+  const h = harness();
+  h.repo.createBook({ title: "Dune", author: "Frank Herbert", isbn: "9780441013593", createdBy: "seed" }, ["isbn:9780441013593"], "2026-10-01T00:00:00.000Z");
+  h.repo.createBook({ title: "Dune Messiah", author: "Frank Herbert", isbn: "9780593098233", createdBy: "seed" }, ["isbn:9780593098233"], "2026-10-01T00:00:00.000Z");
+  h.db.prepare("UPDATE books SET pages = 310 WHERE isbn = '9780441013593'").run();
+  const pages = new Map(h.service.search("dune").map((result) => [result.title, result.pages]));
+  assert.equal(pages.get("Dune"), 310);
+  assert.equal(pages.get("Dune Messiah"), null);
+});
+
 test("a partial saved match no longer hides the outside search", async () => {
   const messiah = { result: { title: "Dune Messiah", authors: ["Frank Herbert"], year: 1969, isbn: null, publisher: null, coverUrl: null, genres: [] }, olCoverId: null, source: "openlibrary" as const };
   const dune = { result: { title: "Dune", authors: ["Frank Herbert"], year: 1965, isbn: "9780441013593", publisher: null, coverUrl: null, genres: [] }, olCoverId: null, source: "openlibrary" as const };
