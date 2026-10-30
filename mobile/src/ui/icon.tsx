@@ -77,6 +77,7 @@ const GLYPHS = {
   chevronDown: { ios: "chevron.down", android: "expand_more" },
   star: { ios: "star.fill", android: "star" },
   characters: { ios: "theatermasks", android: "theater_comedy" },
+  stats: { ios: "chart.bar", android: "bar_chart" },
 } as const satisfies Record<string, Glyph>;
 
 /** Only the tab icons have a solid counterpart worth using; the rest read the
