@@ -59,7 +59,7 @@ Header stays the existing sheet header "Add a book" with its close button.
 - *(Claude's call)* **Adding a book that's already in the library** (the add merges via `mergeBookPair` in `packages/shared/src/library/merge.ts`): `_format` and `_pages` follow incoming-if-present, else existing — the same rule `merge.ts` applies to `_coverUrl`. The form always sends a format (it has a default), so re-adding sets the format the form showed; that is accepted. A blank page count sends no `_pages`, so an existing one survives. In dedupe (`dedupe.ts` `combineBooks`) the same rule: keep whichever copy has a value, preferring the newer.
 - Covers on the record use the existing setters: an upload → `setBookCover(book, imageId, url)`; a Find-cover pick → `setBookCoverUrl(book, url)` (which clears any stale `_coverImageId`).
 - Page count reaches search results by adding an optional `pages` to `BookSearchResult`: catalog results from `books.pages` (`backend/src/modules/books/booksService.ts` `toSearchResult`), Open Library results from the doc's page-count field if its search API returns one (otherwise absent).
-- Genres are already carried on results and on the record (`_genres`, `_genresFrom: "catalog"`). When the user edits genres in the form, the builder decides whether `_genresFrom` stays `"catalog"` or marks a manual choice, following how `_genresFrom` is read elsewhere.
+- Genres are already carried on results and on the record (`_genres`, `_genresFrom: "catalog"`). *(Claude's call)* When the user edits genres in the form, `_genresFrom` is left off, so the catalog genre refresh (`withCatalogGenres`) treats them as the user's own and never overwrites them. Genres taken unedited from a result stay tagged `"catalog"` as today.
 
 ## Constraints
 
