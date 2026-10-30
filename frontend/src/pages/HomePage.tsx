@@ -102,6 +102,12 @@ export function HomePage() {
           <h2 id="home-circle" className={SECTION_HEADING}>Your reading circle</h2>
           <Link to="/community/people" className={SECTION_LINK}>Find people →</Link>
         </div>
+        {actions.loadError ? (
+          <div role="alert" className="mb-4 space-y-1">
+            <p>{actions.loadError}</p>
+            <button type="button" className={BUTTON_SECONDARY} onClick={actions.retryLoad}>Retry</button>
+          </div>
+        ) : null}
         {circleItems.length > 0 ? <div className="flex flex-col gap-4">{circleItems.map((item) => <FeedCard key={`${item.kind}:${item.id}`} item={item} actions={actions} books={books} works={library.data?.works} />)}</div> : null}
         {circleLoading ? <p role="status">Loading your reading circle…</p> : null}
         {circle.isError ? (

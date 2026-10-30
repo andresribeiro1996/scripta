@@ -5,6 +5,7 @@ import { createElement } from "react";
 import { renderToString } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { shareLink } from "../src/lib/shareLink";
 import { digestTarget, type DashboardFeedPage, type DigestItem } from "@scripta/shared";
 import { feedEventLabel, type ActivityComment, type ActivityEngagement } from "@scripta/shared/community";
 import { FeedCard } from "../src/components/home/FeedCard";
@@ -29,9 +30,9 @@ const playedMyQuiz: DigestItem = { kind: "participation", id: "quiz:q", game: { 
 
 const piranesiOnShelf = { Title: "Piranesi", Attribution: "Susanna Clarke", ISBN: "" };
 
-function card(item: DigestItem, opts: { engagement?: Record<string, ActivityEngagement>; saved?: string[]; library?: Array<Record<string, unknown>> } = {}) {
+function card(item: DigestItem, opts: { engagement?: Record<string, ActivityEngagement>; saved?: string[]; library?: Array<Record<string, unknown>>; wanting?: string } = {}) {
   const noop = () => {};
-  const actions: FeedActions = { engagement: opts.engagement ?? {}, saved: new Set(opts.saved ?? []), savedReady: true, busy: { like: false, save: false, want: false }, like: noop, save: noop, wantToRead: noop, share: noop };
+  const actions: FeedActions = { engagement: opts.engagement ?? {}, saved: new Set(opts.saved ?? []), savedReady: true, busy: { like: false, save: false }, wanting: opts.wanting ?? null, loadError: null, retryLoad: noop, like: noop, save: noop, wantToRead: noop, share: noop };
   return renderToString(createElement(MemoryRouter, null, createElement(FeedCard, { item, actions, books: opts.library ?? [], works: undefined })));
 }
 
@@ -140,7 +141,8 @@ test("actions keep the app's limits and paths", () => {
   assert.match(hook, /hasActivityThread\(/);
   assert.match(hook, /toRecommendation\(/);
   assert.match(hook, /preserveExisting: true/);
-  assert.match(hook, /navigator\.share/);
+  assert.match(hook, /shareLink\(/);
+  assert.doesNotMatch(readFileSync(new URL("../src/pages/WorkPage.tsx", import.meta.url), "utf8"), /navigator\.share/);
   assert.match(hook, /\["community", ?"saved", ?"list"\]/);
   assert.match(readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8"), /path="\/dashboard\/saved"/);
 });
@@ -182,4 +184,76 @@ test("comments: the keys, the 429 message and the confirm before delete", () => 
   assert.match(src, /remove\.reset\(\)/);
   assert.match(src, /send\.reset\(\)/);
   assert.match(src, /fieldRef\.current\?\.focus\(\)/);
+});
+
+test("comments: a pending post is never reset by a delete, nor a pending delete by a post", () => {
+  const src = readFileSync(new URL("../src/components/home/CommentsSheet.tsx", import.meta.url), "utf8");
+  assert.match(src, /if \(!send\.isPending\) send\.reset\(\)/);
+  assert.match(src, /if \(!remove\.isPending\) remove\.reset\(\)/);
+  assert.doesNotMatch(src.replace(/if \(!(send|remove)\.isPending\) (send|remove)\.reset\(\)/g, ""), /(send|remove)\.reset\(\)/);
+});
+
+test("comments: the sheet cannot be dismissed while a post is in flight", () => {
+  const src = readFileSync(new URL("../src/components/home/CommentsSheet.tsx", import.meta.url), "utf8");
+  assert.match(src, /const close = \(\) => \{\s*if \(!send\.isPending\) onClose\(\);/);
+  assert.match(src, /<Sheet\s+title="Comments"\s+onClose=\{close\}/);
+  assert.match(src, /<button(?=(?:=>|[^>])*disabled=\{send\.isPending\})(?=(?:=>|[^>])*onClick=\{close\})(?:=>|[^>])*>Cancel<\/button>/);
+  assert.doesNotMatch(src, /onClick=\{onClose\}/);
+});
+
+test("comments: a failed refresh with comments shown says so and offers Retry", () => {
+  const src = readFileSync(new URL("../src/components/home/CommentsSheet.tsx", import.meta.url), "utf8");
+  assert.match(src, /query\.isError && items\.length > 0 && !isFetchNextPageError/);
+  assert.match(src, /Couldn't refresh comments\./);
+});
+
+test("feed actions surface a failed engagement or saved-state load, once, on Home", () => {
+  const hook = readFileSync(new URL("../src/hooks/useFeedActions.ts", import.meta.url), "utf8");
+  assert.match(hook, /Couldn't load reactions\./);
+  assert.match(hook, /Couldn't load saved items\./);
+  assert.match(hook, /retryLoad/);
+  const home = readFileSync(new URL("../src/pages/HomePage.tsx", import.meta.url), "utf8");
+  assert.match(home, /actions\.loadError/);
+  assert.match(home, /actions\.retryLoad/);
+  assert.doesNotMatch(readFileSync(new URL("../src/components/home/FeedCard.tsx", import.meta.url), "utf8"), /loadError/);
+});
+
+test("Saved skips the saved-state fetch and its Retry refetches unless the next page failed", () => {
+  const src = readFileSync(new URL("../src/pages/SavedPage.tsx", import.meta.url), "utf8");
+  assert.match(src, /useFeedActions\(items, \{ trackSaved: false \}\)/);
+  assert.match(src, /query\.isFetchNextPageError \? fetchNextPage\(\) : query\.refetch\(\)/);
+  assert.match(readFileSync(new URL("../src/hooks/useFeedActions.ts", import.meta.url), "utf8"), /trackSaved/);
+});
+
+test("Want to read shows Adding… on the card being added and disables the others", () => {
+  assert.match(card(finishedReading, { wanting: finishedReading.id }), /<button(?=(?:=>|[^>])*disabled="")(?:=>|[^>])*>Adding…<\/button>/);
+  const other = card(finishedReading, { wanting: "someone-else" });
+  assert.match(other, /<button(?=(?:=>|[^>])*disabled="")(?:=>|[^>])*>Want to read<\/button>/);
+  assert.doesNotMatch(card(finishedReading), /Adding…|<button(?=(?:=>|[^>])*disabled="")(?:=>|[^>])*>Want to read<\/button>/);
+});
+
+function stubNavigator(value: object, run: () => Promise<void>) {
+  const original = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  Object.defineProperty(globalThis, "navigator", { value, configurable: true });
+  return run().finally(() => {
+    if (original) Object.defineProperty(globalThis, "navigator", original);
+    else Reflect.deleteProperty(globalThis, "navigator");
+  });
+}
+
+test("shareLink: native share, silent on AbortError, else clipboard with a toast", async () => {
+  const toasts: Array<{ kind?: string; message: string }> = [];
+  const toast = (options: { kind?: string; message: string }) => void toasts.push(options);
+  const shared: unknown[] = [];
+  await stubNavigator({ share: async (data: unknown) => void shared.push(data) }, () => shareLink("T", "https://x/y", toast));
+  assert.deepEqual(shared, [{ title: "T", url: "https://x/y" }]);
+  await stubNavigator({ share: async () => { throw new DOMException("cancelled", "AbortError"); } }, () => shareLink("T", "u", toast));
+  assert.deepEqual(toasts, []);
+  const copied: string[] = [];
+  await stubNavigator({ clipboard: { writeText: async (text: string) => void copied.push(text) } }, () => shareLink("T", "u2", toast));
+  assert.deepEqual(copied, ["u2"]);
+  assert.deepEqual(toasts, [{ message: "Link copied." }]);
+  await stubNavigator({}, () => shareLink("T", "u", toast));
+  assert.equal(toasts.at(-1)?.kind, "error");
+  await assert.rejects(stubNavigator({ share: async () => { throw new TypeError("boom"); } }, () => shareLink("T", "u", toast)), TypeError);
 });

@@ -55,32 +55,42 @@ export function CommentsSheet({ id, title, onClose }: { id: string; title: strin
 
   async function askDelete(commentId: string) {
     if (!(await confirm({ title: "Delete your comment?", body: "This can't be undone." }))) return;
-    send.reset();
+    if (!send.isPending) send.reset();
     remove.mutate(commentId);
   }
 
   function post() {
-    remove.reset();
+    if (!remove.isPending) remove.reset();
     send.mutate();
   }
+
+  const close = () => {
+    if (!send.isPending) onClose();
+  };
 
   return (
     <Sheet
       title="Comments"
-      onClose={onClose}
+      onClose={close}
       footer={
         <div className="flex w-full flex-col gap-1.5">
           <label htmlFor={fieldId} className="text-sm font-semibold">Comment</label>
           <textarea ref={fieldRef} id={fieldId} rows={2} maxLength={1500} placeholder="Write a comment…" value={draft} disabled={send.isPending} onChange={(event) => setDraft(event.target.value)} className={`${FIELD_CLASS} w-full resize-none`} />
           {failed ? <p role="alert" className="text-sm text-(--color-danger)">{failed === send ? "Couldn't post your comment." : "Couldn't delete your comment."}</p> : null}
           <div className="flex flex-wrap justify-end gap-2">
-            <button type="button" className={BUTTON_SECONDARY} onClick={onClose}>Cancel</button>
+            <button type="button" className={BUTTON_SECONDARY} disabled={send.isPending} onClick={close}>Cancel</button>
             <button type="button" className={BUTTON_PRIMARY} disabled={!draft.trim() || send.isPending} onClick={post}>Post</button>
           </div>
         </div>
       }
     >
       <p className="px-2 pb-2 text-sm break-words text-(--color-text-dim)">{title}</p>
+      {query.isError && items.length > 0 && !isFetchNextPageError ? (
+        <div className="px-2">
+          <p role="alert" className="text-sm text-(--color-danger)">Couldn't refresh comments.</p>
+          <button type="button" className={RETRY} onClick={() => void query.refetch()}>Retry</button>
+        </div>
+      ) : null}
       {query.isPending ? (
         <div className="space-y-3 px-2 py-2">
           <Skeleton className="h-14 w-full" />

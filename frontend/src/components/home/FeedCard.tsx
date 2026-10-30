@@ -140,7 +140,7 @@ export function FeedCard({ item, actions, books, works, isSaved }: { item: Diges
             {item.kind === "reading" ? owned ? (
               <Link to={bookHref(bookKey(owned), works)} className={link}>Open in your shelf →</Link>
             ) : (
-              <button type="button" className={BUTTON_SECONDARY} disabled={actions.busy.want} onClick={() => actions.wantToRead(item)}>Want to read</button>
+              <button type="button" className={BUTTON_SECONDARY} disabled={actions.wanting !== null} onClick={() => actions.wantToRead(item)}>{actions.wanting === item.id ? "Adding…" : "Want to read"}</button>
             ) : null}
           </span>
         </div>

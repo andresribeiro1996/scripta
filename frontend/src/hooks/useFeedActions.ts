@@ -1,6 +1,7 @@
 import { useMutation, useQueries, useQueryClient } from "@tanstack/react-query";
 import { savedContentRef, saveFailureMessage, toRecommendation, type DigestItem } from "@scripta/shared";
 import { feedRowModel, feedShareTarget, hasActivityThread, type ActivityEngagement } from "@scripta/shared/community";
+import { shareLink } from "../lib/shareLink";
 import { fetchActivityEngagement, fetchSavedState, likeActivity, saveContent } from "../api/community";
 import { addBookToLibrary } from "../api/library";
 import { useToast } from "../components/Toaster";
@@ -15,7 +16,10 @@ export interface FeedActions {
   engagement: Record<string, ActivityEngagement>;
   saved: Set<string>;
   savedReady: boolean;
-  busy: { like: boolean; save: boolean; want: boolean };
+  busy: { like: boolean; save: boolean };
+  wanting: string | null;
+  loadError: string | null;
+  retryLoad(): void;
   like(item: DigestItem): void;
   save(item: DigestItem, saved: boolean): void;
   wantToRead(item: ReadingItem): void;
@@ -26,14 +30,16 @@ function batches<T>(values: T[]): T[][] {
   return Array.from({ length: Math.ceil(values.length / 50) }, (_, index) => values.slice(index * 50, (index + 1) * 50));
 }
 
-export function useFeedActions(items: DigestItem[]): FeedActions {
+export function useFeedActions(items: DigestItem[], { trackSaved = true }: { trackSaved?: boolean } = {}): FeedActions {
   const queryClient = useQueryClient();
   const toast = useToast();
   const ids = [...new Set(items.filter((item) => hasActivityThread(item)).map((item) => item.id))];
-  const refs = items.flatMap((item) => {
-    const ref = savedContentRef(item);
-    return ref ? [ref] : [];
-  });
+  const refs = trackSaved
+    ? items.flatMap((item) => {
+        const ref = savedContentRef(item);
+        return ref ? [ref] : [];
+      })
+    : [];
   const engagementQueries = useQueries({
     queries: batches(ids).map((chunk) => ({ queryKey: [...ENGAGEMENT_KEY, chunk], queryFn: () => fetchActivityEngagement(chunk), staleTime: 30_000, retry: 1 }))
   });
@@ -69,28 +75,22 @@ export function useFeedActions(items: DigestItem[]): FeedActions {
     onError: fail("Couldn't add the book to your library.")
   });
 
-  async function share(item: DigestItem) {
+  function share(item: DigestItem) {
     const path = feedShareTarget(item);
     if (!path) return;
-    const url = `${window.location.origin}${path}`;
-    const title = feedRowModel(item).title || "Atmyshelf";
-    try {
-      if (typeof navigator.share === "function") await navigator.share({ title, url });
-      else if (navigator.clipboard) {
-        await navigator.clipboard.writeText(url);
-        toast({ message: "Link copied." });
-      } else toast({ kind: "error", message: "Couldn't copy the link." });
-    } catch (reason) {
-      if (!(reason instanceof DOMException)) throw reason;
-      if (reason.name !== "AbortError") toast({ kind: "error", message: "Couldn't share the link." });
-    }
+    return shareLink(feedRowModel(item).title || "Atmyshelf", `${window.location.origin}${path}`, toast);
   }
+
+  const failedQueries = [...engagementQueries, ...savedQueries].filter((query) => query.isError);
 
   return {
     engagement,
     saved,
     savedReady: savedQueries.every((query) => query.isSuccess),
-    busy: { like: like.isPending, save: save.isPending, want: want.isPending },
+    busy: { like: like.isPending, save: save.isPending },
+    wanting: want.isPending ? want.variables.id : null,
+    loadError: engagementQueries.some((query) => query.isError) ? "Couldn't load reactions." : savedQueries.some((query) => query.isError) ? "Couldn't load saved items." : null,
+    retryLoad: () => failedQueries.forEach((query) => void query.refetch()),
     like: (item) => like.mutate({ id: item.id, liked: !engagement[item.id]?.liked }),
     save: (item, next) => save.mutate({ item, saved: next }),
     wantToRead: (item) => want.mutate(item),

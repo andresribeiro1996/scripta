@@ -17,7 +17,7 @@ export function SavedPage() {
     retry: 1
   });
   const items = query.data?.pages.flatMap((page) => page.items) ?? [];
-  const actions = useFeedActions(items);
+  const actions = useFeedActions(items, { trackSaved: false });
   const { fetchNextPage } = query;
   const skipping = items.length === 0 && query.hasNextPage && !query.isError;
 
@@ -33,7 +33,7 @@ export function SavedPage() {
         {query.isError ? (
           <div role="alert" className="space-y-3">
             <p>Couldn't load saved items.</p>
-            <button type="button" className={BUTTON_SECONDARY} onClick={() => void (query.hasNextPage ? fetchNextPage() : query.refetch())}>Retry</button>
+            <button type="button" className={BUTTON_SECONDARY} onClick={() => void (query.isFetchNextPageError ? fetchNextPage() : query.refetch())}>Retry</button>
           </div>
         ) : null}
         {!query.isPending && !query.isError && items.length === 0 && !query.hasNextPage ? (
