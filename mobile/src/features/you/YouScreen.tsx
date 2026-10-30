@@ -66,5 +66,5 @@ const styles = StyleSheet.create({
   grid: { flexDirection: "row", flexWrap: "wrap" },
   divider: { position: "absolute", left: "50%", top: spacing.md, bottom: spacing.md, width: 1 },
   cell: { width: "50%", alignItems: "center", gap: spacing.sm, paddingVertical: spacing.xl, borderRadius: radii.lg },
-  label: { fontWeight: "600", textAlign: "center" },
+  label: { alignSelf: "stretch", fontWeight: "600", textAlign: "center" },
 });
