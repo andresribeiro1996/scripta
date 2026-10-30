@@ -361,6 +361,8 @@ git commit -m "Add the Your chapters screen and its Home header entry"
 **Files:**
 - Create: `mobile/src/features/dailyChapter/daily-chapter-day-screen.tsx`
 - Create: `mobile/src/app/(app)/(home)/daily-chapters/[id].tsx`
+- Create: `mobile/src/features/dailyChapter/daily-chapter-squares.tsx`
+- Modify: `mobile/src/features/dailyChapter/your-chapters-screen.tsx`
 
 **Interfaces:**
 - Consumes: `useDailyHistory` (Task 4) and `dailyChapterApi.people` (Task 2).

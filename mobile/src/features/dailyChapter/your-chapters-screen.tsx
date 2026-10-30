@@ -5,6 +5,7 @@ import { DAILY_CHAPTER_THEMES, dailyChapterSummary, dailyChapterThemeRates, reca
 import { Text } from "../../ui/Text";
 import { EmptyState, ErrorState, Icon, Screen, Skeleton, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import { DailyChapterCalendar } from "./daily-chapter-calendar";
+import { DailyChapterSquares } from "./daily-chapter-squares";
 import { useDailyHistory, useDeviceIdentity } from "./use-daily-history";
 
 function shiftMonth(month: string, by: number) {
@@ -53,7 +54,7 @@ export function YourChaptersScreen() {
         <Text accessibilityRole="header" {...dynamicType} style={[typography.title, { color: colors.text, marginBottom: spacing.sm }]}>Past chapters</Text>
         {data.results.map((result) => <Pressable key={result.editionId} accessibilityRole="button" accessibilityLabel={`${result.date}, ${result.title}, ${result.score} out of 5`} onPress={() => open(result.editionId)} style={{ minHeight: minimumTouchTarget, flexDirection: "row", alignItems: "center", gap: spacing.md, borderTopWidth: 1, borderTopColor: colors.border }}>
           <Text numberOfLines={1} {...dynamicType} style={[typography.body, { flex: 1, minWidth: 0, color: colors.text }]}>{result.date} · {result.title}</Text>
-          <View style={{ flexDirection: "row", gap: 2 }}>{result.answers.map((answer) => <View key={answer.questionId} style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: answer.choiceIndex === answer.answerIndex ? colors.accent : colors.border }} />)}</View>
+          <DailyChapterSquares marks={result.answers.map((answer) => answer.choiceIndex === answer.answerIndex)} />
           <Icon name="chevronRight" size={16} color={colors.textDim} />
         </Pressable>)}
       </View>
