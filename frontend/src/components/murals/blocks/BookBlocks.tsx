@@ -2,6 +2,7 @@ import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { readingPercent, booksByWork, isCharacterBook, itemNoun } from "@scripta/shared";
 import type { ReactNode } from "react";
 import { CoverImage } from "../../BookCard";
+import { CharacterName } from "../../CharacterName";
 import type { ResolvedTierlist } from "../../../api/tierlists";
 import { bookKey } from "../../../lib/merge";
 import { blockBooks, resolveShelfBooks, type MuralBlock, type TierDefinition } from "../../../lib/murals";
@@ -53,7 +54,7 @@ export function MiniBookTile({
     const name = String(book.Title ?? "Untitled");
     return (
       <div className="flex h-full items-center justify-center overflow-hidden rounded-lg bg-(--color-accent-soft) p-1 text-center">
-        <span className="line-clamp-3 break-words text-[0.7em] font-bold leading-tight text-(--color-accent)">{name}</span>
+        <CharacterName name={name} className="text-[0.7em] leading-tight" />
       </div>
     );
   }

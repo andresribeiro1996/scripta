@@ -34,6 +34,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import type { Duel, DuelSide, TournamentView } from "../../api/arena";
 import { CoverImage } from "../BookCard";
+import { CharacterName } from "../CharacterName";
 import { Sheet } from "../Sheet";
 import { bracketShape, needsVote, roundLabel, sharePercent, type BracketSlot } from "../../lib/arenaBracket";
 import { useCountdown } from "./useCountdown";
@@ -79,11 +80,7 @@ function MatchSide({ side, duel, character, isWinner, decided }: { side: DuelSid
       >
         {character ? (
           <div className="absolute inset-0 flex items-center justify-center overflow-hidden rounded-xs bg-(--color-accent-soft) p-0.5 text-center">
-            <span className="flex min-w-0 flex-col text-[8px] font-bold leading-tight text-(--color-accent) sm:text-[10px]">
-              {side.title.split(/\s+/).slice(0, 4).map((word, i) => (
-                <span key={i} className="block truncate">{word}</span>
-              ))}
-            </span>
+            <CharacterName name={side.title} className="text-[8px] leading-tight sm:text-[10px]" />
           </div>
         ) : (
           <div className="absolute inset-0 overflow-hidden rounded-xs">
@@ -173,11 +170,7 @@ function SheetSide({ side, duel, character }: { side: DuelSide; duel: Duel; char
       {character ? (
         <>
         <div className={`flex aspect-2/3 w-16 items-center justify-center overflow-hidden rounded-lg bg-(--color-accent-soft) p-1 text-center ${won ? "ring-2 ring-(--color-accent)" : ""}`}>
-          <span className="flex min-w-0 flex-col text-xs font-bold text-(--color-accent)">
-            {side.title.split(/\s+/).slice(0, 4).map((word, i) => (
-              <span key={i} className="block truncate">{word}</span>
-            ))}
-          </span>
+          <CharacterName name={side.title} className="text-xs" />
         </div>
         <p className="mt-1.5 text-xs font-semibold">{side.title}</p>
         </>
