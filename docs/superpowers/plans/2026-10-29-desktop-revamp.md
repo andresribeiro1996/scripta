@@ -335,7 +335,8 @@ test("back link above the title, actions on the title row, subtitle under the ti
 
 test("tabs: 44px, one current, underline on the hairline", () => {
   const html = render(createElement(Page, { title: "Games", tabs: area("games").tabs, children: "x" }));
-  assert.equal(html.match(/<a(?=[^>]*min-h-11)(?=[^>]*border-b-2)(?=[^>]*-mb-px)[^>]*>/g)?.length, 3);
+  assert.equal(html.match(/<a(?=[^>]*min-h-11)(?=[^>]*border-b-2)[^>]*>/g)?.length, 3);
+  assert.match(html, /<nav aria-label="Sections"[^>]*shadow-\[inset_0_-1px_0_var\(--color-border\)\]/);
   assert.match(html, /<a(?=[^>]*aria-current="page")[^>]*>Quizzes<\/a>/);
   assert.equal(html.match(/aria-current="page"/g)?.length, 1);
 });
@@ -376,7 +377,7 @@ test("every Page in these files declares the width, loading states included", ()
 - [ ] **Step 2: Run** the file. Expected: FAIL.
 - [ ] **Step 3: Implement `Page`** as in the spec's "The page header":
   - One container: an outer `px-4 pb-16 sm:px-6 lg:px-8` div wrapping an inner `mx-auto` div with `style={{ maxWidth }}`. The gutters sit outside the width, so `default` gives 1200px of content and the mural canvas keeps its 1152px.
-  - `<header className="pt-8 lg:pt-10">` holds the back link (`-ml-2 inline-flex min-h-11 items-center gap-1 rounded-lg px-2 text-sm font-semibold text-(--color-text-dim) hover:text-(--color-text)`), then the title row (`flex flex-wrap items-end justify-between gap-x-6 gap-y-4`, with the `h1` classes the test pins plus `min-w-0`; subtitle `mt-1.5 text-sm text-(--color-text-dim)`; actions `flex flex-wrap items-center gap-2`), then the tabs (`nav aria-label="Sections"`, `mt-6 flex gap-7 overflow-x-auto border-b border-(--color-border)`; each link `-mb-px inline-flex min-h-11 shrink-0 items-center whitespace-nowrap border-b-2 text-sm font-semibold`, current `border-(--color-accent) text-(--color-text)`, others `border-transparent text-(--color-text-dim) hover:text-(--color-text)`).
+  - `<header className="pt-8 lg:pt-10">` holds the back link (`-ml-2 inline-flex min-h-11 items-center gap-1 rounded-lg px-2 text-sm font-semibold text-(--color-text-dim) hover:text-(--color-text)`), then the title row (`flex flex-wrap items-end justify-between gap-x-6 gap-y-4`, with the `h1` classes the test pins, inside a `min-w-0` wrapper div that holds the `h1` and subtitle; subtitle `mt-1.5 text-sm text-(--color-text-dim)`; actions `flex flex-wrap items-center gap-2`), then the tabs (`nav aria-label="Sections"`, `mt-6 flex gap-7 overflow-x-auto shadow-[inset_0_-1px_0_var(--color-border)]`, the hairline as an inset shadow so the current tab's underline paints over it; each link `inline-flex min-h-11 shrink-0 items-center whitespace-nowrap border-b-2 text-sm font-semibold`, current `border-(--color-accent) text-(--color-text)`, others `border-transparent text-(--color-text-dim) hover:text-(--color-text)`).
   - Content wrapper: `mt-6` after tabs, `mt-8` otherwise.
   - With `title={null}` and `back`, the header holds only the back link. With neither, there is no header.
   - `PublicLayout` drops the provider.

@@ -86,7 +86,7 @@ Things that stick today assume nothing else is pinned: `OfflineBanner.tsx:17`, `
 - **Title row**: `flex flex-wrap items-end justify-between gap-4`.
   - On the left are the `h1` and the subtitle under it. The `h1` is in the display font, bold, `text-3xl` (30/36) below `lg` and 40/48 at `lg`, and wraps without clipping. The subtitle is `text-sm text-dim`, one fact, with `mt-1.5`.
   - On the right are the actions: secondary buttons, then at most one primary, `flex flex-wrap gap-2`. On a phone they wrap under the title.
-- **Tabs**, optional, `mt-6`: a `nav` of 44px links, `gap-7`, with a `border` hairline under the row and horizontal scrolling when it overflows. The current tab has `text` and a 2px `accent` underline sitting on the hairline (`-mb-px`) and `aria-current="page"`. The others are `text-dim`. The data still comes from each area's `tabs`, and `activeTabTo` still picks the current one.
+- **Tabs**, optional, `mt-6`: a `nav` of 44px links, `gap-7`, with a `border` hairline under the row and horizontal scrolling when it overflows. The current tab has `text` and a 2px `accent` underline sitting on the hairline (the hairline is an inset shadow on the scrolling `nav`, so the link's own `border-b-2` paints over it) and `aria-current="page"`. The others are `text-dim`. The data still comes from each area's `tabs`, and `activeTabTo` still picks the current one.
 - **Content** starts `mt-6` below the tabs (or `mt-8` below a header without tabs) and ends with `pb-16`.
 - `title={null}` keeps working for pages that place their own `h1` (quiz results, the book page hero, and the profile header below).
 
