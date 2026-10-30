@@ -4340,3 +4340,33 @@ test("bnpPublisherBooks and bookHolds list bnp books with their works and keys",
   assert.deepEqual(repo.bnpPublisherBooks().map((row) => ({ ...row })), [{ id: book.id, title: "Livro", publisher: "Camara Municipal", isbn: "9789720000041" }]);
   assert.deepEqual(repo.bookHolds([book.id]), [{ id: book.id, workIds: [book.work_id], keys: ["isbn:9789720000041"] }]);
 });
+
+test("castRows gives a work only to its best series, resolves aliases and answers undefined for an unknown id", () => {
+  const { repo } = freshRepo();
+  const a = seriesBook(repo, "Guards", "9780000000011");
+  const b = seriesBook(repo, "Eric", "9780000000012");
+  repo.addWorkSeries(a.work_id!, [{ name: "Discworld", position: "8" }], "wikidata", AT);
+  repo.addWorkSeries(b.work_id!, [{ name: "Discworld", position: "9" }], "ol-subject", AT);
+  repo.addWorkSeries(b.work_id!, [{ name: "Discworld - Rincewind", position: "4" }], "wikidata", AT);
+  repo.replaceWorkSubjects(a.work_id!, subjectsOf(["Sam Vimes"]), NOW);
+  const rows = repo.castRows(a.work_id!)!;
+  assert.deepEqual(rows.series, { name: "Discworld", nameKey: "discworld" });
+  assert.deepEqual(rows.members, [{ id: a.work_id, position: "8", people: ["Sam Vimes"] }]);
+  assert.equal(rows.work.id, a.work_id);
+  const other = repo.castRows(b.work_id!)!;
+  assert.deepEqual(other.series, { name: "Discworld - Rincewind", nameKey: "discworld rincewind" });
+  assert.deepEqual(other.members.map((member) => member.id), [b.work_id]);
+  assert.equal(repo.castRows("nope"), undefined);
+});
+
+test("castRows answers an alias with the canonical work and a seriesless work alone", () => {
+  const { repo } = freshRepo();
+  const canonical = keyedBook(repo, "Canon", "OL20W");
+  const alias = keyedBook(repo, "Alias", null);
+  repo.replaceWorkSubjects(canonical, subjectsOf(["Ann Lee"]), NOW);
+  repo.mergeWorks(alias, canonical);
+  const rows = repo.castRows(alias)!;
+  assert.equal(rows.work.id, canonical);
+  assert.equal(rows.series, null);
+  assert.deepEqual(rows.members, [{ id: canonical, position: null, people: ["Ann Lee"] }]);
+});

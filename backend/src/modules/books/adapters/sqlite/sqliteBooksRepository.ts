@@ -639,6 +639,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     GROUP BY members.root
   `);
   const setWikipediaSitesStmt = db.prepare(`UPDATE works SET wikipedia_sites = ? WHERE ol_work_key = ? AND wikipedia_sites IS NOT ?`);
+  const seriesWorkIdsStmt = db.prepare(`SELECT DISTINCT work_id FROM work_series WHERE name_key = ?`);
   const seriesMembersStmt = db.prepare(`SELECT work_id, name_key, position, source FROM work_series WHERE name_key IN (SELECT value FROM json_each(?)) ORDER BY rowid`);
   const searchCollectionsStmt = db.prepare(`
     SELECT hits.book_id AS book_id, hits.name AS name, (
@@ -716,6 +717,60 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   function applyJoinedJudgment(workId: string) {
     undoJudgmentForWorkStmt.run(workId, GENRE_SAVE_LINE);
     applyJudgmentForWorkStmt.run(workId, GENRE_SAVE_LINE);
+  }
+
+  function charactersOfIds(workIds: string[]): Map<string, string[]> {
+    const characters = new Map<string, string[]>();
+    if (workIds.length === 0) return characters;
+    const canonicalOf = canonicalWorkIds(workIds);
+    const roots = [...new Set(canonicalOf.values())];
+    const rootOf = new Map(roots.map((id) => [id, id]));
+    for (const [alias, canonical] of canonicalWorkIds(aliasesOf(roots))) rootOf.set(alias, canonical);
+    const lists = new Map<string, Map<string, string[]>>();
+    for (const row of workPeopleStmt.all(JSON.stringify([...rootOf.keys()])) as Array<{ work_id: string; name: string }>) {
+      const root = rootOf.get(row.work_id)!;
+      const perWork = lists.get(root) ?? new Map<string, string[]>();
+      const names = perWork.get(row.work_id) ?? [];
+      names.push(row.name);
+      perWork.set(row.work_id, names);
+      lists.set(root, perWork);
+    }
+    for (const [root, perWork] of lists) {
+      const own = perWork.get(root);
+      const best = own ?? [...perWork.values()].reduce((longest, names) => (names.length > longest.length ? names : longest));
+      for (const [id, canonical] of canonicalOf) if (canonical === root) characters.set(id, best);
+    }
+    return characters;
+  }
+
+  function bestSeriesWithKey(workIds: string[]): Map<string, SeriesEntry & { nameKey: string }> {
+    const best = new Map<string, SeriesEntry & { nameKey: string }>();
+    if (workIds.length === 0) return best;
+    const rootOf = new Map(workIds.map((id) => [id, id]));
+    for (const [alias, canonical] of canonicalWorkIds(aliasesOf(workIds))) rootOf.set(alias, canonical);
+    const members = JSON.stringify([...rootOf.keys()]);
+    const stored = workSeriesStmt.all(members) as Array<{ work_id: string; name: string; name_key: string; position: string | null; source: SeriesSource; created_at: string }>;
+    if (stored.length === 0) return best;
+    const candidates = new Map<string, SeriesCandidate[]>();
+    for (const row of stored) {
+      const root = rootOf.get(row.work_id)!;
+      const candidate = { name: row.name, position: row.position, nameKey: row.name_key, source: row.source, rank: SERIES_SOURCE_RANK[row.source], createdAt: row.created_at };
+      const list = candidates.get(root) ?? [];
+      list.push(candidate);
+      candidates.set(root, list);
+    }
+    for (const row of editionCollectionsStmt.all(members) as Array<{ work_id: string; name: string; name_key: string; position: string | null; created_at: string }>) {
+      const named = candidates.get(rootOf.get(row.work_id)!);
+      if (named?.some((candidate) => candidate.nameKey === row.name_key && (candidate.source === "wikidata" || candidate.source === "hardcover" || candidate.source === "ol-subject"))) {
+        named.push({ name: row.name, position: row.position, nameKey: row.name_key, source: "ol-edition", rank: SERIES_SOURCE_RANK["ol-edition"], createdAt: row.created_at });
+      }
+    }
+    for (const [root, list] of candidates) {
+      list.sort((left, right) => left.rank - right.rank || (left.createdAt < right.createdAt ? -1 : left.createdAt > right.createdAt ? 1 : 0));
+      const top = list[0]!;
+      best.set(root, { name: top.name, nameKey: top.nameKey, position: list.find((candidate) => candidate.nameKey === top.nameKey && candidate.position !== null)?.position ?? null });
+    }
+    return best;
   }
 
   function canonicalWorkIds(ids: string[]): Map<string, string> {
@@ -1518,33 +1573,27 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     },
 
     bestSeriesOf(workIds) {
-      const best = new Map<string, SeriesEntry>();
-      if (workIds.length === 0) return best;
-      const rootOf = new Map(workIds.map((id) => [id, id]));
-      for (const [alias, canonical] of canonicalWorkIds(aliasesOf(workIds))) rootOf.set(alias, canonical);
-      const members = JSON.stringify([...rootOf.keys()]);
-      const stored = workSeriesStmt.all(members) as Array<{ work_id: string; name: string; name_key: string; position: string | null; source: SeriesSource; created_at: string }>;
-      if (stored.length === 0) return best;
-      const candidates = new Map<string, SeriesCandidate[]>();
-      for (const row of stored) {
-        const root = rootOf.get(row.work_id)!;
-        const candidate = { name: row.name, position: row.position, nameKey: row.name_key, source: row.source, rank: SERIES_SOURCE_RANK[row.source], createdAt: row.created_at };
-        const list = candidates.get(root) ?? [];
-        list.push(candidate);
-        candidates.set(root, list);
-      }
-      for (const row of editionCollectionsStmt.all(members) as Array<{ work_id: string; name: string; name_key: string; position: string | null; created_at: string }>) {
-        const named = candidates.get(rootOf.get(row.work_id)!);
-        if (named?.some((candidate) => candidate.nameKey === row.name_key && (candidate.source === "wikidata" || candidate.source === "hardcover" || candidate.source === "ol-subject"))) {
-          named.push({ name: row.name, position: row.position, nameKey: row.name_key, source: "ol-edition", rank: SERIES_SOURCE_RANK["ol-edition"], createdAt: row.created_at });
-        }
-      }
-      for (const [root, list] of candidates) {
-        list.sort((left, right) => left.rank - right.rank || (left.createdAt < right.createdAt ? -1 : left.createdAt > right.createdAt ? 1 : 0));
-        const top = list[0]!;
-        best.set(root, { name: top.name, position: list.find((candidate) => candidate.nameKey === top.nameKey && candidate.position !== null)?.position ?? null });
-      }
-      return best;
+      return new Map([...bestSeriesWithKey(workIds)].map(([id, { name, position }]) => [id, { name, position }]));
+    },
+
+    castRows(id) {
+      const canonical = liveWorkId(id);
+      if (canonical === null) return undefined;
+      const work = workStmt.get(canonical) as { id: string; title: string } | undefined;
+      if (!work) return undefined;
+      const coverImageId = (pageEditionsStmt.all(canonical) as WorkPageRows["editions"]).find((edition) => edition.cover_image_id)?.cover_image_id ?? null;
+      const own = bestSeriesWithKey([canonical]).get(canonical);
+      const peopleOf = (ids: string[]) => ids.map((memberId) => ({ id: memberId, people: charactersOfIds([memberId]).get(memberId) ?? [] }));
+      if (!own) return { work: { id: work.id, title: work.title, coverImageId }, series: null, members: peopleOf([canonical]).map((member) => ({ ...member, position: null })) };
+      const roots = [...new Set(canonicalWorkIds((seriesWorkIdsStmt.all(own.nameKey) as Array<{ work_id: string }>).map((row) => row.work_id)).values())];
+      const best = bestSeriesWithKey(roots);
+      const members = roots.filter((root) => best.get(root)?.nameKey === own.nameKey);
+      const people = new Map(peopleOf(members).map((member) => [member.id, member.people]));
+      return {
+        work: { id: work.id, title: work.title, coverImageId },
+        series: { name: own.name, nameKey: own.nameKey },
+        members: members.map((memberId) => ({ id: memberId, position: best.get(memberId)!.position, people: people.get(memberId)! }))
+      };
     },
 
     collectionsOf(bookIds) {
@@ -1646,29 +1695,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       });
     },
 
-    charactersOf(workIds) {
-      const characters = new Map<string, string[]>();
-      if (workIds.length === 0) return characters;
-      const canonicalOf = canonicalWorkIds(workIds);
-      const roots = [...new Set(canonicalOf.values())];
-      const rootOf = new Map(roots.map((id) => [id, id]));
-      for (const [alias, canonical] of canonicalWorkIds(aliasesOf(roots))) rootOf.set(alias, canonical);
-      const lists = new Map<string, Map<string, string[]>>();
-      for (const row of workPeopleStmt.all(JSON.stringify([...rootOf.keys()])) as Array<{ work_id: string; name: string }>) {
-        const root = rootOf.get(row.work_id)!;
-        const perWork = lists.get(root) ?? new Map<string, string[]>();
-        const names = perWork.get(row.work_id) ?? [];
-        names.push(row.name);
-        perWork.set(row.work_id, names);
-        lists.set(root, perWork);
-      }
-      for (const [root, perWork] of lists) {
-        const own = perWork.get(root);
-        const best = own ?? [...perWork.values()].reduce((longest, names) => (names.length > longest.length ? names : longest));
-        for (const [id, canonical] of canonicalOf) if (canonical === root) characters.set(id, best);
-      }
-      return characters;
-    },
+    charactersOf: charactersOfIds,
 
     worksWithOpenLibraryKey() {
       return (worksWithKeyStmt.all() as Array<{ rowid: number; id: string; olWorkKey: string; author: string }>).map((row) => ({ rowid: row.rowid, id: row.id, olWorkKey: row.olWorkKey, author: row.author }));

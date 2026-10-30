@@ -16,6 +16,15 @@ export function buildWorkRoutes(service: WorksService) {
       return reply.send({ characters: service.characters(parsed.data.workIds) });
     });
 
+    app.get("/works/:id/cast", async (request, reply) => {
+      const { id } = request.params as { id: string };
+      getOptionalAuthenticatedUser(request);
+      const cast = service.cast(id);
+      reply.header("Cache-Control", "no-store");
+      if (!cast) return reply.code(404).send({ error: "No book with that id." });
+      return reply.send(cast);
+    });
+
     app.get("/works/:id", async (request, reply) => {
       const { id } = request.params as { id: string };
       const viewer = getOptionalAuthenticatedUser(request);

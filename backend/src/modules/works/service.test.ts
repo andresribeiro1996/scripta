@@ -44,6 +44,7 @@ function deps(overrides: Partial<WorksDeps> = {}): WorksDeps {
     quizzes: () => [],
     getRecentAwards: () => [],
     charactersOf: () => new Map([["w", ["Paul Atreides", "Jessica", "Leto"]]]),
+    getWorkCast: () => undefined,
     ...overrides
   };
 }
@@ -266,4 +267,10 @@ test("getPage passes the characters through", () => {
   const base = deps();
   const getWorkPage: WorksDeps["getWorkPage"] = (id) => ({ ...base.getWorkPage(id)!, characters: ["Paul", "Jessica"] });
   assert.deepEqual(createWorksService(deps({ getWorkPage })).getPage("w", null)!.work.characters, ["Paul", "Jessica"]);
+});
+
+test("cast reads through the dependency", () => {
+  const cast = { scope: { kind: "work" as const, key: "w", label: "Dune", coverUrl: null, workCount: 1 }, characters: [] };
+  assert.equal(createWorksService(deps({ getWorkCast: (id) => (id === "w" ? cast : undefined) })).cast("w"), cast);
+  assert.equal(createWorksService(deps()).cast("w"), undefined);
 });

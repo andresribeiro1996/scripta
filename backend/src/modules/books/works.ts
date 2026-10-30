@@ -1,9 +1,10 @@
-import { PRIZES, isPrizeKey, knownAwards, normalizeBookGenres, workGenres, type AwardAnnouncement, type AwardWinner, type WorkAward, type WorkGenres } from "@scripta/shared";
+import { PRIZES, isPrizeKey, knownAwards, normalizeBookGenres, workGenres, type AwardAnnouncement, type AwardWinner, type WorkAward, type WorkCast, type WorkGenres } from "@scripta/shared";
 import { findOrCreateBook } from "./domain/findOrCreate.js";
 import { searchTokens, WORK_SCAN_LIMIT, type BookLookup } from "./domain/normalize.js";
 import type { SeriesEntry } from "./domain/series.js";
 import { hiddenSynopsisHashes } from "./domain/synopsis.js";
 import type { BooksRepository } from "./domain/ports.js";
+import { buildCast } from "./domain/cast.js";
 import { firstEditionPerWork, workIdsOf } from "./domain/workSearch.js";
 import { booksRepository, coverUrlFor } from "./publicCoverLookup.js";
 
@@ -95,6 +96,11 @@ export function getWorkPageWith(books: BooksRepository, coverUrl: (imageId: stri
 
 export function getWorkPage(id: string): CatalogWorkPage | undefined {
   return getWorkPageWith(booksRepository(), (imageId) => coverUrlFor(imageId, "file"), id);
+}
+
+export function getWorkCast(id: string): WorkCast | undefined {
+  const rows = booksRepository().castRows(id);
+  return rows ? buildCast(rows, (imageId) => coverUrlFor(imageId, "file")) : undefined;
 }
 
 export function getWorkCharacters(workIds: string[]): Map<string, string[]> {
