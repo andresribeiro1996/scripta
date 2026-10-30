@@ -1583,7 +1583,10 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
       if (!work) return undefined;
       const coverImageId = (pageEditionsStmt.all(canonical) as WorkPageRows["editions"]).find((edition) => edition.cover_image_id)?.cover_image_id ?? null;
       const own = bestSeriesWithKey([canonical]).get(canonical);
-      const peopleOf = (ids: string[]) => ids.map((memberId) => ({ id: memberId, people: charactersOfIds([memberId]).get(memberId) ?? [] }));
+      const peopleOf = (ids: string[]) => {
+        const characters = charactersOfIds(ids);
+        return ids.map((memberId) => ({ id: memberId, people: characters.get(memberId) ?? [] }));
+      };
       if (!own) return { work: { id: work.id, title: work.title, coverImageId }, series: null, members: peopleOf([canonical]).map((member) => ({ ...member, position: null })) };
       const roots = [...new Set(canonicalWorkIds((seriesWorkIdsStmt.all(own.nameKey) as Array<{ work_id: string }>).map((row) => row.work_id)).values())];
       const best = bestSeriesWithKey(roots);

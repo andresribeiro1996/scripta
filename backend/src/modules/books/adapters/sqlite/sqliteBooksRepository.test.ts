@@ -21,6 +21,7 @@ const { summaryHashOf } = await import("../../domain/synopsis.js");
 const { authorPattern, originalKey, originalWholeKey, seriesLikeOriginals } = await import("../../domain/translation.js");
 const { catalogTitleKey } = await import("../../domain/normalize.js");
 const { groupKeylessWorks } = await import("../../duplicateWorks.js");
+const { buildCast } = await import("../../domain/cast.js");
 
 const NOW = "2026-10-01T00:00:00.000Z";
 const richDetails = { summary: "Open Library synopsis.", rating: 4, ratingCount: 3, sourceUrl: "https://openlibrary.org/works/OL1W", genres: ["Fantasy" as const], pages: 300, publisher: "Bantam", year: 1975, translator: null };
@@ -4357,6 +4358,20 @@ test("castRows gives a work only to its best series, resolves aliases and answer
   assert.deepEqual(other.series, { name: "Discworld - Rincewind", nameKey: "discworld rincewind" });
   assert.deepEqual(other.members.map((member) => member.id), [b.work_id]);
   assert.equal(repo.castRows("nope"), undefined);
+});
+
+test("castRows lists every work sharing a best series and counts a character on two books once", () => {
+  const { repo } = freshRepo();
+  const a = seriesBook(repo, "Guards", "9780000000021");
+  const c = seriesBook(repo, "Eric", "9780000000022");
+  repo.addWorkSeries(a.work_id!, [{ name: "Discworld", position: "8" }], "wikidata", AT);
+  repo.addWorkSeries(c.work_id!, [{ name: "Discworld", position: "9" }], "wikidata", AT);
+  repo.replaceWorkSubjects(a.work_id!, subjectsOf(["Sam Vimes", "Carrot"]), NOW);
+  repo.replaceWorkSubjects(c.work_id!, subjectsOf(["Sam Vimes"]), NOW);
+  const rows = repo.castRows(a.work_id!)!;
+  assert.deepEqual(rows.members.map((member) => member.id).sort(), [a.work_id, c.work_id].sort());
+  const cast = buildCast(rows, (imageId) => imageId);
+  assert.deepEqual(cast.characters.map(({ name, works }) => ({ name, works })), [{ name: "Sam Vimes", works: 2 }, { name: "Carrot", works: 1 }]);
 });
 
 test("castRows answers an alias with the canonical work and a seriesless work alone", () => {
