@@ -38,6 +38,7 @@
   | Where | Text |
   |---|---|
   | Section title | "Found covers" |
+  | Heading above the gallery, only when Found covers is mounted | "Your gallery" |
   | Apple tile while waiting | "Checking Apple Books…" |
   | Per unavailable source | "`<label>` didn't answer." |
   | Admin action | "Use for everyone" |
@@ -391,6 +392,8 @@
 - Modify: `frontend/src/components/book/BookScreen.tsx`
 - Modify: `frontend/src/pages/LibraryPage.tsx`
 - Modify: `frontend/src/pages/GroupsPage.tsx`
+- Modify: `frontend/src/components/BookCard.tsx`
+- Test: `frontend/scripts/test-covers.mts`
 
 **Interfaces:**
 - Consumes: the shared helpers (Task 1), the routes (Task 5), `apiFetch`, `rememberResolvedCover` and the `["books-admin"]` query (`frontend/src/components/book/BookScreen.tsx:72`).
