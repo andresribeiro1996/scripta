@@ -55,6 +55,11 @@ Characters exist for games (`2026-10-25-book-characters-design.md`). The first g
    - The server creates the tournament, fills its slots from the selected characters in a random order, and starts it, using the existing random-fill shuffle.
    - The library-driven seed screen is not used for characters.
 12. **Tier lists from characters open in the existing editor** as a private draft. The pool is the selected characters and the tiers are the default preset. The owner ranks the characters and publishes through the existing flow.
+13. **The owner's own lists are opt-in for character games.**
+   - `GET /tierlists` and `GET /arenas/mine` return games with a subject only when the client sends `subjects=characters`. This is backend/AGENTS.md's rule for a new row kind.
+   - An older bundle would open a character draft in a library-driven editor that cannot resolve its items. One save from that editor could then empty the pool.
+   - Public surfaces include character games without the parameter, because their book-shaped snapshot renders on old clients (decision 9). Those surfaces are the vote page, the arena view, the feed, discover, profiles and the voted lists.
+   - Cost: an owner on an old phone cannot see their own character games there, or break a tie in one, until the phone updates. The web is always current.
 
 ## The cast
 
@@ -98,7 +103,11 @@ A new read in the books module: `castOf(workId)`. It is exported from the books 
 - **Cover peeks are skipped** for character lists in `fillMissingCovers`, `fillPublicBooks` and `publishedCovers`. Otherwise a title peek would put a book cover on "Harry Potter" the character.
   - A character list's `covers` is `[subject.scope.coverUrl]` when that cover is set, else `[]`.
   - The voted-on ranking preview emitted to the community uses the same entries with `coverUrl: null`.
-- **Copy/remix** of a published character list carries `subject` over unchanged and skips the library lookup.
+- **Routes and wire layer:**
+  - The tier list routes canonicalize every id through the works layer: `knownWorkIds` on ballot submit (`tierlists/routes.ts:292`) and `boardBooks`/`canonicalFirst` (`tierlists/wire.ts`).
+  - For a list with a subject they use the identity mapping instead. Ids are already canonical, and the vote board's `books` is `characterSnapshot(subject)` in pool order.
+- **More cover peeks:** `fillRankingCovers` (`service.ts:516`, read-time feed ranking) and `participationByOwner` (`service.ts:548`) also skip peeks for a list with a subject.
+- **Murals** cannot embed a character list. A mural renders a tier list through the owner's library, so the mural block pickers on web and mobile leave out lists with a subject.
 - **Top Shelf:** `shelfFacts` leaves out lists with a subject.
 
 ## Tournaments
@@ -115,7 +124,7 @@ A new read in the books module: `castOf(workId)`. It is exported from the books 
 
 ## Clients (web and mobile)
 
-- **Book screen:** the "Make a character game" action from decision 3. It opens the cast picker; on mobile that is a pushed screen, on web a page.
+- **Book screen:** the "Make a character game" action from decision 3. It opens the cast picker: on mobile the pushed screen `work/[id]/characters` in the signed-in group, on web the page `/work/:id/characters`.
 - **Cast picker:**
   - The header shows the scope cover, the label and "N books" for a series.
   - Below it, a tier list / tournament choice.
@@ -126,12 +135,21 @@ A new read in the books module: `castOf(workId)`. It is exported from the books 
   - A create button. It stays disabled until the ticked count is valid: at least 4 for a tier list, exactly the bracket size for a tournament.
   - The round duration uses the arena's existing default and control.
 - **After create:** a tier list opens its editor. A tournament opens its view screen.
-- **Rendering:** every place that turns a pool or slot id into a cover branches on `subject`:
-  - the tier board, sort deck, results and share image;
-  - the arena duel, bracket, champion banner and vote deck;
-  - the web equivalents.
-  - With a subject they render the character tile and look the item up in `subject.characters`, not the library or `publicBooks`. The game header shows the scope cover and caption (decision 7).
-- **Community cards** for a game with a subject read "N characters" instead of books, and show the scope cover.
+- **Rendering:** clients already turn ids into library-shaped book records and look them up with `booksByWork` (for example `mobile/src/features/tierlists/tierBoardData.ts:47`). A character game keeps that path.
+  - `@scripta/shared` gains `characterBooks(subject)`. It returns one record per character: `{ Title: name, _workId: id, _character: true }`.
+  - With a subject, a screen passes these records wherever it passes library or `publicBooks` records today.
+  - Tier list tiles branch on `_character` and render the character tile without `CoverImage`:
+    - mobile `TierCover`;
+    - web `MiniBookTile` and `DraggableTierTile` (`frontend/src/components/murals/blocks/BookBlocks.tsx`);
+    - the web vote page's own tile.
+  - The board, sort deck, results and share image then need no branch of their own. The share image waits for every tile's `onLoadEnd`, so a character tile fires it on mount.
+  - Arena components take `{cover, title}` from the slot snapshot, not a book record.
+    - On mobile, `BookCover` with `cover: null` already renders the title alone.
+    - On web, `DuelCard` and `BracketMap` build a book and call `CoverImage`. They take a `character` flag from `tournament.subject` and render the character tile instead.
+  - The editor hides "add books" for a character list.
+  - The game header shows the scope cover and caption (decision 7).
+- **Owner lists:** the clients' `GET /tierlists` and `GET /arenas/mine` calls send `subjects=characters` (decision 13).
+- **Community cards** for a game with a subject read "N characters" instead of books, and show the scope cover. For tournaments the server returns `covers: [scope.coverUrl]`, because slot covers are null. All "book"/"character" copy comes from one shared helper.
 - **Copy** that says "book" in these flows says "character" when `subject` is set. Accessibility labels read "<name>" instead of "<title> by <author>".
 
 ## Goals
