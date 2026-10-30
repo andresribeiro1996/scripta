@@ -4,10 +4,16 @@ import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { useAuth } from "../../core/auth";
 import { API_URL } from "../../core/config";
-import { IconButton, Screen, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { Icon, IconButton, Screen, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { AuthorAvatar } from "../community/AuthorAvatar";
 import { fetchOwnProfile } from "../community/api";
-import { CARDS } from "./YouPreviews";
+
+const CARDS = [
+  { label: "Your shelf", href: "/me", icon: "library" },
+  { label: "Murals", href: "/murals", icon: "murals" },
+  { label: "Reader card", href: "/reader-card", icon: "profile" },
+  { label: "Gallery", href: "/gallery", icon: "image" },
+] as const;
 
 export function YouScreen() {
   const { colors } = useTheme();
@@ -27,26 +33,23 @@ export function YouScreen() {
       />
       <ScrollView contentContainerStyle={styles.page}>
         <View style={styles.profile}>
-          <AuthorAvatar username={username} avatarUrl={avatarUrl} size={64} />
-          <View style={styles.grow}>
-            <Text {...dynamicType} numberOfLines={1} style={[typography.title, { color: colors.text }]}>@{username}</Text>
-            {own.data ? (
-              <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{own.data.published ? "Published" : "Private"}</Text>
-            ) : null}
-          </View>
+          <AuthorAvatar username={username} avatarUrl={avatarUrl} size={96} />
+          <Text {...dynamicType} numberOfLines={1} style={[typography.title, styles.center, { color: colors.text }]}>@{username}</Text>
+          {own.data ? (
+            <Text {...dynamicType} style={[typography.caption, styles.center, { color: colors.textDim }]}>{own.data.published ? "Published" : "Private"}</Text>
+          ) : null}
         </View>
         <View style={styles.grid}>
+          <View style={[styles.divider, { backgroundColor: colors.border }]} />
           {CARDS.map((card) => (
             <Pressable
               key={card.href}
               accessibilityRole="button"
               accessibilityLabel={card.label}
               onPress={() => router.push(card.href as never)}
-              style={({ pressed }) => [styles.card, { backgroundColor: pressed ? colors.surfacePressed : colors.surface, borderColor: colors.border }]}
+              style={({ pressed }) => [styles.cell, pressed ? { backgroundColor: colors.surfacePressed } : null]}
             >
-              <View style={[styles.preview, { backgroundColor: colors.accentSoft }]}>
-                <card.Preview />
-              </View>
+              <Icon name={card.icon} size={44} color={colors.accent} />
               <Text {...dynamicType} style={[typography.body, styles.label, { color: colors.text }]}>{card.label}</Text>
             </Pressable>
           ))}
@@ -57,11 +60,11 @@ export function YouScreen() {
 }
 
 const styles = StyleSheet.create({
-  page: { padding: spacing.lg, gap: spacing.lg },
-  profile: { flexDirection: "row", alignItems: "center", gap: spacing.md },
-  grow: { flex: 1, gap: spacing.xs },
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md },
-  card: { flexGrow: 1, flexBasis: "40%", borderWidth: 1, borderRadius: radii.lg, overflow: "hidden" },
-  preview: { height: 132, alignItems: "center", justifyContent: "center", overflow: "hidden" },
-  label: { fontWeight: "600", textAlign: "center", padding: spacing.md },
+  page: { padding: spacing.lg, gap: spacing.xl },
+  profile: { alignItems: "center", gap: spacing.sm },
+  center: { textAlign: "center" },
+  grid: { flexDirection: "row", flexWrap: "wrap" },
+  divider: { position: "absolute", left: "50%", top: spacing.md, bottom: spacing.md, width: 1 },
+  cell: { width: "50%", alignItems: "center", gap: spacing.sm, paddingVertical: spacing.xl, borderRadius: radii.lg },
+  label: { fontWeight: "600", textAlign: "center" },
 });
