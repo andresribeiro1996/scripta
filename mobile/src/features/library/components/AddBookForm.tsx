@@ -287,7 +287,7 @@ export function AddBookForm({
     try {
       await attempt;
       toast.show("Added to your library", "success");
-      onClose();
+      if (mounted.current) onClose();
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : "Couldn't add that book.");
     } finally {
@@ -305,7 +305,7 @@ export function AddBookForm({
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Search for a book"
+            accessibilityLabel={filledFrom ? `Search for a book, filled from ${filledFrom}` : "Search for a book"}
             accessibilityState={{ expanded: searchOpen }}
             onPress={() => setSearchOpen((open) => !open)}
             style={styles.cardHeader}
@@ -326,7 +326,7 @@ export function AddBookForm({
               <View style={styles.searchRow}>
                 <View style={styles.grow}>
                   <Input
-                    accessibilityLabel="Search for a book"
+                    accessibilityLabel="Title, author or ISBN"
                     placeholder="Title, author or ISBN"
                     value={query}
                     onChangeText={setQuery}
