@@ -1,13 +1,11 @@
 import { useState } from "react";
 import { Pressable, ScrollView, View } from "react-native";
 import { Stack, useRouter } from "expo-router";
-import { DAILY_CHAPTER_THEMES, dailyChapterSummary, dailyChapterThemeRates } from "@scripta/shared";
+import { DAILY_CHAPTER_THEMES, dailyChapterSummary, dailyChapterThemeRates, recapMonthName } from "@scripta/shared";
 import { Text } from "../../ui/Text";
 import { EmptyState, ErrorState, Icon, Screen, Skeleton, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import { DailyChapterCalendar } from "./daily-chapter-calendar";
 import { useDailyHistory, useDeviceIdentity } from "./use-daily-history";
-
-const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
 function shiftMonth(month: string, by: number) {
   const date = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)) - 1 + by, 1));
@@ -41,7 +39,7 @@ export function YourChaptersScreen() {
       <View style={{ flexDirection: "row", gap: spacing.sm }}>{tile(String(summary.streak), "day streak")}{tile(String(summary.average), "avg / 5")}{tile(String(summary.perfect), "perfect")}</View>
       <View style={{ gap: spacing.sm }}>{best("Longest streak", `${data.longestStreak} ${data.longestStreak === 1 ? "day" : "days"}`)}{best("Most perfects in a row", String(data.longestPerfectRun))}{best("Questions right", `${data.correct} of ${data.answered}`)}</View>
       <View style={{ gap: spacing.sm }}>
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>{arrow("Previous month", "‹", shiftMonth(month, -1), month > first)}<Text accessibilityRole="header" {...dynamicType} style={[typography.title, { color: colors.text }]}>{MONTHS[Number(month.slice(5, 7)) - 1]} {month.slice(0, 4)}</Text>{arrow("Next month", "›", shiftMonth(month, 1), month < current)}</View>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>{arrow("Previous month", "‹", shiftMonth(month, -1), month > first)}<Text accessibilityRole="header" {...dynamicType} style={[typography.title, { color: colors.text }]}>{recapMonthName(month)} {month.slice(0, 4)}</Text>{arrow("Next month", "›", shiftMonth(month, 1), month < current)}</View>
         <DailyChapterCalendar days={summary.days} onDayPress={(date) => { const id = byDate.get(date); if (id) open(id); }} />
       </View>
       {rates.length ? <View style={{ gap: spacing.sm }}>

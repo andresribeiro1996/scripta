@@ -5,7 +5,7 @@ import { DAILY_CHAPTER_GUEST_STORAGE, isDailyChapterGuestId } from "@scripta/sha
 import { useAuth } from "../../core/auth";
 import { dailyChapterApi } from "./api";
 
-export async function deviceIdentity() {
+async function deviceIdentity() {
   const stored = await AsyncStorage.getItem(DAILY_CHAPTER_GUEST_STORAGE);
   if (isDailyChapterGuestId(stored)) return stored;
   const id = randomUUID();

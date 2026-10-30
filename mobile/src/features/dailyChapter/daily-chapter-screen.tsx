@@ -11,13 +11,13 @@ import { addBookToLibrary } from "../library/api/client";
 import { publicContentUrl } from "../sharing/links";
 import { dailyChapterApi } from "./api";
 import { DailyChapterArt } from "./daily-chapter-art";
-import { deviceIdentity } from "./use-daily-history";
+import { useDeviceIdentity } from "./use-daily-history";
 
 export function DailyChapterScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const { ready, user, unreachable, retry } = useAuth();
-  const identity = useQuery({ queryKey: ["daily-chapter", "identity"], queryFn: deviceIdentity, staleTime: Infinity });
+  const identity = useDeviceIdentity();
   const daily = useQuery({ queryKey: ["daily-chapter", "today"], queryFn: dailyChapterApi.today, refetchInterval: 60_000 });
   const history = useQuery({ queryKey: ["daily-chapter", "history", user?.id ?? "guest", identity.data, daily.data?.date], queryFn: () => dailyChapterApi.history(identity.data!, Boolean(user)), enabled: ready && !unreachable && Boolean(identity.data && daily.data?.date) });
   const result = history.data?.results.find((item) => item.editionId === daily.data?.board?.id);
