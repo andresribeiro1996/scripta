@@ -191,9 +191,9 @@ test("selecting an edition without a cover shows the placeholder, and without ye
   assert.equal(picked.meta, null);
 });
 
-test("add book defaults to the first edition with an isbn and the work cover, and follows the selected edition", () => {
+test("add book defaults to the displayed edition and the work cover, and follows the selected edition", () => {
   const p = page({ editions: editions(4), coverUrl: "cover:3" });
-  assert.deepEqual(bookScreenModel(p, null, viewer).addBook, { title: "Dune", author: "Frank Herbert", isbn: "isbn1", coverUrl: "cover:3" });
+  assert.deepEqual(bookScreenModel(p, null, viewer).addBook, { title: "Dune", author: "Frank Herbert", isbn: "isbn3", coverUrl: "cover:3" });
   assert.deepEqual(bookScreenModel(p, null, viewer, "e2").addBook, { title: "Dune", author: "Frank Herbert", isbn: "isbn2", coverUrl: "cover:2" });
   assert.deepEqual(bookScreenModel(p, null, viewer, "e0").addBook, { title: "Dune", author: "Frank Herbert", isbn: null, coverUrl: "cover:0" });
   assert.equal(bookScreenModel(page({ editions: editions(1).map((e) => ({ ...e, isbn: null })) }), null, viewer).addBook!.isbn, null);
@@ -315,4 +315,11 @@ test("year is the displayed edition's, falling back to the work's", () => {
   assert.equal(bookScreenModel(page({ editions: editions(5), coverUrl: null }), null, viewer, "e2").year, 2002);
   assert.equal(bookScreenModel(page({ editions: editions(5), coverUrl: null, year: null }), null, viewer).year, null);
   assert.equal(bookScreenModel(null, { Title: "Loose" }, viewer).year, null);
+});
+
+test("add book falls back to the first edition with an isbn when the displayed edition has none", () => {
+  const noIsbn = editions(4).map((e) => (e.bookId === "e2" ? { ...e, isbn: null } : e));
+  assert.equal(bookScreenModel(page({ editions: noIsbn, coverUrl: "cover:2" }), null, viewer).addBook!.isbn, "isbn1");
+  assert.equal(bookScreenModel(page({ editions: noIsbn, coverUrl: "cover:3" }), null, viewer).addBook!.isbn, "isbn3");
+  assert.equal(bookScreenModel(page({ editions: noIsbn, coverUrl: "cover:2" }), null, viewer, "e2").addBook!.isbn, null);
 });
