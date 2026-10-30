@@ -336,7 +336,9 @@ test("listImages returns a book's images newest first", () => {
   repo.insertImage(image("img-03", a.id, "2026-10-01T00:00:03.000Z"));
   repo.insertImage(image("img-02", a.id, "2026-10-01T00:00:02.000Z"));
   repo.insertImage(image("img-b", b.id, "2026-10-01T00:00:04.000Z"));
-  assert.deepEqual(repo.listImages(a.id).map((row) => row.id), ["img-03", "img-02", "img-01"]);
+  repo.insertImage(image("img-tie-first", a.id, "2026-10-01T00:00:05.000Z"));
+  repo.insertImage(image("img-tie-second", a.id, "2026-10-01T00:00:05.000Z"));
+  assert.deepEqual(repo.listImages(a.id).map((row) => row.id), ["img-tie-second", "img-tie-first", "img-03", "img-02", "img-01"]);
   assert.deepEqual(repo.listImages(b.id).map((row) => row.id), ["img-b"]);
 });
 
@@ -344,6 +346,7 @@ test("listImages index exists", () => {
   const { db } = freshRepo();
   const indexes = db.prepare("PRAGMA index_list(cover_images)").all() as Array<{ name: string }>;
   assert.ok(indexes.some((index) => index.name === "idx_cover_images_book"));
+  assert.deepEqual((db.prepare("PRAGMA index_info(idx_cover_images_book)").all() as Array<{ name: string }>).map((column) => column.name), ["book_id"]);
 });
 
 test("a stored image row carries its colour", () => {
