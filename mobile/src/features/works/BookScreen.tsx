@@ -156,7 +156,6 @@ export function BookScreen({ page, book, model, signedIn, onSelectEdition, scrol
   const { about, community } = model;
   const badgeLabel = statusBadgeLabel(model);
   const allCharacters = [...model.characters.shown, ...model.characters.more];
-  const selectedEdition = page && model.edition ? page.work.editions[model.edition.index] : null;
   const showOwnCover = model.edition === null || model.edition.index === model.edition.mineIndex;
   useEffect(() => {
     scrollY?.set(0);
@@ -170,7 +169,7 @@ export function BookScreen({ page, book, model, signedIn, onSelectEdition, scrol
       {wash && coverColor && !scrollY ? <WashGradient color={coverColor} topAlpha={wash.topAlpha} width={windowWidth} /> : null}
       <View style={styles.heroCentered}>
         <View style={[styles.cover, { backgroundColor: colors.border }]}>
-          {book && showOwnCover ? <CoverImage book={book} size="full" /> : <BookCover cover={selectedEdition?.coverUrl ?? page?.work.coverUrl ?? null} title={model.title} width={COVER_WIDTH} height={COVER_HEIGHT} />}
+          {book && showOwnCover ? <CoverImage book={book} size="full" /> : <BookCover key={model.cover.url ?? "none"} cover={model.cover.url} title={model.title} width={COVER_WIDTH} height={COVER_HEIGHT} />}
         </View>
         <Text {...dynamicType} style={[typography.heading, styles.centeredText, { color: colors.text }]}>{model.title}</Text>
         <Text {...dynamicType} style={[typography.input, styles.centeredText, { color: colors.textDim }]}>{`by ${model.author}`}</Text>

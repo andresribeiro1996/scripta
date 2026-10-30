@@ -107,8 +107,9 @@ export function WorkScreen({ id, edition = null }: { id: string; edition?: strin
     setAddingToRead(true);
     let added = false;
     try {
-      await addBookToLibrary({ ...toRecommendation(model.addBook, 0), day: localDay() });
+      await addBookToLibrary({ ...toRecommendation(model.addBook, 0), day: localDay(), preserveExisting: true });
       added = true;
+      await queryClient.cancelQueries({ queryKey: LIBRARY_QUERY_KEY });
       await queryClient.refetchQueries({ queryKey: LIBRARY_QUERY_KEY }, { throwOnError: true });
       await query.refetch({ throwOnError: true });
     } catch (error) {
