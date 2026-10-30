@@ -308,9 +308,11 @@ test("canMakeGame needs four character names", () => {
   assert.equal(bookScreenModel(page({ characters: ["A", "B", "C", "D"] }), null, viewer).characters.canMakeGame, true);
 });
 
-test("year: work year by default, picked edition's year when an edition is selected", () => {
-  assert.equal(bookScreenModel(page(), null, { isAdmin: false }).year, 1965);
-  assert.equal(bookScreenModel(page(), null, { isAdmin: false }, "e3").year, 1968);
-  assert.equal(bookScreenModel(page({ year: null }), null, { isAdmin: false }).year, null);
-  assert.equal(bookScreenModel(null, { Title: "Loose" }, { isAdmin: false }).year, null);
+test("year is the displayed edition's, falling back to the work's", () => {
+  assert.equal(bookScreenModel(page(), null, viewer).year, 1966);
+  assert.equal(bookScreenModel(page(), null, viewer, "e3").year, 1968);
+  assert.equal(bookScreenModel(page({ editions: editions(5), coverUrl: null }), null, viewer).year, 1965);
+  assert.equal(bookScreenModel(page({ editions: editions(5), coverUrl: null }), null, viewer, "e2").year, 2002);
+  assert.equal(bookScreenModel(page({ editions: editions(5), coverUrl: null, year: null }), null, viewer).year, null);
+  assert.equal(bookScreenModel(null, { Title: "Loose" }, viewer).year, null);
 });

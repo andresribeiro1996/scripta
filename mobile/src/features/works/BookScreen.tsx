@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { router, useSegments } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
-import { Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
 import Animated, { useAnimatedScrollHandler, useAnimatedStyle, type SharedValue } from "react-native-reanimated";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import { bookStatsModel, bookKey, coverWash, seriesLabel, type BookScreenModel, type BookScreenTabKey, type WorkPage } from "@scripta/shared";
@@ -177,12 +177,12 @@ export function BookScreen({ page, book, model, signedIn, onSelectEdition, scrol
         {model.series || model.year !== null || model.rating ? (
           <View style={styles.metaRow}>
             {model.series ? <SeriesLine series={model.series} signedIn={signedIn} segments={segments} /> : null}
-            {model.year !== null ? <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{`${model.series ? "· " : ""}${model.year}`}</Text> : null}
+            {model.year !== null ? <Text numberOfLines={1} {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{`${model.series ? "· " : ""}${model.year}`}</Text> : null}
             {model.rating ? (
               <View style={styles.ratingPart}>
-                {model.series || model.year !== null ? <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>·</Text> : null}
+                {model.series || model.year !== null ? <Text numberOfLines={1} {...dynamicType} style={[typography.body, { color: colors.textDim }]}>·</Text> : null}
                 <Icon name="star" size={14} color={colors.accent} />
-                <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{model.rating.label}</Text>
+                <Text numberOfLines={1} {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{model.rating.label}</Text>
               </View>
             ) : null}
           </View>
@@ -215,7 +215,7 @@ export function BookScreen({ page, book, model, signedIn, onSelectEdition, scrol
       </View>
 
       {model.tabs.length > 1 && tab ? (
-        <View accessibilityLabel="Book sections" accessibilityRole="tablist" style={[styles.tabs, { borderColor: colors.border }]}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} accessibilityLabel="Book sections" accessibilityRole="tablist" style={[styles.tabs, { borderColor: colors.border }]} contentContainerStyle={styles.tabsContent}>
           {model.tabs.map((t) => {
             const checked = t.key === tab;
             return (
@@ -227,11 +227,11 @@ export function BookScreen({ page, book, model, signedIn, onSelectEdition, scrol
                 onPress={() => setSelected(t.key)}
                 style={[styles.tab, { borderColor: checked ? colors.accent : "transparent" }]}
               >
-                <Text {...dynamicType} style={[typography.body, checked ? styles.strong : null, styles.centerText, { color: checked ? colors.accent : colors.textDim }]}>{t.label}</Text>
+                <Text numberOfLines={1} {...dynamicType} style={[typography.body, checked ? styles.strong : null, { color: checked ? colors.accent : colors.textDim }]}>{t.label}</Text>
               </Pressable>
             );
           })}
-        </View>
+        </ScrollView>
       ) : null}
 
       {tab === "about" && about ? (
@@ -241,7 +241,7 @@ export function BookScreen({ page, book, model, signedIn, onSelectEdition, scrol
               <Text {...dynamicType} style={[typography.input, styles.synopsis, { color: colors.text }]}>{aboutOpen || !about.preview ? about.summary : about.preview}</Text>
               {about.preview ? (
                 <Pressable accessibilityRole="button" onPress={() => setAboutOpen(!aboutOpen)} style={styles.link}>
-                  <Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.accent }]}>{aboutOpen ? "Show less" : "Show more"}</Text>
+                  <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, { color: colors.accent }]}>{aboutOpen ? "Show less" : "Show more"}</Text>
                 </Pressable>
               ) : null}
             </View>
@@ -353,8 +353,9 @@ const styles = StyleSheet.create({
   shrink: { flexShrink: 1 },
   section: { gap: spacing.sm },
   group: { gap: spacing.sm },
-  tabs: { flexDirection: "row", borderBottomWidth: StyleSheet.hairlineWidth },
-  tab: { flex: 1, minHeight: minimumTouchTarget, alignItems: "center", justifyContent: "center", borderBottomWidth: 2, paddingHorizontal: spacing.xs },
+  tabs: { flexGrow: 0, borderBottomWidth: StyleSheet.hairlineWidth },
+  tabsContent: { columnGap: spacing.xl },
+  tab: { minHeight: minimumTouchTarget, alignItems: "center", justifyContent: "center", borderBottomWidth: 2 },
   strong: { fontWeight: "700" },
   quote: { fontStyle: "italic" },
   highlight: { borderLeftWidth: 2, paddingLeft: spacing.md, gap: spacing.xs },

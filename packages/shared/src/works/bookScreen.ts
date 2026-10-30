@@ -124,7 +124,7 @@ export function bookScreenModel(page: WorkPage | null, book: Book | null, viewer
     possibleGenres: work?.possibleGenres ?? [],
     series: work ? work.series ?? (selected ?? work.editions[defaultEditionIndex(work)])?.collection ?? null : null,
     rating: work?.rating ? { value: work.rating.value, label: `${work.rating.value.toFixed(1)} · ${ratingCountLabel(work.rating.count)}` } : null,
-    year: selected ? selected.year : work?.year ?? null,
+    year: work ? (selected ?? work.editions[defaultEditionIndex(work)])?.year ?? work.year : null,
     meta: selected ? bookMetaLine(selected, selected.language) : work ? bookMetaLine(work) : null,
     cover: selected ? { url: selected.coverUrl, color: selected.coverColor } : { url: work?.coverUrl ?? null, color: work?.coverColor ?? null },
     edition: work && work.editions.length >= 2 ? editionState(work, selected ? work.editions.indexOf(selected) : defaultEditionIndex(work), book !== null) : null,
