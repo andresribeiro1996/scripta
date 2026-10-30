@@ -176,11 +176,15 @@ export function BookScreen({ page, book, model, signedIn, onSelectEdition, scrol
         {book && badgeLabel ? <StatusBadge label={badgeLabel} finished={model.status?.options.find((o) => o.selected)?.value === 2} onPress={() => setStatusOpen(true)} /> : null}
         {model.series || model.year !== null || model.rating ? (
           <View style={styles.metaRow}>
-            {model.series ? <SeriesLine series={model.series} signedIn={signedIn} segments={segments} /> : null}
-            {model.year !== null ? <Text numberOfLines={1} {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{`${model.series ? "· " : ""}${model.year}`}</Text> : null}
+            {model.series ? (
+              <View style={styles.metaPart}>
+                <SeriesLine series={model.series} signedIn={signedIn} segments={segments} />
+                {model.year !== null || model.rating ? <Text numberOfLines={1} {...dynamicType} style={[typography.body, { color: colors.textDim }]}>·</Text> : null}
+              </View>
+            ) : null}
+            {model.year !== null ? <Text numberOfLines={1} {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{model.rating ? `${model.year} ·` : String(model.year)}</Text> : null}
             {model.rating ? (
-              <View style={styles.ratingPart}>
-                {model.series || model.year !== null ? <Text numberOfLines={1} {...dynamicType} style={[typography.body, { color: colors.textDim }]}>·</Text> : null}
+              <View style={styles.metaPart}>
                 <Icon name="star" size={14} color={colors.accent} />
                 <Text numberOfLines={1} {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{model.rating.label}</Text>
               </View>
@@ -337,7 +341,7 @@ const styles = StyleSheet.create({
   cover: { width: COVER_WIDTH, height: COVER_HEIGHT, borderRadius: radii.sm, overflow: "hidden", marginBottom: spacing.xs },
   badge: { flexDirection: "row", alignItems: "center", gap: spacing.xs, maxWidth: "100%", borderRadius: radii.full, paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
   metaRow: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", alignItems: "center", columnGap: spacing.xs },
-  ratingPart: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
+  metaPart: { flexDirection: "row", alignItems: "center", gap: spacing.xs, maxWidth: "100%" },
   genres: { marginTop: spacing.xs },
   centerText: { textAlign: "center" },
   grow: { flex: 1 },
