@@ -47,7 +47,7 @@ export function LibraryToolbar({
             </option>
           ))}
         </select>
-        <div role="group" aria-label="Status" className="-mx-4 flex w-[calc(100%+2rem)] gap-2 overflow-x-auto px-4 sm:mx-0 sm:w-auto sm:overflow-visible sm:px-0">
+        <div role="group" aria-label="Status" className="-mx-4 -my-1 flex w-[calc(100%+2rem)] gap-2 overflow-x-auto px-4 py-1 sm:mx-0 sm:my-0 sm:w-auto sm:overflow-visible sm:p-0">
           {STATUS_FILTER_OPTIONS.map((o) => (
             <button key={o.value} type="button" aria-pressed={status === o.value} onClick={() => onStatusChange(o.value)} className={chipClass(status === o.value)}>
               {o.value === "all" ? "All" : o.label}
