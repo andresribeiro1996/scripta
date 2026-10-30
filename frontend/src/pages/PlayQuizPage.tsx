@@ -10,6 +10,7 @@ import { useParams } from "react-router-dom";
 import type { PublicQuizQuestion } from "@scripta/shared";
 import { CoverImage } from "../components/BookCard";
 import { Page } from "../components/page/Page";
+import { BUTTON_PRIMARY, FIELD_CLASS } from "../components/page/buttonClasses";
 import { QuizPrompt } from "../components/quiz/QuizPrompt";
 import { submitPlayApi, type PlayResponse } from "../api/quizzes";
 import { QuizLeaderboard, QuizResults } from "../components/quiz/QuizResults";
@@ -91,7 +92,7 @@ export function PlayQuizPage() {
   if (stage === "leaderboard") {
     return (
       <Page width="narrow" title={playBoard.name}>
-        <div className="mx-auto flex max-w-xl flex-col gap-6">
+        <div className="flex flex-col gap-6">
           <p className="text-center text-(--color-text-dim)">This quiz is closed.</p>
           <QuizLeaderboard code={code ?? ""} />
         </div>
@@ -138,7 +139,7 @@ export function PlayQuizPage() {
 
   return (
     <Page width="narrow" title={playBoard.name} subtitle={`${index + 1}/${questions.length} · ${Math.floor(elapsed / 1000)}s`}>
-      <div className="mx-auto flex max-w-xl flex-col gap-5">
+      <div className="flex flex-col gap-5">
         <div className="h-1 rounded bg-(--color-border)">
           <div className="h-1 rounded bg-(--color-accent) transition-all" style={{ width: `${Math.round((answeredCount / questions.length) * 100)}%` }} />
         </div>
@@ -155,7 +156,7 @@ export function PlayQuizPage() {
                 onChange={(event) => setPlayerName(event.target.value)}
                 maxLength={40}
                 placeholder="Guest"
-                className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2"
+                className={FIELD_CLASS}
               />
             </label>
             {submitError && <p role="alert" className="text-sm text-(--color-danger)">{submitError}</p>}
@@ -163,7 +164,7 @@ export function PlayQuizPage() {
               type="button"
               disabled={busy}
               onClick={() => void submit()}
-              className="min-h-11 rounded-lg bg-(--color-accent) px-4 font-semibold text-(--color-on-accent) disabled:opacity-50"
+              className={BUTTON_PRIMARY}
             >
               {busy ? "Scoring…" : "See my score"}
             </button>

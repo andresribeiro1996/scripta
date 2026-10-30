@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { QUIZ_POOL, QUIZ_QUESTION_TYPES, bookKey, booksInGroup, eligibleTypes, workIdOf, type QuizBookInput, type QuizDataInput, type QuizQuestionType, booksByWork } from "@scripta/shared";
 import { Page } from "../components/page/Page";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY, FIELD_CLASS } from "../components/page/buttonClasses";
 import { backTo } from "../lib/areas";
 import { createQuizApi } from "../api/quizzes";
 import { resolveCover } from "../api/covers";
@@ -144,12 +145,12 @@ export function QuizCreatePage() {
 
   return (
     <Page width="narrow" title={["Choose books", "Set up questions"][step]} subtitle={`Step ${step + 1} of 2`} back={backTo("quiz")}>
-      <div className="mx-auto flex max-w-2xl flex-col gap-5 pb-10">
+      <div className="flex flex-col gap-5 pb-10">
         {error && <p role="alert" className="text-sm text-(--color-danger)">{error}</p>}
         {step === 0 && (
           <>
             <label className="flex flex-col gap-1 text-sm font-semibold">Quiz name
-              <input value={name} onChange={(event) => setName(event.target.value)} maxLength={200} placeholder="Untitled quiz" className="min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2" />
+              <input value={name} onChange={(event) => setName(event.target.value)} maxLength={200} placeholder="Untitled quiz" className={FIELD_CLASS} />
             </label>
             <fieldset className="flex flex-col gap-2">
               <legend className="mb-1 text-sm font-semibold">Question source</legend>
@@ -166,7 +167,7 @@ export function QuizCreatePage() {
             </fieldset>
             {source === "collection" && (
               <label className="flex flex-col gap-1 text-sm font-semibold">Collection
-                <select value={collectionId} onChange={(event) => setCollectionId(event.target.value)} className="min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2">
+                <select value={collectionId} onChange={(event) => setCollectionId(event.target.value)} className={FIELD_CLASS}>
                   <option value="">Choose a collection…</option>
                   {collections.map((group) => (
                     <option key={group.id} value={group.id}>{group.name}</option>
@@ -206,7 +207,7 @@ export function QuizCreatePage() {
             <label className="flex flex-col gap-1 text-sm font-semibold">Questions
               {/* Only lengths the selected pool can actually fill — with 4–9
                   books the old fixed 5/10/15/20 list left nothing selectable. */}
-              <select value={effectiveQuestionCount} onChange={(event) => setQuestionCount(Number(event.target.value))} className="min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2">
+              <select value={effectiveQuestionCount} onChange={(event) => setQuestionCount(Number(event.target.value))} className={FIELD_CLASS}>
                 {lengthOptions.map((count) => (
                   <option key={count} value={count}>{count} questions</option>
                 ))}
@@ -236,13 +237,13 @@ export function QuizCreatePage() {
           </>
         )}
         <div className="flex justify-end gap-3 pt-2">
-          {step > 0 && <button type="button" onClick={() => setStep((value) => value - 1)} className="min-h-11 rounded-lg border border-(--color-border) px-4">Back</button>}
+          {step > 0 && <button type="button" onClick={() => setStep((value) => value - 1)} className={BUTTON_SECONDARY}>Back</button>}
           {step < 1 ? (
             <button
               type="button"
               disabled={books.length < BOOK_COUNT || (source === "collection" && !collection)}
               onClick={() => setStep(1)}
-              className="min-h-11 rounded-lg bg-(--color-accent) px-4 font-semibold text-(--color-on-accent) disabled:opacity-50"
+              className={BUTTON_PRIMARY}
             >
               Next
             </button>
@@ -251,7 +252,7 @@ export function QuizCreatePage() {
               type="button"
               disabled={busy || effectiveTypes.length === 0 || questionCount > books.length}
               onClick={() => void submit()}
-              className="min-h-11 rounded-lg bg-(--color-accent) px-4 font-semibold text-(--color-on-accent) disabled:opacity-50"
+              className={BUTTON_PRIMARY}
             >
               {busy ? "Creating…" : "Create quiz"}
             </button>

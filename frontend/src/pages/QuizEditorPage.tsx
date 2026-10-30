@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { QUIZ_QUESTION_TYPES, eligibleTypes, playerLabel, quizOptionLabel, quizQuestionLabel, type QuizData, type QuizQuestionType } from "@scripta/shared";
 import { Page } from "../components/page/Page";
-import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../components/page/buttonClasses";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY, FIELD_CLASS } from "../components/page/buttonClasses";
 import { backTo } from "../lib/areas";
 import { useConfirm } from "../components/ConfirmDialog";
 import { deleteQuizApi, fetchQuizResultsApi, publishQuizApi, setPlayStateApi, updateQuizApi, type Quiz } from "../api/quizzes";
@@ -121,16 +121,26 @@ export function QuizEditorPage() {
       title={quiz.name}
       back={backTo("quiz")}
       actions={quiz.voteCode === null ? (
-        <button
-          type="button"
-          onClick={() => { void confirm({ title: `Delete "${quiz.name}"?`, body: "This can't be undone." }).then(async (yes) => { if (yes) { await deleteQuizApi(quiz.id); await queryClient.invalidateQueries({ queryKey: ["quizzes"] }); navigate("/dashboard/arena?tab=quizzes"); } }); }}
-          className={`${BUTTON_SECONDARY} text-(--color-danger)`}
-        >
-          Delete
-        </button>
+        <>
+          <button
+            type="button"
+            onClick={() => { void confirm({ title: `Delete "${quiz.name}"?`, body: "This can't be undone." }).then(async (yes) => { if (yes) { await deleteQuizApi(quiz.id); await queryClient.invalidateQueries({ queryKey: ["quizzes"] }); navigate("/dashboard/arena?tab=quizzes"); } }); }}
+            className={`${BUTTON_SECONDARY} text-(--color-danger)`}
+          >
+            Delete
+          </button>
+          <button
+            type="button"
+            disabled={busy || data.books.length < 4}
+            onClick={() => void publish(quiz)}
+            className={BUTTON_PRIMARY}
+          >
+            {busy ? "Publishing…" : "Publish quiz"}
+          </button>
+        </>
       ) : undefined}
     >
-      <div className="mx-auto flex max-w-3xl flex-col gap-5 pb-10">
+      <div className="flex flex-col gap-5 pb-10">
         {error && <p role="alert" className="text-sm text-(--color-danger)">{error}</p>}
 
         {quiz.voteCode === null && (
@@ -141,7 +151,7 @@ export function QuizEditorPage() {
                 <select
                   value={data.questionCount}
                   onChange={(event) => updateDraft((current) => ({ ...current, questionCount: Number(event.target.value) }))}
-                  className="min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2"
+                  className={FIELD_CLASS}
                 >
                   {[4, 5, 10, 15, 20].map((count) => (
                     <option key={count} value={count}>{count}</option>
@@ -199,7 +209,7 @@ export function QuizEditorPage() {
                       const value = event.target.value.trim();
                       if (value !== (book.quote ?? "")) patchBook(book.workId, { quote: value || null });
                     }}
-                    className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2"
+                    className={FIELD_CLASS}
                   />
                 </label>
                 <label className="mt-2 flex flex-col gap-1 text-sm">
@@ -211,20 +221,12 @@ export function QuizEditorPage() {
                       const value = event.target.value.trim();
                       if (value !== (book.blurb ?? "")) patchBook(book.workId, { blurb: value || null });
                     }}
-                    className="rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2"
+                    className={FIELD_CLASS}
                   />
                 </label>
               </div>
             ))}
 
-            <button
-              type="button"
-              disabled={busy || data.books.length < 4}
-              onClick={() => void publish(quiz)}
-              className="min-h-11 self-start rounded-lg bg-(--color-accent) px-4 font-semibold text-(--color-on-accent) disabled:opacity-50"
-            >
-              {busy ? "Publishing…" : "Publish quiz"}
-            </button>
             {data.books.length < 4 && <p className="text-sm text-(--color-text-dim)">A quiz needs at least 4 books.</p>}
           </section>
         )}

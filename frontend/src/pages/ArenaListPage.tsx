@@ -102,6 +102,17 @@ export function ArenaListPage() {
     <Page
       width="wide"
       title="Games"
+      subtitle={
+        tab === "tournaments" ? (
+          <>
+            Bracket tournaments from your library —{" "}
+            <a href="/arena" className="inline-flex min-h-11 items-center text-(--color-accent) underline">
+              browse public tournaments
+            </a>
+            .
+          </>
+        ) : undefined
+      }
       tabs={area("games").tabs}
       actions={
         <button onClick={create.onClick} className={BUTTON_PRIMARY}>
@@ -111,14 +122,6 @@ export function ArenaListPage() {
     >
       {tab === "tournaments" && (
         <>
-          <p className="mb-4 text-sm text-(--color-text-dim)">
-            Bracket tournaments from your library —{" "}
-            <a href="/arena" className="inline-flex min-h-11 items-center text-(--color-accent) underline">
-              browse public tournaments
-            </a>
-            .
-          </p>
-
           {(tournaments.length > 0 || votedTournaments.length > 0) && (
             <ToolbarRow>
               <input

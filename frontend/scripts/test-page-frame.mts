@@ -165,3 +165,16 @@ test("Home, Murals, Reader card and profiles use Page", () => {
   assert.doesNotMatch(read("pages/MuralsListPage.tsx"), /uppercase/);
   assert.doesNotMatch(read("pages/HomePage.tsx"), /const button\b/);
 });
+
+test("Games pages: one primary in the header, no hand-rolled fills, no inner widths, a centred tournament", () => {
+  const read = (f: string) => readFileSync(new URL(`../src/${f}.tsx`, import.meta.url), "utf8");
+  const list = read("pages/ArenaListPage");
+  assert.match(list, /actions=\{[\s\S]*?BUTTON_PRIMARY/);
+  assert.match(list, /subtitle=\{/);
+  for (const f of ["pages/TierListCreatePage", "pages/QuizCreatePage", "pages/QuizEditorPage", "pages/PlayQuizPage", "components/quiz/QuizResults", "pages/CharacterGamePage"]) {
+    const s = read(f);
+    assert.doesNotMatch(s, /mx-auto[^"`]*max-w-(xl|2xl|3xl|6xl)\b|max-w-(xl|2xl|3xl|6xl)\b[^"`]*mx-auto/, f);
+    assert.doesNotMatch(s, /<button\b(?:=>|[^>])*className=\{?[`"][^`"]*bg-\(--color-accent\)/, f);
+  }
+  assert.match(read("pages/ArenaViewPage"), /<EmptyState/);
+});

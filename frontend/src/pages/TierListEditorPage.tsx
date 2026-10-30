@@ -6,7 +6,7 @@ import { openVotingApi, setVotingStateApi } from "../api/tierlistVoting";
 import { TierRow } from "../components/murals/blocks/BookBlocks";
 import { CharacterHeader } from "../components/CharacterHeader";
 import { Page } from "../components/page/Page";
-import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../components/page/buttonClasses";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY, FIELD_CLASS } from "../components/page/buttonClasses";
 import { backTo } from "../lib/areas";
 import { AddBooksSheet } from "../components/tierlist/AddBooksSheet";
 import { TierBoard } from "../components/tierlist/TierBoard";
@@ -212,7 +212,7 @@ export function TierListEditorPage() {
             if (e.key === "Escape") setEditingName(false);
           }}
           aria-label="Tier list name"
-          className="font-display block w-full min-w-0 rounded-lg border border-(--color-border) bg-(--color-surface) px-2 py-1 font-bold"
+          className={`${FIELD_CLASS} font-display block w-full min-w-0 font-bold`}
         />
       ) : (
         <button

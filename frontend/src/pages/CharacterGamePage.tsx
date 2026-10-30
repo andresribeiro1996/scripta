@@ -8,17 +8,16 @@ import { fetchWorkCast } from "../api/works";
 import { CoverImage } from "../components/BookCard";
 import { LibraryIcon } from "../components/NavIcons";
 import { Page } from "../components/page/Page";
-import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../components/page/buttonClasses";
+import { BUTTON_PRIMARY, FIELD_CLASS, chipClass } from "../components/page/buttonClasses";
 
 const MODES = [{ value: "tierlist", label: "Tier list" }, { value: "tournament", label: "Tournament" }] as const;
-const inputClass = "min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2";
 
 export function CharacterGamePage() {
   const { id = "" } = useParams<{ id: string }>();
   const cast = useQuery({ queryKey: ["works", id, "cast"], queryFn: () => fetchWorkCast(id), retry: false });
   return (
     <Page width="narrow" title="Character game" back={{ to: `/work/${id}`, label: "Book" }}>
-      <div className="mx-auto max-w-2xl pb-10">
+      <div className="pb-10">
         {cast.isPending ? <p>Loading…</p> : cast.isError ? <button type="button" onClick={() => void cast.refetch()} className="min-h-11 text-left text-(--color-accent)">The cast couldn't be loaded. Retry</button> : <CastPicker key={id} workId={id} cast={cast.data} />}
       </div>
     </Page>
@@ -85,21 +84,21 @@ function CastPicker({ workId, cast }: { workId: string; cast: WorkCast }) {
       </div>
       {modes.length > 1 && (
         <div role="group" aria-label="Game type" className="flex gap-2">
-          {modes.map((option) => <button key={option.value} type="button" aria-pressed={mode === option.value} onClick={() => chooseMode(option.value)} className={mode === option.value ? BUTTON_PRIMARY : BUTTON_SECONDARY}>{option.label}</button>)}
+          {modes.map((option) => <button key={option.value} type="button" aria-pressed={mode === option.value} onClick={() => chooseMode(option.value)} className={chipClass(mode === option.value)}>{option.label}</button>)}
         </div>
       )}
       {mode === "tournament" && (
         <>
           <div role="group" aria-label="Bracket size" className="flex flex-wrap gap-2">
-            {sizes.map((value) => <button key={value} type="button" aria-pressed={size === value} onClick={() => chooseSize(value)} className={size === value ? BUTTON_PRIMARY : BUTTON_SECONDARY}>{value}</button>)}
+            {sizes.map((value) => <button key={value} type="button" aria-pressed={size === value} onClick={() => chooseSize(value)} className={chipClass(size === value)}>{value}</button>)}
           </div>
           <label className="flex flex-col gap-1 text-sm font-semibold">Round duration (hours)
-            <input inputMode="decimal" value={duration} onChange={(event) => setDuration(event.target.value)} className={inputClass} />
+            <input inputMode="decimal" value={duration} onChange={(event) => setDuration(event.target.value)} className={FIELD_CLASS} />
           </label>
         </>
       )}
       <label className="flex flex-col gap-1 text-sm font-semibold">Name
-        <input value={name} onChange={(event) => setName(event.target.value)} maxLength={200} className={inputClass} />
+        <input value={name} onChange={(event) => setName(event.target.value)} maxLength={200} className={FIELD_CLASS} />
       </label>
       <p className="text-sm text-(--color-text-dim)">{mode === "tournament" ? `${ticked.length} of ${size} characters` : `${ticked.length} characters`}</p>
       <div className="space-y-2">
