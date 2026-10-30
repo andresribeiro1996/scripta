@@ -80,12 +80,12 @@ export function FoundCovers({
     <section className="mb-4">
       <h3 className="mb-2 text-sm font-semibold">Found covers</h3>
       <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
-        {tiles.map(({ candidate, width, height }) => (
+        {tiles.map(({ candidate, width, height }, index) => (
           <div key={candidate.url} className="flex flex-col">
             <button
               type="button"
               disabled={picking}
-              aria-label={`Use this ${coverSourceLabel(candidate.source)} cover${width !== null && height !== null ? `, ${width} by ${height}` : ""}`}
+              aria-label={`Use this ${coverSourceLabel(candidate.source)} cover${width !== null && height !== null ? `, ${width} by ${height}` : ""}, ${index + 1} of ${tiles.length}`}
               aria-current={isCurrentCover(candidate, coverUrl)}
               onClick={() => void choose(candidate, false)}
               className={`relative aspect-square cursor-pointer overflow-hidden rounded-lg border-2 bg-(--color-border) disabled:cursor-default disabled:opacity-50 ${
@@ -112,7 +112,7 @@ export function FoundCovers({
               <button
                 type="button"
                 disabled={picking}
-                aria-label={`Use for everyone: ${coverSourceLabel(candidate.source)} cover`}
+                aria-label={`Use for everyone: ${coverSourceLabel(candidate.source)} cover, ${index + 1} of ${tiles.length}`}
                 onClick={() => void choose(candidate, true)}
                 className="min-h-11 text-left text-xs font-semibold text-(--color-accent) transition-opacity hover:opacity-80 disabled:opacity-50"
               >

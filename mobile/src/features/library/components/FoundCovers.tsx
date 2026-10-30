@@ -91,7 +91,7 @@ export function FoundCovers({
           return (
             <View key={candidate.url} style={styles.cell}>
               <Pressable
-                accessibilityLabel={`Use this ${label} cover, ${size ? `${size.width} by ${size.height}` : `${index + 1} of ${tiles.length}`}`}
+                accessibilityLabel={`Use this ${label} cover, ${size ? `${size.width} by ${size.height}, ` : ""}${index + 1} of ${tiles.length}`}
                 accessibilityRole="button"
                 accessibilityState={{ selected: current }}
                 disabled={picking}
