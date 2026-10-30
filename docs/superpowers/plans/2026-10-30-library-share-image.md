@@ -142,7 +142,7 @@ git commit -m "Add library share image layouts"
 - Modify: `mobile/src/features/socials/index.ts`
 
 **Interfaces:**
-- Consumes: Task 1's `LIBRARY_SHARE_LAYOUTS`, `LibraryShareLayout`; Task 2's `LibraryShareImage`; `ContentShareSheet` props (`ContentShareSheet.tsx:13-28`); `useLibrary()`'s `share()` / `unshare()` (`useLibrary.ts:35-47`).
+- Consumes: Task 1's `LIBRARY_SHARE_LAYOUTS`, `LibraryShareLayout`, `shelfShareBooks`; Task 2's `LibraryShareImage`; `ContentShareSheet` props (`ContentShareSheet.tsx:13-28`); `useLibrary()`'s `share()` / `unshare()` (`useLibrary.ts:35-47`).
 - Produces: nothing later tasks import.
 
 - [ ] **Step 1: Wire the sheet into `LibraryScreen`**
