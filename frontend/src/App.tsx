@@ -15,6 +15,7 @@ import { ArenaSeedPage } from "./pages/ArenaSeedPage";
 import { ArenaViewPage } from "./pages/ArenaViewPage";
 import { WorkPage } from "./pages/WorkPage";
 import { WorkStatsPage } from "./pages/WorkStatsPage";
+import { CharacterGamePage } from "./pages/CharacterGamePage";
 import { QuizCreatePage } from "./pages/QuizCreatePage";
 import { QuizEditorPage } from "./pages/QuizEditorPage";
 import { ChooseUsernamePage } from "./pages/ChooseUsernamePage";
@@ -71,6 +72,7 @@ export function App() {
           <Route element={<RequireAuth />}>
             <Route element={<RequireUsername />}>
               <Route path="/book/:key" element={<BookKeyPage />} />
+              <Route path="/work/:id/characters" element={<CharacterGamePage />} />
               <Route path="/dashboard" element={<HomePage />} />
               <Route path="/dashboard/library" element={<LibraryPage />} />
               <Route path="/dashboard/series" element={<SeriesPage />} />

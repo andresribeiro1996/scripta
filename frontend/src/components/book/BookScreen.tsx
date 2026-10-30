@@ -221,6 +221,9 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
                 ) : null}
               </p>
             ) : null}
+            {model.characters.canMakeGame && signedIn && page ? (
+              <Link to={`/work/${page.work.id}/characters`} className="mt-1 inline-flex min-h-11 items-center text-xs font-semibold text-(--color-accent)">Make a character game</Link>
+            ) : null}
             {model.genres.length + model.possibleGenres.length > 0 ? (
               <ul className="mt-3 flex flex-wrap justify-center gap-1.5 sm:justify-start">
                 {model.genres.map((genre) => (

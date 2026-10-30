@@ -5,6 +5,7 @@ export type { Duel, DuelSide, SeedBook, Tournament, TournamentView } from "@scri
 
 export const {
   createTournament,
+  createCharacterTournament,
   fetchMyTournaments,
   fetchVotedTournaments,
   fetchTournament,
