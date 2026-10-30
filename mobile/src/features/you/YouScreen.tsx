@@ -9,9 +9,9 @@ import { AuthorAvatar } from "../community/AuthorAvatar";
 import { fetchOwnProfile } from "../community/api";
 
 const CARDS = [
-  { label: "Your shelf", href: "/me", icon: "library" },
+  { label: "Your shelf", href: "/me", icon: "shelf" },
   { label: "Murals", href: "/murals", icon: "murals" },
-  { label: "Reader card", href: "/reader-card", icon: "profile" },
+  { label: "Reader card", href: "/reader-card", icon: "readerCard" },
   { label: "Gallery", href: "/gallery", icon: "image" },
 ] as const;
 

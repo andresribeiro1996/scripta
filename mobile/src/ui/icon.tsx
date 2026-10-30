@@ -18,6 +18,8 @@ const GLYPHS = {
   hidePassword: { ios: "eye.slash", android: "visibility_off" },
   home: { ios: "house", android: "home" },
   library: { ios: "books.vertical", android: "library_books" },
+  shelf: { ios: "books.vertical", android: "shelves" },
+  readerCard: { ios: "person.text.rectangle", android: "id_card" },
   arena: { ios: "trophy", android: "trophy" },
   // Solid on purpose: it marks one book as having won the whole thing, not
   // a link to the Arena feature.
