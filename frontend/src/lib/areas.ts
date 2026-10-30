@@ -67,6 +67,8 @@ export function area(id: AreaId): Area {
 
 export const NAV_AREAS: readonly Area[] = AREAS.filter((a) => a.id !== "admin");
 
+export const TOP_BAR_AREAS: readonly Area[] = NAV_AREAS.filter((a) => a.id !== "settings");
+
 export function footerAreas(isAdmin: boolean): Area[] {
   return isAdmin ? [area("admin")] : [];
 }

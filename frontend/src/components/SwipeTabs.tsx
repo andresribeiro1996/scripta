@@ -30,6 +30,7 @@ export function SwipeTabs<T extends string>({
   const index = Math.max(0, tabs.findIndex((tab) => tab.value === value));
   const rootRef = useRef<HTMLDivElement>(null);
   const anchorRef = useRef<HTMLDivElement>(null);
+  const tablistRef = useRef<HTMLDivElement>(null);
   const gesture = useRef<{ x: number; y: number; width: number; axis: "x" | "y" | null } | null>(null);
   const settleTimer = useRef<number | undefined>(undefined);
   const [drag, setDrag] = useState({ dx: 0, width: 1 });
@@ -39,7 +40,8 @@ export function SwipeTabs<T extends string>({
 
   function revealTop() {
     const anchor = anchorRef.current;
-    if (anchor && anchor.getBoundingClientRect().top < 0) anchor.scrollIntoView({ block: "start" });
+    const tablist = tablistRef.current;
+    if (anchor && tablist && anchor.getBoundingClientRect().top < parseFloat(getComputedStyle(tablist).top)) anchor.scrollIntoView({ block: "start" });
   }
 
   function settle(next: number) {
@@ -108,7 +110,7 @@ export function SwipeTabs<T extends string>({
   return (
     <div>
       <div ref={anchorRef} />
-      <div role="tablist" aria-label={label} className="sticky top-0 z-20 -mx-4 border-b border-(--color-border) bg-(--color-bg)/95 px-4 backdrop-blur sm:mx-0 sm:px-0">
+      <div ref={tablistRef} role="tablist" aria-label={label} className="sticky top-(--app-top) z-20 -mx-4 border-b border-(--color-border) bg-(--color-bg)/95 px-4 backdrop-blur sm:mx-0 sm:px-0">
         <div className="relative flex" style={{ "--tabs": tabs.length } as CSSProperties}>
           {tabs.map((tab, i) => (
             <button

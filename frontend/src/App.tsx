@@ -69,6 +69,11 @@ export function App() {
           <Route path="/arena/:id" element={<ArenaViewPage />} />
           <Route path="/work/:id" element={<WorkPage />} />
           <Route path="/work/:id/stats" element={<WorkStatsPage />} />
+          <Route path="/shared/murals/:token" element={<SharedMuralPage />} />
+          <Route path="/shared/library/:token" element={<SharedLibraryPage />} />
+          <Route path="/vote/:code" element={<VoteTierlistPage />} />
+          <Route path="/daily" element={<DailyChapterPage />} />
+          <Route path="/play/:code" element={<PlayQuizPage />} />
           <Route element={<RequireAuth />}>
             <Route element={<RequireUsername />}>
               <Route path="/book/:key" element={<BookKeyPage />} />
@@ -102,17 +107,8 @@ export function App() {
           </Route>
         </Route>
 
-        {/* Pages a stranger with the link can open. The token or code is the
-            access control (see each public backend route's own comment);
-            nobody is asked for an account, and a signed-in visitor just
-            sees "Open my library" instead of "Log in". */}
         <Route element={<PublicRoutesLayout />}>
           <Route path="/arena" element={<PublicDiscoverPage />} />
-          <Route path="/shared/murals/:token" element={<SharedMuralPage />} />
-          <Route path="/shared/library/:token" element={<SharedLibraryPage />} />
-          <Route path="/vote/:code" element={<VoteTierlistPage />} />
-          <Route path="/daily" element={<DailyChapterPage />} />
-          <Route path="/play/:code" element={<PlayQuizPage />} />
         </Route>
 
         {/* /choose-username and /welcome-avatar need a session but NOT a

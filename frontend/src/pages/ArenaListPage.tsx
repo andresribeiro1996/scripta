@@ -19,9 +19,9 @@ import { EmptyState } from "../components/EmptyState";
 import { ArenaIcon } from "../components/NavIcons";
 import { OptionsMenu } from "../components/OptionsMenu";
 import { Page } from "../components/page/Page";
-import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../components/page/buttonClasses";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY, FIELD_CLASS } from "../components/page/buttonClasses";
 import { SkeletonCardGrid } from "../components/Skeleton";
-import { TOOLBAR_CONTROL_CLASS, ToolbarRow } from "../components/Toolbar";
+import { ToolbarRow } from "../components/Toolbar";
 import { useDelayedShow } from "../hooks/useDelayedShow";
 import { useMyTournaments } from "../hooks/useMyTournaments";
 import { useQuizzes } from "../hooks/useQuizzes";
@@ -100,6 +100,7 @@ export function ArenaListPage() {
 
   return (
     <Page
+      width="wide"
       title="Games"
       tabs={area("games").tabs}
       actions={
@@ -125,7 +126,7 @@ export function ArenaListPage() {
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search"
                 aria-label="Search tournaments by name"
-                className={`${TOOLBAR_CONTROL_CLASS} w-full sm:max-w-xs`}
+                className={`${FIELD_CLASS} w-full sm:max-w-xs`}
               />
             </ToolbarRow>
           )}

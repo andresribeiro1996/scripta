@@ -1,6 +1,7 @@
 import { useState } from "react";
+import { FIELD_CLASS } from "./page/buttonClasses";
 import { OptionSheet } from "./Sheet";
-import { FilterIcon, SortIcon, TOOLBAR_CONTROL_CLASS, ToolbarRow, toolbarIconClass } from "./Toolbar";
+import { FilterIcon, SortIcon, ToolbarRow, toolbarIconClass } from "./Toolbar";
 import { STATUS_FILTER_OPTIONS, SORT_OPTIONS, type SortKey, type StatusFilter } from "../lib/libraryView";
 
 /** Search, filter, sort.
@@ -60,7 +61,7 @@ export function LibraryToolbar({
             onChange={(e) => onQueryChange(e.target.value)}
             placeholder="Search"
             aria-label="Search your library"
-            className={`${TOOLBAR_CONTROL_CLASS} min-w-0 flex-1`}
+            className={`${FIELD_CLASS} min-w-0 flex-1`}
           />
           <button
             onClick={() => setSheet("status")}
@@ -86,14 +87,14 @@ export function LibraryToolbar({
             onChange={(e) => onQueryChange(e.target.value)}
             placeholder="Search"
             aria-label="Search your library"
-            className={`${TOOLBAR_CONTROL_CLASS} w-full sm:max-w-xs`}
+            className={`${FIELD_CLASS} w-full sm:max-w-xs`}
           />
           <div className="flex gap-2 sm:ml-auto">
             <select
               value={status}
               onChange={(e) => onStatusChange(e.target.value as StatusFilter)}
               aria-label="Filter by status"
-              className={TOOLBAR_CONTROL_CLASS}
+              className={FIELD_CLASS}
             >
               {STATUS_FILTER_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>
@@ -105,7 +106,7 @@ export function LibraryToolbar({
               value={sort}
               onChange={(e) => onSortChange(e.target.value as SortKey)}
               aria-label="Sort books"
-              className={TOOLBAR_CONTROL_CLASS}
+              className={FIELD_CLASS}
             >
               {SORT_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>

@@ -17,7 +17,7 @@ export function CharacterGamePage() {
   const { id = "" } = useParams<{ id: string }>();
   const cast = useQuery({ queryKey: ["works", id, "cast"], queryFn: () => fetchWorkCast(id), retry: false });
   return (
-    <Page title="Character game" back={{ to: `/work/${id}`, label: "Book" }}>
+    <Page width="narrow" title="Character game" back={{ to: `/work/${id}`, label: "Book" }}>
       <div className="mx-auto max-w-2xl pb-10">
         {cast.isPending ? <p>Loading…</p> : cast.isError ? <button type="button" onClick={() => void cast.refetch()} className="min-h-11 text-left text-(--color-accent)">The cast couldn't be loaded. Retry</button> : <CastPicker key={id} workId={id} cast={cast.data} />}
       </div>

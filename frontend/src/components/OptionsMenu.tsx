@@ -14,7 +14,9 @@ export interface OptionsMenuItem {
 }
 
 const MENU_WIDTH = 132;
+const HEADED_MENU_WIDTH = 176;
 const ROW_HEIGHT = 44;
+const HEADING_HEIGHT = 32;
 const EDGE_GAP = 8;
 
 /** A single three-dot trigger that opens a small dropdown of actions — the one
@@ -41,11 +43,13 @@ const EDGE_GAP = 8;
 export function OptionsMenu({
   items,
   title = "Settings",
+  heading,
   triggerClassName,
   trigger
 }: {
   items: OptionsMenuItem[];
   title?: string;
+  heading?: string;
   /** Full className for the trigger button. Callers own the visual
    *  treatment — a dark translucent circle for a trigger sitting on
    *  arbitrary block content/imagery (needs contrast regardless of
@@ -59,6 +63,7 @@ export function OptionsMenu({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
+  const menuWidth = heading ? HEADED_MENU_WIDTH : MENU_WIDTH;
 
   useEffect(() => {
     if (!open) return;
@@ -80,8 +85,8 @@ export function OptionsMenu({
   function toggle(e: React.MouseEvent<HTMLButtonElement>) {
     e.stopPropagation();
     const rect = e.currentTarget.getBoundingClientRect();
-    const left = Math.max(8, rect.width > MENU_WIDTH ? rect.left : rect.right - MENU_WIDTH);
-    const wanted = items.length * ROW_HEIGHT + 10;
+    const left = Math.max(8, rect.width > menuWidth ? rect.left : rect.right - menuWidth);
+    const wanted = items.length * ROW_HEIGHT + (heading ? HEADING_HEIGHT : 0) + 10;
     const below = window.innerHeight - rect.bottom - EDGE_GAP - 4;
     const above = rect.top - EDGE_GAP - 4;
     if (wanted <= below || below >= above) setPosition({ top: rect.bottom + 4, left, maxHeight: below });
@@ -125,9 +130,10 @@ export function OptionsMenu({
               event.preventDefault();
               buttons[next]?.focus();
             }}
-            style={{ top: position.top, bottom: position.bottom, left: position.left, minWidth: MENU_WIDTH, maxHeight: position.maxHeight }}
+            style={{ top: position.top, bottom: position.bottom, left: position.left, minWidth: menuWidth, maxHeight: position.maxHeight }}
             className="menu-in fixed z-50 overflow-y-auto rounded-lg border border-(--color-border) bg-(--color-surface) py-1 text-sm shadow-lg"
           >
+            {heading ? <div className="w-0 min-w-full truncate px-3 py-2 text-xs text-(--color-text-dim)">{heading}</div> : null}
             {items.map((item) => (
               <button
                 key={item.label}

@@ -7,7 +7,7 @@ import { resolveLibraryStyle } from "../lib/libraryStyle";
 
 function InfoScreen({ message }: { message: string }) {
   return (
-    <Page title="Library">
+    <Page width="wide" title="Library">
       <p className="text-sm text-(--color-text-dim)">{message}</p>
     </Page>
   );
@@ -35,7 +35,7 @@ export function SharedLibraryPage() {
   }
 
   return (
-    <Page title={data.data.name || "Library"} maxWidth={style.contentMaxWidth}>
+    <Page width="wide" title={data.data.name || "Library"} maxWidth={style.contentMaxWidth}>
       <PublicLibraryGrid library={data.data} />
     </Page>
   );

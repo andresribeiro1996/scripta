@@ -23,8 +23,8 @@
 // onto the board, so a returning voter adjusts their ranking instead of
 // rebuilding it from an empty board.
 import { ballotBoard, blankBoard, characterBooks, itemNoun } from "@scripta/shared";
-import { useState } from "react";
-import { Link, useLocation, useParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useLocation, useOutletContext, useParams } from "react-router-dom";
 import type { PublicBookData } from "../api/sharedMurals";
 import type { TierlistData } from "../api/tierlists";
 import { useAuth } from "../auth/AuthContext";
@@ -37,15 +37,25 @@ import { Sheet } from "../components/Sheet";
 import { TierBoard } from "../components/tierlist/TierBoard";
 import { TierlistResultsView } from "../components/tierlist/TierlistResultsView";
 import { useTierlistVoting } from "../hooks/useTierlistVoting";
+import { backTo } from "../lib/areas";
 import { toPrivateBook } from "../lib/sharedMural";
 import { toPlacements } from "../lib/tierlistResults";
 
-function InfoScreen({ message }: { message: string }) {
+function InfoScreen({ message, back }: { message: string; back?: { to: string; label: string } }) {
   return (
-    <Page title="Tier list">
+    <Page title="Tier list" back={back}>
       <p className="text-sm text-(--color-text-dim)">{message}</p>
     </Page>
   );
+}
+
+function HideBottomNav() {
+  const setNavHidden = useOutletContext<{ setNavHidden?: (hidden: boolean) => void } | undefined>()?.setNavHidden;
+  useEffect(() => {
+    setNavHidden?.(true);
+    return () => setNavHidden?.(false);
+  }, [setNavHidden]);
+  return null;
 }
 
 export function VoteTierlistPage() {
@@ -59,15 +69,16 @@ export function VoteTierlistPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [booksOpen, setBooksOpen] = useState(false);
   const [picked, setPicked] = useState<PublicBookData | null>(null);
+  const back = session?.user.username ? backTo("tierlist") : undefined;
 
   if (!code || error) {
-    return <InfoScreen message="No tier list at that link." />;
+    return <InfoScreen message="No tier list at that link." back={back} />;
   }
   if (isLoading || !board) {
-    return <InfoScreen message="Loading…" />;
+    return <InfoScreen message="Loading…" back={back} />;
   }
   if (ballotError) {
-    return <InfoScreen message="Couldn't load your ballot. Reload to try again." />;
+    return <InfoScreen message="Couldn't load your ballot. Reload to try again." back={back} />;
   }
 
   const subject = board.subject;
@@ -133,6 +144,7 @@ export function VoteTierlistPage() {
     return (
       <Page
         title={board.name}
+        back={back}
         actions={
           <>
             {ballot && board.votingOpen && (
@@ -189,6 +201,7 @@ export function VoteTierlistPage() {
   return (
     <Page
       title={board.name}
+      back={back}
       actions={
         <>
           {membersOnlyBlocked ? (
@@ -225,6 +238,7 @@ export function VoteTierlistPage() {
           : `Drag ${itemNoun(subject, 2)} into tiers to rank them, then submit your ballot.`}
       </p>
       {submitError && <p className="mb-4 text-sm text-(--color-danger)">{submitError}</p>}
+      <HideBottomNav />
       <TierBoard data={data} books={books} onChange={setWorking} structureEditable={false} />
       {booksSheet}
       {pickedSheet}

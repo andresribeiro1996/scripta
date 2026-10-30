@@ -4,31 +4,39 @@ import { test } from "node:test";
 import { createElement, type ReactElement } from "react";
 import { renderToString } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
-import { Page, PageWidthContext } from "../src/components/page/Page";
+import { Page } from "../src/components/page/Page";
 import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../src/components/page/buttonClasses";
 import { area, backTo } from "../src/lib/areas";
 
-const render = (el: ReactElement, path = "/dashboard/arena?tab=quizzes", width?: number) =>
-  renderToString(createElement(MemoryRouter, { initialEntries: [path] },
-    width === undefined ? el : createElement(PageWidthContext.Provider, { value: width }, el)));
+const render = (el: ReactElement, path = "/dashboard/arena?tab=quizzes") =>
+  renderToString(createElement(MemoryRouter, { initialEntries: [path] }, el));
 
-test("one display-font h1 in a surface band", () => {
-  const html = render(createElement(Page, { title: "Games", children: "x" }));
+test("no band: one display h1 at 30px, 40px from lg, wrapping", () => {
+  const html = render(createElement(Page, { title: "A".repeat(120), children: "x" }));
   assert.equal(html.match(/<h1/g)?.length, 1);
-  assert.match(html, /<h1 class="[^"]*font-display[^"]*font-bold[^"]*text-2xl[^"]*sm:text-3xl/);
-  assert.match(html, /bg-\(--color-surface\)[^"]*border-b border-\(--color-border\)|border-b border-\(--color-border\)[^"]*bg-\(--color-surface\)/);
+  assert.match(html, /<h1 class="[^"]*font-display[^"]*break-words[^"]*text-3xl[^"]*font-bold[^"]*lg:text-\[2\.5rem\][^"]*lg:leading-\[3rem\]/);
+  assert.match(html, /<div class="min-w-0"><h1 class="/);
+  assert.doesNotMatch(html.slice(0, html.indexOf("</header>")), /bg-\(--color-surface\)/);
 });
 
-test("the current tab is marked and every tab is a 44px target", () => {
+test("back link above the title, actions on the title row, subtitle under the title, tabs last", () => {
+  const html = render(createElement(Page, { title: "Library", back: backTo("tournament"), subtitle: "84 books", actions: createElement("button", null, "Add a book"), tabs: area("library").tabs, children: "BODY" }), "/dashboard/library");
+  const header = html.slice(0, html.indexOf("</header>"));
+  assert.match(header, /<a(?=[^>]*href="\/dashboard\/arena")(?=[^>]*min-h-11)[^>]*>[\s\S]*?Games<\/a>[\s\S]*<h1[\s\S]*84 books[\s\S]*Add a book[\s\S]*aria-label="Sections"/);
+  assert.match(header, /<div class="flex flex-wrap items-end justify-between[^"]*"><div class="min-w-0"><h1 class="[^"]*">Library<\/h1><div class="mt-1\.5[^"]*">84 books<\/div><\/div><div class="flex flex-wrap items-center gap-2"><button>Add a book<\/button><\/div><\/div>/);
+  assert.match(html, /<\/header>[\s\S]*BODY/);
+});
+
+test("tabs: 44px, one current, underline on the hairline", () => {
   const html = render(createElement(Page, { title: "Games", tabs: area("games").tabs, children: "x" }));
+  assert.equal(html.match(/<a(?=[^>]*min-h-11)(?=[^>]*min-w-11)(?=[^>]*justify-center)(?=[^>]*border-b-2)[^>]*>/g)?.length, 3);
+  assert.equal(html.match(/<a(?=[^>]*border-b-2)(?=[^>]*focus-visible:-outline-offset-2!)[^>]*>/g)?.length, 3);
+  assert.match(html, /<nav(?=[^>]*aria-label="Sections")(?=[^>]*overflow-x-auto)(?=[^>]*shadow-\[inset_0_-1px_0_var\(--color-border\)\])[^>]*>/);
+  assert.doesNotMatch(html, /-mb-px/);
+  assert.doesNotMatch(html, /<nav[^>]*(?:border-b|pb-px)/);
+  assert.match(html, /<\/header><div class="pt-6">/);
   assert.match(html, /<a(?=[^>]*aria-current="page")[^>]*>Quizzes<\/a>/);
   assert.equal(html.match(/aria-current="page"/g)?.length, 1);
-  assert.equal(html.match(/<a(?=[^>]*min-h-11)[^>]*>/g)?.length, 3);
-});
-
-test("back link names the area and is a 44px target", () => {
-  const html = render(createElement(Page, { title: "Summer showdown", back: backTo("tournament"), children: "x" }));
-  assert.match(html, /<a(?=[^>]*href="\/dashboard\/arena")(?=[^>]*min-h-11)[^>]*>[\s\S]*?Games<\/a>/);
 });
 
 test("a rename control can be the title", () => {
@@ -36,45 +44,51 @@ test("a rename control can be the title", () => {
   assert.match(html, /<h1[^>]*><button>Summer showdown<\/button><\/h1>/);
 });
 
-test("the body keeps the page padding", () => {
-  assert.match(render(createElement(Page, { title: "T", children: "x" })), /px-4 py-5 sm:px-5 sm:py-8/);
+test("widths: default 1200, wide 1440, narrow 760, maxWidth wins (owner's 800 and 1800)", () => {
+  assert.match(render(createElement(Page, { title: "T", children: "x" })), /max-width:1200px/);
+  assert.match(render(createElement(Page, { title: "T", width: "wide", children: "x" })), /max-width:1440px/);
+  assert.match(render(createElement(Page, { title: "T", width: "narrow", children: "x" })), /max-width:760px/);
+  for (const w of [800, 1800]) assert.match(render(createElement(Page, { title: "T", width: "wide", maxWidth: w, children: "x" })), new RegExp(`max-width:${w}px`));
+  assert.match(render(createElement(Page, { title: "T", children: "x" })), /px-4 [^"]*sm:px-6 [^"]*lg:px-8/);
 });
 
-test("a page with its own heading can omit the title band and keep the body frame", () => {
-  const html = render(createElement(Page, { title: null }, createElement("h1", null, "Quiz results")));
-  assert.doesNotMatch(html, /<header/);
-  assert.match(html, /px-4 py-5 sm:px-5 sm:py-8/);
-  assert.match(html, /<h1>Quiz results<\/h1>/);
+test("header and body share one container, gutters outside the width", () => {
+  const html = render(createElement(Page, { title: "T", width: "wide", children: "BODY" }));
+  assert.equal(html.match(/max-width:/g)?.length, 1);
+  assert.match(html, /<div class="[^"]*px-4 [^"]*sm:px-6 [^"]*lg:px-8[^"]*"><div class="mx-auto[^"]*" style="max-width:1440px">[\s\S]*<header[\s\S]*BODY/);
+  assert.match(html, /<\/header><div class="pt-8">BODY<\/div>/);
 });
 
-test("a long title can wrap inside the band", () => {
-  const html = render(createElement(Page, { title: "A".repeat(60), children: "x" }));
-  assert.match(html, /min-w-0[^"]*break-words|break-words[^"]*min-w-0/);
-});
-
-test("body width comes from context, a prop overrides only the body", () => {
-  assert.match(render(createElement(Page, { title: "T", children: "x" }), "/", 1400), /max-width:1400px/);
-  const html = render(createElement(Page, { title: "T", maxWidth: 900, children: "x" }), "/", 1400);
-  assert.match(html, /<header[\s\S]*?max-width:1400px[\s\S]*?<\/header>/);
-  assert.match(html, /<\/header><div[^>]*style="max-width:900px"/);
-});
-
-test("tabs and controls sit below the title band", () => {
-  const html = render(createElement(Page, {
-    title: "Library",
-    subtitle: "84 books",
-    actions: createElement("button", null, "Add a book"),
-    tabs: area("library").tabs,
-    children: "Library content"
-  }));
-  const header = html.slice(0, html.indexOf("</header>"));
-  assert.doesNotMatch(header, /84 books|Add a book|aria-label="Sections"/);
-  assert.match(html, /<\/header>[\s\S]*84 books[\s\S]*Add a book[\s\S]*aria-label="Sections"[\s\S]*Library content/);
+test("title null drops the title row but keeps a back link and the container", () => {
+  const html = render(createElement(Page, { title: null, back: backTo("profile") }, createElement("h1", null, "Ana")));
+  assert.match(html, /<a(?=[^>]*min-h-11)[^>]*>[\s\S]*?Community<\/a>/);
+  assert.equal(html.match(/<h1/g)?.length, 1);
+  assert.match(html, /max-width:1200px/);
+  const bare = render(createElement(Page, { title: null }, createElement("h1", null, "Quiz results")));
+  assert.doesNotMatch(bare, /<header/);
+  assert.match(bare, /<div class="pt-8"><h1>Quiz results<\/h1>/);
 });
 
 test("button classes meet the 44px floor", () => {
   for (const cls of [BUTTON_PRIMARY, BUTTON_SECONDARY]) assert.match(cls, /min-h-11/);
   assert.match(BUTTON_PRIMARY, /bg-\(--color-accent\)/);
+});
+
+test("every Page in these files declares the width, loading states included", () => {
+  const read = (f: string) => readFileSync(new URL(`../src/pages/${f}.tsx`, import.meta.url), "utf8");
+  const every = (f: string, width: string) => {
+    const pages = read(f).match(/<Page\b(?:=>|[^>])*>/g) ?? [];
+    assert.ok(pages.length > 0, f);
+    for (const tag of pages) assert.match(tag, new RegExp(`width="${width}"`), `${f}: ${tag.slice(0, 80)}`);
+  };
+  for (const f of ["LibraryPage", "GroupsPage", "GalleryPage", "SharedLibraryPage", "DiscoverPage", "PeoplePage", "ArenaListPage", "MuralsListPage", "AdminGenresPage", "AdminSynopsesPage", "AdminTranslationsPage", "AdminDailyChapterPage"]) every(f, "wide");
+  for (const f of ["TierListCreatePage", "QuizCreatePage", "QuizEditorPage", "PlayQuizPage", "DailyChapterPage", "CharacterGamePage"]) every(f, "narrow");
+});
+
+test("the Library tabs share the owner's width, so switching tabs never moves the title", () => {
+  for (const f of ["LibraryPage", "GroupsPage", "GalleryPage"]) {
+    assert.match(readFileSync(new URL(`../src/pages/${f}.tsx`, import.meta.url), "utf8"), /maxWidth=\{style\.contentMaxWidth\}/, f);
+  }
 });
 
 test("Library area pages use Page with the Library tabs", () => {

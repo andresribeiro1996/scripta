@@ -8,7 +8,7 @@ import { useAuth } from "../auth/AuthContext";
 import { avatarUrlFor } from "./Avatar";
 import { EmptyState } from "./EmptyState";
 import { Page } from "./page/Page";
-import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "./page/buttonClasses";
+import { BUTTON_DANGER, BUTTON_PRIMARY, BUTTON_SECONDARY } from "./page/buttonClasses";
 import { MuralsIcon } from "./NavIcons";
 import { MuralCanvas } from "./murals/MuralCanvas";
 import { ProfileActivity } from "./ProfileActivity";
@@ -382,7 +382,7 @@ function OwnerControls({
                     <button onClick={() => setConfirming(false)} className="min-h-11 px-2 text-sm text-(--color-text-dim) hover:text-(--color-text)">
                       Cancel
                     </button>
-                    <button onClick={onUnpublish} disabled={busy} className="min-h-11 rounded-lg bg-(--color-danger) px-3 text-sm font-semibold text-(--color-on-danger) disabled:opacity-50">
+                    <button onClick={onUnpublish} disabled={busy} className={BUTTON_DANGER}>
                       Unpublish
                     </button>
                   </span>
