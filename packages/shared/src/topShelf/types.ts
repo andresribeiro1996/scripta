@@ -17,6 +17,7 @@ export type TopShelf = {
 export type TopShelfRecapCard =
   | { kind: "summary"; gamesPublished: number; votesCast: number; booksInPlay: number }
   | { kind: "book"; board: TopShelfBoard; book: TopShelfBook; game: DiscoverItem | null }
-  | { kind: "hottestGame"; game: TopShelfGame; open: boolean };
+  | { kind: "hottestGame"; game: TopShelfGame; open: boolean }
+  | { kind: "dailyChapter"; players: number; hardest: { title: string; date: string; average: number } | null; mostMissed: { title: string; missedPercent: number } | null; topPlayers: Array<{ username: string; perfect: number }> };
 export type TopShelfRecap = { month: string; cards: TopShelfRecapCard[] };
 export type TopShelfRecapIndex = { months: string[]; currentMonth: string; announce: boolean };

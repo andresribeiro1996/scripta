@@ -14,7 +14,9 @@ process.env.TZ = "America/Sao_Paulo";
 const tierlist = (id: string, over: Partial<GameShelfFact> = {}): GameShelfFact => ({ kind: "tierlist", id, ownerUserId: "u1", open: true, promoted: false, createdAt: "2026-10-05T00:00:00.000Z", voters: 5, votesSince: 3, workIds: ["w1"], placements: [], champion: null, ...over });
 const input = (over: Partial<ShelfInput> = {}): ShelfInput => ({ games: [], engagement: new Map(), visibleOwners: new Set(["u1"]), canonical: new Map(), genres: new Map(), ...over });
 
-function setup(now = "2026-10-21T10:00:00Z") {
+type DailyFacts = ReturnType<NonNullable<TopShelfDeps["dailyChapterMonth"]>>;
+
+function setup(now = "2026-10-21T10:00:00Z", daily: DailyFacts = null) {
   const db = new DatabaseSync(":memory:");
   db.exec(readFileSync(new URL("./adapters/sqlite/schema.sql", import.meta.url), "utf8"));
   const repo = createRecapRepository(db);
@@ -23,11 +25,11 @@ function setup(now = "2026-10-21T10:00:00Z") {
     gather: (since, until) => { state.gathered.push([since, until]); return state.gatherInput; },
     cached: () => state.live,
   };
-  const shelf = { getWorkPage: (id: string) => (id === "gone" || id === "w-old" ? undefined : { id, title: `Title ${id}`, author: "A", editions: [{ coverUrl: `https://cdn.test/${id}.jpg` }] }) } as unknown as TopShelfDeps;
+  const shelf = { dailyChapterMonth: () => daily, getWorkPage: (id: string) => (id === "gone" || id === "w-old" ? undefined : { id, title: `Title ${id}`, author: "A", editions: [{ coverUrl: `https://cdn.test/${id}.jpg` }] }) } as unknown as TopShelfDeps;
   const community = {
-    repo: { getProfileRow: () => undefined, getFeedSettings: () => undefined },
+    repo: { getProfileRow: () => undefined, getFeedSettings: () => undefined, visibilityRows: (ids: string[]) => ids.map((id) => ({ user_id: id, published: id.startsWith("pub") ? 1 : 0, show_publications: 1, show_reading: 1, show_votes: 1, show_follows: 1, show_reader_glyph: 0 })) },
     games: { tierlist: { getMany: (ids: string[]) => ids.map((id) => ({ id, ownerUserId: "u1", createdAt: "2026-10-05T00:00:00.000Z", promoted: false, content: { kind: "tierlist", id, voteCode: `c-${id}`, name: `List ${id}`, poolSize: 4, ballotCount: 5, promotedAt: null, votingOpen: true, covers: [] } })) }, tournament: { getMany: () => [] }, quiz: { getMany: () => [] } },
-    resolveProfiles: (ids: string[]) => new Map(ids.map((id) => [id, { username: `user-${id}`, avatarUrl: null }])),
+    resolveProfiles: (ids: string[]) => new Map(ids.filter((id) => id !== "pub-nameless").map((id) => [id, { username: `user-${id}`, avatarUrl: null }])),
     readerGlyphFor: () => null,
   } as never;
   const service = createTopShelfRecapService({ repo, gatherer, community, shelf, now: () => state.now });
@@ -116,4 +118,24 @@ test("getIndex announces last month's recap only on Lisbon days 1-7", () => {
   const stale = setup("2026-11-03T12:00:00Z");
   stale.repo.put("2026-08", data(), "x");
   assert.equal(stale.service.getIndex().announce, false);
+});
+
+test("getRecap adds the opt-in Daily Chapter card with published, named top players only", () => {
+  const facts = { players: 3, hardest: null, mostMissed: null, perfect: [{ userId: "priv", perfect: 3 }, { userId: "pub-nameless", perfect: 3 }, { userId: "pub-a", perfect: 2 }, { userId: "pub-b", perfect: 2 }, { userId: "pub-c", perfect: 1 }, { userId: "pub-d", perfect: 1 }] };
+  const { service, repo } = setup("2026-10-21T10:00:00Z", facts);
+  repo.put("2026-09", data(), "x");
+  const plain = service.getRecap("2026-09");
+  assert.deepEqual(plain?.cards.map((c) => c.kind), ["summary", "book"]);
+  assert.deepEqual(service.getRecap("2026-09", { daily: false }), plain);
+  const withDaily = service.getRecap("2026-09", { daily: true });
+  assert.deepEqual(withDaily?.cards.slice(0, -1), plain?.cards);
+  assert.deepEqual(withDaily?.cards.at(-1), { kind: "dailyChapter", players: 3, hardest: null, mostMissed: null, topPlayers: [{ username: "user-pub-a", perfect: 2 }, { username: "user-pub-b", perfect: 2 }, { username: "user-pub-c", perfect: 1 }] });
+});
+
+test("getRecap omits the Daily Chapter card without players", () => {
+  for (const facts of [null, { players: 0, hardest: null, mostMissed: null, perfect: [] }]) {
+    const { service, repo } = setup("2026-10-21T10:00:00Z", facts);
+    repo.put("2026-09", data(), "x");
+    assert.deepEqual(service.getRecap("2026-09", { daily: true })?.cards.map((c) => c.kind), ["summary", "book"]);
+  }
 });

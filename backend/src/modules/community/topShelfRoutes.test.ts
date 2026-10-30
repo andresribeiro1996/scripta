@@ -7,7 +7,8 @@ import { buildTopShelfRoutes } from "./topShelfRoutes.js";
 const empty: TopShelf = { period: "month", genre: null, genres: [], boards: {}, genreChampions: [], games: [] };
 
 const index = { months: ["2026-09"], currentMonth: "2026-10", announce: false };
-const recaps = { freezeMonth: () => undefined, freezeDue: () => undefined, getIndex: () => index, getRecap: (month: string) => (month === "2026-09" ? { month, cards: [] } : null) };
+const seenRecaps: unknown[] = [];
+const recaps = { freezeMonth: () => undefined, freezeDue: () => undefined, getIndex: () => index, getRecap: (month: string, options?: { daily?: boolean }) => { seenRecaps.push(options); return month === "2026-09" ? { month, cards: [] } : null; } };
 
 function appWith(seen: unknown[] = []) {
   const app = Fastify();
@@ -68,5 +69,15 @@ test("400 and 404 responses are no-store too", async () => {
   for (const url of ["/top-shelf", "/top-shelf/recaps/abc", "/top-shelf/recaps/2026-10"]) {
     assert.equal((await app.inject({ url })).headers["cache-control"], "no-store", url);
   }
+  await app.close();
+});
+
+test("the Daily Chapter card is opt-in through ?daily=1 and nothing else", async () => {
+  const app = appWith();
+  seenRecaps.length = 0;
+  assert.equal((await app.inject({ url: "/top-shelf/recaps/2026-09" })).statusCode, 200);
+  assert.equal((await app.inject({ url: "/top-shelf/recaps/2026-09?daily=1" })).statusCode, 200);
+  assert.deepEqual(seenRecaps, [{ daily: false }, { daily: true }]);
+  assert.equal((await app.inject({ url: "/top-shelf/recaps/2026-09?daily=yes" })).statusCode, 400);
   await app.close();
 });

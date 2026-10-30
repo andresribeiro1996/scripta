@@ -45,7 +45,7 @@ import { canonicalWorks, catalogGenres, enqueueBookCovers, getRecentAwards, getW
 import { deleteGalleryUserData, registerGalleryModule } from "./modules/gallery/index.js";
 import { communityRatings, copyOfWork, deleteLibraryUserData, heldWorks, holdersOfWorks, koboCoverLookups, registerLibraryModule, resolvePublicLibrary, readerGlyphFor, resolveEntryWorks, WorkResolutionError, sharedBookCounts, sharedBooks, sweepLibraryWorks, sweepWorks, WORKS_SWEEP_INTERVAL_MS, type BookEvent } from "./modules/library/index.js";
 import { deleteMuralsUserData, getMuralsPublicApi, registerMuralsModule, rekeyMuralsBooks, sweepMuralsWorks } from "./modules/murals/index.js";
-import { deleteQuizzesUserData, getQuizGameSource, getQuizzesPublicApi, registerQuizzesModule } from "./modules/quizzes/index.js";
+import { deleteQuizzesUserData, getDailyChapterPublicApi, getQuizGameSource, getQuizzesPublicApi, registerQuizzesModule } from "./modules/quizzes/index.js";
 import { deleteSocialsUserData, registerSocialsModule } from "./modules/socials/index.js";
 import { deleteTierlistsUserData, getTierlistGameSource, registerTierlistsModule, getTierlistsPublicApi } from "./modules/tierlists/index.js";
 import { registerWaitlistModule } from "./modules/waitlist/index.js";
@@ -201,6 +201,7 @@ export function buildApp() {
     canonicalWorks,
     catalogGenres,
     getWorkPage,
+    dailyChapterMonth: (month: string) => getDailyChapterPublicApi().monthFacts(month),
     getDashboardSeenAt,
     setDashboardSeenAt,
     murals: getMuralsPublicApi(getTierlistsPublicApi().getTierlistData),

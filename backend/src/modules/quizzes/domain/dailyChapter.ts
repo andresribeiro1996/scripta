@@ -16,6 +16,7 @@ export interface DailyChapterRepository {
   importDrafts(books: DailyChapterBook[], questions: DailyChapterQuestion[], editions: StoredDailyChapter[]): void;
   plays(playerId: string): PlayRow[];
   editionPlays(editionIds: string[], voterIds?: string[]): PlayRow[];
+  missRates(editionIds: string[]): Array<{ quiz_id: string; question_id: string; wrong: number; total: number }>;
   claimGuest(guestKey: string, userId: string): void;
 }
 

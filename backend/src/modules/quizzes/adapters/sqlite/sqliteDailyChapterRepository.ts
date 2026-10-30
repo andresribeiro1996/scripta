@@ -38,6 +38,7 @@ export function createSqliteDailyChapterRepository(db: DatabaseSync): DailyChapt
     },
     plays: (playerId) => db.prepare("SELECT p.* FROM quiz_plays p JOIN daily_chapter_editions e ON e.id = p.quiz_id WHERE p.voter_user_id = ? ORDER BY e.date DESC").all(playerId) as unknown as PlayRow[],
     editionPlays: (editionIds, voterIds) => db.prepare("SELECT * FROM quiz_plays WHERE quiz_id IN (SELECT value FROM json_each(?)) AND (? IS NULL OR voter_user_id IN (SELECT value FROM json_each(?)))").all(JSON.stringify(editionIds), voterIds ? JSON.stringify(voterIds) : null, voterIds ? JSON.stringify(voterIds) : null) as unknown as PlayRow[],
+    missRates: (editionIds) => db.prepare("SELECT quiz_id, question_id, SUM(1 - correct) AS wrong, COUNT(*) AS total FROM quiz_play_answers WHERE quiz_id IN (SELECT value FROM json_each(?)) GROUP BY quiz_id, question_id").all(JSON.stringify(editionIds)) as unknown as Array<{ quiz_id: string; question_id: string; wrong: number; total: number }>,
     claimGuest(guestKey, userId) {
       db.exec("BEGIN IMMEDIATE");
       try {

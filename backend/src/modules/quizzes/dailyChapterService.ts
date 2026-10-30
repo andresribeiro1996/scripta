@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { DAILY_CHAPTER_QUOTE_RIGHTS, DAILY_CHAPTER_THEMES, dailyChapterCoverage, dailyChapterStats, dailyChapterSummary, gradeAnswers, type DailyChapterBoard, type DailyChapterBook, type DailyChapterEditionInput, type DailyChapterPerson, type DailyChapterQuestionInput, type DailyChapterResult, type SubmittedAnswer } from "@scripta/shared";
+import { DAILY_CHAPTER_QUOTE_RIGHTS, DAILY_CHAPTER_THEMES, dailyChapterCoverage, dailyChapterStats, dailyChapterSummary, gradeAnswers, type DailyChapterBoard, type DailyChapterBook, type DailyChapterEditionInput, type DailyChapterMonthFacts, type DailyChapterPerson, type DailyChapterQuestionInput, type DailyChapterResult, type SubmittedAnswer } from "@scripta/shared";
 import { DailyChapterError, NO_DAILY_PEOPLE, type DailyChapterPeople, type DailyChapterRepository, type StoredDailyChapter } from "./domain/dailyChapter.js";
 import type { QuizzesRepository } from "./domain/ports.js";
 import type { PlayRow } from "./domain/types.js";
@@ -50,6 +50,33 @@ export function createDailyChapterService(repo: DailyChapterRepository, plays: Q
         const you = play.voter_user_id === viewerId;
         return [{ userId: play.voter_user_id!, username: profile?.username ?? "You", avatarUrl: profile?.avatarUrl ?? null, score: play.score, marks: edition.snapshot!.map((q) => given.get(q.id) === q.answerIndex), you }];
       }).sort((a, b) => b.score - a.score || a.username.localeCompare(b.username));
+    },
+    monthFacts(month: string): DailyChapterMonthFacts | null {
+      const closed = repo.editions().filter((edition) => edition.publishedAt && edition.date.startsWith(month) && edition.date < today()).sort((a, b) => a.date.localeCompare(b.date));
+      if (!closed.length) return null;
+      const ids = closed.map((edition) => edition.id);
+      const played = repo.editionPlays(ids);
+      const voters = new Set(played.flatMap((play) => (play.voter_user_id ? [play.voter_user_id] : [])));
+      if (!voters.size) return null;
+      let hardest: DailyChapterMonthFacts["hardest"] = null;
+      for (const edition of closed) {
+        const scores = played.filter((play) => play.quiz_id === edition.id).map((play) => play.score);
+        if (!scores.length) continue;
+        const average = Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length * 10) / 10;
+        if (!hardest || average < hardest.average) hardest = { title: edition.title, date: edition.date, average };
+      }
+      const missRates = new Map(repo.missRates(ids).map((row) => [row.quiz_id + "\0" + row.question_id, row]));
+      let mostMissed: DailyChapterMonthFacts["mostMissed"] = null;
+      let worst = 0;
+      for (const edition of closed) for (const question of edition.snapshot!) {
+        const row = missRates.get(edition.id + "\0" + question.id);
+        if (!row || row.wrong / row.total <= worst) continue;
+        worst = row.wrong / row.total;
+        mostMissed = { title: question.book.title, missedPercent: Math.round(worst * 100) };
+      }
+      const perfect = new Map<string, number>();
+      for (const play of played) if (play.score === 5 && play.voter_user_id && !play.voter_user_id.startsWith(dailyGuestKey(""))) perfect.set(play.voter_user_id, (perfect.get(play.voter_user_id) ?? 0) + 1);
+      return { players: voters.size, hardest, mostMissed, perfect: [...perfect].map(([userId, count]) => ({ userId, perfect: count })).sort((a, b) => b.perfect - a.perfect || a.userId.localeCompare(b.userId)) };
     },
     player(userId: string, viewerId: string | null) {
       if (viewerId !== userId && !people.published([userId]).has(userId)) return null;

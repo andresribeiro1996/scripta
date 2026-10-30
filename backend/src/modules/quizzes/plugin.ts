@@ -7,6 +7,7 @@ import { createSqliteDailyChapterRepository } from "./adapters/sqlite/sqliteDail
 import type { DailyChapterPeople } from "./domain/dailyChapter.js";
 import { createDailyChapterService } from "./dailyChapterService.js";
 import { buildDailyChapterRoutes } from "./dailyChapterRoutes.js";
+import type { DailyChapterMonthFacts } from "@scripta/shared";
 import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
 import { getWorkCharacters } from "../books/index.js";
@@ -52,6 +53,17 @@ let cachedApi: QuizzesPublicApi | null = null;
 export function getQuizzesPublicApi(): QuizzesPublicApi {
   if (!cachedApi) cachedApi = createQuizzesPublicApi(createQuizzesService(createSqliteQuizzesRepository(openQuizzesDb()), quizWorks));
   return cachedApi;
+}
+
+let cachedDailyChapterApi: { monthFacts(month: string): DailyChapterMonthFacts | null } | null = null;
+
+export function getDailyChapterPublicApi() {
+  if (!cachedDailyChapterApi) {
+    const db = openQuizzesDb();
+    const service = createDailyChapterService(createSqliteDailyChapterRepository(db), createSqliteQuizzesRepository(db));
+    cachedDailyChapterApi = { monthFacts: (month) => service.monthFacts(month) };
+  }
+  return cachedDailyChapterApi;
 }
 
 let erasingQuizzes: ReturnType<typeof createSqliteQuizzesRepository> | undefined;

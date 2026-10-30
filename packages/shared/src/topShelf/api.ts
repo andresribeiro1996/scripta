@@ -23,8 +23,8 @@ export function createTopShelfApi(request: ApiRequest) {
     fetchRecapIndex(): Promise<TopShelfRecapIndex> {
       return request<TopShelfRecapIndex>("/top-shelf/recaps", { auth: "none" });
     },
-    async fetchRecap(month: string): Promise<TopShelfRecap> {
-      const result = await request<TopShelfRecap>(`/top-shelf/recaps/${encodeURIComponent(month)}`, { auth: "none" });
+    async fetchRecap(month: string, options: { daily?: boolean } = {}): Promise<TopShelfRecap> {
+      const result = await request<TopShelfRecap>(`/top-shelf/recaps/${encodeURIComponent(month)}${options.daily ? "?daily=1" : ""}`, { auth: "none" });
       return {
         ...result,
         cards: result.cards.flatMap((card): TopShelfRecapCard[] => {

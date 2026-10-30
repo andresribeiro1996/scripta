@@ -459,3 +459,25 @@ test("reading a player's plays by voter uses the voter index", () => {
   const plan = db.prepare("EXPLAIN QUERY PLAN SELECT p.* FROM quiz_plays p JOIN daily_chapter_editions e ON e.id = p.quiz_id WHERE p.voter_user_id = ?").all("pub").map((row) => String((row as { detail: string }).detail)).join("\n");
   assert.match(plan, /idx_quiz_plays_voter/);
 });
+
+test("month facts count closed editions only, keep guests out of perfect and need a played month", () => {
+  const { service, on } = setup();
+  const answers30 = seed(service, "edition-30", "2030-01-30");
+  const answers31 = seed(service, "edition-31", "2030-01-31");
+  const pick = (answers: typeof answers30, wrongCount: number) => answers.map((answer, index) => ({ ...answer, choiceIndex: index < wrongCount ? 1 : 0 }));
+  on("2030-01-30T12:00:00Z");
+  service.publish("edition-30");
+  service.play("edition-30", "a", pick(answers30, 0));
+  service.play("edition-30", "b", pick(answers30, 3));
+  service.play("edition-30", dailyGuestKey("guest"), pick(answers30, 0));
+  on("2030-01-31T12:00:00Z");
+  service.publish("edition-31");
+  service.play("edition-31", "a", pick(answers31, 0));
+  on("2030-02-01T12:00:00Z");
+  assert.deepEqual(service.monthFacts("2030-01"), { players: 3, hardest: { title: "edition-30", date: "2030-01-30", average: 4 }, mostMissed: { title: "edition-30-book-0", missedPercent: 33 }, perfect: [{ userId: "a", perfect: 2 }] });
+  assert.equal(service.monthFacts("2030-02"), null);
+  on("2030-01-31T12:00:00Z");
+  const open = service.monthFacts("2030-01");
+  assert.equal(open?.hardest?.date, "2030-01-30");
+  assert.equal(open?.perfect[0]?.perfect, 1);
+});
