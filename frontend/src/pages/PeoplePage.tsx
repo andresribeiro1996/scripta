@@ -12,9 +12,9 @@ import { followUser, unfollowUser } from "../api/community";
 import { useCommunityPeople, useSuggestedPeople } from "../hooks/useCommunity";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { area } from "../lib/areas";
-import { BUTTON_SECONDARY, FIELD_CLASS } from "../components/page/buttonClasses";
+import { BUTTON_SECONDARY } from "../components/page/buttonClasses";
 import { LIST_PANEL, LIST_ROW, PANEL, PANEL_HEADING } from "../components/page/surfaceClasses";
-import { SearchIcon, ToolbarRow } from "../components/Toolbar";
+import { SearchField, ToolbarRow } from "../components/Toolbar";
 
 function retryButton(refetch: () => void) {
   return (
@@ -61,19 +61,7 @@ function PeoplePane() {
   return (
     <div>
       <ToolbarRow>
-        <div className="relative min-w-0 sm:w-85">
-          <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-(--color-text-dim)">
-            <SearchIcon />
-          </span>
-          <input
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by username"
-            aria-label="Search people by username"
-            className={`${FIELD_CLASS} w-full pl-10`}
-          />
-        </div>
+        <SearchField value={search} onChange={setSearch} placeholder="Search by username" label="Search people by username" />
       </ToolbarRow>
       {followError && (
         <p role="alert" className="mb-3 text-sm text-(--color-danger)">
@@ -105,16 +93,16 @@ function SharedCover({ src }: { src: string | null }) {
 }
 
 function FollowButton({ person, busy, onToggle }: { person: PersonResult; busy: boolean; onToggle: (person: PersonResult) => Promise<void> }) {
+  const label = person.viewerFollows ? "Following" : "Follow";
   return (
     <button
       type="button"
-      aria-label={`Follow ${person.user.username}`}
-      aria-pressed={person.viewerFollows}
+      aria-label={`${label} ${person.user.username}`}
       onClick={() => void onToggle(person)}
       disabled={busy}
       className={`${BUTTON_SECONDARY} shrink-0`}
     >
-      {busy ? "…" : person.viewerFollows ? "Following" : "Follow"}
+      {busy ? "…" : label}
     </button>
   );
 }

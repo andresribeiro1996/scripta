@@ -1,5 +1,5 @@
 import { chipClass, FIELD_CLASS } from "./page/buttonClasses";
-import { SearchIcon, ToolbarRow } from "./Toolbar";
+import { SearchField, ToolbarRow } from "./Toolbar";
 import { STATUS_FILTER_OPTIONS, SORT_OPTIONS, type SortKey, type StatusFilter } from "../lib/libraryView";
 
 export function LibraryToolbar({
@@ -22,19 +22,7 @@ export function LibraryToolbar({
   return (
     <ToolbarRow>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <div className="relative min-w-0 flex-1 sm:w-85 sm:flex-none">
-          <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-(--color-text-dim)">
-            <SearchIcon />
-          </span>
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => onQueryChange(e.target.value)}
-            placeholder="Search"
-            aria-label="Search your library"
-            className={`${FIELD_CLASS} w-full pl-10`}
-          />
-        </div>
+        <SearchField value={query} onChange={onQueryChange} placeholder="Search" label="Search your library" className="flex-1 sm:flex-none" />
         <select
           value={sort}
           onChange={(e) => onSortChange(e.target.value as SortKey)}

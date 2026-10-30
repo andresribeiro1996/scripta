@@ -83,14 +83,19 @@ const people = page("PeoplePage");
 
 check("Discover filters with chip buttons", /chipClass\(/.test(discover) && /aria-pressed=/.test(discover));
 check("Discover chips sit in a labelled group", /role="group"\s+aria-label=/.test(discover));
-check("Discover search uses the field class and drops the local input class", /FIELD_CLASS/.test(discover) && !/const searchInput/.test(discover));
-check("Discover search and chips live in the shared toolbar row", /<ToolbarRow>/.test(discover) && /<SearchIcon/.test(discover));
+check("Discover search uses the shared field and drops the local input class", /<SearchField/.test(discover) && !/const searchInput/.test(discover));
+check("Discover search and chips live in the shared toolbar row", /<ToolbarRow>/.test(discover) && /<SearchField/.test(discover));
 check("Discover drops the segmented control", !/segmented/.test(discover));
-check("People search uses the field class and drops the local input class", /FIELD_CLASS/.test(people) && !/const searchInput/.test(people));
+check("People search drops the local input class", !/const searchInput/.test(people));
 check("People shows person cards in a grid panel", /PANEL/.test(people) && /repeat\(auto-fill,minmax\(280px,1fr\)\)/.test(people));
 check("People lists use the list panel", /LIST_PANEL/.test(people));
 check("People Follow is secondary, never primary", /BUTTON_SECONDARY/.test(people) && !/BUTTON_PRIMARY/.test(people));
-check("People Follow names the person", /aria-label=\{`Follow \$\{/.test(people));
+check(
+  "People Follow name starts with the visible label and holds no pressed state",
+  /const label = person\.viewerFollows \? "Following" : "Follow"/.test(people) && /aria-label=\{`\$\{label\} \$\{person\.user\.username\}`\}/.test(people) && !/aria-pressed/.test(people)
+);
+check("People search uses the shared field", /<SearchField/.test(people));
+check("SearchField carries the field class", /FIELD_CLASS\} w-full pl-10/.test(readFileSync(new URL("../src/components/Toolbar.tsx", import.meta.url), "utf8")));
 check("People follow refreshes the home circle", /"community", "dashboard", "circle"/.test(people));
 
 console.log(`\n${passed} passed, ${failed} failed`);

@@ -11,8 +11,8 @@ import { useCommunityDiscover } from "../hooks/useCommunity";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { area } from "../lib/areas";
 import { discoverDestination } from "../lib/landing";
-import { BUTTON_SECONDARY, chipClass, FIELD_CLASS } from "../components/page/buttonClasses";
-import { SearchIcon, ToolbarRow } from "../components/Toolbar";
+import { BUTTON_SECONDARY, chipClass } from "../components/page/buttonClasses";
+import { SearchField, ToolbarRow } from "../components/Toolbar";
 
 const DISCOVER_FILTERS: Array<{ value: DiscoverType; label: string }> = [
   { value: "all", label: "All" },
@@ -58,19 +58,13 @@ function DiscoverPane() {
     <div>
       <ToolbarRow>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <div className="relative min-w-0 flex-1 sm:w-85 sm:flex-none">
-            <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-(--color-text-dim)">
-              <SearchIcon />
-            </span>
-            <input
-              type="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search tier lists, tournaments and quizzes"
-              aria-label="Search tier lists, tournaments and quizzes by name or book"
-              className={`${FIELD_CLASS} w-full pl-10`}
-            />
-          </div>
+          <SearchField
+            value={search}
+            onChange={setSearch}
+            placeholder="Search tier lists, tournaments and quizzes"
+            label="Search tier lists, tournaments and quizzes by name or book"
+            className="flex-1 sm:flex-none"
+          />
           <div role="group" aria-label="Type" className="-mx-4 -my-1 flex w-[calc(100%+2rem)] gap-2 overflow-x-auto px-4 py-1 sm:mx-0 sm:my-0 sm:w-auto sm:overflow-visible sm:p-0">
             {DISCOVER_FILTERS.map((f) => (
               <button key={f.value} type="button" aria-pressed={type === f.value} onClick={() => setType(f.value)} className={chipClass(type === f.value)}>
