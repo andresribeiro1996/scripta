@@ -4,7 +4,7 @@
 
 **Goal:** Replace the web app's desktop frame and page layouts with the revamp design: a sticky top bar, one page header, three page widths, desktop compositions per page, and one of each control.
 
-**Architecture:** Phase 1 changes the shared frame (`DashboardLayout`, `PublicLayout`, `Page`) and the shared control classes, so every page moves to the new header in one PR. Phases 2–5 recompose pages area by area on top of it. Phase 6 sweeps what's left and rewrites the docs. Each phase is one PR.
+**Architecture:** Phase 1 changes the shared frame (`DashboardLayout`, `PublicLayout`, `Page`) and the shared control classes, so every page moves to the new header in one PR. Phases 2–5 recompose pages area by area on top of it. Phase 6 sweeps what's left and rewrites the docs. Each phase is one PR, except Home, which is two (3a and 3b).
 
 **Tech Stack:** React 19, React Router, Tailwind v4 (no config file; `bg-(--color-…)` form), TypeScript. Tests are `node:test` with `react-dom/server` and regex or source assertions (`frontend/scripts/test-*.mts`), plus `packages/shared` tests.
 
@@ -459,7 +459,7 @@ git add frontend/src/layouts/PublicLayout.tsx frontend/src/App.tsx frontend/src/
 
 **Interfaces:**
 - Consumes: `CoverImage({ book, onHasCoverChange?, fit?, alt?, size? })`, exported from `frontend/src/components/BookCard.tsx:69`. It already resolves `_coverUrl`, the resolver cache and the `onError` fall-through, and `FinishSheet.tsx:18` and others share it.
-- Produces: `BookCover(props: { book: LibraryBook; width?: number; size?: CoverSize }): JSX.Element`. It renders at `width` px when given and fills its container otherwise, which Task 11's `minmax(112px,1fr)` tracks need. `size` defaults to `"thumb"`; the book page passes `"full"`.
+- Produces: `BookCover(props: { book: LibraryBook; width?: number; size?: CoverSize }): JSX.Element`. It renders at `width` px when given and fills its container otherwise, which Task 11c's reading-strip grid needs. `size` defaults to `"thumb"`; the book page passes `"full"`.
 
 - [ ] **Step 1: Write the failing test.** Render with `react-dom/server`, and stub `fetch` as `test-book-covers.mts` does if the resolver needs it.
 
@@ -673,69 +673,426 @@ git add frontend/src/components/book/BookScreen.tsx frontend/src/pages/WorkPage.
 
 ---
 
-## Phase 3 — Home (PR 3)
+## Phase 3a — Social Home: layout, games, feed, For you (PR 3)
 
-### Task 11: Two-column Home
+The Home section of the spec was rewritten with the user on 2026-10-30. Home now mirrors the phone app's Home, uses only existing endpoints, and its reference is the canvas's "Home" artboard. Every new Home query uses `staleTime: 30_000` and `retry: 1`, as the app does. The engagement routes share a 60/min budget, and the web `QueryClient` otherwise refetches on every focus.
+
+### Task 11a: Move the app's Home view models to shared
 
 **Files:**
-- Modify: `frontend/src/pages/HomePage.tsx`
-- Test: `frontend/scripts/test-dashboard-cards.mts`
-- Test: `frontend/scripts/test-controls.mts`
+- Create: `packages/shared/src/community/feedRowModel.ts`
+- Create: `packages/shared/src/community/feedRowModel.test.ts`
+- Create: `packages/shared/src/community/activityModel.ts`
+- Create: `packages/shared/src/community/activityModel.test.ts`
+- Create: `packages/shared/src/community/homeModel.ts`
+- Create: `packages/shared/src/community/homeModel.test.ts`
+- Create: `packages/shared/src/works/awardCardModel.ts`
+- Create: `packages/shared/src/works/awardCardModel.test.ts`
+- Modify: `packages/shared/src/community/index.ts`
+- Modify: `packages/shared/src/index.ts`
+- Modify: `mobile/src/features/home/feedRowModel.ts`
+- Modify: `mobile/src/features/home/feedRowModel.test.ts`
+- Delete: `mobile/src/features/home/activityModel.ts`
+- Delete: `mobile/src/features/home/activityModel.test.ts`
+- Delete: `mobile/src/features/home/homeModel.ts`
+- Delete: `mobile/src/features/awards/awardCardModel.ts`
+- Delete: `mobile/src/features/awards/awardCardModel.test.ts`
+- Modify: `mobile/src/features/home/HomeFeedRow.tsx`
+- Modify: `mobile/src/features/home/FeedPreview.tsx`
+- Modify: `mobile/src/features/home/ActivityRow.tsx`
+- Modify: `mobile/src/features/home/ActivityScreen.tsx`
+- Modify: `mobile/src/features/home/SavedContentSheet.tsx`
+- Modify: `mobile/src/features/home/HomeScreen.tsx`
+- Modify: `mobile/src/features/home/CommentsSheet.tsx`
+- Modify: `mobile/src/features/home/useHomeActions.ts`
+- Modify: `mobile/src/features/awards/AwardHomeCard.tsx`
 
 **Interfaces:**
-- Consumes: `BookCover`, `readingPercent` (`@scripta/shared`), `SECTION_HEADING`, `PANEL`, `LIST_PANEL`, `LIST_ROW_LINK`, `PANEL_HEADING`, `EmptyState`, `BUTTON_PRIMARY`/`BUTTON_SECONDARY`.
+- Produces, unchanged in name and signature, from `@scripta/shared/community`:
+  - `FeedRowModel`, `feedRowModel`, `feedRowAccessibilityLabel`, `feedEventLabel`, `feedPrimaryLabel`, `readingShelfBook`, `feedShareTarget`, `hasActivityThread`, `reactionCount` (all from `mobile/src/features/home/feedRowModel.ts`);
+  - `PersonalItem`, `ActivityAction`, `ActivityRowModel`, `isPersonalItem`, `activityRowModel`, `activitySentence` (`activityModel.ts`);
+  - `shouldMarkFeedSeen` (`homeModel.ts:1`).
+- Produces from `@scripta/shared`: `AwardCardModel`, `awardKey`, `awardCardModel`, `firstUndismissed` (`awards/awardCardModel.ts`).
+- Produces `FeedRowModel.icon: FeedIconName`, where `export type FeedIconName = "tierlist" | "champion" | "arena" | "vote" | "book" | "follow" | "bracket" | "murals"` replaces the React Native `IconName` import. Mobile keeps passing it to its icon component.
+- `digestRoute` returns Expo routes, so it stays in `mobile/src/features/home/feedRowModel.ts` with its tests (`feedRowModel.test.ts:142-163`). That file keeps only `digestRoute`. `relativeTime` is already shared (`packages/shared/src/community/helpers.ts:222`), so drop its re-export.
 
-- [ ] **Step 1: Write the failing tests** (`test-dashboard-cards.mts`, source assertions in the suite's style). Also update the Home activity-row assertion in `test-controls.mts` to the new row class.
+- [ ] **Step 1: Move the tests.** Move every test except `digestRoute`'s into the shared files (`feedRowModel.test.ts` 16 tests, `activityModel.test.ts` 5, `homeModel` 1 new, `awardCardModel.test.ts` 10), with imports pointing at the new shared modules.
 
 ```ts
-const home = readFileSync(new URL("../src/pages/HomePage.tsx", import.meta.url), "utf8");
+// packages/shared/src/community/homeModel.test.ts
+test("the feed is marked seen once, only when focused, loaded, idle and a row is visible", () => {
+  const base = { focused: true, rowVisible: true, loaded: true, failed: false, fetching: false, sent: false };
+  assert.equal(shouldMarkFeedSeen(base), true);
+  for (const key of ["focused", "rowVisible", "loaded"] as const) assert.equal(shouldMarkFeedSeen({ ...base, [key]: false }), false, key);
+  for (const key of ["failed", "fetching", "sent"] as const) assert.equal(shouldMarkFeedSeen({ ...base, [key]: true }), false, key);
+});
+```
 
-test("two columns from lg: main and a 340px side column", () => {
-  assert.match(home, /lg:grid-cols-\[minmax\(0,1fr\)_340px\]/);
-  assert.doesNotMatch(home, /actions=\{/);
+- [ ] **Step 2: Run** `npm test --workspace packages/shared`. Expected: FAIL (modules missing).
+- [ ] **Step 3: Move the modules and point every importer at the shared ones.** Export the community models from `community/index.ts`, and the award model from the root index next to the other `works` exports.
+- [ ] **Step 4: Run** `npm test --workspace packages/shared && npm run build --workspace @scripta/shared && npm run typecheck --workspace mobile && npm test --workspace mobile`. Expected: PASS, with the same test counts as before the move (minus none).
+- [ ] **Step 5: Commit**
+
+```bash
+git add -A packages/shared/src/community packages/shared/src/works packages/shared/src/index.ts mobile/src/features/home mobile/src/features/awards && git commit -m "Move the app's Home view models to shared"
+```
+
+### Task 11b: Home feeds, games and awards data
+
+**Files:**
+- Modify: `frontend/src/hooks/useDashboard.ts`
+- Modify: `frontend/src/layouts/DashboardLayout.tsx`
+- Create: `frontend/src/api/topShelf.ts`
+- Modify: `frontend/src/api/works.ts`
+- Create: `frontend/src/lib/homeGames.ts`
+- Create: `frontend/scripts/test-home-games.mts`
+
+**Interfaces:**
+- Consumes: `fetchDashboard(cursor?, kinds?)` with `CIRCLE_DIGEST_KINDS` / `PERSONAL_DIGEST_KINDS` (`packages/shared/src/dashboard.ts:77-80`); `fetchTopShelf({ period, genre, view })` (`packages/shared/src/topShelf/api.ts:16`); `fetchRecentAwards()` (`packages/shared/src/works/api.ts:24`); `fetchDiscover` via `useCommunityDiscover("all", "")` (`frontend/src/hooks/useCommunity.ts:25`).
+- Produces in `useDashboard.ts`, alongside the existing `useDashboard` (Task 11c deletes it):
+  - `useCircleFeed()`: an infinite query, key `["community","dashboard","circle"]`. Returns `{ items: DigestItem[]; isLoading; error; hasNextPage; fetchNextPage; isFetchingNextPage; refetch }`.
+  - `useActivityFeed()`: key `["community","dashboard","activity"]`, the same key the app uses. Returns `{ items: DigestItem[]; seenAt: string | null; personalNewCount: number; isLoading; error; hasNextPage; fetchNextPage; refetch }`.
+- Produces `fetchTopShelf` in `frontend/src/api/topShelf.ts` and `fetchRecentAwards` in `frontend/src/api/works.ts`, bound to the web `request` the way `frontend/src/api/community.ts` binds `createCommunityApi(request)`.
+- Produces `homeGames(input: { circle: DigestItem[]; popular: TopShelfGame[]; newest: DiscoverItem[]; viewerId: string }): { followed: DiscoverItem[]; others: DiscoverItem[]; othersLabel: "Popular this month" | "New games" }`. `TopShelfGame` is the element type of `TopShelf["games"]` (`packages/shared/src/topShelf/types.ts:7-15`).
+  - `followed` is the circle's `publication` items mapped to `{ author: item.actor, content: item.content }`, at most 2.
+  - `others` is the popular items minus your own (`author.userId === viewerId`) and minus anything already in `followed`, at most 2, labelled "Popular this month".
+  - When `followed` and `others` are both empty, `others` is the newest non-own items, at most 2, labelled "New games".
+
+- [ ] **Step 1: Write the failing tests** (`test-home-games.mts`). Build the fixtures from the shapes in `packages/shared/src/dashboard.test.ts` and `topShelf/api.test.ts`.
+
+```ts
+test("followed games come from the circle's publications, at most two", () => {
+  const out = homeGames({ circle: [pub("t1", "alice"), reading("b1"), pub("q1", "alice"), pub("q2", "bob")], popular: [], newest: [], viewerId: "me" });
+  assert.deepEqual(out.followed.map((g) => g.content.id), ["t1", "q1"]);
 });
 
-test("reading items: book cover, progress only when known, at most six, See all to the Reading filter", () => {
-  assert.match(home, /<BookCover/);
-  assert.match(home, /readingPercent\(/);
-  assert.match(home, /\.slice\(0, 6\)/);
-  assert.match(home, /\/dashboard\/library\?status=reading/);
-  assert.match(home, /\/dashboard\/library\?status=unread/);
-  assert.match(home, /Can't choose\?/);
+test("popular drops your own games and ones already followed, at most two", () => {
+  const out = homeGames({ circle: [pub("t1", "alice")], popular: [hot("mine", "me"), hot("t1", "alice"), hot("p1", "joana"), hot("p2", "ines"), hot("p3", "x")], newest: [], viewerId: "me" });
+  assert.deepEqual(out.others.map((g) => g.content.id), ["p1", "p2"]);
+  assert.equal(out.othersLabel, "Popular this month");
 });
 
-test("activity and readers are side panels; the empty library is an EmptyState", () => {
-  assert.match(home, /LIST_PANEL/);
-  assert.match(home, /\/community\/people/);
-  assert.match(home, /\/community\/discover/);
-  assert.match(home, /<EmptyState[\s\S]*?Import library/);
-  assert.doesNotMatch(home, /BookGrid/);
+test("with nothing followed or popular, the newest public games fill in", () => {
+  const out = homeGames({ circle: [], popular: [], newest: [game("mine", "me"), game("n1", "joana"), game("n2", "ines")], viewerId: "me" });
+  assert.deepEqual(out.others.map((g) => g.content.id), ["n1", "n2"]);
+  assert.equal(out.othersLabel, "New games");
+});
+
+test("the Home badge counts the personal feed, and the new hooks keep the app's cache budget", () => {
+  const read = (f: string) => readFileSync(new URL(`../src/${f}.tsx`, import.meta.url), "utf8");
+  assert.match(read("layouts/DashboardLayout"), /useActivityFeed\(\)/);
+  const hooks = readFileSync(new URL("../src/hooks/useDashboard.ts", import.meta.url), "utf8");
+  assert.match(hooks, /CIRCLE_DIGEST_KINDS/);
+  assert.match(hooks, /PERSONAL_DIGEST_KINDS/);
+  assert.equal(hooks.match(/staleTime: 30_000/g)?.length, 2);
 });
 ```
 
 - [ ] **Step 2: Run.** Expected: FAIL.
-- [ ] **Step 3: Implement** the spec's "Home":
-  - Grid: `grid gap-12 lg:grid-cols-[minmax(0,1fr)_340px]`.
-  - Main column: `flex flex-col gap-12`.
-  - **Currently reading.** A heading (`SECTION_HEADING`) with the count (`font-text text-sm font-normal text-(--color-text-dim)`). Items in a grid: `grid gap-x-8 gap-y-7 [grid-template-columns:repeat(auto-fill,minmax(300px,1fr))]`. Each item is a `group` link holding a `BookCover` at 84, then title, author and a progress bar (`h-1 rounded-full bg-(--color-border)` with an `bg-(--color-accent)` fill at the percent, plus the percent in `text-xs`) when `readingPercent` is not null.
-  - **Up next.** A heading with the count, "Can't choose?" (existing `PickNextSheet`) and "See all". Six `group` links in `grid [grid-template-columns:repeat(auto-fill,minmax(112px,1fr))] gap-x-5 gap-y-6`, each a `BookCover` with no width (it fills the track) above the title and author.
-  - **Rediscover.** A `figure` in a `PANEL` with `p-8`: the quote in `font-display text-2xl italic leading-[2.125rem]`, an `accent` opening mark, and the figcaption in `text-dim`.
-  - **Side column:** an Activity `LIST_PANEL` (`PANEL_HEADING` plus the "N new" chip; rows `LIST_ROW_LINK` with a 32px `Avatar`, the bold name, the text, a `text-xs` time line and an 8px `accent` dot labelled "New"), with today's loading, retry, paging and mark-seen code unchanged. Then the Readers `LIST_PANEL` with two rows.
-  - The empty library is `<EmptyState title="Start your library" body="Import your existing collection, or add your first book manually." action={…Import library primary + Add a book secondary…} />`. Check how `EmptyState`'s `action` prop is typed before passing two buttons.
-- [ ] **Step 4: Run** the tests and the Verify line. In the browser at 1440×900, the first screen shows Currently reading and the Activity panel. Check 1024 and 390 too, and an empty library: run `node scripts/dev-web.mjs --reset` on a fresh slot only if no seeded empty account exists, otherwise skip it.
+- [ ] **Step 3: Implement** the two hooks, the two API bindings and `homeGames`. In `DashboardLayout`, take the badge from `useActivityFeed().personalNewCount` instead of `useDashboard()`.
+- [ ] **Step 4: Run** the test and the Verify line.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add frontend/src/pages/HomePage.tsx frontend/scripts/test-dashboard-cards.mts frontend/scripts/test-controls.mts && git commit -m "Lay out Home as a two-column dashboard"
+git add frontend/src/hooks/useDashboard.ts frontend/src/layouts/DashboardLayout.tsx frontend/src/api/topShelf.ts frontend/src/api/works.ts frontend/src/lib/homeGames.ts frontend/scripts/test-home-games.mts && git commit -m "Add the circle and activity feeds and pick Home's games"
 ```
 
-### Task 12: Phase 3 browser pass and PR
+### Task 11c: Home layout, games, awards card, reading strip, suggestions
 
-- [ ] Same steps as Task 5, over Home in all four sizes and three themes, the Activity links and "Can't choose?".
+**Files:**
+- Modify: `frontend/src/pages/HomePage.tsx`
+- Create: `frontend/src/components/games/DiscoverTicket.tsx`
+- Modify: `frontend/src/pages/DiscoverPage.tsx`
+- Create: `frontend/src/components/home/AwardsCard.tsx`
+- Create: `frontend/src/components/home/ReadingStrip.tsx`
+- Create: `frontend/src/components/home/SuggestedReaders.tsx`
+- Modify: `frontend/src/hooks/useDashboard.ts`
+- Test: `frontend/scripts/test-dashboard-cards.mts`
+
+**Interfaces:**
+- Consumes: `homeGames`, `useCircleFeed`, `fetchTopShelf`, `fetchRecentAwards` (Task 11b); `awardCardModel`, `firstUndismissed`, `awardKey` (Task 11a); `BookCover` (Task 6); `useSuggestedPeople`, `followUser` (`frontend/src/hooks/useCommunity.ts:52`, `frontend/src/api/community.ts`); `SECTION_HEADING`, `PANEL`, `LIST_PANEL`, `PANEL_HEADING` (Task 1).
+- Produces:
+  - `DiscoverTicket({ item }: { item: DiscoverItem })`, extracted unchanged from `DiscoverPage`'s private `DiscoverRow` (`DiscoverPage.tsx:118`).
+  - `AwardsCard({ announcements, library })`.
+  - `ReadingStrip({ books })`.
+  - `SuggestedReaders()`.
+- Deletes `useDashboard` once nothing uses it.
+
+- [ ] **Step 1: Write the failing tests** (`test-dashboard-cards.mts`, source assertions in the suite's style).
+
+```ts
+const read = (f: string) => readFileSync(new URL(`../src/${f}.tsx`, import.meta.url), "utf8");
+
+test("Home: two columns from lg, awards card, games from homeGames, reading strip and suggestions", () => {
+  const home = read("pages/HomePage");
+  assert.match(home, /lg:grid-cols-\[minmax\(0,1fr\)_340px\]/);
+  for (const part of ["<AwardsCard", "<DiscoverTicket", "<ReadingStrip", "<SuggestedReaders"]) assert.match(home, new RegExp(part), part);
+  assert.match(home, /homeGames\(/);
+  assert.match(home, /Browse all/);
+  assert.doesNotMatch(home, /useDashboard\(/);
+  assert.doesNotMatch(home, /Rediscover|Up next|Currently reading/);
+});
+
+test("the reading strip: five covers, progress when known, a link to the Reading filter", () => {
+  const strip = read("components/home/ReadingStrip");
+  assert.match(strip, /<BookCover/);
+  assert.match(strip, /readingPercent\(/);
+  assert.match(strip, /\.slice\(0, 5\)/);
+  assert.match(strip, /\/dashboard\/library\?status=reading/);
+});
+
+test("Discover and Home share one ticket", () => {
+  assert.match(read("pages/DiscoverPage"), /<DiscoverTicket/);
+  assert.doesNotMatch(read("pages/DiscoverPage"), /function DiscoverRow/);
+});
+
+test("the awards card uses the shared model, links a work, and can be dismissed", () => {
+  const card = read("components/home/AwardsCard");
+  assert.match(card, /awardCardModel\(/);
+  assert.match(card, /firstUndismissed\(/);
+  assert.match(card, /aria-label="Dismiss"/);
+});
+
+test("suggestions: at most three, Follow as a secondary button, See all to People", () => {
+  const s = read("components/home/SuggestedReaders");
+  assert.match(s, /\.slice\(0, 3\)/);
+  assert.match(s, /BUTTON_SECONDARY[\s\S]*?Follow|Follow[\s\S]*?BUTTON_SECONDARY/);
+  assert.match(s, /\/community\/people/);
+});
+```
+
+- [ ] **Step 2: Run.** Expected: FAIL.
+- [ ] **Step 3: Implement**, following the spec's Home section and the canvas:
+  - **HomePage**: `<Page title="Home">` with `grid gap-10 lg:grid-cols-[minmax(0,1fr)_340px]`.
+    - Main column: `AwardsCard` when `firstUndismissed` returns one; the Games section (`SECTION_HEADING`, "Browse all →" to `/community/discover`, "From people you follow" then `othersLabel`, two `DiscoverTicket`s each in `[grid-template-columns:repeat(auto-fill,minmax(340px,1fr))] gap-4`); then a "Your reading circle" section that Task 11d fills.
+    - Side column: a For you slot that Task 11d fills, `ReadingStrip`, then `SuggestedReaders`.
+    - An empty library swaps `ReadingStrip` for today's "Start your library" content as an `EmptyState` (Import library primary, Add a book secondary).
+    - Keep `PickNextSheet` out; the reading strip replaces Up next.
+  - **AwardsCard**:
+    - Uses the app's shell: `PANEL` with a 16px radius, a 40×60 `BookCover`, the prize line, and title and author.
+    - The `accent` shelf line comes from the model and is omitted when null.
+    - The card links to `/work/:id` when the model's target is a work, and is not a link for the `{ kind: "search" }` target, which has no web route.
+    - Dismissal stores `awardKey` values under `localStorage` key `dismissedAwards`, guarded with try/catch so a blocked storage just shows the card.
+  - **ReadingStrip**:
+    - A `PANEL` with a `PANEL_HEADING` "Your reading" plus the count, and "Library →" to `/dashboard/library?status=reading`.
+    - A 5-column grid of `BookCover`s with no width, each with a `h-0.75` progress bar when `readingPercent` is not null.
+  - **SuggestedReaders**: a `LIST_PANEL` of `useSuggestedPeople(true)`'s first three, each with avatar, name, reason and Follow (`BUTTON_SECONDARY`, `followUser`, then invalidate `["community","people"]`), plus "See all →".
+- [ ] **Step 4: Run** the tests and the Verify line.
+- [ ] **Step 5: Commit**
+
+```bash
+git add frontend/src/pages/HomePage.tsx frontend/src/components/games/DiscoverTicket.tsx frontend/src/pages/DiscoverPage.tsx frontend/src/components/home/AwardsCard.tsx frontend/src/components/home/ReadingStrip.tsx frontend/src/components/home/SuggestedReaders.tsx frontend/src/hooks/useDashboard.ts frontend/scripts/test-dashboard-cards.mts && git commit -m "Rebuild Home around games, the reading strip and suggestions"
+```
+
+### Task 11d: Circle feed cards and the For you panel
+
+**Files:**
+- Create: `frontend/src/components/home/FeedCard.tsx`
+- Create: `frontend/src/components/home/ForYouPanel.tsx`
+- Modify: `frontend/src/pages/HomePage.tsx`
+- Create: `frontend/scripts/test-feed-card.mts`
+- Test: `frontend/scripts/test-controls.mts`
+
+**Interfaces:**
+- Consumes: `feedRowModel`, `feedEventLabel`, `feedPrimaryLabel`, `feedRowAccessibilityLabel`, `activityRowModel`, `shouldMarkFeedSeen` (Task 11a); `useCircleFeed`, `useActivityFeed` (Task 11b); `digestTarget`, `relativeTime`, `newCountLabel`, `markDashboardSeen` (already shared and bound); `AuthorAvatar` (`frontend/src/components/CommunityAuthorAvatar.tsx`); `ReaderGlyph`; `BookCover`.
+- Produces:
+  - `FeedCard({ item }: { item: DigestItem })`, which Task 12a extends with actions.
+  - `ForYouPanel()`.
+
+- [ ] **Step 1: Write the failing tests** (`test-feed-card.mts`).
+  - Render with `react-dom/server` inside `MemoryRouter`, plus a `QueryClientProvider` where a component needs one.
+  - Reuse the fixtures from `packages/shared/src/community/feedRowModel.test.ts` and `activityModel.test.ts` (Task 11a).
+  - In `test-controls.mts`, replace the old Home row assertion (`:28-32`) with: `assert.match(src("components/home/FeedCard"), /min-h-11/)`.
+
+```ts
+test("a finished book: avatar, name, event label, time, cover, title, author, and its primary link", () => {
+  const html = card(finishedReading);
+  assert.match(html, /<article/);
+  assert.match(html, new RegExp(feedEventLabel(finishedReading)));
+  assert.match(html, />Piranesi</);
+  assert.match(html, /Susanna Clarke/);
+  assert.match(html, new RegExp(`href="${digestTarget(finishedReading)}"`));
+});
+
+test("a tournament shows VS covers, a quiz the ? disc, a mural its tile", () => {
+  assert.match(card(publishedTournament), />VS</);
+  assert.match(card(publishedQuiz), />\?</);
+  assert.match(card(publishedMural), /Open mural/);
+});
+
+test("For you: Follow back, View results and Following, with the new count", () => {
+  const html = forYou([followedMe, playedMyQuiz, followedMeAlreadyFollowing], { personalNewCount: 2 });
+  assert.match(html, /<button[^>]*>Follow back<\/button>/);
+  assert.match(html, /View results/);
+  assert.match(html, />Following</);
+  assert.match(html, /2 new/);
+});
+
+test("For you marks the feed seen only through the shared gate", () => {
+  const src = readFileSync(new URL("../src/components/home/ForYouPanel.tsx", import.meta.url), "utf8");
+  assert.match(src, /IntersectionObserver/);
+  assert.match(src, /shouldMarkFeedSeen\(/);
+  assert.match(src, /markDashboardSeen\(/);
+});
+```
+
+`card(item)` renders `FeedCard`. `forYou(items, page)` renders `ForYouPanel` with a `QueryClient` seeded via `setQueryData(["community","dashboard","activity"], …)` in the shape `useActivityFeed` reads.
+
+- [ ] **Step 2: Run.** Expected: FAIL.
+- [ ] **Step 3: Implement** the spec's feed card and For you.
+  - **FeedCard** is a `PANEL` article with a 16px radius, `px-4.5 pt-4 pb-2`.
+    - Header: a 36px `AuthorAvatar` with the name linking to the profile and the `feedEventLabel` under it, then the `relativeTime`.
+    - Preview by kind:
+      - book: a `BookCover` at 72 next to the title (`font-display text-[22px] font-bold`), the author, and the `feedPrimaryLabel` link;
+      - tournament: two `BookCover`s at 40, rotated ±7°, with "VS" on an `accent-soft` tile;
+      - quiz: a two-cover fan and a `?` disc on a `reference-soft` tile;
+      - mural: an `aspect-[16/6]` tile with "Open mural →";
+      - any other kind: the model's icon in a 48×72 tile.
+    - Map `FeedIconName` to the web nav icons (`frontend/src/components/NavIcons.tsx`).
+    - Set the article's `aria-label` from `feedRowAccessibilityLabel`.
+  - **ForYouPanel**: a `LIST_PANEL` with a `PANEL_HEADING` "For you" and the `newCountLabel` chip.
+    - Rows come from `activityRowModel`: a 32px avatar, the sentence, the time, and an 8px `accent` dot (labelled "New") when newer than `seenAt`.
+    - The action is **Follow back** (`BUTTON_SECONDARY`, `followUser`), a "View results →" link, or "Following" in `text-dim`.
+    - Show the first 6 rows; "Show more" calls `fetchNextPage`.
+    - Mark seen through an `IntersectionObserver` on the rows, gated by `shouldMarkFeedSeen`.
+  - **HomePage**: "Your reading circle" renders `FeedCard`s from `useCircleFeed` with "Load more", and "Find people →" on the heading row. When you follow nobody, it shows the app's onboarding copy with a **Find people** `BUTTON_PRIMARY`.
+- [ ] **Step 4: Run** the tests and the Verify line.
+- [ ] **Step 5: Commit**
+
+```bash
+git add frontend/src/components/home/FeedCard.tsx frontend/src/components/home/ForYouPanel.tsx frontend/src/pages/HomePage.tsx frontend/scripts/test-feed-card.mts frontend/scripts/test-controls.mts && git commit -m "Show the reading circle as the app's feed cards and add For you"
+```
+
+### Task 12: Phase 3a browser pass and PR
+
+- [ ] Same steps as Task 5, over Home at all four sizes and three themes. Cover:
+  - an account that follows people (the fixture) and one that follows nobody;
+  - Follow back, Load more and "Show more";
+  - that the Home badge clears after For you has been on screen.
 
 ---
 
-## Phase 4 — Community and Games (PR 4)
+## Phase 3b — Feed actions and Saved (PR 4)
+
+### Task 12a: Like, save, share and Want to read on feed cards, and the Saved page
+
+**Files:**
+- Modify: `frontend/src/api/community.ts`
+- Create: `frontend/src/hooks/useFeedActions.ts`
+- Modify: `frontend/src/components/home/FeedCard.tsx`
+- Create: `frontend/src/pages/SavedPage.tsx`
+- Modify: `frontend/src/App.tsx`
+- Modify: `frontend/src/pages/HomePage.tsx`
+- Test: `frontend/scripts/test-feed-card.mts`
+
+**Interfaces:**
+- Consumes: from `packages/shared/src/community/api.ts`, `likeActivity`, `fetchActivityEngagement` (1–50 ids), `saveContent`, `fetchSavedState`, `fetchSavedContent`; `savedContentRef` (`packages/shared/src/dashboard.ts:46`); `reactionCount`, `hasActivityThread`, `feedShareTarget`, `readingShelfBook` (Task 11a); `addBookToLibrary` (`frontend/src/api/library.ts:46`).
+- Produces:
+  - Those five functions, bound in `frontend/src/api/community.ts`'s `createCommunityApi(request)` destructure.
+  - `useFeedActions(items: DigestItem[]): { engagement: Record<string, ActivityEngagement>; saved: Set<string>; like(item): void; save(item): void; wantToRead(item): void; share(item): void }`. It is the web port of the app's `useHomeActions` (`mobile/src/features/home/useHomeActions.ts:19`):
+    - the engagement query key is `["community","engagement", ids]`, batched in chunks of 50, with `staleTime: 30_000`;
+    - like and save are optimistic and roll back on error with a toast;
+    - Want to read calls `addBookToLibrary({ title, author, isbn: isbn ?? null, coverUrl: coverUrl ?? null, readStatus: 0, preserveExisting: true })`, then invalidates `["library"]`;
+    - share uses `navigator.share` when present, else copies `${location.origin}${feedShareTarget(item)}` with a toast, as `WorkPage.tsx:57-67` does.
+  - Route `/dashboard/saved` → `SavedPage`, under `RequireUsername`.
+
+- [ ] **Step 1: Write the failing tests** (append to `test-feed-card.mts`).
+
+```ts
+test("the footer: like with its count and pressed state, comments with count, share", () => {
+  const html = card(finishedReading, { engagement: { [finishedReading.id]: { likes: 2, liked: true, comments: 1 } } });
+  assert.match(html, /<button(?=[^>]*aria-pressed="true")(?=[^>]*aria-label="Like, 2 likes")[^>]*>/);
+  assert.match(html, /<button(?=[^>]*aria-label="Comments, 1")[^>]*>/);
+  assert.match(html, /<button[^>]*>[\s\S]*?Share<\/button>/);
+});
+
+test("save in the header; Want to read, or Open in your shelf when you hold the book", () => {
+  assert.match(card(finishedReading), /<button(?=[^>]*aria-label="Save")(?=[^>]*aria-pressed="false")[^>]*>/);
+  assert.match(card(finishedReading), /<button[^>]*>Want to read<\/button>/);
+  assert.match(card(finishedReading, { library: [piranesiOnShelf] }), /Open in your shelf/);
+});
+
+test("actions keep the app's limits and paths", () => {
+  const hook = readFileSync(new URL("../src/hooks/useFeedActions.ts", import.meta.url), "utf8");
+  assert.match(hook, /staleTime: 30_000/);
+  assert.match(hook, /50/);
+  assert.match(hook, /preserveExisting: true/);
+  assert.match(hook, /navigator\.share/);
+  assert.match(readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8"), /path="\/dashboard\/saved"/);
+});
+```
+
+`card(item, opts)` gains the optional engagement, saved and library inputs. The test passes them through a seeded `QueryClient` or props, whichever `FeedCard`'s final shape takes.
+
+- [ ] **Step 2: Run.** Expected: FAIL.
+- [ ] **Step 3: Implement.**
+  - **FeedCard footer**: like (heart icon and count, `aria-pressed`), comments (bubble and count; it opens Task 12b's sheet and is disabled until then), a spacer, then Share. Every one is a 44px `rounded-full` button.
+  - **FeedCard header**: a 44px Save button (bookmark, `aria-pressed`).
+  - **Book preview**: **Want to read** (`BUTTON_SECONDARY`), or "Open in your shelf →" when `readingShelfBook` finds the book.
+  - **SavedPage**: `<Page title="Saved" back={{ to: "/dashboard", label: "Home" }}>` listing `fetchSavedContent` pages as `FeedCard`s, without comment counts since saved ids have no thread. Empty: `EmptyState`.
+  - **HomePage**: a Saved icon button (`toolbarIconClass()`, `aria-label="Saved"`) linking to `/dashboard/saved` in `actions`.
+- [ ] **Step 4: Run** the tests and the Verify line.
+- [ ] **Step 5: Commit**
+
+```bash
+git add frontend/src/api/community.ts frontend/src/hooks/useFeedActions.ts frontend/src/components/home/FeedCard.tsx frontend/src/pages/SavedPage.tsx frontend/src/App.tsx frontend/src/pages/HomePage.tsx frontend/scripts/test-feed-card.mts && git commit -m "Let readers like, save, share and add books from the feed"
+```
+
+### Task 12b: Comments sheet
+
+**Files:**
+- Modify: `frontend/src/api/community.ts`
+- Create: `frontend/src/components/home/CommentsSheet.tsx`
+- Modify: `frontend/src/components/home/FeedCard.tsx`
+- Test: `frontend/scripts/test-feed-card.mts`
+
+**Interfaces:**
+- Consumes: `fetchActivityComments(id, cursor?)`, `addActivityComment(id, text)`, `deleteActivityComment(commentId)` (`packages/shared/src/community/api.ts:16-22`), bound in `frontend/src/api/community.ts`; `Sheet`; `FIELD_CLASS`; `useConfirm`.
+- Produces `CommentsSheet({ id, title, onClose }: { id: string; title: string; onClose: () => void })`, a port of the app's `CommentsSheet` (`mobile/src/features/home/CommentsSheet.tsx:15`).
+  - The list is an infinite query with key `["community","comments", id]`.
+  - The composer is a labelled textarea with `FIELD_CLASS` and a Post `BUTTON_PRIMARY` in the sheet footer.
+  - Delete is shown only on your own comments and asks first.
+  - Any change invalidates `["community","engagement"]`.
+  - A 429 from the 30/min comment limit shows a toast saying to wait a moment.
+
+- [ ] **Step 1: Write the failing test.**
+
+```ts
+test("comments: both shown, delete only on your own, a labelled composer with one Post button", () => {
+  const html = comments("a1", [{ id: "c1", author: alice, text: "Loved it", createdAt: "2026-10-29T10:00:00Z", own: false }, { id: "c2", author: me, text: "Same", createdAt: "2026-10-29T11:00:00Z", own: true }]);
+  assert.match(html, /Loved it[\s\S]*Same/);
+  assert.equal(html.match(/>Delete</g)?.length, 1);
+  assert.match(html, /<label[^>]*for="[^"]+"[^>]*>[^<]*Comment/);
+  assert.match(html, /<textarea[^>]*id="/);
+  assert.equal(html.match(/>Post</g)?.length, 1);
+});
+```
+
+`comments(id, list)` renders `CommentsSheet` with a `QueryClient` seeded at `["community","comments", id]` in the infinite-query shape.
+
+- [ ] **Step 2: Run.** Expected: FAIL.
+- [ ] **Step 3: Implement** the sheet, and enable the FeedCard comment button so it opens it.
+- [ ] **Step 4: Run** the test and the Verify line.
+- [ ] **Step 5: Commit**
+
+```bash
+git add frontend/src/api/community.ts frontend/src/components/home/CommentsSheet.tsx frontend/src/components/home/FeedCard.tsx frontend/scripts/test-feed-card.mts && git commit -m "Open feed comments in a sheet"
+```
+
+### Task 12c: Phase 3b browser pass and PR
+
+- [ ] Same steps as Task 5. Cover:
+  - like and unlike;
+  - save, then the Saved page;
+  - share (in the preview browser, the clipboard fallback shows its error toast; that is expected there);
+  - Want to read, then the book appearing in the library;
+  - posting and deleting a comment.
+
+Run every action against the fixture account only.
+
+---
+
+## Phase 4 — Community and Games (PR 5)
 
 ### Task 13: Discover and People
 
@@ -871,7 +1228,7 @@ git add frontend/src/pages/ArenaListPage.tsx frontend/src/pages/ArenaViewPage.ts
 
 ---
 
-## Phase 5 — Murals, Reader card, Settings, Admin, public pages (PR 5)
+## Phase 5 — Murals, Reader card, Settings, Admin, public pages (PR 6)
 
 ### Task 17: Murals list and editor header
 
@@ -1037,7 +1394,7 @@ git add frontend/src/components/GenreReviewList.tsx frontend/src/components/Syno
 
 ---
 
-## Phase 6 — Sweep, docs, screenshots (PR 6)
+## Phase 6 — Sweep, docs, screenshots (PR 7)
 
 ### Task 22: Control sweep
 

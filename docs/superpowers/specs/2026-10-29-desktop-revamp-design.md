@@ -12,7 +12,7 @@ The 2026-10-25 page-frame work (`docs/superpowers/specs/2026-10-25-site-page-fra
 - **Too many boxes.** Activity, people, series and settings each wrap every item in its own white card.
 - **The review's harmony findings** (H1–H8) were half closed by the page-frame work. The parts it left open (hand-rolled buttons, inputs and danger fills; three empty-state shapes) are still there (`frontend/src/components/ConfirmDialog.tsx:79`, `frontend/src/components/AddBookModal.tsx:312-372`, `frontend/src/pages/PeoplePage.tsx:17`).
 
-Mockups: the "Atmyshelf desktop revamp" design canvas, https://claude.ai/artifact/8i4a5Kt22ny6DeyHaqwcow. A copy of each artboard's source is in `docs/superpowers/specs/2026-10-29-desktop-revamp-mockups/`. The inline styles there are the measurements this document refers to.
+Mockups: the "Atmyshelf desktop revamp" design canvas, https://claude.ai/artifact/8i4a5Kt22ny6DeyHaqwcow. A copy of each artboard's source is in `docs/superpowers/specs/2026-10-29-desktop-revamp-mockups/` (`home.dc.html` is the social Home agreed on 2026-10-30). The inline styles there are the measurements this document refers to.
 
 ## Goals
 
@@ -24,7 +24,7 @@ Mockups: the "Atmyshelf desktop revamp" design canvas, https://claude.ai/artifac
 - **Nothing regresses**: all eleven themes, their decor, reduced motion, the AA pairs, the 44px floor and phone-width web all keep working.
 
 What success looks like (*my call*):
-- At 1440×900, Home's first screen shows the reading list and the activity panel.
+- At 1440×900, Home's first screen shows games from people you follow and the For you panel.
 - Every page's content is centred. No column hugs the left edge.
 - Desktop navigation is visible at every scroll position.
 - Going from any page to any other never moves or restyles the title.
@@ -34,7 +34,7 @@ What success looks like (*my call*):
 
 - The landing page, privacy page and sign-in journey. The user kept the landing page as it is on 2026-10-25, and `AuthCard` already follows the system. The one exception is the landing screenshots, which show Library and Home and are regenerated at the end.
 - The mobile app.
-- New features. That includes web search, a notifications centre, Top Shelf on web, recaps, keyboard shortcuts and a collapsible nav. The review's feature gaps stay separate work.
+- New features beyond the social Home. Out of scope: web search, a Top Shelf page, recaps, keyboard shortcuts, a collapsible nav, an everyone-feed (it would need a new endpoint) and folding Discover into Games. The Home section brings over what the phone app's Home already has on existing endpoints: feed actions, a Saved list, the awards card, and Top Shelf's popular games.
 - The flow changes the review listed separately: #6 (where a new public tier list lands), #8 (Publish position in the quiz editor), #10 (drafts created on click) and #18 (merging Discover with public tournaments).
 
 ## Anti-goals
@@ -143,16 +143,29 @@ Every page below renders through `Page`. Unless it says otherwise, its title, ba
 
 ### Home (`/dashboard`, `default`)
 
-- **Header**: title "Home", no actions. "Find people" and "Discover" move into the side panel.
-- **At `lg` and up, two columns**: a main column (`minmax(0,1fr)`) and a 340px side column with a 48px gap. Below `lg` it is one column with the side panels after the main column.
-- **Main column:**
-  - **Currently reading.** Section heading with the book count. A grid of reading items (`repeat(auto-fill, minmax(300px, 1fr))`). Each item is the book-style cover at 84px wide, then title (16/22 semibold), author (`text-dim`) and, when `readingPercent(book)` (`packages/shared/src/library/libraryView.ts:91`) is not null, a 4px progress bar (`accent` on `border`) with the percent. The whole item is one link to the book. Show up to 6 items. If there are more, a "See all" link goes to `/dashboard/library?status=<reading>` (the value from `STATUS_FILTER_OPTIONS`).
-  - **Up next.** Section heading with the count. Up to 6 book-style covers (`minmax(112px, 1fr)`) with title and author under each. On the heading row: "See all", going to the library filtered to to-read, plus today's "Can't choose?" button that opens `PickNextSheet`.
-  - **Rediscover.** One `surface` panel holding the quote in the display font, italic, 24/34, a large `accent` opening quote mark, and the book and author under it in `text-dim`.
-  - **Empty library.** Today's "Start your library" card becomes an `EmptyState` with Import library as the primary and Add a book as the secondary.
-- **Side column:**
-  - **Activity.** A list panel with a panel heading and the "N new" chip (`accent-soft`/`accent`). Each row has a 32px avatar, a bold name, the action text and a time line, plus an 8px `accent` dot (labelled "New") on new rows. Loading, error, retry, pagination and mark-seen behave as they do today. The panel is now near the top of the page, so the section becomes visible on first paint. That is correct: the reader does see it.
-  - **Readers.** A small list panel with two rows: "Find people" (`/community/people`) and "Discover games" (`/community/discover`), each with a one-line description and a chevron.
+**Decided with the user on 2026-10-30, replacing the personal Home first drafted here.** Home is social-first and mirrors the phone app's Home (`mobile/src/features/home/`) in parts and look. It is built only on endpoints that already exist. The user ruled out a new endpoint, so there is no everyone-feed: activity comes from people you follow, and suggested readers keep Home from feeling empty. The canvas's "Home" artboard is the reference.
+
+- **Header**: title "Home". The only action is **Saved**, an icon button (bookmark) that opens the saved list, as the app's Home header does.
+- **At `lg` and up, two columns**: a main column (`minmax(0,1fr)`) and a 340px side column with a 40px gap. Below `lg` it is one column, with the side panels after the main column.
+- **Main column, top to bottom:**
+  - **Awards card**, only while `GET /awards/recent` returns something. This is the app's `AwardHomeCard`: a `surface` row with a `border`, 16px radius, a small cover, the prize line, title and author, and an `accent` shelf line ("Not on your shelf yet" / on your shelf). Its copy comes from the app's award card model, which moves to `@scripta/shared`. The app's monthly recap card stays out, because the web has no recap player.
+  - **Games.** A section heading with "Browse all →" (to Discover).
+    - "From people you follow": games the people you follow published, taken from the existing Home feed's publication items.
+    - "Popular this week": the existing Top Shelf games list (`GET /top-shelf?view=games`), without your own games.
+    - If both are empty, show the newest from Discover.
+    - Each game is the web `GameTicket` (already a port of the app's ticket): the tinted art column per type, title, author, status chip, numbers, and the dashed footer with its tinted action ("Vote in tournament", "Play quiz", "Rank books"). Show two per group in a `repeat(auto-fill, minmax(340px,1fr))` grid.
+  - **Your reading circle.** A section heading with "Find people →". These are the app's feed cards (`HomeFeedRow`) for the circle kinds (`CIRCLE_DIGEST_KINDS`). Each is a `surface` card with a 16px radius:
+    - a header with a 36px avatar, the bold name, the event label in `text-dim` under it, the relative time and a Save button;
+    - a preview by kind: a book cover with the title in the display font, the author, and **Want to read** (or **Open in your shelf →** when you hold it); a tournament's two tilted covers with "VS"; a quiz's cover fan with the "?" disc; a mural tile;
+    - a footer with like (with count), comment (with count) and Share.
+    - Like, comment, save, Want to read and share call the app's existing endpoints. Comments open in a `Sheet`. "Load more" pages as today.
+  - **Empty circle.** When you follow nobody yet, the app's onboarding copy and a **Find people** primary.
+- **Side column, top to bottom:**
+  - **For you**: the app's bell list (`PERSONAL_DIGEST_KINDS`) as a list panel. It has a "N new" chip, and each row has a 32px avatar, a bold sentence, the time, and the row's action on the right (**Follow back**, "View results →", or "Following" in `text-dim`). The nav's Home badge counts this list (`personalNewCount`). It is marked seen when its rows are on screen, as the app's Activity screen does.
+  - **Your reading**: a slim strip. A panel heading with the count and "Library →", then up to five small book-style covers, each with a 3px progress bar when `readingPercent(book)` is known.
+  - **Readers you might like**: up to three of the existing suggested readers (the ones the People page shows), with avatar, name, reason ("You share 4 books") and a **Follow** secondary button, and "See all →" to People.
+- **Empty library**: Today's "Start your library" card becomes an `EmptyState` with Import library as the primary and Add a book as the secondary. It takes the reading strip's place.
+- **No duplicated logic.** The app's feed-row, activity-row and award-card view models move to `@scripta/shared` and both clients use them, as `AGENTS.md` requires.
 
 ### Library area (`wide`, owner's width)
 
@@ -256,7 +269,7 @@ Keeps its centred message, with "Go to your library" as `BUTTON_PRIMARY`.
 
 1. **Frame.** The top bar with account menu and skip link, public bar mode, routes moved under `SessionLayout`, the new `Page` header, widths on every page, the sticky offset, the control classes, the panel-heading font override, the cover shadow and the book-style cover component. Every page picks up the new header through `Page` in this PR, and every page gets its width.
 2. **Library area and book page.**
-3. **Home.**
+3. **Home**, in two PRs: (a) the layout, the games, the circle feed cards (read-only), For you, the reading strip, suggestions and the awards card, with the view models moved to shared; (b) the feed actions (like, comment `Sheet`, save and the Saved list, Want to read, share).
 4. **Community and Games.**
 5. **Murals, Reader card, Settings, Admin, public pages, Not found.**
 6. **Docs and screenshots**: `DESIGN.md`, `frontend/README.md`, landing screenshots, then ask for the `site-ui-reviewer` pass.
