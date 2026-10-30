@@ -29,7 +29,7 @@ export const fonts: Record<FontId, FontDefinition> = {
   vt323: { label: "VT323", family: "VT323", slots: ["display"], weights: [400], scale: 1.3, fallback: MONO },
   orbitron: { label: "Orbitron", family: "Orbitron", slots: ["display"], weights: [700], scale: 0.88, fallback: SANS },
   righteous: { label: "Righteous", family: "Righteous", slots: ["display"], weights: [400], scale: 1, fallback: SANS },
-  atkinson: { label: "Atkinson Hyperlegible", family: "Atkinson Hyperlegible", slots: ["text"], weights: [400, 700], scale: 1, fallback: SANS },
+  atkinson: { label: "Atkinson", family: "Atkinson Hyperlegible", slots: ["text"], weights: [400, 700], scale: 1, fallback: SANS },
   jetbrainsMono: { label: "JetBrains Mono", family: "JetBrains Mono", slots: ["text"], weights: [400, 700], scale: 1, fallback: MONO },
 };
 

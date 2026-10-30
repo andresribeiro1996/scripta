@@ -15,7 +15,7 @@ function Swatch({ colors }: { colors: ThemeColors }) {
   );
 }
 
-function tile(option: ThemePreference) {
+export function themeTile(option: ThemePreference) {
   return option === "system" ? { label: "System", palettes: [themes.light.colors, themes.dark.colors] } : { label: themes[option].label, palettes: [themes[option].colors] };
 }
 
@@ -25,7 +25,7 @@ export function ThemeGrid<T extends ThemePreference>({ options, value, onChange 
     <View accessibilityRole="radiogroup" accessibilityLabel="Theme" style={styles.grid}>
       {options.map((option) => {
         const checked = option === value;
-        const { label, palettes } = tile(option);
+        const { label, palettes } = themeTile(option);
         return (
           <Pressable
             key={option}

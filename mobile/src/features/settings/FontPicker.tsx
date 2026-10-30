@@ -6,9 +6,10 @@ import { SYSTEM_FAMILY } from "../../ui/systemFont";
 import { Text } from "../../ui/Text";
 import { dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui/theme";
 import { isAppearanceSyncFailure, saveAccountAppearance } from "./appearanceSync";
+import { SWATCH } from "./ThemePicker";
 
 function sampleStyle(font: FontId, slot: FontSlot) {
-  return fontStyleFor(font, slot, typography.body) ?? { fontFamily: SYSTEM_FAMILY };
+  return fontStyleFor(font, slot, typography.title) ?? { fontFamily: SYSTEM_FAMILY };
 }
 
 export function FontPicker({ slot }: { slot: FontSlot }) {
@@ -32,23 +33,25 @@ export function FontPicker({ slot }: { slot: FontSlot }) {
       <Text {...dynamicType} style={[typography.caption, styles.heading, { color: colors.textDim }]}>
         {slot === "display" ? "Headings" : "Text"}
       </Text>
-      <View accessibilityRole="radiogroup" accessibilityLabel={slot === "display" ? "Heading font" : "Text font"} style={styles.row}>
+      <View accessibilityRole="radiogroup" accessibilityLabel={slot === "display" ? "Heading font" : "Text font"} style={styles.grid}>
         {options.map((option) => {
           const checked = option === selected;
           const shown = option === "theme" ? themeDefault : option;
-          const label = option === "theme" ? `Theme default · ${fonts[themeDefault].label}` : fonts[option].label;
+          const label = option === "theme" ? "Default" : fonts[option].label;
+          const a11yLabel = option === "theme" ? `Theme default · ${fonts[themeDefault].label}` : label;
           return (
             <Pressable
               key={option}
               accessibilityRole="radio"
               accessibilityState={{ checked }}
-              accessibilityLabel={label}
+              accessibilityLabel={a11yLabel}
               onPress={() => choose(option)}
-              style={[styles.chip, { borderColor: checked ? colors.accent : colors.border, backgroundColor: checked ? colors.accentSoft : colors.surface }]}
+              style={styles.item}
             >
-              <Text {...dynamicType} style={[typography.body, { color: colors.text }, sampleStyle(shown, slot)]}>
-                {label}
-              </Text>
+              <View style={[styles.tile, { borderColor: checked ? colors.accent : colors.border, borderWidth: checked ? 2 : 1, backgroundColor: checked ? colors.accentSoft : colors.surface }]}>
+                <Text {...dynamicType} style={[typography.title, { color: colors.text }, sampleStyle(shown, slot)]}>Aa</Text>
+              </View>
+              <Text {...dynamicType} numberOfLines={2} style={[typography.caption, styles.name, { color: checked ? colors.text : colors.textDim }]}>{label}</Text>
             </Pressable>
           );
         })}
@@ -65,6 +68,8 @@ export function FontPicker({ slot }: { slot: FontSlot }) {
 const styles = StyleSheet.create({
   wrap: { gap: spacing.sm },
   heading: { fontWeight: "600" },
-  row: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
-  chip: { width: "48%", flexGrow: 1, minHeight: minimumTouchTarget, justifyContent: "center", paddingHorizontal: spacing.md, borderRadius: radii.md, borderWidth: 1 },
+  grid: { flexDirection: "row", flexWrap: "wrap", rowGap: spacing.sm },
+  item: { width: "25%", minHeight: minimumTouchTarget, alignItems: "center", gap: spacing.xs },
+  tile: { width: SWATCH, height: SWATCH, borderRadius: radii.lg, alignItems: "center", justifyContent: "center" },
+  name: { textAlign: "center" },
 });
