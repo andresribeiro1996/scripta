@@ -174,6 +174,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
   async function offeredPick(userId: string, book: BookRow, url: string, at: string): Promise<string> {
     const offer = offers.get(`${userId}\n${book.id}`)?.get(url);
     if (!offer || offer.expiresAt <= now().getTime()) throw new CoverOfferExpiredError();
+    if (deps.repo.listRejectedUrls(book.id).has(url)) throw new CoverOfferExpiredError();
     const stored = deps.repo.listImages(book.id).find((row) => row.source_url === url);
     if (stored) return stored.id;
     const key = `${book.id}\n${url}`;
@@ -411,7 +412,8 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
         const found = outcome.found;
         const replacesWatermark = lane === "upgrade" && found !== null && found.image.width >= MIN_GOOD_WIDTH && watermarked(source, book.isbn);
         if (found && (found.image.width > width || replacesWatermark)) {
-          imageId = await storeCoverImage(deps, bookId, found.candidate.source, found.candidate.url, found.image, at);
+          const stored = deps.repo.listImages(bookId).find((row) => row.source_url === found.candidate.url && row.width === found.image.width && row.height === found.image.height);
+          imageId = stored?.id ?? await storeCoverImage(deps, bookId, found.candidate.source, found.candidate.url, found.image, at);
           width = found.image.width;
           source = found.candidate.source;
         }

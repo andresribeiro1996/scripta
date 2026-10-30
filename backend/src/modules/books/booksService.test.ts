@@ -3407,6 +3407,22 @@ test("a listing lets an unexpected source error propagate", async () => {
   await assert.rejects(h.service.listCoverCandidates("u1", orlando, "quick"), TypeError);
 });
 
+test("candidates ask pickerSources and never the worker's sources when pickerSources is given", async () => {
+  const calls: string[] = [];
+  const failing: CoverSource = {
+    byIsbn: async () => { calls.push("byIsbn"); throw new Error("the worker's sources are not expected"); },
+    byTitle: async () => { calls.push("byTitle"); throw new Error("the worker's sources are not expected"); }
+  };
+  const h = harness({
+    sources: { isbndb: failing, apple: failing, openlibrary: failing },
+    pickerSources: { isbndb: null, apple: listing("apple", { isbn: ["https://p/a"] }), openlibrary: listing("openlibrary", { isbn: ["https://o/a"] }) }
+  });
+  pickerBook(h);
+  assert.deepEqual(urlsOf((await h.service.listCoverCandidates("u1", orlando, "quick")).candidates), ["https://o/a"]);
+  assert.deepEqual(urlsOf((await h.service.listCoverCandidates("u1", orlando, "apple")).candidates), ["https://p/a"]);
+  assert.deepEqual(calls, []);
+});
+
 test("quick and apple offers merge", async () => {
   const h = harness({
     sources: { isbndb: listing("isbndb", { isbn: ["https://i/a"] }), apple: listing("apple", { isbn: ["https://p/a"] }), openlibrary: emptySource }
@@ -3482,6 +3498,31 @@ test("pick reuses a stored row for the same source URL without downloading", asy
   const cover = await h.service.pickCover("u1", orlando, { url: "https://o/a" }, false);
   assert.deepEqual(cover, { url: thumbOf("have"), fullUrl: fileOf("have"), pending: false, upgrading: false });
   assert.equal(h.repo.listImages(book.id).length, 1);
+});
+
+test("pick refuses an offered URL that was rejected after the offer, stored or not", async () => {
+  let fetches = 0;
+  const h = harness({
+    sources: { isbndb: null, apple: emptySource, openlibrary: listing("openlibrary", { isbn: ["https://o/stored", "https://o/new"] }) },
+    fetchPickedImage: async () => {
+      fetches += 1;
+      return encodedCover(600, 900);
+    }
+  });
+  const book = pickerBook(h);
+  storedImage(h, book.id, { id: "current", url: "https://s/current" });
+  h.repo.setCover(book.id, { imageId: "current", status: "good", checkedAt: PICKER_AT });
+  await h.service.listCoverCandidates("u1", orlando, "quick");
+  storedImage(h, book.id, { id: "have", url: "https://o/stored" });
+  h.repo.addRejection(book.id, "https://o/stored", PICKER_AT);
+  h.repo.addRejection(book.id, "https://o/new", PICKER_AT);
+  const before = h.repo.getBook(book.id);
+  for (const url of ["https://o/stored", "https://o/new"]) {
+    await assert.rejects(h.service.pickCover("u1", orlando, { url }, true), CoverOfferExpiredError);
+  }
+  assert.equal(fetches, 0);
+  assert.deepEqual(h.repo.getBook(book.id), before);
+  assert.deepEqual(h.repo.listImages(book.id).map((row) => row.id).sort(), ["current", "have"]);
 });
 
 test("pick refuses a URL never offered, offered to another user, offered for another book, or older than 30 minutes", async () => {
@@ -3577,6 +3618,24 @@ test("pick by coverImageId refuses another book's image or a rejected one", asyn
   await h.service.pickCover("u1", orlando, { coverImageId: "own" }, true);
   assert.equal(h.repo.getBook(book.id)!.cover_image_id, "own");
   assert.equal(h.repo.getBook(book.id)!.cover_status, "manual");
+});
+
+test("an upgrade that finds a URL a reader already picked reuses that row instead of storing a copy", async () => {
+  const { h, id } = prepare(orlando, { isbndb: null, apple: recording("apple", [], "https://a/1"), openlibrary: emptySource }, [["https://a/1", 900]]);
+  const old = withCover(h, id, "openlibrary", 300, "low_res");
+  await h.service.listCoverCandidates("u1", orlando, "apple");
+  await h.service.pickCover("u1", orlando, { url: "https://a/1" }, false);
+  const picked = h.repo.listImages(id).filter((row) => row.source_url === "https://a/1");
+  assert.equal(picked.length, 1);
+  assert.equal(h.repo.getBook(id)!.cover_image_id, old);
+  await h.service.processBook(id, "upgrade");
+  const book = h.repo.getBook(id)!;
+  assert.equal(book.cover_image_id, picked[0]!.id);
+  assert.equal(book.cover_status, "good");
+  assert.equal(book.cover_checked_at, PICKER_AT);
+  assert.equal(book.cover_upgrade_wanted_at, null);
+  assert.equal(h.repo.listImages(id).filter((row) => row.source_url === "https://a/1").length, 1);
+  assert.equal(h.repo.listImages(id).length, 2);
 });
 
 test("candidates and picks for an unknown book throw BookNotFoundError", async () => {
