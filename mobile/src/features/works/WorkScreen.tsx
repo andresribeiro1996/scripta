@@ -106,12 +106,14 @@ export function WorkScreen({ id, edition = null }: { id: string; edition?: strin
     if (addInFlight.current || !model.addBook) return;
     addInFlight.current = true;
     setAddingToRead(true);
+    let added = false;
     try {
       await addBookToLibrary({ ...toRecommendation(model.addBook, 0), day: localDay() });
-      await queryClient.refetchQueries({ queryKey: LIBRARY_QUERY_KEY });
-      await query.refetch();
+      added = true;
+      await queryClient.refetchQueries({ queryKey: LIBRARY_QUERY_KEY }, { throwOnError: true });
+      await query.refetch({ throwOnError: true });
     } catch (error) {
-      show(saveFailureMessage(error, "Could not add the book."), "error");
+      show(added ? "Added to your library, but the page didn't refresh." : saveFailureMessage(error, "Could not add the book."), "error");
     } finally {
       addInFlight.current = false;
       setAddingToRead(false);
