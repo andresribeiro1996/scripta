@@ -3,7 +3,7 @@ import { Stack } from "expo-router";
 import { FlatList, Pressable, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { booksByWork, filterBooks, seedCoverLookup, toSeedBook, workIdOf, type SeedBook } from "@scripta/shared";
+import { booksByWork, filterBooks, roundMinutesFromHours, seedCoverLookup, toSeedBook, workIdOf, type SeedBook } from "@scripta/shared";
 import { Button, EmptyState, ErrorState, Input, Screen, Sheet, Skeleton, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { useLibrary, useWorkBooks } from "../library";
 import { createTournament, fetchTournament, randomFillTournament, resolveCover, setTournamentSlots, startTournament, type Tournament } from "./api";
@@ -44,8 +44,7 @@ export function ArenaSeedScreen({ tournament, onStarted }: { tournament?: Tourna
 
   async function materialize() {
     if (current) return current;
-    const hours = Number(duration);
-    const created = await createTournament({ name: name.trim() || "Untitled tournament", bracketSize: size, roundDurationMinutes: Number.isFinite(hours) && hours > 0 ? hours * 60 : 1440 });
+    const created = await createTournament({ name: name.trim() || "Untitled tournament", bracketSize: size, roundDurationMinutes: roundMinutesFromHours(duration) });
     setCurrent(created);
     await queryClient.invalidateQueries({ queryKey: ["arena", "mine"] });
     return created;

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { bracketSizes, canCreate, defaultTicked, plural, type CharacterGameMode, type WorkCast } from "@scripta/shared";
+import { bracketSizes, canCreate, defaultTicked, plural, roundMinutesFromHours, type CharacterGameMode, type WorkCast } from "@scripta/shared";
 import { createCharacterTournament } from "../api/arena";
 import { createCharacterTierlist, type Tierlist } from "../api/tierlists";
 import { fetchWorkCast } from "../api/works";
@@ -60,8 +60,7 @@ function CastPicker({ workId, cast }: { workId: string; cast: WorkCast }) {
         queryClient.setQueryData<Tierlist[]>(["tierlists"], (items = []) => [...items, created]);
         navigate(`/dashboard/arena/tierlist/${created.id}`, { replace: true });
       } else {
-        const hours = Number(duration);
-        const created = await createCharacterTournament({ name: title, bracketSize: size, roundDurationMinutes: Number.isFinite(hours) && hours > 0 ? hours * 60 : 1440, characters });
+        const created = await createCharacterTournament({ name: title, bracketSize: size, roundDurationMinutes: roundMinutesFromHours(duration), characters });
         void queryClient.invalidateQueries({ queryKey: ["arenas", "mine"] });
         navigate(`/arena/${created.id}`, { replace: true });
       }
