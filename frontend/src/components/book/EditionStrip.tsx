@@ -1,8 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { editionLabel, type BookScreenModel, type WorkEdition } from "@scripta/shared";
-import { CoverImage } from "../BookCard";
 import { OptionsMenu } from "../OptionsMenu";
 import { ChevronDownIcon } from "../Toolbar";
+import { BookCover, editionCoverBook } from "./BookCover";
 
 type Props = {
   editions: WorkEdition[];
@@ -26,7 +26,7 @@ export function EditionStrip({ editions, author, edition, mineBook, onSelect }: 
   });
 
   const coverBooks = useMemo(
-    () => editions.map((e) => (e.coverUrl ? { Title: e.title, Attribution: author, ISBN: e.isbn ?? undefined, _coverUrl: e.coverUrl } : {})),
+    () => editions.map((e) => editionCoverBook(e, author)),
     [editions, author]
   );
 
@@ -87,7 +87,7 @@ export function EditionStrip({ editions, author, edition, mineBook, onSelect }: 
         aria-label="Editions"
         tabIndex={0}
         onKeyDown={onKeyDown}
-        className="relative flex snap-x snap-mandatory gap-3 overflow-x-auto px-[calc(50%-4rem)] py-1 [scrollbar-width:none] sm:px-[calc(50%-4.5rem)] [&::-webkit-scrollbar]:hidden"
+        className="relative flex snap-x snap-mandatory gap-3 overflow-x-auto px-[calc(50%-6.25rem)] py-4 [scrollbar-width:none] lg:px-[calc(50%-8.75rem)] [&::-webkit-scrollbar]:hidden"
       >
         {editions.map((e, i) => {
           const selected = i === index;
@@ -100,9 +100,9 @@ export function EditionStrip({ editions, author, edition, mineBook, onSelect }: 
               aria-current={selected}
               aria-label={`${e.title} · ${editionLabel(e)}`}
               onClick={() => (selected ? undefined : choose(i))}
-              className={`relative aspect-[2/3] w-32 shrink-0 snap-center overflow-hidden rounded-xl bg-(--color-border) transition sm:w-36 ${selected ? "" : "scale-90 opacity-60"}`}
+              className={`relative w-50 shrink-0 snap-center transition lg:w-70 ${selected ? "" : "scale-90 opacity-60"}`}
             >
-              <CoverImage book={coverBook} size="full" />
+              <BookCover book={coverBook} title={e.title} size="full" />
             </button>
           );
         })}

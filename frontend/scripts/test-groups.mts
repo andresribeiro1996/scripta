@@ -72,6 +72,7 @@ console.log("\n5. groups are sections, not cards, and an empty group uses EmptyS
   check("each group is a labelled section", /<section(?:=>|[^>])*aria-labelledby=/.test(groups));
   check("groups are separated by a top border", /border-t border-\(--color-border\)/.test(groups));
   check("no white card wrapper on a group", !/<section(?:=>|[^>])*bg-\(--color-surface\)/.test(groups));
+  check("a long group name wraps anywhere instead of widening the page", /<button(?:=>|[^>])*className="[^"]*\bwrap-anywhere\b[^"]*"(?:=>|[^>])*title="Rename"/.test(groups));
   check("no one-line empty text", !/<p className="[^"]*">No books here yet/.test(groups));
   check("an empty group uses EmptyState", /<EmptyState(?:=>|[^>])*title="No books here yet"/.test(groups));
 }

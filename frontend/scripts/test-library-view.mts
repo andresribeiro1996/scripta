@@ -56,7 +56,7 @@ test("the Books header: the rename control stays in the subtitle and wraps, More
   const page = readFileSync(new URL("../src/pages/LibraryPage.tsx", import.meta.url), "utf8");
   assert.match(page, /subtitle=\{[\s\S]*?aria-label="Library name"[\s\S]*?title="Rename your library"(?:=>|[^>])*className="[^"]*min-w-0[^"]*break-all/);
   assert.match(page, /actions=\{[\s\S]*?Add a book/);
-  assert.match(readFileSync(new URL("../src/components/Toolbar.tsx", import.meta.url), "utf8"), /export function ToolbarRow[\s\S]*?sticky top-\(--app-top\) z-30(?![^"]*sm:static)/);
+  assert.match(readFileSync(new URL("../src/components/Toolbar.tsx", import.meta.url), "utf8"), /export function ToolbarRow[\s\S]*?sticky top-\[calc\(var\(--app-top\)\+var\(--offline-h,0px\)\)\] z-30(?![^"]*sm:static)/);
 });
 
 if (failed > 0) {

@@ -5,7 +5,9 @@ import { renderToString } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { WorkPage } from "@scripta/shared";
+import { readFileSync } from "node:fs";
 import { BookScreen, ReaderList } from "../src/components/book/BookScreen";
+import { editionCoverBook } from "../src/components/book/BookCover";
 import { ConfirmProvider } from "../src/components/ConfirmDialog";
 import { ToastProvider } from "../src/components/Toaster";
 import { createWebLibrarySaver, LibrarySaverContext } from "../src/hooks/useLibrarySaver";
@@ -166,6 +168,35 @@ test("editions are a list panel with a small cover per row and a Yours chip", ()
   assert.equal(list.match(/<li/g)?.length, 3);
   assert.equal(list.match(/width:36px/g)?.length, 3);
   assert.equal(list.match(/>Yours</g)?.length, 1);
+});
+
+test("cover-less editions pass an empty book so no cover lookup fires, in the list and the strip", () => {
+  assert.deepEqual(editionCoverBook(edition(1), "Frank Herbert"), {});
+  assert.deepEqual(editionCoverBook({ ...edition(1), coverUrl: "https://covers.test/1.jpg" }, "Frank Herbert"), { Title: "Dune 1", Attribution: "Frank Herbert", ISBN: "9780441013593", _coverUrl: "https://covers.test/1.jpg" });
+  for (const f of ["BookScreen", "EditionStrip"]) assert.match(readFileSync(new URL(`../src/components/book/${f}.tsx`, import.meta.url), "utf8"), /editionCoverBook\(/, f);
+});
+
+test("a single owned edition's Yours row shows the library cover", () => {
+  const one = { ...page, work: { ...page.work, editions: [{ ...edition(1, true), coverUrl: "https://covers.test/1.jpg" }] }, mine: ownedPage.mine };
+  const list = render({ book: { ...owned, _coverUrl: "https://library.test/mine.jpg" }, page: one }).match(/<ul class="[^"]*divide-y[^"]*">[\s\S]*?<\/ul>/)![0];
+  assert.ok(list.includes("https://library.test/mine.jpg"));
+  assert.ok(!list.includes("https://covers.test/1.jpg"));
+});
+
+test("the edition strip draws book-style covers sized to the hero column, not 144px tiles", () => {
+  const strip = render({}).match(/aria-roledescription="carousel"[\s\S]*?aria-live/)![0];
+  assert.match(strip, /shadow-\(--shadow-cover\)/);
+  assert.match(strip, /<button(?:=>|[^>])*class="[^"]*\bw-50\b[^"]*\blg:w-70\b/);
+  assert.doesNotMatch(strip, /rounded-xl/);
+});
+
+test("the tab classes come from one shared constant", () => {
+  for (const f of ["book/BookScreen", "page/Page"]) {
+    const src = readFileSync(new URL(`../src/components/${f}.tsx`, import.meta.url), "utf8");
+    assert.match(src, /tabClass|TAB_NAV/, f);
+    assert.doesNotMatch(src, /inline-flex min-h-11 min-w-11/, f);
+    assert.doesNotMatch(src, /overflow-x-auto shadow-\[inset/, f);
+  }
 });
 
 const rows = [

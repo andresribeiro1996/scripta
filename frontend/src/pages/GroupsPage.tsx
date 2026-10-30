@@ -450,7 +450,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
                         setEditingId(group.id);
                         setEditingName(group.name);
                       }}
-                      className="min-h-11 text-left text-lg font-bold transition-colors hover:text-(--color-accent)"
+                      className="min-h-11 wrap-anywhere text-left text-lg font-bold transition-colors hover:text-(--color-accent)"
                       title="Rename"
                     >
                       {group.name}

@@ -5,3 +5,6 @@ export const LIST_ROW_LINK = `${LIST_ROW} hover:bg-(--color-surface-hover) focus
 export const SECTION_HEADING = "font-display text-2xl font-bold";
 export const PANEL_HEADING = "font-text text-base font-bold";
 export const CARD = "rounded-2xl border border-(--color-border) bg-(--color-surface)";
+export const TAB_NAV = "flex gap-7 overflow-x-auto shadow-[inset_0_-1px_0_var(--color-border)]";
+export const tabClass = (active: boolean) =>
+  `inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center whitespace-nowrap border-b-2 text-sm font-semibold focus-visible:-outline-offset-2! ${active ? "border-(--color-accent) text-(--color-text)" : "border-transparent text-(--color-text-dim) hover:text-(--color-text)"}`;

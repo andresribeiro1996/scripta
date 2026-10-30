@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { activeTabTo, type AreaTab } from "../../lib/areas";
 import { ChevronLeftIcon } from "../Toolbar";
+import { TAB_NAV, tabClass } from "./surfaceClasses";
 
 export const PAGE_WIDTHS = { wide: 1440, default: 1200, narrow: 760 } as const;
 export type PageWidth = keyof typeof PAGE_WIDTHS;
@@ -39,7 +40,7 @@ export function Page({ title, subtitle, back, actions, tabs, width = "default", 
               </div>
             ) : null}
             {tabList ? (
-              <nav aria-label="Sections" className="mt-6 flex gap-7 overflow-x-auto shadow-[inset_0_-1px_0_var(--color-border)]">
+              <nav aria-label="Sections" className={`mt-6 ${TAB_NAV}`}>
                 {tabList.map((tab) => {
                   const active = tab.to === activeTo;
                   return (
@@ -47,7 +48,7 @@ export function Page({ title, subtitle, back, actions, tabs, width = "default", 
                       key={tab.to}
                       to={tab.to}
                       aria-current={active ? "page" : undefined}
-                      className={`inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center whitespace-nowrap border-b-2 text-sm font-semibold focus-visible:-outline-offset-2! ${active ? "border-(--color-accent) text-(--color-text)" : "border-transparent text-(--color-text-dim) hover:text-(--color-text)"}`}
+                      className={tabClass(active)}
                     >{tab.label}</Link>
                   );
                 })}

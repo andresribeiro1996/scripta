@@ -35,10 +35,10 @@ import { PerCardStylePanel } from "../PerCardStylePanel";
 import { ReaderGlyph } from "../ReaderGlyph";
 import { ArenaIcon } from "../NavIcons";
 import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../page/buttonClasses";
-import { LIST_PANEL, LIST_ROW, SECTION_HEADING } from "../page/surfaceClasses";
+import { LIST_PANEL, LIST_ROW, SECTION_HEADING, TAB_NAV, tabClass } from "../page/surfaceClasses";
 import { ChevronDownIcon, MoreIcon, ShareIcon, toolbarIconClass } from "../Toolbar";
 import { StatsTiles } from "./BookStats";
-import { BookCover } from "./BookCover";
+import { BookCover, editionCoverBook } from "./BookCover";
 import { EditionStrip } from "./EditionStrip";
 import { RatingStars } from "./RatingStars";
 
@@ -59,7 +59,6 @@ const winPillClass = `${pillClass} border-(--color-accent-soft) bg-(--color-acce
 const nomineePillClass = `${pillClass} border-(--color-border) text-(--color-text-dim)`;
 const roundButtonClass = `${toolbarIconClass()} rounded-full!`;
 const statusTriggerClass = "inline-flex min-h-11 items-center gap-2 rounded-lg border border-(--color-accent) bg-(--color-accent-soft) px-4 text-sm font-semibold text-(--color-accent)";
-const tabClass = "inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center whitespace-nowrap border-b-2 text-sm font-semibold focus-visible:-outline-offset-2!";
 
 function CheckIcon() {
   return (
@@ -105,9 +104,9 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
     () => (work ? { Title: work.title, Attribution: work.author, ISBN: isbn ?? undefined, _coverUrl: work.coverUrl ?? undefined } : null),
     [work, isbn]
   );
-  const mineIndex = model.edition?.mineIndex ?? null;
+  const mineIndex = model.edition ? model.edition.mineIndex : book ? 0 : null;
   const editionCovers = useMemo(
-    () => (work ? work.editions.map((e, i) => (i === mineIndex && book ? book : { Title: e.title, Attribution: work.author, ISBN: e.isbn ?? undefined, _coverUrl: e.coverUrl ?? undefined })) : []),
+    () => (work ? work.editions.map((e, i) => (i === mineIndex && book ? book : editionCoverBook(e, work.author))) : []),
     [work, book, mineIndex]
   );
   const heroBook = book ?? workCoverBook;
@@ -299,7 +298,7 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
             ) : null}
 
             {model.tabs.length > 1 ? (
-              <nav aria-label="Book sections" className="mt-9 flex gap-7 overflow-x-auto shadow-[inset_0_-1px_0_var(--color-border)]">
+              <nav aria-label="Book sections" className={`mt-9 ${TAB_NAV}`}>
                 {model.tabs.map((t) => {
                   const current = t.key === activeTab;
                   return (
@@ -308,7 +307,7 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
                       type="button"
                       aria-current={current ? "page" : undefined}
                       onClick={() => setTab(t.key)}
-                      className={`${tabClass} ${current ? "border-(--color-accent) text-(--color-text)" : "border-transparent text-(--color-text-dim) hover:text-(--color-text)"}`}
+                      className={tabClass(current)}
                     >{t.label}</button>
                   );
                 })}

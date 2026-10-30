@@ -1,8 +1,11 @@
 import { useState } from "react";
-import type { CoverSize, LibraryBook } from "@scripta/shared";
+import type { CoverSize, LibraryBook, WorkEdition } from "@scripta/shared";
 import { CoverImage } from "../BookCard";
 
-export function BookCover({ book, width, size = "thumb" }: { book: LibraryBook; width?: number; size?: CoverSize }) {
+export const editionCoverBook = (e: WorkEdition, author: string): LibraryBook =>
+  e.coverUrl ? { Title: e.title, Attribution: author, ISBN: e.isbn ?? undefined, _coverUrl: e.coverUrl } : {};
+
+export function BookCover({ book, title, width, size = "thumb" }: { book: LibraryBook; title?: string; width?: number; size?: CoverSize }) {
   const [hasCover, setHasCover] = useState(false);
   return (
     <span
@@ -10,7 +13,7 @@ export function BookCover({ book, width, size = "thumb" }: { book: LibraryBook; 
       style={{ width }}
     >
       <span aria-hidden="true" className="absolute inset-0 flex items-center justify-center border border-(--color-border) bg-(--color-surface) p-2 text-center text-xs font-semibold">
-        <span className="line-clamp-4 break-words">{String(book.Title ?? "")}</span>
+        <span className="line-clamp-4 break-words">{String(book.Title ?? title ?? "")}</span>
       </span>
       <span className={`absolute inset-0 ${hasCover ? "" : "invisible"}`}>
         <CoverImage book={book} size={size} onHasCoverChange={setHasCover} />

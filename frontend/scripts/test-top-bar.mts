@@ -64,10 +64,13 @@ test("the desktop sidebar is gone and pinned elements sit under the bar", () => 
   assert.doesNotMatch(layout, /<aside className="hidden/);
   assert.match(layout, /<main id="content"/);
   assert.match(layout, /pathname === `\/community\/u\/\$\{/);
-  for (const f of ["components/OfflineBanner", "components/SwipeTabs", "pages/MuralEditorPage", "pages/SharedMuralPage", "components/Toolbar"]) {
+  for (const f of ["components/OfflineBanner", "components/SwipeTabs", "pages/MuralEditorPage", "pages/SharedMuralPage"]) {
     assert.doesNotMatch(read(f), /sticky top-0/, f);
     assert.match(read(f), /sticky top-\(--app-top\)/, f);
   }
+  assert.doesNotMatch(read("components/Toolbar"), /sticky top-0/);
+  assert.match(read("components/Toolbar"), /sticky top-\[calc\(var\(--app-top\)\+var\(--offline-h,0px\)\)\]/);
+  assert.match(read("components/OfflineBanner"), /--offline-h/);
   assert.match(read("pages/ReaderCardPage"), /lg:top-\[calc\(var\(--app-top\)\+1\.5rem\)\]/);
   assert.match(read("components/book/BookScreen"), /lg:top-\[calc\(var\(--app-top\)\+1\.5rem\)\]/);
 });
