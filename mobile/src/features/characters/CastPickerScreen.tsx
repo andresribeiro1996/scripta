@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Stack, router } from "expo-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from "react-native";
-import { bracketSizes, canCreate, defaultTicked, plural, type CharacterGameMode, type WorkCast } from "@scripta/shared";
+import { bracketSizes, canCreate, defaultTicked, plural, roundMinutesFromHours, type CharacterGameMode, type WorkCast } from "@scripta/shared";
 import { Text } from "../../ui/Text";
 import { Button, ErrorState, Input, Screen, Segmented, Skeleton, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { BookCover } from "../arena/BookCover";
@@ -55,10 +55,9 @@ function CastPicker({ workId, cast }: { workId: string; cast: WorkCast }) {
       if (mode === "tierlist") {
         const created = await createCharacterTierlist(title, characters);
         queryClient.setQueryData<Tierlist[]>(["tierlists"], (items = []) => [created, ...items]);
-        router.replace(`/tierlist/${created.id}?rank=1` as never);
+        router.navigate(`/(app)/(arena)/tierlist/${created.id}?rank=1` as never);
       } else {
-        const hours = Number(duration);
-        const created = await createCharacterTournament({ name: title, bracketSize: size, roundDurationMinutes: Number.isFinite(hours) && hours > 0 ? hours * 60 : 1440, characters });
+        const created = await createCharacterTournament({ name: title, bracketSize: size, roundDurationMinutes: roundMinutesFromHours(duration), characters });
         void queryClient.invalidateQueries({ queryKey: ["arena", "mine"] });
         router.replace(`/arena/${created.id}` as never);
       }
@@ -92,7 +91,7 @@ function CastPicker({ workId, cast }: { workId: string; cast: WorkCast }) {
   );
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.grow}>
+    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.form}>
       {error ? <Toast visible message={error} tone="error" /> : null}
       <FlatList
         data={cast.characters}
@@ -119,6 +118,7 @@ function CastPicker({ workId, cast }: { workId: string; cast: WorkCast }) {
 const styles = StyleSheet.create({
   screen: { padding: spacing.lg, gap: spacing.md },
   grow: { flex: 1 },
+  form: { flex: 1, gap: spacing.md },
   headerBlock: { gap: spacing.md, paddingBottom: spacing.sm },
   header: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   row: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
