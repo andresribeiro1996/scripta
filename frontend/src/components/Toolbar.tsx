@@ -7,7 +7,7 @@ import type { ReactNode } from "react";
  *  Extracted when the Library's one-row phone treatment was applied to
  *  the rest: before that it was one page's private layout and there was
  *  nothing to share it with. Only the genuinely common parts live here —
- *  the sticky row and the two control sizes. What each page puts IN the
+ *  the sticky row and the icon button size. What each page puts IN the
  *  row differs enough (a search field, a create field, a plain button)
  *  that a single configurable component would take more props than the
  *  markup it replaced. */
@@ -29,11 +29,6 @@ export function ToolbarRow({ children }: { children: ReactNode }) {
     </div>
   );
 }
-
-/** Text inputs and selects sitting in a ToolbarRow. min-h-11 ≈ 44px, the
- *  smallest comfortably tappable target. */
-export const TOOLBAR_CONTROL_CLASS =
-  "min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-2.5 py-2.5 text-sm";
 
 const BOX_INPUT =
   "relative h-11 w-11 shrink-0 cursor-pointer appearance-none disabled:cursor-not-allowed disabled:opacity-50 before:absolute before:top-1/2 before:left-1/2 before:flex before:size-5 before:-translate-x-1/2 before:-translate-y-1/2 before:items-center before:justify-center before:border before:border-(--color-border) before:bg-(--color-surface) before:text-xs before:leading-none before:text-(--color-on-accent) checked:before:border-(--color-accent) checked:before:bg-(--color-accent)";

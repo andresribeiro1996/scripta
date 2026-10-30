@@ -13,12 +13,12 @@ import { LibraryCanvas } from "../components/LibraryCanvas";
 import { CollectionsIcon, SeriesIcon } from "../components/NavIcons";
 import { OptionsMenu } from "../components/OptionsMenu";
 import { Page } from "../components/page/Page";
-import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../components/page/buttonClasses";
+import { BUTTON_DANGER, BUTTON_PRIMARY, BUTTON_SECONDARY, FIELD_CLASS } from "../components/page/buttonClasses";
 import { PerCardStylePanel } from "../components/PerCardStylePanel";
 import { Sheet } from "../components/Sheet";
 import { SkeletonGroups } from "../components/Skeleton";
 import { useToast } from "../components/Toaster";
-import { TOOLBAR_CONTROL_CLASS, ToolbarRow, CHECKBOX_CLASS } from "../components/Toolbar";
+import { ToolbarRow, CHECKBOX_CLASS } from "../components/Toolbar";
 import { useDelayedShow } from "../hooks/useDelayedShow";
 import { useLibrary } from "../hooks/useLibrary";
 import { useLibrarySaver } from "../hooks/useLibrarySaver";
@@ -347,7 +347,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
             <button
               onClick={() => void handleDeleteSelected()}
               disabled={selectedKeys.size === 0}
-              className="inline-flex min-h-11 items-center justify-center rounded-lg bg-(--color-danger) px-4 text-sm font-semibold text-(--color-on-danger) hover:opacity-90 disabled:opacity-50"
+              className={BUTTON_DANGER}
             >
               Delete selected
             </button>
@@ -371,7 +371,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search"
               aria-label={`Search ${copy.title.toLowerCase()} by name`}
-              className={`${TOOLBAR_CONTROL_CLASS} min-w-0 flex-1 sm:max-w-xs`}
+              className={`${FIELD_CLASS} min-w-0 flex-1 sm:max-w-xs`}
             />
           </div>
         </ToolbarRow>

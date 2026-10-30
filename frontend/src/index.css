@@ -79,6 +79,32 @@ body {
   }
 }
 
+:root {
+  --app-top: 0px;
+  --shadow-cover: 0 1px 2px rgb(32 30 28 / 0.2), 0 12px 24px -12px rgb(32 30 28 / 0.5);
+
+  @variant dark {
+    --shadow-cover: 0 1px 2px rgb(0 0 0 / 0.6), 0 14px 28px -12px rgb(0 0 0 / 0.9);
+  }
+}
+
+@media (min-width: 64rem) {
+  :root {
+    --app-top: 4rem;
+  }
+}
+
+html {
+  scroll-padding-top: var(--app-top);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  [data-top-bar] {
+    background: var(--color-bg);
+    backdrop-filter: none;
+  }
+}
+
 /* Themed scrollbars — every scrollable area in the app (the page itself,
    a modal's overflow-y-auto list, a mural Shelf block's horizontal book
    row) otherwise gets the OS/browser's own default scrollbar, which on

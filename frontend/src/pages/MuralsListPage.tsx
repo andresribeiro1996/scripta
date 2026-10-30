@@ -12,11 +12,11 @@ import { MuralPresetPicker } from "../components/murals/MuralPresetPicker";
 import { MuralsIcon } from "../components/NavIcons";
 import { OptionsMenu } from "../components/OptionsMenu";
 import { Page } from "../components/page/Page";
-import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../components/page/buttonClasses";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY, FIELD_CLASS } from "../components/page/buttonClasses";
 import { ShareModal } from "../components/ShareModal";
 import { OptionSheet } from "../components/Sheet";
 import { SkeletonCardGrid } from "../components/Skeleton";
-import { FolderIcon, SortIcon, TOOLBAR_CONTROL_CLASS, ToolbarRow, toolbarIconClass } from "../components/Toolbar";
+import { FolderIcon, SortIcon, ToolbarRow, toolbarIconClass } from "../components/Toolbar";
 import { useDelayedShow } from "../hooks/useDelayedShow";
 import { useMuralFolders } from "../hooks/useMuralFolders";
 import { useMurals } from "../hooks/useMurals";
@@ -217,7 +217,7 @@ export function MuralsListPage() {
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search"
                   aria-label="Search murals by name"
-                  className={`${TOOLBAR_CONTROL_CLASS} min-w-0 flex-1`}
+                  className={`${FIELD_CLASS} min-w-0 flex-1`}
                 />
                 <button
                   onClick={() => setSheet("sort")}

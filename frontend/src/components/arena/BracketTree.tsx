@@ -102,7 +102,7 @@ export function BracketTree({ tournament, renderDuel }: { tournament: Tournament
             height, so the dividers run edge to edge — with the default
             `items-center` they'd stop short and the seams would look
             broken. This deliberately doesn't reuse toolbarIconClass() or
-            TOOLBAR_CONTROL_CLASS: both bring their own border, rounding
+            FIELD_CLASS: both bring their own border, rounding
             and background, which is exactly what a segment must not
             have. */}
         <div className="mb-4 flex items-stretch overflow-hidden rounded-lg border border-(--color-border) bg-(--color-surface)">

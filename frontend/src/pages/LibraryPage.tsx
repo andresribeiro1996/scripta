@@ -23,7 +23,7 @@ import { LibraryToolbar } from "../components/LibraryToolbar";
 import { LibraryIcon, MoreIcon } from "../components/NavIcons";
 import { OptionsMenu, type OptionsMenuItem } from "../components/OptionsMenu";
 import { Page } from "../components/page/Page";
-import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../components/page/buttonClasses";
+import { BUTTON_DANGER, BUTTON_PRIMARY, BUTTON_SECONDARY } from "../components/page/buttonClasses";
 import { PerCardStylePanel } from "../components/PerCardStylePanel";
 import { ShareModal } from "../components/ShareModal";
 import { SyncGoodreadsModal } from "../components/SyncGoodreadsModal";
@@ -364,7 +364,7 @@ export function LibraryPage() {
               <button
                 onClick={() => void handleDeleteSelected()}
                 disabled={selectedKeys.size === 0}
-                className="inline-flex min-h-11 items-center justify-center rounded-lg bg-(--color-danger) px-4 text-sm font-semibold text-(--color-on-danger) hover:opacity-90 disabled:opacity-50"
+                className={BUTTON_DANGER}
               >
                 Delete selected
               </button>

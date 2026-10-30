@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { AccountSecurity } from "@scripta/shared";
 import { apiFetch } from "../api/client";
+import { BUTTON_DANGER } from "../components/page/buttonClasses";
 import { useAuth } from "./AuthContext";
 import { setAuthNotice } from "./returnTo";
 import { setSession } from "./tokenStore";
@@ -38,7 +39,7 @@ export function DeleteAccountSection() {
           ? <label className="block">Enter your password to confirm<PasswordInput required autoComplete="current-password" value={value} onChange={(event) => setValue(event.target.value)} /></label>
           : <label className="block">Type <b>{name}</b> to confirm<input required autoComplete="off" autoCapitalize="none" spellCheck={false} className="mt-1 w-full rounded-lg border border-(--color-border) bg-(--color-bg) p-3" value={value} onChange={(event) => setValue(event.target.value)} /></label>}
         {error && <p role="alert" className="text-(--color-danger)">{error}</p>}
-        <div className="flex flex-wrap gap-4"><button className="min-h-11 rounded-lg bg-(--color-danger) px-4 font-semibold text-(--color-on-danger)">{busy ? "Deleting…" : "Delete my account"}</button><button type="button" onClick={() => { setOpen(false); setValue(""); setError(""); }}>Cancel</button></div>
+        <div className="flex flex-wrap gap-4"><button className={BUTTON_DANGER}>{busy ? "Deleting…" : "Delete my account"}</button><button type="button" onClick={() => { setOpen(false); setValue(""); setError(""); }}>Cancel</button></div>
       </fieldset></form>}
   </section>;
 }

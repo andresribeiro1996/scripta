@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "./page/buttonClasses";
+import { BUTTON_DANGER, BUTTON_PRIMARY, BUTTON_SECONDARY } from "./page/buttonClasses";
 import { Sheet } from "./Sheet";
 
 interface ConfirmOptions {
@@ -73,11 +73,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
               </button>
               <button
                 onClick={() => settle(true)}
-                className={
-                  pending.danger === false
-                    ? BUTTON_PRIMARY
-                    : "inline-flex min-h-11 items-center justify-center rounded-lg bg-(--color-danger) px-4 text-sm font-semibold text-(--color-on-danger) hover:opacity-90"
-                }
+                className={pending.danger === false ? BUTTON_PRIMARY : BUTTON_DANGER}
               >
                 {pending.confirmLabel ?? "Delete"}
               </button>
