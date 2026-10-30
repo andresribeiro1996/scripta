@@ -1,6 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
-  coverQueryKey,
   coverSourceLabel,
   isCurrentCover,
   visibleCandidates,
@@ -21,7 +20,7 @@ function messageOf(error: unknown): string {
 }
 
 export function FoundCovers({
-  lookup,
+  lookup: lookupProp,
   coverUrl,
   isAdmin = false,
   onPick
@@ -36,7 +35,15 @@ export function FoundCovers({
   const [measured, setMeasured] = useState<ReadonlyMap<string, Size>>(new Map());
   const [picking, setPicking] = useState(false);
   const [pickFailure, setPickFailure] = useState<{ url: string; message: string } | null>(null);
-  const lookupKey = coverQueryKey(lookup);
+  const [lookup] = useState(lookupProp);
+  const mounted = useRef(true);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     let current = true;
@@ -51,7 +58,7 @@ export function FoundCovers({
     return () => {
       current = false;
     };
-  }, [lookupKey]);
+  }, [lookup]);
 
   function measure(url: string, size: Size) {
     setMeasured((previous) => new Map(previous).set(url, size));
@@ -62,7 +69,7 @@ export function FoundCovers({
     setPickFailure(null);
     try {
       const cover = await pickCover(lookup, candidate.coverImageId ? { coverImageId: candidate.coverImageId } : { url: candidate.url }, everyone);
-      onPick(cover, everyone);
+      if (mounted.current) onPick(cover, everyone);
     } catch (error) {
       setPickFailure({ url: candidate.url, message: messageOf(error) });
     } finally {
@@ -90,7 +97,7 @@ export function FoundCovers({
             <button
               type="button"
               disabled={picking}
-              aria-label={`Use this ${coverSourceLabel(candidate.source)} cover`}
+              aria-label={`Use this ${coverSourceLabel(candidate.source)} cover${width !== null && height !== null ? `, ${width} by ${height}` : ""}`}
               aria-current={isCurrentCover(candidate, coverUrl)}
               onClick={() => void choose(candidate, false)}
               className={`relative aspect-square cursor-pointer overflow-hidden rounded-lg border-2 bg-(--color-border) disabled:cursor-default disabled:opacity-50 ${
@@ -117,6 +124,7 @@ export function FoundCovers({
               <button
                 type="button"
                 disabled={picking}
+                aria-label={`Use this ${coverSourceLabel(candidate.source)} cover for everyone`}
                 onClick={() => void choose(candidate, true)}
                 className="min-h-11 text-left text-xs font-semibold text-(--color-accent) transition-opacity hover:opacity-80 disabled:opacity-50"
               >
@@ -131,7 +139,7 @@ export function FoundCovers({
           </div>
         ))}
         {checkingApple && (
-          <div className="flex aspect-square items-center justify-center rounded-lg border-2 border-transparent bg-(--color-border) p-2 text-center text-xs text-(--color-text-dim)">
+          <div role="status" className="flex aspect-square items-center justify-center rounded-lg border-2 border-transparent bg-(--color-border) p-2 text-center text-xs text-(--color-text-dim)">
             Checking Apple Books…
           </div>
         )}

@@ -1,5 +1,6 @@
 import {
   coverCandidatesQuery,
+  coverQueryKey,
   createCoverResolver,
   pickCoverBody,
   type CoverCacheEntry,
@@ -51,8 +52,19 @@ export function forgetResolvedCover(params: ResolveCoverParams): void {
   resolver.forget(params);
 }
 
+const rememberListeners = new Set<(key: string) => void>();
+
+export function subscribeResolvedCovers(listener: (key: string) => void): () => void {
+  rememberListeners.add(listener);
+  return () => {
+    rememberListeners.delete(listener);
+  };
+}
+
 export function rememberResolvedCover(params: ResolveCoverParams, cover: { url: string | null; fullUrl: string | null }): void {
   resolver.remember(params, cover);
+  const key = coverQueryKey(params);
+  for (const listener of rememberListeners) listener(key);
 }
 
 export async function fetchCoverCandidates(params: ResolveCoverParams, from: CoverPickSource): Promise<CoverCandidatesResponse> {

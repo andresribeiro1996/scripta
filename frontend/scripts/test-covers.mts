@@ -12,6 +12,9 @@
 // Run with:
 //   npx tsx scripts/test-covers.mts
 
+import { coverQueryKey } from "@scripta/shared";
+import { API_URL } from "../src/api/baseUrl";
+import { fetchCoverCandidates, peekResolvedCover, pickCover, rememberResolvedCover, subscribeResolvedCovers } from "../src/api/covers";
 import { normalizeImageId, normalizeIsbn } from "../src/lib/covers";
 
 let passed = 0;
@@ -48,6 +51,55 @@ console.log("\n2. normalizeImageId — accepts a real UUID shape, rejects anythi
   check("a bare ISBN is NOT mistaken for an ImageId", normalizeImageId("9781234567897") === "");
   check("garbage rejected (empty string)", normalizeImageId("not-a-uuid") === "");
   check("undefined input rejected (empty string, no throw)", normalizeImageId(undefined) === "");
+}
+
+const lookup = { isbn: "9781234567897", title: "A Title", author: "An Author" };
+
+console.log("\n3. fetchCoverCandidates and pickCover — request URL, method and body");
+{
+  const originalFetch = globalThis.fetch;
+  const requests: Array<{ url: string; method: string; body: unknown }> = [];
+  globalThis.fetch = async (url, init) => {
+    requests.push({ url: String(url), method: init?.method ?? "GET", body: init?.body === undefined ? undefined : JSON.parse(String(init.body)) });
+    return Response.json({ candidates: [], unavailable: [], url: null, fullUrl: null, pending: false });
+  };
+  try {
+    await fetchCoverCandidates(lookup, "quick");
+    await fetchCoverCandidates(lookup, "apple");
+    await pickCover(lookup, { url: "https://covers.test/a.jpg" }, false);
+    await pickCover(lookup, { coverImageId: "00000000-0000-4000-8000-000000000001" }, true);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+  const query = coverQueryKey(lookup);
+  check("quick candidates: GET with the lookup query", requests[0]?.url === `${API_URL}/covers/candidates?${query}` && requests[0].method === "GET" && requests[0].body === undefined, JSON.stringify(requests[0]));
+  check("apple candidates: GET with from=apple appended", requests[1]?.url === `${API_URL}/covers/candidates?${query}&from=apple` && requests[1].method === "GET", JSON.stringify(requests[1]));
+  check(
+    "personal pick: POST with the lookup and the url, no everyone",
+    requests[2]?.url === `${API_URL}/covers/pick` &&
+      requests[2].method === "POST" &&
+      JSON.stringify(requests[2].body) === JSON.stringify({ ...lookup, url: "https://covers.test/a.jpg" }),
+    JSON.stringify(requests[2])
+  );
+  check(
+    "pick for everyone: POST with the lookup, the stored image id and everyone: true",
+    requests[3]?.method === "POST" &&
+      JSON.stringify(requests[3].body) === JSON.stringify({ ...lookup, coverImageId: "00000000-0000-4000-8000-000000000001", everyone: true }),
+    JSON.stringify(requests[3])
+  );
+}
+
+console.log("\n4. rememberResolvedCover — notifies subscribers until they unsubscribe");
+{
+  const notified: string[] = [];
+  const unsubscribe = subscribeResolvedCovers((key) => notified.push(key));
+  const cover = { url: "https://covers.test/thumb.jpg", fullUrl: "https://covers.test/full.jpg" };
+  rememberResolvedCover(lookup, cover);
+  check("subscriber is told which cover changed", notified.length === 1 && notified[0] === coverQueryKey(lookup), JSON.stringify(notified));
+  check("the remembered cover is already peekable when the subscriber runs", peekResolvedCover(lookup, "full") === cover.fullUrl);
+  unsubscribe();
+  rememberResolvedCover(lookup, cover);
+  check("an unsubscribed listener is not called again", notified.length === 1, JSON.stringify(notified));
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

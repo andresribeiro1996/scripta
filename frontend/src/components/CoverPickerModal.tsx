@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import type { ResolvedCoverResponse } from "@scripta/shared";
+import { coverQueryKey, type ResolvedCoverResponse } from "@scripta/shared";
 import type { ResolveCoverParams } from "../api/covers";
 import type { GalleryImage } from "../api/gallery";
 import { useDeleteGalleryImage } from "../hooks/useDeleteGalleryImage";
@@ -147,9 +147,9 @@ export function CoverPickerModal({
       </div>
 
       <div className="p-2">
-        {lookup && onPickFound && (
+        {lookup && onPickFound && (lookup.isbn || lookup.title) && (
           <>
-            <FoundCovers lookup={lookup} coverUrl={coverUrl} isAdmin={isAdmin} onPick={onPickFound} />
+            <FoundCovers key={coverQueryKey(lookup)} lookup={lookup} coverUrl={coverUrl} isAdmin={isAdmin} onPick={onPickFound} />
             <h3 className="mb-2 text-sm font-semibold">Your gallery</h3>
           </>
         )}
