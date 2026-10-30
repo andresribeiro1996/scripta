@@ -39,6 +39,7 @@ function Row({ item, isNew, children }: { item: PersonalItem; isNew: boolean; ch
 export function ForYouPanel() {
   const queryClient = useQueryClient();
   const feed = useActivityFeed();
+  const { fetchNextPage } = feed;
   const items = feed.items.filter(isPersonalItem);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -94,13 +95,17 @@ export function ForYouPanel() {
     try {
       await followUser(userId);
       await queryClient.invalidateQueries({ queryKey: ["community", "people"] });
-      await feed.refetch();
+      if ((await feed.refetch()).isError) setError("Couldn't refresh activity.");
     } catch (failure) {
       setError(followFailureMessage(failure, "Couldn't follow them. Try again."));
     } finally {
       setBusyId(null);
     }
   }
+
+  useEffect(() => {
+    if (items.length === 0 && feed.hasNextPage && !feed.isFetching && !feed.isError) void fetchNextPage();
+  }, [items.length, feed.hasNextPage, feed.isFetching, feed.isError, fetchNextPage]);
 
   const count = newCountLabel(feed.personalNewCount);
   return (
@@ -114,7 +119,7 @@ export function ForYouPanel() {
           <p>Couldn't load activity.</p>
           <button type="button" className={BUTTON_SECONDARY} onClick={() => void feed.refetch()}>Retry</button>
         </div>
-      ) : items.length === 0 && !feed.hasNextPage ? <p className={NOTE}>Nothing new yet. New followers and plays of your games show up here.</p> : (
+      ) : items.length === 0 && feed.hasNextPage && !feed.isError ? <p role="status" className={NOTE}>Loading…</p> : items.length === 0 && !feed.hasNextPage ? <p className={NOTE}>Nothing new yet. New followers and plays of your games show up here.</p> : (
         <ul ref={list} className="divide-y divide-(--color-border)">
           {items.map((item) => {
             const row = activityRowModel(item);
@@ -137,7 +142,7 @@ export function ForYouPanel() {
                   <Row item={item} isNew={isNew} />
                 </Link>
                 {row.action.kind === "followBack" && item.kind === "follow" ? (
-                  <button type="button" aria-label={`Follow ${item.actor.username} back`} className={`${BUTTON_SECONDARY} shrink-0`} disabled={busyId === item.actor.userId} onClick={() => void followBack(item.actor.userId)}>Follow back</button>
+                  <button type="button" aria-label={`Follow back ${item.actor.username}`} className={`${BUTTON_SECONDARY} shrink-0`} disabled={busyId === item.actor.userId} onClick={() => void followBack(item.actor.userId)}>Follow back</button>
                 ) : <span className="shrink-0 text-(--color-text-dim)">Following</span>}
               </li>
             );

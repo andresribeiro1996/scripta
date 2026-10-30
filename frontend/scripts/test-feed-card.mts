@@ -47,9 +47,14 @@ test("a tournament shows VS covers, a quiz the ? disc, a mural its tile", () => 
   assert.match(card(publishedMural), /Open mural/);
 });
 
+test("the tournament and quiz tiles are block-level so their size and background apply", () => {
+  for (const html of [card(publishedTournament), card(publishedQuiz)]) assert.match(html, /<span class="relative block h-27 w-30 shrink-0 rounded-xl bg-\(--color-(accent|reference)-soft\)/);
+});
+
 test("For you: Follow back, View results and Following, with the new count", () => {
   const html = forYou([followedMe, playedMyQuiz, followedMeAlreadyFollowing], { personalNewCount: 2 });
   assert.match(html, /<button[^>]*>Follow back<\/button>/);
+  assert.match(html, /aria-label="Follow back alice"/);
   assert.match(html, /View results/);
   assert.match(html, />Following</);
   assert.match(html, /2 new/);

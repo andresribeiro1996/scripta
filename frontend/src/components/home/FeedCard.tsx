@@ -20,7 +20,7 @@ const ICONS: Record<FeedIconName, ComponentType<{ size?: number }>> = {
 };
 
 const PREVIEW_LINK = "group shrink-0";
-const TILE = "relative h-27 w-30 shrink-0 rounded-xl";
+const TILE = "relative block h-27 w-30 shrink-0 rounded-xl";
 
 function Cover({ url, title, author, width }: { url: string | null | undefined; title?: string; author?: string; width: number }) {
   const book = useMemo(() => ({ Title: title, Attribution: author, _coverUrl: url ?? undefined }), [title, author, url]);
