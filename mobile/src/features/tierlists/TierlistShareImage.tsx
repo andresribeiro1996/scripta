@@ -1,13 +1,15 @@
 import { useEffect, useState } from "react";
-import { AGGREGATION_MODES, booksByWork, type AggregationMode, type HistogramCell, type TierlistData } from "@scripta/shared";
+import { AGGREGATION_MODES, booksByWork, type AggregationMode, type CharacterSubject, type HistogramCell, type TierlistData } from "@scripta/shared";
 import { View } from "react-native";
 import { Text } from "../../ui/Text";
 import { radii, spacing, typography, useTheme } from "../../ui";
+import { CharacterHeader } from "../characters/CharacterHeader";
 import { TierCover, type TierBook } from "./TierBoard";
 import { tierlistShareRows } from "./tierlistShareData";
 
-export function TierlistShareImage({ title, data, books, community, histogram, ballotCount, mode = "average", onReadyChange }: {
+export function TierlistShareImage({ title, subject, data, books, community, histogram, ballotCount, mode = "average", onReadyChange }: {
   title: string;
+  subject?: CharacterSubject | null;
   data: TierlistData;
   books: TierBook[];
   community?: boolean;
@@ -27,6 +29,7 @@ export function TierlistShareImage({ title, data, books, community, histogram, b
   return <View style={{ width: "100%", padding: spacing.md, gap: spacing.md, backgroundColor: colors.background }}>
     <View style={{ gap: spacing.xs }}>
       <Text style={[typography.title, { color: colors.text, fontWeight: "600" }]}>{title}</Text>
+      {subject ? <CharacterHeader subject={subject} /> : null}
       {community ? <>
         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: spacing.sm }}>
           <Text style={[typography.caption, { color: colors.textDim }]}>Community ranking</Text>

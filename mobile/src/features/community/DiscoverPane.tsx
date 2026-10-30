@@ -23,7 +23,7 @@ export function DiscoverPane({ linkAuthors = true, fab }: { linkAuthors?: boolea
     retry: false,
   });
   const items = discover.data?.pages.flatMap((page) => page.items) ?? [];
-  const [preview, setPreview] = useState<{ id: string; name: string } | null>(null);
+  const [preview, setPreview] = useState<{ id: string; name: string; character: boolean } | null>(null);
   const [addBook, setAddBook] = useState<{ title: string; author: string; coverUrl?: string | null } | null>(null);
   const index = DISCOVER_FILTERS.findIndex((option) => option.value === filter);
   const current = DISCOVER_FILTERS[index];
@@ -89,6 +89,7 @@ export function DiscoverPane({ linkAuthors = true, fab }: { linkAuthors?: boolea
       <ArenaBooksSheet
         id={preview?.id ?? null}
         name={preview?.name ?? "Tournament"}
+        character={preview?.character}
         onAddBook={(book) => {
           setPreview(null);
           setAddBook(book);

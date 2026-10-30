@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { router } from "expo-router";
 import { Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
 import { Text } from "../../ui/Text";
-import { quizClueHeading, readerGlyphLabel, type QuizPreview } from "@scripta/shared";
+import { itemNoun, quizClueHeading, readerGlyphLabel, type QuizPreview } from "@scripta/shared";
 import { ActionSheet, Icon, IconButton, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import type { ContentTone, DiscoverItem, PublishedContent } from "@scripta/shared/community";
 import { TIER_LADDER, contentStats, contentStatus, contentTarget, gameActionLabel } from "./communityHome";
@@ -10,7 +10,7 @@ import { AuthorAvatar, openProfile } from "./AuthorAvatar";
 import { ReaderGlyph } from "./ReaderGlyph";
 import { GameTicketArt } from "./GameTicketArt";
 
-export function DiscoverRow({ item, linkAuthor, stats, onPreviewBooks, onOpen }: { item: DiscoverItem; linkAuthor: boolean; stats?: Array<{ value: number; label: string }>; onPreviewBooks?: (tournament: { id: string; name: string }) => void; onOpen?: () => void }) {
+export function DiscoverRow({ item, linkAuthor, stats, onPreviewBooks, onOpen }: { item: DiscoverItem; linkAuthor: boolean; stats?: Array<{ value: number; label: string }>; onPreviewBooks?: (tournament: { id: string; name: string; character: boolean }) => void; onOpen?: () => void }) {
   const { colors } = useTheme();
   const { content, author } = item;
   const status = contentStatus(content);
@@ -50,7 +50,7 @@ export function DiscoverRow({ item, linkAuthor, stats, onPreviewBooks, onOpen }:
       }
       badges={status.votedBadge ? [status, { label: "Voted", tone: "info" }] : [status]}
       stats={stats ?? contentStats(content)}
-      seeBooks={content.kind === "tournament" && onPreviewBooks ? { label: `See all ${content.bookCount} books in ${content.name}`, onPress: () => onPreviewBooks({ id: content.id, name: content.name }) } : undefined}
+      seeBooks={content.kind === "tournament" && onPreviewBooks ? { text: `See ${itemNoun(content.subject, 2)}`, label: `See all ${content.bookCount} ${itemNoun(content.subject, content.bookCount)} in ${content.name}`, onPress: () => onPreviewBooks({ id: content.id, name: content.name, character: content.subject?.kind === "characters" }) } : undefined}
     />
   );
 }
@@ -68,7 +68,7 @@ export type GameRowProps = {
   ladder?: string[];
   preview?: QuizPreview;
   actionLabel?: string;
-  seeBooks?: { label: string; onPress: () => void };
+  seeBooks?: { text: string; label: string; onPress: () => void };
   accessibilityRole?: "link" | "button";
   onPress: () => void;
   onDelete?: () => void;
@@ -131,9 +131,9 @@ export function GameRow({ kind, name, meta, badges, caption, stats = [], covers,
         <View style={[styles.notch, styles.leftNotch, { backgroundColor: colors.background }]} />
         <View style={[styles.notch, styles.rightNotch, { backgroundColor: colors.background }]} />
         <Pressable accessibilityRole={accessibilityRole} accessibilityLabel={`${actionLabel}: ${name}`} onPress={onPress} style={({ pressed }) => [styles.primaryAction, { backgroundColor: pressed ? colors.accentFill : soft }]}>
-          {({ pressed }) => <><Text {...dynamicType} style={[typography.body, styles.strong, styles.shrink, { color: pressed ? colors.text : color }]}>{actionLabel}</Text><Icon name="chevronRight" size={16} color={pressed ? colors.text : color} /></>}
+          {({ pressed }) => <><Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, styles.shrink, { color: pressed ? colors.text : color }]}>{actionLabel}</Text><Icon name="chevronRight" size={16} color={pressed ? colors.text : color} /></>}
         </Pressable>
-        {seeBooks ? <Pressable accessibilityRole="button" accessibilityLabel={seeBooks.label} onPress={seeBooks.onPress} style={({ pressed }) => [styles.secondaryAction, { borderColor: colors.border, backgroundColor: pressed ? colors.surfacePressed : colors.surface }]}><Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.textDim }]}>See books</Text></Pressable> : null}
+        {seeBooks ? <Pressable accessibilityRole="button" accessibilityLabel={seeBooks.label} onPress={seeBooks.onPress} style={({ pressed }) => [styles.secondaryAction, { borderColor: colors.border, backgroundColor: pressed ? colors.surfacePressed : colors.surface }]}><Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, { color: colors.textDim }]}>{seeBooks.text}</Text></Pressable> : null}
         {onDelete ? <ActionSheet title={name} groups={[[{ label: "Delete", icon: "delete", destructive: true, onPress: onDelete }]]}>{(open) => <IconButton accessibilityLabel={`More actions for ${name}`} name="more" onPress={open} />}</ActionSheet> : null}
       </View>
     </View>
@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
   clueHeading: { flexDirection: "row", alignItems: "center", gap: spacing.sm, flexWrap: "wrap" },
   badge: { borderWidth: 1, borderRadius: radii.full, paddingHorizontal: spacing.sm },
   footer: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, padding: spacing.lg, borderTopWidth: 1, borderStyle: "dashed" },
-  primaryAction: { flex: 1, minWidth: 120, minHeight: spacing.huge, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderRadius: radii.lg },
+  primaryAction: { flexGrow: 1, flexShrink: 0, minWidth: 120, minHeight: spacing.huge, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderRadius: radii.lg },
   secondaryAction: { minHeight: spacing.huge, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.md, paddingVertical: spacing.md, borderWidth: 1, borderRadius: radii.lg },
   notch: { position: "absolute", width: 14, height: 14, borderRadius: radii.full, top: -7 },
   leftNotch: { left: -7 },

@@ -26,6 +26,7 @@ const WORKS = [
     author: "J.R.R. Tolkien",
     genres: ["Fantasy", "Classics", "Children's"],
     series: { name: "Middle-earth", position: null },
+    characters: ["Bilbo Baggins", "Gandalf", "Thorin Oakenshield", "Smaug", "Gollum", "Bard the Bowman"],
     editions: [
       { isbn: "9780261102217", title: "The Hobbit", languages: ["eng"], year: 1999, pages: 310, publisher: "HarperCollins", color: "#8a5a2b", summary: "Bilbo Baggins likes his armchair and his pantry. A wizard and thirteen dwarves talk him into a long walk east, with a dragon at the end of it and a ring he picks up on the way." },
       { isbn: "9788445077528", title: "El hobbit", languages: ["spa"], year: 2012, pages: 320, publisher: "Minotauro", color: "#b3361f", summary: "A Bilbo Bolsón le gustan su sillón y su despensa. Un mago y trece enanos lo convencen de emprender un largo viaje hacia el este, con un dragón al final del camino." },
@@ -38,6 +39,7 @@ const WORKS = [
     author: "Frank Herbert",
     genres: ["Science Fiction", "Classics"],
     series: { name: "Dune Chronicles", position: "1" },
+    characters: ["Paul Atreides", "Lady Jessica", "Duncan Idaho", "Stilgar", "Chani", "Leto Atreides", "Vladimir Harkonnen", "Gurney Halleck"],
     editions: [
       { isbn: "9780441172719", title: "Dune", languages: ["eng"], year: 2005, pages: 535, publisher: "Ace", color: "#c98a2b", summary: "On the desert planet that is the only source of the spice, a young duke's son survives his family's betrayal and finds a place among the people of the sand." },
       { isbn: "9788576573135", title: "Duna", languages: ["por"], year: 2017, pages: 680, publisher: "Aleph", collection: { name: "Clássicos Aleph", position: "12" }, color: "#7a3b8c", summary: "No planeta deserto que é a única fonte da especiaria, o filho de um duque sobrevive à traição contra a sua família e encontra lugar entre o povo das areias." },
@@ -88,6 +90,7 @@ try {
     if (!workId) throw new Error(`No work for ${work.editions[0].title} (${work.editions[0].isbn}).`);
     repo.fillSourceGenres(workId, work.genres);
     repo.addWorkSeries(workId, [work.series], "wikidata", at);
+    repo.replaceWorkSubjects(workId, { person: work.characters, place: [], time: [] }, at);
   }
 } finally {
   db.close();

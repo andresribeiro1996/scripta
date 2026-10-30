@@ -26,3 +26,10 @@ export function toSeedBook(book: Record<string, unknown>, cover: string | null):
   const workId = workIdOf(book);
   return workId ? { workId, title: String(book.Title ?? "Untitled"), author: String(book.Attribution ?? "Unknown author"), cover } : null;
 }
+
+const DEFAULT_ROUND_MINUTES = 1440;
+
+export function roundMinutesFromHours(text: string): number {
+  const minutes = Math.round(Number(text) * 60);
+  return Number.isFinite(minutes) && minutes > 0 ? minutes : DEFAULT_ROUND_MINUTES;
+}

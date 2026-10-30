@@ -7,8 +7,11 @@ export function createArenaApi(request: ApiRequest) {
     async createTournament(input: { name: string; bracketSize: number; roundDurationMinutes: number }): Promise<Tournament> {
       return (await request<{ tournament: Tournament }>("/arenas", { method: "POST", body: input, auth: "required" })).tournament;
     },
+    async createCharacterTournament(input: { name: string; bracketSize: number; roundDurationMinutes: number; characters: { workId: string; characterIds: string[] } }): Promise<Tournament> {
+      return (await request<{ tournament: Tournament }>("/arenas", { method: "POST", body: input, auth: "required" })).tournament;
+    },
     async fetchMyTournaments(): Promise<Tournament[]> {
-      return (await request<{ tournaments: Tournament[] }>("/arenas/mine", { auth: "required" })).tournaments;
+      return (await request<{ tournaments: Tournament[] }>("/arenas/mine?subjects=characters", { auth: "required" })).tournaments;
     },
     async fetchVotedTournaments(): Promise<Tournament[]> {
       return (await request<{ tournaments: Tournament[] }>("/arenas/voted", { auth: "required" })).tournaments;

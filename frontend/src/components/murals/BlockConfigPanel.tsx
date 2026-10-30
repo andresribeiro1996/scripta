@@ -1,4 +1,4 @@
-import { resolveHomeBlock, type Group } from "@scripta/shared";
+import { bookTierlists, resolveHomeBlock, type Group } from "@scripta/shared";
 // "Configure this block" modal, opened from a block's options menu
 // (MuralCanvas.tsx) in edit mode. One modal handles every block type —
 // its body switches on `draft.type` — rather than eight separate modals,
@@ -48,7 +48,8 @@ export function BlockConfigPanel({
   // about a tier list — structure, pool, ranking — is edited over in
   // the Games area (TierListEditorPage); this modal's whole tierlist job is
   // choosing WHICH one the block displays.
-  const { data: tierlists } = useTierlists();
+  const { data: allTierlists } = useTierlists();
+  const tierlists = allTierlists && bookTierlists(allTierlists);
   // Only meaningful for quote/quoteCollection's two-step "pick a book,
   // then pick one of its highlights" flow — null means "show the book
   // search," set means "show that highlights."

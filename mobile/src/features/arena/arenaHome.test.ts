@@ -5,7 +5,7 @@ import { test } from "node:test";
 import type { Quiz } from "../quizzes/api.js";
 import type { Tierlist, VotedTierlist } from "../tierlists/api.js";
 import type { Tournament } from "./api.js";
-import { ARENA_TABS, GAMES_TABS, NEW_GAMES, emptyCopy, gameRow, homeSections, nextOwnerFilter, ownedItems, tierlistCovers, tabAtIndex, tabIndex, tournamentProgress, votedTierlistDetail, type OwnedItem, type SectionedItem } from "./arenaHome.js";
+import { ARENA_TABS, GAMES_TABS, NEW_GAMES, emptyCopy, gameRow, homeSections, nextOwnerFilter, ownedItems, tierlistCovers, tierlistRowCovers, tabAtIndex, tabIndex, tournamentProgress, votedTierlistDetail, type OwnedItem, type SectionedItem } from "./arenaHome.js";
 
 const itemDetail = (items: OwnedItem[]): string | undefined => {
   const first = items[0];
@@ -24,6 +24,7 @@ const tournament = (over: Partial<Tournament> = {}): Tournament => ({
   covers: [],
   filledSlots: 0,
   winner: null,
+  subject: null,
   ...over,
 });
 
@@ -40,6 +41,7 @@ const tierlist = (over: Partial<Tierlist> = {}): Tierlist => ({
   promotedAt: null,
   originCreatorId: "u1",
   ranksWorstFirst: false,
+  subject: null,
   ...over,
 });
 
@@ -203,6 +205,7 @@ test("only an empty tab offers to create one", () => {
 test("voted tier list cards read like the public directory's", () => {
   assert.equal(votedTierlistDetail(votedTierlist()), "6 books · 3 ballots");
   assert.equal(votedTierlistDetail(votedTierlist({ votingOpen: false })), "6 books · 3 ballots");
+  assert.equal(votedTierlistDetail(votedTierlist({ poolSize: 12, subject: { kind: "characters", label: "Harry Potter" } })), "12 characters · 3 ballots");
 });
 
 test("Games opens on Browse, with your three lists beside it, and New offers each kind", () => {
@@ -245,6 +248,12 @@ test("tierlistCovers takes library books tier by tier, then the pool, skipping m
   assert.deepEqual(ids({ tiers: [tier("s", ["x", "a", "y"])], pool: ["z", "b", "c", "d"] }), ["a", "b", "c"]);
   assert.deepEqual(ids({ tiers: [tier("s", ["a"])], pool: ["b"] }, new Map()), []);
   assert.deepEqual(ids({ tiers: [], pool: [] }), []);
+});
+
+test("a character tier list shows its scope cover, or none when the scope has no cover", () => {
+  const subject = (coverUrl: string | null) => ({ kind: "characters" as const, scope: { kind: "series" as const, key: "hp", label: "Harry Potter", coverUrl }, characters: [] });
+  assert.deepEqual(tierlistRowCovers(tierlist({ subject: subject("/covers/hp.jpg") }), new Map()), ["/covers/hp.jpg"]);
+  assert.deepEqual(tierlistRowCovers(tierlist({ subject: subject(null) }), new Map()), []);
 });
 
 test("an owned quiz row carries its books and an actual question preview", () => {

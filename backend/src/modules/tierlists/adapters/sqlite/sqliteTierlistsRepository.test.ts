@@ -99,6 +99,7 @@ function row(overrides: Partial<TierlistRow> & { id: string }): TierlistRow {
     promoted_at: null,
     public_books: null,
     ranks_worst_first: 0,
+    subject: null,
     created_at: "2026-01-01T00:00:00.000Z",
     updated_at: "2026-01-01T00:00:00.000Z",
     ...overrides
@@ -131,7 +132,7 @@ test("publish updates one row with its seeded ballot atomically", () => {
   );
 
   assert.equal(published?.id, "c1");
-  assert.equal(repo.listByUser("u1").length, 1);
+  assert.equal(repo.listByUser("u1", false).length, 1);
   assert.equal(repo.getByVoteCode("abc12345")?.id, "c1");
   assert.equal(repo.ballotCount("c1"), 1);
   assert.deepEqual(repo.getPlacements("bal1"), [
@@ -258,7 +259,7 @@ test("participation counts other people's ballots on the creator's published lis
 
   const rows = repo.listParticipation("u1", "2026-01-01T00:00:00.000Z").map((r) => ({ ...r })).sort((a, b) => a.id.localeCompare(b.id));
   assert.deepEqual(rows, [
-    { id: "c1", name: "Fantasy", public_books: publicBooks, participants: 3, latest_at: "2026-01-04T00:00:00.000Z" }
+    { id: "c1", name: "Fantasy", public_books: publicBooks, subject: null, participants: 3, latest_at: "2026-01-04T00:00:00.000Z" }
   ]);
   assert.deepEqual(repo.listRecentVoters("c1", "u1", 10).map((r) => ({ ...r })), [
     { user_id: "u3", at: "2026-01-04T00:00:00.000Z" },
@@ -429,7 +430,7 @@ test("a trigger that rolls the transaction back surfaces its own error and keeps
     /trigger boom/
   );
   assert.equal(repo.getByVoteCode("abc12345"), undefined);
-  assert.equal(repo.listByUser("u1")[0]?.vote_code, null);
+  assert.equal(repo.listByUser("u1", false)[0]?.vote_code, null);
   assert.equal(db.isTransaction, false);
 });
 
@@ -663,4 +664,44 @@ test("topShelfFacts open is false for members-only, closed and promoted lists", 
   repo.promote("promoted", "2026-04-02T00:00:00.000Z");
   const byId = new Map(repo.topShelfFacts(null, null).map((f) => [f.id, f.open]));
   assert.deepEqual(["anon", "members", "closed", "promoted"].map((id) => byId.get(id)), [true, false, false, false]);
+});
+
+const subjectJson = JSON.stringify({ kind: "characters", scope: { kind: "series", key: "s:hp", label: "HP", coverUrl: null }, characters: [{ id: "ch:a", name: "A" }] });
+
+test("a list with a subject writes no tierlist_works rows on insert, update or publish", () => {
+  const db = freshDb();
+  const repo = createSqliteTierlistsRepository(db);
+  const count = () => (db.prepare("SELECT COUNT(*) AS n FROM tierlist_works").get() as { n: number }).n;
+  repo.insert(row({ id: "ch", subject: subjectJson }));
+  assert.equal(count(), 0);
+  repo.update("ch", "u1", { data: row({ id: "ch" }).data });
+  assert.equal(count(), 0);
+  assert.ok(repo.publish("ch", "u1", row({ id: "ch" }).data, "anonymous", "chcode", "[]", ballot({ id: "chb", tierlist_id: "ch", voter_user_id: "u1" }), [{ workId: "b1", tierId: "s" }]));
+  assert.equal(count(), 0);
+  repo.insert(row({ id: "plain" }));
+  assert.equal(count(), 2);
+});
+
+test("listByUser leaves out subject rows unless asked, and shelf facts never include them", () => {
+  const repo = createSqliteTierlistsRepository(freshDb());
+  repo.insert(row({ id: "plain" }));
+  repo.insert(row({ id: "ch", subject: subjectJson, vote_code: "chcode", voting_open: 1 }));
+  assert.deepEqual(repo.listByUser("u1", false).map((r) => r.id), ["plain"]);
+  assert.deepEqual(repo.listByUser("u1", true).map((r) => r.id).sort(), ["ch", "plain"]);
+  assert.deepEqual(repo.topShelfFacts(null, null), []);
+});
+
+test("listParticipation rows carry the subject", () => {
+  const repo = createSqliteTierlistsRepository(freshDb());
+  insertPublished(repo, row({ id: "ch", subject: subjectJson, vote_code: "chcode", voting_open: 1 }), ballot({ id: "own", tierlist_id: "ch", voter_user_id: "u1" }), []);
+  repo.saveBallot(ballot({ id: "reader", tierlist_id: "ch", voter_user_id: "u2" }), [{ workId: "ch:a", tierId: "s" }]);
+  assert.equal(repo.listParticipation("u1", "2026-01-01T00:00:00.000Z")[0]?.subject, subjectJson);
+});
+
+test("migrating a database without subject adds the column", () => {
+  const db = freshDb();
+  db.exec("ALTER TABLE tierlists DROP COLUMN subject");
+  assert.ok(!columnNames(db, "tierlists").includes("subject"));
+  applyTierlistsMigrations(db);
+  assert.ok(columnNames(db, "tierlists").includes("subject"));
 });

@@ -299,6 +299,11 @@ test("characters split after eight", () => {
 
 test("a page without characters has none", () => {
   for (const model of [bookScreenModel(page(), null, viewer), bookScreenModel(null, owned(), viewer)]) {
-    assert.deepEqual(model.characters, { shown: [], more: [] });
+    assert.deepEqual(model.characters, { shown: [], more: [], canMakeGame: false });
   }
+});
+
+test("canMakeGame needs four character names", () => {
+  assert.equal(bookScreenModel(page({ characters: ["A", "B", "C"] }), null, viewer).characters.canMakeGame, false);
+  assert.equal(bookScreenModel(page({ characters: ["A", "B", "C", "D"] }), null, viewer).characters.canMakeGame, true);
 });

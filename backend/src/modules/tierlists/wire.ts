@@ -1,6 +1,6 @@
 import { canonicalByKey, canonicalWorkIds, firstKeyPerWork } from "../library/index.js";
 import { canonicalBoard as boardOf, storedIds } from "./domain/board.js";
-import type { HistogramCell, Placement, PublicBookData, TierlistData } from "@scripta/shared";
+import { characterSnapshot, type CharacterSubject, type HistogramCell, type Placement, type PublicBookData, type TierlistData } from "@scripta/shared";
 
 function selfMap(ids: string[]) {
   return canonicalByKey(new Map(ids.map((id) => [id, id])));
@@ -19,6 +19,10 @@ export function canonicalFirst(ids: string[]): { canonical: Map<string, string>;
   return { canonical, first: new Set(firstKeyPerWork(ids, canonical).values()) };
 }
 
+export function characterView(pool: string[]): { canonical: Map<string, string>; first: Set<string> } {
+  return { canonical: new Map(pool.map((id) => [id, id])), first: new Set(pool) };
+}
+
 export function histogramToWorks(cells: HistogramCell[], canonical: Map<string, string>, first: Set<string>): HistogramCell[] {
   return cells.flatMap((cell) => (first.has(cell.workId) ? [{ workId: canonical.get(cell.workId)!, tierId: cell.tierId, votes: cell.votes }] : []));
 }
@@ -35,6 +39,11 @@ export function placementsFromWorks(placements: Array<{ workId: string; tierId: 
     stored.push({ workId, tierId: placement.tierId });
   }
   return stored;
+}
+
+export function characterBooks(subject: CharacterSubject, pool: string[]): PublicBookData[] {
+  const byId = new Map(characterSnapshot(subject).map((book) => [book.workId!, book]));
+  return pool.flatMap((id) => byId.get(id) ?? []);
 }
 
 export function boardBooks(pool: string[], snapshot: unknown[] | null, live: () => PublicBookData[]): PublicBookData[] {

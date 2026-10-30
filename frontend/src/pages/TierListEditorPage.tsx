@@ -1,9 +1,10 @@
-import { ballotBoard, workIdOf, booksByWork } from "@scripta/shared";
+import { ballotBoard, workIdOf, booksByWork, characterBooks, itemNoun } from "@scripta/shared";
 import { useEffect, useState } from "react";
 import { useOutletContext, useParams } from "react-router-dom";
 import type { TierlistData } from "../api/tierlists";
 import { openVotingApi, setVotingStateApi } from "../api/tierlistVoting";
 import { TierRow } from "../components/murals/blocks/BookBlocks";
+import { CharacterHeader } from "../components/CharacterHeader";
 import { Page } from "../components/page/Page";
 import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../components/page/buttonClasses";
 import { backTo } from "../lib/areas";
@@ -20,8 +21,10 @@ export function TierListEditorPage() {
   const { id } = useParams<{ id: string }>();
   const { data: library } = useLibrary();
   const { data: tierlistsData, isLoading, rename, saveData, refetch } = useTierlists();
-  const books = useWorkBooks(library);
+  const libraryBooks = useWorkBooks(library);
   const tierlist = (tierlistsData ?? []).find((t) => t.id === id);
+  const subject = tierlist?.subject ?? null;
+  const books = subject ? characterBooks(subject) : libraryBooks;
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
   const [addingBooks, setAddingBooks] = useState(false);
@@ -234,6 +237,7 @@ export function TierListEditorPage() {
       ) : undefined}
     >
 
+      {subject ? <CharacterHeader subject={subject} /> : null}
       {votingActionError && <p className="mb-4 text-sm text-(--color-danger)">{votingActionError}</p>}
 
       {voteCode === null ? (
@@ -349,12 +353,12 @@ export function TierListEditorPage() {
           )}
           {resolvedPool.length > 0 && (
             <p className="mt-1 text-xs text-(--color-text-dim)">
-              {resolvedPool.length} {resolvedPool.length === 1 ? "book" : "books"} still unranked — tap Edit to place them.
+              {resolvedPool.length} {itemNoun(subject, resolvedPool.length)} still unranked — tap Edit to place them.
             </p>
           )}
         </div>
       ) : (
-        <TierBoard data={data} books={books} onChange={(next) => void commit(next)} structureEditable={editing} onAddBooks={() => setAddingBooks(true)} />
+        <TierBoard data={data} books={books} onChange={(next) => void commit(next)} structureEditable={editing} onAddBooks={subject ? undefined : () => setAddingBooks(true)} />
       )}
 
       {voteCode !== null && (

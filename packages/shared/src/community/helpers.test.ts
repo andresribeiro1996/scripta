@@ -134,3 +134,18 @@ test("ticket actions reflect closed games and prior participation", () => {
 test("the tier ladder is the default preset colours", () => {
   assert.deepEqual(TIER_LADDER, DEFAULT_TIER_PRESET.map((tier) => tier.color));
 });
+
+test("a character tier list names characters and a book one is unchanged", () => {
+  const base = { kind: "tierlist" as const, id: "t", voteCode: "c", name: "N", poolSize: 12, ballotCount: 3, votingOpen: true, promotedAt: null, covers: [] };
+  assert.equal(contentDetail({ ...base, subject: { kind: "characters", label: "Harry Potter" } }), "12 characters · 3 ballots");
+  assert.equal(contentDetail(base), "12 books · 3 ballots");
+  assert.equal(gameActionLabel({ ...base, subject: { kind: "characters", label: "Harry Potter" } }), "Rank characters");
+  assert.equal(gameActionLabel(base), "Rank books");
+  assert.deepEqual(contentStats({ ...base, subject: { kind: "characters", label: "H" } })[0], { value: 12, label: "characters" });
+});
+
+test("a character tournament says character bracket", () => {
+  const base = { kind: "tournament" as const, id: "t", name: "N", bracketSize: 8, status: "active" as const, bookCount: 8, covers: [] };
+  assert.equal(contentDetail({ ...base, subject: { kind: "characters", label: "H" } }), "8-character bracket · active");
+  assert.equal(contentDetail(base), "8-book bracket · active");
+});

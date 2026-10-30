@@ -7,7 +7,7 @@
 
 import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { quizPreview } from "@scripta/shared";
+import { itemNoun, quizPreview } from "@scripta/shared";
 import { TIER_LADDER, contentDetail, contentTarget } from "@scripta/shared/community";
 import type { Quiz } from "../api/quizzes";
 import type { Tierlist } from "../api/tierlists";
@@ -214,7 +214,7 @@ export function ArenaListPage() {
                   to={`/dashboard/arena/tierlist/${tl.id}`}
                   meta={`Updated ${new Date(tl.updatedAt).toLocaleDateString()}`}
                   badges={null}
-                  covers={[]}
+                  covers={tl.subject?.scope.coverUrl ? [tl.subject.scope.coverUrl] : []}
                   ladder={tl.data.tiers.map((tier) => tier.color)}
                   menu={
                     <OptionsMenu
@@ -306,7 +306,7 @@ function TournamentCard({ t }: { t: Tournament }) {
       kind="tournament"
       name={t.name}
       to={t.status === "seeding" ? `/dashboard/arena/${t.id}/seed` : `/arena/${t.id}`}
-      meta={`${t.bracketSize}-book bracket`}
+      meta={`${t.bracketSize}-${itemNoun(t.subject, 1)} bracket`}
       badges={<TournamentStatusBadge status={t.status} round={t.currentRound} />}
       covers={t.covers}
     />

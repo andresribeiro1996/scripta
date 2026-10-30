@@ -186,3 +186,60 @@ test("a non-owner sending an unknown work to PUT slots gets 404, not 400", async
   assert.equal(res.statusCode, 404);
   await app.close();
 });
+
+const hpCast = {
+  scope: { kind: "series" as const, key: "hp", label: "Harry Potter", coverUrl: "https://covers.test/hp.jpg", workCount: 7 },
+  characters: Array.from({ length: 6 }, (_, index) => ({ id: `ch:hp|c${index}`, name: `Character ${index}`, works: 7 }))
+};
+
+async function characterArena() {
+  const db = new DatabaseSync(":memory:");
+  applyArenaMigrations(db);
+  const works = { ...arenaWorks, castOf: (workId: string) => (workId === "hp" ? hpCast : undefined) };
+  const service = createArenaService(createSqliteArenaRepository(db), works);
+  const app = Fastify();
+  app.decorate("authenticateAccessToken", (token: string) => ({ id: token, email: `${token}@example.test`, username: token, avatarId: null }));
+  await app.register(buildArenaRoutes(service));
+  const headers = { authorization: "Bearer owner" };
+  const create = (payload: Record<string, unknown>) => app.inject({ method: "POST", url: "/arenas", headers, payload });
+  const body = (characters: Record<string, unknown>, bracketSize = 4) => ({ name: "HP", bracketSize, roundDurationMinutes: 60, characters });
+  return { app, headers, create, body, service };
+}
+
+test("POST /arenas with characters answers 201 with the started tournament", async () => {
+  const { app, create, body } = await characterArena();
+  const res = await create(body({ workId: "hp", characterIds: hpCast.characters.map((c) => c.id) }));
+  assert.equal(res.statusCode, 201);
+  const tournament = res.json().tournament;
+  assert.equal(tournament.status, "active");
+  assert.equal(tournament.bracketSize, 4);
+  assert.equal(tournament.subject.scope.label, "Harry Potter");
+  assert.deepEqual(tournament.covers, ["https://covers.test/hp.jpg"]);
+  await app.close();
+});
+
+test("POST /arenas with an invalid character selection is a 400", async () => {
+  const { app, create, body } = await characterArena();
+  const ids = hpCast.characters.map((c) => c.id);
+  const bad = [
+    body({ workId: "hp", characterIds: ids }, 6),
+    body({ workId: "hp", characterIds: ids }, 2),
+    body({ workId: "hp", characterIds: ids }, 8),
+    body({ workId: "hp", characterIds: [ids[0], ids[0], ids[1], ids[2]] }),
+    body({ workId: "hp", characterIds: [...ids.slice(0, 3), "ch:hp|nobody"] }),
+    body({ workId: "unknown", characterIds: ids.slice(0, 4) }),
+    body({ workId: "hp", characterIds: ids.slice(0, 3) })
+  ];
+  for (const payload of bad) assert.equal((await create(payload)).statusCode, 400, JSON.stringify(payload));
+  await app.close();
+});
+
+test("GET /arenas/mine lists character tournaments only with subjects=characters", async () => {
+  const { app, headers, create, body } = await characterArena();
+  await create(body({ workId: "hp", characterIds: hpCast.characters.slice(0, 4).map((c) => c.id) }));
+  await create({ name: "Plain", bracketSize: 4, roundDurationMinutes: 60 });
+  const names = async (url: string) => (await app.inject({ method: "GET", url, headers })).json().tournaments.map((t: { name: string }) => t.name).sort();
+  assert.deepEqual(await names("/arenas/mine"), ["Plain"]);
+  assert.deepEqual(await names("/arenas/mine?subjects=characters"), ["HP", "Plain"]);
+  await app.close();
+});

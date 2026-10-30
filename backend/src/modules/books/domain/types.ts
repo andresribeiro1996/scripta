@@ -94,6 +94,12 @@ export type WorkPageRows = {
   editions: Array<{ id: string; title: string; language: string | null; year: number | null; first_published_year: number | null; isbn: string | null; summary: string | null; summary_hash: string | null; cover_image_id: string | null; cover_color: string | null; genres: string; rating: number | null; rating_count: number; pages: number | null; genres_source: GenresSource | null; genres_confidence: number | null }>;
 };
 
+export type CastRows = {
+  work: { id: string; title: string; coverImageId: string | null };
+  series: { name: string; nameKey: string } | null;
+  members: Array<{ id: string; position: string | null; people: string[] }>;
+};
+
 export interface WorkView {
   id: string;
   olWorkKey: string | null;

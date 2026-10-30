@@ -1,5 +1,6 @@
 // Domain types for the tierlists module.
 
+import type { CharacterSubject } from "@scripta/shared";
 import type { TierPlacementFact } from "../../community/index.js";
 
 /** Who may cast a ballot on a community tier list. */
@@ -30,6 +31,7 @@ export interface TierlistRow {
   promoted_at: string | null;
   public_books: string | null;
   ranks_worst_first: number;
+  subject: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -62,6 +64,7 @@ export interface Tierlist {
   promotedAt: string | null;
   originCreatorId: string;
   ranksWorstFirst: boolean;
+  subject: CharacterSubject | null;
   createdAt: string;
   updatedAt: string;
 }

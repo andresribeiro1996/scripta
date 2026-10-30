@@ -3,12 +3,12 @@
 // service.ts is written against this interface only, with no idea whether
 // SQLite, Postgres, or an in-memory fake is on the other side.
 
-import type { PublicBookData } from "@scripta/shared";
+import type { PublicBookData, WorkCast } from "@scripta/shared";
 import type { TierlistRow, BallotRow, BallotTotals, HistogramCell, Placement, TierlistDiscoverRow, TierlistGameRow, TierPlacement, TierlistShelfFacts, VoteAccess } from "./types.js";
 
 export interface TierlistsRepository {
   deleteUserData(userId: string): void;
-  listByUser(userId: string): TierlistRow[];
+  listByUser(userId: string, includeCharacters: boolean): TierlistRow[];
   /** Ownership-checked lookup — undefined if no row with that id exists,
    *  or it exists but isn't owned by userId. service.ts treats both cases
    *  identically (a caller-facing 404, not a server error). */
@@ -58,7 +58,7 @@ export interface TierlistsRepository {
   /** Ballot totals for every tier list at once — one grouped count, so
    *  listing the public directory doesn't fire a query per row. */
   ballotCountsByTierlist(): Map<string, number>;
-  listParticipation(ownerUserId: string, since: string): Array<{ id: string; name: string; public_books: string | null; participants: number; latest_at: string }>;
+  listParticipation(ownerUserId: string, since: string): Array<{ id: string; name: string; public_books: string | null; subject: string | null; participants: number; latest_at: string }>;
   listRecentVoters(tierlistId: string, ownerUserId: string, limit: number): Array<{ user_id: string; at: string }>;
 }
 
@@ -66,4 +66,5 @@ export interface TierlistWorks {
   knownWorkIds(ids: string[]): string[];
   canonicalByKey(ids: Map<string, string>): Map<string, string>;
   publicBooksByWork(ownerUserId: string, workIds: string[]): Map<string, PublicBookData>;
+  castOf(workId: string): WorkCast | undefined;
 }

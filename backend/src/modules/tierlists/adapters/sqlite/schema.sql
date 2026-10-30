@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS tierlists (
   promoted_at        TEXT,
   public_books       TEXT,
   ranks_worst_first  INTEGER NOT NULL DEFAULT 0,
+  subject            TEXT,
   created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   updated_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );

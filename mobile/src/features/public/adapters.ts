@@ -23,7 +23,7 @@ export function reconstructBooks(books: PublicBookData[], reading: PublicBookDat
 }
 
 export function reconstructTierlists(tierlists: Record<string, ResolvedTierlist>): Tierlist[] {
-  return Object.entries(tierlists).map(([id, tierlist]) => ({ id, name: tierlist.name, data: { tiers: tierlist.tiers, pool: tierlist.pool }, createdAt: "", updatedAt: "", voteCode: null, voteAccess: "anonymous", votingOpen: false, sourceTierlistId: null, promotedAt: null, originCreatorId: "", ranksWorstFirst: false }));
+  return Object.entries(tierlists).map(([id, tierlist]) => ({ id, name: tierlist.name, data: { tiers: tierlist.tiers, pool: tierlist.pool }, createdAt: "", updatedAt: "", voteCode: null, voteAccess: "anonymous", votingOpen: false, sourceTierlistId: null, promotedAt: null, originCreatorId: "", ranksWorstFirst: false, subject: null }));
 }
 
 export function muralPreviewOf(payload: NonNullable<CommunityProfileView["mural"]>) {

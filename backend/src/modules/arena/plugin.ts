@@ -5,6 +5,7 @@ import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
 import { createJobs } from "../../jobs.js";
 import { timeSync } from "../../stallLog.js";
+import { getWorkCast } from "../books/index.js";
 import { canonicalWorkIds, knownWorkIds } from "../library/index.js";
 import { openArenaDb } from "./adapters/sqlite/connection.js";
 import { createSqliteArenaRepository } from "./adapters/sqlite/sqliteArenaRepository.js";
@@ -15,7 +16,7 @@ import { createArenaPublicApi, createArenaService } from "./service.js";
 
 const SWEEP_INTERVAL_MS = 30_000;
 
-export const arenaWorks: ArenaWorks = { knownWorkIds, canonicalWorkIds };
+export const arenaWorks: ArenaWorks = { knownWorkIds, canonicalWorkIds, castOf: getWorkCast };
 
 export interface ArenaPluginOptions {
   emitPublished?: EmitPublished;

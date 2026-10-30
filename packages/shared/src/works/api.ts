@@ -1,5 +1,6 @@
 import { apiPath } from "../api/path.js";
 import type { ApiRequest } from "../api/port.js";
+import type { WorkCast } from "../characters/index.js";
 import type { BookStats } from "./bookStats.js";
 import type { RecentAwards, WorkPage } from "./types.js";
 
@@ -20,6 +21,9 @@ export function createWorksApi(request: ApiRequest) {
         Object.assign(characters, page.characters);
       }
       return { characters };
+    },
+    fetchWorkCast(workId: string): Promise<WorkCast> {
+      return request<WorkCast>(apiPath`/works/${workId}/cast`, { auth: "optional" });
     },
     fetchRecentAwards(): Promise<RecentAwards> {
       return request<RecentAwards>("/awards/recent", { auth: "none" });

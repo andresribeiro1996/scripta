@@ -15,7 +15,7 @@ import { EditionStrip } from "./EditionStrip";
 import { fetchWorkStats } from "./api";
 import { StatsTiles } from "./BookStats";
 import { RatingStars } from "./RatingStars";
-import { bookToolPath, seriesSearchHref, seriesSearchMethod, workStatsPath } from "./workPath";
+import { bookToolPath, seriesSearchHref, seriesSearchMethod, workCharactersPath, workStatsPath } from "./workPath";
 import { AuthorAvatar, openProfile } from "../community/AuthorAvatar";
 import { ReaderGlyph } from "../community/ReaderGlyph";
 
@@ -204,6 +204,9 @@ export function BookScreen({ page, book, model, signedIn, onAdd, onSelectEdition
           <Pressable accessibilityRole="button" accessibilityLabel="Show all characters" onPress={() => setCharactersOpen(true)} style={{ minHeight: minimumTouchTarget, justifyContent: "center" }}>
             <Text {...dynamicType} style={[typography.caption, { color: colors.accent }]}>{`+${model.characters.more.length} more`}</Text>
           </Pressable>
+        ) : null}
+        {model.characters.canMakeGame && signedIn && page ? (
+          <Button label="Make a character game" variant="secondary" onPress={() => router.push(workCharactersPath(page.work.id, segments) as never)} />
         ) : null}
         {model.genres.length + model.possibleGenres.length > 0 ? (
           <View style={styles.chips}>

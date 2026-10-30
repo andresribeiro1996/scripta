@@ -7,6 +7,7 @@ export const {
   fetchTierlists,
   fetchTierlist,
   createTierlist: createTierlistApi,
+  createCharacterTierlist,
   updateTierlist: updateTierlistApi,
   deleteTierlist: deleteTierlistApi,
 } = createTierlistsApi(request);

@@ -1,7 +1,8 @@
 import { useDraggable, useDroppable } from "@dnd-kit/core";
-import { readingPercent, booksByWork } from "@scripta/shared";
+import { readingPercent, booksByWork, isCharacterBook, itemNoun } from "@scripta/shared";
 import type { ReactNode } from "react";
 import { CoverImage } from "../../BookCard";
+import { CharacterName } from "../../CharacterName";
 import type { ResolvedTierlist } from "../../../api/tierlists";
 import { bookKey } from "../../../lib/merge";
 import { blockBooks, resolveShelfBooks, type MuralBlock, type TierDefinition } from "../../../lib/murals";
@@ -49,6 +50,14 @@ export function MiniBookTile({
   showTitle?: boolean;
   showAuthor?: boolean;
 }) {
+  if (isCharacterBook(book)) {
+    const name = String(book.Title ?? "Untitled");
+    return (
+      <div className="flex h-full items-center justify-center overflow-hidden rounded-lg bg-(--color-accent-soft) p-1 text-center">
+        <CharacterName name={name} className="text-[0.7em] leading-tight" />
+      </div>
+    );
+  }
   const showFooter = showTitle || showAuthor;
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-lg">
@@ -201,7 +210,7 @@ export function TierRow({ tier, books }: { tier: TierDefinition; books: Array<Re
   return (
     <TierRowShell tier={tier}>
       {resolvedKeys.length === 0 ? (
-        <TierRowEmpty message="No books on this tier." />
+        <TierRowEmpty message={`No ${itemNoun(books.some(isCharacterBook), 2)} on this tier.`} />
       ) : (
         <TierRowTiles>
           {resolvedKeys.map((key) => (
@@ -281,6 +290,7 @@ export function DraggableTierTile({
   // one control that could rank a book without dragging was invisible.
   const coarse = typeof window !== "undefined" && Boolean(window.matchMedia?.("(pointer: coarse)").matches);
   const title = String(book.Title ?? "Untitled");
+  const noun = itemNoun(isCharacterBook(book), 1);
   return (
     <div
       ref={setRefs}
@@ -337,7 +347,7 @@ export function DraggableTierTile({
       >
         <OptionsMenu
           items={menuItems}
-          title="Move this book"
+          title={`Move this ${noun}`}
           triggerClassName="flex h-11 w-11 items-center justify-center"
           trigger={<span className="flex h-6 w-6 items-center justify-center rounded-full bg-[rgba(10,8,6,0.72)] text-white backdrop-blur-xs"><MoreIcon size={16} /></span>}
         />

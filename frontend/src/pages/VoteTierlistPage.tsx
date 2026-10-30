@@ -22,13 +22,14 @@
 // localStorage ballot id for an anonymous voter). Editing one loads it back
 // onto the board, so a returning voter adjusts their ranking instead of
 // rebuilding it from an empty board.
-import { ballotBoard, blankBoard } from "@scripta/shared";
+import { ballotBoard, blankBoard, characterBooks, itemNoun } from "@scripta/shared";
 import { useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import type { PublicBookData } from "../api/sharedMurals";
 import type { TierlistData } from "../api/tierlists";
 import { useAuth } from "../auth/AuthContext";
 import { AddBookSheet } from "../components/AddBookSheet";
+import { CharacterHeader } from "../components/CharacterHeader";
 import { CoverImage } from "../components/BookCard";
 import { Page } from "../components/page/Page";
 import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../components/page/buttonClasses";
@@ -69,7 +70,14 @@ export function VoteTierlistPage() {
     return <InfoScreen message="Couldn't load your ballot. Reload to try again." />;
   }
 
-  const books = publicBooks.map((b) => toPrivateBook(b as unknown as PublicBookData));
+  const subject = board.subject;
+  const books = subject ? characterBooks(subject) : publicBooks.map((b) => toPrivateBook(b as unknown as PublicBookData));
+  const header = subject ? <CharacterHeader subject={subject} /> : null;
+  const booksButton = subject ? null : (
+    <button onClick={() => setBooksOpen(true)} className={BUTTON_SECONDARY}>
+      Books
+    </button>
+  );
   const signedIn = Boolean(session);
   const alreadySubmitted = ballot !== null;
   const showResults = (alreadySubmitted || !board.votingOpen) && !editing;
@@ -138,12 +146,11 @@ export function VoteTierlistPage() {
                 Edit ballot
               </button>
             )}
-            <button onClick={() => setBooksOpen(true)} className={BUTTON_SECONDARY}>
-              Books
-            </button>
+            {booksButton}
           </>
         }
       >
+        {header}
         {board.ranksWorstFirst ? <p className="mb-2 text-xs text-(--color-text-dim)">Top tier = worst</p> : null}
         <p className="mb-4 text-sm text-(--color-text-dim)">
           {justSubmitted ? "Your ballot is in. " : alreadySubmitted ? "You've already ranked this one. " : ""}
@@ -206,17 +213,16 @@ export function VoteTierlistPage() {
               </button>
             </>
           )}
-          <button onClick={() => setBooksOpen(true)} className={BUTTON_SECONDARY}>
-            Books
-          </button>
+          {booksButton}
         </>
       }
     >
+      {header}
       {board.ranksWorstFirst ? <p className="mb-2 text-xs text-(--color-text-dim)">Top tier = worst</p> : null}
       <p className="mb-4 text-sm text-(--color-text-dim)">
         {membersOnlyBlocked
           ? "This tier list only accepts votes from signed-in members — rank away, then sign in to cast your ballot."
-          : "Drag books into tiers to rank them, then submit your ballot."}
+          : `Drag ${itemNoun(subject, 2)} into tiers to rank them, then submit your ballot.`}
       </p>
       {submitError && <p className="mb-4 text-sm text-(--color-danger)">{submitError}</p>}
       <TierBoard data={data} books={books} onChange={setWorking} structureEditable={false} />

@@ -7,7 +7,7 @@ function toCard(ref: PublishedTournamentRef): GameCard<"tournament"> {
     ownerUserId: ref.ownerUserId,
     createdAt: ref.createdAt,
     promoted: false,
-    content: { kind: "tournament", id: ref.id, name: ref.name, bracketSize: ref.bracketSize, status: ref.status, bookCount: ref.bracketSize, covers: ref.covers }
+    content: { kind: "tournament", id: ref.id, name: ref.name, bracketSize: ref.bracketSize, status: ref.status, bookCount: ref.bracketSize, covers: ref.covers, ...(ref.subject ? { subject: ref.subject } : {}) }
   };
 }
 

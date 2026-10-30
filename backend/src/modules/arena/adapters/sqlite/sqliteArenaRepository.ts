@@ -10,12 +10,13 @@ import type { CompletedVotedRow, DuelRow, SeedPreview, TournamentDiscoverRow, To
 
 export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
   const insertTournamentStmt = db.prepare(`
-    INSERT INTO tournaments (id, owner_user_id, name, name_key, bracket_size, round_duration_minutes, status, current_round, created_at, updated_at)
-    VALUES ($id, $owner_user_id, $name, $name_key, $bracket_size, $round_duration_minutes, $status, $current_round, $created_at, $updated_at)
+    INSERT INTO tournaments (id, owner_user_id, name, name_key, bracket_size, round_duration_minutes, status, current_round, subject, created_at, updated_at)
+    VALUES ($id, $owner_user_id, $name, $name_key, $bracket_size, $round_duration_minutes, $status, $current_round, $subject, $created_at, $updated_at)
   `);
   const getTournamentStmt = db.prepare(`SELECT * FROM tournaments WHERE id = ?`);
   const getOwnedTournamentStmt = db.prepare(`SELECT * FROM tournaments WHERE id = ? AND owner_user_id = ?`);
-  const listByOwnerStmt = db.prepare(`SELECT * FROM tournaments WHERE owner_user_id = ? ORDER BY created_at DESC`);
+  const listByOwnerStmt = db.prepare(`SELECT * FROM tournaments WHERE owner_user_id = ? AND subject IS NULL ORDER BY created_at DESC`);
+  const listByOwnerWithCharactersStmt = db.prepare(`SELECT * FROM tournaments WHERE owner_user_id = ? ORDER BY created_at DESC`);
   const listPublicStmt = db.prepare(`SELECT * FROM tournaments WHERE status != 'seeding' ORDER BY created_at DESC LIMIT ? OFFSET ?`);
   const discoverWindowStmt = db.prepare(`SELECT id, created_at, owner_user_id FROM tournaments WHERE status != 'seeding' ORDER BY created_at DESC LIMIT ?`);
   const discoverSearchStmt = db.prepare(
@@ -33,17 +34,17 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
         WHERE d.tournament_id = t.id AND (v.voter_user_id IS NULL OR v.voter_user_id != t.owner_user_id) AND ($until IS NULL OR v.created_at < $until)) AS voters,
       (SELECT COUNT(*) FROM votes v JOIN duels d ON d.id = v.duel_id
         WHERE d.tournament_id = t.id AND (v.voter_user_id IS NULL OR v.voter_user_id != t.owner_user_id) AND ($since IS NULL OR v.created_at >= $since) AND ($until IS NULL OR v.created_at < $until)) AS votes_since
-    FROM tournaments t WHERE t.status != 'seeding'
+    FROM tournaments t WHERE t.status != 'seeding' AND t.subject IS NULL
   `);
   const shelfWorksStmt = db.prepare(`
     SELECT DISTINCT s.tournament_id, s.work_id FROM tournament_slots s JOIN tournaments t ON t.id = s.tournament_id
-    WHERE s.work_id IS NOT NULL AND t.status != 'seeding'
+    WHERE s.work_id IS NOT NULL AND t.status != 'seeding' AND t.subject IS NULL
   `);
   const shelfFinalsStmt = db.prepare(`
     SELECT d.tournament_id,
       CASE d.winner_side WHEN 'a' THEN d.book_a_work_id ELSE d.book_b_work_id END AS work_id,
       d.settled_at
-    FROM duels d JOIN tournaments t ON t.id = d.tournament_id AND t.status = 'completed'
+    FROM duels d JOIN tournaments t ON t.id = d.tournament_id AND t.status = 'completed' AND t.subject IS NULL
     WHERE d.round_number = (SELECT MAX(d2.round_number) FROM duels d2 WHERE d2.tournament_id = d.tournament_id)
       AND d.winner_side IS NOT NULL AND d.settled_at IS NOT NULL
   `);
@@ -169,7 +170,7 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
       AND EXISTS (SELECT 1 FROM duels d JOIN votes v ON v.duel_id = d.id WHERE d.tournament_id = t.id AND v.voter_user_id = ?)
   `);
   const participationStmt = db.prepare(`
-    SELECT t.id, t.name, COUNT(*) AS participants, MAX(p.first_at) AS latest_at
+    SELECT t.id, t.name, t.subject, COUNT(*) AS participants, MAX(p.first_at) AS latest_at
     FROM (
       SELECT d.tournament_id, COALESCE(v.voter_user_id, v.voter_token) AS voter, MIN(v.created_at) AS first_at, MAX(v.created_at) AS last_at
       FROM votes v
@@ -191,6 +192,17 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
   `);
 
   return {
+    transaction(fn) {
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        const result = fn();
+        db.exec("COMMIT");
+        return result;
+      } catch (error) {
+        if (db.isTransaction) db.exec("ROLLBACK");
+        throw error;
+      }
+    },
     deleteUserData(userId) {
       db.exec("BEGIN IMMEDIATE");
       try {
@@ -212,6 +224,7 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
         $round_duration_minutes: row.round_duration_minutes,
         $status: row.status,
         $current_round: row.current_round,
+        $subject: row.subject,
         $created_at: row.created_at,
         $updated_at: row.updated_at
       });
@@ -222,8 +235,8 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
     getOwnedTournament(id, ownerUserId) {
       return getOwnedTournamentStmt.get(id, ownerUserId) as TournamentRow | undefined;
     },
-    listTournamentsByOwner(ownerUserId) {
-      return listByOwnerStmt.all(ownerUserId) as unknown as TournamentRow[];
+    listTournamentsByOwner(ownerUserId, includeCharacters) {
+      return (includeCharacters ? listByOwnerWithCharactersStmt : listByOwnerStmt).all(ownerUserId) as unknown as TournamentRow[];
     },
     listPublicTournaments(limit, offset) {
       return listPublicStmt.all(limit, offset) as unknown as TournamentRow[];
@@ -413,7 +426,7 @@ export function createSqliteArenaRepository(db: DatabaseSync): ArenaRepository {
       return (votedAmongStmt.all(JSON.stringify(ids), voterUserId, voterUserId) as unknown as Array<{ id: string }>).map((row) => row.id);
     },
     listParticipation(ownerUserId, since) {
-      const rows = participationStmt.all(ownerUserId, since) as unknown as Array<{ id: string; name: string; participants: number; latest_at: string }>;
+      const rows = participationStmt.all(ownerUserId, since) as unknown as Array<{ id: string; name: string; subject: string | null; participants: number; latest_at: string }>;
       return rows.map((r) => ({ ...r, participants: Number(r.participants) }));
     },
     listRecentVoters(tournamentId, ownerUserId, limit) {

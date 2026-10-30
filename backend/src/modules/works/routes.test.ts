@@ -17,7 +17,7 @@ const { buildWorkRoutes, buildWorkStatsRoutes } = await import("./routes.js");
 const { worksPlugin } = await import("./plugin.js");
 const { WorkResolutionError } = await import("../library/index.js");
 
-function appWith(getPage: (id: string, viewerId: string | null) => unknown, getStats: (id: string) => unknown = () => undefined, recentAwards: () => unknown = () => ({ announcements: [] }), characters: (ids: string[]) => unknown = () => ({})) {
+function appWith(getPage: (id: string, viewerId: string | null) => unknown, getStats: (id: string) => unknown = () => undefined, recentAwards: () => unknown = () => ({ announcements: [] }), characters: (ids: string[]) => unknown = () => ({}), cast: (id: string) => unknown = () => undefined) {
   const app = Fastify();
   app.decorate("authenticateAccessToken", (token: string) => (token === "good" ? { id: "viewer", email: "v@example.test", username: "viewer", avatarId: null } : null));
   app.setErrorHandler((error: FastifyError, _request, reply) => {
@@ -25,7 +25,7 @@ function appWith(getPage: (id: string, viewerId: string | null) => unknown, getS
     const statusCode = typeof error.statusCode === "number" && error.statusCode >= 400 && error.statusCode < 500 ? error.statusCode : 500;
     return statusCode === 500 ? reply.code(500).send({ error: "Internal server error" }) : reply.code(statusCode).send({ error: error.message });
   });
-  void app.register(buildWorkRoutes({ getPage, recentAwards, characters } as never));
+  void app.register(buildWorkRoutes({ getPage, recentAwards, characters, cast } as never));
   void app.register(buildWorkStatsRoutes({ getStats } as never));
   return app;
 }
@@ -124,5 +124,18 @@ test("characters route rejects 501 ids with 400", async () => {
 test("characters route needs no token", async () => {
   const app = appWith(() => undefined);
   assert.equal((await app.inject({ method: "POST", url: "/works/characters", payload: { workIds: ["w"] } })).statusCode, 200);
+  await app.close();
+});
+
+test("GET /works/:id/cast: 404 for an unknown work, the cast otherwise, never cached", async () => {
+  const body = { scope: { kind: "work", key: "w", label: "Dune", coverUrl: null, workCount: 1 }, characters: [{ id: "ch:w:w|a b", name: "A B", works: 1 }] };
+  const app = appWith(() => undefined, () => undefined, undefined, undefined, (id) => (id === "w" ? body : undefined));
+  const missing = await app.inject({ url: "/works/nope/cast" });
+  assert.equal(missing.statusCode, 404);
+  assert.deepEqual(missing.json(), { error: "No book with that id." });
+  const found = await app.inject({ url: "/works/w/cast" });
+  assert.equal(found.statusCode, 200);
+  assert.deepEqual(found.json(), body);
+  assert.equal(found.headers["cache-control"], "no-store");
   await app.close();
 });

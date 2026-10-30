@@ -1,3 +1,4 @@
+import type { CharacterSubject } from "../characters/index.js";
 import type { Placement } from "./ballot.js";
 import type { HistogramCell } from "./results.js";
 import type { TierDefinition } from "./tierlist.js";
@@ -26,6 +27,7 @@ export interface Tierlist {
   promotedAt: string | null;
   originCreatorId: string;
   ranksWorstFirst: boolean;
+  subject: CharacterSubject | null;
 }
 
 export interface VotingBoard {
@@ -38,6 +40,7 @@ export interface VotingBoard {
   eligibleVoteCount: number;
   promotedAt: string | null;
   ranksWorstFirst: boolean;
+  subject: CharacterSubject | null;
   histogram?: HistogramCell[];
 }
 
@@ -59,4 +62,5 @@ export interface VotedTierlist {
   promotedAt: string | null;
   votingOpen: boolean;
   covers: string[];
+  subject?: { kind: "characters"; label: string };
 }

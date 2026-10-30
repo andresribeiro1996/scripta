@@ -1,6 +1,6 @@
 import { RankingMethodSelector } from "./RankingMethodSelector";
 import { useEffect, useRef, useState } from "react";
-import { aggregate, AGGREGATION_MODES, booksByWork, type AggregationMode, type HistogramCell } from "@scripta/shared";
+import { aggregate, AGGREGATION_MODES, booksByWork, isCharacterBook, type AggregationMode, type HistogramCell } from "@scripta/shared";
 import { router, useSegments } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
@@ -37,6 +37,8 @@ export function TierlistResults({ histogram, tiers, pool, books, ballotCount, el
   const [explainProgress, setExplainProgress] = useState(false);
   const results = aggregate(histogram, tiers.map((tier) => tier.id), pool, mode);
   const byWork = booksByWork(books);
+  const character = books.some(isCharacterBook);
+  const noun = character ? "character" : "book";
   const mine = new Map(ownPlacements.map(({ workId, tierId }) => [workId, tierId]));
   const votedBooks = results.filter((result) => result.votes > 0).length;
   const unrankedBooks = results.filter((result) => result.tierId === null);
@@ -54,8 +56,8 @@ export function TierlistResults({ histogram, tiers, pool, books, ballotCount, el
       {rows.length ? rows.map((result) => {
         const book = byWork.get(result.workId);
         const personal = tiers.find((item) => item.id === mine.get(result.workId));
-        return <Pressable key={result.workId} accessibilityRole="button" accessibilityLabel={`${book ? titleOf(book) : "Book"}, ${result.votes} ${result.votes === 1 ? "vote" : "votes"}${personal ? `, your rank ${personal.label}` : ""}. View vote details`} onPress={() => setSelected(result.workId)} style={styles.book}>
-          {book ? <TierCover book={book} /> : <Text style={[typography.caption, { color: colors.text }]}>Book</Text>}
+        return <Pressable key={result.workId} accessibilityRole="button" accessibilityLabel={`${book ? titleOf(book) : noun}, ${result.votes} ${result.votes === 1 ? "vote" : "votes"}${personal ? `, your rank ${personal.label}` : ""}. View vote details`} onPress={() => setSelected(result.workId)} style={styles.book}>
+          {book ? <TierCover book={book} /> : <Text style={[typography.caption, { color: colors.text }]}>{noun}</Text>}
           {showMine && personal ? <View style={[styles.badge, { backgroundColor: colors.surface }]}><Text style={[typography.caption, { color: colors.text }]}>You: {personal.label}</Text></View> : null}
         </Pressable>;
       }) : <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>–</Text>}
@@ -64,7 +66,7 @@ export function TierlistResults({ histogram, tiers, pool, books, ballotCount, el
 
   return <View style={styles.root}>
     <TierHead>
-    <View style={styles.summary}><Text {...dynamicType} style={[typography.caption, styles.strong, { color: colors.text }]}>{ballotCount} {ballotCount === 1 ? "vote" : "votes"}</Text><Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{votedBooks}/{pool.length} books · {promoted ? "Reference" : votingOpen === undefined ? "Community" : votingOpen ? "Voting open" : "Voting closed"}</Text></View>
+    <View style={styles.summary}><Text {...dynamicType} style={[typography.caption, styles.strong, { color: colors.text }]}>{ballotCount} {ballotCount === 1 ? "vote" : "votes"}</Text><Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{votedBooks}/{pool.length} {character ? "characters" : "books"} · {promoted ? "Reference" : votingOpen === undefined ? "Community" : votingOpen ? "Voting open" : "Voting closed"}</Text></View>
     {(eligibleVoteCount !== undefined && !promoted || ownPlacements.length > 0) ? <View style={styles.metaActions}>
       {eligibleVoteCount !== undefined && !promoted ? <Pressable accessibilityRole="button" accessibilityLabel={`${eligibleVoteCount} of 100 eligible voters toward reference status. Learn more`} hitSlop={captionHitSlop} onPress={() => setExplainProgress(true)}><Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{eligibleVoteCount}/100 eligible ⓘ</Text></Pressable> : null}
       {ownPlacements.length ? <Pressable accessibilityRole="switch" accessibilityState={{ checked: showMine }} hitSlop={captionHitSlop} onPress={() => setShowMine(!showMine)} style={styles.toggle}><Text {...dynamicType} style={[typography.caption, { color: colors.text }]}>My ranks:</Text><Text {...dynamicType} style={[typography.caption, { color: colors.accent }]}>{showMine ? "On" : "Off"}</Text></Pressable> : null}
@@ -87,15 +89,15 @@ export function TierlistResults({ histogram, tiers, pool, books, ballotCount, el
     </View>
     <Sheet visible={explain} title="Ranking methods" onClose={() => setExplain(false)}><View style={styles.detailBody}>{AGGREGATION_MODES.map((item) => <Text key={item.mode} {...dynamicType} style={[typography.body, { color: colors.text }]}><Text style={styles.strong}>{item.label}: </Text>{descriptions[item.mode]} Ties favour the higher tier.</Text>)}</View></Sheet>
     <Sheet visible={explainProgress} title="Reference status" onClose={() => setExplainProgress(false)}><Text {...dynamicType} style={[typography.body, { color: colors.text }]}>After 100 distinct signed-in voters other than the creator submit votes, this tier list becomes a permanent community reference. Anonymous votes still count in the results.</Text></Sheet>
-    <Sheet visible={detail !== undefined} title="Book votes" onClose={() => setSelected(null)}>
+    <Sheet visible={detail !== undefined} title={character ? "Character votes" : "Book votes"} onClose={() => setSelected(null)}>
       {detail && <ScrollView contentContainerStyle={styles.detailBody}>
-        <View style={styles.detailHead}>{detailBook ? <TierCover book={detailBook} style={styles.detailCover} /> : null}<View style={styles.detailText}><Text {...dynamicType} style={[typography.title, { color: colors.text }]}>{detailBook ? titleOf(detailBook) : "Book"}</Text><Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{detailBook ? authorOf(detailBook) : ""}</Text><Text {...dynamicType} style={[typography.body, { color: colors.text }]}>{detailTier ? `Community tier ${detailTier.label}` : "No community tier yet"}{myTier ? ` · Your tier ${myTier.label}` : ""}</Text></View></View>
+        <View style={styles.detailHead}>{detailBook ? <TierCover book={detailBook} style={styles.detailCover} /> : null}<View style={styles.detailText}><Text {...dynamicType} style={[typography.title, { color: colors.text }]}>{detailBook ? titleOf(detailBook) : noun}</Text><Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{detailBook ? authorOf(detailBook) : ""}</Text><Text {...dynamicType} style={[typography.body, { color: colors.text }]}>{detailTier ? `Community tier ${detailTier.label}` : "No community tier yet"}{myTier ? ` · Your tier ${myTier.label}` : ""}</Text></View></View>
         <Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>How readers voted</Text>
-        <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{detail.votes} of {ballotCount} participants ranked this book{detail.votes > 0 && detail.votes < 5 ? " · Small sample" : ""}</Text>
+        <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{detail.votes} of {ballotCount} participants ranked this {noun}{detail.votes > 0 && detail.votes < 5 ? " · Small sample" : ""}</Text>
         {tied ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Tie for most votes; ranking method determines the displayed tier.</Text> : null}
         {tiers.map((tier, index) => <View key={tier.id} style={styles.histRow}><View style={[styles.histLabel, { backgroundColor: tier.color }]}><Text style={[typography.caption, { color: "#fff" }]}>{tier.label}</Text></View><View style={[styles.histTrack, { backgroundColor: colors.background }]}><View style={{ flex: detail.votes ? counts[index]! / detail.votes : 0, backgroundColor: tier.color }} /></View><Text {...dynamicType} style={[typography.caption, styles.histCount, { color: colors.text }]}>{counts[index]} ({detail.votes ? Math.round(counts[index]! / detail.votes * 100) : 0}%)</Text></View>)}
         {detailTier && detail.votes > 0 ? <Text {...dynamicType} style={[typography.body, styles.center, { color: colors.accent }]}>{Math.round((1 - detail.spread) * 100)}% chose {detailTier.label}</Text> : null}
-        <Button label="About this book" variant="secondary" onPress={() => { setSelected(null); router.push(workPath(detail.workId, segments) as never); }} />
+        {character ? null : <Button label="About this book" variant="secondary" onPress={() => { setSelected(null); router.push(workPath(detail.workId, segments) as never); }} />}
       </ScrollView>}
     </Sheet>
   </View>;

@@ -4,17 +4,18 @@
 // covers, arena has no separate blob store, so there's nothing to split
 // a second port out for.
 
-import type { TournamentRecord } from "@scripta/shared";
+import type { TournamentRecord, WorkCast } from "@scripta/shared";
 import type { CompletedVotedRow, DuelRow, SeedPreview, TournamentDiscoverRow, TournamentGameRow, TournamentRow, TournamentShelfFacts, TournamentSlotRow, VoteRow } from "./types.js";
 
 export interface ArenaRepository {
   deleteUserData(userId: string): void;
+  transaction<T>(fn: () => T): T;
   insertTournament(row: TournamentRow): void;
   getTournament(id: string): TournamentRow | undefined;
   /** Ownership-checked lookup — for anything that mutates a tournament
    *  (seed, start, delete) or an owner-only action on one of its duels. */
   getOwnedTournament(id: string, ownerUserId: string): TournamentRow | undefined;
-  listTournamentsByOwner(ownerUserId: string): TournamentRow[];
+  listTournamentsByOwner(ownerUserId: string, includeCharacters: boolean): TournamentRow[];
   listPublicTournaments(limit: number, offset: number): TournamentRow[];
   discoverWindow(needle: string, limit: number): TournamentDiscoverRow[];
   listPublicByIds(ids: string[]): TournamentRow[];
@@ -86,11 +87,12 @@ export interface ArenaRepository {
    *  duel's winner and settled_at — filtered in SQL so the community
    *  dashboard doesn't scan the account's whole voting history per page. */
   listCompletedVotedSince(voterUserId: string, since: string): CompletedVotedRow[];
-  listParticipation(ownerUserId: string, since: string): Array<{ id: string; name: string; participants: number; latest_at: string }>;
+  listParticipation(ownerUserId: string, since: string): Array<{ id: string; name: string; subject: string | null; participants: number; latest_at: string }>;
   listRecentVoters(tournamentId: string, ownerUserId: string, limit: number): Array<{ user_id: string; at: string }>;
 }
 
 export interface ArenaWorks {
   knownWorkIds(ids: string[]): string[];
   canonicalWorkIds(ids: string[]): Map<string, string>;
+  castOf(workId: string): WorkCast | undefined;
 }

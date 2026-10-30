@@ -1,4 +1,4 @@
-import { cleanSummary, QUIZ_MIN_CHARACTERS, QUIZ_PROMPT_CHARACTERS, validBookRating, workGenres, type AwardAnnouncement, type IdentityKey, type ReaderProfile, type RecentAwards, type WorkGameRef, type WorkPage, type WorkReader } from "@scripta/shared";
+import { cleanSummary, QUIZ_MIN_CHARACTERS, QUIZ_PROMPT_CHARACTERS, validBookRating, workGenres, type AwardAnnouncement, type IdentityKey, type ReaderProfile, type RecentAwards, type WorkCast, type WorkGameRef, type WorkPage, type WorkReader } from "@scripta/shared";
 import { summaryMatchesLanguage, type CatalogWorkPage } from "../books/index.js";
 import type { ViewerCopy } from "../library/index.js";
 
@@ -17,6 +17,7 @@ export type WorksDeps = {
   quizzes(workIds: string[], limit: number): GameByWork[];
   getRecentAwards(): AwardAnnouncement[];
   charactersOf(workIds: string[]): Map<string, string[]>;
+  getWorkCast(id: string): WorkCast | undefined;
 };
 
 const READER_CAP = 50;
@@ -85,6 +86,10 @@ export function createWorksService(deps: WorksDeps) {
       const result: Record<string, string[]> = {};
       for (const [id, names] of deps.charactersOf(workIds)) if (names.length >= QUIZ_MIN_CHARACTERS) result[id] = names.slice(0, QUIZ_PROMPT_CHARACTERS);
       return result;
+    },
+
+    cast(id: string): WorkCast | undefined {
+      return deps.getWorkCast(id);
     },
 
     getPage(id: string, viewerId: string | null): WorkPage | undefined {

@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS tournaments (
   round_duration_minutes   INTEGER NOT NULL,
   status                   TEXT NOT NULL DEFAULT 'seeding', -- 'seeding' | 'active' | 'completed'
   current_round            INTEGER NOT NULL DEFAULT 0,
+  subject                  TEXT,
   created_at               TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   updated_at               TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );

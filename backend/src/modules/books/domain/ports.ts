@@ -5,7 +5,7 @@ import type { CollectionSource, SeriesEntry, SeriesSource } from "./series.js";
 import type { WorkSignals } from "./searchRank.js";
 import type { OriginalClaim } from "./translation.js";
 import type { RawWorkSubjects, WorkSubjects } from "./workSubjects.js";
-import type { BookRow, CoverImageRow, CoverSourceName, CoverStatus, DataSource, GenreEvidence, GenresSource, JevRejection, JevTask, LossyBook, MergeSource, MojibakeApplied, NewBook, RowRepair, SummarySource, WorkMatchJudgment, WorkPageRows, WorkView } from "./types.js";
+import type { BookRow, CastRows, CoverImageRow, CoverSourceName, CoverStatus, DataSource, GenreEvidence, GenresSource, JevRejection, JevTask, LossyBook, MergeSource, MojibakeApplied, NewBook, RowRepair, SummarySource, WorkMatchJudgment, WorkPageRows, WorkView } from "./types.js";
 
 export type MergeableDetails = Pick<BookMetadata, "summary" | "pages" | "year" | "publisher" | "translator">;
 
@@ -162,6 +162,7 @@ export interface BooksRepository {
   seriesMemberKind(nameKey: string, workId: string): "series" | "collection" | null;
   seriesPositionsOf(workId: string): Array<{ nameKey: string; position: string | null }>;
   bestSeriesOf(workIds: string[]): Map<string, SeriesEntry>;
+  castRows(workId: string): CastRows | undefined;
   collectionsOf(bookIds: string[]): Map<string, SeriesEntry>;
   searchSeries(tokens: string[]): { workIds: string[]; matches: SeriesMatch[] };
   workSignals(workIds: string[]): Map<string, WorkSignals>;

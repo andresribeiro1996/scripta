@@ -27,6 +27,7 @@ export interface TierlistSummary {
   promotedAt: string | null;
   covers: string[];
   viewerVoted?: boolean;
+  subject?: { kind: "characters"; label: string };
 }
 
 export interface TournamentSummary {
@@ -38,6 +39,7 @@ export interface TournamentSummary {
   bookCount: number;
   covers: string[];
   viewerVoted?: boolean;
+  subject?: { kind: "characters"; label: string };
 }
 
 export interface QuizSummary {
