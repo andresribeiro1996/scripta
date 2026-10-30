@@ -1,14 +1,12 @@
 import { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import { DISPLAY_FONT_IDS, TEXT_FONT_IDS, fonts, resolveFonts, type FontId, type FontPreference, type FontSlot } from "@scripta/shared/themes";
 import { fontStyleFor } from "../../ui/fontStyle";
 import { SYSTEM_FAMILY } from "../../ui/systemFont";
 import { Text } from "../../ui/Text";
 import { dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui/theme";
 import { isAppearanceSyncFailure, saveAccountAppearance } from "./appearanceSync";
-
-const CHIP_PADDING = 7;
-const CHIP_SLOP = Math.max(0, (minimumTouchTarget - (typography.body.lineHeight + 2 * CHIP_PADDING + 2)) / 2);
+import { SWATCH } from "./ThemePicker";
 
 function sampleStyle(font: FontId, slot: FontSlot) {
   return fontStyleFor(font, slot, typography.body) ?? { fontFamily: SYSTEM_FAMILY };
@@ -35,7 +33,7 @@ export function FontPicker({ slot }: { slot: FontSlot }) {
       <Text {...dynamicType} style={[typography.caption, styles.heading, { color: colors.textDim }]}>
         {slot === "display" ? "Headings" : "Text"}
       </Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} accessibilityRole="radiogroup" accessibilityLabel={slot === "display" ? "Heading font" : "Text font"} contentContainerStyle={styles.row}>
+      <View accessibilityRole="radiogroup" accessibilityLabel={slot === "display" ? "Heading font" : "Text font"} style={styles.grid}>
         {options.map((option) => {
           const checked = option === selected;
           const shown = option === "theme" ? themeDefault : option;
@@ -47,17 +45,17 @@ export function FontPicker({ slot }: { slot: FontSlot }) {
               accessibilityRole="radio"
               accessibilityState={{ checked }}
               accessibilityLabel={a11yLabel}
-              hitSlop={{ top: CHIP_SLOP, bottom: CHIP_SLOP }}
               onPress={() => choose(option)}
-              style={[styles.chip, { borderColor: checked ? colors.accent : colors.border, backgroundColor: checked ? colors.accentSoft : colors.surface }]}
+              style={styles.item}
             >
-              <Text {...dynamicType} numberOfLines={1} style={[typography.body, { color: colors.text }, sampleStyle(shown, slot)]}>
-                {label}
-              </Text>
+              <View style={[styles.tile, { borderColor: checked ? colors.accent : colors.border, borderWidth: checked ? 2 : 1, backgroundColor: checked ? colors.accentSoft : colors.surface }]}>
+                <Text {...dynamicType} style={[typography.body, { color: colors.text }, sampleStyle(shown, slot)]}>Aa</Text>
+              </View>
+              <Text {...dynamicType} numberOfLines={2} style={[typography.caption, styles.name, { color: checked ? colors.text : colors.textDim }]}>{label}</Text>
             </Pressable>
           );
         })}
-      </ScrollView>
+      </View>
       {error ? (
         <Text accessibilityRole="alert" {...dynamicType} style={[typography.caption, { color: colors.danger }]}>
           {error}
@@ -70,6 +68,8 @@ export function FontPicker({ slot }: { slot: FontSlot }) {
 const styles = StyleSheet.create({
   wrap: { gap: spacing.sm },
   heading: { fontWeight: "600" },
-  row: { gap: spacing.sm },
-  chip: { paddingVertical: CHIP_PADDING, paddingHorizontal: spacing.md, borderRadius: radii.full, borderWidth: 1 },
+  grid: { flexDirection: "row", flexWrap: "wrap", rowGap: spacing.sm },
+  item: { width: "25%", minHeight: minimumTouchTarget, alignItems: "center", gap: spacing.xs },
+  tile: { width: SWATCH, height: SWATCH, borderRadius: radii.lg, alignItems: "center", justifyContent: "center" },
+  name: { textAlign: "center" },
 });

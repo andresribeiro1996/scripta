@@ -9,7 +9,7 @@ import { isAppearanceSyncFailure, saveAccountAppearance } from "./appearanceSync
 
 const OPTIONS: ThemePreference[] = ["system", ...THEME_IDS];
 
-const SWATCH = 46;
+export const SWATCH = 46;
 
 export function ThemePicker() {
   const { colors, preference, setPreference } = useTheme();
