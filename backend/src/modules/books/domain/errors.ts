@@ -41,6 +41,20 @@ export class BookNotFoundError extends Error {
   }
 }
 
+export class CoverOfferExpiredError extends Error {
+  constructor() {
+    super("That cover offer expired. Reopen the picker.");
+    this.name = "CoverOfferExpiredError";
+  }
+}
+
+export class UnusableCoverError extends Error {
+  constructor() {
+    super("That image can't be used as a cover.");
+    this.name = "UnusableCoverError";
+  }
+}
+
 export class FileTooLargeError extends Error {
   constructor(readonly maxBytes: number) {
     super(`Image is larger than ${Math.round(maxBytes / (1024 * 1024))} MB.`);
