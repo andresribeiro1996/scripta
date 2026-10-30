@@ -57,7 +57,7 @@ function DailyGame({ board, guestId, playerId, recovered }: { board: DailyChapte
     const body = dailyChapterSubmission(questions, answers);
     if (!body) return;
     setBusy(true); setError("");
-    try { setSubmitted(await dailyChapterApi.play(board.id, guestId, body, Boolean(user))); void client.invalidateQueries({ queryKey: ["daily-chapter", "history"] }); }
+    try { setSubmitted(await dailyChapterApi.play(board.id, guestId, body, Boolean(user))); void client.invalidateQueries({ queryKey: ["daily-chapter", "history"] }); void client.invalidateQueries({ queryKey: ["daily-chapter", "player"] }); }
     catch (reason) { setError(reason instanceof Error ? reason.message : "Couldn't score your chapter. Try again."); void client.invalidateQueries({ queryKey: ["daily-chapter", "today"] }); }
     finally { setBusy(false); }
   }

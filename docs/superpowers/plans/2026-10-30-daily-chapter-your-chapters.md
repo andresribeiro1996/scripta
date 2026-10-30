@@ -442,6 +442,7 @@ git commit -m "Share Your chapters as a month poster or text"
 - Create: `mobile/src/features/dailyChapter/daily-chapter-profile-section.tsx`
 - Modify: `mobile/src/features/community/ProfileScreen.tsx`
 - Modify: `mobile/src/features/community/MyShelfScreen.tsx`
+- Modify: `mobile/src/features/dailyChapter/daily-chapter-screen.tsx`
 
 **Interfaces:**
 - Consumes: `dailyChapterApi.player(userId)` (Task 2), `DailyChapterCalendar` (Task 4) and `dailyChapterThemeRates`.
