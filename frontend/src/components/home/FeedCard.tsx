@@ -1,9 +1,10 @@
-import { useMemo, type ComponentType } from "react";
+import { useMemo, useState, type ComponentType } from "react";
 import { Link } from "react-router-dom";
 import { bookKey, digestTarget, participationLead, plural, savedContentRef, type DigestItem } from "@scripta/shared";
 import { contentDetail, feedEventLabel, feedPrimaryLabel, feedRowAccessibilityLabel, feedRowModel, feedShareTarget, hasActivityThread, reactionCount, readingShelfBook, relativeTime, type FeedIconName } from "@scripta/shared/community";
 import type { FeedActions } from "../../hooks/useFeedActions";
 import { bookHref } from "../../lib/libraryView";
+import { CommentsSheet } from "./CommentsSheet";
 import { BookCover } from "../book/BookCover";
 import { AuthorAvatar } from "../CommunityAuthorAvatar";
 import { ReaderGlyph } from "../ReaderGlyph";
@@ -80,6 +81,7 @@ function Preview({ item, covers }: { item: DigestItem; covers: string[] }) {
 }
 
 export function FeedCard({ item, actions, books, works, isSaved }: { item: DigestItem; actions: FeedActions; books: Array<Record<string, unknown>>; works: Record<string, string> | undefined; isSaved?: boolean }) {
+  const [commentsOpen, setCommentsOpen] = useState(false);
   const row = feedRowModel(item);
   const target = digestTarget(item);
   const primary = feedPrimaryLabel(item);
@@ -152,7 +154,7 @@ export function FeedCard({ item, actions, books, works, isSaved }: { item: Diges
                 <GlyphIcon path={HEART} filled={engagement?.liked} />
                 {likes ? <span className="tabular-nums">{likes}</span> : null}
               </button>
-              <button type="button" aria-label={engagement ? `Comments, ${engagement.comments}` : "Comments"} disabled className={`${ACTION} ${MUTED}`}>
+              <button type="button" aria-label={engagement ? `Comments, ${engagement.comments}` : "Comments"} aria-haspopup="dialog" onClick={() => setCommentsOpen(true)} className={`${ACTION} ${MUTED}`}>
                 <GlyphIcon path={BUBBLE} />
                 {comments ? <span className="tabular-nums">{comments}</span> : null}
               </button>
@@ -165,6 +167,7 @@ export function FeedCard({ item, actions, books, works, isSaved }: { item: Diges
           ) : null}
         </div>
       ) : null}
+      {commentsOpen ? <CommentsSheet id={item.id} title={title || name} onClose={() => setCommentsOpen(false)} /> : null}
     </article>
   );
 }

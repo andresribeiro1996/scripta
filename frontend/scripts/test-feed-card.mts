@@ -6,10 +6,13 @@ import { renderToString } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { digestTarget, type DashboardFeedPage, type DigestItem } from "@scripta/shared";
-import { feedEventLabel, type ActivityEngagement } from "@scripta/shared/community";
+import { feedEventLabel, type ActivityComment, type ActivityEngagement } from "@scripta/shared/community";
 import { FeedCard } from "../src/components/home/FeedCard";
 import { ForYouPanel } from "../src/components/home/ForYouPanel";
 import type { FeedActions } from "../src/hooks/useFeedActions";
+import { CommentsSheet } from "../src/components/home/CommentsSheet";
+import { ConfirmProvider } from "../src/components/ConfirmDialog";
+import { ToastProvider } from "../src/components/Toaster";
 
 const actor = { userId: "u1", username: "alice", avatarUrl: null };
 const createdAt = "2026-10-14T10:00:00.000Z";
@@ -30,6 +33,14 @@ function card(item: DigestItem, opts: { engagement?: Record<string, ActivityEnga
   const noop = () => {};
   const actions: FeedActions = { engagement: opts.engagement ?? {}, saved: new Set(opts.saved ?? []), savedReady: true, busy: { like: false, save: false, want: false }, like: noop, save: noop, wantToRead: noop, share: noop };
   return renderToString(createElement(MemoryRouter, null, createElement(FeedCard, { item, actions, books: opts.library ?? [], works: undefined })));
+}
+
+const me = { userId: "u9", username: "me", avatarUrl: null };
+
+function comments(id: string, list: ActivityComment[]) {
+  const client = new QueryClient();
+  client.setQueryData(["community", "comments", id], { pages: [{ items: list, nextCursor: null }], pageParams: [undefined] });
+  return renderToString(createElement(QueryClientProvider, { client }, createElement(ToastProvider, null, createElement(ConfirmProvider, null, createElement(CommentsSheet, { id, title: "Piranesi", onClose: () => {} })))));
 }
 
 function forYou(items: DigestItem[], page: Partial<DashboardFeedPage>) {
@@ -138,4 +149,31 @@ test("Home links to Saved from its header", () => {
   const home = readFileSync(new URL("../src/pages/HomePage.tsx", import.meta.url), "utf8");
   assert.match(home, /aria-label="Saved"/);
   assert.match(home, /to="\/dashboard\/saved"/);
+});
+
+test("comments: both shown, delete only on your own, a labelled composer with one Post button", () => {
+  const html = comments("a1", [{ id: "c1", author: actor, text: "Loved it", createdAt: "2026-10-29T10:00:00Z", own: false }, { id: "c2", author: me, text: "Same", createdAt: "2026-10-29T11:00:00Z", own: true }]);
+  assert.match(html, /Loved it[\s\S]*Same/);
+  assert.equal(html.match(/>Delete</g)?.length, 1);
+  assert.match(html, /<label[^>]*for="[^"]+"[^>]*>[^<]*Comment/);
+  assert.match(html, /<textarea[^>]*id="/);
+  assert.equal(html.match(/>Post</g)?.length, 1);
+});
+
+test("comments: the Post button starts disabled, and the feed comment button opens the sheet", () => {
+  const html = comments("a1", []);
+  assert.match(html, /<button(?=(?:=>|[^>])*disabled)(?:=>|[^>])*>Post<\/button>/);
+  const card = readFileSync(new URL("../src/components/home/FeedCard.tsx", import.meta.url), "utf8");
+  assert.match(card, /<CommentsSheet /);
+  assert.match(card, /setCommentsOpen\(true\)/);
+});
+
+test("comments: the keys, the 429 message and the confirm before delete", () => {
+  const src = readFileSync(new URL("../src/components/home/CommentsSheet.tsx", import.meta.url), "utf8");
+  assert.match(src, /const key = \["community", "comments", id\]/);
+  assert.match(src, /staleTime: 30_000/);
+  assert.match(src, /ENGAGEMENT_KEY/);
+  assert.match(src, /status === 429/);
+  assert.match(src, /await confirm\(/);
+  assert.match(src, /maxLength=\{1500\}/);
 });
