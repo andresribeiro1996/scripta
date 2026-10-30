@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { FIELD_CLASS } from "./page/buttonClasses";
 
 /** The shared bits of every list page's toolbar (Library, Series,
  *  Collections, Murals, Gallery), so the five don't drift into five
@@ -67,6 +68,29 @@ export function SearchIcon() {
       <circle cx="11" cy="11" r="6.5" />
       <path d="m20 20-4.2-4.2" />
     </svg>
+  );
+}
+
+export function SearchField({
+  value,
+  onChange,
+  placeholder,
+  label,
+  className = ""
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  label: string;
+  className?: string;
+}) {
+  return (
+    <div className={`relative min-w-0 sm:w-85 ${className}`}>
+      <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-(--color-text-dim)">
+        <SearchIcon />
+      </span>
+      <input type="search" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} aria-label={label} className={`${FIELD_CLASS} w-full pl-10`} />
+    </div>
   );
 }
 

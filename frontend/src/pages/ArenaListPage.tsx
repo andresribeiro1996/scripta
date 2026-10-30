@@ -21,7 +21,7 @@ import { OptionsMenu } from "../components/OptionsMenu";
 import { Page } from "../components/page/Page";
 import { BUTTON_PRIMARY, BUTTON_SECONDARY, FIELD_CLASS } from "../components/page/buttonClasses";
 import { SkeletonCardGrid } from "../components/Skeleton";
-import { ToolbarRow } from "../components/Toolbar";
+import { SearchField, ToolbarRow } from "../components/Toolbar";
 import { useDelayedShow } from "../hooks/useDelayedShow";
 import { useMyTournaments } from "../hooks/useMyTournaments";
 import { useQuizzes } from "../hooks/useQuizzes";
@@ -102,6 +102,17 @@ export function ArenaListPage() {
     <Page
       width="wide"
       title="Games"
+      subtitle={
+        tab === "tournaments" ? (
+          <>
+            Bracket tournaments from your library —{" "}
+            <a href="/arena" className="inline-flex min-h-11 items-center text-(--color-accent) underline">
+              browse public tournaments
+            </a>
+            .
+          </>
+        ) : undefined
+      }
       tabs={area("games").tabs}
       actions={
         <button onClick={create.onClick} className={BUTTON_PRIMARY}>
@@ -111,23 +122,9 @@ export function ArenaListPage() {
     >
       {tab === "tournaments" && (
         <>
-          <p className="mb-4 text-sm text-(--color-text-dim)">
-            Bracket tournaments from your library —{" "}
-            <a href="/arena" className="inline-flex min-h-11 items-center text-(--color-accent) underline">
-              browse public tournaments
-            </a>
-            .
-          </p>
-
           {(tournaments.length > 0 || votedTournaments.length > 0) && (
             <ToolbarRow>
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search"
-                aria-label="Search tournaments by name"
-                className={`${FIELD_CLASS} w-full sm:max-w-xs`}
-              />
+              <SearchField value={search} onChange={setSearch} placeholder="Search" label="Search tournaments by name" />
             </ToolbarRow>
           )}
 
@@ -203,7 +200,7 @@ export function ArenaListPage() {
                       if (e.key === "Escape") setRenamingTierlistId(null);
                     }}
                     aria-label="Tier list name"
-                    className="w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-2 py-1 font-semibold"
+                    className={`${FIELD_CLASS} w-full font-semibold`}
                   />
                   <p className="mt-1 text-sm text-(--color-text-dim)">Updated {new Date(tl.updatedAt).toLocaleDateString()}</p>
                 </div>

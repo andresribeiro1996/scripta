@@ -1170,6 +1170,8 @@ Run every action against the fixture account only.
 **Files:**
 - Modify: `frontend/src/pages/DiscoverPage.tsx`
 - Modify: `frontend/src/pages/PeoplePage.tsx`
+- Modify: `frontend/src/components/Toolbar.tsx`
+- Modify: `frontend/src/components/LibraryToolbar.tsx`
 - Test: `frontend/scripts/test-community-helpers.mts`
 
 **Interfaces:**

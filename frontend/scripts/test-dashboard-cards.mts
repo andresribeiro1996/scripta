@@ -83,7 +83,7 @@ test("suggestions: a failed load shows Retry, Follow names the reader, and follo
   assert.match(s, /refetch/);
   assert.match(s, /Retry/);
   assert.match(s, /<button(?:=>|[^>])*aria-label=\{`Follow \$\{reader\.user\.username\}`\}/);
-  assert.match(s, /queryKey: \["community", "dashboard", "circle"\]/);
+  assert.match(s, /await invalidateAfterFollow\(queryClient\)/);
 });
 
 test("the reading strip's empty-state link is a 44px target", () => {

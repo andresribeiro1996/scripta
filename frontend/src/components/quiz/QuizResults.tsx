@@ -54,12 +54,13 @@ function QuizAnswer({ row, question, expanded, onToggle }: { row: ScoreRow; ques
   );
 }
 
-export function QuizResults({ code, name, result, questions, alreadyPlayed }: {
+export function QuizResults({ code, name, result, questions, alreadyPlayed, back }: {
   code: string;
   name: string;
   result: PlayResponse;
   questions: PublicQuizQuestion[];
   alreadyPlayed: boolean;
+  back?: { to: string; label: string };
 }) {
   const [tab, setTab] = useState<"answers" | "board">("answers");
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -72,62 +73,60 @@ export function QuizResults({ code, name, result, questions, alreadyPlayed }: {
   })).entries()].slice(0, 3);
 
   return (
-    <Page title={null}>
-      <div className="mx-auto max-w-lg lg:max-w-6xl">
-        <section aria-label="Your result" className={`relative isolate mb-3 grid items-center gap-x-4 gap-y-3 pb-3 lg:mb-8 lg:gap-6 lg:border-b lg:border-(--color-border) lg:pb-10 ${covers.length ? "grid-cols-[minmax(0,1fr)_auto] lg:grid-cols-2" : ""}`}>
-          <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10" style={{ background: "radial-gradient(ellipse at 60% 50%, color-mix(in srgb, var(--color-accent) 8%, transparent), transparent 70%)" }} />
-          <div className="contents min-w-0 lg:block">
-            <div className="col-span-full min-w-0">
-              <p className="mb-2 text-xs text-(--color-text-dim) lg:mb-3 lg:text-sm">Your results</p>
-              <h1 className="font-sans text-2xl leading-tight font-extralight tracking-[-0.015em] break-words lg:text-4xl">{name}</h1>
-            </div>
-            <div className="min-w-0">
-              <p aria-label={`${result.score} of ${questions.length} correct`} className="my-3 font-sans text-[clamp(3.5rem,18vw,5rem)] leading-none font-extralight tracking-[-0.05em] lg:text-[6.5rem]">
-                {result.score}<span className="text-[0.45em] text-(--color-text-dim)"> / {questions.length}</span>
-              </p>
-              <p className="text-xs text-(--color-text-dim) lg:hidden">{result.score} correct · {questions.length - result.score} incorrect</p>
-              <p className="hidden text-sm text-(--color-text-dim) lg:block">{alreadyPlayed ? "You already played this quiz." : "Quiz complete. Here’s how you did."}</p>
-            </div>
+    <Page back={back} title={null}>
+      <section aria-label="Your result" className={`relative isolate mb-3 grid items-center gap-x-4 gap-y-3 pb-3 lg:mb-8 lg:gap-6 lg:border-b lg:border-(--color-border) lg:pb-10 ${covers.length ? "grid-cols-[minmax(0,1fr)_auto] lg:grid-cols-2" : ""}`}>
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10" style={{ background: "radial-gradient(ellipse at 60% 50%, color-mix(in srgb, var(--color-accent) 8%, transparent), transparent 70%)" }} />
+        <div className="contents min-w-0 lg:block">
+          <div className="col-span-full min-w-0">
+            <p className="mb-2 text-xs text-(--color-text-dim) lg:mb-3 lg:text-sm">Your results</p>
+            <h1 className="font-sans text-2xl leading-tight font-extralight tracking-[-0.015em] break-words lg:text-4xl">{name}</h1>
           </div>
-          {covers.length > 0 && (
-            <div aria-hidden="true" className="flex justify-end py-3 lg:justify-center lg:py-6">
-              {covers.map(([url, title], index) => (
-                <div key={url} className="relative -mx-1.5 h-20 w-14 overflow-hidden rounded bg-(--color-border) shadow-md lg:-mx-2 lg:h-48 lg:w-32" style={{ transform: `rotate(${(index - (covers.length - 1) / 2) * 10}deg) translateY(${index === 1 ? -8 : 0}px)`, zIndex: index === 1 ? 1 : 0 }}>
-                  <CoverImage book={{ _coverUrl: url }} fit="contain" alt={title} />
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-
-        <div role="tablist" aria-label="Quiz results" className="mb-1 flex border-b border-(--color-border) lg:hidden" onKeyDown={(event) => {
-          let next: "answers" | "board";
-          if (["ArrowLeft", "ArrowRight"].includes(event.key)) next = tab === "answers" ? "board" : "answers";
-          else if (event.key === "Home") next = "answers";
-          else if (event.key === "End") next = "board";
-          else return;
-          event.preventDefault();
-          setTab(next);
-          event.currentTarget.querySelector<HTMLButtonElement>(`#quiz-${next}-tab`)?.focus();
-        }}>
-          {([{ value: "answers", label: "Your answers" }, { value: "board", label: "Leaderboard" }] as const).map((item) => (
-            <button key={item.value} type="button" role="tab" id={`quiz-${item.value}-tab`} aria-selected={tab === item.value} aria-controls={`quiz-${item.value}-panel`} tabIndex={tab === item.value ? 0 : -1} onClick={() => setTab(item.value)} className={`min-h-12 flex-1 border-b-2 px-3 text-sm font-semibold ${tab === item.value ? "border-(--color-accent) text-(--color-accent)" : "border-transparent text-(--color-text-dim)"}`}>{item.label}</button>
-          ))}
+          <div className="min-w-0">
+            <p aria-label={`${result.score} of ${questions.length} correct`} className="my-3 font-sans text-[clamp(3.5rem,18vw,5rem)] leading-none font-extralight tracking-[-0.05em] lg:text-[6.5rem]">
+              {result.score}<span className="text-[0.45em] text-(--color-text-dim)"> / {questions.length}</span>
+            </p>
+            <p className="text-xs text-(--color-text-dim) lg:hidden">{result.score} correct · {questions.length - result.score} incorrect</p>
+            <p className="hidden text-sm text-(--color-text-dim) lg:block">{alreadyPlayed ? "You already played this quiz." : "Quiz complete. Here’s how you did."}</p>
+          </div>
         </div>
-        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:grid-rows-[auto_1fr] lg:gap-x-10 lg:gap-y-8">
-          <section id="quiz-answers-panel" role="tabpanel" aria-labelledby="quiz-answers-tab" className={`min-w-0 lg:row-span-2 lg:block ${tab === "answers" ? "" : "hidden"}`}>
-            <h2 id="quiz-answers-heading" className="mb-4 hidden font-display text-2xl lg:block">Your answers</h2>
-            <ol className="divide-y divide-(--color-border) lg:rounded-xl lg:border lg:border-(--color-border) lg:bg-(--color-surface)">
-              {rows.map((row, index) => <QuizAnswer key={row.id} row={row} question={questions[index]!} expanded={expanded === row.id} onToggle={() => setExpanded((current) => current === row.id ? null : row.id)} />)}
-            </ol>
-          </section>
-          <div id="quiz-board-panel" role="tabpanel" aria-labelledby="quiz-board-tab" className={`min-w-0 lg:col-start-2 lg:row-start-2 lg:block [&_h2]:hidden lg:[&_h2]:block ${tab === "board" ? "" : "hidden"}`}>
-            <QuizLeaderboard code={code} />
+        {covers.length > 0 && (
+          <div aria-hidden="true" className="flex justify-end py-3 lg:justify-center lg:py-6">
+            {covers.map(([url, title], index) => (
+              <div key={url} className="relative -mx-1.5 h-20 w-14 overflow-hidden rounded bg-(--color-border) shadow-md lg:-mx-2 lg:h-48 lg:w-32" style={{ transform: `rotate(${(index - (covers.length - 1) / 2) * 10}deg) translateY(${index === 1 ? -8 : 0}px)`, zIndex: index === 1 ? 1 : 0 }}>
+                <CoverImage book={{ _coverUrl: url }} fit="contain" alt={title} />
+              </div>
+            ))}
           </div>
-          <div className="min-w-0 lg:col-start-2 lg:row-start-1">
-            <ChallengeLink code={code} />
-            <p className="mt-3 text-center text-xs text-(--color-text-dim) lg:hidden">{alreadyPlayed ? "You already played this quiz." : "Quiz complete."}</p>
-          </div>
+        )}
+      </section>
+
+      <div role="tablist" aria-label="Quiz results" className="mb-1 flex border-b border-(--color-border) lg:hidden" onKeyDown={(event) => {
+        let next: "answers" | "board";
+        if (["ArrowLeft", "ArrowRight"].includes(event.key)) next = tab === "answers" ? "board" : "answers";
+        else if (event.key === "Home") next = "answers";
+        else if (event.key === "End") next = "board";
+        else return;
+        event.preventDefault();
+        setTab(next);
+        event.currentTarget.querySelector<HTMLButtonElement>(`#quiz-${next}-tab`)?.focus();
+      }}>
+        {([{ value: "answers", label: "Your answers" }, { value: "board", label: "Leaderboard" }] as const).map((item) => (
+          <button key={item.value} type="button" role="tab" id={`quiz-${item.value}-tab`} aria-selected={tab === item.value} aria-controls={`quiz-${item.value}-panel`} tabIndex={tab === item.value ? 0 : -1} onClick={() => setTab(item.value)} className={`min-h-12 flex-1 border-b-2 px-3 text-sm font-semibold ${tab === item.value ? "border-(--color-accent) text-(--color-accent)" : "border-transparent text-(--color-text-dim)"}`}>{item.label}</button>
+        ))}
+      </div>
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:grid-rows-[auto_1fr] lg:gap-x-10 lg:gap-y-8">
+        <section id="quiz-answers-panel" role="tabpanel" aria-labelledby="quiz-answers-tab" className={`min-w-0 lg:row-span-2 lg:block ${tab === "answers" ? "" : "hidden"}`}>
+          <h2 id="quiz-answers-heading" className="mb-4 hidden font-display text-2xl lg:block">Your answers</h2>
+          <ol className="divide-y divide-(--color-border) lg:rounded-xl lg:border lg:border-(--color-border) lg:bg-(--color-surface)">
+            {rows.map((row, index) => <QuizAnswer key={row.id} row={row} question={questions[index]!} expanded={expanded === row.id} onToggle={() => setExpanded((current) => current === row.id ? null : row.id)} />)}
+          </ol>
+        </section>
+        <div id="quiz-board-panel" role="tabpanel" aria-labelledby="quiz-board-tab" className={`min-w-0 lg:col-start-2 lg:row-start-2 lg:block [&_h2]:hidden lg:[&_h2]:block ${tab === "board" ? "" : "hidden"}`}>
+          <QuizLeaderboard code={code} />
+        </div>
+        <div className="min-w-0 lg:col-start-2 lg:row-start-1">
+          <ChallengeLink code={code} />
+          <p className="mt-3 text-center text-xs text-(--color-text-dim) lg:hidden">{alreadyPlayed ? "You already played this quiz." : "Quiz complete."}</p>
         </div>
       </div>
     </Page>

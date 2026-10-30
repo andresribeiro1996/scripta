@@ -9,13 +9,12 @@ import { ReaderGlyph } from "../components/ReaderGlyph";
 import { Page } from "../components/page/Page";
 import { SkeletonCardGrid } from "../components/Skeleton";
 import { followUser, unfollowUser } from "../api/community";
-import { useCommunityPeople, useSuggestedPeople } from "../hooks/useCommunity";
+import { invalidateAfterFollow, useCommunityPeople, useSuggestedPeople } from "../hooks/useCommunity";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { area } from "../lib/areas";
 import { BUTTON_SECONDARY } from "../components/page/buttonClasses";
-
-const searchInput =
-  "mb-3 min-h-11 w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm outline-none focus:border-(--color-accent)";
+import { LIST_PANEL, LIST_ROW, PANEL, PANEL_HEADING } from "../components/page/surfaceClasses";
+import { SearchField, ToolbarRow } from "../components/Toolbar";
 
 function retryButton(refetch: () => void) {
   return (
@@ -48,7 +47,7 @@ function PeoplePane() {
     try {
       if (person.viewerFollows) await unfollowUser(person.user.userId);
       else await followUser(person.user.userId);
-      await queryClient.invalidateQueries({ queryKey: ["community", "people"] });
+      await invalidateAfterFollow(queryClient);
     } catch (error) {
       setFollowError(followFailureMessage(error, "Couldn't update who you follow."));
     } finally {
@@ -58,7 +57,9 @@ function PeoplePane() {
 
   return (
     <div>
-      <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by username" aria-label="Search people by username" className={searchInput} />
+      <ToolbarRow>
+        <SearchField value={search} onChange={setSearch} placeholder="Search by username" label="Search people by username" />
+      </ToolbarRow>
       {followError && (
         <p role="alert" className="mb-3 text-sm text-(--color-danger)">
           {followError}
@@ -67,8 +68,8 @@ function PeoplePane() {
       {needle.length === 0 &&
         (suggested.people.length > 0 ? (
           <>
-            <h3 className="mb-3 text-sm font-semibold text-(--color-text-dim)">Readers you might like</h3>
-            <PersonList people={suggested.people} busyId={busyId} onToggle={toggle} />
+            <h2 className={`${PANEL_HEADING} mb-3`}>Readers you might like</h2>
+            <PersonCards people={suggested.people} busyId={busyId} onToggle={toggle} />
           </>
         ) : suggested.error ? (
           <EmptyState title="Couldn't load suggestions." action={retryButton(suggested.refetch)} />
@@ -88,52 +89,79 @@ function SharedCover({ src }: { src: string | null }) {
   return src ? <img src={src} alt="" loading="lazy" className={`${className} object-cover`} /> : <span className={`${className} bg-(--color-border)`} />;
 }
 
-function PersonList({
-  people,
-  busyId,
-  onToggle
-}: {
+function FollowButton({ person, busy, onToggle }: { person: PersonResult; busy: boolean; onToggle: (person: PersonResult) => Promise<void> }) {
+  const label = person.viewerFollows ? "Following" : "Follow";
+  return (
+    <button
+      type="button"
+      aria-label={`${label} ${person.user.username}`}
+      onClick={() => void onToggle(person)}
+      disabled={busy}
+      className={`${BUTTON_SECONDARY} shrink-0`}
+    >
+      {busy ? "…" : label}
+    </button>
+  );
+}
+
+function PersonName({ person }: { person: PersonResult | SuggestedReader }) {
+  return (
+    <span className="min-w-0">
+      <span className="flex items-center gap-1 font-bold">
+        <span className="truncate">{person.user.username}</span>
+        <ReaderGlyph identity={person.user.readerGlyph} />
+      </span>
+      <span className="block text-xs text-(--color-text-dim)">{personCaption(person)}</span>
+    </span>
+  );
+}
+
+type PersonListProps = {
   people: (PersonResult | SuggestedReader)[];
   busyId: string | null;
   onToggle: (person: PersonResult) => Promise<void>;
-}) {
+};
+
+function PersonCards({ people, busyId, onToggle }: PersonListProps) {
   return (
-    <div className="grid grid-cols-1 gap-3">
+    <ul className="grid [grid-template-columns:repeat(auto-fill,minmax(280px,1fr))] gap-4">
       {people.map((person) => {
-        const suggestion = "sharedCount" in person ? person : null;
+        const covers = "sharedCount" in person ? person.sharedBooks.slice(0, 3) : [];
         return (
-          <div key={person.user.userId} className="flex items-center justify-between gap-3 rounded-xl border border-(--color-border) bg-(--color-surface) p-4">
-            <Link to={`/community/u/${person.user.username}`} className="flex min-h-11 min-w-0 flex-1 items-center gap-2">
-              <AuthorAvatar author={person.user} size={32} />
-              <span className="min-w-0">
-                <span className="flex items-center gap-1 text-sm font-semibold">
-                  <span className="truncate">{person.user.username}</span>
-                  <ReaderGlyph identity={person.user.readerGlyph} />
-                </span>
-                <span className="block text-xs text-(--color-text-dim)">{personCaption(person)}</span>
-              </span>
-              {suggestion && suggestion.sharedBooks.length > 0 && (
-                <span className="ml-auto flex shrink-0 -space-x-1.5">
-                  {suggestion.sharedBooks.slice(0, 3).map((book, index) => (
+          <li key={person.user.userId} className={`${PANEL} flex flex-col gap-3 p-4`}>
+            <Link to={`/community/u/${person.user.username}`} className="flex min-h-11 min-w-0 items-center gap-3">
+              <AuthorAvatar author={person.user} size={48} />
+              <PersonName person={person} />
+            </Link>
+            {(covers.length > 0 || !person.private) && (
+              <div className="mt-auto flex items-center justify-between gap-3">
+                <span className="flex -space-x-1.5">
+                  {covers.map((book, index) => (
                     <SharedCover key={`${index}:${book.coverUrl}`} src={book.coverUrl} />
                   ))}
                 </span>
-              )}
-            </Link>
-            {!person.private && (
-              <button
-                onClick={() => void onToggle(person)}
-                disabled={busyId === person.user.userId}
-                className={`min-h-11 shrink-0 rounded-full border px-4 text-xs font-semibold disabled:opacity-50 ${
-                  person.viewerFollows ? "border-(--color-border) text-(--color-text-dim)" : "border-(--color-accent) bg-(--color-accent-soft) text-(--color-accent)"
-                }`}
-              >
-                {busyId === person.user.userId ? "…" : person.viewerFollows ? "Following" : "Follow"}
-              </button>
+                {!person.private && <FollowButton person={person} busy={busyId === person.user.userId} onToggle={onToggle} />}
+              </div>
             )}
-          </div>
+          </li>
         );
       })}
-    </div>
+    </ul>
+  );
+}
+
+function PersonList({ people, busyId, onToggle }: PersonListProps) {
+  return (
+    <ul className={LIST_PANEL}>
+      {people.map((person) => (
+        <li key={person.user.userId} className={LIST_ROW}>
+          <Link to={`/community/u/${person.user.username}`} className="flex min-h-11 min-w-0 flex-1 items-center gap-3">
+            <AuthorAvatar author={person.user} size={40} />
+            <PersonName person={person} />
+          </Link>
+          {!person.private && <FollowButton person={person} busy={busyId === person.user.userId} onToggle={onToggle} />}
+        </li>
+      ))}
+    </ul>
   );
 }

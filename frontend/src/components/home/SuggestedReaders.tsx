@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { followFailureMessage, suggestionReason } from "@scripta/shared/community";
 import { followUser } from "../../api/community";
-import { useSuggestedPeople } from "../../hooks/useCommunity";
+import { invalidateAfterFollow, useSuggestedPeople } from "../../hooks/useCommunity";
 import { AuthorAvatar } from "../CommunityAuthorAvatar";
 import { ReaderGlyph } from "../ReaderGlyph";
 import { BUTTON_SECONDARY } from "../page/buttonClasses";
@@ -22,10 +22,7 @@ export function SuggestedReaders() {
     setError(null);
     try {
       await followUser(userId);
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["community", "people"] }),
-        queryClient.invalidateQueries({ queryKey: ["community", "dashboard", "circle"] })
-      ]);
+      await invalidateAfterFollow(queryClient);
     } catch (failure) {
       setError(followFailureMessage(failure, "Couldn't follow them."));
     } finally {

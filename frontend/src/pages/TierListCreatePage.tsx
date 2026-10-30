@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { createTier, DEFAULT_TIER_PRESET, workIdOf, type TierlistData, booksByWork } from "@scripta/shared";
 import { Page } from "../components/page/Page";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY, FIELD_CLASS } from "../components/page/buttonClasses";
 import { backTo } from "../lib/areas";
 import { useLibrary } from "../hooks/useLibrary";
 import { useTierlists } from "../hooks/useTierlists";
@@ -41,14 +42,14 @@ export function TierListCreatePage() {
   }
 
   return <Page width="narrow" title={["Choose books", "Set up tiers", "Publish settings"][step]} subtitle={`Step ${step + 1} of 3`} back={backTo("tierlist")}>
-    <div className="mx-auto flex max-w-2xl flex-col gap-5 pb-10">
+    <div className="flex flex-col gap-5 pb-10">
       {error && <p role="alert" className="text-sm text-(--color-danger)">{error}</p>}
       {step === 0 && <>
         <label className="flex flex-col gap-1 text-sm font-semibold">Tier list name
-          <input value={name} onChange={(event) => setName(event.target.value)} maxLength={200} placeholder="Untitled tier list" className="min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2" />
+          <input value={name} onChange={(event) => setName(event.target.value)} maxLength={200} placeholder="Untitled tier list" className={FIELD_CLASS} />
         </label>
         <label className="flex flex-col gap-1 text-sm font-semibold">Books in pool · {pool.length}
-          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search your library" className="min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2" />
+          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search your library" className={FIELD_CLASS} />
         </label>
         {isLoading ? <p>Loading books…</p> : isError ? <button onClick={() => void refetch()} className="min-h-11 text-left text-(--color-accent)">Couldn't load your library. Retry</button> : <div className="max-h-[50vh] space-y-2 overflow-y-auto">
           {filtered.map((book) => {
@@ -66,11 +67,11 @@ export function TierListCreatePage() {
         {tiers.map((tier, index) => <div key={tier.id} className="flex items-end gap-3">
           <span className="mb-1 h-10 w-3 shrink-0 rounded" style={{ backgroundColor: tier.color }} />
           <label className="flex flex-1 flex-col gap-1 text-sm">Tier {index + 1}
-            <input value={tier.label} maxLength={30} onChange={(event) => setTiers((value) => value.map((entry) => entry.id === tier.id ? { ...entry, label: event.target.value } : entry))} className="min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2" />
+            <input value={tier.label} maxLength={30} onChange={(event) => setTiers((value) => value.map((entry) => entry.id === tier.id ? { ...entry, label: event.target.value } : entry))} className={FIELD_CLASS} />
           </label>
-          <button type="button" disabled={tiers.length === 1} onClick={() => setTiers((value) => value.filter((entry) => entry.id !== tier.id))} className="min-h-11 rounded-lg border border-(--color-border) px-3 disabled:opacity-50">Remove</button>
+          <button type="button" disabled={tiers.length === 1} onClick={() => setTiers((value) => value.filter((entry) => entry.id !== tier.id))} className={BUTTON_SECONDARY}>Remove</button>
         </div>)}
-        <button type="button" onClick={() => setTiers((value) => [...value, createTier("New tier", "#8a8580")])} className="min-h-11 rounded-lg border border-(--color-border) px-3">Add tier</button>
+        <button type="button" onClick={() => setTiers((value) => [...value, createTier("New tier", "#8a8580")])} className={BUTTON_SECONDARY}>Add tier</button>
       </>}
       {step === 2 && <>
         <fieldset className="flex flex-col gap-3"><legend className="mb-2 font-semibold">Top tier means</legend>
@@ -89,8 +90,8 @@ export function TierListCreatePage() {
         <p className="text-sm text-(--color-text-dim)">{pool.length} {pool.length === 1 ? "book" : "books"} · {tiers.length} tiers</p>
       </>}
       <div className="flex justify-end gap-3 pt-2">
-        {step > 0 && <button type="button" onClick={() => setStep((value) => value - 1)} className="min-h-11 rounded-lg border border-(--color-border) px-4">Back</button>}
-        {step < 2 ? <button type="button" disabled={step === 0 ? !pool.length || isError : tiers.some((tier) => !tier.label.trim())} onClick={() => setStep((value) => value + 1)} className="min-h-11 rounded-lg bg-(--color-accent) px-4 font-semibold text-(--color-on-accent) disabled:opacity-50">Next</button> : <button type="button" disabled={busy} onClick={() => void submit()} className="min-h-11 rounded-lg bg-(--color-accent) px-4 font-semibold text-(--color-on-accent) disabled:opacity-50">{busy ? "Creating…" : "Create tier list"}</button>}
+        {step > 0 && <button type="button" onClick={() => setStep((value) => value - 1)} className={BUTTON_SECONDARY}>Back</button>}
+        {step < 2 ? <button type="button" disabled={step === 0 ? !pool.length || isError : tiers.some((tier) => !tier.label.trim())} onClick={() => setStep((value) => value + 1)} className={BUTTON_PRIMARY}>Next</button> : <button type="button" disabled={busy} onClick={() => void submit()} className={BUTTON_PRIMARY}>{busy ? "Creating…" : "Create tier list"}</button>}
       </div>
     </div>
   </Page>;

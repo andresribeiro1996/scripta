@@ -1,7 +1,14 @@
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, type QueryClient } from "@tanstack/react-query";
 import type { DiscoverType } from "@scripta/shared/community";
 import { ApiError } from "../api/client";
 import { fetchActivity, fetchCommunityProfile, fetchDiscover, fetchPeople, fetchProfileLibrary, fetchSuggestedPeople } from "../api/community";
+
+export function invalidateAfterFollow(queryClient: QueryClient) {
+  return Promise.all([
+    queryClient.invalidateQueries({ queryKey: ["community", "people"] }),
+    queryClient.invalidateQueries({ queryKey: ["community", "dashboard", "circle"] })
+  ]);
+}
 
 export function useCommunityActivity(username: string) {
   const query = useInfiniteQuery({

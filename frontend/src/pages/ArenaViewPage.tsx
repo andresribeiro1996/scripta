@@ -16,8 +16,9 @@ import { TournamentStatusBadge } from "../components/arena/TournamentStatusBadge
 import { BracketTree } from "../components/arena/BracketTree";
 import { DuelCard } from "../components/arena/DuelCard";
 import { useArena } from "../hooks/useArena";
+import { EmptyState } from "../components/EmptyState";
 import { Page } from "../components/page/Page";
-import { BUTTON_SECONDARY } from "../components/page/buttonClasses";
+import { BUTTON_SECONDARY, TITLE_FIELD_CLASS } from "../components/page/buttonClasses";
 import { backTo } from "../lib/areas";
 
 export function ArenaViewPage() {
@@ -125,7 +126,7 @@ export function ArenaViewPage() {
               if (e.key === "Escape") setEditingName(false);
             }}
             aria-label="Tournament name"
-            className="min-h-11 w-full rounded-lg border border-(--color-border) bg-(--color-bg) px-2 py-1 text-2xl font-bold"
+            className={TITLE_FIELD_CLASS}
           />
         ) : isOwner ? (
           <button
@@ -189,9 +190,7 @@ export function ArenaViewPage() {
           // BracketMap draws the full skeleton from bracketSize, so it
           // WOULD render an all-empty bracket here. That reads as broken
           // rather than as "not started", so say so instead.
-          <p className="rounded-xl border-2 border-dashed border-(--color-border) py-10 text-center text-sm text-(--color-text-dim)">
-            This tournament hasn't started yet — its bracket appears once it's seeded and running.
-          </p>
+          <EmptyState title="This tournament hasn't started yet." body="Its bracket appears once it's seeded and running." />
         ) : (
           <BracketMap
             tournament={tournament}

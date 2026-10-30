@@ -6,7 +6,7 @@ import { openVotingApi, setVotingStateApi } from "../api/tierlistVoting";
 import { TierRow } from "../components/murals/blocks/BookBlocks";
 import { CharacterHeader } from "../components/CharacterHeader";
 import { Page } from "../components/page/Page";
-import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../components/page/buttonClasses";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY, TITLE_FIELD_CLASS } from "../components/page/buttonClasses";
 import { backTo } from "../lib/areas";
 import { AddBooksSheet } from "../components/tierlist/AddBooksSheet";
 import { TierBoard } from "../components/tierlist/TierBoard";
@@ -212,7 +212,7 @@ export function TierListEditorPage() {
             if (e.key === "Escape") setEditingName(false);
           }}
           aria-label="Tier list name"
-          className="font-display block w-full min-w-0 rounded-lg border border-(--color-border) bg-(--color-surface) px-2 py-1 font-bold"
+          className={TITLE_FIELD_CLASS}
         />
       ) : (
         <button
@@ -228,12 +228,19 @@ export function TierListEditorPage() {
         </button>
       )}
       actions={voteCode === null ? (
-        <button
-          onClick={() => (editing ? exitEditing() : setEditing(true))}
-          className={editing && !openPanelOpen ? BUTTON_PRIMARY : BUTTON_SECONDARY}
-        >
-          {editing ? "Done" : "Edit"}
-        </button>
+        <>
+          <button
+            onClick={() => (editing ? exitEditing() : setEditing(true))}
+            className={BUTTON_SECONDARY}
+          >
+            {editing ? "Done" : "Edit"}
+          </button>
+          {openPanelOpen ? null : (
+            <button onClick={() => setOpenPanelOpen(true)} className={BUTTON_PRIMARY}>
+              Open for voting
+            </button>
+          )}
+        </>
       ) : undefined}
     >
 
@@ -241,8 +248,8 @@ export function TierListEditorPage() {
       {votingActionError && <p className="mb-4 text-sm text-(--color-danger)">{votingActionError}</p>}
 
       {voteCode === null ? (
-        <div className="mb-6 rounded-xl border border-(--color-border) bg-(--color-surface) p-3">
-          {openPanelOpen ? (
+        openPanelOpen ? (
+          <div className="mb-6 rounded-xl border border-(--color-border) bg-(--color-surface) p-3">
             <div className="flex flex-col gap-2">
               <p className="text-sm text-(--color-text-dim)">Who can vote?</p>
               <div className="flex items-stretch overflow-hidden rounded-lg border border-(--color-border) bg-(--color-surface)">
@@ -280,15 +287,8 @@ export function TierListEditorPage() {
                 </button>
               </div>
             </div>
-          ) : (
-            <button
-              onClick={() => setOpenPanelOpen(true)}
-              className={BUTTON_SECONDARY}
-            >
-              Open for voting
-            </button>
-          )}
-        </div>
+          </div>
+        ) : null
       ) : (
         <div className="mb-6 flex flex-col gap-3 rounded-xl border border-(--color-border) bg-(--color-surface) p-3">
           <p className="text-sm text-(--color-text-dim)">This public tier list is locked. At 100 distinct signed-in voters, it becomes an app-owned reference.</p>

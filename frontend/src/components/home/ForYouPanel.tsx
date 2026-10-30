@@ -4,6 +4,7 @@ import { useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { clearDashboardCounts, digestTarget, isNewDigestItem, newCountLabel, type DashboardFeedPage } from "@scripta/shared";
 import { activityRowModel, followFailureMessage, isPersonalItem, relativeTime, shouldMarkFeedSeen, type PersonalItem } from "@scripta/shared/community";
 import { followUser, markDashboardSeen } from "../../api/community";
+import { invalidateAfterFollow } from "../../hooks/useCommunity";
 import { useActivityFeed } from "../../hooks/useDashboard";
 import { AuthorAvatar } from "../CommunityAuthorAvatar";
 import { ArenaIcon, CommunityIcon } from "../NavIcons";
@@ -94,10 +95,7 @@ export function ForYouPanel() {
     setError(null);
     try {
       await followUser(userId);
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["community", "people"] }),
-        queryClient.invalidateQueries({ queryKey: ["community", "dashboard", "circle"] })
-      ]);
+      await invalidateAfterFollow(queryClient);
       await feed.refetch();
     } catch (failure) {
       setError(followFailureMessage(failure, "Couldn't follow them. Try again."));

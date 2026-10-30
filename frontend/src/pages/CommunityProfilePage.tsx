@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { contentDetail, followFailureMessage, contentKindLabel, contentTarget } from "@scripta/shared/community";
+import { contentDetail, followFailureMessage, contentKindLabel, contentTarget, type CommunityAuthor } from "@scripta/shared/community";
 import { followUser, unfollowUser } from "../api/community";
 import type { GalleryImage } from "../api/gallery";
 import { useAuth } from "../auth/AuthContext";
@@ -9,6 +9,7 @@ import { AuthorAvatar } from "../components/CommunityAuthorAvatar";
 import { EmptyState } from "../components/EmptyState";
 import { Page } from "../components/page/Page";
 import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../components/page/buttonClasses";
+import { LIST_PANEL, LIST_ROW_LINK } from "../components/page/surfaceClasses";
 import { CommunityIcon } from "../components/NavIcons";
 import { MuralCanvas } from "../components/murals/MuralCanvas";
 import { OwnShelfView } from "../components/OwnShelfView";
@@ -17,7 +18,7 @@ import { PublicLibraryGrid } from "../components/PublicLibraryGrid";
 import { ReaderGlyph } from "../components/ReaderGlyph";
 import { SkeletonCardGrid } from "../components/Skeleton";
 import { SwipeTabs } from "../components/SwipeTabs";
-import { useCommunityActivity, useCommunityLibrary, useCommunityProfile } from "../hooks/useCommunity";
+import { invalidateAfterFollow, useCommunityActivity, useCommunityLibrary, useCommunityProfile } from "../hooks/useCommunity";
 import { backTo } from "../lib/areas";
 import { ensureBookBlockHeights, profileOnlyMural, type Mural } from "../lib/murals";
 import { useResolvedTheme } from "../lib/theme";
@@ -51,7 +52,7 @@ export function CommunityProfilePage() {
     try {
       await action();
       await queryClient.invalidateQueries({ queryKey: ["community", "profile", username] });
-      await queryClient.invalidateQueries({ queryKey: ["community", "people"] });
+      await invalidateAfterFollow(queryClient);
     } catch (error) {
       setError(followFailureMessage(error, "Something went wrong. Try again."));
     } finally {
@@ -66,9 +67,7 @@ export function CommunityProfilePage() {
   if (!session || isLoading || (!view && !isNotFound && !error)) {
     return (
       <Page title={`@${username ?? ""}`} back={backTo("profile")}>
-        <div className="max-w-3xl mx-auto">
-          <SkeletonCardGrid count={2} label="Loading profile" tileClassName="min-h-[120px]" />
-        </div>
+        <SkeletonCardGrid count={2} label="Loading profile" tileClassName="min-h-[120px]" />
       </Page>
     );
   }
@@ -76,20 +75,16 @@ export function CommunityProfilePage() {
   if (isNotFound || !view) {
     return (
       <Page title={`@${username ?? ""}`} back={backTo("profile")}>
-        <div className="max-w-3xl mx-auto">
-          <PrivateProfileState />
-        </div>
+        <PrivateProfileState />
       </Page>
     );
   }
 
   if (view.private) {
     return (
-      <Page
-        title={<span className="flex items-center gap-3"><AuthorAvatar author={view.profile.user} size={40} /><span className="min-w-0">@{view.profile.user.username}</span></span>}
-        back={backTo("profile")}
-      >
-        <div className="max-w-3xl mx-auto">
+      <Page title={null} back={backTo("profile")}>
+        <ProfileHeader user={view.profile.user} />
+        <div className="mt-8">
           <PrivateProfileState />
         </div>
       </Page>
@@ -126,23 +121,23 @@ export function CommunityProfilePage() {
   const user = view.profile.user;
 
   return (
-    <Page
-      title={<span className="flex items-center gap-1.5"><span className="min-w-0">@{user.username}</span><ReaderGlyph identity={user.readerGlyph} /></span>}
-      back={backTo("profile")}
-      actions={
-        <FollowControls
-          busy={busy}
-          following={view.profile.viewerFollows === true}
-          onToggle={(next) =>
-            run(async () => {
-              if (next === "unfollow") await unfollowUser(user.userId);
-              else await followUser(user.userId);
-            })
-          }
-        />
-      }
-    >
-      <div className="max-w-4xl mx-auto">
+    <Page title={null} back={backTo("profile")}>
+      <ProfileHeader
+        user={user}
+        action={
+          <FollowControls
+            busy={busy}
+            following={view.profile.viewerFollows === true}
+            onToggle={(next) =>
+              run(async () => {
+                if (next === "unfollow") await unfollowUser(user.userId);
+                else await followUser(user.userId);
+              })
+            }
+          />
+        }
+      />
+      <div className="mt-8">
         {error && <p className="mb-4 text-sm text-(--color-danger)">{error}</p>}
         <SwipeTabs tabs={PROFILE_TABS} value={tab} onChange={setTab} label="Profile sections">
           {(panel) => {
@@ -177,19 +172,15 @@ export function CommunityProfilePage() {
                 {publishedRows.length === 0 ? (
                   <EmptyState title="Nothing published yet." body="Tier lists, tournaments and quizzes show up here." />
                 ) : (
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className={LIST_PANEL}>
                     {publishedRows.map((row) => (
-                      <Link
-                        key={`${row.kind}:${row.target}`}
-                        to={row.target}
-                        className="group flex items-center gap-3 rounded-xl border border-(--color-border) bg-(--color-surface) px-4 py-3.5 transition-colors hover:border-(--color-accent)"
-                      >
+                      <Link key={`${row.kind}:${row.target}`} to={row.target} className={LIST_ROW_LINK}>
                         <span className="min-w-0 flex-1">
                           <span className="block text-xs font-semibold text-(--color-accent)">{row.kind}</span>
                           <span className="block truncate font-semibold">{row.name}</span>
                           <span className="block text-sm text-(--color-text-dim)">{row.detail}</span>
                         </span>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-(--color-text-dim) transition-transform group-hover:translate-x-0.5" aria-hidden>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-(--color-text-dim)" aria-hidden>
                           <path d="m9 18 6-6-6-6" />
                         </svg>
                       </Link>
@@ -212,6 +203,21 @@ const PROFILE_TABS = [
 ] as const;
 
 type ProfileTab = (typeof PROFILE_TABS)[number]["value"];
+
+function ProfileHeader({ user, action }: { user: CommunityAuthor; action?: ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-center gap-5">
+      <AuthorAvatar author={user} size={72} />
+      <h1 className="font-display min-w-0 flex-1 basis-48 break-words text-3xl font-bold lg:text-[2.5rem] lg:leading-[3rem]">
+        <span className="flex items-center gap-1.5">
+          <span className="min-w-0 break-words">@{user.username}</span>
+          <ReaderGlyph identity={user.readerGlyph} />
+        </span>
+      </h1>
+      {action}
+    </div>
+  );
+}
 
 function PrivateProfileState() {
   return <EmptyState icon={CommunityIcon} title="This profile is private." body="Only published profiles are visible in the community." />;

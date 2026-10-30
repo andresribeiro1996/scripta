@@ -11,7 +11,8 @@ import { useCommunityDiscover } from "../hooks/useCommunity";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { area } from "../lib/areas";
 import { discoverDestination } from "../lib/landing";
-import { BUTTON_SECONDARY } from "../components/page/buttonClasses";
+import { BUTTON_SECONDARY, chipClass } from "../components/page/buttonClasses";
+import { SearchField, ToolbarRow } from "../components/Toolbar";
 
 const DISCOVER_FILTERS: Array<{ value: DiscoverType; label: string }> = [
   { value: "all", label: "All" },
@@ -19,14 +20,6 @@ const DISCOVER_FILTERS: Array<{ value: DiscoverType; label: string }> = [
   { value: "tournament", label: "Tournaments" },
   { value: "quiz", label: "Quizzes" }
 ];
-
-const segmented = (active: boolean, first: boolean) =>
-  `flex min-h-11 flex-auto shrink-0 items-center whitespace-nowrap justify-center px-3 text-sm font-semibold ${first ? "" : "border-l border-(--color-border)"} ${
-    active ? "bg-(--color-accent-soft) text-(--color-accent)" : "text-(--color-text-dim) hover:bg-(--color-surface-hover)"
-  }`;
-
-const searchInput =
-  "mb-3 min-h-11 w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm outline-none focus:border-(--color-accent)";
 
 function retryButton(refetch: () => void) {
   return (
@@ -63,14 +56,24 @@ function DiscoverPane() {
 
   return (
     <div>
-      <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search tier lists, tournaments and quizzes" aria-label="Search tier lists, tournaments and quizzes by name or book" className={searchInput} />
-      <div className="mb-4 flex items-stretch overflow-x-auto rounded-lg border border-(--color-border) bg-(--color-surface) sm:w-96">
-        {DISCOVER_FILTERS.map((f, i) => (
-          <button key={f.value} onClick={() => setType(f.value)} aria-pressed={type === f.value} className={segmented(type === f.value, i === 0)}>
-            {f.label}
-          </button>
-        ))}
-      </div>
+      <ToolbarRow>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <SearchField
+            value={search}
+            onChange={setSearch}
+            placeholder="Search tier lists, tournaments and quizzes"
+            label="Search tier lists, tournaments and quizzes by name or book"
+            className="flex-1 sm:flex-none"
+          />
+          <div role="group" aria-label="Type" className="-mx-4 -my-1 flex w-[calc(100%+2rem)] gap-2 overflow-x-auto px-4 py-1 sm:mx-0 sm:my-0 sm:w-auto sm:overflow-visible sm:p-0">
+            {DISCOVER_FILTERS.map((f) => (
+              <button key={f.value} type="button" aria-pressed={type === f.value} onClick={() => setType(f.value)} className={chipClass(type === f.value)}>
+                {f.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </ToolbarRow>
       {isLoading && <SkeletonCardGrid count={4} label="Loading published games" tileClassName="min-h-[260px]" gridClassName="game-ticket-grid" />}
       {!isLoading && error && items.length === 0 && <EmptyState title="Couldn't load published games." action={retryButton(refetch)} />}
       {!isLoading && !error && items.length === 0 && (
