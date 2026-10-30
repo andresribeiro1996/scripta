@@ -40,3 +40,4 @@ export * from "./passages.js";
 export * from "./saveFailure.js";
 export * from "./htmlText.js";
 export * from "./summaryCleaning.js";
+export * from "./recommendation.js";

@@ -9,7 +9,7 @@ import { BookCover } from "../arena/BookCover";
 import { useLibrary } from "../library/hooks/useLibrary";
 import { fetchRecentAwards } from "../works/api";
 import { seriesSearchHref, workPath } from "../works/workPath";
-import { awardCardModel, awardKey, firstUndismissed } from "./awardCardModel";
+import { awardCardModel, awardKey, firstUndismissed } from "@scripta/shared";
 
 export const RECENT_AWARDS_QUERY_KEY = ["recentAwards"] as const;
 

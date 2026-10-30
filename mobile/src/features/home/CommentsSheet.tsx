@@ -9,7 +9,7 @@ import { AuthorAvatar } from "../community/AuthorAvatar";
 import { useAuth } from "../../core/auth";
 import { addActivityComment, deleteActivityComment, fetchActivityComments } from "../community/api";
 import { useSkipEmptyPages } from "./FeedRow";
-import { relativeTime } from "./feedRowModel";
+import { relativeTime } from "@scripta/shared/community";
 import { ENGAGEMENT_QUERY_KEY } from "./useHomeActions";
 
 export function CommentsSheet({ id, title, onClose }: { id: string; title: string; onClose: () => void }) {
