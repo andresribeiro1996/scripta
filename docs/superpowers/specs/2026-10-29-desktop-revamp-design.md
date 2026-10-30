@@ -16,7 +16,7 @@ Mockups: the "Atmyshelf desktop revamp" design canvas, https://claude.ai/artifac
 
 ## Goals
 
-- **Navigation is always one click away on desktop.** A sticky top bar holds the areas and the account menu (see "Open decision" for the sidebar alternative).
+- **Navigation is always one click away on desktop.** A sticky top bar holds the areas and the account menu.
 - **One page header, used by every page.** It holds an optional back link, the title, an optional one-fact subtitle, the page's actions on the title's own row, and optional tabs underneath. It sits on the page background, with no separate band.
 - **Pages use the width.** Content is centred in one of three widths (wide, default, narrow), and desktop gets real compositions: two columns on Home, a cover-and-text hero on the book page, a side navigation in Settings, and preview plus controls in Reader card.
 - **Calmer, denser content.** Fewer boxes: a list is one container with rows, not a card per item. Covers outside the owner's library grid look like books, in one consistent style.
@@ -45,9 +45,9 @@ What success looks like (*my call*):
 - **Changed URLs.** Routes, `?tab=`, `?status=`, `?sort=`, `?action=` and share-link formats stay valid.
 - **Breaking phone-width web.** Below `lg` the bottom tab bar and More drawer stay the phone's navigation.
 
-## Open decision (the user's)
+## Navigation (decided by the user)
 
-**Top bar or sidebar on desktop.** On 2026-10-25 the user was shown "No sidebar: a top nav and a narrower column" and picked the header band with a sidebar. This revamp proposes a top bar anyway, for three reasons. Covers and murals get the full width. The empty sidebar column goes away. And the account menu, Settings and Admin get the place sites usually give them. The difference from the 10-25 option is that content keeps its full width instead of narrowing to a column. The canvas has both versions: "Home · top bar (proposed)" and "Home · sticky sidebar (alternative)". **This document assumes the top bar until the user answers.** If they pick the sidebar, only "The frame" changes. That version is a sticky full-height 248px sidebar, `surface`, with icons and labels, Settings and the account row pinned to its foot, and no top bar. The page header, widths, components and pages are the same either way.
+**A top bar, not a sidebar.** On 2026-10-25 the user picked a header band with a sidebar over a top-nav option. Shown both versions side by side on the canvas, they chose the top bar on 2026-10-30. Covers and murals get the full width, the empty sidebar column goes away, and the account menu, Settings and Admin sit where sites usually put them. Unlike the 10-25 top-nav option, content keeps its full width instead of narrowing to a column.
 
 ## The frame
 

@@ -21,7 +21,7 @@
 - Sentence case. Copy for the area is "Games", never "Arena".
 - Repo rules: minimum code, reuse `@scripta/shared`, no comments in code, no new dependencies, and catch only specific failures.
 - Tests that pin today's frame are rewritten to assert the new rule, never deleted.
-- **Open decision:** the user may still choose a sticky sidebar over the top bar (spec, "Open decision"). If they do before Task 2 runs, Task 2 builds the sidebar variant described at its end, and nothing else in this plan changes.
+- **Navigation:** the user chose the top bar over a sticky sidebar (2026-10-30).
 
 ## Review Focus
 
@@ -277,14 +277,6 @@ test("the top bar lists every area but Settings and Admin", () => {
 ```bash
 git add frontend/src/components/page/TopBar.tsx frontend/src/components/page/AccountMenu.tsx frontend/src/components/OptionsMenu.tsx frontend/src/components/Toolbar.tsx frontend/src/lib/areas.ts frontend/src/layouts/DashboardLayout.tsx frontend/src/components/OfflineBanner.tsx frontend/src/components/SwipeTabs.tsx frontend/src/pages/MuralEditorPage.tsx frontend/src/pages/SharedMuralPage.tsx frontend/src/pages/ReaderCardPage.tsx frontend/src/components/book/BookScreen.tsx frontend/scripts/test-top-bar.mts frontend/scripts/test-areas.mts && git commit -m "Replace the sidebar with a sticky top bar and account menu"
 ```
-
-**Sidebar variant (only if the user picks it):**
-- Same files, but no `TopBar` in `DashboardLayout`. The sidebar becomes `sticky top-0 h-screen w-62 overflow-y-auto` at `lg`, on `surface` with a right `border`.
-- `SidebarNav` gets 20px icons.
-- The foot holds a Settings link and an `AccountMenu` row (avatar, @username, three dots). Log out moves into the menu.
-- `--app-top` stays `0px` at every width, and the `min-width: 64rem` override is dropped from Task 1.
-- `PublicLayout` still uses `TopBar` (Task 4).
-- The tests change to match: a sticky sidebar, no Log out box, an account menu.
 
 ### Task 3: Page header and widths
 
