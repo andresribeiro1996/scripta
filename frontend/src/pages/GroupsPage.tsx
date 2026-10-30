@@ -383,9 +383,9 @@ export function GroupsPage({ type }: { type: GroupType }) {
         <p className="text-sm text-(--color-text-dim)">Nothing matches “{search.trim()}”.</p>
       )}
 
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col">
         {drafting ? (
-          <div className="rounded-xl border-2 border-dashed border-(--color-accent) p-3">
+          <div className="mb-6 rounded-xl border-2 border-dashed border-(--color-accent) p-3">
             <label htmlFor="new-group-name" className="mb-1 block text-sm font-semibold">
               Name
             </label>
@@ -424,39 +424,45 @@ export function GroupsPage({ type }: { type: GroupType }) {
         {groups.map((group) => {
           const members = orderedGroupBooks(group, books);
           return (
-            <section key={group.id} className="rounded-xl border border-(--color-border) bg-(--color-surface) p-4">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                {editingId === group.id ? (
-                  <input
-                    autoFocus
-                    value={editingName}
-                    maxLength={200}
-                    onChange={(e) => setEditingName(e.target.value)}
-                    onBlur={() => handleRename(group.id)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleRename(group.id);
-                      if (e.key === "Escape") setEditingId(null);
-                    }}
-                    className="min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-2 text-sm font-semibold"
-                  />
-                ) : (
-                  <button
-                    onClick={() => {
-                      setEditingId(group.id);
-                      setEditingName(group.name);
-                    }}
-                    className="min-h-11 text-left text-sm font-semibold transition-colors hover:text-(--color-accent)"
-                    title="Rename"
-                  >
-                    {group.name}
-                    {group.style && (
-                      <span className="ml-1.5 inline-block rounded-full bg-(--color-accent-soft) px-1.5 py-0.5 align-middle whitespace-nowrap text-[10px] font-semibold text-(--color-accent)">
-                        custom style
-                      </span>
-                    )}
-                  </button>
-                )}
-                <div className="flex shrink-0 items-center gap-3 text-xs text-(--color-text-dim)">
+            <section
+              key={group.id}
+              aria-labelledby={`group-${group.id}-name`}
+              className="mt-8 border-t border-(--color-border) pt-8 first-of-type:mt-0 first-of-type:border-t-0 first-of-type:pt-0"
+            >
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <h2 id={`group-${group.id}-name`} className="min-w-0 text-lg font-bold">
+                  {editingId === group.id ? (
+                    <input
+                      autoFocus
+                      value={editingName}
+                      maxLength={200}
+                      onChange={(e) => setEditingName(e.target.value)}
+                      onBlur={() => handleRename(group.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleRename(group.id);
+                        if (e.key === "Escape") setEditingId(null);
+                      }}
+                      className="min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-2 text-lg font-bold"
+                    />
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setEditingId(group.id);
+                        setEditingName(group.name);
+                      }}
+                      className="min-h-11 text-left text-lg font-bold transition-colors hover:text-(--color-accent)"
+                      title="Rename"
+                    >
+                      {group.name}
+                      {group.style && (
+                        <span className="ml-1.5 inline-block rounded-full bg-(--color-accent-soft) px-1.5 py-0.5 align-middle whitespace-nowrap text-[10px] font-semibold text-(--color-accent)">
+                          custom style
+                        </span>
+                      )}
+                    </button>
+                  )}
+                </h2>
+                <div className="flex shrink-0 items-center gap-3 text-sm text-(--color-text-dim)">
                   <span>
                     {members.length} book{members.length === 1 ? "" : "s"}
                   </span>
@@ -476,7 +482,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
               </div>
 
               {members.length === 0 ? (
-                <p className="text-sm text-(--color-text-dim)">No books here yet — use "Manage books" to add some.</p>
+                <EmptyState title="No books here yet" body='Use "Manage books" to add some.' />
               ) : (
                 // Layout (BookGrid's own style prop) is always the plain
                 // library style — series/book overrides never touch
