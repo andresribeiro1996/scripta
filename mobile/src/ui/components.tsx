@@ -409,6 +409,27 @@ export function Sheet(props: OverlayProps) {
 
 export type ActionItem = { label: string; icon: IconName; destructive?: boolean; onPress: () => void };
 
+export function useDismissThen(visible: boolean, onClose: () => void) {
+  const pending = useRef<(() => void) | null>(null);
+  const running = useRef(false);
+  useEffect(() => {
+    if (visible) running.current = false;
+  }, [visible]);
+  const then = (action: () => void) => {
+    if (running.current) return;
+    running.current = true;
+    onClose();
+    if (Platform.OS === "ios") pending.current = action;
+    else action();
+  };
+  const onDismiss = () => {
+    const action = pending.current;
+    pending.current = null;
+    action?.();
+  };
+  return { then, onDismiss };
+}
+
 export function ActionSheet({ title, groups, children }: {
   title: string;
   groups: ActionItem[][];
@@ -416,29 +437,13 @@ export function ActionSheet({ title, groups, children }: {
 }) {
   const { colors } = useTheme();
   const [visible, setVisible] = useState(false);
-  const pending = useRef<(() => void) | null>(null);
   const close = useCallback(() => setVisible(false), []);
-  const running = useRef(false);
-  const open = useCallback(() => {
-    running.current = false;
-    setVisible(true);
-  }, []);
-  const run = (item: ActionItem) => {
-    if (running.current) return;
-    running.current = true;
-    setVisible(false);
-    if (Platform.OS === "ios") pending.current = item.onPress;
-    else item.onPress();
-  };
-  const runPending = () => {
-    const action = pending.current;
-    pending.current = null;
-    action?.();
-  };
+  const open = useCallback(() => setVisible(true), []);
+  const { then, onDismiss } = useDismissThen(visible, close);
   return (
     <>
       {children(open)}
-      <Sheet visible={visible} title={title} onClose={close} onDismiss={runPending}>
+      <Sheet visible={visible} title={title} onClose={close} onDismiss={onDismiss}>
         <ScrollView style={styles.actionRows}>
           {groups.filter((group) => group.length > 0).map((group, index) => (
             <View key={index}>
@@ -447,7 +452,7 @@ export function ActionSheet({ title, groups, children }: {
                 <Pressable
                   key={item.label}
                   accessibilityRole="button"
-                  onPress={() => run(item)}
+                  onPress={() => then(item.onPress)}
                   style={({ pressed }) => [styles.actionRow, { backgroundColor: pressed ? colors.surfacePressed : "transparent" }]}
                 >
                   <View style={[styles.actionTile, { backgroundColor: item.destructive ? colors.dangerSoft : colors.accentSoft }]}>
