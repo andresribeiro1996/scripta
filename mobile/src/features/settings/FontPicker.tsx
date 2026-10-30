@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { DISPLAY_FONT_IDS, TEXT_FONT_IDS, fonts, resolveFonts, type FontId, type FontPreference, type FontSlot } from "@scripta/shared/themes";
 import { fontStyleFor } from "../../ui/fontStyle";
 import { SYSTEM_FAMILY } from "../../ui/systemFont";
 import { Text } from "../../ui/Text";
-import { dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui/theme";
+import { dynamicType, radii, spacing, typography, useTheme } from "../../ui/theme";
 import { isAppearanceSyncFailure, saveAccountAppearance } from "./appearanceSync";
 
 function sampleStyle(font: FontId, slot: FontSlot) {
@@ -32,11 +32,11 @@ export function FontPicker({ slot }: { slot: FontSlot }) {
       <Text {...dynamicType} style={[typography.caption, styles.heading, { color: colors.textDim }]}>
         {slot === "display" ? "Headings" : "Text"}
       </Text>
-      <View accessibilityRole="radiogroup" accessibilityLabel={slot === "display" ? "Heading font" : "Text font"} style={styles.row}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} accessibilityRole="radiogroup" accessibilityLabel={slot === "display" ? "Heading font" : "Text font"} contentContainerStyle={styles.row}>
         {options.map((option) => {
           const checked = option === selected;
           const shown = option === "theme" ? themeDefault : option;
-          const label = option === "theme" ? `Theme default · ${fonts[themeDefault].label}` : fonts[option].label;
+          const label = option === "theme" ? "Default" : fonts[option].label;
           return (
             <Pressable
               key={option}
@@ -46,13 +46,13 @@ export function FontPicker({ slot }: { slot: FontSlot }) {
               onPress={() => choose(option)}
               style={[styles.chip, { borderColor: checked ? colors.accent : colors.border, backgroundColor: checked ? colors.accentSoft : colors.surface }]}
             >
-              <Text {...dynamicType} style={[typography.body, { color: colors.text }, sampleStyle(shown, slot)]}>
+              <Text {...dynamicType} numberOfLines={1} style={[typography.body, { color: colors.text }, sampleStyle(shown, slot)]}>
                 {label}
               </Text>
             </Pressable>
           );
         })}
-      </View>
+      </ScrollView>
       {error ? (
         <Text accessibilityRole="alert" {...dynamicType} style={[typography.caption, { color: colors.danger }]}>
           {error}
@@ -65,6 +65,6 @@ export function FontPicker({ slot }: { slot: FontSlot }) {
 const styles = StyleSheet.create({
   wrap: { gap: spacing.sm },
   heading: { fontWeight: "600" },
-  row: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
-  chip: { width: "48%", flexGrow: 1, minHeight: minimumTouchTarget, justifyContent: "center", paddingHorizontal: spacing.md, borderRadius: radii.md, borderWidth: 1 },
+  row: { gap: spacing.sm },
+  chip: { paddingVertical: 7, paddingHorizontal: spacing.md, borderRadius: radii.full, borderWidth: 1 },
 });
