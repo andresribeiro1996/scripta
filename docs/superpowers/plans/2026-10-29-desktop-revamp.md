@@ -303,6 +303,7 @@ git add frontend/src/components/page/TopBar.tsx frontend/src/components/page/Acc
 - Modify: `frontend/src/pages/DailyChapterPage.tsx`
 - Modify: `frontend/src/pages/CharacterGamePage.tsx`
 - Modify: `frontend/src/pages/AdminDailyChapterPage.tsx`
+- Modify: `frontend/src/pages/PeoplePage.tsx`
 - Test: `frontend/scripts/test-page-frame.mts`
 
 **Interfaces:**

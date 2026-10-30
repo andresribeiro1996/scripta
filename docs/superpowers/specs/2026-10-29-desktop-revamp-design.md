@@ -96,11 +96,11 @@ Things that stick today assume nothing else is pinned: `OfflineBanner.tsx:17`, `
 
 | Width | Max | Pages |
 |---|---|---|
-| `wide` | the owner's `contentMaxWidth` on library pages (default 1600); 1440 elsewhere | Library (Books, Series, Collections, Gallery), shared library, Discover, Games lists, Murals list, Admin |
-| `default` | 1200 | Home, book and Work pages, Work stats, profiles, People, tournament view and seed, Reader card, mural editor and shared mural (the canvas stays 1152 inside), tier list editor and vote, Settings |
+| `wide` | the owner's `contentMaxWidth` on library pages (default 1600); 1440 elsewhere | Library (Books, Series, Collections, Gallery), shared library, Discover, People, Games lists, Murals list, Admin |
+| `default` | 1200 | Home, book and Work pages, Work stats, profiles, tournament view and seed, Reader card, mural editor and shared mural (the canvas stays 1152 inside), tier list editor and vote, Settings |
 | `narrow` | 760 | tier list and quiz create wizards, quiz editor, quiz play |
 
-These replace every ad-hoc inner width (`max-w-xl` … `max-w-7xl` in Settings, SettingsAppearance, PlayQuiz, QuizCreate, TierListCreate, QuizEditor, CommunityProfile, OwnShelfView, ReaderCard, MuralEditor, SharedMural and QuizResults; the full list is in the 2026-10-29 Explore report, condensed in "Today's code" below). The Library "Content width" setting keeps changing only the library pages. The Style tab keeps the width that was in force when it opened, as today.
+Tabs of one area share one width, so switching tabs never moves the title: People is `wide` like Discover, and Gallery takes the owner's width like the other Library tabs (2026-10-30, found in review). These replace every ad-hoc inner width (`max-w-xl` … `max-w-7xl` in Settings, SettingsAppearance, PlayQuiz, QuizCreate, TierListCreate, QuizEditor, CommunityProfile, OwnShelfView, ReaderCard, MuralEditor, SharedMural and QuizResults; the full list is in the 2026-10-29 Explore report, condensed in "Today's code" below). The Library "Content width" setting keeps changing only the library pages. The Style tab keeps the width that was in force when it opened, as today.
 
 ## Visual rules
 
