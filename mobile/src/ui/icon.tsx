@@ -44,6 +44,7 @@ const GLYPHS = {
   public: { ios: "globe", android: "public" },
   lock: { ios: "lock", android: "lock" },
   image: { ios: "photo", android: "image" },
+  camera: { ios: "camera", android: "photo_camera" },
   link: { ios: "link", android: "link" },
   qr: { ios: "qrcode", android: "qr_code_2" },
   close: { ios: "xmark", android: "close" },
