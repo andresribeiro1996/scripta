@@ -26,6 +26,8 @@ export function ShareActions({ message }: { message: string }) {
     }
   }
 
+  if (!connected("x") && !connected("threads") && !notice) return null;
+
   return (
     <View style={styles.actions}>
       {connected("x") ? <Button label="Post to X" loading={posting === "x"} onPress={() => void post("x")} /> : null}

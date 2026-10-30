@@ -85,14 +85,14 @@ export function ContentShareSheet({ visible, onClose, title, description, url, c
 
   return <BottomSheet isPresented={visible} onDismiss={() => { if (!busy) onClose(); }} snapPoints={["full"]} containerColor={colors.surface} contentPadding={0} shouldDismissOnBackPress={!busy} shouldDismissOnClickOutside={!busy}>
     <RNHostView>
-      <View style={{ width: Math.min(width, 560), alignSelf: "center", flexGrow: 1, height: 0, paddingHorizontal: spacing.xl, paddingTop: spacing.sm, paddingBottom: Math.max(insets.bottom, spacing.lg), gap: spacing.lg }}>
+      <View pointerEvents={busy ? "none" : "auto"} style={{ width: Math.min(width, 560), alignSelf: "center", flexGrow: 1, height: 0, paddingHorizontal: spacing.xl, paddingTop: spacing.sm, paddingBottom: Math.max(insets.bottom, spacing.lg), gap: spacing.lg }}>
         <View style={styles.header}>
           {view !== "actions" ? <Pressable accessibilityRole="button" accessibilityLabel="Back to share options" accessibilityState={{ disabled: busy }} disabled={busy} onPress={() => { setView("actions"); setError(null); setNotice(null); }} style={({ pressed }) => [styles.iconAction, { backgroundColor: pressed ? colors.border : colors.background, opacity: busy ? 0.5 : 1 }]}><Icon name="back" size={20} color={colors.text} /></Pressable> : null}
           {view === "actions" ? <View style={{ flex: 1 }} /> : <Text accessibilityRole="header" {...dynamicType} style={[typography.title, { color: colors.text, flex: 1, textAlign: "center", fontWeight: "600" }]}>{view === "image" ? "Image preview" : "Scan to open"}</Text>}
           <Pressable accessibilityRole="button" accessibilityLabel="Close share sheet" accessibilityState={{ disabled: busy }} disabled={busy} onPress={onClose} style={({ pressed }) => [styles.iconAction, { backgroundColor: pressed ? colors.border : colors.background, opacity: busy ? 0.5 : 1 }]}><Icon name="close" size={18} color={colors.textDim} /></Pressable>
         </View>
         {view === "image" ? <>
-          {previewControls ? <View pointerEvents={busy ? "none" : "auto"} style={{ opacity: busy ? 0.5 : 1 }}>{previewControls}</View> : null}
+          {previewControls}
           {description ? <Text style={[typography.caption, { color: colors.textDim }]}>{description}</Text> : null}
           <ScrollView style={{ flex: 1, borderRadius: radii.xl, backgroundColor: colors.background }} contentContainerStyle={{ padding: spacing.sm }} removeClippedSubviews={false}>
             <View ref={capture} collapsable={false} onLayout={(event) => { size.current = event.nativeEvent.layout; }} style={{ backgroundColor: colors.background }}>
