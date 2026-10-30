@@ -131,9 +131,9 @@ export function GameRow({ kind, name, meta, badges, caption, stats = [], covers,
         <View style={[styles.notch, styles.leftNotch, { backgroundColor: colors.background }]} />
         <View style={[styles.notch, styles.rightNotch, { backgroundColor: colors.background }]} />
         <Pressable accessibilityRole={accessibilityRole} accessibilityLabel={`${actionLabel}: ${name}`} onPress={onPress} style={({ pressed }) => [styles.primaryAction, { backgroundColor: pressed ? colors.accentFill : soft }]}>
-          {({ pressed }) => <><Text {...dynamicType} style={[typography.body, styles.strong, styles.shrink, { color: pressed ? colors.text : color }]}>{actionLabel}</Text><Icon name="chevronRight" size={16} color={pressed ? colors.text : color} /></>}
+          {({ pressed }) => <><Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, styles.shrink, { color: pressed ? colors.text : color }]}>{actionLabel}</Text><Icon name="chevronRight" size={16} color={pressed ? colors.text : color} /></>}
         </Pressable>
-        {seeBooks ? <Pressable accessibilityRole="button" accessibilityLabel={seeBooks.label} onPress={seeBooks.onPress} style={({ pressed }) => [styles.secondaryAction, { borderColor: colors.border, backgroundColor: pressed ? colors.surfacePressed : colors.surface }]}><Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.textDim }]}>{seeBooks.text}</Text></Pressable> : null}
+        {seeBooks ? <Pressable accessibilityRole="button" accessibilityLabel={seeBooks.label} onPress={seeBooks.onPress} style={({ pressed }) => [styles.secondaryAction, { borderColor: colors.border, backgroundColor: pressed ? colors.surfacePressed : colors.surface }]}><Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, { color: colors.textDim }]}>{seeBooks.text}</Text></Pressable> : null}
         {onDelete ? <ActionSheet title={name} groups={[[{ label: "Delete", icon: "delete", destructive: true, onPress: onDelete }]]}>{(open) => <IconButton accessibilityLabel={`More actions for ${name}`} name="more" onPress={open} />}</ActionSheet> : null}
       </View>
     </View>
@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
   clueHeading: { flexDirection: "row", alignItems: "center", gap: spacing.sm, flexWrap: "wrap" },
   badge: { borderWidth: 1, borderRadius: radii.full, paddingHorizontal: spacing.sm },
   footer: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, padding: spacing.lg, borderTopWidth: 1, borderStyle: "dashed" },
-  primaryAction: { flex: 1, minWidth: 120, minHeight: spacing.huge, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderRadius: radii.lg },
+  primaryAction: { flexGrow: 1, flexShrink: 0, minWidth: 120, minHeight: spacing.huge, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderRadius: radii.lg },
   secondaryAction: { minHeight: spacing.huge, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.md, paddingVertical: spacing.md, borderWidth: 1, borderRadius: radii.lg },
   notch: { position: "absolute", width: 14, height: 14, borderRadius: radii.full, top: -7 },
   leftNotch: { left: -7 },

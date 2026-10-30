@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Stack, router } from "expo-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, View } from "react-native";
 import { bracketSizes, canCreate, defaultTicked, plural, roundMinutesFromHours, type CharacterGameMode, type WorkCast } from "@scripta/shared";
 import { Text } from "../../ui/Text";
 import { Button, ErrorState, Input, Screen, Segmented, Skeleton, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
@@ -82,16 +82,16 @@ function CastPicker({ workId, cast }: { workId: string; cast: WorkCast }) {
         <>
           <Text {...dynamicType} style={[typography.body, { color: colors.text }]}>Bracket size</Text>
           <View style={styles.row}>{sizes.map((value) => <Button key={value} label={String(value)} variant={size === value ? "primary" : "secondary"} onPress={() => chooseSize(value)} />)}</View>
-          <Input label="Round duration (hours)" keyboardType="decimal-pad" value={duration} onChangeText={setDuration} />
+          <Input label="Round duration (hours)" keyboardType="decimal-pad" value={duration} onChangeText={setDuration} returnKeyType="done" />
         </>
       ) : null}
-      <Input label="Name" value={name} onChangeText={setName} maxLength={200} />
+      <Input label="Name" value={name} onChangeText={setName} maxLength={200} returnKeyType="done" />
       <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{mode === "tournament" ? `${ticked.length} of ${size} characters` : `${ticked.length} characters`}</Text>
     </View>
   );
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.form}>
+    <View style={styles.form}>
       {error ? <Toast visible message={error} tone="error" /> : null}
       <FlatList
         data={cast.characters}
@@ -111,7 +111,7 @@ function CastPicker({ workId, cast }: { workId: string; cast: WorkCast }) {
         }}
       />
       <Button label={mode === "tierlist" ? "Create tier list" : "Create tournament"} loading={busy} disabled={!canCreate(mode, ticked.length, size)} onPress={() => void create()} />
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
