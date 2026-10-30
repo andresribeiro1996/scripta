@@ -77,7 +77,7 @@
   - `PANEL = "rounded-xl border border-(--color-border) bg-(--color-surface)"`
   - `LIST_PANEL` (PANEL plus `divide-y divide-(--color-border) overflow-hidden`)
   - `LIST_ROW = "flex min-h-11 items-center gap-3 px-4 py-3"`
-  - `LIST_ROW_LINK` (LIST_ROW plus `hover:bg-(--color-surface-hover)`)
+  - `LIST_ROW_LINK` (LIST_ROW plus `hover:bg-(--color-surface-hover)` and an inset focus ring, `focus-visible:-outline-offset-2!`, so `LIST_PANEL`'s `overflow-hidden` doesn't clip it). Focusable full-bleed rows use it.
   - `SECTION_HEADING = "font-display text-2xl font-bold"`
   - `PANEL_HEADING = "font-text text-base font-bold"`
   - `CARD = "rounded-2xl border border-(--color-border) bg-(--color-surface)"`: the phone app's 16px card, used by Home's feed and awards cards. It is its own constant because appending `rounded-2xl` to `PANEL` loses to `rounded-xl` in Tailwind's emitted order (the trap described at `Toolbar.tsx:54-61`).
@@ -138,7 +138,7 @@ test("layout variables: sticky offset, scroll padding, cover shadow in both sche
 
 - [ ] **Step 2: Run** the file. Expected: FAIL, because the imports don't exist.
 - [ ] **Step 3: Implement.**
-  - Add the constants and `chipClass`, using `BUTTON_PRIMARY`'s `BOX` for both danger variants. `FIELD_CLASS` is `min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-base text-(--color-text) placeholder:text-(--color-text-dim) focus:border-(--color-accent) aria-invalid:border-(--color-danger) disabled:opacity-55`.
+  - Add the constants and `chipClass`, using `BUTTON_PRIMARY`'s `BOX` for both danger variants. `FIELD_CLASS` is `min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-base text-(--color-text) placeholder:text-(--color-text-dim) focus:border-(--color-accent) aria-invalid:border-(--color-danger) disabled:opacity-55`.
     - It carries no width. Callers add `w-full` where a field fills its row, because appending a competing width class doesn't reliably win (see the specificity note above `TOOLBAR_ICON_BUTTON_CLASS`).
     - It carries no `outline-none`, so the global `*:focus-visible` ring (`index.css:128`) still shows.
   - `chipClass` is `inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border px-4 text-sm font-semibold` plus, when selected, `border-(--color-text) bg-(--color-text) text-(--color-bg)`, and otherwise `border-(--color-border) bg-(--color-surface) text-(--color-text) hover:bg-(--color-surface-hover)`.
