@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Text } from "../../ui/Text";
 import { useAuth } from "../../core/auth";
 import { API_URL } from "../../core/config";
-import { ActionSheet, Button, Icon, IconButton, Input, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
+import { ActionSheet, Button, Icon, IconButton, Input, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import { AuthorAvatar } from "../community/AuthorAvatar";
 import { fetchOwnProfile } from "../community/api";
 
@@ -66,7 +66,7 @@ export function ProfileHeader() {
               accessibilityLabel={avatarUrl ? "Edit picture" : "Add picture"}
               accessibilityState={{ disabled: busy }}
               disabled={busy}
-              hitSlop={(44 - BADGE) / 2}
+              hitSlop={(minimumTouchTarget - BADGE) / 2}
               onPress={avatarUrl ? open : () => void pickAvatar()}
               style={[styles.badge, { backgroundColor: colors.surface, borderColor: colors.border, opacity: busy ? 0.55 : 1 }]}
             >

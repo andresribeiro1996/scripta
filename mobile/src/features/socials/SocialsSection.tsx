@@ -59,7 +59,6 @@ export function SocialsSection() {
 
   return (
     <View style={[styles.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <Text style={[styles.heading, { color: colors.text }]}>Socials</Text>
       <Text style={[typography.caption, { color: colors.textDim }]}>Connect accounts for sharing. OAuth connections finish in your browser; return here when complete.</Text>
       {isPending ? <Text style={[typography.body, { color: colors.textDim }]}>Loading…</Text> : data.map((status) => (
         <View key={status.provider} style={[styles.row, { opacity: status.enabled ? 1 : 0.5 }]}>
@@ -91,7 +90,6 @@ export function SocialsSection() {
 
 const styles = StyleSheet.create({
   section: { borderWidth: 1, borderRadius: radii.lg, padding: spacing.lg, gap: spacing.md },
-  heading: { ...typography.title, fontWeight: "700" },
   row: { flexDirection: "row", alignItems: "center", gap: spacing.md, minHeight: minimumTouchTarget },
   grow: { flex: 1 },
   form: { gap: spacing.md, paddingTop: spacing.sm },

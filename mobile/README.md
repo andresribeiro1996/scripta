@@ -144,7 +144,8 @@ The web route tree has a native equivalent. The native tab shell uses shorter in
 |---|---|
 | `/dashboard` | Home tab `/` |
 | `/dashboard/series`, `/dashboard/collections`, `/dashboard/style` | Library tab views |
-| `/dashboard/gallery`, `/dashboard/murals`, `/dashboard/settings` | `/gallery`, `/murals`, `/settings`, reached from the You tab |
+| `/dashboard/gallery`, `/dashboard/murals` | `/gallery`, `/murals`, reached from the You tab |
+| `/dashboard/settings` | You tab `/you`, which holds the settings |
 | `/dashboard/arena` | Games tab `/my-arena` |
 | `/dashboard/arena/tierlist/:id`, `/dashboard/arena/:id/seed` | Guarded native editor routes |
 | `/welcome-avatar` | Native skippable avatar onboarding |
@@ -191,7 +192,7 @@ Search and Add Book results and the book page show a book's series or collection
 
 The shared Input supports password visibility and field hints. Login/signup validate fields before submission, preserve autofill, scroll above the keyboard, and prevent competing sign-in attempts. Sessions continue to use SecureStore and remain signed in by default.
 
-`/forgot-password` requests a recovery email; the link completes recovery on the HTTPS web client. Settings opens `/account-security` for password changes, email verification, and correction. Existing accounts remain usable while unverified. Sign-in destinations survive username and avatar onboarding.
+`/forgot-password` requests a recovery email; the link completes recovery on the HTTPS web client. The You tab's "Account and security" row opens `/account-security` for password changes, email verification, and correction. Existing accounts remain usable while unverified. Sign-in destinations survive username and avatar onboarding.
 
 ### The Daily Chapter
 
