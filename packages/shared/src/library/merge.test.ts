@@ -74,3 +74,12 @@ test("a re-import that carries its own genres drops the catalog marker", () => {
   assert.deepEqual(merged[0]!._genres, ["Fantasy"]);
   assert.equal("_genresFrom" in merged[0]!, false);
 });
+
+test("re-adding a book takes the incoming format and keeps an existing page count when none is sent", () => {
+  const existing = { Title: "Dune", Attribution: "Frank Herbert", ISBN: "9780441013593", _format: "ebook", _pages: 300 };
+  const incoming = { Title: "Dune", Attribution: "Frank Herbert", ISBN: "9780441013593", _format: "hardcopy" };
+  const merged = mergeBookLists([existing], [incoming]);
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0]!._format, "hardcopy");
+  assert.equal(merged[0]!._pages, 300);
+});

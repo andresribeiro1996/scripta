@@ -108,3 +108,9 @@ test("combining two catalog-marked books keeps the marker", () => {
   const combined = combineBooks({ Title: "Dune", _genres: ["Fantasy"], _genresFrom: "catalog" }, { Title: "Dune", _genres: ["Science Fiction"], _genresFrom: "catalog" });
   assert.equal(combined._genresFrom, "catalog");
 });
+
+test("combineBooks fills format and pages from the other copy", () => {
+  const combined = combineBooks({ ...kobo, _format: "ebook" }, { ...goodreads, _format: "hardcopy", _pages: 120 });
+  assert.equal(combined._format, "ebook");
+  assert.equal(combined._pages, 120);
+});
