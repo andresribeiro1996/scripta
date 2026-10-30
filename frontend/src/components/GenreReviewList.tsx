@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { BOOK_GENRES, GENRE_REVIEW_GROUPS, GENRE_REVIEW_HEADINGS, genreEvidenceLabel, type GenreReview, type GenreReviewAction, type GenreReviewItem } from "@scripta/shared";
-import { BUTTON_PRIMARY, BUTTON_SECONDARY, chipClass } from "./page/buttonClasses";
+import { BUTTON_SECONDARY, chipClass } from "./page/buttonClasses";
 import { LIST_PANEL, LIST_ROW, PANEL_HEADING } from "./page/surfaceClasses";
 
 const MAX_GENRES = 3;
@@ -58,7 +58,7 @@ export function GenreReviewRowView({
           ))}
         </ul>
         <div className="mt-2 flex flex-wrap gap-2">
-          <button type="button" disabled={busy || picked.length === 0} onClick={() => onDecide({ genres: picked })} className={BUTTON_PRIMARY}>
+          <button type="button" disabled={busy || picked.length === 0} onClick={() => onDecide({ genres: picked })} className={BUTTON_SECONDARY}>
             Save
           </button>
           <button type="button" disabled={busy} onClick={() => onDecide({ genres: [] })} className={BUTTON_SECONDARY}>

@@ -208,7 +208,7 @@ export function MuralsListPage() {
           {!isLoading && murals.length > 0 && (
             <ToolbarRow>
               <div className="flex items-center gap-2">
-                <SearchField className="flex-1 sm:flex-none" value={search} onChange={setSearch} placeholder="Search" label="Search murals by name" />
+                <SearchField className="flex-1 sm:flex-initial" value={search} onChange={setSearch} placeholder="Search" label="Search murals by name" />
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as SortBy)}

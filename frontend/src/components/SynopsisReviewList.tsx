@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { SYNOPSIS_REVIEW_GROUPS, SYNOPSIS_REVIEW_HEADINGS, synopsisEvidenceLabel, type SynopsisDecision, type SynopsisReview, type SynopsisReviewItem } from "@scripta/shared";
-import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "./page/buttonClasses";
+import { BUTTON_SECONDARY } from "./page/buttonClasses";
 import { LIST_PANEL, LIST_ROW, PANEL_HEADING } from "./page/surfaceClasses";
 
 function SynopsisReviewRow({ item, onDecide }: { item: SynopsisReviewItem; onDecide: (hash: string, decision: SynopsisDecision) => Promise<void> }) {
@@ -24,7 +24,7 @@ function SynopsisReviewRow({ item, onDecide }: { item: SynopsisReviewItem; onDec
         <p className="mt-1 text-xs text-(--color-text-dim)">{`${synopsisEvidenceLabel(item)} · ${item.source ?? "unknown source"} · ${carriers} · ${item.holders} ${item.holders === 1 ? "library" : "libraries"}${item.finished ? " · finished" : ""}`}</p>
         <p className="mt-2 whitespace-pre-line text-sm">{item.text}</p>
         <div className="mt-2 flex flex-wrap gap-2">
-          <button type="button" disabled={busy} onClick={() => decide("keep")} className={BUTTON_PRIMARY}>
+          <button type="button" disabled={busy} onClick={() => decide("keep")} className={BUTTON_SECONDARY}>
             Keep
           </button>
           <button type="button" disabled={busy} onClick={() => decide("hide")} className={BUTTON_SECONDARY}>

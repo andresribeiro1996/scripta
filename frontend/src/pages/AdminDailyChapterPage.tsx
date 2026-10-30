@@ -34,7 +34,7 @@ export function AdminDailyChapterPage() {
   }
   if (admin.isPending) return <p role="status">Checking editor access…</p>;
   if (admin.isError) return <p role="alert">Couldn't check editor access. <button className={BUTTON_SECONDARY} onClick={() => void admin.refetch()}>Retry</button></p>;
-  if (!admin.data) return <NotFoundPage />;
+  if (!admin.data) return <NotFoundPage framed />;
   const data = editorial.data;
   const quoteStatus = (bookId: string) => {
     const quotes = data?.questions.filter((q) => q.bookId === bookId && q.type === "quote_title") ?? [];

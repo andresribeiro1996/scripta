@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { TRANSLATION_REVIEW_GROUPS, TRANSLATION_REVIEW_HEADINGS, translationEvidenceLabel, type TranslationReview, type TranslationReviewAction, type TranslationReviewItem } from "@scripta/shared";
-import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "./page/buttonClasses";
+import { BUTTON_SECONDARY } from "./page/buttonClasses";
 import { LIST_PANEL, LIST_ROW, PANEL_HEADING } from "./page/surfaceClasses";
 
 function TranslationReviewRow({ item, onDecide }: { item: TranslationReviewItem; onDecide: (workId: string, action: TranslationReviewAction) => Promise<void> }) {
@@ -26,7 +26,7 @@ function TranslationReviewRow({ item, onDecide }: { item: TranslationReviewItem;
         {item.synopsis ? <p className="mt-1 line-clamp-3 text-sm">{item.synopsis}</p> : null}
         <div className="mt-2 flex flex-wrap gap-2">
           {item.group === "possible" ? (
-            <button type="button" disabled={busy} onClick={() => decide({ merge: original.workId })} className={BUTTON_PRIMARY}>
+            <button type="button" disabled={busy} onClick={() => decide({ merge: original.workId })} className={BUTTON_SECONDARY}>
               Merge
             </button>
           ) : null}
