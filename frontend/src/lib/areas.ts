@@ -44,7 +44,7 @@ export const AREAS: readonly Area[] = [
     tabs: [
       { label: "Account", to: "/dashboard/settings" },
       { label: "Appearance", to: "/dashboard/settings/appearance" },
-      { label: "Style", to: "/dashboard/style" }
+      { label: "Library style", to: "/dashboard/style" }
     ]
   },
   {
