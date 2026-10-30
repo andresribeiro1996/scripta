@@ -109,7 +109,7 @@ export function WorkScreen({ id, edition = null }: { id: string; edition?: strin
       />
       {shareError && !tint ? <Toast visible message={shareError} tone="error" /> : null}
       {tint ? <WashBackdrop color={tint.color} topAlpha={tint.topAlpha} scrollY={scrollY} headerHeight={headerHeight} /> : null}
-      <BookScreen page={page} book={book} model={model} signedIn={signedIn} onAdd={() => setAdding(true)} onSelectEdition={setEditionId} scrollY={scrollY} headerInset={tint ? headerHeight : 0} />
+      <BookScreen page={page} book={book} model={model} signedIn={signedIn} onSelectEdition={setEditionId} scrollY={scrollY} headerInset={tint ? headerHeight : 0} />
       {shareError && tint ? <View pointerEvents="box-none" style={[styles.toastBelowHeader, { top: headerHeight }]}><Toast visible message={shareError} tone="error" /></View> : null}
       <ContentShareSheet visible={shareUrl !== null} onClose={() => setShareUrl(null)} title={work.title} url={shareUrl} />
       {adding && model.addBook ? (

@@ -40,7 +40,7 @@ export default function BookRoute() {
       {loading || workId ? (
         <Skeleton height={180} />
       ) : book && model ? (
-        <BookScreen page={null} book={book} model={model} signedIn onAdd={() => {}} />
+        <BookScreen page={null} book={book} model={model} signedIn />
       ) : isError ? (
         <ErrorState body="Couldn't load your library." actionLabel="Retry" onAction={() => void refetch()} />
       ) : (
