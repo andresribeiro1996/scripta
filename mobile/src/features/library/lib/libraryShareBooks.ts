@@ -45,3 +45,7 @@ export function shelfShareBooks(
 ): LibraryBook[] {
   return sortBooks(filterBooks(ordered, query, status), sortKey);
 }
+
+export function wallColumns(count: number): number {
+  return Math.max(8, Math.ceil(Math.sqrt(count / 8)));
+}

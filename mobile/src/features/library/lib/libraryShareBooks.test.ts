@@ -6,7 +6,8 @@ import {
   newestFinished,
   readingNow,
   shelfShareBooks,
-  summaryCoverBooks
+  summaryCoverBooks,
+  wallColumns
 } from "./libraryShareBooks.js";
 
 function book(Title: string, ReadStatus: number, DateLastRead?: string): LibraryBook {
@@ -67,4 +68,11 @@ test("LIBRARY_SHARE_LAYOUTS lists the four layouts in order", () => {
     LIBRARY_SHARE_LAYOUTS.map((layout) => layout.label),
     ["Wall", "Summary", "Reading", "This shelf"]
   );
+});
+
+test("wallColumns grows with the library to bound wall height", () => {
+  assert.equal(wallColumns(0), 8);
+  assert.equal(wallColumns(500), 8);
+  assert.equal(wallColumns(1000), 12);
+  assert.equal(wallColumns(5000), 25);
 });

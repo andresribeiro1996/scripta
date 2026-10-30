@@ -36,6 +36,7 @@ import {
 } from "@scripta/shared";
 import { ActionSheet, Button, EmptyState, ErrorState, Fab, IconButton, Input, Screen, Sheet, Skeleton, SwipeableTabs, type ActionItem, type MenuItem } from "../../ui/components";
 import { ContentShareSheet } from "../sharing/ContentShareSheet";
+import { ShareActions } from "../socials";
 import { ConfirmDialog, SearchDock, dynamicType, searchDockClearance, searchDockFabClearance, useTheme } from "../../ui";
 import { radii, spacing, typography } from "../../ui/theme";
 import { useToast } from "../../ui/ToastHost";
@@ -358,6 +359,7 @@ export function LibraryScreen() {
         onEnableLink={async () => (await share()).shareUrl ?? undefined}
         onDisableLink={async () => { await unshare(); }}
         imageReady={shareImageReady}
+        linkActions={library?.shareUrl ? <ShareActions message={library.shareUrl} /> : null}
         previewControls={
           <View style={styles.shareOptions}>
             {LIBRARY_SHARE_LAYOUTS.filter((layout) => !(onCollectionsTab && layout.value === "shelf")).map((layout) => {

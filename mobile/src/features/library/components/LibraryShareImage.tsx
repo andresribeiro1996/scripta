@@ -5,16 +5,15 @@ import { Text } from "../../../ui/Text";
 import { radii, spacing, typography, useTheme } from "../../../ui";
 import { TierCover } from "../../tierlists/TierBoard";
 import { libraryGridColumns } from "../lib/gridColumns";
-import { newestFinished, readingNow, summaryCoverBooks, type LibraryShareLayout } from "../lib/libraryShareBooks";
+import { newestFinished, readingNow, summaryCoverBooks, wallColumns, type LibraryShareLayout } from "../lib/libraryShareBooks";
 import { BookCard } from "./BookCard";
 
-const WALL_COLUMNS = 8;
 const WALL_GAP = 2;
 const FAN_ROTATIONS = ["-10deg", "-3deg", "4deg", "11deg"] as const;
 const FAN_COVER = { width: 84, height: 126 };
 
 function coverKey(section: string, book: LibraryBook, index: number) {
-  return `${section}:${String(book.ContentID ?? index)}`;
+  return `${section}:${index}:${String(book.ContentID ?? "")}`;
 }
 
 const ShareCover = memo(function ShareCover({ book, id, width, height, marginLeft, zIndex, rotate, onLoaded }: {
@@ -115,7 +114,7 @@ export function LibraryShareImage({ layout, name, ordered, shelf, style, seriesG
   }
 
   function body() {
-    if (layout === "wall") return covers("wall", wall, WALL_COLUMNS, WALL_GAP);
+    if (layout === "wall") return wall.length ? covers("wall", wall, wallColumns(wall.length), WALL_GAP) : sectionLabel("Your library is empty.");
     if (layout === "summary") {
       const genres = calculateShelfTheme(ordered, 3).genres;
       const counts = statusCounts(ordered);
