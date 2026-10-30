@@ -42,6 +42,7 @@ import { refreshAwards } from "./seed/awardsFill.js";
 import { BNP_SYNC_INTERVAL_MS, fetchBnpPage, fetchBnpScan, logBnpSync, lookupBnpIsbn, syncBnp, type BnpHarvestDeps } from "./seed/bnpImport.js";
 import { fetchText } from "./seed/siteFetch.js";
 import { createCoverWorker } from "./worker.js";
+import { rateLimitKey } from "../auth/index.js";
 
 const ISBNDB_GAP_MS = 1100;
 const APPLE_GAP_MS = 3200;
@@ -279,7 +280,7 @@ export async function booksPlugin(app: FastifyInstance, options: BooksPluginOpti
     await scoped.register(buildCatalogRoutes(service));
   });
   await app.register(async (scoped) => {
-    await scoped.register(fastifyRateLimit, { max: 30, timeWindow: "1 minute" });
+    await scoped.register(fastifyRateLimit, { max: 30, timeWindow: "1 minute", keyGenerator: rateLimitKey });
     await scoped.register(buildCoverPickerRoutes(service));
   });
   await app.register(async (scoped) => {
