@@ -2,7 +2,7 @@ import { RankingMethodSelector } from "./RankingMethodSelector";
 import { useEffect, useRef, useState } from "react";
 import { aggregate, AGGREGATION_MODES, booksByWork, isCharacterBook, type AggregationMode, type HistogramCell } from "@scripta/shared";
 import { router, useSegments } from "expo-router";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View, type ScrollViewInstance } from "react-native";
 import { Text } from "../../ui/Text";
 import { Button, Sheet, captionHitSlop, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { workPath } from "../works/workPath";
@@ -30,7 +30,7 @@ export function TierlistResults({ histogram, tiers, pool, books, ballotCount, el
 }) {
   const { colors } = useTheme();
   const segments = useSegments();
-  const boardScroll = useRef<ScrollView>(null);
+  const boardScroll = useRef<ScrollViewInstance>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [showMine, setShowMine] = useState(false);
   const [explain, setExplain] = useState(false);

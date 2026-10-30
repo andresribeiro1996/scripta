@@ -63,7 +63,7 @@ export function HomeScreen() {
       </View>}
       renderItem={({ item }) => <FeedRow item={item} actions={actions} onOpen={() => router.push(digestRoute(item) as never)} onComments={() => setComments(item)} />}
       renderSectionFooter={({ section }) => !section.data.length ? <View style={styles.onboarding}>{empty}</View> : null}
-      ListFooterComponent={dashboard.isFetchingNextPage && items.length ? <View style={styles.onboarding}><Skeleton height={80} /></View> : dashboard.isFetchNextPageError ? <View style={styles.onboarding}><ErrorState body="Couldn't load more." actionLabel="Retry" onAction={() => void dashboard.fetchNextPage()} /></View> : null}
+      ListFooterComponent={dashboard.isFetchingNextPage && items.length ? <View style={styles.onboarding}><Skeleton height={80} /></View> : dashboard.isFetchNextPageError ? <View style={styles.onboarding}><ErrorState body="Couldn't load more." actionLabel="Retry" onAction={() => void dashboard.fetchNextPage()} /></View> : undefined}
       onEndReached={() => { if (dashboard.hasNextPage && !dashboard.isFetchingNextPage && !dashboard.isFetchNextPageError) void dashboard.fetchNextPage(); }} onEndReachedThreshold={0.4} refreshControl={<RefreshControl refreshing={pulling} onRefresh={() => void onRefresh()} />} />
     {comments ? <CommentsSheet key={comments.id} id={comments.id} title={feedRowModel(comments).title || "Activity"} onClose={() => setComments(null)} /> : null}
     {savedOpen ? <SavedContentSheet actions={actions} onClose={() => setSavedOpen(false)} /> : null}

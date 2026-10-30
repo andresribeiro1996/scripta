@@ -1,5 +1,5 @@
 import { useEffect, useRef, type ReactNode, type Ref } from "react";
-import { Keyboard, Pressable, StyleSheet, TextInput, View } from "react-native";
+import { Keyboard, Pressable, StyleSheet, TextInput, View, type TextInputInstance } from "react-native";
 import { Icon, type IconName } from "./icon";
 import { Input, Menu, type MenuItem } from "./components";
 import { ScrollDock, scrollDockFabHeight, type SearchDockScrollProps } from "./ScrollDock";
@@ -37,12 +37,12 @@ export function SearchDock({
   fab?: ReactNode;
   hidden?: boolean;
   onSubmitEditing?: () => void;
-  inputRef?: Ref<TextInput>;
+  inputRef?: Ref<TextInputInstance>;
   children: (scrollProps: SearchDockScrollProps) => ReactNode;
 }) {
   const { colors } = useTheme();
-  const input = useRef<TextInput | null>(null);
-  const setInput = (node: TextInput | null) => {
+  const input = useRef<TextInputInstance | null>(null);
+  const setInput = (node: TextInputInstance | null) => {
     input.current = node;
     if (typeof inputRef === "function") inputRef(node);
     else if (inputRef) inputRef.current = node;
