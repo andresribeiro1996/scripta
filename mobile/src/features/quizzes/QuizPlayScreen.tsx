@@ -1,16 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { playerLabel, scoreRows, type PublicQuizQuestion } from "@scripta/shared";
+import { playerLabel, resultCovers, scoreRows, type PublicQuizQuestion, type ScoreRow } from "@scripta/shared";
 import { useQuery } from "@tanstack/react-query";
 import { router, Stack } from "expo-router";
 import { isPermanentError } from "../../core/apiClient";
 import { Image } from "expo-image";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, ScrollView, Share, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { useAuth } from "../../core/auth";
 import { ApiError } from "../../core/api";
 import { API_URL } from "../../core/config";
-import { Button, ErrorState, FormScroll, Input, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, radii, spacing, typography, useTheme, useUnsavedChangesGuard } from "../../ui";
+import { Button, ErrorState, FormScroll, Icon, Input, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme, useUnsavedChangesGuard } from "../../ui";
+import { publicContentUrl } from "../sharing/links";
 import { coverUrlForApi } from "../library/lib/coverUrl";
 import { fetchPlay, fetchPlayBoard, fetchPublicResults, submitPlay, type PlayBoard, type PlayResponse } from "./api";
 import { buildSubmission, isComplete, nextIndex, playStage, playStorageKey } from "./quizPlay";
@@ -30,7 +31,7 @@ export function QuizPlayScreen({ code }: { code: string }) {
   const [playerName, setPlayerName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<"you" | "board">("you");
+  const [tab, setTab] = useState<"answers" | "board">("answers");
   const startRef = useRef(Date.now());
   const board = useQuery({ queryKey: ["quizzes", "board", code], queryFn: () => fetchPlayBoard(code), enabled: Boolean(code), retry: false });
 
@@ -98,7 +99,7 @@ export function QuizPlayScreen({ code }: { code: string }) {
       <Text {...dynamicType} style={[typography.body, styles.center, { color: colors.textDim }]}>This quiz is closed.</Text>
       <Leaderboard code={code} />
     </View>
-    : stage === "played" && board.data ? <EndScreen code={code} board={board.data} result={result!} returning={submitted === null} tab={tab} setTab={setTab} />
+    : stage === "played" && board.data ? <EndScreen code={code} board={board.data} result={result!} tab={tab} setTab={setTab} onError={setError} />
     : board.data ? (() => {
       const questions = board.data.questions;
       const question = questions[index];
@@ -158,42 +159,86 @@ function Prompt({ question }: { question: PublicQuizQuestion }) {
   return <Text {...dynamicType} display={false} style={[typography.title, styles.promptQuote, { color: colors.text }]}>“{question.prompt}”</Text>;
 }
 
-function EndScreen({ code, board, result, returning, tab, setTab }: {
+function EndScreen({ code, board, result, tab, setTab, onError }: {
   code: string;
   board: PlayBoard;
   result: PlayResponse;
-  returning: boolean;
-  tab: "you" | "board";
-  setTab: (tab: "you" | "board") => void;
+  tab: "answers" | "board";
+  setTab: (tab: "answers" | "board") => void;
+  onError: (message: string | null) => void;
 }) {
   const { colors } = useTheme();
-  return <SwipeableTabs accessibilityLabel="Quiz results" options={[{ value: "you", label: "You" }, { value: "board", label: "Leaderboard" }]} value={tab} onChange={setTab} renderPage={(page) => page === "board" ? (
-    <Leaderboard code={code} />
-  ) : (
-    <ScrollView contentContainerStyle={styles.section}>
-      <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{returning ? "You already played this quiz." : "Your score"}</Text>
-      <Text {...dynamicType} display={false} style={[typography.heading, styles.score, { color: colors.accent }]}>{result.score}/{board.questionCount}</Text>
-      {scoreRows(board.questions, result.correct, result.answers).map((row) => (
-        <View key={row.id} style={[styles.verdict, { borderColor: colors.border }]}>
-          <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{row.number}</Text>
-          <Text {...dynamicType} style={[typography.title, { color: row.correct ? colors.success : colors.danger }]}>{row.correct ? "✓" : "✗"}</Text>
-          <View style={styles.grow}>
-            {row.answer ? <ScoreValue value={row.answer} title={row.answer.title} /> : null}
-            {row.pick ? <ScoreValue value={row.pick} dim /> : null}
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const rows = scoreRows(board.questions, result.correct, result.answers);
+  const covers = resultCovers(board.questions, rows);
+
+  async function challenge() {
+    onError(null);
+    try {
+      await Share.share({ message: await publicContentUrl(`/play/${code}`) });
+    } catch (reason) {
+      onError(reason instanceof Error ? reason.message : "Couldn't create a public link.");
+    }
+  }
+
+  return <View style={styles.end}>
+    <View style={styles.hero}>
+      <View style={styles.heroText}>
+        <Text {...dynamicType} display={false} maxFontSizeMultiplier={1.2} accessibilityLabel={`${result.score} of ${board.questionCount} correct`} style={[styles.score, { color: colors.text }]}>
+          {result.score}<Text style={[styles.scoreOutOf, { color: colors.textDim }]}> / {board.questionCount}</Text>
+        </Text>
+      </View>
+      {covers.length > 0 ? <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.fan}>
+        {covers.map(({ url }, i) => (
+          <View key={url} style={[styles.fanCover, { backgroundColor: colors.border, zIndex: i === 1 ? 1 : 0, transform: [{ rotate: `${(i - (covers.length - 1) / 2) * 10}deg` }, { translateY: i === 1 ? -8 : 0 }] }]}>
+            <Image source={{ uri: uriFor(url) }} contentFit="contain" style={StyleSheet.absoluteFill} />
           </View>
-        </View>
-      ))}
-    </ScrollView>
-  )} />;
+        ))}
+      </View> : null}
+    </View>
+    <SwipeableTabs accessibilityLabel="Quiz results" options={[{ value: "answers", label: "Your answers" }, { value: "board", label: "Leaderboard" }]} value={tab} onChange={setTab} renderPage={(page) => page === "board" ? (
+      <Leaderboard code={code} />
+    ) : (
+      <ScrollView contentContainerStyle={styles.answers}>
+        {rows.map((row, i) => <AnswerRow key={row.id} row={row} question={board.questions[i]!} expanded={expanded === row.id} onToggle={() => setExpanded((current) => current === row.id ? null : row.id)} />)}
+      </ScrollView>
+    )} />
+    <Button label="Challenge a friend" onPress={() => void challenge()} />
+  </View>;
 }
 
-function ScoreValue({ value, title, dim }: { value: { kind: "text" | "cover"; value: string }; title?: string; dim?: boolean }) {
+function AnswerRow({ row, question, expanded, onToggle }: { row: ScoreRow; question: PublicQuizQuestion; expanded: boolean; onToggle: () => void }) {
   const { colors } = useTheme();
-  if (value.kind === "text") return <Text numberOfLines={1} {...dynamicType} style={[typography.body, { color: dim ? colors.textDim : colors.text }]}>{dim ? "Your pick: " : ""}{value.value}</Text>;
-  return <View style={styles.scoreCover}>
-    <Image source={{ uri: uriFor(value.value) }} contentFit="cover" style={styles.scoreThumb} alt={title ?? "Picked cover"} />
-    {title ? <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.grow, { color: colors.text }]}>{title}</Text> : null}
-    {dim ? <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>Your pick</Text> : null}
+  const title = row.answer?.title ?? (row.answer?.kind === "text" ? row.answer.value : `Question ${row.number}`);
+  const cover = row.answer?.kind === "cover" ? row.answer.value : question.type === "cover_title" ? question.prompt : null;
+  const verdict = row.correct ? "Correct" : "Incorrect";
+  return <View style={[styles.answerRow, { borderColor: colors.border }]}>
+    <Pressable accessibilityRole="button" accessibilityState={{ expanded }} accessibilityLabel={`${row.answer ? `Question ${row.number}: ` : ""}${title}, ${verdict.toLowerCase()}`} onPress={onToggle} style={styles.answerHead}>
+      <View style={[styles.thumb, { backgroundColor: cover ? colors.border : colors.accentSoft }]}>
+        {cover ? <Image source={{ uri: uriFor(cover) }} contentFit="contain" style={StyleSheet.absoluteFill} /> : <Icon name="book" size={18} color={colors.textDim} />}
+      </View>
+      <View style={styles.grow}>
+        <Text {...dynamicType} style={[typography.body, { color: colors.text }]}>{title}</Text>
+        <Text {...dynamicType} style={[typography.caption, { color: row.correct ? colors.success : colors.danger }]}>{row.correct ? "✓" : "✗"} {verdict}</Text>
+      </View>
+      <Icon name={expanded ? "chevronDown" : "chevronRight"} size={16} color={colors.textDim} />
+    </Pressable>
+    {expanded ? <View style={styles.answerBody}>
+      {row.answer ? <View style={styles.answerColumn}><AnswerValue value={row.answer} /></View> : <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>Answer details aren’t available for this play.</Text>}
+      {row.pick ? <View style={[styles.answerColumn, styles.pickColumn, { borderColor: colors.border }]}><AnswerValue value={row.pick} picked /></View> : null}
+    </View> : null}
+  </View>;
+}
+
+function AnswerValue({ value, picked = false }: { value: NonNullable<ScoreRow["answer"]>; picked?: boolean }) {
+  const { colors } = useTheme();
+  const text = value.kind === "text" ? value.value : value.title;
+  return <View style={styles.answerValue}>
+    <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{picked ? "Your pick" : "Correct answer"}</Text>
+    {value.kind === "cover" ? <View style={[picked ? styles.pickCover : styles.answerCover, { backgroundColor: colors.border }]}>
+      <Image source={{ uri: uriFor(value.value) }} contentFit="contain" style={StyleSheet.absoluteFill} alt={text ?? "Cover"} />
+    </View> : null}
+    {text ? <Text {...dynamicType} style={[typography.body, picked ? { color: colors.textDim } : [styles.strong, { color: colors.text }]]}>{text}</Text> : null}
   </View>;
 }
 
@@ -206,11 +251,15 @@ function Leaderboard({ code }: { code: string }) {
   return <ScrollView contentContainerStyle={styles.section}>
     {leaderboard.data.plays.map((play, i) => (
       <View key={`${play.playerName ?? "Guest"}-${i}`} style={[styles.leaderRow, { borderColor: colors.border }]}>
-        <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{i + 1}</Text>
-        <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, styles.grow, { color: colors.text }]}>{playerLabel(play).name}</Text>
-        {playerLabel(play).guest ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>guest</Text> : null}
-        <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{play.score}/{leaderboard.data.questionCount}</Text>
-        <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{(play.durationMs / 1000).toFixed(1)}s</Text>
+        <Text {...dynamicType} style={[typography.body, styles.rank, { color: colors.textDim }]}>{i + 1}</Text>
+        <View style={styles.grow}>
+          <Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>{playerLabel(play).name}</Text>
+          {playerLabel(play).guest ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Guest</Text> : null}
+        </View>
+        <View style={styles.leaderScore}>
+          <Text {...dynamicType} numberOfLines={1} style={[typography.body, styles.strong, { color: colors.text }]}>{play.score}/{leaderboard.data.questionCount}</Text>
+          <Text {...dynamicType} numberOfLines={1} style={[typography.caption, { color: colors.textDim }]}>{(play.durationMs / 1000).toFixed(1)}s</Text>
+        </View>
       </View>
     ))}
   </ScrollView>;
@@ -233,12 +282,27 @@ const styles = StyleSheet.create({
   options: { gap: spacing.sm },
   option: { minHeight: 52, borderWidth: 1, borderRadius: radii.md, paddingHorizontal: spacing.md, justifyContent: "center" },
   complete: { gap: spacing.sm, paddingBottom: spacing.xl },
-  section: { gap: spacing.sm, paddingTop: spacing.lg },
-  leaderRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.xs, borderBottomWidth: StyleSheet.hairlineWidth },
-  verdict: { flexDirection: "row", alignItems: "center", gap: spacing.md, borderWidth: 1, borderRadius: radii.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
-  scoreCover: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  scoreThumb: { width: 32, height: 48, borderRadius: radii.sm },
-  score: { textAlign: "center", fontWeight: "700" },
+  section: { paddingTop: spacing.sm },
+  leaderRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, minHeight: minimumTouchTarget, paddingVertical: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth },
+  rank: { minWidth: spacing.xl },
+  leaderScore: { alignItems: "flex-end" },
+  end: { flex: 1, gap: spacing.md },
+  hero: { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  heroText: { flex: 1 },
+  score: { fontSize: 56, lineHeight: 64 },
+  scoreOutOf: { fontSize: 24 },
+  fan: { flexDirection: "row", paddingTop: spacing.sm },
+  fanCover: { width: 44, height: 64, marginHorizontal: -spacing.xs, borderRadius: radii.sm, overflow: "hidden" },
+  answers: { paddingTop: spacing.sm },
+  answerRow: { borderBottomWidth: StyleSheet.hairlineWidth },
+  answerHead: { flexDirection: "row", alignItems: "center", gap: spacing.md, minHeight: minimumTouchTarget, paddingVertical: spacing.sm },
+  thumb: { width: 30, height: 44, borderRadius: radii.sm, overflow: "hidden", alignItems: "center", justifyContent: "center" },
+  answerBody: { flexDirection: "row", paddingBottom: spacing.md },
+  answerColumn: { flex: 1 },
+  pickColumn: { borderLeftWidth: StyleSheet.hairlineWidth, paddingLeft: spacing.md },
+  answerValue: { gap: spacing.xs },
+  answerCover: { alignSelf: "flex-start", width: 64, height: 96, borderRadius: radii.sm, overflow: "hidden" },
+  pickCover: { alignSelf: "flex-start", width: 40, height: 60, borderRadius: radii.sm, overflow: "hidden" },
   strong: { fontWeight: "700" },
   grow: { flex: 1 },
 });

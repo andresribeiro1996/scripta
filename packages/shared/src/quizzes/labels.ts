@@ -32,6 +32,16 @@ export function scoreRows(questions: PublicQuizQuestion[], correct: Record<strin
   });
 }
 
+export function resultCovers(questions: PublicQuizQuestion[], rows: ScoreRow[]): Array<{ url: string; title: string }> {
+  const covers = new Map<string, string>();
+  rows.forEach((row, index) => {
+    const question = questions[index]!;
+    if (row.answer?.kind === "cover") covers.set(row.answer.value, row.answer.title ?? "");
+    else if (question.type === "cover_title") covers.set(question.prompt, row.answer?.value ?? "");
+  });
+  return [...covers].slice(0, 3).map(([url, title]) => ({ url, title }));
+}
+
 export function playerLabel(play: { playerName: string | null; anonymous: boolean }): { name: string; guest: boolean } {
   return { name: play.playerName ?? "Guest", guest: play.anonymous };
 }
