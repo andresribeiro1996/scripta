@@ -36,6 +36,7 @@ export function BookCard({
   selectable = false,
   selected = false,
   onToggleSelect,
+  onLoadEnd,
 }: {
   book: Record<string, unknown>;
   onPress: () => void;
@@ -44,6 +45,7 @@ export function BookCard({
   selectable?: boolean;
   selected?: boolean;
   onToggleSelect?: (book: Record<string, unknown>) => void;
+  onLoadEnd?: () => void;
 }) {
   const { colors } = useTheme();
   const [hasCover, setHasCover] = useState(false);
@@ -86,7 +88,7 @@ export function BookCard({
         },
       ]}
     >
-      <CoverImage book={book} onHasCoverChange={setHasCover} />
+      <CoverImage book={book} onHasCoverChange={setHasCover} onLoadEnd={onLoadEnd} />
 
       {selectable && (
         <View
