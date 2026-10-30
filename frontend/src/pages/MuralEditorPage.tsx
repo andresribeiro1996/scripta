@@ -104,6 +104,7 @@ export function MuralEditorPage() {
   // state, because it must be true for the SECOND call synchronously,
   // before any re-render.
   const creatingRef = useRef(false);
+  const stickyRef = useRef<HTMLDivElement>(null);
 
   /** The mural to act on, creating it first if this is still a draft.
    *  Every mutation below goes through this rather than touching
@@ -581,7 +582,7 @@ export function MuralEditorPage() {
           style={fullscreen ? muralThemeStyle(view.theme) : undefined}
           className={fullscreen ? "fixed inset-0 z-50 overflow-y-auto [--app-top:0px] [--offline-h:0px] bg-(--color-bg) px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]" : ""}
         >
-          <div style={{ visibility: dragging ? "hidden" : undefined }} className="sticky top-(--app-top) z-40">
+          <div ref={stickyRef} style={{ visibility: dragging ? "hidden" : undefined }} className="sticky top-(--app-top) z-40">
           {fullscreen && (
             <div className="-mx-4 -mt-4 mb-3 flex items-center justify-between bg-(--color-bg)/95 px-4 py-3 backdrop-blur">
               <p className="truncate font-semibold">{view.name}</p>
@@ -606,6 +607,7 @@ export function MuralEditorPage() {
               profile={session?.user.username ? { username: session.user.username, avatarUrl: session.user.avatarId ? avatarUrlFor(session.user.avatarId) : null } : undefined}
               revertNonce={revertNonce}
               onLayoutChange={(blockId, layout) => void guard(changeLayout((blocks) => moveMuralBlock(blocks, blockId, layout)), "Couldn't save that move.")}
+              topEdge={() => stickyRef.current?.getBoundingClientRect().bottom ?? 0}
               onToggleExpansion={(blockId, axis, bottom, top) => void guard(changeLayout((blocks) => toggleMuralBlockExpansion(blocks, blockId, axis, bottom, top)), "Couldn't resize that block.")}
               onConfigureBlock={(block) => setConfiguringBlockId(block.id)}
               onStyleBlock={(block) => setStylingBlockId(block.id)}

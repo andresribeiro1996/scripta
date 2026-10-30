@@ -14,6 +14,7 @@ export function SettingsPage() {
   const [draft, setDraft] = useState(session?.user.username ?? "");
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [avatarBusy, setAvatarBusy] = useState(false);
@@ -23,26 +24,24 @@ export function SettingsPage() {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
-    setError(null);
-    setSuccess(false);
+    setAvatarError(null);
     setAvatarBusy(true);
     try {
       await uploadAvatar(file);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+      setAvatarError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
       setAvatarBusy(false);
     }
   }
 
   async function handleAvatarRemove() {
-    setError(null);
-    setSuccess(false);
+    setAvatarError(null);
     setAvatarBusy(true);
     try {
       await removeAvatar();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+      setAvatarError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
       setAvatarBusy(false);
     }
@@ -73,7 +72,12 @@ export function SettingsPage() {
               <SettingRow
                 leading={<Avatar user={session.user} size={48} className={avatarBusy ? "animate-pulse" : ""} />}
                 label="Profile picture"
-                description={avatarBusy ? "Working…" : "Shown on your profile, murals and games"}
+                description={
+                  <>
+                    <span className="block">{avatarBusy ? "Working…" : "Shown on your profile, murals and games"}</span>
+                    {avatarError ? <span role="alert" className="block text-(--color-danger)">{avatarError}</span> : null}
+                  </>
+                }
               >
                 <input
                   ref={fileInputRef}
@@ -95,13 +99,11 @@ export function SettingsPage() {
             <SettingRow
               label={<label htmlFor="settings-username">Username</label>}
               description={
-                error ? (
-                  <span className="text-(--color-danger)">{error}</span>
-                ) : success ? (
-                  <span className="text-(--color-accent)">Username updated.</span>
-                ) : (
-                  `@${session?.user.username ?? "—"}`
-                )
+                <>
+                  <span className="block">@{session?.user.username ?? "—"}</span>
+                  {error ? <span role="alert" className="block text-(--color-danger)">{error}</span> : null}
+                  {success ? <span role="status" className="block text-(--color-accent)">Username updated.</span> : null}
+                </>
               }
             >
               {!editing ? (

@@ -30,6 +30,19 @@ test("side tabs: a row below lg, a vertical nav from lg, current marked in both"
   assert.match(html, /max-w-3xl[^>]*>BODY/);
 });
 
+test("the row nav and side nav share one tab-link helper", () => {
+  const page = readFileSync(new URL("../src/components/page/Page.tsx", import.meta.url), "utf8");
+  assert.equal(page.match(/tabList\.map|tabs\.map/g)?.length, 1);
+  assert.match(page, /tabLinks\(tabList, activeTo, tabClass\)/);
+  assert.match(page, /tabLinks\(tabList, activeTo, sideTabClass\)/);
+});
+
+test("the Appearance tab uses the Account tab's group heading", () => {
+  const src = readFileSync(new URL("../src/pages/SettingsAppearancePage.tsx", import.meta.url), "utf8");
+  assert.match(src, /<h2 className=\{`\$\{PANEL_HEADING\}[^`]*`\}>Appearance<\/h2>/);
+  assert.doesNotMatch(src, /<h3/);
+});
+
 test("all Settings tabs use side tabs", () => {
   for (const f of ["SettingsPage", "SettingsAppearancePage", "LibraryStylePage"]) assert.match(readFileSync(new URL(`../src/pages/${f}.tsx`, import.meta.url), "utf8"), /sideTabs/, f);
 });

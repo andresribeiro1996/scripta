@@ -26,6 +26,11 @@ test("Settings rows name their object and meet the floor", () => {
   assert.match(s, />\s*Change username\s*</);
   assert.doesNotMatch(s, />\s*Change\s*</);
   assert.match(s, /LIST_PANEL/);
+  assert.match(s, /setAvatarError\(err/);
+  assert.equal(s.match(/setError\(err/g)?.length, 1);
+  assert.match(s, /role="alert"[^>]*>\{avatarError\}/);
+  assert.match(s, /<span className="block">@\{session\?\.user\.username/);
+  assert.match(s, /role="status"[^>]*>Username updated\./);
   assert.match(src("auth/DeleteAccountSection"), /BUTTON_DANGER_OUTLINE/);
 });
 

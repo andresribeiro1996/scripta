@@ -1,27 +1,21 @@
 import type { MuralBlock } from "@scripta/shared";
 import type { RefObject } from "react";
 
-function stickyOffset(element: HTMLElement) {
-  const style = getComputedStyle(element);
-  const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
-  const appTop = style.getPropertyValue("--app-top").trim();
-  return (parseFloat(appTop) || 0) * (appTop.endsWith("rem") ? rem : 1) + (parseFloat(style.getPropertyValue("--offline-h")) || 0);
-}
-
-export function MuralExpandButtons({ block, canvas, scale = 1, busy, compact, bottomEdge, onToggle }: {
+export function MuralExpandButtons({ block, canvas, scale = 1, busy, compact, bottomEdge, topEdge, onToggle }: {
   block: MuralBlock;
   canvas: RefObject<HTMLDivElement | null>;
   scale?: number;
   busy?: boolean;
   compact?: boolean;
   bottomEdge?: () => number;
+  topEdge?: () => number;
   onToggle?: (id: string, axis: "w" | "h", bottom: number, top: number) => void;
 }) {
   function toggle(axis: "w" | "h") {
     const element = canvas.current;
     if (!element) return;
     let bottom = Math.min(window.innerHeight, bottomEdge?.() ?? Infinity);
-    let top = stickyOffset(element);
+    let top = topEdge?.() ?? 0;
     for (let parent = element.parentElement; parent; parent = parent.parentElement) {
       if (/auto|scroll|hidden/.test(getComputedStyle(parent).overflowY)) { const rect = parent.getBoundingClientRect(); bottom = Math.min(bottom, rect.bottom); top = Math.max(top, rect.top); }
     }

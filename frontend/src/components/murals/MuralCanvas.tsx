@@ -36,6 +36,7 @@ export function MuralCanvas({
   onLayoutChange,
   onDragChange,
   onToggleExpansion,
+  topEdge,
   onConfigureBlock,
   onStyleBlock,
   onDuplicateBlock,
@@ -65,6 +66,7 @@ export function MuralCanvas({
   onDragChange?: (dragging: boolean) => void;
   onLayoutChange?: (blockId: string, layout: BlockLayout) => void;
   onToggleExpansion?: (blockId: string, axis: "w" | "h", bottom: number, top: number) => void;
+  topEdge?: () => number;
   onConfigureBlock?: (block: MuralBlock) => void;
   onStyleBlock?: (block: MuralBlock) => void;
   onDuplicateBlock?: (blockId: string) => void;
@@ -128,6 +130,7 @@ export function MuralCanvas({
         onLayoutChange={onLayoutChange}
         onDragChange={onDragChange}
         onToggleExpansion={onToggleExpansion}
+        topEdge={topEdge}
         onDraftChange={onMobileDraftChange}
         onApplyDraft={onApplyMobileDraft}
         onCancelDraft={onCancelMobileDraft}
@@ -215,7 +218,7 @@ export function MuralCanvas({
             )}
           </div>
           </DraggableMuralBlock>
-          {editMode && selectedBlockId === block.id && !drag.drop ? <div className="mural-block-controls absolute top-1 left-1 z-20 flex gap-1 rounded-xl border border-(--color-accent) bg-(--color-surface) p-1"><MuralExpandButtons block={originalBlock(block)} canvas={canvasRef} busy={busy} compact onToggle={onToggleExpansion} /></div> : null}
+          {editMode && selectedBlockId === block.id && !drag.drop ? <div className="mural-block-controls absolute top-1 left-1 z-20 flex gap-1 rounded-xl border border-(--color-accent) bg-(--color-surface) p-1"><MuralExpandButtons block={originalBlock(block)} canvas={canvasRef} busy={busy} compact topEdge={topEdge} onToggle={onToggleExpansion} /></div> : null}
           </div>
         );
       })}

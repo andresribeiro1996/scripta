@@ -7,6 +7,23 @@ import { LIST_ROW, PANEL_HEADING, TAB_NAV, tabClass } from "./surfaceClasses";
 export const PAGE_WIDTHS = { wide: 1440, default: 1200, narrow: 760 } as const;
 export type PageWidth = keyof typeof PAGE_WIDTHS;
 
+const sideTabClass = (active: boolean) =>
+  `flex min-h-11 items-center rounded-lg px-3.5 text-sm font-semibold ${active ? "bg-(--color-accent-soft) text-(--color-accent)" : "text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)"}`;
+
+function tabLinks(tabs: readonly AreaTab[], activeTo: string | null, className: (active: boolean) => string) {
+  return tabs.map((tab) => {
+    const active = tab.to === activeTo;
+    return (
+      <Link
+        key={tab.to}
+        to={tab.to}
+        aria-current={active ? "page" : undefined}
+        className={className(active)}
+      >{tab.label}</Link>
+    );
+  });
+}
+
 export function Page({ title, subtitle, back, actions, tabs, sideTabs, width = "default", maxWidth, children }: {
   title: ReactNode;
   subtitle?: ReactNode;
@@ -42,17 +59,7 @@ export function Page({ title, subtitle, back, actions, tabs, sideTabs, width = "
             ) : null}
             {tabList ? (
               <nav aria-label="Sections" className={`mt-6 ${TAB_NAV}${sideTabs ? " lg:hidden" : ""}`}>
-                {tabList.map((tab) => {
-                  const active = tab.to === activeTo;
-                  return (
-                    <Link
-                      key={tab.to}
-                      to={tab.to}
-                      aria-current={active ? "page" : undefined}
-                      className={tabClass(active)}
-                    >{tab.label}</Link>
-                  );
-                })}
+                {tabLinks(tabList, activeTo, tabClass)}
               </nav>
             ) : null}
           </header>
@@ -60,17 +67,7 @@ export function Page({ title, subtitle, back, actions, tabs, sideTabs, width = "
         {tabList && sideTabs ? (
           <div className="pt-6 lg:grid lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-12">
             <nav aria-label="Sections" className="hidden lg:flex flex-col gap-0.5">
-              {tabList.map((tab) => {
-                const active = tab.to === activeTo;
-                return (
-                  <Link
-                    key={tab.to}
-                    to={tab.to}
-                    aria-current={active ? "page" : undefined}
-                    className={`flex min-h-11 items-center rounded-lg px-3.5 text-sm font-semibold ${active ? "bg-(--color-accent-soft) text-(--color-accent)" : "text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)"}`}
-                  >{tab.label}</Link>
-                );
-              })}
+              {tabLinks(tabList, activeTo, sideTabClass)}
             </nav>
             <div className="min-w-0 max-w-3xl">{children}</div>
           </div>
