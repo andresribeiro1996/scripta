@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { statusLabel } from "./covers.js";
-import { LIBRARY_STATUS_TABS, STATUS_FILTER_OPTIONS, localDay, matchesSearch, readingPercent, setReadStatus } from "./libraryView.js";
+import { LIBRARY_STATUS_TABS, STATUS_FILTER_OPTIONS, localDay, matchesSearch, readingPercent, setReadStatus, statusCounts, type LibraryBook } from "./libraryView.js";
 
 process.env.TZ = "America/Sao_Paulo";
 
@@ -79,4 +79,9 @@ test("a library search for an ISBN matches either form of the book's ISBN", () =
   assert.equal(matchesSearch(dune, "0441013597"), true);
   assert.equal(matchesSearch(dune, "9780441013594"), false);
   assert.equal(matchesSearch({ Title: "No ISBN" }, "9780441013593"), false);
+});
+
+test("statusCounts counts each status filter over the whole library", () => {
+  const books = [{ ReadStatus: 1 }, { ReadStatus: 2 }, { ReadStatus: 2 }, { ReadStatus: 0 }, {}] as LibraryBook[];
+  assert.deepEqual(statusCounts(books), { all: 5, reading: 1, finished: 2, unread: 2 });
 });

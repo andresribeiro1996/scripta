@@ -8,7 +8,8 @@ import {
   findDuplicates,
   LIBRARY_CSV_TEMPLATE,
   restoreDeletedBooks,
-  saveFailureMessage
+  saveFailureMessage,
+  statusCounts
 } from "@scripta/shared";
 import { fetchIsAdmin } from "../api/books";
 import type { LibraryData, LibraryDocument } from "../api/library";
@@ -23,13 +24,14 @@ import { LibraryToolbar } from "../components/LibraryToolbar";
 import { LibraryIcon, MoreIcon } from "../components/NavIcons";
 import { OptionsMenu, type OptionsMenuItem } from "../components/OptionsMenu";
 import { Page } from "../components/page/Page";
-import { BUTTON_DANGER, BUTTON_PRIMARY, BUTTON_SECONDARY } from "../components/page/buttonClasses";
+import { BUTTON_DANGER, BUTTON_PRIMARY, BUTTON_SECONDARY, FIELD_CLASS } from "../components/page/buttonClasses";
+import { PANEL } from "../components/page/surfaceClasses";
 import { PerCardStylePanel } from "../components/PerCardStylePanel";
 import { ShareModal } from "../components/ShareModal";
 import { SyncGoodreadsModal } from "../components/SyncGoodreadsModal";
 import { SkeletonBookGrid } from "../components/Skeleton";
 import { useToast } from "../components/Toaster";
-import { FilterIcon } from "../components/Toolbar";
+import { FilterIcon, toolbarIconClass } from "../components/Toolbar";
 import { useBookActions } from "../hooks/useBookActions";
 import { useDelayedShow } from "../hooks/useDelayedShow";
 import { useLibrary } from "../hooks/useLibrary";
@@ -277,6 +279,7 @@ export function LibraryPage() {
     () => sortBooks(filterBooks(ordered, query, statusFilter), sortKey),
     [ordered, query, statusFilter, sortKey]
   );
+  const counts = useMemo(() => statusCounts(library?.data.books ?? []), [library]);
   const gridReady = books.length > 0 && displayBooks.length > 0;
   useLayoutEffect(() => {
     function remember() {
@@ -338,7 +341,7 @@ export function LibraryPage() {
                 if (e.key === "Escape") setEditingName(false);
               }}
               placeholder="Name your library…"
-              className="min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-2 text-sm"
+              className={`${FIELD_CLASS} max-w-full`}
             />
           ) : (
             <button
@@ -378,7 +381,7 @@ export function LibraryPage() {
                 items={actionItems}
                 title="More actions"
                 trigger={<MoreIcon size={22} />}
-                triggerClassName="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-(--color-border) bg-(--color-surface) text-(--color-text) hover:bg-(--color-surface-hover)"
+                triggerClassName={toolbarIconClass()}
               />
             </>
           )}
@@ -396,7 +399,7 @@ export function LibraryPage() {
         </>
       }
     >
-      {searchParams.get("action") === "import" ? <div className="mb-4 rounded-lg border border-(--color-border) p-4"><h2 className="font-semibold">Import library</h2><button className={`mt-2 ${BUTTON_SECONDARY}`} onClick={() => fileInputRef.current?.click()}>Choose import file</button></div> : null}
+      {searchParams.get("action") === "import" ? <div className={`mb-4 p-4 ${PANEL}`}><h2 className="font-semibold">Import library</h2><button className={`mt-2 ${BUTTON_SECONDARY}`} onClick={() => fileInputRef.current?.click()}>Choose import file</button></div> : null}
 
       {importStatus && (
         <div className="mb-5 rounded-lg bg-(--color-accent-soft) px-3 py-2 text-sm text-(--color-accent)">{importStatus}</div>
@@ -411,6 +414,7 @@ export function LibraryPage() {
           onQueryChange={setQuery}
           status={statusFilter}
           onStatusChange={(status) => updateView({ status })}
+          counts={counts}
           sort={sortKey}
           onSortChange={(sort) => updateView({ sort })}
         />

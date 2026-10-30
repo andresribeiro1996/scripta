@@ -43,6 +43,12 @@ export function filterBooks(books: LibraryBook[], query: string, status: StatusF
   });
 }
 
+export function statusCounts(books: LibraryBook[]): Record<StatusFilter, number> {
+  const counts = {} as Record<StatusFilter, number>;
+  for (const { value } of STATUS_FILTER_OPTIONS) counts[value] = filterBooks(books, "", value).length;
+  return counts;
+}
+
 export function matchesSearch(book: LibraryBook, query: string): boolean {
   const trimmed = query.trim();
   if (looksLikeIsbnQuery(trimmed)) return canonicalIsbn(trimmed) === canonicalIsbn(book.ISBN);

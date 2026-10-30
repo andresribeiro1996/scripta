@@ -12,19 +12,9 @@ import type { ReactNode } from "react";
  *  that a single configurable component would take more props than the
  *  markup it replaced. */
 
-/** Sticky on phones, static from `sm` up.
- *
- *  Scrolling a long list used to put its controls out of reach entirely,
- *  so finding something meant scrolling back to the top to type, then
- *  back down. Pinning costs no extra vertical space — the row is already
- *  there. It needs its own opaque background and a negative inset to
- *  cover Page's body padding, or content scrolls visibly through the
- *  gap behind it. Not sticky at `sm`+, where the toolbar is usually on
- *  screen anyway and a pinned bar would just spend space that isn't
- *  scarce. */
 export function ToolbarRow({ children }: { children: ReactNode }) {
   return (
-    <div className="sticky top-(--app-top) z-30 -mx-4 -mt-5 mb-6 bg-(--color-bg) px-4 pt-5 pb-2 sm:static sm:mx-0 sm:mt-0 sm:mb-5 sm:bg-transparent sm:px-0 sm:pt-0 sm:pb-0">
+    <div className="sticky top-(--app-top) z-20 -mx-4 bg-(--color-bg) px-4 py-3 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
       {children}
     </div>
   );
@@ -70,6 +60,15 @@ export function toolbarIconClass(active = false): string {
 // Icons are drawn SVGs on a 24×24 viewBox centred on (12,12), never
 // Unicode glyphs — a character sits off-centre in its own cell in most
 // fonts, so even a correctly centred button looks wrong.
+
+export function SearchIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="m20 20-4.2-4.2" />
+    </svg>
+  );
+}
 
 /** Funnel — a filter. */
 export function FilterIcon() {
