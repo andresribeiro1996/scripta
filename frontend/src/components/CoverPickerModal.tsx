@@ -1,8 +1,11 @@
 import { useRef, useState } from "react";
+import type { ResolvedCoverResponse } from "@scripta/shared";
+import type { ResolveCoverParams } from "../api/covers";
 import type { GalleryImage } from "../api/gallery";
 import { useDeleteGalleryImage } from "../hooks/useDeleteGalleryImage";
 import { useGalleryImages } from "../hooks/useGalleryImages";
 import { useConfirm } from "./ConfirmDialog";
+import { FoundCovers } from "./FoundCovers";
 import { BUTTON_SECONDARY } from "./page/buttonClasses";
 import { Sheet } from "./Sheet";
 import { CloseIcon } from "./Toolbar";
@@ -26,15 +29,23 @@ import { CloseIcon } from "./Toolbar";
 export function CoverPickerModal({
   title,
   currentImageId,
+  lookup,
+  coverUrl,
+  isAdmin,
   removeCoverLabel = "Remove custom cover",
   onSelect,
+  onPickFound,
   onRemoveCover,
   onClose
 }: {
   title: string;
   currentImageId: string | null;
+  lookup?: ResolveCoverParams;
+  coverUrl?: string | null;
+  isAdmin?: boolean;
   removeCoverLabel?: string;
   onSelect: (image: GalleryImage) => void;
+  onPickFound?: (cover: ResolvedCoverResponse, everyone: boolean) => void;
   onRemoveCover: () => void;
   onClose: () => void;
 }) {
@@ -120,7 +131,7 @@ export function CoverPickerModal({
         </div>
         {uploadError && <p className="mx-2 mt-2 text-xs text-(--color-danger)">{uploadError}</p>}
 
-        {currentImageId && (
+        {(currentImageId || coverUrl) && (
           <div className="mx-2 mt-3">
             <button
               onClick={() => {
@@ -136,6 +147,12 @@ export function CoverPickerModal({
       </div>
 
       <div className="p-2">
+        {lookup && onPickFound && (
+          <>
+            <FoundCovers lookup={lookup} coverUrl={coverUrl} isAdmin={isAdmin} onPick={onPickFound} />
+            <h3 className="mb-2 text-sm font-semibold">Your gallery</h3>
+          </>
+        )}
         {isLoading && <p className="text-sm text-(--color-text-dim)">Loading your gallery…</p>}
         {!isLoading && images.length === 0 && (
           <p className="text-sm text-(--color-text-dim)">No images in your gallery yet — upload one above.</p>

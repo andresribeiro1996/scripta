@@ -1,8 +1,11 @@
+import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { useEffect, useMemo, useRef, useState, type ComponentType } from "react";
-import { deleteBooks, restoreDeletedBooks, saveFailureMessage } from "@scripta/shared";
+import { deleteBooks, restoreDeletedBooks, saveFailureMessage, setBookCoverUrl, type ResolvedCoverResponse } from "@scripta/shared";
+import { fetchIsAdmin } from "../api/books";
+import { rememberResolvedCover } from "../api/covers";
 import type { GalleryImage } from "../api/gallery";
-import { BookCard } from "../components/BookCard";
+import { BookCard, coverParamsFor } from "../components/BookCard";
 import { BookGrid } from "../components/BookGrid";
 import { CoverPickerModal } from "../components/CoverPickerModal";
 import { EmptyState } from "../components/EmptyState";
@@ -65,6 +68,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
   const saver = useLibrarySaver();
   const { data: library, isLoading, updateLibrary } = useLibrary();
   const { scrubBooks } = useMurals();
+  const { data: isAdmin = false } = useQuery({ queryKey: ["books-admin"], queryFn: fetchIsAdmin, staleTime: Infinity });
   const copy = COPY[type];
   const [params] = useSearchParams();
   const selectedGroupId = params.get("group");
@@ -232,6 +236,18 @@ export function GroupsPage({ type }: { type: GroupType }) {
     }
   }
 
+  async function handleSaveBookCoverUrl(book: Record<string, unknown>, url: string) {
+    const key = bookKey(book);
+    try {
+      await updateLibrary((data) => ({
+        ...data,
+        books: data.books.map((b) => (bookKey(b) === key ? setBookCoverUrl(b, url) : b))
+      }));
+    } catch (error) {
+      toast({ message: saveFailureMessage(error, "Couldn't save — check your connection."), kind: "error" });
+    }
+  }
+
   async function handleRemoveBookCover(book: Record<string, unknown>) {
     const key = bookKey(book);
     try {
@@ -242,6 +258,16 @@ export function GroupsPage({ type }: { type: GroupType }) {
     } catch (error) {
       toast({ message: saveFailureMessage(error, "Couldn't save — check your connection."), kind: "error" });
     }
+  }
+
+  function handlePickFoundCover(book: Record<string, unknown>, cover: ResolvedCoverResponse, everyone: boolean) {
+    if (everyone) {
+      rememberResolvedCover(coverParamsFor(book), cover);
+      if (book._coverUrl) void handleRemoveBookCover(book);
+    } else if (cover.fullUrl) {
+      void handleSaveBookCoverUrl(book, cover.fullUrl);
+    }
+    setCoverBookKey(null);
   }
 
   // Select mode: turn it on, tap books across any of this page's group
@@ -520,8 +546,12 @@ export function GroupsPage({ type }: { type: GroupType }) {
         <CoverPickerModal
           title={String(coverBook.Title ?? "Untitled")}
           currentImageId={typeof coverBook._coverImageId === "string" ? coverBook._coverImageId : null}
+          lookup={coverParamsFor(coverBook)}
+          coverUrl={typeof coverBook._coverUrl === "string" ? coverBook._coverUrl : null}
+          isAdmin={isAdmin}
           removeCoverLabel="Remove custom cover — go back to the normal auto-detected one"
           onSelect={(image) => void handleSaveBookCover(coverBook, image)}
+          onPickFound={(cover, everyone) => handlePickFoundCover(coverBook, cover, everyone)}
           onRemoveCover={() => void handleRemoveBookCover(coverBook)}
           onClose={() => setCoverBookKey(null)}
         />
