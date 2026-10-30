@@ -68,7 +68,7 @@ export function SocialsSection() {
         return (
           <View key={status.provider} style={[styles.row, { opacity: status.enabled ? 1 : 0.5, borderBottomColor: colors.border, borderBottomWidth: index < sorted.length - 1 ? StyleSheet.hairlineWidth : 0 }]}>
             <View style={styles.logo}>
-              <FontAwesome6 name={mark.glyph as never} brand size={22} color={mark.color ?? colors.text} />
+              <FontAwesome6 name={mark.glyph} brand size={22} color={mark.color ?? colors.text} />
             </View>
             <View style={styles.grow}>
               <Text style={[typography.body, { color: colors.text, fontWeight: "600" }]}>{LABELS[status.provider]}</Text>

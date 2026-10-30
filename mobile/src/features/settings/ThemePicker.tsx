@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
-import { THEME_IDS, themes, type ThemePreference } from "@scripta/shared/themes";
+import { THEME_IDS, type ThemePreference } from "@scripta/shared/themes";
+import { themeTile } from "../../ui/ThemeGrid";
 import { Icon } from "../../ui/icon";
 import { dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui/theme";
 import { isAppearanceSyncFailure, saveAccountAppearance } from "./appearanceSync";
@@ -9,12 +10,6 @@ import { isAppearanceSyncFailure, saveAccountAppearance } from "./appearanceSync
 const OPTIONS: ThemePreference[] = ["system", ...THEME_IDS];
 
 const SWATCH = 46;
-
-function swatch(option: ThemePreference) {
-  return option === "system"
-    ? { label: "System", left: themes.light.colors, right: themes.dark.colors }
-    : { label: themes[option].label, left: themes[option].colors, right: themes[option].colors };
-}
 
 export function ThemePicker() {
   const { colors, preference, setPreference } = useTheme();
@@ -34,7 +29,9 @@ export function ThemePicker() {
       <View accessibilityRole="radiogroup" accessibilityLabel="Theme" style={styles.grid}>
         {OPTIONS.map((option) => {
           const checked = option === preference;
-          const { label, left, right } = swatch(option);
+          const { label, palettes } = themeTile(option);
+          const left = palettes[0];
+          const right = palettes[palettes.length - 1];
           return (
             <Pressable key={option} accessibilityRole="radio" accessibilityState={{ checked }} accessibilityLabel={label} onPress={() => choose(option)} style={styles.item}>
               <View style={[styles.circle, { borderColor: checked ? colors.accent : colors.border }]}>

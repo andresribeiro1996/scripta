@@ -4,8 +4,11 @@ import { DISPLAY_FONT_IDS, TEXT_FONT_IDS, fonts, resolveFonts, type FontId, type
 import { fontStyleFor } from "../../ui/fontStyle";
 import { SYSTEM_FAMILY } from "../../ui/systemFont";
 import { Text } from "../../ui/Text";
-import { dynamicType, radii, spacing, typography, useTheme } from "../../ui/theme";
+import { dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui/theme";
 import { isAppearanceSyncFailure, saveAccountAppearance } from "./appearanceSync";
+
+const CHIP_PADDING = 7;
+const CHIP_SLOP = Math.max(0, (minimumTouchTarget - (typography.body.lineHeight + 2 * CHIP_PADDING + 2)) / 2);
 
 function sampleStyle(font: FontId, slot: FontSlot) {
   return fontStyleFor(font, slot, typography.body) ?? { fontFamily: SYSTEM_FAMILY };
@@ -37,12 +40,14 @@ export function FontPicker({ slot }: { slot: FontSlot }) {
           const checked = option === selected;
           const shown = option === "theme" ? themeDefault : option;
           const label = option === "theme" ? "Default" : fonts[option].label;
+          const a11yLabel = option === "theme" ? `Theme default · ${fonts[themeDefault].label}` : label;
           return (
             <Pressable
               key={option}
               accessibilityRole="radio"
               accessibilityState={{ checked }}
-              accessibilityLabel={label}
+              accessibilityLabel={a11yLabel}
+              hitSlop={{ top: CHIP_SLOP, bottom: CHIP_SLOP }}
               onPress={() => choose(option)}
               style={[styles.chip, { borderColor: checked ? colors.accent : colors.border, backgroundColor: checked ? colors.accentSoft : colors.surface }]}
             >
@@ -66,5 +71,5 @@ const styles = StyleSheet.create({
   wrap: { gap: spacing.sm },
   heading: { fontWeight: "600" },
   row: { gap: spacing.sm },
-  chip: { paddingVertical: 7, paddingHorizontal: spacing.md, borderRadius: radii.full, borderWidth: 1 },
+  chip: { paddingVertical: CHIP_PADDING, paddingHorizontal: spacing.md, borderRadius: radii.full, borderWidth: 1 },
 });
