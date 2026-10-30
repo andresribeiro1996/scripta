@@ -23,8 +23,8 @@
 // onto the board, so a returning voter adjusts their ranking instead of
 // rebuilding it from an empty board.
 import { ballotBoard, blankBoard, characterBooks, itemNoun } from "@scripta/shared";
-import { useState } from "react";
-import { Link, useLocation, useParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useLocation, useOutletContext, useParams } from "react-router-dom";
 import type { PublicBookData } from "../api/sharedMurals";
 import type { TierlistData } from "../api/tierlists";
 import { useAuth } from "../auth/AuthContext";
@@ -46,6 +46,15 @@ function InfoScreen({ message }: { message: string }) {
       <p className="text-sm text-(--color-text-dim)">{message}</p>
     </Page>
   );
+}
+
+function HideBottomNav() {
+  const setNavHidden = useOutletContext<{ setNavHidden?: (hidden: boolean) => void } | undefined>()?.setNavHidden;
+  useEffect(() => {
+    setNavHidden?.(true);
+    return () => setNavHidden?.(false);
+  }, [setNavHidden]);
+  return null;
 }
 
 export function VoteTierlistPage() {
@@ -225,6 +234,7 @@ export function VoteTierlistPage() {
           : `Drag ${itemNoun(subject, 2)} into tiers to rank them, then submit your ballot.`}
       </p>
       {submitError && <p className="mb-4 text-sm text-(--color-danger)">{submitError}</p>}
+      <HideBottomNav />
       <TierBoard data={data} books={books} onChange={setWorking} structureEditable={false} />
       {booksSheet}
       {pickedSheet}
