@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactElement } from "react";
+import { memo, useCallback, useEffect, useState, type ReactElement } from "react";
 import { bookKey, calculateShelfTheme, effectiveCardStyle, plural, statusCounts, type Group, type LibraryBook, type LibraryStyleSettings, type PerCardStyle } from "@scripta/shared";
 import { useWindowDimensions, View } from "react-native";
 import { Text } from "../../../ui/Text";
@@ -16,6 +16,32 @@ const FAN_COVER = { width: 84, height: 126 };
 function coverKey(section: string, book: LibraryBook, index: number) {
   return `${section}:${String(book.ContentID ?? index)}`;
 }
+
+const ShareCover = memo(function ShareCover({ book, id, width, height, marginLeft, zIndex, rotate, onLoaded }: {
+  book: LibraryBook;
+  id: string;
+  width: number;
+  height: number;
+  marginLeft?: number;
+  zIndex?: number;
+  rotate?: string;
+  onLoaded: (key: string) => void;
+}) {
+  return <TierCover book={book} style={{ width, height, marginLeft, zIndex, transform: rotate ? [{ rotate }] : undefined }} onLoadEnd={() => onLoaded(id)} />;
+});
+
+const ShareShelfCard = memo(function ShareShelfCard({ book, id, width, style, seriesStyle, onLoaded }: {
+  book: LibraryBook;
+  id: string;
+  width: number;
+  style: LibraryStyleSettings;
+  seriesStyle: Partial<PerCardStyle> | undefined;
+  onLoaded: (key: string) => void;
+}) {
+  return <View style={{ width }}>
+    <BookCard book={book} style={effectiveCardStyle(style, seriesStyle, book._style as PerCardStyle | undefined)} onPress={() => {}} onLoadEnd={() => onLoaded(id)} />
+  </View>;
+});
 
 export function LibraryShareImage({ layout, name, ordered, shelf, style, seriesGroups, onReadyChange }: {
   layout: LibraryShareLayout;
@@ -47,9 +73,9 @@ export function LibraryShareImage({ layout, name, ordered, shelf, style, seriesG
   const renderable = layout !== "shelf" || shelf !== null;
   useEffect(() => {
     onReadyChange(renderable && (!needsCover || expected.length > 0) && expected.every((key) => loaded.has(key)));
-  }, [loaded, onReadyChange, expected.join("|")]);
+  }, [loaded, onReadyChange, renderable, needsCover, expected.join("|")]);
 
-  const markLoaded = (key: string) => () => setLoaded((current) => current.has(key) ? current : new Set(current).add(key));
+  const markLoaded = useCallback((key: string) => setLoaded((current) => current.has(key) ? current : new Set(current).add(key)), []);
 
   function covers(section: string, books: LibraryBook[], perRow: number, gap: number) {
     if (width <= 0) return null;
@@ -57,7 +83,7 @@ export function LibraryShareImage({ layout, name, ordered, shelf, style, seriesG
     return <View style={{ flexDirection: "row", flexWrap: "wrap", gap }}>
       {books.map((book, index) => {
         const key = coverKey(section, book, index);
-        return <TierCover key={key} book={book} style={{ width: cell, height: Math.round(cell * 1.5) }} onLoadEnd={markLoaded(key)} />;
+        return <ShareCover key={key} id={key} book={book} width={cell} height={Math.round(cell * 1.5)} onLoaded={markLoaded} />;
       })}
     </View>;
   }
@@ -83,9 +109,7 @@ export function LibraryShareImage({ layout, name, ordered, shelf, style, seriesG
     return <View style={{ flexDirection: "row", flexWrap: "wrap", columnGap: style.cardGap, rowGap: style.rowGap, paddingHorizontal: style.contentPaddingX, paddingVertical: style.contentPaddingY, backgroundColor: style.backgroundColor ?? undefined }}>
       {shelf.books.map((book, index) => {
         const key = coverKey("shelf", book, index);
-        return <View key={key} style={{ width: cellWidth }}>
-          <BookCard book={book} style={effectiveCardStyle(style, seriesGroups.get(bookKey(book))?.style, book._style as PerCardStyle | undefined)} onPress={() => {}} onLoadEnd={markLoaded(key)} />
-        </View>;
+        return <ShareShelfCard key={key} id={key} book={book} width={cellWidth} style={style} seriesStyle={seriesGroups.get(bookKey(book))?.style} onLoaded={markLoaded} />;
       })}
     </View>;
   }
@@ -99,7 +123,7 @@ export function LibraryShareImage({ layout, name, ordered, shelf, style, seriesG
         <View style={{ flexDirection: "row", justifyContent: "center", paddingVertical: spacing.md }}>
           {fan.map((book, index) => {
             const key = coverKey("fan", book, index);
-            return <TierCover key={key} book={book} style={{ ...FAN_COVER, marginLeft: index === 0 ? 0 : -28, zIndex: index, transform: [{ rotate: FAN_ROTATIONS[index] ?? "0deg" }] }} onLoadEnd={markLoaded(key)} />;
+            return <ShareCover key={key} id={key} book={book} {...FAN_COVER} marginLeft={index === 0 ? 0 : -28} zIndex={index} rotate={FAN_ROTATIONS[index] ?? "0deg"} onLoaded={markLoaded} />;
           })}
         </View>
         <View style={{ flexDirection: "row", gap: spacing.sm }}>
