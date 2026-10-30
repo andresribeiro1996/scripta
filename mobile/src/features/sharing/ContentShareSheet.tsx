@@ -92,7 +92,7 @@ export function ContentShareSheet({ visible, onClose, title, description, url, c
           <Pressable accessibilityRole="button" accessibilityLabel="Close share sheet" accessibilityState={{ disabled: busy }} disabled={busy} onPress={onClose} style={({ pressed }) => [styles.iconAction, { backgroundColor: pressed ? colors.border : colors.background, opacity: busy ? 0.5 : 1 }]}><Icon name="close" size={18} color={colors.textDim} /></Pressable>
         </View>
         {view === "image" ? <>
-          <View pointerEvents={busy ? "none" : "auto"} style={{ opacity: busy ? 0.5 : 1 }}>{previewControls}</View>
+          {previewControls ? <View pointerEvents={busy ? "none" : "auto"} style={{ opacity: busy ? 0.5 : 1 }}>{previewControls}</View> : null}
           {description ? <Text style={[typography.caption, { color: colors.textDim }]}>{description}</Text> : null}
           <ScrollView style={{ flex: 1, borderRadius: radii.xl, backgroundColor: colors.background }} contentContainerStyle={{ padding: spacing.sm }} removeClippedSubviews={false}>
             <View ref={capture} collapsable={false} onLayout={(event) => { size.current = event.nativeEvent.layout; }} style={{ backgroundColor: colors.background }}>
