@@ -1,16 +1,21 @@
+import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import type { BookScreenModel } from "@scripta/shared";
 import { Text } from "../../ui/Text";
-import { Icon, Sheet, dynamicType, minimumTouchTarget, spacing, typography, useDismissThen, useTheme } from "../../ui";
+import { Icon, Sheet, Toast, dynamicType, minimumTouchTarget, spacing, typography, useDismissThen, useTheme } from "../../ui";
 import { useChangeStatus } from "../library/hooks/useChangeStatus";
 import { useLibraryActions } from "../library/hooks/useLibraryActions";
 import { FeelingChips } from "../library/components/FeelingChips";
 
 export function StatusSheet({ book, model, visible, onClose }: { book: Record<string, unknown>; model: BookScreenModel; visible: boolean; onClose: () => void }) {
   const { colors } = useTheme();
-  const { setRating } = useLibraryActions();
+  const [error, setError] = useState<string | null>(null);
+  const { setRating } = useLibraryActions(setError);
   const changeStatus = useChangeStatus();
   const { then, onDismiss } = useDismissThen(visible, onClose);
+  useEffect(() => {
+    if (visible) setError(null);
+  }, [visible]);
   const { status, feeling } = model;
   if (!status) return null;
   const feelingValue = feeling?.options.find((option) => option.selected)?.rating ?? null;
@@ -33,7 +38,14 @@ export function StatusSheet({ book, model, visible, onClose }: { book: Record<st
       {feeling ? (
         <View style={styles.feeling}>
           <Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>How it landed</Text>
-          <FeelingChips value={feelingValue} onChange={(rating) => void setRating(book, rating)} />
+          <FeelingChips
+            value={feelingValue}
+            onChange={(rating) => {
+              setError(null);
+              void setRating(book, rating);
+            }}
+          />
+          {error ? <Toast visible message={error} tone="error" /> : null}
         </View>
       ) : null}
     </Sheet>
