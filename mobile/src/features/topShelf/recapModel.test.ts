@@ -58,3 +58,13 @@ test("recapEntries hides the button when the last completed month has no recap",
 test("recapEntries keeps the button when the latest month is the current one", () => {
   assert.deepEqual(recapEntries({ months: ["2026-10", "2026-09"], currentMonth: "2026-10" }), { play: "2026-10", past: ["2026-09"] });
 });
+
+const daily: TopShelfRecapCard = { kind: "dailyChapter", players: 42, hardest: { title: "Poetry", date: "2026-11-04", average: 2.1 }, mostMissed: { title: "The Stranger", missedPercent: 71 }, topPlayers: [{ username: "marta", perfect: 9 }, { username: "joao", perfect: 7 }] };
+
+test("the Daily Chapter recap card speaks for the whole community", () => {
+  assert.equal(recapTitle(daily, "2026-11"), "📖 November's Daily Chapter");
+  assert.equal(recapNumber(daily), "42 readers played\nHardest: Poetry · 2.1/5\nMost missed: The Stranger · 71%\nMost perfect: @marta (9), @joao (7)");
+  assert.equal(recapNumber({ ...daily, hardest: null, mostMissed: null, topPlayers: [] }), "42 readers played");
+  assert.equal(recapCta(daily, "2026-12"), "Play today's Daily Chapter");
+  assert.equal(recapLinkPath(daily), "/daily");
+});

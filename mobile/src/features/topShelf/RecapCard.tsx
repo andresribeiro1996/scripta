@@ -68,7 +68,7 @@ export function RecapCard({ card, month, currentMonth, url, sharing = false, onO
   const [coverSpace, setCoverSpace] = useState<number | null>(null);
   const coverHeightCap = card.kind === "hottestGame" ? 120 : 255;
   const coverWidth = Math.max(1, Math.floor(Math.min(coverSpace ?? coverHeightCap, coverHeightCap) / 1.5));
-  const summary = card.kind === "summary";
+  const summary = card.kind === "summary" || card.kind === "dailyChapter";
   const body = (
     <View style={styles.cover} onLayout={(event) => setCoverSpace(event.nativeEvent.layout.height)}>
       {summary ? null : <Glow size={coverWidth * 3.4} />}
@@ -77,6 +77,8 @@ export function RecapCard({ card, month, currentMonth, url, sharing = false, onO
       </View>
     </View>
   );
+  const numbersText = <Text {...dynamicType} style={[summary ? styles.summaryNumbers : styles.number, { fontFamily: SERIF }]}>{recapNumber(card)}</Text>;
+  const numbers = card.kind === "dailyChapter" && onOpen ? <Pressable accessibilityRole="button" accessibilityLabel="Play today's Daily Chapter" onPress={onOpen} style={styles.numbersPress}>{numbersText}</Pressable> : numbersText;
   return (
     <View style={[styles.card, sharing ? styles.sharing : styles.full, { paddingTop: sharing ? spacing.xxxl : insets.top + 64, paddingBottom: sharing ? spacing.lg : insets.bottom + spacing.xxxl }]}>
       <Background />
@@ -87,7 +89,7 @@ export function RecapCard({ card, month, currentMonth, url, sharing = false, onO
           <Text numberOfLines={3} style={[styles.title, { fontFamily: SERIF }]}>{title}</Text>
           <Text numberOfLines={1} {...dynamicType} style={[typography.body, { color: RECAP_COLORS.dim, alignSelf: "stretch", textAlign: "center" }]}>{subtitle}</Text>
         </View>}
-        <Text {...dynamicType} style={[summary ? styles.summaryNumbers : styles.number, { fontFamily: SERIF }]}>{recapNumber(card)}</Text>
+        {numbers}
       </View>
       {sharing ? <View style={styles.strip}>
         {url ? <View style={styles.qr}><QRCode value={url} size={72} quietZone={4} backgroundColor="white" color="black" /></View> : null}
@@ -116,6 +118,7 @@ const styles = StyleSheet.create({
   title: { color: RECAP_COLORS.text, fontSize: 28, textAlign: "center", alignSelf: "stretch" },
   number: { color: RECAP_COLORS.gold, fontSize: 22, textAlign: "center", alignSelf: "stretch" },
   summaryNumbers: { color: RECAP_COLORS.text, fontSize: 28, textAlign: "center", alignSelf: "stretch" },
+  numbersPress: { alignSelf: "stretch" },
   hint: { color: RECAP_COLORS.dim, textAlign: "center", alignSelf: "stretch", paddingHorizontal: minimumTouchTarget },
   strip: { flexDirection: "row", alignItems: "center", gap: spacing.lg, paddingTop: spacing.lg, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: RECAP_COLORS.border },
   qr: { padding: spacing.xs, backgroundColor: "white", borderRadius: radii.sm },
