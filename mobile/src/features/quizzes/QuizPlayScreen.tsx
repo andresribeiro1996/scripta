@@ -90,7 +90,7 @@ export function QuizPlayScreen({ code }: { code: string }) {
 
   return <Screen bottom top={false} style={styles.screen}>
     {leaveDialog}
-    <Stack.Screen options={{ headerShown: true, title: stage === "played" ? "" : board.data?.name ?? "Quiz" }} />
+    <Stack.Screen options={{ headerShown: true, title: board.data?.name ?? "Quiz" }} />
     {error ? <Toast visible message={error} tone="error" /> : null}
     {stage === "loading" || board.isPending ? <Screen bottom style={styles.screen}><Skeleton height={180} /></Screen>
     : stage === "unavailable" ? <ErrorState title="No quiz at that link" body="Check the code and try again." actionLabel={isPermanentError(board.error) ? "Go to Atmyshelf" : "Retry"} onAction={isPermanentError(board.error) ? () => router.replace("/") : () => void board.refetch()} />
@@ -184,8 +184,6 @@ function EndScreen({ code, board, result, tab, setTab, onError }: {
   return <View style={styles.end}>
     <View style={styles.hero}>
       <View style={styles.heroText}>
-        <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Your results</Text>
-        <Text {...dynamicType} numberOfLines={2} style={[typography.heading, { color: colors.text }]}>{board.name}</Text>
         <Text {...dynamicType} display={false} maxFontSizeMultiplier={1.2} accessibilityLabel={`${result.score} of ${board.questionCount} correct`} style={[styles.score, { color: colors.text }]}>
           {result.score}<Text style={[styles.scoreOutOf, { color: colors.textDim }]}> / {board.questionCount}</Text>
         </Text>
