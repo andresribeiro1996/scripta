@@ -2,6 +2,7 @@ import { AccountActionPage } from "./pages/AccountActionPage";
 import { DailyChapterPage } from "./pages/DailyChapterPage";
 import { AdminDailyChapterPage } from "./pages/AdminDailyChapterPage";
 import { HomePage } from "./pages/HomePage";
+import { SavedPage } from "./pages/SavedPage";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { RequireAuth } from "./auth/RequireAuth";
 import { RequireUsername } from "./auth/RequireUsername";
@@ -79,6 +80,7 @@ export function App() {
               <Route path="/book/:key" element={<BookKeyPage />} />
               <Route path="/work/:id/characters" element={<CharacterGamePage />} />
               <Route path="/dashboard" element={<HomePage />} />
+              <Route path="/dashboard/saved" element={<SavedPage />} />
               <Route path="/dashboard/library" element={<LibraryPage />} />
               <Route path="/dashboard/series" element={<SeriesPage />} />
               <Route path="/dashboard/collections" element={<CollectionsPage />} />

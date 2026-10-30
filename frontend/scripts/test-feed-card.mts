@@ -6,9 +6,10 @@ import { renderToString } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { digestTarget, type DashboardFeedPage, type DigestItem } from "@scripta/shared";
-import { feedEventLabel } from "@scripta/shared/community";
+import { feedEventLabel, type ActivityEngagement } from "@scripta/shared/community";
 import { FeedCard } from "../src/components/home/FeedCard";
 import { ForYouPanel } from "../src/components/home/ForYouPanel";
+import type { FeedActions } from "../src/hooks/useFeedActions";
 
 const actor = { userId: "u1", username: "alice", avatarUrl: null };
 const createdAt = "2026-10-14T10:00:00.000Z";
@@ -23,7 +24,13 @@ const followedMe: DigestItem = { kind: "follow", id: "f1", actor, viewerFollows:
 const followedMeAlreadyFollowing: DigestItem = { kind: "follow", id: "f2", actor: { userId: "u2", username: "bob", avatarUrl: null }, viewerFollows: true, createdAt };
 const playedMyQuiz: DigestItem = { kind: "participation", id: "quiz:q", game: { kind: "quiz", id: "q", name: "Guess the classic", covers: [] }, actors: [actor], count: 1, createdAt };
 
-const card = (item: DigestItem) => renderToString(createElement(MemoryRouter, null, createElement(FeedCard, { item })));
+const piranesiOnShelf = { Title: "Piranesi", Attribution: "Susanna Clarke", ISBN: "" };
+
+function card(item: DigestItem, opts: { engagement?: Record<string, ActivityEngagement>; saved?: string[]; library?: Array<Record<string, unknown>> } = {}) {
+  const noop = () => {};
+  const actions: FeedActions = { engagement: opts.engagement ?? {}, saved: new Set(opts.saved ?? []), savedReady: true, busy: { like: false, save: false, want: false }, like: noop, save: noop, wantToRead: noop, share: noop };
+  return renderToString(createElement(MemoryRouter, null, createElement(FeedCard, { item, actions, books: opts.library ?? [], works: undefined })));
+}
 
 function forYou(items: DigestItem[], page: Partial<DashboardFeedPage>) {
   const client = new QueryClient();
@@ -88,4 +95,47 @@ test("For you follow back refreshes the circle, and a failed refresh or page wit
   assert.match(src, /queryKey: \["community", "dashboard", "circle"\]/);
   assert.match(src, /feed\.isError && items\.length > 0/);
   assert.match(src, /Couldn't refresh activity\./);
+});
+
+test("the footer: like with its count and pressed state, comments with count, share", () => {
+  const html = card(finishedReading, { engagement: { [finishedReading.id]: { likes: 2, liked: true, comments: 1 } } });
+  assert.match(html, /<button(?=(?:=>|[^>])*aria-pressed="true")(?=(?:=>|[^>])*aria-label="Like, 2 likes")(?:=>|[^>])*>/);
+  assert.match(html, /<button(?=(?:=>|[^>])*aria-label="Comments, 1")(?:=>|[^>])*>/);
+  assert.match(html, /<button(?:=>|[^>])*>[\s\S]*?Share<\/button>/);
+});
+
+test("Save only where the backend can save: on a game card, never on a book card", () => {
+  assert.match(card(publishedTournament), /<button(?=(?:=>|[^>])*aria-label="Save")(?=(?:=>|[^>])*aria-pressed="false")(?:=>|[^>])*>/);
+  assert.match(card(publishedTournament, { saved: ["tournament:g1"] }), /<button(?=(?:=>|[^>])*aria-label="Save")(?=(?:=>|[^>])*aria-pressed="true")(?:=>|[^>])*>/);
+  assert.doesNotMatch(card(finishedReading), /aria-label="Save"/);
+});
+
+test("a book card offers Want to read, or Open in your shelf when you hold the book", () => {
+  assert.match(card(finishedReading), /<button(?:=>|[^>])*>Want to read<\/button>/);
+  assert.match(card(finishedReading, { library: [piranesiOnShelf] }), /Open in your shelf/);
+  assert.doesNotMatch(card(finishedReading, { library: [piranesiOnShelf] }), /Want to read/);
+});
+
+test("a saved card has no like or comment buttons", () => {
+  const html = card({ ...publishedTournament, id: `saved:${publishedTournament.id}` });
+  assert.doesNotMatch(html, /aria-label="Like/);
+  assert.doesNotMatch(html, /aria-label="Comments/);
+});
+
+test("actions keep the app's limits and paths", () => {
+  const hook = readFileSync(new URL("../src/hooks/useFeedActions.ts", import.meta.url), "utf8");
+  assert.match(hook, /staleTime: 30_000/);
+  assert.match(hook, /50/);
+  assert.match(hook, /hasActivityThread\(/);
+  assert.match(hook, /toRecommendation\(/);
+  assert.match(hook, /preserveExisting: true/);
+  assert.match(hook, /navigator\.share/);
+  assert.match(hook, /\["community", ?"saved", ?"list"\]/);
+  assert.match(readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8"), /path="\/dashboard\/saved"/);
+});
+
+test("Home links to Saved from its header", () => {
+  const home = readFileSync(new URL("../src/pages/HomePage.tsx", import.meta.url), "utf8");
+  assert.match(home, /aria-label="Saved"/);
+  assert.match(home, /to="\/dashboard\/saved"/);
 });

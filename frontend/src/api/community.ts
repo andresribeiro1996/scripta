@@ -19,4 +19,9 @@ export const {
   unpublishProfile,
   fetchOwnProfile,
   setShelfMural,
+  likeActivity,
+  fetchActivityEngagement,
+  saveContent,
+  fetchSavedState,
+  fetchSavedContent,
 } = createCommunityApi(request);

@@ -51,3 +51,7 @@ test("back links go to the tab the item belongs to", () => {
   assert.deepEqual(backTo("book"), { to: "/dashboard/library", label: "Library" });
   assert.deepEqual(backTo("profile"), { to: "/community/discover", label: "Community" });
 });
+
+test("the Saved page belongs to Home", () => {
+  assert.equal(areaIdForPath("/dashboard/saved"), "home");
+});
