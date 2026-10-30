@@ -10,7 +10,7 @@ import { AuthorAvatar, openProfile } from "./AuthorAvatar";
 import { ReaderGlyph } from "./ReaderGlyph";
 import { GameTicketArt } from "./GameTicketArt";
 
-export function DiscoverRow({ item, linkAuthor, stats, onPreviewBooks, onOpen }: { item: DiscoverItem; linkAuthor: boolean; stats?: Array<{ value: number; label: string }>; onPreviewBooks?: (tournament: { id: string; name: string }) => void; onOpen?: () => void }) {
+export function DiscoverRow({ item, linkAuthor, stats, onPreviewBooks, onOpen }: { item: DiscoverItem; linkAuthor: boolean; stats?: Array<{ value: number; label: string }>; onPreviewBooks?: (tournament: { id: string; name: string; character: boolean }) => void; onOpen?: () => void }) {
   const { colors } = useTheme();
   const { content, author } = item;
   const status = contentStatus(content);
@@ -50,7 +50,7 @@ export function DiscoverRow({ item, linkAuthor, stats, onPreviewBooks, onOpen }:
       }
       badges={status.votedBadge ? [status, { label: "Voted", tone: "info" }] : [status]}
       stats={stats ?? contentStats(content)}
-      seeBooks={content.kind === "tournament" && onPreviewBooks ? { text: `See ${itemNoun(content.subject, 2)}`, label: `See all ${content.bookCount} ${itemNoun(content.subject, content.bookCount)} in ${content.name}`, onPress: () => onPreviewBooks({ id: content.id, name: content.name }) } : undefined}
+      seeBooks={content.kind === "tournament" && onPreviewBooks ? { text: `See ${itemNoun(content.subject, 2)}`, label: `See all ${content.bookCount} ${itemNoun(content.subject, content.bookCount)} in ${content.name}`, onPress: () => onPreviewBooks({ id: content.id, name: content.name, character: content.subject?.kind === "characters" }) } : undefined}
     />
   );
 }
