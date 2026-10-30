@@ -41,7 +41,7 @@ export function AdminDailyChapterPage() {
     return quotes.some((q) => q.approvedAt) ? "Covered" : quotes.length ? "Editorial review pending" : "Source needed";
   };
   const locked = Boolean(data?.editions.find((item) => item.id === edition.id)?.publishedAt);
-  return <Page title="The Daily Chapter" subtitle="Book coverage, reviewed questions and the publishing calendar" tabs={area("admin").tabs}>
+  return <Page width="wide" title="The Daily Chapter" subtitle="Book coverage, reviewed questions and the publishing calendar" tabs={area("admin").tabs}>
     <div className="space-y-8">
       {error ? <p role="alert" className="text-(--color-danger)">{error}</p> : notice ? <p role="status">{notice}</p> : null}
       {editorial.isError ? <div role="alert"><p>Couldn't load the editorial bank.</p><button className={BUTTON_SECONDARY} onClick={() => void editorial.refetch()}>Retry</button></div> : null}

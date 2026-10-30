@@ -143,7 +143,7 @@ export function QuizCreatePage() {
   }
 
   return (
-    <Page title={["Choose books", "Set up questions"][step]} subtitle={`Step ${step + 1} of 2`} back={backTo("quiz")}>
+    <Page width="narrow" title={["Choose books", "Set up questions"][step]} subtitle={`Step ${step + 1} of 2`} back={backTo("quiz")}>
       <div className="mx-auto flex max-w-2xl flex-col gap-5 pb-10">
         {error && <p role="alert" className="text-sm text-(--color-danger)">{error}</p>}
         {step === 0 && (

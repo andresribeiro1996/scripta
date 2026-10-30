@@ -147,7 +147,7 @@ export function MuralsListPage() {
   const movingFolder = movingFolderId ? folders.find((f) => f.id === movingFolderId) : null;
 
   return (
-    <Page title="Murals" actions={<button onClick={handleCreate} className={BUTTON_PRIMARY}>New mural</button>}>
+    <Page width="wide" title="Murals" actions={<button onClick={handleCreate} className={BUTTON_PRIMARY}>New mural</button>}>
       <button onClick={() => setPresetsOpen(true)} className="mb-4 flex min-h-11 w-full items-center justify-between rounded-xl border border-(--color-border) bg-(--color-surface) px-4 text-left text-sm font-semibold hover:bg-(--color-surface-hover)">
         <span>Start from a preset</span><span aria-hidden="true">→</span>
       </button>

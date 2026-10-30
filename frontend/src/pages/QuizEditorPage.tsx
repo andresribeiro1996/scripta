@@ -96,10 +96,10 @@ export function QuizEditorPage() {
     }
   }
 
-  if (isLoading) return <Page title="Quiz" back={backTo("quiz")}><p className="text-(--color-text-dim)">Loading…</p></Page>;
+  if (isLoading) return <Page width="narrow" title="Quiz" back={backTo("quiz")}><p className="text-(--color-text-dim)">Loading…</p></Page>;
   if (!quiz) {
     return (
-      <Page title="Quiz" back={backTo("quiz")}>
+      <Page width="narrow" title="Quiz" back={backTo("quiz")}>
         <p className="text-(--color-text-dim)">No quiz with that id.</p>
       </Page>
     );
@@ -109,7 +109,7 @@ export function QuizEditorPage() {
   const shareLink = quiz.voteCode ? `${window.location.origin}/play/${quiz.voteCode}` : null;
   if (!data) {
     return (
-      <Page title={quiz.name} back={backTo("quiz")}>
+      <Page width="narrow" title={quiz.name} back={backTo("quiz")}>
         <p className="text-(--color-text-dim)">Loading…</p>
       </Page>
     );
@@ -117,6 +117,7 @@ export function QuizEditorPage() {
 
   return (
     <Page
+      width="narrow"
       title={quiz.name}
       back={backTo("quiz")}
       actions={quiz.voteCode === null ? (

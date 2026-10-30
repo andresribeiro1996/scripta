@@ -1,6 +1,5 @@
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { BrandLockup } from "../components/BrandLockup";
-import { PageWidthContext } from "../components/page/Page";
 import { DEFAULT_LIBRARY_STYLE } from "../lib/libraryStyle";
 
 const linkClass = "inline-flex min-h-11 items-center rounded-lg px-3 text-sm font-semibold text-(--color-accent) hover:underline";
@@ -15,9 +14,7 @@ export function PublicLayout({ signedIn }: { signedIn: boolean }) {
           {signedIn ? <Link to="/dashboard" className={linkClass}>Open my library</Link> : <Link to="/login" state={{ from: location }} className={linkClass}>Log in</Link>}
         </div>
       </div>
-      <PageWidthContext.Provider value={DEFAULT_LIBRARY_STYLE.contentMaxWidth}>
-        <main><Outlet /></main>
-      </PageWidthContext.Provider>
+      <main><Outlet /></main>
     </div>
   );
 }

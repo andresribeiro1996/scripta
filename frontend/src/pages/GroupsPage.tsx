@@ -336,6 +336,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
 
   return (
     <Page
+      width="wide"
       title="Library"
       subtitle={isLoading ? undefined : `${allGroups.length} ${allGroups.length === 1 ? copy.noun : copy.plural}`}
       tabs={area("library").tabs}

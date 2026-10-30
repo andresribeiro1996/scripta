@@ -40,7 +40,7 @@ export function TierListCreatePage() {
     }
   }
 
-  return <Page title={["Choose books", "Set up tiers", "Publish settings"][step]} subtitle={`Step ${step + 1} of 3`} back={backTo("tierlist")}>
+  return <Page width="narrow" title={["Choose books", "Set up tiers", "Publish settings"][step]} subtitle={`Step ${step + 1} of 3`} back={backTo("tierlist")}>
     <div className="mx-auto flex max-w-2xl flex-col gap-5 pb-10">
       {error && <p role="alert" className="text-sm text-(--color-danger)">{error}</p>}
       {step === 0 && <>

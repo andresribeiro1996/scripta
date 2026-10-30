@@ -321,6 +321,7 @@ export function LibraryPage() {
 
   return (
     <Page
+      width="wide"
       title="Library"
       subtitle={
         <>

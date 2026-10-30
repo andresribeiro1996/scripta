@@ -100,6 +100,7 @@ export function ArenaListPage() {
 
   return (
     <Page
+      width="wide"
       title="Games"
       tabs={area("games").tabs}
       actions={

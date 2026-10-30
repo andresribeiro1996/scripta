@@ -25,7 +25,7 @@ export function AdminGenresPage() {
   else if (review.data) body = <GenreReviewList review={review.data} onDecide={(workId, action) => decideGenre(client, workId, action)} />;
   else if (review.isError) body = <p role="alert" className="mt-4 text-sm text-(--color-danger)">The review list didn't load.</p>;
   return (
-    <Page title="Admin" subtitle="Genre review" tabs={area("admin").tabs}>
+    <Page width="wide" title="Admin" subtitle="Genre review" tabs={area("admin").tabs}>
       {body}
     </Page>
   );

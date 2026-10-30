@@ -18,7 +18,7 @@ import { storePlayId, useQuizPlay } from "../hooks/useQuizPlay";
 
 function InfoScreen({ message }: { message: string }) {
   return (
-    <Page title="Quiz">
+    <Page width="narrow" title="Quiz">
       <p className="text-sm text-(--color-text-dim)">{message}</p>
     </Page>
   );
@@ -90,7 +90,7 @@ export function PlayQuizPage() {
   if (stage === "loading") return <InfoScreen message="Loading…" />;
   if (stage === "leaderboard") {
     return (
-      <Page title={playBoard.name}>
+      <Page width="narrow" title={playBoard.name}>
         <div className="mx-auto flex max-w-xl flex-col gap-6">
           <p className="text-center text-(--color-text-dim)">This quiz is closed.</p>
           <QuizLeaderboard code={code ?? ""} />
@@ -137,7 +137,7 @@ export function PlayQuizPage() {
   const answeredCount = Object.keys(answers).length;
 
   return (
-    <Page title={playBoard.name} subtitle={`${index + 1}/${questions.length} · ${Math.floor(elapsed / 1000)}s`}>
+    <Page width="narrow" title={playBoard.name} subtitle={`${index + 1}/${questions.length} · ${Math.floor(elapsed / 1000)}s`}>
       <div className="mx-auto flex max-w-xl flex-col gap-5">
         <div className="h-1 rounded bg-(--color-border)">
           <div className="h-1 rounded bg-(--color-accent) transition-all" style={{ width: `${Math.round((answeredCount / questions.length) * 100)}%` }} />

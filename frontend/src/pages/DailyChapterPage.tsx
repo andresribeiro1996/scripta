@@ -23,7 +23,7 @@ export function DailyChapterPage() {
   const daily = useQuery({ queryKey: ["daily-chapter", "today"], queryFn: dailyChapterApi.today, refetchInterval: 60_000 });
   const history = useQuery({ queryKey: ["daily-chapter", "history", session?.user.id ?? "guest", identity.id, daily.data?.date], queryFn: () => dailyChapterApi.history(identity.id!, Boolean(session)), enabled: Boolean(identity.id && daily.data?.date) });
   const result = history.data?.results.find((item) => item.editionId === daily.data?.board?.id);
-  return <Page title="The Daily Chapter" subtitle="One theme. Five questions. A little discovery, every day." maxWidth={760}>
+  return <Page width="narrow" title="The Daily Chapter" subtitle="One theme. Five questions. A little discovery, every day.">
     <div className="space-y-8">
       <p className="text-sm text-(--color-text-dim)">A shared edition for everyone. A new chapter opens at 00:00 UTC.</p>
       {identity.error ? <div role="alert"><p>{identity.error}</p><button className={BUTTON_SECONDARY} onClick={() => setIdentity(loadIdentity())}>Retry storage</button></div> : daily.isError || history.isError ? <div role="alert"><p>Couldn't load your chapter or saved results.</p><button className={BUTTON_SECONDARY} onClick={() => { void daily.refetch(); void history.refetch(); }}>Retry</button></div> : daily.isPending || history.isPending ? <p role="status">Opening your chapter…</p> : daily.data.board ? <DailyGame key={daily.data.board.id + ":" + (session?.user.id ?? identity.id)} board={daily.data.board} guestId={identity.id!} playerId={session?.user.id ?? identity.id!} result={result} /> : <p>Another chapter is on its way. Check back soon.</p>}

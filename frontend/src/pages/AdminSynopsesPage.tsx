@@ -24,7 +24,7 @@ export function AdminSynopsesPage() {
   else if (review.data) body = <SynopsisReviewList review={review.data} onDecide={decide} />;
   else if (review.isError) body = <p role="alert" className="mt-4 text-sm text-(--color-danger)">The review list didn't load.</p>;
   return (
-    <Page title="Admin" subtitle="Synopsis review" tabs={area("admin").tabs}>
+    <Page width="wide" title="Admin" subtitle="Synopsis review" tabs={area("admin").tabs}>
       {body}
     </Page>
   );
