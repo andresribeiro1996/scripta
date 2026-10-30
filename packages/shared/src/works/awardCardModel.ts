@@ -1,4 +1,7 @@
-import { PRIZES, bookKey, isPrizeKey, type AwardAnnouncement, type LibraryDocument } from "@scripta/shared";
+import { bookKey } from "../library/merge.js";
+import type { LibraryDocument } from "../library/types.js";
+import { PRIZES, isPrizeKey } from "./awards.js";
+import type { AwardAnnouncement } from "./types.js";
 
 export type AwardCardModel = {
   key: string;

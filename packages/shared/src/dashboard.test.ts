@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { DigestItem, ParticipationItem } from "./dashboard.js";
-import { CIRCLE_DIGEST_KINDS, PERSONAL_DIGEST_KINDS, clearDashboardCounts, dashboardQuery, digestAction, digestHeading, digestTarget, isNewDigestItem, newCountLabel, participationLead, upNextPair, withKnownDigestItems } from "./dashboard.js";
+import { CIRCLE_DIGEST_KINDS, PERSONAL_DIGEST_KINDS, clearDashboardCounts, dashboardQuery, digestAction, digestHeading, digestTarget, isNewDigestItem, newCountLabel, participationLead, withKnownDigestItems } from "./dashboard.js";
 
 const actor = { userId: "u1", username: "alice", avatarUrl: null };
 const tierlist = { kind: "tierlist" as const, id: "t1", voteCode: "abc", name: "Fantasy doorstoppers", poolSize: 5, ballotCount: 1, votingOpen: true, promotedAt: null, covers: [] };
@@ -108,30 +108,6 @@ test("Home and Activity ask for disjoint kinds that together cover every kind th
   assert.deepEqual([...CIRCLE_DIGEST_KINDS, ...PERSONAL_DIGEST_KINDS].sort(), [...all].sort());
   assert.equal(dashboardQuery(undefined, PERSONAL_DIGEST_KINDS), "?kinds=follow,participation,completion");
   assert.equal(dashboardQuery("a b", CIRCLE_DIGEST_KINDS), "?kinds=publication,vote,reading,mural,started&cursor=a%20b");
-});
-
-test("two keys pairs both, at any offset", () => {
-  const keys = ["a", "b"];
-  assert.deepEqual(upNextPair(keys, 0), ["a", "b"]);
-  assert.deepEqual(upNextPair(keys, 1), ["b", "a"]);
-});
-
-test("six keys step through three pairs then wrap to the first", () => {
-  const keys = ["k0", "k1", "k2", "k3", "k4", "k5"];
-  assert.deepEqual(upNextPair(keys, 0), ["k0", "k1"]);
-  assert.deepEqual(upNextPair(keys, 2), ["k2", "k3"]);
-  assert.deepEqual(upNextPair(keys, 4), ["k4", "k5"]);
-  assert.deepEqual(upNextPair(keys, 6), ["k0", "k1"]);
-});
-
-test("an odd count wraps mid-pair", () => {
-  const keys = ["k0", "k1", "k2", "k3", "k4"];
-  assert.deepEqual(upNextPair(keys, 4), ["k4", "k0"]);
-});
-
-test("fewer than two keys yields no pair", () => {
-  assert.deepEqual(upNextPair(["only"], 0), []);
-  assert.deepEqual(upNextPair([], 0), []);
 });
 
 test("a reading item with a work opens the work page, without one the reader's profile", () => {

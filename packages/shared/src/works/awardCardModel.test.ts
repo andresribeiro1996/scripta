@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { AwardAnnouncement, AwardWinner, LibraryDocument } from "@scripta/shared";
+import type { LibraryDocument } from "../library/types.js";
+import type { AwardAnnouncement, AwardWinner } from "./types.js";
 import { awardCardModel, firstUndismissed } from "./awardCardModel.js";
 
 const winner = (workId: string, title = "Wolf Hall", author = "Hilary Mantel"): AwardWinner => ({ workId, title, author, coverUrl: `https://covers.test/${workId}.jpg` });

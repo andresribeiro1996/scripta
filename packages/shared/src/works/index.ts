@@ -9,3 +9,4 @@ export * from "./workGenres.js";
 export * from "./genreReview.js";
 export * from "./synopsisReview.js";
 export * from "./translationReview.js";
+export * from "./awardCardModel.js";

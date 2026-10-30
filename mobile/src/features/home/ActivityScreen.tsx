@@ -4,13 +4,12 @@ import { Stack, useFocusEffect, useRouter } from "expo-router";
 import { useIsFocused } from "expo-router/react-navigation";
 import { useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { clearDashboardCounts, isNewDigestItem, type DashboardFeedPage } from "@scripta/shared";
+import { isPersonalItem, shouldMarkFeedSeen } from "@scripta/shared/community";
 import { EmptyState, ErrorState, Screen, Skeleton, Toast, spacing } from "../../ui";
 import { markDashboardSeen } from "../community/api";
 import { ActivityRow } from "./ActivityRow";
-import { isPersonalItem } from "./activityModel";
 import { ACTIVITY_QUERY_KEY, useActivityFeed, useFollowBack, useSkipEmptyPages } from "./FeedRow";
 import { digestRoute } from "./feedRowModel";
-import { shouldMarkFeedSeen } from "./homeModel";
 
 const ACTIVITY_VIEWABILITY = { itemVisiblePercentThreshold: 50 };
 

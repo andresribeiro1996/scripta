@@ -1,14 +1,12 @@
 import { Share } from "react-native";
 import { useMutation, useQueries, useQueryClient } from "@tanstack/react-query";
-import { savedContentRef, saveFailureMessage, type DigestItem } from "@scripta/shared";
+import { savedContentRef, saveFailureMessage, toRecommendation, type DigestItem } from "@scripta/shared";
 import { useAuth } from "../../core/auth";
 import { fetchActivityEngagement, fetchSavedState, likeActivity, saveContent } from "../community/api";
 import { addBookToLibrary } from "../library/api/client";
 import { LIBRARY_QUERY_KEY, useLibrary } from "../library/hooks/useLibrary";
-import { toRecommendation } from "../library/lib/recommendation";
 import { publicContentUrl } from "../sharing/links";
-import { feedRowModel, feedShareTarget, hasActivityThread } from "./feedRowModel";
-import type { ActivityEngagement } from "@scripta/shared/community";
+import { feedRowModel, feedShareTarget, hasActivityThread, type ActivityEngagement } from "@scripta/shared/community";
 
 export const ENGAGEMENT_QUERY_KEY = ["community", "engagement"] as const;
 export const SAVED_STATE_QUERY_KEY = ["community", "saved-state"] as const;

@@ -1,165 +1,128 @@
-import { DailyChapterCard } from "../components/dailyChapter/DailyChapterCard";
-import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { useQueryClient, type InfiniteData } from "@tanstack/react-query";
-import { bookKey, buildDashboardCards, clearDashboardCounts, digestAction, digestHeading, digestTarget, isNewDigestItem, localDay, newCountLabel, resolveQuote, type DashboardFeedPage } from "@scripta/shared";
-import { markDashboardSeen } from "../api/community";
-import { DASHBOARD_QUERY_KEY, useDashboard } from "../hooks/useDashboard";
-import { useLibrary } from "../hooks/useLibrary";
+import { useEffect } from "react";
+import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { fetchDiscover } from "../api/community";
+import { fetchTopShelf } from "../api/topShelf";
+import { fetchRecentAwards } from "../api/works";
 import { useAuth } from "../auth/AuthContext";
+import { DailyChapterCard } from "../components/dailyChapter/DailyChapterCard";
+import { EmptyState } from "../components/EmptyState";
+import { CommunityIcon } from "../components/NavIcons";
+import { DiscoverTicket } from "../components/games/DiscoverTicket";
+import { AwardsCard } from "../components/home/AwardsCard";
+import { FeedCard } from "../components/home/FeedCard";
+import { ForYouPanel } from "../components/home/ForYouPanel";
+import { ReadingStrip } from "../components/home/ReadingStrip";
+import { SuggestedReaders } from "../components/home/SuggestedReaders";
 import { Page } from "../components/page/Page";
 import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../components/page/buttonClasses";
-import { BookGrid } from "../components/BookGrid";
-import { BookCard } from "../components/BookCard";
-import { AuthorAvatar } from "../components/CommunityAuthorAvatar";
-import { PickNextSheet } from "../components/PickNextSheet";
-import { ReaderGlyph } from "../components/ReaderGlyph";
-import { resolveLibraryStyle } from "../lib/libraryStyle";
-import { bookHref } from "../lib/libraryView";
+import { SECTION_HEADING } from "../components/page/surfaceClasses";
+import { toolbarIconClass } from "../components/Toolbar";
+import { useCircleFeed } from "../hooks/useDashboard";
+import { useFeedActions } from "../hooks/useFeedActions";
+import { useLibrary } from "../hooks/useLibrary";
+import { homeGames } from "../lib/homeGames";
+
+const SECTION_LINK = "inline-flex min-h-11 shrink-0 items-center font-semibold text-(--color-accent)";
+const GROUP_LABEL = "mb-3 font-semibold text-(--color-text-dim)";
 
 export function HomePage() {
-  const navigate = useNavigate();
   const { session } = useAuth();
-  const queryClient = useQueryClient();
-  const dashboard = useDashboard();
   const library = useLibrary();
-  const [day] = useState(localDay);
-  const [picking, setPicking] = useState(false);
-  const [activity, setActivity] = useState<HTMLElement | null>(null);
-  const markedRef = useRef(false);
-  const { fetchNextPage } = dashboard;
-  const skippingEmptyPage = dashboard.items.length === 0 && dashboard.hasNextPage && !dashboard.isFetchNextPageError;
-  const loadingActivity = dashboard.isLoading || skippingEmptyPage;
-  const settled = !loadingActivity && !dashboard.error && !dashboard.isFetching;
-  const newLabel = newCountLabel(dashboard.personalNewCount);
-
-  useEffect(() => {
-    if (skippingEmptyPage && !dashboard.isFetching) void fetchNextPage();
-  }, [skippingEmptyPage, dashboard.isFetching, fetchNextPage]);
-
-  useEffect(() => {
-    if (!activity || !settled) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (markedRef.current || !entries.some((entry) => entry.isIntersecting)) return;
-        markedRef.current = true;
-        void markDashboardSeen().then(
-          () => queryClient.setQueryData<InfiniteData<DashboardFeedPage>>(DASHBOARD_QUERY_KEY, (data) => data && clearDashboardCounts(data)),
-          () => { markedRef.current = false; }
-        );
-      },
-      { rootMargin: "0px 0px -25% 0px" }
-    );
-    observer.observe(activity);
-    return () => observer.disconnect();
-  }, [activity, settled, queryClient]);
-
+  const circle = useCircleFeed();
+  const shelf = useQuery({ queryKey: ["topShelf", "month", null, "games"], queryFn: () => fetchTopShelf({ period: "month", genre: null, view: "games" }), staleTime: 30_000, retry: 1 });
+  const awards = useQuery({ queryKey: ["recentAwards"], queryFn: fetchRecentAwards, staleTime: 30_000, retry: 1 });
+  const viewerId = session?.user.id ?? "";
+  const popular = shelf.data?.games ?? [];
+  const settled = !circle.isLoading && !shelf.isPending;
+  const picked = homeGames({ circle: circle.items, popular, newest: [], viewerId });
+  const needsNewest = settled && picked.followed.length === 0 && picked.others.length === 0;
+  const newest = useQuery({ queryKey: ["community", "discover", "home"], queryFn: () => fetchDiscover("all", "", 0), enabled: needsNewest, staleTime: 30_000, retry: 1 });
+  const games = needsNewest ? homeGames({ circle: circle.items, popular, newest: newest.data?.items ?? [], viewerId }) : picked;
+  const loadingGames = !settled || newest.isLoading;
+  const noGames = games.followed.length === 0 && games.others.length === 0;
+  const gamesFailed = noGames && (circle.isError || shelf.isError || newest.isError);
   const books = library.data?.data.books ?? [];
-  const style = resolveLibraryStyle(library.data?.data.style);
-  const byKey = new Map(books.map((book) => [bookKey(book), book] as const));
-  const cards = session ? buildDashboardCards(books, day, session.user.id) : [];
-  const upNextKeys = cards.find((c) => c.kind === "upNext")?.bookKeys ?? [];
+  const reading = books.filter((book) => book.ReadStatus === 1);
+  const circleItems = circle.items;
+  const actions = useFeedActions(circleItems);
+  const { fetchNextPage } = circle;
+  const circleLoading = circle.isLoading || (circleItems.length === 0 && circle.hasNextPage === true && !circle.isError);
 
-  return <Page title="Home" actions={<>
-      <Link className={BUTTON_SECONDARY} to="/community/people">Find people</Link>
-      <Link className={BUTTON_SECONDARY} to="/community/discover">Discover</Link>
-    </>}>
-    <div className="mb-6"><DailyChapterCard /></div>
-    <div className="space-y-5">
-      {library.isPending ? <p role="status">Loading home…</p> : library.isError ? <div role="alert"><p>Couldn't load your home.</p><button className={BUTTON_SECONDARY} onClick={() => { void dashboard.refetch(); void library.refetch(); }}>Retry</button></div> : <>
-        {!books.length ? <div className="space-y-3 rounded-xl border border-(--color-border) p-6"><h2 className="text-xl">Start your library</h2><p>Import your existing collection, or add your first book manually.</p><div className="flex flex-wrap gap-2"><Link className={BUTTON_PRIMARY} to="/dashboard/library?action=import">Import library</Link><Link className={BUTTON_SECONDARY} to="/dashboard/library?action=add">Add a book</Link></div></div>
-          : cards.map((card) => {
-            if (card.kind === "currentlyReading" || card.kind === "upNext") {
-              const section = card.kind === "currentlyReading" ? card.bookKeys : card.bookKeys.slice(0, 6);
-              const sectionBooks = section.flatMap((key) => { const book = byKey.get(key); return book ? [book] : []; });
-              if (!sectionBooks.length) return null;
-              return <section key={card.kind} aria-label={card.kind === "currentlyReading" ? "Currently reading" : "Up next"} className="space-y-3">
-                <div className="flex items-baseline justify-between">
-                  <h2 className="text-xl">{card.kind === "currentlyReading" ? "Currently reading" : "Up next"}</h2>
-                  {card.kind === "upNext" && card.bookKeys.length >= 2 ? (
-                    <button type="button" className="inline-flex min-h-11 items-center text-sm text-(--color-text-dim) hover:text-(--color-accent)" onClick={() => setPicking(true)}>Can't choose?</button>
-                  ) : null}
-                </div>
-                <BookGrid style={style}>
-                  {sectionBooks.map((book) => <BookCard key={bookKey(book)} book={book} onClick={() => navigate(bookHref(bookKey(book), library.data?.works))} style={style} />)}
-                </BookGrid>
-              </section>;
-            }
-            const quote = resolveQuote({ type: "quote", bookKey: card.bookKey, highlightId: card.highlightId } as never, books);
-            if (!quote) return null;
-            return <section key="rediscover" aria-label="Rediscover" className="space-y-3">
-              <h2 className="text-xl">Rediscover</h2>
-              <blockquote className="space-y-2 rounded-xl border border-(--color-border) bg-(--color-surface) p-4">
-                <p>{String(quote.highlight.Text ?? "")}</p>
-                <footer className="text-sm text-(--color-text-dim)">{String(quote.book.Title ?? "")}{quote.book.Attribution ? ` — ${String(quote.book.Attribution)}` : ""}</footer>
-              </blockquote>
-            </section>;
-          })}
-        <section ref={setActivity} aria-label="Activity" className="space-y-3">
-          <h2 className="text-xl">Activity</h2>
-          {newLabel ? <p className="text-sm font-semibold text-(--color-accent)">{newLabel} new for you</p> : null}
-          {loadingActivity ? <p role="status">Loading activity…</p> : dashboard.error && dashboard.items.length === 0 ? (
-            <div role="alert"><p>Couldn't load activity.</p><button className={BUTTON_SECONDARY} onClick={() => void dashboard.refetch()}>Retry</button></div>
-          ) : dashboard.items.length === 0 ? <p className="text-sm text-(--color-text-dim)">Nothing here yet. Follow people to see what they publish.</p> : (
-            <>
-              {dashboard.isRefetchError && !dashboard.isRefetching ? <p role="alert" className="text-sm text-(--color-danger)">Couldn't refresh activity.</p> : null}
-              <div className="space-y-3">
-                {dashboard.items.map((item) => (
-                  <div key={`${item.kind}:${item.id}`} className="rounded-xl border border-(--color-border) bg-(--color-surface) p-4">
-                    <Link to={digestTarget(item)} className="flex min-h-11 items-center gap-2">
-                      {item.kind === "participation" ? (
-                        <>
-                          {item.actors.length > 0 && (
-                            <span className="flex shrink-0 -space-x-1">
-                              {item.actors.map((actor) => (
-                                <span key={actor.userId} className="rounded-full ring-2 ring-(--color-surface)">
-                                  <AuthorAvatar author={actor} />
-                                </span>
-                              ))}
-                            </span>
-                          )}
-                          <span className="text-sm font-semibold">{digestHeading(item)}</span>
-                        </>
-                      ) : item.kind === "completion" ? (
-                        <>
-                          <AuthorAvatar author={item.actor} />
-                          <span className="text-sm font-semibold">{digestHeading(item)}</span>
-                        </>
-                      ) : (
-                        <>
-                          <AuthorAvatar author={item.actor} />
-                          <span>
-                            <span className="block text-sm font-semibold">
-                              <span className="inline-flex items-center gap-1">
-                                {item.actor.username}
-                                <ReaderGlyph identity={item.actor.readerGlyph} />
-                              </span>{" "}
-                              {digestAction(item)}
-                            </span>
-                            {item.kind === "publication" ? <span className="block text-sm text-(--color-text-dim)">{item.content.name}</span> : null}
-                          </span>
-                        </>
-                      )}
-                      {isNewDigestItem(item, dashboard.seenAt) ? <span className="ml-auto rounded-full bg-(--color-accent-soft) px-2 text-xs font-semibold text-(--color-accent)">New</span> : null}
-                    </Link>
-                  </div>
-                ))}
-              </div>
-              {dashboard.isFetchNextPageError && !dashboard.isFetchingNextPage ? <p role="alert" className="text-sm text-(--color-danger)">Couldn't load more.</p> : null}
-              {dashboard.hasNextPage && (
-                <button
-                  onClick={() => void dashboard.fetchNextPage()}
-                  disabled={dashboard.isFetchingNextPage}
-                  className="w-full rounded-lg border border-(--color-border) px-3 py-2 text-sm text-(--color-text-dim) hover:border-(--color-accent) disabled:opacity-50"
-                >
-                  {dashboard.isFetchingNextPage ? "Loading…" : "Load more"}
-                </button>
-              )}
-            </>
+  useEffect(() => {
+    if (circleItems.length === 0 && circle.hasNextPage && !circle.isFetchingNextPage && !circle.isError) void fetchNextPage();
+  }, [circleItems.length, circle.hasNextPage, circle.isFetchingNextPage, circle.isError, fetchNextPage]);
+
+  const saved = (
+    <Link to="/dashboard/saved" aria-label="Saved" className={toolbarIconClass()}>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 3.5h12v17l-6-4-6 4Z" /></svg>
+    </Link>
+  );
+
+  return <Page title="Home" actions={saved}>
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-10 lg:grid-cols-[minmax(0,1fr)_340px] lg:grid-rows-[auto_1fr]">
+      <div className="flex min-w-0 flex-col gap-10 lg:col-start-1 lg:row-start-1">
+        <DailyChapterCard />
+        {awards.data ? <AwardsCard announcements={awards.data.announcements} library={library.data ?? null} /> : null}
+        <section aria-labelledby="home-games">
+          <div className="mb-3.5 flex items-baseline justify-between gap-3">
+            <h2 id="home-games" className={SECTION_HEADING}>Games</h2>
+            <Link to="/community/discover" className={SECTION_LINK}>Browse all →</Link>
+          </div>
+          {loadingGames ? <p role="status">Loading games…</p> : gamesFailed ? (
+            <div role="alert" className="space-y-3">
+              <p>Couldn't load games.</p>
+              <button type="button" className={BUTTON_SECONDARY} onClick={() => { void circle.refetch(); void shelf.refetch(); void newest.refetch(); }}>Retry</button>
+            </div>
+          ) : noGames ? <p className="text-(--color-text-dim)">Nothing published yet. Games from readers show up here.</p> : (
+            <div className="space-y-6">
+              {games.followed.length > 0 ? <div>
+                <p className={GROUP_LABEL}>From people you follow</p>
+                <ul className="game-ticket-grid">{games.followed.map((item) => <DiscoverTicket key={`${item.content.kind}:${item.content.id}`} item={item} />)}</ul>
+              </div> : null}
+              {games.others.length > 0 ? <div>
+                <p className={GROUP_LABEL}>{games.othersLabel}</p>
+                <ul className="game-ticket-grid">{games.others.map((item) => <DiscoverTicket key={`${item.content.kind}:${item.content.id}`} item={item} />)}</ul>
+              </div> : null}
+            </div>
           )}
         </section>
-      </>}
-      {picking && upNextKeys.length >= 2 ? <PickNextSheet keys={upNextKeys} books={books} onClose={() => setPicking(false)} /> : null}
+      </div>
+      <div className="flex min-w-0 flex-col gap-6 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:self-start">
+        <ForYouPanel />
+        {library.isPending ? <p role="status">Loading your reading…</p> : library.isError ? (
+          <div role="alert" className="space-y-3"><p>Couldn't load your library.</p><button type="button" className={BUTTON_SECONDARY} onClick={() => void library.refetch()}>Retry</button></div>
+        ) : books.length === 0 ? (
+          <EmptyState title="Start your library" body="Import your existing collection, or add your first book manually." action={<div className="flex flex-wrap justify-center gap-2"><Link className={BUTTON_PRIMARY} to="/dashboard/library?action=import">Import library</Link><Link className={BUTTON_SECONDARY} to="/dashboard/library?action=add">Add a book</Link></div>} />
+        ) : <ReadingStrip books={reading} works={library.data?.works} />}
+        <SuggestedReaders />
+      </div>
+      <section aria-labelledby="home-circle" className="min-w-0 lg:col-start-1 lg:row-start-2">
+        <div className="mb-3.5 flex items-baseline justify-between gap-3">
+          <h2 id="home-circle" className={SECTION_HEADING}>Your reading circle</h2>
+          <Link to="/community/people" className={SECTION_LINK}>Find people →</Link>
+        </div>
+        {actions.loadError ? (
+          <div role="alert" className="mb-4 space-y-1">
+            <p>{actions.loadError}</p>
+            <button type="button" className={BUTTON_SECONDARY} onClick={actions.retryLoad}>Retry</button>
+          </div>
+        ) : null}
+        {circleItems.length > 0 ? <div className="flex flex-col gap-4">{circleItems.map((item) => <FeedCard key={`${item.kind}:${item.id}`} item={item} actions={actions} books={books} works={library.data?.works} />)}</div> : null}
+        {circleLoading ? <p role="status">Loading your reading circle…</p> : null}
+        {circle.isError ? (
+          <div role="alert" className="mt-4 space-y-3">
+            <p>Couldn't load your reading circle.</p>
+            <button type="button" className={BUTTON_SECONDARY} onClick={() => void circle.refetch()}>Retry</button>
+          </div>
+        ) : null}
+        {!circleLoading && !circle.isError && circleItems.length === 0 && circle.hasNextPage === false ? (
+          <EmptyState icon={CommunityIcon} title="Your circle starts here" body="Follow readers to see their books, games and murals." action={<Link className={BUTTON_SECONDARY} to="/community/people">Find people</Link>} />
+        ) : null}
+        {circleItems.length > 0 && circle.hasNextPage ? (
+          <div className="mt-4 flex justify-center"><button type="button" className={BUTTON_SECONDARY} disabled={circle.isFetchingNextPage} onClick={() => void circle.fetchNextPage()}>Load more</button></div>
+        ) : null}
+      </section>
     </div>
   </Page>;
 }

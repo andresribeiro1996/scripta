@@ -76,6 +76,7 @@ export function footerAreas(isAdmin: boolean): Area[] {
 export const BOTTOM_BAR_AREAS: readonly AreaId[] = ["home", "library", "murals", "games"];
 
 const PREFIXES: ReadonlyArray<[string, AreaId]> = [
+  ["/dashboard/saved", "home"],
   ["/dashboard/library", "library"],
   ["/dashboard/series", "library"],
   ["/dashboard/collections", "library"],

@@ -27,10 +27,9 @@ test("Settings' Change buttons and fields meet the 44px floor and carry labels",
   assert.match(s, /min-h-11[^"]*"\s*>\s*Change/);
 });
 
-test("Style and Cover chips and Home activity rows are 44px targets", () => {
+test("Style and Cover chips are 44px targets", () => {
   const card = src("components/BookCard");
   assert.equal(card.match(/flex min-h-11 min-w-11 items-start justify-center/g)?.length, 2);
-  assert.match(src("pages/HomePage"), /<Link to=\{digestTarget\(item\)\} className="flex min-h-11/);
 });
 
 test("the mural editor and seed page have one accent each", () => {
@@ -86,4 +85,8 @@ test("layout variables: sticky offset, scroll padding, cover shadow in both sche
   assert.equal(css.match(/--shadow-cover:/g)?.length, 2);
   assert.match(css, /@variant dark\s*\{\s*--shadow-cover:/);
   assert.match(css, /prefers-reduced-transparency:\s*reduce[\s\S]*?\[data-top-bar\]/);
+});
+
+test("Home's feed card controls are 44px targets", () => {
+  assert.match(src("components/home/FeedCard"), /min-h-11/);
 });

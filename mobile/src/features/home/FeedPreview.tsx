@@ -11,7 +11,7 @@ import { fetchProfile } from "../community/api";
 import { MuralThumbnail } from "../murals/MuralCanvas";
 import { muralPreviewOf } from "../public/adapters";
 import { themes } from "@scripta/shared/themes";
-import { feedRowModel } from "./feedRowModel";
+import { feedRowModel } from "@scripta/shared/community";
 
 export function FeedPreview({ item }: { item: DigestItem }) {
   const { colors } = useTheme();

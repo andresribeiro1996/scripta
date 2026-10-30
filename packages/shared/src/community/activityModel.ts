@@ -1,5 +1,5 @@
-import { PERSONAL_DIGEST_KINDS, participationLead, type DigestItem } from "@scripta/shared";
-import { feedEventLabel, feedPrimaryLabel } from "./feedRowModel";
+import { PERSONAL_DIGEST_KINDS, participationLead, type DigestItem } from "../dashboard.js";
+import { feedEventLabel, feedPrimaryLabel } from "./feedRowModel.js";
 
 export type PersonalItem = Extract<DigestItem, { kind: (typeof PERSONAL_DIGEST_KINDS)[number] }>;
 export type ActivityAction = { kind: "followBack" } | { kind: "following" } | { kind: "open"; label: string };

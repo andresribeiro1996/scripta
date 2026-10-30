@@ -1,4 +1,4 @@
-import type { BookRecommendationInput } from "@scripta/shared/community";
+import type { BookRecommendationInput } from "../community/types.js";
 
 export function toRecommendation(
   book: { title: string; author: string; isbn?: string | null; coverUrl?: string | null },

@@ -4,10 +4,11 @@ import { Pressable, RefreshControl, SectionList, StyleSheet, View } from "react-
 import { Stack, useFocusEffect, useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { newCountLabel, type DigestItem } from "@scripta/shared";
+import { feedRowModel } from "@scripta/shared/community";
 import { Text } from "../../ui/Text";
 import { BrandMark, EmptyState, ErrorState, HeaderActions, IconButton, Screen, Skeleton, Toast, dynamicType, minimumTouchTarget, spacing, typography, useTheme } from "../../ui";
 import { FeedRow, useActivityFeed, useDashboardFeed, useSkipEmptyPages } from "./FeedRow";
-import { digestRoute, feedRowModel } from "./feedRowModel";
+import { digestRoute } from "./feedRowModel";
 import { CommentsSheet } from "./CommentsSheet";
 import { SavedContentSheet } from "./SavedContentSheet";
 import { RecapHomeCard } from "../topShelf/RecapHomeCard";
