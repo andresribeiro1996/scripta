@@ -22,7 +22,8 @@ const works = {
   knownWorkIds: (ids: string[]) => ids,
   canonicalByKey: (ids: Map<string, string>) => new Map(ids),
   publicBooksByWork: (_ownerUserId: string, workIds: string[]) =>
-    new Map(workIds.map((id) => [id, { key: id, workId: id, title: id, author: "A", isbn: null, imageId: null, coverUrl: `https://covers.test/${id}.jpg`, readStatus: null } satisfies PublicBookData]))
+    new Map(workIds.map((id) => [id, { key: id, workId: id, title: id, author: "A", isbn: null, imageId: null, coverUrl: `https://covers.test/${id}.jpg`, readStatus: null } satisfies PublicBookData])),
+  castOf: () => undefined
 };
 
 const tiers = [{ id: "s", label: "S", color: "#c9482f", workIds: [] as string[] }];
@@ -126,4 +127,21 @@ test("participation rows carry the vote code", () => {
   const rows = source.participation("u1", "2000-01-01T00:00:00.000Z");
 
   assert.deepEqual(rows.map((row) => [row.id, row.voteCode, row.participantCount]), [[list.id, list.voteCode, 1]]);
+});
+
+test("a character list's card carries the subject label and the scope cover", () => {
+  const characters = ["a", "b", "c", "d"].map((name) => ({ id: `ch:s:hp|${name}`, name, works: 1 }));
+  const castWorks = { ...works, castOf: () => ({ scope: { kind: "series" as const, key: "s:hp", label: "Harry Potter", coverUrl: "https://covers.test/hp.jpg", workCount: 1 }, characters }) };
+  const db = new DatabaseSync(":memory:");
+  applyTierlistsMigrations(db);
+  const service = createTierlistsService(createSqliteTierlistsRepository(db), castWorks);
+  const source = createTierlistGameSource(createTierlistsPublicApi(service, castWorks));
+  const made = service.createTierlist("u1", { name: "HP characters", characters: { workId: "w1", characterIds: characters.map((c) => c.id) } });
+  assert.ok(made.ok);
+  const opened = service.openVoting("u1", made.tierlist.id, "anonymous")!;
+  const card = source.get(opened.tierlist.id)!;
+  assert.deepEqual(card.content.kind === "tierlist" && card.content.subject, { kind: "characters", label: "Harry Potter" });
+  assert.deepEqual(card.content.covers, ["https://covers.test/hp.jpg"]);
+  assert.equal(source.shelfFacts(null, null).length, 0);
+  assert.equal(source.listByOwner("u1").length, 1);
 });

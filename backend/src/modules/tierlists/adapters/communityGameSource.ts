@@ -7,7 +7,7 @@ function toCard(ref: PublishedTierlistRef): GameCard<"tierlist"> {
     ownerUserId: ref.ownerUserId,
     createdAt: ref.createdAt,
     promoted: ref.promotedAt !== null,
-    content: { kind: "tierlist", id: ref.id, voteCode: ref.voteCode, name: ref.name, poolSize: ref.poolSize, ballotCount: ref.ballotCount, votingOpen: ref.votingOpen, promotedAt: ref.promotedAt, covers: ref.covers }
+    content: { kind: "tierlist", id: ref.id, voteCode: ref.voteCode, name: ref.name, poolSize: ref.poolSize, ballotCount: ref.ballotCount, votingOpen: ref.votingOpen, promotedAt: ref.promotedAt, covers: ref.covers, ...(ref.subject ? { subject: ref.subject } : {}) }
   };
 }
 

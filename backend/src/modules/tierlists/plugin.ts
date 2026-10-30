@@ -5,7 +5,7 @@
 import fastifyMultipart from "@fastify/multipart";
 import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
-import { peekCachedCoverUrls } from "../books/index.js";
+import { getWorkCast, peekCachedCoverUrls } from "../books/index.js";
 import { canonicalByKey, knownWorkIds, resolvePublicBooksByWork } from "../library/index.js";
 import { openTierlistsDb } from "./adapters/sqlite/connection.js";
 import { createSqliteTierlistsRepository } from "./adapters/sqlite/sqliteTierlistsRepository.js";
@@ -20,7 +20,7 @@ export interface TierlistsPluginOptions {
   emitVotedOn?: EmitVotedOn;
 }
 
-export const tierlistWorks: TierlistWorks = { knownWorkIds, canonicalByKey, publicBooksByWork: resolvePublicBooksByWork };
+export const tierlistWorks: TierlistWorks = { knownWorkIds, canonicalByKey, publicBooksByWork: resolvePublicBooksByWork, castOf: getWorkCast };
 
 export async function tierlistsPlugin(app: FastifyInstance, opts: TierlistsPluginOptions = {}) {
   // --- composition: swap this one block to change storage technology ---

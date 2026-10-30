@@ -6,7 +6,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { normalizeWords, type PublicBookData, type TierDefinition } from "@scripta/shared";
+import { characterSnapshot, DEFAULT_TIER_PRESET, normalizeWords, type CharacterSubject, type PublicBookData, type TierDefinition, type WorkCast } from "@scripta/shared";
 import type { TierlistsRepository, TierlistWorks } from "./domain/ports.js";
 import { createTierlistsPublicApi, createTierlistsService, type TierlistWriteOutcome } from "./service.js";
 import type { TierlistRow, BallotRow, BallotTotals, HistogramCell, Placement } from "./domain/types.js";
@@ -16,12 +16,13 @@ function book(workId: string, patch: Partial<PublicBookData> = {}): PublicBookDa
   return { key: workId, workId, title: workId, author: "A", isbn: null, imageId: null, coverUrl: null, readStatus: null, ...patch };
 }
 
-function fakeWorks(options: { books?: PublicBookData[]; aliases?: Record<string, string> } = {}): TierlistWorks {
+function fakeWorks(options: { books?: PublicBookData[]; aliases?: Record<string, string>; casts?: Record<string, WorkCast> } = {}): TierlistWorks {
   const alias = (id: string) => options.aliases?.[id] ?? id;
   return {
     knownWorkIds: (ids) => ids.map(alias),
     canonicalByKey: (ids) => new Map([...ids].map(([key, id]) => [key, alias(id)])),
-    publicBooksByWork: (_ownerUserId, workIds) => new Map(workIds.flatMap((id) => (options.books ? options.books.filter((entry) => entry.workId === id) : [book(id)]).map((entry) => [id, entry] as const)))
+    publicBooksByWork: (_ownerUserId, workIds) => new Map(workIds.flatMap((id) => (options.books ? options.books.filter((entry) => entry.workId === id) : [book(id)]).map((entry) => [id, entry] as const))),
+    castOf: (workId) => options.casts?.[workId]
   };
 }
 
@@ -37,8 +38,8 @@ function createInMemoryRepo(): TierlistsRepository {
 
   return {
     deleteUserData() {},
-    listByUser(userId) {
-      return [...tierlists.values()].filter((t) => t.owner_user_id === userId && !t.promoted_at);
+    listByUser(userId, includeCharacters) {
+      return [...tierlists.values()].filter((t) => t.owner_user_id === userId && !t.promoted_at && (includeCharacters || !t.subject));
     },
     getOwned(id, userId) {
       const t = tierlists.get(id);
@@ -253,7 +254,7 @@ test("public creation uses one immutable resource and a book snapshot", () => {
   const data = { tiers: [{ id: "s", label: "S", color: "#c9482f", workIds: [] }], pool: ["b1"] };
   const board = created(service.createTierlist("u1", { name: "Books", data, access: "anonymous" }));
   assert.ok(board.voteCode);
-  assert.equal(service.listTierlists("u1").length, 1);
+  assert.equal(service.listTierlists("u1", false).length, 1);
   assert.equal(service.getVotingBoard(board.voteCode!)?.publicBooks?.length, 1);
   assert.equal(service.getResults(board.id).ballotCount, 0);
   assert.equal(service.updateTierlist("u1", board.id, { name: "Changed" }).ok, false);
@@ -264,7 +265,7 @@ const oneTier = [{ id: "s", label: "S", color: "#c9482f", workIds: [] as string[
 test("a create with access but no board is invalid", () => {
   const service = makeService();
   assert.deepEqual(service.createTierlist("u1", { name: "X", access: "anonymous" }), { ok: false, reason: "invalid", error: "Choose books and tiers before publishing." });
-  assert.equal(service.listTierlists("u1").length, 0);
+  assert.equal(service.listTierlists("u1", false).length, 0);
 });
 
 test("a create with two tiers sharing an id is invalid", () => {
@@ -283,19 +284,19 @@ test("a public create needs every book in the pool and no tier filled", () => {
   const error = "Public tier lists need an unranked book pool.";
   assert.deepEqual(service.createTierlist("u1", { name: "X", data: { tiers: oneTier, pool: [] }, access: "anonymous" }), { ok: false, reason: "invalid", error });
   assert.deepEqual(service.createTierlist("u1", { name: "X", data: { tiers: [{ ...oneTier[0]!, workIds: ["b1"] }], pool: ["b2"] }, access: "anonymous" }), { ok: false, reason: "invalid", error });
-  assert.equal(service.listTierlists("u1").length, 0);
+  assert.equal(service.listTierlists("u1", false).length, 0);
 });
 
 test("a public create whose book the library no longer holds is invalid", () => {
   const service = createTierlistsService(createInMemoryRepo(), fakeWorks({ books: [book("b1")] }));
   assert.deepEqual(service.createTierlist("u1", { name: "X", data: { tiers: oneTier, pool: ["b1", "b2"] }, access: "members" }), { ok: false, reason: "invalid", error: "A selected book is no longer in your library." });
-  assert.equal(service.listTierlists("u1").length, 0);
+  assert.equal(service.listTierlists("u1", false).length, 0);
 });
 
 test("a create with two editions of one work is a duplicate-work outcome with no title", () => {
   const service = createTierlistsService(createInMemoryRepo(), fakeWorks({ aliases: { e1: "w1", e2: "w1" } }));
   assert.deepEqual(service.createTierlist("u1", { name: "X", data: { tiers: oneTier, pool: ["e1", "e2"] } }), { ok: false, reason: "duplicate-work", title: null });
-  assert.equal(service.listTierlists("u1").length, 0);
+  assert.equal(service.listTierlists("u1", false).length, 0);
 });
 
 test("a create stores canonical work ids and snapshots the pool's public books in order", () => {
@@ -365,7 +366,7 @@ test("listTierlists is scoped per user", () => {
   const a = created(service.createTierlist("u1", { name: "A" }));
   const b = created(service.createTierlist("u1", { name: "B" }));
   created(service.createTierlist("u2", { name: "Theirs" }));
-  const listed = service.listTierlists("u1");
+  const listed = service.listTierlists("u1", false);
   assert.equal(listed.length, 2);
   assert.ok(listed.some((t) => t.id === a.id));
   assert.ok(listed.some((t) => t.id === b.id));
@@ -417,6 +418,7 @@ test("a tier list stored before the tiers/pool shape existed normalizes to empty
     owner_user_id: "u1",
     name: "Legacy",
     data: "{}",
+    subject: null,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
   } as TierlistRow;
@@ -978,7 +980,7 @@ test("getPublishedRefs and participationByOwner fill snapshot covers", () => {
   assert.deepEqual(service.getPublishedRefs([board.id])[0]?.covers, ["https://covers.test/Dune.jpg"]);
   assert.deepEqual(service.listPublishedRefsByOwner("owner")[0]?.covers, ["https://covers.test/Dune.jpg"]);
 
-  const participating = createTierlistsService({ ...repo, listParticipation: () => [{ id: board.id, name: "Pool", public_books: JSON.stringify([{ title: "Dune", coverUrl: null }]), participants: 1, latest_at: "2026-10-01T00:00:00.000Z" }] }, works, undefined, undefined, peek);
+  const participating = createTierlistsService({ ...repo, listParticipation: () => [{ id: board.id, name: "Pool", public_books: JSON.stringify([{ title: "Dune", coverUrl: null }]), subject: null, participants: 1, latest_at: "2026-10-01T00:00:00.000Z" }] }, works, undefined, undefined, peek);
   assert.deepEqual(participating.participationByOwner("owner", "2026-09-01T00:00:00.000Z")[0]?.covers, ["https://covers.test/Dune.jpg"]);
 });
 
@@ -990,4 +992,117 @@ test("a throwing cover peek leaves the ballot unsaved and emits nothing", () => 
   assert.throws(() => service.submitBallot(board.voteCode!, [{ workId: "w1", tierId: "s" }], { kind: "user", userId: "reader" }), /books db down/);
   assert.equal(service.getResults(board.id).ballotCount, 0);
   assert.equal(emitted.length, 0);
+});
+
+const cast: WorkCast = {
+  scope: { kind: "series", key: "s:harry potter", label: "Harry Potter", coverUrl: "https://covers.test/hp.jpg", workCount: 7 },
+  characters: ["Harry", "Ron", "Hermione", "Snape", "Hagrid"].map((name) => ({ id: `ch:s:harry potter|${name.toLowerCase()}`, name, works: 7 }))
+};
+const castIds = cast.characters.map((character) => character.id);
+const castSubject: CharacterSubject = { kind: "characters", scope: { kind: "series", key: "s:harry potter", label: "Harry Potter", coverUrl: "https://covers.test/hp.jpg" }, characters: cast.characters.slice(0, 4).map(({ id, name }) => ({ id, name })) };
+
+function throwingWorks(): TierlistWorks {
+  const stub = fakeWorks({ casts: { w1: cast } });
+  const fail = () => { throw new Error("works layer touched"); };
+  return { ...stub, knownWorkIds: fail, canonicalByKey: fail, publicBooksByWork: fail };
+}
+
+function characterService(peek?: (params: Array<{ title: string | null }>) => Array<string | null>, emit?: (...args: unknown[]) => void) {
+  const repo = createInMemoryRepo();
+  const service = createTierlistsService(repo, throwingWorks(), undefined, emit, peek as never);
+  const list = created(service.createTierlist("u1", { name: "HP characters", characters: { workId: "w1", characterIds: castIds.slice(0, 4) } }));
+  return { repo, service, list };
+}
+
+test("a character create freezes the subject and pools the ids in cast order", () => {
+  const { list } = characterService();
+  assert.deepEqual(list.subject, castSubject);
+  assert.deepEqual((list.data as { pool: string[] }).pool, castIds.slice(0, 4));
+  assert.deepEqual((list.data as { tiers: TierDefinition[] }).tiers.map((tier) => tier.label), DEFAULT_TIER_PRESET.map((tier) => tier.label));
+});
+
+test("a character create keeps cast order whatever order the ids arrive in", () => {
+  const service = createTierlistsService(createInMemoryRepo(), throwingWorks());
+  const list = created(service.createTierlist("u1", { name: "X", characters: { workId: "w1", characterIds: [castIds[3]!, castIds[0]!, castIds[2]!, castIds[1]!] } }));
+  assert.deepEqual((list.data as { pool: string[] }).pool, castIds.slice(0, 4));
+});
+
+test("a character create needs four distinct ids from the work's cast", () => {
+  const service = createTierlistsService(createInMemoryRepo(), throwingWorks());
+  const invalid = (characters: { workId: string; characterIds: string[] }) => service.createTierlist("u1", { name: "X", characters });
+  assert.equal(invalid({ workId: "w1", characterIds: castIds.slice(0, 3) }).ok, false);
+  assert.equal(invalid({ workId: "w1", characterIds: [...castIds.slice(0, 3), "ch:s:other|x"] }).ok, false);
+  assert.equal(invalid({ workId: "w1", characterIds: [...castIds.slice(0, 3), castIds[0]!] }).ok, false);
+  assert.equal(invalid({ workId: "unknown", characterIds: castIds.slice(0, 4) }).ok, false);
+  assert.equal(service.createTierlist("u1", { name: "X", characters: { workId: "w1", characterIds: castIds.slice(0, 4) }, access: "anonymous" }).ok, false);
+  assert.equal(service.listTierlists("u1", true).length, 0);
+});
+
+test("a character list's board accepts only its own ids and never calls the works layer", () => {
+  const { service, list } = characterService();
+  const tier = (workIds: string[]) => ({ id: "s", label: "S", color: "#c9482f", workIds });
+  const ok = service.updateTierlist("u1", list.id, { data: { tiers: [tier([castIds[1]!])], pool: [castIds[0]!, castIds[2]!, castIds[3]!] } });
+  assert.equal(ok.ok, true);
+  assert.equal(service.updateTierlist("u1", list.id, { data: { tiers: [tier([])], pool: [...castIds.slice(0, 3), castIds[4]!] } }).ok, false);
+  assert.equal(service.updateTierlist("u1", list.id, { data: { tiers: [tier([])], pool: ["w-real-work"] } }).ok, false);
+  assert.equal(service.updateTierlist("u1", list.id, { data: { tiers: [tier([castIds[0]!])], pool: [castIds[0]!] } }).ok, false);
+  assert.equal(service.updateTierlist("u1", list.id, { name: "Renamed" }).ok, true);
+  assert.deepEqual((service.getTierlist("u1", list.id)!.data as { tiers: Array<{ workIds: string[] }> }).tiers[0]!.workIds, [castIds[1]!]);
+});
+
+test("a character list is hidden from listTierlists unless characters are requested", () => {
+  const { service, list } = characterService();
+  assert.deepEqual(service.listTierlists("u1", false), []);
+  assert.deepEqual(service.listTierlists("u1", true).map((t) => t.id), [list.id]);
+});
+
+test("publishing a character list snapshots the subject, not the owner's library", () => {
+  const { service, list } = characterService();
+  const opened = service.openVoting("u1", list.id, "anonymous")!;
+  const board = service.getVotingBoard(opened.tierlist.voteCode!)!;
+  assert.deepEqual(board.publicBooks, characterSnapshot(castSubject));
+  assert.deepEqual(board.subject, castSubject);
+  assert.deepEqual(board.pool, castIds.slice(0, 4));
+});
+
+test("a corrupt stored subject throws instead of reading as a book list", () => {
+  const repo = createInMemoryRepo();
+  const service = createTierlistsService(repo, fakeWorks());
+  const list = created(service.createTierlist("u1", { name: "X" }));
+  const stored = repo.getOwned(list.id, "u1")!;
+  repo.insert({ ...stored, id: "00000000-0000-4000-8000-000000000009", subject: "{broken" });
+  assert.throws(() => service.getTierlist("u1", "00000000-0000-4000-8000-000000000009"), SyntaxError);
+});
+
+test("character lists skip every cover peek and use the scope cover", () => {
+  const peeked: unknown[] = [];
+  const peek = (params: Array<{ title: string | null }>) => { peeked.push(params); return params.map(() => "https://peek.test/x.jpg"); };
+  const emitted: Array<{ ranking: unknown }> = [];
+  const { repo, service, list } = characterService(peek, (...args) => { emitted.push({ ranking: args[3] }); });
+  const opened = service.openVoting("u1", list.id, "members")!.tierlist;
+  const code = opened.voteCode!;
+
+  assert.deepEqual(service.getPublishedRefs([list.id])[0]?.covers, ["https://covers.test/hp.jpg"]);
+  assert.deepEqual(service.getPublishedRef(list.id)?.subject, { kind: "characters", label: "Harry Potter" });
+  assert.deepEqual(service.listVotedByUser("reader"), []);
+  assert.equal(service.getVotingBoard(code)!.publicBooks!.every((entry) => (entry as { coverUrl: unknown }).coverUrl === null), true);
+
+  const tierId = (opened.data as { tiers: Array<{ id: string }> }).tiers[0]!.id;
+  assert.equal(service.submitBallot(code, [{ workId: castIds[0]!, tierId }], { kind: "user", userId: "reader" }).ok, true);
+  assert.deepEqual((emitted[0]!.ranking as Array<{ books: unknown[] }>)[0]!.books, [{ title: "Harry", coverUrl: null }]);
+  assert.equal(service.submitBallot(code, [{ workId: "w-real-work", tierId }], { kind: "user", userId: "reader" }).ok, false);
+
+  const ranking = [{ label: "S", color: "#c9482f", books: [{ title: "Harry", coverUrl: null }] }];
+  assert.deepEqual(service.fillRankingCovers(list.id, ranking), ranking);
+  assert.deepEqual(service.listVotedByUser("reader")[0]?.covers, ["https://covers.test/hp.jpg"]);
+
+  const participating = createTierlistsService({ ...repo, listParticipation: () => [{ id: list.id, name: "HP", public_books: JSON.stringify(characterSnapshot(castSubject)), subject: JSON.stringify(castSubject), participants: 1, latest_at: "2026-10-01T00:00:00.000Z" }] }, throwingWorks(), undefined, undefined, peek);
+  assert.deepEqual(participating.participationByOwner("u1", "2026-09-01T00:00:00.000Z")[0]?.covers, ["https://covers.test/hp.jpg"]);
+  assert.deepEqual(peeked, []);
+});
+
+test("a character list is not offered to murals", () => {
+  const { service, list } = characterService();
+  const works = throwingWorks();
+  assert.equal(createTierlistsPublicApi(service, works).getTierlistData("u1", list.id), undefined);
 });

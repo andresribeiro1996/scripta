@@ -10,10 +10,11 @@ import type { TierlistRow, BallotRow, BallotTotals, Placement, TierlistDiscoverR
 
 export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepository {
   const insertStmt = db.prepare(`
-    INSERT INTO tierlists (id, owner_user_id, origin_user_id, name, name_key, data, vote_code, vote_access, voting_open, source_tierlist_id, promoted_at, public_books, ranks_worst_first, created_at, updated_at)
-    VALUES ($id, $owner_user_id, $origin_user_id, $name, $name_key, $data, $vote_code, $vote_access, $voting_open, $source_tierlist_id, $promoted_at, $public_books, $ranks_worst_first, $created_at, $updated_at)
+    INSERT INTO tierlists (id, owner_user_id, origin_user_id, name, name_key, data, vote_code, vote_access, voting_open, source_tierlist_id, promoted_at, public_books, ranks_worst_first, subject, created_at, updated_at)
+    VALUES ($id, $owner_user_id, $origin_user_id, $name, $name_key, $data, $vote_code, $vote_access, $voting_open, $source_tierlist_id, $promoted_at, $public_books, $ranks_worst_first, $subject, $created_at, $updated_at)
   `);
-  const listStmt = db.prepare(`SELECT * FROM tierlists WHERE owner_user_id = ? AND promoted_at IS NULL ORDER BY created_at DESC`);
+  const listStmt = db.prepare(`SELECT * FROM tierlists WHERE owner_user_id = ? AND promoted_at IS NULL AND subject IS NULL ORDER BY created_at DESC`);
+  const listWithCharactersStmt = db.prepare(`SELECT * FROM tierlists WHERE owner_user_id = ? AND promoted_at IS NULL ORDER BY created_at DESC`);
   const getOwnedStmt = db.prepare(`SELECT * FROM tierlists WHERE id = ? AND owner_user_id = ? AND promoted_at IS NULL`);
   // Full-row SET rather than a dynamic per-field statement: update()
   // below always merges the patch onto a freshly-read row first, so every
@@ -57,7 +58,7 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
       (t.voting_open = 1 AND t.vote_access = 'anonymous' AND t.promoted_at IS NULL) AS open,
       (SELECT COUNT(*) FROM tierlist_ballots b WHERE b.tierlist_id = t.id AND (b.voter_user_id IS NULL OR b.voter_user_id != t.origin_user_id) AND ($until IS NULL OR b.created_at < $until)) AS voters,
       (SELECT COUNT(*) FROM tierlist_ballots b WHERE b.tierlist_id = t.id AND (b.voter_user_id IS NULL OR b.voter_user_id != t.origin_user_id) AND ($since IS NULL OR b.created_at >= $since) AND ($until IS NULL OR b.created_at < $until)) AS votes_since
-    FROM tierlists t WHERE t.vote_code IS NOT NULL
+    FROM tierlists t WHERE t.vote_code IS NOT NULL AND t.subject IS NULL
   `);
   const shelfWorksStmt = db.prepare(`
     SELECT w.tierlist_id, w.work_id FROM tierlist_works w JOIN tierlists t ON t.id = w.tierlist_id AND t.vote_code IS NOT NULL
@@ -71,7 +72,7 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
   `);
   const shelfBoardsStmt = db.prepare(`
     SELECT t.id, t.data, t.ranks_worst_first FROM tierlists t
-    WHERE t.vote_code IS NOT NULL AND EXISTS (SELECT 1 FROM tierlist_ballot_placements p WHERE p.tierlist_id = t.id)
+    WHERE t.vote_code IS NOT NULL AND t.subject IS NULL AND EXISTS (SELECT 1 FROM tierlist_ballot_placements p WHERE p.tierlist_id = t.id)
   `);
   const ballotTotalsForStmt = db.prepare(`
     SELECT b.tierlist_id,
@@ -133,7 +134,7 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
   const promoteStmt = db.prepare(`UPDATE tierlists SET owner_user_id = '__app__', promoted_at = ?, voting_open = 0, updated_at = ? WHERE id = ? AND promoted_at IS NULL`);
   const eligibleCountStmt = db.prepare(`SELECT COUNT(*) AS n FROM tierlist_ballots AS ballot WHERE ballot.tierlist_id = ? AND ballot.voter_user_id IS NOT NULL AND ballot.voter_user_id != ? AND EXISTS (SELECT 1 FROM tierlist_ballot_placements WHERE ballot_id = ballot.id)`);
   const participationStmt = db.prepare(`
-    SELECT t.id, t.name, t.public_books, COUNT(b.id) AS participants, MAX(b.created_at) AS latest_at
+    SELECT t.id, t.name, t.public_books, t.subject, COUNT(b.id) AS participants, MAX(b.created_at) AS latest_at
     FROM tierlists t
     JOIN tierlist_ballots b ON b.tierlist_id = t.id
     WHERE t.origin_user_id = ? AND t.vote_code IS NOT NULL AND t.promoted_at IS NULL
@@ -147,8 +148,9 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
     ORDER BY created_at DESC LIMIT ?
   `);
 
-  function setWorks(tierlistId: string, data: string): void {
+  function setWorks(tierlistId: string, data: string, subject: string | null): void {
     deleteWorksStmt.run(tierlistId);
+    if (subject) return;
     for (const workId of boardWorks(JSON.parse(data))) insertWorkStmt.run(tierlistId, workId);
   }
 
@@ -201,8 +203,8 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
         throw error;
       }
     },
-    listByUser(userId) {
-      return listStmt.all(userId) as unknown as TierlistRow[];
+    listByUser(userId, includeCharacters) {
+      return (includeCharacters ? listWithCharactersStmt : listStmt).all(userId) as unknown as TierlistRow[];
     },
 
     getOwned(id, userId) {
@@ -225,10 +227,11 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
           $promoted_at: row.promoted_at,
           $public_books: row.public_books,
           $ranks_worst_first: row.ranks_worst_first,
+          $subject: row.subject,
           $created_at: row.created_at,
           $updated_at: row.updated_at
         });
-        setWorks(row.id, row.data);
+        setWorks(row.id, row.data, row.subject);
       });
     },
 
@@ -247,7 +250,7 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
           $data: merged.data,
           $updated_at: updatedAt
         });
-        setWorks(id, merged.data);
+        setWorks(id, merged.data, merged.subject);
         return merged;
       });
     },
@@ -278,9 +281,10 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
         const changed = publishStmt.run(data, access, code, publicBooks, new Date().toISOString(), id, userId);
         if (!changed.changes) { if (db.isTransaction) db.exec("ROLLBACK"); return undefined; }
         saveBallotRow(ballot, placements);
-        setWorks(id, data);
+        const published = getOwnedStmt.get(id, userId) as unknown as TierlistRow;
+        setWorks(id, data, published.subject);
         db.exec("COMMIT");
-        return getOwnedStmt.get(id, userId) as unknown as TierlistRow;
+        return published;
       } catch (error) {
         if (db.isTransaction) db.exec("ROLLBACK");
         throw error;
@@ -428,7 +432,7 @@ export function createSqliteTierlistsRepository(db: DatabaseSync): TierlistsRepo
     },
 
     listParticipation(ownerUserId, since) {
-      const rows = participationStmt.all(ownerUserId, since) as unknown as { id: string; name: string; public_books: string | null; participants: number; latest_at: string }[];
+      const rows = participationStmt.all(ownerUserId, since) as unknown as { id: string; name: string; public_books: string | null; subject: string | null; participants: number; latest_at: string }[];
       return rows.map((r) => ({ ...r, participants: Number(r.participants) }));
     },
 

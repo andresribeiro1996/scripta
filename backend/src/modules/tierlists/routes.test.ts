@@ -585,3 +585,89 @@ test("a published worst-first list's voting board says so", async () => {
   assert.equal(board.json().board.ranksWorstFirst, true);
   await app.close();
 });
+
+const hpCast = {
+  scope: { kind: "series" as const, key: "s:hp", label: "Harry Potter", coverUrl: null, workCount: 7 },
+  characters: ["Harry", "Ron", "Hermione", "Snape", "Hagrid"].map((name) => ({ id: `ch:s:hp|${name.toLowerCase()}`, name, works: 7 }))
+};
+
+async function characterApp() {
+  const db = new DatabaseSync(":memory:");
+  applyTierlistsMigrations(db);
+  const service = createTierlistsService(createSqliteTierlistsRepository(db), { ...tierlistWorks, castOf: (workId) => (workId === "w1" ? hpCast : undefined) });
+  const app = Fastify();
+  app.decorate("authenticateAccessToken", (token: string) => ({ id: token, email: `${token}@example.test`, username: token, avatarId: null }));
+  await app.register(buildTierlistRoutes(service));
+  await app.register(buildPublicTierlistRoutes(service));
+  const ids = hpCast.characters.slice(0, 4).map((character) => character.id);
+  const created = await app.inject({ method: "POST", url: "/tierlists", headers: headers("c1"), payload: { name: "HP characters", characters: { workId: "w1", characterIds: ids } } });
+  return { app, db, ids, created };
+}
+
+test("a character create answers the subject and keeps the list out of the default listing", async () => {
+  const { app, ids, created } = await characterApp();
+  assert.equal(created.statusCode, 201);
+  assert.equal(created.json().subject.scope.label, "Harry Potter");
+  assert.deepEqual(created.json().data.pool, ids);
+  const plain = await app.inject({ method: "GET", url: "/tierlists", headers: headers("c1") });
+  const other = await app.inject({ method: "GET", url: "/tierlists?subjects=books", headers: headers("c1") });
+  const withCharacters = await app.inject({ method: "GET", url: "/tierlists?subjects=characters", headers: headers("c1") });
+  assert.deepEqual(plain.json().tierlists, []);
+  assert.deepEqual(other.json().tierlists, []);
+  assert.equal(withCharacters.json().tierlists.length, 1);
+  const read = await app.inject({ method: "GET", url: `/tierlists/${created.json().id}`, headers: headers("c1") });
+  assert.deepEqual(read.json().data.pool, ids);
+  await app.close();
+});
+
+test("a character create rejects an unknown work, a short pick, and both data and characters", async () => {
+  const { app, ids } = await characterApp();
+  const post = (payload: unknown) => app.inject({ method: "POST", url: "/tierlists", headers: headers("c1"), payload: payload as never });
+  assert.equal((await post({ name: "X", characters: { workId: "nope", characterIds: ids } })).statusCode, 400);
+  assert.equal((await post({ name: "X", characters: { workId: "w1", characterIds: ids.slice(0, 3) } })).statusCode, 400);
+  assert.equal((await post({ name: "X", characters: { workId: "w1", characterIds: ids }, data: { tiers: [tier([])], pool: [] } })).statusCode, 400);
+  await app.close();
+});
+
+test("a character PUT rejects a real work id and an id outside the cast", async () => {
+  const { app, ids, created } = await characterApp();
+  const put = (pool: string[]) => app.inject({ method: "PUT", url: `/tierlists/${created.json().id}`, headers: headers("c1"), payload: { data: { tiers: [tier([])], pool } } });
+  assert.equal((await put([...ids.slice(0, 3), titleWork("Real Book")])).statusCode, 400);
+  assert.equal((await put([...ids.slice(0, 3), hpCast.characters[4]!.id])).statusCode, 400);
+  assert.equal((await put([ids[1]!, ids[0]!, ids[2]!, ids[3]!])).statusCode, 200);
+  await app.close();
+});
+
+test("a published character list serves its names and takes ballots on pool ids only", async () => {
+  const { app, ids, created } = await characterApp();
+  const opened = await app.inject({ method: "POST", url: `/tierlists/${created.json().id}/open-voting`, headers: headers("c1"), payload: { access: "anonymous" } });
+  assert.equal(opened.statusCode, 201);
+  assert.deepEqual(opened.json().tierlist.data.pool, ids);
+  const code = opened.json().voteCode as string;
+  const board = await app.inject({ method: "GET", url: `/tierlists/voting/${code}` });
+  assert.deepEqual(board.json().books.map((book: { title: string }) => book.title), ["Harry", "Ron", "Hermione", "Snape"]);
+  assert.deepEqual(board.json().board.pool, ids);
+  assert.equal(board.json().board.subject.scope.label, "Harry Potter");
+  const tierId = opened.json().tierlist.data.tiers[0].id as string;
+  const vote = (workId: string) => app.inject({ method: "POST", url: `/tierlists/voting/${code}/ballot`, payload: { placements: [{ workId, tierId }] } });
+  const ok = await vote(ids[2]!);
+  assert.equal(ok.statusCode, 200);
+  assert.deepEqual(ok.json().results.histogram, [{ workId: ids[2], tierId, votes: 1 }]);
+  assert.equal((await vote(hpCast.characters[4]!.id)).statusCode, 400);
+  assert.equal((await vote(titleWork("Real Book"))).statusCode, 400);
+  const results = await app.inject({ method: "GET", url: `/tierlists/${created.json().id}/results`, headers: headers("c1") });
+  assert.deepEqual(results.json().histogram, [{ workId: ids[2], tierId, votes: 1 }]);
+  await app.close();
+});
+
+test("the voted-on list carries the subject label", async () => {
+  const { app, ids, created } = await characterApp();
+  const opened = await app.inject({ method: "POST", url: `/tierlists/${created.json().id}/open-voting`, headers: headers("c1"), payload: { access: "anonymous" } });
+  const code = opened.json().voteCode as string;
+  const tierId = opened.json().tierlist.data.tiers[0].id as string;
+  const vote = await app.inject({ method: "POST", url: `/tierlists/voting/${code}/ballot`, headers: headers("c2"), payload: { placements: [{ workId: ids[0], tierId }] } });
+  assert.equal(vote.statusCode, 200);
+  const voted = await app.inject({ method: "GET", url: "/tierlists/voted", headers: headers("c2") });
+  assert.deepEqual(voted.json().tierlists[0].subject, { kind: "characters", label: "Harry Potter" });
+  await app.close();
+});

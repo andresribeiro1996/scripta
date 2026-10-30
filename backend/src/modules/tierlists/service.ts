@@ -5,12 +5,16 @@
 import { randomUUID } from "node:crypto";
 import { generateVoteCode } from "../../voteCode.js";
 import type { GameByWork } from "../works/index.js";
-import { DEFAULT_TIER_PRESET, type PublicBookData, type ResolvedTierlist, type TierlistData, type VotedTierlist } from "@scripta/shared";
+import { characterSnapshot, DEFAULT_TIER_PRESET, type CharacterSubject, type PublicBookData, type ResolvedTierlist, type TierlistData, type VotedTierlist } from "@scripta/shared";
 import type { GameParticipation, RankingTierPreview } from "@scripta/shared/community";
 import { boardWorks } from "./domain/boardKeys.js";
 import { canonicalBoard, storedIds } from "./domain/board.js";
 import type { TierlistsRepository, TierlistWorks } from "./domain/ports.js";
 import type { BallotRow, HistogramCell, Placement, Tierlist, TierlistGameRow, TierlistRow, TierlistShelfFacts, TierPlacement, VoteAccess } from "./domain/types.js";
+
+function parseSubject(value: string | null): CharacterSubject | null {
+  return value === null ? null : (JSON.parse(value) as CharacterSubject);
+}
 
 function toTierlist(row: TierlistRow): Tierlist {
   const parsed = JSON.parse(row.data) as { tiers?: unknown; pool?: unknown };
@@ -25,6 +29,7 @@ function toTierlist(row: TierlistRow): Tierlist {
     promotedAt: row.promoted_at,
     originCreatorId: row.origin_user_id,
     ranksWorstFirst: row.ranks_worst_first === 1,
+    subject: parseSubject(row.subject),
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
@@ -52,6 +57,7 @@ export interface VotingBoard {
   promotedAt: string | null;
   publicBooks: unknown[] | null;
   ranksWorstFirst: boolean;
+  subject: CharacterSubject | null;
 }
 
 export interface PublicTierlistSummary {
@@ -76,6 +82,7 @@ export interface PublishedTierlistRef {
   promotedAt: string | null;
   votingOpen: boolean;
   covers: string[];
+  subject?: { kind: "characters"; label: string };
 }
 
 export interface TierlistDiscoverRef {
@@ -97,8 +104,8 @@ export type TierlistWriteOutcome =
 type StoredBoard = { ok: true; data: TierlistData } | Exclude<TierlistWriteOutcome, { ok: true }>;
 
 export interface TierlistsService {
-  listTierlists(userId: string): Tierlist[];
-  createTierlist(userId: string, input: { name: string; data?: TierlistData; access?: VoteAccess; ranksWorstFirst?: boolean }): TierlistWriteOutcome;
+  listTierlists(userId: string, includeCharacters: boolean): Tierlist[];
+  createTierlist(userId: string, input: { name: string; data?: TierlistData; characters?: { workId: string; characterIds: string[] }; access?: VoteAccess; ranksWorstFirst?: boolean }): TierlistWriteOutcome;
   /** undefined if no tier list with that id is owned by userId — a
    *  caller-facing 404, not a server error. Same convention as
    *  modules/murals/service.ts's getMural. */
@@ -216,8 +223,13 @@ function publishedCovers(publicBooks: string | null, peek: CoverPeek | undefined
   return covers;
 }
 
+function subjectCovers(subject: CharacterSubject): string[] {
+  return subject.scope.coverUrl ? [subject.scope.coverUrl] : [];
+}
+
 function toPublishedRef(row: TierlistRow, ballotCount: number, peek: CoverPeek | undefined): PublishedTierlistRef {
-  const { tiers, pool } = readDocument(toTierlist(row));
+  const tierlist = toTierlist(row);
+  const { tiers, pool } = readDocument(tierlist);
   const keys = new Set(pool);
   for (const tier of tiers) for (const id of tier.workIds) keys.add(id);
   return {
@@ -231,7 +243,8 @@ function toPublishedRef(row: TierlistRow, ballotCount: number, peek: CoverPeek |
     eligibleVoteCount: 0,
     promotedAt: row.promoted_at,
     votingOpen: row.voting_open === 1,
-    covers: publishedCovers(row.public_books, peek)
+    covers: tierlist.subject ? subjectCovers(tierlist.subject) : publishedCovers(row.public_books, peek),
+    ...(tierlist.subject ? { subject: { kind: "characters" as const, label: tierlist.subject.scope.label } } : {})
   };
 }
 
@@ -240,9 +253,14 @@ export type EmitPublished = (tierlistId: string, ownerUserId: string) => void;
 export type EmitVotedOn = (voterUserId: string, tierlistId: string, tierlistName: string, ranking: RankingTierPreview[]) => void;
 
 export function createTierlistsService(repo: TierlistsRepository, works: TierlistWorks, emitPublished?: EmitPublished, emitVotedOn?: EmitVotedOn, peekCovers?: CoverPeek): TierlistsService {
-  function storedBoard(board: TierlistData): StoredBoard {
+  function storedBoard(board: TierlistData, subject: CharacterSubject | null): StoredBoard {
     const all = [...board.tiers.flatMap((tier) => tier.workIds), ...board.pool];
     if (new Set(all).size !== all.length) return { ok: false, reason: "invalid", error: "Duplicate tier or book." };
+    if (subject) {
+      const cast = new Set(subject.characters.map((character) => character.id));
+      if (!all.every((id) => cast.has(id))) return { ok: false, reason: "invalid", error: "A character is not in this list." };
+      return { ok: true, data: board };
+    }
     const ids = works.knownWorkIds(all);
     if (new Set(ids).size !== ids.length) return { ok: false, reason: "duplicate-work", title: null };
     const canonical = new Map(all.map((id, index) => [id, ids[index]!]));
@@ -256,11 +274,22 @@ export function createTierlistsService(repo: TierlistsRepository, works: Tierlis
   }
 
   return {
-    listTierlists(userId) {
-      return repo.listByUser(userId).map(toTierlist);
+    listTierlists(userId, includeCharacters) {
+      return repo.listByUser(userId, includeCharacters).map(toTierlist);
     },
 
-    createTierlist(userId, { name, data, access, ranksWorstFirst = false }) {
+    createTierlist(userId, { name, data, characters, access, ranksWorstFirst = false }) {
+      let subject: CharacterSubject | null = null;
+      if (characters) {
+        if (data || access) return { ok: false, reason: "invalid", error: "Choose either books or characters." };
+        const cast = works.castOf(characters.workId);
+        const wanted = new Set(characters.characterIds);
+        if (!cast || wanted.size !== characters.characterIds.length || wanted.size < 4) return { ok: false, reason: "invalid", error: "Choose at least 4 characters from the cast." };
+        const selected = cast.characters.filter((character) => wanted.has(character.id));
+        if (selected.length !== wanted.size) return { ok: false, reason: "invalid", error: "Choose at least 4 characters from the cast." };
+        const { kind, key, label, coverUrl } = cast.scope;
+        subject = { kind: "characters", scope: { kind, key, label, coverUrl }, characters: selected.map(({ id, name: characterName }) => ({ id, name: characterName })) };
+      }
       if (access && !data) return { ok: false, reason: "invalid", error: "Choose books and tiers before publishing." };
       if (data) {
         const tierIds = data.tiers.map((tier) => tier.id);
@@ -269,8 +298,10 @@ export function createTierlistsService(repo: TierlistsRepository, works: Tierlis
       }
       let board: TierlistData;
       let publicBooks: PublicBookData[] = [];
-      if (data) {
-        const stored = storedBoard(data);
+      if (subject) {
+        board = { tiers: DEFAULT_TIER_PRESET.map((t) => ({ id: randomUUID(), label: t.label, color: t.color, workIds: [] })), pool: subject.characters.map((character) => character.id) };
+      } else if (data) {
+        const stored = storedBoard(data, null);
         if (!stored.ok) return stored;
         board = stored.data;
         if (access) {
@@ -294,6 +325,7 @@ export function createTierlistsService(repo: TierlistsRepository, works: Tierlis
         promoted_at: null,
         public_books: access ? JSON.stringify(publicBooks) : null,
         ranks_worst_first: ranksWorstFirst ? 1 : 0,
+        subject: subject ? JSON.stringify(subject) : null,
         created_at: now,
         updated_at: now
       };
@@ -310,14 +342,14 @@ export function createTierlistsService(repo: TierlistsRepository, works: Tierlis
     updateTierlist(userId, id, patch) {
       const existing = repo.getOwned(id, userId);
       if (!existing || existing.vote_code !== null) return { ok: false, reason: "not-found", error: "No tier list with that id." };
+      const current = toTierlist(existing);
       let board: TierlistData;
       if (patch.data !== undefined) {
-        const stored = storedBoard(patch.data);
+        const stored = storedBoard(patch.data, current.subject);
         if (!stored.ok) return stored;
         board = stored.data;
       } else {
-        const current = toTierlist(existing);
-        board = canonicalBoard(current.data, knownFor(works, current.data));
+        board = current.subject ? (current.data as TierlistData) : canonicalBoard(current.data, knownFor(works, current.data));
       }
       const row = repo.update(id, userId, {
         ...(patch.name !== undefined ? { name: patch.name } : {}),
@@ -337,8 +369,10 @@ export function createTierlistsService(repo: TierlistsRepository, works: Tierlis
       const row = repo.getOwned(id, userId);
       if (!row || row.vote_code !== null) return undefined;
       const original = toTierlist(row);
-      const known = knownFor(works, original.data);
-      const publicBooks = booksInOrder(userId, boardWorks(original.data));
+      const ids = boardWorks(original.data);
+      const known = original.subject ? new Map(ids.map((id) => [id, id])) : knownFor(works, original.data);
+      const wanted = new Set(ids);
+      const publicBooks = original.subject ? characterSnapshot(original.subject).filter((book) => wanted.has(book.workId!)) : booksInOrder(userId, ids);
 
       const { tiers, pool } = readDocument(original);
       const placements: Placement[] = [];
@@ -379,7 +413,8 @@ export function createTierlistsService(repo: TierlistsRepository, works: Tierlis
       if (row.voting_open !== 1) return { ok: false, reason: "closed" };
       if (row.vote_access === "members" && voter.kind !== "user") return { ok: false, reason: "members-only" };
 
-      const { tiers, pool } = readDocument(toTierlist(row));
+      const tierlist = toTierlist(row);
+      const { tiers, pool } = readDocument(tierlist);
       const validPool = new Set(pool);
       const validTiers = new Set(tiers.map((t) => t.id));
       const seen = new Set<string>();
@@ -420,7 +455,7 @@ export function createTierlistsService(repo: TierlistsRepository, works: Tierlis
           .map((tier) => ({ label: tier.label, color: tier.color, entries: placements.filter((placement) => placement.tierId === tier.id).slice(0, 2).flatMap((placement) => { const book = books.get(placement.workId); return book ? [book] : []; }) }))
           .filter((tier) => tier.entries.length > 0)
           .slice(0, 3);
-        const filled = fillMissingCovers(picked.flatMap((tier) => tier.entries), peekCovers) as Array<Record<string, unknown>>;
+        const filled = fillMissingCovers(picked.flatMap((tier) => tier.entries), tierlist.subject ? undefined : peekCovers) as Array<Record<string, unknown>>;
         let next = 0;
         ranking = picked.map((tier) => ({
           label: tier.label,
@@ -462,7 +497,8 @@ export function createTierlistsService(repo: TierlistsRepository, works: Tierlis
     getVotingBoard(code) {
       const row = repo.getByVoteCode(code);
       if (!row) return undefined;
-      const { tiers, pool } = readDocument(toTierlist(row));
+      const tierlist = toTierlist(row);
+      const { tiers, pool } = readDocument(tierlist);
       return {
         id: row.id,
         ownerUserId: row.origin_user_id,
@@ -478,8 +514,9 @@ export function createTierlistsService(repo: TierlistsRepository, works: Tierlis
         // Corrupt JSON here omits the field rather than 500ing the whole
         // public voting board — same defensive stance as murals' shared
         // route and library's getPublicByToken.
-        publicBooks: fillPublicBooks(parsePublicBooks(row.public_books), peekCovers),
-        ranksWorstFirst: row.ranks_worst_first === 1
+        publicBooks: fillPublicBooks(parsePublicBooks(row.public_books), tierlist.subject ? undefined : peekCovers),
+        ranksWorstFirst: row.ranks_worst_first === 1,
+        subject: tierlist.subject
       };
     },
 
@@ -515,7 +552,9 @@ export function createTierlistsService(repo: TierlistsRepository, works: Tierlis
 
     fillRankingCovers(tierlistId, ranking) {
       const titles = new Set(ranking.flatMap((tier) => tier.books.filter((book) => !book.coverUrl).map((book) => book.title)));
-      const snapshot = parsePublicBooks(repo.getPublicById(tierlistId)?.public_books ?? null);
+      const row = repo.getPublicById(tierlistId);
+      if (row?.subject) return ranking;
+      const snapshot = parsePublicBooks(row?.public_books ?? null);
       if (titles.size === 0 || !Array.isArray(snapshot)) return ranking;
       const candidates = snapshot.filter((entry) => !!entry && typeof entry === "object" && titles.has(text((entry as Record<string, unknown>).title) ?? ""));
       const covers = new Map<string, string>();
@@ -545,7 +584,7 @@ export function createTierlistsService(repo: TierlistsRepository, works: Tierlis
       return repo.listParticipation(ownerUserId, since).map((row) => ({
         id: row.id,
         name: row.name,
-        covers: publishedCovers(row.public_books, peekCovers),
+        covers: row.subject ? subjectCovers(parseSubject(row.subject)!) : publishedCovers(row.public_books, peekCovers),
         participantCount: row.participants,
         latestAt: row.latest_at,
         recent: repo.listRecentVoters(row.id, ownerUserId, RECENT_PARTICIPANT_LIMIT).map((r) => ({ userId: r.user_id, at: r.at }))
@@ -583,7 +622,7 @@ export function createTierlistsPublicApi(service: TierlistsService, works: Tierl
   return {
     getTierlistData(ownerUserId, tierlistId) {
       const tierlist = service.getTierlist(ownerUserId, tierlistId);
-      if (!tierlist) return undefined;
+      if (!tierlist || tierlist.subject) return undefined;
       return { name: tierlist.name, ...canonicalBoard(tierlist.data, knownFor(works, tierlist.data)) };
     },
     discoverWindow: (needle, limit) => service.discoverWindow(needle, limit),

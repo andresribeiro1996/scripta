@@ -13,6 +13,7 @@ process.env.TIERLISTS_DB_PATH = join(scratch, "tierlists.sqlite");
 process.env.JWT_ACCESS_SECRET = "a".repeat(64);
 process.env.JWT_REFRESH_SECRET = "b".repeat(64);
 
+const wireModule = await import("./wire.js");
 const { boardBooks, canonicalBoard, canonicalFirst, histogramToWorks, placementsFromWorks, placementsToWorks } = await import("./wire.js");
 const { openBooksDb } = await import("../books/adapters/sqlite/connection.js");
 const { resolveWorks } = await import("../books/index.js");
@@ -52,4 +53,12 @@ test("boardBooks matches snapshot books by canonical work and falls back to live
   assert.deepEqual(boardBooks([other, kept], snapshot, live), [canonicalSnapshot[1], canonicalSnapshot[0]]);
   assert.deepEqual(boardBooks([kept, other], [snapshot[1]!], live), live());
   assert.deepEqual(boardBooks([kept], null, live), live());
+});
+
+test("characterView maps each id to itself and keeps every id", () => {
+  const { characterView } = wireModule;
+  const { canonical, first } = characterView(["a", "b"]);
+  assert.equal(canonical.get("a"), "a");
+  assert.equal(canonical.get("b"), "b");
+  assert.deepEqual([...first], ["a", "b"]);
 });
