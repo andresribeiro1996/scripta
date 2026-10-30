@@ -5,6 +5,7 @@ import { DEFAULT_FEED_SETTINGS, type OwnProfile } from "@scripta/shared/communit
 import { fetchOwnProfile, updateFeedSettings } from "../../api/community";
 import { ReaderGlyph } from "../ReaderGlyph";
 import { useToast } from "../Toaster";
+import { PANEL_HEADING } from "../page/surfaceClasses";
 import { ToggleSwitch } from "../ToggleSwitch";
 
 const OWN_PROFILE_KEY = ["community", "own-profile"] as const;
@@ -36,7 +37,7 @@ export function ReaderGlyphSetting({ username, books, groups }: { username: stri
   return (
     <section>
       <div className="flex items-center justify-between gap-3">
-        <h3 className="text-sm font-semibold">{LABEL}</h3>
+        <h3 className={PANEL_HEADING}>{LABEL}</h3>
         <ToggleSwitch checked={settings.readerGlyph ?? false} disabled={!profile || busy} label={LABEL} onChange={(next) => void toggle(next)} />
       </div>
       <p className="mt-2 flex items-center gap-1.5 text-sm text-(--color-text-dim)">

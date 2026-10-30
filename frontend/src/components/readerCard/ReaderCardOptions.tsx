@@ -1,6 +1,7 @@
 import { useDeferredValue, useMemo, useRef, useState } from "react";
 import { CARD_PRINTS, CORNER_LABELS, CORNER_STYLES, COUNTERS, COUNTER_LABELS, FINISHES, FINISH_LABELS, FOOTER_LEFTS, FOOTER_LEFT_LABELS, FOOTER_RIGHTS, FOOTER_RIGHT_LABELS, LAYOUTS, LAYOUT_LABELS, MOTTO_LOOKS, MOTTO_LOOK_LABELS, MOTTO_MAX, PRINT_LABELS, TRAITS, TRAIT_LABELS, counterThumbnail, styleThumbnail, type MottoLook, type ReaderCardBase } from "@scripta/shared";
 import type { ThemeScheme } from "@scripta/shared/themes";
+import { PANEL_HEADING } from "../page/surfaceClasses";
 import { DraftField } from "./DraftField";
 import { ReaderCardImage } from "./ReaderCardImage";
 import type { SaveStyle } from "./ReaderCardChoices";
@@ -79,7 +80,7 @@ export function ReaderCardOptions({ input, scheme, onChange }: { input: ReaderCa
   return (
     <>
       <section>
-        <h3 className="mb-2 text-sm font-semibold">Counter</h3>
+        <h3 className={`${PANEL_HEADING} mb-2`}>Counter</h3>
         <div role="radiogroup" aria-label="Counter" className="grid grid-cols-3 gap-2 sm:grid-cols-5">
           {counterThumbs.map(({ option, input: thumbnail }) => (
             <button key={option} type="button" role="radio" aria-checked={counter === option} onClick={() => void onChange({ counter: option })} className={TILE(counter === option)}>
@@ -90,37 +91,37 @@ export function ReaderCardOptions({ input, scheme, onChange }: { input: ReaderCa
         </div>
       </section>
       <section>
-        <h3 className="mb-2 text-sm font-semibold">Second trait</h3>
+        <h3 className={`${PANEL_HEADING} mb-2`}>Second trait</h3>
         <Segmented label="Second trait" options={TRAITS} labels={TRAIT_LABELS} value={trait} onChange={(next) => void onChange({ trait: next })} />
       </section>
       <section>
-        <h3 className="mb-2 text-sm font-semibold">Motto</h3>
+        <h3 className={`${PANEL_HEADING} mb-2`}>Motto</h3>
         <DraftField label="Your motto" initial={motto?.text ?? null} max={MOTTO_MAX} onSave={saveMotto} />
         <div className="mt-3">
           <Thumbnails label="Motto look" options={MOTTO_LOOKS} labels={MOTTO_LOOK_LABELS} value={motto?.look ?? look} thumbnail={(option) => mottoThumbs.get(option)!} onPick={pickLook} columns="grid-cols-3 sm:grid-cols-4" />
         </div>
       </section>
       <section>
-        <h3 className="mb-2 text-sm font-semibold">Footer</h3>
+        <h3 className={`${PANEL_HEADING} mb-2`}>Footer</h3>
         <p className="mb-1 text-xs text-(--color-text-dim)">Left</p>
         <Chips label="Footer left" options={FOOTER_LEFTS} labels={FOOTER_LEFT_LABELS} value={footer.left} onPick={(left) => void onChange({ footer: { ...footer, left } })} />
         <p className="mb-1 mt-3 text-xs text-(--color-text-dim)">Right</p>
         <Chips label="Footer right" options={FOOTER_RIGHTS} labels={FOOTER_RIGHT_LABELS} value={footer.right} onPick={(right) => void onChange({ footer: { ...footer, right } })} />
       </section>
       <section>
-        <h3 className="mb-2 text-sm font-semibold">Corners</h3>
+        <h3 className={`${PANEL_HEADING} mb-2`}>Corners</h3>
         <Thumbnails label="Corners" options={CORNER_STYLES} labels={CORNER_LABELS} value={corners} thumbnail={(option) => cornerThumbs.get(option)!} onPick={(next) => void onChange({ corners: next })} columns="grid-cols-4 sm:grid-cols-6" />
       </section>
       <section>
-        <h3 className="mb-2 text-sm font-semibold">Finish</h3>
+        <h3 className={`${PANEL_HEADING} mb-2`}>Finish</h3>
         <Chips label="Finish" options={FINISHES} labels={FINISH_LABELS} value={finish} onPick={(next) => void onChange({ finish: next })} />
       </section>
       <section>
-        <h3 className="mb-2 text-sm font-semibold">Print</h3>
+        <h3 className={`${PANEL_HEADING} mb-2`}>Print</h3>
         <Segmented label="Print" options={CARD_PRINTS} labels={PRINT_LABELS} value={print} onChange={(next) => void onChange({ print: next })} />
       </section>
       <section>
-        <h3 className="mb-2 text-sm font-semibold">Layout</h3>
+        <h3 className={`${PANEL_HEADING} mb-2`}>Layout</h3>
         <Segmented label="Layout" options={LAYOUTS} labels={LAYOUT_LABELS} value={layout} onChange={(next) => void onChange({ layout: next })} />
       </section>
     </>
