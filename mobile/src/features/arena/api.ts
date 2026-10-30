@@ -5,6 +5,7 @@ export type { Tournament, TournamentView } from "@scripta/shared";
 
 export const {
   createTournament,
+  createCharacterTournament,
   fetchMyTournaments,
   fetchVotedTournaments,
   fetchTournament,

@@ -23,3 +23,7 @@ export function seriesSearchHref(name: string, nonce: number, method: SeriesSear
   const params = { q: name, t: String(nonce) };
   return { pathname: "/search", params: method === "navigate" ? { ...params, pop: "true" } : params };
 }
+
+export function workCharactersPath(id: string, segments: readonly string[]): string {
+  return `${workPath(id, segments)}/characters`;
+}

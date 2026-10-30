@@ -7,6 +7,7 @@ export type { BallotResponse, Tierlist, VotedTierlist, VotingBoard } from "@scri
 export const {
   fetchTierlists,
   createTierlist,
+  createCharacterTierlist,
   updateTierlist,
   deleteTierlist,
   fetchVotedTierlists,
