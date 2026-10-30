@@ -173,8 +173,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
 
   async function offeredPick(userId: string, book: BookRow, url: string, at: string): Promise<string> {
     const offer = offers.get(`${userId}\n${book.id}`)?.get(url);
-    if (!offer || offer.expiresAt <= now().getTime()) throw new CoverOfferExpiredError();
-    if (deps.repo.listRejectedUrls(book.id).has(url)) throw new CoverOfferExpiredError();
+    if (!offer || offer.expiresAt <= now().getTime() || deps.repo.listRejectedUrls(book.id).has(url)) throw new CoverOfferExpiredError();
     const stored = deps.repo.listImages(book.id).find((row) => row.source_url === url);
     if (stored) return stored.id;
     const key = `${book.id}\n${url}`;

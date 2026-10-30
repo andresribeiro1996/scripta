@@ -69,7 +69,7 @@
 2. **No side effects from browsing.** Listing candidates, including a paused or spent ISBNdb, never calls `deps.warn`, stamps nothing, and leaves `cover_status`, `cover_checked_at`, `apple_checked_at`, `cover_upgrade_wanted_at` and the backoff alone. Pinned in Task 4.
 3. **A personal pick leaves the catalog cover alone.** Only an admin's `everyone: true` sets it, as `manual`. Pinned in Tasks 4 and 5.
 4. **`findBestCover` behaves the same after the step extraction.** The existing `coverResolver.test.ts` cases pass unchanged. Pinned in Task 3.
-5. **One stored row per `(book, source_url)`.** Picking an already-stored URL reuses its row and downloads nothing. Two picks of the same URL at once share one download. Pinned in Task 4.
+5. **One stored row per `(book, source_url)` and image size.** Picking an already-stored URL reuses its row and downloads nothing. Two picks of the same URL at once share one download. The worker reuses a picked row only when the URL still serves an image of the same size; a URL that now serves a bigger image gets a new row, as before. Pinned in Task 4.
 6. **Picker lookups use the urgent lane of the shared throttles.** They never get throttles of their own, which would double the request rate a source sees. `urgentLane` overrides the explicit `{ urgent: false }` that `createIsbndbGet` passes (`backend/src/modules/books/adapters/sources/isbndb.ts:30`). Pinned in Task 5.
 7. **A found-cover pick can be undone.** Both pickers show Remove custom cover when the book has a gallery cover or any `_coverUrl`. Pinned in Tasks 6 and 7.
 8. **Parallel listings don't cancel each other's offers.** The quick and apple listings merge into one offer set. Pinned in Task 4.

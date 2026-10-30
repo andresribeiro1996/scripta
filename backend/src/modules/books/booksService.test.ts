@@ -3408,10 +3408,9 @@ test("a listing lets an unexpected source error propagate", async () => {
 });
 
 test("candidates ask pickerSources and never the worker's sources when pickerSources is given", async () => {
-  const calls: string[] = [];
   const failing: CoverSource = {
-    byIsbn: async () => { calls.push("byIsbn"); throw new Error("the worker's sources are not expected"); },
-    byTitle: async () => { calls.push("byTitle"); throw new Error("the worker's sources are not expected"); }
+    byIsbn: async () => { throw new Error("the worker's sources are not expected"); },
+    byTitle: async () => { throw new Error("the worker's sources are not expected"); }
   };
   const h = harness({
     sources: { isbndb: failing, apple: failing, openlibrary: failing },
@@ -3420,7 +3419,6 @@ test("candidates ask pickerSources and never the worker's sources when pickerSou
   pickerBook(h);
   assert.deepEqual(urlsOf((await h.service.listCoverCandidates("u1", orlando, "quick")).candidates), ["https://o/a"]);
   assert.deepEqual(urlsOf((await h.service.listCoverCandidates("u1", orlando, "apple")).candidates), ["https://p/a"]);
-  assert.deepEqual(calls, []);
 });
 
 test("quick and apple offers merge", async () => {
@@ -3636,6 +3634,20 @@ test("an upgrade that finds a URL a reader already picked reuses that row instea
   assert.equal(book.cover_upgrade_wanted_at, null);
   assert.equal(h.repo.listImages(id).filter((row) => row.source_url === "https://a/1").length, 1);
   assert.equal(h.repo.listImages(id).length, 2);
+});
+
+test("an upgrade stores a new row when a picked URL now serves an image of another height", async () => {
+  const { h, id } = prepare(orlando, { isbndb: null, apple: recording("apple", [], "https://a/1"), openlibrary: emptySource }, [["https://a/1", 900]]);
+  withCover(h, id, "openlibrary", 300, "low_res");
+  await h.service.listCoverCandidates("u1", orlando, "apple");
+  await h.service.pickCover("u1", orlando, { url: "https://a/1" }, false);
+  const [picked] = h.repo.listImages(id).filter((row) => row.source_url === "https://a/1");
+  h.sizes.set("https://a/1", [900, 1400]);
+  await h.service.processBook(id, "upgrade");
+  const rows = h.repo.listImages(id).filter((row) => row.source_url === "https://a/1");
+  assert.equal(rows.length, 2);
+  assert.notEqual(h.repo.getBook(id)!.cover_image_id, picked!.id);
+  assert.equal(h.repo.getImage(h.repo.getBook(id)!.cover_image_id!)!.height, 1400);
 });
 
 test("candidates and picks for an unknown book throw BookNotFoundError", async () => {
