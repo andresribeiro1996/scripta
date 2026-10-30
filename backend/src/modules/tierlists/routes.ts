@@ -60,7 +60,7 @@ const listPublicQuerySchema = z.object({
 });
 
 function answer(tierlist: Tierlist): WireTierlist {
-  return { ...tierlist, data: canonicalBoard(tierlist.data) };
+  return { ...tierlist, subject: null, data: canonicalBoard(tierlist.data) };
 }
 
 function sendWriteFailure(reply: FastifyReply, outcome: Exclude<TierlistWriteOutcome, { ok: true }>) {
@@ -84,7 +84,7 @@ export function buildTierlistRoutes(service: TierlistsService) {
       try {
         const outcome = service.createTierlist(request.user.id, parsed.data);
         if (!outcome.ok) return sendWriteFailure(reply, outcome);
-        return reply.code(201).send({ ...outcome.tierlist, data: outcome.data } satisfies WireTierlist);
+        return reply.code(201).send({ ...outcome.tierlist, subject: null, data: outcome.data } satisfies WireTierlist);
       } catch (err) {
         return sendWorksError(reply, err);
       }
@@ -112,7 +112,7 @@ export function buildTierlistRoutes(service: TierlistsService) {
       try {
         const outcome = service.updateTierlist(request.user.id, params.data.id, { ...(body.data.name !== undefined ? { name: body.data.name } : {}), ...(body.data.data !== undefined ? { data: body.data.data } : {}) });
         if (!outcome.ok) return sendWriteFailure(reply, outcome);
-        return reply.send({ ...outcome.tierlist, data: outcome.data } satisfies WireTierlist);
+        return reply.send({ ...outcome.tierlist, subject: null, data: outcome.data } satisfies WireTierlist);
       } catch (err) {
         return sendWorksError(reply, err);
       }
@@ -143,7 +143,7 @@ export function buildTierlistRoutes(service: TierlistsService) {
         const opened = service.openVoting(request.user.id, params.data.id, body.data.access);
         if (!opened) return reply.code(404).send({ error: "No tier list with that id." });
         const { tierlist, known } = opened;
-        return reply.code(201).send({ tierlist: { ...tierlist, data: canonicalBoard(tierlist.data, known) } satisfies WireTierlist, voteCode: tierlist.voteCode });
+        return reply.code(201).send({ tierlist: { ...tierlist, subject: null, data: canonicalBoard(tierlist.data, known) } satisfies WireTierlist, voteCode: tierlist.voteCode });
       } catch (err) {
         return sendWorksError(reply, err);
       }
@@ -166,7 +166,7 @@ export function buildTierlistRoutes(service: TierlistsService) {
         if (!tierlist) {
           return reply.code(404).send({ error: "No tier list with that id." });
         }
-        return reply.send({ tierlist: { ...tierlist, data } satisfies WireTierlist });
+        return reply.send({ tierlist: { ...tierlist, subject: null, data } satisfies WireTierlist });
       } catch (err) {
         return sendWorksError(reply, err);
       }
@@ -274,6 +274,7 @@ export function buildPublicTierlistRoutes(service: TierlistsService) {
           eligibleVoteCount: board.eligibleVoteCount,
           promotedAt: board.promotedAt,
           ranksWorstFirst: board.ranksWorstFirst,
+          subject: null,
           ...(board.votingOpen ? {} : { histogram: histogramToWorks(board.histogram, canonical, first) })
         } satisfies VotingBoard,
         books: boardBooks(pool, board.publicBooks, () => service.booksInOrder(board.ownerUserId, pool))

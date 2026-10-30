@@ -102,7 +102,8 @@ function toTournamentSummary(row: TournamentRow, preview: SeedPreview, winner: S
     ownerUserId: row.owner_user_id,
     covers: preview.covers,
     filledSlots: preview.filledSlots,
-    winner: winner && { workId: winner.workId, title: winner.title, author: winner.author, cover: winner.cover }
+    winner: winner && { workId: winner.workId, title: winner.title, author: winner.author, cover: winner.cover },
+    subject: null
   };
 }
 

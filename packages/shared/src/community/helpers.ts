@@ -1,4 +1,5 @@
 import { statusLabel } from "../library/covers.js";
+import { itemNoun } from "../characters/index.js";
 import { plural } from "../plural.js";
 import { DEFAULT_TIER_PRESET } from "../tierlists/tierlist.js";
 import type {
@@ -20,7 +21,7 @@ export const TIER_LADDER = DEFAULT_TIER_PRESET.map((tier) => tier.color);
 export function gameActionLabel(content: PublishedContent): string {
   if (content.kind === "quiz") return content.playOpen && !content.viewerVoted ? "Play quiz" : "View quiz";
   if (content.kind === "tournament") return content.status === "completed" ? "View results" : "Vote in tournament";
-  return content.promotedAt || !content.votingOpen ? "View rankings" : content.viewerVoted ? "Edit ranking" : "Rank books";
+  return content.promotedAt || !content.votingOpen ? "View rankings" : content.viewerVoted ? "Edit ranking" : `Rank ${itemNoun(content.subject, 2)}`;
 }
 
 export function isKnownContent(content: PublishedContent): boolean {
@@ -41,9 +42,9 @@ export function contentKindLabel(content: PublishedContent): string {
 export function contentDetail(content: PublishedContent): string {
   switch (content.kind) {
     case "tierlist":
-      return `${plural(content.poolSize, "book", "books")} · ${plural(content.ballotCount, "ballot", "ballots")}${content.promotedAt ? " · permanent reference" : content.votingOpen ? "" : " · closed"}`;
+      return `${plural(content.poolSize, itemNoun(content.subject, 1), itemNoun(content.subject, 2))} · ${plural(content.ballotCount, "ballot", "ballots")}${content.promotedAt ? " · permanent reference" : content.votingOpen ? "" : " · closed"}`;
     case "tournament":
-      return `${content.bracketSize}-book bracket · ${content.status}`;
+      return `${content.bracketSize}-${itemNoun(content.subject, 1)} bracket · ${content.status}`;
     case "quiz":
       return `${plural(content.questionCount, "question", "questions")} · ${plural(content.playCount, "play", "plays")}${content.playOpen ? "" : " · closed"}`;
   }
@@ -81,11 +82,11 @@ export function contentStats(content: PublishedContent): Array<{ value: number; 
   switch (content.kind) {
     case "tierlist":
       return [
-        { value: content.poolSize, label: content.poolSize === 1 ? "book" : "books" },
+        { value: content.poolSize, label: itemNoun(content.subject, content.poolSize) },
         { value: content.ballotCount, label: content.ballotCount === 1 ? "ballot" : "ballots" }
       ];
     case "tournament":
-      return [{ value: content.bracketSize, label: content.bracketSize === 1 ? "book" : "books" }];
+      return [{ value: content.bracketSize, label: itemNoun(content.subject, content.bracketSize) }];
     case "quiz":
       return [
         { value: content.questionCount, label: content.questionCount === 1 ? "question" : "questions" },

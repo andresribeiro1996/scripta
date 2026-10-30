@@ -18,7 +18,7 @@ export type BookScreenModel = {
   author: string;
   authorAwards: string | null;
   awards: Array<{ label: string; won: boolean }>;
-  characters: { shown: string[]; more: string[] };
+  characters: { shown: string[]; more: string[]; canMakeGame: boolean };
   genres: string[];
   possibleGenres: string[];
   series: BookSeries | null;
@@ -118,7 +118,7 @@ export function bookScreenModel(page: WorkPage | null, book: Book | null, viewer
     author: work?.author ?? String(book?.Attribution ?? "Unknown author"),
     authorAwards,
     awards,
-    characters: { shown: (work?.characters ?? []).slice(0, CHARACTERS_SHOWN), more: (work?.characters ?? []).slice(CHARACTERS_SHOWN) },
+    characters: { shown: (work?.characters ?? []).slice(0, CHARACTERS_SHOWN), more: (work?.characters ?? []).slice(CHARACTERS_SHOWN), canMakeGame: (work?.characters ?? []).length >= 4 },
     genres: work ? work.genres ?? [] : book ? genresForBook(book).slice(0, GENRE_CAP) : [],
     possibleGenres: work?.possibleGenres ?? [],
     series: work ? work.series ?? (selected ?? work.editions[defaultEditionIndex(work)])?.collection ?? null : null,

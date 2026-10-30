@@ -16,7 +16,8 @@ const data = { tiers: [], pool: ["w1"] };
 const placements = [{ workId: "w1", tierId: "s" }];
 
 const cases: Array<[string, (api: TierlistsApi) => Promise<unknown>, string, ApiRequestInit]> = [
-  ["fetchTierlists", (api) => api.fetchTierlists(), "/tierlists", { auth: "required" }],
+  ["fetchTierlists", (api) => api.fetchTierlists(), "/tierlists?subjects=characters", { auth: "required" }],
+  ["createCharacterTierlist", (api) => api.createCharacterTierlist("N", { workId: "w1", characterIds: ["a", "b"] }), "/tierlists", { method: "POST", body: { name: "N", characters: { workId: "w1", characterIds: ["a", "b"] } }, auth: "required" }],
   ["fetchTierlist", (api) => api.fetchTierlist("t1"), "/tierlists/t1", { auth: "required" }],
   ["createTierlist", (api) => api.createTierlist("N", data, "members", true), "/tierlists", { method: "POST", body: { name: "N", data, access: "members", ranksWorstFirst: true }, auth: "required" }],
   ["updateTierlist", (api) => api.updateTierlist("t1", { name: "M" }), "/tierlists/t1", { method: "PUT", body: { name: "M" }, auth: "required" }],

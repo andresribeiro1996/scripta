@@ -10,13 +10,16 @@ type Access = "anonymous" | "members";
 export function createTierlistsApi(request: ApiRequest) {
   return {
     async fetchTierlists(): Promise<Tierlist[]> {
-      return (await request<{ tierlists: Tierlist[] }>("/tierlists", { auth: "required" })).tierlists;
+      return (await request<{ tierlists: Tierlist[] }>("/tierlists?subjects=characters", { auth: "required" })).tierlists;
     },
     fetchTierlist(id: string): Promise<Tierlist> {
       return request<Tierlist>(apiPath`/tierlists/${id}`, { auth: "required" });
     },
     createTierlist(name: string, data?: TierlistData, access?: Access, ranksWorstFirst?: boolean): Promise<Tierlist> {
       return request<Tierlist>("/tierlists", { method: "POST", body: { name, data, access, ranksWorstFirst }, auth: "required" });
+    },
+    createCharacterTierlist(name: string, characters: { workId: string; characterIds: string[] }): Promise<Tierlist> {
+      return request<Tierlist>("/tierlists", { method: "POST", body: { name, characters }, auth: "required" });
     },
     updateTierlist(id: string, patch: { name?: string; data?: TierlistData }): Promise<Tierlist> {
       return request<Tierlist>(apiPath`/tierlists/${id}`, { method: "PUT", body: patch, auth: "required" });

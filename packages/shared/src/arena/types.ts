@@ -1,3 +1,4 @@
+import type { CharacterSubject } from "../characters/index.js";
 export interface SeedBook {
   workId: string | null;
   title: string;
@@ -34,6 +35,7 @@ export interface Tournament {
   covers: string[];
   filledSlots: number;
   winner: SeedBook | null;
+  subject: CharacterSubject | null;
 }
 
 export interface TournamentView extends Tournament {

@@ -24,6 +24,7 @@ const tournament = (over: Partial<Tournament> = {}): Tournament => ({
   covers: [],
   filledSlots: 0,
   winner: null,
+  subject: null,
   ...over,
 });
 
@@ -40,6 +41,7 @@ const tierlist = (over: Partial<Tierlist> = {}): Tierlist => ({
   promotedAt: null,
   originCreatorId: "u1",
   ranksWorstFirst: false,
+  subject: null,
   ...over,
 });
 

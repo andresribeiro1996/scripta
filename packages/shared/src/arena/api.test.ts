@@ -16,7 +16,8 @@ const book = { workId: "w1", title: "T", author: "A", cover: null };
 
 const cases: Array<[string, (api: ArenaApi) => Promise<unknown>, string, ApiRequestInit]> = [
   ["createTournament", (api) => api.createTournament({ name: "N", bracketSize: 8, roundDurationMinutes: 60 }), "/arenas", { method: "POST", body: { name: "N", bracketSize: 8, roundDurationMinutes: 60 }, auth: "required" }],
-  ["fetchMyTournaments", (api) => api.fetchMyTournaments(), "/arenas/mine", { auth: "required" }],
+  ["fetchMyTournaments", (api) => api.fetchMyTournaments(), "/arenas/mine?subjects=characters", { auth: "required" }],
+  ["createCharacterTournament", (api) => api.createCharacterTournament({ name: "N", bracketSize: 4, roundDurationMinutes: 60, characters: { workId: "w1", characterIds: ["a", "b", "c", "d"] } }), "/arenas", { method: "POST", body: { name: "N", bracketSize: 4, roundDurationMinutes: 60, characters: { workId: "w1", characterIds: ["a", "b", "c", "d"] } }, auth: "required" }],
   ["fetchVotedTournaments", (api) => api.fetchVotedTournaments(), "/arenas/voted", { auth: "required" }],
   ["fetchTournament with a voter token", (api) => api.fetchTournament("t1", "tok en"), "/arenas/t1?voterToken=tok%20en", { auth: "optional" }],
   ["fetchTournament without a voter token", (api) => api.fetchTournament("t1"), "/arenas/t1", { auth: "optional" }],

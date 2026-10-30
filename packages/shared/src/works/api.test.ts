@@ -55,3 +55,13 @@ test("fetchWorkCharacters splits more than 500 ids into two posts and merges the
   assert.deepEqual(await createWorksApi(request).fetchWorkCharacters(ids), { characters: { w0: ["x"], w500: ["x"] } });
   assert.deepEqual(sizes, [500, 1]);
 });
+
+test("fetchWorkCast reads the cast with optional auth", async () => {
+  const calls: Array<{ path: string; init: unknown }> = [];
+  const request = (async (path: string, init: unknown) => {
+    calls.push({ path, init });
+    return { scope: "S", characters: [] };
+  }) as ApiRequest;
+  assert.deepEqual(await createWorksApi(request).fetchWorkCast("w/1"), { scope: "S", characters: [] });
+  assert.deepEqual(calls, [{ path: "/works/w%2F1/cast", init: { auth: "optional" } }]);
+});
