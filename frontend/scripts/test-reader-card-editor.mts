@@ -151,3 +151,10 @@ test("twelve finish chips between corners and print, with the stored one checked
   assert.match(finishes, /aria-checked="true"[^>]*>(?:(?!<\/button>).)*Gilt edge/s);
   assert.ok(html.indexOf(`aria-label="Corners"`) < html.indexOf(`aria-label="Finish"`) && html.indexOf(`aria-label="Finish"`) < html.indexOf(`aria-label="Print"`));
 });
+
+test("preview sticks under the bar beside the controls at lg; no inner page width", () => {
+  const page = readFileSync(new URL("../src/pages/ReaderCardPage.tsx", import.meta.url), "utf8");
+  assert.match(page, /lg:grid-cols-\[minmax\(0,5fr\)_minmax\(0,7fr\)\]/);
+  assert.match(page, /lg:sticky lg:top-\[calc\(var\(--app-top\)\+1\.5rem\)\]/);
+  assert.doesNotMatch(page, /max-w-7xl/);
+});
