@@ -1,23 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import {
   coverSourceLabel,
+  errorMessage,
+  FOUND_COVERS_PENDING,
+  foundCoversView,
   isCurrentCover,
-  visibleCandidates,
-  type CoverCandidatesResponse,
   type CoverCandidateView,
   type CoverPickSource,
+  type FoundCoversLoad,
+  type MeasuredCoverSize,
   type ResolvedCoverResponse
 } from "@scripta/shared";
 import { fetchCoverCandidates, pickCover, type ResolveCoverParams } from "../api/covers";
-
-type Load = { state: "pending" } | { state: "done"; response: CoverCandidatesResponse } | { state: "failed"; message: string };
-type Size = { width: number; height: number } | null;
-
-const PENDING: Load = { state: "pending" };
-
-function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
 
 export function FoundCovers({
   lookup: lookupProp,
@@ -30,9 +24,9 @@ export function FoundCovers({
   isAdmin?: boolean;
   onPick: (cover: ResolvedCoverResponse, everyone: boolean) => void;
 }) {
-  const [quick, setQuick] = useState<Load>(PENDING);
-  const [apple, setApple] = useState<Load>(PENDING);
-  const [measured, setMeasured] = useState<ReadonlyMap<string, Size>>(new Map());
+  const [quick, setQuick] = useState<FoundCoversLoad>(FOUND_COVERS_PENDING);
+  const [apple, setApple] = useState<FoundCoversLoad>(FOUND_COVERS_PENDING);
+  const [measured, setMeasured] = useState<ReadonlyMap<string, MeasuredCoverSize>>(new Map());
   const [picking, setPicking] = useState(false);
   const [pickFailure, setPickFailure] = useState<{ url: string; message: string } | null>(null);
   const [lookup] = useState(lookupProp);
@@ -47,10 +41,10 @@ export function FoundCovers({
 
   useEffect(() => {
     let current = true;
-    function load(from: CoverPickSource, set: (next: Load) => void) {
+    function load(from: CoverPickSource, set: (next: FoundCoversLoad) => void) {
       fetchCoverCandidates(lookup, from).then(
         (response) => current && set({ state: "done", response }),
-        (error: unknown) => current && set({ state: "failed", message: messageOf(error) })
+        (error: unknown) => current && set({ state: "failed", message: errorMessage(error) })
       );
     }
     load("quick", setQuick);
@@ -60,7 +54,7 @@ export function FoundCovers({
     };
   }, [lookup]);
 
-  function measure(url: string, size: Size) {
+  function measure(url: string, size: MeasuredCoverSize) {
     setMeasured((previous) => new Map(previous).set(url, size));
   }
 
@@ -71,22 +65,15 @@ export function FoundCovers({
       const cover = await pickCover(lookup, candidate.coverImageId ? { coverImageId: candidate.coverImageId } : { url: candidate.url }, everyone);
       if (mounted.current) onPick(cover, everyone);
     } catch (error) {
-      setPickFailure({ url: candidate.url, message: messageOf(error) });
+      setPickFailure({ url: candidate.url, message: errorMessage(error) });
     } finally {
       setPicking(false);
     }
   }
 
-  const loads = [quick, apple];
-  const tiles = visibleCandidates(
-    loads.flatMap((load) => (load.state === "done" ? load.response.candidates : [])),
-    measured
-  );
-  const unavailable = [...new Set(loads.flatMap((load) => (load.state === "done" ? load.response.unavailable : [])))];
-  const failures = [...new Set(loads.flatMap((load) => (load.state === "failed" ? [load.message] : [])))];
-  const checkingApple = apple.state === "pending";
+  const { tiles, unavailable, failures, checkingApple, empty } = foundCoversView(quick, apple, measured);
 
-  if (tiles.length === 0 && unavailable.length === 0 && failures.length === 0 && !checkingApple) return null;
+  if (empty) return null;
 
   return (
     <section className="mb-4">
@@ -124,7 +111,7 @@ export function FoundCovers({
               <button
                 type="button"
                 disabled={picking}
-                aria-label={`Use this ${coverSourceLabel(candidate.source)} cover for everyone`}
+                aria-label={`Use for everyone: ${coverSourceLabel(candidate.source)} cover`}
                 onClick={() => void choose(candidate, true)}
                 className="min-h-11 text-left text-xs font-semibold text-(--color-accent) transition-opacity hover:opacity-80 disabled:opacity-50"
               >

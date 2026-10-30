@@ -3,11 +3,15 @@ import { test } from "node:test";
 import {
   coverCandidatesQuery,
   coverSourceLabel,
+  errorMessage,
+  FOUND_COVERS_PENDING,
+  foundCoversView,
   isAcceptableCover,
   isCurrentCover,
   pickCoverBody,
   visibleCandidates,
-  type CoverCandidateView
+  type CoverCandidateView,
+  type FoundCoversLoad
 } from "./coverCandidates.js";
 
 const params = { isbn: "9780441013593", imageId: "abc", title: "Dune" };
@@ -119,4 +123,67 @@ test("source labels", () => {
   assert.equal(coverSourceLabel("publisher"), "Publisher");
   assert.equal(coverSourceLabel("upload"), "Admin upload");
   assert.equal(coverSourceLabel("mystery"), "mystery");
+});
+
+function done(candidates: CoverCandidateView[], unavailable: string[] = []): FoundCoversLoad {
+  return { state: "done", response: { candidates, unavailable } };
+}
+
+test("the found-covers view lists the quick tiles first, then Apple's, and drops what failed to load", () => {
+  const kobo = found("kobo", "https://kobo/1.jpg");
+  const dropped = found("openlibrary", "https://ol/1.jpg");
+  const apple = found("apple", "https://apple/1.jpg");
+  const view = foundCoversView(done([kobo, dropped]), done([apple]), new Map([[dropped.url, null]]));
+  assert.deepEqual(
+    view.tiles.map((tile) => tile.candidate.url),
+    [kobo.url, apple.url]
+  );
+  assert.equal(view.checkingApple, false);
+  assert.equal(view.empty, false);
+});
+
+test("the found-covers view is checking Apple while that load is pending, even with no tiles", () => {
+  const view = foundCoversView(done([]), FOUND_COVERS_PENDING, new Map());
+  assert.equal(view.checkingApple, true);
+  assert.equal(view.empty, false);
+});
+
+test("the found-covers view is empty once both loads are done with nothing to show", () => {
+  const view = foundCoversView(done([]), done([]), new Map());
+  assert.deepEqual(view, { tiles: [], unavailable: [], failures: [], checkingApple: false, empty: true });
+});
+
+test("the found-covers view is empty when every found candidate was dropped", () => {
+  const candidate = found("apple", "https://apple/1.jpg");
+  const view = foundCoversView(done([]), done([candidate]), new Map([[candidate.url, { width: 1400, height: 1400 }]]));
+  assert.equal(view.tiles.length, 0);
+  assert.equal(view.empty, true);
+});
+
+test("the found-covers view lists each unavailable source once", () => {
+  const view = foundCoversView(done([], ["kobo", "isbndb"]), done([], ["kobo", "apple"]), new Map());
+  assert.deepEqual(view.unavailable, ["kobo", "isbndb", "apple"]);
+  assert.equal(view.empty, false);
+});
+
+test("the found-covers view lists each failure message once and does not call a failed Apple load pending", () => {
+  const failed: FoundCoversLoad = { state: "failed", message: "Network request failed" };
+  const view = foundCoversView(failed, failed, new Map());
+  assert.deepEqual(view.failures, ["Network request failed"]);
+  assert.equal(view.checkingApple, false);
+  assert.equal(view.empty, false);
+  assert.deepEqual(foundCoversView(failed, { state: "failed", message: "Timed out" }, new Map()).failures, ["Network request failed", "Timed out"]);
+});
+
+test("the found-covers view keeps one load's tiles when the other failed", () => {
+  const kobo = found("kobo", "https://kobo/1.jpg");
+  const view = foundCoversView(done([kobo]), { state: "failed", message: "Timed out" }, new Map());
+  assert.equal(view.tiles.length, 1);
+  assert.deepEqual(view.failures, ["Timed out"]);
+});
+
+test("an error's message is its text, anything else is stringified", () => {
+  assert.equal(errorMessage(new Error("boom")), "boom");
+  assert.equal(errorMessage("plain"), "plain");
+  assert.equal(errorMessage(404), "404");
 });

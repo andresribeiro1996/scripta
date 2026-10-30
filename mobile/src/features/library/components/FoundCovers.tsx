@@ -1,31 +1,24 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Image } from "expo-image";
 import {
-  coverQueryKey,
   coverSourceLabel,
+  errorMessage,
+  FOUND_COVERS_PENDING,
+  foundCoversView,
   isCurrentCover,
-  visibleCandidates,
-  type CoverCandidatesResponse,
   type CoverCandidateView,
   type CoverPickSource,
+  type FoundCoversLoad,
+  type MeasuredCoverSize,
   type ResolvedCoverResponse,
 } from "@scripta/shared";
 import { Text } from "../../../ui/Text";
 import { minimumTouchTarget, radii, spacing, typography, useTheme } from "../../../ui/theme";
 import { fetchCoverCandidates, pickCover, type ResolveCoverParams } from "../api/covers";
 
-type Load = { state: "pending" } | { state: "done"; response: CoverCandidatesResponse } | { state: "failed"; message: string };
-type Size = { width: number; height: number } | null;
-
-const PENDING: Load = { state: "pending" };
-
-function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
 export function FoundCovers({
-  lookup,
+  lookup: lookupProp,
   coverUrl,
   onPick,
 }: {
@@ -34,19 +27,27 @@ export function FoundCovers({
   onPick: (cover: ResolvedCoverResponse) => void;
 }) {
   const { colors } = useTheme();
-  const [quick, setQuick] = useState<Load>(PENDING);
-  const [apple, setApple] = useState<Load>(PENDING);
-  const [measured, setMeasured] = useState<ReadonlyMap<string, Size>>(new Map());
+  const [quick, setQuick] = useState<FoundCoversLoad>(FOUND_COVERS_PENDING);
+  const [apple, setApple] = useState<FoundCoversLoad>(FOUND_COVERS_PENDING);
+  const [measured, setMeasured] = useState<ReadonlyMap<string, MeasuredCoverSize>>(new Map());
   const [picking, setPicking] = useState(false);
   const [pickFailure, setPickFailure] = useState<{ url: string; message: string } | null>(null);
-  const lookupKey = coverQueryKey(lookup);
+  const [lookup] = useState(lookupProp);
+  const mounted = useRef(true);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     let current = true;
-    function load(from: CoverPickSource, set: (next: Load) => void) {
+    function load(from: CoverPickSource, set: (next: FoundCoversLoad) => void) {
       fetchCoverCandidates(lookup, from).then(
         (response) => current && set({ state: "done", response }),
-        (error: unknown) => current && set({ state: "failed", message: messageOf(error) }),
+        (error: unknown) => current && set({ state: "failed", message: errorMessage(error) }),
       );
     }
     load("quick", setQuick);
@@ -54,9 +55,9 @@ export function FoundCovers({
     return () => {
       current = false;
     };
-  }, [lookupKey]);
+  }, [lookup]);
 
-  function measure(url: string, size: Size) {
+  function measure(url: string, size: MeasuredCoverSize) {
     setMeasured((previous) => new Map(previous).set(url, size));
   }
 
@@ -64,24 +65,18 @@ export function FoundCovers({
     setPicking(true);
     setPickFailure(null);
     try {
-      onPick(await pickCover(lookup, candidate.coverImageId ? { coverImageId: candidate.coverImageId } : { url: candidate.url }));
+      const cover = await pickCover(lookup, candidate.coverImageId ? { coverImageId: candidate.coverImageId } : { url: candidate.url });
+      if (mounted.current) onPick(cover);
     } catch (error) {
-      setPickFailure({ url: candidate.url, message: messageOf(error) });
+      setPickFailure({ url: candidate.url, message: errorMessage(error) });
     } finally {
       setPicking(false);
     }
   }
 
-  const loads = [quick, apple];
-  const tiles = visibleCandidates(
-    loads.flatMap((load) => (load.state === "done" ? load.response.candidates : [])),
-    measured,
-  );
-  const unavailable = [...new Set(loads.flatMap((load) => (load.state === "done" ? load.response.unavailable : [])))];
-  const failures = [...new Set(loads.flatMap((load) => (load.state === "failed" ? [load.message] : [])))];
-  const checkingApple = apple.state === "pending";
+  const { tiles, unavailable, failures, checkingApple, empty } = foundCoversView(quick, apple, measured);
 
-  if (tiles.length === 0 && unavailable.length === 0 && failures.length === 0 && !checkingApple) return null;
+  if (empty) return null;
 
   return (
     <View style={styles.section}>
@@ -89,14 +84,14 @@ export function FoundCovers({
         Found covers
       </Text>
       <View style={styles.grid}>
-        {tiles.map(({ candidate, width, height }) => {
+        {tiles.map(({ candidate, width, height }, index) => {
           const label = coverSourceLabel(candidate.source);
           const size = width !== null && height !== null ? { width, height } : null;
           const current = isCurrentCover(candidate, coverUrl);
           return (
             <View key={candidate.url} style={styles.cell}>
               <Pressable
-                accessibilityLabel={size ? `${label} cover, ${size.width} by ${size.height}` : `${label} cover`}
+                accessibilityLabel={`Use this ${label} cover, ${size ? `${size.width} by ${size.height}` : `${index + 1} of ${tiles.length}`}`}
                 accessibilityRole="button"
                 accessibilityState={{ selected: current }}
                 disabled={picking}
@@ -110,12 +105,15 @@ export function FoundCovers({
                   source={{ uri: candidate.url }}
                   style={styles.thumbImage}
                   contentFit="contain"
+                  allowDownscaling={false}
                   onLoad={(e) => measure(candidate.url, { width: e.source.width, height: e.source.height })}
                   onError={() => measure(candidate.url, null)}
                 />
               </Pressable>
-              {size && <Text style={[typography.caption, { color: colors.textDim }]}>{`${size.width} × ${size.height}`}</Text>}
-              <Text style={[typography.caption, { color: colors.textDim }]}>{label}</Text>
+              <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+                {size && <Text style={[typography.caption, { color: colors.textDim }]}>{`${size.width} × ${size.height}`}</Text>}
+                <Text style={[typography.caption, { color: colors.textDim }]}>{label}</Text>
+              </View>
               {pickFailure?.url === candidate.url && (
                 <Text accessibilityRole="alert" style={[typography.caption, { color: colors.danger }]}>
                   {pickFailure.message}

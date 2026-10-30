@@ -48,9 +48,11 @@ export function pickCoverBody(
   };
 }
 
+export type MeasuredCoverSize = { width: number; height: number } | null;
+
 export function visibleCandidates(
   candidates: CoverCandidateView[],
-  measured: ReadonlyMap<string, { width: number; height: number } | null>
+  measured: ReadonlyMap<string, MeasuredCoverSize>
 ): Array<{ candidate: CoverCandidateView; width: number | null; height: number | null }> {
   const shown: Array<{ candidate: CoverCandidateView; width: number | null; height: number | null }> = [];
   for (const candidate of candidates) {
@@ -65,6 +67,30 @@ export function visibleCandidates(
     }
   }
   return shown;
+}
+
+export type FoundCoversLoad =
+  | { state: "pending" }
+  | { state: "done"; response: CoverCandidatesResponse }
+  | { state: "failed"; message: string };
+
+export const FOUND_COVERS_PENDING: FoundCoversLoad = { state: "pending" };
+
+export function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+export function foundCoversView(quick: FoundCoversLoad, apple: FoundCoversLoad, measured: ReadonlyMap<string, MeasuredCoverSize>) {
+  const loads = [quick, apple];
+  const tiles = visibleCandidates(
+    loads.flatMap((load) => (load.state === "done" ? load.response.candidates : [])),
+    measured
+  );
+  const unavailable = [...new Set(loads.flatMap((load) => (load.state === "done" ? load.response.unavailable : [])))];
+  const failures = [...new Set(loads.flatMap((load) => (load.state === "failed" ? [load.message] : [])))];
+  const checkingApple = apple.state === "pending";
+  const empty = tiles.length === 0 && unavailable.length === 0 && failures.length === 0 && !checkingApple;
+  return { tiles, unavailable, failures, checkingApple, empty };
 }
 
 export function isCurrentCover(candidate: CoverCandidateView, coverUrl: unknown): boolean {
