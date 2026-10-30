@@ -611,11 +611,13 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
 export interface CommunityPublicApi {
   emitEvent(userId: string, type: ActivityEventType, refType: CommunityRefType, refId: string, payload?: Record<string, unknown>): void;
   readerVisibility(viewerId: string | null, userIds: string[]): Map<string, ReaderListing>;
+  followees(userId: string): string[];
 }
 
 export function createCommunityPublicApi(repo: CommunityRepository, now: () => number = Date.now): CommunityPublicApi {
   return {
     emitEvent: createActivityRecorder(repo, now),
+    followees: (userId) => repo.listFollowees(userId),
     readerVisibility(viewerId, userIds) {
       const visible = new Map<string, ReaderListing>();
       for (const [userId, standing] of createVisibility(repo, viewerId).standings(userIds)) {

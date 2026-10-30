@@ -17,6 +17,7 @@ const { createSqliteQuizzesRepository } = await import("./adapters/sqlite/sqlite
 const { createSqliteDailyChapterRepository } = await import("./adapters/sqlite/sqliteDailyChapterRepository.js");
 const { createDailyChapterService, dailyGuestKey } = await import("./dailyChapterService.js");
 const { buildDailyChapterRoutes } = await import("./dailyChapterRoutes.js");
+const { DailyChapterError } = await import("./domain/dailyChapter.js");
 
 function setup() {
   const db = new DatabaseSync(":memory:");
@@ -397,4 +398,64 @@ test("saving a question treats prompts that differ only by case as duplicates", 
   const { service } = setup(); seed(service);
   const first = service.editorial().questions[0]!;
   assert.throws(() => service.saveQuestion({ ...first, id: first.id + "-copy", prompt: first.prompt.toUpperCase(), approved: false }, "editor"), /already in the bank/);
+});
+
+function withPeople() {
+  const db = new DatabaseSync(":memory:");
+  applyQuizzesMigrations(db);
+  const repo = createSqliteDailyChapterRepository(db);
+  const plays = createSqliteQuizzesRepository(db);
+  const profiles = new Map([["reader", { username: "Reader", avatarUrl: null }], ["pub", { username: "Pub", avatarUrl: null }]]);
+  const people = { followees: (id: string) => id === "reader" ? ["pub", "priv", "nameless"] : [], published: (ids: string[]) => new Set(ids.filter((id) => id === "pub" || id === "nameless")), profiles: (ids: string[]) => new Map(ids.flatMap((id) => profiles.has(id) ? [[id, profiles.get(id)!] as const] : [])) };
+  const service = createDailyChapterService(repo, plays, () => new Date("2030-01-01T12:00:00.000Z"), people);
+  const answers = seed(service);
+  service.publish("edition-1");
+  const wrong = (count: number) => answers.map((answer, index) => ({ ...answer, choiceIndex: index < count ? 0 : 1 }));
+  for (const [id, correct] of [["reader", 5], ["pub", 3], ["priv", 4], ["nameless", 2], [dailyGuestKey("guest"), 1]] as const) service.play("edition-1", id, wrong(correct));
+  return { db, service };
+}
+
+test("people for an edition are the viewer and published followees, squares only", () => {
+  const { service } = withPeople();
+  const people = service.people("edition-1", "reader");
+  assert.deepEqual(people.map((p) => [p.userId, p.score, p.you]), [["reader", 5, true], ["pub", 3, false]]);
+  assert.equal(people[1]!.marks.length, 5);
+  assert.deepEqual(people[1]!.marks, [true, true, true, false, false]);
+  assert.ok(people.every((p) => !("choiceIndex" in p) && !("answers" in p)));
+});
+
+test("people stay hidden until the viewer has played that edition", () => {
+  const { service } = withPeople();
+  assert.throws(() => service.people("edition-1", "pub-viewer-without-play"), (error: InstanceType<typeof DailyChapterError>) => error.status === 403);
+  assert.throws(() => service.people("missing", "reader"), (error: InstanceType<typeof DailyChapterError>) => error.status === 404);
+});
+
+test("a player summary is visible to its owner and to everyone only when published", () => {
+  const { service } = withPeople();
+  assert.equal(service.player("priv", "reader"), null);
+  assert.equal(service.player("priv", "priv")?.perfect, 0);
+  assert.equal(service.player("pub", null)?.average, 3);
+  assert.equal(service.player("pub", null)?.month, "2030-01");
+  assert.equal(service.player("nobody", "nobody"), null);
+});
+
+test("the people and player routes require sign-in where they must and are never cached", async () => {
+  const { service } = withPeople();
+  assert.equal((await call(service, { method: "GET", url: "/daily-chapter/edition-1/people" })).status, 401);
+  const people = await call(service, { method: "GET", url: "/daily-chapter/edition-1/people" }, "reader");
+  assert.equal(people.status, 200);
+  assert.equal(people.headers["cache-control"], "no-store");
+  assert.deepEqual(people.body.people.map((p: { userId: string }) => p.userId), ["reader", "pub"]);
+  const anonymous = await call(service, { method: "GET", url: "/daily-chapter/players/pub" });
+  assert.equal(anonymous.status, 200);
+  assert.equal(anonymous.headers["cache-control"], "no-store");
+  assert.equal(anonymous.body.summary.average, 3);
+  assert.equal((await call(service, { method: "GET", url: "/daily-chapter/players/priv" })).body.summary, null);
+  assert.equal((await call(service, { method: "GET", url: "/daily-chapter/players/pub" }, "invalid")).status, 401);
+});
+
+test("reading a player's plays by voter uses the voter index", () => {
+  const { db } = withPeople();
+  const plan = db.prepare("EXPLAIN QUERY PLAN SELECT p.* FROM quiz_plays p JOIN daily_chapter_editions e ON e.id = p.quiz_id WHERE p.voter_user_id = ?").all("pub").map((row) => String((row as { detail: string }).detail)).join("\n");
+  assert.match(plan, /idx_quiz_plays_voter/);
 });

@@ -37,6 +37,7 @@ export function createSqliteDailyChapterRepository(db: DatabaseSync): DailyChapt
       } catch (error) { if (db.isTransaction) db.exec("ROLLBACK"); throw error; }
     },
     plays: (playerId) => db.prepare("SELECT p.* FROM quiz_plays p JOIN daily_chapter_editions e ON e.id = p.quiz_id WHERE p.voter_user_id = ? ORDER BY e.date DESC").all(playerId) as unknown as PlayRow[],
+    editionPlays: (editionIds, voterIds) => db.prepare("SELECT * FROM quiz_plays WHERE quiz_id IN (SELECT value FROM json_each(?)) AND (? IS NULL OR voter_user_id IN (SELECT value FROM json_each(?)))").all(JSON.stringify(editionIds), voterIds ? JSON.stringify(voterIds) : null, voterIds ? JSON.stringify(voterIds) : null) as unknown as PlayRow[],
     claimGuest(guestKey, userId) {
       db.exec("BEGIN IMMEDIATE");
       try {
