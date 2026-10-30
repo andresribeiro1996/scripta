@@ -192,6 +192,11 @@ export function tierlistCovers(data: Tierlist["data"], byWork: Map<string, Recor
   return [...books];
 }
 
+export function tierlistRowCovers(tierlist: Tierlist, byWork: Map<string, Record<string, unknown>>): Array<string | Record<string, unknown>> {
+  if (tierlist.subject) return tierlist.subject.scope.coverUrl ? [tierlist.subject.scope.coverUrl] : [];
+  return tierlistCovers(tierlist.data, byWork);
+}
+
 export function votedTierlistDetail(tierlist: VotedTierlist): string {
   return `${tierlist.poolSize} ${itemNoun(tierlist.subject, tierlist.poolSize)} · ${tierlist.ballotCount} ballots`;
 }

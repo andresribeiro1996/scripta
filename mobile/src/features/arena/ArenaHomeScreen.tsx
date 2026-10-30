@@ -21,7 +21,7 @@ import {
   homeSections,
   nextOwnerFilter,
   ownedItems,
-  tierlistCovers,
+  tierlistRowCovers,
   type ArenaTab,
   type GamesTab,
   type OwnedItem,
@@ -215,7 +215,7 @@ function ArenaList({
         }
         const row = gameRow(item);
         if (item.kind === "owned") {
-          const covers: RowCover[] = item.item.kind === "tierlist" ? tierlistCovers(item.item.source.data, byWork) : row.covers;
+          const covers: RowCover[] = item.item.kind === "tierlist" ? tierlistRowCovers(item.item.source, byWork) : row.covers;
           return <GameRow {...row} covers={covers} onPress={() => onOpen(item.item)} onDelete={() => onDelete({ kind: item.item.kind, id: item.item.id, name: item.item.name })} />;
         }
         return <GameRow {...row} onPress={() => router.push(item.target as never)} />;
