@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { router } from "expo-router";
 import { Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
 import { Text } from "../../ui/Text";
-import { quizClueHeading, readerGlyphLabel, type QuizPreview } from "@scripta/shared";
+import { itemNoun, quizClueHeading, readerGlyphLabel, type QuizPreview } from "@scripta/shared";
 import { ActionSheet, Icon, IconButton, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import type { ContentTone, DiscoverItem, PublishedContent } from "@scripta/shared/community";
 import { TIER_LADDER, contentStats, contentStatus, contentTarget, gameActionLabel } from "./communityHome";
@@ -50,7 +50,7 @@ export function DiscoverRow({ item, linkAuthor, stats, onPreviewBooks, onOpen }:
       }
       badges={status.votedBadge ? [status, { label: "Voted", tone: "info" }] : [status]}
       stats={stats ?? contentStats(content)}
-      seeBooks={content.kind === "tournament" && onPreviewBooks ? { label: `See all ${content.bookCount} books in ${content.name}`, onPress: () => onPreviewBooks({ id: content.id, name: content.name }) } : undefined}
+      seeBooks={content.kind === "tournament" && onPreviewBooks ? { label: `See all ${content.bookCount} ${itemNoun(content.subject, content.bookCount)} in ${content.name}`, onPress: () => onPreviewBooks({ id: content.id, name: content.name }) } : undefined}
     />
   );
 }

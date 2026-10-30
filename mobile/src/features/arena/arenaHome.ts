@@ -1,5 +1,5 @@
 import { FAN_SIZE, TIER_LADDER } from "../community/communityHome";
-import { quizPreview, type QuizPreview } from "@scripta/shared";
+import { itemNoun, quizPreview, type QuizPreview } from "@scripta/shared";
 import { CONTENT_STATUS, type ContentTone } from "@scripta/shared/community";
 import type { Quiz } from "../quizzes/api";
 import type { Tierlist, VotedTierlist } from "../tierlists/api";
@@ -101,7 +101,7 @@ export function ownedItems(tab: ArenaTab, tournaments: Tournament[], tierlists: 
     return {
       id: source.id,
       name: source.name,
-      detail: `${books} ${books === 1 ? "book" : "books"} · ${tiers} ${tiers === 1 ? "tier" : "tiers"}`,
+      detail: `${books} ${itemNoun(source.subject, books)} · ${tiers} ${tiers === 1 ? "tier" : "tiers"}`,
       kind: "tierlist",
       source,
     };
@@ -193,7 +193,7 @@ export function tierlistCovers(data: Tierlist["data"], byWork: Map<string, Recor
 }
 
 export function votedTierlistDetail(tierlist: VotedTierlist): string {
-  return `${tierlist.poolSize} books · ${tierlist.ballotCount} ballots`;
+  return `${tierlist.poolSize} ${itemNoun(tierlist.subject, tierlist.poolSize)} · ${tierlist.ballotCount} ballots`;
 }
 
 export type GameRowModel = {
@@ -211,7 +211,7 @@ function tournamentRow(tournament: Tournament): GameRowModel {
   return {
     kind: "tournament",
     name: tournament.name,
-    meta: `${tournament.bracketSize}-book bracket`,
+    meta: `${tournament.bracketSize}-${itemNoun(tournament.subject, 1)} bracket`,
     badges: [TOURNAMENT_BADGE[tournament.status]],
     caption: tournamentProgress(tournament).label,
     covers: tournament.covers,

@@ -1,5 +1,5 @@
-import { useState, type ReactNode } from "react";
-import { booksByWork, workIdOf, type TierDefinition, type TierlistData } from "@scripta/shared";
+import { useEffect, useState, type ReactNode } from "react";
+import { booksByWork, isCharacterBook, workIdOf, type TierDefinition, type TierlistData } from "@scripta/shared";
 import { Pressable, ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import { Text } from "../../ui/Text";
 import { ActionSheet, Button, Dialog, IconButton, Input, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
@@ -8,7 +8,8 @@ import { CoverImage } from "../library/components/CoverImage";
 export type TierBook = Record<string, unknown>;
 
 export function titleOf(book: TierBook) { return String(book.Title ?? book.title ?? "Untitled"); }
-export function authorOf(book: TierBook) { return String(book.Attribution ?? book.author ?? "Unknown author"); }
+export function authorOf(book: TierBook) { return isCharacterBook(book) ? "" : String(book.Attribution ?? book.author ?? "Unknown author"); }
+export function labelOf(book: TierBook) { return isCharacterBook(book) ? titleOf(book) : `${titleOf(book)} by ${authorOf(book)}`; }
 export function workOf(book: TierBook): string | undefined {
   return workIdOf(book);
 }
@@ -16,6 +17,11 @@ export function workOf(book: TierBook): string | undefined {
 export function TierCover({ book, style, onLoadEnd }: { book: TierBook; style?: StyleProp<ViewStyle>; onLoadEnd?: () => void }) {
   const { colors } = useTheme();
   const [hasCover, setHasCover] = useState(false);
+  const character = isCharacterBook(book);
+  useEffect(() => { if (character) onLoadEnd?.(); }, [character]);
+  if (character) return <View style={[styles.cover, style]}>
+    <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.characterTile, { backgroundColor: colors.accentSoft }]}><Text numberOfLines={3} {...dynamicType} style={[styles.fallbackTitle, styles.center, { color: colors.accent }]}>{titleOf(book)}</Text></View>
+  </View>;
   return <View style={[styles.cover, style]}>
     <CoverImage book={book} onHasCoverChange={setHasCover} onLoadEnd={onLoadEnd} />
     {!hasCover ? <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.fallback, { backgroundColor: colors.accentSoft }]}><Text numberOfLines={3} {...dynamicType} style={[styles.fallbackTitle, { color: colors.accent }]}>{titleOf(book)}</Text><Text numberOfLines={1} {...dynamicType} style={[styles.fallbackAuthor, { color: colors.textDim }]}>{authorOf(book)}</Text></View> : null}
@@ -30,7 +36,7 @@ export function TierRowScroll({ style, contentContainerStyle, children }: { styl
 
 function BookChip({ book, onReassign }: { book: TierBook; onReassign?: () => void }) {
   return (
-    <Pressable disabled={!onReassign} accessibilityRole={onReassign ? "button" : undefined} accessibilityLabel={`${titleOf(book)} by ${authorOf(book)}`} accessibilityHint={onReassign ? "Opens the tier ring to reassign this book" : undefined} onPress={onReassign} onLongPress={onReassign} style={styles.chipWrap}>
+    <Pressable disabled={!onReassign} accessibilityRole={onReassign ? "button" : undefined} accessibilityLabel={labelOf(book)} accessibilityHint={onReassign ? `Opens the tier ring to reassign this ${isCharacterBook(book) ? "character" : "book"}` : undefined} onPress={onReassign} onLongPress={onReassign} style={styles.chipWrap}>
       <TierCover book={book} />
     </Pressable>
   );
@@ -107,6 +113,7 @@ const styles = StyleSheet.create({
   chipWrap: { width: 56, height: 84 },
   cover: { width: "100%", height: "100%", borderRadius: 2, overflow: "hidden" },
   fallback: { justifyContent: "space-between", padding: 5 },
+  characterTile: { alignItems: "center", justifyContent: "center", padding: 5 },
   fallbackTitle: { fontFamily: "serif", fontSize: 11, lineHeight: 13, fontWeight: "700" },
   fallbackAuthor: { fontSize: 8, lineHeight: 10, fontWeight: "700" },
   center: { textAlign: "center" },

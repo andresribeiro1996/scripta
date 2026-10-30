@@ -1,7 +1,7 @@
 import { RankingMethodSelector } from "./RankingMethodSelector";
 import { useEffect, useMemo, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { ballotBoard, blankBoard, toPlacements, type AggregationMode, type TierlistData } from "@scripta/shared";
+import { ballotBoard, blankBoard, characterBooks, itemNoun, toPlacements, type AggregationMode, type TierlistData } from "@scripta/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { router, Stack } from "expo-router";
 import { FlatList, Pressable, StyleSheet, View } from "react-native";
@@ -19,6 +19,7 @@ import { TierSortDeck } from "./TierSortDeck";
 import { moveBookTo, samePlacements, votingBooks } from "./tierBoardData";
 import { TierlistShareImage } from "./TierlistShareImage";
 import { shareableCommunityResults } from "./tierlistShareData";
+import { CharacterHeader } from "../characters/CharacterHeader";
 import { ContentShareSheet } from "../sharing/ContentShareSheet";
 import { publicContentUrl } from "../sharing/links";
 
@@ -49,7 +50,8 @@ export function VoteTierlistScreen({ code, startInRank = false }: { code: string
   const [resultMode, setResultMode] = useState<AggregationMode>("average");
   const boardQuery = useQuery({ queryKey: ["tierlists", "voting", code], queryFn: () => fetchVotingBoard(code), enabled: Boolean(code), retry: false });
   const votingBoard = boardQuery.data?.board;
-  const books: TierBook[] = useMemo(() => votingBooks(boardQuery.data?.books ?? []), [boardQuery.data?.books]);
+  const subject = boardQuery.data?.board.subject ?? null;
+  const books: TierBook[] = useMemo(() => subject ? characterBooks(subject) : votingBooks(boardQuery.data?.books ?? []), [subject, boardQuery.data?.books]);
   useEffect(() => {
     if (!sharing) return;
     let active = true;
@@ -128,6 +130,7 @@ export function VoteTierlistScreen({ code, startInRank = false }: { code: string
     {error ? <Toast visible message={error} tone="error" /> : null}
     <SwipeableTabs accessibilityLabel="Tier list view" options={[{ value: "board", label: "My board" }, { value: "community", label: "Community" }]} value={view === "community" ? "community" : "board"} onChange={setView} renderPage={(page, active) => {
       if (page !== "community") return <View style={styles.page}>
+        {subject ? <CharacterHeader subject={subject} /> : null}
         {board.ranksWorstFirst ? <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Top tier = worst</Text> : null}
         <TierHead>
         <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{board.promotedAt ? "Permanent reference" : board.votingOpen ? "Voting open" : "Voting closed"} · {ballot ? dirty ? "Unsaved changes" : "Votes submitted" : "Not submitted"}</Text>
@@ -135,10 +138,11 @@ export function VoteTierlistScreen({ code, startInRank = false }: { code: string
         </TierHead>
         {showRank ? <TierSortDeck data={data} books={books} selectedWorkId={selectedWorkId} onAssign={(workId, tierId) => { changeData(moveBookTo(data, workId, tierId)); if (selectedWorkId || (data.pool.length === 1 && data.pool.includes(workId))) { setSelectedWorkId(null); setView("board"); } }} /> : <TierBoard data={data} books={books} onChange={canEdit ? changeData : () => {}} structureEditable={false} poolLabel="Unranked" bottomClearance={76} onReassign={canEdit ? (workId) => { setSelectedWorkId(workId); setView("rank"); } : undefined} />}
         {blocked && board.votingOpen ? <Button label="Sign in to vote" onPress={() => router.push({ pathname: "/(public)/login", params: { returnTo: `/vote/${code}` } } as never)} /> : null}
-        {canEdit && (data.pool.length === 0 || placements.length > 0) ? <View style={[styles.complete, view === "board" && data.pool.length > 0 ? styles.fabClearance : null]}>{data.pool.length === 0 ? <Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>All books ranked</Text> : null}<Button label={ballot ? "Update votes" : "Submit votes"} loading={busy} disabled={!dirty || !placements.length} onPress={() => void submit()} /></View> : null}
+        {canEdit && (data.pool.length === 0 || placements.length > 0) ? <View style={[styles.complete, view === "board" && data.pool.length > 0 ? styles.fabClearance : null]}>{data.pool.length === 0 ? <Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>All {itemNoun(subject, 2)} ranked</Text> : null}<Button label={ballot ? "Update votes" : "Submit votes"} loading={busy} disabled={!dirty || !placements.length} onPress={() => void submit()} /></View> : null}
       </View>;
       if (!histogram) return <EmptyState title="No results yet" body="Live results stay hidden while voting is open. Submit your votes to see them as soon as they exist." />;
       return <View style={styles.community}>
+        {subject ? <CharacterHeader subject={subject} /> : null}
         {board.ranksWorstFirst ? <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Top tier = worst</Text> : null}
         <TierlistResults histogram={histogram} tiers={board.tiers} pool={cleanBoard.pool} books={books} ballotCount={board.ballotCount} eligibleVoteCount={board.eligibleVoteCount} votingOpen={board.votingOpen} promoted={Boolean(board.promotedAt)} ownPlacements={ballot?.placements ?? []} active={active} mode={resultMode} onModeChange={setResultMode} />
       </View>;
@@ -158,7 +162,7 @@ export function VoteTierlistScreen({ code, startInRank = false }: { code: string
     </Sheet>
     {addBook ? <AddBookSheet book={{ title: addBook.title, author: addBook.author ?? "", isbn: addBook.isbn ?? null, coverUrl: addBook.coverUrl ?? null }} onClose={() => setAddBook(null)} /> : null}
     <ContentShareSheet visible={sharing} onClose={() => setSharing(false)} title={board.name} url={shareUrl} linkError={linkError} onRetryLink={() => setLinkAttempt((value) => value + 1)} imageReady={imageReady && (shareView === "community" ? hasCommunity : hasMyBoard)} previewControls={<>{hasCommunity && hasMyBoard ? <View style={styles.shareOptions}><Button label="My ranking" variant={shareView === "board" ? "primary" : "secondary"} onPress={() => { if (shareView !== "board") { setImageReady(false); setShareView("board"); } }} /><Button label="Community" variant={shareView === "community" ? "primary" : "secondary"} onPress={() => { if (shareView !== "community") { setImageReady(false); setShareView("community"); } }} /></View> : undefined}{shareView === "community" ? <View style={{ flexDirection: "row" }}><RankingMethodSelector mode={resultMode} onChange={(next) => { if (next !== resultMode) { setImageReady(false); setResultMode(next); } }} /></View> : null}</>}>
-      {hasCommunity || hasMyBoard ? <TierlistShareImage key={`${shareView}:${resultMode}`} title={board.name} data={shareView === "community" ? blankBoard(cleanBoard) : data} books={books} community={shareView === "community"} histogram={histogram ?? undefined} ballotCount={board.ballotCount} mode={resultMode} onReadyChange={setImageReady} /> : null}
+      {hasCommunity || hasMyBoard ? <TierlistShareImage key={`${shareView}:${resultMode}`} title={board.name} subject={subject} data={shareView === "community" ? blankBoard(cleanBoard) : data} books={books} community={shareView === "community"} histogram={histogram ?? undefined} ballotCount={board.ballotCount} mode={resultMode} onReadyChange={setImageReady} /> : null}
     </ContentShareSheet>
   </Screen>;
 }

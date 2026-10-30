@@ -5,23 +5,23 @@ import { EmptyState, ErrorState, Sheet, Skeleton, dynamicType, spacing, typograp
 import { fetchTournament } from "./api";
 import { BookCover } from "./BookCover";
 
-export function ArenaBooksSheet({ id, name, onAddBook, onClose }: { id: string | null; name: string; onAddBook: (book: { title: string; author: string; coverUrl?: string | null }) => void; onClose: () => void }) {
+export function ArenaBooksSheet({ id, name, character = false, onAddBook, onClose }: { id: string | null; name: string; character?: boolean; onAddBook: (book: { title: string; author: string; coverUrl?: string | null }) => void; onClose: () => void }) {
   const { colors } = useTheme();
   const tournament = useQuery({ queryKey: ["arena", id, "preview"], queryFn: () => fetchTournament(id!), enabled: Boolean(id), retry: false });
 
-  return <Sheet visible={id !== null} title={`${name} books`} onClose={onClose}>
+  return <Sheet visible={id !== null} title={`${name} ${character ? "characters" : "books"}`} onClose={onClose}>
     {tournament.isPending ? <Skeleton height={180} /> : tournament.isError ? <ErrorState body="Couldn't load these books." actionLabel="Retry" onAction={() => void tournament.refetch()} /> :
       <FlatList
         data={tournament.data.slots}
         keyExtractor={(slot) => String(slot.slotIndex)}
         style={styles.list}
         contentContainerStyle={styles.content}
-        ListEmptyComponent={<EmptyState title="No books seeded" body="Books will appear when the bracket is filled." />}
-        renderItem={({ item }) => <Pressable accessibilityLabel={`${item.title} by ${item.author}`} onPress={() => onAddBook({ title: item.title, author: item.author, coverUrl: item.cover ?? null })} style={styles.book}>
+        ListEmptyComponent={<EmptyState title={character ? "No characters seeded" : "No books seeded"} body="Books will appear when the bracket is filled." />}
+        renderItem={({ item }) => <Pressable disabled={character} accessibilityLabel={character ? item.title : `${item.title} by ${item.author}`} onPress={() => onAddBook({ title: item.title, author: item.author, coverUrl: item.cover ?? null })} style={styles.book}>
           <BookCover cover={item.cover} title={item.title} width={46} height={66} />
           <View style={styles.text}>
             <Text numberOfLines={2} {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>{item.title}</Text>
-            <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{item.author}</Text>
+            {character ? null : <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{item.author}</Text>}
           </View>
         </Pressable>}
       />}

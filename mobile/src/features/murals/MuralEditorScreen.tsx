@@ -2,6 +2,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { THEME_IDS, themes, type ThemeId } from "@scripta/shared/themes";
 import {
   BLOCK_TYPES,
+  bookTierlists,
   blockLabel,
   bookKey,
   compactMuralBlocks,
@@ -53,6 +54,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
   const { data: library } = libraryQuery;
   const gallery = useQuery({ queryKey: ["gallery"], queryFn: fetchGalleryImages });
   const tierlists = useQuery({ queryKey: ["tierlists"], queryFn: fetchTierlists });
+  const tierlistOptions = useMemo(() => bookTierlists(tierlists.data ?? []), [tierlists.data]);
   const [name, setName] = useState<string | null>(null);
   const [theme, setTheme] = useState<ThemeId | null>(null);
   const [themeOpen, setThemeOpen] = useState(false);
@@ -250,7 +252,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
       <Animated.ScrollView ref={scrollRef} onLayout={(event) => setViewportHeight(event.nativeEvent.layout.height)} onScroll={onScroll} scrollEventThrottle={16} onContentSizeChange={(_width, height) => { contentHeight.set(height); flushScroll(height); }} keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.canvasScroll, { paddingBottom: Math.max(120, dockHeight + spacing.md) }]}>
         <EditorHeading name={currentName} accessibilityLabel={`Rename mural, ${currentName}`} onRename={() => { setDraftName(currentName); setNameError(undefined); setRenaming(true); }} />
         <Text style={[typography.caption, styles.dragHelp, { color: colors.textDim }]}>Hold a block to drag. Move to an edge to scroll.</Text>
-        <View onLayout={(event) => setCanvasTop(event.nativeEvent.layout.y)}><MuralCanvas mural={draftMural} books={books} groups={groups} images={gallery.data ?? []} tierlists={tierlists.data ?? []} profile={profile} editable={!busy} onDragChange={onDragChange} dragScroll={{ ref: scrollRef, offset: scrollOffset, contentHeight, bottomInset }} selectedBlockId={selectedId} onSelectBlock={(blockId) => { setSelectedId(blockId); if (blockId === null) setSheetTab(null); }} onLayoutChange={(blockId, layout) => {
+        <View onLayout={(event) => setCanvasTop(event.nativeEvent.layout.y)}><MuralCanvas mural={draftMural} books={books} groups={groups} images={gallery.data ?? []} tierlists={tierlistOptions} profile={profile} editable={!busy} onDragChange={onDragChange} dragScroll={{ ref: scrollRef, offset: scrollOffset, contentHeight, bottomInset }} selectedBlockId={selectedId} onSelectBlock={(blockId) => { setSelectedId(blockId); if (blockId === null) setSheetTab(null); }} onLayoutChange={(blockId, layout) => {
           const next = moveMuralBlock(currentBlocks, blockId, layout);
           if (next === currentBlocks) AccessibilityInfo.announceForAccessibility("Can't move there");
           else changeBlocks(next);
@@ -261,7 +263,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
       <Dialog visible={renaming} title="Rename mural" onClose={() => setRenaming(false)}>
         <View style={styles.dialog}><Input label="Mural name" value={draftName} maxLength={200} error={nameError} onChangeText={(text) => { setDraftName(text); setNameError(undefined); }} /><Button label="Done" onPress={() => { const trimmed = draftName.trim(); if (!trimmed) { setNameError("Name can't be empty"); return; } setName(trimmed); setRenaming(false); }} /></View>
       </Dialog>
-      <MuralShareSheet mural={shareFor} books={books} groups={groups} images={gallery.data ?? []} tierlists={tierlists.data ?? []} profile={profile} draft={unsaved} contentReady={!libraryQuery.isPending && !gallery.isPending && !tierlists.isPending} contentError={libraryQuery.error?.message ?? gallery.error?.message ?? tierlists.error?.message ?? undefined} onRetryContent={() => { void libraryQuery.refetch(); void gallery.refetch(); void tierlists.refetch(); }} onClose={() => setShareFor(null)} onEnableLink={async () => {
+      <MuralShareSheet mural={shareFor} books={books} groups={groups} images={gallery.data ?? []} tierlists={tierlistOptions} profile={profile} draft={unsaved} contentReady={!libraryQuery.isPending && !gallery.isPending && !tierlists.isPending} contentError={libraryQuery.error?.message ?? gallery.error?.message ?? tierlists.error?.message ?? undefined} onRetryContent={() => { void libraryQuery.refetch(); void gallery.refetch(); void tierlists.refetch(); }} onClose={() => setShareFor(null)} onEnableLink={async () => {
         if (shareFor === null) return;
         if (unsaved) setShareFor(await persist());
         const updated = await shareMural(id);
@@ -296,8 +298,8 @@ export function MuralEditorScreen({ id }: { id: string }) {
         tab={sheetTab}
         onTabChange={setSheetTab}
         onClose={() => setSheetTab(null)}
-        preview={(maxHeight) => selected ? <BlockPreview theme={currentTheme} block={selected} canvasWidth={windowWidth - spacing.sm * 2} maxHeight={maxHeight} books={books} images={gallery.data ?? []} tierlists={tierlists.data ?? []} profile={profile} groups={groups} /> : null}
-        content={selected && isConfigurable(selected.type) ? <ContentTab block={selected} books={books} groups={groups} images={gallery.data ?? []} tierlists={tierlists.data ?? []} update={updateSelected} onPick={setPicking} /> : null}
+        preview={(maxHeight) => selected ? <BlockPreview theme={currentTheme} block={selected} canvasWidth={windowWidth - spacing.sm * 2} maxHeight={maxHeight} books={books} images={gallery.data ?? []} tierlists={tierlistOptions} profile={profile} groups={groups} /> : null}
+        content={selected && isConfigurable(selected.type) ? <ContentTab block={selected} books={books} groups={groups} images={gallery.data ?? []} tierlists={tierlistOptions} update={updateSelected} onPick={setPicking} /> : null}
         style={selected ? <StyleTab
           style={resolveBlockStyle(selected.style)}
           palette={themes[currentTheme].colors}
@@ -332,8 +334,8 @@ export function MuralEditorScreen({ id }: { id: string }) {
             }}
           /> : null}
           {picking === "image" ? (gallery.data ?? []).map((image) => <Pressable accessibilityLabel={`Choose ${image.filename}`} accessibilityRole="button" key={image.id} onPress={() => { updateSelected((block) => block.type === "image" ? { ...block, imageId: image.id } : block); setPicking(null); }}><Text style={[typography.body, { color: colors.text }]}>{image.filename}</Text></Pressable>) : null}
-          {picking === "tierlist" ? (tierlists.data ?? []).map((tierlist) => <Button key={tierlist.id} label={tierlist.name} variant="secondary" onPress={() => { updateSelected((block) => block.type === "tierlist" ? { ...block, tierlistId: tierlist.id } : block); setPicking(null); }} />) : null}
-          {picking && ((picking === "book" && books.length === 0) || (picking === "image" && !gallery.data?.length) || (picking === "tierlist" && !tierlists.data?.length)) ? <EmptyState title="Nothing available" /> : null}
+          {picking === "tierlist" ? tierlistOptions.map((tierlist) => <Button key={tierlist.id} label={tierlist.name} variant="secondary" onPress={() => { updateSelected((block) => block.type === "tierlist" ? { ...block, tierlistId: tierlist.id } : block); setPicking(null); }} />) : null}
+          {picking && ((picking === "book" && books.length === 0) || (picking === "image" && !gallery.data?.length) || (picking === "tierlist" && !tierlistOptions.length)) ? <EmptyState title="Nothing available" /> : null}
         </ScrollView>
       </Sheet>
     </MuralScreen>

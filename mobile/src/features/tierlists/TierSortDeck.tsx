@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { booksByWork, type TierDefinition, type TierlistData } from "@scripta/shared";
+import { booksByWork, isCharacterBook, itemNoun, type TierDefinition, type TierlistData } from "@scripta/shared";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { ReduceMotion, useAnimatedStyle, useSharedValue, withSpring, type SharedValue } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
@@ -7,7 +7,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { commitHaptic, liftHaptic } from "../../ui/haptics";
 import { EmptyState, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
-import { authorOf, TierCover, titleOf, type TierBook } from "./TierBoard";
+import { labelOf, TierCover, type TierBook } from "./TierBoard";
 
 const TARGET_SIZE = 56;
 
@@ -40,7 +40,7 @@ function DragBook({ book, x, y, lifted }: {
       { scale: withSpring(lifted.get() ? 1.08 : 1, { duration: 400, dampingRatio: 1, reduceMotion: ReduceMotion.System }) },
     ],
   }));
-  return <Animated.View accessibilityLabel={`${titleOf(book)} by ${authorOf(book)}. Swipe up from the lower half to drag into a tier; or tap a tier.`} style={style}>
+  return <Animated.View accessibilityLabel={`${labelOf(book)}. Swipe up from the lower half to drag into a tier; or tap a tier.`} style={style}>
     <TierCover book={book} style={styles.cover} />
   </Animated.View>;
 }
@@ -118,7 +118,7 @@ export function TierSortDeck({ data, books, onAssign, selectedWorkId }: { data: 
   if (!book) return <EmptyState title="Nothing left to rank" body="Every book in this list already sits in a tier." />;
 
   return <View style={styles.deck}>
-    <Text {...dynamicType} style={[typography.caption, styles.center, { color: colors.textDim }]}>{selectedWorkId ? "Choose a new tier · drag or tap a circle" : `${pending.length} ${pending.length === 1 ? "book" : "books"} left · swipe up from below`}</Text>
+    <Text {...dynamicType} style={[typography.caption, styles.center, { color: colors.textDim }]}>{selectedWorkId ? "Choose a new tier · drag or tap a circle" : `${pending.length} ${itemNoun(books.some(isCharacterBook), pending.length)} left · swipe up from below`}</Text>
     <GestureDetector gesture={gesture}><View ref={ringRef} style={styles.ring} onLayout={(event) => setRing(event.nativeEvent.layout)}>
       <DragBook key={current} book={book} x={x} y={y} lifted={lifted} />
       {data.tiers.map((tier, index) => <View key={tier.id} style={[styles.targetWrap, { transform: [{ translateX: radius * Math.sin(index * 2 * Math.PI / data.tiers.length) }, { translateY: -radius * Math.cos(index * 2 * Math.PI / data.tiers.length) }] }]}>

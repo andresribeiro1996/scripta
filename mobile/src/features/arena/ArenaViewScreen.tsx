@@ -4,10 +4,11 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
-import { createVoterToken } from "@scripta/shared";
+import { createVoterToken, itemNoun } from "@scripta/shared";
 import { useAuth } from "../../core/auth";
 import { isPermanentError } from "../../core/apiClient";
 import { ActionSheet, Button, ConfirmDialog, Dialog, EmptyState, ErrorState, HeaderActions, IconButton, Input, Screen, Skeleton, SwipeableTabs, Toast, dynamicType, spacing, typography, useTheme } from "../../ui";
+import { CharacterHeader } from "../characters/CharacterHeader";
 import { AddBookSheet } from "../community/AddBookSheet";
 import { fetchTournament, renameTournament, resolveTiebreak, settleDuelEarly, voteOnDuel } from "./api";
 import { arenaViewTabs, matchEmptyCopy, tournamentChampion, votableDuels, type ArenaViewTab } from "./arenaView";
@@ -188,7 +189,7 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
             <ActionSheet
               title={data.name}
               groups={[
-                [{ label: data.slots.length ? `See all ${data.slots.length} books` : "View book pool", icon: "book", onPress: () => setBooksOpen(true) }],
+                [{ label: data.slots.length ? `See all ${data.slots.length} ${itemNoun(data.subject, data.slots.length)}` : data.subject ? "View characters" : "View book pool", icon: "book", onPress: () => setBooksOpen(true) }],
                 ...(isOwner ? [[{ label: "Rename", icon: "edit" as const, onPress: () => { setName(data.name); setRenaming(true); } }]] : []),
               ]}
             >
@@ -199,6 +200,7 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
         }}
       />
       {error ? <Toast visible message={error} tone="error" /> : null}
+      {data.subject ? <View style={styles.subjectHeader}><CharacterHeader subject={data.subject} /></View> : null}
       <SwipeableTabs
         accessibilityLabel="Tournament view"
         options={tabs.map((option) => option.value === "match" ? { ...option, badge: votable.length } : option)}
@@ -207,7 +209,7 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
         renderPage={(pageTab) => pageTab === "match" ? matchPane() : bracketPane()}
       />
       <ContentShareSheet visible={shareUrl !== null} onClose={() => setShareUrl(null)} title={data.name} url={shareUrl} />
-      <ArenaBooksSheet id={booksOpen ? id : null} name={data.name} onAddBook={openAddBook} onClose={() => setBooksOpen(false)} />
+      <ArenaBooksSheet id={booksOpen ? id : null} name={data.name} character={Boolean(data.subject)} onAddBook={openAddBook} onClose={() => setBooksOpen(false)} />
       {addBook ? <AddBookSheet book={addBook} onClose={() => setAddBook(null)} /> : null}
       <Dialog visible={renaming} title="Rename tournament" onClose={() => setRenaming(false)}><View style={styles.dialog}><Input label="Tournament name" value={name} onChangeText={setName} maxLength={200} /><Button label="Save name" disabled={!name.trim()} loading={busy === "rename"} onPress={() => void action("rename", async () => { await renameTournament(id, name.trim()); setRenaming(false); })} /></View></Dialog>
       <ConfirmDialog visible={settling !== null} title="Settle this match now?" body="Voting closes and the current votes decide the winner. A tie comes back to you to break." confirmLabel="Settle" destructive loading={settling !== null && busy === settling} onConfirm={() => settling && void settle(settling)} onCancel={() => setSettling(null)} />
@@ -221,6 +223,7 @@ const styles = StyleSheet.create({
   // Each pane carries its own gutter instead.
   centered: { padding: spacing.lg, gap: spacing.md },
   grow: { flex: 1 },
+  subjectHeader: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
   pane: { gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.huge, flexGrow: 1, justifyContent: "center" },
   matchWrap: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.lg, justifyContent: "center" },
   list: { gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.huge, flexGrow: 1 },

@@ -205,6 +205,7 @@ test("only an empty tab offers to create one", () => {
 test("voted tier list cards read like the public directory's", () => {
   assert.equal(votedTierlistDetail(votedTierlist()), "6 books · 3 ballots");
   assert.equal(votedTierlistDetail(votedTierlist({ votingOpen: false })), "6 books · 3 ballots");
+  assert.equal(votedTierlistDetail(votedTierlist({ poolSize: 12, subject: { kind: "characters", label: "Harry Potter" } })), "12 characters · 3 ballots");
 });
 
 test("Games opens on Browse, with your three lists beside it, and New offers each kind", () => {
