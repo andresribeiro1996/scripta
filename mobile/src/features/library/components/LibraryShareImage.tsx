@@ -13,7 +13,7 @@ const FAN_ROTATIONS = ["-10deg", "-3deg", "4deg", "11deg"] as const;
 const FAN_COVER = { width: 84, height: 126 };
 
 function coverKey(section: string, book: LibraryBook, index: number) {
-  return `${section}:${index}:${String(book.ContentID ?? "")}`;
+  return `${section}:${index}:${String(book.ContentID ?? "")}:${String(book._coverUrl ?? "")}`;
 }
 
 const ShareCover = memo(function ShareCover({ book, id, width, height, marginLeft, zIndex, rotate, onLoaded }: {
