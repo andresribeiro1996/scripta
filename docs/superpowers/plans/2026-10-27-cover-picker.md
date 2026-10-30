@@ -171,7 +171,7 @@
 - [ ] **Step 3: Implement.**
   - Add `CREATE INDEX IF NOT EXISTS idx_cover_images_book ON cover_images(book_id);` directly after the `cover_images` table in `books.sql`. That file runs on every boot (`connection.ts:32`).
   - Add the method to `ports.ts` beside `getImage`.
-  - Add the prepared statement and method in `sqliteBooksRepository.ts`, next to `imageStmt` and `getImage` (`:857`).
+  - Add the prepared statement and method in `sqliteBooksRepository.ts`, next to `imageStmt` and `getImage` (`:910`).
 
 - [ ] **Step 4: Run to verify pass.** Same command. Expected: PASS.
 
@@ -243,7 +243,7 @@
     - `listCoverCandidates(userId: string, lookup: BookLookup, from: CoverPickSource): Promise<CoverCandidatesResponse>`
     - `pickCover(userId: string, lookup: BookLookup, choice: CoverChoice, everyone: boolean): Promise<ResolvedCover>`
   - **Internal helpers:**
-    - `isbnOnlyFor(book: BookRow): boolean`, extracted from `booksService.ts:343` (`created_by === "bnp" && year !== null && year < ISBN_ONLY_BEFORE_YEAR`). `processBook` uses it too.
+    - `isbnOnlyFor(book: BookRow): boolean`, extracted from `booksService.ts:344` (`created_by === "bnp" && year !== null && year < ISBN_ONLY_BEFORE_YEAR`). `processBook` uses it too.
     - `setManualCover(bookId: string, imageId: string, at: string)`, extracted from the tail of `uploadCover` (`setCover` manual, `setUpgradeWanted(null)`, `backoffUntil.delete`). `uploadCover` uses it too.
 
 **Behaviour:**
@@ -260,7 +260,7 @@
     - from each step's `offerable(result, rejected)`, every URL not in `seen` becomes `{ source, url, fullUrl: url, coverImageId: null, width: null, height: null }` and is added to `seen`
   - It merges every found URL into the offer map, keyed `${userId}\n${book.id}`, mapping url → `{ source, expiresAt: now().getTime() + COVER_OFFER_TTL_MS }`. Merging matters: the quick and apple listings run in parallel, and replacing the key's entries would expire the other listing's offers. On each write, entries whose `expiresAt` has passed are removed, and so are keys left empty.
 - **`pickCover`:**
-  - It finds the book as `rejectCover` does (`booksService.ts:486-488`): `lookupIdentity(lookup)`, then `findByIdentity(deps.repo, identity)`. It throws `BookNotFoundError` when either returns nothing.
+  - It finds the book as `rejectCover` does (`booksService.ts:506-508`): `lookupIdentity(lookup)`, then `findByIdentity(deps.repo, identity)`. It throws `BookNotFoundError` when either returns nothing.
   - With `coverImageId`: the row must exist, have `book_id === book.id`, and have a `source_url` that is null or not rejected; otherwise `BookNotFoundError`.
   - With `url`:
     - The URL must be in the offer map for this user and book and not expired, or the method throws `CoverOfferExpiredError`.
@@ -364,7 +364,7 @@
   - Turn the `fetchImage` body into `makeFetchImage(openLibraryCover: Throttle, koboCover: Throttle): FetchCoverImage`. `fetchImage` is `makeFetchImage(openLibraryCoverThrottle, koboCoverThrottle)`, and `fetchPickedImage` is `makeFetchImage(urgentLane(openLibraryCoverThrottle), urgentLane(koboCoverThrottle))`.
 
 - [ ] **Step 5: Docs.** In `backend/README.md`, under `books`:
-  - Add both routes to the module table row, the route table, and the rate-limit line (`backend/README.md:200`), as their own 30/min scope.
+  - Add both routes to the module table row, the route table, and the rate-limit line (`backend/README.md:201`), as their own 30/min scope.
   - Add one bullet, "**The cover picker lists and stores candidates on demand**", covering:
     - the order of the stored and found groups
     - the 30-minute offer guard and why (the server only fetches URLs it listed)
