@@ -1,5 +1,5 @@
-import { SettingsScreen } from "@/features/settings";
+import { Redirect } from "expo-router";
 
 export default function SettingsPage() {
-  return <SettingsScreen />;
+  return <Redirect href="/you" withAnchor />;
 }
