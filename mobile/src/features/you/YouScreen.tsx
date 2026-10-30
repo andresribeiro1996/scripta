@@ -8,11 +8,11 @@ import { Icon, IconButton, Screen, dynamicType, radii, spacing, typography, useT
 import { AuthorAvatar } from "../community/AuthorAvatar";
 import { fetchOwnProfile } from "../community/api";
 
-const ROWS = [
-  { label: "Your shelf", href: "/me" },
-  { label: "Murals", href: "/murals" },
-  { label: "Reader card", href: "/reader-card" },
-  { label: "Gallery", href: "/gallery" },
+const CARDS = [
+  { label: "Your shelf", href: "/me", icon: "shelf" },
+  { label: "Murals", href: "/murals", icon: "murals" },
+  { label: "Reader card", href: "/reader-card", icon: "readerCard" },
+  { label: "Gallery", href: "/gallery", icon: "image" },
 ] as const;
 
 export function YouScreen() {
@@ -33,28 +33,24 @@ export function YouScreen() {
       />
       <ScrollView contentContainerStyle={styles.page}>
         <View style={styles.profile}>
-          <AuthorAvatar username={username} avatarUrl={avatarUrl} size={64} />
-          <View style={styles.grow}>
-            <Text {...dynamicType} numberOfLines={1} style={[typography.title, { color: colors.text }]}>@{username}</Text>
-            {own.data ? (
-              <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{own.data.published ? "Published" : "Private"}</Text>
-            ) : null}
-          </View>
+          <AuthorAvatar username={username} avatarUrl={avatarUrl} size={96} />
+          <Text {...dynamicType} numberOfLines={1} style={[typography.title, styles.center, { color: colors.text }]}>@{username}</Text>
+          {own.data ? (
+            <Text {...dynamicType} style={[typography.caption, styles.center, { color: colors.textDim }]}>{own.data.published ? "Published" : "Private"}</Text>
+          ) : null}
         </View>
-        <View style={[styles.rows, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          {ROWS.map((row, index) => (
+        <View style={styles.grid}>
+          <View style={[styles.divider, { backgroundColor: colors.border }]} />
+          {CARDS.map((card) => (
             <Pressable
-              key={row.href}
+              key={card.href}
               accessibilityRole="button"
-              onPress={() => router.push(row.href as never)}
-              style={({ pressed }) => [
-                styles.row,
-                index > 0 ? { borderTopWidth: 1, borderTopColor: colors.border } : null,
-                pressed ? { backgroundColor: colors.surfacePressed } : null,
-              ]}
+              accessibilityLabel={card.label}
+              onPress={() => router.push(card.href as never)}
+              style={({ pressed }) => [styles.cell, pressed ? { backgroundColor: colors.surfacePressed } : null]}
             >
-              <Text {...dynamicType} style={[typography.body, styles.rowLabel, { color: colors.text }]}>{row.label}</Text>
-              <Icon name="chevronRight" size={18} color={colors.textDim} />
+              <Icon name={card.icon} size={44} color={colors.accent} />
+              <Text {...dynamicType} style={[typography.body, styles.label, { color: colors.text }]}>{card.label}</Text>
             </Pressable>
           ))}
         </View>
@@ -64,10 +60,11 @@ export function YouScreen() {
 }
 
 const styles = StyleSheet.create({
-  page: { padding: spacing.lg, gap: spacing.lg },
-  profile: { flexDirection: "row", alignItems: "center", gap: spacing.md },
-  grow: { flex: 1, gap: spacing.xs },
-  rows: { borderWidth: 1, borderRadius: radii.lg, overflow: "hidden" },
-  row: { minHeight: 52, flexDirection: "row", alignItems: "center", gap: spacing.md, paddingHorizontal: spacing.lg },
-  rowLabel: { flex: 1, fontWeight: "600" },
+  page: { padding: spacing.lg, gap: spacing.xl },
+  profile: { alignItems: "center", gap: spacing.sm },
+  center: { textAlign: "center" },
+  grid: { flexDirection: "row", flexWrap: "wrap" },
+  divider: { position: "absolute", left: "50%", top: spacing.md, bottom: spacing.md, width: 1 },
+  cell: { width: "50%", alignItems: "center", gap: spacing.sm, paddingVertical: spacing.xl, borderRadius: radii.lg },
+  label: { alignSelf: "stretch", fontWeight: "600", textAlign: "center" },
 });
