@@ -1,7 +1,5 @@
 import type { CommunityAuthor, FeedItem, ParticipationGameKind, PublishedContent, RankingTierPreview, SavedContentRef } from "./community/types.js";
 import { contentTarget, feedAction, feedTarget, isKnownContent } from "./community/helpers.js";
-import { bookKey } from "./library/merge.js";
-import { rediscoverPassage } from "./murals/home.js";
 import type { PublicMural } from "./public/types.js";
 
 export interface DigestBook {
@@ -80,30 +78,6 @@ export const PERSONAL_DIGEST_KINDS = ["follow", "participation", "completion"] a
 export function dashboardQuery(cursor?: string, kinds: readonly string[] = ALL_DIGEST_KINDS): string {
   const query = `?kinds=${kinds.join(",")}`;
   return cursor ? `${query}&cursor=${encodeURIComponent(cursor)}` : query;
-}
-
-export type DashboardCard =
-  | { kind: "currentlyReading"; bookKeys: string[] }
-  | { kind: "upNext"; bookKeys: string[] }
-  | { kind: "rediscover"; bookKey: string; highlightId: string };
-
-export function buildDashboardCards(books: Array<Record<string, unknown>>, day: string, salt = "dashboard"): DashboardCard[] {
-  const cards: DashboardCard[] = [];
-  const reading = books.filter((book) => book.ReadStatus === 1).map(bookKey);
-  if (reading.length) cards.push({ kind: "currentlyReading", bookKeys: reading });
-  const upNext = books.filter((book) => book.ReadStatus !== 1 && book.ReadStatus !== 2).map(bookKey);
-  if (upNext.length) cards.push({ kind: "upNext", bookKeys: upNext });
-  const passage = rediscoverPassage(salt, books, day);
-  if (passage) cards.push({ kind: "rediscover", bookKey: passage.bookKey, highlightId: passage.highlightId });
-  return cards;
-}
-
-export function upNextPair(keys: string[], offset: number): string[] {
-  const n = keys.length;
-  if (n < 2) return [];
-  const first = keys[offset % n];
-  const second = keys[(offset + 1) % n];
-  return first === second ? [first] : [first, second];
 }
 
 const PARTICIPATION_VERBS: Record<ParticipationGameKind, string> = {
