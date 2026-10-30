@@ -10,7 +10,7 @@ export function BookCover({ book, width, size = "thumb" }: { book: LibraryBook; 
       style={{ width }}
     >
       <span aria-hidden="true" className="absolute inset-0 flex items-center justify-center border border-(--color-border) bg-(--color-surface) p-2 text-center text-xs font-semibold">
-        {String(book.Title ?? "")}
+        <span className="line-clamp-4 break-words">{String(book.Title ?? "")}</span>
       </span>
       <span className={`absolute inset-0 ${hasCover ? "" : "invisible"}`}>
         <CoverImage book={book} size={size} onHasCoverChange={setHasCover} />
