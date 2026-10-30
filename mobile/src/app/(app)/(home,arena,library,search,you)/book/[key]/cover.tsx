@@ -1,5 +1,6 @@
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { CoverPicker } from "@/features/library/components/CoverPicker";
+import { coverParamsFor } from "@/features/library/components/CoverImage";
 import { useBook } from "@/features/library/hooks/useBook";
 import { useLibraryActions } from "@/features/library/hooks/useLibraryActions";
 import { ErrorState, Screen, SheetHeader, Skeleton } from "@/ui";
@@ -7,7 +8,7 @@ import { ErrorState, Screen, SheetHeader, Skeleton } from "@/ui";
 export default function BookCoverRoute() {
   const { key } = useLocalSearchParams<{ key: string }>();
   const { book, loading } = useBook(key);
-  const { saveBookCover, removeBookCover } = useLibraryActions();
+  const { saveBookCover, saveBookCoverUrl, removeBookCover } = useLibraryActions();
   const title = String(book?.Title ?? "");
   const sheetTitle = title ? `Cover for "${title}"` : "Cover";
 
@@ -23,7 +24,13 @@ export default function BookCoverRoute() {
         <CoverPicker
           title={title}
           currentImageId={typeof book._coverImageId === "string" ? book._coverImageId : null}
+          lookup={coverParamsFor(book)}
+          coverUrl={typeof book._coverUrl === "string" ? book._coverUrl : null}
           onSelect={(image) => void saveBookCover(book, image)}
+          onPickFound={(cover) => {
+            if (cover.fullUrl) void saveBookCoverUrl(book, cover.fullUrl);
+            router.back();
+          }}
           onRemoveCover={() => void removeBookCover(book)}
           onClose={() => router.back()}
         />

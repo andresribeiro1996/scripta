@@ -1,5 +1,16 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { createCoverResolver, type CoverCacheEntry, type CoverLookupParams, type CoverSize, type ResolvedCoverResponse } from "@scripta/shared";
+import {
+  coverCandidatesQuery,
+  createCoverResolver,
+  pickCoverBody,
+  type CoverCacheEntry,
+  type CoverCandidatesResponse,
+  type CoverChoice,
+  type CoverLookupParams,
+  type CoverPickSource,
+  type CoverSize,
+  type ResolvedCoverResponse,
+} from "@scripta/shared";
 import { apiClient } from "../../../core/api";
 
 export type ResolveCoverParams = CoverLookupParams;
@@ -37,4 +48,12 @@ export function resolveCover(params: ResolveCoverParams, options?: { size?: Cove
 
 export function forgetResolvedCover(params: ResolveCoverParams): void {
   resolver.forget(params);
+}
+
+export function fetchCoverCandidates(params: ResolveCoverParams, from: CoverPickSource): Promise<CoverCandidatesResponse> {
+  return apiClient.request<CoverCandidatesResponse>(`/covers/candidates?${coverCandidatesQuery(params, from)}`, { auth: true });
+}
+
+export function pickCover(params: ResolveCoverParams, choice: CoverChoice): Promise<ResolvedCoverResponse> {
+  return apiClient.request<ResolvedCoverResponse>("/covers/pick", { method: "POST", body: pickCoverBody(params, choice, false), auth: true });
 }
