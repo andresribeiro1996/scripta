@@ -74,6 +74,9 @@ const GLYPHS = {
   sync: { ios: "arrow.triangle.2.circlepath", android: "sync" },
   reorder: { ios: "arrow.up.arrow.down", android: "reorder" },
   select: { ios: "checkmark.circle", android: "check_circle" },
+  chevronDown: { ios: "chevron.down", android: "expand_more" },
+  star: { ios: "star.fill", android: "star" },
+  characters: { ios: "theatermasks", android: "theater_comedy" },
 } as const satisfies Record<string, Glyph>;
 
 /** Only the tab icons have a solid counterpart worth using; the rest read the

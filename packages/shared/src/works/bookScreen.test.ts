@@ -152,7 +152,7 @@ test("a selected edition overrides the hero and the add-book details but not the
   assert.equal(picked.meta, "2002 · 300 pages · pt-BR");
   assert.deepEqual(picked.cover, { url: "cover:2", color: "#000002" });
   assert.deepEqual(picked.edition, { index: 2, count: 5, label: "Edition 3 of 5", showDots: true, mineIndex: 1 });
-  const sameAsDefault = (model: typeof base) => ({ ...model, title: "", meta: null, cover: base.cover, edition: null });
+  const sameAsDefault = (model: typeof base) => ({ ...model, title: "", year: null, meta: null, cover: base.cover, edition: null });
   assert.deepEqual(sameAsDefault(picked), sameAsDefault(base));
 });
 
@@ -306,4 +306,13 @@ test("a page without characters has none", () => {
 test("canMakeGame needs four character names", () => {
   assert.equal(bookScreenModel(page({ characters: ["A", "B", "C"] }), null, viewer).characters.canMakeGame, false);
   assert.equal(bookScreenModel(page({ characters: ["A", "B", "C", "D"] }), null, viewer).characters.canMakeGame, true);
+});
+
+test("year is the displayed edition's, falling back to the work's", () => {
+  assert.equal(bookScreenModel(page(), null, viewer).year, 1966);
+  assert.equal(bookScreenModel(page(), null, viewer, "e3").year, 1968);
+  assert.equal(bookScreenModel(page({ editions: editions(5), coverUrl: null }), null, viewer).year, 1965);
+  assert.equal(bookScreenModel(page({ editions: editions(5), coverUrl: null }), null, viewer, "e2").year, 2002);
+  assert.equal(bookScreenModel(page({ editions: editions(5), coverUrl: null, year: null }), null, viewer).year, null);
+  assert.equal(bookScreenModel(null, { Title: "Loose" }, viewer).year, null);
 });

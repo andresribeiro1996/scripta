@@ -73,7 +73,7 @@ export function StatsSections({ model }: { model: BookStatsModel }) {
                     <View accessible accessibilityLabel={`${step.label}, ${step.reached ? "reached" : "not reached"}`} style={[styles.pill, { borderColor: step.reached ? colors.accent : colors.border }]}>
                       <Text numberOfLines={1} {...dynamicType} style={[typography.caption, step.reached ? styles.strong : null, { color: step.reached ? colors.accent : colors.textDim }]}>{step.label}</Text>
                     </View>
-                    <Text numberOfLines={1} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>→</Text>
+                    <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants"><Icon name="chevronRight" size={12} color={colors.textDim} /></View>
                   </View>
                 ))}
                 <View accessible accessibilityLabel={tournamentRun.champion ? "Won a title" : "No title"} style={[styles.pill, { borderColor: tournamentRun.champion ? colors.accent : colors.border, opacity: tournamentRun.champion ? 1 : 0.5 }]}>
