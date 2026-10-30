@@ -60,7 +60,7 @@ export function visibleCandidates(
     }
     const size = measured.get(candidate.url);
     if (size === undefined) shown.push({ candidate, width: null, height: null });
-    else if (size && isAcceptableCover(candidate.source, size.width, size.height)) {
+    else if (size && size.width > 0 && size.height > 0 && isAcceptableCover(candidate.source, size.width, size.height)) {
       shown.push({ candidate, width: size.width, height: size.height });
     }
   }

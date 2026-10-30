@@ -55,11 +55,13 @@ test("a pick body carries the lookup and the choice, never the Kobo image id, an
   assert.equal(everyone.coverImageId, "id");
   assert.equal(everyone.everyone, true);
   assert.equal("imageId" in everyone, false);
+  assert.equal(pickCoverBody({ ...params, author: "Frank Herbert" }, { url: "https://x/1.jpg" }, false).author, "Frank Herbert");
 });
 
 test("a stored candidate always shows with its own size", () => {
   const candidate = stored();
   assert.deepEqual(visibleCandidates([candidate], new Map()), [{ candidate, width: 600, height: 900 }]);
+  assert.deepEqual(visibleCandidates([candidate], new Map([[candidate.url, null]])), [{ candidate, width: 600, height: 900 }]);
 });
 
 test("a found candidate still loading shows with no size", () => {
@@ -70,6 +72,7 @@ test("a found candidate still loading shows with no size", () => {
 test("a found candidate that failed to load is dropped", () => {
   const candidate = found("openlibrary", "https://ol/1.jpg");
   assert.deepEqual(visibleCandidates([candidate], new Map([[candidate.url, null]])), []);
+  assert.deepEqual(visibleCandidates([candidate], new Map([[candidate.url, { width: 0, height: 0 }]])), []);
 });
 
 test("a found ISBNdb candidate measured at the placeholder size is dropped", () => {
