@@ -17,7 +17,9 @@ import { SuggestedReaders } from "../components/home/SuggestedReaders";
 import { Page } from "../components/page/Page";
 import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../components/page/buttonClasses";
 import { SECTION_HEADING } from "../components/page/surfaceClasses";
+import { toolbarIconClass } from "../components/Toolbar";
 import { useCircleFeed } from "../hooks/useDashboard";
+import { useFeedActions } from "../hooks/useFeedActions";
 import { useLibrary } from "../hooks/useLibrary";
 import { homeGames } from "../lib/homeGames";
 
@@ -43,6 +45,7 @@ export function HomePage() {
   const books = library.data?.data.books ?? [];
   const reading = books.filter((book) => book.ReadStatus === 1);
   const circleItems = circle.items;
+  const actions = useFeedActions(circleItems);
   const { fetchNextPage } = circle;
   const circleLoading = circle.isLoading || (circleItems.length === 0 && circle.hasNextPage === true && !circle.isError);
 
@@ -50,7 +53,13 @@ export function HomePage() {
     if (circleItems.length === 0 && circle.hasNextPage && !circle.isFetchingNextPage && !circle.isError) void fetchNextPage();
   }, [circleItems.length, circle.hasNextPage, circle.isFetchingNextPage, circle.isError, fetchNextPage]);
 
-  return <Page title="Home">
+  const saved = (
+    <Link to="/dashboard/saved" aria-label="Saved" className={toolbarIconClass()}>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 3.5h12v17l-6-4-6 4Z" /></svg>
+    </Link>
+  );
+
+  return <Page title="Home" actions={saved}>
     <div className="grid grid-cols-[minmax(0,1fr)] gap-10 lg:grid-cols-[minmax(0,1fr)_340px] lg:grid-rows-[auto_1fr]">
       <div className="flex min-w-0 flex-col gap-10 lg:col-start-1 lg:row-start-1">
         <DailyChapterCard />
@@ -93,7 +102,13 @@ export function HomePage() {
           <h2 id="home-circle" className={SECTION_HEADING}>Your reading circle</h2>
           <Link to="/community/people" className={SECTION_LINK}>Find people →</Link>
         </div>
-        {circleItems.length > 0 ? <div className="flex flex-col gap-4">{circleItems.map((item) => <FeedCard key={`${item.kind}:${item.id}`} item={item} />)}</div> : null}
+        {actions.loadError ? (
+          <div role="alert" className="mb-4 space-y-1">
+            <p>{actions.loadError}</p>
+            <button type="button" className={BUTTON_SECONDARY} onClick={actions.retryLoad}>Retry</button>
+          </div>
+        ) : null}
+        {circleItems.length > 0 ? <div className="flex flex-col gap-4">{circleItems.map((item) => <FeedCard key={`${item.kind}:${item.id}`} item={item} actions={actions} books={books} works={library.data?.works} />)}</div> : null}
         {circleLoading ? <p role="status">Loading your reading circle…</p> : null}
         {circle.isError ? (
           <div role="alert" className="mt-4 space-y-3">

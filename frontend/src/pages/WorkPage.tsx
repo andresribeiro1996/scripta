@@ -11,6 +11,7 @@ import { BookScreen } from "../components/book/BookScreen";
 import { useLibrary } from "../hooks/useLibrary";
 import { useWork } from "../hooks/useWork";
 import { backTo } from "../lib/areas";
+import { shareLink } from "../lib/shareLink";
 
 export function WorkPage() {
   const { id } = useParams<{ id: string }>();
@@ -56,18 +57,6 @@ export function WorkPage() {
   }
 
   const url = `${window.location.origin}/work/${page.work.id}`;
-  const share = async () => {
-    try {
-      if (typeof navigator.share === "function") await navigator.share({ title: page.work.title, url });
-      else if (navigator.clipboard) {
-        await navigator.clipboard.writeText(url);
-        toast({ message: "Link copied." });
-      } else toast({ kind: "error", message: "Couldn't copy the link." });
-    } catch (reason) {
-      if (!(reason instanceof DOMException)) throw reason;
-      if (reason.name !== "AbortError") toast({ kind: "error", message: "Couldn't share the link." });
-    }
-  };
 
   return (
     <>
@@ -78,7 +67,7 @@ export function WorkPage() {
         editionId={editionId}
         onSelectEdition={setEditionId}
         onAdd={setAdding}
-        onShare={() => void share()}
+        onShare={() => void shareLink(page.work.title, url, toast)}
         frame={(body) => <Page title={null} back={back}>{body}</Page>}
       />
       {adding ? <AddBookSheet book={adding} onClose={() => {

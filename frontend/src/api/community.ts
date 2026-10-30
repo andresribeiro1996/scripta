@@ -19,4 +19,12 @@ export const {
   unpublishProfile,
   fetchOwnProfile,
   setShelfMural,
+  likeActivity,
+  fetchActivityEngagement,
+  fetchActivityComments,
+  addActivityComment,
+  deleteActivityComment,
+  saveContent,
+  fetchSavedState,
+  fetchSavedContent,
 } = createCommunityApi(request);
