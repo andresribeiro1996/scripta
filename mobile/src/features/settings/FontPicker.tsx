@@ -9,7 +9,7 @@ import { isAppearanceSyncFailure, saveAccountAppearance } from "./appearanceSync
 import { SWATCH } from "./ThemePicker";
 
 function sampleStyle(font: FontId, slot: FontSlot) {
-  return fontStyleFor(font, slot, typography.body) ?? { fontFamily: SYSTEM_FAMILY };
+  return fontStyleFor(font, slot, typography.title) ?? { fontFamily: SYSTEM_FAMILY };
 }
 
 export function FontPicker({ slot }: { slot: FontSlot }) {
@@ -49,7 +49,7 @@ export function FontPicker({ slot }: { slot: FontSlot }) {
               style={styles.item}
             >
               <View style={[styles.tile, { borderColor: checked ? colors.accent : colors.border, borderWidth: checked ? 2 : 1, backgroundColor: checked ? colors.accentSoft : colors.surface }]}>
-                <Text {...dynamicType} style={[typography.body, { color: colors.text }, sampleStyle(shown, slot)]}>Aa</Text>
+                <Text {...dynamicType} style={[typography.title, { color: colors.text }, sampleStyle(shown, slot)]}>Aa</Text>
               </View>
               <Text {...dynamicType} numberOfLines={2} style={[typography.caption, styles.name, { color: checked ? colors.text : colors.textDim }]}>{label}</Text>
             </Pressable>
