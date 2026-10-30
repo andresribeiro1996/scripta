@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createElement, Fragment, type ReactNode } from "react";
+import { createElement, type ReactNode } from "react";
 import { renderToString } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { WorkPage } from "@scripta/shared";
+import { readFileSync } from "node:fs";
 import { BookScreen, ReaderList } from "../src/components/book/BookScreen";
+import { editionCoverBook } from "../src/components/book/BookCover";
 import { ConfirmProvider } from "../src/components/ConfirmDialog";
 import { ToastProvider } from "../src/components/Toaster";
 import { createWebLibrarySaver, LibrarySaverContext } from "../src/hooks/useLibrarySaver";
@@ -27,7 +29,8 @@ const owned = { Title: "Dune", Attribution: "Frank Herbert", ISBN: "978044101359
 Object.defineProperty(globalThis, "matchMedia", { value: () => ({ matches: false }), configurable: true });
 
 type Props = Parameters<typeof BookScreen>[0];
-const base: Props = { page, book: null, signedIn: true, frame: (_title: string, actions: ReactNode, body: ReactNode) => createElement(Fragment, null, actions, body), editionId: null, onSelectEdition: () => undefined, onAdd: () => undefined, onShare: () => undefined };
+const base: Props = { page, book: null, signedIn: true, frame: (body: ReactNode) => body, editionId: null, onSelectEdition: () => undefined, onAdd: () => undefined, onShare: () => undefined };
+const renderOwnedBook = () => render({ book: owned, page: ownedPage });
 function render(props: Partial<Props>) {
   const client = new QueryClient();
   return renderToString(
@@ -58,8 +61,8 @@ test("not owned: add button, About and Community tabs, no highlights tab, no men
 test("owned and finished: status and feeling menus, highlights tab, more menu", () => {
   const html = render({ book: owned, page: ownedPage });
   assert.ok(!html.includes("Add to library"));
-  assert.ok(html.includes("Finished ▾"));
-  assert.ok(html.includes("Loved it ▾"));
+  assert.ok(html.includes("Finished"));
+  assert.ok(html.includes("Loved it"));
   assert.ok(html.includes("Highlights (1)"));
   assert.ok(html.includes('title="More"'));
 });
@@ -88,7 +91,7 @@ test("owned: the strip marks your edition, with owner controls and no add button
   assert.ok(html.includes("Your edition · 1 of 5"));
   assert.ok(html.includes("Yours"));
   assert.ok(!html.includes("Back to your edition"));
-  assert.ok(html.includes("Finished ▾"));
+  assert.ok(html.includes("Finished"));
   assert.ok(!html.includes("Add this edition"));
 });
 
@@ -107,7 +110,7 @@ test("owned with another edition selected: moved counter, way back, same owner c
   assert.ok(html.includes("Edition 3 of 5"));
   assert.ok(html.includes("Back to your edition"));
   assert.ok(html.includes("1968 · 403 pages"));
-  assert.ok(html.includes("Finished ▾"));
+  assert.ok(html.includes("Finished"));
   assert.ok(!html.includes("Add this edition"));
 });
 
@@ -131,11 +134,69 @@ test("a library-only book opens on Highlights with no About or Community", () =>
   assert.ok(!html.includes("Rated"));
 });
 
-test("the title and back link belong to the band: the screen renders no h1 of its own", () => {
-  assert.ok(!render({}).includes("<h1"));
-  const titles: string[] = [];
-  render({ frame: (title, _actions, body) => (titles.push(title), body) });
-  assert.deepEqual(titles, ["Dune"]);
+test("the hero holds the only h1, with Share and More on the title row", () => {
+  const html = renderOwnedBook();
+  assert.equal(html.match(/<h1/g)?.length, 1);
+  assert.match(html, /<h1[^>]*class="[^"]*font-display[^"]*lg:text-5xl[^"]*"[^>]*>[^<]+<\/h1>[\s\S]*?aria-label="Share"/);
+  assert.match(html, /<h1[^>]*class="[^"]*\bmin-w-0\b[^"]*\bbreak-words\b[^"]*"/);
+});
+
+test("sections are labelled underline tabs with the current one announced", () => {
+  const html = renderOwnedBook();
+  const nav = html.match(/<nav aria-label="Book sections"[\s\S]*?<\/nav>/)![0];
+  assert.match(nav, />About</);
+  assert.match(nav, />Highlights \(1\)</);
+  assert.match(nav, /aria-current="page"/);
+  assert.match(nav, /border-b-2/);
+});
+
+test("the status menu shows its label with a check, not a ▾ glyph", () => {
+  const html = renderOwnedBook();
+  assert.doesNotMatch(html, /▾/);
+  assert.match(html, /aria-haspopup="menu"[^>]*>[\s\S]*?Finished/);
+});
+
+test("the cover column is sticky only from lg and the hero grid is two columns there", () => {
+  const html = render({});
+  assert.match(html, /class="[^"]*lg:grid-cols-\[minmax\(0,280px\)_minmax\(0,1fr\)\][^"]*lg:gap-14[^"]*"/);
+  assert.match(html, /class="min-w-0 self-start[^"]*lg:sticky[^"]*"/);
+});
+
+test("editions are a list panel with a small cover per row and a Yours chip", () => {
+  const html = renderOwnedBook();
+  const list = html.match(/<ul class="[^"]*divide-y[^"]*">[\s\S]*?<\/ul>/)![0];
+  assert.equal(list.match(/<li/g)?.length, 3);
+  assert.equal(list.match(/width:36px/g)?.length, 3);
+  assert.equal(list.match(/>Yours</g)?.length, 1);
+});
+
+test("cover-less editions pass an empty book so no cover lookup fires, in the list and the strip", () => {
+  assert.deepEqual(editionCoverBook(edition(1), "Frank Herbert"), {});
+  assert.deepEqual(editionCoverBook({ ...edition(1), coverUrl: "https://covers.test/1.jpg" }, "Frank Herbert"), { Title: "Dune 1", Attribution: "Frank Herbert", ISBN: "9780441013593", _coverUrl: "https://covers.test/1.jpg" });
+  for (const f of ["BookScreen", "EditionStrip"]) assert.match(readFileSync(new URL(`../src/components/book/${f}.tsx`, import.meta.url), "utf8"), /editionCoverBook\(/, f);
+});
+
+test("a single owned edition's Yours row shows the library cover", () => {
+  const one = { ...page, work: { ...page.work, editions: [{ ...edition(1, true), coverUrl: "https://covers.test/1.jpg" }] }, mine: ownedPage.mine };
+  const list = render({ book: { ...owned, _coverUrl: "https://library.test/mine.jpg" }, page: one }).match(/<ul class="[^"]*divide-y[^"]*">[\s\S]*?<\/ul>/)![0];
+  assert.ok(list.includes("https://library.test/mine.jpg"));
+  assert.ok(!list.includes("https://covers.test/1.jpg"));
+});
+
+test("the edition strip draws book-style covers sized to the hero column, not 144px tiles", () => {
+  const strip = render({}).match(/aria-roledescription="carousel"[\s\S]*?aria-live/)![0];
+  assert.match(strip, /shadow-\(--shadow-cover\)/);
+  assert.match(strip, /<button(?:=>|[^>])*class="[^"]*\bw-50\b[^"]*\blg:w-70\b/);
+  assert.doesNotMatch(strip, /rounded-xl/);
+});
+
+test("the tab classes come from one shared constant", () => {
+  for (const f of ["book/BookScreen", "page/Page"]) {
+    const src = readFileSync(new URL(`../src/components/${f}.tsx`, import.meta.url), "utf8");
+    assert.match(src, /tabClass|TAB_NAV/, f);
+    assert.doesNotMatch(src, /inline-flex min-h-11 min-w-11/, f);
+    assert.doesNotMatch(src, /overflow-x-auto shadow-\[inset/, f);
+  }
 });
 
 const rows = [
@@ -219,7 +280,8 @@ test("the cover column can shrink below the edition strip's width, so a phone pa
 test("a work page lists the first eight characters and counts the rest", () => {
   const characters = Array.from({ length: 10 }, (_, i) => `Person ${i + 1}`);
   const html = render({ page: { ...page, work: { ...page.work, characters } } });
-  assert.ok(html.includes("Characters: Person 1, Person 2"));
+  assert.match(html, /<h2[^>]*>Characters<\/h2>/);
+  assert.ok(html.includes("Person 1 · Person 2"));
   assert.ok(html.includes("Person 8"));
   assert.ok(!html.includes("Person 9"));
   assert.ok(html.includes("+2 more"));

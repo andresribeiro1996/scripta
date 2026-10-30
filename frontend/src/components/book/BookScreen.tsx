@@ -26,16 +26,19 @@ import { useWorkStats } from "../../hooks/useWorkStats";
 import { effectiveCardStyle, resolveLibraryStyle, type PerCardStyle } from "../../lib/libraryStyle";
 import { useResolvedTheme } from "../../lib/theme";
 import { AuthorAvatar } from "../CommunityAuthorAvatar";
-import { CoverImage, coverParamsFor } from "../BookCard";
+import { coverParamsFor } from "../BookCard";
 import { CoverPickerModal } from "../CoverPickerModal";
 import { useConfirm } from "../ConfirmDialog";
 import { FinishSheet } from "../FinishSheet";
 import { OptionsMenu } from "../OptionsMenu";
 import { PerCardStylePanel } from "../PerCardStylePanel";
 import { ReaderGlyph } from "../ReaderGlyph";
-import { ArenaIcon, CommunityIcon, InfoIcon, QuoteIcon } from "../NavIcons";
-import { MoreIcon, ShareIcon } from "../Toolbar";
+import { ArenaIcon } from "../NavIcons";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../page/buttonClasses";
+import { LIST_PANEL, LIST_ROW, SECTION_HEADING, TAB_NAV, tabClass } from "../page/surfaceClasses";
+import { ChevronDownIcon, MoreIcon, ShareIcon, toolbarIconClass } from "../Toolbar";
 import { StatsTiles } from "./BookStats";
+import { BookCover, editionCoverBook } from "./BookCover";
 import { EditionStrip } from "./EditionStrip";
 import { RatingStars } from "./RatingStars";
 
@@ -47,23 +50,28 @@ type Props = {
   onSelectEdition: (bookId: string) => void;
   onAdd: (addBook: NonNullable<BookScreenModel["addBook"]>) => void;
   onShare: (() => void) | null;
-  frame: (title: string, actions: ReactNode, body: ReactNode) => ReactNode;
+  frame: (body: ReactNode) => ReactNode;
 };
-
-const TAB_ICONS: Record<BookScreenTabKey, typeof InfoIcon> = { about: InfoIcon, highlights: QuoteIcon, community: CommunityIcon };
 
 const rowClass = "flex items-center gap-3 rounded-xl border border-(--color-border) bg-(--color-surface) p-4";
 const pillClass = "inline-flex max-w-full items-center gap-1 rounded-full border px-2 text-xs";
 const winPillClass = `${pillClass} border-(--color-accent-soft) bg-(--color-accent-soft) text-(--color-accent)`;
 const nomineePillClass = `${pillClass} border-(--color-border) text-(--color-text-dim)`;
-const sectionHeading = "mb-3 text-lg font-bold";
-const roundButtonClass = "flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-(--color-border) bg-(--color-surface) text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)";
-const controlClass = "inline-flex min-h-11 items-center justify-center rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm font-semibold hover:bg-(--color-surface-hover)";
+const roundButtonClass = `${toolbarIconClass()} rounded-full!`;
+const statusTriggerClass = "inline-flex min-h-11 items-center gap-2 rounded-lg border border-(--color-accent) bg-(--color-accent-soft) px-4 text-sm font-semibold text-(--color-accent)";
+
+function CheckIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="m5 12.5 4.5 4.5L19 7.5" />
+    </svg>
+  );
+}
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="mt-6 first:mt-0">
-      <h2 className={sectionHeading}>{title}</h2>
+    <section className="mt-8 first:mt-0">
+      <h2 className={`${SECTION_HEADING} mb-3`}>{title}</h2>
       {children}
     </section>
   );
@@ -95,6 +103,11 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
   const workCoverBook = useMemo(
     () => (work ? { Title: work.title, Attribution: work.author, ISBN: isbn ?? undefined, _coverUrl: work.coverUrl ?? undefined } : null),
     [work, isbn]
+  );
+  const mineIndex = model.edition ? model.edition.mineIndex : book ? 0 : null;
+  const editionCovers = useMemo(
+    () => (work ? work.editions.map((e, i) => (i === mineIndex && book ? book : editionCoverBook(e, work.author))) : []),
+    [work, book, mineIndex]
   );
   const heroBook = book ?? workCoverBook;
   if (!heroBook) throw new Error("BookScreen needs a page or a book.");
@@ -175,14 +188,20 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
       ) : null}
     </>
   );
+  const characters = allCharacters ? [...model.characters.shown, ...model.characters.more] : model.characters.shown;
+  const metaParts = [
+    ...(model.rating ? [<RatingStars key="rating" value={model.rating.value} label={model.rating.label} />] : []),
+    ...(model.meta ? [<span key="meta">{model.meta}</span>] : []),
+    ...(model.series ? [<span key="series">{seriesLabel(model.series)}</span>] : [])
+  ];
 
-  return frame(model.title, headerActions, (
+  return frame((
     <>
     <div className="relative isolate">
       {wash ? (
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute -inset-x-4 -top-5 -z-10 h-[520px] sm:-inset-x-5 sm:-top-8"
+          className={`pointer-events-none absolute -inset-x-4 -z-10 h-[520px] sm:-inset-x-6 lg:-inset-x-8 ${signedIn ? "-top-27 lg:-top-29" : "-top-8"}`}
           style={{ background: `linear-gradient(to bottom, ${wash.top}, ${wash.mid} 45%, transparent)` }}
         />
       ) : null}
@@ -201,20 +220,37 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
           />
         ) : null}
 
-        <div className="grid gap-6 sm:grid-cols-[220px_1fr]">
-          <div className="min-w-0 self-start text-center sm:sticky sm:top-[calc(var(--app-top)+1.5rem)] sm:text-left">
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,280px)_minmax(0,1fr)] lg:gap-14">
+          <div className="min-w-0 self-start lg:sticky lg:top-[calc(var(--app-top)+1.5rem)]">
             {model.edition && work ? (
               <EditionStrip key={coverVersion} editions={work.editions} author={work.author} edition={model.edition} mineBook={book} onSelect={onSelectEdition} />
             ) : (
-              <div className="relative mx-auto aspect-[2/3] w-32 overflow-hidden rounded-xl bg-(--color-border) sm:mx-0 sm:w-full">
-                <CoverImage key={coverVersion} book={heroBook} size="full" />
+              <div className="mx-auto w-50 lg:w-full">
+                <BookCover key={coverVersion} book={heroBook} size="full" />
               </div>
             )}
-            {model.series ? <p className="mt-4 text-xs text-(--color-text-dim)">{seriesLabel(model.series)}</p> : null}
-            <p className={`${model.series ? "mt-1" : "mt-4"} text-sm text-(--color-text-dim)`}>{model.author}</p>
+            {page ? <StatsTiles tiles={statsTiles} to={`/work/${page.work.id}/stats`} /> : null}
+            {coverError ? (
+              <p role="alert" className="mt-2 text-sm text-(--color-danger)">
+                {coverError}
+              </p>
+            ) : null}
+          </div>
+
+          <div className="min-w-0 lg:max-w-190">
+            <div className="flex items-start justify-between gap-4">
+              <h1 className="min-w-0 font-display text-4xl font-bold break-words lg:text-5xl lg:leading-14">{model.title}</h1>
+              {onShare || menuItems.length > 0 ? <div className="flex shrink-0 items-center gap-2 pt-1 lg:pt-2">{headerActions}</div> : null}
+            </div>
+            <p className="mt-2.5 text-lg">{`by ${model.author}`}</p>
             {model.authorAwards ? <p className="mt-1 text-xs text-(--color-text-dim)">{model.authorAwards}</p> : null}
+            {metaParts.length > 0 ? (
+              <div className="mt-4 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-sm text-(--color-text-dim)">
+                {metaParts.flatMap((part, i) => (i === 0 ? [part] : [<span key={`dot-${i}`} aria-hidden="true">·</span>, part]))}
+              </div>
+            ) : null}
             {model.awards.length > 0 ? (
-              <ul className="mt-3 flex flex-wrap justify-center gap-1.5 sm:justify-start">
+              <ul className="mt-4 flex flex-wrap gap-1.5">
                 {model.awards.map((award) => (
                   <li key={award.label} title={award.label} className={award.won ? winPillClass : nomineePillClass}>
                     {award.won ? <span className="flex shrink-0"><ArenaIcon size={12} /></span> : null}
@@ -223,22 +259,8 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
                 ))}
               </ul>
             ) : null}
-            {model.characters.shown.length > 0 ? (
-              <p className="mt-3 text-xs text-(--color-text-dim)">
-                {`Characters: ${(allCharacters ? [...model.characters.shown, ...model.characters.more] : model.characters.shown).join(", ")}`}
-                {model.characters.more.length > 0 && !allCharacters ? (
-                  <>
-                    {" "}
-                    <button type="button" aria-label="Show all characters" onClick={() => setAllCharacters(true)} className="inline-flex min-h-11 items-center font-semibold text-(--color-accent)">{`+${model.characters.more.length} more`}</button>
-                  </>
-                ) : null}
-              </p>
-            ) : null}
-            {model.characters.canMakeGame && signedIn && page ? (
-              <Link to={`/work/${page.work.id}/characters`} className="mt-1 inline-flex min-h-11 items-center text-xs font-semibold text-(--color-accent)">Make a character game</Link>
-            ) : null}
             {model.genres.length + model.possibleGenres.length > 0 ? (
-              <ul className="mt-3 flex flex-wrap justify-center gap-1.5 sm:justify-start">
+              <ul className="mt-3 flex flex-wrap gap-1.5">
                 {model.genres.map((genre) => (
                   <li key={genre} className="rounded-full border border-(--color-border) px-2 text-xs text-(--color-text-dim)">
                     {genre}
@@ -251,78 +273,53 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
                 ))}
               </ul>
             ) : null}
-            {model.rating ? <RatingStars value={model.rating.value} label={model.rating.label} /> : null}
-            {page ? <StatsTiles tiles={statsTiles} to={`/work/${page.work.id}/stats`} /> : null}
-            {model.meta ? <p className="mt-3 text-xs text-(--color-text-dim)">{model.meta}</p> : null}
-            {coverError ? (
-              <p role="alert" className="mt-2 text-sm text-(--color-danger)">
-                {coverError}
-              </p>
-            ) : null}
-          </div>
 
-          <div className="min-w-0">
             {model.primary === "owner" && model.status ? (
-              <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+              <div className="mt-6 flex flex-wrap items-center gap-2">
                 <OptionsMenu
                   title="Reading status"
-                  trigger={`${model.status.label} ▾`}
-                  triggerClassName={`${controlClass} text-(--color-accent)`}
+                  trigger={<><CheckIcon />{model.status.label}<ChevronDownIcon /></>}
+                  triggerClassName={statusTriggerClass}
                   items={model.status.options.map((option) => ({ label: option.label, checked: option.selected, onClick: () => void pickStatus(option.value) }))}
                 />
                 {model.feeling ? (
                   <OptionsMenu
                     title="How it landed"
-                    trigger={`${model.feeling.label} ▾`}
-                    triggerClassName={controlClass}
+                    trigger={<>{model.feeling.label}<ChevronDownIcon /></>}
+                    triggerClassName={`${BUTTON_SECONDARY} gap-2`}
                     items={model.feeling.options.map((option) => ({ label: option.label, checked: option.selected, onClick: () => void actions.setRating(book!, option.rating) }))}
                   />
                 ) : null}
               </div>
             ) : model.primary === "add" && model.addBook ? (
-              <button
-                type="button"
-                onClick={() => onAdd(model.addBook!)}
-                className="min-h-11 w-full rounded-lg bg-(--color-accent) px-4 py-2 text-sm font-semibold text-(--color-on-accent) hover:opacity-90"
-              >
+              <button type="button" onClick={() => onAdd(model.addBook!)} className={`${BUTTON_PRIMARY} mt-6 w-full sm:w-auto`}>
                 {model.edition ? "Add this edition" : "Add to library"}
               </button>
             ) : null}
 
             {model.tabs.length > 1 ? (
-              <div
-                role="group"
-                aria-label="Book sections"
-                className="mt-4 flex items-stretch overflow-hidden rounded-lg border border-(--color-border) bg-(--color-surface)"
-              >
-                {model.tabs.map((t, i) => {
-                  const checked = t.key === activeTab;
-                  const Icon = TAB_ICONS[t.key];
+              <nav aria-label="Book sections" className={`mt-9 ${TAB_NAV}`}>
+                {model.tabs.map((t) => {
+                  const current = t.key === activeTab;
                   return (
                     <button
                       key={t.key}
                       type="button"
-                      aria-pressed={checked}
-                      aria-label={t.label}
-                      title={t.label}
+                      aria-current={current ? "page" : undefined}
                       onClick={() => setTab(t.key)}
-                      className={`flex min-h-11 flex-1 items-center justify-center px-3 ${
-                        i > 0 ? "border-l border-(--color-border)" : ""
-                      } ${checked ? "bg-(--color-accent-soft) text-(--color-accent)" : "text-(--color-text-dim) hover:bg-(--color-surface-hover)"}`}
-                    >
-                      <Icon />
-                    </button>
+                      className={tabClass(current)}
+                    >{t.label}</button>
                   );
                 })}
-              </div>
+              </nav>
             ) : null}
 
-            <div className="mt-6">
+            <div className="mt-7">
               {activeTab === "about" && model.about ? (
                 <>
                   {aboutSummary ? (
                     <Section title="About this book">
-                      <p className="text-sm leading-6 whitespace-pre-wrap break-words">{aboutOpen || !model.about.preview ? aboutSummary : model.about.preview}</p>
+                      <p className="text-base leading-7 whitespace-pre-wrap break-words">{aboutOpen || !model.about.preview ? aboutSummary : model.about.preview}</p>
                       {model.about.preview ? (
                         <button type="button" aria-expanded={aboutOpen} onClick={() => setAboutOpen(!aboutOpen)} className="min-h-11 text-sm font-semibold text-(--color-accent)">
                           {aboutOpen ? "Show less" : "Show more"}
@@ -330,12 +327,32 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
                       ) : null}
                     </Section>
                   ) : null}
+                  {characters.length > 0 ? (
+                    <Section title="Characters">
+                      <p className="text-[15px] leading-6">
+                        {characters.join(" · ")}
+                        {model.characters.more.length > 0 && !allCharacters ? (
+                          <>
+                            {" "}
+                            <button type="button" aria-label="Show all characters" onClick={() => setAllCharacters(true)} className="inline-flex min-h-11 items-center font-semibold text-(--color-accent)">{`+${model.characters.more.length} more`}</button>
+                          </>
+                        ) : null}
+                      </p>
+                      {model.characters.canMakeGame && signedIn && page ? (
+                        <Link to={`/work/${page.work.id}/characters`} className="inline-flex min-h-11 items-center text-sm font-semibold text-(--color-accent)">Make a character game</Link>
+                      ) : null}
+                    </Section>
+                  ) : null}
                   <Section title="Editions">
-                    <ul className="flex flex-col gap-2">
-                      {editions.map((e) => (
-                        <li key={e.bookId} className="text-sm">
-                          <span className="font-semibold">{e.title}</span>
-                          <span className="text-(--color-text-dim)"> · {editionLabel(e)}{e.mine ? " · Yours" : ""}</span>
+                    <ul className={LIST_PANEL}>
+                      {editions.map((e, i) => (
+                        <li key={e.bookId} className={LIST_ROW}>
+                          <BookCover book={editionCovers[i]!} width={36} />
+                          <span className="min-w-0 flex-1 text-sm">
+                            <span className="block break-words font-semibold">{e.title}</span>
+                            <span className="block text-(--color-text-dim)">{editionLabel(e)}</span>
+                          </span>
+                          {e.mine ? <span className="shrink-0 rounded-full bg-(--color-accent-soft) px-2.5 py-0.5 text-xs font-semibold text-(--color-accent)">Yours</span> : null}
                         </li>
                       ))}
                     </ul>

@@ -617,8 +617,12 @@ git add frontend/src/pages/GroupsPage.tsx frontend/src/pages/GalleryPage.tsx fro
 - Modify: `frontend/src/components/book/BookScreen.tsx`
 - Modify: `frontend/src/pages/WorkPage.tsx`
 - Modify: `frontend/src/pages/BookKeyPage.tsx`
+- Modify: `frontend/src/components/book/EditionStrip.tsx`
+- Modify: `frontend/src/components/book/BookStats.tsx`
+- Modify: `frontend/src/components/book/RatingStars.tsx`
 - Test: `frontend/scripts/test-work-page.mts`
 - Test: `frontend/scripts/test-top-bar.mts`
+- Test: `frontend/scripts/test-book-stats.mts`
 
 **Interfaces:**
 - Consumes: `BookCover` (Task 6), `Page` with `title={null}` and `back` (Task 3), `LIST_PANEL`/`LIST_ROW` (Task 1).

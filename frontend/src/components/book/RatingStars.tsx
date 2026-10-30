@@ -15,7 +15,7 @@ function Stars({ className = "" }: { className?: string }) {
 
 export function RatingStars({ value, label }: { value: number; label: string }) {
   return (
-    <p className="mt-3 flex items-center justify-center gap-2 text-xs text-(--color-text-dim) sm:justify-start">
+    <p className="flex items-center gap-2">
       <span role="img" aria-label={`Rated ${value.toFixed(1)} out of 5`} className="relative flex w-fit">
         <Stars className="opacity-40" />
         <span className="absolute inset-y-0 left-0 overflow-hidden text-(--color-accent)" style={{ width: `${Math.min(100, (value / 5) * 100)}%` }}>
