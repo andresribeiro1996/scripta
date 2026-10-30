@@ -1,12 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { activeTabTo, area, areaIdForPath, backTo, BOTTOM_BAR_AREAS, footerAreas, NAV_AREAS, type AreaId } from "../src/lib/areas.ts";
+import { activeTabTo, area, areaIdForPath, backTo, BOTTOM_BAR_AREAS, footerAreas, NAV_AREAS, TOP_BAR_AREAS, type AreaId } from "../src/lib/areas.ts";
 
 test("areas come in sidebar order; Admin sits in the footer, for admins only", () => {
   assert.deepEqual(NAV_AREAS.map((a) => a.label), ["Home", "Library", "Murals", "Games", "Reader card", "Community", "Settings"]);
   assert.deepEqual(footerAreas(false), []);
   assert.deepEqual(footerAreas(true).map((a) => [a.label, a.to]), [["Admin", "/admin/genres"]]);
   assert.deepEqual(BOTTOM_BAR_AREAS, ["home", "library", "murals", "games"]);
+});
+
+test("the top bar lists every area but Settings and Admin", () => {
+  assert.deepEqual(TOP_BAR_AREAS.map((a) => a.id), ["home", "library", "murals", "games", "readerCard", "community"]);
 });
 
 test("tabs carry today's routes", () => {

@@ -105,10 +105,10 @@ export function SharedMuralPage() {
         <div
           ref={fullscreenRef}
           style={fullscreen ? muralThemeStyle(mural.theme) : undefined}
-          className={fullscreen ? "fixed inset-0 z-50 overflow-y-auto bg-(--color-bg) px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]" : "mx-auto max-w-6xl"}
+          className={fullscreen ? "fixed inset-0 z-50 overflow-y-auto [--app-top:0px] bg-(--color-bg) px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]" : "mx-auto max-w-6xl"}
         >
           {fullscreen && (
-            <div className="sticky top-0 z-40 -mx-4 -mt-4 mb-3 flex items-center justify-between bg-(--color-bg)/95 px-4 py-3 backdrop-blur">
+            <div className="sticky top-(--app-top) z-40 -mx-4 -mt-4 mb-3 flex items-center justify-between bg-(--color-bg)/95 px-4 py-3 backdrop-blur">
               <p className="truncate font-semibold">{mural.name}</p>
               <button onClick={() => void exitFullscreen()} aria-label="Exit fullscreen" className={toolbarIconClass()}>
                 <FullscreenIcon exit />

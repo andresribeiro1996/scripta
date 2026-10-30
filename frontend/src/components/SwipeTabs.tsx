@@ -108,7 +108,7 @@ export function SwipeTabs<T extends string>({
   return (
     <div>
       <div ref={anchorRef} />
-      <div role="tablist" aria-label={label} className="sticky top-0 z-20 -mx-4 border-b border-(--color-border) bg-(--color-bg)/95 px-4 backdrop-blur sm:mx-0 sm:px-0">
+      <div role="tablist" aria-label={label} className="sticky top-(--app-top) z-20 -mx-4 border-b border-(--color-border) bg-(--color-bg)/95 px-4 backdrop-blur sm:mx-0 sm:px-0">
         <div className="relative flex" style={{ "--tabs": tabs.length } as CSSProperties}>
           {tabs.map((tab, i) => (
             <button

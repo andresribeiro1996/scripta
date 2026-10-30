@@ -7,7 +7,9 @@ import { useAuth } from "../auth/AuthContext";
 import { Avatar } from "../components/Avatar";
 import { BrandLockup } from "../components/BrandLockup";
 import { MoreIcon } from "../components/NavIcons";
+import { AccountMenu } from "../components/page/AccountMenu";
 import { AREA_ICONS, SidebarNav } from "../components/page/SidebarNav";
+import { TopBar } from "../components/page/TopBar";
 import { OfflineBanner } from "../components/OfflineBanner";
 import { useAccountAppearanceSync } from "../hooks/useAccountAppearanceSync";
 import { useDashboard } from "../hooks/useDashboard";
@@ -15,9 +17,9 @@ import { useDismissible } from "../hooks/useDismissible";
 import { useGenreEnrichment } from "../hooks/useGenreEnrichment";
 import { useLibrary } from "../hooks/useLibrary";
 import { useScrollLock } from "../hooks/useScrollLock";
-import { area, areaIdForPath, BOTTOM_BAR_AREAS, footerAreas, NAV_AREAS } from "../lib/areas";
+import { area, areaIdForPath, BOTTOM_BAR_AREAS, footerAreas, NAV_AREAS, TOP_BAR_AREAS } from "../lib/areas";
 
-/** Persistent left-hand nav wrapping every signed-in page (every area in lib/areas.ts) — one shared shell instead of each page
+/** Persistent top bar (bottom bar and More drawer below `lg`) wrapping every signed-in page (every area in lib/areas.ts) — one shared shell instead of each page
  *  reimplementing its own header/logout, which is how it worked before
  *  this existed (see git history on DashboardPage.tsx). */
 export function DashboardLayout() {
@@ -39,34 +41,21 @@ export function DashboardLayout() {
 
   useDismissible(() => setDrawerOpen(false), drawerOpen);
 
-  const activeId = areaIdForPath(useLocation().pathname);
+  const { pathname } = useLocation();
+  const activeId = areaIdForPath(pathname);
   const homeBadge = newCountLabel(personalNewCount);
+  const accountActive = activeId === "settings" || activeId === "admin" || pathname === `/community/u/${session?.user.username}`;
 
   return (
-    <div className="flex min-h-screen">
-      <aside className="hidden w-56 shrink-0 flex-col border-r border-(--color-border) bg-(--color-surface) px-3 py-5 lg:flex">
-        <BrandLockup className="mb-6 px-2" />
-        <nav className="flex flex-1 flex-col gap-1">
-          <SidebarNav areas={NAV_AREAS} activeId={activeId} homeBadge={homeBadge} />
-        </nav>
-        <div className="mt-auto border-t border-(--color-border) pt-3">
-          <div className="mb-2 flex items-center gap-2 px-2">
-            {session && (
-              <Link to={`/community/u/${session.user.username}`} aria-label="My shelf" title="My shelf" className="-m-2.5 shrink-0 rounded-full p-2.5 transition-opacity hover:opacity-80">
-                <Avatar user={session.user} size={24} />
-              </Link>
-            )}
-            <p className="truncate text-xs text-(--color-text-dim)">@{session?.user.username ?? session?.user.email}</p>
-          </div>
-          <div className={isAdmin ? "mb-2" : undefined}><SidebarNav areas={footerAreas(isAdmin)} activeId={activeId} /></div>
-          <button
-            onClick={() => void logout()}
-            className="w-full rounded-lg border border-(--color-danger-soft) min-h-11 px-3 py-2.5 text-left text-sm text-(--color-danger) hover:bg-(--color-danger-soft)"
-          >
-            Log out
-          </button>
-        </div>
-      </aside>
+    <div className="min-h-screen">
+      <TopBar
+        areas={TOP_BAR_AREAS}
+        activeId={activeId}
+        homeBadge={homeBadge}
+        brandTo="/dashboard"
+        desktopOnly
+        end={session && <AccountMenu user={session.user} isAdmin={isAdmin} active={accountActive} onLogout={() => void logout()} />}
+      />
 
       {/* No user background color here on purpose. This element wraps the
           ENTIRE signed-in app — every route, the page headers, the
@@ -76,7 +65,7 @@ export function DashboardLayout() {
           `--color-text` title on an arbitrary color. That background now
           belongs to LibraryCanvas, which wraps only the book grid; see
           its comment for the whole boundary. */}
-      <main className={`min-w-0 flex-1 ${navHidden ? "lg:pb-0" : "pb-[calc(3.5rem+env(safe-area-inset-bottom,0px))] lg:pb-0"}`}>
+      <main id="content" className={navHidden ? "lg:pb-0" : "pb-[calc(3.5rem+env(safe-area-inset-bottom,0px))] lg:pb-0"}>
         <OfflineBanner />
         <Outlet context={{ setNavHidden }} />
       </main>
