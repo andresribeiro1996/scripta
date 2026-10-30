@@ -59,3 +59,12 @@ test("a series scope is labeled by the series, a lone work by its title, and unk
   assert.deepEqual(single.scope, { kind: "work", key: "w1", label: "Philosopher's Stone", coverUrl: null, workCount: 1 });
   assert.equal(single.characters[0]!.id, "ch:w:w1|ann lee");
 });
+
+test("roman series positions order by value", () => {
+  const rows: CastRows = {
+    work,
+    series,
+    members: [{ id: "a", position: "IX", people: ["Nine, Pat"] }, { id: "b", position: "V", people: ["Pat Nine"] }]
+  };
+  assert.equal(buildCast(rows, cover).characters[0]!.name, "Pat Nine");
+});
