@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollViewInstance } from "react-native";
 import { editionLabel, type BookScreenModel, type WorkEdition } from "@scripta/shared";
 import { Text } from "../../ui/Text";
 import { Menu, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
@@ -16,7 +16,7 @@ const NEIGHBOUR_OPACITY = 0.6;
 export function EditionStrip({ editions, book, edition, onSelect }: { editions: WorkEdition[]; book: Record<string, unknown> | null; edition: NonNullable<BookScreenModel["edition"]>; onSelect: (bookId: string) => void }) {
   const { colors } = useTheme();
   const { width: windowWidth } = useWindowDimensions();
-  const scroll = useRef<ScrollView>(null);
+  const scroll = useRef<ScrollViewInstance>(null);
   const { index, label, showDots, mineIndex } = edition;
   const [initialOffset] = useState({ x: index * INTERVAL, y: 0 });
   const select = (i: number) => {

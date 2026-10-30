@@ -1,6 +1,6 @@
 import { BottomSheet, RNHostView } from "@expo/ui";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ActivityIndicator, Pressable, ScrollView, Share, StyleSheet, View, useWindowDimensions } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, Share, StyleSheet, View, useWindowDimensions, type HostInstance } from "react-native";
 import { Text } from "../../ui/Text";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { captureRef, releaseCapture } from "react-native-view-shot";
@@ -31,7 +31,7 @@ export function ContentShareSheet({ visible, onClose, title, description, url, c
   const { colors } = useTheme();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const capture = useRef<View>(null);
+  const capture = useRef<HostInstance>(null);
   const size = useRef({ width: 0, height: 0 });
   const [view, setView] = useState<"actions" | "image" | "qr">("actions");
   const [busy, setBusy] = useState(false);

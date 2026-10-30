@@ -43,7 +43,7 @@ import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { measure, scrollTo, useAnimatedReaction, useAnimatedStyle, useFrameCallback, useReducedMotion, useSharedValue, withSpring, type AnimatedRef, type SharedValue } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 import { commitHaptic, liftHaptic } from "../../ui/haptics";
-import { PixelRatio, Pressable, ScrollView, StyleSheet, View, type StyleProp, type TextStyle } from "react-native";
+import { PixelRatio, Pressable, ScrollView, StyleSheet, View, type StyleProp, type TextStyle, type ScrollViewInstance } from "react-native";
 import { Text } from "../../ui/Text";
 import { blockFontFamily, resolveBorderColor, resolveBorderStyle } from "../../ui/libraryStyle";
 import { minimumTouchTarget, MuralThemeScope, radii, spacing, useTheme, type ThemeColors } from "../../ui/theme";
@@ -60,7 +60,7 @@ const GAP = 8;
 const ROW_GAP = GAP;
 const gridColumnWidth = (width: number) => (width + GAP) / GRID_COLUMNS;
 type DragState = { id: string; layout: BlockLayout; dx: number; dy: number; pointerY: number; startScroll: number; drop?: BlockLayout };
-export type MuralDragScroll = { ref: AnimatedRef<ScrollView>; offset: SharedValue<number>; contentHeight: SharedValue<number>; bottomInset: SharedValue<number> };
+export type MuralDragScroll = { ref: AnimatedRef<ScrollViewInstance>; offset: SharedValue<number>; contentHeight: SharedValue<number>; bottomInset: SharedValue<number> };
 const PROGRESS_TRACK = 4;
 
 const BLOCK_PADDING = { tight: spacing.sm, normal: spacing.md, roomy: spacing.xl } as const;

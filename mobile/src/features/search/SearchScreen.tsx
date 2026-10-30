@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { FlatList, StyleSheet, View, type TextInput } from "react-native";
+import { FlatList, StyleSheet, View, type TextInputInstance } from "react-native";
 import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { Stack, router, useNavigation } from "expo-router";
 import { looksLikeIsbnQuery, matchesSearch, withWorkIds, workIdOf, type BookSearchResult } from "@scripta/shared";
@@ -27,7 +27,7 @@ export function SearchScreen({ q, t }: { q?: string | string[]; t?: string | str
   const follow = useFollowToggle();
   const library = useLibrary();
   const navigation = useNavigation();
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<TextInputInstance>(null);
   const trimmed = query.trim();
   const debounced = useDebouncedValue(trimmed, 300);
   const needle = submitted ?? (isNetworkQuery(trimmed) ? debounced : trimmed);
@@ -139,11 +139,11 @@ export function SearchScreen({ q, t }: { q?: string | string[]; t?: string | str
                   }}
                   onEndReachedThreshold={0.4}
                   ListFooterComponent={
-                    pageScope !== "games" ? null : games.isFetchingNextPage ? (
+                    pageScope !== "games" ? undefined : games.isFetchingNextPage ? (
                       <View style={styles.footer}><Skeleton height={80} /></View>
                     ) : games.isFetchNextPageError ? (
                       <View style={styles.footer}><ErrorState body="Couldn't load more." actionLabel="Retry" onAction={() => void games.fetchNextPage()} /></View>
-                    ) : null
+                    ) : undefined
                   }
                   renderItem={({ item }) => <SearchResultRow row={item} actions={actions} />}
                 />

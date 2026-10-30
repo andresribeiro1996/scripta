@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
-import { FlatList, StyleSheet, View, type ViewToken } from "react-native";
+import { FlatList, StyleSheet, View, type ListViewToken } from "react-native";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
 import { useIsFocused } from "expo-router/react-navigation";
 import { useQueryClient, type InfiniteData } from "@tanstack/react-query";
@@ -41,7 +41,7 @@ export function ActivityScreen() {
     );
   };
   useEffect(() => { markSeen.current(); }, [focused, feed.data, feed.isError, feed.isFetching]);
-  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
+  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ListViewToken[] }) => {
     rowVisible.current = viewableItems.length > 0;
     markSeen.current();
   }).current;
@@ -54,7 +54,7 @@ export function ActivityScreen() {
     <FlatList data={items} keyExtractor={(item) => `${item.kind}:${item.id}`} contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.list}
       renderItem={({ item }) => <ActivityRow item={item} isNew={isNewDigestItem(item, seenAt)} following={item.kind === "follow" && followingId === item.actor.userId} onOpen={() => router.push(digestRoute(item) as never)} onFollowBack={() => { if (item.kind === "follow") void followBack(item.actor.userId); }} />}
       ListEmptyComponent={<View style={styles.state}>{empty}</View>}
-      ListFooterComponent={feed.isFetchingNextPage && items.length ? <View style={styles.state}><Skeleton height={64} /></View> : feed.isFetchNextPageError ? <View style={styles.state}><ErrorState body="Couldn't load more." actionLabel="Retry" onAction={() => void feed.fetchNextPage()} /></View> : null}
+      ListFooterComponent={feed.isFetchingNextPage && items.length ? <View style={styles.state}><Skeleton height={64} /></View> : feed.isFetchNextPageError ? <View style={styles.state}><ErrorState body="Couldn't load more." actionLabel="Retry" onAction={() => void feed.fetchNextPage()} /></View> : undefined}
       onEndReached={() => { if (feed.hasNextPage && !feed.isFetchingNextPage && !feed.isFetchNextPageError) void feed.fetchNextPage(); }} onEndReachedThreshold={0.4}
       onViewableItemsChanged={onViewableItemsChanged} viewabilityConfig={ACTIVITY_VIEWABILITY} />
   </Screen>;

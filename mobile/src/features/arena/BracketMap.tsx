@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View, type ScrollViewInstance } from "react-native";
 import Animated, { useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, type SharedValue } from "react-native-reanimated";
 import { Text } from "../../ui/Text";
 import { bracketShape, countdownLabel, duelWinner, needsVote, roundLabel, type BracketSlot, type Duel, type DuelSide } from "@scripta/shared";
@@ -206,7 +206,7 @@ export function BracketMap({
   const { colors } = useTheme();
   const [openId, setOpenId] = useState<string | null>(null);
   const [viewportWidth, setViewportWidth] = useState(0);
-  const horizontal = useRef<ScrollView>(null);
+  const horizontal = useRef<ScrollViewInstance>(null);
   const headingOffset = useSharedValue(0);
   const onPan = useAnimatedScrollHandler((event) => { headingOffset.set(event.contentOffset.x); });
   const openDuel = openId ? (tournament.duels.find((d) => d.id === openId) ?? null) : null;

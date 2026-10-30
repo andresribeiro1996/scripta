@@ -1,5 +1,5 @@
 import { createContext, memo, type ReactNode, type Ref, type RefObject, useCallback, useContext, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Animated, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, type TextInputProps, View, type ViewStyle } from "react-native";
+import { ActivityIndicator, Animated, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, type TextInputProps, View, type ViewStyle, type HostInstance, type ScrollViewInstance, type TextInputInstance } from "react-native";
 import { SvgXml } from "react-native-svg";
 import { Text } from "./Text";
 import MenuView, { type MenuAction } from "@expo/ui/community/menu";
@@ -74,7 +74,7 @@ export function Screen({
 // Every Input inside a FormScroll asks to be shown when it takes focus. Null
 // outside one — an Input in a sheet or a filter row scrolls with whatever
 // contains it, and must not reach for a scroll view that isn't there.
-const RevealField = createContext<((field: View) => void) | null>(null);
+const RevealField = createContext<((field: HostInstance) => void) | null>(null);
 
 // A scroll view that keeps the focused field above the keyboard.
 //
@@ -97,18 +97,18 @@ export function FormScroll({
   contentContainerStyle?: ViewStyle;
   scrollToEnd?: boolean;
 }) {
-  const frame = useRef<View>(null);
-  const scroll = useRef<ScrollView>(null);
+  const frame = useRef<HostInstance>(null);
+  const scroll = useRef<ScrollViewInstance>(null);
   // The content view, not the scroll view: a field's offset has to be measured
   // against what scrolls, or every measurement moves with the scroll itself.
-  const content = useRef<View>(null);
-  const focused = useRef<View | null>(null);
+  const content = useRef<HostInstance>(null);
+  const focused = useRef<HostInstance | null>(null);
   const scrollY = useRef(0);
   const [overlap, setOverlap] = useState(0);
   const overlapRef = useRef(0);
   overlapRef.current = overlap;
 
-  const reveal = useCallback((field: View | null) => {
+  const reveal = useCallback((field: HostInstance | null) => {
     if (field) focused.current = field;
     const target = focused.current;
     if (!target || !content.current || !frame.current) return;
@@ -157,7 +157,7 @@ export function FormScroll({
       <View ref={frame} style={styles.grow}>
         <ScrollView
           ref={scroll}
-          innerViewRef={content as RefObject<View>}
+          innerViewRef={content as RefObject<HostInstance>}
           keyboardShouldPersistTaps="handled"
           onScroll={(event) => { scrollY.current = event.nativeEvent.contentOffset.y; }}
           scrollEventThrottle={16}
@@ -288,11 +288,11 @@ export function Input({
   // it there is no way to reach the underlying TextInput.
   ref,
   ...props
-}: Omit<TextInputProps, "style"> & { label?: string; error?: string; hint?: string; icon?: IconName; ref?: Ref<TextInput>; style?: ViewStyle }) {
+}: Omit<TextInputProps, "style"> & { label?: string; error?: string; hint?: string; icon?: IconName; ref?: Ref<TextInputInstance>; style?: ViewStyle }) {
   const { colors, fonts } = useTheme();
   const [visible, setVisible] = useState(false);
-  const inputRef = useRef<TextInput>(null);
-  const fieldRef = useRef<View>(null);
+  const inputRef = useRef<TextInputInstance>(null);
+  const fieldRef = useRef<HostInstance>(null);
   const reveal = useContext(RevealField);
   const [focused, setFocused] = useState(false);
   const clearable = props.returnKeyType === "search" && !!props.value && !!props.onChangeText;

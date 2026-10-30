@@ -37,7 +37,7 @@
 // as nested Pressables, so tapping one doesn't also open the sheet.
 
 import { Fragment, useRef, useState } from "react";
-import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View, type ScrollViewInstance } from "react-native";
 import { Text } from "../../ui/Text";
 import { bracketShape, countdownLabel, duelWinner, needsVote, roundLabel, sharePercent, type BracketSlot, type Duel, type DuelSide } from "@scripta/shared";
 import { Icon, Sheet, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
@@ -268,7 +268,7 @@ export function BracketRounds({
   const { colors } = useTheme();
   const [openId, setOpenId] = useState<string | null>(null);
   const [picked, setPicked] = useState<number | null>(null);
-  const scroller = useRef<ScrollView>(null);
+  const scroller = useRef<ScrollViewInstance>(null);
   const openDuel = openId ? (tournament.duels.find((d) => d.id === openId) ?? null) : null;
 
   const byRound = bracketShape(tournament.bracketSize, tournament.duels);

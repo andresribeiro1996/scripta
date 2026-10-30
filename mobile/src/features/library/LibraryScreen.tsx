@@ -278,7 +278,7 @@ export function LibraryScreen() {
                     topInset={spacing.lg}
                     bottomInset={selectionMode ? searchDockClearance : searchDockFabClearance}
                     {...scrollProps}
-                    refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} />}
+                    refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => void refetch()} />}
                     ListHeaderComponent={
                       possibleDuplicates.length > 0 ? (
                         <View style={styles.shelfHead}>
