@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { bracketSizes, canCreate, defaultTicked, type CharacterGameMode, type WorkCast } from "@scripta/shared";
+import { bracketSizes, canCreate, defaultTicked, plural, type CharacterGameMode, type WorkCast } from "@scripta/shared";
 import { createCharacterTournament } from "../api/arena";
 import { createCharacterTierlist, type Tierlist } from "../api/tierlists";
 import { fetchWorkCast } from "../api/works";
@@ -81,7 +81,7 @@ function CastPicker({ workId, cast }: { workId: string; cast: WorkCast }) {
         </div>
         <div className="min-w-0">
           <p className="font-semibold">{cast.scope.label}</p>
-          {cast.scope.kind === "series" && <p className="text-sm text-(--color-text-dim)">{`${cast.scope.workCount} books`}</p>}
+          {cast.scope.kind === "series" && <p className="text-sm text-(--color-text-dim)">{plural(cast.scope.workCount, "book", "books")}</p>}
         </div>
       </div>
       {modes.length > 1 && (

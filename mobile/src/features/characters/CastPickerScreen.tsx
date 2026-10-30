@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Stack, router } from "expo-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { FlatList, Pressable, StyleSheet, View } from "react-native";
-import { bracketSizes, canCreate, defaultTicked, type CharacterGameMode, type WorkCast } from "@scripta/shared";
+import { FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from "react-native";
+import { bracketSizes, canCreate, defaultTicked, plural, type CharacterGameMode, type WorkCast } from "@scripta/shared";
 import { Text } from "../../ui/Text";
 import { Button, ErrorState, Input, Screen, Segmented, Skeleton, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { BookCover } from "../arena/BookCover";
@@ -75,7 +75,7 @@ function CastPicker({ workId, cast }: { workId: string; cast: WorkCast }) {
         <BookCover cover={cast.scope.coverUrl} title={cast.scope.label} width={48} height={72} />
         <View style={styles.grow}>
           <Text numberOfLines={2} {...dynamicType} style={[typography.title, { color: colors.text }]}>{cast.scope.label}</Text>
-          {cast.scope.kind === "series" ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{`${cast.scope.workCount} books`}</Text> : null}
+          {cast.scope.kind === "series" ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{plural(cast.scope.workCount, "book", "books")}</Text> : null}
         </View>
       </View>
       {modes.length > 1 ? <Segmented accessibilityLabel="Game type" options={modes} value={mode} onChange={chooseMode} /> : null}
@@ -92,7 +92,7 @@ function CastPicker({ workId, cast }: { workId: string; cast: WorkCast }) {
   );
 
   return (
-    <>
+    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.grow}>
       {error ? <Toast visible message={error} tone="error" /> : null}
       <FlatList
         data={cast.characters}
@@ -112,7 +112,7 @@ function CastPicker({ workId, cast }: { workId: string; cast: WorkCast }) {
         }}
       />
       <Button label={mode === "tierlist" ? "Create tier list" : "Create tournament"} loading={busy} disabled={!canCreate(mode, ticked.length, size)} onPress={() => void create()} />
-    </>
+    </KeyboardAvoidingView>
   );
 }
 

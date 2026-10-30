@@ -9,7 +9,7 @@ export function ArenaBooksSheet({ id, name, character = false, onAddBook, onClos
   const { colors } = useTheme();
   const tournament = useQuery({ queryKey: ["arena", id, "preview"], queryFn: () => fetchTournament(id!), enabled: Boolean(id), retry: false });
 
-  return <Sheet visible={id !== null} title={`${name} ${character ? "characters" : "books"}`} onClose={onClose}>
+  return <Sheet visible={id !== null} title={name.toLowerCase().endsWith(character ? "characters" : "books") ? name : `${name} ${character ? "characters" : "books"}`} onClose={onClose}>
     {tournament.isPending ? <Skeleton height={180} /> : tournament.isError ? <ErrorState body={`Couldn't load these ${character ? "characters" : "books"}.`} actionLabel="Retry" onAction={() => void tournament.refetch()} /> :
       <FlatList
         data={tournament.data.slots}

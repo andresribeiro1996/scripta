@@ -127,7 +127,7 @@ export function ArenaVoteDeck({ duel, character = false, disabled, onVote }: { d
         <VoteHalf character={character} side={duel.bookB} winId={duel.bookB.workId} loseId={duel.bookA.workId} disabled={disabled} edge="right" onVote={vote} />
         <View pointerEvents="none" style={[styles.vs, { backgroundColor: colors.surface, borderColor: colors.border }]}><Text style={[styles.vsText, { color: colors.text }]}>VS</Text></View>
       </View>
-      <Text {...dynamicType} style={[typography.caption, styles.center, { color: colors.textDim }]}>Swipe a cover up to pick it, down to pass — or tap it to pick. Votes can't be changed.</Text>
+      <Text {...dynamicType} style={[typography.caption, styles.center, { color: colors.textDim }]}>{`Swipe a ${character ? "character" : "cover"} up to pick it, down to pass — or tap it to pick. Votes can't be changed.`}</Text>
     </View>
   );
 }

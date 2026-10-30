@@ -50,7 +50,7 @@ export function DiscoverRow({ item, linkAuthor, stats, onPreviewBooks, onOpen }:
       }
       badges={status.votedBadge ? [status, { label: "Voted", tone: "info" }] : [status]}
       stats={stats ?? contentStats(content)}
-      seeBooks={content.kind === "tournament" && onPreviewBooks ? { label: `See all ${content.bookCount} ${itemNoun(content.subject, content.bookCount)} in ${content.name}`, onPress: () => onPreviewBooks({ id: content.id, name: content.name }) } : undefined}
+      seeBooks={content.kind === "tournament" && onPreviewBooks ? { text: `See ${itemNoun(content.subject, 2)}`, label: `See all ${content.bookCount} ${itemNoun(content.subject, content.bookCount)} in ${content.name}`, onPress: () => onPreviewBooks({ id: content.id, name: content.name }) } : undefined}
     />
   );
 }
@@ -68,7 +68,7 @@ export type GameRowProps = {
   ladder?: string[];
   preview?: QuizPreview;
   actionLabel?: string;
-  seeBooks?: { label: string; onPress: () => void };
+  seeBooks?: { text: string; label: string; onPress: () => void };
   accessibilityRole?: "link" | "button";
   onPress: () => void;
   onDelete?: () => void;
@@ -133,7 +133,7 @@ export function GameRow({ kind, name, meta, badges, caption, stats = [], covers,
         <Pressable accessibilityRole={accessibilityRole} accessibilityLabel={`${actionLabel}: ${name}`} onPress={onPress} style={({ pressed }) => [styles.primaryAction, { backgroundColor: pressed ? colors.accentFill : soft }]}>
           {({ pressed }) => <><Text {...dynamicType} style={[typography.body, styles.strong, styles.shrink, { color: pressed ? colors.text : color }]}>{actionLabel}</Text><Icon name="chevronRight" size={16} color={pressed ? colors.text : color} /></>}
         </Pressable>
-        {seeBooks ? <Pressable accessibilityRole="button" accessibilityLabel={seeBooks.label} onPress={seeBooks.onPress} style={({ pressed }) => [styles.secondaryAction, { borderColor: colors.border, backgroundColor: pressed ? colors.surfacePressed : colors.surface }]}><Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.textDim }]}>See books</Text></Pressable> : null}
+        {seeBooks ? <Pressable accessibilityRole="button" accessibilityLabel={seeBooks.label} onPress={seeBooks.onPress} style={({ pressed }) => [styles.secondaryAction, { borderColor: colors.border, backgroundColor: pressed ? colors.surfacePressed : colors.surface }]}><Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.textDim }]}>{seeBooks.text}</Text></Pressable> : null}
         {onDelete ? <ActionSheet title={name} groups={[[{ label: "Delete", icon: "delete", destructive: true, onPress: onDelete }]]}>{(open) => <IconButton accessibilityLabel={`More actions for ${name}`} name="more" onPress={open} />}</ActionSheet> : null}
       </View>
     </View>

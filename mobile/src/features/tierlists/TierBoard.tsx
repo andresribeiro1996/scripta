@@ -20,7 +20,7 @@ export function TierCover({ book, style, onLoadEnd }: { book: TierBook; style?: 
   const character = isCharacterBook(book);
   useEffect(() => { if (character) onLoadEnd?.(); }, [character]);
   if (character) return <View style={[styles.cover, style]}>
-    <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.characterTile, { backgroundColor: colors.accentSoft }]}><Text numberOfLines={3} {...dynamicType} style={[styles.fallbackTitle, styles.center, { color: colors.accent }]}>{titleOf(book)}</Text></View>
+    <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.characterTile, { backgroundColor: colors.accentSoft }]}>{titleOf(book).split(/\s+/).slice(0, 4).map((word, index) => <Text key={index} numberOfLines={1} {...dynamicType} style={[styles.fallbackTitle, styles.center, styles.word, { color: colors.accent }]}>{word}</Text>)}</View>
   </View>;
   return <View style={[styles.cover, style]}>
     <CoverImage book={book} onHasCoverChange={setHasCover} onLoadEnd={onLoadEnd} />
@@ -116,6 +116,7 @@ const styles = StyleSheet.create({
   characterTile: { alignItems: "center", justifyContent: "center", padding: 5 },
   fallbackTitle: { fontFamily: "serif", fontSize: 11, lineHeight: 13, fontWeight: "700" },
   fallbackAuthor: { fontSize: 8, lineHeight: 10, fontWeight: "700" },
+  word: { alignSelf: "stretch" },
   center: { textAlign: "center" },
   strong: { fontWeight: "700" },
   empty: { height: "100%", paddingHorizontal: spacing.sm, textAlignVertical: "center" },
