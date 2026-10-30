@@ -9,7 +9,6 @@ import type { CompletedVotedRow, DuelRow, SeedPreview, TournamentDiscoverRow, To
 
 export interface ArenaRepository {
   deleteUserData(userId: string): void;
-  /** Runs fn inside one write transaction: commits when it returns, rolls back when it throws. */
   transaction<T>(fn: () => T): T;
   insertTournament(row: TournamentRow): void;
   getTournament(id: string): TournamentRow | undefined;
