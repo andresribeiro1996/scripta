@@ -4,7 +4,7 @@ import { useSocials } from "../hooks/useSocials";
 import { useConfirm } from "./ConfirmDialog";
 import { ToggleSwitch } from "./ToggleSwitch";
 import { SocialIcon } from "./icons/SocialIcons";
-import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "./page/buttonClasses";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY, FIELD_CLASS } from "./page/buttonClasses";
 import { SettingGroup, SettingRow } from "./page/Page";
 import { LIST_PANEL } from "./page/surfaceClasses";
 import { Sheet } from "./Sheet";
@@ -213,7 +213,7 @@ function BlueskyConnectModal({
             value={handle}
             onChange={(e) => setHandle(e.target.value)}
             placeholder="you.bsky.social"
-            className="min-h-11 w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-1.5 text-sm"
+            className={`${FIELD_CLASS} w-full`}
           />
         </div>
 
@@ -228,7 +228,7 @@ function BlueskyConnectModal({
             value={appPassword}
             onChange={(e) => setAppPassword(e.target.value)}
             placeholder="xxxx-xxxx-xxxx-xxxx"
-            className="min-h-11 w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-1.5 text-sm"
+            className={`${FIELD_CLASS} w-full`}
           />
         </div>
 

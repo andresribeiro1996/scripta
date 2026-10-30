@@ -37,6 +37,7 @@ import { CoverImage } from "../BookCard";
 import { CharacterName } from "../CharacterName";
 import { Sheet } from "../Sheet";
 import { bracketShape, needsVote, roundLabel, sharePercent, type BracketSlot } from "../../lib/arenaBracket";
+import { BUTTON_SECONDARY } from "../page/buttonClasses";
 import { useCountdown } from "./useCountdown";
 
 function coverBookFor(side: DuelSide) {
@@ -258,9 +259,9 @@ function MatchSheet({
                 key={s.workId ?? s.title}
                 onClick={() => s.workId && onVote(s.workId)}
                 disabled={voting || s.workId === null}
-                className="min-h-11 min-w-0 flex-1 truncate rounded-lg bg-(--color-accent) px-3 text-sm font-semibold text-(--color-on-accent) disabled:opacity-60"
+                className={`${BUTTON_SECONDARY} min-w-0 flex-1`}
               >
-                {s.title}
+                <span className="truncate">{s.title}</span>
               </button>
             ))}
           </div>

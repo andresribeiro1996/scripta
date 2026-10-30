@@ -2,6 +2,7 @@ import { readSavedBlockLooks, saveBlockLook, savedBlockLooksKey, type BlockStyle
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useAuth } from "../../auth/AuthContext";
+import { FIELD_CLASS } from "../page/buttonClasses";
 
 export function SavedLooks({ style, onApply }: { style: BlockStyle; onApply: (style: BlockStyle) => void }) {
   const { session } = useAuth();
@@ -26,7 +27,7 @@ export function SavedLooks({ style, onApply }: { style: BlockStyle; onApply: (st
       <button className={button} aria-label={`Delete ${look.name}`} disabled={!ready} onClick={() => save.mutate(looks.data!.filter((item) => item.name !== look.name))}>Delete</button>
     </div>)}
     <form onSubmit={(event) => { event.preventDefault(); if (ready && name.trim()) save.mutate(saveBlockLook(looks.data!, name, style)); }} className="flex flex-wrap items-end gap-2">
-      <label className="flex-1 text-sm font-semibold">Look name<input className="mt-1 block min-h-11 w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 font-normal" value={name} onChange={(event) => setName(event.target.value)} maxLength={48} placeholder="My reading corner" /></label>
+      <label className="flex-1 text-sm font-semibold">Look name<input className={`${FIELD_CLASS} mt-1 block w-full font-normal`} value={name} onChange={(event) => setName(event.target.value)} maxLength={48} placeholder="My reading corner" /></label>
       <button className={button} disabled={!ready || !name.trim()}>Save current look</button>
     </form>
     {save.isError ? <p role="alert" className="text-sm text-(--color-danger)">Could not save looks. Try again.</p> : null}

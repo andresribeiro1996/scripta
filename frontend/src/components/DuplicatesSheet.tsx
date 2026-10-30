@@ -5,6 +5,7 @@ import { mergeLibraryBooks, type LibraryDocument } from "../api/library";
 import { useLibrary } from "../hooks/useLibrary";
 import { useLibrarySaver } from "../hooks/useLibrarySaver";
 import { CoverImage } from "./BookCard";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "./page/buttonClasses";
 import { Sheet } from "./Sheet";
 import { useToast } from "./Toaster";
 
@@ -59,10 +60,10 @@ export function DuplicatesSheet({ groups, library, onClose }: { groups: string[]
               );
             })}
             <div className="flex gap-2">
-              <button type="button" disabled={busy} onClick={() => void merge(group)} className="min-h-11 flex-1 rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-semibold text-(--color-on-accent) disabled:opacity-50">
+              <button type="button" disabled={busy} onClick={() => void merge(group)} className={`${BUTTON_PRIMARY} flex-1`}>
                 Merge
               </button>
-              <button type="button" disabled={busy} onClick={() => void keepApart(group)} className="min-h-11 flex-1 rounded-lg border border-(--color-border) px-3 py-2 text-sm font-semibold hover:bg-(--color-surface-hover) disabled:opacity-50">
+              <button type="button" disabled={busy} onClick={() => void keepApart(group)} className={`${BUTTON_SECONDARY} flex-1`}>
                 Not the same
               </button>
             </div>

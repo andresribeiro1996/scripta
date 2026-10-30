@@ -1,4 +1,5 @@
 import { CHECKBOX_CLASS, RANGE_CLASS } from "./Toolbar";
+import { FIELD_CLASS } from "./page/buttonClasses";
 import type { ReactNode } from "react";
 import { BLOCK_GRADIENT_ANGLE_RANGE, BLOCK_GRADIENT_STRENGTH_RANGE, BLOCK_SHADOW_BLUR_RANGE, BLOCK_SHADOW_OFFSET_RANGE, BLOCK_SHADOW_OPACITY_RANGE, BLOCK_THEME_COLOR_LABELS, parseThemeColorRef } from "@scripta/shared";
 import {
@@ -156,7 +157,7 @@ export function CardAppearanceSection({ idPrefix, draft, onApply, onSaveNow }: C
           id={`${idPrefix}-card-aspect`}
           value={draft.cardAspectRatio}
           onChange={(e) => onSaveNow({ cardAspectRatio: e.target.value as CardAspectRatio })}
-          className="w-full rounded-lg border border-(--color-border) bg-(--color-surface) min-h-11 px-3 py-2 text-sm"
+          className={`${FIELD_CLASS} w-full`}
         >
           {CARD_ASPECT_RATIO_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -248,7 +249,7 @@ export function CardBorderSection({ idPrefix, draft, onApply, onSaveNow }: CardB
           value={draft.cardBorderStyle}
           disabled={draft.cardBorderWidth === 0}
           onChange={(e) => onSaveNow({ cardBorderStyle: e.target.value as CardBorderStyle })}
-          className="w-full rounded-lg border border-(--color-border) bg-(--color-surface) min-h-11 px-3 py-2 text-sm disabled:opacity-60"
+          className={`${FIELD_CLASS} w-full`}
         >
           {CARD_BORDER_STYLE_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -330,7 +331,7 @@ export function CardTextSection({ idPrefix, draft, onApply, onSaveNow }: { idPre
           id={`${idPrefix}-card-font-family`}
           value={draft.cardFontFamily}
           onChange={(e) => onSaveNow({ cardFontFamily: e.target.value as CardFontFamily })}
-          className="w-full rounded-lg border border-(--color-border) bg-(--color-surface) min-h-11 px-3 py-2 text-sm"
+          className={`${FIELD_CLASS} w-full`}
         >
           {CARD_FONT_FAMILY_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -449,7 +450,7 @@ export function BlockBackgroundSection({
           id={`${idPrefix}-background-finish`}
           value={draft.backgroundFinish}
           onChange={(e) => onSaveNow({ backgroundFinish: e.target.value as BlockBackgroundFinish })}
-          className="w-full rounded-lg border border-(--color-border) bg-(--color-surface) min-h-11 px-3 py-2 text-sm"
+          className={`${FIELD_CLASS} w-full`}
         >
           {BLOCK_BACKGROUND_FINISH_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -468,7 +469,7 @@ export function BlockBackgroundSection({
           id={`${idPrefix}-inner-spacing`}
           value={draft.innerSpacing}
           onChange={(e) => onSaveNow({ innerSpacing: e.target.value as BlockInnerSpacing })}
-          className="w-full rounded-lg border border-(--color-border) bg-(--color-surface) min-h-11 px-3 py-2 text-sm"
+          className={`${FIELD_CLASS} w-full`}
         >
           {BLOCK_INNER_SPACING_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -547,7 +548,7 @@ export function BlockTextSection({
           id={`${idPrefix}-font-family`}
           value={draft.fontFamily}
           onChange={(e) => onSaveNow({ fontFamily: e.target.value as BlockFontFamily })}
-          className="w-full rounded-lg border border-(--color-border) bg-(--color-surface) min-h-11 px-3 py-2 text-sm"
+          className={`${FIELD_CLASS} w-full`}
         >
           {BLOCK_FONT_FAMILY_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -573,7 +574,7 @@ export function BlockTextSection({
           id={`${idPrefix}-text-align`}
           value={draft.textAlign}
           onChange={(e) => onSaveNow({ textAlign: e.target.value as BlockTextAlign })}
-          className="w-full rounded-lg border border-(--color-border) bg-(--color-surface) min-h-11 px-3 py-2 text-sm"
+          className={`${FIELD_CLASS} w-full`}
         >
           {BLOCK_TEXT_ALIGN_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>

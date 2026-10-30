@@ -3,7 +3,7 @@ import { ApiError, postToSocial, type SocialProvider } from "../api/socials";
 import { useSocials } from "../hooks/useSocials";
 import { useConfirm } from "./ConfirmDialog";
 import { SocialIcon } from "./icons/SocialIcons";
-import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "./page/buttonClasses";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY, FIELD_CLASS } from "./page/buttonClasses";
 import { Sheet } from "./Sheet";
 
 type Platform = Extract<SocialProvider, "x" | "threads">;
@@ -201,7 +201,7 @@ export function ShareModal({
                 aria-label="Share link"
                 value={current.shareUrl}
                 onFocus={(e) => e.currentTarget.select()}
-                className="min-h-11 w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm"
+                className={`${FIELD_CLASS} w-full`}
               />
               <button onClick={() => void handleCopy()} className={`${BUTTON_SECONDARY} shrink-0`}>
                 Copy link
@@ -245,7 +245,7 @@ export function ShareModal({
                   value={composeText}
                   onChange={(e) => setComposeText(e.target.value)}
                   rows={5}
-                  className="w-full resize-none rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm"
+                  className={`${FIELD_CLASS} w-full resize-none`}
                 />
                 {postError && <p className="mt-2 text-xs text-(--color-danger)">{postError}</p>}
                 {postSuccess && (

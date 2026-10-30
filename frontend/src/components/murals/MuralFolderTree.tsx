@@ -2,6 +2,7 @@ import { useState } from "react";
 import { buildTree, folderPath } from "../../lib/muralFolders";
 import type { MuralFolder } from "../../lib/murals";
 import { OptionsMenu } from "../OptionsMenu";
+import { FIELD_CLASS } from "../page/buttonClasses";
 
 export function MuralFolderTree({
   folders,
@@ -92,7 +93,7 @@ export function MuralFolderTree({
                     if (e.key === "Enter") commitRename(folder);
                     if (e.key === "Escape") setRenamingId(null);
                   }}
-                  className="min-h-11 w-full min-w-0 rounded border border-(--color-border) bg-(--color-surface) px-1.5 text-sm"
+                  className={`${FIELD_CLASS} w-full min-w-0`}
                 />
               ) : (
                 <button
