@@ -385,6 +385,8 @@ console.log("\n18. Murals page — preset and new mural in the header, a folder 
   check("no uppercase labels", !/uppercase/.test(list));
   check("the stale Library-toolbar comment is gone", !/Library toolbar's filter and sort/.test(list));
   check("the current folder row carries aria-current", (tree.match(/aria-current=\{selectedFolderId === (?:null|folder\.id) \? "true" : undefined\}/g) ?? []).length === 2);
+  check("the folder column shows from md and the folder sheet icon hides there", /md:grid-cols-\[200px_minmax\(0,1fr\)\]/.test(list) && /<div className="hidden md:block">\s*<MuralFolderTree/.test(list) && /\$\{toolbarIconClass\(selectedFolderId !== null\)\} md:hidden/.test(list));
+  check("the fullscreen overlay resets the offline banner offset", /\[--app-top:0px\] \[--offline-h:0px\]/.test(editor));
   check("width stays the first Page prop", /<Page\s+width="wide"/.test(list));
   check("the editor keeps its back link and a single primary in edit mode", /back=\{backToMurals\}/.test(editor) && /editMode \? BUTTON_PRIMARY : BUTTON_SECONDARY/.test(editor));
   const expand = read("components/murals/MuralExpandButtons");

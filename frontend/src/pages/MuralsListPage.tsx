@@ -163,8 +163,8 @@ export function MuralsListPage() {
       }
     >
       {presetsOpen && <MuralPresetPicker folderId={selectedFolderId} onClose={() => setPresetsOpen(false)} />}
-      <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
-        <div className="hidden lg:block">
+      <div className="grid gap-6 md:grid-cols-[200px_minmax(0,1fr)] lg:grid-cols-[220px_minmax(0,1fr)]">
+        <div className="hidden md:block">
           <MuralFolderTree
             folders={folders}
             selectedFolderId={selectedFolderId}
@@ -231,7 +231,7 @@ export function MuralsListPage() {
                 <button
                   onClick={() => setSheet("folder")}
                   aria-label={`Folder (${selectedFolderId ? folderPath(folders, selectedFolderId).map((f) => f.name).join(" / ") : "All murals"})`}
-                  className={`${toolbarIconClass(selectedFolderId !== null)} lg:hidden`}
+                  className={`${toolbarIconClass(selectedFolderId !== null)} md:hidden`}
                 >
                   <FolderIcon />
                 </button>

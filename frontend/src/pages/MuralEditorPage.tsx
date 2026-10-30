@@ -579,7 +579,7 @@ export function MuralEditorPage() {
         <div
           ref={fullscreenRef}
           style={fullscreen ? muralThemeStyle(view.theme) : undefined}
-          className={fullscreen ? "fixed inset-0 z-50 overflow-y-auto [--app-top:0px] bg-(--color-bg) px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]" : ""}
+          className={fullscreen ? "fixed inset-0 z-50 overflow-y-auto [--app-top:0px] [--offline-h:0px] bg-(--color-bg) px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]" : ""}
         >
           <div style={{ visibility: dragging ? "hidden" : undefined }} className="sticky top-(--app-top) z-40">
           {fullscreen && (
