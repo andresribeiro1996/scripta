@@ -109,7 +109,7 @@ export function PlayQuizPage() {
   }
 
   const question = questions[index];
-  if (!question) return <InfoScreen message="This quiz has no questions yet." />;
+  if (!question) return <InfoScreen message="This quiz has no questions yet." back={back} />;
 
   function pick(choiceIndex: number) {
     setPicked(choiceIndex);
