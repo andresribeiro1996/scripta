@@ -1,4 +1,5 @@
 import { positiveInteger, setBookCover, setBookCoverUrl, type GalleryImage } from "@scripta/shared";
+import { isPermanentError } from "../../../core/apiClient";
 
 export type DraftCover =
   | { kind: "none" }
@@ -24,9 +25,13 @@ export async function uploadToDeleteOnExit(cover: DraftCover, pendingSave: Promi
   return abandonedUpload(cover, pendingSave ? await pendingSave : false);
 }
 
+export function saveMayHaveLanded(error: unknown): boolean {
+  return !isPermanentError(error);
+}
+
 export function withDraftCover(book: Record<string, unknown>, cover: DraftCover): Record<string, unknown> {
   if (cover.kind === "upload") return setBookCover(book, cover.image.id, cover.image.url);
-  if (cover.kind === "found") return setBookCoverUrl(book, cover.url);
+  if (cover.kind === "found") return { ...setBookCoverUrl(book, cover.url), _coverImageId: null };
   return book;
 }
 

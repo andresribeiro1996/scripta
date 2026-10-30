@@ -28,6 +28,7 @@ import {
   coverStatusLabel,
   parsePages,
   replacedUpload,
+  saveMayHaveLanded,
   uploadToDeleteOnExit,
   withDraftCover,
   type DraftCover,
@@ -141,6 +142,11 @@ export function AddBookForm({
     coverRef.current = next;
     setCoverState(next);
     if (replaced) removeUpload(replaced, REPLACED_CLEANUP_FAILED);
+  }
+
+  function toggleSearchCard() {
+    if (searchOpen) setScanning(false);
+    setSearchOpen(!searchOpen);
   }
 
   function toggleScanner() {
@@ -283,7 +289,7 @@ export function AddBookForm({
         coverRef.current,
       ),
     );
-    pendingSave.current = attempt.then(() => true, () => false);
+    pendingSave.current = attempt.then(() => true, saveMayHaveLanded);
     try {
       await attempt;
       toast.show("Added to your library", "success");
@@ -307,7 +313,7 @@ export function AddBookForm({
             accessibilityRole="button"
             accessibilityLabel={filledFrom ? `Search for a book, filled from ${filledFrom}` : "Search for a book"}
             accessibilityState={{ expanded: searchOpen }}
-            onPress={() => setSearchOpen((open) => !open)}
+            onPress={toggleSearchCard}
             style={styles.cardHeader}
           >
             <Icon name="search" size={20} color={colors.accent} />
@@ -394,7 +400,7 @@ export function AddBookForm({
             <Text style={[typography.caption, { color: colors.textDim }]}>{coverStatusLabel(cover)}</Text>
             <View style={styles.coverButtons}>
               <View style={styles.grow}>
-                <Button label="Find cover" variant="secondary" disabled={!canFindCover || saving} onPress={openCoverSearch} />
+                <Button label="Find cover" variant="secondary" disabled={!canFindCover || saving || uploading} onPress={openCoverSearch} />
               </View>
               <View style={styles.grow}>
                 <Button label={uploading ? "Uploading…" : "Upload"} variant="secondary" loading={uploading} disabled={saving} onPress={() => void handleUpload()} />

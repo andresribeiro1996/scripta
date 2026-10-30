@@ -26,7 +26,7 @@ export function Chip({ label, selected, onPress, fontFamily, icon, grow = false 
   const { colors } = useTheme();
   const color = selected ? colors.accent : colors.text;
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected }} onPress={onPress} style={[styles.chip, grow ? styles.chipGrow : null, { borderColor: selected ? colors.accent : colors.border, backgroundColor: selected ? colors.accentSoft : colors.surface }]}>
+    <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected }} onPress={onPress} style={[styles.chip, icon || grow ? styles.chipRow : null, grow ? styles.chipGrow : null, { borderColor: selected ? colors.accent : colors.border, backgroundColor: selected ? colors.accentSoft : colors.surface }]}>
       {icon ? <Icon name={icon} size={16} color={color} /> : null}
       <Text numberOfLines={1} style={{ color, fontSize: 14, fontWeight: selected ? "700" : "500", fontFamily, textAlign: grow ? "center" : undefined }}>{label}</Text>
     </Pressable>
@@ -190,7 +190,8 @@ export function ColorSwatchRow({ label, value, defaultColor, onChange }: {
 const styles = StyleSheet.create({
   section: { gap: spacing.sm },
   sectionTitle: { ...typography.caption, fontWeight: "700", letterSpacing: 0.4 },
-  chip: { minHeight: minimumTouchTarget, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.xs, borderWidth: 1, borderRadius: radii.md, paddingHorizontal: spacing.md },
+  chip: { minHeight: minimumTouchTarget, justifyContent: "center", borderWidth: 1, borderRadius: radii.md, paddingHorizontal: spacing.md },
+  chipRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   chipGrow: { flex: 1 },
   tileWrap: { alignItems: "center", gap: spacing.xs },
   tile: { borderRadius: radii.md, alignItems: "center", justifyContent: "center" },

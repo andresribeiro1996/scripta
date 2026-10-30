@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { GalleryImage } from "@scripta/shared";
+import { ApiError } from "../../../core/apiClient.js";
 import {
   abandonedUpload,
   coverAfterResult,
   coverStatusLabel,
   parsePages,
   replacedUpload,
+  saveMayHaveLanded,
   uploadToDeleteOnExit,
   withDraftCover,
   type DraftCover
@@ -57,7 +59,7 @@ test("uploadToDeleteOnExit waits for an in-flight save", async () => {
 test("withDraftCover writes only hand-chosen covers", () => {
   const book = { title: "T" };
   assert.deepEqual(withDraftCover(book, upload("A")), { title: "T", _coverImageId: "A", _coverUrl: "https://img.example/A" });
-  assert.deepEqual(withDraftCover(book, found), { title: "T", _coverUrl: "u" });
+  assert.deepEqual(withDraftCover(book, found), { title: "T", _coverUrl: "u", _coverImageId: null });
   for (const cover of [{ kind: "search", url: "s" } as const, none]) {
     const result = withDraftCover(book, cover);
     assert.equal("_coverUrl" in result, false);
@@ -76,4 +78,16 @@ test("coverStatusLabel names each cover kind", () => {
   assert.equal(coverStatusLabel({ kind: "search", url: "s" }), "From search");
   assert.equal(coverStatusLabel(found), "Chosen");
   assert.equal(coverStatusLabel(upload("A")), "Uploaded");
+});
+
+test("a found cover overrides an uploaded cover already on the incoming record", () => {
+  const result = withDraftCover({ title: "T", _coverImageId: "OLD" }, found);
+  assert.equal(result._coverImageId, null);
+  assert.equal(result._coverUrl, "u");
+});
+
+test("saveMayHaveLanded is false only for a permanent server rejection", () => {
+  for (const status of [400, 404, 409]) assert.equal(saveMayHaveLanded(new ApiError(status, "no")), false);
+  for (const status of [408, 429, 500, 503]) assert.equal(saveMayHaveLanded(new ApiError(status, "later")), true);
+  assert.equal(saveMayHaveLanded(new TypeError("Network request failed")), true);
 });
