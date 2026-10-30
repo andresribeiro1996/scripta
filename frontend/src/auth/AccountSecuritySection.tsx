@@ -5,7 +5,7 @@ import { apiFetch } from "../api/client";
 import { setAuthNotice } from "./returnTo";
 import { setSession } from "./tokenStore";
 import { PasswordInput } from "./PasswordInput";
-import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../components/page/buttonClasses";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY, FIELD_CLASS } from "../components/page/buttonClasses";
 import { SettingGroup, SettingRow } from "../components/page/Page";
 import { LIST_PANEL } from "../components/page/surfaceClasses";
 
@@ -62,7 +62,7 @@ export function AccountSecuritySection() {
     {error && <p role="alert" className="px-4 py-3 text-sm text-(--color-danger)">{error}</p>}
     {mode && <form onSubmit={submit} className="px-4 py-3"><fieldset disabled={busy} className="space-y-3 text-sm">
       <label className="block">Current password<PasswordInput required autoComplete="current-password" value={current} onChange={(event) => setCurrent(event.target.value)} /></label>
-      {mode === "email" ? <label className="block">New email<input type="email" required autoComplete="email" className="min-h-11 w-full rounded-lg border border-(--color-border) bg-(--color-bg) p-3" value={email} onChange={(event) => setEmail(event.target.value)} /></label> : <>
+      {mode === "email" ? <label className="block">New email<input type="email" required autoComplete="email" className={`${FIELD_CLASS} w-full`} value={email} onChange={(event) => setEmail(event.target.value)} /></label> : <>
         <label className="block">New password<PasswordInput required minLength={8} maxLength={128} autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} /></label><p className="text-xs">{PASSWORD_HINT}</p>
         <label className="block">Confirm new password<PasswordInput required autoComplete="new-password" value={confirm} onChange={(event) => setConfirm(event.target.value)} /></label>
         <p className="text-xs">Changing your password signs you out on every device.</p>

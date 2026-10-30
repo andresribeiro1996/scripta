@@ -21,14 +21,28 @@ function files(): string[] {
 
 const read = (f: string) => readFileSync(join(ROOT, f), "utf8");
 
-const FILL = /<(button|Link|a)\b(?:=>|[^>])*className=\{?[`"][^`"]*bg-\(--color-(accent|danger)\)[^`"]*text-\(--color-on-(accent|danger)\)/s;
-const FIELD =
-  /<(input|select|textarea)\b(?!(?:=>|[^>])*type="(checkbox|radio|range|file|color)")(?:=>|[^>])*className=\{?[`"][^`"]*border border-\(--color-border\)[^`"]*bg-\(--color-surface\)/s;
+const EXEMPT = ["auth/PasswordInput.tsx", "components/murals/pickers.tsx"];
+
+function elements(src: string, tag: RegExp): string[] {
+  return [...src.matchAll(new RegExp(`<(?:${tag.source})\\b(?:=>|[^>])*>`, "gs"))].map((m) => m[0]);
+}
+
+function classNames(el: string): string[] {
+  return [...el.matchAll(/className=\{?[`"]([^`"]*)[`"]/g)].map((m) => m[1]);
+}
+
+const hasFill = (c: string) => /bg-\(--color-(accent|danger)\)/.test(c) && /text-\(--color-on-(accent|danger)\)/.test(c);
+const hasFieldChrome = (c: string) => /\bborder border-\(--color-border\)/.test(c) && /\brounded/.test(c);
+const SKIPPED_TYPE = /type="(checkbox|radio|range|file|color)"/;
 
 test("no button or link hand-rolls an accent or danger fill", () => {
-  assert.deepEqual(files().filter((f) => FILL.test(read(f))), []);
+  const offenders = files().filter((f) => elements(read(f), /button|Link|a/).some((el) => classNames(el).some(hasFill)));
+  assert.deepEqual(offenders, []);
 });
 
 test("no text field hand-rolls the field chrome", () => {
-  assert.deepEqual(files().filter((f) => FIELD.test(read(f))), []);
+  const offenders = files()
+    .filter((f) => !EXEMPT.includes(f))
+    .filter((f) => elements(read(f), /input|select|textarea/).some((el) => !SKIPPED_TYPE.test(el) && classNames(el).some(hasFieldChrome)));
+  assert.deepEqual(offenders, []);
 });

@@ -6,7 +6,7 @@ import { CoverImage } from "../BookCard";
 import { LibraryIcon } from "../NavIcons";
 import { ChevronRightIcon, ShareIcon } from "../Toolbar";
 import { Page } from "../page/Page";
-import { BUTTON_PRIMARY } from "../page/buttonClasses";
+import { BUTTON_PRIMARY, FIELD_CLASS } from "../page/buttonClasses";
 
 function AnswerValue({ value, picked = false }: { value: NonNullable<ScoreRow["answer"]>; picked?: boolean }) {
   return (
@@ -165,7 +165,7 @@ function ChallengeLink({ code }: { code: string }) {
       </button>
       <label className={`mt-4 text-xs text-(--color-text-dim) lg:block ${showLink ? "block" : "hidden"}`}>
         Challenge link
-        <input readOnly value={shareLink} onFocus={(event) => event.target.select()} className="mt-1 min-h-11 w-full min-w-0 rounded-lg border border-(--color-border) bg-(--color-bg) px-3 text-base text-(--color-text) lg:text-sm" />
+        <input readOnly value={shareLink} onFocus={(event) => event.target.select()} className={`${FIELD_CLASS} mt-1 w-full min-w-0`} />
       </label>
       <p role="status" className="sr-only">{copied ? "Challenge link copied." : ""}</p>
       {copyError && <p role="alert" className="mt-2 text-sm text-(--color-danger)">{copyError}</p>}

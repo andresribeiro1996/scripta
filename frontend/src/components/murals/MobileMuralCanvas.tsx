@@ -8,7 +8,7 @@ import type { ResolvedTierlist } from "../../api/tierlists";
 import { BLOCK_PAD_SCALE, blockFinishImage, blockFontFamilyCss, resolveBlockStyle, resolveBorderColor } from "../../lib/libraryStyle";
 import { isConfigurable, muralBlockTitle, GRID_COLUMNS, screenPointToGrid, type BlockLayout, type Mural, type MuralBlock, type ReaderProfile, type ShelfTheme } from "../../lib/murals";
 import { muralThemeStyle } from "../../lib/theme";
-import { BUTTON_PRIMARY } from "../page/buttonClasses";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../page/buttonClasses";
 import { ActionSheet } from "../Sheet";
 import { MobileBlockPreview } from "./MobileBlockPreview";
 import { MuralBlockDetail } from "./MuralBlockDetail";
@@ -386,7 +386,7 @@ export function MobileMuralCanvas({
           )}
           {!draft.valid && <p role="alert" className="mb-3 px-1 text-sm text-(--color-danger)">Choose a free position inside the mural.</p>}
           <div className="grid grid-cols-2 gap-2">
-            <button onClick={onCancelDraft} disabled={busy} className="min-h-11 rounded-xl px-3 text-sm font-semibold text-(--color-text-dim) hover:bg-(--color-surface-hover) disabled:opacity-40">
+            <button onClick={onCancelDraft} disabled={busy} className={BUTTON_SECONDARY}>
               {draft.kind === "add" || draft.kind === "duplicate" ? "Discard" : "Cancel"}
             </button>
             <button onClick={onApplyDraft} disabled={busy || !draft.valid} className={BUTTON_PRIMARY}>

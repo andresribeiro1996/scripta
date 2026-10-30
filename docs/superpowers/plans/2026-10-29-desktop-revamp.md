@@ -1495,6 +1495,10 @@ git add frontend/src/components/GenreReviewList.tsx frontend/src/components/Syno
 - Modify: `frontend/src/components/readerCard/ReaderCardChoices.tsx`
 - Modify: `frontend/src/components/tierlist/AddBooksSheet.tsx`
 - Modify: `frontend/src/components/tierlist/TierBoard.tsx`
+- Modify: `frontend/src/auth/AccountSecuritySection.tsx`
+- Modify: `frontend/src/auth/DeleteAccountSection.tsx`
+- Modify: `frontend/src/components/quiz/QuizResults.tsx`
+- Modify: `frontend/src/components/murals/BlockConfigPanel.tsx`
 - Modify: `frontend/src/pages/DailyChapterPage.tsx`
 - Modify: `frontend/src/pages/GroupsPage.tsx`
 - Modify: `frontend/src/pages/MuralsListPage.tsx`
