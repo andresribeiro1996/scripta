@@ -15,7 +15,7 @@
 - Phone app only. No website, backend or `@scripta/shared` changes (every helper needed already exists there; the new helpers have one consumer, so they live in `mobile/`).
 - Layout button labels, in this order: `Wall`, `Summary`, `Reading`, `This shelf`.
 - Library title falls back to `"Library"` when `library.data.name` is empty.
-- Every layout ends with the footer `Created with: Atmyshelf`, styled as in `mobile/src/features/tierlists/TierlistShareImage.tsx:56-58`.
+- Every layout ends with the footer `Created with: Atmyshelf`, styled as in `mobile/src/features/tierlists/TierlistShareImage.tsx:60-62`.
 - Summary: 4 fan covers; counts books / finished / reading; top 3 genres as names. Reading: every reading book, then the 5 newest finished.
 - Finished books without a parseable `DateLastRead` sort after all dated ones.
 - Save/Send stay disabled (`imageReady` false) until every cover in the current layout has called `onLoadEnd`.
@@ -39,13 +39,14 @@
 - Test: `mobile/src/features/library/lib/libraryShareBooks.test.ts`
 
 **Interfaces:**
-- Consumes: `filterBooks`, `parseBookDate`, `type LibraryBook` from `@scripta/shared`.
+- Consumes: `filterBooks`, `sortBooks`, `parseBookDate`, `type LibraryBook`, `type LibraryStatusTab`, `type SortKey` from `@scripta/shared`.
 - Produces:
   - `export type LibraryShareLayout = "wall" | "summary" | "reading" | "shelf";`
   - `export const LIBRARY_SHARE_LAYOUTS: ReadonlyArray<{ value: LibraryShareLayout; label: string }>` — `wall`/`Wall`, `summary`/`Summary`, `reading`/`Reading`, `shelf`/`This shelf`, in that order.
   - `export function newestFinished(books: LibraryBook[], limit: number): LibraryBook[]` — `ReadStatus` 2 only (via `filterBooks(books, "", "finished")`), newest `DateLastRead` first, undated after all dated in their input order, at most `limit`.
   - `export function summaryCoverBooks(ordered: LibraryBook[]): LibraryBook[]` — `newestFinished(ordered, 4)`, or `ordered.slice(0, 4)` when that is empty.
   - `export function readingNow(ordered: LibraryBook[]): LibraryBook[]` — `filterBooks(ordered, "", "reading")`.
+  - `export function shelfShareBooks(ordered: LibraryBook[], query: string, status: LibraryStatusTab, sortKey: SortKey): LibraryBook[]` — `sortBooks(filterBooks(ordered, query, status), sortKey)`, the same list `LibraryScreen.tsx:272` renders.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -58,6 +59,7 @@ Use the style of `mobile/src/features/tierlists/tierlistShareData.test.ts` (`nod
 - `summaryCoverBooks falls back to library order with nothing finished` — five to-read books → the first four in input order.
 - `summaryCoverBooks returns what exists with fewer than four finished` — two finished + three to-read → only the two finished (no padding from to-read).
 - `readingNow keeps library order` — reading R2, to-read X, reading R1 (input order) → `["R2", "R1"]`.
+- `shelfShareBooks applies shelf, search and sort` — input order: finished "Dune", finished "Emma", reading "Dune Messiah", finished "Children of Dune"; `shelfShareBooks(books, "dune", "finished", "title")` → titles `["Children of Dune", "Dune"]`. (`ReadStatus` must be a number: `filterBooks` compares with `!==`.)
 - `LIBRARY_SHARE_LAYOUTS lists the four layouts in order` — labels deep-equal `["Wall", "Summary", "Reading", "This shelf"]`.
 
 - [ ] **Step 2: Run tests to verify they fail**
@@ -106,16 +108,16 @@ git commit -m "Add library share image book pickers"
 
 - [ ] **Step 1: Add `onLoadEnd` passthrough to `BookCard`**
 
-Optional prop, passed straight to `<CoverImage … onLoadEnd={onLoadEnd} />` at `BookCard.tsx:89`. Existing callers don't pass it, so the library grid keeps polling and its 150 ms transition (`CoverImage.tsx:71,106`).
+Optional prop, passed straight to `<CoverImage … onLoadEnd={onLoadEnd} />` at `BookCard.tsx:89`. Existing callers don't pass it, so the library grid keeps polling and its 150 ms transition (`CoverImage.tsx:71,103`).
 
 - [ ] **Step 2: Implement `LibraryShareImage`**
 
-Outer frame, readiness and footer as in `TierlistShareImage.tsx:10-60`: a `loaded` `Set<string>` keyed by `bookKey`, `expected` = the keys of every cover the layout renders, and an effect calling `onReadyChange(expected.length > 0 && expected.every(loaded.has))`. The one exception is Summary, which is ready when `expected.every(loaded.has)` even with zero covers, since its counts still make a valid card. Title = `name`; footer per Global Constraints. Per layout:
+Outer frame, readiness and footer as in `TierlistShareImage.tsx:10-60`: a `loaded` `Set<string>`, `expected` = the keys of every cover the layout renders, and an effect calling `onReadyChange(expected.length > 0 && expected.every((key) => loaded.has(key)))` with dependencies `[loaded, onReadyChange, expected.join("|")]` (as `TierlistShareImage.tsx:26`). Keys — React keys and the `loaded` set alike — are `` `${section}:${String(book.ContentID ?? index)}` `` (the library grid keys by `ContentID ?? index`, `LibraryScreen.tsx:276`, because duplicate-ISBN rows share a `bookKey`; the section prefix keeps a book that is in both Reading sections or the fan distinct). Summary and an empty Reading card are ready with zero covers (`expected.every(...)` alone), since their text still makes a valid card; only Wall, This shelf and `shelf === null` need at least one cover. Title = `name`; footer per Global Constraints. Per layout:
 
 - **wall**: subtitle `plural(ordered.length, "book", "books")`; every book of `ordered` as a `TierCover` in a `flexWrap` row, 8 per row, 2pt gap, 2:3 cells sized from the measured row width (`onLayout`).
-- **summary**: a fan of `summaryCoverBooks(ordered)` as overlapping `TierCover`s, each rotated (about −10°, −3°, 4°, 11°); three stat tiles from `statusCounts(ordered)` — `all` "books", `finished` "finished", `reading` "reading" (tile look: `TierlistShareImage.tsx:37-44`); then "Top genres" with `calculateShelfTheme(ordered, 3).genres` as a ranked list, the section omitted when the list is empty.
-- **reading**: "Reading now" with `readingNow(ordered)` 4 per row, then "Recently finished" with `newestFinished(ordered, 5)` 5 per row; omit an empty section; with both empty, one caption line "Nothing being read or finished yet." and not ready.
-- **shelf**: subtitle `shelf.label`, then `“${shelf.query.trim()}”` when non-empty, then `plural(shelf.books.length, "book", "books")`, joined with ` · `. Grid as `LibraryGrid` lays it out (`LibraryGrid.tsx:10-16,55-69`) but as a plain `flexWrap` `View`, not a FlatList: `backgroundColor`, `contentPaddingX/Y`, `cardGap` between columns, `rowGap` between rows, columns = `libraryGridColumns(windowWidth, measuredWidth - 2 * style.contentPaddingX, style)`. Each cell is `<BookCard book style={effectiveCardStyle(style, seriesGroups.get(bookKey(book))?.style, book._style as PerCardStyle | undefined)} onPress={() => {}} onLoadEnd={…} />`. When `shelf.books` is empty, a caption "This shelf is empty." and not ready. `layout === "shelf"` with `shelf === null` never happens (Task 3 hides it); render nothing and stay not ready.
+- **summary**: a fan of `summaryCoverBooks(ordered)` as overlapping `TierCover`s, each rotated (about −10°, −3°, 4°, 11°); three stat tiles from `statusCounts(ordered)` — `all` "books", `finished` "finished", `reading` "reading" (tile look: `TierlistShareImage.tsx:39-46`); then "Top genres" with `calculateShelfTheme(ordered, 3).genres` as a ranked list, the section omitted when the list is empty.
+- **reading**: "Reading now" with `readingNow(ordered)` 4 per row, then "Recently finished" with `newestFinished(ordered, 5)` 5 per row; omit an empty section; with both empty, one caption line "Nothing being read or finished yet." (still shareable, per the spec).
+- **shelf**: subtitle `shelf.label`, then `“${shelf.query.trim()}”` when non-empty, then `plural(shelf.books.length, "book", "books")`, joined with ` · `. Grid as `LibraryGrid` lays it out (`LibraryGrid.tsx:10-16,55-69`) but as a plain `flexWrap` `View`, not a FlatList: `backgroundColor`, `contentPaddingX/Y`, `cardGap` between columns, `rowGap` between rows, with `contentWidth = measuredWidth - 2 * style.contentPaddingX`, `columns = libraryGridColumns(windowWidth, contentWidth, style)` and `cellWidth = Math.floor((contentWidth - style.cardGap * (columns - 1)) / columns)` (floored so rounding never wraps the last column). Each cell is a `<View style={{ width: cellWidth }}>` around `<BookCard book style={effectiveCardStyle(style, seriesGroups.get(bookKey(book))?.style, book._style as PerCardStyle | undefined)} onPress={() => {}} onLoadEnd={…} />`. When `shelf.books` is empty, a caption "This shelf is empty." and not ready. `layout === "shelf"` with `shelf === null` never happens (Task 3 hides it); render nothing and stay not ready.
 
 - [ ] **Step 3: Typecheck**
 
@@ -153,12 +155,12 @@ git commit -m "Add library share image layouts"
   - `url={library?.shareUrl ?? null}`.
   - `onEnableLink={async () => (await share()).shareUrl ?? undefined}`, `onDisableLink={async () => { await unshare(); }}`. Errors propagate to the sheet's own error note (`ContentShareSheet.tsx:52-59`).
   - `imageReady={shareImageReady}`.
-  - `previewControls`: a wrapping row of `Button`s from `LIBRARY_SHARE_LAYOUTS`, minus `shelf` when `onCollectionsTab`; the selected one `variant="primary"`, the rest `"secondary"`; pressing an unselected one sets `shareImageReady` false and then `shareLayout` (same as `TierlistEditorScreen.tsx:177`).
-  - Child: `<LibraryShareImage key={shareLayout} layout={shareLayout} name=… ordered={ordered} shelf={onCollectionsTab ? null : { label: LIBRARY_TABS.find(t => t.value === statusFilter)!.label, query, books: sortBooks(filterBooks(ordered, query, statusFilter), sortKey) }} style={style} seriesGroups={bookSeriesGroup} onReadyChange={setShareImageReady} />`. `filterBooks` needs a `StatusFilter`, so narrow `statusFilter` (a `LibraryTab`, `LibraryScreen.tsx:50`) with the `onCollectionsTab` check first.
+  - `previewControls`: a wrapping row of `Button`s from `LIBRARY_SHARE_LAYOUTS`, minus `shelf` when `onCollectionsTab`; the selected one `variant="primary"` with `accessibilityLabel={`${label}, selected`}`, the rest `"secondary"` (`Button` exposes no selected state of its own, `ui/components.tsx:175-202`); pressing an unselected one sets `shareImageReady` false and then `shareLayout` (same as `TierlistEditorScreen.tsx:177`).
+  - Child: `<LibraryShareImage key={shareLayout} layout={shareLayout} name=… ordered={ordered} shelf={onCollectionsTab ? null : { label: LIBRARY_TABS.find(t => t.value === statusFilter)!.label, query, books: shelfShareBooks(ordered, query, statusFilter, sortKey) }} style={style} seriesGroups={bookSeriesGroup} onReadyChange={setShareImageReady} />`. `shelfShareBooks` needs a `LibraryStatusTab`, so narrow `statusFilter` (a `LibraryTab`, `LibraryScreen.tsx:50`) with the `onCollectionsTab` check first.
 
 - [ ] **Step 2: Delete the old screen**
 
-Remove the `share` `Stack.Screen` (`_layout.tsx:28`), `share.tsx` and `ShareSheet.tsx`. `ShareActions` has no other user once `ShareSheet.tsx` is gone (`rg -n ShareActions mobile/src` to confirm): delete the file and its export line in `socials/index.ts:3`.
+Remove the `share` `Stack.Screen` (`_layout.tsx:28`), `share.tsx` and `ShareSheet.tsx`, and drop "share" from the sibling-routes comment at `LibraryScreen.tsx:1-3`. `ShareActions` has no other user once `ShareSheet.tsx` is gone (`rg -n ShareActions mobile/src` to confirm): delete the file and its export line in `socials/index.ts:3`.
 
 - [ ] **Step 3: Verify**
 
@@ -176,6 +178,8 @@ git commit -m "Share the library as an image from the Library tab"
 
 **Files:**
 - Test: `mobile/src/features/library/LibraryScreen.tsx`
+
+(Listed only because the gate needs a file. A fix the pass turns up goes back to the task that owns that file, with that task's review, not through this task.)
 
 Dispatch `device-checker` (never `general-purpose`) on the 24-book dev fixture, screenshots into the session scratchpad. Per repo memory, the device pass gates merge, not the PR: push and open the PR first.
 
