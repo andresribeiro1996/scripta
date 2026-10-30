@@ -1,6 +1,7 @@
 // Exercises the community list helpers in @scripta/shared/community — the
 // same copy the mobile app re-exports. Run with: npx tsx scripts/test-community-helpers.mts
 
+import { readFileSync } from "node:fs";
 import type { FeedItem, PublishedContent } from "../../packages/shared/dist/community/index.js";
 import { contentDetail, contentKindLabel, contentStats, contentStatus, contentTarget, feedHeading, feedTarget, isKnownContent } from "../../packages/shared/dist/community/index.js";
 
@@ -75,6 +76,22 @@ check("quiz stats", contentStats(quiz).length === 2);
 check("quiz feed heading", feedHeading({ ...feedItem, content: quiz, type: "quiz_published" }) === "andre published a quiz");
 check("quiz is known content", isKnownContent(quiz));
 check("unknown content kind is not known", !isKnownContent({ kind: "hologram" } as never));
+
+const page = (name: string) => readFileSync(new URL(`../src/pages/${name}.tsx`, import.meta.url), "utf8");
+const discover = page("DiscoverPage");
+const people = page("PeoplePage");
+
+check("Discover filters with chip buttons", /chipClass\(/.test(discover) && /aria-pressed=/.test(discover));
+check("Discover chips sit in a labelled group", /role="group"\s+aria-label=/.test(discover));
+check("Discover search uses the field class and drops the local input class", /FIELD_CLASS/.test(discover) && !/const searchInput/.test(discover));
+check("Discover search and chips live in the shared toolbar row", /<ToolbarRow>/.test(discover) && /<SearchIcon/.test(discover));
+check("Discover drops the segmented control", !/segmented/.test(discover));
+check("People search uses the field class and drops the local input class", /FIELD_CLASS/.test(people) && !/const searchInput/.test(people));
+check("People shows person cards in a grid panel", /PANEL/.test(people) && /repeat\(auto-fill,minmax\(280px,1fr\)\)/.test(people));
+check("People lists use the list panel", /LIST_PANEL/.test(people));
+check("People Follow is secondary, never primary", /BUTTON_SECONDARY/.test(people) && !/BUTTON_PRIMARY/.test(people));
+check("People Follow names the person", /aria-label=\{`Follow \$\{/.test(people));
+check("People follow refreshes the home circle", /"community", "dashboard", "circle"/.test(people));
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);
