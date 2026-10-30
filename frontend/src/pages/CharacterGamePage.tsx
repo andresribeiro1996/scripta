@@ -5,6 +5,8 @@ import { bracketSizes, canCreate, defaultTicked, type CharacterGameMode, type Wo
 import { createCharacterTournament } from "../api/arena";
 import { createCharacterTierlist, type Tierlist } from "../api/tierlists";
 import { fetchWorkCast } from "../api/works";
+import { CoverImage } from "../components/BookCard";
+import { LibraryIcon } from "../components/NavIcons";
 import { Page } from "../components/page/Page";
 import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../components/page/buttonClasses";
 
@@ -17,7 +19,7 @@ export function CharacterGamePage() {
   return (
     <Page title="Character game" back={{ to: `/work/${id}`, label: "Book" }}>
       <div className="mx-auto max-w-2xl pb-10">
-        {cast.isPending ? <p>Loading…</p> : cast.isError ? <button type="button" onClick={() => void cast.refetch()} className="min-h-11 text-left text-(--color-accent)">The cast couldn't be loaded. Retry</button> : <CastPicker workId={id} cast={cast.data} />}
+        {cast.isPending ? <p>Loading…</p> : cast.isError ? <button type="button" onClick={() => void cast.refetch()} className="min-h-11 text-left text-(--color-accent)">The cast couldn't be loaded. Retry</button> : <CastPicker key={id} workId={id} cast={cast.data} />}
       </div>
     </Page>
   );
@@ -73,9 +75,14 @@ function CastPicker({ workId, cast }: { workId: string; cast: WorkCast }) {
   return (
     <div className="flex flex-col gap-5">
       {error && <p role="alert" className="text-sm text-(--color-danger)">{error}</p>}
-      <div>
-        <p className="font-semibold">{cast.scope.label}</p>
-        {cast.scope.kind === "series" && <p className="text-sm text-(--color-text-dim)">{`${cast.scope.workCount} books`}</p>}
+      <div className="flex items-center gap-3">
+        <div className="relative flex h-18 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md bg-(--color-border)">
+          {cast.scope.coverUrl ? <CoverImage book={{ _coverUrl: cast.scope.coverUrl }} fit="contain" alt={cast.scope.label} /> : <LibraryIcon size={22} />}
+        </div>
+        <div className="min-w-0">
+          <p className="font-semibold">{cast.scope.label}</p>
+          {cast.scope.kind === "series" && <p className="text-sm text-(--color-text-dim)">{`${cast.scope.workCount} books`}</p>}
+        </div>
       </div>
       {modes.length > 1 && (
         <div role="group" aria-label="Game type" className="flex gap-2">
