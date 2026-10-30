@@ -14,6 +14,7 @@ import { NO_GROUPS } from "../murals/MuralCanvas";
 import { fetchMural } from "../murals/api";
 import { useMurals } from "../murals/useMurals";
 import { fetchTierlists } from "../tierlists/api";
+import { DailyChapterProfileSection } from "../dailyChapter/daily-chapter-profile-section";
 import { ActivityList } from "./ActivityList";
 import { FeedSettingsDialog } from "./FeedSettingsDialog";
 import { ShelfPreview } from "./ShelfPreview";
@@ -23,6 +24,7 @@ import { MuralPicker } from "./ProfileScreen";
 const MY_SHELF_TABS = [
   { value: "shelf", label: "Shelf" },
   { value: "activity", label: "Activity" },
+  { value: "daily", label: "Daily" },
 ] as const;
 
 type MyShelfTab = (typeof MY_SHELF_TABS)[number]["value"];
@@ -198,6 +200,7 @@ export function MyShelfScreen() {
         value={tab}
         onChange={handleTabChange}
         renderPage={(value) => {
+          if (value === "daily") return <DailyChapterProfileSection userId={user!.id} own />;
           if (value === "activity") return <ActivityList username={username} />;
           if (hasMural && mural.isPending) return <View style={styles.tabPad}><Skeleton height={240} /></View>;
           if (hasMural && mural.isError) return <ErrorState body="Couldn't load your shelf." actionLabel="Retry" onAction={() => void mural.refetch()} />;

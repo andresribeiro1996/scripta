@@ -12,6 +12,7 @@ import { useMurals } from "../murals/useMurals";
 import { reconstructBooks, reconstructTierlists } from "../public/adapters";
 import { PublicLibraryGrid } from "../public/PublicLibraryGrid";
 import type { GalleryImage } from "../gallery/api";
+import { DailyChapterProfileSection } from "../dailyChapter/daily-chapter-profile-section";
 import { ActivityList } from "./ActivityList";
 import { AuthorAvatar } from "./AuthorAvatar";
 import { fetchProfile, fetchProfileLibrary, followUser, unfollowUser, type CommunityProfileView } from "./api";
@@ -126,6 +127,7 @@ export function ProfileScreen({ username }: { username: string }) {
         onChange={setTab}
         renderPage={(value) => {
           if (value === "activity") return <ActivityList username={username} />;
+          if (value === "daily") return <DailyChapterProfileSection userId={profileUser.userId} own={false} />;
           if (value === "library") {
             if (library.isPending) return <View style={styles.page}><Skeleton height={180} /></View>;
             if (library.isError) return <View style={styles.page}><ErrorState body="Couldn't load this library." actionLabel="Retry" onAction={() => void library.refetch()} /></View>;
@@ -201,6 +203,7 @@ const PROFILE_TABS = [
   { value: "mural", label: "Mural" },
   { value: "activity", label: "Activity" },
   { value: "library", label: "Library" },
+  { value: "daily", label: "Daily" },
 ] as const;
 
 type ProfileTab = (typeof PROFILE_TABS)[number]["value"];
