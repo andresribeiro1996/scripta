@@ -69,10 +69,6 @@ export function App() {
           <Route path="/arena/:id" element={<ArenaViewPage />} />
           <Route path="/work/:id" element={<WorkPage />} />
           <Route path="/work/:id/stats" element={<WorkStatsPage />} />
-          {/* Pages a stranger with the link can open. The token or code is the
-              access control (see each public backend route's own comment);
-              nobody is asked for an account. A reader with a username keeps
-              the app frame; everyone else gets the public bar. */}
           <Route path="/shared/murals/:token" element={<SharedMuralPage />} />
           <Route path="/shared/library/:token" element={<SharedLibraryPage />} />
           <Route path="/vote/:code" element={<VoteTierlistPage />} />
