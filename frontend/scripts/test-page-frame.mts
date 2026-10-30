@@ -171,6 +171,7 @@ test("Games pages: one primary in the header, no hand-rolled fills, no inner wid
   const list = read("pages/ArenaListPage");
   assert.match(list, /actions=\{[\s\S]*?BUTTON_PRIMARY/);
   assert.match(list, /subtitle=\{/);
+  assert.doesNotMatch(list, /<input\b(?:=>|[^>])*className="[^"]*border border-\(--color-border\)/);
   for (const f of ["pages/TierListCreatePage", "pages/QuizCreatePage", "pages/QuizEditorPage", "pages/PlayQuizPage", "components/quiz/QuizResults", "pages/CharacterGamePage"]) {
     const s = read(f);
     assert.doesNotMatch(s, /mx-auto[^"`]*max-w-(xl|2xl|3xl|6xl)\b|max-w-(xl|2xl|3xl|6xl)\b[^"`]*mx-auto/, f);

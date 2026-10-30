@@ -206,7 +206,7 @@ export function ArenaListPage() {
                       if (e.key === "Escape") setRenamingTierlistId(null);
                     }}
                     aria-label="Tier list name"
-                    className="w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-2 py-1 font-semibold"
+                    className={`${FIELD_CLASS} w-full font-semibold`}
                   />
                   <p className="mt-1 text-sm text-(--color-text-dim)">Updated {new Date(tl.updatedAt).toLocaleDateString()}</p>
                 </div>
