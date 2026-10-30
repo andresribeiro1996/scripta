@@ -79,7 +79,7 @@ export function WorkPage() {
         onSelectEdition={setEditionId}
         onAdd={setAdding}
         onShare={() => void share()}
-        frame={(title, actions, body) => <Page title={title} back={back} actions={actions}>{body}</Page>}
+        frame={(body) => <Page title={null} back={back}>{body}</Page>}
       />
       {adding ? <AddBookSheet book={adding} onClose={() => {
         setAdding(null);

@@ -23,7 +23,7 @@ export function BookKeyPage() {
         onSelectEdition={() => {}}
         onAdd={() => {}}
         onShare={null}
-        frame={(title, actions, body) => <Page title={title} back={back} actions={actions}>{body}</Page>}
+        frame={(body) => <Page title={null} back={back}>{body}</Page>}
       />
     );
   }

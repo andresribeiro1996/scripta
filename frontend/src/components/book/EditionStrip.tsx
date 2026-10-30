@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { editionLabel, type BookScreenModel, type WorkEdition } from "@scripta/shared";
 import { CoverImage } from "../BookCard";
 import { OptionsMenu } from "../OptionsMenu";
+import { ChevronDownIcon } from "../Toolbar";
 
 type Props = {
   editions: WorkEdition[];
@@ -116,8 +117,8 @@ export function EditionStrip({ editions, author, edition, mineBook, onSelect }: 
       <div aria-live="polite" className="flex justify-center">
         <OptionsMenu
           title="Editions"
-          trigger={`${edition.label} ▾`}
-          triggerClassName="inline-flex min-h-11 items-center px-2 text-xs text-(--color-text-dim) hover:text-(--color-text)"
+          trigger={<>{edition.label}<ChevronDownIcon /></>}
+          triggerClassName="inline-flex min-h-11 items-center gap-1 px-2 text-xs text-(--color-text-dim) hover:text-(--color-text)"
           items={editions.map((e, i) => ({ label: `${e.title} · ${editionLabel(e)}${e.mine ? " · Yours" : ""}`, checked: i === index, onClick: () => choose(i) }))}
         />
       </div>

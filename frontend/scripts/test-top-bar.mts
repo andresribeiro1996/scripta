@@ -69,7 +69,7 @@ test("the desktop sidebar is gone and pinned elements sit under the bar", () => 
     assert.match(read(f), /sticky top-\(--app-top\)/, f);
   }
   assert.match(read("pages/ReaderCardPage"), /lg:top-\[calc\(var\(--app-top\)\+1\.5rem\)\]/);
-  assert.match(read("components/book/BookScreen"), /sm:top-\[calc\(var\(--app-top\)\+1\.5rem\)\]/);
+  assert.match(read("components/book/BookScreen"), /lg:top-\[calc\(var\(--app-top\)\+1\.5rem\)\]/);
 });
 
 test("SwipeTabs reveals its top against the sticky offset, not against zero", () => {
