@@ -78,7 +78,7 @@ export function RecapCard({ card, month, currentMonth, url, sharing = false, onO
     </View>
   );
   const numbersText = <Text {...dynamicType} style={[summary ? styles.summaryNumbers : styles.number, { fontFamily: SERIF }]}>{recapNumber(card)}</Text>;
-  const numbers = card.kind === "dailyChapter" && onOpen ? <Pressable accessibilityRole="button" accessibilityLabel="Play today's Daily Chapter" onPress={onOpen} style={styles.numbersPress}>{numbersText}</Pressable> : numbersText;
+  const numbers = card.kind === "dailyChapter" && onOpen ? <Pressable accessibilityRole="button" accessibilityHint="Opens today's Daily Chapter" onPress={onOpen} style={styles.numbersPress}>{numbersText}</Pressable> : numbersText;
   return (
     <View style={[styles.card, sharing ? styles.sharing : styles.full, { paddingTop: sharing ? spacing.xxxl : insets.top + 64, paddingBottom: sharing ? spacing.lg : insets.bottom + spacing.xxxl }]}>
       <Background />
