@@ -99,7 +99,7 @@ export function QuizPlayScreen({ code }: { code: string }) {
       <Text {...dynamicType} style={[typography.body, styles.center, { color: colors.textDim }]}>This quiz is closed.</Text>
       <Leaderboard code={code} />
     </View>
-    : stage === "played" && board.data ? <EndScreen code={code} board={board.data} result={result!} returning={submitted === null} tab={tab} setTab={setTab} onError={setError} />
+    : stage === "played" && board.data ? <EndScreen code={code} board={board.data} result={result!} tab={tab} setTab={setTab} onError={setError} />
     : board.data ? (() => {
       const questions = board.data.questions;
       const question = questions[index];
@@ -159,11 +159,10 @@ function Prompt({ question }: { question: PublicQuizQuestion }) {
   return <Text {...dynamicType} display={false} style={[typography.title, styles.promptQuote, { color: colors.text }]}>“{question.prompt}”</Text>;
 }
 
-function EndScreen({ code, board, result, returning, tab, setTab, onError }: {
+function EndScreen({ code, board, result, tab, setTab, onError }: {
   code: string;
   board: PlayBoard;
   result: PlayResponse;
-  returning: boolean;
   tab: "answers" | "board";
   setTab: (tab: "answers" | "board") => void;
   onError: (message: string | null) => void;
@@ -190,7 +189,6 @@ function EndScreen({ code, board, result, returning, tab, setTab, onError }: {
         <Text {...dynamicType} display={false} maxFontSizeMultiplier={1.2} accessibilityLabel={`${result.score} of ${board.questionCount} correct`} style={[styles.score, { color: colors.text }]}>
           {result.score}<Text style={[styles.scoreOutOf, { color: colors.textDim }]}> / {board.questionCount}</Text>
         </Text>
-        <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{result.score} correct · {board.questionCount - result.score} incorrect</Text>
       </View>
       {covers.length > 0 ? <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.fan}>
         {covers.map(({ url }, i) => (
@@ -208,7 +206,6 @@ function EndScreen({ code, board, result, returning, tab, setTab, onError }: {
       </ScrollView>
     )} />
     <Button label="Challenge a friend" onPress={() => void challenge()} />
-    <Text {...dynamicType} style={[typography.caption, styles.center, { color: colors.textDim }]}>{returning ? "You already played this quiz." : "Quiz complete."}</Text>
   </View>;
 }
 
