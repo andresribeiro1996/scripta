@@ -300,6 +300,9 @@ git add frontend/src/components/page/TopBar.tsx frontend/src/components/page/Acc
 - Modify: `frontend/src/pages/QuizCreatePage.tsx`
 - Modify: `frontend/src/pages/QuizEditorPage.tsx`
 - Modify: `frontend/src/pages/PlayQuizPage.tsx`
+- Modify: `frontend/src/pages/DailyChapterPage.tsx`
+- Modify: `frontend/src/pages/CharacterGamePage.tsx`
+- Modify: `frontend/src/pages/AdminDailyChapterPage.tsx`
 - Test: `frontend/scripts/test-page-frame.mts`
 
 **Interfaces:**
@@ -613,6 +616,7 @@ git add frontend/src/pages/GroupsPage.tsx frontend/src/pages/GalleryPage.tsx fro
 - Modify: `frontend/src/pages/WorkPage.tsx`
 - Modify: `frontend/src/pages/BookKeyPage.tsx`
 - Test: `frontend/scripts/test-work-page.mts`
+- Test: `frontend/scripts/test-top-bar.mts`
 
 **Interfaces:**
 - Consumes: `BookCover` (Task 6), `Page` with `title={null}` and `back` (Task 3), `LIST_PANEL`/`LIST_ROW` (Task 1).
@@ -1243,6 +1247,7 @@ git add frontend/src/pages/CommunityProfilePage.tsx frontend/src/components/OwnS
 - Modify: `frontend/src/pages/QuizEditorPage.tsx`
 - Modify: `frontend/src/pages/PlayQuizPage.tsx`
 - Modify: `frontend/src/components/quiz/QuizResults.tsx`
+- Modify: `frontend/src/pages/CharacterGamePage.tsx`
 - Test: `frontend/scripts/test-page-frame.mts`
 
 **Interfaces:**
