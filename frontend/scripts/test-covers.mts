@@ -92,11 +92,15 @@ console.log("\n3. fetchCoverCandidates and pickCover — request URL, method and
 console.log("\n4. rememberResolvedCover — notifies subscribers until they unsubscribe");
 {
   const notified: string[] = [];
-  const unsubscribe = subscribeResolvedCovers((key) => notified.push(key));
+  const seen: Array<string | null | undefined> = [];
+  const unsubscribe = subscribeResolvedCovers((key) => {
+    notified.push(key);
+    seen.push(peekResolvedCover(lookup, "full"));
+  });
   const cover = { url: "https://covers.test/thumb.jpg", fullUrl: "https://covers.test/full.jpg" };
   rememberResolvedCover(lookup, cover);
   check("subscriber is told which cover changed", notified.length === 1 && notified[0] === coverQueryKey(lookup), JSON.stringify(notified));
-  check("the remembered cover is already peekable when the subscriber runs", peekResolvedCover(lookup, "full") === cover.fullUrl);
+  check("the remembered cover is already peekable when the subscriber runs", seen.length === 1 && seen[0] === cover.fullUrl, JSON.stringify(seen));
   unsubscribe();
   rememberResolvedCover(lookup, cover);
   check("an unsubscribed listener is not called again", notified.length === 1, JSON.stringify(notified));

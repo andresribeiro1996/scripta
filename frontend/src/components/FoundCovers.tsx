@@ -11,7 +11,7 @@ import {
   type MeasuredCoverSize,
   type ResolvedCoverResponse
 } from "@scripta/shared";
-import { fetchCoverCandidates, pickCover, type ResolveCoverParams } from "../api/covers";
+import { fetchCoverCandidates, pickCover, rememberResolvedCover, type ResolveCoverParams } from "../api/covers";
 
 export function FoundCovers({
   lookup: lookupProp,
@@ -64,6 +64,7 @@ export function FoundCovers({
     try {
       const cover = await pickCover(lookup, candidate.coverImageId ? { coverImageId: candidate.coverImageId } : { url: candidate.url }, everyone);
       if (mounted.current) onPick(cover, everyone);
+      else if (everyone) rememberResolvedCover(lookup, cover);
     } catch (error) {
       setPickFailure({ url: candidate.url, message: errorMessage(error) });
     } finally {
