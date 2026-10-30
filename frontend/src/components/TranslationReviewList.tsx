@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { TRANSLATION_REVIEW_GROUPS, TRANSLATION_REVIEW_HEADINGS, translationEvidenceLabel, type TranslationReview, type TranslationReviewAction, type TranslationReviewItem } from "@scripta/shared";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "./page/buttonClasses";
+import { LIST_PANEL, LIST_ROW, PANEL_HEADING } from "./page/surfaceClasses";
 
 function TranslationReviewRow({ item, onDecide }: { item: TranslationReviewItem; onDecide: (workId: string, action: TranslationReviewAction) => Promise<void> }) {
   const [error, setError] = useState<string | null>(null);
@@ -14,7 +16,7 @@ function TranslationReviewRow({ item, onDecide }: { item: TranslationReviewItem;
   };
   const original = item.proposed;
   return (
-    <li className="flex gap-3 border-b border-(--color-border) py-4">
+    <li className={`${LIST_ROW} items-start!`}>
       {item.coverUrl ? <img src={item.coverUrl} alt="" className="h-24 w-16 shrink-0 rounded object-cover" /> : <div className="h-24 w-16 shrink-0 rounded bg-(--color-surface-hover)" />}
       <div className="min-w-0 flex-1">
         <p className="font-semibold">{item.title}</p>
@@ -24,16 +26,16 @@ function TranslationReviewRow({ item, onDecide }: { item: TranslationReviewItem;
         {item.synopsis ? <p className="mt-1 line-clamp-3 text-sm">{item.synopsis}</p> : null}
         <div className="mt-2 flex flex-wrap gap-2">
           {item.group === "possible" ? (
-            <button type="button" disabled={busy} onClick={() => decide({ merge: original.workId })} className="rounded-lg bg-(--color-accent) px-3 py-1.5 text-sm font-semibold text-(--color-on-accent) disabled:opacity-50">
+            <button type="button" disabled={busy} onClick={() => decide({ merge: original.workId })} className={BUTTON_PRIMARY}>
               Merge
             </button>
           ) : null}
           {item.group === "merged" ? (
-            <button type="button" disabled={busy} onClick={() => decide({ undo: true })} className="rounded-lg border border-(--color-border) px-3 py-1.5 text-sm">
+            <button type="button" disabled={busy} onClick={() => decide({ undo: true })} className={BUTTON_SECONDARY}>
               Undo
             </button>
           ) : (
-            <button type="button" disabled={busy} onClick={() => decide({ reject: true })} className="rounded-lg border border-(--color-border) px-3 py-1.5 text-sm">
+            <button type="button" disabled={busy} onClick={() => decide({ reject: true })} className={BUTTON_SECONDARY}>
               Not a translation
             </button>
           )}
@@ -53,8 +55,8 @@ export function TranslationReviewList({ review, onDecide }: { review: Translatio
         if (items.length === 0) return null;
         return (
           <section key={group} className="mt-6">
-            <h2 className="text-lg font-bold">{`${TRANSLATION_REVIEW_HEADINGS[group]} (${items.length})`}</h2>
-            <ul>
+            <h2 className={`${PANEL_HEADING} mb-2`}>{`${TRANSLATION_REVIEW_HEADINGS[group]} (${items.length})`}</h2>
+            <ul className={LIST_PANEL}>
               {items.map((item) => (
                 <TranslationReviewRow key={item.workId} item={item} onDecide={onDecide} />
               ))}

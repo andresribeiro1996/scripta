@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { createElement, isValidElement, type ReactElement, type ReactNode } from "react";
 import { renderToString } from "react-dom/server";
@@ -125,4 +126,11 @@ test("a failed decision leaves the list as it was and rejects", async () => {
     await assert.rejects(decideGenre(client, "u", { genres: [] }), /No such work/);
     assert.equal(client.getQueryData<GenreReview>(["genre-review"]), review);
   } finally { http.restore(); }
+});
+
+test("review queues are list panels; Not found uses the shared primary", () => {
+  const read = (f: string) => readFileSync(new URL(`../src/${f}.tsx`, import.meta.url), "utf8");
+  for (const f of ["components/GenreReviewList", "components/SynopsisReviewList", "components/TranslationReviewList"]) assert.match(read(f), /LIST_PANEL/, f);
+  assert.match(read("pages/NotFoundPage"), /BUTTON_PRIMARY/);
+  assert.match(read("pages/NotFoundPage"), /min-h-\[calc\(100dvh-var\(--app-top\)\)\]/);
 });
