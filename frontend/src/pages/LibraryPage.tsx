@@ -1,5 +1,5 @@
 import { closestCenter, DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useNavigationType, useSearchParams } from "react-router-dom";
 import {
@@ -10,9 +10,10 @@ import {
   restoreDeletedBooks,
   saveFailureMessage
 } from "@scripta/shared";
+import { fetchIsAdmin } from "../api/books";
 import type { LibraryData, LibraryDocument } from "../api/library";
 import { AddBookModal } from "../components/AddBookModal";
-import { BookCard } from "../components/BookCard";
+import { BookCard, coverParamsFor } from "../components/BookCard";
 import { BookGrid } from "../components/BookGrid";
 import { CoverPickerModal } from "../components/CoverPickerModal";
 import { DuplicatesSheet } from "../components/DuplicatesSheet";
@@ -69,6 +70,7 @@ export function LibraryPage() {
   }, [library]);
   const toast = useToast();
   const bookActions = useBookActions();
+  const { data: isAdmin = false } = useQuery({ queryKey: ["books-admin"], queryFn: fetchIsAdmin, staleTime: Infinity });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const suppressClickAfterDragRef = useRef(false);
   const sensors = useSensors(
@@ -549,8 +551,16 @@ export function LibraryPage() {
         <CoverPickerModal
           title={String(coverBook.Title ?? "Untitled")}
           currentImageId={typeof coverBook._coverImageId === "string" ? coverBook._coverImageId : null}
+          lookup={coverParamsFor(coverBook)}
+          coverUrl={typeof coverBook._coverUrl === "string" ? coverBook._coverUrl : null}
+          isAdmin={isAdmin}
           removeCoverLabel="Remove custom cover — go back to the normal auto-detected one"
           onSelect={(image) => void bookActions.saveCover(coverBook, image)}
+          onPickFound={(cover, everyone) => {
+            if (everyone) void bookActions.saveCoverForEveryone(coverBook, cover);
+            else if (cover.fullUrl) void bookActions.saveCoverUrl(coverBook, cover.fullUrl);
+            setCoverBookKey(null);
+          }}
           onRemoveCover={() => void bookActions.removeCover(coverBook)}
           onClose={() => setCoverBookKey(null)}
         />

@@ -14,6 +14,7 @@ import {
   type BookScreenReaderRow,
   type BookScreenTabKey,
   type ReadSnapshot,
+  type ResolvedCoverResponse,
   type WorkPage
 } from "@scripta/shared";
 import { themes } from "@scripta/shared/themes";
@@ -137,6 +138,18 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
     } catch (error) {
       setCoverError(error instanceof Error ? error.message : "Couldn't upload the cover.");
     }
+  }
+
+  function pickFoundCover(cover: ResolvedCoverResponse, everyone: boolean) {
+    if (!book) return;
+    if (everyone) {
+      void actions.saveCoverForEveryone(book, cover);
+      setCoverVersion((v) => v + 1);
+      if (page) void queryClient.invalidateQueries({ queryKey: ["works", page.work.id] });
+    } else if (cover.fullUrl) {
+      void actions.saveCoverUrl(book, cover.fullUrl);
+    }
+    setPickingCover(false);
   }
 
   const menuItems = model.menu.map((key) => {
@@ -407,8 +420,12 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
         <CoverPickerModal
           title={String(book.Title ?? "Untitled")}
           currentImageId={typeof book._coverImageId === "string" ? book._coverImageId : null}
+          lookup={coverParamsFor(book)}
+          coverUrl={typeof book._coverUrl === "string" ? book._coverUrl : null}
+          isAdmin={isAdmin}
           removeCoverLabel="Remove custom cover — go back to the normal auto-detected one"
           onSelect={(image) => void actions.saveCover(book, image)}
+          onPickFound={pickFoundCover}
           onRemoveCover={() => void actions.removeCover(book)}
           onClose={() => setPickingCover(false)}
         />

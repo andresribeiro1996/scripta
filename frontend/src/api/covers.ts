@@ -1,4 +1,16 @@
-import { createCoverResolver, type CoverCacheEntry, type CoverLookupParams, type CoverSize, type ResolvedCoverResponse } from "@scripta/shared";
+import {
+  coverCandidatesQuery,
+  coverQueryKey,
+  createCoverResolver,
+  pickCoverBody,
+  type CoverCacheEntry,
+  type CoverCandidatesResponse,
+  type CoverChoice,
+  type CoverLookupParams,
+  type CoverPickSource,
+  type CoverSize,
+  type ResolvedCoverResponse
+} from "@scripta/shared";
 import { apiFetch } from "./client";
 
 export type ResolveCoverParams = CoverLookupParams;
@@ -40,6 +52,25 @@ export function forgetResolvedCover(params: ResolveCoverParams): void {
   resolver.forget(params);
 }
 
+const rememberListeners = new Set<(key: string) => void>();
+
+export function subscribeResolvedCovers(listener: (key: string) => void): () => void {
+  rememberListeners.add(listener);
+  return () => {
+    rememberListeners.delete(listener);
+  };
+}
+
 export function rememberResolvedCover(params: ResolveCoverParams, cover: { url: string | null; fullUrl: string | null }): void {
   resolver.remember(params, cover);
+  const key = coverQueryKey(params);
+  for (const listener of rememberListeners) listener(key);
+}
+
+export async function fetchCoverCandidates(params: ResolveCoverParams, from: CoverPickSource): Promise<CoverCandidatesResponse> {
+  return (await apiFetch(`/covers/candidates?${coverCandidatesQuery(params, from)}`)) as CoverCandidatesResponse;
+}
+
+export async function pickCover(params: ResolveCoverParams, choice: CoverChoice, everyone: boolean): Promise<ResolvedCoverResponse> {
+  return (await apiFetch("/covers/pick", { method: "POST", body: JSON.stringify(pickCoverBody(params, choice, everyone)) })) as ResolvedCoverResponse;
 }

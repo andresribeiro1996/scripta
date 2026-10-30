@@ -5,18 +5,27 @@ import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { Button, ConfirmDialog, ErrorState } from "../../../ui/components";
 import { minimumTouchTarget, radii, spacing, typography, useTheme } from "../../../ui/theme";
+import { coverQueryKey, type ResolvedCoverResponse } from "@scripta/shared";
 import { deleteGalleryImage, fetchGalleryImages, uploadGalleryImage, type GalleryImage } from "../../gallery/api";
+import type { ResolveCoverParams } from "../api/covers";
+import { FoundCovers } from "./FoundCovers";
 
 export function CoverPicker({
   title,
   currentImageId,
+  lookup,
+  coverUrl,
   onSelect,
+  onPickFound,
   onRemoveCover,
   onClose,
 }: {
   title: string;
   currentImageId: string | null;
+  lookup: ResolveCoverParams;
+  coverUrl: string | null;
   onSelect: (image: GalleryImage) => void;
+  onPickFound: (cover: ResolvedCoverResponse) => void;
   onRemoveCover: () => void;
   onClose: () => void;
 }) {
@@ -79,13 +88,15 @@ export function CoverPicker({
       .finally(() => setDeletingId(null));
   }
 
+  const hasCustomCover = Boolean(currentImageId) || Boolean(coverUrl);
+
   return (
     <>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: spacing.md, paddingBottom: spacing.xl }}>
         <Button label={uploading ? "Uploading…" : "Upload from your photos…"} loading={uploading} onPress={() => void handlePickAndUpload()} />
         {uploadError && <Text style={[typography.caption, { color: colors.danger }]}>{uploadError}</Text>}
 
-        {currentImageId && (
+        {hasCustomCover && (
           <Button
             label="Remove custom cover — go back to the normal auto-detected one"
             variant="destructive"
@@ -94,6 +105,15 @@ export function CoverPicker({
               onClose();
             }}
           />
+        )}
+
+        {Boolean(lookup.isbn || lookup.title) && (
+          <>
+            <FoundCovers key={coverQueryKey(lookup)} lookup={lookup} coverUrl={coverUrl} onPick={onPickFound} />
+            <Text accessibilityRole="header" style={[typography.body, { color: colors.text, fontWeight: "600" }]}>
+              Your gallery
+            </Text>
+          </>
         )}
 
         {loadError && <ErrorState body={loadError} actionLabel="Retry" onAction={() => setLoadError(null)} />}

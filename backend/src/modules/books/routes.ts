@@ -1,9 +1,9 @@
-import type { GenreReview, GenreReviewAction, SynopsisDecision, SynopsisReview, TranslationReview, TranslationReviewAction } from "@scripta/shared";
+import type { CoverChoice, GenreReview, GenreReviewAction, SynopsisDecision, SynopsisReview, TranslationReview, TranslationReviewAction } from "@scripta/shared";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { authGuard } from "../auth/index.js";
 import { MAX_UPLOAD_BYTES, type BooksService, type CoverFileSize } from "./booksService.js";
-import { BookNotFoundError, FileTooLargeError, InvalidImageError, SourceUnavailableError, WorkMergeError } from "./domain/errors.js";
+import { BookNotFoundError, CoverOfferExpiredError, FileTooLargeError, InvalidImageError, SourceUnavailableError, UnusableCoverError, WorkMergeError } from "./domain/errors.js";
 import { labelProblem } from "./genrePass.js";
 
 const lookupSchema = z.object({
@@ -14,6 +14,14 @@ const lookupSchema = z.object({
 const searchSchema = z.object({ q: z.string().max(200) });
 const catalogSearchSchema = searchSchema.extend({ by: z.literal("work").optional() });
 const fileParamsSchema = z.object({ id: z.string().uuid(), size: z.enum(["file", "thumb"]) });
+const candidatesSchema = lookupSchema.extend({ from: z.enum(["quick", "apple"]).default("quick") });
+const pickSchema = lookupSchema
+  .extend({
+    coverImageId: z.string().uuid().optional(),
+    url: z.string().url().max(2000).optional(),
+    everyone: z.boolean().optional()
+  })
+  .refine((body) => (body.coverImageId === undefined) !== (body.url === undefined));
 
 const FORBIDDEN = { error: "Only the admin can change shared covers." };
 const NOT_FOUND = { error: "No such book." };
@@ -57,6 +65,43 @@ export function buildResolveRoutes(service: BooksService) {
         return reply.code(400).send({ error: `Send up to ${MAX_BATCH} lookups, each with an isbn or a title (author optional).` });
       }
       return reply.send({ results: parsed.data.map((lookup) => service.resolveCover(lookup)) });
+    });
+  };
+}
+
+export function buildCoverPickerRoutes(service: BooksService) {
+  return async function coverPickerRoutes(app: FastifyInstance) {
+    app.get("/covers/candidates", { preHandler: authGuard }, async (request, reply) => {
+      const parsed = candidatesSchema.safeParse(request.query);
+      if (!parsed.success || !isLookable(parsed.data)) {
+        return reply.code(400).send({ error: "Send an isbn or a title (author optional), and from as quick or apple." });
+      }
+      const { from, ...lookup } = parsed.data;
+      try {
+        return reply.send(await service.listCoverCandidates(request.user.id, lookup, from));
+      } catch (error) {
+        if (error instanceof BookNotFoundError) return reply.code(404).send(NOT_FOUND);
+        throw error;
+      }
+    });
+
+    app.post("/covers/pick", { preHandler: authGuard }, async (request, reply) => {
+      const parsed = pickSchema.safeParse(request.body);
+      if (!parsed.success || !isLookable(parsed.data)) {
+        return reply.code(400).send({ error: "Send an isbn or a title (author optional), and exactly one of coverImageId and url." });
+      }
+      const { coverImageId, url, everyone = false, ...lookup } = parsed.data;
+      if (everyone && !service.isAdmin(request.user.id)) return reply.code(403).send(FORBIDDEN);
+      const choice: CoverChoice = coverImageId === undefined ? { url: url! } : { coverImageId };
+      try {
+        return reply.send(await service.pickCover(request.user.id, lookup, choice, everyone));
+      } catch (error) {
+        if (error instanceof BookNotFoundError) return reply.code(404).send(NOT_FOUND);
+        if (error instanceof CoverOfferExpiredError) return reply.code(409).send({ error: error.message });
+        if (error instanceof UnusableCoverError) return reply.code(422).send({ error: error.message });
+        if (error instanceof SourceUnavailableError) return reply.code(502).send({ error: "Couldn't download that cover. Try again." });
+        throw error;
+      }
     });
   };
 }

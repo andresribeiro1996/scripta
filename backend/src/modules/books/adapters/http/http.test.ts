@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, mock, test } from "node:test";
 import { SourceUnavailableError } from "../../domain/errors.js";
-import { createThrottle, fetchBytes, fetchJson, postJson, USER_AGENT } from "./http.js";
+import { createThrottle, fetchBytes, fetchJson, postJson, urgentLane, USER_AGENT } from "./http.js";
 
 const originalFetch = globalThis.fetch;
 afterEach(() => {
@@ -122,6 +122,24 @@ test("an urgent task runs before queued normal tasks, the gap holds, and each la
     throttle(mark("n3")),
     throttle(mark("u1"), { urgent: true }),
     throttle(mark("u2"), { urgent: true })
+  ]);
+  assert.deepEqual(order, [["n1", 0], ["u1", 1000], ["u2", 2000], ["n2", 3000], ["n3", 4000]]);
+});
+
+test("a task sent through urgentLane with { urgent: false } still runs before queued normal tasks", async () => {
+  let clock = 0;
+  const throttle = createThrottle(1000, () => clock, async (ms) => {
+    clock += ms;
+  });
+  const lane = urgentLane(throttle);
+  const order: Array<[string, number]> = [];
+  const mark = (name: string) => async () => { order.push([name, clock]); };
+  await Promise.all([
+    throttle(mark("n1")),
+    throttle(mark("n2")),
+    throttle(mark("n3")),
+    lane(mark("u1"), { urgent: false }),
+    lane(mark("u2"))
   ]);
   assert.deepEqual(order, [["n1", 0], ["u1", 1000], ["u2", 2000], ["n2", 3000], ["n3", 4000]]);
 });

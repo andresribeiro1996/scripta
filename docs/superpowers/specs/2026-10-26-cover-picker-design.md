@@ -69,7 +69,7 @@ For a `url`:
   - An image that passes is stored with `storeCoverImage(deps, book.id, offer.source, url, image, at)`.
   - Two picks of the same URL for the same book at once share one download and one row.
 
-With `everyone: true`, the book's cover is set to the image with status `manual`, its upgrade mark is cleared, and its backoff is dropped. That is the same tail `uploadCover` runs (`backend/src/modules/books/booksService.ts:509-522`); both call one helper. Without `everyone`, the catalog cover is untouched.
+With `everyone: true`, the book's cover is set to the image with status `manual`, its upgrade mark is cleared, and its backoff is dropped. That is the same tail `uploadCover` runs (`backend/src/modules/books/booksService.ts:530-543`); both call one helper. Without `everyone`, the catalog cover is untouched.
 
 The response is `coverOf(imageId, false)`: `{ url, fullUrl, pending: false, upgrading: false }`.
 

@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { isObjectKey } from "../../storage/objectStore.js";
-import { canonicalIsbn, looksLikeIsbnQuery, normalizeImageId, type BookGenre, type BookMetadata, type BookSearchResult, type BookSeries } from "@scripta/shared";
-import { findBestCover, type CoverSources, type FetchCoverImage } from "./coverResolver.js";
+import { canonicalIsbn, isAcceptableCover, looksLikeIsbnQuery, normalizeImageId, type BookGenre, type BookMetadata, type BookSearchResult, type BookSeries, type CoverCandidatesResponse, type CoverCandidateView, type CoverChoice, type CoverPickSource } from "@scripta/shared";
+import { coverSteps, findBestCover, offerable, type CoverSources, type FetchCoverImage } from "./coverResolver.js";
 import { MIN_GOOD_WIDTH } from "./domain/constants.js";
-import { BookNotFoundError, FileTooLargeError, InvalidImageError, SourcePausedError, SourceUnavailableError, WorkMergeError } from "./domain/errors.js";
+import { BookNotFoundError, CoverOfferExpiredError, FileTooLargeError, InvalidImageError, SourcePausedError, SourceUnavailableError, UnusableCoverError, WorkMergeError } from "./domain/errors.js";
 import { coverColor, encodeCover, type EncodedCover } from "./domain/images.js";
 import { hiddenSynopsisHashes } from "./domain/synopsis.js";
 import { findExisting, findOrCreateBook } from "./domain/findOrCreate.js";
@@ -13,7 +13,7 @@ import { editionLanguage, findByIdentity, normalizeWorkKey, isPortugalIsbn, isPo
 import { summaryMatchesLanguage } from "./adapters/catalog/languageFilter.js";
 import { canonicalHits, catalogHits, type Hit } from "./catalogSearch.js";
 import { saveCatalogHits, storeSeries } from "./saveHits.js";
-import type { BookCatalog, BooksRepository, CatalogDetails, CatalogSearchHit, CoverBlobReader, CoverBlobStore, CoverSource, EditionRecordSource, PageCursor } from "./domain/ports.js";
+import type { BookCatalog, BooksRepository, CatalogDetails, CatalogSearchHit, CoverBlobReader, CoverBlobStore, CoverCandidate, CoverSource, EditionRecordSource, PageCursor } from "./domain/ports.js";
 import type { SeriesEntry } from "./domain/series.js";
 import { cleanWorkSubjects } from "./domain/workSubjects.js";
 import type { BookRow, CoverSourceName, CoverStatus, WorkView } from "./domain/types.js";
@@ -24,6 +24,7 @@ const WORK_RECHECK_MS = 30 * 24 * 60 * 60 * 1000;
 const UNAVAILABLE_BACKOFF_MS = 10 * 60 * 1000;
 const COVER_EXTENSION = "webp";
 const ISBN_ONLY_BEFORE_YEAR = 2002;
+const COVER_OFFER_TTL_MS = 30 * 60 * 1000;
 const NO_SOURCE: CoverSource = { byIsbn: async () => [], byTitle: async () => [] };
 const NO_COVER: ResolvedCover = { url: null, fullUrl: null, pending: false, upgrading: false };
 const PENDING: ResolvedCover = { url: null, fullUrl: null, pending: true, upgrading: false };
@@ -34,6 +35,11 @@ export const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
 export type CoverFileSize = "file" | "thumb";
 
 type Found = { result: BookSearchResult; bookId: string | null; matched?: SeriesEntry };
+type CoverOffer = { source: CoverCandidate["source"]; expiresAt: number };
+
+function isbnOnlyFor(book: BookRow): boolean {
+  return book.created_by === "bnp" && book.year !== null && book.year < ISBN_ONLY_BEFORE_YEAR;
+}
 
 export interface ResolvedCover {
   url: string | null;
@@ -46,10 +52,12 @@ export interface BooksServiceDeps {
   repo: BooksRepository;
   blobs: CoverBlobStore & CoverBlobReader;
   sources: CoverSources;
+  pickerSources?: CoverSources;
   catalog: BookCatalog;
   backgroundCatalog: BookCatalog;
   editionRecords: EditionRecordSource;
   fetchImage: FetchCoverImage;
+  fetchPickedImage?: FetchCoverImage;
   enqueue: (bookId: string, priority?: CoverPriority) => void;
   publicUrlFor: (imageId: string, size: CoverFileSize) => string;
   adminUserId: string;
@@ -77,6 +85,8 @@ export interface BooksService {
   isAdmin(userId: string): boolean;
   rejectCover(lookup: BookLookup): ResolvedCover;
   uploadCover(lookup: BookLookup, bytes: Buffer): Promise<ResolvedCover>;
+  listCoverCandidates(userId: string, lookup: BookLookup, from: CoverPickSource): Promise<CoverCandidatesResponse>;
+  pickCover(userId: string, lookup: BookLookup, choice: CoverChoice, everyone: boolean): Promise<ResolvedCover>;
   mergeWorks(from: BookLookup, into: BookLookup): WorkView;
   detachEdition(edition: BookLookup): WorkView;
 }
@@ -100,6 +110,10 @@ export async function storeCoverImage(
 export function createBooksService(deps: BooksServiceDeps): BooksService {
   const now = deps.now ?? (() => new Date());
   const backoffUntil = new Map<string, number>();
+  const offers = new Map<string, Map<string, CoverOffer>>();
+  const picks = new Map<string, Promise<string>>();
+  const pickerSources = deps.pickerSources ?? deps.sources;
+  const fetchPickedImage = deps.fetchPickedImage ?? deps.fetchImage;
   let uncheckedCursor: PageCursor | null = null;
   let upgradeCursor: PageCursor | null = null;
 
@@ -131,6 +145,47 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
     if (lane === "upgrade") return { apple: deps.sources.apple, isbndb: null, openlibrary: NO_SOURCE };
     if (!olderThan(book.apple_checked_at, RETRY_AFTER_MS)) return { ...deps.sources, apple: NO_SOURCE };
     return deps.sources;
+  }
+
+  function setManualCover(bookId: string, imageId: string, at: string) {
+    deps.repo.setCover(bookId, { imageId, status: "manual", checkedAt: at });
+    deps.repo.setUpgradeWanted(bookId, null);
+    backoffUntil.delete(bookId);
+  }
+
+  function recordOffers(key: string, found: CoverCandidate[]) {
+    const at = now().getTime();
+    for (const [offerKey, entries] of offers) {
+      for (const [url, offer] of entries) if (offer.expiresAt <= at) entries.delete(url);
+      if (entries.size === 0) offers.delete(offerKey);
+    }
+    if (found.length === 0) return;
+    const entries = offers.get(key) ?? new Map<string, CoverOffer>();
+    for (const { source, url } of found) entries.set(url, { source, expiresAt: at + COVER_OFFER_TTL_MS });
+    offers.set(key, entries);
+  }
+
+  function storedPick(book: BookRow, coverImageId: string): string {
+    const row = deps.repo.getImage(coverImageId);
+    if (!row || row.book_id !== book.id || (row.source_url !== null && deps.repo.listRejectedUrls(book.id).has(row.source_url))) throw new BookNotFoundError();
+    return row.id;
+  }
+
+  async function offeredPick(userId: string, book: BookRow, url: string, at: string): Promise<string> {
+    const offer = offers.get(`${userId}\n${book.id}`)?.get(url);
+    if (!offer || offer.expiresAt <= now().getTime() || deps.repo.listRejectedUrls(book.id).has(url)) throw new CoverOfferExpiredError();
+    const stored = deps.repo.listImages(book.id).find((row) => row.source_url === url);
+    if (stored) return stored.id;
+    const key = `${book.id}\n${url}`;
+    const running = picks.get(key);
+    if (running) return running;
+    const download = (async () => {
+      const image = await fetchPickedImage({ source: offer.source, url });
+      if (!image || !isAcceptableCover(offer.source, image.width, image.height)) throw new UnusableCoverError();
+      return storeCoverImage(deps, book.id, offer.source, url, image, at);
+    })().finally(() => picks.delete(key));
+    picks.set(key, download);
+    return download;
   }
 
   function schedule(bookId: string, priority: CoverPriority = "normal") {
@@ -341,7 +396,7 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       if (!book || book.cover_status === "manual") return;
       try {
         const sources = sourcesFor(lane, book);
-        const outcome = await findBestCover({ isbn: book.isbn, title: book.title, author: book.author, koboImageId: book.kobo_image_id, isbnOnly: book.created_by === "bnp" && book.year !== null && book.year < ISBN_ONLY_BEFORE_YEAR }, deps.repo.listRejectedUrls(bookId), sources, deps.fetchImage);
+        const outcome = await findBestCover({ isbn: book.isbn, title: book.title, author: book.author, koboImageId: book.kobo_image_id, isbnOnly: isbnOnlyFor(book) }, deps.repo.listRejectedUrls(bookId), sources, deps.fetchImage);
         const endedAtKobo = outcome.found?.candidate.source === "kobo" && outcome.found.image.width >= MIN_GOOD_WIDTH;
         if (sources.apple !== NO_SOURCE && !endedAtKobo && !outcome.failures.some((failure) => failure.source === "apple")) deps.repo.setAppleChecked(bookId, now().toISOString());
         for (const failure of outcome.failures.filter((failure) => !(failure instanceof SourcePausedError))) deps.warn({ bookId, source: failure.source, error: failure.message }, "cover source unavailable");
@@ -356,7 +411,8 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
         const found = outcome.found;
         const replacesWatermark = lane === "upgrade" && found !== null && found.image.width >= MIN_GOOD_WIDTH && watermarked(source, book.isbn);
         if (found && (found.image.width > width || replacesWatermark)) {
-          imageId = await storeCoverImage(deps, bookId, found.candidate.source, found.candidate.url, found.image, at);
+          const stored = deps.repo.listImages(bookId).find((row) => row.source_url === found.candidate.url && row.width === found.image.width && row.height === found.image.height);
+          imageId = stored?.id ?? await storeCoverImage(deps, bookId, found.candidate.source, found.candidate.url, found.image, at);
           width = found.image.width;
           source = found.candidate.source;
         }
@@ -536,9 +592,52 @@ export function createBooksService(deps: BooksServiceDeps): BooksService {
       if (!book) throw new BookNotFoundError();
       const at = now().toISOString();
       const imageId = await storeCoverImage(deps, book.id, "upload", null, image, at);
-      deps.repo.setCover(book.id, { imageId, status: "manual", checkedAt: at });
-      deps.repo.setUpgradeWanted(book.id, null);
-      backoffUntil.delete(book.id);
+      setManualCover(book.id, imageId, at);
+      return coverOf(imageId, false);
+    },
+
+    async listCoverCandidates(userId, lookup, from) {
+      const book = findOrCreateBook(deps.repo, lookup, now().toISOString());
+      if (!book) throw new BookNotFoundError();
+      const rejected = deps.repo.listRejectedUrls(book.id);
+      const stored = deps.repo.listImages(book.id).filter((row) => row.source_url === null || !rejected.has(row.source_url));
+      const seen = new Set(stored.flatMap((row) => (row.source_url === null ? [] : [row.source_url])));
+      const sources: CoverSources = from === "quick"
+        ? { ...pickerSources, apple: NO_SOURCE }
+        : { apple: pickerSources.apple, isbndb: null, openlibrary: NO_SOURCE };
+      const steps = coverSteps({ isbn: book.isbn, title: book.title, author: book.author, koboImageId: from === "quick" ? book.kobo_image_id : null, isbnOnly: isbnOnlyFor(book) }, sources);
+      const found: CoverCandidate[] = [];
+      const unavailable: string[] = [];
+      for (const step of steps) {
+        let result: CoverCandidate[];
+        try {
+          result = await step();
+        } catch (error) {
+          if (!(error instanceof SourceUnavailableError)) throw error;
+          if (!unavailable.includes(error.source)) unavailable.push(error.source);
+          continue;
+        }
+        for (const candidate of offerable(result, rejected)) {
+          if (seen.has(candidate.url)) continue;
+          seen.add(candidate.url);
+          found.push(candidate);
+        }
+      }
+      recordOffers(`${userId}\n${book.id}`, found);
+      const storedViews: CoverCandidateView[] = from === "quick"
+        ? stored.map((row) => ({ source: row.source, url: deps.publicUrlFor(row.id, "thumb"), fullUrl: deps.publicUrlFor(row.id, "file"), coverImageId: row.id, width: row.width, height: row.height }))
+        : [];
+      const foundViews = found.map(({ source, url }): CoverCandidateView => ({ source, url, fullUrl: url, coverImageId: null, width: null, height: null }));
+      return { candidates: [...storedViews, ...foundViews], unavailable };
+    },
+
+    async pickCover(userId, lookup, choice, everyone) {
+      const identity = lookupIdentity(lookup);
+      const book = identity ? findByIdentity(deps.repo, identity) : undefined;
+      if (!book) throw new BookNotFoundError();
+      const at = now().toISOString();
+      const imageId = "coverImageId" in choice ? storedPick(book, choice.coverImageId) : await offeredPick(userId, book, choice.url, at);
+      if (everyone) setManualCover(book.id, imageId, at);
       return coverOf(imageId, false);
     }
   };

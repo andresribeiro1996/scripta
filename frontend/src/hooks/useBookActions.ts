@@ -5,12 +5,16 @@ import {
   removeReaderNote,
   restoreReadState,
   saveFailureMessage,
+  setBookCoverUrl,
   setRating,
   type FinishRating,
-  type ReadSnapshot
+  type ReadSnapshot,
+  type ResolvedCoverResponse
 } from "@scripta/shared";
+import { rememberResolvedCover } from "../api/covers";
 import type { GalleryImage } from "../api/gallery";
 import type { LibraryDocument } from "../api/library";
+import { coverParamsFor } from "../components/BookCard";
 import { useToast } from "../components/Toaster";
 import { clearBookCover, setBookCover } from "../lib/bookCovers";
 import type { PerCardStyle } from "../lib/libraryStyle";
@@ -119,6 +123,25 @@ export function useBookActions() {
     }
   }
 
+  async function saveCoverUrl(book: Book, url: string) {
+    const current = queryClient.getQueryData<LibraryDocument>(["library"]);
+    if (!current) return;
+    const key = bookKey(book);
+    try {
+      await saver.saveWhole((data) => ({
+        ...data,
+        books: data.books.map((b) => (bookKey(b) === key ? setBookCoverUrl(b, url) : b))
+      }));
+    } catch (error) {
+      toast({ message: saveFailureMessage(error, "Couldn't save the cover change."), kind: "error" });
+    }
+  }
+
+  async function saveCoverForEveryone(book: Book, cover: ResolvedCoverResponse) {
+    rememberResolvedCover(coverParamsFor(book), cover);
+    if (book._coverUrl) await removeCover(book);
+  }
+
   async function removeCover(book: Book) {
     const current = queryClient.getQueryData<LibraryDocument>(["library"]);
     if (!current) return;
@@ -133,5 +156,5 @@ export function useBookActions() {
     }
   }
 
-  return { saveStyle, setStatus, setRating: setBookRating, addNote, deleteNote, restoreRead, saveCover, removeCover };
+  return { saveStyle, setStatus, setRating: setBookRating, addNote, deleteNote, restoreRead, saveCover, saveCoverUrl, saveCoverForEveryone, removeCover };
 }

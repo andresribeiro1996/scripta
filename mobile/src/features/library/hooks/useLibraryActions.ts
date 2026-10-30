@@ -17,6 +17,7 @@ import {
   restoreReadState,
   saveFailureMessage,
   setBookCover,
+  setBookCoverUrl,
   setReadStatus,
   setRating as rateBook,
   type FinishRating,
@@ -96,6 +97,9 @@ export function useLibraryActions(onError?: (message: string) => void) {
 
     saveBookCover: (book: Record<string, unknown>, image: GalleryImage) =>
       run(mapBook(bookKey(book), (b) => setBookCover(b, image.id, image.url)), "Couldn't save the cover change."),
+
+    saveBookCoverUrl: (book: Record<string, unknown>, url: string) =>
+      run(mapBook(bookKey(book), (b) => setBookCoverUrl(b, url)), "Couldn't save the cover change."),
 
     removeBookCover: (book: Record<string, unknown>) =>
       run(mapBook(bookKey(book), (b) => clearBookCover(b)), "Couldn't save the cover change."),

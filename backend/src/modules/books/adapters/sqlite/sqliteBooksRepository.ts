@@ -323,6 +323,7 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
   const searchableStmt = db.prepare(`SELECT 1 FROM books_search WHERE book_id = ?`);
   const confirmedStmt = db.prepare(`SELECT 1 FROM books WHERE id = ? AND ${CONFIRMED_SQL}`);
   const imageStmt = db.prepare(`SELECT * FROM cover_images WHERE id = ?`);
+  const bookImagesStmt = db.prepare(`SELECT * FROM cover_images WHERE book_id = ? ORDER BY created_at DESC, rowid DESC`);
   const insertImageStmt = db.prepare(`
     INSERT INTO cover_images (id, book_id, source, source_url, origin, width, height, byte_size, color, created_at)
     VALUES ($id, $book_id, $source, $source_url, $origin, $width, $height, $byte_size, $color, $created_at)
@@ -908,6 +909,8 @@ export function createSqliteBooksRepository(db: DatabaseSync): BooksRepository {
     isSearchable: (id) => searchableStmt.get(id) !== undefined,
 
     getImage: (id) => imageStmt.get(id) as CoverImageRow | undefined,
+
+    listImages: (bookId) => bookImagesStmt.all(bookId) as unknown as CoverImageRow[],
 
     listPendingColorImageIds: (limit) => (pendingColorStmt.all(limit) as Array<{ id: string }>).map((row) => row.id),
 

@@ -1,7 +1,8 @@
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { useEffect, useState } from "react";
-import { forgetResolvedCover, peekResolvedCover, resolveCover, type ResolveCoverParams } from "../api/covers";
+import { coverQueryKey } from "@scripta/shared";
+import { forgetResolvedCover, peekResolvedCover, resolveCover, subscribeResolvedCovers, type ResolveCoverParams } from "../api/covers";
 import { normalizeImageId, normalizeIsbn, statusLabel } from "../lib/covers";
 import { DEFAULT_LIBRARY_STYLE, cardFontFamilyCss, resolveBorderColor, type LibraryStyleSettings } from "../lib/libraryStyle";
 import { bookKey } from "../lib/merge";
@@ -92,6 +93,13 @@ export function CoverImage({
     setConfirmedFailed(false);
     setAutoUrl(peekResolvedCover(coverParamsFor(book), size) ?? null);
   }, [book, confirmedUrl, size]);
+
+  useEffect(() => {
+    const key = coverQueryKey(coverParamsFor(book));
+    return subscribeResolvedCovers((changed) => {
+      if (changed === key) setAutoUrl(peekResolvedCover(coverParamsFor(book), size) ?? null);
+    });
+  }, [book, size]);
 
   useEffect(() => {
     if (!useAuto) return;

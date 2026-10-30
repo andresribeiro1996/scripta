@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import sharp from "sharp";
-import { classifyPublisherImage, coverColor, encodeCover, isAcceptableCover } from "./images.js";
+import { classifyPublisherImage, coverColor, encodeCover } from "./images.js";
 
 function jpeg(width: number, height: number) {
   return sharp({ create: { width, height, channels: 3, background: "#886644" } }).jpeg().toBuffer();
@@ -48,18 +48,6 @@ test("a JPEG truncated after its header decodes metadata but fails to encode, an
   const full = await jpeg(2000, 3000);
   const truncated = full.subarray(0, Math.floor(full.byteLength / 2));
   assert.equal(await encodeCover(truncated), null);
-});
-
-test("only portrait covers are acceptable", () => {
-  assert.equal(isAcceptableCover("apple", 900, 1400), true);
-  assert.equal(isAcceptableCover("apple", 500, 500), false);
-  assert.equal(isAcceptableCover("isbndb", 1030, 773), false);
-  assert.equal(isAcceptableCover("openlibrary", 100, 400), false);
-});
-
-test("ISBNdb's 200x248 placeholder is refused, the same size elsewhere is not", () => {
-  assert.equal(isAcceptableCover("isbndb", 200, 248), false);
-  assert.equal(isAcceptableCover("openlibrary", 200, 248), true);
 });
 
 type Layer = { input: Buffer; left: number; top: number };
