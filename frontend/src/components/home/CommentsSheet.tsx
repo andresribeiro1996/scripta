@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { relativeTime } from "@scripta/shared/community";
 import { ApiError } from "../../api/client";
@@ -19,6 +19,7 @@ export function CommentsSheet({ id, title, onClose }: { id: string; title: strin
   const confirm = useConfirm();
   const fieldId = useId();
   const [draft, setDraft] = useState("");
+  const fieldRef = useRef<HTMLTextAreaElement>(null);
   const key = ["community", "comments", id];
   const query = useInfiniteQuery({
     queryKey: key,
@@ -47,10 +48,20 @@ export function CommentsSheet({ id, title, onClose }: { id: string; title: strin
     onError
   });
   const remove = useMutation({ mutationFn: deleteActivityComment, onSuccess: refresh, onError });
+  useEffect(() => {
+    if (send.isSuccess) fieldRef.current?.focus();
+  }, [send.isSuccess]);
   const failed = [send, remove].find((mutation) => mutation.isError && !(mutation.error instanceof ApiError && mutation.error.status === 429));
 
   async function askDelete(commentId: string) {
-    if (await confirm({ title: "Delete your comment?", body: "This can't be undone." })) remove.mutate(commentId);
+    if (!(await confirm({ title: "Delete your comment?", body: "This can't be undone." }))) return;
+    send.reset();
+    remove.mutate(commentId);
+  }
+
+  function post() {
+    remove.reset();
+    send.mutate();
   }
 
   return (
@@ -58,9 +69,15 @@ export function CommentsSheet({ id, title, onClose }: { id: string; title: strin
       title="Comments"
       onClose={onClose}
       footer={
-        <button type="button" className={BUTTON_PRIMARY} disabled={!draft.trim() || send.isPending} onClick={() => send.mutate()}>
-          Post
-        </button>
+        <div className="flex w-full flex-col gap-1.5">
+          <label htmlFor={fieldId} className="text-sm font-semibold">Comment</label>
+          <textarea ref={fieldRef} id={fieldId} rows={2} maxLength={1500} placeholder="Write a comment…" value={draft} disabled={send.isPending} onChange={(event) => setDraft(event.target.value)} className={`${FIELD_CLASS} w-full resize-none`} />
+          {failed ? <p role="alert" className="text-sm text-(--color-danger)">{failed === send ? "Couldn't post your comment." : "Couldn't delete your comment."}</p> : null}
+          <div className="flex flex-wrap justify-end gap-2">
+            <button type="button" className={BUTTON_SECONDARY} onClick={onClose}>Cancel</button>
+            <button type="button" className={BUTTON_PRIMARY} disabled={!draft.trim() || send.isPending} onClick={post}>Post</button>
+          </div>
+        </div>
       }
     >
       <p className="px-2 pb-2 text-sm break-words text-(--color-text-dim)">{title}</p>
@@ -86,7 +103,7 @@ export function CommentsSheet({ id, title, onClose }: { id: string; title: strin
                 <p className="break-words whitespace-pre-wrap">{comment.text}</p>
               </div>
               {comment.own ? (
-                <button type="button" className={`${BUTTON_SECONDARY} shrink-0`} disabled={remove.isPending} onClick={() => void askDelete(comment.id)}>Delete</button>
+                <button type="button" className={`${BUTTON_SECONDARY} shrink-0`} disabled={remove.isPending} aria-label={`Delete your comment "${comment.text.slice(0, 40)}"`} onClick={() => void askDelete(comment.id)}>Delete</button>
               ) : null}
             </li>
           ))}
@@ -102,11 +119,6 @@ export function CommentsSheet({ id, title, onClose }: { id: string; title: strin
           {isFetchingNextPage ? "Loading…" : "Load more"}
         </button>
       ) : null}
-      <div className="flex flex-col gap-1.5 px-2 pt-3 pb-2">
-        <label htmlFor={fieldId} className="text-sm font-semibold">Comment</label>
-        <textarea id={fieldId} rows={3} maxLength={1500} placeholder="Write a comment…" value={draft} disabled={send.isPending} onChange={(event) => setDraft(event.target.value)} className={`${FIELD_CLASS} w-full resize-y`} />
-        {failed ? <p role="alert" className="text-sm text-(--color-danger)">{failed === send ? "Couldn't post your comment." : "Couldn't delete your comment."}</p> : null}
-      </div>
     </Sheet>
   );
 }

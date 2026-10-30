@@ -158,6 +158,9 @@ test("comments: both shown, delete only on your own, a labelled composer with on
   assert.match(html, /<label[^>]*for="[^"]+"[^>]*>[^<]*Comment/);
   assert.match(html, /<textarea[^>]*id="/);
   assert.equal(html.match(/>Post</g)?.length, 1);
+  assert.equal(html.match(/>Cancel</g)?.length, 1);
+  assert.match(html, /aria-label="Delete your comment &quot;Same&quot;"/);
+  assert.ok(html.indexOf("<textarea") > html.indexOf("Same"));
 });
 
 test("comments: the Post button starts disabled, and the feed comment button opens the sheet", () => {
@@ -176,4 +179,7 @@ test("comments: the keys, the 429 message and the confirm before delete", () => 
   assert.match(src, /status === 429/);
   assert.match(src, /await confirm\(/);
   assert.match(src, /maxLength=\{1500\}/);
+  assert.match(src, /remove\.reset\(\)/);
+  assert.match(src, /send\.reset\(\)/);
+  assert.match(src, /fieldRef\.current\?\.focus\(\)/);
 });
