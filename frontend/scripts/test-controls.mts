@@ -86,3 +86,7 @@ test("layout variables: sticky offset, scroll padding, cover shadow in both sche
   assert.match(css, /@variant dark\s*\{\s*--shadow-cover:/);
   assert.match(css, /prefers-reduced-transparency:\s*reduce[\s\S]*?\[data-top-bar\]/);
 });
+
+test("Home's feed card controls are 44px targets", () => {
+  assert.match(src("components/home/FeedCard"), /min-h-11/);
+});

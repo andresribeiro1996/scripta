@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { fetchDiscover } from "../api/community";
@@ -6,8 +7,11 @@ import { fetchRecentAwards } from "../api/works";
 import { useAuth } from "../auth/AuthContext";
 import { DailyChapterCard } from "../components/dailyChapter/DailyChapterCard";
 import { EmptyState } from "../components/EmptyState";
+import { CommunityIcon } from "../components/NavIcons";
 import { DiscoverTicket } from "../components/games/DiscoverTicket";
 import { AwardsCard } from "../components/home/AwardsCard";
+import { FeedCard } from "../components/home/FeedCard";
+import { ForYouPanel } from "../components/home/ForYouPanel";
 import { ReadingStrip } from "../components/home/ReadingStrip";
 import { SuggestedReaders } from "../components/home/SuggestedReaders";
 import { Page } from "../components/page/Page";
@@ -38,6 +42,13 @@ export function HomePage() {
   const gamesFailed = noGames && (circle.isError || shelf.isError || newest.isError);
   const books = library.data?.data.books ?? [];
   const reading = books.filter((book) => book.ReadStatus === 1);
+  const circleItems = circle.items;
+  const { fetchNextPage } = circle;
+  const circleLoading = circle.isLoading || (circleItems.length === 0 && circle.hasNextPage === true && !circle.isError);
+
+  useEffect(() => {
+    if (circleItems.length === 0 && circle.hasNextPage && !circle.isFetchingNextPage && !circle.isError) void fetchNextPage();
+  }, [circleItems.length, circle.hasNextPage, circle.isFetchingNextPage, circle.isError, fetchNextPage]);
 
   return <Page title="Home">
     <div className="grid grid-cols-[minmax(0,1fr)] gap-10 lg:grid-cols-[minmax(0,1fr)_340px] lg:grid-rows-[auto_1fr]">
@@ -69,6 +80,7 @@ export function HomePage() {
         </section>
       </div>
       <div className="flex min-w-0 flex-col gap-6 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:self-start">
+        <ForYouPanel />
         {library.isPending ? <p role="status">Loading your reading…</p> : library.isError ? (
           <div role="alert" className="space-y-3"><p>Couldn't load your library.</p><button type="button" className={BUTTON_SECONDARY} onClick={() => void library.refetch()}>Retry</button></div>
         ) : books.length === 0 ? (
@@ -77,10 +89,24 @@ export function HomePage() {
         <SuggestedReaders />
       </div>
       <section aria-labelledby="home-circle" className="min-w-0 lg:col-start-1 lg:row-start-2">
-        <div className="flex items-baseline justify-between gap-3">
+        <div className="mb-3.5 flex items-baseline justify-between gap-3">
           <h2 id="home-circle" className={SECTION_HEADING}>Your reading circle</h2>
           <Link to="/community/people" className={SECTION_LINK}>Find people →</Link>
         </div>
+        {circleItems.length > 0 ? <div className="flex flex-col gap-4">{circleItems.map((item) => <FeedCard key={`${item.kind}:${item.id}`} item={item} />)}</div> : null}
+        {circleLoading ? <p role="status">Loading your reading circle…</p> : null}
+        {circle.isError ? (
+          <div role="alert" className="mt-4 space-y-3">
+            <p>Couldn't load your reading circle.</p>
+            <button type="button" className={BUTTON_SECONDARY} onClick={() => void circle.refetch()}>Retry</button>
+          </div>
+        ) : null}
+        {!circleLoading && !circle.isError && circleItems.length === 0 && circle.hasNextPage === false ? (
+          <EmptyState icon={CommunityIcon} title="Your circle starts here" body="Follow readers to see their books, games and murals." action={<Link className={BUTTON_SECONDARY} to="/community/people">Find people</Link>} />
+        ) : null}
+        {circleItems.length > 0 && circle.hasNextPage ? (
+          <div className="mt-4 flex justify-center"><button type="button" className={BUTTON_SECONDARY} disabled={circle.isFetchingNextPage} onClick={() => void circle.fetchNextPage()}>Load more</button></div>
+        ) : null}
       </section>
     </div>
   </Page>;
