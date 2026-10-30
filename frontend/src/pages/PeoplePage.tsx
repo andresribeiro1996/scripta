@@ -27,7 +27,7 @@ function retryButton(refetch: () => void) {
 
 export function PeoplePage() {
   return (
-    <Page title="Community" tabs={area("community").tabs}>
+    <Page width="wide" title="Community" tabs={area("community").tabs}>
       <PeoplePane />
     </Page>
   );

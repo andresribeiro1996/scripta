@@ -32,14 +32,14 @@ export function Page({ title, subtitle, back, actions, tabs, width = "default", 
             {title != null ? (
               <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
                 <div className="min-w-0">
-                  <h1 className="font-display min-w-0 break-words text-3xl font-bold lg:text-[2.5rem] lg:leading-[3rem]">{title}</h1>
+                  <h1 className="font-display break-words text-3xl font-bold lg:text-[2.5rem] lg:leading-[3rem]">{title}</h1>
                   {subtitle ? <div className="mt-1.5 text-sm text-(--color-text-dim)">{subtitle}</div> : null}
                 </div>
                 {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
               </div>
             ) : null}
             {tabList ? (
-              <nav aria-label="Sections" className="mt-6 flex gap-7 overflow-x-auto border-b border-(--color-border) pb-px">
+              <nav aria-label="Sections" className="mt-6 flex gap-7 overflow-x-auto shadow-[inset_0_-1px_0_var(--color-border)]">
                 {tabList.map((tab) => {
                   const active = tab.to === activeTo;
                   return (
@@ -47,7 +47,7 @@ export function Page({ title, subtitle, back, actions, tabs, width = "default", 
                       key={tab.to}
                       to={tab.to}
                       aria-current={active ? "page" : undefined}
-                      className={`-mb-px inline-flex min-h-11 shrink-0 items-center whitespace-nowrap border-b-2 text-sm font-semibold focus-visible:-outline-offset-2! ${active ? "border-(--color-accent) text-(--color-text)" : "border-transparent text-(--color-text-dim) hover:text-(--color-text)"}`}
+                      className={`inline-flex min-h-11 shrink-0 items-center whitespace-nowrap border-b-2 text-sm font-semibold focus-visible:-outline-offset-2! ${active ? "border-(--color-accent) text-(--color-text)" : "border-transparent text-(--color-text-dim) hover:text-(--color-text)"}`}
                     >{tab.label}</Link>
                   );
                 })}

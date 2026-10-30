@@ -15,6 +15,7 @@ test("no band: one display h1 at 30px, 40px from lg, wrapping", () => {
   const html = render(createElement(Page, { title: "A".repeat(120), children: "x" }));
   assert.equal(html.match(/<h1/g)?.length, 1);
   assert.match(html, /<h1 class="[^"]*font-display[^"]*break-words[^"]*text-3xl[^"]*font-bold[^"]*lg:text-\[2\.5rem\][^"]*lg:leading-\[3rem\]/);
+  assert.match(html, /<div class="min-w-0"><h1 class="/);
   assert.doesNotMatch(html.slice(0, html.indexOf("</header>")), /bg-\(--color-surface\)/);
 });
 
@@ -22,14 +23,17 @@ test("back link above the title, actions on the title row, subtitle under the ti
   const html = render(createElement(Page, { title: "Library", back: backTo("tournament"), subtitle: "84 books", actions: createElement("button", null, "Add a book"), tabs: area("library").tabs, children: "BODY" }), "/dashboard/library");
   const header = html.slice(0, html.indexOf("</header>"));
   assert.match(header, /<a(?=[^>]*href="\/dashboard\/arena")(?=[^>]*min-h-11)[^>]*>[\s\S]*?Games<\/a>[\s\S]*<h1[\s\S]*84 books[\s\S]*Add a book[\s\S]*aria-label="Sections"/);
+  assert.match(header, /<div class="flex flex-wrap items-end justify-between[^"]*"><div class="min-w-0"><h1 class="[^"]*">Library<\/h1><div class="mt-1\.5[^"]*">84 books<\/div><\/div><div class="flex flex-wrap items-center gap-2"><button>Add a book<\/button><\/div><\/div>/);
   assert.match(html, /<\/header>[\s\S]*BODY/);
 });
 
 test("tabs: 44px, one current, underline on the hairline", () => {
   const html = render(createElement(Page, { title: "Games", tabs: area("games").tabs, children: "x" }));
-  assert.equal(html.match(/<a(?=[^>]*min-h-11)(?=[^>]*border-b-2)(?=[^>]*-mb-px)[^>]*>/g)?.length, 3);
+  assert.equal(html.match(/<a(?=[^>]*min-h-11)(?=[^>]*border-b-2)[^>]*>/g)?.length, 3);
   assert.equal(html.match(/<a(?=[^>]*border-b-2)(?=[^>]*focus-visible:-outline-offset-2!)[^>]*>/g)?.length, 3);
-  assert.match(html, /<nav(?=[^>]*aria-label="Sections")(?=[^>]*overflow-x-auto)(?=[^>]*pb-px)[^>]*>/);
+  assert.match(html, /<nav(?=[^>]*aria-label="Sections")(?=[^>]*overflow-x-auto)(?=[^>]*shadow-\[inset_0_-1px_0_var\(--color-border\)\])[^>]*>/);
+  assert.doesNotMatch(html, /-mb-px/);
+  assert.doesNotMatch(html, /<nav[^>]*(?:border-b|pb-px)/);
   assert.match(html, /<\/header><div class="pt-6">/);
   assert.match(html, /<a(?=[^>]*aria-current="page")[^>]*>Quizzes<\/a>/);
   assert.equal(html.match(/aria-current="page"/g)?.length, 1);
@@ -73,12 +77,18 @@ test("button classes meet the 44px floor", () => {
 test("every Page in these files declares the width, loading states included", () => {
   const read = (f: string) => readFileSync(new URL(`../src/pages/${f}.tsx`, import.meta.url), "utf8");
   const every = (f: string, width: string) => {
-    const pages = read(f).match(/<Page\b(?:[^>]|=>)*>/g) ?? [];
+    const pages = read(f).match(/<Page\b(?:=>|[^>])*>/g) ?? [];
     assert.ok(pages.length > 0, f);
     for (const tag of pages) assert.match(tag, new RegExp(`width="${width}"`), `${f}: ${tag.slice(0, 80)}`);
   };
-  for (const f of ["LibraryPage", "GroupsPage", "GalleryPage", "SharedLibraryPage", "DiscoverPage", "ArenaListPage", "MuralsListPage", "AdminGenresPage", "AdminSynopsesPage", "AdminTranslationsPage", "AdminDailyChapterPage"]) every(f, "wide");
+  for (const f of ["LibraryPage", "GroupsPage", "GalleryPage", "SharedLibraryPage", "DiscoverPage", "PeoplePage", "ArenaListPage", "MuralsListPage", "AdminGenresPage", "AdminSynopsesPage", "AdminTranslationsPage", "AdminDailyChapterPage"]) every(f, "wide");
   for (const f of ["TierListCreatePage", "QuizCreatePage", "QuizEditorPage", "PlayQuizPage", "DailyChapterPage", "CharacterGamePage"]) every(f, "narrow");
+});
+
+test("the Library tabs share the owner's width, so switching tabs never moves the title", () => {
+  for (const f of ["LibraryPage", "GroupsPage", "GalleryPage"]) {
+    assert.match(readFileSync(new URL(`../src/pages/${f}.tsx`, import.meta.url), "utf8"), /maxWidth=\{style\.contentMaxWidth\}/, f);
+  }
 });
 
 test("Library area pages use Page with the Library tabs", () => {

@@ -11,6 +11,7 @@ import { useDeleteGalleryImage } from "../hooks/useDeleteGalleryImage";
 import { useGalleryImages } from "../hooks/useGalleryImages";
 import { useLibrary } from "../hooks/useLibrary";
 import { area } from "../lib/areas";
+import { resolveLibraryStyle } from "../lib/libraryStyle";
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -30,6 +31,7 @@ export function GalleryPage() {
   const showSkeleton = useDelayedShow(isLoading);
   const deleteImage = useDeleteGalleryImage();
   const { data: library } = useLibrary();
+  const style = resolveLibraryStyle(library?.data.style);
   const confirm = useConfirm();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -97,6 +99,7 @@ export function GalleryPage() {
       title="Library"
       subtitle={isLoading ? undefined : `${images.length} image${images.length === 1 ? "" : "s"}`}
       tabs={area("library").tabs}
+      maxWidth={style.contentMaxWidth}
       actions={
         <>
           <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className={BUTTON_PRIMARY}>
