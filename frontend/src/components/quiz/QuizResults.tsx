@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { playerLabel, scoreRows, type PlayResponse, type PublicQuizQuestion, type ScoreRow } from "@scripta/shared";
+import { playerLabel, resultCovers, scoreRows, type PlayResponse, type PublicQuizQuestion, type ScoreRow } from "@scripta/shared";
 import { fetchPublicResultsApi } from "../../api/quizzes";
 import { CoverImage } from "../BookCard";
 import { LibraryIcon } from "../NavIcons";
@@ -65,12 +65,7 @@ export function QuizResults({ code, name, result, questions, alreadyPlayed, back
   const [tab, setTab] = useState<"answers" | "board">("answers");
   const [expanded, setExpanded] = useState<string | null>(null);
   const rows = scoreRows(questions, result.correct, result.answers);
-  const covers = [...new Map(rows.flatMap((row, index) => {
-    const question = questions[index]!;
-    if (row.answer?.kind === "cover") return [[row.answer.value, row.answer.title ?? ""] as const];
-    if (question.type === "cover_title") return [[question.prompt, row.answer?.value ?? ""] as const];
-    return [];
-  })).entries()].slice(0, 3);
+  const covers = resultCovers(questions, rows);
 
   return (
     <Page back={back} title={null}>
@@ -91,7 +86,7 @@ export function QuizResults({ code, name, result, questions, alreadyPlayed, back
         </div>
         {covers.length > 0 && (
           <div aria-hidden="true" className="flex justify-end py-3 lg:justify-center lg:py-6">
-            {covers.map(([url, title], index) => (
+            {covers.map(({ url, title }, index) => (
               <div key={url} className="relative -mx-1.5 h-20 w-14 overflow-hidden rounded bg-(--color-border) shadow-md lg:-mx-2 lg:h-48 lg:w-32" style={{ transform: `rotate(${(index - (covers.length - 1) / 2) * 10}deg) translateY(${index === 1 ? -8 : 0}px)`, zIndex: index === 1 ? 1 : 0 }}>
                 <CoverImage book={{ _coverUrl: url }} fit="contain" alt={title} />
               </div>

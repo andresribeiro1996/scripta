@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { playerLabel, quizClueHeading, quizOptionLabel, quizQuestionLabel, scoreRows } from "./labels.js";
+import { playerLabel, quizClueHeading, quizOptionLabel, quizQuestionLabel, resultCovers, scoreRows } from "./labels.js";
 import type { PublicQuizQuestion, QuizBook, QuizQuestion } from "./types.js";
 
 const books: QuizBook[] = [{ workId: "w1", title: "Dune", author: "Frank Herbert", coverUrl: "/c/dune.jpg", quote: null, blurb: null }];
@@ -39,4 +39,27 @@ test("the discover clue heading follows the question type", () => {
   assert.equal(quizClueHeading("characters_title"), "Which book has these characters?");
   assert.equal(quizClueHeading("title_cover"), "Which cover belongs to this title?");
   assert.equal(quizClueHeading("quote_title"), "Which book is this from?");
+});
+
+test("result covers are the first three distinct covers in question order", () => {
+  const cover = (id: string, prompt: string, options: string[]): PublicQuizQuestion => ({ id, type: "title_cover", prompt, options });
+  const questions: PublicQuizQuestion[] = [
+    cover("q0", "Dune", ["/c/a.jpg", "/c/b.jpg"]),
+    { id: "q1", type: "cover_title", prompt: "/c/x.jpg", options: ["Emma", "Ulysses"] },
+    cover("q2", "Dune again", ["/c/c.jpg", "/c/b.jpg"]),
+    cover("q3", "Emma", ["/c/d.jpg", "/c/e.jpg"]),
+    cover("q4", "Ulysses", ["/c/f.jpg", "/c/g.jpg"])
+  ];
+  const answers = Object.fromEntries(questions.map((q) => [q.id, { choiceIndex: 0, answerIndex: 1 }]));
+  const rows = scoreRows(questions, {}, answers);
+  assert.deepEqual(resultCovers(questions, rows), [
+    { url: "/c/b.jpg", title: "Dune again" },
+    { url: "/c/x.jpg", title: "Ulysses" },
+    { url: "/c/e.jpg", title: "Emma" }
+  ]);
+});
+
+test("a quiz without covers has no result covers", () => {
+  const questions: PublicQuizQuestion[] = [{ id: "q0", type: "quote_title", prompt: "Call me Ishmael", options: ["Moby-Dick", "Emma"] }];
+  assert.deepEqual(resultCovers(questions, scoreRows(questions, {}, { q0: { choiceIndex: 0, answerIndex: 0 } })), []);
 });
