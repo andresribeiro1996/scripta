@@ -54,7 +54,7 @@ test("account menu: shelf, settings, admin only for admins, log out last and dan
 
 test("the account trigger is named, and a long username truncates in the menu heading", () => {
   const menu = readFileSync(new URL("../src/components/OptionsMenu.tsx", import.meta.url), "utf8");
-  assert.match(menu, /heading\b[\s\S]*?truncate/);
+  assert.match(menu, /className="w-0 min-w-full truncate[^"]*">\{heading\}/);
   assert.match(readFileSync(new URL("../src/components/page/AccountMenu.tsx", import.meta.url), "utf8"), /title="Account menu"/);
 });
 
