@@ -48,8 +48,8 @@ test("danger buttons meet the floor and pair danger with on-danger", () => {
   assert.match(BUTTON_DANGER_OUTLINE, /border-\(--color-danger\)[^"]*text-\(--color-danger\)|text-\(--color-danger\)[^"]*border-\(--color-danger\)/);
 });
 
-test("one field class: 44px, 16px text, accent focus, danger when invalid", () => {
-  for (const cls of [/min-h-11/, /text-base/, /rounded-lg/, /border-\(--color-border\)/, /bg-\(--color-surface\)/, /focus:border-\(--color-accent\)/, /aria-invalid:border-\(--color-danger\)/]) assert.match(FIELD_CLASS, cls);
+test("one field class: 44px, 16px text, textarea padding, accent focus, danger when invalid", () => {
+  for (const cls of [/min-h-11/, /text-base/, /(?:^|\s)py-2(?:\s|$)/, /rounded-lg/, /border-\(--color-border\)/, /bg-\(--color-surface\)/, /focus:border-\(--color-accent\)/, /aria-invalid:border-\(--color-danger\)/]) assert.match(FIELD_CLASS, cls);
 });
 
 test("filter chips: 44px pills, inverted ink when selected", () => {
@@ -68,6 +68,11 @@ test("lists are one panel with divided rows, headings have two styles", () => {
   assert.doesNotMatch(CARD, /rounded-xl/);
 });
 
+test("a linked row's focus ring sits inside the clipped list panel", () => {
+  assert.match(LIST_PANEL, /overflow-hidden/);
+  assert.match(LIST_ROW_LINK, /(?:^|\s)focus-visible:-outline-offset-2!(?:\s|$)/);
+});
+
 test("no hand-rolled danger fills and no toolbar field class", () => {
   for (const f of ["components/ConfirmDialog", "auth/DeleteAccountSection", "pages/LibraryPage", "pages/GroupsPage", "components/OwnShelfView"]) assert.doesNotMatch(src(f), /bg-\(--color-danger\)/, f);
   assert.doesNotMatch(src("components/Toolbar"), /TOOLBAR_CONTROL_CLASS/);
@@ -79,5 +84,6 @@ test("layout variables: sticky offset, scroll padding, cover shadow in both sche
   assert.match(css, /min-width:\s*64rem[\s\S]*?--app-top:\s*4rem/);
   assert.match(css, /scroll-padding-top:\s*var\(--app-top\)/);
   assert.equal(css.match(/--shadow-cover:/g)?.length, 2);
+  assert.match(css, /@variant dark\s*\{\s*--shadow-cover:/);
   assert.match(css, /prefers-reduced-transparency:\s*reduce[\s\S]*?\[data-top-bar\]/);
 });

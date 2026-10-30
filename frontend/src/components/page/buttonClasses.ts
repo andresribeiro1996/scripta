@@ -7,7 +7,7 @@ export const BUTTON_DANGER = `${BOX} bg-(--color-danger) text-(--color-on-danger
 export const BUTTON_DANGER_OUTLINE = `${BOX} border border-(--color-danger) bg-transparent text-(--color-danger) hover:bg-(--color-danger-soft)`;
 
 export const FIELD_CLASS =
-  "min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-base text-(--color-text) placeholder:text-(--color-text-dim) focus:border-(--color-accent) aria-invalid:border-(--color-danger) disabled:opacity-55";
+  "min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-base text-(--color-text) placeholder:text-(--color-text-dim) focus:border-(--color-accent) aria-invalid:border-(--color-danger) disabled:opacity-55";
 
 export function chipClass(selected: boolean): string {
   const state = selected
