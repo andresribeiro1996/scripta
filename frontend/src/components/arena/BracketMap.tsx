@@ -68,10 +68,7 @@ function MatchSide({ side, duel, character, isWinner, decided }: { side: DuelSid
 
   return (
     <div className="flex min-w-0 flex-1 flex-col items-center gap-0.5 px-0.5 py-1 sm:gap-1 sm:py-1.5">
-      {/* Cover only: no title. At a bracket's scale the jacket is the
-          faster identifier, and dropping the text buys the art enough
-          room to actually be recognisable. The title lives in the sheet.
-          The winner carries a check badge as well as the accent ring —
+      {/* The winner carries a check badge as well as the accent ring —
           ring colour and a faded loser encode the result in hue and
           opacity alone, which a colourblind viewer may not see at all.
           The badge is a shape, so it survives that. */}
@@ -82,7 +79,11 @@ function MatchSide({ side, duel, character, isWinner, decided }: { side: DuelSid
       >
         {character ? (
           <div className="absolute inset-0 flex items-center justify-center overflow-hidden rounded-xs bg-(--color-accent-soft) p-0.5 text-center">
-            <span className="line-clamp-4 break-words text-[8px] font-bold leading-tight text-(--color-accent) sm:text-[10px]">{side.title}</span>
+            <span className="flex min-w-0 flex-col text-[8px] font-bold leading-tight text-(--color-accent) sm:text-[10px]">
+              {side.title.split(/\s+/).slice(0, 4).map((word, i) => (
+                <span key={i} className="block truncate">{word}</span>
+              ))}
+            </span>
           </div>
         ) : (
           <div className="absolute inset-0 overflow-hidden rounded-xs">
@@ -135,9 +136,6 @@ function MatchTile({ duel, character, onOpen }: { duel: BracketSlot; character: 
     // both books either way, so which half you touched never mattered.
     <button
       onClick={onOpen}
-      // The bracket contains no text at all, so the accessible name has
-      // to carry the whole match — two covers and two percentages are
-      // nothing to a screen reader otherwise.
       aria-label={
         `${duel.bookA.title} versus ${duel.bookB.title}` +
         (pctA === null ? ", no votes yet" : `, ${pctA}% to ${pctB}%`) +
@@ -173,9 +171,16 @@ function SheetSide({ side, duel, character }: { side: DuelSide; duel: Duel; char
   return (
     <div className="flex min-w-0 flex-1 flex-col items-center text-center">
       {character ? (
+        <>
         <div className={`flex aspect-2/3 w-16 items-center justify-center overflow-hidden rounded-lg bg-(--color-accent-soft) p-1 text-center ${won ? "ring-2 ring-(--color-accent)" : ""}`}>
-          <span className="line-clamp-4 break-words text-xs font-bold text-(--color-accent)">{side.title}</span>
+          <span className="flex min-w-0 flex-col text-xs font-bold text-(--color-accent)">
+            {side.title.split(/\s+/).slice(0, 4).map((word, i) => (
+              <span key={i} className="block truncate">{word}</span>
+            ))}
+          </span>
         </div>
+        <p className="mt-1.5 text-xs font-semibold">{side.title}</p>
+        </>
       ) : (
         <>
           <div className={`relative aspect-2/3 w-16 overflow-hidden rounded-lg bg-(--color-border) ${won ? "ring-2 ring-(--color-accent)" : ""}`}>

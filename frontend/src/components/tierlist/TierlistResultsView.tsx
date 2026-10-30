@@ -6,7 +6,7 @@
 // number of ballots — so every mode is recomputed on each render with no
 // memoization and, crucially, no network request between switches.
 
-import { booksByWork, isCharacterBook } from "@scripta/shared";
+import { booksByWork, isCharacterBook, itemNoun } from "@scripta/shared";
 import { Link } from "react-router-dom";
 import { aggregate, AGGREGATION_MODES, type AggregationMode, type BookResult, type HistogramCell } from "../../lib/tierlistResults";
 import { MiniBookTile } from "../murals/blocks/BookBlocks";
@@ -46,7 +46,7 @@ export function TierlistResultsView({ histogram, tierIds, tiers, pool, books, ba
   const [mode, setMode] = useState<AggregationMode>("average");
   const results = aggregate(histogram, tierIds, pool, mode);
   const byWork = booksByWork(books);
-  const noun = books.some(isCharacterBook) ? "character" : "book";
+  const noun = itemNoun(books.some(isCharacterBook), 1);
 
   const byTier = new Map<string, BookResult[]>(tierIds.map((id) => [id, []]));
   const unranked: BookResult[] = [];

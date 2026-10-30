@@ -147,7 +147,7 @@ function TierEditorRow({
       <DropZone id={tier.id}>
         <TierRowShell tier={tier} colorControl={structureEditable ? <TierColorPicker color={tier.color} onChange={onRecolor} /> : undefined}>
           {resolvedKeys.length === 0 ? (
-            <TierRowEmpty message={`Drag a ${books.some(isCharacterBook) ? "character" : "book"} here from the pool.`} />
+            <TierRowEmpty message={`Drag a ${itemNoun(books.some(isCharacterBook), 1)} here from the pool.`} />
           ) : (
             <TierRowTiles>
               {resolvedKeys.map((key) => {
@@ -407,7 +407,7 @@ export function TierBoard({ data, books, onChange, structureEditable, poolLabel,
             <div className="flex min-h-[7em] items-start gap-1.5 overflow-x-auto overscroll-contain px-3 pb-3">
               {resolvedPool.length === 0 ? (
                 <p className="py-4 text-xs text-(--color-text-dim)">
-                  Pool is empty — every {character ? "character" : "book"} is ranked. Drag one back here to unrank it.
+                  Pool is empty — every {itemNoun(character, 1)} is ranked. Drag one back here to unrank it.
                 </p>
               ) : (
                 resolvedPool.map((key) => (
