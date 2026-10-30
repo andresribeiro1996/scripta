@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Home, desktop</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&amp;display=swap">
+<style>
+body{margin:0}
+.t-light{--bg:#f2f0ec;--surface:#ffffff;--surface-hover:#f7f5f1;--text:#201e1c;--text-dim:#6b6560;--border:#ddd8d0;--accent:#97532d;--accent-soft:#f1e2d8;--on-accent:#ffffff;--info:#285f7a;--info-soft:#dcebf2;--success:#47713c;--success-soft:#e4efdf;--reference:#6b4f8f;--reference-soft:#ebe4f3;--topbar:rgba(242,240,236,.88);--book-shadow:0 1px 2px rgba(32,30,28,.2),0 10px 20px -10px rgba(32,30,28,.5)}
+.t-dark{--bg:#141210;--surface:#2a2724;--surface-hover:#333029;--text:#ece8e3;--text-dim:#a8a199;--border:#45403a;--accent:#e08a52;--accent-soft:#3a2c22;--on-accent:#141210;--info:#7fb8d4;--info-soft:#1f2d33;--success:#8fbf7f;--success-soft:#262f21;--reference:#b9a3d6;--reference-soft:#2c2536;--topbar:rgba(20,18,16,.88);--book-shadow:0 1px 2px rgba(0,0,0,.6),0 12px 24px -10px rgba(0,0,0,.9)}
+a{color:inherit;text-decoration:none}
+a:hover{color:inherit}
+.bottombar{display:none}
+@media (max-width: 1023px){.topbar{display:none !important}.bottombar{display:flex}main{padding-bottom:104px !important}}
+.navlink:hover{background:var(--surface-hover)}
+.row:hover{background:var(--surface-hover)}
+.ticket:hover{border-color:var(--text-dim)}
+.icon-btn:hover{background:var(--surface-hover);color:var(--text)}
+.btn2:hover{background:var(--surface-hover)}
+</style>
+</helmet>
+<div class="{{themeClass}}" style="min-height: 100vh; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; line-height: 20px">
+
+<header class="topbar" style="position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 28px; min-height: 64px; padding: 0 32px; flex-wrap: nowrap; background: var(--topbar); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border)">
+  <a href="#" style="display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 18px; font-weight: 700">
+    <svg width="28" height="28" viewBox="0 0 76 76" aria-hidden="true"><g fill="currentColor"><rect x="3.75" y="3" width="11" height="66" transform="rotate(18 14.75 69)"></rect><rect x="55.54" y="3" width="17" height="66" transform="rotate(-18 55.54 69)"></rect><rect x="18" y="41" width="36" height="5"></rect><rect x="0" y="69" width="76" height="5"></rect></g></svg>
+    Atmyshelf
+  </a>
+  <nav aria-label="Main" style="display: flex; align-items: center; gap: 2px; flex: 1; min-width: 0; flex-wrap: nowrap; white-space: nowrap">
+    <a href="#" aria-current="page" style="display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-weight: 600">Home <span style="min-width: 20px; height: 20px; padding: 0 6px; box-sizing: border-box; border-radius: 999px; background: var(--accent); color: var(--on-accent); font-size: 12px; line-height: 20px; text-align: center">2</span></a>
+    <a class="navlink" href="Library.dc.html" style="display: flex; align-items: center; min-height: 44px; padding: 0 14px; border-radius: 999px; color: var(--text-dim); font-weight: 600">Library</a>
+    <a class="navlink" href="#" style="display: flex; align-items: center; min-height: 44px; padding: 0 14px; border-radius: 999px; color: var(--text-dim); font-weight: 600">Murals</a>
+    <a class="navlink" href="#" style="display: flex; align-items: center; min-height: 44px; padding: 0 14px; border-radius: 999px; color: var(--text-dim); font-weight: 600">Games</a>
+    <a class="navlink" href="#" style="display: flex; align-items: center; min-height: 44px; padding: 0 14px; border-radius: 999px; color: var(--text-dim); font-weight: 600">Reader card</a>
+    <a class="navlink" href="#" style="display: flex; align-items: center; min-height: 44px; padding: 0 14px; border-radius: 999px; color: var(--text-dim); font-weight: 600">Community</a>
+  </nav>
+  <a href="Settings.dc.html" aria-label="Account menu" style="display: flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 6px 0 4px; border-radius: 999px; color: var(--text-dim)">
+    <span style="width: 34px; height: 34px; border-radius: 999px; background: var(--accent); color: var(--on-accent); font-weight: 700; font-size: 14px; line-height: 34px; text-align: center">S</span>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+  </a>
+</header>
+
+<main style="max-width: 1200px; margin: 0 auto; padding: 40px 32px 72px; box-sizing: border-box">
+  <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 28px">
+    <h1 style="margin: 0; font-family: 'Playfair Display', Georgia, serif; font-size: 40px; line-height: 48px; font-weight: 700">Home</h1>
+    <a class="icon-btn" href="#" aria-label="Saved" title="Saved" style="width: 44px; height: 44px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--text-dim); display: flex; align-items: center; justify-content: center">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4.5h10a1 1 0 0 1 1 1v14l-6-3.8-6 3.8v-14a1 1 0 0 1 1-1z"></path></svg>
+    </a>
+  </div>
+
+  <div style="display: flex; gap: 40px; flex-wrap: wrap; align-items: flex-start">
+    <div style="flex: 999 1 600px; min-width: 0; display: flex; flex-direction: column; gap: 40px">
+
+      <a href="Book.dc.html" style="display: flex; gap: 16px; align-items: center; padding: 14px 18px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px">
+        <span style="flex: 0 0 40px; height: 60px; border-radius: 2px 4px 4px 2px; background: #2b3f5c; box-shadow: var(--book-shadow)"></span>
+        <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+          <span style="font-weight: 700">Booker Prize 2024 · winner</span>
+          <span style="color: var(--text-dim)">Orbital, Samantha Harvey</span>
+          <span style="color: var(--accent); font-weight: 600">On your to-read shelf</span>
+        </span>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: var(--text-dim)"><path d="m9 6 6 6-6 6"></path></svg>
+      </a>
+
+      <section aria-labelledby="h-games">
+        <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px">
+          <h2 id="h-games" style="margin: 0; font-family: 'Playfair Display', Georgia, serif; font-size: 24px; line-height: 32px; font-weight: 700">Games</h2>
+          <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; color: var(--accent); font-weight: 600">Browse all →</a>
+        </div>
+        <p style="margin: 0 0 12px; font-weight: 600; color: var(--text-dim)">From people you follow</p>
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px">
+          <sc-for list="{{followedGames}}" as="g" hint-placeholder-count="2">
+            <a class="ticket" href="#" style="display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden">
+              <span style="display: flex; min-height: 150px">
+                <span style="flex: 0 0 104px; position: relative; display: flex; align-items: center; justify-content: center; background: {{g.artBg}}; color: {{g.tone}}">
+                  <sc-if value="{{g.isTournament}}" hint-placeholder-val="{{false}}">
+                    <span aria-hidden="true" style="position: relative; width: 84px; height: 96px">
+                      <span style="position: absolute; left: 6px; top: 4px; width: 36px; height: 54px; border-radius: 2px 4px 4px 2px; background: {{g.coverA}}; transform: rotate(-7deg); box-shadow: var(--book-shadow)"></span>
+                      <span style="position: absolute; right: 6px; bottom: 4px; width: 36px; height: 54px; border-radius: 2px 4px 4px 2px; background: {{g.coverB}}; transform: rotate(7deg); box-shadow: var(--book-shadow)"></span>
+                      <span style="position: absolute; left: 0; right: 0; top: 38px; text-align: center; font-weight: 800; font-size: 13px; letter-spacing: .04em">VS</span>
+                    </span>
+                  </sc-if>
+                  <sc-if value="{{g.isQuiz}}" hint-placeholder-val="{{false}}">
+                    <span aria-hidden="true" style="display: flex; flex-direction: column; align-items: center; gap: 8px">
+                      <span style="font-family: 'Playfair Display', Georgia, serif; font-size: 40px; line-height: 32px; font-weight: 700">“”</span>
+                      <span style="display: flex; gap: 3px; font-size: 9px; line-height: 12px; font-weight: 700"><span style="padding: 1px 4px; border: 1px solid currentColor; border-radius: 3px">A</span><span style="padding: 1px 4px; border: 1px solid currentColor; border-radius: 3px">B</span><span style="padding: 1px 4px; border: 1px solid currentColor; border-radius: 3px">C</span></span>
+                    </span>
+                  </sc-if>
+                  <sc-if value="{{g.isTier}}" hint-placeholder-val="{{false}}">
+                    <span aria-hidden="true" style="display: flex; flex-direction: column; gap: 4px; width: 70px">
+                      <span style="height: 9px; width: 70px; border-radius: 3px; background: #c9482f"></span>
+                      <span style="height: 9px; width: 63px; border-radius: 3px; background: #d98a3d"></span>
+                      <span style="height: 9px; width: 56px; border-radius: 3px; background: #c9a53d"></span>
+                      <span style="height: 9px; width: 49px; border-radius: 3px; background: #5c9e5c"></span>
+                      <span style="height: 9px; width: 42px; border-radius: 3px; background: #4a7fc9"></span>
+                    </span>
+                  </sc-if>
+                </span>
+                <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; padding: 16px 18px">
+                  <span style="font-family: 'Playfair Display', Georgia, serif; font-size: 19px; line-height: 24px; font-weight: 700">{{g.title}}</span>
+                  <span style="display: flex; align-items: center; gap: 8px">
+                    <span style="width: 24px; height: 24px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 11px; font-weight: 700; line-height: 24px; text-align: center">{{g.initial}}</span>
+                    {{g.by}}
+                  </span>
+                  <span style="align-self: flex-start; padding: 1px 10px; border-radius: 999px; border: 1px solid {{g.chipFg}}; background: {{g.chipBg}}; color: {{g.chipFg}}; font-size: 12px; line-height: 18px; font-weight: 600">{{g.status}}</span>
+                  <span style="display: flex; gap: 20px; padding-top: 8px; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 12px; line-height: 16px">
+                    <span><span style="display: block; font-size: 18px; line-height: 24px; font-weight: 700; color: var(--text)">{{g.n1}}</span>{{g.l1}}</span>
+                    <span><span style="display: block; font-size: 18px; line-height: 24px; font-weight: 700; color: var(--text)">{{g.n2}}</span>{{g.l2}}</span>
+                  </span>
+                </span>
+              </span>
+              <span style="position: relative; display: block; padding: 12px 16px 14px; border-top: 1.5px dashed var(--border)">
+                <span aria-hidden="true" style="position: absolute; left: -8px; top: -8px; width: 14px; height: 14px; border-radius: 999px; background: var(--bg); border: 1px solid var(--border)"></span>
+                <span aria-hidden="true" style="position: absolute; right: -8px; top: -8px; width: 14px; height: 14px; border-radius: 999px; background: var(--bg); border: 1px solid var(--border)"></span>
+                <span style="display: flex; align-items: center; justify-content: space-between; min-height: 44px; padding: 0 14px; border-radius: 10px; background: {{g.artBg}}; color: {{g.tone}}; font-weight: 600">{{g.cta}} <span aria-hidden="true">›</span></span>
+              </span>
+            </a>
+          </sc-for>
+        </div>
+        <p style="margin: 22px 0 12px; font-weight: 600; color: var(--text-dim)">Popular this month</p>
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px">
+          <sc-for list="{{popularGames}}" as="g" hint-placeholder-count="2">
+            <a class="ticket" href="#" style="display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden">
+              <span style="display: flex; min-height: 150px">
+                <span style="flex: 0 0 104px; position: relative; display: flex; align-items: center; justify-content: center; background: {{g.artBg}}; color: {{g.tone}}">
+                  <sc-if value="{{g.isTournament}}" hint-placeholder-val="{{false}}">
+                    <span aria-hidden="true" style="position: relative; width: 84px; height: 96px">
+                      <span style="position: absolute; left: 6px; top: 4px; width: 36px; height: 54px; border-radius: 2px 4px 4px 2px; background: {{g.coverA}}; transform: rotate(-7deg); box-shadow: var(--book-shadow)"></span>
+                      <span style="position: absolute; right: 6px; bottom: 4px; width: 36px; height: 54px; border-radius: 2px 4px 4px 2px; background: {{g.coverB}}; transform: rotate(7deg); box-shadow: var(--book-shadow)"></span>
+                      <span style="position: absolute; left: 0; right: 0; top: 38px; text-align: center; font-weight: 800; font-size: 13px; letter-spacing: .04em">VS</span>
+                    </span>
+                  </sc-if>
+                  <sc-if value="{{g.isQuiz}}" hint-placeholder-val="{{false}}">
+                    <span aria-hidden="true" style="display: flex; flex-direction: column; align-items: center; gap: 8px">
+                      <span style="font-family: 'Playfair Display', Georgia, serif; font-size: 40px; line-height: 32px; font-weight: 700">“”</span>
+                      <span style="display: flex; gap: 3px; font-size: 9px; line-height: 12px; font-weight: 700"><span style="padding: 1px 4px; border: 1px solid currentColor; border-radius: 3px">A</span><span style="padding: 1px 4px; border: 1px solid currentColor; border-radius: 3px">B</span><span style="padding: 1px 4px; border: 1px solid currentColor; border-radius: 3px">C</span></span>
+                    </span>
+                  </sc-if>
+                  <sc-if value="{{g.isTier}}" hint-placeholder-val="{{false}}">
+                    <span aria-hidden="true" style="display: flex; flex-direction: column; gap: 4px; width: 70px">
+                      <span style="height: 9px; width: 70px; border-radius: 3px; background: #c9482f"></span>
+                      <span style="height: 9px; width: 63px; border-radius: 3px; background: #d98a3d"></span>
+                      <span style="height: 9px; width: 56px; border-radius: 3px; background: #c9a53d"></span>
+                      <span style="height: 9px; width: 49px; border-radius: 3px; background: #5c9e5c"></span>
+                      <span style="height: 9px; width: 42px; border-radius: 3px; background: #4a7fc9"></span>
+                    </span>
+                  </sc-if>
+                </span>
+                <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; padding: 16px 18px">
+                  <span style="font-family: 'Playfair Display', Georgia, serif; font-size: 19px; line-height: 24px; font-weight: 700">{{g.title}}</span>
+                  <span style="display: flex; align-items: center; gap: 8px">
+                    <span style="width: 24px; height: 24px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 11px; font-weight: 700; line-height: 24px; text-align: center">{{g.initial}}</span>
+                    {{g.by}}
+                  </span>
+                  <span style="align-self: flex-start; padding: 1px 10px; border-radius: 999px; border: 1px solid {{g.chipFg}}; background: {{g.chipBg}}; color: {{g.chipFg}}; font-size: 12px; line-height: 18px; font-weight: 600">{{g.status}}</span>
+                  <span style="display: flex; gap: 20px; padding-top: 8px; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 12px; line-height: 16px">
+                    <span><span style="display: block; font-size: 18px; line-height: 24px; font-weight: 700; color: var(--text)">{{g.n1}}</span>{{g.l1}}</span>
+                    <span><span style="display: block; font-size: 18px; line-height: 24px; font-weight: 700; color: var(--text)">{{g.n2}}</span>{{g.l2}}</span>
+                  </span>
+                </span>
+              </span>
+              <span style="position: relative; display: block; padding: 12px 16px 14px; border-top: 1.5px dashed var(--border)">
+                <span aria-hidden="true" style="position: absolute; left: -8px; top: -8px; width: 14px; height: 14px; border-radius: 999px; background: var(--bg); border: 1px solid var(--border)"></span>
+                <span aria-hidden="true" style="position: absolute; right: -8px; top: -8px; width: 14px; height: 14px; border-radius: 999px; background: var(--bg); border: 1px solid var(--border)"></span>
+                <span style="display: flex; align-items: center; justify-content: space-between; min-height: 44px; padding: 0 14px; border-radius: 10px; background: {{g.artBg}}; color: {{g.tone}}; font-weight: 600">{{g.cta}} <span aria-hidden="true">›</span></span>
+              </span>
+            </a>
+          </sc-for>
+        </div>
+      </section>
+
+      <section aria-labelledby="h-circle">
+        <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px">
+          <h2 id="h-circle" style="margin: 0; font-family: 'Playfair Display', Georgia, serif; font-size: 24px; line-height: 32px; font-weight: 700">Your reading circle</h2>
+          <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; color: var(--accent); font-weight: 600">Find people →</a>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 16px">
+          <sc-for list="{{feed}}" as="f" hint-placeholder-count="5">
+            <article style="background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 16px 18px 8px">
+              <div style="display: flex; align-items: center; gap: 12px">
+                <span style="flex: 0 0 36px; height: 36px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-weight: 700; line-height: 36px; text-align: center">{{f.initial}}</span>
+                <span style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+                  <a href="#" style="font-weight: 700">{{f.who}}</a>
+                  <span style="color: var(--text-dim)">{{f.label}}</span>
+                </span>
+                <span style="color: var(--text-dim)">{{f.when}}</span>
+                <button class="icon-btn" type="button" aria-label="Save" style="width: 44px; height: 44px; border: 0; border-radius: 999px; background: transparent; color: var(--text-dim); cursor: pointer; display: flex; align-items: center; justify-content: center">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4.5h10a1 1 0 0 1 1 1v14l-6-3.8-6 3.8v-14a1 1 0 0 1 1-1z"></path></svg>
+                </button>
+              </div>
+
+              <sc-if value="{{f.isBook}}" hint-placeholder-val="{{true}}">
+                <div style="display: flex; gap: 18px; align-items: center; margin-top: 14px">
+                  <span style="flex: 0 0 72px; height: 108px; border-radius: 2px 5px 5px 2px; background: {{f.coverA}}; box-shadow: var(--book-shadow)"></span>
+                  <span style="display: flex; flex-direction: column; gap: 4px; align-items: flex-start">
+                    <a href="Book.dc.html" style="font-family: 'Playfair Display', Georgia, serif; font-size: 22px; line-height: 28px; font-weight: 700">{{f.title}}</a>
+                    <span style="color: var(--text-dim)">{{f.author}}</span>
+                    <sc-if value="{{f.wantToRead}}" hint-placeholder-val="{{true}}">
+                      <button class="btn2" type="button" style="margin-top: 8px; min-height: 44px; padding: 0 18px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 14px; font-weight: 600; cursor: pointer">Want to read</button>
+                    </sc-if>
+                    <sc-if value="{{f.onShelf}}" hint-placeholder-val="{{false}}">
+                      <a href="Book.dc.html" style="margin-top: 8px; display: inline-flex; align-items: center; min-height: 44px; color: var(--accent); font-weight: 600">Open in your shelf →</a>
+                    </sc-if>
+                  </span>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{f.isTournament}}" hint-placeholder-val="{{false}}">
+                <div style="display: flex; gap: 18px; align-items: center; margin-top: 14px">
+                  <span aria-hidden="true" style="flex: 0 0 120px; height: 108px; position: relative; border-radius: 12px; background: var(--accent-soft); color: var(--accent)">
+                    <span style="position: absolute; left: 14px; top: 14px; width: 40px; height: 60px; border-radius: 2px 4px 4px 2px; background: {{f.coverA}}; transform: rotate(-7deg); box-shadow: var(--book-shadow)"></span>
+                    <span style="position: absolute; right: 14px; bottom: 14px; width: 40px; height: 60px; border-radius: 2px 4px 4px 2px; background: {{f.coverB}}; transform: rotate(7deg); box-shadow: var(--book-shadow)"></span>
+                    <span style="position: absolute; left: 0; right: 0; top: 44px; text-align: center; font-weight: 800; font-size: 13px">VS</span>
+                  </span>
+                  <span style="display: flex; flex-direction: column; gap: 4px; align-items: flex-start">
+                    <a href="#" style="font-family: 'Playfair Display', Georgia, serif; font-size: 22px; line-height: 28px; font-weight: 700">{{f.title}}</a>
+                    <span style="color: var(--text-dim)">{{f.author}}</span>
+                    <a href="#" style="margin-top: 8px; display: inline-flex; align-items: center; min-height: 44px; color: var(--accent); font-weight: 600">Vote in tournament →</a>
+                  </span>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{f.isQuiz}}" hint-placeholder-val="{{false}}">
+                <div style="display: flex; gap: 18px; align-items: center; margin-top: 14px">
+                  <span aria-hidden="true" style="flex: 0 0 120px; height: 108px; position: relative; border-radius: 12px; background: var(--reference-soft); color: var(--reference)">
+                    <span style="position: absolute; left: 18px; top: 22px; width: 42px; height: 64px; border-radius: 2px 4px 4px 2px; background: {{f.coverA}}; transform: rotate(-8deg); box-shadow: var(--book-shadow)"></span>
+                    <span style="position: absolute; left: 40px; top: 20px; width: 42px; height: 64px; border-radius: 2px 4px 4px 2px; background: {{f.coverB}}; transform: rotate(6deg); box-shadow: var(--book-shadow)"></span>
+                    <span style="position: absolute; right: 12px; bottom: 12px; width: 32px; height: 32px; border-radius: 999px; background: var(--reference); color: var(--surface); font-weight: 800; font-size: 18px; line-height: 32px; text-align: center">?</span>
+                  </span>
+                  <span style="display: flex; flex-direction: column; gap: 4px; align-items: flex-start">
+                    <a href="#" style="font-family: 'Playfair Display', Georgia, serif; font-size: 22px; line-height: 28px; font-weight: 700">{{f.title}}</a>
+                    <span style="color: var(--text-dim)">{{f.author}}</span>
+                    <a href="#" style="margin-top: 8px; display: inline-flex; align-items: center; min-height: 44px; color: var(--accent); font-weight: 600">Play quiz →</a>
+                  </span>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{f.isMural}}" hint-placeholder-val="{{false}}">
+                <a href="#" style="display: flex; align-items: center; justify-content: center; margin-top: 14px; aspect-ratio: 16 / 6; border-radius: 12px; background: var(--surface-hover); border: 1px solid var(--border); color: var(--accent)">
+                  <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5a8.5 8.5 0 1 0 0 17c1.2 0 1.8-.8 1.8-1.7 0-1.3-1-1.6-1-2.8 0-1 .8-1.7 1.8-1.7H17a3.5 3.5 0 0 0 3.5-3.5C20.5 6.8 16.7 3.5 12 3.5z"></path><circle cx="7.5" cy="11" r="1.2"></circle><circle cx="10" cy="7.5" r="1.2"></circle><circle cx="14.5" cy="7.5" r="1.2"></circle></svg>
+                </a>
+                <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; margin-top: 4px; color: var(--accent); font-weight: 600">Open mural →</a>
+              </sc-if>
+
+              <div style="display: flex; align-items: center; gap: 4px; margin-top: 6px">
+                <button class="icon-btn" type="button" aria-label="Like, {{f.likes}} likes" style="display: flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 10px; border: 0; border-radius: 999px; background: transparent; color: var(--text-dim); font-size: 13px; cursor: pointer">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"></path></svg>
+                  {{f.likes}}
+                </button>
+                <button class="icon-btn" type="button" aria-label="Comments, {{f.comments}}" style="display: flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 10px; border: 0; border-radius: 999px; background: transparent; color: var(--text-dim); font-size: 13px; cursor: pointer">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5.5h14a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H10l-4 3.5v-3.5H5a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1z"></path></svg>
+                  {{f.comments}}
+                </button>
+                <span style="flex: 1"></span>
+                <button class="icon-btn" type="button" style="display: flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 12px; border: 0; border-radius: 999px; background: transparent; color: var(--text-dim); font-size: 13px; cursor: pointer">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="17.5" cy="6" r="2.2"></circle><circle cx="6.5" cy="12" r="2.2"></circle><circle cx="17.5" cy="18" r="2.2"></circle><path d="m8.5 11 7-4M8.5 13l7 4"></path></svg>
+                  Share
+                </button>
+              </div>
+            </article>
+          </sc-for>
+        </div>
+      </section>
+    </div>
+
+    <aside style="flex: 1 1 320px; min-width: 0; display: flex; flex-direction: column; gap: 24px">
+      <section aria-labelledby="h-foryou" style="background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden">
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 16px 18px 6px">
+          <h2 id="h-foryou" style="margin: 0; font-size: 16px; line-height: 22px; font-weight: 700">For you</h2>
+          <span style="padding: 2px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 12px; line-height: 16px; font-weight: 600">2 new</span>
+        </div>
+        <ul style="list-style: none; margin: 0; padding: 0">
+          <sc-for list="{{forYou}}" as="a" hint-placeholder-count="3">
+            <li style="display: flex; gap: 12px; align-items: center; padding: 12px 18px; border-top: 1px solid var(--border)">
+              <span style="flex: 0 0 32px; height: 32px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: 13px; line-height: 32px; text-align: center">{{a.initial}}</span>
+              <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+                <span><span style="font-weight: 700">{{a.who}}</span> {{a.text}} <span style="font-weight: 700">{{a.object}}</span></span>
+                <span style="font-size: 12px; line-height: 16px; color: var(--text-dim)">{{a.when}}</span>
+              </span>
+              <sc-if value="{{a.followBack}}" hint-placeholder-val="{{false}}">
+                <button class="btn2" type="button" style="flex: 0 0 auto; min-height: 44px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 14px; font-weight: 600; cursor: pointer">Follow back</button>
+              </sc-if>
+              <sc-if value="{{a.hasLink}}" hint-placeholder-val="{{false}}">
+                <a href="#" style="flex: 0 0 auto; display: inline-flex; align-items: center; min-height: 44px; color: var(--accent); font-weight: 600">{{a.link}}</a>
+              </sc-if>
+              <sc-if value="{{a.following}}" hint-placeholder-val="{{false}}">
+                <span style="flex: 0 0 auto; color: var(--text-dim)">Following</span>
+              </sc-if>
+            </li>
+          </sc-for>
+        </ul>
+      </section>
+
+      <section aria-labelledby="h-reading" style="background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 14px 18px 18px">
+        <div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px">
+          <h2 id="h-reading" style="margin: 0; font-size: 16px; line-height: 22px; font-weight: 700">Your reading <span style="font-weight: 400; color: var(--text-dim)">6</span></h2>
+          <a href="Library.dc.html" style="display: inline-flex; align-items: center; min-height: 44px; color: var(--accent); font-weight: 600">Library →</a>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px">
+          <sc-for list="{{reading}}" as="b" hint-placeholder-count="5">
+            <a href="Book.dc.html" aria-label="{{b.title}}, {{b.pct}} read" style="display: flex; flex-direction: column; gap: 6px">
+              <span style="aspect-ratio: 2 / 3; border-radius: 2px 4px 4px 2px; background: {{b.bg}}; box-shadow: var(--book-shadow)"></span>
+              <span style="height: 3px; border-radius: 2px; background: var(--border); overflow: hidden"><span style="display: block; height: 3px; width: {{b.pct}}; background: var(--accent)"></span></span>
+            </a>
+          </sc-for>
+        </div>
+      </section>
+
+      <section aria-labelledby="h-suggest" style="background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden">
+        <div style="display: flex; align-items: baseline; justify-content: space-between; padding: 14px 18px 4px">
+          <h2 id="h-suggest" style="margin: 0; font-size: 16px; line-height: 22px; font-weight: 700">Readers you might like</h2>
+          <a href="#" style="display: inline-flex; align-items: center; min-height: 44px; color: var(--accent); font-weight: 600">See all →</a>
+        </div>
+        <ul style="list-style: none; margin: 0; padding: 0">
+          <sc-for list="{{suggested}}" as="p" hint-placeholder-count="2">
+            <li style="display: flex; gap: 12px; align-items: center; padding: 12px 18px; border-top: 1px solid var(--border)">
+              <span style="flex: 0 0 40px; height: 40px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-weight: 700; line-height: 40px; text-align: center">{{p.initial}}</span>
+              <span style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+                <span style="font-weight: 700">{{p.who}}</span>
+                <span style="font-size: 12px; line-height: 16px; color: var(--text-dim)">{{p.reason}}</span>
+              </span>
+              <button class="btn2" type="button" style="min-height: 44px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 14px; font-weight: 600; cursor: pointer">Follow</button>
+            </li>
+          </sc-for>
+        </ul>
+      </section>
+    </aside>
+  </div>
+</main>
+<nav class="bottombar" aria-label="Main" style="position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; height: 64px; align-items: stretch; background: var(--surface); border-top: 1px solid var(--border)">
+  <a href="Main.dc.html" aria-current="page" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 44px; font-size: 11px; line-height: 14px; font-weight: 600; color: var(--accent)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11 12 4.5 20 11"></path><path d="M6 9.8V19.5h12V9.8"></path><path d="M10 19.5v-5h4v5"></path></svg>Home</a>
+  <a href="Library.dc.html" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 44px; font-size: 11px; line-height: 14px; font-weight: 600; color: var(--text-dim)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7v12.5"></path><path d="M12 7c-1.5-1.6-3.6-2.2-8-2.2v12.9c4.4 0 6.5.6 8 2.2"></path><path d="M12 7c1.5-1.6 3.6-2.2 8-2.2v12.9c-4.4 0-6.5.6-8 2.2"></path></svg>Library</a>
+  <a href="#" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 44px; font-size: 11px; line-height: 14px; font-weight: 600; color: var(--text-dim)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="2"></rect><path d="M10.5 5v14"></path><path d="M10.5 12.2h10"></path></svg>Murals</a>
+  <a href="#" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 44px; font-size: 11px; line-height: 14px; font-weight: 600; color: var(--text-dim)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.5 4.5h9v4.6a4.5 4.5 0 0 1-9 0z"></path><path d="M7.5 6H5.2a3 3 0 0 0 3 3.2"></path><path d="M16.5 6h2.3a3 3 0 0 1-3 3.2"></path><path d="M12 13.6v3.4"></path><path d="M8.6 19.5h6.8"></path></svg>Games</a>
+  <a href="Settings.dc.html" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 44px; font-size: 11px; line-height: 14px; font-weight: 600; color: var(--text-dim)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5.2" cy="12" r="1.2"></circle><circle cx="12" cy="12" r="1.2"></circle><circle cx="18.8" cy="12" r="1.2"></circle></svg>More</a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":2000}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const dark = this.props.dark ?? false;
+    const tournament = { isTournament: true, isQuiz: false, isTier: false, artBg: "var(--accent-soft)", tone: "var(--accent)" };
+    const quiz = { isTournament: false, isQuiz: true, isTier: false, artBg: "var(--reference-soft)", tone: "var(--reference)" };
+    const tier = { isTournament: false, isQuiz: false, isTier: true, artBg: "var(--success-soft)", tone: "var(--success)" };
+    const open = { chipBg: "var(--accent-soft)", chipFg: "var(--accent)" };
+    const running = { chipBg: "var(--info-soft)", chipFg: "var(--info)" };
+    const card = { isBook: false, isTournament: false, isQuiz: false, isMural: false, wantToRead: false, onShelf: false, coverA: "#2b4a5c", coverB: "#c98a3d" };
+    return {
+      themeClass: dark ? "t-dark" : "t-light",
+      followedGames: [
+        { ...tournament, ...running, title: "Alice’s Top Shelf bracket", by: "fixture_alice", initial: "A", status: "In progress", n1: "4", l1: "books", n2: "6", l2: "votes", cta: "Vote in tournament", coverA: "#2f3a2c", coverB: "#c4473a" },
+        { ...quiz, ...open, title: "Alice’s guess-the-book quiz", by: "fixture_alice", initial: "A", status: "Open", n1: "4", l1: "questions", n2: "0", l2: "plays", cta: "Play quiz", coverA: "", coverB: "" }
+      ],
+      popularGames: [
+        { ...tournament, ...open, title: "Best Portuguese novel of the decade", by: "joana.reads", initial: "J", status: "Voting open", n1: "16", l1: "books", n2: "214", l2: "votes", cta: "Vote in tournament", coverA: "#7a2a1f", coverB: "#24435a" },
+        { ...tier, ...open, title: "Every Discworld book, ranked", by: "ines.m", initial: "I", status: "Voting open", n1: "41", l1: "books", n2: "96", l2: "ballots", cta: "Rank books", coverA: "", coverB: "" }
+      ],
+      feed: [
+        { ...card, isBook: true, wantToRead: true, initial: "A", who: "fixture_alice", label: "finished reading", when: "23h ago", title: "Piranesi", author: "Susanna Clarke", likes: 2, comments: 1, coverA: "#2b4a5c" },
+        { ...card, isTournament: true, initial: "A", who: "fixture_alice", label: "published a tournament", when: "1d ago", title: "Alice’s Top Shelf bracket", author: "4 books · round 1", likes: 3, comments: 0, coverA: "#2f3a2c", coverB: "#c4473a" },
+        { ...card, isBook: true, onShelf: true, initial: "B", who: "fixture_bob", label: "started reading", when: "1d ago", title: "Dune", author: "Frank Herbert", likes: 1, comments: 0, coverA: "#c98a3d" },
+        { ...card, isQuiz: true, initial: "A", who: "fixture_alice", label: "published a quiz", when: "2d ago", title: "Alice’s guess-the-book quiz", author: "4 questions", likes: 0, comments: 2, coverA: "#5b3a5e", coverB: "#1f3550" },
+        { ...card, isMural: true, initial: "B", who: "fixture_bob", label: "published a mural", when: "3d ago", title: "", author: "", likes: 4, comments: 1 }
+      ],
+      forYou: [
+        { initial: "A", who: "fixture_alice", text: "played your quiz", object: "Guess the classic", when: "23h ago", followBack: false, hasLink: true, link: "View results →", following: false },
+        { initial: "C", who: "fixture_charlie", text: "followed you", object: "", when: "23h ago", followBack: true, hasLink: false, link: "", following: false },
+        { initial: "A", who: "fixture_alice", text: "followed you", object: "", when: "2d ago", followBack: false, hasLink: false, link: "", following: true }
+      ],
+      reading: [
+        { title: "A Clash of Kings", bg: "#2f3a2c", pct: "62%" },
+        { title: "Brave New World", bg: "#c4473a", pct: "35%" },
+        { title: "The Great Gatsby", bg: "#1f3550", pct: "81%" },
+        { title: "Crime and Punishment", bg: "#e7dcc6", pct: "12%" },
+        { title: "The Picture of Dorian Gray", bg: "#5b3a5e", pct: "47%" }
+      ],
+      suggested: [
+        { initial: "J", who: "joana.reads", reason: "You share 4 books" },
+        { initial: "I", who: "ines.m", reason: "You share 2 books" }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>
