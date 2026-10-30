@@ -31,6 +31,10 @@ export function clearBookCover(book: Record<string, unknown>): Record<string, un
   return rest;
 }
 
+export function setBookCoverUrl(book: Record<string, unknown>, url: string): Record<string, unknown> {
+  return { ...clearBookCover(book), _coverUrl: url };
+}
+
 /** Call this alongside actually deleting a gallery image (see
  *  hooks/useDeleteGalleryImage.ts) so a book that had it assigned doesn't
  *  keep pointing at a now-404ing URL forever — it falls back to

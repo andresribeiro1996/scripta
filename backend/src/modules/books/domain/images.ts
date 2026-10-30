@@ -1,3 +1,4 @@
+import { COVER_MAX_ASPECT_RATIO, COVER_MIN_ASPECT_RATIO } from "@scripta/shared";
 import sharp, { type OutputInfo } from "sharp";
 
 const MAX_INPUT_DIMENSION = 8000;
@@ -6,9 +7,6 @@ const FULL_QUALITY = 85;
 const THUMB_MAX_WIDTH = 600;
 const THUMB_MAX_HEIGHT = 900;
 const THUMB_QUALITY = 80;
-const MIN_ASPECT_RATIO = 1.2;
-const MAX_ASPECT_RATIO = 1.9;
-const ISBNDB_PLACEHOLDER = { width: 200, height: 248 };
 const CLASSIFY_MAX_DIMENSION = 400;
 const CORNER_TOLERANCE = 32;
 const EDGE_STEP = 15;
@@ -232,22 +230,16 @@ export async function classifyPublisherImage(input: Buffer): Promise<PublisherIm
       const cropWidth = Math.min(width - left, right - left);
       const cropHeight = Math.min(height - top, bottom - top);
       const ratio = cropHeight / cropWidth;
-      if (ratio < MIN_ASPECT_RATIO || ratio > MAX_ASPECT_RATIO || (cropWidth * cropHeight) / (width * height) < MIN_CROP_AREA) return null;
+      if (ratio < COVER_MIN_ASPECT_RATIO || ratio > COVER_MAX_ASPECT_RATIO || (cropWidth * cropHeight) / (width * height) < MIN_CROP_AREA) return null;
       const cropped = await sharp(decoded.data, rawOptions).extract({ left, top, width: cropWidth, height: cropHeight }).png().toBuffer();
       return { kind: "cropped", input: cropped };
     }
     if (photoOnCanvas && cornerMean < LIGHT_CANVAS_MEAN) return null;
     const ratio = height / width;
-    if (ratio < FLAT_MIN_RATIO || ratio > MAX_ASPECT_RATIO) return null;
+    if (ratio < FLAT_MIN_RATIO || ratio > COVER_MAX_ASPECT_RATIO) return null;
     if (uniform && cornerMean >= WHITE_CANVAS_MEAN && (keptWidth < CANVAS_KEPT || keptHeight < CANVAS_KEPT)) return null;
     return { kind: "flat", input };
   } catch {
     return null;
   }
-}
-
-export function isAcceptableCover(source: string, width: number, height: number): boolean {
-  const ratio = height / width;
-  if (ratio < MIN_ASPECT_RATIO || ratio > MAX_ASPECT_RATIO) return false;
-  return !(source === "isbndb" && width === ISBNDB_PLACEHOLDER.width && height === ISBNDB_PLACEHOLDER.height);
 }

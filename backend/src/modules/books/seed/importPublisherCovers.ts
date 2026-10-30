@@ -1,7 +1,8 @@
+import { isAcceptableCover } from "@scripta/shared";
 import { storeCoverImage } from "../booksService.js";
 import { MIN_GOOD_WIDTH } from "../domain/constants.js";
 import { SourceUnavailableError } from "../domain/errors.js";
-import { classifyPublisherImage, encodeCover, isAcceptableCover, type EncodedCover } from "../domain/images.js";
+import { classifyPublisherImage, encodeCover, type EncodedCover } from "../domain/images.js";
 import { fillLossy } from "../domain/lossy.js";
 import { editionLanguage, isPortugalIsbn, normalizeTitle } from "../domain/normalize.js";
 import type { BooksRepository, CoverBlobStore } from "../domain/ports.js";

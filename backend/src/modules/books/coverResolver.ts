@@ -1,7 +1,8 @@
+import { isAcceptableCover } from "@scripta/shared";
 import { koboCoverUrl } from "./adapters/sources/kobo.js";
 import { MIN_GOOD_WIDTH } from "./domain/constants.js";
 import { SourceUnavailableError } from "./domain/errors.js";
-import { isAcceptableCover, type EncodedCover } from "./domain/images.js";
+import type { EncodedCover } from "./domain/images.js";
 import { authorMatches, normalizeTitle, titleMatches } from "./domain/normalize.js";
 import type { CoverCandidate, CoverSource, TitledCandidate } from "./domain/ports.js";
 

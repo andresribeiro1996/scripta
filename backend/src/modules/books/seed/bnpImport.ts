@@ -1,11 +1,12 @@
 import type { DatabaseSync } from "node:sqlite";
 import { setTimeout as sleep } from "node:timers/promises";
+import { isAcceptableCover } from "@scripta/shared";
 import { ObjectStoreUnavailableError } from "../../../storage/objectStore.js";
 import { storeCoverImage } from "../booksService.js";
 import { MIN_GOOD_WIDTH } from "../domain/constants.js";
 import { SourceUnavailableError } from "../domain/errors.js";
 import { fillMissingIdentity, keysOf } from "../domain/findOrCreate.js";
-import { encodeCover, isAcceptableCover, type EncodedCover } from "../domain/images.js";
+import { encodeCover, type EncodedCover } from "../domain/images.js";
 import { editionLanguage, isPortugueseIsbn, lookupIdentity } from "../domain/normalize.js";
 import type { BooksRepository, CoverBlobStore } from "../domain/ports.js";
 import type { BookRow, CoverImageRow } from "../domain/types.js";
