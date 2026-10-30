@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { findBestCover, type CoverSources, type FetchCoverImage } from "./coverResolver.js";
+import { coverSteps, findBestCover, offerable, type CoverSources, type FetchCoverImage } from "./coverResolver.js";
 import { SourceUnavailableError } from "./domain/errors.js";
 import type { CoverCandidate, CoverSource, TitledCandidate } from "./domain/ports.js";
 
@@ -184,4 +184,60 @@ test("an ISBN-only lookup with a Kobo image id asks Kobo first and no source by 
   assert.equal(fetched[0], KOBO_URL);
   assert.deepEqual(outcome.found?.candidate, { source: "kobo", url: KOBO_URL });
   assert.deepEqual([...apple.calls, ...isbndb.calls].filter((call) => call.startsWith("title:")), []);
+});
+
+function tracked(name: string, log: string[]): CoverSource {
+  return {
+    async byIsbn(isbn) {
+      log.push(`${name}:isbn:${isbn}`);
+      return [];
+    },
+    async byTitle(title) {
+      log.push(`${name}:title:${title}`);
+      return [];
+    }
+  };
+}
+
+async function runAll(steps: Array<() => Promise<CoverCandidate[]>>): Promise<CoverCandidate[][]> {
+  const results: CoverCandidate[][] = [];
+  for (const step of steps) results.push(await step());
+  return results;
+}
+
+test("coverSteps orders Kobo, then ISBN, then title, skipping null sources", async () => {
+  const log: string[] = [];
+  const steps = coverSteps({ ...orlando, koboImageId: KOBO_ID }, sources({ isbndb: null, apple: tracked("apple", log), openlibrary: tracked("openlibrary", log) }));
+  assert.equal(steps.length, 5);
+  assert.deepEqual(log, []);
+  const results = await runAll(steps);
+  assert.deepEqual(results[0], [{ source: "kobo", url: KOBO_URL }]);
+  assert.deepEqual(log, [
+    "apple:isbn:9780141184272",
+    "openlibrary:isbn:9780141184272",
+    "apple:title:Orlando (Penguin Modern Classics)",
+    "openlibrary:title:Orlando (Penguin Modern Classics)"
+  ]);
+});
+
+test("coverSteps with isbnOnly has no title steps", async () => {
+  const log: string[] = [];
+  const steps = coverSteps({ ...orlando, isbnOnly: true }, sources({ isbndb: tracked("isbndb", log), apple: tracked("apple", log), openlibrary: tracked("openlibrary", log) }));
+  assert.equal(steps.length, 3);
+  await runAll(steps);
+  assert.deepEqual(log, ["apple:isbn:9780141184272", "isbndb:isbn:9780141184272", "openlibrary:isbn:9780141184272"]);
+});
+
+test("coverSteps with an empty normalized title has no title steps", async () => {
+  const log: string[] = [];
+  const steps = coverSteps({ isbn: orlando.isbn, title: "?!", author: "" }, sources({ apple: tracked("apple", log), openlibrary: tracked("openlibrary", log) }));
+  assert.equal(steps.length, 2);
+  await runAll(steps);
+  assert.deepEqual(log, ["apple:isbn:9780141184272", "openlibrary:isbn:9780141184272"]);
+  assert.deepEqual(coverSteps({ isbn: null, title: "?!", author: "" }, sources({})), []);
+});
+
+test("offerable drops rejected URLs before capping at 3", () => {
+  const candidates = [1, 2, 3, 4, 5].map((n): CoverCandidate => ({ source: "isbndb", url: `https://i/${n}` }));
+  assert.deepEqual(offerable(candidates, new Set(["https://i/1"])), candidates.slice(1, 4));
 });
