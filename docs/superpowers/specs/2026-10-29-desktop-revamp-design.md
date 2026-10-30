@@ -69,9 +69,9 @@ These keep today's navigation: the fixed bottom bar (`BOTTOM_BAR_AREAS` plus Mor
 
 ### Signed-out and public pages
 
-`PublicLayout` gets the same bar at every width; like the signed-in bar, it is sticky only from `lg`. It shows the brand and "Log in" (or "Open my library" for a session without a username), and has no area links. This covers `/shared/library/:token`, `/shared/murals/:token`, `/vote/:code`, `/play/:code` and public `/arena`, plus the signed-out `/work/:id`, `/work/:id/stats` and `/arena/:id`.
+`PublicLayout` gets the same bar at every width; like the signed-in bar, it is sticky only from `lg`. It shows the brand and "Log in" (or "Open my library" for a session without a username), and has no area links. This covers `/shared/library/:token`, `/shared/murals/:token`, `/vote/:code`, `/play/:code`, `/daily` and public `/arena`, plus the signed-out `/work/:id`, `/work/:id/stats` and `/arena/:id`.
 
-**Signed-in viewers of share, vote and play pages now get the app frame** (*my call*). `/shared/*`, `/vote/:code` and `/play/:code` move under `SessionLayout`, which already picks the dashboard frame for a session with a username and the public frame otherwise (`frontend/src/layouts/SessionLayout.tsx:7`). A signed-in reader then never loses their navigation by opening a friend's link. Public `/arena` keeps its redirect for signed-in users.
+**Signed-in viewers of share, vote and play pages now get the app frame** (*my call*). `/shared/*`, `/vote/:code`, `/play/:code` and `/daily` (the Daily Chapter, which Home's card links to) move under `SessionLayout`, which already picks the dashboard frame for a session with a username and the public frame otherwise (`frontend/src/layouts/SessionLayout.tsx:7`). A signed-in reader then never loses their navigation by opening a friend's link. Public `/arena` keeps its redirect for signed-in users.
 
 ### Sticky offsets
 
@@ -218,7 +218,7 @@ At `lg`, two columns: the card preview (sticky under the bar, with the You/Visit
 ### Community
 
 - **Discover** (`/community/discover`, `wide`). Header: title "Community", tabs Discover · People. A toolbar with the search field and the type filter as **filter chips** (All · Tier lists · Tournaments · Quizzes). `GameTicket` grid.
-- **People** (`/community/people`, `default`). Same header. Search field. "Readers you might like" as a grid of person cards (`surface`): 48px avatar, name, reason ("You share 2 books"), a small strip of shared covers, and Follow as a secondary button, since several can show at once. Other lists on the page use list panels.
+- **People** (`/community/people`, `wide`, like Discover). Same header. Search field. "Readers you might like" as a grid of person cards (`surface`): 48px avatar, name, reason ("You share 2 books"), a small strip of shared covers, and Follow as a secondary button, since several can show at once. Other lists on the page use list panels.
 - **Profile** (`/community/u/:username`, `default`, `title={null}`).
   - A profile header replaces the band title: back link "‹ Community", 72px avatar, `h1` @username in the display font, any existing one-line facts, and the primary action on the same row (Follow or Following for others; the existing owner action on your own).
   - Tabs Mural · Activity · Library are underline tabs at `lg`. `SwipeTabs` stays below `lg`.
