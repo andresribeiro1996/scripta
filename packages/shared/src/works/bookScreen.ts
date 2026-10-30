@@ -106,6 +106,7 @@ export function bookScreenModel(page: WorkPage | null, book: Book | null, viewer
   const work = page?.work;
   const picked = editionId === null ? undefined : work?.editions.find((edition) => edition.bookId === editionId);
   const selected = work && picked && work.editions.indexOf(picked) !== defaultEditionIndex(work) ? picked : undefined;
+  const displayed = work ? selected ?? work.editions[defaultEditionIndex(work)] : undefined;
   const primary = book ? "owner" : page?.mine ? null : "add";
   const tabs: Array<{ key: BookScreenTabKey; label: string }> = [
     ...(page ? [{ key: "about" as const, label: "About" }] : []),
@@ -122,13 +123,13 @@ export function bookScreenModel(page: WorkPage | null, book: Book | null, viewer
     characters: { shown: (work?.characters ?? []).slice(0, CHARACTERS_SHOWN), more: (work?.characters ?? []).slice(CHARACTERS_SHOWN), canMakeGame: (work?.characters ?? []).length >= 4 },
     genres: work ? work.genres ?? [] : book ? genresForBook(book).slice(0, GENRE_CAP) : [],
     possibleGenres: work?.possibleGenres ?? [],
-    series: work ? work.series ?? (selected ?? work.editions[defaultEditionIndex(work)])?.collection ?? null : null,
+    series: work ? work.series ?? displayed?.collection ?? null : null,
     rating: work?.rating ? { value: work.rating.value, label: `${work.rating.value.toFixed(1)} · ${ratingCountLabel(work.rating.count)}` } : null,
-    year: work ? (selected ?? work.editions[defaultEditionIndex(work)])?.year ?? work.year : null,
+    year: work ? displayed?.year ?? work.year : null,
     meta: selected ? bookMetaLine(selected, selected.language) : work ? bookMetaLine(work) : null,
     cover: selected ? { url: selected.coverUrl, color: selected.coverColor } : { url: work?.coverUrl ?? null, color: work?.coverColor ?? null },
     edition: work && work.editions.length >= 2 ? editionState(work, selected ? work.editions.indexOf(selected) : defaultEditionIndex(work), book !== null) : null,
-    addBook: work && primary === "add" ? { title: work.title, author: work.author, isbn: selected ? selected.isbn : work.editions.find((edition) => edition.isbn)?.isbn ?? null, coverUrl: selected ? selected.coverUrl : work.coverUrl } : null,
+    addBook: work && primary === "add" ? { title: work.title, author: work.author, isbn: displayed?.isbn ?? (selected ? null : work.editions.find((edition) => edition.isbn)?.isbn ?? null), coverUrl: selected ? selected.coverUrl : work.coverUrl } : null,
     primary,
     status: readStatus === null ? null : { label: statusLabel(readStatus), options: STATUSES.map((value) => ({ value, label: statusLabel(value), selected: value === readStatus })) },
     feeling: readStatus === 2 ? {
