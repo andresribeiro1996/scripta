@@ -129,7 +129,7 @@ export function bookScreenModel(page: WorkPage | null, book: Book | null, viewer
     meta: selected ? bookMetaLine(selected, selected.language) : work ? bookMetaLine(work) : null,
     cover: selected ? { url: selected.coverUrl, color: selected.coverColor } : { url: work?.coverUrl ?? null, color: work?.coverColor ?? null },
     edition: work && work.editions.length >= 2 ? editionState(work, selected ? work.editions.indexOf(selected) : defaultEditionIndex(work), book !== null) : null,
-    addBook: work && primary === "add" ? { title: work.title, author: work.author, isbn: displayed?.isbn ?? (selected ? null : work.editions.find((edition) => edition.isbn)?.isbn ?? null), coverUrl: selected ? selected.coverUrl : work.coverUrl } : null,
+    addBook: work && primary === "add" ? { title: work.title, author: work.author, isbn: displayed?.isbn ?? (picked ? null : work.editions.find((edition) => edition.isbn)?.isbn ?? null), coverUrl: selected ? selected.coverUrl : work.coverUrl } : null,
     primary,
     status: readStatus === null ? null : { label: statusLabel(readStatus), options: STATUSES.map((value) => ({ value, label: statusLabel(value), selected: value === readStatus })) },
     feeling: readStatus === 2 ? {

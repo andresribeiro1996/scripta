@@ -321,4 +321,5 @@ test("add book falls back to the first edition with an isbn when the displayed e
   const noIsbn = editions(4).map((e) => (e.bookId === "e2" ? { ...e, isbn: null } : e));
   assert.equal(bookScreenModel(page({ editions: noIsbn, coverUrl: "cover:2" }), null, viewer).addBook!.isbn, "isbn1");
   assert.equal(bookScreenModel(page({ editions: noIsbn, coverUrl: "cover:3" }), null, viewer).addBook!.isbn, "isbn3");
+  assert.equal(bookScreenModel(page({ editions: noIsbn, coverUrl: "cover:2" }), null, viewer, "e2").addBook!.isbn, null);
 });
