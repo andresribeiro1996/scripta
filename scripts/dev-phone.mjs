@@ -52,7 +52,7 @@ import { fileURLToPath } from "node:url";
 import { claimThisWorktreeSlot } from "./devClaim.mjs";
 import { devDataDirEnv } from "./devDataDir.mjs";
 import { DEV_USERNAME } from "./dev-account.mjs";
-import { assertAdoptedBackendMatches, ensureSharedBuilt, resetDevDataIfRequested, seedCommunityGraph, seedDevAccount, seedEditionWorks, seedFixtureUsers } from "./devFixtureSetup.mjs";
+import { assertAdoptedBackendMatches, ensureSharedBuilt, resetDevDataIfRequested, seedCommunityGraph, seedDailyChapter, seedDevAccount, seedEditionWorks, seedFixtureUsers } from "./devFixtureSetup.mjs";
 import { isPortOpen, spawnDetached, waitFor } from "./devProcess.mjs";
 import { metroCacheEnv } from "./devMetroCache.mjs";
 import { broadcastReload } from "./devReload.mjs";
@@ -146,6 +146,7 @@ async function main() {
   seedEditionWorks(log);
   seedFixtureUsers(log);
   seedCommunityGraph(log);
+  seedDailyChapter(log);
   await ensureBackendRunning();
   await ensureMetroRunning();
   // Expo Go keeps running the bundle it already has when its Metro is

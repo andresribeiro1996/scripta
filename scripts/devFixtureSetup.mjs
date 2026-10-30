@@ -106,3 +106,15 @@ export function seedEditionWorks(log) {
   const result = spawnSync("node", ["--import", "tsx", "scripts/dev-editions.mjs"], { cwd: repoRoot, env, stdio: "inherit" });
   if (result.status !== 0) throw new Error("scripts/dev-editions.mjs failed — see output above.");
 }
+
+/** Adds published Daily Chapter editions for last month and this month, with
+ *  plays by the dev account, the followed fixture users, an unfollowed one and
+ *  a guest, so the Your chapters screens, the profile Daily tab and the recap
+ *  card have data. Runs after the community graph; it only reads the accounts
+ *  the earlier steps created. */
+export function seedDailyChapter(log) {
+  log("Seeding Daily Chapter editions and plays...");
+  const env = { ...process.env, ...devDataDirEnv() };
+  const result = spawnSync("node", ["--import", "tsx", "scripts/dev-daily-chapter.mjs"], { cwd: repoRoot, env, stdio: "inherit" });
+  if (result.status !== 0) throw new Error("scripts/dev-daily-chapter.mjs failed — see output above.");
+}
