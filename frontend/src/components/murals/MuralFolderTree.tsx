@@ -43,6 +43,7 @@ export function MuralFolderTree({
     <nav className="flex flex-col gap-0.5">
       <button
         onClick={() => onSelect(null)}
+        aria-current={selectedFolderId === null ? "true" : undefined}
         className={`min-h-11 rounded-lg px-2 text-left text-sm font-semibold ${
           selectedFolderId === null
             ? "bg-(--color-accent-soft) text-(--color-accent)"
@@ -96,6 +97,7 @@ export function MuralFolderTree({
               ) : (
                 <button
                   onClick={() => onSelect(folder.id)}
+                  aria-current={selectedFolderId === folder.id ? "true" : undefined}
                   className={`min-h-11 flex-1 truncate rounded px-1.5 text-left text-sm ${
                     selectedFolderId === folder.id
                       ? "bg-(--color-accent-soft) font-semibold text-(--color-accent)"

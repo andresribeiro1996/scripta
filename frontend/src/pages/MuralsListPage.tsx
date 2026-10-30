@@ -13,10 +13,11 @@ import { MuralsIcon } from "../components/NavIcons";
 import { OptionsMenu } from "../components/OptionsMenu";
 import { Page } from "../components/page/Page";
 import { BUTTON_PRIMARY, BUTTON_SECONDARY, FIELD_CLASS } from "../components/page/buttonClasses";
+import { PANEL } from "../components/page/surfaceClasses";
 import { ShareModal } from "../components/ShareModal";
 import { OptionSheet } from "../components/Sheet";
 import { SkeletonCardGrid } from "../components/Skeleton";
-import { FolderIcon, SortIcon, ToolbarRow, toolbarIconClass } from "../components/Toolbar";
+import { FolderIcon, SearchField, SortIcon, ToolbarRow, toolbarIconClass } from "../components/Toolbar";
 import { useDelayedShow } from "../hooks/useDelayedShow";
 import { useMuralFolders } from "../hooks/useMuralFolders";
 import { useMurals } from "../hooks/useMurals";
@@ -147,13 +148,23 @@ export function MuralsListPage() {
   const movingFolder = movingFolderId ? folders.find((f) => f.id === movingFolderId) : null;
 
   return (
-    <Page width="wide" title="Murals" actions={<button onClick={handleCreate} className={BUTTON_PRIMARY}>New mural</button>}>
-      <button onClick={() => setPresetsOpen(true)} className="mb-4 flex min-h-11 w-full items-center justify-between rounded-xl border border-(--color-border) bg-(--color-surface) px-4 text-left text-sm font-semibold hover:bg-(--color-surface-hover)">
-        <span>Start from a preset</span><span aria-hidden="true">→</span>
-      </button>
+    <Page
+      width="wide"
+      title="Murals"
+      actions={
+        <>
+          <button onClick={() => setPresetsOpen(true)} className={BUTTON_SECONDARY}>
+            Start from a preset
+          </button>
+          <button onClick={handleCreate} className={BUTTON_PRIMARY}>
+            New mural
+          </button>
+        </>
+      }
+    >
       {presetsOpen && <MuralPresetPicker folderId={selectedFolderId} onClose={() => setPresetsOpen(false)} />}
-      <div className="flex items-start gap-6">
-        <div className="hidden w-56 shrink-0 md:block">
+      <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
+        <div className="hidden lg:block">
           <MuralFolderTree
             folders={folders}
             selectedFolderId={selectedFolderId}
@@ -165,18 +176,18 @@ export function MuralsListPage() {
           />
         </div>
 
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0">
           <nav className="mb-3 hidden items-center gap-1 text-xs text-(--color-text-dim) md:flex">
             <button onClick={() => setSelectedFolderId(null)} className="inline-flex min-h-11 items-center hover:text-(--color-text)">
               All murals
             </button>
             {folderPath(folders, selectedFolderId).map((f, i, path) => (
-              <span key={f.id} className="flex items-center gap-1">
+              <span key={f.id} className="flex min-w-0 items-center gap-1">
                 <span>/</span>
                 {i === path.length - 1 ? (
-                  <span className="font-semibold text-(--color-text)">{f.name}</span>
+                  <span className="min-w-0 break-words font-semibold text-(--color-text)">{f.name}</span>
                 ) : (
-                  <button onClick={() => setSelectedFolderId(f.id)} className="inline-flex min-h-11 items-center hover:text-(--color-text)">
+                  <button onClick={() => setSelectedFolderId(f.id)} className="inline-flex min-h-11 min-w-0 items-center break-words text-left hover:text-(--color-text)">
                     {f.name}
                   </button>
                 )}
@@ -190,101 +201,40 @@ export function MuralsListPage() {
             <EmptyState
               icon={MuralsIcon}
               title="No murals yet."
-              body={'A mural is a freeform dashboard you build yourself \u2014 a "Top 5 Books This Year" shelf, a favorite quote, a photo, whatever you want on the wall. Use the + below to start.'}
-              action={
-                <button onClick={() => setPresetsOpen(true)} className={BUTTON_SECONDARY}>
-                  Start from a preset
-                </button>
-              }
+              body={'A mural is a freeform dashboard you build yourself \u2014 a "Top 5 Books This Year" shelf, a favorite quote, a photo, whatever you want on the wall. Use New mural above to start.'}
             />
           )}
 
           {!isLoading && murals.length > 0 && (
             <ToolbarRow>
-              {/* Phone: one row — search, sort, folder. The three used to
-                  be a full-width folder select on its own line plus two
-                  labelled controls below it, which on a 375px phone cost
-                  more vertical space than the first row of murals. Each
-                  becomes a 44px icon opening a bottom sheet, matching the
-                  Library toolbar's filter and sort exactly, so the same
-                  gesture works on both pages. An icon can't show its
-                  current value, so it goes accent-coloured whenever its
-                  control is off its default — the only cue left once the
-                  labels are gone. */}
-              <div className="flex items-center gap-2 sm:hidden">
-                <input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search"
-                  aria-label="Search murals by name"
-                  className={`${FIELD_CLASS} min-w-0 flex-1`}
-                />
+              <div className="flex items-center gap-2">
+                <SearchField className="flex-1 sm:flex-none" value={search} onChange={setSearch} placeholder="Search" label="Search murals by name" />
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as SortBy)}
+                  aria-label="Sort murals"
+                  className={`${FIELD_CLASS} hidden sm:block`}
+                >
+                  {SORT_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
                 <button
                   onClick={() => setSheet("sort")}
                   aria-label={`Sort murals (${SORT_OPTIONS.find((o) => o.value === sortBy)?.label})`}
-                  className={toolbarIconClass(sortBy !== SORT_OPTIONS[0].value)}
+                  className={`${toolbarIconClass(sortBy !== SORT_OPTIONS[0].value)} sm:hidden`}
                 >
                   <SortIcon />
                 </button>
                 <button
                   onClick={() => setSheet("folder")}
                   aria-label={`Folder (${selectedFolderId ? folderPath(folders, selectedFolderId).map((f) => f.name).join(" / ") : "All murals"})`}
-                  className={toolbarIconClass(selectedFolderId !== null)}
+                  className={`${toolbarIconClass(selectedFolderId !== null)} lg:hidden`}
                 >
                   <FolderIcon />
                 </button>
-              </div>
-
-              {/* Desktop keeps the labelled controls: there's room, and a
-                  word beats an icon whose value you'd have to open a
-                  sheet to read. `items-end` bottom-aligns each control
-                  regardless of its label's height. */}
-              <div className="hidden flex-wrap items-end gap-3 sm:flex">
-                <label className="flex flex-col gap-1">
-                  <span className="text-[10.5px] font-semibold text-(--color-text-dim)">Search</span>
-                  <input
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search"
-                    className="min-h-11 w-56 max-w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm"
-                  />
-                </label>
-                <label className="flex flex-col gap-1">
-                  <span className="text-[10.5px] font-semibold text-(--color-text-dim)">Sort</span>
-                  {/* appearance-none + a hand-drawn chevron, not the browser's
-                      own <select> arrow — the native one rendered flush
-                      against the box's right edge with no real breathing room
-                      from the border at this size, cramped rather than
-                      deliberate. pr-8 clears space for it; pointer-events-none
-                      on the chevron keeps clicks reaching the (invisibly
-                      stretched, same-size) real <select> underneath. */}
-                  <div className="relative">
-                    <select
-                      value={sortBy}
-                      onChange={(e) => setSortBy(e.target.value as SortBy)}
-                      className="min-h-11 w-full appearance-none rounded-lg border border-(--color-border) bg-(--color-surface) py-2 pr-8 pl-3 text-sm"
-                    >
-                      {SORT_OPTIONS.map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
-                    <svg
-                      width="12"
-                      height="12"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-(--color-text-dim)"
-                    >
-                      <polyline points="6 9 12 15 18 9" />
-                    </svg>
-                  </div>
-                </label>
               </div>
             </ToolbarRow>
           )}
@@ -326,7 +276,7 @@ export function MuralsListPage() {
             <p className="text-sm text-(--color-text-dim)">No murals in this folder.</p>
           )}
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {filteredMurals.map((mural) => {
               const hasCover = Boolean(mural.coverImageUrl);
               return (
@@ -357,8 +307,8 @@ export function MuralsListPage() {
                       navigate(`/dashboard/murals/${mural.id}`);
                     }
                   }}
-                  className={`group relative min-h-40 cursor-pointer overflow-hidden rounded-xl border border-(--color-border) transition-colors ${
-                    hasCover ? "" : "bg-(--color-surface) hover:bg-(--color-surface-hover)"
+                  className={`${PANEL} group relative min-h-40 cursor-pointer overflow-hidden p-4 transition-colors ${
+                    hasCover ? "" : "hover:bg-(--color-surface-hover)"
                   }`}
                 >
                   {hasCover && (
@@ -371,7 +321,7 @@ export function MuralsListPage() {
                       <div className="absolute inset-0 bg-linear-to-t from-[rgba(10,8,6,0.85)] via-[rgba(10,8,6,0.35)] to-transparent" />
                     </>
                   )}
-                  <div className={`relative flex h-full flex-col p-4 ${hasCover ? "justify-end" : ""}`}>
+                  <div className={`relative flex h-full flex-col ${hasCover ? "justify-end" : ""}`}>
                     <div className="mb-1 flex items-start justify-between gap-2">
                       {editingId === mural.id ? (
                         <input
@@ -400,9 +350,9 @@ export function MuralsListPage() {
                         // cover image, where it sits on arbitrary artwork
                         // rather than a flat theme surface) keeps it legible
                         // the same way BookCard's own title treatment does.
-                        <span className="flex min-w-0 items-center gap-1.5">
+                        <span className="flex min-w-0 flex-wrap items-center gap-1.5">
                           <span
-                            className={`text-left text-lg leading-tight font-bold transition-colors ${
+                            className={`min-w-0 text-left text-lg leading-tight font-bold break-words transition-colors ${
                               hasCover ? "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.5)]" : "group-hover:text-(--color-accent)"
                             }`}
                           >

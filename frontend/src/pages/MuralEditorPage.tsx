@@ -10,7 +10,7 @@ import { MuralCanvas } from "../components/murals/MuralCanvas";
 import type { MobileMuralDraft } from "../components/murals/MobileMuralCanvas";
 import { MuralsIcon } from "../components/NavIcons";
 import { Page } from "../components/page/Page";
-import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../components/page/buttonClasses";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY, TITLE_FIELD_CLASS } from "../components/page/buttonClasses";
 import { backTo } from "../lib/areas";
 import { ShareModal } from "../components/ShareModal";
 import { Sheet } from "../components/Sheet";
@@ -482,7 +482,7 @@ export function MuralEditorPage() {
             if (e.key === "Escape") setEditingName(false);
           }}
           aria-label="Mural name"
-          className="font-display block min-h-11 w-full min-w-0 rounded-lg border border-(--color-border) bg-(--color-surface) px-2 py-1 font-bold"
+          className={TITLE_FIELD_CLASS}
         />
       ) : (
         <button
