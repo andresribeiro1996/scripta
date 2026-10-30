@@ -80,7 +80,7 @@ export function DiscoverPane({ linkAuthors = true, fab }: { linkAuthors?: boolea
                 <View style={styles.page}><Skeleton height={80} /></View>
               ) : discover.isFetchNextPageError ? (
                 <View style={styles.page}><ErrorState body="Couldn't load more." actionLabel="Retry" onAction={() => void discover.fetchNextPage()} /></View>
-              ) : null
+              ) : undefined
             }
             renderItem={({ item }) => <DiscoverRow item={item} onPreviewBooks={setPreview} linkAuthor={linkAuthors} />}
           />

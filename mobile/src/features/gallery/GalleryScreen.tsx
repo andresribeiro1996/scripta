@@ -104,7 +104,7 @@ export function GalleryScreen() {
         keyExtractor={(item) => item.id}
         numColumns={2}
         refreshControl={<RefreshControl refreshing={gallery.isRefetching} onRefresh={() => void gallery.refetch()} />}
-        ListEmptyComponent={!gallery.isPending ? <EmptyState title="No images yet" body="Upload an image to use it in your library or murals." actionLabel="Upload image" onAction={() => void pickImage()} /> : null}
+        ListEmptyComponent={!gallery.isPending ? <EmptyState title="No images yet" body="Upload an image to use it in your library or murals." actionLabel="Upload image" onAction={() => void pickImage()} /> : undefined}
         renderItem={({ item }) => (
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Image source={{ uri: item.url }} style={styles.image} contentFit="cover" />

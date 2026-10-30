@@ -1,7 +1,7 @@
 import { authFieldErrors, PASSWORD_HINT, USERNAME_HINT } from "@scripta/shared";
 import { afterSignIn, startAuthNavigation } from "../../features/auth/navigation";
 import { useRef, useState } from "react";
-import { ActivityIndicator, StyleSheet, type TextInput, View } from "react-native";
+import { ActivityIndicator, StyleSheet, View, type TextInputInstance } from "react-native";
 import { Text } from "../../ui/Text";
 import { Redirect, router, useLocalSearchParams } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
@@ -29,9 +29,9 @@ export default function LoginPage() {
   const [googleBusy, setGoogleBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [noticeDismissed, setNoticeDismissed] = useState(false);
-  const identifierRef = useRef<TextInput>(null);
-  const usernameRef = useRef<TextInput>(null);
-  const passwordRef = useRef<TextInput>(null);
+  const identifierRef = useRef<TextInputInstance>(null);
+  const usernameRef = useRef<TextInputInstance>(null);
+  const passwordRef = useRef<TextInputInstance>(null);
 
   const health = useQuery({
     queryKey: ["health"],

@@ -207,8 +207,8 @@ function ArenaList({
         void query.refetch();
         void votedQuery.refetch();
       }}
-      ListEmptyComponent={votedUnknown ? null : <View style={styles.page}><EmptyState title={empty.title} body={empty.body} actionLabel={empty.action} onAction={empty.action ? () => router.push(NEW_GAMES.find((option) => option.tab === tab)!.href as never) : undefined} /></View>}
-      ListFooterComponent={votedQuery.isError ? <View style={styles.page}><ErrorState body="Couldn't load the games you voted in." actionLabel="Retry" onAction={() => void votedQuery.refetch()} /></View> : null}
+      ListEmptyComponent={votedUnknown ? undefined : <View style={styles.page}><EmptyState title={empty.title} body={empty.body} actionLabel={empty.action} onAction={empty.action ? () => router.push(NEW_GAMES.find((option) => option.tab === tab)!.href as never) : undefined} /></View>}
+      ListFooterComponent={votedQuery.isError ? <View style={styles.page}><ErrorState body="Couldn't load the games you voted in." actionLabel="Retry" onAction={() => void votedQuery.refetch()} /></View> : undefined}
       renderItem={({ item }) => {
         if (item.kind === "header") {
           return <Text {...dynamicType} style={[typography.title, styles.sectionHeader, styles.strong, { color: colors.text }]}>{item.title}</Text>;

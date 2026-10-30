@@ -8,9 +8,9 @@
     "packages/*"
   ],
   "overrides": {
-    "react": "19.2.3",
-    "react-dom": "19.2.3",
-    "@expo/ui": "57.0.22"
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "@expo/ui": "58.0.25"
   },
   "scripts": {
     "backend": "npm run dev:claim && npm run dev --workspace backend",
@@ -37,6 +37,7 @@
   },
   "devDependencies": {
     "patch-package": "^8.0.1",
-    "railway": "^3.12.0"
+    "railway": "^3.12.0",
+    "ws": "^8.22.0"
   }
 }

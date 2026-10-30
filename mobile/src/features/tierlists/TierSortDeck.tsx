@@ -3,7 +3,7 @@ import { booksByWork, isCharacterBook, itemNoun, type TierDefinition, type Tierl
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { ReduceMotion, useAnimatedStyle, useSharedValue, withSpring, type SharedValue } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View, type HostInstance } from "react-native";
 import { Text } from "../../ui/Text";
 import { commitHaptic, liftHaptic } from "../../ui/haptics";
 import { EmptyState, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
@@ -47,7 +47,7 @@ function DragBook({ book, x, y, lifted }: {
 
 export function TierSortDeck({ data, books, onAssign, selectedWorkId }: { data: TierlistData; books: TierBook[]; onAssign: (workId: string, tierId: string) => void; selectedWorkId?: string | null }) {
   const { colors } = useTheme();
-  const ringRef = useRef<View>(null);
+  const ringRef = useRef<HostInstance>(null);
   const zones = useSharedValue<Array<{ x: number; y: number }>>([]);
   const center = useSharedValue({ x: 0, y: 0 });
   const [ring, setRing] = useState({ width: 0, height: 0 });

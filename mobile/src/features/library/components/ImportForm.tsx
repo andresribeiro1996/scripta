@@ -51,7 +51,7 @@ export function ImportForm({
     try {
       if (!await Sharing.isAvailableAsync()) throw new Error("Saving files is unavailable on this device.");
       const file = new File(Paths.cache, "atmyshelf-library.csv");
-      file.write(LIBRARY_CSV_TEMPLATE);
+      await file.write(LIBRARY_CSV_TEMPLATE);
       await Sharing.shareAsync(file.uri, { mimeType: "text/csv", UTI: "public.comma-separated-values-text", dialogTitle: "Save CSV template" });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't save the CSV template.");

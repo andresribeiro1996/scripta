@@ -43,7 +43,7 @@ export function ActivityList({ username }: { username: string }) {
       }}
       onEndReachedThreshold={0.4}
       ListEmptyComponent={<View style={styles.body}><EmptyState title="No activity yet" body="Publishing and reading will show up here." /></View>}
-      ListFooterComponent={activity.isFetchingNextPage ? <View style={styles.body}><Skeleton height={80} /></View> : null}
+      ListFooterComponent={activity.isFetchingNextPage ? <View style={styles.body}><Skeleton height={80} /></View> : undefined}
       renderItem={({ item, index }) => {
         const day = activityDay(item.createdAt);
         return <ActivityRowView item={item} day={index === 0 || activityDay(items[index - 1]!.createdAt) !== day ? day : null} />;

@@ -26,6 +26,6 @@ export async function renderTierlistShareVideo(id: string, imageUri: string) {
   const { base64 } = await apiClient.request<{ base64: string }>(`/tierlists/${encodeURIComponent(id)}/share-video`, { method: "POST", body: form, auth: true });
   const file = new File(Paths.cache, `tierlist-${id}-${Date.now()}.mp4`);
   file.create();
-  file.write(base64, { encoding: "base64" });
+  await file.write(base64, { encoding: "base64" });
   return file.uri;
 }

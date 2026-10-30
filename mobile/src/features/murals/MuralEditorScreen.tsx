@@ -20,7 +20,7 @@ import {
 } from "@scripta/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Stack, useFocusEffect, useRouter } from "expo-router";
-import { AccessibilityInfo, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
+import { AccessibilityInfo, Pressable, ScrollView, StyleSheet, useWindowDimensions, View, type ScrollViewInstance } from "react-native";
 import Animated, { useAnimatedReaction, useAnimatedRef, useAnimatedScrollHandler, useSharedValue } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 import { Text } from "../../ui/Text";
@@ -60,7 +60,7 @@ export function MuralEditorScreen({ id }: { id: string }) {
   const [themeOpen, setThemeOpen] = useState(false);
   const [blocks, setBlocks] = useState<MuralBlock[] | null>(null);
   const [history, setHistory] = useState<MuralBlock[][]>([]);
-  const scrollRef = useAnimatedRef<ScrollView>();
+  const scrollRef = useAnimatedRef<ScrollViewInstance>();
   const pendingScroll = useRef<number | null>(null);
   const unsavedRef = useRef(false);
   const scrollOffset = useSharedValue(0);

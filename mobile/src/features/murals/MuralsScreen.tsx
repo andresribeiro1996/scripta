@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Dimensions, FlatList, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
+import { Dimensions, FlatList, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View, type HostInstance } from "react-native";
 import { Text } from "../../ui/Text";
 import { Image } from "expo-image";
 import { RNHostView } from "@expo/ui";
@@ -38,7 +38,7 @@ export function MuralsScreen() {
   const tierlists = useQuery({ queryKey: ["tierlists"], queryFn: fetchTierlists });
   const [folderId, setFolderId] = useState<string | null | undefined>(undefined);
   const [search, setSearch] = useState("");
-  const frame = useRef<View>(null);
+  const frame = useRef<HostInstance>(null);
   const [overlap, setOverlap] = useState(0);
   const [presets, setPresets] = useState(false);
   const pendingPreset = useRef<{ id: string; preset: MuralPresetId } | null>(null);
@@ -209,7 +209,7 @@ export function MuralsScreen() {
             keyboardDismissMode="on-drag"
             refreshing={murals.isRefetching}
             onRefresh={() => void murals.refetch()}
-            ListEmptyComponent={!murals.isPending ? <EmptyState title={search ? "Nothing matches" : "No murals here"} body={search ? "Search covers every folder — nothing in your murals matches this." : "Create a freeform mural or start from a preset."} actionLabel={search ? "Clear search" : "Start from a preset"} onAction={search ? clearSearch : openPresets} /> : null}
+            ListEmptyComponent={!murals.isPending ? <EmptyState title={search ? "Nothing matches" : "No murals here"} body={search ? "Search covers every folder — nothing in your murals matches this." : "Create a freeform mural or start from a preset."} actionLabel={search ? "Clear search" : "Start from a preset"} onAction={search ? clearSearch : openPresets} /> : undefined}
             renderItem={({ item }) => {
               const muralTheme = muralThemeId(item.theme);
               const palette = themes[muralTheme].colors;

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Animated, Dimensions, Keyboard, KeyboardAvoidingView, Platform, StyleSheet, View } from "react-native";
+import { Animated, Dimensions, Keyboard, KeyboardAvoidingView, Platform, StyleSheet, View, type HostInstance } from "react-native";
 import { minimumTouchTarget, spacing, useReducedMotion } from "./theme";
 
 export const scrollDockFabHeight = 56;
@@ -24,7 +24,7 @@ export function ScrollDock({
   hidden?: boolean;
   children: (scrollProps: SearchDockScrollProps) => ReactNode;
 }) {
-  const frame = useRef<View>(null);
+  const frame = useRef<HostInstance>(null);
   const [overlap, setOverlap] = useState(0);
   const [scrolling, setScrolling] = useState(false);
   const reducedMotion = useReducedMotion();
