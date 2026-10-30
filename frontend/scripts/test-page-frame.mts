@@ -156,9 +156,12 @@ test("Home, Murals, Reader card and profiles use Page", () => {
     assert.doesNotMatch(src, /PageContainer/, file);
   }
   for (const file of ["pages/CommunityProfilePage", "components/OwnShelfView"]) {
-    assert.match(read(`${file}.tsx`), /back=\{backTo\("profile"\)\}/, file);
+    const src = read(`${file}.tsx`);
+    assert.match(src, /back=\{backTo\("profile"\)\}/, file);
+    assert.match(src, /title=\{null\}/, file);
+    assert.match(src, /<h1[^>]*font-display/, file);
+    assert.doesNotMatch(src, /max-w-(3xl|4xl)/, file);
   }
-  assert.doesNotMatch(read("components/OwnShelfView.tsx"), /<h1/);
   assert.doesNotMatch(read("pages/MuralsListPage.tsx"), /uppercase/);
   assert.doesNotMatch(read("pages/HomePage.tsx"), /const button\b/);
 });

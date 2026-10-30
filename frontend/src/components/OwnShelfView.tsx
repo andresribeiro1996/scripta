@@ -5,7 +5,7 @@ import type { FeedCategory, FeedSettings } from "@scripta/shared/community";
 import { DEFAULT_FEED_SETTINGS } from "@scripta/shared/community";
 import { fetchOwnProfile, publishProfile, setShelfMural, unpublishProfile, updateFeedSettings } from "../api/community";
 import { useAuth } from "../auth/AuthContext";
-import { avatarUrlFor } from "./Avatar";
+import { Avatar, avatarUrlFor } from "./Avatar";
 import { EmptyState } from "./EmptyState";
 import { Page } from "./page/Page";
 import { BUTTON_DANGER, BUTTON_PRIMARY, BUTTON_SECONDARY } from "./page/buttonClasses";
@@ -115,9 +115,7 @@ export function OwnShelfView({ username }: { username: string }) {
   if (own.isPending || murals.isLoading) {
     return (
       <Page title={`@${username}`} back={backTo("profile")}>
-        <div className="max-w-3xl mx-auto">
-          <SkeletonCardGrid count={2} label="Loading your shelf" tileClassName="min-h-[120px]" />
-        </div>
+        <SkeletonCardGrid count={2} label="Loading your shelf" tileClassName="min-h-[120px]" />
       </Page>
     );
   }
@@ -125,23 +123,21 @@ export function OwnShelfView({ username }: { username: string }) {
   if (own.isError || murals.isError) {
     return (
       <Page title={`@${username}`} back={backTo("profile")}>
-        <div className="max-w-3xl mx-auto">
-          <EmptyState
-            title="Shelf unavailable."
-            body="Couldn't load your shelf."
-            action={
-              <button
-                onClick={() => {
-                  void own.refetch();
-                  void murals.refetch();
-                }}
-                className={BUTTON_SECONDARY}
-              >
-                Retry
-              </button>
-            }
-          />
-        </div>
+        <EmptyState
+          title="Shelf unavailable."
+          body="Couldn't load your shelf."
+          action={
+            <button
+              onClick={() => {
+                void own.refetch();
+                void murals.refetch();
+              }}
+              className={BUTTON_SECONDARY}
+            >
+              Retry
+            </button>
+          }
+        />
       </Page>
     );
   }
@@ -154,11 +150,11 @@ export function OwnShelfView({ username }: { username: string }) {
     : undefined;
 
   return (
-    <Page
-      title={`@${username}`}
-      back={backTo("profile")}
-      actions={
-        <>
+    <Page title={null} back={backTo("profile")}>
+      <div className="flex flex-wrap items-center gap-5">
+        {session?.user && <Avatar user={session.user} size={72} />}
+        <h1 className="font-display min-w-0 flex-1 basis-48 break-words text-3xl font-bold lg:text-[2.5rem] lg:leading-[3rem]">@{username}</h1>
+        <div className="flex flex-wrap items-center gap-2">
           <span
             className={`inline-flex min-h-11 items-center rounded-full border px-3 text-sm font-semibold ${
               ownData.published ? "border-(--color-accent) bg-(--color-accent-soft) text-(--color-accent)" : "border-(--color-border) text-(--color-text-dim)"
@@ -185,10 +181,9 @@ export function OwnShelfView({ username }: { username: string }) {
             onUnpublish={() => void run(() => unpublishProfile())}
             onSaveSettings={(settings) => void run(() => updateFeedSettings(settings))}
           />
-        </>
-      }
-    >
-      <div className="max-w-4xl mx-auto">
+        </div>
+      </div>
+      <div className="mt-8">
         {error && <p className="mb-4 text-sm text-(--color-danger)">{error}</p>}
         <SwipeTabs tabs={OWN_SHELF_TABS} value={tab} onChange={setTab} label="Shelf sections">
           {(panel) => {

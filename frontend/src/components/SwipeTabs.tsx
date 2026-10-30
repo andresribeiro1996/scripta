@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type TouchEvent } from "react";
 import { prefersReducedMotion } from "../lib/theme";
+import { TAB_NAV, tabClass } from "./page/surfaceClasses";
 
 const EDGE_ZONE_PX = 24;
 const AXIS_LOCK_PX = 8;
@@ -110,7 +111,17 @@ export function SwipeTabs<T extends string>({
   return (
     <div>
       <div ref={anchorRef} />
-      <div ref={tablistRef} role="tablist" aria-label={label} className="sticky top-(--app-top) z-20 -mx-4 border-b border-(--color-border) bg-(--color-bg)/95 px-4 backdrop-blur sm:mx-0 sm:px-0">
+      <div className="hidden lg:block">
+        <nav aria-label={label} className={TAB_NAV}>
+          {tabs.map((tab, i) => (
+            <button key={tab.value} type="button" aria-current={i === index ? "true" : undefined} onClick={() => onChange(tab.value)} className={`${tabClass(i === index)} gap-1.5 px-1`}>
+              {tab.label}
+              {tab.count != null && <span className="text-xs font-medium tabular-nums text-(--color-text-dim)">{tab.count.toLocaleString()}</span>}
+            </button>
+          ))}
+        </nav>
+      </div>
+      <div ref={tablistRef} role="tablist" aria-label={label} className="sticky top-(--app-top) z-20 -mx-4 border-b border-(--color-border) bg-(--color-bg)/95 px-4 backdrop-blur sm:mx-0 sm:px-0 lg:hidden">
         <div className="relative flex" style={{ "--tabs": tabs.length } as CSSProperties}>
           {tabs.map((tab, i) => (
             <button
@@ -149,7 +160,7 @@ export function SwipeTabs<T extends string>({
                 id={`panel-${tab.value}`}
                 aria-labelledby={`tab-${tab.value}`}
                 inert={!active}
-                className={`w-full shrink-0 pt-5 ${active ? "" : moving ? "max-h-svh overflow-hidden" : "hidden"}`}
+                className={`w-full shrink-0 pt-5 lg:pt-6 ${active ? "" : moving ? "max-h-svh overflow-hidden" : "hidden"}`}
               >
                 {children(tab.value)}
               </div>
