@@ -47,7 +47,7 @@ export function Page({ title, subtitle, back, actions, tabs, width = "default", 
                       key={tab.to}
                       to={tab.to}
                       aria-current={active ? "page" : undefined}
-                      className={`inline-flex min-h-11 shrink-0 items-center whitespace-nowrap border-b-2 text-sm font-semibold focus-visible:-outline-offset-2! ${active ? "border-(--color-accent) text-(--color-text)" : "border-transparent text-(--color-text-dim) hover:text-(--color-text)"}`}
+                      className={`inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center whitespace-nowrap border-b-2 text-sm font-semibold focus-visible:-outline-offset-2! ${active ? "border-(--color-accent) text-(--color-text)" : "border-transparent text-(--color-text-dim) hover:text-(--color-text)"}`}
                     >{tab.label}</Link>
                   );
                 })}

@@ -45,3 +45,14 @@ test("the vote page hides the phone bottom bar while its pool dock shows, under 
   assert.match(vote, /setNavHidden\?\.\(false\)/);
   assert.match(vote, /<HideBottomNav \/>\s*<TierBoard\b/);
 });
+
+test("the vote page keeps a way out to Games for a reader with a username, and gives nobody else one", () => {
+  const vote = readFileSync(new URL("../src/pages/VoteTierlistPage.tsx", import.meta.url), "utf8");
+  assert.match(vote, /const back = session\?\.user\.username \? backTo\("tierlist"\) : undefined;/);
+  const pages = vote.match(/<Page\b(?:=>|[^>])*>/g) ?? [];
+  assert.ok(pages.length > 0);
+  for (const tag of pages) assert.match(tag, /\bback=\{back\}/, tag.slice(0, 80));
+  const screens = vote.match(/<InfoScreen\b(?:=>|[^>])*>/g) ?? [];
+  assert.ok(screens.length > 0);
+  for (const tag of screens) assert.match(tag, /\bback=\{back\}/, tag.slice(0, 80));
+});

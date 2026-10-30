@@ -72,6 +72,12 @@ test("the desktop sidebar is gone and pinned elements sit under the bar", () => 
   assert.match(read("components/book/BookScreen"), /sm:top-\[calc\(var\(--app-top\)\+1\.5rem\)\]/);
 });
 
+test("SwipeTabs reveals its top against the sticky offset, not against zero", () => {
+  const swipe = readFileSync(new URL("../src/components/SwipeTabs.tsx", import.meta.url), "utf8");
+  assert.match(swipe, /anchor\.getBoundingClientRect\(\)\.top < parseFloat\(getComputedStyle\(tablist\)\.top\)/);
+  assert.doesNotMatch(swipe, /getBoundingClientRect\(\)\.top < 0/);
+});
+
 test("a fullscreen mural covers the bar, so its pinned header sticks at the top of the overlay", () => {
   const read = (f: string) => readFileSync(new URL(`../src/${f}.tsx`, import.meta.url), "utf8");
   for (const f of ["pages/MuralEditorPage", "pages/SharedMuralPage"]) assert.match(read(f), /fixed inset-0 z-50 [^"]*\[--app-top:0px\]/, f);

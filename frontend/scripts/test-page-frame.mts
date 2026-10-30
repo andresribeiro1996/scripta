@@ -29,7 +29,7 @@ test("back link above the title, actions on the title row, subtitle under the ti
 
 test("tabs: 44px, one current, underline on the hairline", () => {
   const html = render(createElement(Page, { title: "Games", tabs: area("games").tabs, children: "x" }));
-  assert.equal(html.match(/<a(?=[^>]*min-h-11)(?=[^>]*border-b-2)[^>]*>/g)?.length, 3);
+  assert.equal(html.match(/<a(?=[^>]*min-h-11)(?=[^>]*min-w-11)(?=[^>]*justify-center)(?=[^>]*border-b-2)[^>]*>/g)?.length, 3);
   assert.equal(html.match(/<a(?=[^>]*border-b-2)(?=[^>]*focus-visible:-outline-offset-2!)[^>]*>/g)?.length, 3);
   assert.match(html, /<nav(?=[^>]*aria-label="Sections")(?=[^>]*overflow-x-auto)(?=[^>]*shadow-\[inset_0_-1px_0_var\(--color-border\)\])[^>]*>/);
   assert.doesNotMatch(html, /-mb-px/);

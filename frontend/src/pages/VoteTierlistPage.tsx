@@ -37,12 +37,13 @@ import { Sheet } from "../components/Sheet";
 import { TierBoard } from "../components/tierlist/TierBoard";
 import { TierlistResultsView } from "../components/tierlist/TierlistResultsView";
 import { useTierlistVoting } from "../hooks/useTierlistVoting";
+import { backTo } from "../lib/areas";
 import { toPrivateBook } from "../lib/sharedMural";
 import { toPlacements } from "../lib/tierlistResults";
 
-function InfoScreen({ message }: { message: string }) {
+function InfoScreen({ message, back }: { message: string; back?: { to: string; label: string } }) {
   return (
-    <Page title="Tier list">
+    <Page title="Tier list" back={back}>
       <p className="text-sm text-(--color-text-dim)">{message}</p>
     </Page>
   );
@@ -68,15 +69,16 @@ export function VoteTierlistPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [booksOpen, setBooksOpen] = useState(false);
   const [picked, setPicked] = useState<PublicBookData | null>(null);
+  const back = session?.user.username ? backTo("tierlist") : undefined;
 
   if (!code || error) {
-    return <InfoScreen message="No tier list at that link." />;
+    return <InfoScreen message="No tier list at that link." back={back} />;
   }
   if (isLoading || !board) {
-    return <InfoScreen message="Loading…" />;
+    return <InfoScreen message="Loading…" back={back} />;
   }
   if (ballotError) {
-    return <InfoScreen message="Couldn't load your ballot. Reload to try again." />;
+    return <InfoScreen message="Couldn't load your ballot. Reload to try again." back={back} />;
   }
 
   const subject = board.subject;
@@ -142,6 +144,7 @@ export function VoteTierlistPage() {
     return (
       <Page
         title={board.name}
+        back={back}
         actions={
           <>
             {ballot && board.votingOpen && (
@@ -198,6 +201,7 @@ export function VoteTierlistPage() {
   return (
     <Page
       title={board.name}
+      back={back}
       actions={
         <>
           {membersOnlyBlocked ? (
