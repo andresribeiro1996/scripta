@@ -43,6 +43,7 @@ export interface BooksRepository {
   makeSearchable(id: string): void;
   isSearchable(id: string): boolean;
   getImage(id: string): CoverImageRow | undefined;
+  listImages(bookId: string): CoverImageRow[];
   insertImage(row: CoverImageRow): void;
   listPendingColorImageIds(limit: number): string[];
   setImageColor(id: string, color: string): void;
