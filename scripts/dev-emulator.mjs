@@ -19,7 +19,8 @@
 //   1. Boot the leased AVD if it isn't already running (creating it
 //      first, on a machine that's never run this before). No lock
 //      screen, no screen timeout — the whole reason this script exists.
-//   2. Sideload Expo Go if this AVD doesn't have it (the `google_apis`
+//   2. Sideload Expo Go if this AVD doesn't have it, or has one built for
+//      a different SDK major than mobile/package.json (the `google_apis`
 //      image has no Play Store to install it from normally).
 //   3. --reset only: wipe backend/data/dev/ so every module starts clean.
 //   4. Seed the dev account + fixture library (scripts/dev-account.mjs,
@@ -170,15 +171,25 @@ async function ensureAvdBooted(avd, env) {
   return serial;
 }
 
+export function parseExpoGoVersion(dumpsysOutput) {
+  return dumpsysOutput.match(/versionName=(\S+)/)?.[1] ?? null;
+}
+
+export function expoGoMatchesSdk(versionName, sdkMajor) {
+  return versionName?.split(".")[0] === String(sdkMajor);
+}
+
 async function ensureExpoGo(serial, env) {
-  const { stdout } = run("adb", ["-s", serial, "shell", "pm", "list", "packages"], { env });
-  if (stdout.includes("host.exp.exponent")) {
-    log("Expo Go already installed.");
-    return;
-  }
   const expoDependency = JSON.parse(readFileSync(join(mobileDir, "package.json"), "utf8")).dependencies.expo;
   const sdkMajor = expoDependency.match(/\d+/)[0];
-  log(`Installing Expo Go for SDK ${sdkMajor}...`);
+  const dumpsys = run("adb", ["-s", serial, "shell", "dumpsys", "package", "host.exp.exponent"], { env });
+  if (dumpsys.status !== 0) throw new Error(`adb dumpsys package failed:\n${dumpsys.stdout}\n${dumpsys.stderr}`);
+  const installed = parseExpoGoVersion(dumpsys.stdout);
+  if (expoGoMatchesSdk(installed, sdkMajor)) {
+    log(`Expo Go ${installed} already installed.`);
+    return;
+  }
+  log(installed ? `Replacing Expo Go ${installed} with one for SDK ${sdkMajor}...` : `Installing Expo Go for SDK ${sdkMajor}...`);
   const versions = await fetch("https://api.expo.dev/v2/versions/latest").then((r) => r.json());
   const apkUrl = versions.data.sdkVersions[`${sdkMajor}.0.0`]?.androidClientUrl;
   if (!apkUrl) throw new Error(`No Expo Go APK listed for SDK ${sdkMajor}.0.0 — check https://api.expo.dev/v2/versions/latest`);
@@ -190,7 +201,12 @@ async function ensureExpoGo(serial, env) {
   // routinely outruns run()'s 15s default — that default exists to bound
   // the fast adb calls (devices/getprop/emu avd name/reverse), not this
   // one, so it's overridden here rather than raised globally.
-  const install = run("adb", ["-s", serial, "install", apkPath], { env, timeoutMs: 300_000 });
+  let install = run("adb", ["-s", serial, "install", "-r", apkPath], { env, timeoutMs: 300_000 });
+  if (install.stdout.includes("INSTALL_FAILED_VERSION_DOWNGRADE") || install.stderr.includes("INSTALL_FAILED_VERSION_DOWNGRADE")) {
+    log(`Expo Go ${installed} is newer than SDK ${sdkMajor}'s; uninstalling it first...`);
+    run("adb", ["-s", serial, "uninstall", "host.exp.exponent"], { env, timeoutMs: 60_000 });
+    install = run("adb", ["-s", serial, "install", apkPath], { env, timeoutMs: 300_000 });
+  }
   if (!install.stdout.includes("Success")) throw new Error(`adb install failed:\n${install.stdout}\n${install.stderr}`);
 }
 

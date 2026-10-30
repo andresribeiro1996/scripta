@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { metroNodeOptions, parseAvdNameOutput, pickSerialForAvd, shouldCreateAvd } from "./dev-emulator.mjs";
+import { expoGoMatchesSdk, metroNodeOptions, parseAvdNameOutput, parseExpoGoVersion, pickSerialForAvd, shouldCreateAvd } from "./dev-emulator.mjs";
 
 const TWO_EMULATORS = "List of devices attached\nemulator-5554\tdevice\nemulator-5556\tdevice\n";
 
@@ -75,4 +75,33 @@ test("metroNodeOptions appends to, not replaces, an existing NODE_OPTIONS", () =
 test("metroNodeOptions is idempotent — re-running does not duplicate the flag", () => {
   const once = metroNodeOptions(undefined);
   assert.equal(metroNodeOptions(once), once);
+});
+
+const EXPO_GO_DUMPSYS = `Packages:
+  Package [host.exp.exponent] (a1b2c3d):
+    userId=10190
+    versionCode=319 minSdk=24 targetSdk=35
+    versionName=57.0.9
+    flags=[ HAS_CODE ALLOW_CLEAR_USER_DATA ]
+`;
+
+test("parseExpoGoVersion reads versionName from dumpsys package output", () => {
+  assert.equal(parseExpoGoVersion(EXPO_GO_DUMPSYS), "57.0.9");
+});
+
+test("parseExpoGoVersion returns null when Expo Go is not installed", () => {
+  assert.equal(parseExpoGoVersion("Unable to find package: host.exp.exponent\n"), null);
+  assert.equal(parseExpoGoVersion(""), null);
+});
+
+test("expoGoMatchesSdk compares the installed major to the project's SDK major", () => {
+  assert.equal(expoGoMatchesSdk("58.0.5", "58"), true);
+  assert.equal(expoGoMatchesSdk("58.0.5", 58), true);
+  assert.equal(expoGoMatchesSdk("57.0.9", "58"), false);
+  assert.equal(expoGoMatchesSdk("59.0.0", "58"), false);
+  assert.equal(expoGoMatchesSdk("5.8.0", "58"), false);
+});
+
+test("expoGoMatchesSdk treats a missing Expo Go as a mismatch", () => {
+  assert.equal(expoGoMatchesSdk(null, "58"), false);
 });

@@ -51,11 +51,12 @@ with `npm run dev:release` after testing.
 
 Idempotent — boots the `scripta-dev` AVD if it isn't running (creating it
 first, on a machine that's never run this before), sideloads Expo Go if
-needed, builds `@scripta/shared` if this worktree hasn't yet, seeds the dev
-data (below), starts the backend and Metro if either isn't already up, and
-opens Expo Go pointed at this worktree's servers. Safe to re-run any time —
-re-running while everything is already up just re-launches Expo Go against
-the current bundle. By default, re-running **preserves** whatever you did
+it's missing or built for a different SDK major, builds `@scripta/shared`
+if this worktree hasn't yet, seeds the dev data (below), starts the
+backend and Metro if either isn't already up, and opens Expo Go pointed
+at this worktree's servers. Safe to re-run any time — re-running while
+everything is already up just re-launches Expo Go against the current
+bundle. By default, re-running **preserves** whatever you did
 in the app last time; pass `--reset` to wipe the seeded data back to its
 initial state:
 
