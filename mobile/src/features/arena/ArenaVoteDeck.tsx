@@ -14,6 +14,7 @@ const FLY_OUT_DISTANCE = 500;
 
 function VoteHalf({
   side,
+  character,
   winId,
   loseId,
   disabled,
@@ -21,6 +22,7 @@ function VoteHalf({
   onVote,
 }: {
   side: DuelSide;
+  character: boolean;
   winId: string | null;
   loseId: string | null;
   disabled: boolean;
@@ -86,8 +88,8 @@ function VoteHalf({
       <Animated.View
         accessible
         accessibilityRole="button"
-        accessibilityLabel={`${side.title} by ${side.author}`}
-        accessibilityHint="Picks this book as the winner"
+        accessibilityLabel={character ? side.title : `${side.title} by ${side.author}`}
+        accessibilityHint={`Picks this ${character ? "character" : "book"} as the winner`}
         accessibilityState={{ disabled: disabled || winId === null }}
         onAccessibilityTap={() => { if (winId) onVote(winId); }}
         style={[styles.half, rounding, cardStyle]}
@@ -100,7 +102,7 @@ function VoteHalf({
         <View pointerEvents="none" style={[styles.scrim, { backgroundColor: colors.scrim }]} />
         <View pointerEvents="none" style={styles.textOverlay}>
           <Text numberOfLines={2} {...dynamicType} style={[typography.body, styles.strong, { color: "#ffffff" }]}>{side.title}</Text>
-          <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: "rgba(255,255,255,0.8)" }]}>{side.author}</Text>
+          {character ? null : <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: "rgba(255,255,255,0.8)" }]}>{side.author}</Text>}
         </View>
         <Text {...dynamicType} pointerEvents="none" style={[typography.caption, styles.hint, styles.hintTop]}>↑ pick</Text>
         <Text {...dynamicType} pointerEvents="none" style={[typography.caption, styles.hint, styles.hintBottom]}>↓ pass</Text>
@@ -112,7 +114,7 @@ function VoteHalf({
 /** One card at a time, remounted per attempt: a swipe animates a half off
  *  screen, so both the next duel and a retry of this one need fresh ones
  *  back at rest. */
-export function ArenaVoteDeck({ duel, disabled, onVote }: { duel: Duel; disabled: boolean; onVote: (workId: string) => void }) {
+export function ArenaVoteDeck({ duel, character = false, disabled, onVote }: { duel: Duel; character?: boolean; disabled: boolean; onVote: (workId: string) => void }) {
   const { colors } = useTheme();
   const [attempt, setAttempt] = useState(0);
   const vote = (workId: string) => { setAttempt((n) => n + 1); onVote(workId); };
@@ -121,8 +123,8 @@ export function ArenaVoteDeck({ duel, disabled, onVote }: { duel: Duel; disabled
     <View key={`${duel.id}:${attempt}`} style={styles.wrap}>
       <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.center, { color: colors.text }]}>Round {duel.roundNumber} · Match {duel.duelIndex + 1} · {countdownLabel(duel.closesAt)}</Text>
       <View style={styles.row}>
-        <VoteHalf side={duel.bookA} winId={duel.bookA.workId} loseId={duel.bookB.workId} disabled={disabled} edge="left" onVote={vote} />
-        <VoteHalf side={duel.bookB} winId={duel.bookB.workId} loseId={duel.bookA.workId} disabled={disabled} edge="right" onVote={vote} />
+        <VoteHalf character={character} side={duel.bookA} winId={duel.bookA.workId} loseId={duel.bookB.workId} disabled={disabled} edge="left" onVote={vote} />
+        <VoteHalf character={character} side={duel.bookB} winId={duel.bookB.workId} loseId={duel.bookA.workId} disabled={disabled} edge="right" onVote={vote} />
         <View pointerEvents="none" style={[styles.vs, { backgroundColor: colors.surface, borderColor: colors.border }]}><Text style={[styles.vsText, { color: colors.text }]}>VS</Text></View>
       </View>
       <Text {...dynamicType} style={[typography.caption, styles.center, { color: colors.textDim }]}>Swipe a cover up to pick it, down to pass — or tap it to pick. Votes can't be changed.</Text>

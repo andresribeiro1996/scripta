@@ -11,17 +11,17 @@ import { BookCover } from "./BookCover";
 const COVER_WIDTH = 140;
 const COVER_HEIGHT = 210;
 
-export function ChampionBanner({ champion }: { champion: DuelSide }) {
+export function ChampionBanner({ champion, character = false }: { champion: DuelSide; character?: boolean }) {
   const { colors } = useTheme();
   return (
-    <View accessibilityLabel={`Winner: ${champion.title} by ${champion.author}`} style={styles.wrap}>
+    <View accessibilityLabel={character ? `Winner: ${champion.title}` : `Winner: ${champion.title} by ${champion.author}`} style={styles.wrap}>
       <BookCover cover={champion.cover} title={champion.title} width={COVER_WIDTH} height={COVER_HEIGHT} />
       <View style={styles.label}>
         <Icon name="champion" size={16} color={colors.accent} />
         <Text {...dynamicType} style={[typography.caption, styles.labelText, { color: colors.accent }]}>Winner</Text>
       </View>
       <Text {...dynamicType} numberOfLines={3} style={[typography.heading, styles.title, { color: colors.text }]}>{champion.title}</Text>
-      <Text {...dynamicType} numberOfLines={1} style={[typography.body, styles.center, { color: colors.textDim }]}>{champion.author}</Text>
+      {character ? null : <Text {...dynamicType} numberOfLines={1} style={[typography.body, styles.center, { color: colors.textDim }]}>{champion.author}</Text>}
     </View>
   );
 }

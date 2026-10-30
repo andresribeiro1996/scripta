@@ -112,6 +112,7 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
       return (
         <View style={styles.matchWrap}>
           <ArenaVoteDeck
+            character={data.subject !== null}
             duel={next}
             disabled={busy === next.id}
             onVote={(workId) => void action(next.id, () => voteOnDuel(id, next.id, token, workId))}
@@ -124,7 +125,7 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
         {champion ? (
           <>
             <Text {...dynamicType} style={[typography.caption, styles.note, { color: colors.textDim }]}>{empty.title}</Text>
-            <ChampionBanner champion={champion} />
+            <ChampionBanner champion={champion} character={data.subject !== null} />
           </>
         ) : (
           <EmptyState title={empty.title} body={empty.body} />

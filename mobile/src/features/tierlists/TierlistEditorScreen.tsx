@@ -169,7 +169,7 @@ export function TierlistEditorScreen({ tierlist, onUpdated, startInRank = false 
     </Dialog>
     <Dialog visible={confirmingVoting} title="Open voting" onClose={() => setConfirmingVoting(false)}>
       <View style={styles.dialog}>
-        <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>This makes “{current.name}” public and locks its name, books, and tiers. At 100 distinct signed-in voters, it becomes an app-owned reference.</Text>
+        <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>This makes “{current.name}” public and locks its name, {subject ? "characters" : "books"}, and tiers. At 100 distinct signed-in voters, it becomes an app-owned reference.</Text>
         <Button label="Open to anyone" loading={busy} onPress={() => void openCommunityVoting("anonymous")} />
         <Button label="Members only" variant="secondary" loading={busy} onPress={() => void openCommunityVoting("members")} />
       </View>

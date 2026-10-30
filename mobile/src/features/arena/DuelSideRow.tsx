@@ -6,18 +6,18 @@ import { Button, dynamicType, radii, spacing, typography, useTheme } from "../..
 import { workPath } from "../works/workPath";
 import { BookCover } from "./BookCover";
 
-export function DuelSideRow({ side, duel, onClose }: { side: DuelSide; duel: Duel; onClose: () => void }) {
+export function DuelSideRow({ side, duel, character = false, onClose }: { side: DuelSide; duel: Duel; character?: boolean; onClose: () => void }) {
   const { colors } = useTheme();
   const percent = sharePercent(side.votes, duel);
   const segments = useSegments();
   return (
-    <View accessibilityLabel={`${side.title} by ${side.author}`} style={[styles.side, { borderColor: duelWinner(duel) === side ? colors.success : colors.border }]}>
+    <View accessibilityLabel={character ? side.title : `${side.title} by ${side.author}`} style={[styles.side, { borderColor: duelWinner(duel) === side ? colors.success : colors.border }]}>
       <BookCover cover={side.cover} title={side.title} width={46} height={66} />
       <View style={styles.grow}>
         <Text numberOfLines={2} {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>{side.title}</Text>
-        <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{side.author}</Text>
+        {character ? null : <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{side.author}</Text>}
         <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{side.votes} votes{percent === null ? "" : ` · ${percent}%`}</Text>
-        {side.workId ? <Button label="About this book" accessibilityLabel={`About ${side.title}`} variant="secondary" onPress={() => { onClose(); router.push(workPath(side.workId!, segments) as never); }} /> : null}
+        {side.workId && !character ? <Button label="About this book" accessibilityLabel={`About ${side.title}`} variant="secondary" onPress={() => { onClose(); router.push(workPath(side.workId!, segments) as never); }} /> : null}
       </View>
     </View>
   );

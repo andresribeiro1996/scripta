@@ -54,7 +54,7 @@ const BAR_RESERVE = BAR_HEIGHT + 24;
 const COVER_WIDTH = 32;
 const COVER_HEIGHT = 48;
 
-function MatchRow({ side, isWinner, isChampion, decided, busy, blankTally, onPick }: { side: DuelSide; isWinner: boolean; isChampion: boolean; decided: boolean; busy: boolean; blankTally: boolean; onPick?: () => void }) {
+function MatchRow({ side, character, isWinner, isChampion, decided, busy, blankTally, onPick }: { side: DuelSide; character: boolean; isWinner: boolean; isChampion: boolean; decided: boolean; busy: boolean; blankTally: boolean; onPick?: () => void }) {
   const { colors } = useTheme();
   const faded = decided && !isWinner;
   const won = decided && isWinner;
@@ -63,7 +63,7 @@ function MatchRow({ side, isWinner, isChampion, decided, busy, blankTally, onPic
       <BookCover cover={side.cover} title={side.title} width={COVER_WIDTH} height={COVER_HEIGHT} />
       <View style={styles.rowText}>
         <Text numberOfLines={1} {...dynamicType} style={[typography.body, isWinner && styles.bold, { color: faded ? colors.textDim : colors.text }]}>{side.title}</Text>
-        <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{side.author}</Text>
+        {character ? null : <Text numberOfLines={1} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{side.author}</Text>}
       </View>
       {onPick ? (
         <Pressable
@@ -130,6 +130,7 @@ function MatchCard({
   matchNumber,
   feeders,
   championId,
+  character,
   isOwner,
   busy,
   onOpen,
@@ -140,6 +141,7 @@ function MatchCard({
   matchNumber: number;
   feeders: [string, string] | null;
   championId: string | null;
+  character: boolean;
   isOwner: boolean;
   busy: boolean;
   onOpen: (duel: Duel) => void;
@@ -206,6 +208,7 @@ function MatchCard({
       <Brace winnerSide={winner === duel.bookA ? "a" : winner === duel.bookB ? "b" : null} />
       <View style={styles.grow}>
       <MatchRow
+        character={character}
         side={duel.bookA}
         isWinner={winner === duel.bookA}
         isChampion={championId !== null && championId === duel.bookA.workId}
@@ -216,6 +219,7 @@ function MatchCard({
       />
       <VersusRule />
       <MatchRow
+        character={character}
         side={duel.bookB}
         isWinner={winner === duel.bookB}
         isChampion={championId !== null && championId === duel.bookB.workId}
@@ -329,6 +333,7 @@ export function BracketRounds({
                 matchNumber={i + 1}
                 feeders={roundIdx > 0 ? [feederLabel(roundIdx - 1, i * 2 + 1), feederLabel(roundIdx - 1, i * 2 + 2)] : null}
                 championId={champion?.workId ?? null}
+                character={tournament.subject !== null}
                 isOwner={isOwner}
                 busy={busyDuelId === duel?.id}
                 onOpen={(opened) => setOpenId(opened.id)}
@@ -382,8 +387,8 @@ export function BracketRounds({
             <Text {...dynamicType} style={[typography.caption, styles.center, { color: colors.textDim }]}>
               Round {openDuel.roundNumber} · Match {openDuel.duelIndex + 1} · {openDuel.status === "active" ? countdownLabel(openDuel.closesAt) : openDuel.status === "tied_pending_tiebreak" ? "Owner tiebreak needed" : "Settled"}
             </Text>
-            <DuelSideRow side={openDuel.bookA} duel={openDuel} onClose={() => setOpenId(null)} />
-            <DuelSideRow side={openDuel.bookB} duel={openDuel} onClose={() => setOpenId(null)} />
+            <DuelSideRow side={openDuel.bookA} duel={openDuel} character={tournament.subject !== null} onClose={() => setOpenId(null)} />
+            <DuelSideRow side={openDuel.bookB} duel={openDuel} character={tournament.subject !== null} onClose={() => setOpenId(null)} />
           </ScrollView>
         ) : null}
       </Sheet>

@@ -61,7 +61,7 @@ export function TierBoard({ data, books, onChange, structureEditable, poolLabel 
   }
   function renderBooks(section: string) {
     const ids = idsFor(section).filter((id) => byWork.has(id));
-    if (!ids.length) return <Text {...dynamicType} style={[typography.caption, styles.empty, { color: colors.textDim }]}>{section === "pool" ? "Books unavailable" : "–"}</Text>;
+    if (!ids.length) return <Text {...dynamicType} style={[typography.caption, styles.empty, { color: colors.textDim }]}>{section === "pool" ? `${books.some(isCharacterBook) ? "Characters" : "Books"} unavailable` : "–"}</Text>;
     return <TierRowScroll style={section === "pool" ? styles.poolBooks : styles.booksScroll} contentContainerStyle={styles.books}>{ids.map((id) => <BookChip key={id} book={byWork.get(id)!} onReassign={onReassign ? () => onReassign(id) : undefined} />)}</TierRowScroll>;
   }
 

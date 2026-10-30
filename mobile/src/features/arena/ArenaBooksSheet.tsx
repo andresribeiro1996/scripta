@@ -10,13 +10,13 @@ export function ArenaBooksSheet({ id, name, character = false, onAddBook, onClos
   const tournament = useQuery({ queryKey: ["arena", id, "preview"], queryFn: () => fetchTournament(id!), enabled: Boolean(id), retry: false });
 
   return <Sheet visible={id !== null} title={`${name} ${character ? "characters" : "books"}`} onClose={onClose}>
-    {tournament.isPending ? <Skeleton height={180} /> : tournament.isError ? <ErrorState body="Couldn't load these books." actionLabel="Retry" onAction={() => void tournament.refetch()} /> :
+    {tournament.isPending ? <Skeleton height={180} /> : tournament.isError ? <ErrorState body={`Couldn't load these ${character ? "characters" : "books"}.`} actionLabel="Retry" onAction={() => void tournament.refetch()} /> :
       <FlatList
         data={tournament.data.slots}
         keyExtractor={(slot) => String(slot.slotIndex)}
         style={styles.list}
         contentContainerStyle={styles.content}
-        ListEmptyComponent={<EmptyState title={character ? "No characters seeded" : "No books seeded"} body="Books will appear when the bracket is filled." />}
+        ListEmptyComponent={<EmptyState title={character ? "No characters seeded" : "No books seeded"} body={`${character ? "Characters" : "Books"} will appear when the bracket is filled.`} />}
         renderItem={({ item }) => <Pressable disabled={character} accessibilityLabel={character ? item.title : `${item.title} by ${item.author}`} onPress={() => onAddBook({ title: item.title, author: item.author, coverUrl: item.cover ?? null })} style={styles.book}>
           <BookCover cover={item.cover} title={item.title} width={46} height={66} />
           <View style={styles.text}>

@@ -114,7 +114,7 @@ export function TierSortDeck({ data, books, onAssign, selectedWorkId }: { data: 
       targeted.set(-1);
     });
 
-  if (!data.tiers.length) return <EmptyState title="No tiers yet" body="Add a tier from the menu, then rank your books." />;
+  if (!data.tiers.length) return <EmptyState title="No tiers yet" body={`Add a tier from the menu, then rank your ${books.some(isCharacterBook) ? "characters" : "books"}.`} />;
   if (!book) return <EmptyState title="Nothing left to rank" body="Every book in this list already sits in a tier." />;
 
   return <View style={styles.deck}>
