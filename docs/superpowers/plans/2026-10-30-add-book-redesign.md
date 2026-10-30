@@ -27,7 +27,7 @@
 ## Review Focus
 
 1. Upload a photo, then leave by Android back or swipe-down (not the ✕) → the photo is deleted. Owned by Task 4 (unmount clean-up) and pinned by Task 3's `abandonedUpload` tests.
-2. Upload, tap Add, the save fails, then the user leaves → the photo is deleted (only a *successful* add keeps it). Task 3 test `abandonedUpload after a failed save`.
+2. Upload, tap Add, then leave while the save is in flight → the photo is deleted only if that save fails; a save that succeeds keeps it. Task 3 `uploadToDeleteOnExit` tests; also in the Task 4 device pass (failed save via the tunnel cut).
 3. Total pages typed as `0`, `-3`, `310 pages`, `3.5`, or blank → no `_pages` is stored and the field shows no error-blocking state. Task 3 `parsePages` tests.
 4. Upload photo A, then Upload photo B (or Find cover) → A is deleted, B (or the found cover) is kept. Task 3 `replacedUpload` tests.
 5. Upload a photo, then search and tap a result with no cover, or one with a cover → the photo stays. Task 3 `coverAfterResult` tests.
@@ -41,6 +41,8 @@
 - Test: `packages/shared/src/library/bookSearch.test.ts`
 - Test: `packages/shared/src/library/merge.test.ts`
 - Test: `packages/shared/src/library/dedupe.test.ts`
+
+`merge.ts` and `dedupe.ts` already behave as the Step 2 tests describe (checked in pre-execution review); if a Step 2 test fails anyway, stop and report rather than changing them.
 
 **Interfaces:**
 - Produces (exported from `@scripta/shared`):
@@ -61,8 +63,8 @@
   - `merge.test.ts` `re-adding a book takes the incoming format and keeps an existing page count when none is sent` — existing `{…, _format: "ebook", _pages: 300}`, incoming same identity `{…, _format: "hardcopy"}` → merged `_format === "hardcopy"`, `_pages === 300`. Use the same merge entry point the file's existing tests use.
   - `dedupe.test.ts` `combineBooks fills format and pages from the other copy` — keep `{_format: "ebook"}`, other `{_format: "hardcopy", _pages: 120}` → `_format === "ebook"`, `_pages === 120`.
 - [ ] **Step 3: Run** `npm test --workspace @scripta/shared` — Step 1 tests FAIL (no `_format` / `pages`), Step 2 tests PASS.
-- [ ] **Step 4: Implement** the Interfaces above in `bookSearch.ts`. If a Step 2 test failed, fix `merge.ts`/`dedupe.ts` to the stated rule (incoming-if-present else existing; dedupe fills blanks from the other copy) and add that file to this task's commit.
-- [ ] **Step 5: Run** `npm run build --workspace @scripta/shared && npm test --workspace @scripta/shared` — PASS.
+- [ ] **Step 4: Implement** the Interfaces above in `bookSearch.ts`.
+- [ ] **Step 5: Run** `npm run build --workspace @scripta/shared && npm test --workspace @scripta/shared && npm run typecheck --workspace frontend && npm test --workspace frontend` — PASS (shared changes reach the web client too).
 - [ ] **Step 6: Commit** `Add format and page count to manual books and search results`.
 
 ### Task 2: Backend — page count on search results
@@ -103,6 +105,7 @@
   export function coverAfterResult(current: DraftCover, resultCoverUrl: string | null): DraftCover;
   export function replacedUpload(previous: DraftCover, next: DraftCover): string | null;
   export function abandonedUpload(cover: DraftCover, added: boolean): string | null;
+  export function uploadToDeleteOnExit(cover: DraftCover, pendingSave: Promise<boolean> | null): Promise<string | null>;
   export function withDraftCover(book: Record<string, unknown>, cover: DraftCover): Record<string, unknown>;
   export function parsePages(text: string): number | null;
   export function coverStatusLabel(cover: DraftCover): "No cover yet" | "From search" | "Chosen" | "Uploaded";
@@ -113,6 +116,7 @@
   - `coverAfterResult replaces an empty or search cover` — `none` + `"x"` → `{kind:"search", url:"x"}`; `search("a")` + `null` → `{kind:"none"}`.
   - `replacedUpload names the upload being replaced` — `upload(A)` → `upload(B)` gives `A.id`; `upload(A)` → `found` gives `A.id`; `upload(A)` → same `upload(A)` gives `null`; `none` → `upload(B)` gives `null`.
   - `abandonedUpload after a failed save` — `abandonedUpload(upload(A), false) === A.id`; `abandonedUpload(upload(A), true) === null`; `abandonedUpload(found, false) === null`.
+  - `uploadToDeleteOnExit waits for an in-flight save` — with `upload(A)`: `pendingSave` resolving `true` → `null`; resolving `false` → `A.id`; `null` (no save started) → `A.id`. `pendingSave` is a `Promise<boolean>` that resolves `false` on a failed add (it never rejects).
   - `withDraftCover writes only hand-chosen covers` — `upload(A)` → `_coverImageId === A.id`, `_coverUrl === A.url`; `found("u")` → `_coverUrl === "u"`, no `_coverImageId`; `search` and `none` → record returned without `_coverUrl` / `_coverImageId`.
   - `parsePages accepts positive whole numbers only` — `"310"` → 310, `" 42 "` → 42; `""`, `"0"`, `"-3"`, `"3.5"`, `"310 pages"` → null.
   - `coverStatusLabel` — one assertion per kind, matching the four labels.
@@ -126,6 +130,7 @@
 **Files:**
 - Modify: `mobile/src/features/library/components/AddBookForm.tsx`
 - Create: `mobile/src/features/library/components/GenreChoices.tsx`
+- Modify: `mobile/src/features/library/components/StyleControls.tsx`
 - Modify: `mobile/src/features/murals/ContentTab.tsx`
 - Modify: `mobile/src/ui/icon.tsx`
 - Modify: `mobile/README.md`
@@ -135,25 +140,26 @@
 - Produces:
   - `export function GenreChoices({ value, onChange }: { value: readonly BookGenre[]; onChange: (next: BookGenre[]) => void }): JSX.Element` — the multi-select chip grid over `BOOK_GENRES`, lifted from `ContentTab.tsx`'s profile block (same look and `checkbox` a11y role); `ContentTab` uses it instead of its inline copy.
   - `AddBookForm`'s props are unchanged (`onAdd`, `onClose`, `initialQuery`, `initialScanning`); the route file is unchanged.
+  - `Chip` (`StyleControls.tsx`) gains two optional props, `icon?: IconName` (drawn before the label) and `grow?: boolean` (`flex: 1`, centred label, for equal-width rows); existing callers are unchanged.
   - New `Icon` names: `ebook` (ios `ipad`, android `tablet_android`), `audiobook` (ios `headphones`, android `headphones`), `otherFormat` (ios `square.on.circle`, android `category`). Hardcopy uses the existing `book`.
 
 Layout and behaviour are the spec's "The screen, top to bottom" and "Behaviour" sections and the mockup; the decisions not in the spec:
 
 - Search card: expanded on open (and when `initialQuery` or `initialScanning` is set); folds after a result is picked (tap or auto-select); header tap toggles. Scan button toggles the existing `IsbnScanner` inside the card; the separate "Scan again" button goes away.
-- Picking a result: set title, author, ISBN, publisher, genres, pages (`String(pages)` or `""`), then `setCover(coverAfterResult(cover, result.coverUrl))`. Scanning clears those fields and does `setCover(coverAfterResult(cover, null))`.
+- Picking a result keeps `query` and `results` (drop today's `setResults(null)` in `selectResult`) so re-expanding the card shows them. Then set title, author, ISBN, publisher, genres, pages (`String(pages)` or `""`), then `setCover(coverAfterResult(cover, result.coverUrl))`. Scanning clears those fields and does `setCover(coverAfterResult(cover, null))`.
 - One `setCover(next)` helper is the only way the cover changes; it calls `replacedUpload(cover, next)` and deletes that id (toast `Couldn't remove the replaced photo from your gallery.` on failure).
-- Find cover: disabled until title or ISBN is non-blank; opens a `Sheet` with `FoundCovers` keyed by `{ isbn, title, author }` at open time; a pick → `setCover({ kind: "found", url })` and closes the sheet.
-- Upload: same permission / picker / `uploadGalleryImage` sequence as `CoverPicker.handlePickAndUpload` (copy it, don't import from `CoverPicker`); success → `setCover({ kind: "upload", image })`. Show an uploading state on the button.
+- Find cover: disabled until title or ISBN is non-blank, with the caption `Add a title or ISBN to find a cover.` under the buttons while disabled; opens a `Sheet` with `FoundCovers` keyed by `{ isbn, title, author }` at open time; a pick with a `fullUrl` → `setCover({ kind: "found", url: cover.fullUrl })` and closes the sheet; a pick without `fullUrl` is ignored, as `book/[key]/cover.tsx` does (never fall back to the thumbnail `url`).
+- Upload: same permission / picker / `uploadGalleryImage` sequence as `CoverPicker.handlePickAndUpload` (copy it, don't import from `CoverPicker`); success → `setCover({ kind: "upload", image })`. Show an uploading state on the button. If the upload resolves after the form has unmounted (a `mounted` ref), delete the image straight away instead of setting it.
 - Genres: a `genresEdited` flag turns true when the user changes genres in the form and resets to false on a result pick or scan.
-- Save: `withDraftCover(buildManualBook({ …, format, pages: parsePages(pagesText), genres, genresEdited }, id), cover)` → `onAdd`. Set an `added` ref to `true` only after `onAdd` resolves.
-- Clean-up: an unmount effect reads the latest cover and `added` from refs and deletes `abandonedUpload(cover, added)`; this covers ✕, Android back and swipe-down. Failure → toast `Couldn't remove the uploaded photo from your gallery.`
+- Save: `withDraftCover(buildManualBook({ …, format, pages: parsePages(pagesText), genres, genresEdited }, id), cover)` → `onAdd`. Keep the save as a `Promise<boolean>` in a ref (`true` when `onAdd` resolves, `false` when it throws).
+- Clean-up: an unmount effect reads the latest cover and the pending-save ref and deletes `await uploadToDeleteOnExit(cover, pendingSave)`; this covers ✕, Android back and swipe-down, including leaving mid-save. Failure → toast `Couldn't remove the uploaded photo from your gallery.`
 - Format and Add as: rows of `Chip`s (format chips with icon + label; Add as as three equal-width chips). Genres: selected genres as chips plus an `+ Add` chip that expands `GenreChoices` inline.
 - More details: folded by default; expands to the ISBN and Publisher inputs. Opens automatically if a scan fills the ISBN.
-- `Add to library` sits outside the `ScrollView`, pinned at the bottom of the sheet; disabled until title and author are non-blank; save error text directly above it.
+- The fields scroll in `FormScroll` (it already keeps a focused field above the keyboard). `Add to library` sits below it, pinned at the bottom of the sheet above the bottom safe-area inset; while the keyboard is open the keyboard may cover it. Disabled until title and author are non-blank; save error text directly above it.
 - `mobile/README.md`: update the Add Book paragraph (around line 183) to describe the new fields and the upload clean-up.
 
 - [ ] **Step 1:** Add the three icon names; extract `GenreChoices` and switch `ContentTab.tsx` to it.
 - [ ] **Step 2:** Rewrite `AddBookForm.tsx` to the layout and decisions above.
 - [ ] **Step 3: Run** `npm run build --workspace @scripta/shared && npm run typecheck --workspace mobile && npm test --workspace mobile` — PASS.
 - [ ] **Step 4: Commit** `Redesign the mobile Add a book sheet`.
-- [ ] **Step 5: Device pass** — dispatch `device-checker` (after `node scripts/dev-status.mjs --json` shows the emulator free) on the Add a book sheet, light and dark theme: empty form; search "hobbit" and pick a result (fields, pages, cover preview fill; card folds); Upload then Android back (photo gone from You → Gallery); Upload then pick a result with a cover (upload kept, status `Uploaded`); add the book and open it in the library. Fix what it reports in this task.
+- [ ] **Step 5: Device pass** — dispatch `device-checker` (after `node scripts/dev-status.mjs --json` shows the emulator free) on the Add a book sheet, light and dark theme: empty form; search "hobbit" and pick a result (fields, pages, cover preview fill; card folds); Upload then Android back (photo gone from You → Gallery); Upload then pick a result with a cover (upload kept, status `Uploaded`); Upload, cut the backend tunnel (`adb reverse --remove`), tap Add, leave (photo gone once the tunnel is back); add the book and open it in the library. Fix what it reports in this task.

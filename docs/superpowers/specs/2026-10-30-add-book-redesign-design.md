@@ -85,3 +85,6 @@ Header stays the existing sheet header "Add a book" with its close button.
 - A replaced upload is deleted too, not only on cancel.
 - A hand-chosen cover survives a later result pick or scan.
 - Re-adding an owned book overwrites its format with the form's value.
+- When two copies are merged by dedupe, the surviving copy's format/pages win and the other only fills blanks (the existing `combineBooks` rule), not "newer wins".
+- A cover that came only from a search result is preview-only and not written to the book; the saved book gets its cover from the normal resolve chain (full size), which may pick a different image than the preview for Open Library results.
+- Find cover may create a catalog row for the typed title/ISBN even if the form is then abandoned — the same thing cover resolving already does.
