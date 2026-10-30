@@ -12,7 +12,7 @@
 
 import { randomUUID } from "node:crypto";
 import type { GameByWork } from "../works/index.js";
-import type { Duel, DuelSide, SeedBook, Tournament, TournamentRecord, TournamentView } from "@scripta/shared";
+import type { CharacterSubject, Duel, DuelSide, SeedBook, Tournament, TournamentRecord, TournamentView } from "@scripta/shared";
 import type { GameParticipation } from "@scripta/shared/community";
 import {
   AlreadyVotedError,
@@ -24,6 +24,7 @@ import {
   IncompleteSeedError,
   InvalidBookError,
   InvalidBracketSizeError,
+  InvalidCharacterSelectionError,
   InvalidSlotIndexError,
   NotEnoughBooksError,
   TournamentAlreadyStartedError,
@@ -42,8 +43,8 @@ export type { Duel, DuelSide, SeedBook, Tournament, TournamentView };
 export type { TournamentShelfFacts };
 
 export interface ArenaService {
-  createTournament(ownerUserId: string, input: { name: string; bracketSize: number; roundDurationMinutes: number }): Tournament;
-  listMine(ownerUserId: string): Tournament[];
+  createTournament(ownerUserId: string, input: { name: string; bracketSize: number; roundDurationMinutes: number; characters?: { workId: string; characterIds: string[] } }): Tournament;
+  listMine(ownerUserId: string, includeCharacters: boolean): Tournament[];
   listPublic(limit: number, offset: number): Tournament[];
   discoverWindow(needle: string, limit: number): TournamentDiscoverRef[];
   listPublicByIds(ids: string[]): Tournament[];
@@ -86,11 +87,30 @@ function isPowerOfTwo(n: number): boolean {
 const COVER_PREVIEW_LIMIT = 8;
 const RECENT_PARTICIPANT_LIMIT = 10;
 const EMPTY_PREVIEW: SeedPreview = { covers: [], filledSlots: 0 };
+const MIN_CHARACTER_BRACKET = 4;
+
+function parseSubject(value: string | null): CharacterSubject | null {
+  return value === null ? null : (JSON.parse(value) as CharacterSubject);
+}
+
+function subjectCovers(subject: CharacterSubject): string[] {
+  return subject.scope.coverUrl ? [subject.scope.coverUrl] : [];
+}
+
+function shuffled<T>(items: T[]): T[] {
+  const copy = [...items];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j]!, copy[i]!];
+  }
+  return copy;
+}
 
 // The preview and winner are required arguments rather than optional ones:
 // every caller has to say what a card should show, so a new list endpoint
 // can't quietly ship summaries with no covers/winner and no error to notice.
 function toTournamentSummary(row: TournamentRow, preview: SeedPreview, winner: SeedBook | null): Tournament {
+  const subject = parseSubject(row.subject);
   return {
     id: row.id,
     name: row.name,
@@ -100,10 +120,10 @@ function toTournamentSummary(row: TournamentRow, preview: SeedPreview, winner: S
     currentRound: row.current_round,
     createdAt: row.created_at,
     ownerUserId: row.owner_user_id,
-    covers: preview.covers,
+    covers: subject ? subjectCovers(subject) : preview.covers,
     filledSlots: preview.filledSlots,
     winner: winner && { workId: winner.workId, title: winner.title, author: winner.author, cover: winner.cover },
-    subject: null
+    subject
   };
 }
 
@@ -259,6 +279,47 @@ export function createArenaService(
     };
   }
 
+  function startSeeded(tournament: TournamentRow): void {
+    const slots = repo.getSlots(tournament.id).sort((a, b) => a.slot_index - b.slot_index);
+    if (slots.length !== tournament.bracket_size) throw new IncompleteSeedError(tournament.bracket_size, slots.length);
+
+    const books: SeedBook[] = slots.map((s) => ({ workId: s.work_id, title: s.title, author: s.author, cover: s.cover_url }));
+    const duels = buildDuelsForRound(tournament.id, 1, books, new Date().toISOString(), tournament.round_duration_minutes);
+    repo.insertDuels(duels);
+    repo.updateTournamentStatus(tournament.id, "active", 1);
+  }
+
+  function createCharacterTournament(row: TournamentRow, characters: { workId: string; characterIds: string[] }): Tournament {
+    const { characterIds } = characters;
+    if (row.bracket_size < MIN_CHARACTER_BRACKET) throw new InvalidCharacterSelectionError("A character tournament needs a bracket of at least 4.");
+    if (characterIds.length < row.bracket_size) throw new InvalidCharacterSelectionError("Choose at least as many characters as the bracket holds.");
+    const wanted = new Set(characterIds);
+    if (wanted.size !== characterIds.length) throw new InvalidCharacterSelectionError("Each character can only be chosen once.");
+    const cast = works.castOf(characters.workId);
+    if (!cast) throw new InvalidCharacterSelectionError("No cast for that book.");
+    const selected = cast.characters.filter((character) => wanted.has(character.id));
+    if (selected.length !== wanted.size) throw new InvalidCharacterSelectionError("A chosen character is not in this cast.");
+
+    const { kind, key, label, coverUrl } = cast.scope;
+    const subject: CharacterSubject = { kind: "characters", scope: { kind, key, label, coverUrl }, characters: selected.map(({ id, name }) => ({ id, name })) };
+    const slots: TournamentSlotRow[] = shuffled(subject.characters).slice(0, row.bracket_size).map((character, slotIndex) => ({
+      tournament_id: row.id,
+      slot_index: slotIndex,
+      work_id: character.id,
+      title: character.name,
+      author: label,
+      cover_url: null
+    }));
+    const seeded: TournamentRow = { ...row, subject: JSON.stringify(subject) };
+    repo.transaction(() => {
+      repo.insertTournament(seeded);
+      repo.replaceSlots(row.id, slots);
+      startSeeded(seeded);
+    });
+    emitPublished?.(row.id, row.owner_user_id);
+    return toTournamentSummary({ ...seeded, status: "active", current_round: 1 }, previewFromSlots(slots), null);
+  }
+
   return {
     createTournament(ownerUserId, input) {
       if (!isPowerOfTwo(input.bracketSize)) throw new InvalidBracketSizeError();
@@ -271,15 +332,17 @@ export function createArenaService(
         round_duration_minutes: input.roundDurationMinutes,
         status: "seeding",
         current_round: 0,
+        subject: null,
         created_at: now,
         updated_at: now
       };
+      if (input.characters) return createCharacterTournament(row, input.characters);
       repo.insertTournament(row);
       return toTournamentSummary(row, EMPTY_PREVIEW, null);
     },
 
-    listMine(ownerUserId) {
-      return summariesWithPreviews(repo, repo.listTournamentsByOwner(ownerUserId));
+    listMine(ownerUserId, includeCharacters) {
+      return summariesWithPreviews(repo, repo.listTournamentsByOwner(ownerUserId, includeCharacters));
     },
 
     listVoted(voterUserId) {
@@ -289,7 +352,19 @@ export function createArenaService(
     completedForParticipant(voterUserId, since) {
       return repo.listCompletedVotedSince(voterUserId, since).map((row) => {
         const winner = winnerBookFromDuel(row);
-        return { id: row.id, ownerUserId: row.owner_user_id, createdAt: row.created_at, name: row.name, bracketSize: row.bracket_size, status: "completed" as const, covers: winner.cover ? [winner.cover] : [], completedAt: row.settled_at, winner };
+        const subject = parseSubject(row.subject);
+        return {
+          id: row.id,
+          ownerUserId: row.owner_user_id,
+          createdAt: row.created_at,
+          name: row.name,
+          bracketSize: row.bracket_size,
+          status: "completed" as const,
+          covers: subject ? subjectCovers(subject) : winner.cover ? [winner.cover] : [],
+          ...(subject ? { subject: { kind: "characters" as const, label: subject.scope.label } } : {}),
+          completedAt: row.settled_at,
+          winner
+        };
       });
     },
 
@@ -297,7 +372,7 @@ export function createArenaService(
       return repo.listParticipation(ownerUserId, since).map((row) => ({
         id: row.id,
         name: row.name,
-        covers: previewFromSlots(repo.getSlots(row.id)).covers,
+        covers: row.subject ? subjectCovers(parseSubject(row.subject)!) : previewFromSlots(repo.getSlots(row.id)).covers,
         participantCount: row.participants,
         latestAt: row.latest_at,
         recent: repo.listRecentVoters(row.id, ownerUserId, RECENT_PARTICIPANT_LIMIT).map((r) => ({ userId: r.user_id, at: r.at }))
@@ -390,13 +465,7 @@ export function createArenaService(
       const unique = resolved.filter((book) => !seen.has(book.workId) && (seen.add(book.workId), true));
       if (unique.length < tournament.bracket_size) throw new NotEnoughBooksError(tournament.bracket_size, unique.length);
 
-      // Fisher-Yates.
-      const shuffled = [...unique];
-      for (let i = shuffled.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [shuffled[i], shuffled[j]] = [shuffled[j]!, shuffled[i]!];
-      }
-      const chosen = shuffled.slice(0, tournament.bracket_size);
+      const chosen = shuffled(unique).slice(0, tournament.bracket_size);
       const rows: TournamentSlotRow[] = chosen.map((book, i) => ({
         tournament_id: tournamentId,
         slot_index: i,
@@ -412,14 +481,7 @@ export function createArenaService(
       const tournament = repo.getOwnedTournament(tournamentId, ownerUserId);
       if (!tournament) throw new TournamentNotFoundError();
       if (tournament.status !== "seeding") throw new TournamentAlreadyStartedError();
-      const slots = repo.getSlots(tournamentId).sort((a, b) => a.slot_index - b.slot_index);
-      if (slots.length !== tournament.bracket_size) throw new IncompleteSeedError(tournament.bracket_size, slots.length);
-
-      const books: SeedBook[] = slots.map((s) => ({ workId: s.work_id, title: s.title, author: s.author, cover: s.cover_url }));
-      const nowIso = new Date().toISOString();
-      const duels = buildDuelsForRound(tournamentId, 1, books, nowIso, tournament.round_duration_minutes);
-      repo.insertDuels(duels);
-      repo.updateTournamentStatus(tournamentId, "active", 1);
+      startSeeded(tournament);
       emitPublished?.(tournamentId, ownerUserId);
     },
 
@@ -496,6 +558,7 @@ export interface PublishedTournamentRef {
   bracketSize: number;
   status: "active" | "completed";
   covers: string[];
+  subject?: { kind: "characters"; label: string };
 }
 
 export interface CompletedTournamentRef extends PublishedTournamentRef {
@@ -526,7 +589,8 @@ function toPublishedRef(summary: Tournament): PublishedTournamentRef {
     name: summary.name,
     bracketSize: summary.bracketSize,
     status: summary.status === "completed" ? "completed" : "active",
-    covers: summary.covers
+    covers: summary.covers,
+    ...(summary.subject ? { subject: { kind: "characters" as const, label: summary.subject.scope.label } } : {})
   };
 }
 
@@ -552,7 +616,7 @@ export function createArenaPublicApi(service: ArenaService): ArenaPublicApi {
       return summary ? toPublishedRef(summary) : undefined;
     },
     listPublishedByOwner: (ownerUserId) =>
-      service.listMine(ownerUserId).filter((s) => s.status !== "seeding").map(toPublishedRef),
+      service.listMine(ownerUserId, true).filter((s) => s.status !== "seeding").map(toPublishedRef),
     participationByOwner: (ownerUserId, since) => service.participationByOwner(ownerUserId, since),
     completedForParticipant: (voterUserId, since) => service.completedForParticipant(voterUserId, since)
   };

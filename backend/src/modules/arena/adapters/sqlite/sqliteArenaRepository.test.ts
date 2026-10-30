@@ -283,7 +283,7 @@ test("participation counts each voter once per started tournament, at their firs
   repo.insertVote(vote("v9", "duel-t3", "tok-2a", "u2", "2026-01-10T00:00:00.000Z"));
 
   assert.deepEqual(repo.listParticipation("u1", "2026-01-01T00:00:00.000Z").map((r) => ({ ...r })), [
-    { id: "t1", name: "Bracket", participants: 4, latest_at: "2026-01-05T00:00:00.000Z" }
+    { id: "t1", name: "Bracket", subject: null, participants: 4, latest_at: "2026-01-05T00:00:00.000Z" }
   ]);
   assert.deepEqual(repo.listRecentVoters("t1", "u1", 10).map((r) => ({ ...r })), [
     { user_id: "u3", at: "2026-01-03T00:00:00.000Z" },
@@ -323,6 +323,7 @@ function tournament(overrides: Partial<TournamentRow> & { id: string }): Tournam
     round_duration_minutes: 60,
     status: "seeding",
     current_round: 0,
+    subject: null,
     created_at: "2026-01-01T00:00:00.000Z",
     updated_at: "2026-01-01T00:00:00.000Z",
     ...overrides
@@ -605,4 +606,67 @@ test("topShelfFacts open is true only while active", () => {
   shelfTournament(db, "done", "completed", ["w1"]);
   const byId = new Map(createSqliteArenaRepository(db).topShelfFacts(null, null).map((f) => [f.id, f.open]));
   assert.deepEqual([byId.get("live"), byId.get("done")], [true, false]);
+});
+
+const characterSubject = JSON.stringify({ kind: "characters", scope: { kind: "work", key: "w", label: "Dune", coverUrl: null }, characters: [] });
+
+test("the subject column is added to an existing database and read back", () => {
+  const db = freshDb();
+  db.exec(`ALTER TABLE tournaments DROP COLUMN subject`);
+  assert.ok(!columnNames(db, "tournaments").includes("subject"));
+  applyArenaMigrations(db);
+  assert.ok(columnNames(db, "tournaments").includes("subject"));
+  const repo = createSqliteArenaRepository(db);
+  repo.insertTournament(tournament({ id: "c", subject: characterSubject }));
+  assert.equal(repo.getTournament("c")?.subject, characterSubject);
+});
+
+test("transaction commits on return and rolls back everything when the body throws", () => {
+  const repo = createSqliteArenaRepository(freshDb());
+  assert.equal(repo.transaction(() => { repo.insertTournament(tournament({ id: "kept" })); return 7; }), 7);
+  assert.throws(() => repo.transaction(() => { repo.insertTournament(tournament({ id: "lost" })); throw new Error("boom"); }), /boom/);
+  assert.ok(repo.getTournament("kept"));
+  assert.equal(repo.getTournament("lost"), undefined);
+});
+
+test("listTournamentsByOwner hides character tournaments unless asked", () => {
+  const repo = createSqliteArenaRepository(freshDb());
+  repo.insertTournament(tournament({ id: "plain" }));
+  repo.insertTournament(tournament({ id: "chars", subject: characterSubject }));
+  assert.deepEqual(repo.listTournamentsByOwner("u1", false).map((t) => t.id), ["plain"]);
+  assert.deepEqual(repo.listTournamentsByOwner("u1", true).map((t) => t.id).sort(), ["chars", "plain"]);
+});
+
+test("topShelfFacts leaves out a tournament with a subject", () => {
+  const db = freshDb();
+  shelfTournament(db, "plain", "active", ["w1"]);
+  shelfTournament(db, "chars", "completed", ["ch:a", "ch:b"], { winner: "a", settledAt: "2026-01-03T00:00:00.000Z" });
+  db.prepare(`UPDATE tournaments SET subject = ? WHERE id = 'chars'`).run(characterSubject);
+  assert.deepEqual(createSqliteArenaRepository(db).topShelfFacts(null, null).map((f) => f.id), ["plain"]);
+});
+
+test("discoverByWorks never returns a character tournament for a real work id", async () => {
+  const { createArenaService, createArenaPublicApi } = await import("../../service.js");
+  const { arenaWorks } = await import("../../plugin.js");
+  const db = freshDb();
+  const repo = createSqliteArenaRepository(db);
+  repo.insertTournament(tournament({ id: "chars", status: "active", subject: characterSubject }));
+  repo.replaceSlots("chars", [{ tournament_id: "chars", slot_index: 0, work_id: "ch:dune|paul", title: "Paul", author: "Dune", cover_url: null }]);
+  const api = createArenaPublicApi(createArenaService(repo, arenaWorks));
+  assert.deepEqual(api.discoverByWorks(["real-work-id"], 20), []);
+});
+
+test("listPublishedByOwner includes started character tournaments with their card subject and cover", async () => {
+  const { createArenaService, createArenaPublicApi } = await import("../../service.js");
+  const { arenaWorks } = await import("../../plugin.js");
+  const repo = createSqliteArenaRepository(freshDb());
+  const subject = JSON.stringify({ kind: "characters", scope: { kind: "work", key: "w", label: "Dune", coverUrl: "https://covers.test/dune.jpg" }, characters: [] });
+  repo.insertTournament(tournament({ id: "chars", status: "active", subject }));
+  repo.insertTournament(tournament({ id: "draft", status: "seeding" }));
+  const api = createArenaPublicApi(createArenaService(repo, arenaWorks));
+  const [ref, ...rest] = api.listPublishedByOwner("u1");
+  assert.equal(rest.length, 0);
+  assert.equal(ref?.id, "chars");
+  assert.deepEqual(ref?.subject, { kind: "characters", label: "Dune" });
+  assert.deepEqual(ref?.covers, ["https://covers.test/dune.jpg"]);
 });

@@ -1,0 +1,872 @@
+// backend/src/modules/arena/service.test.ts
+//
+// Exercises service.ts against a hand-written in-memory ArenaRepository
+// fake — no real SQLite database needed, same seam backend/README.md
+// describes for every other module's service layer.
+
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { normalizeWords } from "@scripta/shared";
+import {
+  AlreadyVotedError,
+  DuelNotTiedError,
+  DuelNotVotableError,
+  DuplicateBookError,
+  IncompleteSeedError,
+  InvalidBookError,
+  InvalidBracketSizeError,
+  NotEnoughBooksError,
+  TournamentAlreadyStartedError,
+  TournamentNotFoundError
+} from "./domain/errors.js";
+import type { ArenaRepository, ArenaWorks } from "./domain/ports.js";
+import type { DuelRow, SeedPreview, TournamentRow, TournamentSlotRow, VoteRow } from "./domain/types.js";
+import type { Duel, EmitPublished, EmitVotedOn } from "./service.js";
+import { createArenaService } from "./service.js";
+
+const identityWorks: ArenaWorks = {
+  knownWorkIds: (ids) => ids,
+  canonicalWorkIds: (ids) => new Map(ids.map((id) => [id, id]))
+};
+
+function newService(repo: ArenaRepository, works: ArenaWorks = identityWorks, emitPublished?: EmitPublished, emitVotedOn?: EmitVotedOn) {
+  return createArenaService(repo, works, emitPublished, emitVotedOn);
+}
+
+function createInMemoryArenaRepository(): ArenaRepository {
+  const tournaments = new Map<string, TournamentRow>();
+  const slots = new Map<string, TournamentSlotRow[]>();
+  const duels = new Map<string, DuelRow>();
+  const votes: VoteRow[] = [];
+
+  return {
+    deleteUserData() {},
+    insertTournament(row) {
+      tournaments.set(row.id, { ...row });
+    },
+    getTournament(id) {
+      return tournaments.get(id);
+    },
+    getOwnedTournament(id, ownerUserId) {
+      const t = tournaments.get(id);
+      return t && t.owner_user_id === ownerUserId ? t : undefined;
+    },
+    listTournamentsByOwner(ownerUserId) {
+      return [...tournaments.values()].filter((t) => t.owner_user_id === ownerUserId);
+    },
+    listPublicTournaments(limit, offset) {
+      return [...tournaments.values()].slice(offset, offset + limit);
+    },
+    discoverWindow(needle, limit) {
+      return [...tournaments.values()]
+        .filter((t) => t.status !== "seeding" && normalizeWords(t.name).includes(needle))
+        .sort((a, b) => b.created_at.localeCompare(a.created_at))
+        .slice(0, limit)
+        .map((t) => ({ id: t.id, created_at: t.created_at, owner_user_id: t.owner_user_id }));
+    },
+    listPublicByIds(ids) {
+      return [...tournaments.values()].filter((t) => t.status !== "seeding" && ids.includes(t.id));
+    },
+    updateTournamentStatus(id, status, currentRound) {
+      const t = tournaments.get(id);
+      if (t) {
+        t.status = status;
+        t.current_round = currentRound;
+      }
+    },
+    renameTournament(id, name) {
+      const t = tournaments.get(id);
+      if (t) t.name = name;
+    },
+    deleteTournament(id) {
+      tournaments.delete(id);
+      slots.delete(id);
+      for (const [duelId, duel] of duels) if (duel.tournament_id === id) duels.delete(duelId);
+    },
+
+    replaceSlots(tournamentId, newSlots) {
+      slots.set(tournamentId, newSlots.map((s) => ({ ...s })));
+    },
+    getSlots(tournamentId) {
+      return [...(slots.get(tournamentId) ?? [])];
+    },
+
+    getSeedPreviews(tournamentIds, coverLimit) {
+      const previews = new Map<string, SeedPreview>();
+      for (const id of tournamentIds) {
+        const rows = [...(slots.get(id) ?? [])].sort((a, b) => a.slot_index - b.slot_index);
+        previews.set(id, {
+          covers: rows.map((row) => row.cover_url).filter((url): url is string => Boolean(url)).slice(0, coverLimit),
+          filledSlots: rows.length
+        });
+      }
+      return previews;
+    },
+
+    insertDuels(newDuels) {
+      for (const duel of newDuels) duels.set(duel.id, { ...duel });
+    },
+    getDuel(id) {
+      return duels.get(id);
+    },
+    getDuelsForTournament(tournamentId) {
+      return [...duels.values()].filter((d) => d.tournament_id === tournamentId);
+    },
+    getDuelsForRound(tournamentId, roundNumber) {
+      return [...duels.values()].filter((d) => d.tournament_id === tournamentId && d.round_number === roundNumber);
+    },
+    getFinalDuels(tournamentIds) {
+      return tournamentIds.flatMap((id) => {
+        const rows = [...duels.values()].filter((d) => d.tournament_id === id);
+        if (rows.length === 0) return [];
+        const maxRound = Math.max(...rows.map((d) => d.round_number));
+        return rows.filter((d) => d.round_number === maxRound);
+      });
+    },
+    updateDuelSettlement(id, status, winnerSide, settledAt) {
+      const d = duels.get(id);
+      if (d) {
+        d.status = status;
+        d.winner_side = winnerSide;
+        d.settled_at = settledAt;
+      }
+    },
+    findActiveDuelsPastDeadline(nowIso) {
+      return [...duels.values()].filter((d) => d.status === "active" && d.closes_at <= nowIso);
+    },
+
+    insertVote(row) {
+      const alreadyVoted = votes.some(
+        (v) =>
+          v.duel_id === row.duel_id &&
+          (v.voter_token === row.voter_token ||
+            (row.voter_user_id !== null && v.voter_user_id === row.voter_user_id))
+      );
+      if (alreadyVoted) return false;
+      votes.push({ ...row });
+      return true;
+    },
+    linkVotesToUser(voterToken, voterUserId) {
+      for (const v of votes) {
+        if (v.voter_token !== voterToken || v.voter_user_id !== null) continue;
+        if (votes.some((other) => other.duel_id === v.duel_id && other.voter_user_id === voterUserId)) continue;
+        v.voter_user_id = voterUserId;
+      }
+    },
+    countVotesBySide(duelId) {
+      const counts = { a: 0, b: 0 };
+      for (const v of votes) if (v.duel_id === duelId) counts[v.side] += 1;
+      return counts;
+    },
+    hasVoted(duelId, voterToken, voterUserId) {
+      return votes.some(
+        (v) =>
+          v.duel_id === duelId &&
+          ((voterToken !== null && voterToken !== undefined && v.voter_token === voterToken) ||
+            (voterUserId !== null && voterUserId !== undefined && v.voter_user_id === voterUserId))
+      );
+    },
+    listVotedByUser(voterUserId) {
+      const lastVoteAt = new Map<string, string>();
+      for (const v of votes) {
+        if (v.voter_user_id !== voterUserId) continue;
+        const tournamentId = duels.get(v.duel_id)?.tournament_id;
+        if (!tournamentId) continue;
+        const previous = lastVoteAt.get(tournamentId);
+        if (!previous || v.created_at > previous) lastVoteAt.set(tournamentId, v.created_at);
+      }
+      return [...lastVoteAt.entries()]
+        .map(([id, at]) => ({ tournament: tournaments.get(id), at }))
+        .filter((entry): entry is { tournament: TournamentRow; at: string } => entry.tournament !== undefined)
+        .filter(({ tournament }) => tournament.owner_user_id !== voterUserId)
+        .sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0))
+        .map(({ tournament }) => tournament);
+    },
+    listCompletedVotedSince(voterUserId, since) {
+      const voted = this.listVotedByUser(voterUserId).filter((t) => t.status === "completed");
+      return this.getFinalDuels(voted.map((t) => t.id)).flatMap((final) => {
+        const tournament = voted.find((t) => t.id === final.tournament_id);
+        if (!tournament || final.status !== "settled" || !final.winner_side || !final.settled_at || final.settled_at < since) return [];
+        return [{ ...tournament, ...final, id: tournament.id, status: tournament.status, winner_side: final.winner_side, settled_at: final.settled_at }];
+      });
+    },
+    votedAmong(voterUserId, ids) {
+      return ids.filter((id) => {
+        const tournament = tournaments.get(id);
+        return tournament !== undefined && tournament.owner_user_id !== voterUserId && votes.some((v) => v.voter_user_id === voterUserId && duels.get(v.duel_id)?.tournament_id === id);
+      });
+    },
+    listPublishedByWorks() {
+      return [];
+    },
+    tournamentRecord() {
+      return { entered: 0, titles: 0, wins: 0, losses: 0, best: null };
+    },
+    topShelfFacts: () => [],
+    worksShareATournament: () => false,
+    listParticipation() {
+      return [];
+    },
+    listRecentVoters() {
+      return [];
+    }
+  };
+}
+
+function makeBook(n: number) {
+  return { workId: `w${n}`, title: `Book ${n}`, author: `Author ${n}`, cover: null };
+}
+
+function makeBookWithCover(n: number) {
+  return { workId: `w${n}`, title: `Book ${n}`, author: `Author ${n}`, cover: `https://covers.test/${n}.jpg` };
+}
+
+test("a summary carries the seeded cover preview and how many slots are filled", () => {
+  const service = newService(createInMemoryArenaRepository());
+  const tournament = service.createTournament("owner-1", { name: "Best of 2025", bracketSize: 16, roundDurationMinutes: 60 });
+  service.setSlotsManual(tournament.id, "owner-1", Array.from({ length: 9 }, (_, index) => ({
+    slotIndex: index,
+    book: makeBookWithCover(index + 1)
+  })));
+
+  const summary = service.listMine("owner-1")[0];
+  assert.equal(summary?.filledSlots, 9);
+  // Capped at eight: the card shows eight thumbnails and a remainder.
+  assert.deepEqual(summary?.covers, Array.from({ length: 8 }, (_, index) => `https://covers.test/${index + 1}.jpg`));
+});
+
+test("a cover preview skips slots seeded without art but still counts them", () => {
+  const service = newService(createInMemoryArenaRepository());
+  const tournament = service.createTournament("owner-1", { name: "No art", bracketSize: 4, roundDurationMinutes: 60 });
+  service.setSlotsManual(tournament.id, "owner-1", [
+    { slotIndex: 0, book: makeBook(1) },
+    { slotIndex: 1, book: makeBookWithCover(2) },
+    { slotIndex: 2, book: makeBook(3) }
+  ]);
+
+  const summary = service.listMine("owner-1")[0];
+  assert.equal(summary?.filledSlots, 3);
+  assert.deepEqual(summary?.covers, ["https://covers.test/2.jpg"]);
+});
+
+test("an unseeded tournament has an empty preview rather than a missing one", () => {
+  const service = newService(createInMemoryArenaRepository());
+  service.createTournament("owner-1", { name: "Fresh", bracketSize: 4, roundDurationMinutes: 60 });
+
+  const summary = service.listMine("owner-1")[0];
+  assert.equal(summary?.filledSlots, 0);
+  assert.deepEqual(summary?.covers, []);
+});
+
+test("renameTournament changes the name and leaves the bracket alone", () => {
+  const service = newService(createInMemoryArenaRepository());
+  const tournament = service.createTournament("owner-1", { name: "Untitled tournament", bracketSize: 4, roundDurationMinutes: 60 });
+
+  service.renameTournament(tournament.id, "owner-1", "Best of 2026");
+
+  const renamed = service.listMine("owner-1")[0];
+  assert.ok(renamed);
+  assert.equal(renamed.name, "Best of 2026");
+  // The whole reason rename is name-only: bracketSize is structural,
+  // and slots/duels are laid out from it.
+  assert.equal(renamed.bracketSize, 4);
+  assert.equal(renamed.status, "seeding");
+});
+
+test("renameTournament refuses someone else's tournament", () => {
+  const service = newService(createInMemoryArenaRepository());
+  const tournament = service.createTournament("owner-1", { name: "Mine", bracketSize: 4, roundDurationMinutes: 60 });
+
+  assert.throws(() => service.renameTournament(tournament.id, "owner-2", "Hijacked"), TournamentNotFoundError);
+  assert.equal(service.listMine("owner-1")[0]?.name, "Mine");
+});
+
+test("createTournament rejects a non-power-of-two bracket size", () => {
+  const service = newService(createInMemoryArenaRepository());
+  assert.throws(
+    () => service.createTournament("owner-1", { name: "Test", bracketSize: 6, roundDurationMinutes: 60 }),
+    InvalidBracketSizeError
+  );
+});
+
+test("start rejects an incompletely-seeded tournament", () => {
+  const service = newService(createInMemoryArenaRepository());
+  const tournament = service.createTournament("owner-1", { name: "Test", bracketSize: 4, roundDurationMinutes: 60 });
+  service.setSlotsManual(tournament.id, "owner-1", [
+    { slotIndex: 0, book: makeBook(1) },
+    { slotIndex: 1, book: makeBook(2) }
+  ]);
+  assert.throws(() => service.start(tournament.id, "owner-1"), IncompleteSeedError);
+});
+
+test("random-fill rejects a pool smaller than the bracket", () => {
+  const service = newService(createInMemoryArenaRepository());
+  const tournament = service.createTournament("owner-1", { name: "Test", bracketSize: 4, roundDurationMinutes: 60 });
+  assert.throws(
+    () => service.randomFill(tournament.id, "owner-1", [makeBook(1), makeBook(2)]),
+    NotEnoughBooksError
+  );
+});
+
+test("a full round of voting settles duels and advances to the next round, ending at a champion", () => {
+  const service = newService(createInMemoryArenaRepository());
+  const tournament = service.createTournament("owner-1", { name: "Test", bracketSize: 4, roundDurationMinutes: 60 });
+  service.setSlotsManual(tournament.id, "owner-1", [
+    { slotIndex: 0, book: makeBook(1) },
+    { slotIndex: 1, book: makeBook(2) },
+    { slotIndex: 2, book: makeBook(3) },
+    { slotIndex: 3, book: makeBook(4) }
+  ]);
+  service.start(tournament.id, "owner-1");
+
+  let view = service.getTournamentView(tournament.id);
+  assert.equal(view?.duels.length, 2);
+  assert.equal(view?.status, "active");
+
+  const [duelA, duelB] = view!.duels as [Duel, Duel];
+  service.vote(tournament.id, duelA.id, "voter-1", "w1");
+  service.vote(tournament.id, duelA.id, "voter-2", "w1");
+  service.vote(tournament.id, duelA.id, "voter-3", "w2");
+  service.vote(tournament.id, duelB.id, "voter-1", "w3");
+
+  // Force-settle both duels early (owner action), same path the
+  // scheduler's timer-driven sweep uses internally.
+  service.settleEarly(tournament.id, "owner-1", duelA.id);
+  service.settleEarly(tournament.id, "owner-1", duelB.id);
+
+  view = service.getTournamentView(tournament.id);
+  assert.equal(view?.status, "active"); // round 2 (the final) generated
+  assert.equal(view?.currentRound, 2);
+  const final = view!.duels.find((d) => d.roundNumber === 2)!;
+  assert.deepEqual(
+    [final.bookA.workId, final.bookB.workId].sort(),
+    ["w1", "w3"]
+  );
+
+  service.vote(tournament.id, final.id, "voter-1", "w1");
+  service.settleEarly(tournament.id, "owner-1", final.id);
+
+  view = service.getTournamentView(tournament.id);
+  assert.equal(view?.status, "completed");
+  assert.equal(view?.duels.find((d) => d.roundNumber === 2)?.winnerWorkId, "w1");
+});
+
+test("works flow from slots into round one and on to the next round's duels", () => {
+  const repo = createInMemoryArenaRepository();
+  const service = newService(repo);
+  const tournament = service.createTournament("owner-1", { name: "Test", bracketSize: 4, roundDurationMinutes: 60 });
+  service.setSlotsManual(
+    tournament.id,
+    "owner-1",
+    [1, 2, 3, 4].map((n) => ({ slotIndex: n - 1, book: makeBook(n) }))
+  );
+  service.start(tournament.id, "owner-1");
+
+  const roundOne = repo.getDuelsForRound(tournament.id, 1).sort((a, b) => a.duel_index - b.duel_index);
+  assert.deepEqual(roundOne.map((d) => [d.book_a_work_id, d.book_b_work_id]), [["w1", "w2"], ["w3", "w4"]]);
+
+  service.vote(tournament.id, roundOne[0]!.id, "voter-1", "w1");
+  service.vote(tournament.id, roundOne[1]!.id, "voter-1", "w3");
+  service.settleEarly(tournament.id, "owner-1", roundOne[0]!.id);
+  service.settleEarly(tournament.id, "owner-1", roundOne[1]!.id);
+
+  assert.equal(repo.getDuel(roundOne[0]!.id)?.winner_side, "a");
+  const [final] = repo.getDuelsForRound(tournament.id, 2);
+  assert.equal(final?.book_a_work_id, "w1");
+  assert.equal(final?.book_b_work_id, "w3");
+});
+
+test("two editions of one work can't fill two slots", () => {
+  const service = newService(createInMemoryArenaRepository());
+  const tournament = service.createTournament("owner-1", { name: "Test", bracketSize: 4, roundDurationMinutes: 60 });
+  assert.throws(
+    () =>
+      service.setSlotsManual(tournament.id, "owner-1", [
+        { slotIndex: 0, book: { workId: "w1", title: "Dune", author: "Frank Herbert", cover: null } },
+        { slotIndex: 1, book: { workId: "w1", title: "Dune", author: "Frank Herbert", cover: null } }
+      ]),
+    (error: unknown) => error instanceof DuplicateBookError && error.message.includes("Dune")
+  );
+});
+
+test("random fill keeps the first entry of each work", () => {
+  const repo = createInMemoryArenaRepository();
+  const service = newService(repo);
+  const tournament = service.createTournament("owner-1", { name: "Test", bracketSize: 2, roundDurationMinutes: 60 });
+  service.randomFill(tournament.id, "owner-1", [
+    { ...makeBook(1), workId: "w1" },
+    { ...makeBook(2), workId: "w1" },
+    makeBook(3)
+  ]);
+  assert.deepEqual(repo.getSlots(tournament.id).map((slot) => slot.title).sort(), ["Book 1", "Book 3"]);
+});
+
+test("random fill counts distinct works against the bracket size", () => {
+  const service = newService(createInMemoryArenaRepository());
+  const tournament = service.createTournament("owner-1", { name: "Test", bracketSize: 2, roundDurationMinutes: 60 });
+  assert.throws(
+    () =>
+      service.randomFill(tournament.id, "owner-1", [
+        { ...makeBook(1), workId: "w1" },
+        { ...makeBook(2), workId: "w1" }
+      ]),
+    NotEnoughBooksError
+  );
+});
+
+test("a completed tournament's summary carries the champion book", () => {
+  const repo = createInMemoryArenaRepository();
+  const service = newService(repo);
+  const tournament = service.createTournament("owner-1", { name: "Test", bracketSize: 2, roundDurationMinutes: 60 });
+  service.setSlotsManual(tournament.id, "owner-1", [
+    { slotIndex: 0, book: makeBookWithCover(1) },
+    { slotIndex: 1, book: makeBook(2) }
+  ]);
+  service.start(tournament.id, "owner-1");
+  const duel = service.getTournamentView(tournament.id)!.duels[0]!;
+  service.vote(tournament.id, duel.id, "voter-1", "w1", "voter-1");
+  service.settleEarly(tournament.id, "owner-1", duel.id);
+
+  const summary = service.listMine("owner-1")[0];
+  assert.equal(summary?.status, "completed");
+  assert.deepEqual(summary?.winner, makeBookWithCover(1));
+  const completed = service.completedForParticipant("voter-1", "2020-01-01T00:00:00.000Z");
+  assert.equal(completed.length, 1);
+  assert.deepEqual(completed[0]?.winner, makeBookWithCover(1));
+  assert.equal(completed[0]?.completedAt, repo.getDuel(duel.id)?.settled_at);
+  assert.deepEqual(service.completedForParticipant("nonparticipant", "2020-01-01T00:00:00.000Z"), []);
+  assert.deepEqual(service.completedForParticipant("voter-1", "2099-01-01T00:00:00.000Z"), []);
+  service.renameTournament(tournament.id, "owner-1", "Renamed");
+  assert.equal(service.completedForParticipant("voter-1", "2020-01-01T00:00:00.000Z")[0]?.completedAt, completed[0]?.completedAt);
+});
+
+test("a seeding or active tournament's summary has no winner yet", () => {
+  const service = newService(createInMemoryArenaRepository());
+  const fresh = service.createTournament("owner-1", { name: "Fresh", bracketSize: 2, roundDurationMinutes: 60 });
+  assert.equal(service.listMine("owner-1").find((t) => t.id === fresh.id)?.winner, null);
+
+  const running = service.createTournament("owner-1", { name: "Running", bracketSize: 2, roundDurationMinutes: 60 });
+  service.setSlotsManual(running.id, "owner-1", [
+    { slotIndex: 0, book: makeBook(1) },
+    { slotIndex: 1, book: makeBook(2) }
+  ]);
+  service.start(running.id, "owner-1");
+  assert.equal(service.listMine("owner-1").find((t) => t.id === running.id)?.winner, null);
+});
+
+test("a tied duel waits for the owner's tie-break instead of auto-advancing", () => {
+  const service = newService(createInMemoryArenaRepository());
+  const tournament = service.createTournament("owner-1", { name: "Test", bracketSize: 2, roundDurationMinutes: 60 });
+  service.setSlotsManual(tournament.id, "owner-1", [
+    { slotIndex: 0, book: makeBook(1) },
+    { slotIndex: 1, book: makeBook(2) }
+  ]);
+  service.start(tournament.id, "owner-1");
+  const duel = service.getTournamentView(tournament.id)!.duels[0]!;
+
+  service.vote(tournament.id, duel.id, "voter-1", "w1", "voter-1");
+  service.vote(tournament.id, duel.id, "voter-2", "w2");
+  service.settleEarly(tournament.id, "owner-1", duel.id);
+
+  let view = service.getTournamentView(tournament.id);
+  assert.equal(view?.duels[0]?.status, "tied_pending_tiebreak");
+  assert.deepEqual(service.completedForParticipant("voter-1", "2020-01-01T00:00:00.000Z"), []);
+  assert.equal(view?.status, "active"); // not yet completed — waiting on the owner
+
+  service.tiebreak(tournament.id, "owner-1", duel.id, "w2");
+  assert.equal(service.completedForParticipant("voter-1", "2020-01-01T00:00:00.000Z")[0]?.winner.workId, "w2");
+  assert.deepEqual(service.completedForParticipant("voter-2", "2020-01-01T00:00:00.000Z"), []);
+
+  view = service.getTournamentView(tournament.id);
+  assert.equal(view?.duels[0]?.status, "settled");
+  assert.equal(view?.duels[0]?.winnerWorkId, "w2");
+  assert.equal(view?.status, "completed"); // that was the only (final) duel
+
+  assert.throws(() => service.tiebreak(tournament.id, "owner-1", duel.id, "w1"), DuelNotTiedError);
+});
+
+test("a voter can't vote twice on the same duel, or for a book not in it", () => {
+  const service = newService(createInMemoryArenaRepository());
+  const tournament = service.createTournament("owner-1", { name: "Test", bracketSize: 2, roundDurationMinutes: 60 });
+  service.setSlotsManual(tournament.id, "owner-1", [
+    { slotIndex: 0, book: makeBook(1) },
+    { slotIndex: 1, book: makeBook(2) }
+  ]);
+  service.start(tournament.id, "owner-1");
+  const duel = service.getTournamentView(tournament.id)!.duels[0]!;
+
+  service.vote(tournament.id, duel.id, "voter-1", "w1");
+  assert.throws(() => service.vote(tournament.id, duel.id, "voter-1", "w2"), AlreadyVotedError);
+  assert.throws(() => service.vote(tournament.id, duel.id, "voter-2", "w999"), InvalidBookError);
+});
+
+test("runScheduledSweep only settles duels whose deadline has actually passed", () => {
+  const service = newService(createInMemoryArenaRepository());
+  const tournament = service.createTournament("owner-1", { name: "Test", bracketSize: 2, roundDurationMinutes: 60 });
+  service.setSlotsManual(tournament.id, "owner-1", [
+    { slotIndex: 0, book: makeBook(1) },
+    { slotIndex: 1, book: makeBook(2) }
+  ]);
+  service.start(tournament.id, "owner-1");
+  const duel = service.getTournamentView(tournament.id)!.duels[0]!;
+  service.vote(tournament.id, duel.id, "voter-1", "w1");
+
+  // "Now" is before the duel's closes_at (round_duration_minutes: 60) —
+  // the sweep must leave it alone.
+  service.runScheduledSweep(new Date(Date.parse(duel.opensAt) + 1000).toISOString());
+  assert.equal(service.getTournamentView(tournament.id)?.duels[0]?.status, "active");
+
+  // "Now" is well past closes_at — the sweep must settle it.
+  service.runScheduledSweep(new Date(Date.parse(duel.closesAt) + 1000).toISOString());
+  assert.equal(service.getTournamentView(tournament.id)?.duels[0]?.status, "settled");
+});
+
+test("only the owner can seed, start, settle, or tie-break a tournament", () => {
+  const service = newService(createInMemoryArenaRepository());
+  const tournament = service.createTournament("owner-1", { name: "Test", bracketSize: 2, roundDurationMinutes: 60 });
+  assert.throws(
+    () => service.setSlotsManual(tournament.id, "someone-else", [{ slotIndex: 0, book: makeBook(1) }]),
+    TournamentNotFoundError
+  );
+});
+
+test("a settled or already-completed duel can't be voted on", () => {
+  const service = newService(createInMemoryArenaRepository());
+  const tournament = service.createTournament("owner-1", { name: "Test", bracketSize: 2, roundDurationMinutes: 60 });
+  service.setSlotsManual(tournament.id, "owner-1", [
+    { slotIndex: 0, book: makeBook(1) },
+    { slotIndex: 1, book: makeBook(2) }
+  ]);
+  service.start(tournament.id, "owner-1");
+  const duel = service.getTournamentView(tournament.id)!.duels[0]!;
+  service.vote(tournament.id, duel.id, "voter-1", "w1");
+  service.settleEarly(tournament.id, "owner-1", duel.id);
+
+  assert.throws(() => service.vote(tournament.id, duel.id, "voter-2", "w1"), DuelNotVotableError);
+});
+
+test("start, setSlotsManual, and randomFill all reject a tournament that isn't in seeding", () => {
+  const service = newService(createInMemoryArenaRepository());
+  const tournament = service.createTournament("owner-1", { name: "Test", bracketSize: 2, roundDurationMinutes: 60 });
+  service.setSlotsManual(tournament.id, "owner-1", [
+    { slotIndex: 0, book: makeBook(1) },
+    { slotIndex: 1, book: makeBook(2) }
+  ]);
+  service.start(tournament.id, "owner-1");
+
+  assert.throws(() => service.start(tournament.id, "owner-1"), TournamentAlreadyStartedError);
+  assert.throws(
+    () => service.setSlotsManual(tournament.id, "owner-1", [{ slotIndex: 0, book: makeBook(3) }]),
+    TournamentAlreadyStartedError
+  );
+  assert.throws(
+    () => service.randomFill(tournament.id, "owner-1", [makeBook(1), makeBook(2)]),
+    TournamentAlreadyStartedError
+  );
+});
+
+test("start emits exactly one publish event and the public summary flips", () => {
+  const repo = createInMemoryArenaRepository();
+  const emitted: Array<[string, string]> = [];
+  const service = newService(repo, identityWorks, (tournamentId, ownerUserId) => emitted.push([tournamentId, ownerUserId]));
+  const t = service.createTournament("owner-1", { name: "Test", bracketSize: 2, roundDurationMinutes: 60 });
+  service.setSlotsManual(t.id, "owner-1", [
+    { slotIndex: 0, book: makeBook(1) },
+    { slotIndex: 1, book: makeBook(2) }
+  ]);
+
+  assert.equal(service.getPublicSummary(t.id), undefined);
+  service.start(t.id, "owner-1");
+  assert.deepEqual(emitted, [[t.id, "owner-1"]]);
+  assert.equal(service.getPublicSummary(t.id)?.status, "active");
+  assert.throws(() => service.start(t.id, "owner-1"), TournamentAlreadyStartedError);
+  assert.equal(emitted.length, 1);
+});
+
+function startedTournament(service: ReturnType<typeof newService>, owner: string, name: string, books: number) {
+  const tournament = service.createTournament(owner, { name, bracketSize: 2, roundDurationMinutes: 60 });
+  service.setSlotsManual(
+    tournament.id,
+    owner,
+    Array.from({ length: 2 }, (_, i) => ({ slotIndex: i, book: makeBook(i + 1 + books) }))
+  );
+  service.start(tournament.id, owner);
+  return tournament;
+}
+
+test("a signed-in vote stamps the account and backfills the token's earlier anonymous votes", (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: Date.now() });
+  const service = newService(createInMemoryArenaRepository());
+  const first = startedTournament(service, "owner-1", "First", 0);
+  const second = startedTournament(service, "owner-1", "Second", 10);
+  const duelA = service.getTournamentView(first.id)!.duels[0]!;
+  const duelB = service.getTournamentView(second.id)!.duels[0]!;
+
+  // Anonymous vote today, signed-in vote tomorrow, same browser token.
+  service.vote(first.id, duelA.id, "voter-token-1", "w1");
+  assert.equal(service.listVoted("voter-1").length, 0);
+
+  t.mock.timers.tick(5);
+  service.vote(second.id, duelB.id, "voter-token-1", "w11", "voter-1");
+
+  const voted = service.listVoted("voter-1");
+  assert.deepEqual(
+    voted.map((t) => t.name),
+    ["Second", "First"] // most recent vote first
+  );
+  // The backfill only claims unclaimed votes — re-voting the same duel
+  // (a 409) must not reshuffle anything.
+  assert.throws(() => service.vote(first.id, duelA.id, "voter-token-1", "w1", "voter-1"), AlreadyVotedError);
+  assert.deepEqual(
+    service.listVoted("voter-1").map((t) => t.name),
+    ["Second", "First"]
+  );
+});
+
+test("a signed-in first vote emits voted_on with the tournament's name", () => {
+  const repo = createInMemoryArenaRepository();
+  const emitted: Array<[string, string, string | null]> = [];
+  const service = newService(repo, identityWorks, undefined, (voterUserId, tournamentId, tournamentName) =>
+    emitted.push([voterUserId, tournamentId, tournamentName])
+  );
+  const t = startedTournament(service, "owner-1", "Best of 2025", 10);
+  const duel = service.getTournamentView(t.id)!.duels[0]!;
+
+  service.vote(t.id, duel.id, "token-a", "w11", "voter-1");
+
+  assert.deepEqual(emitted, [["voter-1", t.id, "Best of 2025"]]);
+});
+
+test("an already-voted duel emits no voted_on event", () => {
+  const repo = createInMemoryArenaRepository();
+  const emitted: Array<[string, string, string | null]> = [];
+  const service = newService(repo, identityWorks, undefined, (voterUserId, tournamentId, tournamentName) =>
+    emitted.push([voterUserId, tournamentId, tournamentName])
+  );
+  const t = startedTournament(service, "owner-1", "Test", 10);
+  const duel = service.getTournamentView(t.id)!.duels[0]!;
+  service.vote(t.id, duel.id, "token-a", "w11", "voter-1");
+
+  assert.throws(() => service.vote(t.id, duel.id, "token-a", "w12", "voter-1"), AlreadyVotedError);
+  assert.deepEqual(emitted.length, 1);
+});
+
+test("a signed-in voter cannot vote the same duel twice by switching tokens", () => {
+  const service = newService(createInMemoryArenaRepository());
+  const t = startedTournament(service, "owner-1", "Test", 10);
+  const duel = service.getTournamentView(t.id)!.duels[0]!;
+
+  service.vote(t.id, duel.id, "token-a", "w11", "voter-1");
+
+  assert.throws(() => service.vote(t.id, duel.id, "token-b", "w12", "voter-1"), AlreadyVotedError);
+  // A different account on the same fresh token is a different voter.
+  service.vote(t.id, duel.id, "token-b", "w12", "voter-2");
+});
+
+test("the view's hasVoted follows the account, not just the browser token", () => {
+  const service = newService(createInMemoryArenaRepository());
+  const t = startedTournament(service, "owner-1", "Test", 10);
+  const duel = service.getTournamentView(t.id)!.duels[0]!;
+  service.vote(t.id, duel.id, "token-a", "w11", "voter-1");
+
+  const anonymous = service.getTournamentView(t.id)!.duels[0]!;
+  assert.equal(anonymous.hasVoted, false);
+  const freshBrowser = service.getTournamentView(t.id, "token-b", "voter-1")!.duels[0]!;
+  assert.equal(freshBrowser.hasVoted, true);
+  const sameBrowser = service.getTournamentView(t.id, "token-a")!.duels[0]!;
+  assert.equal(sameBrowser.hasVoted, true);
+});
+
+test("an anonymous vote emits no voted_on event", () => {
+  const repo = createInMemoryArenaRepository();
+  const emitted: Array<[string, string, string | null]> = [];
+  const service = newService(repo, identityWorks, undefined, (voterUserId, tournamentId, tournamentName) =>
+    emitted.push([voterUserId, tournamentId, tournamentName])
+  );
+  const t = startedTournament(service, "owner-1", "Test", 10);
+  const duel = service.getTournamentView(t.id)!.duels[0]!;
+
+  service.vote(t.id, duel.id, "token-a", "w11");
+
+  assert.deepEqual(emitted, []);
+});
+
+test("an anonymous vote leaves no participation trail, and own tournaments stay out of listVoted", () => {
+  const service = newService(createInMemoryArenaRepository());
+  const own = startedTournament(service, "voter-1", "Mine", 0);
+  const other = startedTournament(service, "owner-1", "Theirs", 10);
+  const ownDuel = service.getTournamentView(own.id)!.duels[0]!;
+  const otherDuel = service.getTournamentView(other.id)!.duels[0]!;
+
+  service.vote(other.id, otherDuel.id, "token-a", "w11", "voter-1");
+  service.vote(own.id, ownDuel.id, "token-a", "w1", "voter-1");
+
+  assert.deepEqual(
+    service.listVoted("voter-1").map((t) => t.name),
+    ["Theirs"]
+  );
+  service.vote(other.id, otherDuel.id, "token-b", "w12");
+  assert.equal(service.listVoted("voter-2").length, 0);
+});
+
+test("discoverWindow lists only started tournaments, matching the normalized needle", () => {
+  const service = newService(createInMemoryArenaRepository());
+  const habits = startedTournament(service, "owner-1", "Hábitos Atómicos", 0);
+  const fantasy = startedTournament(service, "owner-2", "Fantasy Cup", 2);
+  service.createTournament("owner-1", { name: "Hábitos rascunho", bracketSize: 2, roundDurationMinutes: 60 });
+
+  assert.deepEqual(service.discoverWindow("habitos", 10).map((ref) => ref.id), [habits.id]);
+  assert.deepEqual(service.discoverWindow("", 10).map((ref) => ref.id).sort(), [habits.id, fantasy.id].sort());
+  assert.equal(service.discoverWindow("", 1).length, 1);
+  assert.deepEqual(service.discoverWindow("fantasy", 10), [{ id: fantasy.id, createdAt: fantasy.createdAt, ownerUserId: "owner-2" }]);
+});
+
+test("listPublicByIds builds covers and winners for the requested started tournaments only", () => {
+  const service = newService(createInMemoryArenaRepository());
+  const first = service.createTournament("owner-1", { name: "First", bracketSize: 2, roundDurationMinutes: 60 });
+  service.setSlotsManual(first.id, "owner-1", [
+    { slotIndex: 0, book: makeBookWithCover(1) },
+    { slotIndex: 1, book: makeBookWithCover(2) }
+  ]);
+  service.start(first.id, "owner-1");
+  const second = startedTournament(service, "owner-1", "Second", 2);
+  startedTournament(service, "owner-1", "Third", 4);
+  const draft = service.createTournament("owner-1", { name: "Draft", bracketSize: 2, roundDurationMinutes: 60 });
+  const duel = service.getTournamentView(first.id)!.duels[0]!;
+  service.vote(first.id, duel.id, "voter-1", "w1");
+  service.settleEarly(first.id, "owner-1", duel.id);
+
+  const summaries = service.listPublicByIds([first.id, second.id, draft.id, "ghost"]);
+
+  assert.deepEqual(summaries.map((summary) => summary.id).sort(), [first.id, second.id].sort());
+  const ofFirst = summaries.find((summary) => summary.id === first.id)!;
+  assert.deepEqual(ofFirst, service.getPublicSummary(first.id));
+  assert.equal(ofFirst.status, "completed");
+  assert.deepEqual(ofFirst.winner, makeBookWithCover(1));
+  assert.deepEqual(ofFirst.covers, ["https://covers.test/1.jpg", "https://covers.test/2.jpg"]);
+  assert.equal(summaries.find((summary) => summary.id === second.id)?.winner, null);
+  assert.deepEqual(service.listPublicByIds([]), []);
+});
+
+test("votedAmong returns only the requested tournaments the account voted in, never its own", () => {
+  const service = newService(createInMemoryArenaRepository());
+  const first = startedTournament(service, "owner-1", "First", 0);
+  const second = startedTournament(service, "owner-1", "Second", 2);
+  const mine = startedTournament(service, "voter-1", "Mine", 4);
+  for (const tournament of [first, second, mine]) {
+    const duel = service.getTournamentView(tournament.id)!.duels[0]!;
+    service.vote(tournament.id, duel.id, `token-${tournament.id}`, duel.bookA.workId!, tournament === second ? null : "voter-1");
+  }
+
+  assert.deepEqual(service.votedAmong("voter-1", [first.id, second.id, mine.id]), [first.id]);
+  assert.deepEqual(service.votedAmong("voter-1", []), []);
+  assert.deepEqual(service.votedAmong("nobody", [first.id]), []);
+});
+
+function startedDuel(canonical: (ids: string[]) => Map<string, string> = identityWorks.canonicalWorkIds) {
+  const service = newService(createInMemoryArenaRepository(), { ...identityWorks, canonicalWorkIds: canonical });
+  const tournament = service.createTournament("owner-1", { name: "Test", bracketSize: 2, roundDurationMinutes: 60 });
+  service.setSlotsManual(tournament.id, "owner-1", [
+    { slotIndex: 0, book: makeBook(1) },
+    { slotIndex: 1, book: makeBook(2) }
+  ]);
+  service.start(tournament.id, "owner-1");
+  const duel = service.getTournamentView(tournament.id)!.duels[0]!;
+  return { service, tournament, duel };
+}
+
+test("views carry each slot's, side's and winner's work", () => {
+  const { service, tournament, duel } = startedDuel();
+  const view = service.getTournamentView(tournament.id)!;
+  assert.deepEqual(view.slots.map((slot) => slot.workId), ["w1", "w2"]);
+  assert.deepEqual([duel.bookA.workId, duel.bookB.workId, duel.winnerWorkId], ["w1", "w2", null]);
+  service.vote(tournament.id, duel.id, "v1", "w2");
+  service.settleEarly(tournament.id, "owner-1", duel.id);
+  const settled = service.getTournamentView(tournament.id)!;
+  assert.equal(settled.duels[0]!.winnerWorkId, "w2");
+  assert.equal(settled.winner?.workId, "w2");
+});
+
+test("a vote by work lands on the side holding that work, through merges", () => {
+  const { service, tournament, duel } = startedDuel((ids) => new Map(ids.map((id) => [id, id === "w2-old" ? "w2" : id])));
+  service.vote(tournament.id, duel.id, "v1", "w2-old");
+  assert.equal(service.getTournamentView(tournament.id)!.duels[0]!.bookB.votes, 1);
+  assert.throws(() => service.vote(tournament.id, duel.id, "v2", "w9"), InvalidBookError);
+});
+
+test("a vote by work for a duel whose sides share a work goes to side A", () => {
+  const { service, tournament, duel } = startedDuel((ids) => new Map(ids.map((id) => [id, id === "w2" ? "w1" : id])));
+  service.vote(tournament.id, duel.id, "v1", "w1");
+  const after = service.getTournamentView(tournament.id)!.duels[0]!;
+  assert.deepEqual([after.bookA.votes, after.bookB.votes], [1, 0]);
+});
+
+test("a vote naming a work merged after the write lands on that side and the view answers the target", () => {
+  const merged = new Map([["old", "target"]]);
+  const service = newService(createInMemoryArenaRepository(), { ...identityWorks, canonicalWorkIds: (ids) => new Map(ids.map((id) => [id, merged.get(id) ?? id])) });
+  const tournament = service.createTournament("owner-1", { name: "Test", bracketSize: 2, roundDurationMinutes: 60 });
+  service.setSlotsManual(tournament.id, "owner-1", [
+    { slotIndex: 0, book: makeBook(1) },
+    { slotIndex: 1, book: { ...makeBook(2), workId: "old" } }
+  ]);
+  service.start(tournament.id, "owner-1");
+  const duel = service.getTournamentView(tournament.id)!.duels[0]!;
+  service.vote(tournament.id, duel.id, "v1", "target");
+  assert.equal(service.getTournamentView(tournament.id)!.duels[0]!.bookB.votes, 1);
+});
+
+test("a tiebreak by work settles that side", () => {
+  const { service, tournament, duel } = startedDuel();
+  service.settleEarly(tournament.id, "owner-1", duel.id);
+  service.tiebreak(tournament.id, "owner-1", duel.id, "w2");
+  assert.equal(service.getTournamentView(tournament.id)!.duels[0]!.winnerWorkId, "w2");
+});
+
+test("slots store canonical work ids", () => {
+  const repo = createInMemoryArenaRepository();
+  const service = newService(repo, { ...identityWorks, knownWorkIds: (ids) => ids.map((id) => (id === "old" ? "target" : id)) });
+  const tournament = service.createTournament("owner-1", { name: "Test", bracketSize: 2, roundDurationMinutes: 60 });
+  service.setSlotsManual(tournament.id, "owner-1", [
+    { slotIndex: 0, book: makeBook(1) },
+    { slotIndex: 1, book: { ...makeBook(2), workId: "old" } }
+  ]);
+  assert.deepEqual(repo.getSlots(tournament.id).map((slot) => slot.work_id).sort(), ["target", "w1"]);
+});
+
+test("two wire ids that resolve to one work can't fill two slots", () => {
+  const service = newService(createInMemoryArenaRepository(), { ...identityWorks, knownWorkIds: (ids) => ids.map(() => "same") });
+  const tournament = service.createTournament("owner-1", { name: "Test", bracketSize: 2, roundDurationMinutes: 60 });
+  assert.throws(
+    () => service.setSlotsManual(tournament.id, "owner-1", [{ slotIndex: 0, book: makeBook(1) }, { slotIndex: 1, book: makeBook(2) }]),
+    DuplicateBookError
+  );
+});
+
+test("a repeated work is a duplicate book even when the slot index repeats too", () => {
+  const service = newService(createInMemoryArenaRepository(), { ...identityWorks, knownWorkIds: (ids) => ids.map(() => "same") });
+  const tournament = service.createTournament("owner-1", { name: "Test", bracketSize: 2, roundDurationMinutes: 60 });
+  assert.throws(
+    () => service.setSlotsManual(tournament.id, "owner-1", [{ slotIndex: 0, book: makeBook(1) }, { slotIndex: 0, book: makeBook(2) }]),
+    DuplicateBookError
+  );
+});
+
+test("a non-owner's slots are refused before any work is looked up", () => {
+  const throwing: ArenaWorks = { ...identityWorks, knownWorkIds: () => { throw new Error("looked up"); } };
+  const service = newService(createInMemoryArenaRepository(), throwing);
+  const tournament = service.createTournament("owner-1", { name: "Test", bracketSize: 2, roundDurationMinutes: 60 });
+  assert.throws(() => service.setSlotsManual(tournament.id, "someone", [{ slotIndex: 0, book: makeBook(1) }]), TournamentNotFoundError);
+  assert.throws(() => service.randomFill(tournament.id, "someone", [makeBook(1)]), TournamentNotFoundError);
+});
+
+test("slots on a started tournament are refused before any work is looked up", () => {
+  let armed = false;
+  const works: ArenaWorks = { ...identityWorks, knownWorkIds: (ids) => { if (armed) throw new Error("looked up"); return ids; } };
+  const service = newService(createInMemoryArenaRepository(), works);
+  const tournament = service.createTournament("owner-1", { name: "Test", bracketSize: 2, roundDurationMinutes: 60 });
+  service.setSlotsManual(tournament.id, "owner-1", [{ slotIndex: 0, book: makeBook(1) }, { slotIndex: 1, book: makeBook(2) }]);
+  service.start(tournament.id, "owner-1");
+  armed = true;
+  assert.throws(() => service.setSlotsManual(tournament.id, "owner-1", [{ slotIndex: 0, book: makeBook(1) }]), TournamentAlreadyStartedError);
+  assert.throws(() => service.randomFill(tournament.id, "owner-1", [makeBook(1)]), TournamentAlreadyStartedError);
+});

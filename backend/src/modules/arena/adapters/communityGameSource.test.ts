@@ -19,7 +19,8 @@ const { createCompletedTournaments, createTournamentGameSource } = await import(
 
 const works = {
   knownWorkIds: (ids: string[]) => ids,
-  canonicalWorkIds: (ids: string[]) => new Map(ids.map((id) => [id, id]))
+  canonicalWorkIds: (ids: string[]) => new Map(ids.map((id) => [id, id])),
+  castOf: () => undefined
 };
 
 const book = (n: number) => ({ workId: `w${n}`, title: `Book ${n}`, author: `Author ${n}`, cover: `https://covers.test/${n}.jpg` });
@@ -128,4 +129,22 @@ test("completed tournaments carry their card and winner", () => {
   assert.deepEqual(rows[0]!.winner, { title: "Book 1", author: "Author 1", cover: "https://covers.test/1.jpg", workId: "w1" });
   assert.ok(rows[0]!.completedAt);
   assert.deepEqual(completed("u8", "2000-01-01T00:00:00.000Z"), []);
+});
+
+test("a character tournament card carries its subject label and the scope cover", () => {
+  const db = new DatabaseSync(":memory:");
+  applyArenaMigrations(db);
+  const cast = {
+    scope: { kind: "work" as const, key: "dune", label: "Dune", coverUrl: "https://covers.test/dune.jpg", workCount: 1 },
+    characters: [0, 1, 2, 3].map((n) => ({ id: `ch:dune|c${n}`, name: `C${n}`, works: 1 }))
+  };
+  const service = createArenaService(createSqliteArenaRepository(db), { ...works, castOf: () => cast });
+  const source = createTournamentGameSource(createArenaPublicApi(service));
+  const created = service.createTournament("u1", { name: "Dune", bracketSize: 4, roundDurationMinutes: 60, characters: { workId: "dune", characterIds: cast.characters.map((c) => c.id) } });
+
+  const card = source.get(created.id)!;
+  assert.deepEqual(card.content.subject, { kind: "characters", label: "Dune" });
+  assert.deepEqual(card.content.covers, ["https://covers.test/dune.jpg"]);
+  assert.equal(source.listByOwner("u1").length, 1);
+  assert.deepEqual(source.shelfFacts(null, null), []);
 });

@@ -15,6 +15,7 @@ export interface TournamentRow {
   round_duration_minutes: number;
   status: "seeding" | "active" | "completed";
   current_round: number;
+  subject: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -15,6 +15,7 @@ import {
   IncompleteSeedError,
   InvalidBookError,
   InvalidBracketSizeError,
+  InvalidCharacterSelectionError,
   NotEnoughBooksError,
   TournamentAlreadyStartedError,
   TournamentNotFoundError
@@ -26,7 +27,8 @@ import { createArenaService } from "./service.js";
 
 const identityWorks: ArenaWorks = {
   knownWorkIds: (ids) => ids,
-  canonicalWorkIds: (ids) => new Map(ids.map((id) => [id, id]))
+  canonicalWorkIds: (ids) => new Map(ids.map((id) => [id, id])),
+  castOf: () => undefined
 };
 
 function newService(repo: ArenaRepository, works: ArenaWorks = identityWorks, emitPublished?: EmitPublished, emitVotedOn?: EmitVotedOn) {
@@ -40,6 +42,7 @@ function createInMemoryArenaRepository(): ArenaRepository {
   const votes: VoteRow[] = [];
 
   return {
+    transaction: (fn) => fn(),
     deleteUserData() {},
     insertTournament(row) {
       tournaments.set(row.id, { ...row });
@@ -51,8 +54,8 @@ function createInMemoryArenaRepository(): ArenaRepository {
       const t = tournaments.get(id);
       return t && t.owner_user_id === ownerUserId ? t : undefined;
     },
-    listTournamentsByOwner(ownerUserId) {
-      return [...tournaments.values()].filter((t) => t.owner_user_id === ownerUserId);
+    listTournamentsByOwner(ownerUserId, includeCharacters) {
+      return [...tournaments.values()].filter((t) => t.owner_user_id === ownerUserId && (includeCharacters || t.subject === null));
     },
     listPublicTournaments(limit, offset) {
       return [...tournaments.values()].slice(offset, offset + limit);
@@ -229,7 +232,7 @@ test("a summary carries the seeded cover preview and how many slots are filled",
     book: makeBookWithCover(index + 1)
   })));
 
-  const summary = service.listMine("owner-1")[0];
+  const summary = service.listMine("owner-1", false)[0];
   assert.equal(summary?.filledSlots, 9);
   // Capped at eight: the card shows eight thumbnails and a remainder.
   assert.deepEqual(summary?.covers, Array.from({ length: 8 }, (_, index) => `https://covers.test/${index + 1}.jpg`));
@@ -244,7 +247,7 @@ test("a cover preview skips slots seeded without art but still counts them", () 
     { slotIndex: 2, book: makeBook(3) }
   ]);
 
-  const summary = service.listMine("owner-1")[0];
+  const summary = service.listMine("owner-1", false)[0];
   assert.equal(summary?.filledSlots, 3);
   assert.deepEqual(summary?.covers, ["https://covers.test/2.jpg"]);
 });
@@ -253,7 +256,7 @@ test("an unseeded tournament has an empty preview rather than a missing one", ()
   const service = newService(createInMemoryArenaRepository());
   service.createTournament("owner-1", { name: "Fresh", bracketSize: 4, roundDurationMinutes: 60 });
 
-  const summary = service.listMine("owner-1")[0];
+  const summary = service.listMine("owner-1", false)[0];
   assert.equal(summary?.filledSlots, 0);
   assert.deepEqual(summary?.covers, []);
 });
@@ -264,7 +267,7 @@ test("renameTournament changes the name and leaves the bracket alone", () => {
 
   service.renameTournament(tournament.id, "owner-1", "Best of 2026");
 
-  const renamed = service.listMine("owner-1")[0];
+  const renamed = service.listMine("owner-1", false)[0];
   assert.ok(renamed);
   assert.equal(renamed.name, "Best of 2026");
   // The whole reason rename is name-only: bracketSize is structural,
@@ -278,7 +281,7 @@ test("renameTournament refuses someone else's tournament", () => {
   const tournament = service.createTournament("owner-1", { name: "Mine", bracketSize: 4, roundDurationMinutes: 60 });
 
   assert.throws(() => service.renameTournament(tournament.id, "owner-2", "Hijacked"), TournamentNotFoundError);
-  assert.equal(service.listMine("owner-1")[0]?.name, "Mine");
+  assert.equal(service.listMine("owner-1", false)[0]?.name, "Mine");
 });
 
 test("createTournament rejects a non-power-of-two bracket size", () => {
@@ -427,7 +430,7 @@ test("a completed tournament's summary carries the champion book", () => {
   service.vote(tournament.id, duel.id, "voter-1", "w1", "voter-1");
   service.settleEarly(tournament.id, "owner-1", duel.id);
 
-  const summary = service.listMine("owner-1")[0];
+  const summary = service.listMine("owner-1", false)[0];
   assert.equal(summary?.status, "completed");
   assert.deepEqual(summary?.winner, makeBookWithCover(1));
   const completed = service.completedForParticipant("voter-1", "2020-01-01T00:00:00.000Z");
@@ -443,7 +446,7 @@ test("a completed tournament's summary carries the champion book", () => {
 test("a seeding or active tournament's summary has no winner yet", () => {
   const service = newService(createInMemoryArenaRepository());
   const fresh = service.createTournament("owner-1", { name: "Fresh", bracketSize: 2, roundDurationMinutes: 60 });
-  assert.equal(service.listMine("owner-1").find((t) => t.id === fresh.id)?.winner, null);
+  assert.equal(service.listMine("owner-1", false).find((t) => t.id === fresh.id)?.winner, null);
 
   const running = service.createTournament("owner-1", { name: "Running", bracketSize: 2, roundDurationMinutes: 60 });
   service.setSlotsManual(running.id, "owner-1", [
@@ -451,7 +454,7 @@ test("a seeding or active tournament's summary has no winner yet", () => {
     { slotIndex: 1, book: makeBook(2) }
   ]);
   service.start(running.id, "owner-1");
-  assert.equal(service.listMine("owner-1").find((t) => t.id === running.id)?.winner, null);
+  assert.equal(service.listMine("owner-1", false).find((t) => t.id === running.id)?.winner, null);
 });
 
 test("a tied duel waits for the owner's tie-break instead of auto-advancing", () => {
@@ -869,4 +872,94 @@ test("slots on a started tournament are refused before any work is looked up", (
   armed = true;
   assert.throws(() => service.setSlotsManual(tournament.id, "owner-1", [{ slotIndex: 0, book: makeBook(1) }]), TournamentAlreadyStartedError);
   assert.throws(() => service.randomFill(tournament.id, "owner-1", [makeBook(1)]), TournamentAlreadyStartedError);
+});
+
+const cast = {
+  scope: { kind: "series" as const, key: "harry-potter", label: "Harry Potter", coverUrl: "https://covers.test/hp.jpg", workCount: 7 },
+  characters: Array.from({ length: 12 }, (_, index) => ({ id: `ch:hp|c${index}`, name: `Character ${index}`, works: 7 }))
+};
+const characterWorks: ArenaWorks = { ...identityWorks, castOf: (workId) => (workId === "hp-1" ? cast : undefined) };
+const castIds = (count: number) => cast.characters.slice(0, count).map((character) => character.id);
+
+function characterSetup(emitPublished?: EmitPublished) {
+  const repo = createInMemoryArenaRepository();
+  return { repo, service: newService(repo, characterWorks, emitPublished) };
+}
+
+test("a character tournament is seeded from the selection and started in one call", () => {
+  const published: string[] = [];
+  const { repo, service } = characterSetup((id) => published.push(id));
+  const tournament = service.createTournament("owner-1", { name: "HP", bracketSize: 8, roundDurationMinutes: 60, characters: { workId: "hp-1", characterIds: castIds(8) } });
+
+  assert.equal(tournament.status, "active");
+  assert.equal(tournament.currentRound, 1);
+  assert.deepEqual(tournament.subject?.scope, { kind: "series", key: "harry-potter", label: "Harry Potter", coverUrl: "https://covers.test/hp.jpg" });
+  assert.deepEqual(tournament.covers, ["https://covers.test/hp.jpg"]);
+  const slots = repo.getSlots(tournament.id);
+  assert.equal(slots.length, 8);
+  assert.deepEqual(slots.map((slot) => slot.work_id).sort(), castIds(8).sort());
+  assert.ok(slots.every((slot) => slot.author === "Harry Potter" && slot.cover_url === null));
+  assert.equal(repo.getDuelsForRound(tournament.id, 1).length, 4);
+  assert.deepEqual(published, [tournament.id]);
+});
+
+test("a character tournament keeps bracketSize distinct ids from a larger selection", () => {
+  const { repo, service } = characterSetup();
+  const tournament = service.createTournament("owner-1", { name: "HP", bracketSize: 8, roundDurationMinutes: 60, characters: { workId: "hp-1", characterIds: castIds(10) } });
+
+  const used = repo.getSlots(tournament.id).map((slot) => slot.work_id);
+  assert.equal(new Set(used).size, 8);
+  assert.ok(used.every((id) => castIds(10).includes(id!)));
+});
+
+test("a character tournament refuses a bad bracket, selection or work, and stores nothing", () => {
+  const published: string[] = [];
+  const { service } = characterSetup((id) => published.push(id));
+  const create = (bracketSize: number, characterIds: string[], workId = "hp-1") =>
+    () => service.createTournament("owner-1", { name: "HP", bracketSize, roundDurationMinutes: 60, characters: { workId, characterIds } });
+
+  assert.throws(create(2, castIds(4)), InvalidCharacterSelectionError);
+  assert.throws(create(6, castIds(8)), InvalidBracketSizeError);
+  assert.throws(create(16, castIds(10)), InvalidCharacterSelectionError);
+  assert.throws(create(4, ["ch:hp|c0", "ch:hp|c0", "ch:hp|c1", "ch:hp|c2"]), InvalidCharacterSelectionError);
+  assert.throws(create(4, [...castIds(3), "ch:other|nobody"]), InvalidCharacterSelectionError);
+  assert.throws(create(4, castIds(4), "unknown-work"), InvalidCharacterSelectionError);
+  assert.equal(service.listMine("owner-1", true).length, 0);
+  assert.deepEqual(published, []);
+});
+
+test("seeding routes refuse a character tournament because it is already started", () => {
+  const { service } = characterSetup();
+  const tournament = service.createTournament("owner-1", { name: "HP", bracketSize: 4, roundDurationMinutes: 60, characters: { workId: "hp-1", characterIds: castIds(4) } });
+
+  assert.throws(() => service.setSlotsManual(tournament.id, "owner-1", [{ slotIndex: 0, book: makeBook(1) }]), TournamentAlreadyStartedError);
+  assert.throws(() => service.randomFill(tournament.id, "owner-1", [makeBook(1), makeBook(2), makeBook(3), makeBook(4)]), TournamentAlreadyStartedError);
+});
+
+test("votes and tiebreaks name a character by its id when canonicalWorkIds knows nothing", () => {
+  const empty: ArenaWorks = { ...characterWorks, canonicalWorkIds: () => new Map() };
+  const repo = createInMemoryArenaRepository();
+  const service = newService(repo, empty);
+  const tournament = service.createTournament("owner-1", { name: "HP", bracketSize: 4, roundDurationMinutes: 60, characters: { workId: "hp-1", characterIds: castIds(4) } });
+  const [first, second] = repo.getDuelsForRound(tournament.id, 1).sort((a, b) => a.duel_index - b.duel_index);
+
+  service.vote(tournament.id, first!.id, "tok", first!.book_b_work_id!);
+  service.settleEarly(tournament.id, "owner-1", first!.id);
+  assert.equal(repo.getDuel(first!.id)?.winner_side, "b");
+
+  service.settleEarly(tournament.id, "owner-1", second!.id);
+  assert.equal(repo.getDuel(second!.id)?.status, "tied_pending_tiebreak");
+  service.tiebreak(tournament.id, "owner-1", second!.id, second!.book_a_work_id!);
+  assert.equal(repo.getDuel(second!.id)?.winner_side, "a");
+  assert.throws(() => service.vote(tournament.id, repo.getDuelsForRound(tournament.id, 2)[0]!.id, "tok2", "ch:hp|c11"), InvalidBookError);
+});
+
+test("the owner list hides character tournaments unless asked, and the card carries the subject", () => {
+  const { service } = characterSetup();
+  service.createTournament("owner-1", { name: "Plain", bracketSize: 4, roundDurationMinutes: 60 });
+  const created = service.createTournament("owner-1", { name: "HP", bracketSize: 4, roundDurationMinutes: 60, characters: { workId: "hp-1", characterIds: castIds(4) } });
+
+  assert.deepEqual(service.listMine("owner-1", false).map((t) => t.name), ["Plain"]);
+  assert.deepEqual(service.listMine("owner-1", true).map((t) => t.name).sort(), ["HP", "Plain"]);
+  assert.equal(service.getTournamentView(created.id)?.subject?.characters.length, 4);
 });

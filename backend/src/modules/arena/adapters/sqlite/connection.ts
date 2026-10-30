@@ -27,6 +27,9 @@ export function applyArenaMigrations(db: DatabaseSync): void {
   if (tournamentsColumns.length > 0 && !tournamentsColumns.some((column) => column.name === "name_key")) {
     db.exec(`ALTER TABLE tournaments ADD COLUMN name_key TEXT`);
   }
+  if (tournamentsColumns.length > 0 && !tournamentsColumns.some((column) => column.name === "subject")) {
+    db.exec(`ALTER TABLE tournaments ADD COLUMN subject TEXT`);
+  }
 
   const slotColumns = db.prepare(`PRAGMA table_info(tournament_slots)`).all() as { name: string }[];
   if (slotColumns.some((column) => column.name === "book_key")) {

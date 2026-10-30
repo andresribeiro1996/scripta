@@ -81,3 +81,9 @@ export class DuelNotTiedError extends ArenaError {
     super("This duel isn't waiting on a tie-break.");
   }
 }
+
+export class InvalidCharacterSelectionError extends ArenaError {
+  constructor(message: string) {
+    super(message);
+  }
+}

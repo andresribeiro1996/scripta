@@ -31,8 +31,11 @@ const duelParamSchema = z.object({ id: z.string().uuid(), duelId: z.string().uui
 const createTournamentSchema = z.object({
   name: z.string().trim().min(1).max(200),
   bracketSize: z.number().int().min(2).max(128),
-  roundDurationMinutes: z.number().int().min(1).max(60 * 24 * 30)
+  roundDurationMinutes: z.number().int().min(1).max(60 * 24 * 30),
+  characters: z.object({ workId: z.string().min(1), characterIds: z.array(z.string().min(1)).min(4).max(128) }).optional()
 });
+
+const listMineQuerySchema = z.object({ subjects: z.string().optional() });
 
 // Name only. Everything else about a tournament is fixed at creation:
 // `bracketSize` lays out the slots and duels, so changing it would mean
@@ -77,7 +80,9 @@ export function buildArenaRoutes(service: ArenaService) {
     });
 
     app.get("/arenas/mine", { preHandler: authGuard }, async (request, reply) => {
-      return reply.send({ tournaments: summariesForWire(service.listMine(request.user.id)) });
+      const query = listMineQuerySchema.safeParse(request.query);
+      const includeCharacters = query.success && query.data.subjects === "characters";
+      return reply.send({ tournaments: summariesForWire(service.listMine(request.user.id, includeCharacters)) });
     });
 
     app.get("/arenas/voted", { preHandler: authGuard }, async (request, reply) => {
