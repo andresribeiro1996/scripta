@@ -5,6 +5,7 @@
 // single in-flight refresh instead of each firing their own.
 
 import { getSession, setSession } from "../auth/tokenStore";
+import { getLocale, t } from "../i18n";
 import { API_URL } from "./baseUrl";
 
 export class ApiError extends Error {
@@ -25,7 +26,17 @@ async function rawFetch(path: string, init: RequestInit | undefined, accessToken
   // Content-Type is left unset entirely — setting "application/json" here
   // would silently break every upload.
   if (init?.body && !(init.body instanceof FormData) && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+  headers.set("Accept-Language", getLocale());
   return fetch(`${API_URL}${path}`, { ...init, headers });
+}
+
+const WAIT_KEYS = { second: "errors.waitSeconds", minute: "errors.waitMinutes", hour: "errors.waitHours" } as const;
+
+function waitText(body: unknown): string {
+  const message = body && typeof body === "object" && "message" in body && typeof body.message === "string" ? body.message : "";
+  const match = /(\d+) (second|minute|hour)s?/.exec(message);
+  if (!match) return t("errors.waitFallback");
+  return t(WAIT_KEYS[match[2] as keyof typeof WAIT_KEYS], { count: Number(match[1]) });
 }
 
 async function parseOrThrow(res: Response): Promise<unknown> {
@@ -36,8 +47,7 @@ async function parseOrThrow(res: Response): Promise<unknown> {
     // no body (e.g. a 204), that's fine
   }
   if (res.status === 429) {
-    const wait = body && typeof body === "object" && "message" in body && typeof body.message === "string" ? /retry in (.+)$/.exec(body.message)?.[1] : undefined;
-    throw new ApiError(429, `Too many tries. Wait ${wait ?? "a minute"} and try again.`);
+    throw new ApiError(429, t("errors.tooManyTries", { wait: waitText(body) }));
   }
   if (!res.ok) {
     const message =
