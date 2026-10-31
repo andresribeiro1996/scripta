@@ -492,6 +492,8 @@ test("catalogMismatches finds every kind of drift", () => {
 - Modify: `packages/shared/src/murals/`
 - Modify: `packages/shared/src/readerCards/`
 - Modify: `packages/shared/src/plural.ts`
+- Modify: `packages/shared/src/`
+- Modify: `packages/shared/scripts/contact-sheet.ts`
 - Modify: `frontend/src/`
 - Modify: `mobile/src/`
 - Modify: `backend/src/`
