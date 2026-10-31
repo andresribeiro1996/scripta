@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { publicReaderCardOf } from "../library/readerCardFacts.js";
 import type { PublicReaderCard } from "../library/readerIdentity.js";
 import { readerCardSummary } from "./pages.js";
 import type { ReaderCardBase } from "./render.js";
@@ -14,7 +15,7 @@ const card: PublicReaderCard = {
   facts: { finished: 34, highlights: 40, series: 2, since: 2014, edition: 2026 },
   chosen: { signature: { title: "A Wizard of Earthsea", author: "Ursula K. Le Guin", workId: null, coverUrl: null, note: "lent twice" }, highlight: { text: "To light a candle", title: "A Wizard of Earthsea", author: "Ursula K. Le Guin" } },
 };
-const base = (fields: Partial<ReaderCardBase> = {}): ReaderCardBase => ({ card, style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), counter: "dial", layout: "faces", trait: "both" }, readerName: "andre", label: "Reader card", seed: seedOf("andre"), view: "visitor", ...fields });
+const base = (fields: Partial<ReaderCardBase> = {}): ReaderCardBase => ({ card, style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), counter: "dial", layout: "faces", trait: "both" }, locale: "en", readerName: "andre", label: "Reader card", seed: seedOf("andre"), view: "visitor", ...fields });
 
 test("the summary reads the card in order: plate, streak, evidence, choices, coverage", () => {
   assert.deepEqual(readerCardSummary(base()), [
@@ -43,4 +44,11 @@ test("an unwritten card says so", () => {
 test("the motto is read out after the plate", () => {
   const lines = readerCardSummary(base({ style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), motto: { text: "Per libros ad astra", look: "arc" } } }));
   assert.equal(lines[1], "Motto: “Per libros ad astra”.");
+});
+
+test("a visitor in Portuguese reads an English-derived card's evidence in Portuguese", () => {
+  const books = Array.from({ length: 10 }, (_, i) => ({ Title: `Book ${i}`, Attribution: i < 4 ? "Kazuo Ishiguro" : `Author ${i}`, ReadStatus: 2 }));
+  const lines = readerCardSummary(base({ card: publicReaderCardOf(books, [], "en"), locale: "pt-PT" }));
+  assert.ok(lines.includes("4 de 10 livros lidos são de autores a que volta sempre."));
+  assert.equal(lines.at(-1), "géneros conhecidos em 0 de 10 livros lidos");
 });

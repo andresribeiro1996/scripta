@@ -1,5 +1,5 @@
 import type { LibraryData } from "@scripta/shared";
-import { BOOK_CSV_ERRORS } from "@scripta/shared";
+import { bookCsvErrors } from "@scripta/shared";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { importTooLargeMessage } from "../domain/sizeLimit.js";
@@ -18,7 +18,7 @@ export interface ImportPreview {
 }
 
 const SAFE_IMPORT_ERRORS = new Set([
-  ...BOOK_CSV_ERRORS,
+  ...bookCsvErrors("en"),
   "The import contains too many rows.",
   "`content` table has none of the required Kobo columns.",
   "Couldn't decode that file as text, and it isn't a SQLite database.",

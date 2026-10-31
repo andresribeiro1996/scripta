@@ -6,6 +6,7 @@ import { Text } from "../../ui/Text";
 import { BookPickerList } from "../library/components/BookPickerList";
 import { Section } from "../library/components/StyleControls";
 import { DraftField } from "./DraftField";
+import { useLocale } from "../../i18n";
 
 export type SaveStyle = (patch: ReaderCardStylePatch) => Promise<boolean>;
 type Book = Record<string, unknown>;
@@ -48,12 +49,13 @@ export function SignatureChoice({ books, signature, chosen, onChange }: { books:
 }
 
 export function HighlightChoice({ books, highlight, chosen, onChange }: { books: Book[]; highlight: ChosenHighlight | null; chosen?: ReaderCardChosen["highlight"]; onChange: SaveStyle }) {
+  const locale = useLocale();
   const { colors } = useTheme();
-  const withPassages = useMemo(() => books.filter((book) => bookPassages(book).length > 0), [books]);
+  const withPassages = useMemo(() => books.filter((book) => bookPassages(book, locale).length > 0), [books, locale]);
   const [picking, setPicking] = useState(false);
   const [query, setQuery] = useState("");
   const [browsing, setBrowsing] = useState<Book | null>(null);
-  const matches = useMemo(() => searchPassages(books, query), [books, query]);
+  const matches = useMemo(() => searchPassages(books, query, locale), [books, query, locale]);
   const close = () => { setPicking(false); setBrowsing(null); setQuery(""); };
   const choose = (passage: Passage) => { close(); void onChange({ highlight: { bookKey: passage.bookKey, highlightId: passage.highlightId } }); };
   const list = (passages: Passage[]) => passages.map((passage) => (
@@ -76,7 +78,7 @@ export function HighlightChoice({ books, highlight, chosen, onChange }: { books:
           {query.trim() ? (matches.length ? list(matches) : <Text style={[typography.body, { color: colors.textDim }]}>No highlights match.</Text>) : browsing ? (
             <>
               <Button label="Back to books" variant="secondary" onPress={() => setBrowsing(null)} />
-              {list(bookPassages(browsing))}
+              {list(bookPassages(browsing, locale))}
             </>
           ) : (
             <BookPickerList books={withPassages} onSelect={setBrowsing} />

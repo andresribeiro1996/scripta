@@ -8,8 +8,10 @@ import { CoverImage } from "./BookCard";
 import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "./page/buttonClasses";
 import { Sheet } from "./Sheet";
 import { useToast } from "./Toaster";
+import { getLocale, useLocale } from "../i18n";
 
 export function DuplicatesSheet({ groups, library, onClose }: { groups: string[][]; library: LibraryDocument; onClose: () => void }) {
+  const locale = useLocale();
   const { updateLibrary } = useLibrary();
   const saver = useLibrarySaver();
   const queryClient = useQueryClient();
@@ -25,7 +27,7 @@ export function DuplicatesSheet({ groups, library, onClose }: { groups: string[]
     } catch (error) {
       console.error(error);
       void queryClient.invalidateQueries({ queryKey: ["library"] });
-      toast({ message: saveFailureMessage(error, failure), kind: "error" });
+      toast({ message: saveFailureMessage(error, failure, getLocale()), kind: "error" });
     } finally {
       setBusy(false);
     }
@@ -54,7 +56,7 @@ export function DuplicatesSheet({ groups, library, onClose }: { groups: string[]
                   <div className="min-w-0 text-sm">
                     <p className="truncate font-semibold">{String(book.Title ?? "Untitled")}</p>
                     <p className="truncate text-(--color-text-dim)">{String(book.Attribution ?? "")}</p>
-                    <p className="text-xs text-(--color-text-dim)">{[book.ISBN ? `ISBN ${String(book.ISBN)}` : null, statusLabel(book.ReadStatus)].filter(Boolean).join(" · ")}</p>
+                    <p className="text-xs text-(--color-text-dim)">{[book.ISBN ? `ISBN ${String(book.ISBN)}` : null, statusLabel(book.ReadStatus, locale)].filter(Boolean).join(" · ")}</p>
                   </div>
                 </div>
               );

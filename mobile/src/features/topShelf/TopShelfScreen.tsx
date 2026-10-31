@@ -12,12 +12,14 @@ import { fetchRecapIndex, fetchTopShelf } from "./api";
 import { TopShelfBar } from "./TopShelfBar";
 import { recapEntries } from "./recapModel";
 import { boardTitle, emptySections, valueLabel, visibleBoards } from "./topShelfModel";
+import { useLocale } from "../../i18n";
 
 function topShelfHref(view: TopShelfView, period: TopShelfPeriod, genre: string | null) {
   return { pathname: "/top-shelf/[view]", params: { view, period, ...(genre ? { genre } : {}) } } as never;
 }
 
 export function TopShelfScreen() {
+  const locale = useLocale();
   const { colors } = useTheme();
   const segments = useSegments();
   const params = useLocalSearchParams<{ period?: string; genre?: string }>();
@@ -39,12 +41,12 @@ export function TopShelfScreen() {
         : <View style={styles.page}><Skeleton height={200} /></View>;
     }
     const empty = emptySections(data);
-    const playButton = play ? <View style={styles.recapButton}><Button label={`▶ Play ${recapMonthName(play)} recap`} numberOfLines={1} onPress={() => openRecap(play)} /></View> : null;
+    const playButton = play ? <View style={styles.recapButton}><Button label={`▶ Play ${recapMonthName(play, locale)} recap`} numberOfLines={1} onPress={() => openRecap(play)} /></View> : null;
     const pastRecaps = past.length ? (
       <Section title="Past recaps">
         {past.map((month) => (
-          <Pressable key={month} accessibilityRole="button" accessibilityLabel={`${recapMonthName(month)} recap`} onPress={() => openRecap(month)} style={[styles.recapRow, { borderColor: colors.border }]}>
-            <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.grow, { color: colors.text }]}>{`${recapMonthName(month)} recap`}</Text>
+          <Pressable key={month} accessibilityRole="button" accessibilityLabel={`${recapMonthName(month, locale)} recap`} onPress={() => openRecap(month)} style={[styles.recapRow, { borderColor: colors.border }]}>
+            <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.grow, { color: colors.text }]}>{`${recapMonthName(month, locale)} recap`}</Text>
             <Icon name="chevronRight" size={20} color={colors.textDim} />
           </Pressable>
         ))}

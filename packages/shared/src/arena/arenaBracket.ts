@@ -1,3 +1,5 @@
+import type { Locale } from "../i18n/locale.js";
+import { sharedT } from "../i18n/sharedT.js";
 import type { Duel, DuelSide } from "./types.js";
 
 export type BracketSlot = Duel | null;
@@ -18,11 +20,12 @@ export function bracketShape(bracketSize: number, duels: Duel[]): BracketSlot[][
   });
 }
 
-export function roundLabel(slotCount: number, roundNumber: number): string {
-  if (slotCount === 1) return "Final";
-  if (slotCount === 2) return "Semis";
-  if (slotCount === 4) return "Quarters";
-  return `Round ${roundNumber}`;
+export function roundLabel(slotCount: number, roundNumber: number, locale: Locale): string {
+  const t = sharedT(locale);
+  if (slotCount === 1) return t("shared.arenaBracket.final");
+  if (slotCount === 2) return t("shared.arenaBracket.semis");
+  if (slotCount === 4) return t("shared.arenaBracket.quarters");
+  return t("shared.arenaBracket.round", { number: roundNumber });
 }
 
 export function needsVote(duel: Duel): boolean {

@@ -11,6 +11,7 @@
 
 import { resolveCover } from "../api/covers";
 import type { SeedBook, Tournament } from "../api/arena";
+import { getLocale } from "../i18n";
 import { seedCoverLookup, toSeedBook as createSeedBook, type createArenaApi } from "@scripta/shared";
 
 export const UNTITLED_TOURNAMENT = "Untitled tournament";
@@ -43,7 +44,7 @@ export async function createSeededTournament(
 export async function toSeedBook(book: Record<string, unknown>): Promise<SeedBook | null> {
   const existing = typeof book._coverUrl === "string" ? book._coverUrl : null;
   const cover = existing ?? (await resolveBookCover(book));
-  return createSeedBook(book, cover);
+  return createSeedBook(book, cover, getLocale());
 }
 
 async function resolveBookCover(book: Record<string, unknown>): Promise<string | null> {

@@ -64,7 +64,7 @@ test("no finished books gives an empty dial", () => {
 
 test("the public card carries the identity fields and the facts, never the leaders", () => {
   const books = Array.from({ length: 6 }, (_, i) => book(i, { _genres: ["Fantasy"] }));
-  const card = publicReaderCardOf(books, [], NOW);
+  const card = publicReaderCardOf(books, [], "en", NOW);
   assert.equal(card.identity, "star");
   assert.equal(card.facts?.finished, 6);
   assert.deepEqual(card.dial?.segments, [{ group: "star", books: 6, marked: 0 }]);
@@ -74,7 +74,7 @@ test("the public card carries the identity fields and the facts, never the leade
 
 test("the owner's input carries leaders and facts beside a public card; a visitor's carries neither leaders nor missing", () => {
   const books = Array.from({ length: 6 }, (_, i) => book(i, { _genres: ["Fantasy"] }));
-  const owner = readerCardInputOf(books, [], "andre");
+  const owner = readerCardInputOf(books, [], "andre", "en");
   assert.equal(owner.view, "owner");
   assert.equal(owner.card.identity, "star");
   assert.equal(owner.card.facts?.finished, 6);
@@ -82,7 +82,7 @@ test("the owner's input carries leaders and facts beside a public card; a visito
   assert.equal("leaders" in owner.card, false);
   assert.equal("missing" in owner.card, false);
   assert.deepEqual(owner.style, { ...publicStyle(DEFAULT_READER_CARD_STYLE), counter: "dial", layout: "faces", trait: "both" });
-  const visitor = readerCardInputOf([], [], "andre", { ...owner.card, style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), counter: "ring", layout: "book", trait: "seal" } });
+  const visitor = readerCardInputOf([], [], "andre", "en", { ...owner.card, style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), counter: "ring", layout: "book", trait: "seal" } });
   assert.equal(visitor.view, "visitor");
   assert.equal(visitor.leaders, undefined);
   assert.equal(visitor.missing, undefined);
@@ -91,22 +91,22 @@ test("the owner's input carries leaders and facts beside a public card; a visito
 });
 
 test("the owner's own card for a library with few finished books is unwritten and says what is missing", () => {
-  const owner = readerCardInputOf([book(1), book(2)], [], "andre");
+  const owner = readerCardInputOf([book(1), book(2)], [], "andre", "en");
   assert.equal(owner.card.state, "unwritten");
   assert.ok(owner.missing);
 });
 
 test("an older or newer server style still draws: missing fields and unknown options fall back", () => {
   const card: PublicReaderCard = { state: "settled", identity: "star", runnerUp: null, signal: null, coverage: [] };
-  assert.deepEqual(readerCardInputOf([], [], "x", card).style, { ...publicStyle(DEFAULT_READER_CARD_STYLE), counter: "dial", layout: "faces", trait: "both" });
-  assert.equal(readerCardInputOf([], [], "x", { ...card, style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), counter: "dial", layout: "scroll" as never, trait: "both" } }).style.layout, "faces");
+  assert.deepEqual(readerCardInputOf([], [], "x", "en", card).style, { ...publicStyle(DEFAULT_READER_CARD_STYLE), counter: "dial", layout: "faces", trait: "both" });
+  assert.equal(readerCardInputOf([], [], "x", "en", { ...card, style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), counter: "dial", layout: "scroll" as never, trait: "both" } }).style.layout, "faces");
 });
 
 test("the owner's input draws their saved style and resolves their choices from the local library", () => {
   const books = Array.from({ length: 6 }, (_, i) => book(i, { _genres: ["Fantasy"], highlights: mark(2) }));
   const style = { counter: "ring", layout: "book", trait: "seal", motto: null, footer: { left: "plate", right: "name" }, corners: "diamonds", finish: "paper", print: "auto", signature: { bookKey: bookKey(books[0]!), note: "lent twice" }, highlight: { bookKey: bookKey(books[1]!), highlightId: "h1" } } as const;
   const covers: string[] = [];
-  const input = readerCardInputOf(books, [], "andre", undefined, { style, coverOf: (item) => { covers.push(String(item.Title)); return "https://covers.example.org/0.jpg"; } });
+  const input = readerCardInputOf(books, [], "andre", "en", undefined, { style, coverOf: (item) => { covers.push(String(item.Title)); return "https://covers.example.org/0.jpg"; } });
   assert.deepEqual(input.style, { ...publicStyle(DEFAULT_READER_CARD_STYLE), counter: "ring", layout: "book", trait: "seal" });
   assert.deepEqual(input.card.chosen, {
     signature: { title: "Book 0", author: "Author 0", workId: null, coverUrl: "https://covers.example.org/0.jpg", note: "lent twice" },
@@ -119,15 +119,15 @@ test("the owner's input draws their saved style and resolves their choices from 
 test("a choice whose book or highlight is gone is left out, and no style means the default with nothing chosen", () => {
   const books = [book(1, { highlights: [{ Type: "note", Text: "mine", BookmarkID: "n1" }] })];
   const style = { counter: "dial", layout: "faces", trait: "both", motto: null, footer: { left: "plate", right: "name" }, corners: "diamonds", finish: "paper", print: "auto", signature: { bookKey: "isbn:gone", note: null }, highlight: { bookKey: bookKey(books[0]!), highlightId: "n1" } } as const;
-  assert.deepEqual(readerCardInputOf(books, [], "andre", undefined, { style, coverOf: () => null }).card.chosen, {});
-  const plain = readerCardInputOf(books, [], "andre");
+  assert.deepEqual(readerCardInputOf(books, [], "andre", "en", undefined, { style, coverOf: () => null }).card.chosen, {});
+  const plain = readerCardInputOf(books, [], "andre", "en");
   assert.equal("chosen" in plain.card, false);
   assert.deepEqual(plain.style, { ...publicStyle(DEFAULT_READER_CARD_STYLE), counter: "dial", layout: "faces", trait: "both" });
 });
 
 test("the visitors' preview of the owner's card drops the leaders, the missing line and the owner's plate line", () => {
   const books = Array.from({ length: 2 }, (_, i) => book(i, { _genres: ["Fantasy"] }));
-  const owner = readerCardInputOf(books, [], "andre", undefined, { style: { counter: "beads", layout: "merged", trait: "line", motto: null, footer: { left: "plate", right: "name" }, corners: "diamonds", finish: "paper", print: "auto", signature: null, highlight: null }, coverOf: () => null });
+  const owner = readerCardInputOf(books, [], "andre", "en", undefined, { style: { counter: "beads", layout: "merged", trait: "line", motto: null, footer: { left: "plate", right: "name" }, corners: "diamonds", finish: "paper", print: "auto", signature: null, highlight: null }, coverOf: () => null });
   const visitor = visitorView(owner);
   assert.ok(owner.missing);
   assert.equal(visitor.view, "visitor");
@@ -141,7 +141,7 @@ test("the visitors' preview of the owner's card drops the leaders, the missing l
 test("the owner's reader number joins the facts only when given", () => {
   const books = Array.from({ length: 6 }, (_, i) => book(i, { _genres: ["Fantasy"] }));
   const style = { ...DEFAULT_READER_CARD_STYLE, footer: { left: "readerNumber", right: "name" } } as const;
-  assert.equal(readerCardInputOf(books, [], "andre", undefined, { style, coverOf: () => null, readerNumber: 42 }).card.facts?.readerNumber, 42);
-  assert.equal("readerNumber" in readerCardInputOf(books, [], "andre", undefined, { style, coverOf: () => null }).card.facts!, false);
-  assert.equal("readerNumber" in readerCardInputOf(books, [], "andre", undefined, { style, coverOf: () => null, readerNumber: null }).card.facts!, false);
+  assert.equal(readerCardInputOf(books, [], "andre", "en", undefined, { style, coverOf: () => null, readerNumber: 42 }).card.facts?.readerNumber, 42);
+  assert.equal("readerNumber" in readerCardInputOf(books, [], "andre", "en", undefined, { style, coverOf: () => null }).card.facts!, false);
+  assert.equal("readerNumber" in readerCardInputOf(books, [], "andre", "en", undefined, { style, coverOf: () => null, readerNumber: null }).card.facts!, false);
 });

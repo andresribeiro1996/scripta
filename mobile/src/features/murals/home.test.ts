@@ -21,9 +21,9 @@ test("rediscovery excludes reviews, notes, malformed and ambiguous highlights, a
   assert.deepEqual(rediscoverPassage(block.id, [...books].reverse(), "2026-09-09"), first);
   assert.notDeepEqual(rediscoverPassage(block.id, books, "2026-09-09", 1), first);
   assert.equal(rediscoverPassage(block.id, [], "2026-09-09"), undefined);
-  const resolved = resolveHomeBlock(block, books, [], "2026-09-09");
+  const resolved = resolveHomeBlock(block, books, [], "2026-09-09", "en");
   const pinned = pinPassage(block, resolved, books);
-  assert.deepEqual(resolveHomeBlock(pinned, books, [], "2027-01-01"), pinned);
+  assert.deepEqual(resolveHomeBlock(pinned, books, [], "2027-01-01", "en"), pinned);
   assert.deepEqual(pinned.layout, layout);
   assert.equal(block.mode, "rediscover");
 });
@@ -31,17 +31,17 @@ test("rediscovery excludes reviews, notes, malformed and ambiguous highlights, a
 test("collection shelves follow membership and preserve title/layout; missing sources stay empty", () => {
   const group: Group = { id: "collection", name: "Up next", type: "collection", bookKeys: [bookKey(other), bookKey(book)], createdAt: "", updatedAt: "" };
   const shelf: MuralBlock = { id: "shelf", type: "shelf", title: "", bookKeys: [], collectionId: group.id, layout };
-  const resolved = resolveHomeBlock(shelf, books, [group], "");
+  const resolved = resolveHomeBlock(shelf, books, [group], "", "en");
   assert.equal(resolved.type, "shelf");
   if (resolved.type !== "shelf") return;
   assert.deepEqual(resolved.bookKeys, group.bookKeys);
   assert.equal(resolved.title, "Up next");
   assert.deepEqual(resolved.layout, layout);
-  assert.deepEqual(resolveHomeBlock({ ...shelf, title: "Mine" }, books, [{ ...group, name: "Renamed" }], "").type, "shelf");
-  const missing = resolveHomeBlock(shelf, books, [], "");
+  assert.deepEqual(resolveHomeBlock({ ...shelf, title: "Mine" }, books, [{ ...group, name: "Renamed" }], "", "en").type, "shelf");
+  const missing = resolveHomeBlock(shelf, books, [], "", "en");
   assert.ok(missing.type === "shelf" && missing.bookKeys.length === 0);
   const manual = { ...shelf, collectionId: undefined, bookKeys: [bookKey(book)] };
-  assert.equal(resolveHomeBlock(manual, books, [], ""), manual);
+  assert.equal(resolveHomeBlock(manual, books, [], "", "en"), manual);
   const mural = { blocks: [shelf] } as Mural;
   assert.equal(scrubBooksFromMurals([mural], [bookKey(book)])[0], mural);
 });

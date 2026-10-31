@@ -6,7 +6,7 @@ import type { GalleryImage } from "../../api/gallery";
 import type { ResolvedTierlist } from "../../api/tierlists";
 import {
   muralBlockTitle,
-  STAT_METRIC_LABELS,
+  statMetricLabels,
   blockBooks,
   resolveQuote,
   resolveQuoteCollection,
@@ -24,6 +24,7 @@ import { Sheet } from "../Sheet";
 import { ProfileBlockView } from "./blocks/MiscBlocks";
 import { NO_GROUPS, useReaderCard } from "../../hooks/useReaderCard";
 import { ReaderCardViewer } from "../readerCard/ReaderCardViewer";
+import { useLocale } from "../../i18n";
 
 function detailSheetStyle(theme: ThemeId) {
   return { ...muralThemeStyle(theme), backgroundColor: "var(--color-surface)" };
@@ -62,6 +63,7 @@ export function MuralBlockDetail({
   onClose: () => void;
   actions?: ReactNode;
 }) {
+  const locale = useLocale();
   const signedIn = Boolean(useAuth().session);
   const [selectedBook, setSelectedBook] = useState<Record<string, unknown> | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -93,7 +95,7 @@ export function MuralBlockDetail({
       : block.type === "quote"
         ? [resolveQuote(block, books)].filter((quote) => quote !== null)
         : [];
-  const title = book ? "Book details" : muralBlockTitle(block, books, tierlist?.name);
+  const title = book ? "Book details" : muralBlockTitle(block, books, locale, tierlist?.name);
   return (
     <Sheet
       title={title}
@@ -173,7 +175,7 @@ export function MuralBlockDetail({
                 <p className="text-3xl font-bold text-(--color-accent)">
                   {statsOverride && metric in statsOverride ? statsOverride[metric] : computeStat(metric, books)}
                 </p>
-                <p className="mt-1 text-sm leading-5 text-(--color-text-dim)">{STAT_METRIC_LABELS[metric]}</p>
+                <p className="mt-1 text-sm leading-5 text-(--color-text-dim)">{statMetricLabels(locale)[metric]}</p>
               </div>
             ))}
           </div>

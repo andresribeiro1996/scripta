@@ -16,7 +16,7 @@ const library = (held: Record<string, number | undefined>, extra: Array<Record<s
 });
 
 test("a book prize card names the prize and year and the winner's title and author", () => {
-  assert.deepEqual(awardCardModel(bookPrize(), null), {
+  assert.deepEqual(awardCardModel(bookPrize(), null, "en"), {
     key: "awardDismissed:booker:2026",
     title: "Booker Prize 2026",
     subtitle: "Wolf Hall · Hilary Mantel",
@@ -28,37 +28,37 @@ test("a book prize card names the prize and year and the winner's title and auth
 
 test("joint winners read 'and 1 more' and target the first winner", () => {
   const joint = bookPrize({ prize: "international-booker", year: 2019, winners: [winner("w9", "Celestial Bodies", "Jokha Alharthi"), winner("w8", "Girl, Woman, Other", "Bernardine Evaristo")] });
-  const model = awardCardModel(joint, null);
+  const model = awardCardModel(joint, null, "en");
   assert.equal(model?.subtitle, "Celestial Bodies · Jokha Alharthi and 1 more");
   assert.deepEqual(model?.target, { kind: "work", id: "w9" });
-  assert.equal(awardCardModel({ ...joint, winners: [...joint.winners, winner("w7")] }, null)?.subtitle, "Celestial Bodies · Jokha Alharthi and 2 more");
+  assert.equal(awardCardModel({ ...joint, winners: [...joint.winners, winner("w7")] }, null, "en")?.subtitle, "Celestial Bodies · Jokha Alharthi and 2 more");
 });
 
 test("the shelf line says read, reading or to-read for a held winner", () => {
-  assert.equal(awardCardModel(bookPrize(), library({ w1: 2 }))?.shelfLine, "You've read it");
-  assert.equal(awardCardModel(bookPrize(), library({ w1: 1 }))?.shelfLine, "You're reading it");
-  assert.equal(awardCardModel(bookPrize(), library({ w1: 0 }))?.shelfLine, "On your to-read shelf");
-  assert.equal(awardCardModel(bookPrize(), library({ w1: undefined }))?.shelfLine, "On your to-read shelf");
-  assert.equal(awardCardModel(bookPrize({ nomineeWorkIds: ["w2"] }), library({ w1: 2, w2: 2 }))?.shelfLine, "You've read it");
+  assert.equal(awardCardModel(bookPrize(), library({ w1: 2 }), "en")?.shelfLine, "You've read it");
+  assert.equal(awardCardModel(bookPrize(), library({ w1: 1 }), "en")?.shelfLine, "You're reading it");
+  assert.equal(awardCardModel(bookPrize(), library({ w1: 0 }), "en")?.shelfLine, "On your to-read shelf");
+  assert.equal(awardCardModel(bookPrize(), library({ w1: undefined }), "en")?.shelfLine, "On your to-read shelf");
+  assert.equal(awardCardModel(bookPrize({ nomineeWorkIds: ["w2"] }), library({ w1: 2, w2: 2 }), "en")?.shelfLine, "You've read it");
 });
 
 test("a work held in two editions reads at its furthest status", () => {
   const twoCopies = library({ w1: 0 }, [{ _key: "second-copy", ReadStatus: 2 }]);
   twoCopies.works = { ...twoCopies.works, "second-copy": "w1" };
-  assert.equal(awardCardModel(bookPrize(), twoCopies)?.shelfLine, "You've read it");
+  assert.equal(awardCardModel(bookPrize(), twoCopies, "en")?.shelfLine, "You've read it");
   twoCopies.data.books.reverse();
-  assert.equal(awardCardModel(bookPrize(), twoCopies)?.shelfLine, "You've read it");
+  assert.equal(awardCardModel(bookPrize(), twoCopies, "en")?.shelfLine, "You've read it");
 });
 
 test("the shelf line counts held nominees when the winner isn't held, with singular and plural", () => {
   const nominated = bookPrize({ nomineeWorkIds: ["w2", "w3", "w4"] });
-  assert.equal(awardCardModel(nominated, library({ w2: 0 }))?.shelfLine, "1 nominee in your library");
-  assert.equal(awardCardModel(nominated, library({ w2: 2, w4: 1 }))?.shelfLine, "2 nominees in your library");
-  assert.equal(awardCardModel(nominated, library({ w9: 2 }))?.shelfLine, null);
+  assert.equal(awardCardModel(nominated, library({ w2: 0 }), "en")?.shelfLine, "1 nominee in your library");
+  assert.equal(awardCardModel(nominated, library({ w2: 2, w4: 1 }), "en")?.shelfLine, "2 nominees in your library");
+  assert.equal(awardCardModel(nominated, library({ w9: 2 }), "en")?.shelfLine, null);
 });
 
 test("an author prize card names the honoree, counts their held books and targets Search", () => {
-  const model = awardCardModel(authorPrize(), library({ w1: 2, w3: 0, w9: 2 }));
+  const model = awardCardModel(authorPrize(), library({ w1: 2, w3: 0, w9: 2 }), "en");
   assert.deepEqual(model, {
     key: "awardDismissed:nobel-literature:2022",
     title: "Nobel Prize in Literature 2022",
@@ -67,26 +67,26 @@ test("an author prize card names the honoree, counts their held books and target
     coverUrl: null,
     target: { kind: "search", query: "Annie Ernaux" },
   });
-  assert.equal(awardCardModel(authorPrize(), library({ w2: 1 }))?.shelfLine, "1 of their books in your library");
-  assert.equal(awardCardModel(authorPrize(), library({ w9: 1 }))?.shelfLine, null);
+  assert.equal(awardCardModel(authorPrize(), library({ w2: 1 }), "en")?.shelfLine, "1 of their books in your library");
+  assert.equal(awardCardModel(authorPrize(), library({ w9: 1 }), "en")?.shelfLine, null);
 });
 
 test("no library gives no shelf line", () => {
-  assert.equal(awardCardModel(bookPrize({ nomineeWorkIds: ["w2"] }), null)?.shelfLine, null);
-  assert.equal(awardCardModel(authorPrize(), null)?.shelfLine, null);
+  assert.equal(awardCardModel(bookPrize({ nomineeWorkIds: ["w2"] }), null, "en")?.shelfLine, null);
+  assert.equal(awardCardModel(authorPrize(), null, "en")?.shelfLine, null);
 });
 
 test("a book whose work isn't resolved isn't counted", () => {
   const unresolved = library({}, [{ _key: "key-w1", ReadStatus: 2 }, { _key: "key-w2", ReadStatus: 2 }]);
-  assert.equal(awardCardModel(bookPrize({ nomineeWorkIds: ["w2"] }), unresolved)?.shelfLine, null);
-  assert.equal(awardCardModel(authorPrize(), unresolved)?.shelfLine, null);
+  assert.equal(awardCardModel(bookPrize({ nomineeWorkIds: ["w2"] }), unresolved, "en")?.shelfLine, null);
+  assert.equal(awardCardModel(authorPrize(), unresolved, "en")?.shelfLine, null);
   const withoutWorks = { ...unresolved, works: undefined };
-  assert.equal(awardCardModel(bookPrize(), withoutWorks)?.shelfLine, null);
+  assert.equal(awardCardModel(bookPrize(), withoutWorks, "en")?.shelfLine, null);
 });
 
 test("an unknown prize gives null", () => {
-  assert.equal(awardCardModel(bookPrize({ prize: "goodreads-choice" }), null), null);
-  assert.equal(awardCardModel(bookPrize({ prize: "toString" }), null), null);
+  assert.equal(awardCardModel(bookPrize({ prize: "goodreads-choice" }), null, "en"), null);
+  assert.equal(awardCardModel(bookPrize({ prize: "toString" }), null, "en"), null);
 });
 
 test("firstUndismissed skips dismissed keys and unknown prizes", () => {

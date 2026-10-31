@@ -8,10 +8,11 @@
 
 import { booksByWork, isCharacterBook, itemNoun } from "@scripta/shared";
 import { Link } from "react-router-dom";
-import { aggregate, AGGREGATION_MODES, type AggregationMode, type BookResult, type HistogramCell } from "../../lib/tierlistResults";
+import { aggregate, aggregationModes, type AggregationMode, type BookResult, type HistogramCell } from "../../lib/tierlistResults";
 import { MiniBookTile } from "../murals/blocks/BookBlocks";
 import { TierRowEmpty, TierRowShell, TierRowTiles } from "./TierRowShell";
 import { useState } from "react";
+import { useLocale } from "../../i18n";
 
 export interface TierlistResultsViewProps {
   histogram: HistogramCell[];
@@ -43,10 +44,11 @@ function ResultTile({ result, book }: { result: BookResult; book: Record<string,
 }
 
 export function TierlistResultsView({ histogram, tierIds, tiers, pool, books, ballotCount }: TierlistResultsViewProps) {
+  const locale = useLocale();
   const [mode, setMode] = useState<AggregationMode>("average");
   const results = aggregate(histogram, tierIds, pool, mode);
   const byWork = booksByWork(books);
-  const noun = itemNoun(books.some(isCharacterBook), 1);
+  const noun = itemNoun(books.some(isCharacterBook), 1, locale);
 
   const byTier = new Map<string, BookResult[]>(tierIds.map((id) => [id, []]));
   const unranked: BookResult[] = [];
@@ -70,7 +72,7 @@ export function TierlistResultsView({ histogram, tierIds, tiers, pool, books, ba
         {/* Segmented control — markup matches ArenaViewPage's Matches/Bracket
             switch exactly (border + divider + accent-soft active state). */}
         <div className="flex items-stretch overflow-hidden rounded-lg border border-(--color-border) bg-(--color-surface)">
-          {AGGREGATION_MODES.map(({ mode: candidate, label }, i) => (
+          {aggregationModes(locale).map(({ mode: candidate, label }, i) => (
             <button
               key={candidate}
               onClick={() => setMode(candidate)}

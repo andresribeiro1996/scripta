@@ -65,6 +65,12 @@ test("fetchRecap builds the path and drops unknown game kinds", async () => {
 });
 
 test("recapMonthName names the month", () => {
-  assert.equal(recapMonthName("2026-10"), "October");
-  assert.equal(recapMonthName("2027-01"), "January");
+  assert.equal(recapMonthName("2026-10", "en"), "October");
+  assert.equal(recapMonthName("2027-01", "en"), "January");
+});
+
+test("recapMonthName names the month in the reader's language", () => {
+  assert.equal(recapMonthName("2026-10", "en"), "October");
+  assert.equal(recapMonthName("2026-10", "pt-PT"), "outubro");
+  assert.equal(recapMonthName("2026-03", "pt-PT"), "março");
 });

@@ -1,4 +1,4 @@
-import { ALL_STAT_METRICS, STAT_METRIC_LABELS, bookKey, resolveHomeBlock, resolveQuote, type Group, type MuralBlock } from "@scripta/shared";
+import { ALL_STAT_METRICS, statMetricLabels, bookKey, resolveHomeBlock, resolveQuote, type Group, type MuralBlock } from "@scripta/shared";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Icon, Input, Segmented } from "../../ui";
 import { Text } from "../../ui/Text";
@@ -7,6 +7,7 @@ import type { GalleryImage } from "../gallery/api";
 import { GenreChoices } from "../library/components/GenreChoices";
 import { SelectRow, ToggleRow } from "../library/components/StyleControls";
 import type { Tierlist } from "../tierlists/api";
+import { useLocale } from "../../i18n";
 
 export type PickerKind = "book" | "image" | "tierlist";
 
@@ -40,6 +41,7 @@ export function ContentTab({ block, books, groups, images, tierlists, update, on
   update: (transform: (block: MuralBlock) => MuralBlock) => void;
   onPick: (kind: PickerKind) => void;
 }) {
+  const locale = useLocale();
   const { colors } = useTheme();
   const collections = groups.filter((group) => group.type === "collection");
   const bookTitle = (key: string) => key ? String(books.find((book) => bookKey(book) === key)?.Title ?? "Book unavailable") : "None";
@@ -50,7 +52,7 @@ export function ContentTab({ block, books, groups, images, tierlists, update, on
     return (
       <View style={styles.tab}>
         <Input label="Title" value={block.title} hint={following ? "Leave blank to use the collection's name." : undefined} onChangeText={(title) => update((item) => item.type === "shelf" ? { ...item, title } : item)} />
-        {collections.length ? <Segmented options={SHELF_SOURCES} value={following ? "follow" : "pick"} accessibilityLabel="Shelf source" onChange={(source) => update((item) => item.type !== "shelf" ? item : source === "follow" ? { ...item, collectionId: collections[0]!.id, bookKeys: [] } : { ...item, collectionId: undefined, bookKeys: (resolveHomeBlock(item, books, groups, "") as typeof item).bookKeys })} /> : null}
+        {collections.length ? <Segmented options={SHELF_SOURCES} value={following ? "follow" : "pick"} accessibilityLabel="Shelf source" onChange={(source) => update((item) => item.type !== "shelf" ? item : source === "follow" ? { ...item, collectionId: collections[0]!.id, bookKeys: [] } : { ...item, collectionId: undefined, bookKeys: (resolveHomeBlock(item, books, groups, "", locale) as typeof item).bookKeys })} /> : null}
         {following
           ? <SelectRow label="Collection" value={block.collectionId!} options={collections.map((group) => ({ value: group.id, label: group.name }))} onChange={(collectionId) => update((item) => item.type === "shelf" ? { ...item, collectionId, bookKeys: [] } : item)} />
           : <PickerRow label="Books" value={`${block.bookKeys.length} chosen`} onPress={() => onPick("book")} />}
@@ -119,7 +121,7 @@ export function ContentTab({ block, books, groups, images, tierlists, update, on
   if (block.type === "stats") {
     return (
       <View style={styles.tab}>
-        {ALL_STAT_METRICS.map((metric) => <ToggleRow key={metric} label={STAT_METRIC_LABELS[metric]} checked={block.metrics.includes(metric)} onChange={(checked) => update((item) => item.type === "stats" ? { ...item, metrics: checked ? [...item.metrics, metric] : item.metrics.filter((value) => value !== metric) } : item)} />)}
+        {ALL_STAT_METRICS.map((metric) => <ToggleRow key={metric} label={statMetricLabels(locale)[metric]} checked={block.metrics.includes(metric)} onChange={(checked) => update((item) => item.type === "stats" ? { ...item, metrics: checked ? [...item.metrics, metric] : item.metrics.filter((value) => value !== metric) } : item)} />)}
       </View>
     );
   }

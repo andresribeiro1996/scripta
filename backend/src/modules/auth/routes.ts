@@ -19,7 +19,8 @@ import {
   OAuthAccountConflictError,
   UsernameInUseError
 } from "./domain/errors.js";
-import { RECOVERY_MESSAGE } from "@scripta/shared";
+import { recoveryMessage } from "@scripta/shared";
+import { LOCALE_PREFERENCES } from "@scripta/shared/i18n";
 import { DISPLAY_FONT_PREFERENCES, TEXT_FONT_PREFERENCES, THEME_PREFERENCES } from "@scripta/shared/themes";
 import { AccountActionError, type AccountSecurityService } from "./accountSecurity.js";
 import type { AuthService } from "./service.js";
@@ -62,7 +63,7 @@ const setUsernameSchema = z.object({
 const avatarIdParamSchema = z.object({ id: z.string().uuid() });
 
 const setAppearanceSchema = z
-  .object({ theme: z.enum(THEME_PREFERENCES), displayFont: z.enum(DISPLAY_FONT_PREFERENCES), textFont: z.enum(TEXT_FONT_PREFERENCES) })
+  .object({ theme: z.enum(THEME_PREFERENCES), displayFont: z.enum(DISPLAY_FONT_PREFERENCES), textFont: z.enum(TEXT_FONT_PREFERENCES), locale: z.enum(LOCALE_PREFERENCES) })
   .partial()
   .strict()
   .refine((body) => Object.keys(body).length > 0);
@@ -92,7 +93,7 @@ export function buildAuthRoutes(service: AuthService, avatarUrlFor: (id: string)
         if (!parsed.success) return reply.code(400).send({ error: "Enter a valid email address." });
         if (!security.enabled) return reply.code(503).send({ error: "Email delivery is unavailable. Please try again later." });
         deliver(() => security.forgotPassword(parsed.data.email));
-        return reply.code(202).send({ message: RECOVERY_MESSAGE });
+        return reply.code(202).send({ message: recoveryMessage("en") });
       });
       app.post("/auth/reset-password", async (request, reply) => {
         const parsed = z.object({ token: tokenSchema, password: signupSchema.shape.password }).safeParse(request.body);

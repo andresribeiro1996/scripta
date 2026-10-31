@@ -18,8 +18,10 @@ import { publicContentUrl } from "../sharing/links";
 import { fetchWork } from "./api";
 import { BookScreen, WashBackdrop, bookMenuItems } from "./BookScreen";
 import { workPath } from "./workPath";
+import { getLocale, useLocale } from "../../i18n";
 
 export function WorkScreen({ id, edition = null }: { id: string; edition?: string | null }) {
+  const locale = useLocale();
   const [adding, setAdding] = useState(false);
   const [addingToRead, setAddingToRead] = useState(false);
   const addInFlight = useRef(false);
@@ -83,7 +85,7 @@ export function WorkScreen({ id, edition = null }: { id: string; edition?: strin
       </Screen>
     );
   }
-  const model = bookScreenModel(page, book, { isAdmin: false }, editionId);
+  const model = bookScreenModel(page, book, { isAdmin: false }, locale, editionId);
   const menuItems = book && page.mine ? bookMenuItems(model, page.mine.bookKey, segments) : [];
   const wash = coverWash(model.cover.color, mode);
   const tint = wash && model.cover.color ? { color: model.cover.color, topAlpha: wash.topAlpha } : null;
@@ -113,7 +115,7 @@ export function WorkScreen({ id, edition = null }: { id: string; edition?: strin
       await queryClient.refetchQueries({ queryKey: LIBRARY_QUERY_KEY }, { throwOnError: true });
       await query.refetch({ throwOnError: true });
     } catch (error) {
-      show(added ? "Added to your library, but the page didn't refresh." : saveFailureMessage(error, "Could not add the book."), "error");
+      show(added ? "Added to your library, but the page didn't refresh." : saveFailureMessage(error, "Could not add the book.", getLocale()), "error");
     } finally {
       addInFlight.current = false;
       setAddingToRead(false);

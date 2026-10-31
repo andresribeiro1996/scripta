@@ -12,8 +12,10 @@ import { ReaderGlyph } from "../community/ReaderGlyph";
 import { MuralThumbnail } from "../murals/MuralCanvas";
 import { ReaderCardImage } from "../murals/ReaderCardImage";
 import { muralPreviewOf } from "../public/adapters";
+import { useLocale } from "../../i18n";
 
 export function ReaderPortraitCard({ person, width, canvasWidth, busy, onToggleFollow }: { person: SuggestedReader; width: number; canvasWidth: number; busy: boolean; onToggleFollow: () => void }) {
+  const locale = useLocale();
   const { colors } = useTheme();
   const fadeId = useId();
   const payload = person.private ? null : person.mural;
@@ -21,10 +23,10 @@ export function ReaderPortraitCard({ person, width, canvasWidth, busy, onToggleF
     if (!payload) return null;
     return muralPreviewOf(payload);
   }, [payload]);
-  const glyphLabel = readerGlyphLabel(person.private ? undefined : person.user.readerGlyph);
+  const glyphLabel = readerGlyphLabel(person.private ? undefined : person.user.readerGlyph, locale);
   const identity = glyphLabel ? person.user.readerGlyph : undefined;
-  const fallback = useMemo(() => readerCardInputOf([], [], person.user.username, { state: identity ? "settled" : "unwritten", identity: identity ?? null, runnerUp: null, signal: null, coverage: [] }), [identity, person.user.username]);
-  const caption = personCaption(person);
+  const fallback = useMemo(() => readerCardInputOf([], [], person.user.username, locale, { state: identity ? "settled" : "unwritten", identity: identity ?? null, runnerUp: null, signal: null, coverage: [] }), [identity, person.user.username, locale]);
+  const caption = personCaption(person, locale);
   const palette = preview ? themes[preview.mural.theme].colors : colors;
   return (
     <View style={[styles.card, { width, backgroundColor: colors.surface }]}>

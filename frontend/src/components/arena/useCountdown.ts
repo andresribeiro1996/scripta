@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { countdownLabel } from "@scripta/shared";
+import { useLocale } from "../../i18n";
 
 /** Live "time left" label for a duel's `closesAt`, ticking once a second.
  *
@@ -14,14 +15,15 @@ import { countdownLabel } from "@scripta/shared";
  *  there's a real window where a client sees a closed duel that hasn't
  *  been swept yet. */
 export function useCountdown(closesAt: string): string {
+  const locale = useLocale();
   const [label, setLabel] = useState("");
   useEffect(() => {
     function tick() {
-      setLabel(countdownLabel(closesAt));
+      setLabel(countdownLabel(closesAt, locale));
     }
     tick();
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [closesAt]);
+  }, [closesAt, locale]);
   return label;
 }

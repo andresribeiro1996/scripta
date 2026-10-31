@@ -1,8 +1,8 @@
 import { useState, type ReactNode } from "react";
 import { StyleSheet, View } from "react-native";
 import {
-  CARD_ASPECT_RATIO_OPTIONS, CARD_BORDER_OPACITY_RANGE, CARD_BORDER_STYLE_OPTIONS, CARD_BORDER_WIDTH_RANGE,
-  CARD_FONT_FAMILY_OPTIONS, CARD_FONT_SIZE_RANGE, CARD_OPACITY_RANGE, CARD_RADIUS_RANGE, OVERLAY_INTENSITY_RANGE,
+  cardAspectRatioOptions, CARD_BORDER_OPACITY_RANGE, cardBorderStyleOptions, CARD_BORDER_WIDTH_RANGE,
+  cardFontFamilyOptions, CARD_FONT_SIZE_RANGE, CARD_OPACITY_RANGE, CARD_RADIUS_RANGE, OVERLAY_INTENSITY_RANGE,
   type PerCardStyle,
 } from "@scripta/shared";
 import { Button } from "../../../ui";
@@ -15,6 +15,7 @@ import {
 } from "../../murals/blockStyleOptions";
 import { Caption, Chip, ColorSwatchRow, PresetRow, SelectRow, StepperRow, Tile } from "./StyleControls";
 import { cardTextMayBeHardToRead } from "./scrim";
+import { useLocale } from "../../../i18n";
 
 const TEXT_SIZES = [
   { key: "s", label: "S", value: 11 },
@@ -46,6 +47,7 @@ export function PerCardStyleFields({ draft, canvasColor, onApply, onSaveNow }: {
   onApply: (patch: Partial<PerCardStyle>) => void;
   onSaveNow: (patch: Partial<PerCardStyle>) => void;
 }) {
+  const locale = useLocale();
   const { colors } = useTheme();
   const [fineTune, setFineTune] = useState(false);
   return (
@@ -64,7 +66,7 @@ export function PerCardStyleFields({ draft, canvasColor, onApply, onSaveNow }: {
       </Section>
       <Section title="Cover">
         <View style={styles.looks}>
-          {CARD_ASPECT_RATIO_OPTIONS.map((option) => (
+          {cardAspectRatioOptions(locale).map((option) => (
             <Tile key={option.value} label={option.label} width="30%" selected={draft.cardAspectRatio === option.value} onPress={() => onSaveNow({ cardAspectRatio: option.value })}>
               <View style={{ width: 24, aspectRatio: option.value, borderWidth: 1, borderRadius: radii.sm, borderColor: colors.text }} />
             </Tile>
@@ -76,7 +78,7 @@ export function PerCardStyleFields({ draft, canvasColor, onApply, onSaveNow }: {
       </Section>
       <Section title="Text">
         <View style={styles.wrap}>
-          {CARD_FONT_FAMILY_OPTIONS.map((option) => <Chip key={option.value} label={option.label.replace(" (system)", "")} fontFamily={cardFontFamily(option.value)} selected={draft.cardFontFamily === option.value} onPress={() => onSaveNow({ cardFontFamily: option.value })} />)}
+          {cardFontFamilyOptions(locale).map((option) => <Chip key={option.value} label={option.shortLabel} fontFamily={cardFontFamily(option.value)} selected={draft.cardFontFamily === option.value} onPress={() => onSaveNow({ cardFontFamily: option.value })} />)}
         </View>
         <PresetRow label="Size" presets={TEXT_SIZES} value={draft.cardFontSize} onChange={(cardFontSize) => onSaveNow({ cardFontSize })} />
         <View style={styles.wrap}>
@@ -94,7 +96,7 @@ export function PerCardStyleFields({ draft, canvasColor, onApply, onSaveNow }: {
         <PresetRow label="Width" presets={BORDER_WIDTH_PRESETS} value={draft.cardBorderWidth} onChange={(cardBorderWidth) => onSaveNow({ cardBorderWidth })} />
         {draft.cardBorderWidth > 0 ? <>
           <SelectRow label="Style" value={resolveBorderStyle(draft.cardBorderStyle)} options={BORDER_STYLE_CHOICES} onChange={(cardBorderStyle) => onSaveNow({ cardBorderStyle })} />
-          {resolveBorderStyle(draft.cardBorderStyle) !== draft.cardBorderStyle ? <Caption>{`${CARD_BORDER_STYLE_OPTIONS.find((option) => option.value === draft.cardBorderStyle)?.label} is saved for web; displays as ${resolveBorderStyle(draft.cardBorderStyle)} here.`}</Caption> : null}
+          {resolveBorderStyle(draft.cardBorderStyle) !== draft.cardBorderStyle ? <Caption>{`${cardBorderStyleOptions(locale).find((option) => option.value === draft.cardBorderStyle)?.label} is saved for web; displays as ${resolveBorderStyle(draft.cardBorderStyle)} here.`}</Caption> : null}
           <PresetRow label="Strength" presets={BORDER_STRENGTH_PRESETS} value={draft.cardBorderOpacity} onChange={(cardBorderOpacity) => onSaveNow({ cardBorderOpacity })} />
           <Text style={[typography.body, styles.label, { color: colors.text }]}>Sides</Text>
           <View style={styles.wrap}>

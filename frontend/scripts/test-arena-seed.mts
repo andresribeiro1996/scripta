@@ -19,7 +19,7 @@ console.log("1. Seed books preserve the existing shape");
     ISBN: "978-1-4028-9462-6",
     Title: "  The Book  ",
     Attribution: "  An Author  "
-  }, "https://covers.example/resolved.jpg");
+  }, "https://covers.example/resolved.jpg", "en");
   check("resolved cover is accepted as an argument", JSON.stringify(seed) === JSON.stringify({
     workId: "w1",
     title: "  The Book  ",
@@ -27,7 +27,7 @@ console.log("1. Seed books preserve the existing shape");
     cover: "https://covers.example/resolved.jpg"
   }), JSON.stringify(seed));
 
-  const empty = toSeedBook({ _workId: "w2" }, null);
+  const empty = toSeedBook({ _workId: "w2" }, null, "en");
   check("fallback fields and work id are stable", JSON.stringify(empty) === JSON.stringify({
     workId: "w2",
     title: "Untitled",
@@ -37,7 +37,7 @@ console.log("1. Seed books preserve the existing shape");
 }
 
 console.log("\n1b. A book without a work cannot be seeded");
-check("no work id gives no seed book", toSeedBook({ Title: "Orphan" }, null) === null);
+check("no work id gives no seed book", toSeedBook({ Title: "Orphan" }, null, "en") === null);
 
 console.log("\n2. Cover lookups normalize identifiers and trim search titles");
 {

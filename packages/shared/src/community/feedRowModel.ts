@@ -1,7 +1,9 @@
-import { digestHeading, digestTarget, participationLead, type DigestBook, type DigestItem } from "../dashboard.js";
+import { digestHeading, digestTarget, participationLead, participationVerb, type DigestBook, type DigestItem } from "../dashboard.js";
 import { isCertainMatch } from "../library/bookMatch.js";
+import { sharedT } from "../i18n/sharedT.js";
+import type { Locale } from "../i18n/locale.js";
 import { readerGlyphLabel } from "../readerCards/card.js";
-import { contentDetail, contentKindLabel } from "./helpers.js";
+import { contentDetail, contentKindLabel, feedAction } from "./helpers.js";
 
 export type FeedIconName = "tierlist" | "champion" | "arena" | "vote" | "book" | "follow" | "bracket" | "murals";
 
@@ -27,30 +29,31 @@ export interface FeedRowModel {
   action: "followBack" | null;
 }
 
-export function feedRowAccessibilityLabel(item: DigestItem): string {
-  const heading = digestHeading(item);
+export function feedRowAccessibilityLabel(item: DigestItem, locale: Locale): string {
+  const heading = digestHeading(item, locale);
   if (item.kind === "participation") return heading;
-  const label = readerGlyphLabel(item.actor.readerGlyph);
+  const label = readerGlyphLabel(item.actor.readerGlyph, locale);
   return label ? `${heading}, ${label}` : heading;
 }
 
-export function feedRowModel(item: DigestItem): FeedRowModel {
+export function feedRowModel(item: DigestItem, locale: Locale): FeedRowModel {
+  const t = sharedT(locale);
   switch (item.kind) {
     case "publication":
       return {
         covers: item.content.covers,
         icon: item.content.kind === "tierlist" ? "tierlist" : item.content.kind === "quiz" ? "champion" : "arena",
-        label: contentKindLabel(item.content),
+        label: contentKindLabel(item.content, locale),
         tone: "accent",
         title: item.content.name,
-        detail: contentDetail(item.content),
+        detail: contentDetail(item.content, locale),
         action: null
       };
     case "vote":
       return {
         covers: [],
         icon: item.content.kind === "quiz" ? "champion" : "vote",
-        label: item.content.kind === "tierlist" ? "Ranked" : item.content.kind === "quiz" ? "Played" : "Voted",
+        label: t(item.content.kind === "tierlist" ? "shared.feedRowModel.ranked" : item.content.kind === "quiz" ? "shared.feedRowModel.played" : "shared.feedRowModel.voted"),
         tone: "accent",
         title: "",
         detail: item.content.name,
@@ -60,7 +63,7 @@ export function feedRowModel(item: DigestItem): FeedRowModel {
       return {
         covers: item.book.coverUrl ? [item.book.coverUrl] : [],
         icon: "book",
-        label: item.finished ? "Finished" : item.started ? "Started" : "Added",
+        label: t(item.finished ? "shared.feedRowModel.finished" : item.started ? "shared.feedRowModel.started" : "shared.feedRowModel.added"),
         tone: item.finished ? "success" : "dim",
         title: item.book.title,
         detail: item.book.author || undefined,
@@ -69,43 +72,45 @@ export function feedRowModel(item: DigestItem): FeedRowModel {
     case "follow":
       // Offered only one way round: following back is the reply to being
       // followed, and there is nothing to offer once it is mutual.
-      return { covers: [], icon: "follow", label: "New follower", tone: "dim", title: "", action: item.viewerFollows ? null : "followBack" };
+      return { covers: [], icon: "follow", label: t("shared.feedRowModel.newFollower"), tone: "dim", title: "", action: item.viewerFollows ? null : "followBack" };
     case "participation":
       return {
         covers: item.game.covers,
         icon: item.game.kind === "tierlist" ? "tierlist" : item.game.kind === "tournament" ? "bracket" : "champion",
-        label: item.game.kind === "tierlist" ? "Ranked" : item.game.kind === "tournament" ? "Voted" : "Played",
+        label: t(item.game.kind === "tierlist" ? "shared.feedRowModel.ranked" : item.game.kind === "tournament" ? "shared.feedRowModel.voted" : "shared.feedRowModel.played"),
         tone: "accent",
         title: item.game.name,
-        detail: participationLead(item),
+        detail: participationLead(item, locale),
         action: null
       };
     case "mural":
-      return { covers: item.mural.coverImageUrl ? [item.mural.coverImageUrl] : [], icon: "murals", label: "Mural", tone: "accent", title: item.mural.name, action: null };
+      return { covers: item.mural.coverImageUrl ? [item.mural.coverImageUrl] : [], icon: "murals", label: t("shared.feedRowModel.mural"), tone: "accent", title: item.mural.name, action: null };
     case "completion":
-      return { covers: item.winner.coverUrl ? [item.winner.coverUrl] : [], icon: "champion", label: "Tournament finished", tone: "accent", title: `${item.winner.title} is the winner`, detail: `${item.tournament.name} · ${item.tournament.bracketSize} books`, action: null };
+      return { covers: item.winner.coverUrl ? [item.winner.coverUrl] : [], icon: "champion", label: t("shared.feedRowModel.tournamentFinished"), tone: "accent", title: t("shared.feedRowModel.winnerIs", { title: item.winner.title }), detail: t("shared.feedRowModel.tournamentBooks", { name: item.tournament.name, count: item.tournament.bracketSize }), action: null };
   }
 }
 
-export function feedEventLabel(item: DigestItem): string {
-  if (item.kind === "publication") return `published a ${contentKindLabel(item.content).toLowerCase()}`;
-  if (item.kind === "vote") return item.content.kind === "tierlist" ? "ranked a tier list" : item.content.kind === "quiz" ? "played a quiz" : "voted in a tournament";
-  if (item.kind === "reading") return item.finished ? "finished reading" : item.started ? "started reading" : "added to their library";
-  if (item.kind === "mural") return "published a mural";
-  if (item.kind === "follow") return "followed you";
-  if (item.kind === "completion") return "A tournament you joined has finished";
-  return item.game.kind === "tierlist" ? "ranked your tier list" : item.game.kind === "quiz" ? "played your quiz" : "voted in your tournament";
+export function feedEventLabel(item: DigestItem, locale: Locale): string {
+  const t = sharedT(locale);
+  if (item.kind === "publication") return feedAction(item, locale);
+  if (item.kind === "vote") return t(item.content.kind === "tierlist" ? "shared.feedRowModel.eventRankedTierlist" : item.content.kind === "quiz" ? "shared.feedRowModel.eventPlayedQuiz" : "shared.feedRowModel.eventVotedTournament");
+  if (item.kind === "reading") return t(item.finished ? "shared.feedRowModel.eventFinishedReading" : item.started ? "shared.feedRowModel.eventStartedReading" : "shared.feedRowModel.eventAddedToLibrary");
+  if (item.kind === "mural") return t("shared.feedRowModel.eventPublishedMural");
+  if (item.kind === "follow") return t("shared.feedRowModel.eventFollowed");
+  if (item.kind === "completion") return t("shared.feedRowModel.eventCompletion");
+  return participationVerb(item, locale);
 }
 
-export function feedPrimaryLabel(item: DigestItem): string | null {
-  if (item.kind === "completion") return "View final bracket";
-  if (item.kind === "mural") return "Open mural";
+export function feedPrimaryLabel(item: DigestItem, locale: Locale): string | null {
+  const t = sharedT(locale);
+  if (item.kind === "completion") return t("shared.feedRowModel.viewFinalBracket");
+  if (item.kind === "mural") return t("shared.feedRowModel.openMural");
   if (item.kind === "publication") {
     const content = item.content;
-    return content.kind === "tierlist" ? content.votingOpen ? "Rank this list" : "View rankings" : content.kind === "quiz" ? content.playOpen ? "Play quiz" : "View quiz" : content.status === "active" ? "Vote in tournament" : "View final bracket";
+    return t(content.kind === "tierlist" ? content.votingOpen ? "shared.feedRowModel.rankThisList" : "shared.helpers.viewRankings" : content.kind === "quiz" ? content.playOpen ? "shared.helpers.playQuiz" : "shared.helpers.viewQuiz" : content.status === "active" ? "shared.helpers.voteInTournament" : "shared.feedRowModel.viewFinalBracket");
   }
-  if (item.kind === "vote") return item.content.kind === "tierlist" ? "View tier list" : item.content.kind === "quiz" ? "Play quiz" : "View tournament";
-  if (item.kind === "participation") return item.game.kind === "tierlist" ? "View rankings" : item.game.kind === "quiz" ? "View results" : "View tournament";
+  if (item.kind === "vote") return t(item.content.kind === "tierlist" ? "shared.feedRowModel.viewTierlist" : item.content.kind === "quiz" ? "shared.helpers.playQuiz" : "shared.feedRowModel.viewTournament");
+  if (item.kind === "participation") return t(item.game.kind === "tierlist" ? "shared.helpers.viewRankings" : item.game.kind === "quiz" ? "shared.helpers.viewResults" : "shared.feedRowModel.viewTournament");
   return null;
 }
 

@@ -7,6 +7,7 @@ import { addBookToLibrary } from "../library/api/client";
 import { LIBRARY_QUERY_KEY, useLibrary } from "../library/hooks/useLibrary";
 import { publicContentUrl } from "../sharing/links";
 import { feedRowModel, feedShareTarget, hasActivityThread, type ActivityEngagement } from "@scripta/shared/community";
+import { getLocale, useLocale } from "../../i18n";
 
 export const ENGAGEMENT_QUERY_KEY = ["community", "engagement"] as const;
 export const SAVED_STATE_QUERY_KEY = ["community", "saved-state"] as const;
@@ -15,6 +16,7 @@ export const SAVED_QUERY_KEY = ["community", "saved"] as const;
 function batches<T>(values: T[]) { return Array.from({ length: Math.ceil(values.length / 50) }, (_, index) => values.slice(index * 50, (index + 1) * 50)); }
 
 export function useHomeActions(items: DigestItem[]) {
+  const locale = useLocale();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const library = useLibrary();
@@ -46,7 +48,7 @@ export function useHomeActions(items: DigestItem[]) {
     const path = feedShareTarget(item);
     if (!path) throw new Error("This game has no public share link.");
     const url = await publicContentUrl(path);
-    const row = feedRowModel(item);
+    const row = feedRowModel(item, locale);
     await Share.share({ message: url, title: row.title || "Atmyshelf" });
   } });
   function clearErrors() { if (like.isError) like.reset(); if (save.isError) save.reset(); if (want.isError) want.reset(); if (share.isError) share.reset(); }
@@ -54,7 +56,7 @@ export function useHomeActions(items: DigestItem[]) {
   return {
     library, engagement, savedKeys,
     savedReady: savedQueries.every((query) => query.isSuccess),
-    error: error ? saveFailureMessage(error, "Couldn't complete that action.") : engagementQueries.some((query) => query.isError) ? "Couldn't load reactions. Pull to refresh." : savedQueries.some((query) => query.isError) ? "Couldn't load saved items. Pull to refresh." : null,
+    error: error ? saveFailureMessage(error, "Couldn't complete that action.", getLocale()) : engagementQueries.some((query) => query.isError) ? "Couldn't load reactions. Pull to refresh." : savedQueries.some((query) => query.isError) ? "Couldn't load saved items. Pull to refresh." : null,
     liking: like.isPending, saving: save.isPending, wanting: want.isPending,
     toggleLike: (item: DigestItem) => { clearErrors(); like.mutate({ id: item.id, liked: !engagement[item.id]?.liked }); },
     toggleSaved: (item: DigestItem, saved: boolean) => { clearErrors(); save.mutate({ item, saved: !saved }); },

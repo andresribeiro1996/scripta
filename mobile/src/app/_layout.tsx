@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { LibrarySaver } from "@scripta/shared";
 import { useFonts } from "expo-font";
@@ -9,6 +9,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { AuthProvider, useAuth } from "../core/auth";
 import { createAccountLibrarySaver, LibrarySaverContext } from "../features/library/hooks/useLibrary";
+import { installNativeLocale } from "../i18n/native";
 import { FONT_ASSETS } from "../ui/fontAssets";
 import { ThemeProvider, useTheme } from "../ui/theme";
 import { ToastProvider } from "../ui/ToastHost";
@@ -70,7 +71,13 @@ export default function RootLayout() {
   useEffect(() => {
     if (fontError) console.warn("Couldn't load the bundled fonts; using system fonts.", fontError);
   }, [fontError]);
-  if (!fontsLoaded && !fontError) return null;
+  const [localeReady, setLocaleReady] = useState(false);
+  useEffect(() => {
+    installNativeLocale()
+      .catch((err: unknown) => console.warn("Couldn't set up the app language.", err))
+      .finally(() => setLocaleReady(true));
+  }, []);
+  if ((!fontsLoaded && !fontError) || !localeReady) return null;
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>

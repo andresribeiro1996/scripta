@@ -5,6 +5,7 @@ import { shareLink } from "../lib/shareLink";
 import { fetchActivityEngagement, fetchSavedState, likeActivity, saveContent } from "../api/community";
 import { addBookToLibrary } from "../api/library";
 import { useToast } from "../components/Toaster";
+import { getLocale, useLocale } from "../i18n";
 
 export const ENGAGEMENT_KEY = ["community", "engagement"] as const;
 export const SAVED_STATE_KEY = ["community", "saved", "state"] as const;
@@ -31,6 +32,7 @@ function batches<T>(values: T[]): T[][] {
 }
 
 export function useFeedActions(items: DigestItem[], { trackSaved = true }: { trackSaved?: boolean } = {}): FeedActions {
+  const locale = useLocale();
   const queryClient = useQueryClient();
   const toast = useToast();
   const ids = [...new Set(items.filter((item) => hasActivityThread(item)).map((item) => item.id))];
@@ -49,7 +51,7 @@ export function useFeedActions(items: DigestItem[], { trackSaved = true }: { tra
   const engagement: Record<string, ActivityEngagement> = Object.assign({}, ...engagementQueries.map((query) => query.data ?? {}));
   const saved = new Set(savedQueries.flatMap((query) => query.data ?? []));
 
-  const fail = (generic: string) => (error: unknown) => toast({ kind: "error", message: saveFailureMessage(error, generic) });
+  const fail = (generic: string) => (error: unknown) => toast({ kind: "error", message: saveFailureMessage(error, generic, getLocale()) });
 
   const like = useMutation({
     mutationFn: ({ id, liked }: { id: string; liked: boolean }) => likeActivity(id, liked),
@@ -78,7 +80,7 @@ export function useFeedActions(items: DigestItem[], { trackSaved = true }: { tra
   function share(item: DigestItem) {
     const path = feedShareTarget(item);
     if (!path) return;
-    return shareLink(feedRowModel(item).title || "Atmyshelf", `${window.location.origin}${path}`, toast);
+    return shareLink(feedRowModel(item, locale).title || "Atmyshelf", `${window.location.origin}${path}`, toast);
   }
 
   const failedQueries = [...engagementQueries, ...savedQueries].filter((query) => query.isError);

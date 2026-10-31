@@ -7,6 +7,7 @@ import { attemptUpdate } from "@/features/library/lib/attemptUpdate";
 import { Screen } from "@/ui";
 import { Text } from "@/ui/Text";
 import { spacing, typography, useTheme } from "@/ui/theme";
+import { getLocale } from "../../../i18n";
 
 export default function LibraryStyleRoute() {
   const { data: library, updateLibrary } = useLibrary();
@@ -24,7 +25,7 @@ export default function LibraryStyleRoute() {
           setError(null);
           void attemptUpdate(
             () => updateLibrary((data) => ({ ...data, style: next })),
-            (failure) => setError(saveFailureMessage(failure, "Couldn't save the style change.")),
+            (failure) => setError(saveFailureMessage(failure, "Couldn't save the style change.", getLocale())),
           );
         }}
       />

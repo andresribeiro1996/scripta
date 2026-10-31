@@ -3,13 +3,15 @@ import { Text } from "../../ui/Text";
 import { Button, Icon, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import { AuthorAvatar } from "../community/AuthorAvatar";
 import { activityRowModel, activitySentence, relativeTime, type PersonalItem } from "@scripta/shared/community";
+import { useLocale } from "../../i18n";
 
 export function ActivityRow({ item, isNew, following, onOpen, onFollowBack }: { item: PersonalItem; isNew: boolean; following: boolean; onOpen: () => void; onFollowBack: () => void }) {
+  const locale = useLocale();
   const { colors } = useTheme();
   const stacked = useWindowDimensions().fontScale > 1;
-  const row = activityRowModel(item);
+  const row = activityRowModel(item, locale);
   const avatar = item.kind === "follow" ? item.actor : item.kind === "participation" ? item.actors[0] : undefined;
-  const time = relativeTime(item.createdAt);
+  const time = relativeTime(item.createdAt, locale);
   return <View style={[styles.row, stacked ? styles.rowStacked : null, { borderBottomColor: colors.border }]}>
     <Pressable accessibilityRole="link" accessibilityLabel={`${activitySentence(row)}, ${time}`} onPress={onOpen} style={({ pressed }) => [styles.main, stacked ? styles.mainStacked : null, { opacity: pressed ? 0.6 : 1 }]}>
       {avatar ? <AuthorAvatar username={avatar.username} avatarUrl={avatar.avatarUrl} /> : <View style={[styles.tile, { backgroundColor: colors.accentSoft }]}><Icon name={item.kind === "completion" ? "champion" : "community"} size={16} color={colors.accent} /></View>}

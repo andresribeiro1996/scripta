@@ -1,3 +1,6 @@
+import type { Locale } from "../i18n/locale.js";
+import { sharedT } from "../i18n/sharedT.js";
+
 export const DAILY_CHAPTER_THEMES = [
   {
     "id": "cozy-mysteries",
@@ -282,3 +285,8 @@ export const DAILY_CHAPTER_THEMES = [
 ] as const;
 
 export type DailyChapterTheme = (typeof DAILY_CHAPTER_THEMES)[number];
+
+export function dailyThemeName(id: string, locale: Locale): string {
+  const theme = DAILY_CHAPTER_THEMES.find((item) => item.id === id);
+  return theme ? sharedT(locale)(`shared.dailyThemes.${theme.id}`) : id;
+}

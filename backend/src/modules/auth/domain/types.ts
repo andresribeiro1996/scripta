@@ -14,6 +14,7 @@ export interface UserRow {
   theme?: string | null;
   display_font?: string | null;
   text_font?: string | null;
+  locale?: string | null;
   created_at: string;
 }
 

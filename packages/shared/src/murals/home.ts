@@ -1,3 +1,5 @@
+import type { Locale } from "../i18n/locale.js";
+import { sharedT } from "../i18n/sharedT.js";
 import { bookKey } from "../library/merge.js";
 import type { Group } from "../library/groups.js";
 import { resolveQuote, type MuralBlock } from "./murals.js";
@@ -22,10 +24,10 @@ export function rediscoverPassage(blockId: string, books: Array<Record<string, u
   return candidates.length ? candidates[(hash + offset) % candidates.length] : undefined;
 }
 
-export function resolveHomeBlock(block: MuralBlock, books: Array<Record<string, unknown>>, groups: Group[], day: string, offset = 0): MuralBlock {
+export function resolveHomeBlock(block: MuralBlock, books: Array<Record<string, unknown>>, groups: Group[], day: string, locale: Locale, offset = 0): MuralBlock {
   if (block.type === "shelf" && block.collectionId) {
     const collection = groups.find((group) => group.type === "collection" && group.id === block.collectionId);
-    return { ...block, collectionId: undefined, title: block.title || collection?.name || "Collection unavailable — reconnect in Edit", bookKeys: collection?.bookKeys ?? [] };
+    return { ...block, collectionId: undefined, title: block.title || collection?.name || sharedT(locale)("shared.murals.collectionUnavailable"), bookKeys: collection?.bookKeys ?? [] };
   }
   if (block.type === "quote" && block.mode === "rediscover") {
     const ref = rediscoverPassage(block.id, books, day, offset);

@@ -7,15 +7,17 @@ import { useAuth } from "../../core/auth";
 import { Button, Input } from "../../ui";
 import { Text } from "../../ui/Text";
 import { spacing, typography, useTheme } from "../../ui/theme";
+import { useLocale } from "../../i18n";
 
 export function SavedLooks({ style, onApply }: { style: BlockStyle; onApply: (style: BlockStyle) => void }) {
+  const locale = useLocale();
   const { user } = useAuth();
   const { colors } = useTheme();
   const client = useQueryClient();
   const [name, setName] = useState("");
   const queryKey = ["mural-block-looks", user?.id];
   const key = savedBlockLooksKey(user?.id ?? "");
-  const looks = useQuery({ queryKey, queryFn: async () => readSavedBlockLooks(await AsyncStorage.getItem(key)), enabled: !!user, retry: false });
+  const looks = useQuery({ queryKey, queryFn: async () => readSavedBlockLooks(await AsyncStorage.getItem(key), locale), enabled: !!user, retry: false });
   const save = useMutation({
     mutationFn: async (next: SavedBlockLook[]) => { await AsyncStorage.setItem(key, JSON.stringify(next)); return next; },
     onSuccess: (next) => { client.setQueryData(queryKey, next); setName(""); },
@@ -33,7 +35,7 @@ export function SavedLooks({ style, onApply }: { style: BlockStyle; onApply: (st
       <Button label="Delete" accessibilityLabel={`Delete ${look.name}`} variant="secondary" disabled={!ready} onPress={() => save.mutate(looks.data!.filter((item) => item.name !== look.name))} />
     </View>)}
     <Input label="Look name" value={name} onChangeText={setName} maxLength={48} placeholder="My reading corner" />
-    <Button label="Save current look" variant="secondary" disabled={!ready || !name.trim()} onPress={() => save.mutate(saveBlockLook(looks.data!, name, style))} />
+    <Button label="Save current look" variant="secondary" disabled={!ready || !name.trim()} onPress={() => save.mutate(saveBlockLook(looks.data!, name, style, locale))} />
     {save.isError ? <Text accessibilityLiveRegion="polite" style={[typography.caption, { color: colors.danger }]}>Could not save looks. Try again.</Text> : null}
   </View>;
 }

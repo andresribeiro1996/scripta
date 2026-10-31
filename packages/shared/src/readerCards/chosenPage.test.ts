@@ -9,7 +9,7 @@ import { DEFAULT_READER_CARD_STYLE, publicStyle, type ReaderCardChosen } from ".
 const signature = { title: "A Wizard of Earthsea", author: "Ursula K. Le Guin", workId: null, coverUrl: "https://covers.example.org/earthsea.jpg", note: "the one I lend to everyone" };
 const highlight = { text: "To light a candle is to cast a shadow.", title: "A Wizard of Earthsea", author: "Ursula K. Le Guin" };
 const card = (chosen: ReaderCardChosen): PublicReaderCard => ({ state: "settled", identity: "star", runnerUp: null, signal: null, coverage: [], chosen });
-const page = (chosen: ReaderCardChosen, view: "owner" | "visitor" = "visitor") => renderReaderCard({ card: card(chosen), style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), counter: "dial", layout: "faces", trait: "both" }, readerName: "andre", print: "paper", label: "Reader card", seed: seedOf("andre"), view } as ReaderCardInput, "chosen");
+const page = (chosen: ReaderCardChosen, view: "owner" | "visitor" = "visitor") => renderReaderCard({ card: card(chosen), style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), counter: "dial", layout: "faces", trait: "both" }, locale: "en", readerName: "andre", print: "paper", label: "Reader card", seed: seedOf("andre"), view } as ReaderCardInput, "chosen");
 const texts = (svg: string) => [...svg.matchAll(/<text[^>]*>([^<]*)<\/text>/g)].map((match) => match[1]!);
 
 test("with both chosen, the page shows the book, its note, a divider and the highlight", () => {

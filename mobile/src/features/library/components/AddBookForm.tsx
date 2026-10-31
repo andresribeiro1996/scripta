@@ -37,6 +37,7 @@ import { FoundCovers } from "./FoundCovers";
 import { GenreChoices } from "./GenreChoices";
 import { IsbnScanner } from "./IsbnScanner";
 import { Chip } from "./StyleControls";
+import { useLocale } from "../../../i18n";
 
 const FORMAT_CHIPS: Record<BookFormat, { label: string; icon: IconName }> = {
   hardcopy: { label: "Hardcopy", icon: "book" },
@@ -78,6 +79,7 @@ export function AddBookForm({
   initialQuery?: string;
   initialScanning?: boolean;
 }) {
+  const locale = useLocale();
   const { colors } = useTheme();
   const toast = useToast();
   const insets = useSafeAreaInsets();
@@ -369,7 +371,7 @@ export function AddBookForm({
                         </Text>
                         {r.series && (
                           <Text style={[typography.caption, { color: colors.textDim }]} numberOfLines={1}>
-                            {seriesLabel(r.series)}
+                            {seriesLabel(r.series, locale)}
                           </Text>
                         )}
                         <Text style={[typography.caption, { color: colors.textDim }]} numberOfLines={1}>

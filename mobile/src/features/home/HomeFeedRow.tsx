@@ -8,6 +8,7 @@ import { AuthorAvatar, openProfile } from "../community/AuthorAvatar";
 import { ReaderGlyph } from "../community/ReaderGlyph";
 import { FeedPreview } from "./FeedPreview";
 import type { HomeActions } from "./useHomeActions";
+import { useLocale } from "../../i18n";
 
 const readerHitSlop = { top: spacing.sm };
 const bookmarkHitSlop = { top: spacing.md, left: 6, right: 6 };
@@ -16,35 +17,36 @@ const linkHitSlop = { ...captionHitSlop, top: spacing.xl, bottom: spacing.sm };
 const reactionHitSlop = { bottom: spacing.md };
 
 export function FeedRow({ item, onOpen, actions, onComments, isSaved, onOpenProfile = openProfile }: { item: DigestItem; onOpen: () => void; actions: HomeActions; onComments?: () => void; isSaved?: boolean; onOpenProfile?: (username: string) => void }) {
+  const locale = useLocale();
   const { colors } = useTheme();
-  const row = feedRowModel(item);
+  const row = feedRowModel(item, locale);
   const actor = item.kind === "participation" ? item.actors[0] : item.actor;
-  const name = item.kind === "participation" ? participationLead(item) : actor?.username;
+  const name = item.kind === "participation" ? participationLead(item, locale) : actor?.username;
   const ref = savedContentRef(item);
   const saved = isSaved ?? (ref ? actions.savedKeys.has(`${ref.kind}:${ref.id}`) : false);
   const engagement = actions.engagement[item.id];
-  const primary = feedPrimaryLabel(item);
+  const primary = feedPrimaryLabel(item, locale);
   const title = item.kind === "vote" ? item.content.name : row.title;
-  const detail = item.kind === "vote" ? contentDetail(item.content) : row.detail;
+  const detail = item.kind === "vote" ? contentDetail(item.content, locale) : row.detail;
   const owned = item.kind === "reading" ? readingShelfBook(item.book, actions.library.data?.data.books ?? []) : undefined;
   const dense = item.kind === "reading" || item.kind === "vote" || item.kind === "participation" || (item.kind === "publication" && item.content.kind !== "tierlist");
   const filled = item.kind === "publication" && ((item.content.kind === "tierlist" && item.content.votingOpen) || (item.content.kind === "quiz" && item.content.playOpen));
   const bookmark = ref ? <Pressable accessibilityRole="button" accessibilityLabel={saved ? `Remove ${title} from saved` : `Save ${title} for later`} accessibilityState={{ selected: saved, disabled: actions.saving || (isSaved === undefined && !actions.savedReady) }} disabled={actions.saving || (isSaved === undefined && !actions.savedReady)} hitSlop={bookmarkHitSlop} onPress={() => actions.toggleSaved(item, saved)} style={({ pressed }) => [styles.iconAction, { backgroundColor: pressed ? colors.surfacePressed : "transparent" }]}><Icon name="bookmark" filled={saved} size={18} color={saved ? colors.accent : colors.textDim} /></Pressable> : null;
   const action = primary ? filled ? <View style={styles.primary}><Button label={primary} onPress={onOpen} /></View> : <Pressable accessibilityRole="link" hitSlop={linkHitSlop} onPress={onOpen} style={({ pressed }) => [styles.textAction, { opacity: pressed ? 0.6 : 1 }]}><Text {...dynamicType} style={[typography.caption, styles.strong, { color: colors.accent }]}>{primary} →</Text></Pressable> : null;
-  const heading = title ? <Pressable accessibilityRole="link" accessibilityLabel={feedRowAccessibilityLabel(item)} hitSlop={headingHitSlop} onPress={onOpen} style={({ pressed }) => [styles.heading, { opacity: pressed ? 0.6 : 1 }]}><Text display {...dynamicType} style={[typography.title, styles.strong, { color: colors.text }]}>{title}</Text></Pressable> : null;
+  const heading = title ? <Pressable accessibilityRole="link" accessibilityLabel={feedRowAccessibilityLabel(item, locale)} hitSlop={headingHitSlop} onPress={onOpen} style={({ pressed }) => [styles.heading, { opacity: pressed ? 0.6 : 1 }]}><Text display {...dynamicType} style={[typography.title, styles.strong, { color: colors.text }]}>{title}</Text></Pressable> : null;
   const mural = item.kind === "mural";
   const likes = reactionCount(engagement?.likes);
   const comments = reactionCount(engagement?.comments);
   return <View style={[styles.post, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-    {item.kind === "completion" ? <View style={[styles.winnerLabel, { backgroundColor: colors.accentSoft }]}><Icon name="champion" size={16} color={colors.accent} /><Text {...dynamicType} style={[typography.caption, styles.grow, { color: colors.accent }]}>{feedEventLabel(item)}</Text>{bookmark}</View> : <View style={[styles.actor, styles.inset]}>
+    {item.kind === "completion" ? <View style={[styles.winnerLabel, { backgroundColor: colors.accentSoft }]}><Icon name="champion" size={16} color={colors.accent} /><Text {...dynamicType} style={[typography.caption, styles.grow, { color: colors.accent }]}>{feedEventLabel(item, locale)}</Text>{bookmark}</View> : <View style={[styles.actor, styles.inset]}>
       <Pressable accessibilityRole="link" accessibilityLabel={actor && !actor.unavailable ? `Open ${actor.username}'s profile` : undefined} disabled={!actor || actor.unavailable} hitSlop={readerHitSlop} onPress={() => actor && onOpenProfile(actor.username)} style={({ pressed }) => [styles.reader, { backgroundColor: pressed ? colors.surfacePressed : "transparent" }]}>
         {actor ? <AuthorAvatar username={actor.username} avatarUrl={actor.avatarUrl} /> : <Icon name="community" size={28} color={colors.textDim} />}
         <View style={[styles.grow, styles.readerText]}>
           <View style={styles.readerName}><Text {...dynamicType} numberOfLines={2} style={[typography.caption, styles.strong, styles.shrink, { color: colors.text }]}>{name}</Text>{actor && item.kind !== "participation" ? <ReaderGlyph identity={actor.readerGlyph} /> : null}</View>
-          <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{feedEventLabel(item)}</Text>
+          <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{feedEventLabel(item, locale)}</Text>
         </View>
       </Pressable>
-      <View style={styles.stamp}><Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{relativeTime(item.createdAt)}</Text></View>
+      <View style={styles.stamp}><Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{relativeTime(item.createdAt, locale)}</Text></View>
       {bookmark}
     </View>}
     {item.kind === "follow" ? null : <View style={[styles.body, !mural && styles.inset, dense ? styles.bodyRow : styles.bodyColumn, item.kind === "completion" && styles.winnerBody]}>
@@ -53,7 +55,7 @@ export function FeedRow({ item, onOpen, actions, onComments, isSaved, onOpenProf
       <View style={[styles.copy, mural && styles.inset, (dense || item.kind === "completion") && styles.grow]}>
         {item.kind === "publication" && item.content.kind === "tierlist" ? null : heading}
         {detail ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{detail}</Text> : null}
-        {item.kind === "completion" ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>You took part · {relativeTime(item.createdAt)}</Text> : null}
+        {item.kind === "completion" ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>You took part · {relativeTime(item.createdAt, locale)}</Text> : null}
         {action}
         {item.kind === "reading" ? owned
           ? <Pressable accessibilityRole="link" hitSlop={linkHitSlop} onPress={() => router.push(`/book/${encodeURIComponent(bookKey(owned))}` as never)} style={({ pressed }) => [styles.textAction, !detail && styles.shelfGap, { opacity: pressed ? 0.6 : 1 }]}><Text {...dynamicType} style={[typography.caption, styles.strong, { color: colors.accent }]}>Open in your shelf →</Text></Pressable>

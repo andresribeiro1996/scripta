@@ -7,8 +7,10 @@ import { EmptyState, ErrorState, Icon, Skeleton, dynamicType, radii, spacing, ty
 import { fetchActivity } from "./api";
 import { renderableActivity } from "./communityHome";
 import { CoverFan, SLOT_HEIGHT, SLOT_WIDTH } from "./CoverFan";
+import { useLocale } from "../../i18n";
 
 export function ActivityList({ username }: { username: string }) {
+  const locale = useLocale();
   const activity = useInfiniteQuery({
     queryKey: ["community", "activity", username],
     queryFn: ({ pageParam }) => fetchActivity(username, pageParam),
@@ -45,8 +47,8 @@ export function ActivityList({ username }: { username: string }) {
       ListEmptyComponent={<View style={styles.body}><EmptyState title="No activity yet" body="Publishing and reading will show up here." /></View>}
       ListFooterComponent={activity.isFetchingNextPage ? <View style={styles.body}><Skeleton height={80} /></View> : undefined}
       renderItem={({ item, index }) => {
-        const day = activityDay(item.createdAt);
-        return <ActivityRowView item={item} day={index === 0 || activityDay(items[index - 1]!.createdAt) !== day ? day : null} />;
+        const day = activityDay(item.createdAt, locale);
+        return <ActivityRowView item={item} day={index === 0 || activityDay(items[index - 1]!.createdAt, locale) !== day ? day : null} />;
       }}
     />
   );
@@ -72,8 +74,9 @@ function iconFor(item: ActivityItem): IconName {
 }
 
 function ActivityRowView({ item, day }: { item: ActivityItem; day: string | null }) {
+  const locale = useLocale();
   const { colors } = useTheme();
-  const row = activityRow(item);
+  const row = activityRow(item, locale);
   if (!row) return null;
   const toneColor = row.tone === "accent" ? colors.accent : row.tone === "success" ? colors.success : colors.textDim;
   const toneFill = row.tone === "accent" ? colors.accentSoft : row.tone === "success" ? colors.successSoft : colors.surface;
@@ -98,7 +101,7 @@ function ActivityRowView({ item, day }: { item: ActivityItem; day: string | null
             {row.label}
           </Text>
           <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.time, { color: colors.textDim }]}>
-            {relativeTime(item.createdAt)}
+            {relativeTime(item.createdAt, locale)}
           </Text>
         </View>
         {row.title ? (

@@ -1,3 +1,5 @@
+import { sharedT } from "./i18n/sharedT.js";
+import type { Locale } from "./i18n/locale.js";
 import type { CommunityAuthor, FeedItem, ParticipationGameKind, PublishedContent, RankingTierPreview, SavedContentRef } from "./community/types.js";
 import { contentTarget, feedAction, feedTarget, isKnownContent } from "./community/helpers.js";
 import type { PublicMural } from "./public/types.js";
@@ -80,18 +82,23 @@ export function dashboardQuery(cursor?: string, kinds: readonly string[] = ALL_D
   return cursor ? `${query}&cursor=${encodeURIComponent(cursor)}` : query;
 }
 
-const PARTICIPATION_VERBS: Record<ParticipationGameKind, string> = {
-  tierlist: "ranked your tier list",
-  tournament: "voted in your tournament",
-  quiz: "played your quiz"
-};
+const PARTICIPATION_VERBS = {
+  tierlist: "shared.dashboard.verbTierlist",
+  tournament: "shared.dashboard.verbTournament",
+  quiz: "shared.dashboard.verbQuiz"
+} as const satisfies Record<ParticipationGameKind, Parameters<ReturnType<typeof sharedT>>[0]>;
 
-export function participationLead(item: ParticipationItem): string {
+export function participationVerb(item: ParticipationItem, locale: Locale): string {
+  return sharedT(locale)(PARTICIPATION_VERBS[item.game.kind], { count: item.count });
+}
+
+export function participationLead(item: ParticipationItem, locale: Locale): string {
+  const t = sharedT(locale);
   const names = item.actors.map((actor) => actor.username);
   const others = item.count - names.length;
-  if (names.length === 0) return `${item.count} ${item.count === 1 ? "person" : "people"}`;
-  if (others <= 0) return names.length === 1 ? names[0]! : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
-  return `${names.join(", ")} and ${others} ${others === 1 ? "other" : "others"}`;
+  if (names.length === 0) return t("shared.dashboard.people", { count: item.count });
+  if (others <= 0) return names.length === 1 ? names[0]! : t("shared.dashboard.namesAnd", { names: names.slice(0, -1).join(", "), last: names[names.length - 1]! });
+  return t("shared.dashboard.namesAndOthers", { names: names.join(", "), count: others });
 }
 
 export function isNewDigestItem(item: DigestItem, seenAt: string | null): boolean {
@@ -107,36 +114,37 @@ export function clearDashboardCounts<T extends { pages: DashboardFeedPage[] }>(d
   return { ...data, pages: data.pages.map((page) => ({ ...page, personalNewCount: 0, followingNewCount: 0 })) };
 }
 
-export function digestAction(item: DigestItem): string {
+export function digestAction(item: DigestItem, locale: Locale): string {
+  const t = sharedT(locale);
   switch (item.kind) {
     case "publication":
-      return feedAction(item);
+      return feedAction(item, locale);
     case "vote":
       switch (item.content.kind) {
         case "tierlist":
-          return `ranked books on ${item.content.name}`;
+          return t("shared.dashboard.rankedBooksOn", { name: item.content.name });
         case "tournament":
-          return `voted in ${item.content.name}`;
+          return t("shared.dashboard.votedIn", { name: item.content.name });
         case "quiz":
-          return `played ${item.content.name}`;
+          return t("shared.dashboard.played", { name: item.content.name });
       }
     case "reading":
-      return `${item.finished ? "finished reading" : item.started ? "started reading" : "added"} ${item.book.title}`;
+      return t(item.finished ? "shared.dashboard.finishedReading" : item.started ? "shared.dashboard.startedReading" : "shared.dashboard.added", { title: item.book.title });
     case "mural":
-      return `published a mural, ${item.mural.name}`;
+      return t("shared.dashboard.publishedMural", { name: item.mural.name });
     case "completion":
-      return `${item.tournament.name} finished; ${item.winner.title} is the winner`;
+      return t("shared.dashboard.completion", { tournament: item.tournament.name, winner: item.winner.title });
     case "follow":
-      return "started following you";
+      return t("shared.dashboard.startedFollowing");
     case "participation":
-      return `${PARTICIPATION_VERBS[item.game.kind]} ${item.game.name}`;
+      return `${participationVerb(item, locale)} ${item.game.name}`;
   }
 }
 
-export function digestHeading(item: DigestItem): string {
-  if (item.kind === "participation") return `${participationLead(item)} ${digestAction(item)}`;
-  if (item.kind === "completion") return digestAction(item);
-  return `${item.actor.username} ${digestAction(item)}`;
+export function digestHeading(item: DigestItem, locale: Locale): string {
+  if (item.kind === "participation") return `${participationLead(item, locale)} ${digestAction(item, locale)}`;
+  if (item.kind === "completion") return digestAction(item, locale);
+  return `${item.actor.username} ${digestAction(item, locale)}`;
 }
 
 export function digestTarget(item: DigestItem): string {

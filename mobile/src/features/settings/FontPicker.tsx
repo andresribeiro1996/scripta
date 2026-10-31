@@ -1,18 +1,20 @@
 import { useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
-import { DISPLAY_FONT_IDS, TEXT_FONT_IDS, fonts, resolveFonts, type FontId, type FontPreference, type FontSlot } from "@scripta/shared/themes";
+import { DISPLAY_FONT_IDS, TEXT_FONT_IDS, fontLabel, resolveFonts, type FontId, type FontPreference, type FontSlot } from "@scripta/shared/themes";
 import { fontStyleFor } from "../../ui/fontStyle";
 import { SYSTEM_FAMILY } from "../../ui/systemFont";
 import { Text } from "../../ui/Text";
 import { dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui/theme";
 import { isAppearanceSyncFailure, saveAccountAppearance } from "./appearanceSync";
 import { SWATCH } from "./ThemePicker";
+import { useLocale } from "../../i18n";
 
 function sampleStyle(font: FontId, slot: FontSlot) {
   return fontStyleFor(font, slot, typography.title) ?? { fontFamily: SYSTEM_FAMILY };
 }
 
 export function FontPicker({ slot }: { slot: FontSlot }) {
+  const locale = useLocale();
   const { id, colors, displayFont, textFont, setFontPreference } = useTheme();
   const selected = slot === "display" ? displayFont : textFont;
   const themeDefault = resolveFonts(id, "theme", "theme")[slot];
@@ -37,8 +39,8 @@ export function FontPicker({ slot }: { slot: FontSlot }) {
         {options.map((option) => {
           const checked = option === selected;
           const shown = option === "theme" ? themeDefault : option;
-          const label = option === "theme" ? "Default" : fonts[option].label;
-          const a11yLabel = option === "theme" ? `Theme default · ${fonts[themeDefault].label}` : label;
+          const label = option === "theme" ? "Default" : fontLabel(option, locale);
+          const a11yLabel = option === "theme" ? `Theme default · ${fontLabel(themeDefault, locale)}` : label;
           return (
             <Pressable
               key={option}

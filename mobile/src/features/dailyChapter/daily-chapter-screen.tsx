@@ -12,6 +12,7 @@ import { publicContentUrl } from "../sharing/links";
 import { dailyChapterApi } from "./api";
 import { DailyChapterArt } from "./daily-chapter-art";
 import { useDeviceIdentity } from "./use-daily-history";
+import { useLocale } from "../../i18n";
 
 export function DailyChapterScreen() {
   const { colors } = useTheme();
@@ -30,6 +31,7 @@ export function DailyChapterScreen() {
 }
 
 function DailyGame({ board, guestId, playerId, recovered }: { board: DailyChapterBoard; guestId: string; playerId: string; recovered?: DailyChapterResult }) {
+  const locale = useLocale();
   const { colors } = useTheme();
   const { user } = useAuth();
   const client = useQueryClient();
@@ -69,7 +71,7 @@ function DailyGame({ board, guestId, playerId, recovered }: { board: DailyChapte
   }
   async function share() {
     if (!result) return;
-    try { await Share.share({ message: dailyChapterShare(result, await publicContentUrl("/daily")) }); }
+    try { await Share.share({ message: dailyChapterShare(result, await publicContentUrl("/daily"), locale) }); }
     catch (reason) { setError(reason instanceof Error ? reason.message : "Couldn't share the result."); }
   }
   const question = questions[index]!;

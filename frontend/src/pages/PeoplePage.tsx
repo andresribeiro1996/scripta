@@ -15,6 +15,7 @@ import { area } from "../lib/areas";
 import { BUTTON_SECONDARY } from "../components/page/buttonClasses";
 import { LIST_PANEL, LIST_ROW, PANEL, PANEL_HEADING } from "../components/page/surfaceClasses";
 import { SearchField, ToolbarRow } from "../components/Toolbar";
+import { useLocale } from "../i18n";
 
 function retryButton(refetch: () => void) {
   return (
@@ -105,13 +106,14 @@ function FollowButton({ person, busy, onToggle }: { person: PersonResult; busy: 
 }
 
 function PersonName({ person }: { person: PersonResult | SuggestedReader }) {
+  const locale = useLocale();
   return (
     <span className="min-w-0">
       <span className="flex items-center gap-1 font-bold">
         <span className="truncate">{person.user.username}</span>
         <ReaderGlyph identity={person.user.readerGlyph} />
       </span>
-      <span className="block text-xs text-(--color-text-dim)">{personCaption(person)}</span>
+      <span className="block text-xs text-(--color-text-dim)">{personCaption(person, locale)}</span>
     </span>
   );
 }

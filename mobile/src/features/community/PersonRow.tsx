@@ -6,12 +6,14 @@ import { personCaption, type PersonResult, type SuggestedReader } from "@scripta
 import { BookCover } from "../arena/BookCover";
 import { AuthorAvatar, openProfile } from "./AuthorAvatar";
 import { ReaderGlyph } from "./ReaderGlyph";
+import { useLocale } from "../../i18n";
 
 export function PersonRow({ person, busy, onToggleFollow, onOpen }: { person: PersonResult | SuggestedReader; busy: boolean; onToggleFollow: () => void; onOpen?: () => void }) {
+  const locale = useLocale();
   const { colors } = useTheme();
-  const glyphLabel = readerGlyphLabel(person.user.readerGlyph);
+  const glyphLabel = readerGlyphLabel(person.user.readerGlyph, locale);
   const suggestion = "sharedCount" in person ? person : null;
-  const caption = personCaption(person);
+  const caption = personCaption(person, locale);
   return (
     <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <Pressable

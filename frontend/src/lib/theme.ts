@@ -1,5 +1,6 @@
 import { useSyncExternalStore, type CSSProperties } from "react";
 import { flushSync } from "react-dom";
+import { getLocalePreference, setLocalePreference } from "../i18n";
 import { parseFontPreference, parseThemePreference, resolveTheme, themes, type Appearance, type FontPreference, type FontSlot, type ThemeColors, type ThemeId, type ThemePreference, type ThemeScheme } from "@scripta/shared/themes";
 
 export const WEB_TOKENS: Array<[keyof ThemeColors, string]> = [
@@ -118,13 +119,14 @@ export function useFontPreference(slot: FontSlot): FontPreference {
 }
 
 export function readAppearance(): Appearance {
-  return { theme: readThemePreference(), displayFont: readFontPreference("display"), textFont: readFontPreference("text") };
+  return { theme: readThemePreference(), displayFont: readFontPreference("display"), textFont: readFontPreference("text"), locale: getLocalePreference() };
 }
 
 export function applyAppearance(patch: Partial<Appearance>): void {
   if (patch.theme) applyThemePreference(patch.theme);
   if (patch.displayFont) applyFontPreference("display", patch.displayFont);
   if (patch.textFont) applyFontPreference("text", patch.textFont);
+  if (patch.locale) setLocalePreference(patch.locale);
 }
 
 export function followAppearanceFromOtherTabs(): () => void {

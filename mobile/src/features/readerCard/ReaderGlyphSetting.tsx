@@ -7,17 +7,19 @@ import { Toast, ToggleSwitch, minimumTouchTarget, spacing, typography, useTheme 
 import { Text } from "../../ui/Text";
 import { fetchOwnProfile, updateFeedSettings } from "../community/api";
 import { ReaderGlyph } from "../community/ReaderGlyph";
+import { getLocale, useLocale } from "../../i18n";
 
 const OWN_PROFILE_KEY = ["community", "own-profile"] as const;
 const LABEL = "Show my reader glyph next to my name";
 
 export function ReaderGlyphSetting({ username, books, groups }: { username: string; books: Array<Record<string, unknown>>; groups: Group[] }) {
+  const locale = useLocale();
   const { colors } = useTheme();
   const client = useQueryClient();
   const { data: profile } = useQuery({ queryKey: OWN_PROFILE_KEY, queryFn: fetchOwnProfile });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const preview = useMemo(() => ownGlyphPreview(readerIdentity(books, groups)), [books, groups]);
+  const preview = useMemo(() => ownGlyphPreview(readerIdentity(books, groups, locale), locale), [books, groups, locale]);
   const settings = profile?.feedSettings ?? DEFAULT_FEED_SETTINGS;
   const on = settings.readerGlyph ?? false;
 
@@ -31,7 +33,7 @@ export function ReaderGlyphSetting({ username, books, groups }: { username: stri
       void client.invalidateQueries({ queryKey: ["community", "profile", username] });
     } catch (reason) {
       client.setQueryData<OwnProfile>(OWN_PROFILE_KEY, profile);
-      setError(saveFailureMessage(reason, "Couldn't save the glyph setting."));
+      setError(saveFailureMessage(reason, "Couldn't save the glyph setting.", getLocale()));
     } finally {
       setBusy(false);
     }

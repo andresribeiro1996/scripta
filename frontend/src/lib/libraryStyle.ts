@@ -11,7 +11,7 @@
 // `var()` nor `color-mix()`; Task 4D builds its own equivalents rather
 // than reusing these.
 
-import { BLOCK_FONT_FAMILY_OPTIONS, CARD_FONT_FAMILY_OPTIONS, blockFinish, blockGradient, finishPatternSvg, type BlockFontFamily, type BlockInnerSpacing, type BlockStyle, type CardFontFamily } from "@scripta/shared";
+import { FONT_FAMILY_CSS, blockFinish, blockGradient, finishPatternSvg, type BlockFontFamily, type BlockInnerSpacing, type BlockStyle, type CardFontFamily } from "@scripta/shared";
 import type { ThemeColors } from "@scripta/shared/themes";
 
 export type {
@@ -29,7 +29,7 @@ export type {
 } from "@scripta/shared";
 
 export {
-  CARD_FONT_FAMILY_OPTIONS,
+  cardFontFamilyOptions,
   CARD_FONT_SIZE_RANGE,
   DEFAULT_BORDER_SIDES,
   DEFAULT_LIBRARY_STYLE,
@@ -39,20 +39,20 @@ export {
   CARD_BORDER_WIDTH_RANGE,
   CARD_BORDER_OPACITY_RANGE,
   CARD_OPACITY_RANGE,
-  CARD_BORDER_STYLE_OPTIONS,
+  cardBorderStyleOptions,
   OVERLAY_INTENSITY_RANGE,
   CONTENT_MAX_WIDTH_RANGE,
   CONTENT_PADDING_RANGE,
-  CARD_ASPECT_RATIO_OPTIONS,
+  cardAspectRatioOptions,
   resolveLibraryStyle,
   PER_CARD_STYLE_KEYS,
   extractPerCardStyle,
   resolvePerCardStyle,
-  BLOCK_BACKGROUND_FINISH_OPTIONS,
-  BLOCK_FONT_FAMILY_OPTIONS,
+  blockBackgroundFinishOptions,
+  blockFontFamilyOptions,
   BLOCK_FONT_SIZE_RANGE,
-  BLOCK_INNER_SPACING_OPTIONS,
-  BLOCK_TEXT_ALIGN_OPTIONS,
+  blockInnerSpacingOptions,
+  blockTextAlignOptions,
   DEFAULT_BLOCK_STYLE,
   resolveBlockStyle,
   CARD_OVERLAY_TEXT_MIN_WIDTH,
@@ -75,7 +75,7 @@ export const BLOCK_PAD_SCALE: Record<BlockInnerSpacing, number> = { tight: 0.5, 
  *  by the picker itself. Falls back to the first option for any
  *  unrecognized value, same reasoning as blockFontFamilyCss below. */
 export function cardFontFamilyCss(value: CardFontFamily): string {
-  return CARD_FONT_FAMILY_OPTIONS.find((o) => o.value === value)?.css ?? CARD_FONT_FAMILY_OPTIONS[0].css;
+  return FONT_FAMILY_CSS[value] ?? FONT_FAMILY_CSS.sans;
 }
 
 /** Resolves a BlockFontFamily value to its real CSS `font-family` stack —
@@ -85,7 +85,7 @@ export function cardFontFamilyCss(value: CardFontFamily): string {
  *  (hand-edited data, a future removed option) rather than rendering with
  *  no font-family at all. */
 export function blockFontFamilyCss(value: BlockFontFamily): string {
-  return BLOCK_FONT_FAMILY_OPTIONS.find((o) => o.value === value)?.css ?? BLOCK_FONT_FAMILY_OPTIONS[0].css;
+  return FONT_FAMILY_CSS[value] ?? FONT_FAMILY_CSS.sans;
 }
 
 /** Applies `cardBorderOpacity` on top of `cardBorderColor` — kept as two

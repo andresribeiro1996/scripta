@@ -1,4 +1,5 @@
 import { activityRow, contentDetail, contentKindLabel, contentStats, contentStatus, contentTarget, feedHeading, feedTarget, gameActionLabel, TIER_LADDER, type ActivityItem } from "@scripta/shared/community";
+import { getLocale } from "../../i18n";
 
 export const FAN_SIZE = 3;
 
@@ -14,5 +15,6 @@ export const DISCOVER_FILTERS = [
 export type DiscoverFilter = (typeof DISCOVER_FILTERS)[number]["value"];
 
 export function renderableActivity(items: ActivityItem[]): ActivityItem[] {
-  return items.filter((item) => activityRow(item) !== null);
+  const locale = getLocale();
+  return items.filter((item) => activityRow(item, locale) !== null);
 }

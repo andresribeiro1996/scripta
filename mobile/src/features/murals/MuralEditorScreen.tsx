@@ -44,8 +44,10 @@ import { fetchMural, shareMural, unshareMural, updateMural } from "./api";
 import { MURALS_QUERY_KEY, withGrownBlocks } from "./useMurals";
 import { useAuth } from "../../core/auth";
 import { API_URL } from "../../core/config";
+import { useLocale } from "../../i18n";
 
 export function MuralEditorScreen({ id }: { id: string }) {
+  const locale = useLocale();
   const { user } = useAuth();
   const router = useRouter();
   const client = useQueryClient();
@@ -276,8 +278,8 @@ export function MuralEditorScreen({ id }: { id: string }) {
         setShareFor({ ...updated, name: currentName, theme: currentTheme, blocks: currentBlocks });
       }} />
       <Sheet visible={themeOpen} title="Theme" onClose={() => setThemeOpen(false)}><ScrollView contentContainerStyle={styles.sheet}><ThemeGrid options={THEME_IDS} value={currentTheme} onChange={(next) => { setTheme(next); setThemeOpen(false); }} /></ScrollView></Sheet>
-      <Sheet visible={adding} title="Add block" onClose={() => setAdding(false)}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheet}>{BLOCK_TYPES.map((type) => <Button key={type} label={blockLabel(type)} variant="secondary" onPress={() => add(type)} />)}</ScrollView></Sheet>
-      <Sheet visible={selected !== null && actionsOpen} title={selected ? `${blockLabel(selected.type)} actions` : "Block actions"} onClose={() => setActionsOpen(false)}>
+      <Sheet visible={adding} title="Add block" onClose={() => setAdding(false)}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheet}>{BLOCK_TYPES.map((type) => <Button key={type} label={blockLabel(type, locale)} variant="secondary" onPress={() => add(type)} />)}</ScrollView></Sheet>
+      <Sheet visible={selected !== null && actionsOpen} title={selected ? `${blockLabel(selected.type, locale)} actions` : "Block actions"} onClose={() => setActionsOpen(false)}>
         <View>
           {moreActions.map((action) => {
             const disabled = busy || action.disabled;

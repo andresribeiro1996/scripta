@@ -2,18 +2,18 @@ import { CHECKBOX_CLASS, RANGE_CLASS } from "./Toolbar";
 import { FIELD_CLASS } from "./page/buttonClasses";
 import { PANEL, PANEL_HEADING } from "./page/surfaceClasses";
 import type { ReactNode } from "react";
-import { BLOCK_GRADIENT_ANGLE_RANGE, BLOCK_GRADIENT_STRENGTH_RANGE, BLOCK_SHADOW_BLUR_RANGE, BLOCK_SHADOW_OFFSET_RANGE, BLOCK_SHADOW_OPACITY_RANGE, BLOCK_THEME_COLOR_LABELS, parseThemeColorRef } from "@scripta/shared";
+import { BLOCK_GRADIENT_ANGLE_RANGE, BLOCK_GRADIENT_STRENGTH_RANGE, BLOCK_SHADOW_BLUR_RANGE, BLOCK_SHADOW_OFFSET_RANGE, BLOCK_SHADOW_OPACITY_RANGE, blockThemeColorLabels, parseThemeColorRef } from "@scripta/shared";
 import {
-  BLOCK_BACKGROUND_FINISH_OPTIONS,
-  BLOCK_FONT_FAMILY_OPTIONS,
+  blockBackgroundFinishOptions,
+  blockFontFamilyOptions,
   BLOCK_FONT_SIZE_RANGE,
-  BLOCK_INNER_SPACING_OPTIONS,
-  BLOCK_TEXT_ALIGN_OPTIONS,
-  CARD_ASPECT_RATIO_OPTIONS,
+  blockInnerSpacingOptions,
+  blockTextAlignOptions,
+  cardAspectRatioOptions,
   CARD_BORDER_OPACITY_RANGE,
-  CARD_BORDER_STYLE_OPTIONS,
+  cardBorderStyleOptions,
   CARD_BORDER_WIDTH_RANGE,
-  CARD_FONT_FAMILY_OPTIONS,
+  cardFontFamilyOptions,
   CARD_FONT_SIZE_RANGE,
   CARD_OPACITY_RANGE,
   CARD_RADIUS_RANGE,
@@ -28,6 +28,7 @@ import {
   type CardFontFamily,
   type PerCardStyle
 } from "../lib/libraryStyle";
+import { useLocale } from "../i18n";
 
 // Shared building blocks for /dashboard/style (the full library-wide
 // panel, LibraryStylePage.tsx), the per-series/per-book style panel
@@ -88,11 +89,12 @@ export function SliderRow({
 }
 
 function ColorValueInput({ value, fallback, onChange, label = "Custom color" }: { value: string; fallback: string; onChange: (color: string) => void; label?: string }) {
+  const locale = useLocale();
   const themeKey = parseThemeColorRef(value);
   if (themeKey) {
     return (
       <span className="flex items-center gap-2 text-sm text-(--color-text-dim)">
-        Theme color: {BLOCK_THEME_COLOR_LABELS[themeKey]}
+        Theme color: {blockThemeColorLabels(locale)[themeKey]}
         <button type="button" onClick={() => onChange(fallback)} className="min-h-11 font-semibold text-(--color-text) underline decoration-(--color-accent)">
           Use a custom color
         </button>
@@ -140,6 +142,7 @@ interface CardStyleSectionProps {
 }
 
 export function CardAppearanceSection({ idPrefix, draft, onApply, onSaveNow }: CardStyleSectionProps) {
+  const locale = useLocale();
   return (
     <Section title="Card appearance">
       <SliderRow
@@ -160,7 +163,7 @@ export function CardAppearanceSection({ idPrefix, draft, onApply, onSaveNow }: C
           onChange={(e) => onSaveNow({ cardAspectRatio: e.target.value as CardAspectRatio })}
           className={`${FIELD_CLASS} w-full`}
         >
-          {CARD_ASPECT_RATIO_OPTIONS.map((opt) => (
+          {cardAspectRatioOptions(locale).map((opt) => (
             <option key={opt.value} value={opt.value}>
               {opt.label}
             </option>
@@ -210,6 +213,7 @@ interface CardBorderSectionProps {
 }
 
 export function CardBorderSection({ idPrefix, draft, onApply, onSaveNow }: CardBorderSectionProps) {
+  const locale = useLocale();
   const usingCustomBorderColor = draft.cardBorderColor !== null;
 
   return (
@@ -252,7 +256,7 @@ export function CardBorderSection({ idPrefix, draft, onApply, onSaveNow }: CardB
           onChange={(e) => onSaveNow({ cardBorderStyle: e.target.value as CardBorderStyle })}
           className={`${FIELD_CLASS} w-full`}
         >
-          {CARD_BORDER_STYLE_OPTIONS.map((opt) => (
+          {cardBorderStyleOptions(locale).map((opt) => (
             <option key={opt.value} value={opt.value}>
               {opt.label}
             </option>
@@ -320,6 +324,7 @@ type CardTextFields = "cardFontFamily" | "cardFontSize" | "cardTextColor" | "car
  *  Deliberately its own type/section, not shared with mural blocks'
  *  BlockTextSection below — see CardFontFamily's own comment for why. */
 export function CardTextSection({ idPrefix, draft, onApply, onSaveNow }: { idPrefix: string; draft: Pick<PerCardStyle, CardTextFields>; onApply: (patch: Partial<Pick<PerCardStyle, CardTextFields>>) => void; onSaveNow: (patch: Partial<Pick<PerCardStyle, CardTextFields>>) => void }) {
+  const locale = useLocale();
   const usingCustomTextColor = draft.cardTextColor !== null;
 
   return (
@@ -334,7 +339,7 @@ export function CardTextSection({ idPrefix, draft, onApply, onSaveNow }: { idPre
           onChange={(e) => onSaveNow({ cardFontFamily: e.target.value as CardFontFamily })}
           className={`${FIELD_CLASS} w-full`}
         >
-          {CARD_FONT_FAMILY_OPTIONS.map((opt) => (
+          {cardFontFamilyOptions(locale).map((opt) => (
             <option key={opt.value} value={opt.value}>
               {opt.label}
             </option>
@@ -397,6 +402,7 @@ export function BlockBackgroundSection({
   onApply: (patch: Partial<Pick<BlockStyle, BlockBackgroundFields>>) => void;
   onSaveNow: (patch: Partial<Pick<BlockStyle, BlockBackgroundFields>>) => void;
 }) {
+  const locale = useLocale();
   const transparent = draft.backgroundColor === "transparent";
   const usingCustomBackground = draft.backgroundColor !== null && !transparent;
 
@@ -453,7 +459,7 @@ export function BlockBackgroundSection({
           onChange={(e) => onSaveNow({ backgroundFinish: e.target.value as BlockBackgroundFinish })}
           className={`${FIELD_CLASS} w-full`}
         >
-          {BLOCK_BACKGROUND_FINISH_OPTIONS.map((opt) => (
+          {blockBackgroundFinishOptions(locale).map((opt) => (
             <option key={opt.value} value={opt.value}>
               {opt.label}
             </option>
@@ -472,7 +478,7 @@ export function BlockBackgroundSection({
           onChange={(e) => onSaveNow({ innerSpacing: e.target.value as BlockInnerSpacing })}
           className={`${FIELD_CLASS} w-full`}
         >
-          {BLOCK_INNER_SPACING_OPTIONS.map((opt) => (
+          {blockInnerSpacingOptions(locale).map((opt) => (
             <option key={opt.value} value={opt.value}>
               {opt.label}
             </option>
@@ -537,6 +543,7 @@ export function BlockTextSection({
   onApply: (patch: Partial<Pick<BlockStyle, BlockTextFields>>) => void;
   onSaveNow: (patch: Partial<Pick<BlockStyle, BlockTextFields>>) => void;
 }) {
+  const locale = useLocale();
   const usingCustomTextColor = draft.textColor !== null;
 
   return (
@@ -551,7 +558,7 @@ export function BlockTextSection({
           onChange={(e) => onSaveNow({ fontFamily: e.target.value as BlockFontFamily })}
           className={`${FIELD_CLASS} w-full`}
         >
-          {BLOCK_FONT_FAMILY_OPTIONS.map((opt) => (
+          {blockFontFamilyOptions(locale).map((opt) => (
             <option key={opt.value} value={opt.value}>
               {opt.label}
             </option>
@@ -577,7 +584,7 @@ export function BlockTextSection({
           onChange={(e) => onSaveNow({ textAlign: e.target.value as BlockTextAlign })}
           className={`${FIELD_CLASS} w-full`}
         >
-          {BLOCK_TEXT_ALIGN_OPTIONS.map((opt) => (
+          {blockTextAlignOptions(locale).map((opt) => (
             <option key={opt.value} value={opt.value}>
               {opt.label}
             </option>

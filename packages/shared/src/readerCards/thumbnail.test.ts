@@ -3,7 +3,7 @@ import { test } from "node:test";
 import type { DialSegment } from "../library/readerCardFacts.js";
 import type { PublicReaderCard } from "../library/readerIdentity.js";
 import { COUNTERS } from "./counters.js";
-import { COUNTER_LABELS, LAYOUT_LABELS, TRAIT_LABELS } from "./labels.js";
+import { counterLabels, layoutLabels, traitLabels } from "./labels.js";
 import { emblem } from "./plates.js";
 import { CARD_CROPS, cardRatio, renderReaderCard, type ReaderCardBase } from "./render.js";
 import { seedOf } from "./seed.js";
@@ -31,7 +31,7 @@ test("a small dial is drawn as it is", () => {
 
 test("a thumbnail swaps the counter and draws far fewer marks than the card", () => {
   const card: PublicReaderCard = { state: "settled", identity: "corr", runnerUp: null, signal: null, coverage: [], dial: { segments: large }, facts: { finished: 258, highlights: 300, series: 0, since: null, edition: 2026 } };
-  const input: ReaderCardBase = { card, style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), counter: "dial", layout: "faces", trait: "both" }, readerName: "andre", label: "Reader card", seed: seedOf("andre"), view: "owner" };
+  const input: ReaderCardBase = { card, style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), counter: "dial", layout: "faces", trait: "both" }, locale: "en", readerName: "andre", label: "Reader card", seed: seedOf("andre"), view: "owner" };
   const thumb = counterThumbnail(input, "beads");
   assert.equal(thumb.style.counter, "beads");
   assert.equal(thumb.card.facts, card.facts);
@@ -41,19 +41,19 @@ test("a thumbnail swaps the counter and draws far fewer marks than the card", ()
 
 test("a card without a dial stays without one", () => {
   const card: PublicReaderCard = { state: "unwritten", identity: null, runnerUp: null, signal: null, coverage: [] };
-  const input: ReaderCardBase = { card, style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), counter: "dial", layout: "faces", trait: "both" }, readerName: "andre", label: "Reader card", seed: seedOf("andre") };
+  const input: ReaderCardBase = { card, style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), counter: "dial", layout: "faces", trait: "both" }, locale: "en", readerName: "andre", label: "Reader card", seed: seedOf("andre") };
   assert.equal(counterThumbnail(input, "ring").card, card);
 });
 
 test("every option has a name", () => {
-  assert.deepEqual(COUNTERS.map((key) => COUNTER_LABELS[key]), ["Dial", "Beads", "Shelf", "Frame", "Ring"]);
-  assert.deepEqual(TRAITS.map((key) => TRAIT_LABELS[key]), ["Both", "Seal", "Line", "None"]);
-  assert.deepEqual(LAYOUTS.map((key) => LAYOUT_LABELS[key]), ["Flip", "Book", "One back"]);
+  assert.deepEqual(COUNTERS.map((key) => counterLabels("en")[key]), ["Dial", "Beads", "Shelf", "Frame", "Ring"]);
+  assert.deepEqual(TRAITS.map((key) => traitLabels("en")[key]), ["Both", "Seal", "Line", "None"]);
+  assert.deepEqual(LAYOUTS.map((key) => layoutLabels("en")[key]), ["Flip", "Book", "One back"]);
 });
 
 test("a style thumbnail swaps any option, scales the dial and can crop to a region", () => {
   const card: PublicReaderCard = { state: "settled", identity: "corr", runnerUp: null, signal: null, coverage: [], dial: { segments: large }, facts: { finished: 258, highlights: 300, series: 0, since: null, edition: 2026 } };
-  const input: ReaderCardBase = { card, style: publicStyle(DEFAULT_READER_CARD_STYLE), readerName: "andre", label: "Reader card", seed: seedOf("andre"), view: "owner" };
+  const input: ReaderCardBase = { card, style: publicStyle(DEFAULT_READER_CARD_STYLE), locale: "en", readerName: "andre", label: "Reader card", seed: seedOf("andre"), view: "owner" };
   const thumb = styleThumbnail(input, { corners: "laurel" }, "corner");
   assert.equal(thumb.style.corners, "laurel");
   assert.equal(thumb.crop, "corner");
@@ -71,8 +71,8 @@ test("crop ratios", () => {
 
 test("a corner thumbnail leaves out the emblem it crops away", () => {
   const card: PublicReaderCard = { state: "settled", identity: "corr", runnerUp: null, signal: null, coverage: [], dial: { segments: large }, facts: { finished: 258, highlights: 300, series: 0, since: null, edition: 2026 } };
-  const input: ReaderCardBase = { card, style: publicStyle(DEFAULT_READER_CARD_STYLE), readerName: "andre", label: "Reader card", seed: seedOf("andre"), view: "owner" };
-  const stroke = emblem("corr").match(/ d="([^"]{60})/)![1]!;
+  const input: ReaderCardBase = { card, style: publicStyle(DEFAULT_READER_CARD_STYLE), locale: "en", readerName: "andre", label: "Reader card", seed: seedOf("andre"), view: "owner" };
+  const stroke = emblem("corr", "en").match(/ d="([^"]{60})/)![1]!;
   const corner = renderReaderCard({ ...styleThumbnail(input, { corners: "laurel" }, "corner"), print: "paper", width: 64 });
   assert.ok(!corner.includes(stroke));
   assert.ok(corner.length < 15_000, String(corner.length));

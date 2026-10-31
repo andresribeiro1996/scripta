@@ -9,12 +9,14 @@ import { TIER_LADDER, contentStats, contentStatus, contentTarget, gameActionLabe
 import { AuthorAvatar, openProfile } from "./AuthorAvatar";
 import { ReaderGlyph } from "./ReaderGlyph";
 import { GameTicketArt } from "./GameTicketArt";
+import { useLocale } from "../../i18n";
 
 export function DiscoverRow({ item, linkAuthor, stats, onPreviewBooks, onOpen }: { item: DiscoverItem; linkAuthor: boolean; stats?: Array<{ value: number; label: string }>; onPreviewBooks?: (tournament: { id: string; name: string; character: boolean }) => void; onOpen?: () => void }) {
+  const locale = useLocale();
   const { colors } = useTheme();
   const { content, author } = item;
-  const status = contentStatus(content);
-  const glyphLabel = readerGlyphLabel(author.readerGlyph);
+  const status = contentStatus(content, locale);
+  const glyphLabel = readerGlyphLabel(author.readerGlyph, locale);
   const creator = <>
     <AuthorAvatar username={author.username} avatarUrl={author.avatarUrl} size={28} />
     <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, styles.metaName, { color: colors.text }]}>{author.username}</Text>
@@ -28,7 +30,7 @@ export function DiscoverRow({ item, linkAuthor, stats, onPreviewBooks, onOpen }:
       onPress={() => { onOpen?.(); router.push(contentTarget(content) as never); }}
       covers={content.covers}
       preview={content.kind === "quiz" ? content.preview : undefined}
-      actionLabel={gameActionLabel(content)}
+      actionLabel={gameActionLabel(content, locale)}
       ladder={content.kind === "tierlist" ? TIER_LADDER : undefined}
       meta={
         <View style={styles.metaRow}>
@@ -49,8 +51,8 @@ export function DiscoverRow({ item, linkAuthor, stats, onPreviewBooks, onOpen }:
         </View>
       }
       badges={status.votedBadge ? [status, { label: "Voted", tone: "info" }] : [status]}
-      stats={stats ?? contentStats(content)}
-      seeBooks={content.kind === "tournament" && onPreviewBooks ? { text: `See ${itemNoun(content.subject, 2)}`, label: `See all ${content.bookCount} ${itemNoun(content.subject, content.bookCount)} in ${content.name}`, onPress: () => onPreviewBooks({ id: content.id, name: content.name, character: content.subject?.kind === "characters" }) } : undefined}
+      stats={stats ?? contentStats(content, locale)}
+      seeBooks={content.kind === "tournament" && onPreviewBooks ? { text: `See ${itemNoun(content.subject, 2, locale)}`, label: `See all ${content.bookCount} ${itemNoun(content.subject, content.bookCount, locale)} in ${content.name}`, onPress: () => onPreviewBooks({ id: content.id, name: content.name, character: content.subject?.kind === "characters" }) } : undefined}
     />
   );
 }
@@ -75,6 +77,7 @@ export type GameRowProps = {
 };
 
 export function GameRow({ kind, name, meta, badges, caption, stats = [], covers, ladder, preview, actionLabel = "Open game", seeBooks, accessibilityRole = "button", onPress, onDelete }: GameRowProps) {
+  const locale = useLocale();
   const { colors } = useTheme();
   const { fontScale } = useWindowDimensions();
   const color = kind === "quiz" ? colors.reference : kind === "tierlist" ? colors.success : colors.accent;
@@ -121,7 +124,7 @@ export function GameRow({ kind, name, meta, badges, caption, stats = [], covers,
               </View>
             </View>
             {clue ? <View style={[styles.clue, { backgroundColor: colors.background, borderColor: colors.border }]}>
-              <View style={styles.clueHeading}><Icon name={clue.type === "title_cover" ? "book" : "quote"} size={18} color={colors.textDim} /><Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{quizClueHeading(clue.type)}</Text></View>
+              <View style={styles.clueHeading}><Icon name={clue.type === "title_cover" ? "book" : "quote"} size={18} color={colors.textDim} /><Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{quizClueHeading(clue.type, locale)}</Text></View>
               <Text numberOfLines={fontScale > 1.3 ? undefined : 3} {...dynamicType} style={[typography.body, { color: colors.text }]}>{clue.prompt}</Text>
             </View> : null}
           </View>

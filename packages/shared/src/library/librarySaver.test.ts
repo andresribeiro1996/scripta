@@ -85,6 +85,7 @@ function harness(srv: Server, overrides: Overrides = {}) {
   const writes: Array<LibraryDocument | null> = [];
   const fetches = { count: 0 };
   const saver = createLibrarySaver({
+    locale: () => "en",
     send: (change, signal) => {
       sent.push(change);
       return overrides.send ? overrides.send(change, signal) : Promise.resolve().then(() => srv.send(change));
@@ -1052,7 +1053,7 @@ test("a failed change hands the caller the server's error, so a 429 is not shown
   await h.saver.fetch();
   const result = await h.saver.submit(tick(duneKey));
   assert.deepEqual(result, { ok: false, error: failure });
-  assert.equal(saveFailureMessage((result as { error: unknown }).error, "Couldn't save."), "Too many changes in a row — wait a minute and try again.");
+  assert.equal(saveFailureMessage((result as { error: unknown }).error, "Couldn't save.", "en"), "Too many changes in a row — wait a minute and try again.");
 });
 
 test("a change dropped, interrupted or refused by dispose reports that the library was closed", { timeout: 5000 }, async () => {
@@ -1100,6 +1101,7 @@ function throwingWriteSaver(srv: Server, failOn: (call: number) => boolean) {
   const boom = new Error("write failed");
   const writes: Array<LibraryDocument | null> = [];
   const saver = createLibrarySaver({
+    locale: () => "en",
     send: async (change) => srv.send(change),
     put: async (data, expected) => srv.put(data, expected),
     fetch: async () => srv.doc,
@@ -1269,6 +1271,7 @@ for (const mode of ["submit", "saveWhole"] as const) {
     const writes: Array<LibraryDocument | null> = [];
     let armed = false;
     const saver = createLibrarySaver({
+    locale: () => "en",
       send: (change) => Promise.resolve().then(() => srv.send(change)),
       put: (data, expected) => Promise.resolve().then(() => srv.put(data, expected)),
       fetch: () => Promise.resolve(srv.doc),
@@ -1293,3 +1296,17 @@ for (const mode of ["submit", "saveWhole"] as const) {
     assert.equal(writes.at(-1)!.data.name, "Mine");
   });
 }
+
+test("a disposed saver reports the closed library in the reader's language", async () => {
+  const saver = createLibrarySaver({
+    locale: () => "pt-PT",
+    send: async () => ({ updatedAt: "t", baseUpdatedAt: null }),
+    put: async () => { throw new Error("unused"); },
+    fetch: async () => null,
+    write: () => {}
+  });
+  saver.dispose();
+  const result = await saver.submit({ kind: "book", bookKey: "k", readStatus: 1 });
+  assert.equal(result.ok, false);
+  assert.match(String((result as { error: Error }).error.message), /A biblioteca foi fechada/);
+});

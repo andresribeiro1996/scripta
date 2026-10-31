@@ -4,6 +4,7 @@ import { BookSearchList } from "../murals/pickers";
 import { SearchField } from "../Toolbar";
 import { PANEL_HEADING } from "../page/surfaceClasses";
 import { DraftField } from "./DraftField";
+import { useLocale } from "../../i18n";
 
 export type SaveStyle = (patch: ReaderCardStylePatch) => Promise<boolean>;
 type Book = Record<string, unknown>;
@@ -47,11 +48,12 @@ export function SignatureChoice({ books, signature, chosen, onChange }: { books:
 }
 
 export function HighlightChoice({ books, highlight, chosen, onChange }: { books: Book[]; highlight: ChosenHighlight | null; chosen?: ReaderCardChosen["highlight"]; onChange: SaveStyle }) {
-  const withPassages = useMemo(() => books.filter((book) => bookPassages(book).length > 0), [books]);
+  const locale = useLocale();
+  const withPassages = useMemo(() => books.filter((book) => bookPassages(book, locale).length > 0), [books, locale]);
   const [picking, setPicking] = useState(false);
   const [query, setQuery] = useState("");
   const [browsing, setBrowsing] = useState<Book | null>(null);
-  const matches = useMemo(() => searchPassages(books, query), [books, query]);
+  const matches = useMemo(() => searchPassages(books, query, locale), [books, query, locale]);
   const close = () => { setPicking(false); setBrowsing(null); setQuery(""); };
   const choose = (passage: Passage) => { close(); void onChange({ highlight: { bookKey: passage.bookKey, highlightId: passage.highlightId } }); };
   const list = (passages: Passage[]) => (
@@ -79,7 +81,7 @@ export function HighlightChoice({ books, highlight, chosen, onChange }: { books:
           {query.trim() ? (matches.length ? list(matches) : <p className={DIM}>No highlights match.</p>) : browsing ? (
             <>
               <button type="button" className={LINK} onClick={() => setBrowsing(null)}>Back to books</button>
-              {list(bookPassages(browsing))}
+              {list(bookPassages(browsing, locale))}
             </>
           ) : (
             <BookSearchList books={withPassages} onSelect={setBrowsing} />

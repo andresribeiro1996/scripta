@@ -9,6 +9,7 @@ import { blockBooks, resolveShelfBooks, type MuralBlock, type TierDefinition } f
 import { OptionsMenu, type OptionsMenuItem } from "../../OptionsMenu";
 import { TierRowEmpty, TierRowShell, TierRowTiles } from "../../tierlist/TierRowShell";
 import { MoreIcon } from "../../NavIcons";
+import { useLocale } from "../../../i18n";
 
 /** A small, read-only cover tile — reuses BookCard's own CoverImage (same
  *  Kobo/Open Library/gallery-assigned resolution chain) but with none of
@@ -200,6 +201,7 @@ export function CurrentlyReadingBlockView({ block, books }: { block: Extract<Mur
  *  renderer — all ranking/editing lives in TierListEditorPage, whose own
  *  draggable tiles (DraggableTierTile below) are shared from this file. */
 export function TierRow({ tier, books }: { tier: TierDefinition; books: Array<Record<string, unknown>> }) {
+  const locale = useLocale();
   const byWork = booksByWork(books);
   // Walking `tier.workIds` directly (not filtering to resolved books
   // first) so each tile still knows its own real work id — a
@@ -210,7 +212,7 @@ export function TierRow({ tier, books }: { tier: TierDefinition; books: Array<Re
   return (
     <TierRowShell tier={tier}>
       {resolvedKeys.length === 0 ? (
-        <TierRowEmpty message={`No ${itemNoun(books.some(isCharacterBook), 2)} on this tier.`} />
+        <TierRowEmpty message={`No ${itemNoun(books.some(isCharacterBook), 2, locale)} on this tier.`} />
       ) : (
         <TierRowTiles>
           {resolvedKeys.map((key) => (
@@ -279,6 +281,7 @@ export function DraggableTierTile({
   workId: string;
   menuItems: OptionsMenuItem[];
 }) {
+  const locale = useLocale();
   const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({ id: workId });
   const { setNodeRef: setDropRef, isOver } = useDroppable({ id: workId });
   const setRefs = (el: HTMLDivElement | null) => {
@@ -290,7 +293,7 @@ export function DraggableTierTile({
   // one control that could rank a book without dragging was invisible.
   const coarse = typeof window !== "undefined" && Boolean(window.matchMedia?.("(pointer: coarse)").matches);
   const title = String(book.Title ?? "Untitled");
-  const noun = itemNoun(isCharacterBook(book), 1);
+  const noun = itemNoun(isCharacterBook(book), 1, locale);
   return (
     <div
       ref={setRefs}

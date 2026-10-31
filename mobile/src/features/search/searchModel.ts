@@ -1,5 +1,6 @@
 import { bookKey, canonicalIsbn, isCertainMatch, statusLabel, type BookSearchResult, type LibraryBook } from "@scripta/shared";
 import type { DiscoverItem, PersonResult } from "@scripta/shared/community";
+import { getLocale } from "../../i18n";
 
 export const SEARCH_SCOPES = [
   { value: "all", label: "All" },
@@ -109,7 +110,7 @@ function itemRows(section: ResultSection, input: ResultsInput, cap: number): Sea
 }
 
 export function libraryStatus(book: LibraryBook): { label: string; tone: "accent" | "neutral" | "success" } {
-  const label = statusLabel(book.ReadStatus);
+  const label = statusLabel(book.ReadStatus, getLocale());
   if (book.ReadStatus === 1) return { label, tone: "accent" };
   if (book.ReadStatus === 2) return { label, tone: "success" };
   return { label, tone: "neutral" };

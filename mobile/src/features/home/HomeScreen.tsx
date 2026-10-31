@@ -15,8 +15,10 @@ import { useDailyHistory } from "../dailyChapter/use-daily-history";
 import { RecapHomeCard } from "../topShelf/RecapHomeCard";
 import { AwardHomeCard, RECENT_AWARDS_QUERY_KEY } from "../awards/AwardHomeCard";
 import { ENGAGEMENT_QUERY_KEY, SAVED_STATE_QUERY_KEY, useHomeActions } from "./useHomeActions";
+import { useLocale } from "../../i18n";
 
 export function HomeScreen() {
+  const locale = useLocale();
   const { colors } = useTheme();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -68,7 +70,7 @@ export function HomeScreen() {
       renderSectionFooter={({ section }) => !section.data.length ? <View style={styles.onboarding}>{empty}</View> : null}
       ListFooterComponent={dashboard.isFetchingNextPage && items.length ? <View style={styles.onboarding}><Skeleton height={80} /></View> : dashboard.isFetchNextPageError ? <View style={styles.onboarding}><ErrorState body="Couldn't load more." actionLabel="Retry" onAction={() => void dashboard.fetchNextPage()} /></View> : undefined}
       onEndReached={() => { if (dashboard.hasNextPage && !dashboard.isFetchingNextPage && !dashboard.isFetchNextPageError) void dashboard.fetchNextPage(); }} onEndReachedThreshold={0.4} refreshControl={<RefreshControl refreshing={pulling} onRefresh={() => void onRefresh()} />} />
-    {comments ? <CommentsSheet key={comments.id} id={comments.id} title={feedRowModel(comments).title || "Activity"} onClose={() => setComments(null)} /> : null}
+    {comments ? <CommentsSheet key={comments.id} id={comments.id} title={feedRowModel(comments, locale).title || "Activity"} onClose={() => setComments(null)} /> : null}
     {savedOpen ? <SavedContentSheet actions={actions} onClose={() => setSavedOpen(false)} /> : null}
   </Screen>;
 }

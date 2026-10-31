@@ -11,6 +11,7 @@ import { coverUrlForApi } from "../library/lib/coverUrl";
 import { publicContentUrl } from "../sharing/links";
 import { fetchQuizResults, publishQuiz, setPlayState, updateQuiz, type Quiz } from "./api";
 import { useWorkCharacters } from "./useWorkCharacters";
+import { useLocale } from "../../i18n";
 
 type EditorView = "setup" | "results";
 
@@ -27,6 +28,7 @@ const TYPE_LABELS: Record<QuizQuestionType, string> = {
 const uriFor = (url: string): string => coverUrlForApi(url, API_URL);
 
 export function QuizEditorScreen({ quiz, onUpdated, initialView }: { quiz: Quiz; onUpdated: (quiz: Quiz) => void; initialView?: EditorView }) {
+  const locale = useLocale();
   const { colors } = useTheme();
   const queryClient = useQueryClient();
   const [current, setCurrent] = useState(quiz);
@@ -149,14 +151,14 @@ export function QuizEditorScreen({ quiz, onUpdated, initialView }: { quiz: Quiz;
     </FormScroll> : frozen ? results.isPending ? <Skeleton height={180} /> : <View style={styles.grow}><View style={styles.frozenHeading}><EditorHeading name={current.name} /></View><SwipeableTabs accessibilityLabel="Quiz editor view" options={PUBLISHED_VIEWS} value={view} onChange={setView} renderPage={(page) => page === "results" ? results.isError ? <ErrorState body="Couldn't load results." actionLabel="Retry" onAction={() => void results.refetch()} /> : <ScrollView contentContainerStyle={styles.screen}>
       {(results.data?.plays ?? []).map((play, i) => <View key={`${play.playerName ?? "Guest"}-${i}`} style={[styles.leaderRow, { borderColor: colors.border }]}>
         <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{i + 1}</Text>
-        <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, styles.grow, { color: colors.text }]}>{playerLabel(play).name}</Text>
-        {playerLabel(play).guest ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>guest</Text> : null}
+        <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, styles.grow, { color: colors.text }]}>{playerLabel(play, locale).name}</Text>
+        {playerLabel(play, locale).guest ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>guest</Text> : null}
         <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{play.score}/{results.data!.questionCount}</Text>
       </View>)}
       {(results.data?.stats ?? []).map((stat) => { const index = (current.data.questions ?? []).findIndex((item) => item.id === stat.questionId); const asked = current.data.questions?.[index]; return <View key={stat.questionId} style={styles.stat}>
-        <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{asked ? quizQuestionLabel(asked, index, current.data.books) : stat.questionId} · {stat.correctCount}/{stat.answerCount} correct</Text>
+        <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{asked ? quizQuestionLabel(asked, index, current.data.books, locale) : stat.questionId} · {stat.correctCount}/{stat.answerCount} correct</Text>
         {stat.picks.map((pick) => <View key={pick.choiceIndex} style={styles.pick}>
-          <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.pickLabel, { color: colors.textDim }]}>{asked ? quizOptionLabel(asked.type, asked.options[pick.choiceIndex], current.data.books) : `#${pick.choiceIndex + 1}`}</Text>
+          <Text numberOfLines={1} {...dynamicType} style={[typography.caption, styles.pickLabel, { color: colors.textDim }]}>{asked ? quizOptionLabel(asked.type, asked.options[pick.choiceIndex], current.data.books, locale) : `#${pick.choiceIndex + 1}`}</Text>
           <View style={[styles.pickTrack, { backgroundColor: colors.border }]}><View style={[styles.pickFill, { backgroundColor: colors.accent, width: `${Math.round((pick.count / stat.answerCount) * 100)}%` }]} /></View>
           <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{pick.count}</Text>
         </View>)}

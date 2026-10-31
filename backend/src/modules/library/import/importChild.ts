@@ -117,7 +117,7 @@ function parseKobo(input: Input): LibraryData {
 }
 
 async function parseText(input: Input): Promise<LibraryData> {
-  const text = decodeLibraryImport(await readFile(input.path));
+  const text = decodeLibraryImport(await readFile(input.path), "en");
 
   try {
     const json: unknown = JSON.parse(text);
@@ -128,9 +128,9 @@ async function parseText(input: Input): Promise<LibraryData> {
   }
 
   try {
-    if (looksLikeGoodreadsCsv(text)) return goodreadsCsvToLibraryJson(text);
-    if (looksLikeStorygraphCsv(text)) return storygraphCsvToLibraryJson(text);
-    const books = bookCsvToLibraryJson(text);
+    if (looksLikeGoodreadsCsv(text)) return goodreadsCsvToLibraryJson(text, "en");
+    if (looksLikeStorygraphCsv(text)) return storygraphCsvToLibraryJson(text, "en");
+    const books = bookCsvToLibraryJson(text, "en");
     if (books) return books;
   } catch (error) {
     fail(error instanceof Error ? error.message : "Couldn't parse that CSV export.");

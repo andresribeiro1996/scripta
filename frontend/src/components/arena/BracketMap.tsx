@@ -39,6 +39,7 @@ import { Sheet } from "../Sheet";
 import { bracketShape, needsVote, roundLabel, sharePercent, type BracketSlot } from "../../lib/arenaBracket";
 import { BUTTON_SECONDARY } from "../page/buttonClasses";
 import { useCountdown } from "./useCountdown";
+import { useLocale } from "../../i18n";
 
 function coverBookFor(side: DuelSide) {
   return { Title: side.title, Attribution: side.author, _coverUrl: side.cover ?? undefined };
@@ -367,6 +368,7 @@ export function BracketMap({
   /** The duel whose vote is currently in flight, so its buttons disable. */
   votingDuelId?: string | null;
 }) {
+  const locale = useLocale();
   // Which match is open. An id, not the duel object: useArena refetches
   // every 5s, so a captured reference would freeze the percentages and
   // the vote state at whatever they were when the sheet opened.
@@ -409,7 +411,7 @@ export function BracketMap({
   const tileRatio = (cells: number) => cells / maxPerRow;
 
   function labelFor(roundIdx: number): string {
-    return roundLabel(byRound[roundIdx]!.length, roundNumbers[roundIdx]!);
+    return roundLabel(byRound[roundIdx]!.length, roundNumbers[roundIdx]!, locale);
   }
 
   const finalDuel = hasCentre ? finalRound[0]! : null;

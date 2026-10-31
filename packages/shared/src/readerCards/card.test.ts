@@ -10,9 +10,9 @@ const shelf = (count: number, fields: (i: number) => Record<string, unknown> = (
 const series = (books: ReturnType<typeof book>[]): Group => ({ id: "g1", type: "series", name: "Discworld", bookKeys: books.map(bookKey), createdAt: "", updatedAt: "" });
 
 test("the card's accessible label names the identity and how sure it is", () => {
-  assert.equal(readerCardLabel({ state: "settled", identity: "star" }), "Reader card: the Stargazer");
-  assert.equal(readerCardLabel({ state: "leaning", identity: "carto" }), "Reader card: the Cartographer, leaning");
-  assert.equal(readerCardLabel({ state: "unwritten", identity: null }), "Reader card: unwritten");
+  assert.equal(readerCardLabel({ state: "settled", identity: "star" }, "en"), "Reader card: the Stargazer");
+  assert.equal(readerCardLabel({ state: "leaning", identity: "carto" }, "en"), "Reader card: the Cartographer, leaning");
+  assert.equal(readerCardLabel({ state: "unwritten", identity: null }, "en"), "Reader card: unwritten");
 });
 
 test("the Unwritten plate line is the missing sentence with a lowercase first letter", () => {
@@ -22,21 +22,21 @@ test("the Unwritten plate line is the missing sentence with a lowercase first le
 });
 
 test("readerGlyphLabel names the identity, and is undefined for no or an unknown identity", () => {
-  assert.equal(readerGlyphLabel("star"), "the Stargazer");
-  assert.equal(readerGlyphLabel(undefined), undefined);
-  assert.equal(readerGlyphLabel("ghost" as never), undefined);
+  assert.equal(readerGlyphLabel("star", "en"), "the Stargazer");
+  assert.equal(readerGlyphLabel(undefined, "en"), undefined);
+  assert.equal(readerGlyphLabel("ghost" as never, "en"), undefined);
 });
 
 test("ownGlyphPreview shows the glyph and names the identity once settled", () => {
   const loyal = shelf(10, (i) => (i < 4 ? { Attribution: "Kazuo Ishiguro" } : {}));
-  const identity = readerIdentity(loyal, []);
+  const identity = readerIdentity(loyal, [], "en");
   assert.equal(identity.state, "settled");
-  assert.deepEqual(ownGlyphPreview(identity), { glyph: "loyal", line: "Others see you as the Loyalist." });
+  assert.deepEqual(ownGlyphPreview(identity, "en"), { glyph: "loyal", line: "Others see you as the Loyalist." });
 });
 
 test("ownGlyphPreview shows no glyph while leaning", () => {
   const books = shelf(11);
-  const leaning = readerIdentity(books, [series(books.slice(0, 3))]);
+  const leaning = readerIdentity(books, [series(books.slice(0, 3))], "en");
   assert.equal(leaning.state, "leaning");
-  assert.deepEqual(ownGlyphPreview(leaning), { glyph: null, line: "Your reader card isn't settled yet, so no glyph shows." });
+  assert.deepEqual(ownGlyphPreview(leaning, "en"), { glyph: null, line: "Your reader card isn't settled yet, so no glyph shows." });
 });

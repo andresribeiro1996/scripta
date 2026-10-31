@@ -1,4 +1,4 @@
-import { BLOCK_BACKGROUND_FINISH_OPTIONS, BLOCK_FONT_FAMILY_OPTIONS, BLOCK_INNER_SPACING_OPTIONS, BLOCK_TEXT_ALIGN_OPTIONS, BLOCK_THEME_COLOR_LABELS, normalizeHexColor, resolveBlockColor, themeColorRef, type BlockStyle, type BlockThemeColorKey } from "@scripta/shared";
+import { blockBackgroundFinishOptions, blockFontFamilyOptions, blockInnerSpacingOptions, blockTextAlignOptions, blockThemeColorLabels, normalizeHexColor, resolveBlockColor, themeColorRef, type BlockStyle, type BlockThemeColorKey } from "@scripta/shared";
 import { Collapsible, Host, RNHostView } from "@expo/ui";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
@@ -14,6 +14,7 @@ import {
   BORDER_WIDTH_PRESETS, COLOR_LOOKS, CORNER_PRESETS, FADE_PRESETS, FRAME_LOOKS, GRADIENT_DIRECTION_PRESETS, GRADIENT_STRENGTH_PRESETS, SHADOW_BLUR_PRESETS, SHADOW_DISTANCE_PRESETS, SHADOW_STRENGTH_PRESETS, SIZE_PRESETS, TEXT_THEME_SWATCHES,
   applyLook, customColorStart, isHardToRead, matchSides, type CustomColorTarget, type Look,
 } from "./blockStyleOptions";
+import { useLocale } from "../../i18n";
 
 const COLLAPSIBLE_CONTENT_INSET = 32;
 
@@ -39,6 +40,7 @@ function ColorRow({ label, palette, value, defaults, themeKeys, fixed, onChange,
   onCustom: () => void;
   editor: ReactNode;
 }) {
+  const locale = useLocale();
   const { colors } = useTheme();
   const current = value?.toLowerCase() ?? null;
   const swatch = (key: string, accessibilityLabel: string, fill: string, stored: string) => {
@@ -51,7 +53,7 @@ function ColorRow({ label, palette, value, defaults, themeKeys, fixed, onChange,
       <Text style={[typography.body, styles.rowLabel, { color: colors.text }]}>{label}</Text>
       <View style={styles.wrap}>{defaults.map((option) => <Chip key={option.label} label={option.label} selected={value === option.value} onPress={() => onChange(option.value)} />)}</View>
       <Caption>Theme · follows the mural theme</Caption>
-      <View style={styles.wrap}>{themeKeys.map((key) => swatch(key, `${BLOCK_THEME_COLOR_LABELS[key]}, theme color`, palette[key], themeColorRef(key)))}</View>
+      <View style={styles.wrap}>{themeKeys.map((key) => swatch(key, `${blockThemeColorLabels(locale)[key]}, theme color`, palette[key], themeColorRef(key)))}</View>
       <Caption>Fixed</Caption>
       <View style={styles.wrap}>{fixed.map((hex) => swatch(hex, `Use ${hex}`, hex, hex))}
         <Pressable accessibilityRole="button" accessibilityLabel={custom ? `Custom color, ${custom}` : "Custom color"} accessibilityState={{ selected: custom !== null }} onPress={onCustom} style={[styles.swatch, styles.custom, { backgroundColor: custom ?? colors.surface, borderColor: custom ? colors.accent : colors.border, borderWidth: custom ? 3 : 1 }]}>
@@ -88,6 +90,7 @@ export function StyleTab({ style, palette, onChange, onReset, onCopy, onPaste, c
   onPaste: () => void;
   canPaste: boolean;
 }) {
+  const locale = useLocale();
   const { colors } = useTheme();
   const set = (patch: Partial<BlockStyle>) => onChange({ ...style, ...patch });
   const [section, setSection] = useState<string | null>("Background");
@@ -137,16 +140,16 @@ export function StyleTab({ style, palette, onChange, onReset, onCopy, onPaste, c
           <PresetRow label="Direction" presets={GRADIENT_DIRECTION_PRESETS} value={style.gradientAngle} onChange={(gradientAngle) => set({ gradientAngle })} />
           <PresetRow label="Blend strength" presets={GRADIENT_STRENGTH_PRESETS} value={style.gradientStrength} onChange={(gradientStrength) => set({ gradientStrength })} />
         </> : null}
-        <SelectRow label="Finish" value={style.backgroundFinish} options={BLOCK_BACKGROUND_FINISH_OPTIONS} onChange={(backgroundFinish) => set({ backgroundFinish })} />
+        <SelectRow label="Finish" value={style.backgroundFinish} options={blockBackgroundFinishOptions(locale)} onChange={(backgroundFinish) => set({ backgroundFinish })} />
         {style.backgroundColor === "transparent" ? <Caption>Shows when the block has a background</Caption> : null}
-        <SelectRow label="Inner spacing" value={style.innerSpacing} options={BLOCK_INNER_SPACING_OPTIONS} onChange={(innerSpacing) => set({ innerSpacing })} />
+        <SelectRow label="Inner spacing" value={style.innerSpacing} options={blockInnerSpacingOptions(locale)} onChange={(innerSpacing) => set({ innerSpacing })} />
       </Group>
       <Group {...group("Text")}>
         <ColorRow palette={palette} label="Text color" value={style.textColor} defaults={[{ label: "Auto", value: null }]} themeKeys={TEXT_THEME_SWATCHES} fixed={SWATCHES} onChange={(textColor) => set({ textColor })} {...customRow("textColor")} />
         {isHardToRead(style, palette) ? <Text accessibilityLiveRegion="polite" style={[typography.caption, { color: colors.danger }]}>Hard to read on this background</Text> : null}
 
         <View style={styles.wrap}>
-          {BLOCK_FONT_FAMILY_OPTIONS.map((option) => <Chip key={option.value} label={option.label.replace(" (system)", "")} fontFamily={blockFontFamily(option.value)} selected={style.fontFamily === option.value} onPress={() => set({ fontFamily: option.value })} />)}
+          {blockFontFamilyOptions(locale).map((option) => <Chip key={option.value} label={option.shortLabel} fontFamily={blockFontFamily(option.value)} selected={style.fontFamily === option.value} onPress={() => set({ fontFamily: option.value })} />)}
         </View>
         <PresetRow label="Size" presets={SIZE_PRESETS} value={style.fontSize} onChange={(fontSize) => set({ fontSize })} />
         <View style={styles.wrap}>
@@ -154,7 +157,7 @@ export function StyleTab({ style, palette, onChange, onReset, onCopy, onPaste, c
           <Chip label="Italic" selected={style.italic} onPress={() => set({ italic: !style.italic })} />
           <Chip label="Code" selected={style.codeStyle} onPress={() => set({ codeStyle: !style.codeStyle })} />
         </View>
-        <SelectRow label="Alignment" value={style.textAlign} options={BLOCK_TEXT_ALIGN_OPTIONS} onChange={(textAlign) => set({ textAlign })} />
+        <SelectRow label="Alignment" value={style.textAlign} options={blockTextAlignOptions(locale)} onChange={(textAlign) => set({ textAlign })} />
       </Group>
       <Group {...group("Border")}>
         <View style={styles.wrap}>

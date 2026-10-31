@@ -1,16 +1,18 @@
+import type { Locale } from "../i18n/locale.js";
+import { sharedT } from "../i18n/sharedT.js";
 import type { PublicReaderCard } from "../library/readerIdentity.js";
 import { SANS, SCRIPT, SERIF, type PlateSlots } from "./compose.js";
 import { fitLine, textWidth } from "./fit.js";
 import { displayName, nameParts, roman } from "./numerals.js";
-import { GROUP_LABELS } from "./pages.js";
-import { PLATES, type IdentityKey } from "./plates.js";
+import { groupLabel } from "./pages.js";
+import { PLATES, plateName, type IdentityKey } from "./plates.js";
 import type { CardFooter, FooterLeft, FooterRight } from "./style.js";
 import { escapeText } from "./svgText.js";
 
 export const GENRE_LEADS: ReadonlySet<string> = new Set(["lamp", "star", "arch", "corr"]);
 export const truncateName = (name: string) => (name.length > 16 ? `${name.slice(0, 16)}…` : name);
 
-export interface FooterContext { card: PublicReaderCard; readerName: string; glyph: (key: IdentityKey, x: number, y: number, size: number) => string }
+export interface FooterContext { locale: Locale; card: PublicReaderCard; readerName: string; glyph: (key: IdentityKey, x: number, y: number, size: number) => string }
 
 const ROOM = 190;
 const GAP = 12;
@@ -21,25 +23,26 @@ const CAPS = { font: "caps", size: 7.5, spacing: 1.8 } as const;
 const caps = (text: string, x: number, end: boolean, width: number) =>
   `<text class="pt" x="${x}" y="321"${end ? ` text-anchor="end"` : ""} font-size="7.5" letter-spacing="1.8" font-family="${SANS}" font-weight="600">${escapeText(fitLine(text, { ...CAPS, width }))}</text>`;
 const plateOf = (card: PublicReaderCard) => (card.state !== "unwritten" && card.identity ? PLATES.find((plate) => plate.key === card.identity) : undefined);
-const counted = (n: number | undefined, one: string, many: string) => (n ? `${roman(n)} ${n === 1 ? one : many}` : null);
+const counted = (n: number | undefined, key: "shared.readerCard.footerVolumes" | "shared.readerCard.footerHighlights" | "shared.readerCard.footerSeries", locale: Locale) => (n ? sharedT(locale)(key, { count: n, roman: roman(n) }) : null);
 const initial = (word: string) => [...word][0] ?? "";
 
-function leftText(value: FooterLeft, card: PublicReaderCard): string | null {
+function leftText(value: FooterLeft, card: PublicReaderCard, locale: Locale): string | null {
+  const t = sharedT(locale);
   const facts = card.facts;
   const plate = plateOf(card);
   switch (value) {
-    case "plateName": return plate ? `${plate.numeral} · ${plate.name.toUpperCase()}` : null;
-    case "since": return facts?.since ? `READER SINCE ${facts.since}` : null;
-    case "est": return facts?.since ? `EST. ${roman(facts.since)}` : null;
-    case "volumes": return counted(facts?.finished, "VOLUME", "VOLUMES");
-    case "highlights": return counted(facts?.highlights, "HIGHLIGHT", "HIGHLIGHTS");
-    case "series": return counted(facts?.series, "SERIES", "SERIES");
+    case "plateName": return plate ? `${plate.numeral} · ${plateName(plate.key, locale).toUpperCase()}` : null;
+    case "since": return facts?.since ? t("shared.readerCard.footerSince", { year: facts.since }) : null;
+    case "est": return facts?.since ? t("shared.readerCard.footerEst", { year: roman(facts.since) }) : null;
+    case "volumes": return counted(facts?.finished, "shared.readerCard.footerVolumes", locale);
+    case "highlights": return counted(facts?.highlights, "shared.readerCard.footerHighlights", locale);
+    case "series": return counted(facts?.series, "shared.readerCard.footerSeries", locale);
     case "genre": {
       const lead = plate && GENRE_LEADS.has(plate.key) ? card.dial?.segments.find((segment) => segment.group === plate.key) : undefined;
-      return lead ? GROUP_LABELS[lead.group].toUpperCase() : null;
+      return lead ? groupLabel(lead.group, locale).toUpperCase() : null;
     }
-    case "edition": return facts?.edition ? `EDITION ${roman(facts.edition)}` : null;
-    case "readerNumber": return facts?.readerNumber ? `Nº ${roman(facts.readerNumber)}` : null;
+    case "edition": return facts?.edition ? t("shared.readerCard.footerEdition", { roman: roman(facts.edition) }) : null;
+    case "readerNumber": return facts?.readerNumber ? t("shared.readerCard.footerNumber", { roman: roman(facts.readerNumber) }) : null;
     default: return null;
   }
 }
@@ -50,7 +53,7 @@ function leftSlot(value: FooterLeft, ctx: FooterContext, width: number): string 
     const plate = plateOf(ctx.card);
     return plate ? ctx.glyph(plate.key, 30, 309.5, 13) : undefined;
   }
-  const text = leftText(value, ctx.card);
+  const text = leftText(value, ctx.card, ctx.locale);
   return text ? caps(text, 30, false, width) : undefined;
 }
 
@@ -89,8 +92,8 @@ function rightSlot(value: FooterRight, readerName: string): Right {
   return { width: textWidth(fallback, CAPS), text: value === "name" ? fallback : null };
 }
 
-export function footerLeftText(value: FooterLeft, card: PublicReaderCard): string | null {
-  return value === "plate" ? `PLATE ${plateOf(card)?.numeral ?? "—"}` : leftText(value, card);
+export function footerLeftText(value: FooterLeft, card: PublicReaderCard, locale: Locale): string | null {
+  return value === "plate" ? sharedT(locale)("shared.readerCard.footerPlate", { numeral: plateOf(card)?.numeral ?? "—" }) : leftText(value, card, locale);
 }
 
 export function footerRightText(value: FooterRight, readerName: string): string | null {

@@ -15,6 +15,7 @@ import { publicContentUrl } from "../sharing/links";
 import { coverUrlForApi } from "../library/lib/coverUrl";
 import { fetchPlay, fetchPlayBoard, fetchPublicResults, submitPlay, type PlayBoard, type PlayResponse } from "./api";
 import { buildSubmission, isComplete, nextIndex, playStage, playStorageKey } from "./quizPlay";
+import { useLocale } from "../../i18n";
 
 const uriFor = (url: string): string => coverUrlForApi(url, API_URL);
 
@@ -243,6 +244,7 @@ function AnswerValue({ value, picked = false }: { value: NonNullable<ScoreRow["a
 }
 
 function Leaderboard({ code }: { code: string }) {
+  const locale = useLocale();
   const { colors } = useTheme();
   const leaderboard = useQuery({ queryKey: ["quizzes", "results", code], queryFn: () => fetchPublicResults(code), retry: false });
   if (leaderboard.isPending) return <View style={styles.section}><Skeleton height={180} /></View>;
@@ -253,8 +255,8 @@ function Leaderboard({ code }: { code: string }) {
       <View key={`${play.playerName ?? "Guest"}-${i}`} style={[styles.leaderRow, { borderColor: colors.border }]}>
         <Text {...dynamicType} style={[typography.body, styles.rank, { color: colors.textDim }]}>{i + 1}</Text>
         <View style={styles.grow}>
-          <Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>{playerLabel(play).name}</Text>
-          {playerLabel(play).guest ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Guest</Text> : null}
+          <Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>{playerLabel(play, locale).name}</Text>
+          {playerLabel(play, locale).guest ? <Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>Guest</Text> : null}
         </View>
         <View style={styles.leaderScore}>
           <Text {...dynamicType} numberOfLines={1} style={[typography.body, styles.strong, { color: colors.text }]}>{play.score}/{leaderboard.data.questionCount}</Text>

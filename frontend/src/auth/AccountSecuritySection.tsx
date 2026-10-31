@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { PASSWORD_HINT, type AccountSecurity } from "@scripta/shared";
+import { passwordHint, type AccountSecurity } from "@scripta/shared";
 import { apiFetch } from "../api/client";
 import { setAuthNotice } from "./returnTo";
 import { setSession } from "./tokenStore";
@@ -8,10 +8,12 @@ import { PasswordInput } from "./PasswordInput";
 import { BUTTON_PRIMARY, BUTTON_SECONDARY, FIELD_CLASS } from "../components/page/buttonClasses";
 import { SettingGroup, SettingRow } from "../components/page/Page";
 import { LIST_PANEL } from "../components/page/surfaceClasses";
+import { useLocale } from "../i18n";
 
 const PASSWORD_FIELD = `${FIELD_CLASS} w-full`;
 
 export function AccountSecuritySection() {
+  const locale = useLocale();
   const account = useQuery({ queryKey: ["account-security"], queryFn: () => apiFetch("/auth/account") as Promise<AccountSecurity> });
   const [mode, setMode] = useState<"password" | "email" | null>(null);
   const [email, setEmail] = useState("");
@@ -65,7 +67,7 @@ export function AccountSecuritySection() {
     {mode && <form onSubmit={submit} className="px-4 py-3"><fieldset disabled={busy} className="space-y-3 text-sm">
       <label className="block">Current password<PasswordInput className={PASSWORD_FIELD} required autoComplete="current-password" value={current} onChange={(event) => setCurrent(event.target.value)} /></label>
       {mode === "email" ? <label className="block">New email<input type="email" required autoComplete="email" className={`${FIELD_CLASS} w-full`} value={email} onChange={(event) => setEmail(event.target.value)} /></label> : <>
-        <label className="block">New password<PasswordInput className={PASSWORD_FIELD} required minLength={8} maxLength={128} autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} /></label><p className="text-xs">{PASSWORD_HINT}</p>
+        <label className="block">New password<PasswordInput className={PASSWORD_FIELD} required minLength={8} maxLength={128} autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} /></label><p className="text-xs">{passwordHint(locale)}</p>
         <label className="block">Confirm new password<PasswordInput className={PASSWORD_FIELD} required autoComplete="new-password" value={confirm} onChange={(event) => setConfirm(event.target.value)} /></label>
         <p className="text-xs">Changing your password signs you out on every device.</p>
       </>}

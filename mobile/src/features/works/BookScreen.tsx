@@ -19,6 +19,7 @@ import { statusBadgeLabel } from "./bookPage";
 import { CharactersSheet } from "./CharactersSheet";
 import { EditionsSheet } from "./EditionsSheet";
 import { StatusSheet } from "./StatusSheet";
+import { useLocale } from "../../i18n";
 
 const COVER_WIDTH = 150;
 const COVER_HEIGHT = 225;
@@ -98,8 +99,9 @@ function StatusBadge({ label, finished, onPress }: { label: string; finished: bo
 }
 
 function SeriesLine({ series, signedIn, segments }: { series: NonNullable<BookScreenModel["series"]>; signedIn: boolean; segments: readonly string[] }) {
+  const locale = useLocale();
   const { colors } = useTheme();
-  const label = seriesLabel(series);
+  const label = seriesLabel(series, locale);
   const method = signedIn ? seriesSearchMethod(segments) : null;
   if (!method) return <Text {...dynamicType} style={[typography.body, styles.shrink, styles.centerText, { color: colors.textDim }]}>{label}</Text>;
   return (
@@ -135,6 +137,7 @@ function DeleteNote({ book, bookmarkId }: { book: Record<string, unknown>; bookm
 }
 
 export function BookScreen({ page, book, model, signedIn, onSelectEdition, scrollY, headerInset = 0 }: { page: WorkPage | null; book: Record<string, unknown> | null; model: BookScreenModel; signedIn: boolean; onSelectEdition?: (bookId: string) => void; scrollY?: SharedValue<number>; headerInset?: number }) {
+  const locale = useLocale();
   const { colors, mode } = useTheme();
   const { width: windowWidth } = useWindowDimensions();
   const coverColor = model.cover.color;
@@ -142,7 +145,7 @@ export function BookScreen({ page, book, model, signedIn, onSelectEdition, scrol
   const segments = useSegments();
   const workId = page?.work.id;
   const statsQuery = useQuery({ queryKey: ["works", workId, "stats"], queryFn: () => fetchWorkStats(workId!), enabled: Boolean(workId), retry: false });
-  const statsTiles = bookStatsModel(statsQuery.data ?? null, page?.work.rating ?? null).tiles;
+  const statsTiles = bookStatsModel(statsQuery.data ?? null, page?.work.rating ?? null, locale).tiles;
   const [selected, setSelected] = useState<BookScreenTabKey | null>(null);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);

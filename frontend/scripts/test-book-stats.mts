@@ -13,8 +13,8 @@ const full: BookStats = {
 };
 const rating = { value: 4.12, count: 2310 };
 const tiles = (stats: BookStats | null, ol: typeof rating | null) =>
-  renderToString(createElement(MemoryRouter, null, createElement(StatsTiles, { tiles: bookStatsModel(stats, ol).tiles, to: "/work/w/stats" })));
-const sections = (stats: BookStats | null, ol: typeof rating | null) => renderToString(createElement(StatsSections, { model: bookStatsModel(stats, ol) }));
+  renderToString(createElement(MemoryRouter, null, createElement(StatsTiles, { tiles: bookStatsModel(stats, ol, "en").tiles, to: "/work/w/stats" })));
+const sections = (stats: BookStats | null, ol: typeof rating | null) => renderToString(createElement(StatsSections, { model: bookStatsModel(stats, ol, "en") }));
 
 test("tiles link to the stats page as one panel strip, a column per tile", () => {
   const html = tiles(full, rating);

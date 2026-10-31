@@ -17,6 +17,7 @@ import { deleteQuizApi, fetchQuizResultsApi, publishQuizApi, setPlayStateApi, up
 import { useQuizzes } from "../hooks/useQuizzes";
 import { CHECKBOX_CLASS } from "../components/Toolbar";
 import { useWorkCharacters } from "../hooks/useWorkCharacters";
+import { useLocale } from "../i18n";
 
 export function QuizEditorPage() {
   const { id } = useParams();
@@ -231,6 +232,7 @@ export function QuizEditorPage() {
 }
 
 function PublishedSection({ quiz, shareLink, copied, setCopied }: { quiz: Quiz; shareLink: string; copied: boolean; setCopied: (value: boolean) => void }) {
+  const locale = useLocale();
   const queryClient = useQueryClient();
   const results = useQuery({ queryKey: ["quizResults", quiz.id], queryFn: () => fetchQuizResultsApi(quiz.id) });
   const ownerQuestions = quiz.data.questions ?? [];
@@ -290,8 +292,8 @@ function PublishedSection({ quiz, shareLink, copied, setCopied }: { quiz: Quiz; 
               <tr key={play.playId} className="border-t border-(--color-border)">
                 <td className="py-1.5 pr-3">{index + 1}</td>
                 <td className="py-1.5 pr-3">
-                  {playerLabel(play).name}
-                  {playerLabel(play).guest && <span className="ml-2 text-xs text-(--color-text-dim)">guest</span>}
+                  {playerLabel(play, locale).name}
+                  {playerLabel(play, locale).guest && <span className="ml-2 text-xs text-(--color-text-dim)">guest</span>}
                 </td>
                 <td className="py-1.5 pr-3">{play.score}/{results.data!.questionCount}</td>
                 <td className="py-1.5">{(play.durationMs / 1000).toFixed(1)}s</td>
@@ -310,12 +312,12 @@ function PublishedSection({ quiz, shareLink, copied, setCopied }: { quiz: Quiz; 
             return (
             <div key={stat.questionId} className="rounded-xl border border-(--color-border) bg-(--color-surface) p-3">
               <p className="text-sm font-semibold">
-                {asked ? quizQuestionLabel(asked, index, quiz.data.books) : stat.questionId} · {stat.correctCount}/{stat.answerCount} correct
+                {asked ? quizQuestionLabel(asked, index, quiz.data.books, locale) : stat.questionId} · {stat.correctCount}/{stat.answerCount} correct
               </p>
               <div className="mt-2 flex flex-col gap-1">
                 {stat.picks.map((pick) => (
                   <div key={pick.choiceIndex} className="flex items-center gap-2 text-xs text-(--color-text-dim)">
-                    <span className="w-40 truncate">{asked ? quizOptionLabel(asked.type, asked.options[pick.choiceIndex], quiz.data.books) : `#${pick.choiceIndex + 1}`}</span>
+                    <span className="w-40 truncate">{asked ? quizOptionLabel(asked.type, asked.options[pick.choiceIndex], quiz.data.books, locale) : `#${pick.choiceIndex + 1}`}</span>
                     {/* Same tally-bar treatment as DuelCard: accent fill on a border track. */}
                     <span className="h-2 flex-1 rounded bg-(--color-border)">
                       <span className="block h-2 rounded bg-(--color-accent)" style={{ width: `${Math.round((pick.count / stat.answerCount) * 100)}%` }} />

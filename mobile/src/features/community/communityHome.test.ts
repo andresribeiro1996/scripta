@@ -53,40 +53,40 @@ test("filter option table", () => {
 });
 
 test("content labels and detail lines", () => {
-  assert.equal(contentKindLabel(tierlist), "Tier list");
-  assert.equal(contentKindLabel(tournament), "Tournament");
-  assert.equal(contentDetail(tierlist), "12 books · 4 ballots");
-  assert.equal(contentDetail({ ...tierlist, votingOpen: false }), "12 books · 4 ballots · closed");
-  assert.equal(contentDetail(tournament), "8-book bracket · active");
+  assert.equal(contentKindLabel(tierlist, "en"), "Tier list");
+  assert.equal(contentKindLabel(tournament, "en"), "Tournament");
+  assert.equal(contentDetail(tierlist, "en"), "12 books · 4 ballots");
+  assert.equal(contentDetail({ ...tierlist, votingOpen: false }, "en"), "12 books · 4 ballots · closed");
+  assert.equal(contentDetail(tournament, "en"), "8-book bracket · active");
 });
 
 test("quiz copy, status and target", () => {
-  assert.equal(contentKindLabel(quiz), "Quiz");
-  assert.equal(contentDetail(quiz), "5 questions · 2 plays");
-  assert.equal(contentDetail({ ...quiz, playOpen: false }), "5 questions · 2 plays · closed");
-  assert.deepEqual(contentStatus(quiz), { label: "Open", tone: "accent" });
-  assert.deepEqual(contentStatus({ ...quiz, viewerVoted: true }), { label: "Played", tone: "info" });
-  assert.deepEqual(contentStatus({ ...quiz, playOpen: false }), { label: "Closed", tone: "neutral" });
-  assert.deepEqual(contentStats(quiz), [{ value: 5, label: "questions" }, { value: 2, label: "plays" }]);
+  assert.equal(contentKindLabel(quiz, "en"), "Quiz");
+  assert.equal(contentDetail(quiz, "en"), "5 questions · 2 plays");
+  assert.equal(contentDetail({ ...quiz, playOpen: false }, "en"), "5 questions · 2 plays · closed");
+  assert.deepEqual(contentStatus(quiz, "en"), { label: "Open", tone: "accent" });
+  assert.deepEqual(contentStatus({ ...quiz, viewerVoted: true }, "en"), { label: "Played", tone: "info" });
+  assert.deepEqual(contentStatus({ ...quiz, playOpen: false }, "en"), { label: "Closed", tone: "neutral" });
+  assert.deepEqual(contentStats(quiz, "en"), [{ value: 5, label: "questions" }, { value: 2, label: "plays" }]);
   assert.equal(contentTarget(quiz), "/play/qc12");
 });
 
 test("content status names the state and its tone", () => {
-  assert.deepEqual(contentStatus(tierlist), { label: "Voting open", tone: "accent" });
-  assert.deepEqual(contentStatus({ ...tierlist, viewerVoted: true }), { label: "Voted", tone: "info" });
-  assert.deepEqual(contentStatus({ ...tierlist, votingOpen: false }), { label: "Closed", tone: "neutral" });
-  assert.deepEqual(contentStatus({ ...tierlist, votingOpen: false, viewerVoted: true }), { label: "Closed", tone: "neutral" });
-  assert.deepEqual(contentStatus({ ...tierlist, votingOpen: false, promotedAt: "2026-09-01T00:00:00.000Z" }), { label: "Reference", tone: "reference" });
-  assert.deepEqual(contentStatus(tournament), { label: "In progress", tone: "info" });
-  assert.deepEqual(contentStatus({ ...tournament, status: "completed" }), { label: "Completed", tone: "success" });
-  assert.deepEqual(contentStatus({ ...tournament, viewerVoted: true }), { label: "In progress", tone: "info", votedBadge: true });
-  assert.deepEqual(contentStatus({ ...tournament, status: "completed", viewerVoted: true }), { label: "Completed", tone: "success", votedBadge: true });
+  assert.deepEqual(contentStatus(tierlist, "en"), { label: "Voting open", tone: "accent" });
+  assert.deepEqual(contentStatus({ ...tierlist, viewerVoted: true }, "en"), { label: "Voted", tone: "info" });
+  assert.deepEqual(contentStatus({ ...tierlist, votingOpen: false }, "en"), { label: "Closed", tone: "neutral" });
+  assert.deepEqual(contentStatus({ ...tierlist, votingOpen: false, viewerVoted: true }, "en"), { label: "Closed", tone: "neutral" });
+  assert.deepEqual(contentStatus({ ...tierlist, votingOpen: false, promotedAt: "2026-09-01T00:00:00.000Z" }, "en"), { label: "Reference", tone: "reference" });
+  assert.deepEqual(contentStatus(tournament, "en"), { label: "In progress", tone: "info" });
+  assert.deepEqual(contentStatus({ ...tournament, status: "completed" }, "en"), { label: "Completed", tone: "success" });
+  assert.deepEqual(contentStatus({ ...tournament, viewerVoted: true }, "en"), { label: "In progress", tone: "info", votedBadge: true });
+  assert.deepEqual(contentStatus({ ...tournament, status: "completed", viewerVoted: true }, "en"), { label: "Completed", tone: "success", votedBadge: true });
 });
 
 test("content stats count books, and ballots for tier lists", () => {
-  assert.deepEqual(contentStats(tierlist), [{ value: 12, label: "books" }, { value: 4, label: "ballots" }]);
-  assert.deepEqual(contentStats({ ...tierlist, poolSize: 1, ballotCount: 1 }), [{ value: 1, label: "book" }, { value: 1, label: "ballot" }]);
-  assert.deepEqual(contentStats(tournament), [{ value: 8, label: "books" }]);
+  assert.deepEqual(contentStats(tierlist, "en"), [{ value: 12, label: "books" }, { value: 4, label: "ballots" }]);
+  assert.deepEqual(contentStats({ ...tierlist, poolSize: 1, ballotCount: 1 }, "en"), [{ value: 1, label: "book" }, { value: 1, label: "ballot" }]);
+  assert.deepEqual(contentStats(tournament, "en"), [{ value: 8, label: "books" }]);
 });
 
 test("content targets route by kind", () => {
@@ -100,9 +100,9 @@ test("content targets route by kind", () => {
     createdAt: "2026-09-10T00:00:00.000Z",
   };
   assert.equal(feedTarget(feedItem), "/vote/code12ab");
-  assert.equal(feedHeading(feedItem), "andre published a tier list");
+  assert.equal(feedHeading(feedItem, "en"), "andre published a tier list");
   assert.equal(
-    feedHeading({ ...feedItem, content: tournament, type: "tournament_published" }),
+    feedHeading({ ...feedItem, content: tournament, type: "tournament_published" }, "en"),
     "andre published a tournament"
   );
 });

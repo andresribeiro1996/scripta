@@ -1,13 +1,15 @@
 import { Pressable, StyleSheet, View } from "react-native";
 import { Text } from "../../../ui/Text";
-import { FINISH_FEELINGS, type FinishRating } from "@scripta/shared";
+import { finishFeelings, type FinishRating } from "@scripta/shared";
 import { dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../../ui/theme";
+import { useLocale } from "../../../i18n";
 
 export function FeelingChips({ value, onChange }: { value: number | null; onChange: (rating: FinishRating) => void }) {
+  const locale = useLocale();
   const { colors } = useTheme();
   return (
     <View accessibilityRole="radiogroup" style={styles.row}>
-      {FINISH_FEELINGS.map(({ rating, label }) => {
+      {finishFeelings(locale).map(({ rating, label }) => {
         const selected = value === rating;
         return (
           <Pressable

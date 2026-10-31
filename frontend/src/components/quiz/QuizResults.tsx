@@ -7,6 +7,7 @@ import { LibraryIcon } from "../NavIcons";
 import { ChevronRightIcon, ShareIcon } from "../Toolbar";
 import { Page } from "../page/Page";
 import { BUTTON_PRIMARY, FIELD_CLASS } from "../page/buttonClasses";
+import { useLocale } from "../../i18n";
 
 function AnswerValue({ value, picked = false }: { value: NonNullable<ScoreRow["answer"]>; picked?: boolean }) {
   return (
@@ -157,6 +158,7 @@ function ChallengeLink({ code }: { code: string }) {
 }
 
 export function QuizLeaderboard({ code }: { code: string }) {
+  const locale = useLocale();
   const leaderboard = useQuery({ queryKey: ["quizPublicResults", code], queryFn: () => fetchPublicResultsApi(code) });
   if (leaderboard.isError) return <p className="text-sm text-(--color-text-dim)">Couldn't load the leaderboard.</p>;
   if (!leaderboard.data) return <p role="status" className="text-sm text-(--color-text-dim)">Loading leaderboard…</p>;
@@ -171,8 +173,8 @@ export function QuizLeaderboard({ code }: { code: string }) {
             <li key={index} className="flex items-center gap-3 py-4 text-sm">
               <span className="w-5 shrink-0 tabular-nums text-(--color-text-dim)">{index + 1}</span>
               <div className="min-w-0 flex-1">
-                <p className="break-words font-medium">{playerLabel(play).name}</p>
-                {playerLabel(play).guest && <p className="text-xs text-(--color-text-dim)">Guest</p>}
+                <p className="break-words font-medium">{playerLabel(play, locale).name}</p>
+                {playerLabel(play, locale).guest && <p className="text-xs text-(--color-text-dim)">Guest</p>}
               </div>
               <div className="shrink-0 text-right tabular-nums">
                 <p className="font-semibold"><span className="sr-only">Score: </span>{play.score}/{leaderboard.data.questionCount}</p>

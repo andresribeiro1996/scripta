@@ -38,8 +38,8 @@ test("duelWinner gives a shared winning work to side A only", () => {
 });
 
 test("roundLabel names rounds from the back of the draw", () => {
-  assert.equal(roundLabel(1, 3), "Final");
-  assert.equal(roundLabel(2, 2), "Semis");
-  assert.equal(roundLabel(4, 1), "Quarters");
-  assert.equal(roundLabel(8, 1), "Round 1");
+  assert.equal(roundLabel(1, 3, "en"), "Final");
+  assert.equal(roundLabel(2, 2, "en"), "Semis");
+  assert.equal(roundLabel(4, 1, "en"), "Quarters");
+  assert.equal(roundLabel(8, 1, "en"), "Round 1");
 });

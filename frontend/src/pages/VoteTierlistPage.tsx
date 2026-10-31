@@ -40,6 +40,7 @@ import { useTierlistVoting } from "../hooks/useTierlistVoting";
 import { backTo } from "../lib/areas";
 import { toPrivateBook } from "../lib/sharedMural";
 import { toPlacements } from "../lib/tierlistResults";
+import { useLocale } from "../i18n";
 
 function InfoScreen({ message, back }: { message: string; back?: { to: string; label: string } }) {
   return (
@@ -59,6 +60,7 @@ function HideBottomNav() {
 }
 
 export function VoteTierlistPage() {
+  const locale = useLocale();
   const { code } = useParams<{ code: string }>();
   const location = useLocation();
   const { session } = useAuth();
@@ -235,7 +237,7 @@ export function VoteTierlistPage() {
       <p className="mb-4 text-sm text-(--color-text-dim)">
         {membersOnlyBlocked
           ? "This tier list only accepts votes from signed-in members — rank away, then sign in to cast your ballot."
-          : `Drag ${itemNoun(subject, 2)} into tiers to rank them, then submit your ballot.`}
+          : `Drag ${itemNoun(subject, 2, locale)} into tiers to rank them, then submit your ballot.`}
       </p>
       {submitError && <p className="mb-4 text-sm text-(--color-danger)">{submitError}</p>}
       <HideBottomNav />

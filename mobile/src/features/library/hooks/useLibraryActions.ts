@@ -32,6 +32,7 @@ import { assertSaved, attemptUpdate } from "../lib/attemptUpdate";
 import { buildMergedLibrary } from "../lib/mergeAndSave";
 import { useToast } from "../../../ui/ToastHost";
 import { useLibrary } from "./useLibrary";
+import { getLocale } from "../../../i18n";
 
 export function useLibraryActions(onError?: (message: string) => void) {
   const { updateLibrary, submit } = useLibrary();
@@ -39,11 +40,11 @@ export function useLibraryActions(onError?: (message: string) => void) {
   const report = onError ?? ((message: string) => show(message, "error"));
 
   function run(mutate: (data: LibraryData) => LibraryData, failureMessage: string, onSuccess?: () => void) {
-    return attemptUpdate(() => updateLibrary(mutate), (error) => report(saveFailureMessage(error, failureMessage)), onSuccess);
+    return attemptUpdate(() => updateLibrary(mutate), (error) => report(saveFailureMessage(error, failureMessage, getLocale())), onSuccess);
   }
 
   function runChange(change: LibraryChange, failureMessage: string) {
-    return attemptUpdate(async () => assertSaved(await submit(change)), (error) => report(saveFailureMessage(error, failureMessage)));
+    return attemptUpdate(async () => assertSaved(await submit(change)), (error) => report(saveFailureMessage(error, failureMessage, getLocale())));
   }
 
   function mapBook(key: string, change: (book: Record<string, unknown>) => Record<string, unknown>) {

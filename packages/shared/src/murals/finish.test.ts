@@ -14,21 +14,21 @@ function keysOf(blocks: MuralBlock[], role: "finished" | "favourites") {
 
 test("a blank or hand-made shelf is never modified", () => {
   const blocks = [text, shelf("mine", undefined, ["a"], 3)];
-  const result = shelfAfterFinish(blocks, "b", 5);
+  const result = shelfAfterFinish(blocks, "b", 5, "en");
   assert.equal(result.blocks, blocks);
   assert.deepEqual(result.landed, []);
 });
 
 test("the finished book moves to the front of Finished, deduped", () => {
   const blocks = [text, shelf("f", "finished", ["a", "b", "c"], 3)];
-  const result = shelfAfterFinish(blocks, "b", null);
+  const result = shelfAfterFinish(blocks, "b", null, "en");
   assert.deepEqual(keysOf(result.blocks, "finished"), ["b", "a", "c"]);
   assert.deepEqual(result.landed, ["finished"]);
 });
 
 test("a 4 or 5 with no Favourites shelf appends one below the lowest block", () => {
   const blocks = [text, shelf("f", "finished", ["a"], 3)];
-  const result = shelfAfterFinish(blocks, "b", 4);
+  const result = shelfAfterFinish(blocks, "b", 4, "en");
   assert.deepEqual(keysOf(result.blocks, "favourites"), ["b"]);
   const favourites = result.blocks.at(-1)!;
   assert.equal(favourites.layout.y, 8);
@@ -37,16 +37,16 @@ test("a 4 or 5 with no Favourites shelf appends one below the lowest block", () 
 });
 
 test("a 3 or an existing Favourites shelf adds nothing to Favourites", () => {
-  assert.equal(keysOf(shelfAfterFinish([shelf("f", "finished", [], 0)], "b", 3).blocks, "favourites"), undefined);
+  assert.equal(keysOf(shelfAfterFinish([shelf("f", "finished", [], 0)], "b", 3, "en").blocks, "favourites"), undefined);
   const withFavourites = [shelf("f", "finished", [], 0), shelf("v", "favourites", ["x"], 5)];
-  const result = shelfAfterFinish(withFavourites, "b", 5);
+  const result = shelfAfterFinish(withFavourites, "b", 5, "en");
   assert.deepEqual(keysOf(result.blocks, "favourites"), ["x"]);
   assert.deepEqual(result.landed, ["finished"]);
 });
 
 test("running it twice is stable — and the second run is a pure no-op", () => {
-  const once = shelfAfterFinish([shelf("f", "finished", ["a"], 0)], "b", 5).blocks;
-  const twice = shelfAfterFinish(once, "b", 5);
+  const once = shelfAfterFinish([shelf("f", "finished", ["a"], 0)], "b", 5, "en").blocks;
+  const twice = shelfAfterFinish(once, "b", 5, "en");
   assert.equal(twice.blocks, once);
   assert.deepEqual(twice.landed, ["finished"]);
 });
@@ -77,7 +77,8 @@ test("createShelfSession serializes a rating then a promote, keeping the promoti
   const session = createShelfSession({
     load: async () => ({ id: "m1", blocks, updatedAt: "t0" }),
     save: async (_id, next) => { blocks = next; return {}; },
-    onChange: () => {}
+    onChange: () => {},
+    locale: "en"
   });
   await Promise.all([session.finish("b", 5), session.promote("b")]);
   assert.deepEqual(keysOf(blocks, "favourites"), ["b", "x"]);
@@ -89,7 +90,8 @@ test("restore after a queued rating doesn't let the rating re-add the book", asy
   const session = createShelfSession({
     load: async () => ({ id: "m1", blocks, updatedAt: "t0" }),
     save: async (_id, next) => { saveCalls++; blocks = next; return {}; },
-    onChange: () => {}
+    onChange: () => {},
+    locale: "en"
   });
   const finishing = session.finish("b", null);
   const restoring = session.restore();
@@ -106,7 +108,8 @@ test("restore before load resolves still restores (nothing saved)", async () => 
   const session = createShelfSession({
     load: () => loadPromise,
     save: async (_id, next) => { saveCalls++; return {}; },
-    onChange: () => {}
+    onChange: () => {},
+    locale: "en"
   });
   const finishing = session.finish("b", null);
   const restoring = session.restore();
@@ -122,7 +125,8 @@ test("no save when nothing changed", async () => {
   const session = createShelfSession({
     load: async () => ({ id: "m1", blocks, updatedAt: "t0" }),
     save: async (_id, next) => { saveCalls++; return {}; },
-    onChange: () => {}
+    onChange: () => {},
+    locale: "en"
   });
   await session.finish("b", null);
   assert.equal(saveCalls, 0);
@@ -138,7 +142,8 @@ test("updatedAt threads from load into saves, then from each save into the next"
       blocks = next;
       return { updatedAt: `t${seenUpdatedAt.length}` };
     },
-    onChange: () => {}
+    onChange: () => {},
+    locale: "en"
   });
   await session.finish("b", 4);
   await session.finish("c", 4);
@@ -150,7 +155,8 @@ test("a failed save surfaces to the caller", async () => {
   const session = createShelfSession({
     load: async () => ({ id: "m1", blocks, updatedAt: "t0" }),
     save: async () => { throw new Error("boom"); },
-    onChange: () => {}
+    onChange: () => {},
+    locale: "en"
   });
   await assert.rejects(session.finish("b", null), /boom/);
 });

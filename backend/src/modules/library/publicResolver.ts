@@ -123,7 +123,7 @@ function getStatements() {
 const EMPTY_RESULT: PublicLibraryData = { books: [], highlights: [], currentlyReading: [], stats: {} };
 
 function emptyResult(req: PublicDataRequest): PublicLibraryData {
-  return req.needsReaderCard ? { ...EMPTY_RESULT, readerCard: publicReaderCard(readerIdentity([], [])) } : EMPTY_RESULT;
+  return req.needsReaderCard ? { ...EMPTY_RESULT, readerCard: publicReaderCard(readerIdentity([], [], "en")) } : EMPTY_RESULT;
 }
 
 interface ParsedLibraryDocument {

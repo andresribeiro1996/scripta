@@ -1,3 +1,5 @@
+import type { Locale } from "../i18n/locale.js";
+import { sharedT } from "../i18n/sharedT.js";
 import { rekeyKeys } from "../library/dedupe.js";
 import { bookKey } from "../library/merge.js";
 import { booksByWork } from "../library/works.js";
@@ -72,7 +74,7 @@ export function resolveShelfBooks(block: Extract<MuralBlock, { type: "shelf" }>,
 }
 
 interface Kind<T extends BlockType> {
-  label: string;
+  label: Parameters<ReturnType<typeof sharedT>>[0];
   size: { w: number; h: number };
   minHeight: number;
   configurable: boolean;
@@ -85,13 +87,13 @@ interface Kind<T extends BlockType> {
 }
 
 const KINDS: { [T in BlockType]: Kind<T> } = {
-  spotlight: { label: "Book spotlight", size: { w: 3, h: 4 }, minHeight: 0, configurable: true, content: () => ({ bookKey: "" }),
+  spotlight: { label: "shared.murals.kindSpotlight", size: { w: 3, h: 4 }, minHeight: 0, configurable: true, content: () => ({ bookKey: "" }),
     valid: (b) => typeof b.bookKey === "string",
     references: (b, refs) => { if (nonEmpty(b.bookKey)) refs.bookKeys.add(b.bookKey); },
     rekey: (b, from, to) => (from.has(b.bookKey) ? { ...b, bookKey: to } : b),
     scrub: (b, keys) => (keys.has(b.bookKey) ? null : b),
     draws: (b, books) => byKeys([b.bookKey], books) },
-  shelf: { label: "Shelf", size: { w: 8, h: 4 }, minHeight: 4, configurable: true, content: () => ({ title: "", bookKeys: [] }),
+  shelf: { label: "shared.murals.kindShelf", size: { w: 8, h: 4 }, minHeight: 4, configurable: true, content: () => ({ title: "", bookKeys: [] }),
     valid: (b) => Array.isArray(b.bookKeys),
     references: (b, refs) => { if (nonEmpty(b.collectionId)) refs.collectionIds.add(b.collectionId); else addStrings(refs.bookKeys, b.bookKeys); },
     rekey: (b, from, to) => ({ ...b, bookKeys: rekeyKeys(b.bookKeys, from, to) }),
@@ -102,13 +104,13 @@ const KINDS: { [T in BlockType]: Kind<T> } = {
       return bookKeys.length ? { ...b, bookKeys } : null;
     },
     draws: (b, books) => resolveShelfBooks(b, books) },
-  quote: { label: "Quote spotlight", size: { w: 4, h: 3 }, minHeight: 0, configurable: true, content: () => ({ bookKey: "", highlightId: "" }),
+  quote: { label: "shared.murals.kindQuote", size: { w: 4, h: 3 }, minHeight: 0, configurable: true, content: () => ({ bookKey: "", highlightId: "" }),
     valid: (b) => typeof b.bookKey === "string",
     references: (b, refs) => { if (b.mode !== "rediscover") addQuote(refs, b); },
     rekey: (b, from, to) => (from.has(b.bookKey) ? { ...b, bookKey: to } : b),
     scrub: (b, keys) => (b.mode !== "rediscover" && keys.has(b.bookKey) ? null : b),
     draws: (b, books) => byKeys([b.bookKey], books) },
-  quoteCollection: { label: "Quote collection", size: { w: 6, h: 4 }, minHeight: 0, configurable: true, content: () => ({ title: "", quotes: [] }),
+  quoteCollection: { label: "shared.murals.kindQuoteCollection", size: { w: 6, h: 4 }, minHeight: 0, configurable: true, content: () => ({ title: "", quotes: [] }),
     valid: (b) => Array.isArray(b.quotes),
     references: (b, refs) => { for (const quote of b.quotes) addQuote(refs, quote); },
     rekey: (b, from, to) => ({ ...b, quotes: rekeyQuotes(b.quotes, from, to) as typeof b.quotes }),
@@ -118,24 +120,24 @@ const KINDS: { [T in BlockType]: Kind<T> } = {
       return quotes.length ? { ...b, quotes } : null;
     },
     draws: (b, books) => byKeys(b.quotes.map((quote) => quote.bookKey), books) },
-  image: { label: "Image", size: { w: 4, h: 3 }, minHeight: 0, configurable: true, content: () => ({ imageId: "" }),
+  image: { label: "shared.murals.kindImage", size: { w: 4, h: 3 }, minHeight: 0, configurable: true, content: () => ({ imageId: "" }),
     valid: (b) => typeof b.imageId === "string",
     references: (b, refs) => { if (nonEmpty(b.imageId)) refs.imageIds.add(b.imageId); },
     rekey: same, scrub: same, draws: noBooks },
-  text: { label: "Text", size: { w: 4, h: 3 }, minHeight: 0, configurable: true, content: () => ({ heading: "", body: "" }),
+  text: { label: "shared.murals.kindText", size: { w: 4, h: 3 }, minHeight: 0, configurable: true, content: () => ({ heading: "", body: "" }),
     valid: always, references: nothing, rekey: same, scrub: same, draws: noBooks },
-  profile: { label: "Reader profile", size: { w: 6, h: 5 }, minHeight: 0, configurable: true, content: () => ({ bio: "", favoriteGenres: [] }),
+  profile: { label: "shared.murals.kindProfile", size: { w: 6, h: 5 }, minHeight: 0, configurable: true, content: () => ({ bio: "", favoriteGenres: [] }),
     valid: always, references: (_b, refs) => { refs.needsShelfTheme = true; }, rekey: same, scrub: same, draws: noBooks },
-  currentlyReading: { label: "Currently reading", size: { w: 4, h: 6 }, minHeight: 6, configurable: false, content: () => ({}),
+  currentlyReading: { label: "shared.murals.kindCurrentlyReading", size: { w: 4, h: 6 }, minHeight: 6, configurable: false, content: () => ({}),
     valid: always, references: (_b, refs) => { refs.needsCurrentlyReading = true; }, rekey: same, scrub: same,
     draws: (_b, books) => books.filter((book) => book.ReadStatus === 1) },
-  stats: { label: "Stats", size: { w: 6, h: 2 }, minHeight: 0, configurable: true, content: () => ({ metrics: ["totalBooks", "booksFinished", "totalHighlights"] }),
+  stats: { label: "shared.murals.kindStats", size: { w: 6, h: 2 }, minHeight: 0, configurable: true, content: () => ({ metrics: ["totalBooks", "booksFinished", "totalHighlights"] }),
     valid: (b) => Array.isArray(b.metrics),
     references: (b, refs) => addStrings(refs.statsMetrics, b.metrics),
     rekey: same, scrub: same, draws: noBooks },
-  empty: { label: "Empty block", size: { w: 3, h: 2 }, minHeight: 0, configurable: false, content: () => ({}),
+  empty: { label: "shared.murals.kindEmpty", size: { w: 3, h: 2 }, minHeight: 0, configurable: false, content: () => ({}),
     valid: always, references: nothing, rekey: same, scrub: same, draws: noBooks },
-  tierlist: { label: "Tier list", size: { w: 10, h: 8 }, minHeight: 8, configurable: true, content: () => ({ tierlistId: "" }),
+  tierlist: { label: "shared.murals.kindTierlist", size: { w: 10, h: 8 }, minHeight: 8, configurable: true, content: () => ({ tierlistId: "" }),
     valid: always, references: nothing, rekey: same, scrub: same,
     draws: (b, books, tierlist) => {
       const data = tierlist?.(b.tierlistId);
@@ -143,14 +145,14 @@ const KINDS: { [T in BlockType]: Kind<T> } = {
       const byWork = booksByWork(books);
       return [...new Set([...data.tiers.flatMap((tier) => tier.workIds), ...data.pool])].flatMap<Book>((id) => byWork.get(id) ?? []);
     } },
-  readerCard: { label: "Reader card", size: { w: 4, h: 6 }, minHeight: 0, configurable: false, content: () => ({}),
+  readerCard: { label: "shared.murals.kindReaderCard", size: { w: 4, h: 6 }, minHeight: 0, configurable: false, content: () => ({}),
     valid: always, references: (_b, refs) => { refs.needsReaderCard = true; }, rekey: same, scrub: same, draws: noBooks }
 };
 
 export const BLOCK_TYPES = Object.keys(KINDS) as BlockType[];
 
-export function blockLabel(type: BlockType): string {
-  return KINDS[type].label;
+export function blockLabel(type: BlockType, locale: Locale): string {
+  return sharedT(locale)(KINDS[type].label);
 }
 
 export function blockSize(type: BlockType): { w: number; h: number } {

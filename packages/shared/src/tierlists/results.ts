@@ -7,6 +7,8 @@
 // 10,000 produce the same input. Every mode is derived from it here rather
 // than being fetched separately, so switching modes never hits the network.
 
+import type { Locale } from "../i18n/locale.js";
+import { sharedT } from "../i18n/sharedT.js";
 import type { Placement } from "./ballot.js";
 
 export type AggregationMode = "average" | "plurality" | "median";
@@ -30,11 +32,14 @@ export interface BookResult {
   spread: number;
 }
 
-export const AGGREGATION_MODES: Array<{ mode: AggregationMode; label: string }> = [
-  { mode: "average", label: "Average" },
-  { mode: "plurality", label: "Most-voted" },
-  { mode: "median", label: "Median" }
-];
+export function aggregationModes(locale: Locale): Array<{ mode: AggregationMode; label: string }> {
+  const t = sharedT(locale);
+  return [
+    { mode: "average", label: t("shared.results.average") },
+    { mode: "plurality", label: t("shared.results.mostVoted") },
+    { mode: "median", label: t("shared.results.median") }
+  ];
+}
 
 export function aggregate(
   histogram: HistogramCell[],

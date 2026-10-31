@@ -12,6 +12,7 @@ import { CARD } from "../page/surfaceClasses";
 import { ArenaIcon, CollectionsIcon, CommunityIcon, LibraryIcon, MuralsIcon } from "../NavIcons";
 import { MuralThumb } from "../murals/MuralThumb";
 import { ShareIcon } from "../Toolbar";
+import { useLocale } from "../../i18n";
 
 const ICONS: Record<FeedIconName, ComponentType<{ size?: number }>> = {
   tierlist: CollectionsIcon,
@@ -69,6 +70,7 @@ function QuizTile({ covers }: { covers: string[] }) {
 }
 
 function Preview({ item, covers }: { item: DigestItem; covers: string[] }) {
+  const locale = useLocale();
   if (item.kind === "reading" || item.kind === "completion") {
     const book = item.kind === "reading" ? item.book : item.winner;
     return <Cover url={book.coverUrl} title={book.title} width={72} />;
@@ -76,20 +78,21 @@ function Preview({ item, covers }: { item: DigestItem; covers: string[] }) {
   const game = item.kind === "publication" || item.kind === "vote" ? item.content.kind : item.kind === "participation" ? item.game.kind : null;
   if (game === "tournament") return <TournamentTile covers={covers} />;
   if (game === "quiz") return <QuizTile covers={covers} />;
-  const Icon = ICONS[feedRowModel(item).icon];
+  const Icon = ICONS[feedRowModel(item, locale).icon];
   return <span className="flex h-18 w-12 shrink-0 items-center justify-center rounded-lg bg-(--color-accent-soft) text-(--color-accent)"><Icon size={22} /></span>;
 }
 
 export function FeedCard({ item, actions, books, works, isSaved }: { item: DigestItem; actions: FeedActions; books: Array<Record<string, unknown>>; works: Record<string, string> | undefined; isSaved?: boolean }) {
+  const locale = useLocale();
   const [commentsOpen, setCommentsOpen] = useState(false);
-  const row = feedRowModel(item);
+  const row = feedRowModel(item, locale);
   const target = digestTarget(item);
-  const primary = feedPrimaryLabel(item);
+  const primary = feedPrimaryLabel(item, locale);
   const actor = item.kind === "participation" ? item.actors[0] : item.actor;
-  const name = item.kind === "participation" ? participationLead(item) : item.kind === "completion" ? feedEventLabel(item) : item.actor.username;
+  const name = item.kind === "participation" ? participationLead(item, locale) : item.kind === "completion" ? feedEventLabel(item, locale) : item.actor.username;
   const profile = actor && !actor.unavailable && item.kind !== "participation" && item.kind !== "completion" ? `/community/u/${actor.username}` : null;
   const title = row.title || (item.kind === "vote" ? item.content.name : "");
-  const detail = item.kind === "vote" ? contentDetail(item.content) : row.detail;
+  const detail = item.kind === "vote" ? contentDetail(item.content, locale) : row.detail;
   const covers = item.kind === "vote" ? item.content.covers : row.covers;
   const link = "inline-flex min-h-11 items-center font-semibold text-(--color-accent)";
   const ref = savedContentRef(item);
@@ -104,7 +107,7 @@ export function FeedCard({ item, actions, books, works, isSaved }: { item: Diges
   const action = primary ? <Link to={target} className={link}>{primary} →</Link> : null;
 
   return (
-    <article aria-label={feedRowAccessibilityLabel(item)} className={`${CARD} px-4.5 pt-4 pb-2`}>
+    <article aria-label={feedRowAccessibilityLabel(item, locale)} className={`${CARD} px-4.5 pt-4 pb-2`}>
       <div className="flex items-center gap-3">
         {actor ? <AuthorAvatar author={actor} size={36} /> : <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-(--color-accent-soft) text-(--color-accent)"><CommunityIcon size={18} /></span>}
         <span className="flex min-w-0 flex-1 flex-col">
@@ -112,9 +115,9 @@ export function FeedCard({ item, actions, books, works, isSaved }: { item: Diges
             {profile ? <Link to={profile} className="-my-3 block min-w-0 truncate leading-11 hover:text-(--color-accent)">{name}</Link> : <span className="min-w-0 truncate">{name}</span>}
             {item.kind === "participation" ? null : <ReaderGlyph identity={actor?.readerGlyph} />}
           </span>
-          {item.kind === "completion" ? null : <span className="text-(--color-text-dim)">{feedEventLabel(item)}</span>}
+          {item.kind === "completion" ? null : <span className="text-(--color-text-dim)">{feedEventLabel(item, locale)}</span>}
         </span>
-        <span className="shrink-0 text-(--color-text-dim)">{relativeTime(item.createdAt)}</span>
+        <span className="shrink-0 text-(--color-text-dim)">{relativeTime(item.createdAt, locale)}</span>
       </div>
 
       {item.kind === "follow" ? null : item.kind === "mural" ? (

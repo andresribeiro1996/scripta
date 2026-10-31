@@ -14,7 +14,7 @@ test("tier letters split the range into five equal bands", () => {
 });
 
 test("the ratings section has an Open Library line, a feeling and a summary", () => {
-  const { ratings } = bookStatsModel(full, openLibrary);
+  const { ratings } = bookStatsModel(full, openLibrary, "en");
   assert.equal(ratings.openLibrary, "★ 4.1 · 2.3K ratings on Open Library");
   assert.equal(ratings.community!.feeling, "Loved it");
   assert.equal(ratings.community!.summary, "3.8 average · 12 ratings");
@@ -22,14 +22,14 @@ test("the ratings section has an Open Library line, a feeling and a summary", ()
 });
 
 test("the average is rounded once, so the tile, summary and feeling agree", () => {
-  const model = bookStatsModel({ community: { average: 3.45, count: 4, distribution: [0, 0, 2, 2, 0] }, tiers: null, tournaments: null }, null);
+  const model = bookStatsModel({ community: { average: 3.45, count: 4, distribution: [0, 0, 2, 2, 0] }, tiers: null, tournaments: null }, null, "en");
   assert.deepEqual(model.tiles, [{ key: "community", value: "3.5", caption: "Loved it" }]);
   assert.equal(model.ratings.community!.feeling, "Loved it");
   assert.equal(model.ratings.community!.summary, "3.5 average · 4 ratings");
 });
 
 test("the Open Library count is abbreviated without Intl", () => {
-  const line = (count: number) => bookStatsModel(null, { value: 4, count }).ratings.openLibrary;
+  const line = (count: number) => bookStatsModel(null, { value: 4, count }, "en").ratings.openLibrary;
   assert.equal(line(999), "★ 4.0 · 999 ratings on Open Library");
   assert.equal(line(1000), "★ 4.0 · 1K ratings on Open Library");
   assert.equal(line(2310), "★ 4.0 · 2.3K ratings on Open Library");
@@ -38,7 +38,7 @@ test("the Open Library count is abbreviated without Intl", () => {
 });
 
 test("every empty section explains itself", () => {
-  const model = bookStatsModel({ community: null, tiers: null, tournaments: null }, null);
+  const model = bookStatsModel({ community: null, tiers: null, tournaments: null }, null, "en");
   assert.equal(model.ratings.openLibrary, null);
   assert.equal(model.ratings.community, null);
   assert.equal(model.ratings.empty, "Shown once 3 readers have rated it.");
@@ -47,11 +47,11 @@ test("every empty section explains itself", () => {
 });
 
 test("tier bands split the range into five equal parts", () => {
-  assert.deepEqual([0, 0.19, 0.2, 0.4, 0.6, 0.8, 1].map(tierBand), ["Top tier", "Top tier", "Upper tiers", "Middle", "Lower tiers", "Bottom tier", "Bottom tier"]);
+  assert.deepEqual([0, 0.19, 0.2, 0.4, 0.6, 0.8, 1].map((score) => tierBand(score, "en")), ["Top tier", "Top tier", "Upper tiers", "Middle", "Lower tiers", "Bottom tier", "Bottom tier"]);
 });
 
 test("tiles: big value and caption for each stat that exists", () => {
-  assert.deepEqual(bookStatsModel(full, openLibrary).tiles, [
+  assert.deepEqual(bookStatsModel(full, openLibrary, "en").tiles, [
     { key: "community", value: "3.8", caption: "Loved it" },
     { key: "tiers", value: "Upper", caption: "tiers · 4 lists" },
     { key: "tournaments", value: "🏆", caption: "Winner" }
@@ -59,32 +59,32 @@ test("tiles: big value and caption for each stat that exists", () => {
 });
 
 test("tile captions follow the band and the counts", () => {
-  const tile = (score: number, lists: number) => bookStatsModel({ community: null, tiers: { score, letter: "S", lists, ballots: 3 }, tournaments: null }, null).tiles[0];
+  const tile = (score: number, lists: number) => bookStatsModel({ community: null, tiers: { score, letter: "S", lists, ballots: 3 }, tournaments: null }, null, "en").tiles[0];
   assert.deepEqual(tile(0, 1), { key: "tiers", value: "Top", caption: "tier · 1 list" });
   assert.deepEqual(tile(0.5, 2), { key: "tiers", value: "Middle", caption: "2 lists" });
   assert.deepEqual(tile(0.9, 3), { key: "tiers", value: "Bottom", caption: "tier · 3 lists" });
-  const run = (best: { round: number; duels: number } | null) => bookStatsModel({ community: null, tiers: null, tournaments: { entered: 1, titles: 0, wins: 0, losses: 0, best } }, null).tiles[0];
+  const run = (best: { round: number; duels: number } | null) => bookStatsModel({ community: null, tiers: null, tournaments: { entered: 1, titles: 0, wins: 0, losses: 0, best } }, null, "en").tiles[0];
   assert.deepEqual(run({ round: 2, duels: 2 }), { key: "tournaments", value: "🏆", caption: "Semis" });
   assert.deepEqual(run(null), { key: "tournaments", value: "🏆", caption: "Entered" });
-  assert.deepEqual(bookStatsModel(null, openLibrary).tiles, []);
+  assert.deepEqual(bookStatsModel(null, openLibrary, "en").tiles, []);
 });
 
 test("feeling columns run from Not for me to All-time and mark the tallest", () => {
-  const { columns } = bookStatsModel(full, openLibrary).ratings.community!;
+  const { columns } = bookStatsModel(full, openLibrary, "en").ratings.community!;
   assert.deepEqual(columns.map((c) => [c.label, c.count, c.top]), [["Not for me", 1, false], ["Fine", 0, false], ["Good", 2, false], ["Loved it", 6, true], ["All-time", 3, false]]);
   assert.equal(columns[3]!.fraction, 1);
-  const tied = bookStatsModel({ community: { average: 3, count: 4, distribution: [2, 0, 0, 2, 0] }, tiers: null, tournaments: null }, null).ratings.community!.columns;
+  const tied = bookStatsModel({ community: { average: 3, count: 4, distribution: [2, 0, 0, 2, 0] }, tiers: null, tournaments: null }, null, "en").ratings.community!.columns;
   assert.deepEqual(tied.map((c) => c.top), [true, false, false, true, false]);
 });
 
 test("tier bar carries the band, a marker at the score and the summary", () => {
-  assert.deepEqual(bookStatsModel(full, null).tierBar, { band: "Upper tiers", marker: 0.31, summary: "Across 4 published tier lists · 23 votes" });
-  assert.equal(bookStatsModel({ community: null, tiers: null, tournaments: null }, null).tierBar, null);
+  assert.deepEqual(bookStatsModel(full, null, "en").tierBar, { band: "Upper tiers", marker: 0.31, summary: "Across 4 published tier lists · 23 votes" });
+  assert.equal(bookStatsModel({ community: null, tiers: null, tournaments: null }, null, "en").tierBar, null);
 });
 
 test("tournament path walks the best run from round 1 to the final", () => {
   const run = (titles: number, best: { round: number; duels: number } | null, entered = 1, wins = 2, losses = 1) =>
-    bookStatsModel({ community: null, tiers: null, tournaments: { entered, titles, wins, losses, best } }, null).tournamentRun;
+    bookStatsModel({ community: null, tiers: null, tournaments: { entered, titles, wins, losses, best } }, null, "en").tournamentRun;
   assert.deepEqual(run(0, { round: 2, duels: 2 })!.path, [{ label: "Quarters", reached: true }, { label: "Semis", reached: true }, { label: "Final", reached: false }]);
   assert.deepEqual(run(0, { round: 1, duels: 2 })!.path, [{ label: "Semis", reached: true }, { label: "Final", reached: false }]);
   const won = run(1, { round: 6, duels: 1 }, 2, 6, 1)!;
@@ -99,4 +99,13 @@ test("tierPosition flips worst-first lists and skips single-tier lists", () => {
   assert.equal(tierPosition({ tierIndex: 1, tierCount: 5, ranksWorstFirst: false }), 0.25);
   assert.equal(tierPosition({ tierIndex: 1, tierCount: 5, ranksWorstFirst: true }), 0.75);
   assert.equal(tierPosition({ tierIndex: 0, tierCount: 1, ranksWorstFirst: false }), null);
+});
+
+test("Portuguese ratings use a decimal comma and mil/M counts", () => {
+  const model = bookStatsModel(full, openLibrary, "pt-PT");
+  assert.equal(model.tiles[0]!.value, "3,8");
+  assert.equal(model.ratings.openLibrary, "★ 4,1 · 2,3 mil classificações na Open Library");
+  assert.equal(model.ratings.community!.summary, "média de 3,8 · 12 classificações");
+  assert.equal(bookStatsModel(null, { value: 4, count: 1_250_000 }, "pt-PT").ratings.openLibrary, "★ 4,0 · 1,3 M classificações na Open Library");
+  assert.equal(bookStatsModel(null, { value: 4, count: 1000 }, "pt-PT").ratings.openLibrary, "★ 4,0 · 1 mil classificações na Open Library");
 });

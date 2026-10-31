@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import { useQuery } from "@tanstack/react-query";
 import { Stack, useRouter } from "expo-router";
-import { buildMuralPreset, muralThemeId, MURAL_PRESETS, presetAvailability, type Mural, type MuralFolder, type MuralPresetId } from "@scripta/shared";
+import { buildMuralPreset, muralThemeId, muralPresets, presetAvailability, type Mural, type MuralFolder, type MuralPresetId } from "@scripta/shared";
 import { ActionSheet, Button, ConfirmDialog, dynamicType, EmptyState, ErrorState, Fab, Icon, IconButton, Input, minimumTouchTarget, ModalBody, Screen, Sheet, Toast } from "../../ui";
 import { radii, spacing, typography, useTheme } from "../../ui/theme";
 import { themes } from "@scripta/shared/themes";
@@ -21,8 +21,10 @@ import { fetchOwnProfile } from "../community/api";
 import { MuralShareSheet } from "./MuralShareSheet";
 import { useMuralFolders, useMurals } from "./useMurals";
 import { FolderSheet } from "./FolderSheet";
+import { useLocale } from "../../i18n";
 
 export function MuralsScreen() {
+  const locale = useLocale();
   const { colors, id: theme } = useTheme();
   const router = useRouter();
   const { width, height } = useWindowDimensions();
@@ -102,7 +104,7 @@ export function MuralsScreen() {
     working.current = true;
     setPresetError(null);
     try {
-      const preset = buildMuralPreset(id, libraryQuery.data?.data.books ?? [], libraryQuery.data?.data.groups ?? []);
+      const preset = buildMuralPreset(id, libraryQuery.data?.data.books ?? [], locale, libraryQuery.data?.data.groups ?? []);
       const target = pendingPreset.current?.preset === id ? pendingPreset.current : { id: (await murals.create(preset.name, theme, folderId ?? null)).id, preset: id };
       pendingPreset.current = target;
       const updated = await murals.update(target.id, { blocks: preset.blocks });
@@ -271,8 +273,8 @@ export function MuralsScreen() {
           {presetError ? <Toast visible message={presetError} tone="error" /> : null}
           <Button label="Blank mural" onPress={() => void createBlank()} />
           {libraryQuery.isError ? <><Toast visible message="Couldn't load your library." tone="error" /><Button label="Retry" variant="secondary" onPress={() => void libraryQuery.refetch()} /></> : null}
-          {MURAL_PRESETS.map((preset) => {
-            const reason = libraryQuery.isPending ? "Loading library…" : libraryQuery.isError ? undefined : presetAvailability(preset.id, libraryQuery.data?.data.books ?? []);
+          {muralPresets(locale).map((preset) => {
+            const reason = libraryQuery.isPending ? "Loading library…" : libraryQuery.isError ? undefined : presetAvailability(preset.id, libraryQuery.data?.data.books ?? [], locale);
             return (
               <View key={preset.id} style={styles.presetRow}>
                 <Button label={preset.name} variant="secondary" disabled={libraryQuery.isPending || libraryQuery.isError || Boolean(reason)} onPress={() => void createFromPreset(preset.id)} />

@@ -61,7 +61,7 @@ test("every counter, trait, print, state and identity stays inside react-native-
   for (const [index, identity] of identities.entries()) for (const state of identity ? (["settled", "leaning"] as const) : (["unwritten"] as const)) {
     for (const [size, segments] of Object.entries(dials)) for (const counter of COUNTERS) for (const trait of TRAITS) for (const print of ["paper", "reversed"] as const) {
       const card: PublicReaderCard = { state, identity, runnerUp: null, streak: PLATES[(index + 1) % PLATES.length]!.key, signal: null, coverage: [], dial: { segments }, facts: { finished: 0, highlights: 0, series: 0, since: null, edition: 2026 } };
-      const svg = renderReaderCard({ card, style: { ...DEFAULT_READER_CARD_STYLE, counter, trait }, readerName: "andre", print, label: "x", seed: seedOf("andre") });
+      const svg = renderReaderCard({ card, style: { ...DEFAULT_READER_CARD_STYLE, counter, trait }, locale: "en", readerName: "andre", print, label: "x", seed: seedOf("andre") });
       assert.deepEqual(portabilityProblems(svg), [], `${identity}/${state}/${size}/${counter}/${trait}/${print}`);
     }
   }
@@ -81,7 +81,7 @@ test("every back page, view, choice and print stays inside the subset, and a vis
       const smuggled: ReaderCardChosen = chosen.highlight ? { ...chosen, highlight: { ...chosen.highlight, annotation: "SECRET-NOTE" } as never } : chosen;
       const card: PublicReaderCard = { state, identity, runnerUp: null, streak: PLATES[(index + 1) % PLATES.length]!.key, signal: null, coverage: ["c"], dial: { segments }, facts: { finished: 0, highlights: 0, series: 0, since: null, edition: 2026 }, chosen: smuggled };
       for (const page of ["chosen", "record", "merged"] as ReaderCardPage[]) for (const view of ["owner", "visitor"] as const) for (const print of ["paper", "reversed"] as const) {
-        const svg = renderReaderCard({ card, style: { ...DEFAULT_READER_CARD_STYLE, layout: "faces" }, readerName: "andre", print, label: "x", seed: seedOf("andre"), view, ...secrets }, page);
+        const svg = renderReaderCard({ card, style: { ...DEFAULT_READER_CARD_STYLE, layout: "faces" }, locale: "en", readerName: "andre", print, label: "x", seed: seedOf("andre"), view, ...secrets }, page);
         const where = `${identity}/${state}/${size}/${set}/${page}/${view}/${print}`;
         assert.deepEqual(portabilityProblems(svg), [], where);
         assert.doesNotMatch(svg, /SECRET-NOTE/, where);
@@ -103,7 +103,7 @@ const decorationsOf: Array<[string, Partial<PublicReaderCardStyle>]> = [
 test("every motto, footer and corner stays inside the subset on every plate and print, and draws the same twice", () => {
   for (const [index, identity] of identities.entries()) for (const [name, patch] of decorationsOf) for (const print of ["paper", "reversed"] as const) {
     const card: PublicReaderCard = { state: identity ? "settled" : "unwritten", identity, runnerUp: null, streak: PLATES[(index + 1) % PLATES.length]!.key, signal: null, coverage: ["c"], dial: { segments: dials.small! }, facts: { finished: 48, highlights: 140, series: 12, since: 2014, edition: 2026, readerNumber: 42 } };
-    const input = { card, style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), ...patch }, readerName: "andre.ribeiro", print, label: "x", seed: seedOf("andre.ribeiro"), view: "owner" as const };
+    const input = { card, style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), ...patch }, locale: "en", readerName: "andre.ribeiro", print, label: "x", seed: seedOf("andre.ribeiro"), view: "owner" as const };
     for (const page of ["front", "record"] as const) {
       const svg = renderReaderCard(input, page);
       assert.deepEqual(portabilityProblems(svg), [], `${identity}/${name}/${print}/${page}`);
@@ -120,7 +120,7 @@ test("fifty seeded combinations of every dimension stay inside the subset", () =
     const card: PublicReaderCard = { state: identity ? pick(["settled", "leaning"] as const) : "unwritten", identity, runnerUp: null, streak: pick(PLATES).key, signal: null, coverage: ["c"], dial: { segments: pick(Object.values(dials)) }, facts: { finished: 48, highlights: pick([0, 140]), series: 12, since: pick([null, 2014]), edition: 2026 }, chosen: pick(Object.values(chosenSets)) };
     const style: PublicReaderCardStyle = { counter: pick(COUNTERS), layout: "faces", trait: pick(TRAITS), motto: pick([null, { text: pick(["Per libros ad astra", LONG, "x"]), look: pick(MOTTO_LOOKS) }]), footer: { left: pick(FOOTER_LEFTS), right: pick(FOOTER_RIGHTS) }, corners: pick(CORNER_STYLES), finish: pick(FINISHES), print: pick(CARD_PRINTS) };
     for (const page of ["front", "chosen", "record", "merged"] as const) for (const print of ["paper", "reversed"] as const) {
-      const svg = renderReaderCard({ card, style, readerName: pick(["andre", "andre.ribeiro", "a".repeat(30)]), print, label: "x", seed: seedOf(String(i)), view: pick(["owner", "visitor"] as const) }, page);
+      const svg = renderReaderCard({ card, style, locale: "en", readerName: pick(["andre", "andre.ribeiro", "a".repeat(30)]), print, label: "x", seed: seedOf(String(i)), view: pick(["owner", "visitor"] as const) }, page);
       assert.deepEqual(portabilityProblems(svg), [], `combination ${i}/${page}/${print}`);
     }
   }

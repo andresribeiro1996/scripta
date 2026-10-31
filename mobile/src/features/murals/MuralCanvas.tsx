@@ -24,7 +24,7 @@ import {
   resolveBlockStyle,
   resolveQuote,
   resolveQuoteCollection,
-  STAT_METRIC_LABELS,
+  statMetricLabels,
   type BlockLayout,
   type BlockStyle,
   type Mural,
@@ -51,6 +51,7 @@ import type { GalleryImage } from "../gallery/api";
 import type { Tierlist } from "../tierlists/api";
 import { selectionBorderColor } from "./blockStyleOptions";
 import { MURAL_ROW_HEIGHT, muralCanvasHeight, muralDragCell, muralDragPosition, muralPreviewScale } from "./layout";
+import { useLocale } from "../../i18n";
 
 export const NO_GROUPS: Group[] = [];
 const LIFT_SPRING = { duration: 300, dampingRatio: 0.8 } as const;
@@ -170,6 +171,7 @@ function CoverRow({ blockId, books, mode, caption, dim, accent, editable, onAsse
 }
 
 export function BlockContent({ block, books, images, tierlists, profile, groups, shelfThemeOverride, readerCardOverride, statsOverride, editable, onAssetReady }: { block: MuralBlock; books: Array<Record<string, unknown>>; images: GalleryImage[]; tierlists: Tierlist[]; profile?: ReaderProfile; groups?: Group[]; shelfThemeOverride?: ShelfTheme; readerCardOverride?: PublicReaderCard; statsOverride?: Record<string, number>; editable?: boolean; onAssetReady?: (key: string) => void }) {
+  const locale = useLocale();
   const { colors: themeColors } = useTheme();
   const [failedSource, setFailedSource] = useState<string | null>(null);
   const style = resolveBlockStyle(block.style);
@@ -220,7 +222,7 @@ export function BlockContent({ block, books, images, tierlists, profile, groups,
   if (block.type === "stats") {
     const value = (metric: StatMetric) => statsOverride?.[metric] ?? computeStat(metric, books);
     const breakdown = libraryBreakdown(block.metrics, value);
-    if (!breakdown) return <View style={styles.stats}>{block.metrics.map((metric) => <View key={metric}><Text numberOfLines={1} style={text.stat}>{value(metric)}</Text><Text numberOfLines={1} style={[text.caption, dim]}>{STAT_METRIC_LABELS[metric]}</Text></View>)}</View>;
+    if (!breakdown) return <View style={styles.stats}>{block.metrics.map((metric) => <View key={metric}><Text numberOfLines={1} style={text.stat}>{value(metric)}</Text><Text numberOfLines={1} style={[text.caption, dim]}>{statMetricLabels(locale)[metric]}</Text></View>)}</View>;
     const segments = [
       { label: "finished", count: breakdown.finished, color: blockColors.accent },
       { label: "reading", count: breakdown.reading, color: colors.accentFill },
@@ -231,12 +233,12 @@ export function BlockContent({ block, books, images, tierlists, profile, groups,
       <View style={styles.statsHero}><Text style={[text.hero, { color: blockColors.accent }]}>{breakdown.finished}</Text><Text style={[text.caption, dim, styles.statsOf]}>of {breakdown.total} finished</Text></View>
       <View style={styles.statsBar}>{breakdown.total ? segments.filter((segment) => segment.count).map((segment) => <View key={segment.label} style={{ flex: segment.count, backgroundColor: segment.color }} />) : <View style={{ flex: 1, backgroundColor: colors.border }} />}</View>
       <View style={styles.statsLegend}>{segments.map((segment) => <View key={segment.label} style={styles.statsLegendRow}><View style={[styles.statsDot, { backgroundColor: segment.color }]} /><Text numberOfLines={1} style={[text.caption, dim]}>{segment.count} {segment.label}</Text></View>)}</View>
-      {breakdown.others.map((metric) => <View key={metric} style={styles.statsRow}><Text numberOfLines={1} style={[text.stat, { color: blockColors.accent }]}>{value(metric)}</Text><Text numberOfLines={1} style={[text.caption, dim, styles.statsOf]}>{STAT_METRIC_LABELS[metric]}</Text></View>)}
+      {breakdown.others.map((metric) => <View key={metric} style={styles.statsRow}><Text numberOfLines={1} style={[text.stat, { color: blockColors.accent }]}>{value(metric)}</Text><Text numberOfLines={1} style={[text.caption, dim, styles.statsOf]}>{statMetricLabels(locale)[metric]}</Text></View>)}
     </View>;
   }
   if (block.type === "tierlist") { const tierlist = tierlists.find((item) => item.id === block.tierlistId); return <>{eyebrow(tierlist?.name ?? "Tier list unavailable")}{tierlist?.data.tiers.map((tier) => <Text key={tier.id} style={text.body}>{tier.label}: {tier.workIds.length}</Text>)}</>; }
   if (block.type === "readerCard") return <ReaderCardBlock books={books} groups={groups ?? NO_GROUPS} readerName={profile?.username || "reader"} publicCard={readerCardOverride} editable={editable} />;
-  return <Text style={text.body}>{blockLabel(block.type)}</Text>;
+  return <Text style={text.body}>{blockLabel(block.type, locale)}</Text>;
 }
 
 const MOVES: Record<string, [number, number]> = { moveLeft: [-1, 0], moveRight: [1, 0], moveUp: [0, -1], moveDown: [0, 1] };
@@ -268,6 +270,7 @@ const CanvasBlock = memo(function CanvasBlock({ block, columnWidth, editable, se
   drop: SharedValue<BlockLayout | null>;
   scroll?: MuralDragScroll;
 }) {
+  const locale = useLocale();
   const { colors } = useTheme();
   const lifted = useSharedValue(0);
   const pointerOrigin = useSharedValue({ x: 0, y: 0, scroll: 0 });
@@ -345,7 +348,7 @@ const CanvasBlock = memo(function CanvasBlock({ block, columnWidth, editable, se
         animated,
       ]}>
         <FinishOverlay id={block.id} style={style} colors={colors} />
-        {editable ? <Pressable accessibilityRole="button" accessibilityLabel={`${blockLabel(block.type)} block. Long press and drag to move`} accessibilityActions={MOVE_ACTIONS} onAccessibilityAction={(event) => { const move = MOVES[event.nativeEvent.actionName]; if (move) onMove(move[0], move[1]); }} onPress={onSelect} style={[styles.blockPress, blockPadding(style)]}>{body}</Pressable> : <View style={[styles.blockPress, blockPadding(style)]}>{body}</View>}
+        {editable ? <Pressable accessibilityRole="button" accessibilityLabel={`${blockLabel(block.type, locale)} block. Long press and drag to move`} accessibilityActions={MOVE_ACTIONS} onAccessibilityAction={(event) => { const move = MOVES[event.nativeEvent.actionName]; if (move) onMove(move[0], move[1]); }} onPress={onSelect} style={[styles.blockPress, blockPadding(style)]}>{body}</Pressable> : <View style={[styles.blockPress, blockPadding(style)]}>{body}</View>}
         <FadeOverlay style={style} colors={colors} />
         {selected ? <View pointerEvents="none" style={{ position: "absolute", inset: 0, borderWidth: 2, borderRadius: style.cardRadius, borderColor: selectionBorderColor(style, colors) }} /> : null}
       </Animated.View>;
@@ -363,10 +366,11 @@ export function BlockPreview({ theme, block, canvasWidth, maxHeight, books, imag
   profile?: ReaderProfile;
   groups?: Group[];
 }) {
+  const locale = useLocale();
   const colors = themes[theme].colors;
   const [boxWidth, setBoxWidth] = useState(0);
   const [day] = useState(localDay);
-  const resolved = useMemo(() => resolveHomeBlock(block, books, groups, day), [block, books, groups, day]);
+  const resolved = useMemo(() => resolveHomeBlock(block, books, groups, day, locale), [block, books, groups, day, locale]);
   const style = resolveBlockStyle(resolved.style);
   const width = block.layout.w * gridColumnWidth(canvasWidth) - GAP;
   const height = block.layout.h * ROW_HEIGHT - ROW_GAP;
@@ -375,7 +379,7 @@ export function BlockPreview({ theme, block, canvasWidth, maxHeight, books, imag
   return (
     <MuralThemeScope theme={theme}>
     <View
-      accessibilityLabel={`Preview of this ${blockLabel(block.type)} block`}
+      accessibilityLabel={`Preview of this ${blockLabel(block.type, locale)} block`}
       onLayout={(event) => setBoxWidth(event.nativeEvent.layout.width)}
       style={[styles.previewBox, { height: (scale ? height * scale : maxHeight) + spacing.md * 2, backgroundColor: colors.background }]}
     >
@@ -413,6 +417,7 @@ export function MuralCanvas({ mural, books, images, tierlists, profile, shelfThe
   onDragChange?: (dragging: boolean) => void;
   dragScroll?: MuralDragScroll;
 }) {
+  const locale = useLocale();
   const theme = muralThemeId(mural.theme);
   const colors = themes[theme].colors;
   const [width, setWidth] = useState(0);
@@ -469,7 +474,7 @@ export function MuralCanvas({ mural, books, images, tierlists, profile, shelfThe
   const [day] = useState(localDay);
   const [readyAssets, setReadyAssets] = useState<Set<string>>(() => new Set());
   const onAssetReady = useCallback((key: string) => setReadyAssets((current) => current.has(key) ? current : new Set(current).add(key)), []);
-  const resolvedBlocks = useMemo(() => mural.blocks.map((block) => resolveHomeBlock(block, books, groups, day)), [mural.blocks, books, groups, day]);
+  const resolvedBlocks = useMemo(() => mural.blocks.map((block) => resolveHomeBlock(block, books, groups, day, locale)), [mural.blocks, books, groups, day, locale]);
   const assetKeys = resolvedBlocks.flatMap((block) => {
     if (block.type === "profile" && profile?.avatarUrl) return [`avatar:${block.id}:${profile.avatarUrl}`];
     if (block.type === "image") { const image = images.find((item) => item.id === block.imageId); return image ? [`image:${block.id}:${image.url}`] : []; }

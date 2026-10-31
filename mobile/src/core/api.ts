@@ -1,9 +1,10 @@
+import { getLocale } from "../i18n";
 import { API_URL } from "./config";
 import { getAccessToken, secureTokenStore, setAccessToken } from "./tokenStore";
 import { ApiError, createApiClient, type ApiClient } from "./apiClient";
 import { createRequest } from "./request";
 
-const session = createApiClient(API_URL, secureTokenStore, getAccessToken, setAccessToken);
+const session = createApiClient(API_URL, secureTokenStore, getAccessToken, setAccessToken, fetch, getLocale);
 
 export const apiClient: ApiClient = session.apiClient;
 export const request = createRequest(session.apiClient, getAccessToken);

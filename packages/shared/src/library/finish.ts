@@ -1,12 +1,14 @@
-export const FINISH_FEELINGS = [
-  { rating: 1, label: "Not for me" },
-  { rating: 2, label: "Fine" },
-  { rating: 3, label: "Good" },
-  { rating: 4, label: "Loved it" },
-  { rating: 5, label: "All-time" }
-] as const;
+import type { Locale } from "../i18n/locale.js";
+import { sharedT } from "../i18n/sharedT.js";
 
-export type FinishRating = (typeof FINISH_FEELINGS)[number]["rating"];
+export type FinishRating = 1 | 2 | 3 | 4 | 5;
+
+const FEELING_KEYS = { 1: "shared.finish.feeling1", 2: "shared.finish.feeling2", 3: "shared.finish.feeling3", 4: "shared.finish.feeling4", 5: "shared.finish.feeling5" } as const;
+
+export function finishFeelings(locale: Locale): Array<{ rating: FinishRating; label: string }> {
+  const t = sharedT(locale);
+  return ([1, 2, 3, 4, 5] as const).map((rating) => ({ rating, label: t(FEELING_KEYS[rating]) }));
+}
 
 type Book = Record<string, unknown>;
 

@@ -30,8 +30,10 @@ import { useVotedTierlists } from "../hooks/useVotedTierlists";
 import { useVotedTournaments } from "../hooks/useVotedTournaments";
 import { area } from "../lib/areas";
 import type { Tournament } from "../api/arena";
+import { useLocale } from "../i18n";
 
 export function ArenaListPage() {
+  const locale = useLocale();
   const { tournaments, isLoading, error: tournamentsError, refetch: refetchTournaments } = useMyTournaments();
   const showSkeleton = useDelayedShow(isLoading);
   const { tournaments: votedTournaments, isLoading: votedLoading, error: votedError, refetch: refetchVoted } = useVotedTournaments();
@@ -201,7 +203,7 @@ export function ArenaListPage() {
                     aria-label="Tier list name"
                     className={`${FIELD_CLASS} w-full font-semibold`}
                   />
-                  <p className="mt-1 text-sm text-(--color-text-dim)">Updated {formatDate(tl.updatedAt)}</p>
+                  <p className="mt-1 text-sm text-(--color-text-dim)">Updated {formatDate(tl.updatedAt, locale)}</p>
                 </div>
               ) : (
                 <GameTicket
@@ -209,9 +211,9 @@ export function ArenaListPage() {
                   kind="tierlist"
                   name={tl.name}
                   to={`/dashboard/arena/tierlist/${tl.id}`}
-                  meta={`Updated ${formatDate(tl.updatedAt)}`}
-                  badges={<StatusBadge {...ownedTierlistStatus(tl)} />}
-                  stats={[{ value: tierlistBookCount(tl.data), label: itemNoun(tl.subject, tierlistBookCount(tl.data)) }]}
+                  meta={`Updated ${formatDate(tl.updatedAt, locale)}`}
+                  badges={<StatusBadge {...ownedTierlistStatus(tl, locale)} />}
+                  stats={[{ value: tierlistBookCount(tl.data), label: itemNoun(tl.subject, tierlistBookCount(tl.data), locale) }]}
                   covers={tl.subject?.scope.coverUrl ? [tl.subject.scope.coverUrl] : []}
                   ladder={tl.data.tiers.map((tier) => tier.color)}
                   play={tl.voteCode === null ? undefined : { to: `/vote/${tl.voteCode}`, label: "Preview" }}
@@ -246,7 +248,7 @@ export function ArenaListPage() {
                     kind="tierlist"
                     name={tl.name}
                     to={contentTarget({ kind: "tierlist", ...tl })}
-                    meta={contentDetail({ kind: "tierlist", ...tl })}
+                    meta={contentDetail({ kind: "tierlist", ...tl }, locale)}
                     badges={null}
                     covers={tl.covers}
                     ladder={TIER_LADDER}
@@ -301,14 +303,15 @@ export function ArenaListPage() {
 // Shared by both tournament sections — a voted tournament is never
 // seeding, but the card markup is identical either way.
 function TournamentCard({ t }: { t: Tournament }) {
+  const locale = useLocale();
   return (
     <GameTicket
       kind="tournament"
       name={t.name}
       to={t.status === "seeding" ? `/dashboard/arena/${t.id}/seed` : `/arena/${t.id}`}
-      meta={`Created ${formatDate(t.createdAt)}`}
+      meta={`Created ${formatDate(t.createdAt, locale)}`}
       badges={<TournamentStatusBadge status={t.status} round={t.currentRound} />}
-      stats={[{ value: t.bracketSize, label: itemNoun(t.subject, t.bracketSize) }]}
+      stats={[{ value: t.bracketSize, label: itemNoun(t.subject, t.bracketSize, locale) }]}
       covers={t.covers}
     />
   );

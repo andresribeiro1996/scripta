@@ -1,4 +1,5 @@
-import { FINISH_FEELINGS, type FinishRating } from "@scripta/shared";
+import { finishFeelings, type FinishRating } from "@scripta/shared";
+import { useLocale } from "../i18n";
 
 export function FeelingChips({
   value,
@@ -9,9 +10,10 @@ export function FeelingChips({
   onChange: (rating: FinishRating) => void;
   label?: string;
 }) {
+  const locale = useLocale();
   return (
     <div role="radiogroup" aria-label={label} className="flex flex-wrap gap-2">
-      {FINISH_FEELINGS.map(({ rating, label: feelingLabel }) => {
+      {finishFeelings(locale).map(({ rating, label: feelingLabel }) => {
         const selected = value === rating;
         return (
           <button

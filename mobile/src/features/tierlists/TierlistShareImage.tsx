@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { AGGREGATION_MODES, booksByWork, type AggregationMode, type CharacterSubject, type HistogramCell, type TierlistData } from "@scripta/shared";
+import { aggregationModes, booksByWork, type AggregationMode, type CharacterSubject, type HistogramCell, type TierlistData } from "@scripta/shared";
 import { View } from "react-native";
 import { Text } from "../../ui/Text";
 import { radii, spacing, typography, useTheme } from "../../ui";
 import { CharacterHeader } from "../characters/CharacterHeader";
 import { TierCover, type TierBook } from "./TierBoard";
 import { tierlistShareRows } from "./tierlistShareData";
+import { useLocale } from "../../i18n";
 
 export function TierlistShareImage({ title, subject, data, books, community, histogram, ballotCount, mode = "average", onReadyChange }: {
   title: string;
@@ -18,6 +19,7 @@ export function TierlistShareImage({ title, subject, data, books, community, his
   mode?: AggregationMode;
   onReadyChange?: (ready: boolean) => void;
 }) {
+  const locale = useLocale();
   const { colors } = useTheme();
   const [loaded, setLoaded] = useState<Set<string>>(() => new Set());
   const byWork = booksByWork(books);
@@ -41,7 +43,7 @@ export function TierlistShareImage({ title, subject, data, books, community, his
             <Text style={[typography.caption, { color: colors.textDim }]}>{ballotCount === 1 ? "vote cast" : "votes cast"}</Text>
           </View>
           <View style={{ flexGrow: 1, padding: spacing.md, borderRadius: radii.lg, backgroundColor: colors.surface, gap: spacing.xs, justifyContent: "center", borderLeftWidth: 3, borderLeftColor: colors.accent }}>
-            <Text display={false} style={[typography.title, { color: colors.text, fontWeight: "600" }]}>{AGGREGATION_MODES.find((item) => item.mode === mode)?.label ?? "Average"}</Text>
+            <Text display={false} style={[typography.title, { color: colors.text, fontWeight: "600" }]}>{aggregationModes(locale).find((item) => item.mode === mode)?.label ?? "Average"}</Text>
             <Text style={[typography.caption, { color: colors.textDim }]}>Ranking method</Text>
           </View>
         </View>

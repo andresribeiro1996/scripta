@@ -7,6 +7,7 @@ import { ArenaIcon, CommunityIcon, LibraryIcon, MuralsIcon } from "./NavIcons";
 import { SkeletonCardGrid } from "./Skeleton";
 import { BUTTON_SECONDARY } from "./page/buttonClasses";
 import { LIST_PANEL, LIST_ROW, LIST_ROW_LINK, SECTION_HEADING } from "./page/surfaceClasses";
+import { useLocale } from "../i18n";
 
 const TONE = {
   accent: { text: "text-(--color-accent)", fill: "bg-(--color-accent-soft)" },
@@ -36,6 +37,7 @@ function Glyph({ item, size }: { item: ActivityItem; size: number }) {
 }
 
 function ActivityEntry({ item, row }: { item: ActivityItem; row: ActivityRow }) {
+  const locale = useLocale();
   const tone = TONE[row.tone];
   const target = row.workId ? `/work/${row.workId}` : row.href ?? (row.username ? `/community/u/${row.username}` : null);
   const body: ReactNode = (
@@ -65,7 +67,7 @@ function ActivityEntry({ item, row }: { item: ActivityItem; row: ActivityRow }) 
           </span>
           <span className={`truncate text-xs font-bold ${tone.text}`}>{row.label}</span>
           <time dateTime={item.createdAt} title={new Date(item.createdAt).toLocaleString()} className="ml-auto shrink-0 text-xs text-(--color-text-dim) tabular-nums">
-            {relativeTime(item.createdAt)}
+            {relativeTime(item.createdAt, locale)}
           </time>
         </span>
         {row.title && <span className="mt-0.5 line-clamp-2 block text-sm font-semibold">{row.title}</span>}
@@ -83,6 +85,7 @@ function ActivityEntry({ item, row }: { item: ActivityItem; row: ActivityRow }) 
 }
 
 export function ProfileActivity({ activity }: { activity: ReturnType<typeof useCommunityActivity> }) {
+  const locale = useLocale();
   if (activity.isLoading) return <SkeletonCardGrid count={3} label="Loading activity" tileClassName="min-h-[72px]" />;
   if (activity.error) {
     return (
@@ -97,12 +100,12 @@ export function ProfileActivity({ activity }: { activity: ReturnType<typeof useC
     );
   }
   const entries = activity.items.flatMap((item) => {
-    const row = activityRow(item);
+    const row = activityRow(item, locale);
     return row ? [{ item, row }] : [];
   });
   if (entries.length === 0) return <EmptyState title="No activity yet." body="Publishing and reading will show up here." />;
   const days = entries.reduce<Array<{ day: string; rows: typeof entries }>>((groups, entry) => {
-    const day = activityDay(entry.item.createdAt);
+    const day = activityDay(entry.item.createdAt, locale);
     const last = groups[groups.length - 1];
     if (last?.day === day) last.rows.push(entry);
     else groups.push({ day, rows: [entry] });

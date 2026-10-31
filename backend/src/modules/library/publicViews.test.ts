@@ -700,11 +700,13 @@ const expectedDataMain = {
     signal: {
       counted: 3,
       of: 5,
+      key: "loyal",
       label: "3 of 5 finished books are by authors you keep returning to"
     },
     coverage: [
       "genres known for 2 of 5 finished books"
     ],
+    coverageFacts: { known: 2, n: 5, imported: false },
     style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), counter: "dial", layout: "faces", trait: "both" },
     chosen: {}
   },
@@ -752,6 +754,7 @@ const expectedDataEmpty = {
     coverage: [
       "genres known for 0 of 0 finished books"
     ],
+    coverageFacts: { known: 0, n: 0, imported: false },
     style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), counter: "dial", layout: "faces", trait: "both" },
     chosen: {}
   },
@@ -816,6 +819,7 @@ const expectedDataBare = {
     coverage: [
       "genres known for 0 of 0 finished books"
     ],
+    coverageFacts: { known: 0, n: 0, imported: false },
     style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), counter: "dial", layout: "faces", trait: "both" },
     chosen: {}
   },
@@ -840,7 +844,8 @@ const expectedDataGhost = {
     signal: null,
     coverage: [
       "genres known for 0 of 0 finished books"
-    ]
+    ],
+    coverageFacts: { known: 0, n: 0, imported: false }
   }
 };
 

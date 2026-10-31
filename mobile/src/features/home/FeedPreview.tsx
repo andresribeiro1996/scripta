@@ -12,8 +12,10 @@ import { MuralThumbnail } from "../murals/MuralCanvas";
 import { muralPreviewOf } from "../public/adapters";
 import { themes } from "@scripta/shared/themes";
 import { feedRowModel } from "@scripta/shared/community";
+import { useLocale } from "../../i18n";
 
 export function FeedPreview({ item }: { item: DigestItem }) {
+  const locale = useLocale();
   const { colors } = useTheme();
   if (item.kind === "mural") return <MuralPreview item={item} />;
   if (item.kind === "reading" || item.kind === "completion") {
@@ -27,15 +29,15 @@ export function FeedPreview({ item }: { item: DigestItem }) {
       {tier.books.map((book, index) => <BookCover key={index} cover={book.coverUrl} title={book.title} width={28} height={42} />)}
     </View>)}
   </View>;
-  const covers = item.kind === "vote" ? item.content.covers : feedRowModel(item).covers;
+  const covers = item.kind === "vote" ? item.content.covers : feedRowModel(item, locale).covers;
   const quiz = item.kind === "publication" && item.content.kind === "quiz";
   const fan = quiz ? covers.slice(0, 2) : covers;
   if (!(item.kind === "publication" && item.content.kind === "tierlist")) return <View style={{ width: fan.length ? fanWidth(fan.length) : styles.iconTile.width, height: SLOT_HEIGHT }}>
-    {fan.length ? <CoverFan covers={fan} inset={0} /> : <View style={[styles.iconTile, { backgroundColor: colors.accentSoft }]}><Icon name={feedRowModel(item).icon} size={24} color={colors.accent} /></View>}
+    {fan.length ? <CoverFan covers={fan} inset={0} /> : <View style={[styles.iconTile, { backgroundColor: colors.accentSoft }]}><Icon name={feedRowModel(item, locale).icon} size={24} color={colors.accent} /></View>}
     {quiz ? <View style={[styles.quizBadge, { backgroundColor: colors.surface }]}><Text display {...dynamicType} style={[typography.title, { color: colors.text }]}>?</Text></View> : null}
   </View>;
   return <View style={[styles.covers, { backgroundColor: colors.surface }]}>
-    {covers.length ? covers.map((cover, index) => <BookCover key={`${cover}:${index}`} cover={cover} title="Book" width={54} height={81} />) : <Icon name={feedRowModel(item).icon} size={32} color={colors.accent} />}
+    {covers.length ? covers.map((cover, index) => <BookCover key={`${cover}:${index}`} cover={cover} title="Book" width={54} height={81} />) : <Icon name={feedRowModel(item, locale).icon} size={32} color={colors.accent} />}
   </View>;
 }
 

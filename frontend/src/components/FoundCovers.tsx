@@ -12,6 +12,7 @@ import {
   type ResolvedCoverResponse
 } from "@scripta/shared";
 import { fetchCoverCandidates, pickCover, rememberResolvedCover, type ResolveCoverParams } from "../api/covers";
+import { useLocale } from "../i18n";
 
 export function FoundCovers({
   lookup: lookupProp,
@@ -24,6 +25,7 @@ export function FoundCovers({
   isAdmin?: boolean;
   onPick: (cover: ResolvedCoverResponse, everyone: boolean) => void;
 }) {
+  const locale = useLocale();
   const [quick, setQuick] = useState<FoundCoversLoad>(FOUND_COVERS_PENDING);
   const [apple, setApple] = useState<FoundCoversLoad>(FOUND_COVERS_PENDING);
   const [measured, setMeasured] = useState<ReadonlyMap<string, MeasuredCoverSize>>(new Map());
@@ -85,7 +87,7 @@ export function FoundCovers({
             <button
               type="button"
               disabled={picking}
-              aria-label={`Use this ${coverSourceLabel(candidate.source)} cover${width !== null && height !== null ? `, ${width} by ${height}` : ""}, ${index + 1} of ${tiles.length}`}
+              aria-label={`Use this ${coverSourceLabel(candidate.source, locale)} cover${width !== null && height !== null ? `, ${width} by ${height}` : ""}, ${index + 1} of ${tiles.length}`}
               aria-current={isCurrentCover(candidate, coverUrl)}
               onClick={() => void choose(candidate, false)}
               className={`relative aspect-square cursor-pointer overflow-hidden rounded-lg border-2 bg-(--color-border) disabled:cursor-default disabled:opacity-50 ${
@@ -106,13 +108,13 @@ export function FoundCovers({
                   {width} × {height}
                 </span>
               )}
-              <span className="block">{coverSourceLabel(candidate.source)}</span>
+              <span className="block">{coverSourceLabel(candidate.source, locale)}</span>
             </p>
             {isAdmin && (
               <button
                 type="button"
                 disabled={picking}
-                aria-label={`Use for everyone: ${coverSourceLabel(candidate.source)} cover, ${index + 1} of ${tiles.length}`}
+                aria-label={`Use for everyone: ${coverSourceLabel(candidate.source, locale)} cover, ${index + 1} of ${tiles.length}`}
                 onClick={() => void choose(candidate, true)}
                 className="min-h-11 text-left text-xs font-semibold text-(--color-accent) transition-opacity hover:opacity-80 disabled:opacity-50"
               >
@@ -134,7 +136,7 @@ export function FoundCovers({
       </div>
       {unavailable.map((name) => (
         <p key={name} className="mt-2 text-xs text-(--color-text-dim)">
-          {coverSourceLabel(name)} didn't answer.
+          {coverSourceLabel(name, locale)} didn't answer.
         </p>
       ))}
       {failures.map((message) => (

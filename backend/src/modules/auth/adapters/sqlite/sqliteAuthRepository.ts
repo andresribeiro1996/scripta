@@ -164,7 +164,7 @@ export function createSqliteAuthRepository(db: DatabaseSync): AuthRepository {
     },
 
     setAppearance(userId, fields) {
-      const columns = (["theme", "display_font", "text_font"] as const).filter((column) => fields[column] !== undefined);
+      const columns = (["theme", "display_font", "text_font", "locale"] as const).filter((column) => fields[column] !== undefined);
       if (columns.length === 0) return;
       db.prepare(`UPDATE users SET ${columns.map((column) => `${column} = ?`).join(", ")} WHERE id = ?`).run(...columns.map((column) => fields[column] as string), userId);
     },

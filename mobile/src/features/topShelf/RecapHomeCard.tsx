@@ -7,10 +7,12 @@ import { recapMonthName } from "@scripta/shared";
 import { Text } from "../../ui/Text";
 import { IconButton, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import { fetchRecapIndex } from "./api";
+import { useLocale } from "../../i18n";
 
 const dismissedKey = (month: string) => `topShelfRecapDismissed:${month}`;
 
 export function RecapHomeCard() {
+  const locale = useLocale();
   const { colors } = useTheme();
   const index = useQuery({ queryKey: ["topShelfRecaps"], queryFn: fetchRecapIndex, retry: false });
   const month = index.data?.announce ? index.data.months[0] : undefined;
@@ -28,7 +30,7 @@ export function RecapHomeCard() {
   }, [month]);
 
   if (!month || dismissed !== false) return null;
-  const name = recapMonthName(month);
+  const name = recapMonthName(month, locale);
   const dismiss = () => {
     setDismissed(true);
     AsyncStorage.setItem(dismissedKey(month), "1").catch((reason) => { console.warn("Couldn't save the recap dismissal", reason); });

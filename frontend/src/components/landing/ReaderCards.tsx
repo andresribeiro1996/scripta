@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { READER_PLATES, type IdentityKey } from "@scripta/shared";
+import { READER_PLATES, plateEpithet, plateName, type IdentityKey } from "@scripta/shared";
 import { readerCardSrc } from "./books";
+import { useLocale } from "../../i18n";
 
 const SHOWN: IdentityKey[] = ["carto", "lamp", "corr", "way"];
 const BOX_W = 660;
@@ -9,6 +10,7 @@ const PLATE_W = 150;
 const PLATE_H = 210;
 
 export function ReaderCards() {
+  const locale = useLocale();
   const [selected, setSelected] = useState<IdentityKey>("corr");
   const plates = SHOWN.map((key) => READER_PLATES.find((plate) => plate.key === key)!);
   const active = plates.find((plate) => plate.key === selected)!;
@@ -22,8 +24,8 @@ export function ReaderCards() {
         </p>
         <div className="mt-7 border-t border-(--color-border) pt-5">
           <p className="text-[13px] text-(--color-text-dim)">Plate {active.numeral}</p>
-          <p className="mt-1 font-display text-[26px] leading-tight">The {active.name}</p>
-          <p className="mt-0.5 text-[15px]">{active.epithet}</p>
+          <p className="mt-1 font-display text-[26px] leading-tight">The {plateName(active.key, locale)}</p>
+          <p className="mt-0.5 text-[15px]">{plateEpithet(active.key, locale)}</p>
         </div>
       </div>
 
@@ -40,7 +42,7 @@ export function ReaderCards() {
               type="button"
               onClick={() => setSelected(plate.key)}
               aria-pressed={on}
-              aria-label={`Plate ${plate.numeral}, the ${plate.name}`}
+              aria-label={`Plate ${plate.numeral}, the ${plateName(plate.key, locale)}`}
               className="absolute origin-bottom cursor-pointer border-0 bg-none p-0 motion-safe:transition-[top,transform] motion-safe:duration-[260ms] motion-safe:ease-[cubic-bezier(0.32,0.72,0,1)]"
               style={{
                 left: `${left}%`,

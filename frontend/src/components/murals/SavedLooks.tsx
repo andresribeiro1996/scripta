@@ -3,14 +3,16 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useAuth } from "../../auth/AuthContext";
 import { FIELD_CLASS } from "../page/buttonClasses";
+import { useLocale } from "../../i18n";
 
 export function SavedLooks({ style, onApply }: { style: BlockStyle; onApply: (style: BlockStyle) => void }) {
+  const locale = useLocale();
   const { session } = useAuth();
   const client = useQueryClient();
   const [name, setName] = useState("");
   const queryKey = ["mural-block-looks", session?.user.id];
   const key = savedBlockLooksKey(session?.user.id ?? "");
-  const looks = useQuery({ queryKey, queryFn: () => readSavedBlockLooks(localStorage.getItem(key)), enabled: !!session, retry: false });
+  const looks = useQuery({ queryKey, queryFn: () => readSavedBlockLooks(localStorage.getItem(key), locale), enabled: !!session, retry: false });
   const save = useMutation({
     mutationFn: async (next: SavedBlockLook[]) => { localStorage.setItem(key, JSON.stringify(next)); return next; },
     onSuccess: (next) => { client.setQueryData(queryKey, next); setName(""); },
@@ -26,7 +28,7 @@ export function SavedLooks({ style, onApply }: { style: BlockStyle; onApply: (st
       <button className={`${button} flex-1 text-left`} disabled={!ready} onClick={() => onApply({ ...look.style, cardBorderSides: { ...look.style.cardBorderSides } })}>{look.name}</button>
       <button className={button} aria-label={`Delete ${look.name}`} disabled={!ready} onClick={() => save.mutate(looks.data!.filter((item) => item.name !== look.name))}>Delete</button>
     </div>)}
-    <form onSubmit={(event) => { event.preventDefault(); if (ready && name.trim()) save.mutate(saveBlockLook(looks.data!, name, style)); }} className="flex flex-wrap items-end gap-2">
+    <form onSubmit={(event) => { event.preventDefault(); if (ready && name.trim()) save.mutate(saveBlockLook(looks.data!, name, style, locale)); }} className="flex flex-wrap items-end gap-2">
       <label className="flex-1 text-sm font-semibold">Look name<input className={`${FIELD_CLASS} mt-1 block w-full font-normal`} value={name} onChange={(event) => setName(event.target.value)} maxLength={48} placeholder="My reading corner" /></label>
       <button className={button} disabled={!ready || !name.trim()}>Save current look</button>
     </form>

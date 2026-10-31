@@ -2,12 +2,14 @@ import { useEffect, useState } from "react";
 import { KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
 import { Text } from "../ui/Text";
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { RECOVERY_MESSAGE } from "@scripta/shared";
+import { recoveryMessage } from "@scripta/shared";
 import { apiClient } from "../core/api";
 import { Button, Input, Screen } from "../ui";
 import { spacing, typography, useTheme } from "../ui/theme";
+import { useLocale } from "../i18n";
 
 export default function ForgotPassword() {
+  const locale = useLocale();
   const params = useLocalSearchParams<{ email?: string }>();
   const [email, setEmail] = useState(params.email ?? "");
   const [busy, setBusy] = useState(false);
@@ -33,7 +35,7 @@ export default function ForgotPassword() {
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: spacing.xl, gap: spacing.lg }}>
         <Text style={[typography.body, { color: colors.textDim }]}>Enter your account’s email address. We’ll send a link that opens securely in your browser.</Text>
-        {sent && <Text accessibilityLiveRegion="polite" style={[typography.body, { color: colors.text }]}>{RECOVERY_MESSAGE}</Text>}
+        {sent && <Text accessibilityLiveRegion="polite" style={[typography.body, { color: colors.text }]}>{recoveryMessage(locale)}</Text>}
         <Input label="Email" autoComplete="email" textContentType="emailAddress" autoCapitalize="none" autoCorrect={false} keyboardType="email-address" value={email} onChangeText={(value) => { setEmail(value); setSent(false); }} editable={!busy} returnKeyType="send" onSubmitEditing={() => void submit()} />
         {error ? <Text accessibilityRole="alert" selectable style={{ color: colors.danger }}>{error}</Text> : null}
         <View><Button label={cooldown ? `Resend in ${cooldown}s` : sent ? "Resend email" : "Send recovery email"} loading={busy} disabled={cooldown > 0 || !email.trim()} onPress={() => void submit()} /></View>

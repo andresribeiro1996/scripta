@@ -54,26 +54,26 @@ const quiz: PublishedContent = {
   covers: []
 };
 
-check("tier list kind label", contentKindLabel(tierlist) === "Tier list");
-check("tournament kind label", contentKindLabel(tournament) === "Tournament");
-check("tier list detail", contentDetail(tierlist) === "12 books · 4 ballots");
-check("closed tier list detail", contentDetail({ ...tierlist, votingOpen: false }) === "12 books · 4 ballots · closed");
-check("tournament detail", contentDetail(tournament) === "8-book bracket · active");
+check("tier list kind label", contentKindLabel(tierlist, "en") === "Tier list");
+check("tournament kind label", contentKindLabel(tournament, "en") === "Tournament");
+check("tier list detail", contentDetail(tierlist, "en") === "12 books · 4 ballots");
+check("closed tier list detail", contentDetail({ ...tierlist, votingOpen: false }, "en") === "12 books · 4 ballots · closed");
+check("tournament detail", contentDetail(tournament, "en") === "8-book bracket · active");
 check("tier list target", contentTarget(tierlist) === "/vote/code12ab");
 check("tournament target", contentTarget(tournament) === "/arena/g1");
 check("feed target follows content", feedTarget(feedItem) === "/vote/code12ab");
-check("feed heading", feedHeading(feedItem) === "andre published a tier list");
+check("feed heading", feedHeading(feedItem, "en") === "andre published a tier list");
 check(
   "tournament feed heading",
-  feedHeading({ ...feedItem, content: tournament, type: "tournament_published" }) === "andre published a tournament"
+  feedHeading({ ...feedItem, content: tournament, type: "tournament_published" }, "en") === "andre published a tournament"
 );
 
-check("quiz kind label", contentKindLabel(quiz) === "Quiz");
-check("quiz detail", contentDetail(quiz) === "8 questions · 3 plays");
+check("quiz kind label", contentKindLabel(quiz, "en") === "Quiz");
+check("quiz detail", contentDetail(quiz, "en") === "8 questions · 3 plays");
 check("quiz target", contentTarget(quiz) === "/play/qcode");
-check("quiz status", contentStatus(quiz).label === "Open");
-check("quiz stats", contentStats(quiz).length === 2);
-check("quiz feed heading", feedHeading({ ...feedItem, content: quiz, type: "quiz_published" }) === "andre published a quiz");
+check("quiz status", contentStatus(quiz, "en").label === "Open");
+check("quiz stats", contentStats(quiz, "en").length === 2);
+check("quiz feed heading", feedHeading({ ...feedItem, content: quiz, type: "quiz_published" }, "en") === "andre published a quiz");
 check("quiz is known content", isKnownContent(quiz));
 check("unknown content kind is not known", !isKnownContent({ kind: "hologram" } as never));
 

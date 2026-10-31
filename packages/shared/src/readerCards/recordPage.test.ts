@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { PublicReaderCard } from "../library/readerIdentity.js";
-import { PLATES } from "./plates.js";
-import { renderReaderCard, type ReaderCardInput } from "./render.js";
+import { sharedT } from "../i18n/sharedT.js";
+import { wrapLines } from "./fit.js";
+import { PLATES, plateName } from "./plates.js";
+import { renderPlate, renderReaderCard, type ReaderCardInput } from "./render.js";
 import { seedOf } from "./seed.js";
 import { DEFAULT_READER_CARD_STYLE, publicStyle } from "./style.js";
 
@@ -13,7 +15,7 @@ const card: PublicReaderCard = {
   dial: { segments: [{ group: "star", books: 22, marked: 9 }, { group: "lamp", books: 8, marked: 1 }, { group: "unknown", books: 4, marked: 0 }] },
   facts: { finished: 34, highlights: 40, series: 2, since: 2014, edition: 2026 },
 };
-const input = (fields: Partial<ReaderCardInput> = {}): ReaderCardInput => ({ card, style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), counter: "dial", layout: "faces", trait: "both" }, readerName: "andre", print: "paper", label: "Reader card", seed: seedOf("andre"), view: "visitor", ...fields });
+const input = (fields: Partial<ReaderCardInput> = {}): ReaderCardInput => ({ card, style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), counter: "dial", layout: "faces", trait: "both" }, locale: "en", readerName: "andre", print: "paper", label: "Reader card", seed: seedOf("andre"), view: "visitor", ...fields });
 const texts = (svg: string) => [...svg.matchAll(/<text[^>]*>([^<]*)<\/text>/g)].map((match) => match[1]!);
 
 test("the record lists finished, each genre segment with the lead's share, highlights and the runner-up", () => {
@@ -60,7 +62,7 @@ test("the front is unchanged when no page is named", () => {
 test("the record's second header line is drawn whole for every plate, settled and leaning", () => {
   for (const plate of PLATES) {
     for (const state of ["settled", "leaning"] as const) {
-      const expected = state === "leaning" ? `LEANING · ${plate.name.toUpperCase()} · PLATE ${plate.numeral}` : `THE ${plate.name.toUpperCase()} · PLATE ${plate.numeral}`;
+      const expected = state === "leaning" ? `LEANING · ${plateName(plate.key, "en").toUpperCase()} · PLATE ${plate.numeral}` : `THE ${plateName(plate.key, "en").toUpperCase()} · PLATE ${plate.numeral}`;
       const all = texts(renderReaderCard(input({ card: { state, identity: plate.key, runnerUp: null, signal: null, coverage: [] } }), "record"));
       assert.ok(all.includes(expected), expected);
     }
@@ -73,4 +75,29 @@ test("text that looks like a class attribute is drawn as typed and never restyle
   assert.ok(all.includes(`◇ x class="abc" y`));
   assert.ok(all.includes(`◇ class="pt"`));
   assert.ok(all.every((line) => !line.includes("style=")));
+});
+
+test("a Portuguese record draws its header, rows and legend in Portuguese", () => {
+  const svg = renderReaderCard(input({ locale: "pt-PT", view: "owner" }), "record");
+  const all = texts(svg);
+  assert.ok(all.includes("REGISTO DO LEITOR"));
+  assert.ok(all.includes("Lidos"));
+  assert.ok(all.includes("Com destaques"));
+  assert.ok(!all.includes("READER’S RECORD"));
+});
+
+test("a Portuguese plate names the identity in Portuguese", () => {
+  const svg = renderPlate({ identity: "star", state: "settled", readerName: "a", print: "paper", label: "x", locale: "pt-PT" });
+  assert.match(svg, />Astrónomo</);
+  assert.match(svg, />vive em parte noutros mundos</);
+  assert.match(svg, />PRANCHA IV</);
+});
+
+test("Portuguese genre gap lines fit the two lines of the record page", () => {
+  const t = sharedT("pt-PT");
+  for (const [words, threshold] of [["wordsLamp", "35%"], ["wordsStar", "40%"], ["wordsArch", "35%"], ["wordsCorr", "40%"]] as const) {
+    const line = `◇ ${t("shared.readerIdentity.genreGap", { pct: "30%", words: t(`shared.readerIdentity.${words}`), threshold })}`;
+    const wrapped = wrapLines(line, { font: "serif", size: 6.4, width: 190, lines: 2 });
+    assert.equal(wrapped.join("").replace(/\s/g, ""), line.replace(/\s/g, ""));
+  }
 });

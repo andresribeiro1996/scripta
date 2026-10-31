@@ -17,6 +17,7 @@ import { BlockRenderer } from "./BlockRenderer";
 import { MobileMuralCanvas, type MobileMuralDraft } from "./MobileMuralCanvas";
 import { DraggableMuralBlock, useMuralDrag } from "./useMuralDrag";
 import { MuralExpandButtons } from "./MuralExpandButtons";
+import { useLocale } from "../../i18n";
 
 const ResponsiveGridLayout = GridLayout.WidthProvider(GridLayout);
 const ROW_HEIGHT = 28;
@@ -83,11 +84,12 @@ export function MuralCanvas({
   onApplyMobileDraft?: () => void;
   onCancelMobileDraft?: () => void;
 }) {
+  const locale = useLocale();
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const drag = useMuralDrag(originalMural.blocks, canvasRef, onLayoutChange, 1, onDragChange);
   const [day] = useState(localDay);
-  const mural = { ...originalMural, theme: muralThemeId(originalMural.theme), blocks: originalMural.blocks.map((block) => resolveHomeBlock(block, books, groups, day)) };
+  const mural = { ...originalMural, theme: muralThemeId(originalMural.theme), blocks: originalMural.blocks.map((block) => resolveHomeBlock(block, books, groups, day, locale)) };
   const originalBlock = (block: MuralBlock) => originalMural.blocks.find((item) => item.id === block.id) ?? block;
   const themeColors = themes[mural.theme].colors;
   useMuralBookMetadata(mural.blocks, books, tierlistData);

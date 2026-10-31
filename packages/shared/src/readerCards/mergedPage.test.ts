@@ -11,7 +11,7 @@ const card: PublicReaderCard = {
   facts: { finished: 34, highlights: 40, series: 2, since: 2014, edition: 2026 },
   chosen: { signature: { title: "A Wizard of Earthsea", author: "Ursula K. Le Guin", workId: null, coverUrl: null, note: null }, highlight: { text: "To light a candle is to cast a shadow.", title: "A Wizard of Earthsea", author: "Ursula K. Le Guin" } },
 };
-const merged = (fields: Partial<ReaderCardInput> = {}) => renderReaderCard({ card, style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), counter: "dial", layout: "merged", trait: "both" }, readerName: "andre", print: "paper", label: "Reader card", seed: seedOf("andre"), view: "visitor", ...fields }, "merged");
+const merged = (fields: Partial<ReaderCardInput> = {}) => renderReaderCard({ card, style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), counter: "dial", layout: "merged", trait: "both" }, locale: "en", readerName: "andre", print: "paper", label: "Reader card", seed: seedOf("andre"), view: "visitor", ...fields }, "merged");
 const texts = (svg: string) => [...svg.matchAll(/<text[^>]*>([^<]*)<\/text>/g)].map((match) => match[1]!);
 
 test("the merged back has the chosen book and highlight above compact rows with only the lead genre", () => {

@@ -12,6 +12,7 @@ import { HighlightChoice, SignatureChoice } from "./ReaderCardChoices";
 import { FrontOptions, GroupHeader, LayoutOption, ReaderCardPanel, useMotto, type PanelId } from "./ReaderCardOptions";
 import { ReaderGlyphSetting } from "./ReaderGlyphSetting";
 import { useOwnCardStyle, useReaderCardStyle, useSaveReaderCardStyle } from "./useReaderCardStyle";
+import { getLocale, useLocale } from "../../i18n";
 
 const NO_BOOKS: Array<Record<string, unknown>> = [];
 const PREVIEW_MAX = 280;
@@ -20,6 +21,7 @@ const pageFor = (patch: ReaderCardStylePatch): ReaderCardPage => ("layout" in pa
 const PIN_CHROME = minimumTouchTarget + spacing.md + spacing.sm * 2;
 
 export function ReaderCardEditorScreen() {
+  const locale = useLocale();
   const { colors } = useTheme();
   const { user } = useAuth();
   const readerName = user?.username ?? "reader";
@@ -33,7 +35,7 @@ export function ReaderCardEditorScreen() {
   const [panel, setPanel] = useState<PanelId | null>(null);
   const [face, setFace] = useState<{ page: ReaderCardPage } | undefined>();
   const own = useOwnCardStyle();
-  const input = useMemo(() => readerCardInputOf(books, groups, readerName, undefined, own), [books, groups, readerName, own]);
+  const input = useMemo(() => readerCardInputOf(books, groups, readerName, locale, undefined, own), [books, groups, readerName, locale, own]);
   const width = Math.min(windowWidth - spacing.xl * 2, PREVIEW_MAX, (windowHeight * PIN_SHARE - PIN_CHROME) / PLATE_RATIO);
 
   const change = async (patch: ReaderCardStylePatch) => {
@@ -43,7 +45,7 @@ export function ReaderCardEditorScreen() {
       await save(patch);
       return true;
     } catch (reason) {
-      setError(saveFailureMessage(reason, "Couldn't save your reader card."));
+      setError(saveFailureMessage(reason, "Couldn't save your reader card.", getLocale()));
       return false;
     }
   };

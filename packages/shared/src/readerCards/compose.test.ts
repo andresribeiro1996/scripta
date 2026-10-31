@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { composePage, composePlate, type PlateFace } from "./compose.js";
 
-const face: PlateFace = { key: "star", emblemSvg: `<g id="emblem"/>`, name: "Stargazer", eyebrow: "THE", epithet: "lives half in other worlds", numeral: "IV", reader: "ANDRE", width: 250, label: "x" };
+const face: PlateFace = { key: "star", emblemSvg: `<g id="emblem"/>`, name: "Stargazer", eyebrow: "THE", epithet: "lives half in other worlds", numeral: "IV", reader: "ANDRE", width: 250, locale: "en", label: "x" };
 
 test("slots land in layer order", () => {
   const svg = composePlate(face, { underlay: `<g id="u"/>`, frameBand: `<g id="f"/>`, top: `<g id="t"/>`, rings: `<g id="r"/>`, seal: `<g id="s"/>`, banner: `<g id="b"/>`, trait: `<g id="tr"/>`, overlay: `<g id="o"/>` });

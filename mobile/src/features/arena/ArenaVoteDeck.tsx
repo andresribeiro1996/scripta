@@ -8,6 +8,7 @@ import { countdownLabel, type Duel, type DuelSide } from "@scripta/shared";
 import { commitHaptic } from "../../ui/haptics";
 import { dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { BookCover } from "./BookCover";
+import { useLocale } from "../../i18n";
 
 const SWIPE_THRESHOLD = 100;
 const FLY_OUT_DISTANCE = 500;
@@ -115,13 +116,14 @@ function VoteHalf({
  *  screen, so both the next duel and a retry of this one need fresh ones
  *  back at rest. */
 export function ArenaVoteDeck({ duel, character = false, disabled, onVote }: { duel: Duel; character?: boolean; disabled: boolean; onVote: (workId: string) => void }) {
+  const locale = useLocale();
   const { colors } = useTheme();
   const [attempt, setAttempt] = useState(0);
   const vote = (workId: string) => { setAttempt((n) => n + 1); onVote(workId); };
 
   return (
     <View key={`${duel.id}:${attempt}`} style={styles.wrap}>
-      <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.center, { color: colors.text }]}>Round {duel.roundNumber} · Match {duel.duelIndex + 1} · {countdownLabel(duel.closesAt)}</Text>
+      <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.center, { color: colors.text }]}>Round {duel.roundNumber} · Match {duel.duelIndex + 1} · {countdownLabel(duel.closesAt, locale)}</Text>
       <View style={styles.row}>
         <VoteHalf character={character} side={duel.bookA} winId={duel.bookA.workId} loseId={duel.bookB.workId} disabled={disabled} edge="left" onVote={vote} />
         <VoteHalf character={character} side={duel.bookB} winId={duel.bookB.workId} loseId={duel.bookA.workId} disabled={disabled} edge="right" onVote={vote} />

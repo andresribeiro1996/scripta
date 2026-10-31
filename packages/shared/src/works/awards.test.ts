@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { PRIZES, awardLabel, isPrizeKey, knownAwards } from "./awards.js";
+import { PRIZES, awardLabel, isPrizeKey, knownAwards, prizeLabel, type PrizeKey } from "./awards.js";
 
 test("PRIZES lists the prizes in order with their labels", () => {
   assert.deepEqual(
-    Object.entries(PRIZES).map(([key, prize]) => [key, prize.label]),
+    (Object.keys(PRIZES) as PrizeKey[]).map((key) => [key, prizeLabel(key, "en")]),
     [
       ["booker", "Booker Prize"],
       ["international-booker", "International Booker Prize"],
@@ -31,8 +31,8 @@ test("only the Nobel and the Camões honour an author", () => {
 });
 
 test("awardLabel names a win and a nomination", () => {
-  assert.equal(awardLabel({ prize: "hugo-novel", year: 1993, won: true }), "Hugo Award 1993");
-  assert.equal(awardLabel({ prize: "booker", year: 2019, won: false }), "Booker Prize 2019 · nominee");
+  assert.equal(awardLabel({ prize: "hugo-novel", year: 1993, won: true }, "en"), "Hugo Award 1993");
+  assert.equal(awardLabel({ prize: "booker", year: 2019, won: false }, "en"), "Booker Prize 2019 · nominee");
 });
 
 test("knownAwards drops unknown keys and sorts wins first, newest first", () => {
@@ -54,4 +54,12 @@ test("knownAwards drops unknown keys and sorts wins first, newest first", () => 
 
 test("knownAwards of undefined is empty", () => {
   assert.deepEqual(knownAwards(undefined), []);
+});
+
+test("prize names follow the Portuguese press, and Portuguese prizes stay as they are", () => {
+  assert.equal(prizeLabel("booker", "pt-PT"), "Prémio Booker");
+  assert.equal(prizeLabel("international-booker", "pt-PT"), "Prémio Booker Internacional");
+  assert.equal(prizeLabel("nobel-literature", "pt-PT"), "Prémio Nobel da Literatura");
+  assert.equal(prizeLabel("camoes", "pt-PT"), "Prémio Camões");
+  assert.equal(awardLabel({ prize: "booker", year: 2019, won: false }, "pt-PT"), "Prémio Booker 2019 · nomeado");
 });

@@ -4,21 +4,23 @@ import { TIER_LADDER, contentStats, contentStatus, contentTarget, gameActionLabe
 import { AuthorAvatar } from "../CommunityAuthorAvatar";
 import { ReaderGlyph } from "../ReaderGlyph";
 import { GameTicket, StatusBadge } from "./GameTicket";
+import { useLocale } from "../../i18n";
 
 export function DiscoverTicket({ item }: { item: DiscoverItem }) {
+  const locale = useLocale();
   const { content, author } = item;
-  const status = contentStatus(content);
+  const status = contentStatus(content, locale);
   return (
     <li className={`flex ${content.kind === "quiz" ? "self-stretch" : ""}`}>
       <GameTicket
         kind={content.kind}
         name={content.name}
         to={contentTarget(content)}
-        actionLabel={gameActionLabel(content)}
+        actionLabel={gameActionLabel(content, locale)}
         covers={content.covers}
         ladder={content.kind === "tierlist" ? TIER_LADDER : undefined}
         preview={content.kind === "quiz" ? content.preview : undefined}
-        stats={contentStats(content)}
+        stats={contentStats(content, locale)}
         meta={
           <span className="flex min-w-0 items-center gap-2">
             <AuthorAvatar author={author} size={32} />

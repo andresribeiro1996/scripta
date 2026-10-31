@@ -6,7 +6,7 @@ import { DEFAULT_READER_CARD_STYLE, readerCardInputOf, type Finish, type Layout 
 import { ReaderCardTurner } from "../src/components/readerCard/ReaderCardTurner";
 
 const books = Array.from({ length: 6 }, (_, i) => ({ Title: `Book ${i}`, Attribution: `Author ${i}`, ReadStatus: 2, _genres: ["Fantasy"] }));
-const turner = (finish: Finish, layout: Layout = "faces") => renderToString(createElement(ReaderCardTurner, { input: readerCardInputOf(books, [], "andre.ribeiro", undefined, { style: { ...DEFAULT_READER_CARD_STYLE, finish, layout }, coverOf: () => null }), cardWidth: "w-72", spreadWidth: "w-96" }));
+const turner = (finish: Finish, layout: Layout = "faces") => renderToString(createElement(ReaderCardTurner, { input: readerCardInputOf(books, [], "andre.ribeiro", "en", undefined, { style: { ...DEFAULT_READER_CARD_STYLE, finish, layout }, coverOf: () => null }), cardWidth: "w-72", spreadWidth: "w-96" }));
 
 test("foil, holo and gilt cards carry one shine, over the front face", () => {
   for (const finish of ["foil", "holo", "gilt"] as const) assert.equal(turner(finish).match(/card-shine-idle/g)?.length, 1, finish);

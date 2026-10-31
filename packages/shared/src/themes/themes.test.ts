@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { THEME_IDS, themes, type ThemeColors } from "./palettes.js";
-import { THEME_PREFERENCES, parseThemePreference, resolveTheme } from "./preference.js";
+import { THEME_PREFERENCES, parseAccountAppearance, parseThemePreference, reconcileAppearance, resolveTheme } from "./preference.js";
 
 function luminance(hex: string): number {
   const channels = [1, 3, 5].map((i) => {
@@ -79,4 +79,17 @@ test("resolveTheme follows the OS only for system", () => {
   assert.equal(resolveTheme("system", "dark"), "dark");
   assert.equal(resolveTheme("matrix", "light"), "matrix");
   assert.equal(resolveTheme("sepia", "dark"), "sepia");
+});
+
+test("reconcileAppearance uploads the device locale when the account has none and applies the account locale otherwise", () => {
+  const base = { theme: "sepia", displayFont: "theme", textFont: "atkinson" } as const;
+  assert.deepEqual(reconcileAppearance({ ...base, locale: null }, { ...base, locale: "en" }), { apply: {}, upload: { locale: "en" } });
+  assert.deepEqual(reconcileAppearance({ ...base, locale: "pt-PT" }, { ...base, locale: "auto" }), { apply: { locale: "pt-PT" }, upload: {} });
+  assert.deepEqual(reconcileAppearance({ ...base, locale: "auto" }, { ...base, locale: "auto" }), { apply: {}, upload: {} });
+});
+
+test("parseAccountAppearance reads locale, normalising unknown values to auto", () => {
+  assert.equal(parseAccountAppearance({ locale: "pt-PT" }).locale, "pt-PT");
+  assert.equal(parseAccountAppearance({ locale: "fr" }).locale, "auto");
+  assert.equal(parseAccountAppearance({}).locale, null);
 });

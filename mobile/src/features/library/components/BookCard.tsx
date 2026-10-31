@@ -22,6 +22,7 @@ import { cardFontFamily, resolveBorderColor, resolveBorderStyle } from "../../..
 import { dynamicType, minimumTouchTarget, useTheme } from "../../../ui/theme";
 import { CoverImage } from "./CoverImage";
 import { scrimStops } from "./scrim";
+import { useLocale } from "../../../i18n";
 
 function aspectRatioNumber(value: LibraryStyleSettings["cardAspectRatio"]): number {
   const [w, h] = value.split("/").map(Number);
@@ -47,11 +48,12 @@ export function BookCard({
   onToggleSelect?: (book: Record<string, unknown>) => void;
   onLoadEnd?: () => void;
 }) {
+  const locale = useLocale();
   const { colors } = useTheme();
   const [hasCover, setHasCover] = useState(false);
   const [width, setWidth] = useState(0);
   const compact = width <= CARD_OVERLAY_COMPACT_WIDTH;
-  const label = statusLabel(book.ReadStatus);
+  const label = statusLabel(book.ReadStatus, locale);
   const highlights = Array.isArray(book.highlights) ? book.highlights.length : 0;
   const showOverlayText = (style.showTitleAuthor && width > CARD_OVERLAY_TEXT_MIN_WIDTH) || !hasCover;
   const overlayTextColor = style.cardTextColor ?? "#ffffff";

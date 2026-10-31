@@ -18,6 +18,8 @@
 // GET /books/search/external (Open Library). This module holds only the
 // pure query-shape, merge and result-mapping logic.
 
+import type { Locale } from "../i18n/locale.js";
+import { sharedT } from "../i18n/sharedT.js";
 import { GENRES_FROM_CATALOG, normalizeBookGenres, type BookGenre } from "./bookGenres.js";
 import { normalizeWords } from "./bookMatch.js";
 import { positiveInteger } from "./bookMetadata.js";
@@ -46,8 +48,8 @@ export interface BookSearchResult {
 
 const COLLECTION_WORD = /collection|colec+ao/;
 
-export function seriesLabel(series: BookSeries): string {
-  const named = series.kind === "collection" && !COLLECTION_WORD.test(normalizeWords(series.name)) ? `${series.name} collection` : series.name;
+export function seriesLabel(series: BookSeries, locale: Locale): string {
+  const named = series.kind === "collection" && !COLLECTION_WORD.test(normalizeWords(series.name)) ? sharedT(locale)("shared.library.seriesCollection", { name: series.name }) : series.name;
   return series.position ? `${named} · ${series.position}` : named;
 }
 

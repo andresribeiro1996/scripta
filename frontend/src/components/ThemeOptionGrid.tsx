@@ -1,5 +1,7 @@
 import { useId } from "react";
-import { themes, type ThemeColors, type ThemePreference } from "@scripta/shared/themes";
+import type { Locale } from "@scripta/shared/i18n";
+import { themes, themeLabel, type ThemeColors, type ThemePreference } from "@scripta/shared/themes";
+import { useLocale } from "../i18n";
 
 function Swatch({ colors }: { colors: ThemeColors }) {
   return (
@@ -13,8 +15,8 @@ function Swatch({ colors }: { colors: ThemeColors }) {
   );
 }
 
-function optionLabel(option: ThemePreference): string {
-  return option === "system" ? "System" : themes[option].label;
+function optionLabel(option: ThemePreference, locale: Locale): string {
+  return option === "system" ? "System" : themeLabel(option, locale);
 }
 
 function OptionSwatch({ option }: { option: ThemePreference }) {
@@ -30,6 +32,7 @@ function OptionSwatch({ option }: { option: ThemePreference }) {
 }
 
 export function ThemeOptionGrid<T extends ThemePreference>({ options, value, onChange }: { options: readonly T[]; value: T; onChange: (option: T) => void }) {
+  const locale = useLocale();
   const name = useId();
   return (
     <fieldset>
@@ -41,7 +44,7 @@ export function ThemeOptionGrid<T extends ThemePreference>({ options, value, onC
             <div className="flex h-16 overflow-hidden rounded-lg border border-(--color-border) peer-checked:ring-2 peer-checked:ring-(--color-accent) peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-(--color-accent)">
               <OptionSwatch option={option} />
             </div>
-            <span className="mt-1.5 block text-center text-xs">{optionLabel(option)}</span>
+            <span className="mt-1.5 block text-center text-xs">{optionLabel(option, locale)}</span>
           </label>
         ))}
       </div>

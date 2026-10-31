@@ -20,7 +20,7 @@ test("each kind tints its art panel with its own soft colour", () => {
 
 test("a quote_title preview shows its clue heading and prompt", () => {
   const html = render({ kind: "quiz", preview: { type: "quote_title", prompt: "Call me Ishmael." } });
-  assert.ok(html.includes(quizClueHeading("quote_title")));
+  assert.ok(html.includes(quizClueHeading("quote_title", "en")));
   assert.ok(html.includes("Call me Ishmael."));
 });
 
@@ -28,7 +28,7 @@ test("a cover_title preview blurs the cover and shows no clue section", () => {
   const html = render({ kind: "quiz", preview: { type: "cover_title", prompt: "https://img.test/c.jpg" } });
   assert.match(html, /<img src="https:\/\/img\.test\/c\.jpg"[^>]*filter:blur\(6px\)/);
   assert.ok(!html.includes("<section"));
-  assert.ok(!html.includes(quizClueHeading("cover_title")));
+  assert.ok(!html.includes(quizClueHeading("cover_title", "en")));
 });
 
 test("no stats means no stats divider", () => {

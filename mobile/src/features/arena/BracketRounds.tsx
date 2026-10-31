@@ -46,6 +46,7 @@ import { DuelSideRow } from "./DuelSideRow";
 import { BracketViewToggle } from "./BracketViewToggle";
 import { matchNote, roundHeadline, tournamentChampion } from "./arenaView";
 import type { TournamentView } from "./api";
+import { useLocale } from "../../i18n";
 
 const BAR_HEIGHT = 64;
 // The strip's own height plus a gap, so the last match scrolls clear of it.
@@ -265,6 +266,7 @@ export function BracketRounds({
   onSettle: (duelId: string) => void;
   onTiebreak: (duelId: string, workId: string) => void;
 }) {
+  const locale = useLocale();
   const { colors } = useTheme();
   const [openId, setOpenId] = useState<string | null>(null);
   const [picked, setPicked] = useState<number | null>(null);
@@ -275,7 +277,7 @@ export function BracketRounds({
   if (byRound.length === 0) return null;
 
   function labelFor(roundIdx: number): string {
-    return roundLabel(byRound[roundIdx]?.length ?? 0, roundIdx + 1);
+    return roundLabel(byRound[roundIdx]?.length ?? 0, roundIdx + 1, locale);
   }
 
   function nodeLabel(roundIdx: number): string {
@@ -385,7 +387,7 @@ export function BracketRounds({
         {openDuel ? (
           <ScrollView style={styles.sheetScroll} contentContainerStyle={styles.sheetBody}>
             <Text {...dynamicType} style={[typography.caption, styles.center, { color: colors.textDim }]}>
-              Round {openDuel.roundNumber} · Match {openDuel.duelIndex + 1} · {openDuel.status === "active" ? countdownLabel(openDuel.closesAt) : openDuel.status === "tied_pending_tiebreak" ? "Owner tiebreak needed" : "Settled"}
+              Round {openDuel.roundNumber} · Match {openDuel.duelIndex + 1} · {openDuel.status === "active" ? countdownLabel(openDuel.closesAt, locale) : openDuel.status === "tied_pending_tiebreak" ? "Owner tiebreak needed" : "Settled"}
             </Text>
             <DuelSideRow side={openDuel.bookA} duel={openDuel} character={tournament.subject !== null} onClose={() => setOpenId(null)} />
             <DuelSideRow side={openDuel.bookB} duel={openDuel} character={tournament.subject !== null} onClose={() => setOpenId(null)} />

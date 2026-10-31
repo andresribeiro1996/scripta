@@ -11,6 +11,7 @@ import { bookCsvToLibraryJson, decodeLibraryImport } from "@scripta/shared";
 import { goodreadsCsvToLibraryJson, looksLikeGoodreadsCsv } from "./goodreads";
 import { isSqliteBytes, parseSqliteFile } from "./sqlite";
 import { looksLikeStorygraphCsv, storygraphCsvToLibraryJson } from "./storygraph";
+import { getLocale } from "../i18n";
 
 export async function parseImportedFile(file: File): Promise<LibraryData> {
   const bytes = new Uint8Array(await file.arrayBuffer());
@@ -19,7 +20,7 @@ export async function parseImportedFile(file: File): Promise<LibraryData> {
     return parseSqliteFile(bytes);
   }
 
-  const text = decodeLibraryImport(bytes);
+  const text = decodeLibraryImport(bytes, getLocale());
 
   const parsedJson = tryParseJson(text);
   if (parsedJson) {
@@ -30,14 +31,14 @@ export async function parseImportedFile(file: File): Promise<LibraryData> {
   }
 
   if (looksLikeGoodreadsCsv(text)) {
-    return goodreadsCsvToLibraryJson(text);
+    return goodreadsCsvToLibraryJson(text, getLocale());
   }
 
   if (looksLikeStorygraphCsv(text)) {
-    return storygraphCsvToLibraryJson(text);
+    return storygraphCsvToLibraryJson(text, getLocale());
   }
 
-  const books = bookCsvToLibraryJson(text);
+  const books = bookCsvToLibraryJson(text, getLocale());
   if (books) return books;
 
   throw new Error(

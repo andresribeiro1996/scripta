@@ -10,10 +10,12 @@ import { Sheet } from "../Sheet";
 import { Skeleton } from "../Skeleton";
 import { useToast } from "../Toaster";
 import { BUTTON_PRIMARY, BUTTON_SECONDARY, FIELD_CLASS } from "../page/buttonClasses";
+import { useLocale } from "../../i18n";
 
 const RETRY = "inline-flex min-h-11 items-center font-semibold text-(--color-accent)";
 
 export function CommentsSheet({ id, title, onClose }: { id: string; title: string; onClose: () => void }) {
+  const locale = useLocale();
   const queryClient = useQueryClient();
   const toast = useToast();
   const confirm = useConfirm();
@@ -109,7 +111,7 @@ export function CommentsSheet({ id, title, onClose }: { id: string; title: strin
             <li key={comment.id} className="flex items-start gap-3 px-2 py-3">
               <AuthorAvatar author={comment.author} size={32} />
               <div className="min-w-0 flex-1">
-                <p className="text-sm break-words text-(--color-text-dim)">{comment.author.username} · {relativeTime(comment.createdAt)}</p>
+                <p className="text-sm break-words text-(--color-text-dim)">{comment.author.username} · {relativeTime(comment.createdAt, locale)}</p>
                 <p className="break-words whitespace-pre-wrap">{comment.text}</p>
               </div>
               {comment.own ? (

@@ -14,8 +14,8 @@ const card = (fields: Partial<PublicReaderCard> = {}): PublicReaderCard => ({
   ...fields,
 });
 const render = (fields: Partial<PublicReaderCard> = {}, style: PublicReaderCardStyle = DEFAULT_READER_CARD_STYLE, print: "paper" | "reversed" = "paper") =>
-  renderReaderCard({ card: card(fields), style, readerName: "andre", print, label: "Reader card", seed: seedOf("andre") });
-const plain = renderPlate({ identity: "star", state: "settled", readerName: "andre", print: "paper", label: "Reader card" });
+  renderReaderCard({ card: card(fields), style, locale: "en", readerName: "andre", print, label: "Reader card", seed: seedOf("andre") });
+const plain = renderPlate({ identity: "star", state: "settled", locale: "en", readerName: "andre", print: "paper", label: "Reader card" });
 
 test("the default card draws the dial, the streak line and the streak's seal", () => {
   const svg = render();

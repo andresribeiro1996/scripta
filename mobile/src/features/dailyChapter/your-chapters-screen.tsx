@@ -13,6 +13,7 @@ import { DailyChapterPoster } from "./daily-chapter-poster";
 import { DailyChapterSquares } from "./daily-chapter-squares";
 import { DailyChapterTiles } from "./daily-chapter-tiles";
 import { useDailyHistory, useDeviceIdentity } from "./use-daily-history";
+import { useLocale } from "../../i18n";
 
 function shiftMonth(month: string, by: number) {
   const date = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)) - 1 + by, 1));
@@ -20,6 +21,7 @@ function shiftMonth(month: string, by: number) {
 }
 
 export function YourChaptersScreen() {
+  const locale = useLocale();
   const { colors } = useTheme();
   const router = useRouter();
   const segments = useSegments();
@@ -49,7 +51,7 @@ export function YourChaptersScreen() {
       <DailyChapterTiles summary={summary} />
       <View style={{ gap: spacing.sm }}>{best("Longest streak", `${data.longestStreak} ${data.longestStreak === 1 ? "day" : "days"}`)}{best("Most perfects in a row", String(data.longestPerfectRun))}{best("Questions right", `${data.correct} of ${data.answered}`)}</View>
       <View style={{ gap: spacing.sm }}>
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>{arrow("Previous month", "‹", shiftMonth(month, -1), month > first)}<Text accessibilityRole="header" {...dynamicType} style={[typography.title, { color: colors.text }]}>{recapMonthName(month)} {month.slice(0, 4)}</Text>{arrow("Next month", "›", shiftMonth(month, 1), month < current)}</View>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>{arrow("Previous month", "‹", shiftMonth(month, -1), month > first)}<Text accessibilityRole="header" {...dynamicType} style={[typography.title, { color: colors.text }]}>{recapMonthName(month, locale)} {month.slice(0, 4)}</Text>{arrow("Next month", "›", shiftMonth(month, 1), month < current)}</View>
         <DailyChapterCalendar days={summary.days} onDayPress={(date) => { const id = byDate.get(date); if (id) open(id); }} />
       </View>
       {rates.length ? <View style={{ gap: spacing.sm }}>
@@ -68,7 +70,7 @@ export function YourChaptersScreen() {
         </Pressable>)}
       </View>
       <Button label="Share my chapters" onPress={() => setSharing(true)} />
-      <ContentShareSheet visible={sharing} onClose={() => setSharing(false)} title="My Daily Chapter" url={link.data ?? null} linkError={link.error ? link.error.message : null} onRetryLink={() => void link.refetch()} textMessage={link.data ? dailyChapterMonthShare(monthSummary, link.data) : undefined}>
+      <ContentShareSheet visible={sharing} onClose={() => setSharing(false)} title="My Daily Chapter" url={link.data ?? null} linkError={link.error ? link.error.message : null} onRetryLink={() => void link.refetch()} textMessage={link.data ? dailyChapterMonthShare(monthSummary, link.data, locale) : undefined}>
         <DailyChapterPoster summary={monthSummary} />
       </ContentShareSheet>
     </>;

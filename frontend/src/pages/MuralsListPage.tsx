@@ -25,6 +25,7 @@ import { useMuralFolders } from "../hooks/useMuralFolders";
 import { useMurals } from "../hooks/useMurals";
 import { buildTree, collectSubtreeIds, folderPath } from "../lib/muralFolders";
 import type { Mural, MuralFolder } from "../lib/murals";
+import { useLocale } from "../i18n";
 
 // Field + direction combined into one option each, rather than two
 // separate selects (field, then direction) — four clearly-labeled
@@ -48,6 +49,7 @@ const SORT_OPTIONS: Array<{ value: SortBy; label: string }> = [
  *  its own full page rather than an inline expandable section — a
  *  freeform canvas needs real room. */
 export function MuralsListPage() {
+  const locale = useLocale();
   const ownProfile = useQuery({ queryKey: ["community", "own-profile"], queryFn: fetchOwnProfile });
   const { data: muralsData, isLoading, rename, remove, move: moveMural, setCover, clearCover, share, unshare } = useMurals();
   const showSkeleton = useDelayedShow(isLoading);
@@ -339,7 +341,7 @@ export function MuralsListPage() {
                     />
                   </div>
                   <p className="text-xs text-(--color-text-dim)">
-                    {mural.blocks.length} block{mural.blocks.length === 1 ? "" : "s"} · Updated {formatDate(mural.updatedAt)}
+                    {mural.blocks.length} block{mural.blocks.length === 1 ? "" : "s"} · Updated {formatDate(mural.updatedAt, locale)}
                   </p>
                 </div>
               </div>

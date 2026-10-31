@@ -1,5 +1,5 @@
 import { useState, type CSSProperties } from "react";
-import { READER_PLATES, blockEffects, blockTextColors, resolveBlockColor, resolveBlockStyle, type BlockStyle } from "@scripta/shared";
+import { READER_PLATES, plateName, blockEffects, blockTextColors, resolveBlockColor, resolveBlockStyle, type BlockStyle } from "@scripta/shared";
 import { themes } from "@scripta/shared/themes";
 import { blockFinishImage, blockFontFamilyCss, resolveBorderColor } from "../../lib/libraryStyle";
 import { muralThemeStyle } from "../../lib/theme";
@@ -7,6 +7,7 @@ import { SpotlightBlockView } from "../murals/blocks/BookBlocks";
 import { TextBlockView } from "../murals/blocks/MiscBlocks";
 import { TierRowShell } from "../tierlist/TierRowShell";
 import { BOOKS, coverSrc, readerCardSrc, type BookSlug } from "./books";
+import { useLocale } from "../../i18n";
 
 const favourites: BookSlug[] = ["piranesi", "gilead", "stoner", "remains", "circe", "the-road"];
 const spotlightBooks = (["piranesi", "remains"] as const).map((slug) => ({ _key: slug, Title: BOOKS[slug].title, Attribution: BOOKS[slug].author, _coverUrl: coverSrc(slug) }));
@@ -21,6 +22,7 @@ const looks = [
 ] as const;
 
 export function ReaderCardPreview() {
+  const locale = useLocale();
   const [flipped, setFlipped] = useState(false);
   const [plate] = useState(() => READER_PLATES[Math.floor(Math.random() * READER_PLATES.length)]);
   const [lookIndex, setLookIndex] = useState(() => Math.floor(Math.random() * looks.length));
@@ -64,8 +66,8 @@ export function ReaderCardPreview() {
             style={{ transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)" }}
           >
             <span aria-hidden={flipped} className="absolute inset-0 overflow-hidden rounded-xl [backface-visibility:hidden] after:pointer-events-none after:absolute after:inset-0 after:bg-linear-to-br after:from-white/10 after:via-transparent after:to-transparent">
-              <img src={cardSources.paper} width="250" height="350" alt={`The ${plate.name} reader card`} className="block h-full w-full dark:hidden" />
-              <img src={cardSources.reversed} width="250" height="350" alt={`The ${plate.name} reader card`} className="hidden h-full w-full dark:block" />
+              <img src={cardSources.paper} width="250" height="350" alt={`The ${plateName(plate.key, locale)} reader card`} className="block h-full w-full dark:hidden" />
+              <img src={cardSources.reversed} width="250" height="350" alt={`The ${plateName(plate.key, locale)} reader card`} className="hidden h-full w-full dark:block" />
             </span>
             <div aria-hidden={!flipped} style={{ ...muralThemeStyle(look.theme), backgroundImage: blockFinishImage(resolveBlockStyle({ backgroundColor: "theme:background", backgroundFinish: look.finish }), palette) }} className={`absolute inset-0 overflow-hidden rounded-xl border border-(--color-border) text-left [backface-visibility:hidden] [transform:rotateY(180deg)] ${nocturne ? "p-4" : "p-2.5"}`}>
               <div style={{ gridTemplateAreas: look.areas, gridTemplateRows: look.rows }} className={`grid h-full grid-cols-4 text-[9px] leading-[1.35] ${nocturne ? "gap-2.5" : "gap-1.5"}`}>
@@ -94,7 +96,7 @@ export function ReaderCardPreview() {
                   <span><span className="block font-display text-base leading-none text-(--color-accent)">19</span><span className="mt-1 block text-(--color-text-dim)">Books</span></span>
                 </span>}
                 {look.name !== "Gallery" && <span style={{ gridArea: "plate" }} className="grid place-items-center p-1.5">
-                  <img src={scheme === "dark" ? cardSources.reversed : cardSources.paper} width="250" height="350" alt={`The ${plate.name} reader card`} className={`block h-auto w-9 ${nocturne ? "" : "-rotate-3 shadow-sm"}`} />
+                  <img src={scheme === "dark" ? cardSources.reversed : cardSources.paper} width="250" height="350" alt={`The ${plateName(plate.key, locale)} reader card`} className={`block h-auto w-9 ${nocturne ? "" : "-rotate-3 shadow-sm"}`} />
                 </span>}
                 {look.name === "Linen" && <span style={{ ...surface({ cardBorderStyle: "dashed", cardBorderColor: "theme:accent", cardBorderOpacity: 25, cardRadius: 3, cardShadow: false }), gridArea: "reading" }} className="p-1.5">
                   <span className="mb-1.5 block text-[7px]">Currently reading</span>

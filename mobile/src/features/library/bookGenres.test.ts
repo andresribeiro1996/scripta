@@ -12,8 +12,8 @@ test("genres normalize noisy metadata and shelf themes count books once", () => 
 });
 
 test("Goodreads shelves and StoryGraph tags preserve recognized genres", () => {
-  const goodreads = goodreadsCsvToLibraryJson('Book Id,Title,Author,Bookshelves,Exclusive Shelf\n1,Dune,Frank Herbert,"science-fiction, classics",read\n');
+  const goodreads = goodreadsCsvToLibraryJson('Book Id,Title,Author,Bookshelves,Exclusive Shelf\n1,Dune,Frank Herbert,"science-fiction, classics",read\n', "en");
   assert.deepEqual(goodreads.books[0]._genres, ["Science Fiction", "Classics"]);
-  const storygraph = storygraphCsvToLibraryJson('Title,Authors,Read Status,ISBN/UID,Tags\nDune,Frank Herbert,read,9780441172719,"science-fiction, fantasy"\n');
+  const storygraph = storygraphCsvToLibraryJson('Title,Authors,Read Status,ISBN/UID,Tags\nDune,Frank Herbert,read,9780441172719,"science-fiction, fantasy"\n', "en");
   assert.deepEqual(storygraph.books[0]._genres, ["Fantasy", "Science Fiction"]);
 });

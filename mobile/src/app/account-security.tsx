@@ -3,13 +3,15 @@ import { KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
 import { Text } from "../ui/Text";
 import { Redirect, router, Stack } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
-import { PASSWORD_HINT, type AccountSecurity } from "@scripta/shared";
+import { passwordHint, type AccountSecurity } from "@scripta/shared";
 import { apiClient } from "../core/api";
 import { useAuth } from "../core/auth";
 import { Button, Input, Screen, useToast } from "../ui";
 import { spacing, typography, useTheme } from "../ui/theme";
+import { useLocale } from "../i18n";
 
 export default function AccountSecurityPage() {
+  const locale = useLocale();
   const { user, ready, signOut } = useAuth();
   const { colors } = useTheme();
   const { show } = useToast();
@@ -71,7 +73,7 @@ export default function AccountSecurityPage() {
         {mode && <View style={{ gap: spacing.md }}>
           <Input label="Current password" secureTextEntry autoComplete="current-password" textContentType="password" value={current} onChangeText={setCurrent} editable={!busy} />
           {mode === "email" ? <Input label="New email" autoComplete="email" autoCapitalize="none" autoCorrect={false} keyboardType="email-address" value={email} onChangeText={setEmail} editable={!busy} /> : <>
-            <Input label="New password" secureTextEntry autoComplete="new-password" textContentType="newPassword" hint={PASSWORD_HINT} value={password} onChangeText={setPassword} editable={!busy} />
+            <Input label="New password" secureTextEntry autoComplete="new-password" textContentType="newPassword" hint={passwordHint(locale)} value={password} onChangeText={setPassword} editable={!busy} />
             <Input label="Confirm new password" secureTextEntry autoComplete="new-password" textContentType="newPassword" error={confirmError} value={confirm} onChangeText={(value) => { setConfirm(value); setConfirmError(""); }} editable={!busy} />
             <Text style={{ color: colors.textDim }}>Changing your password signs you out on every device. Then log in with your new password.</Text>
           </>}

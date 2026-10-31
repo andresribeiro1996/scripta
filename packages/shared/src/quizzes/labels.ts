@@ -1,3 +1,5 @@
+import type { Locale } from "../i18n/locale.js";
+import { sharedT } from "../i18n/sharedT.js";
 import type { PlayResponse, PublicQuizQuestion, QuizBook, QuizQuestion, QuizQuestionType } from "./types.js";
 
 type ScoreValue = { kind: "text" | "cover"; value: string };
@@ -10,14 +12,15 @@ export interface ScoreRow {
   pick?: ScoreValue;
 }
 
-export function quizQuestionLabel(question: QuizQuestion, index: number, books: QuizBook[]): string {
+export function quizQuestionLabel(question: QuizQuestion, index: number, books: QuizBook[], locale: Locale): string {
+  const t = sharedT(locale);
   const title = books.find((book) => book.workId === question.workId)?.title;
-  return title ? `Q${index + 1} · ${title}` : `Q${index + 1}`;
+  return title ? t("shared.labels.questionWithBook", { number: index + 1, title }) : t("shared.labels.questionNumber", { number: index + 1 });
 }
 
-export function quizOptionLabel(type: QuizQuestionType, option: string, books: Array<{ title: string; coverUrl?: string | null }>): string {
+export function quizOptionLabel(type: QuizQuestionType, option: string, books: Array<{ title: string; coverUrl?: string | null }>, locale: Locale): string {
   if (type !== "title_cover") return option;
-  return books.find((book) => book.coverUrl === option)?.title ?? "Unknown book";
+  return books.find((book) => book.coverUrl === option)?.title ?? sharedT(locale)("shared.labels.unknownBook");
 }
 
 export function scoreRows(questions: PublicQuizQuestion[], correct: Record<string, boolean>, answers: PlayResponse["answers"]): ScoreRow[] {
@@ -42,12 +45,13 @@ export function resultCovers(questions: PublicQuizQuestion[], rows: ScoreRow[]):
   return [...covers].slice(0, 3).map(([url, title]) => ({ url, title }));
 }
 
-export function playerLabel(play: { playerName: string | null; anonymous: boolean }): { name: string; guest: boolean } {
-  return { name: play.playerName ?? "Guest", guest: play.anonymous };
+export function playerLabel(play: { playerName: string | null; anonymous: boolean }, locale: Locale): { name: string; guest: boolean } {
+  return { name: play.playerName ?? sharedT(locale)("shared.labels.guest"), guest: play.anonymous };
 }
 
-export function quizClueHeading(type: QuizQuestionType): string {
-  if (type === "characters_title") return "Which book has these characters?";
-  if (type === "title_cover") return "Which cover belongs to this title?";
-  return "Which book is this from?";
+export function quizClueHeading(type: QuizQuestionType, locale: Locale): string {
+  const t = sharedT(locale);
+  if (type === "characters_title") return t("shared.labels.clueCharacters");
+  if (type === "title_cover") return t("shared.labels.clueCover");
+  return t("shared.labels.clueBook");
 }

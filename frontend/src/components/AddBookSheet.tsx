@@ -9,6 +9,7 @@ import { Sheet } from "./Sheet";
 import { useToast } from "./Toaster";
 import { statusLabel } from "../lib/covers";
 import { localDay } from "../lib/libraryView";
+import { getLocale, useLocale } from "../i18n";
 
 /** Add-one-book sheet for the public pages (shared library, arena,
  *  tier-list voting): a link recipient sees a book they like, picks a
@@ -26,6 +27,7 @@ export function AddBookSheet({
   book: { title: string; author: string; isbn?: string | null; coverUrl?: string | null };
   onClose: () => void;
 }) {
+  const locale = useLocale();
   const { session } = useAuth();
   const location = useLocation();
   const toast = useToast();
@@ -70,7 +72,7 @@ export function AddBookSheet({
       toast({ message: updated ? "Updated in your library." : "Added to your library." });
       onClose();
     } catch (error) {
-      toast({ message: saveFailureMessage(error, "Could not add the book."), kind: "error" });
+      toast({ message: saveFailureMessage(error, "Could not add the book.", getLocale()), kind: "error" });
     } finally {
       setBusyStatus(null);
     }
@@ -98,7 +100,7 @@ export function AddBookSheet({
             disabled={busyStatus !== null}
             className={`${actionClass} w-full`}
           >
-            {busyStatus === status ? "Adding…" : statusLabel(status)}
+            {busyStatus === status ? "Adding…" : statusLabel(status, locale)}
           </button>
         ))}
       </div>

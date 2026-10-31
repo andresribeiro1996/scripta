@@ -6,12 +6,14 @@ import { themeTile } from "../../ui/ThemeGrid";
 import { Icon } from "../../ui/icon";
 import { dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui/theme";
 import { isAppearanceSyncFailure, saveAccountAppearance } from "./appearanceSync";
+import { useLocale } from "../../i18n";
 
 const OPTIONS: ThemePreference[] = ["system", ...THEME_IDS];
 
 export const SWATCH = 46;
 
 export function ThemePicker() {
+  const locale = useLocale();
   const { colors, preference, setPreference } = useTheme();
   const [error, setError] = useState<string | null>(null);
 
@@ -29,7 +31,7 @@ export function ThemePicker() {
       <View accessibilityRole="radiogroup" accessibilityLabel="Theme" style={styles.grid}>
         {OPTIONS.map((option) => {
           const checked = option === preference;
-          const { label, palettes } = themeTile(option);
+          const { label, palettes } = themeTile(option, locale);
           const left = palettes[0];
           const right = palettes[palettes.length - 1];
           return (

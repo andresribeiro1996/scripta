@@ -17,8 +17,10 @@ import { useLibrary } from "../hooks/useLibrary";
 import { useTierlists } from "../hooks/useTierlists";
 import { useTierlistResults, useTierlistVoting } from "../hooks/useTierlistVoting";
 import { useWorkBooks } from "../hooks/useWorkBooks";
+import { useLocale } from "../i18n";
 
 export function TierListEditorPage() {
+  const locale = useLocale();
   const { id } = useParams<{ id: string }>();
   const { data: library } = useLibrary();
   const { data: tierlistsData, isLoading, rename, saveData, refetch } = useTierlists();
@@ -349,7 +351,7 @@ export function TierListEditorPage() {
           )}
           {resolvedPool.length > 0 && (
             <p className="mt-1 text-xs text-(--color-text-dim)">
-              {resolvedPool.length} {itemNoun(subject, resolvedPool.length)} still unranked — tap Edit to place them.
+              {resolvedPool.length} {itemNoun(subject, resolvedPool.length, locale)} still unranked — tap Edit to place them.
             </p>
           )}
         </div>

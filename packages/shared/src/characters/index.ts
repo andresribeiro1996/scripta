@@ -1,3 +1,5 @@
+import type { Locale } from "../i18n/locale.js";
+import { sharedT } from "../i18n/sharedT.js";
 import type { PublicBookData } from "../public/types.js";
 
 export type CharacterScope = { kind: "series" | "work"; key: string; label: string; coverUrl: string | null };
@@ -45,9 +47,8 @@ export function canCreate(mode: CharacterGameMode, ticked: number, size: number)
   return mode === "tierlist" ? ticked >= MIN_CAST : ticked === size;
 }
 
-export function itemNoun(subject: unknown, count: number): string {
-  if (subject) return count === 1 ? "character" : "characters";
-  return count === 1 ? "book" : "books";
+export function itemNoun(subject: unknown, count: number, locale: Locale): string {
+  return sharedT(locale)(subject ? "shared.characters.character" : "shared.characters.book", { count });
 }
 
 export function bookTierlists<T extends { subject?: unknown }>(lists: T[]): T[] {

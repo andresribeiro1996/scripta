@@ -19,3 +19,4 @@ export * from "./characters/index.js";
 export * from "./public/index.js";
 export * from "./socials/index.js";
 export * from "./gallery/index.js";
+export * from "./i18n/index.js";

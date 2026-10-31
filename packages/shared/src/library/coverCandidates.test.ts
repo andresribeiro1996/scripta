@@ -115,14 +115,15 @@ test("the current cover matches a candidate's full or thumbnail URL only", () =>
 });
 
 test("source labels", () => {
-  assert.equal(coverSourceLabel("kobo"), "Kobo");
-  assert.equal(coverSourceLabel("isbndb"), "ISBNdb");
-  assert.equal(coverSourceLabel("openlibrary"), "Open Library");
-  assert.equal(coverSourceLabel("apple"), "Apple Books");
-  assert.equal(coverSourceLabel("bnp"), "National Library of Portugal");
-  assert.equal(coverSourceLabel("publisher"), "Publisher");
-  assert.equal(coverSourceLabel("upload"), "Admin upload");
-  assert.equal(coverSourceLabel("mystery"), "mystery");
+  assert.equal(coverSourceLabel("kobo", "en"), "Kobo");
+  assert.equal(coverSourceLabel("isbndb", "en"), "ISBNdb");
+  assert.equal(coverSourceLabel("openlibrary", "en"), "Open Library");
+  assert.equal(coverSourceLabel("apple", "en"), "Apple Books");
+  assert.equal(coverSourceLabel("bnp", "en"), "National Library of Portugal");
+  assert.equal(coverSourceLabel("publisher", "en"), "Publisher");
+  assert.equal(coverSourceLabel("upload", "en"), "Admin upload");
+  assert.equal(coverSourceLabel("mystery", "en"), "mystery");
+  assert.equal(coverSourceLabel("bnp", "pt-PT"), "Biblioteca Nacional de Portugal");
 });
 
 function done(candidates: CoverCandidateView[], unavailable: string[] = []): FoundCoversLoad {

@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { saveFailureMessage } from "@scripta/shared";
 import { ApiError, createApiClient, isPermanentError } from "./apiClient.js";
+import { setLocalePreference } from "../i18n";
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -189,7 +190,7 @@ test("a 413 reaches saveFailureMessage with the server's message", async () => {
 
   const caught = await session.apiClient.request("/library", { method: "PUT", auth: true }).catch((error: unknown) => error);
 
-  assert.equal(saveFailureMessage(caught, "generic"), message);
+  assert.equal(saveFailureMessage(caught, "generic", "en"), message);
 });
 
 function store(initial: string | null) {
@@ -259,4 +260,29 @@ test("only a definite 4xx answer is a permanent error", () => {
   for (const status of [408, 429, 500, 502, 503]) assert.equal(isPermanentError(new ApiError(status, "No")), false);
   assert.equal(isPermanentError(new TypeError("Network request failed")), false);
   assert.equal(isPermanentError(null), false);
+});
+
+test("every request carries the client's Accept-Language, English by default", async () => {
+  const seen: Array<string | null> = [];
+  const fetcher: typeof fetch = async (_input, init) => {
+    seen.push(new Headers(init?.headers).get("Accept-Language"));
+    return jsonResponse(200, {});
+  };
+  const tokenStore = { async getRefreshToken() { return null; }, async setRefreshToken() {}, async clearRefreshToken() {} };
+  await createApiClient("http://api.test", tokenStore, () => null, () => {}, fetcher).apiClient.request("/library");
+  await createApiClient("http://api.test", tokenStore, () => null, () => {}, fetcher, () => "pt-PT").apiClient.request("/library");
+  assert.deepEqual(seen, ["en", "pt-PT"]);
+});
+
+test("the client's own error messages stay English and follow an explicit Portuguese pick", async () => {
+  const tokenStore = { async getRefreshToken() { return null; }, async setRefreshToken() {}, async clearRefreshToken() {} };
+  const failing = (response: Response) => createApiClient("http://api.test", tokenStore, () => "access", () => {}, async () => response).apiClient;
+  await assert.rejects(failing(new Response("<html>", { status: 200 })).request("/library", { auth: true }), /Server returned an invalid response/);
+  await assert.rejects(failing(new Response("{}", { status: 500 })).request("/library", { auth: true }), /Request failed \(500\)/);
+  setLocalePreference("pt-PT");
+  try {
+    await assert.rejects(failing(new Response("{}", { status: 500 })).request("/library", { auth: true }), /O pedido falhou \(500\)/);
+  } finally {
+    setLocalePreference("auto");
+  }
 });

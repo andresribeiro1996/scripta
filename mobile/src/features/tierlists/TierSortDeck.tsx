@@ -8,6 +8,7 @@ import { Text } from "../../ui/Text";
 import { commitHaptic, liftHaptic } from "../../ui/haptics";
 import { EmptyState, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { labelOf, TierCover, type TierBook } from "./TierBoard";
+import { useLocale } from "../../i18n";
 
 const TARGET_SIZE = 56;
 
@@ -46,6 +47,7 @@ function DragBook({ book, x, y, lifted }: {
 }
 
 export function TierSortDeck({ data, books, onAssign, selectedWorkId }: { data: TierlistData; books: TierBook[]; onAssign: (workId: string, tierId: string) => void; selectedWorkId?: string | null }) {
+  const locale = useLocale();
   const { colors } = useTheme();
   const ringRef = useRef<HostInstance>(null);
   const zones = useSharedValue<Array<{ x: number; y: number }>>([]);
@@ -118,7 +120,7 @@ export function TierSortDeck({ data, books, onAssign, selectedWorkId }: { data: 
   if (!book) return <EmptyState title="Nothing left to rank" body={`Every ${books.some(isCharacterBook) ? "character" : "book"} in this list already sits in a tier.`} />;
 
   return <View style={styles.deck}>
-    <Text {...dynamicType} style={[typography.caption, styles.center, { color: colors.textDim }]}>{selectedWorkId ? "Choose a new tier · drag or tap a circle" : `${pending.length} ${itemNoun(books.some(isCharacterBook), pending.length)} left · swipe up from below`}</Text>
+    <Text {...dynamicType} style={[typography.caption, styles.center, { color: colors.textDim }]}>{selectedWorkId ? "Choose a new tier · drag or tap a circle" : `${pending.length} ${itemNoun(books.some(isCharacterBook), pending.length, locale)} left · swipe up from below`}</Text>
     <GestureDetector gesture={gesture}><View ref={ringRef} style={styles.ring} onLayout={(event) => setRing(event.nativeEvent.layout)}>
       <DragBook key={current} book={book} x={x} y={y} lifted={lifted} />
       {data.tiers.map((tier, index) => <View key={tier.id} style={[styles.targetWrap, { transform: [{ translateX: radius * Math.sin(index * 2 * Math.PI / data.tiers.length) }, { translateY: -radius * Math.cos(index * 2 * Math.PI / data.tiers.length) }] }]}>

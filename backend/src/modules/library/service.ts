@@ -53,7 +53,7 @@ function textFields(book: Record<string, unknown>): Record<string, unknown> {
 }
 
 function settledGlyph(books: Record<string, unknown>[], groupRecords: Record<string, unknown>[]): IdentityKey | null {
-  const identity = readerIdentity(books, toReaderGroups(groupRecords));
+  const identity = readerIdentity(books, toReaderGroups(groupRecords), "en");
   return identity.state === "settled" ? identity.identity : null;
 }
 
@@ -146,7 +146,7 @@ export function libraryMeta(data: Record<string, unknown>): string {
 
 export function readerCardOf(parts: { allBooks: Record<string, unknown>[]; groupRecords: Record<string, unknown>[] }, report: ReportSkippedRow): string | null {
   try {
-    return JSON.stringify(publicReaderCardOf(parts.allBooks, toReaderGroups(parts.groupRecords)));
+    return JSON.stringify(publicReaderCardOf(parts.allBooks, toReaderGroups(parts.groupRecords), "en"));
   } catch (error) {
     if (!(error instanceof TypeError)) throw error;
     report(error, "no reader card");
