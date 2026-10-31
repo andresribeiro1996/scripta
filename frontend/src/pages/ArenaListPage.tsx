@@ -7,8 +7,8 @@
 
 import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { itemNoun, quizPreview } from "@scripta/shared";
-import { CONTENT_STATUS, TIER_LADDER, contentDetail, contentTarget, formatDate } from "@scripta/shared/community";
+import { itemNoun, quizPreview, tierlistBookCount } from "@scripta/shared";
+import { TIER_LADDER, ownedTierlistStatus, contentDetail, contentTarget, formatDate } from "@scripta/shared/community";
 import type { Quiz } from "../api/quizzes";
 import type { Tierlist } from "../api/tierlists";
 import { TournamentStatusBadge } from "../components/arena/TournamentStatusBadge";
@@ -30,12 +30,6 @@ import { useVotedTierlists } from "../hooks/useVotedTierlists";
 import { useVotedTournaments } from "../hooks/useVotedTournaments";
 import { area } from "../lib/areas";
 import type { Tournament } from "../api/arena";
-
-function tierlistStatus(tl: Tierlist) {
-  if (tl.promotedAt) return { label: "Reference", tone: "reference" } as const;
-  if (tl.voteCode === null) return { label: "Draft", tone: "neutral" } as const;
-  return tl.votingOpen ? CONTENT_STATUS.votingOpen : CONTENT_STATUS.closed;
-}
 
 export function ArenaListPage() {
   const { tournaments, isLoading, error: tournamentsError, refetch: refetchTournaments } = useMyTournaments();
@@ -118,6 +112,7 @@ export function ArenaListPage() {
         </>
       }
       tabs={area("games").tabs}
+      reserveSubtitle
       actions={
         <button onClick={create.onClick} className={BUTTON_PRIMARY}>
           {create.label}
@@ -215,8 +210,8 @@ export function ArenaListPage() {
                   name={tl.name}
                   to={`/dashboard/arena/tierlist/${tl.id}`}
                   meta={`Updated ${formatDate(tl.updatedAt)}`}
-                  badges={<StatusBadge {...tierlistStatus(tl)} />}
-                  stats={[{ value: tl.data.pool.length, label: itemNoun(tl.subject, tl.data.pool.length) }]}
+                  badges={<StatusBadge {...ownedTierlistStatus(tl)} />}
+                  stats={[{ value: tierlistBookCount(tl.data), label: itemNoun(tl.subject, tierlistBookCount(tl.data)) }]}
                   covers={tl.subject?.scope.coverUrl ? [tl.subject.scope.coverUrl] : []}
                   ladder={tl.data.tiers.map((tier) => tier.color)}
                   menu={

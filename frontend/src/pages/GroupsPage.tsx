@@ -345,6 +345,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
       title="Library"
       subtitle={isLoading ? undefined : `${allGroups.length} ${allGroups.length === 1 ? copy.noun : copy.plural}`}
       tabs={area("library").tabs}
+      reserveSubtitle
       maxWidth={style.contentMaxWidth}
       actions={
         books.length > 0 && selectionMode ? (

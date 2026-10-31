@@ -73,7 +73,8 @@ test("the folder column lines All murals and New folder up with the folder names
   const tree = src("components/murals/MuralFolderTree");
   assert.match(tree, /const nested = folders\.some\(\(folder\) => folder\.parentId !== null\)/);
   assert.equal(tree.match(/\$\{indent\}/g)?.length, 2);
-  assert.match(tree, /!nested \? "hidden"/);
+  assert.match(tree, /\{nested \? \(\s*<button/);
+  assert.doesNotMatch(tree, /"hidden"/);
 });
 
 test("the three Home side panels share one header band and no hairline under it", () => {
@@ -130,11 +131,12 @@ test("the new series / collection field: danger frame on error, Add and Cancel b
   assert.doesNotMatch(s, /Press Enter to add it/);
 });
 
-test("section headings: Published, day groups, Your chapters and the Admin groups use SECTION_HEADING", () => {
+test("section headings: Published, day groups, Your chapters use SECTION_HEADING; the Admin panels use PANEL_HEADING", () => {
   assert.match(src("pages/CommunityProfilePage"), /<h2 className=\{`\$\{SECTION_HEADING\} mb-3`\}>Published<\/h2>/);
   assert.match(src("pages/DailyChapterPage"), /<h2 id="daily-history" className=\{SECTION_HEADING\}>Your chapters<\/h2>/);
   const admin = src("pages/AdminDailyChapterPage");
-  assert.equal(admin.match(/<h2 className=\{SECTION_HEADING\}>/g)?.length, 6);
+  assert.equal(admin.match(/<h2 className=\{PANEL_HEADING\}>/g)?.length, 6);
+  assert.doesNotMatch(admin, /SECTION_HEADING/);
   assert.doesNotMatch(admin, /<h2 className="text-xl">/);
   const activity = src("components/ProfileActivity");
   assert.match(activity, /<h2 className=\{`\$\{SECTION_HEADING\} mb-3`\}>\{day\}<\/h2>\s*<div className=\{LIST_PANEL\}>/);
@@ -143,13 +145,12 @@ test("section headings: Published, day groups, Your chapters and the Admin group
 
 test("the owner's tier list ticket shows its state and size", () => {
   const s = src("pages/ArenaListPage");
-  assert.match(s, /badges=\{<StatusBadge \{\.\.\.tierlistStatus\(tl\)\} \/>\}/);
-  assert.match(s, /stats=\{\[\{ value: tl\.data\.pool\.length/);
-  assert.match(s, /tl\.voteCode === null\) return \{ label: "Draft"/);
+  assert.match(s, /badges=\{<StatusBadge \{\.\.\.ownedTierlistStatus\(tl\)\} \/>\}/);
+  assert.match(s, /stats=\{\[\{ value: tierlistBookCount\(tl\.data\)/);
 });
 
 test("the book meta line keeps its separators with the next item, so none dangles at a wrap", () => {
   const s = src("components/book/BookScreen");
-  assert.match(s, /overflow-hidden text-sm[\s\S]*?-ml-5 flex flex-wrap[\s\S]*?pl-5 before:absolute before:left-2 before:content-\['·'\]/);
+  assert.match(s, /overflow-hidden text-sm[\s\S]*?-ml-5 flex flex-wrap[\s\S]*?pl-5 before:absolute before:left-2 before:content-\['·'_\/_''\]/);
   assert.doesNotMatch(s, /key=\{`dot-/);
 });

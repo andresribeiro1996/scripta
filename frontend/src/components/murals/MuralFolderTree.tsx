@@ -64,27 +64,29 @@ export function MuralFolderTree({
           const isCollapsed = collapsed.has(folder.id);
           return (
             <div key={folder.id} className="group flex items-center gap-0.5" style={{ paddingLeft: depth * 14 }}>
-              <button
-                onClick={() => toggle(folder.id)}
-                title={isCollapsed ? "Expand" : "Collapse"}
-                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded text-(--color-text-dim) hover:bg-(--color-surface-hover) ${
-                  !nested ? "hidden" : hasChildren ? "" : "invisible"
-                }`}
-              >
-                <svg
-                  width="10"
-                  height="10"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className={isCollapsed ? "" : "rotate-90"}
+              {nested ? (
+                <button
+                  onClick={() => toggle(folder.id)}
+                  title={isCollapsed ? "Expand" : "Collapse"}
+                  className={`flex h-11 w-11 shrink-0 items-center justify-center rounded text-(--color-text-dim) hover:bg-(--color-surface-hover) ${
+                    hasChildren ? "" : "invisible"
+                  }`}
                 >
-                  <polyline points="9 18 15 12 9 6" />
-                </svg>
-              </button>
+                  <svg
+                    width="10"
+                    height="10"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className={isCollapsed ? "" : "rotate-90"}
+                  >
+                    <polyline points="9 18 15 12 9 6" />
+                  </svg>
+                </button>
+              ) : null}
               {renamingId === folder.id ? (
                 <input
                   autoFocus

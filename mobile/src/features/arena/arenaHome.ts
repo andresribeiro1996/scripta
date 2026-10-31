@@ -1,6 +1,6 @@
 import { FAN_SIZE, TIER_LADDER } from "../community/communityHome";
-import { itemNoun, quizPreview, type QuizPreview } from "@scripta/shared";
-import { CONTENT_STATUS, type ContentTone } from "@scripta/shared/community";
+import { itemNoun, quizPreview, tierlistBookCount, type QuizPreview } from "@scripta/shared";
+import { CONTENT_STATUS, ownedTierlistStatus, type ContentTone } from "@scripta/shared/community";
 import type { Quiz } from "../quizzes/api";
 import type { Tierlist, VotedTierlist } from "../tierlists/api";
 import type { Tournament } from "./api";
@@ -47,7 +47,7 @@ export const DELETE_EFFECT: Record<OwnedItem["kind"], string> = {
 
 type Badge = { label: string; tone: ContentTone };
 
-const DRAFT_BADGE: Badge = { label: "Draft", tone: "neutral" };
+const DRAFT_BADGE: Badge = CONTENT_STATUS.draft;
 
 const TOURNAMENT_BADGE: Record<Tournament["status"], Badge> = {
   seeding: { label: "Seeding", tone: "neutral" },
@@ -97,7 +97,7 @@ export function ownedItems(tab: ArenaTab, tournaments: Tournament[], tierlists: 
   }
   return tierlists.map((source) => {
     const tiers = source.data.tiers.length;
-    const books = source.data.tiers.reduce((total, tier) => total + tier.workIds.length, source.data.pool.length);
+    const books = tierlistBookCount(source.data);
     return {
       id: source.id,
       name: source.name,
@@ -255,7 +255,7 @@ export function gameRow(row: Exclude<SectionedItem, { kind: "header" }>): GameRo
     kind: "tierlist",
     name: item.name,
     meta: item.detail,
-    badges: [TIERLIST_BADGE[stage(item.source.voteCode, item.source.votingOpen)]],
+    badges: [ownedTierlistStatus(item.source)],
     covers: [],
     ladder: item.source.data.tiers.map((tier) => tier.color),
   };

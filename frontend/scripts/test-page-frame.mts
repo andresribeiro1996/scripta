@@ -284,12 +284,15 @@ test("the quiz editor says why Publish is off next to the header, and play and r
   assert.match(src("components/quiz/QuizResults"), /<Page back=\{back\} title=\{name\}>/);
 });
 
-test("a tabbed header keeps a one-line subtitle slot, so the tab row sits at the same height on every tab", () => {
+test("a tabbed header reserves a one-line subtitle slot only where a sibling tab can carry a subtitle", () => {
   const slot = /<div class="mt-1\.5 [^"]*min-h-11[^"]*">/;
-  assert.match(render(createElement(Page, { title: "Library", tabs: area("library").tabs, children: "x" }), "/dashboard/series"), slot);
-  assert.match(render(createElement(Page, { title: "Library", subtitle: "2 series", tabs: area("library").tabs, children: "x" }), "/dashboard/series"), slot);
+  const tabs = area("library").tabs;
+  assert.match(render(createElement(Page, { title: "Library", tabs, reserveSubtitle: true, children: "x" }), "/dashboard/series"), slot);
+  assert.match(render(createElement(Page, { title: "Library", subtitle: "2 series", tabs, reserveSubtitle: true, children: "x" }), "/dashboard/series"), slot);
+  assert.doesNotMatch(render(createElement(Page, { title: "Community", tabs: area("community").tabs, children: "x" }), "/dashboard/community"), /mt-1\.5/);
   assert.doesNotMatch(render(createElement(Page, { title: "Library", children: "x" })), slot);
-  assert.doesNotMatch(render(createElement(Page, { title: "Settings", tabs: area("settings").tabs, sideTabs: true, children: "x" }), "/dashboard/settings"), slot);
+  assert.doesNotMatch(render(createElement(Page, { title: "Settings", tabs: area("settings").tabs, sideTabs: true, reserveSubtitle: true, children: "x" }), "/dashboard/settings"), slot);
+  for (const f of ["LibraryPage", "GalleryPage", "GroupsPage", "ArenaListPage"]) assert.match(src(`pages/${f}`), /^\s+reserveSubtitle$/m, f);
 });
 
 test("Games keeps one subtitle on every tab, and Admin keeps one title with no per-tab subtitle", () => {
@@ -333,4 +336,6 @@ test("profile tabs are flush with the title, and your own profile has the Librar
     assert.match(s, /<div className="mt-6">\s*\{error && /, f);
   }
   assert.doesNotMatch(src("pages/CommunityProfilePage"), /<PublicLibraryGrid\b/);
+  assert.match(own, /<ProfileLibraryPanel\b(?:=>|[^>])*onOpenBook=\{\(book\) => navigate\(bookHref\(bookKey\(book\)/);
+  assert.doesNotMatch(src("pages/CommunityProfilePage"), /onOpenBook/);
 });

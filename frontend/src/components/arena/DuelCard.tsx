@@ -41,7 +41,7 @@ function DuelSideCard({
     [side.title, side.author, side.cover]
   );
   const aboutable = side.workId !== null && !character;
-  const addable = onAddBook !== undefined && !character;
+  const addBook = character ? undefined : onAddBook;
   return (
     <div className="relative flex min-w-0 flex-1 flex-col">
       <button
@@ -82,15 +82,15 @@ function DuelSideCard({
           </p>
         </div>
       </button>
-      {aboutable || addable ? (
+      {aboutable || addBook ? (
         <div className="flex items-center justify-between gap-2">
           {aboutable ? (
             <Link to={`/work/${side.workId}`} aria-label="About this book" className={SIDE_ACTION}>
               About
             </Link>
           ) : null}
-          {addable && onAddBook ? (
-            <button type="button" aria-label={`Add ${side.title} to your library`} onClick={() => onAddBook(side)} className={`${SIDE_ACTION} ml-auto`}>
+          {addBook ? (
+            <button type="button" aria-label={`Add ${side.title} to your library`} onClick={() => addBook(side)} className={`${SIDE_ACTION} ml-auto`}>
               Add
             </button>
           ) : null}

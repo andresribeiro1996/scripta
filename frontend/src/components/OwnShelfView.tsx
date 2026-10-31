@@ -21,6 +21,8 @@ import { useGalleryImages } from "../hooks/useGalleryImages";
 import { useLibrary } from "../hooks/useLibrary";
 import { useMurals } from "../hooks/useMurals";
 import { backTo } from "../lib/areas";
+import { bookHref } from "../lib/libraryView";
+import { bookKey } from "../lib/merge";
 import { orderLibraryBooks } from "../lib/libraryOrder";
 import { buildMuralPreset, shelfPresetSummary } from "../lib/muralPresets";
 import type { Mural } from "../lib/murals";
@@ -190,7 +192,7 @@ export function OwnShelfView({ username }: { username: string }) {
         <SwipeTabs tabs={OWN_SHELF_TABS} value={tab} onChange={setTab} label="Shelf sections">
           {(panel) => {
             if (panel === "activity") return <ProfileActivity activity={activity} />;
-            if (panel === "library") return <ProfileLibraryPanel library={library?.data} isLoading={libraryQuery.isPending} error={libraryQuery.error} onRetry={() => void libraryQuery.refetch()} />;
+            if (panel === "library") return <ProfileLibraryPanel library={library?.data} isLoading={libraryQuery.isPending} error={libraryQuery.error} onRetry={() => void libraryQuery.refetch()} onOpenBook={(book) => navigate(bookHref(bookKey(book), library?.works))} />;
             return (
               <div className="mb-8">
                 {shelfMural && muralHasBlocks ? (

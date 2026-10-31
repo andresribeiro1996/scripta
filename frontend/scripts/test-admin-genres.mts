@@ -40,7 +40,7 @@ test("Retry is offered on rejected rows only, and Jev's guess is preselected", (
 });
 
 test("the genre review link shows only for the admin", () => {
-  assert.ok(footerAreas(true).some((a) => a.id === "admin" && a.to === "/admin/genres"));
+  assert.ok(footerAreas(true).some((a) => a.id === "admin" && a.to === "/admin/daily-chapter"));
   assert.ok(area("admin").tabs.some((t) => t.to === "/admin/genres"));
   assert.deepEqual(footerAreas(false), []);
 });

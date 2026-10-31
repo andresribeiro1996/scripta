@@ -248,7 +248,7 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
               <div className="mt-4 overflow-hidden text-sm text-(--color-text-dim)">
                 <div className="-ml-5 flex flex-wrap items-center gap-y-1">
                   {metaParts.map((part) => (
-                    <span key={part.key} className="relative pl-5 before:absolute before:left-2 before:content-['·']">{part}</span>
+                    <span key={part.key} className="relative pl-5 before:absolute before:left-2 before:content-['·'_/_'']">{part}</span>
                   ))}
                 </div>
               </div>

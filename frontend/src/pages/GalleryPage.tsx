@@ -99,6 +99,7 @@ export function GalleryPage() {
       title="Library"
       subtitle={isLoading ? undefined : `${images.length} image${images.length === 1 ? "" : "s"}`}
       tabs={area("library").tabs}
+      reserveSubtitle
       maxWidth={style.contentMaxWidth}
       actions={
         <>
