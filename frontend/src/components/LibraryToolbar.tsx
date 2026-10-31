@@ -1,4 +1,5 @@
 import { chipClass, FIELD_CLASS } from "./page/buttonClasses";
+import { SCROLL_FADE } from "./page/surfaceClasses";
 import { SearchField, ToolbarRow } from "./Toolbar";
 import { STATUS_FILTER_OPTIONS, SORT_OPTIONS, type SortKey, type StatusFilter } from "../lib/libraryView";
 
@@ -35,7 +36,7 @@ export function LibraryToolbar({
             </option>
           ))}
         </select>
-        <div role="group" aria-label="Status" className="-mx-4 -my-1 flex w-[calc(100%+2rem)] gap-2 overflow-x-auto px-4 py-1 sm:mx-0 sm:my-0 sm:w-auto sm:overflow-visible sm:p-0">
+        <div role="group" aria-label="Status" className={`-mx-4 -my-1 flex w-[calc(100%+2rem)] gap-2 overflow-x-auto px-4 py-1 ${SCROLL_FADE} sm:mx-0 sm:my-0 sm:w-auto sm:overflow-visible sm:p-0`}>
           {STATUS_FILTER_OPTIONS.map((o) => (
             <button key={o.value} type="button" aria-pressed={status === o.value} onClick={() => onStatusChange(o.value)} className={chipClass(status === o.value)}>
               {o.value === "all" ? "All" : o.label}

@@ -1,10 +1,10 @@
 import { useRef, useState, type InputHTMLAttributes } from "react";
 
-export function PasswordInput(props: InputHTMLAttributes<HTMLInputElement>) {
+export function PasswordInput(props: InputHTMLAttributes<HTMLInputElement> & { className: string }) {
   const [visible, setVisible] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   return <div className="relative">
-    <input {...props} ref={input} type={visible ? "text" : "password"} className={`${props.className ?? "w-full rounded-lg border border-(--color-border) bg-(--color-bg) px-3 py-3"} pr-12`} />
+    <input {...props} ref={input} type={visible ? "text" : "password"} className={`${props.className} pr-12`} />
     <button type="button" aria-label={visible ? "Hide password" : "Show password"} aria-pressed={visible}
       disabled={props.disabled} className="absolute inset-y-0 right-0 flex w-12 items-center justify-center rounded-lg focus-visible:outline-2 focus-visible:outline-current"
       onMouseDown={(event) => event.preventDefault()} onClick={() => { setVisible(!visible); input.current?.focus(); }}>

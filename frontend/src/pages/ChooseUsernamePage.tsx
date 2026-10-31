@@ -10,7 +10,6 @@ import {
   AuthServerError,
   AuthStage,
   authFieldClass,
-  authFieldErrorClass,
   authHintClass,
   authLabelClass,
   authSubmitClass
@@ -82,11 +81,11 @@ export function ChooseUsernamePage() {
               setFieldError(null);
             }}
             onInvalid={handleInvalid}
-            aria-describedby={fieldError ? "username-error" : undefined}
-            className={fieldError ? authFieldErrorClass : authFieldClass}
+            aria-invalid={Boolean(fieldError)}
+            aria-describedby={fieldError ? "username-error" : "username-hint"}
+            className={authFieldClass}
           />
-          <p className={authHintClass}>{USERNAME_HINT}</p>
-          <AuthFieldError id="username-error" message={fieldError} />
+          {fieldError ? <AuthFieldError id="username-error" message={fieldError} /> : <p id="username-hint" className={authHintClass}>{USERNAME_HINT}</p>}
 
           <button type="submit" disabled={submitting} className={`${authSubmitClass} mt-6`}>
             {submitting ? "Saving…" : "Continue"}
