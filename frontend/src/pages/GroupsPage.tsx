@@ -411,7 +411,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
                 }
               }}
               placeholder={`Name this ${copy.noun}…`}
-              className={`min-h-11 w-full rounded-lg border bg-(--color-surface) px-3 text-sm ${draftError ? "border-(--color-danger)" : "border-(--color-border)"}`}
+              className={`${FIELD_CLASS} w-full`}
             />
             <p id="new-group-name-hint" role={draftError ? "alert" : undefined} className={`mt-1 text-xs ${draftError ? "text-(--color-danger)" : "text-(--color-text-dim)"}`}>
               {draftError ?? "Press Enter to add it."}

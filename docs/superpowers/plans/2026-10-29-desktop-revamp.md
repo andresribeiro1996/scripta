@@ -1503,6 +1503,9 @@ git add frontend/src/components/GenreReviewList.tsx frontend/src/components/Syno
 - Modify: `frontend/src/pages/GroupsPage.tsx`
 - Modify: `frontend/src/pages/MuralsListPage.tsx`
 - Modify: `frontend/src/pages/SettingsPage.tsx`
+- Modify: `frontend/src/pages/AdminDailyChapterPage.tsx`
+- Modify: `frontend/src/pages/MuralEditorPage.tsx`
+- Modify: `frontend/README.md`
 - Modify: `docs/superpowers/plans/2026-10-29-desktop-revamp.md`
 
 - [ ] **Step 1: Write the guard test.** It scans every `frontend/src/**/*.tsx` except `components/landing/**` and the class modules.

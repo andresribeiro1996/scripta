@@ -201,7 +201,7 @@ export function BlockConfigPanel({
 
         {draft.type === "shelf" && <div className="space-y-2">
           <label className="block text-sm"><span className="font-semibold">Shelf source</span>
-            <select className="ml-2 min-h-11 rounded border p-2" value={draft.collectionId ?? ""} onChange={(event) => {
+            <select className={`${FIELD_CLASS} ml-2`} value={draft.collectionId ?? ""} onChange={(event) => {
               const collectionId = event.target.value || undefined;
               const resolved = resolveHomeBlock(draft, books, groups, "");
               setDraft({ ...draft, collectionId, bookKeys: collectionId ? [] : resolved.type === "shelf" ? resolved.bookKeys : [] });
@@ -211,9 +211,9 @@ export function BlockConfigPanel({
               {groups.filter((group) => group.type === "collection").map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
             </select>
           </label>
-          {draft.collectionId ? <label className="block text-sm"><span className="font-semibold">Title (blank follows collection name)</span><input className="mt-1 min-h-11 w-full rounded border p-2" value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></label> : null}
+          {draft.collectionId ? <label className="block text-sm"><span className="font-semibold">Title (blank follows collection name)</span><input className={`${FIELD_CLASS} mt-1 w-full`} value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></label> : null}
         </div>}
-        {draft.type === "quote" && <label className="block text-sm"><span className="font-semibold">Passage source</span> <select className="min-h-11 rounded border p-2" value={draft.mode ?? "pinned"} onChange={(event) => setDraft({ ...draft, mode: event.target.value === "rediscover" ? "rediscover" : undefined, bookKey: "", highlightId: "" })}><option value="pinned">Choose a passage</option><option value="rediscover">Rediscover a passage</option></select></label>}
+        {draft.type === "quote" && <label className="block text-sm"><span className="font-semibold">Passage source</span> <select className={FIELD_CLASS} value={draft.mode ?? "pinned"} onChange={(event) => setDraft({ ...draft, mode: event.target.value === "rediscover" ? "rediscover" : undefined, bookKey: "", highlightId: "" })}><option value="pinned">Choose a passage</option><option value="rediscover">Rediscover a passage</option></select></label>}
         {draft.type === "shelf" && !draft.collectionId && (
           <div className="flex flex-col gap-3">
             <div>

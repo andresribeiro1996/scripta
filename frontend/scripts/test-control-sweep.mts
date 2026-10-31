@@ -32,7 +32,7 @@ function classNames(el: string): string[] {
 }
 
 const hasFill = (c: string) => /bg-\(--color-(accent|danger)\)/.test(c) && /text-\(--color-on-(accent|danger)\)/.test(c);
-const hasFieldChrome = (c: string) => /\bborder border-\(--color-border\)/.test(c) && /\brounded/.test(c);
+const hasFieldChrome = (c: string) => /(?:^|\s)border(?:-|\s|$)/.test(c) && /(?:^|\s)rounded/.test(c);
 const SKIPPED_TYPE = /type="(checkbox|radio|range|file|color)"/;
 
 test("no button or link hand-rolls an accent or danger fill", () => {
