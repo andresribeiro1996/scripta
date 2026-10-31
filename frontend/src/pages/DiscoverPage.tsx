@@ -61,7 +61,7 @@ function DiscoverPane() {
           <SearchField
             value={search}
             onChange={setSearch}
-            placeholder="Search tier lists, tournaments and quizzes"
+            placeholder="Search games"
             label="Search tier lists, tournaments and quizzes by name or book"
             className="flex-1 sm:flex-none"
           />

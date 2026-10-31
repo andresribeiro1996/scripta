@@ -8,7 +8,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { itemNoun, quizPreview } from "@scripta/shared";
-import { CONTENT_STATUS, TIER_LADDER, contentDetail, contentTarget } from "@scripta/shared/community";
+import { CONTENT_STATUS, TIER_LADDER, contentDetail, contentTarget, formatDate } from "@scripta/shared/community";
 import type { Quiz } from "../api/quizzes";
 import type { Tierlist } from "../api/tierlists";
 import { TournamentStatusBadge } from "../components/arena/TournamentStatusBadge";
@@ -206,7 +206,7 @@ export function ArenaListPage() {
                     aria-label="Tier list name"
                     className={`${FIELD_CLASS} w-full font-semibold`}
                   />
-                  <p className="mt-1 text-sm text-(--color-text-dim)">Updated {new Date(tl.updatedAt).toLocaleDateString()}</p>
+                  <p className="mt-1 text-sm text-(--color-text-dim)">Updated {formatDate(tl.updatedAt)}</p>
                 </div>
               ) : (
                 <GameTicket
@@ -214,7 +214,7 @@ export function ArenaListPage() {
                   kind="tierlist"
                   name={tl.name}
                   to={`/dashboard/arena/tierlist/${tl.id}`}
-                  meta={`Updated ${new Date(tl.updatedAt).toLocaleDateString()}`}
+                  meta={`Updated ${formatDate(tl.updatedAt)}`}
                   badges={<StatusBadge {...tierlistStatus(tl)} />}
                   stats={[{ value: tl.data.pool.length, label: itemNoun(tl.subject, tl.data.pool.length) }]}
                   covers={tl.subject?.scope.coverUrl ? [tl.subject.scope.coverUrl] : []}

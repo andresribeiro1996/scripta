@@ -17,6 +17,7 @@ import type { IScannerControls } from "@zxing/browser";
 import { seriesLabel } from "@scripta/shared";
 import { BUTTON_PRIMARY, BUTTON_SECONDARY, FIELD_CLASS } from "./page/buttonClasses";
 import { Sheet } from "./Sheet";
+import { SearchField } from "./Toolbar";
 import { normalizeIsbn } from "../lib/covers";
 import { bookSearchApi, buildManualBook, searchInsideOutside, searchResultByline, type BookSearchResult } from "../lib/bookSearch";
 
@@ -231,14 +232,7 @@ export function AddBookModal({
           }}
           className="flex gap-2"
         >
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="ISBN, title, or author"
-            aria-label="Search for a book"
-            className={`${FIELD_CLASS} min-w-0 flex-1`}
-          />
+          <SearchField fill className="flex-1" value={query} onChange={setQuery} placeholder="ISBN, title, or author" label="Search for a book" />
           <button type="submit" disabled={searching || query.trim() === ""} className={`${BUTTON_SECONDARY} shrink-0`}>
             {searching ? "Searching…" : "Search"}
           </button>

@@ -9,7 +9,7 @@ import { useMemo, useState } from "react";
 import type { GalleryImage } from "../../api/gallery";
 import { useDeleteGalleryImage } from "../../hooks/useDeleteGalleryImage";
 import { useConfirm } from "../ConfirmDialog";
-import { CloseIcon } from "../Toolbar";
+import { CloseIcon, SearchField } from "../Toolbar";
 
 /** Search-filtered, click-to-select list of books — used for Spotlight
  *  (single pick), Shelf ("add another book"), and as the first step of
@@ -36,13 +36,9 @@ export function BookSearchList({
 
   return (
     <div className="rounded-lg border border-(--color-border)">
-      <input
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        placeholder={placeholder}
-        aria-label={placeholder}
-        className="min-h-11 w-full border-b border-(--color-border) bg-transparent px-3 py-2 text-sm"
-      />
+      <div className="border-b border-(--color-border) p-2">
+        <SearchField fill value={search} onChange={setSearch} placeholder={placeholder} label={placeholder} />
+      </div>
       <div className="max-h-48 overflow-y-auto">
         {filtered.length === 0 && <p className="p-3 text-sm text-(--color-text-dim)">No books match.</p>}
         {filtered.map((book, i) => (

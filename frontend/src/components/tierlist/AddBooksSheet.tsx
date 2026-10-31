@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MiniBookTile } from "../murals/blocks/BookBlocks";
 import { Sheet } from "../Sheet";
-import { BUTTON_PRIMARY, BUTTON_SECONDARY, FIELD_CLASS } from "../page/buttonClasses";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../page/buttonClasses";
+import { SearchField } from "../Toolbar";
 import { workIdOf, booksByWork } from "@scripta/shared";
 
 /** Picks several books into a tier list's pool in one trip.
@@ -75,14 +76,7 @@ export function AddBooksSheet({
       }
     >
       <div className="sticky top-0 z-10 bg-(--color-surface) p-2 pt-0">
-        <input
-          ref={searchRef}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search your library…"
-          aria-label="Search your library"
-          className={`${FIELD_CLASS} w-full`}
-        />
+        <SearchField fill inputRef={searchRef} value={search} onChange={setSearch} placeholder="Search your library…" label="Search your library" />
       </div>
       <div className="p-2">
         {filtered.length === 0 ? (

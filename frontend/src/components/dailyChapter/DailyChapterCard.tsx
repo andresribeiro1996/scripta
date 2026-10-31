@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import type { DailyChapterBoard } from "@scripta/shared";
+import { formatDate } from "@scripta/shared/community";
 import { dailyChapterApi } from "../../api/dailyChapter";
 import "./dailyChapter.css";
 
@@ -11,7 +12,7 @@ export function DailyChapterArt({ motif }: { motif: string }) {
 export function DailyChapterInvitation({ board }: { board: DailyChapterBoard }) {
   return <section className="daily-chapter-invitation" aria-labelledby="daily-chapter-card-title">
     <DailyChapterArt motif={board.theme.motif} />
-    <div className="min-w-0 space-y-3"><p className="text-sm text-(--color-text-dim)">The Daily Chapter · {board.date}</p><h2 id="daily-chapter-card-title" className="text-2xl">{board.title}</h2><p className="text-sm text-(--color-text-dim)">{board.intro}</p><Link to="/daily" className="inline-flex min-h-11 items-center font-semibold text-(--color-accent)">Open today's chapter →</Link><p className="text-xs text-(--color-text-dim)">5 questions · About 2 minutes · Everyone welcome</p></div>
+    <div className="min-w-0 space-y-3"><p className="text-sm text-(--color-text-dim)">The Daily Chapter · {formatDate(board.date)}</p><h2 id="daily-chapter-card-title" className="text-2xl">{board.title}</h2><p className="text-sm text-(--color-text-dim)">{board.intro}</p><Link to="/daily" className="inline-flex min-h-11 items-center font-semibold text-(--color-accent)">Open today's chapter →</Link><p className="text-xs text-(--color-text-dim)">5 questions · About 2 minutes · Everyone welcome</p></div>
   </section>;
 }
 

@@ -9,6 +9,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { QUIZ_QUESTION_TYPES, eligibleTypes, playerLabel, quizOptionLabel, quizQuestionLabel, type QuizData } from "@scripta/shared";
 import { Page } from "../components/page/Page";
 import { BUTTON_DANGER_OUTLINE, BUTTON_PRIMARY, BUTTON_SECONDARY, FIELD_CLASS } from "../components/page/buttonClasses";
+import { ShareLinkRow } from "../components/ShareLinkRow";
 import { backTo } from "../lib/areas";
 import { QUIZ_TYPE_LABELS } from "../lib/quizTypeLabels";
 import { useConfirm } from "../components/ConfirmDialog";
@@ -241,23 +242,20 @@ function PublishedSection({ quiz, shareLink, copied, setCopied }: { quiz: Quiz; 
 
   return (
     <section className="flex flex-col gap-5">
-      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-(--color-border) bg-(--color-surface) p-4">
-        <code className="min-w-0 flex-1 truncate rounded-lg bg-(--color-surface-hover) px-3 py-2 text-sm">{shareLink}</code>
-        <button
-          type="button"
-          onClick={() => {
+      <div className="flex flex-col gap-3 rounded-xl border border-(--color-border) bg-(--color-surface) p-4">
+        <ShareLinkRow
+          url={shareLink}
+          copied={copied}
+          onCopy={() => {
             void navigator.clipboard.writeText(shareLink);
             setCopied(true);
             window.setTimeout(() => setCopied(false), 1500);
           }}
-          className={BUTTON_PRIMARY}
-        >
-          {copied ? "Copied!" : "Copy challenge link"}
-        </button>
+        />
         <button
           type="button"
           onClick={() => void toggleOpen(!quiz.playOpen)}
-          className={BUTTON_SECONDARY}
+          className={`${BUTTON_SECONDARY} self-start`}
         >
           {quiz.playOpen ? "Close for play" : "Open for play"}
         </button>

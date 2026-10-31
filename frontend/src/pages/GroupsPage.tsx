@@ -607,14 +607,7 @@ function BookPickerModal({
   return (
     <Sheet title={`Books in "${group.name}"`} onClose={onClose}>
       <div className="sticky top-0 z-10 bg-(--color-surface) p-2 pt-0">
-        <input
-          ref={searchRef}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search your library…"
-          aria-label="Search your library"
-          className={`${FIELD_CLASS} w-full`}
-        />
+        <SearchField fill inputRef={searchRef} value={search} onChange={setSearch} placeholder="Search your library…" label="Search your library" />
       </div>
       <div className="p-2">
         {filtered.length === 0 && <p className="p-3 text-sm text-(--color-text-dim)">No books match.</p>}

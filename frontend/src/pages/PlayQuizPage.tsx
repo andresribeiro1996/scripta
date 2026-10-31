@@ -30,11 +30,12 @@ function InfoScreen({ message, back }: { message: string; back?: { to: string; l
 function Options({ question, onPick, picked }: { question: PublicQuizQuestion; onPick: (index: number) => void; picked: number | null }) {
   if (question.type === "title_cover") {
     return (
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {question.options.map((option, index) => (
           <button
             key={option}
             type="button"
+            aria-label={`Cover option ${index + 1} of ${question.options.length}`}
             disabled={picked !== null}
             onClick={() => onPick(index)}
             className={`relative aspect-[2/3] overflow-hidden rounded-xl border-2 bg-(--color-border) transition-colors ${picked === index ? "border-(--color-accent)" : "border-(--color-border) hover:border-(--color-text-dim)"}`}

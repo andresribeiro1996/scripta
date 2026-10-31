@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { formatDate } from "@scripta/shared/community";
 import type { GalleryImage } from "../api/gallery";
 import { fetchOwnProfile } from "../api/community";
 import { useConfirm } from "../components/ConfirmDialog";
@@ -338,7 +339,7 @@ export function MuralsListPage() {
                     />
                   </div>
                   <p className="text-xs text-(--color-text-dim)">
-                    {mural.blocks.length} block{mural.blocks.length === 1 ? "" : "s"} · Updated {new Date(mural.updatedAt).toLocaleDateString()}
+                    {mural.blocks.length} block{mural.blocks.length === 1 ? "" : "s"} · Updated {formatDate(mural.updatedAt)}
                   </p>
                 </div>
               </div>

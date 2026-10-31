@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
-import { parseRankingPreview } from "./helpers.js";
+import { formatDate, parseRankingPreview } from "./helpers.js";
 import { test } from "node:test";
 import { DEFAULT_TIER_PRESET } from "../tierlists/tierlist.js";
+
+process.env.TZ = "America/Sao_Paulo";
 
 test("ranking previews keep real book placements and discard malformed or empty tiers", () => {
   const tier = { label: "S", color: "#c9482f", books: [{ title: "Dune", coverUrl: null }] };
@@ -148,4 +150,11 @@ test("a character tournament says character bracket", () => {
   const base = { kind: "tournament" as const, id: "t", name: "N", bracketSize: 8, status: "active" as const, bookCount: 8, covers: [] };
   assert.equal(contentDetail({ ...base, subject: { kind: "characters", label: "H" } }), "8-character bracket · active");
   assert.equal(contentDetail(base), "8-book bracket · active");
+});
+
+test("one absolute date format: day, short month, year, and a date-only value never shifts a day", () => {
+  assert.equal(formatDate("2026-10-31"), "31 Oct 2026");
+  assert.equal(formatDate("2026-10-31T15:00:00.000Z"), "31 Oct 2026");
+  assert.equal(formatDate("2026-01-05"), "5 Jan 2026");
+  assert.equal(formatDate("not a date"), "");
 });

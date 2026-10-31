@@ -220,6 +220,12 @@ export function activityRow(item: ActivityItem): ActivityRow | null {
 
 const DAY_MS = 86_400_000;
 
+export function formatDate(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", ...(iso.length === 10 ? { timeZone: "UTC" } : {}) });
+}
+
 export function relativeTime(iso: string, now: number = Date.now()): string {
   const then = new Date(iso).getTime();
   if (Number.isNaN(then)) return "";
@@ -232,7 +238,7 @@ export function relativeTime(iso: string, now: number = Date.now()): string {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(elapsed / DAY_MS);
   if (days < 30) return `${days}d ago`;
-  return new Date(iso).toLocaleDateString();
+  return formatDate(iso);
 }
 
 export function activityDay(iso: string, now: Date = new Date()): string {
