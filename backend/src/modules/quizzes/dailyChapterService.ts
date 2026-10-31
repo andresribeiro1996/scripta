@@ -59,18 +59,21 @@ export function createDailyChapterService(repo: DailyChapterRepository, plays: Q
       const voters = new Set(played.flatMap((play) => (play.voter_user_id ? [play.voter_user_id] : [])));
       if (!voters.size) return null;
       let hardest: DailyChapterMonthFacts["hardest"] = null;
+      let lowest = Infinity;
       for (const edition of closed) {
         const scores = played.filter((play) => play.quiz_id === edition.id).map((play) => play.score);
         if (!scores.length) continue;
-        const average = Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length * 10) / 10;
-        if (!hardest || average < hardest.average) hardest = { title: edition.title, date: edition.date, average };
+        const average = scores.reduce((sum, score) => sum + score, 0) / scores.length;
+        if (average >= lowest) continue;
+        lowest = average;
+        hardest = { title: edition.title, date: edition.date, average: Math.round(average * 10) / 10 };
       }
       const missRates = new Map(repo.missRates(ids).map((row) => [row.quiz_id + "\0" + row.question_id, row]));
       let mostMissed: DailyChapterMonthFacts["mostMissed"] = null;
       let worst = 0;
       for (const edition of closed) for (const question of edition.snapshot!) {
         const row = missRates.get(edition.id + "\0" + question.id);
-        if (!row || row.wrong / row.total <= worst) continue;
+        if (!row || row.total < 3 || row.wrong / row.total <= worst) continue;
         worst = row.wrong / row.total;
         mostMissed = { title: question.book.title, missedPercent: Math.round(worst * 100) };
       }

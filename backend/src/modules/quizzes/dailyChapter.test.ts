@@ -481,3 +481,31 @@ test("month facts count closed editions only, keep guests out of perfect and nee
   assert.equal(open?.hardest?.date, "2030-01-30");
   assert.equal(open?.perfect[0]?.perfect, 1);
 });
+
+test("the hardest chapter compares unrounded averages", () => {
+  const { service, on } = setup();
+  const early = seed(service, "edition-10", "2030-01-10");
+  const late = seed(service, "edition-11", "2030-01-11");
+  const pick = (answers: typeof early, score: number) => answers.map((answer, index) => ({ ...answer, choiceIndex: index < score ? 0 : 1 }));
+  on("2030-01-10T12:00:00Z");
+  service.publish("edition-10");
+  [2, 2, 3].forEach((score, index) => service.play("edition-10", "p" + index, pick(early, score)));
+  on("2030-01-11T12:00:00Z");
+  service.publish("edition-11");
+  [2, 2, 2, 3].forEach((score, index) => service.play("edition-11", "p" + index, pick(late, score)));
+  on("2030-02-01T12:00:00Z");
+  assert.deepEqual(service.monthFacts("2030-01")?.hardest, { title: "edition-11", date: "2030-01-11", average: 2.3 });
+});
+
+test("a question needs three plays before it can be the most missed", () => {
+  const { service, on } = setup();
+  const answers = seed(service, "edition-12", "2030-01-12");
+  on("2030-01-12T12:00:00Z");
+  service.publish("edition-12");
+  service.play("edition-12", "a", answers.map((answer) => ({ ...answer, choiceIndex: 1 })));
+  service.play("edition-12", "b", answers.map((answer) => ({ ...answer, choiceIndex: 1 })));
+  on("2030-02-01T12:00:00Z");
+  const facts = service.monthFacts("2030-01");
+  assert.equal(facts?.players, 2);
+  assert.equal(facts?.mostMissed, null);
+});
