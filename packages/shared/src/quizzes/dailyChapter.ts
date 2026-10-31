@@ -95,6 +95,7 @@ export interface DailyChapterHistory {
   answered: number;
   editionDates: string[];
   themes: DailyChapterThemeStats[];
+  today: string;
 }
 
 export interface DailyChapterDay {
@@ -199,13 +200,15 @@ export function dailyChapterStats(results: DailyChapterResult[], releases: Array
     correct: ordered.reduce((sum, result) => sum + result.score, 0),
     answered: ordered.length * 5,
     editionDates: releases.filter((edition) => edition.date <= today).map((edition) => edition.date).sort((a, b) => b.localeCompare(a)),
-    themes
+    themes,
+    today
   };
 }
 
-export function dailyChapterMonth(history: Pick<DailyChapterHistory, "results" | "editionDates">, month: string): DailyChapterDay[] {
-  const published = new Set(history.editionDates);
+export function dailyChapterMonth(history: Pick<DailyChapterHistory, "results" | "editionDates" | "startedOn" | "today">, month: string): DailyChapterDay[] {
   const scores = new Map(history.results.map((result) => [result.date, result.score]));
+  const { startedOn, today } = history;
+  const published = new Set(history.editionDates.filter((date) => startedOn !== null && date >= startedOn && (date !== today || scores.has(date))));
   const length = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0)).getUTCDate();
   return Array.from({ length }, (_, index) => {
     const date = month + "-" + String(index + 1).padStart(2, "0");

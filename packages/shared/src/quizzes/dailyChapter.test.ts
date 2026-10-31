@@ -104,3 +104,11 @@ test("theme rates rank strongest first", () => {
   ]);
   assert.deepEqual(rates, [{ themeId: "a", percent: 100 }, { themeId: "b", percent: 40 }]);
 });
+
+test("days before the first play and today's unplayed edition are not drawn as missed", () => {
+  const releases = ["01", "03", "05", "07"].map((day) => ({ id: "e" + day, date: "2030-01-" + day, themeId: "retold-myths" }));
+  const morning = dailyChapterMonth(dailyChapterStats([result("e03", "2030-01-03")], releases, "2030-01-07"), "2030-01");
+  assert.deepEqual(morning.slice(0, 7).map((day) => day.published), [false, false, true, false, true, false, false]);
+  const evening = dailyChapterMonth(dailyChapterStats([result("e03", "2030-01-03"), result("e07", "2030-01-07", 4)], releases, "2030-01-07"), "2030-01");
+  assert.deepEqual(evening[6], { date: "2030-01-07", published: true, score: 4 });
+});
