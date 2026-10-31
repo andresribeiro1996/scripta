@@ -65,7 +65,7 @@ function DiscoverPane() {
             label="Search tier lists, tournaments and quizzes by name or book"
             className="flex-1 sm:flex-none"
           />
-          <div role="group" aria-label="Type" className="-mx-4 -my-1 flex w-[calc(100%+2rem)] gap-2 overflow-x-auto px-4 py-1 sm:mx-0 sm:my-0 sm:w-auto sm:overflow-visible sm:p-0">
+          <div role="group" aria-label="Type" className="-mx-4 -my-1 flex w-[calc(100%+2rem)] gap-2 overflow-x-auto px-4 py-1 max-sm:[mask-image:linear-gradient(to_right,#000_calc(100%-1rem),transparent)] sm:mx-0 sm:my-0 sm:w-auto sm:overflow-visible sm:p-0">
             {DISCOVER_FILTERS.map((f) => (
               <button key={f.value} type="button" aria-pressed={type === f.value} onClick={() => setType(f.value)} className={chipClass(type === f.value)}>
                 {f.label}

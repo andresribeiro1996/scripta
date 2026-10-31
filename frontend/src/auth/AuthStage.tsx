@@ -2,42 +2,38 @@ import type { ReactNode } from "react";
 import { LandingNav } from "../components/landing/LandingNav";
 import { LandingFooter } from "../components/landing/LandingFooter";
 import { publicPageBackground, publicPageClass } from "../components/landing/ui";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY, FIELD_CLASS } from "../components/page/buttonClasses";
 
 export function AuthStage({ children }: { children: ReactNode }) {
   return (
-    <div className={`${publicPageClass} [accent-color:var(--color-text)]`}>
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10" style={publicPageBackground} />
+    <div className={`${publicPageClass} [color-scheme:light_dark] max-sm:bg-(--color-surface)!`}>
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 max-sm:hidden" style={publicPageBackground} />
       <LandingNav />
-      <main className="mx-auto w-full max-w-[400px] flex-1 px-6 py-8">{children}</main>
+      <main className="mx-auto w-full max-w-[448px] flex-1 px-6 py-8">{children}</main>
       <LandingFooter />
     </div>
   );
 }
 
 export function AuthCard({ children }: { children: ReactNode }) {
-  return <div>{children}</div>;
+  return <div className="sm:rounded-xl sm:border sm:border-(--color-border) sm:bg-(--color-surface) sm:p-8">{children}</div>;
 }
 
 export function AuthHeading({ title, subtitle }: { title: string; subtitle?: ReactNode }) {
   return (
-    <div className="mb-7 text-center">
-      <h1 className="font-sans text-3xl leading-tight font-extralight tracking-[-0.015em] text-(--color-text)/85">{title}</h1>
-      {subtitle && <p className="mt-3 text-sm leading-relaxed text-(--color-text-dim)">{subtitle}</p>}
+    <div className="mb-6 text-center">
+      <h1 className="font-display text-3xl leading-tight">{title}</h1>
+      {subtitle && <p className="mt-2 text-sm text-(--color-text-dim)">{subtitle}</p>}
     </div>
   );
 }
 
-const fieldBase = "min-h-13 w-full rounded-xl border bg-(--color-surface)/60 px-4 py-3 text-base text-(--color-text) placeholder:text-(--color-text-dim) focus:outline-none! motion-safe:transition-[border-color,box-shadow,background-color] motion-safe:duration-300 disabled:opacity-55";
-export const authFieldClass = `${fieldBase} border-(--color-border) focus:border-(--color-text)/65 focus:bg-(--color-surface)/90 focus:shadow-[0_0_28px_-8px_color-mix(in_srgb,var(--color-text)_25%,transparent)]`;
-export const authFieldErrorClass = `${fieldBase} border-(--color-danger) focus:shadow-[0_0_24px_-8px_color-mix(in_srgb,var(--color-danger)_30%,transparent)]`;
-export const authLabelClass = "mb-2 block text-sm font-normal text-(--color-text-dim)";
-export const authHintClass = "mt-2 text-xs leading-relaxed text-(--color-text-dim)";
-export const authLinkClass =
-  "font-normal text-(--color-text) underline decoration-(--color-text)/35 underline-offset-4 transition-opacity hover:opacity-75";
-export const authSubmitClass =
-  "flex min-h-13 w-full items-center justify-center rounded-full bg-(--color-text) px-4 text-sm font-medium text-(--color-bg) shadow-[0_0_28px_-8px_color-mix(in_srgb,var(--color-text)_15%,transparent)] motion-safe:transition-opacity hover:opacity-85 disabled:opacity-55";
-export const authSecondaryClass =
-  "flex min-h-13 w-full items-center justify-center gap-2.5 rounded-full border border-(--color-border) bg-(--color-surface)/40 px-4 text-sm font-medium text-(--color-text) motion-safe:transition-colors hover:bg-(--color-surface)/90 disabled:opacity-55";
+export const authFieldClass = `${FIELD_CLASS} w-full bg-(--color-bg)!`;
+export const authLabelClass = "mb-1.5 block text-sm font-semibold";
+export const authHintClass = "mt-1.5 text-xs text-(--color-text-dim)";
+export const authLinkClass = "text-(--color-text) underline decoration-(--color-accent) decoration-2 underline-offset-4 hover:decoration-4";
+export const authSubmitClass = `${BUTTON_PRIMARY} w-full`;
+export const authSecondaryClass = `${BUTTON_SECONDARY} w-full gap-2.5`;
 
 export function AuthFieldError({ id, message }: { id: string; message: string | null | undefined }) {
   if (!message) return null;

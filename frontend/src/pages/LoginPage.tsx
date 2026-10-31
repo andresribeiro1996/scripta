@@ -4,6 +4,7 @@ import { afterSignIn, clearAuthNotice, readAuthNotice, startAuthNavigation } fro
 import { modeFromSearch, type AuthMode as Mode } from "../lib/landing";
 import { useEffect, useRef, useState } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { CHECKBOX_CLASS } from "../components/Toolbar";
 import { API_URL } from "../api/baseUrl";
 import { ApiError, publicFetch } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
@@ -14,13 +15,13 @@ import {
   AuthHeading,
   AuthServerError,
   AuthStage,
+  authFieldClass,
   authHintClass,
+  authLabelClass,
   authLinkClass,
   authSecondaryClass,
   authSubmitClass
 } from "../auth/AuthStage";
-
-const groupedFieldClass = "min-h-14 w-full border-0 bg-transparent px-4 py-4 text-base text-(--color-text) placeholder:text-(--color-text-dim) focus:outline-none! disabled:opacity-55 aria-invalid:bg-(--color-danger-soft)/30";
 
 // Google's own official "G" mark (Identity branding guidelines) — inlined
 // rather than fetched from Google's asset host, same offline-friendly
@@ -155,89 +156,80 @@ export function LoginPage() {
 
         <form onSubmit={handleSubmit} noValidate>
           <fieldset disabled={submitting}>
-            <div className={`overflow-hidden rounded-3xl border bg-(--color-surface)/65 motion-safe:transition-[border-color,box-shadow] motion-safe:duration-300 ${Object.keys(fieldErrors).length ? "border-(--color-danger) focus-within:shadow-[0_0_28px_-8px_color-mix(in_srgb,var(--color-danger)_20%,transparent)]" : "border-(--color-border) focus-within:border-(--color-text)/65 focus-within:shadow-[0_0_28px_-8px_color-mix(in_srgb,var(--color-text)_15%,transparent)]"}`}>
-              <div>
-                <label className="sr-only" htmlFor="identifier">
-                  {mode === "login" ? "Email or username" : "Email"}
-                </label>
-                <input
-                  id="identifier"
-                  type={mode === "login" ? "text" : "email"}
-                  required
-                  autoComplete={mode === "signup" ? "email" : "username"}
-                  placeholder={mode === "login" ? "Email or username" : "Email address"}
-                  autoCapitalize="none" spellCheck={false}
-                  value={identifier}
-                  onChange={(e) => setIdentifier(e.target.value)}
-                  onInput={clearFieldError}
-                  aria-invalid={Boolean(fieldErrors.identifier)}
-                  aria-describedby={fieldErrors.identifier ? "identifier-error" : undefined}
-                  className={groupedFieldClass}
-                />
-                {fieldErrors.identifier && <div className="px-4 pb-3"><AuthFieldError id="identifier-error" message={fieldErrors.identifier} /></div>}
-              </div>
+            <div className="mb-4">
+              <label className={authLabelClass} htmlFor="identifier">
+                {mode === "login" ? "Email or username" : "Email"}
+              </label>
+              <input
+                id="identifier"
+                type={mode === "login" ? "text" : "email"}
+                required
+                autoComplete={mode === "signup" ? "email" : "username"}
+                autoCapitalize="none" spellCheck={false}
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
+                onInput={clearFieldError}
+                aria-invalid={Boolean(fieldErrors.identifier)}
+                aria-describedby={fieldErrors.identifier ? "identifier-error" : undefined}
+                className={authFieldClass}
+              />
+              <AuthFieldError id="identifier-error" message={fieldErrors.identifier} />
+            </div>
 
-              <div
-                className="grid motion-safe:transition-[grid-template-rows] motion-safe:duration-300 ease-in-out"
-                style={{ gridTemplateRows: mode === "signup" ? "1fr" : "0fr" }}
-              >
-                <div className="overflow-hidden">
-                  <div className="border-t border-(--color-border)">
-                    <label className="sr-only" htmlFor="username">
-                      Username
-                    </label>
-                    <input
-                      id="username"
-                      type="text"
-                      required={mode === "signup"}
-                      disabled={mode !== "signup"}
-                      minLength={3}
-                      maxLength={30}
-                      pattern="[a-zA-Z0-9_.]+"
-                      title="Letters, numbers, underscores, and periods only."
-                      autoComplete="username"
-                      placeholder="Choose a username"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                      onInput={clearFieldError}
-                      aria-invalid={Boolean(fieldErrors.username)}
-                      aria-describedby={fieldErrors.username ? "username-error" : mode === "signup" ? "username-hint" : undefined}
-                      className={groupedFieldClass}
-                    />
-                    {fieldErrors.username && <div className="px-4 pb-3"><AuthFieldError id="username-error" message={fieldErrors.username} /></div>}
-                  </div>
+            <div
+              className="grid motion-safe:transition-[grid-template-rows] motion-safe:duration-300 ease-in-out"
+              style={{ gridTemplateRows: mode === "signup" ? "1fr" : "0fr" }}
+            >
+              <div className="-mx-1 overflow-hidden px-1">
+                <div className="pb-4">
+                  <label className={authLabelClass} htmlFor="username">
+                    Username
+                  </label>
+                  <input
+                    id="username"
+                    type="text"
+                    required={mode === "signup"}
+                    disabled={mode !== "signup"}
+                    minLength={3}
+                    maxLength={30}
+                    pattern="[a-zA-Z0-9_.]+"
+                    title="Letters, numbers, underscores, and periods only."
+                    autoComplete="username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    onInput={clearFieldError}
+                    aria-invalid={Boolean(fieldErrors.username)}
+                    aria-describedby={fieldErrors.username ? "username-error" : mode === "signup" ? "username-hint" : undefined}
+                    className={authFieldClass}
+                  />
+                  {fieldErrors.username ? <AuthFieldError id="username-error" message={fieldErrors.username} /> : <p id="username-hint" className={authHintClass}>{USERNAME_HINT}</p>}
                 </div>
               </div>
-
-              <div className="border-t border-(--color-border)">
-                <label className="sr-only" htmlFor="password">
-                  Password
-                </label>
-                <PasswordInput
-                  key={mode}
-                  id="password"
-                  type="password"
-                  required
-                  minLength={mode === "signup" ? 8 : undefined}
-                  autoComplete={mode === "login" ? "current-password" : "new-password"}
-                  placeholder={mode === "login" ? "Password" : "Create a password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  onInput={clearFieldError}
-                  aria-invalid={Boolean(fieldErrors.password)}
-                  aria-describedby={fieldErrors.password ? "password-error" : mode === "signup" ? "password-hint" : undefined}
-                  className={groupedFieldClass}
-                />
-                {fieldErrors.password && <div className="px-4 pb-3"><AuthFieldError id="password-error" message={fieldErrors.password} /></div>}
-              </div>
             </div>
-            {mode === "signup" && <div className="mt-3">
-              {!fieldErrors.username && <p id="username-hint" className={authHintClass}>{USERNAME_HINT}</p>}
-              {!fieldErrors.password && <p id="password-hint" className={authHintClass}>{PASSWORD_HINT}</p>}
-            </div>}
 
-            <div className="mb-5 mt-3 flex flex-wrap items-center justify-between gap-x-4 text-[13px] text-(--color-text-dim)">
-              <label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} className="h-4 w-4" />Remember me</label>
+            <div className="mb-2">
+              <label className={authLabelClass} htmlFor="password">
+                Password
+              </label>
+              <PasswordInput
+                key={mode}
+                id="password"
+                type="password"
+                required
+                minLength={mode === "signup" ? 8 : undefined}
+                autoComplete={mode === "login" ? "current-password" : "new-password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onInput={clearFieldError}
+                aria-invalid={Boolean(fieldErrors.password)}
+                aria-describedby={fieldErrors.password ? "password-error" : mode === "signup" ? "password-hint" : undefined}
+                className={authFieldClass}
+              />
+              {fieldErrors.password ? <AuthFieldError id="password-error" message={fieldErrors.password} /> : mode === "signup" && <p id="password-hint" className={authHintClass}>{PASSWORD_HINT}</p>}
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-x-4 text-sm">
+              <label className="flex min-h-11 items-center gap-2 text-(--color-text-dim)"><input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} className={CHECKBOX_CLASS} />Remember me</label>
               {mode === "login" && <Link to={`/forgot-password?email=${encodeURIComponent(identifier.includes("@") ? identifier : "")}`} className={`flex min-h-11 items-center ${authLinkClass}`}>Forgot password?</Link>}
             </div>
             <button type="submit" disabled={submitting} className={`${authSubmitClass} gap-3`}>
