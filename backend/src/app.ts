@@ -45,7 +45,7 @@ import { canonicalWorks, catalogGenres, enqueueBookCovers, getRecentAwards, getW
 import { deleteGalleryUserData, registerGalleryModule } from "./modules/gallery/index.js";
 import { communityRatings, copyOfWork, deleteLibraryUserData, heldWorks, holdersOfWorks, koboCoverLookups, registerLibraryModule, resolvePublicLibrary, readerGlyphFor, resolveEntryWorks, WorkResolutionError, sharedBookCounts, sharedBooks, sweepLibraryWorks, sweepWorks, WORKS_SWEEP_INTERVAL_MS, type BookEvent } from "./modules/library/index.js";
 import { deleteMuralsUserData, getMuralsPublicApi, registerMuralsModule, rekeyMuralsBooks, sweepMuralsWorks } from "./modules/murals/index.js";
-import { deleteQuizzesUserData, getQuizGameSource, getQuizzesPublicApi, registerQuizzesModule } from "./modules/quizzes/index.js";
+import { deleteQuizzesUserData, getDailyChapterPublicApi, getQuizGameSource, getQuizzesPublicApi, registerQuizzesModule } from "./modules/quizzes/index.js";
 import { deleteSocialsUserData, registerSocialsModule } from "./modules/socials/index.js";
 import { deleteTierlistsUserData, getTierlistGameSource, registerTierlistsModule, getTierlistsPublicApi } from "./modules/tierlists/index.js";
 import { registerWaitlistModule } from "./modules/waitlist/index.js";
@@ -201,6 +201,7 @@ export function buildApp() {
     canonicalWorks,
     catalogGenres,
     getWorkPage,
+    dailyChapterMonth: (month: string) => getDailyChapterPublicApi().monthFacts(month),
     getDashboardSeenAt,
     setDashboardSeenAt,
     murals: getMuralsPublicApi(getTierlistsPublicApi().getTierlistData),
@@ -217,7 +218,12 @@ export function buildApp() {
     emitPublished: (quizId: string, ownerUserId: string) => recordActivity(ownerUserId, "quiz_published", "quiz", quizId),
     emitPlayed: (playerUserId: string, quizId: string, quizName: string) =>
       recordActivity(playerUserId, "voted_on", "quiz", quizId, { game: "quiz", id: quizId, name: quizName }),
-    resolveUsernames: (userIds: string[]) => new Map([...resolvePublicReaderProfiles(userIds)].map(([id, profile]) => [id, profile.username]))
+    resolveUsernames: (userIds: string[]) => new Map([...resolvePublicReaderProfiles(userIds)].map(([id, profile]) => [id, profile.username])),
+    dailyPeople: {
+      followees: (userId: string) => getCommunityPublicApi().followees(userId),
+      published: (userIds: string[]) => new Set([...getCommunityPublicApi().readerVisibility(null, userIds)].filter(([, listing]) => listing.published).map(([id]) => id)),
+      profiles: resolvePublicReaderProfiles
+    }
   });
   app.register(registerWorksModule, {
     getWorkPage,

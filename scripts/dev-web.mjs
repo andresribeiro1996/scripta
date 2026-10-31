@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { claimThisWorktreeSlot } from "./devClaim.mjs";
 import { devDataDirEnv } from "./devDataDir.mjs";
-import { assertAdoptedBackendMatches, ensureSharedBuilt, resetDevDataIfRequested, seedCommunityGraph, seedDevAccount, seedEditionWorks, seedFixtureUsers } from "./devFixtureSetup.mjs";
+import { assertAdoptedBackendMatches, ensureSharedBuilt, resetDevDataIfRequested, seedCommunityGraph, seedDailyChapter, seedDevAccount, seedEditionWorks, seedFixtureUsers } from "./devFixtureSetup.mjs";
 import { isPortOpen, spawnDetached, waitFor } from "./devProcess.mjs";
 import { readDevUserId, webBackendEnv, webUrls } from "./devWeb.mjs";
 import { CERT_PATH, KEY_PATH, mobileCertsExist } from "./mobileCertPaths.mjs";
@@ -31,6 +31,7 @@ async function main() {
   seedEditionWorks(log);
   seedFixtureUsers(log);
   seedCommunityGraph(log);
+  seedDailyChapter(log);
 
   const account = JSON.parse(readFileSync(join(repoRoot, "scripts", "fixtures", "account.json"), "utf8"));
   const adminUserId = readDevUserId(devDataDirEnv().AUTH_DB_PATH, account.email);

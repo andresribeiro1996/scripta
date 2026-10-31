@@ -1,4 +1,4 @@
-import type { TopShelf, TopShelfBook, TopShelfBoard, TopShelfGame, TopShelfPeriod, TopShelfView } from "@scripta/shared";
+import type { DailyChapterMonthFacts, TopShelf, TopShelfBook, TopShelfBoard, TopShelfGame, TopShelfPeriod, TopShelfView } from "@scripta/shared";
 import type { CatalogWorkPage } from "../books/index.js";
 import { GAME_KINDS, type GameSources } from "./domain/games.js";
 import type { EngagementRepository, GameRef } from "./domain/ports.js";
@@ -10,6 +10,7 @@ export interface TopShelfDeps {
   canonicalWorks(ids: string[]): Map<string, string>;
   catalogGenres(workIds: string[]): Map<string, { genres: string[] }>;
   getWorkPage(id: string): CatalogWorkPage | undefined;
+  dailyChapterMonth?: (month: string) => DailyChapterMonthFacts | null;
 }
 
 export type TopShelfQuery = { period: TopShelfPeriod; genre: string | null; view?: TopShelfView };

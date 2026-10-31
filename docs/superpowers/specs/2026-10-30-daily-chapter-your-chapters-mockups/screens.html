@@ -1,0 +1,117 @@
+<style>
+  .wrap{display:flex;flex-wrap:wrap;gap:22px;justify-content:center;align-items:flex-start}
+  .col{display:flex;flex-direction:column;align-items:center;gap:8px}
+  .col>p{max-width:290px;font-size:13px;margin:0}
+  .phone{width:290px;border:1px solid #d8d2c6;border-radius:26px;background:#faf7f1;color:#2a251e;overflow:hidden;font:14px/1.35 -apple-system,system-ui,sans-serif}
+  .bar{display:flex;align-items:center;gap:10px;padding:14px 14px 10px;border-bottom:1px solid #ece6da}
+  .bar b{flex:1;font-size:17px}
+  .ic{width:30px;height:30px;border-radius:15px;display:grid;place-items:center;font-size:15px}
+  .pad{padding:14px}
+  .dim{color:#7a7062;font-size:12px}
+  .big{font-size:26px;font-weight:700}
+  .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:4px 0 8px}
+  .tile{border:1px solid #e3dccf;border-radius:12px;padding:8px;text-align:center;background:#fff}
+  .best{display:flex;justify-content:space-between;font-size:12px;padding:4px 0;color:#5a5044}
+  .row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid #efe9de;font-size:13px}
+  .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin:6px 0 6px}
+  .cal span{aspect-ratio:1;border-radius:4px;font-size:9px;display:grid;place-items:center;color:#fff}
+  .s0{background:#efe9de;color:#a99f8f!important}.s2{background:#e2b98d}.s3{background:#d2955a}.s4{background:#b5651d}.s5{background:#7a3f0c}.sx{background:transparent}
+  .sel{outline:2px solid #2a251e;outline-offset:1px}
+  h4{margin:16px 0 6px;font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:#7a7062}
+  .btn{display:block;text-align:center;background:#b5651d;color:#fff;border-radius:12px;padding:9px;font-weight:600;margin-top:12px}
+  .btn2{display:block;text-align:center;border:1px solid #d8d2c6;border-radius:12px;padding:9px;font-weight:600;margin-top:8px}
+  .theme{display:flex;justify-content:space-between;font-size:12px;padding:3px 0 2px}
+  .meter{height:6px;border-radius:3px;background:#efe9de;margin-bottom:6px}.meter i{display:block;height:100%;border-radius:3px;background:#b5651d}
+  .meter.low i{background:#c9b9a0}
+  .q{border:1px solid #e3dccf;border-radius:12px;background:#fff;padding:10px;margin-bottom:8px;font-size:12.5px}
+  .q .ok{color:#3f6b31;font-weight:600}.q .no{color:#a3402a;font-weight:600}
+  .sq{display:inline-block;width:10px;height:10px;border-radius:2px;margin-left:1px}.g{background:#5f8a4f}.w{background:#e3dccf}
+  .av{width:24px;height:24px;border-radius:12px;display:inline-grid;place-items:center;font-size:11px;color:#fff;margin-right:8px}
+  .poster{border-radius:18px;padding:16px;background:linear-gradient(160deg,#3b2414,#7a3f0c);color:#fbefe0;font:13px/1.35 Georgia,serif}
+  .poster .cal span{border-radius:3px}
+  .poster .s0{background:rgba(255,255,255,.12)}.poster .s2{background:#f0c99e}.poster .s3{background:#e7a868}.poster .s4{background:#d98535}.poster .s5{background:#fff3e2}
+  .sheet{background:#fff;border-radius:22px 22px 0 0;padding:14px;border-top:1px solid #e3dccf}
+  .choices{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px;text-align:center;font-size:11px}
+  .choices div{border:1px solid #e3dccf;border-radius:12px;padding:8px 4px}
+  .tag{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.04em;background:#efe3cc;color:#7a3f0c;border-radius:6px;padding:2px 6px;margin-left:4px;vertical-align:middle}
+</style>
+
+<h2>Your chapters, everything in</h2>
+<p class="subtitle">Three screens: the stats page (scrolls), a past day opened from it, and the share sheet. Tags show where each of your four ideas lands.</p>
+
+<div class="wrap">
+  <div class="col">
+    <div class="phone">
+      <div class="bar"><span class="ic">‹</span><b>Your chapters</b><span class="ic">⇪</span></div>
+      <div class="pad">
+        <div class="tiles"><div class="tile"><div class="big">6</div><div class="dim">day streak</div></div><div class="tile"><div class="big">3.8</div><div class="dim">avg / 5</div></div><div class="tile"><div class="big">3</div><div class="dim">perfect</div></div></div>
+        <div class="best"><span>🏅 Longest streak</span><b>9 days</b></div>
+        <div class="best"><span>✨ Most perfects in a row</span><b>2</b></div>
+        <div class="best"><span>✓ Questions right</span><b>46 of 60</b></div>
+        <div class="dim" style="margin-top:2px">Personal bests <span class="tag">IDEA 3</span></div>
+
+        <h4>November</h4>
+        <div class="dim" style="display:grid;grid-template-columns:repeat(7,1fr);text-align:center"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
+        <div class="cal"><span class="sx"></span><span class="sx"></span><span class="sx"></span><span class="sx"></span><span class="sx"></span><span class="s3">1</span><span class="s4">2</span><span class="s0">3</span><span class="s2">4</span><span class="s5">5</span><span class="s3">6</span><span class="s4">7</span><span class="s5">8</span><span class="s0">9</span><span class="s3">10</span><span class="s4 sel">11</span><span class="s5">12</span></div>
+        <div class="dim">‹ October · darker = higher score · tap a day</div>
+
+        <h4>By theme <span class="tag">IDEA 1</span></h4>
+        <div class="theme"><span>Crime</span><span>92% · strongest</span></div><div class="meter"><i style="width:92%"></i></div>
+        <div class="theme"><span>First Lines</span><span>76%</span></div><div class="meter"><i style="width:76%"></i></div>
+        <div class="theme"><span>Sea Stories</span><span>68%</span></div><div class="meter"><i style="width:68%"></i></div>
+        <div class="theme"><span>Poetry</span><span>40% · trips you up</span></div><div class="meter low"><i style="width:40%"></i></div>
+
+        <h4>Past chapters</h4>
+        <div class="row"><span>Nov 12 · Sea Stories</span><span><i class="sq g"></i><i class="sq g"></i><i class="sq w"></i><i class="sq g"></i><i class="sq w"></i> ›</span></div>
+        <div class="row"><span>Nov 11 · First Lines</span><span><i class="sq g"></i><i class="sq g"></i><i class="sq g"></i><i class="sq w"></i><i class="sq g"></i> ›</span></div>
+        <div class="row"><span>Nov 10 · Crime</span><span><i class="sq g"></i><i class="sq g"></i><i class="sq g"></i><i class="sq g"></i><i class="sq g"></i> ›</span></div>
+        <span class="btn">Share my chapters</span>
+      </div>
+    </div>
+    <p><b>1 · Stats page.</b> Opened from the new Home header icon. Bests under the numbers, calendar, theme bars, then the list.</p>
+  </div>
+
+  <div class="col">
+    <div class="phone">
+      <div class="bar"><span class="ic">‹</span><b>Nov 11 · First Lines</b></div>
+      <div class="pad">
+        <div class="big">4/5 <span style="font-size:14px;font-weight:400"><i class="sq g"></i><i class="sq g"></i><i class="sq g"></i><i class="sq w"></i><i class="sq g"></i></span></div>
+        <h4>Your answers <span class="tag">IDEA 2</span></h4>
+        <div class="q">"It was a bright cold day in April…"<br><span class="ok">✓ 1984</span></div>
+        <div class="q">"Call me Ishmael."<br><span class="ok">✓ Moby-Dick</span></div>
+        <div class="q">"Happy families are all alike…"<br><span class="ok">✓ Anna Karenina</span></div>
+        <div class="q">"Mother died today."<br><span class="no">✗ You said The Plague</span> · it's <b>The Stranger</b><div class="dim" style="margin-top:4px">Camus opens The Stranger with Meursault's flat report of his mother's death…</div></div>
+        <div class="q">"All this happened, more or less."<br><span class="ok">✓ Slaughterhouse-Five</span></div>
+
+        <h4>People you follow <span class="tag">IDEA 4</span></h4>
+        <div class="row"><span><i class="av" style="background:#5f8a4f">M</i>marta</span><span><i class="sq g"></i><i class="sq g"></i><i class="sq g"></i><i class="sq g"></i><i class="sq g"></i> 5/5</span></div>
+        <div class="row"><span><i class="av" style="background:#4d6c8a">J</i>joao.reads</span><span><i class="sq g"></i><i class="sq w"></i><i class="sq g"></i><i class="sq w"></i><i class="sq g"></i> 3/5</span></div>
+        <div class="row"><span><i class="av" style="background:#b5651d">Y</i>you</span><span><i class="sq g"></i><i class="sq g"></i><i class="sq g"></i><i class="sq w"></i><i class="sq g"></i> 4/5</span></div>
+        <div class="dim" style="margin-top:6px">Only squares and score, never which answers they picked.</div>
+      </div>
+    </div>
+    <p><b>2 · A past day.</b> Tap a calendar day or a list row. Your five answers with the right one and the explanation, then how people you follow did.</p>
+  </div>
+
+  <div class="col">
+    <div class="phone" style="background:#cfc8bb">
+      <div style="height:40px"></div>
+      <div class="sheet">
+        <b>Share my chapters</b>
+        <div class="poster" style="margin-top:10px">
+          <div style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;opacity:.75">The Daily Chapter</div>
+          <div style="font-size:20px;margin:4px 0 10px">My November</div>
+          <div class="cal"><span class="sx"></span><span class="sx"></span><span class="sx"></span><span class="sx"></span><span class="sx"></span><span class="s3"></span><span class="s4"></span><span class="s0"></span><span class="s2"></span><span class="s5"></span><span class="s3"></span><span class="s4"></span><span class="s5"></span><span class="s0"></span><span class="s3"></span><span class="s4"></span><span class="s5"></span></div>
+          <div style="display:flex;justify-content:space-between;margin-top:10px;font-size:12px"><span><b style="font-size:18px">6</b><br>streak</span><span><b style="font-size:18px">3.8</b><br>avg / 5</span><span><b style="font-size:18px">92%</b><br>at Crime</span></div>
+          <div style="margin-top:10px;font-size:10px;opacity:.7">atmyshelf · play today's chapter</div>
+        </div>
+        <div class="choices"><div>🖼️<br>Share image</div><div>⬇️<br>Save to photos</div><div>💬<br>Send as text</div></div>
+        <div class="dim" style="margin-top:10px;background:#f4efe6;border-radius:10px;padding:8px;white-space:pre-line;font-family:-apple-system,system-ui">The Daily Chapter · November
+🟫🟫⬜🟨🟫🟫🟫🟫⬜🟫🟫🟫
+6-day streak · 3.8 avg
+atmyshelf.com/daily</div>
+      </div>
+    </div>
+    <p><b>3 · Share sheet.</b> The existing image share sheet with a month poster (no titles, so no spoilers) and the emoji text version underneath.</p>
+  </div>
+</div>

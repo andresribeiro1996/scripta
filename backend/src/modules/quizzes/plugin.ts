@@ -4,8 +4,10 @@
 
 import { env } from "../../config/env.js";
 import { createSqliteDailyChapterRepository } from "./adapters/sqlite/sqliteDailyChapterRepository.js";
+import type { DailyChapterPeople } from "./domain/dailyChapter.js";
 import { createDailyChapterService } from "./dailyChapterService.js";
 import { buildDailyChapterRoutes } from "./dailyChapterRoutes.js";
+import type { DailyChapterMonthFacts } from "@scripta/shared";
 import fastifyRateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
 import { getWorkCharacters } from "../books/index.js";
@@ -21,6 +23,7 @@ export interface QuizzesPluginOptions {
   emitPublished?: EmitPublished;
   emitPlayed?: EmitPlayed;
   resolveUsernames?: ResolveUsernames;
+  dailyPeople?: DailyChapterPeople;
 }
 
 export const quizWorks: QuizWorks = { knownWorkIds, resolveTitleWorks, canonicalByKey, publicBooksByWork: resolvePublicBooksByWork, charactersOf: getWorkCharacters };
@@ -34,7 +37,7 @@ export async function quizzesPlugin(app: FastifyInstance, opts: QuizzesPluginOpt
   await app.register(buildQuizRoutes(quizzesService));
   await app.register(async (scoped) => {
     await scoped.register(fastifyRateLimit, { max: 120, timeWindow: "1 minute" });
-    await scoped.register(buildDailyChapterRoutes(createDailyChapterService(createSqliteDailyChapterRepository(db), createSqliteQuizzesRepository(db)), (userId) => Boolean(env.ADMIN_USER_ID) && userId === env.ADMIN_USER_ID));
+    await scoped.register(buildDailyChapterRoutes(createDailyChapterService(createSqliteDailyChapterRepository(db), createSqliteQuizzesRepository(db), undefined, opts.dailyPeople), (userId) => Boolean(env.ADMIN_USER_ID) && userId === env.ADMIN_USER_ID));
   });
 
   // Same 30/minute public-write limit as tierlists' ballot routes: this
@@ -50,6 +53,17 @@ let cachedApi: QuizzesPublicApi | null = null;
 export function getQuizzesPublicApi(): QuizzesPublicApi {
   if (!cachedApi) cachedApi = createQuizzesPublicApi(createQuizzesService(createSqliteQuizzesRepository(openQuizzesDb()), quizWorks));
   return cachedApi;
+}
+
+let cachedDailyChapterApi: { monthFacts(month: string): DailyChapterMonthFacts | null } | null = null;
+
+export function getDailyChapterPublicApi() {
+  if (!cachedDailyChapterApi) {
+    const db = openQuizzesDb();
+    const service = createDailyChapterService(createSqliteDailyChapterRepository(db), createSqliteQuizzesRepository(db));
+    cachedDailyChapterApi = { monthFacts: (month) => service.monthFacts(month) };
+  }
+  return cachedDailyChapterApi;
 }
 
 let erasingQuizzes: ReturnType<typeof createSqliteQuizzesRepository> | undefined;

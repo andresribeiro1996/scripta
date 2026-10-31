@@ -1,4 +1,4 @@
-import { recapMonthName, type TopShelfBoard, type TopShelfRecapCard } from "@scripta/shared";
+import { plural, recapMonthName, type TopShelfBoard, type TopShelfRecapCard } from "@scripta/shared";
 import { contentTarget } from "@scripta/shared/community";
 import { gameScoreLabel, valueLabel } from "./topShelfModel";
 
@@ -17,6 +17,7 @@ export function recapTitle(card: TopShelfRecapCard, month: string): string {
   switch (card.kind) {
     case "summary": return `${name} on Atmyshelf`;
     case "hottestGame": return `🔥 ${name}'s hottest game`;
+    case "dailyChapter": return `📖 ${name}'s Daily Chapter`;
     case "book": {
       if (card.board === "champions") return "Book of the month";
       const [emoji, words] = RECORD_TITLES[card.board];
@@ -29,6 +30,12 @@ export function recapNumber(card: TopShelfRecapCard): string {
   switch (card.kind) {
     case "summary": return `${card.gamesPublished} games published\n${card.votesCast} votes cast\n${card.booksInPlay} books in play`;
     case "hottestGame": return gameScoreLabel(card.game);
+    case "dailyChapter": return [
+      `${plural(card.players, "reader", "readers")} played`,
+      ...(card.hardest ? [`Hardest: ${card.hardest.title} · ${card.hardest.average}/5`] : []),
+      ...(card.mostMissed ? [`Most missed: ${card.mostMissed.title} · ${card.mostMissed.missedPercent}%`] : []),
+      ...(card.topPlayers.length ? [`Most perfect: ${card.topPlayers.map((p) => `@${p.username} (${p.perfect})`).join(", ")}`] : []),
+    ].join("\n");
     case "book": return valueLabel(card.board, card.book.value);
   }
 }
@@ -36,6 +43,7 @@ export function recapNumber(card: TopShelfRecapCard): string {
 export function recapCta(card: TopShelfRecapCard, currentMonth: string): string {
   switch (card.kind) {
     case "summary": return "Join in on Atmyshelf";
+    case "dailyChapter": return "Play today's Daily Chapter";
     case "hottestGame": return card.open ? "Play it yourself" : "See how it ended";
     case "book": return card.game ? `${VOTE_VERBS[card.game.content.kind]} — it counts for ${recapMonthName(currentMonth)}` : `See ${card.book.title} on Atmyshelf`;
   }
@@ -44,6 +52,7 @@ export function recapCta(card: TopShelfRecapCard, currentMonth: string): string 
 export function recapLinkPath(card: TopShelfRecapCard): string {
   switch (card.kind) {
     case "summary": return "/";
+    case "dailyChapter": return "/daily";
     case "hottestGame": return contentTarget(card.game.item.content);
     case "book": return card.game ? contentTarget(card.game.content) : `/work/${encodeURIComponent(card.book.workId)}`;
   }

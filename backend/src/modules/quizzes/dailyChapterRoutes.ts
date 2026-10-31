@@ -1,13 +1,20 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
-import { ZodError } from "zod";
+import { z, ZodError } from "zod";
 import { authGuard, getOptionalAuthenticatedUser } from "../auth/index.js";
 import { DailyChapterError } from "./domain/dailyChapter.js";
 import { dailyGuestKey, type DailyChapterService } from "./dailyChapterService.js";
 import { dailyPlayerSchema, dailyPlaySchema } from "./dailyChapterValidation.js";
 
-function player(request: FastifyRequest, guestId?: string): string {
+const playerIdSchema = z.string().min(1).max(100);
+
+function signedIn(request: FastifyRequest) {
   const user = getOptionalAuthenticatedUser(request);
   if (request.headers.authorization && !user) throw new DailyChapterError(401, "Sign in again to load your daily history.");
+  return user;
+}
+
+function player(request: FastifyRequest, guestId?: string): string {
+  const user = signedIn(request);
   if (user) return user.id;
   if (!guestId) throw new DailyChapterError(400, "A device identity is required to save your result.");
   return dailyGuestKey(guestId);
@@ -29,6 +36,11 @@ export function buildDailyChapterRoutes(service: DailyChapterService, isAdmin: (
     app.post<{ Params: { id: string } }>("/daily-chapter/:id/play", { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } }, async (request, reply) => {
       const body = dailyPlaySchema.parse(request.body);
       return reply.header("Cache-Control", "no-store").send(service.play(request.params.id, player(request, body.guestId), body.answers));
+    });
+    app.get<{ Params: { id: string } }>("/daily-chapter/:id/people", { preHandler: authGuard }, async (request, reply) => reply.header("Cache-Control", "no-store").send({ people: service.people(request.params.id, request.user.id) }));
+    app.get<{ Params: { userId: string } }>("/daily-chapter/players/:userId", async (request, reply) => {
+      const userId = playerIdSchema.parse(request.params.userId);
+      return reply.header("Cache-Control", "no-store").send({ summary: service.player(userId, signedIn(request)?.id ?? null) });
     });
     app.get("/daily-chapter/admin", { preHandler: admin }, async (_request, reply) => reply.header("Cache-Control", "no-store").send(service.editorial()));
     app.put("/daily-chapter/admin/books", { preHandler: admin }, async (request, reply) => { service.saveBook(request.body as Parameters<DailyChapterService["saveBook"]>[0]); return reply.code(204).send(); });

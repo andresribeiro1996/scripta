@@ -77,6 +77,7 @@ const GLYPHS = {
   chevronDown: { ios: "chevron.down", android: "expand_more" },
   star: { ios: "star.fill", android: "star" },
   characters: { ios: "theatermasks", android: "theater_comedy" },
+  stats: { ios: "chart.bar", android: "bar_chart" },
   ebook: { ios: "ipad", android: "tablet_android" },
   audiobook: { ios: "headphones", android: "headphones" },
   otherFormat: { ios: "square.on.circle", android: "category" },

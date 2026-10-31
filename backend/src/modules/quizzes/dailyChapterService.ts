@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
-import { DAILY_CHAPTER_QUOTE_RIGHTS, DAILY_CHAPTER_THEMES, dailyChapterCoverage, dailyChapterStats, gradeAnswers, type DailyChapterBoard, type DailyChapterBook, type DailyChapterEditionInput, type DailyChapterQuestionInput, type DailyChapterResult, type SubmittedAnswer } from "@scripta/shared";
-import { DailyChapterError, type DailyChapterRepository, type StoredDailyChapter } from "./domain/dailyChapter.js";
+import { DAILY_CHAPTER_QUOTE_RIGHTS, DAILY_CHAPTER_THEMES, dailyChapterCoverage, dailyChapterStats, dailyChapterSummary, gradeAnswers, type DailyChapterBoard, type DailyChapterBook, type DailyChapterEditionInput, type DailyChapterMonthFacts, type DailyChapterPerson, type DailyChapterQuestionInput, type DailyChapterResult, type SubmittedAnswer } from "@scripta/shared";
+import { DailyChapterError, NO_DAILY_PEOPLE, type DailyChapterPeople, type DailyChapterRepository, type StoredDailyChapter } from "./domain/dailyChapter.js";
 import type { QuizzesRepository } from "./domain/ports.js";
 import type { PlayRow } from "./domain/types.js";
 import { dailyBankSchema, dailyBookSchema, dailyEditionSchema, dailyImportSchema, dailyQuestionSchema } from "./dailyChapterValidation.js";
@@ -11,7 +11,7 @@ const normalized = (value: string) => value.normalize("NFKC").toLocaleLowerCase(
 const bookIdentity = (book: DailyChapterBook) => [normalized(book.title), normalized(book.author), book.language].join("\0");
 const passageKey = (question: Pick<DailyChapterQuestionInput, "bookId" | "type" | "prompt">) => [question.bookId, question.type, normalized(question.prompt)].join("\0");
 
-export function createDailyChapterService(repo: DailyChapterRepository, plays: QuizzesRepository, clock: () => Date = () => new Date()) {
+export function createDailyChapterService(repo: DailyChapterRepository, plays: QuizzesRepository, clock: () => Date = () => new Date(), people: DailyChapterPeople = NO_DAILY_PEOPLE) {
   const today = () => clock().toISOString().slice(0, 10);
   const editionResult = (edition: StoredDailyChapter, play: PlayRow): DailyChapterResult => {
     const given = new Map(plays.getAnswers(play.id).map((answer) => [answer.question_id, answer.choice_index]));
@@ -19,6 +19,13 @@ export function createDailyChapterService(repo: DailyChapterRepository, plays: Q
       answers: edition.snapshot!.map((q) => ({ questionId: q.id, prompt: q.prompt, choiceIndex: given.get(q.id)!, answerIndex: q.answerIndex, options: q.options, explanation: q.explanation, sourceUrl: q.sourceUrl, book: q.book })) };
   };
   const usedQuestions = () => new Set(repo.editions().filter((edition) => edition.publishedAt).flatMap((edition) => edition.questionIds));
+  const history = (playerId: string, guestId?: string) => {
+    if (guestId && playerId !== dailyGuestKey(guestId)) repo.claimGuest(dailyGuestKey(guestId), playerId);
+    const editions = repo.editions().filter((edition) => edition.publishedAt && edition.date <= today());
+    const byId = new Map(editions.map((edition) => [edition.id, edition]));
+    const results = repo.plays(playerId).flatMap((play) => { const edition = byId.get(play.quiz_id); return edition ? [editionResult(edition, play)] : []; });
+    return dailyChapterStats(results, editions, today());
+  };
   return {
     today() {
       const date = today();
@@ -27,12 +34,57 @@ export function createDailyChapterService(repo: DailyChapterRepository, plays: Q
       const board: DailyChapterBoard | null = edition ? { id: edition.id, date, closesAt: nextAt, title: edition.title, intro: edition.intro, theme: DAILY_CHAPTER_THEMES.find((theme) => theme.id === edition.themeId)!, questions: edition.snapshot!.map((q) => ({ id: q.id, type: q.type, prompt: q.prompt, options: q.options })) } : null;
       return { board, date, nextAt };
     },
-    history(playerId: string, guestId?: string) {
-      if (guestId && playerId !== dailyGuestKey(guestId)) repo.claimGuest(dailyGuestKey(guestId), playerId);
-      const editions = repo.editions().filter((edition) => edition.publishedAt && edition.date <= today());
-      const byId = new Map(editions.map((edition) => [edition.id, edition]));
-      const results = repo.plays(playerId).flatMap((play) => { const edition = byId.get(play.quiz_id); return edition ? [editionResult(edition, play)] : []; });
-      return dailyChapterStats(results, editions, today());
+    history,
+    people(editionId: string, viewerId: string): DailyChapterPerson[] {
+      const edition = repo.edition(editionId);
+      if (!edition?.publishedAt || edition.date > today()) return fail(404, "No daily edition at that link.");
+      if (!plays.getPlayByVoter(editionId, viewerId)) return fail(403, "Play this chapter to see how others did.");
+      const followees = people.followees(viewerId).filter((id) => id !== viewerId);
+      const visible = people.published(followees);
+      const ids = [viewerId, ...new Set(followees.filter((id) => visible.has(id)))];
+      const profiles = people.profiles(ids);
+      const named = ids.filter((id) => id === viewerId || profiles.has(id));
+      return repo.editionPlays([editionId], named).flatMap((play) => {
+        const given = new Map(plays.getAnswers(play.id).map((answer) => [answer.question_id, answer.choice_index]));
+        const profile = profiles.get(play.voter_user_id!);
+        const you = play.voter_user_id === viewerId;
+        return [{ userId: play.voter_user_id!, username: profile?.username ?? "You", avatarUrl: profile?.avatarUrl ?? null, score: play.score, marks: edition.snapshot!.map((q) => given.get(q.id) === q.answerIndex), you }];
+      }).sort((a, b) => b.score - a.score || a.username.localeCompare(b.username));
+    },
+    monthFacts(month: string): DailyChapterMonthFacts | null {
+      const closed = repo.editions().filter((edition) => edition.publishedAt && edition.date.startsWith(month) && edition.date < today()).sort((a, b) => a.date.localeCompare(b.date));
+      if (!closed.length) return null;
+      const ids = closed.map((edition) => edition.id);
+      const played = repo.editionPlays(ids);
+      const voters = new Set(played.flatMap((play) => (play.voter_user_id ? [play.voter_user_id] : [])));
+      if (!voters.size) return null;
+      let hardest: DailyChapterMonthFacts["hardest"] = null;
+      let lowest = Infinity;
+      for (const edition of closed) {
+        const scores = played.filter((play) => play.quiz_id === edition.id).map((play) => play.score);
+        if (!scores.length) continue;
+        const average = scores.reduce((sum, score) => sum + score, 0) / scores.length;
+        if (average >= lowest) continue;
+        lowest = average;
+        hardest = { title: edition.title, date: edition.date, average: Math.round(average * 10) / 10 };
+      }
+      const missRates = new Map(repo.missRates(ids).map((row) => [row.quiz_id + "\0" + row.question_id, row]));
+      let mostMissed: DailyChapterMonthFacts["mostMissed"] = null;
+      let worst = 0;
+      for (const edition of closed) for (const question of edition.snapshot!) {
+        const row = missRates.get(edition.id + "\0" + question.id);
+        if (!row || row.total < 3 || row.wrong / row.total <= worst) continue;
+        worst = row.wrong / row.total;
+        mostMissed = { title: question.book.title, missedPercent: Math.round(worst * 100) };
+      }
+      const perfect = new Map<string, number>();
+      for (const play of played) if (play.score === 5 && play.voter_user_id && !play.voter_user_id.startsWith(dailyGuestKey(""))) perfect.set(play.voter_user_id, (perfect.get(play.voter_user_id) ?? 0) + 1);
+      return { players: voters.size, hardest, mostMissed, perfect: [...perfect].map(([userId, count]) => ({ userId, perfect: count })).sort((a, b) => b.perfect - a.perfect || a.userId.localeCompare(b.userId)) };
+    },
+    player(userId: string, viewerId: string | null) {
+      if (viewerId !== userId && !people.published([userId]).has(userId)) return null;
+      const played = history(userId);
+      return played.results.length ? dailyChapterSummary(played, today().slice(0, 7)) : null;
     },
     play(id: string, playerId: string, submitted: SubmittedAnswer[]) {
       const acceptedAt = clock();

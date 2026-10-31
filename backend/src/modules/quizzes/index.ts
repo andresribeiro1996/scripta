@@ -2,7 +2,7 @@
 // modules/quizzes/ is private implementation — same convention as
 // modules/tierlists/index.ts.
 
-export { quizzesPlugin as registerQuizzesModule, deleteQuizzesUserData, getQuizzesPublicApi } from "./plugin.js";
+export { quizzesPlugin as registerQuizzesModule, deleteQuizzesUserData, getDailyChapterPublicApi, getQuizzesPublicApi } from "./plugin.js";
 export type { PublishedQuizRef, QuizDiscoverRef, QuizzesPublicApi } from "./service.js";
 import { createQuizGameSource } from "./adapters/communityGameSource.js";
 import { getQuizzesPublicApi } from "./plugin.js";

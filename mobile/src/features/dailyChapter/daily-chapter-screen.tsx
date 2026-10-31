@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { randomUUID } from "expo-crypto";
-import { Link, Stack } from "expo-router";
+import { Link, Stack, useRouter } from "expo-router";
 import { Linking, Pressable, ScrollView, Share, View } from "react-native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { DAILY_CHAPTER_GUEST_STORAGE, DAILY_CHAPTER_THEMES, dailyChapterDraftKey, dailyChapterShare, dailyChapterSubmission, isDailyChapterGuestId, readDailyChapterDraft, type DailyChapterBoard, type DailyChapterResult } from "@scripta/shared";
+import { DAILY_CHAPTER_THEMES, dailyChapterDraftKey, dailyChapterShare, dailyChapterSubmission, readDailyChapterDraft, type DailyChapterBoard, type DailyChapterResult } from "@scripta/shared";
 import { useAuth } from "../../core/auth";
 import { Text } from "../../ui/Text";
 import { Button, ErrorState, Screen, Skeleton, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
@@ -12,26 +11,20 @@ import { addBookToLibrary } from "../library/api/client";
 import { publicContentUrl } from "../sharing/links";
 import { dailyChapterApi } from "./api";
 import { DailyChapterArt } from "./daily-chapter-art";
-
-async function deviceIdentity() {
-  const stored = await AsyncStorage.getItem(DAILY_CHAPTER_GUEST_STORAGE);
-  if (isDailyChapterGuestId(stored)) return stored;
-  const id = randomUUID();
-  await AsyncStorage.setItem(DAILY_CHAPTER_GUEST_STORAGE, id);
-  return id;
-}
+import { useDeviceIdentity } from "./use-daily-history";
 
 export function DailyChapterScreen() {
   const { colors } = useTheme();
+  const router = useRouter();
   const { ready, user, unreachable, retry } = useAuth();
-  const identity = useQuery({ queryKey: ["daily-chapter", "identity"], queryFn: deviceIdentity, staleTime: Infinity });
+  const identity = useDeviceIdentity();
   const daily = useQuery({ queryKey: ["daily-chapter", "today"], queryFn: dailyChapterApi.today, refetchInterval: 60_000 });
   const history = useQuery({ queryKey: ["daily-chapter", "history", user?.id ?? "guest", identity.data, daily.data?.date], queryFn: () => dailyChapterApi.history(identity.data!, Boolean(user)), enabled: ready && !unreachable && Boolean(identity.data && daily.data?.date) });
   const result = history.data?.results.find((item) => item.editionId === daily.data?.board?.id);
   return <Screen top={false} bottom><Stack.Screen options={{ title: "The Daily Chapter", headerShown: true }} /><ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={{ padding: spacing.lg, gap: spacing.xl, paddingBottom: spacing.huge }}>
     <Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>One theme. Five questions. A new chapter at 00:00 UTC. Everyone welcome.</Text>
     {unreachable ? <ErrorState body="Reconnect to load your account and daily history." actionLabel="Retry" onAction={() => void retry()} /> : identity.isError || daily.isError || history.isError ? <ErrorState body="Couldn't open your chapter or saved results." actionLabel="Retry" onAction={() => { void identity.refetch(); void daily.refetch(); void history.refetch(); }} /> : !ready || daily.isPending || history.isPending ? <Skeleton height={200} /> : daily.data.board ? <DailyGame key={daily.data.board.id + ":" + (user?.id ?? identity.data)} board={daily.data.board} guestId={identity.data!} playerId={user?.id ?? identity.data!} recovered={result} /> : <Text {...dynamicType} style={[typography.body, { color: colors.text }]}>Another chapter is on its way. Check back soon.</Text>}
-    {history.data?.results.length ? <View style={{ gap: spacing.md }}><Text accessibilityRole="header" {...dynamicType} style={[typography.title, { color: colors.text }]}>Your chapters</Text><Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{history.data.results.length} completed · {history.data.streak} day streak</Text>{history.data.themes.map((stats) => <View key={stats.themeId} style={{ gap: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: radii.lg, padding: spacing.md }}><Text {...dynamicType} style={[typography.body, { color: colors.text, fontWeight: "700" }]}>{DAILY_CHAPTER_THEMES.find((theme) => theme.id === stats.themeId)?.name}</Text><Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{stats.completed}/{stats.eligible} editions since {history.data.startedOn} · {stats.correct}/{stats.answered} correct · {stats.perfect} perfect</Text>{stats.perfectStreak > 1 ? <Text {...dynamicType} style={[typography.body, { color: colors.text }]}>{stats.perfectStreak} perfect editions in a row</Text> : null}</View>)}{history.data.results.map((item) => <Text key={item.editionId} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{item.date} · {item.title} · {item.score}/5</Text>)}</View> : null}
+    {history.data?.results.length && user ? <Pressable accessibilityRole="link" accessibilityLabel={`Your chapters, ${history.data.results.length} played, ${history.data.streak} day streak`} onPress={() => router.push("/(public)/daily-chapters" as never)} style={{ minHeight: 44, justifyContent: "center", borderWidth: 1, borderColor: colors.border, borderRadius: radii.lg, padding: spacing.md }}><Text {...dynamicType} style={[typography.body, { color: colors.text, fontWeight: "700" }]}>Your chapters · {history.data.results.length} played · {history.data.streak} day streak ›</Text></Pressable> : history.data?.results.length ? <View style={{ gap: spacing.md }}><Text accessibilityRole="header" {...dynamicType} style={[typography.title, { color: colors.text }]}>Your chapters</Text><Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{history.data.results.length} completed · {history.data.streak} day streak</Text>{history.data.themes.map((stats) => <View key={stats.themeId} style={{ gap: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: radii.lg, padding: spacing.md }}><Text {...dynamicType} style={[typography.body, { color: colors.text, fontWeight: "700" }]}>{DAILY_CHAPTER_THEMES.find((theme) => theme.id === stats.themeId)?.name}</Text><Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{stats.completed}/{stats.eligible} editions since {history.data.startedOn} · {stats.correct}/{stats.answered} correct · {stats.perfect} perfect</Text>{stats.perfectStreak > 1 ? <Text {...dynamicType} style={[typography.body, { color: colors.text }]}>{stats.perfectStreak} perfect editions in a row</Text> : null}</View>)}{history.data.results.map((item) => <Text key={item.editionId} {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{item.date} · {item.title} · {item.score}/5</Text>)}</View> : null}
     {!user ? <View style={{ gap: spacing.sm }}><Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>Your results stay on this device. Sign in to keep them across devices.</Text><Link href={{ pathname: "/login", params: { returnTo: "/daily" } }} style={{ minHeight: 44, paddingVertical: spacing.md, color: colors.accent }}>Keep my chapters</Link></View> : null}
   </ScrollView></Screen>;
 }
@@ -64,7 +57,7 @@ function DailyGame({ board, guestId, playerId, recovered }: { board: DailyChapte
     const body = dailyChapterSubmission(questions, answers);
     if (!body) return;
     setBusy(true); setError("");
-    try { setSubmitted(await dailyChapterApi.play(board.id, guestId, body, Boolean(user))); void client.invalidateQueries({ queryKey: ["daily-chapter", "history"] }); }
+    try { setSubmitted(await dailyChapterApi.play(board.id, guestId, body, Boolean(user))); void client.invalidateQueries({ queryKey: ["daily-chapter", "history"] }); void client.invalidateQueries({ queryKey: ["daily-chapter", "player"] }); }
     catch (reason) { setError(reason instanceof Error ? reason.message : "Couldn't score your chapter. Try again."); void client.invalidateQueries({ queryKey: ["daily-chapter", "today"] }); }
     finally { setBusy(false); }
   }

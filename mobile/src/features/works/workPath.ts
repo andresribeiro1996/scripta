@@ -1,11 +1,11 @@
-const prefix = (segments: readonly string[]) => (segments[0] === "(app)" ? "" : "/(public)");
+export const stackPrefix = (segments: readonly string[]) => (segments[0] === "(app)" ? "" : "/(public)");
 
 export function workPath(id: string, segments: readonly string[], editionId?: string | null): string {
-  return `${prefix(segments)}/work/${id}${editionId ? `?edition=${encodeURIComponent(editionId)}` : ""}`;
+  return `${stackPrefix(segments)}/work/${id}${editionId ? `?edition=${encodeURIComponent(editionId)}` : ""}`;
 }
 
 export function bookToolPath(key: string, tool: "style" | "cover" | "finished", segments: readonly string[]): string {
-  return `${prefix(segments)}/book/${encodeURIComponent(key)}/${tool}`;
+  return `${stackPrefix(segments)}/book/${encodeURIComponent(key)}/${tool}`;
 }
 
 export function workStatsPath(id: string, segments: readonly string[]): string {

@@ -2,6 +2,7 @@ import type { TopShelfRecap, TopShelfRecapCard, TopShelfRecapIndex } from "@scri
 import type { DiscoverItem } from "@scripta/shared/community";
 import type { RecapRepository } from "./adapters/sqlite/sqliteRecapRepository.js";
 import type { GameRef } from "./domain/ports.js";
+import { createVisibility } from "./domain/visibility.js";
 import { buildDiscoverItems } from "./service.js";
 import { addMonths, lisbonDay, lisbonMonth, lisbonMonthStart, type ShelfInput } from "./topShelf.js";
 import { freezeRecap } from "./topShelfRecap.js";
@@ -13,7 +14,7 @@ export interface TopShelfRecapService {
   freezeMonth(month: string): void;
   freezeDue(): void;
   getIndex(): TopShelfRecapIndex;
-  getRecap(month: string): TopShelfRecap | null;
+  getRecap(month: string, options?: { daily?: boolean }): TopShelfRecap | null;
 }
 
 type LiveGame = { ref: GameRef; ownerUserId: string; promoted: boolean; createdAt: string; open: boolean; workIds: string[] };
@@ -46,7 +47,7 @@ export function createTopShelfRecapService(deps: { repo: RecapRepository; gather
       const currentMonth = lisbonMonth(at);
       return { months, currentMonth, announce: months[0] === addMonths(currentMonth, -1) && lisbonDay(at) <= ANNOUNCE_DAYS };
     },
-    getRecap(month) {
+    getRecap(month, options = {}) {
       const data = repo.get(month);
       if (!data) return null;
       const live = gatherer.cached(null);
@@ -71,6 +72,14 @@ export function createTopShelfRecapService(deps: { repo: RecapRepository; gather
       if (hottest) {
         const item = itemOf(hottest.game);
         if (item) cards.push({ kind: "hottestGame", game: { item, likes: hottest.facts.likes, votes: hottest.facts.votes, comments: hottest.facts.comments }, open: hottest.game.open });
+      }
+      const daily = options.daily ? shelf.dailyChapterMonth?.(month) : null;
+      if (daily?.players) {
+        const standings = createVisibility(community.repo, null).standings(daily.perfect.map((entry) => entry.userId));
+        const listed = daily.perfect.filter((entry) => standings.get(entry.userId)?.published);
+        const profiles = community.resolveProfiles(listed.map((entry) => entry.userId));
+        const topPlayers = listed.flatMap((entry) => { const profile = profiles.get(entry.userId); return profile ? [{ username: profile.username, perfect: entry.perfect }] : []; }).slice(0, 3);
+        cards.push({ kind: "dailyChapter", players: daily.players, hardest: daily.hardest, mostMissed: daily.mostMissed, topPlayers });
       }
       return { month, cards };
     },

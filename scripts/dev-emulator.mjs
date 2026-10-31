@@ -54,7 +54,7 @@ import { fileURLToPath } from "node:url";
 import { androidEnv } from "./androidSdk.mjs";
 import { devDataDirEnv } from "./devDataDir.mjs";
 import { DEV_USERNAME } from "./dev-account.mjs";
-import { assertAdoptedBackendMatches, ensureSharedBuilt, resetDevDataIfRequested, seedCommunityGraph, seedDevAccount, seedEditionWorks, seedFixtureUsers } from "./devFixtureSetup.mjs";
+import { assertAdoptedBackendMatches, ensureSharedBuilt, resetDevDataIfRequested, seedCommunityGraph, seedDailyChapter, seedDevAccount, seedEditionWorks, seedFixtureUsers } from "./devFixtureSetup.mjs";
 import { claimThisWorktreeSlot } from "./devClaim.mjs";
 import { assertHoldsDevice, recordDeviceSerial, registryPath, takeDevice } from "./devRegistry.mjs";
 import { isReachableOn, worktreeIdentity } from "./devHost.mjs";
@@ -323,6 +323,7 @@ async function main() {
   seedEditionWorks(log);
   seedFixtureUsers(log);
   seedCommunityGraph(log);
+  seedDailyChapter(log);
   await ensureBackendRunning();
   const metroLogPath = await ensureMetroRunning();
 

@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS quiz_plays (
   updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 CREATE INDEX IF NOT EXISTS idx_quiz_plays_quiz ON quiz_plays(quiz_id);
+CREATE INDEX IF NOT EXISTS idx_quiz_plays_voter ON quiz_plays(voter_user_id);
 
 -- One play per account per quiz, enforced by the database (a submitted
 -- play is final — a player must not resubmit after seeing results).
