@@ -13,7 +13,7 @@ export const LIBRARY_SHARE_LAYOUTS: ReadonlyArray<{ value: LibraryShareLayout; l
   { value: "wall", label: "Wall" },
   { value: "summary", label: "Summary" },
   { value: "reading", label: "Reading" },
-  { value: "shelf", label: "This shelf" }
+  { value: "shelf", label: "Shelf" }
 ];
 
 export function newestFinished(books: LibraryBook[], limit: number): LibraryBook[] {

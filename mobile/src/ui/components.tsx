@@ -176,6 +176,7 @@ export function Button({
   label,
   accessibilityLabel = label,
   variant = "primary",
+  icon,
   loading = false,
   disabled = false,
   numberOfLines,
@@ -184,6 +185,7 @@ export function Button({
   label: string;
   accessibilityLabel?: string;
   variant?: ButtonVariant;
+  icon?: IconName;
   loading?: boolean;
   disabled?: boolean;
   numberOfLines?: number;
@@ -204,6 +206,7 @@ export function Button({
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
+        icon && styles.buttonWithIcon,
         {
           backgroundColor: pressed && variant === "secondary" ? colors.surfacePressed : backgroundColor,
           borderColor: variant === "secondary" ? colors.border : backgroundColor,
@@ -212,7 +215,10 @@ export function Button({
         },
       ]}
     >
-      {loading ? <ActivityIndicator color={color} /> : <Text {...dynamicType} numberOfLines={numberOfLines} style={[styles.buttonText, { color }]}>{label}</Text>}
+      {loading ? <ActivityIndicator color={color} /> : <>
+        {icon ? <Icon name={icon} size={18} color={color} /> : null}
+        <Text {...dynamicType} numberOfLines={numberOfLines} style={[styles.buttonText, { color }]}>{label}</Text>
+      </>}
     </Pressable>
   );
 }
@@ -911,6 +917,7 @@ export function ModalBody({ children }: { children: ReactNode }) {
 
 const styles = StyleSheet.create({
   button: { minHeight: minimumTouchTarget, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: radii.md, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  buttonWithIcon: { flexDirection: "row", gap: spacing.sm },
   buttonText: { ...typography.body, fontWeight: "600", textAlign: "center", alignSelf: "stretch" },
   // 48 is Material's minimum and clears HIG's 44. It is also the ceiling here:
   // padding past it measured as having no effect, because the native header
