@@ -99,8 +99,9 @@ function StatusBadge({ label, finished, onPress }: { label: string; finished: bo
 }
 
 function SeriesLine({ series, signedIn, segments }: { series: NonNullable<BookScreenModel["series"]>; signedIn: boolean; segments: readonly string[] }) {
+  const locale = useLocale();
   const { colors } = useTheme();
-  const label = seriesLabel(series);
+  const label = seriesLabel(series, locale);
   const method = signedIn ? seriesSearchMethod(segments) : null;
   if (!method) return <Text {...dynamicType} style={[typography.body, styles.shrink, styles.centerText, { color: colors.textDim }]}>{label}</Text>;
   return (

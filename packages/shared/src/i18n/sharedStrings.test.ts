@@ -9,7 +9,7 @@ import { playerLabel, quizClueHeading } from "../quizzes/labels.js";
 import { genreLabel, BOOK_GENRES } from "../library/bookGenres.js";
 import { bookCsvToLibraryJson } from "../library/bookCsv.js";
 import { statusLabel } from "../library/covers.js";
-import { cardAspectRatioOptions } from "../library/libraryStyle.js";
+import { cardAspectRatioOptions, cardFontFamilyOptions } from "../library/libraryStyle.js";
 import { readerIdentity } from "../library/readerIdentity.js";
 import { blockLabel, statMetricLabels } from "../murals/murals.js";
 import { blockThemeColorLabels } from "../murals/blockTextColors.js";
@@ -100,6 +100,8 @@ test("import errors, saved looks and block labels follow the language", () => {
   assert.equal(blockLabel("readerCard", "pt-PT"), "Cartão de leitor");
   assert.equal(statMetricLabels("pt-PT").totalBooks, "Livros na sua biblioteca");
   assert.equal(blockThemeColorLabels("pt-PT").onAccent, "Sobre o realce");
+  assert.equal(cardFontFamilyOptions("en")[0]!.shortLabel, "Sans-serif");
+  assert.equal(cardFontFamilyOptions("pt-PT")[0]!.shortLabel, "Sem serifa");
   assert.deepEqual(cardAspectRatioOptions("pt-PT").map((option) => option.label), ["Cartaz (2:3)", "Retrato (3:4)", "Quadrado (1:1)"]);
 });
 

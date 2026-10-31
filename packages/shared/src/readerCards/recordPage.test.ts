@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { PublicReaderCard } from "../library/readerIdentity.js";
+import { sharedT } from "../i18n/sharedT.js";
+import { wrapLines } from "./fit.js";
 import { PLATES, plateName } from "./plates.js";
 import { renderPlate, renderReaderCard, type ReaderCardInput } from "./render.js";
 import { seedOf } from "./seed.js";
@@ -89,4 +91,13 @@ test("a Portuguese plate names the identity in Portuguese", () => {
   assert.match(svg, />Astrónomo</);
   assert.match(svg, />vive em parte noutros mundos</);
   assert.match(svg, />PRANCHA IV</);
+});
+
+test("Portuguese genre gap lines fit the two lines of the record page", () => {
+  const t = sharedT("pt-PT");
+  for (const [words, threshold] of [["wordsLamp", "35%"], ["wordsStar", "40%"], ["wordsArch", "35%"], ["wordsCorr", "40%"]] as const) {
+    const line = `◇ ${t("shared.readerIdentity.genreGap", { pct: "30%", words: t(`shared.readerIdentity.${words}`), threshold })}`;
+    const wrapped = wrapLines(line, { font: "serif", size: 6.4, width: 190, lines: 2 });
+    assert.equal(wrapped.join("").replace(/\s/g, ""), line.replace(/\s/g, ""));
+  }
 });

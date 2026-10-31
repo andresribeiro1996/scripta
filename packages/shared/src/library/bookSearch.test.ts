@@ -127,26 +127,29 @@ test("a search result byline reads author · year · publisher and skips what is
 });
 
 test("a story series reads its name and position, or the name alone", () => {
-  assert.equal(seriesLabel({ name: "Malazan Book of the Fallen", kind: "series", position: "1" }), "Malazan Book of the Fallen · 1");
-  assert.equal(seriesLabel({ name: "Malazan Book of the Fallen", kind: "series", position: null }), "Malazan Book of the Fallen");
+  assert.equal(seriesLabel({ name: "Malazan Book of the Fallen", kind: "series", position: "1" }, "en"), "Malazan Book of the Fallen · 1");
+  assert.equal(seriesLabel({ name: "Malazan Book of the Fallen", kind: "series", position: null }, "en"), "Malazan Book of the Fallen");
 });
 
 test("a collection reads its name, the word collection and its number, or no number", () => {
-  assert.equal(seriesLabel({ name: "Bang!", kind: "collection", position: "248" }), "Bang! collection · 248");
-  assert.equal(seriesLabel({ name: "Bang!", kind: "collection", position: null }), "Bang! collection");
+  assert.equal(seriesLabel({ name: "Bang!", kind: "collection", position: "248" }, "en"), "Bang! collection · 248");
+  assert.equal(seriesLabel({ name: "Bang!", kind: "collection", position: null }, "en"), "Bang! collection");
+  assert.equal(seriesLabel({ name: "Bang!", kind: "collection", position: "248" }, "pt-PT"), "Coleção Bang! · 248");
+  assert.equal(seriesLabel({ name: "Penguin Collection", kind: "collection", position: null }, "pt-PT"), "Penguin Collection");
+  assert.equal(seriesLabel({ name: "Dune", kind: "series", position: "2" }, "pt-PT"), "Dune · 2");
 });
 
 test("a collection whose name already says collection is not given the word again", () => {
-  assert.equal(seriesLabel({ name: "Penguin Collection", kind: "collection", position: null }), "Penguin Collection");
-  assert.equal(seriesLabel({ name: "PENGUIN COLLECTIONS", kind: "collection", position: "3" }), "PENGUIN COLLECTIONS · 3");
-  assert.equal(seriesLabel({ name: "Coleção Clássicos", kind: "collection", position: "12" }), "Coleção Clássicos · 12");
-  assert.equal(seriesLabel({ name: "COLEÇÃO Bang", kind: "collection", position: null }), "COLEÇÃO Bang");
-  assert.equal(seriesLabel({ name: "Colecção Mil Folhas", kind: "collection", position: null }), "Colecção Mil Folhas");
-  assert.equal(seriesLabel({ name: "Colecao Mil Folhas", kind: "collection", position: null }), "Colecao Mil Folhas");
+  assert.equal(seriesLabel({ name: "Penguin Collection", kind: "collection", position: null }, "en"), "Penguin Collection");
+  assert.equal(seriesLabel({ name: "PENGUIN COLLECTIONS", kind: "collection", position: "3" }, "en"), "PENGUIN COLLECTIONS · 3");
+  assert.equal(seriesLabel({ name: "Coleção Clássicos", kind: "collection", position: "12" }, "en"), "Coleção Clássicos · 12");
+  assert.equal(seriesLabel({ name: "COLEÇÃO Bang", kind: "collection", position: null }, "en"), "COLEÇÃO Bang");
+  assert.equal(seriesLabel({ name: "Colecção Mil Folhas", kind: "collection", position: null }, "en"), "Colecção Mil Folhas");
+  assert.equal(seriesLabel({ name: "Colecao Mil Folhas", kind: "collection", position: null }, "en"), "Colecao Mil Folhas");
 });
 
 test("a story series never gets the word collection", () => {
-  assert.equal(seriesLabel({ name: "Dune Chronicles", kind: "series", position: "2" }), "Dune Chronicles · 2");
+  assert.equal(seriesLabel({ name: "Dune Chronicles", kind: "series", position: "2" }, "en"), "Dune Chronicles · 2");
 });
 
 test("buildManualBook stores format and a positive page count", () => {

@@ -155,5 +155,5 @@ test("a Portuguese preset writes its names and block titles in Portuguese", () =
   const shelf = buildMuralPreset("shelf", library, "pt-PT");
   assert.equal(shelf.name, "A minha estante");
   assert.deepEqual(shelves(shelf.blocks).map((block) => block.title), ["Lidos", "Favoritos"]);
-  assert.equal(shelfPresetSummary([book("One", { ReadStatus: 1 })], false, "pt-PT"), "Feito a partir do seu 1 livro: 1 que está a ler e 0 que já leu. Só você a pode ver.");
+  assert.equal(shelfPresetSummary([book("One", { ReadStatus: 1 })], false, "pt-PT"), "Feito a partir do seu 1 livro: 1 que está a ler e 0 que já leu. Visível apenas para si.");
 });

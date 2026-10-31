@@ -36,19 +36,19 @@ export type CardBorderStyle = "solid" | "dashed" | "dotted" | "double" | "groove
  *  never accidentally leak into the other through a shared alias. */
 export type CardFontFamily = "sans" | "serif" | "mono" | "playfairDisplay" | "inter" | "jetbrainsMono";
 
-export function cardFontFamilyOptions(locale: Locale): Array<{ value: CardFontFamily; label: string; css: string }> {
+export function cardFontFamilyOptions(locale: Locale): Array<{ value: CardFontFamily; label: string; shortLabel: string; css: string }> {
   return fontFamilyOptions(locale);
 }
 
-function fontFamilyOptions(locale: Locale): Array<{ value: CardFontFamily; label: string; css: string }> {
+function fontFamilyOptions(locale: Locale): Array<{ value: CardFontFamily; label: string; shortLabel: string; css: string }> {
   const t = sharedT(locale);
   return [
-    { value: "sans", label: t("shared.libraryStyle.fontSans"), css: "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" },
-    { value: "serif", label: t("shared.libraryStyle.fontSerif"), css: "ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif" },
-    { value: "mono", label: t("shared.libraryStyle.fontMono"), css: "ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" },
-    { value: "playfairDisplay", label: "Playfair Display", css: "'Playfair Display', ui-serif, Georgia, serif" },
-    { value: "inter", label: "Inter", css: "'Inter', ui-sans-serif, system-ui, sans-serif" },
-    { value: "jetbrainsMono", label: "JetBrains Mono", css: "'JetBrains Mono', ui-monospace, SFMono-Regular, monospace" }
+    { value: "sans", label: t("shared.libraryStyle.fontSans"), shortLabel: t("shared.libraryStyle.fontSansShort"), css: "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" },
+    { value: "serif", label: t("shared.libraryStyle.fontSerif"), shortLabel: t("shared.libraryStyle.fontSerifShort"), css: "ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif" },
+    { value: "mono", label: t("shared.libraryStyle.fontMono"), shortLabel: t("shared.libraryStyle.fontMonoShort"), css: "ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" },
+    { value: "playfairDisplay", label: "Playfair Display", shortLabel: "Playfair Display", css: "'Playfair Display', ui-serif, Georgia, serif" },
+    { value: "inter", label: "Inter", shortLabel: "Inter", css: "'Inter', ui-sans-serif, system-ui, sans-serif" },
+    { value: "jetbrainsMono", label: "JetBrains Mono", shortLabel: "JetBrains Mono", css: "'JetBrains Mono', ui-monospace, SFMono-Regular, monospace" }
   ];
 }
 
@@ -369,7 +369,7 @@ export function effectiveCardStyle(
  *  feel) rather than a long list of near-identical sans choices. */
 export type BlockFontFamily = "sans" | "serif" | "mono" | "playfairDisplay" | "inter" | "jetbrainsMono";
 
-export function blockFontFamilyOptions(locale: Locale): Array<{ value: BlockFontFamily; label: string; css: string }> {
+export function blockFontFamilyOptions(locale: Locale): Array<{ value: BlockFontFamily; label: string; shortLabel: string; css: string }> {
   return fontFamilyOptions(locale);
 }
 
@@ -396,6 +396,8 @@ export function blockInnerSpacingOptions(locale: Locale): Array<{ value: BlockIn
     { value: "roomy", label: t("shared.libraryStyle.spacingRoomy") }
   ];
 }
+
+const BACKGROUND_FINISHES: readonly BlockBackgroundFinish[] = ["none", "paper", "linen"];
 
 export function blockBackgroundFinishOptions(locale: Locale): Array<{ value: BlockBackgroundFinish; label: string }> {
   const t = sharedT(locale);
@@ -524,7 +526,7 @@ export const DEFAULT_BLOCK_STYLE: BlockStyle = {
 /** Same "fill in whatever's missing" reasoning as resolvePerCardStyle(). */
 export function resolveBlockStyle(style: Partial<BlockStyle> | undefined): BlockStyle {
   const resolved = { ...DEFAULT_BLOCK_STYLE, ...style };
-  if (!blockBackgroundFinishOptions("en").some((option) => option.value === resolved.backgroundFinish)) resolved.backgroundFinish = "none";
+  if (!BACKGROUND_FINISHES.includes(resolved.backgroundFinish)) resolved.backgroundFinish = "none";
   for (const [key, range] of [["shadowOpacity", BLOCK_SHADOW_OPACITY_RANGE], ["shadowBlur", BLOCK_SHADOW_BLUR_RANGE], ["shadowOffsetY", BLOCK_SHADOW_OFFSET_RANGE], ["gradientAngle", BLOCK_GRADIENT_ANGLE_RANGE], ["gradientStrength", BLOCK_GRADIENT_STRENGTH_RANGE]] as const) {
     resolved[key] = typeof resolved[key] === "number" && Number.isFinite(resolved[key]) ? Math.min(range.max, Math.max(range.min, resolved[key])) : DEFAULT_BLOCK_STYLE[key];
   }

@@ -70,12 +70,15 @@ export function blockFinishImage(style: BlockStyle, palette: ThemeColors): strin
 
 export const BLOCK_PAD_SCALE: Record<BlockInnerSpacing, number> = { tight: 0.5, normal: 1, roomy: 1.6 };
 
+const CARD_FONT_STACKS = cardFontFamilyOptions("en");
+const BLOCK_FONT_STACKS = blockFontFamilyOptions("en");
+
 /** Resolves a CardFontFamily value to its real CSS `font-family` stack —
  *  used wherever a card's style is actually applied (BookCard.tsx), not
  *  by the picker itself. Falls back to the first option for any
  *  unrecognized value, same reasoning as blockFontFamilyCss below. */
 export function cardFontFamilyCss(value: CardFontFamily): string {
-  return cardFontFamilyOptions("en").find((o) => o.value === value)?.css ?? cardFontFamilyOptions("en")[0].css;
+  return CARD_FONT_STACKS.find((o) => o.value === value)?.css ?? CARD_FONT_STACKS[0].css;
 }
 
 /** Resolves a BlockFontFamily value to its real CSS `font-family` stack —
@@ -85,7 +88,7 @@ export function cardFontFamilyCss(value: CardFontFamily): string {
  *  (hand-edited data, a future removed option) rather than rendering with
  *  no font-family at all. */
 export function blockFontFamilyCss(value: BlockFontFamily): string {
-  return blockFontFamilyOptions("en").find((o) => o.value === value)?.css ?? blockFontFamilyOptions("en")[0].css;
+  return BLOCK_FONT_STACKS.find((o) => o.value === value)?.css ?? BLOCK_FONT_STACKS[0].css;
 }
 
 /** Applies `cardBorderOpacity` on top of `cardBorderColor` — kept as two

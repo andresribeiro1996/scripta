@@ -10,6 +10,7 @@ import type { useFollowToggle } from "../community/useFollowToggle";
 import { CoverImage } from "../library/components/CoverImage";
 import { workPath } from "../works/workPath";
 import { SCOPE_OF, SECTION_ERRORS, SECTION_TITLES, libraryStatus, type ResultSection, type SearchRow, type SearchScope } from "./searchModel";
+import { useLocale } from "../../i18n";
 
 export type ResultActions = {
   query: string;
@@ -117,10 +118,11 @@ function LibraryResultRow({ book, onOpen }: { book: LibraryBook; onOpen: () => v
 }
 
 function BookResultRow({ result, onOpen, onAdd }: { result: BookSearchResult; onOpen: () => void; onAdd: (result: BookSearchResult) => void }) {
+  const locale = useLocale();
   const { colors } = useTheme();
   const segments = useSegments();
   const byline = searchResultByline(result);
-  const series =result.series ? seriesLabel(result.series) : null;
+  const series =result.series ? seriesLabel(result.series, locale) : null;
   return (
     <View style={[styles.row, { borderBottomColor: colors.border }]}>
       <Pressable

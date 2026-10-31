@@ -55,7 +55,6 @@ import { useLocale } from "../../i18n";
 
 type LibraryTab = LibraryStatusTab | "collections";
 
-
 export function LibraryScreen() {
   const locale = useLocale();
   const libraryTabs: readonly { value: LibraryTab; label: string }[] = [...libraryStatusTabs(locale), { value: "collections", label: "Collections" }];

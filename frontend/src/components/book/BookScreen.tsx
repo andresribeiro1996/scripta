@@ -194,7 +194,7 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
   const metaParts = [
     ...(model.rating ? [<RatingStars key="rating" value={model.rating.value} label={model.rating.label} />] : []),
     ...(model.meta ? [<span key="meta">{model.meta}</span>] : []),
-    ...(model.series ? [<span key="series">{seriesLabel(model.series)}</span>] : [])
+    ...(model.series ? [<span key="series">{seriesLabel(model.series, locale)}</span>] : [])
   ];
 
   return frame((

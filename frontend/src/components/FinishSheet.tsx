@@ -5,6 +5,7 @@ import {
   createShelfSession,
   favouriteOpponent,
   formatFinishDay,
+  intlLocale,
   localDay,
   type FinishRating,
   type Landing,
@@ -149,7 +150,7 @@ export function FinishSheet({
   const opponentKey = shelf ? favouriteOpponent(shelf.blocks, key) : null;
   const opponentBook = opponentKey ? (books.find((candidate) => bookKey(candidate) === opponentKey) ?? null) : null;
 
-  const day = formatFinishDay(typeof book.DateLastRead === "string" ? book.DateLastRead : localDay());
+  const day = formatFinishDay(typeof book.DateLastRead === "string" ? book.DateLastRead : localDay(), intlLocale(locale));
   const landed = shelf?.landed ?? [];
   const footer =
     landed.length === 0

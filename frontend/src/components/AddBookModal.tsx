@@ -20,6 +20,7 @@ import { Sheet } from "./Sheet";
 import { SearchField } from "./Toolbar";
 import { normalizeIsbn } from "../lib/covers";
 import { bookSearchApi, buildManualBook, searchInsideOutside, searchResultByline, type BookSearchResult } from "../lib/bookSearch";
+import { useLocale } from "../i18n";
 
 const STATUS_OPTIONS = [
   { value: 2, label: "Finished" },
@@ -28,6 +29,7 @@ const STATUS_OPTIONS = [
 ];
 
 function ResultSummary({ result }: { result: BookSearchResult }) {
+  const locale = useLocale();
   return (
     <>
       {result.coverUrl ? (
@@ -37,7 +39,7 @@ function ResultSummary({ result }: { result: BookSearchResult }) {
       )}
       <span className="min-w-0">
         <span className="block truncate text-sm font-semibold">{result.title}</span>
-        {result.series && <span className="block truncate text-xs text-(--color-text-dim)">{seriesLabel(result.series)}</span>}
+        {result.series && <span className="block truncate text-xs text-(--color-text-dim)">{seriesLabel(result.series, locale)}</span>}
         <span className="block truncate text-xs text-(--color-text-dim)">{searchResultByline(result)}</span>
       </span>
     </>

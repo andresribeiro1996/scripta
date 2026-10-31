@@ -149,7 +149,7 @@ export function StyleTab({ style, palette, onChange, onReset, onCopy, onPaste, c
         {isHardToRead(style, palette) ? <Text accessibilityLiveRegion="polite" style={[typography.caption, { color: colors.danger }]}>Hard to read on this background</Text> : null}
 
         <View style={styles.wrap}>
-          {blockFontFamilyOptions(locale).map((option) => <Chip key={option.value} label={option.label.replace(" (system)", "")} fontFamily={blockFontFamily(option.value)} selected={style.fontFamily === option.value} onPress={() => set({ fontFamily: option.value })} />)}
+          {blockFontFamilyOptions(locale).map((option) => <Chip key={option.value} label={option.shortLabel} fontFamily={blockFontFamily(option.value)} selected={style.fontFamily === option.value} onPress={() => set({ fontFamily: option.value })} />)}
         </View>
         <PresetRow label="Size" presets={SIZE_PRESETS} value={style.fontSize} onChange={(fontSize) => set({ fontSize })} />
         <View style={styles.wrap}>

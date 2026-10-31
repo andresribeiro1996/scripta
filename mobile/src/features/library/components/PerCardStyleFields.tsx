@@ -78,7 +78,7 @@ export function PerCardStyleFields({ draft, canvasColor, onApply, onSaveNow }: {
       </Section>
       <Section title="Text">
         <View style={styles.wrap}>
-          {cardFontFamilyOptions(locale).map((option) => <Chip key={option.value} label={option.label.replace(" (system)", "")} fontFamily={cardFontFamily(option.value)} selected={draft.cardFontFamily === option.value} onPress={() => onSaveNow({ cardFontFamily: option.value })} />)}
+          {cardFontFamilyOptions(locale).map((option) => <Chip key={option.value} label={option.shortLabel} fontFamily={cardFontFamily(option.value)} selected={draft.cardFontFamily === option.value} onPress={() => onSaveNow({ cardFontFamily: option.value })} />)}
         </View>
         <PresetRow label="Size" presets={TEXT_SIZES} value={draft.cardFontSize} onChange={(cardFontSize) => onSaveNow({ cardFontSize })} />
         <View style={styles.wrap}>
