@@ -73,7 +73,9 @@ export default function RootLayout() {
   }, [fontError]);
   const [localeReady, setLocaleReady] = useState(false);
   useEffect(() => {
-    void installNativeLocale().then(() => setLocaleReady(true));
+    installNativeLocale()
+      .catch((err: unknown) => console.warn("Couldn't set up the app language.", err))
+      .finally(() => setLocaleReady(true));
   }, []);
   if ((!fontsLoaded && !fontError) || !localeReady) return null;
   return (

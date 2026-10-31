@@ -10,6 +10,16 @@ export function deviceLocaleTags(): string[] {
   return tag ? [tag.replace(/_/g, "-")] : [];
 }
 
+function readDeviceTags(): string[] {
+  try {
+    return deviceLocaleTags();
+  } catch (err) {
+    if (!(err instanceof RangeError || err instanceof TypeError)) throw err;
+    console.warn("Couldn't read the device language; using English.", err);
+    return [];
+  }
+}
+
 let installing: Promise<void> | null = null;
 
 async function install(): Promise<void> {
@@ -18,7 +28,7 @@ async function install(): Promise<void> {
   } catch (err) {
     console.warn("Couldn't read the saved language; following the device.", err);
   }
-  setDeviceLocaleTags(deviceLocaleTags());
+  setDeviceLocaleTags(readDeviceTags());
   let persisted = getLocalePreference();
   subscribeLocale(() => {
     const next = getLocalePreference();
@@ -29,7 +39,7 @@ async function install(): Promise<void> {
     });
   });
   AppState.addEventListener("change", (state) => {
-    if (state === "active") setDeviceLocaleTags(deviceLocaleTags());
+    if (state === "active") setDeviceLocaleTags(readDeviceTags());
   });
 }
 
