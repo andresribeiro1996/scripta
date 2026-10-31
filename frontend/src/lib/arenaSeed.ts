@@ -10,8 +10,35 @@
 // resolve anything itself; it just renders the stored URL directly.
 
 import { resolveCover } from "../api/covers";
-import type { SeedBook } from "../api/arena";
-import { seedCoverLookup, toSeedBook as createSeedBook } from "@scripta/shared";
+import type { SeedBook, Tournament } from "../api/arena";
+import { seedCoverLookup, toSeedBook as createSeedBook, type createArenaApi } from "@scripta/shared";
+
+export const UNTITLED_TOURNAMENT = "Untitled tournament";
+
+export function hasTournamentName(name: string): boolean {
+  const trimmed = name.trim();
+  return trimmed !== "" && trimmed !== UNTITLED_TOURNAMENT;
+}
+
+export function slotPayload(slots: Array<SeedBook | null>): Array<{ slotIndex: number; book: SeedBook }> {
+  return slots.flatMap((book, slotIndex) => (book ? [{ slotIndex, book }] : []));
+}
+
+export async function createSeededTournament(
+  api: Pick<ReturnType<typeof createArenaApi>, "createTournament" | "setTournamentSlots">,
+  input: { name: string; bracketSize: number; roundDurationMinutes: number },
+  slots: Array<SeedBook | null>
+): Promise<{ tournament: Tournament; slotsError: unknown }> {
+  const tournament = await api.createTournament(input);
+  const payload = slotPayload(slots);
+  if (payload.length === 0) return { tournament, slotsError: null };
+  try {
+    await api.setTournamentSlots(tournament.id, payload);
+  } catch (slotsError) {
+    return { tournament, slotsError };
+  }
+  return { tournament, slotsError: null };
+}
 
 export async function toSeedBook(book: Record<string, unknown>): Promise<SeedBook | null> {
   const existing = typeof book._coverUrl === "string" ? book._coverUrl : null;

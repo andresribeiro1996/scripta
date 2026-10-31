@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import type { LibraryData } from "../api/library";
-import { orderLibraryBooks } from "../lib/libraryOrder";
-import { resolveLibraryStyle } from "../lib/libraryStyle";
+import { orderLibraryBooks, seriesGroupByBookKey } from "../lib/libraryOrder";
+import { effectiveCardStyle, resolveLibraryStyle, type PerCardStyle } from "../lib/libraryStyle";
 import { bookKey } from "../lib/merge";
 import { AddBookSheet } from "./AddBookSheet";
 import { BookCard } from "./BookCard";
@@ -12,6 +12,7 @@ export function PublicLibraryGrid({ library, onOpenBook }: { library: LibraryDat
   const [selected, setSelected] = useState<Record<string, unknown> | null>(null);
   const style = resolveLibraryStyle(library.style);
   const displayBooks = useMemo(() => orderLibraryBooks(library.books, library.groups ?? []), [library]);
+  const bookSeriesGroup = useMemo(() => seriesGroupByBookKey(library.books, library.groups ?? []), [library]);
 
   if (library.books.length === 0) return <p className="text-sm text-(--color-text-dim)">This library is empty.</p>;
   return (
@@ -19,7 +20,7 @@ export function PublicLibraryGrid({ library, onOpenBook }: { library: LibraryDat
       <LibraryCanvas style={style}>
         <BookGrid style={style}>
           {displayBooks.map((book, i) => (
-            <BookCard key={String(book.ContentID ?? bookKey(book) ?? i)} book={book} onClick={() => (onOpenBook ? onOpenBook(book) : setSelected(book))} style={style} />
+            <BookCard key={String(book.ContentID ?? bookKey(book) ?? i)} book={book} onClick={() => (onOpenBook ? onOpenBook(book) : setSelected(book))} style={effectiveCardStyle(style, bookSeriesGroup.get(bookKey(book))?.style, book._style as PerCardStyle | undefined)} />
           ))}
         </BookGrid>
       </LibraryCanvas>

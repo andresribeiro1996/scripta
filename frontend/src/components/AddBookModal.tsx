@@ -27,6 +27,23 @@ const STATUS_OPTIONS = [
   { value: 0, label: "To read" }
 ];
 
+function ResultSummary({ result }: { result: BookSearchResult }) {
+  return (
+    <>
+      {result.coverUrl ? (
+        <img src={result.coverUrl} alt="" loading="lazy" className="h-16 w-11 shrink-0 rounded object-cover" />
+      ) : (
+        <div className="h-16 w-11 shrink-0 rounded border border-(--color-border)" />
+      )}
+      <span className="min-w-0">
+        <span className="block truncate text-sm font-semibold">{result.title}</span>
+        {result.series && <span className="block truncate text-xs text-(--color-text-dim)">{seriesLabel(result.series)}</span>}
+        <span className="block truncate text-xs text-(--color-text-dim)">{searchResultByline(result)}</span>
+      </span>
+    </>
+  );
+}
+
 export function AddBookModal({
   onAdd,
   onClose
@@ -49,12 +66,13 @@ export function AddBookModal({
   const videoRef = useRef<HTMLVideoElement>(null);
   const detectedRef = useRef(false);
 
+  const [picked, setPicked] = useState<BookSearchResult | null>(null);
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
   const [isbn, setIsbn] = useState("");
   const [publisher, setPublisher] = useState("");
   const [genres, setGenres] = useState<BookSearchResult["genres"]>([]);
-  const [readStatus, setReadStatus] = useState(2);
+  const [readStatus, setReadStatus] = useState(1);
   const [rating, setRating] = useState<number | null>(null);
   const [dateRead, setDateRead] = useState("");
   const [saving, setSaving] = useState(false);
@@ -66,7 +84,7 @@ export function AddBookModal({
     setIsbn(result.isbn ?? "");
     setPublisher(result.publisher ?? "");
     setGenres(result.genres);
-    setResults(null);
+    setPicked(result);
     searchRunRef.current++;
     setSearching(false);
     setOutsidePending(false);
@@ -79,6 +97,7 @@ export function AddBookModal({
     const run = ++searchRunRef.current;
     setSearching(true);
     setSearchError(null);
+    setPicked(null);
     setResults(null);
     setOutsidePending(false);
     setOutsideFailed(false);
@@ -268,7 +287,16 @@ export function AddBookModal({
           </div>
         )}
 
-        {results !== null && !scanning && (
+        {picked && (
+          <div className="mt-3 flex items-center gap-3 rounded-lg border border-(--color-border) p-2.5">
+            <ResultSummary result={picked} />
+            <button type="button" onClick={() => setPicked(null)} className={`${BUTTON_SECONDARY} ml-auto shrink-0`}>
+              Change
+            </button>
+          </div>
+        )}
+
+        {results !== null && !scanning && !picked && (
           <div className="mt-3 max-h-64 overflow-y-auto overscroll-contain rounded-lg border border-(--color-border)">
             {results.length === 0 && !outsidePending && (
               <p className="p-3 text-xs text-(--color-text-dim)">No matches — fill the form in below by hand instead.</p>
@@ -279,16 +307,7 @@ export function AddBookModal({
                 onClick={() => selectResult(r)}
                 className="flex w-full items-center gap-3 border-b border-(--color-border) p-2.5 text-left last:border-b-0 hover:bg-(--color-surface-hover)"
               >
-                {r.coverUrl ? (
-                  <img src={r.coverUrl} alt="" loading="lazy" className="h-16 w-11 shrink-0 rounded object-cover" />
-                ) : (
-                  <div className="h-16 w-11 shrink-0 rounded border border-(--color-border)" />
-                )}
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-semibold">{r.title}</span>
-                  {r.series && <span className="block truncate text-xs text-(--color-text-dim)">{seriesLabel(r.series)}</span>}
-                  <span className="block truncate text-xs text-(--color-text-dim)">{searchResultByline(r)}</span>
-                </span>
+                <ResultSummary result={r} />
               </button>
             ))}
             {outsidePending && <p className="p-3 text-xs text-(--color-text-dim)">Searching Open Library…</p>}

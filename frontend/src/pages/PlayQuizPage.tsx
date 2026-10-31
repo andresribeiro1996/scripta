@@ -92,7 +92,7 @@ export function PlayQuizPage() {
 
   const result = submitted ?? (ownPlay.data ?? null);
   const questions = playBoard.questions;
-  const stage = quizPlayStage({ playOpen: playBoard.playOpen, hasResult: result !== null, ownPlayPending: ownPlay.isPending });
+  const stage = quizPlayStage({ playOpen: playBoard.playOpen, hasResult: result !== null, ownPlayPending: ownPlay.isLoading });
   if (stage === "loading") return <InfoScreen message="Loading…" back={back} />;
   if (stage === "leaderboard") {
     return (

@@ -91,6 +91,7 @@ export function SharedMuralPage() {
   return (
     <Page
       title={mural.name}
+      subtitle={data.profile ? `by @${data.profile.username}` : undefined}
       actions={
         mural.blocks.length > 0 && (
           <button onClick={() => void enterFullscreen()} aria-label="View mural fullscreen" title="View mural fullscreen" className={toolbarIconClass()}>

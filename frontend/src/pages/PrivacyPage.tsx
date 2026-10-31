@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Disclosure } from "../components/Disclosure";
 import { LandingFooter } from "../components/landing/LandingFooter";
 import { LandingNav } from "../components/landing/LandingNav";
 import { container } from "../components/landing/ui";
@@ -6,21 +7,7 @@ import { container } from "../components/landing/ui";
 const CONTACT = "privacy@atmyshelf.com";
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <details className="group border-b border-(--color-border)">
-      <summary className="cursor-pointer list-none rounded-sm [&::-webkit-details-marker]:hidden">
-        <h2 className="flex min-h-14 items-center justify-between gap-4 py-4 font-sans text-base font-normal">
-          {title}
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true" className="shrink-0 text-(--color-text-dim) group-open:rotate-45 motion-safe:transition-transform motion-safe:duration-150">
-            <path d="M12 5v14M5 12h14" />
-          </svg>
-        </h2>
-      </summary>
-      <div className="space-y-3 pb-6 text-pretty text-sm leading-relaxed text-(--color-text-dim) [&_b]:font-medium [&_b]:text-(--color-text) [&_li]:mt-2 [&_ul]:list-disc [&_ul]:pl-5">
-        {children}
-      </div>
-    </details>
-  );
+  return <Disclosure page title={title}>{children}</Disclosure>;
 }
 
 const contactLink = (

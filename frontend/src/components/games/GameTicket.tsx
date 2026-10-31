@@ -35,6 +35,7 @@ export function GameTicket({
   ladder,
   preview,
   actionLabel = "Open game",
+  play,
   menu
 }: {
   kind: PublishedContent["kind"];
@@ -47,6 +48,7 @@ export function GameTicket({
   ladder?: string[];
   preview?: QuizPreview;
   actionLabel?: string;
+  play?: { to: string; label: string };
   menu?: ReactNode;
 }) {
   const { prefix, color, soft, action, hoverBorder } = KINDS[kind];
@@ -98,6 +100,15 @@ export function GameTicket({
           <span className="min-w-0 truncate">{actionLabel}</span>
           <ChevronRightIcon size={20} />
         </Link>
+        {play && (
+          <Link
+            to={play.to}
+            aria-label={`${play.label}: ${name}`}
+            className="relative z-10 flex min-h-11 shrink-0 items-center rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-base font-semibold hover:bg-(--color-surface-hover)"
+          >
+            {play.label}
+          </Link>
+        )}
         {menu}
       </div>
     </div>

@@ -77,6 +77,7 @@ export const BOTTOM_BAR_AREAS: readonly AreaId[] = ["home", "library", "murals",
 
 const PREFIXES: ReadonlyArray<[string, AreaId]> = [
   ["/dashboard/saved", "home"],
+  ["/daily", "home"],
   ["/dashboard/library", "library"],
   ["/dashboard/series", "library"],
   ["/dashboard/collections", "library"],

@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "../auth/AuthContext";
 import type { ResolvedTierlist } from "../api/tierlists";
 import { bookMetadataOptions } from "../lib/bookMetadata";
 import { blockBooks, type MuralBlock } from "../lib/murals";
@@ -18,12 +19,14 @@ export function useMuralBookMetadata(
   tierlistData?: (id: string) => ResolvedTierlist | undefined
 ) {
   const client = useQueryClient();
+  const signedIn = Boolean(useAuth().session);
   const metadataBooks = JSON.stringify(muralMetadataBooks(blocks, books, tierlistData).map((book) => ({
     ISBN: book.ISBN,
     Title: book.Title,
     Attribution: book.Attribution
   })));
   useEffect(() => {
+    if (!signedIn) return;
     let stopped = false;
     async function preload() {
       for (const book of JSON.parse(metadataBooks) as Array<Record<string, unknown>>) {
@@ -33,5 +36,5 @@ export function useMuralBookMetadata(
     }
     void preload();
     return () => { stopped = true; };
-  }, [client, metadataBooks]);
+  }, [client, metadataBooks, signedIn]);
 }

@@ -20,6 +20,10 @@ export function ballotQueryOptions(code: string, storedBallotId: string | null, 
   };
 }
 
+export function canHoldBallot(code: string, ballotCount: number | undefined, storedBallotId: string | null, signedIn: boolean) {
+  return code.length > 0 && (ballotCount ?? 0) > 0 && (storedBallotId !== null || signedIn);
+}
+
 export function useTierlistVoting(code: string) {
   const queryClient = useQueryClient();
   // `enabled`: callers pass "" for a tier list that has no vote code at all
@@ -42,7 +46,7 @@ export function useTierlistVoting(code: string) {
   // openVoting moves their ranking out of the tier list document and seeds
   // it as their ballot, so this is the only route back to it. `retry: false`
   // because "you have no ballot here" comes back as a 404, not a blip.
-  const existing = useQuery(ballotQueryOptions(code, storedBallotId, code.length > 0 && (storedBallotId !== null || Boolean(getSession()))));
+  const existing = useQuery(ballotQueryOptions(code, storedBallotId, canHoldBallot(code, query.data?.board.ballotCount, storedBallotId, Boolean(getSession()))));
 
   async function submit(placements: Array<{ workId: string; tierId: string }>): Promise<BallotResponse> {
     const response = await submitBallotApi(code, placements, storedBallotId);

@@ -31,7 +31,7 @@ function retryButton(refetch: () => void) {
 
 export function DiscoverPage() {
   return (
-    <Page width="wide" title="Community" tabs={area("community").tabs}>
+    <Page width="wide" title="Community" subtitle="Tier lists, tournaments and quizzes readers have published." tabs={area("community").tabs}>
       <DiscoverPane />
     </Page>
   );
@@ -42,7 +42,7 @@ export function PublicDiscoverPage() {
   const destination = discoverDestination(session);
   if (destination) return <Navigate to={destination} replace />;
   return (
-    <Page width="wide" title="Games">
+    <Page width="wide" title="Games" subtitle="Tier lists, tournaments and quizzes readers have published.">
       <DiscoverPane />
     </Page>
   );

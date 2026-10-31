@@ -214,6 +214,7 @@ export function ArenaListPage() {
                   stats={[{ value: tierlistBookCount(tl.data), label: itemNoun(tl.subject, tierlistBookCount(tl.data)) }]}
                   covers={tl.subject?.scope.coverUrl ? [tl.subject.scope.coverUrl] : []}
                   ladder={tl.data.tiers.map((tier) => tier.color)}
+                  play={tl.voteCode === null ? undefined : { to: `/vote/${tl.voteCode}`, label: "Preview" }}
                   menu={
                     <OptionsMenu
                       title="Tier list settings"
@@ -278,6 +279,7 @@ export function ArenaListPage() {
                 to={`/dashboard/arena/quiz/${quiz.id}`}
                 meta={`${quiz.data.books.length} books`}
                 badges={<QuizStatusBadge status={quizStatus(quiz)} />}
+                stats={[{ value: quiz.data.questionCount, label: quiz.data.questionCount === 1 ? "question" : "questions" }]}
                 covers={[]}
                 preview={quizPreview(quiz.data)}
                 menu={
@@ -304,8 +306,9 @@ function TournamentCard({ t }: { t: Tournament }) {
       kind="tournament"
       name={t.name}
       to={t.status === "seeding" ? `/dashboard/arena/${t.id}/seed` : `/arena/${t.id}`}
-      meta={`${t.bracketSize}-${itemNoun(t.subject, 1)} bracket`}
+      meta={`Created ${formatDate(t.createdAt)}`}
       badges={<TournamentStatusBadge status={t.status} round={t.currentRound} />}
+      stats={[{ value: t.bracketSize, label: itemNoun(t.subject, t.bracketSize) }]}
       covers={t.covers}
     />
   );

@@ -252,13 +252,11 @@ function PublishedSection({ quiz, shareLink, copied, setCopied }: { quiz: Quiz; 
             window.setTimeout(() => setCopied(false), 1500);
           }}
         />
-        <button
-          type="button"
-          onClick={() => void toggleOpen(!quiz.playOpen)}
-          className={`${BUTTON_SECONDARY} self-start`}
-        >
-          {quiz.playOpen ? "Close for play" : "Open for play"}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" onClick={() => void toggleOpen(!quiz.playOpen)} className={BUTTON_SECONDARY}>
+            {quiz.playOpen ? "Close for play" : "Open for play"}
+          </button>
+        </div>
       </div>
 
       <h2 className="text-lg font-bold">Questions ({ownerQuestions.length})</h2>

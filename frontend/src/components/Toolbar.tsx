@@ -93,7 +93,20 @@ export function SearchField({
       <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-(--color-text-dim)">
         <SearchIcon />
       </span>
-      <input ref={inputRef} type="search" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} aria-label={label} className={`${FIELD_CLASS} w-full pl-10`} />
+      <input ref={inputRef} type="search" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} aria-label={label} className={`${FIELD_CLASS} w-full pl-10 ${value ? "pr-11" : ""} [&::-webkit-search-cancel-button]:appearance-none`} />
+      {value && (
+        <button
+          type="button"
+          aria-label="Clear search"
+          onClick={(e) => {
+            onChange("");
+            e.currentTarget.parentElement?.querySelector("input")?.focus();
+          }}
+          className="absolute top-1/2 right-0 flex size-11 -translate-y-1/2 items-center justify-center rounded-md text-(--color-text-dim) hover:text-(--color-text)"
+        >
+          <CloseIcon size={14} />
+        </button>
+      )}
     </div>
   );
 }

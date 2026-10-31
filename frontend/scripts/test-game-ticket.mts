@@ -7,7 +7,7 @@ import { quizClueHeading, type QuizPreview } from "@scripta/shared";
 import type { PublishedContent } from "@scripta/shared/community";
 import { GameTicket } from "../src/components/games/GameTicket";
 
-const render = (props: { kind: PublishedContent["kind"]; stats?: Array<{ value: number; label: string }>; preview?: QuizPreview }) =>
+const render = (props: { kind: PublishedContent["kind"]; stats?: Array<{ value: number; label: string }>; preview?: QuizPreview; play?: { to: string; label: string } }) =>
   renderToString(
     createElement(MemoryRouter, null, createElement(GameTicket, { name: "Night Reads", to: "/arena/x", meta: "meta", badges: null, covers: [], actionLabel: "Play quiz", ...props }))
   );
@@ -47,4 +47,11 @@ test("a quiz shows A/B/C chips", () => {
 
 test("the title link carries an sr-only kind prefix", () => {
   assert.match(render({ kind: "tierlist" }), /<span class="sr-only">Tier list: <\/span>Night Reads/);
+});
+
+test("an owned ticket can offer a separate play link beside the open link", () => {
+  const html = render({ kind: "quiz", play: { to: "/play/abc", label: "Play" } });
+  assert.match(html, /<a[^>]*aria-label="Play: Night Reads"[^>]*href="\/play\/abc"[^>]*>Play<\/a>/);
+  assert.match(html, /<a[^>]*aria-label="Play quiz: Night Reads"[^>]*href="\/arena\/x"/);
+  assert.ok(!render({ kind: "quiz" }).includes("/play/abc"));
 });

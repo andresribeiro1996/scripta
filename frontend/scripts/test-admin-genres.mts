@@ -132,8 +132,8 @@ test("review queues are list panels; Not found uses the shared primary", () => {
   const read = (f: string) => readFileSync(new URL(`../src/${f}.tsx`, import.meta.url), "utf8");
   for (const f of ["components/GenreReviewList", "components/SynopsisReviewList", "components/TranslationReviewList"]) assert.match(read(f), /LIST_PANEL/, f);
   assert.match(read("pages/NotFoundPage"), /BUTTON_PRIMARY/);
-  assert.match(read("pages/NotFoundPage"), /framed \? "min-h-\[calc\(100dvh-var\(--app-top\)\)\]" : "min-h-dvh"/);
-  for (const f of ["AdminTranslationsPage", "AdminSynopsesPage", "AdminDailyChapterPage", "AdminGenresPage"]) assert.match(read(`pages/${f}`), /<NotFoundPage framed \/>/, f);
-  assert.match(readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8"), /path="\*" element=\{<NotFoundPage \/>\}/);
+  assert.match(read("pages/NotFoundPage"), /min-h-\[calc\(100dvh-var\(--app-top\)\)\]/);
+  for (const f of ["AdminTranslationsPage", "AdminSynopsesPage", "AdminDailyChapterPage", "AdminGenresPage"]) assert.match(read(`pages/${f}`), /<NotFoundPage \/>/, f);
+  assert.match(readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8"), /<Route element=\{<SessionLayout \/>\}>\s*<Route path="\*" element=\{<NotFoundPage \/>\}/);
   for (const f of ["components/GenreReviewList", "components/SynopsisReviewList", "components/TranslationReviewList"]) assert.doesNotMatch(read(f), /BUTTON_PRIMARY/, f);
 });

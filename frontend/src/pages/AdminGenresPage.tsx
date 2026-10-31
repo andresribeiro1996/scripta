@@ -19,7 +19,7 @@ export function AdminGenresPage() {
   const { data: isAdmin, isPending } = useQuery({ queryKey: ["books-admin"], queryFn: fetchIsAdmin, staleTime: Infinity });
   const review = useQuery({ queryKey: ["genre-review"], queryFn: fetchGenreReview, enabled: isAdmin === true });
   if (isPending) return null;
-  if (!isAdmin) return <NotFoundPage framed />;
+  if (!isAdmin) return <NotFoundPage />;
   let body: ReactNode = null;
   if (review.data?.total === 0) body = <EmptyState icon={InfoIcon} title="Nothing to review." body="New items show up here as they come in." />;
   else if (review.data) body = <GenreReviewList review={review.data} onDecide={(workId, action) => decideGenre(client, workId, action)} />;
