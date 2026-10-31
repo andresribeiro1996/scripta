@@ -24,12 +24,12 @@ import {
   effectiveCardStyle,
   filterBooks,
   findDuplicates,
-  LIBRARY_STATUS_TABS,
+  libraryStatusTabs,
   orderLibraryBooks,
   resolveLibraryStyle,
   seriesGroupByBookKey,
   sortBooks,
-  SORT_OPTIONS,
+  sortOptions,
   type LibraryStatusTab,
   type PerCardStyle,
   type SortKey,
@@ -51,12 +51,14 @@ import { LibraryGrid } from "./components/LibraryGrid";
 import { LibraryShareImage } from "./components/LibraryShareImage";
 import { ShareLayoutPicker } from "./components/ShareLayoutPicker";
 import { LIBRARY_SHARE_LAYOUTS, shelfShareBooks, type LibraryShareLayout } from "./lib/libraryShareBooks";
+import { useLocale } from "../../i18n";
 
 type LibraryTab = LibraryStatusTab | "collections";
 
-const LIBRARY_TABS: readonly { value: LibraryTab; label: string }[] = [...LIBRARY_STATUS_TABS, { value: "collections", label: "Collections" }];
 
 export function LibraryScreen() {
+  const locale = useLocale();
+  const libraryTabs: readonly { value: LibraryTab; label: string }[] = [...libraryStatusTabs(locale), { value: "collections", label: "Collections" }];
   const { colors } = useTheme();
   const { data: library, isPending, isError, error, refetch, isRefetching, share, unshare } = useLibrary();
   const actions = useLibraryActions();
@@ -68,7 +70,7 @@ export function LibraryScreen() {
   useEffect(() => {
     setQuery(q ?? "");
   }, [q]);
-  const [statusFilter, setStatusFilter] = useState<LibraryTab>(LIBRARY_STATUS_TABS[0].value);
+  const [statusFilter, setStatusFilter] = useState<LibraryTab>("finished");
   const [sortKey, setSortKey] = useState<SortKey>("manual");
   const [groupQuery, setGroupQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
@@ -163,8 +165,8 @@ export function LibraryScreen() {
     [{ label: "Share", icon: "share", onPress: startSharing }],
   ];
 
-  const sortLabel = SORT_OPTIONS.find((option) => option.value === sortKey)?.label ?? sortKey;
-  const sortItems: MenuItem[] = SORT_OPTIONS.map((option) => ({
+  const sortLabel = sortOptions(locale).find((option) => option.value === sortKey)?.label ?? sortKey;
+  const sortItems: MenuItem[] = sortOptions(locale).map((option) => ({
     label: option.label,
     selected: option.value === sortKey,
     onPress: () => setSortKey(option.value),
@@ -278,7 +280,7 @@ export function LibraryScreen() {
           {(scrollProps) => (
             <SwipeableTabs
               accessibilityLabel="Library shelf"
-              options={LIBRARY_TABS}
+              options={libraryTabs}
               value={statusFilter}
               onChange={setStatusFilter}
               renderPage={(status) => {
@@ -377,7 +379,7 @@ export function LibraryScreen() {
           layout={shareLayout}
           name={library?.data.name || "Library"}
           ordered={ordered}
-          shelf={onCollectionsTab ? null : { label: LIBRARY_TABS.find((tab) => tab.value === statusFilter)!.label, query, books: shelfShareBooks(ordered, query, statusFilter, sortKey) }}
+          shelf={onCollectionsTab ? null : { label: libraryTabs.find((tab) => tab.value === statusFilter)!.label, query, books: shelfShareBooks(ordered, query, statusFilter, sortKey) }}
           style={style}
           seriesGroups={bookSeriesGroup}
           onReadyChange={setShareImageReady}

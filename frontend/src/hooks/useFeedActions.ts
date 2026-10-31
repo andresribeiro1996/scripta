@@ -5,7 +5,7 @@ import { shareLink } from "../lib/shareLink";
 import { fetchActivityEngagement, fetchSavedState, likeActivity, saveContent } from "../api/community";
 import { addBookToLibrary } from "../api/library";
 import { useToast } from "../components/Toaster";
-import { useLocale } from "../i18n";
+import { getLocale, useLocale } from "../i18n";
 
 export const ENGAGEMENT_KEY = ["community", "engagement"] as const;
 export const SAVED_STATE_KEY = ["community", "saved", "state"] as const;
@@ -51,7 +51,7 @@ export function useFeedActions(items: DigestItem[], { trackSaved = true }: { tra
   const engagement: Record<string, ActivityEngagement> = Object.assign({}, ...engagementQueries.map((query) => query.data ?? {}));
   const saved = new Set(savedQueries.flatMap((query) => query.data ?? []));
 
-  const fail = (generic: string) => (error: unknown) => toast({ kind: "error", message: saveFailureMessage(error, generic) });
+  const fail = (generic: string) => (error: unknown) => toast({ kind: "error", message: saveFailureMessage(error, generic, getLocale()) });
 
   const like = useMutation({
     mutationFn: ({ id, liked }: { id: string; liked: boolean }) => likeActivity(id, liked),

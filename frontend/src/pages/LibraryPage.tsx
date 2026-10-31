@@ -41,9 +41,10 @@ import { parseImportedFile } from "../lib/fileImport";
 import { orderLibraryBooks, reorderOnDrop, seriesGroupByBookKey } from "../lib/libraryOrder";
 import { area } from "../lib/areas";
 import { effectiveCardStyle, resolveLibraryStyle, type PerCardStyle } from "../lib/libraryStyle";
-import { bookHref, filterBooks, SORT_OPTIONS, sortBooks, STATUS_FILTER_OPTIONS, type SortKey, type StatusFilter } from "../lib/libraryView";
+import { bookHref, filterBooks, sortBooks, sortOptions, statusFilterOptions, type SortKey, type StatusFilter } from "../lib/libraryView";
 import { bookKey } from "../lib/merge";
 import { saveWithViewTransition } from "../lib/viewTransition";
+import { getLocale } from "../i18n";
 
 const scrollPositions = new Map<string, number>();
 
@@ -97,9 +98,9 @@ export function LibraryPage() {
   useEffect(() => { setQuery(urlQuery); }, [urlQuery]);
   useEffect(() => { setAddingBook(searchParams.get("action") === "add"); }, [searchParams]);
   const statusParam = searchParams.get("status");
-  const statusFilter = STATUS_FILTER_OPTIONS.find((option) => option.value === statusParam)?.value ?? "all";
+  const statusFilter = statusFilterOptions("en").find((option) => option.value === statusParam)?.value ?? "all";
   const sortParam = searchParams.get("sort");
-  const sortKey = SORT_OPTIONS.find((option) => option.value === sortParam)?.value ?? "manual";
+  const sortKey = sortOptions("en").find((option) => option.value === sortParam)?.value ?? "manual";
   function updateView(changes: { status?: StatusFilter; sort?: SortKey }) {
     const defaults = { status: "all", sort: "manual" };
     setSearchParams(
@@ -127,7 +128,7 @@ export function LibraryPage() {
     try {
       await updateLibrary((data) => ({ ...data, name }));
     } catch (error) {
-      toast({ message: saveFailureMessage(error, "Couldn't save the new name."), kind: "error" });
+      toast({ message: saveFailureMessage(error, "Couldn't save the new name.", getLocale()), kind: "error" });
     }
   }
 
@@ -194,7 +195,7 @@ export function LibraryPage() {
 
     saving.catch((err) => {
       console.error("Failed to persist new book order:", err);
-      toast({ message: saveFailureMessage(err, "Couldn't save the new order — moved back."), kind: "error" });
+      toast({ message: saveFailureMessage(err, "Couldn't save the new order — moved back.", getLocale()), kind: "error" });
     });
   }
 
@@ -236,7 +237,7 @@ export function LibraryPage() {
         return deleteBooks(data, keys);
       });
     } catch (error) {
-      toast({ message: saveFailureMessage(error, "Couldn't delete — nothing was changed."), kind: "error" });
+      toast({ message: saveFailureMessage(error, "Couldn't delete — nothing was changed.", getLocale()), kind: "error" });
       return;
     }
     setSelectedKeys(new Set());
@@ -253,7 +254,7 @@ export function LibraryPage() {
               await updateLibrary((data) => restoreDeletedBooks(data, snapshot, keys));
               toast({ message: "Restored." });
             } catch (error) {
-              toast({ message: saveFailureMessage(error, "Couldn't restore — check your connection."), kind: "error" });
+              toast({ message: saveFailureMessage(error, "Couldn't restore — check your connection.", getLocale()), kind: "error" });
             }
           })();
         }

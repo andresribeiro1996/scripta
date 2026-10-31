@@ -8,8 +8,10 @@ import { backTo } from "../lib/areas";
 import { Page } from "../components/page/Page";
 import { useWork } from "../hooks/useWork";
 import { useWorkStats } from "../hooks/useWorkStats";
+import { useLocale } from "../i18n";
 
 export function WorkStatsView({ id }: { id: string | undefined }) {
+  const locale = useLocale();
   const navigate = useNavigate();
   const { session } = useAuth();
   const back = session ? backTo("book") : undefined;
@@ -34,7 +36,7 @@ export function WorkStatsView({ id }: { id: string | undefined }) {
 
   return (
     <Page title={work.page.work.title} back={back}>
-      <StatsSections model={bookStatsModel(stats.data ?? null, work.page.work.rating)} />
+      <StatsSections model={bookStatsModel(stats.data ?? null, work.page.work.rating, locale)} />
     </Page>
   );
 }

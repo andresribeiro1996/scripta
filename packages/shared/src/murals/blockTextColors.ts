@@ -1,17 +1,22 @@
+import type { Locale } from "../i18n/locale.js";
+import { sharedT } from "../i18n/sharedT.js";
 import type { BlockStyle } from "../library/libraryStyle.js";
 import type { ThemeColors } from "../themes/palettes.js";
 
 export const BLOCK_THEME_COLOR_KEYS = ["background", "surface", "text", "accent", "accentSoft", "accentFill", "onAccent"] as const;
 export type BlockThemeColorKey = (typeof BLOCK_THEME_COLOR_KEYS)[number];
-export const BLOCK_THEME_COLOR_LABELS: Record<BlockThemeColorKey, string> = {
-  background: "Page",
-  surface: "Surface",
-  text: "Text",
-  accent: "Accent",
-  accentSoft: "Tint",
-  accentFill: "Fill",
-  onAccent: "On accent"
-};
+export function blockThemeColorLabels(locale: Locale): Record<BlockThemeColorKey, string> {
+  const t = sharedT(locale);
+  return {
+    background: t("shared.murals.colorBackground"),
+    surface: t("shared.murals.colorSurface"),
+    text: t("shared.murals.colorText"),
+    accent: t("shared.murals.colorAccent"),
+    accentSoft: t("shared.murals.colorAccentSoft"),
+    accentFill: t("shared.murals.colorAccentFill"),
+    onAccent: t("shared.murals.colorOnAccent")
+  };
+}
 
 const THEME_REF = "theme:";
 

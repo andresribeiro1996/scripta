@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { PLATE_INKS, READER_PLATES, renderGlyph, renderPlate } from "./index.js";
-import { PAPER, PLATES, REVERSED_LINE, emblem, glyph, plate, printStyle } from "./plates.js";
+import { PAPER, PLATES, REVERSED_LINE, emblem, glyph, plate, plateEpithet, plateName, printStyle } from "./plates.js";
 
 const masters = join(dirname(fileURLToPath(import.meta.url)), "../../../../design/reader-cards");
 const standalone = (svg: string, ground: string, line: string) => svg.replace(">", `>${printStyle(ground, line)}`);
@@ -14,7 +14,7 @@ test("the port reproduces every committed master byte for byte", () => {
   for (const p of READER_PLATES) {
     const [, ink, deep] = PLATE_INKS[p.key];
     const base = `${p.numeral.toLowerCase()}-${p.key}`;
-    const card = plate({ ...p, label: `The ${p.name} reader card` });
+    const card = plate({ ...p, name: plateName(p.key, "en"), epithet: plateEpithet(p.key, "en"), locale: "en", label: `The ${plateName(p.key, "en")} reader card` });
     assert.equal(standalone(card, PAPER, ink), master(`${base}-paper.svg`), `${base}-paper`);
     assert.equal(standalone(card, deep, REVERSED_LINE), master(`${base}-reversed.svg`), `${base}-reversed`);
     assert.equal(standalone(glyph(p.key, 48), PAPER, ink), master(`${base}-glyph.svg`), `${base}-glyph`);
@@ -28,7 +28,7 @@ test("READER_PLATES has exactly one entry per non-graph identity", () => {
 });
 
 test("a settled plate prints THE, the identity's ink and the reader's name", () => {
-  const svg = renderPlate({ identity: "star", state: "settled", readerName: "scripta_dev", print: "paper", label: "Reader card: the Stargazer" });
+  const svg = renderPlate({ identity: "star", state: "settled", locale: "en", readerName: "scripta_dev", print: "paper", label: "Reader card: the Stargazer" });
   assert.match(svg, />THE</);
   assert.match(svg, />Stargazer</);
   assert.match(svg, />SCRIPTA_DEV</);
@@ -37,28 +37,28 @@ test("a settled plate prints THE, the identity's ink and the reader's name", () 
 });
 
 test("a leaning plate prints LEANING TOWARD over the leading identity", () => {
-  const svg = renderPlate({ identity: "carto", state: "leaning", readerName: "a", print: "paper", label: "x" });
+  const svg = renderPlate({ identity: "carto", state: "leaning", locale: "en", readerName: "a", print: "paper", label: "x" });
   assert.match(svg, />LEANING TOWARD</);
   assert.match(svg, />Cartographer</);
 });
 
 test("an unwritten plate is graphite with an empty cartouche and the given line", () => {
-  const svg = renderPlate({ identity: null, state: "unwritten", readerName: "a", print: "paper", label: "x", unwrittenLine: "finish 2 more books" });
+  const svg = renderPlate({ identity: null, state: "unwritten", locale: "en", readerName: "a", print: "paper", label: "x", unwrittenLine: "finish 2 more books" });
   assert.match(svg, />Unwritten</);
   assert.match(svg, />NOT YET</);
   assert.match(svg, />finish 2 more books</);
   assert.match(svg, />PLATE —</);
   assert.match(svg, new RegExp(PLATE_INKS.graph[1]));
-  assert.match(renderPlate({ identity: null, state: "unwritten", readerName: "a", print: "paper", label: "x" }), />five finished books to begin</);
+  assert.match(renderPlate({ identity: null, state: "unwritten", locale: "en", readerName: "a", print: "paper", label: "x" }), />five finished books to begin</);
 });
 
 test("readerName is escaped after uppercasing", () => {
-  const svg = renderPlate({ identity: "carto", state: "settled", readerName: "a<b", print: "paper", label: "x" });
+  const svg = renderPlate({ identity: "carto", state: "settled", locale: "en", readerName: "a<b", print: "paper", label: "x" });
   assert.match(svg, />A&lt;B</);
 });
 
 test("a long reader name is truncated before it can overprint the plate foot", () => {
-  const svg = renderPlate({ identity: "carto", state: "settled", readerName: "a".repeat(30), print: "paper", label: "x" });
+  const svg = renderPlate({ identity: "carto", state: "settled", locale: "en", readerName: "a".repeat(30), print: "paper", label: "x" });
   const [, printed] = svg.match(/>(A+…?)<\/text>\s*<\/svg>/) ?? [];
   assert.ok(printed, "reader name text not found");
   assert.ok(printed!.length <= 17, `printed name is ${printed!.length} chars`);
@@ -66,12 +66,12 @@ test("a long reader name is truncated before it can overprint the plate foot", (
 });
 
 test("a label containing a quote doesn't break the aria-label attribute", () => {
-  const svg = renderPlate({ identity: "carto", state: "settled", readerName: "a", print: "paper", label: 'Reader "quill" card' });
+  const svg = renderPlate({ identity: "carto", state: "settled", locale: "en", readerName: "a", print: "paper", label: 'Reader "quill" card' });
   assert.match(svg, /aria-label="Reader &quot;quill&quot; card"/);
 });
 
 test("reversed print uses the deep ink as ground and the reversed line", () => {
-  const svg = renderPlate({ identity: "way", state: "settled", readerName: "a", print: "reversed", label: "x" });
+  const svg = renderPlate({ identity: "way", state: "settled", locale: "en", readerName: "a", print: "reversed", label: "x" });
   assert.match(svg, new RegExp(PLATE_INKS.way[2]));
   assert.match(svg, new RegExp(REVERSED_LINE));
 });
@@ -84,8 +84,8 @@ test("renderGlyph is self-contained at the requested size", () => {
 });
 
 test("renderPlate carries no page-wide selector, so two plates on one page can't recolour each other", () => {
-  const a = renderPlate({ identity: "carto", state: "settled", readerName: "a", print: "paper", label: "x" });
-  const b = renderPlate({ identity: "star", state: "settled", readerName: "b", print: "reversed", label: "y" });
+  const a = renderPlate({ identity: "carto", state: "settled", locale: "en", readerName: "a", print: "paper", label: "x" });
+  const b = renderPlate({ identity: "star", state: "settled", locale: "en", readerName: "b", print: "reversed", label: "y" });
   for (const svg of [a, b]) {
     assert.doesNotMatch(svg, /<style>/);
     assert.doesNotMatch(svg, / class="\w+"/);
@@ -101,7 +101,7 @@ function luminance(hex: string) {
 
 test("no plate or glyph path carries a NaN coordinate — react-native-svg throws on one where a browser silently drops it", () => {
   for (const p of READER_PLATES) {
-    assert.doesNotMatch(renderPlate({ identity: p.key, state: "settled", readerName: "a", print: "paper", label: "x" }), /NaN/);
+    assert.doesNotMatch(renderPlate({ identity: p.key, state: "settled", locale: "en", readerName: "a", print: "paper", label: "x" }), /NaN/);
     assert.doesNotMatch(renderGlyph(p.key, 24, "paper"), /NaN/);
   }
 });
@@ -115,7 +115,7 @@ test("every ink clears 5:1 against paper", () => {
 
 test("every emblem is drawn once and served from the cache", () => {
   for (const k of [...PLATES.map((p) => p.key), "none" as const]) {
-    assert.notEqual(emblem(k), "", k);
-    assert.equal(emblem(k), emblem(k), k);
+    assert.notEqual(emblem(k, "en"), "", k);
+    assert.equal(emblem(k, "en"), emblem(k, "en"), k);
   }
 });

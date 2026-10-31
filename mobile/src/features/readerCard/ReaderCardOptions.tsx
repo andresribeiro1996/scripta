@@ -1,12 +1,13 @@
 import { useDeferredValue, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
-import { CARD_PRINTS, CORNER_LABELS, CORNER_STYLES, COUNTERS, COUNTER_LABELS, FINISHES, FINISH_LABELS, FOOTER_LEFTS, FOOTER_LEFT_LABELS, FOOTER_RIGHTS, FOOTER_RIGHT_LABELS, LAYOUTS, LAYOUT_LABELS, MOTTO_LOOKS, MOTTO_LOOK_LABELS, MOTTO_MAX, PRINT_LABELS, TRAITS, TRAIT_LABELS, cardRatio, counterThumbnail, footerLeftText, footerRightText, styleThumbnail, type CardCrop, type Finish, type FooterLeft, type FooterRight, type Layout, type MottoLook, type ReaderCardBase } from "@scripta/shared";
+import { CARD_PRINTS, cornerLabels, CORNER_STYLES, COUNTERS, counterLabels, FINISHES, finishLabels, FOOTER_LEFTS, footerLeftLabels, FOOTER_RIGHTS, footerRightLabels, LAYOUTS, layoutLabels, MOTTO_LOOKS, mottoLookLabels, MOTTO_MAX, printLabels, TRAITS, traitLabels, cardRatio, counterThumbnail, footerLeftText, footerRightText, styleThumbnail, type CardCrop, type Finish, type FooterLeft, type FooterRight, type Layout, type MottoLook, type ReaderCardBase } from "@scripta/shared";
 import { Button, Icon, Segmented, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import { Text } from "../../ui/Text";
 import { Caption, Section, Tile } from "../library/components/StyleControls";
 import { ReaderCardImage } from "../murals/ReaderCardImage";
 import { DraftField } from "./DraftField";
 import type { SaveStyle } from "./ReaderCardChoices";
+import { useLocale } from "../../i18n";
 
 export type PanelId = "look" | "corners" | "finish" | "footerLeft" | "footerRight";
 
@@ -35,9 +36,6 @@ const FINISH_HINTS: Record<Finish, string> = {
   riso: "Two misregistered inks",
 };
 const options = <T extends string>(keys: readonly T[], labels: Record<T, string>) => keys.map((value) => ({ value, label: labels[value] }));
-const TRAIT_OPTIONS = options(TRAITS, TRAIT_LABELS);
-const LAYOUT_OPTIONS = options(LAYOUTS, LAYOUT_LABELS);
-const PRINT_OPTIONS = options(CARD_PRINTS, PRINT_LABELS);
 
 const leftDetail = (value: FooterLeft, text: string | null, hasPlate: boolean) => (value === "glyph" ? (hasPlate ? "Your glyph" : UNAVAILABLE) : value === "none" ? "Nothing" : text ?? UNAVAILABLE);
 const rightDetail = (value: FooterRight, text: string | null) => (value === "none" ? "Nothing" : text ?? UNAVAILABLE);
@@ -104,37 +102,38 @@ type Motto = ReturnType<typeof useMotto>;
 export function FrontOptions({ input, motto, onChange, onOpen }: { input: ReaderCardBase; motto: Motto; onChange: SaveStyle; onOpen: (panel: PanelId) => void }) {
   const { width: windowWidth } = useWindowDimensions();
   const { counter, trait, motto: saved, footer, corners, finish, print } = input.style;
+  const { locale } = input;
   const deferred = useDeferredValue(input);
   const counterThumbs = useMemo(() => COUNTERS.map((option) => ({ option, input: counterThumbnail(deferred, option) })), [deferred]);
   return (
     <>
       <Section title="Motto">
         <DraftField label="Your motto" initial={saved?.text ?? null} max={MOTTO_MAX} onSave={motto.saveMotto} />
-        <PanelTrigger title="Motto look" current={MOTTO_LOOK_LABELS[motto.look]} disabled={!saved} onPress={() => onOpen("look")} />
+        <PanelTrigger title="Motto look" current={mottoLookLabels(locale)[motto.look]} disabled={!saved} onPress={() => onOpen("look")} />
         {saved ? null : <Caption>Write a motto to choose its look</Caption>}
       </Section>
       <Section title="Book marks">
-        <TileRow items={counterThumbs} value={counter} labels={COUNTER_LABELS} available={windowWidth - spacing.xl * 2} onPick={(next) => void onChange({ counter: next })} />
+        <TileRow items={counterThumbs} value={counter} labels={counterLabels(locale)} available={windowWidth - spacing.xl * 2} onPick={(next) => void onChange({ counter: next })} />
         <Caption>One mark per finished book</Caption>
       </Section>
       <Section title="Your streak">
-        <Segmented accessibilityLabel="Your streak" options={TRAIT_OPTIONS} value={trait} onChange={(next) => void onChange({ trait: next })} />
+        <Segmented accessibilityLabel="Your streak" options={options(TRAITS, traitLabels(locale))} value={trait} onChange={(next) => void onChange({ trait: next })} />
         <Caption>Your second-strongest reader type</Caption>
       </Section>
       <Section title="Corners">
-        <PanelTrigger title="Corners" current={CORNER_LABELS[corners]} onPress={() => onOpen("corners")} />
+        <PanelTrigger title="Corners" current={cornerLabels(locale)[corners]} onPress={() => onOpen("corners")} />
       </Section>
       <Section title="Finish">
-        <PanelTrigger title="Finish" current={FINISH_LABELS[finish]} onPress={() => onOpen("finish")} />
+        <PanelTrigger title="Finish" current={finishLabels(locale)[finish]} onPress={() => onOpen("finish")} />
       </Section>
       <Section title="Bottom-left text">
-        <PanelTrigger title="Bottom-left text" current={withText(FOOTER_LEFT_LABELS[footer.left], footerLeftText(footer.left, input.card))} onPress={() => onOpen("footerLeft")} />
+        <PanelTrigger title="Bottom-left text" current={withText(footerLeftLabels(locale)[footer.left], footerLeftText(footer.left, input.card, locale))} onPress={() => onOpen("footerLeft")} />
       </Section>
       <Section title="Bottom-right text">
-        <PanelTrigger title="Bottom-right text" current={withText(FOOTER_RIGHT_LABELS[footer.right], footerRightText(footer.right, input.readerName))} onPress={() => onOpen("footerRight")} />
+        <PanelTrigger title="Bottom-right text" current={withText(footerRightLabels(locale)[footer.right], footerRightText(footer.right, input.readerName))} onPress={() => onOpen("footerRight")} />
       </Section>
       <Section title="Colours">
-        <Segmented accessibilityLabel="Colours" options={PRINT_OPTIONS} value={print} onChange={(next) => void onChange({ print: next })} />
+        <Segmented accessibilityLabel="Colours" options={options(CARD_PRINTS, printLabels(locale))} value={print} onChange={(next) => void onChange({ print: next })} />
         <Caption>Auto follows the app's light or dark theme</Caption>
       </Section>
     </>
@@ -142,9 +141,10 @@ export function FrontOptions({ input, motto, onChange, onOpen }: { input: Reader
 }
 
 export function LayoutOption({ layout, onChange }: { layout: Layout; onChange: SaveStyle }) {
+  const locale = useLocale();
   return (
     <Section title="Layout">
-      <Segmented accessibilityLabel="Layout" options={LAYOUT_OPTIONS} value={layout} onChange={(next) => void onChange({ layout: next })} />
+      <Segmented accessibilityLabel="Layout" options={options(LAYOUTS, layoutLabels(locale))} value={layout} onChange={(next) => void onChange({ layout: next })} />
       <Caption>{LAYOUT_HINTS[layout]}</Caption>
     </Section>
   );
@@ -164,32 +164,36 @@ function OptionRow({ label, detail, selected, onPress }: { label: string; detail
 }
 
 function LookPanel({ input, motto, available }: { input: ReaderCardBase; motto: Motto; available: number }) {
+  const { locale } = input;
   const deferred = useDeferredValue(input, null);
   const thumbs = useMemo(() => MOTTO_LOOKS.map((option) => ({ option, input: deferred && styleThumbnail(deferred, { motto: { text: deferred.style.motto?.text ?? SAMPLE_MOTTO, look: option } }, "motto") })), [deferred]);
-  return <TileRow items={thumbs} value={motto.look} labels={MOTTO_LOOK_LABELS} available={available} crop="motto" onPick={motto.pickLook} />;
+  return <TileRow items={thumbs} value={motto.look} labels={mottoLookLabels(locale)} available={available} crop="motto" onPick={motto.pickLook} />;
 }
 
 function CornersPanel({ input, available, onChange }: { input: ReaderCardBase; available: number; onChange: SaveStyle }) {
+  const { locale } = input;
   const deferred = useDeferredValue(input, null);
   const thumbs = useMemo(() => CORNER_STYLES.map((option) => ({ option, input: deferred && styleThumbnail(deferred, { corners: option }, "corner") })), [deferred]);
-  return <TileRow items={thumbs} value={input.style.corners} labels={CORNER_LABELS} available={available} crop="corner" onPick={(next) => void onChange({ corners: next })} />;
+  return <TileRow items={thumbs} value={input.style.corners} labels={cornerLabels(locale)} available={available} crop="corner" onPick={(next) => void onChange({ corners: next })} />;
 }
 
 function FooterPanel({ side, input, onChange }: { side: "footerLeft" | "footerRight"; input: ReaderCardBase; onChange: SaveStyle }) {
   const { footer } = input.style;
+  const { locale } = input;
   return (
     <View accessibilityRole="radiogroup" style={styles.list}>
       {side === "footerLeft"
-        ? FOOTER_LEFTS.map((value) => <OptionRow key={value} label={FOOTER_LEFT_LABELS[value]} detail={leftDetail(value, footerLeftText(value, input.card), input.card.state !== "unwritten" && Boolean(input.card.identity))} selected={footer.left === value} onPress={() => void onChange({ footer: { ...footer, left: value } })} />)
-        : FOOTER_RIGHTS.map((value) => <OptionRow key={value} label={FOOTER_RIGHT_LABELS[value]} detail={rightDetail(value, footerRightText(value, input.readerName))} selected={footer.right === value} onPress={() => void onChange({ footer: { ...footer, right: value } })} />)}
+        ? FOOTER_LEFTS.map((value) => <OptionRow key={value} label={footerLeftLabels(locale)[value]} detail={leftDetail(value, footerLeftText(value, input.card, locale), input.card.state !== "unwritten" && Boolean(input.card.identity))} selected={footer.left === value} onPress={() => void onChange({ footer: { ...footer, left: value } })} />)
+        : FOOTER_RIGHTS.map((value) => <OptionRow key={value} label={footerRightLabels(locale)[value]} detail={rightDetail(value, footerRightText(value, input.readerName))} selected={footer.right === value} onPress={() => void onChange({ footer: { ...footer, right: value } })} />)}
     </View>
   );
 }
 
 function FinishPanel({ finish, onChange }: { finish: Finish; onChange: SaveStyle }) {
+  const locale = useLocale();
   return (
     <View accessibilityRole="radiogroup" style={styles.list}>
-      {FINISHES.map((value) => <OptionRow key={value} label={FINISH_LABELS[value]} detail={FINISH_HINTS[value]} selected={finish === value} onPress={() => void onChange({ finish: value })} />)}
+      {FINISHES.map((value) => <OptionRow key={value} label={finishLabels(locale)[value]} detail={FINISH_HINTS[value]} selected={finish === value} onPress={() => void onChange({ finish: value })} />)}
     </View>
   );
 }

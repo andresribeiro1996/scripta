@@ -23,9 +23,9 @@ export function ReaderPortraitCard({ person, width, canvasWidth, busy, onToggleF
     if (!payload) return null;
     return muralPreviewOf(payload);
   }, [payload]);
-  const glyphLabel = readerGlyphLabel(person.private ? undefined : person.user.readerGlyph);
+  const glyphLabel = readerGlyphLabel(person.private ? undefined : person.user.readerGlyph, locale);
   const identity = glyphLabel ? person.user.readerGlyph : undefined;
-  const fallback = useMemo(() => readerCardInputOf([], [], person.user.username, { state: identity ? "settled" : "unwritten", identity: identity ?? null, runnerUp: null, signal: null, coverage: [] }), [identity, person.user.username]);
+  const fallback = useMemo(() => readerCardInputOf([], [], person.user.username, locale, { state: identity ? "settled" : "unwritten", identity: identity ?? null, runnerUp: null, signal: null, coverage: [] }), [identity, person.user.username, locale]);
   const caption = personCaption(person, locale);
   const palette = preview ? themes[preview.mural.theme].colors : colors;
   return (

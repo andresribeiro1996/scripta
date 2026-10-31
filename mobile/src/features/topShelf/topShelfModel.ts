@@ -1,4 +1,5 @@
 import { tierBand, type TopShelf, type TopShelfBoard, type TopShelfGame, type TopShelfPeriod, type TopShelfView } from "@scripta/shared";
+import { getLocale } from "../../i18n";
 
 export const BOARD_ORDER: TopShelfBoard[] = ["crowned", "tiered", "highestTier", "quizzed", "risingStar"];
 
@@ -26,7 +27,7 @@ export function valueLabel(board: TopShelfBoard, value: number): string {
   switch (board) {
     case "crowned": return plural(value, "title", "titles");
     case "tiered": return plural(value, "list", "lists");
-    case "highestTier": return tierBand(value);
+    case "highestTier": return tierBand(value, getLocale());
     case "quizzed": return plural(value, "quiz", "quizzes");
     case "risingStar": return plural(value, "game", "games");
     case "champions": return `${value} pts`;

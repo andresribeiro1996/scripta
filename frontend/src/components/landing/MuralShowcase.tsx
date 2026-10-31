@@ -1,11 +1,13 @@
-import { READER_PLATES } from "@scripta/shared";
+import { READER_PLATES, plateName } from "@scripta/shared";
 import { ReaderCards } from "./ReaderCards";
 import { BOOKS, coverSrc, readerCardSrc, type BookSlug } from "./books";
 import { container } from "./ui";
+import { useLocale } from "../../i18n";
 
 const favourites: BookSlug[] = ["piranesi", "gilead", "stoner", "remains", "circe", "the-road"];
 
 export function MuralShowcase() {
+  const locale = useLocale();
   const correspondent = READER_PLATES.find((plate) => plate.key === "corr")!;
   const correspondentSrc = readerCardSrc(correspondent);
 
@@ -91,13 +93,13 @@ export function MuralShowcase() {
             <div className="col-span-1 flex items-center justify-center rounded-xl border border-(--color-border) bg-(--color-surface) lg:col-span-3">
               <img
                 src={correspondentSrc.paper}
-                alt={`The ${correspondent.name} reader card`}
+                alt={`The ${plateName(correspondent.key, locale)} reader card`}
                 loading="lazy"
                 className="aspect-5/7 w-[100px] rounded-[3px] shadow-[0_12px_22px_-10px_rgb(0_0_0/0.4)] sm:w-[125px] lg:w-[150px] dark:hidden"
               />
               <img
                 src={correspondentSrc.reversed}
-                alt={`The ${correspondent.name} reader card`}
+                alt={`The ${plateName(correspondent.key, locale)} reader card`}
                 loading="lazy"
                 className="hidden aspect-5/7 w-[100px] rounded-[3px] shadow-[0_12px_22px_-10px_rgb(0_0_0/0.4)] sm:w-[125px] lg:w-[150px] dark:block"
               />

@@ -8,7 +8,7 @@ const make = (type: BlockType, extra: Record<string, unknown> = {}) => ({ ...cre
 test("every block type has a label and a default block of its own type", () => {
   assert.equal(BLOCK_TYPES.length, 12);
   for (const type of BLOCK_TYPES) {
-    assert.ok(blockLabel(type));
+    assert.ok(blockLabel(type, "en"));
     assert.equal(createBlockCandidate(type, []).type, type);
   }
 });
@@ -25,12 +25,12 @@ test("a new currentlyReading block already meets its minimum height", () => {
 
 test("muralBlockTitle names a block by its content and falls back to its label", () => {
   const books = [{ Title: "Dune", Attribution: "Frank Herbert" }];
-  assert.equal(muralBlockTitle(make("text"), books), "Note");
-  assert.equal(muralBlockTitle(make("shelf"), books), "Shelf");
-  assert.equal(muralBlockTitle(make("shelf", { title: "Top 5" }), books), "Top 5");
-  assert.equal(muralBlockTitle(make("spotlight", { bookKey: bookKey(books[0]) }), books), "Dune");
-  assert.equal(muralBlockTitle(make("tierlist"), books, "Best of"), "Best of");
-  assert.equal(muralBlockTitle(make("stats"), books), "Stats");
+  assert.equal(muralBlockTitle(make("text"), books, "en"), "Note");
+  assert.equal(muralBlockTitle(make("shelf"), books, "en"), "Shelf");
+  assert.equal(muralBlockTitle(make("shelf", { title: "Top 5" }), books, "en"), "Top 5");
+  assert.equal(muralBlockTitle(make("spotlight", { bookKey: bookKey(books[0]) }), books, "en"), "Dune");
+  assert.equal(muralBlockTitle(make("tierlist"), books, "en", "Best of"), "Best of");
+  assert.equal(muralBlockTitle(make("stats"), books, "en"), "Stats");
 });
 
 test("blockReferences collects what each block type points at", () => {

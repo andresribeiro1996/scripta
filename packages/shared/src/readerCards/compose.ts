@@ -1,3 +1,5 @@
+import type { Locale } from "../i18n/locale.js";
+import { sharedT } from "../i18n/sharedT.js";
 import type { IdentityKey } from "./plates.js";
 
 export const SERIF = "'Playfair Display', Georgia, 'Times New Roman', serif";
@@ -17,6 +19,7 @@ export interface PlateFace {
   reader: string;
   width: number;
   label: string;
+  locale: Locale;
   viewBox?: readonly [number, number, number, number];
 }
 
@@ -50,7 +53,7 @@ export type InkWrap = (body: string) => string;
 const bare: InkWrap = (body) => body;
 const footer = (face: PlateFace, slots: PlateSlots) => [
   `<path class="pl" d="M30 305H220" stroke-width=".5"/>`,
-  slots.footerLeft ?? `<text class="pt" x="30" y="321" font-size="7.5" letter-spacing="1.8" font-family="${SANS}" font-weight="600">PLATE ${face.numeral}</text>`,
+  slots.footerLeft ?? `<text class="pt" x="30" y="321" font-size="7.5" letter-spacing="1.8" font-family="${SANS}" font-weight="600">${sharedT(face.locale)("shared.readerCard.footerPlate", { numeral: face.numeral })}</text>`,
   slots.footerRight ?? `<text class="pt" x="220" y="321" text-anchor="end" font-size="7.5" letter-spacing="1.8" font-family="${SANS}" font-weight="600">${face.reader}</text>`,
 ];
 const join = (parts: Array<string | undefined>) => parts.filter((line): line is string => Boolean(line)).join("\n");

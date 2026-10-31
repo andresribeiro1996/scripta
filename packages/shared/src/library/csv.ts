@@ -1,3 +1,6 @@
+import type { Locale } from "../i18n/locale.js";
+import { sharedT } from "../i18n/sharedT.js";
+
 // Minimal RFC4180-ish CSV parsing, shared by every CSV-based importer
 // (goodreads.ts, storygraph.ts). Extracted from goodreads.ts, which was
 // the first (and until now only) CSV importer here.
@@ -5,7 +8,7 @@
 /** Handles quoted fields, commas and newlines inside quotes, and "" as an
  *  escaped quote. Both Goodreads' and StoryGraph's exports need all of
  *  this — review text routinely contains commas and line breaks. */
-export function parseCsv(text: string, delimiter: "," | "\t" = ","): string[][] {
+export function parseCsv(text: string, locale: Locale, delimiter: "," | "\t" = ","): string[][] {
   text = text.replace(/^\uFEFF/, "");
   const rows: string[][] = [];
   let row: string[] = [];
@@ -45,10 +48,10 @@ export function parseCsv(text: string, delimiter: "," | "\t" = ","): string[][] 
       continue;
     }
     if (afterQuote && c !== delimiter && c !== "\r" && c !== "\n" && c !== " " && c !== "\t") {
-      throw new Error("That CSV has invalid quoting.");
+      throw new Error(sharedT(locale)("shared.csv.invalidQuoting"));
     }
     if (c === '"' && (delimiter === "," || field === "" || field === "=")) {
-      if (field !== "" && field !== "=") throw new Error("That CSV has invalid quoting.");
+      if (field !== "" && field !== "=") throw new Error(sharedT(locale)("shared.csv.invalidQuoting"));
       inQuotes = true;
       i++;
       continue;
@@ -70,7 +73,7 @@ export function parseCsv(text: string, delimiter: "," | "\t" = ","): string[][] 
     field += c;
     i++;
   }
-  if (inQuotes) throw new Error("That CSV has invalid quoting.");
+  if (inQuotes) throw new Error(sharedT(locale)("shared.csv.invalidQuoting"));
   if (field.length > 0 || row.length > 0) pushRow();
 
   return rows;

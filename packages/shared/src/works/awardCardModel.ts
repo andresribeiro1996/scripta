@@ -1,6 +1,8 @@
 import { bookKey } from "../library/merge.js";
 import type { LibraryDocument } from "../library/types.js";
-import { PRIZES, isPrizeKey } from "./awards.js";
+import type { Locale } from "../i18n/locale.js";
+import { sharedT } from "../i18n/sharedT.js";
+import { isPrizeKey, prizeLabel } from "./awards.js";
 import type { AwardAnnouncement } from "./types.js";
 
 export type AwardCardModel = {
@@ -12,7 +14,7 @@ export type AwardCardModel = {
   target: { kind: "work"; id: string } | { kind: "search"; query: string };
 };
 
-const SHELF_LINES = ["On your to-read shelf", "You're reading it", "You've read it"] as const;
+const SHELF_LINES = ["shared.awards.shelfToRead", "shared.awards.shelfReading", "shared.awards.shelfRead"] as const;
 
 export function awardKey(announcement: Pick<AwardAnnouncement, "prize" | "year">): string {
   return `awardDismissed:${announcement.prize}:${announcement.year}`;
@@ -29,15 +31,16 @@ function heldStatuses(library: LibraryDocument | null): Map<string, 0 | 1 | 2> {
   return held;
 }
 
-export function awardCardModel(announcement: AwardAnnouncement, library: LibraryDocument | null): AwardCardModel | null {
+export function awardCardModel(announcement: AwardAnnouncement, library: LibraryDocument | null, locale: Locale): AwardCardModel | null {
   if (!isPrizeKey(announcement.prize)) return null;
+  const t = sharedT(locale);
   const held = heldStatuses(library);
-  const title = `${PRIZES[announcement.prize].label} ${announcement.year}`;
+  const title = `${prizeLabel(announcement.prize, locale)} ${announcement.year}`;
   const key = awardKey(announcement);
   if (announcement.honoree) {
     const { name, workIds } = announcement.honoree;
     const books = workIds.filter((id) => held.has(id)).length;
-    return { key, title, subtitle: name, shelfLine: books === 0 ? null : `${books} of their books in your library`, coverUrl: null, target: { kind: "search", query: name } };
+    return { key, title, subtitle: name, shelfLine: books === 0 ? null : t("shared.awards.honoreeBooks", { count: books }), coverUrl: null, target: { kind: "search", query: name } };
   }
   const [first, ...rest] = announcement.winners;
   if (!first) return null;
@@ -46,8 +49,8 @@ export function awardCardModel(announcement: AwardAnnouncement, library: Library
   return {
     key,
     title,
-    subtitle: `${first.title} · ${first.author}${rest.length > 0 ? ` and ${rest.length} more` : ""}`,
-    shelfLine: status !== undefined ? SHELF_LINES[status] : nominees === 0 ? null : `${nominees} ${nominees === 1 ? "nominee" : "nominees"} in your library`,
+    subtitle: rest.length > 0 ? t("shared.awards.winnerMore", { title: first.title, author: first.author, count: rest.length }) : `${first.title} · ${first.author}`,
+    shelfLine: status !== undefined ? t(SHELF_LINES[status]) : nominees === 0 ? null : t("shared.awards.nominees", { count: nominees }),
     coverUrl: first.coverUrl,
     target: { kind: "work", id: first.workId },
   };

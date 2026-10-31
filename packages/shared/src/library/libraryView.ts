@@ -1,3 +1,5 @@
+import type { Locale } from "../i18n/locale.js";
+import { sharedT } from "../i18n/sharedT.js";
 import { canonicalIsbn, normalizeWords } from "./bookMatch.js";
 import { looksLikeIsbnQuery } from "./bookSearch.js";
 
@@ -5,29 +7,37 @@ export type LibraryBook = Record<string, unknown>;
 export type StatusFilter = "all" | "unread" | "reading" | "finished";
 export type SortKey = "manual" | "title" | "author";
 
-export const STATUS_FILTER_OPTIONS: Array<{ value: StatusFilter; label: string }> = [
-  { value: "all", label: "All statuses" },
-  { value: "reading", label: "Reading" },
-  { value: "finished", label: "Finished" },
-  { value: "unread", label: "To read" }
-];
+const STATUS_FILTERS: StatusFilter[] = ["all", "reading", "finished", "unread"];
 
-// The three shelves a library actually has, for the swipeable status tabs
-// atop the mobile Library screen — unlike STATUS_FILTER_OPTIONS above,
-// there's no "all" tab: a shelf is always exactly one of these three.
-export const LIBRARY_STATUS_TABS = [
-  { value: "finished", label: "Finished" },
-  { value: "reading", label: "Reading" },
-  { value: "unread", label: "To read" }
-] as const;
+export function statusFilterOptions(locale: Locale): Array<{ value: StatusFilter; label: string }> {
+  const t = sharedT(locale);
+  return [
+    { value: "all", label: t("shared.libraryView.allStatuses") },
+    { value: "reading", label: t("shared.helpers.readReading") },
+    { value: "finished", label: t("shared.helpers.readFinished") },
+    { value: "unread", label: t("shared.helpers.readToRead") }
+  ];
+}
 
-export type LibraryStatusTab = (typeof LIBRARY_STATUS_TABS)[number]["value"];
+export type LibraryStatusTab = "finished" | "reading" | "unread";
 
-export const SORT_OPTIONS: Array<{ value: SortKey; label: string }> = [
-  { value: "manual", label: "My order" },
-  { value: "title", label: "Title A–Z" },
-  { value: "author", label: "Author A–Z" }
-];
+export function libraryStatusTabs(locale: Locale): Array<{ value: LibraryStatusTab; label: string }> {
+  const t = sharedT(locale);
+  return [
+    { value: "finished", label: t("shared.helpers.readFinished") },
+    { value: "reading", label: t("shared.helpers.readReading") },
+    { value: "unread", label: t("shared.helpers.readToRead") }
+  ];
+}
+
+export function sortOptions(locale: Locale): Array<{ value: SortKey; label: string }> {
+  const t = sharedT(locale);
+  return [
+    { value: "manual", label: t("shared.libraryView.sortManual") },
+    { value: "title", label: t("shared.libraryView.sortTitle") },
+    { value: "author", label: t("shared.libraryView.sortAuthor") }
+  ];
+}
 
 export function filterBooks(books: LibraryBook[], query: string, status: StatusFilter): LibraryBook[] {
   const q = query.trim().toLowerCase();
@@ -45,7 +55,7 @@ export function filterBooks(books: LibraryBook[], query: string, status: StatusF
 
 export function statusCounts(books: LibraryBook[]): Record<StatusFilter, number> {
   const counts = {} as Record<StatusFilter, number>;
-  for (const { value } of STATUS_FILTER_OPTIONS) counts[value] = filterBooks(books, "", value).length;
+  for (const value of STATUS_FILTERS) counts[value] = filterBooks(books, "", value).length;
   return counts;
 }
 

@@ -3,6 +3,7 @@ import { useQuery, type QueryClient } from "@tanstack/react-query";
 import { createLibrarySaver, type LibrarySaver } from "@scripta/shared";
 import { fetchLibrary, saveLibrary, sendLibraryChange, shareLibrary, unshareLibrary } from "../api/client";
 import type { LibraryData, LibraryDocument } from "../api/types";
+import { getLocale } from "../../../i18n";
 
 export const LIBRARY_QUERY_KEY = ["library"] as const;
 
@@ -14,6 +15,7 @@ export function createAccountLibrarySaver(queryClient: QueryClient): LibrarySave
     put: saveLibrary,
     fetch: fetchLibrary,
     write: (view) => queryClient.setQueryData(LIBRARY_QUERY_KEY, view),
+    locale: getLocale,
   });
 }
 

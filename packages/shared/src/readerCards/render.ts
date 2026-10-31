@@ -1,3 +1,5 @@
+import type { Locale } from "../i18n/locale.js";
+import { sharedT } from "../i18n/sharedT.js";
 import type { DialGroup } from "../library/readerCardFacts.js";
 import type { PublicReaderCard, ReaderLeader } from "../library/readerIdentity.js";
 import { composePage, composePlate, cornerMarkup, SANS, type PlateFace, type PlateSlots } from "./compose.js";
@@ -7,7 +9,7 @@ import { finishLayers } from "./finishes.js";
 import { footerSlots, GENRE_LEADS, truncateName } from "./footer.js";
 import { mottoSlots } from "./mottos.js";
 import { inks, withStyle } from "./paint.js";
-import { PLATES, emblem, glyph, glyphBody, type IdentityKey } from "./plates.js";
+import { PLATES, emblem, glyph, glyphBody, plateEpithet, plateName, type IdentityKey } from "./plates.js";
 import { chosenBody, mergedBody, recordBody, type ReaderCardPage, type ReaderCardView } from "./pages.js";
 import type { PublicReaderCardStyle } from "./style.js";
 import { escape } from "./svgText.js";
@@ -28,20 +30,22 @@ export interface RenderPlateOptions {
   readerName: string;
   print: PlatePrint;
   label: string;
+  locale: Locale;
   unwrittenLine?: string;
   width?: number;
   crop?: CardCrop;
 }
 
-function faceOf({ identity, state, readerName, label, unwrittenLine, width = 250, crop }: RenderPlateOptions): { face: PlateFace; ink: IdentityKey | "graph" } {
+function faceOf({ identity, state, readerName, label, locale, unwrittenLine, width = 250, crop }: RenderPlateOptions): { face: PlateFace; ink: IdentityKey | "graph" } {
+  const t = sharedT(locale);
   const cropped = crop === "corner";
   const reader = escape(truncateName(readerName).toUpperCase());
   const safeLabel = escape(label);
   if (state === "unwritten" || !identity) {
-    return { ink: "graph", face: { key: "none", emblemSvg: cropped ? "" : emblem("none"), name: "Unwritten", eyebrow: "NOT YET", epithet: escape(unwrittenLine ?? "five finished books to begin"), numeral: "—", reader, width, label: safeLabel, ...(crop ? { viewBox: CARD_CROPS[crop] } : {}) } };
+    return { ink: "graph", face: { key: "none", emblemSvg: cropped ? "" : emblem("none", locale), name: t("shared.readerCard.unwritten"), eyebrow: t("shared.readerCard.notYet"), epithet: escape(unwrittenLine ?? t("shared.readerCard.fiveToBegin")), numeral: "—", reader, width, label: safeLabel, locale, ...(crop ? { viewBox: CARD_CROPS[crop] } : {}) } };
   }
   const p = PLATES.find((item) => item.key === identity)!;
-  return { ink: identity, face: { key: identity, emblemSvg: cropped ? "" : emblem(identity), name: p.name, eyebrow: state === "leaning" ? "LEANING TOWARD" : "THE", epithet: p.epithet, numeral: p.numeral, reader, width, label: safeLabel, ...(crop ? { viewBox: CARD_CROPS[crop] } : {}) } };
+  return { ink: identity, face: { key: identity, emblemSvg: cropped ? "" : emblem(identity, locale), name: plateName(identity, locale), eyebrow: t(state === "leaning" ? "shared.readerCard.eyebrowLeaning" : "shared.readerCard.eyebrow"), epithet: plateEpithet(identity, locale), numeral: p.numeral, reader, width, label: safeLabel, locale, ...(crop ? { viewBox: CARD_CROPS[crop] } : {}) } };
 }
 
 export function renderPlate(options: RenderPlateOptions): string {
@@ -50,6 +54,7 @@ export function renderPlate(options: RenderPlateOptions): string {
 }
 
 export interface ReaderCardInput {
+  locale: Locale;
   card: PublicReaderCard;
   style: PublicReaderCardStyle;
   readerName: string;
@@ -83,18 +88,18 @@ function sealSlot(streak: IdentityKey, print: PlatePrint): string {
   return `<circle class="pg" cx="${cx.toFixed(2)}" cy="${cy.toFixed(2)}" r="${SEAL_SIZE / 2 + 2.5}"/>${glyphAt(streak, cx - SEAL_SIZE / 2, cy - SEAL_SIZE / 2, SEAL_SIZE, print)}`;
 }
 
-function traitLine(streak: IdentityKey): string {
-  const name = PLATES.find((item) => item.key === streak)!.name.toUpperCase();
-  return `<text class="pt" x="125" y="297" text-anchor="middle" font-size="5.6" letter-spacing="1.5" font-family="${SANS}" font-weight="600">WITH A STREAK OF THE ${name}</text>`;
+function traitLine(streak: IdentityKey, locale: Locale): string {
+  const line = sharedT(locale)("shared.readerCard.traitLine", { name: plateName(streak, locale).toUpperCase() });
+  return `<text class="pt" x="125" y="297" text-anchor="middle" font-size="5.6" letter-spacing="1.5" font-family="${SANS}" font-weight="600">${line}</text>`;
 }
 
 function decorations(input: ReaderCardInput, print: PlatePrint): PlateSlots {
   const corners = cornersSlot(input.style.corners);
-  const footer = footerSlots(input.style.footer, { card: input.card, readerName: input.readerName, glyph: (key, x, y, size) => glyphAt(key, x, y, size, print) });
+  const footer = footerSlots(input.style.footer, { locale: input.locale, card: input.card, readerName: input.readerName, glyph: (key, x, y, size) => glyphAt(key, x, y, size, print) });
   return { ...(corners === undefined ? {} : { corners }), ...footer };
 }
 
-const BACKS = { record: [", reader’s record", recordBody], chosen: [", chosen by the reader", chosenBody], merged: [", back", mergedBody] } as const;
+const BACKS = { record: ["shared.readerCard.suffixRecord", recordBody], chosen: ["shared.readerCard.suffixChosen", chosenBody], merged: ["shared.readerCard.suffixBack", mergedBody] } as const;
 
 export function renderReaderCard(input: ReaderCardInput, page: ReaderCardPage = "front"): string {
   const { card, style, print, seed } = input;
@@ -105,7 +110,7 @@ export function renderReaderCard(input: ReaderCardInput, page: ReaderCardPage = 
   const finish = finishLayers(style.finish, { print, ink, streak, seed, front: page === "front", seal: page === "front" && seal ? sealCentre() : null, corners: cornerMarkup(decorated) });
   if (page !== "front") {
     const [suffix, body] = BACKS[page];
-    return withStyle(composePage({ ...face, label: `${face.label}${suffix}` }, body(input), { ...decorated, ...finish.slots }), finish.palette);
+    return withStyle(composePage({ ...face, label: `${face.label}${sharedT(input.locale)(suffix)}` }, body(input), { ...decorated, ...finish.slots }), finish.palette);
   }
   const line = streak !== null && (style.trait === "both" || style.trait === "line");
   const lead = card.identity && GENRE_LEADS.has(card.identity) ? (card.identity as DialGroup) : null;
@@ -113,7 +118,7 @@ export function renderReaderCard(input: ReaderCardInput, page: ReaderCardPage = 
   const counter = card.dial ? drawCounter(style.counter, card.dial.segments, { seed, sealGap: seal, lead }) : null;
   if (counter) slots[counter.slot] = counter.svg;
   if (streak && seal) slots.seal = sealSlot(streak, print);
-  if (streak && line) slots.trait = traitLine(streak);
+  if (streak && line) slots.trait = traitLine(streak, input.locale);
   return withStyle(composePlate(face, slots, finish.wrapInk), finish.palette);
 }
 

@@ -9,8 +9,10 @@ import { mergeLibraryBooks } from "../api/client";
 import type { LibraryDocument } from "../api/types";
 import { LIBRARY_QUERY_KEY, useLibrary } from "../hooks/useLibrary";
 import { CoverImage } from "./CoverImage";
+import { getLocale, useLocale } from "../../../i18n";
 
 export function DuplicatesSheetBody({ groups, library }: { groups: string[][]; library: LibraryDocument }) {
+  const locale = useLocale();
   const { colors } = useTheme();
   const { updateLibrary, saver } = useLibrary();
   const queryClient = useQueryClient();
@@ -27,7 +29,7 @@ export function DuplicatesSheetBody({ groups, library }: { groups: string[][]; l
     } catch (reason) {
       console.error(reason);
       void queryClient.invalidateQueries({ queryKey: LIBRARY_QUERY_KEY });
-      setError(saveFailureMessage(reason, failure));
+      setError(saveFailureMessage(reason, failure, getLocale()));
     } finally {
       setBusy(false);
     }
@@ -57,7 +59,7 @@ export function DuplicatesSheetBody({ groups, library }: { groups: string[][]; l
                   <View style={{ flex: 1 }}>
                     <Text numberOfLines={1} style={[typography.body, { color: colors.text }]}>{String(book.Title ?? "Untitled")}</Text>
                     <Text numberOfLines={1} style={[typography.caption, { color: colors.textDim }]}>{String(book.Attribution ?? "")}</Text>
-                    <Text style={[typography.caption, { color: colors.textDim }]}>{[book.ISBN ? `ISBN ${String(book.ISBN)}` : null, statusLabel(book.ReadStatus)].filter(Boolean).join(" · ")}</Text>
+                    <Text style={[typography.caption, { color: colors.textDim }]}>{[book.ISBN ? `ISBN ${String(book.ISBN)}` : null, statusLabel(book.ReadStatus, locale)].filter(Boolean).join(" · ")}</Text>
                   </View>
                 </View>
               );

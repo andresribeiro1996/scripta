@@ -1,7 +1,9 @@
 import { readerGlyphLabel, renderGlyph, type IdentityKey } from "@scripta/shared";
+import { useLocale } from "../i18n";
 
 export function ReaderGlyph({ identity }: { identity?: IdentityKey }) {
-  const label = readerGlyphLabel(identity);
+  const locale = useLocale();
+  const label = readerGlyphLabel(identity, locale);
   if (!identity || !label) return null;
   return (
     <span role="img" aria-label={label} className="inline-flex h-6 w-6 shrink-0 align-middle">

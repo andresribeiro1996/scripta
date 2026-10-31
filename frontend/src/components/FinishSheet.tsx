@@ -21,6 +21,7 @@ import { DuelButton } from "./DuelButton";
 import { FeelingChips } from "./FeelingChips";
 import { Sheet } from "./Sheet";
 import { useToast } from "./Toaster";
+import { useLocale } from "../i18n";
 
 type Shelf = { blocks: MuralBlock[]; landed: Landing[] };
 
@@ -44,6 +45,7 @@ export function FinishSheet({
   onRestoreRead: (book: Record<string, unknown>, before: ReadSnapshot) => Promise<boolean>;
   onClose: () => void;
 }) {
+  const locale = useLocale();
   const queryClient = useQueryClient();
   const own = useQuery({ queryKey: ["community", "own-profile"], queryFn: fetchOwnProfile });
   const toast = useToast();
@@ -87,7 +89,8 @@ export function FinishSheet({
         queryClient.setQueryData<Mural[]>(["murals"], (list) => list?.map((m) => (m.id === id ? updated : m)));
         return updated;
       },
-      onChange: (state) => { if (mounted.current) setShelf(state); }
+      onChange: (state) => { if (mounted.current) setShelf(state); },
+      locale
     });
     sessionRef.current = session;
     void session.finish(key, typeof book.Rating === "number" ? book.Rating : null).catch(reportShelfError);

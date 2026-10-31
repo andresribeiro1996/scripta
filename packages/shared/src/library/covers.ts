@@ -23,6 +23,9 @@
 // chain this file used to hold actually lives now, and its README
 // section for the full reasoning.
 
+import type { Locale } from "../i18n/locale.js";
+import { sharedT } from "../i18n/sharedT.js";
+
 export function normalizeIsbn(raw: unknown): string {
   const cleaned = String(raw ?? "")
     .trim()
@@ -35,10 +38,6 @@ export function normalizeImageId(raw: unknown): string {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v) ? v : "";
 }
 
-/** Plain text label for a book's ReadStatus (0/1/2) — BookCard shows this
- *  as a plain label rather than the colored dot+pill badge it used to. */
-export function statusLabel(status: unknown): string {
-  if (status === 2) return "Finished";
-  if (status === 1) return "Reading";
-  return "To read";
+export function statusLabel(status: unknown, locale: Locale): string {
+  return sharedT(locale)(status === 2 ? "shared.helpers.readFinished" : status === 1 ? "shared.helpers.readReading" : "shared.helpers.readToRead");
 }

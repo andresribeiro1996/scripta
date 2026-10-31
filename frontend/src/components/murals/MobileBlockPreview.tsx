@@ -7,6 +7,7 @@ import { computeStat } from "../../lib/muralStats";
 import { blockBooks, calculateShelfTheme, muralBlockTitle, resolveQuote, resolveQuoteCollection, type MuralBlock, type ReaderProfile, type ShelfTheme } from "../../lib/murals";
 import { CoverImage } from "../BookCard";
 import { ReaderCardBlockView } from "./blocks/ReaderCardBlock";
+import { useLocale } from "../../i18n";
 
 const PREVIEW_STAT_LABELS = {
   totalBooks: "Library",
@@ -43,7 +44,8 @@ export function MobileBlockPreview({
   tierlistData?: (id: string) => ResolvedTierlist | undefined;
   editing?: boolean;
 }) {
-  const title = muralBlockTitle(block, books, block.type === "tierlist" ? tierlistData?.(block.tierlistId)?.name : undefined);
+  const locale = useLocale();
+  const title = muralBlockTitle(block, books, locale, block.type === "tierlist" ? tierlistData?.(block.tierlistId)?.name : undefined);
   const compact = height < 64 || width < 80;
   const heading = <p className="shrink-0 truncate text-[14px] leading-5 font-semibold">{title}</p>;
   const placeholder = (

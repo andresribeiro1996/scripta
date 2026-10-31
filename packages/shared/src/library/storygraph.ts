@@ -28,6 +28,8 @@
 //   and "Owned?" have no equivalent in this app's book shape and aren't
 //   imported.
 
+import type { Locale } from "../i18n/locale.js";
+import { sharedT } from "../i18n/sharedT.js";
 import type { LibraryData } from "./types.js";
 import { normalizeIsbn } from "./covers.js";
 import { csvRowsToObjects, parseCsv } from "./csv.js";
@@ -50,10 +52,10 @@ function storygraphStatusToReadStatus(status: string | undefined): number {
   return 0; // "to-read", "did-not-finish", or anything else
 }
 
-export function storygraphCsvToLibraryJson(text: string): LibraryData {
-  const rows = csvRowsToObjects(parseCsv(text));
+export function storygraphCsvToLibraryJson(text: string, locale: Locale): LibraryData {
+  const rows = csvRowsToObjects(parseCsv(text, locale));
   if (!rows.length) {
-    throw new Error("That StoryGraph CSV doesn't have any books in it.");
+    throw new Error(sharedT(locale)("shared.csv.storygraphEmpty"));
   }
 
   const books = rows.map((row, i) => {

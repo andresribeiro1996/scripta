@@ -11,7 +11,7 @@ import { useLocale } from "../../i18n";
 export function PersonRow({ person, busy, onToggleFollow, onOpen }: { person: PersonResult | SuggestedReader; busy: boolean; onToggleFollow: () => void; onOpen?: () => void }) {
   const locale = useLocale();
   const { colors } = useTheme();
-  const glyphLabel = readerGlyphLabel(person.user.readerGlyph);
+  const glyphLabel = readerGlyphLabel(person.user.readerGlyph, locale);
   const suggestion = "sharedCount" in person ? person : null;
   const caption = personCaption(person, locale);
   return (

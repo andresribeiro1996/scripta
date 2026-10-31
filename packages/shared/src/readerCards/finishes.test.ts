@@ -6,7 +6,7 @@ import { seedOf } from "./seed.js";
 import { DEFAULT_READER_CARD_STYLE, FINISHES, publicStyle, type Finish, type PublicReaderCardStyle } from "./style.js";
 
 const card: PublicReaderCard = { state: "settled", identity: "star", runnerUp: null, streak: "carto", signal: null, coverage: ["c"], dial: { segments: [{ group: "star", books: 22, marked: 9 }] }, facts: { finished: 22, highlights: 9, series: 2, since: 2014, edition: 2026 } };
-const input = (finish: Finish, print: "paper" | "reversed" = "paper", patch: Partial<PublicReaderCardStyle> = {}): ReaderCardInput => ({ card, style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), finish, ...patch }, readerName: "andre.ribeiro", print, label: "x", seed: seedOf("andre.ribeiro"), view: "owner" });
+const input = (finish: Finish, print: "paper" | "reversed" = "paper", patch: Partial<PublicReaderCardStyle> = {}): ReaderCardInput => ({ card, style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), finish, ...patch }, locale: "en", readerName: "andre.ribeiro", print, label: "x", seed: seedOf("andre.ribeiro"), view: "owner" });
 const BUILT = FINISHES.filter((finish) => finish !== "paper");
 
 test("a style without a finish draws exactly the plain card", () => {

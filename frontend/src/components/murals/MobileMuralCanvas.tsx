@@ -14,6 +14,7 @@ import { MobileBlockPreview } from "./MobileBlockPreview";
 import { MuralBlockDetail } from "./MuralBlockDetail";
 import { DraggableMuralBlock, useMuralDrag } from "./useMuralDrag";
 import { MuralExpandButtons } from "./MuralExpandButtons";
+import { useLocale } from "../../i18n";
 
 const CANVAS_WIDTH = 1200;
 const ROW_HEIGHT = 28;
@@ -92,6 +93,7 @@ function BlockFrame({
   themeColors: ThemeColors;
   editing: boolean;
 }) {
+  const locale = useLocale();
   const style = resolveBlockStyle(block.style);
   const effects = blockEffects(style, themeColors);
   const pointerStart = useRef<{ x: number; y: number } | null>(null);
@@ -102,7 +104,7 @@ function BlockFrame({
       data-own-font=""
       role="button"
       tabIndex={0}
-      aria-label={`${selected ? "Selected: " : "Open "}${muralBlockTitle(block, books, block.type === "tierlist" ? tierlistData?.(block.tierlistId)?.name : undefined)}`}
+      aria-label={`${selected ? "Selected: " : "Open "}${muralBlockTitle(block, books, locale, block.type === "tierlist" ? tierlistData?.(block.tierlistId)?.name : undefined)}`}
       onPointerDown={(event) => {
         pointerStart.current = { x: event.clientX, y: event.clientY };
       }}

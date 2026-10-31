@@ -2,12 +2,16 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 process.env.TZ = "America/Sao_Paulo";
-const { FINISH_FEELINGS, addReaderNote, formatFinishDay, readSnapshot, removeReaderNote, restoreReadState, setRating } = await import("./finish.js");
+const { finishFeelings, addReaderNote, formatFinishDay, readSnapshot, removeReaderNote, restoreReadState, setRating } = await import("./finish.js");
 
 test("the five feelings map to ratings 1 through 5", () => {
-  assert.deepEqual(FINISH_FEELINGS.map(({ rating, label }) => [rating, label]), [
+  assert.deepEqual(finishFeelings("en").map(({ rating, label }) => [rating, label]), [
     [1, "Not for me"], [2, "Fine"], [3, "Good"], [4, "Loved it"], [5, "All-time"]
   ]);
+});
+
+test("the feelings read in Portuguese", () => {
+  assert.deepEqual(finishFeelings("pt-PT").map(({ label }) => label), ["Não é para mim", "Razoável", "Bom", "Adorei", "Favorito de sempre"]);
 });
 
 test("setRating sets Rating and returns the same object when unchanged", () => {

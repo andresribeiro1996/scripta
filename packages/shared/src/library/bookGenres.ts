@@ -1,3 +1,6 @@
+import type { Locale } from "../i18n/locale.js";
+import { sharedT } from "../i18n/sharedT.js";
+
 export const GENRES_FROM_CATALOG = "catalog";
 
 export const BOOK_GENRES = [
@@ -30,6 +33,43 @@ export const BOOK_GENRES = [
 ] as const;
 
 export type BookGenre = (typeof BOOK_GENRES)[number];
+
+const GENRE_KEYS = {
+  "Fantasy": "shared.genres.fantasy",
+  "Science Fiction": "shared.genres.scienceFiction",
+  "Romance": "shared.genres.romance",
+  "Mystery": "shared.genres.mystery",
+  "Thriller": "shared.genres.thriller",
+  "Horror": "shared.genres.horror",
+  "Crime": "shared.genres.crime",
+  "Historical Fiction": "shared.genres.historicalFiction",
+  "Literary Fiction": "shared.genres.literaryFiction",
+  "Classics": "shared.genres.classics",
+  "Biography & Memoir": "shared.genres.biographyMemoir",
+  "History": "shared.genres.history",
+  "Politics": "shared.genres.politics",
+  "Philosophy": "shared.genres.philosophy",
+  "Psychology": "shared.genres.psychology",
+  "Science": "shared.genres.science",
+  "Technology": "shared.genres.technology",
+  "Business": "shared.genres.business",
+  "Self-Help": "shared.genres.selfHelp",
+  "Poetry": "shared.genres.poetry",
+  "Religion": "shared.genres.religion",
+  "Travel": "shared.genres.travel",
+  "Cooking": "shared.genres.cooking",
+  "Young Adult": "shared.genres.youngAdult",
+  "Children's": "shared.genres.childrens",
+  "Comics & Graphic Novels": "shared.genres.comics"
+} as const satisfies Record<BookGenre, string>;
+
+export function genreLabel(genre: BookGenre, locale: Locale): string {
+  return sharedT(locale)(GENRE_KEYS[genre]);
+}
+
+export function isBookGenre(value: string): value is BookGenre {
+  return Object.hasOwn(GENRE_KEYS, value);
+}
 
 const RULES: Array<[BookGenre, RegExp]> = [
   ["Historical Fiction", /\bromances? historicos?\b/],

@@ -190,7 +190,7 @@ test("a 413 reaches saveFailureMessage with the server's message", async () => {
 
   const caught = await session.apiClient.request("/library", { method: "PUT", auth: true }).catch((error: unknown) => error);
 
-  assert.equal(saveFailureMessage(caught, "generic"), message);
+  assert.equal(saveFailureMessage(caught, "generic", "en"), message);
 });
 
 function store(initial: string | null) {

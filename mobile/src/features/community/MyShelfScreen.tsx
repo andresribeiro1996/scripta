@@ -20,6 +20,7 @@ import { FeedSettingsDialog } from "./FeedSettingsDialog";
 import { ShelfPreview } from "./ShelfPreview";
 import { fetchOwnProfile, publishProfile, setShelfMural, unpublishProfile } from "./api";
 import { MuralPicker } from "./ProfileScreen";
+import { useLocale } from "../../i18n";
 
 const MY_SHELF_TABS = [
   { value: "shelf", label: "Shelf" },
@@ -32,6 +33,7 @@ type MyShelfTab = (typeof MY_SHELF_TABS)[number]["value"];
 let lastTab: MyShelfTab = "shelf";
 
 export function MyShelfScreen() {
+  const locale = useLocale();
   const { colors, id: theme } = useTheme();
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -67,7 +69,7 @@ export function MyShelfScreen() {
     : undefined;
 
   const ordered = useMemo(() => orderLibraryBooks(books, groups), [books, groups]);
-  const preview = useMemo(() => buildMuralPreset("shelf", ordered, groups), [ordered, groups]);
+  const preview = useMemo(() => buildMuralPreset("shelf", ordered, locale, groups), [ordered, locale, groups]);
   const previewMural: Mural = { id: "shelf-preview", name: preview.name, theme, blocks: preview.blocks, createdAt: "", updatedAt: "", shareToken: null, shareUrl: null, folderId: null };
   const pendingShelf = useRef<string | null>(null);
   const working = useRef(false);
@@ -232,7 +234,7 @@ export function MyShelfScreen() {
               />
             );
           }
-          return <ShelfPreview mural={previewMural} summary={shelfPresetSummary(books, ownData.published)} busy={busy} books={books} groups={groups} images={images} tierlists={tierlists} profile={profile} onKeep={() => void keepShelf()} onBlank={() => void startBlank()} />;
+          return <ShelfPreview mural={previewMural} summary={shelfPresetSummary(books, ownData.published, locale)} busy={busy} books={books} groups={groups} images={images} tierlists={tierlists} profile={profile} onKeep={() => void keepShelf()} onBlank={() => void startBlank()} />;
         }}
       />
       <MuralPicker

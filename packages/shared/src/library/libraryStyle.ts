@@ -20,6 +20,9 @@
 // so they stay in frontend/src/lib/libraryStyle.ts. Task 4D builds the
 // React Native equivalents (a single font family, no var()/color-mix()).
 
+import type { Locale } from "../i18n/locale.js";
+import { sharedT } from "../i18n/sharedT.js";
+
 export type CardAspectRatio = "2/3" | "3/4" | "1/1";
 export type CardBorderStyle = "solid" | "dashed" | "dotted" | "double" | "groove" | "ridge";
 
@@ -33,16 +36,21 @@ export type CardBorderStyle = "solid" | "dashed" | "dotted" | "double" | "groove
  *  never accidentally leak into the other through a shared alias. */
 export type CardFontFamily = "sans" | "serif" | "mono" | "playfairDisplay" | "inter" | "jetbrainsMono";
 
-export const CARD_FONT_FAMILY_OPTIONS: Array<{ value: CardFontFamily; label: string; css: string }> = [
-  { value: "sans", label: "Sans-serif (system)", css: "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" },
-  { value: "serif", label: "Serif (system)", css: "ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif" },
-  { value: "mono", label: "Monospace (system)", css: "ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" },
-  // Self-hosted (see frontend's index.css) — real, distinctive typefaces
-  // rather than another OS-default look-alike.
-  { value: "playfairDisplay", label: "Playfair Display", css: "'Playfair Display', ui-serif, Georgia, serif" },
-  { value: "inter", label: "Inter", css: "'Inter', ui-sans-serif, system-ui, sans-serif" },
-  { value: "jetbrainsMono", label: "JetBrains Mono", css: "'JetBrains Mono', ui-monospace, SFMono-Regular, monospace" }
-];
+export function cardFontFamilyOptions(locale: Locale): Array<{ value: CardFontFamily; label: string; css: string }> {
+  return fontFamilyOptions(locale);
+}
+
+function fontFamilyOptions(locale: Locale): Array<{ value: CardFontFamily; label: string; css: string }> {
+  const t = sharedT(locale);
+  return [
+    { value: "sans", label: t("shared.libraryStyle.fontSans"), css: "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" },
+    { value: "serif", label: t("shared.libraryStyle.fontSerif"), css: "ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif" },
+    { value: "mono", label: t("shared.libraryStyle.fontMono"), css: "ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" },
+    { value: "playfairDisplay", label: "Playfair Display", css: "'Playfair Display', ui-serif, Georgia, serif" },
+    { value: "inter", label: "Inter", css: "'Inter', ui-sans-serif, system-ui, sans-serif" },
+    { value: "jetbrainsMono", label: "JetBrains Mono", css: "'JetBrains Mono', ui-monospace, SFMono-Regular, monospace" }
+  ];
+}
 
 export const CARD_FONT_SIZE_RANGE = { min: 9, max: 20, step: 1 };
 
@@ -212,25 +220,31 @@ export const CARD_RADIUS_RANGE = { min: 0, max: 32, step: 2 };
 export const CARD_BORDER_WIDTH_RANGE = { min: 0, max: 6, step: 1 };
 export const CARD_BORDER_OPACITY_RANGE = { min: 0, max: 100, step: 4 };
 export const CARD_OPACITY_RANGE = { min: 0, max: 100, step: 4 };
-export const CARD_BORDER_STYLE_OPTIONS: Array<{ value: CardBorderStyle; label: string }> = [
-  { value: "solid", label: "Solid" },
-  { value: "dashed", label: "Dashed" },
-  { value: "dotted", label: "Dotted" },
-  { value: "double", label: "Double" },
-  { value: "groove", label: "Groove" },
-  { value: "ridge", label: "Ridge" }
-];
+export function cardBorderStyleOptions(locale: Locale): Array<{ value: CardBorderStyle; label: string }> {
+  const t = sharedT(locale);
+  return [
+    { value: "solid", label: t("shared.libraryStyle.borderSolid") },
+    { value: "dashed", label: t("shared.libraryStyle.borderDashed") },
+    { value: "dotted", label: t("shared.libraryStyle.borderDotted") },
+    { value: "double", label: t("shared.libraryStyle.borderDouble") },
+    { value: "groove", label: t("shared.libraryStyle.borderGroove") },
+    { value: "ridge", label: t("shared.libraryStyle.borderRidge") }
+  ];
+}
 // step: 2, not 5 — the default (88) has to actually sit on the grid, or
 // range inputs silently snap it to the nearest step (90) the moment
 // they're touched, diverging from what's documented as the default.
 export const OVERLAY_INTENSITY_RANGE = { min: 0, max: 100, step: 2 };
 export const CONTENT_MAX_WIDTH_RANGE = { min: 800, max: 1800, step: 16 };
 export const CONTENT_PADDING_RANGE = { min: 0, max: 64, step: 4 };
-export const CARD_ASPECT_RATIO_OPTIONS: Array<{ value: CardAspectRatio; label: string }> = [
-  { value: "2/3", label: "Poster (2:3)" },
-  { value: "3/4", label: "Portrait (3:4)" },
-  { value: "1/1", label: "Square (1:1)" }
-];
+export function cardAspectRatioOptions(locale: Locale): Array<{ value: CardAspectRatio; label: string }> {
+  const t = sharedT(locale);
+  return [
+    { value: "2/3", label: t("shared.libraryStyle.aspectPoster") },
+    { value: "3/4", label: t("shared.libraryStyle.aspectPortrait") },
+    { value: "1/1", label: t("shared.libraryStyle.aspectSquare") }
+  ];
+}
 
 /** Fills in defaults for anything unset — a library saved before this
  *  feature existed (or one with a partially-applied style, if the shape
@@ -355,17 +369,9 @@ export function effectiveCardStyle(
  *  feel) rather than a long list of near-identical sans choices. */
 export type BlockFontFamily = "sans" | "serif" | "mono" | "playfairDisplay" | "inter" | "jetbrainsMono";
 
-export const BLOCK_FONT_FAMILY_OPTIONS: Array<{ value: BlockFontFamily; label: string; css: string }> = [
-  { value: "sans", label: "Sans-serif (system)", css: "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" },
-  { value: "serif", label: "Serif (system)", css: "ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif" },
-  { value: "mono", label: "Monospace (system)", css: "ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" },
-  // Self-hosted (see frontend's index.css) — same three as CardFontFamily's
-  // own additions, duplicated rather than shared, per this file's
-  // isolation rule (see BlockStyle's own comment below).
-  { value: "playfairDisplay", label: "Playfair Display", css: "'Playfair Display', ui-serif, Georgia, serif" },
-  { value: "inter", label: "Inter", css: "'Inter', ui-sans-serif, system-ui, sans-serif" },
-  { value: "jetbrainsMono", label: "JetBrains Mono", css: "'JetBrains Mono', ui-monospace, SFMono-Regular, monospace" }
-];
+export function blockFontFamilyOptions(locale: Locale): Array<{ value: BlockFontFamily; label: string; css: string }> {
+  return fontFamilyOptions(locale);
+}
 
 export const BLOCK_FONT_SIZE_RANGE = { min: 10, max: 24, step: 1 };
 
@@ -373,23 +379,32 @@ export type BlockTextAlign = "left" | "center" | "right";
 export type BlockInnerSpacing = "tight" | "normal" | "roomy";
 export type BlockBackgroundFinish = "none" | "paper" | "linen";
 
-export const BLOCK_TEXT_ALIGN_OPTIONS: Array<{ value: BlockTextAlign; label: string }> = [
-  { value: "left", label: "Left" },
-  { value: "center", label: "Center" },
-  { value: "right", label: "Right" }
-];
+export function blockTextAlignOptions(locale: Locale): Array<{ value: BlockTextAlign; label: string }> {
+  const t = sharedT(locale);
+  return [
+    { value: "left", label: t("shared.libraryStyle.alignLeft") },
+    { value: "center", label: t("shared.libraryStyle.alignCenter") },
+    { value: "right", label: t("shared.libraryStyle.alignRight") }
+  ];
+}
 
-export const BLOCK_INNER_SPACING_OPTIONS: Array<{ value: BlockInnerSpacing; label: string }> = [
-  { value: "tight", label: "Tight" },
-  { value: "normal", label: "Normal" },
-  { value: "roomy", label: "Roomy" }
-];
+export function blockInnerSpacingOptions(locale: Locale): Array<{ value: BlockInnerSpacing; label: string }> {
+  const t = sharedT(locale);
+  return [
+    { value: "tight", label: t("shared.libraryStyle.spacingTight") },
+    { value: "normal", label: t("shared.libraryStyle.spacingNormal") },
+    { value: "roomy", label: t("shared.libraryStyle.spacingRoomy") }
+  ];
+}
 
-export const BLOCK_BACKGROUND_FINISH_OPTIONS: Array<{ value: BlockBackgroundFinish; label: string }> = [
-  { value: "none", label: "Plain" },
-  { value: "paper", label: "Paper" },
-  { value: "linen", label: "Linen" }
-];
+export function blockBackgroundFinishOptions(locale: Locale): Array<{ value: BlockBackgroundFinish; label: string }> {
+  const t = sharedT(locale);
+  return [
+    { value: "none", label: t("shared.libraryStyle.finishPlain") },
+    { value: "paper", label: t("shared.libraryStyle.finishPaper") },
+    { value: "linen", label: t("shared.libraryStyle.finishLinen") }
+  ];
+}
 
 export const BLOCK_SHADOW_OPACITY_RANGE = { min: 0, max: 100, step: 1 };
 export const BLOCK_SHADOW_BLUR_RANGE = { min: 0, max: 24, step: 1 };
@@ -509,7 +524,7 @@ export const DEFAULT_BLOCK_STYLE: BlockStyle = {
 /** Same "fill in whatever's missing" reasoning as resolvePerCardStyle(). */
 export function resolveBlockStyle(style: Partial<BlockStyle> | undefined): BlockStyle {
   const resolved = { ...DEFAULT_BLOCK_STYLE, ...style };
-  if (!BLOCK_BACKGROUND_FINISH_OPTIONS.some((option) => option.value === resolved.backgroundFinish)) resolved.backgroundFinish = "none";
+  if (!blockBackgroundFinishOptions("en").some((option) => option.value === resolved.backgroundFinish)) resolved.backgroundFinish = "none";
   for (const [key, range] of [["shadowOpacity", BLOCK_SHADOW_OPACITY_RANGE], ["shadowBlur", BLOCK_SHADOW_BLUR_RANGE], ["shadowOffsetY", BLOCK_SHADOW_OFFSET_RANGE], ["gradientAngle", BLOCK_GRADIENT_ANGLE_RANGE], ["gradientStrength", BLOCK_GRADIENT_STRENGTH_RANGE]] as const) {
     resolved[key] = typeof resolved[key] === "number" && Number.isFinite(resolved[key]) ? Math.min(range.max, Math.max(range.min, resolved[key])) : DEFAULT_BLOCK_STYLE[key];
   }

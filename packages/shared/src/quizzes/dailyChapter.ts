@@ -253,7 +253,8 @@ export function dailyChapterSummary(history: DailyChapterHistory, month: string)
 export function dailyChapterMonthShare(summary: DailyChapterPlayerSummary, url: string, locale: Locale): string {
   const published = summary.days.filter((day) => day.published);
   const squares = published.map((day) => day.score === null ? "⬜" : day.score === 5 ? "🟩" : day.score >= 3 ? "🟨" : "🟥").join("");
-  return sharedT(locale)("shared.dailyChapter.monthShare", { month: recapMonthName(summary.month, locale), year: summary.month.slice(0, 4), squares, streak: summary.streak, average: summary.average, url });
+  const t = sharedT(locale);
+  return t("shared.dailyChapter.monthShare", { month: recapMonthName(summary.month, locale), year: summary.month.slice(0, 4), squares, streak: t("shared.dailyChapter.streak", { count: summary.streak }), average: summary.average, url });
 }
 
 export function dailyChapterShare(result: DailyChapterResult, url: string, locale: Locale): string {

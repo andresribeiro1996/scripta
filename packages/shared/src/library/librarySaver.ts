@@ -1,3 +1,5 @@
+import type { Locale } from "../i18n/locale.js";
+import { sharedT } from "../i18n/sharedT.js";
 import { applyLibraryChange, type LibraryChange } from "./libraryChange.js";
 import type { LibraryData, LibraryDocument } from "./types.js";
 
@@ -17,6 +19,7 @@ export interface LibrarySaverDeps {
   put(data: LibraryData, expectedUpdatedAt: string | undefined, source: "import" | undefined, signal: AbortSignal): Promise<LibraryDocument>;
   fetch(signal?: AbortSignal): Promise<LibraryDocument | null>;
   write(view: LibraryDocument | null): void;
+  locale(): Locale;
 }
 
 export interface LibrarySaveOptions {
@@ -50,11 +53,8 @@ function isConflict(error: unknown): boolean {
   return typeof error === "object" && error !== null && "status" in error && error.status === 409;
 }
 
-function disposedError(): Error {
-  return new Error("The library was closed before this finished.");
-}
-
 export function createLibrarySaver(deps: LibrarySaverDeps): LibrarySaver {
+  const disposedError = () => new Error(sharedT(deps.locale())("shared.librarySaver.closed"));
   let confirmed: LibraryDocument | null = null;
   let view: LibraryDocument | null = null;
   let pending: Entry[] = [];
@@ -132,7 +132,7 @@ export function createLibrarySaver(deps: LibrarySaverDeps): LibrarySaver {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const interrupted = new Promise<never>((_, reject) => {
       interrupt = reject;
-      timer = setTimeout(() => reject(new Error("The server did not answer in time.")), ms);
+      timer = setTimeout(() => reject(new Error(sharedT(deps.locale())("shared.librarySaver.timeout"))), ms);
     });
     try {
       return await Promise.race([run(controller.signal), interrupted]);

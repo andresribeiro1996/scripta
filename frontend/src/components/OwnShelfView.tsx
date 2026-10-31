@@ -27,6 +27,7 @@ import { orderLibraryBooks } from "../lib/libraryOrder";
 import { buildMuralPreset, shelfPresetSummary } from "../lib/muralPresets";
 import type { Mural } from "../lib/murals";
 import { useResolvedTheme } from "../lib/theme";
+import { useLocale } from "../i18n";
 
 const OWN_SHELF_TABS = [
   { value: "mural", label: "Mural" },
@@ -37,6 +38,7 @@ const OWN_SHELF_TABS = [
 type OwnShelfTab = (typeof OWN_SHELF_TABS)[number]["value"];
 
 export function OwnShelfView({ username }: { username: string }) {
+  const locale = useLocale();
   const { session } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -54,7 +56,7 @@ export function OwnShelfView({ username }: { username: string }) {
   const books = useMemo(() => library?.data.books ?? [], [library]);
   const groups = useMemo(() => library?.data.groups ?? [], [library]);
   const ordered = useMemo(() => orderLibraryBooks(books, groups), [books, groups]);
-  const preview = useMemo(() => buildMuralPreset("shelf", ordered, groups), [ordered, groups]);
+  const preview = useMemo(() => buildMuralPreset("shelf", ordered, locale, groups), [ordered, locale, groups]);
   const previewMural: Mural = { id: "shelf-preview", name: preview.name, theme: viewerTheme, blocks: preview.blocks, createdAt: "", updatedAt: "", shareToken: null, shareUrl: null, folderId: null };
   const pendingShelf = useRef<string | null>(null);
   const working = useRef(false);
@@ -227,7 +229,7 @@ export function OwnShelfView({ username }: { username: string }) {
                   />
                 ) : (
                   <div className="space-y-4">
-                    <p className="text-sm text-(--color-text-dim)">{shelfPresetSummary(books, ownData.published)}</p>
+                    <p className="text-sm text-(--color-text-dim)">{shelfPresetSummary(books, ownData.published, locale)}</p>
                     <div className="flex flex-wrap gap-2">
                       <button onClick={() => void keepShelf()} disabled={busy} className={BUTTON_SECONDARY}>
                         Keep this shelf

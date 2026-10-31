@@ -16,6 +16,7 @@ import {
 import { Text } from "../../../ui/Text";
 import { minimumTouchTarget, radii, spacing, typography, useTheme } from "../../../ui/theme";
 import { fetchCoverCandidates, pickCover, type ResolveCoverParams } from "../api/covers";
+import { useLocale } from "../../../i18n";
 
 export function FoundCovers({
   lookup: lookupProp,
@@ -26,6 +27,7 @@ export function FoundCovers({
   coverUrl?: string | null;
   onPick: (cover: ResolvedCoverResponse) => void;
 }) {
+  const locale = useLocale();
   const { colors } = useTheme();
   const [quick, setQuick] = useState<FoundCoversLoad>(FOUND_COVERS_PENDING);
   const [apple, setApple] = useState<FoundCoversLoad>(FOUND_COVERS_PENDING);
@@ -85,7 +87,7 @@ export function FoundCovers({
       </Text>
       <View style={styles.grid}>
         {tiles.map(({ candidate, width, height }, index) => {
-          const label = coverSourceLabel(candidate.source);
+          const label = coverSourceLabel(candidate.source, locale);
           const size = width !== null && height !== null ? { width, height } : null;
           const current = isCurrentCover(candidate, coverUrl);
           return (
@@ -129,7 +131,7 @@ export function FoundCovers({
         )}
       </View>
       {unavailable.map((name) => (
-        <Text key={name} style={[typography.caption, { color: colors.textDim }]}>{`${coverSourceLabel(name)} didn't answer.`}</Text>
+        <Text key={name} style={[typography.caption, { color: colors.textDim }]}>{`${coverSourceLabel(name, locale)} didn't answer.`}</Text>
       ))}
       {failures.map((message) => (
         <Text key={message} style={[typography.caption, { color: colors.danger }]}>

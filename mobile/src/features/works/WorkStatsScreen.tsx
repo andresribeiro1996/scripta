@@ -8,8 +8,10 @@ import { ErrorState, Screen, Skeleton, spacing } from "../../ui";
 import { fetchWork, fetchWorkStats } from "./api";
 import { StatsSections } from "./BookStats";
 import { workStatsPath } from "./workPath";
+import { useLocale } from "../../i18n";
 
 export function WorkStatsScreen({ id }: { id: string }) {
+  const locale = useLocale();
   const segments = useSegments();
   const work = useQuery({ queryKey: ["works", id], queryFn: () => fetchWork(id), retry: false });
   const canonicalId = work.data?.work.id;
@@ -43,7 +45,7 @@ export function WorkStatsScreen({ id }: { id: string }) {
     <Screen bottom top={false}>
       <Stack.Screen options={{ headerShown: true, title: work.data.work.title }} />
       <ScrollView contentContainerStyle={styles.content}>
-        <StatsSections model={bookStatsModel(stats.data, work.data.work.rating)} />
+        <StatsSections model={bookStatsModel(stats.data, work.data.work.rating, locale)} />
       </ScrollView>
     </Screen>
   );

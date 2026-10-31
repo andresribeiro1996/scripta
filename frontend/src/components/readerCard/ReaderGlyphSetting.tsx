@@ -7,16 +7,18 @@ import { ReaderGlyph } from "../ReaderGlyph";
 import { useToast } from "../Toaster";
 import { PANEL_HEADING } from "../page/surfaceClasses";
 import { ToggleSwitch } from "../ToggleSwitch";
+import { getLocale, useLocale } from "../../i18n";
 
 const OWN_PROFILE_KEY = ["community", "own-profile"] as const;
 const LABEL = "Show my reader glyph next to my name";
 
 export function ReaderGlyphSetting({ username, books, groups }: { username: string; books: Array<Record<string, unknown>>; groups: Group[] }) {
+  const locale = useLocale();
   const client = useQueryClient();
   const toast = useToast();
   const { data: profile } = useQuery({ queryKey: OWN_PROFILE_KEY, queryFn: fetchOwnProfile });
   const [busy, setBusy] = useState(false);
-  const preview = useMemo(() => ownGlyphPreview(readerIdentity(books, groups)), [books, groups]);
+  const preview = useMemo(() => ownGlyphPreview(readerIdentity(books, groups, locale), locale), [books, groups, locale]);
   const settings = profile?.feedSettings ?? DEFAULT_FEED_SETTINGS;
 
   const toggle = async (readerGlyph: boolean) => {
@@ -28,7 +30,7 @@ export function ReaderGlyphSetting({ username, books, groups }: { username: stri
       void client.invalidateQueries({ queryKey: ["community", "profile", username] });
     } catch (error) {
       client.setQueryData<OwnProfile>(OWN_PROFILE_KEY, profile);
-      toast({ message: saveFailureMessage(error, "Couldn't save the glyph setting."), kind: "error" });
+      toast({ message: saveFailureMessage(error, "Couldn't save the glyph setting.", getLocale()), kind: "error" });
     } finally {
       setBusy(false);
     }

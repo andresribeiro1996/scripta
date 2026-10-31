@@ -1,3 +1,5 @@
+import type { Locale } from "../i18n/locale.js";
+import { sharedT } from "../i18n/sharedT.js";
 import { newId, type MuralBlock } from "./murals.js";
 
 type Shelf = Extract<MuralBlock, { type: "shelf" }>;
@@ -11,7 +13,7 @@ function toFront(shelf: Shelf, key: string): Shelf {
   return { ...shelf, bookKeys: [key, ...shelf.bookKeys.filter((item) => item !== key)] };
 }
 
-export function shelfAfterFinish(blocks: MuralBlock[], key: string, rating: number | null): { blocks: MuralBlock[]; landed: Landing[] } {
+export function shelfAfterFinish(blocks: MuralBlock[], key: string, rating: number | null, locale: Locale): { blocks: MuralBlock[]; landed: Landing[] } {
   const finished = shelfWithRole(blocks, "finished");
   if (!finished) return { blocks, landed: [] };
   const alreadyFront = finished.bookKeys[0] === key;
@@ -21,7 +23,7 @@ export function shelfAfterFinish(blocks: MuralBlock[], key: string, rating: numb
   const next: MuralBlock[] = alreadyFront ? [...blocks] : blocks.map((block) => (block === finished ? toFront(finished, key) : block));
   if (addsFavourite) {
     const y = Math.max(...blocks.map((block) => block.layout.y + block.layout.h));
-    next.push({ id: newId(), type: "shelf", title: "Favourites", role: "favourites", bookKeys: [key], layout: { x: 0, y, w: 12, h: 5 }, ...(finished.style ? { style: finished.style } : {}) });
+    next.push({ id: newId(), type: "shelf", title: sharedT(locale)("shared.murals.shelfFavourites"), role: "favourites", bookKeys: [key], layout: { x: 0, y, w: 12, h: 5 }, ...(finished.style ? { style: finished.style } : {}) });
     landed.push("favourites");
   }
   return { blocks: next, landed };
@@ -65,6 +67,7 @@ export function createShelfSession(opts: {
   load: () => Promise<ShelfLoadResult>;
   save: (id: string, blocks: MuralBlock[], updatedAt?: string) => Promise<ShelfSaveResult>;
   onChange: (state: { blocks: MuralBlock[]; landed: Landing[] }) => void;
+  locale: Locale;
 }): ShelfSession {
   let chain: Promise<void> = Promise.resolve();
   let loadPromise: Promise<void> | null = null;
@@ -104,7 +107,7 @@ export function createShelfSession(opts: {
 
   return {
     finish(key, rating) {
-      return enqueue(() => applyChange((blocks) => shelfAfterFinish(blocks, key, rating)));
+      return enqueue(() => applyChange((blocks) => shelfAfterFinish(blocks, key, rating, opts.locale)));
     },
     promote(key) {
       return enqueue(() => applyChange((blocks) => ({ blocks: promoteFavourite(blocks, key) })));

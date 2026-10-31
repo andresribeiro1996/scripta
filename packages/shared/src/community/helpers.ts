@@ -1,6 +1,7 @@
 import { itemNoun } from "../characters/index.js";
 import { intlLocale, type Locale } from "../i18n/locale.js";
 import { sharedT } from "../i18n/sharedT.js";
+import { statusLabel } from "../library/covers.js";
 import { DEFAULT_TIER_PRESET } from "../tierlists/tierlist.js";
 import type {
   ActivityEventType,
@@ -222,10 +223,6 @@ function covers(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((cover): cover is string => typeof cover === "string" && cover.length > 0).slice(0, 3) : [];
 }
 
-function readStatus(status: number, locale: Locale): string {
-  return sharedT(locale)(status === 2 ? "shared.helpers.readFinished" : status === 1 ? "shared.helpers.readReading" : "shared.helpers.readToRead");
-}
-
 export function activityRow(item: ActivityItem, locale: Locale): ActivityRow | null {
   const t = sharedT(locale);
   const p = item.payload;
@@ -239,7 +236,7 @@ export function activityRow(item: ActivityItem, locale: Locale): ActivityRow | n
       return { ...base, kind: "publication", label: t("shared.helpers.activityPublishedQuiz"), tone: "accent", title: text(p.name), meta: text(p.detail) };
     case "book_added": {
       const cover = text(p.coverUrl);
-      return { ...base, kind: "reading", label: t(p.started === true ? "shared.helpers.activityStartedReading" : "shared.helpers.activityAddedToLibrary"), tone: "dim", title: text(p.title), meta: [text(p.author), readStatus(Number(p.status ?? 0), locale)].filter(Boolean).join(" · "), covers: cover ? [cover] : [], workId: text(p.workId) || null };
+      return { ...base, kind: "reading", label: t(p.started === true ? "shared.helpers.activityStartedReading" : "shared.helpers.activityAddedToLibrary"), tone: "dim", title: text(p.title), meta: [text(p.author), statusLabel(Number(p.status ?? 0), locale)].filter(Boolean).join(" · "), covers: cover ? [cover] : [], workId: text(p.workId) || null };
     }
     case "book_started":
     case "book_finished": {

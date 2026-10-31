@@ -5,12 +5,14 @@ import { readerCardInputOf, type Group, type PublicReaderCard } from "@scripta/s
 import { useOwnCardStyle } from "../readerCard/useReaderCardStyle";
 import { PLATE_RATIO, ReaderCardImage } from "./ReaderCardImage";
 import { ReaderCardViewer } from "./ReaderCardViewer";
+import { useLocale } from "../../i18n";
 
 export function ReaderCardBlock({ books, groups, readerName, publicCard, editable }: { books: Array<Record<string, unknown>>; groups: Group[]; readerName: string; publicCard?: PublicReaderCard; editable?: boolean }) {
+  const locale = useLocale();
   const [open, setOpen] = useState(false);
   const [box, setBox] = useState({ width: 0, height: 0 });
   const own = useOwnCardStyle(!publicCard);
-  const input = useMemo(() => readerCardInputOf(books, groups, readerName, publicCard, publicCard ? undefined : own), [books, groups, readerName, publicCard, own]);
+  const input = useMemo(() => readerCardInputOf(books, groups, readerName, locale, publicCard, publicCard ? undefined : own), [books, groups, readerName, locale, publicCard, own]);
   const onLayout = (event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
     setBox((current) => current.width === width && current.height === height ? current : { width, height });

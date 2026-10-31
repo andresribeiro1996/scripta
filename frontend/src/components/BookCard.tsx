@@ -6,6 +6,7 @@ import { forgetResolvedCover, peekResolvedCover, resolveCover, subscribeResolved
 import { normalizeImageId, normalizeIsbn, statusLabel } from "../lib/covers";
 import { DEFAULT_LIBRARY_STYLE, cardFontFamilyCss, resolveBorderColor, type LibraryStyleSettings } from "../lib/libraryStyle";
 import { bookKey } from "../lib/merge";
+import { useLocale } from "../i18n";
 
 const BookIcon = () => (
   <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth="1.5">
@@ -221,7 +222,8 @@ export function BookCard({
   selected?: boolean;
   onToggleSelect?: (book: Record<string, unknown>) => void;
 }) {
-  const label = statusLabel(book.ReadStatus);
+  const locale = useLocale();
+  const label = statusLabel(book.ReadStatus, locale);
   const highlights = Array.isArray(book.highlights) ? book.highlights.length : 0;
   const [hasCover, setHasCover] = useState(false);
   const key = bookKey(book);

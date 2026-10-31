@@ -25,6 +25,7 @@ import { DuelButton } from "./components/DuelButton";
 import { FeelingChips } from "./components/FeelingChips";
 import { useLibrary } from "./hooks/useLibrary";
 import { useLibraryActions } from "./hooks/useLibraryActions";
+import { getLocale } from "../../i18n";
 
 type Shelf = { blocks: MuralBlock[]; landed: Landing[] };
 
@@ -80,6 +81,7 @@ export function FinishedScreen({ book, before, onClose }: { book: Record<string,
         return updated;
       },
       onChange: (state) => { if (mounted.current) setShelf(state); },
+      locale: getLocale(),
     });
     sessionRef.current = session;
     void session.finish(key, typeof book.Rating === "number" ? book.Rating : null).catch(reportShelfError);

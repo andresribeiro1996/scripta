@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { statusLabel } from "./covers.js";
-import { LIBRARY_STATUS_TABS, STATUS_FILTER_OPTIONS, localDay, matchesSearch, readingPercent, setReadStatus, statusCounts, type LibraryBook } from "./libraryView.js";
+import { libraryStatusTabs, localDay, matchesSearch, readingPercent, setReadStatus, sortOptions, statusCounts, statusFilterOptions, type LibraryBook } from "./libraryView.js";
 
 process.env.TZ = "America/Sao_Paulo";
 
@@ -29,14 +29,14 @@ test("localDay formats the local calendar date", () => {
 });
 
 test("status 0 reads as To read", () => {
-  assert.equal(statusLabel(0), "To read");
-  assert.equal(statusLabel(undefined), "To read");
-  assert.equal(STATUS_FILTER_OPTIONS.find((option) => option.value === "unread")?.label, "To read");
+  assert.equal(statusLabel(0, "en"), "To read");
+  assert.equal(statusLabel(undefined, "en"), "To read");
+  assert.equal(statusFilterOptions("en").find((option) => option.value === "unread")?.label, "To read");
 });
 
 test("library tabs use the same status words as the filter options", () => {
-  const filterLabels = new Map(STATUS_FILTER_OPTIONS.map((option) => [option.value, option.label]));
-  for (const tab of LIBRARY_STATUS_TABS) assert.equal(tab.label, filterLabels.get(tab.value));
+  const filterLabels = new Map(statusFilterOptions("en").map((option) => [option.value, option.label]));
+  for (const tab of libraryStatusTabs("en")) assert.equal(tab.label, filterLabels.get(tab.value));
 });
 
 test("readingPercent rounds a numeric percent", () => {
@@ -59,7 +59,13 @@ test("readingPercent is null when progress is unknown", () => {
 });
 
 test("library shelves read Finished, Reading, To read", () => {
-  assert.deepEqual(LIBRARY_STATUS_TABS.map((tab) => tab.label), ["Finished", "Reading", "To read"]);
+  assert.deepEqual(libraryStatusTabs("en").map((tab) => tab.label), ["Finished", "Reading", "To read"]);
+});
+
+test("library status, filter and sort labels read in Portuguese", () => {
+  assert.deepEqual(libraryStatusTabs("pt-PT").map((tab) => tab.label), ["Lido", "A ler", "Quero ler"]);
+  assert.equal(statusFilterOptions("pt-PT")[0]!.label, "Todos os estados");
+  assert.deepEqual(sortOptions("pt-PT").map((option) => option.label), ["A minha ordem", "Título A–Z", "Autor A–Z"]);
 });
 
 test("a library search matches the start of any title or author word, ignoring case and accents", () => {

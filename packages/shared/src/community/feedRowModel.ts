@@ -32,7 +32,7 @@ export interface FeedRowModel {
 export function feedRowAccessibilityLabel(item: DigestItem, locale: Locale): string {
   const heading = digestHeading(item, locale);
   if (item.kind === "participation") return heading;
-  const label = readerGlyphLabel(item.actor.readerGlyph);
+  const label = readerGlyphLabel(item.actor.readerGlyph, locale);
   return label ? `${heading}, ${label}` : heading;
 }
 

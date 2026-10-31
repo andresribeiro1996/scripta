@@ -5,8 +5,10 @@ import { BookScreen, bookMenuItems } from "@/features/works/BookScreen";
 import { useBook } from "@/features/library/hooks/useBook";
 import { useLibrary } from "@/features/library/hooks/useLibrary";
 import { ActionSheet, ErrorState, HeaderActions, IconButton, Screen, Skeleton } from "@/ui";
+import { useLocale } from "../../../../../i18n";
 
 export default function BookRoute() {
+  const locale = useLocale();
   const { key } = useLocalSearchParams<{ key: string }>();
   const { book, loading, workId } = useBook(key);
   const { isError, refetch } = useLibrary();
@@ -17,7 +19,7 @@ export default function BookRoute() {
     if (workId) router.replace(`/work/${workId}` as never);
   }, [workId]));
 
-  const model = book ? bookScreenModel(null, book, { isAdmin: false }) : null;
+  const model = book ? bookScreenModel(null, book, { isAdmin: false }, locale) : null;
   const menuItems = model && key ? bookMenuItems(model, key, segments) : [];
 
   return (

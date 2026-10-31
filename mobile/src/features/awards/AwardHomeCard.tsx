@@ -10,10 +10,12 @@ import { useLibrary } from "../library/hooks/useLibrary";
 import { fetchRecentAwards } from "../works/api";
 import { seriesSearchHref, workPath } from "../works/workPath";
 import { awardCardModel, awardKey, firstUndismissed } from "@scripta/shared";
+import { useLocale } from "../../i18n";
 
 export const RECENT_AWARDS_QUERY_KEY = ["recentAwards"] as const;
 
 export function AwardHomeCard() {
+  const locale = useLocale();
   const { colors } = useTheme();
   const segments = useSegments();
   const library = useLibrary();
@@ -33,7 +35,7 @@ export function AwardHomeCard() {
   }, [announcements]);
 
   const announcement = announcements && dismissed ? firstUndismissed(announcements, dismissed) : undefined;
-  const model = announcement ? awardCardModel(announcement, library.data ?? null) : null;
+  const model = announcement ? awardCardModel(announcement, library.data ?? null, locale) : null;
   if (!model) return null;
   const { target } = model;
   const open = () => {

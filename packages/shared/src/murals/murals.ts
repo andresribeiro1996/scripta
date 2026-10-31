@@ -17,6 +17,8 @@
 
 import type { BlockStyle } from "../library/libraryStyle.js";
 import type { BookGenre } from "../library/bookGenres.js";
+import type { Locale } from "../i18n/locale.js";
+import { sharedT } from "../i18n/sharedT.js";
 import { bookKey } from "../library/merge.js";
 import { THEME_IDS, type ThemeId } from "../themes/palettes.js";
 import { blockLabel, blockSize, minBlockHeight, newBlock } from "./blockKinds.js";
@@ -29,13 +31,16 @@ export type StatMetric = "totalBooks" | "booksFinished" | "booksFinishedThisYear
 
 export const ALL_STAT_METRICS: StatMetric[] = ["totalBooks", "booksFinished", "booksFinishedThisYear", "booksInProgress", "totalHighlights"];
 
-export const STAT_METRIC_LABELS: Record<StatMetric, string> = {
-  totalBooks: "Books in your library",
-  booksFinished: "Books finished",
-  booksFinishedThisYear: "Finished this year",
-  booksInProgress: "Currently reading",
-  totalHighlights: "Highlights saved"
-};
+export function statMetricLabels(locale: Locale): Record<StatMetric, string> {
+  const t = sharedT(locale);
+  return {
+    totalBooks: t("shared.murals.metricTotalBooks"),
+    booksFinished: t("shared.murals.metricBooksFinished"),
+    booksFinishedThisYear: t("shared.murals.metricFinishedThisYear"),
+    booksInProgress: t("shared.murals.metricInProgress"),
+    totalHighlights: t("shared.murals.metricHighlights")
+  };
+}
 
 interface QuoteRef {
   bookKey: string;
@@ -89,13 +94,13 @@ export interface ReaderProfile {
   avatarUrl: string | null;
 }
 
-export function muralBlockTitle(block: MuralBlock, books: Array<Record<string, unknown>>, tierlistName?: string) {
-  if (block.type === "text") return block.heading || "Note";
-  if (block.type === "shelf" || block.type === "quoteCollection") return block.title || blockLabel(block.type);
-  if (block.type === "spotlight") return String(books.find((book) => bookKey(book) === block.bookKey)?.Title ?? "Book spotlight");
-  if (block.type === "image") return block.caption || "Image";
-  if (block.type === "tierlist") return tierlistName || "Tier list";
-  return blockLabel(block.type);
+export function muralBlockTitle(block: MuralBlock, books: Array<Record<string, unknown>>, locale: Locale, tierlistName?: string) {
+  if (block.type === "text") return block.heading || sharedT(locale)("shared.murals.noteTitle");
+  if (block.type === "shelf" || block.type === "quoteCollection") return block.title || blockLabel(block.type, locale);
+  if (block.type === "spotlight") return String(books.find((book) => bookKey(book) === block.bookKey)?.Title ?? blockLabel("spotlight", locale));
+  if (block.type === "image") return block.caption || blockLabel("image", locale);
+  if (block.type === "tierlist") return tierlistName || blockLabel("tierlist", locale);
+  return blockLabel(block.type, locale);
 }
 
 export interface Mural {

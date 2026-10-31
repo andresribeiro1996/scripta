@@ -2,12 +2,14 @@ import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLibrary } from "../../hooks/useLibrary";
 import { useMurals } from "../../hooks/useMurals";
-import { buildMuralPreset, MURAL_PRESETS, presetAvailability, type MuralPresetId } from "../../lib/muralPresets";
+import { buildMuralPreset, muralPresets, presetAvailability, type MuralPresetId } from "../../lib/muralPresets";
 import { bookKey } from "../../lib/merge";
 import { useResolvedTheme } from "../../lib/theme";
 import { Sheet } from "../Sheet";
+import { useLocale } from "../../i18n";
 
 export function MuralPresetPicker({ folderId, onClose }: { folderId: string | null; onClose: () => void }) {
+  const locale = useLocale();
   const { data: library, isLoading, isError } = useLibrary();
   const { create, saveBlocks } = useMurals();
   const navigate = useNavigate();
@@ -25,7 +27,7 @@ export function MuralPresetPicker({ folderId, onClose }: { folderId: string | nu
     setBusy(true);
     setError("");
     try {
-      const preset = buildMuralPreset(id, books, groups);
+      const preset = buildMuralPreset(id, books, locale, groups);
       const target = pending ?? { id: (await create(preset.name, viewerTheme, folderId)).id, preset: id };
       setPending(target);
       await saveBlocks(target.id, preset.blocks);
@@ -44,10 +46,10 @@ export function MuralPresetPicker({ folderId, onClose }: { folderId: string | nu
       {error && <p role="alert" className="px-3 pb-3 text-sm text-(--color-danger)">{error}</p>}
       {isError && <p role="alert" className="px-3 pb-3 text-sm text-(--color-danger)">Couldn't load your library. Reopen presets to try again.</p>}
       <div className="space-y-4 px-3 pb-4">
-        {MURAL_PRESETS.map((preset) => {
-          const built = buildMuralPreset(preset.id, books, groups);
+        {muralPresets(locale).map((preset) => {
+          const built = buildMuralPreset(preset.id, books, locale, groups);
           const bottom = Math.max(...built.blocks.map((block) => block.layout.y + block.layout.h));
-          const reason = presetAvailability(preset.id, books);
+          const reason = presetAvailability(preset.id, books, locale);
           return (
             <button key={preset.id} disabled={busy || isLoading || isError || Boolean(reason) || Boolean(pending && pending.preset !== preset.id)} onClick={() => void choose(preset.id)} className="block w-full overflow-hidden rounded-2xl border border-(--color-border) text-left transition-colors hover:border-(--color-accent) disabled:opacity-50">
               <div aria-hidden="true" className="relative h-44 overflow-hidden bg-(--color-bg)">

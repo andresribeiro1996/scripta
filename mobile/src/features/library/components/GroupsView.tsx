@@ -28,6 +28,7 @@ import { useToast } from "../../../ui/ToastHost";
 import { useLibrary } from "../hooks/useLibrary";
 import { attemptUpdate } from "../lib/attemptUpdate";
 import { CoverImage } from "./CoverImage";
+import { getLocale } from "../../../i18n";
 
 export type TypeFilter = GroupType | "all";
 
@@ -103,7 +104,7 @@ export const GroupsView = forwardRef<GroupsViewHandle, GroupsViewProps>(function
     const group = makeGroup(draftType, name);
     await attemptUpdate(
       () => updateLibrary((data) => ({ ...data, groups: [...(data.groups ?? []), group] })),
-      (error) => show(saveFailureMessage(error, "Couldn't save — check your connection."), "error"),
+      (error) => show(saveFailureMessage(error, "Couldn't save — check your connection.", getLocale()), "error"),
       () => router.push(`/collection/${group.id}` as never),
     );
   }

@@ -21,6 +21,7 @@ test("the saver replays a whole save once after the conflict error", async () =>
     },
     fetch: async () => doc("2"),
     write: () => {},
+    locale: () => "en",
   });
   saver.receive(doc("1"));
   const saved = await saver.saveWhole((data) => ({ ...data, name: "x" }));

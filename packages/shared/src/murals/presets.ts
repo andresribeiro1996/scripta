@@ -1,3 +1,5 @@
+import type { Locale } from "../i18n/locale.js";
+import { sharedT } from "../i18n/sharedT.js";
 import { bookKey } from "../library/merge.js";
 import type { Group } from "../library/groups.js";
 import { DEFAULT_BLOCK_STYLE, type BlockStyle } from "../library/libraryStyle.js";
@@ -5,25 +7,28 @@ import { readerIdentity } from "../library/readerIdentity.js";
 import { eligiblePassages } from "./home.js";
 import { ensureBookBlockHeights, newId, type BlockLayout, type MuralBlock } from "./murals.js";
 
-export const MURAL_PRESETS = [
-  { id: "best", name: "All-time favourites", description: "The books that stayed with you." },
-  { id: "recent", name: "Recently finished", description: "Your last pages, newest first." },
-  { id: "next", name: "Want to read", description: "Stories waiting their turn." },
-  { id: "shelf", name: "My shelf", description: "What you're reading, what you've finished, and a passage to revisit." }
-] as const;
+export type MuralPresetId = "best" | "recent" | "next" | "shelf";
 
-export type MuralPresetId = typeof MURAL_PRESETS[number]["id"];
+export function muralPresets(locale: Locale): Array<{ id: MuralPresetId; name: string; description: string }> {
+  const t = sharedT(locale);
+  return [
+    { id: "best", name: t("shared.murals.presetBestName"), description: t("shared.murals.presetBestDescription") },
+    { id: "recent", name: t("shared.murals.presetRecentName"), description: t("shared.murals.presetRecentDescription") },
+    { id: "next", name: t("shared.murals.presetNextName"), description: t("shared.murals.presetNextDescription") },
+    { id: "shelf", name: t("shared.murals.presetShelfName"), description: t("shared.murals.presetShelfDescription") }
+  ];
+}
 
 type Book = Record<string, unknown>;
 
 const SHELF_SIZE = 8;
 
-const UNAVAILABLE: Record<MuralPresetId, string> = {
-  best: "Needs books rated 4 or 5",
-  recent: "Needs finished books",
-  next: "Needs books on your to-read list",
-  shelf: "Needs books in your library"
-};
+const UNAVAILABLE = {
+  best: "shared.murals.needsBest",
+  recent: "shared.murals.needsRecent",
+  next: "shared.murals.needsNext",
+  shelf: "shared.murals.needsShelf"
+} as const satisfies Record<MuralPresetId, string>;
 
 function timestamp(value: unknown) {
   const date = typeof value === "string" ? Date.parse(value) : NaN;
@@ -54,20 +59,22 @@ function presetBooks(id: MuralPresetId, books: Book[]) {
   return books;
 }
 
-export function presetAvailability(id: MuralPresetId, books: Book[]): string | null {
-  return presetBooks(id, titledBooks(books)).length ? null : UNAVAILABLE[id];
+export function presetAvailability(id: MuralPresetId, books: Book[], locale: Locale): string | null {
+  return presetBooks(id, titledBooks(books)).length ? null : sharedT(locale)(UNAVAILABLE[id]);
 }
 
-export function shelfPresetSummary(books: Book[], published: boolean) {
+export function shelfPresetSummary(books: Book[], published: boolean, locale: Locale) {
+  const t = sharedT(locale);
   const library = titledBooks(books);
   const reading = library.filter((book) => book.ReadStatus === 1).length;
   const finished = library.filter((book) => book.ReadStatus === 2).length;
-  const visibility = published ? "Keep this shelf to show it on your published page." : "Only you can see it.";
-  return `Made from your ${library.length} ${library.length === 1 ? "book" : "books"}: ${reading} you're reading and ${finished} you've finished. ${visibility}`;
+  const visibility = t(published ? "shared.murals.shelfPublished" : "shared.murals.shelfPrivate");
+  return t("shared.murals.shelfSummary", { count: library.length, reading, finished, visibility });
 }
 
-export function buildMuralPreset(id: MuralPresetId, books: Book[], groups: Group[] = []) {
-  const preset = MURAL_PRESETS.find((item) => item.id === id)!;
+export function buildMuralPreset(id: MuralPresetId, books: Book[], locale: Locale, groups: Group[] = []) {
+  const t = sharedT(locale);
+  const preset = muralPresets(locale).find((item) => item.id === id)!;
   const library = titledBooks(books);
   const selected = presetBooks(id, library).slice(0, SHELF_SIZE);
   const keys = (list: Book[]) => list.map(bookKey);
@@ -83,7 +90,7 @@ export function buildMuralPreset(id: MuralPresetId, books: Book[], groups: Group
     const hasPassage = eligiblePassages(library).length > 0;
     const profileBottom = 5;
     blocks.push({ ...at(0, 0, 12, profileBottom), type: "profile", bio: "", favoriteGenres: [] });
-    const hasCard = readerIdentity(library, groups).state === "settled";
+    const hasCard = readerIdentity(library, groups, locale).state === "settled";
     let statsY: number;
     if (hasCard) {
       blocks.push({ ...at(0, profileBottom, 6, 6), type: "readerCard" });
@@ -95,25 +102,25 @@ export function buildMuralPreset(id: MuralPresetId, books: Book[], groups: Group
     }
     let y = statsY;
     if (reading.length) { blocks.push({ ...at(0, y, 12, 6), type: "currentlyReading" }); y += 6; }
-    if (finished.length) { blocks.push({ ...at(0, y, 12, 5), type: "shelf", title: "Finished", role: "finished", bookKeys: keys(finished) }); y += 5; }
+    if (finished.length) { blocks.push({ ...at(0, y, 12, 5), type: "shelf", title: t("shared.murals.shelfFinished"), role: "finished", bookKeys: keys(finished) }); y += 5; }
     const width = hasPassage && loved.length ? 6 : 12;
     if (hasPassage) blocks.push({ ...at(0, y, width, 5), type: "quote", bookKey: "", highlightId: "", mode: "rediscover" });
-    if (loved.length) blocks.push({ ...at(12 - width, y, width, 5), type: "shelf", title: "Favourites", role: "favourites", bookKeys: keys(loved) });
+    if (loved.length) blocks.push({ ...at(12 - width, y, width, 5), type: "shelf", title: t("shared.murals.shelfFavourites"), role: "favourites", bookKeys: keys(loved) });
     return { name: preset.name, blocks: ensureBookBlockHeights(blocks), bookCount: library.length };
   }
 
   const heading = id === "best"
-    ? { heading: "My essential library", body: "Stories to keep.\nBooks to open again." }
+    ? { heading: t("shared.murals.bestHeading"), body: t("shared.murals.bestBody") }
     : id === "recent"
-      ? { heading: "Last pages", body: "My reading diary" }
-      : { heading: "The next chapter", body: "So many stories.\nOne book at a time." };
+      ? { heading: t("shared.murals.recentHeading"), body: t("shared.murals.recentBody") }
+      : { heading: t("shared.murals.nextHeading"), body: t("shared.murals.nextBody") };
   blocks.push({ ...at(0, 0, 12, 3, true), type: "text", ...heading });
   if (id === "recent") {
-    if (selected.length) blocks.push({ ...at(0, 3, 12, 8), type: "shelf", title: "Just finished", bookKeys: keys(selected) });
+    if (selected.length) blocks.push({ ...at(0, 3, 12, 8), type: "shelf", title: t("shared.murals.justFinished"), bookKeys: keys(selected) });
   } else if (selected[0]) {
     const rest = selected.slice(1);
-    blocks.push({ ...at(0, 3, rest.length ? 4 : 12, 8), type: "spotlight", bookKey: bookKey(selected[0]), ...(id === "next" ? { caption: "On my list" } : {}) });
-    if (rest.length) blocks.push({ ...at(4, 3, 8, 8), type: "shelf", title: id === "best" ? "Place of honour" : "On the horizon", bookKeys: keys(rest) });
+    blocks.push({ ...at(0, 3, rest.length ? 4 : 12, 8), type: "spotlight", bookKey: bookKey(selected[0]), ...(id === "next" ? { caption: t("shared.murals.onMyList") } : {}) });
+    if (rest.length) blocks.push({ ...at(4, 3, 8, 8), type: "shelf", title: t(id === "best" ? "shared.murals.placeOfHonour" : "shared.murals.onTheHorizon"), bookKeys: keys(rest) });
   }
   return { name: preset.name, blocks: ensureBookBlockHeights(blocks), bookCount: selected.length };
 }

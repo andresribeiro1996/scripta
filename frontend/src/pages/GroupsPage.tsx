@@ -38,6 +38,7 @@ import { area } from "../lib/areas";
 import { seriesGroupByBookKey } from "../lib/libraryOrder";
 import { effectiveCardStyle, resolveLibraryStyle, type PerCardStyle } from "../lib/libraryStyle";
 import { bookKey } from "../lib/merge";
+import { getLocale } from "../i18n";
 
 const COPY: Record<GroupType, { title: string; noun: string; plural: string; emptyTitle: string; emptyBody: string; untitled: string; icon: ComponentType<{ size?: number }> }> = {
   series: {
@@ -147,7 +148,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
     try {
       await updateLibrary((data) => ({ ...data, groups: [...(data.groups ?? []), makeGroup(type, name)] }));
     } catch (error) {
-      toast({ message: saveFailureMessage(error, "Couldn't save — check your connection."), kind: "error" });
+      toast({ message: saveFailureMessage(error, "Couldn't save — check your connection.", getLocale()), kind: "error" });
     } finally {
       setCreating(false);
     }
@@ -160,7 +161,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
     try {
       await updateLibrary((data) => ({ ...data, groups: renameGroup(data.groups ?? [], id, name) }));
     } catch (error) {
-      toast({ message: saveFailureMessage(error, "Couldn't save — check your connection."), kind: "error" });
+      toast({ message: saveFailureMessage(error, "Couldn't save — check your connection.", getLocale()), kind: "error" });
     }
   }
 
@@ -168,7 +169,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
     try {
       await updateLibrary((data) => ({ ...data, groups: deleteGroup(data.groups ?? [], group.id) }));
     } catch (error) {
-      toast({ message: saveFailureMessage(error, "Couldn't delete — nothing was changed."), kind: "error" });
+      toast({ message: saveFailureMessage(error, "Couldn't delete — nothing was changed.", getLocale()), kind: "error" });
       return;
     }
     toast({
@@ -188,7 +189,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
               });
               toast({ message: "Restored." });
             } catch (error) {
-              toast({ message: saveFailureMessage(error, "Couldn't restore — check your connection."), kind: "error" });
+              toast({ message: saveFailureMessage(error, "Couldn't restore — check your connection.", getLocale()), kind: "error" });
             }
           })();
         }
@@ -199,14 +200,14 @@ export function GroupsPage({ type }: { type: GroupType }) {
 
   async function handleToggleBook(groupId: string, book: Record<string, unknown>, inGroup: boolean) {
     const result = await saver.submit({ kind: "membership", groupId, bookKey: bookKey(book), member: !inGroup });
-    if (!result.ok) toast({ message: saveFailureMessage(result.error, "Couldn't save — check your connection."), kind: "error" });
+    if (!result.ok) toast({ message: saveFailureMessage(result.error, "Couldn't save — check your connection.", getLocale()), kind: "error" });
   }
 
   async function handleSaveGroupStyle(groupId: string, groupStyle: PerCardStyle | undefined) {
     try {
       await updateLibrary((data) => ({ ...data, groups: setGroupStyle(data.groups ?? [], groupId, groupStyle) }));
     } catch (error) {
-      toast({ message: saveFailureMessage(error, "Couldn't save — check your connection."), kind: "error" });
+      toast({ message: saveFailureMessage(error, "Couldn't save — check your connection.", getLocale()), kind: "error" });
     }
   }
 
@@ -222,7 +223,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
         books: data.books.map((b) => (bookKey(b) === key ? { ...b, _style: bookStyle } : b))
       }));
     } catch (error) {
-      toast({ message: saveFailureMessage(error, "Couldn't save — check your connection."), kind: "error" });
+      toast({ message: saveFailureMessage(error, "Couldn't save — check your connection.", getLocale()), kind: "error" });
     }
   }
 
@@ -237,7 +238,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
         books: data.books.map((b) => (bookKey(b) === key ? setBookCover(b, image.id, image.url) : b))
       }));
     } catch (error) {
-      toast({ message: saveFailureMessage(error, "Couldn't save — check your connection."), kind: "error" });
+      toast({ message: saveFailureMessage(error, "Couldn't save — check your connection.", getLocale()), kind: "error" });
     }
   }
 
@@ -249,7 +250,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
         books: data.books.map((b) => (bookKey(b) === key ? setBookCoverUrl(b, url) : b))
       }));
     } catch (error) {
-      toast({ message: saveFailureMessage(error, "Couldn't save — check your connection."), kind: "error" });
+      toast({ message: saveFailureMessage(error, "Couldn't save — check your connection.", getLocale()), kind: "error" });
     }
   }
 
@@ -261,7 +262,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
         books: data.books.map((b) => (bookKey(b) === key ? clearBookCover(b) : b))
       }));
     } catch (error) {
-      toast({ message: saveFailureMessage(error, "Couldn't save — check your connection."), kind: "error" });
+      toast({ message: saveFailureMessage(error, "Couldn't save — check your connection.", getLocale()), kind: "error" });
     }
   }
 
@@ -306,7 +307,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
         return deleteBooks(data, keys);
       });
     } catch (error) {
-      toast({ message: saveFailureMessage(error, "Couldn't delete — nothing was changed."), kind: "error" });
+      toast({ message: saveFailureMessage(error, "Couldn't delete — nothing was changed.", getLocale()), kind: "error" });
       return;
     }
     setSelectedKeys(new Set());
@@ -323,7 +324,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
               await updateLibrary((data) => restoreDeletedBooks(data, snapshot, keys));
               toast({ message: "Restored." });
             } catch (error) {
-              toast({ message: saveFailureMessage(error, "Couldn't restore — check your connection."), kind: "error" });
+              toast({ message: saveFailureMessage(error, "Couldn't restore — check your connection.", getLocale()), kind: "error" });
             }
           })();
         }

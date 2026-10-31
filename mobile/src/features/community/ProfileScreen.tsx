@@ -18,7 +18,7 @@ import { AuthorAvatar } from "./AuthorAvatar";
 import { fetchProfile, fetchProfileLibrary, followUser, unfollowUser, type CommunityProfileView } from "./api";
 import { contentDetail, contentKindLabel, contentTarget } from "./communityHome";
 import { ReaderGlyph } from "./ReaderGlyph";
-import { getLocale } from "../../i18n";
+import { getLocale, useLocale } from "../../i18n";
 
 export function ProfileScreen({ username }: { username: string }) {
   const { colors, id: viewerTheme } = useTheme();
@@ -227,9 +227,10 @@ function publishedRows(view: CommunityProfileView): PublishedRow[] {
 }
 
 function ProfileHeaderTitle({ username, identity }: { username: string; identity?: IdentityKey }) {
+  const locale = useLocale();
   const { colors } = useTheme();
   const { width } = useWindowDimensions();
-  const label = readerGlyphLabel(identity);
+  const label = readerGlyphLabel(identity, locale);
   return (
     <View
       accessible

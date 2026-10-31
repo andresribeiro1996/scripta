@@ -1,3 +1,5 @@
+import type { Locale } from "../i18n/locale.js";
+import { sharedT } from "../i18n/sharedT.js";
 import { MONO, SANS, SCRIPT, SERIF, composePlate } from "./compose.js";
 
 export const PLATE_FONTS = { serif: SERIF, sans: SANS, mono: MONO, script: SCRIPT };
@@ -20,16 +22,30 @@ export const INKS: Record<IdentityKey | "graph", readonly [string, string, strin
   graph: ["Graphite", "#3b3a38", "#2a2826"],
 };
 
-export const PLATES: readonly { key: IdentityKey; name: string; epithet: string; numeral: string }[] = [
-  { key: "carto", name: "Cartographer", epithet: "follows a world to its last page", numeral: "I" },
-  { key: "anno", name: "Annotator", epithet: "reads with a pencil", numeral: "II" },
-  { key: "lamp", name: "Lamplighter", epithet: "keeps company with mysteries", numeral: "III" },
-  { key: "star", name: "Stargazer", epithet: "lives half in other worlds", numeral: "IV" },
-  { key: "arch", name: "Archivist", epithet: "reads what happened", numeral: "V" },
-  { key: "corr", name: "Correspondent", epithet: "writes back to the classics", numeral: "VI" },
-  { key: "way", name: "Wayfarer", epithet: "never the same shelf twice", numeral: "VII" },
-  { key: "loyal", name: "Loyalist", epithet: "returns to the same voices", numeral: "VIII" },
+export const PLATES: readonly { key: IdentityKey; numeral: string }[] = [
+  { key: "carto", numeral: "I" },
+  { key: "anno", numeral: "II" },
+  { key: "lamp", numeral: "III" },
+  { key: "star", numeral: "IV" },
+  { key: "arch", numeral: "V" },
+  { key: "corr", numeral: "VI" },
+  { key: "way", numeral: "VII" },
+  { key: "loyal", numeral: "VIII" },
 ];
+
+const PLATE_TEXT = {
+  carto: ["shared.plates.cartoName", "shared.plates.cartoEpithet"],
+  anno: ["shared.plates.annoName", "shared.plates.annoEpithet"],
+  lamp: ["shared.plates.lampName", "shared.plates.lampEpithet"],
+  star: ["shared.plates.starName", "shared.plates.starEpithet"],
+  arch: ["shared.plates.archName", "shared.plates.archEpithet"],
+  corr: ["shared.plates.corrName", "shared.plates.corrEpithet"],
+  way: ["shared.plates.wayName", "shared.plates.wayEpithet"],
+  loyal: ["shared.plates.loyalName", "shared.plates.loyalEpithet"],
+} as const;
+
+export const plateName = (key: IdentityKey, locale: Locale) => sharedT(locale)(PLATE_TEXT[key][0]);
+export const plateEpithet = (key: IdentityKey, locale: Locale) => sharedT(locale)(PLATE_TEXT[key][1]);
 
 const STEP = 0.9;
 const SHADOW = [-Math.SQRT1_2, Math.SQRT1_2];
@@ -216,7 +232,7 @@ const ellipse = (cx: number, cy: number, rx: number, ry: number) => `M${cx - rx}
 const circle = (cx: number, cy: number, r: number) => ellipse(cx, cy, r, r);
 const fourPointStar = (x: number, y: number, r = 4) => `M${x} ${y - r}L${x + r / 4} ${y - r / 4}L${x + r} ${y}L${x + r / 4} ${y + r / 4}L${x} ${y + r}L${x - r / 4} ${y + r / 4}L${x - r} ${y}L${x - r / 4} ${y - r / 4}Z`;
 
-const drawEmblem: Record<IdentityKey | "none", () => string> = {
+const drawEmblem: Record<IdentityKey, () => string> = {
   carto: () => {
     const graticule = [ellipse(125, 134, 55, 20), ellipse(125, 134, 55, 40), ellipse(125, 134, 20, 55), ellipse(125, 134, 40, 55), "M70 134H180M125 79V189"].map((d) => ink(d, 0.5));
     const s = 21.2;
@@ -360,12 +376,14 @@ const drawEmblem: Record<IdentityKey | "none", () => string> = {
       `</g>`,
     ].join("");
   },
-  none: () => `<circle class="pl" cx="125" cy="134" r="38" stroke-width=".8" stroke-dasharray="2 4"/><text class="pt" x="125" y="137.5" text-anchor="middle" font-size="9" letter-spacing="2.4" font-family="${SANS}">NOT YET</text>`,
 };
 
-const drawn = new Map<IdentityKey | "none", string>();
+const drawn = new Map<IdentityKey, string>();
 
-export function emblem(key: IdentityKey | "none"): string {
+const emptyEmblem = (locale: Locale) => `<circle class="pl" cx="125" cy="134" r="38" stroke-width=".8" stroke-dasharray="2 4"/><text class="pt" x="125" y="137.5" text-anchor="middle" font-size="9" letter-spacing="2.4" font-family="${SANS}">${sharedT(locale)("shared.readerCard.notYet")}</text>`;
+
+export function emblem(key: IdentityKey | "none", locale: Locale): string {
+  if (key === "none") return emptyEmblem(locale);
   let svg = drawn.get(key);
   if (svg === undefined) {
     svg = drawEmblem[key]();
@@ -375,6 +393,7 @@ export function emblem(key: IdentityKey | "none"): string {
 }
 
 interface PlateOptions {
+  locale: Locale;
   key: IdentityKey | "none";
   emblem?: IdentityKey | "none";
   name: string;
@@ -386,8 +405,10 @@ interface PlateOptions {
   label?: string;
 }
 
-export function plate({ key, emblem: emblemKey = key, name, eyebrow = "THE", epithet, numeral, reader = "EXAMPLE READER", width = 250, label }: PlateOptions): string {
-  return composePlate({ key, emblemSvg: emblem(emblemKey), name, eyebrow, epithet, numeral, reader, width, label: label ?? `${eyebrow.toLowerCase()} ${name} identity plate` });
+export function plate({ locale, key, emblem: emblemKey = key, name, eyebrow, epithet, numeral, reader, width = 250, label }: PlateOptions): string {
+  const t = sharedT(locale);
+  const shownEyebrow = eyebrow ?? t("shared.readerCard.eyebrow");
+  return composePlate({ key, emblemSvg: emblem(emblemKey, locale), name, eyebrow: shownEyebrow, epithet, numeral, reader: reader ?? t("shared.readerCard.exampleReader"), width, label: label ?? t("shared.readerCard.plateLabel", { eyebrow: shownEyebrow.toLowerCase(), name }), locale });
 }
 
 const glyphShapes: Record<IdentityKey, string> = {

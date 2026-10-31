@@ -2,6 +2,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import { createContext, useContext } from "react";
 import { createLibrarySaver, type LibrarySaver } from "@scripta/shared";
 import { fetchLibrary, saveLibrary, sendLibraryChange } from "../api/library";
+import { getLocale } from "../i18n";
 
 export const LibrarySaverContext = createContext<LibrarySaver | null>(null);
 
@@ -10,7 +11,8 @@ export function createWebLibrarySaver(queryClient: QueryClient): LibrarySaver {
     send: sendLibraryChange,
     put: saveLibrary,
     fetch: fetchLibrary,
-    write: (view) => queryClient.setQueryData(["library"], view)
+    write: (view) => queryClient.setQueryData(["library"], view),
+    locale: getLocale
   });
 }
 

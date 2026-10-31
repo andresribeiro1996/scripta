@@ -21,6 +21,7 @@ import {
   type LibraryStyleSettings,
   type PerCardStyle
 } from "../lib/libraryStyle";
+import { getLocale } from "../i18n";
 
 // A flat-color SVG, inlined as a data: URI — stands in for a "real cover"
 // in the preview below without spending an actual network request on one.
@@ -66,7 +67,7 @@ export function LibraryStylePage() {
 
   function saveStyle(next: LibraryStyleSettings) {
     updateLibrary((data) => ({ ...data, style: next })).catch((error) => {
-      toast({ message: saveFailureMessage(error, "Couldn't save the style change."), kind: "error" });
+      toast({ message: saveFailureMessage(error, "Couldn't save the style change.", getLocale()), kind: "error" });
     });
   }
 

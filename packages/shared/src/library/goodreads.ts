@@ -17,6 +17,8 @@
 // column — series info is sometimes embedded in the title text itself
 // (e.g. "Book Title (Series, #2)") but isn't parsed out here.
 
+import type { Locale } from "../i18n/locale.js";
+import { sharedT } from "../i18n/sharedT.js";
 import type { LibraryData } from "./types.js";
 import { csvRowsToObjects, parseCsv } from "./csv.js";
 import { normalizeBookGenres } from "./bookGenres.js";
@@ -46,10 +48,10 @@ function goodreadsShelfToStatus(shelf: string | undefined): number {
   return 0; // "to-read", or any custom shelf
 }
 
-export function goodreadsCsvToLibraryJson(text: string): LibraryData {
-  const rows = csvRowsToObjects(parseCsv(text));
+export function goodreadsCsvToLibraryJson(text: string, locale: Locale): LibraryData {
+  const rows = csvRowsToObjects(parseCsv(text, locale));
   if (!rows.length) {
-    throw new Error("That Goodreads CSV doesn't have any books in it.");
+    throw new Error(sharedT(locale)("shared.csv.goodreadsEmpty"));
   }
 
   const books = rows.map((row, i) => {

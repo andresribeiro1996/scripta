@@ -21,6 +21,7 @@ import type { PerCardStyle } from "../lib/libraryStyle";
 import { localDay, type LibraryBook as Book, type ReadStatus } from "../lib/libraryView";
 import { bookKey } from "../lib/merge";
 import { useLibrarySaver } from "./useLibrarySaver";
+import { getLocale } from "../i18n";
 
 export function useBookActions() {
   const queryClient = useQueryClient();
@@ -37,7 +38,7 @@ export function useBookActions() {
         books: data.books.map((b) => (bookKey(b) === key ? { ...b, _style: style } : b))
       }));
     } catch (error) {
-      toast({ message: saveFailureMessage(error, "Couldn't save the style change."), kind: "error" });
+      toast({ message: saveFailureMessage(error, "Couldn't save the style change.", getLocale()), kind: "error" });
     }
   }
 
@@ -47,7 +48,7 @@ export function useBookActions() {
     const key = bookKey(book);
     const day = localDay();
     const result = await saver.submit(status === 2 ? { kind: "book", bookKey: key, readStatus: 2, day } : { kind: "book", bookKey: key, readStatus: status });
-    if (!result.ok) toast({ message: saveFailureMessage(result.error, "Couldn't save the status change."), kind: "error" });
+    if (!result.ok) toast({ message: saveFailureMessage(result.error, "Couldn't save the status change.", getLocale()), kind: "error" });
     return result.ok;
   }
 
@@ -57,7 +58,7 @@ export function useBookActions() {
     const key = bookKey(book);
     if (setRating(book, rating) === book) return true;
     const result = await saver.submit({ kind: "book", bookKey: key, rating });
-    if (!result.ok) toast({ message: saveFailureMessage(result.error, "Couldn't save the rating."), kind: "error" });
+    if (!result.ok) toast({ message: saveFailureMessage(result.error, "Couldn't save the rating.", getLocale()), kind: "error" });
     return result.ok;
   }
 
@@ -72,7 +73,7 @@ export function useBookActions() {
       }));
       return true;
     } catch (error) {
-      toast({ message: saveFailureMessage(error, "Couldn't save your note."), kind: "error" });
+      toast({ message: saveFailureMessage(error, "Couldn't save your note.", getLocale()), kind: "error" });
       return false;
     }
   }
@@ -88,7 +89,7 @@ export function useBookActions() {
       }));
       return true;
     } catch (error) {
-      toast({ message: saveFailureMessage(error, "Couldn't delete the note."), kind: "error" });
+      toast({ message: saveFailureMessage(error, "Couldn't delete the note.", getLocale()), kind: "error" });
       return false;
     }
   }
@@ -104,7 +105,7 @@ export function useBookActions() {
       }));
       return true;
     } catch (error) {
-      toast({ message: saveFailureMessage(error, "Couldn't undo the status change."), kind: "error" });
+      toast({ message: saveFailureMessage(error, "Couldn't undo the status change.", getLocale()), kind: "error" });
       return false;
     }
   }
@@ -119,7 +120,7 @@ export function useBookActions() {
         books: data.books.map((b) => (bookKey(b) === key ? setBookCover(b, image.id, image.url) : b))
       }));
     } catch (error) {
-      toast({ message: saveFailureMessage(error, "Couldn't save the cover change."), kind: "error" });
+      toast({ message: saveFailureMessage(error, "Couldn't save the cover change.", getLocale()), kind: "error" });
     }
   }
 
@@ -133,7 +134,7 @@ export function useBookActions() {
         books: data.books.map((b) => (bookKey(b) === key ? setBookCoverUrl(b, url) : b))
       }));
     } catch (error) {
-      toast({ message: saveFailureMessage(error, "Couldn't save the cover change."), kind: "error" });
+      toast({ message: saveFailureMessage(error, "Couldn't save the cover change.", getLocale()), kind: "error" });
     }
   }
 
@@ -152,7 +153,7 @@ export function useBookActions() {
         books: data.books.map((b) => (bookKey(b) === key ? clearBookCover(b) : b))
       }));
     } catch (error) {
-      toast({ message: saveFailureMessage(error, "Couldn't save the cover change."), kind: "error" });
+      toast({ message: saveFailureMessage(error, "Couldn't save the cover change.", getLocale()), kind: "error" });
     }
   }
 

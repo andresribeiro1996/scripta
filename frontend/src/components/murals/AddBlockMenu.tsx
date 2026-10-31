@@ -4,6 +4,7 @@ import { Sheet } from "../Sheet";
 import { BUTTON_SECONDARY } from "../page/buttonClasses";
 import { PlusIcon, toolbarIconClass } from "../Toolbar";
 import { blockLabel, type BlockType } from "../../lib/murals";
+import { useLocale } from "../../i18n";
 
 // Label comes from blockLabel (lib/murals.ts, over the shared block table) —
 // which the history log's "X block added" entries also draw from — so a type's
@@ -40,6 +41,7 @@ const BLOCK_CHOICES: Array<{ type: BlockType; description: string }> = [
  *  there. CSS picks which one shows; neither state is ever shared
  *  across the split. */
 export function AddBlockMenu({ onAdd }: { onAdd: (type: BlockType) => void }) {
+  const locale = useLocale();
   const [open, setOpen] = useState(false);
   // Only covers the desktop dropdown branch below — the mobile Sheet
   // branch already registers its own dismissible via Sheet itself. Both
@@ -75,7 +77,7 @@ export function AddBlockMenu({ onAdd }: { onAdd: (type: BlockType) => void }) {
                   onClick={() => pick(choice.type)}
                   className="block w-full rounded-lg px-3 py-2 text-left hover:bg-(--color-surface-hover)"
                 >
-                  <div className="text-sm font-semibold">{blockLabel(choice.type)}</div>
+                  <div className="text-sm font-semibold">{blockLabel(choice.type, locale)}</div>
                   <div className="text-xs text-(--color-text-dim)">{choice.description}</div>
                 </button>
               ))}
@@ -92,7 +94,7 @@ export function AddBlockMenu({ onAdd }: { onAdd: (type: BlockType) => void }) {
                 onClick={() => pick(choice.type)}
                 className="flex min-h-12 w-full flex-col items-start gap-0.5 rounded-lg px-3 py-2 text-left hover:bg-(--color-surface-hover)"
               >
-                <span className="text-[15px] font-semibold">{blockLabel(choice.type)}</span>
+                <span className="text-[15px] font-semibold">{blockLabel(choice.type, locale)}</span>
                 <span className="text-xs text-(--color-text-dim)">{choice.description}</span>
               </button>
             ))}

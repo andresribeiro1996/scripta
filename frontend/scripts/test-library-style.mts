@@ -10,11 +10,11 @@
 //   npx tsx scripts/test-library-style.mts
 
 import {
-  BLOCK_FONT_FAMILY_OPTIONS,
+  blockFontFamilyOptions,
   BLOCK_FONT_SIZE_RANGE,
   CARD_BORDER_OPACITY_RANGE,
   CARD_BORDER_WIDTH_RANGE,
-  CARD_FONT_FAMILY_OPTIONS,
+  cardFontFamilyOptions,
   CARD_FONT_SIZE_RANGE,
   CARD_GAP_RANGE,
   CARD_MIN_WIDTH_RANGE,
@@ -211,12 +211,12 @@ console.log("\n8. BlockStyle — resolveBlockStyle fills in defaults, doesn't ca
 
 console.log("\n9. blockFontFamilyCss — every option resolves to a real CSS stack, unknown values fall back rather than rendering with no font-family");
 {
-  for (const opt of BLOCK_FONT_FAMILY_OPTIONS) {
+  for (const opt of blockFontFamilyOptions("en")) {
     check(`"${opt.value}" resolves to its own css stack`, blockFontFamilyCss(opt.value) === opt.css);
   }
   check(
     "an unrecognized value falls back to the first option rather than returning undefined/empty",
-    blockFontFamilyCss("not-a-real-option" as never) === BLOCK_FONT_FAMILY_OPTIONS[0].css
+    blockFontFamilyCss("not-a-real-option" as never) === blockFontFamilyOptions("en")[0].css
   );
 }
 
@@ -265,19 +265,19 @@ console.log("\n11. Isolation — BlockStyle (murals) and PerCardStyle/LibrarySty
   );
   check(
     "the two font-family option sets are separately declared, not the same array/reference",
-    (BLOCK_FONT_FAMILY_OPTIONS as unknown) !== (CARD_FONT_FAMILY_OPTIONS as unknown)
+    (blockFontFamilyOptions as unknown) !== (cardFontFamilyOptions as unknown)
   );
   check("blockFontFamilyCss and cardFontFamilyCss are two distinct functions", (blockFontFamilyCss as unknown) !== (cardFontFamilyCss as unknown));
 }
 
 console.log("\n12. cardFontFamilyCss — every option resolves to a real CSS stack, unknown values fall back rather than rendering with no font-family");
 {
-  for (const opt of CARD_FONT_FAMILY_OPTIONS) {
+  for (const opt of cardFontFamilyOptions("en")) {
     check(`"${opt.value}" resolves to its own css stack`, cardFontFamilyCss(opt.value) === opt.css);
   }
   check(
     "an unrecognized value falls back to the first option rather than returning undefined/empty",
-    cardFontFamilyCss("not-a-real-option" as never) === CARD_FONT_FAMILY_OPTIONS[0].css
+    cardFontFamilyCss("not-a-real-option" as never) === cardFontFamilyOptions("en")[0].css
   );
 }
 

@@ -13,6 +13,7 @@ import { LIBRARY_QUERY_KEY, useLibrary } from "../library/hooks/useLibrary";
 import { ownedEntry } from "../search/searchModel";
 import { pathWithQuery } from "../auth/navigation";
 import { workPath } from "../works/workPath";
+import { getLocale } from "../../i18n";
 
 const STATUS_OPTIONS: ReadonlyArray<{ value: 0 | 1 | 2; label: string }> = [
   { value: 0, label: "To read" },
@@ -73,7 +74,7 @@ export function AddBookSheet({
       setToast({ message: updated ? "Updated in your library." : "Added to your library.", tone: "success" });
       setTimeout(onClose, 1600);
     } catch (error) {
-      setToast({ message: saveFailureMessage(error, "Could not add the book."), tone: "error" });
+      setToast({ message: saveFailureMessage(error, "Could not add the book.", getLocale()), tone: "error" });
     } finally {
       setBusyStatus(null);
     }

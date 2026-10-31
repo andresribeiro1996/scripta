@@ -13,7 +13,7 @@ const card = (fields: Partial<PublicReaderCard> = {}): PublicReaderCard => ({
   facts: { finished: 48, highlights: 140, series: 12, since: 2014, edition: 2026, readerNumber: 42 },
   ...fields,
 });
-const ctx = (fields: Partial<PublicReaderCard> = {}, readerName = "andre.ribeiro"): FooterContext => ({ card: card(fields), readerName, glyph: (key, x, y, size) => `<g data-glyph="${key} ${x} ${y} ${size}"/>` });
+const ctx = (fields: Partial<PublicReaderCard> = {}, readerName = "andre.ribeiro"): FooterContext => ({ locale: "en", card: card(fields), readerName, glyph: (key, x, y, size) => `<g data-glyph="${key} ${x} ${y} ${size}"/>` });
 const left = (value: FooterLeft, fields: Partial<PublicReaderCard> = {}) => footerSlots({ left: value, right: "name" }, ctx(fields, "andre")).footerLeft;
 const right = (value: FooterRight, readerName = "andre.ribeiro") => footerSlots({ left: "plate", right: value }, ctx({}, readerName)).footerRight;
 const text = (svg: string | undefined) => svg?.match(/>([^<]*)<\/text>/)?.[1];
@@ -76,7 +76,7 @@ test("a 30-character handle is cut to its corner and the left value gives way to
 test("the chosen footer draws on the front and on every back page", () => {
   const footer: CardFooter = { left: "since", right: "initials" };
   for (const page of ["front", "chosen", "record", "merged"] as const) {
-    const svg = renderReaderCard({ card: card(), style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), footer }, readerName: "andre.ribeiro", print: "paper", label: "x", seed: seedOf("andre"), view: "owner" }, page);
+    const svg = renderReaderCard({ card: card(), style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), footer }, locale: "en", readerName: "andre.ribeiro", print: "paper", label: "x", seed: seedOf("andre"), view: "owner" }, page);
     assert.match(svg, />READER SINCE 2014</, page);
     assert.match(svg, />A\. R\.</, page);
     assert.doesNotMatch(svg, />PLATE IV</, page);
@@ -84,7 +84,7 @@ test("the chosen footer draws on the front and on every back page", () => {
 });
 
 test("the glyph footer is the identity's glyph, inked like the seal", () => {
-  const svg = renderReaderCard({ card: card(), style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), footer: { left: "glyph", right: "name" } }, readerName: "andre", print: "paper", label: "x", seed: seedOf("andre") });
+  const svg = renderReaderCard({ card: card(), style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), footer: { left: "glyph", right: "name" } }, locale: "en", readerName: "andre", print: "paper", label: "x", seed: seedOf("andre") });
   assert.match(svg, /<g class="glyph id-star" transform="translate\(30.00 309.50\) scale\(0.2708\)">/);
 });
 
@@ -92,16 +92,16 @@ const unwritten = { state: "unwritten", identity: null, dial: null, facts: undef
 const bare = { facts: { finished: 0, highlights: 0, series: 0, since: null, edition: 2026 } };
 
 test("footerLeftText says what each corner will print", () => {
-  assert.equal(footerLeftText("plate", card()), "PLATE IV");
-  assert.equal(footerLeftText("plate", card(unwritten)), "PLATE —");
-  assert.equal(footerLeftText("plateName", card()), "IV · STARGAZER");
-  assert.equal(footerLeftText("since", card()), "READER SINCE 2014");
-  assert.equal(footerLeftText("volumes", card()), "XLVIII VOLUMES");
-  assert.equal(footerLeftText("readerNumber", card()), "Nº XLII");
-  for (const value of ["since", "volumes", "readerNumber"] as const) assert.equal(footerLeftText(value, card(bare)), null, value);
-  assert.equal(footerLeftText("plateName", card(unwritten)), null);
-  assert.equal(footerLeftText("glyph", card()), null);
-  assert.equal(footerLeftText("none", card()), null);
+  assert.equal(footerLeftText("plate", card(), "en"), "PLATE IV");
+  assert.equal(footerLeftText("plate", card(unwritten), "en"), "PLATE —");
+  assert.equal(footerLeftText("plateName", card(), "en"), "IV · STARGAZER");
+  assert.equal(footerLeftText("since", card(), "en"), "READER SINCE 2014");
+  assert.equal(footerLeftText("volumes", card(), "en"), "XLVIII VOLUMES");
+  assert.equal(footerLeftText("readerNumber", card(), "en"), "Nº XLII");
+  for (const value of ["since", "volumes", "readerNumber"] as const) assert.equal(footerLeftText(value, card(bare), "en"), null, value);
+  assert.equal(footerLeftText("plateName", card(unwritten), "en"), null);
+  assert.equal(footerLeftText("glyph", card(), "en"), null);
+  assert.equal(footerLeftText("none", card(), "en"), null);
 });
 
 test("footerRightText says what each corner will print", () => {
@@ -121,10 +121,10 @@ test("footerRightText says what each corner will print", () => {
 
 test("every printed text the editor shows is on the rendered front", () => {
   const render = (footer: CardFooter, fields: Partial<PublicReaderCard>, readerName: string) =>
-    renderReaderCard({ card: card(fields), style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), footer }, readerName, print: "paper", label: "x", seed: seedOf("andre") });
+    renderReaderCard({ card: card(fields), style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), footer }, locale: "en", readerName, print: "paper", label: "x", seed: seedOf("andre") });
   for (const [fields, readerName] of [[{}, "andre.ribeiro"], [bare, "andre"], [unwritten, "a".repeat(30)]] as const) {
     for (const value of FOOTER_LEFTS) {
-      const printed = footerLeftText(value, card(fields));
+      const printed = footerLeftText(value, card(fields), "en");
       if (printed !== null) assert.ok(render({ left: value, right: "none" }, fields, readerName).includes(`>${escapeText(printed)}<`), `${value} ${printed}`);
     }
     for (const value of FOOTER_RIGHTS) {

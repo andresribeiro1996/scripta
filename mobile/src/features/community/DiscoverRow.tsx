@@ -16,7 +16,7 @@ export function DiscoverRow({ item, linkAuthor, stats, onPreviewBooks, onOpen }:
   const { colors } = useTheme();
   const { content, author } = item;
   const status = contentStatus(content, locale);
-  const glyphLabel = readerGlyphLabel(author.readerGlyph);
+  const glyphLabel = readerGlyphLabel(author.readerGlyph, locale);
   const creator = <>
     <AuthorAvatar username={author.username} avatarUrl={author.avatarUrl} size={28} />
     <Text numberOfLines={1} {...dynamicType} style={[typography.body, styles.strong, styles.metaName, { color: colors.text }]}>{author.username}</Text>

@@ -13,12 +13,14 @@ import { useLibrary } from "../hooks/useLibrary";
 import { NO_GROUPS, useOwnCardStyle } from "../hooks/useReaderCard";
 import { useReaderCardStyle, useSaveReaderCardStyle } from "../hooks/useReaderCardStyle";
 import { useResolvedTheme } from "../lib/theme";
+import { getLocale, useLocale } from "../i18n";
 
 const NO_BOOKS: Array<Record<string, unknown>> = [];
 const AUDIENCES = ["you", "visitors"] as const;
 const AUDIENCE_LABELS = { you: "You", visitors: "Visitors" };
 
 export function ReaderCardPage() {
+  const locale = useLocale();
   const { session } = useAuth();
   const readerName = session?.user.username ?? "reader";
   const { data: library } = useLibrary();
@@ -31,7 +33,7 @@ export function ReaderCardPage() {
   const [saveState, track] = useSaveState();
   const scheme = themes[useResolvedTheme()].scheme;
   const [audience, setAudience] = useState<(typeof AUDIENCES)[number]>("you");
-  const input = useMemo(() => readerCardInputOf(books, groups, readerName, undefined, own), [books, groups, readerName, own]);
+  const input = useMemo(() => readerCardInputOf(books, groups, readerName, locale, undefined, own), [books, groups, readerName, locale, own]);
   const preview = useMemo(() => (audience === "you" ? input : visitorView(input)), [audience, input]);
 
   const change = async (patch: ReaderCardStylePatch) => {
@@ -39,7 +41,7 @@ export function ReaderCardPage() {
       await track(save(patch));
       return true;
     } catch (error) {
-      toast({ message: saveFailureMessage(error, "Couldn't save your reader card."), kind: "error" });
+      toast({ message: saveFailureMessage(error, "Couldn't save your reader card.", getLocale()), kind: "error" });
       return false;
     }
   };

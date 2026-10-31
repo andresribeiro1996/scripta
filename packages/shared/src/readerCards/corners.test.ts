@@ -7,7 +7,7 @@ import { seedOf } from "./seed.js";
 import { CORNER_STYLES, DEFAULT_READER_CARD_STYLE, publicStyle, type CornerStyle } from "./style.js";
 
 const card: PublicReaderCard = { state: "settled", identity: "star", runnerUp: null, streak: "lamp", signal: null, coverage: [], dial: { segments: [{ group: "star", books: 8, marked: 2 }] }, facts: { finished: 8, highlights: 2, series: 0, since: 2014, edition: 2026 } };
-const render = (corners: CornerStyle, page: "front" | "record" = "front") => renderReaderCard({ card, style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), corners }, readerName: "andre", print: "paper", label: "x", seed: seedOf("andre") }, page);
+const render = (corners: CornerStyle, page: "front" | "record" = "front") => renderReaderCard({ card, style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), corners }, locale: "en", readerName: "andre", print: "paper", label: "x", seed: seedOf("andre") }, page);
 
 test("diamonds draw today's corners and none draws no corners", () => {
   assert.equal(cornersSlot("diamonds"), undefined);

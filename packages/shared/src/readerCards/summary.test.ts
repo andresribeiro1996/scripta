@@ -14,7 +14,7 @@ const card: PublicReaderCard = {
   facts: { finished: 34, highlights: 40, series: 2, since: 2014, edition: 2026 },
   chosen: { signature: { title: "A Wizard of Earthsea", author: "Ursula K. Le Guin", workId: null, coverUrl: null, note: "lent twice" }, highlight: { text: "To light a candle", title: "A Wizard of Earthsea", author: "Ursula K. Le Guin" } },
 };
-const base = (fields: Partial<ReaderCardBase> = {}): ReaderCardBase => ({ card, style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), counter: "dial", layout: "faces", trait: "both" }, readerName: "andre", label: "Reader card", seed: seedOf("andre"), view: "visitor", ...fields });
+const base = (fields: Partial<ReaderCardBase> = {}): ReaderCardBase => ({ card, style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), counter: "dial", layout: "faces", trait: "both" }, locale: "en", readerName: "andre", label: "Reader card", seed: seedOf("andre"), view: "visitor", ...fields });
 
 test("the summary reads the card in order: plate, streak, evidence, choices, coverage", () => {
   assert.deepEqual(readerCardSummary(base()), [

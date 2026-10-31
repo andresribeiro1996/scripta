@@ -1,7 +1,8 @@
 import type { GalleryImage } from "../../../api/gallery";
 import { computeStat, libraryBreakdown } from "../../../lib/muralStats";
-import { calculateShelfTheme, STAT_METRIC_LABELS, type MuralBlock, type ReaderProfile, type ShelfTheme, type StatMetric } from "../../../lib/murals";
+import { calculateShelfTheme, statMetricLabels, type MuralBlock, type ReaderProfile, type ShelfTheme, type StatMetric } from "../../../lib/murals";
 import { BlockEyebrow, EmptyBlockState } from "./BookBlocks";
+import { useLocale } from "../../../i18n";
 
 /** A heading and/or freeform note — connective tissue between the other
  *  blocks ("2026 was a big reading year because..."). Either field can be
@@ -87,6 +88,7 @@ export function StatsBlockView({
   books: Array<Record<string, unknown>>;
   statsOverride?: Record<string, number>;
 }) {
+  const locale = useLocale();
   if (block.metrics.length === 0) {
     return <EmptyBlockState message="Pick which numbers to show." />;
   }
@@ -103,7 +105,7 @@ export function StatsBlockView({
                 sets --block-accent to the text colour when the accent
                 can't be read on the block's own background. */}
             <div className="text-[1.6em] font-bold text-[var(--block-accent,var(--color-accent))]">{value(metric)}</div>
-            <div className="text-[0.75em] text-(--color-text-dim)">{STAT_METRIC_LABELS[metric]}</div>
+            <div className="text-[0.75em] text-(--color-text-dim)">{statMetricLabels(locale)[metric]}</div>
           </div>
         ))}
       </div>
@@ -139,7 +141,7 @@ export function StatsBlockView({
           {breakdown.others.map((metric) => (
             <div key={metric} className="flex items-baseline gap-1.5">
               <span className="font-bold text-[var(--block-accent,var(--color-accent))]">{value(metric)}</span>
-              <span className="text-[0.85em] text-(--color-text-dim)">{STAT_METRIC_LABELS[metric]}</span>
+              <span className="text-[0.85em] text-(--color-text-dim)">{statMetricLabels(locale)[metric]}</span>
             </div>
           ))}
         </div>

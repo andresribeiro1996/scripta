@@ -15,13 +15,14 @@ import { bookTierlists, resolveHomeBlock, type Group } from "@scripta/shared";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import type { GalleryImage } from "../../api/gallery";
-import { ALL_STAT_METRICS, BOOK_GENRES, STAT_METRIC_LABELS, blockLabel, type MuralBlock } from "../../lib/murals";
+import { ALL_STAT_METRICS, BOOK_GENRES, statMetricLabels, blockLabel, type MuralBlock } from "../../lib/murals";
 import { bookKey } from "../../lib/merge";
 import { BookSearchList, GalleryImageGrid } from "./pickers";
 import { Sheet } from "../Sheet";
 import { BUTTON_PRIMARY, BUTTON_SECONDARY, FIELD_CLASS } from "../page/buttonClasses";
 import { useTierlists } from "../../hooks/useTierlists";
 import { ChevronLeftIcon, ChevronRightIcon, CHECKBOX_CLASS } from "../Toolbar";
+import { useLocale } from "../../i18n";
 
 function bookHighlights(book: Record<string, unknown> | undefined): Array<Record<string, unknown>> {
   if (!book || !Array.isArray(book.highlights)) return [];
@@ -43,6 +44,7 @@ export function BlockConfigPanel({
   onSave: (block: MuralBlock) => void;
   onClose: () => void;
 }) {
+  const locale = useLocale();
   const [draft, setDraft] = useState<MuralBlock>(block);
   // tierlist only: the saved tier lists to pick from. Everything else
   // about a tier list — structure, pool, ranking — is edited over in
@@ -62,7 +64,7 @@ export function BlockConfigPanel({
 
   return (
     <Sheet
-      title={blockLabel(draft.type)}
+      title={blockLabel(draft.type, locale)}
       onClose={onClose}
       style={{ maxWidth: "32rem" }}
       footer={
@@ -127,7 +129,7 @@ export function BlockConfigPanel({
                     })
                   }
                 />
-                {STAT_METRIC_LABELS[metric]}
+                {statMetricLabels(locale)[metric]}
               </label>
             ))}
           </div>
@@ -203,7 +205,7 @@ export function BlockConfigPanel({
           <label className="block text-sm"><span className="font-semibold">Shelf source</span>
             <select className={`${FIELD_CLASS} ml-2`} value={draft.collectionId ?? ""} onChange={(event) => {
               const collectionId = event.target.value || undefined;
-              const resolved = resolveHomeBlock(draft, books, groups, "");
+              const resolved = resolveHomeBlock(draft, books, groups, "", locale);
               setDraft({ ...draft, collectionId, bookKeys: collectionId ? [] : resolved.type === "shelf" ? resolved.bookKeys : [] });
             }}>
               <option value="">Pick books (keep current selection)</option>

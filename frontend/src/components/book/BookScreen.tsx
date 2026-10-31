@@ -40,6 +40,7 @@ import { StatsTiles } from "./BookStats";
 import { BookCover, editionCoverBook } from "./BookCover";
 import { EditionStrip } from "./EditionStrip";
 import { RatingStars } from "./RatingStars";
+import { useLocale } from "../../i18n";
 
 type Props = {
   page: WorkPage | null;
@@ -77,11 +78,12 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, onAdd, onShare, frame }: Props) {
+  const locale = useLocale();
   const { data: isAdmin = false } = useQuery({ queryKey: ["books-admin"], queryFn: fetchIsAdmin, staleTime: Infinity, enabled: signedIn });
   const { data: library } = useLibrary({ enabled: Boolean(book) });
-  const model = bookScreenModel(page, book, { isAdmin }, editionId);
+  const model = bookScreenModel(page, book, { isAdmin }, locale, editionId);
   const statsQuery = useWorkStats(page?.work.id);
-  const statsTiles = bookStatsModel(statsQuery.data ?? null, page?.work.rating ?? null).tiles;
+  const statsTiles = bookStatsModel(statsQuery.data ?? null, page?.work.rating ?? null, locale).tiles;
   const [searchParams] = useSearchParams();
   const [aboutOpen, setAboutOpen] = useState(false);
   const [allCharacters, setAllCharacters] = useState(false);
@@ -353,7 +355,7 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
                           <BookCover book={editionCovers[i]!} width={36} />
                           <span className="min-w-0 flex-1 text-sm">
                             <span className="block break-words font-semibold">{e.title}</span>
-                            <span className="block text-(--color-text-dim)">{editionLabel(e)}</span>
+                            <span className="block text-(--color-text-dim)">{editionLabel(e, locale)}</span>
                           </span>
                           {e.mine ? <span className="shrink-0 rounded-full bg-(--color-accent-soft) px-2.5 py-0.5 text-xs font-semibold text-(--color-accent)">Yours</span> : null}
                         </li>

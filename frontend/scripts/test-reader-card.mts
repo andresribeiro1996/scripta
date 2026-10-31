@@ -15,7 +15,7 @@ const card: PublicReaderCard = {
   style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), counter: "dial", layout: "faces", trait: "both" },
   chosen: { highlight: { text: "To light a candle", title: "A Wizard of Earthsea", author: "Ursula K. Le Guin" } },
 };
-const visitor = (layout: Layout, fields: Partial<PublicReaderCard> = {}) => readerCardInputOf([], [], "andre", { ...card, style: { ...card.style!, layout }, ...fields });
+const visitor = (layout: Layout, fields: Partial<PublicReaderCard> = {}) => readerCardInputOf([], [], "andre", "en", { ...card, style: { ...card.style!, layout }, ...fields });
 const viewer = (input: ReturnType<typeof visitor>) => renderToString(createElement(ReaderCardViewer, { input, onClose: () => undefined }));
 
 test("the image draws both prints, each hidden by the other theme", () => {
@@ -94,7 +94,7 @@ test("the turner is inline: no dialog, and off the scrim its dots take the page'
 });
 
 test("only the owner's viewer offers Edit card, and only when it can go somewhere", () => {
-  const owner = readerCardInputOf([], [], "andre");
+  const owner = readerCardInputOf([], [], "andre", "en");
   const noop = () => undefined;
   assert.match(renderToString(createElement(ReaderCardViewer, { input: owner, onClose: noop, onEdit: noop })), />Edit card</);
   assert.doesNotMatch(renderToString(createElement(ReaderCardViewer, { input: owner, onClose: noop })), /Edit card/);

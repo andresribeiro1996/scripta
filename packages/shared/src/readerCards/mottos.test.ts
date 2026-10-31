@@ -10,7 +10,7 @@ import { DEFAULT_READER_CARD_STYLE, MOTTO_LOOKS, publicStyle, type MottoLook } f
 
 const WORDS = "Per libros ad astra";
 const card: PublicReaderCard = { state: "settled", identity: "star", runnerUp: null, streak: "lamp", signal: null, coverage: [], dial: { segments: [{ group: "star", books: 8, marked: 2 }] }, facts: { finished: 8, highlights: 2, series: 0, since: 2014, edition: 2026 } };
-const front = (look: MottoLook, text = WORDS) => renderReaderCard({ card, style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), motto: { text, look } }, readerName: "andre", print: "paper", label: "x", seed: seedOf("andre") });
+const front = (look: MottoLook, text = WORDS) => renderReaderCard({ card, style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), motto: { text, look } }, locale: "en", readerName: "andre", print: "paper", label: "x", seed: seedOf("andre") });
 const sizes = (svg: string) => [...svg.matchAll(/font-size="([\d.]+)"/g)].map((match) => Number(match[1]));
 
 test("no motto keeps today's header", () => {

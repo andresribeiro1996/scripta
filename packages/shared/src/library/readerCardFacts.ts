@@ -1,3 +1,5 @@
+import type { Locale } from "../i18n/locale.js";
+import { sharedT } from "../i18n/sharedT.js";
 import { isEligiblePassage } from "../murals/home.js";
 import { readerCardLabel, readerCardPlateLine } from "../readerCards/card.js";
 import type { IdentityKey } from "../readerCards/plates.js";
@@ -48,36 +50,36 @@ export function readerCardFacts(books: Book[], groups: Group[], identity: Identi
   };
 }
 
-export function publicReaderCardOf(books: Book[], groups: Group[], now: Date = new Date()): PublicReaderCard {
-  const identity = readerIdentity(books, groups);
+export function publicReaderCardOf(books: Book[], groups: Group[], locale: Locale, now: Date = new Date()): PublicReaderCard {
+  const identity = readerIdentity(books, groups, locale);
   return { ...publicReaderCard(identity), ...readerCardFacts(books, groups, identity.identity, now) };
 }
 
 export type CoverOf = (book: Book) => string | null;
 export interface OwnCardStyle { style: ReaderCardStyle; coverOf: CoverOf; readerNumber?: number | null }
 
-export function ownChosen(books: Book[], style: ReaderCardStyle, coverOf: CoverOf): ReaderCardChosen {
+export function ownChosen(books: Book[], style: ReaderCardStyle, coverOf: CoverOf, locale: Locale): ReaderCardChosen {
   const chosen: ReaderCardChosen = {};
   const { signature, highlight } = style;
   const signed = signature ? books.find((item) => bookKey(item) === signature.bookKey) : undefined;
-  if (signature && signed) chosen.signature = { ...bookLabel(signed), workId: null, coverUrl: coverOf(signed), note: signature.note };
+  if (signature && signed) chosen.signature = { ...bookLabel(signed, locale), workId: null, coverUrl: coverOf(signed), note: signature.note };
   const marked = highlight ? books.find((item) => bookKey(item) === highlight.bookKey) : undefined;
-  const passage = highlight && marked ? bookPassages(marked).find((item) => item.highlightId === highlight.highlightId) : undefined;
+  const passage = highlight && marked ? bookPassages(marked, locale).find((item) => item.highlightId === highlight.highlightId) : undefined;
   if (passage) chosen.highlight = { text: passage.text, title: passage.title, author: passage.author };
   return chosen;
 }
 
-export function readerCardInputOf(books: Book[], groups: Group[], readerName: string, override?: PublicReaderCard, own?: OwnCardStyle): ReaderCardBase {
+export function readerCardInputOf(books: Book[], groups: Group[], readerName: string, locale: Locale, override?: PublicReaderCard, own?: OwnCardStyle): ReaderCardBase {
   const seed = seedOf(readerName);
   if (override) {
-    return { card: override, style: publicStyle(normalizeReaderCardStyle(override.style)), view: "visitor", readerName, label: readerCardLabel(override), unwrittenLine: "yet to be written", seed };
+    return { card: override, style: publicStyle(normalizeReaderCardStyle(override.style)), view: "visitor", readerName, label: readerCardLabel(override, locale), unwrittenLine: sharedT(locale)("shared.readerCard.yetToBeWritten"), seed, locale };
   }
-  const identity = readerIdentity(books, groups);
+  const identity = readerIdentity(books, groups, locale);
   const facts = readerCardFacts(books, groups, identity.identity);
-  const card: PublicReaderCard = { ...publicReaderCard(identity), ...facts, ...(own?.readerNumber ? { facts: { ...facts.facts, readerNumber: own.readerNumber } } : {}), ...(own ? { chosen: ownChosen(books, own.style, own.coverOf) } : {}) };
-  return { card, style: publicStyle(own?.style ?? DEFAULT_READER_CARD_STYLE), view: "owner", leaders: identity.leaders, missing: identity.missing, readerName, label: readerCardLabel(card), unwrittenLine: readerCardPlateLine(identity.missing), seed };
+  const card: PublicReaderCard = { ...publicReaderCard(identity), ...facts, ...(own?.readerNumber ? { facts: { ...facts.facts, readerNumber: own.readerNumber } } : {}), ...(own ? { chosen: ownChosen(books, own.style, own.coverOf, locale) } : {}) };
+  return { card, style: publicStyle(own?.style ?? DEFAULT_READER_CARD_STYLE), view: "owner", leaders: identity.leaders, missing: identity.missing, readerName, label: readerCardLabel(card, locale), unwrittenLine: readerCardPlateLine(identity.missing), seed, locale };
 }
 
 export function visitorView(input: ReaderCardBase): ReaderCardBase {
-  return readerCardInputOf([], [], input.readerName, { ...input.card, style: input.style });
+  return readerCardInputOf([], [], input.readerName, input.locale, { ...input.card, style: input.style });
 }

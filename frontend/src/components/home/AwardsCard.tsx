@@ -5,6 +5,7 @@ import type { LibraryDocument } from "../../api/library";
 import { BookCover } from "../book/BookCover";
 import { CARD } from "../page/surfaceClasses";
 import { CloseIcon } from "../Toolbar";
+import { useLocale } from "../../i18n";
 
 const STORAGE_KEY = "dismissedAwards";
 
@@ -27,9 +28,10 @@ function writeDismissed(keys: Set<string>) {
 }
 
 export function AwardsCard({ announcements, library }: { announcements: readonly AwardAnnouncement[]; library: LibraryDocument | null }) {
+  const locale = useLocale();
   const [dismissed, setDismissed] = useState(readDismissed);
   const announcement = firstUndismissed(announcements, dismissed);
-  const model = announcement ? awardCardModel(announcement, library) : null;
+  const model = announcement ? awardCardModel(announcement, library, locale) : null;
   if (!model) return null;
 
   const content = (

@@ -18,7 +18,7 @@ const group = (html: string, label: string) => {
   const start = html.indexOf(`aria-label="${label}"`);
   return html.slice(start, html.indexOf("</div>", start));
 };
-const options = (style = {}, scheme: ThemeScheme = "light") => renderToString(createElement(ReaderCardOptions, { scheme, input: readerCardInputOf(books, [], "andre.ribeiro", undefined, { style: { ...DEFAULT_READER_CARD_STYLE, counter: "beads", trait: "seal", layout: "book", ...style }, coverOf: () => null }), onChange: async () => true }));
+const options = (style = {}, scheme: ThemeScheme = "light") => renderToString(createElement(ReaderCardOptions, { scheme, input: readerCardInputOf(books, [], "andre.ribeiro", "en", undefined, { style: { ...DEFAULT_READER_CARD_STYLE, counter: "beads", trait: "seal", layout: "book", ...style }, coverOf: () => null }), onChange: async () => true }));
 
 test("five counter thumbnails, with only the chosen one checked", () => {
   const counters = group(options(), "Counter");

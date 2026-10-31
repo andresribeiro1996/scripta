@@ -3,6 +3,7 @@ import { editionLabel, type BookScreenModel, type WorkEdition } from "@scripta/s
 import { OptionsMenu } from "../OptionsMenu";
 import { ChevronDownIcon } from "../Toolbar";
 import { BookCover, editionCoverBook } from "./BookCover";
+import { useLocale } from "../../i18n";
 
 type Props = {
   editions: WorkEdition[];
@@ -17,6 +18,7 @@ const SETTLE_MS = 120;
 const centreOf = (slide: HTMLElement) => slide.offsetLeft + slide.offsetWidth / 2;
 
 export function EditionStrip({ editions, author, edition, mineBook, onSelect }: Props) {
+  const locale = useLocale();
   const strip = useRef<HTMLDivElement>(null);
   const { index, mineIndex } = edition;
   const latest = useRef({ index, editions, onSelect });
@@ -98,7 +100,7 @@ export function EditionStrip({ editions, author, edition, mineBook, onSelect }: 
               type="button"
               tabIndex={-1}
               aria-current={selected}
-              aria-label={`${e.title} · ${editionLabel(e)}`}
+              aria-label={`${e.title} · ${editionLabel(e, locale)}`}
               onClick={() => (selected ? undefined : choose(i))}
               className={`relative w-50 shrink-0 snap-center transition lg:w-70 ${selected ? "" : "scale-90 opacity-60"}`}
             >
@@ -119,7 +121,7 @@ export function EditionStrip({ editions, author, edition, mineBook, onSelect }: 
           title="Editions"
           trigger={<>{edition.label}<ChevronDownIcon /></>}
           triggerClassName="inline-flex min-h-11 items-center gap-1 px-2 text-xs text-(--color-text-dim) hover:text-(--color-text)"
-          items={editions.map((e, i) => ({ label: `${e.title} · ${editionLabel(e)}${e.mine ? " · Yours" : ""}`, checked: i === index, onClick: () => choose(i) }))}
+          items={editions.map((e, i) => ({ label: `${e.title} · ${editionLabel(e, locale)}${e.mine ? " · Yours" : ""}`, checked: i === index, onClick: () => choose(i) }))}
         />
       </div>
       {mineIndex !== null && index !== mineIndex ? (

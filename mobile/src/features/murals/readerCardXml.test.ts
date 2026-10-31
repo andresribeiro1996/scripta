@@ -12,7 +12,7 @@ const card: PublicReaderCard = {
 const fonts = { serif: "SERIF-X", sans: "SANS-X", mono: "MONO-X", script: "SCRIPT-X" };
 
 test("every card font becomes a bundled family and ampersands draw as themselves", () => {
-  const input = readerCardInputOf([], [], "andre", card);
+  const input = readerCardInputOf([], [], "andre", "en", card);
   for (const page of ["front", "chosen", "record", "merged"] as const) {
     const xml = readerCardXml(renderReaderCard({ ...input, print: "paper" }, page), fonts);
     for (const family of Object.values(PLATE_FONTS)) assert.equal(xml.includes(family), false, `${page}: ${family}`);
@@ -23,7 +23,7 @@ test("every card font becomes a bundled family and ampersands draw as themselves
 
 test("angle brackets survive SvgXml as CDATA and typed entities stay literal", () => {
   const highlightCard = (text: string): PublicReaderCard => ({ ...card, chosen: { highlight: { text, title: "T", author: "A" } } });
-  const chosen = (text: string) => readerCardXml(renderReaderCard({ ...readerCardInputOf([], [], "andre", highlightCard(text)), print: "paper" }, "chosen"), fonts);
+  const chosen = (text: string) => readerCardXml(renderReaderCard({ ...readerCardInputOf([], [], "andre", "en", highlightCard(text)), print: "paper" }, "chosen"), fonts);
   const bracketed = chosen("<b>\"Fire\" & Ice</b>");
   assert.ok(bracketed.includes("<![CDATA[<]]>b>\"Fire\" & Ice<![CDATA[<]]>/b>"));
   assert.doesNotMatch(bracketed, /&lt;|&gt;|&amp;/);

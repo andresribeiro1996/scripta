@@ -1,3 +1,5 @@
+import type { Locale } from "../i18n/locale.js";
+import { sharedT } from "../i18n/sharedT.js";
 import { normalizeIsbn } from "./covers.js";
 import { normalizeBookGenres } from "./bookGenres.js";
 import { parseCsv } from "./csv.js";
@@ -5,18 +7,21 @@ import type { LibraryData } from "./types.js";
 
 export const LIBRARY_CSV_TEMPLATE = "Title,Author,ISBN,Status,Rating,Date Read,Date Added,Series,Series Number,Publisher,Language,Tags\r\n";
 
-export const BOOK_CSV_ERRORS = [
-  "That CSV has invalid quoting.",
-  "That book CSV doesn't have any books in it.",
-  "That book CSV has duplicate column names.",
-  "Each CSV row must have the same number of fields as the header.",
-  "Each CSV book needs a title and author.",
-  "CSV ISBNs must be ISBN-10 or ISBN-13, stored as text.",
-  "CSV statuses must be to-read, reading, or read.",
-  "CSV ratings must be numbers from 0 to 5.",
-  "CSV series numbers must be non-negative numbers.",
-  "CSV dates must be valid YYYY-MM-DD dates."
-] as const;
+export function bookCsvErrors(locale: Locale) {
+  const t = sharedT(locale);
+  return [
+    t("shared.csv.invalidQuoting"),
+    t("shared.csv.noBooks"),
+    t("shared.csv.duplicateColumns"),
+    t("shared.csv.fieldCount"),
+    t("shared.csv.titleAuthor"),
+    t("shared.csv.isbn"),
+    t("shared.csv.status"),
+    t("shared.csv.rating"),
+    t("shared.csv.seriesNumber"),
+    t("shared.csv.date")
+  ] as const;
+}
 
 function columnName(value: string): string {
   return value.trim().toLowerCase().replace(/_/g, " ");
@@ -27,7 +32,7 @@ export function looksLikeLibrarythingTsv(text: string): boolean {
   return ["book id", "title", "primary author"].every((name) => header.includes(name));
 }
 
-export function decodeLibraryImport(bytes: Uint8Array): string {
+export function decodeLibraryImport(bytes: Uint8Array, locale: Locale): string {
   if (bytes[0] === 239 && bytes[1] === 187 && bytes[2] === 191) bytes = bytes.subarray(3);
   const utf8 = new TextDecoder("utf-8", { fatal: true });
   try {
@@ -37,7 +42,7 @@ export function decodeLibraryImport(bytes: Uint8Array): string {
     const legacy = new TextDecoder("windows-1252");
     const newline = bytes.indexOf(10);
     if (!looksLikeLibrarythingTsv(legacy.decode(bytes.subarray(0, newline < 0 ? bytes.length : newline)))) {
-      throw new Error("Couldn't decode that file as text, and it isn't a SQLite database.");
+      throw new Error(sharedT(locale)("shared.csv.decode"));
     }
     let text = "";
     let start = 0;
@@ -57,20 +62,21 @@ export function decodeLibraryImport(bytes: Uint8Array): string {
   }
 }
 
-export function bookCsvToLibraryJson(text: string): LibraryData | null {
+export function bookCsvToLibraryJson(text: string, locale: Locale): LibraryData | null {
+  const errors = bookCsvErrors(locale);
   const librarything = looksLikeLibrarythingTsv(text);
-  const [rawHeader, ...rawRows] = parseCsv(text, librarything ? "\t" : ",");
+  const [rawHeader, ...rawRows] = parseCsv(text, locale, librarything ? "\t" : ",");
   if (!rawHeader) return null;
   const header = rawHeader.map(columnName);
   const bookwyrm = ["title", "author text", "remote id", "shelf"].every((name) => header.includes(name));
   if (!librarything && !bookwyrm && (!header.includes("title") || !(header.includes("author") || header.includes("authors")))) return null;
-  if (new Set(header).size !== header.length) throw new Error(BOOK_CSV_ERRORS[2]);
+  if (new Set(header).size !== header.length) throw new Error(errors[2]);
   const calibre = header.includes("authors") && ["id", "uuid", "library name", "series index", "timestamp", "formats"].some((name) => header.includes(name));
   const rows = rawRows.filter((row) => row.some((value) => value.trim()));
-  if (!rows.length) throw new Error(BOOK_CSV_ERRORS[1]);
+  if (!rows.length) throw new Error(errors[1]);
 
   const books = rows.map((values) => {
-    if (values.length !== header.length) throw new Error(BOOK_CSV_ERRORS[3]);
+    if (values.length !== header.length) throw new Error(errors[3]);
     const row = Object.fromEntries(header.map((name, i) => [name, values[i].trim()]));
     if (librarything) {
       row.author = row["primary author"];
@@ -78,7 +84,7 @@ export function bookCsvToLibraryJson(text: string): LibraryData | null {
       if (!row.isbn && row.isbns) {
         const isbns = row.isbns.split(/[,|]/).map((value) => normalizeIsbn(value.replace(/\[|\]/g, "")));
         row.isbn = isbns.find((value) => value.length === 13) || isbns.find(Boolean) || "";
-        if (!row.isbn) throw new Error(BOOK_CSV_ERRORS[5]);
+        if (!row.isbn) throw new Error(errors[5]);
       }
       row["date read"] = (row["date read"] || "").replace(/^\[|\]$/g, "");
       row["date started"] = (row["date started"] || "").replace(/^\[|\]$/g, "");
@@ -101,10 +107,10 @@ export function bookCsvToLibraryJson(text: string): LibraryData | null {
     }
     const title = row.title;
     const author = row.author || row.authors || "";
-    if (!title || (!author && !librarything && !bookwyrm)) throw new Error(BOOK_CSV_ERRORS[4]);
+    if (!title || (!author && !librarything && !bookwyrm)) throw new Error(errors[4]);
     const rawIsbn = (row.isbn13 || row.isbn || "").replace(/^="?([^"]*)"?$/, "$1");
     const isbn = normalizeIsbn(rawIsbn);
-    if (rawIsbn && !isbn) throw new Error(BOOK_CSV_ERRORS[5]);
+    if (rawIsbn && !isbn) throw new Error(errors[5]);
     const source = librarything ? "librarything" : bookwyrm ? "bookwyrm" : calibre ? "calibre" : "csv";
     const book: Record<string, unknown> = {
       ContentID: `${source}:${(librarything && row["book id"]) || (bookwyrm && row["remote id"]) || isbn || JSON.stringify([title, author])}`,
@@ -117,20 +123,20 @@ export function bookCsvToLibraryJson(text: string): LibraryData | null {
     if (status) {
       const statuses: Record<string, number> = { "to-read": 0, unread: 0, reading: 1, "currently-reading": 1, read: 2, finished: 2 };
       const key = status.toLowerCase();
-      if (!Object.hasOwn(statuses, key)) throw new Error(BOOK_CSV_ERRORS[6]);
+      if (!Object.hasOwn(statuses, key)) throw new Error(errors[6]);
       const readStatus = statuses[key];
       book.ReadStatus = readStatus;
       if (readStatus === 2) book.___PercentRead = 100;
     }
     if (row.rating) {
       const rating = Number(row.rating);
-      if (!Number.isFinite(rating) || rating < 0 || rating > 5) throw new Error(BOOK_CSV_ERRORS[7]);
+      if (!Number.isFinite(rating) || rating < 0 || rating > 5) throw new Error(errors[7]);
       book.Rating = rating || null;
     }
     const seriesNumber = row["series number"] || row["series index"];
     if (seriesNumber) {
       const number = Number(seriesNumber);
-      if (!Number.isFinite(number) || number < 0) throw new Error(BOOK_CSV_ERRORS[8]);
+      if (!Number.isFinite(number) || number < 0) throw new Error(errors[8]);
       book.SeriesNumber = number;
     }
     for (const [column, field] of [["series", "Series"], ["publisher", "Publisher"], ["language", "Language"]]) {
@@ -141,12 +147,12 @@ export function bookCsvToLibraryJson(text: string): LibraryData | null {
       const date = row[column];
       if (!date) continue;
       if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(Date.parse(date)) || new Date(date).toISOString().slice(0, 10) !== date) {
-        throw new Error(BOOK_CSV_ERRORS[9]);
+        throw new Error(errors[9]);
       }
       book[field] = date;
     }
     if (calibre && row.timestamp) {
-      if (!Number.isFinite(Date.parse(row.timestamp))) throw new Error(BOOK_CSV_ERRORS[9]);
+      if (!Number.isFinite(Date.parse(row.timestamp))) throw new Error(errors[9]);
       book.DateCreated = row.timestamp;
     }
     const genres = normalizeBookGenres(row.tags);

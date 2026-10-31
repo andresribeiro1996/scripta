@@ -1,3 +1,5 @@
+import type { Locale } from "../i18n/locale.js";
+import { sharedT } from "../i18n/sharedT.js";
 import { coverQueryKey, type CoverLookupParams } from "./coverResolver.js";
 
 export const COVER_MIN_ASPECT_RATIO = 1.2;
@@ -97,16 +99,16 @@ export function isCurrentCover(candidate: CoverCandidateView, coverUrl: unknown)
   return typeof coverUrl === "string" && coverUrl !== "" && (coverUrl === candidate.url || coverUrl === candidate.fullUrl);
 }
 
-const SOURCE_LABELS = new Map([
+const SOURCE_NAMES = new Map([
   ["kobo", "Kobo"],
   ["isbndb", "ISBNdb"],
   ["openlibrary", "Open Library"],
-  ["apple", "Apple Books"],
-  ["bnp", "National Library of Portugal"],
-  ["publisher", "Publisher"],
-  ["upload", "Admin upload"]
+  ["apple", "Apple Books"]
 ]);
 
-export function coverSourceLabel(source: string): string {
-  return SOURCE_LABELS.get(source) ?? source;
+const SOURCE_KEYS = { bnp: "shared.coverSource.bnp", publisher: "shared.coverSource.publisher", upload: "shared.coverSource.upload" } as const;
+
+export function coverSourceLabel(source: string, locale: Locale): string {
+  if (Object.hasOwn(SOURCE_KEYS, source)) return sharedT(locale)(SOURCE_KEYS[source as keyof typeof SOURCE_KEYS]);
+  return SOURCE_NAMES.get(source) ?? source;
 }

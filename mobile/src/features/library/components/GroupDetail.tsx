@@ -33,6 +33,7 @@ import { assertSaved, attemptUpdate } from "../lib/attemptUpdate";
 import { BookCard } from "./BookCard";
 import { BookWrapGrid } from "./BookWrapGrid";
 import { PerCardStyleSheet } from "./PerCardStyleForm";
+import { getLocale } from "../../../i18n";
 
 export function GroupDetail({ groupId }: { groupId: string }) {
   const { data: library, isPending, updateLibrary, submit } = useLibrary();
@@ -64,7 +65,7 @@ export function GroupDetail({ groupId }: { groupId: string }) {
 
   async function runUpdate(mutate: (data: LibraryData) => LibraryData, onSuccess?: () => void) {
     setNotice(null);
-    return attemptUpdate(() => updateLibrary(mutate), (error) => setNotice(saveFailureMessage(error, "Couldn't save — check your connection.")), onSuccess);
+    return attemptUpdate(() => updateLibrary(mutate), (error) => setNotice(saveFailureMessage(error, "Couldn't save — check your connection.", getLocale())), onSuccess);
   }
 
   function handleCommitRename() {
@@ -85,7 +86,7 @@ export function GroupDetail({ groupId }: { groupId: string }) {
     setPickerError(null);
     void attemptUpdate(
       async () => assertSaved(await submit({ kind: "membership", groupId: group.id, bookKey: bookKey(book), member: !inGroup })),
-      (error) => setPickerError(saveFailureMessage(error, "Couldn't save — check your connection.")),
+      (error) => setPickerError(saveFailureMessage(error, "Couldn't save — check your connection.", getLocale())),
     );
   }
 
@@ -94,7 +95,7 @@ export function GroupDetail({ groupId }: { groupId: string }) {
     setStyleError(null);
     void attemptUpdate(
       () => updateLibrary((data) => ({ ...data, groups: setGroupStyle(data.groups ?? [], group.id, groupStyle) })),
-      (error) => setStyleError(saveFailureMessage(error, "Couldn't save the style change.")),
+      (error) => setStyleError(saveFailureMessage(error, "Couldn't save the style change.", getLocale())),
     );
   }
 
