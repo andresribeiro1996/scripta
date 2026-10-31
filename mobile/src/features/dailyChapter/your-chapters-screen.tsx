@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Pressable, ScrollView, View } from "react-native";
 import { Stack, useRouter } from "expo-router";
-import { DAILY_CHAPTER_THEMES, dailyChapterMonthShare, dailyChapterSummary, dailyChapterThemeRates, recapMonthName } from "@scripta/shared";
+import { DAILY_CHAPTER_THEMES, dailyChapterMonthShare, dailyChapterMonthStats, dailyChapterSummary, dailyChapterThemeRates, recapMonthName } from "@scripta/shared";
 import { Text } from "../../ui/Text";
 import { Button, EmptyState, ErrorState, Icon, IconButton, Screen, Skeleton, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import { ContentShareSheet } from "../sharing/ContentShareSheet";
@@ -36,6 +36,7 @@ export function YourChaptersScreen() {
   else {
     const first = data.results[data.results.length - 1]!.date.slice(0, 7);
     const summary = dailyChapterSummary(data, month);
+    const monthSummary = { ...summary, ...dailyChapterMonthStats(data.results, month) };
     const rates = dailyChapterThemeRates(data.themes);
     const themeName = (id: string) => DAILY_CHAPTER_THEMES.find((theme) => theme.id === id)?.name ?? id;
     const byDate = new Map(data.results.map((result) => [result.date, result.editionId]));
@@ -65,8 +66,8 @@ export function YourChaptersScreen() {
         </Pressable>)}
       </View>
       <Button label="Share my chapters" onPress={() => setSharing(true)} />
-      <ContentShareSheet visible={sharing} onClose={() => setSharing(false)} title="My Daily Chapter" url={link.data ?? null} linkError={link.error ? link.error.message : null} onRetryLink={() => void link.refetch()} textMessage={link.data ? dailyChapterMonthShare(summary, link.data) : undefined}>
-        <DailyChapterPoster summary={summary} />
+      <ContentShareSheet visible={sharing} onClose={() => setSharing(false)} title="My Daily Chapter" url={link.data ?? null} linkError={link.error ? link.error.message : null} onRetryLink={() => void link.refetch()} textMessage={link.data ? dailyChapterMonthShare(monthSummary, link.data) : undefined}>
+        <DailyChapterPoster summary={monthSummary} />
       </ContentShareSheet>
     </>;
   }

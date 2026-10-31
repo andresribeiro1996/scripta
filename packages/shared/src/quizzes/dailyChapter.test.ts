@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { dailyChapterCoverage, dailyChapterMonth, dailyChapterMonthShare, dailyChapterShare, dailyChapterStats, dailyChapterSubmission, dailyChapterSummary, dailyChapterThemeRates, readDailyChapterDraft, type DailyChapterBook, type DailyChapterQuestion, type DailyChapterResult } from "./dailyChapter.js";
+import { dailyChapterCoverage, dailyChapterMonth, dailyChapterMonthShare, dailyChapterMonthStats, dailyChapterShare, dailyChapterStats, dailyChapterSubmission, dailyChapterSummary, dailyChapterThemeRates, readDailyChapterDraft, type DailyChapterBook, type DailyChapterQuestion, type DailyChapterResult } from "./dailyChapter.js";
 
 const book: DailyChapterBook = { id: "book-1", title: "A Book", author: "A Writer", language: "en", themeIds: ["retold-myths"] };
 const question: DailyChapterQuestion = { id: "q1", bookId: book.id, type: "quote_title", prompt: "A passage", options: ["A Book", "Two", "Three", "Four"], answerIndex: 0, explanation: "An explanation", sourceUrl: "https://example.org/book", sourceEdition: "First edition", rights: { basis: "public-domain", evidence: "Reviewed evidence" }, approvedAt: "2030-01-01", approvedBy: "editor" };
@@ -111,4 +111,16 @@ test("days before the first play and today's unplayed edition are not drawn as m
   assert.deepEqual(morning.slice(0, 7).map((day) => day.published), [false, false, true, false, true, false, false]);
   const evening = dailyChapterMonth(dailyChapterStats([result("e03", "2030-01-03"), result("e07", "2030-01-07", 4)], releases, "2030-01-07"), "2030-01");
   assert.deepEqual(evening[6], { date: "2030-01-07", published: true, score: 4 });
+});
+
+test("a month share carries that month's average and best theme, not the lifetime ones", () => {
+  const releases = [{ id: "s1", date: "2030-09-30", themeId: "retold-myths" }, { id: "o1", date: "2030-10-01", themeId: "space-adventures" }];
+  const september = { ...result("s1", "2030-09-30", 0), themeId: "retold-myths" };
+  const october = { ...result("o1", "2030-10-01", 5), themeId: "space-adventures" };
+  const history = dailyChapterStats([september, october], releases, "2030-10-01");
+  assert.deepEqual(dailyChapterMonthStats(history.results, "2030-09"), { average: 0, bestTheme: { themeId: "retold-myths", percent: 0 } });
+  assert.deepEqual(dailyChapterMonthStats(history.results, "2030-10"), { average: 5, bestTheme: { themeId: "space-adventures", percent: 100 } });
+  const summary = { ...dailyChapterSummary(history, "2030-09"), ...dailyChapterMonthStats(history.results, "2030-09") };
+  assert.equal(dailyChapterSummary(history, "2030-09").average, 2.5);
+  assert.equal(dailyChapterMonthShare(summary, "https://example.org/daily"), "The Daily Chapter · September 2030\n🟥\n2-day streak · 0 avg\nhttps://example.org/daily");
 });

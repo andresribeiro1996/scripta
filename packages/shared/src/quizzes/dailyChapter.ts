@@ -216,17 +216,31 @@ export function dailyChapterMonth(history: Pick<DailyChapterHistory, "results" |
   });
 }
 
-export function dailyChapterThemeRates(themes: DailyChapterThemeStats[]): Array<{ themeId: string; percent: number }> {
+export function dailyChapterThemeRates(themes: Array<Pick<DailyChapterThemeStats, "themeId" | "correct" | "answered">>): Array<{ themeId: string; percent: number }> {
   return themes
     .filter((theme) => theme.answered > 0)
     .map((theme) => ({ themeId: theme.themeId, percent: Math.round(theme.correct / theme.answered * 100) }))
     .sort((a, b) => b.percent - a.percent || a.themeId.localeCompare(b.themeId));
 }
 
+const averageScore = (results: DailyChapterResult[]) => results.length ? Math.round(results.reduce((sum, result) => sum + result.score, 0) / results.length * 10) / 10 : 0;
+
+export function dailyChapterMonthStats(results: DailyChapterResult[], month: string): Pick<DailyChapterPlayerSummary, "average" | "bestTheme"> {
+  const played = results.filter((result) => result.date.startsWith(month));
+  const themes = new Map<string, { themeId: string; correct: number; answered: number }>();
+  for (const result of played) {
+    const theme = themes.get(result.themeId) ?? { themeId: result.themeId, correct: 0, answered: 0 };
+    theme.correct += result.score;
+    theme.answered += 5;
+    themes.set(result.themeId, theme);
+  }
+  return { average: averageScore(played), bestTheme: dailyChapterThemeRates([...themes.values()])[0] ?? null };
+}
+
 export function dailyChapterSummary(history: DailyChapterHistory, month: string): DailyChapterPlayerSummary {
   return {
     streak: history.streak,
-    average: history.results.length ? Math.round(history.correct / history.results.length * 10) / 10 : 0,
+    average: averageScore(history.results),
     perfect: history.results.filter((result) => result.score === 5).length,
     bestTheme: dailyChapterThemeRates(history.themes)[0] ?? null,
     month,
