@@ -54,7 +54,7 @@ function forYou(items: DigestItem[], page: Partial<DashboardFeedPage>) {
 test("a finished book: avatar, name, event label, time, cover, title, author, and its primary link", () => {
   const html = card(finishedReading);
   assert.match(html, /<article/);
-  assert.match(html, new RegExp(feedEventLabel(finishedReading)));
+  assert.match(html, new RegExp(feedEventLabel(finishedReading, "en")));
   assert.match(html, />Piranesi</);
   assert.match(html, /Susanna Clarke/);
   assert.match(html, new RegExp(`href="${digestTarget(finishedReading)}"`));

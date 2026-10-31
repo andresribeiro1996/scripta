@@ -1,14 +1,13 @@
+import type { Locale } from "../i18n/locale.js";
+import { sharedT } from "../i18n/sharedT.js";
 import type { ApiRequest } from "../api/port.js";
 import { isKnownContent } from "../community/helpers.js";
 import type { TopShelf, TopShelfPeriod, TopShelfRecap, TopShelfRecapCard, TopShelfRecapIndex, TopShelfView } from "./types.js";
 
-const MONTH_NAMES = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December"
-];
+const LONG_MONTHS = ["longJan", "longFeb", "longMar", "longApr", "longMay", "longJun", "longJul", "longAug", "longSep", "longOct", "longNov", "longDec"] as const;
 
-export function recapMonthName(month: string): string {
-  return MONTH_NAMES[Number(month.slice(5, 7)) - 1]!;
+export function recapMonthName(month: string, locale: Locale): string {
+  return sharedT(locale)(`shared.months.${LONG_MONTHS[Number(month.slice(5, 7)) - 1]!}`);
 }
 
 export function createTopShelfApi(request: ApiRequest) {

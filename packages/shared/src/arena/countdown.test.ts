@@ -10,15 +10,15 @@ const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 
 test("a deadline days away counts in days, not three-digit hours", () => {
-  assert.equal(countdownLabel(at(6 * DAY + 6 * HOUR), NOW), "6d 6h left");
-  assert.equal(countdownLabel(at(2 * DAY), NOW), "2d 0h left");
+  assert.equal(countdownLabel(at(6 * DAY + 6 * HOUR), "en", NOW), "6d 6h left");
+  assert.equal(countdownLabel(at(2 * DAY), "en", NOW), "2d 0h left");
 });
 
 test("the last day counts in hours, and the last hour in minutes", () => {
-  assert.equal(countdownLabel(at(23 * HOUR + 59 * MINUTE), NOW), "23h 59m left");
-  assert.equal(countdownLabel(at(45 * MINUTE + 30_000), NOW), "45m 30s left");
+  assert.equal(countdownLabel(at(23 * HOUR + 59 * MINUTE), "en", NOW), "23h 59m left");
+  assert.equal(countdownLabel(at(45 * MINUTE + 30_000), "en", NOW), "45m 30s left");
 });
 
 test("a passed deadline is closing, whatever it says", () => {
-  assert.equal(countdownLabel(at(-1), NOW), "Closing…");
+  assert.equal(countdownLabel(at(-1), "en", NOW), "Closing…");
 });

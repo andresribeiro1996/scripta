@@ -23,8 +23,10 @@ import { backTo } from "../lib/areas";
 import { ensureBookBlockHeights, profileOnlyMural, type Mural } from "../lib/murals";
 import { useResolvedTheme } from "../lib/theme";
 import { buildReconstructedBooks } from "../lib/sharedMural";
+import { useLocale } from "../i18n";
 
 export function CommunityProfilePage() {
+  const locale = useLocale();
   const { username } = useParams<{ username: string }>();
   const { session } = useAuth();
   const queryClient = useQueryClient();
@@ -105,9 +107,9 @@ export function CommunityProfilePage() {
       }
     : null;
   const publishedRows = [
-    ...view.published.tierlists.map((item) => ({ kind: contentKindLabel(item), name: item.name, detail: contentDetail(item), target: contentTarget(item) })),
-    ...view.published.tournaments.map((item) => ({ kind: contentKindLabel(item), name: item.name, detail: contentDetail(item), target: contentTarget(item) })),
-    ...view.published.quizzes.map((item) => ({ kind: contentKindLabel(item), name: item.name, detail: contentDetail(item), target: contentTarget(item) }))
+    ...view.published.tierlists.map((item) => ({ kind: contentKindLabel(item, locale), name: item.name, detail: contentDetail(item, locale), target: contentTarget(item) })),
+    ...view.published.tournaments.map((item) => ({ kind: contentKindLabel(item, locale), name: item.name, detail: contentDetail(item, locale), target: contentTarget(item) })),
+    ...view.published.quizzes.map((item) => ({ kind: contentKindLabel(item, locale), name: item.name, detail: contentDetail(item, locale), target: contentTarget(item) }))
   ];
 
   const user = view.profile.user;

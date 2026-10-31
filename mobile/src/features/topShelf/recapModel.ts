@@ -1,6 +1,7 @@
 import { plural, recapMonthName, type TopShelfBoard, type TopShelfRecapCard } from "@scripta/shared";
 import { contentTarget } from "@scripta/shared/community";
 import { gameScoreLabel, valueLabel } from "./topShelfModel";
+import { getLocale } from "../../i18n";
 
 const RECORD_TITLES: Record<Exclude<TopShelfBoard, "champions">, [string, string]> = {
   crowned: ["👑", "most crowned"],
@@ -13,7 +14,8 @@ const RECORD_TITLES: Record<Exclude<TopShelfBoard, "champions">, [string, string
 const VOTE_VERBS = { tierlist: "Rank it yourself", quiz: "Play it yourself", tournament: "Vote in the bracket" } as const;
 
 export function recapTitle(card: TopShelfRecapCard, month: string): string {
-  const name = recapMonthName(month);
+  const locale = getLocale();
+  const name = recapMonthName(month, locale);
   switch (card.kind) {
     case "summary": return `${name} on Atmyshelf`;
     case "hottestGame": return `🔥 ${name}'s hottest game`;
@@ -41,11 +43,12 @@ export function recapNumber(card: TopShelfRecapCard): string {
 }
 
 export function recapCta(card: TopShelfRecapCard, currentMonth: string): string {
+  const locale = getLocale();
   switch (card.kind) {
     case "summary": return "Join in on Atmyshelf";
     case "dailyChapter": return "Play today's Daily Chapter";
     case "hottestGame": return card.open ? "Play it yourself" : "See how it ended";
-    case "book": return card.game ? `${VOTE_VERBS[card.game.content.kind]} — it counts for ${recapMonthName(currentMonth)}` : `See ${card.book.title} on Atmyshelf`;
+    case "book": return card.game ? `${VOTE_VERBS[card.game.content.kind]} — it counts for ${recapMonthName(currentMonth, locale)}` : `See ${card.book.title} on Atmyshelf`;
   }
 }
 

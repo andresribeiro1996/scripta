@@ -51,10 +51,10 @@ test("canCreate needs 4 for a tier list and exactly the size for a tournament", 
 });
 
 test("itemNoun names characters when there is a subject", () => {
-  assert.equal(itemNoun(subject, 12), "characters");
-  assert.equal(itemNoun(subject, 1), "character");
-  assert.equal(itemNoun(undefined, 1), "book");
-  assert.equal(itemNoun(null, 2), "books");
+  assert.equal(itemNoun(subject, 12, "en"), "characters");
+  assert.equal(itemNoun(subject, 1, "en"), "character");
+  assert.equal(itemNoun(undefined, 1, "en"), "book");
+  assert.equal(itemNoun(null, 2, "en"), "books");
 });
 
 test("bookTierlists drops lists with a subject", () => {

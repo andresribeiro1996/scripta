@@ -22,6 +22,7 @@ import { createTier } from "../../lib/murals";
 import { BUTTON_SECONDARY, FIELD_CLASS } from "../page/buttonClasses";
 import { TierColorPicker } from "./TierColorPicker";
 import { TierRowEmpty, TierRowShell, TierRowTiles } from "./TierRowShell";
+import { useLocale } from "../../i18n";
 
 export interface TierBoardProps {
   data: TierlistData;
@@ -92,6 +93,7 @@ function TierEditorRow({
    *  color, order, and existence — is gated here. */
   structureEditable: boolean;
 }) {
+  const locale = useLocale();
   const byWork = booksByWork(books);
   const resolvedKeys = tier.workIds.filter((k) => byWork.has(k));
   return (
@@ -148,7 +150,7 @@ function TierEditorRow({
       <DropZone id={tier.id}>
         <TierRowShell tier={tier} colorControl={structureEditable ? <TierColorPicker color={tier.color} onChange={onRecolor} /> : undefined}>
           {resolvedKeys.length === 0 ? (
-            <TierRowEmpty message={`Drag a ${itemNoun(books.some(isCharacterBook), 1)} here from the pool.`} />
+            <TierRowEmpty message={`Drag a ${itemNoun(books.some(isCharacterBook), 1, locale)} here from the pool.`} />
           ) : (
             <TierRowTiles>
               {resolvedKeys.map((key) => {
@@ -181,6 +183,7 @@ function TierEditorRow({
  *  who rank the same fixed set of books into the same fixed tiers but
  *  can't touch the tier list's own shape (`structureEditable: false`). */
 export function TierBoard({ data, books, onChange, structureEditable, poolLabel, onAddBooks }: TierBoardProps) {
+  const locale = useLocale();
   const [poolCollapsed, setPoolCollapsed] = useState(false);
   // The book currently being dragged, tracked purely to feed `DragOverlay`
   // below — dnd-kit doesn't render an overlay on its own, and without one
@@ -389,7 +392,7 @@ export function TierBoard({ data, books, onChange, structureEditable, poolLabel,
             className="flex min-h-11 items-center gap-1.5 text-xs font-semibold text-(--color-text-dim) hover:text-(--color-text)"
           >
             {poolCollapsed ? <ChevronUpIcon /> : <ChevronDownIcon />}
-            {poolHeading} — {resolvedPool.length} {itemNoun(character, resolvedPool.length)}
+            {poolHeading} — {resolvedPool.length} {itemNoun(character, resolvedPool.length, locale)}
           </button>
           {/* Adding to the pool grows the frozen set voters would be
               ranking, so it's gated the same as the tier controls above —
@@ -408,7 +411,7 @@ export function TierBoard({ data, books, onChange, structureEditable, poolLabel,
             <div className="flex min-h-[7em] items-start gap-1.5 overflow-x-auto overscroll-contain px-3 pb-3">
               {resolvedPool.length === 0 ? (
                 <p className="py-4 text-xs text-(--color-text-dim)">
-                  Pool is empty — every {itemNoun(character, 1)} is ranked. Drag one back here to unrank it.
+                  Pool is empty — every {itemNoun(character, 1, locale)} is ranked. Drag one back here to unrank it.
                 </p>
               ) : (
                 resolvedPool.map((key) => (

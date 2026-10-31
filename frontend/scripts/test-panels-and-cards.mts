@@ -145,7 +145,7 @@ test("section headings: Published, day groups, Your chapters use SECTION_HEADING
 
 test("the owner's tier list ticket shows its state and size", () => {
   const s = src("pages/ArenaListPage");
-  assert.match(s, /badges=\{<StatusBadge \{\.\.\.ownedTierlistStatus\(tl\)\} \/>\}/);
+  assert.match(s, /badges=\{<StatusBadge \{\.\.\.ownedTierlistStatus\(tl, locale\)\} \/>\}/);
   assert.match(s, /stats=\{\[\{ value: tierlistBookCount\(tl\.data\)/);
 });
 

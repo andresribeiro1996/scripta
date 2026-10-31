@@ -1,11 +1,13 @@
-import { AGGREGATION_MODES, type AggregationMode } from "@scripta/shared";
+import { aggregationModes, type AggregationMode } from "@scripta/shared";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { dynamicType, radii, typography, useTheme } from "../../ui";
+import { useLocale } from "../../i18n";
 
 export function RankingMethodSelector({ mode, onChange }: { mode: AggregationMode; onChange: (mode: AggregationMode) => void }) {
+  const locale = useLocale();
   const { colors } = useTheme();
-  return <View accessibilityRole="radiogroup" accessibilityLabel="Ranking method" style={[styles.methods, { backgroundColor: colors.background }]}>{AGGREGATION_MODES.map((item) => <Pressable key={item.mode} accessibilityRole="radio" accessibilityState={{ checked: mode === item.mode }} onPress={() => onChange(item.mode)} style={[styles.method, mode === item.mode && { backgroundColor: colors.accentSoft }]}><Text numberOfLines={1} {...dynamicType} style={[typography.caption, { fontWeight: "600" }, { color: mode === item.mode ? colors.text : colors.textDim }]}>{item.label === "Most-voted" ? "Most voted" : item.label}</Text></Pressable>)}</View>;
+  return <View accessibilityRole="radiogroup" accessibilityLabel="Ranking method" style={[styles.methods, { backgroundColor: colors.background }]}>{aggregationModes(locale).map((item) => <Pressable key={item.mode} accessibilityRole="radio" accessibilityState={{ checked: mode === item.mode }} onPress={() => onChange(item.mode)} style={[styles.method, mode === item.mode && { backgroundColor: colors.accentSoft }]}><Text numberOfLines={1} {...dynamicType} style={[typography.caption, { fontWeight: "600" }, { color: mode === item.mode ? colors.text : colors.textDim }]}>{item.label === "Most-voted" ? "Most voted" : item.label}</Text></Pressable>)}</View>;
 }
 
 const styles = StyleSheet.create({

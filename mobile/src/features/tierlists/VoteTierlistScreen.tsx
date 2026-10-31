@@ -22,10 +22,12 @@ import { shareableCommunityResults } from "./tierlistShareData";
 import { CharacterHeader } from "../characters/CharacterHeader";
 import { ContentShareSheet } from "../sharing/ContentShareSheet";
 import { publicContentUrl } from "../sharing/links";
+import { useLocale } from "../../i18n";
 
 function storageKey(code: string) { return `tierlist-ballot:${code}`; }
 
 export function VoteTierlistScreen({ code, startInRank = false }: { code: string; startInRank?: boolean }) {
+  const locale = useLocale();
   const { colors } = useTheme();
   const { ready, user } = useAuth();
   const queryClient = useQueryClient();
@@ -138,7 +140,7 @@ export function VoteTierlistScreen({ code, startInRank = false }: { code: string
         </TierHead>
         {showRank ? <TierSortDeck data={data} books={books} selectedWorkId={selectedWorkId} onAssign={(workId, tierId) => { changeData(moveBookTo(data, workId, tierId)); if (selectedWorkId || (data.pool.length === 1 && data.pool.includes(workId))) { setSelectedWorkId(null); setView("board"); } }} /> : <TierBoard data={data} books={books} onChange={canEdit ? changeData : () => {}} structureEditable={false} poolLabel="Unranked" bottomClearance={76} onReassign={canEdit ? (workId) => { setSelectedWorkId(workId); setView("rank"); } : undefined} />}
         {blocked && board.votingOpen ? <Button label="Sign in to vote" onPress={() => router.push({ pathname: "/(public)/login", params: { returnTo: `/vote/${code}` } } as never)} /> : null}
-        {canEdit && (data.pool.length === 0 || placements.length > 0) ? <View style={[styles.complete, view === "board" && data.pool.length > 0 ? styles.fabClearance : null]}>{data.pool.length === 0 ? <Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>All {itemNoun(subject, 2)} ranked</Text> : null}<Button label={ballot ? "Update votes" : "Submit votes"} loading={busy} disabled={!dirty || !placements.length} onPress={() => void submit()} /></View> : null}
+        {canEdit && (data.pool.length === 0 || placements.length > 0) ? <View style={[styles.complete, view === "board" && data.pool.length > 0 ? styles.fabClearance : null]}>{data.pool.length === 0 ? <Text {...dynamicType} style={[typography.body, styles.strong, { color: colors.text }]}>All {itemNoun(subject, 2, locale)} ranked</Text> : null}<Button label={ballot ? "Update votes" : "Submit votes"} loading={busy} disabled={!dirty || !placements.length} onPress={() => void submit()} /></View> : null}
       </View>;
       if (!histogram) return <EmptyState title="No results yet" body="Live results stay hidden while voting is open. Submit your votes to see them as soon as they exist." />;
       return <View style={styles.community}>

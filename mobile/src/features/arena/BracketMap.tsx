@@ -8,6 +8,7 @@ import { BookCover } from "./BookCover";
 import { DuelSideRow } from "./DuelSideRow";
 import { BRACKET_MATCH_WIDTH, bracketMapLayout } from "./arenaView";
 import type { TournamentView } from "./api";
+import { useLocale } from "../../i18n";
 
 function MatchSide({ side, isWinner, decided, onPick, busy, coverWidth }: { side: DuelSide; isWinner: boolean; decided: boolean; onPick?: () => void; busy: boolean; coverWidth: number }) {
   const { colors } = useTheme();
@@ -203,6 +204,7 @@ export function BracketMap({
   onSettle: (duelId: string) => void;
   onTiebreak: (duelId: string, workId: string) => void;
 }) {
+  const locale = useLocale();
   const { colors } = useTheme();
   const [openId, setOpenId] = useState<string | null>(null);
   const [viewportWidth, setViewportWidth] = useState(0);
@@ -227,7 +229,7 @@ export function BracketMap({
   const bottom = sideRounds.map((slots) => slots.slice(Math.ceil(slots.length / 2)));
 
   function labelFor(roundIdx: number): string {
-    return roundLabel(byRound[roundIdx]!.length, roundIdx + 1);
+    return roundLabel(byRound[roundIdx]!.length, roundIdx + 1, locale);
   }
 
   const finalDuel = hasCentre ? finalRound[0] : null;
@@ -311,7 +313,7 @@ export function BracketMap({
         {openDuel ? (
           <ScrollView style={styles.sheetScroll} contentContainerStyle={styles.sheetBody}>
             <Text {...dynamicType} style={[typography.caption, styles.center, { color: colors.textDim }]}>
-              Round {openDuel.roundNumber} · Match {openDuel.duelIndex + 1} · {openDuel.status === "active" ? countdownLabel(openDuel.closesAt) : openDuel.status === "tied_pending_tiebreak" ? "Owner tiebreak needed" : "Settled"}
+              Round {openDuel.roundNumber} · Match {openDuel.duelIndex + 1} · {openDuel.status === "active" ? countdownLabel(openDuel.closesAt, locale) : openDuel.status === "tied_pending_tiebreak" ? "Owner tiebreak needed" : "Settled"}
             </Text>
             <DuelSideRow side={openDuel.bookA} duel={openDuel} character={tournament.subject !== null} onClose={() => setOpenId(null)} />
             <DuelSideRow side={openDuel.bookB} duel={openDuel} character={tournament.subject !== null} onClose={() => setOpenId(null)} />

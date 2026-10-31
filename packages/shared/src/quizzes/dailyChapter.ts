@@ -1,4 +1,6 @@
 import type { PublicQuizQuestion, SubmittedAnswer } from "./types.js";
+import type { Locale } from "../i18n/locale.js";
+import { sharedT } from "../i18n/sharedT.js";
 import { recapMonthName } from "../topShelf/api.js";
 import { DAILY_CHAPTER_THEMES, type DailyChapterTheme } from "./dailyThemes.js";
 
@@ -248,14 +250,15 @@ export function dailyChapterSummary(history: DailyChapterHistory, month: string)
   };
 }
 
-export function dailyChapterMonthShare(summary: DailyChapterPlayerSummary, url: string): string {
+export function dailyChapterMonthShare(summary: DailyChapterPlayerSummary, url: string, locale: Locale): string {
   const published = summary.days.filter((day) => day.published);
   const squares = published.map((day) => day.score === null ? "⬜" : day.score === 5 ? "🟩" : day.score >= 3 ? "🟨" : "🟥").join("");
-  return "The Daily Chapter · " + recapMonthName(summary.month) + " " + summary.month.slice(0, 4) + "\n" + squares + "\n" + summary.streak + "-day streak · " + summary.average + " avg\n" + url;
+  return sharedT(locale)("shared.dailyChapter.monthShare", { month: recapMonthName(summary.month, locale), year: summary.month.slice(0, 4), squares, streak: summary.streak, average: summary.average, url });
 }
 
-export function dailyChapterShare(result: DailyChapterResult, url: string): string {
-  return "The Daily Chapter · " + result.date + "\n" + result.title + "\n" + result.answers.map((answer) => answer.choiceIndex === answer.answerIndex ? "🟩" : "⬜").join("") + " " + result.score + "/5\n" + url;
+export function dailyChapterShare(result: DailyChapterResult, url: string, locale: Locale): string {
+  const squares = result.answers.map((answer) => answer.choiceIndex === answer.answerIndex ? "🟩" : "⬜").join("");
+  return sharedT(locale)("shared.dailyChapter.share", { date: result.date, title: result.title, squares, score: result.score, url });
 }
 
 export function dailyChapterSubmission(questions: PublicQuizQuestion[], answers: Record<string, number>): SubmittedAnswer[] | null {

@@ -37,7 +37,7 @@ test("defaults keep reading private", () => {
 
 test("activityRow gives each event a label, tone, title and link", () => {
   const row = (type: ActivityItem["type"], payload: Record<string, unknown>) => {
-    const result = activityRow({ id: "1", type, payload, createdAt: "x" });
+    const result = activityRow({ id: "1", type, payload, createdAt: "x" }, "en");
     assert.ok(result, `no row for ${type}`);
     return result;
   };
@@ -60,20 +60,20 @@ test("activityRow gives each event a label, tone, title and link", () => {
 });
 
 test("activityRow gives quiz events a row and returns null for a type it does not know", () => {
-  const quizRow = activityRow({ id: "1", type: "quiz_published", payload: { name: "Dune trivia", href: "/play/qcode", detail: "8 questions · 3 plays", covers: ["a"] }, createdAt: "x" });
+  const quizRow = activityRow({ id: "1", type: "quiz_published", payload: { name: "Dune trivia", href: "/play/qcode", detail: "8 questions · 3 plays", covers: ["a"] }, createdAt: "x" }, "en");
   assert.deepEqual(quizRow, {
     kind: "publication", label: "Published a quiz", tone: "accent", title: "Dune trivia", meta: "8 questions · 3 plays", covers: ["a"], href: "/play/qcode", username: null, workId: null
   });
-  assert.equal(activityRow({ id: "1", type: "voted_on", payload: { game: "quiz", name: "Dune trivia", href: "/play/qcode" }, createdAt: "x" })?.label, "Played a quiz");
-  assert.equal(activityRow({ id: "1", type: "hologram" as ActivityItem["type"], payload: {}, createdAt: "x" }), null);
+  assert.equal(activityRow({ id: "1", type: "voted_on", payload: { game: "quiz", name: "Dune trivia", href: "/play/qcode" }, createdAt: "x" }, "en")?.label, "Played a quiz");
+  assert.equal(activityRow({ id: "1", type: "hologram" as ActivityItem["type"], payload: {}, createdAt: "x" }, "en"), null);
 });
 
 test("activityDay names recent days and dates older ones", () => {
   const now = new Date(2026, 8, 22, 15);
-  assert.equal(activityDay(new Date(2026, 8, 22, 1).toISOString(), now), "Today");
-  assert.equal(activityDay(new Date(2026, 8, 21, 23).toISOString(), now), "Yesterday");
-  assert.equal(activityDay(new Date(2026, 8, 18).toISOString(), now), new Date(2026, 8, 18).toLocaleDateString(undefined, { weekday: "long" }));
-  assert.equal(activityDay(new Date(2026, 7, 1).toISOString(), now), new Date(2026, 7, 1).toLocaleDateString(undefined, { month: "long", day: "numeric" }));
-  assert.match(activityDay(new Date(2025, 0, 5).toISOString(), now), /2025/);
-  assert.equal(activityDay("nope", now), "");
+  assert.equal(activityDay(new Date(2026, 8, 22, 1).toISOString(), "en", now), "Today");
+  assert.equal(activityDay(new Date(2026, 8, 21, 23).toISOString(), "en", now), "Yesterday");
+  assert.equal(activityDay(new Date(2026, 8, 18).toISOString(), "en", now), new Date(2026, 8, 18).toLocaleDateString(undefined, { weekday: "long" }));
+  assert.equal(activityDay(new Date(2026, 7, 1).toISOString(), "en", now), new Date(2026, 7, 1).toLocaleDateString(undefined, { month: "long", day: "numeric" }));
+  assert.match(activityDay(new Date(2025, 0, 5).toISOString(), "en", now), /2025/);
+  assert.equal(activityDay("nope", "en", now), "");
 });

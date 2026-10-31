@@ -1,9 +1,11 @@
 import { FAN_SIZE, TIER_LADDER } from "../community/communityHome";
 import { itemNoun, quizPreview, tierlistBookCount, type QuizPreview } from "@scripta/shared";
-import { CONTENT_STATUS, ownedTierlistStatus, type ContentTone } from "@scripta/shared/community";
+import { contentStatusBadge, ownedTierlistStatus, type ContentTone } from "@scripta/shared/community";
 import type { Quiz } from "../quizzes/api";
 import type { Tierlist, VotedTierlist } from "../tierlists/api";
 import type { Tournament } from "./api";
+import type { Locale } from "@scripta/shared/i18n";
+import { getLocale } from "../../i18n";
 
 export const ARENA_TABS = [
   { value: "tournaments", label: "Tournaments" },
@@ -47,21 +49,16 @@ export const DELETE_EFFECT: Record<OwnedItem["kind"], string> = {
 
 type Badge = { label: string; tone: ContentTone };
 
-const DRAFT_BADGE: Badge = CONTENT_STATUS.draft;
-
-const TOURNAMENT_BADGE: Record<Tournament["status"], Badge> = {
-  seeding: { label: "Seeding", tone: "neutral" },
-  active: CONTENT_STATUS.inProgress,
-  completed: CONTENT_STATUS.completed,
-};
+function tournamentBadge(status: Tournament["status"], locale: Locale): Badge {
+  if (status === "seeding") return { label: "Seeding", tone: "neutral" };
+  return contentStatusBadge(status === "active" ? "inProgress" : "completed", locale);
+}
 
 type Stage = "draft" | "open" | "closed";
 
-const TIERLIST_BADGE: Record<Stage, Badge> = { draft: DRAFT_BADGE, open: CONTENT_STATUS.votingOpen, closed: CONTENT_STATUS.closed };
+const TIERLIST_STATUS = { draft: "draft", open: "votingOpen", closed: "closed" } as const;
 
-const QUIZ_BADGE: Record<Stage, Badge> = { draft: DRAFT_BADGE, open: CONTENT_STATUS.open, closed: CONTENT_STATUS.closed };
-
-const VOTED_BADGE: Badge = { label: "Voted", tone: "info" };
+const QUIZ_STATUS = { draft: "draft", open: "open", closed: "closed" } as const;
 
 function stage(voteCode: string | null, open: boolean): Stage {
   return !voteCode ? "draft" : open ? "open" : "closed";
@@ -76,6 +73,7 @@ export function tabAtIndex(index: number): ArenaTab {
 }
 
 export function ownedItems(tab: ArenaTab, tournaments: Tournament[], tierlists: Tierlist[], quizzes: Quiz[] = []): OwnedItem[] {
+  const locale = getLocale();
   if (tab === "tournaments") {
     return tournaments.map((source) => ({
       id: source.id,
@@ -101,7 +99,7 @@ export function ownedItems(tab: ArenaTab, tournaments: Tournament[], tierlists: 
     return {
       id: source.id,
       name: source.name,
-      detail: `${books} ${itemNoun(source.subject, books)} · ${tiers} ${tiers === 1 ? "tier" : "tiers"}`,
+      detail: `${books} ${itemNoun(source.subject, books, locale)} · ${tiers} ${tiers === 1 ? "tier" : "tiers"}`,
       kind: "tierlist",
       source,
     };
@@ -198,7 +196,8 @@ export function tierlistRowCovers(tierlist: Tierlist, byWork: Map<string, Record
 }
 
 export function votedTierlistDetail(tierlist: VotedTierlist): string {
-  return `${tierlist.poolSize} ${itemNoun(tierlist.subject, tierlist.poolSize)} · ${tierlist.ballotCount} ballots`;
+  const locale = getLocale();
+  return `${tierlist.poolSize} ${itemNoun(tierlist.subject, tierlist.poolSize, locale)} · ${tierlist.ballotCount} ballots`;
 }
 
 export type GameRowModel = {
@@ -213,20 +212,22 @@ export type GameRowModel = {
 };
 
 function tournamentRow(tournament: Tournament): GameRowModel {
+  const locale = getLocale();
   return {
     kind: "tournament",
     name: tournament.name,
-    meta: `${tournament.bracketSize}-${itemNoun(tournament.subject, 1)} bracket`,
-    badges: [TOURNAMENT_BADGE[tournament.status]],
+    meta: `${tournament.bracketSize}-${itemNoun(tournament.subject, 1, locale)} bracket`,
+    badges: [tournamentBadge(tournament.status, locale)],
     caption: tournamentProgress(tournament).label,
     covers: tournament.covers,
   };
 }
 
 export function gameRow(row: Exclude<SectionedItem, { kind: "header" }>): GameRowModel {
+  const locale = getLocale();
   if (row.kind === "votedTournament") {
     const model = tournamentRow(row.tournament);
-    return { ...model, badges: [...model.badges, VOTED_BADGE] };
+    return { ...model, badges: [...model.badges, contentStatusBadge("voted", locale)] };
   }
   if (row.kind === "votedTierlist") {
     const { tierlist } = row;
@@ -234,7 +235,7 @@ export function gameRow(row: Exclude<SectionedItem, { kind: "header" }>): GameRo
       kind: "tierlist",
       name: tierlist.name,
       meta: votedTierlistDetail(tierlist),
-      badges: [TIERLIST_BADGE[tierlist.votingOpen ? "open" : "closed"], VOTED_BADGE],
+      badges: [contentStatusBadge(TIERLIST_STATUS[tierlist.votingOpen ? "open" : "closed"], locale), contentStatusBadge("voted", locale)],
       covers: tierlist.covers,
       ladder: TIER_LADDER,
     };
@@ -246,7 +247,7 @@ export function gameRow(row: Exclude<SectionedItem, { kind: "header" }>): GameRo
       kind: "quiz",
       name: item.name,
       meta: item.detail,
-      badges: [QUIZ_BADGE[stage(item.source.voteCode, item.source.playOpen)]],
+      badges: [contentStatusBadge(QUIZ_STATUS[stage(item.source.voteCode, item.source.playOpen)], locale)],
       covers: item.source.data.books.flatMap((book) => (book.coverUrl ? [book.coverUrl] : [])),
       preview: quizPreview(item.source.data),
     };
@@ -255,7 +256,7 @@ export function gameRow(row: Exclude<SectionedItem, { kind: "header" }>): GameRo
     kind: "tierlist",
     name: item.name,
     meta: item.detail,
-    badges: [ownedTierlistStatus(item.source)],
+    badges: [ownedTierlistStatus(item.source, locale)],
     covers: [],
     ladder: item.source.data.tiers.map((tier) => tier.color),
   };

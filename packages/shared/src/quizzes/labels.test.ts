@@ -7,20 +7,20 @@ const books: QuizBook[] = [{ workId: "w1", title: "Dune", author: "Frank Herbert
 const question = (workId: string | null): QuizQuestion => ({ id: "q0", type: "quote_title", workId, options: ["a", "b"], answerIndex: 0 });
 
 test("a question label names the book it is about", () => {
-  assert.equal(quizQuestionLabel(question("w1"), 0, books), "Q1 · Dune");
-  assert.equal(quizQuestionLabel(question("missing"), 2, books), "Q3");
-  assert.equal(quizQuestionLabel(question(null), 2, books), "Q3");
+  assert.equal(quizQuestionLabel(question("w1"), 0, books, "en"), "Q1 · Dune");
+  assert.equal(quizQuestionLabel(question("missing"), 2, books, "en"), "Q3");
+  assert.equal(quizQuestionLabel(question(null), 2, books, "en"), "Q3");
 });
 
 test("a title_cover option is shown as its book's title", () => {
-  assert.equal(quizOptionLabel("title_cover", "/c/dune.jpg", books), "Dune");
-  assert.equal(quizOptionLabel("title_cover", "/c/other.jpg", books), "Unknown book");
-  assert.equal(quizOptionLabel("quote_title", "Dune", books), "Dune");
+  assert.equal(quizOptionLabel("title_cover", "/c/dune.jpg", books, "en"), "Dune");
+  assert.equal(quizOptionLabel("title_cover", "/c/other.jpg", books, "en"), "Unknown book");
+  assert.equal(quizOptionLabel("quote_title", "Dune", books, "en"), "Dune");
 });
 
 test("a player without a name is a guest", () => {
-  assert.deepEqual(playerLabel({ playerName: null, anonymous: true }), { name: "Guest", guest: true });
-  assert.deepEqual(playerLabel({ playerName: "Reader", anonymous: false }), { name: "Reader", guest: false });
+  assert.deepEqual(playerLabel({ playerName: null, anonymous: true }, "en"), { name: "Guest", guest: true });
+  assert.deepEqual(playerLabel({ playerName: "Reader", anonymous: false }, "en"), { name: "Reader", guest: false });
 });
 
 test("score rows carry the right answer, and the pick when wrong", () => {
@@ -36,9 +36,9 @@ test("score rows carry the right answer, and the pick when wrong", () => {
 });
 
 test("the discover clue heading follows the question type", () => {
-  assert.equal(quizClueHeading("characters_title"), "Which book has these characters?");
-  assert.equal(quizClueHeading("title_cover"), "Which cover belongs to this title?");
-  assert.equal(quizClueHeading("quote_title"), "Which book is this from?");
+  assert.equal(quizClueHeading("characters_title", "en"), "Which book has these characters?");
+  assert.equal(quizClueHeading("title_cover", "en"), "Which cover belongs to this title?");
+  assert.equal(quizClueHeading("quote_title", "en"), "Which book is this from?");
 });
 
 test("result covers are the first three distinct covers in question order", () => {

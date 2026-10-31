@@ -45,13 +45,13 @@ function tournamentPath(record: TournamentRecord) {
   const finalRound = best.round + Math.log2(best.duels);
   return Array.from({ length: finalRound }, (_, index) => {
     const round = index + 1;
-    return { label: roundLabel(2 ** (finalRound - round), round), reached: round <= best.round };
+    return { label: roundLabel(2 ** (finalRound - round), round, "en"), reached: round <= best.round };
   });
 }
 
 function bestFinish(record: TournamentRecord): string | null {
   if (record.titles > 0) return "Winner";
-  return record.best ? roundLabel(record.best.duels, record.best.round) : null;
+  return record.best ? roundLabel(record.best.duels, record.best.round, "en") : null;
 }
 
 export function bookStatsModel(stats: BookStats | null, openLibrary: { value: number; count: number } | null) {

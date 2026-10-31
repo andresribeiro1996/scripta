@@ -1,4 +1,4 @@
-import { authFieldErrors, PASSWORD_HINT, USERNAME_HINT, safeAuthReturnTo } from "@scripta/shared";
+import { authFieldErrors, passwordHint, usernameHint, safeAuthReturnTo } from "@scripta/shared";
 import { PasswordInput } from "../auth/PasswordInput";
 import { afterSignIn, clearAuthNotice, readAuthNotice, startAuthNavigation } from "../auth/returnTo";
 import { modeFromSearch, type AuthMode as Mode } from "../lib/landing";
@@ -22,6 +22,7 @@ import {
   authSecondaryClass,
   authSubmitClass
 } from "../auth/AuthStage";
+import { useLocale } from "../i18n";
 
 // Google's own official "G" mark (Identity branding guidelines) — inlined
 // rather than fetched from Google's asset host, same offline-friendly
@@ -37,6 +38,7 @@ const GoogleLogo = () => (
 );
 
 export function LoginPage() {
+  const locale = useLocale();
   const { session, login, signup } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -106,7 +108,7 @@ export function LoginPage() {
     e.preventDefault();
     if (locked.current) return;
     setError(null);
-    const errors = authFieldErrors(mode, identifier, username, password);
+    const errors = authFieldErrors(mode, identifier, username, password, locale);
     setFieldErrors(errors);
     if (Object.keys(errors).length) {
       document.getElementById(Object.keys(errors)[0]!)?.focus();
@@ -202,7 +204,7 @@ export function LoginPage() {
                     aria-describedby={fieldErrors.username ? "username-error" : mode === "signup" ? "username-hint" : undefined}
                     className={authFieldClass}
                   />
-                  {fieldErrors.username ? <AuthFieldError id="username-error" message={fieldErrors.username} /> : mode === "signup" && <p id="username-hint" className={authHintClass}>{USERNAME_HINT}</p>}
+                  {fieldErrors.username ? <AuthFieldError id="username-error" message={fieldErrors.username} /> : mode === "signup" && <p id="username-hint" className={authHintClass}>{usernameHint(locale)}</p>}
                 </div>
               </div>
             </div>
@@ -225,7 +227,7 @@ export function LoginPage() {
                 aria-describedby={fieldErrors.password ? "password-error" : mode === "signup" ? "password-hint" : undefined}
                 className={authFieldClass}
               />
-              {fieldErrors.password ? <AuthFieldError id="password-error" message={fieldErrors.password} /> : mode === "signup" && <p id="password-hint" className={authHintClass}>{PASSWORD_HINT}</p>}
+              {fieldErrors.password ? <AuthFieldError id="password-error" message={fieldErrors.password} /> : mode === "signup" && <p id="password-hint" className={authHintClass}>{passwordHint(locale)}</p>}
             </div>
 
             <div className="mb-4 flex flex-wrap items-center justify-between gap-x-4 text-sm">

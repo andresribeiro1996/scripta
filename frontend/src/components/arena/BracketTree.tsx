@@ -24,6 +24,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import type { TournamentView } from "../../api/arena";
 import { OptionSheet } from "../Sheet";
 import { bracketShape, roundLabel } from "../../lib/arenaBracket";
+import { useLocale } from "../../i18n";
 
 function ChevronLeftIcon() {
   return (
@@ -42,6 +43,7 @@ function ChevronRightIcon() {
 }
 
 export function BracketTree({ tournament, renderDuel }: { tournament: TournamentView; renderDuel: (duelId: string, round: string) => ReactNode }) {
+  const locale = useLocale();
   const rounds = new Map<number, TournamentView["duels"]>();
   for (const duel of tournament.duels) {
     const list = rounds.get(duel.roundNumber) ?? [];
@@ -53,7 +55,7 @@ export function BracketTree({ tournament, renderDuel }: { tournament: Tournament
   const shape = bracketShape(tournament.bracketSize, tournament.duels);
 
   function labelFor(roundNumber: number): string {
-    return roundLabel(shape[roundNumber - 1]?.length ?? 0, roundNumber);
+    return roundLabel(shape[roundNumber - 1]?.length ?? 0, roundNumber, locale);
   }
 
   // Opens on whichever round is actually live, not round 1 — that's the

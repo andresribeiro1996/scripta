@@ -1,5 +1,6 @@
 import { bracketShape, countdownLabel, duelWinner, needsVote, roundLabel, type BracketSlot, type Duel, type DuelSide } from "@scripta/shared";
 import type { TournamentView } from "./api";
+import { getLocale } from "../../i18n";
 
 const ALL_ARENA_VIEW_TABS = [
   { value: "bracket", label: "Bracket" },
@@ -66,8 +67,9 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
  *  the reader has to turn back into a day before it means anything. Inside
  *  the last day the countdown is the useful form. */
 export function roundHeadline(byRound: BracketSlot[][], roundIdx: number, now = Date.now()): { title: string; status: string } {
+  const locale = getLocale();
   const slots = byRound[roundIdx] ?? [];
-  const name = roundLabel(byRound[roundIdx]?.length ?? 0, roundIdx + 1);
+  const name = roundLabel(byRound[roundIdx]?.length ?? 0, roundIdx + 1, locale);
   const position = `Round ${roundIdx + 1} of ${byRound.length}`;
   const settled = slots.filter((duel) => duel?.status === "settled").length;
   const parts = [`${settled} of ${slots.length} settled`];
@@ -77,10 +79,11 @@ export function roundHeadline(byRound: BracketSlot[][], roundIdx: number, now = 
 }
 
 function closesLabel(closesAt: string, now: number): string {
+  const locale = getLocale();
   const closes = new Date(closesAt);
   const remainingMs = closes.getTime() - now;
   if (remainingMs > 86_400_000) return `Closes ${WEEKDAYS[closes.getDay()]} ${closes.getDate()} ${MONTHS[closes.getMonth()]}`;
-  return countdownLabel(closesAt, now);
+  return countdownLabel(closesAt, locale, now);
 }
 
 /** What a match's tally can't say on its own. A settled duel with nothing in

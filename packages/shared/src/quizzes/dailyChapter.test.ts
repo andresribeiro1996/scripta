@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { dailyThemeName } from "./dailyThemes.js";
 import { dailyChapterCoverage, dailyChapterMonth, dailyChapterMonthShare, dailyChapterMonthStats, dailyChapterShare, dailyChapterStats, dailyChapterSubmission, dailyChapterSummary, dailyChapterThemeRates, readDailyChapterDraft, type DailyChapterBook, type DailyChapterQuestion, type DailyChapterResult } from "./dailyChapter.js";
 
 const book: DailyChapterBook = { id: "book-1", title: "A Book", author: "A Writer", language: "en", themeIds: ["retold-myths"] };
@@ -44,7 +45,7 @@ test("draft recovery validates stored choices and submissions require every ques
 });
 
 test("shared results contain scores and marks without quotations, books, or answer keys", () => {
-  const text = dailyChapterShare(result("e01", "2030-01-01"), "https://example.org/daily");
+  const text = dailyChapterShare(result("e01", "2030-01-01"), "https://example.org/daily", "en");
   assert.match(text, /5\/5/);
   for (const secret of ["Secret passage", "Secret explanation", "A Book", "answerIndex"]) assert.equal(text.includes(secret), false);
   assert.ok(text.endsWith("https://example.org/daily"));
@@ -91,7 +92,7 @@ test("the summary and share text carry numbers and squares only", () => {
   assert.equal(summary.average, 3.5);
   assert.equal(summary.perfect, 1);
   assert.deepEqual(summary.bestTheme, { themeId: "retold-myths", percent: 70 });
-  const text = dailyChapterMonthShare(summary, "https://example.org/daily");
+  const text = dailyChapterMonthShare(summary, "https://example.org/daily", "en");
   assert.equal(text, "The Daily Chapter · January 2030\n🟩⬜🟥\n1-day streak · 3.5 avg\nhttps://example.org/daily");
   assert.ok(!text.includes("Secret passage"));
 });
@@ -122,5 +123,11 @@ test("a month share carries that month's average and best theme, not the lifetim
   assert.deepEqual(dailyChapterMonthStats(history.results, "2030-10"), { average: 5, bestTheme: { themeId: "space-adventures", percent: 100 } });
   const summary = { ...dailyChapterSummary(history, "2030-09"), ...dailyChapterMonthStats(history.results, "2030-09") };
   assert.equal(dailyChapterSummary(history, "2030-09").average, 2.5);
-  assert.equal(dailyChapterMonthShare(summary, "https://example.org/daily"), "The Daily Chapter · September 2030\n🟥\n2-day streak · 0 avg\nhttps://example.org/daily");
+  assert.equal(dailyChapterMonthShare(summary, "https://example.org/daily", "en"), "The Daily Chapter · September 2030\n🟥\n2-day streak · 0 avg\nhttps://example.org/daily");
+});
+
+test("the share text is Portuguese for a Portuguese reader", () => {
+  assert.equal(dailyChapterShare(result("e01", "2030-01-01"), "https://example.org/daily", "pt-PT"), "O Capítulo do Dia · 2030-01-01\nOld myths, new voices\n🟩 5/5\nhttps://example.org/daily");
+  assert.equal(dailyThemeName("retold-myths", "pt-PT"), "Mitos recontados");
+  assert.equal(dailyThemeName("unknown", "pt-PT"), "unknown");
 });

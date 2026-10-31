@@ -14,12 +14,12 @@ test("digestHeading is the actor's username followed by digestAction, for every 
     { kind: "follow", id: "e4", actor, createdAt: "2026-09-17T00:00:00.000Z", viewerFollows: false }
   ];
   for (const item of items) {
-    assert.equal(digestHeading(item), `${actor.username} ${digestAction(item)}`);
+    assert.equal(digestHeading(item, "en"), `${actor.username} ${digestAction(item, "en")}`);
   }
-  assert.equal(digestAction(items[0]!), "published a tier list");
-  assert.equal(digestAction(items[1]!), "ranked books on Fantasy doorstoppers");
-  assert.equal(digestAction(items[2]!), "finished reading Hyperion");
-  assert.equal(digestAction(items[3]!), "started following you");
+  assert.equal(digestAction(items[0]!, "en"), "published a tier list");
+  assert.equal(digestAction(items[1]!, "en"), "ranked books on Fantasy doorstoppers");
+  assert.equal(digestAction(items[2]!, "en"), "finished reading Hyperion");
+  assert.equal(digestAction(items[3]!, "en"), "started following you");
 });
 
 const participation = (overrides: Partial<ParticipationItem> = {}): ParticipationItem => ({
@@ -34,25 +34,25 @@ const participation = (overrides: Partial<ParticipationItem> = {}): Participatio
 const named = (username: string) => ({ userId: username, username, avatarUrl: null });
 
 test("participationLead names up to three readers and counts the rest", () => {
-  assert.equal(participationLead(participation({ count: 5 })), "5 people");
-  assert.equal(participationLead(participation({ count: 1 })), "1 person");
-  assert.equal(participationLead(participation({ actors: [named("ana")], count: 1 })), "ana");
-  assert.equal(participationLead(participation({ actors: [named("ana"), named("rui")], count: 2 })), "ana and rui");
-  assert.equal(participationLead(participation({ actors: [named("ana"), named("rui"), named("bo")], count: 3 })), "ana, rui and bo");
-  assert.equal(participationLead(participation({ actors: [named("ana"), named("rui")], count: 3 })), "ana, rui and 1 other");
-  assert.equal(participationLead(participation({ actors: [named("ana"), named("rui")], count: 12 })), "ana, rui and 10 others");
+  assert.equal(participationLead(participation({ count: 5 }), "en"), "5 people");
+  assert.equal(participationLead(participation({ count: 1 }), "en"), "1 person");
+  assert.equal(participationLead(participation({ actors: [named("ana")], count: 1 }), "en"), "ana");
+  assert.equal(participationLead(participation({ actors: [named("ana"), named("rui")], count: 2 }), "en"), "ana and rui");
+  assert.equal(participationLead(participation({ actors: [named("ana"), named("rui"), named("bo")], count: 3 }), "en"), "ana, rui and bo");
+  assert.equal(participationLead(participation({ actors: [named("ana"), named("rui")], count: 3 }), "en"), "ana, rui and 1 other");
+  assert.equal(participationLead(participation({ actors: [named("ana"), named("rui")], count: 12 }), "en"), "ana, rui and 10 others");
 });
 
 test("participation rows say what happened to which game, and link to the owner's view", () => {
   const tier = participation({ actors: [named("ana")], count: 4 });
-  assert.equal(digestAction(tier), "ranked your tier list Sci-fi");
-  assert.equal(digestHeading(tier), "ana and 3 others ranked your tier list Sci-fi");
+  assert.equal(digestAction(tier, "en"), "ranked your tier list Sci-fi");
+  assert.equal(digestHeading(tier, "en"), "ana and 3 others ranked your tier list Sci-fi");
   assert.equal(digestTarget(tier), "/dashboard/arena/tierlist/t1");
   const cup = participation({ id: "tournament:g1", game: { kind: "tournament", id: "g1", name: "Cup", covers: [] }, count: 2 });
-  assert.equal(digestHeading(cup), "2 people voted in your tournament Cup");
+  assert.equal(digestHeading(cup, "en"), "2 people voted in your tournament Cup");
   assert.equal(digestTarget(cup), "/arena/g1");
   const quiz = participation({ id: "quiz:q1", game: { kind: "quiz", id: "q1", name: "Covers", covers: [] }, actors: [named("bo")], count: 1 });
-  assert.equal(digestHeading(quiz), "bo played your quiz Covers");
+  assert.equal(digestHeading(quiz, "en"), "bo played your quiz Covers");
   assert.equal(digestTarget(quiz), "/dashboard/arena/quiz/q1");
 });
 
@@ -90,7 +90,7 @@ test("a row of a kind this build doesn't know is dropped, and everything else on
 test("a quiz vote reads as played, and a publication of an unknown content kind is dropped", () => {
   const quiz = { kind: "quiz" as const, id: "q1", voteCode: "qc", name: "Dune trivia", questionCount: 8, playCount: 3, playOpen: true, covers: [] };
   const vote: DigestItem = { kind: "vote", id: "e2", actor, content: quiz, createdAt: "2026-09-17T00:00:00.000Z" };
-  assert.equal(digestAction(vote), "played Dune trivia");
+  assert.equal(digestAction(vote, "en"), "played Dune trivia");
   assert.equal(digestTarget(vote), "/play/qc");
   const hologram = { kind: "publication", id: "e5", actor, type: "tierlist_published", content: { kind: "hologram" }, createdAt: "2026-09-18T00:00:00.000Z" } as unknown as DigestItem;
   const page = { items: [hologram, vote], nextCursor: null, seenAt: null, personalNewCount: 0, followingNewCount: 0 };
@@ -114,4 +114,10 @@ test("a reading item with a work opens the work page, without one the reader's p
   const base = { kind: "reading" as const, id: "e", actor, finished: true, createdAt: "2026-10-06T00:00:00Z" };
   assert.equal(digestTarget({ ...base, book: { title: "Dune", author: "FH", coverUrl: null, workId: "w1" } }), "/work/w1");
   assert.equal(digestTarget({ ...base, book: { title: "Dune", author: "FH", coverUrl: null } }), "/community/u/alice");
+});
+
+test("Portuguese names the people and the action", () => {
+  const item: ParticipationItem = { kind: "participation", id: "p", game: { kind: "quiz", id: "q", name: "Clássicos", covers: [] }, actors: [actor], count: 3, createdAt: "2026-09-17T00:00:00.000Z" };
+  assert.equal(participationLead(item, "pt-PT"), "alice e mais 2 pessoas");
+  assert.equal(digestHeading(item, "pt-PT"), "alice e mais 2 pessoas jogaram o seu quiz Clássicos");
 });

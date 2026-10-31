@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { catalogMismatches } from "./catalogCheck.js";
+import { en } from "./messages/en.js";
+import { ptPT } from "./messages/pt-PT.js";
+import { sharedT } from "./sharedT.js";
 import { parseAcceptLanguage, parseLocalePreference, resolveLocale } from "./locale.js";
 import { createTranslator } from "./translate.js";
 
@@ -54,4 +57,15 @@ test("catalogMismatches finds every kind of drift", () => {
     [],
   );
   assert.equal(catalogMismatches(en, { a: "Olá {nome}", b: "x", d: "D" }).length, 4);
+});
+
+test("the shared catalog has no mismatches", () => {
+  assert.deepEqual(catalogMismatches(en, ptPT), []);
+});
+
+test("sharedT answers in the requested language", () => {
+  assert.equal(sharedT("en")("shared.helpers.today"), "Today");
+  assert.equal(sharedT("pt-PT")("shared.helpers.today"), "Hoje");
+  assert.equal(sharedT("pt-PT")("shared.helpers.books", { count: 1 }), "1 livro");
+  assert.equal(sharedT("pt-PT")("shared.helpers.books", { count: 2 }), "2 livros");
 });

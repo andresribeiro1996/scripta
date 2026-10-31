@@ -38,11 +38,11 @@ test("existing sessions survive migration; remember preference survives refresh 
 });
 
 test("validation supports username login and passphrases without trimming passwords", () => {
-  assert.deepEqual(authFieldErrors("login", "reader", "", "x"), {});
-  assert.deepEqual(authFieldErrors("signup", " reader@example.com ", "reader", "long passphrase"), {});
-  assert.ok(authFieldErrors("signup", "bad", "?", "short").identifier);
-  assert.ok(authFieldErrors("signup", "reader@example.com", "?", "short").username);
-  assert.ok(authFieldErrors("signup", "reader@example.com", "reader", "x".repeat(129)).password);
+  assert.deepEqual(authFieldErrors("login", "reader", "", "x", "en"), {});
+  assert.deepEqual(authFieldErrors("signup", " reader@example.com ", "reader", "long passphrase", "en"), {});
+  assert.ok(authFieldErrors("signup", "bad", "?", "short", "en").identifier);
+  assert.ok(authFieldErrors("signup", "reader@example.com", "?", "short", "en").username);
+  assert.ok(authFieldErrors("signup", "reader@example.com", "reader", "x".repeat(129), "en").password);
 });
 
 test("destinations preserve queries and hashes but reject external URLs and auth loops", () => {

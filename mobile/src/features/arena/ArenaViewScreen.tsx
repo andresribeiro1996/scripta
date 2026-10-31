@@ -20,10 +20,12 @@ import { BracketViewToggle, type BracketView } from "./BracketViewToggle";
 import { ContentShareSheet } from "../sharing/ContentShareSheet";
 import { publicContentUrl } from "../sharing/links";
 import { ChampionBanner } from "./ChampionBanner";
+import { useLocale } from "../../i18n";
 
 const TOKEN_KEY = "arena-voter-token";
 
 export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => void }) {
+  const locale = useLocale();
   const { user } = useAuth();
   const { colors } = useTheme();
   const queryClient = useQueryClient();
@@ -190,7 +192,7 @@ export function ArenaViewScreen({ id, onClose }: { id: string; onClose?: () => v
             <ActionSheet
               title={data.name}
               groups={[
-                [{ label: data.slots.length ? `See all ${data.slots.length} ${itemNoun(data.subject, data.slots.length)}` : data.subject ? "View characters" : "View book pool", icon: "book", onPress: () => setBooksOpen(true) }],
+                [{ label: data.slots.length ? `See all ${data.slots.length} ${itemNoun(data.subject, data.slots.length, locale)}` : data.subject ? "View characters" : "View book pool", icon: "book", onPress: () => setBooksOpen(true) }],
                 ...(isOwner ? [[{ label: "Rename", icon: "edit" as const, onPress: () => { setName(data.name); setRenaming(true); } }]] : []),
               ]}
             >

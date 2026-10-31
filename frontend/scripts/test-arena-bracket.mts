@@ -157,10 +157,10 @@ console.log("\n7. sharePercent is null before any vote, never 0%");
 console.log("\n8. Countdown labels keep the existing hour, minute, and closing boundaries");
 {
   const now = Date.parse("2026-01-01T00:00:00.000Z");
-  check("expired", countdownLabel("2026-01-01T00:00:00.000Z", now) === "Closing…");
-  check("seconds", countdownLabel("2026-01-01T00:00:59.999Z", now) === "59s left");
-  check("minutes", countdownLabel("2026-01-01T00:01:01.000Z", now) === "1m 1s left");
-  check("hours", countdownLabel("2026-01-01T01:01:01.000Z", now) === "1h 1m left");
+  check("expired", countdownLabel("2026-01-01T00:00:00.000Z", "en", now) === "Closing…");
+  check("seconds", countdownLabel("2026-01-01T00:00:59.999Z", "en", now) === "59s left");
+  check("minutes", countdownLabel("2026-01-01T00:01:01.000Z", "en", now) === "1m 1s left");
+  check("hours", countdownLabel("2026-01-01T01:01:01.000Z", "en", now) === "1h 1m left");
 }
 
 console.log("\n9. Voter tokens use the client's UUID source when available");

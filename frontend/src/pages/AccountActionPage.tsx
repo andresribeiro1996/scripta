@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { PASSWORD_HINT, RECOVERY_MESSAGE } from "@scripta/shared";
+import { passwordHint, recoveryMessage } from "@scripta/shared";
 import { publicFetch } from "../api/client";
 import { setSession } from "../auth/tokenStore";
 import { PasswordInput } from "../auth/PasswordInput";
 import { AuthCard, AuthHeading, AuthServerError, AuthStage, authFieldClass, authHintClass, authLabelClass, authLinkClass, authSubmitClass } from "../auth/AuthStage";
+import { useLocale } from "../i18n";
 
 export function AccountActionPage({ action }: { action: "forgot" | "reset" | "verify" }) {
+  const locale = useLocale();
   const location = useLocation();
   const navigate = useNavigate();
   const [token] = useState(() => new URLSearchParams(location.hash.slice(1)).get("token") ?? "");
@@ -50,11 +52,11 @@ export function AccountActionPage({ action }: { action: "forgot" | "reset" | "ve
   return <AuthStage><AuthCard>
     <AuthHeading title={action === "forgot" ? "Recover your account" : action === "reset" ? "Choose a new password" : "Verify your email"} subtitle={action === "forgot" ? "Enter your account's email and we’ll send instructions for choosing a new password." : undefined} />
     <AuthServerError message={error} />
-    {done && <p role="status" className="mb-5 text-center text-sm">{action === "forgot" ? RECOVERY_MESSAGE : action === "reset" ? "Password updated. Log in with your new password. Your other sessions have been signed out." : "Email verified. You can return to Atmyshelf. If you changed your email, log in with the new address."}</p>}
+    {done && <p role="status" className="mb-5 text-center text-sm">{action === "forgot" ? recoveryMessage(locale) : action === "reset" ? "Password updated. Log in with your new password. Your other sessions have been signed out." : "Email verified. You can return to Atmyshelf. If you changed your email, log in with the new address."}</p>}
     {(!done || action === "forgot") && <form onSubmit={submit} className="space-y-4">
       <fieldset disabled={busy} className="space-y-4">
         {action === "forgot" ? <div><label htmlFor="recovery-email" className={authLabelClass}>Email</label><input id="recovery-email" type="email" required autoComplete="email" autoCapitalize="none" value={email} onChange={(event) => { setEmail(event.target.value); setDone(false); }} className={authFieldClass} /></div> : action === "reset" && token ? <>
-          <div><label htmlFor="new-password" className={authLabelClass}>New password</label><PasswordInput id="new-password" required minLength={8} maxLength={128} autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} className={authFieldClass} /><p className={authHintClass}>{PASSWORD_HINT}</p></div>
+          <div><label htmlFor="new-password" className={authLabelClass}>New password</label><PasswordInput id="new-password" required minLength={8} maxLength={128} autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} className={authFieldClass} /><p className={authHintClass}>{passwordHint(locale)}</p></div>
           <div><label htmlFor="confirm-password" className={authLabelClass}>Confirm new password</label><PasswordInput id="confirm-password" required autoComplete="new-password" value={confirm} onChange={(event) => setConfirm(event.target.value)} className={authFieldClass} /></div>
         </> : !token ? <p role="alert" className="text-center text-sm">{`This link is missing its ${action === "reset" ? "reset" : "verification"} code.`}</p> : <p className="text-center text-sm">Confirm this email address for your Atmyshelf account.</p>}
         {(action === "forgot" || token) && <button className={authSubmitClass} disabled={busy || (action === "forgot" && cooldown > 0)}>{busy ? "Working…" : action === "forgot" ? cooldown > 0 ? `Resend in ${cooldown}s` : done ? "Resend email" : "Send recovery email" : action === "reset" ? "Update password" : "Verify email"}</button>}

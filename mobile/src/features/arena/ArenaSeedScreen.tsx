@@ -7,8 +7,10 @@ import { booksByWork, filterBooks, roundMinutesFromHours, seedCoverLookup, toSee
 import { Button, EmptyState, ErrorState, Input, Screen, Sheet, Skeleton, Toast, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { useLibrary, useWorkBooks } from "../library";
 import { createTournament, fetchTournament, randomFillTournament, resolveCover, setTournamentSlots, startTournament, type Tournament } from "./api";
+import { useLocale } from "../../i18n";
 
 export function ArenaSeedScreen({ tournament, onStarted }: { tournament?: Tournament; onStarted: (id: string) => void }) {
+  const locale = useLocale();
   const { colors } = useTheme();
   const queryClient = useQueryClient();
   const [name, setName] = useState(tournament?.name ?? "Untitled tournament");
@@ -81,7 +83,7 @@ export function ArenaSeedScreen({ tournament, onStarted }: { tournament?: Tourna
     try {
       const lookup = seedCoverLookup(book);
       const cover = lookup ? await resolveCover(book) : null;
-      const seed = toSeedBook(book, cover);
+      const seed = toSeedBook(book, cover, locale);
       if (!seed) throw new Error("That book isn't in the catalog.");
       const next = [...slots];
       next[slotIndex] = seed;
@@ -100,7 +102,7 @@ export function ArenaSeedScreen({ tournament, onStarted }: { tournament?: Tourna
     setError(null);
     try {
       const target = await materialize();
-      const pool = (await Promise.all(books.map(async (book) => toSeedBook(book, seedCoverLookup(book) ? await resolveCover(book) : null)))).filter((seed): seed is SeedBook => seed !== null);
+      const pool = (await Promise.all(books.map(async (book) => toSeedBook(book, seedCoverLookup(book) ? await resolveCover(book) : null, locale)))).filter((seed): seed is SeedBook => seed !== null);
       await randomFillTournament(target.id, pool);
       const refreshed = await fetchTournament(target.id, "owner-seed");
       const byIndex = new Map(refreshed.slots.map((slot) => [slot.slotIndex, slot]));

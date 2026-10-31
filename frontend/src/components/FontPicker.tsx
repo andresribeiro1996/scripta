@@ -1,9 +1,11 @@
 import { useState } from "react";
-import { DISPLAY_FONT_IDS, TEXT_FONT_IDS, fontStack, fonts, resolveFonts, resolveTheme, type FontPreference, type FontSlot } from "@scripta/shared/themes";
+import { DISPLAY_FONT_IDS, TEXT_FONT_IDS, fontLabel, fontStack, resolveFonts, resolveTheme, type FontPreference, type FontSlot } from "@scripta/shared/themes";
 import { isAppearanceSyncFailure, saveAccountAppearance } from "../api/appearance";
 import { applyFontPreference, osScheme, useFontPreference, useThemePreference } from "../lib/theme";
+import { useLocale } from "../i18n";
 
 export function FontPicker({ slot }: { slot: FontSlot }) {
+  const locale = useLocale();
   const selected = useFontPreference(slot);
   const themeDefault = resolveFonts(resolveTheme(useThemePreference(), osScheme()), "theme", "theme")[slot];
   const [error, setError] = useState<string | null>(null);
@@ -33,7 +35,7 @@ export function FontPicker({ slot }: { slot: FontSlot }) {
                 className="block rounded-lg border border-(--color-border) px-3 py-1.5 text-sm peer-checked:border-(--color-accent) peer-checked:ring-1 peer-checked:ring-(--color-accent) peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-(--color-accent)"
                 style={{ fontFamily: fontStack(shown), fontWeight: slot === "display" ? 700 : undefined }}
               >
-                {option === "theme" ? `Theme default · ${fonts[themeDefault].label}` : fonts[option].label}
+                {option === "theme" ? `Theme default · ${fontLabel(themeDefault, locale)}` : fontLabel(option, locale)}
               </span>
             </label>
           );

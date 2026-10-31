@@ -20,8 +20,10 @@ import { EmptyState } from "../components/EmptyState";
 import { Page } from "../components/page/Page";
 import { BUTTON_SECONDARY, TITLE_FIELD_CLASS } from "../components/page/buttonClasses";
 import { backTo } from "../lib/areas";
+import { useLocale } from "../i18n";
 
 export function ArenaViewPage() {
+  const locale = useLocale();
   const { id } = useParams<{ id: string }>();
   const { session } = useAuth();
   const { tournament, isLoading, vote, refetch } = useArena(id!);
@@ -145,7 +147,7 @@ export function ArenaViewPage() {
       }
       subtitle={
         <span className="flex flex-wrap items-center gap-1.5">
-          {tournament.bracketSize}-{itemNoun(tournament.subject, 1)} bracket
+          {tournament.bracketSize}-{itemNoun(tournament.subject, 1, locale)} bracket
           <TournamentStatusBadge status={tournament.status} round={tournament.currentRound} />
         </span>
       }

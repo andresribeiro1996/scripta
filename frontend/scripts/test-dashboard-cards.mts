@@ -10,9 +10,9 @@ test("digest headings and targets by kind", () => {
     content: { kind: "tierlist", id: "t1", voteCode: "code12ab", name: "Top fantasy", poolSize: 12, ballotCount: 4, votingOpen: true, promotedAt: null }
   };
   const follow: DigestItem = { kind: "follow", id: "u2", createdAt: "2026-09-11T00:00:00.000Z", actor: { userId: "u2", username: "sam", avatarUrl: null } };
-  assert.equal(digestHeading(pub), "andre published a tier list");
+  assert.equal(digestHeading(pub, "en"), "andre published a tier list");
   assert.equal(digestTarget(pub), "/vote/code12ab");
-  assert.equal(digestHeading(follow), "sam started following you");
+  assert.equal(digestHeading(follow, "en"), "sam started following you");
   assert.equal(digestTarget(follow), "/community/u/sam");
 });
 
@@ -23,7 +23,7 @@ test("a quiz digest item reads as a quiz and an unknown content kind is dropped"
     content: { kind: "quiz", id: "q1", voteCode: "qcode", name: "Dune trivia", questionCount: 8, playCount: 3, playOpen: true, covers: [] }
   };
   const unknown = { ...pub, id: "e2", content: { kind: "hologram", id: "h1", name: "x" } } as unknown as DigestItem;
-  assert.equal(digestHeading(pub), "andre published a quiz");
+  assert.equal(digestHeading(pub, "en"), "andre published a quiz");
   assert.equal(digestTarget(pub), "/play/qcode");
   const page: DashboardFeedPage = { items: [pub, unknown], nextCursor: null, seenAt: null, personalNewCount: 0, followingNewCount: 0 };
   assert.deepEqual(withKnownDigestItems(page).items, [pub]);

@@ -5,6 +5,7 @@ import { DAILY_CHAPTER_THEMES, recapMonthName, type DailyChapterPlayerSummary } 
 import { Text } from "../../ui/Text";
 import { cardFontFamily, radii, spacing, typography } from "../../ui";
 import { DailyChapterCalendar, POSTER_COLORS } from "./daily-chapter-calendar";
+import { useLocale } from "../../i18n";
 
 const SERIF = cardFontFamily("serif");
 
@@ -16,6 +17,7 @@ function Stat({ value, label }: { value: string; label: string }) {
 }
 
 export function DailyChapterPoster({ summary }: { summary: DailyChapterPlayerSummary }) {
+  const locale = useLocale();
   const gradientId = useId();
   const best = summary.bestTheme;
   const themeName = best ? DAILY_CHAPTER_THEMES.find((theme) => theme.id === best.themeId)?.name ?? best.themeId : "";
@@ -28,7 +30,7 @@ export function DailyChapterPoster({ summary }: { summary: DailyChapterPlayerSum
       <Rect width="100%" height="100%" fill={`url(#${gradientId})`} />
     </Svg>
     <Text style={styles.eyebrow}>The Daily Chapter</Text>
-    <Text style={[styles.month, { fontFamily: SERIF }]}>My {recapMonthName(summary.month)}</Text>
+    <Text style={[styles.month, { fontFamily: SERIF }]}>My {recapMonthName(summary.month, locale)}</Text>
     <DailyChapterCalendar days={summary.days} tone="poster" numbers={false} />
     <View style={styles.stats}>
       <Stat value={String(summary.streak)} label="streak" />

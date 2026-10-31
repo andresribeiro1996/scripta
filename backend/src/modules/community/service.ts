@@ -548,7 +548,7 @@ export function createCommunityService(deps: CommunityDeps): CommunityService {
           const card = deps.games[kind].get(event.ref_id);
           if (!card || card.ownerUserId !== event.user_id) return undefined;
           const content = feedContent(card.content);
-          return { id: event.id, type: event.type, payload: { ...parseEventPayload(event.payload), name: content.name, href: contentTarget(content), detail: contentDetail(content), covers: content.covers }, createdAt: event.created_at };
+          return { id: event.id, type: event.type, payload: { ...parseEventPayload(event.payload), name: content.name, href: contentTarget(content), detail: contentDetail(content, "en"), covers: content.covers }, createdAt: event.created_at };
         }
         const payload = parseEventPayload(event.payload);
         if (payload !== undefined && event.type === "voted_on") {

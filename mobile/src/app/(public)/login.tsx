@@ -1,4 +1,4 @@
-import { authFieldErrors, PASSWORD_HINT, USERNAME_HINT } from "@scripta/shared";
+import { authFieldErrors, passwordHint, usernameHint } from "@scripta/shared";
 import { afterSignIn, startAuthNavigation } from "../../features/auth/navigation";
 import { useRef, useState } from "react";
 import { ActivityIndicator, StyleSheet, View, type TextInputInstance } from "react-native";
@@ -9,6 +9,7 @@ import { GoogleSignInCancelledError, useAuth } from "../../core/auth";
 import { ApiError, apiClient } from "../../core/api";
 import { BrandMark, Button, FormScroll, Input, Screen, Segmented } from "../../ui";
 import { spacing, typography, useTheme } from "../../ui/theme";
+import { useLocale } from "../../i18n";
 
 const AUTH_MODES = [
   { value: "login", label: "Log in" },
@@ -16,6 +17,7 @@ const AUTH_MODES = [
 ] as const;
 
 export default function LoginPage() {
+  const locale = useLocale();
   const { returnTo, notice } = useLocalSearchParams<{ returnTo?: string; notice?: string }>();
   const { ready, user, signUp, signIn, signInWithGoogle } = useAuth();
   const { colors } = useTheme();
@@ -61,7 +63,7 @@ export default function LoginPage() {
 
   const onSubmit = async () => {
     if (locked.current) return;
-    const errors = authFieldErrors(mode, identifier, username, password);
+    const errors = authFieldErrors(mode, identifier, username, password, locale);
     setFieldErrors(errors);
     if (Object.keys(errors).length) {
       if (errors.identifier) identifierRef.current?.focus();
@@ -155,7 +157,7 @@ export default function LoginPage() {
               ref={usernameRef}
               editable={!busy && !googleBusy}
               error={fieldErrors.username}
-              hint={USERNAME_HINT}
+              hint={usernameHint(locale)}
               label="Username"
               value={username}
               onChangeText={(value) => { setUsername(value); setFieldErrors({ ...fieldErrors, username: "" }); }}
@@ -174,7 +176,7 @@ export default function LoginPage() {
             key={mode}
             editable={!busy && !googleBusy}
             error={fieldErrors.password}
-            hint={mode === "signup" ? PASSWORD_HINT : undefined}
+            hint={mode === "signup" ? passwordHint(locale) : undefined}
             label="Password"
             value={password}
             onChangeText={(value) => { setPassword(value); setFieldErrors({ ...fieldErrors, password: "" }); }}

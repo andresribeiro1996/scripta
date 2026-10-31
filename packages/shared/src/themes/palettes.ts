@@ -1,3 +1,5 @@
+import type { Locale } from "../i18n/locale.js";
+import { sharedT } from "../i18n/sharedT.js";
 import type { FontId } from "./fonts.js";
 
 export type ThemeScheme = "light" | "dark";
@@ -26,7 +28,6 @@ export interface ThemeColors {
 }
 
 export interface ThemeDefinition {
-  label: string;
   scheme: ThemeScheme;
   fonts: { display: FontId; text: FontId };
   colors: ThemeColors;
@@ -38,7 +39,6 @@ export type ThemeId = (typeof THEME_IDS)[number];
 
 export const themes: Record<ThemeId, ThemeDefinition> = {
   light: {
-    label: "Light",
     scheme: "light",
     fonts: { display: "playfair", text: "system" },
     colors: {
@@ -65,7 +65,6 @@ export const themes: Record<ThemeId, ThemeDefinition> = {
     },
   },
   dark: {
-    label: "Dark",
     scheme: "dark",
     fonts: { display: "playfair", text: "system" },
     colors: {
@@ -92,7 +91,6 @@ export const themes: Record<ThemeId, ThemeDefinition> = {
     },
   },
   sepia: {
-    label: "Sepia",
     scheme: "light",
     fonts: { display: "literata", text: "literata" },
     colors: {
@@ -119,7 +117,6 @@ export const themes: Record<ThemeId, ThemeDefinition> = {
     },
   },
   rose: {
-    label: "Rosé",
     scheme: "light",
     fonts: { display: "fraunces", text: "system" },
     colors: {
@@ -146,7 +143,6 @@ export const themes: Record<ThemeId, ThemeDefinition> = {
     },
   },
   midnight: {
-    label: "Midnight",
     scheme: "dark",
     fonts: { display: "playfair", text: "system" },
     colors: {
@@ -173,7 +169,6 @@ export const themes: Record<ThemeId, ThemeDefinition> = {
     },
   },
   forest: {
-    label: "Forest",
     scheme: "dark",
     fonts: { display: "fraunces", text: "system" },
     colors: {
@@ -200,7 +195,6 @@ export const themes: Record<ThemeId, ThemeDefinition> = {
     },
   },
   matrix: {
-    label: "Matrix",
     scheme: "dark",
     fonts: { display: "vt323", text: "jetbrainsMono" },
     colors: {
@@ -227,7 +221,6 @@ export const themes: Record<ThemeId, ThemeDefinition> = {
     },
   },
   synthwave: {
-    label: "Synthwave",
     scheme: "dark",
     fonts: { display: "orbitron", text: "system" },
     colors: {
@@ -254,7 +247,6 @@ export const themes: Record<ThemeId, ThemeDefinition> = {
     },
   },
   seventies: {
-    label: "Seventies",
     scheme: "dark",
     fonts: { display: "righteous", text: "system" },
     colors: {
@@ -281,7 +273,6 @@ export const themes: Record<ThemeId, ThemeDefinition> = {
     },
   },
   newsprint: {
-    label: "Newsprint",
     scheme: "light",
     fonts: { display: "specialElite", text: "literata" },
     colors: {
@@ -308,7 +299,6 @@ export const themes: Record<ThemeId, ThemeDefinition> = {
     },
   },
   oxblood: {
-    label: "Oxblood",
     scheme: "dark",
     fonts: { display: "cormorant", text: "literata" },
     colors: {
@@ -335,3 +325,7 @@ export const themes: Record<ThemeId, ThemeDefinition> = {
     },
   },
 };
+
+export function themeLabel(id: ThemeId, locale: Locale): string {
+  return sharedT(locale)(`shared.palettes.${id}`);
+}

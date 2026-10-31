@@ -1,12 +1,13 @@
 import { RankingMethodSelector } from "./RankingMethodSelector";
 import { useEffect, useRef, useState } from "react";
-import { aggregate, AGGREGATION_MODES, booksByWork, isCharacterBook, type AggregationMode, type HistogramCell } from "@scripta/shared";
+import { aggregate, aggregationModes, booksByWork, isCharacterBook, type AggregationMode, type HistogramCell } from "@scripta/shared";
 import { router, useSegments } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, View, type ScrollViewInstance } from "react-native";
 import { Text } from "../../ui/Text";
 import { Button, Sheet, captionHitSlop, dynamicType, radii, spacing, typography, useTheme } from "../../ui";
 import { workPath } from "../works/workPath";
 import { authorOf, TierCover, TierHead, TierRowScroll, titleOf, type TierBook } from "./TierBoard";
+import { useLocale } from "../../i18n";
 
 const descriptions: Record<AggregationMode, string> = {
   average: "Balances every vote into a tier.",
@@ -28,6 +29,7 @@ export function TierlistResults({ histogram, tiers, pool, books, ballotCount, el
   mode?: AggregationMode;
   onModeChange?: (mode: AggregationMode) => void;
 }) {
+  const locale = useLocale();
   const { colors } = useTheme();
   const segments = useSegments();
   const boardScroll = useRef<ScrollViewInstance>(null);
@@ -87,7 +89,7 @@ export function TierlistResults({ histogram, tiers, pool, books, ballotCount, el
       <RankingMethodSelector mode={mode} onChange={(next) => onModeChange?.(next)} />
       <Pressable accessibilityRole="button" accessibilityLabel="About ranking methods" onPress={() => setExplain(true)} style={styles.infoButton}><Text {...dynamicType} style={[typography.body, { color: colors.accent }]}>ⓘ</Text></Pressable>
     </View>
-    <Sheet visible={explain} title="Ranking methods" onClose={() => setExplain(false)}><View style={styles.detailBody}>{AGGREGATION_MODES.map((item) => <Text key={item.mode} {...dynamicType} style={[typography.body, { color: colors.text }]}><Text style={styles.strong}>{item.label}: </Text>{descriptions[item.mode]} Ties favour the higher tier.</Text>)}</View></Sheet>
+    <Sheet visible={explain} title="Ranking methods" onClose={() => setExplain(false)}><View style={styles.detailBody}>{aggregationModes(locale).map((item) => <Text key={item.mode} {...dynamicType} style={[typography.body, { color: colors.text }]}><Text style={styles.strong}>{item.label}: </Text>{descriptions[item.mode]} Ties favour the higher tier.</Text>)}</View></Sheet>
     <Sheet visible={explainProgress} title="Reference status" onClose={() => setExplainProgress(false)}><Text {...dynamicType} style={[typography.body, { color: colors.text }]}>After 100 distinct signed-in voters other than the creator submit votes, this tier list becomes a permanent community reference. Anonymous votes still count in the results.</Text></Sheet>
     <Sheet visible={detail !== undefined} title={character ? "Character votes" : "Book votes"} onClose={() => setSelected(null)}>
       {detail && <ScrollView contentContainerStyle={styles.detailBody}>

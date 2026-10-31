@@ -1,6 +1,6 @@
-import { statusLabel } from "../library/covers.js";
 import { itemNoun } from "../characters/index.js";
-import { plural } from "../plural.js";
+import { intlLocale, type Locale } from "../i18n/locale.js";
+import { sharedT } from "../i18n/sharedT.js";
 import { DEFAULT_TIER_PRESET } from "../tierlists/tierlist.js";
 import type {
   ActivityEventType,
@@ -18,86 +18,112 @@ const CONTENT_KINDS: Record<PublishedContent["kind"], true> = { tierlist: true, 
 
 export const TIER_LADDER = DEFAULT_TIER_PRESET.map((tier) => tier.color);
 
-export function gameActionLabel(content: PublishedContent): string {
-  if (content.kind === "quiz") return content.playOpen && !content.viewerVoted ? "Play quiz" : "View quiz";
-  if (content.kind === "tournament") return content.status === "completed" ? "View results" : "Vote in tournament";
-  return content.promotedAt || !content.votingOpen ? "View rankings" : content.viewerVoted ? "Edit ranking" : `Rank ${itemNoun(content.subject, 2)}`;
+export function gameActionLabel(content: PublishedContent, locale: Locale): string {
+  const t = sharedT(locale);
+  if (content.kind === "quiz") return t(content.playOpen && !content.viewerVoted ? "shared.helpers.playQuiz" : "shared.helpers.viewQuiz");
+  if (content.kind === "tournament") return t(content.status === "completed" ? "shared.helpers.viewResults" : "shared.helpers.voteInTournament");
+  if (content.promotedAt || !content.votingOpen) return t("shared.helpers.viewRankings");
+  if (content.viewerVoted) return t("shared.helpers.editRanking");
+  return t(content.subject ? "shared.helpers.rankCharacters" : "shared.helpers.rankBooks");
 }
 
 export function isKnownContent(content: PublishedContent): boolean {
   return CONTENT_KINDS[content?.kind] === true;
 }
 
-export function contentKindLabel(content: PublishedContent): string {
+export function contentKindLabel(content: PublishedContent, locale: Locale): string {
+  const t = sharedT(locale);
   switch (content.kind) {
     case "tierlist":
-      return "Tier list";
+      return t("shared.helpers.kindTierlist");
     case "tournament":
-      return "Tournament";
+      return t("shared.helpers.kindTournament");
     case "quiz":
-      return "Quiz";
+      return t("shared.helpers.kindQuiz");
   }
 }
 
-export function contentDetail(content: PublishedContent): string {
+export function contentDetail(content: PublishedContent, locale: Locale): string {
+  const t = sharedT(locale);
   switch (content.kind) {
     case "tierlist":
-      return `${plural(content.poolSize, itemNoun(content.subject, 1), itemNoun(content.subject, 2))} · ${plural(content.ballotCount, "ballot", "ballots")}${content.promotedAt ? " · permanent reference" : content.votingOpen ? "" : " · closed"}`;
+      return [
+        t(content.subject ? "shared.helpers.characters" : "shared.helpers.books", { count: content.poolSize }),
+        t("shared.helpers.ballots", { count: content.ballotCount }),
+        ...(content.promotedAt ? [t("shared.helpers.permanentReference")] : content.votingOpen ? [] : [t("shared.helpers.closed")])
+      ].join(" · ");
     case "tournament":
-      return `${content.bracketSize}-${itemNoun(content.subject, 1)} bracket · ${content.status}`;
+      return [
+        t(content.subject ? "shared.helpers.bracketCharacters" : "shared.helpers.bracketBooks", { size: content.bracketSize }),
+        t(content.status === "active" ? "shared.helpers.detailActive" : "shared.helpers.detailCompleted")
+      ].join(" · ");
     case "quiz":
-      return `${plural(content.questionCount, "question", "questions")} · ${plural(content.playCount, "play", "plays")}${content.playOpen ? "" : " · closed"}`;
+      return [
+        t("shared.helpers.questions", { count: content.questionCount }),
+        t("shared.helpers.plays", { count: content.playCount }),
+        ...(content.playOpen ? [] : [t("shared.helpers.closed")])
+      ].join(" · ");
   }
 }
 
 export type ContentTone = "neutral" | "accent" | "info" | "success" | "reference";
 
-export const CONTENT_STATUS = {
-  draft: { label: "Draft", tone: "neutral" },
-  inProgress: { label: "In progress", tone: "info" },
-  completed: { label: "Completed", tone: "success" },
-  votingOpen: { label: "Voting open", tone: "accent" },
-  open: { label: "Open", tone: "accent" },
-  closed: { label: "Closed", tone: "neutral" }
-} as const satisfies Record<string, { label: string; tone: ContentTone }>;
+const CONTENT_STATUS = {
+  draft: { key: "shared.helpers.statusDraft", tone: "neutral" },
+  inProgress: { key: "shared.helpers.statusInProgress", tone: "info" },
+  completed: { key: "shared.helpers.statusCompleted", tone: "success" },
+  votingOpen: { key: "shared.helpers.statusVotingOpen", tone: "accent" },
+  open: { key: "shared.helpers.statusOpen", tone: "accent" },
+  closed: { key: "shared.helpers.statusClosed", tone: "neutral" },
+  reference: { key: "shared.helpers.statusReference", tone: "reference" },
+  voted: { key: "shared.helpers.statusVoted", tone: "info" },
+  played: { key: "shared.helpers.statusPlayed", tone: "info" }
+} as const satisfies Record<string, { key: Parameters<ReturnType<typeof sharedT>>[0]; tone: ContentTone }>;
 
-export function ownedTierlistStatus(tierlist: { promotedAt: string | null; voteCode: string | null; votingOpen: boolean }): { label: string; tone: ContentTone } {
-  if (tierlist.promotedAt) return { label: "Reference", tone: "reference" };
-  if (tierlist.voteCode === null) return CONTENT_STATUS.draft;
-  return tierlist.votingOpen ? CONTENT_STATUS.votingOpen : CONTENT_STATUS.closed;
+export type ContentStatusName = keyof typeof CONTENT_STATUS;
+
+export function contentStatusBadge(name: ContentStatusName, locale: Locale): { label: string; tone: ContentTone } {
+  return { label: sharedT(locale)(CONTENT_STATUS[name].key), tone: CONTENT_STATUS[name].tone };
 }
 
-export function contentStatus(content: PublishedContent): { label: string; tone: ContentTone; votedBadge?: boolean } {
+export function ownedTierlistStatus(tierlist: { promotedAt: string | null; voteCode: string | null; votingOpen: boolean }, locale: Locale): { label: string; tone: ContentTone } {
+  if (tierlist.promotedAt) return contentStatusBadge("reference", locale);
+  if (tierlist.voteCode === null) return contentStatusBadge("draft", locale);
+  return contentStatusBadge(tierlist.votingOpen ? "votingOpen" : "closed", locale);
+}
+
+export function contentStatus(content: PublishedContent, locale: Locale): { label: string; tone: ContentTone; votedBadge?: boolean } {
   switch (content.kind) {
     case "tournament": {
-      const base = content.status === "active" ? CONTENT_STATUS.inProgress : CONTENT_STATUS.completed;
+      const base = contentStatusBadge(content.status === "active" ? "inProgress" : "completed", locale);
       // Tier lists fold the vote into the status itself ("Voted"); a tournament's
       // status still matters after voting, so it travels as a second badge.
       return content.viewerVoted ? { ...base, votedBadge: true } : base;
     }
     case "tierlist":
-      if (content.promotedAt) return { label: "Reference", tone: "reference" };
-      if (content.votingOpen && content.viewerVoted) return { label: "Voted", tone: "info" };
-      return content.votingOpen ? CONTENT_STATUS.votingOpen : CONTENT_STATUS.closed;
+      if (content.promotedAt) return contentStatusBadge("reference", locale);
+      if (content.votingOpen && content.viewerVoted) return contentStatusBadge("voted", locale);
+      return contentStatusBadge(content.votingOpen ? "votingOpen" : "closed", locale);
     case "quiz":
-      if (content.playOpen && content.viewerVoted) return { label: "Played", tone: "info" };
-      return content.playOpen ? CONTENT_STATUS.open : CONTENT_STATUS.closed;
+      if (content.playOpen && content.viewerVoted) return contentStatusBadge("played", locale);
+      return contentStatusBadge(content.playOpen ? "open" : "closed", locale);
   }
 }
 
-export function contentStats(content: PublishedContent): Array<{ value: number; label: string }> {
+export function contentStats(content: PublishedContent, locale: Locale): Array<{ value: number; label: string }> {
+  const t = sharedT(locale);
   switch (content.kind) {
     case "tierlist":
       return [
-        { value: content.poolSize, label: itemNoun(content.subject, content.poolSize) },
-        { value: content.ballotCount, label: content.ballotCount === 1 ? "ballot" : "ballots" }
+        { value: content.poolSize, label: itemNoun(content.subject, content.poolSize, locale) },
+        { value: content.ballotCount, label: t("shared.helpers.ballotNoun", { count: content.ballotCount }) }
       ];
     case "tournament":
-      return [{ value: content.bracketSize, label: itemNoun(content.subject, content.bracketSize) }];
+      return [{ value: content.bracketSize, label: itemNoun(content.subject, content.bracketSize, locale) }];
     case "quiz":
       return [
-        { value: content.questionCount, label: content.questionCount === 1 ? "question" : "questions" },
-        { value: content.playCount, label: content.playCount === 1 ? "play" : "plays" }
+        { value: content.questionCount, label: t("shared.helpers.questionNoun", { count: content.questionCount }) },
+        { value: content.playCount, label: t("shared.helpers.playNoun", { count: content.playCount }) }
       ];
   }
 }
@@ -117,19 +143,20 @@ export function feedTarget(item: FeedItem): string {
   return contentTarget(item.content);
 }
 
-export function feedAction(item: FeedItem): string {
+export function feedAction(item: FeedItem, locale: Locale): string {
+  const t = sharedT(locale);
   switch (item.content.kind) {
     case "tierlist":
-      return "published a tier list";
+      return t("shared.helpers.feedTierlist");
     case "tournament":
-      return "published a tournament";
+      return t("shared.helpers.feedTournament");
     case "quiz":
-      return "published a quiz";
+      return t("shared.helpers.feedQuiz");
   }
 }
 
-export function feedHeading(item: FeedItem): string {
-  return `${item.actor.username} ${feedAction(item)}`;
+export function feedHeading(item: FeedItem, locale: Locale): string {
+  return `${item.actor.username} ${feedAction(item, locale)}`;
 }
 
 export const DEFAULT_FEED_SETTINGS: FeedSettings = {
@@ -195,31 +222,36 @@ function covers(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((cover): cover is string => typeof cover === "string" && cover.length > 0).slice(0, 3) : [];
 }
 
-export function activityRow(item: ActivityItem): ActivityRow | null {
+function readStatus(status: number, locale: Locale): string {
+  return sharedT(locale)(status === 2 ? "shared.helpers.readFinished" : status === 1 ? "shared.helpers.readReading" : "shared.helpers.readToRead");
+}
+
+export function activityRow(item: ActivityItem, locale: Locale): ActivityRow | null {
+  const t = sharedT(locale);
   const p = item.payload;
   const base = { covers: covers(p.covers), href: text(p.href) || null, username: null, workId: null };
   switch (item.type) {
     case "tierlist_published":
-      return { ...base, kind: "publication", label: "Published a tier list", tone: "accent", title: text(p.name), meta: text(p.detail) };
+      return { ...base, kind: "publication", label: t("shared.helpers.activityPublishedTierlist"), tone: "accent", title: text(p.name), meta: text(p.detail) };
     case "tournament_published":
-      return { ...base, kind: "publication", label: "Started a tournament", tone: "accent", title: text(p.name), meta: text(p.detail) };
+      return { ...base, kind: "publication", label: t("shared.helpers.activityStartedTournament"), tone: "accent", title: text(p.name), meta: text(p.detail) };
     case "quiz_published":
-      return { ...base, kind: "publication", label: "Published a quiz", tone: "accent", title: text(p.name), meta: text(p.detail) };
+      return { ...base, kind: "publication", label: t("shared.helpers.activityPublishedQuiz"), tone: "accent", title: text(p.name), meta: text(p.detail) };
     case "book_added": {
       const cover = text(p.coverUrl);
-      return { ...base, kind: "reading", label: p.started === true ? "Started reading" : "Added to library", tone: "dim", title: text(p.title), meta: [text(p.author), statusLabel(Number(p.status ?? 0))].filter(Boolean).join(" · "), covers: cover ? [cover] : [], workId: text(p.workId) || null };
+      return { ...base, kind: "reading", label: t(p.started === true ? "shared.helpers.activityStartedReading" : "shared.helpers.activityAddedToLibrary"), tone: "dim", title: text(p.title), meta: [text(p.author), readStatus(Number(p.status ?? 0), locale)].filter(Boolean).join(" · "), covers: cover ? [cover] : [], workId: text(p.workId) || null };
     }
     case "book_started":
     case "book_finished": {
       const cover = text(p.coverUrl);
-      return { ...base, kind: "reading", label: item.type === "book_finished" ? "Finished reading" : "Started reading", tone: item.type === "book_finished" ? "success" : "dim", title: text(p.title), meta: text(p.author), covers: cover ? [cover] : [], workId: text(p.workId) || null };
+      return { ...base, kind: "reading", label: t(item.type === "book_finished" ? "shared.helpers.activityFinishedReading" : "shared.helpers.activityStartedReading"), tone: item.type === "book_finished" ? "success" : "dim", title: text(p.title), meta: text(p.author), covers: cover ? [cover] : [], workId: text(p.workId) || null };
     }
     case "following":
-      return { ...base, kind: "follow", label: "Followed", tone: "dim", title: `@${text(p.username)}`, meta: "", username: text(p.username) || null };
+      return { ...base, kind: "follow", label: t("shared.helpers.activityFollowed"), tone: "dim", title: `@${text(p.username)}`, meta: "", username: text(p.username) || null };
     case "mural_published":
-      return { ...base, kind: "mural", label: "Updated profile", tone: "accent", title: "Published a new profile mural", meta: "" };
+      return { ...base, kind: "mural", label: t("shared.helpers.activityUpdatedProfile"), tone: "accent", title: t("shared.helpers.activityPublishedMural"), meta: "" };
     case "voted_on":
-      return { ...base, kind: "vote", label: p.game === "tierlist" ? "Ranked a tier list" : p.game === "quiz" ? "Played a quiz" : "Voted in a tournament", tone: "accent", title: text(p.name), meta: "" };
+      return { ...base, kind: "vote", label: t(p.game === "tierlist" ? "shared.helpers.activityRankedTierlist" : p.game === "quiz" ? "shared.helpers.activityPlayedQuiz" : "shared.helpers.activityVotedTournament"), tone: "accent", title: text(p.name), meta: "" };
     default:
       return null;
   }
@@ -227,50 +259,55 @@ export function activityRow(item: ActivityItem): ActivityRow | null {
 
 const DAY_MS = 86_400_000;
 
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const SHORT_MONTHS = ["shortJan", "shortFeb", "shortMar", "shortApr", "shortMay", "shortJun", "shortJul", "shortAug", "shortSep", "shortOct", "shortNov", "shortDec"] as const;
 
-export function formatDate(iso: string): string {
+export function formatDate(iso: string, locale: Locale): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "";
-  if (iso.length === 10) return `${date.getUTCDate()} ${MONTHS[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
-  return `${date.getDate()} ${MONTHS[date.getMonth()]} ${date.getFullYear()}`;
+  const month = (index: number) => sharedT(locale)(`shared.months.${SHORT_MONTHS[index]!}`);
+  if (iso.length === 10) return `${date.getUTCDate()} ${month(date.getUTCMonth())} ${date.getUTCFullYear()}`;
+  return `${date.getDate()} ${month(date.getMonth())} ${date.getFullYear()}`;
 }
 
-export function relativeTime(iso: string, now: number = Date.now()): string {
+export function relativeTime(iso: string, locale: Locale, now: number = Date.now()): string {
+  const t = sharedT(locale);
   const then = new Date(iso).getTime();
   if (Number.isNaN(then)) return "";
   const elapsed = now - then;
-  if (elapsed < 0) return "now";
+  if (elapsed < 0) return t("shared.helpers.now");
   const minutes = Math.floor(elapsed / 60_000);
-  if (minutes < 1) return "now";
-  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 1) return t("shared.helpers.now");
+  if (minutes < 60) return t("shared.helpers.minutesAgo", { minutes });
   const hours = Math.floor(elapsed / 3_600_000);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) return t("shared.helpers.hoursAgo", { hours });
   const days = Math.floor(elapsed / DAY_MS);
-  if (days < 30) return `${days}d ago`;
-  return formatDate(iso);
+  if (days < 30) return t("shared.helpers.daysAgo", { days });
+  return formatDate(iso, locale);
 }
 
-export function activityDay(iso: string, now: Date = new Date()): string {
+export function activityDay(iso: string, locale: Locale, now: Date = new Date()): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "";
+  const t = sharedT(locale);
   const startOf = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
   const days = Math.round((startOf(now) - startOf(date)) / DAY_MS);
-  if (days <= 0) return "Today";
-  if (days === 1) return "Yesterday";
-  if (days < 7) return date.toLocaleDateString(undefined, { weekday: "long" });
-  return date.toLocaleDateString(undefined, { month: "long", day: "numeric", ...(date.getFullYear() === now.getFullYear() ? {} : { year: "numeric" }) });
+  if (days <= 0) return t("shared.helpers.today");
+  if (days === 1) return t("shared.helpers.yesterday");
+  if (days < 7) return date.toLocaleDateString(intlLocale(locale), { weekday: "long" });
+  return date.toLocaleDateString(intlLocale(locale), { month: "long", day: "numeric", ...(date.getFullYear() === now.getFullYear() ? {} : { year: "numeric" }) });
 }
 
-export function suggestionReason(reader: Pick<SuggestedReader, "sharedCount">): string {
-  if (reader.sharedCount === 0) return "Recently active";
-  return `You share ${reader.sharedCount} ${reader.sharedCount === 1 ? "book" : "books"}`;
+export function suggestionReason(reader: Pick<SuggestedReader, "sharedCount">, locale: Locale): string {
+  const t = sharedT(locale);
+  if (reader.sharedCount === 0) return t("shared.helpers.recentlyActive");
+  return t("shared.helpers.sharedBooks", { count: reader.sharedCount });
 }
 
-export function personCaption(person: PersonResult | SuggestedReader): string {
-  if ("sharedCount" in person) return suggestionReason(person);
-  if (person.private) return "Private";
-  return `${person.followerCount} ${person.followerCount === 1 ? "follower" : "followers"}`;
+export function personCaption(person: PersonResult | SuggestedReader, locale: Locale): string {
+  const t = sharedT(locale);
+  if ("sharedCount" in person) return suggestionReason(person, locale);
+  if (person.private) return t("shared.helpers.private");
+  return t("shared.helpers.followers", { count: person.followerCount });
 }
 
 export function followFailureMessage(error: unknown, generic: string): string {

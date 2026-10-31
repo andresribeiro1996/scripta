@@ -8,8 +8,10 @@ import { AuthorAvatar } from "../CommunityAuthorAvatar";
 import { ReaderGlyph } from "../ReaderGlyph";
 import { BUTTON_SECONDARY } from "../page/buttonClasses";
 import { LIST_ROW, PANEL, PANEL_HEADER, PANEL_HEADING } from "../page/surfaceClasses";
+import { useLocale } from "../../i18n";
 
 export function SuggestedReaders() {
+  const locale = useLocale();
   const { people, error: loadError, refetch } = useSuggestedPeople(true);
   const queryClient = useQueryClient();
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -52,7 +54,7 @@ export function SuggestedReaders() {
                   <span className="truncate">{reader.user.username}</span>
                   <ReaderGlyph identity={reader.user.readerGlyph} />
                 </span>
-                <span className="block text-xs text-(--color-text-dim)">{suggestionReason(reader)}</span>
+                <span className="block text-xs text-(--color-text-dim)">{suggestionReason(reader, locale)}</span>
               </span>
             </Link>
             <button type="button" aria-label={`Follow ${reader.user.username}`} className={`${BUTTON_SECONDARY} shrink-0`} disabled={busyId === reader.user.userId} onClick={() => void follow(reader.user.userId)}>Follow</button>

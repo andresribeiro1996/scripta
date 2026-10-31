@@ -5,6 +5,7 @@ import type { ContentTone, PublishedContent } from "@scripta/shared/community";
 import { LibraryIcon, QuoteIcon } from "../NavIcons";
 import { ChevronRightIcon } from "../Toolbar";
 import { GameTicketArt } from "./GameTicketArt";
+import { useLocale } from "../../i18n";
 
 const STATUS_TONES: Record<ContentTone, string> = {
   neutral: "border-(--color-border) bg-(--color-surface) text-(--color-text-dim)",
@@ -51,6 +52,7 @@ export function GameTicket({
   play?: { to: string; label: string };
   menu?: ReactNode;
 }) {
+  const locale = useLocale();
   const { prefix, color, soft, action, hoverBorder } = KINDS[kind];
   const clue = kind === "quiz" && preview && preview.type !== "cover_title" ? preview : undefined;
   return (
@@ -84,7 +86,7 @@ export function GameTicket({
         <section className="mx-4 mb-3 flex flex-col gap-2 rounded-lg border-l-2 border-(--color-border) bg-(--color-bg) px-4 py-3">
           <div className="flex items-center gap-2 text-sm text-(--color-text-dim)">
             <span aria-hidden="true" className="flex">{clue.type === "title_cover" ? <LibraryIcon size={20} /> : <QuoteIcon size={20} />}</span>
-            {quizClueHeading(clue.type)}
+            {quizClueHeading(clue.type, locale)}
           </div>
           <p className="line-clamp-3 text-base">{clue.prompt}</p>
         </section>

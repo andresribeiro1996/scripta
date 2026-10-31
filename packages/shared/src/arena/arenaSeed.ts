@@ -1,3 +1,5 @@
+import type { Locale } from "../i18n/locale.js";
+import { sharedT } from "../i18n/sharedT.js";
 import { workIdOf } from "../library/works.js";
 import { normalizeImageId, normalizeIsbn } from "../library/covers.js";
 import type { SeedBook } from "./types.js";
@@ -22,9 +24,10 @@ export function seedCoverLookup(book: Record<string, unknown>): SeedCoverLookup 
   };
 }
 
-export function toSeedBook(book: Record<string, unknown>, cover: string | null): SeedBook | null {
+export function toSeedBook(book: Record<string, unknown>, cover: string | null, locale: Locale): SeedBook | null {
+  const t = sharedT(locale);
   const workId = workIdOf(book);
-  return workId ? { workId, title: String(book.Title ?? "Untitled"), author: String(book.Attribution ?? "Unknown author"), cover } : null;
+  return workId ? { workId, title: String(book.Title ?? t("shared.arenaSeed.untitled")), author: String(book.Attribution ?? t("shared.arenaSeed.unknownAuthor")), cover } : null;
 }
 
 const DEFAULT_ROUND_MINUTES = 1440;

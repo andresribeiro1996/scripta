@@ -11,8 +11,10 @@ import { addActivityComment, deleteActivityComment, fetchActivityComments } from
 import { useSkipEmptyPages } from "./FeedRow";
 import { relativeTime } from "@scripta/shared/community";
 import { ENGAGEMENT_QUERY_KEY } from "./useHomeActions";
+import { useLocale } from "../../i18n";
 
 export function CommentsSheet({ id, title, onClose }: { id: string; title: string; onClose: () => void }) {
+  const locale = useLocale();
   const { colors } = useTheme();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -33,7 +35,7 @@ export function CommentsSheet({ id, title, onClose }: { id: string; title: strin
       <Text {...dynamicType} style={[typography.caption, { color: colors.textDim, paddingBottom: spacing.md }]}>{title}</Text>
       <FlatList style={styles.list} data={items} keyExtractor={(item) => item.id} keyboardShouldPersistTaps="handled" renderItem={({ item }) => <View style={[styles.comment, { borderBottomColor: colors.border }]}>
         <AuthorAvatar username={item.author.username} avatarUrl={item.author.avatarUrl} />
-        <View style={styles.copy}><Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{item.author.username} · {relativeTime(item.createdAt)}</Text><Text selectable {...dynamicType} style={[typography.body, { color: colors.text }]}>{item.text}</Text></View>
+        <View style={styles.copy}><Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{item.author.username} · {relativeTime(item.createdAt, locale)}</Text><Text selectable {...dynamicType} style={[typography.body, { color: colors.text }]}>{item.text}</Text></View>
         {item.own ? <IconButton name="delete" accessibilityLabel="Delete your comment" disabled={remove.isPending} onPress={() => remove.mutate(item.id)} /> : null}
       </View>} ListEmptyComponent={query.isPending ? <Skeleton height={80} /> : query.isError ? <ErrorState body="Couldn't load comments." actionLabel="Retry" onAction={() => void query.refetch()} /> : query.hasNextPage ? undefined : <EmptyState title="Start the conversation" body="Be the first to comment." />} ListFooterComponent={query.isFetchingNextPage ? <Skeleton height={48} /> : query.isFetchNextPageError ? <ErrorState body="Couldn't load more comments." actionLabel="Retry" onAction={() => void query.fetchNextPage()} /> : undefined} onEndReached={() => { if (query.hasNextPage && !query.isFetchingNextPage && !query.isFetchNextPageError) void query.fetchNextPage(); }} />
       {error ? <Text accessibilityRole="alert" style={{ color: colors.danger }}>{error instanceof Error ? error.message : "Couldn't save your comment."}</Text> : null}

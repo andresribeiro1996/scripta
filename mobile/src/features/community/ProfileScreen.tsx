@@ -18,6 +18,7 @@ import { AuthorAvatar } from "./AuthorAvatar";
 import { fetchProfile, fetchProfileLibrary, followUser, unfollowUser, type CommunityProfileView } from "./api";
 import { contentDetail, contentKindLabel, contentTarget } from "./communityHome";
 import { ReaderGlyph } from "./ReaderGlyph";
+import { getLocale } from "../../i18n";
 
 export function ProfileScreen({ username }: { username: string }) {
   const { colors, id: viewerTheme } = useTheme();
@@ -211,15 +212,16 @@ type ProfileTab = (typeof PROFILE_TABS)[number]["value"];
 type PublishedRow = { kind: "tierlist" | "tournament" | "quiz"; id: string; name: string; detail: string; target: string; label: string };
 
 function publishedRows(view: CommunityProfileView): PublishedRow[] {
+  const locale = getLocale();
   const rows: PublishedRow[] = [];
   for (const item of view.published.tierlists) {
-    rows.push({ kind: "tierlist", id: item.id, name: item.name, detail: contentDetail(item), target: contentTarget(item), label: contentKindLabel(item) });
+    rows.push({ kind: "tierlist", id: item.id, name: item.name, detail: contentDetail(item, locale), target: contentTarget(item), label: contentKindLabel(item, locale) });
   }
   for (const item of view.published.tournaments) {
-    rows.push({ kind: "tournament", id: item.id, name: item.name, detail: contentDetail(item), target: contentTarget(item), label: contentKindLabel(item) });
+    rows.push({ kind: "tournament", id: item.id, name: item.name, detail: contentDetail(item, locale), target: contentTarget(item), label: contentKindLabel(item, locale) });
   }
   for (const item of view.published.quizzes) {
-    rows.push({ kind: "quiz", id: item.id, name: item.name, detail: contentDetail(item), target: contentTarget(item), label: contentKindLabel(item) });
+    rows.push({ kind: "quiz", id: item.id, name: item.name, detail: contentDetail(item, locale), target: contentTarget(item), label: contentKindLabel(item, locale) });
   }
   return rows;
 }

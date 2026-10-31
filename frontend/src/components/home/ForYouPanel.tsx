@@ -10,14 +10,16 @@ import { AuthorAvatar } from "../CommunityAuthorAvatar";
 import { ArenaIcon, CommunityIcon } from "../NavIcons";
 import { BUTTON_SECONDARY } from "../page/buttonClasses";
 import { LIST_ROW, LIST_ROW_LINK, PANEL, PANEL_HEADER, PANEL_HEADING } from "../page/surfaceClasses";
+import { useLocale } from "../../i18n";
 
 const ACTIVITY_KEY = ["community", "dashboard", "activity"];
 const NOTE = "px-4.5 py-3 text-(--color-text-dim)";
 
 function Row({ item, isNew, children }: { item: PersonalItem; isNew: boolean; children?: ReactNode }) {
-  const row = activityRowModel(item);
+  const locale = useLocale();
+  const row = activityRowModel(item, locale);
   const person = item.kind === "follow" ? item.actor : item.kind === "participation" ? item.actors[0] : undefined;
-  const time = relativeTime(item.createdAt);
+  const time = relativeTime(item.createdAt, locale);
   return (
     <>
       {person ? <AuthorAvatar author={person} size={32} /> : <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-(--color-accent-soft) text-(--color-accent)">{item.kind === "completion" ? <ArenaIcon size={16} /> : <CommunityIcon size={16} />}</span>}
@@ -38,6 +40,7 @@ function Row({ item, isNew, children }: { item: PersonalItem; isNew: boolean; ch
 }
 
 export function ForYouPanel() {
+  const locale = useLocale();
   const queryClient = useQueryClient();
   const feed = useActivityFeed();
   const { fetchNextPage } = feed;
@@ -123,7 +126,7 @@ export function ForYouPanel() {
       ) : items.length === 0 && feed.hasNextPage && !feed.isError ? <p role="status" className={NOTE}>Loading…</p> : items.length === 0 && !feed.hasNextPage ? <p className={NOTE}>Nothing new yet. New followers and plays of your games show up here.</p> : (
         <ul ref={list} className="divide-y divide-(--color-border)">
           {items.map((item) => {
-            const row = activityRowModel(item);
+            const row = activityRowModel(item, locale);
             const isNew = isNewDigestItem(item, feed.seenAt);
             const key = `${item.kind}:${item.id}`;
             if (row.action.kind === "open") {
