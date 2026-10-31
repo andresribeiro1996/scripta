@@ -40,13 +40,18 @@ function dropRepeats(hits: CatalogSearchHit[]): CatalogSearchHit[] {
     const takeWorkKey = existing.workKey == null && hit.workKey != null;
     const takeCoverId = existing.olCoverId == null && hit.olCoverId != null;
     const takeCoverUrl = existing.result.coverUrl == null && hit.result.coverUrl != null;
+    const takePages = existing.result.pages == null && hit.result.pages != null && hit.result.pages > 0;
     const takeSubjectSeries = existing.subjectSeries == null && hit.subjectSeries != null;
-    if (!takeWorkKey && !takeCoverId && !takeCoverUrl && !takeSubjectSeries) continue;
+    if (!takeWorkKey && !takeCoverId && !takeCoverUrl && !takePages && !takeSubjectSeries) continue;
     kept[at] = {
       ...existing,
       workKey: takeWorkKey ? hit.workKey : existing.workKey,
       olCoverId: takeCoverId ? hit.olCoverId : existing.olCoverId,
-      result: takeCoverUrl ? { ...existing.result, coverUrl: hit.result.coverUrl } : existing.result,
+      result: {
+        ...existing.result,
+        ...(takeCoverUrl ? { coverUrl: hit.result.coverUrl } : {}),
+        ...(takePages ? { pages: hit.result.pages } : {})
+      },
       ...(takeSubjectSeries ? { subjectSeries: hit.subjectSeries } : {})
     };
   }

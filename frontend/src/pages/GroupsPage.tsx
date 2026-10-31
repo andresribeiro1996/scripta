@@ -411,7 +411,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
                 }
               }}
               placeholder={`Name this ${copy.noun}…`}
-              className={`min-h-11 w-full rounded-lg border bg-(--color-surface) px-3 text-sm ${draftError ? "border-(--color-danger)" : "border-(--color-border)"}`}
+              className={`${FIELD_CLASS} w-full`}
             />
             <p id="new-group-name-hint" role={draftError ? "alert" : undefined} className={`mt-1 text-xs ${draftError ? "text-(--color-danger)" : "text-(--color-text-dim)"}`}>
               {draftError ?? "Press Enter to add it."}
@@ -442,7 +442,7 @@ export function GroupsPage({ type }: { type: GroupType }) {
                         if (e.key === "Enter") handleRename(group.id);
                         if (e.key === "Escape") setEditingId(null);
                       }}
-                      className="min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-2 text-lg font-bold"
+                      className={`${FIELD_CLASS} text-lg font-bold`}
                     />
                   ) : (
                     <button
@@ -600,7 +600,7 @@ function BookPickerModal({
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search your library…"
           aria-label="Search your library"
-          className="min-h-11 w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm"
+          className={`${FIELD_CLASS} w-full`}
         />
       </div>
       <div className="p-2">

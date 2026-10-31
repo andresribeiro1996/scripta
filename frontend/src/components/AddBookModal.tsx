@@ -15,7 +15,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { IScannerControls } from "@zxing/browser";
 import { seriesLabel } from "@scripta/shared";
-import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "./page/buttonClasses";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY, FIELD_CLASS } from "./page/buttonClasses";
 import { Sheet } from "./Sheet";
 import { normalizeIsbn } from "../lib/covers";
 import { bookSearchApi, buildManualBook, searchInsideOutside, searchResultByline, type BookSearchResult } from "../lib/bookSearch";
@@ -237,7 +237,7 @@ export function AddBookModal({
             onChange={(e) => setQuery(e.target.value)}
             placeholder="ISBN, title, or author"
             aria-label="Search for a book"
-            className="min-h-11 min-w-0 flex-1 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm"
+            className={`${FIELD_CLASS} min-w-0 flex-1`}
           />
           <button type="submit" disabled={searching || query.trim() === ""} className={`${BUTTON_SECONDARY} shrink-0`}>
             {searching ? "Searching…" : "Search"}
@@ -309,7 +309,7 @@ export function AddBookModal({
               required
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="min-h-11 w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm"
+              className={`${FIELD_CLASS} w-full`}
             />
           </label>
           <label className="block">
@@ -318,7 +318,7 @@ export function AddBookModal({
               required
               value={author}
               onChange={(e) => setAuthor(e.target.value)}
-              className="min-h-11 w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm"
+              className={`${FIELD_CLASS} w-full`}
             />
           </label>
           <div className="flex gap-3">
@@ -328,7 +328,7 @@ export function AddBookModal({
                 value={isbn}
                 onChange={(e) => setIsbn(e.target.value)}
                 inputMode="numeric"
-                className="min-h-11 w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm"
+                className={`${FIELD_CLASS} w-full`}
               />
             </label>
             <label className="w-32">
@@ -336,7 +336,7 @@ export function AddBookModal({
               <select
                 value={rating ?? ""}
                 onChange={(e) => setRating(e.target.value === "" ? null : Number(e.target.value))}
-                className="min-h-11 w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm"
+                className={`${FIELD_CLASS} w-full`}
               >
                 <option value="">—</option>
                 {[1, 2, 3, 4, 5].map((n) => (
@@ -353,7 +353,7 @@ export function AddBookModal({
               <select
                 value={readStatus}
                 onChange={(e) => setReadStatus(Number(e.target.value))}
-                className="min-h-11 w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm"
+                className={`${FIELD_CLASS} w-full`}
               >
                 {STATUS_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>
@@ -369,7 +369,7 @@ export function AddBookModal({
                 value={dateRead}
                 onChange={(e) => setDateRead(e.target.value)}
                 disabled={readStatus !== 2}
-                className="min-h-11 w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm disabled:opacity-50"
+                className={`${FIELD_CLASS} w-full`}
               />
             </label>
           </div>

@@ -19,7 +19,7 @@ import { ALL_STAT_METRICS, BOOK_GENRES, STAT_METRIC_LABELS, blockLabel, type Mur
 import { bookKey } from "../../lib/merge";
 import { BookSearchList, GalleryImageGrid } from "./pickers";
 import { Sheet } from "../Sheet";
-import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../page/buttonClasses";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY, FIELD_CLASS } from "../page/buttonClasses";
 import { useTierlists } from "../../hooks/useTierlists";
 import { ChevronLeftIcon, ChevronRightIcon, CHECKBOX_CLASS } from "../Toolbar";
 
@@ -86,7 +86,7 @@ export function BlockConfigPanel({
                 value={draft.heading ?? ""}
                 onChange={(e) => setDraft({ ...draft, heading: e.target.value })}
                 placeholder="e.g. My 2026 in books"
-                className="min-h-11 w-full rounded-lg border border-(--color-border) bg-transparent px-3 py-2 text-sm"
+                className={`${FIELD_CLASS} w-full`}
               />
             </div>
             <div>
@@ -97,7 +97,7 @@ export function BlockConfigPanel({
                 onChange={(e) => setDraft({ ...draft, body: e.target.value })}
                 rows={4}
                 placeholder="A note, a reflection, whatever you want to say here…"
-                className="min-h-11 w-full rounded-lg border border-(--color-border) bg-transparent px-3 py-2 text-sm"
+                className={`${FIELD_CLASS} w-full`}
               />
             </div>
           </div>
@@ -105,7 +105,7 @@ export function BlockConfigPanel({
 
         {draft.type === "profile" && (
           <div className="flex flex-col gap-4">
-            <label className="text-sm"><span className="font-semibold">Biography</span><textarea value={draft.bio} onChange={(event) => setDraft({ ...draft, bio: event.target.value })} rows={4} className="mt-1 w-full rounded-lg border border-(--color-border) bg-transparent px-3 py-2" /></label>
+            <label className="text-sm"><span className="font-semibold">Biography</span><textarea value={draft.bio} onChange={(event) => setDraft({ ...draft, bio: event.target.value })} rows={4} className={`${FIELD_CLASS} mt-1 w-full`} /></label>
             <fieldset><legend className="mb-2 text-sm font-semibold">What I like</legend><div className="flex flex-wrap gap-2">{BOOK_GENRES.map((genre) => { const checked = draft.favoriteGenres.includes(genre); return <label key={genre} className={`cursor-pointer rounded-full border px-3 py-1.5 text-sm ${checked ? "border-(--color-accent) bg-(--color-accent-soft) text-(--color-accent)" : "border-(--color-border)"}`}><input type="checkbox" className="sr-only" checked={checked} onChange={() => setDraft({ ...draft, favoriteGenres: checked ? draft.favoriteGenres.filter((item) => item !== genre) : [...draft.favoriteGenres, genre] })} />{genre}</label>; })}</div></fieldset>
             <p className="text-xs text-(--color-text-dim)">My shelf theme is calculated automatically from your books.</p>
           </div>
@@ -173,7 +173,7 @@ export function BlockConfigPanel({
                 id="image-block-caption"
                 value={draft.caption ?? ""}
                 onChange={(e) => setDraft({ ...draft, caption: e.target.value })}
-                className="min-h-11 w-full rounded-lg border border-(--color-border) bg-transparent px-3 py-2 text-sm"
+                className={`${FIELD_CLASS} w-full`}
               />
             </div>
           </div>
@@ -193,7 +193,7 @@ export function BlockConfigPanel({
                 id="spotlight-block-caption"
                 value={draft.caption ?? ""}
                 onChange={(e) => setDraft({ ...draft, caption: e.target.value })}
-                className="min-h-11 w-full rounded-lg border border-(--color-border) bg-transparent px-3 py-2 text-sm"
+                className={`${FIELD_CLASS} w-full`}
               />
             </div>
           </div>
@@ -201,7 +201,7 @@ export function BlockConfigPanel({
 
         {draft.type === "shelf" && <div className="space-y-2">
           <label className="block text-sm"><span className="font-semibold">Shelf source</span>
-            <select className="ml-2 min-h-11 rounded border p-2" value={draft.collectionId ?? ""} onChange={(event) => {
+            <select className={`${FIELD_CLASS} ml-2`} value={draft.collectionId ?? ""} onChange={(event) => {
               const collectionId = event.target.value || undefined;
               const resolved = resolveHomeBlock(draft, books, groups, "");
               setDraft({ ...draft, collectionId, bookKeys: collectionId ? [] : resolved.type === "shelf" ? resolved.bookKeys : [] });
@@ -211,9 +211,9 @@ export function BlockConfigPanel({
               {groups.filter((group) => group.type === "collection").map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
             </select>
           </label>
-          {draft.collectionId ? <label className="block text-sm"><span className="font-semibold">Title (blank follows collection name)</span><input className="mt-1 min-h-11 w-full rounded border p-2" value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></label> : null}
+          {draft.collectionId ? <label className="block text-sm"><span className="font-semibold">Title (blank follows collection name)</span><input className={`${FIELD_CLASS} mt-1 w-full`} value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></label> : null}
         </div>}
-        {draft.type === "quote" && <label className="block text-sm"><span className="font-semibold">Passage source</span> <select className="min-h-11 rounded border p-2" value={draft.mode ?? "pinned"} onChange={(event) => setDraft({ ...draft, mode: event.target.value === "rediscover" ? "rediscover" : undefined, bookKey: "", highlightId: "" })}><option value="pinned">Choose a passage</option><option value="rediscover">Rediscover a passage</option></select></label>}
+        {draft.type === "quote" && <label className="block text-sm"><span className="font-semibold">Passage source</span> <select className={FIELD_CLASS} value={draft.mode ?? "pinned"} onChange={(event) => setDraft({ ...draft, mode: event.target.value === "rediscover" ? "rediscover" : undefined, bookKey: "", highlightId: "" })}><option value="pinned">Choose a passage</option><option value="rediscover">Rediscover a passage</option></select></label>}
         {draft.type === "shelf" && !draft.collectionId && (
           <div className="flex flex-col gap-3">
             <div>
@@ -223,7 +223,7 @@ export function BlockConfigPanel({
                 value={draft.title}
                 onChange={(e) => setDraft({ ...draft, title: e.target.value })}
                 placeholder="e.g. Top 5 Books This Year"
-                className="min-h-11 w-full rounded-lg border border-(--color-border) bg-transparent px-3 py-2 text-sm"
+                className={`${FIELD_CLASS} w-full`}
               />
             </div>
 
@@ -323,7 +323,7 @@ export function BlockConfigPanel({
                 value={draft.title}
                 onChange={(e) => setDraft({ ...draft, title: e.target.value })}
                 placeholder="e.g. My favorite lines"
-                className="min-h-11 w-full rounded-lg border border-(--color-border) bg-transparent px-3 py-2 text-sm"
+                className={`${FIELD_CLASS} w-full`}
               />
             </div>
 

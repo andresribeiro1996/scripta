@@ -18,6 +18,7 @@ type Props = {
   url?: string | null;
   children?: ReactNode;
   previewControls?: ReactNode;
+  linkActions?: ReactNode;
   imageReady?: boolean;
   onEnableLink?: () => Promise<string | void>;
   enableLinkLabel?: string;
@@ -28,7 +29,7 @@ type Props = {
   textMessage?: string;
 };
 
-export function ContentShareSheet({ visible, onClose, title, description, url, children, previewControls, imageReady = true, onEnableLink, enableLinkLabel = "Create share link", onDisableLink, linkError, onRetryLink, onExportVideo, textMessage }: Props) {
+export function ContentShareSheet({ visible, onClose, title, description, url, children, previewControls, linkActions, imageReady = true, onEnableLink, enableLinkLabel = "Create share link", onDisableLink, linkError, onRetryLink, onExportVideo, textMessage }: Props) {
   const { colors } = useTheme();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -85,7 +86,7 @@ export function ContentShareSheet({ visible, onClose, title, description, url, c
 
   return <BottomSheet isPresented={visible} onDismiss={() => { if (!busy) onClose(); }} snapPoints={["full"]} containerColor={colors.surface} contentPadding={0} shouldDismissOnBackPress={!busy} shouldDismissOnClickOutside={!busy}>
     <RNHostView>
-      <View style={{ width: Math.min(width, 560), alignSelf: "center", flexGrow: 1, height: 0, paddingHorizontal: spacing.xl, paddingTop: spacing.sm, paddingBottom: Math.max(insets.bottom, spacing.lg), gap: spacing.lg }}>
+      <View pointerEvents={busy ? "none" : "auto"} style={{ width: Math.min(width, 560), alignSelf: "center", flexGrow: 1, height: 0, paddingHorizontal: spacing.xl, paddingTop: spacing.sm, paddingBottom: Math.max(insets.bottom, spacing.lg), gap: spacing.lg }}>
         <View style={styles.header}>
           {view !== "actions" ? <Pressable accessibilityRole="button" accessibilityLabel="Back to share options" accessibilityState={{ disabled: busy }} disabled={busy} onPress={() => { setView("actions"); setError(null); setNotice(null); }} style={({ pressed }) => [styles.iconAction, { backgroundColor: pressed ? colors.border : colors.background, opacity: busy ? 0.5 : 1 }]}><Icon name="back" size={20} color={colors.text} /></Pressable> : null}
           {view === "actions" ? <View style={{ flex: 1 }} /> : <Text accessibilityRole="header" {...dynamicType} style={[typography.title, { color: colors.text, flex: 1, textAlign: "center", fontWeight: "600" }]}>{view === "image" ? "Image preview" : "Scan to open"}</Text>}
@@ -129,10 +130,13 @@ export function ContentShareSheet({ visible, onClose, title, description, url, c
             <Button label="Send link instead" disabled={busy} onPress={() => void run(async () => { await Share.share({ message: shareUrl, title }); })} />
           </> : <>
             {children ? <ShareChoice icon="image" label="Share as image" detail="Made for stories, posts & group chats" primary disabled={busy} onPress={() => setView("image")} /> : null}
-            {shareUrl ? <View style={styles.actions}>
-              <View style={styles.rowItem}><ShareChoice icon="link" label="Send link" detail="Open the live version" disabled={busy} onPress={() => void run(async () => { await Share.share({ message: shareUrl, title }); })} /></View>
-              <View style={styles.rowItem}><ShareChoice icon="qr" label="QR code" detail="Share face to face" disabled={busy} onPress={() => setView("qr")} /></View>
-            </View> : onEnableLink ? <ShareChoice icon="link" label={enableLinkLabel} detail="Let others open the live version" disabled={busy} onPress={() => void run(async () => { const next = await onEnableLink(); if (next) setCreatedUrl(next); })} /> : null}
+            {shareUrl ? <>
+              <View style={styles.actions}>
+                <View style={styles.rowItem}><ShareChoice icon="link" label="Send link" detail="Open the live version" disabled={busy} onPress={() => void run(async () => { await Share.share({ message: shareUrl, title }); })} /></View>
+                <View style={styles.rowItem}><ShareChoice icon="qr" label="QR code" detail="Share face to face" disabled={busy} onPress={() => setView("qr")} /></View>
+              </View>
+              {linkActions}
+            </> : onEnableLink ? <ShareChoice icon="link" label={enableLinkLabel} detail="Let others open the live version" disabled={busy} onPress={() => void run(async () => { const next = await onEnableLink(); if (next) setCreatedUrl(next); })} /> : null}
             {textMessage ? <ShareChoice icon="share" label="Send as text" detail="For group chats" disabled={busy} onPress={() => void run(async () => { await Share.share({ message: textMessage, title }); })} /> : null}
             {children ? <Text style={[typography.caption, { color: colors.textDim, textAlign: "center" }]}>Sharing an image keeps your visibility unchanged.</Text> : null}
             {shareUrl && onDisableLink ? <Pressable accessibilityRole="button" accessibilityState={{ disabled: busy }} disabled={busy} onPress={() => void run(async () => { await onDisableLink(); setCreatedUrl(null); })} style={({ pressed }) => [styles.textAction, { opacity: busy || pressed ? 0.5 : 1 }]}><Text {...dynamicType} style={[typography.caption, { color: colors.danger, alignSelf: "stretch", textAlign: "center" }]}>Stop sharing link</Text></Pressable> : null}

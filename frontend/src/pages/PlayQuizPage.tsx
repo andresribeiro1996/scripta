@@ -105,7 +105,7 @@ export function PlayQuizPage() {
   }
 
   if (result) {
-    return <QuizResults code={code ?? ""} name={playBoard.name} result={result} questions={questions} alreadyPlayed={submitted === null} back={back} />;
+    return <QuizResults code={code ?? ""} name={playBoard.name} result={result} questions={questions} back={back} />;
   }
 
   const question = questions[index];

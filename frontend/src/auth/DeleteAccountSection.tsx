@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { AccountSecurity } from "@scripta/shared";
 import { apiFetch } from "../api/client";
-import { BUTTON_DANGER, BUTTON_DANGER_OUTLINE, BUTTON_SECONDARY } from "../components/page/buttonClasses";
+import { BUTTON_DANGER, BUTTON_DANGER_OUTLINE, BUTTON_SECONDARY, FIELD_CLASS } from "../components/page/buttonClasses";
 import { SettingGroup, SettingRow } from "../components/page/Page";
 import { LIST_PANEL } from "../components/page/surfaceClasses";
 import { useAuth } from "./AuthContext";
@@ -39,7 +39,7 @@ export function DeleteAccountSection() {
     {open && <form onSubmit={submit} className="px-4 py-3"><fieldset disabled={busy} className="space-y-3 text-sm">
       {hasPassword
         ? <label className="block">Enter your password to confirm<PasswordInput required autoComplete="current-password" value={value} onChange={(event) => setValue(event.target.value)} /></label>
-        : <label className="block">Type <b>{name}</b> to confirm<input required autoComplete="off" autoCapitalize="none" spellCheck={false} className="mt-1 min-h-11 w-full rounded-lg border border-(--color-border) bg-(--color-bg) p-3" value={value} onChange={(event) => setValue(event.target.value)} /></label>}
+        : <label className="block">Type <b>{name}</b> to confirm<input required autoComplete="off" autoCapitalize="none" spellCheck={false} className={`${FIELD_CLASS} mt-1 w-full`} value={value} onChange={(event) => setValue(event.target.value)} /></label>}
       {error && <p role="alert" className="text-(--color-danger)">{error}</p>}
       <div className="flex flex-wrap gap-4"><button className={BUTTON_DANGER}>{busy ? "Deleting…" : "Delete my account"}</button><button type="button" className={BUTTON_SECONDARY} onClick={() => { setOpen(false); setValue(""); setError(""); }}>Cancel</button></div>
     </fieldset></form>}

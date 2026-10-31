@@ -1,0 +1,101 @@
+<style>
+  .ab-wrap { display:flex; gap:32px; flex-wrap:wrap; justify-content:center; }
+  .ab-col { display:flex; flex-direction:column; align-items:center; gap:8px; }
+  .ab-cap { font-size:13px; color:#6b6560; max-width:360px; text-align:center; }
+  .phone { width:360px; background:#f2f0ec; border-radius:28px; border:8px solid #201e1c; overflow:hidden; font-family:-apple-system, Roboto, sans-serif; color:#201e1c; position:relative; }
+  .ph-head { background:#f2f0ec; padding:18px 16px 10px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #ddd8d0; }
+  .ph-head h1 { font-family:'Playfair Display', Georgia, serif; font-size:22px; margin:0; font-weight:700; }
+  .ph-x { font-size:20px; color:#6b6560; }
+  .ph-body { padding:16px; display:flex; flex-direction:column; gap:16px; height:720px; overflow-y:auto; padding-bottom:96px; }
+  .abcard { background:#ffffff; border:1px solid #ddd8d0; border-radius:16px; }
+  .search-top { display:flex; align-items:center; gap:10px; padding:14px; }
+  .search-top .ic { color:#97532d; font-size:18px; }
+  .search-top b { display:block; font-size:15px; }
+  .search-top small { color:#97532d; font-size:12px; }
+  .chev { margin-left:auto; color:#6b6560; }
+  .search-row { display:flex; gap:8px; padding:0 14px 14px; border-top:1px solid #ddd8d0; padding-top:12px; }
+  .s-in { flex:1; background:#f2f0ec; border:1px solid #ddd8d0; border-radius:12px; padding:11px 12px; font-size:14px; color:#6b6560; }
+  .s-btn { width:46px; border-radius:12px; background:#97532d; color:#fff; display:flex; align-items:center; justify-content:center; font-size:16px; }
+  .s-scan { width:46px; border-radius:12px; background:#f1e2d8; color:#97532d; display:flex; align-items:center; justify-content:center; font-size:16px; border:1px solid #e0ccbf; }
+  .res { display:flex; align-items:center; gap:10px; padding:8px 14px; }
+  .res + .res { border-top:1px solid #f2f0ec; }
+  .res .cv { width:34px; height:50px; border-radius:4px; flex:none; }
+  .res b { font-size:14px; display:block; }
+  .res small { font-size:12px; color:#6b6560; }
+  .res .go { margin-left:auto; color:#6b6560; }
+  .hint { padding:0 14px 6px; font-size:12px; color:#6b6560; }
+  .cover-row { display:flex; gap:14px; align-items:center; }
+  .cover { width:84px; height:122px; border-radius:10px; background:#f1e2d8; border:1px solid #e0ccbf; display:flex; align-items:center; justify-content:center; color:#97532d; font-size:28px; flex:none; overflow:hidden; }
+  .cover-side b { font-size:15px; display:block; }
+  .cover-side small { font-size:12px; color:#6b6560; display:block; margin-bottom:10px; }
+  .obtn { border:1.5px solid #97532d; color:#97532d; border-radius:10px; padding:8px 10px; font-size:13px; font-weight:600; display:inline-block; margin-right:6px; background:#fff; }
+  .lab { font-size:14px; font-weight:600; margin-bottom:6px; }
+  .lab span { color:#6b6560; font-weight:400; }
+  .inp { background:#ffffff; border:1px solid #ddd8d0; border-radius:12px; padding:12px; font-size:15px; }
+  .inp.ph { color:#a39d96; }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; }
+  .chip { border:1px solid #ddd8d0; background:#fff; border-radius:12px; padding:9px 12px; font-size:14px; color:#6b6560; }
+  .chip.on { background:#97532d; color:#fff; border-color:#97532d; font-weight:600; }
+  .chip.sm { padding:6px 10px; font-size:13px; border-radius:999px; }
+  .chip.sm.on { background:#f1e2d8; color:#97532d; border-color:#e0ccbf; }
+  .two { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
+  .two .chip { text-align:center; }
+  .more { display:flex; justify-content:space-between; color:#6b6560; font-size:14px; padding:12px 14px; }
+  .dock { position:absolute; left:0; right:0; bottom:0; padding:12px 16px 18px; background:linear-gradient(transparent, #f2f0ec 30%); }
+  .cta { background:#97532d; color:#fff; text-align:center; border-radius:14px; padding:14px; font-weight:700; font-size:16px; }
+  .cta.off { background:#e0ccbf; color:#fff; }
+  .tag { display:inline-block; font-size:11px; background:#dcebf2; color:#285f7a; border-radius:6px; padding:1px 6px; margin-left:6px; vertical-align:middle; }
+</style>
+
+<h2>Add a book, Scripta style</h2>
+<p class="subtitle">Your example's layout, in Scripta's Light theme (it follows whatever theme is picked). Left: just opened. Right: after tapping a search result. Blue tags mark my guesses.</p>
+
+<div class="ab-wrap">
+  <div class="ab-col">
+    <div class="phone">
+      <div class="ph-head"><h1>Add a book</h1><span class="ph-x">✕</span></div>
+      <div class="ph-body">
+        <div class="abcard">
+          <div class="search-top"><span class="ic">🔍</span><div><b>Search for a book</b><small>Auto-fill title, author, pages &amp; cover</small></div><span class="chev">⌃</span></div>
+          <div class="search-row"><div class="s-in">Title, author or ISBN</div><div class="s-scan">▥</div><div class="s-btn">🔍</div></div>
+          <div class="hint">Tap a result to fill the form</div>
+          <div class="res"><div class="cv" style="background:linear-gradient(#5b7fa8,#2b3d5a)"></div><div><b>A Ilha</b><small>Janaina Lourençato · 2019</small></div><span class="go">›</span></div>
+          <div class="res"><div class="cv" style="background:linear-gradient(#f4b860,#7a4a2a)"></div><div><b>A Ilha</b><small>Joshua Rubberman · 2015</small></div><span class="go">›</span></div>
+          <div class="res"><div class="cv" style="background:linear-gradient(#7d8f86,#2f3b36)"></div><div><b>A Ilha</b><small>Darcy Pinheiro · 2008</small></div><span class="go">›</span></div>
+        </div>
+        <div class="cover-row">
+          <div class="cover">📖</div>
+          <div class="cover-side"><b>Cover image</b><small>No cover yet</small><span class="obtn">Find cover</span><span class="obtn">Upload</span></div>
+        </div>
+        <div><div class="lab">Title *</div><div class="inp ph">e.g. The Hobbit</div></div>
+        <div><div class="lab">Author *</div><div class="inp ph">e.g. J.R.R. Tolkien</div></div>
+        <div><div class="lab">Format</div><div class="chips"><span class="chip on">📕 Hardcopy</span><span class="chip">📱 Ebook</span><span class="chip">🎧 Audiobook</span><span class="chip">◇ Other</span></div></div>
+        <div><div class="lab">Total pages *</div><div class="inp ph">e.g. 310</div></div>
+      </div>
+      <div class="dock"><div class="cta off">Add to library</div></div>
+    </div>
+    <div class="ab-cap">Search card folds away. Scan button sits beside search <span class="tag">guess</span></div>
+  </div>
+
+  <div class="ab-col">
+    <div class="phone">
+      <div class="ph-head"><h1>Add a book</h1><span class="ph-x">✕</span></div>
+      <div class="ph-body">
+        <div class="abcard"><div class="search-top"><span class="ic">🔍</span><div><b>Search for a book</b><small>Filled from “The Hobbit” · tap to search again</small></div><span class="chev">⌄</span></div></div>
+        <div class="cover-row">
+          <div class="cover" style="background:linear-gradient(160deg,#2d5a3d,#16301f); color:#e8d9a8; font-family:Georgia; font-size:13px; text-align:center;">The<br>Hobbit</div>
+          <div class="cover-side"><b>Cover image</b><small>From search</small><span class="obtn">Find cover</span><span class="obtn">Upload</span></div>
+        </div>
+        <div><div class="lab">Title *</div><div class="inp">The Hobbit</div></div>
+        <div><div class="lab">Author *</div><div class="inp">J.R.R. Tolkien</div></div>
+        <div><div class="lab">Format</div><div class="chips"><span class="chip">📕 Hardcopy</span><span class="chip on">📱 Ebook</span><span class="chip">🎧 Audiobook</span><span class="chip">◇ Other</span></div></div>
+        <div><div class="lab">Total pages *</div><div class="inp">310</div></div>
+        <div><div class="lab">Genre <span>(optional)</span></div><div class="chips"><span class="chip sm on">Fantasy</span><span class="chip sm on">Classics</span><span class="chip sm">+ Add</span></div></div>
+        <div><div class="lab">Add as</div><div class="two"><span class="chip on">Reading</span><span class="chip">To read</span><span class="chip">Finished <span class="tag">guess</span></span></div></div>
+        <div class="abcard more"><span>More details · ISBN, publisher <span class="tag">guess</span></span><span>⌄</span></div>
+      </div>
+      <div class="dock"><div class="cta">Add to library</div></div>
+    </div>
+    <div class="ab-cap">Genres as tappable chips instead of a dropdown <span class="tag">guess</span>. ISBN and publisher tucked under “More details” <span class="tag">guess</span></div>
+  </div>
+</div>

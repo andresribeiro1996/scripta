@@ -1483,6 +1483,30 @@ git add frontend/src/components/GenreReviewList.tsx frontend/src/components/Syno
 - Modify: `frontend/src/components/AddBookModal.tsx`
 - Modify: `frontend/src/components/ShareModal.tsx`
 - Modify: `frontend/src/components/FinishSheet.tsx`
+- Modify: `frontend/src/components/DuplicatesSheet.tsx`
+- Modify: `frontend/src/components/OwnShelfView.tsx`
+- Modify: `frontend/src/components/SocialsSection.tsx`
+- Modify: `frontend/src/components/StyleControls.tsx`
+- Modify: `frontend/src/components/arena/BracketMap.tsx`
+- Modify: `frontend/src/components/murals/MobileMuralCanvas.tsx`
+- Modify: `frontend/src/components/murals/MuralFolderTree.tsx`
+- Modify: `frontend/src/components/murals/SavedLooks.tsx`
+- Modify: `frontend/src/components/readerCard/DraftField.tsx`
+- Modify: `frontend/src/components/readerCard/ReaderCardChoices.tsx`
+- Modify: `frontend/src/components/tierlist/AddBooksSheet.tsx`
+- Modify: `frontend/src/components/tierlist/TierBoard.tsx`
+- Modify: `frontend/src/auth/AccountSecuritySection.tsx`
+- Modify: `frontend/src/auth/DeleteAccountSection.tsx`
+- Modify: `frontend/src/components/quiz/QuizResults.tsx`
+- Modify: `frontend/src/components/murals/BlockConfigPanel.tsx`
+- Modify: `frontend/src/pages/DailyChapterPage.tsx`
+- Modify: `frontend/src/pages/GroupsPage.tsx`
+- Modify: `frontend/src/pages/MuralsListPage.tsx`
+- Modify: `frontend/src/pages/SettingsPage.tsx`
+- Modify: `frontend/src/pages/AdminDailyChapterPage.tsx`
+- Modify: `frontend/src/pages/MuralEditorPage.tsx`
+- Modify: `frontend/README.md`
+- Modify: `docs/superpowers/plans/2026-10-29-desktop-revamp.md`
 
 - [ ] **Step 1: Write the guard test.** It scans every `frontend/src/**/*.tsx` except `components/landing/**` and the class modules.
 

@@ -1,9 +1,10 @@
-import { ALL_STAT_METRICS, BOOK_GENRES, STAT_METRIC_LABELS, bookKey, resolveHomeBlock, resolveQuote, type Group, type MuralBlock } from "@scripta/shared";
+import { ALL_STAT_METRICS, STAT_METRIC_LABELS, bookKey, resolveHomeBlock, resolveQuote, type Group, type MuralBlock } from "@scripta/shared";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Icon, Input, Segmented } from "../../ui";
 import { Text } from "../../ui/Text";
 import { minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui/theme";
 import type { GalleryImage } from "../gallery/api";
+import { GenreChoices } from "../library/components/GenreChoices";
 import { SelectRow, ToggleRow } from "../library/components/StyleControls";
 import type { Tierlist } from "../tierlists/api";
 
@@ -110,16 +111,7 @@ export function ContentTab({ block, books, groups, images, tierlists, update, on
       <View style={styles.tab}>
         <Input label="Biography" value={block.bio} multiline onChangeText={(bio) => update((block) => block.type === "profile" ? { ...block, bio } : block)} />
         <Text style={{ color: colors.text }}>What I like</Text>
-        <View style={styles.genreChoices}>
-          {BOOK_GENRES.map((genre) => {
-            const checked = block.favoriteGenres.includes(genre);
-            return (
-              <Pressable key={genre} accessibilityRole="checkbox" accessibilityState={{ checked }} onPress={() => update((block) => block.type === "profile" ? { ...block, favoriteGenres: checked ? block.favoriteGenres.filter((item) => item !== genre) : [...block.favoriteGenres, genre] } : block)} style={[styles.genreChoice, { backgroundColor: checked ? colors.accentSoft : colors.surface, borderColor: checked ? colors.accent : colors.border }]}>
-                <Text style={{ color: checked ? colors.accent : colors.text }}>{genre}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
+        <GenreChoices value={block.favoriteGenres} onChange={(favoriteGenres) => update((block) => block.type === "profile" ? { ...block, favoriteGenres } : block)} />
       </View>
     );
   }
@@ -145,8 +137,6 @@ export function ContentTab({ block, books, groups, images, tierlists, update, on
 
 const styles = StyleSheet.create({
   tab: { gap: spacing.sm },
-  genreChoices: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
-  genreChoice: { borderWidth: 1, borderRadius: 999, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   pickerRow: { minHeight: minimumTouchTarget, borderWidth: 1, borderRadius: radii.md, paddingHorizontal: spacing.md, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md },
   pickerValue: { flexShrink: 1, flexDirection: "row", alignItems: "center", gap: spacing.xs },
   pickerValueText: { flexShrink: 1 },

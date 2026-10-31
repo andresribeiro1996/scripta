@@ -20,9 +20,13 @@
 
 import { GENRES_FROM_CATALOG, normalizeBookGenres, type BookGenre } from "./bookGenres.js";
 import { normalizeWords } from "./bookMatch.js";
+import { positiveInteger } from "./bookMetadata.js";
 import { normalizeIsbn } from "./covers.js";
 import { bookKey } from "./merge.js";
 import { cleanCatalogText } from "./mojibake.js";
+
+export const BOOK_FORMATS = ["hardcopy", "ebook", "audiobook", "other"] as const;
+export type BookFormat = (typeof BOOK_FORMATS)[number];
 
 export type BookSeries = { name: string; kind: "series" | "collection"; position: string | null };
 
@@ -34,6 +38,7 @@ export interface BookSearchResult {
   publisher: string | null;
   coverUrl: string | null;
   genres: BookGenre[];
+  pages?: number | null;
   workId?: string;
   bookId?: string;
   series?: BookSeries;
@@ -138,7 +143,8 @@ export function mapOpenLibraryDoc(doc: Record<string, unknown>): BookSearchResul
     isbn: isbn13 ?? isbn10 ?? null,
     publisher: typeof publishers[0] === "string" ? publishers[0] : null,
     coverUrl: typeof doc.cover_i === "number" ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg` : null,
-    genres: normalizeBookGenres(doc.subject)
+    genres: normalizeBookGenres(doc.subject),
+    pages: positiveInteger(doc.number_of_pages_median)
   };
 }
 
@@ -153,6 +159,9 @@ export interface ManualBookFields {
   /** YYYY-MM-DD off the form's date input, or null. */
   dateRead: string | null;
   genres?: BookGenre[];
+  genresEdited?: boolean;
+  format?: BookFormat;
+  pages?: number | null;
 }
 
 /** Builds a book record in the same shape every importer produces
@@ -182,6 +191,8 @@ export function buildManualBook(fields: ManualBookFields, id: string): Record<st
     MimeType: null,
     ImageId: null,
     highlights: [] as Array<Record<string, unknown>>,
-    ...(fields.genres?.length ? { _genres: fields.genres, _genresFrom: GENRES_FROM_CATALOG } : {})
+    ...(fields.genres?.length ? { _genres: fields.genres, ...(fields.genresEdited ? {} : { _genresFrom: GENRES_FROM_CATALOG }) } : {}),
+    ...(fields.format ? { _format: fields.format } : {}),
+    ...(positiveInteger(fields.pages) ? { _pages: fields.pages } : {})
   };
 }

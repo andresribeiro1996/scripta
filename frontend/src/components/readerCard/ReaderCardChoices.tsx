@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { SIGNATURE_NOTE_MAX, bookKey, bookPassages, isFinishedBook, searchPassages, type ChosenHighlight, type ChosenSignature, type Passage, type ReaderCardChosen, type ReaderCardStylePatch } from "@scripta/shared";
 import { BookSearchList } from "../murals/pickers";
+import { FIELD_CLASS } from "../page/buttonClasses";
 import { PANEL_HEADING } from "../page/surfaceClasses";
 import { DraftField } from "./DraftField";
 
@@ -74,7 +75,7 @@ export function HighlightChoice({ books, highlight, chosen, onChange }: { books:
       </div>
       {picking ? (
         <div className="mt-2 space-y-2">
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search your highlights…" aria-label="Search your highlights" className="min-h-11 w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm" />
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search your highlights…" aria-label="Search your highlights" className={`${FIELD_CLASS} w-full`} />
           {query.trim() ? (matches.length ? list(matches) : <p className={DIM}>No highlights match.</p>) : browsing ? (
             <>
               <button type="button" className={LINK} onClick={() => setBrowsing(null)}>Back to books</button>

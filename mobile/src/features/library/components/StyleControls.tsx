@@ -2,7 +2,7 @@ import { useState, type ReactNode } from "react";
 import { normalizeHexColor } from "@scripta/shared";
 import { ColorEditor } from "../../murals/ColorEditor";
 import { matchPreset, type Preset } from "../../murals/blockStyleOptions";
-import { Icon } from "../../../ui";
+import { Icon, type IconName } from "../../../ui";
 import { Pressable, StyleSheet, Switch, View, type DimensionValue } from "react-native";
 import { Text } from "../../../ui/Text";
 import { minimumTouchTarget, radii, spacing, typography, useTheme } from "../../../ui/theme";
@@ -22,11 +22,13 @@ export function Caption({ children }: { children: string }) {
   return <Text style={[typography.caption, { color: colors.textDim }]}>{children}</Text>;
 }
 
-export function Chip({ label, selected, onPress, fontFamily }: { label: string; selected: boolean; onPress: () => void; fontFamily?: string }) {
+export function Chip({ label, selected, onPress, fontFamily, icon, grow = false }: { label: string; selected: boolean; onPress: () => void; fontFamily?: string; icon?: IconName; grow?: boolean }) {
   const { colors } = useTheme();
+  const color = selected ? colors.accent : colors.text;
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected }} onPress={onPress} style={[styles.chip, { borderColor: selected ? colors.accent : colors.border, backgroundColor: selected ? colors.accentSoft : colors.surface }]}>
-      <Text numberOfLines={1} style={{ color: selected ? colors.accent : colors.text, fontSize: 14, fontWeight: selected ? "700" : "500", fontFamily }}>{label}</Text>
+    <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected }} onPress={onPress} style={[styles.chip, icon || grow ? styles.chipRow : null, grow ? styles.chipGrow : null, { borderColor: selected ? colors.accent : colors.border, backgroundColor: selected ? colors.accentSoft : colors.surface }]}>
+      {icon ? <Icon name={icon} size={16} color={color} /> : null}
+      <Text numberOfLines={1} style={{ color, fontSize: 14, fontWeight: selected ? "700" : "500", fontFamily, textAlign: grow ? "center" : undefined }}>{label}</Text>
     </Pressable>
   );
 }
@@ -189,6 +191,8 @@ const styles = StyleSheet.create({
   section: { gap: spacing.sm },
   sectionTitle: { ...typography.caption, fontWeight: "700", letterSpacing: 0.4 },
   chip: { minHeight: minimumTouchTarget, justifyContent: "center", borderWidth: 1, borderRadius: radii.md, paddingHorizontal: spacing.md },
+  chipRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
+  chipGrow: { flex: 1 },
   tileWrap: { alignItems: "center", gap: spacing.xs },
   tile: { borderRadius: radii.md, alignItems: "center", justifyContent: "center" },
   custom: { alignItems: "center", justifyContent: "center" },

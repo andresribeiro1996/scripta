@@ -16,7 +16,7 @@ import {
 import { fetchOwnProfile } from "../api/community";
 import { fetchMural, updateMuralApi } from "../api/murals";
 import { CoverImage } from "./BookCard";
-import { BUTTON_PRIMARY } from "./page/buttonClasses";
+import { BUTTON_PRIMARY, FIELD_CLASS } from "./page/buttonClasses";
 import { DuelButton } from "./DuelButton";
 import { FeelingChips } from "./FeelingChips";
 import { Sheet } from "./Sheet";
@@ -202,7 +202,7 @@ export function FinishSheet({
               placeholder="What stuck with you?"
               rows={4}
               aria-label="A thought to keep"
-              className="w-full resize-none rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm"
+              className={`${FIELD_CLASS} w-full resize-none`}
             />
           </div>
 

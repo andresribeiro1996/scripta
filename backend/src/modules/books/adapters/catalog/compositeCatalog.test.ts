@@ -163,6 +163,17 @@ test("a kept ISBNdb hit takes the work key and cover id of the Open Library repe
   assert.equal(kept!.result.coverUrl, "https://covers.openlibrary.org/b/id/42-M.jpg");
 });
 
+test("a kept ISBNdb hit takes the page count of the Open Library repeat it replaces, and keeps its own", async () => {
+  const olHit = { ...hit("Dune", "9780441013593"), result: { ...hit("Dune", "9780441013593").result, pages: 412 } };
+  const bnHit = hit("Dune", "9780441013593", "Frank Herbert", "isbndb");
+  const [kept] = await createCompositeCatalog(fake(null, [olHit]).catalog, fake(null, [bnHit]).catalog).search({ text: "dune" });
+  assert.equal(kept!.source, "isbndb");
+  assert.equal(kept!.result.pages, 412);
+  const own = { ...bnHit, result: { ...bnHit.result, pages: 544 } };
+  const [stays] = await createCompositeCatalog(fake(null, [olHit]).catalog, fake(null, [own]).catalog).search({ text: "dune" });
+  assert.equal(stays!.result.pages, 544);
+});
+
 test("a kept ISBNdb hit takes the series subjects of the Open Library repeat it replaces, and keeps its own", async () => {
   const subjectSeries = [{ name: "Dune Chronicles", position: null }];
   const olHit = { ...hit("Dune", "9780441013593"), subjectSeries };

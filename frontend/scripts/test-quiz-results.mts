@@ -19,14 +19,14 @@ const result: PlayResponse = {
   answers: { cover: { answerIndex: 0, choiceIndex: 1 }, quote: { answerIndex: 0, choiceIndex: 0 }, repeat: { answerIndex: 0, choiceIndex: 0 } },
 };
 
-function render(play: PlayResponse, played = true, plays: unknown[] = []) {
+function render(play: PlayResponse, plays: unknown[] = []) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   client.setQueryData(["quizPublicResults", "challenge"], { plays, questionCount: 3 });
   const original = Object.getOwnPropertyDescriptor(globalThis, "window");
   Object.defineProperty(globalThis, "window", { configurable: true, value: { location: { origin: "https://atmyshelf.com" } } });
   try {
     return renderToStaticMarkup(createElement(QueryClientProvider, { client }, createElement(MemoryRouter, null,
-      createElement(QuizResults, { code: "challenge", name: "Book quiz", questions, result: play, alreadyPlayed: played }),
+      createElement(QuizResults, { code: "challenge", name: "Book quiz", questions, result: play }),
     )));
   } finally {
     client.clear();
@@ -37,14 +37,14 @@ function render(play: PlayResponse, played = true, plays: unknown[] = []) {
 
 test("results retain correct answers and show the player's wrong pick once", () => {
   const html = render(result);
-  assert.doesNotMatch(html, /<header/);
+  assert.match(html, /<header[\s\S]*<h1[^>]*>Book quiz<\/h1>[\s\S]*<\/header>/);
   assert.equal((html.match(/<h1 /g) ?? []).length, 1);
   assert.match(html, /<h1[^>]*>Book quiz<\/h1>/);
   assert.match(html, /aria-label="2 of 3 correct"/);
   assert.equal((html.match(/Your pick<\/p>/g) ?? []).length, 1);
   assert.equal((html.match(/Correct answer<\/p>/g) ?? []).length, 3);
   assert.match(html, /alt="Your picked cover"/);
-  assert.match(html, /You already played this quiz/);
+  assert.doesNotMatch(html, /Your results|already played|Quiz complete| correct · /);
   assert.match(html, /value="https:\/\/atmyshelf.com\/play\/challenge"/);
   const artwork = html.slice(0, html.indexOf('</section>'));
   assert.equal((artwork.match(/<img /g) ?? []).length, 1);
@@ -64,8 +64,7 @@ test("mobile results connect the answer tabs and collapsed rows to their panels"
 
 test("legacy results keep every verdict without inventing answers or picks", () => {
   const { answers: _, ...legacy } = result;
-  const html = render(legacy, false);
-  assert.match(html, /Quiz complete/);
+  const html = render(legacy);
   assert.equal((html.match(/>Incorrect<\/p>/g) ?? []).length, 1);
   assert.equal((html.match(/>Correct<\/p>/g) ?? []).length, 2);
   assert.doesNotMatch(html, /Correct answer<\/p>|Your pick<\/p>/);
@@ -73,7 +72,7 @@ test("legacy results keep every verdict without inventing answers or picks", () 
 
 test("leaderboard preserves guest labels, scores, times and its empty state", () => {
   assert.match(render(result), /No plays yet/);
-  const html = render(result, true, [{ playerName: "Martinha", anonymous: true, score: 3, durationMs: 16800 }]);
+  const html = render(result, [{ playerName: "Martinha", anonymous: true, score: 3, durationMs: 16800 }]);
   assert.match(html, /Martinha/);
   assert.match(html, /Guest/);
   assert.match(html, /3\/3/);
