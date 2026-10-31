@@ -18,10 +18,10 @@ export function isAppearanceSyncFailure(err: unknown): boolean {
 
 export function useAccountAppearanceSync(): void {
   const { preference, displayFont, textFont, setPreference, setFontPreference } = useTheme();
-  const latest = useRef<Appearance>({ theme: preference, displayFont, textFont });
+  const latest = useRef<Appearance>({ theme: preference, displayFont, textFont, locale: "auto" });
 
   useEffect(() => {
-    latest.current = { theme: preference, displayFont, textFont };
+    latest.current = { theme: preference, displayFont, textFont, locale: "auto" };
   }, [preference, displayFont, textFont]);
 
   useEffect(() => {

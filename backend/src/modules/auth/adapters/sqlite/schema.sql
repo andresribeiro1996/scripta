@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS users (
   theme         TEXT,
   display_font  TEXT,
   text_font     TEXT,
+  locale        TEXT,
   created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 

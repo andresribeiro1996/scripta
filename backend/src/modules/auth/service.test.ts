@@ -48,6 +48,7 @@ function createInMemoryRepo(): AuthRepository & { rows: Map<string, UserRow>; re
         theme: fields.theme ?? row.theme,
         display_font: fields.display_font ?? row.display_font,
         text_font: fields.text_font ?? row.text_font,
+        locale: fields.locale ?? row.locale,
       });
     },
     rows,
@@ -461,21 +462,21 @@ test("concurrent refreshes of the same token both succeed without revoking unrel
 test("getAppearance is all null until something is saved, and setAppearance updates only the given fields", () => {
   const { service, repo } = makeService();
   const row = repo.createUser({ email: "t@example.test", username: "themer", passwordHash: null, googleId: null });
-  assert.deepEqual(service.getAppearance(row.id), { theme: null, displayFont: null, textFont: null });
+  assert.deepEqual(service.getAppearance(row.id), { theme: null, displayFont: null, textFont: null, locale: null });
   service.setAppearance(row.id, { theme: "oxblood" });
-  assert.deepEqual(service.getAppearance(row.id), { theme: "oxblood", displayFont: null, textFont: null });
-  service.setAppearance(row.id, { displayFont: "righteous", textFont: "theme" });
-  assert.deepEqual(service.getAppearance(row.id), { theme: "oxblood", displayFont: "righteous", textFont: "theme" });
+  assert.deepEqual(service.getAppearance(row.id), { theme: "oxblood", displayFont: null, textFont: null, locale: null });
+  service.setAppearance(row.id, { displayFont: "righteous", textFont: "theme", locale: "pt-PT" });
+  assert.deepEqual(service.getAppearance(row.id), { theme: "oxblood", displayFont: "righteous", textFont: "theme", locale: "pt-PT" });
 });
 
 test("getAppearance reads stored values this server no longer knows as the defaults", () => {
   const { service, repo } = makeService();
   const row = repo.createUser({ email: "old@example.test", username: "oldtheme", passwordHash: null, googleId: null });
   repo.rows.set(row.id, { ...row, theme: "vaporwave", display_font: "comic", text_font: "vt323" });
-  assert.deepEqual(service.getAppearance(row.id), { theme: "system", displayFont: "theme", textFont: "theme" });
+  assert.deepEqual(service.getAppearance(row.id), { theme: "system", displayFont: "theme", textFont: "theme", locale: null });
 });
 
 test("getAppearance is all null for an unknown user", () => {
   const { service } = makeService();
-  assert.deepEqual(service.getAppearance("nobody"), { theme: null, displayFont: null, textFont: null });
+  assert.deepEqual(service.getAppearance("nobody"), { theme: null, displayFont: null, textFont: null, locale: null });
 });

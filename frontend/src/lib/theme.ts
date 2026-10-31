@@ -118,7 +118,7 @@ export function useFontPreference(slot: FontSlot): FontPreference {
 }
 
 export function readAppearance(): Appearance {
-  return { theme: readThemePreference(), displayFont: readFontPreference("display"), textFont: readFontPreference("text") };
+  return { theme: readThemePreference(), displayFont: readFontPreference("display"), textFont: readFontPreference("text"), locale: "auto" };
 }
 
 export function applyAppearance(patch: Partial<Appearance>): void {

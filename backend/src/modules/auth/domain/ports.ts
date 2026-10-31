@@ -35,7 +35,7 @@ export interface AuthRepository {
   linkGoogleId(userId: string, googleId: string): void;
   setUsername(userId: string, username: string): void;
   setAvatarId(userId: string, avatarId: string | null): void;
-  setAppearance(userId: string, fields: { theme?: string; display_font?: string; text_font?: string }): void;
+  setAppearance(userId: string, fields: { theme?: string; display_font?: string; text_font?: string; locale?: string }): void;
   insertRefreshToken(input: { userId: string; tokenHash: string; expiresAt: Date; grantedViaGrace?: boolean }): string;
   findRefreshTokenByHash(tokenHash: string): RefreshTokenRow | undefined;
   /** Needed by the refresh-rotation grace window (service.ts) to follow a

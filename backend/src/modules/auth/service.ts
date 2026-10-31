@@ -266,11 +266,11 @@ export function createAuthService(repo: AuthRepository, avatarStore: AvatarBlobS
 
     getAppearance(userId) {
       const row = repo.findUserById(userId);
-      return parseAccountAppearance({ theme: row?.theme ?? null, displayFont: row?.display_font ?? null, textFont: row?.text_font ?? null });
+      return parseAccountAppearance({ theme: row?.theme ?? null, displayFont: row?.display_font ?? null, textFont: row?.text_font ?? null, locale: row?.locale ?? null });
     },
 
     setAppearance(userId, patch) {
-      repo.setAppearance(userId, { theme: patch.theme, display_font: patch.displayFont, text_font: patch.textFont });
+      repo.setAppearance(userId, { theme: patch.theme, display_font: patch.displayFont, text_font: patch.textFont, locale: patch.locale });
     },
 
     async setAvatar(userId, buffer) {

@@ -145,7 +145,7 @@ test("a PKCE-bound code with the wrong verifier is a 400", async () => {
 });
 
 function appearanceService(stored: Map<string, AccountAppearance>): AuthService {
-  const empty: AccountAppearance = { theme: null, displayFont: null, textFont: null };
+  const empty: AccountAppearance = { theme: null, displayFont: null, textFont: null, locale: null };
   return {
     getAppearance: (userId: string) => stored.get(userId) ?? empty,
     setAppearance: (userId: string, patch: Partial<Appearance>) => {
@@ -174,7 +174,7 @@ test("appearance routes reject a request without a valid access token", async ()
 test("GET /auth/appearance is all null for an account that never chose anything", async () => {
   const { status, body } = await callAppearanceRoute(appearanceService(new Map()), { method: "GET", url: "/auth/appearance" }, "valid-token");
   assert.equal(status, 200);
-  assert.deepEqual(body, { theme: null, displayFont: null, textFont: null });
+  assert.deepEqual(body, { theme: null, displayFont: null, textFont: null, locale: null });
 });
 
 test("a partial PUT round-trips one field without touching the others", async () => {
@@ -183,13 +183,22 @@ test("a partial PUT round-trips one field without touching the others", async ()
   assert.equal((await callAppearanceRoute(service, { method: "PUT", url: "/auth/appearance", payload: { theme: "matrix" } }, "valid-token")).status, 204);
   assert.equal((await callAppearanceRoute(service, { method: "PUT", url: "/auth/appearance", payload: { displayFont: "righteous" } }, "valid-token")).status, 204);
   const { body } = await callAppearanceRoute(service, { method: "GET", url: "/auth/appearance" }, "valid-token");
-  assert.deepEqual(body, { theme: "matrix", displayFont: "righteous", textFont: null });
+  assert.deepEqual(body, { theme: "matrix", displayFont: "righteous", textFont: null, locale: null });
+});
+
+test("PUT /auth/appearance stores a locale pick and returns it", async () => {
+  const stored = new Map<string, AccountAppearance>();
+  const service = appearanceService(stored);
+  assert.equal((await callAppearanceRoute(service, { method: "PUT", url: "/auth/appearance", payload: { locale: "pt-PT" } }, "valid-token")).status, 204);
+  assert.equal(stored.get(user.id)?.locale, "pt-PT");
+  const { body } = await callAppearanceRoute(service, { method: "GET", url: "/auth/appearance" }, "valid-token");
+  assert.equal(body?.locale, "pt-PT");
 });
 
 test("PUT /auth/appearance rejects empty, unknown and slot-ineligible values", async () => {
   const stored = new Map<string, AccountAppearance>();
   const service = appearanceService(stored);
-  for (const payload of [{}, { theme: "vaporwave" }, { displayFont: "atkinson" }, { textFont: "vt323" }, { textFont: null }, { theme: "dark", extra: 1 }, { font: "system" }]) {
+  for (const payload of [{}, { theme: "vaporwave" }, { displayFont: "atkinson" }, { textFont: "vt323" }, { textFont: null }, { theme: "dark", extra: 1 }, { font: "system" }, { locale: "fr" }, { locale: null }]) {
     const { status, body } = await callAppearanceRoute(service, { method: "PUT", url: "/auth/appearance", payload }, "valid-token");
     assert.equal(status, 400, JSON.stringify(payload));
     assert.deepEqual(body, { error: "Unknown appearance." });

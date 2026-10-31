@@ -1,4 +1,5 @@
 import { THEME_IDS, themes, type ThemeId, type ThemeScheme } from "./palettes.js";
+import { parseLocalePreference, type LocalePreference } from "../i18n/locale.js";
 import { DISPLAY_FONT_IDS, TEXT_FONT_IDS, fonts, type FontId, type FontSlot } from "./fonts.js";
 
 export type ThemePreference = ThemeId | "system";
@@ -23,6 +24,7 @@ export interface Appearance {
   theme: ThemePreference;
   displayFont: FontPreference;
   textFont: FontPreference;
+  locale: LocalePreference;
 }
 
 export type AccountAppearance = { [K in keyof Appearance]: Appearance[K] | null };
@@ -42,6 +44,7 @@ export function parseAccountAppearance(value: unknown): AccountAppearance {
     theme: nullable(body.theme, parseThemePreference),
     displayFont: nullable(body.displayFont, (raw) => parseFontPreference("display", raw)),
     textFont: nullable(body.textFont, (raw) => parseFontPreference("text", raw)),
+    locale: nullable(body.locale, parseLocalePreference),
   };
 }
 
@@ -63,5 +66,6 @@ export function reconcileAppearance(account: AccountAppearance, device: Appearan
   reconcileField("theme", account, device, apply, upload);
   reconcileField("displayFont", account, device, apply, upload);
   reconcileField("textFont", account, device, apply, upload);
+  reconcileField("locale", account, device, apply, upload);
   return { apply, upload };
 }

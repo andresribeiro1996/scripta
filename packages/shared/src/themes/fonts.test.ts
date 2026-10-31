@@ -70,11 +70,11 @@ test("parseFontPreference keeps allowed values per slot and turns anything else 
 });
 
 test("parseAccountAppearance keeps null as never-chosen and normalises unknown values", () => {
-  assert.deepEqual(parseAccountAppearance({ theme: null, displayFont: null, textFont: null }), { theme: null, displayFont: null, textFont: null });
-  assert.deepEqual(parseAccountAppearance({}), { theme: null, displayFont: null, textFont: null });
-  assert.deepEqual(parseAccountAppearance(null), { theme: null, displayFont: null, textFont: null });
-  assert.deepEqual(parseAccountAppearance({ theme: "vaporwave", displayFont: "comic", textFont: "vt323" }), { theme: "system", displayFont: "theme", textFont: "theme" });
-  assert.deepEqual(parseAccountAppearance({ theme: "matrix", displayFont: "righteous", textFont: "atkinson" }), { theme: "matrix", displayFont: "righteous", textFont: "atkinson" });
+  assert.deepEqual(parseAccountAppearance({ theme: null, displayFont: null, textFont: null, locale: null }), { theme: null, displayFont: null, textFont: null, locale: null });
+  assert.deepEqual(parseAccountAppearance({}), { theme: null, displayFont: null, textFont: null, locale: null });
+  assert.deepEqual(parseAccountAppearance(null), { theme: null, displayFont: null, textFont: null, locale: null });
+  assert.deepEqual(parseAccountAppearance({ theme: "vaporwave", displayFont: "comic", textFont: "vt323" }), { theme: "system", displayFont: "theme", textFont: "theme", locale: null });
+  assert.deepEqual(parseAccountAppearance({ theme: "matrix", displayFont: "righteous", textFont: "atkinson", locale: null }), { theme: "matrix", displayFont: "righteous", textFont: "atkinson", locale: null });
 });
 
 test("resolveFonts uses the theme default for theme, keeps an allowed override, and ignores an ineligible one", () => {
@@ -85,8 +85,8 @@ test("resolveFonts uses the theme default for theme, keeps an allowed override, 
 });
 
 test("reconcileAppearance applies the rule per field", () => {
-  const device = { theme: "sepia", displayFont: "theme", textFont: "atkinson" } as const;
-  assert.deepEqual(reconcileAppearance({ theme: null, displayFont: null, textFont: null }, device), { apply: {}, upload: device });
-  assert.deepEqual(reconcileAppearance({ theme: "sepia", displayFont: "theme", textFont: "atkinson" }, device), { apply: {}, upload: {} });
-  assert.deepEqual(reconcileAppearance({ theme: "matrix", displayFont: null, textFont: "atkinson" }, device), { apply: { theme: "matrix" }, upload: { displayFont: "theme" } });
+  const device = { theme: "sepia", displayFont: "theme", textFont: "atkinson", locale: "auto" } as const;
+  assert.deepEqual(reconcileAppearance({ theme: null, displayFont: null, textFont: null, locale: null }, device), { apply: {}, upload: device });
+  assert.deepEqual(reconcileAppearance({ theme: "sepia", displayFont: "theme", textFont: "atkinson", locale: "auto" }, device), { apply: {}, upload: {} });
+  assert.deepEqual(reconcileAppearance({ theme: "matrix", displayFont: null, textFont: "atkinson", locale: "auto" }, device), { apply: { theme: "matrix" }, upload: { displayFont: "theme" } });
 });
