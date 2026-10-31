@@ -202,7 +202,7 @@ export function LoginPage() {
                     aria-describedby={fieldErrors.username ? "username-error" : mode === "signup" ? "username-hint" : undefined}
                     className={authFieldClass}
                   />
-                  {fieldErrors.username ? <AuthFieldError id="username-error" message={fieldErrors.username} /> : <p id="username-hint" className={authHintClass}>{USERNAME_HINT}</p>}
+                  {fieldErrors.username ? <AuthFieldError id="username-error" message={fieldErrors.username} /> : mode === "signup" && <p id="username-hint" className={authHintClass}>{USERNAME_HINT}</p>}
                 </div>
               </div>
             </div>
@@ -228,7 +228,7 @@ export function LoginPage() {
               {fieldErrors.password ? <AuthFieldError id="password-error" message={fieldErrors.password} /> : mode === "signup" && <p id="password-hint" className={authHintClass}>{PASSWORD_HINT}</p>}
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-x-4 text-sm">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-x-4 text-sm">
               <label className="flex min-h-11 items-center gap-2 text-(--color-text-dim)"><input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} className={CHECKBOX_CLASS} />Remember me</label>
               {mode === "login" && <Link to={`/forgot-password?email=${encodeURIComponent(identifier.includes("@") ? identifier : "")}`} className={`flex min-h-11 items-center ${authLinkClass}`}>Forgot password?</Link>}
             </div>

@@ -169,7 +169,7 @@ Full guidelines, states and prop shapes live in the artifact's per-component REA
 
 ### Forms (web)
 
-- **AuthCard** (`frontend/src/auth/AuthStage.tsx`) — the frame of every sign-in screen: lockup linking to `/`, then a 400px card (`surface`, `border`, `radius-lg`, 32px padding, no shadow) with a `font-display` 30px heading and an optional `text-dim` line, sentence-case `body-strong` labels, fields on `bg` with 16px text and 44px min height (error replaces hint), one accent submit, "Continue with Google" as a secondary button after an "or" divider, a text link to switch log in/sign up, and a 12px Privacy link under the card. Below `sm` the card chrome drops and the page takes `surface`. `color-scheme: light dark` on the stage so native controls follow the theme.
+- **AuthCard** (`frontend/src/auth/AuthStage.tsx`) — the frame of every sign-in screen: lockup linking to `/`, then a 400px card (`surface`, `border`, `radius-lg`, 32px padding, no shadow) with a `font-display` 30px heading and an optional `text-dim` line, sentence-case `body-strong` labels, fields on `bg` with 16px text and 44px min height (error replaces hint), one accent submit, "Continue with Google" as a secondary button after an "or" divider, a text link to switch log in/sign up, and a 12px Privacy link under the card. Below `sm` the card chrome drops and the page takes `surface`. The stage sets no `color-scheme`, so native and autofill controls follow the chosen theme's own (`themes.css`), not the OS.
 
 ### Other controls
 

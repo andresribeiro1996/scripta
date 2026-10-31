@@ -81,8 +81,21 @@ test("the Daily Chapter art keeps its size and shrinks in one rule at phone widt
   assert.equal(css.match(/^\s+\.daily-chapter-art \.dc-motif\{/gm), null);
 });
 
-test("public Games filter chips that scroll keep focus rings and fade at the edge", () => {
-  const src = read("src/pages/DiscoverPage.tsx");
-  const group = src.match(/<div role="group" aria-label="Type" className="([^"]*)"/)?.[1] ?? "";
-  for (const cls of ["-my-1", "py-1", "overflow-x-auto", "max-sm:[mask-image:"]) assert.ok(group.includes(cls), cls);
+test("chip rows that scroll share one right-edge fade and keep focus rings", () => {
+  const fade = read("src/components/page/surfaceClasses.ts");
+  assert.match(fade, /export const SCROLL_FADE = "max-sm:\[mask-image:/);
+  for (const f of ["src/pages/DiscoverPage.tsx", "src/components/LibraryToolbar.tsx"]) {
+    const group = read(f).match(/<div role="group" aria-label="(?:Type|Status)" className=\{`([^`]*)`\}/)?.[1] ?? "";
+    for (const cls of ["-my-1", "py-1", "overflow-x-auto", "${SCROLL_FADE}"]) assert.ok(group.includes(cls), `${f} ${cls}`);
+  }
+});
+
+test("login mode renders no username hint and the options row keeps its gap above the submit", () => {
+  const html = page("/login", createElement(LoginPage));
+  assert.doesNotMatch(html, /username-hint/);
+  assert.match(html, /<div class="mb-4 flex flex-wrap[^"]*"><label/);
+});
+
+test("the sign-in stage leaves color-scheme to the theme", () => {
+  assert.doesNotMatch(read("src/auth/AuthStage.tsx"), /color-scheme/);
 });

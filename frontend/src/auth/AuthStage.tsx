@@ -6,7 +6,7 @@ import { BUTTON_PRIMARY, BUTTON_SECONDARY, FIELD_CLASS } from "../components/pag
 
 export function AuthStage({ children }: { children: ReactNode }) {
   return (
-    <div className={`${publicPageClass} [color-scheme:light_dark] max-sm:bg-(--color-surface)!`}>
+    <div className={`${publicPageClass} max-sm:bg-(--color-surface)!`}>
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 max-sm:hidden" style={publicPageBackground} />
       <LandingNav />
       <main className="mx-auto w-full max-w-[448px] flex-1 px-6 py-8">{children}</main>
