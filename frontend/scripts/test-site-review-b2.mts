@@ -21,6 +21,8 @@ const { setSession } = await import("../src/auth/tokenStore");
 const { TextBlockView } = await import("../src/components/murals/blocks/MiscBlocks");
 const { SaveStatus } = await import("../src/components/SaveStatus");
 const { Disclosure } = await import("../src/components/Disclosure");
+const { SearchField } = await import("../src/components/Toolbar");
+const { PrivacyPage } = await import("../src/pages/PrivacyPage");
 const { NotFoundPage } = await import("../src/pages/NotFoundPage");
 const { AddBookModal } = await import("../src/components/AddBookModal");
 const { canHoldBallot } = await import("../src/hooks/useTierlistVoting");
@@ -112,4 +114,17 @@ test("expected-empty lookups are not requested when the board says nothing exist
 test("both Discover pages and People say what they are", () => {
   assert.equal([...src("pages/DiscoverPage.tsx").matchAll(/subtitle="Tier lists, tournaments and quizzes readers have published\."/g)].length, 2);
   assert.match(src("pages/PeoplePage.tsx"), /subtitle="Find readers and follow them/);
+});
+
+test("a search box with text shows one 44px Clear control and an empty one shows none", () => {
+  const field = (value: string) => renderToString(createElement(SearchField, { value, onChange: () => undefined, placeholder: "Search", label: "Search books" }));
+  assert.match(field("dune"), /<button[^>]*aria-label="Clear search"[^>]*size-11/);
+  assert.doesNotMatch(field(""), /Clear search/);
+  assert.match(src("components/Toolbar.tsx"), /\[&::-webkit-search-cancel-button\]:appearance-none/);
+});
+
+test("the privacy page sections are the shared Disclosure", () => {
+  const html = renderToString(createElement(MemoryRouter, null, createElement(AuthProvider, null, createElement(PrivacyPage))));
+  assert.match(html, /<details class="group[^"]*border-b[^"]*"><summary class="[^"]*list-none[^"]*"><h2 class="[^"]*min-h-14[^"]*">Sharing<svg/);
+  assert.doesNotMatch(src("pages/PrivacyPage.tsx"), /<details/);
 });
