@@ -441,6 +441,7 @@ test("catalogMismatches finds every kind of drift", () => {
 - Test: `packages/shared/src/community/activityModel.test.ts`
 - Test: `packages/shared/src/topShelf/api.test.ts`
 - Test: `packages/shared/src/i18n/i18n.test.ts`
+- Modify: `packages/shared/src/`
 - Modify: `frontend/src/`
 - Modify: `mobile/src/`
 - Modify: `backend/src/`
