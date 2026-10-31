@@ -6,16 +6,17 @@ import { EmptyState, Screen, Skeleton, dynamicType, minimumTouchTarget, radii, s
 import { AuthorAvatar } from "../community/AuthorAvatar";
 import { dailyChapterApi } from "./api";
 import { DailyChapterSquares } from "./daily-chapter-squares";
-import { useDailyHistory } from "./use-daily-history";
+import { useDailyHistory, useDeviceIdentity } from "./use-daily-history";
 
 export function DailyChapterDayScreen({ id }: { id: string }) {
   const { colors } = useTheme();
+  const identity = useDeviceIdentity();
   const history = useDailyHistory();
   const result = history.data?.results.find((item) => item.editionId === id);
   const people = useQuery({ queryKey: ["daily-chapter", "people", id], queryFn: () => dailyChapterApi.people(id), enabled: Boolean(result) });
   const title = result ? `${result.date} · ${result.title}` : "Daily Chapter";
   let body;
-  if (history.isError) body = <EmptyState title="Couldn't load this chapter" actionLabel="Retry" onAction={() => void history.refetch()} />;
+  if (identity.isError || history.isError) body = <EmptyState title="Couldn't load this chapter" actionLabel="Retry" onAction={() => { void identity.refetch(); void history.refetch(); }} />;
   else if (!history.data) body = <View style={{ gap: spacing.md }}><Skeleton height={48} /><Skeleton height={120} /><Skeleton height={120} /></View>;
   else if (!result) body = <EmptyState title="You didn't play this chapter." />;
   else {
