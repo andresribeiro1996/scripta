@@ -65,6 +65,7 @@ test("the Daily Chapter recap card speaks for the whole community", () => {
   assert.equal(recapTitle(daily, "2026-11"), "📖 November's Daily Chapter");
   assert.equal(recapNumber(daily), "42 readers played\nHardest: Poetry · 2.1/5\nMost missed: The Stranger · 71%\nMost perfect: @marta (9), @joao (7)");
   assert.equal(recapNumber({ ...daily, hardest: null, mostMissed: null, topPlayers: [] }), "42 readers played");
+  assert.equal(recapNumber({ ...daily, players: 1, hardest: null, mostMissed: null, topPlayers: [] }), "1 reader played");
   assert.equal(recapCta(daily, "2026-12"), "Play today's Daily Chapter");
   assert.equal(recapLinkPath(daily), "/daily");
 });

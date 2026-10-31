@@ -1,4 +1,4 @@
-import { recapMonthName, type TopShelfBoard, type TopShelfRecapCard } from "@scripta/shared";
+import { plural, recapMonthName, type TopShelfBoard, type TopShelfRecapCard } from "@scripta/shared";
 import { contentTarget } from "@scripta/shared/community";
 import { gameScoreLabel, valueLabel } from "./topShelfModel";
 
@@ -31,7 +31,7 @@ export function recapNumber(card: TopShelfRecapCard): string {
     case "summary": return `${card.gamesPublished} games published\n${card.votesCast} votes cast\n${card.booksInPlay} books in play`;
     case "hottestGame": return gameScoreLabel(card.game);
     case "dailyChapter": return [
-      `${card.players} readers played`,
+      `${plural(card.players, "reader", "readers")} played`,
       ...(card.hardest ? [`Hardest: ${card.hardest.title} · ${card.hardest.average}/5`] : []),
       ...(card.mostMissed ? [`Most missed: ${card.mostMissed.title} · ${card.mostMissed.missedPercent}%`] : []),
       ...(card.topPlayers.length ? [`Most perfect: ${card.topPlayers.map((p) => `@${p.username} (${p.perfect})`).join(", ")}`] : []),
