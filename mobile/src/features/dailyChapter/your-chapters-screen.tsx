@@ -4,12 +4,13 @@ import { Pressable, ScrollView, View } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import { DAILY_CHAPTER_THEMES, dailyChapterMonthShare, dailyChapterMonthStats, dailyChapterSummary, dailyChapterThemeRates, recapMonthName } from "@scripta/shared";
 import { Text } from "../../ui/Text";
-import { Button, EmptyState, ErrorState, Icon, IconButton, Screen, Skeleton, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
+import { Button, EmptyState, ErrorState, Icon, IconButton, Screen, Skeleton, dynamicType, minimumTouchTarget, spacing, typography, useTheme } from "../../ui";
 import { ContentShareSheet } from "../sharing/ContentShareSheet";
 import { publicContentUrl } from "../sharing/links";
 import { DailyChapterCalendar } from "./daily-chapter-calendar";
 import { DailyChapterPoster } from "./daily-chapter-poster";
 import { DailyChapterSquares } from "./daily-chapter-squares";
+import { DailyChapterTiles } from "./daily-chapter-tiles";
 import { useDailyHistory, useDeviceIdentity } from "./use-daily-history";
 
 function shiftMonth(month: string, by: number) {
@@ -41,10 +42,9 @@ export function YourChaptersScreen() {
     const themeName = (id: string) => DAILY_CHAPTER_THEMES.find((theme) => theme.id === id)?.name ?? id;
     const byDate = new Map(data.results.map((result) => [result.date, result.editionId]));
     const arrow = (label: string, glyph: string, target: string, enabled: boolean) => <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled: !enabled }} disabled={!enabled} onPress={() => setMonth(target)} style={{ minWidth: minimumTouchTarget, minHeight: minimumTouchTarget, alignItems: "center", justifyContent: "center", opacity: enabled ? 1 : 0.3 }}><Text {...dynamicType} style={[typography.heading, { color: colors.text }]}>{glyph}</Text></Pressable>;
-    const tile = (value: string, label: string) => <View style={{ flex: 1, alignItems: "center", padding: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radii.lg, backgroundColor: colors.surface }}><Text {...dynamicType} style={[typography.heading, { color: colors.text, fontWeight: "700" }]}>{value}</Text><Text {...dynamicType} style={[typography.caption, { color: colors.textDim }]}>{label}</Text></View>;
     const best = (label: string, value: string) => <View style={{ flexDirection: "row", justifyContent: "space-between", gap: spacing.md }}><Text {...dynamicType} style={[typography.body, { color: colors.textDim }]}>{label}</Text><Text {...dynamicType} style={[typography.body, { color: colors.text, fontWeight: "700" }]}>{value}</Text></View>;
     body = <>
-      <View style={{ flexDirection: "row", gap: spacing.sm }}>{tile(String(summary.streak), "day streak")}{tile(String(summary.average), "avg / 5")}{tile(String(summary.perfect), "perfect")}</View>
+      <DailyChapterTiles summary={summary} />
       <View style={{ gap: spacing.sm }}>{best("Longest streak", `${data.longestStreak} ${data.longestStreak === 1 ? "day" : "days"}`)}{best("Most perfects in a row", String(data.longestPerfectRun))}{best("Questions right", `${data.correct} of ${data.answered}`)}</View>
       <View style={{ gap: spacing.sm }}>
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>{arrow("Previous month", "‹", shiftMonth(month, -1), month > first)}<Text accessibilityRole="header" {...dynamicType} style={[typography.title, { color: colors.text }]}>{recapMonthName(month)} {month.slice(0, 4)}</Text>{arrow("Next month", "›", shiftMonth(month, 1), month < current)}</View>
