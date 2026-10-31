@@ -275,6 +275,7 @@ test("catalogMismatches finds every kind of drift", () => {
 **Files:**
 - Modify: `packages/shared/src/themes/preference.ts`
 - Test: `packages/shared/src/themes/themes.test.ts`
+- Test: `packages/shared/src/themes/fonts.test.ts`
 - Modify: `backend/src/modules/auth/routes.ts`
 - Modify: `backend/src/modules/auth/service.ts`
 - Modify: `backend/src/modules/auth/domain/ports.ts`
@@ -284,6 +285,7 @@ test("catalogMismatches finds every kind of drift", () => {
 - Modify: `backend/src/modules/auth/adapters/sqlite/sqliteAuthRepository.ts`
 - Test: `backend/src/modules/auth/routes.test.ts`
 - Test: `backend/src/modules/auth/adapters/sqlite/sqliteAuthRepository.test.ts`
+- Test: `backend/src/modules/auth/service.test.ts`
 - Modify: `frontend/src/lib/theme.ts`
 - Modify: `mobile/src/features/settings/appearanceSync.ts`
 
