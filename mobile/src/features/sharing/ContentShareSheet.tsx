@@ -106,7 +106,7 @@ export function ContentShareSheet({ visible, onClose, title, description, url, c
             </View>
             <View style={styles.actions}>
               <IconButton framed name="save" accessibilityLabel="Save image" disabled={busy || !imageReady} onPress={() => void run(() => exportImage("save"))} />
-              <View style={styles.rowItem}><Button label="Share image" icon="share" disabled={busy || !imageReady} onPress={() => void run(() => exportImage("send"))} /></View>
+              <View style={styles.rowItem}><Button label="Share image" icon="share" numberOfLines={1} disabled={busy || !imageReady} onPress={() => void run(() => exportImage("send"))} /></View>
               {onExportVideo ? <View style={styles.rowItem}><Button label="Send video" variant="secondary" disabled={busy || !imageReady} onPress={() => void run(() => exportImage("video"))} /></View> : null}
             </View>
           </View>
