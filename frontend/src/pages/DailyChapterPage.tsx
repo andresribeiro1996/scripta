@@ -8,6 +8,7 @@ import { addBookToLibrary } from "../api/library";
 import { useAuth } from "../auth/AuthContext";
 import { DailyChapterArt } from "../components/dailyChapter/DailyChapterCard";
 import { Page } from "../components/page/Page";
+import { PANEL, SECTION_HEADING } from "../components/page/surfaceClasses";
 import { BUTTON_PRIMARY, BUTTON_SECONDARY, FIELD_CLASS } from "../components/page/buttonClasses";
 
 export function DailyChapterPage() {
@@ -27,8 +28,8 @@ export function DailyChapterPage() {
     <div className="space-y-8">
       <p className="text-sm text-(--color-text-dim)">A shared edition for everyone. A new chapter opens at 00:00 UTC.</p>
       {identity.error ? <div role="alert"><p>{identity.error}</p><button className={BUTTON_SECONDARY} onClick={() => setIdentity(loadIdentity())}>Retry storage</button></div> : daily.isError || history.isError ? <div role="alert"><p>Couldn't load your chapter or saved results.</p><button className={BUTTON_SECONDARY} onClick={() => { void daily.refetch(); void history.refetch(); }}>Retry</button></div> : daily.isPending || history.isPending ? <p role="status">Opening your chapter…</p> : daily.data.board ? <DailyGame key={daily.data.board.id + ":" + (session?.user.id ?? identity.id)} board={daily.data.board} guestId={identity.id!} playerId={session?.user.id ?? identity.id!} result={result} /> : <p>Another chapter is on its way. Check back soon.</p>}
-      {history.data?.results.length ? <section className="space-y-4" aria-labelledby="daily-history"><h2 id="daily-history" className="text-xl">Your chapters</h2><p className="text-sm">{history.data.results.length} completed · {history.data.streak} day streak</p>
-        {history.data.themes.map((stats) => <div key={stats.themeId} className="rounded-xl border border-(--color-border) p-4"><h3 className="font-semibold">{DAILY_CHAPTER_THEMES.find((theme) => theme.id === stats.themeId)?.name}</h3><p className="mt-1 text-sm text-(--color-text-dim)">{stats.completed}/{stats.eligible} editions since {history.data.startedOn} · {stats.correct}/{stats.answered} correct · {stats.perfect} perfect</p>{stats.perfectStreak > 1 ? <p className="mt-1 text-sm">{stats.perfectStreak} perfect editions in a row</p> : null}</div>)}
+      {history.data?.results.length ? <section className="space-y-4" aria-labelledby="daily-history"><h2 id="daily-history" className={SECTION_HEADING}>Your chapters</h2><p className="text-sm">{history.data.results.length} completed · {history.data.streak} day streak</p>
+        {history.data.themes.map((stats) => <div key={stats.themeId} className={`${PANEL} p-4`}><h3 className="font-semibold">{DAILY_CHAPTER_THEMES.find((theme) => theme.id === stats.themeId)?.name}</h3><p className="mt-1 text-sm text-(--color-text-dim)">{stats.completed}/{stats.eligible} editions since {history.data.startedOn} · {stats.correct}/{stats.answered} correct · {stats.perfect} perfect</p>{stats.perfectStreak > 1 ? <p className="mt-1 text-sm">{stats.perfectStreak} perfect editions in a row</p> : null}</div>)}
         <details><summary className="cursor-pointer py-3">Past results</summary><ul className="space-y-2">{history.data.results.map((item) => <li key={item.editionId} className="flex justify-between gap-4 text-sm"><span>{item.date} · {item.title}</span><strong>{item.score}/5</strong></li>)}</ul></details>
       </section> : null}
       {!session ? <p className="text-sm text-(--color-text-dim)">Your results stay with this browser. <Link className="text-(--color-accent)" to="/login?mode=signup&returnTo=%2Fdaily">Create an account</Link> to keep them across devices.</p> : null}

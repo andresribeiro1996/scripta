@@ -9,7 +9,7 @@ import { useActivityFeed } from "../../hooks/useDashboard";
 import { AuthorAvatar } from "../CommunityAuthorAvatar";
 import { ArenaIcon, CommunityIcon } from "../NavIcons";
 import { BUTTON_SECONDARY } from "../page/buttonClasses";
-import { LIST_PANEL, LIST_ROW, LIST_ROW_LINK, PANEL_HEADING } from "../page/surfaceClasses";
+import { LIST_ROW, LIST_ROW_LINK, PANEL, PANEL_HEADER, PANEL_HEADING } from "../page/surfaceClasses";
 
 const ACTIVITY_KEY = ["community", "dashboard", "activity"];
 const NOTE = "px-4.5 py-3 text-(--color-text-dim)";
@@ -110,8 +110,8 @@ export function ForYouPanel() {
 
   const count = newCountLabel(feed.personalNewCount);
   return (
-    <section aria-labelledby="home-foryou" className={LIST_PANEL}>
-      <div className="flex items-center justify-between gap-3 px-4.5 pt-4 pb-1.5">
+    <section aria-labelledby="home-foryou" className={`${PANEL} overflow-hidden`}>
+      <div className={PANEL_HEADER}>
         <h2 id="home-foryou" className={PANEL_HEADING}>For you</h2>
         {count ? <span className="rounded-full bg-(--color-accent-soft) px-2.5 py-0.5 text-xs font-semibold text-(--color-accent)">{`${count} new`}</span> : null}
       </div>

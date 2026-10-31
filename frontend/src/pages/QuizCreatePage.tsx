@@ -8,6 +8,7 @@ import { QUIZ_POOL, QUIZ_QUESTION_TYPES, bookKey, booksInGroup, eligibleTypes, w
 import { Page } from "../components/page/Page";
 import { BUTTON_PRIMARY, BUTTON_SECONDARY, FIELD_CLASS } from "../components/page/buttonClasses";
 import { backTo } from "../lib/areas";
+import { QUIZ_TYPE_LABELS } from "../lib/quizTypeLabels";
 import { createQuizApi } from "../api/quizzes";
 import { resolveCover } from "../api/covers";
 import { normalizeImageId, normalizeIsbn } from "../lib/covers";
@@ -29,14 +30,6 @@ function toQuizBook(book: Record<string, unknown>, resolvedCover: string | null 
     blurb: null
   };
 }
-
-const TYPE_LABELS: Record<QuizQuestionType, string> = {
-  cover_title: "Guess the title from a blurred cover",
-  title_cover: "Guess the cover from the title",
-  quote_title: "Guess the book from a quote",
-  blurb_title: "Guess the book from its blurb",
-  characters_title: "Guess the book from its characters"
-};
 
 const BOOK_COUNT = 4;
 
@@ -227,7 +220,7 @@ export function QuizCreatePage() {
                       checked={checked}
                       onChange={() => setAllowedTypes((value) => (value.includes(type) ? value.filter((entry) => entry !== type) : [...value, type]))}
                     />
-                    {TYPE_LABELS[type]}
+                    {QUIZ_TYPE_LABELS[type]}
                     {!offered && <span className="ml-auto text-xs text-(--color-text-dim)">no book has this data</span>}
                   </label>
                 );

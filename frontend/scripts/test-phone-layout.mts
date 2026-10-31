@@ -40,7 +40,7 @@ const tournament: TournamentView = {
 };
 
 test("duel side cards can shrink below their title, so both stay inside the match card", () => {
-  const html = renderToString(createElement(MemoryRouter, null, createElement(DuelCard, { duel: duel(0), onVote: () => undefined, votingDisabledReason: null })));
+  const html = renderToString(createElement(MemoryRouter, null, createElement(DuelCard, { duel: duel(0), round: "Round 1", onVote: () => undefined, votingDisabledReason: null })));
   assert.equal(html.match(/<div class="relative flex min-w-0 flex-1 flex-col">/g)?.length, 2);
 });
 

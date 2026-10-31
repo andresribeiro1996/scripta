@@ -9,6 +9,8 @@ import { BUTTON_PRIMARY, BUTTON_SECONDARY, FIELD_CLASS } from "../components/pag
 import { SettingGroup, SettingRow } from "../components/page/Page";
 import { LIST_PANEL } from "../components/page/surfaceClasses";
 
+const PASSWORD_FIELD = `${FIELD_CLASS} w-full`;
+
 export function AccountSecuritySection() {
   const account = useQuery({ queryKey: ["account-security"], queryFn: () => apiFetch("/auth/account") as Promise<AccountSecurity> });
   const [mode, setMode] = useState<"password" | "email" | null>(null);
@@ -61,10 +63,10 @@ export function AccountSecuritySection() {
     {message && <p role="status" className="px-4 py-3 text-sm">{message}</p>}
     {error && <p role="alert" className="px-4 py-3 text-sm text-(--color-danger)">{error}</p>}
     {mode && <form onSubmit={submit} className="px-4 py-3"><fieldset disabled={busy} className="space-y-3 text-sm">
-      <label className="block">Current password<PasswordInput required autoComplete="current-password" value={current} onChange={(event) => setCurrent(event.target.value)} /></label>
+      <label className="block">Current password<PasswordInput className={PASSWORD_FIELD} required autoComplete="current-password" value={current} onChange={(event) => setCurrent(event.target.value)} /></label>
       {mode === "email" ? <label className="block">New email<input type="email" required autoComplete="email" className={`${FIELD_CLASS} w-full`} value={email} onChange={(event) => setEmail(event.target.value)} /></label> : <>
-        <label className="block">New password<PasswordInput required minLength={8} maxLength={128} autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} /></label><p className="text-xs">{PASSWORD_HINT}</p>
-        <label className="block">Confirm new password<PasswordInput required autoComplete="new-password" value={confirm} onChange={(event) => setConfirm(event.target.value)} /></label>
+        <label className="block">New password<PasswordInput className={PASSWORD_FIELD} required minLength={8} maxLength={128} autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} /></label><p className="text-xs">{PASSWORD_HINT}</p>
+        <label className="block">Confirm new password<PasswordInput className={PASSWORD_FIELD} required autoComplete="new-password" value={confirm} onChange={(event) => setConfirm(event.target.value)} /></label>
         <p className="text-xs">Changing your password signs you out on every device.</p>
       </>}
       <div className="flex gap-4"><button className={BUTTON_PRIMARY}>{busy ? "Saving…" : mode === "email" ? "Send confirmation" : "Change password"}</button><button type="button" className={BUTTON_SECONDARY} onClick={() => { setMode(null); setCurrent(""); setPassword(""); setConfirm(""); }}>Cancel</button></div>

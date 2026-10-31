@@ -1,5 +1,6 @@
 import { CHECKBOX_CLASS, RANGE_CLASS } from "./Toolbar";
 import { FIELD_CLASS } from "./page/buttonClasses";
+import { PANEL, PANEL_HEADING } from "./page/surfaceClasses";
 import type { ReactNode } from "react";
 import { BLOCK_GRADIENT_ANGLE_RANGE, BLOCK_GRADIENT_STRENGTH_RANGE, BLOCK_SHADOW_BLUR_RANGE, BLOCK_SHADOW_OFFSET_RANGE, BLOCK_SHADOW_OPACITY_RANGE, BLOCK_THEME_COLOR_LABELS, parseThemeColorRef } from "@scripta/shared";
 import {
@@ -41,9 +42,9 @@ import {
 
 export function Section({ title, children, wide }: { title?: string; children: ReactNode; wide?: boolean }) {
   return (
-    <section className={`rounded-xl border border-(--color-border) bg-(--color-surface) p-4 ${wide ? "sm:col-span-2" : ""}`}>
-      {title && <h4 className="mb-3 text-xs font-semibold text-(--color-text-dim)">{title}</h4>}
-      {children}
+    <section className={wide ? "sm:col-span-2" : ""}>
+      {title && <h2 className={`${PANEL_HEADING} mb-3`}>{title}</h2>}
+      <div className={`${PANEL} p-4`}>{children}</div>
     </section>
   );
 }

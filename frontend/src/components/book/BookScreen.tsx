@@ -245,8 +245,12 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
             <p className="mt-2.5 text-lg">{`by ${model.author}`}</p>
             {model.authorAwards ? <p className="mt-1 text-xs text-(--color-text-dim)">{model.authorAwards}</p> : null}
             {metaParts.length > 0 ? (
-              <div className="mt-4 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-sm text-(--color-text-dim)">
-                {metaParts.flatMap((part, i) => (i === 0 ? [part] : [<span key={`dot-${i}`} aria-hidden="true">·</span>, part]))}
+              <div className="mt-4 overflow-hidden text-sm text-(--color-text-dim)">
+                <div className="-ml-5 flex flex-wrap items-center gap-y-1">
+                  {metaParts.map((part) => (
+                    <span key={part.key} className="relative pl-5 before:absolute before:left-2 before:content-['·']">{part}</span>
+                  ))}
+                </div>
               </div>
             ) : null}
             {model.awards.length > 0 ? (

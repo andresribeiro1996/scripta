@@ -128,6 +128,11 @@ export function GroupsPage({ type }: { type: GroupType }) {
     setDrafting(true);
   }
 
+  function cancelDraft() {
+    setDraftName("");
+    setDrafting(false);
+  }
+
   async function handleCommitDraft(fromEnter = false) {
     const name = draftName.trim();
     if (fromEnter && !name) {
@@ -384,7 +389,12 @@ export function GroupsPage({ type }: { type: GroupType }) {
 
       <div className="flex flex-col">
         {drafting ? (
-          <div className="mb-6 rounded-xl border-2 border-dashed border-(--color-accent) p-3">
+          <div
+            onBlur={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget)) void handleCommitDraft();
+            }}
+            className={`mb-6 rounded-xl border-2 border-dashed p-3 ${draftError ? "border-(--color-danger)" : "border-(--color-accent)"}`}
+          >
             <label htmlFor="new-group-name" className="mb-1 block text-sm font-semibold">
               Name
             </label>
@@ -394,27 +404,31 @@ export function GroupsPage({ type }: { type: GroupType }) {
               value={draftName}
               maxLength={200}
               aria-invalid={draftError ? true : undefined}
-              aria-describedby="new-group-name-hint"
+              aria-describedby={draftError ? "new-group-name-error" : undefined}
               onChange={(e) => {
                 setDraftName(e.target.value);
                 setDraftError(null);
               }}
-              onBlur={() => void handleCommitDraft()}
               onKeyDown={(e) => {
                 if (e.key === "Enter") void handleCommitDraft(true);
-                if (e.key === "Escape") {
-                  // Discard outright — don't let the blur that follows
-                  // commit what Escape just cancelled.
-                  setDraftName("");
-                  setDrafting(false);
-                }
+                if (e.key === "Escape") cancelDraft();
               }}
               placeholder={`Name this ${copy.noun}…`}
               className={`${FIELD_CLASS} w-full`}
             />
-            <p id="new-group-name-hint" role={draftError ? "alert" : undefined} className={`mt-1 text-xs ${draftError ? "text-(--color-danger)" : "text-(--color-text-dim)"}`}>
-              {draftError ?? "Press Enter to add it."}
-            </p>
+            {draftError ? (
+              <p id="new-group-name-error" role="alert" className="mt-1 text-xs text-(--color-danger)">
+                {draftError}
+              </p>
+            ) : null}
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => void handleCommitDraft(true)} className={BUTTON_PRIMARY}>
+                Add
+              </button>
+              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={cancelDraft} className={BUTTON_SECONDARY}>
+                Cancel
+              </button>
+            </div>
           </div>
         ) : null}
 

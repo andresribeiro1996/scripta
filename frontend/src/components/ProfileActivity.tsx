@@ -6,6 +6,7 @@ import { EmptyState } from "./EmptyState";
 import { ArenaIcon, CommunityIcon, LibraryIcon, MuralsIcon } from "./NavIcons";
 import { SkeletonCardGrid } from "./Skeleton";
 import { BUTTON_SECONDARY } from "./page/buttonClasses";
+import { LIST_PANEL, LIST_ROW, LIST_ROW_LINK, SECTION_HEADING } from "./page/surfaceClasses";
 
 const TONE = {
   accent: { text: "text-(--color-accent)", fill: "bg-(--color-accent-soft)" },
@@ -72,13 +73,12 @@ function ActivityEntry({ item, row }: { item: ActivityItem; row: ActivityRow }) 
       </span>
     </>
   );
-  const className = "flex min-h-11 items-center gap-3 border-b border-(--color-border) px-1 py-3";
   return target ? (
-    <Link to={target} className={`${className} -mx-2 rounded-lg px-3 transition-colors hover:bg-(--color-surface-hover)`}>
+    <Link to={target} className={LIST_ROW_LINK}>
       {body}
     </Link>
   ) : (
-    <div className={className}>{body}</div>
+    <div className={LIST_ROW}>{body}</div>
   );
 }
 
@@ -101,18 +101,25 @@ export function ProfileActivity({ activity }: { activity: ReturnType<typeof useC
     return row ? [{ item, row }] : [];
   });
   if (entries.length === 0) return <EmptyState title="No activity yet." body="Publishing and reading will show up here." />;
+  const days = entries.reduce<Array<{ day: string; rows: typeof entries }>>((groups, entry) => {
+    const day = activityDay(entry.item.createdAt);
+    const last = groups[groups.length - 1];
+    if (last?.day === day) last.rows.push(entry);
+    else groups.push({ day, rows: [entry] });
+    return groups;
+  }, []);
   return (
     <div>
-      {entries.map(({ item, row }, i) => {
-        const day = activityDay(item.createdAt);
-        const showDay = i === 0 || activityDay(entries[i - 1]!.item.createdAt) !== day;
-        return (
-          <div key={item.id}>
-            {showDay && <h3 className={`pb-1 text-[11px] font-semibold text-(--color-text-dim) ${i === 0 ? "" : "pt-5"}`}>{day}</h3>}
-            <ActivityEntry item={item} row={row} />
+      {days.map(({ day, rows }, i) => (
+        <section key={rows[0]!.item.id} className={i === 0 ? "" : "pt-6"}>
+          <h2 className={`${SECTION_HEADING} mb-3`}>{day}</h2>
+          <div className={LIST_PANEL}>
+            {rows.map(({ item, row }) => (
+              <ActivityEntry key={item.id} item={item} row={row} />
+            ))}
           </div>
-        );
-      })}
+        </section>
+      ))}
       {activity.hasNextPage && (
         <button
           onClick={() => void activity.fetchNextPage()}

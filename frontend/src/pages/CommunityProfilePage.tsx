@@ -9,7 +9,7 @@ import { AuthorAvatar } from "../components/CommunityAuthorAvatar";
 import { EmptyState } from "../components/EmptyState";
 import { Page } from "../components/page/Page";
 import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../components/page/buttonClasses";
-import { LIST_PANEL, LIST_ROW_LINK } from "../components/page/surfaceClasses";
+import { LIST_PANEL, LIST_ROW_LINK, SECTION_HEADING } from "../components/page/surfaceClasses";
 import { CommunityIcon } from "../components/NavIcons";
 import { MuralCanvas } from "../components/murals/MuralCanvas";
 import { OwnShelfView } from "../components/OwnShelfView";
@@ -154,7 +154,7 @@ export function CommunityProfilePage() {
                     <MuralCanvas mural={profileOnlyMural(viewerTheme)} editMode={false} books={[]} images={[]} profile={user} hideProfileName />
                   )}
                 </div>
-                <h2 className="mb-3 text-sm font-semibold text-(--color-text-dim)">Published</h2>
+                <h2 className={`${SECTION_HEADING} mb-3`}>Published</h2>
                 {publishedRows.length === 0 ? (
                   <EmptyState title="Nothing published yet." body="Tier lists, tournaments and quizzes show up here." />
                 ) : (

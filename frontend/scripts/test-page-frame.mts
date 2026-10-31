@@ -37,10 +37,10 @@ test("the row nav and side nav share one tab-link helper", () => {
   assert.match(page, /tabLinks\(tabList, activeTo, sideTabClass\)/);
 });
 
-test("the Appearance tab uses the Account tab's group heading", () => {
+test("the Appearance tab uses the Account tab's group: a heading above its panel", () => {
   const src = readFileSync(new URL("../src/pages/SettingsAppearancePage.tsx", import.meta.url), "utf8");
-  assert.match(src, /<h2 className=\{`\$\{PANEL_HEADING\}[^`]*`\}>Appearance<\/h2>/);
-  assert.doesNotMatch(src, /<h3/);
+  assert.match(src, /<SettingGroup title="Appearance">\s*<div className=\{`\$\{PANEL\} p-5`\}>/);
+  assert.doesNotMatch(src, /<h[1-6]/);
 });
 
 test("all Settings tabs use side tabs", () => {
@@ -305,7 +305,7 @@ test("Games keeps one subtitle on every tab, and Admin keeps one title with no p
 
 test("Admin import and editor groups are PANEL surfaces, not bordered grey boxes", () => {
   const s = src("pages/AdminDailyChapterPage");
-  assert.equal(s.match(/space-y-3 p-4 \$\{PANEL\}/g)?.length, 5);
+  assert.equal(s.match(/space-y-3 p-4 \$\{PANEL\}/g)?.length, 6);
   assert.doesNotMatch(s, /rounded-xl border border-\(--color-border\) p-4/);
 });
 

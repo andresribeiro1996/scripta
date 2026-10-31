@@ -33,12 +33,12 @@ export function DeleteAccountSection() {
   }
 
   return <SettingGroup title="Delete account"><div className={LIST_PANEL}>
-    <SettingRow label="Delete your account" description="Permanently deletes your account and everything in it: your library and highlights, murals, gallery images, tier lists, tournaments, follows and connected accounts. Share links stop working. This can’t be undone.">
+    <SettingRow label="Delete your account" description="Permanently deletes your account and everything in it: your library and highlights, murals, gallery images, tier lists, tournaments, quizzes, comments, follows and connected accounts. Share links stop working. This can’t be undone.">
       {!open && <button type="button" disabled={account.isPending} onClick={() => setOpen(true)} className={BUTTON_DANGER_OUTLINE}>Delete account…</button>}
     </SettingRow>
     {open && <form onSubmit={submit} className="px-4 py-3"><fieldset disabled={busy} className="space-y-3 text-sm">
       {hasPassword
-        ? <label className="block">Enter your password to confirm<PasswordInput required autoComplete="current-password" value={value} onChange={(event) => setValue(event.target.value)} /></label>
+        ? <label className="block">Enter your password to confirm<PasswordInput className={`${FIELD_CLASS} w-full`} required autoComplete="current-password" value={value} onChange={(event) => setValue(event.target.value)} /></label>
         : <label className="block">Type <b>{name}</b> to confirm<input required autoComplete="off" autoCapitalize="none" spellCheck={false} className={`${FIELD_CLASS} mt-1 w-full`} value={value} onChange={(event) => setValue(event.target.value)} /></label>}
       {error && <p role="alert" className="text-(--color-danger)">{error}</p>}
       <div className="flex flex-wrap gap-4"><button className={BUTTON_DANGER}>{busy ? "Deleting…" : "Delete my account"}</button><button type="button" className={BUTTON_SECONDARY} onClick={() => { setOpen(false); setValue(""); setError(""); }}>Cancel</button></div>

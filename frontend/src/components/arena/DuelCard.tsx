@@ -16,6 +16,8 @@ import type { Duel, DuelSide } from "../../api/arena";
 import { CoverImage } from "../BookCard";
 import { useCountdown } from "./useCountdown";
 
+const SIDE_ACTION = "inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg px-2 text-sm font-semibold text-(--color-text-dim) hover:text-(--color-accent)";
+
 function DuelSideCard({
   side,
   character,
@@ -38,9 +40,8 @@ function DuelSideCard({
     () => ({ Title: side.title, Attribution: side.author, _coverUrl: side.cover ?? undefined }),
     [side.title, side.author, side.cover]
   );
-  // The vote button cannot also host the "+" affordance — a button
-  // can't nest another button — so the wrapper carries the flex sizing
-  // the button used to hold and the "+" sits as an absolute sibling.
+  const aboutable = side.workId !== null && !character;
+  const addable = onAddBook !== undefined && !character;
   return (
     <div className="relative flex min-w-0 flex-1 flex-col">
       <button
@@ -81,40 +82,34 @@ function DuelSideCard({
           </p>
         </div>
       </button>
-      {side.workId && !character && (
-        <Link
-          to={`/work/${side.workId}`}
-          aria-label="About this book"
-          className="absolute left-0 top-0 z-10 flex h-11 w-11 items-center justify-center text-sm font-bold text-white"
-        >
-          <span className="rounded-full bg-black/50 px-2 py-0.5">i</span>
-        </Link>
-      )}
-      {onAddBook && !character && (
-        <button
-          type="button"
-          aria-label={`Add ${side.title} to your library`}
-          onClick={(event) => {
-            event.stopPropagation();
-            onAddBook(side);
-          }}
-          className="absolute right-0 top-0 z-10 flex h-11 w-11 items-center justify-center text-sm font-bold text-white"
-        >
-          <span className="rounded-full bg-black/50 px-2 py-0.5">+</span>
-        </button>
-      )}
+      {aboutable || addable ? (
+        <div className="flex items-center justify-between gap-2">
+          {aboutable ? (
+            <Link to={`/work/${side.workId}`} aria-label="About this book" className={SIDE_ACTION}>
+              About
+            </Link>
+          ) : null}
+          {addable && onAddBook ? (
+            <button type="button" aria-label={`Add ${side.title} to your library`} onClick={() => onAddBook(side)} className={`${SIDE_ACTION} ml-auto`}>
+              Add
+            </button>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }
 
 export function DuelCard({
   duel,
+  round,
   character = false,
   onVote,
   votingDisabledReason,
   onAddBook
 }: {
   duel: Duel;
+  round: string;
   character?: boolean;
   onVote: (workId: string) => void;
   /** Non-null when voting shouldn't be allowed right now (already voted,
@@ -134,7 +129,7 @@ export function DuelCard({
     <div className="rounded-2xl border border-(--color-border) bg-(--color-surface) p-4">
       <div className="mb-3 flex items-center justify-between text-xs text-(--color-text-dim)">
         <span>
-          Round {duel.roundNumber} · Duel {duel.duelIndex + 1}
+          {round} · Duel {duel.duelIndex + 1}
         </span>
         <span>
           {duel.status === "active"

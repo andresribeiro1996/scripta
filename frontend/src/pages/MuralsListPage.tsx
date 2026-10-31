@@ -9,6 +9,7 @@ import { EmptyState } from "../components/EmptyState";
 import { MoveToFolderModal } from "../components/murals/MoveToFolderModal";
 import { MuralFolderTree } from "../components/murals/MuralFolderTree";
 import { MuralPresetPicker } from "../components/murals/MuralPresetPicker";
+import { MuralThumb } from "../components/murals/MuralThumb";
 import { MuralsIcon } from "../components/NavIcons";
 import { OptionsMenu } from "../components/OptionsMenu";
 import { Page } from "../components/page/Page";
@@ -277,121 +278,71 @@ export function MuralsListPage() {
           )}
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {filteredMurals.map((mural) => {
-              const hasCover = Boolean(mural.coverImageUrl);
-              return (
-                // The whole card opens the mural, not just its name — same
-                // "the card itself is the click target" convention
-                // BookCard.tsx already uses for opening a book. role="button"/
-                // tabIndex/onKeyDown mirror CoverPickerModal.tsx's gallery
-                // tiles, so opening a mural this way stays keyboard-reachable
-                // too, not just clickable. A fixed min-h-40 so every card in the grid
-                // lines up whether or not it has a cover image, instead of
-                // content-driven cards of differing heights sitting next to a
-                // full-bleed image one.
-                <div
-                  key={mural.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => navigate(`/dashboard/murals/${mural.id}`)}
-                  onKeyDown={(e) => {
-                    // e.target === e.currentTarget: only react when the key
-                    // event originated on the card itself, not bubbled up
-                    // from a real focusable control nested inside it (the
-                    // options menu, or the rename input while editing) — those
-                    // need Enter/Space for their own purposes (activating the
-                    // button, typing a literal space into the name), not
-                    // "open this mural."
-                    if ((e.key === "Enter" || e.key === " ") && e.target === e.currentTarget) {
-                      e.preventDefault();
-                      navigate(`/dashboard/murals/${mural.id}`);
-                    }
-                  }}
-                  className={`${PANEL} group relative min-h-40 cursor-pointer overflow-hidden p-4 transition-colors ${
-                    hasCover ? "" : "hover:bg-(--color-surface-hover)"
-                  }`}
-                >
-                  {hasCover && (
-                    <>
-                      <img src={mural.coverImageUrl ?? undefined} alt="" className="absolute inset-0 h-full w-full object-cover" />
-                      {/* Same dark-scrim-behind-overlay-text treatment
-                          BookCard.tsx uses over its own cover art — strongest
-                          right where the name/menu sit, fading out toward the
-                          top so the image itself still reads through. */}
-                      <div className="absolute inset-0 bg-linear-to-t from-[rgba(10,8,6,0.85)] via-[rgba(10,8,6,0.35)] to-transparent" />
-                    </>
-                  )}
-                  <div className={`relative flex h-full flex-col ${hasCover ? "justify-end" : ""}`}>
-                    <div className="mb-1 flex items-start justify-between gap-2">
-                      {editingId === mural.id ? (
-                        <input
-                          autoFocus
-                          value={editingName}
-                          onChange={(e) => setEditingName(e.target.value)}
-                          onBlur={() => handleRename(mural.id)}
-                          onKeyDown={(e) => {
-                            // Stopped from bubbling to the card's own
-                            // onKeyDown — without this, typing a space into
-                            // the name (a very normal thing to want to
-                            // rename a mural to) would trigger the card's
-                            // "Space activates" handler and navigate away
-                            // mid-edit, on every space character.
-                            e.stopPropagation();
-                            if (e.key === "Enter") handleRename(mural.id);
-                            if (e.key === "Escape") setEditingId(null);
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                          className={`${FIELD_CLASS} w-full text-lg font-bold`}
-                        />
-                      ) : (
-                        // text-lg font-bold — bigger than the old text-sm, so
-                        // a mural's name reads as its own real identity on
-                        // the card, not a caption. text-shadow (only over a
-                        // cover image, where it sits on arbitrary artwork
-                        // rather than a flat theme surface) keeps it legible
-                        // the same way BookCard's own title treatment does.
-                        <span className="flex min-w-0 flex-wrap items-center gap-1.5">
-                          <span
-                            className={`min-w-0 text-left text-lg leading-tight font-bold break-words transition-colors ${
-                              hasCover ? "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.5)]" : "group-hover:text-(--color-accent)"
-                            }`}
-                          >
-                            {mural.name}
-                          </span>
-                          {ownProfile.data?.muralId === mural.id && (
-                            <span className="shrink-0 rounded-full bg-(--color-accent-soft) px-1.5 py-0.5 text-[10px] font-semibold text-(--color-accent)">My shelf</span>
-                          )}
-                        </span>
-                      )}
-                      <OptionsMenu
-                        title="Mural settings"
-                        triggerClassName={
-                          hasCover
-                            ? "-m-2.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[rgba(10,8,6,0.72)] text-white backdrop-blur-xs"
-                            : "-m-2.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)"
-                        }
-                        items={[
-                          {
-                            label: "Rename",
-                            onClick: () => {
-                              setEditingId(mural.id);
-                              setEditingName(mural.name);
-                            }
-                          },
-                          { label: hasCover ? "Change cover" : "Add cover", onClick: () => setCoverMuralId(mural.id) },
-                          { label: "Move to…", onClick: () => setMovingMuralId(mural.id) },
-                          { label: "Share", onClick: () => setSharingMuralId(mural.id) },
-                          { label: "Delete", onClick: () => handleDelete(mural), danger: true }
-                        ]}
+            {filteredMurals.map((mural) => (
+              <div
+                key={mural.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => navigate(`/dashboard/murals/${mural.id}`)}
+                onKeyDown={(e) => {
+                  if ((e.key === "Enter" || e.key === " ") && e.target === e.currentTarget) {
+                    e.preventDefault();
+                    navigate(`/dashboard/murals/${mural.id}`);
+                  }
+                }}
+                className={`${PANEL} group relative cursor-pointer overflow-hidden transition-colors hover:bg-(--color-surface-hover)`}
+              >
+                <MuralThumb theme={mural.theme} coverUrl={mural.coverImageUrl} layouts={mural.blocks.map((block) => block.layout)} className="aspect-[16/7] w-full border-b border-(--color-border)" />
+                <div className="p-4">
+                  <div className="mb-1 flex items-start justify-between gap-2">
+                    {editingId === mural.id ? (
+                      <input
+                        autoFocus
+                        value={editingName}
+                        onChange={(e) => setEditingName(e.target.value)}
+                        onBlur={() => handleRename(mural.id)}
+                        onKeyDown={(e) => {
+                          e.stopPropagation();
+                          if (e.key === "Enter") handleRename(mural.id);
+                          if (e.key === "Escape") setEditingId(null);
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        className={`${FIELD_CLASS} w-full text-lg font-bold`}
                       />
-                    </div>
-                    <p className={`text-xs ${hasCover ? "text-white/75" : "text-(--color-text-dim)"}`}>
-                      {mural.blocks.length} block{mural.blocks.length === 1 ? "" : "s"} · Updated {new Date(mural.updatedAt).toLocaleDateString()}
-                    </p>
+                    ) : (
+                      <span className="flex min-w-0 flex-wrap items-center gap-1.5">
+                        <span className="min-w-0 text-left text-lg leading-tight font-bold break-words transition-colors group-hover:text-(--color-accent)">
+                          {mural.name}
+                        </span>
+                        {ownProfile.data?.muralId === mural.id && (
+                          <span className="shrink-0 rounded-full bg-(--color-accent-soft) px-1.5 py-0.5 text-[10px] font-semibold text-(--color-accent)">My shelf</span>
+                        )}
+                      </span>
+                    )}
+                    <OptionsMenu
+                      title="Mural settings"
+                      triggerClassName="-m-2.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)"
+                      items={[
+                        {
+                          label: "Rename",
+                          onClick: () => {
+                            setEditingId(mural.id);
+                            setEditingName(mural.name);
+                          }
+                        },
+                        { label: mural.coverImageUrl ? "Change cover" : "Add cover", onClick: () => setCoverMuralId(mural.id) },
+                        { label: "Move to…", onClick: () => setMovingMuralId(mural.id) },
+                        { label: "Share", onClick: () => setSharingMuralId(mural.id) },
+                        { label: "Delete", onClick: () => handleDelete(mural), danger: true }
+                      ]}
+                    />
                   </div>
+                  <p className="text-xs text-(--color-text-dim)">
+                    {mural.blocks.length} block{mural.blocks.length === 1 ? "" : "s"} · Updated {new Date(mural.updatedAt).toLocaleDateString()}
+                  </p>
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         </div>
       </div>

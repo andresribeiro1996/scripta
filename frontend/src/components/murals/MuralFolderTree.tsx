@@ -40,12 +40,15 @@ export function MuralFolderTree({
     if (name && name !== folder.name) onRenameFolder(folder, name);
   }
 
+  const nested = folders.some((folder) => folder.parentId !== null);
+  const indent = nested ? "ml-11.5 " : "";
+
   return (
     <nav className="flex flex-col gap-0.5">
       <button
         onClick={() => onSelect(null)}
         aria-current={selectedFolderId === null ? "true" : undefined}
-        className={`min-h-11 rounded-lg px-2 text-left text-sm font-semibold ${
+        className={`${indent}min-h-11 rounded px-1.5 text-left text-sm font-semibold ${
           selectedFolderId === null
             ? "bg-(--color-accent-soft) text-(--color-accent)"
             : "text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)"
@@ -65,7 +68,7 @@ export function MuralFolderTree({
                 onClick={() => toggle(folder.id)}
                 title={isCollapsed ? "Expand" : "Collapse"}
                 className={`flex h-11 w-11 shrink-0 items-center justify-center rounded text-(--color-text-dim) hover:bg-(--color-surface-hover) ${
-                  hasChildren ? "" : "invisible"
+                  !nested ? "hidden" : hasChildren ? "" : "invisible"
                 }`}
               >
                 <svg
@@ -133,7 +136,7 @@ export function MuralFolderTree({
       <button
         onClick={() => onCreateFolder(selectedFolderId === null ? null : (folders.find((f) => f.id === selectedFolderId)?.parentId ?? null))}
         title="Create a folder next to the current selection"
-        className="mt-2 min-h-11 rounded-lg border border-dashed border-(--color-border) px-2 text-left text-xs text-(--color-text-dim) transition-colors hover:border-(--color-accent) hover:text-(--color-accent)"
+        className={`${indent}mt-2 min-h-11 rounded border border-dashed border-(--color-border) px-1.5 text-left text-xs text-(--color-text-dim) transition-colors hover:border-(--color-accent) hover:text-(--color-accent)`}
       >
         + New folder
       </button>

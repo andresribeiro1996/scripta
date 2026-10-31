@@ -6,23 +6,16 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { QUIZ_QUESTION_TYPES, eligibleTypes, playerLabel, quizOptionLabel, quizQuestionLabel, type QuizData, type QuizQuestionType } from "@scripta/shared";
+import { QUIZ_QUESTION_TYPES, eligibleTypes, playerLabel, quizOptionLabel, quizQuestionLabel, type QuizData } from "@scripta/shared";
 import { Page } from "../components/page/Page";
-import { BUTTON_PRIMARY, BUTTON_SECONDARY, FIELD_CLASS } from "../components/page/buttonClasses";
+import { BUTTON_DANGER_OUTLINE, BUTTON_PRIMARY, BUTTON_SECONDARY, FIELD_CLASS } from "../components/page/buttonClasses";
 import { backTo } from "../lib/areas";
+import { QUIZ_TYPE_LABELS } from "../lib/quizTypeLabels";
 import { useConfirm } from "../components/ConfirmDialog";
 import { deleteQuizApi, fetchQuizResultsApi, publishQuizApi, setPlayStateApi, updateQuizApi, type Quiz } from "../api/quizzes";
 import { useQuizzes } from "../hooks/useQuizzes";
 import { CHECKBOX_CLASS } from "../components/Toolbar";
 import { useWorkCharacters } from "../hooks/useWorkCharacters";
-
-const TYPE_LABELS: Record<QuizQuestionType, string> = {
-  cover_title: "Blurred cover → title",
-  title_cover: "Title → cover",
-  quote_title: "Quote → title",
-  blurb_title: "Blurb → title",
-  characters_title: "Characters → title"
-};
 
 export function QuizEditorPage() {
   const { id } = useParams();
@@ -126,7 +119,7 @@ export function QuizEditorPage() {
           <button
             type="button"
             onClick={() => { void confirm({ title: `Delete "${quiz.name}"?`, body: "This can't be undone." }).then(async (yes) => { if (yes) { await deleteQuizApi(quiz.id); await queryClient.invalidateQueries({ queryKey: ["quizzes"] }); navigate("/dashboard/arena?tab=quizzes"); } }); }}
-            className={`${BUTTON_SECONDARY} text-(--color-danger)`}
+            className={BUTTON_DANGER_OUTLINE}
           >
             Delete
           </button>
@@ -177,7 +170,7 @@ export function QuizEditorPage() {
                           }))
                         }
                       />
-                      {TYPE_LABELS[type]}
+                      {QUIZ_TYPE_LABELS[type]}
                     </label>
                   );
                 })}
@@ -274,7 +267,7 @@ function PublishedSection({ quiz, shareLink, copied, setCopied }: { quiz: Quiz; 
       <ol className="flex flex-col gap-2">
         {ownerQuestions.map((question, index) => (
           <li key={question.id} className="rounded-xl border border-(--color-border) bg-(--color-surface) p-3 text-sm">
-            <span className="text-(--color-text-dim)">{index + 1}. {TYPE_LABELS[question.type]}</span>
+            <span className="text-(--color-text-dim)">{index + 1}. {QUIZ_TYPE_LABELS[question.type]}</span>
             {question.type === "title_cover" ? (
               <img src={String(question.options[question.answerIndex])} alt="Answer cover" className="ml-2 inline-block h-10 w-7 rounded object-cover align-middle" />
             ) : (
