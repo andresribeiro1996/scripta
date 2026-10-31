@@ -13,6 +13,17 @@ import { resolveCover } from "../api/covers";
 import type { SeedBook } from "../api/arena";
 import { seedCoverLookup, toSeedBook as createSeedBook } from "@scripta/shared";
 
+export const UNTITLED_TOURNAMENT = "Untitled tournament";
+
+export function hasTournamentName(name: string): boolean {
+  const trimmed = name.trim();
+  return trimmed !== "" && trimmed !== UNTITLED_TOURNAMENT;
+}
+
+export function slotPayload(slots: Array<SeedBook | null>): Array<{ slotIndex: number; book: SeedBook }> {
+  return slots.flatMap((book, slotIndex) => (book ? [{ slotIndex, book }] : []));
+}
+
 export async function toSeedBook(book: Record<string, unknown>): Promise<SeedBook | null> {
   const existing = typeof book._coverUrl === "string" ? book._coverUrl : null;
   const cover = existing ?? (await resolveBookCover(book));

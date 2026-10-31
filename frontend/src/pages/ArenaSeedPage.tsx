@@ -18,11 +18,12 @@ import { useAuth } from "../auth/AuthContext";
 import { SeedSlotGrid } from "../components/arena/SeedSlotGrid";
 import { Page } from "../components/page/Page";
 import { BUTTON_PRIMARY, BUTTON_SECONDARY, TITLE_FIELD_CLASS } from "../components/page/buttonClasses";
+import { useConfirm } from "../components/ConfirmDialog";
 import { OptionSheet } from "../components/Sheet";
 import { backTo } from "../lib/areas";
 import { useArena } from "../hooks/useArena";
 import { useLibrary } from "../hooks/useLibrary";
-import { toSeedBook } from "../lib/arenaSeed";
+import { hasTournamentName, slotPayload, toSeedBook, UNTITLED_TOURNAMENT } from "../lib/arenaSeed";
 import { useWorkBooks } from "../hooks/useWorkBooks";
 
 /** Bracket sizes offered for a draft. Powers of two only — the service
@@ -36,6 +37,7 @@ export function ArenaSeedPage() {
   const { id } = useParams<{ id: string }>();
   const { session } = useAuth();
   const navigate = useNavigate();
+  const confirm = useConfirm();
   // `/dashboard/arena/new/seed` is an UNSAVED tournament. Clicking "New
   // tournament" used to POST one immediately, so an idle tap left an
   // "Untitled tournament" behind — and worse, silently fixed its bracket
@@ -56,7 +58,7 @@ export function ArenaSeedPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
-  const [draftName, setDraftName] = useState("Untitled tournament");
+  const [draftName, setDraftName] = useState(UNTITLED_TOURNAMENT);
   const [draftBracketSize, setDraftBracketSize] = useState(DEFAULT_BRACKET_SIZE);
   const [pickingSize, setPickingSize] = useState(false);
   // A ref, not state: two quick actions on a draft must not each see
@@ -72,7 +74,7 @@ export function ArenaSeedPage() {
     creatingRef.current = true;
     try {
       const created = await createTournament({
-        name: draftName.trim() || "Untitled tournament",
+        name: draftName.trim() || UNTITLED_TOURNAMENT,
         bracketSize: draftBracketSize,
         roundDurationMinutes: DEFAULT_ROUND_HOURS * 60
       });
@@ -95,6 +97,7 @@ export function ArenaSeedPage() {
     const name = nameDraft.trim();
     setEditingName(false);
     if (!name) return;
+    setActionError(null);
     if (isDraft) {
       // Naming a draft IS its first real change, so it creates the
       // tournament with that name rather than making an "Untitled" one
@@ -155,17 +158,29 @@ export function ArenaSeedPage() {
   const filledCount = slots.filter(Boolean).length;
   const canStart = filledCount === bracketSize;
 
+  function requireName() {
+    if (hasTournamentName(name)) return true;
+    setActionError("Name this tournament first.");
+    setNameDraft("");
+    setEditingName(true);
+    return false;
+  }
+
   async function handleStart() {
+    if (!requireName()) return;
+    const confirmed = await confirm({
+      title: `Start "${name}"?`,
+      body: `The ${bracketSize}-book bracket is fixed once the tournament starts.`,
+      confirmLabel: "Start tournament",
+      danger: false
+    });
+    if (!confirmed) return;
     setStarting(true);
     setActionError(null);
     try {
       const target = await materialize();
       if (!target) return;
-      const filled = slots.filter((s): s is SeedBook => s !== null);
-      await setTournamentSlots(
-        target.id,
-        filled.map((book, i) => ({ slotIndex: i, book }))
-      );
+      await setTournamentSlots(target.id, slotPayload(slots));
       await startTournament(target.id);
       navigate(`/arena/${target.id}`);
     } catch (err) {
@@ -176,16 +191,14 @@ export function ArenaSeedPage() {
   }
 
   async function handleSaveProgress() {
+    if (isDraft && !requireName()) return;
     setActionError(null);
     try {
       // Saving seeded books is a real change, so this is where a draft
       // becomes a tournament.
       const target = await materialize();
       if (!target) return;
-      await setTournamentSlots(
-        target.id,
-        slots.filter((s): s is SeedBook => s !== null).map((book, i) => ({ slotIndex: i, book }))
-      );
+      await setTournamentSlots(target.id, slotPayload(slots));
       await refresh(target.id);
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Couldn't save your progress.");
@@ -193,6 +206,7 @@ export function ArenaSeedPage() {
   }
 
   async function handleRandomFill() {
+    if (isDraft && !requireName()) return;
     setRandomFilling(true);
     setActionError(null);
     try {
