@@ -28,11 +28,16 @@ export async function createSeededTournament(
   api: Pick<ReturnType<typeof createArenaApi>, "createTournament" | "setTournamentSlots">,
   input: { name: string; bracketSize: number; roundDurationMinutes: number },
   slots: Array<SeedBook | null>
-): Promise<Tournament> {
-  const created = await api.createTournament(input);
+): Promise<{ tournament: Tournament; slotsError: unknown }> {
+  const tournament = await api.createTournament(input);
   const payload = slotPayload(slots);
-  if (payload.length > 0) await api.setTournamentSlots(created.id, payload);
-  return created;
+  if (payload.length === 0) return { tournament, slotsError: null };
+  try {
+    await api.setTournamentSlots(tournament.id, payload);
+  } catch (slotsError) {
+    return { tournament, slotsError };
+  }
+  return { tournament, slotsError: null };
 }
 
 export async function toSeedBook(book: Record<string, unknown>): Promise<SeedBook | null> {

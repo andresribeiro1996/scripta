@@ -27,7 +27,8 @@ export function MobileBlockPreview({
   width,
   height,
   statsOverride,
-  tierlistData
+  tierlistData,
+  editing = false
 }: {
   block: MuralBlock;
   books: Array<Record<string, unknown>>;
@@ -40,6 +41,7 @@ export function MobileBlockPreview({
   height: number;
   statsOverride?: Record<string, number>;
   tierlistData?: (id: string) => ResolvedTierlist | undefined;
+  editing?: boolean;
 }) {
   const title = muralBlockTitle(block, books, block.type === "tierlist" ? tierlistData?.(block.tierlistId)?.name : undefined);
   const compact = height < 64 || width < 80;
@@ -51,6 +53,7 @@ export function MobileBlockPreview({
     </div>
   );
   if (block.type === "empty") return null;
+  if (block.type === "text" && !block.heading && !block.body && !editing) return null;
   if (block.type === "profile") {
     const theme = shelfThemeOverride ?? calculateShelfTheme(books);
     const avatarSize = Math.max(16, Math.min(40, height - 8));

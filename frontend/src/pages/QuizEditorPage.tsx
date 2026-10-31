@@ -5,7 +5,7 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { QUIZ_QUESTION_TYPES, eligibleTypes, playerLabel, quizOptionLabel, quizQuestionLabel, type QuizData } from "@scripta/shared";
 import { Page } from "../components/page/Page";
 import { BUTTON_DANGER_OUTLINE, BUTTON_PRIMARY, BUTTON_SECONDARY, FIELD_CLASS } from "../components/page/buttonClasses";
@@ -253,11 +253,6 @@ function PublishedSection({ quiz, shareLink, copied, setCopied }: { quiz: Quiz; 
           }}
         />
         <div className="flex flex-wrap items-center gap-2">
-          {quiz.playOpen && (
-            <Link to={`/play/${quiz.voteCode}`} className={BUTTON_SECONDARY}>
-              Play it yourself
-            </Link>
-          )}
           <button type="button" onClick={() => void toggleOpen(!quiz.playOpen)} className={BUTTON_SECONDARY}>
             {quiz.playOpen ? "Close for play" : "Open for play"}
           </button>

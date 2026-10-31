@@ -30,7 +30,7 @@ test("a tournament needs a name other than the placeholder", () => {
 test("creating a tournament from a draft saves the books already picked, at their own slots", async () => {
   const [a, , c] = ["A", "B", "C"].map(book);
   const calls: unknown[] = [];
-  const created = await createSeededTournament(
+  const { tournament: created, slotsError } = await createSeededTournament(
     {
       createTournament: async (input) => { calls.push(["create", input]); return { id: "t1" } as never; },
       setTournamentSlots: async (id, slots) => { calls.push(["slots", id, slots]); }
@@ -39,6 +39,7 @@ test("creating a tournament from a draft saves the books already picked, at thei
     [a, null, c, null]
   );
   assert.equal(created.id, "t1");
+  assert.equal(slotsError, null);
   assert.deepEqual(calls, [
     ["create", { name: "Spring finals", bracketSize: 4, roundDurationMinutes: 60 }],
     ["slots", "t1", [{ slotIndex: 0, book: a }, { slotIndex: 2, book: c }]]
@@ -56,4 +57,18 @@ test("creating an empty draft saves no slots", async () => {
     [null, null, null, null]
   );
   assert.deepEqual(calls, ["create"]);
+});
+
+test("a failed slot save still hands back the created tournament and the error", async () => {
+  const failure = new Error("slots down");
+  const { tournament, slotsError } = await createSeededTournament(
+    {
+      createTournament: async () => ({ id: "t1" }) as never,
+      setTournamentSlots: async () => { throw failure; }
+    },
+    { name: "Spring finals", bracketSize: 4, roundDurationMinutes: 60 },
+    [book("A"), null, null, null]
+  );
+  assert.equal(tournament.id, "t1");
+  assert.equal(slotsError, failure);
 });

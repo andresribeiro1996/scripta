@@ -20,6 +20,7 @@ const { AuthProvider } = await import("../src/auth/AuthContext");
 const { setSession } = await import("../src/auth/tokenStore");
 const { TextBlockView } = await import("../src/components/murals/blocks/MiscBlocks");
 const { SaveStatus } = await import("../src/components/SaveStatus");
+const { MobileBlockPreview } = await import("../src/components/murals/MobileBlockPreview");
 const { Disclosure } = await import("../src/components/Disclosure");
 const { SearchField } = await import("../src/components/Toolbar");
 const { PrivacyPage } = await import("../src/pages/PrivacyPage");
@@ -35,6 +36,23 @@ test("an empty text block shows its editor prompt only while editing", () => {
   assert.match(renderToString(createElement(TextBlockView, { block: textBlock, editing: true })), /Add a heading or some text\./);
   assert.equal(renderToString(createElement(TextBlockView, { block: textBlock })), "");
   assert.match(renderToString(createElement(TextBlockView, { block: { ...textBlock, body: "Hello" } })), /Hello/);
+});
+
+test("an empty text block on the phone canvas is hidden from viewers and shown to the editor", () => {
+  const props = { block: textBlock, books: [], images: [], width: 328, height: 120 };
+  assert.equal(renderToString(createElement(MobileBlockPreview, props)), "");
+  assert.match(renderToString(createElement(MobileBlockPreview, { ...props, editing: true })), /Tap to open/);
+  assert.match(src("components/murals/MobileMuralCanvas.tsx"), /<MobileBlockPreview(?:=>|[^>])*editing=\{editing\}/);
+  assert.match(src("components/murals/MobileMuralCanvas.tsx"), /editing=\{editMode\}/);
+});
+
+test("owners cannot play their own quiz from the editor or the games list", () => {
+  assert.doesNotMatch(src("pages/QuizEditorPage.tsx"), /Play it yourself/);
+  assert.doesNotMatch(src("pages/ArenaListPage.tsx"), /label: "Play"/);
+});
+
+test("the save status line keeps its height while idle", () => {
+  assert.match(renderToString(createElement(SaveStatus, { state: "idle" })), /min-h-5/);
 });
 
 test("the canvas tells blocks whether it is editing", () => {

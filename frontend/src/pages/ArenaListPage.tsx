@@ -280,7 +280,6 @@ export function ArenaListPage() {
                 meta={`${quiz.data.books.length} books`}
                 badges={<QuizStatusBadge status={quizStatus(quiz)} />}
                 stats={[{ value: quiz.data.questionCount, label: quiz.data.questionCount === 1 ? "question" : "questions" }]}
-                play={quiz.voteCode === null || !quiz.playOpen ? undefined : { to: `/play/${quiz.voteCode}`, label: "Play" }}
                 covers={[]}
                 preview={quizPreview(quiz.data)}
                 menu={

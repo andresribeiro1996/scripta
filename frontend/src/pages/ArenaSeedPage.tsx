@@ -73,7 +73,7 @@ export function ArenaSeedPage() {
     if (!isDraft || creatingRef.current) return null;
     creatingRef.current = true;
     try {
-      const created = await createSeededTournament(
+      const { tournament: created, slotsError } = await createSeededTournament(
         { createTournament, setTournamentSlots },
         { name: name.trim() || UNTITLED_TOURNAMENT, bracketSize: draftBracketSize, roundDurationMinutes: DEFAULT_ROUND_HOURS * 60 },
         slots
@@ -81,6 +81,7 @@ export function ArenaSeedPage() {
       // `replace` so Back skips the draft URL rather than opening a
       // second empty draft.
       navigate(`/dashboard/arena/${created.id}/seed`, { replace: true });
+      if (slotsError) throw new Error("The tournament was created, but your picks didn't save. Pick them again and save.");
       return created;
     } finally {
       creatingRef.current = false;
@@ -105,8 +106,8 @@ export function ArenaSeedPage() {
       setDraftName(name);
       try {
         await materialize(name);
-      } catch {
-        setActionError("Couldn't create that tournament.");
+      } catch (err) {
+        setActionError(err instanceof Error ? err.message : "Couldn't create that tournament.");
       }
       return;
     }
