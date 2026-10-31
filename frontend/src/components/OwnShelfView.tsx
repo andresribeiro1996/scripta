@@ -12,6 +12,7 @@ import { BUTTON_DANGER, BUTTON_PRIMARY, BUTTON_SECONDARY, FIELD_CLASS } from "./
 import { MuralsIcon } from "./NavIcons";
 import { MuralCanvas } from "./murals/MuralCanvas";
 import { ProfileActivity } from "./ProfileActivity";
+import { ProfileLibraryPanel } from "./ProfileLibraryPanel";
 import { Sheet } from "./Sheet";
 import { SkeletonCardGrid } from "./Skeleton";
 import { SwipeTabs } from "./SwipeTabs";
@@ -27,7 +28,8 @@ import { useResolvedTheme } from "../lib/theme";
 
 const OWN_SHELF_TABS = [
   { value: "mural", label: "Mural" },
-  { value: "activity", label: "Activity" }
+  { value: "activity", label: "Activity" },
+  { value: "library", label: "Library" }
 ] as const;
 
 type OwnShelfTab = (typeof OWN_SHELF_TABS)[number]["value"];
@@ -183,11 +185,12 @@ export function OwnShelfView({ username }: { username: string }) {
           />
         </div>
       </div>
-      <div className="mt-8">
+      <div className="mt-6">
         {error && <p className="mb-4 text-sm text-(--color-danger)">{error}</p>}
         <SwipeTabs tabs={OWN_SHELF_TABS} value={tab} onChange={setTab} label="Shelf sections">
           {(panel) => {
             if (panel === "activity") return <ProfileActivity activity={activity} />;
+            if (panel === "library") return <ProfileLibraryPanel library={library?.data} isLoading={libraryQuery.isPending} error={libraryQuery.error} onRetry={() => void libraryQuery.refetch()} />;
             return (
               <div className="mb-8">
                 {shelfMural && muralHasBlocks ? (

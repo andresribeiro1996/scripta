@@ -283,3 +283,54 @@ test("the quiz editor says why Publish is off next to the header, and play and r
   assert.match(play, /<QuizResults\b(?:=>|[^>])*back=\{back\}/);
   assert.match(src("components/quiz/QuizResults"), /<Page back=\{back\} title=\{name\}>/);
 });
+
+test("a tabbed header keeps a one-line subtitle slot, so the tab row sits at the same height on every tab", () => {
+  const slot = /<div class="mt-1\.5 [^"]*min-h-11[^"]*">/;
+  assert.match(render(createElement(Page, { title: "Library", tabs: area("library").tabs, children: "x" }), "/dashboard/series"), slot);
+  assert.match(render(createElement(Page, { title: "Library", subtitle: "2 series", tabs: area("library").tabs, children: "x" }), "/dashboard/series"), slot);
+  assert.doesNotMatch(render(createElement(Page, { title: "Library", children: "x" })), slot);
+  assert.doesNotMatch(render(createElement(Page, { title: "Settings", tabs: area("settings").tabs, sideTabs: true, children: "x" }), "/dashboard/settings"), slot);
+});
+
+test("Games keeps one subtitle on every tab, and Admin keeps one title with no per-tab subtitle", () => {
+  const games = src("pages/ArenaListPage");
+  const subtitle = games.slice(games.indexOf("subtitle={"), games.indexOf("tabs={area(\"games\")"));
+  assert.doesNotMatch(subtitle, /tab ===|\?|undefined/);
+  for (const f of ["AdminDailyChapterPage", "AdminGenresPage", "AdminSynopsesPage", "AdminTranslationsPage"]) {
+    const tag = src(`pages/${f}`).match(/<Page\b(?:=>|[^>])*>/)![0];
+    assert.match(tag, /title="Admin"/, f);
+    assert.doesNotMatch(tag, /subtitle=/, f);
+  }
+});
+
+test("Admin import and editor groups are PANEL surfaces, not bordered grey boxes", () => {
+  const s = src("pages/AdminDailyChapterPage");
+  assert.equal(s.match(/space-y-3 p-4 \$\{PANEL\}/g)?.length, 5);
+  assert.doesNotMatch(s, /rounded-xl border border-\(--color-border\) p-4/);
+});
+
+test("the four Admin tabs fit a 328px row: a tighter gap below sm and short labels", () => {
+  assert.match(readFileSync(new URL("../src/components/page/surfaceClasses.ts", import.meta.url), "utf8"), /TAB_NAV = "flex gap-5 sm:gap-7 /);
+  assert.deepEqual(area("admin").tabs.map((t) => t.label), ["Daily", "Genres", "Synopses", "Translations"]);
+});
+
+test("Series and Collections use the Library's toolbar: SearchField and a More actions menu holding Select", () => {
+  const s = src("pages/GroupsPage");
+  assert.match(s, /<SearchField\b(?:=>|[^>])*label=\{`Search \$\{copy\.title\.toLowerCase\(\)\} by name`\}/);
+  assert.match(s, /<OptionsMenu\b(?:=>|[^>])*items=\{\[\{ label: "Select…"[^\]]*\]\}(?:=>|[^>])*title="More actions"/);
+  assert.doesNotMatch(s, /<button\b(?:=>|[^>])*>Select…<\/button>/);
+  assert.doesNotMatch(s, /aria-label=\{`Search/);
+});
+
+test("profile tabs are flush with the title, and your own profile has the Library tab", () => {
+  const swipe = src("components/SwipeTabs");
+  assert.doesNotMatch(swipe, /\$\{tabClass\(i === index\)\} gap-1\.5 px-1/);
+  const own = src("components/OwnShelfView");
+  assert.match(own, /\{ value: "library", label: "Library" \}/);
+  for (const f of ["components/OwnShelfView", "pages/CommunityProfilePage"]) {
+    const s = src(f);
+    assert.match(s, /<ProfileLibraryPanel\b/, f);
+    assert.match(s, /<div className="mt-6">\s*\{error && /, f);
+  }
+  assert.doesNotMatch(src("pages/CommunityProfilePage"), /<PublicLibraryGrid\b/);
+});

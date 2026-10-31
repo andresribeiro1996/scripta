@@ -103,15 +103,13 @@ export function ArenaListPage() {
       width="wide"
       title="Games"
       subtitle={
-        tab === "tournaments" ? (
-          <>
-            Bracket tournaments from your library —{" "}
-            <a href="/arena" className="inline-flex min-h-11 items-center text-(--color-accent) underline">
-              browse public tournaments
-            </a>
-            .
-          </>
-        ) : undefined
+        <>
+          Tier lists, quizzes and tournaments from your library —{" "}
+          <a href="/arena" className="inline-flex min-h-11 items-center text-(--color-accent) underline">
+            browse public games
+          </a>
+          .
+        </>
       }
       tabs={area("games").tabs}
       actions={

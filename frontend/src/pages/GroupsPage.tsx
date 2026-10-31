@@ -10,7 +10,7 @@ import { BookGrid } from "../components/BookGrid";
 import { CoverPickerModal } from "../components/CoverPickerModal";
 import { EmptyState } from "../components/EmptyState";
 import { LibraryCanvas } from "../components/LibraryCanvas";
-import { CollectionsIcon, SeriesIcon } from "../components/NavIcons";
+import { CollectionsIcon, MoreIcon, SeriesIcon } from "../components/NavIcons";
 import { OptionsMenu } from "../components/OptionsMenu";
 import { Page } from "../components/page/Page";
 import { BUTTON_DANGER, BUTTON_PRIMARY, BUTTON_SECONDARY, FIELD_CLASS } from "../components/page/buttonClasses";
@@ -18,7 +18,7 @@ import { PerCardStylePanel } from "../components/PerCardStylePanel";
 import { Sheet } from "../components/Sheet";
 import { SkeletonGroups } from "../components/Skeleton";
 import { useToast } from "../components/Toaster";
-import { ToolbarRow, CHECKBOX_CLASS } from "../components/Toolbar";
+import { ToolbarRow, CHECKBOX_CLASS, SearchField, toolbarIconClass } from "../components/Toolbar";
 import { useDelayedShow } from "../hooks/useDelayedShow";
 import { useLibrary } from "../hooks/useLibrary";
 import { useLibrarySaver } from "../hooks/useLibrarySaver";
@@ -359,22 +359,21 @@ export function GroupsPage({ type }: { type: GroupType }) {
             <button onClick={handleStartDraft} disabled={creating || drafting} className={BUTTON_PRIMARY}>
               {creating ? "Adding…" : `New ${copy.noun}`}
             </button>
-            {books.length > 0 && <button onClick={handleToggleSelectionMode} className={BUTTON_SECONDARY}>Select…</button>}
+            {books.length > 0 && (
+              <OptionsMenu
+                items={[{ label: "Select…", onClick: handleToggleSelectionMode }]}
+                title="More actions"
+                trigger={<MoreIcon size={22} />}
+                triggerClassName={toolbarIconClass()}
+              />
+            )}
           </>
         )
       }
     >
       {books.length > 0 && (
         <ToolbarRow>
-          <div className="flex items-center gap-2">
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search"
-              aria-label={`Search ${copy.title.toLowerCase()} by name`}
-              className={`${FIELD_CLASS} min-w-0 flex-1 sm:max-w-xs`}
-            />
-          </div>
+          <SearchField value={search} onChange={setSearch} placeholder="Search" label={`Search ${copy.title.toLowerCase()} by name`} className="flex-1 sm:flex-none" />
         </ToolbarRow>
       )}
 
