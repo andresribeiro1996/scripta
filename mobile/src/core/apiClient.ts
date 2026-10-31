@@ -1,3 +1,5 @@
+import { t } from "../i18n";
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -41,12 +43,13 @@ export function createApiClient(
   getAccessToken: () => string | null,
   setAccessToken: (token: string | null) => void,
   fetcher: typeof fetch = fetch,
+  locale: () => string = () => "en",
 ) {
   async function rawRequest<T>(
     path: string,
     init: RequestInit,
   ): Promise<RawResponse<T>> {
-    const headers: Record<string, string> = {};
+    const headers: Record<string, string> = { "Accept-Language": locale() };
     const accessTokenUsed = init.auth ? getAccessToken() : null;
     const multipart = typeof FormData !== "undefined" && init.body instanceof FormData;
     if (init.body !== undefined && !multipart) headers["Content-Type"] = "application/json";
@@ -62,7 +65,7 @@ export function createApiClient(
     try {
       if (text) body = JSON.parse(text);
     } catch {
-      throw new ApiError(res.status, res.ok ? "Server returned an invalid response" : `Request failed (${res.status})`);
+      throw new ApiError(res.status, res.ok ? t("errors.invalidResponse") : t("errors.requestFailed", { status: res.status }));
     }
     return { status: res.status, body: body as T, accessTokenUsed };
   }
@@ -139,7 +142,7 @@ export function createApiClient(
       // Without this, one failed refresh made every authed request fail with
       // "Not signed in" for the rest of the app's life.
       if (init.auth && !getAccessToken() && !(await refreshAccessToken())) {
-        throw new ApiError(401, "Not signed in");
+        throw new ApiError(401, t("errors.notSignedIn"));
       }
 
       let response = await rawRequest<T & { error?: string; field?: string }>(path, init);
@@ -148,7 +151,7 @@ export function createApiClient(
       }
 
       if (response.status < 200 || response.status >= 300) {
-        throw new ApiError(response.status, response.body.error ?? `Request failed (${response.status})`, response.body.field);
+        throw new ApiError(response.status, response.body.error ?? t("errors.requestFailed", { status: response.status }), response.body.field);
       }
       return response.body as T;
     },

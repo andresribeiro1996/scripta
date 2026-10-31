@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { AppState } from "react-native";
 import { parseAccountAppearance, reconcileAppearance, type AccountAppearance, type Appearance } from "@scripta/shared/themes";
 import { ApiError, apiClient } from "../../core/api";
+import { getLocalePreference, setLocalePreference } from "../../i18n";
 import { useTheme } from "../../ui/theme";
 
 export async function fetchAccountAppearance(): Promise<AccountAppearance> {
@@ -18,18 +19,19 @@ export function isAppearanceSyncFailure(err: unknown): boolean {
 
 export function useAccountAppearanceSync(): void {
   const { preference, displayFont, textFont, setPreference, setFontPreference } = useTheme();
-  const latest = useRef<Appearance>({ theme: preference, displayFont, textFont, locale: "auto" });
+  const latest = useRef<Omit<Appearance, "locale">>({ theme: preference, displayFont, textFont });
 
   useEffect(() => {
-    latest.current = { theme: preference, displayFont, textFont, locale: "auto" };
+    latest.current = { theme: preference, displayFont, textFont };
   }, [preference, displayFont, textFont]);
 
   useEffect(() => {
     async function syncOnce() {
-      const { apply, upload } = reconcileAppearance(await fetchAccountAppearance(), latest.current);
+      const { apply, upload } = reconcileAppearance(await fetchAccountAppearance(), { ...latest.current, locale: getLocalePreference() });
       if (apply.theme) setPreference(apply.theme);
       if (apply.displayFont) setFontPreference("display", apply.displayFont);
       if (apply.textFont) setFontPreference("text", apply.textFont);
+      if (apply.locale) setLocalePreference(apply.locale);
       if (Object.keys(upload).length > 0) await saveAccountAppearance(upload);
     }
     function run() {

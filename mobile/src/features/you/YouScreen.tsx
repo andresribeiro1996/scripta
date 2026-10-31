@@ -5,6 +5,7 @@ import { Text } from "../../ui/Text";
 import { useAuth } from "../../core/auth";
 import { ConfirmDialog, Icon, Screen, Sheet, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme, type IconName } from "../../ui";
 import { FontPicker } from "../settings/FontPicker";
+import { LanguagePicker } from "../settings/LanguagePicker";
 import { ThemePicker } from "../settings/ThemePicker";
 import { SocialsSection } from "../socials";
 import { ProfileHeader } from "./ProfileHeader";
@@ -75,6 +76,7 @@ export function YouScreen() {
           <ThemePicker />
           <FontPicker slot="display" />
           <FontPicker slot="text" />
+          <LanguagePicker />
         </ScrollView>
       </Sheet>
       <Sheet visible={sheet === "socials"} title="Socials" onClose={() => setSheet(null)}>
