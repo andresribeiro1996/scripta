@@ -93,7 +93,7 @@ export function SearchField({
       <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-(--color-text-dim)">
         <SearchIcon />
       </span>
-      <input ref={inputRef} type="search" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} aria-label={label} className={`${FIELD_CLASS} w-full pl-10`} />
+      <input ref={inputRef} type="search" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} aria-label={label} className={`${FIELD_CLASS} w-full pl-10 [&::-webkit-search-cancel-button]:appearance-none`} />
     </div>
   );
 }

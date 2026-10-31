@@ -104,7 +104,22 @@ export function LibraryStylePage() {
         These settings stay inside your books: they never restyle the app's own menus, page headers, or search and filter bar. A series can override its own card appearance from its own style panel (Series page) — those settings take priority over these for that series' cards.
       </p>
 
-      <div className="mb-6 grid gap-6 sm:grid-cols-2">
+      <div className="sticky top-[calc(var(--app-top)+0.5rem)] z-10 mb-6 bg-(--color-bg) pb-2">
+        <h2 className={`${SECTION_HEADING} mb-3`}>
+          Preview{!library?.data.books.length && " (sample books — your library is empty)"}
+        </h2>
+        <div className="max-h-[40dvh] overflow-y-auto rounded-xl border border-dashed border-(--color-border)">
+          <LibraryCanvas style={draft}>
+            <BookGrid style={draft}>
+              {previewBooks.map((book, i) => (
+                <BookCard key={String(book.ContentID ?? i)} book={book} onClick={() => {}} style={draft} />
+              ))}
+            </BookGrid>
+          </LibraryCanvas>
+        </div>
+      </div>
+
+      <div className="mb-6 grid items-start gap-6 sm:grid-cols-2">
         <Section title="Card layout">
           <SliderRow id="card-size" label="Card size" value={draft.cardMinWidth} range={CARD_MIN_WIDTH_RANGE} onChange={(v) => applyDraft({ ...draft, cardMinWidth: v })} />
           <SliderRow id="card-gap" label="Spacing between cards" value={draft.cardGap} range={CARD_GAP_RANGE} onChange={(v) => applyDraft({ ...draft, cardGap: v })} />
@@ -183,32 +198,10 @@ export function LibraryStylePage() {
       >
         Reset all to defaults
       </button>
-
-      <h2 className={`${SECTION_HEADING} mb-3`}>
-        Preview{!library?.data.books.length && " (sample books — your library is empty)"}
-      </h2>
-      {/* The real LibraryCanvas, not a hand-rolled imitation of it —
-          this used to duplicate its background/width/padding math inline
-          and would silently drift from the component the moment either
-          changed. The dashed outline is the only thing added on top: it
-          marks where the canvas ENDS, which is the whole point of this
-          preview now that these settings stop at the books instead of
-          washing over the entire page. With no custom background set the
-          canvas is transparent, so without an outline there'd be nothing
-          to see at all. */}
-      <div className="overflow-hidden rounded-xl border border-dashed border-(--color-border)">
-        <LibraryCanvas style={draft}>
-          <BookGrid style={draft}>
-            {previewBooks.map((book, i) => (
-              <BookCard key={String(book.ContentID ?? i)} book={book} onClick={() => {}} style={draft} />
-            ))}
-          </BookGrid>
-        </LibraryCanvas>
-      </div>
-      <p className="mt-2 text-xs text-(--color-text-dim)">
+      <p className="text-xs text-(--color-text-dim)">
         The dashed edge is where your canvas ends — the app's own menus, page header, and search bar sit outside it and
         keep the app's theme no matter what you set here. Content width applies on the Library, Series and Collections
-        pages. Hover a card above to see the shadow and hover animation settings.
+        pages. Hover a card in the preview to see the shadow and hover animation settings.
       </p>
     </Page>
   );

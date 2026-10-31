@@ -14,6 +14,7 @@ import {
   type ReaderProfile,
   type ShelfTheme
 } from "../../lib/murals";
+import { useAuth } from "../../auth/AuthContext";
 import { bookKey } from "../../lib/merge";
 import { computeStat } from "../../lib/muralStats";
 import { muralThemeStyle } from "../../lib/theme";
@@ -61,6 +62,7 @@ export function MuralBlockDetail({
   onClose: () => void;
   actions?: ReactNode;
 }) {
+  const signedIn = Boolean(useAuth().session);
   const [selectedBook, setSelectedBook] = useState<Record<string, unknown> | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const collectionScroll = useRef(0);
@@ -122,7 +124,7 @@ export function MuralBlockDetail({
             {block.type === "spotlight" && block.caption && (
               <p className="mt-5 text-base leading-relaxed whitespace-pre-wrap">{block.caption}</p>
             )}
-            <BookSummary book={book} />
+            {signedIn ? <BookSummary book={book} /> : null}
             {workIdOf(book) && (
               <Link to={`/work/${workIdOf(book)}`} className="mt-4 inline-block text-sm font-semibold text-(--color-accent) hover:underline">
                 Book page

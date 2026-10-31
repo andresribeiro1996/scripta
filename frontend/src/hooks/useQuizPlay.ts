@@ -12,7 +12,7 @@ export function useQuizPlay(code: string) {
   const ownPlay = useQuery({
     queryKey: ["quizOwnPlay", code, playId],
     queryFn: () => fetchPlayApi(code, playId),
-    enabled: board.isSuccess,
+    enabled: (board.data?.playCount ?? 0) > 0,
     retry: false
   });
   return { board, ownPlay, playId };

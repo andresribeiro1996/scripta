@@ -7,6 +7,7 @@ import { HighlightChoice, SignatureChoice } from "../components/readerCard/Reade
 import { ReaderCardOptions, Segmented } from "../components/readerCard/ReaderCardOptions";
 import { ReaderCardTurner } from "../components/readerCard/ReaderCardTurner";
 import { ReaderGlyphSetting } from "../components/readerCard/ReaderGlyphSetting";
+import { SaveStatus, useSaveState } from "../components/SaveStatus";
 import { useToast } from "../components/Toaster";
 import { useLibrary } from "../hooks/useLibrary";
 import { NO_GROUPS, useOwnCardStyle } from "../hooks/useReaderCard";
@@ -27,6 +28,7 @@ export function ReaderCardPage() {
   const own = useOwnCardStyle();
   const save = useSaveReaderCardStyle();
   const toast = useToast();
+  const [saveState, track] = useSaveState();
   const scheme = themes[useResolvedTheme()].scheme;
   const [audience, setAudience] = useState<(typeof AUDIENCES)[number]>("you");
   const input = useMemo(() => readerCardInputOf(books, groups, readerName, undefined, own), [books, groups, readerName, own]);
@@ -34,7 +36,7 @@ export function ReaderCardPage() {
 
   const change = async (patch: ReaderCardStylePatch) => {
     try {
-      await save(patch);
+      await track(save(patch));
       return true;
     } catch (error) {
       toast({ message: saveFailureMessage(error, "Couldn't save your reader card."), kind: "error" });
@@ -52,7 +54,7 @@ export function ReaderCardPage() {
   }
 
   return (
-    <Page title="Reader card">
+    <Page title="Reader card" subtitle={<SaveStatus state={saveState} />}>
       <div className="lg:grid lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-8">
         <div className="mb-6 flex flex-col items-center gap-3 lg:sticky lg:top-[calc(var(--app-top)+1.5rem)] lg:mb-0 lg:self-start">
           <div className="w-full max-w-[18rem]">

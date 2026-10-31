@@ -14,7 +14,7 @@ export function AdminSynopsesPage() {
   const { data: isAdmin, isPending } = useQuery({ queryKey: ["books-admin"], queryFn: fetchIsAdmin, staleTime: Infinity });
   const review = useQuery({ queryKey: ["synopsis-review"], queryFn: fetchSynopsisReview, enabled: isAdmin === true });
   if (isPending) return null;
-  if (!isAdmin) return <NotFoundPage framed />;
+  if (!isAdmin) return <NotFoundPage />;
   const decide = async (hash: string, decision: SynopsisDecision) => {
     await reviewSynopsis(hash, decision);
     client.setQueryData<SynopsisReview>(["synopsis-review"], (current) => (current ? withoutSynopsis(current, hash) : current));

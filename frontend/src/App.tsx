@@ -122,7 +122,9 @@ export function App() {
           <Route path="/welcome-avatar" element={<WelcomeAvatarPage />} />
         </Route>
 
-        <Route path="*" element={<NotFoundPage />} />
+        <Route element={<SessionLayout />}>
+          <Route path="*" element={<NotFoundPage />} />
+        </Route>
       </Routes>
     </>
   );

@@ -14,7 +14,7 @@ export function AdminTranslationsPage() {
   const { data: isAdmin, isPending } = useQuery({ queryKey: ["books-admin"], queryFn: fetchIsAdmin, staleTime: Infinity });
   const review = useQuery({ queryKey: ["translation-review"], queryFn: fetchTranslationReview, enabled: isAdmin === true });
   if (isPending) return null;
-  if (!isAdmin) return <NotFoundPage framed />;
+  if (!isAdmin) return <NotFoundPage />;
   const decide = async (workId: string, action: TranslationReviewAction) => {
     await reviewTranslation(workId, action);
     client.setQueryData<TranslationReview>(["translation-review"], (current) => (current ? withoutTranslation(current, workId) : current));

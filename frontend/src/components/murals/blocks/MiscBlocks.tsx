@@ -12,9 +12,9 @@ import { BlockEyebrow, EmptyBlockState } from "./BookBlocks";
  *  own words, unlike a caption/label elsewhere, so there's no "keep it
  *  muted regardless" reason to override it here. Sizes are `em` (see
  *  BookBlocks.tsx's MiniBookTile comment for why). */
-export function TextBlockView({ block }: { block: Extract<MuralBlock, { type: "text" }> }) {
+export function TextBlockView({ block, editing = false }: { block: Extract<MuralBlock, { type: "text" }>; editing?: boolean }) {
   if (!block.heading && !block.body) {
-    return <EmptyBlockState message="Add a heading or some text." />;
+    return editing ? <EmptyBlockState message="Add a heading or some text." /> : null;
   }
   return (
     <div className="flex h-full flex-col gap-1.5 overflow-y-auto block-p-3.5">
