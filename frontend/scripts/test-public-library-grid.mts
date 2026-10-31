@@ -13,17 +13,27 @@ const radiusOf = (html: string, title: string) => {
   return card?.match(/border-radius:(\d+)px/)?.[1];
 };
 
-test("visitors and the owner see per-book and per-series card styles on the public grid", () => {
-  const style = { ...DEFAULT_LIBRARY_STYLE, cardRadius: 5 };
-  const seriesStyle = extractPerCardStyle({ ...style, cardRadius: 17 });
-  const bookStyle = extractPerCardStyle({ ...style, cardRadius: 31 });
+const style = { ...DEFAULT_LIBRARY_STYLE, cardRadius: 5 };
+const seriesStyle = extractPerCardStyle({ ...style, cardRadius: 17 });
+const render = (books: Array<Record<string, unknown>>) => {
   const library = {
-    books: [base("Plain"), { ...base("InSeries"), _key: "k-series" }, { ...base("Own"), _key: "k-own", _style: bookStyle }],
+    books,
     groups: [{ id: "g1", type: "series", name: "S", bookKeys: ["k-series"], createdAt: "", updatedAt: "", style: seriesStyle }],
     style
   } as unknown as LibraryData;
-  const html = renderToString(createElement(MemoryRouter, null, createElement(PublicLibraryGrid, { library })));
+  return renderToString(createElement(MemoryRouter, null, createElement(PublicLibraryGrid, { library })));
+};
+
+test("a visitor's grid applies the library style and the series style", () => {
+  const html = render([base("Plain"), { ...base("InSeries"), _key: "k-series" }]);
   assert.equal(radiusOf(html, "Plain"), "5");
   assert.equal(radiusOf(html, "InSeries"), "17");
+});
+
+test("the own-profile grid also applies a book's own style over its series style", () => {
+  const bookStyle = extractPerCardStyle({ ...style, cardRadius: 31 });
+  const html = render([base("Plain"), { ...base("InSeries"), _key: "k-series" }, { ...base("Own"), _key: "k-own", _style: bookStyle }, { ...base("OwnInSeries"), _key: "k-series", _style: bookStyle }]);
+  assert.equal(radiusOf(html, "Plain"), "5");
   assert.equal(radiusOf(html, "Own"), "31");
+  assert.equal(radiusOf(html, "OwnInSeries"), "31");
 });

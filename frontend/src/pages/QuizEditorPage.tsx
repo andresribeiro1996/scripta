@@ -253,9 +253,11 @@ function PublishedSection({ quiz, shareLink, copied, setCopied }: { quiz: Quiz; 
           }}
         />
         <div className="flex flex-wrap items-center gap-2">
-          <Link to={`/play/${quiz.voteCode}`} className={BUTTON_SECONDARY}>
-            Play it yourself
-          </Link>
+          {quiz.playOpen && (
+            <Link to={`/play/${quiz.voteCode}`} className={BUTTON_SECONDARY}>
+              Play it yourself
+            </Link>
+          )}
           <button type="button" onClick={() => void toggleOpen(!quiz.playOpen)} className={BUTTON_SECONDARY}>
             {quiz.playOpen ? "Close for play" : "Open for play"}
           </button>

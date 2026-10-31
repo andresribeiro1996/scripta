@@ -23,7 +23,7 @@ import { OptionSheet } from "../components/Sheet";
 import { backTo } from "../lib/areas";
 import { useArena } from "../hooks/useArena";
 import { useLibrary } from "../hooks/useLibrary";
-import { hasTournamentName, slotPayload, toSeedBook, UNTITLED_TOURNAMENT } from "../lib/arenaSeed";
+import { createSeededTournament, hasTournamentName, slotPayload, toSeedBook, UNTITLED_TOURNAMENT } from "../lib/arenaSeed";
 import { useWorkBooks } from "../hooks/useWorkBooks";
 
 /** Bracket sizes offered for a draft. Powers of two only — the service
@@ -68,16 +68,16 @@ export function ArenaSeedPage() {
   /** The tournament to act on, creating it first if this is still a
    *  draft. Every action below goes through this, so there is exactly
    *  one place a draft becomes real. */
-  async function materialize(): Promise<{ id: string; bracketSize: number } | null> {
+  async function materialize(name = draftName): Promise<{ id: string; bracketSize: number } | null> {
     if (tournament) return tournament;
     if (!isDraft || creatingRef.current) return null;
     creatingRef.current = true;
     try {
-      const created = await createTournament({
-        name: draftName.trim() || UNTITLED_TOURNAMENT,
-        bracketSize: draftBracketSize,
-        roundDurationMinutes: DEFAULT_ROUND_HOURS * 60
-      });
+      const created = await createSeededTournament(
+        { createTournament, setTournamentSlots },
+        { name: name.trim() || UNTITLED_TOURNAMENT, bracketSize: draftBracketSize, roundDurationMinutes: DEFAULT_ROUND_HOURS * 60 },
+        slots
+      );
       // `replace` so Back skips the draft URL rather than opening a
       // second empty draft.
       navigate(`/dashboard/arena/${created.id}/seed`, { replace: true });
@@ -103,18 +103,10 @@ export function ArenaSeedPage() {
       // tournament with that name rather than making an "Untitled" one
       // and immediately renaming it.
       setDraftName(name);
-      creatingRef.current = true;
       try {
-        const created = await createTournament({
-          name,
-          bracketSize: draftBracketSize,
-          roundDurationMinutes: DEFAULT_ROUND_HOURS * 60
-        });
-        navigate(`/dashboard/arena/${created.id}/seed`, { replace: true });
+        await materialize(name);
       } catch {
         setActionError("Couldn't create that tournament.");
-      } finally {
-        creatingRef.current = false;
       }
       return;
     }
