@@ -4,7 +4,8 @@ import { catalogMismatches } from "./catalogCheck.js";
 import { en } from "./messages/en.js";
 import { ptPT } from "./messages/pt-PT.js";
 import { sharedT } from "./sharedT.js";
-import { parseAcceptLanguage, parseLocalePreference, resolveLocale } from "./locale.js";
+import { intlLocale, parseAcceptLanguage, parseLocalePreference, resolveLocale } from "./locale.js";
+import { decimalText } from "./numbers.js";
 import { createTranslator } from "./translate.js";
 
 test("an explicit pick beats the device", () => {
@@ -35,6 +36,23 @@ test("parseAcceptLanguage orders by q and drops malformed parts", () => {
   assert.deepEqual(parseAcceptLanguage("en;q=0.5, pt-PT"), ["pt-PT", "en"]);
   assert.deepEqual(parseAcceptLanguage("en, fr;q=x, !!, de;q=0.9"), ["en", "de"]);
   assert.deepEqual(parseAcceptLanguage(undefined), []);
+});
+
+test("parseAcceptLanguage drops tags that are not acceptable or out of range", () => {
+  assert.deepEqual(parseAcceptLanguage("pt-PT;q=0, en;q=0.4"), ["en"]);
+  assert.deepEqual(parseAcceptLanguage("pt;q=1.5, fr;q=-0.2, en;q=1"), ["en"]);
+});
+
+test("intlLocale leaves English on the runtime default", () => {
+  assert.equal(intlLocale("en"), undefined);
+  assert.equal(intlLocale("pt-PT"), "pt-PT");
+});
+
+test("decimalText uses a comma only in Portuguese", () => {
+  assert.equal(decimalText(4.25, "en", 1), "4.3");
+  assert.equal(decimalText(4.25, "pt-PT", 1), "4,3");
+  assert.equal(decimalText(3.5, "pt-PT"), "3,5");
+  assert.equal(decimalText(2, "pt-PT"), "2");
 });
 
 test("createTranslator interpolates and pluralises", () => {

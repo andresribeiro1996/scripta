@@ -1,7 +1,7 @@
 import type { Locale } from "../i18n/locale.js";
 import { sharedT } from "../i18n/sharedT.js";
 import type { DialGroup } from "../library/readerCardFacts.js";
-import type { PublicReaderCard } from "../library/readerIdentity.js";
+import { coverageSentences, signalSentence, type PublicReaderCard } from "../library/readerIdentity.js";
 import type { Counter } from "./counters.js";
 import { fitLine, textWidth, wrapLines } from "./fit.js";
 import { PLATES, plateEpithet, plateName, type IdentityKey } from "./plates.js";
@@ -109,7 +109,7 @@ export function recordBody(input: ReaderCardInput): string {
     + rule(59, 0.9) + rule(61.5, 0.4);
   let top = 80;
   if (card.signal) {
-    const lines = wrapLines(card.signal.label, { font: "serif", size: 6.6, width: 190, lines: 2 });
+    const lines = wrapLines(signalSentence(card.signal, locale), { font: "serif", size: 6.6, width: 190, lines: 2 });
     out += lines.map((line, i) => svgText(125, 73 + i * 8, line, { size: 6.6, font: "serif", italic: true })).join("");
     top = 73 + lines.length * 8 + 10;
   }
@@ -118,7 +118,7 @@ export function recordBody(input: ReaderCardInput): string {
   out += rowsSvg(recordRows(input, false), top, bottom, 7.2);
   out += missing.map((line, i) => svgText(30, bottom + 12 + i * 8, line, { size: 6.4, font: "serif", italic: true, anchor: "start", opacity: 0.7 })).join("");
   if (card.dial?.segments.length) out += t(LEGENDS[input.style.counter]).split("\n").map((line, i) => svgText(125, 268 + i * 9, line, { size: 6.2, font: "serif", italic: true })).join("");
-  return out + coverageLines(card.coverage);
+  return out + coverageLines(coverageSentences(card, locale));
 }
 
 export const COVER_URL = /^https:\/\/[^\s"'<>&\\]+$/;
@@ -208,7 +208,7 @@ export function mergedBody(input: ReaderCardInput): string {
     out += svgText(125, 40, t("shared.readerCard.recordTitle"), { size: 8.5, spacing: 3.2, weight: 600 });
     y = 52;
   }
-  return out + rule(y, 0.9) + rule(y + 2.5, 0.4) + rowsSvg(recordRows(input, true), y + 18, 284, 7) + coverageLines(input.card.coverage);
+  return out + rule(y, 0.9) + rule(y + 2.5, 0.4) + rowsSvg(recordRows(input, true), y + 18, 284, 7) + coverageLines(coverageSentences(input.card, input.locale));
 }
 
 export function readerCardSummary(input: ReaderCardBase): string[] {
@@ -219,7 +219,7 @@ export function readerCardSummary(input: ReaderCardBase): string[] {
   if (input.style.motto) lines.push(t("shared.readerCard.summaryMotto", { text: input.style.motto.text }));
   const second = card.state === "unwritten" ? null : card.streak ?? null;
   if (second) lines.push(t("shared.readerCard.summaryStreak", { name: plateName(second, locale) }));
-  if (card.signal) lines.push(`${card.signal.label}.`);
+  if (card.signal) lines.push(`${signalSentence(card.signal, locale)}.`);
   const segments = card.dial?.segments ?? [];
   if (card.facts) {
     const groups = segments.map((segment) => `${segment.books} ${groupLabel(segment.group, locale).toLowerCase()}`).join(", ");
@@ -233,5 +233,5 @@ export function readerCardSummary(input: ReaderCardBase): string[] {
     if (input.leaders?.length) lines.push(t("shared.readerCard.summaryOnlyYou", { text: input.leaders.map((leader) => `${leader.label} (${leader.count})`).join(", ") }));
     if (card.state === "leaning" && input.missing) lines.push(t("shared.readerCard.summaryOnlyYou", { text: input.missing }));
   }
-  return [...lines, ...card.coverage];
+  return [...lines, ...coverageSentences(card, locale)];
 }

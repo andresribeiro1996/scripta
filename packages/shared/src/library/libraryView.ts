@@ -7,7 +7,8 @@ export type LibraryBook = Record<string, unknown>;
 export type StatusFilter = "all" | "unread" | "reading" | "finished";
 export type SortKey = "manual" | "title" | "author";
 
-const STATUS_FILTERS: StatusFilter[] = ["all", "reading", "finished", "unread"];
+export const STATUS_FILTERS: StatusFilter[] = ["all", "reading", "finished", "unread"];
+export const SORT_KEYS: SortKey[] = ["manual", "title", "author"];
 
 export function statusFilterOptions(locale: Locale): Array<{ value: StatusFilter; label: string }> {
   const t = sharedT(locale);

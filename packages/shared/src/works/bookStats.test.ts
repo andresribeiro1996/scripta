@@ -100,3 +100,12 @@ test("tierPosition flips worst-first lists and skips single-tier lists", () => {
   assert.equal(tierPosition({ tierIndex: 1, tierCount: 5, ranksWorstFirst: true }), 0.75);
   assert.equal(tierPosition({ tierIndex: 0, tierCount: 1, ranksWorstFirst: false }), null);
 });
+
+test("Portuguese ratings use a decimal comma and mil/M counts", () => {
+  const model = bookStatsModel(full, openLibrary, "pt-PT");
+  assert.equal(model.tiles[0]!.value, "3,8");
+  assert.equal(model.ratings.openLibrary, "★ 4,1 · 2,3 mil classificações na Open Library");
+  assert.equal(model.ratings.community!.summary, "média de 3,8 · 12 classificações");
+  assert.equal(bookStatsModel(null, { value: 4, count: 1_250_000 }, "pt-PT").ratings.openLibrary, "★ 4,0 · 1,3 M classificações na Open Library");
+  assert.equal(bookStatsModel(null, { value: 4, count: 1000 }, "pt-PT").ratings.openLibrary, "★ 4,0 · 1 mil classificações na Open Library");
+});

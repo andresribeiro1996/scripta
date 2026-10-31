@@ -8,7 +8,7 @@ const OPTIONS: LocalePreference[] = ["auto", "en", "pt-PT"];
 export function LanguagePicker() {
   const selected = useSyncExternalStore(subscribeLocale, getLocalePreference, getLocalePreference);
   const t = useT();
-  const [error, setError] = useState<string | null>(null);
+  const [saveFailed, setSaveFailed] = useState(false);
 
   if (!PORTUGUESE_ENABLED) return null;
 
@@ -16,12 +16,12 @@ export function LanguagePicker() {
 
   async function choose(preference: LocalePreference) {
     setLocalePreference(preference);
-    setError(null);
+    setSaveFailed(false);
     try {
       await saveAccountAppearance({ locale: preference });
     } catch (err) {
       if (!isAppearanceSyncFailure(err)) throw err;
-      setError(t("settings.languageSaveFailed"));
+      setSaveFailed(true);
     }
   }
 
@@ -38,9 +38,9 @@ export function LanguagePicker() {
           </label>
         ))}
       </div>
-      {error && (
+      {saveFailed && (
         <p role="alert" className="mt-2 text-xs text-(--color-danger)">
-          {error}
+          {t("settings.languageSaveFailed")}
         </p>
       )}
     </fieldset>

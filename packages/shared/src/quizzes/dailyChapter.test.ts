@@ -94,6 +94,7 @@ test("the summary and share text carry numbers and squares only", () => {
   assert.deepEqual(summary.bestTheme, { themeId: "retold-myths", percent: 70 });
   const text = dailyChapterMonthShare(summary, "https://example.org/daily", "en");
   assert.equal(text, "The Daily Chapter · January 2030\n🟩⬜🟥\n1-day streak · 3.5 avg\nhttps://example.org/daily");
+  assert.match(dailyChapterMonthShare(summary, "https://example.org/daily", "pt-PT"), /\nSequência de 1 dia · média de 3,5\n/);
   assert.ok(!text.includes("Secret passage"));
 });
 

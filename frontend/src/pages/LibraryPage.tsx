@@ -41,7 +41,7 @@ import { parseImportedFile } from "../lib/fileImport";
 import { orderLibraryBooks, reorderOnDrop, seriesGroupByBookKey } from "../lib/libraryOrder";
 import { area } from "../lib/areas";
 import { effectiveCardStyle, resolveLibraryStyle, type PerCardStyle } from "../lib/libraryStyle";
-import { bookHref, filterBooks, sortBooks, sortOptions, statusFilterOptions, type SortKey, type StatusFilter } from "../lib/libraryView";
+import { SORT_KEYS, STATUS_FILTERS, bookHref, filterBooks, sortBooks, type SortKey, type StatusFilter } from "../lib/libraryView";
 import { bookKey } from "../lib/merge";
 import { saveWithViewTransition } from "../lib/viewTransition";
 import { getLocale } from "../i18n";
@@ -98,9 +98,9 @@ export function LibraryPage() {
   useEffect(() => { setQuery(urlQuery); }, [urlQuery]);
   useEffect(() => { setAddingBook(searchParams.get("action") === "add"); }, [searchParams]);
   const statusParam = searchParams.get("status");
-  const statusFilter = statusFilterOptions("en").find((option) => option.value === statusParam)?.value ?? "all";
+  const statusFilter = STATUS_FILTERS.find((value) => value === statusParam) ?? "all";
   const sortParam = searchParams.get("sort");
-  const sortKey = sortOptions("en").find((option) => option.value === sortParam)?.value ?? "manual";
+  const sortKey = SORT_KEYS.find((value) => value === sortParam) ?? "manual";
   function updateView(changes: { status?: StatusFilter; sort?: SortKey }) {
     const defaults = { status: "all", sort: "manual" };
     setSearchParams(

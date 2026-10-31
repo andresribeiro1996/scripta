@@ -1,4 +1,5 @@
 import type { Locale } from "../i18n/locale.js";
+import { decimalText } from "../i18n/numbers.js";
 import { sharedT } from "../i18n/sharedT.js";
 import { genreLabel, genresForBook, isBookGenre } from "../library/bookGenres.js";
 import type { BookSeries } from "../library/bookSearch.js";
@@ -133,7 +134,7 @@ export function bookScreenModel(page: WorkPage | null, book: Book | null, viewer
     genres: work ? (work.genres ?? []).map((genre) => genreName(genre, locale)) : book ? genresForBook(book).slice(0, GENRE_CAP).map((genre) => genreLabel(genre, locale)) : [],
     possibleGenres: (work?.possibleGenres ?? []).map((genre) => genreName(genre, locale)),
     series: work ? work.series ?? displayed?.collection ?? null : null,
-    rating: work?.rating ? { value: work.rating.value, label: t("shared.bookScreen.ratingLabel", { value: work.rating.value.toFixed(1), ratings: ratingCountLabel(work.rating.count, locale) }) } : null,
+    rating: work?.rating ? { value: work.rating.value, label: t("shared.bookScreen.ratingLabel", { value: decimalText(work.rating.value, locale, 1), ratings: ratingCountLabel(work.rating.count, locale) }) } : null,
     year: work ? displayed?.year ?? work.year : null,
     meta: selected ? bookMetaLine(selected, locale, selected.language) : work ? bookMetaLine(work, locale) : null,
     cover: selected ? { url: selected.coverUrl, color: selected.coverColor } : { url: work?.coverUrl ?? null, color: work?.coverColor ?? null },

@@ -5,7 +5,7 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { bookKey } from "./merge.js";
 import type { Group } from "./groups.js";
-import { publicReaderCard, readerIdentity } from "./readerIdentity.js";
+import { coverageSentences, publicReaderCard, readerIdentity, signalSentence } from "./readerIdentity.js";
 
 const fixturePath = join(dirname(fileURLToPath(import.meta.url)), "../../../../scripts/fixtures/library.json");
 
@@ -33,7 +33,7 @@ test("30% in a series with at least 3 books settles the Cartographer", () => {
   const result = readerIdentity(books, [series(books.slice(0, 3))], "en");
   assert.equal(result.state, "settled");
   assert.equal(result.identity, "carto");
-  assert.deepEqual(result.signal, { counted: 3, of: 10, label: "3 of 10 finished books are in a series" });
+  assert.deepEqual(result.signal, { counted: 3, of: 10, key: "carto", label: "3 of 10 finished books are in a series" });
   assert.deepEqual(result.leaders, [{ label: "Discworld", count: 3 }]);
 });
 
@@ -144,7 +144,7 @@ test("Goodreads and StoryGraph imports add a series coverage line", () => {
 test("the public card carries no titles, authors, series or missing line", () => {
   const books = shelf(10, (i) => (i < 4 ? { Attribution: "Kazuo Ishiguro", Title: `Klara ${i}` } : {}));
   const card = publicReaderCard(readerIdentity(books, [series(books.slice(0, 2), "Secret Series")], "en"));
-  assert.deepEqual(Object.keys(card).sort(), ["coverage", "identity", "runnerUp", "signal", "state", "streak"]);
+  assert.deepEqual(Object.keys(card).sort(), ["coverage", "coverageFacts", "identity", "runnerUp", "signal", "state", "streak"]);
   const text = JSON.stringify(card);
   for (const leak of ["Ishiguro", "Klara", "Secret Series", "Book 5"]) assert.ok(!text.includes(leak), leak);
 });
@@ -250,7 +250,7 @@ test("the sample library fixture settles as a classics reader with a fantasy str
   assert.equal(result.state, "settled");
   assert.equal(result.identity, "corr");
   assert.equal(result.streak, "star");
-  assert.deepEqual(result.signal, { counted: 11, of: 12, label: "11 of 12 finished books with known genres are classics, literary fiction or poetry" });
+  assert.deepEqual(result.signal, { counted: 11, of: 12, key: "corr", label: "11 of 12 finished books with known genres are classics, literary fiction or poetry" });
 });
 
 test("a settled card names the second-strongest reading as its streak", () => {
@@ -300,4 +300,27 @@ test("an unwritten card has no streak, and the public card carries the streak", 
   assert.equal(readerIdentity(shelf(3), [], "en").streak, null);
   const books = shelf(10, (i) => (i < 3 ? { highlights: mark(7) } : {}));
   assert.equal(publicReaderCard(readerIdentity(books, [series(books.slice(3, 7))], "en")).streak, "anno");
+});
+
+test("a card derived in English renders its signal and coverage in Portuguese", () => {
+  const books = shelf(10, (i) => ({ ContentID: i === 0 ? "goodreads:1" : `kobo-${i}` }));
+  const card = publicReaderCard(readerIdentity(books, [series(books.slice(0, 3))], "en"));
+  assert.equal(signalSentence(card.signal!, "pt-PT"), "3 de 10 livros lidos fazem parte de uma série");
+  assert.deepEqual(coverageSentences(card, "pt-PT"), ["géneros conhecidos em 0 de 10 livros lidos", "séries desconhecidas nas importações do Goodreads e do StoryGraph"]);
+  assert.equal(signalSentence(card.signal!, "en"), card.signal!.label);
+  assert.deepEqual(coverageSentences(card, "en"), card.coverage);
+});
+
+test("the Wayfarer's largest share renders in Portuguese from its key", () => {
+  const groupGenres = ["Romance", "Historical Fiction", "Philosophy", "Psychology", "Science", "Technology", "Business"];
+  const books = shelf(20, (i) => ({ _genres: [i < 3 ? "Fantasy" : i < 6 ? "Science Fiction" : groupGenres[Math.floor((i - 6) / 2)]!] }));
+  const card = publicReaderCard(readerIdentity(books, [], "en"));
+  assert.equal(signalSentence(card.signal!, "pt-PT"), "9 géneros acima de 5% dos livros com género conhecido; o maior, fantasia ou ficção científica, tem 30%");
+});
+
+test("an old stored card without structured facts keeps its stored sentences", () => {
+  const old = { signal: { counted: 3, of: 10, label: "3 of 10 finished books are in a series" }, coverage: ["genres known for 0 of 10 finished books"] };
+  assert.equal(signalSentence(old.signal, "pt-PT"), "3 of 10 finished books are in a series");
+  assert.deepEqual(coverageSentences(old, "pt-PT"), ["genres known for 0 of 10 finished books"]);
+  assert.equal(signalSentence({ ...old.signal, key: "way" }, "pt-PT"), "3 of 10 finished books are in a series");
 });

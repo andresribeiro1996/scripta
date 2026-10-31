@@ -1,5 +1,6 @@
 import { roundLabel } from "../arena/arenaBracket.js";
 import type { Locale } from "../i18n/locale.js";
+import { decimalText } from "../i18n/numbers.js";
 import { sharedT } from "../i18n/sharedT.js";
 import { finishFeelings } from "../library/finish.js";
 
@@ -12,9 +13,9 @@ export type TournamentRecord = { entered: number; titles: number; wins: number; 
 export type BookStats = { community: CommunityRating | null; tiers: TierStanding | null; tournaments: TournamentRecord | null };
 type TileKey = "community" | "tiers" | "tournaments";
 
-const scaled = (n: number, unit: number, suffix: string) => `${Math.round((n / unit) * 10) / 10}${suffix}`;
-const compactCount = (n: number) => (n < 1000 ? String(n) : n < 999_950 ? scaled(n, 1000, "K") : scaled(n, 1_000_000, "M"));
-export const ratingCountLabel = (count: number, locale: Locale) => sharedT(locale)("shared.bookStats.ratingCount", { count, compact: compactCount(count) });
+const scaled = (n: number, unit: number, locale: Locale) => decimalText(Math.round((n / unit) * 10) / 10, locale);
+const compactCount = (n: number, locale: Locale) => (n < 1000 ? String(n) : n < 999_950 ? sharedT(locale)("shared.bookStats.thousands", { value: scaled(n, 1000, locale) }) : sharedT(locale)("shared.bookStats.millions", { value: scaled(n, 1_000_000, locale) }));
+export const ratingCountLabel = (count: number, locale: Locale) => sharedT(locale)("shared.bookStats.ratingCount", { count, compact: compactCount(count, locale) });
 const feelingFor = (average: number, locale: Locale) => finishFeelings(locale).find((feeling) => feeling.rating === Math.round(average))!.label;
 
 export function tierPosition({ tierIndex, tierCount, ranksWorstFirst }: { tierIndex: number; tierCount: number; ranksWorstFirst: boolean }): number | null {
@@ -65,17 +66,17 @@ export function bookStatsModel(stats: BookStats | null, openLibrary: { value: nu
   const tournaments = stats?.tournaments ?? null;
   const rounded = community ? Math.round(community.average * 10) / 10 : 0;
   const tiles: Array<{ key: TileKey; value: string; caption: string }> = [];
-  if (community) tiles.push({ key: "community", value: rounded.toFixed(1), caption: feelingFor(rounded, locale) });
+  if (community) tiles.push({ key: "community", value: decimalText(rounded, locale, 1), caption: feelingFor(rounded, locale) });
   if (tiers) tiles.push({ key: "tiers", ...tierTile(tiers.score, tiers.lists, locale) });
   if (tournaments) tiles.push({ key: "tournaments", value: "🏆", caption: bestFinish(tournaments, locale) ?? t("shared.bookStats.entered") });
   const largest = community ? Math.max(...community.distribution) : 0;
   return {
     tiles,
     ratings: {
-      openLibrary: openLibrary ? t("shared.bookStats.openLibrary", { value: openLibrary.value.toFixed(1), ratings: ratingCountLabel(openLibrary.count, locale) }) : null,
+      openLibrary: openLibrary ? t("shared.bookStats.openLibrary", { value: decimalText(openLibrary.value, locale, 1), ratings: ratingCountLabel(openLibrary.count, locale) }) : null,
       community: community ? {
         feeling: feelingFor(rounded, locale),
-        summary: t("shared.bookStats.communitySummary", { average: rounded.toFixed(1), ratings: t("shared.bookStats.ratings", { count: community.count }) }),
+        summary: t("shared.bookStats.communitySummary", { average: decimalText(rounded, locale, 1), ratings: t("shared.bookStats.ratings", { count: community.count }) }),
         columns: finishFeelings(locale).map((feeling) => {
           const count = community.distribution[feeling.rating - 1]!;
           return { label: feeling.label, count, fraction: largest > 0 ? count / largest : 0, top: largest > 0 && count === largest };

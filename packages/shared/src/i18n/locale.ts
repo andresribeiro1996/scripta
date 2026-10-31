@@ -23,7 +23,7 @@ export function parseAcceptLanguage(header: string | undefined): string[] {
     if (!/^[A-Za-z]{1,8}([-_][A-Za-z0-9]{1,8})*$/.test(tag)) continue;
     const qParam = params.find((param) => /^q=/i.test(param));
     const q = qParam ? Number(qParam.slice(2)) : 1;
-    if (Number.isNaN(q)) continue;
+    if (!(q > 0 && q <= 1)) continue;
     entries.push({ tag, q });
   }
   return entries.sort((a, b) => b.q - a.q).map((entry) => entry.tag);

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { publicReaderCardOf } from "../library/readerCardFacts.js";
 import type { PublicReaderCard } from "../library/readerIdentity.js";
 import { readerCardSummary } from "./pages.js";
 import type { ReaderCardBase } from "./render.js";
@@ -43,4 +44,11 @@ test("an unwritten card says so", () => {
 test("the motto is read out after the plate", () => {
   const lines = readerCardSummary(base({ style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), motto: { text: "Per libros ad astra", look: "arc" } } }));
   assert.equal(lines[1], "Motto: “Per libros ad astra”.");
+});
+
+test("a visitor in Portuguese reads an English-derived card's evidence in Portuguese", () => {
+  const books = Array.from({ length: 10 }, (_, i) => ({ Title: `Book ${i}`, Attribution: i < 4 ? "Kazuo Ishiguro" : `Author ${i}`, ReadStatus: 2 }));
+  const lines = readerCardSummary(base({ card: publicReaderCardOf(books, [], "en"), locale: "pt-PT" }));
+  assert.ok(lines.includes("4 de 10 livros lidos são de autores a que volta sempre."));
+  assert.equal(lines.at(-1), "géneros conhecidos em 0 de 10 livros lidos");
 });

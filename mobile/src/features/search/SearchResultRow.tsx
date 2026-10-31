@@ -122,7 +122,7 @@ function BookResultRow({ result, onOpen, onAdd }: { result: BookSearchResult; on
   const { colors } = useTheme();
   const segments = useSegments();
   const byline = searchResultByline(result);
-  const series =result.series ? seriesLabel(result.series, locale) : null;
+  const series = result.series ? seriesLabel(result.series, locale) : null;
   return (
     <View style={[styles.row, { borderBottomColor: colors.border }]}>
       <Pressable

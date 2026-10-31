@@ -6,4 +6,5 @@ export const errors = {
   "errors.waitMinutes": { one: "{count} minute", other: "{count} minutes" },
   "errors.waitHours": { one: "{count} hour", other: "{count} hours" },
   "errors.waitFallback": "a minute",
+  "errors.requestFailed": "Request failed ({status})",
 } satisfies Messages;

@@ -7,4 +7,5 @@ export const errors: CatalogOf<typeof en> = {
   "errors.waitMinutes": { one: "{count} minuto", other: "{count} minutos" },
   "errors.waitHours": { one: "{count} hora", other: "{count} horas" },
   "errors.waitFallback": "um minuto",
+  "errors.requestFailed": "O pedido falhou ({status})",
 };

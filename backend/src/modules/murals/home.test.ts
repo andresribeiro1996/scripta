@@ -123,8 +123,9 @@ test("public mural payload carries the reader card without leaking titles or ser
       identity: "carto",
       runnerUp: null,
       streak: null,
-      signal: { counted: 3, of: 10, label: "3 of 10 finished books are in a series" },
+      signal: { counted: 3, of: 10, key: "carto", label: "3 of 10 finished books are in a series" },
       coverage: ["genres known for 0 of 10 finished books"],
+      coverageFacts: { known: 0, n: 10, imported: false },
       style: { ...publicStyle(DEFAULT_READER_CARD_STYLE), counter: "dial", layout: "faces", trait: "both" },
       chosen: {}
     });
@@ -153,7 +154,7 @@ test("public mural payload carries the reader card without leaking titles or ser
     service.updateMural("noLibraryOwner", noLibraryHome.id, { blocks: [{ id: "c", type: "readerCard", layout: { x: 0, y: 0, w: 4, h: 6 } }], updatedAt: noLibraryHome.updatedAt });
     const sharedNoLibrary = service.share("noLibraryOwner", noLibraryHome.id)!;
     const noLibraryBody = (await app.inject({ method: "GET", url: `/murals/shared/${sharedNoLibrary.shareToken}` })).json();
-    assert.deepEqual(noLibraryBody.readerCard, { state: "unwritten", identity: null, runnerUp: null, streak: null, signal: null, coverage: ["genres known for 0 of 0 finished books"] });
+    assert.deepEqual(noLibraryBody.readerCard, { state: "unwritten", identity: null, runnerUp: null, streak: null, signal: null, coverage: ["genres known for 0 of 0 finished books"], coverageFacts: { known: 0, n: 0, imported: false } });
   } finally {
     await app.close();
     library.close();

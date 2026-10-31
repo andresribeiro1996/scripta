@@ -573,6 +573,8 @@ export const ptPT: CatalogOf<typeof en> = {
   "shared.bookScreen.tabCommunity": "Comunidade",
   "shared.bookScreen.ratingLabel": "{value} · {ratings}",
   "shared.bookStats.ratingCount": { one: "{compact} classificação", other: "{compact} classificações" },
+  "shared.bookStats.thousands": "{value} mil",
+  "shared.bookStats.millions": "{value} M",
   "shared.bookStats.ratings": { one: "{count} classificação", other: "{count} classificações" },
   "shared.bookStats.lists": { one: "{count} lista", other: "{count} listas" },
   "shared.bookStats.publishedLists": { one: "{count} tabela de níveis publicada", other: "{count} tabelas de níveis publicadas" },

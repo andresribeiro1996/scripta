@@ -13,6 +13,7 @@ const { ptPT } = await import("../src/i18n/messages/pt-PT/index.ts");
 const { getLocale, setDeviceLocaleTags, setLocalePreference, t } = await import("../src/i18n/index.ts");
 const { LanguagePicker } = await import("../src/components/LanguagePicker.tsx");
 const { publicFetch } = await import("../src/api/client.ts");
+const { applyAppearance, readAppearance } = await import("../src/lib/theme.ts");
 
 type Seen = { acceptLanguage: string | null };
 
@@ -81,6 +82,18 @@ test("a rate limit reads the same in English and is Portuguese on request", asyn
     assert.equal(portuguese.seen[0]!.acceptLanguage, "pt-PT");
     assert.equal(((await limited("Rate limit exceeded, retry in 1 hour")).error as Error).message, "Demasiadas tentativas. Aguarde 1 hora e tente novamente.");
     assert.equal(((await limited("nope")).error as Error).message, "Demasiadas tentativas. Aguarde um minuto e tente novamente.");
+  } finally {
+    setLocalePreference("auto");
+  }
+});
+
+test("account appearance sync sets and reports the language pick", () => {
+  try {
+    applyAppearance({ locale: "pt-PT" });
+    assert.equal(getLocale(), "pt-PT");
+    assert.equal(readAppearance().locale, "pt-PT");
+    applyAppearance({ locale: "en" });
+    assert.equal(readAppearance().locale, "en");
   } finally {
     setLocalePreference("auto");
   }

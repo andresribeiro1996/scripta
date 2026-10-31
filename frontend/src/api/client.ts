@@ -53,7 +53,7 @@ async function parseOrThrow(res: Response): Promise<unknown> {
     const message =
       body && typeof body === "object" && "error" in body && typeof (body as { error?: unknown }).error === "string"
         ? (body as { error: string }).error
-        : res.statusText;
+        : getLocale() === "en" ? res.statusText : t("errors.requestFailed", { status: res.status });
     throw new ApiError(res.status, message, body && typeof body === "object" && "field" in body && typeof body.field === "string" ? body.field : undefined);
   }
   return body;

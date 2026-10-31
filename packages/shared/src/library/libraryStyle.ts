@@ -40,15 +40,24 @@ export function cardFontFamilyOptions(locale: Locale): Array<{ value: CardFontFa
   return fontFamilyOptions(locale);
 }
 
+export const FONT_FAMILY_CSS: Record<CardFontFamily, string> = {
+  sans: "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif",
+  serif: "ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif",
+  mono: "ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace",
+  playfairDisplay: "'Playfair Display', ui-serif, Georgia, serif",
+  inter: "'Inter', ui-sans-serif, system-ui, sans-serif",
+  jetbrainsMono: "'JetBrains Mono', ui-monospace, SFMono-Regular, monospace",
+};
+
 function fontFamilyOptions(locale: Locale): Array<{ value: CardFontFamily; label: string; shortLabel: string; css: string }> {
   const t = sharedT(locale);
   return [
-    { value: "sans", label: t("shared.libraryStyle.fontSans"), shortLabel: t("shared.libraryStyle.fontSansShort"), css: "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" },
-    { value: "serif", label: t("shared.libraryStyle.fontSerif"), shortLabel: t("shared.libraryStyle.fontSerifShort"), css: "ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif" },
-    { value: "mono", label: t("shared.libraryStyle.fontMono"), shortLabel: t("shared.libraryStyle.fontMonoShort"), css: "ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" },
-    { value: "playfairDisplay", label: "Playfair Display", shortLabel: "Playfair Display", css: "'Playfair Display', ui-serif, Georgia, serif" },
-    { value: "inter", label: "Inter", shortLabel: "Inter", css: "'Inter', ui-sans-serif, system-ui, sans-serif" },
-    { value: "jetbrainsMono", label: "JetBrains Mono", shortLabel: "JetBrains Mono", css: "'JetBrains Mono', ui-monospace, SFMono-Regular, monospace" }
+    { value: "sans", label: t("shared.libraryStyle.fontSans"), shortLabel: t("shared.libraryStyle.fontSansShort"), css: FONT_FAMILY_CSS.sans },
+    { value: "serif", label: t("shared.libraryStyle.fontSerif"), shortLabel: t("shared.libraryStyle.fontSerifShort"), css: FONT_FAMILY_CSS.serif },
+    { value: "mono", label: t("shared.libraryStyle.fontMono"), shortLabel: t("shared.libraryStyle.fontMonoShort"), css: FONT_FAMILY_CSS.mono },
+    { value: "playfairDisplay", label: "Playfair Display", shortLabel: "Playfair Display", css: FONT_FAMILY_CSS.playfairDisplay },
+    { value: "inter", label: "Inter", shortLabel: "Inter", css: FONT_FAMILY_CSS.inter },
+    { value: "jetbrainsMono", label: "JetBrains Mono", shortLabel: "JetBrains Mono", css: FONT_FAMILY_CSS.jetbrainsMono }
   ];
 }
 

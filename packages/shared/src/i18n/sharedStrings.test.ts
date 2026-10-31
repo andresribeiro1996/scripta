@@ -72,8 +72,8 @@ test("genres, awards and statuses are named in the reader's language", () => {
 
 test("a streak of one day is singular in Portuguese", () => {
   const summary = (streak: number) => ({ month: "2030-01", days: [], streak, average: 3.5 }) as unknown as Parameters<typeof dailyChapterMonthShare>[0];
-  assert.match(dailyChapterMonthShare(summary(1), "https://example.org/daily", "pt-PT"), /\nSequência de 1 dia · média de 3\.5\n/);
-  assert.match(dailyChapterMonthShare(summary(2), "https://example.org/daily", "pt-PT"), /\nSequência de 2 dias · média de 3\.5\n/);
+  assert.match(dailyChapterMonthShare(summary(1), "https://example.org/daily", "pt-PT"), /\nSequência de 1 dia · média de 3,5\n/);
+  assert.match(dailyChapterMonthShare(summary(2), "https://example.org/daily", "pt-PT"), /\nSequência de 2 dias · média de 3,5\n/);
   assert.match(dailyChapterMonthShare(summary(1), "https://example.org/daily", "en"), /\n1-day streak · 3\.5 avg\n/);
 });
 
@@ -109,8 +109,8 @@ test("book screens and stats follow the language", () => {
   const stats = { community: { average: 4, count: 4, distribution: [0, 0, 0, 4, 0] as [number, number, number, number, number] }, tiers: { score: 0.1, letter: "S" as const, lists: 1, ballots: 5 }, tournaments: null };
   const model = bookStatsModel(stats, { value: 4.2, count: 1 }, "pt-PT");
   assert.equal(model.ratings.community!.feeling, "Adorei");
-  assert.equal(model.ratings.community!.summary, "média de 4.0 · 4 classificações");
-  assert.equal(model.ratings.openLibrary, "★ 4.2 · 1 classificação na Open Library");
+  assert.equal(model.ratings.community!.summary, "média de 4,0 · 4 classificações");
+  assert.equal(model.ratings.openLibrary, "★ 4,2 · 1 classificação na Open Library");
   assert.deepEqual(model.tiles[1], { key: "tiers", value: "Topo", caption: "nível · 1 lista" });
   assert.equal(model.tierBar!.band, "Nível de topo");
   assert.equal(model.tournamentsEmpty, "Ainda não está em nenhum torneio.");

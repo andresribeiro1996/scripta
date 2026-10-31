@@ -572,6 +572,8 @@ export const en = {
   "shared.bookScreen.tabCommunity": "Community",
   "shared.bookScreen.ratingLabel": "{value} · {ratings}",
   "shared.bookStats.ratingCount": { one: "{compact} rating", other: "{compact} ratings" },
+  "shared.bookStats.thousands": "{value}K",
+  "shared.bookStats.millions": "{value}M",
   "shared.bookStats.ratings": { one: "{count} rating", other: "{count} ratings" },
   "shared.bookStats.lists": { one: "{count} list", other: "{count} lists" },
   "shared.bookStats.publishedLists": { one: "{count} published tier list", other: "{count} published tier lists" },

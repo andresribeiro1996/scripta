@@ -2,7 +2,7 @@ import type { Locale } from "../i18n/locale.js";
 import { sharedT } from "../i18n/sharedT.js";
 import { plateName, type CardState, type IdentityKey } from "../readerCards/index.js";
 import type { PublicReaderCardStyle, ReaderCardChosen } from "../readerCards/style.js";
-import { genreLabel, genresForBook, isFinishedBook, type BookGenre } from "./bookGenres.js";
+import { genreLabel, genresForBook, isBookGenre, isFinishedBook, type BookGenre } from "./bookGenres.js";
 import type { Group } from "./groups.js";
 import { bookKey } from "./merge.js";
 import type { ReaderCardFacts } from "./readerCardFacts.js";
@@ -11,7 +11,8 @@ type Book = Record<string, unknown>;
 
 export type GenreIdentity = "lamp" | "star" | "arch" | "corr";
 
-export interface ReaderSignal { counted: number; of: number; label: string }
+export interface ReaderSignal { counted: number; of: number; label: string; key?: IdentityKey; largest?: BookGenre | GenreIdentity; largestPct?: number }
+export interface CoverageFacts { known: number; n: number; imported: boolean }
 export interface ReaderLeader { label: string; count: number }
 export interface ReaderIdentity {
   state: CardState;
@@ -21,9 +22,10 @@ export interface ReaderIdentity {
   signal: ReaderSignal | null;
   leaders: ReaderLeader[];
   coverage: string[];
+  coverageFacts: CoverageFacts;
   missing: string | null;
 }
-export type PublicReaderCard = Pick<ReaderIdentity, "state" | "identity" | "runnerUp" | "signal" | "coverage"> & Partial<Pick<ReaderIdentity, "streak">> & Partial<ReaderCardFacts> & { style?: PublicReaderCardStyle; chosen?: ReaderCardChosen };
+export type PublicReaderCard = Pick<ReaderIdentity, "state" | "identity" | "runnerUp" | "signal" | "coverage"> & Partial<Pick<ReaderIdentity, "streak" | "coverageFacts">> & Partial<ReaderCardFacts> & { style?: PublicReaderCardStyle; chosen?: ReaderCardChosen };
 
 interface Candidate { key: IdentityKey; strength: number; signal: ReaderSignal; leaders: ReaderLeader[]; gap: string }
 
@@ -41,8 +43,35 @@ export const GENRE_SIGNALS: Array<{ key: GenreIdentity; genres: BookGenre[]; thr
 const SIGNAL_WORDS = { lamp: "shared.readerIdentity.wordsLamp", star: "shared.readerIdentity.wordsStar", arch: "shared.readerIdentity.wordsArch", corr: "shared.readerIdentity.wordsCorr" } as const;
 
 const pct = (value: number) => `${Math.floor(value * 100)}%`;
-const pctUp = (value: number) => `${Math.ceil(value * 100)}%`;
 const normalizeAuthor = (value: unknown) => String(value ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+
+function largestLabel(largest: BookGenre | GenreIdentity, locale: Locale): string {
+  return isBookGenre(largest) ? genreLabel(largest, locale) : sharedT(locale)(SIGNAL_WORDS[largest]);
+}
+
+function factSentence(signal: Omit<ReaderSignal, "label">, locale: Locale): string | null {
+  const t = sharedT(locale);
+  const { key, counted: count, of: n } = signal;
+  if (key === "carto") return t("shared.readerIdentity.cartoSignal", { count, n });
+  if (key === "anno") return t("shared.readerIdentity.annoSignal", { count, n });
+  if (key === "loyal") return t("shared.readerIdentity.loyalSignal", { count, n });
+  if (key === "way") return signal.largest && signal.largestPct !== undefined ? t("shared.readerIdentity.waySignal", { wide: count, largest: largestLabel(signal.largest, locale), pct: `${signal.largestPct}%` }) : null;
+  if (key) return t("shared.readerIdentity.genreSignal", { count, m: n, words: t(SIGNAL_WORDS[key]) });
+  return null;
+}
+
+export function signalSentence(signal: ReaderSignal, locale: Locale): string {
+  return factSentence(signal, locale) ?? signal.label;
+}
+
+function coverageOf({ known, n, imported }: CoverageFacts, locale: Locale): string[] {
+  const t = sharedT(locale);
+  return imported ? [t("shared.readerIdentity.coverageGenres", { known, n }), t("shared.readerIdentity.coverageSeries")] : [t("shared.readerIdentity.coverageGenres", { known, n })];
+}
+
+export function coverageSentences(card: Pick<PublicReaderCard, "coverage" | "coverageFacts">, locale: Locale): string[] {
+  return card.coverageFacts ? coverageOf(card.coverageFacts, locale) : card.coverage;
+}
 
 function bump(counts: Map<string, number>, key: string, by = 1) {
   counts.set(key, (counts.get(key) ?? 0) + by);
@@ -78,9 +107,10 @@ export function readerIdentity(books: Book[], groups: Group[], locale: Locale): 
   const n = finished.length;
   const genresOf = new Map(finished.map((book) => [book, genresForBook(book)] as const));
   const known = finished.filter((book) => genresOf.get(book)!.length > 0);
-  const coverage = [t("shared.readerIdentity.coverageGenres", { known: known.length, n })];
-  if (finished.some((book) => /^(goodreads|storygraph):/.test(String(book.ContentID ?? "")))) coverage.push(t("shared.readerIdentity.coverageSeries"));
-  const unwritten = (missing: string): ReaderIdentity => ({ state: "unwritten", identity: null, runnerUp: null, streak: null, signal: null, leaders: [], coverage, missing });
+  const coverageFacts = { known: known.length, n, imported: finished.some((book) => /^(goodreads|storygraph):/.test(String(book.ContentID ?? ""))) };
+  const coverage = coverageOf(coverageFacts, locale);
+  const signalOf = (facts: Omit<ReaderSignal, "label">): ReaderSignal => ({ ...facts, label: factSentence(facts, locale)! });
+  const unwritten = (missing: string): ReaderIdentity => ({ state: "unwritten", identity: null, runnerUp: null, streak: null, signal: null, leaders: [], coverage, coverageFacts, missing });
   if (n < MIN_BOOKS) return unwritten(t("shared.readerIdentity.finishMore", { count: MIN_BOOKS - n }));
 
   const candidates: Candidate[] = [];
@@ -95,7 +125,7 @@ export function readerIdentity(books: Book[], groups: Group[], locale: Locale): 
   candidates.push({
     key: "carto",
     strength: Math.min(inSeries.size / n / 0.3, inSeries.size / 3),
-    signal: { counted: inSeries.size, of: n, label: t("shared.readerIdentity.cartoSignal", { count: inSeries.size, n }) },
+    signal: signalOf({ counted: inSeries.size, of: n, key: "carto" }),
     leaders: top(seriesCounts),
     gap: t("shared.readerIdentity.cartoGap", { pct: pct(inSeries.size / n) }),
   });
@@ -105,7 +135,7 @@ export function readerIdentity(books: Book[], groups: Group[], locale: Locale): 
   candidates.push({
     key: "anno",
     strength: Math.min(marked.length / n / 0.3, marks / 20),
-    signal: { counted: marked.length, of: n, label: t("shared.readerIdentity.annoSignal", { count: marked.length, n }) },
+    signal: signalOf({ counted: marked.length, of: n, key: "anno" }),
     leaders: top(new Map(marked.map((book) => [String(book.Title ?? t("shared.arenaSeed.untitled")), markCount(book)] as const))),
     gap: t("shared.readerIdentity.annoGap", { pct: pct(marked.length / n), marks: t("shared.readerIdentity.marks", { count: marks }) }),
   });
@@ -126,7 +156,7 @@ export function readerIdentity(books: Book[], groups: Group[], locale: Locale): 
   candidates.push({
     key: "loyal",
     strength: Math.min(byLoyal / n / 0.4, byLoyal / 3),
-    signal: { counted: byLoyal, of: n, label: t("shared.readerIdentity.loyalSignal", { count: byLoyal, n }) },
+    signal: signalOf({ counted: byLoyal, of: n, key: "loyal" }),
     leaders: loyalAuthors,
     gap: t("shared.readerIdentity.loyalGap", { pct: pct(byLoyal / n) }),
   });
@@ -144,23 +174,24 @@ export function readerIdentity(books: Book[], groups: Group[], locale: Locale): 
       candidates.push({
         key: signal.key,
         strength: matching.length / m / signal.threshold,
-        signal: { counted: matching.length, of: m, label: t("shared.readerIdentity.genreSignal", { count: matching.length, m, words }) },
+        signal: signalOf({ counted: matching.length, of: m, key: signal.key }),
         leaders: top(genreCounts, 3, (genre) => genreLabel(genre as BookGenre, locale)),
         gap: t("shared.readerIdentity.genreGap", { pct: pct(matching.length / m), words, threshold: pct(signal.threshold) }),
       });
     }
     const all = new Map<string, number>();
     for (const book of known) for (const genre of genresOf.get(book)!) bump(all, genre);
-    const genreShares = [...all].map(([genre, count]) => ({ label: genreLabel(genre as BookGenre, locale), share: count / m }));
-    const groupSharesNamed = GENRE_SIGNALS.map((signal, i) => ({ label: t(SIGNAL_WORDS[signal.key]), share: groupShares[i]! }));
+    const genreShares = [...all].map(([genre, count]) => ({ key: genre as BookGenre | GenreIdentity, share: count / m }));
+    const groupSharesNamed = GENRE_SIGNALS.map((signal, i) => ({ key: signal.key as BookGenre | GenreIdentity, share: groupShares[i]! }));
     const wide = genreShares.filter((entry) => entry.share > 0.05).length;
     const largest = [...genreShares, ...groupSharesNamed].reduce((a, b) => (b.share > a.share ? b : a));
+    const largestPct = Math.ceil(largest.share * 100);
     candidates.push({
       key: "way",
       strength: Math.min(wide / 6, 0.25 / largest.share),
-      signal: { counted: wide, of: all.size, label: t("shared.readerIdentity.waySignal", { wide, largest: largest.label, pct: pctUp(largest.share) }) },
+      signal: signalOf({ counted: wide, of: all.size, key: "way", largest: largest.key, largestPct }),
       leaders: top(all, 3, (genre) => genreLabel(genre as BookGenre, locale)),
-      gap: t("shared.readerIdentity.wayGap", { genres: t("shared.readerIdentity.genres", { count: wide }), largest: largest.label, pct: pctUp(largest.share) }),
+      gap: t("shared.readerIdentity.wayGap", { genres: t("shared.readerIdentity.genres", { count: wide }), largest: largestLabel(largest.key, locale), pct: `${largestPct}%` }),
     });
   }
 
@@ -171,7 +202,7 @@ export function readerIdentity(books: Book[], groups: Group[], locale: Locale): 
   const clears = (candidate: Candidate | undefined) => Boolean(candidate && candidate.strength >= 1 - EPSILON);
   const tie = clears(best) && clears(second) && second!.strength >= best.strength * 0.95 - EPSILON;
   const streak = second && second.strength >= 0.75 - EPSILON ? second.key : null;
-  const shared = { identity: best.key, signal: best.signal, leaders: best.leaders, coverage, streak };
+  const shared = { identity: best.key, signal: best.signal, leaders: best.leaders, coverage, coverageFacts, streak };
   if (clears(best) && !tie) return { state: "settled", runnerUp: null, missing: null, ...shared };
   return {
     state: "leaning",
@@ -181,6 +212,6 @@ export function readerIdentity(books: Book[], groups: Group[], locale: Locale): 
   };
 }
 
-export function publicReaderCard({ state, identity, runnerUp, streak, signal, coverage }: ReaderIdentity): PublicReaderCard {
-  return { state, identity, runnerUp, streak, signal, coverage };
+export function publicReaderCard({ state, identity, runnerUp, streak, signal, coverage, coverageFacts }: ReaderIdentity): PublicReaderCard {
+  return { state, identity, runnerUp, streak, signal, coverage, coverageFacts };
 }

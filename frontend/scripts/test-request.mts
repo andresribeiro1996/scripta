@@ -7,6 +7,7 @@ Object.defineProperty(globalThis, "localStorage", { value: storage, configurable
 Object.defineProperty(globalThis, "sessionStorage", { value: storage, configurable: true });
 const { setSession } = await import("../src/auth/tokenStore.ts");
 const { request } = await import("../src/api/request.ts");
+const { setLocalePreference } = await import("../src/i18n/index.ts");
 
 type Seen = { url: string; method: string | undefined; authorization: string | null; contentType: string | null; body: unknown };
 
@@ -86,4 +87,15 @@ test("a rate limit says how long to wait", async () => {
 test("a rate limit without a retry time still reads as a sentence", async () => {
   const limited = () => new Response(null, { status: 429, statusText: "Too Many Requests" });
   await assert.rejects(capture(() => request("/auth/login", { method: "POST", auth: "none" }), limited), { message: "Too many tries. Wait a minute and try again." });
+});
+
+test("a non-JSON error falls back to the status text in English and a sentence in Portuguese", async () => {
+  const gateway = () => new Response("<html>bad gateway</html>", { status: 502, statusText: "Bad Gateway" });
+  await assert.rejects(capture(() => request("/a", { auth: "none" }), gateway), { status: 502, message: "Bad Gateway" });
+  setLocalePreference("pt-PT");
+  try {
+    await assert.rejects(capture(() => request("/a", { auth: "none" }), gateway), { status: 502, message: "O pedido falhou (502)" });
+  } finally {
+    setLocalePreference("auto");
+  }
 });
