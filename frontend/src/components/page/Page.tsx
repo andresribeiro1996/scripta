@@ -24,19 +24,21 @@ function tabLinks(tabs: readonly AreaTab[], activeTo: string | null, className: 
   });
 }
 
-export function Page({ title, subtitle, back, actions, tabs, sideTabs, width = "default", maxWidth, children }: {
+export function Page({ title, subtitle, back, actions, tabs, sideTabs, reserveSubtitle, width = "default", maxWidth, children }: {
   title: ReactNode;
   subtitle?: ReactNode;
   back?: { to: string; label: string };
   actions?: ReactNode;
   tabs?: readonly AreaTab[];
   sideTabs?: boolean;
+  reserveSubtitle?: boolean;
   width?: PageWidth;
   maxWidth?: number;
   children: ReactNode;
 }) {
   const location = useLocation();
   const tabList = tabs?.length ? tabs : null;
+  const reservedSlot = reserveSubtitle && tabList && !sideTabs;
   const activeTo = tabList ? activeTabTo(tabList, location) : null;
   return (
     <div className="px-4 pb-16 sm:px-6 lg:px-8">
@@ -52,7 +54,7 @@ export function Page({ title, subtitle, back, actions, tabs, sideTabs, width = "
               <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
                 <div className="min-w-0">
                   <h1 className="font-display break-words text-3xl font-bold lg:text-[2.5rem] lg:leading-[3rem]">{title}</h1>
-                  {subtitle ? <div className="mt-1.5 text-sm text-(--color-text-dim)">{subtitle}</div> : null}
+                  {subtitle || reservedSlot ? <div className={`mt-1.5 text-sm text-(--color-text-dim)${reservedSlot ? " min-h-11" : ""}`}>{subtitle}</div> : null}
                 </div>
                 {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
               </div>

@@ -7,7 +7,7 @@ import { backTo } from "../lib/areas";
 import { useLibrary } from "../hooks/useLibrary";
 import { useTierlists } from "../hooks/useTierlists";
 import { useWorkBooks } from "../hooks/useWorkBooks";
-import { RADIO_CLASS } from "../components/Toolbar";
+import { RADIO_CLASS, SearchField } from "../components/Toolbar";
 
 export function TierListCreatePage() {
   const navigate = useNavigate();
@@ -48,9 +48,9 @@ export function TierListCreatePage() {
         <label className="flex flex-col gap-1 text-sm font-semibold">Tier list name
           <input value={name} onChange={(event) => setName(event.target.value)} maxLength={200} placeholder="Untitled tier list" className={FIELD_CLASS} />
         </label>
-        <label className="flex flex-col gap-1 text-sm font-semibold">Books in pool · {pool.length}
-          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search your library" className={FIELD_CLASS} />
-        </label>
+        <div className="flex flex-col gap-1 text-sm font-semibold">Books in pool · {pool.length}
+          <SearchField fill value={search} onChange={setSearch} placeholder="Search your library" label="Search your library" />
+        </div>
         {isLoading ? <p>Loading books…</p> : isError ? <button onClick={() => void refetch()} className="min-h-11 text-left text-(--color-accent)">Couldn't load your library. Retry</button> : <div className="max-h-[50vh] space-y-2 overflow-y-auto">
           {filtered.map((book) => {
             const key = workIdOf(book)!;

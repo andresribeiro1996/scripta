@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { publicFetch } from "../api/client";
+import { EmptyState } from "../components/EmptyState";
+import { BUTTON_PRIMARY } from "../components/page/buttonClasses";
 import { consumeGoogleOAuthState } from "../auth/googleOAuthState";
 import { useAuth } from "../auth/AuthContext";
 import { afterSignIn } from "../auth/returnTo";
@@ -80,12 +82,16 @@ export function OAuthSuccessPage() {
 
   if (status === "error") {
     return (
-      <div className="mx-auto max-w-sm px-5 py-20 text-center text-sm text-(--color-danger)">
-        Something went wrong signing you in with Google.{" "}
-        <a href="/login" className="underline">
-          Try again
-        </a>
-        .
+      <div role="alert" className="mx-auto max-w-md px-5 py-20">
+        <EmptyState
+          title="Couldn't sign you in"
+          body="Something went wrong signing you in with Google."
+          action={
+            <a href="/login" className={BUTTON_PRIMARY}>
+              Try again
+            </a>
+          }
+        />
       </div>
     );
   }

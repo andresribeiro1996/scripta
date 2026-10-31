@@ -8,7 +8,7 @@ import { BookCard } from "./BookCard";
 import { BookGrid } from "./BookGrid";
 import { LibraryCanvas } from "./LibraryCanvas";
 
-export function PublicLibraryGrid({ library }: { library: LibraryData }) {
+export function PublicLibraryGrid({ library, onOpenBook }: { library: LibraryData; onOpenBook?: (book: Record<string, unknown>) => void }) {
   const [selected, setSelected] = useState<Record<string, unknown> | null>(null);
   const style = resolveLibraryStyle(library.style);
   const displayBooks = useMemo(() => orderLibraryBooks(library.books, library.groups ?? []), [library]);
@@ -19,7 +19,7 @@ export function PublicLibraryGrid({ library }: { library: LibraryData }) {
       <LibraryCanvas style={style}>
         <BookGrid style={style}>
           {displayBooks.map((book, i) => (
-            <BookCard key={String(book.ContentID ?? bookKey(book) ?? i)} book={book} onClick={() => setSelected(book)} style={style} />
+            <BookCard key={String(book.ContentID ?? bookKey(book) ?? i)} book={book} onClick={() => (onOpenBook ? onOpenBook(book) : setSelected(book))} style={style} />
           ))}
         </BookGrid>
       </LibraryCanvas>

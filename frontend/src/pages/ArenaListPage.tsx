@@ -7,13 +7,13 @@
 
 import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { itemNoun, quizPreview } from "@scripta/shared";
-import { TIER_LADDER, contentDetail, contentTarget } from "@scripta/shared/community";
+import { itemNoun, quizPreview, tierlistBookCount } from "@scripta/shared";
+import { TIER_LADDER, ownedTierlistStatus, contentDetail, contentTarget, formatDate } from "@scripta/shared/community";
 import type { Quiz } from "../api/quizzes";
 import type { Tierlist } from "../api/tierlists";
 import { TournamentStatusBadge } from "../components/arena/TournamentStatusBadge";
 import { QuizStatusBadge, quizStatus } from "../components/quizzes/QuizStatusBadge";
-import { GameTicket } from "../components/games/GameTicket";
+import { GameTicket, StatusBadge } from "../components/games/GameTicket";
 import { useConfirm } from "../components/ConfirmDialog";
 import { EmptyState } from "../components/EmptyState";
 import { ArenaIcon } from "../components/NavIcons";
@@ -103,17 +103,16 @@ export function ArenaListPage() {
       width="wide"
       title="Games"
       subtitle={
-        tab === "tournaments" ? (
-          <>
-            Bracket tournaments from your library —{" "}
-            <a href="/arena" className="inline-flex min-h-11 items-center text-(--color-accent) underline">
-              browse public tournaments
-            </a>
-            .
-          </>
-        ) : undefined
+        <>
+          Tier lists, quizzes and tournaments from your library —{" "}
+          <a href="/arena" className="inline-flex min-h-11 items-center text-(--color-accent) underline">
+            browse public games
+          </a>
+          .
+        </>
       }
       tabs={area("games").tabs}
+      reserveSubtitle
       actions={
         <button onClick={create.onClick} className={BUTTON_PRIMARY}>
           {create.label}
@@ -202,7 +201,7 @@ export function ArenaListPage() {
                     aria-label="Tier list name"
                     className={`${FIELD_CLASS} w-full font-semibold`}
                   />
-                  <p className="mt-1 text-sm text-(--color-text-dim)">Updated {new Date(tl.updatedAt).toLocaleDateString()}</p>
+                  <p className="mt-1 text-sm text-(--color-text-dim)">Updated {formatDate(tl.updatedAt)}</p>
                 </div>
               ) : (
                 <GameTicket
@@ -210,8 +209,9 @@ export function ArenaListPage() {
                   kind="tierlist"
                   name={tl.name}
                   to={`/dashboard/arena/tierlist/${tl.id}`}
-                  meta={`Updated ${new Date(tl.updatedAt).toLocaleDateString()}`}
-                  badges={null}
+                  meta={`Updated ${formatDate(tl.updatedAt)}`}
+                  badges={<StatusBadge {...ownedTierlistStatus(tl)} />}
+                  stats={[{ value: tierlistBookCount(tl.data), label: itemNoun(tl.subject, tierlistBookCount(tl.data)) }]}
                   covers={tl.subject?.scope.coverUrl ? [tl.subject.scope.coverUrl] : []}
                   ladder={tl.data.tiers.map((tier) => tier.color)}
                   menu={

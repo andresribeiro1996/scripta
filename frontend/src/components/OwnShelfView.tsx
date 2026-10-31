@@ -12,6 +12,7 @@ import { BUTTON_DANGER, BUTTON_PRIMARY, BUTTON_SECONDARY, FIELD_CLASS } from "./
 import { MuralsIcon } from "./NavIcons";
 import { MuralCanvas } from "./murals/MuralCanvas";
 import { ProfileActivity } from "./ProfileActivity";
+import { ProfileLibraryPanel } from "./ProfileLibraryPanel";
 import { Sheet } from "./Sheet";
 import { SkeletonCardGrid } from "./Skeleton";
 import { SwipeTabs } from "./SwipeTabs";
@@ -20,6 +21,8 @@ import { useGalleryImages } from "../hooks/useGalleryImages";
 import { useLibrary } from "../hooks/useLibrary";
 import { useMurals } from "../hooks/useMurals";
 import { backTo } from "../lib/areas";
+import { bookHref } from "../lib/libraryView";
+import { bookKey } from "../lib/merge";
 import { orderLibraryBooks } from "../lib/libraryOrder";
 import { buildMuralPreset, shelfPresetSummary } from "../lib/muralPresets";
 import type { Mural } from "../lib/murals";
@@ -27,7 +30,8 @@ import { useResolvedTheme } from "../lib/theme";
 
 const OWN_SHELF_TABS = [
   { value: "mural", label: "Mural" },
-  { value: "activity", label: "Activity" }
+  { value: "activity", label: "Activity" },
+  { value: "library", label: "Library" }
 ] as const;
 
 type OwnShelfTab = (typeof OWN_SHELF_TABS)[number]["value"];
@@ -183,11 +187,12 @@ export function OwnShelfView({ username }: { username: string }) {
           />
         </div>
       </div>
-      <div className="mt-8">
+      <div className="mt-6">
         {error && <p className="mb-4 text-sm text-(--color-danger)">{error}</p>}
         <SwipeTabs tabs={OWN_SHELF_TABS} value={tab} onChange={setTab} label="Shelf sections">
           {(panel) => {
             if (panel === "activity") return <ProfileActivity activity={activity} />;
+            if (panel === "library") return <ProfileLibraryPanel library={library?.data} isLoading={libraryQuery.isPending} error={libraryQuery.error} onRetry={() => void libraryQuery.refetch()} onOpenBook={(book) => navigate(bookHref(bookKey(book), library?.works))} />;
             return (
               <div className="mb-8">
                 {shelfMural && muralHasBlocks ? (

@@ -53,12 +53,19 @@ export function contentDetail(content: PublishedContent): string {
 export type ContentTone = "neutral" | "accent" | "info" | "success" | "reference";
 
 export const CONTENT_STATUS = {
+  draft: { label: "Draft", tone: "neutral" },
   inProgress: { label: "In progress", tone: "info" },
   completed: { label: "Completed", tone: "success" },
   votingOpen: { label: "Voting open", tone: "accent" },
   open: { label: "Open", tone: "accent" },
   closed: { label: "Closed", tone: "neutral" }
 } as const satisfies Record<string, { label: string; tone: ContentTone }>;
+
+export function ownedTierlistStatus(tierlist: { promotedAt: string | null; voteCode: string | null; votingOpen: boolean }): { label: string; tone: ContentTone } {
+  if (tierlist.promotedAt) return { label: "Reference", tone: "reference" };
+  if (tierlist.voteCode === null) return CONTENT_STATUS.draft;
+  return tierlist.votingOpen ? CONTENT_STATUS.votingOpen : CONTENT_STATUS.closed;
+}
 
 export function contentStatus(content: PublishedContent): { label: string; tone: ContentTone; votedBadge?: boolean } {
   switch (content.kind) {
@@ -220,6 +227,15 @@ export function activityRow(item: ActivityItem): ActivityRow | null {
 
 const DAY_MS = 86_400_000;
 
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+export function formatDate(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  if (iso.length === 10) return `${date.getUTCDate()} ${MONTHS[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
+  return `${date.getDate()} ${MONTHS[date.getMonth()]} ${date.getFullYear()}`;
+}
+
 export function relativeTime(iso: string, now: number = Date.now()): string {
   const then = new Date(iso).getTime();
   if (Number.isNaN(then)) return "";
@@ -232,7 +248,7 @@ export function relativeTime(iso: string, now: number = Date.now()): string {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(elapsed / DAY_MS);
   if (days < 30) return `${days}d ago`;
-  return new Date(iso).toLocaleDateString();
+  return formatDate(iso);
 }
 
 export function activityDay(iso: string, now: Date = new Date()): string {

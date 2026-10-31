@@ -202,13 +202,14 @@ export function ArenaViewPage() {
       {view === "matches" && (
       <BracketTree
         tournament={tournament}
-        renderDuel={(duelId) => {
+        renderDuel={(duelId, round) => {
           const duel = tournament.duels.find((d) => d.id === duelId)!;
           const votingDisabledReason = duel.hasVoted ? "You already voted" : tournament.status !== "active" ? "Tournament not active" : null;
           return (
             <div>
               <DuelCard
                 duel={duel}
+                round={round}
                 character={tournament.subject !== null}
                 onVote={(workId) => void handleVote(duel.id, workId)}
                 votingDisabledReason={votingDisabledReason}

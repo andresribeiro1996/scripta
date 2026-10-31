@@ -9,12 +9,12 @@ import { AuthorAvatar } from "../components/CommunityAuthorAvatar";
 import { EmptyState } from "../components/EmptyState";
 import { Page } from "../components/page/Page";
 import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../components/page/buttonClasses";
-import { LIST_PANEL, LIST_ROW_LINK } from "../components/page/surfaceClasses";
+import { LIST_PANEL, LIST_ROW_LINK, SECTION_HEADING } from "../components/page/surfaceClasses";
 import { CommunityIcon } from "../components/NavIcons";
 import { MuralCanvas } from "../components/murals/MuralCanvas";
 import { OwnShelfView } from "../components/OwnShelfView";
 import { ProfileActivity } from "../components/ProfileActivity";
-import { PublicLibraryGrid } from "../components/PublicLibraryGrid";
+import { ProfileLibraryPanel } from "../components/ProfileLibraryPanel";
 import { ReaderGlyph } from "../components/ReaderGlyph";
 import { SkeletonCardGrid } from "../components/Skeleton";
 import { SwipeTabs } from "../components/SwipeTabs";
@@ -23,14 +23,6 @@ import { backTo } from "../lib/areas";
 import { ensureBookBlockHeights, profileOnlyMural, type Mural } from "../lib/murals";
 import { useResolvedTheme } from "../lib/theme";
 import { buildReconstructedBooks } from "../lib/sharedMural";
-
-function retryButton(refetch: () => void) {
-  return (
-    <button onClick={() => void refetch()} className={BUTTON_SECONDARY}>
-      Retry
-    </button>
-  );
-}
 
 export function CommunityProfilePage() {
   const { username } = useParams<{ username: string }>();
@@ -137,18 +129,12 @@ export function CommunityProfilePage() {
           />
         }
       />
-      <div className="mt-8">
+      <div className="mt-6">
         {error && <p className="mb-4 text-sm text-(--color-danger)">{error}</p>}
         <SwipeTabs tabs={PROFILE_TABS} value={tab} onChange={setTab} label="Profile sections">
           {(panel) => {
             if (panel === "activity") return <ProfileActivity activity={activity} />;
-            if (panel === "library") {
-              if (library.isLoading) return <SkeletonCardGrid count={6} label="Loading library" tileClassName="aspect-[2/3]" />;
-              if (library.error || !library.library) {
-                return library.error ? <EmptyState title="Couldn't load this library." action={retryButton(library.refetch)} /> : <p className="text-sm text-(--color-text-dim)">This library is empty.</p>;
-              }
-              return <PublicLibraryGrid library={library.library} />;
-            }
+            if (panel === "library") return <ProfileLibraryPanel library={library.library} isLoading={library.isLoading} error={library.error} onRetry={() => void library.refetch()} />;
             return (
               <>
                 <div className="mb-8">
@@ -168,7 +154,7 @@ export function CommunityProfilePage() {
                     <MuralCanvas mural={profileOnlyMural(viewerTheme)} editMode={false} books={[]} images={[]} profile={user} hideProfileName />
                   )}
                 </div>
-                <h2 className="mb-3 text-sm font-semibold text-(--color-text-dim)">Published</h2>
+                <h2 className={`${SECTION_HEADING} mb-3`}>Published</h2>
                 {publishedRows.length === 0 ? (
                   <EmptyState title="Nothing published yet." body="Tier lists, tournaments and quizzes show up here." />
                 ) : (

@@ -37,10 +37,10 @@ test("the row nav and side nav share one tab-link helper", () => {
   assert.match(page, /tabLinks\(tabList, activeTo, sideTabClass\)/);
 });
 
-test("the Appearance tab uses the Account tab's group heading", () => {
+test("the Appearance tab uses the Account tab's group: a heading above its panel", () => {
   const src = readFileSync(new URL("../src/pages/SettingsAppearancePage.tsx", import.meta.url), "utf8");
-  assert.match(src, /<h2 className=\{`\$\{PANEL_HEADING\}[^`]*`\}>Appearance<\/h2>/);
-  assert.doesNotMatch(src, /<h3/);
+  assert.match(src, /<SettingGroup title="Appearance">\s*<div className=\{`\$\{PANEL\} p-5`\}>/);
+  assert.doesNotMatch(src, /<h[1-6]/);
 });
 
 test("all Settings tabs use side tabs", () => {
@@ -282,4 +282,60 @@ test("the quiz editor says why Publish is off next to the header, and play and r
   for (const tag of screens) assert.match(tag, /back=\{back\}/, tag);
   assert.match(play, /<QuizResults\b(?:=>|[^>])*back=\{back\}/);
   assert.match(src("components/quiz/QuizResults"), /<Page back=\{back\} title=\{name\}>/);
+});
+
+test("a tabbed header reserves a one-line subtitle slot only where a sibling tab can carry a subtitle", () => {
+  const slot = /<div class="mt-1\.5 [^"]*min-h-11[^"]*">/;
+  const tabs = area("library").tabs;
+  assert.match(render(createElement(Page, { title: "Library", tabs, reserveSubtitle: true, children: "x" }), "/dashboard/series"), slot);
+  assert.match(render(createElement(Page, { title: "Library", subtitle: "2 series", tabs, reserveSubtitle: true, children: "x" }), "/dashboard/series"), slot);
+  assert.doesNotMatch(render(createElement(Page, { title: "Community", tabs: area("community").tabs, children: "x" }), "/dashboard/community"), /mt-1\.5/);
+  assert.doesNotMatch(render(createElement(Page, { title: "Library", children: "x" })), slot);
+  assert.doesNotMatch(render(createElement(Page, { title: "Settings", tabs: area("settings").tabs, sideTabs: true, reserveSubtitle: true, children: "x" }), "/dashboard/settings"), slot);
+  for (const f of ["LibraryPage", "GalleryPage", "GroupsPage", "ArenaListPage"]) assert.match(src(`pages/${f}`), /^\s+reserveSubtitle$/m, f);
+});
+
+test("Games keeps one subtitle on every tab, and Admin keeps one title with no per-tab subtitle", () => {
+  const games = src("pages/ArenaListPage");
+  const subtitle = games.slice(games.indexOf("subtitle={"), games.indexOf("tabs={area(\"games\")"));
+  assert.doesNotMatch(subtitle, /tab ===|\?|undefined/);
+  for (const f of ["AdminDailyChapterPage", "AdminGenresPage", "AdminSynopsesPage", "AdminTranslationsPage"]) {
+    const tag = src(`pages/${f}`).match(/<Page\b(?:=>|[^>])*>/)![0];
+    assert.match(tag, /title="Admin"/, f);
+    assert.doesNotMatch(tag, /subtitle=/, f);
+  }
+});
+
+test("Admin import and editor groups are PANEL surfaces, not bordered grey boxes", () => {
+  const s = src("pages/AdminDailyChapterPage");
+  assert.equal(s.match(/space-y-3 p-4 \$\{PANEL\}/g)?.length, 6);
+  assert.doesNotMatch(s, /rounded-xl border border-\(--color-border\) p-4/);
+});
+
+test("the four Admin tabs fit a 328px row: a tighter gap below sm and short labels", () => {
+  assert.match(readFileSync(new URL("../src/components/page/surfaceClasses.ts", import.meta.url), "utf8"), /TAB_NAV = "flex gap-5 sm:gap-7 /);
+  assert.deepEqual(area("admin").tabs.map((t) => t.label), ["Daily", "Genres", "Synopses", "Translations"]);
+});
+
+test("Series and Collections use the Library's toolbar: SearchField and a More actions menu holding Select", () => {
+  const s = src("pages/GroupsPage");
+  assert.match(s, /<SearchField\b(?:=>|[^>])*label=\{`Search \$\{copy\.title\.toLowerCase\(\)\} by name`\}/);
+  assert.match(s, /<OptionsMenu\b(?:=>|[^>])*items=\{\[\{ label: "Select…"[^\]]*\]\}(?:=>|[^>])*title="More actions"/);
+  assert.doesNotMatch(s, /<button\b(?:=>|[^>])*>Select…<\/button>/);
+  assert.doesNotMatch(s, /aria-label=\{`Search/);
+});
+
+test("profile tabs are flush with the title, and your own profile has the Library tab", () => {
+  const swipe = src("components/SwipeTabs");
+  assert.doesNotMatch(swipe, /\$\{tabClass\(i === index\)\} gap-1\.5 px-1/);
+  const own = src("components/OwnShelfView");
+  assert.match(own, /\{ value: "library", label: "Library" \}/);
+  for (const f of ["components/OwnShelfView", "pages/CommunityProfilePage"]) {
+    const s = src(f);
+    assert.match(s, /<ProfileLibraryPanel\b/, f);
+    assert.match(s, /<div className="mt-6">\s*\{error && /, f);
+  }
+  assert.doesNotMatch(src("pages/CommunityProfilePage"), /<PublicLibraryGrid\b/);
+  assert.match(own, /<ProfileLibraryPanel\b(?:=>|[^>])*onOpenBook=\{\(book\) => navigate\(bookHref\(bookKey\(book\)/);
+  assert.doesNotMatch(src("pages/CommunityProfilePage"), /onOpenBook/);
 });

@@ -16,7 +16,7 @@ import { ShareModal } from "../components/ShareModal";
 import { Sheet } from "../components/Sheet";
 import { ThemeOptionGrid } from "../components/ThemeOptionGrid";
 import { useToast } from "../components/Toaster";
-import { FullscreenIcon, PaletteIcon, PencilIcon, ShareIcon, toolbarIconClass } from "../components/Toolbar";
+import { FullscreenIcon, toolbarIconClass } from "../components/Toolbar";
 import { useGalleryImages } from "../hooks/useGalleryImages";
 import { useLibrary } from "../hooks/useLibrary";
 import { useMuralFullscreen } from "../hooks/useMuralFullscreen";
@@ -498,29 +498,7 @@ export function MuralEditorPage() {
         </button>
       )}
       actions={<>
-        <div style={{ visibility: dragging ? "hidden" : undefined }} className="flex items-center gap-2 sm:hidden">
-          {editMode && !mobileDraft && <AddBlockMenu onAdd={(type) => void guard(handleAddBlock(type), "Couldn't add that block.")} />}
-          {view.blocks.length > 0 && (
-            <button onClick={() => void enterFullscreen()} aria-label="View mural fullscreen" title="View mural fullscreen" className={toolbarIconClass()}>
-              <FullscreenIcon />
-            </button>
-          )}
-          <button onClick={() => setPickingTheme(true)} aria-label="Mural theme" title="Mural theme" className={toolbarIconClass()}>
-            <PaletteIcon />
-          </button>
-          <button onClick={() => setSharing(true)} aria-label="Share this mural" title="Share this mural" className={toolbarIconClass()}>
-            <ShareIcon />
-          </button>
-          <button
-            onClick={toggleEditMode}
-            aria-label={editMode ? "Done editing" : "Edit this mural"}
-            title={editMode ? "Done editing" : "Edit this mural"}
-            className={toolbarIconClass(editMode)}
-          >
-            <PencilIcon />
-          </button>
-        </div>
-        <div style={{ visibility: dragging ? "hidden" : undefined }} className="hidden items-center gap-2 sm:flex">
+        <div style={{ visibility: dragging ? "hidden" : undefined }} className="flex flex-wrap items-center gap-2">
           {editMode && !mobileDraft && <AddBlockMenu onAdd={(type) => void guard(handleAddBlock(type), "Couldn't add that block.")} />}
           {view.blocks.length > 0 && (
             <button

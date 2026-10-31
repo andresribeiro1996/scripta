@@ -24,7 +24,7 @@ export function AdminTranslationsPage() {
   else if (review.data) body = <TranslationReviewList review={review.data} onDecide={decide} />;
   else if (review.isError) body = <p role="alert" className="mt-4 text-sm text-(--color-danger)">The review list didn't load.</p>;
   return (
-    <Page width="wide" title="Admin" subtitle="Translation review" tabs={area("admin").tabs}>
+    <Page width="wide" title="Admin" tabs={area("admin").tabs}>
       {body}
     </Page>
   );

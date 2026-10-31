@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   bookKey,
@@ -12,7 +12,6 @@ import {
   seriesLabel,
   type BookScreenModel,
   type BookScreenReaderRow,
-  type BookScreenTabKey,
   type ReadSnapshot,
   type ResolvedCoverResponse,
   type WorkPage
@@ -83,7 +82,7 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
   const model = bookScreenModel(page, book, { isAdmin }, editionId);
   const statsQuery = useWorkStats(page?.work.id);
   const statsTiles = bookStatsModel(statsQuery.data ?? null, page?.work.rating ?? null).tiles;
-  const [tab, setTab] = useState<BookScreenTabKey>(model.tabs[0]!.key);
+  const [searchParams] = useSearchParams();
   const [aboutOpen, setAboutOpen] = useState(false);
   const [allCharacters, setAllCharacters] = useState(false);
   const [allEditions, setAllEditions] = useState(false);
@@ -111,7 +110,8 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
   );
   const heroBook = book ?? workCoverBook;
   if (!heroBook) throw new Error("BookScreen needs a page or a book.");
-  const activeTab = model.tabs.some((t) => t.key === tab) ? tab : model.tabs[0]!.key;
+  const wantedTab = searchParams.get("tab");
+  const activeTab = model.tabs.find((t) => t.key === wantedTab)?.key ?? model.tabs[0]!.key;
 
   async function pickStatus(value: 0 | 1 | 2) {
     if (!book) return;
@@ -168,8 +168,8 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
   const menuItems = model.menu.map((key) => {
     if (key === "style") return { label: "Card style", onClick: () => setStyling(true) };
     if (key === "cover") return { label: "Change cover", onClick: () => setPickingCover(true) };
-    if (key === "rejectCover") return { label: "Wrong cover", onClick: () => void rejectCover() };
-    return { label: "Replace cover", onClick: () => coverFile.current?.click() };
+    if (key === "rejectCover") return { label: "Reject cover for everyone", onClick: () => void rejectCover() };
+    return { label: "Upload cover for everyone", onClick: () => coverFile.current?.click() };
   });
 
   const books = library?.data.books ?? [];
@@ -245,8 +245,12 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
             <p className="mt-2.5 text-lg">{`by ${model.author}`}</p>
             {model.authorAwards ? <p className="mt-1 text-xs text-(--color-text-dim)">{model.authorAwards}</p> : null}
             {metaParts.length > 0 ? (
-              <div className="mt-4 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-sm text-(--color-text-dim)">
-                {metaParts.flatMap((part, i) => (i === 0 ? [part] : [<span key={`dot-${i}`} aria-hidden="true">·</span>, part]))}
+              <div className="mt-4 overflow-hidden text-sm text-(--color-text-dim)">
+                <div className="-ml-5 flex flex-wrap items-center gap-y-1">
+                  {metaParts.map((part) => (
+                    <span key={part.key} className="relative pl-5 before:absolute before:left-2 before:content-['·'_/_'']">{part}</span>
+                  ))}
+                </div>
               </div>
             ) : null}
             {model.awards.length > 0 ? (
@@ -302,13 +306,12 @@ export function BookScreen({ page, book, signedIn, editionId, onSelectEdition, o
                 {model.tabs.map((t) => {
                   const current = t.key === activeTab;
                   return (
-                    <button
+                    <Link
                       key={t.key}
-                      type="button"
+                      to={`?tab=${t.key}`}
                       aria-current={current ? "page" : undefined}
-                      onClick={() => setTab(t.key)}
                       className={tabClass(current)}
-                    >{t.label}</button>
+                    >{t.label}</Link>
                   );
                 })}
               </nav>

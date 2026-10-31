@@ -41,7 +41,7 @@ function ChevronRightIcon() {
   );
 }
 
-export function BracketTree({ tournament, renderDuel }: { tournament: TournamentView; renderDuel: (duelId: string) => ReactNode }) {
+export function BracketTree({ tournament, renderDuel }: { tournament: TournamentView; renderDuel: (duelId: string, round: string) => ReactNode }) {
   const rounds = new Map<number, TournamentView["duels"]>();
   for (const duel of tournament.duels) {
     const list = rounds.get(duel.roundNumber) ?? [];
@@ -141,7 +141,7 @@ export function BracketTree({ tournament, renderDuel }: { tournament: Tournament
 
         <div className="flex flex-col gap-6">
           {duelsIn(activeRound!).map((duel) => (
-            <div key={duel.id}>{renderDuel(duel.id)}</div>
+            <div key={duel.id}>{renderDuel(duel.id, labelFor(duel.roundNumber))}</div>
           ))}
         </div>
       </div>
@@ -154,7 +154,7 @@ export function BracketTree({ tournament, renderDuel }: { tournament: Tournament
               {labelFor(roundNumber)}
             </h3>
             {duelsIn(roundNumber).map((duel) => (
-              <div key={duel.id}>{renderDuel(duel.id)}</div>
+              <div key={duel.id}>{renderDuel(duel.id, labelFor(duel.roundNumber))}</div>
             ))}
           </div>
         ))}

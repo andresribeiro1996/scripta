@@ -49,7 +49,7 @@ test("account menu: shelf, settings, admin only for admins, log out last and dan
   assert.equal(items(true).at(-1)!.danger, true);
   const went: string[] = [];
   accountMenuItems({ username: "ana", isAdmin: true, navigate: (to) => went.push(to), logout: () => {} }).slice(0, 3).forEach((i) => i.onClick());
-  assert.deepEqual(went, ["/community/u/ana", "/dashboard/settings", "/admin/genres"]);
+  assert.deepEqual(went, ["/community/u/ana", "/dashboard/settings", "/admin/daily-chapter"]);
 });
 
 test("the account trigger is named, and a long username truncates in the menu heading", () => {

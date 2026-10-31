@@ -40,12 +40,15 @@ export function MuralFolderTree({
     if (name && name !== folder.name) onRenameFolder(folder, name);
   }
 
+  const nested = folders.some((folder) => folder.parentId !== null);
+  const indent = nested ? "ml-11.5 " : "";
+
   return (
     <nav className="flex flex-col gap-0.5">
       <button
         onClick={() => onSelect(null)}
         aria-current={selectedFolderId === null ? "true" : undefined}
-        className={`min-h-11 rounded-lg px-2 text-left text-sm font-semibold ${
+        className={`${indent}min-h-11 rounded px-1.5 text-left text-sm font-semibold ${
           selectedFolderId === null
             ? "bg-(--color-accent-soft) text-(--color-accent)"
             : "text-(--color-text-dim) hover:bg-(--color-surface-hover) hover:text-(--color-text)"
@@ -61,27 +64,29 @@ export function MuralFolderTree({
           const isCollapsed = collapsed.has(folder.id);
           return (
             <div key={folder.id} className="group flex items-center gap-0.5" style={{ paddingLeft: depth * 14 }}>
-              <button
-                onClick={() => toggle(folder.id)}
-                title={isCollapsed ? "Expand" : "Collapse"}
-                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded text-(--color-text-dim) hover:bg-(--color-surface-hover) ${
-                  hasChildren ? "" : "invisible"
-                }`}
-              >
-                <svg
-                  width="10"
-                  height="10"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className={isCollapsed ? "" : "rotate-90"}
+              {nested ? (
+                <button
+                  onClick={() => toggle(folder.id)}
+                  title={isCollapsed ? "Expand" : "Collapse"}
+                  className={`flex h-11 w-11 shrink-0 items-center justify-center rounded text-(--color-text-dim) hover:bg-(--color-surface-hover) ${
+                    hasChildren ? "" : "invisible"
+                  }`}
                 >
-                  <polyline points="9 18 15 12 9 6" />
-                </svg>
-              </button>
+                  <svg
+                    width="10"
+                    height="10"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className={isCollapsed ? "" : "rotate-90"}
+                  >
+                    <polyline points="9 18 15 12 9 6" />
+                  </svg>
+                </button>
+              ) : null}
               {renamingId === folder.id ? (
                 <input
                   autoFocus
@@ -133,7 +138,7 @@ export function MuralFolderTree({
       <button
         onClick={() => onCreateFolder(selectedFolderId === null ? null : (folders.find((f) => f.id === selectedFolderId)?.parentId ?? null))}
         title="Create a folder next to the current selection"
-        className="mt-2 min-h-11 rounded-lg border border-dashed border-(--color-border) px-2 text-left text-xs text-(--color-text-dim) transition-colors hover:border-(--color-accent) hover:text-(--color-accent)"
+        className={`${indent}mt-2 min-h-11 rounded border border-dashed border-(--color-border) px-1.5 text-left text-xs text-(--color-text-dim) transition-colors hover:border-(--color-accent) hover:text-(--color-accent)`}
       >
         + New folder
       </button>

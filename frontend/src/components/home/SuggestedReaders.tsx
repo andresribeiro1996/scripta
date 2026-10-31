@@ -7,7 +7,7 @@ import { invalidateAfterFollow, useSuggestedPeople } from "../../hooks/useCommun
 import { AuthorAvatar } from "../CommunityAuthorAvatar";
 import { ReaderGlyph } from "../ReaderGlyph";
 import { BUTTON_SECONDARY } from "../page/buttonClasses";
-import { LIST_PANEL, LIST_ROW, PANEL_HEADING } from "../page/surfaceClasses";
+import { LIST_ROW, PANEL, PANEL_HEADER, PANEL_HEADING } from "../page/surfaceClasses";
 
 export function SuggestedReaders() {
   const { people, error: loadError, refetch } = useSuggestedPeople(true);
@@ -31,8 +31,8 @@ export function SuggestedReaders() {
   }
 
   return (
-    <section aria-labelledby="home-suggested" className={LIST_PANEL}>
-      <div className="flex items-baseline justify-between gap-3 px-4.5 pb-1 pt-3.5">
+    <section aria-labelledby="home-suggested" className={`${PANEL} overflow-hidden`}>
+      <div className={PANEL_HEADER}>
         <h2 id="home-suggested" className={PANEL_HEADING}>Readers you might like</h2>
         <Link to="/community/people" className="inline-flex min-h-11 shrink-0 items-center font-semibold text-(--color-accent)">See all →</Link>
       </div>

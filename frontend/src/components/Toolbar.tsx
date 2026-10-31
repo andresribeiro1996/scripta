@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ReactNode, Ref } from "react";
 import { FIELD_CLASS } from "./page/buttonClasses";
 
 /** The shared bits of every list page's toolbar (Library, Series,
@@ -76,20 +76,24 @@ export function SearchField({
   onChange,
   placeholder,
   label,
-  className = ""
+  className = "",
+  fill = false,
+  inputRef
 }: {
   value: string;
   onChange: (value: string) => void;
   placeholder: string;
   label: string;
   className?: string;
+  fill?: boolean;
+  inputRef?: Ref<HTMLInputElement>;
 }) {
   return (
-    <div className={`relative min-w-0 sm:w-85 ${className}`}>
+    <div className={`relative min-w-0 ${fill ? "" : "sm:w-85"} ${className}`}>
       <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-(--color-text-dim)">
         <SearchIcon />
       </span>
-      <input type="search" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} aria-label={label} className={`${FIELD_CLASS} w-full pl-10`} />
+      <input ref={inputRef} type="search" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} aria-label={label} className={`${FIELD_CLASS} w-full pl-10`} />
     </div>
   );
 }

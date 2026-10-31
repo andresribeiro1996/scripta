@@ -21,7 +21,7 @@ function files(): string[] {
 
 const read = (f: string) => readFileSync(join(ROOT, f), "utf8");
 
-const EXEMPT = ["auth/PasswordInput.tsx", "components/murals/pickers.tsx"];
+const EXEMPT = ["auth/PasswordInput.tsx"];
 
 function elements(src: string, tag: RegExp): string[] {
   return [...src.matchAll(new RegExp(`<(?:${tag.source})\\b(?:=>|[^>])*>`, "gs"))].map((m) => m[0]);

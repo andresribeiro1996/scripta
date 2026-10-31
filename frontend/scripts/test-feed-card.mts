@@ -257,3 +257,24 @@ test("shareLink: native share, silent on AbortError, else clipboard with a toast
   assert.equal(toasts.at(-1)?.kind, "error");
   await assert.rejects(stubNavigator({ share: async () => { throw new TypeError("boom"); } }, () => shareLink("T", "u", toast)), TypeError);
 });
+
+test("every card keeps its actions in the footer's right-hand cluster, after the like and comment buttons", () => {
+  const cluster = (html: string) => html.slice(html.indexOf("ml-auto flex items-center gap-1"));
+  const tournament = cluster(card(publishedTournament));
+  assert.ok(tournament.indexOf('aria-label="Save"') > 0 && tournament.indexOf('aria-label="Save"') < tournament.indexOf("Share"));
+  assert.ok(card(publishedTournament).indexOf('aria-label="Like') < card(publishedTournament).indexOf("ml-auto flex items-center gap-1"));
+  const book = cluster(card(finishedReading));
+  assert.match(book, />Want to read<\/button>[\s\S]*Share/);
+  assert.doesNotMatch(book, /aria-label="Save"/);
+  const mural = cluster(card(publishedMural));
+  assert.match(mural, /aria-label="Save"/);
+  assert.doesNotMatch(mural, /Share/);
+  assert.doesNotMatch(card(publishedTournament).slice(0, card(publishedTournament).indexOf("ml-auto flex items-center gap-1")), /aria-label="Save"/);
+});
+
+test("a mural card names the mural and shows its cover when it has one", () => {
+  assert.match(card(publishedMural), /<a[^>]*>My wall<\/a>/);
+  const withCover = card({ ...publishedMural, mural: { ...publishedMural.mural, coverImageUrl: "wall.png" } });
+  assert.match(withCover, /<img src="wall\.png"/);
+  assert.doesNotMatch(card(publishedMural), /<img/);
+});

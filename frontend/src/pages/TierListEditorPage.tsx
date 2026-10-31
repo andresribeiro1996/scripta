@@ -7,6 +7,7 @@ import { TierRow } from "../components/murals/blocks/BookBlocks";
 import { CharacterHeader } from "../components/CharacterHeader";
 import { Page } from "../components/page/Page";
 import { BUTTON_PRIMARY, BUTTON_SECONDARY, TITLE_FIELD_CLASS } from "../components/page/buttonClasses";
+import { ShareLinkRow } from "../components/ShareLinkRow";
 import { backTo } from "../lib/areas";
 import { AddBooksSheet } from "../components/tierlist/AddBooksSheet";
 import { TierBoard } from "../components/tierlist/TierBoard";
@@ -293,13 +294,8 @@ export function TierListEditorPage() {
         <div className="mb-6 flex flex-col gap-3 rounded-xl border border-(--color-border) bg-(--color-surface) p-3">
           <p className="text-sm text-(--color-text-dim)">This public tier list is locked. At 100 distinct signed-in voters, it becomes an app-owned reference.</p>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex min-w-0 flex-1 basis-60 items-center gap-2">
-              <a href={voteLink} className="inline-flex min-h-11 min-w-0 flex-1 items-center text-sm font-semibold text-(--color-accent) hover:opacity-80">
-                <span className="truncate">{voteLink}</span>
-              </a>
-              <button type="button" onClick={() => void copyVoteLink()} className={`${BUTTON_SECONDARY} shrink-0`}>
-                {copied ? "Copied!" : "Copy"}
-              </button>
+            <div className="min-w-0 flex-1 basis-80">
+              <ShareLinkRow url={voteLink} copied={copied} onCopy={() => void copyVoteLink()} />
             </div>
             <span className="text-xs text-(--color-text-dim)">
               {votingBoard?.ballotCount ?? 0} {(votingBoard?.ballotCount ?? 0) === 1 ? "ballot" : "ballots"} · {votingBoard?.eligibleVoteCount ?? 0}/100 eligible voters

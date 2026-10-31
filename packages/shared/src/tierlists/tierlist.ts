@@ -18,3 +18,7 @@ export const DEFAULT_TIER_PRESET = [
   { label: "C", color: "#5c9e5c" },
   { label: "D", color: "#4a7fc9" },
 ] as const;
+
+export function tierlistBookCount(data: { tiers: readonly TierDefinition[]; pool: readonly string[] }): number {
+  return data.tiers.reduce((total, tier) => total + tier.workIds.length, data.pool.length);
+}

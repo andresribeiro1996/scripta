@@ -5,6 +5,8 @@ import { BookCard } from "../components/BookCard";
 import { BookGrid } from "../components/BookGrid";
 import { LibraryCanvas } from "../components/LibraryCanvas";
 import { Page } from "../components/page/Page";
+import { BUTTON_SECONDARY } from "../components/page/buttonClasses";
+import { SECTION_HEADING } from "../components/page/surfaceClasses";
 import { area } from "../lib/areas";
 import { CardAppearanceSection, CardBorderSection, CardContentSection, CardTextSection, Section, SliderRow } from "../components/StyleControls";
 import { useToast } from "../components/Toaster";
@@ -177,14 +179,14 @@ export function LibraryStylePage() {
 
       <button
         onClick={() => saveNow(DEFAULT_LIBRARY_STYLE)}
-        className="mb-8 min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm hover:bg-(--color-surface-hover)"
+        className={`${BUTTON_SECONDARY} mb-8`}
       >
         Reset all to defaults
       </button>
 
-      <h3 className="mb-3 text-sm font-semibold text-(--color-text-dim)">
+      <h2 className={`${SECTION_HEADING} mb-3`}>
         Preview{!library?.data.books.length && " (sample books — your library is empty)"}
-      </h3>
+      </h2>
       {/* The real LibraryCanvas, not a hand-rolled imitation of it —
           this used to duplicate its background/width/padding math inline
           and would silently drift from the component the moment either

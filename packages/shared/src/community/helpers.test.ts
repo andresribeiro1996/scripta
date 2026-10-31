@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
-import { parseRankingPreview } from "./helpers.js";
+import { formatDate, ownedTierlistStatus, parseRankingPreview, relativeTime } from "./helpers.js";
 import { test } from "node:test";
 import { DEFAULT_TIER_PRESET } from "../tierlists/tierlist.js";
+
+process.env.TZ = "America/Sao_Paulo";
 
 test("ranking previews keep real book placements and discard malformed or empty tiers", () => {
   const tier = { label: "S", color: "#c9482f", books: [{ title: "Dune", coverUrl: null }] };
@@ -148,4 +150,26 @@ test("a character tournament says character bracket", () => {
   const base = { kind: "tournament" as const, id: "t", name: "N", bracketSize: 8, status: "active" as const, bookCount: 8, covers: [] };
   assert.equal(contentDetail({ ...base, subject: { kind: "characters", label: "H" } }), "8-character bracket · active");
   assert.equal(contentDetail(base), "8-book bracket · active");
+});
+
+test("one absolute date format: day, short month, year, and a date-only value never shifts a day", () => {
+  assert.equal(formatDate("2026-10-31"), "31 Oct 2026");
+  assert.equal(formatDate("2026-11-01T01:00:00.000Z"), "31 Oct 2026");
+  assert.equal(formatDate("2026-01-05"), "5 Jan 2026");
+  assert.equal(formatDate("2026-09-09"), "9 Sep 2026");
+  assert.equal(formatDate("not a date"), "");
+});
+
+test("relativeTime falls back to the absolute date once an entry is 30 days old", () => {
+  const now = Date.parse("2026-11-01T12:00:00.000Z");
+  assert.equal(relativeTime("2026-10-03T12:00:00.000Z", now), "29d ago");
+  assert.equal(relativeTime("2026-10-02T12:00:00.000Z", now), "2 Oct 2026");
+  assert.equal(relativeTime("2025-01-05T12:00:00.000Z", now), "5 Jan 2025");
+});
+
+test("an owned tier list reads Reference once promoted, else Draft, Voting open or Closed", () => {
+  assert.deepEqual(ownedTierlistStatus({ promotedAt: "2026-10-01T00:00:00.000Z", voteCode: "abc", votingOpen: true }), { label: "Reference", tone: "reference" });
+  assert.equal(ownedTierlistStatus({ promotedAt: null, voteCode: null, votingOpen: false }).label, "Draft");
+  assert.equal(ownedTierlistStatus({ promotedAt: null, voteCode: "abc", votingOpen: true }).label, "Voting open");
+  assert.equal(ownedTierlistStatus({ promotedAt: null, voteCode: "abc", votingOpen: false }).label, "Closed");
 });

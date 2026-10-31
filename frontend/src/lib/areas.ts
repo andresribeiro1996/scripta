@@ -19,7 +19,7 @@ export const AREAS: readonly Area[] = [
   {
     id: "games",
     label: "Games",
-    to: "/dashboard/arena",
+    to: "/dashboard/arena?tab=tierlists",
     tabs: [
       { label: "Tier lists", to: "/dashboard/arena?tab=tierlists" },
       { label: "Quizzes", to: "/dashboard/arena?tab=quizzes" },
@@ -50,9 +50,9 @@ export const AREAS: readonly Area[] = [
   {
     id: "admin",
     label: "Admin",
-    to: "/admin/genres",
+    to: "/admin/daily-chapter",
     tabs: [
-      { label: "Daily chapter", to: "/admin/daily-chapter" }, { label: "Genres", to: "/admin/genres" },
+      { label: "Daily", to: "/admin/daily-chapter" }, { label: "Genres", to: "/admin/genres" },
       { label: "Synopses", to: "/admin/synopses" },
       { label: "Translations", to: "/admin/translations" }
     ]

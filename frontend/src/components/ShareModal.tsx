@@ -3,7 +3,8 @@ import { ApiError, postToSocial, type SocialProvider } from "../api/socials";
 import { useSocials } from "../hooks/useSocials";
 import { useConfirm } from "./ConfirmDialog";
 import { SocialIcon } from "./icons/SocialIcons";
-import { BUTTON_PRIMARY, BUTTON_SECONDARY, FIELD_CLASS } from "./page/buttonClasses";
+import { BUTTON_DANGER_OUTLINE, BUTTON_PRIMARY, BUTTON_SECONDARY, FIELD_CLASS } from "./page/buttonClasses";
+import { ShareLinkRow } from "./ShareLinkRow";
 import { Sheet } from "./Sheet";
 
 type Platform = Extract<SocialProvider, "x" | "threads">;
@@ -195,19 +196,7 @@ export function ShareModal({
 
         {current && (
           <div>
-            <div className="flex items-center gap-2">
-              <input
-                readOnly
-                aria-label="Share link"
-                value={current.shareUrl}
-                onFocus={(e) => e.currentTarget.select()}
-                className={`${FIELD_CLASS} w-full`}
-              />
-              <button onClick={() => void handleCopy()} className={`${BUTTON_SECONDARY} shrink-0`}>
-                Copy link
-              </button>
-            </div>
-            {copied && <p className="mt-1.5 text-xs text-(--color-accent)">Copied!</p>}
+            <ShareLinkRow url={current.shareUrl} copied={copied} onCopy={() => void handleCopy()} />
             {copyError && <p className="mt-1.5 text-xs text-(--color-danger)">{copyError}</p>}
 
             {canNativeShare && (
@@ -265,7 +254,7 @@ export function ShareModal({
               <button
                 onClick={() => void handleStopSharing()}
                 disabled={unsharing}
-                className="min-h-11 text-xs text-(--color-danger) transition-opacity hover:opacity-80 disabled:opacity-60"
+                className={BUTTON_DANGER_OUTLINE}
               >
                 {unsharing ? "Stopping…" : "Stop sharing"}
               </button>

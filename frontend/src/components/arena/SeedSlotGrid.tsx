@@ -83,21 +83,32 @@ export function SeedSlotGrid({
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-4 gap-3 sm:grid-cols-8">
         {slots.map((slot, i) => (
-          <button
-            key={i}
-            onClick={() => setPickingSlot(i)}
-            className="flex aspect-2/3 flex-col items-center justify-center overflow-hidden rounded-lg border-2 border-dashed border-(--color-border) bg-(--color-surface) text-xs text-(--color-text-dim) hover:border-(--color-accent)"
-          >
-            {slot ? (
-              <div className="relative h-full w-full">
-                <CoverImage book={{ Title: slot.title, Attribution: slot.author, _coverUrl: slot.cover ?? undefined }} />
-              </div>
-            ) : (
-              <span>Slot {i + 1}</span>
+          <div key={i} className="flex flex-col items-stretch">
+            <button
+              onClick={() => setPickingSlot(i)}
+              aria-label={slot ? `Slot ${i + 1}: ${slot.title}, change book` : undefined}
+              className="flex aspect-2/3 flex-col items-center justify-center overflow-hidden rounded-lg border-2 border-dashed border-(--color-border) bg-(--color-surface) text-xs text-(--color-text-dim) hover:border-(--color-accent)"
+            >
+              {slot ? (
+                <div className="relative h-full w-full">
+                  <CoverImage book={{ Title: slot.title, Attribution: slot.author, _coverUrl: slot.cover ?? undefined }} />
+                </div>
+              ) : (
+                <span>Slot {i + 1}</span>
+              )}
+            </button>
+            {slot && (
+              <button
+                onClick={() => onChange(slots.map((entry, index) => (index === i ? null : entry)))}
+                aria-label={`Remove ${slot.title} from slot ${i + 1}`}
+                className="min-h-11 text-xs font-semibold text-(--color-text-dim) hover:text-(--color-danger)"
+              >
+                Remove
+              </button>
             )}
-          </button>
+          </div>
         ))}
       </div>
 

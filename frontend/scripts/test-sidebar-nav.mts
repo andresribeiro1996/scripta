@@ -23,6 +23,6 @@ test("the Home badge and its label survive", () => {
 });
 
 test("the footer Admin link is a 44px link to the review queues", () => {
-  assert.match(nav({ areas: footerAreas(true), activeId: null }), /<a(?=[^>]*href="\/admin\/genres")(?=[^>]*min-h-11)[^>]*>[\s\S]*?Admin/);
+  assert.match(nav({ areas: footerAreas(true), activeId: null }), /<a(?=[^>]*href="\/admin\/daily-chapter")(?=[^>]*min-h-11)[^>]*>[\s\S]*?Admin/);
   assert.equal(nav({ areas: footerAreas(false), activeId: null }).includes("/admin/"), false);
 });

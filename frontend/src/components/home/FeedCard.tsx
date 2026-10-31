@@ -8,9 +8,9 @@ import { CommentsSheet } from "./CommentsSheet";
 import { BookCover } from "../book/BookCover";
 import { AuthorAvatar } from "../CommunityAuthorAvatar";
 import { ReaderGlyph } from "../ReaderGlyph";
-import { BUTTON_SECONDARY } from "../page/buttonClasses";
 import { CARD } from "../page/surfaceClasses";
 import { ArenaIcon, CollectionsIcon, CommunityIcon, LibraryIcon, MuralsIcon } from "../NavIcons";
+import { MuralThumb } from "../murals/MuralThumb";
 import { ShareIcon } from "../Toolbar";
 
 const ICONS: Record<FeedIconName, ComponentType<{ size?: number }>> = {
@@ -100,6 +100,7 @@ export function FeedCard({ item, actions, books, works, isSaved }: { item: Diges
   const threaded = hasActivityThread(item);
   const shareable = feedShareTarget(item) !== null;
   const owned = item.kind === "reading" ? readingShelfBook(item.book, books) : undefined;
+  const wantable = item.kind === "reading" && !owned;
   const action = primary ? <Link to={target} className={link}>{primary} →</Link> : null;
 
   return (
@@ -114,19 +115,17 @@ export function FeedCard({ item, actions, books, works, isSaved }: { item: Diges
           {item.kind === "completion" ? null : <span className="text-(--color-text-dim)">{feedEventLabel(item)}</span>}
         </span>
         <span className="shrink-0 text-(--color-text-dim)">{relativeTime(item.createdAt)}</span>
-        {ref ? (
-          <button type="button" aria-label="Save" aria-pressed={saved} disabled={actions.busy.save || (isSaved === undefined && !actions.savedReady)} onClick={() => actions.save(item, !saved)} className={`${ACTION} -mr-2.5 ${saved ? ACTIVE : MUTED}`}>
-            <GlyphIcon path={BOOKMARK} filled={saved} />
-          </button>
-        ) : null}
       </div>
 
       {item.kind === "follow" ? null : item.kind === "mural" ? (
         <>
-          <Link to={target} tabIndex={-1} aria-hidden="true" className="mt-3.5 flex aspect-[16/6] items-center justify-center overflow-hidden rounded-xl border border-(--color-border) bg-(--color-surface-hover) text-(--color-accent)">
-            {item.mural.coverImageUrl ? <img src={item.mural.coverImageUrl} alt="" className="size-full object-cover" /> : <MuralsIcon size={36} />}
+          <Link to={target} tabIndex={-1} aria-hidden="true" className="mt-3.5 block aspect-[16/6] overflow-hidden rounded-xl border border-(--color-border)">
+            <MuralThumb theme={item.mural.theme} coverUrl={item.mural.coverImageUrl} className="size-full" />
           </Link>
-          {action}
+          <span className="flex flex-col items-start gap-1 pt-1">
+            {title ? <Link to={target} className="flex min-h-11 items-center font-display text-[22px] leading-7 font-bold break-words hover:text-(--color-accent)">{title}</Link> : null}
+            {action}
+          </span>
         </>
       ) : (
         <div className={`mt-3.5 flex items-center gap-4.5 ${primary ? "" : "pb-2"}`}>
@@ -137,17 +136,13 @@ export function FeedCard({ item, actions, books, works, isSaved }: { item: Diges
             {title ? <Link to={target} className="flex min-h-11 items-center font-display text-[22px] leading-7 font-bold break-words hover:text-(--color-accent)">{title}</Link> : null}
             {detail ? <span className="text-(--color-text-dim)">{detail}</span> : null}
             {action}
-            {item.kind === "reading" ? owned ? (
-              <Link to={bookHref(bookKey(owned), works)} className={link}>Open in your shelf →</Link>
-            ) : (
-              <button type="button" className={BUTTON_SECONDARY} disabled={actions.wanting !== null} onClick={() => actions.wantToRead(item)}>{actions.wanting === item.id ? "Adding…" : "Want to read"}</button>
-            ) : null}
+            {owned ? <Link to={bookHref(bookKey(owned), works)} className={link}>Open in your shelf →</Link> : null}
           </span>
         </div>
       )}
 
-      {threaded || shareable ? (
-        <div className="-mx-3 mt-1 flex items-center gap-1">
+      {threaded || ref || wantable || shareable ? (
+        <div className="-mx-3 mt-1 flex flex-wrap items-center gap-1">
           {threaded ? (
             <>
               <button type="button" aria-label={engagement ? `Like, ${plural(engagement.likes, "like", "likes")}` : "Like"} aria-pressed={engagement?.liked ?? false} disabled={!engagement || actions.busy.like} onClick={() => actions.like(item)} className={`${ACTION} ${engagement?.liked ? ACTIVE : MUTED}`}>
@@ -160,11 +155,21 @@ export function FeedCard({ item, actions, books, works, isSaved }: { item: Diges
               </button>
             </>
           ) : null}
-          {shareable ? (
-            <button type="button" aria-label={`Share ${title || "reader"}`} onClick={() => actions.share(item)} className={`${ACTION} ml-auto ${MUTED}`}>
-              <ShareIcon />Share
-            </button>
-          ) : null}
+          <div className="ml-auto flex items-center gap-1">
+            {ref ? (
+              <button type="button" aria-label="Save" aria-pressed={saved} disabled={actions.busy.save || (isSaved === undefined && !actions.savedReady)} onClick={() => actions.save(item, !saved)} className={`${ACTION} ${saved ? ACTIVE : MUTED}`}>
+                <GlyphIcon path={BOOKMARK} filled={saved} />
+              </button>
+            ) : null}
+            {wantable ? (
+              <button type="button" className={`${ACTION} ${MUTED}`} disabled={actions.wanting !== null} onClick={() => actions.wantToRead(item)}>{actions.wanting === item.id ? "Adding…" : "Want to read"}</button>
+            ) : null}
+            {shareable ? (
+              <button type="button" aria-label={`Share ${title || "reader"}`} onClick={() => actions.share(item)} className={`${ACTION} ${MUTED}`}>
+                <ShareIcon />Share
+              </button>
+            ) : null}
+          </div>
         </div>
       ) : null}
       {commentsOpen ? <CommentsSheet id={item.id} title={title || name} onClose={() => setCommentsOpen(false)} /> : null}

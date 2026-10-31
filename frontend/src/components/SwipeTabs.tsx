@@ -114,7 +114,7 @@ export function SwipeTabs<T extends string>({
       <div className="hidden lg:block">
         <nav aria-label={label} className={TAB_NAV}>
           {tabs.map((tab, i) => (
-            <button key={tab.value} type="button" aria-current={i === index ? "true" : undefined} onClick={() => onChange(tab.value)} className={`${tabClass(i === index)} gap-1.5 px-1`}>
+            <button key={tab.value} type="button" aria-current={i === index ? "true" : undefined} onClick={() => onChange(tab.value)} className={`${tabClass(i === index)} gap-1.5`}>
               {tab.label}
               {tab.count != null && <span className="text-xs font-medium tabular-nums text-(--color-text-dim)">{tab.count.toLocaleString()}</span>}
             </button>

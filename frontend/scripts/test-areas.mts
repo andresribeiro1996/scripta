@@ -5,7 +5,8 @@ import { activeTabTo, area, areaIdForPath, backTo, BOTTOM_BAR_AREAS, footerAreas
 test("areas come in sidebar order; Admin sits in the footer, for admins only", () => {
   assert.deepEqual(NAV_AREAS.map((a) => a.label), ["Home", "Library", "Murals", "Games", "Reader card", "Community", "Settings"]);
   assert.deepEqual(footerAreas(false), []);
-  assert.deepEqual(footerAreas(true).map((a) => [a.label, a.to]), [["Admin", "/admin/genres"]]);
+  assert.deepEqual(footerAreas(true).map((a) => [a.label, a.to]), [["Admin", "/admin/daily-chapter"]]);
+  assert.deepEqual(NAV_AREAS.map((a) => [a.to, a.tabs[0]?.to ?? a.to]).filter(([to, first]) => to !== first), []);
   assert.deepEqual(BOTTOM_BAR_AREAS, ["home", "library", "murals", "games"]);
 });
 

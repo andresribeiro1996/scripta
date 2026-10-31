@@ -359,6 +359,7 @@ export function LibraryPage() {
         </>
       }
       tabs={area("library").tabs}
+      reserveSubtitle
       maxWidth={style.contentMaxWidth}
       actions={
         <>

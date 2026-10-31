@@ -31,7 +31,7 @@ Object.defineProperty(globalThis, "matchMedia", { value: () => ({ matches: false
 type Props = Parameters<typeof BookScreen>[0];
 const base: Props = { page, book: null, signedIn: true, frame: (body: ReactNode) => body, editionId: null, onSelectEdition: () => undefined, onAdd: () => undefined, onShare: () => undefined };
 const renderOwnedBook = () => render({ book: owned, page: ownedPage });
-function render(props: Partial<Props>) {
+function render(props: Partial<Props>, path = "/") {
   const client = new QueryClient();
   return renderToString(
     createElement(
@@ -40,7 +40,7 @@ function render(props: Partial<Props>) {
       createElement(
         LibrarySaverContext.Provider,
         { value: createWebLibrarySaver(client) },
-        createElement(ToastProvider, null, createElement(ConfirmProvider, null, createElement(MemoryRouter, null, createElement(BookScreen, { ...base, ...props }))))
+        createElement(ToastProvider, null, createElement(ConfirmProvider, null, createElement(MemoryRouter, { initialEntries: [path] }, createElement(BookScreen, { ...base, ...props }))))
       )
     )
   );
@@ -148,6 +148,24 @@ test("sections are labelled underline tabs with the current one announced", () =
   assert.match(nav, />Highlights \(1\)</);
   assert.match(nav, /aria-current="page"/);
   assert.match(nav, /border-b-2/);
+});
+
+test("book sections are links to ?tab=, and the URL picks the current one", () => {
+  const nav = (html: string) => html.match(/<nav aria-label="Book sections"[\s\S]*?<\/nav>/)![0];
+  const first = nav(render({ book: owned, page: ownedPage }));
+  assert.match(first, /<a(?=(?:=>|[^>])*href="\/\?tab=about")(?=(?:=>|[^>])*aria-current="page")(?=(?:=>|[^>])*border-b-2)(?:=>|[^>])*>About<\/a>/);
+  assert.match(first, /<a(?=(?:=>|[^>])*href="\/\?tab=highlights")(?:=>|[^>])*>Highlights \(1\)<\/a>/);
+  assert.doesNotMatch(first, /<button/);
+  const second = render({ book: owned, page: ownedPage }, "/work/w?tab=highlights");
+  assert.match(nav(second), /<a(?=(?:=>|[^>])*aria-current="page")(?:=>|[^>])*>Highlights \(1\)<\/a>/);
+  assert.ok(second.includes("Fear is the mind-killer."));
+  assert.match(nav(render({ book: owned, page: ownedPage }, "/work/w?tab=bogus")), /<a(?=(?:=>|[^>])*aria-current="page")(?:=>|[^>])*>About<\/a>/);
+});
+
+test("the cover menu items say what they do and who they affect", () => {
+  const src = readFileSync(new URL("../src/components/book/BookScreen.tsx", import.meta.url), "utf8");
+  const labels = [...src.matchAll(/label: "([^"]*cover[^"]*)"/g)].map((m) => m[1]);
+  assert.deepEqual(labels, ["Change cover", "Reject cover for everyone", "Upload cover for everyone"]);
 });
 
 test("the status menu shows its label with a check, not a ▾ glyph", () => {
