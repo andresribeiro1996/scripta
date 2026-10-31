@@ -15,7 +15,7 @@ The first implementation is mobile: tier-list and mural images, plus website lin
 ## Share sheet
 
 - Send link opens the device's share menu with the website URL.
-- Share as image opens a clean, scrollable preview with Send image and Save image.
+- Share as image opens a clean, scrollable preview with Share image and Save image.
 - Show QR displays the same website URL for scanning from another device.
 - Creating or disabling a mural link remains explicit. Tier-list Open voting retains its existing confirmation and access rules.
 

@@ -66,7 +66,7 @@ test("shelfShareBooks applies shelf, search and sort", () => {
 test("LIBRARY_SHARE_LAYOUTS lists the four layouts in order", () => {
   assert.deepEqual(
     LIBRARY_SHARE_LAYOUTS.map((layout) => layout.label),
-    ["Wall", "Summary", "Reading", "This shelf"]
+    ["Wall", "Summary", "Reading", "Shelf"]
   );
 });
 

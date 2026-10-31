@@ -34,7 +34,7 @@ import {
   type PerCardStyle,
   type SortKey,
 } from "@scripta/shared";
-import { ActionSheet, Button, EmptyState, ErrorState, Fab, IconButton, Input, Screen, Sheet, Skeleton, SwipeableTabs, type ActionItem, type MenuItem } from "../../ui/components";
+import { ActionSheet, EmptyState, ErrorState, Fab, IconButton, Input, Screen, Sheet, Skeleton, SwipeableTabs, type ActionItem, type MenuItem } from "../../ui/components";
 import { ContentShareSheet } from "../sharing/ContentShareSheet";
 import { ShareActions } from "../socials";
 import { ConfirmDialog, SearchDock, dynamicType, searchDockClearance, searchDockFabClearance, useTheme } from "../../ui";
@@ -49,6 +49,7 @@ import { DuplicatesSheetBody } from "./components/DuplicatesSheet";
 import { GroupsView, TYPE_FILTER_OPTIONS, type GroupsViewHandle, type TypeFilter } from "./components/GroupsView";
 import { LibraryGrid } from "./components/LibraryGrid";
 import { LibraryShareImage } from "./components/LibraryShareImage";
+import { ShareLayoutPicker } from "./components/ShareLayoutPicker";
 import { LIBRARY_SHARE_LAYOUTS, shelfShareBooks, type LibraryShareLayout } from "./lib/libraryShareBooks";
 
 type LibraryTab = LibraryStatusTab | "collections";
@@ -361,24 +362,14 @@ export function LibraryScreen() {
         imageReady={shareImageReady}
         linkActions={library?.shareUrl ? <ShareActions message={library.shareUrl} /> : null}
         previewControls={
-          <View style={styles.shareOptions}>
-            {LIBRARY_SHARE_LAYOUTS.filter((layout) => !(onCollectionsTab && layout.value === "shelf")).map((layout) => {
-              const selected = layout.value === shareLayout;
-              return (
-                <Button
-                  key={layout.value}
-                  label={layout.label}
-                  variant={selected ? "primary" : "secondary"}
-                  accessibilityLabel={selected ? `${layout.label}, selected` : undefined}
-                  onPress={() => {
-                    if (selected) return;
-                    setShareImageReady(false);
-                    setShareLayout(layout.value);
-                  }}
-                />
-              );
-            })}
-          </View>
+          <ShareLayoutPicker
+            options={LIBRARY_SHARE_LAYOUTS.filter((layout) => !(onCollectionsTab && layout.value === "shelf"))}
+            value={shareLayout}
+            onChange={(next) => {
+              setShareImageReady(false);
+              setShareLayout(next);
+            }}
+          />
         }
       >
         <LibraryShareImage
@@ -414,5 +405,4 @@ const styles = StyleSheet.create({
   shelfHead: { paddingBottom: spacing.md },
   sortPill: { flexDirection: "row", alignItems: "center", gap: spacing.xs, alignSelf: "flex-start", minHeight: 32, paddingHorizontal: spacing.md, borderRadius: radii.full, borderWidth: 1 },
   strong: { fontWeight: "700" },
-  shareOptions: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: spacing.sm },
 });

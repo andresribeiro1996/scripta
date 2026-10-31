@@ -7,7 +7,7 @@ import { captureRef, releaseCapture } from "react-native-view-shot";
 import * as Sharing from "expo-sharing";
 import { requestPermissionsAsync, saveToLibraryAsync } from "expo-media-library/legacy";
 import QRCode from "react-native-qrcode-svg";
-import { Button, Icon, type IconName, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
+import { Button, Icon, IconButton, type IconName, dynamicType, minimumTouchTarget, radii, spacing, typography, useTheme } from "../../ui";
 import { snapshotSize } from "./shareImage";
 
 type Props = {
@@ -63,7 +63,7 @@ export function ContentShareSheet({ visible, onClose, title, description, url, c
   async function exportImage(mode: "save" | "send" | "video") {
     if (!imageReady || !capture.current) throw new Error("Wait for the image preview to finish loading.");
     if (mode === "save") {
-      const deniedMessage = "Allow saving photos in your device settings, or use Send image.";
+      const deniedMessage = "Allow saving photos in your device settings, or use Share image.";
       let permission;
       try { permission = await requestPermissionsAsync(true, ["photo"]); }
       catch (reason) { throw new Error(deniedMessage, { cause: reason }); }
@@ -93,21 +93,21 @@ export function ContentShareSheet({ visible, onClose, title, description, url, c
           <Pressable accessibilityRole="button" accessibilityLabel="Close share sheet" accessibilityState={{ disabled: busy }} disabled={busy} onPress={onClose} style={({ pressed }) => [styles.iconAction, { backgroundColor: pressed ? colors.border : colors.background, opacity: busy ? 0.5 : 1 }]}><Icon name="close" size={18} color={colors.textDim} /></Pressable>
         </View>
         {view === "image" ? <>
-          {previewControls}
           {description ? <Text style={[typography.caption, { color: colors.textDim }]}>{description}</Text> : null}
           <ScrollView style={{ flex: 1, borderRadius: radii.xl, backgroundColor: colors.background }} contentContainerStyle={{ padding: spacing.sm }} removeClippedSubviews={false}>
             <View ref={capture} collapsable={false} onLayout={(event) => { size.current = event.nativeEvent.layout; }} style={{ backgroundColor: colors.background }}>
               {children}
             </View>
           </ScrollView>
+          {previewControls}
           <View style={{ gap: spacing.md }}>
             <View style={styles.header}>
               {!imageReady || busy ? <ActivityIndicator size="small" color={colors.accent} /> : <Icon name="confirm" size={16} color={colors.textDim} />}
               <Text accessibilityLiveRegion="polite" style={[typography.caption, { color: colors.textDim, flex: 1 }]}>{busy ? "Preparing your share…" : imageReady ? "Full image · Ready to share" : "Loading your image…"}</Text>
             </View>
             <View style={styles.actions}>
-              <View style={styles.rowItem}><Button label="Save image" variant="secondary" disabled={busy || !imageReady} onPress={() => void run(() => exportImage("save"))} /></View>
-              <View style={styles.rowItem}><Button label="Send image" disabled={busy || !imageReady} onPress={() => void run(() => exportImage("send"))} /></View>
+              <IconButton framed name="save" accessibilityLabel="Save image" disabled={busy || !imageReady} onPress={() => void run(() => exportImage("save"))} />
+              <View style={styles.rowItem}><Button label="Share image" icon="share" numberOfLines={1} disabled={busy || !imageReady} onPress={() => void run(() => exportImage("send"))} /></View>
               {onExportVideo ? <View style={styles.rowItem}><Button label="Send video" variant="secondary" disabled={busy || !imageReady} onPress={() => void run(() => exportImage("video"))} /></View> : null}
             </View>
           </View>
@@ -167,7 +167,7 @@ function ShareChoice({ icon, label, detail, primary = false, disabled, onPress }
 
 const styles = StyleSheet.create({
   header: { flexDirection: "row", alignItems: "center", gap: spacing.md },
-  actions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md },
+  actions: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: spacing.md },
   rowItem: { flex: 1, minWidth: 120 },
   iconAction: { width: minimumTouchTarget, height: minimumTouchTarget, borderRadius: radii.full, alignItems: "center", justifyContent: "center" },
   textAction: { minHeight: minimumTouchTarget, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.sm },
