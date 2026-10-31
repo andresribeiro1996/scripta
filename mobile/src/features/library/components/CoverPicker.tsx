@@ -8,6 +8,7 @@ import { minimumTouchTarget, radii, spacing, typography, useTheme } from "../../
 import { coverQueryKey, type ResolvedCoverResponse } from "@scripta/shared";
 import { deleteGalleryImage, fetchGalleryImages, uploadGalleryImage, type GalleryImage } from "../../gallery/api";
 import type { ResolveCoverParams } from "../api/covers";
+import { BookCover } from "../../arena/BookCover";
 import { FoundCovers } from "./FoundCovers";
 
 export function CoverPicker({
@@ -17,6 +18,8 @@ export function CoverPicker({
   coverUrl,
   onSelect,
   onPickFound,
+  editionCovers,
+  onPickEdition,
   onRemoveCover,
   onClose,
 }: {
@@ -26,6 +29,8 @@ export function CoverPicker({
   coverUrl: string | null;
   onSelect: (image: GalleryImage) => void;
   onPickFound: (cover: ResolvedCoverResponse) => void;
+  editionCovers: string[];
+  onPickEdition: (url: string) => void;
   onRemoveCover: () => void;
   onClose: () => void;
 }) {
@@ -105,6 +110,21 @@ export function CoverPicker({
               onClose();
             }}
           />
+        )}
+
+        {editionCovers.length > 0 && (
+          <>
+            <Text accessibilityRole="header" style={[typography.body, { color: colors.text, fontWeight: "600" }]}>
+              Other editions
+            </Text>
+            <View style={styles.grid}>
+              {editionCovers.map((url) => (
+                <Pressable accessibilityLabel="Use this edition's cover" accessibilityRole="button" key={url} onPress={() => onPickEdition(url)}>
+                  <BookCover cover={url} title={title} width={72} height={108} />
+                </Pressable>
+              ))}
+            </View>
+          </>
         )}
 
         {Boolean(lookup.isbn || lookup.title) && (

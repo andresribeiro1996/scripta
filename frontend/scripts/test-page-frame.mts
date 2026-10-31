@@ -281,5 +281,5 @@ test("the quiz editor says why Publish is off next to the header, and play and r
   assert.equal(screens.length, 4);
   for (const tag of screens) assert.match(tag, /back=\{back\}/, tag);
   assert.match(play, /<QuizResults\b(?:=>|[^>])*back=\{back\}/);
-  assert.match(src("components/quiz/QuizResults"), /<Page back=\{back\} title=\{null\}>/);
+  assert.match(src("components/quiz/QuizResults"), /<Page back=\{back\} title=\{name\}>/);
 });

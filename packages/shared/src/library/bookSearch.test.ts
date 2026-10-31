@@ -148,3 +148,31 @@ test("a collection whose name already says collection is not given the word agai
 test("a story series never gets the word collection", () => {
   assert.equal(seriesLabel({ name: "Dune Chronicles", kind: "series", position: "2" }), "Dune Chronicles · 2");
 });
+
+test("buildManualBook stores format and a positive page count", () => {
+  const book = buildManualBook({ ...manualFields, format: "audiobook", pages: 310 }, "1");
+  assert.equal(book._format, "audiobook");
+  assert.equal(book._pages, 310);
+});
+
+test("buildManualBook omits format and pages when not given", () => {
+  for (const extra of [{}, { pages: null }, { pages: 0 }]) {
+    const book = buildManualBook({ ...manualFields, ...extra }, "1");
+    assert.equal("_format" in book, false);
+    assert.equal("_pages" in book, false);
+  }
+});
+
+test("buildManualBook leaves hand-edited genres untagged", () => {
+  const edited = buildManualBook({ ...manualFields, genres: ["Fantasy"], genresEdited: true }, "1");
+  assert.deepEqual(edited._genres, ["Fantasy"]);
+  assert.equal("_genresFrom" in edited, false);
+  const searched = buildManualBook({ ...manualFields, genres: ["Fantasy"] }, "1");
+  assert.equal(searched._genresFrom, "catalog");
+});
+
+test("mapOpenLibraryDoc reads the median page count", () => {
+  assert.equal(mapOpenLibraryDoc({ title: "Dune", number_of_pages_median: 412 })?.pages, 412);
+  assert.equal(mapOpenLibraryDoc({ title: "Dune" })?.pages, null);
+  assert.equal(mapOpenLibraryDoc({ title: "Dune", number_of_pages_median: 0 })?.pages, null);
+});

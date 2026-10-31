@@ -1,6 +1,6 @@
 // The native Library tab — mirrors frontend's pages/LibraryPage.tsx. Every
 // panel it used to present as a modal (book detail, add, import, reorder,
-// share, per-book style and cover) is now a sibling route presented as a form
+// per-book style and cover) is now a sibling route presented as a form
 // sheet, so each one is a real UISheetPresentationController the user can drag
 // away. Status lives in the swipeable tabs, and one bottom dock below them
 // holds the search and the sort or type control of the tab in view, so what is
@@ -35,6 +35,8 @@ import {
   type SortKey,
 } from "@scripta/shared";
 import { ActionSheet, Button, EmptyState, ErrorState, Fab, IconButton, Input, Screen, Sheet, Skeleton, SwipeableTabs, type ActionItem, type MenuItem } from "../../ui/components";
+import { ContentShareSheet } from "../sharing/ContentShareSheet";
+import { ShareActions } from "../socials";
 import { ConfirmDialog, SearchDock, dynamicType, searchDockClearance, searchDockFabClearance, useTheme } from "../../ui";
 import { radii, spacing, typography } from "../../ui/theme";
 import { useToast } from "../../ui/ToastHost";
@@ -46,6 +48,8 @@ import { AddBookOptionsSheet } from "./components/AddBookOptionsSheet";
 import { DuplicatesSheetBody } from "./components/DuplicatesSheet";
 import { GroupsView, TYPE_FILTER_OPTIONS, type GroupsViewHandle, type TypeFilter } from "./components/GroupsView";
 import { LibraryGrid } from "./components/LibraryGrid";
+import { LibraryShareImage } from "./components/LibraryShareImage";
+import { LIBRARY_SHARE_LAYOUTS, shelfShareBooks, type LibraryShareLayout } from "./lib/libraryShareBooks";
 
 type LibraryTab = LibraryStatusTab | "collections";
 
@@ -53,7 +57,7 @@ const LIBRARY_TABS: readonly { value: LibraryTab; label: string }[] = [...LIBRAR
 
 export function LibraryScreen() {
   const { colors } = useTheme();
-  const { data: library, isPending, isError, error, refetch, isRefetching } = useLibrary();
+  const { data: library, isPending, isError, error, refetch, isRefetching, share, unshare } = useLibrary();
   const actions = useLibraryActions();
   const { show } = useToast();
   const murals = useMurals();
@@ -82,9 +86,12 @@ export function LibraryScreen() {
   const [selectionMode, setSelectionMode] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+  const [sharing, setSharing] = useState(false);
+  const [shareLayout, setShareLayout] = useState<LibraryShareLayout>("wall");
+  const [shareImageReady, setShareImageReady] = useState(false);
 
   const books = library?.data.books ?? [];
-  const style = resolveLibraryStyle(library?.data.style);
+  const style = useMemo(() => resolveLibraryStyle(library?.data.style), [library?.data.style]);
   const ordered = useMemo(() => orderLibraryBooks(library?.data.books ?? [], library?.data.groups ?? []), [library]);
   const bookSeriesGroup = useMemo(() => seriesGroupByBookKey(library?.data.books ?? [], library?.data.groups ?? []), [library]);
   const possibleDuplicates = useMemo(() => {
@@ -136,6 +143,12 @@ export function LibraryScreen() {
     setEditingName(true);
   }
 
+  function startSharing() {
+    setShareLayout(onCollectionsTab ? "wall" : "shelf");
+    setShareImageReady(false);
+    setSharing(true);
+  }
+
   const actionGroups: ActionItem[][] = [
     [
       { label: "Rename library", icon: "edit", onPress: startRenamingLibrary },
@@ -146,7 +159,7 @@ export function LibraryScreen() {
       { label: "Library style", icon: "style", onPress: () => router.push("/style" as never) },
       { label: "Import library", icon: "sync", onPress: () => router.push("/import" as never) },
     ],
-    [{ label: "Share", icon: "share", onPress: () => router.push("/share" as never) }],
+    [{ label: "Share", icon: "share", onPress: startSharing }],
   ];
 
   const sortLabel = SORT_OPTIONS.find((option) => option.value === sortKey)?.label ?? sortKey;
@@ -338,6 +351,48 @@ export function LibraryScreen() {
         {library ? <DuplicatesSheetBody groups={possibleDuplicates} library={library} /> : null}
       </Sheet>
 
+      <ContentShareSheet
+        visible={sharing}
+        onClose={() => setSharing(false)}
+        title={library?.data.name || "Library"}
+        url={library?.shareUrl ?? null}
+        onEnableLink={async () => (await share()).shareUrl ?? undefined}
+        onDisableLink={async () => { await unshare(); }}
+        imageReady={shareImageReady}
+        linkActions={library?.shareUrl ? <ShareActions message={library.shareUrl} /> : null}
+        previewControls={
+          <View style={styles.shareOptions}>
+            {LIBRARY_SHARE_LAYOUTS.filter((layout) => !(onCollectionsTab && layout.value === "shelf")).map((layout) => {
+              const selected = layout.value === shareLayout;
+              return (
+                <Button
+                  key={layout.value}
+                  label={layout.label}
+                  variant={selected ? "primary" : "secondary"}
+                  accessibilityLabel={selected ? `${layout.label}, selected` : undefined}
+                  onPress={() => {
+                    if (selected) return;
+                    setShareImageReady(false);
+                    setShareLayout(layout.value);
+                  }}
+                />
+              );
+            })}
+          </View>
+        }
+      >
+        <LibraryShareImage
+          key={shareLayout}
+          layout={shareLayout}
+          name={library?.data.name || "Library"}
+          ordered={ordered}
+          shelf={onCollectionsTab ? null : { label: LIBRARY_TABS.find((tab) => tab.value === statusFilter)!.label, query, books: shelfShareBooks(ordered, query, statusFilter, sortKey) }}
+          style={style}
+          seriesGroups={bookSeriesGroup}
+          onReadyChange={setShareImageReady}
+        />
+      </ContentShareSheet>
+
       <ConfirmDialog
         visible={confirmingDelete}
         title={`Delete ${selectedKeys.size} book${selectedKeys.size === 1 ? "" : "s"}?`}
@@ -359,4 +414,5 @@ const styles = StyleSheet.create({
   shelfHead: { paddingBottom: spacing.md },
   sortPill: { flexDirection: "row", alignItems: "center", gap: spacing.xs, alignSelf: "flex-start", minHeight: 32, paddingHorizontal: spacing.md, borderRadius: radii.full, borderWidth: 1 },
   strong: { fontWeight: "700" },
+  shareOptions: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: spacing.sm },
 });

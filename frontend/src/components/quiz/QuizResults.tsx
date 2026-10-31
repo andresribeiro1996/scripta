@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { playerLabel, scoreRows, type PlayResponse, type PublicQuizQuestion, type ScoreRow } from "@scripta/shared";
+import { playerLabel, resultCovers, scoreRows, type PlayResponse, type PublicQuizQuestion, type ScoreRow } from "@scripta/shared";
 import { fetchPublicResultsApi } from "../../api/quizzes";
 import { CoverImage } from "../BookCard";
 import { LibraryIcon } from "../NavIcons";
@@ -54,44 +54,28 @@ function QuizAnswer({ row, question, expanded, onToggle }: { row: ScoreRow; ques
   );
 }
 
-export function QuizResults({ code, name, result, questions, alreadyPlayed, back }: {
+export function QuizResults({ code, name, result, questions, back }: {
   code: string;
   name: string;
   result: PlayResponse;
   questions: PublicQuizQuestion[];
-  alreadyPlayed: boolean;
   back?: { to: string; label: string };
 }) {
   const [tab, setTab] = useState<"answers" | "board">("answers");
   const [expanded, setExpanded] = useState<string | null>(null);
   const rows = scoreRows(questions, result.correct, result.answers);
-  const covers = [...new Map(rows.flatMap((row, index) => {
-    const question = questions[index]!;
-    if (row.answer?.kind === "cover") return [[row.answer.value, row.answer.title ?? ""] as const];
-    if (question.type === "cover_title") return [[question.prompt, row.answer?.value ?? ""] as const];
-    return [];
-  })).entries()].slice(0, 3);
+  const covers = resultCovers(questions, rows);
 
   return (
-    <Page back={back} title={null}>
+    <Page back={back} title={name}>
       <section aria-label="Your result" className={`relative isolate mb-3 grid items-center gap-x-4 gap-y-3 pb-3 lg:mb-8 lg:gap-6 lg:border-b lg:border-(--color-border) lg:pb-10 ${covers.length ? "grid-cols-[minmax(0,1fr)_auto] lg:grid-cols-2" : ""}`}>
         <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10" style={{ background: "radial-gradient(ellipse at 60% 50%, color-mix(in srgb, var(--color-accent) 8%, transparent), transparent 70%)" }} />
-        <div className="contents min-w-0 lg:block">
-          <div className="col-span-full min-w-0">
-            <p className="mb-2 text-xs text-(--color-text-dim) lg:mb-3 lg:text-sm">Your results</p>
-            <h1 className="font-sans text-2xl leading-tight font-extralight tracking-[-0.015em] break-words lg:text-4xl">{name}</h1>
-          </div>
-          <div className="min-w-0">
-            <p aria-label={`${result.score} of ${questions.length} correct`} className="my-3 font-sans text-[clamp(3.5rem,18vw,5rem)] leading-none font-extralight tracking-[-0.05em] lg:text-[6.5rem]">
-              {result.score}<span className="text-[0.45em] text-(--color-text-dim)"> / {questions.length}</span>
-            </p>
-            <p className="text-xs text-(--color-text-dim) lg:hidden">{result.score} correct · {questions.length - result.score} incorrect</p>
-            <p className="hidden text-sm text-(--color-text-dim) lg:block">{alreadyPlayed ? "You already played this quiz." : "Quiz complete. Here’s how you did."}</p>
-          </div>
-        </div>
+        <p aria-label={`${result.score} of ${questions.length} correct`} className="my-3 min-w-0 font-sans text-[clamp(3.5rem,18vw,5rem)] leading-none font-extralight tracking-[-0.05em] lg:text-[6.5rem]">
+          {result.score}<span className="text-[0.45em] text-(--color-text-dim)"> / {questions.length}</span>
+        </p>
         {covers.length > 0 && (
           <div aria-hidden="true" className="flex justify-end py-3 lg:justify-center lg:py-6">
-            {covers.map(([url, title], index) => (
+            {covers.map(({ url, title }, index) => (
               <div key={url} className="relative -mx-1.5 h-20 w-14 overflow-hidden rounded bg-(--color-border) shadow-md lg:-mx-2 lg:h-48 lg:w-32" style={{ transform: `rotate(${(index - (covers.length - 1) / 2) * 10}deg) translateY(${index === 1 ? -8 : 0}px)`, zIndex: index === 1 ? 1 : 0 }}>
                 <CoverImage book={{ _coverUrl: url }} fit="contain" alt={title} />
               </div>
@@ -126,7 +110,6 @@ export function QuizResults({ code, name, result, questions, alreadyPlayed, back
         </div>
         <div className="min-w-0 lg:col-start-2 lg:row-start-1">
           <ChallengeLink code={code} />
-          <p className="mt-3 text-center text-xs text-(--color-text-dim) lg:hidden">{alreadyPlayed ? "You already played this quiz." : "Quiz complete."}</p>
         </div>
       </div>
     </Page>

@@ -3,10 +3,10 @@ import { StyleSheet, View } from "react-native";
 import { Text } from "../../ui/Text";
 import { Button } from "../../ui";
 import { spacing, typography, useTheme } from "../../ui/theme";
-import { postToSocial, shareNatively } from "./api";
+import { postToSocial } from "./api";
 import { useSocials } from "./useSocials";
 
-export function ShareActions({ message, title }: { message: string; title?: string }) {
+export function ShareActions({ message }: { message: string }) {
   const { data = [] } = useSocials();
   const { colors } = useTheme();
   const [notice, setNotice] = useState<{ message: string; tone: "success" | "error" } | null>(null);
@@ -26,9 +26,10 @@ export function ShareActions({ message, title }: { message: string; title?: stri
     }
   }
 
+  if (!connected("x") && !connected("threads") && !notice) return null;
+
   return (
     <View style={styles.actions}>
-      <Button label="Share…" variant="secondary" onPress={() => void shareNatively(message, title)} />
       {connected("x") ? <Button label="Post to X" loading={posting === "x"} onPress={() => void post("x")} /> : null}
       {connected("threads") ? <Button label="Post to Threads" loading={posting === "threads"} onPress={() => void post("threads")} /> : null}
       {notice ? <Text accessibilityRole="alert" selectable style={[typography.caption, { color: notice.tone === "success" ? colors.success : colors.danger }]}>{notice.message}</Text> : null}
