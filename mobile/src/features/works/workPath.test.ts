@@ -2,12 +2,17 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { bookToolPath, seriesSearchHref, seriesSearchMethod, workPath, workStatsPath } from "./workPath.js";
+import { bookToolPath, seriesSearchHref, seriesSearchMethod, stackPrefix, workPath, workStatsPath } from "./workPath.js";
 
 test("a work opened from inside the tabs stays in them; from a root-level screen it opens above it", () => {
   assert.equal(workPath("w1", ["(app)", "(arena)", "tierlist", "[id]"]), "/work/w1");
   assert.equal(workPath("w1", ["arena", "[id]"]), "/(public)/work/w1");
   assert.equal(workPath("w1", ["vote", "[code]"]), "/(public)/work/w1");
+});
+
+test("a Daily Chapter day opens in the stack Your chapters was opened in", () => {
+  assert.equal(stackPrefix(["(app)", "(home)", "daily-chapters"]), "");
+  assert.equal(stackPrefix(["(public)", "daily-chapters"]), "/(public)");
 });
 
 test("a work opened on one of its editions carries that edition and nothing otherwise", () => {

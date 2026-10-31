@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Pressable, ScrollView, View } from "react-native";
-import { Stack, useRouter } from "expo-router";
+import { Stack, useRouter, useSegments } from "expo-router";
 import { DAILY_CHAPTER_THEMES, dailyChapterMonthShare, dailyChapterMonthStats, dailyChapterSummary, dailyChapterThemeRates, recapMonthName } from "@scripta/shared";
 import { Text } from "../../ui/Text";
 import { Button, EmptyState, ErrorState, Icon, IconButton, Screen, Skeleton, dynamicType, minimumTouchTarget, spacing, typography, useTheme } from "../../ui";
 import { ContentShareSheet } from "../sharing/ContentShareSheet";
 import { publicContentUrl } from "../sharing/links";
+import { stackPrefix } from "../works/workPath";
 import { DailyChapterCalendar } from "./daily-chapter-calendar";
 import { DailyChapterPoster } from "./daily-chapter-poster";
 import { DailyChapterSquares } from "./daily-chapter-squares";
@@ -21,6 +22,7 @@ function shiftMonth(month: string, by: number) {
 export function YourChaptersScreen() {
   const { colors } = useTheme();
   const router = useRouter();
+  const segments = useSegments();
   const identity = useDeviceIdentity();
   const history = useDailyHistory();
   const current = new Date().toISOString().slice(0, 7);
@@ -28,7 +30,7 @@ export function YourChaptersScreen() {
   const data = history.data;
   const [sharing, setSharing] = useState(false);
   const link = useQuery({ queryKey: ["public-url", "/daily"], queryFn: () => publicContentUrl("/daily"), enabled: sharing });
-  const open = (editionId: string) => router.push(`/daily-chapters/${editionId}` as never);
+  const open = (editionId: string) => router.push(`${stackPrefix(segments)}/daily-chapters/${editionId}` as never);
   const retry = () => { void identity.refetch(); void history.refetch(); };
   let body;
   if (identity.isError || history.isError) body = <ErrorState body="Couldn't load your chapters." actionLabel="Retry" onAction={retry} />;
