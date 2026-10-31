@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { draftSaver } from "@scripta/shared";
+import { FIELD_CLASS } from "../page/buttonClasses";
 
 const DRAFT_DELAY_MS = 600;
 
@@ -33,7 +34,7 @@ export function DraftField({ label, initial, max, onSave }: { label: string; ini
           timer.current = setTimeout(() => save(value), DRAFT_DELAY_MS);
         }}
         onBlur={() => save(draft)}
-        className="mt-1 min-h-11 w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm text-(--color-text)"
+        className={`${FIELD_CLASS} mt-1 w-full`}
       />
       <span className="mt-1 block text-right">{`${draft.length}/${max}`}</span>
     </label>

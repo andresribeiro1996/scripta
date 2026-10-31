@@ -341,7 +341,7 @@ export function MuralsListPage() {
                             if (e.key === "Escape") setEditingId(null);
                           }}
                           onClick={(e) => e.stopPropagation()}
-                          className="w-full rounded-lg border border-(--color-border) bg-(--color-surface) px-2 py-1 text-lg font-bold text-(--color-text)"
+                          className={`${FIELD_CLASS} w-full text-lg font-bold`}
                         />
                       ) : (
                         // text-lg font-bold — bigger than the old text-sm, so

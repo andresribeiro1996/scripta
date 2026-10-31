@@ -8,7 +8,7 @@ import { addBookToLibrary } from "../api/library";
 import { useAuth } from "../auth/AuthContext";
 import { DailyChapterArt } from "../components/dailyChapter/DailyChapterCard";
 import { Page } from "../components/page/Page";
-import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../components/page/buttonClasses";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY, FIELD_CLASS } from "../components/page/buttonClasses";
 
 export function DailyChapterPage() {
   const { session } = useAuth();
@@ -79,7 +79,7 @@ function DailyGame({ board, guestId, playerId, result: recovered }: { board: Dai
     {result ? <>
       <div className="rounded-xl bg-(--color-accent-soft) p-5"><h3 className="text-2xl">{result.score}/5 · Chapter complete</h3><p className="mt-2 text-sm">Another little chapter tomorrow.</p></div>
       <button className={BUTTON_PRIMARY} onClick={() => { const text = dailyChapterShare(result, new URL("/daily", window.location.origin).href); setShareText(text); }}>Share your score</button>
-      {shareText ? <label className="block text-sm">Copy your spoiler-free result<textarea aria-label="Share result" className="mt-2 w-full rounded-lg border border-(--color-border) bg-(--color-surface) p-3" rows={4} readOnly value={shareText} onFocus={(event) => event.target.select()} /></label> : null}
+      {shareText ? <label className="block text-sm">Copy your spoiler-free result<textarea aria-label="Share result" className={`${FIELD_CLASS} mt-2 w-full`} rows={4} readOnly value={shareText} onFocus={(event) => event.target.select()} /></label> : null}
       <h3 className="text-xl">The books behind today's chapter</h3>
       {result.answers.map((answer, i) => <article key={answer.questionId} className="space-y-2 rounded-xl border border-(--color-border) bg-(--color-surface) p-4"><p className="text-sm text-(--color-text-dim)">{i + 1}. {answer.choiceIndex === answer.answerIndex ? "Correct" : "Your pick: " + answer.options[answer.choiceIndex]}</p><h4 className="font-semibold">{answer.book.title}</h4><p className="text-sm text-(--color-text-dim)">{answer.book.author}</p><p className="text-sm">{answer.explanation}</p><a href={answer.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center text-sm text-(--color-accent)">Read the source ↗</a>{session ? <button className={BUTTON_SECONDARY + " ml-3"} disabled={busy || saved.includes(answer.book.id)} onClick={() => void saveBook(answer.book)}>{saved.includes(answer.book.id) ? "Saved" : "Want to read"}</button> : null}</article>)}
     </> : <>

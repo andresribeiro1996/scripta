@@ -593,7 +593,7 @@ export function MuralEditorPage() {
           )}
           {editMode ? <div className="mb-2 flex min-h-11 items-center gap-3 bg-(--color-bg) px-2 py-1">
             <p className="flex-1 text-xs text-(--color-text-dim)">Drag a block to place it. Move to an edge to scroll.</p>
-            <button disabled={savingLayout || savingDraft || !layoutHistory.length || layoutHistory.at(-1)?.id !== view.id || JSON.stringify(layoutHistory.at(-1)?.after) !== JSON.stringify(view.blocks)} onClick={() => void guard(undoLayout(), "Couldn't undo that move.")} className="min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm font-semibold disabled:opacity-40">Undo</button>
+            <button disabled={savingLayout || savingDraft || !layoutHistory.length || layoutHistory.at(-1)?.id !== view.id || JSON.stringify(layoutHistory.at(-1)?.after) !== JSON.stringify(view.blocks)} onClick={() => void guard(undoLayout(), "Couldn't undo that move.")} className={BUTTON_SECONDARY}>Undo</button>
           </div> : null}
           </div>
           <div className="mx-auto max-w-6xl">

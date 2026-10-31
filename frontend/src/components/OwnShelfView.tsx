@@ -8,7 +8,7 @@ import { useAuth } from "../auth/AuthContext";
 import { Avatar, avatarUrlFor } from "./Avatar";
 import { EmptyState } from "./EmptyState";
 import { Page } from "./page/Page";
-import { BUTTON_DANGER, BUTTON_PRIMARY, BUTTON_SECONDARY } from "./page/buttonClasses";
+import { BUTTON_DANGER, BUTTON_PRIMARY, BUTTON_SECONDARY, FIELD_CLASS } from "./page/buttonClasses";
 import { MuralsIcon } from "./NavIcons";
 import { MuralCanvas } from "./murals/MuralCanvas";
 import { ProfileActivity } from "./ProfileActivity";
@@ -334,7 +334,7 @@ function OwnerControls({
               value={muralId}
               onChange={(e) => setMuralId(e.target.value)}
               aria-label="Shelf mural"
-              className="min-h-11 min-w-0 flex-1 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2 text-sm"
+              className={`${FIELD_CLASS} min-w-0 flex-1`}
             >
               {(murals ?? []).map((mural) => (
                 <option key={mural.id} value={mural.id}>

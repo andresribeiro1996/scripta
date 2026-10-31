@@ -76,6 +76,7 @@ App text scale (mobile named, web uses the equivalent Tailwind size):
 Used sparingly — surfaces are normally separated by `border`, not shadow.
 - `shadow-overlay`: `0 20px 25px -5px rgb(0 0 0/.1), 0 8px 10px -6px rgb(0 0 0/.1)` — web dialogs/sheets only.
 - `shadow-fab`: `0 4px 8px rgb(0 0 0/.3)` — mobile FAB only, the one elevated control on mobile.
+- `shadow-cover`: `0 1px 2px rgb(32 30 28/.2), 0 12px 24px -12px rgb(32 30 28/.5)` light, `0 1px 2px rgb(0 0 0/.6), 0 14px 28px -12px rgb(0 0 0/.9)` dark — web book covers (`BookCover`) only.
 
 ## Iconography
 
@@ -85,22 +86,28 @@ No bundled icon library, by design:
 
 ## Layout
 
-The shared page frame has a **1600px** max-width and responsive gutters (16px, 20px, then 32px on desktop). Library, Series, Collections and shared libraries keep the owner's content-width preference (`contentMaxWidth`, 800–1800px, default **1600px**) for their bodies. Book grid: CSS Grid `repeat(auto-fill, minmax(cardFloor,1fr))`, `space-lg` gap, phone-width override guarantees 3 columns. No custom breakpoints — stock Tailwind v4 defaults (`sm` = 640px).
+Pages sit in one of three widths, centred, with gutters outside the width (16px, 24px from `sm`, 32px from `lg`): **wide** 1440px, **default** 1200px, **narrow** 760px. Library, Series, Collections, Gallery and shared libraries use the owner's content-width preference (`contentMaxWidth`, 800–1800px, default **1600px**) for their body in place of the wide width. The tabs of one area share one width, so switching tab never moves the page edge. Book grid: CSS Grid `repeat(auto-fill, minmax(cardFloor,1fr))`, `space-lg` gap, phone-width override guarantees 3 columns. No custom breakpoints — stock Tailwind v4 defaults (`sm` = 640px, `lg` = 1024px).
 
 ### The frame
 
-Navigation comes from one map, `frontend/src/lib/areas.ts`. `AREAS` lists Home, Library, Murals, Games, Reader card, Community, Settings and Admin, each with its `to` and its tabs. `NAV_AREAS` is the sidebar (all but Admin), `footerAreas(isAdmin)` adds Admin for admins, and `BOTTOM_BAR_AREAS` (Home, Library, Murals, Games) is the phone bottom bar, with the rest behind "More". `areaIdForPath` finds the active area, `activeTabTo` the active tab, and `backTo(kind)` the back link for a detail page (tierlist, quiz, tournament, mural, book, profile).
+Navigation comes from one map, `frontend/src/lib/areas.ts`. `AREAS` lists Home, Library, Murals, Games, Reader card, Community, Settings and Admin, each with its `to` and its tabs. `NAV_AREAS` is all but Admin (the More drawer), `TOP_BAR_AREAS` drops Settings too (it lives in the account menu), `footerAreas(isAdmin)` adds Admin for admins, and `BOTTOM_BAR_AREAS` (Home, Library, Murals, Games) is the phone bottom bar, with the rest behind "More". `areaIdForPath` finds the active area, `activeTabTo` the active tab, and `backTo(kind)` the back link for a detail page (tierlist, quiz, tournament, mural, book, profile).
 
-`SessionLayout` picks `DashboardLayout` when the session has a username and `PublicLayout` otherwise. Dashboard provides the sidebar, bottom bar and outlet context `setNavHidden` for full-screen editors. Public provides a brand lockup and Log in or Open my library link. Both use the shared 1600px page frame; a saved Library width never resizes unrelated sections.
+`SessionLayout` picks `DashboardLayout` when the session has a username and `PublicLayout` otherwise. Both render `TopBar` (`components/page/TopBar.tsx`): a 64px bar with a hairline under it, `bg` at 88% with a backdrop blur (solid under `prefers-reduced-transparency`), the brand lockup at the left, the areas as pills (`accent-soft` / `accent` when active, a Home badge) and, at the right, the `AccountMenu` (avatar, My shelf, Settings, Admin, Log out). From `lg` it is sticky. Below `lg` Dashboard hides it and shows the bottom bar and the More drawer instead; Public keeps it at every width, with Log in or Open my library at the right and no areas. Dashboard also provides the outlet context `setNavHidden` for full-screen editors. The bar's first focus stop is a "Skip to content" link to `#content`.
+
+`--app-top` is 0 below `lg` and 4rem from `lg`; `scroll-padding-top` uses it, and `OfflineBanner` publishes its height as `--offline-h`. `ToolbarRow` sticks at `top: calc(var(--app-top) + var(--offline-h, 0px))`; `OfflineBanner`, `SwipeTabs` and the mural sticky strips stick at `top-(--app-top)`; the book cover and Reader card columns stick at `--app-top` plus 1.5rem.
 
 Page rules:
-- The title band has an 80px minimum height. Back links sit beside the title; subtitles, actions and sibling-page tabs sit in the body below it. Long titles can wrap without clipping. Quiz results title the band with the quiz name, as the play screen does; the results section below it is just the score and cover fan, with no repeated name or score summary.
+- No title band. The header is a back link (when there is one), then the title row — the `font-display` title (`text-3xl`, 40px from `lg`, wraps) with the actions at the right — then the subtitle, then the tabs. Back links and tab links are 44px high. Quiz results title the page with the quiz name, as the play screen does; the results section below it is just the score and cover fan, with no repeated name or score summary.
+- Tabs sit under the header with the hairline drawn as an inset shadow on the row (`TAB_NAV`), so the current tab's 2px `accent` underline (`tabClass`) paints over it. Settings passes `sideTabs`: from `lg` its tabs become a 220px column beside the content, which is capped at `max-w-3xl`; below `lg` they are the usual row.
 - On phones and tablets (and in the mobile app), quiz results use Quick look: a large score beside the cover fan, expandable answer rows, Your answers / Leaderboard tabs, and one challenge action below the selected panel. Desktop keeps full answer comparisons and the sharing/leaderboard column.
-- The shared library body uses the owner's width. The Style tab keeps the shared frame while dragging "Content width". Profiles and the Reader card keep narrower content columns inside the full-width body. The mural canvas stays 1152px inside the full-width body.
+- The shared library body uses the owner's width. The Style tab keeps the default frame while dragging "Content width". The mural canvas stays 1152px.
 - Reader card editor previews keep the same card width for Flip, Book and One back. Book pages browse individually in the editor; the full viewer can open a two-page spread.
-- One accent button per view: `BUTTON_PRIMARY` for it, `BUTTON_SECONDARY` for the rest.
-- Library keeps Add a book and a More actions menu visible at every width. Sync, import, CSV template, selection, styling and sharing live in that menu.
+- One accent button per view: `BUTTON_PRIMARY` for it, `BUTTON_SECONDARY` for the rest. `BUTTON_DANGER` and `BUTTON_DANGER_OUTLINE` for destructive actions, `chipClass(selected)` for filter pills; all in `components/page/buttonClasses.ts`.
+- Library keeps Add a book and a More actions menu visible at every width. Sync, import, CSV template, selection, styling and sharing live in that menu. Its toolbar (`ToolbarRow`) sticks under the top bar, and its search is the shared `SearchField`.
 - Every control is at least 44px. Checkboxes, radios and ranges use `CHECKBOX_CLASS`, `RADIO_CLASS` and `RANGE_CLASS`; `OptionsMenu`'s default trigger is 44px, and a row with several actions folds them into one menu.
+- Fields use `FIELD_CLASS` (`surface`, `border`, `radius-md`, 16px text, 44px; `accent` border on focus, `danger` when `aria-invalid`); a title that is edited in place uses `TITLE_FIELD_CLASS`, which inherits the heading's size.
+- Panels, not shadows, group content (`components/page/surfaceClasses.ts`): `PANEL` is `surface` + `border` at `radius-lg` (12px, `rounded-xl`); `LIST_PANEL` is a `PANEL` of rows divided by hairlines, each row a `LIST_ROW` (44px, 16px padding) or a `LIST_ROW_LINK` (hover `surface-hover`, focus ring drawn inside the row so the panel doesn't clip it); `CARD` is the `radius-xl` (16px, `rounded-2xl`) variant for tiles. Section headings are `SECTION_HEADING` (`font-display` 24px bold) and, inside a panel or setting group, `PANEL_HEADING` (text font, 16px bold). Settings pages are `SettingGroup`s of `SettingRow`s: label, optional description and leading element on the left, controls wrapping at the right.
+- Book covers are `BookCover` (`components/book/BookCover.tsx`): 2:3, a flat left edge (`2px 5px 5px 2px` corners) with a 6% spine highlight, `shadow-cover`, and a 3px lift on hover inside a `group`. `BookCard` keeps the user's `cardRadius` instead.
 
 ## Motion
 
@@ -108,7 +115,7 @@ Web keyframes 130–200ms on `cubic-bezier(0.32, 0.72, 0, 1)` for dialogs/sheets
 
 ## Brand lockup
 
-One lockup wherever the product names itself: the brand mark at 28px (`components/BrandMark.tsx`, drawn in the active theme's treatment) beside "Atmyshelf" in the system stack, 18px bold (`components/BrandLockup.tsx`). Used by the app sidebar and mobile drawer, the landing nav and footer, and every sign-in screen, where it links to `/`.
+One lockup wherever the product names itself: the brand mark at 28px (`components/BrandMark.tsx`, drawn in the active theme's treatment) beside "Atmyshelf" in the system stack, 18px bold (`components/BrandLockup.tsx`). Used by the top bar and mobile drawer, the landing nav and footer, and every sign-in screen, where it links to `/`.
 
 The name stays live system-stack text, not Playfair: the lockup is interface chrome, and Playfair's single 400 weight reads thin at 18px beside the 28px mark. The stacked lockup (`logo.png`) sets the name in Playfair Display because an image can't carry the system stack; use it only where the product isn't drawing its own UI (store listings, press, a README).
 
@@ -155,8 +162,9 @@ Full guidelines, states and prop shapes live in the artifact's per-component REA
 
 ### Page frame (web)
 
-- **Page** (`components/page/Page.tsx`) — every page renders inside it: an 80px minimum-height title band (`surface`, bottom `border`) holding an optional back link and the `font-display` title (`text-2xl sm:text-3xl`, wraps). The body (`px-4 py-5 sm:px-5 sm:py-8 lg:px-8`) holds the subtitle, right-aligned actions, optional tab row and content. The title band uses `PageWidthContext`; `maxWidth` overrides only the body's width. Back links and tab links are 44px high.
-- **SidebarNav** (`components/page/SidebarNav.tsx`) — the area list shared by the sidebar and the mobile drawer: 44px rows, icon + label, `accent-soft` / `accent` when active, optional description and Home badge.
+- **Page** (`components/page/Page.tsx`) — every page renders inside it: gutters outside a width of `wide` / `default` / `narrow` (`PAGE_WIDTHS`; `maxWidth` overrides it for the owner's width on library pages), a header without a band (back link, `font-display` title row with right-aligned actions, subtitle, tabs) and the content below it. `sideTabs` turns the tabs into a side column from `lg` (Settings). See the page rules under Layout.
+- **TopBar** (`components/page/TopBar.tsx`) with **AccountMenu** (`components/page/AccountMenu.tsx`) — the sticky top navigation from `lg`; see The frame.
+- **SidebarNav** (`components/page/SidebarNav.tsx`) — the area list in the mobile More drawer: 44px rows, icon + label, `accent-soft` / `accent` when active, optional description and Home badge.
 - **Sheet** (`components/Sheet.tsx`) — the shared dialog; takes a `footer` pinned under the scrolling body, right-aligned, for the dialog's actions.
 
 ### Forms (web)

@@ -19,6 +19,7 @@ import { DraggableTierTile, MiniBookTile } from "../murals/blocks/BookBlocks";
 import { OptionsMenu } from "../OptionsMenu";
 import { ChevronDownIcon, ChevronUpIcon, toolbarIconClass } from "../Toolbar";
 import { createTier } from "../../lib/murals";
+import { BUTTON_SECONDARY, FIELD_CLASS } from "../page/buttonClasses";
 import { TierColorPicker } from "./TierColorPicker";
 import { TierRowEmpty, TierRowShell, TierRowTiles } from "./TierRowShell";
 
@@ -112,7 +113,7 @@ function TierEditorRow({
             }}
             placeholder="Label"
             aria-label="Tier label"
-            className="min-h-11 min-w-0 flex-1 rounded-lg border border-(--color-border) bg-(--color-surface) px-2.5 text-sm font-semibold"
+            className={`${FIELD_CLASS} min-w-0 flex-1 font-semibold`}
           />
           {/* Up/down stay as direct buttons — reordering tiers is the
               frequent action. Delete goes behind the ⋮ menu: rare, and
@@ -396,7 +397,7 @@ export function TierBoard({ data, books, onChange, structureEditable, poolLabel,
           {structureEditable && onAddBooks && (
             <button
               onClick={onAddBooks}
-              className="min-h-11 shrink-0 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm font-semibold hover:bg-(--color-surface-hover)"
+              className={`${BUTTON_SECONDARY} shrink-0`}
             >
               Add books
             </button>

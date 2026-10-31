@@ -3,7 +3,7 @@ import { DeleteAccountSection } from "../auth/DeleteAccountSection";
 import { useRef, useState } from "react";
 import { useAuth } from "../auth/AuthContext";
 import { Avatar } from "../components/Avatar";
-import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../components/page/buttonClasses";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY, FIELD_CLASS } from "../components/page/buttonClasses";
 import { Page, SettingGroup, SettingRow } from "../components/page/Page";
 import { LIST_PANEL } from "../components/page/surfaceClasses";
 import { SocialsSection } from "../components/SocialsSection";
@@ -129,7 +129,7 @@ export function SettingsPage() {
                     maxLength={30}
                     pattern="[a-zA-Z0-9_.]+"
                     title="Letters, numbers, underscores, and periods only."
-                    className="min-h-11 w-full min-w-0 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-sm sm:w-48"
+                    className={`${FIELD_CLASS} w-full min-w-0 sm:w-48`}
                   />
                   <button type="submit" disabled={submitting} className={BUTTON_PRIMARY}>
                     Save
