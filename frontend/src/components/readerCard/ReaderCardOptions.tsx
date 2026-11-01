@@ -5,6 +5,7 @@ import { PANEL_HEADING } from "../page/surfaceClasses";
 import { DraftField } from "./DraftField";
 import { ReaderCardImage } from "./ReaderCardImage";
 import type { SaveStyle } from "./ReaderCardChoices";
+import { useT } from "../../i18n";
 
 export function Segmented<T extends string>({ label, options, labels, value, onChange }: { label: string; options: readonly T[]; labels: Record<T, string>; value: T; onChange: (value: T) => void }) {
   return (
@@ -15,7 +16,7 @@ export function Segmented<T extends string>({ label, options, labels, value, onC
           type="button"
           aria-pressed={value === option}
           onClick={() => onChange(option)}
-          className={`flex min-h-11 flex-1 items-center justify-center px-3 text-sm font-semibold ${i > 0 ? "border-l border-(--color-border)" : ""} ${value === option ? "bg-(--color-accent-soft) text-(--color-accent)" : "text-(--color-text-dim) hover:bg-(--color-surface-hover)"}`}
+          className={`flex min-h-11 flex-1 items-center justify-center px-2 text-center text-sm font-semibold ${i > 0 ? "border-l border-(--color-border)" : ""} ${value === option ? "bg-(--color-accent-soft) text-(--color-accent)" : "text-(--color-text-dim) hover:bg-(--color-surface-hover)"}`}
         >
           {labels[option]}
         </button>
@@ -55,6 +56,7 @@ function Chips<T extends string>({ label, options, labels, value, onPick }: { la
 export function ReaderCardOptions({ input, scheme, onChange }: { input: ReaderCardBase; scheme: ThemeScheme; onChange: SaveStyle }) {
   const { counter, trait, layout, motto, footer, corners, finish, print } = input.style;
   const { locale } = input;
+  const t = useT();
   const [look, setLook] = useState<MottoLook>(motto?.look ?? "ribbon");
   const lastText = useRef(motto?.text ?? null);
   const deferred = useDeferredValue(input);
@@ -81,8 +83,8 @@ export function ReaderCardOptions({ input, scheme, onChange }: { input: ReaderCa
   return (
     <>
       <section>
-        <h3 className={`${PANEL_HEADING} mb-2`}>Counter</h3>
-        <div role="radiogroup" aria-label="Counter" className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+        <h3 className={`${PANEL_HEADING} mb-2`}>{t("readerCard.counter")}</h3>
+        <div role="radiogroup" aria-label={t("readerCard.counter")} className="grid grid-cols-3 gap-2 sm:grid-cols-5">
           {counterThumbs.map(({ option, input: thumbnail }) => (
             <button key={option} type="button" role="radio" aria-checked={counter === option} onClick={() => void onChange({ counter: option })} className={TILE(counter === option)}>
               <span aria-hidden="true" className="block w-full"><ReaderCardImage input={thumbnail} className="w-full" /></span>
@@ -92,38 +94,38 @@ export function ReaderCardOptions({ input, scheme, onChange }: { input: ReaderCa
         </div>
       </section>
       <section>
-        <h3 className={`${PANEL_HEADING} mb-2`}>Second trait</h3>
-        <Segmented label="Second trait" options={TRAITS} labels={traitLabels(locale)} value={trait} onChange={(next) => void onChange({ trait: next })} />
+        <h3 className={`${PANEL_HEADING} mb-2`}>{t("readerCard.secondTrait")}</h3>
+        <Segmented label={t("readerCard.secondTrait")} options={TRAITS} labels={traitLabels(locale)} value={trait} onChange={(next) => void onChange({ trait: next })} />
       </section>
       <section>
-        <h3 className={`${PANEL_HEADING} mb-2`}>Motto</h3>
-        <DraftField label="Your motto" initial={motto?.text ?? null} max={MOTTO_MAX} onSave={saveMotto} />
+        <h3 className={`${PANEL_HEADING} mb-2`}>{t("readerCard.motto")}</h3>
+        <DraftField label={t("readerCard.mottoField")} initial={motto?.text ?? null} max={MOTTO_MAX} onSave={saveMotto} />
         <div className="mt-3">
-          <Thumbnails label="Motto look" options={MOTTO_LOOKS} labels={mottoLookLabels(locale)} value={motto?.look ?? look} thumbnail={(option) => mottoThumbs.get(option)!} onPick={pickLook} columns="grid-cols-3 sm:grid-cols-4" />
+          <Thumbnails label={t("readerCard.mottoLook")} options={MOTTO_LOOKS} labels={mottoLookLabels(locale)} value={motto?.look ?? look} thumbnail={(option) => mottoThumbs.get(option)!} onPick={pickLook} columns="grid-cols-3 sm:grid-cols-4" />
         </div>
       </section>
       <section>
-        <h3 className={`${PANEL_HEADING} mb-2`}>Footer</h3>
-        <p className="mb-1 text-xs text-(--color-text-dim)">Left</p>
-        <Chips label="Footer left" options={FOOTER_LEFTS} labels={footerLeftLabels(locale)} value={footer.left} onPick={(left) => void onChange({ footer: { ...footer, left } })} />
-        <p className="mb-1 mt-3 text-xs text-(--color-text-dim)">Right</p>
-        <Chips label="Footer right" options={FOOTER_RIGHTS} labels={footerRightLabels(locale)} value={footer.right} onPick={(right) => void onChange({ footer: { ...footer, right } })} />
+        <h3 className={`${PANEL_HEADING} mb-2`}>{t("readerCard.footer")}</h3>
+        <p className="mb-1 text-xs text-(--color-text-dim)">{t("readerCard.footerLeftHint")}</p>
+        <Chips label={t("readerCard.footerLeft")} options={FOOTER_LEFTS} labels={footerLeftLabels(locale)} value={footer.left} onPick={(left) => void onChange({ footer: { ...footer, left } })} />
+        <p className="mb-1 mt-3 text-xs text-(--color-text-dim)">{t("readerCard.footerRightHint")}</p>
+        <Chips label={t("readerCard.footerRight")} options={FOOTER_RIGHTS} labels={footerRightLabels(locale)} value={footer.right} onPick={(right) => void onChange({ footer: { ...footer, right } })} />
       </section>
       <section>
-        <h3 className={`${PANEL_HEADING} mb-2`}>Corners</h3>
-        <Thumbnails label="Corners" options={CORNER_STYLES} labels={cornerLabels(locale)} value={corners} thumbnail={(option) => cornerThumbs.get(option)!} onPick={(next) => void onChange({ corners: next })} columns="grid-cols-4 sm:grid-cols-6" />
+        <h3 className={`${PANEL_HEADING} mb-2`}>{t("readerCard.corners")}</h3>
+        <Thumbnails label={t("readerCard.corners")} options={CORNER_STYLES} labels={cornerLabels(locale)} value={corners} thumbnail={(option) => cornerThumbs.get(option)!} onPick={(next) => void onChange({ corners: next })} columns="grid-cols-4 sm:grid-cols-6" />
       </section>
       <section>
-        <h3 className={`${PANEL_HEADING} mb-2`}>Finish</h3>
-        <Chips label="Finish" options={FINISHES} labels={finishLabels(locale)} value={finish} onPick={(next) => void onChange({ finish: next })} />
+        <h3 className={`${PANEL_HEADING} mb-2`}>{t("readerCard.finish")}</h3>
+        <Chips label={t("readerCard.finish")} options={FINISHES} labels={finishLabels(locale)} value={finish} onPick={(next) => void onChange({ finish: next })} />
       </section>
       <section>
-        <h3 className={`${PANEL_HEADING} mb-2`}>Print</h3>
-        <Segmented label="Print" options={CARD_PRINTS} labels={printLabels(locale)} value={print} onChange={(next) => void onChange({ print: next })} />
+        <h3 className={`${PANEL_HEADING} mb-2`}>{t("readerCard.print")}</h3>
+        <Segmented label={t("readerCard.print")} options={CARD_PRINTS} labels={printLabels(locale)} value={print} onChange={(next) => void onChange({ print: next })} />
       </section>
       <section>
-        <h3 className={`${PANEL_HEADING} mb-2`}>Layout</h3>
-        <Segmented label="Layout" options={LAYOUTS} labels={layoutLabels(locale)} value={layout} onChange={(next) => void onChange({ layout: next })} />
+        <h3 className={`${PANEL_HEADING} mb-2`}>{t("readerCard.layout")}</h3>
+        <Segmented label={t("readerCard.layout")} options={LAYOUTS} labels={layoutLabels(locale)} value={layout} onChange={(next) => void onChange({ layout: next })} />
       </section>
     </>
   );

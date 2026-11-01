@@ -3,6 +3,7 @@ import { hasChosen, type ReaderCardBase } from "@scripta/shared";
 import { useDismissible } from "../../hooks/useDismissible";
 import { useScrollLock } from "../../hooks/useScrollLock";
 import { keepTabInside } from "../../lib/keepTabInside";
+import { useT } from "../../i18n";
 import { ReaderCardTurner } from "./ReaderCardTurner";
 
 const CARD_WIDTH = "w-[min(88vw,calc((100dvh-10rem)*5/7))]";
@@ -10,6 +11,7 @@ const SPREAD_WIDTH = "w-[min(92vw,calc((100dvh-10rem)*10/7))]";
 const PILL = "h-11 rounded-full bg-(--color-surface) px-4 text-(--color-text)";
 
 export function ReaderCardViewer({ input, onClose, onEdit }: { input: ReaderCardBase; onClose: () => void; onEdit?: () => void }) {
+  const t = useT();
   useScrollLock();
   useDismissible(onClose);
   const [previous] = useState(() => (typeof document === "undefined" ? null : document.activeElement));
@@ -19,10 +21,10 @@ export function ReaderCardViewer({ input, onClose, onEdit }: { input: ReaderCard
 
   return (
     <div className="overlay-in fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
-      <div role="dialog" aria-modal="true" aria-label="Reader card" className="flex flex-col items-center gap-3" onClick={(event) => event.stopPropagation()} onKeyDown={keepTabInside}>
+      <div role="dialog" aria-modal="true" aria-label={t("readerCard.title")} className="flex flex-col items-center gap-3" onClick={(event) => event.stopPropagation()} onKeyDown={keepTabInside}>
         <div className="flex gap-2 self-end">
-          {onEdit && input.view === "owner" ? <button type="button" onClick={onEdit} className={PILL}>Edit card</button> : null}
-          <button type="button" onClick={onClose} className={PILL}>Close</button>
+          {onEdit && input.view === "owner" ? <button type="button" onClick={onEdit} className={PILL}>{t("readerCard.editCard")}</button> : null}
+          <button type="button" onClick={onClose} className={PILL}>{t("shell.close")}</button>
         </div>
         <ReaderCardTurner key={`${input.view}-${input.style.layout}-${hasChosen(input.card.chosen)}`} input={input} cardWidth={CARD_WIDTH} spreadWidth={SPREAD_WIDTH} onScrim autoFocus />
       </div>

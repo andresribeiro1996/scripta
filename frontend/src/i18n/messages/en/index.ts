@@ -8,9 +8,10 @@ import { library } from "./library";
 import { muralEditor } from "./muralEditor";
 import { murals } from "./murals";
 import { quizzes } from "./quizzes";
+import { readerCard } from "./readerCard";
 import { settings } from "./settings";
 import { shell } from "./shell";
 import { tierlists } from "./tierlists";
 
-export const en = { ...addBook, ...arena, ...book, ...community, ...errors, ...library, ...muralEditor, ...murals, ...quizzes, ...settings, ...shell, ...tierlists } satisfies Messages;
+export const en = { ...addBook, ...arena, ...book, ...community, ...errors, ...library, ...muralEditor, ...murals, ...quizzes, ...readerCard, ...settings, ...shell, ...tierlists } satisfies Messages;
 export type WebMessages = typeof en;
