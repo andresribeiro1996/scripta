@@ -858,6 +858,7 @@ Everything in `features/library/` except `components/AddBookForm.tsx` and `compo
 - Modify: `mobile/src/i18n/messages/pt-PT/index.ts`
 - Modify: `mobile/src/features/library/components/AddBookForm.tsx`
 - Modify: `mobile/src/features/library/components/GenreChoices.tsx`
+- Modify: `mobile/src/features/library/lib/addBookDraft.ts`
 - Modify: `mobile/src/features/import/`
 - Modify: `mobile/src/features/gallery/`
 - Modify: `mobile/src/app/gallery.tsx`
